@@ -454,7 +454,7 @@ pub(super) fn write_type_parameter_instantiation(
 }
 
 /// Emit a `TSTypeElement` (property/method/call/construct/index signature).
-fn write_type_element(w: &mut JsonWriter, elem: &ast::TSTypeElement<'_>, ctx: &Ctx<'_>) {
+fn write_type_element(w: &mut JsonWriter, elem: &ast::TSTypeElement, ctx: &Ctx<'_>) {
     match elem {
         ast::TSTypeElement::PropertySignature(p) => {
             // Field order: `readonly` (only when true), `computed?`, `key`,
@@ -554,7 +554,7 @@ fn write_signature_declaration(
     w: &mut JsonWriter,
     node_type: &'static str,
     span: tsv_lang::Span,
-    type_parameters: Option<&ast::TSTypeParameterDeclaration<'_>>,
+    type_parameters: Option<&ast::TSTypeParameterDeclaration>,
     params: &[ast::Expression<'_>],
     return_type: Option<&ast::TSTypeAnnotation>,
     ctx: &Ctx<'_>,
@@ -572,7 +572,7 @@ fn write_signature_declaration(
 /// true), `parameters`, `typeAnnotation`, `decorators` (a class member's, only when present).
 pub(super) fn write_index_signature(
     w: &mut JsonWriter,
-    sig: &ast::TSIndexSignature<'_>,
+    sig: &ast::TSIndexSignature,
     ctx: &Ctx<'_>,
 ) {
     node_header(w, "TSIndexSignature", sig.span, ctx);

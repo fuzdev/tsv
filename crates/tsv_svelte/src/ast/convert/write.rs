@@ -1351,7 +1351,7 @@ fn write_const_declaration(
 /// `VariableDeclaration` tree (every declarator and its id/init) per acorn's
 /// recursive attachment — attaching only to the first init left a comment leading
 /// a later declarator (`{let a = 1, /* c */ b}`) unattached.
-fn write_declaration_tag(w: &mut JsonWriter, tag: &ast::DeclarationTag<'_>, ctx: &Ctx<'_>) {
+fn write_declaration_tag(w: &mut JsonWriter, tag: &ast::DeclarationTag, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"DeclarationTag\",\"start\":");
     w.span_start_end(ctx.positions, tag.span.start, tag.span.end);
     w.raw(",\"declaration\":");
@@ -1782,7 +1782,7 @@ fn json_comma(w: &mut JsonWriter, first: &mut bool) {
 /// positions.
 fn write_custom_element_props(
     w: &mut JsonWriter,
-    props_obj: &tsv_ts::ast::ObjectExpression<'_>,
+    props_obj: &tsv_ts::ast::ObjectExpression,
     ctx: &Ctx<'_>,
 ) {
     use tsv_ts::ast::{Expression, ExpressionKind, LiteralValue, ObjectProperty};

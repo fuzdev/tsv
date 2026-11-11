@@ -97,7 +97,7 @@ pub fn write_expression_embedded(
 #[inline]
 pub fn write_variable_declaration_embedded(
     w: &mut JsonWriter,
-    var_decl: &ast::VariableDeclaration<'_>,
+    var_decl: &ast::VariableDeclaration,
     env: EmbedWriter<'_>,
 ) {
     let ctx = Ctx::from_embed(env);
@@ -629,7 +629,7 @@ fn position_fields<const CHARACTER: bool>(run: &mut StageRun<'_>, span: Span, ct
 #[inline]
 pub(super) fn write_type_parameters_field(
     w: &mut JsonWriter,
-    type_parameters: Option<&ast::TSTypeParameterDeclaration<'_>>,
+    type_parameters: Option<&ast::TSTypeParameterDeclaration>,
     ctx: &Ctx<'_>,
 ) {
     if let Some(tp) = type_parameters {

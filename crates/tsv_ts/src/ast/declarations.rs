@@ -6,18 +6,18 @@
 use tsv_lang::Span;
 
 use super::{
-    AstView, EnumMemList, Expr, ExprId, HeritageList, Identifier, Literal, ModuleDeclId, Run,
-    StmtId, TSEntityName, TSTypeAnnotation, TSTypeParameterDeclaration,
-    TSTypeParameterInstantiation, TypeMemberList,
+    AstView, EnumMem, Expr, ExprId, Heritage, Identifier, Literal, ModuleDeclId, Run, StmtId,
+    TSEntityName, TSTypeAnnotation, TSTypeParameterDeclaration, TSTypeParameterInstantiation,
+    TypeMember,
 };
 
 /// Interface declaration: `interface Foo { ... }` or `interface Foo extends Bar { ... }`
 #[derive(Debug, Clone)]
 pub struct TSInterfaceDeclaration<'arena> {
     pub id: Identifier<'arena>,
-    pub type_parameters: Option<TSTypeParameterDeclaration<'arena>>,
-    pub extends: HeritageList<'arena>,
-    pub body: TSInterfaceBody<'arena>,
+    pub type_parameters: Option<TSTypeParameterDeclaration>,
+    pub extends: Run<Heritage>,
+    pub body: TSInterfaceBody,
     pub declare: bool,
     pub span: Span,
 }
@@ -32,8 +32,8 @@ pub struct TSInterfaceHeritage<'arena> {
 
 /// Interface body: `{ members }`
 #[derive(Debug, Clone)]
-pub struct TSInterfaceBody<'arena> {
-    pub body: TypeMemberList<'arena>,
+pub struct TSInterfaceBody {
+    pub body: Run<TypeMember>,
     pub span: Span,
 }
 
@@ -44,7 +44,7 @@ pub struct TSInterfaceBody<'arena> {
 #[derive(Debug, Clone)]
 pub struct TSDeclareFunction<'arena> {
     pub id: Identifier<'arena>,
-    pub type_parameters: Option<TSTypeParameterDeclaration<'arena>>,
+    pub type_parameters: Option<TSTypeParameterDeclaration>,
     pub params: Run<Expr>,
     pub return_type: Option<TSTypeAnnotation>,
     /// Whether to print the `declare` keyword.
@@ -69,7 +69,7 @@ pub struct TSEnumDeclaration<'arena> {
     /// Enum name
     pub id: Identifier<'arena>,
     /// Enum members
-    pub members: EnumMemList<'arena>,
+    pub members: Run<EnumMem>,
     /// Whether this is a const enum
     pub r#const: bool,
     /// Whether this is an ambient declaration (declare enum)

@@ -1,6 +1,6 @@
-//! The stores a parse's expressions, statements, types and payloads live in, beside the arena
-//! that holds the tree's by-value lists and decoded strings, and the per-thread parking of
-//! their capacity.
+//! The stores a parse's expressions, statements, types, payloads and by-value list elements
+//! live in, beside the arena that holds the tree's decoded strings and comments, and the
+//! per-thread parking of their capacity.
 //!
 //! Beside the three families, [`PayloadStores`] holds one store per payload too rare to sit
 //! inline in the node that refers to it: the function, class and declaration payloads, the
@@ -29,7 +29,7 @@ use std::cell::Cell;
 use std::fmt;
 use std::ops::Deref;
 
-use tsv_lang::store::{Id, ListBuf, ListMark, MarkGroup, Row, Store};
+use tsv_lang::store::{Id, ListBuf, ListMark, MarkGroup, Row, Run, Store};
 
 use super::{
     ArrowFunctionExpression, AstView, CatchClause, ClassDeclaration, ClassExpression, ClassMember,
@@ -171,13 +171,13 @@ macro_rules! payload_stores {
 
 payload_stores! {
     /// Arrow functions, `() => …`: [`ArrowFunctionExpression`] rows.
-    arrow_fns: ArrowFunctionExpression<'arena> => ArrowFn, ArrowFnId, arrow_fn;
+    arrow_fns: ArrowFunctionExpression => ArrowFn, ArrowFnId, arrow_fn;
     /// Function expressions, `function () {}`: [`FunctionExpression`] rows.
     fn_exprs: FunctionExpression<'arena> => FnExpr, FnExprId, fn_expr;
     /// Class expressions, `class {}`: [`ClassExpression`] rows.
     class_exprs: ClassExpression<'arena> => ClassExpr, ClassExprId, class_expr;
     /// Tagged templates, ``tag`…` ``: [`TaggedTemplateExpression`] rows.
-    tagged_tpls: TaggedTemplateExpression<'arena>
+    tagged_tpls: TaggedTemplateExpression
         => TaggedTpl, TaggedTplId, tagged_tpl;
     /// Meta properties, `import.meta` and `new.target`: [`MetaProperty`] rows.
     meta_props: MetaProperty<'arena> => MetaProp, MetaPropId, meta_prop;
@@ -216,7 +216,7 @@ payload_stores! {
     import_equals: TSImportEqualsDeclaration<'arena>
         => ImportEquals, ImportEqualsId, import_equals;
     /// Constructor types, `new () => T`: [`TSConstructorType`] rows.
-    ctor_types: TSConstructorType<'arena> => CtorType, CtorTypeId, ctor_type;
+    ctor_types: TSConstructorType => CtorType, CtorTypeId, ctor_type;
     /// Import types, `import('m')`: [`TSImportType`] rows.
     import_types: TSImportType<'arena> => ImportType, ImportTypeId, import_type;
     /// Inferred types, `infer T`: [`TSInferType`] rows.
@@ -224,27 +224,26 @@ payload_stores! {
     /// Qualified names, `A.B`: [`TSQualifiedName`] rows.
     qual_names: TSQualifiedName<'arena> => QualName, QualNameId, qual_name;
     /// The head of a `for (…; …; …)` statement: [`ForInit`] rows.
-    for_heads: ForInit<'arena> => ForHead, ForHeadId, for_head;
+    for_heads: ForInit => ForHead, ForHeadId, for_head;
     /// The left side of a `for … in` or `for … of`: [`ForInOfLeft`] rows.
-    for_lefts: ForInOfLeft<'arena> => ForLeft, ForLeftId, for_left;
+    for_lefts: ForInOfLeft => ForLeft, ForLeftId, for_left;
     /// Catch clauses, `catch (e) {}`: [`CatchClause`] rows.
     catches: CatchClause<'arena> => Catch, CatchId, catch;
     /// A parameter name's type annotation and decorators: [`IdentifierParamExtra`] rows.
-    param_extras: IdentifierParamExtra<'arena>
+    param_extras: IdentifierParamExtra
         => ParamExtra, ParamExtraId, param_extra;
 }
 
-/// Declares the value-run stores. Per entry: the element type's family tag, the list alias the
-/// tree holds, a [`RunStores`] store and the scratch stack that builds its lists, their lines in
-/// `new` and `park`, the scratch's mark in [`RunMarks`], and the [`AstView`] accessor that reads
-/// one list. The entry's doc comment documents the store and the tag.
-// TODO: each list alias becomes a run of its tag, and its accessor the store's slice.
+/// Declares the value-run stores. Per entry: the element type's family tag, whose [`Run`] is
+/// the list the tree holds, a [`RunStores`] store and the scratch stack that builds its lists,
+/// their lines in `new` and `park`, the scratch's mark in [`RunMarks`], and the [`AstView`]
+/// accessor that reads one list. The entry's doc comment documents the store and the tag.
 macro_rules! value_runs {
     (
         $(
             $(#[$m:meta])*
             $field:ident, $scratch:ident : $Row:ident $(<$lt:lifetime>)?
-                => $Tag:ident, $List:ident, $acc:ident;
+                => $Tag:ident, $acc:ident;
         )*
     ) => {
         $(
@@ -256,12 +255,6 @@ macro_rules! value_runs {
             impl<$($lt)?> Row for $Row$(<$lt>)? {
                 type Family = $Tag;
             }
-
-            #[doc = concat!(
-                "One list of [`", stringify!($Row), "`] held in the tree, read through [`AstView::",
-                stringify!($acc), "`]."
-            )]
-            pub type $List<'arena> = &'arena [$Row$(<$lt>)?];
         )*
 
         /// The stores of the elements of the lists built by value, one per element type, and
@@ -327,13 +320,12 @@ macro_rules! value_runs {
         impl<'arena> AstView<'arena> {
             $(
                 #[doc = concat!(
-                    "The [`", stringify!($Row), "`] rows of `list`: once lists are runs, the run's ",
-                    "rows in the [`", stringify!($Tag), "`] store, a miss ending in the store's ",
-                    "shared cold path."
+                    "The [`", stringify!($Row), "`] rows of `run`, one range check for the whole ",
+                    "run. A miss ends in the store's shared cold path."
                 )]
                 #[inline]
-                pub fn $acc(self, list: $List<'arena>) -> &'arena [$Row$(<$lt>)?] {
-                    list
+                pub fn $acc(self, run: Run<$Tag>) -> &'arena [$Row$(<$lt>)?] {
+                    self.runs().$field.slice(run)
                 }
             )*
         }
@@ -346,64 +338,56 @@ macro_rules! value_runs {
 
 value_runs! {
     /// Object literal members, `{ a: 1, ...b }`: [`ObjectProperty`] rows.
-    // TODO: unread until `ObjectExpression.properties` is a run.
-    obj_props, obj_prop_scratch: ObjectProperty => ObjProp, ObjPropList, obj_props;
+    obj_props, obj_prop_scratch: ObjectProperty => ObjProp, obj_props;
     /// Object pattern members, `{ a: b, ...c } = d`: [`ObjectPatternProperty`] rows.
-    // TODO: unread until `ObjectPattern.properties` is a run.
-    pat_props, pat_prop_scratch: ObjectPatternProperty => PatProp, PatPropList, pat_props;
+    pat_props, pat_prop_scratch: ObjectPatternProperty => PatProp, pat_props;
     /// The text pieces of a template, ``a${b}c``: [`TemplateElement`] rows.
-    // TODO: unread until `TemplateLiteral.quasis` and `TemplateLiteralType.quasis` are runs.
-    quasis, quasi_scratch: TemplateElement<'arena> => Quasi, QuasiList, quasis;
+    quasis, quasi_scratch: TemplateElement<'arena> => Quasi, quasis;
     /// Declarators, the `a = 1` of `let a = 1`: [`VariableDeclarator`] rows.
-    // TODO: unread until `VariableDeclaration.declarations` is a run.
-    declarators, declarator_scratch: VariableDeclarator => Declarator, DeclaratorList, declarators;
+    declarators, declarator_scratch: VariableDeclarator => Declarator, declarators;
     /// The `case` and `default` clauses of a `switch`: [`SwitchCase`] rows.
-    // TODO: unread until `SwitchStatement.cases` is a run.
-    cases, case_scratch: SwitchCase => Case, CaseList, cases;
+    cases, case_scratch: SwitchCase => Case, cases;
     /// Import specifiers, the `a` and `{ b }` of `import a, { b } from 'm'`: [`ImportSpecifier`]
     /// rows.
-    // TODO: unread until `ImportDeclaration.specifiers` is a run.
     import_specs, import_spec_scratch: ImportSpecifier<'arena>
-        => ImportSpec, ImportSpecList, import_specs;
+        => ImportSpec, import_specs;
     /// Export specifiers, the `a` of `export { a }`: [`ExportSpecifier`] rows.
-    // TODO: unread until `ExportNamedDeclaration.specifiers` is a run.
     export_specs, export_spec_scratch: ExportSpecifier<'arena>
-        => ExportSpec, ExportSpecList, export_specs;
+        => ExportSpec, export_specs;
     /// Import attributes, the `type: 'json'` of `with { type: 'json' }`: [`ImportAttribute`] rows.
-    // TODO: unread until the `attributes` of `ImportDeclaration`, `ExportNamedDeclaration` and
-    // `ExportAllDeclaration` are runs.
     import_attrs, import_attr_scratch: ImportAttribute<'arena>
-        => ImportAttr, ImportAttrList, import_attrs;
+        => ImportAttr, import_attrs;
     /// Class members, the `m() {}` of `class C { m() {} }`: [`ClassMember`] rows.
-    // TODO: unread until `ClassBody.body` is a run.
     class_members, class_member_scratch: ClassMember<'arena>
-        => ClassMem, ClassMemList, class_members;
+        => ClassMem, class_members;
     /// Type members, the `a: T` of `{ a: T }` and of an interface body: [`TSTypeElement`] rows.
-    // TODO: unread until `TSTypeLiteral.members` and `TSInterfaceBody.body` are runs.
-    type_members, type_member_scratch: TSTypeElement<'arena>
-        => TypeMember, TypeMemberList, type_members;
+    type_members, type_member_scratch: TSTypeElement
+        => TypeMember, type_members;
     /// Type parameters, the `T` of `<T>`: [`TSTypeParameter`] rows.
-    // TODO: unread until `TSTypeParameterDeclaration.params` is a run.
     type_params, type_param_scratch: TSTypeParameter<'arena>
-        => TypeParam, TypeParamList, type_params;
+        => TypeParam, type_params;
     /// Heritage clauses, the `B` of `extends B` on an interface and of `implements B` on a
     /// class: [`TSInterfaceHeritage`] rows.
-    // TODO: unread until `TSInterfaceDeclaration.extends` and the `implements` of
-    // `ClassDeclaration` and `ClassExpression` are runs.
     heritages, heritage_scratch: TSInterfaceHeritage<'arena>
-        => Heritage, HeritageList, heritages;
+        => Heritage, heritages;
     /// Enum members, the `A = 1` of `enum E { A = 1 }`: [`TSEnumMember`] rows.
-    // TODO: unread until `TSEnumDeclaration.members` is a run.
     enum_members, enum_member_scratch: TSEnumMember<'arena>
-        => EnumMem, EnumMemList, enum_members;
+        => EnumMem, enum_members;
     /// Index-signature parameters, the `k: string` of `[k: string]: T`: [`Identifier`] rows.
-    // TODO: unread until `TSIndexSignature.parameters` is a run.
     index_params, index_param_scratch: Identifier<'arena>
-        => IndexParam, IndexParamList, index_params;
+        => IndexParam, index_params;
     /// Decorators, `@d`: [`Decorator`] rows.
-    // TODO: unread until the `decorators` of every holder are runs.
-    decorators, decorator_scratch: Decorator => Deco, DecoList, decorators;
+    decorators, decorator_scratch: Decorator => Deco, decorators;
 }
+
+// Every value run is a `Run<F>`, which lays out alike for every family `F`, and an absent
+// list (the decorators', an import's attributes) folds into the run's start.
+#[cfg(test)]
+const _: () = {
+    use tsv_lang::store::STORE_CHECK;
+    assert!(STORE_CHECK || size_of::<Run<Deco>>() == 8);
+    assert!(STORE_CHECK || size_of::<Option<Run<Deco>>>() == 8);
+};
 
 // Every payload id is an `Id<F>`, which lays out alike for every family `F`.
 #[cfg(test)]
@@ -448,7 +432,7 @@ impl<'arena> AstStores<'arena> {
     /// for the crate's own read of a row it rebuilds while appending to the stores
     /// ([`crate::__private::attach_pattern_type_annotation`]).
     #[inline]
-    pub(crate) fn param_extra_row(&self, id: ParamExtraId) -> &IdentifierParamExtra<'arena> {
+    pub(crate) fn param_extra_row(&self, id: ParamExtraId) -> &IdentifierParamExtra {
         self.payloads.param_extras.get(id)
     }
 }

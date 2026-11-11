@@ -1060,7 +1060,7 @@ fn try_single_arg_hug(
 fn build_block_arrow_hug_states(
     printer: &Printer<'_>,
     callee: DocId,
-    arrow: &ast::ArrowFunctionExpression<'_>,
+    arrow: &ast::ArrowFunctionExpression,
     span: Span,
     arg: &ast::Expression<'_>,
 ) -> DocId {
@@ -1112,7 +1112,7 @@ fn build_ternary_arrow_hug_states(
     printer: &Printer<'_>,
     callee: DocId,
     arg: &ast::Expression<'_>,
-    arrow: &ast::ArrowFunctionExpression<'_>,
+    arrow: &ast::ArrowFunctionExpression,
     body_expr: &ast::Expression<'_>,
 ) -> DocId {
     let d = printer.d();

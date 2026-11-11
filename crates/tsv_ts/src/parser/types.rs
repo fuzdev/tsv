@@ -7,7 +7,7 @@
 
 use crate::ast::*;
 use crate::lexer::{KeywordKind, TokenKind};
-use crate::parser::push_row;
+use crate::parser::{flush_run, push_row};
 use tsv_lang::{Error, Span};
 
 use super::expression_lookahead::{generic_function_type_arrow_end, paren_starts_function_type};
@@ -1290,7 +1290,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.expect(&TokenKind::BraceClose)?;
 
         Ok(self.push_ty_ret(TSType::TypeLiteral(TSTypeLiteral {
-            members: members.into_bump_slice(),
+            members,
             span: Span::new(start as u32, end as u32),
         })))
     }
@@ -1689,9 +1689,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Parallel structure to `parse_template_literal()` in expression.rs but parses
     /// types inside ${} instead of expressions. Kept separate for clarity despite
     /// duplication - the two contexts (expression vs type) rarely change together.
-    fn parse_template_literal_type(&mut self) -> Result<TemplateLiteralType<'arena>, Error> {
+    fn parse_template_literal_type(&mut self) -> Result<TemplateLiteralType, Error> {
         let (start, _) = self.current_pos();
-        let mut quasis = self.bvec();
+        let quasi_mark = self.stores.runs.quasi_scratch.mark();
         let mark = self.stores.ty_list_scratch.mark();
 
         match self.current_kind() {
@@ -1703,10 +1703,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
                 self.advance()?;
 
-                quasis.push(element);
+                self.stores.runs.quasi_scratch.push(element);
 
                 Ok(TemplateLiteralType {
-                    quasis: quasis.into_bump_slice(),
+                    quasis: flush_run(
+                        &mut self.stores.runs.quasi_scratch,
+                        &mut self.stores.runs.quasis,
+                        quasi_mark,
+                    ),
                     types: self.flush_ty_list(mark),
                     span: Span::new(start as u32, elem_end as u32),
                 })
@@ -1719,7 +1723,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
                 self.advance()?;
 
-                quasis.push(element);
+                self.stores.runs.quasi_scratch.push(element);
 
                 // Parse types and remaining template parts; the interpolations are siblings
                 // (`ListFrame`)
@@ -1755,11 +1759,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
                             self.advance()?;
 
-                            quasis.push(element);
+                            self.stores.runs.quasi_scratch.push(element);
                             frame.close(self);
 
                             return Ok(TemplateLiteralType {
-                                quasis: quasis.into_bump_slice(),
+                                quasis: flush_run(
+                                    &mut self.stores.runs.quasi_scratch,
+                                    &mut self.stores.runs.quasis,
+                                    quasi_mark,
+                                ),
                                 types: self.flush_ty_list(mark),
                                 span: Span::new(start as u32, tail_end as u32),
                             });
@@ -1775,7 +1783,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
                             self.advance()?;
 
-                            quasis.push(element);
+                            self.stores.runs.quasi_scratch.push(element);
                             // Continue loop for next interpolation
                         }
                         _ => {
@@ -1795,7 +1803,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// method / construct signatures).
     pub(in crate::parser) fn parse_optional_type_parameters(
         &mut self,
-    ) -> Result<Option<TSTypeParameterDeclaration<'arena>>, Error> {
+    ) -> Result<Option<TSTypeParameterDeclaration>, Error> {
         if self.check(&TokenKind::LessThan) {
             Ok(Some(self.parse_type_parameters()?))
         } else {
@@ -1805,19 +1813,20 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     pub(in crate::parser) fn parse_type_parameters(
         &mut self,
-    ) -> Result<TSTypeParameterDeclaration<'arena>, Error> {
+    ) -> Result<TSTypeParameterDeclaration, Error> {
         let start = self.current_pos().0 as u32;
         self.expect(&TokenKind::LessThan)?;
 
-        let mut params = self.bvec();
+        let mark = self.stores.runs.type_param_scratch.mark();
         let mut trailing_comma = None;
         // the parameters are siblings (`ListFrame`)
         let mut frame = self.list_frame();
         loop {
-            frame.element(self, params.len());
+            let len = self.stores.runs.type_param_scratch.len_since(mark);
+            frame.element(self, len);
             // two wire levels: the `TSTypeParameterDeclaration` and the parameter
             let param = self.nested(2, Self::parse_type_parameter)?;
-            params.push(param);
+            self.stores.runs.type_param_scratch.push(param);
 
             if !self.eat(TokenKind::Comma)? {
                 break;
@@ -1831,9 +1840,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         frame.close(self);
 
         let end = self.greater_than_end_in_type()?;
+        let params = flush_run(
+            &mut self.stores.runs.type_param_scratch,
+            &mut self.stores.runs.type_params,
+            mark,
+        );
 
         Ok(TSTypeParameterDeclaration {
-            params: params.into_bump_slice(),
+            params,
             trailing_comma,
             span: Span::new(start, end),
         })

@@ -917,7 +917,7 @@ impl<'s, 'b> Walk<'s, 'b> {
         self.mark(block.span.end);
     }
 
-    fn variable_declaration(&mut self, decl: &VariableDeclaration<'_>) {
+    fn variable_declaration(&mut self, decl: &VariableDeclaration) {
         // a top-level `await using` (in a `for` head too) is module syntax, as a top-level
         // `await` is
         if decl.kind == VariableDeclarationKind::AwaitUsing && self.top_level_await() {
@@ -943,7 +943,7 @@ impl<'s, 'b> Walk<'s, 'b> {
         }
     }
 
-    fn for_left(&mut self, left: &ForInOfLeft<'_>) {
+    fn for_left(&mut self, left: &ForInOfLeft) {
         match left {
             ForInOfLeft::VariableDeclaration(decl) => self.variable_declaration(decl),
             ForInOfLeft::Pattern(pattern) => self.expr(self.view.expr(*pattern)),
@@ -1623,7 +1623,7 @@ impl<'s, 'b> Walk<'s, 'b> {
     // Functions and classes
     //
 
-    fn function(&mut self, func: FunctionView<'_, '_>) {
+    fn function(&mut self, func: FunctionView<'_>) {
         self.enter_function();
         if let Some(type_parameters) = func.type_parameters {
             let span = type_parameters.span;
@@ -1680,7 +1680,7 @@ impl<'s, 'b> Walk<'s, 'b> {
     /// A class: decorators stay, `abstract`, type parameters, superclass type arguments
     /// and `implements` blank, and the members take their own verdicts. `outer_start` is
     /// where the class's modifiers can start (an `export` included).
-    fn class(&mut self, class: ClassView<'_, '_>, outer_start: u32) {
+    fn class(&mut self, class: ClassView<'_>, outer_start: u32) {
         self.decorators(class.decorators);
         let modifiers_from = class
             .decorators
@@ -1710,7 +1710,7 @@ impl<'s, 'b> Walk<'s, 'b> {
         self.class_members(class.body);
     }
 
-    fn class_members(&mut self, body: &ClassBody<'_>) {
+    fn class_members(&mut self, body: &ClassBody) {
         let outer_end = self.statement_end;
         // open: the last member left standing is a field whose initializer has no `;`,
         // which a following `[`, `*`, `in` or `instanceof` would continue
@@ -1758,7 +1758,7 @@ impl<'s, 'b> Walk<'s, 'b> {
         }
     }
 
-    fn property_definition(&mut self, property: &PropertyDefinition<'_>, open_field: bool) -> bool {
+    fn property_definition(&mut self, property: &PropertyDefinition, open_field: bool) -> bool {
         let key = self.view.expr(property.key);
         // `declare x: T` and `abstract x: T` declare no runtime field
         if property.declare || property.r#abstract {
@@ -2039,8 +2039,8 @@ fn decorators_end(decorators: Option<&[Decorator]>, start: u32) -> u32 {
 }
 
 /// The parts of a function the walk reads, from any of its node shapes.
-struct FunctionView<'n, 'a> {
-    type_parameters: Option<&'n TSTypeParameterDeclaration<'a>>,
+struct FunctionView<'n> {
+    type_parameters: Option<&'n TSTypeParameterDeclaration>,
     params: &'n [Expression<'n>],
     /// The parameter list's `(`; `None` for a bare arrow parameter (`x => x`).
     params_open: Option<u32>,
@@ -2054,8 +2054,8 @@ enum FunctionBody<'n> {
     Expression(&'n Expression<'n>),
 }
 
-impl<'n, 'a> FunctionView<'n, 'a> {
-    fn declaration(view: AstView<'n>, func: &'n FunctionDeclaration<'a>) -> Self {
+impl<'n> FunctionView<'n> {
+    fn declaration(view: AstView<'n>, func: &'n FunctionDeclaration<'_>) -> Self {
         Self {
             type_parameters: func.type_parameters.as_ref(),
             params: view.run(func.params),
@@ -2066,7 +2066,7 @@ impl<'n, 'a> FunctionView<'n, 'a> {
         }
     }
 
-    fn expression(view: AstView<'n>, func: &'n FunctionExpression<'a>) -> Self {
+    fn expression(view: AstView<'n>, func: &'n FunctionExpression<'_>) -> Self {
         Self {
             type_parameters: func.type_parameters.as_ref(),
             params: view.run(func.params),
@@ -2077,7 +2077,7 @@ impl<'n, 'a> FunctionView<'n, 'a> {
         }
     }
 
-    fn arrow(view: AstView<'n>, arrow: &'n ArrowFunctionExpression<'a>) -> Self {
+    fn arrow(view: AstView<'n>, arrow: &'n ArrowFunctionExpression) -> Self {
         Self {
             type_parameters: arrow.type_parameters.as_ref(),
             params: view.run(arrow.params),
@@ -2093,18 +2093,18 @@ impl<'n, 'a> FunctionView<'n, 'a> {
 }
 
 /// The parts of a class the walk reads, from a declaration or an expression.
-struct ClassView<'n, 'a> {
+struct ClassView<'n> {
     decorators: Option<&'n [Decorator]>,
     r#abstract: bool,
-    type_parameters: Option<&'n TSTypeParameterDeclaration<'a>>,
+    type_parameters: Option<&'n TSTypeParameterDeclaration>,
     super_class: Option<&'n Expression<'n>>,
     super_type_parameters: Option<&'n TSTypeParameterInstantiation>,
     implements: &'n [TSInterfaceHeritage<'n>],
-    body: &'n ClassBody<'a>,
+    body: &'n ClassBody,
 }
 
-impl<'n, 'a> ClassView<'n, 'a> {
-    fn declaration(view: AstView<'n>, class: &'n ClassDeclaration<'a>) -> Self {
+impl<'n> ClassView<'n> {
+    fn declaration(view: AstView<'n>, class: &'n ClassDeclaration<'_>) -> Self {
         Self {
             decorators: view.opt_decorators(class.decorators),
             r#abstract: class.r#abstract,
@@ -2116,7 +2116,7 @@ impl<'n, 'a> ClassView<'n, 'a> {
         }
     }
 
-    fn expression(view: AstView<'n>, class: &'n ClassExpression<'a>) -> Self {
+    fn expression(view: AstView<'n>, class: &'n ClassExpression<'_>) -> Self {
         Self {
             decorators: view.opt_decorators(class.decorators),
             r#abstract: class.r#abstract,

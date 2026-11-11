@@ -1,7 +1,8 @@
 //! How a tree's readers reach a stored node from the field that refers to it.
 //!
 //! One [`AstView`] serves every family of the tree the stores hold: the expressions, the
-//! statements, the types and the payloads stored one store per row type. An edge is an id
+//! statements, the types, and the payloads and the elements of the lists built by value,
+//! stored one store per row type. An edge is an id
 //! ([`ExprId`], [`StmtId`], [`TyId`] or a payload's own), a list an id run or a value run
 //! over the stores, and every read of one goes through the view. The view is one word: a walk
 //! reaches a row through a load of the store's slice header and an indexed load, and holds one
@@ -9,10 +10,10 @@
 
 use tsv_lang::store::Run;
 
-use super::stores::PayloadStores;
+use super::stores::{PayloadStores, RunStores};
 use super::{
-    AstStores, CatchClause, CatchId, DecoList, Decorator, Expr, ExprId, Expression, ForHeadId,
-    ForInit, IdentifierParamExtra, ParamExtraId, Parsed, Program, Statement, StmtId, TSType, TyId,
+    AstStores, CatchClause, CatchId, Deco, Decorator, Expr, ExprId, Expression, ForHeadId, ForInit,
+    IdentifierParamExtra, ParamExtraId, Parsed, Program, Statement, StmtId, TSType, TyId,
 };
 
 /// The read access every consumer of the tree holds: resolves edges and lists.
@@ -98,7 +99,7 @@ impl<'a> AstView<'a> {
 
     /// The `for` head `id` names, when it is present.
     #[inline]
-    pub fn opt_for_head(self, id: Option<ForHeadId>) -> Option<&'a ForInit<'a>> {
+    pub fn opt_for_head(self, id: Option<ForHeadId>) -> Option<&'a ForInit> {
         id.map(|id| self.for_head(id))
     }
 
@@ -110,13 +111,13 @@ impl<'a> AstView<'a> {
 
     /// The parameter name's extras `id` names, when they are present.
     #[inline]
-    pub fn opt_param_extra(self, id: Option<ParamExtraId>) -> Option<&'a IdentifierParamExtra<'a>> {
+    pub fn opt_param_extra(self, id: Option<ParamExtraId>) -> Option<&'a IdentifierParamExtra> {
         id.map(|id| self.param_extra(id))
     }
 
     /// The decorators of `list`, when the holder has a list: absent and empty are distinct.
     #[inline]
-    pub fn opt_decorators(self, list: Option<DecoList<'a>>) -> Option<&'a [Decorator]> {
+    pub fn opt_decorators(self, list: Option<Run<Deco>>) -> Option<&'a [Decorator]> {
         list.map(|list| self.decorators(list))
     }
 
@@ -124,6 +125,12 @@ impl<'a> AstView<'a> {
     #[inline]
     pub(super) fn payloads(self) -> &'a PayloadStores<'a> {
         &self.stores.payloads
+    }
+
+    /// The value-run stores, for the accessors their macro declares beside them.
+    #[inline]
+    pub(super) fn runs(self) -> &'a RunStores<'a> {
+        &self.stores.runs
     }
 }
 

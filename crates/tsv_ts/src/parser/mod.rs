@@ -528,11 +528,6 @@ pub(crate) fn push_row<T: Row + Clone>(store: &mut Store<T>, row: T) -> Id<T::Fa
 /// Flush the list opened at `mark` on `scratch` into `store` and mint its run: where a list
 /// built by value becomes rows. A free function over the two field paths, as [`push_row`] is,
 /// so a caller can flush while it holds a disjoint borrow of the other stores.
-// TODO: unread until the value-run lists are runs; their builders flush here then.
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "the value-run lists are still built in the arena")
-)]
 #[inline]
 pub(crate) fn flush_run<T: Row + Clone>(
     scratch: &mut ListBuf<T>,
@@ -567,16 +562,16 @@ pub(crate) fn push_spanned<T: Row + Clone>(
 
 #[expect(clippy::struct_excessive_bools)]
 pub(crate) struct Parser<'a, 'arena> {
-    /// Bump arena that owns the tree's by-value lists, its decoded strings and its comments.
+    /// Bump arena that owns the tree's decoded strings and its comments.
     /// Supplied by the caller (caller-owns-`Bump`); the returned `Program<'arena>` borrows
-    /// from it. `&'arena Bump` is `Copy`, so a [`Parser::bvec`] or `self.arena.alloc_str(…)`
+    /// from it. `&'arena Bump` is `Copy`, so `self.arena.alloc_str(…)`
     /// works even while `&mut self` is held (the field read borrows the `Bump`, not `self`);
     /// lift it into a local (`let arena = self.arena;`) only when several allocations in one
     /// method share it.
     arena: &'arena Bump,
-    /// The document's expression, statement, type and payload stores, shared by every parser
-    /// of the document. `'a` is the source's lifetime, which the `&mut` takes as covariantly
-    /// as the `&str`.
+    /// The document's expression, statement, type, payload and value-run stores, shared by
+    /// every parser of the document. `'a` is the source's lifetime, which the `&mut` takes as
+    /// covariantly as the `&str`.
     stores: &'a mut AstStores<'arena>,
     source: &'a str,
     lexer: Lexer<'a>,
@@ -1044,17 +1039,6 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     #[inline]
     pub(in crate::parser) fn ty(&self, id: TyId) -> &TSType<'arena> {
         self.stores.tys.get(id)
-    }
-
-    /// A growable vector that builds AST-node collections **directly in the
-    /// arena** — the preferred way to gather children. Build it in the parse
-    /// loop, then `.into_bump_slice()` to store the field (zero-copy: the buffer
-    /// is already arena-owned; `into_bump_slice` just hands it back). Carries its
-    /// own `Copy` `&'arena Bump`, so pushing `self.parse_x()?` inside the loop
-    /// does NOT borrow `self` — no `&mut self` conflict.
-    #[inline]
-    fn bvec<T>(&self) -> BumpVec<'arena, T> {
-        BumpVec::new_in(self.arena)
     }
 
     /// Copy the lexer's just-produced decoded value (escape paths only) into the

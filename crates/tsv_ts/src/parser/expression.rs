@@ -85,7 +85,7 @@ const BP_UNARY: u8 = 29;
 // ⚠️ The frame is what the id buys as much as the return. LLVM gives each sret call
 // site its own stack slot and does not merge them across match arms, and a frame is sized
 // once for its widest arm — so a dispatcher with N arms that each call a `parse_*` returning
-// a bare `Expression` (56 B) reserves N × 56 B at **every** recursion level, whichever arm
+// a bare `Expression` (48 B) reserves N × 48 B at **every** recursion level, whichever arm
 // it takes. `Parser::parse_prefix_expression` and `Parser::parse_primary_expression` are
 // those dispatchers, and both sit on the paren / call / member / object-literal cycle, so
 // their slots set the stack every nesting level costs, which the depth limits' margin is
@@ -3583,7 +3583,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         tag: ExprId,
         tag_start: u32,
         type_arguments: Option<TSTypeParameterInstantiation>,
-        quasi: TemplateLiteral<'arena>,
+        quasi: TemplateLiteral,
     ) -> ExprRet {
         let end = quasi.span.end;
         let tagged = push_row(

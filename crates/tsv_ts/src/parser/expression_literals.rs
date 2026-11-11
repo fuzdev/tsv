@@ -3,7 +3,7 @@
 
 use crate::ast::*;
 use crate::lexer::{KeywordKind, TokenKind};
-use crate::parser::push_spanned;
+use crate::parser::{flush_run, push_spanned};
 use tsv_lang::{Error, Span};
 
 use super::Parser;
@@ -26,14 +26,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Returns the node beside its span rather than a bare `Expression`, so the caller
     /// wrapping it keeps no 72 B value in its frame (§The expression ladder's return
     /// currency).
-    pub(super) fn parse_object_expression(
-        &mut self,
-    ) -> Result<(ObjectExpression<'arena>, Span), Error> {
+    pub(super) fn parse_object_expression(&mut self) -> Result<(ObjectExpression, Span), Error> {
         let (start, _) = self.current_pos();
         self.expect(&TokenKind::BraceOpen)?; // consume '{'
         self.enter_grouping()?;
 
-        let mut properties = self.bvec();
         // Set when a trailing comma follows a final spread property (`{...a,}`):
         // legal in a literal, rejected by `refine_assignable` in pattern context.
         let mut spread_trailing_comma = false;
@@ -45,7 +42,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             self.exit_grouping();
             return Ok((
                 ObjectExpression {
-                    properties: properties.into_bump_slice(),
+                    properties: Run::EMPTY,
                     spread_trailing_comma: false,
                 },
                 Span::new(start as u32, end as u32),
@@ -53,9 +50,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
 
         // Parse properties, siblings each (`ListFrame`)
+        let mark = self.stores.runs.obj_prop_scratch.mark();
         let mut frame = self.list_frame();
         loop {
-            frame.element(self, properties.len());
+            let len = self.stores.runs.obj_prop_scratch.len_since(mark);
+            frame.element(self, len);
             let prop_start = self.current_pos().0;
 
             // Check for spread: { ...obj }
@@ -76,10 +75,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 // is parenthesized (`{...(a && b)}`), matching the array-spread and
                 // object-value paths (acorn includes the `)` in the SpreadElement span).
                 let prop_end = self.prev_token_end();
-                properties.push(ObjectProperty::SpreadElement(SpreadElement {
-                    argument,
-                    span: Span::new(prop_start as u32, prop_end as u32),
-                }));
+                self.stores
+                    .runs
+                    .obj_prop_scratch
+                    .push(ObjectProperty::SpreadElement(SpreadElement {
+                        argument,
+                        span: Span::new(prop_start as u32, prop_end as u32),
+                    }));
 
                 // Check for comma or closing brace. A trailing comma right
                 // after this spread (`{...a,}`) is the rest-trailing-comma case:
@@ -221,12 +223,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 }
             };
 
-            // The key is the `Property`'s by-reference slot from here on: the node
-            // lives in the arena and the property holds a pointer to it, so the
-            // 160 B element the `properties` vector moves is 32 B instead (see
-            // `Property`'s field docs).
             // The key is the `Property`'s by-id slot from here on, so the element the
-            // `properties` vector moves is small (see `Property`'s field docs).
+            // scratch stack moves is small (see `Property`'s field docs).
 
             // Determine property kind, value, shorthand, and method flags
             let (kind, value, shorthand, method) = if let Some(accessor) = accessor_kind {
@@ -342,15 +340,18 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
             // Use prev_token_end() to include closing paren when value is parenthesized
             let prop_end = self.prev_token_end();
-            properties.push(ObjectProperty::Property(Property {
-                key,
-                value,
-                kind,
-                shorthand,
-                computed,
-                method,
-                span: Span::new(prop_start as u32, prop_end as u32),
-            }));
+            self.stores
+                .runs
+                .obj_prop_scratch
+                .push(ObjectProperty::Property(Property {
+                    key,
+                    value,
+                    kind,
+                    shorthand,
+                    computed,
+                    method,
+                    span: Span::new(prop_start as u32, prop_end as u32),
+                }));
 
             // Check for comma or closing brace (with trailing comma support)
             if !self.expect_list_separator(&TokenKind::Comma, &TokenKind::BraceClose)? {
@@ -362,10 +363,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let (_, end) = self.current_pos();
         self.expect(&TokenKind::BraceClose)?; // consume '}'
         self.exit_grouping();
+        let properties = flush_run(
+            &mut self.stores.runs.obj_prop_scratch,
+            &mut self.stores.runs.obj_props,
+            mark,
+        );
 
         Ok((
             ObjectExpression {
-                properties: properties.into_bump_slice(),
+                properties,
                 spread_trailing_comma,
             },
             Span::new(start as u32, end as u32),

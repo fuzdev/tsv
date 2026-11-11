@@ -351,7 +351,7 @@ pub(crate) fn is_curried_arrow_chain(view: AstView<'_>, expr: &Expression<'_>) -
 /// `should_use_arrow_chain_layout`.
 pub(crate) fn arrow_chain_should_break(
     view: AstView<'_>,
-    arrow: &ast::ArrowFunctionExpression<'_>,
+    arrow: &ast::ArrowFunctionExpression,
 ) -> bool {
     // Check this arrow for breaking conditions:
     // 1. return_type AND has params

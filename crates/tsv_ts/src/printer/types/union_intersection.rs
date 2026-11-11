@@ -3286,7 +3286,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn aligned_trailing_object_shell<'t>(
         &self,
         ts_type: &'t TSType<'t>,
-    ) -> Option<(&'t TSIntersectionType, &'t TSTypeLiteral<'t>, Option<Span>)>
+    ) -> Option<(&'t TSIntersectionType, &'t TSTypeLiteral, Option<Span>)>
     where
         'a: 't,
     {

@@ -100,7 +100,7 @@ impl<'a> Printer<'a> {
     /// type.
     pub(in crate::printer) fn template_literal_type_breaks_for_comment(
         &self,
-        template: &TemplateLiteralType<'_>,
+        template: &TemplateLiteralType,
     ) -> bool {
         self.view
             .ty_list(template.types)
@@ -237,10 +237,7 @@ impl<'a> Printer<'a> {
     /// would exceed print width in flat mode, then break all of those. This ensures consistent
     /// formatting - types that would exceed at their original positions break, even if earlier
     /// breaks would have given them more room.
-    pub(super) fn build_template_literal_type_doc(
-        &self,
-        template: &TemplateLiteralType<'_>,
-    ) -> DocId {
+    pub(super) fn build_template_literal_type_doc(&self, template: &TemplateLiteralType) -> DocId {
         let d = self.d();
 
         // Zero-comment fast gate: one binary search over the whole template window

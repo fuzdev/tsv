@@ -71,7 +71,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn build_callable_signature_doc(
         &self,
         params: &[ast::Expression<'_>],
-        type_parameters: Option<&ast::TSTypeParameterDeclaration<'_>>,
+        type_parameters: Option<&ast::TSTypeParameterDeclaration>,
         return_type: Option<&ast::TSTypeAnnotation>,
         params_start: u32,
         body_start: u32,
@@ -108,7 +108,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn build_signature_params_return(
         &self,
         params: &[ast::Expression<'_>],
-        type_parameters: Option<&ast::TSTypeParameterDeclaration<'_>>,
+        type_parameters: Option<&ast::TSTypeParameterDeclaration>,
         return_type: Option<&ast::TSTypeAnnotation>,
         params_start: u32,
         body_start: u32,

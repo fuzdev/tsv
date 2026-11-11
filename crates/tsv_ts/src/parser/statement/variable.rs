@@ -4,7 +4,7 @@ use crate::ast::*;
 use crate::lexer::{KeywordKind, TokenKind};
 use tsv_lang::{Error, Span};
 
-use super::super::Parser;
+use super::super::{Parser, flush_run};
 
 /// Where a variable declarator sits — the two grammar parameters a variable
 /// statement and a `for` head disagree on follow from it.
@@ -91,22 +91,28 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     fn parse_declarator_list(
         &mut self,
         site: DeclaratorSite,
-    ) -> Result<(DeclaratorList<'arena>, u32), Error> {
+    ) -> Result<(Run<Declarator>, u32), Error> {
         // one wire level each: the `VariableDeclarator` over its pattern and initializer
         let first = self.nested(1, |p| p.parse_declarator(site))?;
         let mut end = first.span.end;
-        let mut declarations = self.bvec();
-        declarations.push(first);
+        let mark = self.stores.runs.declarator_scratch.mark();
+        self.stores.runs.declarator_scratch.push(first);
         // the declarators are siblings (`ListFrame`); the first is already counted
         let mut frame = self.list_frame();
         while self.eat(TokenKind::Comma)? {
-            frame.element(self, declarations.len());
+            let len = self.stores.runs.declarator_scratch.len_since(mark);
+            frame.element(self, len);
             let declarator = self.nested(1, |p| p.parse_declarator(site))?;
             end = declarator.span.end;
-            declarations.push(declarator);
+            self.stores.runs.declarator_scratch.push(declarator);
         }
         frame.close(self);
-        Ok((declarations.into_bump_slice(), end))
+        let declarations = flush_run(
+            &mut self.stores.runs.declarator_scratch,
+            &mut self.stores.runs.declarators,
+            mark,
+        );
+        Ok((declarations, end))
     }
 
     /// Parse one variable declarator; `site` settles the two grammar parameters
@@ -174,7 +180,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(super) fn parse_for_head_declaration(
         &mut self,
         kind: VariableDeclarationKind,
-    ) -> Result<VariableDeclaration<'arena>, Error> {
+    ) -> Result<VariableDeclaration, Error> {
         let (decl_start, _) = self.current_pos();
         self.eat_declaration_keyword(kind)?;
         // one wire level: the `VariableDeclaration` under the `for` statement, which a

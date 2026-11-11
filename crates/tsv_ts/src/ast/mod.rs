@@ -9,11 +9,10 @@
 //!
 //! Expressions, statements, types and the payloads too rare to sit inline in the node that
 //! refers to them are rows of per-document stores ([`AstStores`]), named by id and read
-//! through an [`AstView`]. The rest of the tree is allocated in a per-parse
-//! [`bumpalo::Bump`] supplied by the caller: its by-value child collections are
-//! `&'arena [T<'arena>]` (not `Vec`), its comments one `&'arena [Comment]`, and decoded
-//! strings are `&'arena str` (not `String`) — freed wholesale when the `Bump` drops, with no
-//! per-node `Drop`. The rare
+//! through an [`AstView`]; the lists built by value are runs of rows in a store per element
+//! type. The rest is allocated in a per-parse [`bumpalo::Bump`] supplied by the caller: the
+//! comments one `&'arena [Comment]`, and decoded strings `&'arena str` (not `String`) — freed
+//! wholesale when the `Bump` drops, with no per-node `Drop`. The rare
 //! escaped identifier name is one such `&'arena str` ([`IdentName::escaped`]),
 //! read directly at every consumer — the AST holds no interner and needs no
 //! interner lifetime.
@@ -34,18 +33,16 @@ mod view;
 
 pub(crate) use stores::ScratchMarks;
 pub use stores::{
-    ArrowFn, ArrowFnId, AstStores, Case, CaseList, Catch, CatchId, ClassDecl, ClassDeclId,
-    ClassExpr, ClassExprId, ClassMem, ClassMemList, CtorType, CtorTypeId, Declarator,
-    DeclaratorList, DeclareFn, DeclareFnId, Deco, DecoList, EnumDecl, EnumDeclId, EnumMem,
-    EnumMemList, ExportAll, ExportAllId, ExportAssign, ExportAssignId, ExportDefault,
-    ExportDefaultId, ExportNamed, ExportNamedId, ExportSpec, ExportSpecList, Expr, ExprId, FnDecl,
-    FnDeclId, FnExpr, FnExprId, ForHead, ForHeadId, ForLeft, ForLeftId, Heritage, HeritageList,
-    ImportAttr, ImportAttrList, ImportDecl, ImportDeclId, ImportEquals, ImportEqualsId, ImportSpec,
-    ImportSpecList, ImportType, ImportTypeId, IndexParam, IndexParamList, InferType, InferTypeId,
-    InterfaceDecl, InterfaceDeclId, MetaProp, MetaPropId, ModuleDecl, ModuleDeclId, ObjProp,
-    ObjPropList, ParamExtra, ParamExtraId, Parsed, PatProp, PatPropList, QualName, QualNameId,
-    Quasi, QuasiList, Stmt, StmtId, TaggedTpl, TaggedTplId, Ty, TyId, TypeAlias, TypeAliasId,
-    TypeMember, TypeMemberList, TypeParam, TypeParamList, with_stores,
+    ArrowFn, ArrowFnId, AstStores, Case, Catch, CatchId, ClassDecl, ClassDeclId, ClassExpr,
+    ClassExprId, ClassMem, CtorType, CtorTypeId, Declarator, DeclareFn, DeclareFnId, Deco,
+    EnumDecl, EnumDeclId, EnumMem, ExportAll, ExportAllId, ExportAssign, ExportAssignId,
+    ExportDefault, ExportDefaultId, ExportNamed, ExportNamedId, ExportSpec, Expr, ExprId, FnDecl,
+    FnDeclId, FnExpr, FnExprId, ForHead, ForHeadId, ForLeft, ForLeftId, Heritage, ImportAttr,
+    ImportDecl, ImportDeclId, ImportEquals, ImportEqualsId, ImportSpec, ImportType, ImportTypeId,
+    IndexParam, InferType, InferTypeId, InterfaceDecl, InterfaceDeclId, MetaProp, MetaPropId,
+    ModuleDecl, ModuleDeclId, ObjProp, ParamExtra, ParamExtraId, Parsed, PatProp, QualName,
+    QualNameId, Quasi, Stmt, StmtId, TaggedTpl, TaggedTplId, Ty, TyId, TypeAlias, TypeAliasId,
+    TypeMember, TypeParam, with_stores,
 };
 pub use tsv_lang::store::Run;
 pub use tsv_lang::{Comment, Span};
@@ -128,8 +125,8 @@ pub use expressions::{
 // to keep `Expression` out of those frames.
 //
 // Both enums are also the ELEMENT WIDTH of the containers that hold them, which is
-// the larger cost: an `Expression` slot is paid on every element of every
-// `&[Expression]` (parameters, array-pattern elements), so the enum's width
+// the larger cost: an `Expression` slot is paid on every row of the expression store,
+// every parameter of a parameter list's value run among them, so the enum's width
 // multiplies through the whole tree. Both are held down the same way — the variants
 // wide enough to set the size on their own, and rare enough that a row of their own is
 // free, hold their payload by id into a store per payload type: `Expression`'s five
@@ -147,7 +144,7 @@ pub use expressions::{
 // The LIST-ELEMENT containers whose own width was inline `Expression`s —
 // `Property` (an object literal's `key: value`, and a destructuring pattern's),
 // `VariableDeclarator`, and every `Expression`-holding `Statement` head
-// (`ExpressionStatement` 8 B, `IfStatement` 12, `SwitchStatement` 24, `SwitchCase` 20,
+// (`ExpressionStatement` 8 B, `IfStatement` 12, `SwitchStatement` 12, `SwitchCase` 20,
 // `WhileStatement` / `DoWhileStatement` / `WithStatement` 8,
 // `ReturnStatement` / `ThrowStatement` 4)
 // — instead hold those slots by id, which is not the same trade: the parser's
@@ -167,7 +164,12 @@ pub use expressions::{
 // row of the statement store. So do the type lists — union and intersection members, tuple
 // elements, template-literal interpolations, type arguments (`Run<TyId>`) — and the single
 // type edges (`TyId`): the type ladder pushes every type it parses, so each is a row of the
-// type store.
+// type store. The lists whose elements are built whole and stand nowhere else — object
+// members and patterns' members, template quasis, declarators, `switch` cases, import and
+// export specifiers and import attributes, class and type members, type parameters,
+// heritage clauses, enum members, index-signature parameters, decorators — are value runs
+// (`Run<ObjProp>`, `Run<Declarator>`, …): the run's rows ARE the elements, one store per
+// element type (`ast/stores.rs`).
 //
 // `Expression` and `Statement` are each a header over their variant (`span` +
 // `ExpressionKind` / `StatementKind`), so a span read is a field load rather than a
@@ -182,9 +184,9 @@ pub use expressions::{
 // 4 B) in `tsv_wasm`, the crate compiled for wasm32, and `Expression`'s and `Statement`'s
 // `Option` must stay niche-packed on both.
 #[cfg(all(test, target_pointer_width = "64"))]
-const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<Expression<'static>>() == 56);
+const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<Expression<'static>>() == 48);
 #[cfg(all(test, target_pointer_width = "64"))]
-const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<ExpressionKind<'static>>() == 48);
+const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<ExpressionKind<'static>>() == 40);
 #[cfg(test)]
 const _: () = assert!(size_of::<Option<Expression<'static>>>() == size_of::<Expression<'static>>());
 #[cfg(all(test, target_pointer_width = "64"))]
@@ -205,9 +207,9 @@ const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<VariableDeclarat
 const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<SwitchCase>() == 20);
 #[cfg(all(test, target_pointer_width = "64"))]
 const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<TSType<'static>>() == 72);
-// The type-edge holders every type annotation and type-argument list rides inline in: their
-// `Option`s fold into the id's niche and the run's, so an absent annotation or list costs no
-// width in any of the nodes that hold one.
+// The type-edge holders every type annotation, type-argument list and type-parameter list
+// rides inline in: their `Option`s fold into the id's niche and the run's, so an absent
+// annotation or list costs no width in any of the nodes that hold one.
 #[cfg(test)]
 const _: () = assert!(
     tsv_lang::store::STORE_CHECK
@@ -218,6 +220,12 @@ const _: () = assert!(
     tsv_lang::store::STORE_CHECK
         || size_of::<Option<TSTypeParameterInstantiation>>()
             == size_of::<TSTypeParameterInstantiation>()
+);
+#[cfg(test)]
+const _: () = assert!(
+    tsv_lang::store::STORE_CHECK
+        || size_of::<Option<TSTypeParameterDeclaration>>()
+            == size_of::<TSTypeParameterDeclaration>()
 );
 
 //
@@ -458,9 +466,9 @@ pub struct Identifier<'arena> {
 /// `Identifier.extra` only at the few binding sites that set it; absent (`None`, folded
 /// into the id's niche) for every reference.
 #[derive(Debug, Clone)]
-pub struct IdentifierParamExtra<'arena> {
+pub struct IdentifierParamExtra {
     pub type_annotation: Option<TSTypeAnnotation>,
-    pub decorators: Option<DecoList<'arena>>,
+    pub decorators: Option<Run<Deco>>,
 }
 
 impl<'arena> Identifier<'arena> {

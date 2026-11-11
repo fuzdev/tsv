@@ -26,7 +26,7 @@ use tsv_lang::Span;
 ///   `<T>(…) => …` reading grafts them onto the finished arrow).
 pub(super) fn write_arrow_function_expression(
     w: &mut JsonWriter,
-    arrow: &ast::ArrowFunctionExpression<'_>,
+    arrow: &ast::ArrowFunctionExpression,
     span: Span,
     ctx: &Ctx<'_>,
 ) {

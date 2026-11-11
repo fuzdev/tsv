@@ -761,7 +761,7 @@ pub(super) fn type_needs_parens_in_union_or_intersection(
 /// type's text or a comment opens nothing that breaks.
 pub(in crate::printer) fn type_literal_members_hold_brace_type(
     view: AstView<'_>,
-    literal: &ast::TSTypeLiteral<'_>,
+    literal: &ast::TSTypeLiteral,
 ) -> bool {
     view.type_members(literal.members)
         .iter()
@@ -769,7 +769,7 @@ pub(in crate::printer) fn type_literal_members_hold_brace_type(
 }
 
 /// [`type_literal_members_hold_brace_type`] for one member.
-fn type_element_holds_brace_type(view: AstView<'_>, member: &ast::TSTypeElement<'_>) -> bool {
+fn type_element_holds_brace_type(view: AstView<'_>, member: &ast::TSTypeElement) -> bool {
     use ast::TSTypeElement;
     match member {
         TSTypeElement::PropertySignature(p) => {
@@ -812,7 +812,7 @@ fn annotation_holds_brace_type(
 
 fn signature_holds_brace_type(
     view: AstView<'_>,
-    type_parameters: Option<&ast::TSTypeParameterDeclaration<'_>>,
+    type_parameters: Option<&ast::TSTypeParameterDeclaration>,
     params: &[ast::Expression<'_>],
     return_type: Option<&ast::TSTypeAnnotation>,
 ) -> bool {
@@ -825,7 +825,7 @@ fn signature_holds_brace_type(
 
 fn type_parameters_hold_brace_type(
     view: AstView<'_>,
-    decl: &ast::TSTypeParameterDeclaration<'_>,
+    decl: &ast::TSTypeParameterDeclaration,
 ) -> bool {
     view.type_params(decl.params)
         .iter()

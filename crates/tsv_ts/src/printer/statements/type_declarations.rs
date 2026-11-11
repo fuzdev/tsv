@@ -1222,7 +1222,7 @@ impl<'a> Printer<'a> {
     /// trailing-comment divergence). Pass `None` to keep the default behavior.
     fn build_type_elements_doc(
         &self,
-        members: &[ast::TSTypeElement<'_>],
+        members: &[ast::TSTypeElement],
         body_start: u32,
         body_end: u32,
         delimiter_pull_pos: Option<u32>,
@@ -1264,7 +1264,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build doc for a single type element
-    fn build_type_element_doc(&self, elem: &ast::TSTypeElement<'_>) -> DocId {
+    fn build_type_element_doc(&self, elem: &ast::TSTypeElement) -> DocId {
         // Every member doc is shared with the type-literal printer (via the same
         // dispatcher); the only difference is the interface member carries its own
         // `;`, with any own-line comment in the member→`;` gap deferred past it.

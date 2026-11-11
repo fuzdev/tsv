@@ -124,7 +124,7 @@ impl<'a> Printer<'a> {
         &self,
         class_keyword_start: u32,
         id: Option<&ast::Identifier<'_>>,
-        type_parameters: Option<&ast::TSTypeParameterDeclaration<'_>>,
+        type_parameters: Option<&ast::TSTypeParameterDeclaration>,
         super_class: Option<&ast::Expression<'_>>,
         super_type_parameters: Option<&ast::TSTypeParameterInstantiation>,
         implements: &[ast::TSInterfaceHeritage<'_>],
@@ -220,7 +220,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn push_class_type_params(
         &self,
         parts: &mut DocBuf,
-        type_parameters: Option<&ast::TSTypeParameterDeclaration<'_>>,
+        type_parameters: Option<&ast::TSTypeParameterDeclaration>,
         gap: ClassTypeParamsGap,
     ) {
         let Some(type_params) = type_parameters else {

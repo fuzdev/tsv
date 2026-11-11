@@ -1863,7 +1863,7 @@ impl<'a> Printer<'a> {
     /// Example: `type Foo<T extends string, U = number> = ...`
     pub(crate) fn type_alias_has_complex_params(
         &self,
-        type_params: Option<&ast::TSTypeParameterDeclaration<'_>>,
+        type_params: Option<&ast::TSTypeParameterDeclaration>,
     ) -> bool {
         let params = match type_params {
             Some(p) => self.view.type_params(p.params),

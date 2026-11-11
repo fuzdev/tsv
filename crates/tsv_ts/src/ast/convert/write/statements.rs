@@ -409,7 +409,7 @@ fn write_exported_declaration(
 /// depends on `exported`.
 pub(super) fn write_variable_declaration(
     w: &mut JsonWriter,
-    var_decl: &ast::VariableDeclaration<'_>,
+    var_decl: &ast::VariableDeclaration,
     ctx: &Ctx<'_>,
     exported: bool,
 ) {

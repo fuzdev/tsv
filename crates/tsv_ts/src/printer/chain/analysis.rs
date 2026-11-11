@@ -629,7 +629,7 @@ pub(crate) fn call_callee_paren_leading_start(
 /// family answering it in one place is the point ([`chain_paren_leading_gap`]).
 pub(crate) fn tag_paren_leading_start(
     view: AstView<'_>,
-    tagged: &ast::TaggedTemplateExpression<'_>,
+    tagged: &ast::TaggedTemplateExpression,
     span: Span,
 ) -> Option<u32> {
     let tag = view.expr(tagged.tag);

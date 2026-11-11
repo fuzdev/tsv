@@ -7,7 +7,7 @@ use crate::lexer::TokenKind;
 use crate::lexer::escapes::find_legacy_escape;
 use tsv_lang::{Error, Span};
 
-use super::Parser;
+use super::{Parser, flush_run};
 
 /// The delimiter-stripped content of a template token, and its source span.
 ///
@@ -215,9 +215,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(super) fn parse_template_literal(
         &mut self,
         tagged: bool,
-    ) -> Result<TemplateLiteral<'arena>, Error> {
+    ) -> Result<TemplateLiteral, Error> {
         let (start, _) = self.current_pos();
-        let mut quasis = self.bvec();
+        let quasi_mark = self.stores.runs.quasi_scratch.mark();
 
         match self.current_kind() {
             TokenKind::NoSubstitutionTemplate => {
@@ -228,10 +228,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
                 self.advance()?;
 
-                quasis.push(element);
+                self.stores.runs.quasi_scratch.push(element);
 
                 Ok(TemplateLiteral {
-                    quasis: quasis.into_bump_slice(),
+                    quasis: flush_run(
+                        &mut self.stores.runs.quasi_scratch,
+                        &mut self.stores.runs.quasis,
+                        quasi_mark,
+                    ),
                     expressions: Run::EMPTY,
                     span: Span::new(start as u32, elem_end as u32),
                 })
@@ -244,7 +248,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
                 self.advance()?;
 
-                quasis.push(element);
+                self.stores.runs.quasi_scratch.push(element);
 
                 self.enter_grouping()?;
 
@@ -292,7 +296,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
                             self.advance()?;
 
-                            quasis.push(element);
+                            self.stores.runs.quasi_scratch.push(element);
                         }
                         TokenKind::TemplateTail => {
                             // End of template: }content`
@@ -301,7 +305,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
                             self.advance()?;
 
-                            quasis.push(element);
+                            self.stores.runs.quasi_scratch.push(element);
 
                             break;
                         }
@@ -316,10 +320,20 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
                 self.exit_grouping();
 
-                let end = quasis.last().map_or(start as u32, |q| q.span.end);
+                let end = self
+                    .stores
+                    .runs
+                    .quasi_scratch
+                    .frame(quasi_mark)
+                    .last()
+                    .map_or(start as u32, |q| q.span.end);
 
                 Ok(TemplateLiteral {
-                    quasis: quasis.into_bump_slice(),
+                    quasis: flush_run(
+                        &mut self.stores.runs.quasi_scratch,
+                        &mut self.stores.runs.quasis,
+                        quasi_mark,
+                    ),
                     expressions: self.flush_expr_list(mark),
                     span: Span::new(start as u32, end),
                 })

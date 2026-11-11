@@ -7,11 +7,10 @@
 use tsv_lang::Span;
 
 use super::{
-    CaseList, CatchId, ClassDeclId, DeclaratorList, DeclareFnId, EnumDeclId, ExportAllId,
-    ExportAssignId, ExportDefaultId, ExportNamedId, Expr, ExprId, Expression, FnDeclId, ForHeadId,
-    ForLeftId, Identifier, ImportDeclId, ImportEqualsId, InterfaceDeclId, ModuleDeclId, Run,
-    StmtId, TSNamespaceExportDeclaration, TSTypeAnnotation, TSTypeParameterDeclaration,
-    TypeAliasId,
+    Case, CatchId, ClassDeclId, Declarator, DeclareFnId, EnumDeclId, ExportAllId, ExportAssignId,
+    ExportDefaultId, ExportNamedId, Expr, ExprId, Expression, FnDeclId, ForHeadId, ForLeftId,
+    Identifier, ImportDeclId, ImportEqualsId, InterfaceDeclId, ModuleDeclId, Run, StmtId,
+    TSNamespaceExportDeclaration, TSTypeAnnotation, TSTypeParameterDeclaration, TypeAliasId,
 };
 
 /// Statement node: the span every variant shares, beside the variant itself.
@@ -30,7 +29,7 @@ pub struct Statement<'arena> {
 #[derive(Debug, Clone)]
 pub enum StatementKind<'arena> {
     ExpressionStatement(ExpressionStatement),
-    VariableDeclaration(VariableDeclaration<'arena>),
+    VariableDeclaration(VariableDeclaration),
     // Stored, each a row of its own payload store named by id, unlike every inline
     // variant here: these are the widest declaration heads, and their width would
     // otherwise be paid on every `Statement` ROW — every statement in the store and
@@ -83,7 +82,7 @@ pub enum StatementKind<'arena> {
     WhileStatement(WhileStatement),
     DoWhileStatement(DoWhileStatement),
     WithStatement(WithStatement),
-    SwitchStatement(SwitchStatement<'arena>),
+    SwitchStatement(SwitchStatement),
     TryStatement(TryStatement),
     ThrowStatement(ThrowStatement),
     BreakStatement(BreakStatement<'arena>),
@@ -129,7 +128,7 @@ impl<'arena> Statement<'arena> {
     /// wrapped from their id and the span `push_spanned` read off the payload before its
     /// push, so the two come from one value.
     #[inline]
-    pub fn from_variable_declaration(decl: VariableDeclaration<'arena>) -> Self {
+    pub fn from_variable_declaration(decl: VariableDeclaration) -> Self {
         Self {
             span: decl.span,
             kind: StatementKind::VariableDeclaration(decl),
@@ -272,8 +271,8 @@ pub struct ForStatement {
 /// `ForInit` is itself a row of its own store, reached only through `Option<ForHeadId>`,
 /// so its width sets nothing.
 #[derive(Debug, Clone)]
-pub enum ForInit<'arena> {
-    VariableDeclaration(VariableDeclaration<'arena>),
+pub enum ForInit {
+    VariableDeclaration(VariableDeclaration),
     Expression(ExprId),
 }
 
@@ -307,8 +306,8 @@ pub struct ForOfStatement {
 /// owned `Expression`, and this enum is a row of its own store, reached only through a
 /// `ForLeftId`.
 #[derive(Debug, Clone)]
-pub enum ForInOfLeft<'arena> {
-    VariableDeclaration(VariableDeclaration<'arena>),
+pub enum ForInOfLeft {
+    VariableDeclaration(VariableDeclaration),
     Pattern(ExprId),
 }
 
@@ -335,9 +334,9 @@ pub struct WithStatement {
 
 /// Switch statement: `switch (discriminant) { cases }`
 #[derive(Debug, Clone)]
-pub struct SwitchStatement<'arena> {
+pub struct SwitchStatement {
     pub discriminant: ExprId,
-    pub cases: CaseList<'arena>,
+    pub cases: Run<Case>,
 }
 
 /// Switch case: `case test: consequent` or `default: consequent`
@@ -420,7 +419,7 @@ pub struct FunctionDeclaration<'arena> {
     /// Function name (required for declarations, optional for export default)
     pub id: Option<Identifier<'arena>>,
     /// Type parameters (TypeScript generics): `function fn<T>() {}`
-    pub type_parameters: Option<TSTypeParameterDeclaration<'arena>>,
+    pub type_parameters: Option<TSTypeParameterDeclaration>,
     /// Function parameters (Identifier, ArrayPattern, ObjectPattern, or AssignmentPattern for defaults)
     pub params: Run<Expr>,
     /// Return type annotation (e.g., `: number` in `function fn(): number {}`)
@@ -480,9 +479,9 @@ impl VariableDeclarationKind {
 }
 
 #[derive(Debug, Clone)]
-pub struct VariableDeclaration<'arena> {
+pub struct VariableDeclaration {
     pub kind: VariableDeclarationKind,
-    pub declarations: DeclaratorList<'arena>,
+    pub declarations: Run<Declarator>,
     /// Whether this is an ambient declaration (`declare const x: T;`)
     pub declare: bool,
     pub span: Span,

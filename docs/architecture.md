@@ -356,7 +356,7 @@ The `doc` module implements a declarative document builder inspired by prettier'
 
 ### Core Types (Arena-Based)
 
-Doc nodes live in a contiguous `DocArena`, referenced by `DocId` (a `u32` index), with child lists as `ChildRange` (start index + length) — no per-node heap allocation, no recursive `Drop` traversal. Indices suit the doc tree specifically: it's built once, rendered once, and dropped wholesale. The AST is store- and arena-allocated — `Expression`, `Statement` and `TSType` nodes and the payloads too rare to sit inline sit in per-document stores indexed by typed ids (`ExprId`, `StmtId`, `TyId`, one id per payload type), the by-value lists, decoded strings and comments in the bump arena — see [Nested AST](#nested-ast-bump-arena-not-flatindexed).
+Doc nodes live in a contiguous `DocArena`, referenced by `DocId` (a `u32` index), with child lists as `ChildRange` (start index + length) — no per-node heap allocation, no recursive `Drop` traversal. Indices suit the doc tree specifically: it's built once, rendered once, and dropped wholesale. The AST is store- and arena-allocated — `Expression`, `Statement` and `TSType` nodes and the payloads too rare to sit inline sit in per-document stores indexed by typed ids (`ExprId`, `StmtId`, `TyId`, one id per payload type), the lists built by value as runs of rows in a store per element type, decoded strings and comments in the bump arena — see [Nested AST](#nested-ast-bump-arena-not-flatindexed).
 
 ```rust
 pub enum DocNode {
@@ -869,7 +869,7 @@ Native tsv runs on the system allocator — no `#[global_allocator]`, no alterna
 
 **Lexing — spans, not strings.** Tokens store `u32` byte offsets (`start`, `end`) into the source, never slices or copies — `Token` is a small POD (16 B; tsv_svelte's 12 B) that a byte cursor over the source emits. The exception is deliberate: a string literal's decoded value is materialized only when it actually contains escape sequences, decoded into a **reused scratch buffer held out-of-band on the lexer** (`Lexer::decode_scratch`, borrowed via `decoded_str` and copied into the AST arena at receipt) so no per-literal `String` allocates and the per-token `Token` stays pointer-free. Comments are spans too — the token carries a `content_start` and the `Comment` node a `content_span`, recovered from source on demand and never copied. On the parser's hot path (`advance`, plus the CSS and Svelte lookaheads) the lexers write the token in place into the parser's slot (`next_token_into`) rather than returning a by-value `Result<Token, Error>` through a stack slot the parser would reload and re-scatter; other TS and CSS callers take it by value (`next_token`); the Svelte lexer has no by-value form.
 
-**Internal AST — bump-arena nested ownership, span-identity names, no raw text.** Expressions, statements, types and the rare wide payloads are rows of per-document stores named by typed ids; the rest is allocated in a per-parse bump arena, child collections as `&'arena [T]` (not `Vec`), with small children kept inline by value (see [Nested AST](#nested-ast-bump-arena-not-flatindexed) for the layout rationale). Identifier names are span-identity — an `IdentName` records the raw name-token length and the name is re-sliced from source; only the rare `\u`-escaped (or oversized) name carries its decoded form as an `&'arena str`. Svelte element/attribute names are span-identity too (`source[name_span]`, `.trim()` for the padded-`{ shorthand }` edge), so there is no shared symbol table anywhere. Raw source text is never duplicated into the AST — printers re-slice via `span.extract(source)`; the few deliberate stored-raw caches are cataloged in [Source-Based Printing](#source-based-printing). What remains as owned data is genuinely decoded: string-literal values (only when escaped) and the like, arena-allocated as `&'arena str`.
+**Internal AST — bump-arena nested ownership, span-identity names, no raw text.** Expressions, statements, types and the rare wide payloads are rows of per-document stores named by typed ids; a child list is a `Run` over a store (of ids, or of the elements themselves for a list built by value); the rest is allocated in a per-parse bump arena, with small children kept inline by value (see [Nested AST](#nested-ast-bump-arena-not-flatindexed) for the layout rationale). Identifier names are span-identity — an `IdentName` records the raw name-token length and the name is re-sliced from source; only the rare `\u`-escaped (or oversized) name carries its decoded form as an `&'arena str`. Svelte element/attribute names are span-identity too (`source[name_span]`, `.trim()` for the padded-`{ shorthand }` edge), so there is no shared symbol table anywhere. Raw source text is never duplicated into the AST — printers re-slice via `span.extract(source)`; the few deliberate stored-raw caches are cataloged in [Source-Based Printing](#source-based-printing). What remains as owned data is genuinely decoded: string-literal values (only when escaped) and the like, arena-allocated as `&'arena str`.
 
 **Svelte template nodes — contiguous storage.** Fragment children are an `&'arena [FragmentNode]` slice of enum values rather than boxed nodes, keeping siblings contiguous in arena memory for the printer's traversal loops.
 
@@ -972,9 +972,8 @@ Decisions made during development with rationale preserved for future reference.
 ### Nested AST (Bump-Arena, Not Flat/Indexed)
 
 tsv's nodes live in per-document stores named by typed ids (below); a **per-parse
-bump arena** (`bumpalo`), tied to the program lifetime, holds the rest. By-value
-child collections are `&'arena [T<'arena>]`
-(not `Vec`) and decoded strings are `&'arena str`, freed wholesale when the arena
+bump arena** (`bumpalo`), tied to the program lifetime, holds the rest. Decoded strings
+are `&'arena str` and the comments one `&'arena [Comment]`, freed wholesale when the arena
 drops, with no per-node `Drop`.
 
 **`Expression`, `Statement` and `TSType` nodes and the rare payloads are the exceptions: they live in `AstStores`**
@@ -987,15 +986,18 @@ parameter lists). A statement edge is a `StmtId` into the `Store<Statement>`, an
 statement list (a program's, a block's, a `case`'s, a static block's, a namespace's body) a
 `Run<StmtId>`. A type edge is a `TyId` into the `Store<TSType>`, and every type list (union
 and intersection members, tuple elements, type arguments, template-literal types) a
-`Run<TyId>`. A reader reaches them through an `AstView`, one word holding a
+`Run<TyId>`. A list whose elements are built whole and stand nowhere else (object members,
+template quasis, declarators, `switch` cases, import and export specifiers, class and type
+members, type parameters, decorators and the rest) is a value run over a store of its element
+type (`Run<ObjProp>`, `Run<Declarator>`, …), built on that type's scratch stack and flushed
+into the store when the list closes. A reader reaches them through an `AstView`, one word holding a
 reference to the stores; a store row, once pushed, is never edited or truncated, so a parser
 that replaces a node (a cover-grammar conversion, an annotated binding pattern) appends the
 new row and the old one is orphaned. The payloads too rare to sit inline in the node that
 refers to them (`ArrowFunctionExpression`, `FunctionDeclaration`, `TSImportType` and their
 fellows, a `for` head, a catch clause, a parameter name's extras) are rows too, one store per
 payload type, each named by an id of its own type (`ArrowFnId`, `FnDeclId`, `ImportTypeId`,
-…). What the arena still holds is the tree's by-value lists, its decoded strings and its
-comments. The rest of this section describes the layout the stores were built to keep.
+…). What the arena still holds is the tree's decoded strings and its comments. The rest of this section describes the layout the stores were built to keep.
 
 
 ```rust
@@ -1013,7 +1015,7 @@ pub struct Statement<'arena> {
 }
 
 pub enum StatementKind<'arena> {
-    VariableDeclaration(VariableDeclaration<'arena>), // small → inline by value
+    VariableDeclaration(VariableDeclaration), // small → inline by value
     IfStatement(IfStatement), // test: ExprId; consequent: StmtId
     // …
 }
@@ -1044,12 +1046,12 @@ size on its own taxes the whole tree, while the hop to a stored payload is paid 
 where that variant is actually spelled. Where such a variant is also **rare**, it holds
 its payload by id, a row of a store of that payload's own type:
 
-- `Expression` is **56 B**, not 176 — `ClassExpression`, `FunctionExpression`,
+- `Expression` is **48 B**, not 176 — `ClassExpression`, `FunctionExpression`,
   `ArrowFunctionExpression`, `MetaProperty` and `TaggedTemplateExpression` are stored.
   Together they are ~3% of expressions in real source (the two widest, ~0.02%). The
   next-widest variant is `CallExpression`, and it is 14–21% of expressions, which is
   where the ladder stops. `Expression` is a header over its variant —
-  `struct Expression { span, kind: ExpressionKind }` (`ExpressionKind` 48 B) — so reading
+  `struct Expression { span, kind: ExpressionKind }` (`ExpressionKind` 40 B) — so reading
   an expression's span is a field load rather than a dispatch over the variants. A
   variant struct carries no span of its own unless some node also holds that type
   outside an `Expression` (`Identifier`, `Literal`, `TemplateLiteral`, `RestElement`,
@@ -1059,7 +1061,7 @@ its payload by id, a row of a store of that payload's own type:
   that is the only way the wrapped form is built and no span is written after construction
   but the pattern wrapper's (an optional or annotated parameter's `?` / `: T` extension in
   the parameter parser), which lands on array and object patterns, carrying no second span.
-  On wasm32 `Expression` is 48 B.
+  It is 48 B on wasm32 too.
 - `TSType` is **72 B** — `TSImportType`, `TSConstructorType` and `TSInferType` are
   stored. No field holds a `TSType` by value: the type parser's deep precedence ladder
   pushes each type to the type store at its builder's tail and returns the row's id
@@ -1129,7 +1131,7 @@ whose own width was two such slots take it:
   `new` arguments, sequence and template-literal expressions are `Run<ExprId>`, and
   array-literal and array-pattern elements `Run<Option<ExprId>>` (a hole stays `None`; the
   `Option` is niche-packed) — a 4 B element where a by-value one is the whole `Expression`
-  (56 B native, 48 on wasm32). A spread element, built fresh rather than returned by
+  (48 B on both targets). A spread element, built fresh rather than returned by
   the ladder, is pushed once to join them. The parameter lists are value runs (`Run<Expr>`),
   which are rows of the expression store: their elements are built by the parser as
   values (a binding pattern, or an expression converted to one), so an id list would add

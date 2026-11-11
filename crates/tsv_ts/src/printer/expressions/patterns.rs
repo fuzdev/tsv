@@ -48,7 +48,7 @@ enum AssignmentContext {
 /// past the holes is shared.
 fn array_pattern_gap_end(
     view: AstView<'_>,
-    arr: &ast::ArrayPattern<'_>,
+    arr: &ast::ArrayPattern,
     i: usize,
     body_end: u32,
 ) -> u32 {
@@ -568,11 +568,7 @@ impl<'a> Printer<'a> {
 
     /// The object pattern's [`PatternTail`] — [`Self::pattern_body_end`] in its brace
     /// spelling, paired with the tail it bounds.
-    fn object_pattern_tail<'t>(
-        &self,
-        obj: &'t ast::ObjectPattern<'_>,
-        span: Span,
-    ) -> PatternTail<'t> {
+    fn object_pattern_tail<'t>(&self, obj: &'t ast::ObjectPattern, span: Span) -> PatternTail<'t> {
         let optional = obj.optional;
         let type_annotation = obj.type_annotation.as_ref();
         let last_content_end = self
@@ -596,11 +592,7 @@ impl<'a> Printer<'a> {
 
     /// The array pattern's [`PatternTail`]. A trailing hole carries no span, so the scan
     /// starts at the last REAL element — the commas past it are structure.
-    fn array_pattern_tail<'t>(
-        &self,
-        arr: &'t ast::ArrayPattern<'_>,
-        span: Span,
-    ) -> PatternTail<'t> {
+    fn array_pattern_tail<'t>(&self, arr: &'t ast::ArrayPattern, span: Span) -> PatternTail<'t> {
         let optional = arr.optional;
         let type_annotation = arr.type_annotation.as_ref();
         let last_content_end = self
@@ -670,18 +662,14 @@ impl<'a> Printer<'a> {
     /// Prettier expands object patterns when:
     /// 1. Any property has a nested pattern value (always expand)
     /// 2. The pattern exceeds print width (width-based expansion)
-    pub(super) fn build_object_pattern_doc(
-        &self,
-        obj: &ast::ObjectPattern<'_>,
-        span: Span,
-    ) -> DocId {
+    pub(super) fn build_object_pattern_doc(&self, obj: &ast::ObjectPattern, span: Span) -> DocId {
         self.build_object_pattern_doc_with_context(obj, span, PatternContext::Standalone)
     }
 
     /// Build object pattern doc with explicit context
     pub(super) fn build_object_pattern_doc_with_context(
         &self,
-        obj: &ast::ObjectPattern<'_>,
+        obj: &ast::ObjectPattern,
         obj_span: Span,
         context: PatternContext,
     ) -> DocId {
@@ -699,7 +687,7 @@ impl<'a> Printer<'a> {
     /// expands on its own (nesting, comments, blank lines) keep their layout.
     pub(in crate::printer) fn build_hugged_object_pattern_doc(
         &self,
-        obj: &ast::ObjectPattern<'_>,
+        obj: &ast::ObjectPattern,
         obj_span: Span,
     ) -> DocId {
         self.build_object_pattern_doc_grouped(
@@ -714,7 +702,7 @@ impl<'a> Printer<'a> {
     /// for the hugged sole parameter ([`Self::build_hugged_object_pattern_doc`]).
     fn build_object_pattern_doc_grouped(
         &self,
-        obj: &ast::ObjectPattern<'_>,
+        obj: &ast::ObjectPattern,
         obj_span: Span,
         context: PatternContext,
         own_group: bool,
@@ -1048,7 +1036,7 @@ impl<'a> Printer<'a> {
     /// after properties) forces expansion, matching prettier.
     fn object_pattern_has_own_line_block_comments(
         &self,
-        obj: &ast::ObjectPattern<'_>,
+        obj: &ast::ObjectPattern,
         obj_span: Span,
         boundary: u32,
     ) -> bool {
@@ -1064,11 +1052,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build doc for empty object pattern: `{}` with optional `?` + type annotation
-    fn build_empty_object_pattern_doc(
-        &self,
-        obj: &ast::ObjectPattern<'_>,
-        obj_span: Span,
-    ) -> DocId {
+    fn build_empty_object_pattern_doc(&self, obj: &ast::ObjectPattern, obj_span: Span) -> DocId {
         // Bound the comment scan to the braces (before any `?`/`: Type`), mirroring
         // `build_empty_array_pattern_doc`. Scanning the full span would pull a
         // comment out of the type annotation into the empty `{}` and duplicate it.
@@ -1081,7 +1065,7 @@ impl<'a> Printer<'a> {
     /// Build expanded doc for object pattern with hardlines (always multiline)
     fn build_expanded_object_pattern_doc(
         &self,
-        obj: &ast::ObjectPattern<'_>,
+        obj: &ast::ObjectPattern,
         span: Span,
         tail: PatternTail<'_>,
     ) -> DocId {
@@ -1349,11 +1333,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for an array pattern
-    pub(super) fn build_array_pattern_doc(
-        &self,
-        arr: &ast::ArrayPattern<'_>,
-        arr_span: Span,
-    ) -> DocId {
+    pub(super) fn build_array_pattern_doc(&self, arr: &ast::ArrayPattern, arr_span: Span) -> DocId {
         if arr.elements.is_empty() {
             return self.build_empty_array_pattern_doc(arr, arr_span);
         }
@@ -1430,7 +1410,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build doc for empty array pattern: `[]` with optional type annotation
-    fn build_empty_array_pattern_doc(&self, arr: &ast::ArrayPattern<'_>, span: Span) -> DocId {
+    fn build_empty_array_pattern_doc(&self, arr: &ast::ArrayPattern, span: Span) -> DocId {
         // For array patterns with a `?` / type annotation, the body ends at the `]`
         let tail = self.array_pattern_tail(arr, span);
 
@@ -1446,7 +1426,7 @@ impl<'a> Printer<'a> {
     /// skipped (render + fits would still walk it). Byte-identical.
     fn build_grouped_array_pattern_doc(
         &self,
-        arr: &ast::ArrayPattern<'_>,
+        arr: &ast::ArrayPattern,
         span: Span,
         tail: PatternTail<'_>,
         has_comments: bool,
@@ -1546,7 +1526,7 @@ impl<'a> Printer<'a> {
     /// Build expanded array pattern doc (always multiline)
     fn build_expanded_array_pattern_doc(
         &self,
-        arr: &ast::ArrayPattern<'_>,
+        arr: &ast::ArrayPattern,
         arr_span: Span,
         tail: PatternTail<'_>,
     ) -> DocId {
@@ -1713,7 +1693,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for an assignment pattern
     pub(super) fn build_assignment_pattern_doc(
         &self,
-        pattern: &ast::AssignmentPattern<'_>,
+        pattern: &ast::AssignmentPattern,
         span: Span,
     ) -> DocId {
         let left = self.view.expr(pattern.left);

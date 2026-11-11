@@ -7,8 +7,8 @@ use crate::ast::AstView;
 use tsv_lang::Span;
 
 use super::{
-    ClassDeclaration, ExportSpecList, ExprId, FunctionDeclaration, Identifier, ImportAttrList,
-    ImportSpecList, Literal, StmtId, TSDeclareFunction, TSEntityName, TSInterfaceDeclaration,
+    ClassDeclaration, ExportSpec, ExprId, FunctionDeclaration, Identifier, ImportAttr, ImportSpec,
+    Literal, Run, StmtId, TSDeclareFunction, TSEntityName, TSInterfaceDeclaration,
 };
 
 /// Export named declaration: `export const x = 1;`, `export { x }`, `export { x } from "y"`
@@ -18,14 +18,14 @@ pub struct ExportNamedDeclaration<'arena> {
     /// None when using specifiers
     pub declaration: Option<StmtId>,
     /// Export specifiers: `export { a, b as c }`
-    pub specifiers: ExportSpecList<'arena>,
+    pub specifiers: Run<ExportSpec>,
     /// Re-export source: `export { x } from "y"` or None for local exports
     pub source: Option<Literal<'arena>>,
     /// Import attributes: `export { x } from "y" with { type: "json" }`.
-    /// `None` = no `with` clause; `Some([])` = empty `with {}` (preserved,
+    /// `None` = no `with` clause; `Some` of an empty run = empty `with {}` (preserved,
     /// matching acorn/prettier). Only a re-export (with `source`) can carry a
     /// clause (spec: `WithClause` attaches to `export ExportFromClause FromClause`).
-    pub attributes: Option<ImportAttrList<'arena>>,
+    pub attributes: Option<Run<ImportAttr>>,
     /// Export kind: "value" for regular exports, "type" for type-only exports
     pub export_kind: ExportKind,
 }
@@ -99,8 +99,8 @@ pub struct ExportAllDeclaration<'arena> {
     /// Module source
     pub source: Literal<'arena>,
     /// Import attributes: `export * from "y" with { type: "json" }`.
-    /// `None` = no `with` clause; `Some([])` = empty `with {}`.
-    pub attributes: Option<ImportAttrList<'arena>>,
+    /// `None` = no `with` clause; `Some` of an empty run = empty `with {}`.
+    pub attributes: Option<Run<ImportAttr>>,
     /// Export kind: "value" or "type" (for `export type * from`)
     pub export_kind: ExportKind,
 }
@@ -152,12 +152,12 @@ pub use crate::imports::ImportPhase;
 #[derive(Debug, Clone)]
 pub struct ImportDeclaration<'arena> {
     /// Import specifiers (default, named, or namespace)
-    pub specifiers: ImportSpecList<'arena>,
+    pub specifiers: Run<ImportSpec>,
     /// Module source (string literal)
     pub source: Literal<'arena>,
     /// Import attributes: `import x from "y" with { type: "json" }`.
-    /// `None` = no `with` clause; `Some([])` = empty `with {}`.
-    pub attributes: Option<ImportAttrList<'arena>>,
+    /// `None` = no `with` clause; `Some` of an empty run = empty `with {}`.
+    pub attributes: Option<Run<ImportAttr>>,
     /// Import kind: "value" or "type" (for `import type { ... }`)
     pub import_kind: ImportKind,
     /// Import phase: `Source`/`Defer` for `import source …` / `import defer …`.
