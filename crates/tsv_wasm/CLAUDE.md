@@ -689,7 +689,7 @@ Maintenance checklist when a writer's emitted shape changes:
 `deno task check:ast-types` (in `deno task check`) runs three arms against `tsv_ast.d.ts`
 ([docs/audits.md §Wire-Type Drift Check](../../docs/audits.md#wire-type-drift-check-checkast-types)):
 **(A)** `tsv parse --locations` on curated snippets, each output embedded as a typed literal and
-`deno check`ed — excess-property checking catches drift both ways (missing/added fields,
+typechecked by `tsc` — excess-property checking catches drift both ways (missing/added fields,
 discriminator-string mismatches); **(B)** every `type` discriminant the fixture corpus produces
 must be declared here or be deliberately opaque (the CSS node vocabulary plus the
 `customElement` config-data `type:` key); **(C)** a computed minimal cover of every field SLOT

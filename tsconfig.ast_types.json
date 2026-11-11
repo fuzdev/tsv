@@ -1,0 +1,12 @@
+{
+	"compilerOptions": {
+		"noEmit": true,
+		"target": "esnext",
+		"module": "nodenext",
+		"moduleResolution": "nodenext",
+		"strict": true,
+		"allowImportingTsExtensions": true,
+		"types": []
+	},
+	"files": ["scripts/.drift_check.gen.ts"]
+}

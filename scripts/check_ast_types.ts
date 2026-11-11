@@ -29,7 +29,8 @@
  * thought to curate is still graded. `expected_ours.json` takes precedence where a fixture
  * declares a parser divergence — there tsv's wire is the contract.
  *
- * Arms A and C share one generated file and one `deno check` invocation.
+ * Arms A and C share one generated file and one `tsc` invocation (`tsconfig.ast_types.json`:
+ * strict, no ambient types, the file and the `.d.ts` it imports alone).
  *
  * ⚠️ **Arm B is a NAME check, not a reachability check, and its scan is text-level.** Two
  * failure shapes follow, both live in the corpus today and both absorbed deliberately: a name
@@ -39,7 +40,27 @@
  * `<svelte:options customElement>` props config). Arm C is what actually walks the typed
  * paths. The two are complementary in the usual way: B is broad and shallow, C is narrow and
  * deep.
+ *
+ * Its reach: the checkout read-only (the fixtures and the `.d.ts`), `scripts/` read-write (the
+ * generated file, removed when it passes and left for inspection when it fails), and two
+ * programs run in the checkout, its `target/corpus/tsv` and `node_modules/.bin/tsc`
+ * (`CheckAstTypesDeps`, built by `scripts/roots/check_ast_types.ts`).
  */
+
+import type { FsDir, FsReadDir } from '@fuzdev/gro/fs.ts';
+import type { SpawnProgram } from '@fuzdev/gro/spawn.ts';
+
+/** What `run_check_ast_types` reaches. */
+export interface CheckAstTypesDeps {
+	/** The checkout, read for the fixtures and the `.d.ts`, and the programs' working directory. */
+	checkout: FsReadDir;
+	/** The checkout's `scripts/`, where the generated file is written. */
+	scripts: FsDir;
+	/** The checkout's `target/corpus/tsv` (`AST_TYPES_TSV_BIN`). */
+	tsv: SpawnProgram;
+	/** `tsc`, its output inherited, run over `AST_TYPES_TSCONFIG`. */
+	tsc: SpawnProgram;
+}
 
 interface Sample {
 	name: string;
@@ -254,11 +275,14 @@ const samples: Sample[] = [
  * (the diagnostic seams are inert and touch no `write_*` — verified by diffing the two
  * binaries' `parse` output).
  */
-const TSV_BIN = 'target/corpus/tsv';
+export const AST_TYPES_TSV_BIN = 'target/corpus/tsv';
 
-async function parse(sample: Sample): Promise<string> {
-	const cmd = new Deno.Command(TSV_BIN, {
-		args: [
+/** The `tsc` project over the generated file. */
+export const AST_TYPES_TSCONFIG = 'tsconfig.ast_types.json';
+
+async function parse(deps: CheckAstTypesDeps, sample: Sample): Promise<string> {
+	const result = await deps.tsv.out(
+		[
 			'parse',
 			'--content',
 			sample.source,
@@ -269,15 +293,12 @@ async function parse(sample: Sample): Promise<string> {
 			// default wire is span-only, and arm C's fixtures pin it too
 			'--locations'
 		],
-		stdout: 'piped',
-		stderr: 'piped'
-	});
-	const { code, stdout, stderr } = await cmd.output();
-	if (code !== 0) {
-		const err = new TextDecoder().decode(stderr);
-		throw new Error(`tsv parse failed for ${sample.name}:\n${err}`);
+		{ cwd: deps.checkout }
+	);
+	if (result.kind !== 'exited' || result.code !== 0 || result.truncated) {
+		throw new Error(`tsv parse failed for ${sample.name}:\n${result.stderr}`);
 	}
-	return new TextDecoder().decode(stdout).trim();
+	return result.stdout.trim();
 }
 
 //
@@ -403,7 +424,7 @@ function wire_discriminants(json: string): Set<string> {
  * scalar-vs-node change at a slot still registers as a distinct slot.
  *
  * Slots inside an OPAQUE region (parent or child named in `OPAQUE_WIRE_TYPES`) are skipped:
- * the typed side is `unknown` there, so covering them spends `deno check` time grading
+ * the typed side is `unknown` there, so covering them spends `tsc` time grading
  * nothing. The filter keys on the live set, so the day a region is typed (its names leave the
  * set) its slots re-enter the cover automatically. Safe in both directions today because
  * every opaque name occurs only inside an `unknown`-typed region — the stale-entry check is
@@ -447,13 +468,15 @@ function wire_field_slots(json: unknown): Set<string> {
 	return out;
 }
 
-async function collect_fixture_wires(): Promise<FixtureWire[]> {
+/** The fixture wires, or `null` after reporting an unknown input kind. */
+async function collect_fixture_wires(checkout: FsReadDir): Promise<FixtureWire[] | null> {
 	const out: FixtureWire[] = [];
+	let unknown_kind = false;
 	const walk = async (dir: string): Promise<void> => {
 		const entries = [];
-		for await (const e of Deno.readDir(dir)) entries.push(e);
+		for await (const e of checkout.list(dir)) entries.push(e);
 		entries.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
-		const names = new Set(entries.filter((e) => e.isFile).map((e) => e.name));
+		const names = new Set(entries.filter((e) => e.kind === 'file').map((e) => e.name));
 		// `expected_ours.json` is tsv's wire where a fixture declares a parser divergence, and
 		// the `.d.ts` describes what tsv emits — so it wins over the canonical `expected.json`.
 		const pick = names.has('expected_ours.json')
@@ -469,10 +492,11 @@ async function collect_fixture_wires(): Promise<FixtureWire[]> {
 					`Unknown fixture input kind: ${dir}/${input} — add it to ROOT_TYPE so arms B and C` +
 						` grade it; skipping would silently shrink the corpus.`
 				);
-				Deno.exit(1);
+				unknown_kind = true;
+				return;
 			} else {
 				const path = `${dir}/${pick}`;
-				const text = await Deno.readTextFile(path);
+				const text = await checkout.read_text(path);
 				// A no-oracle marker payload (`{"error": …}`) types nothing.
 				if (!/^\s*\{\s*"error"/.test(text)) {
 					out.push({
@@ -486,11 +510,12 @@ async function collect_fixture_wires(): Promise<FixtureWire[]> {
 			}
 		}
 		for (const e of entries) {
-			if (e.isDirectory) await walk(`${dir}/${e.name}`);
+			if (e.kind === 'directory') await walk(`${dir}/${e.name}`);
+			if (unknown_kind) return;
 		}
 	};
 	await walk(FIXTURES_ROOT);
-	return out;
+	return unknown_kind ? null : out;
 }
 
 /**
@@ -529,119 +554,122 @@ function cover(wires: FixtureWire[], wanted: Set<string>): FixtureWire[] {
 	return chosen;
 }
 
-const dts = await Deno.readTextFile(DTS_PATH);
-const declared = declared_discriminants(dts);
+/**
+ * The three arms (module doc).
+ * @returns the exit code: `1` on drift or a refused corpus, else `0`
+ */
+export async function run_check_ast_types(deps: CheckAstTypesDeps): Promise<number> {
+	const dts = await deps.checkout.read_text(DTS_PATH);
+	const declared = declared_discriminants(dts);
 
-console.log(`Scanning ${FIXTURES_ROOT} …`);
-const wires = await collect_fixture_wires();
-const corpus_types = new Set<string>();
-for (const w of wires) for (const t of w.types) corpus_types.add(t);
+	console.log(`Scanning ${FIXTURES_ROOT} …`);
+	const wires = await collect_fixture_wires(deps.checkout);
+	if (wires === null) return 1;
+	const corpus_types = new Set<string>();
+	for (const w of wires) for (const t of w.types) corpus_types.add(t);
 
-if (wires.length < FIXTURES_MIN) {
-	console.error(
-		`Only ${wires.length} fixture wire(s) resolved (floor ${FIXTURES_MIN}). The corpus walk is` +
-			` broken or the tree moved — refusing to grade a shrunken corpus.`
-	);
-	Deno.exit(1);
-}
-if (corpus_types.size < DISCRIMINANTS_MIN) {
-	console.error(
-		`Only ${corpus_types.size} wire discriminant(s) found (floor ${DISCRIMINANTS_MIN}).` +
-			` The extraction is broken — refusing to grade.`
-	);
-	Deno.exit(1);
-}
+	if (wires.length < FIXTURES_MIN) {
+		console.error(
+			`Only ${wires.length} fixture wire(s) resolved (floor ${FIXTURES_MIN}). The corpus walk is` +
+				` broken or the tree moved — refusing to grade a shrunken corpus.`
+		);
+		return 1;
+	}
+	if (corpus_types.size < DISCRIMINANTS_MIN) {
+		console.error(
+			`Only ${corpus_types.size} wire discriminant(s) found (floor ${DISCRIMINANTS_MIN}).` +
+				` The extraction is broken — refusing to grade.`
+		);
+		return 1;
+	}
 
-// Arm B — every discriminant the wire produces is declared, or deliberately opaque.
-const undeclared = [...corpus_types].filter((t) => !declared.has(t) && !OPAQUE_WIRE_TYPES.has(t));
-undeclared.sort();
-const stale_opaque = [...OPAQUE_WIRE_TYPES].filter((t) => !corpus_types.has(t));
-stale_opaque.sort();
-if (undeclared.length > 0 || stale_opaque.length > 0) {
-	console.error('');
-	if (undeclared.length > 0) {
-		console.error(`Wire-type coverage gap — ${undeclared.length} discriminant(s) the fixture`);
-		console.error(`corpus produces but ${DTS_PATH} does not declare:`);
-		for (const t of undeclared) console.error(`  ${t}`);
+	// Arm B — every discriminant the wire produces is declared, or deliberately opaque.
+	const undeclared = [...corpus_types].filter((t) => !declared.has(t) && !OPAQUE_WIRE_TYPES.has(t));
+	undeclared.sort();
+	const stale_opaque = [...OPAQUE_WIRE_TYPES].filter((t) => !corpus_types.has(t));
+	stale_opaque.sort();
+	if (undeclared.length > 0 || stale_opaque.length > 0) {
 		console.error('');
-		console.error('Declare each one, or — if the node is deliberately opaque — add it to');
-		console.error('OPAQUE_WIRE_TYPES with the reason.');
+		if (undeclared.length > 0) {
+			console.error(`Wire-type coverage gap — ${undeclared.length} discriminant(s) the fixture`);
+			console.error(`corpus produces but ${DTS_PATH} does not declare:`);
+			for (const t of undeclared) console.error(`  ${t}`);
+			console.error('');
+			console.error('Declare each one, or — if the node is deliberately opaque — add it to');
+			console.error('OPAQUE_WIRE_TYPES with the reason.');
+		}
+		if (stale_opaque.length > 0) {
+			console.error(`Stale OPAQUE_WIRE_TYPES entr(ies) — no longer produced by the corpus:`);
+			for (const t of stale_opaque) console.error(`  ${t}`);
+			console.error('Remove them; an opaque entry that fires on nothing hides the next one.');
+		}
+		return 1;
 	}
-	if (stale_opaque.length > 0) {
-		console.error(`Stale OPAQUE_WIRE_TYPES entr(ies) — no longer produced by the corpus:`);
-		for (const t of stale_opaque) console.error(`  ${t}`);
-		console.error('Remove them; an opaque entry that fires on nothing hides the next one.');
-	}
-	Deno.exit(1);
-}
-console.log(
-	`Wire-type coverage: ${corpus_types.size} discriminant(s) across ${wires.length} fixture` +
-		` wire(s) — ${corpus_types.size - OPAQUE_WIRE_TYPES.size} declared,` +
-		` ${OPAQUE_WIRE_TYPES.size} deliberately opaque.`
-);
-
-// Arm C — the minimal cover, typed against the .d.ts alongside the curated samples.
-const corpus_positions = new Set<string>();
-for (const w of wires) for (const t of w.positions) corpus_positions.add(t);
-if (corpus_positions.size < SLOTS_MIN) {
-	console.error(
-		`Only ${corpus_positions.size} wire field slot(s) found (floor ${SLOTS_MIN}).` +
-			` The extraction is broken — refusing to grade.`
+	console.log(
+		`Wire-type coverage: ${corpus_types.size} discriminant(s) across ${wires.length} fixture` +
+			` wire(s) — ${corpus_types.size - OPAQUE_WIRE_TYPES.size} declared,` +
+			` ${OPAQUE_WIRE_TYPES.size} deliberately opaque.`
 	);
-	Deno.exit(1);
+
+	// Arm C — the minimal cover, typed against the .d.ts alongside the curated samples.
+	const corpus_positions = new Set<string>();
+	for (const w of wires) for (const t of w.positions) corpus_positions.add(t);
+	if (corpus_positions.size < SLOTS_MIN) {
+		console.error(
+			`Only ${corpus_positions.size} wire field slot(s) found (floor ${SLOTS_MIN}).` +
+				` The extraction is broken — refusing to grade.`
+		);
+		return 1;
+	}
+	const selected = cover(wires, corpus_positions);
+	if (selected.length === 0) {
+		console.error('Cover selection produced no fixtures — refusing to type-check nothing.');
+		return 1;
+	}
+	console.log(
+		`Cover: ${selected.length} fixture(s) span all ${corpus_positions.size} gradable wire field slot(s).`
+	);
+
+	const gen_name = '.drift_check.gen.ts';
+	const gen_path = `scripts/${gen_name}`;
+
+	const header = [
+		'// Auto-generated by scripts/check_ast_types.ts — do not edit.',
+		'// Tests that tsv_ast.d.ts accepts the shapes produced by `tsv parse` (curated samples)',
+		'// and the shapes committed in the fixture corpus (computed cover).',
+		"import type { Program, Root, StyleSheetFile } from '../crates/tsv_wasm/types/tsv_ast.d.ts';",
+		''
+	];
+
+	console.log(`Parsing ${samples.length} curated sample(s)...`);
+	const jsons = await Promise.all(samples.map((sample) => parse(deps, sample)));
+
+	const body = samples.map((sample, i) => `const _${sample.name}: ${sample.type} = ${jsons[i]};\n`);
+
+	for (const [i, w] of selected.entries()) {
+		// Re-serialize compactly: the committed files are tab-indented, which is ~2x the bytes for
+		// `tsc` to tokenize and buys nothing here.
+		const compact = JSON.stringify(JSON.parse(await deps.checkout.read_text(w.path)));
+		body.push(`// ${w.path}\nconst _cover_${i}: ${w.root} = ${compact};\n`);
+	}
+
+	await deps.scripts.write(gen_name, [...header, ...body].join('\n'));
+	console.log(`Wrote ${gen_path}`);
+
+	console.log(`Running \`tsc -p ${AST_TYPES_TSCONFIG}\` over ${gen_path}...`);
+	const check = await deps.tsc.run(['-p', AST_TYPES_TSCONFIG], { cwd: deps.checkout });
+
+	if (check.kind !== 'exited' || check.code !== 0) {
+		console.error('');
+		console.error(`Drift detected. ${gen_path} left in place for inspection.`);
+		console.error(`Update crates/tsv_wasm/types/tsv_ast.d.ts to match the actual`);
+		console.error(`shape, or fix the convert layer if the .d.ts is correct.`);
+		return 1;
+	}
+
+	await deps.scripts.remove(gen_name);
+	console.log(
+		`OK — no drift across ${samples.length} curated sample(s) + ${selected.length} fixture cover file(s).`
+	);
+	return 0;
 }
-const selected = cover(wires, corpus_positions);
-if (selected.length === 0) {
-	console.error('Cover selection produced no fixtures — refusing to type-check nothing.');
-	Deno.exit(1);
-}
-console.log(
-	`Cover: ${selected.length} fixture(s) span all ${corpus_positions.size} gradable wire field slot(s).`
-);
-
-const gen_path = 'scripts/.drift_check.gen.ts';
-
-const header = [
-	'// Auto-generated by scripts/check_ast_types.ts — do not edit.',
-	'// Tests that tsv_ast.d.ts accepts the shapes produced by `tsv parse` (curated samples)',
-	'// and the shapes committed in the fixture corpus (computed cover).',
-	"import type { Program, Root, StyleSheetFile } from '../crates/tsv_wasm/types/tsv_ast.d.ts';",
-	''
-];
-
-console.log(`Parsing ${samples.length} curated sample(s)...`);
-const jsons = await Promise.all(samples.map(parse));
-
-const body = samples.map((sample, i) => `const _${sample.name}: ${sample.type} = ${jsons[i]};\n`);
-
-for (const [i, w] of selected.entries()) {
-	// Re-serialize compactly: the committed files are tab-indented, which is ~2x the bytes for
-	// `deno check` to tokenize and buys nothing here.
-	const compact = JSON.stringify(JSON.parse(await Deno.readTextFile(w.path)));
-	body.push(`// ${w.path}\nconst _cover_${i}: ${w.root} = ${compact};\n`);
-}
-
-await Deno.writeTextFile(gen_path, [...header, ...body].join('\n'));
-console.log(`Wrote ${gen_path}`);
-
-console.log(`Running \`deno check ${gen_path}\`...`);
-const check = new Deno.Command('deno', {
-	// `--no-lock`: the repo is deliberately deno.lock-free, as in `typecheck:scripts`.
-	args: ['check', '--no-lock', gen_path],
-	stdout: 'inherit',
-	stderr: 'inherit'
-});
-const { code } = await check.output();
-
-if (code !== 0) {
-	console.error('');
-	console.error(`Drift detected. ${gen_path} left in place for inspection.`);
-	console.error(`Update crates/tsv_wasm/types/tsv_ast.d.ts to match the actual`);
-	console.error(`shape, or fix the convert layer if the .d.ts is correct.`);
-	Deno.exit(1);
-}
-
-await Deno.remove(gen_path);
-console.log(
-	`OK — no drift across ${samples.length} curated sample(s) + ${selected.length} fixture cover file(s).`
-);

@@ -8,7 +8,8 @@
  */
 
 import { CHANGELOG_PATH, changelog_stamp, type ChangelogStampOutcome } from './changelog.ts';
-import { command_capture, type Result } from './command.ts';
+import { command_capture } from './command.ts';
+import type { Result } from './result.ts';
 import { CARGO_PATH, cargo_workspace_version_set } from './version.ts';
 
 const LOCKFILE_PATH = 'Cargo.lock';

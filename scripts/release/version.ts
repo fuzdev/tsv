@@ -6,7 +6,7 @@
  * @module
  */
 
-import type { Result } from './command.ts';
+import type { Result } from './result.ts';
 
 export const CARGO_PATH = 'Cargo.toml';
 

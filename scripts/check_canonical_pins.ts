@@ -19,6 +19,11 @@
  *
  * Passing neither flag runs both (what `doctor` does); passing both is the same.
  *
+ * Its reach (`CheckCanonicalPinsDeps`, built by `scripts/roots/check_canonical_pins.ts`): the
+ * checkout read-only; for `--checkouts`, the directory the checkout sits in read-only and
+ * `git`, when one is on `PATH`, which reads each sibling checkout's ids. `--pins` gets
+ * neither.
+ *
  * **1. Pin agreement** — the canonical versions must stay IDENTICAL across five
  * places (the sync contract documented in `crates/tsv_debug/src/deno/sidecar.ts`
  * and `benches/js/package.json` `//canonical-sync`):
@@ -75,6 +80,9 @@
  * whatever the checkout's HEAD (a clone that lacks the commit is noted, not graded).
  */
 
+import type { FsReadDir } from '@fuzdev/gro/fs.ts';
+import type { SpawnProgram } from '@fuzdev/gro/spawn.ts';
+
 import { GATE_CHECKOUT_IDS } from '../benches/js/lib/gate_counts.ts';
 
 const MODE_FLAGS = ['--pins', '--checkouts'] as const;
@@ -83,18 +91,48 @@ type ModeFlag = (typeof MODE_FLAGS)[number];
 
 const is_mode_flag = (a: string): a is ModeFlag => MODE_FLAGS.some((f) => f === a);
 
-const unknown_args = Deno.args.filter((a) => !is_mode_flag(a));
-if (unknown_args.length > 0) {
-	console.error(
-		`FAIL: unknown argument(s) ${unknown_args.join(', ')} — expected ${MODE_FLAGS.join(' and/or ')} ` +
-			'(neither = both modes)'
-	);
-	Deno.exit(1);
+/** Which of the two modes a run takes. */
+export interface PinsModes {
+	run_pins: boolean;
+	run_checkouts: boolean;
 }
-// Neither flag = both modes, so a bare invocation stays the full audit.
-const selected = Deno.args.filter(is_mode_flag);
-const run_pins = selected.length === 0 || selected.includes('--pins');
-const run_checkouts = selected.length === 0 || selected.includes('--checkouts');
+
+/**
+ * The modes `args` select: `--pins`, `--checkouts`, both, or neither (= both, so a bare
+ * invocation stays the full audit).
+ * @returns the modes, or the usage error for an argument that is neither flag
+ */
+export function parse_pins_args(args: ReadonlyArray<string>): PinsModes | { error: string } {
+	const unknown_args = args.filter((a) => !is_mode_flag(a));
+	if (unknown_args.length > 0) {
+		return {
+			error:
+				`FAIL: unknown argument(s) ${unknown_args.join(', ')} — expected ${MODE_FLAGS.join(' and/or ')} ` +
+				'(neither = both modes)'
+		};
+	}
+	const selected = args.filter(is_mode_flag);
+	return {
+		run_pins: selected.length === 0 || selected.includes('--pins'),
+		run_checkouts: selected.length === 0 || selected.includes('--checkouts')
+	};
+}
+
+/** What `run_check_canonical_pins` reaches. */
+export interface CheckCanonicalPinsDeps {
+	/** The checkout, where the pin sites are. */
+	checkout: FsReadDir;
+	/**
+	 * The directory the checkout sits in, where the sibling checkouts are (`../svelte`), read
+	 * for `--checkouts`. Unused by `--pins`.
+	 */
+	siblings: FsReadDir | null;
+	/**
+	 * `git`, which reads each sibling checkout's ids for the drift half, or `null` when the run
+	 * has none (`--pins`, or no git on `PATH`), which skips that half and says so.
+	 */
+	git: SpawnProgram | null;
+}
 
 const CANONICAL_PACKAGES = [
 	'prettier',
@@ -133,124 +171,11 @@ const LOCKED_TRANSITIVE: Record<string, string> = {
 
 const escape_regex = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-const sidecar = Deno.readTextFileSync(SIDECAR_PATH);
-const actor = Deno.readTextFileSync(ACTOR_PATH);
-const bench_pkg = JSON.parse(Deno.readTextFileSync(BENCH_PKG_PATH)) as {
-	dependencies?: Record<string, string>;
-};
-const bench_deps = bench_pkg.dependencies ?? {};
-const lock_npm =
-	(JSON.parse(Deno.readTextFileSync(SIDECAR_LOCK_PATH)) as { npm?: Record<string, unknown> }).npm ??
-	{};
-
 /** `name` → version per source, `null` when the source doesn't pin it. */
 interface PinSources {
 	versions_object: string | null;
 	import_specifier: string | null;
 	bench_package_json: string | null;
-}
-
-const failures: string[] = [];
-const report: string[] = [];
-const checkout_notes: string[] = [];
-const drifted: string[] = [];
-
-/**
- * Versions the sidecar lockfile resolves for `name`.
- *
- * Lock keys are `name@version`, optionally suffixed with the peer resolution
- * that disambiguates a duplicate (`prettier-plugin-svelte@4.1.1_prettier@3.9.10_svelte@5.57.3`),
- * and a scoped name carries its own leading `@`. Returns every match so the
- * caller can distinguish absent (0) from a genuinely duplicated package (>1) —
- * two copies of the oracle's printer in one tree would make "the pinned version"
- * meaningless rather than merely wrong.
- */
-const locked_versions = (name: string): string[] => {
-	const prefix = `${name}@`;
-	return Object.keys(lock_npm)
-		.filter((key) => key.startsWith(prefix))
-		.map((key) => key.slice(prefix.length).split('_')[0]);
-};
-
-/** Assert the lockfile resolves `name` to exactly `expected`, attributing the source. */
-const assert_locked = (name: string, expected: string, source: string): void => {
-	const found = locked_versions(name);
-	if (found.length === 0) {
-		failures.push(
-			`${name}: absent from ${SIDECAR_LOCK_PATH} — the sidecar does not resolve it; regenerate the lockfile`
-		);
-	} else if (found.length > 1) {
-		failures.push(
-			`${name}: ${SIDECAR_LOCK_PATH} resolves ${found.length} copies (${found.join(', ')}) — ` +
-				'the sidecar would run more than one, so no single version is "the" oracle'
-		);
-	} else if (found[0] !== expected) {
-		failures.push(
-			`${name}: ${SIDECAR_LOCK_PATH} resolves ${found[0]} but ${source} says ${expected} — ` +
-				'the sidecar runs the lockfile, so regenerate it or fix the pin'
-		);
-	}
-};
-
-// --- Pin agreement (see the header docstring, half 1) --------------------------
-
-if (run_pins) {
-	// The VERSIONS object body — sliced so a stray `name: 'x.y.z'` elsewhere can't match.
-	const versions_block = /const VERSIONS = \{([\s\S]*?)\} as const;/.exec(sidecar)?.[1];
-	if (!versions_block) {
-		console.error(`FAIL: could not locate the VERSIONS object in ${SIDECAR_PATH}`);
-		Deno.exit(1);
-	}
-
-	for (const name of CANONICAL_PACKAGES) {
-		const escaped = escape_regex(name);
-		const pins: PinSources = {
-			versions_object:
-				new RegExp(`(?:'${escaped}'|${escaped}): '([^']+)'`).exec(versions_block)?.[1] ?? null,
-			import_specifier:
-				new RegExp(`npm:${escaped}@(\\d+\\.\\d+\\.\\d+)`).exec(sidecar)?.[1] ?? null,
-			bench_package_json: bench_deps[name] ?? null
-		};
-
-		const entries = Object.entries(pins) as [keyof PinSources, string | null][];
-		const missing = entries.filter(([, v]) => v === null).map(([k]) => k);
-		if (missing.length > 0) {
-			failures.push(`${name}: missing pin in ${missing.join(', ')}`);
-			continue;
-		}
-		// Non-null by the check above — asserted once here so the rest of the loop
-		// reads as plain strings rather than re-testing a field that cannot be null.
-		const versions = entries.map(([, v]) => v as string);
-		const distinct = new Set(versions);
-		if (distinct.size > 1) {
-			failures.push(`${name}: pins disagree — ${entries.map(([k, v]) => `${k}=${v}`).join(', ')}`);
-			continue;
-		}
-		const pinned = versions[0];
-		report.push(`${name}@${pinned}`);
-
-		// The actor.rs import map pins acorn (so the ts plugin extends the same
-		// acorn instance) — it must ride along with the acorn pin.
-		if (name === 'acorn') {
-			const actor_pin = /npm:acorn@(\d+\.\d+\.\d+)/.exec(actor)?.[1] ?? null;
-			if (actor_pin === null) {
-				failures.push(`acorn: missing npm:acorn@x.y.z import-map pin in ${ACTOR_PATH}`);
-			} else if (actor_pin !== pinned) {
-				failures.push(`acorn: ${ACTOR_PATH} import-map pin ${actor_pin} disagrees with ${pinned}`);
-			}
-		}
-
-		// The sidecar RESOLVES against its lockfile, so a literal pin the lock
-		// disagrees with is a lie: the sidecar would run one version while every
-		// pin site claims another. Checked per package rather than once, so the
-		// failure names which one drifted.
-		assert_locked(name, pinned, 'the canonical pin');
-	}
-
-	// The oracle's own transitive dependencies — pinned ONLY by the lockfile.
-	for (const [name, expected] of Object.entries(LOCKED_TRANSITIVE)) {
-		assert_locked(name, expected, 'LOCKED_TRANSITIVE in scripts/check_canonical_pins.ts');
-	}
 }
 
 /**
@@ -273,6 +198,16 @@ function option_pairs(body: string): Map<string, string> {
 	return pairs;
 }
 
+const CHECKOUT_ALIGNMENT: {
+	pkg_json: string;
+	npm_package: (typeof CANONICAL_PACKAGES)[number];
+}[] = [
+	{ pkg_json: '../svelte/packages/svelte/package.json', npm_package: 'svelte' },
+	{ pkg_json: '../acorn-typescript/package.json', npm_package: '@sveltejs/acorn-typescript' }
+];
+
+const BENCH_CANONICAL_PATH = 'benches/js/lib/canonical.ts';
+
 /**
  * The prettier OPTIONS must stay identical across the two oracles, exactly as the
  * versions above must.
@@ -293,10 +228,12 @@ function option_pairs(body: string): Map<string, string> {
  * through the live oracle. This check is the repo-fact half: that the two sets are
  * the SAME set.
  */
-function check_prettier_option_agreement(): void {
-	const BENCH_CANONICAL_PATH = 'benches/js/lib/canonical.ts';
-	const bench_src = Deno.readTextFileSync(BENCH_CANONICAL_PATH);
-
+function check_prettier_option_agreement(
+	bench_src: string,
+	sidecar: string,
+	failures: string[],
+	report: string[]
+): void {
 	const bench_body = /const PRETTIER_OPTIONS = \{([\s\S]*?)\} as const;/.exec(bench_src)?.[1];
 	const sidecar_body = /return await prettier\.format\(content, \{([\s\S]*?)\}\);/.exec(
 		sidecar
@@ -331,142 +268,287 @@ function check_prettier_option_agreement(): void {
 	report.push(`prettier options agree (${[...bench].map(([k, v]) => `${k}=${v}`).join(', ')})`);
 }
 
-// Invoked here rather than inside the `run_pins` block above: that block runs before
-// this declaration, and `PRETTIER_STRUCTURAL_KEYS` is a `const` — a call from there
-// hits the temporal dead zone, where the version checks' hoisted helpers do not.
-if (run_pins) check_prettier_option_agreement();
-
-// --- Checkout alignment + checkout drift (header docstring, halves 2 and 3) ----
-
-const CHECKOUT_ALIGNMENT: {
-	pkg_json: string;
-	npm_package: (typeof CANONICAL_PACKAGES)[number];
-}[] = [
-	{ pkg_json: '../svelte/packages/svelte/package.json', npm_package: 'svelte' },
-	{ pkg_json: '../acorn-typescript/package.json', npm_package: '@sveltejs/acorn-typescript' }
-];
+/**
+ * A sibling path as the messages spell it (`../svelte/...`) relative to the directory the
+ * checkout sits in.
+ */
+const to_sibling_path = (path: string): string => {
+	if (!path.startsWith('../')) throw new Error(`not a sibling path: ${path}`);
+	return path.slice('../'.length);
+};
 
 /**
- * Resolve a git object of a checkout — `HEAD` (the commit) or `HEAD:<tree>` (a
+ * Resolve a git object of a sibling checkout — `HEAD` (the commit) or `HEAD:<tree>` (a
  * subtree's id) — or `null` when it is absent / not a git repo.
  */
-const rev_parse = (repo: string, rev: string): string | null => {
+const rev_parse = async (
+	git: SpawnProgram,
+	siblings: FsReadDir,
+	repo: string,
+	rev: string
+): Promise<string | null> => {
+	let cwd: FsReadDir;
 	try {
-		const { success, stdout } = new Deno.Command('git', {
-			args: ['-C', repo, 'rev-parse', rev],
-			stdout: 'piped',
-			stderr: 'null'
-		}).outputSync();
-		return success ? new TextDecoder().decode(stdout).trim() : null;
+		cwd = siblings.dir(to_sibling_path(repo));
+	} catch {
+		return null;
+	}
+	try {
+		const result = await git.out(['rev-parse', rev], { cwd });
+		return result.kind === 'exited' && result.code === 0 ? result.stdout.trim() : null;
 	} catch {
 		return null;
 	}
 };
 
-if (run_checkouts) {
-	// Without `--allow-run=git` every `rev_parse` throws and the drift half reads
-	// as "all checkouts absent" — silently inert, which is exactly how it sat
-	// unnoticed in `doctor`'s invocation. Say so instead of reporting nothing.
-	const can_run_git = Deno.permissions.querySync({ name: 'run', command: 'git' }).state;
-	if (can_run_git !== 'granted') {
-		checkout_notes.push('checkout drift not checked — this invocation lacks --allow-run=git');
-	}
+/**
+ * The audit in the modes `modes` names (module doc).
+ * @returns the exit code: `1` on any mismatch or missing pin, else `0`
+ */
+export async function run_check_canonical_pins(
+	deps: CheckCanonicalPinsDeps,
+	{ run_pins, run_checkouts }: PinsModes
+): Promise<number> {
+	const sidecar = await deps.checkout.read_text(SIDECAR_PATH);
+	const actor = await deps.checkout.read_text(ACTOR_PATH);
+	const bench_pkg = JSON.parse(await deps.checkout.read_text(BENCH_PKG_PATH)) as {
+		dependencies?: Record<string, string>;
+	};
+	const bench_deps = bench_pkg.dependencies ?? {};
+	const lock_npm =
+		(
+			JSON.parse(await deps.checkout.read_text(SIDECAR_LOCK_PATH)) as {
+				npm?: Record<string, unknown>;
+			}
+		).npm ?? {};
 
-	for (const { pkg_json, npm_package } of CHECKOUT_ALIGNMENT) {
-		let checkout_version: string | undefined;
-		try {
-			checkout_version = (JSON.parse(Deno.readTextFileSync(pkg_json)) as { version?: string })
-				.version;
-		} catch {
-			checkout_notes.push(`${npm_package} checkout absent — alignment not checked`);
-			continue;
-		}
-		const pinned = bench_deps[npm_package];
-		if (checkout_version !== pinned) {
+	const failures: string[] = [];
+	const report: string[] = [];
+	const checkout_notes: string[] = [];
+	const drifted: string[] = [];
+
+	/**
+	 * Versions the sidecar lockfile resolves for `name`.
+	 *
+	 * Lock keys are `name@version`, optionally suffixed with the peer resolution
+	 * that disambiguates a duplicate (`prettier-plugin-svelte@4.1.1_prettier@3.9.10_svelte@5.57.3`),
+	 * and a scoped name carries its own leading `@`. Returns every match so the
+	 * caller can distinguish absent (0) from a genuinely duplicated package (>1) —
+	 * two copies of the oracle's printer in one tree would make "the pinned version"
+	 * meaningless rather than merely wrong.
+	 */
+	const locked_versions = (name: string): string[] => {
+		const prefix = `${name}@`;
+		return Object.keys(lock_npm)
+			.filter((key) => key.startsWith(prefix))
+			.map((key) => key.slice(prefix.length).split('_')[0]);
+	};
+
+	/** Assert the lockfile resolves `name` to exactly `expected`, attributing the source. */
+	const assert_locked = (name: string, expected: string, source: string): void => {
+		const found = locked_versions(name);
+		if (found.length === 0) {
 			failures.push(
-				`${npm_package}: checkout ${pkg_json} is v${checkout_version ?? '?'} but the oracle pin is v${pinned} — ` +
-					'align the checkout to the pinned tag, or bump the canonical pins deliberately (a fixture re-baseline)'
+				`${name}: absent from ${SIDECAR_LOCK_PATH} — the sidecar does not resolve it; regenerate the lockfile`
+			);
+		} else if (found.length > 1) {
+			failures.push(
+				`${name}: ${SIDECAR_LOCK_PATH} resolves ${found.length} copies (${found.join(', ')}) — ` +
+					'the sidecar would run more than one, so no single version is "the" oracle'
+			);
+		} else if (found[0] !== expected) {
+			failures.push(
+				`${name}: ${SIDECAR_LOCK_PATH} resolves ${found[0]} but ${source} says ${expected} — ` +
+					'the sidecar runs the lockfile, so regenerate it or fix the pin'
 			);
 		}
-	}
+	};
 
-	// Skipped wholesale rather than per-repo: without the permission every
-	// `rev_parse` returns `null`, which would read as "every checkout absent".
-	if (can_run_git === 'granted') {
-		for (const [repo, { hash, tree, pins, commit }] of Object.entries(GATE_CHECKOUT_IDS)) {
-			// A `tree` pin compares that subtree's id at HEAD, so a commit that touches
-			// nothing under it is not a move (the corpora snapshot's tooling commits).
-			const what = tree === undefined ? repo : `${repo}:${tree}`;
-			const current = rev_parse(repo, tree === undefined ? 'HEAD' : `HEAD:${tree}`);
-			if (current === null) {
-				checkout_notes.push(`${repo} absent — drift not checked`);
+	if (run_pins) {
+		// The VERSIONS object body — sliced so a stray `name: 'x.y.z'` elsewhere can't match.
+		const versions_block = /const VERSIONS = \{([\s\S]*?)\} as const;/.exec(sidecar)?.[1];
+		if (!versions_block) {
+			console.error(`FAIL: could not locate the VERSIONS object in ${SIDECAR_PATH}`);
+			return 1;
+		}
+
+		for (const name of CANONICAL_PACKAGES) {
+			const escaped = escape_regex(name);
+			const pins: PinSources = {
+				versions_object:
+					new RegExp(`(?:'${escaped}'|${escaped}): '([^']+)'`).exec(versions_block)?.[1] ?? null,
+				import_specifier:
+					new RegExp(`npm:${escaped}@(\\d+\\.\\d+\\.\\d+)`).exec(sidecar)?.[1] ?? null,
+				bench_package_json: bench_deps[name] ?? null
+			};
+
+			const entries = Object.entries(pins) as [keyof PinSources, string | null][];
+			const missing = entries.filter(([, v]) => v === null).map(([k]) => k);
+			if (missing.length > 0) {
+				failures.push(`${name}: missing pin in ${missing.join(', ')}`);
 				continue;
 			}
-			// A recorded commit is what the PGO training fetches, so its tree must BE the pin —
-			// a fact about the two recorded ids, not about this checkout, hence a failure
-			if (commit !== undefined && tree !== undefined) {
-				const commit_tree = rev_parse(repo, `${commit}:${tree}`);
-				if (commit_tree === null) {
-					checkout_notes.push(`${repo} lacks the recorded commit ${commit.slice(0, 12)}`);
-				} else if (!commit_tree.startsWith(hash)) {
+			// Non-null by the check above — asserted once here so the rest of the loop
+			// reads as plain strings rather than re-testing a field that cannot be null.
+			const versions = entries.map(([, v]) => v as string);
+			const distinct = new Set(versions);
+			if (distinct.size > 1) {
+				failures.push(
+					`${name}: pins disagree — ${entries.map(([k, v]) => `${k}=${v}`).join(', ')}`
+				);
+				continue;
+			}
+			const pinned = versions[0];
+			report.push(`${name}@${pinned}`);
+
+			// The actor.rs import map pins acorn (so the ts plugin extends the same
+			// acorn instance) — it must ride along with the acorn pin.
+			if (name === 'acorn') {
+				const actor_pin = /npm:acorn@(\d+\.\d+\.\d+)/.exec(actor)?.[1] ?? null;
+				if (actor_pin === null) {
+					failures.push(`acorn: missing npm:acorn@x.y.z import-map pin in ${ACTOR_PATH}`);
+				} else if (actor_pin !== pinned) {
 					failures.push(
-						`${what}: the recorded commit ${commit.slice(0, 12)} holds ${tree} ${commit_tree.slice(0, hash.length)}, ` +
-							`not the pinned ${hash} — re-record GATE_CHECKOUT_IDS' commit with its tree`
+						`acorn: ${ACTOR_PATH} import-map pin ${actor_pin} disagrees with ${pinned}`
 					);
 				}
 			}
-			// The recorded ids are abbreviated, so compare on the prefix.
-			if (!current.startsWith(hash)) {
-				drifted.push(
-					`${what}: measured at ${hash}, now at ${current.slice(0, hash.length)} — pins: ${pins.join(', ')}`
+
+			// The sidecar RESOLVES against its lockfile, so a literal pin the lock
+			// disagrees with is a lie: the sidecar would run one version while every
+			// pin site claims another. Checked per package rather than once, so the
+			// failure names which one drifted.
+			assert_locked(name, pinned, 'the canonical pin');
+		}
+
+		// The oracle's own transitive dependencies — pinned ONLY by the lockfile.
+		for (const [name, expected] of Object.entries(LOCKED_TRANSITIVE)) {
+			assert_locked(name, expected, 'LOCKED_TRANSITIVE in scripts/check_canonical_pins.ts');
+		}
+
+		check_prettier_option_agreement(
+			await deps.checkout.read_text(BENCH_CANONICAL_PATH),
+			sidecar,
+			failures,
+			report
+		);
+	}
+
+	if (run_checkouts) {
+		const { siblings } = deps;
+		if (siblings === null)
+			throw new Error('--checkouts reads the sibling checkouts, and none were given');
+		// Without git every `rev_parse` would read as "all checkouts absent" — silently
+		// inert, which is exactly how it once sat unnoticed in `doctor`'s invocation. Say so
+		// instead of reporting nothing.
+		const { git } = deps;
+		if (git === null) {
+			checkout_notes.push('checkout drift not checked — git is not on PATH');
+		}
+
+		for (const { pkg_json, npm_package } of CHECKOUT_ALIGNMENT) {
+			let checkout_version: string | undefined;
+			try {
+				checkout_version = (
+					JSON.parse(siblings.read_text_sync(to_sibling_path(pkg_json))) as { version?: string }
+				).version;
+			} catch {
+				checkout_notes.push(`${npm_package} checkout absent — alignment not checked`);
+				continue;
+			}
+			const pinned = bench_deps[npm_package];
+			if (checkout_version !== pinned) {
+				failures.push(
+					`${npm_package}: checkout ${pkg_json} is v${checkout_version ?? '?'} but the oracle pin is v${pinned} — ` +
+						'align the checkout to the pinned tag, or bump the canonical pins deliberately (a fixture re-baseline)'
 				);
 			}
 		}
+
+		// Skipped wholesale rather than per-repo: without git every `rev_parse` would return
+		// `null`, which would read as "every checkout absent".
+		if (git !== null) {
+			for (const [repo, { hash, tree, pins, commit }] of Object.entries(GATE_CHECKOUT_IDS)) {
+				// A `tree` pin compares that subtree's id at HEAD, so a commit that touches
+				// nothing under it is not a move (the corpora snapshot's tooling commits).
+				const what = tree === undefined ? repo : `${repo}:${tree}`;
+				const current = await rev_parse(
+					git,
+					siblings,
+					repo,
+					tree === undefined ? 'HEAD' : `HEAD:${tree}`
+				);
+				if (current === null) {
+					checkout_notes.push(`${repo} absent — drift not checked`);
+					continue;
+				}
+				// A recorded commit is what the PGO training fetches, so its tree must BE the pin —
+				// a fact about the two recorded ids, not about this checkout, hence a failure
+				if (commit !== undefined && tree !== undefined) {
+					const commit_tree = await rev_parse(git, siblings, repo, `${commit}:${tree}`);
+					if (commit_tree === null) {
+						checkout_notes.push(`${repo} lacks the recorded commit ${commit.slice(0, 12)}`);
+					} else if (!commit_tree.startsWith(hash)) {
+						failures.push(
+							`${what}: the recorded commit ${commit.slice(0, 12)} holds ${tree} ${commit_tree.slice(0, hash.length)}, ` +
+								`not the pinned ${hash} — re-record GATE_CHECKOUT_IDS' commit with its tree`
+						);
+					}
+				}
+				// The recorded ids are abbreviated, so compare on the prefix.
+				if (!current.startsWith(hash)) {
+					drifted.push(
+						`${what}: measured at ${hash}, now at ${current.slice(0, hash.length)} — pins: ${pins.join(', ')}`
+					);
+				}
+			}
+		}
 	}
-}
 
-/** Names the mode that ran, so a message points at the command to re-run. */
-const task =
-	run_pins && run_checkouts ? 'canonical pins' : run_pins ? 'pins:audit' : 'pins:audit:checkouts';
+	/** Names the mode that ran, so a message points at the command to re-run. */
+	const task =
+		run_pins && run_checkouts ? 'canonical pins' : run_pins ? 'pins:audit' : 'pins:audit:checkouts';
 
-if (failures.length > 0) {
-	console.error('FAIL: canonical version sync broken:');
-	for (const f of failures) console.error(`  · ${f}`);
-	if (run_pins) {
+	if (failures.length > 0) {
+		console.error('FAIL: canonical version sync broken:');
+		for (const f of failures) console.error(`  · ${f}`);
+		if (run_pins) {
+			console.error(
+				`  Pin sites: ${SIDECAR_PATH} (VERSIONS + imports), ${BENCH_PKG_PATH}, ${ACTOR_PATH} — edit in lockstep.`
+			);
+		}
 		console.error(
-			`  Pin sites: ${SIDECAR_PATH} (VERSIONS + imports), ${BENCH_PKG_PATH}, ${ACTOR_PATH} — edit in lockstep.`
+			'  ⚠ Bumping a canonical pin re-baselines the fixture corpus — see docs/benchmarks.md §"Canonical baseline is coupled".'
+		);
+		return 1;
+	}
+	if (drifted.length > 0) {
+		console.warn(`⚠ ${task} — checkout(s) moved since the gate counts were measured:`);
+		for (const d of drifted) console.warn(`  · ${d}`);
+		console.warn(
+			'  The count pins are the gate; this is the diagnosis. If one trips, suspect corpus movement\n' +
+				'  before a tsv regression — and re-record the id in GATE_CHECKOUT_IDS when you re-pin.'
 		);
 	}
-	console.error(
-		'  ⚠ Bumping a canonical pin re-baselines the fixture corpus — see docs/benchmarks.md §"Canonical baseline is coupled".'
-	);
-	Deno.exit(1);
+	const done: string[] = [];
+	if (run_pins) {
+		done.push(
+			'canonical pins agree across sidecar VERSIONS/imports, benches/js/package.json, actor.rs, deno.lock ' +
+				`(${report.join(', ')})`
+		);
+		// Named separately: these are pinned ONLY by the lockfile, so a green line
+		// that didn't say so would leave the oracle's printer looking unguarded.
+		done.push(
+			`lockfile-only pins hold (${Object.entries(LOCKED_TRANSITIVE)
+				.map(([n, v]) => `${n}@${v}`)
+				.join(', ')})`
+		);
+	}
+	if (run_checkouts) {
+		done.push(
+			`checkouts aligned${checkout_notes.length > 0 ? ` (${checkout_notes.join('; ')})` : ''}`
+		);
+	}
+	console.log(`${task} OK — ${done.join('; ')}`);
+	return 0;
 }
-if (drifted.length > 0) {
-	console.warn(`⚠ ${task} — checkout(s) moved since the gate counts were measured:`);
-	for (const d of drifted) console.warn(`  · ${d}`);
-	console.warn(
-		'  The count pins are the gate; this is the diagnosis. If one trips, suspect corpus movement\n' +
-			'  before a tsv regression — and re-record the id in GATE_CHECKOUT_IDS when you re-pin.'
-	);
-}
-const done: string[] = [];
-if (run_pins) {
-	done.push(
-		'canonical pins agree across sidecar VERSIONS/imports, benches/js/package.json, actor.rs, deno.lock ' +
-			`(${report.join(', ')})`
-	);
-	// Named separately: these are pinned ONLY by the lockfile, so a green line
-	// that didn't say so would leave the oracle's printer looking unguarded.
-	done.push(
-		`lockfile-only pins hold (${Object.entries(LOCKED_TRANSITIVE)
-			.map(([n, v]) => `${n}@${v}`)
-			.join(', ')})`
-	);
-}
-if (run_checkouts) {
-	done.push(
-		`checkouts aligned${checkout_notes.length > 0 ? ` (${checkout_notes.join('; ')})` : ''}`
-	);
-}
-console.log(`${task} OK — ${done.join('; ')}`);

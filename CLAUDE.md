@@ -134,11 +134,11 @@ deno task typecheck:packages # the STAGED npm packages' .d.ts as a consumer comp
 deno task typecheck:scripts # scripts/ by the checker of the runtime each script runs on, so in `check` (nothing else
 #                          typechecks the release scripts): `tsc -p tsconfig.scripts.json` over the Node roots under
 #                          `scripts/roots/` and what they import (Node's types, no `Deno`), then deno check over the rest
-#                          of scripts/, node-modules-free; that walk excludes `scripts/doctor.ts`, whose corpus probe
-#                          reaches node_modules
-deno task typecheck:bench-core # the node-modules-free bench modules scripts/'s import graph misses
-#                          (`lib/{wasm,harvest_stamp,loc_wire_client,fixture_documents,error_text}.ts` + `compose_reports.ts`,
-#                          and the modules the `test:node` suites test that nothing else Deno-checks); the rest of that core
+#                          of scripts/, node-modules-free; that walk excludes the Node scripts (deno.json `exclude`) and
+#                          `scripts/doctor.ts`, whose corpus probe reaches node_modules
+deno task typecheck:bench-core # the node-modules-free bench modules the Deno scripts' import graph misses
+#                          (`lib/{wasm,harvest_stamp,loc_wire_client,fixture_documents,error_text,loc_cross_grade}.ts` +
+#                          `compose_reports.ts`, and the modules the `test:node` suites test that nothing else Deno-checks); the rest of that core
 #                          rides `typecheck:scripts` or `test:deno`. Scope rationale: deno.json's `//` note; in `check`
 deno task test           # cargo test
 deno task test:node      # vitest under Node over the suites beside their modules (`tsc -p tsconfig.vitest.json` first,
@@ -155,7 +155,10 @@ deno task test:node      # vitest under Node over the suites beside their module
 #                          perf:ab's verdict rule; `pgo/profile_test.ts` — the PGO gates' readers over captured
 #                          llvm-profdata / llvm-readobj / build-log output; `pgo/depth_stack_test.ts` — the PE
 #                          stack-reserve reader + writer the Windows depth gate uses; `cargo_build_test.ts` — the stamp
-#                          paths, the `target/` fence, and the cargo run over a fake cargo, its signal exits included); in `check`
+#                          paths, the `target/` fence, and the cargo run over a fake cargo, its signal exits included; `cargo_env_test.ts` — what reaches
+#                          a script's cargo; `check_canonical_pins_test.ts` — pins:audit's mode flags, its no-git path, and
+#                          where its git runs; `discovery_audit_test.ts` — what discovery:audit hands git and tsv;
+#                          `package_audit_test.ts` + `check_loc_test.ts` — their checkout-relative paths); in `check`
 #                          (docs/tasks.md §`test:node`)
 deno task test:node:canonical # the same over `benches/js/lib/canonical_test.ts`, the canonical prettier baseline's parser
 #                          routing; needs `deno task bench:install`, so NOT in `check`

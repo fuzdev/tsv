@@ -1,6 +1,6 @@
 /**
  * The host machine's N-API platform triple, in node-platform terms
- * (`linux-x64-gnu`, `darwin-arm64`, `win32-x64`, …), from Deno's own build target.
+ * (`linux-x64-gnu`, `darwin-arm64`, `win32-x64`, …), from the runtime's build target.
  *
  * Its own module because several scripts read it and the one that stages the
  * packages (`build_napi_packages.ts`) runs its staging on import, so it can export
@@ -11,8 +11,16 @@
  * triple, and `release_asset_name`, the one spelling of its GitHub Release asset, for the
  * same reason.
  */
-export const host_triple = (): string => {
-	const { os, arch, target } = Deno.build;
+
+/** A runtime's build target in Deno's terms (`Deno.build`): what `host_triple` reads. */
+export interface HostBuild {
+	os: string;
+	arch: string;
+	target: string;
+}
+
+/** The host's N-API platform triple, from the build target the caller's runtime reports. */
+export const host_triple = ({ os, arch, target }: HostBuild): string => {
 	const cpu = arch === 'x86_64' ? 'x64' : arch === 'aarch64' ? 'arm64' : arch;
 	if (os === 'linux') return `linux-${cpu}-${target.includes('musl') ? 'musl' : 'gnu'}`;
 	if (os === 'darwin') return `darwin-${cpu}`;

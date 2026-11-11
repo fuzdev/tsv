@@ -135,7 +135,7 @@ function find_native_cli(): { path: string; label: string } | undefined {
 				? { path: candidate, label: `staged platform package (${triple})` }
 				: undefined;
 		};
-		const host = staged(host_triple());
+		const host = staged(host_triple(Deno.build));
 		if (host !== undefined) return host;
 		for (const entry of readdirSync(pkg_root)) {
 			if (entry === 'napi') continue;

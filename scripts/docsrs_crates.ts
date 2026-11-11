@@ -15,9 +15,10 @@
  *
  * A member's `[package.metadata.docs.rs]` table must be written as a table header; an
  * inline spelling is not parsed, so its crate is not listed.
+ *
+ * The manifests are read through the caller's `read_text`, so the module runs on any runtime:
+ * the gates pass their checkout handle's read, `publish_crates.ts` a file read of its own.
  */
-
-import { readFileSync } from 'node:fs';
 
 /** A crate meant for docs.rs, and the docs.rs settings its manifest names. */
 export interface DocsRsCrate {
@@ -27,10 +28,13 @@ export interface DocsRsCrate {
 	no_default_features: boolean;
 }
 
+/** Reads a file of the workspace, by its path relative to the workspace root, as text. */
+export type DocsRsRead = (path: string) => string;
+
 /** The workspace's member directories: the root package (`.`, when the root `Cargo.toml`
  * declares one) and the root `Cargo.toml`'s `members` list. */
-function workspace_members(): string[] {
-	const root = readFileSync('Cargo.toml', 'utf8');
+function workspace_members(read_text: DocsRsRead): string[] {
+	const root = read_text('Cargo.toml');
 	const members = /^members\s*=\s*\[([^\]]*)\]/m.exec(root);
 	if (!members) throw new Error('no `members` list in the root Cargo.toml');
 	return [
@@ -41,9 +45,9 @@ function workspace_members(): string[] {
 
 /** A member's docs.rs settings, or `null` when it is `publish = false`. Throws for a member
  * that is both or neither. */
-function docs_rs_crate(member: string): DocsRsCrate | null {
+function docs_rs_crate(read_text: DocsRsRead, member: string): DocsRsCrate | null {
 	const path = `${member}/Cargo.toml`;
-	const manifest = readFileSync(path, 'utf8');
+	const manifest = read_text(path);
 	const name = /^\[package\][^[]*?^name\s*=\s*"([^"]+)"/ms.exec(manifest)?.[1];
 	if (!name) throw new Error(`no package name in ${path}`);
 	const unpublished = /^\[package\][^[]*?^publish\s*=\s*false\s*$/ms.test(manifest);
@@ -71,8 +75,8 @@ function docs_rs_crate(member: string): DocsRsCrate | null {
 
 /** Every workspace member carrying a `[package.metadata.docs.rs]` table — every publishable
  * member — in `members` order. Throws when a member is neither tabled nor `publish = false`. */
-export function docs_rs_crates(): DocsRsCrate[] {
-	return workspace_members()
-		.map(docs_rs_crate)
+export function docs_rs_crates(read_text: DocsRsRead): DocsRsCrate[] {
+	return workspace_members(read_text)
+		.map((member) => docs_rs_crate(read_text, member))
 		.filter((c) => c !== null);
 }

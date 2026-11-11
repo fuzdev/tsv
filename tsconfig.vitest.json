@@ -9,6 +9,7 @@
 		"allowJs": true,
 		"allowImportingTsExtensions": true,
 		"skipLibCheck": true,
+		"verbatimModuleSyntax": true,
 		"types": ["node"]
 	},
 	"files": [
@@ -35,9 +36,14 @@
 		"scripts/branch_report/timing_test.ts",
 		"scripts/branch_report/wasm_board_test.ts",
 		"scripts/cargo_build_test.ts",
+		"scripts/cargo_env_test.ts",
+		"scripts/check_canonical_pins_test.ts",
+		"scripts/check_loc_test.ts",
+		"scripts/discovery_audit_test.ts",
 		"scripts/npm_api_imports_test.ts",
 		"scripts/npm_api_strip_test.ts",
 		"scripts/npm_api_test.ts",
+		"scripts/package_audit_test.ts",
 		"scripts/perf_ab_verdict_test.ts",
 		"scripts/pgo/depth_stack_test.ts",
 		"scripts/pgo/profile_test.ts",

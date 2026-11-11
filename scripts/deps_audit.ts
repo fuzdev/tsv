@@ -34,9 +34,15 @@
  * `cargo tree` resolves against `Cargo.lock`, which a consumer's resolution can differ
  * from, but a denied package is reached by a dependency edge tsv declares, which no
  * lockfile removes.
+ *
+ * ## Reach
+ *
+ * The checkout read-only (the manifests) and `cargo`, which runs `cargo tree` in it
+ * (`DepsAuditDeps`, built by `scripts/roots/deps_audit.ts`).
  */
 
-import { spawnSync } from 'node:child_process';
+import type { FsReadDir } from '@fuzdev/gro/fs.ts';
+import type { SpawnProgram } from '@fuzdev/gro/spawn.ts';
 
 import { docs_rs_crates } from './docsrs_crates.ts';
 
@@ -45,27 +51,43 @@ const log = (...args: unknown[]) => console.error(...args);
 /** The packages no crate meant for publishing may reach through a normal or build edge. */
 const DENIED = ['serde_json'];
 
-/** `cargo tree` over `crate_name`'s normal and build edges, every feature and target. */
-function cargo_tree(crate_name: string, extra: string[]): { status: number; stdout: string } {
-	const result = spawnSync(
-		'cargo',
-		['tree', '-p', crate_name, '-e', 'normal,build', '--all-features', '--target', 'all', ...extra],
-		{ encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }
-	);
-	if (result.status !== 0) log(result.stderr.trimEnd());
-	return { status: result.status ?? 1, stdout: result.stdout ?? '' };
+/** What `run_deps_audit` reaches. */
+export interface DepsAuditDeps {
+	/** The checkout, read for its manifests and cargo's working directory. */
+	checkout: FsReadDir;
+	/** `cargo`, its output captured. */
+	cargo: SpawnProgram;
 }
 
-function run(): never {
-	const crates = docs_rs_crates();
+/** `cargo tree` over `crate_name`'s normal and build edges, every feature and target. */
+async function cargo_tree(
+	deps: DepsAuditDeps,
+	crate_name: string,
+	extra: string[]
+): Promise<{ status: number; stdout: string }> {
+	const result = await deps.cargo.out(
+		['tree', '-p', crate_name, '-e', 'normal,build', '--all-features', '--target', 'all', ...extra],
+		{ cwd: deps.checkout }
+	);
+	const status = result.kind === 'exited' ? result.code : 1;
+	if (status !== 0) log(result.stderr.trimEnd());
+	return { status, stdout: result.stdout };
+}
+
+/**
+ * The audit (module doc).
+ * @returns the exit code: `1` when a crate reaches a denied package or isn't graded, else `0`
+ */
+export async function run_deps_audit(deps: DepsAuditDeps): Promise<number> {
+	const crates = docs_rs_crates((path) => deps.checkout.read_text_sync(path));
 	if (crates.length === 0) {
 		log('Error: no workspace crate carries a [package.metadata.docs.rs] table — nothing graded.');
-		process.exit(1);
+		return 1;
 	}
 
 	let failed = 0;
 	for (const c of crates) {
-		const tree = cargo_tree(c.name, ['--prefix', 'none', '--format', '{p}']);
+		const tree = await cargo_tree(deps, c.name, ['--prefix', 'none', '--format', '{p}']);
 		if (tree.status !== 0) {
 			failed++;
 			log(`✗ ${c.name}: cargo tree failed`);
@@ -88,7 +110,7 @@ function run(): never {
 		if (denied.length > 0) {
 			failed++;
 			for (const name of denied) {
-				log(cargo_tree(c.name, ['-i', name]).stdout.trimEnd());
+				log((await cargo_tree(deps, c.name, ['-i', name])).stdout.trimEnd());
 			}
 			log(`✗ ${c.name}: reaches ${denied.join(', ')} through a normal or build dependency`);
 		} else {
@@ -97,10 +119,8 @@ function run(): never {
 	}
 	if (failed > 0) {
 		log(`deps:audit FAILED — ${failed} of ${crates.length} crate(s)`);
-		process.exit(1);
+		return 1;
 	}
 	log(`deps:audit OK — ${crates.length} crate(s) reach none of: ${DENIED.join(', ')}`);
-	process.exit(0);
+	return 0;
 }
-
-run();

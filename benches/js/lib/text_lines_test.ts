@@ -59,3 +59,10 @@ test('lines_of: an empty stream yields nothing', async () => {
 	deepStrictEqual(await collect([]), []);
 	deepStrictEqual(await collect([encoder.encode('')]), []);
 });
+
+test("lines_of: a character cut off at the stream's end decodes as U+FFFD", async () => {
+	deepStrictEqual(await collect([encoder.encode('a\n'), Uint8Array.of(0xe2, 0x82)]), [
+		'a',
+		'\uFFFD'
+	]);
+});

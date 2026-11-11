@@ -230,11 +230,10 @@ section('Canonical oracle pins');
 // No mode flag = BOTH halves — the pin agreement `deno task check` gates plus the
 // checkout alignment/drift `deno task conformance` gates. Doctor is the one place
 // that reports them together, which is what makes an env skew visible before a
-// conformance run rather than during one. `--allow-run=git` is load-bearing: the
-// commit-drift half shells out to `git rev-parse`, and without it every checkout
-// reads as absent.
-const pins = new Deno.Command('deno', {
-	args: ['run', '--allow-read', '--allow-run=git', 'scripts/check_canonical_pins.ts'],
+// conformance run rather than during one. It runs under Node, as `pins:audit` does; its
+// commit-drift half shells out to `git rev-parse` and says so when no git is on `PATH`.
+const pins = new Deno.Command('node', {
+	args: ['scripts/roots/check_canonical_pins.ts'],
 	stdout: 'piped',
 	stderr: 'piped'
 }).outputSync();

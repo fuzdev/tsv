@@ -4,7 +4,8 @@
  * @module
  */
 
-import { command_capture, type Result } from './command.ts';
+import { command_capture } from './command.ts';
+import type { Result } from './result.ts';
 
 /** The logged-in npm user. */
 export const npm_whoami = async (): Promise<Result<{ user: string }>> => {

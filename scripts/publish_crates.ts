@@ -121,7 +121,7 @@ if (!wetrun && args.wait) fail('--wait is for a --wetrun; a dry run hits no rate
 
 console.log(`=== publish:crates (${wetrun ? 'WETRUN — publishes to crates.io' : 'dry run'}) ===`);
 
-const crates = docs_rs_crates();
+const crates = docs_rs_crates((path) => Deno.readTextFileSync(path));
 if (crates.length === 0) fail('no workspace crate carries a [package.metadata.docs.rs] table');
 const names = crates.map((c) => c.name);
 

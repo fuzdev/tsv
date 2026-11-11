@@ -8,7 +8,7 @@
  * @module
  */
 
-import { type Result } from './command.ts';
+import type { Result } from './result.ts';
 import { type BumpLevel, version_parse, version_tag } from './version.ts';
 
 /** The crates.io web API. Liveness is read here, not from the sparse index: the index is

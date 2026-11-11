@@ -49,11 +49,18 @@
  * exists and links absolutely, never what it says.
  * `--allow-dirty` lists the working tree as it stands, untracked files included, so a run
  * on a dirty tree grades what a publish from that tree would upload.
+ *
+ * ## Reach
+ *
+ * The checkout read-only (the manifests, each crate's files, the toolchain pin, the release
+ * workflow) and `cargo`, which runs `cargo metadata` and `cargo package --list` in it
+ * (`PackageAuditDeps`, built by `scripts/roots/package_audit.ts`).
  */
 
-import { spawnSync } from 'node:child_process';
-import { readFileSync, existsSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, isAbsolute, join, relative, sep } from 'node:path';
+
+import type { FsReadDir } from '@fuzdev/gro/fs.ts';
+import type { SpawnProgram } from '@fuzdev/gro/spawn.ts';
 
 import { docs_rs_crates } from './docsrs_crates.ts';
 import {
@@ -96,23 +103,45 @@ interface MetadataPackage {
 /** The workflow whose GitHub Release carries the binaries `cargo binstall` fetches. */
 const RELEASE_WORKFLOW = '.github/workflows/release.yml';
 
-function cargo(args: string[]): { status: number; stdout: string } {
-	const result = spawnSync('cargo', args, {
-		encoding: 'utf8',
-		stdio: ['ignore', 'pipe', 'pipe'],
-		maxBuffer: 64 * 1024 * 1024
-	});
-	if (result.status !== 0) log(result.stderr.trimEnd());
-	return { status: result.status ?? 1, stdout: result.stdout ?? '' };
+/** What `run_package_audit` reaches. */
+export interface PackageAuditDeps {
+	/** The checkout, read for the files graded and cargo's working directory. */
+	checkout: FsReadDir;
+	/** `cargo`, its output captured. */
+	cargo: SpawnProgram;
+}
+
+async function cargo(
+	deps: PackageAuditDeps,
+	args: string[]
+): Promise<{ status: number; stdout: string }> {
+	const result = await deps.cargo.out(args, { cwd: deps.checkout });
+	const status = result.kind === 'exited' && !result.truncated ? result.code : 1;
+	if (status !== 0) log(result.stderr.trimEnd());
+	return { status, stdout: result.stdout };
 }
 
 /** The toolchain channel `rust-toolchain.toml` pins, as major.minor. */
-function toolchain_minor(): string {
-	const toml = readFileSync('rust-toolchain.toml', 'utf8');
+function toolchain_minor(checkout: FsReadDir): string {
+	const toml = checkout.read_text_sync('rust-toolchain.toml');
 	const channel = /^channel\s*=\s*"(\d+)\.(\d+)(?:\.\d+)?"/m.exec(toml);
 	if (!channel) throw new Error('no numeric `channel` in rust-toolchain.toml');
 	return `${channel[1]}.${channel[2]}`;
 }
+
+/**
+ * The directory of `manifest_path` (cargo's absolute path) relative to the checkout, or `null`
+ * when it is not beneath it.
+ */
+export function to_crate_dir(checkout_path: string, manifest_path: string): string | null {
+	const rel = relative(checkout_path, dirname(manifest_path));
+	if (isAbsolute(rel) || rel === '..' || rel.startsWith(`..${sep}`)) return null;
+	return rel === '' ? '.' : rel.split(sep).join('/');
+}
+
+/** Whether two byte arrays hold the same bytes. */
+const same_bytes = (a: Uint8Array, b: Uint8Array): boolean =>
+	a.length === b.length && a.every((byte, i) => byte === b[i]);
 
 /** The link targets in `markdown` (inline, reference definitions, HTML `href`/`src`) that are
  * not absolute URLs. Code (fenced blocks, inline spans) is dropped first: a `let src = "…"` or
@@ -130,19 +159,24 @@ function relative_links(markdown: string): string[] {
 }
 
 /** Every finding for one crate's tarball listing and files, empty when it passes. */
-function grade_listing(name: string, dir: string, listing: string[]): string[] {
+async function grade_listing(
+	checkout: FsReadDir,
+	name: string,
+	dir: string,
+	listing: string[]
+): Promise<string[]> {
 	const findings: string[] = [];
 	const files = new Set(listing);
 	for (const required of ['README.md', 'LICENSE', 'src/lib.rs']) {
 		if (!files.has(required)) findings.push(`tarball lacks ${required}`);
 	}
-	const notice_on_disk = existsSync(join(dir, 'NOTICE'));
+	const notice_on_disk = await checkout.exists(join(dir, 'NOTICE'));
 	if (REQUIRED_NOTICE.includes(name) && !notice_on_disk) {
 		findings.push('crate holds no NOTICE, which its shipped data requires');
 	}
 	if (notice_on_disk && !files.has('NOTICE')) findings.push('tarball lacks the NOTICE');
 	for (const file of MUST_NOT_SHIP[name] ?? []) {
-		if (!existsSync(join(dir, file))) {
+		if (!(await checkout.exists(join(dir, file)))) {
 			findings.push(`${file} is absent from the crate directory, so its exclusion grades nothing`);
 		}
 		if (files.has(file)) findings.push(`tarball ships ${file}, which stays in the repository`);
@@ -152,13 +186,13 @@ function grade_listing(name: string, dir: string, listing: string[]): string[] {
 			findings.push(`tarball ships ${file} (only README.md belongs in it)`);
 		}
 	}
-	if (existsSync(join(dir, 'LICENSE'))) {
-		if (!readFileSync(join(dir, 'LICENSE')).equals(readFileSync('LICENSE'))) {
+	if (await checkout.exists(join(dir, 'LICENSE'))) {
+		if (!same_bytes(await checkout.read(join(dir, 'LICENSE')), await checkout.read('LICENSE'))) {
 			findings.push("LICENSE differs from the root LICENSE's bytes");
 		}
 	}
-	if (existsSync(join(dir, 'README.md'))) {
-		for (const target of relative_links(readFileSync(join(dir, 'README.md'), 'utf8'))) {
+	if (await checkout.exists(join(dir, 'README.md'))) {
+		for (const target of relative_links(await checkout.read_text(join(dir, 'README.md')))) {
 			findings.push(`README.md links relatively (${target}), which crates.io cannot resolve`);
 		}
 	}
@@ -183,22 +217,27 @@ function grade_metadata(pkg: MetadataPackage, msrv: string): string[] {
 	return findings;
 }
 
-function run(): never {
-	const crates = docs_rs_crates();
+/**
+ * The audit (module doc).
+ * @returns the exit code: `1` on any finding, else `0`
+ */
+export async function run_package_audit(deps: PackageAuditDeps): Promise<number> {
+	const { checkout } = deps;
+	const crates = docs_rs_crates((path) => checkout.read_text_sync(path));
 	if (crates.length === 0) {
 		log('Error: no workspace crate carries a [package.metadata.docs.rs] table — nothing graded.');
-		process.exit(1);
+		return 1;
 	}
-	const msrv = toolchain_minor();
+	const msrv = toolchain_minor(checkout);
 
-	const metadata = cargo(['metadata', '--no-deps', '--format-version', '1']);
+	const metadata = await cargo(deps, ['metadata', '--no-deps', '--format-version', '1']);
 	if (metadata.status !== 0) {
 		log('package:audit FAILED — cargo metadata failed');
-		process.exit(1);
+		return 1;
 	}
 	const packages: MetadataPackage[] = JSON.parse(metadata.stdout).packages;
 	const by_name = new Map(packages.map((p) => [p.name, p]));
-	const release_triples = workflow_release_triples(readFileSync(RELEASE_WORKFLOW, 'utf8'));
+	const release_triples = workflow_release_triples(await checkout.read_text(RELEASE_WORKFLOW));
 
 	let failed = 0;
 
@@ -223,15 +262,30 @@ function run(): never {
 			log(`✗ ${c.name}: not in cargo metadata`);
 			continue;
 		}
-		const dir = dirname(pkg.manifest_path);
-		const list = cargo(['package', '--list', '-p', c.name, '--locked', '--allow-dirty']);
+		const dir = to_crate_dir(checkout.path, pkg.manifest_path);
+		if (dir === null) {
+			failed++;
+			log(`✗ ${c.name}: its manifest ${pkg.manifest_path} is outside the checkout`);
+			continue;
+		}
+		const list = await cargo(deps, [
+			'package',
+			'--list',
+			'-p',
+			c.name,
+			'--locked',
+			'--allow-dirty'
+		]);
 		if (list.status !== 0) {
 			failed++;
 			log(`✗ ${c.name}: cargo package --list failed`);
 			continue;
 		}
 		const listing = list.stdout.split('\n').filter((line) => line !== '');
-		const findings = [...grade_listing(c.name, dir, listing), ...grade_metadata(pkg, msrv)];
+		const findings = [
+			...(await grade_listing(checkout, c.name, dir, listing)),
+			...grade_metadata(pkg, msrv)
+		];
 		// a crate shipping a binary must let `cargo binstall` find the Release's prebuilt one
 		const ships_bin = pkg.targets.some((t) => t.kind.includes('bin'));
 		if (ships_bin) {
@@ -259,10 +313,8 @@ function run(): never {
 	}
 	if (failed > 0) {
 		log(`package:audit FAILED — ${failed} finding group(s) over ${crates.length} crate(s)`);
-		process.exit(1);
+		return 1;
 	}
 	log(`package:audit OK — ${crates.length} crate(s) package as stated`);
-	process.exit(0);
+	return 0;
 }
-
-run();

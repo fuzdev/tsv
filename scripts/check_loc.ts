@@ -28,18 +28,35 @@
  * against the loc wire, key order ignored (the Rust writer places `loc` after `end`, the
  * reconstruction appends it last; the contract leaves order unspecified).
  *
- * Usage: `deno task check:loc` (builds `target/corpus/tsv_debug` first), or directly
- * `deno run --allow-read --allow-run=target/corpus/tsv_debug scripts/check_loc.ts [root]`.
+ * Usage: `deno task check:loc` (builds `target/corpus/tsv_debug` first), or directly from the
+ * checkout's root, `node scripts/roots/check_loc.ts [root]`, the root a path in the checkout.
+ *
+ * Its reach: the checkout read-only (the ledger) and the checkout's `target/corpus/tsv_debug`,
+ * run in it (`CheckLocDeps`, built by `scripts/roots/check_loc.ts`).
  */
 
+import type { FsReadDir } from '@fuzdev/gro/fs.ts';
+import type { SpawnProgram, SpawnResult } from '@fuzdev/gro/spawn.ts';
+
 import { loc_definition_violation } from '../benches/js/lib/loc_cross_grade.ts';
-import { TSV_DEBUG_CORPUS as TSV_DEBUG } from '../benches/js/lib/tsv_debug_server.ts';
 import type { Language } from '../benches/js/lib/types.ts';
 import { lines_of } from '../benches/js/lib/text_lines.ts';
+import { signal_exit_code } from './exit_code.ts';
+
+/** The `tsv_debug` binary of the shared `--profile corpus` build world. */
+export const CHECK_LOC_TSV_DEBUG = 'target/corpus/tsv_debug';
 
 const DEFAULT_ROOT = 'tests/fixtures';
 /** The prettier-side documents tsv rejects, relative to `DEFAULT_ROOT` — the ledger. */
-const REJECTS_LEDGER = new URL('./check_loc_rejects.txt', import.meta.url);
+const REJECTS_LEDGER = 'scripts/check_loc_rejects.txt';
+
+/** What `run_check_loc` reaches. */
+export interface CheckLocDeps {
+	/** The checkout, read for the ledger and `tsv_debug`'s working directory. */
+	checkout: FsReadDir;
+	/** The checkout's `target/corpus/tsv_debug` (`CHECK_LOC_TSV_DEBUG`). */
+	tsv_debug: SpawnProgram;
+}
 /** Mismatching documents listed in full before the rest are only counted. */
 const MAX_REPORTED = 20;
 
@@ -59,8 +76,8 @@ interface RejectedRecord {
 }
 
 /** The ledger's paths: one per line, `#` to the line's end a comment. */
-async function read_rejects_ledger(): Promise<Set<string>> {
-	const text = await Deno.readTextFile(REJECTS_LEDGER);
+async function read_rejects_ledger(checkout: FsReadDir): Promise<Set<string>> {
+	const text = await checkout.read_text(REJECTS_LEDGER);
 	const paths = new Set<string>();
 	for (const line of text.split('\n')) {
 		const path = line.replace(/#.*/, '').trim();
@@ -77,12 +94,12 @@ function fixture_relative(path: string): string {
 }
 
 /**
- * The root as a cwd-relative path with no `./` prefix, doubled `/`, or trailing `/`, so the
- * paths `loc_wires` emits under it line up with the ledger's.
+ * The root as a checkout-relative path with no `./` prefix, doubled `/`, or trailing `/`, so
+ * the paths `loc_wires` emits under it line up with the ledger's.
  */
-function normalize_root(root: string): string {
-	const cwd = `${Deno.cwd()}/`;
-	let path = root.startsWith(cwd) ? root.slice(cwd.length) : root;
+export function normalize_root(root: string, checkout_path: string): string {
+	const prefix = `${checkout_path}/`;
+	let path = root.startsWith(prefix) ? root.slice(prefix.length) : root;
 	path = path.replace(/\/{2,}/g, '/');
 	while (path.startsWith('./')) path = path.slice(2);
 	return path.replace(/\/+$/, '') || '.';
@@ -93,20 +110,36 @@ function ledger_entry_under(path: string, root: string): boolean {
 	return root === '.' || `${DEFAULT_ROOT}/${path}`.startsWith(`${root}/`);
 }
 
-async function main(): Promise<void> {
-	const root = normalize_root(Deno.args[0] ?? DEFAULT_ROOT);
-	const ledger = await read_rejects_ledger();
+/**
+ * The code `loc_wires` ended with, as the failure line names it: its exit code, `128 + N` for
+ * signal `N`.
+ */
+export function to_ended_code(status: SpawnResult): number {
+	if (status.kind === 'exited') return status.code;
+	if (status.kind === 'signaled') return signal_exit_code(status.signal);
+	return status.signal === null ? (status.code ?? 1) : signal_exit_code(status.signal);
+}
+
+/**
+ * The cross-grade over `args[0]`, the fixture tree by default.
+ * @returns the exit code: `1` on any failure, else `0`
+ */
+export async function run_check_loc(
+	deps: CheckLocDeps,
+	args: ReadonlyArray<string>
+): Promise<number> {
+	const root = normalize_root(args[0] ?? DEFAULT_ROOT, deps.checkout.path);
+	const ledger = await read_rejects_ledger(deps.checkout);
 	const started = performance.now();
-	const child = new Deno.Command(TSV_DEBUG, {
-		args: ['loc_wires', root],
-		stdout: 'piped',
-		stderr: 'inherit'
-	}).spawn();
+	const child = await deps.tsv_debug.start(['loc_wires', root], {
+		cwd: deps.checkout,
+		stdio: ['inherit', 'pipe', 'inherit']
+	});
 
 	const graded: Record<Language, number> = { svelte: 0, typescript: 0, css: 0 };
 	const mismatches: string[] = [];
 	const rejected = new Set<string>();
-	for await (const line of lines_of(child.stdout)) {
+	for await (const line of lines_of(child.stdout!)) {
 		if (line === '') continue;
 		const parsed = JSON.parse(line) as WireRecord | RejectedRecord;
 		if ('rejected' in parsed) {
@@ -125,7 +158,7 @@ async function main(): Promise<void> {
 		}
 		graded[record.language]++;
 	}
-	const status = await child.status;
+	const status = await child.closed;
 	const seconds = ((performance.now() - started) / 1000).toFixed(1);
 	const total = graded.svelte + graded.typescript + graded.css;
 	console.log(
@@ -134,7 +167,8 @@ async function main(): Promise<void> {
 	);
 
 	const failures: string[] = [];
-	if (!status.success) failures.push(`\`${TSV_DEBUG} loc_wires\` exited ${status.code}`);
+	const code = to_ended_code(status);
+	if (code !== 0) failures.push(`\`${CHECK_LOC_TSV_DEBUG} loc_wires\` exited ${code}`);
 	// Every language reached the grade: a walk that silently stopped producing one would
 	// leave it ungraded while the run reads green. Only the whole tree holds all three; a
 	// narrowed root (one language's subtree) is held to grading something.
@@ -173,11 +207,10 @@ async function main(): Promise<void> {
 	}
 	if (failures.length > 0) {
 		console.log(`FAIL: ${failures.join('; ')}`);
-		Deno.exit(1);
+		return 1;
 	}
 	console.log(
 		'PASS: the loc wire equals the reconstruction of the span-only wire on every document'
 	);
+	return 0;
 }
-
-if (import.meta.main) await main();

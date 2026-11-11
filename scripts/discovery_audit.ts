@@ -39,11 +39,18 @@
  * Cost is ~0.1 s (pure Rust, ~6,700 files — every collection the snapshot vendors, not
  * only the ones the bench views read) on the `--profile corpus` `tsv` binary of the shared
  * build world (deno.json `//build:check`), which the `format:audit` leg has already built.
+ *
+ * ## Reach
+ *
+ * The directory the checkout sits in, read-only (whether `../corpora` is there), `git`, which
+ * reads the snapshot's status and file list in it, and the checkout's `target/corpus/tsv`, run
+ * in the checkout (`DiscoveryAuditDeps`, built by `scripts/roots/discovery_audit.ts`).
  */
 
-import { spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
 import { relative, resolve } from 'node:path';
+
+import type { FsReadDir } from '@fuzdev/gro/fs.ts';
+import type { SpawnProgram } from '@fuzdev/gro/spawn.ts';
 
 import {
 	CORPORA_COLLECTIONS,
@@ -64,7 +71,22 @@ const TSV_EXTENSIONS = ['ts', 'mts', 'cts', 'js', 'mjs', 'cjs', 'svelte', 'css']
  * The `tsv` binary of the shared `--profile corpus` build world (deno.json `//build:check`),
  * which the `discovery:audit` task builds before running this.
  */
-const TSV_BIN = 'target/corpus/tsv';
+export const DISCOVERY_TSV_BIN = 'target/corpus/tsv';
+
+/** What `run_discovery_audit` reaches. */
+export interface DiscoveryAuditDeps {
+	/** The checkout, `tsv`'s working directory. */
+	checkout: FsReadDir;
+	/** The directory the checkout sits in, where `../corpora` is. */
+	siblings: FsReadDir;
+	/**
+	 * `git`, its stdout captured and its stderr passed through, or `null` when there is none,
+	 * which grades a present snapshot as no git checkout.
+	 */
+	git: SpawnProgram | null;
+	/** The checkout's `target/corpus/tsv` (`DISCOVERY_TSV_BIN`). */
+	tsv: SpawnProgram;
+}
 
 const log = (...args: unknown[]) => console.error(...args);
 
@@ -75,46 +97,84 @@ const has_tsv_extension = (path: string): boolean => {
 	return dot > path.lastIndexOf('/') + 1 && TSV_EXTENSIONS.includes(path.slice(dot + 1));
 };
 
-/** Runs `git -C ../corpora <args>`; the trimmed stdout, or `null` on a non-zero exit. */
-function git(args: string[]): string | null {
-	const { status, stdout } = spawnSync('git', ['-C', CORPORA_ROOT, ...args], {
-		encoding: 'utf8',
-		stdio: ['ignore', 'pipe', 'inherit']
-	});
-	return status === 0 ? stdout : null;
+/**
+ * Runs `program <args>` in `cwd` with its stderr passed through; its exit code (`null` when a
+ * signal ended it) and its stdout.
+ */
+async function run_capturing_stdout(
+	program: SpawnProgram,
+	args: string[],
+	cwd: FsReadDir
+): Promise<{ code: number | null; stdout: string }> {
+	const child = await program.start(args, { cwd, stdio: ['ignore', 'pipe', 'inherit'] });
+	const chunks: Uint8Array[] = [];
+	let length = 0;
+	for await (const chunk of child.stdout!) {
+		chunks.push(chunk);
+		length += chunk.length;
+	}
+	const bytes = new Uint8Array(length);
+	let at = 0;
+	for (const chunk of chunks) {
+		bytes.set(chunk, at);
+		at += chunk.length;
+	}
+	const result = await child.closed;
+	return {
+		code: result.kind === 'exited' ? result.code : null,
+		stdout: new TextDecoder().decode(bytes)
+	};
 }
 
-function run(): never {
+/** Runs `git <args>` in `../corpora`; its stdout, or `null` on a non-zero exit or no git. */
+async function git(
+	program: SpawnProgram | null,
+	corpora: FsReadDir,
+	args: string[]
+): Promise<string | null> {
+	if (program === null) return null;
+	const { code, stdout } = await run_capturing_stdout(program, args, corpora);
+	return code === 0 ? stdout : null;
+}
+
+/**
+ * The audit (module doc).
+ * @returns the exit code: `0` when the two lists agree or no snapshot is present, else `1`
+ * (or `tsv`'s own non-zero code)
+ */
+export async function run_discovery_audit(deps: DiscoveryAuditDeps): Promise<number> {
 	const tree = CORPORA_COLLECTIONS;
-	if (!existsSync(tree)) {
+	const corpora_name = CORPORA_ROOT.slice('../'.length);
+	if (!(await deps.siblings.exists(`${corpora_name}/${CORPORA_TREE}`))) {
 		log(`⚠ discovery:audit NOT RUN — no ${CORPORA_ROOT} checkout.`);
 		log("  This leg checks tsv's discovery against the real-code snapshot's committed file list.");
 		log(`  Clone it beside this repo to gate it locally: git clone ${CORPORA_URL} ${CORPORA_ROOT}`);
-		process.exit(0);
+		return 0;
 	}
+	const corpora = deps.siblings.dir(corpora_name);
 
-	const dirty = git(['status', '--porcelain', '--', CORPORA_TREE]);
+	const dirty = await git(deps.git, corpora, ['status', '--porcelain', '--', CORPORA_TREE]);
 	if (dirty === null) {
 		log(
 			`Error: ${CORPORA_ROOT} is not a git checkout — the snapshot's file list is its committed tree.`
 		);
-		process.exit(1);
+		return 1;
 	}
 	if (dirty.trim() !== '') {
 		log(
 			`Error: ${tree} has local modifications — restore it before grading ` +
 				`(git -C ${CORPORA_ROOT} checkout -- ${CORPORA_TREE}):\n${dirty.trimEnd()}`
 		);
-		process.exit(1);
+		return 1;
 	}
 
 	// The committed tree, filtered to what tsv formats — paths relative to the corpora root.
-	const listed = git(['ls-files', '-z', '--', CORPORA_TREE]);
-	if (listed === null) process.exit(1);
+	const listed = await git(deps.git, corpora, ['ls-files', '-z', '--', CORPORA_TREE]);
+	if (listed === null) return 1;
 	const expected = new Set(listed.split('\0').filter((p) => p !== '' && has_tsv_extension(p)));
 	if (expected.size === 0) {
 		log(`Error: ${tree} holds no file in tsv's extensions — an empty snapshot grades nothing.`);
-		process.exit(1);
+		return 1;
 	}
 
 	// The production discovery, on the `--profile corpus` `tsv` binary. Exec'd by PATH rather
@@ -122,20 +182,18 @@ function run(): never {
 	// without `_internal_audits` and so rebuilds the whole stack into a second corpus-profile world (see
 	// deno.json `//build:check`). The `discovery:audit` task runs `build:check` ahead of this,
 	// so the binary is fresh on a standalone run too.
-	const list = spawnSync(TSV_BIN, ['format', '--list', tree], {
-		encoding: 'utf8',
-		stdio: ['ignore', 'pipe', 'inherit']
-	});
-	if (list.status !== 0) {
-		log(`Error: tsv format --list exited ${list.status}.`);
-		process.exit(list.status ?? 1);
+	const list = await run_capturing_stdout(deps.tsv, ['format', '--list', tree], deps.checkout);
+	const list_status = list.code;
+	if (list_status !== 0) {
+		log(`Error: tsv format --list exited ${list_status}.`);
+		return list_status ?? 1;
 	}
-	const root = resolve(CORPORA_ROOT);
+	const root = resolve(deps.checkout.path, CORPORA_ROOT);
 	const actual = new Set(
 		list.stdout
 			.split('\n')
 			.filter((line) => line !== '')
-			.map((line) => relative(root, resolve(line)))
+			.map((line) => relative(root, resolve(deps.checkout.path, line)))
 	);
 
 	const not_listed = [...expected].filter((p) => !actual.has(p)).sort();
@@ -145,7 +203,7 @@ function run(): never {
 		log(
 			`discovery:audit OK — tsv format --list names all ${actual.size} snapshot files in its extensions`
 		);
-		process.exit(0);
+		return 0;
 	}
 
 	const show = (paths: string[]): string =>
@@ -167,7 +225,5 @@ function run(): never {
 				show(not_in_tree)
 		);
 	}
-	process.exit(1);
+	return 1;
 }
-
-run();

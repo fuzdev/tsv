@@ -77,18 +77,27 @@
  * Its own target directory (`target/docsrs`): the lint flags differ from `docs:audit`'s,
  * and sharing `target/doc` would make the two gates rebuild each other's output on every
  * run.
+ *
+ * ## Reach
+ *
+ * The checkout read-only (the manifests), `target/docsrs` read-write (the renders removed
+ * before each build and read back after), and `cargo`, which runs `cargo doc` in the checkout
+ * with `RUSTDOCFLAGS` and `CARGO_TARGET_DIR` set (`DocsrsAuditDeps`, built by
+ * `scripts/roots/docsrs_audit.ts`).
  */
 
-import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { dirname, join, normalize } from 'node:path';
+
+import type { FsDir, FsReadDir } from '@fuzdev/gro/fs.ts';
+import { fs_search } from '@fuzdev/gro/fs_search.ts';
+import type { SpawnProgram } from '@fuzdev/gro/spawn.ts';
 
 import { docs_rs_crates } from './docsrs_crates.ts';
 
 const log = (...args: unknown[]) => console.error(...args);
 
 /** The flags docs.rs's build and this one share, plus the gate's lint levels. */
-const RUSTDOCFLAGS = [
+export const DOCSRS_RUSTDOCFLAGS = [
 	'--cfg docsrs',
 	'-D rustdoc::broken_intra_doc_links',
 	'-D rustdoc::invalid_html_tags',
@@ -98,32 +107,47 @@ const RUSTDOCFLAGS = [
 	'-D unfulfilled_lint_expectations'
 ].join(' ');
 
-const TARGET_DIR = 'target/docsrs';
+/** The build's own target directory, relative to the checkout's `target/`. */
+export const DOCSRS_DIR = 'docsrs';
+
+/** The build's own target directory, relative to the checkout. */
+export const DOCSRS_TARGET_DIR = `target/${DOCSRS_DIR}`;
 
 /** A crate with at most this many dead renders lists them without `-v`. */
 const LIST_LIMIT = 20;
 
-const verbose = process.argv.includes('-v') || process.argv.includes('--verbose');
+/** What `run_docsrs_audit` reaches. */
+export interface DocsrsAuditDeps {
+	/** The checkout, read for its manifests and cargo's working directory. */
+	checkout: FsReadDir;
+	/** `target/docsrs`, the build's own target directory. */
+	docsrs: FsDir;
+	/** `cargo`, with `RUSTDOCFLAGS` (`DOCSRS_RUSTDOCFLAGS`) and `CARGO_TARGET_DIR` set. */
+	cargo: SpawnProgram;
+}
 
-/** A crate's render directory, `target/docsrs/doc/<crate>`. The name is a package name read
+/** A crate's render directory, `doc/<crate>` beneath `target/docsrs`. The name is a package name read
  * from a manifest; anything but `[A-Za-z0-9_-]` is refused rather than joined into a path
  * the script then removes. */
 function render_dir(crate_name: string): string {
 	if (!/^[A-Za-z0-9_-]+$/.test(crate_name)) {
 		throw Error(`refusing an unexpected crate name: ${JSON.stringify(crate_name)}`);
 	}
-	return join(TARGET_DIR, 'doc', crate_name.replaceAll('-', '_'));
+	return join('doc', crate_name.replaceAll('-', '_'));
 }
 
 /** One rendered page's ids, read once per run. */
-const page_ids = new Map<string, Set<string> | null>();
+type PageIds = Map<string, Set<string> | null>;
 
-function ids_of(page: string): Set<string> | null {
+async function ids_of(
+	docsrs: FsReadDir,
+	page_ids: PageIds,
+	page: string
+): Promise<Set<string> | null> {
 	let ids = page_ids.get(page);
 	if (ids === undefined) {
-		ids = existsSync(page)
-			? new Set([...readFileSync(page, 'utf8').matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]))
-			: null;
+		const html = await docsrs.read_text_if_exists(page);
+		ids = html === null ? null : new Set([...html.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]));
 		page_ids.set(page, ids);
 	}
 	return ids;
@@ -139,17 +163,23 @@ interface DeadRenders {
 /** Reads `crate_name`'s rendered pages back (module doc §Rendered links); `graded` names
  * every crate whose pages a cross-crate href is checked against. `null` when the render
  * holds no `index.html`, which leaves nothing to read back and must not read as clean. */
-function check_rendered(crate_name: string, graded: Set<string>): DeadRenders | null {
-	const doc_root = join(TARGET_DIR, 'doc');
+async function check_rendered(
+	docsrs: FsReadDir,
+	page_ids: PageIds,
+	crate_name: string,
+	graded: Set<string>
+): Promise<DeadRenders | null> {
+	const doc_root = 'doc';
 	const crate_dir = render_dir(crate_name);
 	const dead: DeadRenders = { anchors: [], pages: [], inert: [] };
-	if (!existsSync(join(crate_dir, 'index.html'))) return null;
-	const pages = (readdirSync(crate_dir, { recursive: true }) as string[])
+	if (!(await docsrs.exists(join(crate_dir, 'index.html')))) return null;
+	const pages = (await fs_search(docsrs, { path: crate_dir, sort: false }))
+		.map((f) => f.path)
 		.filter((f) => f.endsWith('.html'))
 		.sort();
 	for (const rel of pages) {
 		const page = join(crate_dir, rel);
-		const html = readFileSync(page, 'utf8');
+		const html = await docsrs.read_text(page);
 		for (const m of html.matchAll(/\[<code>([^<]*)<\/code>\]/g)) {
 			dead.inert.push(`${crate_name}/${rel}: [${m[1]}]`);
 		}
@@ -163,7 +193,7 @@ function check_rendered(crate_name: string, graded: Set<string>): DeadRenders | 
 			const target = path === '' ? page : normalize(join(dirname(page), path));
 			const inside = target.slice(doc_root.length + 1).split('/')[0];
 			if (!target.startsWith(doc_root + '/') || !graded.has(inside)) continue;
-			const ids = ids_of(target);
+			const ids = await ids_of(docsrs, page_ids, target);
 			if (ids === null) dead.pages.push(`${crate_name}/${rel} → ${href}`);
 			else if (fragment !== '' && !ids.has(fragment))
 				dead.anchors.push(`${crate_name}/${rel} → ${href}`);
@@ -172,11 +202,21 @@ function check_rendered(crate_name: string, graded: Set<string>): DeadRenders | 
 	return dead;
 }
 
-function run(): never {
-	const crates = docs_rs_crates();
+/**
+ * The audit (module doc).
+ * @param args - `-v` / `--verbose` lists every dead render
+ * @returns the exit code: `1` when a build fails or a render is dead or unreadable, else `0`
+ */
+export async function run_docsrs_audit(
+	deps: DocsrsAuditDeps,
+	args: ReadonlyArray<string>
+): Promise<number> {
+	const { checkout, docsrs, cargo } = deps;
+	const verbose = args.includes('-v') || args.includes('--verbose');
+	const crates = docs_rs_crates((path) => checkout.read_text_sync(path));
 	if (crates.length === 0) {
 		log('Error: no workspace crate carries a [package.metadata.docs.rs] table — nothing graded.');
-		process.exit(1);
+		return 1;
 	}
 
 	let failed = 0;
@@ -196,15 +236,13 @@ function run(): never {
 		for (const [label, flags] of legs) {
 			builds++;
 			// module doc §Stale pages: this leg's render is all the directory holds
-			rmSync(render_dir(c.name), { recursive: true, force: true });
-			const result = spawnSync('cargo', ['doc', '-p', c.name, '--no-deps', '--quiet', ...flags], {
-				encoding: 'utf8',
-				env: { ...process.env, RUSTDOCFLAGS, CARGO_TARGET_DIR: TARGET_DIR },
-				stdio: ['ignore', 'ignore', 'pipe']
+			await docsrs.remove(render_dir(c.name), { recursive: true, missing_ok: true });
+			const result = await cargo.out(['doc', '-p', c.name, '--no-deps', '--quiet', ...flags], {
+				cwd: checkout
 			});
-			const stderr = result.stderr ?? '';
+			const stderr = result.stderr;
 			const shape = flags.length > 0 ? ` ${flags.join(' ')}` : '';
-			if (result.status !== 0) {
+			if (result.kind !== 'exited' || result.code !== 0) {
 				failed++;
 				log(stderr.trimEnd());
 				log(`✗ ${c.name}${shape}: the ${label} build fails`);
@@ -218,8 +256,9 @@ function run(): never {
 	// the read-back (module doc §Rendered links), after every build
 	let dead_total = 0;
 	let unreadable = 0;
+	const page_ids: PageIds = new Map();
 	for (const name of rendered) {
-		const dead = check_rendered(name, rendered);
+		const dead = await check_rendered(docsrs, page_ids, name, rendered);
 		if (dead === null) {
 			unreadable++;
 			log(`✗ ${name}: the docs.rs render left no index.html to read back`);
@@ -244,10 +283,8 @@ function run(): never {
 				`render(s) left nothing to read back, ${dead_total} dead render(s) (a hidden or ` +
 				'private link target; -v lists them)'
 		);
-		process.exit(1);
+		return 1;
 	}
 	log(`docs:audit:docsrs OK — ${crates.length} crate(s), ${builds} build(s), no dead renders`);
-	process.exit(0);
+	return 0;
 }
-
-run();

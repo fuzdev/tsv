@@ -5,7 +5,8 @@
  * @module
  */
 
-import { command_capture, command_stream, type Result } from './command.ts';
+import { command_capture, command_stream } from './command.ts';
+import type { Result } from './result.ts';
 
 /** The working tree's `git status --porcelain` lines. */
 export const git_status_lines = async (): Promise<Result<{ lines: Array<string> }>> => {

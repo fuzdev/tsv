@@ -83,7 +83,7 @@ if (!pipeline.success) {
 }
 
 const paths = pgo_paths(PGO_DIR);
-const built = cargo_artifacts(paths.target('use'), host_triple());
+const built = cargo_artifacts(paths.target('use'), host_triple(Deno.build));
 const source: Record<PgoBenchWorld, string> = { ffi: built.ffi, napi: built.addon };
 const corpus = JSON.parse(Deno.readTextFileSync(paths.corpus)) as { own: string[] };
 

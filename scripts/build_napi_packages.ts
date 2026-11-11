@@ -83,7 +83,7 @@ const native_library_filename = (): string => {
 	return `${prefix}tsv_napi.${ext}`;
 };
 
-const triple = args.triple ?? host_triple();
+const triple = args.triple ?? host_triple(Deno.build);
 const artifact = args.artifact ?? `target/napi/${native_library_filename()}`;
 // The staged NAME follows the triple; the default SOURCE path follows the host
 // (every matrix leg builds natively or in a same-arch container, so the two agree).

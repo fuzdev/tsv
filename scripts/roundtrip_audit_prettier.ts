@@ -33,10 +33,16 @@
  *
  * A *partial* checkout is different and says so: if `../prettier` exists but a listed suite
  * does not, that is a broken checkout rather than a machine without one.
+ *
+ * ## Reach
+ *
+ * The directory the checkout sits in, read-only (whether the suites are there), and `cargo`,
+ * which runs the audit in the checkout with its output inherited
+ * (`RoundtripAuditPrettierDeps`, built by `scripts/roots/roundtrip_audit_prettier.ts`).
  */
 
-import { spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import type { FsReadDir } from '@fuzdev/gro/fs.ts';
+import type { SpawnProgram } from '@fuzdev/gro/spawn.ts';
 
 /**
  * The Prettier format suites the round-trip audit walks — the pinned, adversarial half of
@@ -61,9 +67,27 @@ export const PRETTIER_ROUNDTRIP_SUITES = [
 
 const log = (...args: unknown[]) => console.error(...args);
 
-/** The leg. Exits the process with the audit's own status. */
-function run(): never {
-	const present = PRETTIER_ROUNDTRIP_SUITES.filter((p) => existsSync(p));
+/** What `run_roundtrip_audit_prettier` reaches. */
+export interface RoundtripAuditPrettierDeps {
+	/** The checkout, cargo's working directory. */
+	checkout: FsReadDir;
+	/** The directory the checkout sits in, where `../prettier` is. */
+	siblings: FsReadDir;
+	/** `cargo`, its output inherited. */
+	cargo: SpawnProgram;
+}
+
+/**
+ * The leg.
+ * @returns the audit's own exit code, `0` when no suite is present
+ */
+export async function run_roundtrip_audit_prettier(
+	deps: RoundtripAuditPrettierDeps
+): Promise<number> {
+	const present: string[] = [];
+	for (const suite of PRETTIER_ROUNDTRIP_SUITES) {
+		if (await deps.siblings.exists(suite.slice('../'.length))) present.push(suite);
+	}
 
 	if (present.length === 0) {
 		log(
@@ -71,7 +95,7 @@ function run(): never {
 		);
 		log('  This leg is the only one in `check` that reaches non-format-stable inputs.');
 		log('  Clone prettier beside this repo (see `deno task doctor`) to gate it locally.');
-		process.exit(0);
+		return 0;
 	}
 
 	// Present-but-incomplete is a broken checkout, not a machine without one — say so, and
@@ -82,8 +106,7 @@ function run(): never {
 
 	// Same profile + features as the `roundtrip:audit` leg that precedes this one in `check`,
 	// so the binary is already built and `cargo run` is a no-op re-check.
-	const { status } = spawnSync(
-		'cargo',
+	const result = await deps.cargo.run(
 		[
 			'run',
 			'--profile',
@@ -98,12 +121,8 @@ function run(): never {
 			'--gate',
 			...present
 		],
-		{ stdio: 'inherit' }
+		{ cwd: deps.checkout }
 	);
 
-	process.exit(status ?? 1);
+	return result.kind === 'exited' ? result.code : 1;
 }
-
-// Guarded because `benches/js/corpus_audit.ts` imports the suite list above — running the
-// audit (and exiting) as an import side effect would take that driver down with it.
-if (import.meta.main) run();

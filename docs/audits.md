@@ -1315,8 +1315,8 @@ deno task check:ast-types   # scripts/check_ast_types.ts
 ```
 
 Three arms (below) over `crates/tsv_wasm/types/tsv_ast.d.ts`; A and C share one generated file
-and one `deno check`. ~20 s when the generated content changes (nearly all arm C); an
-unchanged rerun hits deno's check cache at ~4.5 s.
+and one `tsc -p tsconfig.ast_types.json` (strict, no ambient types: the generated file and the
+`.d.ts` it imports). ~17 s a run (nearly all arm C), changed or not: `tsc` keeps no cache.
 
 **What it proves.** That `crates/tsv_wasm/types/tsv_ast.d.ts` still describes what the
 converter emits. That `.d.ts` is hand-maintained and it **ships** — `@fuzdev/tsv-parse-wasm`
@@ -1360,10 +1360,8 @@ The cost was measured before choosing: ~1 s for positions against ~19 s for slot
 whose total is minutes and whose cost is dominated by build configuration rather than audit
 code. Two things keep the price honest. Slots inside an OPAQUE region (parent or child named in
 `OPAQUE_WIRE_TYPES`) are excluded from the cover target — they type against `unknown`, so
-covering them graded nothing (2893 → 2636 slots, 770 → 698 files, ~20 s). And the figures are
-CACHE-MISS costs: `deno check` caches by content, so the full price is paid exactly when the
-`.d.ts` or a covered `expected*.json` changed — the commits where the arm has fresh work — and
-in cold-cache CI, while an unchanged rerun costs ~4.5 s. Reverting is a one-line change in
+covering them graded nothing (2893 → 2636 slots, 770 → 698 files, ~20 s). The checker keeps no
+cache, so each run pays the full price, the cover's size being what bounds it. Reverting is a one-line change in
 `wire_field_slots`; the trade it buys is precisely the class of bug this gate exists for. Same
 lesson one level up from the one that motivated arm B, and then again one level up from that.
 
@@ -1539,7 +1537,7 @@ asks for the install. A stale staging is refused as the package suites refuse it
 ## Canonical-Pin Agreement Audit (`pins:audit`)
 
 ```bash
-# scripts/check_canonical_pins.ts --pins. Read-only Deno, no build, no sidecar.
+# scripts/check_canonical_pins.ts --pins. Read-only, under Node; no build, no sidecar.
 deno task pins:audit
 ```
 
@@ -1595,8 +1593,8 @@ upstream publishes — drift to decide about, not a broken build.
 ## Checkout-Alignment Audit (`pins:audit:checkouts`)
 
 ```bash
-# the same script's other mode (--checkouts). `--allow-run=git` is load-bearing:
-# without it the drift half cannot run (the audit reports it unchecked).
+# the same script's other mode (--checkouts), the one that runs git: with no git on
+# PATH the drift half cannot run (the audit reports it unchecked).
 deno task pins:audit:checkouts
 ```
 
