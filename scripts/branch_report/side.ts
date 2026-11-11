@@ -43,8 +43,11 @@ export class CommandLog {
 
 /** Thrown for a command a leg needs and the machine lacks: a `missing_tool` leg, never `failed`. */
 export class MissingTool extends HarnessError {
-	constructor(readonly tool: string) {
+	readonly tool: string;
+
+	constructor(tool: string) {
 		super(`\`${tool}\` is not installed`);
+		this.tool = tool;
 	}
 }
 

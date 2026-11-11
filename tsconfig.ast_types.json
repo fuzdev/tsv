@@ -6,6 +6,7 @@
 		"moduleResolution": "nodenext",
 		"strict": true,
 		"allowImportingTsExtensions": true,
+		"erasableSyntaxOnly": true,
 		"types": []
 	},
 	"files": ["scripts/.drift_check.gen.ts"]
