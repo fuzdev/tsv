@@ -505,7 +505,7 @@ impl<'a> Printer<'a> {
         self.append_type_params_and_signature(
             &mut parts,
             f.type_parameters.as_ref(),
-            f.params,
+            self.view.run(f.params),
             &f.return_type,
             f.span.start,
         );
@@ -555,7 +555,7 @@ impl<'a> Printer<'a> {
         self.append_type_params_and_signature(
             &mut sig_parts,
             c.type_parameters.as_ref(),
-            c.params,
+            self.view.run(c.params),
             &c.return_type,
             c.span.start,
         );
@@ -1177,12 +1177,12 @@ impl<'a> Printer<'a> {
                 // Comments between `...` and the argument (e.g., `.../* c */ args`); a
                 // line comment breaks so it can't swallow the rest parameter.
                 let dots_end = rest.span.start + "...".len() as u32;
-                let arg_start = rest.argument.span().start;
+                let arg_start = self.view.expr(rest.argument).span().start;
                 let comments_doc = self.build_trailing_comments_hang_next(dots_end, arg_start);
                 let mut parts: DocBuf = smallvec![
                     d.text("..."),
                     comments_doc,
-                    self.build_function_type_param_expression_doc(rest.argument),
+                    self.build_function_type_param_expression_doc(self.view.expr(rest.argument)),
                 ];
                 // The optional `?` marker and the `: type` annotation, with the comment
                 // landings both of their gaps need — `wrap` is true to match the

@@ -305,6 +305,7 @@ describe('a provisioned machine', () => {
 			'canonical pins OK — all agree'
 		]);
 		deepStrictEqual(marked(r.lines, '·'), [
+			'tsv_check is outside the workspace build — the conformance:tsc-* tasks do not run',
 			'freshness (artifact vs source mtimes) is enforced at run time by lib/check_artifact_freshness.ts (bench/corpus) and scripts/check_staged_freshness.ts (the staged npm/napi packages)',
 			'the Node that answers: `cargo run -p tsv_debug check`'
 		]);

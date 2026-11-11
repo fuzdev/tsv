@@ -44,8 +44,9 @@ impl<'a> Printer<'a> {
         decl: &ast::TSExportAssignment<'_>,
         span: Span,
     ) -> DocId {
+        let expression = self.view.slot(&decl.expression);
         let d = self.d();
-        let value_span = decl.expression.span();
+        let value_span = expression.span();
         // `export =` word by word: the `export`→`=` gap is a position an author can
         // comment in. Emitting the two as one text never scans it — the comment would
         // be dropped. The `=`→value gap is a freeze head, `export default`'s twin, so the
@@ -67,18 +68,18 @@ impl<'a> Printer<'a> {
         // prints its shells itself.
         let frozen = self.value_head_frozen_span(keyword_end, value_span);
         let run_start = match shell_close {
-            Some(_) if frozen.is_none() => self.pair_trailing_gap_start(&decl.expression),
+            Some(_) if frozen.is_none() => self.pair_trailing_gap_start(expression),
             _ => argument_end,
         };
         let value = self.with_claimed_right_spine_run(run_start, argument_end, || {
-            self.build_value_head_doc(keyword_end, &decl.expression, || {
-                self.build_expression_doc_claiming_outermost(&decl.expression)
+            self.build_value_head_doc(keyword_end, expression, || {
+                self.build_expression_doc_claiming_outermost(expression)
             })
         });
         // An assignment as the exported value takes clarity parens, the same answer every
         // other value position gives (`ParenContext::ExportAssignment`) — outside the freeze
         // head, so a frozen value keeps the position's pair, exactly as `export default` does.
-        let value = if needs_parens(&decl.expression, ParenContext::ExportAssignment, false) {
+        let value = if needs_parens(self.view, expression, ParenContext::ExportAssignment, false) {
             d.parens(value)
         } else {
             value
@@ -408,7 +409,7 @@ impl<'a> Printer<'a> {
             return doc;
         }
 
-        let value_span = decl.declaration.span();
+        let value_span = decl.declaration.span(self.view);
         let decl_start = value_span.start;
         // The `export default`→value gap (a line comment indents the value). The
         // keyword's own words are located, not measured — the gap *between* them is a
@@ -441,9 +442,12 @@ impl<'a> Printer<'a> {
         // takes this gap's own separator instead, glued.
         let (value_doc, left_spine_run) = match &decl.declaration {
             ast::ExportDefaultValue::Expression(expr)
-                if !left_spine_shell_is_comment_free(self.source, expr.span().start) =>
+                if !left_spine_shell_is_comment_free(
+                    self.source,
+                    self.view.slot(expr).span().start,
+                ) =>
             {
-                self.export_default_leading_edge(expr, value_doc)
+                self.export_default_leading_edge(self.view.slot(expr), value_doc)
             }
             _ => (value_doc, false),
         };
@@ -460,8 +464,8 @@ impl<'a> Printer<'a> {
         // sequence, which prints its own `(` ahead of the cast.
         if left_spine_run
             || matches!(&decl.declaration, ast::ExportDefaultValue::Expression(expr)
-                if !matches!(expr.kind, ast::ExpressionKind::SequenceExpression(_))
-                    && self.is_own_line_jsdoc_cast(expr))
+                if !matches!(self.view.slot(expr).kind, ast::ExpressionKind::SequenceExpression(_))
+                    && self.is_own_line_jsdoc_cast(self.view.slot(expr)))
             || self
                 .keyword_value_hang_doc(keyword_end, decl_start, || value_doc)
                 .is_some()
@@ -541,17 +545,18 @@ impl<'a> Printer<'a> {
                 // behind a same-line block of that run and welded onto its line. Asked of the
                 // shell's own close, read from the value's span end, so a gap holding no `//`
                 // opens no shell; a FROZEN value's slice prints its shells itself.
-                let frozen = self.value_head_frozen_span(keyword_end, expr.span());
+                let frozen = self.value_head_frozen_span(keyword_end, self.view.slot(expr).span());
                 let line_comment_close = self
                     .value_paren_line_comment_close(value_span.end, span.end)
                     .filter(|_| frozen.is_none());
-                let run_start = line_comment_close
-                    .map_or(value_span.end, |_| self.pair_trailing_gap_start(expr));
+                let run_start = line_comment_close.map_or(value_span.end, |_| {
+                    self.pair_trailing_gap_start(self.view.slot(expr))
+                });
                 // A multi-line comment the value owns prints outside the value's own group (the
                 // keyword gap's run never sees it), beneath the clarity parens added below.
                 let expr_doc = self.with_claimed_right_spine_run(run_start, value_span.end, || {
-                    self.build_value_head_doc(keyword_end, expr, || {
-                        self.build_expression_doc_claiming_outermost(expr)
+                    self.build_value_head_doc(keyword_end, self.view.slot(expr), || {
+                        self.build_expression_doc_claiming_outermost(self.view.slot(expr))
                     })
                 });
                 // Prettier wraps the exported expression when its leftmost
@@ -566,11 +571,19 @@ impl<'a> Printer<'a> {
                 // FunctionDeclaration/ClassDeclaration arms cover bare
                 // `export default function/class …`. A frozen value is read as its
                 // verbatim slice, which carries no pair the printer would add inside.
-                let needs_pair =
-                    export_default_needs_parens(expr, LeftmostText::of_value(frozen.is_some()));
+                let needs_pair = export_default_needs_parens(
+                    self.view,
+                    self.view.slot(expr),
+                    LeftmostText::of_value(frozen.is_some()),
+                );
                 let argument_end = value_span.end;
                 if !self.has_comments_to_emit_between(argument_end, span.end) {
-                    let doc = self.export_default_value_pair(expr, expr_doc, needs_pair, frozen);
+                    let doc = self.export_default_value_pair(
+                        self.view.slot(expr),
+                        expr_doc,
+                        needs_pair,
+                        frozen,
+                    );
                     return d.concat(&[doc, d.text(";")]);
                 }
                 // A `//` the author wrote inside the value's own grouping parens keeps
@@ -602,8 +615,12 @@ impl<'a> Printer<'a> {
                     parts.extend(after);
                     return d.concat(&parts);
                 }
-                let mut parts =
-                    smallvec![self.export_default_value_pair(expr, expr_doc, needs_pair, frozen)];
+                let mut parts = smallvec![self.export_default_value_pair(
+                    self.view.slot(expr),
+                    expr_doc,
+                    needs_pair,
+                    frozen
+                )];
                 // `operand_parens_printed: false` — this position's pair closes at the
                 // EXPRESSION's end, so it never encloses the terminator gap: a comment
                 // written inside the author's shell (`export default (x /* c */);`) is
@@ -706,12 +723,14 @@ impl<'a> Printer<'a> {
             ]));
         }
 
-        let ast::ExportDefaultValue::Expression(
-            value @ ast::Expression {
-                span: class_span,
-                kind: ast::ExpressionKind::ClassExpression(class_expr),
-            },
-        ) = &decl.declaration
+        let ast::ExportDefaultValue::Expression(value) = &decl.declaration else {
+            return None;
+        };
+        let value = self.view.slot(value);
+        let ast::Expression {
+            span: class_span,
+            kind: ast::ExpressionKind::ClassExpression(class_expr),
+        } = value
         else {
             return None;
         };

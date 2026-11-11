@@ -16,6 +16,7 @@
 
 use crate::ast;
 use crate::whitespace::{is_svelte_ws, svelte_ws_width_at};
+use tsv_ts::ast::ExprView;
 
 use tsv_lang::{Comment, Span, source_scan::skip_comment};
 use tsv_ts::__private::{CommentAttach, CommentMode, IslandComments};
@@ -314,11 +315,17 @@ pub(super) fn pattern_comment_window(pattern: &tsv_ts::ast::Expression<'_>) -> S
 /// same windows the `{#each}` / `{:then}` / `{:catch}` bindings take, which is what makes
 /// the id and init windows split at the end of the BINDING rather than of its bare name.
 pub(super) fn attach_const_tag_init<'a>(
+    view: ExprView<'_>,
     tag: &ast::ConstTag<'_>,
     attach: AttachInputs<'a>,
 ) -> CommentAttach<'a> {
-    let binding_end = pattern_comment_window(tag.id).end;
-    attach_expression(attach, binding_end, tag.init.span(), tag.span.end)
+    let binding_end = pattern_comment_window(view.expr(tag.id)).end;
+    attach_expression(
+        attach,
+        binding_end,
+        view.expr(tag.init).span(),
+        tag.span.end,
+    )
 }
 
 /// The attach for a comment-bearing expression LIST that canonical Svelte parses

@@ -43,7 +43,7 @@ Every one takes the parse goal as a **trailing optional argument**
 twin to pick between. Omitted or `undefined` means **none named**, which the two
 families answer differently: a parse reads it as `module` (its wire's
 `Program.sourceType` is a claim one settled grammar has to produce), a format as the
-module grammar retried as a script (`tsv_ts::__private::parse_with_goal_or_fallback`, via
+module grammar retried as a script (`tsv_ts::__private::parse_with_goal_or_fallback_into`, via
 `tsv_arena`'s `parse_ast_for_format!`) — so a legacy sloppy script formats through
 `format_typescript(source)` with no argument at all, while anything the module
 grammar accepts is never reinterpreted. A set value is exact on both. See

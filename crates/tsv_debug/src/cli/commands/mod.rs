@@ -12,20 +12,29 @@ pub mod build_fanout_audit;
 pub mod build_visit_census;
 pub mod canonical_compile;
 pub mod canonical_parse;
+#[cfg(tsv_unported)]
 pub mod canonicalize_audit;
 pub mod census_audit;
 pub mod check;
 #[cfg(feature = "_internal_comment_check")]
 pub mod comment_audit;
 pub mod compare;
+#[cfg(tsv_unported)]
 pub mod compile_compare;
+#[cfg(tsv_unported)]
 pub mod compile_conformance_audit;
+#[cfg(tsv_unported)]
 pub mod compile_corpus_compare;
+#[cfg(tsv_unported)]
 pub mod compile_fixture_init;
+#[cfg(tsv_unported)]
 pub mod compile_fixtures_validate;
+#[cfg(tsv_unported)]
 pub mod compile_fuzz;
+#[cfg(tsv_unported)]
 pub mod compile_profile;
 pub mod conformance_audit;
+#[cfg(tsv_unported)]
 pub mod erase_comment_census;
 pub mod fabrication_audit;
 pub mod fixture_init;
@@ -64,6 +73,7 @@ pub mod strip_fixtures_validate;
 pub mod swallow_audit;
 pub mod test262;
 pub mod ts_fixture_audit;
+#[cfg(tsv_unported)]
 pub mod tsc_conformance;
 pub mod type_sizes;
 pub mod variant_audit;
@@ -423,7 +433,7 @@ type WorkTaskStream<T> = Pin<Box<dyn Stream<Item = Result<T, JoinError>>>>;
 /// Spawn `work(item)` for every item on the bulk sidecar pool, returning a
 /// stream of join results — join each with [`task_result`].
 ///
-/// Generic over the work item (a [`Fixture`], a [`CompileFixture`], a corpus
+/// Generic over the work item (a [`Fixture`], a `CompileFixture`, a corpus
 /// `PathBuf`, …) so every bulk sidecar command shares one fan-out shape.
 ///
 /// Each task is `tokio::spawn`ed so the CPU-bound Rust work (parse, format,
@@ -433,8 +443,6 @@ type WorkTaskStream<T> = Pin<Box<dyn Stream<Item = Result<T, JoinError>>>>;
 /// the compile oracle) is spread over the small sidecar pool sized by
 /// `init_bulk_pool`. `order` picks input order (deterministic progress lines)
 /// vs completion order.
-///
-/// [`CompileFixture`]: crate::compile_fixtures::CompileFixture
 ///
 /// The stream is boxed to unify the two combinator types behind one return; the
 /// per-item vtable poll is negligible against each item's parse/format cost.

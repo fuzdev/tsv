@@ -16,7 +16,7 @@ Inputs the oracle itself rejects (legacy-mode syntax, invalid JS, TypeScript in 
 
 A **Refused** entry below opens with the `Refusal`'s stable **bucket key** in a code span (user-chosen identifiers shown as `{name}`), so it can be matched directly against a `compile_corpus_compare` run, which reports those keys via `Refusal::bucket_key`. `compile_conformance_audit` gates that correspondence in one direction: a quoted key no variant produces fails the audit. The reverse does not hold — this is a coverage map, not a key dump, and a variant covered by a prose paragraph rather than its own bullet is fine (the audit reports the unquoted count without gating it). Each variant also carries a human-readable `Display` message that substitutes the real name and often adds a parenthetical the key omits — the two are deliberately decoupled so a message can be reworded without shifting corpus buckets.
 
-**Verification**: `cargo run -p tsv_debug compile_fixtures_validate` (fixture parity, oracle freshness, canonicalize fixed points) and `npm run compile:corpus:compare` (corpus-scale bucketing over real repos + the Svelte test suites).
+**Verification**: `cargo run -p tsv_debug compile_fixtures_validate` (fixture parity, oracle freshness, canonicalize fixed points) and `npm run compile:corpus:compare` (corpus-scale bucketing over real repos + the Svelte test suites). Neither runs while the crate is outside the workspace build ([CLAUDE.md §Project Structure](../CLAUDE.md#project-structure)).
 
 **Spec References**:
 

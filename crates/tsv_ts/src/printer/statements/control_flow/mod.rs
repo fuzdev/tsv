@@ -1136,11 +1136,11 @@ impl<'a> Printer<'a> {
         }
         // Peel one optional inner `!` (so `!` and `!!` qualify; a third `!` leaves a
         // UnaryExpression here and fails the logical-binary check below).
-        let inner = match outer.argument {
+        let inner = match self.view.expr(outer.argument) {
             Expression {
                 kind: ExpressionKind::UnaryExpression(u),
                 ..
-            } if u.operator == UnaryOperator::Bang => u.argument,
+            } if u.operator == UnaryOperator::Bang => self.view.expr(u.argument),
             other => other,
         };
         matches!(&inner.kind, ExpressionKind::BinaryExpression(b) if b.operator.is_logical())

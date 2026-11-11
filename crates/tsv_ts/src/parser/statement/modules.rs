@@ -1417,7 +1417,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// The decoded `[[Key]]` StringValue of an import-attribute key (ecma262):
     /// an identifier resolves to its name, a string literal to its decoded
     /// content. Used to detect duplicate keys, where `type` and `'type'` collide.
-    fn attribute_key_string(&self, key: &ImportAttributeKey<'_>) -> String {
+    fn attribute_key_string(&self, key: &ImportAttributeKey<'arena>) -> String {
         match key {
             ImportAttributeKey::Identifier(id) => match id.escaped_name {
                 Some(s) => s.to_string(),

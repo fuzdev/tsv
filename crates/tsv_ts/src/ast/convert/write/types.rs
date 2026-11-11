@@ -74,7 +74,7 @@ pub(super) fn write_type(w: &mut JsonWriter, ts_type: &ast::TSType<'_>, ctx: &Ct
             node_header(w, "TSFunctionType", f.span, ctx);
             write_type_parameters_field(w, f.type_parameters.as_ref(), ctx);
             w.raw(",\"parameters\":");
-            write_expressions(w, f.params, ctx);
+            write_expressions(w, ctx.view.run(f.params), ctx);
             w.raw(",\"typeAnnotation\":");
             write_type_annotation(w, &f.return_type, ctx);
             close_node(w, "TSFunctionType", f.span, ctx);
@@ -85,7 +85,7 @@ pub(super) fn write_type(w: &mut JsonWriter, ts_type: &ast::TSType<'_>, ctx: &Ct
             w.bool(c.abstract_);
             write_type_parameters_field(w, c.type_parameters.as_ref(), ctx);
             w.raw(",\"parameters\":");
-            write_expressions(w, c.params, ctx);
+            write_expressions(w, ctx.view.run(c.params), ctx);
             w.raw(",\"typeAnnotation\":");
             write_type_annotation(w, &c.return_type, ctx);
             close_node(w, "TSConstructorType", c.span, ctx);
@@ -247,7 +247,7 @@ fn write_import_type(w: &mut JsonWriter, i: &ast::TSImportType<'_>, ctx: &Ctx<'_
     node_header(w, "TSImportType", i.span, ctx);
     w.raw(",\"argument\":");
     write_literal(w, &i.argument, ctx);
-    if let Some(o) = &i.options {
+    if let Some(o) = ctx.view.opt(i.options) {
         w.raw(",\"options\":");
         write_expression(w, o, ctx);
     }
@@ -288,7 +288,7 @@ fn write_literal_type(w: &mut JsonWriter, lit: &ast::TSLiteralType<'_>, ctx: &Ct
             // Negative number types like `-1`; the parser guarantees the
             // argument is a Literal.
             #[expect(clippy::unreachable)]
-            let ast::ExpressionKind::Literal(arg_lit) = &unary.argument.kind else {
+            let ast::ExpressionKind::Literal(arg_lit) = &ctx.view.expr(unary.argument).kind else {
                 unreachable!(
                     "parser only creates TSLiteralType::UnaryExpression with Literal argument"
                 )
@@ -441,7 +441,7 @@ fn write_type_element(w: &mut JsonWriter, elem: &ast::TSTypeElement<'_>, ctx: &C
             }
             // acorn quirk: omits `computed` when the key is the `new` keyword
             // and the signature is neither computed nor readonly.
-            let is_new_key = matches!(&p.key.kind, ast::ExpressionKind::Identifier(id)
+            let is_new_key = matches!(&ctx.view.slot(&p.key).kind, ast::ExpressionKind::Identifier(id)
                 if id.name(ctx.source) == "new");
             if !p.computed && !p.readonly && is_new_key {
                 w.raw(",\"key\":");
@@ -452,7 +452,7 @@ fn write_type_element(w: &mut JsonWriter, elem: &ast::TSTypeElement<'_>, ctx: &C
                     b",\"computed\":false,\"key\":",
                 );
             }
-            write_expression(w, &p.key, ctx);
+            write_expression(w, ctx.view.slot(&p.key), ctx);
             if p.optional {
                 w.raw(",\"optional\":true");
             }
@@ -477,7 +477,7 @@ fn write_type_element(w: &mut JsonWriter, elem: &ast::TSTypeElement<'_>, ctx: &C
             w.raw(",\"computed\":");
             w.bool(m.computed);
             w.raw(",\"key\":");
-            write_expression(w, &m.key, ctx);
+            write_expression(w, ctx.view.slot(&m.key), ctx);
             let getset = matches!(m.kind, ast::MethodKind::Get | ast::MethodKind::Set);
             if getset {
                 w.raw(",\"kind\":");
@@ -491,7 +491,7 @@ fn write_type_element(w: &mut JsonWriter, elem: &ast::TSTypeElement<'_>, ctx: &C
             }
             write_type_parameters_field(w, m.type_parameters.as_ref(), ctx);
             w.raw(",\"parameters\":");
-            write_expressions(w, m.params, ctx);
+            write_expressions(w, ctx.view.run(m.params), ctx);
             write_type_annotation_field(w, m.return_type.as_ref(), ctx);
             if !getset {
                 w.raw(",\"kind\":\"method\"");
@@ -504,7 +504,7 @@ fn write_type_element(w: &mut JsonWriter, elem: &ast::TSTypeElement<'_>, ctx: &C
                 "TSCallSignatureDeclaration",
                 c.span,
                 c.type_parameters.as_ref(),
-                c.params,
+                ctx.view.run(c.params),
                 c.return_type.as_ref(),
                 ctx,
             );
@@ -515,7 +515,7 @@ fn write_type_element(w: &mut JsonWriter, elem: &ast::TSTypeElement<'_>, ctx: &C
                 "TSConstructSignatureDeclaration",
                 c.span,
                 c.type_parameters.as_ref(),
-                c.params,
+                ctx.view.run(c.params),
                 c.return_type.as_ref(),
                 ctx,
             );
@@ -652,7 +652,7 @@ pub(super) fn write_declare_function(
     write_function_flags_fields(w, func.generator, func.r#async);
     write_type_parameters_field(w, func.type_parameters.as_ref(), ctx);
     w.raw(",\"params\":");
-    write_expressions(w, func.params, ctx);
+    write_expressions(w, ctx.view.run(func.params), ctx);
     super::write_return_type_field(w, func.return_type.as_ref(), ctx);
     if func.declare && exported {
         w.raw(",\"declare\":true");
@@ -686,7 +686,7 @@ pub(super) fn write_enum_declaration(
             ast::TSEnumMemberId::Identifier(id) => write_identifier_plain(w, id, ctx),
             ast::TSEnumMemberId::String(lit) => write_literal(w, lit, ctx),
         }
-        if let Some(init) = &member.initializer {
+        if let Some(init) = ctx.view.opt_slot(&member.initializer) {
             w.raw(",\"initializer\":");
             write_expression(w, init, ctx);
         }

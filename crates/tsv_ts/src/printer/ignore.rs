@@ -73,7 +73,6 @@ use super::types::helpers::{TypeParenRule, outermost_paren, paren_shell_gaps};
 use super::unwrap_parenthesized;
 use crate::ast::{self, Comment, TSType};
 use smallvec::smallvec;
-use std::borrow::Borrow;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
@@ -839,10 +838,10 @@ impl<'a> Printer<'a> {
         let ast::ExpressionKind::NewExpression(new_expr) = &expr.kind else {
             return false;
         };
-        let head_end = new_expr
-            .type_arguments
-            .as_ref()
-            .map_or_else(|| new_expr.callee.span().end, |args| args.span.end);
+        let head_end = new_expr.type_arguments.as_ref().map_or_else(
+            || self.view.expr(new_expr.callee).span().end,
+            |args| args.span.end,
+        );
         let mut pos = head_end;
         while let Some(i) = next_significant_byte(self.source, pos, expr.span.end) {
             if self.source.as_bytes()[i] == b'(' {
@@ -1061,13 +1060,13 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn args_frozen_span(
         &self,
         container_start: u32,
-        args: &[&ast::Expression<'_>],
+        args: &[ast::ExprEdge<'_>],
         i: usize,
     ) -> Option<Span> {
         if !self.has_format_ignore {
             return None;
         }
-        let item_span = |j: usize| args[j].span();
+        let item_span = |j: usize| self.view.expr(args[j]).span();
         self.list_item_frozen(container_start, &item_span, i)
             .then(|| item_span(i))
     }
@@ -1083,7 +1082,7 @@ impl<'a> Printer<'a> {
     /// element's end — or at `container_start` when every earlier slot is a hole. That
     /// anchor rule is why this is spelled here beside [`Self::list_item_frozen`], the
     /// other home of the gap-anchor convention, rather than at the element loops.
-    pub(in crate::printer) fn element_frozen_span<'e, E: Borrow<ast::Expression<'e>>>(
+    pub(in crate::printer) fn element_frozen_span<E: ast::ListElement>(
         &self,
         container_start: u32,
         elements: &[Option<E>],
@@ -1092,13 +1091,13 @@ impl<'a> Printer<'a> {
         if !self.has_format_ignore {
             return None;
         }
-        let elem = elements[i].as_ref()?.borrow();
+        let elem = elements[i].as_ref()?.element(self.view);
         let prev_end = elements[..i]
             .iter()
             .rev()
             .flatten()
             .next()
-            .map_or(container_start, |e| e.borrow().span().end);
+            .map_or(container_start, |e| e.element(self.view).span().end);
         self.gap_frozen_span(prev_end, elem.span())
     }
 
@@ -1422,15 +1421,15 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn build_arg_item_doc(
         &self,
         container_start: u32,
-        args: &[&ast::Expression<'_>],
+        args: &[ast::ExprEdge<'_>],
         i: usize,
     ) -> DocId {
         if !self.has_format_ignore {
-            return self.build_arg_expression_doc(args[i]);
+            return self.build_arg_expression_doc(self.view.expr(args[i]));
         }
         self.args_frozen_span(container_start, args, i).map_or_else(
-            || self.build_arg_expression_doc(args[i]),
-            |frozen| self.build_frozen_arg_doc(args[i], frozen),
+            || self.build_arg_expression_doc(self.view.expr(args[i])),
+            |frozen| self.build_frozen_arg_doc(self.view.expr(args[i]), frozen),
         )
     }
 

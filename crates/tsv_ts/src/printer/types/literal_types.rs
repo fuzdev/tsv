@@ -189,7 +189,7 @@ impl<'a> Printer<'a> {
             TSLiteralType::UnaryExpression(unary) => {
                 // For negative number types like `-1`
                 let op = d.text(unary.operator.as_str());
-                let arg = self.build_expression_doc(unary.argument);
+                let arg = self.build_expression_doc(self.view.expr(unary.argument));
                 // The sign→numeral gap has no other emitter, so a comment authored there
                 // (`-/* c */ 1`) is dropped unless this builder claims it. Same seam as the
                 // value-level `build_unary_doc`, minus its paren re-adding: a parenthesized
@@ -208,7 +208,10 @@ impl<'a> Printer<'a> {
                 // A negative literal type is one atom; splitting its sign across a line
                 // break buys nothing.
                 let operator_end = unary.span.start + unary.operator.as_str().len() as u32;
-                match self.build_rhs_comments_glued_opt(operator_end, unary.argument.span().start) {
+                match self.build_rhs_comments_glued_opt(
+                    operator_end,
+                    self.view.expr(unary.argument).span().start,
+                ) {
                     Some(comments) => d.concat(&[op, comments, arg]),
                     None => d.concat(&[op, arg]),
                 }

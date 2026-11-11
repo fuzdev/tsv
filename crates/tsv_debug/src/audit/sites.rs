@@ -17,6 +17,7 @@
 //! parser cannot answer "is this a comment context" for Svelte markup.
 
 use tsv_cli::cli::input::ParserType;
+use tsv_ts::ast::ExprView;
 
 use crate::audit::properties::{Utf16ToByte, tsv_parse_to_value};
 
@@ -195,36 +196,36 @@ fn svelte_internal_regions(source: &str) -> InternalRegions {
         }
     }
 
-    fn walk(frag: &Fragment<'_>, out: &mut Vec<(usize, usize)>) {
+    fn walk(view: ExprView<'_>, frag: &Fragment<'_>, out: &mut Vec<(usize, usize)>) {
         for node in frag.nodes {
             match node {
                 FragmentNode::IfBlock(b) => {
                     interior(b.opening_tag_span, out);
-                    walk(&b.consequent, out);
+                    walk(view, &b.consequent, out);
                     if let Some(alt) = &b.alternate {
-                        walk(alt, out);
+                        walk(view, alt, out);
                     }
                 }
                 FragmentNode::EachBlock(b) => {
                     interior(b.opening_tag_span, out);
-                    walk(&b.body, out);
+                    walk(view, &b.body, out);
                     if let Some(fallback) = &b.fallback {
-                        walk(fallback, out);
+                        walk(view, fallback, out);
                     }
                 }
                 FragmentNode::AwaitBlock(b) => {
                     interior(b.opening_tag_span, out);
                     for f in [&b.pending, &b.then, &b.catch].into_iter().flatten() {
-                        walk(f, out);
+                        walk(view, f, out);
                     }
                 }
                 FragmentNode::KeyBlock(b) => {
                     interior(b.opening_tag_span, out);
-                    walk(&b.fragment, out);
+                    walk(view, &b.fragment, out);
                 }
                 FragmentNode::SnippetBlock(b) => {
                     interior(b.opening_tag_span, out);
-                    walk(&b.body, out);
+                    walk(view, &b.body, out);
                 }
                 // `{@html x}` / `{@const a = b}` / `{@render f()}` / `{@debug a}` — the
                 // whole tag is one brace-delimited head, expression included.
@@ -235,7 +236,7 @@ fn svelte_internal_regions(source: &str) -> InternalRegions {
                 FragmentNode::RenderTag(t) => interior(t.span, out),
                 FragmentNode::Element(e) => {
                     attributes(e.attributes, out);
-                    walk(&e.fragment, out);
+                    walk(view, &e.fragment, out);
                 }
                 FragmentNode::SpecialElement(e) => {
                     // `<svelte:element this={tag}>` / `<svelte:component this={x}>` hold
@@ -248,9 +249,9 @@ fn svelte_internal_regions(source: &str) -> InternalRegions {
                     // unprobed **silently**, which is the exact failure this walk exists to
                     // fix. Let it break the build instead.
                     match &e.kind {
-                        SpecialElementKind::SvelteElement { tag } => push_span(tag.span(), out),
+                        SpecialElementKind::SvelteElement { tag } => push_span(tag.span(view), out),
                         SpecialElementKind::SvelteComponent { expression } => {
-                            push_span(expression.expression.span(), out);
+                            push_span(view.expr(expression.expression).span(), out);
                         }
                         SpecialElementKind::SvelteHead
                         | SpecialElementKind::SvelteWindow
@@ -263,7 +264,7 @@ fn svelte_internal_regions(source: &str) -> InternalRegions {
                         | SpecialElementKind::TitleElement => {}
                     }
                     attributes(e.attributes, out);
-                    walk(&e.fragment, out);
+                    walk(view, &e.fragment, out);
                 }
                 FragmentNode::ExpressionTag(_)
                 | FragmentNode::Text(_)
@@ -283,7 +284,7 @@ fn svelte_internal_regions(source: &str) -> InternalRegions {
         };
     };
     let mut named = Vec::new();
-    walk(&root.fragment, &mut named);
+    walk(root.view(), &root.fragment, &mut named);
     let frozen = [root.instance, root.module]
         .into_iter()
         .flatten()

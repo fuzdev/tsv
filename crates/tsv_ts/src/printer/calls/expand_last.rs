@@ -90,7 +90,7 @@ impl ArgOwner {
 /// no state below can hug, and the caller's general path prints it whole.
 pub(super) fn try_expand_last_arg(
     printer: &Printer<'_>,
-    arguments: &[&ast::Expression<'_>],
+    arguments: &[ast::ExprEdge<'_>],
     callee: DocId,
     paren_open: u32,
     call_end: u32,
@@ -103,7 +103,7 @@ pub(super) fn try_expand_last_arg(
     }
     let opener = ArgOpener::callee(d, callee);
 
-    let last_arg = arguments.last().copied();
+    let last_arg = printer.view.opt(arguments.last().copied());
     let last_is_function = matches!(
         last_arg,
         Some(ast::Expression {
@@ -126,17 +126,19 @@ pub(super) fn try_expand_last_arg(
             span: arrow_span,
             kind: ast::ExpressionKind::ArrowFunctionExpression(arrow),
         }) => {
-            could_expand_arrow_chain(arrow)
+            could_expand_arrow_chain(printer.view, arrow)
                 || match &arrow.body {
                     ast::ArrowFunctionBody::Expression(body_expr) => {
-                        (arrow_body_is_call_through_non_null(body_expr)
-                            || is_ternary_arrow_body(body_expr))
+                        (arrow_body_is_call_through_non_null(
+                            printer.view,
+                            printer.view.expr(*body_expr),
+                        ) || is_ternary_arrow_body(printer.view.expr(*body_expr)))
                             && !(has_comments
                                 && arrow_hug_refused_by_comments(
                                     printer,
                                     arrow,
                                     *arrow_span,
-                                    body_expr,
+                                    printer.view.expr(*body_expr),
                                 ))
                     }
                     ast::ArrowFunctionBody::BlockStatement(_) => false,
@@ -168,7 +170,7 @@ pub(super) fn try_expand_last_arg(
     // here and is the only shape where the two answers are observable.
     if arguments.len() == 2
         && matches!(
-            arguments.first(),
+            printer.view.opt(arguments.first().copied()),
             Some(ast::Expression {
                 kind: ast::ExpressionKind::ArrowFunctionExpression(_),
                 ..
@@ -269,21 +271,25 @@ pub(super) fn try_expand_last_arg(
         // only the body breaks after `=>` (`fn({ a: 1 }, (x) =>⏎\tcall(x, …)⏎)`).
         if let Some(ast::Expression { span: arrow_span, kind: ast::ExpressionKind::ArrowFunctionExpression(arrow) }) = last_arg
             && let ast::ArrowFunctionBody::Expression(body_expr) = &arrow.body
-            && (arrow_body_is_call_through_non_null(body_expr)
-                || matches!(body_expr.kind, ast::ExpressionKind::ConditionalExpression(_)))
+            && (arrow_body_is_call_through_non_null(printer.view, printer.view.expr(*body_expr))
+                || matches!(printer.view.expr(*body_expr).kind, ast::ExpressionKind::ConditionalExpression(_)))
             // The reassembling arm's refusal pair, which holds at every one of these states —
             // and the same question the eligibility gate above already answered to let this
             // block be entered at all.
-            && !(has_comments && arrow_hug_refused_by_comments(printer, arrow, *arrow_span, body_expr))
+            && !(has_comments && arrow_hug_refused_by_comments(printer, arrow, *arrow_span, printer.view.expr(*body_expr)))
         {
             let sig_doc = build_hugged_arrow_sig_doc(printer, arrow, *arrow_span);
             // Reuse the pre-built call body (see above); conditional bodies build fresh.
             let body_doc = body_reuse.map_or_else(
-                || printer.build_arrow_arg_body_doc(body_expr),
+                || printer.build_arrow_arg_body_doc(printer.view.expr(*body_expr)),
                 |(_, doc)| doc,
             );
-            let body_doc =
-                prepend_arrow_body_comments(printer, arrow, body_expr.span().start, body_doc);
+            let body_doc = prepend_arrow_body_comments(
+                printer,
+                arrow,
+                printer.view.expr(*body_expr).span().start,
+                body_doc,
+            );
 
             // The ladder, shared with the member chain's spelling of this same layout.
             return Some(build_break_body_ladder(
@@ -292,7 +298,7 @@ pub(super) fn try_expand_last_arg(
                 &head_parts,
                 sig_doc,
                 body_doc,
-                arrow_body_breaks_after_space(printer, arrow, body_expr),
+                arrow_body_breaks_after_space(printer, arrow, printer.view.expr(*body_expr)),
                 last_arg_doc,
                 all_args_broken,
             ));
@@ -304,7 +310,7 @@ pub(super) fn try_expand_last_arg(
         // the terminal's type, so a typed arrow expands the same way.
         if let Some(arg) = last_arg
             && let ast::ExpressionKind::ArrowFunctionExpression(arrow) = &arg.kind
-            && arrow_body_expands_internally(arrow)
+            && arrow_body_expands_internally(printer.view, arrow)
             // A break inside the signature — the hug renders the callee and the signature
             // run on one line. NOT the body-tail question its reassembling siblings ask
             // ([`arrow_hug_refused_by_comments`]): these states render the argument's own
@@ -350,7 +356,7 @@ pub(super) fn try_expand_last_arg(
     // Array / object last argument. Prettier disables the hug state when the last two arguments
     // have the same outer type (`penultimateArg.type === lastArg.type`), so a breaking last
     // argument expands everything instead.
-    if last_two_args_same_type(arguments) {
+    if last_two_args_same_type(printer.view, arguments) {
         if d.will_break(last_arg_doc) {
             return Some(opener.expand_all(d, all_args_broken));
         }

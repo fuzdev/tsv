@@ -161,7 +161,7 @@ test('grade_profile fails an empty profile, a missing, a never-run and an under-
 			'the profile holds no function records'
 		)
 	);
-	const [first, second, third, ...rest] = HOT_FUNCTIONS;
+	const [first, second, third, ...rest] = HOT_FUNCTIONS.filter((h) => h.worlds.includes('napi'));
 	// the third's loop counter is far over its floor, its entry one under: the entry decides
 	const under = floor_of(third!, TRAINED) - 1;
 	const verdict = grade_profile(

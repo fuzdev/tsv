@@ -6,6 +6,7 @@
 // - Comment preservation
 
 use super::objects::{LiteralRole, is_compound_target_value};
+use crate::ast::ExprView;
 use crate::ast::{self, Expression, ExpressionKind, LiteralValue};
 use crate::printer::comments::{
     ShareSite, block_is_before_comma, next_real_element_start, run_defers_line,
@@ -21,8 +22,8 @@ use tsv_lang::doc::arena::DocId;
 /// element slides to. The array PATTERN's twin is `array_pattern_gap_end`, whose fallback
 /// stops before a `: T` the pattern's span swallowed; each container names its own end
 /// once and the walk past the holes is shared.
-fn array_gap_end(arr: &ast::ArrayExpression<'_>, span: Span, i: usize) -> u32 {
-    next_real_element_start(arr.elements, i).unwrap_or(span.end - 1)
+fn array_gap_end(view: ExprView<'_>, arr: &ast::ArrayExpression<'_>, span: Span, i: usize) -> u32 {
+    next_real_element_start(view, view.opt_list(arr.elements), i).unwrap_or(span.end - 1)
 }
 
 /// The SHAPE half of prettier's `isConciselyPrintedArray` (`print/array.js`): a non-empty
@@ -36,24 +37,23 @@ fn array_gap_end(arr: &ast::ArrayExpression<'_>, span: Span, i: usize) -> u32 {
 /// Free and shape-only so it can be read (and tested) without a printer; the comment clause
 /// that completes the predicate needs the comment array and lives on
 /// [`Printer::is_concisely_printed_array`], the one entry every caller asks.
-fn array_elements_are_signed_numbers(arr: &ast::ArrayExpression<'_>) -> bool {
+fn array_elements_are_signed_numbers(view: ExprView<'_>, arr: &ast::ArrayExpression<'_>) -> bool {
     !arr.elements.is_empty()
-        && arr
-            .elements
-            .iter()
-            .all(|elem| match elem.as_ref().map(|e| &e.kind) {
+        && view.opt_list(arr.elements).iter().all(|elem| {
+            match elem.as_ref().map(|e| &view.expr(*e).kind) {
                 Some(ExpressionKind::Literal(lit)) => matches!(lit.value, LiteralValue::Number(_)),
                 Some(ExpressionKind::UnaryExpression(unary)) => {
                     matches!(
                         unary.operator,
                         ast::UnaryOperator::Minus | ast::UnaryOperator::Plus
                     ) && matches!(
-                        &unary.argument.kind,
+                        &view.expr(unary.argument).kind,
                         ExpressionKind::Literal(lit) if matches!(lit.value, LiteralValue::Number(_))
                     )
                 }
                 _ => false,
-            })
+            }
+        })
 }
 
 impl<'a> Printer<'a> {
@@ -72,8 +72,10 @@ impl<'a> Printer<'a> {
 
         let mut expect_arrays: Option<bool> = None;
 
-        for elem in arr.elements {
-            let Some(expr) = elem else { return false };
+        for elem in self.view.opt_list(arr.elements) {
+            let Some(expr) = self.view.opt(*elem) else {
+                return false;
+            };
 
             let (is_array, inner_len) = match &expr.kind {
                 ExpressionKind::ArrayExpression(inner) => (true, inner.elements.len()),
@@ -149,7 +151,10 @@ impl<'a> Printer<'a> {
         i: usize,
         emitted_leading_start: Option<u32>,
     ) -> bool {
-        let Some(elem) = arr.elements[i].as_ref() else {
+        let Some(elem) = self
+            .view
+            .opt(self.view.opt_list(arr.elements)[i].as_ref().copied())
+        else {
             return false;
         };
         let elem_end = elem.span().end;
@@ -157,12 +162,12 @@ impl<'a> Printer<'a> {
         // search, which runs past `upper`: the comma may sit below slot `i + 1`'s leading
         // comment, and `upper` stops at that comment's start
         // ([`Printer::has_blank_line_after_comma`]).
-        let next_real = array_gap_end(arr, arr_span, i);
+        let next_real = array_gap_end(self.view, arr, arr_span, i);
 
         // A HOLE's printed content is its comma alone, so none of the three spellings above
         // applies — whatever a caller emits in this gap prints *past* that comma, and
         // bounding there reads the hole's own line break as an author's blank line.
-        if matches!(arr.elements.get(i + 1), Some(None)) {
+        if matches!(self.view.opt_list(arr.elements).get(i + 1), Some(None)) {
             let hole_comma = self.hole_slot_comma(elem_end, next_real);
             // …but a comment BELOW this element's line does not print at that comma either —
             // it slides forward past it to lead the next real element — so the scan still
@@ -183,10 +188,11 @@ impl<'a> Printer<'a> {
             .or_else(|| {
                 // Guarded to this gap: the lookup is keyed on the element's own span start,
                 // which says nothing about which gap the comment it finds sits in.
-                arr.elements
+                self.view
+                    .opt_list(arr.elements)
                     .get(i + 1)
                     .and_then(|e| e.as_ref())
-                    .and_then(|e| self.owned_leading_comment_start(e))
+                    .and_then(|e| self.owned_leading_comment_start(self.view.expr(*e)))
                     .filter(|&p| p > elem_end && p < next_real)
             })
             .unwrap_or(next_real);
@@ -232,12 +238,15 @@ impl<'a> Printer<'a> {
         &self,
         arr: &'e ast::ArrayExpression<'e>,
         i: usize,
-    ) -> Option<(usize, &'e Expression<'e>)> {
-        arr.elements[..i]
+    ) -> Option<(usize, &'e Expression<'e>)>
+    where
+        'a: 'e,
+    {
+        self.view.opt_list(arr.elements)[..i]
             .iter()
             .enumerate()
             .rev()
-            .find_map(|(idx, e)| e.map(|e| (idx, e)))
+            .find_map(|(idx, e)| self.view.opt(*e).map(|e| (idx, e)))
     }
 
     /// Does this **block** comment trail the element before it, rather than lead the one after?
@@ -349,7 +358,8 @@ impl<'a> Printer<'a> {
         // Only a REAL next element has a leading run to hand a glued block to: with only
         // holes after the slot, `gap_end` is the array's own end, and the run travels with
         // the share past the elisions.
-        let has_next = next_real_element_start(arr.elements, idx).is_some();
+        let has_next =
+            next_real_element_start(self.view, self.view.opt_list(arr.elements), idx).is_some();
 
         let mut split = elem_end;
         for comment in run {
@@ -381,8 +391,11 @@ impl<'a> Printer<'a> {
         span: Span,
         idx: usize,
     ) -> Option<Span> {
-        let interior = self.printed_paren_interior(arr.elements[idx].as_ref()?)?;
-        self.element_frozen_span(span.start + 1, arr.elements, idx)
+        let interior = self.printed_paren_interior(
+            self.view
+                .expr(*self.view.opt_list(arr.elements)[idx].as_ref()?),
+        )?;
+        self.element_frozen_span(span.start + 1, self.view.opt_list(arr.elements), idx)
             .is_none()
             .then_some(interior)
     }
@@ -505,7 +518,7 @@ impl<'a> Printer<'a> {
         // Bounded at `next_boundary`: this element's separator, if it has one, lies before the
         // next element. A SOURCE trailing comma past the last element is still found — the
         // `is_last` arm is what keeps the comments past it on this element.
-        let next_boundary = array_gap_end(arr, span, current_index);
+        let next_boundary = array_gap_end(self.view, arr, span, current_index);
         let split = self.element_gap_split(arr, span, current_index, elem_end, next_boundary);
 
         // Everything below the split is this element's, by construction — the next
@@ -587,8 +600,9 @@ impl<'a> Printer<'a> {
         elem: &Expression<'_>,
         role: LiteralRole,
     ) -> u32 {
-        let frozen = self.element_frozen_span(span.start + 1, arr.elements, idx);
-        Self::element_claim_anchor(frozen, role.printed_end(elem))
+        let frozen =
+            self.element_frozen_span(span.start + 1, self.view.opt_list(arr.elements), idx);
+        Self::element_claim_anchor(frozen, role.printed_end(self.view, elem))
     }
 
     /// Whether any slot is a spread whose stripped parens hold an own-line share — an
@@ -619,7 +633,11 @@ impl<'a> Printer<'a> {
         arr_span: Span,
         role: LiteralRole,
     ) -> bool {
-        let last_slot_real = arr.elements.last().is_some_and(Option::is_some);
+        let last_slot_real = self
+            .view
+            .opt_list(arr.elements)
+            .last()
+            .is_some_and(Option::is_some);
         let Some(search_start) = last_slot_real
             .then(|| self.end_scan_start(arr, arr_span, role))
             .flatten()
@@ -678,7 +696,9 @@ impl<'a> Printer<'a> {
         arr_span: Span,
         role: LiteralRole,
     ) -> DocId {
-        self.mark_relational_sibling_authored_pairs(arr.elements.iter().copied());
+        self.mark_relational_sibling_authored_pairs(
+            self.view.opt_list(arr.elements).iter().copied(),
+        );
         if arr.elements.is_empty() {
             return self.build_empty_brackets_inline_with_comments_doc(arr_span);
         }
@@ -752,11 +772,15 @@ impl<'a> Printer<'a> {
         span: Span,
         role: LiteralRole,
     ) -> bool {
-        let non_null: SmallVec<[_; 8]> = arr.elements.iter().flatten().collect();
+        let non_null: SmallVec<[_; 8]> =
+            self.view.opt_list(arr.elements).iter().flatten().collect();
         // The element's PRINTED span ([`LiteralRole::printed_end`]): a comment in a compound
         // target's erased value shell is not inside the element, its doc not printing it.
         self.has_own_line_block_comments_in_bracket_list(span, &non_null, |e| {
-            Span::new(e.span().start, role.printed_end(e))
+            Span::new(
+                self.view.expr(**e).span().start,
+                role.printed_end(self.view, self.view.expr(**e)),
+            )
         })
     }
 
@@ -783,11 +807,21 @@ impl<'a> Printer<'a> {
     /// which for all but a huge number is narrower than a comment can be, so
     /// `range_too_narrow_for_a_comment` answers it at the call site without a search.
     fn is_concisely_printed_array(&self, arr: &ast::ArrayExpression<'_>) -> bool {
-        array_elements_are_signed_numbers(arr)
-            && !arr.elements.iter().flatten().any(|elem| {
-                matches!(elem.kind, ExpressionKind::UnaryExpression(_))
-                    && self.has_comments_on_page_between(elem.span().start, elem.span().end)
-            })
+        array_elements_are_signed_numbers(self.view, arr)
+            && !self
+                .view
+                .opt_list(arr.elements)
+                .iter()
+                .flatten()
+                .any(|elem| {
+                    matches!(
+                        self.view.expr(*elem).kind,
+                        ExpressionKind::UnaryExpression(_)
+                    ) && self.has_comments_on_page_between(
+                        self.view.expr(*elem).span().start,
+                        self.view.expr(*elem).span().end,
+                    )
+                })
     }
 
     /// [`Self::is_concisely_printed_array`] read off a call ARGUMENT, which the caller holds
@@ -894,7 +928,10 @@ impl<'a> Printer<'a> {
         role: LiteralRole,
         parts: &mut DocBuf,
     ) {
-        let Some(expr) = arr.elements[i].as_ref() else {
+        let Some(expr) = self
+            .view
+            .opt(self.view.opt_list(arr.elements)[i].as_ref().copied())
+        else {
             return;
         };
 
@@ -933,7 +970,11 @@ impl<'a> Printer<'a> {
         let mut parts = d.pooled_docbuf();
 
         // Check if last element is an elision (requires mandatory trailing comma)
-        let has_trailing_elision = arr.elements.last().is_some_and(Option::is_none);
+        let has_trailing_elision = self
+            .view
+            .opt_list(arr.elements)
+            .last()
+            .is_some_and(Option::is_none);
 
         // Check Prettier's shouldBreak heuristic for nested arrays/objects
         let should_break = role == LiteralRole::Expression && self.should_break_nested_array(arr);
@@ -1026,6 +1067,7 @@ impl<'a> Printer<'a> {
         span: Span,
         role: LiteralRole,
     ) -> DocId {
+        let elements = self.view.opt_list(arr.elements);
         let d = self.d();
         let mut parts = d.pooled_docbuf();
 
@@ -1033,12 +1075,13 @@ impl<'a> Printer<'a> {
         // line (divergence from prettier, which relocates it to its own line as the
         // first element's leading comment). See conformance_prettier_ts_comments.md
         // §Comment relocation (Array literal `[`).
-        let first_elem_start = arr
-            .elements
+        let first_elem_start = self
+            .view
+            .opt_list(arr.elements)
             .iter()
             .flatten()
             .next()
-            .map_or(span.end - 1, |e| e.span().start);
+            .map_or(span.end - 1, |e| self.view.expr(*e).span().start);
         let (bracket_line_prefix, bracket_pull_pos) =
             self.delimiter_line_comment_prefix(span.start, first_elem_start);
 
@@ -1063,13 +1106,13 @@ impl<'a> Printer<'a> {
         // (`Printer::run_leads_next_item`), held across any elisions until that element.
         let mut pending_leads_next: CommentVec<'_> = smallvec![];
 
-        for (i, elem) in arr.elements.iter().enumerate() {
+        for (i, elem) in elements.iter().enumerate() {
             // O(remaining elements) — compute once and reuse below.
-            let next_boundary = array_gap_end(arr, span, i);
+            let next_boundary = array_gap_end(self.view, arr, span, i);
             let (elem_start, elem_end) = match elem {
                 Some(e) => (
-                    e.span().start,
-                    self.element_printed_end(arr, span, i, e, role),
+                    self.view.expr(*e).span().start,
+                    self.element_printed_end(arr, span, i, self.view.expr(*e), role),
                 ),
                 None => (next_boundary, next_boundary),
             };
@@ -1147,8 +1190,8 @@ impl<'a> Printer<'a> {
             // format-ignore directive in the element's gap freezes it verbatim (Rule A);
             // this is the only element printer a directive reaches, since either spelling
             // of an own-line comment routes the whole array here.
-            if let Some(e) = elem {
-                let element_doc = match self.element_frozen_span(span.start + 1, arr.elements, i) {
+            if let Some(e) = self.view.opt(*elem) {
+                let element_doc = match self.element_frozen_span(span.start + 1, elements, i) {
                     // A compound target's default prints bare frozen too: the pair the
                     // argument position gives an assignment is not the target's.
                     Some(frozen)
@@ -1196,7 +1239,7 @@ impl<'a> Printer<'a> {
                 }
                 // A run that leads the next real element (`Printer::run_leads_next_item`) is
                 // carried to it instead of following the interior.
-                let leads = next_real_element_start(arr.elements, i).is_some_and(|next| {
+                let leads = next_real_element_start(self.view, elements, i).is_some_and(|next| {
                     self.run_leads_next_item(&trailing, trailing_comma_pos, next)
                 });
                 if leads {
@@ -1251,10 +1294,10 @@ impl<'a> Printer<'a> {
             // itself when the next slot is real, and a HOLE when elisions intervened —
             // which is exactly when the authored blank inside the parens must be dropped,
             // the elision's line break being structure rather than authorship.
-            if !matches!(arr.elements.get(i + 1), Some(None))
+            if !matches!(elements.get(i + 1), Some(None))
                 && let Some((interior, run)) = pending_behind_interior.take()
             {
-                let site = if arr.elements[i + 1..].iter().any(Option::is_some) {
+                let site = if elements[i + 1..].iter().any(Option::is_some) {
                     ShareSite::NextElement
                 } else {
                     ShareSite::Closer
@@ -1377,7 +1420,9 @@ impl<'a> Printer<'a> {
         arr: &ast::ArrayExpression<'_>,
         span: Span,
     ) -> DocId {
-        self.mark_relational_sibling_authored_pairs(arr.elements.iter().copied());
+        self.mark_relational_sibling_authored_pairs(
+            self.view.opt_list(arr.elements).iter().copied(),
+        );
         let d = self.d();
         // A commented array hands off to `build_array_doc` wholesale — the element-doc-only
         // loop below would DROP every structural comment, the empty-`[]` dangling one
@@ -1391,9 +1436,9 @@ impl<'a> Printer<'a> {
         }
 
         let mut parts = DocBuf::new();
-        for (i, elem) in arr.elements.iter().enumerate() {
+        for (i, elem) in self.view.opt_list(arr.elements).iter().enumerate() {
             // Elements are Option<Expression> where None = hole/elision
-            if let Some(expr) = elem {
+            if let Some(expr) = self.view.opt(*elem) {
                 parts.push(self.build_arg_expression_doc(expr));
             }
             // Holes are represented by just a comma (no element content)
@@ -1430,8 +1475,9 @@ mod tests {
             0,
             0,
             arena,
+            &mut ast::AstStores::new(),
             "end of input",
-            |_| Ok(()),
+            |_, _| Ok(()),
         )
         .expect("expression should parse")
         .0
@@ -1449,33 +1495,39 @@ mod tests {
     /// fixture.
     #[test]
     fn concise_array_shape_detection() {
+        let stores = ast::AstStores::new();
+        let view = stores.view();
         let arena = Bump::new();
-        assert!(array_elements_are_signed_numbers(parse_array(
-            &arena,
-            "[1, 2, 3]"
-        )));
+        assert!(array_elements_are_signed_numbers(
+            view,
+            parse_array(&arena, "[1, 2, 3]")
+        ));
         // A single +/- prefix over a numeric literal is a signed number.
-        assert!(array_elements_are_signed_numbers(parse_array(
-            &arena, "[-1, +2]"
-        )));
+        assert!(array_elements_are_signed_numbers(
+            view,
+            parse_array(&arena, "[-1, +2]")
+        ));
         // …but the rule is NOT recursive (prettier's `isSignedNumericLiteral`), so a
         // doubled sign is not one.
-        assert!(!array_elements_are_signed_numbers(parse_array(
-            &arena,
-            "[- -1, -2]"
-        )));
+        assert!(!array_elements_are_signed_numbers(
+            view,
+            parse_array(&arena, "[- -1, -2]")
+        ));
         // An empty array is not concisely printed.
-        assert!(!array_elements_are_signed_numbers(parse_array(
-            &arena, "[]"
-        )));
+        assert!(!array_elements_are_signed_numbers(
+            view,
+            parse_array(&arena, "[]")
+        ));
         // A non-numeric element disqualifies it.
-        assert!(!array_elements_are_signed_numbers(parse_array(
-            &arena, "[1, 'x']"
-        )));
+        assert!(!array_elements_are_signed_numbers(
+            view,
+            parse_array(&arena, "[1, 'x']")
+        ));
         // A hole is not a numeric element (unlike is_simple_call_argument) — the fill
         // printer has nothing to push for one.
-        assert!(!array_elements_are_signed_numbers(parse_array(
-            &arena, "[1, , 2]"
-        )));
+        assert!(!array_elements_are_signed_numbers(
+            view,
+            parse_array(&arena, "[1, , 2]")
+        ));
     }
 }

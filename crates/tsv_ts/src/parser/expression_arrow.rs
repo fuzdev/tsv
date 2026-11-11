@@ -202,7 +202,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         })?;
         let end = self.prev_token_end() as u32;
         debug_assert!(
-            body.span().end <= end,
+            body.span(self.stores.view()).end <= end,
             "an arrow's extent encloses its body"
         );
 
@@ -251,6 +251,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             if body.span().start as usize == body_start
                 && (matches!(body.kind, ExpressionKind::ConditionalExpression(_))
                     || crate::printer::printer_adds_operand_pair(
+                        self.stores.view(),
                         body,
                         crate::printer::ParenContext::ArrowBody,
                         self.in_for_header,
@@ -294,7 +295,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         })?;
         let end = self.prev_token_end() as u32;
         debug_assert!(
-            body.span().end <= end,
+            body.span(self.stores.view()).end <= end,
             "an arrow's extent encloses its body"
         );
 
@@ -351,7 +352,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let body = self.with_fn_context(false, false, Self::parse_arrow_body)?;
         let end = self.prev_token_end() as u32;
         debug_assert!(
-            body.span().end <= end,
+            body.span(self.stores.view()).end <= end,
             "an arrow's extent encloses its body"
         );
 
@@ -425,7 +426,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let body = self.with_fn_context(true, false, Self::parse_arrow_body)?;
         let end = self.prev_token_end() as u32;
         debug_assert!(
-            body.span().end <= end,
+            body.span(self.stores.view()).end <= end,
             "an arrow's extent encloses its body"
         );
 
