@@ -36,12 +36,14 @@
 		"scripts/branch_report/report_test.ts",
 		"scripts/branch_report/timing_test.ts",
 		"scripts/branch_report/wasm_board_test.ts",
-		"scripts/cargo_build_closure_test.ts",
+		"scripts/build_napi_packages_test.ts",
 		"scripts/cargo_build_test.ts",
 		"scripts/cargo_env_test.ts",
 		"scripts/check_canonical_pins_test.ts",
 		"scripts/check_loc_test.ts",
 		"scripts/discovery_audit_test.ts",
+		"scripts/napi_host_test.ts",
+		"scripts/no_package_closure_test.ts",
 		"scripts/npm_api_imports_test.ts",
 		"scripts/npm_api_strip_test.ts",
 		"scripts/npm_api_test.ts",
@@ -54,6 +56,8 @@
 		"scripts/release/plan_test.ts",
 		"scripts/release/version_test.ts",
 		"scripts/sidecar_install_test.ts",
-		"scripts/typecheck_packages_test.ts"
+		"scripts/stage_file_test.ts",
+		"scripts/typecheck_packages_test.ts",
+		"scripts/validate_napi_artifact_test.ts"
 	]
 }

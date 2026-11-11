@@ -16,13 +16,20 @@
  * Bun's export conditions pick is the one graded (the auto-init `node` entry; the lazy
  * `default` one would throw `WASM not initialized` on the first row).
  *
- * One file, two roles, split on `process.versions.bun`: run by Deno (`deno task
- * test:bun`) it is the launcher — it names the packages, spawns `bun test` on itself,
- * and warn-skips, exiting 0, where no `bun` is on the PATH — or, with `--require-bun`
- * (what a publish `--wetrun` passes), fails; run by `bun test` it is the suite. Positional
+ * One file, two roles, split on `process.versions.bun`: run by Node (`npm run test:bun`,
+ * or `deno task test:bun`, which runs the npm script) it is the launcher — it names the
+ * packages, spawns `bun test` on itself, and warn-skips, exiting 0, where no `bun` is on the
+ * PATH — or, with `--require-bun` (what a publish `--wetrun` passes), fails; run by
+ * `bun test` it is the suite. Positional
  * arguments (`format`, `parse`, `all`, `napi`) name exactly the packages graded, each
  * required; none grades all four. A missing or stale staging fails like the package
  * suites' (`scripts/check_staged_freshness.ts`, `BENCH_STALE_OK=1` the same override).
+ *
+ * Node's own `node:*` modules and relative files only, never a package, under both
+ * runtimes: CI runs the launcher on Windows and macOS (`test:napi:npm` in the `platforms`
+ * job) and in the `artifacts` job, none of which installs `node_modules`
+ * (docs/tasks.md §`test:bun`). `bun` is the bare name on `PATH`, run with the whole
+ * environment.
  *
  * Usage: deno task test:bun [--require-bun] [format|parse|all|napi ...]
  * Prerequisite: the named stagings — deno task build:npm:<variant>, build:napi:packages

@@ -76,8 +76,9 @@ import {
 	facade_type_names
 } from './npm_facade.ts';
 import { NPM_SHARED_METADATA, THIRD_PARTY_NOTICE } from './npm_metadata.ts';
-import { format_size, gzip_size } from './size.ts';
-import { stage_file } from './stage_file.ts';
+import { gzip_size } from './gzip_size.ts';
+import { format_size } from './size.ts';
+import { stage_file, type StageFileDeps } from './stage_file.ts';
 
 const variant = Deno.args[0];
 if (variant !== 'format' && variant !== 'parse' && variant !== 'all') {
@@ -96,6 +97,12 @@ const has_parse_exports = variant !== 'format';
 const has_strip_exports = variant === 'all';
 const has_imports_exports = variant === 'all';
 const pkg_root = `crates/tsv_wasm/pkg/${variant}/npm`;
+/** The staging copy's reach: Deno's copy, which keeps the source's mode, and its dates. */
+const stage_deps: StageFileDeps = {
+	copy: (from, to) => Deno.copyFile(from, to),
+	set_times: (path, { mtime_ms, atime_ms = mtime_ms }) =>
+		Deno.utime(path, new Date(atime_ms), new Date(mtime_ms))
+};
 const main_js = 'tsv_wasm.js';
 const dts_file = 'tsv_wasm.d.ts';
 /**
@@ -832,14 +839,18 @@ console.log(`Created ${pkg_root}/${browser_dts}`);
 // root.
 
 const readme_src = `crates/tsv_wasm/README_${variant}.md`;
-stage_file(readme_src, `${pkg_root}/README.md`);
+await stage_file(stage_deps, readme_src, `${pkg_root}/README.md`);
 console.log(`Copied ${readme_src} → ${pkg_root}/README.md`);
 
-stage_file('LICENSE', `${pkg_root}/LICENSE`);
+await stage_file(stage_deps, 'LICENSE', `${pkg_root}/LICENSE`);
 console.log(`Copied LICENSE → ${pkg_root}/LICENSE`);
 
 // the WHATWG notice for the entity table compiled into the bundle (see THIRD_PARTY_NOTICE)
-stage_file(THIRD_PARTY_NOTICE.source, `${pkg_root}/${THIRD_PARTY_NOTICE.published}`);
+await stage_file(
+	stage_deps,
+	THIRD_PARTY_NOTICE.source,
+	`${pkg_root}/${THIRD_PARTY_NOTICE.published}`
+);
 console.log(`Copied ${THIRD_PARTY_NOTICE.source} → ${pkg_root}/${THIRD_PARTY_NOTICE.published}`);
 
 // The facade the entries import — its parse half (with the reconstruction helper
@@ -852,13 +863,13 @@ const families = {
 	imports: has_imports_exports
 };
 for (const { published, source } of facade_files(families)) {
-	stage_file(source, `${pkg_root}/${published}`);
+	await stage_file(stage_deps, source, `${pkg_root}/${published}`);
 	console.log(`Copied ${source} → ${pkg_root}/${published}`);
 }
 
 if (variant === 'all') {
 	// The full-tool package ships the CLI (`tsv` bin); the subsets stay pure libraries.
-	stage_file(`crates/tsv_wasm/npm/${cli_file}`, `${pkg_root}/${cli_file}`);
+	await stage_file(stage_deps, `crates/tsv_wasm/npm/${cli_file}`, `${pkg_root}/${cli_file}`);
 	console.log(`Copied crates/tsv_wasm/npm/${cli_file} → ${pkg_root}/${cli_file}`);
 }
 

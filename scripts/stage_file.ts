@@ -10,13 +10,28 @@
  * a staging made seconds ago as stale. Stamping the copy makes the mtime mean the
  * same thing on every platform.
  *
+ * Imports nothing, so the Windows staging entry (`scripts/roots/build_napi_packages.ts`)
+ * reaches it with no `node_modules`.
+ *
  * @module
  */
 
-/** Copy `from` to `to` (mode preserved, as `Deno.copyFileSync` does) and set the copy's
- * access and modification times to now. */
-export function stage_file(from: string, to: string): void {
-	Deno.copyFileSync(from, to);
-	const now = new Date();
-	Deno.utimeSync(to, now, now);
+/** The times a staging sets, in milliseconds since the epoch. */
+export interface StageTimes {
+	mtime_ms: number;
+	atime_ms?: number;
+}
+
+/** What `stage_file` reaches: a copy that keeps the source's mode, and a file's dates. */
+export interface StageFileDeps {
+	copy: (from: string, to: string) => Promise<void>;
+	set_times: (path: string, times: StageTimes) => Promise<void>;
+}
+
+/** Copy `from` to `to`, the copy keeping the source's mode, then set the copy's access and
+ * modification times to now. */
+export async function stage_file(deps: StageFileDeps, from: string, to: string): Promise<void> {
+	await deps.copy(from, to);
+	const now = Date.now();
+	await deps.set_times(to, { mtime_ms: now, atime_ms: now });
 }

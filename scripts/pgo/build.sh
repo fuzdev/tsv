@@ -32,7 +32,7 @@
 # cost-benefit inliner, which otherwise inlines hot call sites past every
 # threshold — most of the binary-size cost of a default PGO build for little of
 # its speed. A silently ignored flag shows as a size jump at the size gate
-# (`validate_napi_artifact.ts --pgo`). `-pgo-warn-missing-function` makes every
+# (`scripts/roots/validate_napi_artifact.ts --pgo`). `-pgo-warn-missing-function` makes every
 # function the profile does not cover a build warning, which the build-log gate
 # reads (`pgo.ts gate-builds`); it does not change codegen. The instrumented builds
 # pass `-pgo-instrument-entry`, which puts a counter on every function's entry so

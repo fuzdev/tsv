@@ -106,7 +106,8 @@ import {
 	SIDECAR_LOCK_PATH,
 	sidecar_install_state
 } from './sidecar_install.ts';
-import { format_size, gzip_size } from './size.ts';
+import { gzip_size } from './gzip_size.ts';
+import { format_size } from './size.ts';
 import { TYPECHECK_INSTALL } from './typecheck_packages.ts';
 
 const USAGE =
@@ -650,7 +651,7 @@ if (no_check) {
 	await run('deno task test:depth:wasm', 'deno', ['task', 'test:depth:wasm']);
 }
 // The parse-failure table under Bun, the one runtime that grades the engines' point
-// properties (deno.json `//test:bun`), over the three wasm packages this script publishes —
+// properties (docs/tasks.md §`test:bun`), over the three wasm packages this script publishes —
 // the napi engine under Bun is graded locally by `test:napi:npm`, not here. Bun's presence
 // was settled by the preflight, so the leg requires it.
 if (bun_skip_reason === null) {
@@ -670,11 +671,8 @@ if (bun_skip_reason === null) {
 // staging is a file copy (no cargo build), so it is staged here at this version and graded
 // beside the three wasm packages — all four named, so each is required. Needs the
 // benches/js install whatever --no-check says: it grades what is about to ship.
-await run('stage the @fuzdev/tsv loader', 'deno', [
-	'run',
-	'--allow-read',
-	'--allow-write=crates/tsv_napi/pkg',
-	'scripts/build_napi_packages.ts',
+await run('stage the @fuzdev/tsv loader', 'node', [
+	'scripts/roots/build_napi_packages.ts',
 	'--loader-only'
 ]);
 await run('deno task typecheck:packages', 'deno', [

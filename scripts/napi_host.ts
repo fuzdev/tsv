@@ -1,10 +1,10 @@
 /**
  * The host machine's N-API platform triple, in node-platform terms
- * (`linux-x64-gnu`, `darwin-arm64`, `win32-x64`, …), from the runtime's build target.
+ * (`linux-x64-gnu`, `darwin-arm64`, `win32-x64`, …), from Deno's build target
+ * (`host_triple`) or from what a Node process reports (`node_host_triple`).
  *
- * Its own module because several scripts read it and the one that stages the
- * packages (`build_napi_packages.ts`) runs its staging on import, so it can export
- * nothing: the staging picks the host triple when `--triple` is not given, and
+ * Its own module because several scripts read it: the staging
+ * (`scripts/roots/build_napi_packages.ts`) picks the host triple when `--triple` is not given, and
  * `engine_parity.ts` picks the host's staged package over whatever `pkg/` happens to
  * list first — a runner that has gathered several matrix artifacts holds several.
  * Also home to `cli_binary_name`, the one spelling of the CLI binary's filename per
@@ -27,6 +27,21 @@ export const host_triple = ({ os, arch, target }: HostBuild): string => {
 	if (os === 'windows') return `win32-${cpu}`;
 	return `${os}-${cpu}`;
 };
+
+/** What `node_host_triple` reads of a Node process: `process.platform`, `process.arch`, and
+ * whether its runtime reports a glibc version (`process.report`'s
+ * `header.glibcVersionRuntime`, absent on musl). */
+export interface NodeHost {
+	platform: string;
+	arch: string;
+	glibc: boolean;
+}
+
+/** The host's N-API platform triple from what a Node process reports of itself: Node's
+ * platform and CPU names are the triples' own, and a Linux host is `gnu` exactly when its
+ * runtime reports a glibc. */
+export const node_host_triple = ({ platform, arch, glibc }: NodeHost): string =>
+	platform === 'linux' ? `linux-${arch}-${glibc ? 'gnu' : 'musl'}` : `${platform}-${arch}`;
 
 /** The native CLI binary's filename inside a platform package: `tsv.exe` on the
  * `win32-*` triples, `tsv` everywhere else — one spelling for every script that

@@ -100,7 +100,9 @@
 		"conformance:tsc-check": "cargo run -p tsv_debug --quiet tsc_conformance run --report benches/js/results/report.tsc-conformance",
 		"conformance:tsc-check:update": "cargo run -p tsv_debug --quiet tsc_conformance run --update --report benches/js/results/report.tsc-conformance",
 		"conformance:test262": "cargo run --release -p tsv_debug test262 --gate",
-		"test:napi:run": "node --test scripts/test_napi.ts"
+		"test:napi:run": "node --test scripts/test_napi.ts",
+		"test:bun": "node scripts/test_bun.ts",
+		"validate:napi": "node scripts/roots/validate_napi_artifact.ts"
 	},
 	"devDependencies": {
 		"@fuzdev/blake3-wasm": "^0.2.0",

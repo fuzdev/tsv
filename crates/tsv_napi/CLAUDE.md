@@ -216,7 +216,7 @@ a bare `typecheck:packages` run while the loader is staged): the staged package 
 into a temp consumer, its root, `./locations` and README examples compiled on `es2022`
 alone — no DOM lib, which pins that it declares none — under `nodenext` and `bundler`
 resolution. `scripts/publish.ts` Step 6 runs it: staging the loader is a file copy
-(`build_napi_packages.ts --loader-only`, no cargo build), so the WASM release stages it at
+(`scripts/roots/build_napi_packages.ts --loader-only`, no cargo build), so the WASM release stages it at
 the release version and grades it beside the three wasm packages. It needs the `benches/js`
 TypeScript, so neither `test:napi:npm` nor the release workflow runs it
 ([docs/audits.md §Package-Declaration Check](../../docs/audits.md#package-declaration-check-typecheckpackages)).
@@ -343,7 +343,7 @@ release side is the root [CLAUDE.md §Publishing](../../CLAUDE.md#publishing).
   the bench's C-FFI library as a third world) and stages the gated pair in `.pgo/bench/`.
   The gnu rows build in almalinux:8 → glibc 2.28 floor (Node's own binary floor), measured
   by the workflow's floor gate over both artifacts; musl in rust:alpine with `-crt-static`
-  off, both gated GLIBC-free. Then per-artifact size bounds (`scripts/validate_napi_artifact.ts --triple <t> --pgo`, the script behind `deno task validate:napi`;
+  off, both gated GLIBC-free. Then per-artifact size bounds (`scripts/roots/validate_napi_artifact.ts --triple <t> --pgo`, the entry behind `deno task validate:napi`;
   one tight anchored band per binary, a PGO set for what ships and a plain set graded on
   every PR over the Linux host build by `check.yml`'s `artifacts` job) and the npm-shape
   test over the real artifacts (node:alpine for musl).

@@ -68,8 +68,8 @@
  *     the plain CLI's bytes, and the PGO addon parse and strip to them in process; the
  *     PGO addon's import records must equal the instrumented addon's (the same source
  *     and optimization without the profile — the CLI has no import records).
- * 12. the size bands (`validate_napi_artifact.ts --pgo`), so a silently re-enabled
- *     inliner reads as a size jump.
+ * 12. the size bands (`scripts/roots/validate_napi_artifact.ts --pgo`), so a silently
+ *     re-enabled inliner reads as a size jump.
  * With `--ffi` (the bench's build, `scripts/pgo/bench.ts`) a third world rides every step
  * above: the C-FFI library (`tsv_ffi`, `release`) the Deno bench row loads — built plain
  * beside the CLI as its byte-identity reference, instrumented, trained AS ITSELF through the
@@ -135,6 +135,7 @@ import {
 } from '../../benches/js/lib/corpora.ts';
 import { GATE_CHECKOUT_IDS } from '../../benches/js/lib/gate_counts.ts';
 import { write_shape_limits } from '../depth_shapes.ts';
+import { node_host_triple } from '../napi_host.ts';
 import { type AddonRecord, is_strip_path } from './addon_ops.ts';
 import {
 	CANNOT_GRADE_EXIT,
@@ -227,17 +228,18 @@ const FFI_OPS_RUN = [
 	'scripts/pgo/ffi_ops.ts'
 ];
 
-/** The host's platform triple, in the platform packages' terms. `scripts/napi_host.ts`
- * spells the same from `Deno.build`, which this pipeline cannot read under Node. */
+/** The host's platform triple, in the platform packages' terms (`node_host_triple`, the
+ * spelling the staging's default shares). */
 const host_triple = (): string => {
-	const cpu = process.arch;
-	if (process.platform === 'win32') return `win32-${cpu}`;
-	if (process.platform === 'darwin') return `darwin-${cpu}`;
-	if (process.platform === 'linux') {
-		const report = process.report?.getReport() as { header?: { glibcVersionRuntime?: string } };
-		return `linux-${cpu}-${report?.header?.glibcVersionRuntime ? 'gnu' : 'musl'}`;
+	if (!['win32', 'darwin', 'linux'].includes(process.platform)) {
+		return fail(`no platform triple for ${process.platform}-${process.arch} — pass --triple`);
 	}
-	return fail(`no platform triple for ${process.platform}-${cpu} — pass --triple`);
+	const report = process.report?.getReport() as { header?: { glibcVersionRuntime?: string } };
+	return node_host_triple({
+		platform: process.platform,
+		arch: process.arch,
+		glibc: Boolean(report?.header?.glibcVersionRuntime)
+	});
 };
 
 const dir = resolve(args.dir!);
@@ -417,11 +419,8 @@ const cmd_stage = (phase: Phase): void => {
 	const a = artifacts(phase);
 	require_file(a.cli, `run build.sh ${phase} first`);
 	require_file(a.addon, `run build.sh ${phase} first`);
-	run(DENO, [
-		'run',
-		'--allow-read',
-		`--allow-write=${PKG_ROOT}`,
-		'scripts/build_napi_packages.ts',
+	run(NODE, [
+		'scripts/roots/build_napi_packages.ts',
 		'--triple',
 		triple,
 		'--artifact',
@@ -1384,8 +1383,8 @@ const PIPELINE_ENTRIES = [
 	'scripts/pgo/pgo.ts',
 	'scripts/pgo/ffi_ops.ts',
 	'scripts/pgo/addon_ops.ts',
-	'scripts/build_napi_packages.ts',
-	'scripts/validate_napi_artifact.ts'
+	'scripts/roots/build_napi_packages.ts',
+	'scripts/roots/validate_napi_artifact.ts'
 ];
 
 /** Environment variables cargo or rustc read that can change a build's output — everything
@@ -1525,14 +1524,7 @@ const write_stamp = (keys: { build: string; depth: string }, depth_graded: boole
 // --- all ---------------------------------------------------------------------------------
 
 const size_bands = (): void =>
-	run(DENO, [
-		'run',
-		'--allow-read',
-		'scripts/validate_napi_artifact.ts',
-		'--triple',
-		triple,
-		'--pgo'
-	]);
+	run(NODE, ['scripts/roots/validate_napi_artifact.ts', '--triple', triple, '--pgo']);
 
 /**
  * Every step in order, ending with the stamp (`write_stamp`) once every gate passed. With

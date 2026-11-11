@@ -1,8 +1,12 @@
 /**
- * Size helpers shared by the npm packaging scripts — `patch_npm_package.ts`,
- * `build_napi_packages.ts`, `validate_artifacts.ts`, `validate_napi_artifact.ts`,
- * and `publish.ts`. Console output only: no size formatted here reaches a published
- * package, and no gate compares one (bounds are raw byte counts).
+ * `format_size`, the byte count the npm packaging scripts print — `patch_npm_package.ts`,
+ * `build_napi_packages.ts`, `validate_artifacts.ts`, `validate_napi_artifact.ts`, and
+ * `publish.ts`. Console output only: no size formatted here reaches a published package, and
+ * no gate compares one (bounds are raw byte counts). Pure, so the scripts CI runs on Windows
+ * with no `node_modules` import it (`scripts/roots/build_napi_packages.ts`); the gzipped count,
+ * which runs a program, is `gzip_size.ts`.
+ *
+ * @module
  */
 
 /**
@@ -20,17 +24,4 @@ export function format_size(bytes: number): string {
 	if (bytes < 1000) return `${bytes} B`;
 	if (bytes < 1_000_000) return `${(bytes / 1000).toFixed(1)} KB`;
 	return `${(bytes / 1_000_000).toFixed(2)} MB`;
-}
-
-/**
- * Return the gzipped size of a file. Shells out to `gzip -c` so the number
- * matches `gzip -c | wc -c` (Deno's CompressionStream uses a different
- * default level and reports ~2% high). Requires `--allow-run=gzip`.
- */
-export async function gzip_size(path: string): Promise<number> {
-	const output = await new Deno.Command('gzip', {
-		args: ['-c', path],
-		stdout: 'piped'
-	}).output();
-	return output.stdout.length;
 }

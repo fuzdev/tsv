@@ -27,13 +27,11 @@
 # glibc floor is 2.28 — Node's own binary floor, i.e. every machine that can
 # run modern Node can load tsv_napi (covers RHEL 8, Amazon Linux 2, and
 # everything newer) — and the musl row builds in rust:alpine (with
-# -crt-static off: a cdylib must link musl dynamically). Staging (Deno) and
-# tests run on the runner HOST, where current toolchains exist (Deno's own
-# binaries need a newer glibc than 2.28, so a job-level almalinux container
-# can't host them); the 2.28-floor artifact loads fine on the host's newer
-# glibc. The musl artifact CANNOT load into the host's glibc Node, so its
-# npm-shape test runs in a node:alpine container instead — which is also the
-# real deployment environment it exists for.
+# -crt-static off: a cdylib must link musl dynamically). Staging and tests
+# run on the runner HOST, outside the containers; the 2.28-floor artifact
+# loads fine on the host's newer glibc. The musl artifact CANNOT load into the
+# host's glibc Node, so its npm-shape test runs in a node:alpine container
+# instead — which is also the real deployment environment it exists for.
 #
 # Auth: NPM_TOKEN secret (granular, publish-only) for the bootstrap releases —
 # npm trusted publishing is only configurable on packages that already exist.
@@ -201,16 +199,11 @@ jobs:
           key: napi-${{ matrix.triple }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
           restore-keys: napi-${{ matrix.triple }}-
 
-      # Staging (scripts/build_napi_packages.ts) runs on the host.
-      - name: Install Deno
-        uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
-        with:
-          # Pinned to match the check workflow / local. Bump deliberately.
-          deno-version: 2.9.7
-
-      # For the PGO steps (scripts/pgo/pgo.ts runs under Node) and the npm-shape
-      # test (`node --test` executes the .ts directly via native type stripping,
-      # >= 22.18). Pinned to match check.yml.
+      # For the PGO steps (scripts/pgo/pgo.ts runs under Node, and stages through
+      # scripts/roots/build_napi_packages.ts on the host), the size bands and the
+      # npm-shape test (`node --test` executes the .ts directly via native type
+      # stripping, >= 22.18). None of them imports a package, so this job installs
+      # no npm dependencies. Pinned to match check.yml.
       - name: Install Node
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -453,7 +446,7 @@ jobs:
       # The PGO bands: a profile that did not apply reads as a plain-sized
       # binary, and a re-enabled cost-benefit inliner as a far larger one.
       - name: Size bounds
-        run: deno run --allow-read scripts/validate_napi_artifact.ts --triple ${{ matrix.triple }} --pgo
+        run: node scripts/roots/validate_napi_artifact.ts --triple ${{ matrix.triple }} --pgo
 
       # The npm-shape test over the REAL artifacts: loader platform-resolution,
       # the wasm-parity options surface, the packaged .node, and the `tsv` bin
@@ -519,8 +512,10 @@ jobs:
           done
           ls crates/tsv_napi/pkg
 
+      # On Node's own modules alone: this job holds the npm credentials, so it
+      # installs no npm dependencies (docs/tasks.md §`build:napi:packages`).
       - name: Stage loader package
-        run: deno run --allow-read --allow-write=crates/tsv_napi/pkg scripts/build_napi_packages.ts --loader-only
+        run: node scripts/roots/build_napi_packages.ts --loader-only
 
       # Completeness (every platform the loader pins, versions in lockstep),
       # tag↔version agreement, platforms-then-loader order, and

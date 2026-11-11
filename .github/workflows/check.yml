@@ -189,7 +189,9 @@ jobs:
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           # Pinned to match local. Needs >= 22.18 for native .ts type stripping
-          # (scripts/test_npm.ts runs under node --test directly). Bump deliberately.
+          # (scripts/test_npm.ts runs under node --test directly; the N-API
+          # staging, its size bands and the Bun launcher under node, importing no
+          # package). Bump deliberately.
           node-version: '24.14.1'
 
       # Builds only the publishable wasm bundles (npm + deno) — exactly what
@@ -322,7 +324,9 @@ jobs:
       # `cargo test --workspace` needs Node: the fixture suite drives prettier +
       # svelte through tsv_debug's sidecar, a Node process (see the `check` job
       # comment). Also test:napi's runner (`node --test` executes the .ts directly
-      # via native type stripping, >= 22.18). Pinned to match the artifacts job.
+      # via native type stripping, >= 22.18), and test:napi:npm's staging and Bun
+      # launcher, which import no package (docs/tasks.md §`build:napi:packages`,
+      # §`test:bun`). Pinned to match the artifacts job.
       - name: Install Node
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:

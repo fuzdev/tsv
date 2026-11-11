@@ -12,7 +12,7 @@ import { copyFile, mkdir, readdir, readFile, rename, rm, stat, writeFile } from 
 import { join, resolve } from 'node:path';
 
 import { HarnessError, ROOT, run, sha256_hex } from '../git_snapshot.ts';
-import { gzip_size } from '../size.ts';
+import { gzip_size } from '../gzip_size.ts';
 import {
 	assert_bounds_sites,
 	assert_format_check_finished,

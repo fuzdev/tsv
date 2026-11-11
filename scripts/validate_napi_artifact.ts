@@ -24,21 +24,23 @@
  * build turns LLVM's cost-benefit inliner off, and a toolchain or flag change that
  * quietly turned it back on would grow the binaries by far more than any band.
  *
- * Usage: deno run --allow-read scripts/validate_napi_artifact.ts [--triple <t>] [--pgo]
+ * Its entry is `scripts/roots/validate_napi_artifact.ts`, whose module doc says why this module
+ * and everything it imports stay on `node:*` and relative modules, never a package. The
+ * staged packages are the checkout's, never the working directory's.
+ *
+ * Usage: node scripts/roots/validate_napi_artifact.ts [--triple <t>] [--pgo]
  * (default: the single staged platform dir under crates/tsv_napi/pkg/)
+ *
+ * Exits 0 when both binaries sit in their bands, 1 otherwise; a bad flag throws.
+ *
+ * @module
  */
 
+import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 
 import { cli_binary_name } from './napi_host.ts';
 import { format_size } from './size.ts';
-
-const { values: args } = parseArgs({
-	options: {
-		triple: { type: 'string' },
-		pgo: { type: 'boolean', default: false }
-	}
-});
 
 /** [min, max] bytes per triple for a PLAIN `tsv_napi.node` (napi profile: release +
  * unwind), ±8% around a measured artifact — the anchor is the measured size, not a running
@@ -48,12 +50,12 @@ const { values: args } = parseArgs({
  * builds no plain addon — every row ships and grades the PGO one (`PGO_BOUNDS`) — so no
  * other row has a band to keep honest, and a plain check of one is refused
  * (`PLAIN_ADDON_ROWS`). */
-const BOUNDS: Record<string, [number, number]> = {
+export const BOUNDS: Record<string, [number, number]> = {
 	'linux-x64-gnu': [4_067_000, 4_774_000] // 4,420,608
 };
 
 /** The rows something builds a plain addon for, named by the refusal. */
-const PLAIN_ADDON_ROWS = Object.keys(BOUNDS);
+export const PLAIN_ADDON_ROWS = Object.keys(BOUNDS);
 
 /** [min, max] bytes per triple for the plain native `tsv` CLI binary (`release` profile:
  * abort + LTO), ±8% around a measured artifact. Every matrix row builds it — `pgo.ts`'s
@@ -66,7 +68,7 @@ const PLAIN_ADDON_ROWS = Object.keys(BOUNDS);
  * an Intel runner until one is measured. They are re-anchored from the release
  * workflow's dispatch dry run. A host build lands within a few KB of the almalinux
  * linux-x64-gnu figure, so the container is not the size variable; the TARGET is. */
-const CLI_BOUNDS: Record<string, [number, number]> = {
+export const CLI_BOUNDS: Record<string, [number, number]> = {
 	'linux-x64-gnu': [3_929_000, 4_613_000], // 4,271,000
 	'linux-arm64-gnu': [3_323_000, 3_902_000], // 3,612,816
 	'linux-x64-musl': [3_610_000, 4_239_000], // 3,924,680
@@ -89,7 +91,7 @@ const CLI_BOUNDS: Record<string, [number, number]> = {
  * where that ratio holds, so each failure falls outside with margin; the other rows lean
  * on linux-x64-gnu's PGO-over-plain ratio holding on their targets, which no same-source
  * plain build there has measured. */
-const PGO_BOUNDS: Record<string, [number, number]> = {
+export const PGO_BOUNDS: Record<string, [number, number]> = {
 	'linux-x64-gnu': [4_906_000, 5_759_000], // 5,332,592
 	'linux-arm64-gnu': [4_347_000, 5_103_000], // 4,725,112
 	'linux-x64-musl': [4_908_000, 5_761_000], // 5,334,720
@@ -100,7 +102,7 @@ const PGO_BOUNDS: Record<string, [number, number]> = {
 
 /** [min, max] bytes per triple for the PGO-use `tsv` CLI binary (`--pgo`), anchored as
  * `PGO_BOUNDS` is. */
-const PGO_CLI_BOUNDS: Record<string, [number, number]> = {
+export const PGO_CLI_BOUNDS: Record<string, [number, number]> = {
 	'linux-x64-gnu': [4_691_000, 5_507_000], // 5,099,096
 	'linux-arm64-gnu': [4_226_000, 4_961_000], // 4,593,384
 	'linux-x64-musl': [4_700_000, 5_517_000], // 5,108,424
@@ -109,63 +111,97 @@ const PGO_CLI_BOUNDS: Record<string, [number, number]> = {
 	'win32-x64': [4_253_000, 4_992_000] // 4,622,336
 };
 
-const pkg_root = 'crates/tsv_napi/pkg';
-let triple = args.triple;
-if (!triple) {
-	const platform_dirs = [...Deno.readDirSync(pkg_root)]
-		.filter((e) => e.isDirectory && e.name !== 'napi')
-		.map((e) => e.name);
-	if (platform_dirs.length !== 1) {
-		console.error(
-			`FAIL: pass --triple, or stage exactly one platform package (found: ${platform_dirs.join(', ') || 'none'})`
-		);
-		Deno.exit(1);
-	}
-	triple = platform_dirs[0];
+/** What `run_validate_napi_artifact` reaches. */
+export interface ValidateNapiArtifactDeps {
+	/** The checkout's path, whose `crates/tsv_napi/pkg/` holds the staged packages. */
+	checkout: string;
+	/** The names of the directories in a directory, symlinks not followed. */
+	list_dirs: (path: string) => Promise<Array<string>>;
+	/** A file's size in bytes, following symlinks; throws when it can't be read. */
+	size: (path: string) => Promise<number>;
+	print: (line: string) => void;
+	print_error: (line: string) => void;
 }
 
-const cli_binary = cli_binary_name(triple!);
+/**
+ * Check the staged addon and CLI binary of one platform package against their bands, logging
+ * each size either way (module doc).
+ * @returns the exit code: 0 when both pass, 1 otherwise
+ * @throws `TypeError` - for a flag `parseArgs` refuses
+ */
+export async function run_validate_napi_artifact(
+	deps: ValidateNapiArtifactDeps,
+	argv: Array<string>
+): Promise<number> {
+	const { values: args } = parseArgs({
+		args: argv,
+		options: {
+			triple: { type: 'string' },
+			pgo: { type: 'boolean', default: false }
+		}
+	});
 
-/** Check one artifact against its band, logging the size either way; returns false on a
- * failure so both artifacts report before the exit (a failed addon must not hide the CLI's
- * size, which the next re-anchor needs). */
-const validate = (filename: string, bounds: [number, number] | undefined): boolean => {
-	if (!bounds && !args.pgo && filename === 'tsv_napi.node') {
-		console.error(
-			`FAIL: no plain tsv_napi.node band for '${triple}' — only ${PLAIN_ADDON_ROWS.join(', ')} ` +
-				'builds a plain addon (check.yml); the release matrix ships and grades the PGO one, so grade ' +
-				`it with --pgo. A plain addon of this row is graded by nothing, and a check of one is refused, not passed`
+	const pkg_root = 'crates/tsv_napi/pkg';
+	let triple = args.triple;
+	if (!triple) {
+		const platform_dirs = (await deps.list_dirs(join(deps.checkout, pkg_root))).filter(
+			(name) => name !== 'napi'
 		);
-		return false;
+		if (platform_dirs.length !== 1) {
+			deps.print_error(
+				`FAIL: pass --triple, or stage exactly one platform package (found: ${platform_dirs.join(', ') || 'none'})`
+			);
+			return 1;
+		}
+		triple = platform_dirs[0]!;
 	}
-	if (!bounds) {
-		console.error(
-			`FAIL: no ${filename} size bounds for triple '${triple}' — add a band in scripts/validate_napi_artifact.ts, ±8% around a matrix-built artifact (a wide placeholder until the first run prints one)`
-		);
-		return false;
-	}
-	const path = `${pkg_root}/${triple}/${filename}`;
-	let size: number;
-	try {
-		size = Deno.statSync(path).size;
-	} catch {
-		console.error(`FAIL: ${path} not staged — run 'deno task build:napi:packages' first`);
-		return false;
-	}
-	const [min, max] = bounds;
-	if (size < min || size > max) {
-		console.error(
-			`FAIL: ${triple} ${filename} is ${size} bytes (${format_size(size)}) — outside [${min}, ${max}]. ` +
-				`A deliberate size change must move the bound in scripts/validate_napi_artifact.ts.`
-		);
-		return false;
-	}
-	console.log(
-		`OK: ${triple} ${filename} ${size} bytes (${format_size(size)}) within [${min}, ${max}]`
-	);
-	return true;
-};
 
-const addon_ok = validate('tsv_napi.node', (args.pgo ? PGO_BOUNDS : BOUNDS)[triple!]);
-const cli_ok = validate(cli_binary, (args.pgo ? PGO_CLI_BOUNDS : CLI_BOUNDS)[triple!]);
-if (!addon_ok || !cli_ok) Deno.exit(1);
+	const cli_binary = cli_binary_name(triple);
+
+	/** Check one artifact against its band, logging the size either way; returns false on a
+	 * failure so both artifacts report before the exit (a failed addon must not hide the CLI's
+	 * size, which the next re-anchor needs). */
+	const validate = async (
+		filename: string,
+		bounds: [number, number] | undefined
+	): Promise<boolean> => {
+		if (!bounds && !args.pgo && filename === 'tsv_napi.node') {
+			deps.print_error(
+				`FAIL: no plain tsv_napi.node band for '${triple}' — only ${PLAIN_ADDON_ROWS.join(', ')} ` +
+					'builds a plain addon (check.yml); the release matrix ships and grades the PGO one, so grade ' +
+					`it with --pgo. A plain addon of this row is graded by nothing, and a check of one is refused, not passed`
+			);
+			return false;
+		}
+		if (!bounds) {
+			deps.print_error(
+				`FAIL: no ${filename} size bounds for triple '${triple}' — add a band in scripts/validate_napi_artifact.ts, ±8% around a matrix-built artifact (a wide placeholder until the first run prints one)`
+			);
+			return false;
+		}
+		const path = `${pkg_root}/${triple}/${filename}`;
+		let size: number;
+		try {
+			size = await deps.size(join(deps.checkout, path));
+		} catch {
+			deps.print_error(`FAIL: ${path} not staged — run 'deno task build:napi:packages' first`);
+			return false;
+		}
+		const [min, max] = bounds;
+		if (size < min || size > max) {
+			deps.print_error(
+				`FAIL: ${triple} ${filename} is ${size} bytes (${format_size(size)}) — outside [${min}, ${max}]. ` +
+					`A deliberate size change must move the bound in scripts/validate_napi_artifact.ts.`
+			);
+			return false;
+		}
+		deps.print(
+			`OK: ${triple} ${filename} ${size} bytes (${format_size(size)}) within [${min}, ${max}]`
+		);
+		return true;
+	};
+
+	const addon_ok = await validate('tsv_napi.node', (args.pgo ? PGO_BOUNDS : BOUNDS)[triple]);
+	const cli_ok = await validate(cli_binary, (args.pgo ? PGO_CLI_BOUNDS : CLI_BOUNDS)[triple]);
+	return addon_ok && cli_ok ? 0 : 1;
+}

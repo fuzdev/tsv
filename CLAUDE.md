@@ -155,7 +155,11 @@ deno task test:node      # vitest under Node over the suites beside their module
 #                          perf:ab's verdict rule; `pgo/profile_test.ts` — the PGO gates' readers over captured
 #                          llvm-profdata / llvm-readobj / build-log output; `pgo/depth_stack_test.ts` — the PE
 #                          stack-reserve reader + writer the Windows depth gate uses; `cargo_build_test.ts` — the stamp
-#                          paths, the `target/` fence, and the cargo run over a fake cargo, its signal exits included; `cargo_env_test.ts` — what reaches
+#                          paths, the `target/` fence, and the cargo run over a fake cargo, its signal exits included;
+#                          `build_napi_packages_test.ts` + `validate_napi_artifact_test.ts` + `stage_file_test.ts` +
+#                          `napi_host_test.ts` — the N-API staging, its size bands and the host triple over fakes;
+#                          `no_package_closure_test.ts` — the scripts CI runs with no `node_modules` import no package;
+#                          `cargo_env_test.ts` — what reaches
 #                          a script's cargo; `check_canonical_pins_test.ts` — pins:audit's mode flags, its no-git path, and
 #                          where its git runs; `discovery_audit_test.ts` — what discovery:audit hands git and tsv;
 #                          `package_audit_test.ts` + `check_loc_test.ts` — their checkout-relative paths); in `check`
