@@ -52,6 +52,19 @@ pub const STORE_CHECK: bool = cfg!(feature = "_internal_store_check");
 /// still fits a `u32`.
 const SLOT_LIMIT: usize = u32::MAX as usize;
 
+/// The bytes, in whole rows, a store first written by a flush reserves on the cold arm that
+/// primes it ([`Store::prime_range`]), so a one-shot document's store takes its first lists
+/// without growing one doubling at a time, and the hot path pays nothing for the sizing. A
+/// store whose capacity already holds the request, a recycled one usually, keeps it untouched.
+/// Neither a smaller nor a larger first allocation measured better on the one-shot path.
+const FIRST_ALLOC_BYTES: usize = 1024;
+
+/// [`FIRST_ALLOC_BYTES`] in rows of `T`; a zero-sized row counts as one byte, though a `Vec`
+/// of one never allocates.
+fn first_alloc_rows<T>() -> usize {
+    FIRST_ALLOC_BYTES / size_of::<T>().max(1)
+}
+
 /// The sentinel at byte 0 of a [`TextPool`], whose offset no span can name.
 const POOL_SENTINEL: char = '\0';
 
@@ -593,20 +606,25 @@ impl<T: Row> Store<T> {
     /// The refused arm of a flush's mint, as [`Store::prime_after_first_push`] is a push's: a
     /// store not yet written fills slot 0 with a clone of `first`, the frame's first row, and
     /// mints the run behind it; a store already written, or a run that cannot fit, overflows.
+    /// The store's first allocation is sized here, to [`FIRST_ALLOC_BYTES`] of rows or the
+    /// run and its slot 0, whichever is more; capacity that already holds that is kept.
     #[cold]
     #[inline(never)]
     fn prime_range(&mut self, first: Option<&T>, count: usize) -> (NonZeroU32, u32)
     where
         T: Clone,
     {
-        match first {
-            Some(first) if self.rows.is_empty() => self.rows.push(first.clone()),
-            _ => store_overflow(),
-        }
-        match mint_range(self.rows.len(), count) {
-            Some(range) => range,
-            None => store_overflow(),
-        }
+        let Some(first) = first.filter(|_| self.rows.is_empty()) else {
+            store_overflow();
+        };
+        // the run starts behind slot 0; minted before the reserve, so a run past the index
+        // space never asks the allocator for its rows, and `count + 1` fits a `u32`
+        let Some(range) = mint_range(1, count) else {
+            store_overflow();
+        };
+        self.rows.reserve(first_alloc_rows::<T>().max(count + 1));
+        self.rows.push(first.clone());
+        range
     }
 
     /// Mints the run that `count` rows about to be appended will occupy, priming slot 0 first
@@ -1198,6 +1216,93 @@ mod tests {
         assert_eq!((run.start.get(), run.len()), (1, 1));
         assert_eq!(copied.rows, [Node("c"), Node("c")]);
         assert_eq!(copied.push(Node("d")).index(), 2);
+    }
+
+    #[test]
+    fn the_first_flush_reserves_the_first_allocation() {
+        let mut nodes = store();
+        let mut scratch = ListBuf::new();
+        let mark = scratch.mark();
+        scratch.push(Node("a"));
+        scratch.push(Node("b"));
+        scratch.flush_move(mark, &mut nodes);
+        assert!(first_alloc_rows::<Node<'static>>() > 4);
+        assert!(nodes.rows.capacity() >= first_alloc_rows::<Node<'static>>());
+
+        let mut ids: Store<Id<Alpha>> = Store::new();
+        let mut scratch = ListBuf::new();
+        let mark = scratch.mark();
+        scratch.push(id_at(1));
+        scratch.flush_copy(mark, &mut ids);
+        assert!(ids.rows.capacity() >= first_alloc_rows::<Id<Alpha>>());
+        assert!(STORE_CHECK || first_alloc_rows::<Id<Alpha>>() == FIRST_ALLOC_BYTES / 4);
+    }
+
+    #[test]
+    fn a_first_flush_into_enough_capacity_keeps_the_allocation() {
+        let wanted = first_alloc_rows::<Node<'static>>() + 8;
+        let mut sized: Store<Node<'static>> = Store::with_capacity(wanted);
+        let (before, capacity) = (sized.rows.as_ptr(), sized.rows.capacity());
+        let mut scratch = ListBuf::new();
+        let mark = scratch.mark();
+        scratch.push(Node("a"));
+        scratch.flush_copy(mark, &mut sized);
+        assert_eq!(
+            (sized.rows.as_ptr(), sized.rows.capacity()),
+            (before, capacity)
+        );
+
+        // a recycled store is empty, slot 0 included, so its next flush primes again
+        let mut recycled: Store<Node<'_>> = sized.recycle();
+        let (before, capacity) = (recycled.rows.as_ptr(), recycled.rows.capacity());
+        let mark = scratch.mark();
+        scratch.push(Node("b"));
+        scratch.push(Node("c"));
+        let run = scratch.flush_move(mark, &mut recycled);
+        assert_eq!(
+            (recycled.rows.as_ptr(), recycled.rows.capacity()),
+            (before, capacity)
+        );
+        assert_eq!(texts(&recycled, run), ["b", "c"]);
+    }
+
+    #[test]
+    fn a_first_flush_into_too_little_capacity_grows_to_the_first_allocation() {
+        let mut sized: Store<Node<'static>> = Store::with_capacity(2);
+        let mut scratch = ListBuf::new();
+        let mark = scratch.mark();
+        scratch.push(Node("a"));
+        scratch.flush_copy(mark, &mut sized);
+        assert!(sized.rows.capacity() >= first_alloc_rows::<Node<'static>>());
+    }
+
+    // `count + 1` against `count` in the reserve is capacity only: a short reserve grows once
+    // more in the extend, and no test can tell that from `reserve`'s own latitude
+    #[test]
+    fn a_first_flush_past_the_first_allocation_lands_intact() {
+        const WORDS: [&str; 5] = ["p", "q", "r", "s", "t"];
+        let count = first_alloc_rows::<Node<'static>>() + 5;
+        let mut nodes = store();
+        let mut scratch = ListBuf::new();
+        let mark = scratch.mark();
+        for index in 0..count {
+            scratch.push(Node(WORDS[index % WORDS.len()]));
+        }
+        let run = scratch.flush_move(mark, &mut nodes);
+        assert_eq!((run.start.get(), run.len()), (1, count));
+        assert_eq!(nodes.rows.len(), count + 1);
+        assert_eq!(
+            nodes.rows[0],
+            Node("p"),
+            "slot 0 holds the frame's first row"
+        );
+        let read = texts(&nodes, run);
+        assert!(
+            read.iter()
+                .enumerate()
+                .all(|(index, text)| *text == WORDS[index % 5])
+        );
+        assert_eq!(nodes.push(Node("u")).index(), count + 1);
     }
 
     #[cfg(not(feature = "_internal_store_check"))]
