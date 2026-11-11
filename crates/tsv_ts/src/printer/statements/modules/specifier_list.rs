@@ -79,6 +79,7 @@ impl<'a> Printer<'a> {
     pub(super) fn has_empty_named_braces(
         &self,
         decl: &ast::ImportDeclaration<'_>,
+        specifiers: &[ast::ImportSpecifier<'_>],
         span: Span,
     ) -> bool {
         // A surviving named specifier PROVES the braces are non-empty — decide
@@ -89,9 +90,7 @@ impl<'a> Printer<'a> {
         // Svelte compiler's type erasure filters out `import { type X, Y }`'s
         // type-only specifiers) would otherwise be judged against the *original*
         // source text, including the specifiers that no longer exist.
-        if self
-            .view
-            .import_specs(decl.specifiers)
+        if specifiers
             .iter()
             .any(|spec| matches!(spec, ast::ImportSpecifier::Named(_)))
         {

@@ -723,6 +723,7 @@ impl<'a> Printer<'a> {
         if obj.properties.is_empty() {
             self.build_empty_object_pattern_doc(obj, obj_span)
         } else {
+            let properties = self.view.pat_props(obj.properties);
             // Expand if: nested patterns, line comments, blank lines BETWEEN
             // properties, or own-line block comments between/around properties.
             // One whole-span comment pre-check gates both comment-scanning hints
@@ -738,7 +739,7 @@ impl<'a> Printer<'a> {
             let boundary = tail.body_end;
             let has_comments = self.has_comments_on_page_between(obj_span.start, boundary);
             let (has_line_comments, has_blank_lines) =
-                self.object_pattern_formatting_hints(obj, obj_span, boundary, has_comments);
+                self.object_pattern_formatting_hints(properties, obj_span, boundary, has_comments);
             let has_own_line_block = has_comments
                 && self.object_pattern_has_own_line_block_comments(obj, obj_span, boundary);
             // The multi-line half of the own-line question, asked on its own the way the
@@ -753,8 +754,7 @@ impl<'a> Printer<'a> {
             // gap scan above — see the array pattern's twin.
             let rest_interior_expands = has_comments
                 && self.paren_interior_forces_expansion(
-                    self.view
-                        .pat_props(obj.properties)
+                    properties
                         .last()
                         .and_then(|property| property.paren_interior(self.view)),
                 );
@@ -775,7 +775,7 @@ impl<'a> Printer<'a> {
                 // Track previous end for comment detection (start after `{`)
                 let mut prev_end = obj_span.start + 1;
 
-                for (i, prop) in self.view.pat_props(obj.properties).iter().enumerate() {
+                for (i, prop) in properties.iter().enumerate() {
                     // Check for leading comments before this property. Gated on the
                     // object-wide comment flag: with no comment in the pattern span, the
                     // per-property gap is empty too, so skip the `empty()` leading child
@@ -797,9 +797,7 @@ impl<'a> Printer<'a> {
                     let is_last = i == obj.properties.len() - 1;
 
                     // Collect trailing comments (stop at next property or type annotation)
-                    let upper_bound = self
-                        .view
-                        .pat_props(obj.properties)
+                    let upper_bound = properties
                         .get(i + 1)
                         .map_or(boundary, |next| next.span().start);
                     let trailing = self.collect_trailing_comments(prop_end, upper_bound, is_last);
@@ -1027,7 +1025,7 @@ impl<'a> Printer<'a> {
     /// Returns (has_line_comments, has_blank_lines) in a single pass.
     fn object_pattern_formatting_hints(
         &self,
-        obj: &ast::ObjectPattern<'_>,
+        properties: &[ObjectPatternProperty],
         obj_span: Span,
         boundary: u32,
         has_comments: bool,
@@ -1035,7 +1033,7 @@ impl<'a> Printer<'a> {
         self.collection_formatting_hints(
             obj_span.start,
             boundary,
-            self.view.pat_props(obj.properties),
+            properties,
             has_comments,
             ObjectPatternProperty::span,
             |property| property.value_end(self.view),
@@ -1103,12 +1101,13 @@ impl<'a> Printer<'a> {
         // still emit it. The expansion decision itself runs earlier and is
         // unaffected. Canonical reference: build_params_doc_with_comments.
         let has_comments = self.has_comments_to_emit_between(span.start, boundary);
+        let properties = self.view.pat_props(obj.properties);
 
         // A comment trailing the opening `{` on its own line is kept on the `{`
         // line when the pattern expands (divergence from prettier, which relocates
         // it to its own line as the first property's leading comment). See
         // conformance_prettier_ts_comments.md §Comment relocation (Object destructuring `{`).
-        let first_prop_start = self.view.pat_props(obj.properties)[0].span().start;
+        let first_prop_start = properties[0].span().start;
         let (brace_line_prefix, brace_pull_pos) = if has_comments {
             self.delimiter_line_comment_prefix(span.start, first_prop_start)
         } else {
@@ -1119,7 +1118,7 @@ impl<'a> Printer<'a> {
         let mut prev_end = span.start + 1;
 
         let mut prop_parts = DocBuf::new();
-        for (i, prop) in self.view.pat_props(obj.properties).iter().enumerate() {
+        for (i, prop) in properties.iter().enumerate() {
             // Handle leading comments before this property (with blank line preservation)
             let prop_start = prop.span().start;
             let leading_comments: CommentVec<'_> = if has_comments {
@@ -1148,9 +1147,7 @@ impl<'a> Printer<'a> {
             let is_last = i == obj.properties.len() - 1;
 
             // Collect trailing comments (stop at next property or type annotation)
-            let upper_bound = self
-                .view
-                .pat_props(obj.properties)
+            let upper_bound = properties
                 .get(i + 1)
                 .map_or(boundary, |next| next.span().start);
             // A rest's stripped-paren interior (a frozen one printed it verbatim): the run
@@ -1177,7 +1174,7 @@ impl<'a> Printer<'a> {
                 // express it: counting the newlines in the gap, a blank *after* a
                 // comma the author pushed onto its own line (`a1⏎,⏎⏎b1`) reads as an author
                 // blank and was preserved, where prettier collapses it.
-                let next_start = self.view.pat_props(obj.properties)[i + 1].span().start;
+                let next_start = properties[i + 1].span().start;
                 self.push_item_blank_separator(&mut prop_parts, trailing.end_pos, next_start);
             }
 

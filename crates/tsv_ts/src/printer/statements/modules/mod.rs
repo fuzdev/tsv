@@ -914,8 +914,9 @@ impl<'a> Printer<'a> {
         span: Span,
     ) -> DocId {
         let d = self.d();
+        let specifiers = self.view.import_specs(decl.specifiers);
         // Check if source has empty braces (for `import {} from 'x'`)
-        let has_empty_braces = self.has_empty_named_braces(decl, span);
+        let has_empty_braces = self.has_empty_named_braces(decl, specifiers, span);
 
         // Check if this is a type-only import
         let is_type_import = decl.import_kind == ast::ImportKind::Type;
@@ -934,7 +935,7 @@ impl<'a> Printer<'a> {
         let mut default_spec_end = 0u32;
         let mut namespace_spec: Option<&ast::ImportNamespaceSpecifier<'_>> = None;
 
-        for spec in self.view.import_specs(decl.specifiers) {
+        for spec in specifiers {
             match spec {
                 ast::ImportSpecifier::Default(default_spec) => {
                     has_default = true;
