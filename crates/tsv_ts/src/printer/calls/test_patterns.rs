@@ -319,7 +319,7 @@ fn callee_is_test_pattern(view: AstView<'_>, callee: &ast::Expression<'_>, sourc
         let Some(slot) = names.get_mut(depth) else {
             return false;
         };
-        *slot = id.ident_name().resolve(id.span.start, source);
+        *slot = id.ident_name().resolve(id.span.start, source, view);
         depth += 1;
         match object {
             Some(object) => expr = view.expr(object),

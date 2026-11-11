@@ -73,11 +73,11 @@ pub(super) fn write_template_element(
     // has already folded `<CR>` / `<CR><LF>` to `<LF>` (§12.9.6). The source
     // slice is the printer's question.
     w.raw(",\"value\":{\"raw\":");
-    w.string(element.trv(ctx.source));
+    w.string(element.trv(ctx.source, ctx.view));
     w.raw(",\"cooked\":");
     match element.cooked {
-        ast::TemplateCooked::Verbatim => w.string(element.trv(ctx.source)),
-        ast::TemplateCooked::Decoded(decoded) => w.string(decoded),
+        ast::TemplateCooked::Verbatim => w.string(element.trv(ctx.source, ctx.view)),
+        ast::TemplateCooked::Decoded(decoded) => w.string(ctx.view.text(decoded)),
         ast::TemplateCooked::Invalid => w.null(),
     }
     w.raw_pick(element.tail, b"},\"tail\":true", b"},\"tail\":false");

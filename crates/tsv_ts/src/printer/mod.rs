@@ -3619,7 +3619,7 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         match name.escaped {
-            Some(s) => d.text_pooled(s),
+            Some(s) => d.text_pooled(self.view.text(s)),
             None => {
                 let span = Span::new(name_start, name_start + name.raw_len as u32);
                 // Graded BOTH ways on every name in every debug build, because both
@@ -3659,7 +3659,7 @@ impl<'a> Printer<'a> {
         f: impl FnOnce(&str) -> R,
     ) -> R {
         match name.escaped {
-            Some(s) => f(s),
+            Some(s) => f(self.view.text(s)),
             None => {
                 f(&self.source[name_start as usize..name_start as usize + name.raw_len as usize])
             }

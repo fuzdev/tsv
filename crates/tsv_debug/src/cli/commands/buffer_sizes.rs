@@ -131,7 +131,7 @@ fn collect_file(
         ParserType::TypeScript => {
             let ast = tsv_ts::__private::parse(source, &arena).map_err(|_| ())?;
             collect_imports(ast.view(), ast.body, named_specs);
-            collect_comments(ast.comments, source, comment_lines);
+            collect_comments(ast.view().comments(ast.comments), source, comment_lines);
             // Run the real printer so the armed _internal_buffer_stats hooks sample the
             // actual chain/comment buffer populations. Output is discarded.
             #[cfg(feature = "_internal_buffer_stats")]

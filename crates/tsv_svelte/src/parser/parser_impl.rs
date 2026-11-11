@@ -262,6 +262,19 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             .expect("the island stores are out only while a `&Self` is held")
     }
 
+    /// Appends an island's comments to the document's template comments, read through the
+    /// document's stores.
+    #[expect(clippy::expect_used)]
+    #[inline]
+    pub(crate) fn merge_island_comments(&mut self, comments: tsv_ts::ast::CommentList<'arena>) {
+        let stores = self
+            .stores
+            .as_deref()
+            .expect("the island stores are out only while a `&Self` is held");
+        self.expression_comments
+            .extend_from_slice(stores.view().comments(comments));
+    }
+
     /// The view reading the document's stores outside an island parse.
     #[inline]
     pub(crate) fn ts_view(&self) -> AstView<'_> {
@@ -749,7 +762,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 |view, expr| host_check(this, view, expr),
             )
         })?;
-        self.expression_comments.extend_from_slice(comments);
+        self.merge_island_comments(comments);
         Ok(expr)
     }
 
@@ -788,7 +801,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 |view, expr, end_pos| host_check(this, view, expr, end_pos),
             )
         })?;
-        self.expression_comments.extend_from_slice(comments);
+        self.merge_island_comments(comments);
         Ok((expr, end_pos))
     }
 
@@ -817,7 +830,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 stores,
             )
         })?;
-        self.expression_comments.extend_from_slice(comments);
+        self.merge_island_comments(comments);
         Ok(ta)
     }
 
@@ -852,7 +865,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             .is_none(),
             "a block pattern's `: T` is its own sub-parse (`parse_block_pattern`)"
         );
-        self.expression_comments.extend_from_slice(comments);
+        self.merge_island_comments(comments);
         Ok(pattern)
     }
 
@@ -904,7 +917,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 |view, stmt| host_check(this, view, stmt),
             )
         })?;
-        self.expression_comments.extend_from_slice(comments);
+        self.merge_island_comments(comments);
         Ok(stmt)
     }
 }

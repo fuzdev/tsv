@@ -216,7 +216,7 @@ pub fn format_canonical_in<'a>(
     format_program_in(
         parsed,
         source,
-        parsed.program.comments,
+        parsed.view.comments(parsed.program.comments),
         line_breaks,
         arena,
         true,
@@ -351,7 +351,7 @@ pub fn parse_expression_with_comments<'arena>(
     stores: &mut AstStores<'arena>,
     end: &str,
     host_check: impl Fn(AstView<'_>, ExprId) -> Result<()>,
-) -> Result<(ExprId, &'arena [ast::Comment])> {
+) -> Result<(ExprId, ast::CommentList<'arena>)> {
     with_embedding_parser(
         source,
         base_offset,
@@ -401,7 +401,7 @@ pub fn parse_pattern_with_comments<'arena>(
     host_nesting: u32,
     arena: &'arena bumpalo::Bump,
     stores: &mut AstStores<'arena>,
-) -> Result<(ExprId, &'arena [ast::Comment])> {
+) -> Result<(ExprId, ast::CommentList<'arena>)> {
     with_embedding_parser(
         source,
         base_offset,
@@ -638,7 +638,7 @@ pub fn parse_type_annotation_partial<'arena>(
     host_nesting: u32,
     arena: &'arena bumpalo::Bump,
     stores: &mut AstStores<'arena>,
-) -> Result<(TSTypeAnnotation, &'arena [ast::Comment])> {
+) -> Result<(TSTypeAnnotation, ast::CommentList<'arena>)> {
     with_embedding_parser(
         source,
         base_offset,
@@ -685,7 +685,7 @@ pub fn parse_expression_partial_with_comments<'arena>(
     stores: &mut AstStores<'arena>,
     top_level_as: TopLevelAs,
     host_check: impl Fn(AstView<'_>, ExprId, usize) -> Result<()>,
-) -> Result<(ExprId, usize, &'arena [ast::Comment])> {
+) -> Result<(ExprId, usize, ast::CommentList<'arena>)> {
     with_embedding_parser(
         source,
         base_offset,
@@ -764,7 +764,7 @@ pub fn parse_statement_with_comments<'arena>(
     arena: &'arena bumpalo::Bump,
     stores: &mut AstStores<'arena>,
     host_check: impl Fn(AstView<'_>, &Statement<'arena>) -> Result<()>,
-) -> Result<(Statement<'arena>, &'arena [ast::Comment])> {
+) -> Result<(Statement<'arena>, ast::CommentList<'arena>)> {
     with_embedding_parser(
         source,
         base_offset,

@@ -142,9 +142,9 @@ pub(crate) fn is_module_path_fluid_call(
         && !member.computed
         && !member.optional
         && let ast::ExpressionKind::Identifier(resolve_id) = &view.expr(member.property).kind
-        && resolve_id.name(source) == "resolve"
+        && resolve_id.name(source, view) == "resolve"
         && let ast::ExpressionKind::Identifier(require_id) = &view.expr(member.object).kind
-        && require_id.name(source) == "require"
+        && require_id.name(source, view) == "require"
     {
         return true;
     }

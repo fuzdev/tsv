@@ -1799,7 +1799,7 @@ impl<'a> Printer<'a> {
         name: &str,
         tag_span: Option<Span>,
     ) -> bool {
-        matches!(&expr.kind, ExpressionKind::Identifier(id) if id.name(self.source) == name)
+        matches!(&expr.kind, ExpressionKind::Identifier(id) if id.name(self.source, self.view) == name)
             && tag_span.is_none_or(|s| !self.has_comments_on_page_between(s.start, s.end))
     }
 }

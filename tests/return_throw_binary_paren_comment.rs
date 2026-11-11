@@ -20,7 +20,8 @@ fn comments(source: &str) -> Vec<String> {
     let arena = bumpalo::Bump::new();
     let program = tsv_ts::__private::parse(source, &arena).expect("parse failed");
     let mut found: Vec<String> = program
-        .comments
+        .view()
+        .comments(program.comments)
         .iter()
         .map(|comment| comment.content(source).to_owned())
         .collect();

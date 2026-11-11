@@ -1674,7 +1674,7 @@ impl<'s, 'b> Walk<'s, 'b> {
     }
 
     fn is_this_parameter(&self, param: &Expression<'_>) -> bool {
-        matches!(&param.kind, ExpressionKind::Identifier(id) if id.name(self.src.text) == "this")
+        matches!(&param.kind, ExpressionKind::Identifier(id) if id.name(self.src.text, self.view) == "this")
     }
 
     /// A class: decorators stay, `abstract`, type parameters, superclass type arguments
@@ -1925,7 +1925,7 @@ impl<'s, 'b> Walk<'s, 'b> {
     fn is_operator_key(&self, key: &Expression<'_>, computed: bool) -> bool {
         !computed
             && matches!(&key.kind, ExpressionKind::Identifier(id)
-                if matches!(id.name(self.src.text), "in" | "instanceof"))
+                if matches!(id.name(self.src.text, self.view), "in" | "instanceof"))
     }
 
     /// Blank a kept member's TypeScript modifiers keyword by keyword (`static` and

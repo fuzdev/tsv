@@ -34,15 +34,15 @@ mod view;
 pub(crate) use stores::ScratchMarks;
 pub use stores::{
     ArrowFn, ArrowFnId, AstStores, Case, Catch, CatchId, ClassDecl, ClassDeclId, ClassExpr,
-    ClassExprId, ClassMem, CtorType, CtorTypeId, Declarator, DeclareFn, DeclareFnId, Deco,
-    EnumDecl, EnumDeclId, EnumMem, ExportAll, ExportAllId, ExportAssign, ExportAssignId,
+    ClassExprId, ClassMem, CommentList, CtorType, CtorTypeId, Declarator, DeclareFn, DeclareFnId,
+    Deco, EnumDecl, EnumDeclId, EnumMem, ExportAll, ExportAllId, ExportAssign, ExportAssignId,
     ExportDefault, ExportDefaultId, ExportNamed, ExportNamedId, ExportSpec, Expr, ExprId, FnDecl,
     FnDeclId, FnExpr, FnExprId, ForHead, ForHeadId, ForLeft, ForLeftId, Heritage, ImportAttr,
     ImportDecl, ImportDeclId, ImportEquals, ImportEqualsId, ImportSpec, ImportType, ImportTypeId,
     IndexParam, InferType, InferTypeId, InterfaceDecl, InterfaceDeclId, MetaProp, MetaPropId,
-    ModuleDecl, ModuleDeclId, ObjProp, ParamExtra, ParamExtraId, Parsed, PatProp, QualName,
-    QualNameId, Quasi, Stmt, StmtId, TaggedTpl, TaggedTplId, Ty, TyId, TypeAlias, TypeAliasId,
-    TypeMember, TypeParam, with_stores,
+    ModuleDecl, ModuleDeclId, ObjProp, ParamExtra, ParamExtraId, Parsed, PatProp, PoolStr,
+    QualName, QualNameId, Quasi, Stmt, StmtId, TaggedTpl, TaggedTplId, Text, Ty, TyId, TypeAlias,
+    TypeAliasId, TypeMember, TypeParam, with_stores,
 };
 pub use tsv_lang::store::Run;
 pub use tsv_lang::{Comment, Span};
@@ -241,7 +241,7 @@ const _: () = assert!(
 #[derive(Debug, Clone)]
 pub struct Program<'arena> {
     pub body: Run<StmtId>,
-    pub comments: &'arena [Comment],
+    pub comments: CommentList<'arena>,
     pub span: Span,
     /// The goal symbol this program was parsed against. Drives the public AST's
     /// `sourceType` and (eventually) the goal-specific grammar gates.
@@ -285,28 +285,27 @@ pub enum StringCooked<'arena> {
     /// Decoded value == the inner source slice (no escapes to decode).
     Verbatim,
     /// Escapes were decoded into a value distinct from the raw inner text.
-    Decoded(&'arena str),
+    Decoded(PoolStr<'arena>),
 }
 
 impl<'arena> StringCooked<'arena> {
     /// The decoded string value. `span` is the owning [`Literal`]'s span (the
     /// quoted token); `source` is the host document. `Verbatim` slices the inner
-    /// text (zero-copy); `Decoded` returns the arena bytes. Both share `'s`
-    /// (`'arena: 's` via `&'s self`).
+    /// text (zero-copy); `Decoded` reads the tree's text through `view`.
     ///
     /// Inside the parser use `Parser::resolve_cooked` instead — there
     /// `self.source` is the local (embedded) slice, not the host document,
     /// so the host-coordinate span must shift back by `base_offset` first.
     #[inline]
-    pub fn resolve<'s>(&'s self, span: Span, source: &'s str) -> &'s str {
-        match self {
+    pub fn resolve<'s>(&'s self, span: Span, source: &'s str, view: AstView<'s>) -> &'s str {
+        match *self {
             StringCooked::Verbatim => {
                 let raw = span.extract(source);
                 // The string token's source slice always includes both quote
                 // delimiters (≥2 bytes), so stripping one from each end is in bounds.
                 &raw[1..raw.len() - 1]
             }
-            StringCooked::Decoded(decoded) => decoded,
+            StringCooked::Decoded(decoded) => view.text(decoded),
         }
     }
 }
@@ -365,7 +364,7 @@ impl<'arena> Literal<'arena> {
 /// to `escaped: Some`; debug builds assert the claim at the write.
 #[derive(Debug, Clone, Copy)]
 pub struct IdentName<'arena> {
-    pub escaped: Option<&'arena str>,
+    pub escaped: Option<PoolStr<'arena>>,
     pub raw_len: u16,
     /// Whether the raw name is **plain one-column ASCII** — no byte at or above
     /// `0x80`. Answered by the lexer, which walked those bytes anyway and records the
@@ -403,18 +402,17 @@ impl<'arena> IdentName<'arena> {
         }
     }
 
-    /// Resolve the name: the decoded `&'arena str` for an escaped name, else
-    /// the leading `raw_len` bytes at `span_start`. `source` must be the host
+    /// Resolve the name: an escaped name's text, read through `view`, else the
+    /// leading `raw_len` bytes at `span_start`. `source` must be the host
     /// document the spans were recorded against. `IdentName` is `Copy`, so it
-    /// is taken by value; the escaped arena string outlives `source`
-    /// (`'arena: 's`), so both arms unify at the source lifetime.
+    /// is taken by value.
     #[inline]
-    pub fn resolve<'s>(self, span_start: u32, source: &'s str) -> &'s str
+    pub fn resolve<'s>(self, span_start: u32, source: &'s str, view: AstView<'s>) -> &'s str
     where
         'arena: 's,
     {
         match self.escaped {
-            Some(s) => s,
+            Some(s) => view.text(s),
             None => &source[span_start as usize..span_start as usize + self.raw_len as usize],
         }
     }
@@ -432,7 +430,7 @@ pub struct Identifier<'arena> {
     /// `sizeof(Expression)`, but it sets `Identifier`'s own width, which every node
     /// holding one inline pays, a type name or a statement label among them.) Read via
     /// [`Self::ident_name`].
-    pub escaped_name: Option<&'arena str>,
+    pub escaped_name: Option<PoolStr<'arena>>,
     /// The [`IdentName`] channel's `raw_len`: the raw name-token byte length
     /// (the node span may extend past the name — `?` / `!` / `: Type`).
     pub name_len: u16,
@@ -507,15 +505,15 @@ impl<'arena> Identifier<'arena> {
         Span::new(self.span.start, self.span.start + self.name_len as u32)
     }
 
-    /// Resolve the identifier's name: the raw source slice (span-identity), or
-    /// the decoded `&'arena str` for escaped names. `source` must be the host
-    /// document the spans were recorded against.
+    /// Resolve the identifier's name: the raw source slice (span-identity), or an
+    /// escaped name's text, read through `view`. `source` must be the host document
+    /// the spans were recorded against.
     #[inline]
-    pub fn name<'s>(&self, source: &'s str) -> &'s str
+    pub fn name<'s>(&self, source: &'s str, view: AstView<'s>) -> &'s str
     where
         'arena: 's,
     {
-        self.ident_name().resolve(self.span.start, source)
+        self.ident_name().resolve(self.span.start, source, view)
     }
 
     /// Create a simple identifier (a reference): no optional flag, no binding extra.
@@ -558,15 +556,15 @@ impl<'arena> PrivateIdentifier<'arena> {
         Span::new(span.end - self.name.raw_len as u32, span.end)
     }
 
-    /// Resolve the name (without `#`): the raw source slice, or the decoded
-    /// `&'arena str` for escaped names. `span` is the holding `Expression`'s.
+    /// Resolve the name (without `#`): the raw source slice, or an escaped name's
+    /// text, read through `view`. `span` is the holding `Expression`'s.
     #[inline]
-    pub fn name<'s>(&self, span: Span, source: &'s str) -> &'s str
+    pub fn name<'s>(&self, span: Span, source: &'s str, view: AstView<'s>) -> &'s str
     where
         'arena: 's,
     {
         self.name
-            .resolve(span.end - self.name.raw_len as u32, source)
+            .resolve(span.end - self.name.raw_len as u32, source, view)
     }
 }
 

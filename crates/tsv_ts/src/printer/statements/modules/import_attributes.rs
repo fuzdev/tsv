@@ -213,7 +213,7 @@ impl<'a> Printer<'a> {
             }
             ast::ImportAttributeKey::Literal(lit) => match &lit.value {
                 ast::LiteralValue::String(cooked) => {
-                    cooked.resolve(lit.span, self.source) == "type"
+                    cooked.resolve(lit.span, self.source, self.view) == "type"
                 }
                 _ => false,
             },
@@ -284,7 +284,7 @@ impl<'a> Printer<'a> {
             ast::ImportAttributeKey::Identifier(id) => self.identifier_name_doc(id),
             ast::ImportAttributeKey::Literal(lit) => {
                 if let ast::LiteralValue::String(cooked) = &lit.value {
-                    let content = cooked.resolve(lit.span, self.source);
+                    let content = cooked.resolve(lit.span, self.source, self.view);
                     self.build_string_literal_key_doc(lit, content)
                 } else {
                     // Attribute keys are only identifiers or string literals.

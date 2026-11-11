@@ -1473,7 +1473,7 @@ impl<'a> Printer<'a> {
             // `'b'` prints `b`, while `'d-2'` and an escape-bearing `'\x62'` keep their quotes.
             ast::TSEnumMemberId::String(lit) => {
                 if let ast::LiteralValue::String(cooked) = &lit.value {
-                    let content = cooked.resolve(lit.span, self.source);
+                    let content = cooked.resolve(lit.span, self.source, self.view);
                     self.build_string_literal_key_doc(lit, content)
                 } else {
                     // The parser builds this arm from a string token alone.

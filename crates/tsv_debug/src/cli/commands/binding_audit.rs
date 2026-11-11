@@ -390,7 +390,7 @@ fn extract_bindings(source: &str) -> Option<Vec<CommentBinding>> {
     let bytes = source.as_bytes();
 
     let mut out = Vec::new();
-    for c in program.comments {
+    for c in program.view().comments(program.comments) {
         if !c.is_block {
             continue;
         }

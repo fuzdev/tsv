@@ -1577,7 +1577,7 @@ fn write_directive_value_expression(
         };
         w.span_start_end_object(ctx.positions, id.span.start, id.span.end);
         w.raw(",\"type\":\"Identifier\",\"name\":");
-        w.string(id.name(ctx.source));
+        w.string(id.name(ctx.source, ctx.view));
         w.raw("}");
     }
 }
@@ -1706,11 +1706,14 @@ fn write_script(
     // comment) needs acorn's leading/trailing attach, which runs online off this
     // emit's own node opens and closes. The common case (no comments) fuses with
     // no attach at all.
-    let attach = if script.content.comments.is_empty() && html_leading_comment.is_none() {
+    let attach = if ctx.view.comments(script.content.comments).is_empty()
+        && html_leading_comment.is_none()
+    {
         None
     } else {
         Some(attach_script(
             script,
+            ctx.view,
             ctx.attach_inputs(),
             html_leading_comment,
         ))
@@ -1806,7 +1809,7 @@ fn write_custom_element_props(
             continue;
         };
         json_comma(w, &mut first_prop);
-        w.string(key.name(ctx.source));
+        w.string(key.name(ctx.source, ctx.view));
         w.raw(":{");
         let mut first_attr = true;
         for inner_prop in ctx.view.obj_props(inner.properties) {
@@ -1826,13 +1829,13 @@ fn write_custom_element_props(
             else {
                 continue;
             };
-            let key_name = ikey.name(ctx.source);
+            let key_name = ikey.name(ctx.source, ctx.view);
             match &lit.value {
                 LiteralValue::String(cooked) => {
                     json_comma(w, &mut first_attr);
                     w.string(key_name);
                     w.raw(":");
-                    w.string(cooked.resolve(lit.span, ctx.source));
+                    w.string(cooked.resolve(lit.span, ctx.source, ctx.view));
                 }
                 LiteralValue::Boolean(b) => {
                     json_comma(w, &mut first_attr);
@@ -1875,7 +1878,7 @@ fn write_custom_element_field(w: &mut JsonWriter, attrs: &[ast::AttributeNode<'_
                 if let ObjectProperty::Property(p) = prop
                     && let ExpressionKind::Identifier(key) = &ctx.view.expr(p.key).kind
                 {
-                    let slot = match key.name(ctx.source) {
+                    let slot = match key.name(ctx.source, ctx.view) {
                         "tag" => &mut tag,
                         "props" => &mut props,
                         "shadow" => &mut shadow,
@@ -1899,7 +1902,7 @@ fn write_custom_element_field(w: &mut JsonWriter, attrs: &[ast::AttributeNode<'_
             {
                 json_comma(w, &mut first);
                 w.raw("\"tag\":");
-                w.string(cooked.resolve(lit.span, ctx.source));
+                w.string(cooked.resolve(lit.span, ctx.source, ctx.view));
             }
             // `props`: statically-evaluated plain object.
             if let Some(Expression {
@@ -1920,7 +1923,7 @@ fn write_custom_element_field(w: &mut JsonWriter, attrs: &[ast::AttributeNode<'_
                     if let LiteralValue::String(cooked) = &lit.value {
                         json_comma(w, &mut first);
                         w.raw("\"shadow\":");
-                        w.string(cooked.resolve(lit.span, ctx.source));
+                        w.string(cooked.resolve(lit.span, ctx.source, ctx.view));
                     }
                 }
                 Some(
@@ -1951,7 +1954,9 @@ fn write_custom_element_field(w: &mut JsonWriter, attrs: &[ast::AttributeNode<'_
                 if let ExpressionKind::Literal(lit) = &ctx.view.expr(expr.expression).kind
                     && let LiteralValue::String(cooked) = &lit.value
                 {
-                    Some(Cow::Borrowed(cooked.resolve(lit.span, ctx.source)))
+                    Some(Cow::Borrowed(
+                        cooked.resolve(lit.span, ctx.source, ctx.view),
+                    ))
                 } else {
                     None
                 }

@@ -109,7 +109,8 @@ fn ts_wire(source: &str) -> Option<Value> {
     let arena = bumpalo::Bump::new();
     let program = tsv_ts::__private::parse(source, &arena).expect("the wire's source parses");
     let comments = program
-        .comments
+        .view()
+        .comments(program.comments)
         .iter()
         .map(|comment| serde_json::json!({ "value": comment.content(source) }))
         .collect();

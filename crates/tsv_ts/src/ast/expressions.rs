@@ -3,7 +3,7 @@
 //! Contains the Expression enum and all expression types including
 //! operators, literals, function expressions, and TypeScript type assertions.
 
-use crate::ast::AstView;
+use crate::ast::{AstView, PoolStr};
 use tsv_lang::{Comment, Span};
 
 use super::{
@@ -1013,7 +1013,7 @@ pub enum TemplateCooked<'arena> {
     /// Cooked value == the element's TRV (no escapes to decode).
     Verbatim,
     /// Escapes were decoded into a value distinct from the raw text.
-    Decoded(&'arena str),
+    Decoded(PoolStr<'arena>),
     /// No cooked value — an invalid escape in a TAGGED template, which ES2018
     /// permits and acorn reports as `null`. (Untagged, the same escape is a
     /// syntax error, so `Parser::template_cooked` raises there instead.)
@@ -1049,7 +1049,7 @@ pub struct TemplateElement<'arena> {
     /// a 4-byte source span and a 3-character value, and `raw_span` alone cannot
     /// express it. `None` — overwhelmingly the common case — means the source
     /// slice IS the TRV, so this costs no allocation on any ordinary template.
-    pub raw_trv: Option<&'arena str>,
+    pub raw_trv: Option<PoolStr<'arena>>,
     /// The decoded value. `Verbatim` (the common no-escape case) costs no
     /// allocation — its text equals `trv(source)`; recover via `cooked(source)`.
     pub cooked: TemplateCooked<'arena>,
@@ -1075,21 +1075,23 @@ impl<'arena> TemplateElement<'arena> {
     /// The element's TRV — the raw text as a *value*, with `<CR>` / `<CR><LF>`
     /// normalized to `<LF>` per ECMAScript. The WIRE's view (`value.raw`), and
     /// what a tagged template's `String.raw` observes at runtime. Equals
-    /// [`Self::raw`] unless the source carries a `<CR>`; see `raw_trv`.
+    /// [`Self::raw`] unless the source carries a `<CR>`; see `raw_trv`, read through `view`.
     #[inline]
-    pub fn trv<'s>(&'s self, source: &'s str) -> &'s str {
-        self.raw_trv.unwrap_or_else(|| self.raw(source))
+    pub fn trv<'s>(&'s self, source: &'s str, view: AstView<'s>) -> &'s str {
+        match self.raw_trv {
+            Some(trv) => view.text(trv),
+            None => self.raw(source),
+        }
     }
 
     /// The decoded ("cooked") value as text, or `None` for an invalid escape.
     /// The no-escape case borrows the TRV (no owned string unless a `<CR>`
-    /// forced one); the `Decoded` arm borrows from the arena (`'arena: 's` via
-    /// `&'s self`).
+    /// forced one); the `Decoded` arm reads the tree's text through `view`.
     #[inline]
-    pub fn cooked<'s>(&'s self, source: &'s str) -> Option<&'s str> {
+    pub fn cooked<'s>(&'s self, source: &'s str, view: AstView<'s>) -> Option<&'s str> {
         match self.cooked {
-            TemplateCooked::Verbatim => Some(self.trv(source)),
-            TemplateCooked::Decoded(decoded) => Some(decoded),
+            TemplateCooked::Verbatim => Some(self.trv(source, view)),
+            TemplateCooked::Decoded(decoded) => Some(view.text(decoded)),
             TemplateCooked::Invalid => None,
         }
     }

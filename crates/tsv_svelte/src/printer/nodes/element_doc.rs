@@ -1322,7 +1322,7 @@ impl<'a> Printer<'a> {
         #[cfg(feature = "_internal_comment_check")]
         tsv_lang::comment_ledger::register_parsed(
             self.source,
-            &tsv_lang::merge_nestled_block_comments(self.source, program.comments),
+            &tsv_lang::merge_nestled_block_comments(self.source, view.comments(program.comments)),
         );
         tsv_ts::__private::build_program_body_doc(
             self.d(),
