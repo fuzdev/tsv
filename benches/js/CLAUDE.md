@@ -32,7 +32,7 @@ grades); the reference halves live in `docs/`:
 
 | Gate | Composition | Corpus / oracle | Cadence |
 | --- | --- | --- | --- |
-| **`deno task check`** | `cargo fmt --check` · `format:audit` · `pins:audit` · `docs:audit` · `docs:audit:docsrs` · `deps:audit` · `package:audit` · `typecheck` · `typecheck:features` · `typecheck:scripts` · `typecheck:bench-core` · `conformance:audit` · `conformance:audit:compiler` · `variants:audit` · `scan:audit` · `fanout:audit` · `roundtrip:audit` · `roundtrip:audit:prettier` · `discovery:audit` · `canonicalize:audit` · `binding:audit` · `authoring:audit` · `paren:audit` · `razor:audit` · `fuzz:audit` (+ `:css` · `:ts`) · `fuzz:audit:debug` · `test:deno` · `cargo test` (incl. fixtures) · `test:depth` · `test:audits` · `swallow:audit` · `comments:audit` · `gaps:audit` · `blanks:audit` · `fabrication:audit` · `census:audit` · `width:audit` · `ignore:audit` · `check:ast-types` · `check:loc` · `clippy` | **committed tree only** (`tests/fixtures` + pure-Rust/Deno audits, no external oracle), save the two opportunistic legs: `roundtrip:audit:prettier` (the pinned `../prettier` format suites) and `discovery:audit` (`tsv format --list` over the `../corpora` snapshot vs its committed file list) | every commit; the CI `check` job |
+| **`deno task check`** | `cargo fmt --check` · `format:audit` · `pins:audit` · `docs:audit` · `docs:audit:docsrs` · `deps:audit` · `package:audit` · `typecheck` · `typecheck:features` · `typecheck:scripts` · `typecheck:bench-core` · `conformance:audit` · `conformance:audit:compiler` · `variants:audit` · `scan:audit` · `fanout:audit` · `roundtrip:audit` · `roundtrip:audit:prettier` · `discovery:audit` · `canonicalize:audit` · `binding:audit` · `authoring:audit` · `paren:audit` · `razor:audit` · `fuzz:audit` (+ `:css` · `:ts`) · `fuzz:audit:debug` · `test:node` · `test:deno` · `cargo test` (incl. fixtures) · `test:depth` · `test:audits` · `swallow:audit` · `comments:audit` · `gaps:audit` · `blanks:audit` · `fabrication:audit` · `census:audit` · `width:audit` · `ignore:audit` · `check:ast-types` · `check:loc` · `clippy` | **committed tree only** (`tests/fixtures` + pure-Rust/Deno audits, no external oracle), save the two opportunistic legs: `roundtrip:audit:prettier` (the pinned `../prettier` format suites) and `discovery:audit` (`tsv format --list` over the `../corpora` snapshot vs its committed file list) | every commit; the CI `check` job |
 | **`deno task conformance:all`** | `pins:audit:checkouts` + `bench:pins:suites` + `fixtures:validate` + `compile:fixtures:validate` preflights (then `bench:harvest:svelte-styles`, late, beside the corpus legs that read its cache, `strip:corpus:run`, the type strip vs ts-blank-space over the snapshot's TypeScript, and `imports:corpus:run`, the import records vs oxc-parser's module record over its JS/TS and Svelte), then `conformance` (one process, its FFI legs: `svelte-fixtures` · `ts-fixtures` · `ts-repo` · `corpus:compare:parse --all` · `corpus:compare:parse tests/fixtures --fixtures` · `corpus:compare:format --all`, plus `render:audit` as its one subprocess leg) **+** `conformance:test262` (pure Rust) | `../corpora` (the real-code snapshot), `../svelte`, `../acorn-typescript`, `../typescript` (tsc baselines), `../prettier`, `../prettier-plugin-svelte`, `../test262`; the **`gates`** corpus view | release; `scripts/publish.ts` **Step 3b** |
 | **`deno task bench` / `bench:conformance`** | perf throughput ×3 runtimes + compose; parse-coverage report | **`perf`** view (100%-coverage invariant) / **`conformance`** view (fixtures filtered to what their own suite calls valid + wpt/test262 harvests; coverage-only + node-only) | dev / release cadence; feeds tsv.fuz.dev |
 | **`deno task idempotency:sweep`** | `tsv_debug fuzz --iterations 0` over the corpus dirs — F1 (`format(format(x)) == format(x)`) + no-panic + structural reparse on every file **as authored**, plus the `locations` wire (no panic) and the type strip of every TypeScript-family file (no panic, position contract, idempotence) | **`robustness`** view (the WHOLE `../corpora` snapshot — every collection it vendors, placed or not — + the `svelte_styles` cache + the live working trees' DIFF against the snapshot; absent dirs skipped with a warning) | after a printer change; conformance cadence |
@@ -138,8 +138,9 @@ delta on the same row is the detector.
   runtime-specific files are the native loader (`ffi.ts` `Deno.dlopen` vs `napi.ts`
   `process.dlopen`) and the WASM target the loader picks. The Deno-only entry points
   (`corpus_compare_*`, `diagnostics/*` but the node/bun `biome_heap_probe.ts`) stay Deno-idiomatic. The
-  `deno test` suite (`test:deno`) is the node-modules-free core's: the divergence detectors plus
-  the other dependency-free `lib/` modules' tests (`node:assert` + relative imports).
+  core's suites are its tests: the divergence detectors plus the other dependency-free `lib/`
+  modules' (`node:assert` + relative imports), run by vitest under Node (`test:node`) but for the
+  fixture-coverage audit, whose fixture reads are Deno's (`test:deno`).
 - **The native row differs by runtime, fairly.** Deno → FFI (`tsv_ffi`, via
   `Deno.dlopen`); Node/Bun → N-API (`tsv_napi`, via `process.dlopen`). Same engine,
   same per-thread arena reuse, different binding boundary. Both are **profile-guided**
@@ -410,7 +411,7 @@ tables.
        type its acorn read swallowed; for `two_line_classes` the exact count inside a
        `<script>` and a band in a template island (a line one off inside the band is the
        deliberate residual). Every row also requires tsv's own value to be the definition's,
-       and each is mutation-tested in `lib/loc_tolerance_test.ts` (a `test:deno` leg).
+       and each is mutation-tested in `lib/loc_tolerance_test.ts` (a `test:node` suite).
 
   A tolerated row neither fills the per-file diff cap nor stores an entry: it is counted per row
   (files and sites) in the summary and in `--json` as `loc_arm.rows`, beside `loc_arm.superset` /
@@ -446,7 +447,7 @@ divergence baked into `expected_ours.json` stays invisible here, as it does to `
 
 The documented-divergence matchers live in `lib/parse_divergences.ts`
 (`DOCUMENTED_MATCHERS`, each naming its `docs/conformance_svelte.md` section — a
-`test:deno` leg, `parse_divergences_test.ts`, checks every named section exists and gives
+`test:node` suite, `parse_divergences_test.ts`, checks every named section exists and gives
 each matcher the difference it exists for plus a near miss it must refuse) and cover
 only the AST-content divergences that parse on both sides. Each is gated on the SHAPE its
 catalog entry describes — the values on both sides, the duplicate or the shift that
@@ -464,7 +465,7 @@ Three gates run tsv's parsers against an upstream suite, sharing one shape: **ve
 (enforced) plus an **AST-shape** deep-diff (report-only), through the engine
 `corpus_compare_parse.ts` grades with (`lib/parse_diff.ts`'s `diff_asts` +
 `lib/parse_divergences.ts`'s `DOCUMENTED_MATCHERS`, both node-modules-free and unit-tested in
-`test:deno`). The shape half grades tsv's shipped span-only wire against the oracle with its
+`test:node`). The shape half grades tsv's shipped span-only wire against the oracle with its
 `loc` / `name_loc` stripped (`lib/span_only.ts`), as `corpus:compare:parse`'s span-only arm
 does; `loc` is that tool's loc arm's to grade. All accept `-v`, `--json`, and a subtree path;
 each has a freshness-guarded `:run` variant that skips the FFI rebuild.
@@ -640,14 +641,15 @@ operational summary.
   (`patterns.ts`, tested by `patterns_test.ts`); each pattern carries
   `conformance_sections` (which doc sections it covers) and `fixtures` (an explicit
   assertion that it detects those `*_prettier_divergence` fixtures, gated by
-  `test:deno`).
+  `test:deno`'s `fixture_coverage_test.ts`).
 - **Classification**: `known` (all hunks explained), `partial` (some hunks
   unexplained), `unknown` (needs investigation), `SAFETY` (data loss).
 
 ```bash
 deno task divergence:audit [--json]
+deno task test:node
 deno task test:deno
-deno task test:deno:canonical
+deno task test:node:canonical
 deno task typecheck:js
 ```
 
@@ -655,29 +657,34 @@ deno task typecheck:js
   forms. Coverage is COMPUTED, not read out of the `fixtures[]` arrays (those are explicit
   assertions, gated by `test:deno`, and drift from what the detectors actually see). Exits 1 on a
   genuine gap; listing drift is bookkeeping.
-- **`test:deno`** — the node-modules-free suite, gated by `deno task check`; for the divergence detectors: pattern
-  positive/negative overmatch-rejection cases, safety differential cases, and a behavioral
-  fixture-coverage audit driving each detector against its own committed fixtures
-  (input == ours, output_prettier == prettier), failing if a pattern stops claiming a hunk in a
-  fixture it lists. Dependency-free (`node:assert` + relative imports), so CI runs it on a clean
-  checkout with no `bench:install` — why it's in the core `check` gate.
-- **`test:deno:canonical`** — the canonical-oracle test, NOT gated (needs prettier/svelte; run
-  after `bench:install`): asserts the prettier baseline formats with a filepath, so `.ts`
+- **`test:node`** — vitest under Node over the node-modules-free suites, gated by `deno task check`;
+  for the divergence detectors: pattern positive/negative overmatch-rejection cases and safety
+  differential cases. The suites import nothing from the bench install (`node:assert` + relative
+  imports), so CI runs them with no `bench:install` — why they're in the core `check` gate.
+- **`test:deno`** — gated by `deno task check` too: the behavioral fixture-coverage audit driving
+  each detector against its own committed fixtures (input == ours, output_prettier == prettier),
+  failing if a pattern stops claiming a hunk in a fixture it lists. It reads the fixtures through
+  `lib/divergence/fixture_cases.ts`'s Deno file reads, so it stays on `deno test` until that
+  module runs under Node.
+- **`test:node:canonical`** — the canonical-oracle test under vitest, NOT gated (needs
+  prettier/svelte; run after `bench:install`): asserts the prettier baseline formats with a filepath, so `.ts`
   single-type-param arrows stay `<T>` and `.svelte` ones get `<T,>`, and the `.js` → babel /
   `.ts` → typescript parser routing holds.
 - **`typecheck:js`** typechecks the JS/TS the repo owns — this harness, `scripts/`, and the
   tsv_debug Deno sidecar — which `deno task typecheck` (cargo) does not see. Takes DIRECTORIES, so
   a new subdirectory is covered the day it appears. NOT gated, for the same reason: the harness
-  imports npm by bare specifier, and CI's `check` job installs no node_modules. Run it after a
+  imports npm by bare specifier, and CI's `check` job installs no bench node_modules. Run it after a
   harness, scripts, or sidecar change.
 
   The node-modules-free part of the harness IS gated, mostly for free: `deno check` walks
   transitive imports, so `typecheck:scripts` already covers the loader/guard core through
   scripts/'s own graph (check_artifact_freshness, ffi, napi, tsv_artifacts, runtime, types,
-  reject_probe, locations_probe, and — through check_loc.ts — tsv_debug_server), and `test:deno`
-  covers gate_counts. `typecheck:bench-core` names the orphans nothing else reaches —
-  `lib/wasm.ts`, `lib/harvest_stamp.ts`, `lib/loc_wire_client.ts`, `lib/fixture_documents.ts`,
-  `lib/error_text.ts` and `compose_reports.ts`. It is deliberately NOT the maximal checkable set: the impl wrappers also
+  reject_probe, locations_probe, gate_counts, and — through check_loc.ts — tsv_debug_server), and
+  `test:deno`'s divergence suite covers the detectors. `typecheck:bench-core` names the orphans
+  nothing else reaches — `lib/wasm.ts`, `lib/harvest_stamp.ts`, `lib/loc_wire_client.ts`,
+  `lib/fixture_documents.ts`, `lib/error_text.ts`, `compose_reports.ts`, and the modules the
+  `test:node` suites test that nothing else Deno-checks (`tsc -p tsconfig.vitest.json` typechecks
+  them, but with `node_modules` in reach). It is deliberately NOT the maximal checkable set: the impl wrappers also
   check on a bare checkout, but only because their npm imports are dynamic, and gating them would
   impose that import style on modules whose job is loading npm (deno.json
   `//typecheck:bench-core`).

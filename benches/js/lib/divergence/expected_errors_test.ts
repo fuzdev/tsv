@@ -13,6 +13,7 @@
  */
 
 import { deepStrictEqual as assertEquals, ok as assert } from 'node:assert';
+import { test } from 'vitest';
 import { check_expected_error } from './expected_errors.ts';
 
 // --- Bucket B: non-standard CSS → expected ---
@@ -37,7 +38,7 @@ const non_standard_css: Array<[string, string, string]> = [
 ];
 
 for (const [label, content, expected_pattern] of non_standard_css) {
-	Deno.test(`css expected: ${label}`, () => {
+	test(`css expected: ${label}`, () => {
 		const r = check_expected_error(content, 'css');
 		assert(r.expected, `expected ${label} to classify`);
 		assertEquals(r.pattern!.name, expected_pattern);
@@ -56,7 +57,7 @@ const genuine_gaps: Array<[string, string]> = [
 ];
 
 for (const [label, content] of genuine_gaps) {
-	Deno.test(`css genuine gap stays error: ${label}`, () => {
+	test(`css genuine gap stays error: ${label}`, () => {
 		const r = check_expected_error(content, 'css');
 		assert(!r.expected, `${label} must NOT classify as expected (it is a real gap)`);
 	});
@@ -64,13 +65,13 @@ for (const [label, content] of genuine_gaps) {
 
 // --- Language scoping: CSS markers must not fire on TS/Svelte ---
 
-Deno.test('css markers do not fire on TypeScript', () => {
+test('css markers do not fire on TypeScript', () => {
 	// `prop: {` (the nested-props marker) is a normal TS object type.
 	const ts = 'type T = { font: { weight: number } };\n';
 	assertEquals(check_expected_error(ts, 'typescript').expected, false);
 });
 
-Deno.test('css markers do not fire on Svelte', () => {
+test('css markers do not fire on Svelte', () => {
 	// `$foo:` is a Svelte reactive label, not an SCSS variable.
 	const svelte = '<script>\n$foo: bar;\n</script>\n';
 	assertEquals(check_expected_error(svelte, 'svelte').expected, false);
@@ -78,13 +79,13 @@ Deno.test('css markers do not fire on Svelte', () => {
 
 // --- Existing svelte/html patterns still apply (no language tag = all langs) ---
 
-Deno.test('scss in <style> still classifies', () => {
+test('scss in <style> still classifies', () => {
 	const r = check_expected_error('<style lang="scss">$x: 1;</style>', 'svelte');
 	assert(r.expected);
 	assertEquals(r.pattern!.name, 'scss_style');
 });
 
-Deno.test('clean CSS does not classify', () => {
+test('clean CSS does not classify', () => {
 	assertEquals(check_expected_error('a { color: red; }\n', 'css').expected, false);
 });
 
@@ -104,7 +105,7 @@ const js_proposals: Array<[string, string, string]> = [
 ];
 
 for (const [label, content, expected_pattern] of js_proposals) {
-	Deno.test(`js proposal expected: ${label}`, () => {
+	test(`js proposal expected: ${label}`, () => {
 		const r = check_expected_error(content, 'typescript');
 		assert(r.expected, `expected ${label} to classify`);
 		assertEquals(r.pattern!.name, expected_pattern);
@@ -125,7 +126,7 @@ const js_must_stay_error: Array<[string, string]> = [
 ];
 
 for (const [label, content] of js_must_stay_error) {
-	Deno.test(`js stays error (no false-positive): ${label}`, () => {
+	test(`js stays error (no false-positive): ${label}`, () => {
 		const r = check_expected_error(content, 'typescript');
 		assert(!r.expected, `${label} must NOT classify (would hide a real gap)`);
 	});
@@ -133,7 +134,7 @@ for (const [label, content] of js_must_stay_error) {
 
 // --- range marker is language-agnostic (was CSS-scoped) ---
 
-Deno.test('range marker classifies in TS too', () => {
+test('range marker classifies in TS too', () => {
 	const r = check_expected_error('a = 1;<<<PRETTIER_RANGE_START>>>b = 2;\n', 'typescript');
 	assert(r.expected);
 	assertEquals(r.pattern!.name, 'range_marker');

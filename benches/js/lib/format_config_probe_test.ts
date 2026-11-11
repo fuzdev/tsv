@@ -11,7 +11,7 @@
  * Hand-written rather than tool-produced on purpose: the graders' job is to read a
  * layout decision out of text, and a unit test that formats through the real tools
  * would test the tools instead, need their node_modules, and stop gating in
- * `deno task check` (see `test:deno`). The claims about what each TOOL actually
+ * `deno task check` (see `test:node`). The claims about what each TOOL actually
  * emits at its defaults live in the module's own docs, verified by running them.
  *
  * The vacuity arms are here too — an assertion that grades nothing passes every
@@ -20,6 +20,7 @@
  */
 
 import { throws, doesNotThrow } from 'node:assert';
+import { test } from 'vitest';
 import {
 	assert_embedded_regions_landed,
 	assert_format_config_landed
@@ -67,7 +68,7 @@ const pinned: Record<Language, string> = {
 };
 
 for (const language of Object.keys(pinned) as Array<Language>) {
-	Deno.test(`config landed: ${language} pinned output passes`, () => {
+	test(`config landed: ${language} pinned output passes`, () => {
 		doesNotThrow(() => assert_format_config_landed('probe-tool', language, pinned[language]));
 	});
 }
@@ -209,7 +210,7 @@ const dropped: Array<{ label: string; language: Language; output: string; option
 ];
 
 for (const { label, language, output, option } of dropped) {
-	Deno.test(`config did NOT land: ${label}`, () => {
+	test(`config did NOT land: ${label}`, () => {
 		throws(
 			() => assert_format_config_landed('probe-tool', language, output),
 			(e: unknown) => e instanceof Error && e.message.includes(option),
@@ -233,7 +234,7 @@ const embedded_pinned = [
 	''
 ].join('\n');
 
-Deno.test('embedded regions landed: pinned output passes', () => {
+test('embedded regions landed: pinned output passes', () => {
 	doesNotThrow(() => assert_embedded_regions_landed('probe-tool', embedded_pinned));
 });
 
@@ -268,7 +269,7 @@ const dropped_embeds: Array<{ label: string; output: string; hop: string }> = [
 ];
 
 for (const { label, output, hop } of dropped_embeds) {
-	Deno.test(`embedded regions did NOT land: ${label}`, () => {
+	test(`embedded regions did NOT land: ${label}`, () => {
 		throws(
 			() => assert_embedded_regions_landed('probe-tool', output),
 			(e: unknown) => e instanceof Error && e.message.includes(hop),

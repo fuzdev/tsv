@@ -20,7 +20,7 @@
  * language from that source, so a zero count is a real reading, not an absence. The
  * buckets cover every file a passing run grades, so a row also pins its file count.
  *
- * Node builtins only, so it gates in `deno task test:deno`.
+ * Node builtins only, so `corpus_pins_test.ts` gates it in `deno task test:node`.
  *
  * @module
  */

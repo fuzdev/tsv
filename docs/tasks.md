@@ -30,7 +30,7 @@ The per-package feature sets `deno task typecheck` cannot see: all three binding
 
 ## `strip:fixtures:oracle`
 
-The ORACLE side of the strip fixtures (tests/fixtures_strip): re-derives each fixture's expected output from ts-blank-space (benches/js/package.json) and cross-checks it against Node's module.stripTypeScriptTypes, failing on a stale file or an undeclared oracle disagreement; `strip:fixtures:update` writes the files instead. Runs under NODE (the second oracle is Node's own; the script refuses to run as Deno) and needs `deno task bench:install`, so it is NOT in `check` — CI installs no node_modules. tsv's side is `strip:fixtures:validate`, which `cargo test` also runs (tests/strip_fixtures_tests.rs).
+The ORACLE side of the strip fixtures (tests/fixtures_strip): re-derives each fixture's expected output from ts-blank-space (benches/js/package.json) and cross-checks it against Node's module.stripTypeScriptTypes, failing on a stale file or an undeclared oracle disagreement; `strip:fixtures:update` writes the files instead. Runs under NODE (the second oracle is Node's own; the script refuses to run as Deno) and needs `deno task bench:install`, so it is NOT in `check` — CI installs no bench node_modules. tsv's side is `strip:fixtures:validate`, which `cargo test` also runs (tests/strip_fixtures_tests.rs).
 
 ## `imports:fixtures:validate`
 
@@ -39,6 +39,14 @@ The import-record fixtures (tests/fixtures_imports): per fixture, the tree's sha
 ## `compile:corpus:compare`
 
 Roots: the WHOLE ../corpora snapshot (every collection it vendors — the author's repos, the framework source, the third-party Svelte libraries — one root, so a new collection is in scope the day it lands), then Svelte's own runtime/snapshot/SSR/css suites, then any per-machine roots in the gitignored `compile_corpus_compare.roots.local` (one path per line, `#` comments; live checkouts the snapshot cannot carry). A missing roots file adds none; a missing positional root fails the run.
+
+## `test:node`
+
+The JS suites beside their modules under `scripts/` and `benches/js/lib/`, under Node: `tsc -p tsconfig.vitest.json` typechecks them, then vitest runs them. The suites are the `_test.ts` files `tsconfig.vitest.json` names, which `vitest.config.ts` reads as its include list, so a suite vitest runs is always one `tsc` checks, and a named file that's missing fails the run. Named rather than a directory, because `benches/js/lib/` also holds `canonical_test.ts`, which needs the bench install (`test:node:canonical`), and the suites still on `deno test` (`test:deno`): the ones whose module under test calls `Deno.*` in the paths they test. A suite moves here once its module runs under Node, and is added by name. The script starts `tsc` and vitest with `node` because `deno task`, and `npm run` inside a `deno task`, runs a package's bin under Deno; `vitest.config.ts` refuses to run under Deno, which is also what a machine with no Node gets, since `deno task` then resolves `node` to its node-compat shim. Some modules the suites import still call `Deno.*` in functions the suites don't reach; `deno_global.d.ts` declares `Deno` as `any` for this program, and `typecheck:scripts` grades those calls against Deno's types (its walk of `scripts/` reaches the bench modules among them). The suites import the repo's own modules by relative path (the npm facade from `crates/tsv_wasm/npm/`), never the `@fuzdev/tsv` that `@fuzdev/gro` brings into the root `node_modules`, and none spawns `tsv`. The suites mutate no environment variable and no process state, so vitest's default pool serves; the ones that do (`perf_ab_test.ts` clears git's variables) are among those on `deno test`.
+
+## `test:node:canonical`
+
+`benches/js/lib/canonical_test.ts` under Node, typechecked by `tsc -p tsconfig.canonical.json` and run by `vitest.canonical.config.ts`: the canonical prettier baseline's `filepath` hint and its `.js` → babel / `.ts` → typescript parser routing. It loads prettier, `prettier-plugin-svelte`, Svelte and acorn, which resolve from `benches/js/node_modules` (the nearest `node_modules` above `benches/js/lib/`), so it needs `npm run bench:install` and is not in `check`.
 
 ## `test:depth`
 

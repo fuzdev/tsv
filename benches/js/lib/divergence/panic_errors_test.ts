@@ -11,6 +11,7 @@
  */
 
 import { deepStrictEqual as assertEquals } from 'node:assert';
+import { test } from 'vitest';
 import { is_native_panic_error } from './panic_errors.ts';
 
 const panics: Array<[string, string]> = [
@@ -21,7 +22,7 @@ const panics: Array<[string, string]> = [
 ];
 
 for (const [label, message] of panics) {
-	Deno.test(`panic: ${label}`, () => {
+	test(`panic: ${label}`, () => {
 		assertEquals(is_native_panic_error(message), true);
 	});
 }
@@ -40,12 +41,12 @@ const rejections: Array<[string, string]> = [
 ];
 
 for (const [label, message] of rejections) {
-	Deno.test(`not a panic: ${label}`, () => {
+	test(`not a panic: ${label}`, () => {
 		assertEquals(is_native_panic_error(message), false);
 	});
 }
 
-Deno.test('absent message is not a panic', () => {
+test('absent message is not a panic', () => {
 	assertEquals(is_native_panic_error(undefined), false);
 	assertEquals(is_native_panic_error(null), false);
 });

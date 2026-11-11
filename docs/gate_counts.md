@@ -207,7 +207,7 @@ shallow-fetches and checks against the tree id) — that struct is the single
 provenance record for what a pin was measured against (upstream version files only bump
 at release) — and run `deno task bench:pins:suites` there too, so the suite-derived pins
 move with it. Each entry's `pins` list is graded by
-`benches/js/lib/gate_counts_test.ts` (in `test:deno`): every exported pin must be
+`benches/js/lib/gate_counts_test.ts` (in `test:node`): every exported pin must be
 named by some checkout (or by the test's `UNTRACKED_PINS`, with a reason), and every
 name must exist — a new pin cannot land without its provenance, and a rename cannot
 leave a ghost.

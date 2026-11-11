@@ -4,11 +4,12 @@
  *
  * Hand-written trees, on purpose: the engine is a pure function over two JSON values, and a
  * test that parsed through the oracle would need the sidecar and stop gating in
- * `deno task check` (see `test:deno`). What the real oracle writes is graded by
+ * `deno task check` (see `test:node`). What the real oracle writes is graded by
  * `corpus:compare:parse`.
  */
 
 import { deepStrictEqual, strictEqual } from 'node:assert';
+import { test } from 'vitest';
 import {
 	classify,
 	diff_asts,
@@ -38,7 +39,7 @@ const diff = (ours: unknown, canonical: unknown, language: Language = 'typescrip
 const kinds = (ours: unknown, canonical: unknown): string[] =>
 	diff(ours, canonical).diffs.map((d) => `${d.kind} ${d.path}`);
 
-Deno.test('diff_asts: equal trees have no diffs', () => {
+test('diff_asts: equal trees have no diffs', () => {
 	const tree = { type: 'Program', start: 0, end: 3, body: [{ type: 'X', value: 'a' }] };
 	const result = diff(tree, structuredClone(tree));
 	deepStrictEqual(result.diffs, []);
@@ -48,7 +49,7 @@ Deno.test('diff_asts: equal trees have no diffs', () => {
 	strictEqual(result.loc_span_skipped, 0);
 });
 
-Deno.test('diff_asts: a leaf value mismatch, with array indices erased in its signature', () => {
+test('diff_asts: a leaf value mismatch, with array indices erased in its signature', () => {
 	const { diffs } = diff({ body: [{ end: 4 }] }, { body: [{ end: 5 }] });
 	strictEqual(diffs.length, 1);
 	const [d] = diffs;
@@ -60,13 +61,13 @@ Deno.test('diff_asts: a leaf value mismatch, with array indices erased in its si
 	strictEqual(d!.documented, null);
 });
 
-Deno.test('diff_asts: a type mismatch stops at the node and does not recurse', () => {
+test('diff_asts: a type mismatch stops at the node and does not recurse', () => {
 	deepStrictEqual(kinds({ a: 1 }, { a: '1' }), ['type_mismatch a']);
 	deepStrictEqual(kinds({ a: { b: 1 } }, { a: [1] }), ['type_mismatch a']);
 	deepStrictEqual(kinds({ a: null }, { a: {} }), ['type_mismatch a']);
 });
 
-Deno.test('diff_asts: a length mismatch still diffs the shared prefix', () => {
+test('diff_asts: a length mismatch still diffs the shared prefix', () => {
 	deepStrictEqual(kinds({ xs: [1, 2] }, { xs: [1, 2, 3] }), ['length_mismatch xs']);
 	deepStrictEqual(kinds({ xs: [9, 2, 3] }, { xs: [1, 2] }), [
 		'length_mismatch xs',
@@ -77,7 +78,7 @@ Deno.test('diff_asts: a length mismatch still diffs the shared prefix', () => {
 	strictEqual(d!.canonical, 2);
 });
 
-Deno.test('diff_asts: a key on one side only is missing on the other', () => {
+test('diff_asts: a key on one side only is missing on the other', () => {
 	deepStrictEqual(kinds({ a: 1 }, { a: 1, b: 2 }), ['missing_ours b']);
 	deepStrictEqual(kinds({ a: 1, b: 2 }, { a: 1 }), ['missing_canonical b']);
 	const [d] = diff({}, { b: 2 }).diffs;
@@ -85,7 +86,7 @@ Deno.test('diff_asts: a key on one side only is missing on the other', () => {
 	strictEqual(d!.canonical, 2);
 });
 
-Deno.test('diff_asts: the per-file cap keeps each class apart and flags the file truncated', () => {
+test('diff_asts: the per-file cap keeps each class apart and flags the file truncated', () => {
 	const ours: Record<string, number> = {};
 	const canonical: Record<string, number> = {};
 	for (let i = 0; i < MAX_DIFFS_PER_FILE + 5; i++) {
@@ -114,7 +115,7 @@ function documented_then_undocumented(documented: number): [unknown, unknown] {
 	return [ours, canonical];
 }
 
-Deno.test('diff_asts: documented entries never crowd out an undocumented one', () => {
+test('diff_asts: documented entries never crowd out an undocumented one', () => {
 	// past the cap: the documented tail is dropped, the undocumented entry is still kept
 	const past = diff(...documented_then_undocumented(MAX_DIFFS_PER_FILE + 5));
 	strictEqual(past.truncated, true);
@@ -131,54 +132,48 @@ Deno.test('diff_asts: documented entries never crowd out an undocumented one', (
 	strictEqual(at.diffs.at(-1)!.documented, null);
 });
 
-Deno.test('diff_asts: a documented divergence is classified by its matcher', () => {
+test('diff_asts: a documented divergence is classified by its matcher', () => {
 	const [d] = diff({ value: '\u{FFFD}' }, { value: '\uD800' }).diffs;
 	strictEqual(d!.documented, 'lone_surrogate_value');
 	const [near] = diff({ value: 'x' }, { value: '\uD800' }).diffs;
 	strictEqual(near!.documented, null);
 });
 
-Deno.test(
-	'diff_asts: a TypeScript `loc` half follows its span, the other half still grades',
-	() => {
-		const at = (line: number, column: number) => ({ line, column });
-		const ours = { start: 0, end: 5, loc: { start: at(1, 0), end: at(1, 5) } };
-		// `end` differs: graded at the span, `loc.end` skipped
-		const end_moved = { start: 0, end: 6, loc: { start: at(1, 0), end: at(1, 6) } };
-		const skipped = diff(ours, end_moved);
-		deepStrictEqual(
-			skipped.diffs.map((d) => `${d.kind} ${d.path}`),
-			['value_mismatch end']
-		);
-		strictEqual(skipped.loc_span_skipped, 1);
-		// `end` differs AND `loc.start` does: the agreeing half is still graded, exactly
-		const both = { start: 0, end: 6, loc: { start: at(2, 0), end: at(1, 6) } };
-		deepStrictEqual(kinds(ours, both).sort(), [
-			'value_mismatch end',
-			'value_mismatch loc.start.line'
-		]);
-		// offsets agree: a TypeScript `loc` difference is never tolerated
-		const line_moved = { start: 0, end: 5, loc: { start: at(1, 0), end: at(2, 5) } };
-		const [d] = diff(ours, line_moved).diffs;
-		strictEqual(d!.path, 'loc.end.line');
-		strictEqual(d!.documented, null);
-	}
-);
+test('diff_asts: a TypeScript `loc` half follows its span, the other half still grades', () => {
+	const at = (line: number, column: number) => ({ line, column });
+	const ours = { start: 0, end: 5, loc: { start: at(1, 0), end: at(1, 5) } };
+	// `end` differs: graded at the span, `loc.end` skipped
+	const end_moved = { start: 0, end: 6, loc: { start: at(1, 0), end: at(1, 6) } };
+	const skipped = diff(ours, end_moved);
+	deepStrictEqual(
+		skipped.diffs.map((d) => `${d.kind} ${d.path}`),
+		['value_mismatch end']
+	);
+	strictEqual(skipped.loc_span_skipped, 1);
+	// `end` differs AND `loc.start` does: the agreeing half is still graded, exactly
+	const both = { start: 0, end: 6, loc: { start: at(2, 0), end: at(1, 6) } };
+	deepStrictEqual(kinds(ours, both).sort(), [
+		'value_mismatch end',
+		'value_mismatch loc.start.line'
+	]);
+	// offsets agree: a TypeScript `loc` difference is never tolerated
+	const line_moved = { start: 0, end: 5, loc: { start: at(1, 0), end: at(2, 5) } };
+	const [d] = diff(ours, line_moved).diffs;
+	strictEqual(d!.path, 'loc.end.line');
+	strictEqual(d!.documented, null);
+});
 
-Deno.test(
-	'diff_asts: a tsv `loc` the TypeScript oracle lacks is a difference, never superset',
-	() => {
-		const ours = { start: 0, end: 1, loc: { start: { line: 1, column: 0 } } };
-		const result = diff(ours, { start: 0, end: 1 });
-		deepStrictEqual(
-			result.diffs.map((d) => `${d.kind} ${d.path} ${d.documented}`),
-			['missing_canonical loc null']
-		);
-		deepStrictEqual(result.loc_superset, {});
-	}
-);
+test('diff_asts: a tsv `loc` the TypeScript oracle lacks is a difference, never superset', () => {
+	const ours = { start: 0, end: 1, loc: { start: { line: 1, column: 0 } } };
+	const result = diff(ours, { start: 0, end: 1 });
+	deepStrictEqual(
+		result.diffs.map((d) => `${d.kind} ${d.path} ${d.documented}`),
+		['missing_canonical loc null']
+	);
+	deepStrictEqual(result.loc_superset, {});
+});
 
-Deno.test('classify: a declared divergence excuses span differences only', () => {
+test('classify: a declared divergence excuses span differences only', () => {
 	const declared: MatchContext = { ...ctx({}), declared_divergence: true };
 	const entry = (kind: 'value_mismatch' | 'missing_canonical', path: string) => ({
 		kind,
@@ -198,7 +193,7 @@ Deno.test('classify: a declared divergence excuses span differences only', () =>
 	strictEqual(classify(entry('missing_canonical', 'body[0].loc'), {}, declared), null);
 });
 
-Deno.test('classify: no matcher may excuse a difference at or inside a location', () => {
+test('classify: no matcher may excuse a difference at or inside a location', () => {
 	// `static_member_ladder` claims every difference in a ladder's members — the shape of
 	// matcher the refusal exists for
 	const source = 'class C {\n\tstatic\n\tstatic\n\ta() {}\n}';

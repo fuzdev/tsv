@@ -1,4 +1,5 @@
 import { deepStrictEqual } from 'node:assert';
+import { test } from 'vitest';
 
 import { release_plan, type ReleasePlan } from './plan.ts';
 
@@ -6,7 +7,7 @@ const pending = '# c\n\n## Unreleased\n<!-- bump: patch -->\n\n- fix: x\n\n## 0.
 
 const problems = (plan: ReleasePlan): Array<string> => (plan.kind === 'fresh' ? plan.problems : []);
 
-Deno.test('a matching bump plans a fresh release', () => {
+test('a matching bump plans a fresh release', () => {
 	deepStrictEqual(
 		release_plan({ version: '0.1.1', bump: 'patch', sentinel: null, changelog: pending }),
 		{
@@ -20,7 +21,7 @@ Deno.test('a matching bump plans a fresh release', () => {
 	);
 });
 
-Deno.test('a sentinel naming the checkout version resumes, ignoring --bump', () => {
+test('a sentinel naming the checkout version resumes, ignoring --bump', () => {
 	deepStrictEqual(
 		release_plan({ version: '0.1.2', bump: 'minor', sentinel: '0.1.2', changelog: null }),
 		{
@@ -35,7 +36,7 @@ Deno.test('a sentinel naming the checkout version resumes, ignoring --bump', () 
 	);
 });
 
-Deno.test('a sentinel naming another version is stale', () => {
+test('a sentinel naming another version is stale', () => {
 	const plan = release_plan({
 		version: '0.1.1',
 		bump: 'patch',
@@ -46,7 +47,7 @@ Deno.test('a sentinel naming another version is stale', () => {
 	deepStrictEqual(problems(plan), []);
 });
 
-Deno.test('a fresh release states its level twice', () => {
+test('a fresh release states its level twice', () => {
 	const missing = release_plan({
 		version: '0.1.1',
 		bump: null,
@@ -75,7 +76,7 @@ Deno.test('a fresh release states its level twice', () => {
 	deepStrictEqual(problems(unmarked).length, 1);
 });
 
-Deno.test('a fresh release needs notes', () => {
+test('a fresh release needs notes', () => {
 	for (const changelog of [
 		null,
 		'# c\n\n## 0.1.1\n',
@@ -88,7 +89,7 @@ Deno.test('a fresh release needs notes', () => {
 	}
 });
 
-Deno.test('a version with no bump is a problem', () => {
+test('a version with no bump is a problem', () => {
 	const plan = release_plan({
 		version: '0.2.0-alpha.1',
 		bump: 'patch',

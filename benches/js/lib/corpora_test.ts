@@ -5,10 +5,11 @@
  */
 
 import { deepStrictEqual } from 'node:assert';
+import { test } from 'vitest';
 
 import { benched_own_collections } from './corpora.ts';
 
-Deno.test('benched_own_collections: an own collection on the bench is refused', () => {
+test('benched_own_collections: an own collection on the bench is refused', () => {
 	deepStrictEqual(
 		benched_own_collections([
 			{ name: 'kit', benched: true, origin: 'third_party' },

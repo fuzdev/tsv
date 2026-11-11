@@ -11,7 +11,7 @@
  *
  * Shared by `corpus_compare_parse.ts` and the parse-conformance fixtures gates
  * (`fixtures_gate.ts`). Node-modules-free, so `parse_diff_test.ts` gates it in
- * `deno task test:deno`.
+ * `deno task test:node`.
  *
  * @module
  */

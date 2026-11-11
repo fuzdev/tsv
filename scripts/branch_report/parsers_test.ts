@@ -1,4 +1,5 @@
 import { deepStrictEqual, throws } from 'node:assert';
+import { test } from 'vitest';
 
 import {
 	assert_bounds_sites,
@@ -19,7 +20,7 @@ import {
 	test_run_matched
 } from './parsers.ts';
 
-Deno.test('symbol_key drops the legacy hash segment and an llvm suffix', () => {
+test('symbol_key drops the legacy hash segment and an llvm suffix', () => {
 	deepStrictEqual(
 		symbol_key('_ZN4core9panicking18panic_bounds_check17h0123456789abcdefE'),
 		'core::panicking::panic_bounds_check'
@@ -27,7 +28,7 @@ Deno.test('symbol_key drops the legacy hash segment and an llvm suffix', () => {
 	deepStrictEqual(symbol_key('_ZN6tsv_ts3foo17h0123456789abcdefE.llvm.123456'), 'tsv_ts::foo');
 });
 
-Deno.test('symbol_key translates the legacy path escapes', () => {
+test('symbol_key translates the legacy path escapes', () => {
 	deepStrictEqual(
 		symbol_key('_ZN5alloc3vec16Vec$LT$T$C$A$GT$3new17h0000000000000000E'),
 		'alloc::vec::Vec<T,A>::new'
@@ -38,12 +39,12 @@ Deno.test('symbol_key translates the legacy path escapes', () => {
 	);
 });
 
-Deno.test('symbol_key passes through a non-legacy name unchanged (minus an llvm suffix)', () => {
+test('symbol_key passes through a non-legacy name unchanged (minus an llvm suffix)', () => {
 	deepStrictEqual(symbol_key('memcpy'), 'memcpy');
 	deepStrictEqual(symbol_key('_RNvCs1234_3foo3bar.llvm.77'), '_RNvCs1234_3foo3bar');
 });
 
-Deno.test('parse_nm sums same-keyed copies and ignores data and zero-size symbols', () => {
+test('parse_nm sums same-keyed copies and ignores data and zero-size symbols', () => {
 	const text = [
 		'0000000000001000 0000000000000010 t _ZN3foo3bar17h0000000000000001E',
 		'0000000000002000 0000000000000014 t _ZN3foo3bar17h0000000000000002E',
@@ -59,46 +60,43 @@ Deno.test('parse_nm sums same-keyed copies and ignores data and zero-size symbol
 	deepStrictEqual(parsed.total, 24);
 });
 
-Deno.test(
-	'diff_symbols reports added, removed and changed, widest first, and is empty on A/A',
-	() => {
-		const base = {
-			sizes: new Map([
-				['a', 100],
-				['b', 50],
-				['gone', 30]
-			]),
-			copies: new Map(),
-			total: 180
-		};
-		const cand = {
-			sizes: new Map([
-				['a', 120],
-				['b', 50],
-				['new', 7]
-			]),
-			copies: new Map(),
-			total: 177
-		};
-		const diff = diff_symbols(base, cand);
-		deepStrictEqual(diff.changed, 1);
-		deepStrictEqual(diff.added, 1);
-		deepStrictEqual(diff.removed, 1);
-		deepStrictEqual(
-			diff.movers.map((m) => m.key),
-			['gone', 'a', 'new']
-		);
-		deepStrictEqual(
-			diff.movers.map((m) => m.delta),
-			[-30, 20, 7]
-		);
+test('diff_symbols reports added, removed and changed, widest first, and is empty on A/A', () => {
+	const base = {
+		sizes: new Map([
+			['a', 100],
+			['b', 50],
+			['gone', 30]
+		]),
+		copies: new Map(),
+		total: 180
+	};
+	const cand = {
+		sizes: new Map([
+			['a', 120],
+			['b', 50],
+			['new', 7]
+		]),
+		copies: new Map(),
+		total: 177
+	};
+	const diff = diff_symbols(base, cand);
+	deepStrictEqual(diff.changed, 1);
+	deepStrictEqual(diff.added, 1);
+	deepStrictEqual(diff.removed, 1);
+	deepStrictEqual(
+		diff.movers.map((m) => m.key),
+		['gone', 'a', 'new']
+	);
+	deepStrictEqual(
+		diff.movers.map((m) => m.delta),
+		[-30, 20, 7]
+	);
 
-		const same = diff_symbols(base, base);
-		deepStrictEqual(same.movers, []);
-	}
-);
+	const same = diff_symbols(base, base);
+	deepStrictEqual(same.movers, []);
+});
 
-Deno.test('count_bounds_sites counts call and jmp edges per panic group', () => {
+test('count_bounds_sites counts call and jmp edges per panic group', () => {
 	const objdump = [
 		'0000000000001000 <_ZN3foo3bar17h0000000000000000E>:',
 		'    1000:\tcall   1234 <_ZN4core9panicking18panic_bounds_check17h0000000000000000E>',
@@ -114,14 +112,14 @@ Deno.test('count_bounds_sites counts call and jmp edges per panic group', () => 
 	deepStrictEqual(counts.get('str slice_error_fail'), 1);
 });
 
-Deno.test('count_bounds_sites starts every group at zero', () => {
+test('count_bounds_sites starts every group at zero', () => {
 	const counts = count_bounds_sites('');
 	deepStrictEqual(counts.get('panic_bounds_check'), 0);
 	deepStrictEqual(counts.get('slice index fail'), 0);
 	deepStrictEqual(counts.get('str slice_error_fail'), 0);
 });
 
-Deno.test('parse_size_sections reads size -A -d', () => {
+test('parse_size_sections reads size -A -d', () => {
 	const text = [
 		'target/release/tsv  :',
 		'section                 size     addr',
@@ -136,7 +134,7 @@ Deno.test('parse_size_sections reads size -A -d', () => {
 	deepStrictEqual(sections.has('Total'), false);
 });
 
-Deno.test('heaptrack sizes and summary', () => {
+test('heaptrack sizes and summary', () => {
 	deepStrictEqual(parse_heaptrack_size('682.35K'), 682350);
 	deepStrictEqual(parse_heaptrack_size('1.20G'), 1_200_000_000);
 	deepStrictEqual(parse_heaptrack_size('512B'), 512);
@@ -158,7 +156,7 @@ Deno.test('heaptrack sizes and summary', () => {
 	deepStrictEqual(parse_heaptrack_summary('nothing'), null);
 });
 
-Deno.test('parse_shape_limits reads name, language and n, unescaping the name', () => {
+test('parse_shape_limits reads name, language and n, unescaping the name', () => {
 	const text = 'parens\ttypescript\t256\t(\t(a\t)\t\t\nmember\\tcall\tsvelte\t6000\tx\ty\tz\t\t\n';
 	deepStrictEqual(parse_shape_limits(text), [
 		{ name: 'parens', lang: 'typescript', n: 256 },
@@ -166,7 +164,7 @@ Deno.test('parse_shape_limits reads name, language and n, unescaping the name', 
 	]);
 });
 
-Deno.test('parse_board_text reads the wasm32 board tab format', () => {
+test('parse_board_text reads the wasm32 board tab format', () => {
 	deepStrictEqual(
 		parse_board_text('ts/expression\tExpression\t56\t8\t64\nts/statement\tStatement\t24\t8\t24\n'),
 		[
@@ -176,7 +174,7 @@ Deno.test('parse_board_text reads the wasm32 board tab format', () => {
 	);
 });
 
-Deno.test('format --check exit 2 is not a finished run, and names its stderr', () => {
+test('format --check exit 2 is not a finished run, and names its stderr', () => {
 	assert_format_check_finished(0, '', 'x');
 	assert_format_check_finished(1, '', 'x');
 	throws(
@@ -185,7 +183,7 @@ Deno.test('format --check exit 2 is not a finished run, and names its stderr', (
 	);
 });
 
-Deno.test('an empty symbol table is refused, not read as identical', () => {
+test('an empty symbol table is refused, not read as identical', () => {
 	throws(
 		() => assert_symbols({ sizes: new Map(), copies: new Map(), total: 0 }, '/bin/x'),
 		/\/bin\/x/
@@ -194,7 +192,7 @@ Deno.test('an empty symbol table is refused, not read as identical', () => {
 	deepStrictEqual(assert_symbols(symbols, '/bin/x'), symbols);
 });
 
-Deno.test('all-zero bounds sites are refused, one non-zero group is fine', () => {
+test('all-zero bounds sites are refused, one non-zero group is fine', () => {
 	throws(() => assert_bounds_sites(count_bounds_sites('nothing here'), '/bin/x'), /no bounds-miss/);
 	const counts = new Map([
 		['panic_bounds_check', 0],
@@ -203,7 +201,7 @@ Deno.test('all-zero bounds sites are refused, one non-zero group is fine', () =>
 	deepStrictEqual(assert_bounds_sites(counts, '/bin/x'), counts);
 });
 
-Deno.test('count_bounds_sites takes callq/jmpq, and not a jump inside a panic function', () => {
+test('count_bounds_sites takes callq/jmpq, and not a jump inside a panic function', () => {
 	const objdump = [
 		'    1000:\tcallq  1234 <_ZN4core9panicking18panic_bounds_check17h0000000000000000E>',
 		'    1010:\tjmpq   1234 <_ZN4core9panicking18panic_bounds_check17h0000000000000000E>',
@@ -212,13 +210,13 @@ Deno.test('count_bounds_sites takes callq/jmpq, and not a jump inside a panic fu
 	deepStrictEqual(count_bounds_sites(objdump).get('panic_bounds_check'), 2);
 });
 
-Deno.test('an empty board or shape parse is refused', () => {
+test('an empty board or shape parse is refused', () => {
 	throws(() => assert_parsed_rows([], 'the base board'), /the base board parsed to no rows/);
 	deepStrictEqual(assert_parsed_rows([1], 'x'), [1]);
 	throws(() => assert_parsed_rows(parse_shape_limits(''), 'the base shape-limit file'));
 });
 
-Deno.test('parse_rss_kib: empty stderr, non-numeric and zero are not an RSS', () => {
+test('parse_rss_kib: empty stderr, non-numeric and zero are not an RSS', () => {
 	deepStrictEqual(parse_rss_kib('24000\n'), 24000);
 	deepStrictEqual(parse_rss_kib('some warning\n24000\n'), 24000);
 	deepStrictEqual(parse_rss_kib(''), null);
@@ -226,7 +224,7 @@ Deno.test('parse_rss_kib: empty stderr, non-numeric and zero are not an RSS', ()
 	deepStrictEqual(parse_rss_kib('0\n'), null);
 });
 
-Deno.test('a libtest filter that matched nothing did not pass', () => {
+test('a libtest filter that matched nothing did not pass', () => {
 	deepStrictEqual(test_run_matched('test result: ok. 1 passed; 0 failed; 0 ignored'), true);
 	deepStrictEqual(
 		test_run_matched('running 0 tests\n\ntest result: ok. 0 passed; 0 failed'),
@@ -235,7 +233,7 @@ Deno.test('a libtest filter that matched nothing did not pass', () => {
 	deepStrictEqual(test_run_matched(''), false);
 });
 
-Deno.test('a wasm sweep over no files, or with a throw, is refused', () => {
+test('a wasm sweep over no files, or with a throw, is refused', () => {
 	const sweep = { files: 10, errors: 0, first_error: null };
 	assert_wasm_sweep(sweep, 'x');
 	throws(() => assert_wasm_sweep({ ...sweep, files: 0 }, 'x'), /0 files/);

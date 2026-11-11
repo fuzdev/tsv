@@ -11,6 +11,7 @@
  */
 
 import { deepStrictEqual, ok, strictEqual, throws } from 'node:assert';
+import { test } from 'vitest';
 
 import {
 	CONTRACT_STACK_MB,
@@ -59,7 +60,7 @@ function synthetic_pe(magic: 0x10b | 0x20b, reserve: number, commit = 4096): Uin
 	return bytes;
 }
 
-Deno.test('pe_stack_sizes reads both optional-header widths', () => {
+test('pe_stack_sizes reads both optional-header widths', () => {
 	deepStrictEqual(pe_stack_sizes(synthetic_pe(0x20b, 8 * MIB, 8192)), {
 		reserve: 8 * MIB,
 		commit: 8192
@@ -69,14 +70,14 @@ Deno.test('pe_stack_sizes reads both optional-header widths', () => {
 	strictEqual(pe_stack_sizes(synthetic_pe(0x20b, 2 ** 33))?.reserve, 2 ** 33);
 });
 
-Deno.test('pe_stack_sizes reads through a subarray at an offset', () => {
+test('pe_stack_sizes reads through a subarray at an offset', () => {
 	const image = synthetic_pe(0x20b, 3 * MIB);
 	const padded = new Uint8Array(image.length + 16);
 	padded.set(image, 16);
 	strictEqual(pe_stack_sizes(padded.subarray(16))?.reserve, 3 * MIB);
 });
 
-Deno.test('pe_stack_sizes refuses what is not a PE image', () => {
+test('pe_stack_sizes refuses what is not a PE image', () => {
 	strictEqual(pe_stack_sizes(new Uint8Array(0)), null);
 	strictEqual(pe_stack_sizes(new Uint8Array(0x40)), null); // no `MZ`
 	const no_signature = synthetic_pe(0x20b, 1);
@@ -90,27 +91,24 @@ Deno.test('pe_stack_sizes refuses what is not a PE image', () => {
 	strictEqual(pe_stack_sizes(synthetic_pe(0x10b, 1).subarray(0, OPTIONAL + 79)), null);
 });
 
-Deno.test(
-	'pe_stack_sizes refuses a COFF header whose optional header ends before the fields',
-	() => {
-		for (const [magic, fields_end] of [
-			[0x20b, 88],
-			[0x10b, 80]
-		] as const) {
-			const image = synthetic_pe(magic, MIB);
-			const view = new DataView(image.buffer);
-			view.setUint16(PE_OFFSET + 4 + 16, fields_end - 1, true);
-			strictEqual(pe_stack_sizes(image), null);
-			strictEqual(pe_set_stack_reserve(image, MIB).ok, false);
-			view.setUint16(PE_OFFSET + 4 + 16, fields_end, true);
-			strictEqual(pe_stack_sizes(image)?.reserve, MIB);
-		}
+test('pe_stack_sizes refuses a COFF header whose optional header ends before the fields', () => {
+	for (const [magic, fields_end] of [
+		[0x20b, 88],
+		[0x10b, 80]
+	] as const) {
+		const image = synthetic_pe(magic, MIB);
+		const view = new DataView(image.buffer);
+		view.setUint16(PE_OFFSET + 4 + 16, fields_end - 1, true);
+		strictEqual(pe_stack_sizes(image), null);
+		strictEqual(pe_set_stack_reserve(image, MIB).ok, false);
+		view.setUint16(PE_OFFSET + 4 + 16, fields_end, true);
+		strictEqual(pe_stack_sizes(image)?.reserve, MIB);
 	}
-);
+});
 
 for (const magic of [0x20b, 0x10b] as const) {
 	const width = magic === 0x20b ? 'PE32+' : 'PE32';
-	Deno.test(`pe_set_stack_reserve round-trips through the reader (${width})`, () => {
+	test(`pe_set_stack_reserve round-trips through the reader (${width})`, () => {
 		for (const reserve of [CONTROL_STACK_RESERVE, GATE_STACK_RESERVE]) {
 			const image = synthetic_pe(magic, MIB);
 			const before = image.slice();
@@ -126,13 +124,13 @@ for (const magic of [0x20b, 0x10b] as const) {
 	});
 }
 
-Deno.test('pe_set_stack_reserve clears the upper half of a PE32+ field', () => {
+test('pe_set_stack_reserve clears the upper half of a PE32+ field', () => {
 	const image = synthetic_pe(0x20b, 2 ** 40);
 	ok(pe_set_stack_reserve(image, CONTROL_STACK_RESERVE).ok);
 	strictEqual(pe_stack_sizes(image)?.reserve, CONTROL_STACK_RESERVE);
 });
 
-Deno.test('pe_set_stack_reserve refuses what it cannot write', () => {
+test('pe_set_stack_reserve refuses what it cannot write', () => {
 	const not_pe = new Uint8Array(0x200);
 	strictEqual(pe_set_stack_reserve(not_pe, CONTROL_STACK_RESERVE).ok, false);
 	ok(
@@ -144,7 +142,7 @@ Deno.test('pe_set_stack_reserve refuses what it cannot write', () => {
 	throws(() => pe_set_stack_reserve(synthetic_pe(0x20b, 1), 1.5), RangeError);
 });
 
-Deno.test('pe_set_stack_reserve refuses a reserve below the image commit', () => {
+test('pe_set_stack_reserve refuses a reserve below the image commit', () => {
 	for (const magic of [0x20b, 0x10b] as const) {
 		const image = synthetic_pe(magic, 8 * MIB, CONTROL_STACK_RESERVE + 4096);
 		const before = image.slice();
@@ -157,7 +155,7 @@ Deno.test('pe_set_stack_reserve refuses a reserve below the image commit', () =>
 	}
 });
 
-Deno.test("each copy's reserve sits just above its pass's request", () => {
+test("each copy's reserve sits just above its pass's request", () => {
 	strictEqual(CONTROL_STACK_RESERVE, 576 * 1024);
 	strictEqual(GATE_STACK_RESERVE, 1_900_544);
 	for (const [stack_mb, reserve] of [
@@ -174,7 +172,7 @@ Deno.test("each copy's reserve sits just above its pass's request", () => {
 	ok(GATE_STACK_RESERVE < CONTRACT_STACK_MB * MIB);
 });
 
-Deno.test('windows_thread_bytes rounds a commit at or above the reserve up to a MiB', () => {
+test('windows_thread_bytes rounds a commit at or above the reserve up to a MiB', () => {
 	const gate = stack_request_bytes(GATE_STACK_MB);
 	// the gate under the control copy, or under one reserve for both passes
 	strictEqual(windows_thread_bytes(gate, CONTROL_STACK_RESERVE), 2 * MIB);
@@ -184,7 +182,7 @@ Deno.test('windows_thread_bytes rounds a commit at or above the reserve up to a 
 	strictEqual(windows_thread_bytes(gate, 8 * MIB), 8 * MIB);
 });
 
-Deno.test('spawn_did_not_start reads only a start failure as one', () => {
+test('spawn_did_not_start reads only a start failure as one', () => {
 	const error = (code?: string): Error & { code?: string } =>
 		Object.assign(new Error('spawn'), { code });
 	for (const code of ['ENOENT', 'EACCES', 'EPERM']) ok(spawn_did_not_start(error(code)), code);
@@ -193,7 +191,7 @@ Deno.test('spawn_did_not_start reads only a start failure as one', () => {
 	}
 });
 
-Deno.test('spawn_timed_out reads only a timeout as one', () => {
+test('spawn_timed_out reads only a timeout as one', () => {
 	const error = (code?: string): Error & { code?: string } =>
 		Object.assign(new Error('spawn'), { code });
 	ok(spawn_timed_out(error('ETIMEDOUT')));
@@ -203,7 +201,7 @@ Deno.test('spawn_timed_out reads only a timeout as one', () => {
 	ok(!spawn_timed_out(undefined));
 });
 
-Deno.test('the run outlasts both of its passes, so a hung pass is named by its own bound', () => {
+test('the run outlasts both of its passes, so a hung pass is named by its own bound', () => {
 	ok(RUN_TIMEOUT_MS > 2 * PASS_TIMEOUT_MS);
 	strictEqual(timeout_minutes(PASS_TIMEOUT_MS), '30 min');
 });

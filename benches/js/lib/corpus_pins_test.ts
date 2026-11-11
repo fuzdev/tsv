@@ -1,10 +1,11 @@
 /**
  * Tests for the per-source corpus pins (`corpus_pins.ts`): the row derivation, the
  * file grammar's round trip and its refusals, and the diff a grade reports.
- * Dependency-free, so it gates in `deno task test:deno`.
+ * Dependency-free, so it gates in `deno task test:node`.
  */
 
 import { deepStrictEqual, ok, rejects, strictEqual, throws } from 'node:assert';
+import { test } from 'vitest';
 
 import { CORPORA_COLLECTIONS } from './corpora.ts';
 import {
@@ -21,7 +22,7 @@ import type { Language } from './types.ts';
 
 const BUCKETS = ['match', 'unknown'] as const;
 
-Deno.test('corpus_pin_row names a collection whatever its subpath, else the entry path', () => {
+test('corpus_pin_row names a collection whatever its subpath, else the entry path', () => {
 	strictEqual(corpus_pin_row(`${CORPORA_COLLECTIONS}/kit/packages/kit/src`), 'kit');
 	strictEqual(
 		corpus_pin_row(`${CORPORA_COLLECTIONS}/language-tools/packages/svelte2tsx`),
@@ -34,12 +35,12 @@ Deno.test('corpus_pin_row names a collection whatever its subpath, else the entr
 	strictEqual(corpus_pin_row('benches/js/.cache/svelte_styles'), 'benches/js/.cache/svelte_styles');
 });
 
-Deno.test('corpus_pin_row refuses a row the file grammar cannot hold', () => {
+test('corpus_pin_row refuses a row the file grammar cannot hold', () => {
 	throws(() => corpus_pin_row(`${CORPORA_COLLECTIONS}/`), /no pin row/);
 	throws(() => corpus_pin_row('../some dir/x'), /no pin row/);
 });
 
-Deno.test('a tally round-trips through the file grammar, rows sorted, zero rows kept', () => {
+test('a tally round-trips through the file grammar, rows sorted, zero rows kept', () => {
 	const tally = new CorpusPinTally(BUCKETS);
 	tally.add(`${CORPORA_COLLECTIONS}/zzz/src`, 'typescript', 'match');
 	tally.add(`${CORPORA_COLLECTIONS}/zzz/src`, 'svelte', 'unknown');
@@ -66,7 +67,7 @@ Deno.test('a tally round-trips through the file grammar, rows sorted, zero rows 
 	});
 });
 
-Deno.test('parse_pins refuses a malformed line, naming it', () => {
+test('parse_pins refuses a malformed line, naming it', () => {
 	const cases: [string, string][] = [
 		['kit typescript match=1', 'line 1: expected'],
 		['kit rust match=1 unknown=0', 'unknown language'],
@@ -80,7 +81,7 @@ Deno.test('parse_pins refuses a malformed line, naming it', () => {
 	}
 });
 
-Deno.test('diff_pins names every moved bucket and one-sided row', () => {
+test('diff_pins names every moved bucket and one-sided row', () => {
 	const read = (text: string) => {
 		const r = parse_pins(text, BUCKETS);
 		if (!r.ok) throw new Error(r.error);
@@ -100,7 +101,7 @@ Deno.test('diff_pins names every moved bucket and one-sided row', () => {
 	deepStrictEqual(diff_pins(pinned, pinned, BUCKETS), []);
 });
 
-Deno.test('a tally that disagrees with the run stats fails before the pins are read', async () => {
+test('a tally that disagrees with the run stats fails before the pins are read', async () => {
 	const tally = new CorpusPinTally(BUCKETS);
 	tally.add(`${CORPORA_COLLECTIONS}/zzz/src`, 'css', 'match');
 	const stats = (language: Language) => ({ match: language === 'css' ? 2 : 0, unknown: 0 });
@@ -118,21 +119,18 @@ Deno.test('a tally that disagrees with the run stats fails before the pins are r
 	ok(failures[0]!.includes('disagrees'));
 });
 
-Deno.test(
-	'an update with a blocker refuses without writing; a grade of a missing file fails',
-	async () => {
-		const tally = new CorpusPinTally(BUCKETS);
-		tally.add(`${CORPORA_COLLECTIONS}/zzz/src`, 'css', 'match');
-		const stats = (language: Language) => ({ match: language === 'css' ? 1 : 0, unknown: 0 });
-		const file = 'benches/js/lib/no_such_pins.txt';
-		const options = { file, gate: 'test', tally, stats };
-		deepStrictEqual(
-			await grade_corpus_pins({ ...options, update: true, update_blockers: ['a red verdict'] }),
-			['refusing --update: a red verdict']
-		);
-		deepStrictEqual(await grade_corpus_pins({ ...options, update: false }), [
-			`${file} is missing — run \`deno task test --all --update\``
-		]);
-		await rejects(grade_corpus_pins({ ...options, file: 'benches/js/lib', update: false }));
-	}
-);
+test('an update with a blocker refuses without writing; a grade of a missing file fails', async () => {
+	const tally = new CorpusPinTally(BUCKETS);
+	tally.add(`${CORPORA_COLLECTIONS}/zzz/src`, 'css', 'match');
+	const stats = (language: Language) => ({ match: language === 'css' ? 1 : 0, unknown: 0 });
+	const file = 'benches/js/lib/no_such_pins.txt';
+	const options = { file, gate: 'test', tally, stats };
+	deepStrictEqual(
+		await grade_corpus_pins({ ...options, update: true, update_blockers: ['a red verdict'] }),
+		['refusing --update: a red verdict']
+	);
+	deepStrictEqual(await grade_corpus_pins({ ...options, update: false }), [
+		`${file} is missing — run \`deno task test --all --update\``
+	]);
+	await rejects(grade_corpus_pins({ ...options, file: 'benches/js/lib', update: false }));
+});

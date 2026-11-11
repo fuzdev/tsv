@@ -43,6 +43,8 @@
 		"compile:corpus:compare": "cargo run -p tsv_debug --quiet compile_corpus_compare --roots-file compile_corpus_compare.roots.local ../corpora/collections ../svelte/packages/svelte/tests/runtime-runes ../svelte/packages/svelte/tests/snapshot ../svelte/packages/svelte/tests/server-side-rendering ../svelte/packages/svelte/tests/css",
 		"docs:audit": "RUSTDOCFLAGS='-D rustdoc::broken_intra_doc_links -D rustdoc::invalid_html_tags -D rustdoc::bare_urls -D rustdoc::redundant_explicit_links -A rustdoc::private_intra_doc_links' cargo doc --workspace --no-deps --document-private-items --all-features --quiet",
 		"test:audits": "cargo test -p tsv_lang --features _internal_audits --quiet",
+		"test:node": "node node_modules/.bin/tsc -p tsconfig.vitest.json && node node_modules/.bin/vitest run",
+		"test:node:canonical": "node node_modules/.bin/tsc -p tsconfig.canonical.json && node node_modules/.bin/vitest run --config vitest.canonical.config.ts",
 		"test:depth": "cargo test --profile corpus -p tsv_tests --features tsv_debug/_internal_audits --test depth_limit --quiet",
 		"test:depth:napi": "TSV_DEPTH_SWEEP=full cargo test --profile napi -p tsv_tests --test depth_limit --quiet",
 		"test:depth:wasm": "node scripts/depth_wasm.ts",

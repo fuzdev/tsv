@@ -8,6 +8,7 @@
  */
 
 import { deepStrictEqual, strictEqual, throws } from 'node:assert';
+import { test } from 'vitest';
 
 import {
 	type PrettierFormatTestCall,
@@ -22,7 +23,7 @@ import {
 	prettier_parsers_run
 } from './prettier_fixtures.ts';
 
-Deno.test('jsx: a JSX node anywhere in an ESTree/Babel AST', () => {
+test('jsx: a JSX node anywhere in an ESTree/Babel AST', () => {
 	strictEqual(ast_has_jsx({ type: 'Program', body: [] }), false);
 	strictEqual(
 		ast_has_jsx({
@@ -52,7 +53,7 @@ Deno.test('jsx: a JSX node anywhere in an ESTree/Babel AST', () => {
 	strictEqual(ast_has_jsx(cyclic), false);
 });
 
-Deno.test('markers: range and cursor placeholders, anywhere in the source', () => {
+test('markers: range and cursor placeholders, anywhere in the source', () => {
 	strictEqual(prettier_fixture_has_markers('const a = 1;\n'), false);
 	strictEqual(
 		prettier_fixture_has_markers('<<<PRETTIER_RANGE_START>>>a<<<PRETTIER_RANGE_END>>>'),
@@ -61,7 +62,7 @@ Deno.test('markers: range and cursor placeholders, anywhere in the source', () =
 	strictEqual(prettier_fixture_has_markers('foo(<|>a);'), true);
 });
 
-Deno.test('front matter: getFrontMatter mirrored — an opening AND a closing fence', () => {
+test('front matter: getFrontMatter mirrored — an opening AND a closing fence', () => {
 	strictEqual(prettier_fixture_has_front_matter('---\ntitle: x\n---\na {}\n'), true);
 	strictEqual(prettier_fixture_has_front_matter('\uFEFF---\r\ntitle: x\r\n---\r\n'), true);
 	// CR alone ends a line too: Prettier folds CR / CRLF to LF before it looks
@@ -86,7 +87,7 @@ Deno.test('front matter: getFrontMatter mirrored — an opening AND a closing fe
 	strictEqual(prettier_fixture_content_skip('---\nx\n---\na {}\n'), true);
 });
 
-Deno.test('parsers run: get-parsers.js implicit verify parsers', () => {
+test('parsers run: get-parsers.js implicit verify parsers', () => {
 	deepStrictEqual(prettier_parsers_run('js', ['babel']), [
 		'babel',
 		'acorn',
@@ -111,14 +112,14 @@ Deno.test('parsers run: get-parsers.js implicit verify parsers', () => {
 	]);
 });
 
-Deno.test('error test: isErrorTest — a directory at or below one named _errors_', () => {
+test('error test: isErrorTest — a directory at or below one named _errors_', () => {
 	strictEqual(prettier_error_test_dir('/p/tests/format/js/_errors_/x'), true);
 	strictEqual(prettier_error_test_dir('/p/tests/format/js/_errors_'), true);
 	strictEqual(prettier_error_test_dir('/p/tests/format/js/errors'), false);
 	strictEqual(prettier_error_test_dir('/p/tests/format/js/_errors_x/y'), false);
 });
 
-Deno.test('expects throw: shouldThrowOnFormat', () => {
+test('expects throw: shouldThrowOnFormat', () => {
 	strictEqual(prettier_expects_throw('a.js', 'acorn', undefined), false);
 	strictEqual(prettier_expects_throw('a.js', 'acorn', true), true);
 	strictEqual(prettier_expects_throw('a.js', 'acorn', { acorn: true }), true);
@@ -127,7 +128,7 @@ Deno.test('expects throw: shouldThrowOnFormat', () => {
 	strictEqual(prettier_expects_throw('a.js', 'espree', { acorn: true }), false);
 });
 
-Deno.test('verdict: kept when any spec-grammar parser is expected to accept', () => {
+test('verdict: kept when any spec-grammar parser is expected to accept', () => {
 	// a babel-only proposal dir: every ES parser declared throwing
 	const proposal: PrettierFormatTestCall[] = [
 		{
@@ -187,7 +188,7 @@ Deno.test('verdict: kept when any spec-grammar parser is expected to accept', ()
 	strictEqual(prettier_fixture_expected_valid('x.js', 'js', error_dir_override, true), true);
 });
 
-Deno.test('evaluate: the spec shapes the suites use', () => {
+test('evaluate: the spec shapes the suites use', () => {
 	deepStrictEqual(
 		evaluate_prettier_spec('runFormatTest(import.meta, ["babel", "flow", "typescript"]);\n', '/s'),
 		[{ parsers: ['babel', 'flow', 'typescript'], errors: undefined }]
@@ -229,7 +230,7 @@ test("x", () => { expect(1).toBe(1); });
 	);
 });
 
-Deno.test('evaluate: an import/export spelled inside a snippet is text, not a statement', () => {
+test('evaluate: an import/export spelled inside a snippet is text, not a statement', () => {
 	const spec = `import { outdent } from "outdent";
 runFormatTest(
 	{ importMeta: import.meta, snippets: [outdent\`
@@ -242,7 +243,7 @@ runFormatTest(
 	deepStrictEqual(evaluate_prettier_spec(spec, '/s'), [{ parsers: ['babel'], errors: undefined }]);
 });
 
-Deno.test('evaluate: refuses what it cannot read, naming the spec', () => {
+test('evaluate: refuses what it cannot read, naming the spec', () => {
 	throws(
 		() => evaluate_prettier_spec('runFormatTest(import.meta, "babel");\n', '/spec/x'),
 		/non-string parser list: \/spec\/x/

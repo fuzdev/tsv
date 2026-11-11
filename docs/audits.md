@@ -1249,7 +1249,7 @@ per Rust target whose URL names exactly the asset the release workflow uploads f
 target's triple — the triples read from `.github/workflows/release.yml`'s build matrix, the
 asset spelled by `release_asset_name` (`scripts/napi_host.ts`, the function
 `scripts/release_assets.ts` names the assets with), the dynamically-linked musl triple
-deliberately unmapped (`scripts/release/binstall.ts`; unit-tested in `test:deno`). A crate
+deliberately unmapped (`scripts/release/binstall.ts`; unit-tested in `test:node`). A crate
 with no binary carries no such table.
 
 **Which crates.** The members with a `[package.metadata.docs.rs]` table
@@ -1515,12 +1515,12 @@ package's lib reference cannot satisfy another's declarations. A README block th
 compiles under Node (it imports a `node:` builtin or the Node-only `wasm_module`) carries
 `<!-- typecheck: node -->` on the line directly above its fence and grades under `nodenext`
 with `@types/node`; any other `typecheck:` marker, or one not directly above a graded fence,
-fails the run (the grammar is unit-tested in `test:deno`). Every `types` target the `exports`
+fails the run (the grammar is unit-tested in `test:node`). Every `types` target the `exports`
 map names must be loaded by some program, so a subpath no consumer module reaches fails rather
 than passes ungraded, and a staging missing a file its `files` declares fails naming the file.
 
 **Where it runs.** TypeScript and `@types/node` come from `benches/js/node_modules`; without
-them the task fails, pointing at `deno task bench:install`. CI installs no `node_modules`, so it
+them the task fails, pointing at `deno task bench:install`. CI installs no bench `node_modules`, so it
 is not in `deno task check`; `scripts/publish.ts` runs it in Step 6 over all four packages —
 the three wasm packages it builds, and the napi loader, which it stages for this (a file copy,
 no cargo build) although the loader itself publishes from the release workflow. Its preflight

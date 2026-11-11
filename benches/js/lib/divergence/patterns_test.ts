@@ -12,6 +12,7 @@ import {
 	deepStrictEqual as assertEquals,
 	notDeepStrictEqual as assertNotEquals
 } from 'node:assert';
+import { test } from 'vitest';
 import { diff_lines, extract_hunks } from '../diff.ts';
 import {
 	type DetectionContext,
@@ -71,7 +72,7 @@ function assert_ours_overruns(ctx: DetectionContext): void {
 
 // ─── svelte_element_this_string ──────────────────────────────────
 
-Deno.test('svelte_element_this_string: positive - brace-wrapped literal re-quoted', () => {
+test('svelte_element_this_string: positive - brace-wrapped literal re-quoted', () => {
 	const prettier = '<svelte:element this={"hello"}></svelte:element>';
 	const ours = "<svelte:element this={'hello'}></svelte:element>";
 	const match = run_pattern('svelte_element_this_string', make_context(ours, prettier));
@@ -79,13 +80,13 @@ Deno.test('svelte_element_this_string: positive - brace-wrapped literal re-quote
 	assertEquals(match!.pattern, 'svelte_element_this_string');
 });
 
-Deno.test('svelte_element_this_string: negative - different literal value', () => {
+test('svelte_element_this_string: negative - different literal value', () => {
 	const prettier = '<svelte:element this={"hello"}></svelte:element>';
 	const ours = "<svelte:element this={'hi'}></svelte:element>";
 	assertEquals(run_pattern('svelte_element_this_string', make_context(ours, prettier)), null);
 });
 
-Deno.test('svelte_element_this_string: negative - plain attribute form is not a quote swap', () => {
+test('svelte_element_this_string: negative - plain attribute form is not a quote swap', () => {
 	// prettier's collapse of a comment-prefixed literal to the plain attribute drops the
 	// comment — a structural rewrite this detector must not vouch for.
 	const prettier = '<svelte:element this="hello"></svelte:element>';
@@ -93,7 +94,7 @@ Deno.test('svelte_element_this_string: negative - plain attribute form is not a 
 	assertEquals(run_pattern('svelte_element_this_string', make_context(ours, prettier)), null);
 });
 
-Deno.test('svelte_element_this_string: negative - ordinary attribute single quotes', () => {
+test('svelte_element_this_string: negative - ordinary attribute single quotes', () => {
 	const prettier = '<div data-attr="a"></div>';
 	const ours = "<div data-attr='a\"b'></div>";
 	assertEquals(run_pattern('svelte_element_this_string', make_context(ours, prettier)), null);
@@ -101,7 +102,7 @@ Deno.test('svelte_element_this_string: negative - ordinary attribute single quot
 
 // ─── inline_content_block_style: the comment-first arm ───────────
 
-Deno.test('inline_content_block_style: positive - comment-first inline content', () => {
+test('inline_content_block_style: positive - comment-first inline content', () => {
 	// prettier welds the opening comment to the open tag and the closing comment to the
 	// close tag; tsv lays the content out block-style, comment delimiters on their own lines.
 	const prettier = '<span><!--\n--><span>a</span><!--\n--></span>';
@@ -111,7 +112,7 @@ Deno.test('inline_content_block_style: positive - comment-first inline content',
 	assertEquals(match!.pattern, 'inline_content_block_style');
 });
 
-Deno.test('inline_content_block_style: negative - comment on its own line in both outputs', () => {
+test('inline_content_block_style: negative - comment on its own line in both outputs', () => {
 	// Same delimiters, but prettier never welded them: a plain blank-line change is not the
 	// block-style relocation and stays unclaimed for its own detector.
 	const prettier = '<div>\n\t<!-- c -->\n\n\t<span>a</span>\n</div>';
@@ -121,7 +122,7 @@ Deno.test('inline_content_block_style: negative - comment on its own line in bot
 
 // ─── template_literal_width ─────────────────────────────────────────────────
 
-Deno.test('template_literal_width: positive - }` closing on own line', () => {
+test('template_literal_width: positive - }` closing on own line', () => {
 	// Prettier keeps ${expr} on one line (> 80 chars), we break to separate lines.
 	// The diff has a proper removed/added hunk with prettier's long line visible.
 	const padding = 'x'.repeat(70);
@@ -134,7 +135,7 @@ Deno.test('template_literal_width: positive - }` closing on own line', () => {
 	assertEquals(match!.pattern, 'template_literal_width');
 });
 
-Deno.test('template_literal_width: positive - ${ at end of line in ours', () => {
+test('template_literal_width: positive - ${ at end of line in ours', () => {
 	// We break after ${ (end of line), prettier keeps ${expr} inline.
 	// Prettier line must be > 80 chars to confirm width-motivated break.
 	const prettier =
@@ -149,7 +150,7 @@ Deno.test('template_literal_width: positive - ${ at end of line in ours', () => 
 	assertEquals(match!.pattern, 'template_literal_width');
 });
 
-Deno.test('template_literal_width: negative - inline ${ on both sides', () => {
+test('template_literal_width: negative - inline ${ on both sides', () => {
 	// Both sides have ${expr} inline (not at end of line) — not a template break divergence
 	const prettier = '\t\tconsole.log(`hello ${name}`);\n\t\tconsole.log(`bye ${name}`);';
 	const ours = '\t\tconsole.log(`hello ${name}`);\n\t\tconsole.log(`goodbye ${name}`);';
@@ -159,7 +160,7 @@ Deno.test('template_literal_width: negative - inline ${ on both sides', () => {
 	assertEquals(match, null);
 });
 
-Deno.test('template_literal_width: negative - no ${ in source', () => {
+test('template_literal_width: negative - no ${ in source', () => {
 	const prettier = 'const x = someVeryLongVariableName.property.method();';
 	const ours = 'const x =\n\tsomeVeryLongVariableName.property.method();';
 	const ctx = make_context(ours, prettier, 'typescript');
@@ -167,7 +168,7 @@ Deno.test('template_literal_width: negative - no ${ in source', () => {
 	assertEquals(match, null);
 });
 
-Deno.test('template_literal_width: negative - both sides have ${ breaks', () => {
+test('template_literal_width: negative - both sides have ${ breaks', () => {
 	const prettier = 'const x = `hello ${\n\tname\n} world`;';
 	const ours = 'const x = `hello ${\n\tname\n} world`;';
 	const ctx = make_context(ours, prettier, 'typescript');
@@ -175,26 +176,23 @@ Deno.test('template_literal_width: negative - both sides have ${ breaks', () => 
 	assertEquals(ctx.hunks.length, 0);
 });
 
-Deno.test(
-	'template_literal_width: positive - atomization divergence (both sides break, different interpolation)',
-	() => {
-		// Both sides break at ${} boundaries, but at different interpolations.
-		// Prettier atomizes simple expressions (keeps ${indent} inline) and breaks elsewhere.
-		// We break the simple expression instead. Key signal: isolated simple expression in
-		// our added lines that appears inline as ${expr} in prettier's removed lines.
-		const prettier =
-			'\t\t\treturn `<span style="--indent: ${indent}ch">${\n\t\t\t\tline ?? \'\'\n\t\t\t}</span>`;';
-		const ours =
-			'\t\t\treturn `<span style="--indent: ${\n\t\t\t\tindent\n\t\t\t}ch">${line ?? \'\'}</span>`;';
-		const ctx = make_context(ours, prettier, 'typescript');
-		ctx.source = 'return `<span style="--indent: ${indent}ch">${line ?? \'\'}</span>`;';
-		const match = run_pattern('template_literal_width', ctx);
-		assertNotEquals(match, null);
-		assertEquals(match!.pattern, 'template_literal_width');
-	}
-);
+test('template_literal_width: positive - atomization divergence (both sides break, different interpolation)', () => {
+	// Both sides break at ${} boundaries, but at different interpolations.
+	// Prettier atomizes simple expressions (keeps ${indent} inline) and breaks elsewhere.
+	// We break the simple expression instead. Key signal: isolated simple expression in
+	// our added lines that appears inline as ${expr} in prettier's removed lines.
+	const prettier =
+		'\t\t\treturn `<span style="--indent: ${indent}ch">${\n\t\t\t\tline ?? \'\'\n\t\t\t}</span>`;';
+	const ours =
+		'\t\t\treturn `<span style="--indent: ${\n\t\t\t\tindent\n\t\t\t}ch">${line ?? \'\'}</span>`;';
+	const ctx = make_context(ours, prettier, 'typescript');
+	ctx.source = 'return `<span style="--indent: ${indent}ch">${line ?? \'\'}</span>`;';
+	const match = run_pattern('template_literal_width', ctx);
+	assertNotEquals(match, null);
+	assertEquals(match!.pattern, 'template_literal_width');
+});
 
-Deno.test('template_literal_width: positive - atomization divergence (more breaks in ours)', () => {
+test('template_literal_width: positive - atomization divergence (more breaks in ours)', () => {
 	// Prettier keeps ${spec.method} inline (atomized), we break it.
 	// Both sides end with ${ but ours has an additional break.
 	const prettier = '\t\t\treturn `${spec.method}: (${';
@@ -206,45 +204,39 @@ Deno.test('template_literal_width: positive - atomization divergence (more break
 	assertEquals(match!.pattern, 'template_literal_width');
 });
 
-Deno.test(
-	'template_literal_width: positive - atomization divergence (prettier breaks simple expr, ours keeps inline)',
-	() => {
-		// Reverse of the typical atomization case: prettier breaks the simple expression
-		// (response.status) while ours keeps it inline and breaks a different expression.
-		// From load_data.js: `...value: "${response.status}" type: ${typeof response.status}`
-		const prettier =
-			'\t\t\t\t\t\t\t`response.status is not a number. value: "${\n\t\t\t\t\t\t\t\tresponse.status\n\t\t\t\t\t\t\t}" type: ${typeof response.status}`,';
-		const ours =
-			'\t\t\t\t\t\t\t`response.status is not a number. value: "${response.status}" type: ${\n\t\t\t\t\t\t\t\ttypeof response.status\n\t\t\t\t\t\t\t}`,';
-		const ctx = make_context(ours, prettier, 'typescript');
-		ctx.source =
-			'`response.status is not a number. value: "${response.status}" type: ${typeof response.status}`,';
-		const match = run_pattern('template_literal_width', ctx);
-		assertNotEquals(match, null);
-		assertEquals(match!.pattern, 'template_literal_width');
-	}
-);
+test('template_literal_width: positive - atomization divergence (prettier breaks simple expr, ours keeps inline)', () => {
+	// Reverse of the typical atomization case: prettier breaks the simple expression
+	// (response.status) while ours keeps it inline and breaks a different expression.
+	// From load_data.js: `...value: "${response.status}" type: ${typeof response.status}`
+	const prettier =
+		'\t\t\t\t\t\t\t`response.status is not a number. value: "${\n\t\t\t\t\t\t\t\tresponse.status\n\t\t\t\t\t\t\t}" type: ${typeof response.status}`,';
+	const ours =
+		'\t\t\t\t\t\t\t`response.status is not a number. value: "${response.status}" type: ${\n\t\t\t\t\t\t\t\ttypeof response.status\n\t\t\t\t\t\t\t}`,';
+	const ctx = make_context(ours, prettier, 'typescript');
+	ctx.source =
+		'`response.status is not a number. value: "${response.status}" type: ${typeof response.status}`,';
+	const match = run_pattern('template_literal_width', ctx);
+	assertNotEquals(match, null);
+	assertEquals(match!.pattern, 'template_literal_width');
+});
 
-Deno.test(
-	'template_literal_width: positive - nested template/array in interpolation breaks',
-	() => {
-		// Prettier keeps the nested `${[`…`]}` construct inline past print width; ours
-		// breaks the inner array bracket. The end-of-line `${` / `}`` markers never
-		// appear — Case 3 (nested-template shape + re-wrap guard) claims it.
-		const e = 'e'.repeat(64);
-		const prettier = `\t\t\t\t\t\t\t\t\t\t\t\t\te: '\${[\`\${${e}}\`]}',`;
-		const ours = `\t\t\t\t\t\t\t\t\t\t\t\t\te: '\${[\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t\`\${${e}}\`,\n\t\t\t\t\t\t\t\t\t\t\t\t\t]}',`;
-		const ctx = make_context(ours, prettier, 'typescript');
-		ctx.source = `e: '\${[\`\${${e}}\`]}',`;
-		const vw = visual_width(prettier);
-		assertEquals(vw > 100, true, `Expected prettier line > 100, got ${vw}`);
-		const match = run_pattern('template_literal_width', ctx);
-		assertNotEquals(match, null);
-		assertEquals(match!.pattern, 'template_literal_width');
-	}
-);
+test('template_literal_width: positive - nested template/array in interpolation breaks', () => {
+	// Prettier keeps the nested `${[`…`]}` construct inline past print width; ours
+	// breaks the inner array bracket. The end-of-line `${` / `}`` markers never
+	// appear — Case 3 (nested-template shape + re-wrap guard) claims it.
+	const e = 'e'.repeat(64);
+	const prettier = `\t\t\t\t\t\t\t\t\t\t\t\t\te: '\${[\`\${${e}}\`]}',`;
+	const ours = `\t\t\t\t\t\t\t\t\t\t\t\t\te: '\${[\n\t\t\t\t\t\t\t\t\t\t\t\t\t\t\`\${${e}}\`,\n\t\t\t\t\t\t\t\t\t\t\t\t\t]}',`;
+	const ctx = make_context(ours, prettier, 'typescript');
+	ctx.source = `e: '\${[\`\${${e}}\`]}',`;
+	const vw = visual_width(prettier);
+	assertEquals(vw > 100, true, `Expected prettier line > 100, got ${vw}`);
+	const match = run_pattern('template_literal_width', ctx);
+	assertNotEquals(match, null);
+	assertEquals(match!.pattern, 'template_literal_width');
+});
 
-Deno.test('template_literal_width: negative - nested template line, ours did NOT re-wrap', () => {
+test('template_literal_width: negative - nested template line, ours did NOT re-wrap', () => {
 	// A wide nested-template interpolation line, but ours emitted the same long
 	// line (a different in-place edit — no legitimate break). The re-wrap guard in
 	// Case 3 (more added than removed lines) must reject — claiming would mask a
@@ -258,7 +250,7 @@ Deno.test('template_literal_width: negative - nested template line, ours did NOT
 	assertEquals(match, null);
 });
 
-Deno.test('template_literal_width: negative - both sides break same complex expr', () => {
+test('template_literal_width: negative - both sides break same complex expr', () => {
 	// Both sides break at ${} but with complex expressions (not atomizable)
 	// — not a template atomization divergence
 	const prettier = '\t\tconst x = `${\n\t\t\tfoo() + bar()\n\t\t}`;';
@@ -271,7 +263,7 @@ Deno.test('template_literal_width: negative - both sides break same complex expr
 
 // ─── block_expression_logical ───────────────────────────────────────────────
 
-Deno.test('block_expression_logical: positive - && at start of line in ours', () => {
+test('block_expression_logical: positive - && at start of line in ours', () => {
 	const prettier = '{#if someCondition && anotherCondition && thirdCondition}content{/if}';
 	const ours = '{#if someCondition\n\t&& anotherCondition\n\t&& thirdCondition}content{/if}';
 	const ctx = make_context(ours, prettier, 'svelte');
@@ -280,7 +272,7 @@ Deno.test('block_expression_logical: positive - && at start of line in ours', ()
 	assertEquals(match!.pattern, 'block_expression_logical');
 });
 
-Deno.test('block_expression_logical: negative - not svelte', () => {
+test('block_expression_logical: negative - not svelte', () => {
 	const prettier = 'if (someCondition && anotherCondition) {}';
 	const ours = 'if (someCondition\n\t&& anotherCondition) {}';
 	const ctx = make_context(ours, prettier, 'typescript');
@@ -288,7 +280,7 @@ Deno.test('block_expression_logical: negative - not svelte', () => {
 	assertEquals(match, null);
 });
 
-Deno.test('block_expression_logical: negative - both sides have operator breaks', () => {
+test('block_expression_logical: negative - both sides have operator breaks', () => {
 	const prettier = '{#if a\n\t&& b}content{/if}';
 	const ours = '{#if a\n\t&& b}content{/if}';
 	const ctx = make_context(ours, prettier, 'svelte');
@@ -297,7 +289,7 @@ Deno.test('block_expression_logical: negative - both sides have operator breaks'
 
 // ─── fill_101_boundary ──────────────────────────────────────────────────────
 
-Deno.test('fill_101_boundary: positive - prettier > 100 chars, we break', () => {
+test('fill_101_boundary: positive - prettier > 100 chars, we break', () => {
 	// Simulate a 105-char prettier line that we break
 	const longLine = '\t' + 'x'.repeat(103); // visual width = 2 + 103 = 105
 	const prettier = `before\n${longLine}\nafter`;
@@ -308,7 +300,7 @@ Deno.test('fill_101_boundary: positive - prettier > 100 chars, we break', () => 
 	assertEquals(match!.pattern, 'fill_101_boundary');
 });
 
-Deno.test('fill_101_boundary: negative - prettier lines under 100 chars', () => {
+test('fill_101_boundary: negative - prettier lines under 100 chars', () => {
 	const prettier = 'before\n\t' + 'x'.repeat(90) + '\nafter';
 	const ours = 'before\n\t' + 'x'.repeat(45) + '\n\t' + 'x'.repeat(45) + '\nafter';
 	const ctx = make_context(ours, prettier, 'svelte');
@@ -316,22 +308,19 @@ Deno.test('fill_101_boundary: negative - prettier lines under 100 chars', () => 
 	assertEquals(match, null);
 });
 
-Deno.test(
-	'fill_101_boundary: positive - same line count, different wrapping at print width',
-	() => {
-		// Prettier has 105-char line, we rewrap to 3 lines all ≤ 100 chars (same total line count)
-		const prettierLine = '\t' + 'x'.repeat(50) + ' ' + 'y'.repeat(52); // visual width = 2 + 50 + 1 + 52 = 105
-		const prettier = `before\n${prettierLine}\nyy\nafter`;
-		// Same 3 content lines, but we break differently (all ≤ 100)
-		const ours = `before\n\t${'x'.repeat(50)}\n\t${'y'.repeat(52)} yy\nafter`;
-		const ctx = make_context(ours, prettier, 'svelte');
-		const match = run_pattern('fill_101_boundary', ctx);
-		assertNotEquals(match, null);
-		assertEquals(match!.pattern, 'fill_101_boundary');
-	}
-);
+test('fill_101_boundary: positive - same line count, different wrapping at print width', () => {
+	// Prettier has 105-char line, we rewrap to 3 lines all ≤ 100 chars (same total line count)
+	const prettierLine = '\t' + 'x'.repeat(50) + ' ' + 'y'.repeat(52); // visual width = 2 + 50 + 1 + 52 = 105
+	const prettier = `before\n${prettierLine}\nyy\nafter`;
+	// Same 3 content lines, but we break differently (all ≤ 100)
+	const ours = `before\n\t${'x'.repeat(50)}\n\t${'y'.repeat(52)} yy\nafter`;
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('fill_101_boundary', ctx);
+	assertNotEquals(match, null);
+	assertEquals(match!.pattern, 'fill_101_boundary');
+});
 
-Deno.test('fill_101_boundary: negative - our lines also exceed 100 chars', () => {
+test('fill_101_boundary: negative - our lines also exceed 100 chars', () => {
 	// Both sides have lines > 100 chars — not a print-width boundary divergence
 	const longLine = '\t' + 'x'.repeat(103); // visual width = 105
 	const prettier = `before\n${longLine}\nafter`;
@@ -341,7 +330,7 @@ Deno.test('fill_101_boundary: negative - our lines also exceed 100 chars', () =>
 	assertEquals(match, null);
 });
 
-Deno.test('fill_101_boundary: negative - we have fewer lines (not a break)', () => {
+test('fill_101_boundary: negative - we have fewer lines (not a break)', () => {
 	const longLine = '\t' + 'x'.repeat(103);
 	const prettier = `before\n${longLine}\n${'x'.repeat(50)}\nafter`;
 	// We have FEWER lines, not more - not a break scenario
@@ -353,7 +342,7 @@ Deno.test('fill_101_boundary: negative - we have fewer lines (not a break)', () 
 
 // ─── spec_block_elements ────────────────────────────────────────────────────
 
-Deno.test('spec_block_elements: positive - prettier hugs menu content, we expand', () => {
+test('spec_block_elements: positive - prettier hugs menu content, we expand', () => {
 	const prettier = '<menu\n\tdata-attr1="value1"\n\tdata-attr2="value2">{@render fn()}</menu\n>';
 	const ours = '<menu\n\tdata-attr1="value1"\n\tdata-attr2="value2"\n>\n\t{@render fn()}\n</menu>';
 	const ctx = make_context(ours, prettier, 'svelte');
@@ -363,22 +352,19 @@ Deno.test('spec_block_elements: positive - prettier hugs menu content, we expand
 	assertEquals(match!.confidence, 'certain');
 });
 
-Deno.test(
-	'spec_block_elements: positive - glued sibling after </summary> detaches to its own line',
-	() => {
-		// prettier (summary inline in its blockElements-derived model) keeps the glued
-		// {@html} on the summary line; tsv (summary block, per the HTML spec's UA rules)
-		// gives the following sibling its own line.
-		const prettier = '<details>\n\t<summary>{title}</summary>{@html content}\n</details>';
-		const ours = '<details>\n\t<summary>{title}</summary>\n\t{@html content}\n</details>';
-		const ctx = make_context(ours, prettier, 'svelte');
-		const match = run_pattern('spec_block_elements', ctx);
-		assertNotEquals(match, null);
-		assertEquals(match!.pattern, 'spec_block_elements');
-	}
-);
+test('spec_block_elements: positive - glued sibling after </summary> detaches to its own line', () => {
+	// prettier (summary inline in its blockElements-derived model) keeps the glued
+	// {@html} on the summary line; tsv (summary block, per the HTML spec's UA rules)
+	// gives the following sibling its own line.
+	const prettier = '<details>\n\t<summary>{title}</summary>{@html content}\n</details>';
+	const ours = '<details>\n\t<summary>{title}</summary>\n\t{@html content}\n</details>';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('spec_block_elements', ctx);
+	assertNotEquals(match, null);
+	assertEquals(match!.pattern, 'spec_block_elements');
+});
 
-Deno.test('spec_block_elements: negative - not svelte', () => {
+test('spec_block_elements: negative - not svelte', () => {
 	const prettier = '<menu\n\tclass="nav">{@render fn()}</menu\n>';
 	const ours = '<menu\n\tclass="nav"\n>\n\t{@render fn()}\n</menu>';
 	const ctx = make_context(ours, prettier, 'typescript');
@@ -386,7 +372,7 @@ Deno.test('spec_block_elements: negative - not svelte', () => {
 	assertEquals(match, null);
 });
 
-Deno.test('spec_block_elements: negative - not a menu/summary element', () => {
+test('spec_block_elements: negative - not a menu/summary element', () => {
 	const prettier = '<div\n\tclass="nav">content</div>';
 	const ours = '<div\n\tclass="nav"\n>\n\tcontent\n</div>';
 	const ctx = make_context(ours, prettier, 'svelte');
@@ -396,7 +382,7 @@ Deno.test('spec_block_elements: negative - not a menu/summary element', () => {
 
 // ─── inline_content_hug ─────────────────────────────────────────────────────
 
-Deno.test('inline_content_hug: positive - we hug >{, prettier breaks >', () => {
+test('inline_content_hug: positive - we hug >{, prettier breaks >', () => {
 	const prettier = '<span\n\tclass="long"\n>\n\t{content}\n</span>';
 	const ours = '<span\n\tclass="long"\n>{content}\n</span>';
 	const ctx = make_context(ours, prettier, 'svelte');
@@ -404,7 +390,7 @@ Deno.test('inline_content_hug: positive - we hug >{, prettier breaks >', () => {
 	assertNotEquals(match, null);
 });
 
-Deno.test('inline_content_hug: positive - prettier >content on same line, we break ternary', () => {
+test('inline_content_hug: positive - prettier >content on same line, we break ternary', () => {
 	const prettier =
 		"<small\n\t>no action history{show ? '' : ', showing only write actions'}</small";
 	const ours = "<small>no action history{show\n\t? ''\n\t: ', showing only write actions'}</small";
@@ -413,7 +399,7 @@ Deno.test('inline_content_hug: positive - prettier >content on same line, we bre
 	assertNotEquals(match, null);
 });
 
-Deno.test('inline_content_hug: negative - not svelte', () => {
+test('inline_content_hug: negative - not svelte', () => {
 	const prettier = '<span\n\tclass="long"\n>\n\t{content}\n</span>';
 	const ours = '<span\n\tclass="long"\n>{content}\n</span>';
 	const ctx = make_context(ours, prettier, 'typescript');
@@ -423,27 +409,24 @@ Deno.test('inline_content_hug: negative - not svelte', () => {
 
 // ─── inline_sibling_newline_flow ────────────────────────────────────────────
 
-Deno.test(
-	'inline_sibling_newline_flow: positive - inline element flowed onto the text line',
-	() => {
-		// prettier keeps the authored newline before <strong>; ours respells it as the
-		// space it already renders as. Content identical, ours one line shorter.
-		const prettier = '<div>\n\tLorem ipsum,\n\t<strong>dolor</strong>.\n</div>';
-		const ours = '<div>\n\tLorem ipsum, <strong>dolor</strong>.\n</div>';
-		const ctx = make_context(ours, prettier, 'svelte');
-		const match = run_pattern('inline_sibling_newline_flow', ctx);
-		assertNotEquals(match, null);
-	}
-);
+test('inline_sibling_newline_flow: positive - inline element flowed onto the text line', () => {
+	// prettier keeps the authored newline before <strong>; ours respells it as the
+	// space it already renders as. Content identical, ours one line shorter.
+	const prettier = '<div>\n\tLorem ipsum,\n\t<strong>dolor</strong>.\n</div>';
+	const ours = '<div>\n\tLorem ipsum, <strong>dolor</strong>.\n</div>';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('inline_sibling_newline_flow', ctx);
+	assertNotEquals(match, null);
+});
 
-Deno.test('inline_sibling_newline_flow: negative - not svelte', () => {
+test('inline_sibling_newline_flow: negative - not svelte', () => {
 	const prettier = '<div>\n\tLorem ipsum,\n\t<strong>dolor</strong>.\n</div>';
 	const ours = '<div>\n\tLorem ipsum, <strong>dolor</strong>.\n</div>';
 	const ctx = make_context(ours, prettier, 'typescript');
 	assertEquals(run_pattern('inline_sibling_newline_flow', ctx), null);
 });
 
-Deno.test('inline_sibling_newline_flow: negative - an EATEN blank line is not a flow', () => {
+test('inline_sibling_newline_flow: negative - an EATEN blank line is not a flow', () => {
 	// A blank line is an authored separator the rule never crosses. Welding would
 	// treat `A⏎⏎B` and `A B` as equal, so without the blank-line guard this real
 	// authoring-intent change would be absorbed as a layout claim.
@@ -453,7 +436,7 @@ Deno.test('inline_sibling_newline_flow: negative - an EATEN blank line is not a 
 	assertEquals(run_pattern('inline_sibling_newline_flow', ctx), null);
 });
 
-Deno.test('inline_sibling_newline_flow: negative - GLUE direction (separator eaten)', () => {
+test('inline_sibling_newline_flow: negative - GLUE direction (separator eaten)', () => {
 	// ours dropped the inter-sibling space entirely rather than respelling it:
 	// welds to `<span>a</span> <span>b</span>` vs `<span>a</span><span>b</span>`.
 	const prettier = '<div>\n\t<span>a</span>\n\t<span>b</span>\n</div>';
@@ -462,7 +445,7 @@ Deno.test('inline_sibling_newline_flow: negative - GLUE direction (separator eat
 	assertEquals(run_pattern('inline_sibling_newline_flow', ctx), null);
 });
 
-Deno.test('inline_sibling_newline_flow: negative - ours is the side that BROKE', () => {
+test('inline_sibling_newline_flow: negative - ours is the side that BROKE', () => {
 	// Directional: the rule only ever collapses lines. A hunk where ours added lines
 	// belongs to some other pattern.
 	const prettier = '<div>\n\tLorem ipsum, <strong>dolor</strong>.\n</div>';
@@ -471,7 +454,7 @@ Deno.test('inline_sibling_newline_flow: negative - ours is the side that BROKE',
 	assertEquals(run_pattern('inline_sibling_newline_flow', ctx), null);
 });
 
-Deno.test('inline_sibling_newline_flow: negative - dropped content is never claimed', () => {
+test('inline_sibling_newline_flow: negative - dropped content is never claimed', () => {
 	// The weld equality is the content-preservation proof: lose a word and it fails.
 	const prettier = '<div>\n\tLorem ipsum,\n\t<strong>dolor</strong>.\n</div>';
 	const ours = '<div>\n\tLorem, <strong>dolor</strong>.\n</div>';
@@ -479,21 +462,18 @@ Deno.test('inline_sibling_newline_flow: negative - dropped content is never clai
 	assertEquals(run_pattern('inline_sibling_newline_flow', ctx), null);
 });
 
-Deno.test(
-	'inline_sibling_newline_flow: positive - re-pack (equal counts, break moves later)',
-	() => {
-		// The flowed run is over-width, so the fill re-breaks at a later boundary: line
-		// counts match, ours' first line strictly extends prettier's, all ours lines ≤ 100.
-		const pad = 'lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor';
-		const prettier = `<li>\n\t<a href={url}>${pad}</a>\n\t— {description} and a tail wide enough to overflow the flowed line\n</li>`;
-		const ours = `<li>\n\t<a href={url}>${pad}</a> —\n\t{description} and a tail wide enough to overflow the flowed line\n</li>`;
-		const ctx = make_context(ours, prettier, 'svelte');
-		const match = run_pattern('inline_sibling_newline_flow', ctx);
-		assertNotEquals(match, null);
-	}
-);
+test('inline_sibling_newline_flow: positive - re-pack (equal counts, break moves later)', () => {
+	// The flowed run is over-width, so the fill re-breaks at a later boundary: line
+	// counts match, ours' first line strictly extends prettier's, all ours lines ≤ 100.
+	const pad = 'lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor';
+	const prettier = `<li>\n\t<a href={url}>${pad}</a>\n\t— {description} and a tail wide enough to overflow the flowed line\n</li>`;
+	const ours = `<li>\n\t<a href={url}>${pad}</a> —\n\t{description} and a tail wide enough to overflow the flowed line\n</li>`;
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('inline_sibling_newline_flow', ctx);
+	assertNotEquals(match, null);
+});
 
-Deno.test('inline_sibling_newline_flow: negative - re-pack refuses ours breaking EARLIER', () => {
+test('inline_sibling_newline_flow: negative - re-pack refuses ours breaking EARLIER', () => {
 	// The mirror shape: ours' first line is a PREFIX of prettier's (the break moved
 	// earlier though the packed form fits) — the deep inline-container early-break
 	// defect. The extension key must refuse it so it surfaces as partial/unknown.
@@ -505,7 +485,7 @@ Deno.test('inline_sibling_newline_flow: negative - re-pack refuses ours breaking
 	assertEquals(run_pattern('inline_sibling_newline_flow', ctx), null);
 });
 
-Deno.test('inline_sibling_newline_flow: negative - re-pack refuses an over-width ours line', () => {
+test('inline_sibling_newline_flow: negative - re-pack refuses an over-width ours line', () => {
 	// The hard-limit guard: an ours line past 100 is not the sanctioned re-pack, even
 	// with the weld equality and the extension key both holding.
 	const wide = 'w'.repeat(79);
@@ -515,7 +495,7 @@ Deno.test('inline_sibling_newline_flow: negative - re-pack refuses an over-width
 	assertEquals(run_pattern('inline_sibling_newline_flow', ctx), null);
 });
 
-Deno.test('inline_sibling_newline_flow: positive - composed with the fragment-edge trim', () => {
+test('inline_sibling_newline_flow: positive - composed with the fragment-edge trim', () => {
 	// One hunk carrying BOTH sanctioned respellings at once: the newline before `and`
 	// flows onto the content line, and the render-free run inside the <a> is trimmed.
 	// Neither rule's own equality holds alone, so without the composed arm the hunk
@@ -526,48 +506,39 @@ Deno.test('inline_sibling_newline_flow: positive - composed with the fragment-ed
 	assertNotEquals(run_pattern('inline_sibling_newline_flow', ctx), null);
 });
 
-Deno.test(
-	'inline_sibling_newline_flow: negative - composed arm never absorbs an eaten separator',
-	() => {
-		// The composed arm normalizes only FRAGMENT-EDGE runs. The run after `</a>` is
-		// inter-sibling — render-significant, so it survives the collapse on both sides —
-		// and ours ate it outright. Claiming this would hide real content loss behind a
-		// layout claim.
-		const prettier = '<p>\n\t<a href="/chat"> Discord </a>\n\tand let us know\n</p>';
-		const ours = '<p>\n\t<a href="/chat">Discord</a>and let us know\n</p>';
-		const ctx = make_context(ours, prettier, 'svelte');
-		assertEquals(run_pattern('inline_sibling_newline_flow', ctx), null);
-	}
-);
+test('inline_sibling_newline_flow: negative - composed arm never absorbs an eaten separator', () => {
+	// The composed arm normalizes only FRAGMENT-EDGE runs. The run after `</a>` is
+	// inter-sibling — render-significant, so it survives the collapse on both sides —
+	// and ours ate it outright. Claiming this would hide real content loss behind a
+	// layout claim.
+	const prettier = '<p>\n\t<a href="/chat"> Discord </a>\n\tand let us know\n</p>';
+	const ours = '<p>\n\t<a href="/chat">Discord</a>and let us know\n</p>';
+	const ctx = make_context(ours, prettier, 'svelte');
+	assertEquals(run_pattern('inline_sibling_newline_flow', ctx), null);
+});
 
-Deno.test(
-	'inline_sibling_newline_flow: negative - composed arm is directional on whitespace',
-	() => {
-		// The trim only ever REMOVES. Here ours is the side that added the fragment-edge
-		// run, so the collapse equality holds but the direction is wrong.
-		const prettier = '<p>\n\t<a href="/chat">Discord chatroom</a>\n\tand let us know\n</p>';
-		const ours = '<p>\n\t<a href="/chat"> Discord chatroom </a> and let us know\n</p>';
-		const ctx = make_context(ours, prettier, 'svelte');
-		assertEquals(run_pattern('inline_sibling_newline_flow', ctx), null);
-	}
-);
+test('inline_sibling_newline_flow: negative - composed arm is directional on whitespace', () => {
+	// The trim only ever REMOVES. Here ours is the side that added the fragment-edge
+	// run, so the collapse equality holds but the direction is wrong.
+	const prettier = '<p>\n\t<a href="/chat">Discord chatroom</a>\n\tand let us know\n</p>';
+	const ours = '<p>\n\t<a href="/chat"> Discord chatroom </a> and let us know\n</p>';
+	const ctx = make_context(ours, prettier, 'svelte');
+	assertEquals(run_pattern('inline_sibling_newline_flow', ctx), null);
+});
 
 // ─── inline_content_block_style ─────────────────────────────────────────────
 
-Deno.test(
-	'inline_content_block_style: positive - ours block-style, prettier dangles closing >',
-	() => {
-		// prettier hugs content to the attr line and dangles the closing `>`; ours keeps
-		// both tags intact with the content on its own indented line. Whitespace-only.
-		const prettier = '<code\n\tclass="x">PUBLIC</code\n>';
-		const ours = '<code\n\tclass="x"\n>\n\tPUBLIC\n</code>';
-		const ctx = make_context(ours, prettier, 'svelte');
-		const match = run_pattern('inline_content_block_style', ctx);
-		assertNotEquals(match, null);
-	}
-);
+test('inline_content_block_style: positive - ours block-style, prettier dangles closing >', () => {
+	// prettier hugs content to the attr line and dangles the closing `>`; ours keeps
+	// both tags intact with the content on its own indented line. Whitespace-only.
+	const prettier = '<code\n\tclass="x">PUBLIC</code\n>';
+	const ours = '<code\n\tclass="x"\n>\n\tPUBLIC\n</code>';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('inline_content_block_style', ctx);
+	assertNotEquals(match, null);
+});
 
-Deno.test('inline_content_block_style: positive - ours dangles the open > to its own line', () => {
+test('inline_content_block_style: positive - ours dangles the open > to its own line', () => {
 	const prettier = '<span class="x">{content}</span>';
 	const ours = '<span\n\tclass="x"\n>{content}</span\n>';
 	const ctx = make_context(ours, prettier, 'svelte');
@@ -575,7 +546,7 @@ Deno.test('inline_content_block_style: positive - ours dangles the open > to its
 	assertNotEquals(match, null);
 });
 
-Deno.test('inline_content_block_style: negative - not svelte', () => {
+test('inline_content_block_style: negative - not svelte', () => {
 	const prettier = '<code\n\tclass="x">PUBLIC</code\n>';
 	const ours = '<code\n\tclass="x"\n>\n\tPUBLIC\n</code>';
 	const ctx = make_context(ours, prettier, 'typescript');
@@ -583,31 +554,25 @@ Deno.test('inline_content_block_style: negative - not svelte', () => {
 	assertEquals(match, null);
 });
 
-Deno.test(
-	'inline_content_block_style: negative - format-ignore verbatim (whitespace-only, no tag dangle)',
-	() => {
-		// tags stay intact and in place; only redundant internal spaces differ. No
-		// dangled delimiter → must NOT be claimed (it is a format-ignore divergence).
-		const prettier = '<div class="a">text</div>';
-		const ours = '<div    class="a"    >text</div>';
-		const ctx = make_context(ours, prettier, 'svelte');
-		const match = run_pattern('inline_content_block_style', ctx);
-		assertEquals(match, null);
-	}
-);
+test('inline_content_block_style: negative - format-ignore verbatim (whitespace-only, no tag dangle)', () => {
+	// tags stay intact and in place; only redundant internal spaces differ. No
+	// dangled delimiter → must NOT be claimed (it is a format-ignore divergence).
+	const prettier = '<div class="a">text</div>';
+	const ours = '<div    class="a"    >text</div>';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('inline_content_block_style', ctx);
+	assertEquals(match, null);
+});
 
-Deno.test(
-	'inline_content_block_style: negative - empty-destructure brace spacing (no tag dangle)',
-	() => {
-		const prettier = '{#each items as { }}<div>x</div>{/each}';
-		const ours = '{#each items as {}}<div>x</div>{/each}';
-		const ctx = make_context(ours, prettier, 'svelte');
-		const match = run_pattern('inline_content_block_style', ctx);
-		assertEquals(match, null);
-	}
-);
+test('inline_content_block_style: negative - empty-destructure brace spacing (no tag dangle)', () => {
+	const prettier = '{#each items as { }}<div>x</div>{/each}';
+	const ours = '{#each items as {}}<div>x</div>{/each}';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('inline_content_block_style', ctx);
+	assertEquals(match, null);
+});
 
-Deno.test('inline_content_block_style: positive - block body dropped to its own line', () => {
+test('inline_content_block_style: positive - block body dropped to its own line', () => {
 	// prettier hugs the block body onto the head line; tsv drops it, leaving the
 	// `{#snippet …}` head alone on its own line. Whitespace-only.
 	const prettier = '{#snippet foo()}{#if x}<A />{/if}{/snippet}';
@@ -617,7 +582,7 @@ Deno.test('inline_content_block_style: positive - block body dropped to its own 
 	assertNotEquals(match, null);
 });
 
-Deno.test('inline_content_block_style: positive - snippet declaration takes its own line', () => {
+test('inline_content_block_style: positive - snippet declaration takes its own line', () => {
 	// The declaration own-line rule: prettier welds a one-lined `{#snippet}` to the
 	// content beside it; ours gives the declaration its own line. Whitespace-only.
 	const prettier = '<Card href={x}>docs{#snippet icon()}{glyph}{/snippet}</Card>';
@@ -627,7 +592,7 @@ Deno.test('inline_content_block_style: positive - snippet declaration takes its 
 	assertNotEquals(match, null);
 });
 
-Deno.test('inline_content_block_style: positive - declaration tag takes its own line', () => {
+test('inline_content_block_style: positive - declaration tag takes its own line', () => {
 	// The `{@const}` flavor of the same rule (the compact authoring one-lines it).
 	const prettier = '{#if cond}{@const x = 1}{/if}';
 	const ours = '{#if cond}\n\t{@const x = 1}\n{/if}';
@@ -636,7 +601,7 @@ Deno.test('inline_content_block_style: positive - declaration tag takes its own 
 	assertNotEquals(match, null);
 });
 
-Deno.test('inline_content_block_style: negative - a render tag alone is not a declaration', () => {
+test('inline_content_block_style: negative - a render tag alone is not a declaration', () => {
 	// `{@render}` produces output, so it is NOT in the own-line declaration set —
 	// an isolated render tag carries no signature and must stay unclaimed even
 	// though the diff is whitespace-only.
@@ -647,7 +612,7 @@ Deno.test('inline_content_block_style: negative - a render tag alone is not a de
 	assertEquals(match, null);
 });
 
-Deno.test('inline_content_block_style: negative - block head not isolated (hugged in ours)', () => {
+test('inline_content_block_style: negative - block head not isolated (hugged in ours)', () => {
 	// A `{#if}` head that stays hugged inside an element on ours side is not a
 	// dropped-body signature (no head-alone line, no tag dangle).
 	const prettier = '<div>\n\t{#if c}text{/if}\n</div>';
@@ -657,65 +622,53 @@ Deno.test('inline_content_block_style: negative - block head not isolated (hugge
 	assertEquals(match, null);
 });
 
-Deno.test(
-	'inline_content_block_style: negative - content differs (safety gate blocks a real loss)',
-	() => {
-		// Same block-style/dangle shape, but the text content itself differs — the
-		// whitespace-only gate fails so the detector can never absorb a content change.
-		const prettier = '<code\n\tclass="x">GOODBYE</code\n>';
-		const ours = '<code\n\tclass="x"\n>\n\tHELLO\n</code>';
-		const ctx = make_context(ours, prettier, 'svelte');
-		const match = run_pattern('inline_content_block_style', ctx);
-		assertEquals(match, null);
-	}
-);
+test('inline_content_block_style: negative - content differs (safety gate blocks a real loss)', () => {
+	// Same block-style/dangle shape, but the text content itself differs — the
+	// whitespace-only gate fails so the detector can never absorb a content change.
+	const prettier = '<code\n\tclass="x">GOODBYE</code\n>';
+	const ours = '<code\n\tclass="x"\n>\n\tHELLO\n</code>';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('inline_content_block_style', ctx);
+	assertEquals(match, null);
+});
 
-Deno.test(
-	'inline_content_block_style: positive - break-before, complete open tag dangles at EOL',
-	() => {
-		// The break-before posture (form a): prettier keeps the whole opening tag on the
-		// overflowing text line (`…using <MdnLink …>` at EOL) and dangles only the content;
-		// tsv breaks before the element so it starts a fresh line and collapses inline.
-		// The fuz_ui Redirect/+page.svelte shape. Whitespace-only.
-		const prettier = 'text using <MdnLink path="/a/b">\n\ta meta tag\n</MdnLink>';
-		const ours = 'text using\n<MdnLink path="/a/b">a meta tag</MdnLink>';
-		const ctx = make_context(ours, prettier, 'svelte');
-		const match = run_pattern('inline_content_block_style', ctx);
-		assertNotEquals(match, null);
-	}
-);
+test('inline_content_block_style: positive - break-before, complete open tag dangles at EOL', () => {
+	// The break-before posture (form a): prettier keeps the whole opening tag on the
+	// overflowing text line (`…using <MdnLink …>` at EOL) and dangles only the content;
+	// tsv breaks before the element so it starts a fresh line and collapses inline.
+	// The fuz_ui Redirect/+page.svelte shape. Whitespace-only.
+	const prettier = 'text using <MdnLink path="/a/b">\n\ta meta tag\n</MdnLink>';
+	const ours = 'text using\n<MdnLink path="/a/b">a meta tag</MdnLink>';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('inline_content_block_style', ctx);
+	assertNotEquals(match, null);
+});
 
-Deno.test(
-	'inline_content_block_style: positive - break-before, bare tag name dangles (attrs wrap)',
-	() => {
-		// The break-before posture (form b): prettier wraps the void component's attributes,
-		// leaving the bare tag NAME dangling after the text (`…with the <TomeLink` at EOL) and
-		// `/>` on its own line; tsv breaks before it. The fuz_ui icons/logos shape. Whitespace-only.
-		const prettier = 'mounted with the <TomeLink\n\tslug="Svg"\n/>';
-		const ours = 'mounted with the\n<TomeLink slug="Svg" />';
-		const ctx = make_context(ours, prettier, 'svelte');
-		const match = run_pattern('inline_content_block_style', ctx);
-		assertNotEquals(match, null);
-	}
-);
+test('inline_content_block_style: positive - break-before, bare tag name dangles (attrs wrap)', () => {
+	// The break-before posture (form b): prettier wraps the void component's attributes,
+	// leaving the bare tag NAME dangling after the text (`…with the <TomeLink` at EOL) and
+	// `/>` on its own line; tsv breaks before it. The fuz_ui icons/logos shape. Whitespace-only.
+	const prettier = 'mounted with the <TomeLink\n\tslug="Svg"\n/>';
+	const ours = 'mounted with the\n<TomeLink slug="Svg" />';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('inline_content_block_style', ctx);
+	assertNotEquals(match, null);
+});
 
-Deno.test(
-	'inline_content_block_style: negative - open tag legitimately starts its own line',
-	() => {
-		// An opening tag that begins its own line (indent-only before `<`, no preceding
-		// text + space) is NOT a break-before dangle — the `\S[ \t]` guard rejects it, so a
-		// plain indentation-only reflow of an already-fresh-line element stays unclaimed.
-		const prettier = '<div>\n\t<span class="x">text</span>\n</div>';
-		const ours = '<div>\n\t\t<span class="x">text</span>\n</div>';
-		const ctx = make_context(ours, prettier, 'svelte');
-		const match = run_pattern('inline_content_block_style', ctx);
-		assertEquals(match, null);
-	}
-);
+test('inline_content_block_style: negative - open tag legitimately starts its own line', () => {
+	// An opening tag that begins its own line (indent-only before `<`, no preceding
+	// text + space) is NOT a break-before dangle — the `\S[ \t]` guard rejects it, so a
+	// plain indentation-only reflow of an already-fresh-line element stays unclaimed.
+	const prettier = '<div>\n\t<span class="x">text</span>\n</div>';
+	const ours = '<div>\n\t\t<span class="x">text</span>\n</div>';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('inline_content_block_style', ctx);
+	assertEquals(match, null);
+});
 
 // ─── spaced_tag_travel ──────────────────────────────────────────────────────
 
-Deno.test('spaced_tag_travel: positive - traveled tag breaks internally on its fresh line', () => {
+test('spaced_tag_travel: positive - traveled tag breaks internally on its fresh line', () => {
 	// The zzz CapabilityWebsocket shape: ours travels the wide spaced tag to a fresh
 	// line and breaks it internally there (the expression cannot fit flat anywhere);
 	// prettier keeps it on the text line and opens it mid-line.
@@ -730,44 +683,41 @@ Deno.test('spaced_tag_travel: positive - traveled tag breaks internally on its f
 	assertNotEquals(match, null);
 });
 
-Deno.test(
-	'spaced_tag_travel: positive - traveled tag collapses flat, prettier breaks in parens',
-	() => {
-		// The tsv.fuz.dev BenchmarksConformance shape: ours travels the second tag and
-		// collapses it flat; prettier opens it mid-line and breaks inside the call parens.
-		// Exercises the expression-aware weld (a break after `(` / before `)` joins with
-		// no space).
-		const indent = '\t\t\t\t\t\t\t';
-		const prettier =
-			'<td>\n' +
-			indent +
-			"{row.files_processed.toLocaleString('en-US')} / {row.files_total.toLocaleString(\n" +
-			indent +
-			"\t'en-US'\n" +
-			indent +
-			')}\n' +
-			'</td>';
-		const ours =
-			'<td>\n' +
-			indent +
-			"{row.files_processed.toLocaleString('en-US')} /\n" +
-			indent +
-			"{row.files_total.toLocaleString('en-US')}\n" +
-			'</td>';
-		const ctx = make_context(ours, prettier, 'svelte');
-		const match = run_pattern('spaced_tag_travel', ctx);
-		assertNotEquals(match, null);
-	}
-);
+test('spaced_tag_travel: positive - traveled tag collapses flat, prettier breaks in parens', () => {
+	// The tsv.fuz.dev BenchmarksConformance shape: ours travels the second tag and
+	// collapses it flat; prettier opens it mid-line and breaks inside the call parens.
+	// Exercises the expression-aware weld (a break after `(` / before `)` joins with
+	// no space).
+	const indent = '\t\t\t\t\t\t\t';
+	const prettier =
+		'<td>\n' +
+		indent +
+		"{row.files_processed.toLocaleString('en-US')} / {row.files_total.toLocaleString(\n" +
+		indent +
+		"\t'en-US'\n" +
+		indent +
+		')}\n' +
+		'</td>';
+	const ours =
+		'<td>\n' +
+		indent +
+		"{row.files_processed.toLocaleString('en-US')} /\n" +
+		indent +
+		"{row.files_total.toLocaleString('en-US')}\n" +
+		'</td>';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('spaced_tag_travel', ctx);
+	assertNotEquals(match, null);
+});
 
-Deno.test('spaced_tag_travel: negative - not svelte', () => {
+test('spaced_tag_travel: negative - not svelte', () => {
 	const prettier = '<span>\n\taaaa bbbb {cond\n\t\t? 1\n\t\t: 2}\n</span>';
 	const ours = '<span>\n\taaaa bbbb\n\t{cond ? 1 : 2}\n</span>';
 	const ctx = make_context(ours, prettier, 'typescript');
 	assertEquals(run_pattern('spaced_tag_travel', ctx), null);
 });
 
-Deno.test('spaced_tag_travel: negative - GLUED mid-line open on the prettier side', () => {
+test('spaced_tag_travel: negative - GLUED mid-line open on the prettier side', () => {
 	// The zzz ThreadListitem shape: prettier's unmatched `{` is glued to a word
 	// (`token{thread.token_count !==`) — the welded word+tag pair's territory, not the
 	// spaced rule's — and ours' own side tears a tag that FITS flat. Claiming this
@@ -789,7 +739,7 @@ Deno.test('spaced_tag_travel: negative - GLUED mid-line open on the prettier sid
 	assertEquals(run_pattern('spaced_tag_travel', ctx), null);
 });
 
-Deno.test('spaced_tag_travel: negative - ours tears open a tag that fits flat', () => {
+test('spaced_tag_travel: negative - ours tears open a tag that fits flat', () => {
 	// Prettier carries the spaced mid-line marker, but ours' own side has an
 	// unmatched `{` whose flat spelling fits easily at its indent — an avoidable
 	// tear (the zzz DiskfileMetrics defect class), never a sanctioned travel.
@@ -801,7 +751,7 @@ Deno.test('spaced_tag_travel: negative - ours tears open a tag that fits flat', 
 	assertEquals(run_pattern('spaced_tag_travel', ctx), null);
 });
 
-Deno.test('spaced_tag_travel: negative - prettier keeps a compact balanced form', () => {
+test('spaced_tag_travel: negative - prettier keeps a compact balanced form', () => {
 	// The zzz DiskfileMetrics hunk: prettier's side is the compact form (every `{`
 	// closed on its line — no mid-line-open marker), ours tears two tags open.
 	// No prettier marker → unclaimed, so the defect surfaces as unknown.
@@ -819,7 +769,7 @@ Deno.test('spaced_tag_travel: negative - prettier keeps a compact balanced form'
 	assertEquals(run_pattern('spaced_tag_travel', ctx), null);
 });
 
-Deno.test('spaced_tag_travel: negative - dropped content is never claimed', () => {
+test('spaced_tag_travel: negative - dropped content is never claimed', () => {
 	// The weld equality is the content-preservation proof: lose a word and it fails.
 	const prettier =
 		'<span>\n\twebsocket aaaa bbbb cccc dddd eeee ffff gggg hhhh iiii {socket.connected\n\t\t? 1\n\t\t: 2}\n</span>';
@@ -829,7 +779,7 @@ Deno.test('spaced_tag_travel: negative - dropped content is never claimed', () =
 	assertEquals(run_pattern('spaced_tag_travel', ctx), null);
 });
 
-Deno.test('spaced_tag_travel: negative - short respelling with no width motive', () => {
+test('spaced_tag_travel: negative - short respelling with no width motive', () => {
 	// Prettier mid-line marker + clean weld, but the flat content fits well under
 	// print width — travel never fires there, so this is some other reflow.
 	const prettier = '<span>\n\taa {cond\n\t\t? 1\n\t\t: 2}\n</span>';
@@ -840,7 +790,7 @@ Deno.test('spaced_tag_travel: negative - short respelling with no width motive',
 
 // ─── svelte_boundary_ws_trim ────────────────────────────────────────────────
 
-Deno.test('svelte_boundary_ws_trim: positive - fragment-edge run trimmed inside a tag', () => {
+test('svelte_boundary_ws_trim: positive - fragment-edge run trimmed inside a tag', () => {
 	// The legitimate class: whitespace at a tag's content boundary is render-free
 	// (Svelte 5 clean_nodes deletes every fragment-edge run at compile), so tsv
 	// trims it where prettier keeps the boundary space.
@@ -851,7 +801,7 @@ Deno.test('svelte_boundary_ws_trim: positive - fragment-edge run trimmed inside 
 	assertNotEquals(match, null);
 });
 
-Deno.test('svelte_boundary_ws_trim: positive - block-section boundary runs trimmed', () => {
+test('svelte_boundary_ws_trim: positive - block-section boundary runs trimmed', () => {
 	// Each block branch is its own fragment, so the runs after `{#if x}` and
 	// before `{/if}` are fragment edges — render-free, legitimately trimmed.
 	const prettier = '{#if x} <span>a</span> {/if}';
@@ -861,115 +811,91 @@ Deno.test('svelte_boundary_ws_trim: positive - block-section boundary runs trimm
 	assertNotEquals(match, null);
 });
 
-Deno.test(
-	'svelte_boundary_ws_trim: positive - boundary trim on a tag with an arrow-handler attr',
-	() => {
-		// The open-tag matcher must tolerate `>` inside a braced attr expression —
-		// `onclick={() => …}` is ubiquitous in Svelte — or a real fragment-edge trim
-		// on such an element reads unknown (regressed live on fuz_ui's Teleport page).
-		const prettier =
-			'<button type="button" onclick={() => (swap = !swap)}> teleport the bunny </button>';
-		const ours = '<button type="button" onclick={() => (swap = !swap)}>teleport the bunny</button>';
-		const ctx = make_context(ours, prettier, 'svelte');
-		const match = run_pattern('svelte_boundary_ws_trim', ctx);
-		assertNotEquals(match, null);
-	}
-);
+test('svelte_boundary_ws_trim: positive - boundary trim on a tag with an arrow-handler attr', () => {
+	// The open-tag matcher must tolerate `>` inside a braced attr expression —
+	// `onclick={() => …}` is ubiquitous in Svelte — or a real fragment-edge trim
+	// on such an element reads unknown (regressed live on fuz_ui's Teleport page).
+	const prettier =
+		'<button type="button" onclick={() => (swap = !swap)}> teleport the bunny </button>';
+	const ours = '<button type="button" onclick={() => (swap = !swap)}>teleport the bunny</button>';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('svelte_boundary_ws_trim', ctx);
+	assertNotEquals(match, null);
+});
 
-Deno.test(
-	'svelte_boundary_ws_trim: positive - boundary trim on a tag with a quoted `>` attr',
-	() => {
-		const prettier = '<span title="a > b"> x </span>';
-		const ours = '<span title="a > b">x</span>';
-		const ctx = make_context(ours, prettier, 'svelte');
-		const match = run_pattern('svelte_boundary_ws_trim', ctx);
-		assertNotEquals(match, null);
-	}
-);
+test('svelte_boundary_ws_trim: positive - boundary trim on a tag with a quoted `>` attr', () => {
+	const prettier = '<span title="a > b"> x </span>';
+	const ours = '<span title="a > b">x</span>';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('svelte_boundary_ws_trim', ctx);
+	assertNotEquals(match, null);
+});
 
-Deno.test(
-	'svelte_boundary_ws_trim: negative - ours ADDS boundary whitespace (some other reflow)',
-	() => {
-		// The trim only removes; a diff where ours carries more whitespace is some
-		// other reflow and must stay unclaimed (the count_ws direction guard).
-		const prettier = '<span>text</span>';
-		const ours = '<span> text </span>';
-		const ctx = make_context(ours, prettier, 'svelte');
-		const match = run_pattern('svelte_boundary_ws_trim', ctx);
-		assertEquals(match, null);
-	}
-);
+test('svelte_boundary_ws_trim: negative - ours ADDS boundary whitespace (some other reflow)', () => {
+	// The trim only removes; a diff where ours carries more whitespace is some
+	// other reflow and must stay unclaimed (the count_ws direction guard).
+	const prettier = '<span>text</span>';
+	const ours = '<span> text </span>';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('svelte_boundary_ws_trim', ctx);
+	assertEquals(match, null);
+});
 
-Deno.test(
-	'svelte_boundary_ws_trim: negative - inter-sibling space between elements deleted (render-changing)',
-	() => {
-		// NOT the trim class: whitespace BETWEEN sibling nodes is render-significant
-		// (Svelte collapses it to one space — it never vanishes). Ours deleting it
-		// renders "a b" as "ab"; claiming this hunk would bucket a real rendering
-		// bug as a sanctioned divergence.
-		const prettier = '<p><span>a</span> <span>b</span></p>';
-		const ours = '<p><span>a</span><span>b</span></p>';
-		const ctx = make_context(ours, prettier, 'svelte');
-		const match = run_pattern('svelte_boundary_ws_trim', ctx);
-		assertEquals(match, null);
-	}
-);
+test('svelte_boundary_ws_trim: negative - inter-sibling space between elements deleted (render-changing)', () => {
+	// NOT the trim class: whitespace BETWEEN sibling nodes is render-significant
+	// (Svelte collapses it to one space — it never vanishes). Ours deleting it
+	// renders "a b" as "ab"; claiming this hunk would bucket a real rendering
+	// bug as a sanctioned divergence.
+	const prettier = '<p><span>a</span> <span>b</span></p>';
+	const ours = '<p><span>a</span><span>b</span></p>';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('svelte_boundary_ws_trim', ctx);
+	assertEquals(match, null);
+});
 
-Deno.test(
-	'svelte_boundary_ws_trim: negative - inter-sibling space between expression tags deleted (render-changing)',
-	() => {
-		// `{a} {b}` renders with a space; `{a}{b}` without. Same render-significant
-		// inter-sibling class as adjacent elements — must not be claimed.
-		const prettier = '<p>{a} {b}</p>';
-		const ours = '<p>{a}{b}</p>';
-		const ctx = make_context(ours, prettier, 'svelte');
-		const match = run_pattern('svelte_boundary_ws_trim', ctx);
-		assertEquals(match, null);
-	}
-);
+test('svelte_boundary_ws_trim: negative - inter-sibling space between expression tags deleted (render-changing)', () => {
+	// `{a} {b}` renders with a space; `{a}{b}` without. Same render-significant
+	// inter-sibling class as adjacent elements — must not be claimed.
+	const prettier = '<p>{a} {b}</p>';
+	const ours = '<p>{a}{b}</p>';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('svelte_boundary_ws_trim', ctx);
+	assertEquals(match, null);
+});
 
-Deno.test(
-	'svelte_boundary_ws_trim: negative - space between text and inline element deleted (render-changing)',
-	() => {
-		// "hi <b>x</b>" renders "hi x"; gluing renders "hix". The run sits between
-		// sibling nodes (text, element) — render-significant, must not be claimed.
-		const prettier = '<p>hi <b>x</b></p>';
-		const ours = '<p>hi<b>x</b></p>';
-		const ctx = make_context(ours, prettier, 'svelte');
-		const match = run_pattern('svelte_boundary_ws_trim', ctx);
-		assertEquals(match, null);
-	}
-);
+test('svelte_boundary_ws_trim: negative - space between text and inline element deleted (render-changing)', () => {
+	// "hi <b>x</b>" renders "hi x"; gluing renders "hix". The run sits between
+	// sibling nodes (text, element) — render-significant, must not be claimed.
+	const prettier = '<p>hi <b>x</b></p>';
+	const ours = '<p>hi<b>x</b></p>';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('svelte_boundary_ws_trim', ctx);
+	assertEquals(match, null);
+});
 
-Deno.test(
-	'svelte_boundary_ws_trim: positive - identical script present, template trim still claimed',
-	() => {
-		// A verbatim <script> region must not defeat the equality when its content is
-		// byte-identical on both sides — the trim claim rides on the template alone.
-		const prettier = '<script>\n\tlet x = 1;\n</script>\n\n<span> text </span>';
-		const ours = '<script>\n\tlet x = 1;\n</script>\n\n<span>text</span>';
-		const ctx = make_context(ours, prettier, 'svelte');
-		const match = run_pattern('svelte_boundary_ws_trim', ctx);
-		assertNotEquals(match, null);
-	}
-);
+test('svelte_boundary_ws_trim: positive - identical script present, template trim still claimed', () => {
+	// A verbatim <script> region must not defeat the equality when its content is
+	// byte-identical on both sides — the trim claim rides on the template alone.
+	const prettier = '<script>\n\tlet x = 1;\n</script>\n\n<span> text </span>';
+	const ours = '<script>\n\tlet x = 1;\n</script>\n\n<span>text</span>';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('svelte_boundary_ws_trim', ctx);
+	assertNotEquals(match, null);
+});
 
-Deno.test(
-	'svelte_boundary_ws_trim: negative - ws deleted inside a script template-literal string',
-	() => {
-		// `a <b> c` → `a <b>c` inside a template literal is STRING content — program
-		// bytes, not template markup. Tag-shaped, so the fragment-edge erasure would
-		// equate the two sides if it ran over script text; SAFETY counts no whitespace,
-		// so a claim here would hide real content loss. Script interiors stay verbatim.
-		const prettier = '<script>\n\tconst s = `a <b> c`;\n</script>';
-		const ours = '<script>\n\tconst s = `a <b>c`;\n</script>';
-		const ctx = make_context(ours, prettier, 'svelte');
-		const match = run_pattern('svelte_boundary_ws_trim', ctx);
-		assertEquals(match, null);
-	}
-);
+test('svelte_boundary_ws_trim: negative - ws deleted inside a script template-literal string', () => {
+	// `a <b> c` → `a <b>c` inside a template literal is STRING content — program
+	// bytes, not template markup. Tag-shaped, so the fragment-edge erasure would
+	// equate the two sides if it ran over script text; SAFETY counts no whitespace,
+	// so a claim here would hide real content loss. Script interiors stay verbatim.
+	const prettier = '<script>\n\tconst s = `a <b> c`;\n</script>';
+	const ours = '<script>\n\tconst s = `a <b>c`;\n</script>';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('svelte_boundary_ws_trim', ctx);
+	assertEquals(match, null);
+});
 
-Deno.test('svelte_boundary_ws_trim: negative - ws deleted inside a style content string', () => {
+test('svelte_boundary_ws_trim: negative - ws deleted inside a style content string', () => {
 	// The CSS analog: `content: 'a <b> c'` → `'a <b>c'` is string bytes.
 	const prettier = "<style>\n\tp::before {\n\t\tcontent: 'a <b> c';\n\t}\n</style>";
 	const ours = "<style>\n\tp::before {\n\t\tcontent: 'a <b>c';\n\t}\n</style>";
@@ -978,37 +904,31 @@ Deno.test('svelte_boundary_ws_trim: negative - ws deleted inside a style content
 	assertEquals(match, null);
 });
 
-Deno.test(
-	'svelte_boundary_ws_trim: negative - script-string deletion not claimed alongside a template trim',
-	() => {
-		// Mixed file: the template trim hunk may be claimed, but the hunk inside the
-		// <script> region must not be — its whitespace is program bytes.
-		const prettier =
-			'<script>\n\tconst s = `a <b> c`;\n</script>\n\n<div>\n\t<span> ok </span>\n</div>';
-		const ours = '<script>\n\tconst s = `a <b>c`;\n</script>\n\n<div>\n\t<span>ok</span>\n</div>';
-		const ctx = make_context(ours, prettier, 'svelte');
-		const coverage = detect_divergences(ctx);
-		assertNotEquals(coverage.classification, 'all_explained');
-	}
-);
+test('svelte_boundary_ws_trim: negative - script-string deletion not claimed alongside a template trim', () => {
+	// Mixed file: the template trim hunk may be claimed, but the hunk inside the
+	// <script> region must not be — its whitespace is program bytes.
+	const prettier =
+		'<script>\n\tconst s = `a <b> c`;\n</script>\n\n<div>\n\t<span> ok </span>\n</div>';
+	const ours = '<script>\n\tconst s = `a <b>c`;\n</script>\n\n<div>\n\t<span>ok</span>\n</div>';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const coverage = detect_divergences(ctx);
+	assertNotEquals(coverage.classification, 'all_explained');
+});
 
-Deno.test(
-	'svelte_boundary_ws_trim: negative - mixed file must not blanket-claim the render-changing hunk',
-	() => {
-		// One legitimate fragment-edge trim plus one render-changing inter-sibling
-		// deletion. The legit trim may be claimed, but the deletion's hunk must not
-		// be — a blanket claim would classify the file all_explained and hide the bug.
-		const prettier = '<div>\n\t<span> a </span>\n\t<p><i>x</i> <i>y</i></p>\n</div>';
-		const ours = '<div>\n\t<span>a</span>\n\t<p><i>x</i><i>y</i></p>\n</div>';
-		const ctx = make_context(ours, prettier, 'svelte');
-		const coverage = detect_divergences(ctx);
-		assertNotEquals(coverage.classification, 'all_explained');
-	}
-);
+test('svelte_boundary_ws_trim: negative - mixed file must not blanket-claim the render-changing hunk', () => {
+	// One legitimate fragment-edge trim plus one render-changing inter-sibling
+	// deletion. The legit trim may be claimed, but the deletion's hunk must not
+	// be — a blanket claim would classify the file all_explained and hide the bug.
+	const prettier = '<div>\n\t<span> a </span>\n\t<p><i>x</i> <i>y</i></p>\n</div>';
+	const ours = '<div>\n\t<span>a</span>\n\t<p><i>x</i><i>y</i></p>\n</div>';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const coverage = detect_divergences(ctx);
+	assertNotEquals(coverage.classification, 'all_explained');
+});
 
 // ─── self_closing_nonvoid ───────────────────────────────────────────────────
 
-Deno.test('self_closing_nonvoid: positive - self-closing component', () => {
+test('self_closing_nonvoid: positive - self-closing component', () => {
 	const prettier = '<Component></Component>';
 	const ours = '<Component />';
 	const ctx = make_context(ours, prettier, 'svelte');
@@ -1016,7 +936,7 @@ Deno.test('self_closing_nonvoid: positive - self-closing component', () => {
 	assertNotEquals(match, null);
 });
 
-Deno.test('self_closing_nonvoid: negative - not svelte', () => {
+test('self_closing_nonvoid: negative - not svelte', () => {
 	const prettier = '<Component></Component>';
 	const ours = '<Component />';
 	const ctx = make_context(ours, prettier, 'typescript');
@@ -1024,7 +944,7 @@ Deno.test('self_closing_nonvoid: negative - not svelte', () => {
 	assertEquals(match, null);
 });
 
-Deno.test('self_closing_nonvoid: positive - HTML element ours expands self-closing', () => {
+test('self_closing_nonvoid: positive - HTML element ours expands self-closing', () => {
 	const prettier = '<div />';
 	const ours = '<div></div>';
 	const ctx = make_context(ours, prettier, 'svelte');
@@ -1033,7 +953,7 @@ Deno.test('self_closing_nonvoid: positive - HTML element ours expands self-closi
 	assertEquals(match!.pattern, 'self_closing_nonvoid');
 });
 
-Deno.test('self_closing_nonvoid: positive - split hunks from identical intervening line', () => {
+test('self_closing_nonvoid: positive - split hunks from identical intervening line', () => {
 	// When <div /> → <div></div> has an identical <div></div> between them,
 	// the diff splits into two hunks (one remove-only, one add-only)
 	const prettier = '<div />\n<div></div>';
@@ -1044,7 +964,7 @@ Deno.test('self_closing_nonvoid: positive - split hunks from identical interveni
 	assertEquals(match!.hunk_indices.length, 2);
 });
 
-Deno.test('self_closing_nonvoid: positive - multiline element /> vs ></div>', () => {
+test('self_closing_nonvoid: positive - multiline element /> vs ></div>', () => {
 	const prettier = '  data-my-prop\n/>';
 	const ours = '  data-my-prop\n></div>';
 	const ctx = make_context(ours, prettier, 'svelte');
@@ -1053,7 +973,7 @@ Deno.test('self_closing_nonvoid: positive - multiline element /> vs ></div>', ()
 	assertEquals(match!.pattern, 'self_closing_nonvoid');
 });
 
-Deno.test('self_closing_nonvoid: negative - different elements in wrapping diff', () => {
+test('self_closing_nonvoid: negative - different elements in wrapping diff', () => {
 	// Self-closing <Glyph /> is same in both outputs (just rewrapped),
 	// </ProviderLink> is an unrelated close tag also rewrapped
 	const prettier = '><span><Glyph glyph={GLYPH} /> text</span\n> provider</ProviderLink';
@@ -1063,7 +983,7 @@ Deno.test('self_closing_nonvoid: negative - different elements in wrapping diff'
 	assertEquals(match, null);
 });
 
-Deno.test('self_closing_nonvoid: negative - dotted component name regex escape', () => {
+test('self_closing_nonvoid: negative - dotted component name regex escape', () => {
 	// <X.Y /> (member expression component) self-closes in ours,
 	// </X_Y> is a different component's close tag in prettier.
 	// Without escaping `.` in the regex, `X.Y` matches `X_Y`
@@ -1077,7 +997,7 @@ Deno.test('self_closing_nonvoid: negative - dotted component name regex escape',
 
 // ─── bom_strip ──────────────────────────────────────────────────────────────
 
-Deno.test('bom_strip: positive - BOM in source, we strip', () => {
+test('bom_strip: positive - BOM in source, we strip', () => {
 	const prettier = '\ufeffconst x = 1;';
 	const ours = 'const x = 1;';
 	const ctx = make_context(ours, prettier, 'typescript');
@@ -1088,7 +1008,7 @@ Deno.test('bom_strip: positive - BOM in source, we strip', () => {
 	assertEquals(match!.confidence, 'certain');
 });
 
-Deno.test('bom_strip: negative - no BOM in source', () => {
+test('bom_strip: negative - no BOM in source', () => {
 	const prettier = 'const x = 1;';
 	const ours = 'const y = 1;';
 	const ctx = make_context(ours, prettier, 'typescript');
@@ -1098,7 +1018,7 @@ Deno.test('bom_strip: negative - no BOM in source', () => {
 
 // ─── fill_after_inline ──────────────────────────────────────────────────────
 
-Deno.test('fill_after_inline: positive - long line with inline close tag', () => {
+test('fill_after_inline: positive - long line with inline close tag', () => {
 	// 70 chars of content puts prettier's packed line at 128 and OURS at 98 — the shape the
 	// divergence actually takes. A content run wide enough to leave ours over the limit too
 	// would be a formatter defect, and the ours-side width guard rejects it (below).
@@ -1111,7 +1031,7 @@ Deno.test('fill_after_inline: positive - long line with inline close tag', () =>
 	assertNotEquals(match, null);
 });
 
-Deno.test('fill_after_inline: negative - ours re-wrapped but its own line still overruns', () => {
+test('fill_after_inline: negative - ours re-wrapped but its own line still overruns', () => {
 	// Same shape at 90 chars of content: ours breaks the trailing text off and STILL emits a
 	// 118-column line with a fill seam in it (` <span>`). Re-wrapping is not the claim — the
 	// claim is that ours spent the breaks it had, and this one did not.
@@ -1123,7 +1043,7 @@ Deno.test('fill_after_inline: negative - ours re-wrapped but its own line still 
 	assertEquals(run_pattern('fill_after_inline', ctx), null);
 });
 
-Deno.test('fill_after_inline: negative - inline close tag under 100 chars', () => {
+test('fill_after_inline: negative - inline close tag under 100 chars', () => {
 	const prettier = '\t<p>Some text <span>short</span> more text</p>';
 	const ours = '\t<p>Some text <span>short</span>\n\tmore text</p>';
 	const ctx = make_context(ours, prettier, 'svelte');
@@ -1131,7 +1051,7 @@ Deno.test('fill_after_inline: negative - inline close tag under 100 chars', () =
 	assertEquals(match, null);
 });
 
-Deno.test('fill_after_inline: negative - not svelte', () => {
+test('fill_after_inline: negative - not svelte', () => {
 	const longContent = 'x'.repeat(90);
 	const prettier = `\t<p>Some text <span>${longContent}</span> more text</p>`;
 	const ours = `\t<p>Some text <span>${longContent}</span>\n\tmore text</p>`;
@@ -1142,7 +1062,7 @@ Deno.test('fill_after_inline: negative - not svelte', () => {
 
 // ─── css_value_wrap ─────────────────────────────────────────────────────────
 
-Deno.test('css_value_wrap: positive - long CSS property value', () => {
+test('css_value_wrap: positive - long CSS property value', () => {
 	const longValue = 'var(--a) ' + 'color-mix(in srgb, red, blue) '.repeat(3);
 	const prettier = `\tbox-shadow: ${longValue};`;
 	const ours = `\tbox-shadow:\n\t\t${longValue.split(' ').slice(0, 3).join(' ')}\n\t\t${longValue
@@ -1154,7 +1074,7 @@ Deno.test('css_value_wrap: positive - long CSS property value', () => {
 	assertNotEquals(match, null);
 });
 
-Deno.test('css_value_wrap: negative - short CSS property value', () => {
+test('css_value_wrap: negative - short CSS property value', () => {
 	const prettier = '\tcolor: red;';
 	const ours = '\tcolor: blue;';
 	const ctx = make_context(ours, prettier, 'css');
@@ -1162,7 +1082,7 @@ Deno.test('css_value_wrap: negative - short CSS property value', () => {
 	assertEquals(match, null);
 });
 
-Deno.test('css_value_wrap: positive - the over-width ours line is one component value', () => {
+test('css_value_wrap: positive - the over-width ours line is one component value', () => {
 	// The forced-overrun licence in CSS. `prettier/tests/format/css/parens/parens.css` is this
 	// shape: the IE `filter` value is a SINGLE function, so its only whitespace sits inside the
 	// parens where no formatter breaks, and the declaration stands at 112 columns. Ours broke
@@ -1176,7 +1096,7 @@ Deno.test('css_value_wrap: positive - the over-width ours line is one component 
 	assertNotEquals(run_pattern('css_value_wrap', ctx), null);
 });
 
-Deno.test('css_value_wrap: negative - the over-width ours line still has a top-level seam', () => {
+test('css_value_wrap: negative - the over-width ours line still has a top-level seam', () => {
 	// The over-match rejection for the licence above: same widths, but each ours line carries a
 	// depth-0 space between two component values — a seam the space-separated list wrap would
 	// have taken. Only a value with NO top-level separator is an atom.
@@ -1188,7 +1108,7 @@ Deno.test('css_value_wrap: negative - the over-width ours line still has a top-l
 	assertEquals(run_pattern('css_value_wrap', ctx), null);
 });
 
-Deno.test('css_value_wrap: negative - a top-level COMMA is a seam too', () => {
+test('css_value_wrap: negative - a top-level COMMA is a seam too', () => {
 	// The comma half of the same rule — the comma-separated list wrap. A depth-0 comma with no
 	// space after it (which prettier's own `parens.css` spells) must still read as a seam.
 	const half = `${'a'.repeat(52)},${'b'.repeat(52)}`;
@@ -1201,7 +1121,7 @@ Deno.test('css_value_wrap: negative - a top-level COMMA is a seam too', () => {
 
 // ─── member_expression_call ─────────────────────────────────────────────────
 
-Deno.test('member_expression_call: positive - require.resolve.paths (path_calls_long)', () => {
+test('member_expression_call: positive - require.resolve.paths (path_calls_long)', () => {
 	// The fixture `path_calls_long_prettier_divergence`'s `require.resolve.paths` site:
 	// prettier breaks at the chain, tsv expands the argument; the tokens are the same.
 	const prettier =
@@ -1211,7 +1131,7 @@ Deno.test('member_expression_call: positive - require.resolve.paths (path_calls_
 	assert_claims_every_hunk(make_context(ours, prettier, 'typescript'), 'member_expression_call');
 });
 
-Deno.test('member_expression_call: negative - no module pattern in source', () => {
+test('member_expression_call: negative - no module pattern in source', () => {
 	const prettier = 'const p = something.other("path");';
 	const ours = 'const p = something.other(\n\t"path",\n);';
 	const ctx = make_context(ours, prettier, 'typescript');
@@ -1221,7 +1141,7 @@ Deno.test('member_expression_call: negative - no module pattern in source', () =
 
 // ─── union_paren_member_inline ──────────────────────────────────────────────
 
-Deno.test('union_paren_member_inline: positive - inner union kept inline vs exploded', () => {
+test('union_paren_member_inline: positive - inner union kept inline vs exploded', () => {
 	// prettier explodes `| a` / `| b // c`; tsv keeps `a | b // c` inline (18389's shape).
 	const prettier = '\t| (\n\t\t\t| A\n\t\t\t| B // comment 1\n\t  )\n\t| C;';
 	const ours = '\t| (\n\t\t\tA | B // comment 1\n\t  )\n\t| C;';
@@ -1231,7 +1151,7 @@ Deno.test('union_paren_member_inline: positive - inner union kept inline vs expl
 	assertEquals(match!.pattern, 'union_paren_member_inline');
 });
 
-Deno.test('union_paren_member_inline: negative - overmatch rejection, a member is DROPPED', () => {
+test('union_paren_member_inline: negative - overmatch rejection, a member is DROPPED', () => {
 	// prettier has three members; ours drops `C`. A pure reflow would preserve every
 	// member — the string-equality proof fails, so a content-loss bug is never claimed.
 	const prettier = '\t| (\n\t\t\t| A\n\t\t\t| B\n\t\t\t| C // c\n\t  )\n\t| D;';
@@ -1241,7 +1161,7 @@ Deno.test('union_paren_member_inline: negative - overmatch rejection, a member i
 	assertEquals(match, null);
 });
 
-Deno.test('union_paren_member_inline: negative - overmatch rejection, a member is ADDED', () => {
+test('union_paren_member_inline: negative - overmatch rejection, a member is ADDED', () => {
 	// ours has an extra member `C` prettier does not — also a content change, rejected.
 	const prettier = '\t| (\n\t\t\t| A\n\t\t\t| B // c\n\t  )\n\t| D;';
 	const ours = '\t| (\n\t\t\tA | B | C // c\n\t  )\n\t| D;';
@@ -1252,7 +1172,7 @@ Deno.test('union_paren_member_inline: negative - overmatch rejection, a member i
 
 // ─── comment_position ───────────────────────────────────────────────────────
 
-Deno.test('comment_position: positive - comment moved to different line', () => {
+test('comment_position: positive - comment moved to different line', () => {
 	// Prettier puts comment after {, we put it on its own line
 	// The comment text "todo" is the same, just on different lines
 	const prettier = 'for (let i = 0; i < n; i++) // todo\n{\n\tx++;\n}';
@@ -1262,7 +1182,7 @@ Deno.test('comment_position: positive - comment moved to different line', () => 
 	assertNotEquals(match, null);
 });
 
-Deno.test('comment_position: positive - prettier MERGED two trailing line comments', () => {
+test('comment_position: positive - prettier MERGED two trailing line comments', () => {
 	// The canonical shape of this divergence family: prettier relocates both
 	// comments onto one line, where the second `//` becomes mere TEXT of the
 	// first (an information-losing merge); tsv preserves position and
@@ -1276,7 +1196,7 @@ Deno.test('comment_position: positive - prettier MERGED two trailing line commen
 	assertNotEquals(match, null);
 });
 
-Deno.test('comment_position: negative - a URL in a comment is not split at `//`', () => {
+test('comment_position: negative - a URL in a comment is not split at `//`', () => {
 	// `http://x` must stay ONE comment text. Splitting it would invent the texts
 	// `see http:` and `x`, either of which could spuriously overlap a real
 	// comment elsewhere — so the split skips a `//` preceded by `:`.
@@ -1286,7 +1206,7 @@ Deno.test('comment_position: negative - a URL in a comment is not split at `//`'
 	assertEquals(extract_line_comment_contents('a; /* b */'), []);
 });
 
-Deno.test('comment_position: negative - merged comments do NOT excuse a code change', () => {
+test('comment_position: negative - merged comments do NOT excuse a code change', () => {
 	// The split widens only the TEXT-overlap gate; the non-comment content
 	// checks still have to pass. Here the code genuinely differs (a call gained
 	// an argument), so the hunk stays unclaimed despite the comment overlap.
@@ -1297,14 +1217,14 @@ Deno.test('comment_position: negative - merged comments do NOT excuse a code cha
 	assertEquals(match, null);
 });
 
-Deno.test('comment_position: negative - identical comments same position', () => {
+test('comment_position: negative - identical comments same position', () => {
 	const prettier = 'const x = 1; // comment\nconst y = 2;';
 	const ours = 'const x = 1; // comment\nconst y = 2;';
 	const ctx = make_context(ours, prettier, 'typescript');
 	assertEquals(ctx.hunks.length, 0);
 });
 
-Deno.test('comment_position: negative - comment incidental to code layout change', () => {
+test('comment_position: negative - comment incidental to code layout change', () => {
 	// Non-comment code differs (return vs return + paren wrapping) — comment is incidental
 	const prettier = 'return (\n\tstr\n\t\t// replace\n\t\t.replace(/a/g, "-")\n);';
 	const ours = 'return str\n\t// replace\n\t.replace(/a/g, "-");';
@@ -1313,7 +1233,7 @@ Deno.test('comment_position: negative - comment incidental to code layout change
 	assertEquals(match, null);
 });
 
-Deno.test('comment_position: negative - Case 1 comment not in other side output', () => {
+test('comment_position: negative - Case 1 comment not in other side output', () => {
 	// Comment on one side only, and the comment text doesn't exist in the other output
 	const prettier = 'const x = 1;\nconst y = 2;';
 	const ours = 'const x = 1;\n// added comment\nconst y = 2;';
@@ -1322,7 +1242,7 @@ Deno.test('comment_position: negative - Case 1 comment not in other side output'
 	assertEquals(match, null);
 });
 
-Deno.test('comment_position: positive - Case 1 comment moved out of hunk region', () => {
+test('comment_position: positive - Case 1 comment moved out of hunk region', () => {
 	// Comment on one side of hunk, but text exists in other side's full output (moved)
 	const prettier = '// todo\nconst x = 1;\nconst y = 2;';
 	const ours = 'const x = 1;\n// todo\nconst y = 2;';
@@ -1331,7 +1251,7 @@ Deno.test('comment_position: positive - Case 1 comment moved out of hunk region'
 	assertNotEquals(match, null);
 });
 
-Deno.test('comment_position: positive - comment absorbed into block body', () => {
+test('comment_position: positive - comment absorbed into block body', () => {
 	// Prettier absorbs comment between ) and {} into the block body, reformatting the block
 	const prettier = 'while (a) {\n\t/* comment */\n}';
 	const ours = 'while (a) /* comment */ {}';
@@ -1340,7 +1260,7 @@ Deno.test('comment_position: positive - comment absorbed into block body', () =>
 	assertNotEquals(match, null);
 });
 
-Deno.test('comment_position: positive - line comment absorbed into try block', () => {
+test('comment_position: positive - line comment absorbed into try block', () => {
 	// Prettier absorbs line comment between try and { into block body
 	const prettier = 'try {\n\t// comment\n} catch (e) {}';
 	const ours = 'try // comment\n{\n} catch (e) {}';
@@ -1349,7 +1269,7 @@ Deno.test('comment_position: positive - line comment absorbed into try block', (
 	assertNotEquals(match, null);
 });
 
-Deno.test('comment_position: positive - comment absorbed into catch parens', () => {
+test('comment_position: positive - comment absorbed into catch parens', () => {
 	// Prettier absorbs line comment after catch (e) into parens, reformatting to multiline
 	const prettier = '} catch (\n\te // comment\n) {}';
 	const ours = '} catch (e) // comment\n{}';
@@ -1358,23 +1278,20 @@ Deno.test('comment_position: positive - comment absorbed into catch parens', () 
 	assertNotEquals(match, null);
 });
 
-Deno.test(
-	'comment_position: positive - Case 3 structural relocation around bordering comment',
-	() => {
-		// Empty-switch shape: the `// note` comment is byte-identical in both outputs,
-		// so the diff aligns it as a CONTEXT line; the hunk carries only the
-		// discriminant-paren reshape (`switch (x) {` ↔ `switch (\n\tx\n) {`). The
-		// comment borders the hunk in BOTH outputs and exists in both → Case 3 claims.
-		const prettier = '\tswitch (\n\t\tx\n\t\t// note\n\t) {\n\t}';
-		const ours = '\tswitch (x) {\n\t\t// note\n\t}';
-		const ctx = make_context(ours, prettier, 'typescript');
-		const match = run_pattern('comment_position', ctx);
-		assertNotEquals(match, null);
-		assertEquals(match!.pattern, 'comment_position');
-	}
-);
+test('comment_position: positive - Case 3 structural relocation around bordering comment', () => {
+	// Empty-switch shape: the `// note` comment is byte-identical in both outputs,
+	// so the diff aligns it as a CONTEXT line; the hunk carries only the
+	// discriminant-paren reshape (`switch (x) {` ↔ `switch (\n\tx\n) {`). The
+	// comment borders the hunk in BOTH outputs and exists in both → Case 3 claims.
+	const prettier = '\tswitch (\n\t\tx\n\t\t// note\n\t) {\n\t}';
+	const ours = '\tswitch (x) {\n\t\t// note\n\t}';
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('comment_position', ctx);
+	assertNotEquals(match, null);
+	assertEquals(match!.pattern, 'comment_position');
+});
 
-Deno.test('comment_position: negative - Case 3 bordering comment DROPPED by prettier', () => {
+test('comment_position: negative - Case 3 bordering comment DROPPED by prettier', () => {
 	// Same structural reshape, but prettier DROPPED the `// note` comment entirely
 	// (a content loss). The "exists as a whole comment line in BOTH outputs" guard
 	// must reject — claiming would mask the drop as a known divergence and, in
@@ -1386,7 +1303,7 @@ Deno.test('comment_position: negative - Case 3 bordering comment DROPPED by pret
 	assertEquals(match, null);
 });
 
-Deno.test('comment_position: negative - Case 3 bordering comment CHANGED, not relocated', () => {
+test('comment_position: negative - Case 3 bordering comment CHANGED, not relocated', () => {
 	// The comment bordering the hunk differs between the two outputs (`// note` vs
 	// `// other`) — the comment text was altered, not merely repositioned. The
 	// border-text-must-match-in-both guard must reject.
@@ -1397,7 +1314,7 @@ Deno.test('comment_position: negative - Case 3 bordering comment CHANGED, not re
 	assertEquals(match, null);
 });
 
-Deno.test('comment_position: negative - Case 3 preserved comment not bordering the hunk', () => {
+test('comment_position: negative - Case 3 preserved comment not bordering the hunk', () => {
 	// A preserved comment exists in both outputs but is NOT the immediate border of
 	// the structural hunk (a blank line and other code separate them). Case 3 must
 	// not claim a structural reshape just because some preserved comment lives
@@ -1411,7 +1328,7 @@ Deno.test('comment_position: negative - Case 3 preserved comment not bordering t
 
 // ─── short_expr_100 ─────────────────────────────────────────────────────────
 
-Deno.test('short_expr_100: positive - block expr slightly over 100', () => {
+test('short_expr_100: positive - block expr slightly over 100', () => {
 	// Create a block expression that's 105 chars in prettier (within 100-110 range)
 	const expr = 'a'.repeat(65);
 	const prettier = `{#if typeof ${expr} === 'string'}content{/if}`;
@@ -1423,7 +1340,7 @@ Deno.test('short_expr_100: positive - block expr slightly over 100', () => {
 	assertNotEquals(match, null);
 });
 
-Deno.test('short_expr_100: negative - not svelte', () => {
+test('short_expr_100: negative - not svelte', () => {
 	const prettier = '{#if typeof x === "string"}content{/if}';
 	const ours = '{#if\n\ttypeof x === "string"\n}content{/if}';
 	const ctx = make_context(ours, prettier, 'typescript');
@@ -1433,7 +1350,7 @@ Deno.test('short_expr_100: negative - not svelte', () => {
 
 // ─── css_unit_serialize_case ────────────────────────────────────────────────
 
-Deno.test('css_unit_serialize_case: positive - Hz/kHz/Q lowercased in .css', () => {
+test('css_unit_serialize_case: positive - Hz/kHz/Q lowercased in .css', () => {
 	const prettier = 'a {\n\tpitch: 440Hz;\n\tpitch: 1kHz;\n\tleft: 10Q;\n}';
 	const ours = 'a {\n\tpitch: 440hz;\n\tpitch: 1khz;\n\tleft: 10q;\n}';
 	const ctx = make_context(ours, prettier, 'css');
@@ -1442,7 +1359,7 @@ Deno.test('css_unit_serialize_case: positive - Hz/kHz/Q lowercased in .css', () 
 	assertEquals(match!.confidence, 'certain');
 });
 
-Deno.test('css_unit_serialize_case: positive - inside a Svelte <style> block', () => {
+test('css_unit_serialize_case: positive - inside a Svelte <style> block', () => {
 	const prettier = '<style>\n\ta {\n\t\tpitch: 440Hz;\n\t}\n</style>';
 	const ours = '<style>\n\ta {\n\t\tpitch: 440hz;\n\t}\n</style>';
 	const ctx = make_context(ours, prettier, 'svelte');
@@ -1450,20 +1367,17 @@ Deno.test('css_unit_serialize_case: positive - inside a Svelte <style> block', (
 	assertNotEquals(match, null);
 });
 
-Deno.test(
-	'css_unit_serialize_case: negative - reverse direction (ours upcases) is NOT matched',
-	() => {
-		// A hypothetical bug where OURS upcases must not be excused — the pattern is
-		// direction-specific (prettier-upcases / ours-lowercases only).
-		const prettier = 'a {\n\tpitch: 440hz;\n}';
-		const ours = 'a {\n\tpitch: 440Hz;\n}';
-		const ctx = make_context(ours, prettier, 'css');
-		const match = run_pattern('css_unit_serialize_case', ctx);
-		assertEquals(match, null);
-	}
-);
+test('css_unit_serialize_case: negative - reverse direction (ours upcases) is NOT matched', () => {
+	// A hypothetical bug where OURS upcases must not be excused — the pattern is
+	// direction-specific (prettier-upcases / ours-lowercases only).
+	const prettier = 'a {\n\tpitch: 440hz;\n}';
+	const ours = 'a {\n\tpitch: 440Hz;\n}';
+	const ctx = make_context(ours, prettier, 'css');
+	const match = run_pattern('css_unit_serialize_case', ctx);
+	assertEquals(match, null);
+});
 
-Deno.test('css_unit_serialize_case: negative - unrelated value change', () => {
+test('css_unit_serialize_case: negative - unrelated value change', () => {
 	const prettier = 'a {\n\tcolor: red;\n}';
 	const ours = 'a {\n\tcolor: blue;\n}';
 	const ctx = make_context(ours, prettier, 'css');
@@ -1473,7 +1387,7 @@ Deno.test('css_unit_serialize_case: negative - unrelated value change', () => {
 
 // ─── css_atrule_spec_spacing ────────────────────────────────────────────────
 
-Deno.test('css_atrule_spec_spacing: positive - missing space after and(', () => {
+test('css_atrule_spec_spacing: positive - missing space after and(', () => {
 	const prettier =
 		'<style>\n@container (min-width: 700px) and(min-height: 500px) {\n\tdiv { color: red; }\n}\n</style>';
 	const ours =
@@ -1484,7 +1398,7 @@ Deno.test('css_atrule_spec_spacing: positive - missing space after and(', () => 
 	assertEquals(match!.confidence, 'certain');
 });
 
-Deno.test('css_atrule_spec_spacing: negative - correct spacing already', () => {
+test('css_atrule_spec_spacing: negative - correct spacing already', () => {
 	const prettier =
 		'<style>\n@media screen and (min-width: 768px) {\n\tdiv { color: red; }\n}\n</style>';
 	const ours =
@@ -1496,7 +1410,7 @@ Deno.test('css_atrule_spec_spacing: negative - correct spacing already', () => {
 
 // ─── css_atrule_long_wrap ───────────────────────────────────────────────────
 
-Deno.test('css_atrule_long_wrap: positive - @media over 100 chars, we wrap', () => {
+test('css_atrule_long_wrap: positive - @media over 100 chars, we wrap', () => {
 	const longQuery =
 		'@media screen and (min-width: 768px) and (max-width: 1024px) and (orientation: landscape) and (color)';
 	const prettier = `<style>\n${longQuery} {\n\tdiv { color: red; }\n}\n</style>`;
@@ -1506,7 +1420,7 @@ Deno.test('css_atrule_long_wrap: positive - @media over 100 chars, we wrap', () 
 	assertNotEquals(match, null);
 });
 
-Deno.test('css_atrule_long_wrap: negative - @media under 100 chars', () => {
+test('css_atrule_long_wrap: negative - @media under 100 chars', () => {
 	const prettier =
 		'<style>\n@media screen and (min-width: 768px) {\n\tdiv { color: red; }\n}\n</style>';
 	const ours =
@@ -1518,7 +1432,7 @@ Deno.test('css_atrule_long_wrap: negative - @media under 100 chars', () => {
 
 // ─── css_atrule_stable_quirk ────────────────────────────────────────────────
 
-Deno.test('css_atrule_stable_quirk: positive - @layer with extra spaces', () => {
+test('css_atrule_stable_quirk: positive - @layer with extra spaces', () => {
 	const prettier = '<style>\n@layer base,  components;\n</style>';
 	const ours = '<style>\n@layer base, components;\n</style>';
 	const ctx = make_context(ours, prettier, 'svelte');
@@ -1526,7 +1440,7 @@ Deno.test('css_atrule_stable_quirk: positive - @layer with extra spaces', () => 
 	assertNotEquals(match, null);
 });
 
-Deno.test('css_atrule_stable_quirk: positive - @scope with spaces in parens', () => {
+test('css_atrule_stable_quirk: positive - @scope with spaces in parens', () => {
 	const prettier =
 		'<style>\n@scope ( .class1 )  to  ( .class2 ) {\n\timg { border: 1px; }\n}\n</style>';
 	const ours = '<style>\n@scope (.class1) to (.class2) {\n\timg { border: 1px; }\n}\n</style>';
@@ -1535,7 +1449,7 @@ Deno.test('css_atrule_stable_quirk: positive - @scope with spaces in parens', ()
 	assertNotEquals(match, null);
 });
 
-Deno.test('css_atrule_stable_quirk: negative - at-rule wrapping (different pattern)', () => {
+test('css_atrule_stable_quirk: negative - at-rule wrapping (different pattern)', () => {
 	const prettier =
 		'<style>\n@media screen and (min-width: 768px) {\n\tdiv { color: red; }\n}\n</style>';
 	const ours =
@@ -1547,7 +1461,7 @@ Deno.test('css_atrule_stable_quirk: negative - at-rule wrapping (different patte
 
 // ─── css_selector_divergence ────────────────────────────────────────────────
 
-Deno.test('css_selector_divergence: positive - column combinator ||', () => {
+test('css_selector_divergence: positive - column combinator ||', () => {
 	const prettier = '<style>\ncol.selected||td {\n\tcolor: red;\n}\n</style>';
 	const ours = '<style>\ncol.selected || td {\n\tcolor: red;\n}\n</style>';
 	const ctx = make_context(ours, prettier, 'svelte');
@@ -1555,7 +1469,7 @@ Deno.test('css_selector_divergence: positive - column combinator ||', () => {
 	assertNotEquals(match, null);
 });
 
-Deno.test('css_selector_divergence: positive - nth-child normalization', () => {
+test('css_selector_divergence: positive - nth-child normalization', () => {
 	const prettier = '<style>\nli:nth-child(3n- 2) {\n\tcolor: yellow;\n}\n</style>';
 	const ours = '<style>\nli:nth-child(3n - 2) {\n\tcolor: yellow;\n}\n</style>';
 	const ctx = make_context(ours, prettier, 'svelte');
@@ -1563,7 +1477,7 @@ Deno.test('css_selector_divergence: positive - nth-child normalization', () => {
 	assertNotEquals(match, null);
 });
 
-Deno.test('css_selector_divergence: negative - || in TypeScript (logical OR)', () => {
+test('css_selector_divergence: negative - || in TypeScript (logical OR)', () => {
 	const prettier = 'const x = a || b;';
 	const ours = 'const x = a ||\n\tb;';
 	const ctx = make_context(ours, prettier, 'typescript');
@@ -1571,59 +1485,47 @@ Deno.test('css_selector_divergence: negative - || in TypeScript (logical OR)', (
 	assertEquals(match, null);
 });
 
-Deno.test(
-	'css_selector_divergence: positive - nested pseudo-args re-indent (:is in :where)',
-	() => {
-		// prettier indents the :is() arg list one extra level (`nodes.length > 2`); tsv
-		// keys on a real combinator, so the same list sits one tab shallower. Pure re-indent.
-		const prettier =
-			':where(\n\t:is(\n\t\t\tp,\n\t\t\tul\n\t\t):not(:last-child)\n) {\n\tmargin: 0;\n}';
-		const ours = ':where(\n\t:is(\n\t\tp,\n\t\tul\n\t):not(:last-child)\n) {\n\tmargin: 0;\n}';
-		const ctx = make_context(ours, prettier, 'css');
-		const match = run_pattern('css_selector_divergence', ctx);
-		assertNotEquals(match, null);
-	}
-);
+test('css_selector_divergence: positive - nested pseudo-args re-indent (:is in :where)', () => {
+	// prettier indents the :is() arg list one extra level (`nodes.length > 2`); tsv
+	// keys on a real combinator, so the same list sits one tab shallower. Pure re-indent.
+	const prettier =
+		':where(\n\t:is(\n\t\t\tp,\n\t\t\tul\n\t\t):not(:last-child)\n) {\n\tmargin: 0;\n}';
+	const ours = ':where(\n\t:is(\n\t\tp,\n\t\tul\n\t):not(:last-child)\n) {\n\tmargin: 0;\n}';
+	const ctx = make_context(ours, prettier, 'css');
+	const match = run_pattern('css_selector_divergence', ctx);
+	assertNotEquals(match, null);
+});
 
-Deno.test(
-	'css_selector_divergence: negative - selector content actually differs (not pure re-indent)',
-	() => {
-		// Same shape, but a selector token changed (`ul` → `ol`): NOT a pure re-indent,
-		// so the pseudo-args clause must not claim it (a real content difference).
-		const prettier =
-			':where(\n\t:is(\n\t\t\tp,\n\t\t\tul\n\t):not(:last-child)\n) {\n\tmargin: 0;\n}';
-		const ours = ':where(\n\t:is(\n\t\tp,\n\t\tol\n\t):not(:last-child)\n) {\n\tmargin: 0;\n}';
-		const ctx = make_context(ours, prettier, 'css');
-		const match = run_pattern('css_selector_divergence', ctx);
-		assertEquals(match, null);
-	}
-);
+test('css_selector_divergence: negative - selector content actually differs (not pure re-indent)', () => {
+	// Same shape, but a selector token changed (`ul` → `ol`): NOT a pure re-indent,
+	// so the pseudo-args clause must not claim it (a real content difference).
+	const prettier =
+		':where(\n\t:is(\n\t\t\tp,\n\t\t\tul\n\t):not(:last-child)\n) {\n\tmargin: 0;\n}';
+	const ours = ':where(\n\t:is(\n\t\tp,\n\t\tol\n\t):not(:last-child)\n) {\n\tmargin: 0;\n}';
+	const ctx = make_context(ours, prettier, 'css');
+	const match = run_pattern('css_selector_divergence', ctx);
+	assertEquals(match, null);
+});
 
 // ─── forced_continuation_indent ─────────────────────────────────────────────
 
-Deno.test(
-	'forced_continuation_indent: positive - type after colon line comment indents one level',
-	() => {
-		const prettier = 'const e: // c\nFoo = x;';
-		const ours = 'const e: // c\n\tFoo = x;';
-		const ctx = make_context(ours, prettier, 'svelte');
-		const match = run_pattern('forced_continuation_indent', ctx);
-		assertNotEquals(match, null);
-	}
-);
+test('forced_continuation_indent: positive - type after colon line comment indents one level', () => {
+	const prettier = 'const e: // c\nFoo = x;';
+	const ours = 'const e: // c\n\tFoo = x;';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('forced_continuation_indent', ctx);
+	assertNotEquals(match, null);
+});
 
-Deno.test(
-	'forced_continuation_indent: positive - module header gap (import keyword→source)',
-	() => {
-		const prettier = "import // c\n'a';";
-		const ours = "import // c\n\t'a';";
-		const ctx = make_context(ours, prettier, 'typescript');
-		const match = run_pattern('forced_continuation_indent', ctx);
-		assertNotEquals(match, null);
-	}
-);
+test('forced_continuation_indent: positive - module header gap (import keyword→source)', () => {
+	const prettier = "import // c\n'a';";
+	const ours = "import // c\n\t'a';";
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('forced_continuation_indent', ctx);
+	assertNotEquals(match, null);
+});
 
-Deno.test('forced_continuation_indent: positive - prefix type operator operand hang', () => {
+test('forced_continuation_indent: positive - prefix type operator operand hang', () => {
 	const prettier = 'type A = keyof // c\nB;';
 	const ours = 'type A = keyof // c\n\tB;';
 	const ctx = make_context(ours, prettier, 'typescript');
@@ -1631,31 +1533,25 @@ Deno.test('forced_continuation_indent: positive - prefix type operator operand h
 	assertNotEquals(match, null);
 });
 
-Deno.test(
-	'forced_continuation_indent: positive - key→colon gap (continuation leads with `:`)',
-	() => {
-		const prettier = 'interface A {\n\t[\n\t\tkey // c\n\t\t: string\n\t]: number;\n}';
-		const ours = 'interface A {\n\t[\n\t\tkey // c\n\t\t\t: string\n\t]: number;\n}';
-		const ctx = make_context(ours, prettier, 'typescript');
-		const match = run_pattern('forced_continuation_indent', ctx);
-		assertNotEquals(match, null);
-	}
-);
+test('forced_continuation_indent: positive - key→colon gap (continuation leads with `:`)', () => {
+	const prettier = 'interface A {\n\t[\n\t\tkey // c\n\t\t: string\n\t]: number;\n}';
+	const ours = 'interface A {\n\t[\n\t\tkey // c\n\t\t\t: string\n\t]: number;\n}';
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('forced_continuation_indent', ctx);
+	assertNotEquals(match, null);
+});
 
-Deno.test(
-	'forced_continuation_indent: positive - block comment sits in the target→colon gap',
-	() => {
-		// `/* */` never runs to end-of-line, so it cannot force the break — it only
-		// separates the annotation target from its colon, which still carries the `//`.
-		const prettier = 'type T = {\n\t[k: string] /* x */ : // c\n\tnumber;\n};';
-		const ours = 'type T = {\n\t[k: string] /* x */ : // c\n\t\tnumber;\n};';
-		const ctx = make_context(ours, prettier, 'typescript');
-		const match = run_pattern('forced_continuation_indent', ctx);
-		assertNotEquals(match, null);
-	}
-);
+test('forced_continuation_indent: positive - block comment sits in the target→colon gap', () => {
+	// `/* */` never runs to end-of-line, so it cannot force the break — it only
+	// separates the annotation target from its colon, which still carries the `//`.
+	const prettier = 'type T = {\n\t[k: string] /* x */ : // c\n\tnumber;\n};';
+	const ours = 'type T = {\n\t[k: string] /* x */ : // c\n\t\tnumber;\n};';
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('forced_continuation_indent', ctx);
+	assertNotEquals(match, null);
+});
 
-Deno.test('forced_continuation_indent: positive - declaration header gap (keyword→name)', () => {
+test('forced_continuation_indent: positive - declaration header gap (keyword→name)', () => {
 	const prettier = 'function // c\nf1() {}';
 	const ours = 'function // c\n\tf1() {}';
 	const ctx = make_context(ours, prettier, 'typescript');
@@ -1663,59 +1559,47 @@ Deno.test('forced_continuation_indent: positive - declaration header gap (keywor
 	assertNotEquals(match, null);
 });
 
-Deno.test(
-	'forced_continuation_indent: positive - generator `*` sits between keyword and comment',
-	() => {
-		const prettier = 'function* // c\ng1() {}';
-		const ours = 'function* // c\n\tg1() {}';
-		const ctx = make_context(ours, prettier, 'typescript');
-		const match = run_pattern('forced_continuation_indent', ctx);
-		assertNotEquals(match, null);
-	}
-);
+test('forced_continuation_indent: positive - generator `*` sits between keyword and comment', () => {
+	const prettier = 'function* // c\ng1() {}';
+	const ours = 'function* // c\n\tg1() {}';
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('forced_continuation_indent', ctx);
+	assertNotEquals(match, null);
+});
 
-Deno.test(
-	'forced_continuation_indent: positive - Svelte prefixed head, closer dropped to its own line',
-	() => {
-		// tsv drops a braced head's closer once the content indents, so the hunk has one
-		// more added line than removed — still whitespace-only, so `fold_dropped_closer`
-		// restores the shape the re-indent test measures.
-		const prettier = '{@html // c\nexpr}';
-		const ours = '{@html // c\n\texpr\n}';
-		const ctx = make_context(ours, prettier, 'svelte');
-		const match = run_pattern('forced_continuation_indent', ctx);
-		assertNotEquals(match, null);
-	}
-);
+test('forced_continuation_indent: positive - Svelte prefixed head, closer dropped to its own line', () => {
+	// tsv drops a braced head's closer once the content indents, so the hunk has one
+	// more added line than removed — still whitespace-only, so `fold_dropped_closer`
+	// restores the shape the re-indent test measures.
+	const prettier = '{@html // c\nexpr}';
+	const ours = '{@html // c\n\texpr\n}';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('forced_continuation_indent', ctx);
+	assertNotEquals(match, null);
+});
 
-Deno.test(
-	'forced_continuation_indent: positive - unprefixed `{` head line carries the separator',
-	() => {
-		// The head line itself changes here (tsv separates the brace from the comment), so
-		// the hunk opens ON the head and `split_leading_head` supplies it — including at
-		// line 0, where there is no line above the hunk to read one from.
-		const prettier = '{// c\na}';
-		const ours = '{ // c\n\ta\n}';
-		const ctx = make_context(ours, prettier, 'svelte');
-		const match = run_pattern('forced_continuation_indent', ctx);
-		assertNotEquals(match, null);
-	}
-);
+test('forced_continuation_indent: positive - unprefixed `{` head line carries the separator', () => {
+	// The head line itself changes here (tsv separates the brace from the comment), so
+	// the hunk opens ON the head and `split_leading_head` supplies it — including at
+	// line 0, where there is no line above the hunk to read one from.
+	const prettier = '{// c\na}';
+	const ours = '{ // c\n\ta\n}';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('forced_continuation_indent', ctx);
+	assertNotEquals(match, null);
+});
 
-Deno.test(
-	'forced_continuation_indent: negative - a line-leading `{ //` in TYPESCRIPT is a block statement',
-	() => {
-		// The bare-brace clause is language-gated: with the space allowed, `{ // c` is a
-		// shape the TS printer can produce (a block statement), so only markup may claim it.
-		const prettier = '{// c\na;\n}';
-		const ours = '{ // c\n\ta;\n}';
-		const ctx = make_context(ours, prettier, 'typescript');
-		const match = run_pattern('forced_continuation_indent', ctx);
-		assertEquals(match, null);
-	}
-);
+test('forced_continuation_indent: negative - a line-leading `{ //` in TYPESCRIPT is a block statement', () => {
+	// The bare-brace clause is language-gated: with the space allowed, `{ // c` is a
+	// shape the TS printer can produce (a block statement), so only markup may claim it.
+	const prettier = '{// c\na;\n}';
+	const ours = '{ // c\n\ta;\n}';
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('forced_continuation_indent', ctx);
+	assertEquals(match, null);
+});
 
-Deno.test('forced_continuation_indent: negative - an extra added line that is not a closer', () => {
+test('forced_continuation_indent: negative - an extra added line that is not a closer', () => {
 	// The fold is what keeps the whitespace-only safety argument: only a closers-only
 	// trailing line may be folded back, never a line carrying content.
 	const prettier = '{@html // c\nexpr}';
@@ -1725,51 +1609,42 @@ Deno.test('forced_continuation_indent: negative - an extra added line that is no
 	assertEquals(match, null);
 });
 
-Deno.test(
-	'forced_continuation_indent: negative - body-open-brace comment is a different gap',
-	() => {
-		// The keyword must IMMEDIATELY precede the comment. Here the comment trails the
-		// body's `{`, so it never split a keyword from its name — claiming it would let
-		// the clause absorb any re-indent under any function.
-		const prettier = 'function f() { // c\nbar;\n}';
-		const ours = 'function f() { // c\n\tbar;\n}';
-		const ctx = make_context(ours, prettier, 'typescript');
-		const match = run_pattern('forced_continuation_indent', ctx);
-		assertEquals(match, null);
-	}
-);
+test('forced_continuation_indent: negative - body-open-brace comment is a different gap', () => {
+	// The keyword must IMMEDIATELY precede the comment. Here the comment trails the
+	// body's `{`, so it never split a keyword from its name — claiming it would let
+	// the clause absorb any re-indent under any function.
+	const prettier = 'function f() { // c\nbar;\n}';
+	const ours = 'function f() { // c\n\tbar;\n}';
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('forced_continuation_indent', ctx);
+	assertEquals(match, null);
+});
 
-Deno.test(
-	'forced_continuation_indent: negative - prettier RELOCATES the keyword-gap comment',
-	() => {
-		// The anonymous class/function expression shape (`expr_anon_line_comment`): the
-		// head matches the clause's regex, but prettier moves the comment into the body
-		// rather than merely flattening the indent, so `is_pure_reindent` must reject it.
-		// That relocation is `comment_position`'s to claim, not this pattern's.
-		const prettier = 'const a = class {\n\t// c1\n};';
-		const ours = 'const a = class // c1\n{};';
-		const ctx = make_context(ours, prettier, 'typescript');
-		const match = run_pattern('forced_continuation_indent', ctx);
-		assertEquals(match, null);
-	}
-);
+test('forced_continuation_indent: negative - prettier RELOCATES the keyword-gap comment', () => {
+	// The anonymous class/function expression shape (`expr_anon_line_comment`): the
+	// head matches the clause's regex, but prettier moves the comment into the body
+	// rather than merely flattening the indent, so `is_pure_reindent` must reject it.
+	// That relocation is `comment_position`'s to claim, not this pattern's.
+	const prettier = 'const a = class {\n\t// c1\n};';
+	const ours = 'const a = class // c1\n{};';
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('forced_continuation_indent', ctx);
+	assertEquals(match, null);
+});
 
-Deno.test(
-	'forced_continuation_indent: negative - contextual keyword is not a declaration head',
-	() => {
-		// The clause's keyword set is closed to the RESERVED words. With the name on the
-		// next line `interface` is not a declaration keyword at all — Svelte's parser and
-		// prettier both reject this input — so no such divergence exists to explain, and
-		// a clause claiming one would be keying on a construct that cannot occur.
-		const prettier = 'interface // c\nX {}';
-		const ours = 'interface // c\n\tX {}';
-		const ctx = make_context(ours, prettier, 'typescript');
-		const match = run_pattern('forced_continuation_indent', ctx);
-		assertEquals(match, null);
-	}
-);
+test('forced_continuation_indent: negative - contextual keyword is not a declaration head', () => {
+	// The clause's keyword set is closed to the RESERVED words. With the name on the
+	// next line `interface` is not a declaration keyword at all — Svelte's parser and
+	// prettier both reject this input — so no such divergence exists to explain, and
+	// a clause claiming one would be keying on a construct that cannot occur.
+	const prettier = 'interface // c\nX {}';
+	const ours = 'interface // c\n\tX {}';
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('forced_continuation_indent', ctx);
+	assertEquals(match, null);
+});
 
-Deno.test('forced_continuation_indent: negative - ternary branch (line-leading colon)', () => {
+test('forced_continuation_indent: negative - ternary branch (line-leading colon)', () => {
 	// A `:` at the start of its line is a ternary branch, not an annotation target;
 	// requiring a word/closer before the colon excludes it.
 	const prettier = 'const x = cond\n\t? a\n\t: // c\nb;';
@@ -1779,7 +1654,7 @@ Deno.test('forced_continuation_indent: negative - ternary branch (line-leading c
 	assertEquals(match, null);
 });
 
-Deno.test('forced_continuation_indent: negative - pure re-indent with no comment above it', () => {
+test('forced_continuation_indent: negative - pure re-indent with no comment above it', () => {
 	// The bug-class guard. An indentation defect with no comment in play (a wrong
 	// conditional-type body indent is the real precedent) must stay `unknown` — this
 	// detector exists to explain COMMENT-forced continuations, and claiming a bare
@@ -1791,64 +1666,52 @@ Deno.test('forced_continuation_indent: negative - pure re-indent with no comment
 	assertEquals(match, null);
 });
 
-Deno.test(
-	'forced_continuation_indent: negative - our continuation is two levels below the head',
-	() => {
-		// The rule indents "one level" below the construct head. A deeper continuation
-		// is some other layout difference and must not ride along.
-		const prettier = "import // c\n'a';";
-		const ours = "import // c\n\t\t'a';";
-		const ctx = make_context(ours, prettier, 'typescript');
-		const match = run_pattern('forced_continuation_indent', ctx);
-		assertEquals(match, null);
-	}
-);
+test('forced_continuation_indent: negative - our continuation is two levels below the head', () => {
+	// The rule indents "one level" below the construct head. A deeper continuation
+	// is some other layout difference and must not ride along.
+	const prettier = "import // c\n'a';";
+	const ours = "import // c\n\t\t'a';";
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('forced_continuation_indent', ctx);
+	assertEquals(match, null);
+});
 
-Deno.test(
-	'forced_continuation_indent: positive - multi-line continuation shifts as a block',
-	() => {
-		// An intersection hangs its members a further level in, so the continuation is
-		// multi-line with internal structure. tsv re-roots the whole block one level
-		// below the head; a rule demanding every line sit AT head+1 would reject the
-		// case the pattern was originally written for (and did, on real corpus files).
-		const prettier = 'elements: // c\n[string] &\n\t[string, B] &\n\t[string, B, C];';
-		const ours = 'elements: // c\n\t[string] &\n\t\t[string, B] &\n\t\t[string, B, C];';
-		const ctx = make_context(ours, prettier, 'typescript');
-		const match = run_pattern('forced_continuation_indent', ctx);
-		assertNotEquals(match, null);
-	}
-);
+test('forced_continuation_indent: positive - multi-line continuation shifts as a block', () => {
+	// An intersection hangs its members a further level in, so the continuation is
+	// multi-line with internal structure. tsv re-roots the whole block one level
+	// below the head; a rule demanding every line sit AT head+1 would reject the
+	// case the pattern was originally written for (and did, on real corpus files).
+	const prettier = 'elements: // c\n[string] &\n\t[string, B] &\n\t[string, B, C];';
+	const ours = 'elements: // c\n\t[string] &\n\t\t[string, B] &\n\t\t[string, B, C];';
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('forced_continuation_indent', ctx);
+	assertNotEquals(match, null);
+});
 
-Deno.test(
-	'forced_continuation_indent: positive - depth is judged against the head, not prettier',
-	() => {
-		// Prettier's own line is the DIVERGENCE, so it cannot also be the baseline. Here
-		// prettier emits a tab-plus-stray-space and ours sits exactly one level below the
-		// `export` head — the rule is satisfied, whatever prettier chose.
-		const prettier = 'export // c\n {};';
-		const ours = 'export // c\n\t{};';
-		const ctx = make_context(ours, prettier, 'typescript');
-		const match = run_pattern('forced_continuation_indent', ctx);
-		assertNotEquals(match, null);
-	}
-);
+test('forced_continuation_indent: positive - depth is judged against the head, not prettier', () => {
+	// Prettier's own line is the DIVERGENCE, so it cannot also be the baseline. Here
+	// prettier emits a tab-plus-stray-space and ours sits exactly one level below the
+	// `export` head — the rule is satisfied, whatever prettier chose.
+	const prettier = 'export // c\n {};';
+	const ours = 'export // c\n\t{};';
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('forced_continuation_indent', ctx);
+	assertNotEquals(match, null);
+});
 
-Deno.test(
-	'forced_continuation_indent: negative - own-line comment above an unrelated re-indent',
-	() => {
-		// An own-line comment is not evidence that a comment forced the continuation:
-		// where one genuinely does lead a continuation, prettier relocates the comment
-		// and the hunk stops being a pure re-indent (so `comment_position` claims it).
-		// A bare comment sitting above some other re-indent must not be claimed here.
-		const prettier = 'const a = 1;\n// c\nfoo(\n\tbar\n);';
-		const ours = 'const a = 1;\n// c\nfoo(\n\t\tbar\n);';
-		const ctx = make_context(ours, prettier, 'typescript');
-		const match = run_pattern('forced_continuation_indent', ctx);
-		assertEquals(match, null);
-	}
-);
+test('forced_continuation_indent: negative - own-line comment above an unrelated re-indent', () => {
+	// An own-line comment is not evidence that a comment forced the continuation:
+	// where one genuinely does lead a continuation, prettier relocates the comment
+	// and the hunk stops being a pure re-indent (so `comment_position` claims it).
+	// A bare comment sitting above some other re-indent must not be claimed here.
+	const prettier = 'const a = 1;\n// c\nfoo(\n\tbar\n);';
+	const ours = 'const a = 1;\n// c\nfoo(\n\t\tbar\n);';
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('forced_continuation_indent', ctx);
+	assertEquals(match, null);
+});
 
-Deno.test('forced_continuation_indent: negative - content changed, not a pure re-indent', () => {
+test('forced_continuation_indent: negative - content changed, not a pure re-indent', () => {
 	// `is_pure_reindent` is the content-preservation proof the whole detector rests
 	// on: a token differing beyond leading whitespace must fail it, so no content
 	// change can ever be claimed as an indent divergence.
@@ -1861,7 +1724,7 @@ Deno.test('forced_continuation_indent: negative - content changed, not a pure re
 
 // ─── format_ignore_preserved ────────────────────────────────────────────────
 
-Deno.test('format_ignore_preserved: positive - tsv keeps the ignored construct verbatim', () => {
+test('format_ignore_preserved: positive - tsv keeps the ignored construct verbatim', () => {
 	const prettier = '// format-ignore\nconst a = { b: 1, c: 2 };';
 	const ours = '// format-ignore\nconst   a = {b:   1,   c:   2};';
 	const ctx = make_context(ours, prettier, 'typescript');
@@ -1869,7 +1732,7 @@ Deno.test('format_ignore_preserved: positive - tsv keeps the ignored construct v
 	assertNotEquals(match, null);
 });
 
-Deno.test('format_ignore_preserved: negative - `prettier-ignore` alone explains nothing', () => {
+test('format_ignore_preserved: negative - `prettier-ignore` alone explains nothing', () => {
 	// Prettier honors its OWN directive, so a `prettier-ignore`d construct is
 	// preserved by both tools and cannot be the cause of a divergence. Claiming on
 	// any ignore-ish comment would excuse a real layout bug sitting next to one.
@@ -1880,7 +1743,7 @@ Deno.test('format_ignore_preserved: negative - `prettier-ignore` alone explains 
 	assertEquals(match, null);
 });
 
-Deno.test('format_ignore_preserved: negative - a real content change fails the safety gate', () => {
+test('format_ignore_preserved: negative - a real content change fails the safety gate', () => {
 	// Suppressing formatting can only preserve layout. A token that actually differs
 	// means something other than the directive is at work, and the whole-file
 	// whitespace-only proof is what refuses to claim it.
@@ -1891,7 +1754,7 @@ Deno.test('format_ignore_preserved: negative - a real content change fails the s
 	assertEquals(match, null);
 });
 
-Deno.test('format_ignore_preserved: negative - divergence ABOVE every directive', () => {
+test('format_ignore_preserved: negative - divergence ABOVE every directive', () => {
 	// A hunk before the first directive cannot have been caused by one; leaving it
 	// unclaimed keeps the file honestly `partial`.
 	const prettier = 'const z = [1, 2];\n// format-ignore\nconst a = 1;';
@@ -1903,43 +1766,34 @@ Deno.test('format_ignore_preserved: negative - divergence ABOVE every directive'
 
 // ─── prettier_ignore_trailing_colon_head ────────────────────────────────────
 
-Deno.test(
-	'prettier_ignore_trailing_colon_head: positive - prettier freezes the value under a `:`-trailing directive',
-	() => {
-		const prettier =
-			'x = {\n\tk: // prettier-ignore\n\t\tfn([\n\t\t0, 0,\n\t\t1, 0\n\t]),\n\tm: 1\n};';
-		const ours = 'x = {\n\tk: // prettier-ignore\n\t\tfn([0, 0, 1, 0]),\n\tm: 1\n};';
-		const ctx = make_context(ours, prettier, 'typescript');
-		const match = run_pattern('prettier_ignore_trailing_colon_head', ctx);
-		assertNotEquals(match, null);
-	}
-);
+test('prettier_ignore_trailing_colon_head: positive - prettier freezes the value under a `:`-trailing directive', () => {
+	const prettier =
+		'x = {\n\tk: // prettier-ignore\n\t\tfn([\n\t\t0, 0,\n\t\t1, 0\n\t]),\n\tm: 1\n};';
+	const ours = 'x = {\n\tk: // prettier-ignore\n\t\tfn([0, 0, 1, 0]),\n\tm: 1\n};';
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('prettier_ignore_trailing_colon_head', ctx);
+	assertNotEquals(match, null);
+});
 
-Deno.test(
-	'prettier_ignore_trailing_colon_head: negative - an own-line directive explains nothing',
-	() => {
-		// Alone on its line the directive is honored by BOTH formatters, so a divergence under it
-		// cannot be the trailing placement's — it is some other layout difference.
-		const prettier = 'x = {\n\tk:\n\t\t// prettier-ignore\n\t\tfn([\n\t\t0, 0\n\t]),\n};';
-		const ours = 'x = {\n\tk:\n\t\t// prettier-ignore\n\t\tfn([0, 0]),\n};';
-		const ctx = make_context(ours, prettier, 'typescript');
-		const match = run_pattern('prettier_ignore_trailing_colon_head', ctx);
-		assertEquals(match, null);
-	}
-);
+test('prettier_ignore_trailing_colon_head: negative - an own-line directive explains nothing', () => {
+	// Alone on its line the directive is honored by BOTH formatters, so a divergence under it
+	// cannot be the trailing placement's — it is some other layout difference.
+	const prettier = 'x = {\n\tk:\n\t\t// prettier-ignore\n\t\tfn([\n\t\t0, 0\n\t]),\n};';
+	const ours = 'x = {\n\tk:\n\t\t// prettier-ignore\n\t\tfn([0, 0]),\n};';
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('prettier_ignore_trailing_colon_head', ctx);
+	assertEquals(match, null);
+});
 
-Deno.test(
-	'prettier_ignore_trailing_colon_head: negative - a real content change fails the proof',
-	() => {
-		const prettier = 'x = {\n\tk: // prettier-ignore\n\t\tfn([\n\t\t0, 0\n\t]),\n};';
-		const ours = 'x = {\n\tk: // prettier-ignore\n\t\tfn([0, 1]),\n};';
-		const ctx = make_context(ours, prettier, 'typescript');
-		const match = run_pattern('prettier_ignore_trailing_colon_head', ctx);
-		assertEquals(match, null);
-	}
-);
+test('prettier_ignore_trailing_colon_head: negative - a real content change fails the proof', () => {
+	const prettier = 'x = {\n\tk: // prettier-ignore\n\t\tfn([\n\t\t0, 0\n\t]),\n};';
+	const ours = 'x = {\n\tk: // prettier-ignore\n\t\tfn([0, 1]),\n};';
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('prettier_ignore_trailing_colon_head', ctx);
+	assertEquals(match, null);
+});
 
-Deno.test('prettier_ignore_trailing_colon_head: negative - a hunk past the frozen value', () => {
+test('prettier_ignore_trailing_colon_head: negative - a hunk past the frozen value', () => {
 	// The window is the value's own lines; a sibling property's whitespace difference is not
 	// the directive's, and leaving it unclaimed keeps the file honestly `partial`.
 	const prettier = 'x = {\n\tk: // prettier-ignore\n\t\tfn(1),\n\tm: [1, 2]\n};';
@@ -1949,22 +1803,19 @@ Deno.test('prettier_ignore_trailing_colon_head: negative - a hunk past the froze
 	assertEquals(match, null);
 });
 
-Deno.test(
-	'prettier_ignore_trailing_colon_head: negative - a `case` label is not a value head',
-	() => {
-		// A `case` / `default` `:` heads a statement list; nothing pins what prettier freezes under a
-		// directive trailing it, so the detector leaves the hunk unexplained.
-		const prettier = 'switch (x) {\n\tcase 1: // prettier-ignore\n\t\tfn([1,   2]);\n}';
-		const ours = 'switch (x) {\n\tcase 1: // prettier-ignore\n\t\tfn([1, 2]);\n}';
-		const ctx = make_context(ours, prettier, 'typescript');
-		const match = run_pattern('prettier_ignore_trailing_colon_head', ctx);
-		assertEquals(match, null);
-	}
-);
+test('prettier_ignore_trailing_colon_head: negative - a `case` label is not a value head', () => {
+	// A `case` / `default` `:` heads a statement list; nothing pins what prettier freezes under a
+	// directive trailing it, so the detector leaves the hunk unexplained.
+	const prettier = 'switch (x) {\n\tcase 1: // prettier-ignore\n\t\tfn([1,   2]);\n}';
+	const ours = 'switch (x) {\n\tcase 1: // prettier-ignore\n\t\tfn([1, 2]);\n}';
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('prettier_ignore_trailing_colon_head', ctx);
+	assertEquals(match, null);
+});
 
 // ─── comment_preserved ──────────────────────────────────────────────────────
 
-Deno.test('comment_preserved: positive - prettier drops a MULTI-LINE block comment', () => {
+test('comment_preserved: positive - prettier drops a MULTI-LINE block comment', () => {
 	// The comment spans two of our lines, so neither carries a complete `/* … */`
 	// and the per-line pass sees nothing strippable. The joined compare is what
 	// claims it.
@@ -1975,7 +1826,7 @@ Deno.test('comment_preserved: positive - prettier drops a MULTI-LINE block comme
 	assertNotEquals(match, null);
 });
 
-Deno.test('comment_preserved: negative - prettier RELOCATES the comment (not a drop)', () => {
+test('comment_preserved: negative - prettier RELOCATES the comment (not a drop)', () => {
 	// Both sides carry the comment — prettier hoisted it out of the brackets rather
 	// than dropping it. Stripping comments makes the two sides equal either way, so
 	// the joined compare would claim it without the "prettier's side has no comment"
@@ -1991,7 +1842,7 @@ Deno.test('comment_preserved: negative - prettier RELOCATES the comment (not a d
 
 // ─── css_comment_stable_quirk ───────────────────────────────────────────────
 
-Deno.test('css_comment_stable_quirk: positive - comment before { in at-rule', () => {
+test('css_comment_stable_quirk: positive - comment before { in at-rule', () => {
 	const prettier = '<style>\n@media screen/* comment */ {\n\tdiv { color: red; }\n}\n</style>';
 	const ours = '<style>\n@media screen /* comment */ {\n\tdiv { color: red; }\n}\n</style>';
 	const ctx = make_context(ours, prettier, 'svelte');
@@ -1999,7 +1850,7 @@ Deno.test('css_comment_stable_quirk: positive - comment before { in at-rule', ()
 	assertNotEquals(match, null);
 });
 
-Deno.test('css_comment_stable_quirk: positive - CSS language', () => {
+test('css_comment_stable_quirk: positive - CSS language', () => {
 	const prettier = '@media screen/* comment */ {\n\tdiv { color: red; }\n}';
 	const ours = '@media screen /* comment */ {\n\tdiv { color: red; }\n}';
 	const ctx = make_context(ours, prettier, 'css');
@@ -2007,7 +1858,7 @@ Deno.test('css_comment_stable_quirk: positive - CSS language', () => {
 	assertNotEquals(match, null);
 });
 
-Deno.test('css_comment_stable_quirk: negative - TypeScript comment (not CSS)', () => {
+test('css_comment_stable_quirk: negative - TypeScript comment (not CSS)', () => {
 	const prettier = 'if (x) /* comment */ {\n\tconsole.log(1);\n}';
 	const ours = 'if (x) /* comment */\n{\n\tconsole.log(1);\n}';
 	const ctx = make_context(ours, prettier, 'typescript');
@@ -2017,7 +1868,7 @@ Deno.test('css_comment_stable_quirk: negative - TypeScript comment (not CSS)', (
 
 // ─── empty_statement_removal ────────────────────────────────────────────────
 
-Deno.test('empty_statement_removal: positive - standalone ; removed', () => {
+test('empty_statement_removal: positive - standalone ; removed', () => {
 	const prettier = '<script>\n;\n;\nconst x = 1;\n</script>';
 	const ours = '<script>\nconst x = 1;\n</script>';
 	const ctx = make_context(ours, prettier, 'svelte');
@@ -2026,14 +1877,14 @@ Deno.test('empty_statement_removal: positive - standalone ; removed', () => {
 	assertEquals(match!.confidence, 'certain');
 });
 
-Deno.test('empty_statement_removal: negative - semicolons in for(;;)', () => {
+test('empty_statement_removal: negative - semicolons in for(;;)', () => {
 	const prettier = 'for (;;) {\n\tbreak;\n}';
 	const ours = 'for (;;) {\n\tbreak;\n}';
 	const ctx = make_context(ours, prettier, 'typescript');
 	assertEquals(ctx.hunks.length, 0);
 });
 
-Deno.test('empty_statement_removal: negative - normal statement semicolons', () => {
+test('empty_statement_removal: negative - normal statement semicolons', () => {
 	const prettier = 'const x = 1;\nconst y = 2;';
 	const ours = 'const x = 1;\nconst y = 3;';
 	const ctx = make_context(ours, prettier, 'typescript');
@@ -2043,7 +1894,7 @@ Deno.test('empty_statement_removal: negative - normal statement semicolons', () 
 
 // ─── nullable_union_type_argument ───────────────────────────────────────────
 
-Deno.test('nullable_union_type_argument: positive - generic with | null wraps', () => {
+test('nullable_union_type_argument: positive - generic with | null wraps', () => {
 	// Need prettier line > 100 chars with generic union
 	const prettier =
 		'function processWithVeryLongFunctionName(input: SomeVeryLongParameterType): Promise<VeryLongReturnTypeName | null> {';
@@ -2054,7 +1905,7 @@ Deno.test('nullable_union_type_argument: positive - generic with | null wraps', 
 	assertNotEquals(match, null);
 });
 
-Deno.test('nullable_union_type_argument: positive - `null` first', () => {
+test('nullable_union_type_argument: positive - `null` first', () => {
 	const prettier =
 		'\taaaaaaaaaaaaaaaaaaaaaaaa03: Promise<null | Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb>;';
 	const ours =
@@ -2064,18 +1915,15 @@ Deno.test('nullable_union_type_argument: positive - `null` first', () => {
 	assertNotEquals(match, null);
 });
 
-Deno.test(
-	'nullable_union_type_argument: positive - member with breakable type arguments kept whole',
-	() => {
-		const prettier = 'type A = Promise<Map<\n\tKkkk,\n\tVvvv\n> | null>;';
-		const ours = 'type A =\n\tPromise<Map<Kkkk, Vvvv> | null>;';
-		const ctx = make_context(ours, prettier, 'typescript');
-		const match = run_pattern('nullable_union_type_argument', ctx);
-		assertNotEquals(match, null);
-	}
-);
+test('nullable_union_type_argument: positive - member with breakable type arguments kept whole', () => {
+	const prettier = 'type A = Promise<Map<\n\tKkkk,\n\tVvvv\n> | null>;';
+	const ours = 'type A =\n\tPromise<Map<Kkkk, Vvvv> | null>;';
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('nullable_union_type_argument', ctx);
+	assertNotEquals(match, null);
+});
 
-Deno.test('nullable_union_type_argument: negative - generic without union', () => {
+test('nullable_union_type_argument: negative - generic without union', () => {
 	const prettier = 'function foo(): Promise<string> {';
 	const ours = 'function foo(): Promise<\n\tstring\n> {';
 	const ctx = make_context(ours, prettier, 'typescript');
@@ -2083,7 +1931,7 @@ Deno.test('nullable_union_type_argument: negative - generic without union', () =
 	assertEquals(match, null);
 });
 
-Deno.test('nullable_union_type_argument: negative - `| undefined` is not in the set', () => {
+test('nullable_union_type_argument: negative - `| undefined` is not in the set', () => {
 	const prettier =
 		'function processWithVeryLongFunctionName(input: SomeVeryLongParameterType): Promise<VeryLongReturnTypeName | undefined> {';
 	const ours =
@@ -2095,7 +1943,7 @@ Deno.test('nullable_union_type_argument: negative - `| undefined` is not in the 
 
 // ─── non_null_paren_base ────────────────────────────────────────────────────
 
-Deno.test('non_null_paren_base: positive - tsv hangs parens, prettier hugs ))!.', () => {
+test('non_null_paren_base: positive - tsv hangs parens, prettier hugs ))!.', () => {
 	// Prettier hugs the inner call: `))!.ok` collapses on one line.
 	const prettier =
 		'\tconst ok = (await call(\n\t\tapplicationObjectLong,\n\t\tspecificationObjectLong,\n\t\thh,\n\t))!.ok;';
@@ -2108,7 +1956,7 @@ Deno.test('non_null_paren_base: positive - tsv hangs parens, prettier hugs ))!.'
 	assertEquals(match!.pattern, 'non_null_paren_base');
 });
 
-Deno.test('non_null_paren_base: negative - no `!` (plain trailing member matches prettier)', () => {
+test('non_null_paren_base: negative - no `!` (plain trailing member matches prettier)', () => {
 	// Without the non-null `!`, prettier has no `))!.` hug and tsv emits `).ok` —
 	// the detector must not claim a plain trailing-member break.
 	const prettier =
@@ -2121,7 +1969,7 @@ Deno.test('non_null_paren_base: negative - no `!` (plain trailing member matches
 
 // ─── instantiation_parens ─────────────────────────────────────────────────
 
-Deno.test('instantiation_parens: positive - ternary parens stripped', () => {
+test('instantiation_parens: positive - ternary parens stripped', () => {
 	const prettier = '\tlet c = x ? y : z<T>;';
 	const ours = '\tlet c = (x ? y : z)<T>;';
 	const ctx = make_context(ours, prettier, 'svelte');
@@ -2131,7 +1979,7 @@ Deno.test('instantiation_parens: positive - ternary parens stripped', () => {
 	assertEquals(match!.confidence, 'certain');
 });
 
-Deno.test('instantiation_parens: positive - binary parens stripped', () => {
+test('instantiation_parens: positive - binary parens stripped', () => {
 	const prettier = '\tlet d = a + b<T>;';
 	const ours = '\tlet d = (a + b)<T>;';
 	const ctx = make_context(ours, prettier, 'typescript');
@@ -2139,7 +1987,7 @@ Deno.test('instantiation_parens: positive - binary parens stripped', () => {
 	assertNotEquals(match, null);
 });
 
-Deno.test('instantiation_parens: positive - unary parens stripped', () => {
+test('instantiation_parens: positive - unary parens stripped', () => {
 	const prettier = '\tlet f = typeof e<T>;\n\tlet g = -e<T>;\n\tlet h = !e<T>;';
 	const ours = '\tlet f = (typeof e)<T>;\n\tlet g = (-e)<T>;\n\tlet h = (!e)<T>;';
 	const ctx = make_context(ours, prettier, 'svelte');
@@ -2147,7 +1995,7 @@ Deno.test('instantiation_parens: positive - unary parens stripped', () => {
 	assertNotEquals(match, null);
 });
 
-Deno.test('instantiation_parens: negative - a pair added with other changes', () => {
+test('instantiation_parens: negative - a pair added with other changes', () => {
 	// not the exact twin: the operand changed too, so the pair is not the whole difference
 	const prettier = '\tlet f = typeof d<T>;';
 	const ours = '\tlet f = (typeof e)<T>;';
@@ -2156,7 +2004,7 @@ Deno.test('instantiation_parens: negative - a pair added with other changes', ()
 	assertEquals(match, null);
 });
 
-Deno.test('instantiation_parens: positive - two unary pairs on one line', () => {
+test('instantiation_parens: positive - two unary pairs on one line', () => {
 	const prettier = '\tlet f = g(typeof e<T>, !f<U>);';
 	const ours = '\tlet f = g((typeof e)<T>, (!f)<U>);';
 	const ctx = make_context(ours, prettier, 'svelte');
@@ -2164,7 +2012,7 @@ Deno.test('instantiation_parens: positive - two unary pairs on one line', () => 
 	assertNotEquals(match, null);
 });
 
-Deno.test('instantiation_parens: negative - a pair around a plain callee', () => {
+test('instantiation_parens: negative - a pair around a plain callee', () => {
 	// a redundant pair around an identifier is no unary operand's
 	const prettier = '\tlet f = g<T>(x);';
 	const ours = '\tlet f = (g)<T>(x);';
@@ -2173,7 +2021,7 @@ Deno.test('instantiation_parens: negative - a pair around a plain callee', () =>
 	assertEquals(match, null);
 });
 
-Deno.test('instantiation_parens: negative - a double wrap', () => {
+test('instantiation_parens: negative - a double wrap', () => {
 	// prettier keeps one pair and ours adds a second: not the pair this pattern explains
 	const prettier = '\tlet f = (typeof e)<T>;';
 	const ours = '\tlet f = ((typeof e))<T>;';
@@ -2182,7 +2030,7 @@ Deno.test('instantiation_parens: negative - a double wrap', () => {
 	assertEquals(match, null);
 });
 
-Deno.test('instantiation_parens: negative - an extra line beside the twin', () => {
+test('instantiation_parens: negative - an extra line beside the twin', () => {
 	const prettier = '\tlet f = typeof e<T>;';
 	const ours = '\tlet f = (typeof e)<T>;\n\tlet g = 1;';
 	const ctx = make_context(ours, prettier, 'svelte');
@@ -2190,7 +2038,7 @@ Deno.test('instantiation_parens: negative - an extra line beside the twin', () =
 	assertEquals(match, null);
 });
 
-Deno.test("instantiation_parens: negative - a call's own paren", () => {
+test("instantiation_parens: negative - a call's own paren", () => {
 	const prettier = '\tlet f = htypeof e<T>;';
 	const ours = '\tlet f = h(typeof e)<T>;';
 	const ctx = make_context(ours, prettier, 'svelte');
@@ -2198,7 +2046,7 @@ Deno.test("instantiation_parens: negative - a call's own paren", () => {
 	assertEquals(match, null);
 });
 
-Deno.test('instantiation_parens: negative - assignment parens (both agree)', () => {
+test('instantiation_parens: negative - assignment parens (both agree)', () => {
 	// Both formatters preserve parens for assignment — no diff
 	const prettier = '\tlet a = (x = y)<T>;';
 	const ours = '\tlet a = (x = y)<T>;';
@@ -2207,7 +2055,7 @@ Deno.test('instantiation_parens: negative - assignment parens (both agree)', () 
 	assertEquals(match, null);
 });
 
-Deno.test('instantiation_parens: positive - lowercase type param', () => {
+test('instantiation_parens: positive - lowercase type param', () => {
 	const prettier = '\tlet e = x ? y : z<string>;';
 	const ours = '\tlet e = (x ? y : z)<string>;';
 	const ctx = make_context(ours, prettier, 'typescript');
@@ -2215,7 +2063,7 @@ Deno.test('instantiation_parens: positive - lowercase type param', () => {
 	assertNotEquals(match, null);
 });
 
-Deno.test('instantiation_parens: negative - normal generic usage', () => {
+test('instantiation_parens: negative - normal generic usage', () => {
 	const prettier = '\tconst x = foo<T>();';
 	const ours = '\tconst x = foo<T>();';
 	const ctx = make_context(ours, prettier, 'typescript');
@@ -2225,7 +2073,7 @@ Deno.test('instantiation_parens: negative - normal generic usage', () => {
 
 // ─── template_embedded_verbatim ───────────────────────────────────────────
 
-Deno.test('template_embedded_verbatim: positive - html body collapsed by prettier', () => {
+test('template_embedded_verbatim: positive - html body collapsed by prettier', () => {
 	const ours = '\tconst t = html`<div>  {{label}}  </div>`;';
 	const prettier = '\tconst t = html`<div>{{label}}</div>`;';
 	const ctx = make_context(ours, prettier, 'svelte');
@@ -2235,7 +2083,7 @@ Deno.test('template_embedded_verbatim: positive - html body collapsed by prettie
 	assertEquals(match!.confidence, 'certain');
 });
 
-Deno.test('template_embedded_verbatim: positive - css body expanded by prettier', () => {
+test('template_embedded_verbatim: positive - css body expanded by prettier', () => {
 	const ours = '\tconst s = css`.a{color:red}`;';
 	const prettier = '\tconst s = css`\n\t\t.a {\n\t\t\tcolor: red;\n\t\t}\n\t`;';
 	const ctx = make_context(ours, prettier, 'typescript');
@@ -2243,25 +2091,22 @@ Deno.test('template_embedded_verbatim: positive - css body expanded by prettier'
 	assertNotEquals(match, null);
 });
 
-Deno.test(
-	'template_embedded_verbatim: negative - unrecognized tag (no embedded formatting)',
-	() => {
-		// `sql` is not an embedded-language tag prettier reformats, so a diff on a
-		// `sql`…`` template must not be claimed.
-		const ours = '\tconst q = sql`SELECT 1`;';
-		const prettier = '\tconst q = sql`SELECT 2`;';
-		const ctx = make_context(ours, prettier, 'typescript');
-		const match = run_pattern('template_embedded_verbatim', ctx);
-		assertEquals(match, null);
-	}
-);
+test('template_embedded_verbatim: negative - unrecognized tag (no embedded formatting)', () => {
+	// `sql` is not an embedded-language tag prettier reformats, so a diff on a
+	// `sql`…`` template must not be claimed.
+	const ours = '\tconst q = sql`SELECT 1`;';
+	const prettier = '\tconst q = sql`SELECT 2`;';
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('template_embedded_verbatim', ctx);
+	assertEquals(match, null);
+});
 
 // ─── field_key_quoted ─────────────────────────────────────────────────────
 
 // The pattern reads the source (a KEPT key was written quoted), so these contexts carry
 // one: tsv's own output, which is a fixed point, unless a case names another.
 
-Deno.test('field_key_quoted: positive - auto-accessor key kept quoted', () => {
+test('field_key_quoted: positive - auto-accessor key kept quoted', () => {
 	const ours = "class A {\n\taccessor 'a': string;\n\tstatic accessor 'c' = 2;\n}";
 	const prettier = 'class A {\n\taccessor a: string;\n\tstatic accessor c = 2;\n}';
 	const ctx = make_context(ours, prettier, 'typescript', ours);
@@ -2271,7 +2116,7 @@ Deno.test('field_key_quoted: positive - auto-accessor key kept quoted', () => {
 	assertEquals(match!.confidence, 'certain');
 });
 
-Deno.test('field_key_quoted: positive - abstract and decorated field keys kept quoted', () => {
+test('field_key_quoted: positive - abstract and decorated field keys kept quoted', () => {
 	const ours =
 		"abstract class B {\n\tabstract readonly 'b': number;\n\t@dec accessor 'd': string;\n}";
 	const prettier =
@@ -2281,7 +2126,7 @@ Deno.test('field_key_quoted: positive - abstract and decorated field keys kept q
 	assertNotEquals(match, null);
 });
 
-Deno.test('field_key_quoted: positive - plain field keys of a .js file kept quoted', () => {
+test('field_key_quoted: positive - plain field keys of a .js file kept quoted', () => {
 	// The corpus shape (js/quote-props/classes.js): prettier's `babel` parser unquotes
 	// every class field key, tsv keeps the quotes. Each shape alone, so each must be
 	// claimed by itself — the first is the value that spells its own key.
@@ -2297,14 +2142,14 @@ Deno.test('field_key_quoted: positive - plain field keys of a .js file kept quot
 	}
 });
 
-Deno.test('field_key_quoted: positive - a double-quoted source spelling', () => {
+test('field_key_quoted: positive - a double-quoted source spelling', () => {
 	const ours = "class C {\n\taccessor 'a' = 1;\n}";
 	const prettier = 'class C {\n\taccessor a = 1;\n}';
 	const ctx = make_context(ours, prettier, 'typescript', 'class C { accessor "a" = 1 }');
 	assertNotEquals(run_pattern('field_key_quoted', ctx), null);
 });
 
-Deno.test('field_key_quoted: negative - enum member key (same direction)', () => {
+test('field_key_quoted: negative - enum member key (same direction)', () => {
 	// Prettier unquotes an enum member key too and tsv keeps it — the SAME direction as a
 	// field key, but another construct. A member ends in `,` or nothing, never `;`, so the
 	// bare arm does not claim it; claiming it would mask that difference.
@@ -2316,7 +2161,7 @@ Deno.test('field_key_quoted: negative - enum member key (same direction)', () =>
 	}
 });
 
-Deno.test('field_key_quoted: negative - object, type-member and method keys', () => {
+test('field_key_quoted: negative - object, type-member and method keys', () => {
 	const cases: Array<[string, string]> = [
 		// object property
 		["const o = {\n\t'a': 1,\n\t'b': 2\n};", 'const o = {\n\ta: 1,\n\tb: 2\n};'],
@@ -2334,7 +2179,7 @@ Deno.test('field_key_quoted: negative - object, type-member and method keys', ()
 	}
 });
 
-Deno.test('field_key_quoted: negative - the reverse direction is not claimed', () => {
+test('field_key_quoted: negative - the reverse direction is not claimed', () => {
 	// tsv unquoting a field key prettier keeps quoted would be a regression, not this
 	// divergence.
 	const ours = 'class C {\n\taccessor a: string;\n\tb = 1;\n}';
@@ -2343,7 +2188,7 @@ Deno.test('field_key_quoted: negative - the reverse direction is not claimed', (
 	assertEquals(run_pattern('field_key_quoted', ctx), null);
 });
 
-Deno.test('field_key_quoted: negative - a line-initial string VALUE is not a key', () => {
+test('field_key_quoted: negative - a line-initial string VALUE is not a key', () => {
 	// An assignment that breaks after its `=` puts the string value at line start, and the
 	// value may spell its own target (`kind = 'kind'`). That is a layout difference, not a
 	// kept key: prettier's line is not tsv's line with one pair of quotes dropped.
@@ -2358,7 +2203,7 @@ Deno.test('field_key_quoted: negative - a line-initial string VALUE is not a key
 	}
 });
 
-Deno.test('field_key_quoted: negative - anything else moving on the key line', () => {
+test('field_key_quoted: negative - anything else moving on the key line', () => {
 	// The divergence drops one pair of quotes and nothing else, so a line that also
 	// re-spaces its value, breaks after its `=`, re-spells its type, changes or reorders
 	// its modifiers, loses a comment, carries a second quoted key, or names another member
@@ -2389,7 +2234,7 @@ Deno.test('field_key_quoted: negative - anything else moving on the key line', (
 	}
 });
 
-Deno.test('field_key_quoted: negative - another changed line in the same hunk', () => {
+test('field_key_quoted: negative - another changed line in the same hunk', () => {
 	// The whole hunk must be this divergence. A value that wraps differently under a kept
 	// key, or an unrelated neighbour that moved, leaves the hunk unexplained.
 	const cases: Array<[string, string]> = [
@@ -2408,7 +2253,7 @@ Deno.test('field_key_quoted: negative - another changed line in the same hunk', 
 	}
 });
 
-Deno.test('field_key_quoted: negative - a key the source never spelled as a string', () => {
+test('field_key_quoted: negative - a key the source never spelled as a string', () => {
 	// A kept key was written quoted. Here the source is bare, so tsv would have ADDED the
 	// quotes — a formatter bug, not this divergence.
 	const cases: Array<[string, string, string]> = [
@@ -2426,7 +2271,7 @@ Deno.test('field_key_quoted: negative - a key the source never spelled as a stri
 	}
 });
 
-Deno.test('field_key_quoted: negative - field value change is not a key difference', () => {
+test('field_key_quoted: negative - field value change is not a key difference', () => {
 	// The field KEY is quoted on both sides; only the VALUE differs, so prettier's line is
 	// not tsv's line minus a pair of quotes.
 	const ours = "class C {\n\t'a' = 'x';\n}";
@@ -2437,7 +2282,7 @@ Deno.test('field_key_quoted: negative - field value change is not a key differen
 
 // ─── single_type_param_comma ──────────────────────────────────────────────
 
-Deno.test('single_type_param_comma: positive - bare <T> vs prettier <T,>', () => {
+test('single_type_param_comma: positive - bare <T> vs prettier <T,>', () => {
 	const prettier = '\tconst identity = <T,>(x: T) => x;';
 	const ours = '\tconst identity = <T>(x: T) => x;';
 	const ctx = make_context(ours, prettier, 'svelte');
@@ -2447,7 +2292,7 @@ Deno.test('single_type_param_comma: positive - bare <T> vs prettier <T,>', () =>
 	assertEquals(match!.confidence, 'certain');
 });
 
-Deno.test('single_type_param_comma: positive - const-modified <const T>', () => {
+test('single_type_param_comma: positive - const-modified <const T>', () => {
 	const prettier = '\tconst arrow = <const T,>(x: T) => x;';
 	const ours = '\tconst arrow = <const T>(x: T) => x;';
 	const ctx = make_context(ours, prettier, 'svelte');
@@ -2455,7 +2300,7 @@ Deno.test('single_type_param_comma: positive - const-modified <const T>', () => 
 	assertNotEquals(match, null);
 });
 
-Deno.test('single_type_param_comma: positive - default-only <T = string>', () => {
+test('single_type_param_comma: positive - default-only <T = string>', () => {
 	const prettier = '\tconst withDefault = <T = string,>(x: T) => x;';
 	const ours = '\tconst withDefault = <T = string>(x: T) => x;';
 	const ctx = make_context(ours, prettier, 'svelte');
@@ -2463,7 +2308,7 @@ Deno.test('single_type_param_comma: positive - default-only <T = string>', () =>
 	assertNotEquals(match, null);
 });
 
-Deno.test('single_type_param_comma: negative - not svelte (pure .ts agrees)', () => {
+test('single_type_param_comma: negative - not svelte (pure .ts agrees)', () => {
 	// On the .ts path prettier strips the comma, so there is no divergence and the
 	// language guard rejects regardless. Synthesize the diff to prove the guard fires.
 	const prettier = '\tconst identity = <T,>(x: T) => x;';
@@ -2473,7 +2318,7 @@ Deno.test('single_type_param_comma: negative - not svelte (pure .ts agrees)', ()
 	assertEquals(match, null);
 });
 
-Deno.test('single_type_param_comma: negative - multi-param <T, U> (interior comma)', () => {
+test('single_type_param_comma: negative - multi-param <T, U> (interior comma)', () => {
 	// `<T, U>` has an interior comma, so the `<...,>` single-param shape never matches.
 	const prettier = '\tconst pair = <T, U>(a: T, b: U) => [a, b];';
 	const ours = '\tconst pair = <T,U>(a: T, b: U) => [a, b];';
@@ -2482,7 +2327,7 @@ Deno.test('single_type_param_comma: negative - multi-param <T, U> (interior comm
 	assertEquals(match, null);
 });
 
-Deno.test('single_type_param_comma: negative - both sides keep <T,> (no divergence)', () => {
+test('single_type_param_comma: negative - both sides keep <T,> (no divergence)', () => {
 	const prettier = '\tconst identity = <T,>(x: T) => x;';
 	const ours = '\tconst identity = <T,>(x: T) => x;';
 	const ctx = make_context(ours, prettier, 'svelte');
@@ -2493,7 +2338,7 @@ Deno.test('single_type_param_comma: negative - both sides keep <T,> (no divergen
 
 // ─── block_comment_computed_member ────────────────────────────────────────
 
-Deno.test('block_comment_computed_member: positive - JSDoc hoisted from brackets', () => {
+test('block_comment_computed_member: positive - JSDoc hoisted from brackets', () => {
 	const prettier = '\t/** @type {string} */ obj.aaaa.bbbb.cccc?.[\n\t\td\n\t];';
 	const ours = '\tobj.aaaa.bbbb.cccc?.[\n\t\t/** @type {string} */ d\n\t];';
 	const ctx = make_context(ours, prettier, 'svelte');
@@ -2503,7 +2348,7 @@ Deno.test('block_comment_computed_member: positive - JSDoc hoisted from brackets
 	assertEquals(match!.confidence, 'certain');
 });
 
-Deno.test('block_comment_computed_member: negative - JSDoc in normal position', () => {
+test('block_comment_computed_member: negative - JSDoc in normal position', () => {
 	const prettier = '\t/** @type {string} */ const x = 1;';
 	const ours = '\t/** @type {string} */ const x = 1;';
 	const ctx = make_context(ours, prettier, 'svelte');
@@ -2511,7 +2356,7 @@ Deno.test('block_comment_computed_member: negative - JSDoc in normal position', 
 	assertEquals(match, null);
 });
 
-Deno.test('block_comment_computed_member: positive - non-optional computed', () => {
+test('block_comment_computed_member: positive - non-optional computed', () => {
 	// Same pattern with non-optional computed member (still detects)
 	const prettier = '\t/** @type {string} */ obj.aaaa.bbbb.cccc[\n\t\td\n\t];';
 	const ours = '\tobj.aaaa.bbbb.cccc[\n\t\t/** @type {string} */ d\n\t];';
@@ -2522,7 +2367,7 @@ Deno.test('block_comment_computed_member: positive - non-optional computed', () 
 
 // ─── block_comment_chain ──────────────────────────────────────────────────
 
-Deno.test('block_comment_chain: positive - comment spacing before dot differs', () => {
+test('block_comment_chain: positive - comment spacing before dot differs', () => {
 	// Prettier intermediate: `a/* inner */ .b` (space before dot)
 	// Ours/stable: `a /* inner */.b` (no space before dot)
 	const prettier = '\t/* outer */ a/* inner */ .b\n\t\t.c(a);';
@@ -2534,7 +2379,7 @@ Deno.test('block_comment_chain: positive - comment spacing before dot differs', 
 	assertEquals(match!.confidence, 'likely');
 });
 
-Deno.test('block_comment_chain: positive - deeper chain member', () => {
+test('block_comment_chain: positive - deeper chain member', () => {
 	const prettier = '\t/* outer */ a.b/* inner */ .c\n\t\t.d(a);';
 	const ours = '\t/* outer */ a.b /* inner */.c\n\t\t.d(a);';
 	const ctx = make_context(ours, prettier, 'typescript');
@@ -2542,7 +2387,7 @@ Deno.test('block_comment_chain: positive - deeper chain member', () => {
 	assertNotEquals(match, null);
 });
 
-Deno.test('block_comment_chain: negative - identical comment spacing', () => {
+test('block_comment_chain: negative - identical comment spacing', () => {
 	const prettier = '\t/* comment */ a.b\n\t\t.c(a);';
 	const ours = '\t/* comment */ a.b\n\t\t.c(a);';
 	const ctx = make_context(ours, prettier, 'typescript');
@@ -2550,7 +2395,7 @@ Deno.test('block_comment_chain: negative - identical comment spacing', () => {
 	assertEquals(match, null);
 });
 
-Deno.test('block_comment_chain: negative - CSS (not applicable)', () => {
+test('block_comment_chain: negative - CSS (not applicable)', () => {
 	const prettier = '\t/* comment */ .class { color: red; }';
 	const ours = '\t/* comment */.class { color: red; }';
 	const ctx = make_context(ours, prettier, 'css');
@@ -2560,7 +2405,7 @@ Deno.test('block_comment_chain: negative - CSS (not applicable)', () => {
 
 // ─── block_comment_computed_member (additional) ──────────────────────────
 
-Deno.test('block_comment_computed_member: positive - regular block comment (not JSDoc)', () => {
+test('block_comment_computed_member: positive - regular block comment (not JSDoc)', () => {
 	// Same hoisting behavior with /* */ instead of /** */
 	const prettier = '\t/* cast */ obj.aaaa.bbbb.cccc?.[\n\t\td\n\t];';
 	const ours = '\tobj.aaaa.bbbb.cccc?.[\n\t\t/* cast */ d\n\t];';
@@ -2572,7 +2417,7 @@ Deno.test('block_comment_computed_member: positive - regular block comment (not 
 
 // ─── fill_after_inline (additional) ───────────────────────────────────────
 
-Deno.test('fill_after_inline: positive - <mark> element (expanded inline list)', () => {
+test('fill_after_inline: positive - <mark> element (expanded inline list)', () => {
 	const longContent = 'x'.repeat(70);
 	const prettier = `\t<p>Text <mark>${longContent}</mark> trailing text after inline element</p>`;
 	const ours = `\t<p>Text <mark>${longContent}</mark>\n\ttrailing text after inline element</p>`;
@@ -2583,7 +2428,7 @@ Deno.test('fill_after_inline: positive - <mark> element (expanded inline list)',
 
 // ─── template_literal_width (additional) ──────────────────────────────────
 
-Deno.test('template_literal_width: negative - short prettier line (not width-motivated)', () => {
+test('template_literal_width: negative - short prettier line (not width-motivated)', () => {
 	// Our side breaks at ${ but prettier's line is only ~40 chars.
 	// Not width-motivated — likely a bug in our formatter.
 	const prettier = '\tconst x = `hello ${name}`;';
@@ -2596,7 +2441,7 @@ Deno.test('template_literal_width: negative - short prettier line (not width-mot
 
 // ─── jsdoc_type_cast_parens ────────────────────────────────────────────────
 
-Deno.test('jsdoc_type_cast_parens: positive - typescript (ours keeps, prettier-TS strips)', () => {
+test('jsdoc_type_cast_parens: positive - typescript (ours keeps, prettier-TS strips)', () => {
 	// tsv preserves the cast parens (required for the assertion); prettier's
 	// oxc-ts backend strips them in TS contexts.
 	const prettier = '\tconst a = /** @type {A} */ document.activeElement;';
@@ -2607,7 +2452,7 @@ Deno.test('jsdoc_type_cast_parens: positive - typescript (ours keeps, prettier-T
 	assertEquals(match!.pattern, 'jsdoc_type_cast_parens');
 });
 
-Deno.test('jsdoc_type_cast_parens: negative - @satisfies without paren difference', () => {
+test('jsdoc_type_cast_parens: negative - @satisfies without paren difference', () => {
 	// Both sides have the same parens — no divergence
 	const prettier = '\tconst a = /** @satisfies {A} */ (fn(x));';
 	const ours = '\tconst a = /** @satisfies {A} */ (fn(x));';
@@ -2616,7 +2461,7 @@ Deno.test('jsdoc_type_cast_parens: negative - @satisfies without paren differenc
 	assertEquals(match, null);
 });
 
-Deno.test('jsdoc_type_cast_parens: negative - reverse direction (ours strips) not claimed', () => {
+test('jsdoc_type_cast_parens: negative - reverse direction (ours strips) not claimed', () => {
 	// If OURS dropped the parens and prettier kept them, that would be a bug — the
 	// detector must NOT claim it (claiming an ours-side strip masks a real loss).
 	const prettier = '\tconst a = /** @type {A} */ (fn(x));';
@@ -2628,7 +2473,7 @@ Deno.test('jsdoc_type_cast_parens: negative - reverse direction (ours strips) no
 
 // ─── member_expression_call (additional) ──────────────────────────────────
 
-Deno.test('member_expression_call: positive - import.meta.resolve (path_calls_long)', () => {
+test('member_expression_call: positive - import.meta.resolve (path_calls_long)', () => {
 	// The fixture `path_calls_long_prettier_divergence`'s `import.meta.resolve` site.
 	const prettier =
 		"\tconst f = import.meta\n\t\t.resolve('./aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');\n";
@@ -2641,7 +2486,7 @@ Deno.test('member_expression_call: positive - import.meta.resolve (path_calls_lo
 
 // ─── block_expression_logical (additional) ────────────────────────────────
 
-Deno.test('block_expression_logical: positive - || at start of line in ours', () => {
+test('block_expression_logical: positive - || at start of line in ours', () => {
 	const prettier = '{#if someCondition || anotherCondition || thirdCondition}content{/if}';
 	const ours = '{#if someCondition\n\t|| anotherCondition\n\t|| thirdCondition}content{/if}';
 	const ctx = make_context(ours, prettier, 'svelte');
@@ -2652,7 +2497,7 @@ Deno.test('block_expression_logical: positive - || at start of line in ours', ()
 
 // ─── css_atrule_spec_spacing (additional) ─────────────────────────────────
 
-Deno.test('css_atrule_spec_spacing: positive - not( missing space', () => {
+test('css_atrule_spec_spacing: positive - not( missing space', () => {
 	const prettier = '<style>\n@media not(print) {\n\tdiv { color: red; }\n}\n</style>';
 	const ours = '<style>\n@media not (print) {\n\tdiv { color: red; }\n}\n</style>';
 	const ctx = make_context(ours, prettier, 'svelte');
@@ -2663,7 +2508,7 @@ Deno.test('css_atrule_spec_spacing: positive - not( missing space', () => {
 
 // ─── comment_position (additional) ────────────────────────────────────────
 
-Deno.test('comment_position: negative - short comment text matches incidentally', () => {
+test('comment_position: negative - short comment text matches incidentally', () => {
 	// Comment text "x" is very short (< 3 chars) and would match incidentally
 	// in prettier's output (e.g., inside variable names). Should NOT claim.
 	const prettier = 'const max = 1;\nconst y = 2;';
@@ -2673,7 +2518,7 @@ Deno.test('comment_position: negative - short comment text matches incidentally'
 	assertEquals(match, null);
 });
 
-Deno.test('comment_position: negative - comment text in code but not as comment', () => {
+test('comment_position: negative - comment text in code but not as comment', () => {
 	// Comment "map" (3+ chars) exists in prettier output but only as a method
 	// name (arr.map), NOT as a comment. Should NOT claim as moved comment.
 	const prettier = 'const result = arr.map(x => x * 2);\nconst y = 2;';
@@ -2683,7 +2528,7 @@ Deno.test('comment_position: negative - comment text in code but not as comment'
 	assertEquals(match, null);
 });
 
-Deno.test('comment_position: positive - retained-paren-union line-comment expansion', () => {
+test('comment_position: positive - retained-paren-union line-comment expansion', () => {
 	// A preserved line comment inside a parenthesized union forces tsv to expand
 	// the member to its broken leading-`|` form; Prettier keeps it inline and
 	// relocates the comment. Only separator/paren layout differs (same members,
@@ -2695,7 +2540,7 @@ Deno.test('comment_position: positive - retained-paren-union line-comment expans
 	assertNotEquals(match, null);
 });
 
-Deno.test('comment_position: negative - dropped union separator not masked by layout strip', () => {
+test('comment_position: negative - dropped union separator not masked by layout strip', () => {
 	// Same identifiers and same comment, but ours DROPS a union `|` (a real
 	// content loss). The separator-count guard (ours `|` count < prettier's) must
 	// reject so the union-layout fallback never masks a dropped separator.
@@ -2708,7 +2553,7 @@ Deno.test('comment_position: negative - dropped union separator not masked by la
 
 // ─── css_comment_stable_quirk (additional) ────────────────────────────────
 
-Deno.test('css_comment_stable_quirk: negative - one-sided comment not in other output', () => {
+test('css_comment_stable_quirk: negative - one-sided comment not in other output', () => {
 	// Comment on our side only, but text doesn't exist in prettier's output.
 	// Should NOT claim as a comment position divergence.
 	const prettier = '<style>\n.a { color: red; }\n</style>';
@@ -2720,7 +2565,7 @@ Deno.test('css_comment_stable_quirk: negative - one-sided comment not in other o
 
 // ─── fill_101_boundary covers multiline_value_inline_long ─────────────────
 
-Deno.test('fill_101_boundary: positive - multiline attr inline long text', () => {
+test('fill_101_boundary: positive - multiline attr inline long text', () => {
 	// Prettier keeps trailing text on one line (102 chars), we break at word boundary
 	const prettier =
 		'\t> text1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 text12 text13 text14 text15_ x';
@@ -2734,7 +2579,7 @@ Deno.test('fill_101_boundary: positive - multiline attr inline long text', () =>
 
 // ─── jsdoc_type_cast_parens in a svelte lang="ts" context ─────────────────
 
-Deno.test('jsdoc_type_cast_parens: positive - svelte lang=ts (ours keeps, prettier strips)', () => {
+test('jsdoc_type_cast_parens: positive - svelte lang=ts (ours keeps, prettier strips)', () => {
 	// In `<script lang="ts">` prettier routes to oxc-ts and strips; tsv preserves.
 	const prettier = '\tconst a = b.map((x) => /** @type {A} */ fn(x));';
 	const ours = '\tconst a = b.map((x) => /** @type {A} */ (fn(x)));';
@@ -2751,22 +2596,19 @@ Deno.test('jsdoc_type_cast_parens: positive - svelte lang=ts (ours keeps, pretti
 // must REJECT it — claiming would mask a bug, and in corpus_compare_format can mask a
 // data-loss safety violation by reclassifying it as known_divergence.
 
-Deno.test(
-	'member_expression_call: negative - bug collapses what prettier expanded (no re-wrap)',
-	() => {
-		// `require.resolve(` is present, but ours COLLAPSED the call onto one line
-		// while prettier kept it expanded — the opposite of the documented divergence
-		// (ours expands). added_lines.length is not > removed_lines.length → reject.
-		const prettier = 'const p = require.resolve(\n\t"x",\n);';
-		const ours = 'const p = require.resolve("x");';
-		const ctx = make_context(ours, prettier, 'typescript');
-		ctx.source = 'const p = require.resolve("x");';
-		const match = run_pattern('member_expression_call', ctx);
-		assertEquals(match, null);
-	}
-);
+test('member_expression_call: negative - bug collapses what prettier expanded (no re-wrap)', () => {
+	// `require.resolve(` is present, but ours COLLAPSED the call onto one line
+	// while prettier kept it expanded — the opposite of the documented divergence
+	// (ours expands). added_lines.length is not > removed_lines.length → reject.
+	const prettier = 'const p = require.resolve(\n\t"x",\n);';
+	const ours = 'const p = require.resolve("x");';
+	const ctx = make_context(ours, prettier, 'typescript');
+	ctx.source = 'const p = require.resolve("x");';
+	const match = run_pattern('member_expression_call', ctx);
+	assertEquals(match, null);
+});
 
-Deno.test('member_expression_call: negative - module pattern only on prettier side', () => {
+test('member_expression_call: negative - module pattern only on prettier side', () => {
 	// The module pattern appears only in prettier's removed lines; ours rewrote
 	// the expression to something else (e.g. dropped `require.resolve`). The
 	// divergent break must be in OUR output to claim — reject.
@@ -2778,7 +2620,7 @@ Deno.test('member_expression_call: negative - module pattern only on prettier si
 	assertEquals(match, null);
 });
 
-Deno.test('short_expr_100: negative - bug in 101-110 band without legitimate break', () => {
+test('short_expr_100: negative - bug in 101-110 band without legitimate break', () => {
 	// Prettier's `{#if` line is in the 101-110 band, but ours did NOT break the
 	// block condition — it mangled the line in place (same line count). Claiming
 	// purely from the prettier width would mask this bug → reject.
@@ -2792,26 +2634,23 @@ Deno.test('short_expr_100: negative - bug in 101-110 band without legitimate bre
 	assertEquals(match, null);
 });
 
-Deno.test(
-	'short_expr_100: negative - ours broke the block and still left an over-width line',
-	() => {
-		// The other half of the guard, and the one this detector hand-rolled its way around: ours
-		// DOES break the condition out (more added lines than removed) and still emits a
-		// 131-column line with spaces in it. Re-breaking is not the claim.
-		const expr = 'a'.repeat(65);
-		const prettier = `{#if typeof ${expr} === 'string'}content{/if}`;
-		const wide = `\ttypeof ${expr} === 'string' && ${'b'.repeat(40)}`;
-		const ours = `{#if\n${wide}\n}content{/if}`;
-		const ctx = make_context(ours, prettier, 'svelte');
-		const vw = visual_width(prettier);
-		assertEquals(vw > 100 && vw <= 110, true, `Expected width 101-110, got ${vw}`);
-		assert_ours_overruns(ctx);
-		assertEquals(ctx.hunks[0].added_lines.length > ctx.hunks[0].removed_lines.length, true);
-		assertEquals(run_pattern('short_expr_100', ctx), null);
-	}
-);
+test('short_expr_100: negative - ours broke the block and still left an over-width line', () => {
+	// The other half of the guard, and the one this detector hand-rolled its way around: ours
+	// DOES break the condition out (more added lines than removed) and still emits a
+	// 131-column line with spaces in it. Re-breaking is not the claim.
+	const expr = 'a'.repeat(65);
+	const prettier = `{#if typeof ${expr} === 'string'}content{/if}`;
+	const wide = `\ttypeof ${expr} === 'string' && ${'b'.repeat(40)}`;
+	const ours = `{#if\n${wide}\n}content{/if}`;
+	const ctx = make_context(ours, prettier, 'svelte');
+	const vw = visual_width(prettier);
+	assertEquals(vw > 100 && vw <= 110, true, `Expected width 101-110, got ${vw}`);
+	assert_ours_overruns(ctx);
+	assertEquals(ctx.hunks[0].added_lines.length > ctx.hunks[0].removed_lines.length, true);
+	assertEquals(run_pattern('short_expr_100', ctx), null);
+});
 
-Deno.test('fill_after_inline: negative - long inline-close line, ours did not re-wrap', () => {
+test('fill_after_inline: negative - long inline-close line, ours did not re-wrap', () => {
 	// Prettier's line has a long inline close tag (> 100), but ours emitted the
 	// same long line (no legitimate fill break — a different edit on it). Without
 	// the re-wrap guard this would be claimed purely from prettier's width.
@@ -2831,7 +2670,7 @@ Deno.test('fill_after_inline: negative - long inline-close line, ours did not re
  */
 const breakable_over_width = Array.from({ length: 21 }, () => 'yyyy').join(' ');
 
-Deno.test('fill_101_boundary: negative - we break more but still leave an over-width line', () => {
+test('fill_101_boundary: negative - we break more but still leave an over-width line', () => {
 	// prettier [6, 100, 5] vs ours [6, 104, 12, 5]: tsv breaks the 100-column line into
 	// MORE lines than prettier had and still emits one at 104 that had breaks to spend. The
 	// old case-1 arm ("added_lines.length > removed_lines.length") graded nobody's width, so
@@ -2851,7 +2690,7 @@ Deno.test('fill_101_boundary: negative - we break more but still leave an over-w
 	assertEquals(run_pattern('fill_101_boundary', ctx), null);
 });
 
-Deno.test('fill_101_boundary: positive - the over-width ours line is an unbreakable atom', () => {
+test('fill_101_boundary: positive - the over-width ours line is an unbreakable atom', () => {
 	// The forced-overrun licence: ours moved the glued comment+word unit to its own line
 	// (spending the only break the run had) and it still lands at 101, because the comment
 	// alone is wider than print width. `svelte/elements/…/fill_after_comment_glued_midline`
@@ -2865,7 +2704,7 @@ Deno.test('fill_101_boundary: positive - the over-width ours line is an unbreaka
 	assertNotEquals(run_pattern('fill_101_boundary', ctx), null);
 });
 
-Deno.test('fill_101_boundary: negative - a {tag} outside the comment is a seam', () => {
+test('fill_101_boundary: negative - a {tag} outside the comment is a seam', () => {
 	// The over-match rejection for the licence above. Same shape, but the moved unit carries
 	// a `{tag}` outside the comment, which breaks internally — a seam tsv declined. Only the
 	// comment's own interior is un-re-wrappable, never the markup around it.
@@ -2877,7 +2716,7 @@ Deno.test('fill_101_boundary: negative - a {tag} outside the comment is a seam',
 	assertEquals(run_pattern('fill_101_boundary', ctx), null);
 });
 
-Deno.test('fill_101_boundary: negative - the atom licence does not reach into a <script>', () => {
+test('fill_101_boundary: negative - the atom licence does not reach into a <script>', () => {
 	// REGION SCOPING, held against its own control. A seam-free line is an atom in Svelte TEXT
 	// and means nothing two lines away: a member chain breaks with no whitespace in it at all.
 	// The SAME 111-column, whitespace-free line is claimed in the template (the control) and
@@ -2901,29 +2740,26 @@ Deno.test('fill_101_boundary: negative - the atom licence does not reach into a 
 	assertEquals(run_pattern('fill_101_boundary', in_script), null);
 });
 
-Deno.test(
-	'fill_101_boundary: negative - a truncated <script> region does not open the licence',
-	() => {
-		// The region scanner is non-greedy, so a `</script>` written inside a STRING closes the
-		// region early and strands the rest of the script OUTSIDE it — which would hand the tail's
-		// JS the Svelte-text atom licence. Proven reachable before the reliability check went in:
-		// this same member chain was claimed. The markers no longer pair up, so the whole file
-		// falls back to the strict reading.
-		const chain = `${'a.bbbbbbbbb'.repeat(9)}.cccccccc;`;
-		const lead = `\tconst s = '</script>';`;
-		const ctx = make_context(
-			`<script>\n${lead}\n\t${chain}\n</script>`,
-			`<script>\n${lead}\n\tx;\n\t${'y'.repeat(99)};\n</script>`,
-			'svelte'
-		);
-		// Confirm the shape: the region really is truncated, so the chain looks like template.
-		assertEquals(ctx.ours_code_regions_reliable, false);
-		assert_ours_overruns(ctx);
-		assertEquals(run_pattern('fill_101_boundary', ctx), null);
-	}
-);
+test('fill_101_boundary: negative - a truncated <script> region does not open the licence', () => {
+	// The region scanner is non-greedy, so a `</script>` written inside a STRING closes the
+	// region early and strands the rest of the script OUTSIDE it — which would hand the tail's
+	// JS the Svelte-text atom licence. Proven reachable before the reliability check went in:
+	// this same member chain was claimed. The markers no longer pair up, so the whole file
+	// falls back to the strict reading.
+	const chain = `${'a.bbbbbbbbb'.repeat(9)}.cccccccc;`;
+	const lead = `\tconst s = '</script>';`;
+	const ctx = make_context(
+		`<script>\n${lead}\n\t${chain}\n</script>`,
+		`<script>\n${lead}\n\tx;\n\t${'y'.repeat(99)};\n</script>`,
+		'svelte'
+	);
+	// Confirm the shape: the region really is truncated, so the chain looks like template.
+	assertEquals(ctx.ours_code_regions_reliable, false);
+	assert_ours_overruns(ctx);
+	assertEquals(run_pattern('fill_101_boundary', ctx), null);
+});
 
-Deno.test('fill_101_boundary: negative - removal-only hunk (empty added_lines)', () => {
+test('fill_101_boundary: negative - removal-only hunk (empty added_lines)', () => {
 	// A prettier line >= 100 chars that we simply DELETED (no added lines). The
 	// `added_lines.every(...)` width guard is vacuously true for empty arrays —
 	// requiring added_lines.length > 0 keeps a deleted long line from being
@@ -2941,7 +2777,7 @@ Deno.test('fill_101_boundary: negative - removal-only hunk (empty added_lines)',
 
 // ─── css_scss_directive_number (positive + negative) ───────────────────────
 
-Deno.test('css_scss_directive_number: positive - @include number normalization divergence', () => {
+test('css_scss_directive_number: positive - @include number normalization divergence', () => {
 	// Prettier value-parses SCSS @include and number-normalizes (.5s → 0.5s,
 	// 1.50 → 1.5); tsv preserves the prelude verbatim. Same numeric-token count,
 	// identical non-numeric skeleton → claim.
@@ -2953,7 +2789,7 @@ Deno.test('css_scss_directive_number: positive - @include number normalization d
 	assertEquals(match!.pattern, 'css_scss_directive_number');
 });
 
-Deno.test('css_scss_directive_number: negative - dropped numeric value not claimed', () => {
+test('css_scss_directive_number: negative - dropped numeric value not claimed', () => {
 	// Ours DROPS a numeric value (`100px` → `px`) inside an @include. The old
 	// skeleton stripped digits/dots, so this compared skeleton-equal and was
 	// masked. The numeric-token-count check (prettier has 1 number, ours has 0)
@@ -2967,7 +2803,7 @@ Deno.test('css_scss_directive_number: negative - dropped numeric value not claim
 
 // ─── css_line_comment_freeze (positive + negatives) ────────────────────────
 
-Deno.test('css_line_comment_freeze: positive - a `//` argument normalized, prettier frozen', () => {
+test('css_line_comment_freeze: positive - a `//` argument normalized, prettier frozen', () => {
 	// Prettier's loose value tokenizer reads `//x,.10)` as a line comment, throws on the
 	// unbalanced paren, and prints the value verbatim; tsv spaces the comma and gives the
 	// number its leading zero. Same numeric-token count, identical skeleton → claim.
@@ -2979,20 +2815,17 @@ Deno.test('css_line_comment_freeze: positive - a `//` argument normalized, prett
 	assertEquals(match!.pattern, 'css_line_comment_freeze');
 });
 
-Deno.test(
-	"css_line_comment_freeze: positive - the split-url prelude of prettier's own suite",
-	() => {
-		// `css/no-semicolon/url.css`: `ur⏎  l(//fonts…:400,400italic)` — prettier keeps the
-		// author's line break and glued comma inside the frozen prelude; tsv collapses the
-		// run and spaces the comma. A line-count change is still one whitespace-only hunk.
-		const prettier = '@import ur\n  l(//fonts.fuz.dev/css?family=Open+Sans:400,400italic);\n';
-		const ours = '@import ur l(//fonts.fuz.dev/css?family=Open+Sans:400, 400italic);\n';
-		const ctx = make_context(ours, prettier, 'css');
-		assertNotEquals(run_pattern('css_line_comment_freeze', ctx), null);
-	}
-);
+test("css_line_comment_freeze: positive - the split-url prelude of prettier's own suite", () => {
+	// `css/no-semicolon/url.css`: `ur⏎  l(//fonts…:400,400italic)` — prettier keeps the
+	// author's line break and glued comma inside the frozen prelude; tsv collapses the
+	// run and spaces the comma. A line-count change is still one whitespace-only hunk.
+	const prettier = '@import ur\n  l(//fonts.fuz.dev/css?family=Open+Sans:400,400italic);\n';
+	const ours = '@import ur l(//fonts.fuz.dev/css?family=Open+Sans:400, 400italic);\n';
+	const ctx = make_context(ours, prettier, 'css');
+	assertNotEquals(run_pattern('css_line_comment_freeze', ctx), null);
+});
 
-Deno.test('css_line_comment_freeze: negative - `//` inside url() is opaque on both sides', () => {
+test('css_line_comment_freeze: negative - `//` inside url() is opaque on both sides', () => {
 	// An unquoted `url(//…)` is one `<url-token>` for both formatters, so a `//` there
 	// freezes nothing — a comma-spacing hunk inside it is some other divergence's.
 	const prettier = '<style>\n\ta {\n\t\tcolor: url(//x,y);\n\t}\n</style>';
@@ -3001,14 +2834,14 @@ Deno.test('css_line_comment_freeze: negative - `//` inside url() is opaque on bo
 	assertEquals(run_pattern('css_line_comment_freeze', ctx), null);
 });
 
-Deno.test('css_line_comment_freeze: negative - `//` inside a string is content', () => {
+test('css_line_comment_freeze: negative - `//` inside a string is content', () => {
 	const prettier = "<style>\n\ta {\n\t\tcolor: fn('//x',.10);\n\t}\n</style>";
 	const ours = "<style>\n\ta {\n\t\tcolor: fn('//x', 0.1);\n\t}\n</style>";
 	const ctx = make_context(ours, prettier, 'svelte');
 	assertEquals(run_pattern('css_line_comment_freeze', ctx), null);
 });
 
-Deno.test('css_line_comment_freeze: negative - a dropped argument is not claimed', () => {
+test('css_line_comment_freeze: negative - a dropped argument is not claimed', () => {
 	// The content-preservation gate: ours drops `y` from the frozen list. The skeletons
 	// differ, so the hunk stays unexplained.
 	const prettier = '<style>\n\ta {\n\t\tcolor: fn(//x,y);\n\t}\n</style>';
@@ -3017,7 +2850,7 @@ Deno.test('css_line_comment_freeze: negative - a dropped argument is not claimed
 	assertEquals(run_pattern('css_line_comment_freeze', ctx), null);
 });
 
-Deno.test('css_line_comment_freeze: negative - a dropped number is not claimed', () => {
+test('css_line_comment_freeze: negative - a dropped number is not claimed', () => {
 	const prettier = '<style>\n\ta {\n\t\tcolor: fn(//x,.10);\n\t}\n</style>';
 	const ours = '<style>\n\ta {\n\t\tcolor: fn(//x, );\n\t}\n</style>';
 	const ctx = make_context(ours, prettier, 'svelte');
@@ -3026,7 +2859,7 @@ Deno.test('css_line_comment_freeze: negative - a dropped number is not claimed',
 
 // ─── foreign_body_freeze (positive + unterminated-open negatives) ──────────
 
-Deno.test('foreign_body_freeze: positive - a frozen <style> body tsv keeps verbatim', () => {
+test('foreign_body_freeze: positive - a frozen <style> body tsv keeps verbatim', () => {
 	// tsv emits the author's bytes for a lang it does not format at that position;
 	// prettier restyles the body with its scss parser. Both hunk sides sit inside the
 	// frozen region, so the hunk is claimed.
@@ -3050,7 +2883,7 @@ const UNTERMINATED_OPEN_HEADS: ReadonlyArray<readonly [string, string]> = [
 ];
 
 for (const [where, head] of UNTERMINATED_OPEN_HEADS) {
-	Deno.test(`foreign_body_freeze: negative - an unterminated open ${where} claims nothing`, () => {
+	test(`foreign_body_freeze: negative - an unterminated open ${where} claims nothing`, () => {
 		const prettier = `${head}\n<div>\n\t<span\n\t\t>a</span\n\t>\n</div>`;
 		const ours = `${head}\n<div>\n\t<span>a</span>\n</div>`;
 		const ctx = make_context(ours, prettier, 'svelte');
@@ -3067,53 +2900,44 @@ for (const [where, head] of UNTERMINATED_OPEN_HEADS) {
 // `prettier/tests/format/html/tags/tags.html` two unrelated whitespace hunks were
 // load-bearing for a delta caused entirely by a third.
 
-Deno.test(
-	'safety_vouched: a char-risky hunk claimed only by a NON-vouching pattern is not vouched',
-	() => {
-		// `comment_position` does not declare `may_alter_char_frequency` (it relocates a
-		// comment, it does not add or drop content), so it cannot excuse a char delta.
-		const prettier = '<div>\n\t<!-- c -->\n\t<span>a</span>\n</div>';
-		const ours = '<div>\n\t<span>a</span>\n\t<!-- c -->\n</div>';
-		const ctx = make_context(ours, prettier, 'svelte');
-		const coverage = detect_divergences(ctx);
-		// Whatever it claims, no vouching pattern exists here, so any char-risky hunk
-		// leaves the coverage unvouched.
-		if (coverage.char_risky_hunks.length > 0) {
-			assertEquals(coverage.safety_vouched, false);
-		}
+test('safety_vouched: a char-risky hunk claimed only by a NON-vouching pattern is not vouched', () => {
+	// `comment_position` does not declare `may_alter_char_frequency` (it relocates a
+	// comment, it does not add or drop content), so it cannot excuse a char delta.
+	const prettier = '<div>\n\t<!-- c -->\n\t<span>a</span>\n</div>';
+	const ours = '<div>\n\t<span>a</span>\n\t<!-- c -->\n</div>';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const coverage = detect_divergences(ctx);
+	// Whatever it claims, no vouching pattern exists here, so any char-risky hunk
+	// leaves the coverage unvouched.
+	if (coverage.char_risky_hunks.length > 0) {
+		assertEquals(coverage.safety_vouched, false);
 	}
-);
+});
 
-Deno.test(
-	'safety_vouched: a whitespace-only hunk is never char-risky, so it need not vouch',
-	() => {
-		// Reflowing whitespace cannot move the semantic char count, so such a hunk is
-		// excluded from the vouching requirement entirely — which is the whole point:
-		// it can no longer prop up (or, by regressing, collapse) a SAFETY downgrade.
-		const prettier = '<div>\n\t<span>a</span>\n</div>';
-		const ours = '<div>\n  <span>a</span>\n</div>';
-		const ctx = make_context(ours, prettier, 'svelte');
-		const coverage = detect_divergences(ctx);
-		assertEquals(coverage.char_risky_hunks, []);
-	}
-);
+test('safety_vouched: a whitespace-only hunk is never char-risky, so it need not vouch', () => {
+	// Reflowing whitespace cannot move the semantic char count, so such a hunk is
+	// excluded from the vouching requirement entirely — which is the whole point:
+	// it can no longer prop up (or, by regressing, collapse) a SAFETY downgrade.
+	const prettier = '<div>\n\t<span>a</span>\n</div>';
+	const ours = '<div>\n  <span>a</span>\n</div>';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const coverage = detect_divergences(ctx);
+	assertEquals(coverage.char_risky_hunks, []);
+});
 
-Deno.test(
-	'safety_vouched: self_closing_nonvoid vouches for the hunk carrying its own char delta',
-	() => {
-		// `<i />` → `<i></i>` adds `<`, `/`, `>` and the tag name — a real char delta, and
-		// exactly the tags.html case. The pattern declares `may_alter_char_frequency`, so
-		// it may vouch for the hunk it claims.
-		const prettier = '<div>\n\t<i class="x" />\n</div>';
-		const ours = '<div>\n\t<i class="x"></i>\n</div>';
-		const ctx = make_context(ours, prettier, 'svelte');
-		const coverage = detect_divergences(ctx);
-		assertEquals(coverage.char_risky_hunks.length > 0, true);
-		assertEquals(coverage.safety_vouched, true);
-	}
-);
+test('safety_vouched: self_closing_nonvoid vouches for the hunk carrying its own char delta', () => {
+	// `<i />` → `<i></i>` adds `<`, `/`, `>` and the tag name — a real char delta, and
+	// exactly the tags.html case. The pattern declares `may_alter_char_frequency`, so
+	// it may vouch for the hunk it claims.
+	const prettier = '<div>\n\t<i class="x" />\n</div>';
+	const ours = '<div>\n\t<i class="x"></i>\n</div>';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const coverage = detect_divergences(ctx);
+	assertEquals(coverage.char_risky_hunks.length > 0, true);
+	assertEquals(coverage.safety_vouched, true);
+});
 
-Deno.test('may_alter_char_frequency: only deliberately-declared patterns may vouch', () => {
+test('may_alter_char_frequency: only deliberately-declared patterns may vouch', () => {
 	// The declaration is a promise that the pattern's detect carries a
 	// content-preservation proof. Keep the set small and reviewed — a new pattern is
 	// safe by omission (the field defaults to false, so the gate fails CLOSED).
@@ -3165,57 +2989,48 @@ function assert_unclaimed(ctx: DetectionContext): void {
 // group of a hugged sole parameter's object type, collapsing the authored expansion
 // to one flat line; tsv keeps it.
 
-Deno.test(
-	'sole_param_object_type_hug: positive - function-type property, authored expansion kept',
-	() => {
-		const prettier =
-			"interface UseModelSelectorProps {\n\tonMessage: (message: { role: string; content: string; messageType: 'system' }) => void;\n\tonModelSwitch?: () => void;\n}\n";
-		const ours =
-			"interface UseModelSelectorProps {\n\tonMessage: (message: {\n\t\trole: string;\n\t\tcontent: string;\n\t\tmessageType: 'system';\n\t}) => void;\n\tonModelSwitch?: () => void;\n}\n";
-		const source =
-			'interface UseModelSelectorProps {\n  onMessage: (message: {\n    role: string;\n    content: string;\n    messageType: "system";\n  }) => void;\n  onModelSwitch?: () => void;\n}\n';
-		assert_claims_every_hunk(
-			make_context(ours, prettier, 'typescript', source),
-			'sole_param_object_type_hug'
-		);
-	}
-);
+test('sole_param_object_type_hug: positive - function-type property, authored expansion kept', () => {
+	const prettier =
+		"interface UseModelSelectorProps {\n\tonMessage: (message: { role: string; content: string; messageType: 'system' }) => void;\n\tonModelSwitch?: () => void;\n}\n";
+	const ours =
+		"interface UseModelSelectorProps {\n\tonMessage: (message: {\n\t\trole: string;\n\t\tcontent: string;\n\t\tmessageType: 'system';\n\t}) => void;\n\tonModelSwitch?: () => void;\n}\n";
+	const source =
+		'interface UseModelSelectorProps {\n  onMessage: (message: {\n    role: string;\n    content: string;\n    messageType: "system";\n  }) => void;\n  onModelSwitch?: () => void;\n}\n';
+	assert_claims_every_hunk(
+		make_context(ours, prettier, 'typescript', source),
+		'sole_param_object_type_hug'
+	);
+});
 
-Deno.test(
-	'sole_param_object_type_hug: positive - annotated object pattern, the break propagates into it',
-	() => {
-		const prettier =
-			'export const ServiceContainerProvider = ({ children }: { children: React.ReactNode }) => {\n\treturn React.createElement(React.Fragment, null, children);\n};\n';
-		const ours =
-			'export const ServiceContainerProvider = ({\n\tchildren\n}: {\n\tchildren: React.ReactNode;\n}) => {\n\treturn React.createElement(React.Fragment, null, children);\n};\n';
-		const source =
-			'export const ServiceContainerProvider = ({\n  children,\n}: {\n  children: React.ReactNode;\n}) => {\n  return React.createElement(React.Fragment, null, children);\n};\n';
-		assert_claims_every_hunk(
-			make_context(ours, prettier, 'typescript', source),
-			'sole_param_object_type_hug'
-		);
-	}
-);
+test('sole_param_object_type_hug: positive - annotated object pattern, the break propagates into it', () => {
+	const prettier =
+		'export const ServiceContainerProvider = ({ children }: { children: React.ReactNode }) => {\n\treturn React.createElement(React.Fragment, null, children);\n};\n';
+	const ours =
+		'export const ServiceContainerProvider = ({\n\tchildren\n}: {\n\tchildren: React.ReactNode;\n}) => {\n\treturn React.createElement(React.Fragment, null, children);\n};\n';
+	const source =
+		'export const ServiceContainerProvider = ({\n  children,\n}: {\n  children: React.ReactNode;\n}) => {\n  return React.createElement(React.Fragment, null, children);\n};\n';
+	assert_claims_every_hunk(
+		make_context(ours, prettier, 'typescript', source),
+		'sole_param_object_type_hug'
+	);
+});
 
-Deno.test(
-	'sole_param_object_type_hug: positive - function type as one parameter of a longer list',
-	() => {
-		// The hug is the function TYPE's sole parameter; the outer list's other
-		// parameters are outside it, and the trailing `,` belongs to the outer list.
-		const prettier =
-			"export function markProcessAsRunning(\n\ttoolCallId: string,\n\tonPartialOutput?: (params: { toolCallId: string; contextItems: any[] }) => void,\n\tcurrentOutput: string = ''\n): void {}\n";
-		const ours =
-			"export function markProcessAsRunning(\n\ttoolCallId: string,\n\tonPartialOutput?: (params: {\n\t\ttoolCallId: string;\n\t\tcontextItems: any[];\n\t}) => void,\n\tcurrentOutput: string = ''\n): void {}\n";
-		const source =
-			'export function markProcessAsRunning(\n  toolCallId: string,\n  onPartialOutput?: (params: {\n    toolCallId: string;\n    contextItems: any[];\n  }) => void,\n  currentOutput: string = "",\n): void {}\n';
-		assert_claims_every_hunk(
-			make_context(ours, prettier, 'typescript', source),
-			'sole_param_object_type_hug'
-		);
-	}
-);
+test('sole_param_object_type_hug: positive - function type as one parameter of a longer list', () => {
+	// The hug is the function TYPE's sole parameter; the outer list's other
+	// parameters are outside it, and the trailing `,` belongs to the outer list.
+	const prettier =
+		"export function markProcessAsRunning(\n\ttoolCallId: string,\n\tonPartialOutput?: (params: { toolCallId: string; contextItems: any[] }) => void,\n\tcurrentOutput: string = ''\n): void {}\n";
+	const ours =
+		"export function markProcessAsRunning(\n\ttoolCallId: string,\n\tonPartialOutput?: (params: {\n\t\ttoolCallId: string;\n\t\tcontextItems: any[];\n\t}) => void,\n\tcurrentOutput: string = ''\n): void {}\n";
+	const source =
+		'export function markProcessAsRunning(\n  toolCallId: string,\n  onPartialOutput?: (params: {\n    toolCallId: string;\n    contextItems: any[];\n  }) => void,\n  currentOutput: string = "",\n): void {}\n';
+	assert_claims_every_hunk(
+		make_context(ours, prettier, 'typescript', source),
+		'sole_param_object_type_hug'
+	);
+});
 
-Deno.test('sole_param_object_type_hug: negative - the parameter is not sole', () => {
+test('sole_param_object_type_hug: negative - the parameter is not sole', () => {
 	// A second parameter means no hug, so prettier keeps the group and the authored
 	// break — a flat prettier line here is not this divergence.
 	const prettier =
@@ -3227,23 +3042,20 @@ Deno.test('sole_param_object_type_hug: negative - the parameter is not sole', ()
 	assert_unclaimed(make_context(ours, prettier, 'typescript', source));
 });
 
-Deno.test(
-	'sole_param_object_type_hug: negative - the source was flat (no authored expansion)',
-	() => {
-		// The divergence keeps an expansion the AUTHOR wrote; tsv expanding a flat
-		// object type that fits is a tsv bug. The unrelated `options: {` object elsewhere
-		// in the file must not stand in for the authored expansion: the source check is
-		// anchored at the site (its first member key), not anywhere in the file.
-		const cfg = 'const cfg = {\n\toptions: {\n\t\ta: 1\n\t}\n};\n';
-		const prettier = `${cfg}interface P {\n\tonMessage: (options: { role: string; content: string; messageType: 'system' }) => void;\n}\n`;
-		const ours = `${cfg}interface P {\n\tonMessage: (options: {\n\t\trole: string;\n\t\tcontent: string;\n\t\tmessageType: 'system';\n\t}) => void;\n}\n`;
-		const source =
-			"const cfg = {\n  options: {\n    a: 1\n  }\n};\ninterface P {\n  onMessage: (options: { role: string; content: string; messageType: 'system' }) => void;\n}\n";
-		assert_unclaimed(make_context(ours, prettier, 'typescript', source));
-	}
-);
+test('sole_param_object_type_hug: negative - the source was flat (no authored expansion)', () => {
+	// The divergence keeps an expansion the AUTHOR wrote; tsv expanding a flat
+	// object type that fits is a tsv bug. The unrelated `options: {` object elsewhere
+	// in the file must not stand in for the authored expansion: the source check is
+	// anchored at the site (its first member key), not anywhere in the file.
+	const cfg = 'const cfg = {\n\toptions: {\n\t\ta: 1\n\t}\n};\n';
+	const prettier = `${cfg}interface P {\n\tonMessage: (options: { role: string; content: string; messageType: 'system' }) => void;\n}\n`;
+	const ours = `${cfg}interface P {\n\tonMessage: (options: {\n\t\trole: string;\n\t\tcontent: string;\n\t\tmessageType: 'system';\n\t}) => void;\n}\n`;
+	const source =
+		"const cfg = {\n  options: {\n    a: 1\n  }\n};\ninterface P {\n  onMessage: (options: { role: string; content: string; messageType: 'system' }) => void;\n}\n";
+	assert_unclaimed(make_context(ours, prettier, 'typescript', source));
+});
 
-Deno.test('sole_param_object_type_hug: negative - ours lost a member', () => {
+test('sole_param_object_type_hug: negative - ours lost a member', () => {
 	const prettier =
 		"interface P {\n\tonMessage: (message: { role: string; content: string; messageType: 'system' }) => void;\n}\n";
 	const ours =
@@ -3257,7 +3069,7 @@ Deno.test('sole_param_object_type_hug: negative - ours lost a member', () => {
 // `;` as formatting characters and whitespace as nothing, so the content proof is the
 // only thing standing between each of these tsv bugs and a `known` verdict.
 
-Deno.test('sole_param_object_type_hug: negative - ours dropped a comma in a member type', () => {
+test('sole_param_object_type_hug: negative - ours dropped a comma in a member type', () => {
 	const prettier =
 		'interface P {\n\tonX: (opts: { cb: (a: string, b: number) => void; id: string }) => void;\n}\n';
 	const ours =
@@ -3267,19 +3079,15 @@ Deno.test('sole_param_object_type_hug: negative - ours dropped a comma in a memb
 	assert_unclaimed(make_context(ours, prettier, 'typescript', source));
 });
 
-Deno.test(
-	'sole_param_object_type_hug: negative - ours dropped a comma between pattern properties',
-	() => {
-		const prettier = 'export const F = ({ a, b }: { a: A; b: B }) => {\n\treturn a;\n};\n';
-		const ours =
-			'export const F = ({\n\ta\n\tb\n}: {\n\ta: A;\n\tb: B;\n}) => {\n\treturn a;\n};\n';
-		const source =
-			'export const F = ({\n  a,\n  b,\n}: {\n  a: A;\n  b: B;\n}) => {\n  return a;\n};\n';
-		assert_unclaimed(make_context(ours, prettier, 'typescript', source));
-	}
-);
+test('sole_param_object_type_hug: negative - ours dropped a comma between pattern properties', () => {
+	const prettier = 'export const F = ({ a, b }: { a: A; b: B }) => {\n\treturn a;\n};\n';
+	const ours = 'export const F = ({\n\ta\n\tb\n}: {\n\ta: A;\n\tb: B;\n}) => {\n\treturn a;\n};\n';
+	const source =
+		'export const F = ({\n  a,\n  b,\n}: {\n  a: A;\n  b: B;\n}) => {\n  return a;\n};\n';
+	assert_unclaimed(make_context(ours, prettier, 'typescript', source));
+});
 
-Deno.test('sole_param_object_type_hug: negative - ours separates members with `,`', () => {
+test('sole_param_object_type_hug: negative - ours separates members with `,`', () => {
 	const prettier = 'interface P {\n\tonX: (m: { kind: string; id: string }) => void;\n}\n';
 	const ours =
 		'interface P {\n\tonX: (m: {\n\t\tkind: string,\n\t\tid: string,\n\t}) => void;\n}\n';
@@ -3288,7 +3096,7 @@ Deno.test('sole_param_object_type_hug: negative - ours separates members with `,
 	assert_unclaimed(make_context(ours, prettier, 'typescript', source));
 });
 
-Deno.test('sole_param_object_type_hug: negative - ours re-spaced a string literal type', () => {
+test('sole_param_object_type_hug: negative - ours re-spaced a string literal type', () => {
 	const prettier = "interface P {\n\tonX: (m: { kind: 'system prompt'; id: string }) => void;\n}\n";
 	const ours =
 		"interface P {\n\tonX: (m: {\n\t\tkind: 'systemprompt';\n\t\tid: string;\n\t}) => void;\n}\n";
@@ -3297,27 +3105,24 @@ Deno.test('sole_param_object_type_hug: negative - ours re-spaced a string litera
 	assert_unclaimed(make_context(ours, prettier, 'typescript', source));
 });
 
-Deno.test(
-	'sole_param_object_type_hug: negative - flat site, same name and first key expanded elsewhere',
-	() => {
-		// An interface field and a function taking it share a name and first key all the
-		// time; the interface's authored `options: {⏎ timeout` must not vouch for tsv
-		// expanding the FLAT parameter type below it.
-		const cfg = 'interface Cfg {\n\toptions: {\n\t\ttimeout: number;\n\t};\n}\n';
-		const prettier = `${cfg}function f(options: { timeout: number; retries: number }) {}\n`;
-		const ours = `${cfg}function f(options: {\n\ttimeout: number;\n\tretries: number;\n}) {}\n`;
-		const source =
-			'interface Cfg {\n  options: {\n    timeout: number;\n  };\n}\nfunction f(options: { timeout: number; retries: number }) {}\n';
-		assert_unclaimed(make_context(ours, prettier, 'typescript', source));
-	}
-);
+test('sole_param_object_type_hug: negative - flat site, same name and first key expanded elsewhere', () => {
+	// An interface field and a function taking it share a name and first key all the
+	// time; the interface's authored `options: {⏎ timeout` must not vouch for tsv
+	// expanding the FLAT parameter type below it.
+	const cfg = 'interface Cfg {\n\toptions: {\n\t\ttimeout: number;\n\t};\n}\n';
+	const prettier = `${cfg}function f(options: { timeout: number; retries: number }) {}\n`;
+	const ours = `${cfg}function f(options: {\n\ttimeout: number;\n\tretries: number;\n}) {}\n`;
+	const source =
+		'interface Cfg {\n  options: {\n    timeout: number;\n  };\n}\nfunction f(options: { timeout: number; retries: number }) {}\n';
+	assert_unclaimed(make_context(ours, prettier, 'typescript', source));
+});
 
 // ─── member_expression_call (source spells the chain across lines) ────────
 // conformance_prettier_ts.md §Module path calls: prettier breaks `import.meta.resolve(…)`
 // at the `.resolve` chain, tsv expands the call's arguments. The source here is
 // prettier's own chain break, so `import.meta.resolve(` never appears in it whole.
 
-Deno.test('member_expression_call: positive - source breaks the chain before `.resolve(`', () => {
+test('member_expression_call: positive - source breaks the chain before `.resolve(`', () => {
 	const prettier =
 		"\tconst commonOverridePreset = import.meta\n\t\t.resolve('storybook/internal/core-server/presets/common-override-preset');\n\n\tlogger.step('Loading presets');\n";
 	const ours =
@@ -3330,17 +3135,14 @@ Deno.test('member_expression_call: positive - source breaks the chain before `.r
 	);
 });
 
-Deno.test(
-	'member_expression_call: negative - chain-broken source, but ours holds no module path call',
-	() => {
-		const prettier = "\tconst p = import.meta\n\t\t.resolve('x');\n";
-		const ours = "\tconst p = import.meta.url.concat(\n\t\t'x'\n\t);\n";
-		const source = "  const p = import.meta\n    .resolve('x');\n";
-		assert_unclaimed(make_context(ours, prettier, 'typescript', source));
-	}
-);
+test('member_expression_call: negative - chain-broken source, but ours holds no module path call', () => {
+	const prettier = "\tconst p = import.meta\n\t\t.resolve('x');\n";
+	const ours = "\tconst p = import.meta.url.concat(\n\t\t'x'\n\t);\n";
+	const source = "  const p = import.meta\n    .resolve('x');\n";
+	assert_unclaimed(make_context(ours, prettier, 'typescript', source));
+});
 
-Deno.test('member_expression_call: negative - ours dropped an argument while re-wrapping', () => {
+test('member_expression_call: negative - ours dropped an argument while re-wrapping', () => {
 	// The layout is the cataloged one, but the `parent` argument is gone: the two
 	// layouts of one call must hold the same tokens.
 	const prettier =
@@ -3352,14 +3154,14 @@ Deno.test('member_expression_call: negative - ours dropped an argument while re-
 	assert_unclaimed(make_context(ours, prettier, 'typescript', source));
 });
 
-Deno.test('member_expression_call: negative - ours re-spaced a string argument', () => {
+test('member_expression_call: negative - ours re-spaced a string argument', () => {
 	// Whitespace inside a string is content: the two layouts must agree on it.
 	const prettier = "\tconst f = import.meta\n\t\t.resolve('./my file.js', parent);\n";
 	const ours = "\tconst f = import.meta.resolve(\n\t\t'./myfile.js',\n\t\tparent\n\t);\n";
 	assert_unclaimed(make_context(ours, prettier, 'typescript', prettier));
 });
 
-Deno.test('member_expression_call: positive - the string argument kept (control)', () => {
+test('member_expression_call: positive - the string argument kept (control)', () => {
 	const prettier = "\tconst f = import.meta\n\t\t.resolve('./my file.js', parent);\n";
 	const ours = "\tconst f = import.meta.resolve(\n\t\t'./my file.js',\n\t\tparent\n\t);\n";
 	assert_claims_every_hunk(
@@ -3373,46 +3175,40 @@ Deno.test('member_expression_call: positive - the string argument kept (control)
 // embedded `css` body; tsv keeps it as authored. When only the body's indentation
 // moves, the `css`` opener sits in the context above the hunk.
 
-Deno.test(
-	'template_embedded_verbatim: positive - css body re-indented, opener above the hunk',
-	() => {
-		const prettier =
-			'const inlineGlow: SerializedStyles = css`\n\tanimation: ${glow} 1.5s ease-in-out infinite;\n\tcolor: transparent;\n\tcursor: progress;\n`;\n';
-		const ours =
-			'const inlineGlow: SerializedStyles = css`\n  animation: ${glow} 1.5s ease-in-out infinite;\n  color: transparent;\n  cursor: progress;\n`;\n';
-		assert_claims_every_hunk(
-			make_context(ours, prettier, 'typescript', ours),
-			'template_embedded_verbatim'
-		);
-	}
-);
+test('template_embedded_verbatim: positive - css body re-indented, opener above the hunk', () => {
+	const prettier =
+		'const inlineGlow: SerializedStyles = css`\n\tanimation: ${glow} 1.5s ease-in-out infinite;\n\tcolor: transparent;\n\tcursor: progress;\n`;\n';
+	const ours =
+		'const inlineGlow: SerializedStyles = css`\n  animation: ${glow} 1.5s ease-in-out infinite;\n  color: transparent;\n  cursor: progress;\n`;\n';
+	assert_claims_every_hunk(
+		make_context(ours, prettier, 'typescript', ours),
+		'template_embedded_verbatim'
+	);
+});
 
-Deno.test(
-	'template_embedded_verbatim: positive - nested css blocks, several hunks under one opener',
-	() => {
-		const prettier =
-			'const hoverable: SerializedStyles = css`\n\ttransition: all 150ms ease-out;\n\ttransform: translate3d(0, 0, 0);\n\n\t&:hover {\n\t\ttransform: translate3d(0, -2px, 0);\n\t}\n\n\t&:active {\n\t\ttransform: translate3d(0, 0, 0);\n\t}\n`;\n';
-		const ours =
-			'const hoverable: SerializedStyles = css`\n  transition: all 150ms ease-out;\n  transform: translate3d(0, 0, 0);\n\n  &:hover {\n    transform: translate3d(0, -2px, 0);\n  }\n\n  &:active {\n    transform: translate3d(0, 0, 0);\n  }\n`;\n';
-		const ctx = make_context(ours, prettier, 'typescript', ours);
-		assertEquals(ctx.hunks.length > 1, true);
-		assert_claims_every_hunk(ctx, 'template_embedded_verbatim');
-	}
-);
+test('template_embedded_verbatim: positive - nested css blocks, several hunks under one opener', () => {
+	const prettier =
+		'const hoverable: SerializedStyles = css`\n\ttransition: all 150ms ease-out;\n\ttransform: translate3d(0, 0, 0);\n\n\t&:hover {\n\t\ttransform: translate3d(0, -2px, 0);\n\t}\n\n\t&:active {\n\t\ttransform: translate3d(0, 0, 0);\n\t}\n`;\n';
+	const ours =
+		'const hoverable: SerializedStyles = css`\n  transition: all 150ms ease-out;\n  transform: translate3d(0, 0, 0);\n\n  &:hover {\n    transform: translate3d(0, -2px, 0);\n  }\n\n  &:active {\n    transform: translate3d(0, 0, 0);\n  }\n`;\n';
+	const ctx = make_context(ours, prettier, 'typescript', ours);
+	assertEquals(ctx.hunks.length > 1, true);
+	assert_claims_every_hunk(ctx, 'template_embedded_verbatim');
+});
 
-Deno.test('template_embedded_verbatim: negative - re-indented body under a non-embed tag', () => {
+test('template_embedded_verbatim: negative - re-indented body under a non-embed tag', () => {
 	const prettier = 'const q = sql`\n\tSELECT 1\n\tFROM t\n`;\n';
 	const ours = 'const q = sql`\n  SELECT 1\n  FROM t\n`;\n';
 	assert_unclaimed(make_context(ours, prettier, 'typescript', ours));
 });
 
-Deno.test('template_embedded_verbatim: negative - the css template closed above the hunk', () => {
+test('template_embedded_verbatim: negative - the css template closed above the hunk', () => {
 	const prettier = 'const a = css`\n  color: red;\n`;\nconst b = {\n\tx: 1\n};\n';
 	const ours = 'const a = css`\n  color: red;\n`;\nconst b = {\n  x: 1\n};\n';
 	assert_unclaimed(make_context(ours, prettier, 'typescript', ours));
 });
 
-Deno.test('template_embedded_verbatim: negative - css body lost a declaration', () => {
+test('template_embedded_verbatim: negative - css body lost a declaration', () => {
 	const prettier =
 		'const inlineGlow = css`\n\tanimation: ${glow} 1.5s ease-in-out infinite;\n\tcolor: transparent;\n\tcursor: progress;\n`;\n';
 	const ours =
@@ -3420,18 +3216,15 @@ Deno.test('template_embedded_verbatim: negative - css body lost a declaration', 
 	assert_unclaimed(make_context(ours, prettier, 'typescript', ours));
 });
 
-Deno.test(
-	'template_embedded_verbatim: negative - ours re-spaced the css body (whitespace only)',
-	() => {
-		// Quasi whitespace is string CONTENT, so a non-whitespace comparison cannot see it.
-		// tsv keeps the body byte for byte, so an ours body line the source does not hold
-		// is a tsv bug even when only spaces moved.
-		const prettier = 'const glow = css`\n\tcolor: red;\n\tcursor: progress;\n`;\n';
-		const ours = 'const glow = css`\n  color:  red;\n  cursor: progress;\n`;\n';
-		const source = 'const glow = css`\n  color: red;\n  cursor: progress;\n`;\n';
-		assert_unclaimed(make_context(ours, prettier, 'typescript', source));
-	}
-);
+test('template_embedded_verbatim: negative - ours re-spaced the css body (whitespace only)', () => {
+	// Quasi whitespace is string CONTENT, so a non-whitespace comparison cannot see it.
+	// tsv keeps the body byte for byte, so an ours body line the source does not hold
+	// is a tsv bug even when only spaces moved.
+	const prettier = 'const glow = css`\n\tcolor: red;\n\tcursor: progress;\n`;\n';
+	const ours = 'const glow = css`\n  color:  red;\n  cursor: progress;\n`;\n';
+	const source = 'const glow = css`\n  color: red;\n  cursor: progress;\n`;\n';
+	assert_unclaimed(make_context(ours, prettier, 'typescript', source));
+});
 
 // Whole-template near misses: a blank or whitespace-only body line is string content too,
 // and every line of it exists somewhere in the source, so only the whole quasi string,
@@ -3441,23 +3234,23 @@ Deno.test(
 const css_blank_source = 'const s = css`\n  color: red;\n\n  cursor: progress;\n`;\n';
 const css_blank_prettier = 'const s = css`\n\tcolor: red;\n\n\tcursor: progress;\n`;\n';
 
-Deno.test('template_embedded_verbatim: negative - ours dropped a blank body line', () => {
+test('template_embedded_verbatim: negative - ours dropped a blank body line', () => {
 	const ours = 'const s = css`\n  color: red;\n  cursor: progress;\n`;\n';
 	assert_unclaimed(make_context(ours, css_blank_prettier, 'typescript', css_blank_source));
 });
 
-Deno.test('template_embedded_verbatim: negative - ours duplicated a blank body line', () => {
+test('template_embedded_verbatim: negative - ours duplicated a blank body line', () => {
 	const ours = 'const s = css`\n  color: red;\n\n\n  cursor: progress;\n`;\n';
 	assert_unclaimed(make_context(ours, css_blank_prettier, 'typescript', css_blank_source));
 });
 
-Deno.test('template_embedded_verbatim: negative - ours emptied a whitespace-only body line', () => {
+test('template_embedded_verbatim: negative - ours emptied a whitespace-only body line', () => {
 	const ours = css_blank_source;
 	const source = 'const s = css`\n  color: red;\n  \n  cursor: progress;\n`;\n';
 	assert_unclaimed(make_context(ours, css_blank_prettier, 'typescript', source));
 });
 
-Deno.test('template_embedded_verbatim: negative - ours re-spaced a one-line interpolation', () => {
+test('template_embedded_verbatim: negative - ours re-spaced a one-line interpolation', () => {
 	const prettier = 'const s = css`\n\twidth: ${a + b}px;\n\tcursor: progress;\n`;\n';
 	const ours = 'const s = css`\n  width: ${a+b}px;\n  cursor: progress;\n`;\n';
 	const source = 'const s = css`\n  width: ${a + b}px;\n  cursor: progress;\n`;\n';
@@ -3472,63 +3265,51 @@ const css_arrow_source =
 const css_arrow_prettier =
 	"const a = css`\n\tcolor: ${(p) =>\n\t\tp.on ? 'a  b' : 'c'};\n\tcursor: progress;\n`;\n";
 
-Deno.test(
-	'template_embedded_verbatim: positive - a multi-line interpolation kept (control)',
-	() => {
-		assert_claims_every_hunk(
-			make_context(css_arrow_source, css_arrow_prettier, 'typescript', css_arrow_source),
-			'template_embedded_verbatim'
-		);
-	}
-);
+test('template_embedded_verbatim: positive - a multi-line interpolation kept (control)', () => {
+	assert_claims_every_hunk(
+		make_context(css_arrow_source, css_arrow_prettier, 'typescript', css_arrow_source),
+		'template_embedded_verbatim'
+	);
+});
 
-Deno.test(
-	'template_embedded_verbatim: negative - a string re-spaced in a multi-line interpolation',
-	() => {
-		const ours =
-			"const a = css`\n  color: ${(p) =>\n    p.on ? 'a b' : 'c'};\n  cursor: progress;\n`;\n";
-		assert_unclaimed(make_context(ours, css_arrow_prettier, 'typescript', css_arrow_source));
-	}
-);
+test('template_embedded_verbatim: negative - a string re-spaced in a multi-line interpolation', () => {
+	const ours =
+		"const a = css`\n  color: ${(p) =>\n    p.on ? 'a b' : 'c'};\n  cursor: progress;\n`;\n";
+	assert_unclaimed(make_context(ours, css_arrow_prettier, 'typescript', css_arrow_source));
+});
 
-Deno.test(
-	'template_embedded_verbatim: negative - a blank dropped in a multi-line interpolation',
-	() => {
-		const source =
-			'const a = css`\n  color: ${(p) => {\n    const x = 1;\n\n    return x;\n  }};\n  cursor: progress;\n`;\n';
-		const prettier =
-			'const a = css`\n\tcolor: ${(p) => {\n\t\tconst x = 1;\n\n\t\treturn x;\n\t}};\n\tcursor: progress;\n`;\n';
-		const ours =
-			'const a = css`\n  color: ${(p) => {\n    const x = 1;\n    return x;\n  }};\n  cursor: progress;\n`;\n';
-		assert_unclaimed(make_context(ours, prettier, 'typescript', source));
-	}
-);
+test('template_embedded_verbatim: negative - a blank dropped in a multi-line interpolation', () => {
+	const source =
+		'const a = css`\n  color: ${(p) => {\n    const x = 1;\n\n    return x;\n  }};\n  cursor: progress;\n`;\n';
+	const prettier =
+		'const a = css`\n\tcolor: ${(p) => {\n\t\tconst x = 1;\n\n\t\treturn x;\n\t}};\n\tcursor: progress;\n`;\n';
+	const ours =
+		'const a = css`\n  color: ${(p) => {\n    const x = 1;\n    return x;\n  }};\n  cursor: progress;\n`;\n';
+	assert_unclaimed(make_context(ours, prettier, 'typescript', source));
+});
 
 // A template's CLOSER can read like a tag (`` `${name}.css` ``): it must never open a
 // body, or the code below it would be vouched as verbatim quasi text.
 
-Deno.test('template_embedded_verbatim: negative - a closer ending `.css`, code re-indented', () => {
+test('template_embedded_verbatim: negative - a closer ending `.css`, code re-indented', () => {
 	const prettier = 'const file = `${name}.css`;\nfunction f() {\n\treturn 1;\n}\nconst t = `x`;\n';
 	const ours = 'const file = `${name}.css`;\nfunction f() {\n  return 1;\n}\nconst t = `x`;\n';
 	assert_unclaimed(make_context(ours, prettier, 'typescript', ours));
 });
 
-Deno.test(
-	'template_embedded_verbatim: negative - a closer ending `/index.html`, code re-indented',
-	() => {
-		const prettier = 'const page = `${dir}/index.html`;\nif (a) {\n\tgo(a);\n}\nlog(`done`);\n';
-		const ours = 'const page = `${dir}/index.html`;\nif (a) {\n  go(a);\n}\nlog(`done`);\n';
-		assert_unclaimed(make_context(ours, prettier, 'typescript', ours));
-	}
-);
+test('template_embedded_verbatim: negative - a closer ending `/index.html`, code re-indented', () => {
+	const prettier = 'const page = `${dir}/index.html`;\nif (a) {\n\tgo(a);\n}\nlog(`done`);\n';
+	const ours = 'const page = `${dir}/index.html`;\nif (a) {\n  go(a);\n}\nlog(`done`);\n';
+	assert_unclaimed(make_context(ours, prettier, 'typescript', ours));
+});
 
-Deno.test('template_embedded_verbatim: negative - a closer ending `.css`, code re-spaced', () => {
+test('template_embedded_verbatim: negative - a closer ending `.css`, code re-spaced', () => {
 	const prettier = 'const file = `${name}.css`;\nconst x = a + b;\nconst t = `x`;\n';
 	const ours = 'const file = `${name}.css`;\nconst x = a+b;\nconst t = `x`;\n';
 	assert_unclaimed(make_context(ours, prettier, 'typescript', ours));
 });
 
-Deno.test('template_embedded_verbatim: negative - the closer line re-spaced after the `', () => {
+test('template_embedded_verbatim: negative - the closer line re-spaced after the `', () => {
 	const prettier = 'const a = css`\n\tcolor: red;\n` + suffix;\n';
 	const ours = 'const a = css`\n  color: red;\n`+ suffix;\n';
 	const source = 'const a = css`\n  color: red;\n` + suffix;\n';
@@ -3538,34 +3319,28 @@ Deno.test('template_embedded_verbatim: negative - the closer line re-spaced afte
 // The source template that vouches for ours' must be ITS OWN (same ordinal, same tag),
 // never a sibling whose quasi text happens to equal ours'.
 
-Deno.test(
-	'template_embedded_verbatim: partial - a same-tag sibling cannot vouch a dropped blank',
-	() => {
-		const source =
-			'const a = css`\n  color: red;\n\n  cursor: progress;\n`;\nconst b = css`\n  color: red;\n  cursor: progress;\n`;\n';
-		const prettier =
-			'const a = css`\n\tcolor: red;\n\n\tcursor: progress;\n`;\nconst b = css`\n\tcolor: red;\n\tcursor: progress;\n`;\n';
-		const ours =
-			'const a = css`\n  color: red;\n  cursor: progress;\n`;\nconst b = css`\n  color: red;\n  cursor: progress;\n`;\n';
-		const ctx = make_context(ours, prettier, 'typescript', source);
-		assertEquals(ctx.hunks.length, 2);
-		assertEquals(claimed_by(ctx, 'template_embedded_verbatim'), [1]);
-		assertEquals(detect_divergences(ctx).classification, 'partial');
-	}
-);
+test('template_embedded_verbatim: partial - a same-tag sibling cannot vouch a dropped blank', () => {
+	const source =
+		'const a = css`\n  color: red;\n\n  cursor: progress;\n`;\nconst b = css`\n  color: red;\n  cursor: progress;\n`;\n';
+	const prettier =
+		'const a = css`\n\tcolor: red;\n\n\tcursor: progress;\n`;\nconst b = css`\n\tcolor: red;\n\tcursor: progress;\n`;\n';
+	const ours =
+		'const a = css`\n  color: red;\n  cursor: progress;\n`;\nconst b = css`\n  color: red;\n  cursor: progress;\n`;\n';
+	const ctx = make_context(ours, prettier, 'typescript', source);
+	assertEquals(ctx.hunks.length, 2);
+	assertEquals(claimed_by(ctx, 'template_embedded_verbatim'), [1]);
+	assertEquals(detect_divergences(ctx).classification, 'partial');
+});
 
-Deno.test(
-	'template_embedded_verbatim: partial - an html sibling cannot vouch a css template',
-	() => {
-		const source = 'const a = css`\n  x\n\n  y\n`;\nconst b = html`\n  x\n  y\n`;\n';
-		const prettier = 'const a = css`\n\tx\n\n\ty\n`;\nconst b = html`\n\tx\n\ty\n`;\n';
-		const ours = 'const a = css`\n  x\n  y\n`;\nconst b = html`\n  x\n  y\n`;\n';
-		const ctx = make_context(ours, prettier, 'typescript', source);
-		assertEquals(ctx.hunks.length, 2);
-		assertEquals(claimed_by(ctx, 'template_embedded_verbatim'), [1]);
-		assertEquals(detect_divergences(ctx).classification, 'partial');
-	}
-);
+test('template_embedded_verbatim: partial - an html sibling cannot vouch a css template', () => {
+	const source = 'const a = css`\n  x\n\n  y\n`;\nconst b = html`\n  x\n  y\n`;\n';
+	const prettier = 'const a = css`\n\tx\n\n\ty\n`;\nconst b = html`\n\tx\n\ty\n`;\n';
+	const ours = 'const a = css`\n  x\n  y\n`;\nconst b = html`\n  x\n  y\n`;\n';
+	const ctx = make_context(ours, prettier, 'typescript', source);
+	assertEquals(ctx.hunks.length, 2);
+	assertEquals(claimed_by(ctx, 'template_embedded_verbatim'), [1]);
+	assertEquals(detect_divergences(ctx).classification, 'partial');
+});
 
 // ─── template_literal_width (glued `}` in a template literal type) ────────
 // conformance_prettier_ts.md §Template-literal types: tsv breaks after `${` with `}` on its
@@ -3573,37 +3348,31 @@ Deno.test(
 // `|`), prettier breaks after `${` too and glues `}` to the last member, so only the `}`
 // line differs.
 
-Deno.test(
-	'template_literal_width: positive - type interpolation closes on its own line, prettier glues `}`',
-	() => {
-		const head =
-			"\tname: `${string} ${`v${number}` | 'Latest' | 'Prerelease'} (${'Webpack' | 'Vite' | 'RsBuild'} | ${";
-		const prettier = `type BaseTemplates = Template & {\n${head}\n\t\t'JavaScript' | 'TypeScript'})\`;\n};\n`;
-		const ours = `type BaseTemplates = Template & {\n${head}\n\t\t'JavaScript' | 'TypeScript'\n\t})\`;\n};\n`;
-		const source =
-			"type BaseTemplates = Template & {\n  name: `${string} ${`v${number}` | 'Latest' | 'Prerelease'} (${'Webpack' | 'Vite' | 'RsBuild'} | ${\n    | 'JavaScript'\n    | 'TypeScript'})`;\n};\n";
-		assert_claims_every_hunk(
-			make_context(ours, prettier, 'typescript', source),
-			'template_literal_width'
-		);
-	}
-);
+test('template_literal_width: positive - type interpolation closes on its own line, prettier glues `}`', () => {
+	const head =
+		"\tname: `${string} ${`v${number}` | 'Latest' | 'Prerelease'} (${'Webpack' | 'Vite' | 'RsBuild'} | ${";
+	const prettier = `type BaseTemplates = Template & {\n${head}\n\t\t'JavaScript' | 'TypeScript'})\`;\n};\n`;
+	const ours = `type BaseTemplates = Template & {\n${head}\n\t\t'JavaScript' | 'TypeScript'\n\t})\`;\n};\n`;
+	const source =
+		"type BaseTemplates = Template & {\n  name: `${string} ${`v${number}` | 'Latest' | 'Prerelease'} (${'Webpack' | 'Vite' | 'RsBuild'} | ${\n    | 'JavaScript'\n    | 'TypeScript'})`;\n};\n";
+	assert_claims_every_hunk(
+		make_context(ours, prettier, 'typescript', source),
+		'template_literal_width'
+	);
+});
 
-Deno.test(
-	'template_literal_width: negative - the same `}` shape in a VALUE template (not a type)',
-	() => {
-		// A value-position interpolation that is not a member/identifier/binary keeps
-		// `${`…`}` hugged in both formatters; tsv dropping `}` to its own line there
-		// is a bug, not the template-literal-type divergence.
-		const head =
-			"\tname: `${string} ${`v${number}` | 'Latest' | 'Prerelease'} (${'Webpack' | 'Vite' | 'RsBuild'} | ${";
-		const prettier = `const baseTemplates = {\n${head}\n\t\tlabel('JavaScript', 'TypeScript')})\`\n};\n`;
-		const ours = `const baseTemplates = {\n${head}\n\t\tlabel('JavaScript', 'TypeScript')\n\t})\`\n};\n`;
-		assert_unclaimed(make_context(ours, prettier, 'typescript', ours));
-	}
-);
+test('template_literal_width: negative - the same `}` shape in a VALUE template (not a type)', () => {
+	// A value-position interpolation that is not a member/identifier/binary keeps
+	// `${`…`}` hugged in both formatters; tsv dropping `}` to its own line there
+	// is a bug, not the template-literal-type divergence.
+	const head =
+		"\tname: `${string} ${`v${number}` | 'Latest' | 'Prerelease'} (${'Webpack' | 'Vite' | 'RsBuild'} | ${";
+	const prettier = `const baseTemplates = {\n${head}\n\t\tlabel('JavaScript', 'TypeScript')})\`\n};\n`;
+	const ours = `const baseTemplates = {\n${head}\n\t\tlabel('JavaScript', 'TypeScript')\n\t})\`\n};\n`;
+	assert_unclaimed(make_context(ours, prettier, 'typescript', ours));
+});
 
-Deno.test('template_literal_width: negative - the flat interpolation would fit', () => {
+test('template_literal_width: negative - the flat interpolation would fit', () => {
 	// `${'JavaScript' | 'TypeScript'})` fits after this short head, so there is no width
 	// reason for tsv's break — a short-line `}` relocation is a bug.
 	const prettier = "type T = {\n\tname: `(${\n\t\t'JavaScript' | 'TypeScript'})`;\n};\n";
@@ -3611,7 +3380,7 @@ Deno.test('template_literal_width: negative - the flat interpolation would fit',
 	assert_unclaimed(make_context(ours, prettier, 'typescript', ours));
 });
 
-Deno.test('template_literal_width: negative - the relocated `}` line lost a member', () => {
+test('template_literal_width: negative - the relocated `}` line lost a member', () => {
 	const head =
 		"\tname: `${string} ${`v${number}` | 'Latest' | 'Prerelease'} (${'Webpack' | 'Vite' | 'RsBuild'} | ${";
 	const prettier = `type BaseTemplates = Template & {\n${head}\n\t\t'JavaScript' | 'TypeScript'})\`;\n};\n`;
@@ -3619,26 +3388,23 @@ Deno.test('template_literal_width: negative - the relocated `}` line lost a memb
 	assert_unclaimed(make_context(ours, prettier, 'typescript', ours));
 });
 
-Deno.test(
-	'template_literal_width: negative - a `}` then text then a backtick is not a template break',
-	() => {
-		// The glued-`}` case reads its own wider `}…\`` marker; the shared Case 1 marker
-		// stays `}\`` exactly. Widened, Case 1 would claim this ordinary over-break of a
-		// line that fits (a prettier line over 80, ours `}), \`…` on its own line).
-		const prettier =
-			'\tassert.equal(compute({ alpha: 1, beta: 2 }), `the computed value ${name} should match`);\n';
-		const ours =
-			'\tassert.equal(compute({\n\t\talpha: 1,\n\t\tbeta: 2\n\t}), `the computed value ${name} should match`);\n';
-		assertEquals(visual_width(prettier.trimEnd()) > 80, true);
-		assert_unclaimed(make_context(ours, prettier, 'typescript', ours));
-	}
-);
+test('template_literal_width: negative - a `}` then text then a backtick is not a template break', () => {
+	// The glued-`}` case reads its own wider `}…\`` marker; the shared Case 1 marker
+	// stays `}\`` exactly. Widened, Case 1 would claim this ordinary over-break of a
+	// line that fits (a prettier line over 80, ours `}), \`…` on its own line).
+	const prettier =
+		'\tassert.equal(compute({ alpha: 1, beta: 2 }), `the computed value ${name} should match`);\n';
+	const ours =
+		'\tassert.equal(compute({\n\t\talpha: 1,\n\t\tbeta: 2\n\t}), `the computed value ${name} should match`);\n';
+	assertEquals(visual_width(prettier.trimEnd()) > 80, true);
+	assert_unclaimed(make_context(ours, prettier, 'typescript', ours));
+});
 
 // ─── jest_each_table ──────────────────────────────────────────────────────
 // conformance_prettier_ts.md §jest-each tables: prettier re-aligns (and re-indents) a
 // `describe`/`it`/`test` `.each` table; tsv keeps the quasi text as authored.
 
-Deno.test('jest_each_table: positive - table re-indented, tag above the hunk', () => {
+test('jest_each_table: positive - table re-indented, tag above the hunk', () => {
 	const prettier =
 		"\tit.each`\n\t\tlanguage        | exists          | expected\n\t\t${'javascript'} | ${['js', 'ts']} | ${'/js'}\n\t\t${'typescript'} | ${[]}           | ${''}\n\t`(\n\t\t`should copy $expected`,\n\t\tasync ({ language, exists, expected }) => {}\n\t);\n";
 	const ours =
@@ -3646,7 +3412,7 @@ Deno.test('jest_each_table: positive - table re-indented, tag above the hunk', (
 	assert_claims_every_hunk(make_context(ours, prettier, 'typescript', ours), 'jest_each_table');
 });
 
-Deno.test('jest_each_table: positive - table cells re-padded to their column', () => {
+test('jest_each_table: positive - table cells re-padded to their column', () => {
 	const prettier =
 		"test.each`\n\ta      | b      | expected\n\t${1}   | ${2}   | ${3}\n\t${100} | ${200} | ${300}\n`('adds $a + $b', ({ a, b, expected }) => {\n\texpect(a + b).toBe(expected);\n});\n";
 	const ours =
@@ -3654,13 +3420,13 @@ Deno.test('jest_each_table: positive - table cells re-padded to their column', (
 	assert_claims_every_hunk(make_context(ours, prettier, 'typescript', ours), 'jest_each_table');
 });
 
-Deno.test('jest_each_table: negative - an `.each` tag prettier does not treat as jest', () => {
+test('jest_each_table: negative - an `.each` tag prettier does not treat as jest', () => {
 	const prettier = 'table.each`\n\ta    | b\n\t${1} | ${2}\n`(run);\n';
 	const ours = 'table.each`\n\ta | b\n\t${1} | ${2}\n`(run);\n';
 	assert_unclaimed(make_context(ours, prettier, 'typescript', ours));
 });
 
-Deno.test('jest_each_table: negative - a cell changed, not a re-alignment', () => {
+test('jest_each_table: negative - a cell changed, not a re-alignment', () => {
 	const prettier =
 		"test.each`\n\ta      | b      | expected\n\t${1}   | ${2}   | ${3}\n\t${100} | ${200} | ${300}\n`('adds', fn);\n";
 	const ours =
@@ -3668,7 +3434,7 @@ Deno.test('jest_each_table: negative - a cell changed, not a re-alignment', () =
 	assert_unclaimed(make_context(ours, prettier, 'typescript', ours));
 });
 
-Deno.test('jest_each_table: negative - re-indent in the callback after the table closed', () => {
+test('jest_each_table: negative - re-indent in the callback after the table closed', () => {
 	const prettier =
 		"describe.each`\n\ta    | b\n\t${1} | ${2}\n`('$a', ({ a, b }) => {\n\texpect(a).toBe(b);\n});\n";
 	const ours =
@@ -3676,7 +3442,7 @@ Deno.test('jest_each_table: negative - re-indent in the callback after the table
 	assert_unclaimed(make_context(ours, prettier, 'typescript', ours));
 });
 
-Deno.test('jest_each_table: negative - a member `.describe.each` is not a jest table', () => {
+test('jest_each_table: negative - a member `.describe.each` is not a jest table', () => {
 	// Prettier's `isJestEachTemplateLiteral` wants an Identifier object (`describe`, or
 	// `describe.only`), so `foo.describe.each` is an ordinary tagged template to it.
 	const prettier = 'foo.describe.each`\n\ta    | b\n\t${1} | ${2}\n`(run);\n';
@@ -3684,7 +3450,7 @@ Deno.test('jest_each_table: negative - a member `.describe.each` is not a jest t
 	assert_unclaimed(make_context(ours, prettier, 'typescript', ours));
 });
 
-Deno.test('jest_each_table: negative - ours re-spaced the table (whitespace only)', () => {
+test('jest_each_table: negative - ours re-spaced the table (whitespace only)', () => {
 	// The quasi is verbatim in tsv, so an ours table line the source does not hold is a
 	// tsv bug, even when prettier's re-alignment leaves the non-whitespace text equal.
 	const prettier = "describe.each`\n\ta    | b\n\t${1} | ${2}\n`('$a', fn);\n";
@@ -3698,19 +3464,19 @@ const jest_blank_source =
 const jest_blank_prettier =
 	"describe('x', () => {\n\tit.each`\n\t\ta    | b\n\t\t${1} | ${2}\n\n\t\t${3} | ${4}\n\t`('t', () => {});\n});\n";
 
-Deno.test('jest_each_table: negative - ours dropped a blank table line', () => {
+test('jest_each_table: negative - ours dropped a blank table line', () => {
 	const ours =
 		"describe('x', () => {\n\tit.each`\n    a    | b\n    ${1} | ${2}\n    ${3} | ${4}\n  `('t', () => {});\n});\n";
 	assert_unclaimed(make_context(ours, jest_blank_prettier, 'typescript', jest_blank_source));
 });
 
-Deno.test('jest_each_table: negative - ours re-spaced a cell interpolation', () => {
+test('jest_each_table: negative - ours re-spaced a cell interpolation', () => {
 	const ours =
 		"describe('x', () => {\n\tit.each`\n    a    | b\n    ${ 1 } | ${2}\n\n    ${3} | ${4}\n  `('t', () => {});\n});\n";
 	assert_unclaimed(make_context(ours, jest_blank_prettier, 'typescript', jest_blank_source));
 });
 
-Deno.test('jest_each_table: positive - the blank-line table kept verbatim (control)', () => {
+test('jest_each_table: positive - the blank-line table kept verbatim (control)', () => {
 	// The near misses above, without the bug: the table as authored is claimed.
 	const ours =
 		"describe('x', () => {\n\tit.each`\n    a    | b\n    ${1} | ${2}\n\n    ${3} | ${4}\n  `('t', () => {});\n});\n";
@@ -3720,23 +3486,20 @@ Deno.test('jest_each_table: positive - the blank-line table kept verbatim (contr
 	);
 });
 
-Deno.test(
-	'jest_each_table: positive - the opener line itself changed (prettier suite jest-each.js)',
-	() => {
-		// The table starts on the tag's line; prettier moves it to the next line, so the
-		// opener is in the hunk on both sides. The second table's interpolation breaks
-		// across lines, which only the interpolation's own continuation lines may do.
-		const prettier =
-			'describe.each`\n\ta    | b    | expected\n\t${1} | ${1} | ${2}\n\t${1} | ${2} | ${3}\n\t${2} | ${1} | ${3}\n`;\n\n// an example to demo multiline quasi\ndescribe.each`\n\ta    | b    | expected\n\t${11111111111} | ${a()\n\t\t.b((x) => x)\n\t\t.c()\n\t\t.d()} | ${2}\n\t${1} | ${2} | ${3}\n\t${2} | ${1} | ${3}\n`;\n';
-		const ours =
-			'describe.each`a    | b    | expected\n${1} | ${1} | ${2}\n${1} | ${2} | ${3}\n${2} | ${1} | ${3}`;\n\n// an example to demo multiline quasi\ndescribe.each`a    | b    | expected\n${11111111111} | ${a()\n\t.b((x) => x)\n\t.c()\n\t.d()} | ${2}\n${1} | ${2} | ${3}\n${2} | ${1} | ${3}`;\n';
-		const source =
-			'describe.each`a    | b    | expected\n${1} | ${1} | ${2}\n${1} | ${2} | ${3}\n${2} | ${1} | ${3}`\n\n// an example to demo multiline quasi\ndescribe.each`a    | b    | expected\n${11111111111} | ${a().b(x => x).c().d()} | ${2}\n${1} | ${2} | ${3}\n${2} | ${1} | ${3}`\n';
-		assert_claims_every_hunk(make_context(ours, prettier, 'typescript', source), 'jest_each_table');
-	}
-);
+test('jest_each_table: positive - the opener line itself changed (prettier suite jest-each.js)', () => {
+	// The table starts on the tag's line; prettier moves it to the next line, so the
+	// opener is in the hunk on both sides. The second table's interpolation breaks
+	// across lines, which only the interpolation's own continuation lines may do.
+	const prettier =
+		'describe.each`\n\ta    | b    | expected\n\t${1} | ${1} | ${2}\n\t${1} | ${2} | ${3}\n\t${2} | ${1} | ${3}\n`;\n\n// an example to demo multiline quasi\ndescribe.each`\n\ta    | b    | expected\n\t${11111111111} | ${a()\n\t\t.b((x) => x)\n\t\t.c()\n\t\t.d()} | ${2}\n\t${1} | ${2} | ${3}\n\t${2} | ${1} | ${3}\n`;\n';
+	const ours =
+		'describe.each`a    | b    | expected\n${1} | ${1} | ${2}\n${1} | ${2} | ${3}\n${2} | ${1} | ${3}`;\n\n// an example to demo multiline quasi\ndescribe.each`a    | b    | expected\n${11111111111} | ${a()\n\t.b((x) => x)\n\t.c()\n\t.d()} | ${2}\n${1} | ${2} | ${3}\n${2} | ${1} | ${3}`;\n';
+	const source =
+		'describe.each`a    | b    | expected\n${1} | ${1} | ${2}\n${1} | ${2} | ${3}\n${2} | ${1} | ${3}`\n\n// an example to demo multiline quasi\ndescribe.each`a    | b    | expected\n${11111111111} | ${a().b(x => x).c().d()} | ${2}\n${1} | ${2} | ${3}\n${2} | ${1} | ${3}`\n';
+	assert_claims_every_hunk(make_context(ours, prettier, 'typescript', source), 'jest_each_table');
+});
 
-Deno.test('jest_each_table: negative - a closer ending `test.each`, code re-indented', () => {
+test('jest_each_table: negative - a closer ending `test.each`, code re-indented', () => {
 	const prettier = 'const s = `run test.each`;\nfunction f() {\n\treturn 1;\n}\nconst t = `x`;\n';
 	const ours = 'const s = `run test.each`;\nfunction f() {\n  return 1;\n}\nconst t = `x`;\n';
 	assert_unclaimed(make_context(ours, prettier, 'typescript', ours));
@@ -3747,233 +3510,221 @@ Deno.test('jest_each_table: negative - a closer ending `test.each`, code re-inde
 // block-bodied arrow hugged to a curried callee's `(` and breaks its parameters; tsv
 // breaks the argument out, the signature on one line, the body one level deeper.
 
-Deno.test(
-	'curried_callee_callback_hug: positive - typed signature, re-indented body (Storybook tree.ts)',
-	() => {
-		const prettier = [
-			'export const getDescendantIds = memoize(1000)((',
-			'\tdata: IndexHash,',
-			'\tid: string,',
-			'\tskipLeafs: boolean',
-			'): string[] => {',
-			'\tconst entry = data[id];',
-			"\tif (!entry || !('children' in entry) || !entry.children) {",
-			'\t\treturn [];',
-			'\t}',
-			'\treturn entry.children.reduce((acc, childId) => {',
-			'\t\tconst child = data[childId];',
-			'',
-			"\t\tif (!child || (skipLeafs && (child.type === 'story' || child.type === 'docs'))) {",
-			'\t\t\treturn acc;',
-			'\t\t}',
-			'\t\tacc.push(childId, ...getDescendantIds(data, childId, skipLeafs));',
-			'\t\treturn acc;',
-			'\t}, [] as string[]);',
-			'});',
-			'',
-			'export function getPath(item: Item): string[] {}',
-			''
-		].join('\n');
-		const ours = [
-			'export const getDescendantIds = memoize(1000)(',
-			'\t(data: IndexHash, id: string, skipLeafs: boolean): string[] => {',
-			'\t\tconst entry = data[id];',
-			"\t\tif (!entry || !('children' in entry) || !entry.children) {",
-			'\t\t\treturn [];',
-			'\t\t}',
-			'\t\treturn entry.children.reduce((acc, childId) => {',
-			'\t\t\tconst child = data[childId];',
-			'',
-			"\t\t\tif (!child || (skipLeafs && (child.type === 'story' || child.type === 'docs'))) {",
-			'\t\t\t\treturn acc;',
-			'\t\t\t}',
-			'\t\t\tacc.push(childId, ...getDescendantIds(data, childId, skipLeafs));',
-			'\t\t\treturn acc;',
-			'\t\t}, [] as string[]);',
-			'\t}',
-			');',
-			'',
-			'export function getPath(item: Item): string[] {}',
-			''
-		].join('\n');
-		const ctx = make_context(ours, prettier, 'typescript', prettier.replaceAll('\t', '  '));
-		assertEquals(ctx.hunks.length > 1, true);
-		assert_claims_every_hunk(ctx, 'curried_callee_callback_hug');
-	}
-);
+test('curried_callee_callback_hug: positive - typed signature, re-indented body (Storybook tree.ts)', () => {
+	const prettier = [
+		'export const getDescendantIds = memoize(1000)((',
+		'\tdata: IndexHash,',
+		'\tid: string,',
+		'\tskipLeafs: boolean',
+		'): string[] => {',
+		'\tconst entry = data[id];',
+		"\tif (!entry || !('children' in entry) || !entry.children) {",
+		'\t\treturn [];',
+		'\t}',
+		'\treturn entry.children.reduce((acc, childId) => {',
+		'\t\tconst child = data[childId];',
+		'',
+		"\t\tif (!child || (skipLeafs && (child.type === 'story' || child.type === 'docs'))) {",
+		'\t\t\treturn acc;',
+		'\t\t}',
+		'\t\tacc.push(childId, ...getDescendantIds(data, childId, skipLeafs));',
+		'\t\treturn acc;',
+		'\t}, [] as string[]);',
+		'});',
+		'',
+		'export function getPath(item: Item): string[] {}',
+		''
+	].join('\n');
+	const ours = [
+		'export const getDescendantIds = memoize(1000)(',
+		'\t(data: IndexHash, id: string, skipLeafs: boolean): string[] => {',
+		'\t\tconst entry = data[id];',
+		"\t\tif (!entry || !('children' in entry) || !entry.children) {",
+		'\t\t\treturn [];',
+		'\t\t}',
+		'\t\treturn entry.children.reduce((acc, childId) => {',
+		'\t\t\tconst child = data[childId];',
+		'',
+		"\t\t\tif (!child || (skipLeafs && (child.type === 'story' || child.type === 'docs'))) {",
+		'\t\t\t\treturn acc;',
+		'\t\t\t}',
+		'\t\t\tacc.push(childId, ...getDescendantIds(data, childId, skipLeafs));',
+		'\t\t\treturn acc;',
+		'\t\t}, [] as string[]);',
+		'\t}',
+		');',
+		'',
+		'export function getPath(item: Item): string[] {}',
+		''
+	].join('\n');
+	const ctx = make_context(ours, prettier, 'typescript', prettier.replaceAll('\t', '  '));
+	assertEquals(ctx.hunks.length > 1, true);
+	assert_claims_every_hunk(ctx, 'curried_callee_callback_hug');
+});
 
-Deno.test(
-	'curried_callee_callback_hug: positive - two callbacks, untyped and typed (Storybook router/utils.ts)',
-	() => {
-		const prettier = [
-			'export const parsePath: (path: string | undefined) => StoryData = memoize(1000)((',
-			'\tpath: string | undefined | null',
-			') => {',
-			'\tconst result: StoryData = {',
-			'\t\tviewMode: undefined',
-			'\t};',
-			'',
-			'\tif (path) {',
-			"\t\tresult.viewMode = 'review';",
-			'\t}',
-			'\treturn result;',
-			'});',
-			'',
-			'type Match = { path: string };',
-			'',
-			'export const getMatch = memoize(1000)((',
-			'\tcurrent: string,',
-			'\ttarget: string | RegExp,',
-			'\tstartsWith = true',
-			'): Match | null => {',
-			'\tif (startsWith) {',
-			"\t\tif (typeof target !== 'string') {",
-			"\t\t\tthrow new Error('startsWith only works with string targets');",
-			'\t\t}',
-			'\t\tconst startsWithTarget = current && current.startsWith(target);',
-			'\t\tif (startsWithTarget) {',
-			'\t\t\treturn { path: current };',
-			'\t\t}',
-			'',
-			'\t\treturn null;',
-			'\t}',
-			'',
-			"\tconst currentIsTarget = typeof target === 'string' && current === target;",
-			'\tconst matchTarget = current && target && current.match(target);',
-			'',
-			'\tif (currentIsTarget || matchTarget) {',
-			'\t\treturn { path: current };',
-			'\t}',
-			'',
-			'\treturn null;',
-			'});',
-			''
-		].join('\n');
-		const ours = [
-			'export const parsePath: (path: string | undefined) => StoryData = memoize(1000)(',
-			'\t(path: string | undefined | null) => {',
-			'\t\tconst result: StoryData = {',
-			'\t\t\tviewMode: undefined',
-			'\t\t};',
-			'',
-			'\t\tif (path) {',
-			"\t\t\tresult.viewMode = 'review';",
-			'\t\t}',
-			'\t\treturn result;',
-			'\t}',
-			');',
-			'',
-			'type Match = { path: string };',
-			'',
-			'export const getMatch = memoize(1000)(',
-			'\t(current: string, target: string | RegExp, startsWith = true): Match | null => {',
-			'\t\tif (startsWith) {',
-			"\t\t\tif (typeof target !== 'string') {",
-			"\t\t\t\tthrow new Error('startsWith only works with string targets');",
-			'\t\t\t}',
-			'\t\t\tconst startsWithTarget = current && current.startsWith(target);',
-			'\t\t\tif (startsWithTarget) {',
-			'\t\t\t\treturn { path: current };',
-			'\t\t\t}',
-			'',
-			'\t\t\treturn null;',
-			'\t\t}',
-			'',
-			"\t\tconst currentIsTarget = typeof target === 'string' && current === target;",
-			'\t\tconst matchTarget = current && target && current.match(target);',
-			'',
-			'\t\tif (currentIsTarget || matchTarget) {',
-			'\t\t\treturn { path: current };',
-			'\t\t}',
-			'',
-			'\t\treturn null;',
-			'\t}',
-			');',
-			''
-		].join('\n');
-		const ctx = make_context(ours, prettier, 'typescript', prettier.replaceAll('\t', '  '));
-		assertEquals(ctx.hunks.length > 2, true);
-		assert_claims_every_hunk(ctx, 'curried_callee_callback_hug');
-	}
-);
+test('curried_callee_callback_hug: positive - two callbacks, untyped and typed (Storybook router/utils.ts)', () => {
+	const prettier = [
+		'export const parsePath: (path: string | undefined) => StoryData = memoize(1000)((',
+		'\tpath: string | undefined | null',
+		') => {',
+		'\tconst result: StoryData = {',
+		'\t\tviewMode: undefined',
+		'\t};',
+		'',
+		'\tif (path) {',
+		"\t\tresult.viewMode = 'review';",
+		'\t}',
+		'\treturn result;',
+		'});',
+		'',
+		'type Match = { path: string };',
+		'',
+		'export const getMatch = memoize(1000)((',
+		'\tcurrent: string,',
+		'\ttarget: string | RegExp,',
+		'\tstartsWith = true',
+		'): Match | null => {',
+		'\tif (startsWith) {',
+		"\t\tif (typeof target !== 'string') {",
+		"\t\t\tthrow new Error('startsWith only works with string targets');",
+		'\t\t}',
+		'\t\tconst startsWithTarget = current && current.startsWith(target);',
+		'\t\tif (startsWithTarget) {',
+		'\t\t\treturn { path: current };',
+		'\t\t}',
+		'',
+		'\t\treturn null;',
+		'\t}',
+		'',
+		"\tconst currentIsTarget = typeof target === 'string' && current === target;",
+		'\tconst matchTarget = current && target && current.match(target);',
+		'',
+		'\tif (currentIsTarget || matchTarget) {',
+		'\t\treturn { path: current };',
+		'\t}',
+		'',
+		'\treturn null;',
+		'});',
+		''
+	].join('\n');
+	const ours = [
+		'export const parsePath: (path: string | undefined) => StoryData = memoize(1000)(',
+		'\t(path: string | undefined | null) => {',
+		'\t\tconst result: StoryData = {',
+		'\t\t\tviewMode: undefined',
+		'\t\t};',
+		'',
+		'\t\tif (path) {',
+		"\t\t\tresult.viewMode = 'review';",
+		'\t\t}',
+		'\t\treturn result;',
+		'\t}',
+		');',
+		'',
+		'type Match = { path: string };',
+		'',
+		'export const getMatch = memoize(1000)(',
+		'\t(current: string, target: string | RegExp, startsWith = true): Match | null => {',
+		'\t\tif (startsWith) {',
+		"\t\t\tif (typeof target !== 'string') {",
+		"\t\t\t\tthrow new Error('startsWith only works with string targets');",
+		'\t\t\t}',
+		'\t\t\tconst startsWithTarget = current && current.startsWith(target);',
+		'\t\t\tif (startsWithTarget) {',
+		'\t\t\t\treturn { path: current };',
+		'\t\t\t}',
+		'',
+		'\t\t\treturn null;',
+		'\t\t}',
+		'',
+		"\t\tconst currentIsTarget = typeof target === 'string' && current === target;",
+		'\t\tconst matchTarget = current && target && current.match(target);',
+		'',
+		'\t\tif (currentIsTarget || matchTarget) {',
+		'\t\t\treturn { path: current };',
+		'\t\t}',
+		'',
+		'\t\treturn null;',
+		'\t}',
+		');',
+		''
+	].join('\n');
+	const ctx = make_context(ours, prettier, 'typescript', prettier.replaceAll('\t', '  '));
+	assertEquals(ctx.hunks.length > 2, true);
+	assert_claims_every_hunk(ctx, 'curried_callee_callback_hug');
+});
 
-Deno.test(
-	'curried_callee_callback_hug: positive - a signature too wide for its own line, under a broken inner list',
-	() => {
-		// The inner call takes more arguments than the outer one, so both formatters break the
-		// inner list first; ours then breaks the signature on a line of its own, each line
-		// prettier's one level deeper.
-		const prettier = [
-			'const aaaaaaaa = memoize(',
-			'\t1000,',
-			'\ta',
-			')((',
-			'\tbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb: B,',
-			'\tccccccccccccccccccccccccc: string,',
-			'\td: boolean',
-			'): string[] => {',
-			'\treturn [c];',
-			'});',
-			''
-		].join('\n');
-		const ours = [
-			'const aaaaaaaa = memoize(',
-			'\t1000,',
-			'\ta',
-			')(',
-			'\t(',
-			'\t\tbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb: B,',
-			'\t\tccccccccccccccccccccccccc: string,',
-			'\t\td: boolean',
-			'\t): string[] => {',
-			'\t\treturn [c];',
-			'\t}',
-			');',
-			''
-		].join('\n');
-		assert_claims_every_hunk(
-			make_context(ours, prettier, 'typescript', prettier),
-			'curried_callee_callback_hug'
-		);
-	}
-);
+test('curried_callee_callback_hug: positive - a signature too wide for its own line, under a broken inner list', () => {
+	// The inner call takes more arguments than the outer one, so both formatters break the
+	// inner list first; ours then breaks the signature on a line of its own, each line
+	// prettier's one level deeper.
+	const prettier = [
+		'const aaaaaaaa = memoize(',
+		'\t1000,',
+		'\ta',
+		')((',
+		'\tbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb: B,',
+		'\tccccccccccccccccccccccccc: string,',
+		'\td: boolean',
+		'): string[] => {',
+		'\treturn [c];',
+		'});',
+		''
+	].join('\n');
+	const ours = [
+		'const aaaaaaaa = memoize(',
+		'\t1000,',
+		'\ta',
+		')(',
+		'\t(',
+		'\t\tbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb: B,',
+		'\t\tccccccccccccccccccccccccc: string,',
+		'\t\td: boolean',
+		'\t): string[] => {',
+		'\t\treturn [c];',
+		'\t}',
+		');',
+		''
+	].join('\n');
+	assert_claims_every_hunk(
+		make_context(ours, prettier, 'typescript', prettier),
+		'curried_callee_callback_hug'
+	);
+});
 
-Deno.test(
-	'curried_callee_callback_hug: negative - a broken signature that fits on a line of its own',
-	() => {
-		// Ours breaks a signature only when it overflows its own line; one that fits there
-		// broken anyway is not this divergence.
-		const prettier = [
-			'const aaaaaaaa = memoize(',
-			'\t1000,',
-			'\ta',
-			')((',
-			'\tb: B,',
-			'\tc: string',
-			'): string[] => {',
-			'\treturn [c];',
-			'});',
-			''
-		].join('\n');
-		const ours = [
-			'const aaaaaaaa = memoize(',
-			'\t1000,',
-			'\ta',
-			')(',
-			'\t(',
-			'\t\tb: B,',
-			'\t\tc: string',
-			'\t): string[] => {',
-			'\t\treturn [c];',
-			'\t}',
-			');',
-			''
-		].join('\n');
-		assert_unclaimed(make_context(ours, prettier, 'typescript', prettier));
-	}
-);
+test('curried_callee_callback_hug: negative - a broken signature that fits on a line of its own', () => {
+	// Ours breaks a signature only when it overflows its own line; one that fits there
+	// broken anyway is not this divergence.
+	const prettier = [
+		'const aaaaaaaa = memoize(',
+		'\t1000,',
+		'\ta',
+		')((',
+		'\tb: B,',
+		'\tc: string',
+		'): string[] => {',
+		'\treturn [c];',
+		'});',
+		''
+	].join('\n');
+	const ours = [
+		'const aaaaaaaa = memoize(',
+		'\t1000,',
+		'\ta',
+		')(',
+		'\t(',
+		'\t\tb: B,',
+		'\t\tc: string',
+		'\t): string[] => {',
+		'\t\treturn [c];',
+		'\t}',
+		');',
+		''
+	].join('\n');
+	assert_unclaimed(make_context(ours, prettier, 'typescript', prettier));
+});
 
-Deno.test('curried_callee_callback_hug: negative - a plain (non-curried) callee', () => {
+test('curried_callee_callback_hug: negative - a plain (non-curried) callee', () => {
 	// Prettier's exemption is for a curried callee alone; under a plain callee it breaks
 	// every argument out like tsv, so this pair is not the divergence.
 	const prettier = [
@@ -3996,29 +3747,26 @@ Deno.test('curried_callee_callback_hug: negative - a plain (non-curried) callee'
 	assert_unclaimed(make_context(ours, prettier, 'typescript', ours));
 });
 
-Deno.test(
-	'curried_callee_callback_hug: negative - a curried call whose body also lost a statement',
-	() => {
-		// The header and signature have the divergence's shape, but the body is not the
-		// prettier body one level deeper — a tsv change inside it must not ride along.
-		const prettier = [
-			'export const getDescendantIdentifiers = memoize(1000)((',
-			'\tdata: IndexHash,',
-			'\tidentifier: string',
-			'): string[] => {',
-			'\tconst entry = data[identifier];',
-			'\treturn [identifier];',
-			'});',
-			''
-		].join('\n');
-		const ours = [
-			'export const getDescendantIdentifiers = memoize(1000)(',
-			'\t(data: IndexHash, identifier: string): string[] => {',
-			'\t\treturn [identifier];',
-			'\t}',
-			');',
-			''
-		].join('\n');
-		assert_unclaimed(make_context(ours, prettier, 'typescript', ours));
-	}
-);
+test('curried_callee_callback_hug: negative - a curried call whose body also lost a statement', () => {
+	// The header and signature have the divergence's shape, but the body is not the
+	// prettier body one level deeper — a tsv change inside it must not ride along.
+	const prettier = [
+		'export const getDescendantIdentifiers = memoize(1000)((',
+		'\tdata: IndexHash,',
+		'\tidentifier: string',
+		'): string[] => {',
+		'\tconst entry = data[identifier];',
+		'\treturn [identifier];',
+		'});',
+		''
+	].join('\n');
+	const ours = [
+		'export const getDescendantIdentifiers = memoize(1000)(',
+		'\t(data: IndexHash, identifier: string): string[] => {',
+		'\t\treturn [identifier];',
+		'\t}',
+		');',
+		''
+	].join('\n');
+	assert_unclaimed(make_context(ours, prettier, 'typescript', ours));
+});

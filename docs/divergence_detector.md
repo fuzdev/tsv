@@ -95,13 +95,14 @@ deno task corpus:compare:format --all --audit-patterns               # Per-patte
 deno task divergence:audit        # Human-readable report
 deno task divergence:audit --json # Machine-readable JSON
 
-deno task test:deno               # pattern tests
+deno task test:node               # pattern tests
+deno task test:deno               # fixture-coverage audit
 ```
 
 `divergence:audit` runs every pattern against every documented fixture's committed prettier
 forms and reports which are actually DETECTED, plus the `fixtures[]` listing drift as separate
-bookkeeping; it exits 1 on a genuine detection gap. `test:deno` runs the synthetic
-positive/negative (overmatch-rejection) unit tests PLUS a read-only behavioral
+bookkeeping; it exits 1 on a genuine detection gap. `test:node` runs the synthetic
+positive/negative (overmatch-rejection) unit tests and `test:deno` a read-only behavioral
 fixture-coverage audit that drives each detector against its own committed fixtures (input ==
 ours, output_prettier == prettier) and fails if a pattern stops claiming a hunk in a fixture
 it lists.
@@ -381,14 +382,15 @@ silently.
 A pattern that matches a hunk it shouldn't will mark a real bug (or real data loss) as
 `known`. Two layers guard against this:
 
-- **Behavioral + unit tests** (`deno task test:deno`): synthetic positive cases,
+- **Behavioral + unit tests** (`deno task test:node` + `test:deno`): synthetic positive cases,
   overmatch-**rejection** negative cases (a bug-shaped diff must return `null`), and the
   fixture-coverage audit. New patterns must add a negative for the false-positive scenario.
 - **Corpus spot-check**: per-pattern report of what each pattern claims, with sample diffs.
 
 ```bash
 deno task corpus:compare:format --all --audit-patterns   # what each pattern claims, with samples
-deno task test:deno                          # unit + behavioral tests
+deno task test:node                          # unit tests
+deno task test:deno                          # behavioral tests
 ```
 
 **Audit workflow:**
@@ -399,7 +401,7 @@ deno task test:deno                          # unit + behavioral tests
    - The pattern's detection logic is too broad — tighten it (prefer reusing the shared
      `long_line_rewrapped` helper, which bundles the ours-side re-wrap guard)
    - Add a negative test case in `patterns_test.ts` for the false-positive scenario
-4. Run `deno task test:deno` to verify no regressions
+4. Run `deno task test:node` and `deno task test:deno` to verify no regressions
 
 ## Adding New Patterns
 
@@ -442,5 +444,5 @@ const new_pattern: DivergencePattern = {
    don't list a divergence the pattern structurally can't claim (reassign it to the pattern
    that does, or leave it honestly uncovered).
 5. Add to `PATTERNS` array (respect tier ordering: specific before broad)
-6. Run `deno task test:deno` to verify tests pass
+6. Run `deno task test:node` and `deno task test:deno` to verify tests pass
 7. Run `deno task divergence:audit` to verify coverage

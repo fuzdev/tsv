@@ -7,18 +7,28 @@
  *
  * A fake engine rather than a built package on purpose: what this grades is the
  * facade's own logic, which needs no artifact — so it gates in `deno task check`
- * (`test:deno`) on a bare clone. The package suites (`scripts/test_npm.ts`,
+ * (`test:node`) on a bare clone. The package suites (`scripts/test_npm.ts`,
  * `scripts/test_napi_npm.ts`) grade the same surface through the real engines, and
  * `deno task check:loc` grades the reconstruction itself against the Rust emitter.
  */
 
 import { deepStrictEqual, strictEqual, throws } from 'node:assert';
+import { test } from 'vitest';
 
 import { create_format_api, read_options } from '../crates/tsv_wasm/npm/api.js';
 import { create_parse_api } from '../crates/tsv_wasm/npm/api_parse.js';
 import { create_locator, reconstruct_locations } from '../crates/tsv_wasm/npm/locations.js';
 
 type Call = { source: string; source_type: string | undefined };
+
+/** A node literal handed to the reconstruction, which stamps its `loc` in place. */
+type LocatedNode = {
+	type: string;
+	start: number;
+	end: number;
+	loc?: { end: { line: number; column: number } };
+	[key: string]: unknown;
+};
 
 /** A span-only wire for `source`: a root spanning it, as every engine emits. */
 const span_wire = (type: string, source: string): string =>
@@ -70,7 +80,7 @@ const throws_range_error = (f: () => unknown, pattern: RegExp): void => {
 	throws(f, (e: unknown) => e instanceof RangeError && pattern.test(e.message));
 };
 
-Deno.test('read_options: defaults — locations off, the source type unset', () => {
+test('read_options: defaults — locations off, the source type unset', () => {
 	for (const options of [undefined, null, {}]) {
 		deepStrictEqual(read_options(options, 'parse', 'typescript'), {
 			locations: false,
@@ -103,7 +113,7 @@ Deno.test('read_options: defaults — locations off, the source type unset', () 
 	});
 });
 
-Deno.test('read_options: every refusal, word for word', () => {
+test('read_options: every refusal, word for word', () => {
 	throws_type_error(
 		() => read_options('script', 'parse', 'typescript'),
 		'parse options must be an object'
@@ -213,7 +223,7 @@ Deno.test('read_options: every refusal, word for word', () => {
 	);
 });
 
-Deno.test('read_options: a throwing getter is named, its error kept as the cause', () => {
+test('read_options: a throwing getter is named, its error kept as the cause', () => {
 	const getter_error = new Error('getter exploded');
 	const bag = (name: string) =>
 		Object.defineProperty({}, name, {
@@ -241,7 +251,7 @@ Deno.test('read_options: a throwing getter is named, its error kept as the cause
 	);
 });
 
-Deno.test('read_options: a non-plain object reads as a keyless bag — all defaults', () => {
+test('read_options: a non-plain object reads as a keyless bag — all defaults', () => {
 	for (const options of [new Date(0), new Map([['locations', true]])]) {
 		deepStrictEqual(read_options(options, 'parse', 'typescript'), {
 			locations: false,
@@ -250,7 +260,7 @@ Deno.test('read_options: a non-plain object reads as a keyless bag — all defau
 	}
 });
 
-Deno.test('parse: the span tree by default, `loc` reconstructed on request', () => {
+test('parse: the span tree by default, `loc` reconstructed on request', () => {
 	for (const with_object_parse of [true, false]) {
 		const { engine, calls } = fake_engine(with_object_parse);
 		const api = create_parse_api(engine);
@@ -269,7 +279,7 @@ Deno.test('parse: the span tree by default, `loc` reconstructed on request', () 
 	}
 });
 
-Deno.test('parse: the language reaches the reconstruction (Svelte counts LF alone)', () => {
+test('parse: the language reaches the reconstruction (Svelte counts LF alone)', () => {
 	const { engine } = fake_engine(false);
 	const api = create_parse_api(engine);
 	// a lone CR: a line under ECMAScript's rule, none under Svelte's
@@ -278,7 +288,7 @@ Deno.test('parse: the language reaches the reconstruction (Svelte counts LF alon
 	strictEqual(api.parse_typescript(source, { locations: true }).ast.loc.end.line, 2);
 });
 
-Deno.test('reconstruct_locations: the language is inferred from a root, never guessed', () => {
+test('reconstruct_locations: the language is inferred from a root, never guessed', () => {
 	// each parse root names its document
 	const lf_cr = 'a\rb';
 	for (const [type, line] of [
@@ -292,7 +302,7 @@ Deno.test('reconstruct_locations: the language is inferred from a root, never gu
 		strictEqual(ast.loc.end.line, line, type);
 	}
 	// a subtree names no document: refused, rather than read under TypeScript's rule
-	const fragment = { type: 'Fragment', start: 0, end: 3, nodes: [] };
+	const fragment: LocatedNode = { type: 'Fragment', start: 0, end: 3, nodes: [] };
 	throws_type_error(
 		() => reconstruct_locations(fragment, lf_cr),
 		"locations option 'language' is required: cannot infer the document's language from " +
@@ -308,7 +318,13 @@ Deno.test('reconstruct_locations: the language is inferred from a root, never gu
 	// a Svelte `<script>`'s program is a `Program` that starts after its tag: refused,
 	// rather than read as a TypeScript root (ECMAScript terminators, a counted BOM)
 	const svelte_source = '<script>\na\rb\n</script>';
-	const script_program = { type: 'Program', start: 8, end: 13, body: [], sourceType: 'module' };
+	const script_program: LocatedNode = {
+		type: 'Program',
+		start: 8,
+		end: 13,
+		body: [],
+		sourceType: 'module'
+	};
 	throws_type_error(
 		() => reconstruct_locations(script_program, svelte_source),
 		"locations option 'language' is required: cannot infer the document's language from " +
@@ -316,11 +332,11 @@ Deno.test('reconstruct_locations: the language is inferred from a root, never gu
 			"'svelte' | 'css'}, or the parse's own root (Root, Program or StyleSheetFile)"
 	);
 	strictEqual(
-		reconstruct_locations(script_program, svelte_source, { language: 'svelte' }).loc.end.line,
+		reconstruct_locations(script_program, svelte_source, { language: 'svelte' }).loc!.end.line,
 		3
 	);
 	// named, a subtree reconstructs under that language's rule
-	strictEqual(reconstruct_locations(fragment, lf_cr, { language: 'svelte' }).loc.end.line, 1);
+	strictEqual(reconstruct_locations(fragment, lf_cr, { language: 'svelte' }).loc!.end.line, 1);
 	// a named language that is not one of the three keeps the locator's own refusal
 	throws_type_error(
 		() => reconstruct_locations(fragment, lf_cr, { language: 'html' as 'css' }),
@@ -328,7 +344,7 @@ Deno.test('reconstruct_locations: the language is inferred from a root, never gu
 	);
 });
 
-Deno.test('locations: a non-string source is refused, as read_source refuses one', () => {
+test('locations: a non-string source is refused, as read_source refuses one', () => {
 	const ast = JSON.parse(span_wire('Program', 'x'));
 	for (const [source, got] of [
 		[42, 'number'],
@@ -348,7 +364,7 @@ Deno.test('locations: a non-string source is refused, as read_source refuses one
 // and a per-unit scan otherwise. Both are graded here against one reference over every
 // offset of seeded random documents drawn from the terminator alphabet, in each language,
 // so a document routed to either builder answers as the per-unit rule says.
-Deno.test('create_locator: both line-table builders answer as the per-unit rule', () => {
+test('create_locator: both line-table builders answer as the per-unit rule', () => {
 	/** The reference: every offset's `{line, column}` by one per-unit pass. */
 	const reference = (text: string, ecmascript: boolean) => {
 		const points = [];
@@ -396,7 +412,7 @@ Deno.test('create_locator: both line-table builders answer as the per-unit rule'
 	}
 });
 
-Deno.test("create_locator: position_at answers one offset in the wire's coordinates", () => {
+test("create_locator: position_at answers one offset in the wire's coordinates", () => {
 	const ts = create_locator('ab\r\ncd', { language: 'typescript' });
 	deepStrictEqual(ts.position_at(0), { line: 1, column: 0 });
 	deepStrictEqual(ts.position_at(4), { line: 2, column: 0 });
@@ -435,45 +451,42 @@ Deno.test("create_locator: position_at answers one offset in the wire's coordina
 	}
 });
 
-Deno.test(
-	"a locator's loc_of: null without a span, a RangeError for one the text does not hold",
-	() => {
-		const source = 'a\nbc';
-		const locator = create_locator(source, { language: 'svelte' });
-		deepStrictEqual(locator.loc_of({ start: 2, end: 4 }), {
-			start: { line: 2, column: 0 },
-			end: { line: 2, column: 2 }
-		});
-		for (const node of [null, undefined, {}, { start: 0 }, { start: '0', end: 1 }]) {
-			strictEqual(locator.loc_of(node as never), null);
-		}
-		for (const [start, end] of [
-			[0, 5],
-			[5, 5],
-			[3, 2],
-			[-1, 2],
-			[0.5, 2]
-		]) {
-			const pattern = new RegExp(`^loc_of: node span ${start}\\.\\.${end} is not a range`);
-			throws_range_error(() => locator.loc_of({ start, end }), pattern);
-		}
-		// the bound is the INDEXED text's: a Svelte BOM is not in the wire's coordinates
-		const bom_locator = create_locator('\uFEFFa\nbc', { language: 'svelte' });
-		deepStrictEqual(bom_locator.loc_of({ start: 2, end: 4 }), {
-			start: { line: 2, column: 0 },
-			end: { line: 2, column: 2 }
-		});
-		throws_range_error(() => bom_locator.loc_of({ start: 2, end: 5 }), /^loc_of: node span 2\.\.5/);
-		// a `-0` offset is offset 0, not a `column: -0`
-		deepStrictEqual(locator.position_at(-0), { line: 1, column: 0 });
-		deepStrictEqual(locator.loc_of({ start: -0, end: -0 }), {
-			start: { line: 1, column: 0 },
-			end: { line: 1, column: 0 }
-		});
+test("a locator's loc_of: null without a span, a RangeError for one the text does not hold", () => {
+	const source = 'a\nbc';
+	const locator = create_locator(source, { language: 'svelte' });
+	deepStrictEqual(locator.loc_of({ start: 2, end: 4 }), {
+		start: { line: 2, column: 0 },
+		end: { line: 2, column: 2 }
+	});
+	for (const node of [null, undefined, {}, { start: 0 }, { start: '0', end: 1 }]) {
+		strictEqual(locator.loc_of(node as never), null);
 	}
-);
+	for (const [start, end] of [
+		[0, 5],
+		[5, 5],
+		[3, 2],
+		[-1, 2],
+		[0.5, 2]
+	]) {
+		const pattern = new RegExp(`^loc_of: node span ${start}\\.\\.${end} is not a range`);
+		throws_range_error(() => locator.loc_of({ start, end }), pattern);
+	}
+	// the bound is the INDEXED text's: a Svelte BOM is not in the wire's coordinates
+	const bom_locator = create_locator('\uFEFFa\nbc', { language: 'svelte' });
+	deepStrictEqual(bom_locator.loc_of({ start: 2, end: 4 }), {
+		start: { line: 2, column: 0 },
+		end: { line: 2, column: 2 }
+	});
+	throws_range_error(() => bom_locator.loc_of({ start: 2, end: 5 }), /^loc_of: node span 2\.\.5/);
+	// a `-0` offset is offset 0, not a `column: -0`
+	deepStrictEqual(locator.position_at(-0), { line: 1, column: 0 });
+	deepStrictEqual(locator.loc_of({ start: -0, end: -0 }), {
+		start: { line: 1, column: 0 },
+		end: { line: 1, column: 0 }
+	});
+});
 
-Deno.test("a locator's loc_of names a throwing getter and reads each offset once", () => {
+test("a locator's loc_of names a throwing getter and reads each offset once", () => {
 	const locator = create_locator('a\nbc', { language: 'svelte' });
 	const cause = new Error('boom');
 	for (const key of ['start', 'end'] as const) {
@@ -508,8 +521,8 @@ Deno.test("a locator's loc_of names a throwing getter and reads each offset once
 	deepStrictEqual(reads, { start: 1, end: 1 });
 });
 
-Deno.test('locations: the options bag is read as the facade reads one', () => {
-	const ast = { type: 'Program', start: 0, end: 1 };
+test('locations: the options bag is read as the facade reads one', () => {
+	const ast: LocatedNode = { type: 'Program', start: 0, end: 1 };
 	for (const bag of ['typescript', 1, ['typescript']]) {
 		throws_type_error(
 			() => create_locator('a', bag as never),
@@ -532,9 +545,7 @@ Deno.test('locations: the options bag is read as the facade reads one', () => {
 					throw getter_error;
 				}
 			}),
-		(
-			e: unknown
-		) =>
+		(e: unknown) =>
 			e instanceof TypeError &&
 			e.message === "failed to read locations option 'language'" &&
 			e.cause === getter_error
@@ -558,7 +569,7 @@ Deno.test('locations: the options bag is read as the facade reads one', () => {
 	}
 	// unset — an absent bag, `null`, or the key set to `undefined` — infers
 	for (const bag of [undefined, null, {}, { language: undefined }]) {
-		strictEqual(reconstruct_locations({ ...ast }, 'a', bag as never).loc.end.column, 1);
+		strictEqual(reconstruct_locations({ ...ast }, 'a', bag as never).loc!.end.column, 1);
 	}
 	// the bag is read by its own enumerable keys alone, as `read_options` reads one: an
 	// inherited `language` is not a setting
@@ -569,13 +580,11 @@ Deno.test('locations: the options bag is read as the facade reads one', () => {
 	);
 	// so the language is inferred from the `Program` root (TypeScript's rule: the lone CR
 	// breaks a line), not read off the prototype (CSS's: it does not)
-	strictEqual(
-		reconstruct_locations({ type: 'Program', start: 0, end: 3 }, 'a\rb', inherited).loc.end.line,
-		2
-	);
+	const program: LocatedNode = { type: 'Program', start: 0, end: 3 };
+	strictEqual(reconstruct_locations(program, 'a\rb', inherited).loc!.end.line, 2);
 });
 
-Deno.test('reconstruct_locations: depth costs no JS stack', () => {
+test('reconstruct_locations: depth costs no JS stack', () => {
 	// far past where a frame-per-level walk throws a `RangeError` on every runtime; each
 	// level nests an array too, which a recursive walk pays a frame for as well
 	const depth = 100_000;
@@ -596,40 +605,37 @@ Deno.test('reconstruct_locations: depth costs no JS stack', () => {
 	deepStrictEqual(innermost.loc, { start: { line: 1, column: 0 }, end: { line: 1, column: 1 } });
 });
 
-Deno.test(
-	'reconstruct_locations: an in-tag comment is told by the key order its collector wrote',
-	() => {
-		// Svelte's template reader writes `{type, start, end, value}` (an in-tag comment, which
-		// gets `character`); acorn's `onComment` wrapper `{type, value, start, end}` (the plain
-		// shape) — whatever the tree around them says
-		const source = '<div /* a */ title={/* b */ x}></div>';
-		const at = (needle: string) => source.indexOf(needle);
-		const template_reader: Record<string, unknown> = {
-			type: 'Block',
-			start: at('/* a'),
-			end: at('/* a') + 7,
-			value: ' a '
-		};
-		const acorn: Record<string, unknown> = {
-			type: 'Block',
-			value: ' b ',
-			start: at('/* b'),
-			end: at('/* b') + 7
-		};
-		const root = { type: 'Root', start: 0, end: source.length, comments: [acorn, template_reader] };
-		reconstruct_locations(root, source);
-		deepStrictEqual(template_reader.loc, {
-			start: { line: 1, column: 5, character: 5 },
-			end: { line: 1, column: 12, character: 12 }
-		});
-		deepStrictEqual(acorn.loc, {
-			start: { line: 1, column: at('/* b') },
-			end: { line: 1, column: at('/* b') + 7 }
-		});
-	}
-);
+test('reconstruct_locations: an in-tag comment is told by the key order its collector wrote', () => {
+	// Svelte's template reader writes `{type, start, end, value}` (an in-tag comment, which
+	// gets `character`); acorn's `onComment` wrapper `{type, value, start, end}` (the plain
+	// shape) — whatever the tree around them says
+	const source = '<div /* a */ title={/* b */ x}></div>';
+	const at = (needle: string) => source.indexOf(needle);
+	const template_reader: Record<string, unknown> = {
+		type: 'Block',
+		start: at('/* a'),
+		end: at('/* a') + 7,
+		value: ' a '
+	};
+	const acorn: Record<string, unknown> = {
+		type: 'Block',
+		value: ' b ',
+		start: at('/* b'),
+		end: at('/* b') + 7
+	};
+	const root = { type: 'Root', start: 0, end: source.length, comments: [acorn, template_reader] };
+	reconstruct_locations(root, source);
+	deepStrictEqual(template_reader.loc, {
+		start: { line: 1, column: 5, character: 5 },
+		end: { line: 1, column: 12, character: 12 }
+	});
+	deepStrictEqual(acorn.loc, {
+		start: { line: 1, column: at('/* b') },
+		end: { line: 1, column: at('/* b') + 7 }
+	});
+});
 
-Deno.test('parse: the source type is forwarded, unset when not named', () => {
+test('parse: the source type is forwarded, unset when not named', () => {
 	const { engine, calls } = fake_engine(false);
 	const api = create_parse_api(engine);
 	api.parse_typescript('x', { sourceType: 'script' });
@@ -642,7 +648,7 @@ Deno.test('parse: the source type is forwarded, unset when not named', () => {
 	);
 });
 
-Deno.test('parse_*_json: the wire string untouched, and `locations` refused with a pointer', () => {
+test('parse_*_json: the wire string untouched, and `locations` refused with a pointer', () => {
 	const { engine, calls } = fake_engine(true);
 	const api = create_parse_api(engine);
 	deepStrictEqual(api.parse_css_json('a{}'), {
@@ -668,7 +674,7 @@ Deno.test('parse_*_json: the wire string untouched, and `locations` refused with
 	);
 });
 
-Deno.test('format: the source type forwarded, `locations` unknown', () => {
+test('format: the source type forwarded, `locations` unknown', () => {
 	const { engine, calls } = fake_engine(false);
 	const api = create_format_api(engine.format);
 	deepStrictEqual(api.format_typescript('x', { sourceType: 'script' }), {
@@ -697,7 +703,7 @@ Deno.test('format: the source type forwarded, `locations` unknown', () => {
 	);
 });
 
-Deno.test('a non-string source is refused before the engine sees it', () => {
+test('a non-string source is refused before the engine sees it', () => {
 	const { engine, calls } = fake_engine(false);
 	const api = { ...create_parse_api(engine), ...create_format_api(engine.format) };
 	for (const [name, noun] of [
@@ -722,7 +728,7 @@ Deno.test('a non-string source is refused before the engine sees it', () => {
 	strictEqual(calls.length, 0);
 });
 
-Deno.test('the facade builds exactly the engine families it is handed', () => {
+test('the facade builds exactly the engine families it is handed', () => {
 	const { engine } = fake_engine(false);
 	deepStrictEqual(Object.keys(create_format_api(engine.format)).sort(), [
 		'format_css',
@@ -739,13 +745,13 @@ Deno.test('the facade builds exactly the engine families it is handed', () => {
 	]);
 });
 
-Deno.test('every function the facade builds is named for its export', () => {
+test('every function the facade builds is named for its export', () => {
 	const { engine } = fake_engine(true);
 	const api = { ...create_parse_api(engine), ...create_format_api(engine.format) };
 	for (const [name, f] of Object.entries(api)) strictEqual(f.name, name);
 });
 
-Deno.test('a source that is not well-formed UTF-16 is refused, naming its offset', () => {
+test('a source that is not well-formed UTF-16 is refused, naming its offset', () => {
 	const { engine, calls } = fake_engine(true);
 	const api: Record<string, (source: string) => unknown> = {
 		...create_parse_api(engine),
@@ -854,7 +860,7 @@ const engine_failure = (kind: string) => ({
 	}
 });
 
-Deno.test("a returned engine failure of kind 'parse' is the result, as it is", () => {
+test("a returned engine failure of kind 'parse' is the result, as it is", () => {
 	for (const with_object_parse of [true, false]) {
 		let last: unknown;
 		const { api } = failing_api(
@@ -869,7 +875,7 @@ Deno.test("a returned engine failure of kind 'parse' is the result, as it is", (
 	}
 });
 
-Deno.test("a format's returned refusal is the result; a parse export throws it", () => {
+test("a format's returned refusal is the result; a parse export throws it", () => {
 	for (const with_object_parse of [true, false]) {
 		let last: unknown;
 		const { api } = failing_api(
@@ -894,7 +900,7 @@ Deno.test("a format's returned refusal is the result; a parse export throws it",
 	}
 });
 
-Deno.test('a malformed returned failure is thrown as an engine bug, the value its cause', () => {
+test('a malformed returned failure is thrown as an engine bug, the value its cause', () => {
 	const complete = engine_failure('parse');
 	const without = (key: string) => {
 		const error: Record<string, unknown> = { ...complete.error };
@@ -956,7 +962,7 @@ Deno.test('a malformed returned failure is thrown as an engine bug, the value it
 	}
 });
 
-Deno.test("an object parse's `{ok: true}` without an `ast` is thrown as an engine bug", () => {
+test("an object parse's `{ok: true}` without an `ast` is thrown as an engine bug", () => {
 	for (const returned of [{ ok: true }, { ok: true, json: '{}' }]) {
 		const api = create_parse_api({
 			parse_json: { typescript: () => '{}' },
@@ -971,7 +977,7 @@ Deno.test("an object parse's `{ok: true}` without an `ast` is thrown as an engin
 	}
 });
 
-Deno.test('anything an engine throws passes through as the same object', () => {
+test('anything an engine throws passes through as the same object', () => {
 	class RuntimeError extends Error {}
 	const values: Array<() => unknown> = [
 		// the size cap (or a raw engine's own refusal, reached past the facade): a plain
@@ -998,7 +1004,7 @@ Deno.test('anything an engine throws passes through as the same object', () => {
 	}
 });
 
-Deno.test('argument refusals stay TypeErrors and never reach the engine', () => {
+test('argument refusals stay TypeErrors and never reach the engine', () => {
 	const { api, calls } = failing_api(() => engine_failure('parse'), 'return', true);
 	for (const name of PUBLISHED) {
 		strictEqual(caught(() => api[name](42)) instanceof TypeError, true, name);
@@ -1007,7 +1013,7 @@ Deno.test('argument refusals stay TypeErrors and never reach the engine', () => 
 	strictEqual(calls.length, 0);
 });
 
-Deno.test("the facade's own JSON.parse failing is a thrown internal Error, not a result", () => {
+test("the facade's own JSON.parse failing is a thrown internal Error, not a result", () => {
 	const api = create_parse_api({
 		parse_json: { typescript: () => '{"type":"Program",' }
 	});
@@ -1020,28 +1026,25 @@ Deno.test("the facade's own JSON.parse failing is a thrown internal Error, not a
 	deepStrictEqual(api.parse_typescript_json('x'), { ok: true, json: '{"type":"Program",' });
 });
 
-Deno.test(
-	'an options read that throws reaches the caller as itself, before any engine call',
-	() => {
-		// the bag is read ahead of the engine call, so its throw reaches the caller as itself
-		// and no engine runs
-		const pointed = new Error('from the bag');
-		const bag = new Proxy(
-			{},
-			{
-				ownKeys() {
-					throw pointed;
-				}
+test('an options read that throws reaches the caller as itself, before any engine call', () => {
+	// the bag is read ahead of the engine call, so its throw reaches the caller as itself
+	// and no engine runs
+	const pointed = new Error('from the bag');
+	const bag = new Proxy(
+		{},
+		{
+			ownKeys() {
+				throw pointed;
 			}
-		);
-		const { api, calls } = throwing_api(() => new Error('engine'), true);
-		for (const name of PUBLISHED) {
-			strictEqual(
-				caught(() => api[name]('x', bag)),
-				pointed,
-				name
-			);
 		}
-		strictEqual(calls.length, 0);
+	);
+	const { api, calls } = throwing_api(() => new Error('engine'), true);
+	for (const name of PUBLISHED) {
+		strictEqual(
+			caught(() => api[name]('x', bag)),
+			pointed,
+			name
+		);
 	}
-);
+	strictEqual(calls.length, 0);
+});

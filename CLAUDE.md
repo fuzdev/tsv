@@ -112,7 +112,7 @@ cargo run -p tsv_cli strip --check --content 'enum E {}'                 # exit 
 
 ### Testing & Code Quality
 
-"In `check`" = gates in `deno task check`. A task that needs `deno task bench:install` (node_modules — CI installs none) can't gate there.
+"In `check`" = gates in `deno task check`. A task that needs `deno task bench:install` (the bench's node_modules — CI installs none) can't gate there.
 
 ```bash
 deno task check          # full committed-tree gate (benches/js/CLAUDE.md §Gate map)
@@ -134,26 +134,35 @@ deno task typecheck:packages # the STAGED npm packages' .d.ts as a consumer comp
 deno task typecheck:scripts # deno check over scripts/ alone — node-modules-free, so in `check` (nothing else typechecks
 #                          the release scripts); excludes `scripts/doctor.ts`, whose corpus probe reaches node_modules
 deno task typecheck:bench-core # the node-modules-free bench modules scripts/'s import graph misses
-#                          (`lib/{wasm,harvest_stamp,loc_wire_client,fixture_documents,error_text}.ts` + `compose_reports.ts`); the rest
-#                          of that core rides `typecheck:scripts` or `test:deno`. Scope rationale: deno.json's `//` note; in `check`
+#                          (`lib/{wasm,harvest_stamp,loc_wire_client,fixture_documents,error_text}.ts` + `compose_reports.ts`,
+#                          and the modules the `test:node` suites test that nothing else Deno-checks); the rest of that core
+#                          rides `typecheck:scripts` or `test:deno`. Scope rationale: deno.json's `//` note; in `check`
 deno task test           # cargo test
-deno task test:deno      # deno tests over the node-modules-free bench core (divergence detectors, format-config probe,
-#                          span-only wire probe, gate_counts, bench pass plan, perf-omit summary, Prettier-suite filter, loc tolerance
-#                          rows, parse diff engine + divergence matchers, NDJSON reader) + scripts/ (`release/changelog_test.ts`
-#                          — the changelog grammar publish.ts writes and release_notes.ts reads; `release/version_test.ts` +
-#                          `release/plan_test.ts` — the version grammar and the fresh/resume plan; `release/crates_test.ts` —
-#                          publish:crates' order, liveness, semver baseline + release type + feature flags and rate-limit read over a
-#                          fake crates.io, plus its packaging cleanup on the real filesystem (own invocation, `--allow-write`);
-#                          `branch_report/*_test.ts` — the branch report's parsers, verdicts and wasm-board extraction;
-#                          `release/binstall_test.ts` — the binstall-table grader; `npm_api_test.ts` + `npm_api_strip_test.ts` +
-#                          `npm_api_imports_test.ts` — the npm options facade and its strip and imports halves over a fake
-#                          engine; `typecheck_packages_test.ts` — the README fence + marker grammar; `perf_ab_verdict_test.ts` —
+deno task test:node      # vitest under Node over the suites beside their modules (`tsc -p tsconfig.vitest.json` first,
+#                          which typechecks them; the suites are the `_test.ts` files it names): the bench core's (divergence
+#                          detectors, format-config probe, span-only wire probe, gate_counts, bench pass plan, perf-omit
+#                          summary, Prettier-suite filter, loc tolerance rows, parse diff engine + divergence matchers, NDJSON
+#                          reader) + scripts/'s (`release/changelog_test.ts` — the changelog grammar publish.ts writes and
+#                          release_notes.ts reads; `release/version_test.ts` + `release/plan_test.ts` — the version grammar and
+#                          the fresh/resume plan; `branch_report/{parsers,report,timing,wasm_board}_test.ts` — the branch
+#                          report's parsers, verdicts and wasm-board extraction; `release/binstall_test.ts` — the
+#                          binstall-table grader; `npm_api_test.ts` + `npm_api_strip_test.ts` + `npm_api_imports_test.ts` —
+#                          the npm options facade and its strip and imports halves over a fake engine;
+#                          `typecheck_packages_test.ts` — the README fence + marker grammar; `perf_ab_verdict_test.ts` —
 #                          perf:ab's verdict rule; `pgo/profile_test.ts` — the PGO gates' readers over captured
 #                          llvm-profdata / llvm-readobj / build-log output; `pgo/depth_stack_test.ts` — the PE
-#                          stack-reserve reader + writer the Windows depth gate uses; `perf_ab_test.ts` —
-#                          perf:ab's `git ls-tree -z` listing and strip entry-point probe over a scratch repo, its
-#                          own `deno test` invocation with `--allow-write --allow-run=git` + `--allow-env` for the three
-#                          `GIT_*` variables it clears); in `check`
+#                          stack-reserve reader + writer the Windows depth gate uses; `cargo_build_test.ts` — the stamp
+#                          paths); in `check` (docs/tasks.md §`test:node`)
+deno task test:node:canonical # the same over `benches/js/lib/canonical_test.ts`, the canonical prettier baseline's parser
+#                          routing; needs `deno task bench:install`, so NOT in `check`
+deno task test:deno      # deno tests over the suites whose module under test calls `Deno.*`: the divergence detectors
+#                          against their committed fixtures (`benches/js/lib/divergence/fixture_coverage_test.ts`);
+#                          `release/crates_test.ts` — publish:crates' order, liveness, semver baseline + release type + feature
+#                          flags and rate-limit read over a fake crates.io, plus its packaging cleanup on the real filesystem
+#                          (own invocation, `--allow-write`); `perf_ab_test.ts` — perf:ab's `git ls-tree -z` listing and strip
+#                          entry-point probe over a scratch repo, with `branch_report/side_test.ts` — the corpus identity over
+#                          one, their own invocation with `--allow-write --allow-run=git` + `--allow-env` for the three
+#                          `GIT_*` variables perf_ab_test.ts clears; in `check`
 deno task test:depth     # tests/depth_limit.rs optimized (`--profile corpus`): every shape the depth limits count, a catalog
 #                          of grammar positions each nested in itself, and a generated sweep — `check`'s scope: every pair
 #                          behind the heads `a` and `a()`, a few hundred seeded triples, every commented link, the bare prefix
@@ -403,7 +412,7 @@ Version source of truth: `Cargo.toml` `[workspace.package] version` (read direct
 
 Package shape: wasm-pack `web` target, then `scripts/patch_npm_package.ts` adds a Node/Bun entry (sync auto-init), a browser entry (guarded `await init()`), `index.d.ts`, conditional `exports`, npm metadata, and the variant README. Every entry publishes through one hand-written facade shared with the native `@fuzdev/tsv` (`crates/tsv_wasm/npm/api.js` + `api_parse.js` + `api_strip.js`: the `(source, options?)` bags, their errors, `{locations: true}` over the span-only wire, and the `{ok, …}` result every export returns — ./crates/tsv_wasm/CLAUDE.md §The npm Facade). The export list is extracted from the generated JS, so new `lang_bindings!` languages flow through automatically.
 
-`scripts/publish.ts` orchestrates the release: preflight → bump → check → conformance:all → audit:corpus (Step 3c) → build npm packages + deno bundles → verify → artifact validation (size bounds + Deno smoke + Node tests + `test:bun` over the three wasm packages + `typecheck:packages` over all four npm packages, the napi loader staged) → idempotent npm publish → git commit + tag + push, printing a wasm size summary. It stamps CHANGELOG.md's `## Unreleased` into the released version (which the tag's GitHub Release reads back); that section must be non-empty with a `<!-- bump: <level> -->` marker matching `--bump` (both required; a fresh empty `## Unreleased` is seeded on stamp; shared grammar: `scripts/release/changelog.ts`; agents never edit it — [Releases](#releases)). A failed wetrun resumes at **every** step, git finalize included — the retry sentinel is removed only once the push lands, so re-run `--wetrun` with no `--bump`: nothing publishes twice and the tag finishes. The release logic is a library under `scripts/release/` (version, changelog, plan, bump, git, npm, sentinel, crates, binstall; the pure ones unit-tested in `test:deno`): one `release_plan` decides fresh vs resumed and every reason a fresh release cannot proceed, so a dry run warns on exactly what a wetrun refuses. The preflight refuses a `HEAD` that is not exactly `origin/main` (a resume may sit one release commit ahead) and a `v<version>` tag that already exists locally or on origin (a resume's only on `HEAD`), the checkout is fingerprinted after the bump and refused if it moved before Step 7, and a resume whose packages are all on npm skips straight to the git finalize.
+`scripts/publish.ts` orchestrates the release: preflight → bump → check → conformance:all → audit:corpus (Step 3c) → build npm packages + deno bundles → verify → artifact validation (size bounds + Deno smoke + Node tests + `test:bun` over the three wasm packages + `typecheck:packages` over all four npm packages, the napi loader staged) → idempotent npm publish → git commit + tag + push, printing a wasm size summary. It stamps CHANGELOG.md's `## Unreleased` into the released version (which the tag's GitHub Release reads back); that section must be non-empty with a `<!-- bump: <level> -->` marker matching `--bump` (both required; a fresh empty `## Unreleased` is seeded on stamp; shared grammar: `scripts/release/changelog.ts`; agents never edit it — [Releases](#releases)). A failed wetrun resumes at **every** step, git finalize included — the retry sentinel is removed only once the push lands, so re-run `--wetrun` with no `--bump`: nothing publishes twice and the tag finishes. The release logic is a library under `scripts/release/` (version, changelog, plan, bump, git, npm, sentinel, crates, binstall; the pure ones unit-tested in `test:node`, crates in `test:deno`): one `release_plan` decides fresh vs resumed and every reason a fresh release cannot proceed, so a dry run warns on exactly what a wetrun refuses. The preflight refuses a `HEAD` that is not exactly `origin/main` (a resume may sit one release commit ahead) and a `v<version>` tag that already exists locally or on origin (a resume's only on `HEAD`), the checkout is fingerprinted after the bump and refused if it moved before Step 7, and a resume whose packages are all on npm skips straight to the git finalize.
 
 **Conformance gates (Step 3b)** — `deno task conformance:all` (see [Corpus Comparison](#corpus-comparison)); skipped by `--no-check`. Preflights the oracles (`../svelte`, `../acorn-typescript`, `../typescript`, `../test262`, `../prettier`, `../prettier-plugin-svelte`, the `../corpora` snapshot + the `benches/js` `node_modules` sidecar): a **`--wetrun` FAILS** when any is missing (releasing without gates requires the explicit `--no-check`); a dry-run warn-skips, re-warned in the final summary. `deno task doctor` checks the same ahead of time. Only the CSS-WPT harvest stays manual. A `corpus:compare:format` SAFETY hit is self-verified in-run (the native format re-runs and must reproduce byte-identically), so treat it as real; FFI nondeterminism surfaces as a loud `native format nondeterminism` per-file error instead (./benches/js/CLAUDE.md §Known Issues). A caught **panic** hard-fails either corpus tool on every run — a shipped artifact would abort the host, so it must never grade as one more per-file error.
 

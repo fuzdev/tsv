@@ -13,6 +13,7 @@
  */
 
 import { deepStrictEqual, strictEqual, throws } from 'node:assert';
+import { test } from 'vitest';
 
 import { create_strip_api } from '../crates/tsv_wasm/npm/api_strip.js';
 
@@ -51,7 +52,7 @@ const refusal = (construct: string) => ({
 	loc: { start: { line: 2, column: 0 }, end: { line: 2, column: 9 } }
 });
 
-Deno.test('strip: the code, as an ok result', () => {
+test('strip: the code, as an ok result', () => {
 	const { api, calls } = fake_strip((source) => source.replace(': T', '   '));
 	const result = api.strip_typescript('let x: T;');
 	deepStrictEqual(result, { ok: true, code: 'let x   ;' });
@@ -60,19 +61,19 @@ Deno.test('strip: the code, as an ok result', () => {
 	deepStrictEqual(calls, [['let x: T;', undefined]]);
 });
 
-Deno.test('strip: a returned parse failure is the result, as it is', () => {
+test('strip: a returned parse failure is the result, as it is', () => {
 	const failure = engine_failure(PARSE_ERROR);
 	const { api } = fake_strip(() => failure);
 	strictEqual(api.strip_typescript('let = ;'), failure);
 });
 
-Deno.test('strip: a returned refusal is the result, as it is', () => {
+test('strip: a returned refusal is the result, as it is', () => {
 	const failure = engine_failure(refusal('enum'));
 	const { api } = fake_strip(() => failure);
 	strictEqual(api.strip_typescript('x;\n\nenum E {}'), failure);
 });
 
-Deno.test('strip: every construct the engines name is passed through by name', () => {
+test('strip: every construct the engines name is passed through by name', () => {
 	for (const construct of [
 		'enum',
 		'value_namespace',
@@ -89,7 +90,7 @@ Deno.test('strip: every construct the engines name is passed through by name', (
 	}
 });
 
-Deno.test('strip: a malformed returned failure is thrown as an engine bug', () => {
+test('strip: a malformed returned failure is thrown as an engine bug', () => {
 	const returned = [
 		// a refusal naming a construct the facade does not know
 		engine_failure(refusal('decorator')),
@@ -112,7 +113,7 @@ Deno.test('strip: a malformed returned failure is thrown as an engine bug', () =
 	}
 });
 
-Deno.test('strip: anything an engine throws passes through as the same object', () => {
+test('strip: anything an engine throws passes through as the same object', () => {
 	class RuntimeError extends Error {}
 	const thrown = [
 		new Error('File too large: 5000000000 bytes (maximum: 4294967295 bytes / 4 GiB)'),
@@ -133,7 +134,7 @@ Deno.test('strip: anything an engine throws passes through as the same object', 
 	}
 });
 
-Deno.test('strip: the options bag — the source type forwarded, unknown keys refused', () => {
+test('strip: the options bag — the source type forwarded, unknown keys refused', () => {
 	const { api, calls } = fake_strip((source) => source);
 	for (const options of [
 		undefined,
@@ -172,7 +173,7 @@ Deno.test('strip: the options bag — the source type forwarded, unknown keys re
 	strictEqual(calls.length, 6, 'a refused bag never reaches the engine');
 });
 
-Deno.test('strip: a bad source is a TypeError that never reaches the engine', () => {
+test('strip: a bad source is a TypeError that never reaches the engine', () => {
 	const { api, calls } = fake_strip((source) => source);
 	const refusals: Array<[unknown, string]> = [
 		[42, 'strip source must be a string (got number)'],
@@ -190,7 +191,7 @@ Deno.test('strip: a bad source is a TypeError that never reaches the engine', ()
 	strictEqual(calls.length, 0);
 });
 
-Deno.test('strip: the function is named for its export', () => {
+test('strip: the function is named for its export', () => {
 	const { api } = fake_strip((source) => source);
 	strictEqual(api.strip_typescript.name, 'strip_typescript');
 	deepStrictEqual(Object.keys(api), ['strip_typescript']);

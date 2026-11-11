@@ -85,7 +85,7 @@ The diff matches a documented pattern in the `conformance_prettier*.md` family, 
 3. Understand why it fails to match this specific diff
 4. Broaden the pattern (without overmatching)
 5. Add a positive test case in `patterns_test.ts` matching the new variant
-6. Verify: `deno task test:deno` (all tests pass)
+6. Verify: `deno task test:node` and `deno task test:deno` (all tests pass)
 7. Verify: `deno task corpus:compare:format:run --all --explain` (unknown count decreased)
 8. Move to next file
 

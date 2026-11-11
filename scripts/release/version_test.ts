@@ -1,4 +1,6 @@
 import { deepStrictEqual } from 'node:assert';
+import { readFileSync } from 'node:fs';
+import { test } from 'vitest';
 
 import {
 	cargo_workspace_version,
@@ -22,7 +24,7 @@ rust-version = "1.89"
 serde = { version = "1.0.0" }
 `;
 
-Deno.test('cargo_workspace_version reads the workspace.package table only', () => {
+test('cargo_workspace_version reads the workspace.package table only', () => {
 	deepStrictEqual(cargo_workspace_version(cargo), '0.1.1');
 	deepStrictEqual(
 		cargo_workspace_version(
@@ -33,7 +35,7 @@ Deno.test('cargo_workspace_version reads the workspace.package table only', () =
 	deepStrictEqual(cargo_workspace_version('[package]\nversion = "0.1.0"\n'), null);
 });
 
-Deno.test('cargo_workspace_version_set rewrites that one value', () => {
+test('cargo_workspace_version_set rewrites that one value', () => {
 	const next = cargo_workspace_version_set(cargo, '0.2.0');
 	deepStrictEqual(next, {
 		ok: true,
@@ -45,10 +47,8 @@ Deno.test('cargo_workspace_version_set rewrites that one value', () => {
 	});
 });
 
-Deno.test(
-	"cargo_workspace_version_set moves the path entries' exact pins in the same write",
-	() => {
-		const pinned = `[workspace.package]
+test("cargo_workspace_version_set moves the path entries' exact pins in the same write", () => {
+	const pinned = `[workspace.package]
 version = "0.7.1"
 
 [workspace.dependencies]
@@ -63,32 +63,31 @@ serde = "1"
 name = "x"
 version = "=0.7.1"
 `;
-		const next = cargo_workspace_version_set(pinned, '0.8.0');
-		const text = pinned
-			.replace('version = "0.7.1"', 'version = "0.8.0"')
-			.replace('tsv_lang", version = "=0.7.1"', 'tsv_lang", version = "=0.8.0"')
-			.replace('tsv_ts", version = "=0.7.1"', 'tsv_ts", version = "=0.8.0"');
-		deepStrictEqual(next, { ok: true, text });
-		// idempotent: a resumed release repeats the write and changes nothing
-		deepStrictEqual(cargo_workspace_version_set(text, '0.8.0'), next);
-	}
-);
+	const next = cargo_workspace_version_set(pinned, '0.8.0');
+	const text = pinned
+		.replace('version = "0.7.1"', 'version = "0.8.0"')
+		.replace('tsv_lang", version = "=0.7.1"', 'tsv_lang", version = "=0.8.0"')
+		.replace('tsv_ts", version = "=0.7.1"', 'tsv_ts", version = "=0.8.0"');
+	deepStrictEqual(next, { ok: true, text });
+	// idempotent: a resumed release repeats the write and changes nothing
+	deepStrictEqual(cargo_workspace_version_set(text, '0.8.0'), next);
+});
 
-Deno.test('version_parse accepts release versions only', () => {
+test('version_parse accepts release versions only', () => {
 	deepStrictEqual(version_parse('0.1.10'), { major: 0, minor: 1, patch: 10 });
 	deepStrictEqual(version_parse('0.2.0-alpha.1'), null);
 	deepStrictEqual(version_parse('01.0.0'), null);
 	deepStrictEqual(version_parse('1.0'), null);
 });
 
-Deno.test('version_bump resets the lower components', () => {
+test('version_bump resets the lower components', () => {
 	deepStrictEqual(version_bump('0.1.9', 'patch'), '0.1.10');
 	deepStrictEqual(version_bump('0.1.9', 'minor'), '0.2.0');
 	deepStrictEqual(version_bump('0.1.9', 'major'), '1.0.0');
 	deepStrictEqual(version_bump('0.2.0-alpha.1', 'patch'), null);
 });
 
-Deno.test('is_bump_level and version_tag', () => {
+test('is_bump_level and version_tag', () => {
 	deepStrictEqual(['patch', 'minor', 'major', 'prerelease', undefined].map(is_bump_level), [
 		true,
 		true,
@@ -99,7 +98,7 @@ Deno.test('is_bump_level and version_tag', () => {
 	deepStrictEqual(version_tag('0.1.1'), 'v0.1.1');
 });
 
-Deno.test('version_from_tag accepts v-prefixed and bare semver only', () => {
+test('version_from_tag accepts v-prefixed and bare semver only', () => {
 	deepStrictEqual(version_from_tag('v0.3.0'), '0.3.0');
 	deepStrictEqual(version_from_tag('0.3.0'), '0.3.0');
 	deepStrictEqual(version_from_tag('v0.3'), null);
@@ -107,11 +106,11 @@ Deno.test('version_from_tag accepts v-prefixed and bare semver only', () => {
 	deepStrictEqual(version_from_tag('main'), null);
 });
 
-Deno.test("cargo_workspace_version_set leaves the repo's Cargo.toml no old version to name", () => {
+test("cargo_workspace_version_set leaves the repo's Cargo.toml no old version to name", () => {
 	// the setter refuses the spellings it can see but not move (a non-exact or single-quoted
 	// pin, a `[workspace.dependencies.<name>]` table); this pins the real file against the ones
 	// it cannot see (dotted keys), which would keep the old version
-	const cargo_toml = Deno.readTextFileSync('Cargo.toml');
+	const cargo_toml = readFileSync(new URL('../../Cargo.toml', import.meta.url), 'utf8');
 	const current = cargo_workspace_version(cargo_toml)!;
 	const named = new RegExp(`(?<![\\d.])${current.replaceAll('.', '\\.')}(?![\\d.])`);
 	const next = cargo_workspace_version_set(cargo_toml, '999.0.0');
@@ -119,7 +118,7 @@ Deno.test("cargo_workspace_version_set leaves the repo's Cargo.toml no old versi
 	deepStrictEqual(named.test(next.text), false);
 });
 
-Deno.test('cargo_workspace_version_set refuses a path entry pin it cannot move', () => {
+test('cargo_workspace_version_set refuses a path entry pin it cannot move', () => {
 	const head = '[workspace.package]\nversion = "0.7.1"\n\n[workspace.dependencies]\n';
 	for (const entry of [
 		'tsv_lang = { path = "crates/tsv_lang", version = "0.7.1" }',
@@ -143,7 +142,7 @@ Deno.test('cargo_workspace_version_set refuses a path entry pin it cannot move',
 	});
 });
 
-Deno.test('cargo_workspace_version_set refuses a dependency declared as its own table', () => {
+test('cargo_workspace_version_set refuses a dependency declared as its own table', () => {
 	const cargo_toml =
 		'[workspace.package]\nversion = "0.7.1"\n\n[workspace.dependencies.tsv_lang]\npath = "crates/tsv_lang"\nversion = "=0.7.1"\n';
 	deepStrictEqual(cargo_workspace_version_set(cargo_toml, '0.8.0'), {

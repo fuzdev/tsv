@@ -1,4 +1,5 @@
 import { deepStrictEqual, ok } from 'node:assert';
+import { test } from 'vitest';
 
 import {
 	BINSTALL_URL_PREFIX,
@@ -34,11 +35,11 @@ const good = () => ({
 
 const REPO = 'https://github.com/fuzdev/tsv';
 
-Deno.test('the release URL prefix is the tag spelling', () => {
+test('the release URL prefix is the tag spelling', () => {
 	deepStrictEqual(BINSTALL_URL_PREFIX, '{ repo }/releases/download/v{ version }/');
 });
 
-Deno.test('npm_triple_of_rust_target spells the asset triples', () => {
+test('npm_triple_of_rust_target spells the asset triples', () => {
 	deepStrictEqual(npm_triple_of_rust_target('x86_64-unknown-linux-gnu'), 'linux-x64-gnu');
 	deepStrictEqual(npm_triple_of_rust_target('aarch64-unknown-linux-gnu'), 'linux-arm64-gnu');
 	deepStrictEqual(npm_triple_of_rust_target('x86_64-unknown-linux-musl'), 'linux-x64-musl');
@@ -48,14 +49,14 @@ Deno.test('npm_triple_of_rust_target spells the asset triples', () => {
 	deepStrictEqual(npm_triple_of_rust_target('x86_64-pc-windows-gnu'), null);
 });
 
-Deno.test('every musl triple stays unmapped, nothing else does', () => {
+test('every musl triple stays unmapped, nothing else does', () => {
 	ok(binstall_unmapped_reason('linux-x64-musl') !== null);
 	ok(binstall_unmapped_reason('linux-arm64-musl') !== null);
 	deepStrictEqual(binstall_unmapped_reason('linux-x64-gnu'), null);
 	deepStrictEqual(binstall_unmapped_reason('win32-x64'), null);
 });
 
-Deno.test('workflow_release_triples reads the matrix rows', () => {
+test('workflow_release_triples reads the matrix rows', () => {
 	const workflow =
 		'jobs:\n  build:\n    strategy:\n      matrix:\n        include:\n' +
 		'          - triple: linux-x64-gnu\n            runner: ubuntu-24.04\n' +
@@ -64,11 +65,11 @@ Deno.test('workflow_release_triples reads the matrix rows', () => {
 	deepStrictEqual(workflow_release_triples(workflow), ['linux-x64-gnu', 'win32-x64']);
 });
 
-Deno.test('the shipped table passes', () => {
+test('the shipped table passes', () => {
 	deepStrictEqual(binstall_findings(good(), REPO, triples), []);
 });
 
-Deno.test('an asset name that is not the release asset fails', () => {
+test('an asset name that is not the release asset fails', () => {
 	const meta = good();
 	meta.overrides['x86_64-unknown-linux-gnu'] = { 'pkg-url': url('tsv-linux-x64') };
 	const findings = binstall_findings(meta, REPO, triples);
@@ -86,7 +87,7 @@ Deno.test('an asset name that is not the release asset fails', () => {
 	deepStrictEqual(binstall_findings(tag, REPO, triples).length, 1);
 });
 
-Deno.test('coverage: every shipped triple but musl is mapped, and nothing else', () => {
+test('coverage: every shipped triple but musl is mapped, and nothing else', () => {
 	const missing = good();
 	delete missing.overrides['x86_64-apple-darwin'];
 	const findings = binstall_findings(missing, REPO, triples);
@@ -107,7 +108,7 @@ Deno.test('coverage: every shipped triple but musl is mapped, and nothing else',
 	ok(grown[0]!.includes('win32-arm64'), grown[0]);
 });
 
-Deno.test('format, strategies, base URL and repository are graded', () => {
+test('format, strategies, base URL and repository are graded', () => {
 	deepStrictEqual(binstall_findings(undefined, REPO, triples), [
 		'no [package.metadata.binstall] table'
 	]);

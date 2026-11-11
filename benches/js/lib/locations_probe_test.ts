@@ -13,10 +13,11 @@
  * Hand-written ASTs rather than a real binding on purpose: the grader's job is to
  * read a wire's shape, and a test that parsed through an artifact would need one
  * built, test the artifact instead, and stop gating in `deno task check` (see
- * `test:deno`). What the bindings actually emit is asked at every `init()`.
+ * `test:node`). What the bindings actually emit is asked at every `init()`.
  */
 
 import { doesNotThrow, strictEqual, throws } from 'node:assert';
+import { test } from 'vitest';
 import {
 	assert_binding_emits_span_only,
 	assert_span_only,
@@ -69,7 +70,7 @@ const names_artifact =
 		e.message.includes(`${artifact.path} still emits the loc-bearing wire`) &&
 		e.message.includes(artifact.rebuild);
 
-Deno.test('count_loc_keys: counts loc and name_loc keys at every depth, never values', () => {
+test('count_loc_keys: counts loc and name_loc keys at every depth, never values', () => {
 	strictEqual(count_loc_keys(with_loc), 2);
 	strictEqual(count_loc_keys(span_only), 0);
 	strictEqual(count_loc_keys(with_name_loc), 1);
@@ -77,11 +78,11 @@ Deno.test('count_loc_keys: counts loc and name_loc keys at every depth, never va
 	strictEqual(count_loc_keys('loc'), 0);
 });
 
-Deno.test('span only: offsets without loc pass', () => {
+test('span only: offsets without loc pass', () => {
 	doesNotThrow(() => assert_span_only('probe', 'parse[x]', artifact, span_only));
 });
 
-Deno.test('span only: an AST carrying `loc` fails, naming the artifact', () => {
+test('span only: an AST carrying `loc` fails, naming the artifact', () => {
 	throws(
 		() => assert_span_only('probe', 'parse[x]', artifact, with_loc),
 		names_artifact('2 `loc` / `name_loc` keys')
@@ -92,7 +93,7 @@ Deno.test('span only: an AST carrying `loc` fails, naming the artifact', () => {
 	);
 });
 
-Deno.test('span only: a root with no numeric offsets fails as vacuous', () => {
+test('span only: a root with no numeric offsets fails as vacuous', () => {
 	for (const ast of [{ error: 'x' }, null, { type: 'Program', start: '0', end: 1 }]) {
 		throws(() => assert_span_only('probe', 'parse[x]', artifact, ast), /no longer discriminates/);
 	}
@@ -106,7 +107,7 @@ const binding = (span: boolean, calls: Array<string>): LocationsProbeTarget => (
 	}
 });
 
-Deno.test('binding emits span only: probes every language, and every typescript goal', () => {
+test('binding emits span only: probes every language, and every typescript goal', () => {
 	const calls: Array<string> = [];
 	doesNotThrow(() => assert_binding_emits_span_only('probe', artifact, binding(true, calls)));
 	strictEqual(
@@ -115,7 +116,7 @@ Deno.test('binding emits span only: probes every language, and every typescript 
 	);
 });
 
-Deno.test('binding emits span only: a binding still emitting loc fails', () => {
+test('binding emits span only: a binding still emitting loc fails', () => {
 	throws(
 		() => assert_binding_emits_span_only('probe', artifact, binding(false, [])),
 		/probe: parse\[svelte\]\(\) returned an AST carrying 2 `loc` \/ `name_loc` keys/

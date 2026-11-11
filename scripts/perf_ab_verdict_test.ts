@@ -1,4 +1,5 @@
 import { deepStrictEqual, throws } from 'node:assert';
+import { test } from 'vitest';
 
 import {
 	ab_row,
@@ -43,14 +44,14 @@ import {
 	wants_more_rounds
 } from './perf_ab_verdict.ts';
 
-Deno.test('median takes the middle, or the mean of the middle two', () => {
+test('median takes the middle, or the mean of the middle two', () => {
 	deepStrictEqual(median([3, 1, 2]), 2);
 	deepStrictEqual(median([4, 1, 3, 2]), 2.5);
 	deepStrictEqual(median([7]), 7);
 	throws(() => median([]));
 });
 
-Deno.test('spread_pct is the median absolute deviation over the median', () => {
+test('spread_pct is the median absolute deviation over the median', () => {
 	deepStrictEqual(spread_pct([99, 100, 101]), 1);
 	deepStrictEqual(spread_pct([100]), 0);
 	// one outlier round does not widen it, and more rounds of the same noise do not either
@@ -59,13 +60,13 @@ Deno.test('spread_pct is the median absolute deviation over the median', () => {
 	deepStrictEqual(mad([1, 2, 4]), 1);
 });
 
-Deno.test('pct_delta is relative to the base', () => {
+test('pct_delta is relative to the base', () => {
 	deepStrictEqual(pct_delta(200, 203), 1.5);
 	deepStrictEqual(pct_delta(200, 190), -5);
 	deepStrictEqual(pct_delta(0, 0), 0);
 });
 
-Deno.test('the thresholds are the ruled ones', () => {
+test('the thresholds are the ruled ones', () => {
 	deepStrictEqual(WALL_REGRESSION_PCT, 1.5);
 	deepStrictEqual(INSTRUCTIONS_LAYOUT_PCT, 0.5);
 	deepStrictEqual(INSTRUCTIONS_REGRESSION_PCT, 1.5);
@@ -73,19 +74,19 @@ Deno.test('the thresholds are the ruled ones', () => {
 	deepStrictEqual(SIGN_OFF_EXCESS_PCT, 1.5);
 });
 
-Deno.test('the rounds policy is balanced', () => {
+test('the rounds policy is balanced', () => {
 	deepStrictEqual(DEFAULT_ROUNDS % 2, 0);
 	deepStrictEqual(MAX_ROUNDS % 2, 0);
 	deepStrictEqual(MAX_ROUNDS > DEFAULT_ROUNDS, true);
 });
 
-Deno.test('row_verdict: wall within the threshold passes', () => {
+test('row_verdict: wall within the threshold passes', () => {
 	deepStrictEqual(row_verdict(1.5, 0), 'pass');
 	deepStrictEqual(row_verdict(-3, -2), 'pass');
 	deepStrictEqual(row_verdict(1.4, 0.49), 'pass');
 });
 
-Deno.test('row_verdict: wall over the threshold fails unless instructions are flat', () => {
+test('row_verdict: wall over the threshold fails unless instructions are flat', () => {
 	deepStrictEqual(row_verdict(1.51, 0.49), 'layout');
 	deepStrictEqual(row_verdict(3.3, 0), 'layout');
 	deepStrictEqual(row_verdict(3.3, -0.49), 'layout');
@@ -95,7 +96,7 @@ Deno.test('row_verdict: wall over the threshold fails unless instructions are fl
 	deepStrictEqual(row_verdict(2.1, -0.5), 'fail');
 });
 
-Deno.test('row_verdict: instructions rising under a passing wall warn', () => {
+test('row_verdict: instructions rising under a passing wall warn', () => {
 	deepStrictEqual(row_verdict(0.2, 0.5), 'warn');
 	deepStrictEqual(row_verdict(-1, 0.76), 'warn');
 	// the instruction gate is strict: exactly on it still warns
@@ -103,7 +104,7 @@ Deno.test('row_verdict: instructions rising under a passing wall warn', () => {
 	deepStrictEqual(row_verdict(-1, 1.5), 'warn');
 });
 
-Deno.test('row_verdict: instructions over their own threshold fail whatever the wall', () => {
+test('row_verdict: instructions over their own threshold fail whatever the wall', () => {
 	deepStrictEqual(row_verdict(0, 1.501), 'fail');
 	deepStrictEqual(row_verdict(-3, 1.501), 'fail');
 	deepStrictEqual(row_verdict(1.1, 2.94), 'fail');
@@ -113,7 +114,7 @@ Deno.test('row_verdict: instructions over their own threshold fail whatever the 
 	deepStrictEqual(row_verdict(-1, -12), 'pass');
 });
 
-Deno.test('row_verdict: without instruction counts the wall alone decides', () => {
+test('row_verdict: without instruction counts the wall alone decides', () => {
 	deepStrictEqual(row_verdict(1.6, null), 'fail');
 	deepStrictEqual(row_verdict(1.4, null), 'pass');
 	// no counts, no instruction gate: a passing wall passes however the code changed
@@ -121,14 +122,14 @@ Deno.test('row_verdict: without instruction counts the wall alone decides', () =
 	deepStrictEqual(row_verdict(-5, null), 'pass');
 });
 
-Deno.test('row_verdict: a non-finite delta is a harness bug, never a verdict', () => {
+test('row_verdict: a non-finite delta is a harness bug, never a verdict', () => {
 	throws(() => row_verdict(NaN, 0), RangeError);
 	throws(() => row_verdict(Infinity, 0), RangeError);
 	throws(() => row_verdict(0, NaN), RangeError);
 	throws(() => row_verdict(0, -Infinity), RangeError);
 });
 
-Deno.test('ab_row grades the median of the per-round paired deltas', () => {
+test('ab_row grades the median of the per-round paired deltas', () => {
 	const row = ab_row(
 		'svelte',
 		'parse',
@@ -155,7 +156,7 @@ Deno.test('ab_row grades the median of the per-round paired deltas', () => {
 	deepStrictEqual(uncounted.verdict, 'fail');
 });
 
-Deno.test('ab_row: drift shared by a round cancels in the paired delta', () => {
+test('ab_row: drift shared by a round cancels in the paired delta', () => {
 	// the base drifts 10% slower over the run; the candidate is 1% slower in every round
 	const base = [100, 105, 110, 104];
 	const row = ab_row(
@@ -168,7 +169,7 @@ Deno.test('ab_row: drift shared by a round cancels in the paired delta', () => {
 	deepStrictEqual(Math.round(row.wall_pct_spread * 1e9) / 1e9, 0);
 });
 
-Deno.test('ab_row refuses an empty, zero, mismatched or non-finite side', () => {
+test('ab_row refuses an empty, zero, mismatched or non-finite side', () => {
 	const ok = { wall_us: [100, 100], instructions: [] };
 	throws(() =>
 		ab_row('css', 'parse', { wall_us: [], instructions: [] }, { wall_us: [], instructions: [] })
@@ -193,7 +194,7 @@ Deno.test('ab_row refuses an empty, zero, mismatched or non-finite side', () => 
 	);
 });
 
-Deno.test('ab_row refuses a non-positive or non-finite instruction sample', () => {
+test('ab_row refuses a non-positive or non-finite instruction sample', () => {
 	const wall = { wall_us: [100, 100] };
 	const counted = (instructions: Array<number>) => ({ ...wall, instructions });
 	// a negative base would otherwise flip the delta's sign: a rise graded as a fall
@@ -210,34 +211,31 @@ Deno.test('ab_row refuses a non-positive or non-finite instruction sample', () =
 	deepStrictEqual(ab_row('css', 'parse', counted([]), counted([])).instructions_pct, null);
 });
 
-Deno.test(
-	'needs_sign_off: a wall FAIL with instructions in the WARN band, a layout move apart',
-	() => {
-		const sensitive = (wall: number, instr: number | null) =>
-			needs_sign_off(row_verdict(wall, instr), wall, instr);
-		// the band is inclusive at both ends, as the WARN band is
-		deepStrictEqual(sensitive(1.6, 0.5), true);
-		deepStrictEqual(sensitive(1.6, 0.753), true);
-		deepStrictEqual(sensitive(2.5, 1.5), true);
-		// under the wall line it is a WARN, not a failure
-		deepStrictEqual(sensitive(1.5, 0.753), false);
-		// flat instructions: LAYOUT, a pass
-		deepStrictEqual(sensitive(1.6, 0.49), false);
-		// over the instruction gate the count decides, whatever the sitting
-		deepStrictEqual(sensitive(1.6, 1.501), false);
-		deepStrictEqual(sensitive(0, 2.94), false);
-		// fallen instructions and no counts are plain wall failures, outside the band
-		deepStrictEqual(sensitive(1.6, -0.5), false);
-		deepStrictEqual(sensitive(1.6, null), false);
-		// the wall may exceed the instructions by a layout move, inclusive, and no more: past it the
-		// wall carries cost the count does not, a plain failure
-		deepStrictEqual(sensitive(0.5 + SIGN_OFF_EXCESS_PCT, 0.5), true);
-		deepStrictEqual(sensitive(0.501 + SIGN_OFF_EXCESS_PCT, 0.5), false);
-		deepStrictEqual(sensitive(6, 0.8), false);
-	}
-);
+test('needs_sign_off: a wall FAIL with instructions in the WARN band, a layout move apart', () => {
+	const sensitive = (wall: number, instr: number | null) =>
+		needs_sign_off(row_verdict(wall, instr), wall, instr);
+	// the band is inclusive at both ends, as the WARN band is
+	deepStrictEqual(sensitive(1.6, 0.5), true);
+	deepStrictEqual(sensitive(1.6, 0.753), true);
+	deepStrictEqual(sensitive(2.5, 1.5), true);
+	// under the wall line it is a WARN, not a failure
+	deepStrictEqual(sensitive(1.5, 0.753), false);
+	// flat instructions: LAYOUT, a pass
+	deepStrictEqual(sensitive(1.6, 0.49), false);
+	// over the instruction gate the count decides, whatever the sitting
+	deepStrictEqual(sensitive(1.6, 1.501), false);
+	deepStrictEqual(sensitive(0, 2.94), false);
+	// fallen instructions and no counts are plain wall failures, outside the band
+	deepStrictEqual(sensitive(1.6, -0.5), false);
+	deepStrictEqual(sensitive(1.6, null), false);
+	// the wall may exceed the instructions by a layout move, inclusive, and no more: past it the
+	// wall carries cost the count does not, a plain failure
+	deepStrictEqual(sensitive(0.5 + SIGN_OFF_EXCESS_PCT, 0.5), true);
+	deepStrictEqual(sensitive(0.501 + SIGN_OFF_EXCESS_PCT, 0.5), false);
+	deepStrictEqual(sensitive(6, 0.8), false);
+});
 
-Deno.test('a sign-off row still fails the run, and says so', () => {
+test('a sign-off row still fails the run, and says so', () => {
 	const row = ab_row(
 		'svelte',
 		'parse',
@@ -258,7 +256,7 @@ Deno.test('a sign-off row still fails the run, and says so', () => {
 	deepStrictEqual(plain.sign_off, false);
 });
 
-Deno.test('layout_reading takes the widest wall move among flat-instruction rows', () => {
+test('layout_reading takes the widest wall move among flat-instruction rows', () => {
 	const flat_slow = row_with(-1.9, 0.5, 0);
 	const flat_fast = row_with(1.2, 0.5, 0.3);
 	const risen = row_with(4, 0.5, 0.8);
@@ -268,7 +266,7 @@ Deno.test('layout_reading takes the widest wall move among flat-instruction rows
 	deepStrictEqual(layout_reading([]), null);
 });
 
-Deno.test('overall_passes fails on any failing row and only then', () => {
+test('overall_passes fails on any failing row and only then', () => {
 	const row = (wall: number, instr: number) =>
 		ab_row(
 			'css',
@@ -286,7 +284,7 @@ Deno.test('overall_passes fails on any failing row and only then', () => {
 	deepStrictEqual(overall_passes([row(0, 0), row(0, 2)]), false);
 });
 
-Deno.test('parse_perf_stat_instructions reads the CSV value', () => {
+test('parse_perf_stat_instructions reads the CSV value', () => {
 	const csv = '# started on Thu Oct 16 2026\n\n14108901234,,instructions:u,5012345678,100.00,,\n';
 	deepStrictEqual(parse_perf_stat_instructions(csv), 14108901234);
 	deepStrictEqual(parse_perf_stat_instructions('<not counted>,,instructions:u,0,0.00,,'), null);
@@ -295,7 +293,7 @@ Deno.test('parse_perf_stat_instructions reads the CSV value', () => {
 	deepStrictEqual(parse_perf_stat_instructions(''), null);
 });
 
-Deno.test('formatters', () => {
+test('formatters', () => {
 	deepStrictEqual(format_us(127_600), '127.60ms');
 	deepStrictEqual(format_us(817.4), '817us');
 	deepStrictEqual(format_instructions(1_410_690_000), '1410.69M');
@@ -307,7 +305,7 @@ Deno.test('formatters', () => {
 	deepStrictEqual(format_pct(0.497), '+0.497%');
 });
 
-Deno.test('render_table prints one aligned row per entry', () => {
+test('render_table prints one aligned row per entry', () => {
 	const table = render_table([
 		ab_row(
 			'ts',
@@ -357,7 +355,7 @@ const row_with = (
 	sign_off: needs_sign_off(row_verdict(wall_pct, instructions_pct), wall_pct, instructions_pct)
 });
 
-Deno.test('wall_delta_error is the median error at the spread, shrinking with √rounds', () => {
+test('wall_delta_error is the median error at the spread, shrinking with √rounds', () => {
 	// 1.4826 × 1.2533 × 0.5 / √6
 	deepStrictEqual(wall_delta_error(row_with(1.6, 0.5, 0.8)).toFixed(4), '0.3793');
 	deepStrictEqual(
@@ -367,7 +365,7 @@ Deno.test('wall_delta_error is the median error at the spread, shrinking with �
 	deepStrictEqual(wall_delta_error(row_with(1.6, 0, 0.8)), 0);
 });
 
-Deno.test('row_is_ambiguous: within its error of the line, and the line decides', () => {
+test('row_is_ambiguous: within its error of the line, and the line decides', () => {
 	// the error, not the spread: 0.4 from the line at a 0.5 spread is outside 0.379
 	deepStrictEqual(row_is_ambiguous(row_with(1.1, 0.5, 0.76)), false);
 	deepStrictEqual(row_is_ambiguous(row_with(1.2, 0.5, 0.76)), true);
@@ -393,7 +391,7 @@ Deno.test('row_is_ambiguous: within its error of the line, and the line decides'
 	deepStrictEqual(row_is_ambiguous(row_with(1.4, 0, 0.76)), false);
 });
 
-Deno.test('row_is_settleable: the cap could narrow the error under the distance', () => {
+test('row_is_settleable: the cap could narrow the error under the distance', () => {
 	// at a 0.3 spread the error is 0.228 at 6 rounds and 0.176 at the cap of 10
 	deepStrictEqual(row_is_settleable(row_with(1.3, 0.3, 0.76)), true);
 	// the Svelte-parse shape this rule came from: 0.11 from the line at a 0.525 spread (error
@@ -405,7 +403,7 @@ Deno.test('row_is_settleable: the cap could narrow the error under the distance'
 	deepStrictEqual(row_is_settleable(row_with(1.45, 0.3, 0.76, MAX_ROUNDS)), false);
 });
 
-Deno.test('wants_more_rounds extends in pairs up to the cap', () => {
+test('wants_more_rounds extends in pairs up to the cap', () => {
 	const ambiguous = [row_with(0, 0.1, 0), row_with(1.3, 0.3, 0.76)];
 	deepStrictEqual(wants_more_rounds(ambiguous, DEFAULT_ROUNDS), true);
 	deepStrictEqual(wants_more_rounds(ambiguous, MAX_ROUNDS - 2), true);
@@ -416,14 +414,14 @@ Deno.test('wants_more_rounds extends in pairs up to the cap', () => {
 	deepStrictEqual(wants_more_rounds([row_with(1.61, 0.525, 0.772)], DEFAULT_ROUNDS), false);
 });
 
-Deno.test('noisy_rows names a row with either side over the spread line', () => {
+test('noisy_rows names a row with either side over the spread line', () => {
 	const quiet = row_with(0, 0.1, 0);
 	const noisy = { ...row_with(0, 0.1, 0), cand_wall_spread_pct: 0.8 };
 	deepStrictEqual(noisy_rows([quiet, noisy]), [noisy]);
 	deepStrictEqual(noisy_rows([{ ...quiet, base_wall_spread_pct: 0.75 }]), []);
 });
 
-Deno.test('lang_presence: absent on both is left out, one-sided is an error', () => {
+test('lang_presence: absent on both is left out, one-sided is an error', () => {
 	deepStrictEqual(lang_presence(10, 10), 'measured');
 	deepStrictEqual(lang_presence(10, 9), 'measured');
 	deepStrictEqual(lang_presence(0, 0), 'absent');
@@ -431,7 +429,7 @@ Deno.test('lang_presence: absent on both is left out, one-sided is an error', ()
 	deepStrictEqual(lang_presence(10, 0), 'one_sided');
 });
 
-Deno.test('file_set_mismatch compares counts, bytes and parse errors', () => {
+test('file_set_mismatch compares counts, bytes and parse errors', () => {
 	const set = { files: 3, bytes: 900, errors: 0 };
 	deepStrictEqual(file_set_mismatch(set, { ...set }), null);
 	deepStrictEqual(file_set_mismatch(set, { ...set, bytes: 901 }) !== null, true);
@@ -439,7 +437,7 @@ Deno.test('file_set_mismatch compares counts, bytes and parse errors', () => {
 	deepStrictEqual(file_set_mismatch(set, { ...set, errors: 1 }) !== null, true);
 });
 
-Deno.test('build_inputs_of reads the inputs, the missing ones and the key text', () => {
+test('build_inputs_of reads the inputs, the missing ones and the key text', () => {
 	const driver = 'crates/tsv_debug/examples/perf_ab.rs';
 	const strip_driver = 'crates/tsv_debug/examples/perf_ab_strip.rs';
 	const drivers = [driver, strip_driver];
@@ -493,7 +491,7 @@ Deno.test('build_inputs_of reads the inputs, the missing ones and the key text',
 	deepStrictEqual(ended.key_text.endsWith(raw), true);
 });
 
-Deno.test('build_recipe_text moves with the command and the set and kept variables', () => {
+test('build_recipe_text moves with the command and the set and kept variables', () => {
 	const command = ['cargo', 'build', '--release'];
 	const fixed = { CARGO_TARGET_DIR: '../target' };
 	const env = ['PATH', 'HOME'];
@@ -522,7 +520,7 @@ Deno.test('build_recipe_text moves with the command and the set and kept variabl
 	);
 });
 
-Deno.test('CACHE_DIR_PATTERN takes a build-inputs key, nothing else', () => {
+test('CACHE_DIR_PATTERN takes a build-inputs key, nothing else', () => {
 	deepStrictEqual(CACHE_DIR_PATTERN.test('a'.repeat(64)), true);
 	// a git tree id is not a build-inputs key
 	deepStrictEqual(CACHE_DIR_PATTERN.test('b'.repeat(40)), false);
@@ -532,7 +530,7 @@ Deno.test('CACHE_DIR_PATTERN takes a build-inputs key, nothing else', () => {
 	deepStrictEqual(CACHE_DIR_PATTERN.test('index.12'), false);
 });
 
-Deno.test('trees_to_evict keeps the trees in use plus the most recently used', () => {
+test('trees_to_evict keeps the trees in use plus the most recently used', () => {
 	deepStrictEqual(KEEP_TREES, 6);
 	const trees = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].map((name, i) => ({ name, mtime_ms: i }));
 	// in use: a (oldest) and h; keep the four newest others, g f e d
@@ -544,35 +542,32 @@ Deno.test('trees_to_evict keeps the trees in use plus the most recently used', (
 	);
 });
 
-Deno.test(
-	'phase_instructions: a format row splits at parse-only, the strip row parses twice',
-	() => {
-		const totals = { full: 1_000, parse: 400, fixed: 100 };
-		// parse = parse-only − fixed; format = full − parse-only
-		deepStrictEqual(phase_instructions('ts', totals, 10), [30, 60]);
-		deepStrictEqual(phase_instructions('css', totals, 1), [300, 600]);
-		// the strip's full run = fixed + it × (parse + parse + walk): walk = full − 2 × parse-only + fixed
-		const [parse, walk] = [30, 7];
-		const it = 5;
-		const strip_totals = {
-			full: 100 + it * (parse + parse + walk),
-			parse: 100 + it * parse,
-			fixed: 100
-		};
-		deepStrictEqual(phase_instructions('strip', strip_totals, it), [parse, walk]);
-		deepStrictEqual(LANG_PHASES.strip, ['parse', 'strip']);
-		deepStrictEqual(LANG_PHASES.ts, ['parse', 'format']);
-	}
-);
+test('phase_instructions: a format row splits at parse-only, the strip row parses twice', () => {
+	const totals = { full: 1_000, parse: 400, fixed: 100 };
+	// parse = parse-only − fixed; format = full − parse-only
+	deepStrictEqual(phase_instructions('ts', totals, 10), [30, 60]);
+	deepStrictEqual(phase_instructions('css', totals, 1), [300, 600]);
+	// the strip's full run = fixed + it × (parse + parse + walk): walk = full − 2 × parse-only + fixed
+	const [parse, walk] = [30, 7];
+	const it = 5;
+	const strip_totals = {
+		full: 100 + it * (parse + parse + walk),
+		parse: 100 + it * parse,
+		fixed: 100
+	};
+	deepStrictEqual(phase_instructions('strip', strip_totals, it), [parse, walk]);
+	deepStrictEqual(LANG_PHASES.strip, ['parse', 'strip']);
+	deepStrictEqual(LANG_PHASES.ts, ['parse', 'format']);
+});
 
-Deno.test('strip_skip_reason: measured only when both sides have the strip', () => {
+test('strip_skip_reason: measured only when both sides have the strip', () => {
 	deepStrictEqual(strip_skip_reason(true, true), null);
 	deepStrictEqual(strip_skip_reason(false, true)?.includes('the base lacks'), true);
 	deepStrictEqual(strip_skip_reason(true, false)?.includes('the candidate lacks'), true);
 	deepStrictEqual(strip_skip_reason(false, false)?.includes('neither side has'), true);
 });
 
-Deno.test('parse_perf_stat_counter reads a named event from perf stat -x, output', () => {
+test('parse_perf_stat_counter reads a named event from perf stat -x, output', () => {
 	const text = '# started\n123,,instructions:u,1000,100.00,,\n456,,cycles:u,1000,100.00,,\n';
 	deepStrictEqual(parse_perf_stat_counter(text, 'instructions'), 123);
 	deepStrictEqual(parse_perf_stat_counter(text, 'cycles'), 456);

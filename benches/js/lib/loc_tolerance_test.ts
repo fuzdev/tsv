@@ -13,11 +13,12 @@
  *
  * Hand-written canonical trees holding only the fields the rows read, on purpose: the
  * rows are predicates over a tree's shape, and a test that parsed through the oracle
- * would need the sidecar and stop gating in `deno task check` (see `test:deno`). What
+ * would need the sidecar and stop gating in `deno task check` (see `test:node`). What
  * the real oracle writes is graded by `corpus:compare:parse`.
  */
 
 import { strictEqual } from 'node:assert';
+import { test } from 'vitest';
 import {
 	classify_loc_difference,
 	type LocRow,
@@ -111,7 +112,7 @@ const CONTEXT_START_COLUMN = 'fragment.nodes[0].context.loc.start.column';
 // Svelte reads a destructured block binding at the document's own column, so a shift
 // there is a finding like any other — on the pattern, on line 1 or off it, and on a
 // comment inside it.
-Deno.test('a destructured binding one column off is no row', () => {
+test('a destructured binding one column off is no row', () => {
 	for (const prefix of ['', '\n']) {
 		const [source, root] = each_with_context(prefix, '{ a, b }', 'ObjectPattern');
 		const column = lf_point(source, at(source, '{ a')).column;
@@ -120,7 +121,7 @@ Deno.test('a destructured binding one column off is no row', () => {
 	}
 });
 
-Deno.test('a root comment inside a destructured binding one column off is no row', () => {
+test('a root comment inside a destructured binding one column off is no row', () => {
 	const source = '\n{#each xs as { a /* c */ }}{a}{/each} /* d */';
 	const p = at(source, '{ a');
 	const each = node(source, 'EachBlock', 1, at(source, '{/each}') + 7, {
@@ -160,7 +161,7 @@ function each_with_annotation(gap: string): [string, Node] {
 
 const ANNOTATION_TYPE = 'fragment.nodes[0].context.typeAnnotation.typeAnnotation.loc.start';
 
-Deno.test('annotation_swallow: the `_ as ` rewrite erases the newline before the colon', () => {
+test('annotation_swallow: the `_ as ` rewrite erases the newline before the colon', () => {
 	const [source, root] = each_with_annotation('\n');
 	const t = at(source, 'T');
 	// the type sits on the colon's line: one line up, its column measured from line 1
@@ -174,7 +175,7 @@ Deno.test('annotation_swallow: the `_ as ` rewrite erases the newline before the
 	);
 });
 
-Deno.test('annotation_swallow: mutants do not classify', () => {
+test('annotation_swallow: mutants do not classify', () => {
 	const [source, root] = each_with_annotation('\n');
 	const t = at(source, 'T');
 	strictEqual(
@@ -213,20 +214,14 @@ function script_root(source: string): Node {
 	};
 }
 
-Deno.test(
-	'two_line_classes: a script node counts every ECMAScript terminator in the script',
-	() => {
-		const root = script_root(SCRIPT);
-		const leaf = 'instance.content.body[1].loc.start';
-		strictEqual(classify(SCRIPT, root, `${leaf}.line`, { line: 3, column: 0 }), 'two_line_classes');
-		strictEqual(
-			classify(SCRIPT, root, `${leaf}.column`, { line: 3, column: 0 }),
-			'two_line_classes'
-		);
-	}
-);
+test('two_line_classes: a script node counts every ECMAScript terminator in the script', () => {
+	const root = script_root(SCRIPT);
+	const leaf = 'instance.content.body[1].loc.start';
+	strictEqual(classify(SCRIPT, root, `${leaf}.line`, { line: 3, column: 0 }), 'two_line_classes');
+	strictEqual(classify(SCRIPT, root, `${leaf}.column`, { line: 3, column: 0 }), 'two_line_classes');
+});
 
-Deno.test('two_line_classes: a script node is exact — mutants do not classify', () => {
+test('two_line_classes: a script node is exact — mutants do not classify', () => {
 	const root = script_root(SCRIPT);
 	const leaf = 'instance.content.body[1].loc.start';
 	strictEqual(classify(SCRIPT, root, `${leaf}.line`, { line: 4, column: 0 }), null);
@@ -256,7 +251,7 @@ function island(): [string, Node] {
 
 const ISLAND_B = 'fragment.nodes[0].fragment.nodes[1].expression.right.loc.start';
 
-Deno.test('two_line_classes: an island point within the band classifies', () => {
+test('two_line_classes: an island point within the band classifies', () => {
 	const [source, root] = island();
 	const b = at(source, 'b');
 	const ls = at(source, '\u2028');
@@ -270,7 +265,7 @@ Deno.test('two_line_classes: an island point within the band classifies', () => 
 	);
 });
 
-Deno.test('two_line_classes: island mutants outside the band do not classify', () => {
+test('two_line_classes: island mutants outside the band do not classify', () => {
 	const [source, root] = island();
 	const b = at(source, 'b');
 	const ls = at(source, '\u2028');
@@ -307,7 +302,7 @@ Deno.test('two_line_classes: island mutants outside the band do not classify', (
 	);
 });
 
-Deno.test('two_line_classes: under a swallow, the colon line is the one it was joined onto', () => {
+test('two_line_classes: under a swallow, the colon line is the one it was joined onto', () => {
 	// two lone terminators ahead, then a binding whose `_ as ` swallows the newline before
 	// its colon: acorn counts the terminators, loses the swallowed line, and measures the
 	// type's column from the binding's line
@@ -344,7 +339,7 @@ Deno.test('two_line_classes: under a swallow, the colon line is the one it was j
 
 const PROGRAM = '<div></div>\n\t<script>\nlet a;\n</script>';
 
-Deno.test('program_at_tag: a script Program reads its tag position', () => {
+test('program_at_tag: a script Program reads its tag position', () => {
 	const root = script_root(PROGRAM.replace('let a;', 'let a = 1;let b = 2;'));
 	const source = PROGRAM.replace('let a;', 'let a = 1;let b = 2;');
 	const tag = lf_point(source, root.instance.start);
@@ -353,7 +348,7 @@ Deno.test('program_at_tag: a script Program reads its tag position', () => {
 	strictEqual(classify(source, root, 'instance.content.loc.end.column', tag_end), 'program_at_tag');
 });
 
-Deno.test('program_at_tag: mutants do not classify', () => {
+test('program_at_tag: mutants do not classify', () => {
 	const source = PROGRAM.replace('let a;', 'let a = 1;let b = 2;');
 	const root = script_root(source);
 	const tag = lf_point(source, root.instance.start);
@@ -390,7 +385,7 @@ function typed_destructure(prefix: string): [string, Node, number] {
 
 const CONTEXT_END_COLUMN = 'fragment.nodes[0].context.loc.end.column';
 
-Deno.test('typed_destructure_end: loc.end stays at the bracket', () => {
+test('typed_destructure_end: loc.end stays at the bracket', () => {
 	const [source, root, colon] = typed_destructure('');
 	strictEqual(
 		classify(source, root, CONTEXT_END_COLUMN, lf_point(source, colon)),
@@ -404,7 +399,7 @@ Deno.test('typed_destructure_end: loc.end stays at the bracket', () => {
 	);
 });
 
-Deno.test('typed_destructure_end: mutants do not classify', () => {
+test('typed_destructure_end: mutants do not classify', () => {
 	const [source, root, colon] = typed_destructure('');
 	const p = lf_point(source, colon);
 	strictEqual(classify(source, root, CONTEXT_END_COLUMN, { column: p.column + 1 }), null);
@@ -444,7 +439,7 @@ function each_as(source = EACH_AS_TS): [string, Node] {
 
 const EACH_EXPRESSION_END = 'fragment.nodes[0].expression.loc.end.column';
 
-Deno.test('each_as_stale_loc: loc.end stays at the swallowed `as` type', () => {
+test('each_as_stale_loc: loc.end stays at the swallowed `as` type', () => {
 	const [source, root] = each_as();
 	const context_end = at(source, 'section') + 7;
 	strictEqual(
@@ -453,7 +448,7 @@ Deno.test('each_as_stale_loc: loc.end stays at the swallowed `as` type', () => {
 	);
 });
 
-Deno.test('each_as_stale_loc: mutants do not classify', () => {
+test('each_as_stale_loc: mutants do not classify', () => {
 	const [source, root] = each_as();
 	const s = at(source, 'section');
 	// past the context
@@ -495,7 +490,7 @@ Deno.test('each_as_stale_loc: mutants do not classify', () => {
 
 // --- languages ---------------------------------------------------------------------
 
-Deno.test('no row applies to a TypeScript or CSS document', () => {
+test('no row applies to a TypeScript or CSS document', () => {
 	const ts = 'let a = 1;\u2028let b = 2;';
 	const program = node(ts, 'Program', 0, ts.length, {
 		body: [node(ts, 'VariableDeclaration', 0, 10), node(ts, 'VariableDeclaration', 11, 21)]
@@ -534,7 +529,7 @@ Deno.test('no row applies to a TypeScript or CSS document', () => {
 
 // --- the superset pin ---------------------------------------------------------------
 
-Deno.test('superset: TypeScript has none; Svelte and CSS pin their reader-built kinds', () => {
+test('superset: TypeScript has none; Svelte and CSS pin their reader-built kinds', () => {
 	strictEqual(superset_kinds_of('typescript'), null);
 	const svelte = superset_kinds_of('svelte')!;
 	const css = superset_kinds_of('css')!;
@@ -547,7 +542,7 @@ Deno.test('superset: TypeScript has none; Svelte and CSS pin their reader-built 
 	strictEqual(css.has('RegularElement'), false);
 });
 
-Deno.test('superset_key: a plain type, a shape, an attached comment, an untyped span', () => {
+test('superset_key: a plain type, a shape, an attached comment, an untyped span', () => {
 	const svelte = superset_kinds_of('svelte')!;
 	const span = { start: 0, end: 1 };
 	strictEqual(
@@ -615,7 +610,7 @@ Deno.test('superset_key: a plain type, a shape, an attached comment, an untyped 
 	);
 });
 
-Deno.test('superset_key: a braced spelling of a pinned shape is acorn-parsed, never pinned', () => {
+test('superset_key: a braced spelling of a pinned shape is acorn-parsed, never pinned', () => {
 	const svelte = superset_kinds_of('svelte')!;
 	/** The key of the last `needle` in `source`, the directive or element `anchor`'s `slot`. */
 	const key = (source: string, needle: string, type: string, anchor: string, slot: string) => {

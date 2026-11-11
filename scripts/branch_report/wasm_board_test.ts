@@ -1,14 +1,15 @@
 import { deepStrictEqual, throws } from 'node:assert';
+import { test } from 'vitest';
 
 import { balanced_block, wasm_board_lib, wasm_board_manifest } from './wasm_board.ts';
 
-Deno.test('balanced_block finds the matching brace past strings and nesting', () => {
+test('balanced_block finds the matching brace past strings and nesting', () => {
 	const text = 'pub fn f() { let s = "}{"; if x { y } }';
 	const { start, end } = balanced_block(text, 0);
 	deepStrictEqual(text.slice(start, end), '{ let s = "}{"; if x { y } }');
 });
 
-Deno.test('balanced_block rejects a missing or unbalanced block', () => {
+test('balanced_block rejects a missing or unbalanced block', () => {
 	throws(() => balanced_block('no braces', 0));
 	throws(() => balanced_block('fn f() { unclosed', 0));
 });
@@ -40,7 +41,7 @@ pub(crate) fn board() -> Vec<TypeRow> {
 }
 `;
 
-Deno.test('wasm_board_lib wraps the board and exports its text', () => {
+test('wasm_board_lib wraps the board and exports its text', () => {
 	const lib = wasm_board_lib(BOARD);
 	deepStrictEqual(lib.includes('struct TypeRow'), true);
 	deepStrictEqual(lib.includes('pub(crate) struct'), false);
@@ -49,11 +50,11 @@ Deno.test('wasm_board_lib wraps the board and exports its text', () => {
 	deepStrictEqual(lib.includes('board_text_ptr'), true);
 });
 
-Deno.test('wasm_board_lib rejects a board source missing an item', () => {
+test('wasm_board_lib rejects a board source missing an item', () => {
 	throws(() => wasm_board_lib('fn nothing() {}'));
 });
 
-Deno.test('wasm_board_manifest depends on the tree crates by relative path', () => {
+test('wasm_board_manifest depends on the tree crates by relative path', () => {
 	const manifest = wasm_board_manifest('../src');
 	deepStrictEqual(manifest.includes('path = "../src/crates/tsv_ts"'), true);
 	deepStrictEqual(manifest.includes('[workspace]'), true);

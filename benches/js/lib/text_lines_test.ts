@@ -5,6 +5,7 @@
  */
 
 import { deepStrictEqual } from 'node:assert';
+import { test } from 'vitest';
 import { lines_of } from './text_lines.ts';
 
 const encoder = new TextEncoder();
@@ -42,19 +43,19 @@ async function assert_split_invariant(text: string, expected: string[]): Promise
 	);
 }
 
-Deno.test('lines_of: terminated lines, empty ones included', async () => {
+test('lines_of: terminated lines, empty ones included', async () => {
 	await assert_split_invariant('a\n\nbc\n', ['a', '', 'bc']);
 });
 
-Deno.test('lines_of: a final unterminated line is kept', async () => {
+test('lines_of: a final unterminated line is kept', async () => {
 	await assert_split_invariant('a\nbc', ['a', 'bc']);
 });
 
-Deno.test('lines_of: multi-byte characters split across chunks', async () => {
+test('lines_of: multi-byte characters split across chunks', async () => {
 	await assert_split_invariant('é\u{1F600}x\n\u{1F600}', ['é\u{1F600}x', '\u{1F600}']);
 });
 
-Deno.test('lines_of: an empty stream yields nothing', async () => {
+test('lines_of: an empty stream yields nothing', async () => {
 	deepStrictEqual(await collect([]), []);
 	deepStrictEqual(await collect([encoder.encode('')]), []);
 });

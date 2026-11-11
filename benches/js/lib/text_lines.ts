@@ -16,7 +16,10 @@
  */
 export async function* lines_of(stream: ReadableStream<Uint8Array>): AsyncGenerator<string> {
 	let parts: string[] = [];
-	for await (const chunk of stream.pipeThrough(new TextDecoderStream())) {
+	// TypeScript's DOM lib types the decoder's writable side as `BufferSource`, which it
+	// won't accept for a `Uint8Array` stream's chunks; the decoder takes every one of them
+	const decoder = new TextDecoderStream() as ReadableWritablePair<string, Uint8Array>;
+	for await (const chunk of stream.pipeThrough(decoder)) {
 		let from = 0;
 		let newline = chunk.indexOf('\n');
 		while (newline !== -1) {

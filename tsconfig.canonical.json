@@ -1,0 +1,4 @@
+{
+	"extends": "./tsconfig.vitest.json",
+	"files": ["vitest.canonical.config.ts", "benches/js/lib/canonical_test.ts"]
+}

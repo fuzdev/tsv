@@ -4,6 +4,7 @@
  */
 
 import { deepStrictEqual } from 'node:assert';
+import { test } from 'vitest';
 
 import { stamp_paths } from './cargo_build.ts';
 
@@ -15,7 +16,7 @@ const artifact = (kind: string[], filenames: string[], executable: string | null
 	fresh: true
 });
 
-Deno.test('a bin stamps its executable', () => {
+test('a bin stamps its executable', () => {
 	deepStrictEqual(stamp_paths(artifact(['bin'], ['/t/corpus/tsv'], '/t/corpus/tsv')), [
 		'/t/corpus/tsv'
 	]);
@@ -27,7 +28,7 @@ Deno.test('a bin stamps its executable', () => {
 	);
 });
 
-Deno.test('a cdylib stamps its dynamic library, not the files beside it', () => {
+test('a cdylib stamps its dynamic library, not the files beside it', () => {
 	deepStrictEqual(stamp_paths(artifact(['cdylib'], ['/t/corpus/libtsv_ffi.so'])), [
 		'/t/corpus/libtsv_ffi.so'
 	]);
@@ -45,7 +46,7 @@ Deno.test('a cdylib stamps its dynamic library, not the files beside it', () => 
 	);
 });
 
-Deno.test('a target with dependents is never stamped', () => {
+test('a target with dependents is never stamped', () => {
 	deepStrictEqual(
 		stamp_paths(
 			artifact(['lib'], ['/t/corpus/libtsv_cli.rlib', '/t/corpus/deps/libtsv_cli-0.rmeta'])
@@ -69,7 +70,7 @@ Deno.test('a target with dependents is never stamped', () => {
 	);
 });
 
-Deno.test('a message that is not an artifact stamps nothing', () => {
+test('a message that is not an artifact stamps nothing', () => {
 	deepStrictEqual(stamp_paths({ reason: 'build-finished', success: true }), []);
 	deepStrictEqual(
 		stamp_paths({ reason: 'build-script-executed', out_dir: '/t/corpus/build/x/out' }),

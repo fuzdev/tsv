@@ -13,7 +13,7 @@
  *
  * Shared by `corpus_compare_parse.ts` and the parse-conformance fixtures gates
  * (`fixtures_gate.ts`), so a divergence cataloged here shrinks every count at once.
- * Node-modules-free, so `parse_divergences_test.ts` gates it in `deno task test:deno`.
+ * Node-modules-free, so `parse_divergences_test.ts` gates it in `deno task test:node`.
  *
  * @module
  */

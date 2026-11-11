@@ -150,7 +150,7 @@ stays Rust-only.
 **Why the reader is JS.** Both package sets need it, and the native one has no WASM to host a
 Rust reader — a Rust reader would need a hand restatement in the napi loader plus a parity test.
 One shared JS reader is strictly less to drift: it is unit-tested over a fake engine by
-`scripts/npm_api_test.ts` (a `deno task test:deno` leg, so it gates in `check` with no package
+`scripts/npm_api_test.ts` (a `deno task test:node` suite, so it gates in `check` with no package
 built) — its strip and imports halves by `scripts/npm_api_strip_test.ts` /
 `scripts/npm_api_imports_test.ts`, the same way — and exercised through
 the real engines by `scripts/test_npm.ts` / `scripts/test_napi_npm.ts`, whose exact-string

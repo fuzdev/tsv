@@ -10,7 +10,8 @@
  */
 
 import { deepStrictEqual, ok } from 'node:assert';
-import { readFileSync } from 'node:fs';
+import { test } from 'vitest';
+import { readdirSync, readFileSync } from 'node:fs';
 
 import { GATE_CHECKOUT_IDS } from './gate_counts.ts';
 
@@ -51,7 +52,7 @@ const all_entries = Object.entries(GATE_CHECKOUT_IDS).flatMap(([repo, { pins }])
 	pins.map((entry) => ({ repo, entry }))
 );
 
-Deno.test('gate_counts exports the pins this test expects to grade', () => {
+test('gate_counts exports the pins this test expects to grade', () => {
 	// A regex that matched nothing would pass both directions vacuously.
 	ok(exported_pins.length >= 10, `found only ${exported_pins.length} exported pins`);
 	ok(exported_pins.includes('CSS_REJECTS_PIN'));
@@ -62,17 +63,17 @@ Deno.test('gate_counts exports the pins this test expects to grade', () => {
  * The generated per-source pins files beside the module (`corpus_pins.ts`) — pins too, so
  * any `*_pins.txt` placed here must name the checkouts it was measured against.
  */
-const pin_files = [...Deno.readDirSync(new URL('.', import.meta.url))]
-	.map((e) => e.name)
-	.filter((name) => name.endsWith('_pins.txt'));
+const pin_files = readdirSync(new URL('.', import.meta.url)).filter((name) =>
+	name.endsWith('_pins.txt')
+);
 
-Deno.test('every pins file names the checkouts it was measured against', () => {
+test('every pins file names the checkouts it was measured against', () => {
 	ok(pin_files.length >= 2, `found only ${pin_files.length} pins files`);
 	const orphans = pin_files.filter((file) => !all_entries.some(({ entry }) => entry === file));
 	deepStrictEqual(orphans, [], `pins files with no checkout in GATE_CHECKOUT_IDS: ${orphans}`);
 });
 
-Deno.test('NON_PIN_EXPORTS lists only constants that exist', () => {
+test('NON_PIN_EXPORTS lists only constants that exist', () => {
 	for (const name of Object.keys(NON_PIN_EXPORTS)) {
 		ok(
 			new RegExp(`^export const ${name}\\b`, 'm').test(source),
@@ -81,7 +82,7 @@ Deno.test('NON_PIN_EXPORTS lists only constants that exist', () => {
 	}
 });
 
-Deno.test('every exported pin names the checkout it was measured against', () => {
+test('every exported pin names the checkout it was measured against', () => {
 	const orphans = exported_pins.filter(
 		(pin) => !(pin in UNTRACKED_PINS) && !all_entries.some(({ entry }) => names(entry, pin))
 	);
@@ -93,7 +94,7 @@ Deno.test('every exported pin names the checkout it was measured against', () =>
 	);
 });
 
-Deno.test('every listed pin name resolves to an export', () => {
+test('every listed pin name resolves to an export', () => {
 	const ghosts = all_entries.filter(
 		({ entry }) => !exported_pins.some((pin) => names(entry, pin)) && !pin_files.includes(entry)
 	);
@@ -104,7 +105,7 @@ Deno.test('every listed pin name resolves to an export', () => {
 	);
 });
 
-Deno.test('UNTRACKED_PINS lists only pins that exist and are not also tracked', () => {
+test('UNTRACKED_PINS lists only pins that exist and are not also tracked', () => {
 	for (const pin of Object.keys(UNTRACKED_PINS)) {
 		ok(exported_pins.includes(pin), `${pin} is not exported`);
 		ok(!all_entries.some(({ entry }) => names(entry, pin)), `${pin} is both tracked and untracked`);

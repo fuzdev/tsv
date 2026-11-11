@@ -13,6 +13,7 @@
  */
 
 import { deepStrictEqual, strictEqual, throws } from 'node:assert';
+import { test } from 'vitest';
 
 import { create_imports_api } from '../crates/tsv_wasm/npm/api_imports.js';
 
@@ -53,7 +54,7 @@ const PARSE_ERROR = {
 	loc: { start: { line: 1, column: 6 }, end: { line: 1, column: 6 } }
 };
 
-Deno.test('imports: the records, as an ok result', () => {
+test('imports: the records, as an ok result', () => {
 	const { api, calls } = fake_imports(() => JSON.stringify(RECORDS));
 	const result = api.parse_imports_typescript("import 'a';");
 	deepStrictEqual(result, { ok: true, ...RECORDS });
@@ -66,27 +67,25 @@ Deno.test('imports: the records, as an ok result', () => {
 	]);
 });
 
-Deno.test('imports: a returned parse failure is the result, as it is', () => {
+test('imports: a returned parse failure is the result, as it is', () => {
 	const failure = { ok: false, error: PARSE_ERROR };
 	const { api } = fake_imports(() => failure);
 	strictEqual(api.parse_imports_typescript('let = ;'), failure);
 	strictEqual(api.parse_imports_svelte('<div'), failure);
 });
 
-Deno.test('imports: invalid JSON from the engine is thrown as an engine bug', () => {
+test('imports: invalid JSON from the engine is thrown as an engine bug', () => {
 	const { api } = fake_imports(() => '{"hasModuleSyntax":');
 	throws(
 		() => api.parse_imports_typescript('x'),
-		(
-			e: unknown
-		) =>
+		(e: unknown) =>
 			e instanceof Error &&
 			e.message === 'internal error: import records serialized to invalid JSON' &&
 			e.cause instanceof SyntaxError
 	);
 });
 
-Deno.test('imports: a malformed returned failure is thrown as an engine bug', () => {
+test('imports: a malformed returned failure is thrown as an engine bug', () => {
 	const returned = [
 		// a kind the imports parse never returns
 		{ ok: false, error: { ...PARSE_ERROR, kind: 'refused' } },
@@ -106,7 +105,7 @@ Deno.test('imports: a malformed returned failure is thrown as an engine bug', ()
 	}
 });
 
-Deno.test('imports: anything an engine throws passes through as the same object', () => {
+test('imports: anything an engine throws passes through as the same object', () => {
 	class RuntimeError extends Error {}
 	const thrown = [
 		new Error('File too large: 5000000000 bytes (maximum: 4294967295 bytes / 4 GiB)'),
@@ -125,7 +124,7 @@ Deno.test('imports: anything an engine throws passes through as the same object'
 	}
 });
 
-Deno.test('imports: the options bag — the source type forwarded, unknown keys refused', () => {
+test('imports: the options bag — the source type forwarded, unknown keys refused', () => {
 	const { api, calls } = fake_imports(() => JSON.stringify(RECORDS));
 	for (const options of [
 		undefined,
@@ -179,7 +178,7 @@ Deno.test('imports: the options bag — the source type forwarded, unknown keys 
 	strictEqual(calls.length, before, 'a refused bag never reaches the engine');
 });
 
-Deno.test('imports: a bad source is a TypeError that never reaches the engine', () => {
+test('imports: a bad source is a TypeError that never reaches the engine', () => {
 	const { api, calls } = fake_imports(() => JSON.stringify(RECORDS));
 	const refusals: Array<[unknown, string]> = [
 		[42, 'imports source must be a string (got number)'],
@@ -196,7 +195,7 @@ Deno.test('imports: a bad source is a TypeError that never reaches the engine', 
 	strictEqual(calls.length, 0);
 });
 
-Deno.test('imports: each function is named for its export', () => {
+test('imports: each function is named for its export', () => {
 	const { api } = fake_imports(() => JSON.stringify(RECORDS));
 	strictEqual(api.parse_imports_typescript.name, 'parse_imports_typescript');
 	strictEqual(api.parse_imports_svelte.name, 'parse_imports_svelte');

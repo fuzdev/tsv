@@ -8,14 +8,15 @@
  */
 
 import { deepStrictEqual as assertEquals } from 'node:assert';
+import { test } from 'vitest';
 import { check_safety_vs_prettier } from './safety.ts';
 
-Deno.test('vs_prettier: identical output is safe', () => {
+test('vs_prettier: identical output is safe', () => {
 	const v = check_safety_vs_prettier('const x = 1;\n', 'const x = 1;\n', 'const x = 1;\n');
 	assertEquals(v, []);
 });
 
-Deno.test('vs_prettier: shared normalization cancels (no violation)', () => {
+test('vs_prettier: shared normalization cancels (no violation)', () => {
 	// Both formatters strip the redundant leading `|`. Ours drops one `|` vs
 	// source, prettier drops the same one — the differential remainder is empty.
 	const source = 'type A = | B;\n';
@@ -24,7 +25,7 @@ Deno.test('vs_prettier: shared normalization cancels (no violation)', () => {
 	assertEquals(check_safety_vs_prettier(source, ours, prettier), []);
 });
 
-Deno.test('vs_prettier: shared normalization + unrelated layout diff is still safe', () => {
+test('vs_prettier: shared normalization + unrelated layout diff is still safe', () => {
 	// Both strip the leading `|` (shared, cancels). Our output ALSO differs from
 	// prettier on layout (line breaks), but layout uses excluded whitespace —
 	// no semantic char is lost beyond prettier, so no safety violation. This is
@@ -35,7 +36,7 @@ Deno.test('vs_prettier: shared normalization + unrelated layout diff is still sa
 	assertEquals(check_safety_vs_prettier(source, ours, prettier), []);
 });
 
-Deno.test('vs_prettier: real loss beyond prettier is flagged', () => {
+test('vs_prettier: real loss beyond prettier is flagged', () => {
 	// Ours drops the `| C` union member's infix pipe that prettier keeps. The
 	// source's own leading `= | B` pipe is excluded as break layout, so the only
 	// counted pipes are the infix separators: source 1, prettier 1, ours 0.
@@ -50,7 +51,7 @@ Deno.test('vs_prettier: real loss beyond prettier is flagged', () => {
 	assertEquals(v[0].chars, [{ char: '|', real: 1, ours: 1, prettier: 0 }]);
 });
 
-Deno.test('vs_prettier: leading-pipe union break (ours breaks, prettier inline) is safe', () => {
+test('vs_prettier: leading-pipe union break (ours breaks, prettier inline) is safe', () => {
 	// A return-type union in method-signature position: tsv keeps the params
 	// inline and breaks the return-type union with leading pipes
 	// (`Resolvable<| A⏎| B⏎| C>`), where prettier breaks the params and keeps the
@@ -63,7 +64,7 @@ Deno.test('vs_prettier: leading-pipe union break (ours breaks, prettier inline) 
 	assertEquals(check_safety_vs_prettier(source, ours, prettier), []);
 });
 
-Deno.test('vs_prettier: bracket-hugged leading union pipe (`R<| A`) is safe', () => {
+test('vs_prettier: bracket-hugged leading union pipe (`R<| A`) is safe', () => {
 	// tsv also hugs the first member onto the `<` line with a leading pipe
 	// (`R<| A`); that operand-less pipe (prev is `<`) is excluded like a
 	// line-leading one, so no fabricated content_added.
@@ -73,7 +74,7 @@ Deno.test('vs_prettier: bracket-hugged leading union pipe (`R<| A`) is safe', ()
 	assertEquals(check_safety_vs_prettier(source, ours, prettier), []);
 });
 
-Deno.test('vs_prettier: a dropped member in a broken union is still flagged', () => {
+test('vs_prettier: a dropped member in a broken union is still flagged', () => {
 	// Excluding the leading pipe must not blind the check: ours breaks the union
 	// AND drops the `C` member (identifier + its infix pipe). The infix-pipe drop
 	// and the `C` letter drop both register.
@@ -90,7 +91,7 @@ Deno.test('vs_prettier: a dropped member in a broken union is still flagged', ()
 	assertEquals(pipe, { char: '|', real: 1, ours: 1, prettier: 0 });
 });
 
-Deno.test('vs_prettier: space-separated leading pipes (`| | | |`) are all excluded', () => {
+test('vs_prettier: space-separated leading pipes (`| | | |`) are all excluded', () => {
 	// tsv can collapse nested single-member unions to space-separated leading pipes
 	// (`type A = | ( | ( | X ))` → `type A = | | | X`). Every one of those pipes is
 	// operand-less break layout — a space-separated `| |` is NOT `||`. Prettier keeps
@@ -102,7 +103,7 @@ Deno.test('vs_prettier: space-separated leading pipes (`| | | |`) are all exclud
 	assertEquals(check_safety_vs_prettier(source, ours, prettier), []);
 });
 
-Deno.test('vs_prettier: `||` logical-or is fully counted (both pipes)', () => {
+test('vs_prettier: `||` logical-or is fully counted (both pipes)', () => {
 	// A `|` after `|` is `||`, not a leading union pipe — both pipes stay content,
 	// so turning `||` into a single `|` (a catastrophic bug) is still flagged.
 	const source = 'const x = a || b;\n';
@@ -114,7 +115,7 @@ Deno.test('vs_prettier: `||` logical-or is fully counted (both pipes)', () => {
 	assertEquals(v[0].total, 1);
 });
 
-Deno.test('vs_prettier: dropped comment prettier keeps is flagged', () => {
+test('vs_prettier: dropped comment prettier keeps is flagged', () => {
 	const source = 'const x = 1; // note\n';
 	const prettier = 'const x = 1; // note\n';
 	const ours = 'const x = 1;\n';
@@ -125,7 +126,7 @@ Deno.test('vs_prettier: dropped comment prettier keeps is flagged', () => {
 	assertEquals(v[0].total, 6);
 });
 
-Deno.test('vs_prettier: added chars beyond prettier are flagged', () => {
+test('vs_prettier: added chars beyond prettier are flagged', () => {
 	// A rendering bug that duplicates a token: ours has an extra `a` neither
 	// source nor prettier has.
 	const source = 'const x = a;\n';
@@ -137,7 +138,7 @@ Deno.test('vs_prettier: added chars beyond prettier are flagged', () => {
 	assertEquals(v[0].total, 1); // one extra `a`
 });
 
-Deno.test('vs_prettier: loss shared with prettier (e.g. trailing-zero strip) cancels', () => {
+test('vs_prettier: loss shared with prettier (e.g. trailing-zero strip) cancels', () => {
 	// Both formatters normalize `1.0` → `1`, dropping the `0`. Shared, so safe.
 	const source = '.a {\n\tflex: 1.0;\n}\n';
 	const ours = '.a {\n\tflex: 1;\n}\n';
@@ -145,7 +146,7 @@ Deno.test('vs_prettier: loss shared with prettier (e.g. trailing-zero strip) can
 	assertEquals(check_safety_vs_prettier(source, ours, prettier), []);
 });
 
-Deno.test('vs_prettier: opposite-direction case canonicalization is safe (CSS unit case)', () => {
+test('vs_prettier: opposite-direction case canonicalization is safe (CSS unit case)', () => {
 	// tsv lowercases EVERY unit to its spec-canonical serialized form (`5CH`→`5ch`,
 	// `5hZ`→`5hz`); prettier lowercases most but UPCASES the Hz/kHz/Q trio (`5hZ`→`5Hz`)
 	// — the sanctioned `units_serialize_case` divergence. The shared lowercasing (`5CH`
@@ -159,7 +160,7 @@ Deno.test('vs_prettier: opposite-direction case canonicalization is safe (CSS un
 	assertEquals(check_safety_vs_prettier(source, ours, prettier), []);
 });
 
-Deno.test('vs_prettier: a genuine letter drop is still flagged despite case-folding', () => {
+test('vs_prettier: a genuine letter drop is still flagged despite case-folding', () => {
 	// Case-folding must not mask a real loss: dropping a letter entirely still reduces
 	// the folded count. Here ours drops the `c` from an identifier prettier keeps.
 	const source = 'const abc = 1;\n';
@@ -171,7 +172,7 @@ Deno.test('vs_prettier: a genuine letter drop is still flagged despite case-fold
 	assertEquals(v[0].total, 1); // the dropped `c`
 });
 
-Deno.test('vs_prettier: prettier-empty output never fabricates a violation', () => {
+test('vs_prettier: prettier-empty output never fabricates a violation', () => {
 	// The prettier Deno sidecar can return '' for a file under load. The check
 	// iterates the chars OURS deviates on and uses prettier only as a subtrahend,
 	// so an empty prettier (prettier_excess = the whole source) can only CANCEL
@@ -182,16 +183,13 @@ Deno.test('vs_prettier: prettier-empty output never fabricates a violation', () 
 	assertEquals(check_safety_vs_prettier(source, 'const x = abc;\n', ''), []); // ours formatted
 });
 
-Deno.test(
-	'vs_prettier: prettier-empty MASKS a real loss (false negative — caller must guard)',
-	() => {
-		// The flip side: when prettier is empty AND ours genuinely drops a char, the
-		// differential subtracts the loss away (prettier "dropped" it too) and reports
-		// nothing. The primitive cannot tell real loss from a sidecar miss once
-		// prettier is gone — which is why `corpus_compare_format.ts` errors out on
-		// `prettier === '' && source non-empty` instead of trusting this verdict.
-		const source = 'const x = abc;\n';
-		const ours = 'const x = ab;\n'; // ours dropped the `c`
-		assertEquals(check_safety_vs_prettier(source, ours, ''), []); // masked — NOT flagged
-	}
-);
+test('vs_prettier: prettier-empty MASKS a real loss (false negative — caller must guard)', () => {
+	// The flip side: when prettier is empty AND ours genuinely drops a char, the
+	// differential subtracts the loss away (prettier "dropped" it too) and reports
+	// nothing. The primitive cannot tell real loss from a sidecar miss once
+	// prettier is gone — which is why `corpus_compare_format.ts` errors out on
+	// `prettier === '' && source non-empty` instead of trusting this verdict.
+	const source = 'const x = abc;\n';
+	const ours = 'const x = ab;\n'; // ours dropped the `c`
+	assertEquals(check_safety_vs_prettier(source, ours, ''), []); // masked — NOT flagged
+});

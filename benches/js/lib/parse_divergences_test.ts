@@ -7,11 +7,12 @@
  *
  * Hand-written canonical trees holding only the fields the matchers read, on purpose: a
  * test that parsed through the oracle would need the sidecar and stop gating in
- * `deno task check` (see `test:deno`). What the real oracle writes is graded by
+ * `deno task check` (see `test:node`). What the real oracle writes is graded by
  * `corpus:compare:parse`.
  */
 
 import { ok, strictEqual } from 'node:assert';
+import { test } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
@@ -41,12 +42,12 @@ function claims(
 	return matcher(name).matches(entry, get_at_path(canonical_root, parent_path), ctx);
 }
 
-Deno.test('matcher names are unique', () => {
+test('matcher names are unique', () => {
 	const names = DOCUMENTED_MATCHERS.map((m) => m.name);
 	strictEqual(new Set(names).size, names.length);
 });
 
-Deno.test('lone_surrogate_value: U+FFFD for a lone surrogate, and only that', () => {
+test('lone_surrogate_value: U+FFFD for a lone surrogate, and only that', () => {
 	const entry = (ours: string, canonical: string): Entry => ({
 		kind: 'value_mismatch',
 		path: 'body[0].expression.value',
@@ -63,128 +64,124 @@ Deno.test('lone_surrogate_value: U+FFFD for a lone surrogate, and only that', ()
 	strictEqual(claims('lone_surrogate_value', entry('a', 'b'), {}), false);
 });
 
-Deno.test(
-	'svelte_empty_container_comment_drain: a comment walked as a node in an empty container',
-	() => {
-		// `if (a) {} else if (b) { // r⏎} else { // s⏎}` — `// r` leads the empty else block,
-		// and canonical nests `// s` in it; tsv trails `// s` on the `if`
-		const r = { type: 'Line', value: ' r', start: 30, end: 34 };
-		const s = { type: 'Line', value: ' s', start: 46, end: 50 };
-		const root = (block: unknown) => ({
-			instance: {
-				content: {
-					body: [{ type: 'IfStatement', start: 0, end: 52, alternate: { alternate: block } }]
-				}
+test('svelte_empty_container_comment_drain: a comment walked as a node in an empty container', () => {
+	// `if (a) {} else if (b) { // r⏎} else { // s⏎}` — `// r` leads the empty else block,
+	// and canonical nests `// s` in it; tsv trails `// s` on the `if`
+	const r = { type: 'Line', value: ' r', start: 30, end: 34 };
+	const s = { type: 'Line', value: ' s', start: 46, end: 50 };
+	const root = (block: unknown) => ({
+		instance: {
+			content: {
+				body: [{ type: 'IfStatement', start: 0, end: 52, alternate: { alternate: block } }]
 			}
-		});
-		const drained = root({
-			type: 'BlockStatement',
-			body: [],
-			start: 44,
-			end: 52,
-			leadingComments: [{ ...r, trailingComments: [s] }]
-		});
-		const nested =
-			'instance.content.body[0].alternate.alternate.leadingComments[0].trailingComments';
-		const trailing = 'instance.content.body[0].trailingComments';
-		const missing_ours: Entry = {
-			kind: 'missing_ours',
-			path: nested,
-			ours: undefined,
-			canonical: [s]
-		};
-		const missing_canonical = (ours: unknown): Entry => ({
-			kind: 'missing_canonical',
-			path: trailing,
-			ours,
-			canonical: undefined
-		});
-		const drain = (e: Entry, tree: unknown = drained) =>
-			claims('svelte_empty_container_comment_drain', e, tree, 'svelte');
-		strictEqual(drain(missing_ours), true);
-		strictEqual(drain(missing_canonical([s])), true);
-		// a NON-empty container: the leading comment is no walk node that passes `is_last_in_body`
-		const filled = root({
-			type: 'BlockStatement',
-			body: [{ type: 'ExpressionStatement' }],
-			start: 44,
-			end: 52,
-			leadingComments: [{ ...r, trailingComments: [s] }]
-		});
-		strictEqual(drain(missing_ours, filled), false);
-		strictEqual(drain(missing_canonical([s]), filled), false);
-		// a comment canonical never drained, attached by tsv where canonical has none, is a bug
-		const other = { type: 'Line', value: ' t', start: 60, end: 64 };
-		strictEqual(drain(missing_canonical([other])), false);
-		strictEqual(drain(missing_canonical([s, other])), false);
-		// a holder the walk cannot reach: a node ending before the container, for a trailing
-		// array, and one starting before its end, for a leading array
-		const early = root({
-			type: 'BlockStatement',
-			body: [],
-			start: 44,
-			end: 52,
-			leadingComments: [{ ...r, trailingComments: [s] }]
-		}) as { instance: { content: { body: unknown[] } } };
-		early.instance.content.body.unshift({ type: 'ExpressionStatement', start: 10, end: 20 });
-		const before: Entry = {
-			kind: 'missing_canonical',
-			path: 'instance.content.body[0].trailingComments',
-			ours: [s],
-			canonical: undefined
-		};
-		strictEqual(drain(before, early), false);
-		const leading_if: Entry = {
-			kind: 'missing_canonical',
-			path: 'instance.content.body[0].leadingComments',
-			ours: [s],
-			canonical: undefined
-		};
-		strictEqual(drain(leading_if), false);
-		// a leading holder is exactly the first node starting at or after the container's end:
-		// `… else { // s⏎} after(); later();` — `after()` (outermost, not its callee), never `later()`
-		const followed = root({
-			type: 'BlockStatement',
-			body: [],
-			start: 44,
-			end: 52,
-			leadingComments: [{ ...r, trailingComments: [s] }]
-		}) as { instance: { content: { body: unknown[] } } };
-		followed.instance.content.body.push(
-			{
-				type: 'ExpressionStatement',
+		}
+	});
+	const drained = root({
+		type: 'BlockStatement',
+		body: [],
+		start: 44,
+		end: 52,
+		leadingComments: [{ ...r, trailingComments: [s] }]
+	});
+	const nested = 'instance.content.body[0].alternate.alternate.leadingComments[0].trailingComments';
+	const trailing = 'instance.content.body[0].trailingComments';
+	const missing_ours: Entry = {
+		kind: 'missing_ours',
+		path: nested,
+		ours: undefined,
+		canonical: [s]
+	};
+	const missing_canonical = (ours: unknown): Entry => ({
+		kind: 'missing_canonical',
+		path: trailing,
+		ours,
+		canonical: undefined
+	});
+	const drain = (e: Entry, tree: unknown = drained) =>
+		claims('svelte_empty_container_comment_drain', e, tree, 'svelte');
+	strictEqual(drain(missing_ours), true);
+	strictEqual(drain(missing_canonical([s])), true);
+	// a NON-empty container: the leading comment is no walk node that passes `is_last_in_body`
+	const filled = root({
+		type: 'BlockStatement',
+		body: [{ type: 'ExpressionStatement' }],
+		start: 44,
+		end: 52,
+		leadingComments: [{ ...r, trailingComments: [s] }]
+	});
+	strictEqual(drain(missing_ours, filled), false);
+	strictEqual(drain(missing_canonical([s]), filled), false);
+	// a comment canonical never drained, attached by tsv where canonical has none, is a bug
+	const other = { type: 'Line', value: ' t', start: 60, end: 64 };
+	strictEqual(drain(missing_canonical([other])), false);
+	strictEqual(drain(missing_canonical([s, other])), false);
+	// a holder the walk cannot reach: a node ending before the container, for a trailing
+	// array, and one starting before its end, for a leading array
+	const early = root({
+		type: 'BlockStatement',
+		body: [],
+		start: 44,
+		end: 52,
+		leadingComments: [{ ...r, trailingComments: [s] }]
+	}) as { instance: { content: { body: unknown[] } } };
+	early.instance.content.body.unshift({ type: 'ExpressionStatement', start: 10, end: 20 });
+	const before: Entry = {
+		kind: 'missing_canonical',
+		path: 'instance.content.body[0].trailingComments',
+		ours: [s],
+		canonical: undefined
+	};
+	strictEqual(drain(before, early), false);
+	const leading_if: Entry = {
+		kind: 'missing_canonical',
+		path: 'instance.content.body[0].leadingComments',
+		ours: [s],
+		canonical: undefined
+	};
+	strictEqual(drain(leading_if), false);
+	// a leading holder is exactly the first node starting at or after the container's end:
+	// `… else { // s⏎} after(); later();` — `after()` (outermost, not its callee), never `later()`
+	const followed = root({
+		type: 'BlockStatement',
+		body: [],
+		start: 44,
+		end: 52,
+		leadingComments: [{ ...r, trailingComments: [s] }]
+	}) as { instance: { content: { body: unknown[] } } };
+	followed.instance.content.body.push(
+		{
+			type: 'ExpressionStatement',
+			start: 53,
+			end: 61,
+			expression: {
+				type: 'CallExpression',
 				start: 53,
-				end: 61,
-				expression: {
-					type: 'CallExpression',
-					start: 53,
-					end: 60,
-					callee: { type: 'Identifier', start: 53, end: 58 }
-				}
-			},
-			{ type: 'ExpressionStatement', start: 62, end: 70 }
-		);
-		const leading_at = (path: string): Entry => ({
-			kind: 'missing_canonical',
-			path,
-			ours: [s],
-			canonical: undefined
-		});
-		strictEqual(drain(leading_at('instance.content.body[1].leadingComments'), followed), true);
-		strictEqual(drain(leading_at('instance.content.body[2].leadingComments'), followed), false);
-		strictEqual(
-			drain(leading_at('instance.content.body[1].expression.callee.leadingComments'), followed),
-			false
-		);
-		// the direction: a comment array tsv LACKS on a node is a drop, not the drain
-		strictEqual(drain({ ...missing_canonical([s]), kind: 'missing_ours', canonical: [s] }), false);
-		// a nested array under something that is not a comment
-		const not_comment = 'instance.content.body[0].alternate.alternate.trailingComments';
-		strictEqual(drain({ ...missing_ours, path: not_comment }), false);
-	}
-);
+				end: 60,
+				callee: { type: 'Identifier', start: 53, end: 58 }
+			}
+		},
+		{ type: 'ExpressionStatement', start: 62, end: 70 }
+	);
+	const leading_at = (path: string): Entry => ({
+		kind: 'missing_canonical',
+		path,
+		ours: [s],
+		canonical: undefined
+	});
+	strictEqual(drain(leading_at('instance.content.body[1].leadingComments'), followed), true);
+	strictEqual(drain(leading_at('instance.content.body[2].leadingComments'), followed), false);
+	strictEqual(
+		drain(leading_at('instance.content.body[1].expression.callee.leadingComments'), followed),
+		false
+	);
+	// the direction: a comment array tsv LACKS on a node is a drop, not the drain
+	strictEqual(drain({ ...missing_canonical([s]), kind: 'missing_ours', canonical: [s] }), false);
+	// a nested array under something that is not a comment
+	const not_comment = 'instance.content.body[0].alternate.alternate.trailingComments';
+	strictEqual(drain({ ...missing_ours, path: not_comment }), false);
+});
 
-Deno.test('rest_param_type_end: the annotation end against the binding end, nothing else', () => {
+test('rest_param_type_end: the annotation end against the binding end, nothing else', () => {
 	// `(...args: Array<any>) => 1`, offsets as acorn-typescript writes them
 	const rest = (fields: Record<string, unknown>) => ({
 		params: [
@@ -205,7 +202,7 @@ Deno.test('rest_param_type_end: the annotation end against the binding end, noth
 	strictEqual(claims('rest_param_type_end', { ...end, path: 'params[1].start' }, rest({})), false);
 });
 
-Deno.test('comment_dedup: the canonical extras must BE duplicates of what tsv lists', () => {
+test('comment_dedup: the canonical extras must BE duplicates of what tsv lists', () => {
 	const span = (start: number, end: number, value = '') => ({ type: 'Block', start, end, value });
 	const attached = (comments: unknown[]) => ({ body: [{ leadingComments: comments }] });
 	const length = (ours: number, canonical: number): Entry => ({
@@ -260,7 +257,7 @@ Deno.test('comment_dedup: the canonical extras must BE duplicates of what tsv li
 	strictEqual(claims('comment_dedup', value(' a\n  b '), twins), false);
 });
 
-Deno.test('svelte_template_paren_comment: a leading comment ahead of a stripped paren', () => {
+test('svelte_template_paren_comment: a leading comment ahead of a stripped paren', () => {
 	const source = '{/* c */ (a) + b}';
 	const comment = { type: 'Block', start: 1, end: 8 };
 	const root = (start: number, comments: unknown[] = [comment]) => ({
@@ -335,7 +332,7 @@ Deno.test('svelte_template_paren_comment: a leading comment ahead of a stripped 
 	strictEqual(paren(entry('missing_canonical', path, [d, c]), two, two_root), false);
 });
 
-Deno.test('manufactured_line_comment_dedent: a dedent measured on a manufactured line', () => {
+test('manufactured_line_comment_dedent: a dedent measured on a manufactured line', () => {
 	// `read_script` hands acorn `<script>` blanked to eight spaces, so Svelte strips eight
 	// spaces the author typed where the document's line opens with no run at all
 	const source = '<script>/*\n        c */</script>';
@@ -369,7 +366,7 @@ Deno.test('manufactured_line_comment_dedent: a dedent measured on a manufactured
 	strictEqual(dedent(entry('\n        c ', '\nc '), '﻿' + source), true);
 });
 
-Deno.test('svelte_instance_comment_duplication: a module-region prefix and nothing else', () => {
+test('svelte_instance_comment_duplication: a module-region prefix and nothing else', () => {
 	// the instance script starts at 50; the module-region comment at 10 is copied ahead of
 	// the instance's own comment at 60
 	const comment = (start: number, value: string) => ({
@@ -469,7 +466,7 @@ function lifted_document(source: string): Record<string, unknown> {
 	return root;
 }
 
-Deno.test('svelte_lifted_root_comment_duplication: a copy only past another lifted root', () => {
+test('svelte_lifted_root_comment_duplication: a copy only past another lifted root', () => {
 	const copy = (value: string) => ({ type: 'Line', value });
 	const script_copy = (key: 'instance' | 'module', value = ' c '): Entry => ({
 		kind: 'missing_ours',
@@ -524,71 +521,63 @@ Deno.test('svelte_lifted_root_comment_duplication: a copy only past another lift
 	strictEqual(lifted(css_copy({ ...comment, data: ' d ' }), script_style), false);
 });
 
-Deno.test(
-	'extends_instantiation_linebreak: the instantiation unwrapped, across a line break',
-	() => {
-		const broken = 'class A extends B<T>\n\timplements I {}';
-		const one_line = 'class A extends B<T> implements I {}';
-		const expression = { type: 'Identifier', start: 16, end: 17, name: 'B' };
-		const type_arguments = {
-			type: 'TSTypeParameterInstantiation',
-			start: 17,
-			end: 20,
-			params: [{ type: 'TSTypeReference', start: 18, end: 19 }]
-		};
-		const root = {
-			body: [
-				{
-					type: 'ClassDeclaration',
-					superClass: {
-						type: 'TSInstantiationExpression',
-						start: 16,
-						end: 20,
-						expression,
-						typeArguments: type_arguments
-					}
+test('extends_instantiation_linebreak: the instantiation unwrapped, across a line break', () => {
+	const broken = 'class A extends B<T>\n\timplements I {}';
+	const one_line = 'class A extends B<T> implements I {}';
+	const expression = { type: 'Identifier', start: 16, end: 17, name: 'B' };
+	const type_arguments = {
+		type: 'TSTypeParameterInstantiation',
+		start: 17,
+		end: 20,
+		params: [{ type: 'TSTypeReference', start: 18, end: 19 }]
+	};
+	const root = {
+		body: [
+			{
+				type: 'ClassDeclaration',
+				superClass: {
+					type: 'TSInstantiationExpression',
+					start: 16,
+					end: 20,
+					expression,
+					typeArguments: type_arguments
 				}
-			]
-		};
-		const entry = (
-			kind: Entry['kind'],
-			path: string,
-			ours: unknown,
-			canonical?: unknown
-		): Entry => ({
-			kind,
-			path,
-			ours,
-			canonical
-		});
-		const shape = (e: Entry, source = broken) =>
-			claims('extends_instantiation_linebreak', e, root, 'typescript', source);
-		const type = entry('value_mismatch', 'body[0].superClass.type', 'Identifier');
-		strictEqual(shape(type), true);
-		strictEqual(shape(entry('value_mismatch', 'body[0].superClass.end', 17, 20)), true);
-		strictEqual(shape(entry('missing_canonical', 'body[0].superClass.name', 'B')), true);
-		strictEqual(shape(entry('missing_ours', 'body[0].superClass.expression', undefined, {})), true);
-		// key order is no difference
-		const reordered = {
-			params: type_arguments.params,
-			end: 20,
-			start: 17,
-			type: type_arguments.type
-		};
-		strictEqual(shape(entry('missing_canonical', 'body[0].superTypeParameters', reordered)), true);
-		// the same line: acorn-typescript emits tsv's shape, so a difference is a bug
-		strictEqual(shape(type, one_line), false);
-		// a line break inside a comment is still a preceding line break
-		strictEqual(shape(type, 'class A extends B<T> /*\n*/ implements I {}'), true);
-		// a wrong superclass, a wrong end, wrong type arguments
-		strictEqual(shape(entry('missing_canonical', 'body[0].superClass.name', 'C')), false);
-		strictEqual(shape(entry('value_mismatch', 'body[0].superClass.end', 18, 20)), false);
-		const wrong = { ...type_arguments, params: [] };
-		strictEqual(shape(entry('missing_canonical', 'body[0].superTypeParameters', wrong)), false);
-	}
-);
+			}
+		]
+	};
+	const entry = (kind: Entry['kind'], path: string, ours: unknown, canonical?: unknown): Entry => ({
+		kind,
+		path,
+		ours,
+		canonical
+	});
+	const shape = (e: Entry, source = broken) =>
+		claims('extends_instantiation_linebreak', e, root, 'typescript', source);
+	const type = entry('value_mismatch', 'body[0].superClass.type', 'Identifier');
+	strictEqual(shape(type), true);
+	strictEqual(shape(entry('value_mismatch', 'body[0].superClass.end', 17, 20)), true);
+	strictEqual(shape(entry('missing_canonical', 'body[0].superClass.name', 'B')), true);
+	strictEqual(shape(entry('missing_ours', 'body[0].superClass.expression', undefined, {})), true);
+	// key order is no difference
+	const reordered = {
+		params: type_arguments.params,
+		end: 20,
+		start: 17,
+		type: type_arguments.type
+	};
+	strictEqual(shape(entry('missing_canonical', 'body[0].superTypeParameters', reordered)), true);
+	// the same line: acorn-typescript emits tsv's shape, so a difference is a bug
+	strictEqual(shape(type, one_line), false);
+	// a line break inside a comment is still a preceding line break
+	strictEqual(shape(type, 'class A extends B<T> /*\n*/ implements I {}'), true);
+	// a wrong superclass, a wrong end, wrong type arguments
+	strictEqual(shape(entry('missing_canonical', 'body[0].superClass.name', 'C')), false);
+	strictEqual(shape(entry('value_mismatch', 'body[0].superClass.end', 18, 20)), false);
+	const wrong = { ...type_arguments, params: [] };
+	strictEqual(shape(entry('missing_canonical', 'body[0].superTypeParameters', wrong)), false);
+});
 
-Deno.test('decorator_paren_subscript_start: ours at the `(`, canonical just inside it', () => {
+test('decorator_paren_subscript_start: ours at the `(`, canonical just inside it', () => {
 	const source = '@(f)() class A {}';
 	const root = {
 		body: [{ decorators: [{ expression: { type: 'CallExpression', start: 2, end: 8 } }] }]
@@ -647,73 +636,67 @@ Deno.test('decorator_paren_subscript_start: ours at the `(`, canonical just insi
 	);
 });
 
-Deno.test(
-	'css_declaration_tokenization: the garbage declaration and the comment tail it shifts',
-	() => {
-		const garbage = {
-			type: 'Declaration',
-			start: 20,
-			end: 40,
-			property: 'color/*',
-			value: 'c */: red'
-		};
-		const sheet = (declaration: Record<string, unknown>) => ({
-			children: [{ type: 'Rule', block: { children: [declaration] } }],
-			comments: [
-				{ type: 'Comment', start: 1, end: 8 },
-				{ type: 'Comment', start: 50, end: 57 }
-			]
-		});
-		const root = sheet(garbage);
-		const clean = sheet({ ...garbage, property: 'color' });
-		const css = (e: Entry, r: unknown = root, language: Language = 'css') =>
-			claims('css_declaration_tokenization', e, r, language);
-		// (1) the declaration's own fields
-		const property: Entry = {
-			kind: 'value_mismatch',
-			path: 'children[0].block.children[0].property',
-			ours: 'color',
-			canonical: 'color/*'
-		};
-		strictEqual(css(property), true);
-		strictEqual(css(property, clean), false);
-		// (2) the comment array: longer on OUR side, from the first comment past the garbage on
-		const length = (ours: number): Entry => ({
-			kind: 'length_mismatch',
-			path: 'comments',
-			ours,
-			canonical: 2
-		});
-		strictEqual(css(length(3)), true);
-		strictEqual(css(length(1)), false);
-		strictEqual(css(length(3), clean), false);
-		const shifted = (index: number): Entry => ({
-			kind: 'value_mismatch',
-			path: `comments[${index}].start`,
-			ours: 25,
-			canonical: 50
-		});
-		strictEqual(css(shifted(1)), true);
-		// a comment AHEAD of the garbage pairs with its own
-		strictEqual(css(shifted(0)), false);
-		// tsv emitting no comments array at all
-		strictEqual(
-			css({ kind: 'missing_ours', path: 'comments', ours: undefined, canonical: [] }),
-			false
-		);
-		// a Svelte document's stylesheet
-		strictEqual(
-			css({ ...shifted(1), path: 'css.comments[1].start' }, { css: root }, 'svelte'),
-			true
-		);
-		// a Svelte root's `comments` is its JS comment list, which the garbage cannot shift
-		const svelte_root = { css: root, comments: root.comments };
-		strictEqual(css(shifted(1), svelte_root, 'svelte'), false);
-		strictEqual(css(length(3), svelte_root, 'svelte'), false);
-	}
-);
+test('css_declaration_tokenization: the garbage declaration and the comment tail it shifts', () => {
+	const garbage = {
+		type: 'Declaration',
+		start: 20,
+		end: 40,
+		property: 'color/*',
+		value: 'c */: red'
+	};
+	const sheet = (declaration: Record<string, unknown>) => ({
+		children: [{ type: 'Rule', block: { children: [declaration] } }],
+		comments: [
+			{ type: 'Comment', start: 1, end: 8 },
+			{ type: 'Comment', start: 50, end: 57 }
+		]
+	});
+	const root = sheet(garbage);
+	const clean = sheet({ ...garbage, property: 'color' });
+	const css = (e: Entry, r: unknown = root, language: Language = 'css') =>
+		claims('css_declaration_tokenization', e, r, language);
+	// (1) the declaration's own fields
+	const property: Entry = {
+		kind: 'value_mismatch',
+		path: 'children[0].block.children[0].property',
+		ours: 'color',
+		canonical: 'color/*'
+	};
+	strictEqual(css(property), true);
+	strictEqual(css(property, clean), false);
+	// (2) the comment array: longer on OUR side, from the first comment past the garbage on
+	const length = (ours: number): Entry => ({
+		kind: 'length_mismatch',
+		path: 'comments',
+		ours,
+		canonical: 2
+	});
+	strictEqual(css(length(3)), true);
+	strictEqual(css(length(1)), false);
+	strictEqual(css(length(3), clean), false);
+	const shifted = (index: number): Entry => ({
+		kind: 'value_mismatch',
+		path: `comments[${index}].start`,
+		ours: 25,
+		canonical: 50
+	});
+	strictEqual(css(shifted(1)), true);
+	// a comment AHEAD of the garbage pairs with its own
+	strictEqual(css(shifted(0)), false);
+	// tsv emitting no comments array at all
+	strictEqual(
+		css({ kind: 'missing_ours', path: 'comments', ours: undefined, canonical: [] }),
+		false
+	);
+	// a Svelte document's stylesheet
+	strictEqual(css({ ...shifted(1), path: 'css.comments[1].start' }, { css: root }, 'svelte'), true);
+	// a Svelte root's `comments` is its JS comment list, which the garbage cannot shift
+	const svelte_root = { css: root, comments: root.comments };
+	strictEqual(css(shifted(1), svelte_root, 'svelte'), false);
+	strictEqual(css(length(3), svelte_root, 'svelte'), false);
+});
 
-Deno.test('type_assertion_paren_arrow: a doubled paren after the type parameters', () => {
+test('type_assertion_paren_arrow: a doubled paren after the type parameters', () => {
 	const source = 'x = <any>(() => {});';
 	const root = (end: number) => ({
 		body: [
@@ -741,7 +724,7 @@ Deno.test('type_assertion_paren_arrow: a doubled paren after the type parameters
 	strictEqual(assertion('﻿' + svelte, svelte.indexOf('>(') + 1, 'svelte'), true);
 });
 
-Deno.test('type_args_tsc_follower: a second list ahead of a `<`, as acorn reads it', () => {
+test('type_args_tsc_follower: a second list ahead of a `<`, as acorn reads it', () => {
 	// `a = f<T><U>(z);` as acorn-typescript reads it: a call with a second list
 	const root_for = (source: string) => {
 		const close = source.indexOf('>') + 1;
@@ -849,7 +832,7 @@ Deno.test('type_args_tsc_follower: a second list ahead of a `<`, as acorn reads 
 	strictEqual(in_hybrid(operand(kept)), false);
 });
 
-Deno.test('type_args_tsc_follower: a `+` or `-` past a line break, as acorn reads it', () => {
+test('type_args_tsc_follower: a `+` or `-` past a line break, as acorn reads it', () => {
 	// `a = f<T>⏎+c;` as acorn-typescript reads it: the instantiation added to `c`
 	const root_for = (source: string, operator: string) => ({
 		body: [
@@ -897,7 +880,7 @@ Deno.test('type_args_tsc_follower: a `+` or `-` past a line break, as acorn read
 	strictEqual(at('a = f<T>\n+c;', operator_entry, '-'), false);
 });
 
-Deno.test('static_member_ladder: an ASI-split `static`, from the ladder on', () => {
+test('static_member_ladder: an ASI-split `static`, from the ladder on', () => {
 	// `class C {⏎static;⏎static⏎static⏎a() {}⏎}` as acorn-typescript reads it
 	const source = 'class C {\n\tstatic;\n\tstatic\n\tstatic\n\ta() {}\n}';
 	const field = (start: number, end: number) => ({
@@ -953,7 +936,7 @@ Deno.test('static_member_ladder: an ASI-split `static`, from the ladder on', () 
 	);
 });
 
-Deno.test("nth_of_structure: anchored on Svelte's `of` word in an Nth value", () => {
+test("nth_of_structure: anchored on Svelte's `of` word in an Nth value", () => {
 	const root = (value: string) => ({
 		children: [{ prelude: { args: { children: [{ type: 'Nth', value }] } } }]
 	});
@@ -990,7 +973,7 @@ function catalog_sections(markdown: string): Map<string, string> {
 	);
 }
 
-Deno.test('every conformance_section names a docs/conformance_svelte.md section', () => {
+test('every conformance_section names a docs/conformance_svelte.md section', () => {
 	const doc = readFileSync(
 		fileURLToPath(new URL('../../../docs/conformance_svelte.md', import.meta.url)),
 		'utf8'

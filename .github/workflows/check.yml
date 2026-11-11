@@ -1,7 +1,7 @@
 # Three jobs run on every push to main and every PR:
 #
 #   check     — runs the local `deno task check` gate verbatim, so the two cannot
-#               drift: rustfmt, typecheck, the audit suite, cargo + deno tests,
+#               drift: rustfmt, typecheck, the audit suite, cargo + vitest + deno tests,
 #               AST-type drift, clippy with -D warnings. The authoritative list is
 #               the `check` task in deno.json — deliberately NOT re-enumerated here,
 #               because a hand-copied list goes stale every time an audit is added.
@@ -26,12 +26,13 @@
 #               npm-package tests, per OS (see the job comment). Linux is
 #               covered by `check`.
 #
-# `check` needs Rust *and* Deno: the fixture suite drives prettier + svelte
+# `check` needs Rust, Deno *and* Node: the fixture suite drives prettier + svelte
 # through a Deno sidecar (npm: specifiers pinned in
 # crates/tsv_debug/src/deno/sidecar.ts and locked by its sibling deno.lock,
 # frozen at runtime — hence the cache-hash on both below), so
 # `cargo test --workspace` panics without Deno — tests/fixtures_tests.rs
-# health-checks the sidecar first. wasm-pack is not needed by `check`.
+# health-checks the sidecar first. Node runs the JS suites (`test:node`, vitest
+# over the root's npm install). wasm-pack is not needed by `check`.
 
 name: check
 
@@ -94,12 +95,12 @@ jobs:
           # Key on the sidecar pins (fetched at runtime, not lockfile-pinned) so a
           # bump invalidates the cached deps. The sidecar's prettier/svelte fetches
           # are the only runtime npm `check` does: `test:deno` runs the
-          # node-modules-free deno tests (node: builtins + relative imports, no
-          # node_modules — proven by a clean checkout), and the bench's heavy npm
-          # tree (biome/oxc/oxfmt) is never installed here. The only deno.lock is the
+          # node-modules-free deno tests (node: builtins + relative imports, with the
+          # root package.json kept out of view), and the bench's heavy npm tree
+          # (biome/oxc/oxfmt) is never installed here. The only deno.lock is the
           # sidecar's (crates/tsv_debug/src/deno/deno.lock, embedded + frozen); the
-          # bench resolves npm from its package-lock.json, and this job installs neither
-          # it nor the root's.
+          # bench resolves npm from its package-lock.json, which this job doesn't
+          # install, and the root's install is the `npm ci` below.
           cache-hash: ${{ hashFiles('crates/tsv_debug/src/deno/sidecar.ts', 'crates/tsv_debug/src/deno/actor.rs', 'crates/tsv_debug/src/deno/deno.lock') }}
 
       # The lockfile gate for this job, in one cheap step instead of `--locked` on
@@ -113,6 +114,18 @@ jobs:
       # costs seconds and fails before the toolchain does any work.
       - name: Verify Cargo.lock is current
         run: cargo metadata --locked --format-version 1 > /dev/null
+
+      # Pinned to match the artifacts job. `check` runs vitest and tsc under it
+      # (`test:node`), from the root's install below.
+      - name: Install Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24.14.1'
+
+      # The root package-lock.json's tree (vitest, typescript, @types/node), install
+      # scripts off by the root .npmrc.
+      - name: Install npm dependencies
+        run: npm ci
 
       - name: Check
         run: deno task check

@@ -5,10 +5,11 @@
  */
 
 import { deepStrictEqual, throws } from 'node:assert';
+import { test } from 'vitest';
 
 import { readme_blocks } from './typecheck_packages.ts';
 
-Deno.test('a fence with an info string after its language opens a graded block', () => {
+test('a fence with an info string after its language opens a graded block', () => {
 	const markdown = [
 		'```ts title="a.ts"',
 		'const a = 1;',
@@ -23,12 +24,12 @@ Deno.test('a fence with an info string after its language opens a graded block',
 	]);
 });
 
-Deno.test('an ungraded fence stays paired, so the block after it is still read', () => {
+test('an ungraded fence stays paired, so the block after it is still read', () => {
 	const markdown = ['```bash title="run"', '```ts', '```', '```typescript', 'c;', '```'].join('\n');
 	deepStrictEqual(readme_blocks(markdown, 'R'), [{ line: 4, lang: 'ts', code: 'c;', node: false }]);
 });
 
-Deno.test('a node marker flags only the block directly below it', () => {
+test('a node marker flags only the block directly below it', () => {
 	const markdown = ['<!-- typecheck: node -->', '```ts', 'a;', '```', '```ts', 'b;', '```'].join(
 		'\n'
 	);
@@ -38,14 +39,14 @@ Deno.test('a node marker flags only the block directly below it', () => {
 	]);
 });
 
-Deno.test('an unknown marker is refused', () => {
+test('an unknown marker is refused', () => {
 	throws(
 		() => readme_blocks('<!-- typecheck: skip -->\n```ts\na;\n```', 'R'),
 		/R:1: unknown marker/
 	);
 });
 
-Deno.test('a marker not immediately followed by a graded fence is refused', () => {
+test('a marker not immediately followed by a graded fence is refused', () => {
 	for (const markdown of [
 		'<!-- typecheck: node -->\n\n```ts\na;\n```',
 		'<!-- typecheck: node -->\n```bash\na\n```',
@@ -55,6 +56,6 @@ Deno.test('a marker not immediately followed by a graded fence is refused', () =
 	}
 });
 
-Deno.test('an unclosed fence is refused', () => {
+test('an unclosed fence is refused', () => {
 	throws(() => readme_blocks('```ts\na;', 'R'), /R:1: unclosed fence/);
 });
