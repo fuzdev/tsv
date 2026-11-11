@@ -13,9 +13,9 @@
  * every built bundle, so they're rebuilt here to never gate on stale artifacts.
  *
  * Version source of truth: `Cargo.toml [workspace.package] version` (read
- * directly by wasm-pack). There is no root package.json and no changesets —
- * `--bump` edits Cargo.toml and converts CHANGELOG.md's `## Unreleased`
- * section into the new version's section (the grammar is `scripts/release/changelog.ts`;
+ * directly by wasm-pack). The root package.json is private and carries no version;
+ * there are no changesets — `--bump` edits Cargo.toml and converts CHANGELOG.md's
+ * `## Unreleased` section into the new version's section (the grammar is `scripts/release/changelog.ts`;
  * that stamped section is what the tag's GitHub Release reads back as its body,
  * via `scripts/release_notes.ts` in the release workflow). What a run releases
  * — fresh or resumed, and every reason a fresh one cannot — is decided once by
@@ -462,7 +462,7 @@ if (no_check) {
 	// profile, without the profile guidance the published pair adds): `check`'s
 	// `test:depth` grades the `corpus` world, whose frames are further still from what
 	// ships. The profile-guided addon itself is graded by the release workflow on every
-	// row (deno.json `//test:depth:napi`).
+	// row (docs/tasks.md §`test:depth:napi`).
 	console.log('\n=== Step 3: Depth contract, napi profile (deno task test:depth:napi) ===');
 	await run('deno task test:depth:napi', 'deno', ['task', 'test:depth:napi']);
 }
@@ -619,7 +619,7 @@ for (const { label, dir } of packages) {
 }
 // The depth limits' stack contract in the WASM engine, over the `all` package just built:
 // every shape the native gate generates, at its accepted depth, on a Node main thread, cold
-// and tiered up (deno.json `//test:depth:wasm`). A `check`-cadence gate like Step 3's
+// and tiered up (docs/tasks.md §`test:depth:wasm`). A `check`-cadence gate like Step 3's
 // shipped-build leg, so `--no-check` skips it with that one.
 if (no_check) {
 	console.warn('  WARN: skipping deno task test:depth:wasm (--no-check)');

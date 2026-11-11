@@ -69,6 +69,8 @@ cargo run -p tsv_debug ast_diff tests/fixtures/path/input.svelte # verify AST eq
 
 ## Commands
 
+Tasks live in `deno.json` (the ones that run Deno, `deno task <name> <flags>`) and `package.json` (the rest, `npm run <name> -- <flags>`); `deno task` falls through to the `package.json` script when `deno.json` has no task of that name, so `deno task <name>` runs either. `npm ci` installs the JS dependencies `package-lock.json` pins into the root `node_modules`; `.npmrc` turns install scripts off. The rationale for a `package.json` script lives in ./docs/tasks.md, keyed by name; a `deno.json` task's sits beside it as its `//<name>` key.
+
 ### Build & Development
 
 ```bash
@@ -164,10 +166,10 @@ deno task test:depth     # tests/depth_limit.rs optimized (`--profile corpus`): 
 deno task test:depth:napi # the same in the shipped binaries' optimization (`--profile napi`, fat LTO — without the profile
 #                          guidance the published pair adds) over the FULL sweep (every head, `TSV_DEPTH_SWEEP=full`); NOT in
 #                          `check` — publish Step 3 and CI's `artifacts` job. The profile-guided addon itself is graded by
-#                          `build:pgo` / the release matrix (scripts/pgo/addon_depth.ts; deno.json `//test:depth:napi`)
+#                          `build:pgo` / the release matrix (scripts/pgo/addon_depth.ts; docs/tasks.md §`test:depth:napi`)
 deno task test:depth:wasm # the full sweep's shapes at the same depths through the staged `all` WASM package on a Node MAIN thread,
 #                          cold and tiered up — parse, format + its output's reparse and F1, the import records and the strip (scripts/depth_wasm.ts); NOT
-#                          in `check` — publish Step 6 and CI's `artifacts` job (deno.json `//test:depth:wasm`)
+#                          in `check` — publish Step 6 and CI's `artifacts` job (docs/tasks.md §`test:depth:wasm`)
 deno task test:audits    # cargo test -p tsv_lang --features _internal_audits — the `_internal_swallow_check` + `_internal_comment_check` seams' own tests; in `check`
 deno task lint           # cargo clippy
 deno task entities:update # regenerate tsv_html's committed entity table from its entities.json (the generator is
@@ -397,7 +399,7 @@ deno task publish:crates --wetrun [--wait] # publish (the maintainer's, from a c
 
 A types-only `@fuzdev/tsv-ast` package is deferred — `import type` from `@fuzdev/tsv-parse-wasm` is zero-runtime-cost; reconsider when a real consumer appears.
 
-Version source of truth: `Cargo.toml` `[workspace.package] version` (read directly by `wasm-pack`). No root package.json, no changesets; all published packages and crates move together.
+Version source of truth: `Cargo.toml` `[workspace.package] version` (read directly by `wasm-pack`). The root `package.json` is private and carries no version; no changesets; all published packages and crates move together.
 
 Package shape: wasm-pack `web` target, then `scripts/patch_npm_package.ts` adds a Node/Bun entry (sync auto-init), a browser entry (guarded `await init()`), `index.d.ts`, conditional `exports`, npm metadata, and the variant README. Every entry publishes through one hand-written facade shared with the native `@fuzdev/tsv` (`crates/tsv_wasm/npm/api.js` + `api_parse.js` + `api_strip.js`: the `(source, options?)` bags, their errors, `{locations: true}` over the span-only wire, and the `{ok, …}` result every export returns — ./crates/tsv_wasm/CLAUDE.md §The npm Facade). The export list is extracted from the generated JS, so new `lang_bindings!` languages flow through automatically.
 

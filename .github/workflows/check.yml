@@ -98,7 +98,8 @@ jobs:
           # node_modules — proven by a clean checkout), and the bench's heavy npm
           # tree (biome/oxc/oxfmt) is never installed here. The only deno.lock is the
           # sidecar's (crates/tsv_debug/src/deno/deno.lock, embedded + frozen); the
-          # bench resolves npm from package-lock.json and the root has no external deps.
+          # bench resolves npm from its package-lock.json, and this job installs neither
+          # it nor the root's.
           cache-hash: ${{ hashFiles('crates/tsv_debug/src/deno/sidecar.ts', 'crates/tsv_debug/src/deno/actor.rs', 'crates/tsv_debug/src/deno/deno.lock') }}
 
       # The lockfile gate for this job, in one cheap step instead of `--locked` on
@@ -225,7 +226,7 @@ jobs:
       # grades the same test in its `corpus` world, whose frames differ from
       # these by more than the contract's margin, so this is the push-time grade
       # of the optimized frames; the published, profile-guided addon itself is
-      # graded by the release matrix on every row (deno.json `//test:depth:napi`).
+      # graded by the release matrix on every row (docs/tasks.md §`test:depth:napi`).
       - name: Depth contract, napi profile
         run: deno task test:depth:napi
 
@@ -242,7 +243,7 @@ jobs:
       # every shape the native gate above generates, at its accepted depth, through
       # the `all` package `build:packages` staged — cold and tiered up. The shapes
       # come from the native test built under the napi profile the depth step above
-      # already compiled (deno.json `//test:depth:wasm`).
+      # already compiled (docs/tasks.md §`test:depth:wasm`).
       - name: Depth contract, WASM engine
         run: deno task test:depth:wasm
 
