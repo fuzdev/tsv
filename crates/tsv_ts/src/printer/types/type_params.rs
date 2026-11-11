@@ -52,7 +52,7 @@ impl<'a> Printer<'a> {
     /// multi-line frozen parameter) force multiline
     pub(in crate::printer) fn build_type_parameter_declaration_doc(
         &self,
-        decl: &TSTypeParameterDeclaration<'_>,
+        decl: &TSTypeParameterDeclaration,
     ) -> DocId {
         if self.has_expanding_comments_in_type_param_declaration(decl)
             || self.has_frozen_multiline_type_param(decl)
@@ -73,7 +73,7 @@ impl<'a> Printer<'a> {
     /// blocks), yet the frozen member's own span can still cross lines — the `<…>`
     /// must expand (a `verbatim_source_span` is `will_break`-opaque, so the forcing
     /// is explicit).
-    fn has_frozen_multiline_type_param(&self, decl: &TSTypeParameterDeclaration<'_>) -> bool {
+    fn has_frozen_multiline_type_param(&self, decl: &TSTypeParameterDeclaration) -> bool {
         self.has_format_ignore
             && (0..decl.params.len()).any(|i| {
                 self.list_item_frozen(
@@ -91,7 +91,7 @@ impl<'a> Printer<'a> {
     /// When the group breaks, each param goes on its own line with trailing comma
     pub(crate) fn build_type_parameter_declaration_doc_wrapping(
         &self,
-        decl: &TSTypeParameterDeclaration<'_>,
+        decl: &TSTypeParameterDeclaration,
     ) -> DocId {
         // A test call's callback inlines its type parameters at any width — the one peek
         // for both function-expression and arrow callbacks, which share this builder
@@ -111,7 +111,7 @@ impl<'a> Printer<'a> {
     /// Used when caller wants to control the group (e.g., interface header)
     pub(in crate::printer) fn build_type_parameter_declaration_doc_inner(
         &self,
-        decl: &TSTypeParameterDeclaration<'_>,
+        decl: &TSTypeParameterDeclaration,
     ) -> DocId {
         let d = self.d();
         if decl.params.is_empty() {
@@ -159,7 +159,7 @@ impl<'a> Printer<'a> {
     ///
     pub(in crate::printer) fn build_type_parameter_declaration_doc_with_line_comments(
         &self,
-        decl: &TSTypeParameterDeclaration<'_>,
+        decl: &TSTypeParameterDeclaration,
     ) -> DocId {
         // Type parameters are declarations, never types, so no leading-edge paren shell
         // can widen an item span here — Rule A reads the params' own spans directly.
@@ -180,7 +180,7 @@ impl<'a> Printer<'a> {
     /// `T extends // comment\n  A`). Used by both wrapping and non-wrapping paths.
     pub(in crate::printer) fn has_expanding_comments_in_type_param_declaration(
         &self,
-        decl: &TSTypeParameterDeclaration<'_>,
+        decl: &TSTypeParameterDeclaration,
     ) -> bool {
         // Zero-comment window gate: one binary search over the whole `<…>` span. The
         // shared clauses and the per-param one below are all bounded within
@@ -213,10 +213,7 @@ impl<'a> Printer<'a> {
     /// comma stays after where the comma was (no trailing comma emitted;
     /// trailingComma: 'none'), the same shape as `build_angle_list_doc`'s last-item
     /// arm.
-    fn build_type_parameter_docs_with_comments(
-        &self,
-        decl: &TSTypeParameterDeclaration<'_>,
-    ) -> DocBuf {
+    fn build_type_parameter_docs_with_comments(&self, decl: &TSTypeParameterDeclaration) -> DocBuf {
         let d = self.d();
         let mut prev_end = decl.span.start + 1; // After `<`
         self.view
@@ -1260,7 +1257,7 @@ impl<'a> Printer<'a> {
 /// How a sole type argument hugs its `<…>` ([`Printer::sole_type_arg_hug`]).
 enum SoleTypeArgHug<'t> {
     /// An object type literal, hugging `<{` with its own width-aware group.
-    TypeLiteral(&'t ast::TSTypeLiteral<'t>),
+    TypeLiteral(&'t ast::TSTypeLiteral),
     /// A mapped type, hugging `<{` the same way.
     Mapped(&'t ast::TSMappedType<'t>),
     /// A hugged union (`{…} | null`), inlined atomically.

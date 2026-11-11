@@ -57,7 +57,7 @@ pub(super) fn write_for_statement(
 }
 
 /// Emit a `for`-`in`/`for`-`of` `left` (an untagged declaration-or-pattern).
-fn write_for_in_of_left(w: &mut JsonWriter, left: &ast::ForInOfLeft<'_>, ctx: &Ctx<'_>) {
+fn write_for_in_of_left(w: &mut JsonWriter, left: &ast::ForInOfLeft, ctx: &Ctx<'_>) {
     match left {
         ast::ForInOfLeft::VariableDeclaration(decl) => {
             write_variable_declaration(w, decl, ctx, false);
@@ -151,7 +151,7 @@ pub(super) fn write_do_while_statement(
 /// Emits a `SwitchStatement` node (each case a `SwitchCase`).
 pub(super) fn write_switch_statement(
     w: &mut JsonWriter,
-    switch_stmt: &ast::SwitchStatement<'_>,
+    switch_stmt: &ast::SwitchStatement,
     span: Span,
     ctx: &Ctx<'_>,
 ) {

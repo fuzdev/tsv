@@ -1458,7 +1458,7 @@ impl<'a> Printer<'a> {
     pub(crate) fn build_signature_head_comments_opt(
         &self,
         start: u32,
-        type_parameters: Option<&ast::TSTypeParameterDeclaration<'_>>,
+        type_parameters: Option<&ast::TSTypeParameterDeclaration>,
         no_type_params_end: u32,
     ) -> Option<DocId> {
         self.build_name_to_type_params_comments_opt(
@@ -1487,7 +1487,7 @@ impl<'a> Printer<'a> {
         &self,
         parts: &mut DocBuf,
         start: u32,
-        type_parameters: Option<&ast::TSTypeParameterDeclaration<'_>>,
+        type_parameters: Option<&ast::TSTypeParameterDeclaration>,
         no_type_params_end: u32,
     ) {
         if let Some(comments) =
@@ -1781,7 +1781,7 @@ impl<'a> Printer<'a> {
     /// the parameter list's.
     pub(crate) fn type_params_paren_gap(
         &self,
-        type_parameters: Option<&ast::TSTypeParameterDeclaration<'_>>,
+        type_parameters: Option<&ast::TSTypeParameterDeclaration>,
     ) -> Option<(u32, u32)> {
         let tp = type_parameters?;
         find_char_skipping_comments(

@@ -6,7 +6,7 @@
 use crate::ast::AstView;
 use tsv_lang::Span;
 
-use super::{DecoList, ExprId, PatPropList, Property, Run, TSTypeAnnotation};
+use super::{Deco, ExprId, PatProp, Property, Run, TSTypeAnnotation};
 
 /// Object pattern for destructuring: `{a, b}`, `{a: x, b: y}`, `{...rest}`
 ///
@@ -20,8 +20,8 @@ use super::{DecoList, ExprId, PatPropList, Property, Run, TSTypeAnnotation};
 /// - Default values: `{a = 1}` (use 1 if obj.a is undefined)
 /// - Rest: `{...rest}` (collect remaining properties)
 #[derive(Debug, Clone)]
-pub struct ObjectPattern<'arena> {
-    pub properties: PatPropList<'arena>,
+pub struct ObjectPattern {
+    pub properties: Run<PatProp>,
     /// Optional destructuring-pattern parameter (`{a}?`). Only ever set in a
     /// parameter position; the `?` extends the expression's span and precedes `type_annotation`.
     pub optional: bool,
@@ -29,7 +29,7 @@ pub struct ObjectPattern<'arena> {
     /// Parameter decorators (`@dec { a }: T`). Only set in a parameter position;
     /// emitted last in the wire, matching acorn (which attaches a parameter's
     /// decorators to its top-level binding node).
-    pub decorators: Option<DecoList<'arena>>,
+    pub decorators: Option<Run<Deco>>,
 }
 
 /// Object pattern property - either a regular property or a rest element
@@ -91,7 +91,7 @@ impl ObjectPatternProperty {
 /// - Rest: `[...rest]`
 /// - Holes: `[a, , b]` (skip element at index 1)
 #[derive(Debug, Clone)]
-pub struct ArrayPattern<'arena> {
+pub struct ArrayPattern {
     /// Elements are Option to support holes like `[a, , b]`
     pub elements: Run<Option<ExprId>>,
     /// Optional destructuring-pattern parameter (`[a]?`). Only ever set in a
@@ -100,7 +100,7 @@ pub struct ArrayPattern<'arena> {
     pub type_annotation: Option<TSTypeAnnotation>,
     /// Parameter decorators (`@dec [a]: T`). Only set in a parameter position;
     /// emitted last in the wire, matching acorn.
-    pub decorators: Option<DecoList<'arena>>,
+    pub decorators: Option<Run<Deco>>,
 }
 
 /// Assignment pattern for default values in destructuring: `a = 1`
@@ -112,7 +112,7 @@ pub struct ArrayPattern<'arena> {
 ///
 /// The left side is the binding pattern, the right side is the default value.
 #[derive(Debug, Clone)]
-pub struct AssignmentPattern<'arena> {
+pub struct AssignmentPattern {
     /// The binding (identifier or nested pattern)
     pub left: ExprId,
     /// The default value expression
@@ -120,7 +120,7 @@ pub struct AssignmentPattern<'arena> {
     /// Parameter decorators (`@dec a = 1`, `@dec { a } = {}`). Only set in a
     /// parameter position; emitted last in the wire — acorn attaches a decorated
     /// default parameter's decorators to the `AssignmentPattern`, not its `left`.
-    pub decorators: Option<DecoList<'arena>>,
+    pub decorators: Option<Run<Deco>>,
 }
 
 /// Rest element in destructuring: `...rest`

@@ -5,7 +5,7 @@
 
 use crate::ast::*;
 use crate::lexer::{KeywordKind, TokenKind};
-use crate::parser::{push_row, push_spanned};
+use crate::parser::{flush_run, push_row, push_spanned};
 use tsv_lang::{Error, Span};
 
 use super::super::Parser;
@@ -140,12 +140,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let type_parameters = self.parse_optional_type_parameters()?;
 
         // Parse optional extends clause
-        let extends: HeritageList<'arena> = if self.check(&TokenKind::Keyword(KeywordKind::Extends))
-        {
+        let extends: Run<Heritage> = if self.check(&TokenKind::Keyword(KeywordKind::Extends)) {
             self.advance()?;
-            self.parse_interface_heritage_list()?.into_bump_slice()
+            self.parse_interface_heritage_list()?
         } else {
-            &[]
+            Run::EMPTY
         };
 
         // Parse interface body
@@ -165,13 +164,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Parse interface heritage list: `Foo, Bar<T>`
     pub(in crate::parser) fn parse_interface_heritage_list(
         &mut self,
-    ) -> Result<crate::parser::BumpVec<'arena, TSInterfaceHeritage<'arena>>, Error> {
-        let mut heritages = self.bvec();
+    ) -> Result<Run<Heritage>, Error> {
+        let mark = self.stores.runs.heritage_scratch.mark();
 
         // the heritages are siblings (`ListFrame`)
         let mut frame = self.list_frame();
         loop {
-            frame.element(self, heritages.len());
+            let len = self.stores.runs.heritage_scratch.len_since(mark);
+            frame.element(self, len);
             let start = self.current_pos().0;
 
             // A heritage element is a type REFERENCE, whose head is an
@@ -218,7 +218,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 .as_ref()
                 .map_or_else(|| expression.span().end, |ta| ta.span.end);
 
-            heritages.push(TSInterfaceHeritage {
+            self.stores.runs.heritage_scratch.push(TSInterfaceHeritage {
                 expression,
                 type_arguments,
                 span: Span::new(start as u32, end),
@@ -230,11 +230,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
         frame.close(self);
 
-        Ok(heritages)
+        Ok(flush_run(
+            &mut self.stores.runs.heritage_scratch,
+            &mut self.stores.runs.heritages,
+            mark,
+        ))
     }
 
     /// Parse interface body: `{ members }`
-    fn parse_interface_body(&mut self) -> Result<TSInterfaceBody<'arena>, Error> {
+    fn parse_interface_body(&mut self) -> Result<TSInterfaceBody, Error> {
         let start = self.current_pos().0;
         self.expect(&TokenKind::BraceOpen)?;
 
@@ -244,7 +248,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.expect(&TokenKind::BraceClose)?;
 
         Ok(TSInterfaceBody {
-            body: body.into_bump_slice(),
+            body,
             span: Span::new(start as u32, end as u32),
         })
     }
@@ -674,13 +678,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Parse enum body: { members }
         self.expect(&TokenKind::BraceOpen)?;
 
-        let mut members = self.bvec();
+        let mark = self.stores.runs.enum_member_scratch.mark();
         // the members are siblings (`ListFrame`)
         let mut frame = self.list_frame();
         while !matches!(self.current_kind(), TokenKind::BraceClose | TokenKind::Eof) {
-            frame.element(self, members.len());
+            let len = self.stores.runs.enum_member_scratch.len_since(mark);
+            frame.element(self, len);
             // one wire level: the `TSEnumMember` over its initializer
-            members.push(self.nested(1, Self::parse_enum_member)?);
+            let member = self.nested(1, Self::parse_enum_member)?;
+            self.stores.runs.enum_member_scratch.push(member);
 
             // Consume comma if present (trailing comma is allowed)
             if !self.eat(TokenKind::Comma)? {
@@ -694,6 +700,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         let (_, end) = self.current_pos();
         self.expect(&TokenKind::BraceClose)?;
+        let members = flush_run(
+            &mut self.stores.runs.enum_member_scratch,
+            &mut self.stores.runs.enum_members,
+            mark,
+        );
 
         Ok(Statement {
             span: Span::new(start as u32, end as u32),
@@ -701,7 +712,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 &mut self.stores.payloads.enum_decls,
                 TSEnumDeclaration {
                     id,
-                    members: members.into_bump_slice(),
+                    members,
                     r#const: is_const,
                     declare: is_declare,
                 },

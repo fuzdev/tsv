@@ -4,12 +4,12 @@
 
 use crate::ast::{
     ArrayPattern, AssignmentOperator, AssignmentPattern, AstView, ExprId, Expression,
-    ExpressionKind, ObjPropList, ObjectPattern, ObjectPatternProperty, ObjectProperty, Property,
+    ExpressionKind, ObjProp, ObjectPattern, ObjectPatternProperty, ObjectProperty, Property,
     PropertyKind, RestElement, Run,
 };
 use tsv_lang::{Error, Span};
 
-use super::{ExprRet, Parser};
+use super::{ExprRet, Parser, flush_run};
 
 /// Which assignable position `refine_assignable` is converting for — the axis that
 /// decides whether a type-assertion or JSDoc-cast target is allowed, and what a
@@ -55,20 +55,20 @@ pub(in crate::parser) enum AssignableContext {
 /// walk holds no borrow of the stores across its own pushes. The node may be a stored row or a
 /// value the parse never placed; [`CoverHead::of`] reads both.
 #[derive(Clone, Copy)]
-struct CoverHead<'arena> {
+struct CoverHead {
     span: Span,
     /// Whether a for-in/of head's optional-chain target rejects here (answered once).
     for_head_chain: bool,
-    shape: CoverShape<'arena>,
+    shape: CoverShape,
 }
 
 /// The node kinds the conversion distinguishes; see [`Parser::refine_assignable`].
 #[derive(Clone, Copy)]
-enum CoverShape<'arena> {
+enum CoverShape {
     Identifier,
     Member,
     Object {
-        properties: ObjPropList<'arena>,
+        properties: Run<ObjProp>,
         spread_trailing_comma: bool,
     },
     Array {
@@ -93,10 +93,10 @@ enum CoverShape<'arena> {
     Other,
 }
 
-impl<'arena> CoverHead<'arena> {
+impl CoverHead {
     /// Reads `expr` into its pieces, asking the two questions that walk the node's own
     /// subtree here, while the read is free.
-    fn of(view: AstView<'_>, expr: &Expression<'arena>, context: AssignableContext) -> Self {
+    fn of(view: AstView<'_>, expr: &Expression<'_>, context: AssignableContext) -> Self {
         let for_head_chain = matches!(context, AssignableContext::ForHead)
             && expr.skip_type_assertions(view).has_optional_in_chain(view);
         let shape = match &expr.kind {
@@ -184,7 +184,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// pair (a default that is itself a bare assignment, [`Parser::printer_pair`]).
     fn refine_assignable(
         &mut self,
-        head: CoverHead<'arena>,
+        head: CoverHead,
         context: AssignableContext,
     ) -> Result<Option<Expression<'arena>>, Error> {
         let span = head.span;
@@ -276,7 +276,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                         .get(i)
                         .cloned()
                 };
-                let mut properties = self.bvec();
+                let mark = self.stores.runs.pat_prop_scratch.mark();
                 let last_index = source_properties.len().saturating_sub(1);
                 let mut i = 0;
                 while let Some(prop) = property_at(self, i) {
@@ -292,14 +292,20 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                             spread.span.start_usize(),
                         ));
                     }
-                    properties.push(self.object_property_to_pattern(&prop, context)?);
+                    let property = self.object_property_to_pattern(prop, context)?;
+                    self.stores.runs.pat_prop_scratch.push(property);
                     i += 1;
                 }
+                let properties = flush_run(
+                    &mut self.stores.runs.pat_prop_scratch,
+                    &mut self.stores.runs.pat_props,
+                    mark,
+                );
 
                 Ok(Some(Expression {
                     span,
                     kind: ExpressionKind::ObjectPattern(ObjectPattern {
-                        properties: properties.into_bump_slice(),
+                        properties,
                         optional: false,
                         type_annotation: None,
                         decorators: None,
@@ -718,7 +724,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Convert an object property to a pattern property
     fn object_property_to_pattern(
         &mut self,
-        prop: &ObjectProperty,
+        prop: ObjectProperty,
         context: AssignableContext,
     ) -> Result<ObjectPatternProperty, Error> {
         match prop {

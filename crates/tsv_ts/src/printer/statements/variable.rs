@@ -894,14 +894,14 @@ impl<'a> Printer<'a> {
     /// the `;` and the gap before it, so there is no terminator here to hand a policy to.
     pub(crate) fn build_embedded_variable_declaration_doc(
         &self,
-        decl: &ast::VariableDeclaration<'_>,
+        decl: &ast::VariableDeclaration,
     ) -> DocId {
         self.build_variable_declaration_doc(decl, None)
     }
 
     pub(in crate::printer) fn build_variable_declaration_doc(
         &self,
-        decl: &ast::VariableDeclaration<'_>,
+        decl: &ast::VariableDeclaration,
         terminator: Option<TerminatorGap>,
     ) -> DocId {
         let d = self.d();

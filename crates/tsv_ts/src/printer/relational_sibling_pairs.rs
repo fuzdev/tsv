@@ -702,7 +702,7 @@ impl<'a> Printer<'a> {
     #[inline]
     pub(in crate::printer) fn region_param_is_bare(
         &self,
-        arrow: &ArrowFunctionExpression<'_>,
+        arrow: &ArrowFunctionExpression,
         arrow_span: Span,
     ) -> bool {
         arrow.params_start.is_none()

@@ -8,8 +8,8 @@ use tsv_lang::{Comment, Span};
 
 use super::{
     ArrayPattern, ArrowFnId, AssignmentPattern, BlockStatement, ClassExprId, Expr, ExprId,
-    FnExprId, Identifier, Literal, MetaPropId, ObjPropList, ObjectPattern, PrivateIdentifier,
-    QuasiList, RestElement, Run, TSParameterProperty, TSTypeAnnotation, TSTypeParameterDeclaration,
+    FnExprId, Identifier, Literal, MetaPropId, ObjProp, ObjectPattern, PrivateIdentifier, Quasi,
+    RestElement, Run, TSParameterProperty, TSTypeAnnotation, TSTypeParameterDeclaration,
     TSTypeParameterInstantiation, TaggedTplId, TyId,
 };
 
@@ -30,7 +30,7 @@ pub enum ExpressionKind<'arena> {
     Literal(Literal<'arena>),
     Identifier(Identifier<'arena>),
     PrivateIdentifier(PrivateIdentifier<'arena>),
-    ObjectExpression(ObjectExpression<'arena>),
+    ObjectExpression(ObjectExpression),
     ArrayExpression(ArrayExpression),
     UnaryExpression(UnaryExpression),
     UpdateExpression(UpdateExpression),
@@ -58,7 +58,7 @@ pub enum ExpressionKind<'arena> {
     FunctionExpression(FnExprId),
     ClassExpression(ClassExprId),
     SpreadElement(SpreadElement),
-    TemplateLiteral(TemplateLiteral<'arena>),
+    TemplateLiteral(TemplateLiteral),
     TaggedTemplateExpression(TaggedTplId),
     AwaitExpression(AwaitExpression),
     YieldExpression(YieldExpression),
@@ -68,9 +68,9 @@ pub enum ExpressionKind<'arena> {
     Super(Super),
     // Assignment and patterns
     AssignmentExpression(AssignmentExpression),
-    ObjectPattern(ObjectPattern<'arena>),
-    ArrayPattern(ArrayPattern<'arena>),
-    AssignmentPattern(AssignmentPattern<'arena>),
+    ObjectPattern(ObjectPattern),
+    ArrayPattern(ArrayPattern),
+    AssignmentPattern(AssignmentPattern),
     RestElement(RestElement),
     // TypeScript type assertions
     TSTypeAssertion(TSTypeAssertion),
@@ -129,7 +129,7 @@ impl<'arena> Expression<'arena> {
 
     /// Wrap a [`TemplateLiteral`] (see [`Expression::from_identifier`]).
     #[inline]
-    pub fn from_template_literal(template: TemplateLiteral<'arena>) -> Self {
+    pub fn from_template_literal(template: TemplateLiteral) -> Self {
         Self {
             span: template.span,
             kind: ExpressionKind::TemplateLiteral(template),
@@ -402,8 +402,8 @@ impl<'arena> ParenthesizedExpression {
 }
 
 #[derive(Debug, Clone)]
-pub struct ObjectExpression<'arena> {
-    pub properties: ObjPropList<'arena>,
+pub struct ObjectExpression {
+    pub properties: Run<ObjProp>,
     /// `true` when a trailing comma follows a final spread property (`{...a,}`).
     /// Valid in an object *literal*, but a syntax error once the literal is
     /// refined to an object pattern — the grammar's rest property admits no
@@ -857,9 +857,9 @@ pub struct ConditionalExpression {
 /// - Expression body: `x => x + 1` (body is Expression)
 /// - Block body: `x => { return x + 1; }` (body is BlockStatement)
 #[derive(Debug, Clone)]
-pub struct ArrowFunctionExpression<'arena> {
+pub struct ArrowFunctionExpression {
     /// Type parameters (TypeScript generics): `<T>() => ...`
-    pub type_parameters: Option<TSTypeParameterDeclaration<'arena>>,
+    pub type_parameters: Option<TSTypeParameterDeclaration>,
     /// Function parameters (Identifier, ArrayPattern, ObjectPattern, or AssignmentPattern for defaults)
     pub params: Run<Expr>,
     pub body: ArrowFunctionBody,
@@ -911,7 +911,7 @@ pub struct FunctionExpression<'arena> {
     /// Optional function name (for named function expressions)
     pub id: Option<Identifier<'arena>>,
     /// Type parameters (TypeScript generics): `function<T>() {}`
-    pub type_parameters: Option<TSTypeParameterDeclaration<'arena>>,
+    pub type_parameters: Option<TSTypeParameterDeclaration>,
     /// Function parameters (Identifier, ArrayPattern, ObjectPattern, or AssignmentPattern for defaults)
     pub params: Run<Expr>,
     /// Return type annotation (e.g., `: number` in `function fn(): number {}`)
@@ -997,8 +997,8 @@ pub struct Property {
 /// - quasis: ["a ", " c ", " e"]
 /// - expressions: [b, d]
 #[derive(Debug, Clone)]
-pub struct TemplateLiteral<'arena> {
-    pub quasis: QuasiList<'arena>,
+pub struct TemplateLiteral {
+    pub quasis: Run<Quasi>,
     pub expressions: Run<ExprId>,
     pub span: Span,
 }
@@ -1101,10 +1101,10 @@ impl<'arena> TemplateElement<'arena> {
 /// When the tag has type arguments (e.g., `tag<T>\`content\``), they are stored
 /// separately rather than wrapping the tag in `TSInstantiationExpression`.
 #[derive(Debug, Clone)]
-pub struct TaggedTemplateExpression<'arena> {
+pub struct TaggedTemplateExpression {
     pub tag: ExprId,
     pub type_arguments: Option<TSTypeParameterInstantiation>,
-    pub quasi: TemplateLiteral<'arena>,
+    pub quasi: TemplateLiteral,
 }
 
 /// Await expression: `await promise`

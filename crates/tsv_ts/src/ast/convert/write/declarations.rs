@@ -256,7 +256,7 @@ fn write_implements_field(
 }
 
 /// Emits a `ClassBody` node (dispatching each `ClassMember`).
-fn write_class_body(w: &mut JsonWriter, body: &ast::ClassBody<'_>, ctx: &Ctx<'_>) {
+fn write_class_body(w: &mut JsonWriter, body: &ast::ClassBody, ctx: &Ctx<'_>) {
     node_header(w, "ClassBody", body.span, ctx);
     w.raw(",\"body\":");
     write_array(w, ctx.view.class_members(body.body), |w, m| match m {
@@ -459,11 +459,7 @@ fn write_method_definition(w: &mut JsonWriter, method: &ast::MethodDefinition<'_
 /// `override?`, `static` — see `write_modifiers_in_source_order`), `computed`,
 /// `key`, `optional?`, `definite?`, `typeAnnotation?`, `value` (nullable),
 /// `decorators?` (attached to the finished member, so they serialize last).
-fn write_property_definition(
-    w: &mut JsonWriter,
-    prop: &ast::PropertyDefinition<'_>,
-    ctx: &Ctx<'_>,
-) {
+fn write_property_definition(w: &mut JsonWriter, prop: &ast::PropertyDefinition, ctx: &Ctx<'_>) {
     node_header(w, "PropertyDefinition", prop.span, ctx);
     let mut mods = [
         prop.declare.then_some(MemberModifier {
@@ -520,7 +516,7 @@ fn write_property_definition(
 /// space).
 pub(super) fn write_type_parameter_declaration(
     w: &mut JsonWriter,
-    params: &ast::TSTypeParameterDeclaration<'_>,
+    params: &ast::TSTypeParameterDeclaration,
     ctx: &Ctx<'_>,
 ) {
     node_header(w, "TSTypeParameterDeclaration", params.span, ctx);

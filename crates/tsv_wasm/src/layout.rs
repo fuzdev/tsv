@@ -15,7 +15,7 @@ use tsv_ts::Error;
 use tsv_ts::ast::{
     Expr, ExprId, Expression, ExpressionKind, ObjectPatternProperty, ObjectProperty, Property,
     Statement, StatementKind, StmtId, SwitchCase, TSType, TSTypeAnnotation,
-    TSTypeParameterInstantiation, Ty, TyId, VariableDeclarator,
+    TSTypeParameterDeclaration, TSTypeParameterInstantiation, Ty, TyId, VariableDeclarator,
 };
 
 // `DocContext` rides inline in `DocNode::WithContext`; see its native pin in `tsv_lang`
@@ -40,6 +40,9 @@ const _: () = assert!(size_of::<TSType<'static>>() == 56);
 const _: () = assert!(size_of::<Option<TSTypeAnnotation>>() == size_of::<TSTypeAnnotation>());
 const _: () = assert!(
     size_of::<Option<TSTypeParameterInstantiation>>() == size_of::<TSTypeParameterInstantiation>()
+);
+const _: () = assert!(
+    size_of::<Option<TSTypeParameterDeclaration>>() == size_of::<TSTypeParameterDeclaration>()
 );
 // The list elements and their shared `Property` payload, as the same native pins hold them.
 const _: () = assert!(size_of::<Property>() == 20);

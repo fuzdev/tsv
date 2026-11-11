@@ -14,8 +14,8 @@
 //! allocation counts one, a flushed list counts its length. A list of references reads
 //! `Id<T> (ids)` and an `Option` of one `Option<Id<T>> (ids)` (references read the same way); those are id lists, not rows of
 //! `T`, whose nodes are counted where they were allocated. A pattern is an `Expression` row,
-//! except an array pattern's elements, which are a by-value list and read `Option<Expression>`
-//! (a hole is a row there, and an element is not an `Expression` row).
+//! and an array pattern's elements an id list with holes, `Option<Id<Expr>> (ids)`, where a
+//! hole is a row too.
 //!
 //! - `minted`: every row placed, whatever became of it.
 //! - `abandoned`: minted inside a parse a rewind threw away (TypeScript's checkpoint
@@ -46,8 +46,9 @@
 //!   property's key and value). Informational, inside `live`.
 //! - `scratch_peak`: the largest total of open list prefixes of this type at any moment,
 //!   maximum over files, and the same per source byte (summed per-file peaks over bytes).
-//!   Counted for lists built in the arena (the census's `BumpVec`) and on a store's scratch
-//!   (`ListBuf`: the expression, statement and type id lists, the parameter value runs).
+//!   Counted on every store's scratch (`ListBuf`: the expression, statement and type id
+//!   lists, the parameter value runs, the lists built by value) and for the comment lists
+//!   built in the arena (the census's `BumpVec`).
 //! - `wire` / `delta`: the wire's count of the node named like the row, when the wire has
 //!   one, and `live - wire`. Rows with no wire name (`Expression`, `Statement`, `TSType`,
 //!   `ObjectProperty`, the id lists) leave it blank, and a row whose wire name is shared by a

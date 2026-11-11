@@ -2,7 +2,7 @@
 
 use crate::ast::*;
 use crate::lexer::{KeywordKind, TokenKind};
-use crate::parser::push_row;
+use crate::parser::{flush_run, push_row};
 use tsv_lang::{Error, Span};
 
 use super::super::{Parser, RootEnd};
@@ -557,25 +557,32 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // The clauses stand past the discriminant's `) {`: its `<` regions do not reach
         // their tests (`Parser::lt_regions_statement_base`).
         self.reset_lt_region_for_statement();
-        let mut cases = self.bvec();
+        let mark = self.stores.runs.case_scratch.mark();
 
         // the cases are siblings (`ListFrame`)
         let mut frame = self.list_frame();
         while !matches!(self.current_kind(), TokenKind::BraceClose | TokenKind::Eof) {
-            frame.element(self, cases.len());
+            let len = self.stores.runs.case_scratch.len_since(mark);
+            frame.element(self, len);
             // one wire level: the `SwitchCase` (the depth limit's count)
-            cases.push(self.nested(1, Self::parse_switch_case)?);
+            let case = self.nested(1, Self::parse_switch_case)?;
+            self.stores.runs.case_scratch.push(case);
         }
         frame.close(self);
 
         let (_, end) = self.current_pos();
         self.expect(&TokenKind::BraceClose)?;
+        let cases = flush_run(
+            &mut self.stores.runs.case_scratch,
+            &mut self.stores.runs.cases,
+            mark,
+        );
 
         Ok(Statement {
             span: Span::new(start as u32, end as u32),
             kind: StatementKind::SwitchStatement(SwitchStatement {
                 discriminant,
-                cases: cases.into_bump_slice(),
+                cases,
             }),
         })
     }

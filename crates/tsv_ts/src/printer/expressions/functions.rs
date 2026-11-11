@@ -210,9 +210,9 @@ fn ternary_body_parens_group_spaced(d: &DocArena, body: DocId) -> DocId {
 /// short would leave a region unclaimed by either, which is a DROPPED comment.
 fn walk_arrow_chain<'a>(
     view: AstView<'a>,
-    head: &'a ast::ArrowFunctionExpression<'a>,
+    head: &'a ast::ArrowFunctionExpression,
     head_span: Span,
-    mut visit: impl FnMut(&'a ast::ArrowFunctionExpression<'a>, Span, Option<u32>),
+    mut visit: impl FnMut(&'a ast::ArrowFunctionExpression, Span, Option<u32>),
 ) -> &'a ast::ArrowFunctionBody {
     let mut current = head;
     let mut current_span = head_span;
@@ -285,7 +285,7 @@ fn is_huggable_pattern(view: AstView<'_>, expr: &ast::Expression<'_>) -> bool {
 /// expand-last-arg hug gate, `arrow_token + "=>".len()` everywhere else. The `=>` token's own
 /// bytes can hold no comment, so both ranges held the same comments and the drift stayed
 /// invisible — which is the argument for not carrying two of them, not for tolerating it.
-pub(in crate::printer) fn arrow_token_end(arrow: &ast::ArrowFunctionExpression<'_>) -> u32 {
+pub(in crate::printer) fn arrow_token_end(arrow: &ast::ArrowFunctionExpression) -> u32 {
     arrow.arrow_token + "=>".len() as u32
 }
 
@@ -301,7 +301,7 @@ pub(in crate::printer) fn arrow_token_end(arrow: &ast::ArrowFunctionExpression<'
 /// duplicate owned-comment claim; see the ⚠️ there.
 fn bare_param_sharing_arrow_start(
     view: AstView<'_>,
-    arrow: &ast::ArrowFunctionExpression<'_>,
+    arrow: &ast::ArrowFunctionExpression,
     span: Span,
 ) -> Option<u32> {
     if arrow.params_start.is_some() {
@@ -345,7 +345,7 @@ fn bare_param_sharing_arrow_start(
 /// the question *is* stable. The two disjuncts below are exactly that split.
 pub(in crate::printer) fn arrow_signature_has_breaking_comments(
     printer: &Printer<'_>,
-    arrow: &ast::ArrowFunctionExpression<'_>,
+    arrow: &ast::ArrowFunctionExpression,
     span: Span,
 ) -> bool {
     // `arrow_token` is the `=>`, captured by the parser for exactly this kind of question.
@@ -470,7 +470,7 @@ pub(in crate::printer) fn function_signature_has_breaking_comments(
 /// parameters.
 fn arrow_signature_will_break(
     printer: &Printer<'_>,
-    arrow: &ast::ArrowFunctionExpression<'_>,
+    arrow: &ast::ArrowFunctionExpression,
     span: Span,
 ) -> bool {
     let d = printer.d();
@@ -718,7 +718,7 @@ fn sole_param_object_type<'a>(
     params: &'a [ast::Expression<'a>],
     open: Option<u32>,
     close: impl FnOnce() -> Option<u32>,
-) -> Option<&'a ast::TSTypeLiteral<'a>> {
+) -> Option<&'a ast::TSTypeLiteral> {
     let [param] = params else {
         return None;
     };
@@ -980,7 +980,7 @@ fn return_type_hug_brace(printer: &Printer<'_>, ty: &ast::TSType<'_>) -> Option<
 /// callee spelling — so no site can answer it from one half alone.
 pub(in crate::printer) fn arrow_signature_refuses_hug(
     printer: &Printer<'_>,
-    arrow: &ast::ArrowFunctionExpression<'_>,
+    arrow: &ast::ArrowFunctionExpression,
     span: Span,
 ) -> bool {
     arrow_signature_has_breaking_comments(printer, arrow, span)
@@ -1149,7 +1149,7 @@ impl<'a> Printer<'a> {
     /// before its `removeLines`. **On page**: an owned comment occupies the line as well.
     pub(in crate::printer) fn arrow_empty_params_hold_comments(
         &self,
-        arrow: &ast::ArrowFunctionExpression<'_>,
+        arrow: &ast::ArrowFunctionExpression,
     ) -> bool {
         arrow.params.is_empty()
             && arrow
@@ -1539,11 +1539,7 @@ impl<'a> Printer<'a> {
     /// ])
     /// " " + body
     /// ```
-    fn build_arrow_doc_wrapping(
-        &self,
-        arrow: &ast::ArrowFunctionExpression<'_>,
-        span: Span,
-    ) -> DocId {
+    fn build_arrow_doc_wrapping(&self, arrow: &ast::ArrowFunctionExpression, span: Span) -> DocId {
         // Consume the chain context (set by the enclosing assignment / call-arg /
         // binary-operand printer) so only the outermost chain arrow uses it;
         // nested arrows in the chain reset to the default layout.
@@ -1695,7 +1691,7 @@ impl<'a> Printer<'a> {
         &self,
         parts: &mut DocBuf,
         expr: &ast::Expression<'_>,
-        arrow: &ast::ArrowFunctionExpression<'_>,
+        arrow: &ast::ArrowFunctionExpression,
         arrow_span: Span,
         arrow_end: u32,
     ) {
@@ -2133,7 +2129,7 @@ impl<'a> Printer<'a> {
     /// the author broke after, so the two are disjoint by construction.
     fn arrow_hug_body_doc(
         &self,
-        arrow: &ast::ArrowFunctionExpression<'_>,
+        arrow: &ast::ArrowFunctionExpression,
         arrow_span: Span,
         gap_start: u32,
         expr: &ast::Expression<'_>,
@@ -2274,7 +2270,7 @@ impl<'a> Printer<'a> {
     /// of their own.
     fn should_use_arrow_chain_layout(
         &self,
-        arrow: &ast::ArrowFunctionExpression<'_>,
+        arrow: &ast::ArrowFunctionExpression,
         span: Span,
         context: ArrowChainContext,
     ) -> bool {
@@ -2312,7 +2308,7 @@ impl<'a> Printer<'a> {
     /// which between the `<` and the later `>` reads as one generic call, or puts a head's
     /// `=>` past another inside the region, a line tsv's own parse can refuse; so such a chain
     /// takes the ordinary arrow layout, whose body builds through the kept pair.
-    fn chain_holds_region_kept_body(&self, arrow: &ast::ArrowFunctionExpression<'_>) -> bool {
+    fn chain_holds_region_kept_body(&self, arrow: &ast::ArrowFunctionExpression) -> bool {
         if !self.has_relational_sibling_pairs.get() {
             return false;
         }
@@ -2361,7 +2357,7 @@ impl<'a> Printer<'a> {
     /// [`Self::range_has_layout_stable_break_forcing_comment`].
     fn chain_comment_outside_emitted_regions(
         &self,
-        head: &ast::ArrowFunctionExpression<'_>,
+        head: &ast::ArrowFunctionExpression,
         head_span: Span,
     ) -> bool {
         if !self.has_comments_to_emit_between(head_span.start, head_span.end) {
@@ -2604,7 +2600,7 @@ impl<'a> Printer<'a> {
     ///   which open onto their own lines when the chain breaks.
     fn build_arrow_chain_doc(
         &self,
-        head: &ast::ArrowFunctionExpression<'_>,
+        head: &ast::ArrowFunctionExpression,
         span: Span,
         context: ArrowChainContext,
     ) -> DocId {
@@ -3131,7 +3127,7 @@ impl<'a> Printer<'a> {
     /// scoped to this list so a nested arrow in the body still claims its own.
     fn build_arrow_params_doc_ungrouped(
         &self,
-        arrow: &ast::ArrowFunctionExpression<'_>,
+        arrow: &ast::ArrowFunctionExpression,
         span: Span,
     ) -> DocId {
         // The trailing boundary stops at `)`, not at the return type or the body:
@@ -3185,7 +3181,7 @@ impl<'a> Printer<'a> {
     pub(crate) fn push_async_arrow_head(
         &self,
         parts: &mut DocBuf,
-        arrow: &ast::ArrowFunctionExpression<'_>,
+        arrow: &ast::ArrowFunctionExpression,
         span: Span,
     ) {
         if !arrow.r#async {
@@ -3219,7 +3215,7 @@ impl<'a> Printer<'a> {
     /// `None` only for a shape the grammar does not produce — a parenthesized list whose
     /// `)` cannot be found, or no parens and no parameter — which is why the readers that
     /// need a concrete offset supply their own floor rather than this returning one.
-    fn arrow_params_end(&self, arrow: &ast::ArrowFunctionExpression<'_>) -> Option<u32> {
+    fn arrow_params_end(&self, arrow: &ast::ArrowFunctionExpression) -> Option<u32> {
         match arrow.params_start {
             // Find closing `)` to get accurate boundary
             Some(params_start) => self.close_paren_after_params(
@@ -3234,7 +3230,7 @@ impl<'a> Printer<'a> {
 
     /// Where an arrow's **signature** ends — after its return type when it has one,
     /// otherwise after its parameter list. The start of the gap before `=>`.
-    fn arrow_signature_end(&self, arrow: &ast::ArrowFunctionExpression<'_>, span: Span) -> u32 {
+    fn arrow_signature_end(&self, arrow: &ast::ArrowFunctionExpression, span: Span) -> u32 {
         if let Some(rt) = &arrow.return_type {
             return rt.span.end;
         }
@@ -3297,7 +3293,7 @@ impl<'a> Printer<'a> {
     /// one.
     fn arrow_trailing_param_comment_forces_break(
         &self,
-        arrow: &ast::ArrowFunctionExpression<'_>,
+        arrow: &ast::ArrowFunctionExpression,
     ) -> bool {
         self.trailing_param_comment_forces_break(
             self.view.run(arrow.params),
@@ -3375,7 +3371,7 @@ impl<'a> Printer<'a> {
     /// question.
     pub(in crate::printer) fn append_pre_arrow_comments(
         &self,
-        arrow: &ast::ArrowFunctionExpression<'_>,
+        arrow: &ast::ArrowFunctionExpression,
         arrow_span: Span,
         sig: DocId,
     ) -> DocId {
@@ -3410,7 +3406,7 @@ impl<'a> Printer<'a> {
     /// where call expressions need to build arrows with conditional parens around the body.
     pub(crate) fn build_arrow_signature_doc(
         &self,
-        arrow: &ast::ArrowFunctionExpression<'_>,
+        arrow: &ast::ArrowFunctionExpression,
         span: Span,
     ) -> DocId {
         let d = self.d();
@@ -3453,7 +3449,7 @@ impl<'a> Printer<'a> {
     /// An arrow signature's tail — its parameters, plus its return type when it has one.
     fn build_arrow_signature_tail_doc(
         &self,
-        arrow: &ast::ArrowFunctionExpression<'_>,
+        arrow: &ast::ArrowFunctionExpression,
         span: Span,
     ) -> DocId {
         let params_doc = self.build_arrow_params_doc_ungrouped(arrow, span);
@@ -3797,7 +3793,7 @@ impl<'a> Printer<'a> {
     /// comment too). `None` for any other gap.
     pub(in crate::printer) fn arrow_gap_glued_block_comment(
         &self,
-        arrow: &ast::ArrowFunctionExpression<'_>,
+        arrow: &ast::ArrowFunctionExpression,
         body: &ast::Expression<'_>,
     ) -> Option<u32> {
         let gap_start = arrow_token_end(arrow);
@@ -3839,7 +3835,7 @@ impl<'a> Printer<'a> {
     /// A body that FITS keeps the glued hug in both formatters (`=> /* c */ ({ a: 1 })`).
     pub(crate) fn arrow_gap_broke_after_run(
         &self,
-        arrow: &ast::ArrowFunctionExpression<'_>,
+        arrow: &ast::ArrowFunctionExpression,
         span: Span,
         sig_end: u32,
         body_start: u32,
@@ -3865,7 +3861,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for an arrow function (simple, non-wrapping version for nested contexts)
     pub(super) fn build_arrow_doc(
         &self,
-        arrow: &ast::ArrowFunctionExpression<'_>,
+        arrow: &ast::ArrowFunctionExpression,
         span: Span,
     ) -> DocId {
         // For nested contexts where we don't want independent wrapping decisions,

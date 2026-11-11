@@ -24,7 +24,7 @@ impl<'a> Printer<'a> {
     /// when the `switch (discriminant) {` line exceeds print width.
     pub(in crate::printer::statements) fn build_switch_statement_doc(
         &self,
-        stmt: &ast::SwitchStatement<'_>,
+        stmt: &ast::SwitchStatement,
         span: Span,
     ) -> DocId {
         let d = self.d();

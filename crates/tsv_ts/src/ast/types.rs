@@ -7,9 +7,8 @@ use crate::lexer::KeywordKind;
 use tsv_lang::Span;
 
 use super::{
-    CtorTypeId, DecoList, Expr, ExprId, IdentName, Identifier, ImportTypeId, IndexParamList,
-    InferTypeId, Literal, MethodKind, QualNameId, QuasiList, Run, TyId, TypeMemberList,
-    TypeParamList, UnaryExpression,
+    CtorTypeId, Deco, Expr, ExprId, IdentName, Identifier, ImportTypeId, IndexParam, InferTypeId,
+    Literal, MethodKind, QualNameId, Quasi, Run, TyId, TypeMember, TypeParam, UnaryExpression,
 };
 
 /// TypeScript type annotation node (e.g., `: number` in `const a: number = 5`)
@@ -55,9 +54,9 @@ pub enum TSType<'arena> {
     /// Type references: `SomeType`, `Array<T>`
     TypeReference(TSTypeReference<'arena>),
     /// Object/type literal: `{ prop: T }`
-    TypeLiteral(TSTypeLiteral<'arena>),
+    TypeLiteral(TSTypeLiteral),
     /// Function types: `(x: T) => U`
-    Function(TSFunctionType<'arena>),
+    Function(TSFunctionType),
     /// Constructor types: `new () => T` or `abstract new <T>() => T`
     Constructor(Span, CtorTypeId),
     /// Tuple types: `[T, U]`
@@ -295,7 +294,7 @@ impl TSKeywordKind {
 #[derive(Debug, Clone)]
 pub struct TSTypeAliasDeclaration<'arena> {
     pub id: Identifier<'arena>,
-    pub type_parameters: Option<TSTypeParameterDeclaration<'arena>>,
+    pub type_parameters: Option<TSTypeParameterDeclaration>,
     pub type_annotation: TyId,
     pub declare: bool,
 }
@@ -306,7 +305,7 @@ pub struct TSTypeAliasDeclaration<'arena> {
 /// Also supports string, number, boolean, null, undefined literals as types.
 #[derive(Debug, Clone)]
 pub enum TSLiteralType<'arena> {
-    TemplateLiteral(TemplateLiteralType<'arena>),
+    TemplateLiteral(TemplateLiteralType),
     /// String literal type: `"hello"`, `'world'`
     String(Literal<'arena>),
     /// Number literal type: `1`, `42.5`
@@ -335,8 +334,8 @@ impl<'arena> TSLiteralType<'arena> {
 /// Similar to TemplateLiteral but interpolations contain types, not expressions.
 /// Used in TypeScript template literal types.
 #[derive(Debug, Clone)]
-pub struct TemplateLiteralType<'arena> {
-    pub quasis: QuasiList<'arena>,
+pub struct TemplateLiteralType {
+    pub quasis: Run<Quasi>,
     pub types: Run<TyId>,
     pub span: Span,
 }
@@ -402,8 +401,8 @@ pub struct TSTypeParameterInstantiation {
 
 /// Type parameter declaration: `<T, U>` (for declaring type parameters)
 #[derive(Debug, Clone)]
-pub struct TSTypeParameterDeclaration<'arena> {
-    pub params: TypeParamList<'arena>,
+pub struct TSTypeParameterDeclaration {
+    pub params: Run<TypeParam>,
     /// Position of trailing comma if present (e.g., `<T,>`)
     pub trailing_comma: Option<u32>,
     pub span: Span,
@@ -491,22 +490,22 @@ pub struct TSTypeParameter<'arena> {
 
 /// Type literal (object type): `{ prop: T; method(): U }`
 #[derive(Debug, Clone)]
-pub struct TSTypeLiteral<'arena> {
-    pub members: TypeMemberList<'arena>,
+pub struct TSTypeLiteral {
+    pub members: Run<TypeMember>,
     pub span: Span,
 }
 
 /// Type element - member of a type literal or interface
 #[derive(Debug, Clone)]
-pub enum TSTypeElement<'arena> {
+pub enum TSTypeElement {
     PropertySignature(TSPropertySignature),
-    MethodSignature(TSMethodSignature<'arena>),
-    CallSignature(TSCallSignatureDeclaration<'arena>),
-    ConstructSignature(TSConstructSignatureDeclaration<'arena>),
-    IndexSignature(TSIndexSignature<'arena>),
+    MethodSignature(TSMethodSignature),
+    CallSignature(TSCallSignatureDeclaration),
+    ConstructSignature(TSConstructSignatureDeclaration),
+    IndexSignature(TSIndexSignature),
 }
 
-impl<'arena> TSTypeElement<'arena> {
+impl TSTypeElement {
     pub fn span(&self) -> Span {
         match self {
             TSTypeElement::PropertySignature(p) => p.span,
@@ -558,7 +557,7 @@ pub struct TSPropertySignature {
 
 /// Method signature: `method(): T` or `method<T>(x: T): T` or `get x(): T` or `set x(v: T)`
 #[derive(Debug, Clone)]
-pub struct TSMethodSignature<'arena> {
+pub struct TSMethodSignature {
     pub key: ExprId,
     pub computed: bool,
     pub optional: bool,
@@ -567,7 +566,7 @@ pub struct TSMethodSignature<'arena> {
     pub readonly: bool,
     /// Method kind: method, get, or set (for accessor signatures in type literals)
     pub kind: MethodKind,
-    pub type_parameters: Option<TSTypeParameterDeclaration<'arena>>,
+    pub type_parameters: Option<TSTypeParameterDeclaration>,
     pub params: Run<Expr>,
     pub return_type: Option<TSTypeAnnotation>,
     pub span: Span,
@@ -575,8 +574,8 @@ pub struct TSMethodSignature<'arena> {
 
 /// Call signature: `(): T` or `<T>(): T` or `(x: A): T`
 #[derive(Debug, Clone)]
-pub struct TSCallSignatureDeclaration<'arena> {
-    pub type_parameters: Option<TSTypeParameterDeclaration<'arena>>,
+pub struct TSCallSignatureDeclaration {
+    pub type_parameters: Option<TSTypeParameterDeclaration>,
     pub params: Run<Expr>,
     pub return_type: Option<TSTypeAnnotation>,
     pub span: Span,
@@ -584,8 +583,8 @@ pub struct TSCallSignatureDeclaration<'arena> {
 
 /// Construct signature: `new (): T` or `new <T>(): T` or `new (x: A): T`
 #[derive(Debug, Clone)]
-pub struct TSConstructSignatureDeclaration<'arena> {
-    pub type_parameters: Option<TSTypeParameterDeclaration<'arena>>,
+pub struct TSConstructSignatureDeclaration {
+    pub type_parameters: Option<TSTypeParameterDeclaration>,
     pub params: Run<Expr>,
     pub return_type: Option<TSTypeAnnotation>,
     pub span: Span,
@@ -595,13 +594,13 @@ pub struct TSConstructSignatureDeclaration<'arena> {
 /// type annotation is optional — a typeless form is a deferred tsc checker error
 /// (TS1021), not a parse error; acorn parses it and omits `typeAnnotation`).
 #[derive(Debug, Clone)]
-pub struct TSIndexSignature<'arena> {
-    pub parameters: IndexParamList<'arena>,
+pub struct TSIndexSignature {
+    pub parameters: Run<IndexParam>,
     pub type_annotation: Option<TSTypeAnnotation>,
     /// Decorators in front of a class index signature (`@a [k: string]: T;`).
     /// No decorator grammar reaches one (tsc's checker reports TS1206); acorn keeps
     /// the list and tsv defers the error. Always `None` in a type literal or interface.
-    pub decorators: Option<DecoList<'arena>>,
+    pub decorators: Option<Run<Deco>>,
     pub is_static: bool,
     pub readonly: bool,
     pub span: Span,
@@ -609,8 +608,8 @@ pub struct TSIndexSignature<'arena> {
 
 /// Function type: `(x: T) => U` or `<T>(x: T) => U`
 #[derive(Debug, Clone)]
-pub struct TSFunctionType<'arena> {
-    pub type_parameters: Option<TSTypeParameterDeclaration<'arena>>,
+pub struct TSFunctionType {
+    pub type_parameters: Option<TSTypeParameterDeclaration>,
     pub params: Run<Expr>,
     // Inline by value rather than `&'arena`: `TSTypeAnnotation` is a span and the id of
     // its type's row, held inline everywhere else (`Option<TSTypeAnnotation>`), so a
@@ -622,9 +621,9 @@ pub struct TSFunctionType<'arena> {
 
 /// Constructor type: `new () => T` or `abstract new <T>() => T`
 #[derive(Debug, Clone)]
-pub struct TSConstructorType<'arena> {
+pub struct TSConstructorType {
     pub abstract_: bool,
-    pub type_parameters: Option<TSTypeParameterDeclaration<'arena>>,
+    pub type_parameters: Option<TSTypeParameterDeclaration>,
     pub params: Run<Expr>,
     // Inline by value — see `TSFunctionType.return_type`.
     pub return_type: TSTypeAnnotation,

@@ -1516,7 +1516,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // text — accepted every malformed head (`fn(a b)`, `fn(,,)`, `fn<T extends>()`) and
         // was lossy twice over: the wire emits no parameters at all, and the printer
         // reflowed the kept text.
-        let mut type_parameters: Option<tsv_ts::ast::TSTypeParameterDeclaration<'arena>> = None;
+        let mut type_parameters: Option<tsv_ts::ast::TSTypeParameterDeclaration> = None;
         let mut parameters: tsv_ts::ast::Run<tsv_ts::ast::Expr> = tsv_ts::ast::Run::EMPTY;
         if type_params_raw.is_some() || !params_str.trim_matches(is_svelte_ws).is_empty() {
             // The head runs from where the signature begins (`<` or `(`) through the `)`.

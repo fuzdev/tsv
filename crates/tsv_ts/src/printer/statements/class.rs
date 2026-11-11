@@ -272,7 +272,7 @@ impl<'a> Printer<'a> {
     /// (`body_prettier_ignore_head_prettier_divergence`).
     pub(in crate::printer) fn build_class_body_doc(
         &self,
-        body: &ast::ClassBody<'_>,
+        body: &ast::ClassBody,
         frozen: Option<Span>,
     ) -> DocId {
         let d = self.d();
@@ -350,7 +350,7 @@ impl<'a> Printer<'a> {
     /// the `static`/`readonly` modifiers and every in-bracket comment gap) and
     /// appends the trailing `;`, matching the interface caller. An own-line comment
     /// in the value-type→`;` gap defers past the `;` (prettier).
-    fn build_index_signature_doc(&self, sig: &ast::TSIndexSignature<'_>) -> DocId {
+    fn build_index_signature_doc(&self, sig: &ast::TSIndexSignature) -> DocId {
         let mut deferred = DocBuf::new();
         let member = self.build_index_signature_member_doc(sig, &mut deferred);
         self.build_member_with_semicolon_doc(member, deferred)
@@ -363,7 +363,7 @@ impl<'a> Printer<'a> {
     // and its `in_program_or_block=false` carve-out) — a second such divergent
     // property would need a second bolt-on. Worth a real `StaticBlock`-native path
     // (or an explicit node-kind tag) if that happens.
-    fn build_static_block_doc(&self, block: &ast::StaticBlock<'_>) -> DocId {
+    fn build_static_block_doc(&self, block: &ast::StaticBlock) -> DocId {
         let d = self.d();
         // Decorators (inline or own-line as authored, like any member's). The block's
         // own span opens at its first decorator, so the `BlockStatement` wrapper starts
@@ -421,7 +421,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for a property definition
-    fn build_property_definition_doc(&self, prop: &ast::PropertyDefinition<'_>) -> DocId {
+    fn build_property_definition_doc(&self, prop: &ast::PropertyDefinition) -> DocId {
         let key = self.view.expr(prop.key);
         let d = self.d();
         let mut parts = smallvec![];

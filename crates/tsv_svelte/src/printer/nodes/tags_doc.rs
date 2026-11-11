@@ -74,7 +74,7 @@ impl<'a> Printer<'a> {
     /// the same [`Printer::trailing_comment_docs`] every sibling tag uses, and the `;`
     /// goes after it. Cataloged as
     /// [declaration_terminator_comment](../../../../../tests/fixtures/svelte/tags/declaration/declaration_terminator_comment_prettier_divergence/).
-    pub(super) fn build_declaration_tag_doc(&self, tag: &ast::DeclarationTag<'_>) -> DocId {
+    pub(super) fn build_declaration_tag_doc(&self, tag: &ast::DeclarationTag) -> DocId {
         let d = self.d();
         let decl = &tag.declaration;
         // The gap is named by `tsv_ts`, not spelled here: it is the same range the statement

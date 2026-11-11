@@ -21,8 +21,8 @@ impl<'a> Printer<'a> {
     /// Shared by the import declaration and the two re-export hosts
     /// (`export { … } from …` and `export * from …`). `attributes` is `None`
     /// when there is no `with` clause (nothing emitted) and `Some(_)` when one
-    /// is present — `Some([])` emits an empty `with {}` (preserved to match
-    /// acorn/prettier). `source_end` is the byte offset just past the source
+    /// is present — `Some` of an empty run emits an empty `with {}` (preserved
+    /// to match acorn/prettier). `source_end` is the byte offset just past the source
     /// string literal — where the `with` keyword search begins; `stmt_end` is
     /// the declaration's span end (the `;`). PR #17329 (prettier 3.7): break
     /// attributes across lines when long.

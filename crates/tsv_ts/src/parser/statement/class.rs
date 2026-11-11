@@ -1,15 +1,15 @@
 // Class declaration parsing
 
 use crate::ast::{
-    Accessibility, BlockStatement, ClassBody, ClassDeclaration, ClassExpression, ClassMember,
-    DecoList, Decorator, ExportDefaultDeclaration, ExportDefaultValue, ExportKind,
-    ExportNamedDeclaration, ExprId, Expression, ExpressionKind, FunctionExpression, HeritageList,
-    Identifier, Literal, LiteralValue, MethodDefinition, MethodKind, PropertyDefinition,
-    PropertyModifier, Run, Statement, StatementKind, StaticBlock, TSIndexSignature,
-    TSTypeParameterDeclaration, TSTypeParameterInstantiation,
+    Accessibility, BlockStatement, ClassBody, ClassDeclaration, ClassExpression, ClassMember, Deco,
+    Decorator, ExportDefaultDeclaration, ExportDefaultValue, ExportKind, ExportNamedDeclaration,
+    ExprId, Expression, ExpressionKind, FunctionExpression, Heritage, Identifier, Literal,
+    LiteralValue, MethodDefinition, MethodKind, PropertyDefinition, PropertyModifier, Run,
+    Statement, StatementKind, StaticBlock, TSIndexSignature, TSTypeParameterDeclaration,
+    TSTypeParameterInstantiation,
 };
 use crate::lexer::{KeywordKind, TokenKind};
-use crate::parser::{push_row, push_spanned};
+use crate::parser::{flush_run, push_row, push_spanned};
 use crate::printer::ParenContext;
 use tsv_lang::{Error, Span};
 
@@ -38,9 +38,9 @@ pub(in crate::parser) enum DecoratorListKind {
 /// markers. `parse_class_member` builds this, then dispatches to
 /// `finish_method_member` / `finish_property_member`.
 #[expect(clippy::struct_excessive_bools)] // independent modifier flags, not a state machine
-struct ClassMemberHeader<'arena> {
+struct ClassMemberHeader {
     start: usize,
-    decorators: DecoList<'arena>,
+    decorators: Run<Deco>,
     accessibility: Option<Accessibility>,
     is_static: bool,
     is_declare: bool,
@@ -60,7 +60,7 @@ struct ClassMemberHeader<'arena> {
     /// recoverable from `key`, and nothing else consumes it.
     name_is_constructor: bool,
     modifier: PropertyModifier,
-    type_parameters: Option<TSTypeParameterDeclaration<'arena>>,
+    type_parameters: Option<TSTypeParameterDeclaration>,
 }
 
 /// Where an `export` keyword sits relative to a decorated class's decorator run.
@@ -86,11 +86,11 @@ pub(in crate::parser) enum DecoratedClassExport {
 /// expression nodes to wrap. The fields are the two nodes' shared ones, by name.
 struct ClassHead<'arena> {
     id: Option<Identifier<'arena>>,
-    type_parameters: Option<TSTypeParameterDeclaration<'arena>>,
+    type_parameters: Option<TSTypeParameterDeclaration>,
     super_class: Option<ExprId>,
     super_type_parameters: Option<TSTypeParameterInstantiation>,
-    implements: HeritageList<'arena>,
-    body: ClassBody<'arena>,
+    implements: Run<Heritage>,
+    body: ClassBody,
 }
 
 impl<'a, 'arena> Parser<'a, 'arena> {
@@ -203,7 +203,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                         &mut self.stores.payloads.export_nameds,
                         ExportNamedDeclaration {
                             declaration: Some(class_decl),
-                            specifiers: &[],
+                            specifiers: Run::EMPTY,
                             source: None,
                             attributes: None,
                             export_kind,
@@ -236,7 +236,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(super) fn finish_decorated_class(
         &mut self,
         deco_start: usize,
-        decorators: crate::parser::BumpVec<'arena, Decorator>,
+        decorators: Run<Deco>,
         export: DecoratedClassExport,
     ) -> Result<ClassDeclaration<'arena>, Error> {
         // `export default class {}` is the one name-optional decorated form.
@@ -303,15 +303,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             )?
         };
         // Always a `Some`: both callers dispatch on `TokenKind::At`, so the run is
-        // non-empty. `None` and `Some(&[])` are different wire shapes — the field is
-        // omitted for the first and emitted as `[]` for the second — so folding an empty
-        // run to `None` here would be a claim about a case that cannot arrive; see
+        // non-empty. `None` and `Some(Run::EMPTY)` are different wire shapes — the field
+        // is omitted for the first and emitted as `[]` for the second — so folding an
+        // empty run to `None` here would be a claim about a case that cannot arrive; see
         // `parse_class_expression_from`, which states the same rule for its own entry.
         debug_assert!(
             !decorators.is_empty(),
             "a decorated class is only reached at a `@`"
         );
-        class.decorators = Some(decorators.into_bump_slice());
+        class.decorators = Some(decorators);
         // The class span covers its decorators — except for an ambient class behind an
         // intervening `export`, where acorn anchors the declaration at its own
         // `declare` and leaves the decorators outside the span (`@dec export declare
@@ -361,7 +361,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(super) fn finish_decorated_class_expression(
         &mut self,
         start: usize,
-        decorators: crate::parser::BumpVec<'arena, Decorator>,
+        decorators: Run<Deco>,
         r#abstract: bool,
     ) -> Result<ExprRet, Error> {
         if r#abstract {
@@ -374,7 +374,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // The run is non-empty — this is only reached at a `@` — so it is always a
         // `Some`. `start` is that first `@`, so the class node's span covers it.
-        self.parse_class_expression_from(start, Some(decorators.into_bump_slice()), r#abstract)
+        self.parse_class_expression_from(start, Some(decorators), r#abstract)
     }
 
     /// Parse a list of decorators: `@dec1 @dec2 ...`
@@ -398,7 +398,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(in crate::parser) fn parse_decorators(
         &mut self,
         kind: DecoratorListKind,
-    ) -> Result<crate::parser::BumpVec<'arena, Decorator>, Error> {
+    ) -> Result<Run<Deco>, Error> {
         match kind {
             DecoratorListKind::Class => self.with_strict_class_scope(Self::parse_decorator_run),
             DecoratorListKind::Parameter => self.parse_decorator_run(),
@@ -408,14 +408,19 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// The run itself: `@dec` until the `@`s stop. Split out so
     /// [`parse_decorators`](Self::parse_decorators) can hand it to the strict-scope
     /// combinator or call it bare, one spelling either way.
-    fn parse_decorator_run(&mut self) -> Result<crate::parser::BumpVec<'arena, Decorator>, Error> {
-        let mut decorators = self.bvec();
+    fn parse_decorator_run(&mut self) -> Result<Run<Deco>, Error> {
+        let mark = self.stores.runs.decorator_scratch.mark();
 
         while *self.current_kind() == TokenKind::At {
-            decorators.push(self.parse_decorator()?);
+            let decorator = self.parse_decorator()?;
+            self.stores.runs.decorator_scratch.push(decorator);
         }
 
-        Ok(decorators)
+        Ok(flush_run(
+            &mut self.stores.runs.decorator_scratch,
+            &mut self.stores.runs.decorators,
+            mark,
+        ))
     }
 
     /// Parse a single decorator: `@expression`, where the expression follows the
@@ -548,15 +553,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// built once, in place: a builder that hands a bare `Expression` back for its
     /// caller to fix up makes that caller hold the 64 B value across the push.
     ///
-    /// `None` and `Some(&[])` are **different wire shapes** — the field is omitted
-    /// for the first and emitted as `[]` for the second (`write_decorators_field`) —
-    /// so this takes the caller's answer as given rather than folding an empty slice
+    /// `None` and `Some(Run::EMPTY)` are **different wire shapes** — the field is
+    /// omitted for the first and emitted as `[]` for the second (`write_decorators_field`)
+    /// — so this takes the caller's answer as given rather than folding an empty run
     /// back to `None`. It can: the undecorated entry point passes `None`, and the
     /// decorated one is only reached at a `@`, so its run is never empty.
     fn parse_class_expression_from(
         &mut self,
         start: usize,
-        decorators: Option<DecoList<'arena>>,
+        decorators: Option<Run<Deco>>,
         r#abstract: bool,
     ) -> Result<ExprRet, Error> {
         // Consume 'class' keyword
@@ -622,10 +627,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             let (super_class, super_type_parameters) = p.parse_optional_extends_clause()?;
 
             // Parse optional `implements` clause
-            let implements: HeritageList<'arena> = if p.eat_contextual_keyword("implements")? {
-                p.parse_interface_heritage_list()?.into_bump_slice()
+            let implements: Run<Heritage> = if p.eat_contextual_keyword("implements")? {
+                p.parse_interface_heritage_list()?
             } else {
-                &[]
+                Run::EMPTY
             };
 
             // Parse class body (ambient members share the concrete grammar; see
@@ -715,7 +720,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// forbidden constructs (a method body, a decorator, an initializer) parse
     /// structurally; their early-errors are deferred to diagnostics (see
     /// `parse_class_declaration_inner_with_start`).
-    pub(super) fn parse_class_body(&mut self) -> Result<ClassBody<'arena>, Error> {
+    pub(super) fn parse_class_body(&mut self) -> Result<ClassBody, Error> {
         let (start, _) = self.current_pos();
         self.expect(&TokenKind::BraceOpen)?;
 
@@ -724,7 +729,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // and static blocks all permit `in` even when the class expression sits
         // in a for-header init. A nested for-header inside re-disables it.
         let body = self.with_body_frame(|p| {
-            let mut body = p.bvec();
+            let mark = p.stores.runs.class_member_scratch.mark();
             // the members are siblings (`ListFrame`)
             let mut frame = p.list_frame();
             while !matches!(p.current_kind(), TokenKind::BraceClose | TokenKind::Eof) {
@@ -733,20 +738,25 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 if p.eat(TokenKind::Semicolon)? {
                     continue;
                 }
-                frame.element(p, body.len());
+                let len = p.stores.runs.class_member_scratch.len_since(mark);
+                frame.element(p, len);
                 // one wire level: the member (the depth limit's count)
                 let member = p.nested(1, Self::parse_class_member)?;
-                body.push(member);
+                p.stores.runs.class_member_scratch.push(member);
             }
             frame.close(p);
-            Ok(body)
+            Ok(flush_run(
+                &mut p.stores.runs.class_member_scratch,
+                &mut p.stores.runs.class_members,
+                mark,
+            ))
         })?;
 
         let (_, end) = self.current_pos();
         self.expect(&TokenKind::BraceClose)?;
 
         Ok(ClassBody {
-            body: body.into_bump_slice(),
+            body,
             span: Span::new(start as u32, end as u32),
         })
     }
@@ -813,9 +823,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // decorators too — acorn accepts them and prettier formats the body form; the
         // TS1206 ("Decorators are not valid here") ambient early-error is deferred to
         // the diagnostics layer.
-        let decorators: DecoList<'arena> = self
-            .parse_decorators(DecoratorListKind::Class)?
-            .into_bump_slice();
+        let decorators = self.parse_decorators(DecoratorListKind::Class)?;
 
         // Handle 'declare' contextual keyword - only if followed by a class member name or another modifier
         // Otherwise `declare` itself is the property name: `declare = 1;`
@@ -1136,7 +1144,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     #[inline(always)]
     fn finish_method_member(
         &mut self,
-        header: ClassMemberHeader<'arena>,
+        header: ClassMemberHeader,
     ) -> Result<ClassMember<'arena>, Error> {
         let ClassMemberHeader {
             start,
@@ -1353,7 +1361,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     #[inline(always)]
     fn finish_property_member(
         &mut self,
-        header: ClassMemberHeader<'arena>,
+        header: ClassMemberHeader,
     ) -> Result<ClassMember<'arena>, Error> {
         let ClassMemberHeader {
             start,
@@ -1456,7 +1464,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(in crate::parser) fn parse_class_index_signature(
         &mut self,
         start: usize,
-        decorators: DecoList<'arena>,
+        decorators: Run<Deco>,
         is_static: bool,
         readonly: bool,
     ) -> Result<ClassMember<'arena>, Error> {
@@ -1517,10 +1525,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             return Err(self.error_expected("';'"));
         }
 
-        let mut parameters = self.bvec();
-        parameters.push(parameter);
+        let mark = self.stores.runs.index_param_scratch.mark();
+        self.stores.runs.index_param_scratch.push(parameter);
+        let parameters = flush_run(
+            &mut self.stores.runs.index_param_scratch,
+            &mut self.stores.runs.index_params,
+            mark,
+        );
         Ok(ClassMember::IndexSignature(TSIndexSignature {
-            parameters: parameters.into_bump_slice(),
+            parameters,
             type_annotation: value_type,
             // A decorated index signature is kept: acorn keeps the list on the
             // `TSIndexSignature` and tsc reports TS1206 from its checker, which tsv defers.

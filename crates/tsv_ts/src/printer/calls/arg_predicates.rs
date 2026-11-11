@@ -347,7 +347,7 @@ pub(super) fn is_ternary_arrow_body(body: &Expression<'_>) -> bool {
 /// ([`arrow_body_has_leading_own_line_comment`]).
 pub(super) fn arrow_body_breaks_after_space(
     printer: &Printer<'_>,
-    arrow: &ast::ArrowFunctionExpression<'_>,
+    arrow: &ast::ArrowFunctionExpression,
     body: &Expression<'_>,
 ) -> bool {
     is_ternary_arrow_body(body)
@@ -362,7 +362,7 @@ pub(super) fn arrow_body_breaks_after_space(
 /// `=>` line by it ([`arrow_body_breaks_after_space`] and the lone ternary ladder).
 pub(super) fn arrow_body_has_leading_own_line_comment(
     printer: &Printer<'_>,
-    arrow: &ast::ArrowFunctionExpression<'_>,
+    arrow: &ast::ArrowFunctionExpression,
     body: &Expression<'_>,
 ) -> bool {
     printer

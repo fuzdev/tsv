@@ -99,7 +99,7 @@ pub(in crate::printer) fn is_compound_target_value(expr: &Expression<'_>) -> boo
 /// Whether a [`LiteralRole::CompoundTarget`] object breaks for a nested pattern —
 /// prettier's `shouldBreak` for an `ObjectPattern` (`print/object.js`): some property's
 /// value is directly an object or array pattern. A default (`a: [b] = c`) is not one.
-fn compound_target_object_breaks(view: AstView<'_>, obj: &ast::ObjectExpression<'_>) -> bool {
+fn compound_target_object_breaks(view: AstView<'_>, obj: &ast::ObjectExpression) -> bool {
     view.obj_props(obj.properties).iter().any(|prop| {
         matches!(
             prop,
@@ -118,7 +118,7 @@ impl<'a> Printer<'a> {
     /// Handles comments between properties, blank line preservation, and trailing comments.
     pub(in crate::printer) fn build_object_doc(
         &self,
-        obj: &ast::ObjectExpression<'_>,
+        obj: &ast::ObjectExpression,
         obj_span: Span,
     ) -> DocId {
         self.build_object_doc_as(obj, obj_span, LiteralRole::Expression)
@@ -127,7 +127,7 @@ impl<'a> Printer<'a> {
     /// [`Self::build_object_doc`] in a [`LiteralRole`].
     pub(in crate::printer) fn build_object_doc_as(
         &self,
-        obj: &ast::ObjectExpression<'_>,
+        obj: &ast::ObjectExpression,
         obj_span: Span,
         role: LiteralRole,
     ) -> DocId {
@@ -473,7 +473,7 @@ impl<'a> Printer<'a> {
     /// Produces: `{\n  prop,\n}` with actual hardlines.
     pub(in crate::printer) fn build_object_doc_expanded(
         &self,
-        obj: &ast::ObjectExpression<'_>,
+        obj: &ast::ObjectExpression,
         span: Span,
     ) -> DocId {
         let d = self.d();
@@ -588,11 +588,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Whether `span` lies in some regular property's key→`:` gap.
-    fn comment_in_property_key_colon_gap(
-        &self,
-        obj: &ast::ObjectExpression<'_>,
-        span: Span,
-    ) -> bool {
+    fn comment_in_property_key_colon_gap(&self, obj: &ast::ObjectExpression, span: Span) -> bool {
         self.view
             .obj_props(obj.properties)
             .iter()

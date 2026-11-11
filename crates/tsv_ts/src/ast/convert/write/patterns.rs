@@ -33,7 +33,7 @@ pub(super) fn pattern_header(
 /// Emits a `TemplateLiteral` node. Field order: `expressions`, `quasis`.
 pub(super) fn write_template_literal(
     w: &mut JsonWriter,
-    template: &ast::TemplateLiteral<'_>,
+    template: &ast::TemplateLiteral,
     ctx: &Ctx<'_>,
 ) {
     node_header(w, "TemplateLiteral", template.span, ctx);
@@ -88,7 +88,7 @@ pub(super) fn write_template_element(
 /// (only when true), `typeAnnotation?`, `decorators?` (parameter position).
 pub(super) fn write_object_pattern(
     w: &mut JsonWriter,
-    obj: &ast::ObjectPattern<'_>,
+    obj: &ast::ObjectPattern,
     span: Span,
     ctx: &Ctx<'_>,
 ) {
@@ -220,7 +220,7 @@ fn write_property_value(w: &mut JsonWriter, prop: &ast::Property, ctx: &Ctx<'_>)
 /// quirk widens it to the whole parameter property).
 pub(super) fn write_assignment_pattern(
     w: &mut JsonWriter,
-    pattern: &ast::AssignmentPattern<'_>,
+    pattern: &ast::AssignmentPattern,
     ctx: &Ctx<'_>,
     span: Span,
 ) {

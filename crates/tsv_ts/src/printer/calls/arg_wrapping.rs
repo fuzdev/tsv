@@ -108,7 +108,7 @@ pub(super) fn build_printed_argument_doc(
 /// a layout divergence this shape already had while the comment was being dropped.
 pub(super) fn build_arrow_sig_doc(
     printer: &Printer<'_>,
-    arrow: &ast::ArrowFunctionExpression<'_>,
+    arrow: &ast::ArrowFunctionExpression,
     span: Span,
 ) -> DocId {
     let d = printer.d();
@@ -157,7 +157,7 @@ pub(super) fn build_arrow_sig_doc(
 /// argument broken open ([`build_break_body_ladder`]).
 pub(super) fn build_hugged_arrow_sig_doc(
     printer: &Printer<'_>,
-    arrow: &ast::ArrowFunctionExpression<'_>,
+    arrow: &ast::ArrowFunctionExpression,
     span: Span,
 ) -> Option<DocId> {
     (!arrow_signature_refuses_hug(printer, arrow, span))
@@ -173,7 +173,7 @@ pub(super) fn build_hugged_arrow_sig_doc(
 /// `=>` line takes [`prepend_hugged_arrow_body_comments`] instead.
 pub(super) fn prepend_arrow_body_comments(
     printer: &Printer<'_>,
-    arrow: &ast::ArrowFunctionExpression<'_>,
+    arrow: &ast::ArrowFunctionExpression,
     body_start: u32,
     body_doc: DocId,
 ) -> DocId {
@@ -223,7 +223,7 @@ pub(super) fn prepend_arrow_body_comments(
 /// gap-break state and prints differently — `blanks:audit` found it.
 pub(super) fn prepend_hugged_arrow_body_comments(
     printer: &Printer<'_>,
-    arrow: &ast::ArrowFunctionExpression<'_>,
+    arrow: &ast::ArrowFunctionExpression,
     body_start: u32,
     body_doc: DocId,
 ) -> DocId {
@@ -358,15 +358,12 @@ pub(super) fn classify_chain_arg(view: AstView<'_>, arg: &ast::Expression<'_>) -
 /// grouped signature in a call-argument state while the rest take the flattened one
 /// ([`build_arrow_sig_doc`]). A param-level type annotation does NOT count: it introduces
 /// no break point of its own, so a params-only-typed arrow renders identically either way.
-fn arrow_has_return_or_type_params(arrow: &ast::ArrowFunctionExpression<'_>) -> bool {
+fn arrow_has_return_or_type_params(arrow: &ast::ArrowFunctionExpression) -> bool {
     arrow.return_type.is_some() || arrow.type_parameters.is_some()
 }
 
 /// Classify how an arrow function body should be formatted in chain context.
-fn classify_arrow_body(
-    view: AstView<'_>,
-    arrow: &ast::ArrowFunctionExpression<'_>,
-) -> ChainArgKind {
+fn classify_arrow_body(view: AstView<'_>, arrow: &ast::ArrowFunctionExpression) -> ChainArgKind {
     match &arrow.body {
         ast::ArrowFunctionBody::BlockStatement(_) => ChainArgKind::HugsNaturally,
         ast::ArrowFunctionBody::Expression(expr) => {
@@ -393,7 +390,7 @@ fn classify_arrow_body(
 /// on how deep a chain reaches.
 pub(super) fn could_expand_arrow_chain(
     view: AstView<'_>,
-    arrow: &ast::ArrowFunctionExpression<'_>,
+    arrow: &ast::ArrowFunctionExpression,
 ) -> bool {
     arrow_terminal_expression_body(view, arrow).is_none_or(|body| {
         matches!(
@@ -418,7 +415,7 @@ pub(super) fn could_expand_arrow_chain(
 /// [`arrow_hug_refused_by_comments`] on top: a comment refusal answers "can THIS arm render
 /// the argument", a different question from "would prettier expand it at all", and the gap
 /// break below needs the second one alone.
-fn could_expand_arrow_arg(view: AstView<'_>, arrow: &ast::ArrowFunctionExpression<'_>) -> bool {
+fn could_expand_arrow_arg(view: AstView<'_>, arrow: &ast::ArrowFunctionExpression) -> bool {
     could_expand_arrow_chain(view, arrow)
         || match &arrow.body {
             ast::ArrowFunctionBody::Expression(body) => {
@@ -579,8 +576,8 @@ fn arrow_hug_body_needs_parens(body_expr: &ast::Expression<'_>) -> bool {
 /// terminal's.
 fn terminal_arrow<'a>(
     view: AstView<'a>,
-    arrow: &'a ast::ArrowFunctionExpression<'a>,
-) -> (&'a ast::ArrowFunctionExpression<'a>, Option<Span>) {
+    arrow: &'a ast::ArrowFunctionExpression,
+) -> (&'a ast::ArrowFunctionExpression, Option<Span>) {
     let mut current = arrow;
     let mut span = None;
     loop {
@@ -601,7 +598,7 @@ fn terminal_arrow<'a>(
 /// [`terminal_arrow`] plus the block-vs-expression split.
 fn arrow_terminal_expression_body<'arena>(
     view: AstView<'arena>,
-    arrow: &'arena ast::ArrowFunctionExpression<'arena>,
+    arrow: &'arena ast::ArrowFunctionExpression,
 ) -> Option<&'arena ast::Expression<'arena>> {
     match &terminal_arrow(view, arrow).0.body {
         ast::ArrowFunctionBody::Expression(body) => Some(view.expr(*body)),
@@ -624,7 +621,7 @@ fn arrow_terminal_expression_body<'arena>(
 /// (`expressions/arrow/curried_untyped_call_arg_long` catches exactly that).
 pub(super) fn arrow_body_expands_internally(
     view: AstView<'_>,
-    arrow: &ast::ArrowFunctionExpression<'_>,
+    arrow: &ast::ArrowFunctionExpression,
 ) -> bool {
     arrow_terminal_expression_body(view, arrow).is_some_and(|body| {
         matches!(
@@ -1001,7 +998,7 @@ pub(super) fn arrow_body_tail_has_comments(
 /// which is free — either question implies a comment inside the call's own window.
 pub(super) fn arrow_hug_refused_by_comments(
     printer: &Printer<'_>,
-    arrow: &ast::ArrowFunctionExpression<'_>,
+    arrow: &ast::ArrowFunctionExpression,
     span: Span,
     body_expr: &ast::Expression<'_>,
 ) -> bool {
@@ -1388,7 +1385,7 @@ impl HugArgDocs {
 fn build_arrow_hug_arg_docs(
     printer: &Printer<'_>,
     arg: &ast::Expression<'_>,
-    arrow: &ast::ArrowFunctionExpression<'_>,
+    arrow: &ast::ArrowFunctionExpression,
     build: impl Fn() -> DocId,
 ) -> HugArgDocs {
     let inject = prebuild_expand_last_obj_array_body(printer, Some(arg));
@@ -1418,7 +1415,7 @@ fn build_arrow_hug_arg_docs(
 pub(super) fn build_arrow_hug_printed_doc(
     printer: &Printer<'_>,
     arg: &ast::Expression<'_>,
-    arrow: &ast::ArrowFunctionExpression<'_>,
+    arrow: &ast::ArrowFunctionExpression,
     build: impl FnOnce() -> DocId,
 ) -> DocId {
     // The break-forcing-chain arm is the pair's `None`-injection arm, keyed on the same
@@ -1452,7 +1449,7 @@ pub(super) fn build_single_arrow_hug_doc(
     printer: &Printer<'_>,
     opener: ArgOpener,
     arg: &ast::Expression<'_>,
-    arrow: &ast::ArrowFunctionExpression<'_>,
+    arrow: &ast::ArrowFunctionExpression,
     leading: Option<DocId>,
     build: impl Fn() -> DocId,
 ) -> DocId {
@@ -2564,7 +2561,7 @@ pub(super) fn build_break_body_ladder(
 pub(super) fn build_ternary_arrow_hug_ladder(
     printer: &Printer<'_>,
     opener: ArgOpener,
-    arrow: &ast::ArrowFunctionExpression<'_>,
+    arrow: &ast::ArrowFunctionExpression,
     body_expr: &ast::Expression<'_>,
     sig_doc: DocId,
     body_doc: DocId,
@@ -2646,7 +2643,7 @@ pub(super) fn build_arrow_call_body_states(
     printer: &Printer<'_>,
     opener: ArgOpener,
     arg: &ast::Expression<'_>,
-    arrow: &ast::ArrowFunctionExpression<'_>,
+    arrow: &ast::ArrowFunctionExpression,
     body_expr: &ast::Expression<'_>,
     body_reuse: (u32, DocId),
     printed: impl FnOnce() -> DocId,

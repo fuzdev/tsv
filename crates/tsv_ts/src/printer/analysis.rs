@@ -243,7 +243,7 @@ pub(crate) enum PatternContext {
 /// - In standalone contexts: depth 2+ expands (e.g., {a: {b}} expands)
 pub(crate) fn object_pattern_should_expand(
     view: AstView<'_>,
-    obj: &ast::ObjectPattern<'_>,
+    obj: &ast::ObjectPattern,
     context: PatternContext,
 ) -> bool {
     let depth = pattern_nesting_depth(view, obj);
@@ -260,7 +260,7 @@ pub(crate) fn object_pattern_should_expand(
 /// Depth 1 = simple pattern like {a}
 /// Depth 2 = one level of nesting like {a: {b}}
 /// Depth 3 = two levels of nesting like {a: {b: {c}}}
-fn pattern_nesting_depth(view: AstView<'_>, obj: &ast::ObjectPattern<'_>) -> usize {
+fn pattern_nesting_depth(view: AstView<'_>, obj: &ast::ObjectPattern) -> usize {
     let mut max_depth = 1;
 
     for prop in view.pat_props(obj.properties) {
@@ -293,7 +293,7 @@ fn pattern_nesting_depth(view: AstView<'_>, obj: &ast::ObjectPattern<'_>) -> usi
 }
 
 /// Calculate the maximum nesting depth of an array pattern
-fn array_pattern_nesting_depth(view: AstView<'_>, arr: &ast::ArrayPattern<'_>) -> usize {
+fn array_pattern_nesting_depth(view: AstView<'_>, arr: &ast::ArrayPattern) -> usize {
     let mut max_depth = 1;
 
     for elem in view.opt_list(arr.elements).iter().flatten() {
@@ -320,7 +320,7 @@ fn array_pattern_nesting_depth(view: AstView<'_>, arr: &ast::ArrayPattern<'_>) -
 /// Matches Prettier's `templateLiteralHasNewLines` function
 pub(crate) fn template_literal_has_newlines(
     view: AstView<'_>,
-    template: &ast::TemplateLiteral<'_>,
+    template: &ast::TemplateLiteral,
 ) -> bool {
     view.quasis(template.quasis).iter().any(|q| q.has_newline)
 }

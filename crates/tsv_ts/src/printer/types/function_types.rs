@@ -35,7 +35,7 @@ fn get_type_literal_from_identifier<'a>(
 ) -> Option<(
     &'a ast::Identifier<'a>,
     &'a ast::TSTypeAnnotation,
-    &'a ast::TSTypeLiteral<'a>,
+    &'a ast::TSTypeLiteral,
 )> {
     match &expr.kind {
         ast::ExpressionKind::Identifier(id) => id.type_annotation(view).and_then(|ann| {
@@ -54,7 +54,7 @@ fn get_type_literal_from_identifier<'a>(
 /// Shared between function declarations and function/constructor types.
 pub(in crate::printer) fn type_params_allow_grouping(
     view: AstView<'_>,
-    type_parameters: Option<&ast::TSTypeParameterDeclaration<'_>>,
+    type_parameters: Option<&ast::TSTypeParameterDeclaration>,
 ) -> bool {
     let Some(tp) = type_parameters else {
         return true;
@@ -91,7 +91,7 @@ pub(in crate::printer) fn return_type_triggers_grouping(
 pub(in crate::printer) fn should_group_function_parameters(
     view: AstView<'_>,
     params: &[ast::Expression<'_>],
-    type_parameters: Option<&ast::TSTypeParameterDeclaration<'_>>,
+    type_parameters: Option<&ast::TSTypeParameterDeclaration>,
     return_type: Option<&ast::TSTypeAnnotation>,
     return_type_doc: Option<DocId>,
     d: &DocArena,
@@ -117,7 +117,7 @@ pub(in crate::printer) fn group_params_if_should(
     view: AstView<'_>,
     params_doc: DocId,
     params: &[ast::Expression<'_>],
-    type_parameters: Option<&ast::TSTypeParameterDeclaration<'_>>,
+    type_parameters: Option<&ast::TSTypeParameterDeclaration>,
     return_type: Option<&ast::TSTypeAnnotation>,
     return_type_doc: Option<DocId>,
     d: &DocArena,
@@ -232,7 +232,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn hugged_param_annotation_literal<'t>(
         &self,
         type_ann: &'t ast::TSTypeAnnotation,
-    ) -> Option<&'t ast::TSTypeLiteral<'t>>
+    ) -> Option<&'t ast::TSTypeLiteral>
     where
         'a: 't,
     {
@@ -249,7 +249,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn build_hugged_literal_annotation_doc(
         &self,
         type_ann: &ast::TSTypeAnnotation,
-        type_literal: &ast::TSTypeLiteral<'_>,
+        type_literal: &ast::TSTypeLiteral,
         window_has_comments: bool,
     ) -> DocId {
         let d = self.d();
@@ -517,7 +517,7 @@ impl<'a> Printer<'a> {
     /// Applies `shouldGroupFunctionParameters` when there's 1 param and the
     /// return type is an object type or will break — params are wrapped in
     /// their own group so they stay flat when the outer group breaks.
-    pub(super) fn build_function_type_doc(&self, f: &TSFunctionType<'_>) -> DocId {
+    pub(super) fn build_function_type_doc(&self, f: &TSFunctionType) -> DocId {
         let d = self.d();
         let mut parts = DocBuf::new();
         self.append_type_params_and_signature(
@@ -536,7 +536,7 @@ impl<'a> Printer<'a> {
     fn append_type_params_and_signature(
         &self,
         parts: &mut DocBuf,
-        type_parameters: Option<&ast::TSTypeParameterDeclaration<'_>>,
+        type_parameters: Option<&ast::TSTypeParameterDeclaration>,
         params: &[ast::Expression<'_>],
         return_type: &ast::TSTypeAnnotation,
         span_start: u32,
@@ -564,7 +564,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for a constructor type: `new () => T` or `abstract new <T>() => T`
-    pub(super) fn build_constructor_type_doc(&self, c: &TSConstructorType<'_>) -> DocId {
+    pub(super) fn build_constructor_type_doc(&self, c: &TSConstructorType) -> DocId {
         let d = self.d();
 
         // Built inside-out: each keyword gap OWNS everything after it, because a `//` in
@@ -641,7 +641,7 @@ impl<'a> Printer<'a> {
         params: &[ast::Expression<'_>],
         paren_search_start: u32,
         return_type: &ast::TSTypeAnnotation,
-        type_parameters: Option<&ast::TSTypeParameterDeclaration<'_>>,
+        type_parameters: Option<&ast::TSTypeParameterDeclaration>,
     ) -> [DocId; 2] {
         let d = self.d();
 
@@ -867,7 +867,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn build_signature_params_return_group(
         &self,
         params: &[ast::Expression<'_>],
-        type_parameters: Option<&ast::TSTypeParameterDeclaration<'_>>,
+        type_parameters: Option<&ast::TSTypeParameterDeclaration>,
         return_type: Option<&ast::TSTypeAnnotation>,
         paren_pos: Option<u32>,
     ) -> DocId {
@@ -885,7 +885,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn build_signature_params_return_doc(
         &self,
         params: &[ast::Expression<'_>],
-        type_parameters: Option<&ast::TSTypeParameterDeclaration<'_>>,
+        type_parameters: Option<&ast::TSTypeParameterDeclaration>,
         return_type: Option<&ast::TSTypeAnnotation>,
         paren_pos: Option<u32>,
     ) -> DocId {

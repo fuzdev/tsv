@@ -1386,7 +1386,7 @@ impl<'a> Printer<'a> {
     #[expect(clippy::too_many_arguments)] // one cohesive for-in/of assembly; a bundle would re-thread the same values
     fn build_for_in_of_statement_with_body_doc(
         &self,
-        left: &ast::ForInOfLeft<'_>,
+        left: &ast::ForInOfLeft,
         right: &Expression<'_>,
         body: &Statement<'_>,
         stmt_start: u32,
@@ -1531,7 +1531,7 @@ impl<'a> Printer<'a> {
     /// located, and `close_paren` follows the depth-tracked open paren.
     fn for_in_of_spans(
         &self,
-        left: &ast::ForInOfLeft<'_>,
+        left: &ast::ForInOfLeft,
         right: &Expression<'_>,
         keyword: &str,
         stmt_start: u32,
@@ -1824,7 +1824,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Get the end position of the left side of a for-in/for-of statement
-    fn get_for_in_of_left_end(&self, left: &ast::ForInOfLeft<'_>) -> u32 {
+    fn get_for_in_of_left_end(&self, left: &ast::ForInOfLeft) -> u32 {
         match left {
             ast::ForInOfLeft::VariableDeclaration(decl) => decl.span.end,
             ast::ForInOfLeft::Pattern(expr) => self.view.expr(*expr).span().end,
@@ -1832,7 +1832,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Get the start position of the left side of a for-in/for-of statement
-    fn get_for_in_of_left_start(&self, left: &ast::ForInOfLeft<'_>) -> u32 {
+    fn get_for_in_of_left_start(&self, left: &ast::ForInOfLeft) -> u32 {
         match left {
             ast::ForInOfLeft::VariableDeclaration(decl) => decl.span.start,
             ast::ForInOfLeft::Pattern(expr) => self.view.expr(*expr).span().start,
@@ -1846,7 +1846,7 @@ impl<'a> Printer<'a> {
     /// skips the declaration kind so the keyword→binding gap (`const // c⏎x`) reads
     /// as a header-structural position while the binding pattern's own interior does
     /// not — see `for_in_of_header_gap_comment_forces_break`.
-    fn get_for_in_of_binding_start(&self, left: &ast::ForInOfLeft<'_>) -> u32 {
+    fn get_for_in_of_binding_start(&self, left: &ast::ForInOfLeft) -> u32 {
         match left {
             ast::ForInOfLeft::VariableDeclaration(decl) => self
                 .view
@@ -2061,7 +2061,7 @@ impl<'a> Printer<'a> {
     /// interior gap is emitted by `build_keyword_words_doc`.
     fn build_for_decl_keyword_gap(
         &self,
-        decl: &ast::VariableDeclaration<'_>,
+        decl: &ast::VariableDeclaration,
         binding_start: u32,
         continuation: DocId,
     ) -> DocId {
@@ -2093,7 +2093,7 @@ impl<'a> Printer<'a> {
     /// this is spelled here rather than through [`Printer::build_frozen_expression_doc`]: a
     /// `SequenceExpression` clause prints BARE here (`for (a, b; ;)`), where that builder
     /// re-synthesizes the grouping pair every other position needs.
-    fn build_frozen_init_clause_doc(&self, init: &ast::ForInit<'_>, frozen: Span) -> DocId {
+    fn build_frozen_init_clause_doc(&self, init: &ast::ForInit, frozen: Span) -> DocId {
         let doc = self.build_frozen_node_doc(frozen);
         match init {
             // This clause IS the init; it needs no ambient flag to know it.
@@ -2107,7 +2107,7 @@ impl<'a> Printer<'a> {
         }
     }
 
-    fn build_for_init_doc(&self, init: &ast::ForInit<'_>) -> DocId {
+    fn build_for_init_doc(&self, init: &ast::ForInit) -> DocId {
         let d = self.d();
         // The init clause is `[~In]`: an `in` binary must be parenthesized so it
         // isn't read as the `for (x in y)` separator. Set for the whole init
@@ -2374,7 +2374,7 @@ impl<'a> Printer<'a> {
     /// once here rather than per arm below.
     fn build_for_in_of_left_doc(
         &self,
-        left: &ast::ForInOfLeft<'_>,
+        left: &ast::ForInOfLeft,
         wrap_async_paren: bool,
         spans: &ForInOfSpans,
     ) -> DocId {
@@ -2453,7 +2453,7 @@ impl<'a> Printer<'a> {
     /// `name === "async" && !parent.await && parent.type === "ForOfStatement"`).
     fn for_lhs_needs_async_paren(
         &self,
-        left: &ast::ForInOfLeft<'_>,
+        left: &ast::ForInOfLeft,
         keyword: &str,
         is_await: bool,
     ) -> bool {
@@ -2470,7 +2470,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Get the end position of a ForInit
-    fn get_for_init_span_end(&self, init: &ast::ForInit<'_>) -> u32 {
+    fn get_for_init_span_end(&self, init: &ast::ForInit) -> u32 {
         match init {
             ast::ForInit::VariableDeclaration(decl) => decl.span.end,
             ast::ForInit::Expression(expr) => self.view.expr(*expr).span().end,

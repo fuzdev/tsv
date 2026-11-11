@@ -796,7 +796,7 @@ pub fn parse_statement_with_comments<'arena>(
 /// A declaration with no declarators — which the grammar does not admit — yields the empty
 /// span at the declaration's end, so a caller emits its bare terminator through the same
 /// path rather than a defensive arm of its own.
-pub fn declaration_terminator_gap(view: AstView<'_>, decl: &VariableDeclaration<'_>) -> Span {
+pub fn declaration_terminator_gap(view: AstView<'_>, decl: &VariableDeclaration) -> Span {
     Span {
         start: view
             .declarators(decl.declarations)
@@ -817,7 +817,7 @@ pub fn declaration_terminator_gap(view: AstView<'_>, decl: &VariableDeclaration<
 /// need to be preserved.
 pub fn build_variable_declaration_doc(
     arena: &DocArena,
-    decl: &VariableDeclaration<'_>,
+    decl: &VariableDeclaration,
     inputs: &PrinterInputs<'_>,
     embed: EmbedContext,
 ) -> DocId {
@@ -1113,7 +1113,7 @@ pub fn build_function_params_doc(
 /// for `{#snippet}` generics.
 pub fn build_type_parameters_doc(
     arena: &DocArena,
-    type_parameters: &TSTypeParameterDeclaration<'_>,
+    type_parameters: &TSTypeParameterDeclaration,
     inputs: &PrinterInputs<'_>,
     embed: EmbedContext,
 ) -> DocId {

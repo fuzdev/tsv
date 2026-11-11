@@ -157,7 +157,7 @@ pub enum FragmentNode<'arena> {
     SnippetBlock(SnippetBlock<'arena>),
     HtmlTag(HtmlTag),
     ConstTag(ConstTag),
-    DeclarationTag(DeclarationTag<'arena>),
+    DeclarationTag(DeclarationTag),
     DebugTag(DebugTag),
     RenderTag(RenderTag),
 }
@@ -288,7 +288,7 @@ pub struct SnippetBlock<'arena> {
     /// `tsv_ts`'s type-parameter printer for constraint/default/modifier
     /// handling and width-based wrapping. `Some` whenever `type_params_raw` is
     /// — a signature the parser cannot read is a parse error, not a node.
-    pub type_parameters: Option<TSTypeParameterDeclaration<'arena>>,
+    pub type_parameters: Option<TSTypeParameterDeclaration>,
     /// Raw inner text of the generics (`T extends X` for `<T extends X>`),
     /// always set when generics are present. Feeds the public AST's `typeParams`
     /// string, matching Svelte's parser (which stores it raw too).
@@ -337,8 +337,8 @@ pub struct ConstTag {
 /// multiple declarators, comments, and every bracket/string case are handled
 /// natively. (`{@const}` is a separate `ConstTag` on its own path.)
 #[derive(Debug, Clone)]
-pub struct DeclarationTag<'arena> {
-    pub declaration: VariableDeclaration<'arena>,
+pub struct DeclarationTag {
+    pub declaration: VariableDeclaration,
     pub span: Span,
 }
 

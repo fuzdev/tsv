@@ -63,7 +63,7 @@ impl<'a> Printer<'a> {
     /// in a member gap.
     fn type_literal_member_body(
         &self,
-        t: &TSTypeLiteral<'_>,
+        t: &TSTypeLiteral,
         comments_present: bool,
         delimiter_pull_pos: Option<u32>,
         freeze: MemberFreeze,
@@ -96,7 +96,7 @@ impl<'a> Printer<'a> {
     /// body has no first member to pull ahead of, and its own emitter owns the braces.
     fn type_literal_brace_line_pull(
         &self,
-        t: &TSTypeLiteral<'_>,
+        t: &TSTypeLiteral,
         comments_present: bool,
     ) -> (Option<DocId>, Option<u32>) {
         match self.view.type_members(t.members).first() {
@@ -703,7 +703,7 @@ impl<'a> Printer<'a> {
     fn build_parenthesized_intersection_trailing_object_doc(
         &self,
         intersection: &TSIntersectionType,
-        trailing_obj: &TSTypeLiteral<'_>,
+        trailing_obj: &TSTypeLiteral,
         paren: Option<&TSParenthesizedType>,
         claimed_shell: Option<Span>,
     ) -> DocId {
@@ -870,7 +870,7 @@ impl<'a> Printer<'a> {
     /// for width-aware formatting.
     fn build_type_literal_members_only_doc_for_alignment(
         &self,
-        t: &TSTypeLiteral<'_>,
+        t: &TSTypeLiteral,
         force_multiline: bool,
         comments_present: bool,
         delimiter_pull_pos: Option<u32>,
@@ -926,7 +926,7 @@ impl<'a> Printer<'a> {
     fn push_width_aware_type_literal_opener(
         &self,
         member_parts: &mut DocBuf,
-        t: &TSTypeLiteral<'_>,
+        t: &TSTypeLiteral,
         comments_present: bool,
     ) {
         let d = self.d();
@@ -959,9 +959,9 @@ impl<'a> Printer<'a> {
     fn push_width_aware_type_member(
         &self,
         member_parts: &mut DocBuf,
-        t: &TSTypeLiteral<'_>,
+        t: &TSTypeLiteral,
         i: usize,
-        m: &TSTypeElement<'_>,
+        m: &TSTypeElement,
         comments_present: bool,
     ) {
         let d = self.d();
@@ -1052,7 +1052,7 @@ impl<'a> Printer<'a> {
     /// the source reads count only when a blank line also separates two members.
     pub(super) fn type_literal_force_multiline(
         &self,
-        obj: &TSTypeLiteral<'_>,
+        obj: &TSTypeLiteral,
         comments_present: bool,
     ) -> bool {
         // Both reads below are newline-derived authoring intent (a source newline
@@ -1110,7 +1110,7 @@ impl<'a> Printer<'a> {
     /// Whether the author broke `obj` after its `{`: a newline right after the brace, or
     /// before the first member (a block comment on the brace line hides the first from
     /// `is_brace_block_multiline`).
-    pub(in crate::printer) fn literal_authored_expanded(&self, obj: &TSTypeLiteral<'_>) -> bool {
+    pub(in crate::printer) fn literal_authored_expanded(&self, obj: &TSTypeLiteral) -> bool {
         super::super::is_brace_block_multiline(self.source, obj.span)
             || self
                 .view
@@ -1126,7 +1126,7 @@ impl<'a> Printer<'a> {
     /// ([`MemberBlankScan::PastComments`]).
     pub(in crate::printer) fn type_literal_members_hold_blank_line(
         &self,
-        obj: &TSTypeLiteral<'_>,
+        obj: &TSTypeLiteral,
     ) -> bool {
         self.view.type_members(obj.members).windows(2).any(|pair| {
             let next_start = pair[1].span().start;
@@ -1148,7 +1148,7 @@ impl<'a> Printer<'a> {
     /// The doc ends at the object's own `}`. A caller whose shell continues past it
     /// (the parenthesized intersection's `)`) appends that itself rather than fusing
     /// it into the closing text, so the gap between the two stays an emittable seam.
-    fn build_aligned_object_literal_doc(&self, obj: &TSTypeLiteral<'_>, opening: DocId) -> DocId {
+    fn build_aligned_object_literal_doc(&self, obj: &TSTypeLiteral, opening: DocId) -> DocId {
         let d = self.d();
         // Empty object type: keep the braces delimiter-tight (`{}` not `{ }`) and
         // preserve any interior comment. The members-only alignment path returns an
@@ -1220,7 +1220,7 @@ impl<'a> Printer<'a> {
     ///     }           // align(2): base + 2 spaces (aligns under "{", any tab width)
     ///   | B;
     /// ```
-    pub(super) fn build_union_member_object_literal_doc(&self, obj: &TSTypeLiteral<'_>) -> DocId {
+    pub(super) fn build_union_member_object_literal_doc(&self, obj: &TSTypeLiteral) -> DocId {
         self.build_aligned_object_literal_doc(obj, self.d().text("{"))
     }
 
@@ -1234,7 +1234,7 @@ impl<'a> Printer<'a> {
     /// - Single-line source stays single-line if it fits: `{ a: T; b: U }`
     /// - Multi-line source (newline after `{`) stays multi-line
     /// - Comments force multi-line formatting
-    pub(super) fn build_type_literal_doc(&self, t: &TSTypeLiteral<'_>) -> DocId {
+    pub(super) fn build_type_literal_doc(&self, t: &TSTypeLiteral) -> DocId {
         self.build_type_literal_doc_inner(t, TypeLiteralMode::Standard)
     }
 
@@ -1243,7 +1243,7 @@ impl<'a> Printer<'a> {
     /// `mode` controls formatting behavior:
     /// - `Standard`: Width-aware with softlines, wrapped in group
     /// - `NoGroup`: Width-aware with softlines, no group (parent controls breaking)
-    fn build_type_literal_doc_inner(&self, t: &TSTypeLiteral<'_>, mode: TypeLiteralMode) -> DocId {
+    fn build_type_literal_doc_inner(&self, t: &TSTypeLiteral, mode: TypeLiteralMode) -> DocId {
         let d = self.d();
         let wrap_in_group = matches!(mode, TypeLiteralMode::Standard);
         // Zero-comment whole-construct gate: one existence check over the literal's
@@ -1322,7 +1322,7 @@ impl<'a> Printer<'a> {
     ///
     /// When the function type group breaks (because line is too long), these
     /// softlines become newlines, expanding the param's object type.
-    pub(super) fn build_type_literal_doc_for_function_param(&self, t: &TSTypeLiteral<'_>) -> DocId {
+    pub(super) fn build_type_literal_doc_for_function_param(&self, t: &TSTypeLiteral) -> DocId {
         self.build_type_literal_doc_inner(t, TypeLiteralMode::NoGroup)
     }
 

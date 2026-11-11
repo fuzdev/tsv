@@ -6,7 +6,7 @@
 use tsv_lang::Span;
 
 use super::{
-    ClassMemList, DecoList, ExprId, FunctionExpression, HeritageList, Identifier, Run, StmtId,
+    ClassMem, Deco, ExprId, FunctionExpression, Heritage, Identifier, Run, StmtId,
     TSIndexSignature, TSTypeAnnotation, TSTypeParameterDeclaration, TSTypeParameterInstantiation,
 };
 
@@ -17,7 +17,7 @@ use super::{
 #[derive(Debug, Clone)]
 pub struct ClassDeclaration<'arena> {
     /// Decorators applied to this class
-    pub decorators: Option<DecoList<'arena>>,
+    pub decorators: Option<Run<Deco>>,
     /// Class name (required for declarations, optional for export default)
     pub id: Option<Identifier<'arena>>,
     /// Optional superclass expression (for `extends`)
@@ -25,15 +25,15 @@ pub struct ClassDeclaration<'arena> {
     /// Type arguments for superclass (e.g., `<T>` in `extends Base<T>`)
     pub super_type_parameters: Option<TSTypeParameterInstantiation>,
     /// Implements clause for declare class: `implements Foo, Bar`
-    pub implements: HeritageList<'arena>,
+    pub implements: Run<Heritage>,
     /// Class body containing methods and properties
-    pub body: ClassBody<'arena>,
+    pub body: ClassBody,
     /// Whether this is a declare class (ambient declaration)
     pub declare: bool,
     /// Whether this is an abstract class
     pub r#abstract: bool,
     /// Type parameters (e.g., `<T>` in `class Foo<T>`)
-    pub type_parameters: Option<TSTypeParameterDeclaration<'arena>>,
+    pub type_parameters: Option<TSTypeParameterDeclaration>,
     pub span: Span,
 }
 
@@ -44,7 +44,7 @@ pub struct ClassDeclaration<'arena> {
 #[derive(Debug, Clone)]
 pub struct ClassExpression<'arena> {
     /// Decorators applied to this class
-    pub decorators: Option<DecoList<'arena>>,
+    pub decorators: Option<Run<Deco>>,
     /// Class name (always optional for expressions)
     pub id: Option<Identifier<'arena>>,
     /// Optional superclass expression (for `extends`)
@@ -52,21 +52,21 @@ pub struct ClassExpression<'arena> {
     /// Type arguments for superclass (e.g., `<T>` in `extends Base<T>`)
     pub super_type_parameters: Option<TSTypeParameterInstantiation>,
     /// Implements clause: `implements Foo, Bar`
-    pub implements: HeritageList<'arena>,
+    pub implements: Run<Heritage>,
     /// Class body containing methods and properties
-    pub body: ClassBody<'arena>,
+    pub body: ClassBody,
     /// Whether this is an abstract class
     pub r#abstract: bool,
     /// Type parameters (e.g., `<T>` in `class Foo<T>`)
-    pub type_parameters: Option<TSTypeParameterDeclaration<'arena>>,
+    pub type_parameters: Option<TSTypeParameterDeclaration>,
 }
 
 /// Class body: `{ constructor() {} method() {} prop = value; }`
 ///
 /// Contains the methods and properties of a class.
 #[derive(Debug, Clone)]
-pub struct ClassBody<'arena> {
-    pub body: ClassMemList<'arena>,
+pub struct ClassBody {
+    pub body: Run<ClassMem>,
     pub span: Span,
 }
 
@@ -74,9 +74,9 @@ pub struct ClassBody<'arena> {
 #[derive(Debug, Clone)]
 pub enum ClassMember<'arena> {
     MethodDefinition(MethodDefinition<'arena>),
-    PropertyDefinition(PropertyDefinition<'arena>),
-    StaticBlock(StaticBlock<'arena>),
-    IndexSignature(TSIndexSignature<'arena>),
+    PropertyDefinition(PropertyDefinition),
+    StaticBlock(StaticBlock),
+    IndexSignature(TSIndexSignature),
 }
 
 impl<'arena> ClassMember<'arena> {
@@ -92,11 +92,11 @@ impl<'arena> ClassMember<'arena> {
 
 /// Static initialization block in a class: `static { ... }` (ES2022)
 #[derive(Debug, Clone)]
-pub struct StaticBlock<'arena> {
+pub struct StaticBlock {
     /// Decorators in front of the block (`@a static {}`). No decorator grammar
     /// reaches a static block (tsc's checker reports TS1206); acorn keeps the list
     /// and tsv defers the error, so the list is kept and printed.
-    pub decorators: Option<DecoList<'arena>>,
+    pub decorators: Option<Run<Deco>>,
     pub body: Run<StmtId>,
     pub span: Span,
 }
@@ -169,7 +169,7 @@ pub struct TSParameterProperty {
 #[expect(clippy::struct_excessive_bools)] // independent flags, not a state machine
 pub struct MethodDefinition<'arena> {
     /// Decorators applied to this method
-    pub decorators: Option<DecoList<'arena>>,
+    pub decorators: Option<Run<Deco>>,
     /// Method name (key)
     pub key: ExprId,
     /// Method implementation (value)
@@ -212,9 +212,9 @@ pub enum PropertyModifier {
 /// Unlike methods, properties use `=` for initialization.
 #[expect(clippy::struct_excessive_bools)]
 #[derive(Debug, Clone)]
-pub struct PropertyDefinition<'arena> {
+pub struct PropertyDefinition {
     /// Decorators applied to this property
-    pub decorators: Option<DecoList<'arena>>,
+    pub decorators: Option<Run<Deco>>,
     /// Property name (key)
     pub key: ExprId,
     /// Type annotation (e.g., `: number` in `a: number = 0;`)

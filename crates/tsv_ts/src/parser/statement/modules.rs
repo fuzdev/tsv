@@ -2,7 +2,7 @@
 
 use crate::ast::*;
 use crate::lexer::{KeywordKind, TokenKind};
-use crate::parser::{push_row, push_spanned};
+use crate::parser::{flush_run, push_row, push_spanned};
 use tsv_lang::{Error, Span};
 
 use super::super::Parser;
@@ -74,7 +74,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 &mut self.stores.payloads.export_nameds,
                 ExportNamedDeclaration {
                     declaration: Some(declaration),
-                    specifiers: &[],
+                    specifiers: Run::EMPTY,
                     source: None,
                     attributes: None,
                     export_kind,
@@ -810,7 +810,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         debug_assert!(matches!(self.current_kind(), TokenKind::BraceOpen));
         self.advance()?;
 
-        let mut specifiers = self.bvec();
+        let mark = self.stores.runs.export_spec_scratch.mark();
 
         // Parse specifiers until '}'
         while !matches!(self.current_kind(), TokenKind::BraceClose) {
@@ -831,7 +831,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 let exported = parts
                     .right
                     .unwrap_or(ModuleExportName::Identifier(parts.left));
-                specifiers.push(ExportSpecifier {
+                self.stores.runs.export_spec_scratch.push(ExportSpecifier {
                     local,
                     exported,
                     export_kind: if parts.has_type_specifier {
@@ -844,7 +844,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             } else {
                 let (local, exported, spec_end) = self.parse_export_specifier_names()?;
 
-                specifiers.push(ExportSpecifier {
+                self.stores.runs.export_spec_scratch.push(ExportSpecifier {
                     local,
                     exported,
                     export_kind: ExportKind::Value,
@@ -880,6 +880,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             };
 
         let end = self.semicolon_end()?;
+        let specifiers = flush_run(
+            &mut self.stores.runs.export_spec_scratch,
+            &mut self.stores.runs.export_specs,
+            mark,
+        );
 
         Ok(Statement {
             span: Span::new(start, end),
@@ -887,7 +892,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 &mut self.stores.payloads.export_nameds,
                 ExportNamedDeclaration {
                     declaration: None,
-                    specifiers: specifiers.into_bump_slice(),
+                    specifiers,
                     source,
                     attributes,
                     export_kind,
@@ -1069,8 +1074,6 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             ImportPhase::None
         };
 
-        let mut specifiers = self.bvec();
-
         // Check for side-effect import: `import "y"`
         if matches!(self.current_kind(), TokenKind::String) {
             self.check_import_declaration_goal(context, start)?;
@@ -1084,7 +1087,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 kind: StatementKind::ImportDeclaration(push_row(
                     &mut self.stores.payloads.import_decls,
                     ImportDeclaration {
-                        specifiers: &[],
+                        specifiers: Run::EMPTY,
                         source,
                         attributes,
                         import_kind: ImportKind::Value,
@@ -1129,6 +1132,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // reject `import x * as ns` / `import x { a }` (a default must be separated
         // from a namespace/named clause by a comma).
         let mut default_needs_comma = false;
+        // The default binding, pushed once the list opens past the import-equals return.
+        let mut default_specifier = None;
 
         // Parse default import: `import x from "y"` or `import type X from "y"`
         // Also check for `import x = require("y")` or `import x = A.B`. The binding is
@@ -1159,7 +1164,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 );
             }
 
-            specifiers.push(ImportSpecifier::Default(ImportDefaultSpecifier {
+            default_specifier = Some(ImportSpecifier::Default(ImportDefaultSpecifier {
                 local: Identifier::simple(name, Span::new(id_start as u32, id_end as u32)),
                 span: Span::new(id_start as u32, id_end as u32),
             }));
@@ -1181,6 +1186,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // already returned if it was an import-equals), while `* as ns` and `{ … }`
         // never enter it, since `try_binding_name` declines their leading token.
         self.check_import_declaration_goal(context, start)?;
+        let mark = self.stores.runs.import_spec_scratch.mark();
+        if let Some(specifier) = default_specifier {
+            self.stores.runs.import_spec_scratch.push(specifier);
+        }
 
         // Parse namespace import: `import * as ns from "y"`
         if matches!(self.current_kind(), TokenKind::Star) {
@@ -1203,10 +1212,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             };
             let local_end = local.span.end;
 
-            specifiers.push(ImportSpecifier::Namespace(ImportNamespaceSpecifier {
-                local,
-                span: Span::new(ns_start as u32, local_end),
-            }));
+            self.stores
+                .runs
+                .import_spec_scratch
+                .push(ImportSpecifier::Namespace(ImportNamespaceSpecifier {
+                    local,
+                    span: Span::new(ns_start as u32, local_end),
+                }));
         }
 
         // Parse named imports: `import { a, b as c } from "y"`
@@ -1247,24 +1259,30 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                         }
                         None => parts.left.clone(),
                     };
-                    specifiers.push(ImportSpecifier::Named(ImportNamedSpecifier {
-                        imported: ModuleExportName::Identifier(parts.left),
-                        local,
-                        import_kind: if parts.has_type_specifier {
-                            ImportKind::Type
-                        } else {
-                            ImportKind::Value
-                        },
-                        span: Span::new(spec_start as u32, parts.end as u32),
-                    }));
+                    self.stores
+                        .runs
+                        .import_spec_scratch
+                        .push(ImportSpecifier::Named(ImportNamedSpecifier {
+                            imported: ModuleExportName::Identifier(parts.left),
+                            local,
+                            import_kind: if parts.has_type_specifier {
+                                ImportKind::Type
+                            } else {
+                                ImportKind::Value
+                            },
+                            span: Span::new(spec_start as u32, parts.end as u32),
+                        }));
                 } else {
                     let (imported, local, spec_end) = self.parse_import_specifier_names()?;
-                    specifiers.push(ImportSpecifier::Named(ImportNamedSpecifier {
-                        imported,
-                        local,
-                        import_kind: ImportKind::Value,
-                        span: Span::new(spec_start as u32, spec_end),
-                    }));
+                    self.stores
+                        .runs
+                        .import_spec_scratch
+                        .push(ImportSpecifier::Named(ImportNamedSpecifier {
+                            imported,
+                            local,
+                            import_kind: ImportKind::Value,
+                            span: Span::new(spec_start as u32, spec_end),
+                        }));
                 }
 
                 // Comma separator
@@ -1286,7 +1304,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // stray `type` modifier) `import source type { a }`. (`import defer` is held
         // to its `* as ns` shape by the phase lookahead, so it needs no analogue.)
         if phase == ImportPhase::Source
-            && !(specifiers.len() == 1 && matches!(specifiers[0], ImportSpecifier::Default(_)))
+            && !matches!(
+                self.stores.runs.import_spec_scratch.frame(mark),
+                [ImportSpecifier::Default(_)]
+            )
         {
             return Err(self.error_msg("a source-phase import takes a single binding"));
         }
@@ -1307,13 +1328,18 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let attributes = self.parse_import_attributes()?;
 
         let end = self.semicolon_end()?;
+        let specifiers = flush_run(
+            &mut self.stores.runs.import_spec_scratch,
+            &mut self.stores.runs.import_specs,
+            mark,
+        );
 
         Ok(Statement {
             span: Span::new(start as u32, end),
             kind: StatementKind::ImportDeclaration(push_row(
                 &mut self.stores.payloads.import_decls,
                 ImportDeclaration {
-                    specifiers: specifiers.into_bump_slice(),
+                    specifiers,
                     source,
                     attributes,
                     import_kind,
@@ -1325,10 +1351,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     /// Parse import attributes: `with { type: "json" }`.
     ///
-    /// `None` when there is no `with` clause; `Some(vec)` when one is present —
-    /// `Some([])` for an empty `with {}`, which is preserved (acorn/prettier
-    /// keep it).
-    fn parse_import_attributes(&mut self) -> Result<Option<ImportAttrList<'arena>>, Error> {
+    /// `None` when there is no `with` clause; `Some(run)` when one is present —
+    /// `Some` of an empty run for an empty `with {}`, which is preserved
+    /// (acorn/prettier keep it).
+    fn parse_import_attributes(&mut self) -> Result<Option<Run<ImportAttr>>, Error> {
         // The `WithClause`'s own `with` token. It is the reserved word (a `ReservedWord`
         // barred from every name position — see `KeywordKind::With`), spelled out by this
         // production rather than read as an identifier, so match the keyword token.
@@ -1343,7 +1369,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
         self.advance()?;
 
-        let mut attributes = self.bvec();
+        let mark = self.stores.runs.import_attr_scratch.mark();
         // Decoded `[[Key]]` StringValues seen so far, for the duplicate-key early
         // error (ecma262 §sec-imports-static-semantics-early-errors).
         let mut seen_keys: Vec<String> = Vec::new();
@@ -1390,7 +1416,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             let value = self.parse_string_literal()?;
             let attr_end = value.span.end;
 
-            attributes.push(ImportAttribute {
+            self.stores.runs.import_attr_scratch.push(ImportAttribute {
                 key,
                 value,
                 span: Span::new(attr_start as u32, attr_end),
@@ -1406,7 +1432,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         self.expect(&TokenKind::BraceClose)?;
 
-        Ok(Some(attributes.into_bump_slice()))
+        Ok(Some(flush_run(
+            &mut self.stores.runs.import_attr_scratch,
+            &mut self.stores.runs.import_attrs,
+            mark,
+        )))
     }
 
     /// The decoded `[[Key]]` StringValue of an import-attribute key (ecma262):

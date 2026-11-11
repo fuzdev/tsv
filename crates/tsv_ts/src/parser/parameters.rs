@@ -73,7 +73,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     fn attach_param_decorators(
         &mut self,
         mut param: Expression<'arena>,
-        decorators: DecoList<'arena>,
+        decorators: Run<Deco>,
     ) -> Expression<'arena> {
         match &mut param.kind {
             // `@dec private a` — decorators ride the inner binding, not the
@@ -418,7 +418,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // again with the level charged (`Parser::decorated_parameter_properties`).
         let decorators_start = self.current_pos().0 as u32;
         let mut reread: Option<Checkpoint<'arena>> = None;
-        let decorators: DecoList<'arena> = if self.check(&TokenKind::At) {
+        let decorators: Run<Deco> = if self.check(&TokenKind::At) {
             // Reject decorators where the position forbids them (arrow
             // parameters, type-member signatures). Checked per-parameter, so
             // a mid-list decorator (`(a, @dec b)`) rejects too.
@@ -445,9 +445,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             if self.check(&TokenKind::DotDotDot) {
                 return Err(self.error_msg("Decorators are not valid on a rest parameter"));
             }
-            decorators.into_bump_slice()
+            decorators
         } else {
-            &[]
+            Run::EMPTY
         };
 
         // Parse parameter: identifier, parameter property, or destructuring pattern

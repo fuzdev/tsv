@@ -5,7 +5,7 @@
 
 use crate::ast::*;
 use crate::lexer::{KeywordKind, TokenKind};
-use crate::parser::push_row;
+use crate::parser::{flush_run, push_row};
 use tsv_lang::{Error, Span};
 
 use super::Parser;
@@ -20,7 +20,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         param_name: IdentName<'arena>,
         id_start: usize,
         readonly: bool,
-    ) -> Result<TSTypeElement<'arena>, Error> {
+    ) -> Result<TSTypeElement, Error> {
         let param_colon_start = self.current_pos().0;
         self.expect(&TokenKind::Colon)?;
         // two wire levels: the parameter's `Identifier` and its `TSTypeAnnotation` (the
@@ -61,10 +61,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         };
         let member_end = type_annotation.as_ref().map_or(bracket_end, |t| t.span.end);
 
-        let mut parameters = self.bvec();
-        parameters.push(param);
+        let mark = self.stores.runs.index_param_scratch.mark();
+        self.stores.runs.index_param_scratch.push(param);
+        let parameters = flush_run(
+            &mut self.stores.runs.index_param_scratch,
+            &mut self.stores.runs.index_params,
+            mark,
+        );
         Ok(TSTypeElement::IndexSignature(TSIndexSignature {
-            parameters: parameters.into_bump_slice(),
+            parameters,
             type_annotation,
             decorators: None,
             is_static: false,
@@ -76,14 +81,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Parse a run of type members up to (but not consuming) the closing `}`.
     /// Each member's span is extended over a trailing `;`/`,` separator when one
     /// is present. Shared by type literals (`{ … }`) and interface bodies.
-    pub(in crate::parser) fn parse_type_members(
-        &mut self,
-    ) -> Result<crate::parser::BumpVec<'arena, TSTypeElement<'arena>>, Error> {
-        let mut members = self.bvec();
+    pub(in crate::parser) fn parse_type_members(&mut self) -> Result<Run<TypeMember>, Error> {
+        let mark = self.stores.runs.type_member_scratch.mark();
         // the members are siblings (`ListFrame`)
         let mut frame = self.list_frame();
         while !matches!(self.current_kind(), TokenKind::BraceClose | TokenKind::Eof) {
-            frame.element(self, members.len());
+            let len = self.stores.runs.type_member_scratch.len_since(mark);
+            frame.element(self, len);
             // one wire level: the member (the depth limit's count, `Parser::nested`)
             let mut element = self.nested(1, Self::parse_type_element)?;
             // A type member ends at a `;`/`,` separator, the body's `}`/EOF, or a
@@ -98,14 +102,18 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             } else if !self.can_insert_semicolon() {
                 return Err(self.error_expected("';'"));
             }
-            members.push(element);
+            self.stores.runs.type_member_scratch.push(element);
         }
         frame.close(self);
-        Ok(members)
+        Ok(flush_run(
+            &mut self.stores.runs.type_member_scratch,
+            &mut self.stores.runs.type_members,
+            mark,
+        ))
     }
 
     /// Parse type element: property, method, call signature, construct signature, or index signature
-    pub(in crate::parser) fn parse_type_element(&mut self) -> Result<TSTypeElement<'arena>, Error> {
+    pub(in crate::parser) fn parse_type_element(&mut self) -> Result<TSTypeElement, Error> {
         let start = self.current_pos().0;
 
         // `readonly` is a modifier only when a property key follows on the same line — an

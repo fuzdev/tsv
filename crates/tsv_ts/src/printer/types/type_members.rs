@@ -190,7 +190,7 @@ impl<'a> Printer<'a> {
     /// emitted twice. Then `>`→`(` and signature end→`;`.
     pub(crate) fn build_method_signature_member_doc(
         &self,
-        method: &ast::TSMethodSignature<'_>,
+        method: &ast::TSMethodSignature,
         deferred: &mut DocBuf,
     ) -> DocId {
         let d = self.d();
@@ -295,7 +295,7 @@ impl<'a> Printer<'a> {
     /// printers (the interface caller appends `;`).
     pub(crate) fn build_call_signature_member_doc(
         &self,
-        call: &ast::TSCallSignatureDeclaration<'_>,
+        call: &ast::TSCallSignatureDeclaration,
         deferred: &mut DocBuf,
     ) -> DocId {
         self.build_call_or_construct_signature_doc(
@@ -313,7 +313,7 @@ impl<'a> Printer<'a> {
     /// type-element printers (the interface caller appends `;`).
     pub(crate) fn build_construct_signature_member_doc(
         &self,
-        ctor: &ast::TSConstructSignatureDeclaration<'_>,
+        ctor: &ast::TSConstructSignatureDeclaration,
         deferred: &mut DocBuf,
     ) -> DocId {
         self.build_call_or_construct_signature_doc(
@@ -339,7 +339,7 @@ impl<'a> Printer<'a> {
     /// trailing space and line comments a hardline.
     fn build_call_or_construct_signature_doc(
         &self,
-        type_parameters: Option<&ast::TSTypeParameterDeclaration<'_>>,
+        type_parameters: Option<&ast::TSTypeParameterDeclaration>,
         params: &[ast::Expression<'_>],
         return_type: Option<&ast::TSTypeAnnotation>,
         span: ast::Span,
@@ -444,7 +444,7 @@ impl<'a> Printer<'a> {
     fn push_member_type_params_and_signature(
         &self,
         parts: &mut DocBuf,
-        type_parameters: Option<&ast::TSTypeParameterDeclaration<'_>>,
+        type_parameters: Option<&ast::TSTypeParameterDeclaration>,
         params: &[ast::Expression<'_>],
         return_type: Option<&ast::TSTypeAnnotation>,
         paren_pos: Option<u32>,
@@ -480,7 +480,7 @@ impl<'a> Printer<'a> {
     /// doesn't own the `;`); empty on the common no-comment path.
     pub(in crate::printer) fn build_type_member_doc_inner(
         &self,
-        member: &TSTypeElement<'_>,
+        member: &TSTypeElement,
         deferred: &mut DocBuf,
     ) -> DocId {
         match member {
@@ -553,7 +553,7 @@ impl<'a> Printer<'a> {
     /// — is delegated to the shared `build_type_annotation_doc`.
     pub(in crate::printer) fn build_index_signature_member_doc(
         &self,
-        idx: &ast::TSIndexSignature<'_>,
+        idx: &ast::TSIndexSignature,
         deferred: &mut DocBuf,
     ) -> DocId {
         let d = self.d();
@@ -798,7 +798,7 @@ impl<'a> Printer<'a> {
 /// method and every other key unquote through `Printer::build_type_member_key_doc` as usual.
 fn method_signature_new_key<'m>(
     view: AstView<'m>,
-    method: &'m ast::TSMethodSignature<'m>,
+    method: &'m ast::TSMethodSignature,
     source: &str,
 ) -> Option<&'m ast::Literal<'m>> {
     if method.computed {
