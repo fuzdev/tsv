@@ -132,6 +132,7 @@ impl<'a> Printer<'a> {
         role: LiteralRole,
     ) -> DocId {
         let d = self.d();
+        let properties = self.view.obj_props(obj.properties);
         // Check for comments inside the object.
         //
         // **on page**: this is the object-wide fast gate, and it short-circuits the
@@ -152,12 +153,8 @@ impl<'a> Printer<'a> {
         // span, so a comment it follows is not standalone — see `StandaloneGlue` for why
         // the type literal answers this differently.
         let has_standalone_block_comment = has_comments && {
-            let property_spans: SmallVec<[_; 8]> = self
-                .view
-                .obj_props(obj.properties)
-                .iter()
-                .map(ast::ObjectProperty::span)
-                .collect();
+            let property_spans: SmallVec<[_; 8]> =
+                properties.iter().map(ast::ObjectProperty::span).collect();
             match role {
                 LiteralRole::Expression => self.has_standalone_block_comment(
                     obj_span.start,
@@ -198,7 +195,7 @@ impl<'a> Printer<'a> {
         //
         // A compound target takes the pattern's own break instead, which the same group
         // carries ([`compound_target_object_breaks`]).
-        let first_prop_start = self.view.obj_props(obj.properties)[0].span().start;
+        let first_prop_start = properties[0].span().start;
         let has_source_newline = match role {
             LiteralRole::Expression => {
                 self.has_newline_between(obj_span.start + 1, first_prop_start)
@@ -242,7 +239,7 @@ impl<'a> Printer<'a> {
             // via has_source_newline, not the must_break conditions above).
             let must_break = must_break || brace_pull_pos.is_some();
 
-            for (i, prop) in self.view.obj_props(obj.properties).iter().enumerate() {
+            for (i, prop) in properties.iter().enumerate() {
                 let prop_start = prop.span().start;
                 let is_first = i == 0;
 
@@ -332,9 +329,7 @@ impl<'a> Printer<'a> {
                 // on every pass.
                 let prop_end =
                     Self::element_claim_anchor(frozen_span, self.property_printed_end(prop, role));
-                let upper_bound = self
-                    .view
-                    .obj_props(obj.properties)
+                let upper_bound = properties
                     .get(i + 1)
                     .map_or(obj_span.end, |next| next.span().start);
 
@@ -411,16 +406,14 @@ impl<'a> Printer<'a> {
             // of this scan is how the comment-bearing path above and this one came to answer
             // that differently. With no comment in the gap the bound is the next property
             // either way, so the two spellings agree by construction.
-            let gap_blank: SmallVec<[bool; 8]> = self
-                .view
-                .obj_props(obj.properties)
+            let gap_blank: SmallVec<[bool; 8]> = properties
                 .windows(2)
                 .map(|pair| {
                     self.item_gap_has_blank_line(pair[0].value_end(self.view), pair[1].span().start)
                 })
                 .collect();
 
-            for (i, prop) in self.view.obj_props(obj.properties).iter().enumerate() {
+            for (i, prop) in properties.iter().enumerate() {
                 // Check for blank line before this property (preserved in multiline).
                 let has_blank_before = i > 0 && gap_blank[i - 1];
 

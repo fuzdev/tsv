@@ -905,8 +905,9 @@ impl<'a> Printer<'a> {
         terminator: Option<TerminatorGap>,
     ) -> DocId {
         let d = self.d();
+        let declarators = self.view.declarators(decl.declarations);
 
-        let first_decl_start = self.view.declarators(decl.declarations)[0].span.start;
+        let first_decl_start = declarators[0].span.start;
 
         // The header keyword, word by word: an optional `declare` modifier plus the
         // kind (`await using` is two words). Every gap *between* those words is a
@@ -929,11 +930,7 @@ impl<'a> Printer<'a> {
         let mut parts = DocBuf::new();
 
         let is_multi_declarator = decl.declarations.len() > 1;
-        let has_any_init = self
-            .view
-            .declarators(decl.declarations)
-            .iter()
-            .any(|d| d.init.is_some());
+        let has_any_init = declarators.iter().any(|d| d.init.is_some());
         let should_break = is_multi_declarator && has_any_init;
 
         // Prettier's `printVariableDeclaration` shape: `[kind, " ", indent(first),
@@ -974,7 +971,7 @@ impl<'a> Printer<'a> {
         // keeps that directive on its own line ([`Printer::build_header_comment_run`]) —
         // flush against the keyword it would be inert and the freeze would be lost on the
         // second pass.
-        let item_span = |j: usize| self.view.declarators(decl.declarations)[j].span;
+        let item_span = |j: usize| declarators[j].span;
 
         // Every declarator after the first, each behind its own separator — a hardline
         // when the list has an initializer, a soft `line` when it has none — wrapped in
@@ -987,17 +984,12 @@ impl<'a> Printer<'a> {
         // prints may take over its trailing region ([`Printer::with_statement_tail`]).
         let tail_end = terminator
             .is_some()
-            .then(|| {
-                self.view
-                    .declarators(decl.declarations)
-                    .last()
-                    .map(|last| last.span.end)
-            })
+            .then(|| declarators.last().map(|last| last.span.end))
             .flatten();
         let outer_tail = self.arm_statement_tail(tail_end);
-        for (i, declarator) in self.view.declarators(decl.declarations).iter().enumerate() {
+        for (i, declarator) in declarators.iter().enumerate() {
             if i > 0 {
-                let prev_end = self.view.declarators(decl.declarations)[i - 1].span.end;
+                let prev_end = declarators[i - 1].span.end;
                 let curr_start = declarator.span.start;
 
                 // Check for comments between declarators
