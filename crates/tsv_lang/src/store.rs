@@ -22,7 +22,10 @@
 //! `'static` type, stated once per row type through [`Row`]; see there for the choices.
 //!
 //! [`TextPool`] holds strings a span of the source cannot express. A [`PoolText`] is its handle,
-//! and `Option<PoolText>` tells an absent string from a present empty one.
+//! and `Option<PoolText>` tells an absent string from a present empty one. A pool and its
+//! handles are parameterized by a family tag of their own, one per pool, so a handle minted by
+//! one language's pool cannot be resolved against another's. A pool allocates nothing until
+//! its first non-empty write.
 //!
 //! Handles are only meaningful to the store that minted them, until it resets. The type system
 //! catches a handle of the wrong family and nothing more: a same-family id retained across a
@@ -293,7 +296,15 @@ impl<T: Row> Row for Option<T> {
     type Family = Option<T::Family>;
 }
 
-impl Row for PoolText {
+impl<F: 'static> Row for PoolText<F> {
+    type Family = Self;
+}
+
+impl Row for crate::Comment {
+    type Family = Self;
+}
+
+impl Row for crate::Span {
     type Family = Self;
 }
 
@@ -776,7 +787,7 @@ impl Default for MarkGroup {
 ///
 /// Under the `_internal_ast_census` feature, every change to the stack's length moves the
 /// census's open-list total of `T` (`ast_census_probe::list_delta`): a push adds one, and a
-/// flush, a truncate, a reset or a recycle takes back what it removes.
+/// pop, a flush, a truncate, a reset or a recycle takes back what it removes.
 pub struct ListBuf<T> {
     items: Vec<T>,
     #[cfg(feature = "_internal_store_check")]
@@ -887,6 +898,42 @@ impl<T: Row> ListBuf<T> {
         }
     }
 
+    /// The elements above `mark`, to edit in place while the frame is still being built: the
+    /// slice [`ListBuf::frame`] reads, every inner frame open above `mark` included, and nothing
+    /// below it. A mark above the top of the stack misses; the check build also refuses a stale
+    /// one, as [`ListBuf::frame`] does.
+    #[inline]
+    pub fn frame_mut(&mut self, mark: ListMark<T::Family>) -> &mut [T] {
+        #[cfg(feature = "_internal_store_check")]
+        self.live.require(mark.seq);
+        match self.items.get_mut(mark.index()..) {
+            Some(frame) => frame,
+            None => store_miss(),
+        }
+    }
+
+    /// Removes and returns the top element of the stack when it lies above `mark`, or `None`
+    /// when the frame `mark` starts is empty, so a pop never reaches below its frame. A mark
+    /// above the top of the stack misses; the check build also refuses a stale one, as
+    /// [`ListBuf::frame`] does.
+    ///
+    /// A pop moves no mark, and invalidates none. An inner mark taken above the new top misses
+    /// only while the stack stays below it: once the stack regrows to it, it is accepted again
+    /// and frames what was pushed after the pop, in the check build too, whose shadow stack a
+    /// [`ListBuf::truncate`] clears above its mark and a pop leaves alone. A caller that pops
+    /// below an inner mark owns that mark.
+    #[inline]
+    pub fn pop(&mut self, mark: ListMark<T::Family>) -> Option<T> {
+        #[cfg(feature = "_internal_store_check")]
+        self.live.require(mark.seq);
+        if self.len_since(mark) == 0 {
+            return None;
+        }
+        #[cfg(feature = "_internal_ast_census")]
+        crate::ast_census_probe::list_delta::<T>(-1);
+        self.items.pop()
+    }
+
     /// Rewinds the stack to `mark`, discarding every element above it. `mark` stays usable, so
     /// a checkpoint can be rewound to more than once.
     #[inline]
@@ -945,29 +992,42 @@ impl<T: Row> ListBuf<T> {
     }
 }
 
-/// A handle to one string of a [`TextPool`]. `Option<PoolText>` keeps the width of a
-/// `PoolText`, and `None` (absent) is distinct from [`PoolText::EMPTY`] (present, empty).
+/// A handle to one string of a [`TextPool`] of the family `F`. `Option<PoolText<F>>` keeps the
+/// width of a `PoolText<F>`, and `None` (absent) is distinct from [`PoolText::EMPTY`] (present,
+/// empty).
 ///
 /// A span of the source is a `Span`; this is decoded text, which has no source span.
-#[derive(Clone, Copy)]
-pub struct PoolText {
+pub struct PoolText<F> {
     start: NonZeroU32,
     len: u32,
     #[cfg(feature = "_internal_store_check")]
     stamp: stamp::Stamp,
+    family: PhantomData<fn() -> F>,
 }
 
-impl PoolText {
-    /// The present, empty string. Every pool resolves it to `""`, untouched.
+impl<F> PoolText<F> {
+    /// The present, empty string. Every pool of the family resolves it to `""`, untouched, one
+    /// never written included.
     pub const EMPTY: Self = Self {
         start: NonZeroU32::MIN,
         len: 0,
         #[cfg(feature = "_internal_store_check")]
         stamp: stamp::Stamp::NONE,
+        family: PhantomData,
     };
 }
 
-impl PartialEq for PoolText {
+// Not derived: a derive would bound each impl on `F`, which is an uninhabited tag.
+impl<F> Clone for PoolText<F> {
+    #[inline]
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<F> Copy for PoolText<F> {}
+
+impl<F> PartialEq for PoolText<F> {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
         #[cfg(feature = "_internal_store_check")]
@@ -976,80 +1036,133 @@ impl PartialEq for PoolText {
     }
 }
 
-impl Eq for PoolText {}
+impl<F> Eq for PoolText<F> {}
 
-impl fmt::Debug for PoolText {
+impl<F> fmt::Debug for PoolText<F> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "PoolText({}, {})", self.start, self.len)
     }
 }
 
-/// An append-only pool of UTF-8 strings, byte 0 a sentinel, keeping its capacity across
+/// An append-only pool of UTF-8 strings for the family `F`, keeping its capacity across
 /// [`TextPool::reset`].
-pub struct TextPool {
+///
+/// Byte 0 of a written pool is a sentinel, so no handle's start is 0 and `Option<PoolText<F>>`
+/// takes its niche from the start. A new pool holds no bytes and allocates nothing: its first
+/// non-empty write writes the sentinel first, on the cold arm the mint already takes for a
+/// start it refuses, as a [`Store`]'s first write fills its slot 0.
+pub struct TextPool<F> {
     text: String,
     #[cfg(feature = "_internal_store_check")]
     stamp: stamp::Stamp,
+    family: PhantomData<fn() -> F>,
 }
 
-impl Default for TextPool {
+impl<F> Default for TextPool<F> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl TextPool {
-    /// An empty pool.
+impl<F> TextPool<F> {
+    /// An empty pool. Allocates nothing until its first non-empty write.
     pub fn new() -> Self {
         Self::with_capacity(0)
     }
 
-    /// An empty pool pre-sized for `bytes` bytes of text.
+    /// An empty pool pre-sized for `bytes` bytes, the sentinel byte among them. Writes nothing.
     pub fn with_capacity(bytes: usize) -> Self {
-        let mut text = String::with_capacity(bytes + POOL_SENTINEL.len_utf8());
-        text.push(POOL_SENTINEL);
         Self {
-            text,
+            text: String::with_capacity(bytes),
             #[cfg(feature = "_internal_store_check")]
             stamp: stamp::Stamp::fresh(),
+            family: PhantomData,
         }
     }
 
-    /// Appends `text` and mints its span. An empty string is [`PoolText::EMPTY`].
+    /// Appends `text` and mints its handle. An empty string is [`PoolText::EMPTY`] and writes
+    /// nothing.
     #[inline]
-    pub fn push(&mut self, text: &str) -> PoolText {
+    pub fn push(&mut self, text: &str) -> PoolText<F> {
         if text.is_empty() {
             return PoolText::EMPTY;
         }
-        let Some((start, len)) = mint_range(self.text.len(), text.len()) else {
-            store_overflow();
+        let (start, len) = match mint_range(self.text.len(), text.len()) {
+            Some(range) => range,
+            None => self.prime_range(text.len()),
         };
         self.text.push_str(text);
-        PoolText {
-            start,
-            len,
-            #[cfg(feature = "_internal_store_check")]
-            stamp: self.stamp,
+        self.handle(start, len)
+    }
+
+    /// Appends the text `write` writes and mints its handle: [`TextPool::push`] for a caller that
+    /// builds its string (a decoder) rather than holding it, so the text is written once,
+    /// straight into the pool. A write of nothing is [`PoolText::EMPTY`].
+    ///
+    /// The writer appends and nothing else, so `write` can reach no byte already in the pool. If
+    /// `write` panics, what it wrote stays behind it as bytes no handle names, and the pool stays
+    /// usable.
+    #[inline]
+    pub fn push_with(&mut self, write: impl FnOnce(&mut PoolWriter<'_>)) -> PoolText<F> {
+        match self.try_push_with(|writer| -> Result<(), std::convert::Infallible> {
+            write(writer);
+            Ok(())
+        }) {
+            Ok(text) => text,
+            Err(never) => match never {},
         }
     }
 
-    /// The string `span` names. A span from this pool always lands on the character boundaries
-    /// it was minted at, and a miss ends in the shared cold path rather than a slice panic.
+    /// [`TextPool::push_with`] for a fallible `write`: its error is returned, and what it wrote
+    /// before failing is taken back out of the pool.
+    ///
+    /// The sentinel of a pool never written is written before `write` runs, so a pool is never
+    /// left holding text without it; a failed or empty write leaves it as a reset pool is.
     #[inline]
-    pub fn get(&self, span: PoolText) -> &str {
-        if span.len == 0 {
+    pub fn try_push_with<E>(
+        &mut self,
+        write: impl FnOnce(&mut PoolWriter<'_>) -> Result<(), E>,
+    ) -> Result<PoolText<F>, E> {
+        if self.text.is_empty() {
+            self.write_sentinel();
+        }
+        let base = self.text.len();
+        let written = write(&mut PoolWriter {
+            text: &mut self.text,
+        });
+        if let Err(error) = written {
+            self.text.truncate(base);
+            return Err(error);
+        }
+        let count = self.text.len() - base;
+        if count == 0 {
+            return Ok(PoolText::EMPTY);
+        }
+        let Some((start, len)) = mint_range(base, count) else {
+            store_overflow();
+        };
+        Ok(self.handle(start, len))
+    }
+
+    /// The string `text` names. A handle from this pool always lands on the character
+    /// boundaries it was minted at, and a miss ends in the shared cold path rather than a slice
+    /// panic. [`PoolText::EMPTY`] answers `""` before the bytes are touched.
+    #[inline]
+    pub fn get(&self, text: PoolText<F>) -> &str {
+        if text.len == 0 {
             return "";
         }
         #[cfg(feature = "_internal_store_check")]
-        self.stamp.check(span.stamp);
-        let start = span.start.get() as usize;
-        match self.text.get(start..start + span.len as usize) {
+        self.stamp.check(text.stamp);
+        let start = text.start.get() as usize;
+        match self.text.get(start..start + text.len as usize) {
             Some(text) => text,
             None => store_miss(),
         }
     }
 
-    /// Discards every string, keeping capacity. Every span minted so far is invalid from here on.
+    /// Discards every string, keeping capacity and, once written, the sentinel. Every handle
+    /// minted so far is invalid from here on.
     #[inline]
     pub fn reset(&mut self) {
         self.text.truncate(POOL_SENTINEL.len_utf8());
@@ -1058,6 +1171,80 @@ impl TextPool {
             self.stamp = self.stamp.next_generation();
         }
     }
+
+    #[inline]
+    fn handle(&self, start: NonZeroU32, len: u32) -> PoolText<F> {
+        PoolText {
+            start,
+            len,
+            #[cfg(feature = "_internal_store_check")]
+            stamp: self.stamp,
+            family: PhantomData,
+        }
+    }
+
+    /// The refused arm of a push's mint, as [`Store::prime_range`] is a flush's: a pool never
+    /// written takes its sentinel and mints `count` bytes behind it; a pool already written, or
+    /// a string that cannot fit, overflows.
+    #[cold]
+    #[inline(never)]
+    fn prime_range(&mut self, count: usize) -> (NonZeroU32, u32) {
+        if !self.text.is_empty() {
+            store_overflow();
+        }
+        self.write_sentinel();
+        match mint_range(self.text.len(), count) {
+            Some(range) => range,
+            None => store_overflow(),
+        }
+    }
+
+    /// Writes the sentinel of a pool never written.
+    #[cold]
+    #[inline(never)]
+    fn write_sentinel(&mut self) {
+        self.text.push(POOL_SENTINEL);
+    }
+}
+
+/// The append-only writer [`TextPool::push_with`] hands its closure: it writes at the pool's
+/// tail and can neither read nor remove a byte the pool already holds.
+pub struct PoolWriter<'a> {
+    text: &'a mut String,
+}
+
+impl PoolWriter<'_> {
+    /// Appends `c`.
+    #[inline]
+    pub fn push(&mut self, c: char) {
+        self.text.push(c);
+    }
+
+    /// Appends `s`.
+    #[inline]
+    pub fn push_str(&mut self, s: &str) {
+        self.text.push_str(s);
+    }
+
+    /// Reserves room for at least `additional` more bytes.
+    #[inline]
+    pub fn reserve(&mut self, additional: usize) {
+        self.text.reserve(additional);
+    }
+}
+
+impl fmt::Write for PoolWriter<'_> {
+    #[inline]
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        self.push_str(s);
+        Ok(())
+    }
+
+    #[inline]
+    fn write_char(&mut self, c: char) -> fmt::Result {
+        self.push(c);
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -1065,6 +1252,9 @@ mod tests {
     use super::*;
 
     enum Alpha {}
+
+    /// The family of the test pools.
+    enum Words {}
 
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
     struct Node<'a>(&'a str);
@@ -1096,7 +1286,7 @@ mod tests {
     const _: () = {
         assert!(STORE_CHECK || size_of::<Id<Alpha>>() == 4);
         assert!(STORE_CHECK || size_of::<Run<Alpha>>() == 8);
-        assert!(STORE_CHECK || size_of::<PoolText>() == 8);
+        assert!(STORE_CHECK || size_of::<PoolText<Words>>() == 8);
         assert!(STORE_CHECK || size_of::<ListMark<Alpha>>() == 4);
         #[cfg(target_pointer_width = "64")]
         {
@@ -1105,14 +1295,14 @@ mod tests {
             assert!(STORE_CHECK || size_of::<StoreView<'static, Id<Alpha>>>() == 16);
             assert!(STORE_CHECK || size_of::<Store<Id<Alpha>>>() == 24);
             assert!(STORE_CHECK || size_of::<ListBuf<Id<Alpha>>>() == 24);
-            assert!(STORE_CHECK || size_of::<TextPool>() == 24);
+            assert!(STORE_CHECK || size_of::<TextPool<Words>>() == 24);
         }
     };
 
     const _: () = {
         assert!(size_of::<Option<Id<Alpha>>>() == size_of::<Id<Alpha>>());
         assert!(size_of::<Option<Run<Alpha>>>() == size_of::<Run<Alpha>>());
-        assert!(size_of::<Option<PoolText>>() == size_of::<PoolText>());
+        assert!(size_of::<Option<PoolText<Words>>>() == size_of::<PoolText<Words>>());
     };
 
     /// Under the census, the open-list total follows the stack's length: a push adds one, and a
@@ -1167,6 +1357,35 @@ mod tests {
             .expect("a row for the element type");
         assert_eq!(row.scratch_peak, 8, "each shrink took back what it removed");
         assert_eq!(row.minted, 0, "a flush mints nothing of its own");
+    }
+
+    /// A pop takes back the one element it removes, and a pop of an empty frame nothing, so
+    /// the pushes after it rise from the stack's real length.
+    #[cfg(feature = "_internal_ast_census")]
+    #[test]
+    fn the_census_takes_back_each_pop() {
+        use crate::ast_census_probe;
+
+        ast_census_probe::arm();
+        let mut scratch = ListBuf::new();
+        let frame = scratch.mark();
+        for _ in 0..3 {
+            scratch.push(Node("j"));
+        }
+        scratch.pop(frame);
+        scratch.pop(frame);
+        let empty = scratch.mark();
+        assert_eq!(scratch.pop(empty), None);
+        scratch.push(Node("k"));
+        scratch.push(Node("l"));
+        scratch.reset();
+        let tally = ast_census_probe::disarm();
+        let (_, row) = tally
+            .rows
+            .iter()
+            .find(|(name, _)| name.contains("::Node"))
+            .expect("a row for the element type");
+        assert_eq!(row.scratch_peak, 3, "each pop took back its element");
     }
 
     #[test]
@@ -1738,6 +1957,170 @@ mod tests {
     }
 
     #[test]
+    fn a_frame_edit_reaches_its_own_frame_and_the_frames_above_it_only() {
+        let mut nodes = store();
+        let mut scratch = ListBuf::new();
+        let outer = scratch.mark();
+        scratch.push(Node("a"));
+        scratch.push(Node("b"));
+        let inner = scratch.mark();
+        scratch.push(Node("c"));
+        for node in scratch.frame_mut(inner) {
+            *node = Node("C");
+        }
+        assert_eq!(scratch.frame(outer), [Node("a"), Node("b"), Node("C")]);
+        // the outer frame's slice reaches the inner frame above it, as a frame read does
+        let outer_frame = scratch.frame_mut(outer);
+        assert_eq!(outer_frame.len(), 3);
+        outer_frame[0] = Node("A");
+        let inner_run = scratch.flush_copy(inner, &mut nodes);
+        let outer_run = scratch.flush_copy(outer, &mut nodes);
+        assert_eq!(texts(&nodes, inner_run), ["C"]);
+        assert_eq!(texts(&nodes, outer_run), ["A", "b"]);
+    }
+
+    #[test]
+    fn an_empty_frame_edits_as_an_empty_slice() {
+        let mut scratch = ListBuf::new();
+        scratch.push(Node("below"));
+        let empty = scratch.mark();
+        assert!(scratch.frame_mut(empty).is_empty());
+        assert_eq!(scratch.items, [Node("below")]);
+    }
+
+    #[test]
+    fn a_pop_takes_the_top_and_never_reaches_below_its_frame() {
+        let mut nodes = store();
+        let mut scratch = ListBuf::new();
+        let outer = scratch.mark();
+        scratch.push(Node("a"));
+        let inner = scratch.mark();
+        scratch.push(Node("b"));
+        scratch.push(Node("c"));
+        assert_eq!(scratch.pop(inner), Some(Node("c")));
+        assert_eq!(scratch.pop(inner), Some(Node("b")));
+        assert_eq!(scratch.pop(inner), None, "the inner frame is empty");
+        assert_eq!(
+            scratch.frame(outer),
+            [Node("a")],
+            "the outer frame is untouched"
+        );
+        scratch.push(Node("d"));
+        let inner_run = scratch.flush_move(inner, &mut nodes);
+        assert_eq!(texts(&nodes, inner_run), ["d"]);
+        assert_eq!(scratch.pop(outer), Some(Node("a")));
+        assert_eq!(scratch.pop(outer), None);
+        assert!(scratch.items.is_empty());
+    }
+
+    #[test]
+    fn a_pop_from_an_outer_frame_takes_an_inner_frames_top() {
+        let mut scratch = ListBuf::new();
+        let outer = scratch.mark();
+        scratch.push(Node("a"));
+        let inner = scratch.mark();
+        scratch.push(Node("b"));
+        // the frame above `outer` holds the inner frame too, as `frame(outer)` reads it
+        assert_eq!(scratch.pop(outer), Some(Node("b")));
+        assert_eq!(scratch.len_since(inner), 0);
+        assert_eq!(scratch.frame(outer), [Node("a")]);
+    }
+
+    /// A mark a pop leaves above the top is not invalidated: once the stack regrows to it, it
+    /// frames what was pushed after the pop, in either build.
+    #[test]
+    fn a_mark_a_pop_left_above_the_top_frames_the_regrown_stack() {
+        let mut nodes = store();
+        let mut scratch = ListBuf::new();
+        let outer = scratch.mark();
+        scratch.push(Node("a"));
+        let inner = scratch.mark();
+        scratch.push(Node("b"));
+        assert_eq!(scratch.pop(outer), Some(Node("b")));
+        assert_eq!(scratch.pop(outer), Some(Node("a")));
+        scratch.push(Node("x"));
+        scratch.push(Node("y"));
+        let inner_run = scratch.flush_move(inner, &mut nodes);
+        let outer_run = scratch.flush_move(outer, &mut nodes);
+        assert_eq!(texts(&nodes, inner_run), ["y"]);
+        assert_eq!(texts(&nodes, outer_run), ["x"]);
+    }
+
+    #[test]
+    fn a_pop_on_a_never_written_buffer_is_none() {
+        let mut scratch: ListBuf<Node<'static>> = ListBuf::new();
+        let mark = scratch.mark();
+        assert_eq!(scratch.pop(mark), None);
+        assert_eq!(scratch.items.capacity(), 0);
+    }
+
+    #[test]
+    #[cfg_attr(
+        not(feature = "_internal_store_check"),
+        should_panic(expected = "store miss")
+    )]
+    #[cfg_attr(
+        feature = "_internal_store_check",
+        should_panic(expected = "stale list mark")
+    )]
+    fn a_pop_at_a_mark_above_the_top_is_refused() {
+        let mut scratch = ListBuf::new();
+        let low = scratch.mark();
+        scratch.push(Node("a"));
+        let high = scratch.mark();
+        scratch.truncate(low);
+        let _ = scratch.pop(high);
+    }
+
+    #[test]
+    #[cfg_attr(
+        not(feature = "_internal_store_check"),
+        should_panic(expected = "store miss")
+    )]
+    #[cfg_attr(
+        feature = "_internal_store_check",
+        should_panic(expected = "stale list mark")
+    )]
+    fn a_frame_edit_at_a_mark_above_the_top_is_refused() {
+        let mut scratch = ListBuf::new();
+        let low = scratch.mark();
+        scratch.push(Node("a"));
+        let high = scratch.mark();
+        scratch.truncate(low);
+        let _ = scratch.frame_mut(high);
+    }
+
+    #[test]
+    fn comment_and_span_lists_use_the_same_primitives() {
+        let comment = crate::Comment {
+            content_span: crate::Span::new(2, 4),
+            is_block: true,
+            multiline: false,
+            span: crate::Span::new(0, 6),
+            from_template_reader: false,
+            owned_by_node: false,
+        };
+        let mut comments: Store<crate::Comment> = Store::new();
+        let mut scratch = ListBuf::new();
+        let mark = scratch.mark();
+        scratch.push(comment);
+        scratch.frame_mut(mark)[0].owned_by_node = true;
+        let run: Run<crate::Comment> = scratch.flush_copy(mark, &mut comments);
+        assert!(comments.slice(run)[0].owned_by_node);
+
+        let mut spans: Store<crate::Span> = Store::new();
+        let mut scratch = ListBuf::new();
+        let mark = scratch.mark();
+        scratch.push(crate::Span::new(1, 2));
+        scratch.push(crate::Span::new(3, 5));
+        let run: Run<crate::Span> = scratch.flush_copy(mark, &mut spans);
+        assert_eq!(
+            spans.slice(run),
+            [crate::Span::new(1, 2), crate::Span::new(3, 5)]
+        );
+    }
+
+    #[test]
     fn a_checkpoint_can_be_rewound_to_more_than_once() {
         let mut nodes = store();
         let mut scratch = ListBuf::new();
@@ -1804,19 +2187,54 @@ mod tests {
         assert_eq!(view.slice(Run::EMPTY), &[]);
     }
 
+    fn fresh_pool() -> TextPool<Words> {
+        TextPool::new()
+    }
+
+    #[test]
+    fn a_new_pool_holds_nothing_and_allocates_nothing() {
+        let fresh = fresh_pool();
+        assert!(fresh.text.is_empty());
+        assert_eq!(fresh.text.capacity(), 0);
+        assert_eq!(fresh.get(PoolText::EMPTY), "");
+        let defaulted: TextPool<Words> = TextPool::default();
+        assert_eq!(defaulted.text.capacity(), 0);
+        let sized: TextPool<Words> = TextPool::with_capacity(16);
+        assert!(sized.text.is_empty(), "a sized pool writes no sentinel");
+        assert!(sized.text.capacity() >= 16);
+    }
+
     #[test]
     fn an_absent_string_is_distinct_from_an_empty_one() {
-        let mut pool = TextPool::new();
+        let mut pool = fresh_pool();
         let empty = pool.push("");
-        let absent: Option<PoolText> = None;
+        let absent: Option<PoolText<Words>> = None;
         assert_ne!(Some(empty), absent);
+        assert_eq!(empty, PoolText::EMPTY);
         assert_eq!(pool.get(empty), "");
-        assert_eq!(pool.text.len(), POOL_SENTINEL.len_utf8());
+        assert!(
+            pool.text.is_empty(),
+            "an empty push writes nothing, not even the sentinel"
+        );
+        assert_eq!(pool.text.capacity(), 0);
+    }
+
+    #[test]
+    fn the_first_push_writes_the_sentinel_and_mints_start_one() {
+        let mut pool = fresh_pool();
+        let first = pool.push("ab");
+        assert_eq!((first.start.get(), first.len), (1, 2));
+        assert_eq!(pool.text, "\0ab");
+        let second = pool.push("c");
+        assert_eq!((second.start.get(), second.len), (3, 1));
+        assert_eq!(pool.text, "\0abc", "a written pool does not prime again");
+        assert_eq!(pool.get(first), "ab");
+        assert_eq!(pool.get(second), "c");
     }
 
     #[test]
     fn pool_text_preserves_multibyte_strings_at_their_boundaries() {
-        let mut pool = TextPool::with_capacity(32);
+        let mut pool = TextPool::<Words>::with_capacity(32);
         let accented = pool.push("é");
         let ascii = pool.push("abc");
         let cjk = pool.push("日本語");
@@ -1830,15 +2248,24 @@ mod tests {
     #[test]
     #[should_panic(expected = "store miss")]
     fn a_span_off_a_character_boundary_misses_rather_than_slice_panics() {
-        let mut pool = TextPool::new();
+        let mut pool = fresh_pool();
         let span = pool.push("é");
         let torn = PoolText { len: 1, ..span };
         pool.get(torn);
     }
 
+    #[cfg(not(feature = "_internal_store_check"))]
+    #[test]
+    #[should_panic(expected = "store miss")]
+    fn a_handle_read_in_a_pool_never_written_misses() {
+        let mut written = fresh_pool();
+        let text = written.push("abc");
+        fresh_pool().get(text);
+    }
+
     #[test]
     fn pool_reset_keeps_capacity_and_the_sentinel() {
-        let mut pool = TextPool::with_capacity(16);
+        let mut pool = TextPool::<Words>::with_capacity(16);
         pool.push("some text");
         let capacity = pool.text.capacity();
         pool.reset();
@@ -1847,6 +2274,112 @@ mod tests {
         let span = pool.push("again");
         assert_eq!(span.start.get(), 1);
         assert_eq!(pool.get(span), "again");
+    }
+
+    #[test]
+    fn a_reset_of_a_pool_never_written_leaves_it_unwritten() {
+        let mut pool = fresh_pool();
+        pool.reset();
+        assert!(pool.text.is_empty());
+        assert_eq!(pool.text.capacity(), 0);
+        let text = pool.push("x");
+        assert_eq!((text.start.get(), pool.get(text)), (1, "x"));
+    }
+
+    #[test]
+    fn a_written_push_lands_as_a_pushed_one_does() {
+        let mut pool = fresh_pool();
+        let built = pool.push_with(|writer| {
+            writer.reserve(8);
+            writer.push('d');
+            writer.push_str("é日");
+            writer.push('👍');
+        });
+        assert_eq!((built.start.get(), built.len), (1, 10));
+        assert_eq!(pool.get(built), "dé日👍");
+        let pushed = pool.push("tail");
+        assert_eq!(pool.get(pushed), "tail");
+        assert_eq!(
+            pool.get(built),
+            "dé日👍",
+            "a later push leaves the written text alone"
+        );
+        let formatted = pool.push_with(|writer| {
+            use std::fmt::Write as _;
+            let (count, letter) = (1, 'z');
+            write!(writer, "{count}-{letter}").expect("a pool write cannot fail");
+        });
+        assert_eq!(pool.get(formatted), "1-z");
+    }
+
+    #[test]
+    fn an_empty_write_is_the_empty_string() {
+        let mut fresh = fresh_pool();
+        let empty = fresh.push_with(|_| {});
+        assert_eq!(empty, PoolText::EMPTY);
+        assert_eq!(fresh.get(empty), "");
+        // the sentinel goes in ahead of the write, so the pool is as a reset one is
+        assert_eq!(fresh.text, "\0");
+        let next = fresh.push("a");
+        assert_eq!((next.start.get(), fresh.get(next)), (1, "a"));
+
+        let mut written = fresh_pool();
+        let a = written.push("a");
+        assert_eq!(written.push_with(|_| {}), PoolText::EMPTY);
+        assert_eq!(written.text, "\0a");
+        assert_eq!(written.get(a), "a");
+    }
+
+    #[test]
+    fn a_write_after_reset_starts_behind_the_sentinel() {
+        let mut pool = fresh_pool();
+        pool.push("old text");
+        pool.reset();
+        let built = pool.push_with(|writer| writer.push_str("new"));
+        assert_eq!((built.start.get(), pool.get(built)), (1, "new"));
+        assert_eq!(pool.text, "\0new");
+    }
+
+    #[test]
+    fn a_failed_write_is_taken_back() {
+        let mut pool = fresh_pool();
+        let kept = pool.push("kept");
+        let failed = pool.try_push_with(|writer| {
+            writer.push_str("partial");
+            Err("refused")
+        });
+        assert_eq!(failed, Err("refused"));
+        assert_eq!(pool.text, "\0kept");
+        let next = pool.try_push_with(|writer| -> Result<(), ()> {
+            writer.push('n');
+            Ok(())
+        });
+        let next = next.expect("an ok write");
+        assert_eq!((next.start.get(), pool.get(next)), (5, "n"));
+        assert_eq!(pool.get(kept), "kept");
+
+        let mut fresh = fresh_pool();
+        assert_eq!(fresh.try_push_with(|_| Err(())), Err(()));
+        assert_eq!(
+            fresh.text, "\0",
+            "a failed write on a fresh pool leaves a reset pool"
+        );
+    }
+
+    #[test]
+    fn a_write_that_panics_leaves_the_pool_usable() {
+        let mut pool = fresh_pool();
+        let before = pool.push("a");
+        let unwound = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            pool.push_with(|writer| {
+                writer.push_str("orphan");
+                panic!("a decoder panic");
+            })
+        }));
+        assert!(unwound.is_err());
+        let after = pool.push("b");
+        assert_eq!(pool.get(before), "a");
+        assert_eq!(pool.get(after), "b");
     }
 
     #[cfg(not(feature = "_internal_store_check"))]
@@ -1982,7 +2515,7 @@ mod tests {
             let (_nodes, run) = run_of_two();
             assert_ne!(run, Run::EMPTY);
             assert_eq!(nodes.slice(Run::EMPTY), &[]);
-            let _ = PoolText::EMPTY == PoolText::EMPTY;
+            let _ = PoolText::<Words>::EMPTY == PoolText::EMPTY;
         }
 
         #[test]
@@ -2046,7 +2579,7 @@ mod tests {
         #[test]
         #[should_panic(expected = "store stamp mismatch")]
         fn a_span_retained_across_reset_is_rejected_in_bounds() {
-            let mut pool = TextPool::new();
+            let mut pool = fresh_pool();
             let span = pool.push("abc");
             pool.reset();
             pool.push("xyz");
@@ -2056,17 +2589,62 @@ mod tests {
         #[test]
         #[should_panic(expected = "store stamp mismatch")]
         fn a_span_from_another_pool_is_rejected_in_bounds() {
-            let mut pool = TextPool::new();
-            let mut other = TextPool::new();
+            let mut pool = fresh_pool();
+            let mut other = fresh_pool();
             let span = pool.push("abc");
             other.push("xyz");
             other.get(span);
         }
 
         #[test]
+        #[should_panic(expected = "store stamp mismatch")]
+        fn a_written_span_from_another_pool_is_rejected_in_bounds() {
+            let mut pool = fresh_pool();
+            let mut other = fresh_pool();
+            let span = pool.push_with(|writer| writer.push_str("abc"));
+            other.push("xyz");
+            other.get(span);
+        }
+
+        #[test]
+        #[should_panic(expected = "store stamp mismatch")]
+        fn a_written_span_retained_across_reset_is_rejected_in_bounds() {
+            let mut pool = fresh_pool();
+            let span = pool.push_with(|writer| writer.push_str("abc"));
+            pool.reset();
+            pool.push_with(|writer| writer.push_str("xyz"));
+            pool.get(span);
+        }
+
+        #[test]
+        #[should_panic(expected = "stale list mark")]
+        fn a_frame_edit_at_a_flushed_mark_is_rejected_after_regrowth() {
+            let mut nodes = store();
+            let mut scratch = ListBuf::new();
+            let inner = scratch.mark();
+            scratch.push(Node("b"));
+            scratch.flush_move(inner, &mut nodes);
+            scratch.push(Node("c"));
+            let _ = scratch.frame_mut(inner);
+        }
+
+        #[test]
+        #[should_panic(expected = "stale list mark")]
+        fn a_pop_at_a_mark_a_truncate_rewound_past_is_rejected_after_regrowth() {
+            let mut scratch = ListBuf::new();
+            let low = scratch.mark();
+            scratch.push(Node("a"));
+            let high = scratch.mark();
+            scratch.truncate(low);
+            scratch.push(Node("b"));
+            scratch.push(Node("c"));
+            let _ = scratch.pop(high);
+        }
+
+        #[test]
         fn a_present_empty_span_reads_empty_in_any_pool() {
-            let mut pool = TextPool::new();
-            let other = TextPool::new();
+            let mut pool = fresh_pool();
+            let other = fresh_pool();
             let span = pool.push("");
             assert_eq!(other.get(span), "");
         }
