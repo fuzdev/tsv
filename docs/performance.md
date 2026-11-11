@@ -945,6 +945,26 @@ over each snapshot: only the measured libraries differ. The format driver times 
 `../corpora/collections`, and is an example rather than a `profile` flag so it compiles against an
 older tree unchanged.
 
+What changes between trees is the entry points the drivers call, as the parse moves from the
+`Bump` into stores, so each driver keeps those calls in an `api` module with one arm per
+generation of tree, and shares everything else. The task probes each side's tree for its
+generation and builds the matching arm: the current tree's is the unmarked one, and an older
+generation's is selected by a `perf_ab_api` cfg passed to the example's own compilation (`cargo
+rustc … -- --cfg`, so no library is built differently). On a tree with the warm parse
+(`tsv_ts::__private::parse_folded_into`), TypeScript and Svelte parse into stores kept warm across
+files, taken before each timed region and parked after it as the CLI's `Formatter` keeps them, and
+CSS, which has no stores, into the `Bump`; on an older tree every language parses into the `Bump`
+alone, which is kept warm the same way. The report names each side's generation, and a run whose
+sides differ says so: its rows then compare two call paths as well as two libraries. A change
+that moves an entry point a driver calls moves that driver's current arm to a new `perf_ab_api`
+value, adds the probe that tells the generations apart (`DRIVER_APIS` in `scripts/perf_ab.ts`) and
+names the value in the workspace's `check-cfg` list.
+
+So a side with the warm parse is measured on the warm path alone: stores reused across files, as
+the CLI's `Formatter` and the bindings' per-thread stores run it. The one-shot free functions
+(`tsv_ts::format`, `tsv_svelte::format`), which build fresh stores on every call, are not what the
+task times.
+
 The strip driver times what `profile --strip` times, over the files a module loader strips
 (`.ts` / `.mts` / `.cts`, no declaration file — not the TypeScript row's set, which carries
 `.js` and `.d.ts`): the parse of the author's bytes (no carriage-return fold, so the TypeScript

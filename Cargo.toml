@@ -108,7 +108,10 @@ unreachable_pub = "warn"
 # `tsv_check`, the two crates outside the workspace build. A custom cfg, not a Cargo feature:
 # an optional path dependency would still join the workspace, and the `--all-features` legs
 # would turn a feature on against a dependency that is not there.
-unexpected_cfgs = { level = "warn", check-cfg = ["cfg(tsv_unported)"] }
+# `perf_ab_api` selects the entry-point generation `tsv_debug`'s `perf_ab` drivers are built
+# against; `scripts/perf_ab.ts` sets it on the example's own compilation alone (the drivers'
+# module docs).
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(tsv_unported)", 'cfg(perf_ab_api, values("no_stores"))'] }
 
 [workspace.lints.rustdoc]
 # A doc link is the only machine-checkable claim a doc comment makes, so an unresolvable

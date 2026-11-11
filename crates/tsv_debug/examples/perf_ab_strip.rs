@@ -3,20 +3,27 @@
 //! times it, printed as one JSON line.
 //!
 //! A separate example from `perf_ab.rs` (whose module doc says why the drivers are examples)
-//! because it reads an entry point the format driver does not, `tsv_ts::__private::strip_in`:
-//! an older base tree without it still builds the format driver, and the task leaves the strip row
-//! out for such a tree, saying so, rather than losing every row to a failed build.
+//! because it reads an entry point the format driver does not, the strip
+//! (`tsv_ts::__private::strip_in`, or `strip_into` with the warm stores): an older base tree
+//! without it still builds the format driver, and the task leaves the strip row out for such a
+//! tree, saying so, rather than losing every row to a failed build.
 //!
 //! Usage: `perf_ab_strip <corpus-dir> --iterations N [--parse-only]`.
 //!
 //! - The file set is `perf_ab.rs`'s directory walk filtered to what a module loader strips —
 //!   `.ts` / `.mts` / `.cts`, no declaration file — `profile --strip`'s set.
-//! - Each iteration parses the source (`tsv_ts::__private::parse_with_goal_or_fallback`, the
-//!   goal read from the extension as `tsv strip` reads a path), then strips it
-//!   (`tsv_ts::__private::strip_in`, which parses again inside, into the same warm arena);
+//! - Each iteration parses the source (`tsv_ts::__private::parse_with_goal_or_fallback_into`,
+//!   the goal read from the extension as `tsv strip` reads a path), then strips it
+//!   (`tsv_ts::__private::strip_into`, which parses again inside, into the same warm arena and
+//!   warm stores);
 //!   the strip column is the strip's time less the parse's — its walk and blank. Both read
 //!   the author's bytes: the strip folds no carriage returns, so the TypeScript format row's
 //!   parse (fold + `parse_folded`) is not this one.
+//! - The calls sit in an `api` module with one arm per entry-point generation, as
+//!   `perf_ab.rs`'s do (its module doc): the current arm parses into stores taken before each
+//!   timed call and parked after it, and `perf_ab_api = "no_stores"`, a tree older than the
+//!   stores, calls `parse_with_goal_or_fallback` and `strip_in` over the `Bump` alone. The
+//!   take, the park and the arena resets sit outside the timed regions.
 //! - `--parse-only` skips the strip. Since a full run parses twice per iteration, the task reads
 //!   the strip's own `instructions:u` as full − 2 × parse-only + the zero-iteration fixed cost;
 //!   `--iterations 0` reads the files and times nothing.
@@ -94,6 +101,7 @@ fn run(args: &Args) -> ExitCode {
     });
 
     let mut arena = bumpalo::Bump::new();
+    let mut warm = api::Warm::default();
     let mut ok_files = 0usize;
     let mut bytes = 0usize;
     let mut errors = 0usize;
@@ -119,10 +127,7 @@ fn run(args: &Args) -> ExitCode {
         let mut failed = false;
         let mut file_output = None;
         for iteration in 0..args.iterations {
-            let t0 = Instant::now();
-            let parsed =
-                tsv_ts::__private::parse_with_goal_or_fallback(&source, goal, &arena).is_ok();
-            let parse = t0.elapsed();
+            let (parse, parsed) = api::parse(&source, goal, &arena, &mut warm);
             arena.reset();
             if !parsed {
                 failed = true;
@@ -132,9 +137,7 @@ fn run(args: &Args) -> ExitCode {
             if args.parse_only {
                 continue;
             }
-            let t1 = Instant::now();
-            let stripped = std::hint::black_box(tsv_ts::__private::strip_in(&source, goal, &arena));
-            let strip = t1.elapsed();
+            let (strip, stripped) = api::strip(&source, goal, &arena, &mut warm);
             let output = match &stripped {
                 Ok(stripped) => Some(stripped.code.len()),
                 Err(tsv_ts::StripError::Parse(_)) => {
@@ -171,6 +174,94 @@ fn run(args: &Args) -> ExitCode {
         args.iterations
     );
     ExitCode::SUCCESS
+}
+
+/// `f`'s wall and its result, kept from the optimizer.
+fn timed<R>(f: impl FnOnce() -> R) -> (Duration, R) {
+    let t0 = Instant::now();
+    let result = std::hint::black_box(f());
+    (t0.elapsed(), result)
+}
+
+/// The entry points of the trees this driver measures: the current tree's, and under
+/// `perf_ab_api = "no_stores"` those of a tree older than the parse stores (`perf_ab.rs`'s
+/// module doc says how an arm is chosen).
+///
+/// Each arm's `Warm` is what it keeps across files and iterations besides the AST `Bump`: the
+/// current arm's parked stores, taken before each timed region and parked after it, as the
+/// bindings' strip keeps them.
+#[cfg(not(perf_ab_api = "no_stores"))]
+mod api {
+    use super::timed;
+    use std::time::Duration;
+    use tsv_ts::ast::AstStores;
+
+    /// The stores parked between the timed calls, rewound.
+    #[derive(Default)]
+    pub(super) struct Warm {
+        stores: Option<AstStores<'static>>,
+    }
+
+    /// The parse's wall and whether it parsed.
+    pub(super) fn parse(
+        source: &str,
+        goal: Option<tsv_ts::Goal>,
+        arena: &bumpalo::Bump,
+        warm: &mut Warm,
+    ) -> (Duration, bool) {
+        let mut stores: AstStores<'_> = warm.stores.take().unwrap_or_default();
+        let (wall, parsed) = timed(|| {
+            tsv_ts::__private::parse_with_goal_or_fallback_into(source, goal, arena, &mut stores)
+                .is_ok()
+        });
+        warm.stores = Some(stores.park());
+        (wall, parsed)
+    }
+
+    /// The strip's wall, its own parse included, and what it returned.
+    pub(super) fn strip(
+        source: &str,
+        goal: Option<tsv_ts::Goal>,
+        arena: &bumpalo::Bump,
+        warm: &mut Warm,
+    ) -> (Duration, Result<tsv_ts::Stripped, tsv_ts::StripError>) {
+        let mut stores: AstStores<'_> = warm.stores.take().unwrap_or_default();
+        let timed = timed(|| tsv_ts::__private::strip_into(source, goal, arena, &mut stores));
+        warm.stores = Some(stores.park());
+        timed
+    }
+}
+
+/// The entry points of a tree older than the parse stores: the parse and the strip into the
+/// `Bump` alone. Built only against such a tree, never against the current one.
+#[cfg(perf_ab_api = "no_stores")]
+mod api {
+    use super::timed;
+    use std::time::Duration;
+
+    /// Nothing is kept warm beside the `Bump`.
+    #[derive(Default)]
+    pub(super) struct Warm;
+
+    /// The parse's wall and whether it parsed.
+    pub(super) fn parse(
+        source: &str,
+        goal: Option<tsv_ts::Goal>,
+        arena: &bumpalo::Bump,
+        _warm: &mut Warm,
+    ) -> (Duration, bool) {
+        timed(|| tsv_ts::__private::parse_with_goal_or_fallback(source, goal, arena).is_ok())
+    }
+
+    /// The strip's wall, its own parse included, and what it returned.
+    pub(super) fn strip(
+        source: &str,
+        goal: Option<tsv_ts::Goal>,
+        arena: &bumpalo::Bump,
+        _warm: &mut Warm,
+    ) -> (Duration, Result<tsv_ts::Stripped, tsv_ts::StripError>) {
+        timed(|| tsv_ts::__private::strip_in(source, goal, arena))
+    }
 }
 
 /// `profile --strip`'s filter: TypeScript a module loader strips — `.ts` / `.mts` / `.cts`,
