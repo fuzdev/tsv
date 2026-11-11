@@ -381,21 +381,20 @@ pub(super) fn attach_expression_list<'a>(
 
 /// The attach for a comment-bearing (or preceding-HTML) `<script>` `Program`.
 ///
-/// The queue is the script's own comments — the whole set, since acorn parsed
-/// the whole body — and the preceding HTML comment rides along as the
+/// The queue is the script's own comments (`comments`, its `Program`'s) — the whole set,
+/// since acorn parsed the whole body — and the preceding HTML comment rides along as the
 /// `Program`'s first `leadingComments` entry (Svelte's positionless
 /// `{type: "Line", value}` shape). The `options: null` non-TS quirk is
 /// reproduced at emit time (schema-driven), so it never perturbs the walk.
 pub(super) fn attach_script<'a>(
-    script: &ast::Script<'a>,
-    view: AstView<'a>,
+    comments: &'a [Comment],
     attach: AttachInputs<'a>,
     html_leading_comment: Option<&ast::HtmlComment>,
 ) -> CommentAttach<'a> {
     CommentAttach::new(
         attach.source,
         IslandComments {
-            queue: view.comments(script.content.comments).iter().collect(),
+            queue: comments.iter().collect(),
             root_parent_end: None,
             root_fallback: true,
             html_leading: html_leading_comment.map(|c| c.content(attach.source)),

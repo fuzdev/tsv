@@ -1,21 +1,21 @@
 //! Internal AST - optimized for traversal and manipulation
 //!
 //! Identifier names are span-identity ([`IdentName`]): recovered from the
-//! source slice, with an arena-allocated `&'arena str` as a rare escape hatch
+//! source slice, with a string of the stores' text pool as a rare escape hatch
 //! (unicode-escaped names). This is the primary AST representation used by the
 //! parser, formatter, and other tools.
 //!
-//! ## Arena allocation
+//! ## Storage
 //!
 //! Expressions, statements, types and the payloads too rare to sit inline in the node that
 //! refers to them are rows of per-document stores ([`AstStores`]), named by id and read
 //! through an [`AstView`]; the lists built by value are runs of rows in a store per element
-//! type. The rest is allocated in a per-parse [`bumpalo::Bump`] supplied by the caller: the
-//! comments one `&'arena [Comment]`, and decoded strings `&'arena str` (not `String`) — freed
-//! wholesale when the `Bump` drops, with no per-node `Drop`. The rare
-//! escaped identifier name is one such `&'arena str` ([`IdentName::escaped`]),
-//! read directly at every consumer — the AST holds no interner and needs no
-//! interner lifetime.
+//! type. The stores also hold the tree's decoded strings, in one text pool (a [`PoolStr`]
+//! handle, read through [`AstView::text`]), and its comments, a program's a run of comment
+//! rows (a [`CommentList`], read through [`AstView::comments`]) — so nothing of the tree
+//! lives anywhere else, and a rewind of the stores frees all of it with no per-node `Drop`.
+//! The rare escaped identifier name is one such string ([`IdentName::escaped`]) — the AST
+//! holds no interner and needs no interner lifetime.
 
 #[cfg(feature = "json")]
 pub(crate) mod convert;
@@ -190,9 +190,9 @@ const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<ExpressionKind<'
 #[cfg(test)]
 const _: () = assert!(size_of::<Option<Expression<'static>>>() == size_of::<Expression<'static>>());
 #[cfg(all(test, target_pointer_width = "64"))]
-const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<Statement<'static>>() == 56);
+const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<Statement<'static>>() == 48);
 #[cfg(all(test, target_pointer_width = "64"))]
-const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<StatementKind<'static>>() == 48);
+const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<StatementKind<'static>>() == 40);
 #[cfg(test)]
 const _: () = assert!(size_of::<Option<Statement<'static>>>() == size_of::<Statement<'static>>());
 #[cfg(all(test, target_pointer_width = "64"))]
@@ -206,7 +206,7 @@ const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<VariableDeclarat
 #[cfg(all(test, target_pointer_width = "64"))]
 const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<SwitchCase>() == 20);
 #[cfg(all(test, target_pointer_width = "64"))]
-const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<TSType<'static>>() == 72);
+const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<TSType<'static>>() == 56);
 // The type-edge holders every type annotation, type-argument list and type-parameter list
 // rides inline in: their `Option`s fold into the id's niche and the run's, so an absent
 // annotation or list costs no width in any of the nodes that hold one.
@@ -234,10 +234,9 @@ const _: () = assert!(
 
 /// Program node - the root of the AST
 ///
-/// Returned by value from `parse`; `body` and `comments` point into the
-/// caller-supplied `'arena` (the parser gathers comments directly in the bump,
-/// so the warm binding loops never malloc for them; `Comment` is a `Copy` POD,
-/// satisfying bumpalo's no-`Drop` rule).
+/// Returned by value from `parse`; `body` and `comments` are runs of the stores the parse
+/// wrote (the parser gathers comments on the stores' comment scratch and flushes them once,
+/// so the warm binding loops never malloc for them).
 #[derive(Debug, Clone)]
 pub struct Program<'arena> {
     pub body: Run<StmtId>,
@@ -264,8 +263,8 @@ pub struct Decorator {
 pub enum LiteralValue<'arena> {
     Number(f64),
     /// String literal. The decoded value is recovered via
-    /// `StringCooked::resolve(span, source)` (no-escape = zero-copy inner slice;
-    /// escaped = arena bytes); the quote char via `Literal::string_quote(source)`.
+    /// `StringCooked::resolve(span, source, view)` (no-escape = zero-copy inner slice;
+    /// escaped = pool text); the quote char via `Literal::string_quote(source)`.
     String(StringCooked<'arena>),
     /// BigInt literal: `1n`, `100n`, `0xffn`. No stored payload — digits via
     /// `Literal::bigint_digits(source)` (span minus trailing `n`); the printer
@@ -279,7 +278,7 @@ pub enum LiteralValue<'arena> {
 ///
 /// `Verbatim` (the common no-escape case) carries **no allocation** — the decoded
 /// value equals the inner source slice (the literal's `span` minus the two quote
-/// bytes). Only escaped strings own arena bytes.
+/// bytes). Only escaped strings hold text of their own, in the stores' text pool.
 #[derive(Debug, Clone)]
 pub enum StringCooked<'arena> {
     /// Decoded value == the inner source slice (no escapes to decode).
@@ -333,17 +332,17 @@ impl<'arena> Literal<'arena> {
 }
 
 /// The name channel of an identifier-like node: span-identity by default, with
-/// an arena-allocated escape hatch for the rare names the source can't recover.
+/// a pool-text escape hatch for the rare names the source can't recover.
 ///
 /// `escaped` is `Some` only when the name text differs from the leading
 /// `raw_len` bytes at the node's span start — a `\u` unicode escape
 /// (`\u0066oo` → `foo`), or a name too long for `raw_len` (> `u16::MAX`
 /// bytes) — or when those bytes need a JSON escape, which only a name the grammar
 /// does not vouch for can hold (a Svelte directive name like `a\b`; see below).
-/// It then carries the name as an `&'arena str`, read directly at every consumer
-/// — no interner round-trip: for an escape, the decoded name (the parser's
-/// `current_decoded`, already arena-allocated); for an oversized name, its raw
-/// text arena-copied; for a Svelte-synthesized name, its text arena-copied
+/// It then carries the name as a [`PoolStr`], read through [`AstView::text`] at every
+/// consumer — no interner round-trip: for an escape, the decoded name (the parser's
+/// `current_decoded`, already in the pool); for an oversized name, its raw text
+/// copied into the pool; for a Svelte-synthesized name, its text copied into the pool
 /// verbatim. Otherwise (`None`, >99.99% of
 /// identifiers) the name is the raw source slice
 /// `span.start .. span.start + raw_len` — nothing stored at all.
@@ -352,7 +351,7 @@ impl<'arena> Literal<'arena> {
 /// owning node's span may later extend past the name (`?`, `!`, `: Type` —
 /// acorn parity), so the name is the leading `raw_len` bytes, never the whole
 /// span. When `escaped` is `Some`, `raw_len` is 0 and unused — read the
-/// `&'arena str` directly.
+/// pool text instead.
 ///
 /// ⚠️ **`escaped: None` is also a claim about the bytes**: the raw slice holds no
 /// `"`, no `\` and no control byte, so the wire writer emits it without a JSON
@@ -420,12 +419,12 @@ impl<'arena> IdentName<'arena> {
 
 #[derive(Debug, Clone)]
 pub struct Identifier<'arena> {
-    /// The [`IdentName`] channel's escape hatch: the decoded name as an
-    /// `&'arena str`, `Some` only for `\u`-escaped or `raw_len`-oversized
+    /// The [`IdentName`] channel's escape hatch: the decoded name as pool text,
+    /// `Some` only for `\u`-escaped or `raw_len`-oversized
     /// names, and for a Svelte-synthesized name holding a JSON-escaped byte (see
     /// [`IdentName`]). Stored flattened (beside `name_len`) rather than as a nested
     /// [`IdentName`] — the nested struct's tail padding would grow `Identifier`,
-    /// and it is an *inline* `Expression` variant. (The fat pointer is the widest field
+    /// and it is an *inline* `Expression` variant. (The handle is the widest field
     /// here; `Expression` is set by wider variants, so it does not move
     /// `sizeof(Expression)`, but it sets `Identifier`'s own width, which every node
     /// holding one inline pays, a type name or a statement label among them.) Read via
@@ -499,7 +498,7 @@ impl<'arena> Identifier<'arena> {
 
     /// The name's sub-span: the leading `name_len` bytes at the span start (the
     /// node span may extend over `?` / `!` / `: Type`). Only meaningful when
-    /// `escaped_name` is `None` — an escaped name reads its `&'arena str` directly.
+    /// `escaped_name` is `None` — an escaped name reads its pool text instead.
     #[inline]
     pub fn name_span(&self) -> Span {
         Span::new(self.span.start, self.span.start + self.name_len as u32)

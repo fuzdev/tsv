@@ -220,8 +220,7 @@ struct Site {
 /// Every same-line-glued block comment whose content is wide enough to host an
 /// annotation (≥6 bytes), keyed by its content byte-range.
 fn glued_block_sites(source: &str) -> Vec<Site> {
-    let arena = bumpalo::Bump::new();
-    let Ok(program) = tsv_ts::__private::parse(source, &arena) else {
+    let Ok(program) = tsv_ts::__private::parse(source) else {
         return Vec::new();
     };
     let bytes = source.as_bytes();
@@ -326,8 +325,7 @@ mod tests {
             let a = annotation_of_width(w);
             assert_eq!(a.len(), w, "width {w}");
             let src = format!("const a = /*{a}*/ x;\n");
-            let arena = bumpalo::Bump::new();
-            let program = tsv_ts::__private::parse(&src, &arena).expect("the probe source parses");
+            let program = tsv_ts::__private::parse(&src).expect("the probe source parses");
             let comments = program.view().comments(program.comments);
             assert_eq!(comments.len(), 1, "width {w}");
             assert!(

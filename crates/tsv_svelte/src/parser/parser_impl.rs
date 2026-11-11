@@ -756,7 +756,6 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 source,
                 base_offset,
                 this.island_nesting(),
-                this.arena,
                 stores,
                 end,
                 |view, expr| host_check(this, view, expr),
@@ -795,7 +794,6 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 source,
                 base_offset,
                 this.island_nesting(),
-                this.arena,
                 stores,
                 top_level_as,
                 |view, expr, end_pos| host_check(this, view, expr, end_pos),
@@ -826,7 +824,6 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 source,
                 base_offset,
                 this.island_nesting(),
-                this.arena,
                 stores,
             )
         })?;
@@ -853,7 +850,6 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 source,
                 base_offset,
                 this.island_nesting(),
-                this.arena,
                 stores,
             )
         })?;
@@ -912,7 +908,6 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 source,
                 base_offset,
                 this.island_nesting(),
-                this.arena,
                 stores,
                 |view, stmt| host_check(this, view, stmt),
             )

@@ -22,11 +22,14 @@
  * passed to the example's own compilation (`build_args`: `cargo rustc … -- --cfg`, so every
  * library builds as `cargo build` builds it). Per generation, each side runs:
  *
- * - current (a tree with `tsv_ts::__private::parse_folded_into`): TypeScript and Svelte parse
- *   into warm stores, taken before each timed region and parked after it as the CLI's
- *   `Formatter` keeps them (`parse_folded_into`, then `format_folded_in` through `parsed_ref`);
- *   CSS parses into the `Bump` (`parse_folded`), having no stores; the strip driver parses with
+ * - current (a tree whose `tsv_ts::__private::parse_folded_into` takes no `Bump`): TypeScript
+ *   and Svelte parse into warm stores, taken before each timed region and parked after it as
+ *   the CLI's `Formatter` keeps them (`parse_folded_into`, then `format_folded_in` through
+ *   `parsed_ref`), the TypeScript parse with no `Bump`; CSS parses into the `Bump`
+ *   (`parse_folded`), having no stores; the strip driver parses with
  *   `parse_with_goal_or_fallback_into` and strips with `strip_into`, into the same warm stores.
+ * - `ts_parse_bump` (a tree with `parse_folded_into` whose TypeScript parse still takes the
+ *   `Bump`): as the current generation, every one of those parses handed the `Bump` too.
  * - `no_stores` (any older tree, `main` before the stores among them): every language parses
  *   into the `Bump` alone (`parse_folded`, then `format_folded_in`), and the strip driver calls
  *   `parse_with_goal_or_fallback` and `strip_in`.
@@ -188,6 +191,14 @@ function driver_of(lang: Lang): DriverKind {
  * comment or doc line naming it cannot answer for it. */
 const STRIP_ENTRY_POINT = '^pub fn strip_in[<(]';
 
+/** The pattern (`git grep -E`) whose match in a tree's `crates/tsv_ts/src` says its TypeScript
+ * parse takes no `Bump`: `__private::parse_folded_into`'s body, the folded parse handing the
+ * fallback parse the stores alone. A body line rather than a declaration, because the
+ * declaration that lost the parameter spans lines; anchored at the line start behind its
+ * indent, where no comment or doc line begins. */
+const TS_PARSE_WITHOUT_BUMP =
+	'^ +folded\\.parse_with\\([|]text[|] parse_with_goal_or_fallback_into\\(text, goal, stores\\)\\)$';
+
 /** One entry-point generation the drivers have an arm for: the `perf_ab_api` cfg value that
  * selects its arm (`null` for the current tree's, the unmarked arm), the `git grep -E` pattern
  * whose match in `path` says a tree is of it (`null` for the oldest, which every tree no newer
@@ -207,9 +218,15 @@ export interface DriverApi {
 export const DRIVER_APIS: ReadonlyArray<DriverApi> = [
 	{
 		cfg: null,
+		probe: { pattern: TS_PARSE_WITHOUT_BUMP, path: 'crates/tsv_ts/src' },
+		calls:
+			'warm stores: TypeScript and Svelte parse into stores parked between iterations (TypeScript with no Bump), CSS into the Bump'
+	},
+	{
+		cfg: 'ts_parse_bump',
 		probe: { pattern: '^pub fn parse_folded_into[<(]', path: 'crates/tsv_ts/src' },
 		calls:
-			'warm stores: TypeScript and Svelte parse into stores parked between iterations, CSS into the Bump'
+			'warm stores: TypeScript and Svelte parse into stores parked between iterations, through the Bump; CSS into the Bump'
 	},
 	{
 		cfg: 'no_stores',

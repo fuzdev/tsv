@@ -122,7 +122,7 @@ fn on_thread<T: Send + 'static>(
 fn parse(lang: Lang, source: &str) -> Result<(), String> {
     let arena = bumpalo::Bump::new();
     match lang {
-        Lang::Ts => tsv_ts::__private::parse(source, &arena).map(drop),
+        Lang::Ts => tsv_ts::__private::parse(source).map(drop),
         Lang::Css => tsv_css::__private::parse(source, &arena).map(drop),
         Lang::Svelte => tsv_svelte::__private::parse(source, &arena).map(drop),
     }
@@ -136,7 +136,7 @@ fn wire_counts(lang: Lang, source: &str) -> WireCounts {
     let arena = bumpalo::Bump::new();
     let wire = match lang {
         Lang::Ts => tsv_ts::__private::convert_ast_json_bytes(
-            &tsv_ts::__private::parse_preserve_parens(source, &arena).expect("parses"),
+            &tsv_ts::__private::parse_preserve_parens(source).expect("parses"),
             source,
         ),
         Lang::Css => tsv_css::__private::convert_ast_json_bytes(
@@ -333,7 +333,7 @@ enum Verdict {
 fn verdict(lang: Lang, source: &str) -> Verdict {
     let arena = bumpalo::Bump::new();
     let result = match lang {
-        Lang::Ts => tsv_ts::__private::parse(source, &arena).map(drop),
+        Lang::Ts => tsv_ts::__private::parse(source).map(drop),
         Lang::Css => tsv_css::__private::parse(source, &arena).map(drop),
         Lang::Svelte => tsv_svelte::__private::parse(source, &arena).map(drop),
     };
@@ -561,7 +561,7 @@ fn run_walks_on(name: String, stack: usize, lang: Lang, source: String) {
         let arena = bumpalo::Bump::new();
         match lang {
             Lang::Ts => {
-                let program = tsv_ts::__private::parse(&source, &arena).expect("parses");
+                let program = tsv_ts::__private::parse(&source).expect("parses");
                 assert!(!tsv_ts::__private::convert_ast_json_bytes(&program, &source).is_empty());
                 assert!(
                     !tsv_ts::__private::convert_ast_json_bytes_with_locations(&program, &source)

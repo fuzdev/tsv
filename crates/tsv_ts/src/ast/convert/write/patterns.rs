@@ -72,11 +72,12 @@ pub(super) fn write_template_element(
     // `trv`, not `raw`: the wire reports the element's VALUE, where ECMAScript
     // has already folded `<CR>` / `<CR><LF>` to `<LF>` (§12.9.6). The source
     // slice is the printer's question.
+    let trv = element.trv(ctx.source, ctx.view);
     w.raw(",\"value\":{\"raw\":");
-    w.string(element.trv(ctx.source, ctx.view));
+    w.string(trv);
     w.raw(",\"cooked\":");
     match element.cooked {
-        ast::TemplateCooked::Verbatim => w.string(element.trv(ctx.source, ctx.view)),
+        ast::TemplateCooked::Verbatim => w.string(trv),
         ast::TemplateCooked::Decoded(decoded) => w.string(ctx.view.text(decoded)),
         ast::TemplateCooked::Invalid => w.null(),
     }

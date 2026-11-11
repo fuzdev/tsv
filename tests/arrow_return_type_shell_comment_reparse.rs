@@ -106,8 +106,7 @@ const COMMENTS: &[&str] = &[" /* x\n */", " // x\n"];
 fn ts_wire(source: &str) -> Option<Value> {
     let json = tsv_ts::parse_to_json(source).ok()?;
     let mut wire = tsv_debug::json::wire_value(json.as_bytes());
-    let arena = bumpalo::Bump::new();
-    let program = tsv_ts::__private::parse(source, &arena).expect("the wire's source parses");
+    let program = tsv_ts::__private::parse(source).expect("the wire's source parses");
     let comments = program
         .view()
         .comments(program.comments)

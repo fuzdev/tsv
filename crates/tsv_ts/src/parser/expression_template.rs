@@ -2,7 +2,7 @@
 // the single `TemplateElement` constructor every template site builds through —
 // expression AND type templates, head/middle/tail/no-substitution alike.
 
-use crate::ast::{Run, TemplateCooked, TemplateElement, TemplateLiteral};
+use crate::ast::{PoolStr, Run, TemplateCooked, TemplateElement, TemplateLiteral};
 use crate::lexer::TokenKind;
 use crate::lexer::escapes::find_legacy_escape;
 use tsv_lang::{Error, Span};
@@ -137,12 +137,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Call BEFORE `advance()` — this reads the current token's text and its
     /// decoded value.
     pub(super) fn template_element(
-        &self,
+        &mut self,
         span: Span,
         tail: bool,
         tagged: bool,
     ) -> Result<TemplateElement<'arena>, Error> {
-        let arena = self.arena;
         let (content, raw_span) = template_token_content(self.current_value(), span, tail);
         let cooked = self.template_cooked(content, raw_span.start as usize, tagged)?;
         // `has_newline` asks about the SOURCE bytes — the printer walks
@@ -172,18 +171,17 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // CR fold touches none — so its error, were there one, is positioned no more
         // precisely than at the segment: its offsets index `trv`, not the document.
         let cooked = match cooked {
-            TemplateCooked::Decoded(_) => TemplateCooked::Decoded(
-                arena.alloc_str(
-                    &crate::lexer::escapes::decode_string_escapes(&trv)
-                        .map_err(|e| e.shift_position(raw_span.start as usize))?,
-                ),
-            ),
+            TemplateCooked::Decoded(_) => {
+                let decoded = crate::lexer::escapes::decode_string_escapes(&trv)
+                    .map_err(|e| e.shift_position(raw_span.start as usize))?;
+                TemplateCooked::Decoded(PoolStr::new(self.stores.text.push(&decoded)))
+            }
             verbatim_or_invalid => verbatim_or_invalid,
         };
 
         Ok(TemplateElement {
             raw_span,
-            raw_trv: Some(arena.alloc_str(&trv)),
+            raw_trv: Some(PoolStr::new(self.stores.text.push(&trv))),
             cooked,
             has_newline,
             tail,

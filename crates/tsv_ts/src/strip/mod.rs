@@ -241,13 +241,13 @@ pub fn strip_in(
 /// # Errors
 ///
 /// As [`strip`].
-pub fn strip_into<'arena>(
+pub fn strip_into(
     source: &str,
     goal: Option<crate::Goal>,
-    arena: &'arena bumpalo::Bump,
-    stores: &mut crate::ast::AstStores<'arena>,
+    arena: &bumpalo::Bump,
+    stores: &mut crate::ast::AstStores<'_>,
 ) -> Result<Stripped, StripError> {
-    let program = crate::__private::parse_with_goal_or_fallback_into(source, goal, arena, stores)
+    let program = crate::__private::parse_with_goal_or_fallback_into(source, goal, stores)
         .map_err(StripError::Parse)?;
     let mut walk = walk::Walk::new(source, arena, walk::Mode::Strip, stores.view());
     walk.program(&program);
@@ -267,8 +267,8 @@ pub fn strip_with_imports_in(
     goal: Option<crate::Goal>,
     arena: &bumpalo::Bump,
 ) -> Result<(Stripped, Imports), StripError> {
-    let program = crate::__private::parse_with_goal_or_fallback(source, goal, arena)
-        .map_err(StripError::Parse)?;
+    let program =
+        crate::__private::parse_with_goal_or_fallback(source, goal).map_err(StripError::Parse)?;
     let mut walk = walk::Walk::new(source, arena, walk::Mode::StripWithImports, program.view());
     walk.program(&program);
     let (mut edits, imports) = walk.finish_with_imports()?;
@@ -507,7 +507,7 @@ mod tests {
             "let a: { [import('./t')]: number } = {};\nexport default a!;",
         ] {
             let arena = bumpalo::Bump::new();
-            let program = crate::__private::parse_with_goal_or_fallback(source, None, &arena)
+            let program = crate::__private::parse_with_goal_or_fallback(source, None)
                 .expect("the source parses");
             let code = |mode| {
                 let mut walk = super::walk::Walk::new(source, &arena, mode, program.view());
@@ -665,8 +665,7 @@ mod tests {
         let StripError::Parse(stripped) = strip_error(source) else {
             panic!("expected a parse error for {source:?}");
         };
-        let arena = bumpalo::Bump::new();
-        let Err(parsed) = crate::__private::parse_with_goal(source, goal, &arena) else {
+        let Err(parsed) = crate::__private::parse_with_goal(source, goal) else {
             panic!("expected {source:?} to fail at {goal:?}");
         };
         (stripped.to_string(), parsed.to_string())

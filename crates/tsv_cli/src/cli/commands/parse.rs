@@ -109,15 +109,18 @@ fn parse_to_json(
     // refused past ~60 nested arrays what the compact form of the same input
     // emitted fine. So the pretty route has no depth ceiling of its own; it stops
     // where the parser stops.
-    // The arena owns the internal AST; convert produces owned JSON, so nothing
-    // borrowed escapes this function. Pre-sized to the source to avoid the
+    // A Svelte or CSS arena owns that internal AST, and TypeScript's lives in the
+    // stores its parse returns; convert produces owned JSON, so nothing borrowed
+    // escapes this function. The arena is pre-sized to the source to avoid the
     // bump's chunk-doubling tail on the parse.
-    let arena = bumpalo::Bump::with_capacity(tsv_lang::estimated_ast_arena_capacity(source.len()));
+    let new_arena =
+        || bumpalo::Bump::with_capacity(tsv_lang::estimated_ast_arena_capacity(source.len()));
 
     // The goal applies only to TypeScript; svelte is always a module and css has
     // no goal.
     let bytes = match parser_type {
         ParserType::Svelte => {
+            let arena = new_arena();
             let ast = tsv_svelte::__private::parse(source, &arena)?;
             if locations {
                 tsv_svelte::__private::convert_ast_json_bytes_with_locations(&ast, source)
@@ -126,6 +129,7 @@ fn parse_to_json(
             }
         }
         ParserType::Css => {
+            let arena = new_arena();
             let ast = tsv_css::__private::parse(source, &arena)?;
             if locations {
                 tsv_css::__private::convert_ast_json_bytes_with_locations(&ast, source)
@@ -134,7 +138,7 @@ fn parse_to_json(
             }
         }
         ParserType::TypeScript => {
-            let ast = tsv_ts::__private::parse_with_goal(source, goal, &arena)?;
+            let ast = tsv_ts::__private::parse_with_goal(source, goal)?;
             if locations {
                 tsv_ts::__private::convert_ast_json_bytes_with_locations(&ast, source)
             } else {

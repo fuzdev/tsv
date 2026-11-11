@@ -16,10 +16,9 @@
 /// The rendered error for `source`, parsed as a module: its message line and its
 /// `line:col` header.
 fn error(source: &str) -> (String, String) {
-    let arena = bumpalo::Bump::new();
     let rendered = format!(
         "{:#}",
-        tsv_ts::__private::parse_with_goal(source, tsv_ts::Goal::Module, &arena)
+        tsv_ts::__private::parse_with_goal(source, tsv_ts::Goal::Module)
             .expect_err("the export must not parse")
     );
     let mut lines = rendered.lines();

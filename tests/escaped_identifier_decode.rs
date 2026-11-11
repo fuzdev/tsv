@@ -30,8 +30,7 @@ fn assert_name_decodes(
     expected_name: &str,
     expected_output: &str,
 ) {
-    let arena = bumpalo::Bump::new();
-    let program = tsv_ts::__private::parse(source, &arena).expect("parse failed");
+    let program = tsv_ts::__private::parse(source).expect("parse failed");
     let json =
         tsv_debug::json::wire_value(&tsv_ts::__private::convert_ast_json_bytes(&program, source));
 
@@ -48,8 +47,7 @@ fn assert_name_decodes(
     );
 
     // The decoded output is tsv's fixed point and reparses to the same name.
-    let arena_out = bumpalo::Bump::new();
-    let reparsed = tsv_ts::__private::parse(&output, &arena_out).expect("reparse failed");
+    let reparsed = tsv_ts::__private::parse(&output).expect("reparse failed");
     assert_eq!(
         tsv_ts::__private::format_ast(&reparsed, &output),
         output,
@@ -116,8 +114,7 @@ fn interface_member_key() {
 #[test]
 fn escaped_constructor_is_constructor() {
     let source = r"class C { \u0063onstructor() {} }";
-    let arena = bumpalo::Bump::new();
-    let program = tsv_ts::__private::parse(source, &arena).expect("parse failed");
+    let program = tsv_ts::__private::parse(source).expect("parse failed");
     let json =
         tsv_debug::json::wire_value(&tsv_ts::__private::convert_ast_json_bytes(&program, source));
     let member = json.pointer("/body/0/body/body/0").expect("class member");

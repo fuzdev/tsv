@@ -728,7 +728,7 @@ pub(super) fn write_export_kind_field(
 
 /// Emit an identifier's `,"name":` field — the single name-emission funnel.
 /// Span-identity names are the raw source slice (the leading `raw_len` bytes at
-/// `name_start`); escaped names are the decoded `&'arena str` (an escaped
+/// `name_start`); escaped names are the decoded pool text (an escaped
 /// identifier's `\u{78}` source form decodes to `x`). Both arms write the wire
 /// value directly; no allocation.
 ///
@@ -1111,11 +1111,11 @@ mod tests {
         source: &str,
         wire: Wire,
         comments: CommentMode<'_>,
+        view: ast::AstView<'_>,
         emit: impl FnOnce(&mut JsonWriter, &Ctx<'_>),
     ) -> String {
         let tables = WireTables::new(source, crate::WIRE_COORDINATES, wire);
-        let stores = ast::AstStores::new();
-        let ctx = Ctx::new(source, tables.positions(), comments, stores.view());
+        let ctx = Ctx::new(source, tables.positions(), comments, view);
         let mut w = JsonWriter::with_capacity(0);
         emit(&mut w, &ctx);
         String::from_utf8(w.into_bytes()).expect("the wire is UTF-8")
@@ -1149,13 +1149,14 @@ mod tests {
         let source = "é;\n\n  abc(\n);\n";
         let start = source.find("abc").expect("present") as u32;
         let span = Span::new(start, source.len() as u32 - 2);
+        let stores = ast::AstStores::new();
         for len in [1, 31, 32, 33, TYPE.len()] {
             let node_type: &'static str = &TYPE[..len];
             for &wire in WIRES {
-                let staged = emitted(source, wire, CommentMode::Off, |w, ctx| {
+                let staged = emitted(source, wire, CommentMode::Off, stores.view(), |w, ctx| {
                     node_header(w, node_type, span, ctx);
                 });
-                let direct = emitted(source, wire, CommentMode::Off, |w, ctx| {
+                let direct = emitted(source, wire, CommentMode::Off, stores.view(), |w, ctx| {
                     node_header_wide_end(w, node_type, span, span.end, ctx);
                 });
                 assert_eq!(staged, direct, "type length {len}, {wire:?}");
@@ -1210,16 +1211,15 @@ mod tests {
         .collect();
         for (written, name) in &cases {
             let source = format!("\n  {written};\n");
-            let arena = bumpalo::Bump::new();
-            let program = crate::__private::parse(&source, &arena).expect("parses");
+            let program = crate::__private::parse(&source).expect("parses");
             let id = sole_identifier(program.view(), &program);
             let end = 3 + written.encode_utf16().count();
             let column = end - 1;
             for &wire in WIRES {
-                let plain = emitted(&source, wire, CommentMode::Off, |w, ctx| {
+                let plain = emitted(&source, wire, CommentMode::Off, program.view(), |w, ctx| {
                     write_identifier_plain(w, id, ctx);
                 });
-                let general = emitted(&source, wire, CommentMode::Off, |w, ctx| {
+                let general = emitted(&source, wire, CommentMode::Off, program.view(), |w, ctx| {
                     write_identifier_parts(w, id.span, id.ident_name(), false, None, None, ctx);
                 });
                 assert_eq!(plain, general, "{written:?}, {wire:?}");
@@ -1249,13 +1249,11 @@ mod tests {
     #[test]
     fn plain_identifier_under_a_comment_attach_emits_its_comments() {
         let source = "/* c */ name";
-        let arena = bumpalo::Bump::new();
         let mut stores = ast::AstStores::new();
         let (expression, comments) = crate::__private::parse_expression_with_comments(
             source,
             0,
             0,
-            &arena,
             &mut stores,
             "end of input",
             |_, _| Ok(()),
@@ -1279,11 +1277,11 @@ mod tests {
         };
         for &wire in WIRES {
             let island = attach();
-            let plain = emitted(source, wire, island.mode(), |w, ctx| {
+            let plain = emitted(source, wire, island.mode(), stores.view(), |w, ctx| {
                 write_identifier_plain(w, id, ctx);
             });
             let island = attach();
-            let general = emitted(source, wire, island.mode(), |w, ctx| {
+            let general = emitted(source, wire, island.mode(), stores.view(), |w, ctx| {
                 write_identifier_parts(w, id.span, id.ident_name(), false, None, None, ctx);
             });
             assert_eq!(plain, general, "{wire:?}");

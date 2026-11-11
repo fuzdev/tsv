@@ -389,13 +389,13 @@ pub fn parse_imports_in(
 /// # Errors
 ///
 /// As [`parse_imports`].
-pub fn parse_imports_into<'arena>(
+pub fn parse_imports_into(
     source: &str,
     goal: Option<Goal>,
-    arena: &'arena bumpalo::Bump,
-    stores: &mut crate::ast::AstStores<'arena>,
+    arena: &bumpalo::Bump,
+    stores: &mut crate::ast::AstStores<'_>,
 ) -> Result<Imports, Error> {
-    let program = crate::__private::parse_with_goal_or_fallback_into(source, goal, arena, stores)?;
+    let program = crate::__private::parse_with_goal_or_fallback_into(source, goal, stores)?;
     Ok(collect_imports(&[&program], stores.view(), source, arena))
 }
 

@@ -474,8 +474,8 @@ impl<'a> Lexer<'a> {
     /// The decoded value produced for the most recently lexed token (escape paths
     /// only); `None` for the common escape-free token. Borrows the parked
     /// `decode_scratch` — valid until the next token is lexed (which may overwrite
-    /// it), so the parser copies it into its AST arena immediately after each lex
-    /// (`Parser::decoded_to_arena`) rather than holding the borrow.
+    /// it), so the parser copies it into its text pool immediately after each lex
+    /// (`Parser::decoded_to_pool`) rather than holding the borrow.
     #[inline]
     pub(crate) fn decoded_str(&self) -> Option<&str> {
         if self.has_decoded {

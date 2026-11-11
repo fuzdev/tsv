@@ -14,15 +14,17 @@
 //!   `.ts` / `.mts` / `.cts`, no declaration file — `profile --strip`'s set.
 //! - Each iteration parses the source (`tsv_ts::__private::parse_with_goal_or_fallback_into`,
 //!   the goal read from the extension as `tsv strip` reads a path), then strips it
-//!   (`tsv_ts::__private::strip_into`, which parses again inside, into the same warm arena and
-//!   warm stores);
+//!   (`tsv_ts::__private::strip_into`, which parses again inside, into the same warm stores, its
+//!   edits in the warm arena);
 //!   the strip column is the strip's time less the parse's — its walk and blank. Both read
 //!   the author's bytes: the strip folds no carriage returns, so the TypeScript format row's
 //!   parse (fold + `parse_folded`) is not this one.
 //! - The calls sit in an `api` module with one arm per entry-point generation, as
 //!   `perf_ab.rs`'s do (its module doc): the current arm parses into stores taken before each
-//!   timed call and parked after it, and `perf_ab_api = "no_stores"`, a tree older than the
-//!   stores, calls `parse_with_goal_or_fallback` and `strip_in` over the `Bump` alone. The
+//!   timed call and parked after it, `perf_ab_api = "ts_parse_bump"` (a tree whose parse still
+//!   takes the `Bump` beside the stores) does the same through the `Bump`, and
+//!   `perf_ab_api = "no_stores"`, a tree older than the stores, calls
+//!   `parse_with_goal_or_fallback` and `strip_in` over the `Bump` alone. The
 //!   take, the park and the arena resets sit outside the timed regions.
 //! - `--parse-only` skips the strip. Since a full run parses twice per iteration, the task reads
 //!   the strip's own `instructions:u` as full − 2 × parse-only + the zero-iteration fixed cost;
@@ -183,14 +185,58 @@ fn timed<R>(f: impl FnOnce() -> R) -> (Duration, R) {
     (t0.elapsed(), result)
 }
 
-/// The entry points of the trees this driver measures: the current tree's, and under
-/// `perf_ab_api = "no_stores"` those of a tree older than the parse stores (`perf_ab.rs`'s
-/// module doc says how an arm is chosen).
+/// The entry points of the trees this driver measures: the current tree's, and under a
+/// `perf_ab_api` value those of an older generation (`perf_ab.rs`'s module doc says how an arm
+/// is chosen).
 ///
 /// Each arm's `Warm` is what it keeps across files and iterations besides the AST `Bump`: the
 /// current arm's parked stores, taken before each timed region and parked after it, as the
 /// bindings' strip keeps them.
-#[cfg(not(perf_ab_api = "no_stores"))]
+#[cfg(not(any(perf_ab_api = "ts_parse_bump", perf_ab_api = "no_stores")))]
+mod api {
+    use super::timed;
+    use std::time::Duration;
+    use tsv_ts::ast::AstStores;
+
+    /// The stores parked between the timed calls, rewound.
+    #[derive(Default)]
+    pub(super) struct Warm {
+        stores: Option<AstStores<'static>>,
+    }
+
+    /// The parse's wall and whether it parsed.
+    pub(super) fn parse(
+        source: &str,
+        goal: Option<tsv_ts::Goal>,
+        _arena: &bumpalo::Bump,
+        warm: &mut Warm,
+    ) -> (Duration, bool) {
+        let mut stores: AstStores<'_> = warm.stores.take().unwrap_or_default();
+        let (wall, parsed) = timed(|| {
+            tsv_ts::__private::parse_with_goal_or_fallback_into(source, goal, &mut stores).is_ok()
+        });
+        warm.stores = Some(stores.park());
+        (wall, parsed)
+    }
+
+    /// The strip's wall, its own parse included, and what it returned.
+    pub(super) fn strip(
+        source: &str,
+        goal: Option<tsv_ts::Goal>,
+        arena: &bumpalo::Bump,
+        warm: &mut Warm,
+    ) -> (Duration, Result<tsv_ts::Stripped, tsv_ts::StripError>) {
+        let mut stores: AstStores<'_> = warm.stores.take().unwrap_or_default();
+        let timed = timed(|| tsv_ts::__private::strip_into(source, goal, arena, &mut stores));
+        warm.stores = Some(stores.park());
+        timed
+    }
+}
+
+/// The entry points of a tree whose TypeScript parse still takes the `Bump` beside the stores:
+/// the parse and the strip into warm stores, both through the `Bump`. Built only against such
+/// a tree, never against the current one.
+#[cfg(perf_ab_api = "ts_parse_bump")]
 mod api {
     use super::timed;
     use std::time::Duration;

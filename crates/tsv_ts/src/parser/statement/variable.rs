@@ -137,9 +137,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         };
 
         let id_end = id.span().end_usize();
-        // Both slots are by-reference (see `VariableDeclarator`): the nodes live in
-        // the arena and the declarator holds pointers, so the element the
-        // declaration's vector moves is 32 B rather than 160.
+        // Both slots are ids (see `VariableDeclarator`): the nodes are rows of the
+        // expression store and the declarator holds their ids, so the element the
+        // declaration's list moves carries no expression inline.
         let id: ExprId = self.push_expr(id);
 
         // Check for initializer

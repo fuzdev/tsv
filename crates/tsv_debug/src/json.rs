@@ -166,7 +166,7 @@ mod tests {
                 let arena = bumpalo::Bump::new();
                 let wires: Vec<Vec<u8>> = match parser {
                     ParserType::TypeScript => {
-                        let Ok(ast) = tsv_ts::__private::parse(&source, &arena) else {
+                        let Ok(ast) = tsv_ts::__private::parse(&source) else {
                             continue;
                         };
                         vec![

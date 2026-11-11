@@ -575,8 +575,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
     /// Name channel for a synthesized TS `Identifier` covering `span`:
     /// span-identity when the name is exactly the source slice — which every
-    /// caller's span is built to be — else the decoded name arena-copied as the
-    /// `&'arena str` escape hatch, so a future caller whose name isn't a verbatim
+    /// caller's span is built to be — else the decoded name copied into the document's
+    /// text pool as the escape hatch, so a future caller whose name isn't a verbatim
     /// run can't silently emit the wrong text.
     ///
     /// ⚠️ Span-identity also promises the wire writer that the slice needs no JSON
@@ -586,7 +586,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// than whitespace is kept too (the canonical parser agrees on both). So the bytes
     /// are checked here, where `escaped: None` is minted, and a name holding such a byte
     /// takes the escape hatch, where the writer escapes it.
-    fn synthesized_ident_name(&self, name: &str, span: Span) -> IdentName<'arena> {
+    fn synthesized_ident_name(&mut self, name: &str, span: Span) -> IdentName<'arena> {
         let slice = &self.source[span.start as usize..span.end as usize];
         if slice == name && u16::try_from(name.len()).is_ok() {
             // A JSON-escaped byte (a control, `"`, `\`) disqualifies span-identity.
@@ -616,7 +616,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             }
         }
         IdentName {
-            escaped: Some(self.alloc_str_in(name)),
+            escaped: Some(tsv_ts::__private::push_text(self.stores_mut(), name)),
             raw_len: 0,
             plain_ascii: false,
         }

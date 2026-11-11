@@ -21,14 +21,12 @@
 use serde_json::Value;
 
 fn parse_json(source: &str) -> Value {
-    let arena = bumpalo::Bump::new();
-    let program = tsv_ts::__private::parse(source, &arena).expect("parse failed");
+    let program = tsv_ts::__private::parse(source).expect("parse failed");
     tsv_debug::json::wire_value(&tsv_ts::__private::convert_ast_json_bytes(&program, source))
 }
 
 fn format(source: &str) -> String {
-    let arena = bumpalo::Bump::new();
-    let program = tsv_ts::__private::parse(source, &arena).expect("parse failed");
+    let program = tsv_ts::__private::parse(source).expect("parse failed");
     tsv_ts::__private::format_ast(&program, source)
 }
 
@@ -317,8 +315,7 @@ fn a_comma_list_its_context_refuses_reads_as_acorn() {
     assert_acorn_call(&json, script, "script");
     assert_acorn_call(&json, "/fragment/nodes/0/expression/consequent", "template");
     // a text both parsers reject keeps the first parse's error
-    let arena = bumpalo::Bump::new();
-    assert!(tsv_ts::__private::parse("const a = f<T, U><V>(x) +;", &arena).is_err());
+    assert!(tsv_ts::__private::parse("const a = f<T, U><V>(x) +;").is_err());
 }
 
 #[test]
@@ -523,8 +520,7 @@ fn a_svelte_head_both_readings_refuse_reports_acorns_error() {
             ";",
         ),
     ] {
-        let arena = bumpalo::Bump::new();
-        let error = tsv_ts::__private::parse(source, &arena).expect_err(source);
+        let error = tsv_ts::__private::parse(source).expect_err(source);
         assert!(error.to_string().contains(message), "{source:?}: {error}");
         assert_eq!(
             error.position(),

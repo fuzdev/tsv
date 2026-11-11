@@ -55,7 +55,7 @@ fn format_all(source: &str, parser: ParserType, label: &str) -> String {
             )
         }
         ParserType::TypeScript => {
-            let ast = tsv_ts::__private::parse(source, &arena).expect("ts parse");
+            let ast = tsv_ts::__private::parse(source).expect("ts parse");
             let via_format = tsv_ts::__private::format_ast(&ast, source);
             (
                 tsv_ts::format(source).expect("ts format"),

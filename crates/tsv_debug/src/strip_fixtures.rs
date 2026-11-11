@@ -435,8 +435,7 @@ pub fn check_fixture(fixture: &StripFixture) -> Vec<Finding> {
                 format!("{} breaks the contract: {detail}", fixture.expected_file),
             );
         }
-        let arena = bumpalo::Bump::new();
-        if let Err(e) = tsv_ts::__private::parse(expected, &arena) {
+        if let Err(e) = tsv_ts::__private::parse(expected) {
             push(
                 StripCheck::Fixture,
                 format!(

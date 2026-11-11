@@ -1007,7 +1007,8 @@ pub struct TemplateLiteral {
 ///
 /// The common no-escape case (`Verbatim`) carries no allocation: the cooked
 /// text equals the element's TRV, recovered via `TemplateElement::trv`.
-/// Only genuinely decoded values (escapes present) hold an arena-allocated str.
+/// Only genuinely decoded values (escapes present) hold text of their own, in the stores'
+/// text pool.
 #[derive(Debug, Clone)]
 pub enum TemplateCooked<'arena> {
     /// Cooked value == the element's TRV (no escapes to decode).
@@ -1024,8 +1025,8 @@ pub enum TemplateCooked<'arena> {
 ///
 /// Each quasi has:
 /// - raw_span: Span of the literal source text (escapes preserved); text via `raw(source)`
-/// - raw_trv: the same text as a VALUE (line terminators normalized); via `trv(source)`
-/// - cooked: The decoded value (escapes interpreted); text via `cooked(source)`
+/// - raw_trv: the same text as a VALUE (line terminators normalized); via `trv(source, view)`
+/// - cooked: The decoded value (escapes interpreted), a [`TemplateCooked`]
 /// - tail: true for the last element in the template
 ///
 /// ⚠️ **`raw` and `trv` are different questions and both have callers.** The
@@ -1048,10 +1049,10 @@ pub struct TemplateElement<'arena> {
     /// `<LS>` and `<PS>` map to themselves (§12.9.6). So `` `x<CR><LF>y` `` has
     /// a 4-byte source span and a 3-character value, and `raw_span` alone cannot
     /// express it. `None` — overwhelmingly the common case — means the source
-    /// slice IS the TRV, so this costs no allocation on any ordinary template.
+    /// slice IS the TRV, so this costs no pool text on any ordinary template.
     pub raw_trv: Option<PoolStr<'arena>>,
     /// The decoded value. `Verbatim` (the common no-escape case) costs no
-    /// allocation — its text equals `trv(source)`; recover via `cooked(source)`.
+    /// allocation — its text equals `trv(source, view)`.
     pub cooked: TemplateCooked<'arena>,
     /// Whether the raw SOURCE text contains a newline (precomputed so newline
     /// checks stay O(1) and source-free, matching `Comment::multiline`). Read by
@@ -1081,18 +1082,6 @@ impl<'arena> TemplateElement<'arena> {
         match self.raw_trv {
             Some(trv) => view.text(trv),
             None => self.raw(source),
-        }
-    }
-
-    /// The decoded ("cooked") value as text, or `None` for an invalid escape.
-    /// The no-escape case borrows the TRV (no owned string unless a `<CR>`
-    /// forced one); the `Decoded` arm reads the tree's text through `view`.
-    #[inline]
-    pub fn cooked<'s>(&'s self, source: &'s str, view: AstView<'s>) -> Option<&'s str> {
-        match self.cooked {
-            TemplateCooked::Verbatim => Some(self.trv(source, view)),
-            TemplateCooked::Decoded(decoded) => Some(view.text(decoded)),
-            TemplateCooked::Invalid => None,
         }
     }
 }

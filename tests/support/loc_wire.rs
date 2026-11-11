@@ -268,8 +268,7 @@ pub(crate) fn wires_and_reference(
             )
         }
         InputType::TypeScript | InputType::SvelteTs => {
-            let ast =
-                tsv_ts::__private::parse_with_goal(source, goal, &arena).expect("TS input parses");
+            let ast = tsv_ts::__private::parse_with_goal(source, goal).expect("TS input parses");
             let (rule, elide_bom) = wire_rule(true);
             (
                 tsv_ts::__private::convert_ast_json_bytes_with_locations(&ast, source),

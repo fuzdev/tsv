@@ -94,8 +94,7 @@ fn css_does_not_weld_a_nestled_pair() {
 #[test]
 fn parse_still_reports_two_comments() {
     let source = "/** a\n *//** b\n */\nconst a = 1;\n";
-    let arena = bumpalo::Bump::new();
-    let program = tsv_ts::__private::parse(source, &arena).unwrap();
+    let program = tsv_ts::__private::parse(source).unwrap();
     assert_eq!(
         program.view().comments(program.comments).len(),
         2,

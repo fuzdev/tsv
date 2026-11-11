@@ -226,11 +226,9 @@ fn run_reuse(files: &[std::path::PathBuf], list_errors: bool) -> Result<(), CliE
         // the shipped format path: fold, parse the folded text, format it
         let folded = tsv_lang::printing::normalize_carriage_returns(&source);
         let formatted = match parser {
-            ParserType::TypeScript => {
-                tsv_ts::__private::parse_folded(&folded, None, &bump).map(|ast| {
-                    let _ = tsv_ts::__private::format_folded_in(&ast, &folded, a);
-                })
-            }
+            ParserType::TypeScript => tsv_ts::__private::parse_folded(&folded, None).map(|ast| {
+                let _ = tsv_ts::__private::format_folded_in(&ast, &folded, a);
+            }),
             ParserType::Svelte => tsv_svelte::__private::parse_folded(&folded, &bump).map(|ast| {
                 let _ = tsv_svelte::__private::format_folded_in(&ast, &folded, a);
             }),
@@ -286,11 +284,12 @@ fn run_reuse(files: &[std::path::PathBuf], list_errors: bool) -> Result<(), CliE
 /// bumpalo's grow-to-fit total, a proxy for the AST's true byte demand (inflated
 /// ≤2× by chunk doubling off the default first chunk). Only used to calibrate
 /// `estimated_ast_arena_capacity`; the AST is dropped with the bump. Returns 0 if
-/// the parse fails (the caller's first parse already succeeded, so it won't here).
+/// the parse fails (the caller's first parse already succeeded, so it won't here), and
+/// always for TypeScript, whose parse writes its stores and allocates in no bump.
 fn measure_bump_demand(source: &str, parser: ParserType) -> u64 {
     let bump = bumpalo::Bump::new();
     let ok = match parser {
-        ParserType::TypeScript => tsv_ts::__private::parse(source, &bump).is_ok(),
+        ParserType::TypeScript => tsv_ts::__private::parse(source).is_ok(),
         ParserType::Svelte => tsv_svelte::__private::parse(source, &bump).is_ok(),
         ParserType::Css => tsv_css::__private::parse(source, &bump).is_ok(),
     };
@@ -310,7 +309,7 @@ fn collect_file(source: &str, parser: ParserType, stats: &mut Stats) -> Result<(
     let parse_error = |e: tsv_lang::Error| format!("{e:#}");
     let output = match parser {
         ParserType::TypeScript => {
-            let ast = tsv_ts::__private::parse_folded(&folded, None, &bump).map_err(parse_error)?;
+            let ast = tsv_ts::__private::parse_folded(&folded, None).map_err(parse_error)?;
             tsv_ts::__private::format_folded_in(&ast, &folded, &arena)
         }
         ParserType::Svelte => {

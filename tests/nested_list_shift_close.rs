@@ -10,8 +10,7 @@
 //! that the grade nests without running past the depth limit, and the bracket it keeps out of.
 
 fn accepts(source: &str) -> bool {
-    let arena = bumpalo::Bump::new();
-    tsv_ts::__private::parse(source, &arena).is_ok()
+    tsv_ts::__private::parse(source).is_ok()
 }
 
 /// tsc reads a `<<` inside a type-argument region as two `<`, and rejects these: the claim
@@ -65,8 +64,7 @@ fn a_deep_nest_of_shift_closed_lists_ends_at_the_depth_limit() {
         "A < ".repeat(depth),
         ">".repeat(depth + 1)
     );
-    let arena = bumpalo::Bump::new();
-    let error = tsv_ts::__private::parse(&source, &arena).expect_err("too deep");
+    let error = tsv_ts::__private::parse(&source).expect_err("too deep");
     assert!(
         error.to_string().contains("depth limit"),
         "refused by the depth limit: {error}"

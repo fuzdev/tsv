@@ -129,7 +129,7 @@ fn collect_file(
 
     match parser {
         ParserType::TypeScript => {
-            let ast = tsv_ts::__private::parse(source, &arena).map_err(|_| ())?;
+            let ast = tsv_ts::__private::parse(source).map_err(|_| ())?;
             collect_imports(ast.view(), ast.body, named_specs);
             collect_comments(ast.view().comments(ast.comments), source, comment_lines);
             // Run the real printer so the armed _internal_buffer_stats hooks sample the

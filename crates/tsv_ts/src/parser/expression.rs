@@ -719,8 +719,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // this is the first point both exist. A `<` with no `>` over it — `check(a < b)`
             // and every other ordinary comparison — then pays nothing, where a question asked
             // at the `<` would walk each one to the statement's end looking for a close that
-            // is not there. The bit rides the `<` node, already in the arena, so setting it
-            // re-allocates that one node; only a chain that takes the pair pays for it.
+            // is not there. The bit rides the `<` node, already a stored row, so setting it
+            // pushes that one node again; only a chain that takes the pair pays for it.
             if operator == BinaryOperator::GreaterThan
                 && let Some(child) = self.lt_child_pieces(left)
                 && let Some(lt) = infix_operator_offset(
@@ -2308,7 +2308,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let paren_span = Span::new(paren_start as u32, paren_end as u32);
         let expr = if self.preserve_parens {
             if let Some(idx) = cast_comment_idx {
-                self.comments[idx].owned_by_node = true;
+                self.comments_mut()[idx].owned_by_node = true;
             }
             self.preserved_a_paren = true;
             self.push_expr(Expression {
@@ -2324,8 +2324,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 Some((idx, CommentBoundPairKind::GluedComment))
             })
         {
-            self.comments[idx].owned_by_node = true;
-            let comment = self.comments[idx];
+            let ledger = self.comments_mut();
+            ledger[idx].owned_by_node = true;
+            let comment = ledger[idx];
             self.push_expr(Expression {
                 span: paren_span,
                 kind: ExpressionKind::CommentBoundPair(CommentBoundPair {
@@ -2340,7 +2341,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         Ok(ExprRet::wrap(expr))
     }
 
-    /// The index in `self.comments` of the JSDoc type-cast block comment
+    /// The index in the comment ledger ([`Parser::comments`]) of the JSDoc type-cast block comment
     /// (`/** @type {T} */` / `/** @satisfies {T} */`) immediately preceding a `(` at
     /// `paren_start` — which is what makes those parens a cast that must be preserved.
     /// `None` when the `(` is an ordinary grouping/call paren.
@@ -2369,14 +2370,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         )?;
         // Resolve the comment through the lexer's spans rather than re-scanning the
         // source (see `block_comment_end_before` — byte scanning cannot find the real
-        // `/*`). The comment ending here was just drained into `self.comments`; match it
+        // `/*`). The comment ending here was just drained into the ledger; match it
         // by its host-coordinate end and test its exact (delimiter-excluded) content.
         let token_end = (i + self.base_offset) as u32;
-        let idx = self
-            .comments
-            .iter()
-            .rposition(|c| c.span.end == token_end)?;
-        let c = &self.comments[idx];
+        let comments = self.comments();
+        let idx = comments.iter().rposition(|c| c.span.end == token_end)?;
+        let c = &comments[idx];
         if !c.is_block {
             return None;
         }
@@ -2387,9 +2386,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // merged content is a plain source slice from the run's first `/*` to this
         // comment's `*/` (`merge_nestled_block_comments`, which keeps the trailing
         // entry's flags), so `idx` remains the comment the cast owns and prints.
-        let run_start =
-            tsv_lang::nestled_run_start(&self.comments, idx, |c| self.comment_content(c));
-        let start = self.comments[run_start].content_span.start as usize - self.base_offset;
+        let run_start = tsv_lang::nestled_run_start(comments, idx, |c| self.comment_content(c));
+        let start = comments[run_start].content_span.start as usize - self.base_offset;
         let end = c.content_span.end as usize - self.base_offset;
         is_jsdoc_type_cast_comment(&self.source[start..end]).then_some(idx)
     }
@@ -2416,9 +2414,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let src = self.source.as_bytes();
         let mut pos = paren_start - self.base_offset + 1;
         let mut next = glued_idx + 1;
+        let comments = self.comments();
         loop {
             pos = skip_whitespace(src, pos);
-            match self.comments.get(next) {
+            match comments.get(next) {
                 Some(c) if c.span.start as usize == pos + self.base_offset => {
                     if !c.is_block {
                         return Some(glued_idx);
@@ -2463,6 +2462,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// a node genuinely starts at the token, never when the head was a grouping `(` the
     /// parser discards (`/* c */ (a + b)` — there the comment leads a paren, no node
     /// begins at it, and it stays an ordinary positional comment).
+    #[inline]
     pub(in crate::parser) fn bind_leading_comment(&mut self, head_start: usize, expr: ExprId) {
         if self.expr(expr).span().start as usize != head_start {
             return;
@@ -2470,10 +2470,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let Some(idx) = self.glued_block_comment_index(head_start) else {
             return;
         };
-        self.comments[idx].owned_by_node = true;
+        self.comments_mut()[idx].owned_by_node = true;
     }
 
-    /// The index in `self.comments` of a **block** comment glued to the token at
+    /// The index in the comment ledger of a **block** comment glued to the token at
     /// `head_start` — nothing but spaces/tabs between its `*/` and the token, and no
     /// newline (a comment the author put on its own line leads the *line*, not the
     /// token, so it keeps its ordinary positional handling).
@@ -2496,11 +2496,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             source_scan::CommentGlue::SameLine,
         )?;
         let token_end = (i + self.base_offset) as u32;
-        let idx = self
-            .comments
-            .iter()
-            .rposition(|c| c.span.end == token_end)?;
-        self.comments[idx].is_block.then_some(idx)
+        let comments = self.comments();
+        let idx = comments.iter().rposition(|c| c.span.end == token_end)?;
+        comments[idx].is_block.then_some(idx)
     }
 
     /// Parse a TypeScript angle-bracket type assertion: `<Type>expr`
@@ -2743,13 +2741,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let lt_pos = self.current_pos().0;
         // the comments drained ahead of the checkpoint that a reading may still claim:
         // the ones at or past the `<`, at the ledger's end
-        let unclaimed = self
-            .comments
+        let comments = self.comments();
+        let unclaimed = comments
             .iter()
             .rposition(|comment| (comment.span.start as usize) < lt_pos)
             .map_or(0, |i| i + 1);
-        let unclaimed: Vec<usize> = (unclaimed..self.comments.len())
-            .filter(|&i| !self.comments[i].owned_by_node)
+        let unclaimed: Vec<usize> = (unclaimed..comments.len())
+            .filter(|&i| !comments[i].owned_by_node)
             .collect();
         let checkpoint = self.checkpoint();
         let reads = self
@@ -2757,8 +2755,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             .is_ok()
             && self.prev_end >= close_end;
         self.rewind(checkpoint);
+        let ledger = self.comments_mut();
         for i in unclaimed {
-            self.comments[i].owned_by_node = false;
+            ledger[i].owned_by_node = false;
         }
         reads
     }

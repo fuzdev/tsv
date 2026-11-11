@@ -496,7 +496,7 @@ Script/style tag content is extracted by **raw byte scanning** for closing delim
 
 ### Multi-Language Embedding
 
-Every embedded region shares the Svelte document's one bump arena (so the whole component is one bump-allocated graph); each embedded region gets a fresh parser instance. There is no shared symbol table — all names are span-identity, recovered from source.
+Every embedded region shares the Svelte document's allocations — the TypeScript islands its one set of `AstStores`, the markup and `<style>` its one bump arena; each embedded region gets a fresh parser instance. There is no shared symbol table — all names are span-identity, recovered from source.
 
 Embedded parsers track `base_offset` so spans are absolute positions in the root source, not relative to tag content. Standalone parsing passes `base_offset = 0`.
 
@@ -751,7 +751,9 @@ present). Two kinds of owned data remain on nodes, both deliberate:
 - **Genuinely decoded text** — `StringCooked::Decoded`, `TemplateCooked::Decoded`
   (escape sequences resolved). Both the `tsv_ts` and `tsv_css` string literals hold a
   `StringCooked` whose common `Verbatim` arm is span-recovered and allocation-free; only
-  the `Decoded` arm — which a span can't reconstruct — is arena-allocated `&'arena str`.
+  the `Decoded` arm — which a span can't reconstruct — holds text of its own, copied once
+  at parse: into the stores' text pool in `tsv_ts` (a `PoolStr`), into the arena as an
+  `&'arena str` in `tsv_css`.
   Don't "restore" a `Decoded` value to span extraction — verify a field is a *verbatim*
   source slice before assuming it's a redundant copy.
 - **Precomputed derived scalars** — a node caches a small derived value (a `bool`/
@@ -775,7 +777,7 @@ check every producer stores the verbatim bytes.**
 
 ## Comment Handling
 
-Comments are stored **separately from AST nodes** in a flat comment array at each root level (`Program.comments` — an arena slice `&'arena [Comment]`; `CssStyleSheet.comments` and `Root.comments` — `Vec<Comment>`). This is the "detached model" used by prettier.
+Comments are stored **separately from AST nodes** in a flat comment array at each root level (`Program.comments` — a `CommentList`, a run of the document stores' comment rows read through `AstView::comments`; `CssStyleSheet.comments` and `Root.comments` — `Vec<Comment>`). This is the "detached model" used by prettier.
 
 ### Core Type
 
@@ -867,9 +869,9 @@ A `format-ignore` / `prettier-ignore` comment suppresses formatting of the const
 
 Native tsv runs on the system allocator — no `#[global_allocator]`, no alternative-allocator dependency. The one exception is WebAssembly: `tsv_wasm` sets a wasm32-gated `#[global_allocator]` to [talc](https://github.com/SFBdragon/talc) (its `WasmGrowAndExtend` source), replacing std's default dlmalloc — the WASM format path is allocation-bound enough that the allocator itself was a measured wall, and the extend source holds the long-lived instance's linear-memory high-water at dlmalloc parity. The performance posture is otherwise structural: each layer avoids allocation by design rather than allocating faster.
 
-**Lexing — spans, not strings.** Tokens store `u32` byte offsets (`start`, `end`) into the source, never slices or copies — `Token` is a small POD (16 B; tsv_svelte's 12 B) that a byte cursor over the source emits. The exception is deliberate: a string literal's decoded value is materialized only when it actually contains escape sequences, decoded into a **reused scratch buffer held out-of-band on the lexer** (`Lexer::decode_scratch`, borrowed via `decoded_str` and copied into the AST arena at receipt) so no per-literal `String` allocates and the per-token `Token` stays pointer-free. Comments are spans too — the token carries a `content_start` and the `Comment` node a `content_span`, recovered from source on demand and never copied. On the parser's hot path (`advance`, plus the CSS and Svelte lookaheads) the lexers write the token in place into the parser's slot (`next_token_into`) rather than returning a by-value `Result<Token, Error>` through a stack slot the parser would reload and re-scatter; other TS and CSS callers take it by value (`next_token`); the Svelte lexer has no by-value form.
+**Lexing — spans, not strings.** Tokens store `u32` byte offsets (`start`, `end`) into the source, never slices or copies — `Token` is a small POD (16 B; tsv_svelte's 12 B) that a byte cursor over the source emits. The exception is deliberate: a string literal's decoded value is materialized only when it actually contains escape sequences, decoded into a **reused scratch buffer held out-of-band on the lexer** (`Lexer::decode_scratch`, borrowed via `decoded_str` and copied out at receipt — into the stores' text pool in `tsv_ts`, into the AST arena in `tsv_css`) so no per-literal `String` allocates and the per-token `Token` stays pointer-free. Comments are spans too — the token carries a `content_start` and the `Comment` node a `content_span`, recovered from source on demand and never copied. On the parser's hot path (`advance`, plus the CSS and Svelte lookaheads) the lexers write the token in place into the parser's slot (`next_token_into`) rather than returning a by-value `Result<Token, Error>` through a stack slot the parser would reload and re-scatter; other TS and CSS callers take it by value (`next_token`); the Svelte lexer has no by-value form.
 
-**Internal AST — bump-arena nested ownership, span-identity names, no raw text.** Expressions, statements, types and the rare wide payloads are rows of per-document stores named by typed ids; a child list is a `Run` over a store (of ids, or of the elements themselves for a list built by value); the rest is allocated in a per-parse bump arena, with small children kept inline by value (see [Nested AST](#nested-ast-bump-arena-not-flatindexed) for the layout rationale). Identifier names are span-identity — an `IdentName` records the raw name-token length and the name is re-sliced from source; only the rare `\u`-escaped (or oversized) name carries its decoded form as an `&'arena str`. Svelte element/attribute names are span-identity too (`source[name_span]`, `.trim()` for the padded-`{ shorthand }` edge), so there is no shared symbol table anywhere. Raw source text is never duplicated into the AST — printers re-slice via `span.extract(source)`; the few deliberate stored-raw caches are cataloged in [Source-Based Printing](#source-based-printing). What remains as owned data is genuinely decoded: string-literal values (only when escaped) and the like, arena-allocated as `&'arena str`.
+**Internal AST — TypeScript in stores, CSS and Svelte in a bump arena, span-identity names, no raw text.** TypeScript's expressions, statements, types and rare wide payloads are rows of per-document stores named by typed ids; a child list is a `Run` over a store (of ids, or of the elements themselves for a list built by value); TypeScript's decoded strings and comments live in the same stores, so its whole tree is there; CSS's and Svelte's own nodes are allocated in a per-parse bump arena; in both, small children are kept inline by value (see [Nested AST](#nested-ast-bump-arena-not-flatindexed) for the layout rationale). Identifier names are span-identity — an `IdentName` records the raw name-token length and the name is re-sliced from source; only the rare `\u`-escaped (or oversized) name carries its decoded form, as pool text. Svelte element/attribute names are span-identity too (`source[name_span]`, `.trim()` for the padded-`{ shorthand }` edge), so there is no shared symbol table anywhere. Raw source text is never duplicated into the AST — printers re-slice via `span.extract(source)`; the few deliberate stored-raw caches are cataloged in [Source-Based Printing](#source-based-printing). What remains as owned data is genuinely decoded: string-literal values (only when escaped) and the like, copied once into the text pool (TypeScript) or the arena (CSS, Svelte).
 
 **Svelte template nodes — contiguous storage.** Fragment children are an `&'arena [FragmentNode]` slice of enum values rather than boxed nodes, keeping siblings contiguous in arena memory for the printer's traversal loops.
 
@@ -971,10 +973,10 @@ Decisions made during development with rationale preserved for future reference.
 
 ### Nested AST (Bump-Arena, Not Flat/Indexed)
 
-tsv's nodes live in per-document stores named by typed ids (below); a **per-parse
-bump arena** (`bumpalo`), tied to the program lifetime, holds the rest. Decoded strings
-are `&'arena str` and the comments one `&'arena [Comment]`, freed wholesale when the arena
-drops, with no per-node `Drop`.
+tsv's TypeScript tree lives in per-document stores named by typed ids (below), its decoded
+strings and comments included, so a TypeScript parse takes no arena. The CSS and Svelte
+trees sit in a **per-parse bump arena** (`bumpalo`), tied to the program lifetime, freed
+wholesale when the arena drops, with no per-node `Drop`.
 
 **`Expression`, `Statement` and `TSType` nodes and the rare payloads are the exceptions: they live in `AstStores`**
 (`ast/stores.rs`), one per document, kept beside the tree in a `Parsed` and shared across a Svelte component's
@@ -997,16 +999,18 @@ new row and the old one is orphaned. The payloads too rare to sit inline in the 
 refers to them (`ArrowFunctionExpression`, `FunctionDeclaration`, `TSImportType` and their
 fellows, a `for` head, a catch clause, a parameter name's extras) are rows too, one store per
 payload type, each named by an id of its own type (`ArrowFnId`, `FnDeclId`, `ImportTypeId`,
-…). What the arena still holds is the tree's decoded strings and its comments. The rest of this section describes the layout the stores were built to keep.
+…). The stores also hold the tree's decoded strings, in one text pool a `PoolStr` names, and
+its comments, a run of comment rows per program (`CommentList`), each read through the view
+like a row. The rest of this section describes the layout the stores were built to keep.
 
 
 ```rust
 pub struct Program<'arena> {
     pub body: Run<StmtId>, // the statement store's ids
-    pub comments: &'arena [Comment], // arena-gathered; not the per-node target
+    pub comments: CommentList<'arena>, // a run of the comment store; not the per-node target
     pub span: Span,
     // no interner / symbol table — identifier names are span-identity, recovered
-    // from source[span]; the rare escaped name carries an &'arena str
+    // from source[span]; the rare escaped name carries a PoolStr into the text pool
 }
 
 pub struct Statement<'arena> {
@@ -1021,13 +1025,14 @@ pub enum StatementKind<'arena> {
 }
 ```
 
-The caller owns the arena (`parse(source, &arena)`); the returned AST borrows it,
-and `format`/`convert` consume it into an owned `String`/JSON, so the arena never
-escapes the call (no self-referential ownership — `unsafe_code = "forbid"`, safe
-bumpalo API only). Identifier and element/attribute names are **span-identity** —
-recovered from `source[span]` at each consumer, with the rare escaped name carried
-as an `&'arena str` — so the arena is the *only* thing threaded through
-parse/format, and no name-table lifetime lands on the AST or the parser.
+A TypeScript parse returns the tree with the stores it wrote (`parse(source)` → `Parsed`, or
+`*_into` a caller's warm stores); a CSS or Svelte caller owns the arena
+(`parse(source, &arena)`), and the returned AST borrows it. `format`/`convert` consume either
+into an owned `String`/JSON, so nothing borrowed escapes the call (no self-referential
+ownership — `unsafe_code = "forbid"`, safe bumpalo API only). Identifier and
+element/attribute names are **span-identity** — recovered from `source[span]` at each
+consumer, with the rare escaped name carried as pool text — so no name-table lifetime lands
+on the AST or the parser.
 
 **Inline-by-value layout, size-minimized only at the variants that set an enum's
 width.** A node holds its children inline by value where they were owned inline

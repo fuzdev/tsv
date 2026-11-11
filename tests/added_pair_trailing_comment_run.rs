@@ -11,8 +11,7 @@
 //! shapes no fixture can hold.
 
 fn format(source: &str) -> String {
-    let arena = bumpalo::Bump::new();
-    let program = tsv_ts::__private::parse(source, &arena).expect("parse failed");
+    let program = tsv_ts::__private::parse(source).expect("parse failed");
     tsv_ts::__private::format_ast(&program, source)
 }
 
@@ -71,9 +70,8 @@ fn cast_operand_multiline_block_stays_inside_the_pair() {
         "x = (a - (b /* c */ /* d\ne */)) as T;\n",
     ] {
         let output = format(source);
-        let arena = bumpalo::Bump::new();
         assert!(
-            tsv_ts::__private::parse(&output, &arena).is_ok(),
+            tsv_ts::__private::parse(&output).is_ok(),
             "the output of {source:?} must parse, got {output:?}"
         );
     }

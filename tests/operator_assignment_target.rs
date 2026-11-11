@@ -35,20 +35,17 @@
 use serde_json::Value;
 
 fn parse_json(source: &str) -> Value {
-    let arena = bumpalo::Bump::new();
-    let program = tsv_ts::__private::parse(source, &arena).expect("parse failed");
+    let program = tsv_ts::__private::parse(source).expect("parse failed");
     tsv_debug::json::wire_value(&tsv_ts::__private::convert_ast_json_bytes(&program, source))
 }
 
 fn format(source: &str) -> String {
-    let arena = bumpalo::Bump::new();
-    let program = tsv_ts::__private::parse(source, &arena).expect("parse failed");
+    let program = tsv_ts::__private::parse(source).expect("parse failed");
     tsv_ts::__private::format_ast(&program, source)
 }
 
 fn rejects(source: &str) -> bool {
-    let arena = bumpalo::Bump::new();
-    tsv_ts::__private::parse(source, &arena).is_err()
+    tsv_ts::__private::parse(source).is_err()
 }
 
 /// Every assignment operator ecma262 names — `=`, the arithmetic / bitwise / shift
@@ -218,8 +215,7 @@ fn bare_assertion_target_rejects_under_every_operator() {
         for operator in ASSIGNMENT_OPERATORS {
             let source = format!("{left} {operator} c;");
             // the target's own error, not a failure somewhere else in the spelling
-            let arena = bumpalo::Bump::new();
-            let error = tsv_ts::__private::parse(&source, &arena)
+            let error = tsv_ts::__private::parse(&source)
                 .err()
                 .unwrap_or_else(|| panic!("a bare assertion target rejects: {source:?}"));
             assert!(
@@ -516,9 +512,8 @@ fn left_hand_side_and_absorbed_controls_parse() {
 #[test]
 fn script_goal_await_is_a_name() {
     for source in ["await = 1;", "await(a) = 1;", "await\na = 1;"] {
-        let arena = bumpalo::Bump::new();
         assert!(
-            tsv_ts::__private::parse_with_goal(source, tsv_ts::Goal::Script, &arena).is_ok(),
+            tsv_ts::__private::parse_with_goal(source, tsv_ts::Goal::Script).is_ok(),
             "parses at Script: {source:?}"
         );
     }
@@ -543,8 +538,7 @@ fn script_goal_await_is_a_name() {
     // A top-level `import` is a goal gate: the Script retry dies on it, so the fallback
     // reports the Module attempt's error — the operator target — not the Script's.
     let source = "import x from 'y';\nawait (a) = 1;";
-    let arena = bumpalo::Bump::new();
-    let module_error = tsv_ts::__private::parse_with_goal(source, tsv_ts::Goal::Module, &arena)
+    let module_error = tsv_ts::__private::parse_with_goal(source, tsv_ts::Goal::Module)
         .expect_err("the module attempt rejects the `await` target");
     let fallback_error = tsv_ts::format(source).expect_err("the fallback rejects");
     assert_eq!(

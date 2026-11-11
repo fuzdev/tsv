@@ -382,8 +382,7 @@ fn audit_file(path: &Path) -> FileOutcome {
 /// The forward binding of every block comment in `source` (parsed with
 /// `preserve_parens`), in source order. `None` if the source doesn't parse.
 fn extract_bindings(source: &str) -> Option<Vec<CommentBinding>> {
-    let arena = bumpalo::Bump::new();
-    let program = tsv_ts::__private::parse_preserve_parens(source, &arena).ok()?;
+    let program = tsv_ts::__private::parse_preserve_parens(source).ok()?;
     let wire =
         crate::json::wire_value(&tsv_ts::__private::convert_ast_json_bytes(&program, source));
     let map = Utf16ToByte::new(source);

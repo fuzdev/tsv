@@ -345,7 +345,7 @@ pub(crate) fn is_multiline_template_expression(
 /// Build doc for TSEntityName (qualified names like `A.B.C`)
 ///
 /// Needs the printer for the name-emission seam (span-identity source slices,
-/// arena-string escaped names).
+/// pool-text escaped names).
 ///
 /// A qualified name nests down its `left` side, one level per `.`, and its length is
 /// bounded only by `SPINE_LIMIT` — so the names are collected iteratively and the pairs

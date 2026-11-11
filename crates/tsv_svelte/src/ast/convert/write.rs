@@ -1706,14 +1706,12 @@ fn write_script(
     // comment) needs acorn's leading/trailing attach, which runs online off this
     // emit's own node opens and closes. The common case (no comments) fuses with
     // no attach at all.
-    let attach = if ctx.view.comments(script.content.comments).is_empty()
-        && html_leading_comment.is_none()
-    {
+    let comments = ctx.view.comments(script.content.comments);
+    let attach = if comments.is_empty() && html_leading_comment.is_none() {
         None
     } else {
         Some(attach_script(
-            script,
-            ctx.view,
+            comments,
             ctx.attach_inputs(),
             html_leading_comment,
         ))

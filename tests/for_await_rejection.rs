@@ -20,14 +20,11 @@
 //! — the rejections themselves are pinned by
 //! `tests/fixtures/typescript/declarations/function/async/for_await/`.
 
-use bumpalo::Bump;
-
 /// The rendered error's `(line, column)`, read back off the caret form. A positionless
 /// render carries no located line, so this panics rather than silently reading the
 /// message line as a location.
 fn error_at(source: &str) -> (usize, usize, String) {
-    let arena = Bump::new();
-    let err = tsv_ts::__private::parse(source, &arena).expect_err("the input must not parse");
+    let err = tsv_ts::__private::parse(source).expect_err("the input must not parse");
     let rendered = format!("{err:#}");
     let mut lines = rendered.lines();
     let message = lines
@@ -94,8 +91,7 @@ fn a_for_await_of_head_still_parses() {
         "async function f() { for await (const x of o) {} }",
         "async function f() { for await (x of o) {} }",
     ] {
-        let arena = Bump::new();
-        tsv_ts::__private::parse(source, &arena)
+        tsv_ts::__private::parse(source)
             .unwrap_or_else(|e| panic!("a for-await-of head must parse: {source} — {e}"));
     }
 }

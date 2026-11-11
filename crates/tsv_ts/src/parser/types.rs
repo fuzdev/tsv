@@ -1536,10 +1536,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// lexer re-classifies an escaped one as an `Identifier`), so its name reads raw.
     /// The caller keeps the keyword because the head may turn out to be a standalone
     /// type instead — see [`Parser::tuple_label_head_as_type`].
-    fn tuple_label_head(&self) -> Option<(IdentName<'arena>, Option<KeywordKind>)> {
+    fn tuple_label_head(&mut self) -> Option<(IdentName<'arena>, Option<KeywordKind>)> {
         match self.current_kind() {
             TokenKind::Identifier => Some((self.current_ident_name(), None)),
-            TokenKind::Keyword(kw) => Some((self.current_raw_ident_name(), Some(*kw))),
+            &TokenKind::Keyword(kw) => Some((self.current_raw_ident_name(), Some(kw))),
             _ => None,
         }
     }

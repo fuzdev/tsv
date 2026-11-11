@@ -52,8 +52,7 @@ fn node_kinds(source: &str) -> Vec<String> {
             _ => {}
         }
     }
-    let arena = bumpalo::Bump::new();
-    let program = tsv_ts::__private::parse(source, &arena).expect("the case parses");
+    let program = tsv_ts::__private::parse(source).expect("the case parses");
     let json =
         tsv_debug::json::wire_value(&tsv_ts::__private::convert_ast_json_bytes(&program, source));
     let mut out = Vec::new();
@@ -94,16 +93,14 @@ fn assert_two_comparisons(source: &str, printed: &str) {
 }
 
 fn rejects(source: &str) -> bool {
-    let arena = bumpalo::Bump::new();
-    tsv_ts::__private::parse(source, &arena).is_err()
+    tsv_ts::__private::parse(source).is_err()
 }
 
 /// The rendered error for `source`: its message line and its `line:col` header.
 fn error(source: &str) -> (String, String) {
-    let arena = bumpalo::Bump::new();
     let rendered = format!(
         "{:#}",
-        tsv_ts::__private::parse(source, &arena).expect_err("the case must not parse")
+        tsv_ts::__private::parse(source).expect_err("the case must not parse")
     );
     let mut lines = rendered.lines();
     let message = lines.next().expect("a message line").to_owned();
@@ -554,13 +551,11 @@ fn when_both_readings_fail_the_error_that_reached_further_is_reported() {
 #[test]
 fn an_embedded_parse_reports_the_further_error_too() {
     // An expression island's parser is built by another constructor than a document's.
-    let arena = bumpalo::Bump::new();
     let source = "fn(a < b, c + d > (e)";
     let error = tsv_ts::__private::parse_expression_with_comments(
         source,
         100,
         0,
-        &arena,
         &mut tsv_ts::ast::AstStores::new(),
         "end of input",
         |_, _| Ok(()),
@@ -581,8 +576,7 @@ fn a_goal_gate_in_the_tail_is_reported_as_it_stands() {
         "c ? (x = f<A, { p: X; [import.meta]: 1 }>(y)) : T => z;",
         "fn(a < b, { [k(f<A, { p: X; [import.meta]: 1 }>(y))]: 1 }, c + d > (e));",
     ] {
-        let arena = bumpalo::Bump::new();
-        let error = tsv_ts::__private::parse_with_goal(source, tsv_ts::Goal::Script, &arena)
+        let error = tsv_ts::__private::parse_with_goal(source, tsv_ts::Goal::Script)
             .expect_err("`import.meta` is no script's");
         assert!(error.is_goal_gated(), "{source:?}: {error}");
     }
@@ -644,8 +638,7 @@ fn a_list_tried_inside_a_tried_list_is_tried_once() {
     }
     let source = format!("fn({source});");
     let started = Instant::now();
-    let arena = bumpalo::Bump::new();
-    assert!(tsv_ts::__private::parse(&source, &arena).is_ok());
+    assert!(tsv_ts::__private::parse(&source).is_ok());
     assert!(
         started.elapsed() < Duration::from_secs(20),
         "nested tried lists took {:?}",

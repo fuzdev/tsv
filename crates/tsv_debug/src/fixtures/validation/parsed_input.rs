@@ -31,7 +31,7 @@ pub(crate) fn parse_input<'arena>(
             .map(ParsedInput::Svelte)
             .map_err(|e| format!("Parse error: {e:?}")),
         InputType::SvelteTs | InputType::TypeScript => {
-            tsv_ts::__private::parse_with_goal(content, goal, arena)
+            tsv_ts::__private::parse_with_goal(content, goal)
                 .map(ParsedInput::Ts)
                 .map_err(|e| format!("Parse error: {e:?}"))
         }

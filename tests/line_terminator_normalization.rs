@@ -126,8 +126,7 @@ fn the_fused_format_str_entry_points_fold_as_well() {
 #[test]
 fn parse_leaves_the_authors_line_terminators_alone() {
     let cr = "const a = 1;\rconst b = 2;\r";
-    let arena = bumpalo::Bump::new();
-    let program = tsv_ts::__private::parse(cr, &arena).expect("parse");
+    let program = tsv_ts::__private::parse(cr).expect("parse");
     let json =
         tsv_debug::json::wire_value(&tsv_ts::__private::convert_ast_json_bytes(&program, cr));
     let second = json

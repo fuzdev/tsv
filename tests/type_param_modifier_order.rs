@@ -38,14 +38,12 @@
 use serde_json::Value;
 
 fn parse_json(source: &str) -> Value {
-    let arena = bumpalo::Bump::new();
-    let program = tsv_ts::__private::parse(source, &arena).expect("parse failed");
+    let program = tsv_ts::__private::parse(source).expect("parse failed");
     tsv_debug::json::wire_value(&tsv_ts::__private::convert_ast_json_bytes(&program, source))
 }
 
 fn format(source: &str) -> String {
-    let arena = bumpalo::Bump::new();
-    let program = tsv_ts::__private::parse(source, &arena).expect("parse failed");
+    let program = tsv_ts::__private::parse(source).expect("parse failed");
     tsv_ts::__private::format_ast(&program, source)
 }
 
@@ -127,7 +125,6 @@ fn printer_normalizes_to_canonical_order() {
 /// is the message and the boundary below.
 #[test]
 fn repeated_modifier_rejects() {
-    let arena = bumpalo::Bump::new();
     for (source, expected) in [
         ("class C<const const T> {}", "Duplicate modifier: 'const'"),
         ("class C<in in T> {}", "Duplicate modifier: 'in'"),
@@ -138,7 +135,7 @@ fn repeated_modifier_rejects() {
             "Duplicate modifier: 'const'",
         ),
     ] {
-        let err = tsv_ts::__private::parse(source, &arena)
+        let err = tsv_ts::__private::parse(source)
             .expect_err(&format!("expected a parse error for {source:?}"));
         let message = err.to_string();
         assert!(

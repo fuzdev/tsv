@@ -31,8 +31,7 @@ fn utf8(bytes: Vec<u8>) -> String {
 #[test]
 fn ts_parse_to_json_is_the_module_span_wire() {
     for source in TS {
-        let arena = Bump::new();
-        let ast = tsv_ts::__private::parse(source, &arena).expect("parses");
+        let ast = tsv_ts::__private::parse(source).expect("parses");
         let span = utf8(tsv_ts::__private::convert_ast_json_bytes(&ast, source));
         let loc = utf8(tsv_ts::__private::convert_ast_json_bytes_with_locations(
             &ast, source,
@@ -53,8 +52,7 @@ fn ts_parse_to_json_is_the_module_span_wire() {
 
 #[test]
 fn ts_json_options_goal_is_exact() {
-    let arena = Bump::new();
-    let ast = tsv_ts::__private::parse_with_goal(SCRIPT, Goal::Script, &arena).expect("a script");
+    let ast = tsv_ts::__private::parse_with_goal(SCRIPT, Goal::Script).expect("a script");
     let span = utf8(tsv_ts::__private::convert_ast_json_bytes(&ast, SCRIPT));
     let loc = utf8(tsv_ts::__private::convert_ast_json_bytes_with_locations(
         &ast, SCRIPT,
@@ -66,7 +64,7 @@ fn ts_json_options_goal_is_exact() {
         Ok(loc)
     );
     // no fallback: the bare form is the module goal alone, and its error the module parse's
-    let module_error = tsv_ts::__private::parse(SCRIPT, &arena).expect_err("not a module");
+    let module_error = tsv_ts::__private::parse(SCRIPT).expect_err("not a module");
     let bare = tsv_ts::parse_to_json(SCRIPT).expect_err("the bare form is Module");
     assert_eq!(format!("{bare:#}"), format!("{module_error:#}"));
     let named = tsv_ts::JsonOptions::new().goal(Goal::Module);
@@ -149,7 +147,7 @@ fn a_parse_error_is_the_hidden_parse_error() {
         (
             "ts",
             tsv_ts::parse_to_json("let = ;"),
-            tsv_ts::__private::parse("let = ;", &arena).expect_err("invalid"),
+            tsv_ts::__private::parse("let = ;").expect_err("invalid"),
         ),
         (
             "css",

@@ -491,7 +491,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Asked twice per return type, once to decide whether an ordinary predicate
     /// outranks a leading `asserts` and once to take the name, so the set they agree on
     /// is spelled here rather than at each.
-    fn try_type_predicate_subject(&self) -> Option<IdentName<'arena>> {
+    fn try_type_predicate_subject(&mut self) -> Option<IdentName<'arena>> {
         self.try_ident_or_contextual_name()
             .or_else(|| self.this_as_name())
     }

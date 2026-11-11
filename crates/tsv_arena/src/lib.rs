@@ -261,7 +261,8 @@ pub fn decode_source_type<G>(
 ///
 /// The `$storeness` tag is the language's store axis: `stores` (TypeScript, Svelte) calls
 /// the `*_into` form with `$stores`, the one [`with_lang_stores!`] hands over; `nostores`
-/// (CSS, which has no store) calls the arena-only `parse`.
+/// (CSS, which has no store) calls the arena-only `parse`. The `goal` language parses
+/// into its stores alone and takes no `$arena`; the `nogoal` ones still allocate in it.
 ///
 /// `$lang` and `$arena` resolve in the caller's scope, so this crate needs no
 /// dependency on the language crates.
@@ -271,9 +272,10 @@ pub fn decode_source_type<G>(
 /// ```
 #[macro_export]
 macro_rules! parse_ast {
-    (goal, stores, $lang:ident, $source:expr, $goal:expr, $arena:expr, $stores:expr) => {
-        $lang::__private::parse_with_goal_into($source, $goal, $arena, $stores)
-    };
+    (goal, stores, $lang:ident, $source:expr, $goal:expr, $arena:expr, $stores:expr) => {{
+        let _ = $arena;
+        $lang::__private::parse_with_goal_into($source, $goal, $stores)
+    }};
     (nogoal, stores, $lang:ident, $source:expr, $goal:expr, $arena:expr, $stores:expr) => {{
         // Consume the (always-`Module`) goal so the binding stays used in every
         // expansion.
@@ -407,9 +409,10 @@ macro_rules! parse_internal {
 /// ```
 #[macro_export]
 macro_rules! parse_ast_for_format {
-    (goal, stores, $lang:ident, $folded:expr, $goal:expr, $arena:expr, $stores:expr) => {
-        $lang::__private::parse_folded_into($folded, $goal, $arena, $stores)
-    };
+    (goal, stores, $lang:ident, $folded:expr, $goal:expr, $arena:expr, $stores:expr) => {{
+        let _ = $arena;
+        $lang::__private::parse_folded_into($folded, $goal, $stores)
+    }};
     (nogoal, stores, $lang:ident, $folded:expr, $goal:expr, $arena:expr, $stores:expr) => {{
         // Consume the (always-unset) goal so the binding stays used in every
         // expansion.
@@ -679,24 +682,19 @@ mod tests {
             pub(crate) fn parse_into(source: &str, arena: &str, stores: &str) -> String {
                 format!("parse_into({source}, {arena}, {stores})")
             }
-            pub(crate) fn parse_with_goal_into(
-                source: &str,
-                goal: &str,
-                arena: &str,
-                stores: &str,
-            ) -> String {
-                format!("parse_with_goal_into({source}, {goal}, {arena}, {stores})")
+            /// The goal-axis language parses into its stores alone.
+            pub(crate) fn parse_with_goal_into(source: &str, goal: &str, stores: &str) -> String {
+                format!("parse_with_goal_into({source}, {goal}, {stores})")
             }
             /// The goal-axis language's format-path parse (`tsv_ts::__private::parse_folded`).
             pub(crate) fn parse_folded_into(
                 folded: &str,
                 goal: Option<&str>,
-                arena: &str,
                 stores: &str,
             ) -> String {
                 match goal {
-                    Some(goal) => format!("exact({folded}, {goal}, {arena}, {stores})"),
-                    None => format!("fallback({folded}, {arena}, {stores})"),
+                    Some(goal) => format!("exact({folded}, {goal}, {stores})"),
+                    None => format!("fallback({folded}, {stores})"),
                 }
             }
         }
@@ -718,7 +716,7 @@ mod tests {
     fn parse_ast_dispatches_on_the_goalness_tag() {
         assert_eq!(
             parse_ast!(goal, stores, fake_lang, "src", "script", "arena", "stores"),
-            "parse_with_goal_into(src, script, arena, stores)",
+            "parse_with_goal_into(src, script, stores)",
             "`goal` must thread the goal into `parse_with_goal_into`"
         );
         assert_eq!(
@@ -747,12 +745,12 @@ mod tests {
                 "arena",
                 "stores"
             ),
-            "exact(folded, script, arena, stores)",
+            "exact(folded, script, stores)",
             "a NAMED source type must be exact — the same grammar `parse_ast!` runs"
         );
         assert_eq!(
             parse_ast_for_format!(goal, stores, fake_lang, "folded", None, "arena", "stores"),
-            "fallback(folded, arena, stores)",
+            "fallback(folded, stores)",
             "an unset source type must take the module-then-script fallback"
         );
         assert_eq!(
@@ -791,13 +789,12 @@ mod tests {
             pub(crate) fn with_stores<R>(f: impl FnOnce(&str) -> R) -> R {
                 f("marker")
             }
-            pub(crate) fn parse(source: &str, arena: &bumpalo::Bump) -> Result<String, String> {
-                parse_with_goal_into(source, "goalless", arena, "marker")
+            pub(crate) fn parse(source: &str, _arena: &bumpalo::Bump) -> Result<String, String> {
+                parse_with_goal_into(source, "goalless", "marker")
             }
             pub(crate) fn parse_with_goal_into(
                 source: &str,
                 goal: &str,
-                _arena: &bumpalo::Bump,
                 stores: &str,
             ) -> Result<String, String> {
                 debug_assert_eq!(stores, "marker");

@@ -122,16 +122,21 @@ impl<'a> AstView<'a> {
         list.map(|list| self.decorators(list))
     }
 
-    /// The text `text` names: a decoded or normalized string of the tree.
-    #[inline]
+    /// The text `text` names: a decoded or normalized string of the tree. A miss ends in the
+    /// pool's shared cold path.
+    ///
+    /// Out of line because only the rare text reads it — an escaped name, a decoded string or
+    /// template value, a carriage-return-folded template raw — so every name reader's common,
+    /// span-identity arm stays small enough to inline where it is read.
+    #[inline(never)]
     pub fn text(self, text: PoolStr<'a>) -> &'a str {
-        text
+        self.stores.text.get(text.text)
     }
 
-    /// The comments of `list`: a program's.
+    /// The comments of `list`: a program's. A miss ends in the store's shared cold path.
     #[inline]
     pub fn comments(self, list: CommentList<'a>) -> &'a [Comment] {
-        list
+        self.stores.comments.slice(list.run)
     }
 
     /// The payload stores, for the accessors their macro declares beside them.

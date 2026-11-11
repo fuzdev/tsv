@@ -31,8 +31,7 @@ fn assert_operand_paren_arrow(source: &str, expected_output: &str) {
          parens) — if they become idempotent, promote to a fixture"
     );
 
-    let arena = bumpalo::Bump::new();
-    let program = tsv_ts::__private::parse(source, &arena).expect("parse failed");
+    let program = tsv_ts::__private::parse(source).expect("parse failed");
     let json =
         tsv_debug::json::wire_value(&tsv_ts::__private::convert_ast_json_bytes(&program, source));
 
@@ -64,8 +63,7 @@ fn assert_operand_paren_arrow(source: &str, expected_output: &str) {
     assert_eq!(output, expected_output, "paren-strip output");
 
     // The stripped form is tsv's fixed point and keeps the same arrow shape.
-    let arena_out = bumpalo::Bump::new();
-    let reparsed = tsv_ts::__private::parse(&output, &arena_out).expect("reparse failed");
+    let reparsed = tsv_ts::__private::parse(&output).expect("reparse failed");
     assert_eq!(
         tsv_ts::__private::format_ast(&reparsed, &output),
         output,

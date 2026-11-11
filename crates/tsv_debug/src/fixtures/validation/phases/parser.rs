@@ -381,7 +381,7 @@ pub(in crate::fixtures::validation) fn validate_tsv_rejects(
             .map(|_| ())
             .map_err(|e| format!("{e:#}")),
         InputType::SvelteTs | InputType::TypeScript => {
-            tsv_ts::__private::parse_with_goal(input, fixture.goal(), &arena)
+            tsv_ts::__private::parse_with_goal(input, fixture.goal())
                 .map(|_| ())
                 .map_err(|e| format!("{e:#}"))
         }

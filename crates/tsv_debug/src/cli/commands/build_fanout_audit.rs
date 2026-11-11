@@ -640,7 +640,7 @@ fn doc_node_count(source: &str, parser: ParserType) -> Result<usize, String> {
             let _ = tsv_svelte::__private::format_ast_in(&ast, source, &doc_arena);
         }
         ParserType::TypeScript => {
-            let ast = tsv_ts::__private::parse(source, &bump).map_err(|e| format!("{e:#}"))?;
+            let ast = tsv_ts::__private::parse(source).map_err(|e| format!("{e:#}"))?;
             let _ = tsv_ts::__private::format_ast_in(&ast, source, &doc_arena);
         }
         ParserType::Css => {
