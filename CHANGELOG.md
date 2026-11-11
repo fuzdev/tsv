@@ -13,6 +13,10 @@ Each `## Unreleased` section must be non-empty and carry a
 ## Unreleased
 <!-- bump: patch -->
 
+- chore: the internal TypeScript AST lives in per-document stores named by typed ids, with
+  decoded text in a pool, instead of bump-arena references; formatted output and the parse
+  wire are unchanged, and the hidden Rust `ast` / `__private` items change shape with it
+
 ## 0.8.1
 
 - feat: import records — `parse_imports_typescript(source, options?)` and
