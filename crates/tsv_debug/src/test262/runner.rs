@@ -437,8 +437,7 @@ fn grade_runs(content: &str, is_negative_parse: bool, runs: GradedRuns) -> TestR
 /// unit both `grade_runs` and `run_parse_test` grade.
 fn parse_run(source: &str, goal: tsv_ts::Goal) -> Option<String> {
     // test262 tests are pure ECMAScript, so we parse as TypeScript (a superset).
-    let arena = bumpalo::Bump::new();
-    match tsv_ts::__private::parse_with_goal(source, goal, &arena) {
+    match tsv_ts::__private::parse_with_goal(source, goal) {
         Ok(_) => None,
         Err(error) => Some(format!("{error:?}")),
     }

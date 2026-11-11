@@ -184,16 +184,14 @@ const COMMENT_DROP_CASES: &[(&str, &str, &str)] = &[
 #[test]
 fn comment_drop_exact_output_and_idempotent() {
     for &(label, input, expected) in COMMENT_DROP_CASES {
-        let arena = bumpalo::Bump::new();
-        let program = tsv_ts::__private::parse(input, &arena).expect("parse failed");
+        let program = tsv_ts::__private::parse(input).expect("parse failed");
         let ours = tsv_ts::__private::format_ast(&program, input);
         assert_eq!(
             ours, expected,
             "case `{label}`: output should preserve the interior comment"
         );
 
-        let arena_twice = bumpalo::Bump::new();
-        let program_twice = tsv_ts::__private::parse(&ours, &arena_twice).expect("reparse failed");
+        let program_twice = tsv_ts::__private::parse(&ours).expect("reparse failed");
         let ours_twice = tsv_ts::__private::format_ast(&program_twice, &ours);
         assert_eq!(
             ours_twice, ours,
@@ -307,16 +305,14 @@ const SEPARATOR_NORMALIZED_COMMENT_CASES: &[(&str, &str, &str)] = &[
 #[test]
 fn separator_normalized_comment_exact_output_and_idempotent() {
     for &(label, input, expected) in SEPARATOR_NORMALIZED_COMMENT_CASES {
-        let arena = bumpalo::Bump::new();
-        let program = tsv_ts::__private::parse(input, &arena).expect("parse failed");
+        let program = tsv_ts::__private::parse(input).expect("parse failed");
         let ours = tsv_ts::__private::format_ast(&program, input);
         assert_eq!(
             ours, expected,
             "case `{label}`: comment on the wrong side of `;`"
         );
 
-        let arena_twice = bumpalo::Bump::new();
-        let program_twice = tsv_ts::__private::parse(&ours, &arena_twice).expect("reparse failed");
+        let program_twice = tsv_ts::__private::parse(&ours).expect("reparse failed");
         let ours_twice = tsv_ts::__private::format_ast(&program_twice, &ours);
         assert_eq!(
             ours_twice, ours,

@@ -10,6 +10,9 @@
  */
 
 import { deepStrictEqual, ok, rejects, strictEqual } from 'node:assert';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { fs, type FsDir, type FsReadDir } from '@fuzdev/gro/fs.ts';
 import { create_fs_paths } from '@fuzdev/gro/fs_paths.ts';
@@ -37,6 +40,8 @@ import {
 	tree_has_strip
 } from './perf_ab.ts';
 import { build_inputs_of } from './perf_ab_verdict.ts';
+
+const CHECKOUT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 /** The variables that point git at a repository other than the one its working directory is in.
  * A git hook runs with them set to the outer repo, and every git program made here reads them
@@ -142,15 +147,24 @@ const driver_api_with = async (dir: FsDir, private_rs: string): Promise<string |
 	return (await tree_driver_api(make_git(), dir, await run_git(dir, ['write-tree']))).cfg;
 };
 
-test('a tree with the warm parse is the current generation, any other the oldest', async () => {
+test('a tree whose TypeScript parse takes no Bump is the current generation, one with the warm parse alone the next, any other the oldest', async () => {
 	clear_git_repo_env();
 	await using dir = await fs.temp_dir('perf_ab_test-');
 	await run_git(dir, ['init', '--quiet']);
 	await dir.mkdir('crates/tsv_ts/src', { recursive: true });
-	const warm = "pub fn parse_folded_into<'arena>(\n    folded: &FoldedSource<'_>,\n) {}\n";
-	strictEqual(await driver_api_with(dir, warm), null);
-	const lifetime_free = "pub fn parse_folded_into(\n    folded: &FoldedSource<'_>,\n) {}\n";
+	const body =
+		'    folded.parse_with(|text| parse_with_goal_or_fallback_into(text, goal, stores))\n';
+	const no_bump = `pub fn parse_folded_into<'arena>(\n    goal: Option<Goal>,\n) {\n${body}}\n`;
+	strictEqual(await driver_api_with(dir, no_bump), null);
+	const lifetime_free = `pub fn parse_folded_into(\n    goal: Option<Goal>,\n) {\n${body}}\n`;
 	strictEqual(await driver_api_with(dir, lifetime_free), null);
+	const through_bump =
+		"pub fn parse_folded_into<'arena>(\n    arena: &'arena Bump,\n) {\n    folded.parse_with(|text| parse_with_goal_or_fallback_into(text, goal, arena, stores))\n}\n";
+	strictEqual(await driver_api_with(dir, through_bump), 'ts_parse_bump');
+	const warm = "pub fn parse_folded_into<'arena>(\n    folded: &FoldedSource<'_>,\n) {}\n";
+	strictEqual(await driver_api_with(dir, warm), 'ts_parse_bump');
+	const commented = `pub fn parse_folded_into(\n) {}\n// ${body.trimStart()}    /// ${body.trimStart()}`;
+	strictEqual(await driver_api_with(dir, commented), 'ts_parse_bump');
 	const bump_only = "pub fn parse_folded<'arena>(\n    arena: &'arena Bump,\n) {}\n";
 	strictEqual(await driver_api_with(dir, bump_only), 'no_stores');
 	const lookalike = 'pub fn parse_folded_into_arena(source: &str) {}\n';
@@ -158,6 +172,12 @@ test('a tree with the warm parse is the current generation, any other the oldest
 	const mentioned =
 		"// pub fn parse_folded_into<'arena>(\n    /// pub fn parse_folded_into(\npub fn parse_folded() {}\n";
 	strictEqual(await driver_api_with(dir, mentioned), 'no_stores');
+});
+
+test('the workspace declares every older generation the drivers have an arm for', () => {
+	const manifest = readFileSync(join(CHECKOUT, 'Cargo.toml'), 'utf8');
+	const values = DRIVER_APIS.flatMap((api) => (api.cfg === null ? [] : [`"${api.cfg}"`]));
+	strictEqual(manifest.includes(`'cfg(perf_ab_api, values(${values.join(', ')}))'`), true);
 });
 
 test('an older generation differs from the current build only by its cfg', () => {

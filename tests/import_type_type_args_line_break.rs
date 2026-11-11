@@ -31,8 +31,7 @@ use serde_json::Value;
 const LEFTOVER_ERROR: &str = "Expected expression, found ';'";
 
 fn parse_json(source: &str) -> Value {
-    let arena = bumpalo::Bump::new();
-    let program = tsv_ts::__private::parse(source, &arena).expect("parse failed");
+    let program = tsv_ts::__private::parse(source).expect("parse failed");
     tsv_debug::json::wire_value(&tsv_ts::__private::convert_ast_json_bytes(&program, source))
 }
 
@@ -40,8 +39,7 @@ fn parse_json(source: &str) -> Value {
 /// type-argument list stranded as an expression.
 #[track_caller]
 fn assert_stranded_type_arguments(source: &str) {
-    let arena = bumpalo::Bump::new();
-    let error = tsv_ts::__private::parse(source, &arena)
+    let error = tsv_ts::__private::parse(source)
         .err()
         .map_or_else(|| "<parsed successfully>".to_owned(), |e| e.to_string());
     assert!(

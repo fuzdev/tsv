@@ -1,6 +1,5 @@
-//! The stores a parse's expressions, statements, types, payloads and by-value list elements
-//! live in, beside the arena that holds the tree's decoded strings and comments, and the
-//! per-thread parking of their capacity.
+//! The stores a parse's expressions, statements, types, payloads, by-value list elements,
+//! decoded strings and comments live in, and the per-thread parking of their capacity.
 //!
 //! Beside the three families, [`PayloadStores`] holds one store per payload too rare to sit
 //! inline in the node that refers to it: the function, class and declaration payloads, the
@@ -29,7 +28,9 @@ use std::cell::Cell;
 use std::fmt;
 use std::ops::Deref;
 
-use tsv_lang::store::{Id, ListBuf, ListMark, MarkGroup, Row, Run, Store};
+use std::marker::PhantomData;
+
+use tsv_lang::store::{Id, ListBuf, ListMark, MarkGroup, PoolText, Row, Run, Store, TextPool};
 
 use super::{
     ArrowFunctionExpression, AstView, CatchClause, ClassDeclaration, ClassExpression, ClassMember,
@@ -103,11 +104,70 @@ pub enum Text {}
 
 /// One string of the tree's text — an escaped identifier's decoded name, a string literal's
 /// or a template element's decoded value, a template element's normalized raw text — read
-/// through [`AstView::text`].
-pub type PoolStr<'arena> = &'arena str;
+/// through [`AstView::text`]: a handle into the stores' text pool.
+///
+/// The lifetime marks the tree the handle belongs to and holds no borrow.
+#[derive(Clone, Copy)]
+#[repr(transparent)]
+pub struct PoolStr<'arena> {
+    pub(super) text: PoolText<Text>,
+    tree: PhantomData<&'arena ()>,
+}
 
-/// A program's comments, read through [`AstView::comments`].
-pub type CommentList<'arena> = &'arena [Comment];
+impl PoolStr<'_> {
+    /// The handle `text` names, typed at the tree's lifetime.
+    #[inline]
+    pub(crate) fn new(text: PoolText<Text>) -> Self {
+        Self {
+            text,
+            tree: PhantomData,
+        }
+    }
+}
+
+impl fmt::Debug for PoolStr<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.text.fmt(f)
+    }
+}
+
+/// A program's comments, read through [`AstView::comments`]: a run of the stores' comment
+/// rows.
+///
+/// The lifetime marks the tree the run belongs to and holds no borrow.
+#[derive(Clone, Copy)]
+#[repr(transparent)]
+pub struct CommentList<'arena> {
+    pub(super) run: Run<Comment>,
+    tree: PhantomData<&'arena ()>,
+}
+
+impl CommentList<'_> {
+    /// The list `run` names, typed at the tree's lifetime.
+    #[inline]
+    pub(crate) fn new(run: Run<Comment>) -> Self {
+        Self {
+            run,
+            tree: PhantomData,
+        }
+    }
+}
+
+impl fmt::Debug for CommentList<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.run.fmt(f)
+    }
+}
+
+// A handle keeps its niche, so an absent string costs nothing beside a present one.
+#[cfg(test)]
+const _: () = {
+    use tsv_lang::store::STORE_CHECK;
+    assert!(STORE_CHECK || size_of::<PoolStr<'static>>() == 8);
+    assert!(STORE_CHECK || size_of::<Option<PoolStr<'static>>>() == 8);
+    assert!(STORE_CHECK || size_of::<CommentList<'static>>() == 8);
+    assert!(STORE_CHECK || size_of::<Option<CommentList<'static>>>() == 8);
+};
 
 /// Declares the payload stores. Per entry: the row type's family tag and the id the tree holds,
 /// a [`PayloadStores`] field, that field's lines in `new` and `park`, and the [`AstView`]
@@ -409,11 +469,11 @@ const _: () = {
     assert!(STORE_CHECK || size_of::<Option<ParamExtraId>>() == 4);
 };
 
-/// One document's expression, statement, type, payload and value-run stores and the scratch
-/// stacks that build their lists.
+/// One document's expression, statement, type, payload and value-run stores, the scratch
+/// stacks that build their lists, its text pool and its comments.
 ///
-/// A fresh one allocates nothing: a store's buffer is allocated by its first write, and a
-/// scratch stack's by its first push.
+/// A fresh one allocates nothing: a store's buffer is allocated by its first write, a
+/// scratch stack's by its first push, and the pool's by its first string.
 pub struct AstStores<'arena> {
     pub(crate) exprs: Store<Expression<'arena>>,
     pub(crate) expr_lists: Store<ExprId>,
@@ -429,6 +489,14 @@ pub struct AstStores<'arena> {
     pub(crate) ty_list_scratch: ListBuf<TyId>,
     pub(crate) payloads: PayloadStores<'arena>,
     pub(crate) runs: RunStores<'arena>,
+    /// The tree's decoded and normalized strings, read through [`PoolStr`].
+    pub(crate) text: TextPool<Text>,
+    /// Every comment of the document's programs, a program's read through its
+    /// [`CommentList`].
+    pub(crate) comments: Store<Comment>,
+    /// The comments a parser has drained and not yet handed over: one frame per parser,
+    /// opened when it is built and flushed into [`AstStores::comments`] when it takes them.
+    pub(crate) comment_scratch: ListBuf<Comment>,
 }
 
 impl<'arena> AstStores<'arena> {
@@ -459,6 +527,7 @@ pub(crate) struct ScratchMarks {
     stmt_lists: ListMark<StmtId>,
     ty_lists: ListMark<TyId>,
     runs: RunMarks,
+    comments: ListMark<Comment>,
 }
 
 impl AstStores<'_> {
@@ -474,6 +543,7 @@ impl AstStores<'_> {
             stmt_lists: self.stmt_list_scratch.mark_in(&mut group),
             ty_lists: self.ty_list_scratch.mark_in(&mut group),
             runs: self.runs.marks(&mut group),
+            comments: self.comment_scratch.mark_in(&mut group),
         };
         group.check();
         marks
@@ -490,6 +560,14 @@ impl AstStores<'_> {
         self.stmt_list_scratch.truncate(marks.stmt_lists);
         self.ty_list_scratch.truncate(marks.ty_lists);
         self.runs.truncate(&marks.runs);
+        self.comment_scratch.truncate(marks.comments);
+    }
+
+    /// Truncates the comment scratch alone to `marks`: the comments a finished parser
+    /// drained and never took are dropped with it.
+    #[inline]
+    pub(crate) fn truncate_comment_scratch(&mut self, marks: &ScratchMarks) {
+        self.comment_scratch.truncate(marks.comments);
     }
 
     /// Whether the scratch stacks stand at `marks`.
@@ -501,6 +579,7 @@ impl AstStores<'_> {
             && self.stmt_list_scratch.len_since(marks.stmt_lists) == 0
             && self.ty_list_scratch.len_since(marks.ty_lists) == 0
             && self.runs.is_at(&marks.runs)
+            && self.comment_scratch.len_since(marks.comments) == 0
     }
 
     /// Empty stores for one document.
@@ -521,6 +600,9 @@ impl AstStores<'_> {
             ty_list_scratch: ListBuf::new(),
             payloads: PayloadStores::new(),
             runs: RunStores::new(),
+            text: TextPool::new(),
+            comments: Store::new(),
+            comment_scratch: ListBuf::new(),
         }
     }
 
@@ -546,6 +628,9 @@ impl AstStores<'_> {
             mut ty_list_scratch,
             payloads,
             runs,
+            mut text,
+            mut comments,
+            mut comment_scratch,
         } = self;
         expr_lists.reset();
         expr_opt_lists.reset();
@@ -555,6 +640,9 @@ impl AstStores<'_> {
         stmt_list_scratch.reset();
         ty_lists.reset();
         ty_list_scratch.reset();
+        text.reset();
+        comments.reset();
+        comment_scratch.reset();
         AstStores {
             exprs: exprs.recycle(),
             expr_lists,
@@ -570,6 +658,9 @@ impl AstStores<'_> {
             ty_list_scratch,
             payloads: payloads.park(),
             runs: runs.park(),
+            text,
+            comments,
+            comment_scratch,
         }
     }
 }
@@ -827,8 +918,7 @@ try {
 
     #[test]
     fn a_park_rewinds_every_payload_store() {
-        let bump = bumpalo::Bump::new();
-        let parsed = parse_with_goal(PAYLOADS, Goal::Module, &bump).expect("the payloads parse");
+        let parsed = parse_with_goal(PAYLOADS, Goal::Module).expect("the payloads parse");
         let mut stores = AstStores::new();
         let first = push_every_payload(&mut stores, &parsed);
         let mut pushed: Vec<&str> = first.iter().map(|&(field, _)| field).collect();
@@ -988,8 +1078,7 @@ class C {
 
     #[test]
     fn a_park_rewinds_every_value_run_store() {
-        let bump = bumpalo::Bump::new();
-        let parsed = parse_with_goal(RUNS, Goal::Module, &bump).expect("the lists parse");
+        let parsed = parse_with_goal(RUNS, Goal::Module).expect("the lists parse");
         let mut stores = AstStores::new();
         let first = flush_every_run(&mut stores, &parsed);
         let mut flushed: Vec<&str> = first.iter().map(|&(field, _)| field).collect();

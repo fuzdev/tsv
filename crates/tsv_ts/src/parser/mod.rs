@@ -5,11 +5,6 @@ use crate::ast::*;
 use crate::lexer::escapes::{LegacyEscape, find_legacy_escape};
 use crate::lexer::{KeywordKind, Lexer, LexerCheckpoint, Token, TokenKind, is_es_line_terminator};
 use crate::printer::ParenContext;
-use bumpalo::Bump;
-#[cfg(not(feature = "_internal_ast_census"))]
-use bumpalo::collections::Vec as BumpVec;
-#[cfg(feature = "_internal_ast_census")]
-use census_vec::BumpVec;
 use std::collections::BTreeSet;
 use std::ops::ControlFlow;
 use tsv_lang::store::{Id, IdRet, ListBuf, ListMark, Row, Store};
@@ -25,10 +20,6 @@ pub(in crate::parser) type TyRet = IdRet<Ty>;
 // Import parsing implementations
 mod expression;
 mod expression_arrow; // Arrow function predicate scans and builders
-#[cfg(feature = "_internal_ast_census")]
-mod census_vec {
-    tsv_lang::ast_census_vec!();
-}
 mod expression_assignable; // Cover-grammar expression→pattern conversion (`refine_assignable`)
 mod expression_braced_operand; // Braced-operand byte-scan lookahead (`{} / 2` vs `if (c) {}⏎/re/`)
 mod expression_literals; // Object and array literal parsing
@@ -438,18 +429,18 @@ fn call_spine_step(view: AstView<'_>, inner: ExprId) -> ControlFlow<u32, ExprId>
 /// The parser state [`Parser::rewind`] restores after one of the grammar's
 /// speculative parses ([`Parser::parse_arrow_or_rewind`],
 /// [`Parser::parse_type_arguments_or_rewind`], [`Parser::type_arguments_follower_settled`]
-/// the `export default` value's decorator-list read in `parse_export_declaration`, and a
-/// parameter's in `parse_parameter`):
+/// and a parameter's decorator-list read in `parse_parameter`):
 /// the lexer cursor, the
 /// one-token window with its decoded values and line-terminator flags, `prev_end`,
-/// a peek's stored lexer error, the comment ledger's length, the grouping depth, the
+/// a peek's stored lexer error, the grouping depth, the
 /// depth-limit counts ([`Parser::depth`] — whose nesting is restored on every path anyway,
 /// but whose deepest level an abandoned parse may have raised — and [`Parser::spine`]), the
 /// open `<` regions that are read against it ([`Parser::lt_regions`]) and the error
 /// kept from an abandoned type-argument list
-/// ([`Parser::abandoned_type_arguments_error`]).
+/// ([`Parser::abandoned_type_arguments_error`]), and the scratch stacks' tops, the comment
+/// ledger's among them.
 /// Context flags (`allow_in`, `in_await`, …) are not carried — their combinators
-/// restore them on every path — and neither are stored rows or arena nodes, which an
+/// restore them on every path — and neither are stored rows or pool text, which an
 /// abandoned parse simply leaves unreachable (the scratch stacks' tops are carried:
 /// an abandoned parse's open frames must not outlive it).
 ///
@@ -487,29 +478,28 @@ fn call_spine_step(view: AstView<'_>, inner: ExprId) -> ControlFlow<u32, ExprId>
 /// type grammar claims no comment. The comparison reading it then may try
 /// (`Parser::type_arguments_follower_settled`) reads that token as an expression, which
 /// can claim one, so that speculation puts back the claims it made on the comments
-/// drained ahead of its checkpoint. The `export default` and parameter sites keep any
-/// claim their decorator-list read makes across the rewind, and that is safe: the re-read
-/// parses the same decorator list the same way, so every surviving claim is one it makes
-/// again.
+/// drained ahead of its checkpoint. The parameter site keeps any claim its decorator-list
+/// read makes across the rewind, and that is safe: the re-read parses the same decorator
+/// list the same way, so every surviving claim is one it makes again.
 #[derive(Clone)]
 pub(super) struct Checkpoint<'arena> {
     lexer: LexerCheckpoint,
     current: Token,
-    current_decoded: Option<&'arena str>,
+    current_decoded: Option<PoolStr<'arena>>,
     peek: Option<Token>,
-    peek_decoded: Option<&'arena str>,
+    peek_decoded: Option<PoolStr<'arena>>,
     had_line_terminator: bool,
     peek_had_line_terminator: bool,
     prev_end: usize,
     lexer_error: Option<Error>,
-    comments_len: usize,
     grouping_depth: u32,
     depth: DepthBudget,
     spine: SpineCount,
     lt_regions: LtRegions,
     abandoned_type_arguments_error: Option<Error>,
-    /// The scratch stacks' tops, truncated to on every rewind. The stores are not: an
-    /// abandoned row stays orphaned, and the ids already handed out stay valid.
+    /// The scratch stacks' tops, the comment ledger's among them, truncated to on every
+    /// rewind. The stores are not: an abandoned row stays orphaned, and the ids already
+    /// handed out stay valid.
     scratch_marks: ScratchMarks,
     #[cfg(feature = "_internal_ast_census")]
     ast_census_mark: u32,
@@ -562,16 +552,9 @@ pub(crate) fn push_spanned<T: Row + Clone>(
 
 #[expect(clippy::struct_excessive_bools)]
 pub(crate) struct Parser<'a, 'arena> {
-    /// Bump arena that owns the tree's decoded strings and its comments.
-    /// Supplied by the caller (caller-owns-`Bump`); the returned `Program<'arena>` borrows
-    /// from it. `&'arena Bump` is `Copy`, so `self.arena.alloc_str(…)`
-    /// works even while `&mut self` is held (the field read borrows the `Bump`, not `self`);
-    /// lift it into a local (`let arena = self.arena;`) only when several allocations in one
-    /// method share it.
-    arena: &'arena Bump,
-    /// The document's expression, statement, type, payload and value-run stores, shared by
-    /// every parser of the document. `'a` is the source's lifetime, which the `&mut` takes as
-    /// covariantly as the `&str`.
+    /// The document's expression, statement, type, payload and value-run stores, its text
+    /// pool and its comments, shared by every parser of the document. `'a` is the source's
+    /// lifetime, which the `&mut` takes as covariantly as the `&str`.
     stores: &'a mut AstStores<'arena>,
     source: &'a str,
     lexer: Lexer<'a>,
@@ -585,22 +568,24 @@ pub(crate) struct Parser<'a, 'arena> {
     /// only), mirroring the lexer's split.
     current: Token,
     /// Decoded string/identifier value for the current token (escape paths only),
-    /// copied into the AST arena at receipt so it is a `Copy` `&'arena str` rather
-    /// than an owned `String` — the lexer decodes into a reused scratch buffer and
-    /// the parser arena-copies it immediately, so no per-literal `String` survives.
-    current_decoded: Option<&'arena str>,
+    /// copied into the text pool at receipt so it is a `Copy` [`PoolStr`] rather than an
+    /// owned `String` — the lexer decodes into a reused scratch buffer and the parser
+    /// copies it out immediately, so no per-literal `String` survives. A rewind restores
+    /// it as a value; the text an abandoned token pushed stays in the pool, unnamed.
+    current_decoded: Option<PoolStr<'arena>>,
     /// Single-token lookahead slot, stored as the 16-byte `Token` POD with its
     /// decoded value out-of-band in `peek_decoded` (mirroring the `current` /
     /// `current_decoded` split). Consuming the peek is then a direct `Token` copy
     /// into `current` with no intermediate lookahead struct to reassemble.
     peek: Option<Token>,
-    peek_decoded: Option<&'arena str>,
+    peek_decoded: Option<PoolStr<'arena>>,
     base_offset: usize, // Offset in full source (for embedded expressions)
-    /// Comments collected during parsing, gathered directly in the AST arena
-    /// (`Comment` is a `Copy` POD, so bumpalo's no-`Drop` rule holds). Handed to
-    /// consumers as an `&'arena [Comment]` slice via `take_comments`, so the
-    /// warm binding loops (`reset()`-reused arenas) never malloc for comments.
-    comments: BumpVec<'arena, Comment>,
+    /// Where this parser's comment ledger starts on the stores' comment scratch: the
+    /// comments it has drained, in source order, are the frame above it
+    /// ([`Parser::comments`]), handed over as a [`CommentList`] by `take_comments`. The
+    /// scratch keeps its capacity across documents, so a warm parse never allocates for
+    /// comments.
+    comment_mark: ListMark<Comment>,
     /// True if a line terminator occurred between the previous token and current token.
     /// Used for ASI (Automatic Semicolon Insertion).
     had_line_terminator: bool,
@@ -1042,31 +1027,41 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     /// Copy the lexer's just-produced decoded value (escape paths only) into the
-    /// AST arena, yielding a `Copy` `&'arena str`. The lexer decodes into a reused
+    /// text pool, yielding a `Copy` [`PoolStr`]. The lexer decodes into a reused
     /// scratch that the next lex overwrites, so this runs immediately after each
-    /// lex; `None` for the common escape-free token. One copy into the arena — the
-    /// same copy the old owned-`String` path made when it stored the value, now the
-    /// only allocation on the escape path.
+    /// lex; `None` for the common escape-free token. One copy into the pool, the only
+    /// one on the escape path.
     ///
-    /// Only the test inlines; the copy is [`Parser::copy_decoded_to_arena`]'s. Inlined,
-    /// the bump allocation and its `memcpy` call kept two callee-saved registers live in
+    /// Only the test inlines; the copy is [`Parser::copy_decoded_to_pool`]'s. Inlined,
+    /// the pool push and its `memcpy` call kept two callee-saved registers live in
     /// [`Parser::advance_inner`], which then saved and restored them on every token.
     #[inline]
-    fn decoded_to_arena(&self) -> Option<&'arena str> {
+    fn decoded_to_pool(&mut self) -> Option<PoolStr<'arena>> {
         if self.lexer.decoded_str().is_some() {
-            self.copy_decoded_to_arena()
+            self.copy_decoded_to_pool()
         } else {
             None
         }
     }
 
-    /// [`Parser::decoded_to_arena`]'s copy, for the rare token that decoded an escape.
+    /// [`Parser::decoded_to_pool`]'s copy, for the rare token that decoded an escape.
     #[cold]
     #[inline(never)]
-    fn copy_decoded_to_arena(&self) -> Option<&'arena str> {
-        self.lexer
-            .decoded_str()
-            .map(|s| -> &'arena str { self.arena.alloc_str(s) })
+    fn copy_decoded_to_pool(&mut self) -> Option<PoolStr<'arena>> {
+        let decoded = self.lexer.decoded_str()?;
+        Some(PoolStr::new(self.stores.text.push(decoded)))
+    }
+
+    /// The comments this parser has drained so far, in source order: its ledger.
+    #[inline]
+    pub(super) fn comments(&self) -> &[Comment] {
+        self.stores.comment_scratch.frame(self.comment_mark)
+    }
+
+    /// [`Parser::comments`], to set a comment's `owned_by_node` in place.
+    #[inline]
+    pub(super) fn comments_mut(&mut self) -> &mut [Comment] {
+        self.stores.comment_scratch.frame_mut(self.comment_mark)
     }
 
     /// Push the binding `extra` for a typed identifier carrying `ta`: a type
@@ -1110,11 +1105,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         source: &'a str,
         base_offset: usize,
         goal: Goal,
-        arena: &'arena Bump,
         stores: &'a mut AstStores<'arena>,
     ) -> Self {
+        let comment_mark = stores.comment_scratch.mark();
         Self {
-            arena,
             stores,
             source,
             // The lexer scans `source` (the island) but reports errors against the document
@@ -1129,7 +1123,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             peek: None,
             peek_decoded: None,
             base_offset,
-            comments: BumpVec::new_in(arena),
+            comment_mark,
             had_line_terminator: false, // No line terminator before first token
             prev_end: 0,
             top_level_as_is_assertion: true, // Enable by default (TypeScript context)
@@ -1186,7 +1180,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// it from, so the flag is cleared again.
     pub(crate) fn prime(&mut self) -> Result<(), Error> {
         self.lexer.next_token_into(&mut self.current)?;
-        self.current_decoded = self.decoded_to_arena();
+        self.current_decoded = self.decoded_to_pool();
         self.collect_comments()?;
         self.had_line_terminator = false;
         Ok(())
@@ -1220,14 +1214,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // intermediate `Token` is returned through a stack slot, reloaded and
             // re-scattered here.
             self.lexer.next_token_into(&mut self.current)?;
-            self.current_decoded = self.decoded_to_arena();
+            self.current_decoded = self.decoded_to_pool();
             self.had_line_terminator = self.lexer.had_line_terminator();
         }
 
         self.collect_comments()
     }
 
-    /// Drain any `Comment` tokens at the current position into `self.comments`, leaving the current
+    /// Drain any `Comment` tokens at the current position into the ledger, leaving the current
     /// token at the first non-comment token. Shared by `advance_inner` and the regex relex path
     /// (`parse_primary_expression`), both of which land on a fresh token and must absorb any
     /// comments before the next consumer reads the current token.
@@ -1268,7 +1262,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             if has_line_terminator {
                 self.had_line_terminator = true;
             }
-            self.comments.push(comment);
+            self.stores.comment_scratch.push(comment);
             let token = self.lexer.next_token()?;
             self.update_current(token);
             // Also check line terminator in whitespace after comment
@@ -1296,7 +1290,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.current = token;
         // `decoded` rides out-of-band on the lexer; the caller lexed `token` from
         // `self.lexer` immediately before this call, so drain it here.
-        self.current_decoded = self.decoded_to_arena();
+        self.current_decoded = self.decoded_to_pool();
     }
 
     #[inline]
@@ -1607,7 +1601,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             )
             && crate::printer::operator_operand_takes_no_pair(node)
             && holder.is_none_or(|(operator_end, _)| {
-                self.comments
+                self.comments()
                     .last()
                     .is_none_or(|c| (c.span.start as usize) < operator_end)
             })
@@ -1666,13 +1660,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// `(` ahead of an operand the parser stripped them from, comments between them aside.
     pub(super) fn authored_pairs(&self, from: usize, to: usize) -> u32 {
         let bytes = self.source.as_bytes();
-        let mut comment = self
-            .comments
-            .partition_point(|c| (c.span.start as usize) < from);
+        let comments = self.comments();
+        let mut comment = comments.partition_point(|c| (c.span.start as usize) < from);
         let mut pos = from;
         let mut pairs = 0;
         while pos < to {
-            if let Some(c) = self.comments.get(comment)
+            if let Some(c) = comments.get(comment)
                 && c.span.start as usize == pos
             {
                 pos = c.span.end as usize;
@@ -1834,18 +1827,18 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// without a search.
     #[inline]
     fn has_comment_between(&self, from: usize, to: usize) -> bool {
-        if to.saturating_sub(from) < Comment::MIN_SPAN_LEN as usize
-            || self
-                .comments
-                .last()
-                .is_none_or(|c| (c.span.start as usize) < from)
+        if to.saturating_sub(from) < Comment::MIN_SPAN_LEN as usize {
+            return false;
+        }
+        let comments = self.comments();
+        if comments
+            .last()
+            .is_none_or(|c| (c.span.start as usize) < from)
         {
             return false;
         }
-        let i = self
-            .comments
-            .partition_point(|c| (c.span.start as usize) < from);
-        self.comments
+        let i = comments.partition_point(|c| (c.span.start as usize) < from);
+        comments
             .get(i)
             .is_some_and(|c| (c.span.start as usize) < to)
     }
@@ -2144,6 +2137,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// - Linting (analyzing string content for patterns)
     pub(super) fn current_decoded(&self) -> Option<&str> {
         self.current_decoded
+            .map(|decoded| self.stores.view().text(decoded))
     }
 
     /// Whether the current token's raw bytes are plain one-column ASCII. Asked of the
@@ -2160,8 +2154,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// name constructor. Span-identity (`escaped: None`, name = the raw token
     /// bytes) unless the token carries a decoded unicode escape
     /// (`\u0066oo` → `foo`) or is too long for `raw_len` — only those rare
-    /// cases carry the arena-`&str` escape hatch.
-    pub(super) fn current_ident_name(&self) -> IdentName<'arena> {
+    /// cases carry the pool-text escape hatch.
+    pub(super) fn current_ident_name(&mut self) -> IdentName<'arena> {
         if let Some(decoded) = self.current_decoded {
             IdentName {
                 escaped: Some(decoded),
@@ -2179,11 +2173,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// value flows through `current_ident_name` instead (property/member and
     /// class/interface/type-member keys decode via that path — acorn parity).
     ///
-    /// The oversized-name arm's arena copy is out of line
+    /// The oversized-name arm's pool copy is out of line
     /// ([`Parser::oversized_raw_name`]): inline, every call here would save and
     /// restore the registers the copy needs, on a path no real identifier
-    /// takes.
-    pub(super) fn current_raw_ident_name(&self) -> IdentName<'arena> {
+    /// takes. The copy is why every name constructor takes `&mut self`.
+    pub(super) fn current_raw_ident_name(&mut self) -> IdentName<'arena> {
         let len = self.current.end - self.current.start;
         if len > u16::MAX as u32 {
             return IdentName {
@@ -2199,19 +2193,20 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
     }
 
-    /// The current token's raw text, arena-copied — the escape hatch
+    /// The current token's raw text, copied into the text pool — the escape hatch
     /// [`Parser::current_raw_ident_name`] carries for an absurdly long name
     /// (> 64 KiB), which `raw_len` can't hold (essentially unreachable — no
     /// real identifier is this long).
     ///
-    /// It hands back the string alone, which returns in registers, rather than
+    /// It hands back the handle alone, which returns in a register, rather than
     /// the whole `IdentName`, which would return through a stack slot each
     /// caller this inlines into had to reserve — in parse functions that
     /// recurse.
     #[cold]
     #[inline(never)]
-    fn oversized_raw_name(&self) -> &'arena str {
-        self.arena.alloc_str(self.current_value())
+    fn oversized_raw_name(&mut self) -> PoolStr<'arena> {
+        let raw = self.current_value();
+        PoolStr::new(self.stores.text.push(raw))
     }
 
     /// Name channel for the current token, which the caller has already verified
@@ -2221,7 +2216,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// label). A plain identifier decodes unicode escapes; a keyword token is never
     /// escaped (the lexer re-classifies an escaped keyword as an `Identifier`), so it
     /// is taken verbatim.
-    pub(super) fn current_ident_name_or_await(&self) -> IdentName<'arena> {
+    pub(super) fn current_ident_name_or_await(&mut self) -> IdentName<'arena> {
         if matches!(self.current_kind(), TokenKind::Identifier) {
             self.current_ident_name()
         } else {
@@ -2230,7 +2225,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     /// Whether a private identifier's name (the part after `#`) equals `expected` (an
-    /// ASCII name like `"constructor"`). An escaped name compares its arena string; a
+    /// ASCII name like `"constructor"`). An escaped name compares its pool text; a
     /// span-identity name compares its raw source bytes, which begin one byte past the
     /// node span's start — the `#` — in host coordinates, shifted back to the local
     /// slice. Used to reject the reserved `#constructor` class-element name.
@@ -2268,7 +2263,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ///
     /// ⚠️ For a position the grammar spells `IdentifierName` — where every reserved
     /// word is valid — use [`Parser::try_identifier_name`] instead.
-    pub(super) fn try_ident_or_contextual_name(&self) -> Option<IdentName<'arena>> {
+    pub(super) fn try_ident_or_contextual_name(&mut self) -> Option<IdentName<'arena>> {
         match self.current_kind() {
             TokenKind::Identifier => Some(self.current_ident_name()),
             TokenKind::Keyword(kw) if kw.can_be_identifier() => Some(self.current_raw_ident_name()),
@@ -2283,7 +2278,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// await(){}` / `export function await(){}` reject there, matching
     /// acorn-as-module. Other keyword-lexed names (`async`, `from`, `let`, `yield`,
     /// the type keywords) stay valid.
-    pub(super) fn try_function_name(&self) -> Option<IdentName<'arena>> {
+    pub(super) fn try_function_name(&mut self) -> Option<IdentName<'arena>> {
         if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::Await))
             && !self.await_is_binding_name()
         {
@@ -2295,8 +2290,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Whether the current token is binding-name-eligible — the allocation-free
     /// classification behind `try_binding_name().is_some()`, without building the
     /// name. Pure `&self` (no allocation), so it is safe inside a `debug_assert!`
-    /// (the name-building path `try_binding_name` takes may arena-allocate an
-    /// escaped name).
+    /// (the name-building path `try_binding_name` takes may push an oversized name
+    /// into the text pool, which is why it takes `&mut self`).
     ///
     /// The set is [`KeywordKind::can_be_binding_name`] plus `await` where the goal
     /// axis makes it an identifier — so `let` and `yield` are in, their only bar
@@ -2327,7 +2322,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
     }
 
-    pub(super) fn try_binding_name(&self) -> Option<IdentName<'arena>> {
+    pub(super) fn try_binding_name(&mut self) -> Option<IdentName<'arena>> {
         match self.current_kind() {
             TokenKind::Identifier => Some(self.current_ident_name()),
             TokenKind::Keyword(kw) if kw.can_be_binding_name() => {
@@ -2642,9 +2637,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// [`Parser::parse_type_arguments_or_rewind`] at the `<` of a type-argument list
     /// the lookahead admitted, and again at a whole list whose follower only tsc
     /// refuses, where [`Parser::type_arguments_follower_settled`] tries the comparison from
-    /// a checkpoint of its own; and the `export default` value at the `@` of a decorated
-    /// class, whose decorator list is read ahead to see whether an `abstract` class
-    /// follows (`parse_export_declaration`).
+    /// a checkpoint of its own; and a parameter at the `@` of its decorators, whose list is
+    /// read ahead of the modifiers that may make the parameter a parameter property
+    /// (`parse_parameter`).
     #[must_use]
     pub(super) fn checkpoint(&self) -> Checkpoint<'arena> {
         // An expression head is never between the constrained-infer handoff's set
@@ -2661,7 +2656,6 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             peek_had_line_terminator: self.peek_had_line_terminator,
             prev_end: self.prev_end,
             lexer_error: self.lexer_error.clone(),
-            comments_len: self.comments.len(),
             grouping_depth: self.grouping_depth,
             depth: self.depth,
             spine: self.spine,
@@ -2677,8 +2671,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// and lexer cursor go back, the comments drained since are dropped (the
     /// re-parse drains them again), and the grouping depth is reset — the one
     /// place the hand-balanced `enter_grouping` / `exit_grouping` pairs are
-    /// unwound, since the abandoned parse may have failed inside one. Arena nodes
-    /// the abandoned parse built are unreachable garbage; every context flag was
+    /// unwound, since the abandoned parse may have failed inside one. Rows and pool
+    /// text the abandoned parse wrote are unreachable garbage; every context flag was
     /// restored by its own combinator on the way out.
     pub(super) fn rewind(&mut self, checkpoint: Checkpoint<'arena>) {
         let Checkpoint {
@@ -2691,7 +2685,6 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             peek_had_line_terminator,
             prev_end,
             lexer_error,
-            comments_len,
             grouping_depth,
             depth,
             spine,
@@ -2712,7 +2705,6 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.peek_had_line_terminator = peek_had_line_terminator;
         self.prev_end = prev_end;
         self.lexer_error = lexer_error;
-        self.comments.truncate(comments_len);
         self.grouping_depth = grouping_depth;
         self.depth = depth;
         self.spine = spine;
@@ -2933,7 +2925,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     /// Like `try_binding_name`, but also accepts the `this` keyword as the
     /// TypeScript `this` parameter (`function f(this: T)`, `(this: T) => U`).
-    pub(super) fn try_param_name(&self) -> Option<IdentName<'arena>> {
+    pub(super) fn try_param_name(&mut self) -> Option<IdentName<'arena>> {
         match self.try_binding_name() {
             Some(name) => Some(name),
             None => self.this_as_name(),
@@ -2944,7 +2936,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// parameter (`function f(this: T)`) and the subject of a `this` type
     /// predicate (`this is T`, `asserts this`). `None` when the current token is
     /// not `this`; its raw text is verbatim (`this` is never escaped).
-    pub(super) fn this_as_name(&self) -> Option<IdentName<'arena>> {
+    pub(super) fn this_as_name(&mut self) -> Option<IdentName<'arena>> {
         if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::This)) {
             Some(self.current_raw_ident_name())
         } else {
@@ -2969,7 +2961,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// *narrower* despite the broader-sounding name: it admits only the contextual
     /// keywords. Reaching for that one at an `IdentifierName` position is what made
     /// `#default` an over-rejection.
-    pub(super) fn try_identifier_name(&self) -> Option<IdentName<'arena>> {
+    pub(super) fn try_identifier_name(&mut self) -> Option<IdentName<'arena>> {
         match self.current_kind() {
             TokenKind::Identifier => Some(self.current_ident_name()),
             TokenKind::Keyword(_) => Some(self.current_raw_ident_name()),
@@ -2984,8 +2976,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ///
     /// `Verbatim` (no escapes) carries no allocation — the decoded value equals
     /// the inner source slice (recovered later via `StringCooked::resolve(span,
-    /// source)`). `Decoded` (escapes present) arena-copies the lexer's decoded
-    /// value (one copy). The quote char is no longer stored — recover it via
+    /// source)`). `Decoded` (escapes present) holds the lexer's decoded value, copied
+    /// into the text pool when the token was received. The quote char is no longer stored — recover it via
     /// `Literal::string_quote(source)`.
     ///
     /// Every string literal in the grammar is consumed here — an expression, an object or
@@ -3174,7 +3166,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     // Lazily computes peek token on first access.
     // Stores lexer errors to be returned on next advance() call.
     //
-    // Comment tokens are drained into `self.comments` (mirroring
+    // Comment tokens are drained into the ledger (mirroring
     // `collect_comments()`) so the cached token — and every peek-based
     // decision — is the next CODE token. Line terminators seen while
     // draining are recorded in `peek_had_line_terminator` for the
@@ -3206,11 +3198,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                             if has_line_terminator {
                                 self.peek_had_line_terminator = true;
                             }
-                            self.comments.push(comment);
+                            self.stores.comment_scratch.push(comment);
                             continue;
                         }
                         self.peek = Some(token);
-                        self.peek_decoded = self.decoded_to_arena();
+                        self.peek_decoded = self.decoded_to_pool();
                     }
                     Err(err) => {
                         // Store error to be returned on next advance().
@@ -3798,17 +3790,28 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 self.prev_end = new_start;
                 // Drop comments drained by a discarded peek — the seek below
                 // re-lexes that region, and they'd be collected twice.
+                //
+                // They lie past this token, so only a peek taken while it is current
+                // drained them, and no checkpoint is taken on a `>=`-family token: every
+                // one stands on an arrow head, a `<` or a `@` (`parse_arrow_or_rewind`,
+                // `parse_type_arguments_or_rewind`, `type_arguments_follower_settled`,
+                // `parse_parameter`). So every live checkpoint's comment mark sits at or
+                // below the ledger's top after the pop, and a rewind's `truncate` never
+                // meets a mark above it. The pop moves no mark.
                 let relex_from = self.span_pos(new_start);
+                let ledger = self.comment_mark;
                 while self
-                    .comments
+                    .stores
+                    .comment_scratch
+                    .frame(ledger)
                     .last()
                     .is_some_and(|c| c.span.start >= relex_from)
                 {
-                    self.comments.pop();
+                    self.stores.comment_scratch.pop(ledger);
                 }
                 let token = self.lexer.seek_and_next_token(new_start)?;
                 self.current = token;
-                self.current_decoded = self.decoded_to_arena();
+                self.current_decoded = self.decoded_to_pool();
                 // Clear peek cache since token changed
                 self.peek = None;
                 self.peek_decoded = None;
@@ -4143,10 +4146,19 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         Ok((expr, comments))
     }
 
-    /// Hand the collected comments to the caller as an arena slice.
-    /// Used when parsing expressions that need to return comments to the caller.
+    /// Hand the collected comments to the caller as a [`CommentList`], flushing the ledger
+    /// into the stores' comment rows. The parser drains no comment after it: every caller
+    /// takes them once, at the end of its parse.
     pub(crate) fn take_comments(&mut self) -> CommentList<'arena> {
-        std::mem::replace(&mut self.comments, BumpVec::new_in(self.arena)).into_bump_slice()
+        let stores = &mut *self.stores;
+        let run = stores
+            .comment_scratch
+            .flush_copy(self.comment_mark, &mut stores.comments);
+        #[cfg(feature = "_internal_ast_census")]
+        if !run.is_empty() {
+            tsv_lang::ast_census_probe::mint::<Comment>(run.len());
+        }
+        CommentList::new(run)
     }
 
     /// Parse a single assignment expression and return position where parsing stopped.
@@ -4231,19 +4243,18 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 }
 
-/// Parse TypeScript source code into an AST allocated in `arena`.
+/// Parse TypeScript source code into an AST in `stores`.
 pub(crate) fn parse_typescript<'arena>(
     source: &str,
-    arena: &'arena Bump,
     stores: &mut AstStores<'arena>,
 ) -> Result<Program<'arena>, Error> {
-    parse_typescript_with_goal(source, Goal::Module, arena, stores)
+    parse_typescript_with_goal(source, Goal::Module, stores)
 }
 
 /// Build a parser of `source` at `base_offset` against `goal`, prime it and run `f` — the
 /// driver every parse entry point runs through, standalone ([`parse_typescript_with_goal`])
 /// and embedded (`crate::with_embedding_parser`, which Svelte's entry points take). What
-/// `f` returns borrows only `arena`. Error context (`with_context`) is applied by the
+/// `f` returns borrows nothing. Error context (`with_context`) is applied by the
 /// public `crate::parse*` wrappers, not here.
 ///
 /// **The acorn re-parse.** A whole type-argument list followed by a token only tsc refuses
@@ -4301,7 +4312,6 @@ pub(crate) fn parse_retrying_acorn_followers<'arena, T>(
     base_offset: usize,
     host_nesting: u32,
     goal: Goal,
-    arena: &'arena Bump,
     stores: &mut AstStores<'arena>,
     embedded: bool,
     f: impl Fn(&mut Parser<'_, 'arena>) -> Result<T, Error>,
@@ -4318,9 +4328,13 @@ pub(crate) fn parse_retrying_acorn_followers<'arena, T>(
     let scratch_marks = stores.scratch_marks();
     #[cfg(feature = "_internal_ast_census")]
     let ast_census_mark = tsv_lang::ast_census_probe::mark();
-    let mut parser = Parser::new(source, base_offset, goal, arena, stores);
+    let mut parser = Parser::new(source, base_offset, goal, stores);
     parser.depth = DepthBudget::at(host_nesting);
-    parser.prime()?;
+    // priming drains the comments ahead of the first token, so a lexer error there leaves
+    // them on the ledger
+    if let Err(error) = parser.prime() {
+        return finish_driver_parse(stores, &scratch_marks, Err(error));
+    }
     let first = f(&mut parser)
         .map_err(|error| (parser.prefer_abandoned_type_arguments_error(error), false))
         .and_then(|parsed| checked(parser.stores.view(), parsed));
@@ -4336,7 +4350,7 @@ pub(crate) fn parse_retrying_acorn_followers<'arena, T>(
     let ast_census_retry_mark = tsv_lang::ast_census_probe::mark();
     // No rewind of the stores between the two parses: the first's rows stay valid, since
     // its result is kept when the second one fails.
-    let mut retry = Parser::new(source, base_offset, goal, arena, stores);
+    let mut retry = Parser::new(source, base_offset, goal, stores);
     retry.depth = DepthBudget::at(host_nesting);
     retry.tsc_followers = false;
     let second = retry
@@ -4367,7 +4381,9 @@ pub(crate) fn parse_retrying_acorn_followers<'arena, T>(
 }
 
 /// The driver's exit: a failed parse leaves no open scratch frame behind it, for whatever
-/// the caller goes on to parse.
+/// the caller goes on to parse, and a parse that never took its comments
+/// (`crate::__private::parse_type_extent`) leaves none of them: a parser's comment ledger
+/// is dropped with it unless it was taken.
 #[inline]
 fn finish_driver_parse<'arena, T>(
     stores: &mut AstStores<'arena>,
@@ -4377,6 +4393,7 @@ fn finish_driver_parse<'arena, T>(
     if outcome.is_err() {
         stores.truncate_scratch(marks);
     } else {
+        stores.truncate_comment_scratch(marks);
         #[cfg(debug_assertions)]
         debug_assert!(
             stores.scratch_is_at(marks),
@@ -4394,7 +4411,6 @@ fn finish_driver_parse<'arena, T>(
 pub(crate) fn parse_typescript_with_goal<'arena>(
     source: &str,
     goal: Goal,
-    arena: &'arena Bump,
     stores: &mut AstStores<'arena>,
 ) -> Result<Program<'arena>, Error> {
     parse_retrying_acorn_followers(
@@ -4402,7 +4418,6 @@ pub(crate) fn parse_typescript_with_goal<'arena>(
         0,
         0,
         goal,
-        arena,
         stores,
         false,
         |parser| parser.parse(),
@@ -4417,7 +4432,6 @@ pub(crate) fn parse_typescript_with_goal<'arena>(
 /// structure a glued comment binds to is visible in the wire JSON.
 pub(crate) fn parse_typescript_preserve_parens<'arena>(
     source: &str,
-    arena: &'arena Bump,
     stores: &mut AstStores<'arena>,
 ) -> Result<Program<'arena>, Error> {
     parse_retrying_acorn_followers(
@@ -4425,7 +4439,6 @@ pub(crate) fn parse_typescript_preserve_parens<'arena>(
         0,
         0,
         Goal::Module,
-        arena,
         stores,
         false,
         |parser| {

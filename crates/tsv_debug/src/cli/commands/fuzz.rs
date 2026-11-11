@@ -575,7 +575,7 @@ fn attempt(src: &str, parser: ParserType, render: bool, last: &mut LastInput) ->
 fn locations_wire(src: &str, parser: ParserType) -> bool {
     let arena = bumpalo::Bump::new();
     let wire = match parser {
-        ParserType::TypeScript => tsv_ts::__private::parse_with_goal_or_fallback(src, None, &arena)
+        ParserType::TypeScript => tsv_ts::__private::parse_with_goal_or_fallback(src, None)
             .ok()
             .map(|ast| tsv_ts::__private::convert_ast_json_bytes_with_locations(&ast, src)),
         ParserType::Svelte => tsv_svelte::__private::parse(src, &arena)

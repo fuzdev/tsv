@@ -299,24 +299,18 @@ pub fn format_with_goal(source: &str, goal: Goal) -> Result<String> {
 }
 
 fn format_with_optional_goal(source: &str, goal: Option<Goal>) -> Result<String> {
-    format_in(
-        source,
-        goal,
-        &bumpalo::Bump::new(),
-        &mut AstStores::new(),
-        DocArena::for_source,
-    )
+    format_in(source, goal, &mut AstStores::new(), DocArena::for_source)
 }
 
 /// The one format path, shared by the one-shot functions and [`Formatter`]: fold, parse into
-/// `arena`, then print into the doc arena `doc_arena` hands over once the parse has
+/// `stores`, then print into the doc arena `doc_arena` hands over once the parse has
 /// succeeded (handed the folded text, so a fresh one is sized to it and a failed parse never
-/// builds one). Nothing borrowed from either arena escapes: the result is owned.
-pub(crate) fn format_in<'arena, D: std::borrow::Borrow<DocArena>>(
+/// builds one). Nothing borrowed from the stores or the doc arena escapes: the result is
+/// owned.
+pub(crate) fn format_in<D: std::borrow::Borrow<DocArena>>(
     source: &str,
     goal: Option<Goal>,
-    arena: &'arena bumpalo::Bump,
-    stores: &mut AstStores<'arena>,
+    stores: &mut AstStores<'_>,
     doc_arena: impl FnOnce(&str) -> D,
 ) -> Result<String> {
     // The format path's line-terminator fold, ahead of the parse — see
@@ -324,7 +318,7 @@ pub(crate) fn format_in<'arena, D: std::borrow::Borrow<DocArena>>(
     // the finished string. `parse` deliberately does NOT do this: its offsets are a
     // drop-in contract over the author's own bytes.
     let folded = tsv_lang::printing::normalize_carriage_returns(source);
-    let program = parse_folded_into(&folded, goal, arena, stores)?;
+    let program = parse_folded_into(&folded, goal, stores)?;
     let doc_arena = doc_arena(folded.text());
     let parsed = __private::parsed_ref(&program, stores);
     Ok(format_folded_in(parsed, &folded, doc_arena.borrow()))
@@ -487,8 +481,7 @@ pub fn parse_to_json(source: &str) -> Result<String> {
 /// [`parse_to_json`] under `options`: the goal it parses at (exact, no retry) and whether
 /// the wire carries `loc`.
 ///
-/// Each call parses into a fresh arena sized to the source, dropped once the wire is
-/// written.
+/// Each call parses into fresh stores, dropped once the wire is written.
 ///
 /// ```
 /// # fn main() -> tsv_ts::Result<()> {
@@ -505,8 +498,7 @@ pub fn parse_to_json(source: &str) -> Result<String> {
 /// A parse error at the options' goal.
 #[cfg(feature = "json")]
 pub fn parse_to_json_with(source: &str, options: JsonOptions) -> Result<String> {
-    let arena = bumpalo::Bump::with_capacity(tsv_lang::estimated_ast_arena_capacity(source.len()));
-    let program = __private::parse_with_goal(source, options.goal, &arena)?;
+    let program = __private::parse_with_goal(source, options.goal)?;
     #[cfg(feature = "locations")]
     if options.locations {
         return Ok(wire_string(
@@ -525,7 +517,7 @@ fn wire_string(bytes: Vec<u8>) -> String {
 }
 
 /// Build an embedding [`parser::Parser`] at `base_offset`, run `f` over it, then the
-/// host's `host_check` over what `f` returned. What `f` returns borrows only `arena`. It
+/// host's `host_check` over what `f` returned. What `f` returns borrows nothing. It
 /// runs through the driver the standalone parse takes too
 /// (`parser::parse_retrying_acorn_followers`), so a failed parse that gave a
 /// type-argument list up to tsc's comparison is run once more reading acorn-typescript's
@@ -543,7 +535,6 @@ fn with_embedding_parser<'arena, T>(
     source: &str,
     base_offset: usize,
     host_nesting: u32,
-    arena: &'arena bumpalo::Bump,
     stores: &mut AstStores<'arena>,
     f: impl Fn(&mut parser::Parser<'_, 'arena>) -> std::result::Result<T, Error>,
     host_check: impl Fn(AstView<'_>, &T) -> std::result::Result<(), Error>,
@@ -553,7 +544,6 @@ fn with_embedding_parser<'arena, T>(
         base_offset,
         host_nesting,
         Goal::Module,
-        arena,
         stores,
         true,
         f,

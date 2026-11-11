@@ -953,8 +953,10 @@ generation's is selected by a `perf_ab_api` cfg passed to the example's own comp
 rustc … -- --cfg`, so no library is built differently). On a tree with the warm parse
 (`tsv_ts::__private::parse_folded_into`), TypeScript and Svelte parse into stores kept warm across
 files, taken before each timed region and parked after it as the CLI's `Formatter` keeps them, and
-CSS, which has no stores, into the `Bump`; on an older tree every language parses into the `Bump`
-alone, which is kept warm the same way. The report names each side's generation, and a run whose
+CSS, which has no stores, into the `Bump`; the current tree's TypeScript parse takes the stores
+alone, where an older warm-parse tree's (`perf_ab_api = "ts_parse_bump"`) also took the `Bump`.
+On a tree older than the stores every language parses into the `Bump` alone, which is kept warm
+the same way. The report names each side's generation, and a run whose
 sides differ says so: its rows then compare two call paths as well as two libraries. A change
 that moves an entry point a driver calls moves that driver's current arm to a new `perf_ab_api`
 value, adds the probe that tells the generations apart (`DRIVER_APIS` in `scripts/perf_ab.ts`) and

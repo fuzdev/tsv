@@ -26,8 +26,7 @@ fn tree(source: &str) -> Value {
             _ => {}
         }
     }
-    let arena = bumpalo::Bump::new();
-    let program = tsv_ts::__private::parse(source, &arena).expect("the case parses");
+    let program = tsv_ts::__private::parse(source).expect("the case parses");
     let mut value =
         tsv_debug::json::wire_value(&tsv_ts::__private::convert_ast_json_bytes(&program, source));
     strip(&mut value);

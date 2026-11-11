@@ -263,8 +263,9 @@ occupies (`source[span]`), never from a symbol table:
 - **TS identifier names** (`tsv_ts`'s `IdentName`): the name is the leading
   `raw_len` bytes of the node span, re-sliced at every consumer. The rare
   `\u`-escaped or `u16`-oversized name that can't be recovered from source carries
-  its decoded form as an `Option<&'arena str>` escape hatch (the parser's already
-  arena-allocated `current_decoded`) — read directly, no round-trip.
+  its decoded form as an escape hatch into the stores' text pool (a `PoolText`, the
+  parser's `current_decoded` copied there at token receipt) — read through the tree's
+  view, no round-trip.
 - **Svelte element/attribute names** (`tsv_svelte`): `Element::name(source)` /
   `Attribute::name(source)` = `source[name_span]` — every name is a verbatim source run, a padded `{ shorthand }` included (its `name_span`
   is the identifier alone, as Svelte's `name_loc` is). No stored name field at all.

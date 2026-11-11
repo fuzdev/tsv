@@ -1465,7 +1465,6 @@ impl<'a> Printer<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bumpalo::Bump;
 
     /// Run `f` over a bare array expression parsed from `src` (its spans index into `src`) and
     /// the view of the stores it was parsed into.
@@ -1473,13 +1472,11 @@ mod tests {
         src: &str,
         f: impl for<'a> FnOnce(AstView<'a>, &'a ast::ArrayExpression) -> R,
     ) -> R {
-        let arena = Bump::new();
         let mut stores = ast::AstStores::new();
         let (id, _) = crate::__private::parse_expression_with_comments(
             src,
             0,
             0,
-            &arena,
             &mut stores,
             "end of input",
             |_, _| Ok(()),

@@ -15,8 +15,7 @@ const BOM: char = '\u{FEFF}';
 
 /// The wire of a whole TypeScript file.
 fn ts_wire(source: &str) -> Value {
-    let arena = bumpalo::Bump::new();
-    let program = tsv_ts::__private::parse(source, &arena).expect("the file parses");
+    let program = tsv_ts::__private::parse(source).expect("the file parses");
     tsv_debug::json::wire_value(&tsv_ts::__private::convert_ast_json_bytes(&program, source))
 }
 
@@ -32,8 +31,7 @@ fn a_file_reads_a_hashbang_behind_its_bom() {
     // The format side strips the BOM and keeps the hashbang.
     assert_eq!(tsv_ts::format(&with_bom).expect("the file formats"), plain);
     // Only one BOM is an encoding mark: a second is content, and the `#!` no hashbang.
-    let arena = bumpalo::Bump::new();
-    assert!(tsv_ts::__private::parse(&format!("{BOM}{BOM}{plain}"), &arena).is_err());
+    assert!(tsv_ts::__private::parse(&format!("{BOM}{BOM}{plain}")).is_err());
 }
 
 #[test]

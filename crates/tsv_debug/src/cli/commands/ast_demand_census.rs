@@ -322,7 +322,7 @@ mod census {
     pub(super) fn parse_once(source: &str, parser: ParserType) -> bool {
         let arena = bumpalo::Bump::new();
         match parser {
-            ParserType::TypeScript => tsv_ts::__private::parse(source, &arena).is_ok(),
+            ParserType::TypeScript => tsv_ts::__private::parse(source).is_ok(),
             ParserType::Svelte => tsv_svelte::__private::parse(source, &arena).is_ok(),
             ParserType::Css => tsv_css::__private::parse(source, &arena).is_ok(),
         }

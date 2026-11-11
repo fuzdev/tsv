@@ -6,7 +6,6 @@ use crate::ast::*;
 use crate::lexer::TokenKind;
 use crate::parser::element::{ElementParent, ParsedElement};
 use crate::whitespace::is_svelte_ws;
-use bumpalo::Bump;
 use tsv_lang::source_scan::{TriviaProfile, skip_trivia_run};
 use tsv_lang::{Error, Span};
 use tsv_ts::__private::{TopLevelAs, first_function_declaration};
@@ -198,7 +197,6 @@ fn each_binding_separator<'arena>(
     s: &str,
     s_offset: usize,
     host_nesting: u32,
-    arena: &'arena Bump,
     stores: &mut AstStores<'arena>,
 ) -> EachHeadSplit {
     // Every position the walk names is a subslice of `s`, so one rule converts them all
@@ -226,7 +224,7 @@ fn each_binding_separator<'arena>(
         // separator — the one recorded below, or the head's first `as` when none is.
         let item_at = offset_of(item);
         let Ok(type_end) =
-            tsv_ts::__private::parse_type_extent(item, item_at, host_nesting, arena, stores)
+            tsv_ts::__private::parse_type_extent(item, item_at, host_nesting, stores)
         else {
             break;
         };
@@ -579,7 +577,6 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                         binding_str,
                         binding_offset,
                         this.island_nesting(),
-                        this.arena,
                         stores,
                     )
                 }) {
@@ -1542,7 +1539,6 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                     &wrapper,
                     base,
                     this.island_nesting(),
-                    this.arena,
                     stores,
                 )
             })?;
@@ -1577,13 +1573,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 // than as a silent fallback to the wire tree (which prints a pair's
                 // contents bare).
                 let plain = self.with_island_stores(|this, stores| {
-                    tsv_ts::__private::parse_embedded(
-                        &wrapper,
-                        base,
-                        this.island_nesting(),
-                        this.arena,
-                        stores,
-                    )
+                    tsv_ts::__private::parse_embedded(&wrapper, base, this.island_nesting(), stores)
                 })?;
                 #[cfg(feature = "_internal_ast_census")]
                 tsv_lang::ast_census_probe::dead::<tsv_ts::ast::Statement<'arena>>(
@@ -1902,7 +1892,6 @@ mod tests {
     /// is no type at all.
     #[test]
     fn each_binding_separator_reports_the_binding_offset() {
-        let arena = Bump::new();
         for (input, binding) in [
             ("A[] as item", "item"),
             ("A[]\tas\nitem", "item"),
@@ -1942,7 +1931,7 @@ mod tests {
             let EachHeadSplit::LaterAs {
                 separator,
                 binding: start,
-            } = each_binding_separator(input, 0, 0, &arena, &mut AstStores::new())
+            } = each_binding_separator(input, 0, 0, &mut AstStores::new())
             else {
                 panic!("expected a later `as` in {input:?}");
             };
@@ -1975,7 +1964,7 @@ mod tests {
             "A satisfies { a = 1 }",
         ] {
             assert_eq!(
-                each_binding_separator(input, 0, 0, &arena, &mut AstStores::new()),
+                each_binding_separator(input, 0, 0, &mut AstStores::new()),
                 EachHeadSplit::FirstAs,
                 "{input:?}"
             );
@@ -1997,7 +1986,7 @@ mod tests {
             ("A satisfies B, i (i)", "A satisfies B"),
         ] {
             assert_eq!(
-                each_binding_separator(input, 0, 0, &arena, &mut AstStores::new()),
+                each_binding_separator(input, 0, 0, &mut AstStores::new()),
                 EachHeadSplit::NoBinding { run_end: run.len() },
                 "{input:?}"
             );

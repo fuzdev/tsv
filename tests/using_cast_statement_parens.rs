@@ -17,8 +17,7 @@
 //! `typescript_specific/using/cast` fixture.
 
 fn format(source: &str) -> String {
-    let arena = bumpalo::Bump::new();
-    let program = tsv_ts::__private::parse(source, &arena).expect("parse failed");
+    let program = tsv_ts::__private::parse(source).expect("parse failed");
     tsv_ts::__private::format_ast(&program, source)
 }
 

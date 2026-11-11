@@ -160,7 +160,7 @@ pub(crate) fn tsv_parse_to_wire_bytes(source: &str, parser: ParserType) -> Optio
     let arena = bumpalo::Bump::new();
     match parser {
         ParserType::TypeScript => {
-            let ast = tsv_ts::__private::parse_with_goal_or_fallback(source, None, &arena).ok()?;
+            let ast = tsv_ts::__private::parse_with_goal_or_fallback(source, None).ok()?;
             Some(tsv_ts::__private::convert_ast_json_bytes(&ast, source))
         }
         ParserType::Svelte => {
@@ -190,7 +190,7 @@ pub(crate) fn tsv_parses(source: &str, parser: ParserType) -> bool {
     let arena = bumpalo::Bump::new();
     match parser {
         ParserType::TypeScript => {
-            tsv_ts::__private::parse_with_goal_or_fallback(source, None, &arena).is_ok()
+            tsv_ts::__private::parse_with_goal_or_fallback(source, None).is_ok()
         }
         ParserType::Svelte => tsv_svelte::__private::parse(source, &arena).is_ok(),
         ParserType::Css => tsv_css::__private::parse(source, &arena).is_ok(),

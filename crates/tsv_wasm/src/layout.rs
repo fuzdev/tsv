@@ -13,8 +13,8 @@ use tsv_lang::store::{Id, IdRet, ListBuf, ListMark, PoolText, Run, Store, StoreV
 use tsv_svelte::ast::{AttributeNode, Element, ExpressionTag, FragmentNode};
 use tsv_ts::Error;
 use tsv_ts::ast::{
-    Expr, ExprId, Expression, ExpressionKind, ObjectPatternProperty, ObjectProperty, Property,
-    Statement, StatementKind, StmtId, SwitchCase, TSType, TSTypeAnnotation,
+    CommentList, Expr, ExprId, Expression, ExpressionKind, ObjectPatternProperty, ObjectProperty,
+    PoolStr, Property, Statement, StatementKind, StmtId, SwitchCase, TSType, TSTypeAnnotation,
     TSTypeParameterDeclaration, TSTypeParameterInstantiation, Ty, TyId, VariableDeclarator,
 };
 
@@ -90,3 +90,9 @@ const _: () = assert!(size_of::<StoreView<'static, Id<Family>>>() == 8);
 const _: () = assert!(size_of::<Store<Id<Family>>>() == 12);
 const _: () = assert!(size_of::<ListBuf<Id<Family>>>() == 12);
 const _: () = assert!(size_of::<TextPool<Family>>() == 12);
+// The tree's text and comment handles, niche-packed as the pool's and the store's are. See the
+// native pins in `tsv_ts`'s `ast/stores.rs`.
+const _: () = assert!(size_of::<PoolStr<'static>>() == 8);
+const _: () = assert!(size_of::<Option<PoolStr<'static>>>() == 8);
+const _: () = assert!(size_of::<CommentList<'static>>() == 8);
+const _: () = assert!(size_of::<Option<CommentList<'static>>>() == 8);

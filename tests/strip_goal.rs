@@ -33,8 +33,7 @@ fn parse_errors(source: &str, goal: Goal, parsed_at: Goal) -> (String, String) {
             stripped.code
         ),
     };
-    let parse_arena = Bump::new();
-    let Err(parsed) = tsv_ts::__private::parse_with_goal(source, parsed_at, &parse_arena) else {
+    let Err(parsed) = tsv_ts::__private::parse_with_goal(source, parsed_at) else {
         panic!("expected {source:?} to fail at {parsed_at:?}");
     };
     (error.to_string(), parsed.to_string())

@@ -1243,26 +1243,22 @@ impl<'a> Printer<'a> {
         // The body is parsed where it sits — at host-absolute offsets, against the host's
         // source and line table — exactly as the top-level `<script>` / `<style>` islands
         // are, so the two positions share one formatter path and differ only in how deep the
-        // body is indented. The parse arena is a local: nothing the doc keeps borrows the AST
-        // (its leaves are pooled text or host-source spans). Pre-sized to the content length
-        // to avoid the bump's chunk-doubling tail. A raw-text `Text` never decodes, so
-        // `content` is the author's bytes at `raw_span`.
-        let arena =
-            bumpalo::Bump::with_capacity(tsv_lang::estimated_ast_arena_capacity(content.len()));
+        // body is indented. What the parse writes is local — the script's stores, the style's
+        // arena — and nothing the doc keeps borrows it (its leaves are pooled text or
+        // host-source spans). A raw-text `Text` never decodes, so `content` is the author's
+        // bytes at `raw_span`.
         let base_offset = text.raw_span.start as usize;
         // a body too deep for the document's depth budget fails to parse and keeps its
         // author's bytes (the fallback below)
         let host_nesting = self.nested_raw_text_nesting.get();
         let body = match kind {
             RawTextKind::Script => {
-                // Its own stores, as its own arena: nothing it mints reaches past the doc
-                // built from it.
+                // Its own stores: nothing it mints reaches past the doc built from it.
                 let mut stores = AstStores::new();
                 let parsed = tsv_ts::__private::parse_embedded(
                     &content,
                     base_offset,
                     host_nesting,
-                    &arena,
                     &mut stores,
                 );
                 let view = stores.view();
@@ -1271,6 +1267,10 @@ impl<'a> Printer<'a> {
                     .and_then(|program| self.build_nested_script_body_doc(&program, view))
             }
             RawTextKind::Style => {
+                // pre-sized to the content length to avoid the bump's chunk-doubling tail
+                let arena = bumpalo::Bump::with_capacity(tsv_lang::estimated_ast_arena_capacity(
+                    content.len(),
+                ));
                 tsv_css::__private::parse_embedded(&content, base_offset, host_nesting, &arena)
                     .ok()
                     .and_then(|stylesheet| self.build_nested_style_body_doc(&stylesheet))

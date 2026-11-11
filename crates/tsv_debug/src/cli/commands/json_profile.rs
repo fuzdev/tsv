@@ -164,8 +164,8 @@ fn profile_once(
     let bytes = match parser_type {
         ParserType::TypeScript => {
             let t = Instant::now();
-            let ast = tsv_ts::__private::parse(source, &arena)
-                .map_err(|e| format!("parse error: {e:#}"))?;
+            let ast =
+                tsv_ts::__private::parse(source).map_err(|e| format!("parse error: {e:#}"))?;
             steps.parse.push(t.elapsed());
             let t = Instant::now();
             let bytes = match wire {

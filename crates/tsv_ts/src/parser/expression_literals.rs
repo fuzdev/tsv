@@ -168,7 +168,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                         false,
                     )
                 }
-                TokenKind::Keyword(kw) => {
+                &TokenKind::Keyword(kw) => {
                     let (key_start, key_end) = self.current_pos();
                     let name = self.current_raw_ident_name();
                     // A keyword is a valid bare shorthand only when it is a valid
@@ -184,7 +184,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     // `KeywordKind`.
                     let restricted = match kw {
                         KeywordKind::Await => !self.await_is_identifier(),
-                        _ => !self.keyword_is_expression_identifier(*kw),
+                        _ => !self.keyword_is_expression_identifier(kw),
                     };
                     self.advance()?;
                     (

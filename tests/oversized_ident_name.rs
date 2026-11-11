@@ -50,8 +50,7 @@ fn assert_name_survives(name: &str) {
     for &(template, hits) in POSITIONS {
         let source = template.replace("NAME", name);
 
-        let arena = bumpalo::Bump::new();
-        let program = tsv_ts::__private::parse(&source, &arena)
+        let program = tsv_ts::__private::parse(&source)
             .unwrap_or_else(|e| panic!("parse failed for a {len}-byte name in {template:?}: {e}"));
         // A name of ASCII letters or `é` is written to the wire as its own bytes.
         let field = format!("\"name\":\"{name}\"");

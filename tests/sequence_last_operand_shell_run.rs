@@ -12,8 +12,7 @@
 //! claim leaves alone or that no fixture can hold.
 
 fn format(source: &str) -> String {
-    let arena = bumpalo::Bump::new();
-    let program = tsv_ts::__private::parse(source, &arena).expect("parse failed");
+    let program = tsv_ts::__private::parse(source).expect("parse failed");
     tsv_ts::__private::format_ast(&program, source)
 }
 
@@ -46,15 +45,13 @@ fn sequence_operand_multiline_block_stays_inside_the_pair() {
         "f((a, b < (c /* x\n */)) as T);\n",
     ] {
         let once = format(source);
-        let arena = bumpalo::Bump::new();
         assert!(
-            tsv_ts::__private::parse(&once, &arena).is_ok(),
+            tsv_ts::__private::parse(&once).is_ok(),
             "the output of {source:?} must parse, got {once:?}"
         );
         let twice = format(&once);
-        let arena = bumpalo::Bump::new();
         assert!(
-            tsv_ts::__private::parse(&twice, &arena).is_ok(),
+            tsv_ts::__private::parse(&twice).is_ok(),
             "the second pass of {source:?} must parse, got {twice:?}"
         );
     }
@@ -82,8 +79,7 @@ fn sequence_operand_multiline_block_before_a_loose_follower_trails_the_pair() {
 /// The number of top-level statements `source` parses to: a line break the formatter moves in
 /// front of a postfix token can end the statement there instead of failing the reparse.
 fn statement_count(source: &str) -> usize {
-    let arena = bumpalo::Bump::new();
-    let program = tsv_ts::__private::parse(source, &arena);
+    let program = tsv_ts::__private::parse(source);
     assert!(program.is_ok(), "{source:?} must parse: {program:?}");
     let parsed = program.expect("checked above");
     parsed.view().stmt_list(parsed.body).len()

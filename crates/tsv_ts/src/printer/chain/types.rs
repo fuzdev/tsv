@@ -11,7 +11,7 @@ use smallvec::SmallVec;
 use tsv_lang::Span;
 
 /// Buffer for a linearized chain — chains are measured-short, so small chains
-/// (the common case) stay on the stack. `ChainNode` is `Copy` and 56 bytes, and
+/// (the common case) stay on the stack. `ChainNode` is `Copy` and 48 bytes, and
 /// this is the single buffer every [`ChainGroup`] is a sub-slice of — as is the
 /// peeled trailing member tail, which is named as a pair of runs over it rather
 /// than collected into a second buffer (`builder::TailRuns`).
@@ -75,7 +75,12 @@ impl ChainCall {
 ///
 /// Each variant contains exactly the data it needs - no optional fields.
 /// This makes invalid states unrepresentable.
+///
+/// The tag is an explicit byte: left to choose, the compiler folds it into a niche of the
+/// widest variant's fields, and every `match` on a node then decodes the variant from that
+/// field rather than reading one byte.
 #[derive(Debug, Clone, Copy)]
+#[repr(u8)]
 pub(crate) enum ChainNode<'a> {
     /// Base expression: identifier, literal, complex expr in parens
     ///

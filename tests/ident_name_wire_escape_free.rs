@@ -107,8 +107,7 @@ fn assert_wire_names(source: &str, wires: [Vec<u8>; 2], decoded: &str, hits: usi
 /// Parse `source` as TypeScript at `goal` and grade both wire variants.
 #[track_caller]
 fn ts_holds(source: &str, goal: tsv_ts::Goal, decoded: &str, hits: usize) {
-    let arena = bumpalo::Bump::new();
-    let program = tsv_ts::__private::parse_with_goal(source, goal, &arena)
+    let program = tsv_ts::__private::parse_with_goal(source, goal)
         .unwrap_or_else(|e| panic!("parse failed for {source:?}: {e}"));
     let wires = [
         tsv_ts::__private::convert_ast_json_bytes_with_locations(&program, source),
@@ -359,8 +358,7 @@ fn a_non_string_literal_raw_is_written_verbatim() {
         "1234567890123456789012345678901234567890n",
     ] {
         let source = format!("x = {raw};\n");
-        let arena = bumpalo::Bump::new();
-        let program = tsv_ts::__private::parse(&source, &arena)
+        let program = tsv_ts::__private::parse(&source)
             .unwrap_or_else(|e| panic!("parse failed for {source:?}: {e}"));
         let field = format!("\"raw\":\"{raw}\"");
         for bytes in [

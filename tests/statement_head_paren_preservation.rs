@@ -42,19 +42,16 @@
 use serde_json::Value;
 
 fn parse_json(source: &str) -> Value {
-    let arena = bumpalo::Bump::new();
-    let program = tsv_ts::__private::parse(source, &arena).expect("parse failed");
+    let program = tsv_ts::__private::parse(source).expect("parse failed");
     tsv_debug::json::wire_value(&tsv_ts::__private::convert_ast_json_bytes(&program, source))
 }
 
 fn accepts(source: &str) -> bool {
-    let arena = bumpalo::Bump::new();
-    tsv_ts::__private::parse(source, &arena).is_ok()
+    tsv_ts::__private::parse(source).is_ok()
 }
 
 fn format(source: &str) -> String {
-    let arena = bumpalo::Bump::new();
-    let program = tsv_ts::__private::parse(source, &arena).expect("parse failed");
+    let program = tsv_ts::__private::parse(source).expect("parse failed");
     tsv_ts::__private::format_ast(&program, source)
 }
 

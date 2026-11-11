@@ -428,7 +428,7 @@ fn profile_strip_once(
     arena: &mut bumpalo::Bump,
 ) -> Result<(Duration, Duration), String> {
     let t0 = Instant::now();
-    tsv_ts::__private::parse(source, arena).map_err(|e| format!("parse error: {e:#}"))?;
+    tsv_ts::__private::parse(source).map_err(|e| format!("parse error: {e:#}"))?;
     let parse_dur = t0.elapsed();
     arena.reset();
 
@@ -467,7 +467,7 @@ fn profile_once(
     let folded = tsv_lang::printing::normalize_carriage_returns(source);
     match parser_type {
         ParserType::TypeScript => {
-            let ast = tsv_ts::__private::parse_folded(&folded, None, arena).map_err(parse_error)?;
+            let ast = tsv_ts::__private::parse_folded(&folded, None).map_err(parse_error)?;
             let parse_dur = t0.elapsed();
 
             let t1 = Instant::now();

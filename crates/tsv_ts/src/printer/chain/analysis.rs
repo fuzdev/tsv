@@ -1855,7 +1855,6 @@ mod tests {
     use super::*;
     use crate::__private::PrinterInputs;
     use crate::ast::{CallExpression, Identifier, MemberExpression};
-    use bumpalo::Bump;
     use tsv_lang::doc::arena::DocArena;
     use tsv_lang::printing::LineBreaks;
     use tsv_lang::{EmbedContext, Span};
@@ -1884,12 +1883,15 @@ mod tests {
     }
 
     /// Helper to create an identifier expression. Tests fabricate spans with no
-    /// backing source, so the name rides the escaped channel (an `&'arena str`
-    /// resolved directly, regardless of span).
-    fn make_identifier<'arena>(name: &'arena str) -> Expression<'arena> {
+    /// backing source, so the name rides the escaped channel (pool text in `stores`,
+    /// resolved regardless of span).
+    fn make_identifier<'arena>(
+        stores: &mut ast::AstStores<'arena>,
+        name: &str,
+    ) -> Expression<'arena> {
         let len = name.len() as u32;
         let ident_name = IdentName {
-            escaped: Some(name),
+            escaped: Some(crate::__private::push_text(stores, name)),
             raw_len: 0,
             plain_ascii: false,
         };
@@ -1900,11 +1902,11 @@ mod tests {
     fn make_member<'arena>(
         stores: &mut ast::AstStores<'arena>,
         object: Expression<'arena>,
-        property_name: &'arena str,
+        property_name: &str,
         object_end: u32,
     ) -> Expression<'arena> {
         let prop_name = IdentName {
-            escaped: Some(property_name),
+            escaped: Some(crate::__private::push_text(stores, property_name)),
             raw_len: 0,
             plain_ascii: false,
         };
@@ -1949,11 +1951,11 @@ mod tests {
 
     #[test]
     fn test_linearize_simple_identifier() {
-        let expr = make_identifier("foo");
+        let mut stores = ast::AstStores::new();
+        let expr = make_identifier(&mut stores, "foo");
 
         let docs = DocArena::new();
         let lines = LineBreaks::new("", Vec::new());
-        let stores = ast::AstStores::new();
         let printer = make_printer(&docs, &lines, &[], &stores);
         let nodes = linearize_chain(printer.view, &expr, printer.linearize_input());
 
@@ -1971,7 +1973,7 @@ mod tests {
     fn test_linearize_member_chain() {
         let mut stores = ast::AstStores::new();
         // Build: a.b.c
-        let a = make_identifier("a");
+        let a = make_identifier(&mut stores, "a");
         let ab = make_member(&mut stores, a, "b", 1);
         let abc = make_member(&mut stores, ab, "c", 3);
 
@@ -1991,7 +1993,7 @@ mod tests {
     fn test_linearize_call_chain() {
         let mut stores = ast::AstStores::new();
         // Build: a().b()
-        let a = make_identifier("a");
+        let a = make_identifier(&mut stores, "a");
         let a_call = make_call(&mut stores, a, 1);
         let ab = make_member(&mut stores, a_call, "b", 3);
         let ab_call = make_call(&mut stores, ab, 5);
@@ -2013,7 +2015,7 @@ mod tests {
     fn test_group_member_only_chain() {
         let mut stores = ast::AstStores::new();
         // Build: a.b.c.d
-        let a = make_identifier("a");
+        let a = make_identifier(&mut stores, "a");
         let ab = make_member(&mut stores, a, "b", 1);
         let abc = make_member(&mut stores, ab, "c", 3);
         let abcd = make_member(&mut stores, abc, "d", 5);
@@ -2041,7 +2043,7 @@ mod tests {
     fn test_group_call_chain_breaks_after_call() {
         let mut stores = ast::AstStores::new();
         // Build: a().b().c
-        let a = make_identifier("a");
+        let a = make_identifier(&mut stores, "a");
         let a_call = make_call(&mut stores, a, 1);
         let ab = make_member(&mut stores, a_call, "b", 3);
         let ab_call = make_call(&mut stores, ab, 5);
@@ -2091,12 +2093,13 @@ mod tests {
     }
 
     fn make_member_node<'arena>(
-        name: &'arena str,
+        stores: &mut ast::AstStores<'arena>,
+        name: &str,
         object_end: u32,
         property_start: u32,
     ) -> ChainNode<'arena> {
         let ident_name = IdentName {
-            escaped: Some(name),
+            escaped: Some(crate::__private::push_text(stores, name)),
             raw_len: 0,
             plain_ascii: false,
         };
@@ -2114,15 +2117,16 @@ mod tests {
     #[test]
     fn test_group_splits_at_a_member_whose_gap_holds_a_line_comment() {
         let mut stores = ast::AstStores::new();
-        let base = make_identifier("a");
-        let call_expr = make_call(&mut stores, make_identifier("a"), 1);
+        let base = make_identifier(&mut stores, "a");
+        let callee = make_identifier(&mut stores, "a");
+        let call_expr = make_call(&mut stores, callee, 1);
         let ExpressionKind::CallExpression(call) = &call_expr.kind else {
             panic!("make_call builds a CallExpression")
         };
 
         // a.b.c.d.e — every gap 10 bytes wide, so a comment can sit in any one
         let members: Vec<ChainNode<'_>> = (0..4)
-            .map(|i| make_member_node("m", 20 + i * 10, 26 + i * 10))
+            .map(|i| make_member_node(&mut stores, "m", 20 + i * 10, 26 + i * 10))
             .collect();
 
         for (label, nodes) in [
@@ -2270,8 +2274,7 @@ mod tests {
             .collect();
         for source in &sources {
             let source = source.as_str();
-            let arena = Bump::new();
-            let program = crate::__private::parse(source, &arena).expect("parses");
+            let program = crate::__private::parse(source).expect("parses");
             let view = program.view();
             let mut roots = Vec::new();
             for statement in view.stmt_list(program.body) {

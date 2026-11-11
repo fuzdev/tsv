@@ -295,7 +295,7 @@ fn answer(request: &WireRequest, arena: &mut bumpalo::Bump) -> Result<Vec<u8>, S
                 tsv_svelte::__private::convert_ast_json_bytes_with_locations(&ast, source)
             }
             WireLanguage::Typescript => {
-                let ast = tsv_ts::__private::parse_with_goal(source, goal, arena)
+                let ast = tsv_ts::__private::parse_with_goal(source, goal)
                     .map_err(|e| format!("{e:#}"))?;
                 tsv_ts::__private::convert_ast_json_bytes_with_locations(&ast, source)
             }
