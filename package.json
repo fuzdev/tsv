@@ -9,6 +9,7 @@
 	"scripts": {
 		"build": "cargo build --workspace",
 		"build:release": "cargo build --workspace --release --exclude tsv_ffi --exclude tsv_napi --exclude tsv_wasm",
+		"build:stamped": "node scripts/roots/cargo_build.ts",
 		"install-cli": "cargo build --release -p tsv_cli && mkdir -p ~/.local/bin && cp target/release/tsv ~/.local/bin/tsv",
 		"clean": "cargo clean",
 		"dev": "cargo watch -x 'check --workspace' -x 'test --workspace' || echo '⚠️  cargo-watch not installed. Run: cargo install cargo-watch'",

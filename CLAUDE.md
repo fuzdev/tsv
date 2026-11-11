@@ -131,8 +131,11 @@ deno task typecheck:packages # the STAGED npm packages' .d.ts as a consumer comp
 #                          packages with the DOM lib, the napi loader and every `./locations` without). Args pick
 #                          packages (format/parse/all/napi; none = every staged one). NOT in `check` (node_modules);
 #                          publish.ts Step 6 stages the napi loader and runs it over all four (docs/audits.md)
-deno task typecheck:scripts # deno check over scripts/ alone — node-modules-free, so in `check` (nothing else typechecks
-#                          the release scripts); excludes `scripts/doctor.ts`, whose corpus probe reaches node_modules
+deno task typecheck:scripts # scripts/ by the checker of the runtime each script runs on, so in `check` (nothing else
+#                          typechecks the release scripts): `tsc -p tsconfig.scripts.json` over the Node roots under
+#                          `scripts/roots/` and what they import (Node's types, no `Deno`), then deno check over the rest
+#                          of scripts/, node-modules-free; that walk excludes `scripts/doctor.ts`, whose corpus probe
+#                          reaches node_modules
 deno task typecheck:bench-core # the node-modules-free bench modules scripts/'s import graph misses
 #                          (`lib/{wasm,harvest_stamp,loc_wire_client,fixture_documents,error_text}.ts` + `compose_reports.ts`,
 #                          and the modules the `test:node` suites test that nothing else Deno-checks); the rest of that core
@@ -152,7 +155,8 @@ deno task test:node      # vitest under Node over the suites beside their module
 #                          perf:ab's verdict rule; `pgo/profile_test.ts` — the PGO gates' readers over captured
 #                          llvm-profdata / llvm-readobj / build-log output; `pgo/depth_stack_test.ts` — the PE
 #                          stack-reserve reader + writer the Windows depth gate uses; `cargo_build_test.ts` — the stamp
-#                          paths); in `check` (docs/tasks.md §`test:node`)
+#                          paths, the `target/` fence, and the cargo run over a fake cargo, its signal exits included); in `check`
+#                          (docs/tasks.md §`test:node`)
 deno task test:node:canonical # the same over `benches/js/lib/canonical_test.ts`, the canonical prettier baseline's parser
 #                          routing; needs `deno task bench:install`, so NOT in `check`
 deno task test:deno      # deno tests over the suites whose module under test calls `Deno.*`: the divergence detectors
@@ -376,7 +380,7 @@ deno task build:wasm:all:deno        # deno WASM, full (benches) → pkg/all/den
 deno task build:npm:format           # publishable npm package → pkg/format/npm/ (also :parse; :all adds the tsv bin)
 
 # Or directly (the cargo-built `build:*` tasks above also STAMP their artifact for the `:run` freshness guards —
-# deno.json `//build:stamped`; a bare `cargo build` does not)
+# docs/tasks.md §`build:stamped`; a bare `cargo build` does not)
 cargo build -p tsv_ffi --release
 wasm-pack build crates/tsv_wasm --target deno --release --out-dir pkg/all/deno
 wasm-pack build crates/tsv_wasm --target deno --release --out-dir pkg/parse/deno -- --no-default-features --features parse

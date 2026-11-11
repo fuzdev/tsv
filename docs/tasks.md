@@ -11,14 +11,21 @@ With a `package.json` beside it, Deno resolves a bare specifier through `node_mo
 package installed there whether the `package.json` lists it or not, and looks for `npm:`
 specifiers there instead of in its own cache; with no `node_modules`, a type check that needs
 `@types/node` or a listed package fails outright. The root-config checks that hold code free
-of npm imports (`typecheck:scripts`, `typecheck:bench-core`, `test:deno`, and the sidecar half
-of `typecheck:js`) therefore run with `DENO_NO_PACKAGE_JSON=1`, which keeps the root
-`package.json` out of Deno's view, so a bare import still fails them and a checkout with no
-`node_modules` still passes them.
+of npm imports (`typecheck:scripts`' Deno half, `typecheck:bench-core`, `test:deno`, and the
+sidecar half of `typecheck:js`) therefore run with `DENO_NO_PACKAGE_JSON=1`, which keeps the
+root `package.json` out of Deno's view, so a bare import still fails them and a checkout with
+no `node_modules` still passes them. `typecheck:scripts`' other half is `tsc` from
+`node_modules`, so `typecheck:scripts` as a whole needs `npm ci`.
 
 `package.json` takes no comments, so the rationale for a script whose body can't carry its
 own lives here, one section per script. A `deno.json` task's rationale sits beside it as its
 `//<name>` key.
+
+## `build:stamped`
+
+`cargo build <args>`, then every final artifact it reports (a bin's executable, a cdylib's library) dated at now — what each build task whose output an mtime guard reads goes through (`build:ffi*`, `build:napi*`, `build:check`). Cargo keys `Cargo.lock` and a manifest by content, so one rewritten to something already built (a version bump restored and re-applied, a `git reset`, a branch switched away and back) makes the build a no-op that re-links the cached artifact under its ORIGINAL date; the guard, which compares dates, then refuses a current artifact and names a rebuild that cannot clear it. Stamping makes the date mean when cargo last confirmed the artifact current. Rationale + why only leaf artifacts: scripts/cargo_build.ts.
+
+It runs under Node on Node's own `node:*` modules (`scripts/roots/cargo_build.ts`), a named exception to the host-module rule the other Node scripts follow: CI runs it on Windows and macOS (the `platforms` job's `test:napi` and `test:napi:npm`) and in the `artifacts` job, none of which installs `node_modules`, and gro's host modules don't run programs on Windows. So nothing it imports is a package, which `typecheck:scripts`' Deno walk enforces. Cargo is the bare name `cargo` on `PATH` and inherits the whole environment; the stamp reaches beneath the checkout's `target/` only, so an artifact a `CARGO_TARGET_DIR` puts elsewhere fails the run rather than being dated. A cargo ended by signal `N` exits `128 + N`.
 
 ## `build:release`
 
