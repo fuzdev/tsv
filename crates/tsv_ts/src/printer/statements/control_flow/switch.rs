@@ -3,6 +3,7 @@
 // Switch head, case labels, and case-body layout with comment handling.
 
 use super::{HeadChainGrouping, OpenParenLineBlockComment};
+use crate::ast::ExprView;
 use crate::ast::{self, StatementKind};
 use crate::printer::expressions::blocks::{OrphanSemiCursor, StatementBlankScan};
 use crate::printer::statements::StatementContext;
@@ -48,7 +49,7 @@ impl<'a> Printer<'a> {
         // excludes `switch` from `shouldInlineCondition`, so a negated parenthesized
         // discriminant does not hug its `(`.
         let condition_group = self.build_condition_group_for_parens(
-            stmt.discriminant,
+            self.view.expr(stmt.discriminant),
             open_paren,
             close_paren,
             OpenParenLineBlockComment::JoinsRun,
@@ -59,8 +60,9 @@ impl<'a> Printer<'a> {
         // Join cases with hardlines, handling comments between cases
         let mut case_parts = d.pooled_docbuf();
         // Start after the open brace to find comments between { and first case
-        let brace_start = body_open_brace
-            .unwrap_or_else(|| close_paren.map_or_else(|| stmt.discriminant.span().end, |p| p + 1));
+        let brace_start = body_open_brace.unwrap_or_else(|| {
+            close_paren.map_or_else(|| self.view.expr(stmt.discriminant).span().end, |p| p + 1)
+        });
         let mut prev_end = brace_start + 1;
         // The BLANK cursor, which `prev_end` cannot serve — the same split the statement
         // walks carry ([`StatementBlankScan`]). A case whose last statement handed its
@@ -243,10 +245,10 @@ impl<'a> Printer<'a> {
     /// Where the case's head ends — past the test expression, or past the `default`
     /// keyword — which is where the head→`:` gap opens. The one anchor both the label
     /// scan and the label emitter measure that gap from.
-    fn case_head_end(case: &ast::SwitchCase<'_>) -> u32 {
+    fn case_head_end(view: ExprView<'_>, case: &ast::SwitchCase<'_>) -> u32 {
         case.test.as_ref().map_or_else(
             || case.span.start + "default".len() as u32,
-            |test| test.span().end,
+            |test| view.expr(*test).span().end,
         )
     }
 
@@ -255,7 +257,7 @@ impl<'a> Printer<'a> {
         // Find the label ':' after the head, skipping any ':' inside a comment in the gap
         // (`case 1 /* : */:`, `default /* : */:`). With no comment the colon follows the
         // head immediately, which is also the fallback if the scan finds nothing.
-        let head_end = Self::case_head_end(case);
+        let head_end = Self::case_head_end(self.view, case);
         find_char(
             self.source.as_bytes(),
             head_end as usize,
@@ -302,9 +304,9 @@ impl<'a> Printer<'a> {
         // spelling `case a + b // c⏎// d⏎:` prints it
         // ([`Printer::pair_trailing_gap_start_guarded`]). A lone such comment keeps deferring
         // past the `:` to trail the label. A frozen test's slice prints its shells itself.
-        let mut head_end = Self::case_head_end(case);
+        let mut head_end = Self::case_head_end(self.view, case);
 
-        if let Some(test) = &case.test {
+        if let Some(test) = self.view.opt(case.test) {
             // An assignment takes clarity parens here exactly as it does in a statement
             // test — prettier parenthesizes an `AssignmentExpression` in every position
             // outside its own allowlist (a for init/update, an expression statement, an

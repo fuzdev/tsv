@@ -26,6 +26,7 @@ reachable, hence the ratchet.
 ## Running it
 
 ```bash
+# does not run while tsv_svelte_compile is outside the workspace build (CLAUDE.md §Project Structure)
 npm run compile:validation            # the gate
 npm run compile:validation:update     # re-pin after fixing (or newly refusing) findings
 

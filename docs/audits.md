@@ -13,6 +13,8 @@ The Svelte compiler's *sidecar-dependent* harnesses — the corpus comparison, t
 - **An empty scan is an error at every scope, and so is a run that resolves files but grades none** (`check_graded_nonzero` — the corpus resolves fine and the parser rejects all of it). Each audit floors the count its own *verdict* rests on — files formatted, files compared, boundary sites probed, render keys checked: count every outcome that carries a verdict, exclude only those that could not be evaluated. A trivially-clean outcome is a verdict (a no-op format renders identically by identity) and counts; "the parser rejected it" does not.
 - **The pinned minimums** (`FIXTURES_FORMATTED_MIN`, `comments:audit`'s `REGISTERED_MIN`) are the stronger *default-corpus* guard above that floor: they catch a corpus that shrank rather than vanished, and only a default run can be held to a number, so they stay `default_paths`-gated. They ask different questions — the file count catches a shrunken corpus or a diverged skip policy, the comment count catches *registration* collapsing while every file still formats — so `comments:audit` passes both.
 
+**Not run at present:** `conformance:audit:compiler`, `canonicalize:audit` and `compile:fixtures:validate` need `tsv_svelte_compile`, which is outside the workspace build ([CLAUDE.md §Project Structure](../CLAUDE.md#project-structure)). They are out of `npm run check` and `npm run conformance` and fail as an unrecognized argument if invoked.
+
 ## Overview
 
 | audit | task | catches | gating |
@@ -54,9 +56,9 @@ The Svelte compiler's *sidecar-dependent* harnesses — the corpus comparison, t
 | [Lexer diff](#differential-lexer-harness-lex_diff) | — | token-stream drift after a lexer change | dev tool |
 | [Variant direction](#variant-whitespace-direction-audit-variantsaudit) | `variants:audit` | a `_compact` variant that ADDS whitespace, or a `_spaces` variant that REMOVES it — the pair's two directions collapsing into one | `npm run check` |
 | [Conformance audit](#conformance-audit-conformanceaudit) | `conformance:audit` | doc/fixture catalog + link integrity | `npm run check` |
-| [Compiler conformance](#compiler-conformance-audit-conformanceauditcompiler) | `conformance:audit:compiler` | compile-fixture divergence catalog + checklist ↔ `Refusal` drift | `npm run check` |
-| [Canonicalizer](#canonicalizer-audit-canonicalizeaudit) | `canonicalize:audit` | `canonicalize_js` non-idempotence / corrupt output / comment loss | `npm run check` |
-| [Compile fixtures](#compile-fixture-validation-compilefixturesvalidate) | `compile:fixtures:validate` | a stale compile expectation (oracle freshness) · tsv-vs-expected compile parity · expected-file idempotence | parity legs in `npm run check` (`cargo test`); freshness in `npm run conformance` |
+| [Compiler conformance](#compiler-conformance-audit-conformanceauditcompiler) | `conformance:audit:compiler` | compile-fixture divergence catalog + checklist ↔ `Refusal` drift | not run (see above) |
+| [Canonicalizer](#canonicalizer-audit-canonicalizeaudit) | `canonicalize:audit` | `canonicalize_js` non-idempotence / corrupt output / comment loss | not run (see above) |
+| [Compile fixtures](#compile-fixture-validation-compilefixturesvalidate) | `compile:fixtures:validate` | a stale compile expectation (oracle freshness) · tsv-vs-expected compile parity · expected-file idempotence | not run (see above) |
 | [Strip fixtures](#strip-fixture-validation-stripfixturesvalidate) | `strip:fixtures:validate` · `strip:fixtures:oracle` | `tsv_ts::strip` departing from a fixture's output or refusal, moving a character's line or UTF-16 column or a line terminator, or not idempotent (a ratchet over known failures) · a committed expectation the oracles no longer derive, or an undeclared oracle disagreement | parity in `npm run check` (`cargo test --test strip_fixtures_tests`); the oracle check on demand (Node + `bench:install`) |
 | [Strip corpus](#strip-corpus-differential-stripcorpus) | `strip:corpus` | `tsv_ts::strip` on real TypeScript panicking, breaking the position contract or idempotence, emitting no JS module, or departing from ts-blank-space's bytes or refusals outside a reviewed list | `npm run conformance` (release) |
 | [Import self-check](#import-fixture-self-check-imports_self_check_tests) | `cargo test --test imports_self_check_tests` | `parse_imports` departing from the records an independent ESTree walk reads off the canonical trees the main fixture tree pins | `npm run check` (`cargo test`) |
@@ -1594,8 +1596,8 @@ lock, re-run `npm run compile:fixtures:validate`, update the constant, all in on
   the lock but unreviewed — a regeneration moves them silently unless someone diffs the lock.
 - **It cannot see oracle freshness.** A pin can be perfectly self-consistent and still grade
   against stale committed expectations. That is `compile:fixtures:validate`'s job — the only
-  check that grades the committed expectations against a LIVE oracle — which is why `npm run
-  conformance` preflights it.
+  check that grades the committed expectations against a LIVE oracle — and it does not run
+  while `tsv_svelte_compile` is outside the workspace build.
 
 **Maintenance counterpart: `npm run pins:lock`** (`scripts/regen_sidecar_lock.ts`), not an
 audit: `npm install --package-lock-only` in the sidecar's directory, which resolves what
@@ -2566,6 +2568,8 @@ gated in `npm run check`. Five checks:
 
 ## Compiler Conformance Audit (`conformance:audit:compiler`)
 
+Not run at present: `tsv_svelte_compile` is outside the workspace build ([§Overview](#overview)).
+
 ```bash
 cargo run -p tsv_debug compile_conformance_audit
 # Also: --json
@@ -2595,6 +2599,8 @@ non-zero on any finding; gated in `npm run check`.
 
 ## Canonicalizer Audit (`canonicalize:audit`)
 
+Not run at present: `tsv_svelte_compile` is outside the workspace build ([§Overview](#overview)).
+
 ```bash
 cargo run -p tsv_debug canonicalize_audit                              # default scope (tests/fixtures only)
 cargo run -p tsv_debug canonicalize_audit tests/fixtures tests/fixtures_compile  # the check-gate scope
@@ -2612,6 +2618,8 @@ JS). Pure Rust (no sidecar); exits 1 on any failure. Gated in `npm run check` ov
 tests/fixtures + tests/fixtures_compile (fast); point it at real corpora for the full sweep.
 
 ## Compile-Fixture Validation (`compile:fixtures:validate`)
+
+Not run at present: `tsv_svelte_compile` is outside the workspace build ([§Overview](#overview)).
 
 ```bash
 npm run compile:fixtures:validate     # also: --list, --json, positional filter patterns

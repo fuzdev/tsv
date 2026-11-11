@@ -336,8 +336,9 @@ impl<'a> Printer<'a> {
         ctx: StatementContext,
     ) -> DocId {
         let d = self.d();
+        let expression = self.view.expr(stmt.expression);
 
-        let expr_end = stmt.expression.span().end;
+        let expr_end = expression.span().end;
         // The value reports where the terminator gap opens — past a grouping `)` it retained
         // and emitted the gap up to, or back at the start of a trailing region it handed over
         // — because that region is then the VALUE's share, or the terminator's. Asking the
@@ -356,7 +357,7 @@ impl<'a> Printer<'a> {
             // axis and so never sees the owned member — this seam owes only that one comment
             // (`syntax/comments/statement_leading_multiline_block_flat`).
             let mut gap_start = expr_end;
-            let doc = self.build_value_with_outermost_owned_comment(stmt.expression, || {
+            let doc = self.build_value_with_outermost_owned_comment(expression, || {
                 let (doc, start) =
                     self.build_expression_statement_value_doc(stmt, span, ctx.in_program_or_block);
                 gap_start = start;
@@ -456,7 +457,7 @@ impl<'a> Printer<'a> {
     /// [`Printer::prepend_owned_leading_comment_at`] asks each caller for.
     fn build_directive_doc(&self, stmt: &ast::ExpressionStatement<'_>) -> DocId {
         let d = self.d();
-        let span = stmt.expression.span();
+        let span = self.view.expr(stmt.expression).span();
         let text = d.text_pooled(&format_directive(span.extract(self.source)));
         self.prepend_owned_leading_comment_at(span.start, text)
     }
@@ -472,7 +473,7 @@ impl<'a> Printer<'a> {
         self.expr_stmt_paren_target.set(nested_paren);
 
         self.is_expression_statement.set(true);
-        let doc = match &stmt.expression {
+        let doc = match self.view.expr(stmt.expression) {
             // One of prettier's two `printSequenceExpression` parent arms (the `for`
             // head is the other): the operands after the first take a continuation
             // indent. Claimed here rather than in the expression dispatch because
@@ -513,13 +514,14 @@ impl<'a> Printer<'a> {
         span: Span,
         in_program_or_block: bool,
     ) -> (DocId, u32) {
+        let expression = self.view.expr(stmt.expression);
         let d = self.d();
         // A `//` the author wrote inside the value's own grouping parens keeps those
         // parens: the terminator gap would defer it past the `)` and the `;`, onto a line
         // that may already hold a `//`, where the two MERGE into one comment. The
         // statement's other value positions (declarator initializer, assignment RHS,
         // ternary branch) already answer this way through the shared shell builder.
-        let expr_end = stmt.expression.span().end;
+        let expr_end = expression.span().end;
         let shell_close = self.value_paren_line_comment_close(expr_end, span.end);
         // A comment between a source `(` and the expression (`(// c⏎ expr)` /
         // `(/* c */⏎ expr)` — e.g. a bare parenthesized decorated class
@@ -528,20 +530,19 @@ impl<'a> Printer<'a> {
         // a comment the expression doesn't own to go. prettier hoists the comment
         // before `(` — a divergence (`expression_statement_paren_kept_comment`,
         // `decorated_expr_open_paren_comment`).
-        let expr_start = stmt.expression.span().start;
+        let expr_start = expression.span().start;
         let source_paren = self.statement_opens_with_paren(span, expr_start);
         // An own-line directive in that `(`→expression gap freezes the expression
         // (Rule A). Only a SOURCE paren opens the gap: without one the directive
         // leads the statement, where the statement list's own rule already claims it.
         let frozen = source_paren
-            .then(|| self.value_head_frozen_span(span.start + 1, stmt.expression.span()))
+            .then(|| self.value_head_frozen_span(span.start + 1, expression.span()))
             .flatten();
 
         // Parens required for correctness (object expressions, object pattern
         // assignments) OR to avoid a bare string statement being read as a
         // directive (recomputed fresh, not preserved from source).
-        let mut needs_parens = self
-            .needs_parens(stmt.expression, ParenContext::ExpressionStatement)
+        let mut needs_parens = self.needs_parens(expression, ParenContext::ExpressionStatement)
             || self.needs_avoid_directive_parens(stmt, in_program_or_block);
 
         // When the whole expression isn't wrapped, a nested leftmost
@@ -551,7 +552,7 @@ impl<'a> Printer<'a> {
             None
         } else {
             let text = LeftmostText::of_value(frozen.is_some());
-            self.expr_stmt_nested_paren_target(stmt.expression, text)
+            self.expr_stmt_nested_paren_target(expression, text)
         };
         // A frozen slice is verbatim, so the printer has no interior left to wrap:
         // the nested target's parens go around the WHOLE slice instead. Without the
@@ -588,11 +589,11 @@ impl<'a> Printer<'a> {
         // of the run written after that shell, claimed from the expression's own trailing
         // emitters. A FROZEN expression's slice prints its shells verbatim.
         let shell_run_start = match shell_close {
-            Some(_) if frozen.is_none() => self.pair_trailing_gap_start(stmt.expression),
+            Some(_) if frozen.is_none() => self.pair_trailing_gap_start(expression),
             _ => expr_end,
         };
         let expr_doc = match frozen {
-            Some(span) => self.build_frozen_expression_doc(stmt.expression, span),
+            Some(span) => self.build_frozen_expression_doc(expression, span),
             None => {
                 // Claimed in line rather than through a closure around the tail's own
                 // closure, which keeps the statement's build inline.
@@ -601,7 +602,7 @@ impl<'a> Printer<'a> {
                         .replace(Some(Span::new(shell_run_start, expr_end)))
                 });
                 let (doc, gap_start) = self
-                    .with_statement_tail(plain.then_some(stmt.expression), || {
+                    .with_statement_tail(plain.then_some(expression), || {
                         self.build_expression_statement_expr_doc(stmt, nested_paren)
                     });
                 if let Some(outer) = outer_claim {
@@ -618,7 +619,7 @@ impl<'a> Printer<'a> {
         // inline (flat `else` below).
         let decorated_class_expr = needs_parens
             && matches!(
-                &stmt.expression.kind,
+                &expression.kind,
                 ExpressionKind::ClassExpression(c) if class_expr_has_decorators(c)
             );
 
@@ -743,7 +744,7 @@ impl<'a> Printer<'a> {
         span: Span,
         gap: TerminatorGap,
     ) -> DocId {
-        let Some(arg) = &ret.argument else {
+        let Some(arg) = self.view.opt(ret.argument) else {
             // No argument: a bare keyword closed by `;` (interior comments handled
             // there) — `return; /* c */` etc.
             return self.build_bare_keyword_terminator_doc("return", span, gap);

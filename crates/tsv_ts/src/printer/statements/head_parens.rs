@@ -14,6 +14,7 @@
 // source paren is still stripped and any number collapse to exactly one.
 
 use super::Printer;
+use crate::ast::ExprView;
 use crate::ast::{self, Expression, ExpressionKind};
 use crate::printer::is_string_literal;
 use crate::printer::needs_parens::{
@@ -27,13 +28,16 @@ use tsv_lang::Span;
 /// (parentheses/identifier.js): unlike `leftmost_no_lookahead` it does NOT descend
 /// through member/call heads (`type.foo` is unambiguous), so it fires only for a
 /// bare-identifier operand of a cast chain.
-fn strip_statement_casts<'a>(expr: &'a Expression<'a>) -> Option<&'a Expression<'a>> {
+fn strip_statement_casts<'a>(
+    view: ExprView<'a>,
+    expr: &'a Expression<'a>,
+) -> Option<&'a Expression<'a>> {
     let mut cur = expr;
     let mut stripped = false;
     loop {
         cur = match &cur.kind {
-            ExpressionKind::TSAsExpression(e) => e.expression,
-            ExpressionKind::TSSatisfiesExpression(e) => e.expression,
+            ExpressionKind::TSAsExpression(e) => view.expr(e.expression),
+            ExpressionKind::TSSatisfiesExpression(e) => view.expr(e.expression),
             _ => break,
         };
         stripped = true;
@@ -130,7 +134,7 @@ impl<'a> Printer<'a> {
         expression: &Expression<'_>,
         text: LeftmostText,
     ) -> Option<Span> {
-        let reached = leftmost_no_lookahead_reached(expression, text);
+        let reached = leftmost_no_lookahead_reached(self.view, expression, text);
         let leftmost = reached.0;
         if matches!(
             leftmost.kind,
@@ -157,7 +161,7 @@ impl<'a> Printer<'a> {
         expression: &Expression<'_>,
         is_ambiguous: fn(&str) -> bool,
     ) -> Option<Span> {
-        match strip_statement_casts(expression) {
+        match strip_statement_casts(self.view, expression) {
             Some(Expression {
                 kind: ExpressionKind::Identifier(id),
                 ..
@@ -189,6 +193,7 @@ impl<'a> Printer<'a> {
         expression: &Expression<'_>,
     ) -> Option<Span> {
         self.let_bracket_target_of(leftmost_no_lookahead_reached(
+            self.view,
             expression,
             LeftmostText::Printed,
         ))
@@ -230,7 +235,7 @@ impl<'a> Printer<'a> {
         &self,
         expression: &Expression<'_>,
     ) -> Option<Span> {
-        match &leftmost_no_lookahead(expression).kind {
+        match &leftmost_no_lookahead(self.view, expression).kind {
             ExpressionKind::Identifier(id) if self.with_ident_name(id, |name| name == "let") => {
                 Some(id.span)
             }
@@ -259,6 +264,6 @@ impl<'a> Printer<'a> {
         stmt: &ast::ExpressionStatement<'_>,
         in_program_or_block: bool,
     ) -> bool {
-        in_program_or_block && is_string_literal(stmt.expression)
+        in_program_or_block && is_string_literal(self.view.expr(stmt.expression))
     }
 }

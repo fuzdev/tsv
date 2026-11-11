@@ -226,7 +226,7 @@ impl<'a> Printer<'a> {
             let is_simple_content = element.fragment.nodes.len() == 1
                 && matches!(
                     &element.fragment.nodes[0],
-                    FragmentNode::ExpressionTag(expr) if !Self::expression_has_break_points(expr.expression)
+                    FragmentNode::ExpressionTag(expr) if !Self::expression_has_break_points(self.view, self.view.expr(expr.expression))
                 );
 
             if is_simple_content {
@@ -623,7 +623,7 @@ impl<'a> Printer<'a> {
         let head = self.build_block_head_expr(
             IF_BLOCK_OPEN,
             block.opening_tag_span,
-            block.test,
+            self.view.expr(block.test),
             block.opening_tag_span.end - 1,
             false,
             HeadTail::Delimiter,
@@ -677,12 +677,12 @@ impl<'a> Printer<'a> {
     /// formatted with whitespace-sensitive content formatting.
     fn build_ws_sensitive_each_block_doc(&self, block: &ast::EachBlock<'_>) -> DocId {
         let d = self.d();
-        let expr_comment_end = each_expr_comment_end(block);
+        let expr_comment_end = each_expr_comment_end(self.view, block);
         // Pass false for in_multiline_context: expressions must not wrap in ws-sensitive context
         let head = self.build_block_head_expr(
             EACH_BLOCK_OPEN,
             block.opening_tag_span,
-            block.expression,
+            self.view.expr(block.expression),
             expr_comment_end,
             false,
             HeadTail::of_each(block),
@@ -691,7 +691,7 @@ impl<'a> Printer<'a> {
         let open_doc = self.head_open_doc(EACH_BLOCK_OPEN, head.layout.opens_own_line());
         let mut opening: DocBuf = smallvec![open_doc, head.doc];
 
-        if let Some(context) = block.context {
+        if let Some(context) = self.view.opt(block.context) {
             opening.push(d.text(" as "));
             let pattern_doc = self.build_block_pattern_doc(context);
             opening.push(pattern_doc);
@@ -747,8 +747,8 @@ impl<'a> Printer<'a> {
         let head = self.build_block_head_expr(
             AWAIT_BLOCK_OPEN,
             block.opening_tag_span,
-            block.expression,
-            await_expr_comment_end(block, sections.shorthand),
+            self.view.expr(block.expression),
+            await_expr_comment_end(self.view, block, sections.shorthand),
             false,
             HeadTail::of_await(sections.shorthand),
         );
@@ -788,7 +788,7 @@ impl<'a> Printer<'a> {
         let head = self.build_block_head_expr(
             KEY_BLOCK_OPEN,
             block.opening_tag_span,
-            block.expression,
+            self.view.expr(block.expression),
             block.opening_tag_span.end - 1,
             false,
             HeadTail::Delimiter,

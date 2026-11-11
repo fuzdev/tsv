@@ -56,26 +56,26 @@ impl<'a> Printer<'a> {
         new_expr: &ast::NewExpression<'_>,
         new_expr_span: Span,
     ) -> DocId {
+        let callee = self.view.expr(new_expr.callee);
         let d = self.d();
         let keyword_end = new_expr_span.start + "new".len() as u32;
-        let callee_start = new_expr.callee.span().start;
+        let callee_start = callee.span().start;
         // The `new`→callee value head ([`Printer::value_head_frozen_span`]): an own-line
         // directive in the gap freezes the CALLEE alone — the type arguments and the argument
         // list follow the callee's span and stay parent-owned, so they keep normalizing.
-        let frozen = self.value_head_frozen_span(keyword_end, new_expr.callee.span());
+        let frozen = self.value_head_frozen_span(keyword_end, callee.span());
         // A comment in a shell below the pair the callee prints in leads the whole callee
         // from the keyword gap, ahead of that pair, which is where the reparse reads it
         // (`Printer::left_spine_run_claim`): the gap runs to the claimed region's end. So
         // does a run the callee's doc would OPEN with on a line of its own, pair or no pair —
         // the `await`→operand rule (`Printer::build_await_doc`).
-        let claim = self.left_spine_run_claim(new_expr_span, keyword_end, new_expr.callee, || {
+        let claim = self.left_spine_run_claim(new_expr_span, keyword_end, callee, || {
             let new_list = new_expr
                 .type_arguments
                 .as_ref()
                 .map(|_| SecondTypeArgs::Expression);
-            super::CalleeParens::of(self, new_expr.callee, ParenContext::NewCallee, new_list)
-                .is_some()
-                || self.left_spine_shell_has_own_line_comment(new_expr.callee)
+            super::CalleeParens::of(self, callee, ParenContext::NewCallee, new_list).is_some()
+                || self.left_spine_shell_has_own_line_comment(callee)
         });
         let gap_end = claim.map_or(callee_start, |claim| claim.region.end.max(callee_start));
         self.with_left_spine_claim(claim, || {
@@ -161,7 +161,7 @@ impl<'a> Printer<'a> {
         // the whole cascade rather than in one arm: the chain reaches this position
         // through three of them — bare (`new a.b.C()`), parenthesized where the callee
         // holds a call (`new (fn(k).a.B)()`), and frozen, where the mark is simply inert.
-        self.mark_new_callee_member_lookups(new_expr.callee);
+        self.mark_new_callee_member_lookups(self.view.expr(new_expr.callee));
         let new_list = new_expr
             .type_arguments
             .as_ref()
@@ -174,31 +174,35 @@ impl<'a> Printer<'a> {
         // for a sealed chain, whose pair prints its interior itself.
         let callee_gap_start = if frozen.is_none()
             && !matches!(
-                new_expr.callee.kind,
+                self.view.expr(new_expr.callee).kind,
                 ast::ExpressionKind::TSNonNullExpression(_)
             ) {
-            self.required_pair_gap_start(new_expr.callee, || {
-                self.needs_parens(new_expr.callee, ParenContext::NewCallee)
+            self.required_pair_gap_start(self.view.expr(new_expr.callee), || {
+                self.needs_parens(self.view.expr(new_expr.callee), ParenContext::NewCallee)
             })
         } else {
-            new_expr.callee.span().end
+            self.view.expr(new_expr.callee).span().end
         };
-        let callee =
-            self.with_claimed_right_spine_run(callee_gap_start, new_expr.callee.span().end, || {
+        let callee = self.with_claimed_right_spine_run(
+            callee_gap_start,
+            self.view.expr(new_expr.callee).span().end,
+            || {
                 if let Some(frozen) = frozen {
-                    self.build_frozen_new_callee_doc(new_expr.callee, frozen)
-                } else if let Some(sealed) = self.build_sealed_non_null_paren_doc(new_expr.callee) {
+                    self.build_frozen_new_callee_doc(self.view.expr(new_expr.callee), frozen)
+                } else if let Some(sealed) =
+                    self.build_sealed_non_null_paren_doc(self.view.expr(new_expr.callee))
+                {
                     sealed
                 } else if let Some(parens) = super::CalleeParens::of(
                     self,
-                    new_expr.callee,
+                    self.view.expr(new_expr.callee),
                     ParenContext::NewCallee,
                     new_list,
                 ) {
                     // The pair's shape and the operand's builder off ONE derivation of the callee's
                     // kind — a `new` callee and a call callee are the same position to prettier, so
                     // both read it from [`super::CalleeParens`].
-                    let callee_span = new_expr.callee.span();
+                    let callee_span = self.view.expr(new_expr.callee).span();
                     let pair_is_comment_free = self.pair_gaps_are_comment_free(
                         (span.start, callee_span.start),
                         self.paren_shell_close_after(callee_span.end)
@@ -206,9 +210,10 @@ impl<'a> Printer<'a> {
                     );
                     parens.build_doc(self, parens.build_body_doc(self, pair_is_comment_free))
                 } else {
-                    self.build_expression_doc(new_expr.callee)
+                    self.build_expression_doc(self.view.expr(new_expr.callee))
                 }
-            });
+            },
+        );
 
         // Combine callee with type arguments (`new Foo<K, V>`), preserving comments
         // in the gap, e.g. `new Foo/* c */ <string>()` — comment between callee and `<`
@@ -246,7 +251,7 @@ impl<'a> Printer<'a> {
         // which is what the head/args split below is for — and on the unsplit path, every
         // `new` without a comment in that gap, the head is handed straight through.
         let Some((split_start, paren)) =
-            super::paren_split_for(self, paren_open, new_expr.arguments)
+            super::paren_split_for(self, paren_open, self.view.list(new_expr.arguments))
         else {
             return self.build_new_args_doc(new_expr, span, callee_with_types, paren_open);
         };
@@ -266,7 +271,8 @@ impl<'a> Printer<'a> {
         callee_with_types: DocId,
         paren_open: u32,
     ) -> DocId {
-        self.mark_relational_sibling_authored_pairs(new_expr.arguments.iter().copied().map(Some));
+        let arguments = self.view.list(new_expr.arguments);
+        self.mark_relational_sibling_authored_pairs(arguments.iter().copied().map(Some));
         let d = self.d();
 
         // Single template literal argument with embedded newlines on the same line as `(` —
@@ -283,7 +289,7 @@ impl<'a> Printer<'a> {
         if let Some(doc) = try_hug_multiline_template_arg(
             self,
             callee_with_types,
-            new_expr.arguments,
+            arguments,
             paren_open,
             new_expr_span.end,
         ) {
@@ -310,7 +316,7 @@ impl<'a> Printer<'a> {
         // array collapses here rather than forcing the arguments out.
         if let Some(doc) = try_hook_deps_args_doc(
             self,
-            new_expr.arguments,
+            arguments,
             paren_open,
             new_expr_span.end,
             new_has_comments,
@@ -324,14 +330,14 @@ impl<'a> Printer<'a> {
         // forces `allArgsBrokenOut()`, ABOVE every specialized layout. See the twin in
         // `call_formatting.rs` for the full argument; the single-argument hug arms between here
         // and the first use are vacuously safe (a blank needs two arguments to sit between).
-        let any_arg_empty_line = any_arg_empty_line(new_expr.arguments, self);
+        let any_arg_empty_line = any_arg_empty_line(arguments, self);
 
         // Single huggable argument: object literal or function
         // These stay on the same line as the opening paren: `new Cls({...})` not `new Cls(\n{...})`
         // Skip hugging if there are trailing comments (line OR block) - let the comment handling below handle it
         let single_arg_has_trailing_comment = new_expr.arguments.len() == 1
             && new_has_comments
-            && has_trailing_comments_slice(new_expr.arguments, new_expr_span.end, self);
+            && has_trailing_comments_slice(arguments, new_expr_span.end, self);
 
         // A comment in the `(`→argument gap that this expression would have to EMIT
         // disqualifies the whole single-argument block below: none of its arms has a
@@ -352,10 +358,16 @@ impl<'a> Printer<'a> {
         // same bytes the hug rendered — expanded when the argument breaks.
         let single_arg_leading_emit_comment = new_expr.arguments.len() == 1
             && new_has_comments
-            && self.has_comments_to_emit_between(paren_open, new_expr.arguments[0].span().start);
+            && self.has_comments_to_emit_between(
+                paren_open,
+                self.view.expr(arguments[0]).span().start,
+            );
         let single_arg_leading_on_page_comment = new_expr.arguments.len() == 1
             && new_has_comments
-            && self.has_comments_on_page_between(paren_open, new_expr.arguments[0].span().start);
+            && self.has_comments_on_page_between(
+                paren_open,
+                self.view.expr(arguments[0]).span().start,
+            );
 
         if new_expr.arguments.len() == 1
             && !single_arg_has_trailing_comment
@@ -373,7 +385,7 @@ impl<'a> Printer<'a> {
             // an OWNED comment before the arrow (glued `/* l */`, a JSDoc) is not to emit, so
             // the guard above passes it, yet it still breaks the argument out — the plain
             // call's leading-comment branch returns before its hoist for the same reason.
-            let arg0 = new_expr.arguments[0];
+            let arg0 = self.view.expr(arguments[0]);
             if new_has_comments
                 && !single_arg_leading_on_page_comment
                 && let ast::ExpressionKind::ArrowFunctionExpression(_) = &arg0.kind
@@ -389,7 +401,7 @@ impl<'a> Printer<'a> {
                 );
             }
 
-            match &new_expr.arguments[0] {
+            match self.view.expr(arguments[0]) {
                 // Object / array container argument, cast or not: the shared hug, which also
                 // owns the truly-empty softline case ([`build_single_container_arg_doc`]). An
                 // on-page leading comment declines it (see the guard's comment above);
@@ -407,7 +419,7 @@ impl<'a> Printer<'a> {
                     kind: ast::ExpressionKind::FunctionExpression(_),
                     ..
                 } if !single_arg_leading_on_page_comment => {
-                    let arg_doc = self.build_expression_doc(new_expr.arguments[0]);
+                    let arg_doc = self.build_expression_doc(self.view.expr(arguments[0]));
                     return ArgOpener::callee(d, callee_with_types)
                         .lone_hug_ladder(d, arg_doc, false);
                 }
@@ -415,13 +427,13 @@ impl<'a> Printer<'a> {
                 ast::Expression {
                     kind: ast::ExpressionKind::ArrowFunctionExpression(arrow),
                     ..
-                } if !arrow.body.is_expression() || could_expand_arrow_chain(arrow) => {
-                    let arg0 = &new_expr.arguments[0];
-                    let build = || self.build_expression_doc(arg0);
+                } if !arrow.body.is_expression() || could_expand_arrow_chain(self.view, arrow) => {
+                    let arg0 = &arguments[0];
+                    let build = || self.build_expression_doc(self.view.expr(*arg0));
 
                     // Prepend leading comments (e.g., /** @param {any} x */ before arrow)
                     // and force wrapped state when present (prettier expands args with leading comments)
-                    let arg_start = new_expr.arguments[0].span().start;
+                    let arg_start = self.view.expr(arguments[0]).span().start;
                     // Glued like the regular-call leading-arg paths (prettier shares
                     // one `printCallArguments` for Call and New): a single-line block
                     // hugged to `(` stays with the argument across a source newline.
@@ -441,7 +453,7 @@ impl<'a> Printer<'a> {
                     // A signature that will break, or a leading comment, forces the wrapped
                     // state.
                     let signature_refuses =
-                        arrow_signature_refuses_hug(self, arrow, new_expr.arguments[0].span);
+                        arrow_signature_refuses_hug(self, arrow, self.view.expr(arguments[0]).span);
 
                     // ⚠️ Both refusals are asked BEFORE the printing pair below and read only
                     // the `printedArguments` one — the pair is a second build of the argument
@@ -457,7 +469,7 @@ impl<'a> Printer<'a> {
                         let printed = prepend_leading(
                             d,
                             glued,
-                            build_arrow_hug_printed_doc(self, arg0, arrow, build),
+                            build_arrow_hug_printed_doc(self, self.view.expr(*arg0), arrow, build),
                         );
                         return wrap_call_with_will_break_guard(d, callee_with_types, printed);
                     }
@@ -471,7 +483,7 @@ impl<'a> Printer<'a> {
                     return build_single_arrow_hug_doc(
                         self,
                         ArgOpener::callee(d, callee_with_types),
-                        arg0,
+                        self.view.expr(*arg0),
                         arrow,
                         glued,
                         build,
@@ -493,19 +505,24 @@ impl<'a> Printer<'a> {
                         // signature, or a comment on the body's own tail, either of which
                         // these states cannot honor (`arrow_hug_refused_by_comments`) — and a
                         // signature that will break, which every state prints flattened.
-                        if is_ternary_arrow_body(body_expr)
+                        if is_ternary_arrow_body(self.view.expr(*body_expr))
                             && !(new_has_comments
                                 && arrow_hug_refused_by_comments(
                                     self,
                                     arrow,
-                                    new_expr.arguments[0].span,
-                                    body_expr,
+                                    self.view.expr(arguments[0]).span,
+                                    self.view.expr(*body_expr),
                                 ))
-                            && !arrow_signature_refuses_hug(self, arrow, new_expr.arguments[0].span)
+                            && !arrow_signature_refuses_hug(
+                                self,
+                                arrow,
+                                self.view.expr(arguments[0]).span,
+                            )
                         {
                             let sig_doc =
-                                build_arrow_sig_doc(self, arrow, new_expr.arguments[0].span);
-                            let body_doc = self.build_arrow_arg_body_doc(body_expr);
+                                build_arrow_sig_doc(self, arrow, self.view.expr(arguments[0]).span);
+                            let body_doc =
+                                self.build_arrow_arg_body_doc(self.view.expr(*body_expr));
 
                             // The ladder, shared with the plain call's
                             // `build_ternary_arrow_hug_states` and the member chain's arm.
@@ -513,34 +530,34 @@ impl<'a> Printer<'a> {
                                 self,
                                 ArgOpener::callee(d, callee_with_types),
                                 arrow,
-                                body_expr,
+                                self.view.expr(*body_expr),
                                 sig_doc,
                                 body_doc,
-                                || self.build_expression_doc(new_expr.arguments[0]),
+                                || self.build_expression_doc(self.view.expr(arguments[0])),
                             );
                         }
 
                         // Call body: the expand-last ladder (hug, break at `=>`, break out)
                         // couldExpandArg keys on the body type, looking through the
                         // return-type annotation and a trailing non-null `!`.
-                        if arrow_body_is_call_through_non_null(body_expr)
+                        if arrow_body_is_call_through_non_null(self.view, self.view.expr(*body_expr))
                             // Same refusal pair as the ternary arm above.
                             && !(new_has_comments
-                                && arrow_hug_refused_by_comments(self, arrow, new_expr.arguments[0].span, body_expr))
+                                && arrow_hug_refused_by_comments(self, arrow, self.view.expr(arguments[0]).span, self.view.expr(*body_expr)))
                             // The body is built once and shared by every state (see the
                             // ladder's doc) — last, because it builds.
                             && let Some(body_reuse) =
-                                prebuild_expand_last_break_body(self, Some(new_expr.arguments[0]))
+                                prebuild_expand_last_break_body(self, Some(self.view.expr(arguments[0])))
                         {
-                            let arg0 = new_expr.arguments[0];
+                            let arg0 = arguments[0];
                             return build_arrow_call_body_states(
                                 self,
                                 ArgOpener::callee(d, callee_with_types),
-                                arg0,
+                                self.view.expr(arg0),
                                 arrow,
-                                body_expr,
+                                self.view.expr(*body_expr),
                                 body_reuse,
-                                || self.build_expression_doc(arg0),
+                                || self.build_expression_doc(self.view.expr(arg0)),
                             );
                         }
                     }
@@ -562,7 +579,7 @@ impl<'a> Printer<'a> {
             return build_call_args_with_blank_lines(
                 self,
                 callee_with_types,
-                new_expr.arguments,
+                arguments,
                 paren_open,
                 new_expr_span.end,
             );
@@ -573,14 +590,14 @@ impl<'a> Printer<'a> {
         // e.g., new Cls(arr.map((x) => x), b) → new Cls(\n\t...,\n)
         // e.g., new Cls(() => a, () => b) → new Cls(\n\t...,\n)
         // Skip this path if there are trailing comments - let the comment handling paths handle it
-        if is_function_composition_args(new_expr.arguments)
+        if is_function_composition_args(self.view, arguments)
             && !(new_has_comments
-                && has_trailing_comments_slice(new_expr.arguments, new_expr_span.end, self))
+                && has_trailing_comments_slice(arguments, new_expr_span.end, self))
         {
             return build_call_args_expanded(
                 self,
                 ArgOpener::callee(d, callee_with_types),
-                new_expr.arguments,
+                arguments,
                 paren_open,
                 new_expr_span.end,
             );
@@ -601,18 +618,18 @@ impl<'a> Printer<'a> {
         // The first argument's own signature refusing the hug is asked last, behind the
         // shape test: it builds that signature.
         let expand_first_blocked = new_has_comments
-            && (has_trailing_line_comments_slice(new_expr.arguments, new_expr_span.end, self)
-                || first_arg_has_any_comments(new_expr.arguments, self, paren_open));
+            && (has_trailing_line_comments_slice(arguments, new_expr_span.end, self)
+                || first_arg_has_any_comments(arguments, self, paren_open));
         // One `printCallArguments` prints both spellings, so the layout is the plain call's
         // (`build_expand_first_arg_doc`), not a copy of it.
-        if should_expand_first_arg(self, new_expr.arguments)
+        if should_expand_first_arg(self, arguments)
             && !expand_first_blocked
-            && !first_arg_signature_refuses_expand_first(self, new_expr.arguments)
+            && !first_arg_signature_refuses_expand_first(self, arguments)
         {
             return build_expand_first_arg_doc(
                 self,
                 ArgOpener::callee(d, callee_with_types),
-                new_expr.arguments,
+                arguments,
                 paren_open,
                 new_expr_span.end,
             );
@@ -622,8 +639,7 @@ impl<'a> Printer<'a> {
         // Must check this BEFORE the "last arg is array/object" pattern below,
         // otherwise trailing comments on the last arg cause it to be hugged incorrectly.
         // e.g., new Class(arg1, // comment\n  arg2)
-        if new_has_comments
-            && has_trailing_line_comments_slice(new_expr.arguments, new_expr_span.end, self)
+        if new_has_comments && has_trailing_line_comments_slice(arguments, new_expr_span.end, self)
         {
             // The shared joined-argument builder owns every gap in the list — the
             // `(`→first-argument run (into `paren_line`), each inter-argument gap,
@@ -637,7 +653,7 @@ impl<'a> Printer<'a> {
             let mut paren_line = DocBuf::new();
             let arg_doc = build_args_joined_with_comments(
                 self,
-                new_expr.arguments,
+                arguments,
                 paren_open,
                 new_expr_span.end,
                 ArgsJoin::Hardline,
@@ -666,15 +682,19 @@ impl<'a> Printer<'a> {
         // interior) gates the per-argument scan off the comment-free path, like the
         // call/chain entry gates.
         let spread_paren_comments_expand =
-            new_has_comments && self.any_paren_interior_forces_expansion(new_expr.arguments);
+            new_has_comments && self.any_paren_interior_forces_expansion(arguments);
         let has_trailing_comments_no_gap_line = new_has_comments
-            && new_expr.arguments.last().is_some_and(|last_arg| {
-                let arg_end = last_arg.span().end;
-                let paren_close = new_expr_span.end;
-                (spread_paren_comments_expand
-                    || self.has_comments_to_emit_between(arg_end, paren_close))
-                    && !self.has_line_comments_between(arg_end, paren_close)
-            });
+            && self
+                .view
+                .list(new_expr.arguments)
+                .last()
+                .is_some_and(|last_arg| {
+                    let arg_end = self.view.expr(*last_arg).span().end;
+                    let paren_close = new_expr_span.end;
+                    (spread_paren_comments_expand
+                        || self.has_comments_to_emit_between(arg_end, paren_close))
+                        && !self.has_line_comments_between(arg_end, paren_close)
+                });
 
         if has_trailing_comments_no_gap_line {
             // The shared joined-argument builder owns every gap in the list — the
@@ -684,7 +704,7 @@ impl<'a> Printer<'a> {
             // commas, so it had no inter-argument emitter at all: a comment between two
             // arguments was DROPPED whenever the argument itself didn't own it (the
             // hazard-4 shape in docs/comments.md).
-            let last_arg = &new_expr.arguments[new_expr.arguments.len() - 1];
+            let last_arg = self.view.expr(arguments[new_expr.arguments.len() - 1]);
             let arg_end = last_arg.span().end;
             let paren_close = new_expr_span.end;
 
@@ -693,9 +713,12 @@ impl<'a> Printer<'a> {
             // so the argument list must hard-break around it. So must a `(`-line run,
             // which ends in a `//` nothing may share a line with; asked here rather than
             // read off `paren_line` afterwards, since the join is chosen before the build.
-            let paren_line_run =
-                PartitionedComments::new(self, paren_open, new_expr.arguments[0].span().start)
-                    .has_trailing_line();
+            let paren_line_run = PartitionedComments::new(
+                self,
+                paren_open,
+                self.view.expr(arguments[0]).span().start,
+            )
+            .has_trailing_line();
             // The last-argument arm reads own-line-ness from the SOURCE
             // ([`Printer::has_own_line_block_comment_before_closer`]), the same predicate
             // the call and parameter lists ask of this position: the gap holds the list's
@@ -704,13 +727,13 @@ impl<'a> Printer<'a> {
             // fits (`docs/comments.md` §Own-line-ness is a SOURCE question).
             let hard = paren_line_run
                 || spread_paren_comments_expand
-                || is_function_composition_args(new_expr.arguments)
+                || is_function_composition_args(self.view, arguments)
                 || self.has_own_line_block_comment_before_closer(arg_end, paren_close);
 
             let mut paren_line = DocBuf::new();
             let arg_parts = build_args_joined_with_comments(
                 self,
-                new_expr.arguments,
+                arguments,
                 paren_open,
                 paren_close,
                 if hard {
@@ -737,7 +760,7 @@ impl<'a> Printer<'a> {
         // paths above, which own the gaps these states cannot express.
         if let Some(doc) = try_expand_last_arg(
             self,
-            new_expr.arguments,
+            arguments,
             callee_with_types,
             paren_open,
             new_expr_span.end,
@@ -751,9 +774,12 @@ impl<'a> Printer<'a> {
         // These need explicit handling that the simple join_doc path doesn't provide
         let has_leading_comments = new_has_comments
             && !new_expr.arguments.is_empty()
-            && self.has_comments_to_emit_between(paren_open, new_expr.arguments[0].span().start);
+            && self.has_comments_to_emit_between(
+                paren_open,
+                self.view.expr(arguments[0]).span().start,
+            );
         let has_inter_arg_comments =
-            new_has_comments && has_inter_argument_comments_slice(new_expr.arguments, self);
+            new_has_comments && has_inter_argument_comments_slice(arguments, self);
 
         // Comments trailing the `(` on the same line stay on the `(` line, with
         // own-line comments on their own lines before the first arg — preserving
@@ -762,7 +788,7 @@ impl<'a> Printer<'a> {
         // before `(`). Also content-preserving: a line comment trailing `(` is
         // kept. See conformance_prettier_ts_comments.md §Comment relocation.
         if has_leading_comments {
-            let first_arg_start = new_expr.arguments[0].span().start;
+            let first_arg_start = self.view.expr(arguments[0]).span().start;
             let gap_pc = PartitionedComments::new(self, paren_open, first_arg_start);
             if gap_pc.pulls_to_delimiter_line(self) {
                 let mut paren_line_prefix = DocBuf::new();
@@ -774,7 +800,7 @@ impl<'a> Printer<'a> {
                 let mut unused_paren_line = DocBuf::new();
                 inner.push(build_args_joined_with_comments(
                     self,
-                    new_expr.arguments,
+                    arguments,
                     paren_open,
                     new_expr_span.end,
                     ArgsJoin::HardlineLeadingGapEmitted,
@@ -797,7 +823,7 @@ impl<'a> Printer<'a> {
             let mut paren_line = DocBuf::new();
             let arg_parts = build_args_joined_with_comments(
                 self,
-                new_expr.arguments,
+                arguments,
                 paren_open,
                 new_expr_span.end,
                 ArgsJoin::SoftLine,
@@ -822,8 +848,10 @@ impl<'a> Printer<'a> {
         // with no `expandLastArg` (`build_printed_argument_doc`), exactly as the plain call's
         // twin does.
         let arg_parts = d.join_doc(
-            new_expr.arguments.iter().map(|arg| {
-                build_printed_argument_doc(self, arg, || self.build_arg_expression_doc(arg))
+            arguments.iter().map(|arg| {
+                build_printed_argument_doc(self, self.view.expr(*arg), || {
+                    self.build_arg_expression_doc(self.view.expr(*arg))
+                })
             }),
             d.comma_line(),
         );
@@ -864,8 +892,9 @@ impl<'a> Printer<'a> {
     /// harmless redundancy.
     pub(in crate::printer) fn new_callee_holds_bare_call(
         &self,
-        mut callee: &ast::Expression<'_>,
+        callee: &ast::Expression<'_>,
     ) -> bool {
+        let mut callee = callee;
         use ast::ExpressionKind as E;
         // A loop down the spine, not a recursion: a chain is as long as the spine limit lets
         // it be, and a frame per link is what the stack contract prices
@@ -873,48 +902,56 @@ impl<'a> Printer<'a> {
             let (holds, next) = match &callee.kind {
                 E::CallExpression(_) | E::ImportExpression(_) => return true,
                 E::MemberExpression(member) => (
-                    !self.needs_parens(member.object, ParenContext::ChainBase)
+                    !self.needs_parens(self.view.expr(member.object), ParenContext::ChainBase)
                         && !child_stops_optional_chain(
+                            self.view,
                             callee.span.start,
                             member.optional,
-                            member.object,
+                            self.view.expr(member.object),
                         ),
                     member.object,
                 ),
                 E::TSNonNullExpression(non_null) => (
-                    !self.needs_parens(non_null.expression, ParenContext::NonNull)
-                        && !non_null.seals_optional_chain(callee.span),
+                    !self.needs_parens(self.view.expr(non_null.expression), ParenContext::NonNull)
+                        && !non_null.seals_optional_chain(self.view, callee.span),
                     non_null.expression,
                 ),
                 E::TaggedTemplateExpression(tagged) => {
                     let list = tagged.type_arguments.as_ref();
-                    let keeps_pair = self.needs_parens(tagged.tag, ParenContext::TaggedTemplateTag)
-                        || tag_paren_leading_start(tagged, callee.span).is_some()
-                        || tagged.tag.is_sealing_non_null()
+                    let keeps_pair = self
+                        .needs_parens(self.view.expr(tagged.tag), ParenContext::TaggedTemplateTag)
+                        || tag_paren_leading_start(self.view, tagged, callee.span).is_some()
+                        || self.view.expr(tagged.tag).is_sealing_non_null(self.view)
                         || list.is_some_and(|_| {
                             instantiation_keeps_pair_before_type_args(
+                                self.view,
                                 self.source,
-                                tagged.tag,
+                                self.view.expr(tagged.tag),
                                 SecondTypeArgs::Expression,
                             )
                         });
                     (!keeps_pair, tagged.tag)
                 }
                 E::TSInstantiationExpression(inst) => {
-                    let operand = inst.expression;
+                    let operand = self.view.expr(inst.expression);
                     let second_list_pair = instantiation_keeps_pair_before_type_args(
+                        self.view,
                         self.source,
                         operand,
                         SecondTypeArgs::Expression,
                     );
                     let source_pair = second_list_pair
-                        || instantiation_operand_is_sealed_chain(callee.span.start, operand);
+                        || instantiation_operand_is_sealed_chain(
+                            self.view,
+                            callee.span.start,
+                            operand,
+                        );
                     (
                         !self.needs_parens(
                             operand,
                             ParenContext::InstantiationExpression { source_pair },
                         ),
-                        operand,
+                        inst.expression,
                     )
                 }
                 _ => return false,
@@ -922,7 +959,7 @@ impl<'a> Printer<'a> {
             if !holds {
                 return false;
             }
-            callee = next;
+            callee = self.view.expr(next);
         }
     }
 }

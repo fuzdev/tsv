@@ -252,7 +252,7 @@ fn position(point: tsv_ts::WirePoint) -> PlainObject {
     position
 }
 
-/// Strip the types from TypeScript `source` (`tsv_ts::__private::strip_in`): the JS, every
+/// Strip the types from TypeScript `source` (`tsv_ts::__private::strip_into`): the JS, every
 /// type-only range blanked to whitespace so every surviving character keeps its line and
 /// UTF-16 column. The source type is read as `format_typescript` reads it: omitted, the
 /// module grammar retried as a script; set, exact.
@@ -266,26 +266,28 @@ fn position(point: tsv_ts::WirePoint) -> PlainObject {
 pub fn strip_typescript(source: &str, source_type: JsValue) -> Result<JsValue, JsValue> {
     let goal =
         wasm_source_type(SourceTypeArg::read(&source_type), true, Family::Strip).map_err(err)?;
-    tsv_arena::with_ast_arena(
-        |arena| match tsv_ts::__private::strip_in(source, goal, arena) {
-            Ok(stripped) => Ok(JsValue::from_str(&stripped.code)),
-            Err(tsv_ts::StripError::Parse(e)) => parse_failure(&e).into_return(),
-            // a refusal always reports; the `None` arm is unreachable, thrown with its message
-            Err(tsv_ts::StripError::Unsupported {
-                construct, error, ..
-            }) => match error.to_report() {
-                Some(report) => Ok(failure_result(
-                    "unsupported",
-                    Some(construct.as_str()),
-                    &report,
-                )),
-                None => Err(err(format!("{error:#}"))),
-            },
-            // `StripError` is `#[non_exhaustive]`: a failure this binding does not know yet is
-            // thrown with its message rather than given a `kind` the facade does not declare
-            Err(other) => Err(err(format!("{other:#}"))),
-        },
-    )
+    tsv_arena::with_ast_arena(|arena| {
+        tsv_ts::__private::with_stores(|stores| {
+            match tsv_ts::__private::strip_into(source, goal, arena, stores) {
+                Ok(stripped) => Ok(JsValue::from_str(&stripped.code)),
+                Err(tsv_ts::StripError::Parse(e)) => parse_failure(&e).into_return(),
+                // a refusal always reports; the `None` arm is unreachable, thrown with its message
+                Err(tsv_ts::StripError::Unsupported {
+                    construct, error, ..
+                }) => match error.to_report() {
+                    Some(report) => Ok(failure_result(
+                        "unsupported",
+                        Some(construct.as_str()),
+                        &report,
+                    )),
+                    None => Err(err(format!("{error:#}"))),
+                },
+                // `StripError` is `#[non_exhaustive]`: a failure this binding does not know yet is
+                // thrown with its message rather than given a `kind` the facade does not declare
+                Err(other) => Err(err(format!("{other:#}"))),
+            }
+        })
+    })
 }
 
 /// The import records of TypeScript `source` (`tsv_ts::parse_imports`), as a JSON string
@@ -613,7 +615,7 @@ impl SourceTypeArg {
 /// What an unset one means is the caller's: a parse reads it as `Module` (its wire's
 /// `Program.sourceType` is a claim one settled grammar has to produce), a format or the
 /// strip as "none named" — the module grammar retried as a script
-/// (`tsv_ts::__private::parse_with_goal_or_fallback`).
+/// (`tsv_ts::__private::parse_with_goal_or_fallback_into`).
 #[cfg(feature = "_internal_exports")]
 fn wasm_source_type(
     source_type: SourceTypeArg,
@@ -644,7 +646,7 @@ fn wasm_source_type(
 /// how the parse ended without one: `Result<String, Failure>`.
 #[cfg(feature = "parse")]
 macro_rules! wire_json {
-    ($goalness:ident, $lang:ident, $source:expr, $source_type:expr) => {
+    ($goalness:ident, $storeness:ident, $lang:ident, $source:expr, $source_type:expr) => {
         wasm_source_type(
             SourceTypeArg::read(&$source_type),
             goal_allowed!($goalness),
@@ -654,6 +656,7 @@ macro_rules! wire_json {
         .and_then(|goal| {
             parse_convert!(
                 $goalness,
+                $storeness,
                 $lang,
                 convert_ast_json_string,
                 $source,
@@ -683,6 +686,7 @@ macro_rules! wire_json {
 macro_rules! lang_bindings {
     (
         $goalness:ident,
+        $storeness:ident,
         $parse_fn:ident,
         $parse_json_fn:ident,
         $parse_internal_fn:ident,
@@ -695,7 +699,7 @@ macro_rules! lang_bindings {
         #[cfg(feature = "parse")]
         #[wasm_bindgen]
         pub fn $parse_fn(source: &str, source_type: JsValue) -> Result<JsValue, JsValue> {
-            let json = match wire_json!($goalness, $lang, source, source_type) {
+            let json = match wire_json!($goalness, $storeness, $lang, source, source_type) {
                 Ok(json) => json,
                 Err(failure) => return failure.into_return(),
             };
@@ -714,7 +718,7 @@ macro_rules! lang_bindings {
         #[cfg(feature = "parse")]
         #[wasm_bindgen]
         pub fn $parse_json_fn(source: &str, source_type: JsValue) -> Result<JsValue, JsValue> {
-            match wire_json!($goalness, $lang, source, source_type) {
+            match wire_json!($goalness, $storeness, $lang, source, source_type) {
                 Ok(json) => Ok(JsValue::from(json)),
                 Err(failure) => failure.into_return(),
             }
@@ -732,7 +736,7 @@ macro_rules! lang_bindings {
             )
             .map_err(err)?;
             let parsed: Result<(), Failure> =
-                parse_internal!($goalness, $lang, source, goal, |e: Error| {
+                parse_internal!($goalness, $storeness, $lang, source, goal, |e: Error| {
                     parse_failure(&e)
                 });
             match parsed {
@@ -754,7 +758,7 @@ macro_rules! lang_bindings {
             )
             .map_err(err)?;
             let formatted: Result<String, Failure> =
-                parse_format!($goalness, $lang, source, goal, |e: Error| {
+                parse_format!($goalness, $storeness, $lang, source, goal, |e: Error| {
                     parse_failure(&e)
                 });
             match formatted {
@@ -767,6 +771,7 @@ macro_rules! lang_bindings {
 
 lang_bindings!(
     nogoal,
+    stores,
     parse_svelte,
     parse_svelte_json,
     parse_internal_svelte,
@@ -775,6 +780,7 @@ lang_bindings!(
 );
 lang_bindings!(
     goal,
+    stores,
     parse_typescript,
     parse_typescript_json,
     parse_internal_typescript,
@@ -783,6 +789,7 @@ lang_bindings!(
 );
 lang_bindings!(
     nogoal,
+    nostores,
     parse_css,
     parse_css_json,
     parse_internal_css,

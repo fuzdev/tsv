@@ -45,8 +45,8 @@ const EVERY = ['cli', 'napi', 'ffi'] as const;
 
 /**
  * The functions a trained profile must carry real counts on, by demangled path: the doc
- * renderer every format walks, each language's two parse entries — `parse_folded` (the
- * parse a format runs) and the parse the wire-JSON path runs — the type strip, and the
+ * renderer every format walks, each language's two parse entries — `parse_folded_into`, or
+ * `parse_folded` where a language has no stores (the parse a format runs) and the parse the wire-JSON path runs — the type strip, and the
  * import records' entries. A profile that misses any of them trained nothing that
  * matters, however many records it holds: "zero hash mismatches" passes VACUOUSLY on an
  * empty profile, since every function then reads as missing rather than mismatched. Each
@@ -55,15 +55,18 @@ const EVERY = ['cli', 'napi', 'ffi'] as const;
  */
 export const HOT_FUNCTIONS: readonly HotFunction[] = [
 	{ path: 'tsv_lang::doc::arena_render::render_doc_iterative', per: 'files', worlds: EVERY },
-	{ path: 'tsv_ts::__private::parse_with_goal', per: 'typescript', worlds: EVERY },
-	{ path: 'tsv_ts::__private::parse_folded', per: 'typescript', worlds: EVERY },
-	{ path: 'tsv_svelte::__private::parse', per: 'svelte', worlds: EVERY },
-	{ path: 'tsv_svelte::__private::parse_folded', per: 'svelte', worlds: EVERY },
+	{ path: 'tsv_ts::__private::parse_with_goal', per: 'typescript', worlds: ['cli'] },
+	{ path: 'tsv_ts::__private::parse_with_goal_into', per: 'typescript', worlds: ['napi', 'ffi'] },
+	{ path: 'tsv_ts::__private::parse_folded_into', per: 'typescript', worlds: EVERY },
+	{ path: 'tsv_svelte::__private::parse', per: 'svelte', worlds: ['cli'] },
+	{ path: 'tsv_svelte::__private::parse_into', per: 'svelte', worlds: ['napi', 'ffi'] },
+	{ path: 'tsv_svelte::__private::parse_folded_into', per: 'svelte', worlds: EVERY },
 	{ path: 'tsv_css::__private::parse', per: 'css', worlds: EVERY },
 	{ path: 'tsv_css::__private::parse_folded', per: 'css', worlds: EVERY },
-	{ path: 'tsv_ts::strip::strip_in', per: 'strip', worlds: ['cli', 'napi'] },
-	{ path: 'tsv_ts::imports::parse_imports_in', per: 'imports_typescript', worlds: ['napi'] },
-	{ path: 'tsv_svelte::__private::parse_imports_in', per: 'imports_svelte', worlds: ['napi'] }
+	{ path: 'tsv_ts::strip::strip_in', per: 'strip', worlds: ['cli'] },
+	{ path: 'tsv_ts::strip::strip_into', per: 'strip', worlds: ['napi'] },
+	{ path: 'tsv_ts::imports::parse_imports_into', per: 'imports_typescript', worlds: ['napi'] },
+	{ path: 'tsv_svelte::__private::parse_imports_into', per: 'imports_svelte', worlds: ['napi'] }
 ];
 
 /**

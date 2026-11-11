@@ -259,7 +259,7 @@ impl<'a> Printer<'a> {
         let (mut parts, paren_end) = self.build_paren_condition_head(
             "if",
             span.start,
-            stmt.test,
+            self.view.expr(stmt.test),
             HeadChainGrouping::ParenGroupDrives,
         );
         // The consequent is always one `adjustClause` indent in, and an `else`
@@ -386,9 +386,11 @@ mod tests {
         // end for an `e` at index 0) falls inside the em-dash.
         let source = "ex—";
         let arena = DocArena::new();
+        let stores = ast::AstStores::new();
         let inputs = PrinterInputs {
             source,
             comments: &[],
+            view: stores.view(),
             line_table: tsv_lang::printing::LineTable::EMPTY,
             has_owned_comments: false,
             has_format_ignore: false,

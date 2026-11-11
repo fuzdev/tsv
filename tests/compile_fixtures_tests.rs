@@ -16,6 +16,7 @@
 //! Oracle freshness (does the canonical Svelte compiler still produce these
 //! expectations?) is sidecar-dependent and lives in the
 //! `compile_fixtures_validate` command instead.
+#![cfg(tsv_unported)]
 
 use std::path::Path;
 use tsv_debug::compile_fixtures::{

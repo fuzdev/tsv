@@ -62,11 +62,11 @@ use types::{write_type_annotation, write_type_parameter_instantiation};
 /// Byte-oriented boundaries (FFI, the CLI's stdout) take the bytes as-is; `&str`
 /// boundaries (`convert_ast_json_string` → WASM/N-API) pay the one validation at
 /// the edge.
-pub(crate) fn write_program_bytes(program: &ast::Program<'_>, source: &str, wire: Wire) -> Vec<u8> {
+pub(crate) fn write_program_bytes(parsed: ast::ParsedRef<'_>, source: &str, wire: Wire) -> Vec<u8> {
     let tables = WireTables::new(source, crate::WIRE_COORDINATES, wire);
-    let ctx = Ctx::new(source, tables.positions(), CommentMode::Off);
+    let ctx = Ctx::new(source, tables.positions(), CommentMode::Off, parsed.view);
     let mut w = JsonWriter::with_capacity(tsv_lang::estimated_json_capacity(source.len(), wire));
-    write_program(&mut w, program, &ctx);
+    write_program(&mut w, parsed.program, &ctx);
     w.into_bytes()
 }
 
@@ -262,6 +262,8 @@ impl CommentMode<'_> {
 pub struct EmbedWriter<'a> {
     pub source: &'a str,
     pub positions: WirePositions<'a>,
+    /// Reads the expressions of the tree being written.
+    pub view: ast::ExprView<'a>,
     pub comments: CommentMode<'a>,
     /// The canonical parser for this document — see `Ctx::vanilla_acorn`. It is
     /// component-global, so an island carries the same variant as the
@@ -281,6 +283,8 @@ pub struct EmbedWriter<'a> {
 pub(super) struct Ctx<'a> {
     pub(super) source: &'a str,
     pub(super) positions: WirePositions<'a>,
+    /// Reads the expressions of the tree being written.
+    pub(super) view: ast::ExprView<'a>,
     /// The span of a Svelte block pattern's **top-level** `TSTypeAnnotation` — the
     /// one Svelte reads with a *second* acorn parse (`read_type_annotation`'s `_ as `
     /// trick), which therefore emits under `annotation_comments`.
@@ -325,10 +329,16 @@ impl<'a> Ctx<'a> {
     /// waiting to be inherited by the next caller, which is exactly how the
     /// embedded path shipped `vanilla_acorn: false` to every expression island.
     #[inline]
-    fn new(source: &'a str, positions: WirePositions<'a>, comments: CommentMode<'a>) -> Self {
+    fn new(
+        source: &'a str,
+        positions: WirePositions<'a>,
+        comments: CommentMode<'a>,
+        view: ast::ExprView<'a>,
+    ) -> Self {
         Ctx {
             source,
             positions,
+            view,
             pattern_ann_span: Span::new(u32::MAX, u32::MAX),
             comments,
             vanilla_acorn: false,
@@ -346,6 +356,7 @@ impl<'a> Ctx<'a> {
         Ctx {
             source: env.source,
             positions: env.positions,
+            view: env.view,
             pattern_ann_span: Span::new(u32::MAX, u32::MAX),
             comments: env.comments,
             vanilla_acorn: env.vanilla_acorn,
@@ -1101,21 +1112,25 @@ mod tests {
         emit: impl FnOnce(&mut JsonWriter, &Ctx<'_>),
     ) -> String {
         let tables = WireTables::new(source, crate::WIRE_COORDINATES, wire);
-        let ctx = Ctx::new(source, tables.positions(), comments);
+        let stores = ast::AstStores::new();
+        let ctx = Ctx::new(source, tables.positions(), comments, stores.view());
         let mut w = JsonWriter::with_capacity(0);
         emit(&mut w, &ctx);
         String::from_utf8(w.into_bytes()).expect("the wire is UTF-8")
     }
 
     /// The sole statement of `source` as the `Identifier` its expression is.
-    fn sole_identifier<'a>(program: &'a ast::Program<'a>) -> &'a ast::Identifier<'a> {
+    fn sole_identifier<'a>(
+        view: ast::ExprView<'a>,
+        program: &'a ast::Program<'a>,
+    ) -> &'a ast::Identifier<'a> {
         let [statement] = program.body else {
             panic!("one statement expected");
         };
         let ast::StatementKind::ExpressionStatement(statement) = &statement.kind else {
             panic!("an expression statement expected");
         };
-        let ast::ExpressionKind::Identifier(id) = &statement.expression.kind else {
+        let ast::ExpressionKind::Identifier(id) = &view.expr(statement.expression).kind else {
             panic!("an identifier expected");
         };
         id
@@ -1195,7 +1210,7 @@ mod tests {
             let source = format!("\n  {written};\n");
             let arena = bumpalo::Bump::new();
             let program = crate::__private::parse(&source, &arena).expect("parses");
-            let id = sole_identifier(&program);
+            let id = sole_identifier(program.view(), &program);
             let end = 3 + written.encode_utf16().count();
             let column = end - 1;
             for &wire in WIRES {
@@ -1238,8 +1253,9 @@ mod tests {
             0,
             0,
             &arena,
+            &mut ast::AstStores::new(),
             "end of input",
-            |_| Ok(()),
+            |_, _| Ok(()),
         )
         .expect("parses");
         let ast::ExpressionKind::Identifier(id) = &expression.kind else {

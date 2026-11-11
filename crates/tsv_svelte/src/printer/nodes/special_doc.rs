@@ -338,7 +338,7 @@ impl<'a> Printer<'a> {
         let synthesized_this = match &element.kind {
             SpecialElementKind::SvelteElement { tag } => Some((
                 self.build_this_attr_doc_for_inline(tag),
-                tag.braces().unwrap_or_else(|| tag.span()),
+                tag.braces().unwrap_or_else(|| tag.span(self.view)),
             )),
             SpecialElementKind::SvelteComponent { expression } => {
                 Some((self.build_this_braced_doc(expression), expression.span))

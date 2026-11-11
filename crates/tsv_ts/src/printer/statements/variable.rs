@@ -228,7 +228,7 @@ impl<'a> Printer<'a> {
         // heads stack under the `=` as with no comment, except below a run the author gave
         // lines of its own and behind a preserved multi-line block, where the chain takes
         // its default shape.
-        let chain_breaks = is_curried_arrow_chain_that_breaks(init);
+        let chain_breaks = is_curried_arrow_chain_that_breaks(self.view, init);
         let chain_lead =
             chain_breaks.then(|| self.head_forced_chain_lead(init, rhs_comments_start));
         let build_value = &|| {
@@ -328,17 +328,25 @@ impl<'a> Printer<'a> {
         //   const fn: (
         //     x: number,
         //   ) => void = (x) => {};
-        let has_complex_type_annotation = self.id_has_complex_type_annotation(declarator.id);
-        let has_complex_destructuring = self.is_complex_destructuring_target(declarator.id);
+        let has_complex_type_annotation =
+            self.id_has_complex_type_annotation(self.view.expr(declarator.id));
+        let has_complex_destructuring =
+            self.is_complex_destructuring_target(self.view.expr(declarator.id));
         let is_arrow_with_breakable_left =
             matches!(init.kind, ExpressionKind::ArrowFunctionExpression(_)) && *can_break_left;
 
         // Calls and imports with trailing comments expand internally and should not use fluid layout
         let is_call_with_trailing_comments =
             if let ExpressionKind::CallExpression(call) = &init.kind {
-                call.arguments.last().is_some_and(|last_arg| {
-                    self.has_line_comments_between(last_arg.span().end, init.span.end)
-                })
+                self.view
+                    .list(call.arguments)
+                    .last()
+                    .is_some_and(|last_arg| {
+                        self.has_line_comments_between(
+                            self.view.expr(*last_arg).span().end,
+                            init.span.end,
+                        )
+                    })
             } else {
                 false
             };
@@ -416,7 +424,7 @@ impl<'a> Printer<'a> {
         // cancelling term here that `choose_layout` would lack. The string / poorly-
         // breakable pair is the twin's own `should_break_after_operator`, which asks it
         // of the value UNDER its wrappers (`!!chain`, `await chain`) as prettier does.
-        let should_break_after_op_rhs = is_module_path_fluid_call(init, self.source)
+        let should_break_after_op_rhs = is_module_path_fluid_call(self.view, init, self.source)
             || should_break_after_operator(init, self)
             // A SEQUENCE init breaks after the `=` and lays its operands out under
             // one indent, prettier's own `shouldBreakAfterOperator` switch arm —
@@ -441,12 +449,12 @@ impl<'a> Printer<'a> {
         // Prettier ref: `shouldBreakAfterOperator` (`print/assignment.js`) +
         // `shouldInlineLogicalExpression` (`print/binaryish.js`)
         let is_non_inline_binary = if let ExpressionKind::BinaryExpression(binary) = &init.kind {
-            !should_inline_logical_expression(binary)
+            !should_inline_logical_expression(self.view, binary)
         } else {
             false
         };
         let needs_break_after_op_layout =
-            is_non_inline_binary || conditional_should_break_after_op(init);
+            is_non_inline_binary || conditional_should_break_after_op(self.view, init);
 
         // The operator→value hang — prettier's `chooseLayout` fourth disjunct plus the
         // own-line JSDoc cast beside it, both in [`Printer::value_hangs_under_operator`],
@@ -502,8 +510,8 @@ impl<'a> Printer<'a> {
 
         // Type assertion calls with LHS type annotation need special fluid handling
         // (handled separately below because they need non-wrapping LHS type)
-        let is_type_assertion_with_lhs_type = is_type_assertion_call(init, self.source)
-            && matches!(&declarator.id.kind, ExpressionKind::Identifier(id) if id.type_annotation().is_some());
+        let is_type_assertion_with_lhs_type = is_type_assertion_call(self.view, init, self.source)
+            && matches!(&self.view.expr(declarator.id).kind, ExpressionKind::Identifier(id) if id.type_annotation().is_some());
 
         // Answered per declarator, exactly as prettier's `printAssignment` is: a
         // multi-declarator list does NOT withhold the width-decided break at `=` from its
@@ -573,7 +581,7 @@ impl<'a> Printer<'a> {
             parts.push(lhs_doc_with_comments(id_doc));
             parts.push(d.text(" ="));
             parts.push(hang_after_operator(d, make_init_doc(hung_value())));
-        } else if is_curried_arrow_chain(init) {
+        } else if is_curried_arrow_chain(self.view, init) {
             // Every other curried chain: fluid break after `=`. The chain's
             // signature heads break only when they don't fit on the operator
             // line; a hugging body otherwise expands in place. The context tells
@@ -598,7 +606,7 @@ impl<'a> Printer<'a> {
             // For complex type annotations, rebuild with wrapping type.
             // Complex destructuring and arrow with breakable left already have correct id_doc.
             if has_complex_type_annotation
-                && let ExpressionKind::Identifier(ident) = &declarator.id.kind
+                && let ExpressionKind::Identifier(ident) = &self.view.expr(declarator.id).kind
             {
                 parts.push(lhs_doc_with_comments(self.build_typed_identifier_doc(
                     ident,
@@ -626,7 +634,7 @@ impl<'a> Printer<'a> {
             // call under a typed binding, which rebuilds the LHS with a non-wrapping type
             // annotation. Every value-keyed fluid case is the default arm below.
             let fluid_id_doc = if is_type_assertion_with_lhs_type
-                && let ExpressionKind::Identifier(ident) = &declarator.id.kind
+                && let ExpressionKind::Identifier(ident) = &self.view.expr(declarator.id).kind
             {
                 self.build_typed_identifier_doc(
                     ident,
@@ -741,8 +749,12 @@ impl<'a> Printer<'a> {
         // And an assignment's value (`mark_assignment_value`) — the for-header declarator
         // marks this one itself too, for the same reason.
         self.mark_assignment_value(init);
-        let position_parens =
-            needs_parens(init, ParenContext::VariableInit, self.in_for_init.get());
+        let position_parens = needs_parens(
+            self.view,
+            init,
+            ParenContext::VariableInit,
+            self.in_for_init.get(),
+        );
         // A multi-line comment the value OWNS is claimed HERE, beneath the position's pair,
         // so it prints outside the operand's own group but inside the `(`…`)` the author
         // wrote it in (`const x = (/* c⏎d */ a = b)`); claimed by the gap seam above the
@@ -779,12 +791,12 @@ impl<'a> Printer<'a> {
         declarator: &ast::VariableDeclarator<'_>,
     ) -> Option<u32> {
         if !matches!(
-            declarator.init.map(|init| &init.kind),
+            declarator.init.map(|init| &self.view.expr(init).kind),
             Some(ExpressionKind::ArrowFunctionExpression(_))
         ) {
             return None;
         }
-        let ExpressionKind::Identifier(ident) = &declarator.id.kind else {
+        let ExpressionKind::Identifier(ident) = &self.view.expr(declarator.id).kind else {
             return None;
         };
         let args = match self.unwrap_redundant_parens(ident.type_annotation()?.type_annotation) {
@@ -1071,18 +1083,19 @@ impl<'a> Printer<'a> {
             let arrow_variable_args = self
                 .arrow_variable_type_args
                 .replace(self.arrow_variable_type_args_start(declarator));
-            let id_doc = self.build_variable_binding_doc(declarator.id, declarator.definite);
+            let id_doc =
+                self.build_variable_binding_doc(self.view.expr(declarator.id), declarator.definite);
             self.arrow_variable_type_args.set(arrow_variable_args);
 
             // Initializer with comment handling around =
-            if let Some(init) = &declarator.init {
-                let mut id_end = declarator.id.span().end;
+            if let Some(init) = self.view.opt(declarator.init) {
+                let mut id_end = self.view.expr(declarator.id).span().end;
                 let init_start = init.span().start;
                 // With definite assignment but no type annotation (`let a! = x`), the id
                 // span excludes the `!`; advance past it so comments between the name and
                 // `!` (already emitted inside the id doc) aren't re-emitted before `=`.
                 if declarator.definite
-                    && let ExpressionKind::Identifier(ident) = &declarator.id.kind
+                    && let ExpressionKind::Identifier(ident) = &self.view.expr(declarator.id).kind
                     && ident.type_annotation().is_none()
                     && let Some(bang_pos) =
                         self.find_char_outside_comments(id_end, init_start, b'!')

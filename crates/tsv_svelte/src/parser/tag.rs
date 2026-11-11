@@ -7,7 +7,7 @@ use crate::lexer::TokenKind;
 use crate::whitespace::is_svelte_ws;
 use tsv_lang::source_scan::TriviaProfile;
 use tsv_lang::{Error, Span};
-use tsv_ts::ast::{Expression, ExpressionKind};
+use tsv_ts::ast::{ExprView, Expression, ExpressionKind};
 
 use super::parser_impl::SvelteParser;
 use super::subslice_offset;
@@ -46,7 +46,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         &mut self,
         start: usize,
         keyword: &str,
-        host_check: impl Fn(&Self, &'arena Expression<'arena>) -> Result<(), Error>,
+        host_check: impl Fn(&Self, ExprView<'_>, &'arena Expression<'arena>) -> Result<(), Error>,
     ) -> Result<(&'arena Expression<'arena>, Span), Error> {
         let tag_content_start = self.current_end();
         let (tag_content, after_close) = self.scan_block_tag_content(tag_content_start)?;
@@ -71,7 +71,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
     /// Parse an html tag: {@html expression}
     fn parse_html_tag(&mut self, start: usize) -> Result<FragmentNode<'arena>, Error> {
-        let (expression, span) = self.parse_keyword_expression_tag(start, "html", |_, _| Ok(()))?;
+        let (expression, span) =
+            self.parse_keyword_expression_tag(start, "html", |_, _, _| Ok(()))?;
         Ok(FragmentNode::HtmlTag(HtmlTag { expression, span }))
     }
 
@@ -142,9 +143,10 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // second declarator `U` uninitialized and `><V>(x)` left over, which only the re-read
         // as acorn-typescript's call repairs.
         let close_brace = after_close - 1;
-        let statement = self.parse_ts_statement(tag_content, tag_content_start, |this, stmt| {
-            this.reject_declaration_tag_statement(stmt, tag_content_start, close_brace)
-        })?;
+        let statement =
+            self.parse_ts_statement(tag_content, tag_content_start, |this, _, stmt| {
+                this.reject_declaration_tag_statement(stmt, tag_content_start, close_brace)
+            })?;
         let tsv_ts::ast::StatementKind::VariableDeclaration(declaration) = statement.kind else {
             // Refused inside the parse; this arm only names the shape.
             return Err(self.error_not_a_declaration(tag_content_start));
@@ -248,7 +250,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // `f<T, U><V>(x)` is the sequence `f < T, U > <V>(x)`, which only the re-read as
         // acorn-typescript's call repairs (`parse_ts_expression_checked`).
         let init =
-            self.parse_ts_expression_checked(init_str, init_offset, "'}'", |this, init| {
+            self.parse_ts_expression_checked(init_str, init_offset, "'}'", |this, _, init| {
                 this.reject_multi_declarator(init, init_str, init_offset)
             })?;
         Ok((id, init))
@@ -377,7 +379,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                     // through the cast would drop its parens from the output
                     // (breaking idempotency and the cast's binding).
                     if let ExpressionKind::SequenceExpression(seq) =
-                        &expr.unwrap_comment_bound_pairs().kind
+                        &expr.unwrap_comment_bound_pairs(ExprView::of_parse()).kind
                     {
                         for element in seq.expressions {
                             self.require_debug_identifier(element)?;
@@ -415,7 +417,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// is an identifier to both parsers.
     fn require_debug_identifier(&self, expr: &Expression<'arena>) -> Result<(), Error> {
         if matches!(
-            expr.unwrap_comment_bound_pairs().kind,
+            expr.unwrap_comment_bound_pairs(ExprView::of_parse()).kind,
             ExpressionKind::Identifier(_)
         ) {
             Ok(())
@@ -449,9 +451,9 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // `{@render f<T, U><V>(x)}` — a sequence — is re-read as acorn-typescript's call
         // (`parse_ts_expression_checked`).
         let (expression, span) =
-            self.parse_keyword_expression_tag(start, "render", |this, expression| {
+            self.parse_keyword_expression_tag(start, "render", |this, view, expression| {
                 if matches!(
-                    expression.unwrap_comment_bound_pairs().kind,
+                    expression.unwrap_comment_bound_pairs(view).kind,
                     ExpressionKind::CallExpression(_)
                 ) {
                     Ok(())

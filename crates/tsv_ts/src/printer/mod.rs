@@ -305,6 +305,8 @@ pub(crate) struct Printer<'a> {
     pub(crate) source: &'a str,
     /// Comments from the program (for printing leading/trailing comments)
     pub(crate) comments: &'a [ast::Comment],
+    /// Reads the expressions of the tree being printed.
+    pub(crate) view: ast::ExprView<'a>,
     /// Whether any comment in this document is owned by a node (`owned_by_node`).
     /// Document-level presence flag (from `PrinterInputs`), computed once per document
     /// — never here, per that field's doc (the `.svelte` per-`{expr}` trap). Gates the
@@ -984,6 +986,7 @@ impl<'a> Printer<'a> {
             arena,
             source: inputs.source,
             comments: inputs.comments,
+            view: inputs.view,
             has_owned_comments: inputs.has_owned_comments,
             has_format_ignore: inputs.has_format_ignore,
             program_start: 0,
@@ -1271,25 +1274,35 @@ impl<'a> Printer<'a> {
         if is_in_binary(expr) {
             return true;
         }
-        let mut reaches = |child: &ast::Expression<'_>| {
+        let reaches = |child: &ast::Expression<'_>| {
             !self.frozen_slice_child_is_parenthesized(child, slice_end)
                 && self.frozen_slice_hands_header_a_bare_in(child, slice_end)
         };
         match &expr.kind {
-            E::SequenceExpression(seq) => seq.expressions.iter().copied().any(&mut reaches),
-            E::AssignmentExpression(assign) => reaches(assign.right),
-            E::BinaryExpression(binary) => reaches(binary.left) || reaches(binary.right),
-            E::ConditionalExpression(cond) => reaches(cond.test) || reaches(cond.alternate),
+            E::SequenceExpression(seq) => self
+                .view
+                .list(seq.expressions)
+                .iter()
+                .any(|e| reaches(self.view.expr(*e))),
+            E::AssignmentExpression(assign) => reaches(self.view.expr(assign.right)),
+            E::BinaryExpression(binary) => {
+                reaches(self.view.expr(binary.left)) || reaches(self.view.expr(binary.right))
+            }
+            E::ConditionalExpression(cond) => {
+                reaches(self.view.expr(cond.test)) || reaches(self.view.expr(cond.alternate))
+            }
             E::ArrowFunctionExpression(arrow) => match &arrow.body {
-                ast::ArrowFunctionBody::Expression(body) => reaches(body),
+                ast::ArrowFunctionBody::Expression(body) => reaches(self.view.expr(*body)),
                 ast::ArrowFunctionBody::BlockStatement(_) => false,
             },
             // `yield AssignmentExpression[?In]`, `yield*` alike; a bare `yield` has none.
-            E::YieldExpression(yield_expr) => yield_expr.argument.is_some_and(reaches),
+            E::YieldExpression(yield_expr) => {
+                self.view.opt(yield_expr.argument).is_some_and(reaches)
+            }
             // `'a' in b as T` parses as a cast OVER the binary, so the `in` is the cast's
             // operand rather than the root.
-            E::TSAsExpression(cast) => reaches(cast.expression),
-            E::TSSatisfiesExpression(cast) => reaches(cast.expression),
+            E::TSAsExpression(cast) => reaches(self.view.expr(cast.expression)),
+            E::TSSatisfiesExpression(cast) => reaches(self.view.expr(cast.expression)),
             _ => false,
         }
     }
@@ -1320,7 +1333,7 @@ impl<'a> Printer<'a> {
     /// ([`Self::region_keeps_authored_pair`]).
     #[inline]
     pub(crate) fn needs_parens(&self, expr: &ast::Expression<'_>, ctx: ParenContext) -> bool {
-        (needs_parens(expr, ctx, self.in_for_init.get())
+        (needs_parens(self.view, expr, ctx, self.in_for_init.get())
             && !self.clarity_pair_is_withheld(expr, ctx)
             && !self.region_withholds_assignment_pair(expr, ctx))
             || ((self.has_relational_sibling_pairs.get() || self.has_region_source_marks.get())
@@ -1413,10 +1426,12 @@ impl<'a> Printer<'a> {
     /// comparison behind an open `<` region is the rare one.
     #[cold]
     fn record_withheld_clarity_pairs(&self, close: &ast::BinaryExpression<'_>) {
-        let withheld =
-            clarity_pairs_behind_region_close(close, self.in_for_init.get(), |operand| {
-                self.source_holds_pair_around(operand)
-            });
+        let withheld = clarity_pairs_behind_region_close(
+            self.view,
+            close,
+            self.in_for_init.get(),
+            |operand| self.source_holds_pair_around(operand),
+        );
         for span in withheld {
             self.withheld_clarity_pair_targets.mark(span);
         }
@@ -1489,7 +1504,7 @@ impl<'a> Printer<'a> {
         head: &ast::Expression<'_>,
         follow: SecondTypeArgs,
     ) -> bool {
-        instantiation_keeps_pair_before_type_args(self.source, head, follow)
+        instantiation_keeps_pair_before_type_args(self.view, self.source, head, follow)
     }
 
     /// Get a reference to the doc arena.
@@ -1885,7 +1900,10 @@ impl<'a> Printer<'a> {
                 && obj.properties.iter().any(|prop| match prop {
                     ast::ObjectProperty::Property(p) => {
                         !p.shorthand
-                            || matches!(p.value.kind, ast::ExpressionKind::AssignmentExpression(_))
+                            || matches!(
+                                self.view.expr(p.value).kind,
+                                ast::ExpressionKind::AssignmentExpression(_)
+                            )
                     }
                     ast::ObjectProperty::SpreadElement(_) => false,
                 });
@@ -1903,8 +1921,10 @@ impl<'a> Printer<'a> {
             match prop {
                 ast::ObjectPatternProperty::Property(p) => {
                     // Has default if value is AssignmentPattern
-                    let has_default =
-                        matches!(p.value.kind, ast::ExpressionKind::AssignmentPattern(_));
+                    let has_default = matches!(
+                        self.view.expr(p.value).kind,
+                        ast::ExpressionKind::AssignmentPattern(_)
+                    );
                     // Not shorthand if key != value
                     let not_shorthand = !p.shorthand;
                     has_default || not_shorthand
@@ -2331,18 +2351,21 @@ impl<'a> Printer<'a> {
         &self,
         spread: &ast::SpreadElement<'_>,
     ) -> Span {
-        let interior = spread.paren_interior();
+        let interior = spread.paren_interior(self.view);
         if !self.has_comments_to_emit_between(interior.start, interior.end) {
             return interior;
         }
         let dots_end = spread.span.start + "...".len() as u32;
         if self
-            .value_head_frozen_span(dots_end, spread.argument.span())
+            .value_head_frozen_span(dots_end, self.view.expr(spread.argument).span())
             .is_some()
         {
             return interior;
         }
-        Span::new(self.pair_trailing_gap_start(spread.argument), interior.end)
+        Span::new(
+            self.pair_trailing_gap_start(self.view.expr(spread.argument)),
+            interior.end,
+        )
     }
 
     /// [`ast::Expression::paren_interior`] as the printer partitions it: a spread's from
@@ -2353,7 +2376,7 @@ impl<'a> Printer<'a> {
     ) -> Option<Span> {
         match &e.kind {
             ast::ExpressionKind::SpreadElement(s) => Some(self.spread_printed_interior(s)),
-            _ => e.paren_interior(),
+            _ => e.paren_interior(self.view),
         }
     }
 
@@ -2406,7 +2429,7 @@ impl<'a> Printer<'a> {
                 K::ArrowFunctionExpression(arrow) => match arrow.body {
                     ast::ArrowFunctionBody::Expression(body)
                         if stop_at_printed_pair
-                            && matches!(body.kind, K::ConditionalExpression(_)) =>
+                            && matches!(self.view.expr(body).kind, K::ConditionalExpression(_)) =>
                     {
                         return expr.span().end;
                     }
@@ -2418,13 +2441,15 @@ impl<'a> Printer<'a> {
                 K::YieldExpression(ast::YieldExpression {
                     argument: Some(argument),
                     ..
-                }) => argument,
+                }) => *argument,
                 _ => return expr.span().end,
             };
-            if next.span().end != expr.span().end || self.right_spine_child_frozen(expr, next) {
+            if self.view.expr(next).span().end != expr.span().end
+                || self.right_spine_child_frozen(expr, self.view.expr(next))
+            {
                 return expr.span().end;
             }
-            expr = next;
+            expr = self.view.expr(next);
         }
     }
 
@@ -2449,7 +2474,7 @@ impl<'a> Printer<'a> {
             K::ArrowFunctionExpression(arrow) => expressions::functions::arrow_token_end(arrow),
             K::ConditionalExpression(conditional) => {
                 match self.find_char_outside_comments(
-                    conditional.consequent.span().end,
+                    self.view.expr(conditional.consequent).span().end,
                     child.span().start,
                     b':',
                 ) {
@@ -2460,7 +2485,7 @@ impl<'a> Printer<'a> {
             K::AssignmentExpression(assignment) => {
                 let operator = assignment.operator.as_str();
                 match self.find_operator_in_source(
-                    assignment.left.span().end,
+                    self.view.expr(assignment.left).span().end,
                     child.span().start,
                     operator,
                 ) {

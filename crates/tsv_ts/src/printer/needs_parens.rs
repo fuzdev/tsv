@@ -17,6 +17,7 @@
 //   `parentNeedsParentheses` (`parentheses/parent-needs-parentheses.js`)
 // - `printPathNoParens`'s caller (`print/index.js`, the application layer)
 
+use crate::ast::ExprView;
 use crate::ast::{
     ArrowFunctionBody, AssignmentOperator, BinaryExpression, BinaryOperator, CallExpression,
     Expression, ExpressionKind, LiteralValue, UnaryOperator, UpdateOperator,
@@ -239,6 +240,7 @@ pub(crate) enum SecondTypeArgs {
 /// rejecting it as it did the input. A heritage's list is outside the exception: nothing
 /// follows it for the pair to cut away from the chain.
 pub(crate) fn instantiation_keeps_pair_before_type_args(
+    view: ExprView<'_>,
     source: &str,
     head: &Expression<'_>,
     follow: SecondTypeArgs,
@@ -246,7 +248,7 @@ pub(crate) fn instantiation_keeps_pair_before_type_args(
     matches!(head.kind, ExpressionKind::TSInstantiationExpression(_))
         && (paren_shell_close_after(source, head.span().end).is_some()
             || matches!(follow, SecondTypeArgs::Heritage)
-            || !ends_open_optional_chain(head))
+            || !ends_open_optional_chain(view, head))
 }
 
 /// Whether an instantiation expression starting at `inst_start` instantiates an optional
@@ -261,23 +263,25 @@ pub(crate) fn instantiation_keeps_pair_before_type_args(
 /// acorn-typescript — whose tree Svelte compiles — reads them as two trees
 /// (`((a?.b)<T>)?.()` printed `a?.b<T>?.()` is one chain where the author wrote two).
 pub(crate) fn instantiation_operand_is_sealed_chain(
+    view: ExprView<'_>,
     inst_start: u32,
     operand: &Expression<'_>,
 ) -> bool {
-    child_stops_optional_chain(inst_start, false, operand) || operand.is_sealing_non_null()
+    child_stops_optional_chain(view, inst_start, false, operand)
+        || operand.is_sealing_non_null(view)
 }
 
 /// Whether the instantiation chain `head` is built on an optional chain no authored pair
 /// has sealed (`a?.b<T>`, not `(a?.b)<T>`).
-fn ends_open_optional_chain(head: &Expression<'_>) -> bool {
+fn ends_open_optional_chain(view: ExprView<'_>, head: &Expression<'_>) -> bool {
     let mut level = head;
     while let ExpressionKind::TSInstantiationExpression(inst) = &level.kind {
-        if level.span().start < inst.expression.span().start {
+        if level.span().start < view.expr(inst.expression).span().start {
             return false;
         }
-        level = inst.expression;
+        level = view.expr(inst.expression);
     }
-    level.has_optional_in_chain()
+    level.has_optional_in_chain(view)
 }
 
 impl ParenContext {
@@ -298,7 +302,12 @@ impl ParenContext {
 /// every `in` lexically under the init, regardless of context). It's threaded as
 /// a parameter rather than read from a context because parenthesization is a pure
 /// function of the node and its surroundings.
-pub(super) fn needs_parens(expr: &Expression<'_>, ctx: ParenContext, in_for_init: bool) -> bool {
+pub(super) fn needs_parens(
+    view: ExprView<'_>,
+    expr: &Expression<'_>,
+    ctx: ParenContext,
+    in_for_init: bool,
+) -> bool {
     // Ambient for-init rule: an `in` binary always needs parens here. ORed ahead
     // of the context match so it applies uniformly (call args, object values,
     // binary operands, etc.) and never double-wraps a node a context already
@@ -337,14 +346,14 @@ pub(super) fn needs_parens(expr: &Expression<'_>, ctx: ParenContext, in_for_init
         | ParenContext::StatementTest => assignment_value_needs_parens(expr),
 
         // Object pattern assignment needs parens: `({a} = x);`
-        ParenContext::ExpressionStatement => needs_parens_expression_statement(expr),
+        ParenContext::ExpressionStatement => needs_parens_expression_statement(view, expr),
 
         // Binary operand precedence
         ParenContext::BinaryLeft { parent_op } => {
-            needs_parens_binary_operand(expr, parent_op, false, in_for_init)
+            needs_parens_binary_operand(view, expr, parent_op, false, in_for_init)
         }
         ParenContext::BinaryRight { parent_op } => {
-            needs_parens_binary_operand(expr, parent_op, true, in_for_init)
+            needs_parens_binary_operand(view, expr, parent_op, true, in_for_init)
         }
 
         // Callee: `(a ? b : c)()`, `(a + b)()`, `(() => {})()`, `(x as T)()`, `(<T>x)()`, etc.
@@ -377,7 +386,7 @@ pub(super) fn needs_parens(expr: &Expression<'_>, ctx: ParenContext, in_for_init
             if matches!(
                 ctx,
                 ParenContext::NewCallee | ParenContext::TaggedTemplateTag
-            ) && ends_open_optional_chain(expr)
+            ) && ends_open_optional_chain(view, expr)
             {
                 return true;
             }
@@ -479,7 +488,7 @@ pub(super) fn needs_parens(expr: &Expression<'_>, ctx: ParenContext, in_for_init
         // it ("Instantiation expression parens").
         ParenContext::TypeAssertion => {
             is_await_or_yield(expr)
-                || ends_with_instantiation_close(expr, in_for_init)
+                || ends_with_instantiation_close(view, expr, in_for_init)
                 || matches!(
                     expr.kind,
                     ExpressionKind::BinaryExpression(_)
@@ -609,7 +618,7 @@ pub(super) fn needs_parens(expr: &Expression<'_>, ctx: ParenContext, in_for_init
         // `extends (Base!)` drops to `extends Base!`, while `extends (new Base()!)`
         // keeps the parens because the stripped `new` still wraps.
         ParenContext::SuperClass => {
-            let stripped = strip_non_null_wrappers(expr);
+            let stripped = strip_non_null_wrappers(view, expr);
             is_lower_precedence(stripped)
                 || is_unary_or_update(stripped)
                 || matches!(
@@ -661,7 +670,7 @@ pub(super) fn needs_parens(expr: &Expression<'_>, ctx: ParenContext, in_for_init
                 AssignmentOperator::RightShiftAssign
                     | AssignmentOperator::UnsignedRightShiftAssign
                     | AssignmentOperator::DivideAssign
-            ) && ends_with_instantiation_close(expr, in_for_init))
+            ) && ends_with_instantiation_close(view, expr, in_for_init))
                 || is_type_assertion(expr)
                 || matches!(
                     expr.kind,
@@ -693,10 +702,11 @@ pub(super) fn needs_parens(expr: &Expression<'_>, ctx: ParenContext, in_for_init
 /// `isCallExpression(stripChainElementWrappers(body))` — `=> fn()!` is a call body
 /// that hugs the open paren).
 pub(in crate::printer) fn strip_non_null_wrappers<'a>(
+    view: ExprView<'a>,
     mut expr: &'a Expression<'a>,
 ) -> &'a Expression<'a> {
     while let ExpressionKind::TSNonNullExpression(non_null) = &expr.kind {
-        expr = non_null.expression;
+        expr = view.expr(non_null.expression);
     }
     expr
 }
@@ -860,35 +870,57 @@ pub(in crate::printer) const fn joins_a_trailing_angle_bracket(op: BinaryOperato
 /// the one layout-dependent end — flat, the arrow prints it in a pair of its own, and
 /// broken it prints it bare — so the walk takes the broken answer, which costs a
 /// redundant outer pair in the flat layout and is sound in both.
-pub(crate) fn ends_with_instantiation_close(expr: &Expression<'_>, in_for_init: bool) -> bool {
+pub(crate) fn ends_with_instantiation_close(
+    view: ExprView<'_>,
+    expr: &Expression<'_>,
+    in_for_init: bool,
+) -> bool {
     match &expr.kind {
         ExpressionKind::TSInstantiationExpression(_) => true,
         ExpressionKind::ConditionalExpression(conditional) => {
-            !ternary_branch_needs_parens(conditional.alternate)
-                && ends_with_instantiation_close(conditional.alternate, in_for_init)
+            !ternary_branch_needs_parens(view.expr(conditional.alternate))
+                && ends_with_instantiation_close(
+                    view,
+                    view.expr(conditional.alternate),
+                    in_for_init,
+                )
         }
         ExpressionKind::ArrowFunctionExpression(arrow) => match arrow.body {
             // A sequence body prints its own pair; a conditional one takes the arrow's
             // pair only when flat (see above), so it counts as bare.
             ArrowFunctionBody::Expression(body) => {
-                let bare = matches!(body.kind, ExpressionKind::ConditionalExpression(_))
-                    || (!needs_parens(body, ParenContext::ArrowBody, in_for_init)
-                        && !matches!(body.kind, ExpressionKind::SequenceExpression(_)));
-                bare && ends_with_instantiation_close(body, in_for_init)
+                let bare = matches!(
+                    view.expr(body).kind,
+                    ExpressionKind::ConditionalExpression(_)
+                ) || (!needs_parens(
+                    view,
+                    view.expr(body),
+                    ParenContext::ArrowBody,
+                    in_for_init,
+                ) && !matches!(
+                    view.expr(body).kind,
+                    ExpressionKind::SequenceExpression(_)
+                ));
+                bare && ends_with_instantiation_close(view, view.expr(body), in_for_init)
             }
             ArrowFunctionBody::BlockStatement(_) => false,
         },
         ExpressionKind::AwaitExpression(await_expr) => {
             !needs_parens(
-                await_expr.argument,
+                view,
+                view.expr(await_expr.argument),
                 ParenContext::AwaitArgument,
                 in_for_init,
-            ) && ends_with_instantiation_close(await_expr.argument, in_for_init)
+            ) && ends_with_instantiation_close(view, view.expr(await_expr.argument), in_for_init)
         }
         ExpressionKind::YieldExpression(yield_expr) => {
             yield_expr.argument.is_some_and(|argument| {
-                !needs_parens(argument, ParenContext::YieldArgument, in_for_init)
-                    && ends_with_instantiation_close(argument, in_for_init)
+                !needs_parens(
+                    view,
+                    view.expr(argument),
+                    ParenContext::YieldArgument,
+                    in_for_init,
+                ) && ends_with_instantiation_close(view, view.expr(argument), in_for_init)
             })
         }
         // The PRINTED right operand: a same-operator logical chain nested to the right
@@ -896,29 +928,29 @@ pub(crate) fn ends_with_instantiation_close(expr: &Expression<'_>, in_for_init: 
         // last operand is the innermost right one (`rebalanced_right`, the view the binary
         // printer reads). Every other operator's right operand is its own.
         ExpressionKind::BinaryExpression(binary) => {
-            let right = binary.rebalanced_right();
+            let right = binary.rebalanced_right(view);
             let ctx = ParenContext::BinaryRight {
                 parent_op: binary.operator,
             };
-            !needs_parens(right, ctx, in_for_init)
-                && ends_with_instantiation_close(right, in_for_init)
+            !needs_parens(view, right, ctx, in_for_init)
+                && ends_with_instantiation_close(view, right, in_for_init)
         }
         ExpressionKind::UnaryExpression(unary) => {
             let ctx = ParenContext::UnaryArgument {
                 parent_op: unary.operator,
             };
-            !needs_parens(unary.argument, ctx, in_for_init)
-                && ends_with_instantiation_close(unary.argument, in_for_init)
+            !needs_parens(view, view.expr(unary.argument), ctx, in_for_init)
+                && ends_with_instantiation_close(view, view.expr(unary.argument), in_for_init)
         }
         ExpressionKind::UpdateExpression(update) if update.prefix => {
             let ctx = ParenContext::UpdateArgument { postfix: false };
-            !needs_parens(update.argument, ctx, in_for_init)
-                && ends_with_instantiation_close(update.argument, in_for_init)
+            !needs_parens(view, view.expr(update.argument), ctx, in_for_init)
+                && ends_with_instantiation_close(view, view.expr(update.argument), in_for_init)
         }
         ExpressionKind::TSTypeAssertion(assertion) => {
             let ctx = ParenContext::AngleBracketAssertion;
-            !needs_parens(assertion.expression, ctx, in_for_init)
-                && ends_with_instantiation_close(assertion.expression, in_for_init)
+            !needs_parens(view, view.expr(assertion.expression), ctx, in_for_init)
+                && ends_with_instantiation_close(view, view.expr(assertion.expression), in_for_init)
         }
         _ => false,
     }
@@ -943,7 +975,7 @@ fn is_numeric_literal(expr: &Expression<'_>) -> bool {
 /// declaration, or class declaration. `({...});`, `(function () {});`,
 /// `(class {});` — matches prettier's "statement starts with `{`/`function`/`class`"
 /// rule (parentheses/needs-parentheses.js).
-fn needs_parens_expression_statement(expr: &Expression<'_>) -> bool {
+fn needs_parens_expression_statement(view: ExprView<'_>, expr: &Expression<'_>) -> bool {
     match &expr.kind {
         // Object expression: `({...});` needs parens to avoid being parsed as a block
         ExpressionKind::ObjectExpression(_) => true,
@@ -957,15 +989,14 @@ fn needs_parens_expression_statement(expr: &Expression<'_>) -> bool {
         // goes around the whole assignment, as for the pattern: `({ a }) += x` does not
         // parse under acorn ("Assigning to rvalue").
         ExpressionKind::AssignmentExpression(assign) => matches!(
-            assign.left.kind,
+            view.expr(assign.left).kind,
             ExpressionKind::ObjectPattern(_) | ExpressionKind::ObjectExpression(_)
         ),
         // Sequence: check the first expression
-        ExpressionKind::SequenceExpression(seq) => seq
-            .expressions
+        ExpressionKind::SequenceExpression(seq) => view
+            .list(seq.expressions)
             .first()
-            .copied()
-            .is_some_and(needs_parens_expression_statement),
+            .is_some_and(|first| needs_parens_expression_statement(view, view.expr(*first))),
         _ => false,
     }
 }
@@ -978,8 +1009,11 @@ fn needs_parens_expression_statement(expr: &Expression<'_>) -> bool {
 /// wraps the class, not the whole member expression. Recurses through the
 /// positions that print first (`.left`, `.object`, `.callee`, `.test`, …) and
 /// stops at IIFE callees/tags (already parenthesized) to match prettier.
-pub(crate) fn leftmost_no_lookahead<'a>(expr: &'a Expression<'a>) -> &'a Expression<'a> {
-    leftmost_no_lookahead_reached(expr, LeftmostText::Printed).0
+pub(crate) fn leftmost_no_lookahead<'a>(
+    view: ExprView<'a>,
+    expr: &'a Expression<'a>,
+) -> &'a Expression<'a> {
+    leftmost_no_lookahead_reached(view, expr, LeftmostText::Printed).0
 }
 
 /// Which text a leftmost walk reads the first token of.
@@ -1015,12 +1049,14 @@ impl LeftmostText {
 /// the leftmost node the step that reached it is gone. One walk answers both questions
 /// so the two readings can't drift.
 pub(crate) fn leftmost_no_lookahead_reached<'a>(
+    view: ExprView<'a>,
     expr: &'a Expression<'a>,
     text: LeftmostText,
 ) -> (&'a Expression<'a>, bool) {
     // A loop down the leftmost spine, not a recursion: a chain is as long as the spine
     // limit lets it be, and a frame per link is what the stack contract prices
     fn walk<'a>(
+        view: ExprView<'a>,
         mut expr: &'a Expression<'a>,
         text: LeftmostText,
         mut computed_member_object: bool,
@@ -1031,10 +1067,10 @@ pub(crate) fn leftmost_no_lookahead_reached<'a>(
                 // into a function or class dividend that opens on its own pair
                 // ([`dividend_opens_on_its_pair`]).
                 ExpressionKind::BinaryExpression(b) => {
-                    if dividend_opens_on_its_pair(expr, b, text) {
+                    if dividend_opens_on_its_pair(view, expr, b, text) {
                         return (expr, computed_member_object);
                     }
-                    (b.left, false)
+                    (view.expr(b.left), false)
                 }
                 // A non-LHS target that takes its own pair (`(function () {}) = 1`, `(a + b)
                 // = 1`) already prints `(` first, so the walk stops there, as at an IIFE
@@ -1043,9 +1079,10 @@ pub(crate) fn leftmost_no_lookahead_reached<'a>(
                 // and wraps the leftmost node inside (`(({}).x as T) = 1`), so for the three
                 // cast kinds the walk goes on, matching it.
                 ExpressionKind::AssignmentExpression(a) => {
-                    if !is_type_assertion(a.left)
+                    if !is_type_assertion(view.expr(a.left))
                         && needs_parens(
-                            a.left,
+                            view,
+                            view.expr(a.left),
                             ParenContext::AssignmentTarget {
                                 operator: a.operator,
                             },
@@ -1054,39 +1091,44 @@ pub(crate) fn leftmost_no_lookahead_reached<'a>(
                     {
                         return (expr, computed_member_object);
                     }
-                    (a.left, false)
+                    (view.expr(a.left), false)
                 }
-                ExpressionKind::MemberExpression(m) => (m.object, m.computed && !m.optional),
-                ExpressionKind::ConditionalExpression(c) => (c.test, false),
-                ExpressionKind::SequenceExpression(s) => match s.expressions.first() {
-                    Some(&first) => (first, false),
+                ExpressionKind::MemberExpression(m) => {
+                    (view.expr(m.object), m.computed && !m.optional)
+                }
+                ExpressionKind::ConditionalExpression(c) => (view.expr(c.test), false),
+                ExpressionKind::SequenceExpression(s) => match view.list(s.expressions).first() {
+                    Some(&first) => (view.expr(first), false),
                     None => return (expr, computed_member_object),
                 },
                 // IIFEs (`(function () {})()` / `` (function () {})`x` ``) are already
                 // parenthesized by their callee/tag, so prettier stops the walk there.
                 ExpressionKind::CallExpression(call) => {
-                    if matches!(call.callee.kind, ExpressionKind::FunctionExpression(_)) {
+                    if matches!(
+                        view.expr(call.callee).kind,
+                        ExpressionKind::FunctionExpression(_)
+                    ) {
                         return (expr, computed_member_object);
                     }
-                    (call.callee, false)
+                    (view.expr(call.callee), false)
                 }
                 ExpressionKind::TaggedTemplateExpression(t) => {
-                    if matches!(t.tag.kind, ExpressionKind::FunctionExpression(_)) {
+                    if matches!(view.expr(t.tag).kind, ExpressionKind::FunctionExpression(_)) {
                         return (expr, computed_member_object);
                     }
-                    (t.tag, false)
+                    (view.expr(t.tag), false)
                 }
                 // Postfix update (`x++`) prints its argument first; prefix (`++x`) does not.
-                ExpressionKind::UpdateExpression(u) if !u.prefix => (u.argument, false),
-                ExpressionKind::TSAsExpression(e) => (e.expression, false),
-                ExpressionKind::TSSatisfiesExpression(e) => (e.expression, false),
-                ExpressionKind::TSNonNullExpression(e) => (e.expression, false),
-                ExpressionKind::TSInstantiationExpression(e) => (e.expression, false),
+                ExpressionKind::UpdateExpression(u) if !u.prefix => (view.expr(u.argument), false),
+                ExpressionKind::TSAsExpression(e) => (view.expr(e.expression), false),
+                ExpressionKind::TSSatisfiesExpression(e) => (view.expr(e.expression), false),
+                ExpressionKind::TSNonNullExpression(e) => (view.expr(e.expression), false),
+                ExpressionKind::TSInstantiationExpression(e) => (view.expr(e.expression), false),
                 _ => return (expr, computed_member_object),
             };
         }
     }
-    walk(expr, text, false)
+    walk(view, expr, text, false)
 }
 
 /// Whether `export default <expr>;` wraps the expression in parens — for either of two
@@ -1116,12 +1158,16 @@ pub(crate) fn leftmost_no_lookahead_reached<'a>(
 /// verbatim slice has the pair only where the author wrote it). The other descents
 /// (conditional test, cast operand, …) print the keyword bare, so they recurse
 /// unconditionally like `leftmost_no_lookahead`.
-pub(crate) fn export_default_needs_parens(expr: &Expression<'_>, text: LeftmostText) -> bool {
+pub(crate) fn export_default_needs_parens(
+    view: ExprView<'_>,
+    expr: &Expression<'_>,
+    text: LeftmostText,
+) -> bool {
     // Two independent reasons for one pair — the value-position assignment rule below,
     // and the leftmost-token rule this function is named for.
     assignment_value_needs_parens(expr)
         || matches!(
-            export_default_leftmost(expr, text).kind,
+            export_default_leftmost(view, expr, text).kind,
             ExpressionKind::FunctionExpression(_) | ExpressionKind::ClassExpression(_)
         )
 }
@@ -1144,6 +1190,7 @@ fn assignment_value_needs_parens(expr: &Expression<'_>) -> bool {
 }
 
 fn export_default_leftmost<'a>(
+    view: ExprView<'a>,
     mut expr: &'a Expression<'a>,
     text: LeftmostText,
 ) -> &'a Expression<'a> {
@@ -1153,39 +1200,51 @@ fn export_default_leftmost<'a>(
         expr = match &expr.kind {
             // A division whose function or class dividend opens on its own pair starts with
             // that `(`, like the paren-aware descents below: the walk stops at the division.
-            ExpressionKind::BinaryExpression(b) if dividend_opens_on_its_pair(expr, b, text) => {
+            ExpressionKind::BinaryExpression(b)
+                if dividend_opens_on_its_pair(view, expr, b, text) =>
+            {
                 return expr;
             }
-            ExpressionKind::BinaryExpression(b) => b.left,
-            ExpressionKind::AssignmentExpression(a) => a.left,
-            ExpressionKind::ConditionalExpression(c) => c.test,
+            ExpressionKind::BinaryExpression(b) => view.expr(b.left),
+            ExpressionKind::AssignmentExpression(a) => view.expr(a.left),
+            ExpressionKind::ConditionalExpression(c) => view.expr(c.test),
             // A `SequenceExpression` self-parenthesizes in `build_sequence_doc` (its printed
             // form always starts with `(`), so — like the paren-aware member/call/tag descents
             // below — the walk stops here instead of recursing to the leftmost operand.
             // Recursing would double-wrap a class/function-leftmost sequence:
             // `export default ((class {}, x))` instead of prettier's `(class {}, x)`.
             ExpressionKind::SequenceExpression(_) => return expr,
-            ExpressionKind::UpdateExpression(u) if !u.prefix => u.argument,
-            ExpressionKind::TSAsExpression(e) => e.expression,
-            ExpressionKind::TSSatisfiesExpression(e) => e.expression,
-            ExpressionKind::TSNonNullExpression(e) => e.expression,
-            ExpressionKind::TSInstantiationExpression(e) => e.expression,
+            ExpressionKind::UpdateExpression(u) if !u.prefix => view.expr(u.argument),
+            ExpressionKind::TSAsExpression(e) => view.expr(e.expression),
+            ExpressionKind::TSSatisfiesExpression(e) => view.expr(e.expression),
+            ExpressionKind::TSNonNullExpression(e) => view.expr(e.expression),
+            ExpressionKind::TSInstantiationExpression(e) => view.expr(e.expression),
             // Descents that cross a would-be-parenthesized child: stop there, since its
             // leading `(` already guards any inner keyword.
             ExpressionKind::MemberExpression(m)
-                if !needs_parens(m.object, ParenContext::ChainBase, false) =>
+                if !needs_parens(view, view.expr(m.object), ParenContext::ChainBase, false) =>
             {
-                m.object
+                view.expr(m.object)
             }
             ExpressionKind::CallExpression(call)
-                if !needs_parens(call.callee, ParenContext::callee_of(call), false) =>
+                if !needs_parens(
+                    view,
+                    view.expr(call.callee),
+                    ParenContext::callee_of(call),
+                    false,
+                ) =>
             {
-                call.callee
+                view.expr(call.callee)
             }
             ExpressionKind::TaggedTemplateExpression(t)
-                if !needs_parens(t.tag, ParenContext::TaggedTemplateTag, false) =>
+                if !needs_parens(
+                    view,
+                    view.expr(t.tag),
+                    ParenContext::TaggedTemplateTag,
+                    false,
+                ) =>
             {
-                t.tag
+                view.expr(t.tag)
             }
             _ => return expr,
         };
@@ -1266,12 +1325,17 @@ fn export_default_leftmost<'a>(
 /// LAYOUT-BLIND with the rest of the family — whether the `>` ends a line is not knowable
 /// where parens are decided, and the follow token past the `)` is read the same way at every
 /// width — so the pair stands at every width.
-fn relational_region_opens_on_a_kept_shell(operand: &Expression<'_>, in_for_init: bool) -> bool {
+fn relational_region_opens_on_a_kept_shell(
+    view: ExprView<'_>,
+    operand: &Expression<'_>,
+    in_for_init: bool,
+) -> bool {
     // The root's own pair is the one its POSITION derives — the same `needs_parens` call
     // `Printer::build_binary_operand_doc` makes for a `<`'s right operand.
     let mut node = operand;
     if prints_its_own_paren_pair(node)
         || needs_parens(
+            view,
             node,
             ParenContext::BinaryRight {
                 parent_op: BinaryOperator::LessThan,
@@ -1286,7 +1350,7 @@ fn relational_region_opens_on_a_kept_shell(operand: &Expression<'_>, in_for_init
     // for that child ([`printed_left_spine_step`]), so the two cannot drift.
     let mut open = true;
     loop {
-        let Some((child, parenthesized)) = printed_left_spine_step(node, in_for_init) else {
+        let Some((child, parenthesized)) = printed_left_spine_step(view, node, in_for_init) else {
             return false;
         };
         let hop = RegionHop::of(node);
@@ -1299,7 +1363,8 @@ fn relational_region_opens_on_a_kept_shell(operand: &Expression<'_>, in_for_init
                 // on those shells alone ([`shell_content_may_read_as_a_type`]), and on a
                 // self-parenthesizing child as it is at the root.
                 RegionHop::List => {
-                    shell_content_may_read_as_a_type(child) || prints_its_own_paren_pair(child)
+                    shell_content_may_read_as_a_type(view, child)
+                        || prints_its_own_paren_pair(child)
                 }
                 RegionHop::Closing => false,
             };
@@ -1336,17 +1401,19 @@ fn relational_region_opens_on_a_kept_shell(operand: &Expression<'_>, in_for_init
 /// arrow function, a unary operand that ends on a call (`(a ? b : c)<C>`, `(a = b)<C>`,
 /// `(a < b)<C>`, `(<B>a)<C>`, `(typeof a())<C>`). Those chains print bare, and a width
 /// that ends a line on their `>` prints a region the parser then claims and rejects.
-fn shell_content_may_read_as_a_type(expr: &Expression<'_>) -> bool {
+fn shell_content_may_read_as_a_type(view: ExprView<'_>, expr: &Expression<'_>) -> bool {
     match &expr.kind {
         ExpressionKind::UnaryExpression(unary) => match unary.operator {
-            UnaryOperator::Typeof | UnaryOperator::Bang => ends_like_a_type_operand(unary.argument),
-            UnaryOperator::Minus => is_numeral(unary.argument),
+            UnaryOperator::Typeof | UnaryOperator::Bang => {
+                ends_like_a_type_operand(view, view.expr(unary.argument))
+            }
+            UnaryOperator::Minus => is_numeral(view.expr(unary.argument)),
             UnaryOperator::Plus
             | UnaryOperator::Void
             | UnaryOperator::Delete
             | UnaryOperator::Tilde => false,
         },
-        ExpressionKind::BinaryExpression(_) => ends_like_a_type_operand(expr),
+        ExpressionKind::BinaryExpression(_) => ends_like_a_type_operand(view, expr),
         _ => false,
     }
 }
@@ -1355,7 +1422,8 @@ fn shell_content_may_read_as_a_type(expr: &Expression<'_>) -> bool {
 /// the lookahead's reading: a name or qualified name, `this`, a literal, an object or
 /// array, a group, a member of one, or one of those under `typeof` / `!` or ahead of a
 /// non-null `!`.
-fn ends_like_a_type_operand(mut expr: &Expression<'_>) -> bool {
+fn ends_like_a_type_operand(view: ExprView<'_>, expr: &Expression<'_>) -> bool {
+    let mut expr = expr;
     // A loop down the spine, not a recursion: a chain is as long as the spine limit lets it
     // be, and a frame per link is what the stack contract prices. Each link's own conditions
     // are pure, so asking them before the rest of the spine answers what a recursion would.
@@ -1368,20 +1436,22 @@ fn ends_like_a_type_operand(mut expr: &Expression<'_>) -> bool {
             | ExpressionKind::ArrayExpression(_)
             | ExpressionKind::SequenceExpression(_)
             | ExpressionKind::ImportExpression(_) => return true,
-            ExpressionKind::MemberExpression(member) if !member.optional => member.object,
-            ExpressionKind::TSNonNullExpression(non_null) => non_null.expression,
+            ExpressionKind::MemberExpression(member) if !member.optional => {
+                view.expr(member.object)
+            }
+            ExpressionKind::TSNonNullExpression(non_null) => view.expr(non_null.expression),
             ExpressionKind::UnaryExpression(unary) => match unary.operator {
-                UnaryOperator::Typeof | UnaryOperator::Bang => unary.argument,
-                UnaryOperator::Minus => return is_numeral(unary.argument),
+                UnaryOperator::Typeof | UnaryOperator::Bang => view.expr(unary.argument),
+                UnaryOperator::Minus => return is_numeral(view.expr(unary.argument)),
                 _ => return false,
             },
             ExpressionKind::BinaryExpression(binary)
                 if matches!(
                     binary.operator,
                     BinaryOperator::Pipe | BinaryOperator::Ampersand
-                ) && ends_like_a_type_operand(binary.right) =>
+                ) && ends_like_a_type_operand(view, view.expr(binary.right)) =>
             {
-                binary.left
+                view.expr(binary.left)
             }
             _ => return false,
         };
@@ -1467,14 +1537,15 @@ fn is_function_dividend(expr: &Expression<'_>, parent_op: BinaryOperator) -> boo
 /// which the spans say: the division's begins at the `(` the parser erased from its left
 /// operand, so a dividend starting later than its division sits inside one.
 fn dividend_opens_on_its_pair(
+    view: ExprView<'_>,
     expr: &Expression<'_>,
     binary: &BinaryExpression<'_>,
     text: LeftmostText,
 ) -> bool {
-    is_function_dividend(binary.left, binary.operator)
+    is_function_dividend(view.expr(binary.left), binary.operator)
         && match text {
             LeftmostText::Printed => true,
-            LeftmostText::Frozen => binary.left.span().start > expr.span().start,
+            LeftmostText::Frozen => view.expr(binary.left).span().start > expr.span().start,
         }
 }
 
@@ -1502,12 +1573,13 @@ pub(in crate::printer) enum OperandPair {
 /// for-init flag, read only by the instantiation-tail walk below (it asks the
 /// printed shape of the operand's own children).
 fn needs_parens_binary_operand(
+    view: ExprView<'_>,
     expr: &Expression<'_>,
     parent_op: BinaryOperator,
     is_right: bool,
     in_for_init: bool,
 ) -> bool {
-    binary_operand_pair(expr, parent_op, is_right, in_for_init) != OperandPair::None
+    binary_operand_pair(view, expr, parent_op, is_right, in_for_init) != OperandPair::None
 }
 
 /// The left operand of a `parent_op` binary as the binary the binary-chain printer
@@ -1550,6 +1622,7 @@ pub(crate) fn flattened_left_operand<'e>(
 /// [`fn@needs_parens`] and the parser's own reading of the `for`-header flag
 /// (`in_for_init`: inside a header's init, where every `in` binary takes a pair).
 pub(crate) fn binary_left_operand_reenters(
+    view: ExprView<'_>,
     parent_op: BinaryOperator,
     left: &Expression<'_>,
     in_for_init: bool,
@@ -1557,7 +1630,7 @@ pub(crate) fn binary_left_operand_reenters(
     match left.kind {
         ExpressionKind::BinaryExpression(_) => {
             flattened_left_operand(parent_op, left, |left, ctx| {
-                needs_parens(left, ctx, in_for_init)
+                needs_parens(view, left, ctx, in_for_init)
             })
             .is_none()
         }
@@ -1585,6 +1658,7 @@ pub(crate) fn binary_left_operand_reenters(
 /// rest take [`fn@needs_parens`] out of line.
 #[inline]
 pub(crate) fn printer_adds_operand_pair(
+    view: ExprView<'_>,
     operand: &Expression<'_>,
     ctx: ParenContext,
     in_for_header: bool,
@@ -1608,7 +1682,7 @@ pub(crate) fn printer_adds_operand_pair(
         _ if matches!(ctx, ParenContext::ArrowBody) => return false,
         _ => {}
     }
-    printer_adds_operand_pair_by_rule(operand, ctx, in_for_header)
+    printer_adds_operand_pair_by_rule(view, operand, ctx, in_for_header)
 }
 
 /// [`printer_adds_operand_pair`] for a binary operand of a binary where its two operators
@@ -1664,18 +1738,22 @@ pub(crate) const fn operator_operand_takes_no_pair(operand: &Expression<'_>) -> 
 /// [`printer_adds_operand_pair`] past its kind test.
 #[inline(never)]
 fn printer_adds_operand_pair_by_rule(
+    view: ExprView<'_>,
     operand: &Expression<'_>,
     ctx: ParenContext,
     in_for_header: bool,
 ) -> bool {
-    !(in_for_header && is_in_binary(operand)) && needs_parens(operand, ctx, in_for_header)
+    !(in_for_header && is_in_binary(operand)) && needs_parens(view, operand, ctx, in_for_header)
 }
 
 /// Whether the printer writes a pair around `object` as a member access's object — a
 /// numeric literal (`(1).toString()`) where it is the head the parser asks about
 /// (`Parser::chain_base_pair`).
-pub(crate) fn printer_parenthesizes_chain_base(object: &Expression<'_>) -> bool {
-    needs_parens(object, ParenContext::ChainBase, false)
+pub(crate) fn printer_parenthesizes_chain_base(
+    view: ExprView<'_>,
+    object: &Expression<'_>,
+) -> bool {
+    needs_parens(view, object, ParenContext::ChainBase, false)
 }
 
 /// [`needs_parens_binary_operand`], with the reason the pair is there.
@@ -1685,6 +1763,7 @@ pub(crate) fn printer_parenthesizes_chain_base(object: &Expression<'_>) -> bool 
 /// withheld: `(await f<T>) + 1` is owed by the `>` its `await` operand ends on, though
 /// the `await` alone would take a clarity pair there.
 pub(in crate::printer) fn binary_operand_pair(
+    view: ExprView<'_>,
     expr: &Expression<'_>,
     parent_op: BinaryOperator,
     is_right: bool,
@@ -1759,7 +1838,7 @@ pub(in crate::printer) fn binary_operand_pair(
     // Prettier strips the pair at every one of these, a cataloged ◆prettier_bug.
     if !is_right
         && joins_a_trailing_angle_bracket(parent_op)
-        && ends_with_instantiation_close(expr, in_for_init)
+        && ends_with_instantiation_close(view, expr, in_for_init)
     {
         return OperandPair::Owed;
     }
@@ -1794,7 +1873,7 @@ pub(in crate::printer) fn binary_operand_pair(
             ExpressionKind::BinaryExpression(child)
                 if child.operator == BinaryOperator::LessThan
                     && (child.relexes_as_type_arguments
-                        || relational_region_opens_on_a_kept_shell(child.right, in_for_init))
+                        || relational_region_opens_on_a_kept_shell(view, view.expr(child.right), in_for_init))
         )
     {
         return OperandPair::Owed;
@@ -1948,18 +2027,19 @@ fn binary_child_pair(
 // synthesized where no authored pair is present. A comma-list owner retains an
 // authored whole-element pair, which does not answer this invented-pair gap.
 pub(in crate::printer) fn clarity_pairs_behind_region_close(
+    view: ExprView<'_>,
     close: &BinaryExpression<'_>,
     in_for_init: bool,
     source_holds_pair: impl Fn(&Expression<'_>) -> bool,
 ) -> SmallVec<[Span; 2]> {
     let mut withheld = SmallVec::new();
-    let mut node = close.right;
+    let mut node = view.expr(close.right);
     if prints_its_own_paren_pair(node) {
         return SmallVec::new();
     }
     // The pair `node` takes where it stands, and whether that position is a binary
     // operand's — the one whose `)` an operator follows.
-    let mut pair = binary_operand_pair(node, close.operator, true, in_for_init);
+    let mut pair = binary_operand_pair(view, node, close.operator, true, in_for_init);
     let mut is_operand = true;
     loop {
         match pair {
@@ -1970,15 +2050,15 @@ pub(in crate::printer) fn clarity_pairs_behind_region_close(
                     break;
                 }
                 if is_operand
-                    && (ends_with_instantiation_close(node, in_for_init)
-                        || ends_on_a_function_or_class_body(node, in_for_init))
+                    && (ends_with_instantiation_close(view, node, in_for_init)
+                        || ends_on_a_function_or_class_body(view, node, in_for_init))
                 {
                     return SmallVec::new();
                 }
                 withheld.push(node.span());
             }
         }
-        let Some((child, parenthesized)) = printed_left_spine_step(node, in_for_init) else {
+        let Some((child, parenthesized)) = printed_left_spine_step(view, node, in_for_init) else {
             break;
         };
         if prints_its_own_paren_pair(child) {
@@ -1987,7 +2067,7 @@ pub(in crate::printer) fn clarity_pairs_behind_region_close(
         (pair, is_operand) = match &node.kind {
             _ if !parenthesized => (OperandPair::None, false),
             ExpressionKind::BinaryExpression(parent) => (
-                binary_operand_pair(child, parent.operator, false, in_for_init),
+                binary_operand_pair(view, child, parent.operator, false, in_for_init),
                 true,
             ),
             ExpressionKind::CallExpression(_) | ExpressionKind::TaggedTemplateExpression(_)
@@ -2015,7 +2095,11 @@ pub(in crate::printer) fn is_called_function(expr: &Expression<'_>) -> bool {
 /// `/` directly behind that `}` is a regex to acorn wherever its tokenizer took the
 /// keyword for a statement's (`Printer::mark_dividend_tail`, whose walk this mirrors
 /// through `await`, the one kind that walk never meets bare).
-fn ends_on_a_function_or_class_body(expr: &Expression<'_>, in_for_init: bool) -> bool {
+fn ends_on_a_function_or_class_body(
+    view: ExprView<'_>,
+    expr: &Expression<'_>,
+    in_for_init: bool,
+) -> bool {
     let mut operand = expr;
     loop {
         let (child, ctx) = match &operand.kind {
@@ -2023,27 +2107,28 @@ fn ends_on_a_function_or_class_body(expr: &Expression<'_>, in_for_init: bool) ->
                 return true;
             }
             ExpressionKind::AwaitExpression(await_expr) => {
-                (await_expr.argument, ParenContext::AwaitArgument)
+                (view.expr(await_expr.argument), ParenContext::AwaitArgument)
             }
             ExpressionKind::UnaryExpression(unary) => (
-                unary.argument,
+                view.expr(unary.argument),
                 ParenContext::UnaryArgument {
                     parent_op: unary.operator,
                 },
             ),
             ExpressionKind::BinaryExpression(binary) => (
-                binary.rebalanced_right(),
+                binary.rebalanced_right(view),
                 ParenContext::BinaryRight {
                     parent_op: binary.operator,
                 },
             ),
-            ExpressionKind::TSTypeAssertion(assertion) => {
-                (assertion.expression, ParenContext::AngleBracketAssertion)
-            }
+            ExpressionKind::TSTypeAssertion(assertion) => (
+                view.expr(assertion.expression),
+                ParenContext::AngleBracketAssertion,
+            ),
             _ => return false,
         };
         // An operand inside a pair ends on its `)`.
-        if needs_parens(child, ctx, in_for_init) {
+        if needs_parens(view, child, ctx, in_for_init) {
             return false;
         }
         operand = child;

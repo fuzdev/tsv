@@ -4,6 +4,7 @@
 
 use super::Printer;
 use super::expressions::functions::has_leftmost_arrow_body_parens;
+use crate::ast::ExprView;
 use crate::ast::{
     ArrowFunctionBody, ArrowFunctionExpression, BinaryExpression, BinaryOperator, Decorator,
     Expression, ExpressionKind, ObjectPatternProperty, ObjectProperty, UnaryExpression,
@@ -50,129 +51,146 @@ impl ChildSlot {
 /// opener, the closer and the region marks cannot drift. Every wrapper is explicit; a new
 /// expression kind must settle its own children.
 fn any_expression_child<'e>(
+    view: ExprView<'e>,
     expr: &'e Expression<'e>,
     mut visit: impl FnMut(&'e Expression<'e>, ChildSlot) -> bool,
 ) -> bool {
     use ChildSlot::{ArrowBody, Element, Other, PropertyValue, TemplateExpression};
     match &expr.kind {
         ExpressionKind::BinaryExpression(binary) => {
-            visit(binary.left, Other) || visit(binary.right, Other)
+            visit(view.expr(binary.left), Other) || visit(view.expr(binary.right), Other)
         }
         ExpressionKind::AssignmentExpression(assign) => {
-            visit(assign.left, Other) || visit(assign.right, Other)
+            visit(view.expr(assign.left), Other) || visit(view.expr(assign.right), Other)
         }
         ExpressionKind::AssignmentPattern(assign) => {
-            visit(assign.left, Other)
-                || visit(assign.right, Other)
-                || decorators_any(assign.decorators, &mut visit)
+            visit(view.expr(assign.left), Other)
+                || visit(view.expr(assign.right), Other)
+                || decorators_any(view, assign.decorators, &mut visit)
         }
         ExpressionKind::ObjectExpression(object) => {
             object.properties.iter().any(|property| match property {
                 ObjectProperty::Property(property) => {
-                    visit(property.key, Other) || visit(property.value, PropertyValue)
+                    visit(view.expr(property.key), Other)
+                        || visit(view.expr(property.value), PropertyValue)
                 }
-                ObjectProperty::SpreadElement(spread) => visit(spread.argument, Other),
+                ObjectProperty::SpreadElement(spread) => visit(view.expr(spread.argument), Other),
             })
         }
         ExpressionKind::ObjectPattern(object) => {
-            decorators_any(object.decorators, &mut visit)
+            decorators_any(view, object.decorators, &mut visit)
                 || object.properties.iter().any(|property| match property {
                     ObjectPatternProperty::Property(property) => {
-                        visit(property.key, Other) || visit(property.value, Other)
+                        visit(view.expr(property.key), Other)
+                            || visit(view.expr(property.value), Other)
                     }
-                    ObjectPatternProperty::RestElement(rest) => visit(rest.argument, Other),
+                    ObjectPatternProperty::RestElement(rest) => {
+                        visit(view.expr(rest.argument), Other)
+                    }
                 })
         }
-        ExpressionKind::ArrayExpression(array) => array
-            .elements
+        ExpressionKind::ArrayExpression(array) => view
+            .opt_list(array.elements)
             .iter()
             .flatten()
-            .any(|child| visit(child, Element { list_end: None })),
+            .any(|child| visit(view.expr(*child), Element { list_end: None })),
         ExpressionKind::ArrayPattern(array) => {
-            decorators_any(array.decorators, &mut visit)
-                || array
-                    .elements
+            decorators_any(view, array.decorators, &mut visit)
+                || view
+                    .pattern_elements(array.elements)
                     .iter()
                     .flatten()
-                    .any(|child| visit(child, Other))
+                    .any(|child| visit(view.slot(child), Other))
         }
         ExpressionKind::CallExpression(call) => {
             let list_end = Some(expr.span.end);
-            visit(call.callee, Other)
-                || call
-                    .arguments
+            visit(view.expr(call.callee), Other)
+                || view
+                    .list(call.arguments)
                     .iter()
-                    .any(|child| visit(child, Element { list_end }))
+                    .any(|child| visit(view.expr(*child), Element { list_end }))
         }
         ExpressionKind::NewExpression(new) => {
             let list_end = Some(expr.span.end);
-            visit(new.callee, Other)
-                || new
-                    .arguments
+            visit(view.expr(new.callee), Other)
+                || view
+                    .list(new.arguments)
                     .iter()
-                    .any(|child| visit(child, Element { list_end }))
+                    .any(|child| visit(view.expr(*child), Element { list_end }))
         }
         ExpressionKind::MemberExpression(member) => {
-            visit(member.object, Other) || visit(member.property, Other)
+            visit(view.expr(member.object), Other) || visit(view.expr(member.property), Other)
         }
         ExpressionKind::ConditionalExpression(cond) => {
-            visit(cond.test, Other) || visit(cond.consequent, Other) || visit(cond.alternate, Other)
+            visit(view.expr(cond.test), Other)
+                || visit(view.expr(cond.consequent), Other)
+                || visit(view.expr(cond.alternate), Other)
         }
         ExpressionKind::ArrowFunctionExpression(arrow) => {
-            arrow.params.iter().any(|child| visit(child, Other))
+            view.run(arrow.params)
+                .iter()
+                .any(|child| visit(child, Other))
                 || match &arrow.body {
-                    ArrowFunctionBody::Expression(body) => visit(body, ArrowBody),
+                    ArrowFunctionBody::Expression(body) => visit(view.expr(*body), ArrowBody),
                     ArrowFunctionBody::BlockStatement(_) => false,
                 }
         }
-        ExpressionKind::FunctionExpression(function) => {
-            function.params.iter().any(|child| visit(child, Other))
-        }
+        ExpressionKind::FunctionExpression(function) => view
+            .run(function.params)
+            .iter()
+            .any(|child| visit(child, Other)),
         ExpressionKind::ClassExpression(class) => {
-            decorators_any(class.decorators, &mut visit)
-                || class.super_class.is_some_and(|child| visit(child, Other))
+            decorators_any(view, class.decorators, &mut visit)
+                || class
+                    .super_class
+                    .is_some_and(|child| visit(view.expr(child), Other))
         }
-        ExpressionKind::UnaryExpression(unary) => visit(unary.argument, Other),
-        ExpressionKind::UpdateExpression(update) => visit(update.argument, Other),
-        ExpressionKind::SpreadElement(spread) => visit(spread.argument, Other),
-        ExpressionKind::RestElement(rest) => visit(rest.argument, Other),
-        ExpressionKind::AwaitExpression(await_expr) => visit(await_expr.argument, Other),
-        ExpressionKind::YieldExpression(yield_expr) => {
-            yield_expr.argument.is_some_and(|child| visit(child, Other))
-        }
-        ExpressionKind::SequenceExpression(sequence) => sequence
-            .expressions
+        ExpressionKind::UnaryExpression(unary) => visit(view.expr(unary.argument), Other),
+        ExpressionKind::UpdateExpression(update) => visit(view.expr(update.argument), Other),
+        ExpressionKind::SpreadElement(spread) => visit(view.expr(spread.argument), Other),
+        ExpressionKind::RestElement(rest) => visit(view.expr(rest.argument), Other),
+        ExpressionKind::AwaitExpression(await_expr) => visit(view.expr(await_expr.argument), Other),
+        ExpressionKind::YieldExpression(yield_expr) => yield_expr
+            .argument
+            .is_some_and(|child| visit(view.expr(child), Other)),
+        ExpressionKind::SequenceExpression(sequence) => view
+            .list(sequence.expressions)
             .iter()
-            .any(|child| visit(child, Element { list_end: None })),
-        ExpressionKind::TemplateLiteral(template) => template
-            .expressions
+            .any(|child| visit(view.expr(*child), Element { list_end: None })),
+        ExpressionKind::TemplateLiteral(template) => view
+            .list(template.expressions)
             .iter()
-            .any(|child| visit(child, TemplateExpression)),
+            .any(|child| visit(view.expr(*child), TemplateExpression)),
         ExpressionKind::TaggedTemplateExpression(tagged) => {
-            visit(tagged.tag, Other)
-                || tagged
-                    .quasi
-                    .expressions
+            visit(view.expr(tagged.tag), Other)
+                || view
+                    .list(tagged.quasi.expressions)
                     .iter()
-                    .any(|child| visit(child, TemplateExpression))
+                    .any(|child| visit(view.expr(*child), TemplateExpression))
         }
-        ExpressionKind::TSTypeAssertion(assertion) => visit(assertion.expression, Other),
-        ExpressionKind::TSAsExpression(assertion) => visit(assertion.expression, Other),
-        ExpressionKind::TSSatisfiesExpression(assertion) => visit(assertion.expression, Other),
+        ExpressionKind::TSTypeAssertion(assertion) => visit(view.expr(assertion.expression), Other),
+        ExpressionKind::TSAsExpression(assertion) => visit(view.expr(assertion.expression), Other),
+        ExpressionKind::TSSatisfiesExpression(assertion) => {
+            visit(view.expr(assertion.expression), Other)
+        }
         ExpressionKind::TSInstantiationExpression(instantiation) => {
-            visit(instantiation.expression, Other)
+            visit(view.expr(instantiation.expression), Other)
         }
-        ExpressionKind::TSNonNullExpression(non_null) => visit(non_null.expression, Other),
-        ExpressionKind::TSParameterProperty(property) => visit(property.parameter, Other),
+        ExpressionKind::TSNonNullExpression(non_null) => {
+            visit(view.expr(non_null.expression), Other)
+        }
+        ExpressionKind::TSParameterProperty(property) => {
+            visit(view.expr(property.parameter), Other)
+        }
         ExpressionKind::ImportExpression(import) => {
             let list_end = Some(expr.span.end);
-            visit(import.source, Element { list_end })
+            visit(view.expr(import.source), Element { list_end })
                 || import
                     .options
-                    .is_some_and(|options| visit(options, Element { list_end }))
+                    .is_some_and(|options| visit(view.expr(options), Element { list_end }))
         }
-        ExpressionKind::CommentBoundPair(cast) => visit(cast.inner, Other),
-        ExpressionKind::ParenthesizedExpression(paren) => visit(paren.expression, Other),
+        ExpressionKind::CommentBoundPair(cast) => visit(view.expr(cast.inner), Other),
+        ExpressionKind::ParenthesizedExpression(paren) => visit(view.expr(paren.expression), Other),
         ExpressionKind::Literal(_)
         | ExpressionKind::Identifier(_)
         | ExpressionKind::PrivateIdentifier(_)
@@ -185,13 +203,14 @@ fn any_expression_child<'e>(
 
 /// Whether any decorator's expression satisfies `visit` — a decorator is an `Other` child.
 fn decorators_any<'e>(
+    view: ExprView<'e>,
     decorators: Option<&'e [Decorator<'e>]>,
     visit: &mut impl FnMut(&'e Expression<'e>, ChildSlot) -> bool,
 ) -> bool {
     decorators.is_some_and(|items| {
         items
             .iter()
-            .any(|item| visit(&item.expression, ChildSlot::Other))
+            .any(|item| visit(view.slot(&item.expression), ChildSlot::Other))
     })
 }
 
@@ -204,6 +223,7 @@ fn decorators_any<'e>(
 /// surfaces). The answer is a pure predicate over the subtree, so the visiting order is
 /// free.
 fn expression_holds_binary<'e>(
+    view: ExprView<'e>,
     expr: &'e Expression<'e>,
     predicate: impl Fn(&BinaryExpression<'_>) -> bool,
 ) -> bool {
@@ -214,7 +234,7 @@ fn expression_holds_binary<'e>(
         {
             return true;
         }
-        any_expression_child(expr, |child, _| {
+        any_expression_child(view, expr, |child, _| {
             pending.push(child);
             false
         });
@@ -225,8 +245,11 @@ fn expression_holds_binary<'e>(
 /// The key a chain link is recorded under in `Printer::relational_chain_walked_links`: the
 /// source its operands cover. A binary node holds no span of its own, and no two binaries
 /// cover the same operand source — an ancestor's reaches past its descendant's on one side.
-fn chain_link_key(node: &BinaryExpression<'_>) -> Span {
-    Span::new(node.left.span().start, node.right.span().end)
+fn chain_link_key(view: ExprView<'_>, node: &BinaryExpression<'_>) -> Span {
+    Span::new(
+        view.expr(node.left).span().start,
+        view.expr(node.right).span().end,
+    )
 }
 
 /// Whether `binary` is a `<` / `<<`, the operators that open a type-argument region.
@@ -238,14 +261,14 @@ fn opens_region(binary: &BinaryExpression<'_>) -> bool {
 }
 
 /// Whether `expr` holds a binary `<` / `<<` ([`opens_region`]).
-fn holds_region_opener(expr: &Expression<'_>) -> bool {
-    expression_holds_binary(expr, opens_region)
+fn holds_region_opener(view: ExprView<'_>, expr: &Expression<'_>) -> bool {
+    expression_holds_binary(view, expr, opens_region)
 }
 
 /// Whether `expr` holds a binary the parser flagged as one that may close an open region
 /// (`BinaryExpression::may_close_type_arguments`).
-fn holds_region_closer(expr: &Expression<'_>) -> bool {
-    expression_holds_binary(expr, |binary| binary.may_close_type_arguments)
+fn holds_region_closer(view: ExprView<'_>, expr: &Expression<'_>) -> bool {
+    expression_holds_binary(view, expr, |binary| binary.may_close_type_arguments)
 }
 
 /// Whether `expr` prints a pair of its own that the pair found around it would double: a
@@ -264,7 +287,7 @@ fn supplies_its_own_pair(expr: &Expression<'_>) -> bool {
     )
 }
 
-impl Printer<'_> {
+impl<'a> Printer<'a> {
     /// The comma-list owner's region rules, asked before any element doc is built,
     /// including alternate layouts, so a shared argument doc cannot predate its marks.
     ///
@@ -287,9 +310,11 @@ impl Printer<'_> {
     pub(crate) fn mark_relational_sibling_authored_pairs<'e>(
         &self,
         elements: impl Clone
-        + DoubleEndedIterator<Item = Option<&'e Expression<'e>>>
+        + DoubleEndedIterator<Item = crate::ast::OptExprEdge<'e>>
         + ExactSizeIterator,
     ) {
+        let view = self.view;
+        let elements = elements.map(move |element| view.opt(element));
         let len = elements.len();
         if len < 2 {
             return;
@@ -316,7 +341,7 @@ impl Printer<'_> {
         let Some(opener) = elements
             .clone()
             .take(len - 1)
-            .position(|element| element.is_some_and(holds_region_opener))
+            .position(|element| element.is_some_and(|expr| holds_region_opener(view, expr)))
         else {
             return;
         };
@@ -325,7 +350,11 @@ impl Printer<'_> {
             .enumerate()
             .skip(opener + 1)
             .rev()
-            .find_map(|(i, element)| element.is_some_and(holds_region_closer).then_some(i))
+            .find_map(|(i, element)| {
+                element
+                    .is_some_and(|expr| holds_region_closer(view, expr))
+                    .then_some(i)
+            })
         else {
             return;
         };
@@ -365,12 +394,12 @@ impl Printer<'_> {
         if self.has_relational_chain_walks.get()
             && self
                 .relational_chain_walked_links
-                .is_marked(chain_link_key(node))
+                .is_marked(chain_link_key(self.view, node))
         {
             return true;
         }
         // The source preflight: the right operand of an ordinary `<` holds no `>` byte.
-        let right = node.right.span();
+        let right = self.view.expr(node.right).span();
         if !self
             .source
             .as_bytes()
@@ -386,13 +415,15 @@ impl Printer<'_> {
     /// behind a `<` link is the rare case.
     #[cold]
     fn relational_chain_region_marked(&self, node: &BinaryExpression<'_>) -> bool {
-        if !(holds_region_opener(node.left) && holds_region_closer(node.right)) {
+        if !(holds_region_opener(self.view, self.view.expr(node.left))
+            && holds_region_closer(self.view, self.view.expr(node.right)))
+        {
             return false;
         }
-        self.mark_region_source_pairs(node.left, ChildSlot::Other);
-        self.mark_region_source_pairs(node.right, ChildSlot::Other);
+        self.mark_region_source_pairs(self.view.expr(node.left), ChildSlot::Other);
+        self.mark_region_source_pairs(self.view.expr(node.right), ChildSlot::Other);
         self.relational_chain_walked_links
-            .mark(chain_link_key(node));
+            .mark(chain_link_key(self.view, node));
         self.has_relational_chain_walks.set(true);
         true
     }
@@ -438,7 +469,10 @@ impl Printer<'_> {
     /// decides each node's own pair on the way back up, once every child has answered
     /// whether it holds a `<` / `<<` — the one order that matters, since the marks are sets
     /// and nothing the walk asks reads them.
-    fn mark_region_source_pairs<'e>(&self, expr: &'e Expression<'e>, slot: ChildSlot) {
+    fn mark_region_source_pairs<'e>(&self, expr: &'e Expression<'e>, slot: ChildSlot)
+    where
+        'a: 'e,
+    {
         /// A step of the walk: enter a child of the node at `parent` (`None` for the root),
         /// or leave the node at an index into `visited` once its children are done.
         enum Step<'e> {
@@ -470,7 +504,7 @@ impl Printer<'_> {
                     });
                     steps.push(Step::Leave(index));
                     let first_child = steps.len();
-                    any_expression_child(expr, |child, slot| {
+                    any_expression_child(self.view, expr, |child, slot| {
                         steps.push(Step::Enter(child, slot, Some(index)));
                         false
                     });
@@ -504,7 +538,7 @@ impl Printer<'_> {
             && binary.operator == BinaryOperator::LessThan
         {
             self.relational_chain_walked_links
-                .mark(chain_link_key(binary));
+                .mark(chain_link_key(self.view, binary));
             self.has_relational_chain_walks.set(true);
         }
         let list_end = match slot {
@@ -523,8 +557,9 @@ impl Printer<'_> {
                 // stripped one would leave `c = d` where the author's `(` stood, which
                 // inside an authored sequence pair (`(y, c = d)`) tsc's recovery reads as
                 // a function type's parameters.
-                if self.holds_authored_pair(assign.left, None) {
-                    self.region_kept_shell_targets.mark(assign.left.span());
+                if self.holds_authored_pair(self.view.expr(assign.left), None) {
+                    self.region_kept_shell_targets
+                        .mark(self.view.expr(assign.left).span());
                     self.has_region_source_marks.set(true);
                 }
                 if slot.assignment_pair_follows_source()
@@ -545,11 +580,11 @@ impl Printer<'_> {
                 // (`(x) =>⏎a ? b : c < d,`), and the line reads as a generic call on the next
                 // pass.
                 if let ArrowFunctionBody::Expression(body) = &arrow.body {
-                    match body.kind {
+                    match self.view.expr(*body).kind {
                         ExpressionKind::ConditionalExpression(_)
-                            if !self.holds_authored_pair(body, None) =>
+                            if !self.holds_authored_pair(self.view.expr(*body), None) =>
                         {
-                            self.mark_region_bare(body.span());
+                            self.mark_region_bare(self.view.expr(*body).span());
                         }
                         // A curried chain: printed bare, a head's `=>` follows another
                         // inside the region, a line tsv's own parse can refuse
@@ -559,8 +594,8 @@ impl Printer<'_> {
                             if self.holds_authored_pair(expr, list_end) {
                                 self.mark_relational_sibling_pair(expr.span());
                             }
-                            if self.holds_authored_pair(body, None) {
-                                self.mark_relational_sibling_pair(body.span());
+                            if self.holds_authored_pair(self.view.expr(*body), None) {
+                                self.mark_relational_sibling_pair(self.view.expr(*body).span());
                             }
                         }
                         _ => {}
@@ -615,7 +650,7 @@ impl Printer<'_> {
     /// which is the operand's shell on the next pass, and the head's shell inside it is
     /// still the author's.
     fn mark_prefix_operator_shells(&self, unary: &UnaryExpression<'_>) {
-        let mut node = unary.argument;
+        let mut node = self.view.expr(unary.argument);
         // Where the last marked pair's content starts: a head starting there too stands
         // behind that same `(`, which is not a pair of its own.
         let mut marked_start = None;
@@ -632,10 +667,12 @@ impl Printer<'_> {
                 return;
             }
             node = match &node.kind {
-                ExpressionKind::MemberExpression(member) => member.object,
-                ExpressionKind::CallExpression(call) => call.callee,
-                ExpressionKind::TaggedTemplateExpression(tagged) => tagged.tag,
-                ExpressionKind::TSNonNullExpression(non_null) => non_null.expression,
+                ExpressionKind::MemberExpression(member) => self.view.expr(member.object),
+                ExpressionKind::CallExpression(call) => self.view.expr(call.callee),
+                ExpressionKind::TaggedTemplateExpression(tagged) => self.view.expr(tagged.tag),
+                ExpressionKind::TSNonNullExpression(non_null) => {
+                    self.view.expr(non_null.expression)
+                }
                 _ => return,
             };
         }
@@ -679,7 +716,7 @@ impl Printer<'_> {
     #[inline]
     pub(in crate::printer) fn arrow_body_takes_ternary_pair(&self, body: &Expression<'_>) -> bool {
         matches!(body.kind, ExpressionKind::ConditionalExpression(_))
-            && !has_leftmost_arrow_body_parens(body)
+            && !has_leftmost_arrow_body_parens(self.view, body)
             && !self.region_withholds_pair(body)
     }
 

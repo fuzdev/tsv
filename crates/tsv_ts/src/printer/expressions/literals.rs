@@ -465,14 +465,15 @@ impl<'a> Printer<'a> {
 
     /// Build a Doc for a spread element
     pub(in crate::printer) fn build_spread_doc(&self, spread: &ast::SpreadElement<'_>) -> DocId {
+        let argument = self.view.expr(spread.argument);
         let d = self.d();
-        let needs_parens = self.needs_parens(spread.argument, super::ParenContext::SpreadArgument);
+        let needs_parens = self.needs_parens(argument, super::ParenContext::SpreadArgument);
         // Check for comments between `...` and the argument (e.g., `.../* comment */ arr`)
         let dots_end = spread.span.start + "...".len() as u32;
-        let arg_start = spread.argument.span().start;
+        let arg_start = argument.span().start;
 
         // Check for trailing comments from stripped grouping parens: `...(x /* c */)`
-        let argument_end = spread.argument.span().end;
+        let argument_end = argument.span().end;
         let has_trailing_comments =
             self.has_comments_to_emit_between(argument_end, spread.span.end);
 
@@ -492,12 +493,12 @@ impl<'a> Printer<'a> {
         // Parens the argument REQUIRES are the printer's, not the author's, so they ride
         // OUTSIDE the slice — and the slice→`)` gap is answered by the shell's own trailing
         // emitter rather than a second pair open-coded here (`docs/comments.md` hazard 4).
-        if let Some(frozen) = self.value_head_frozen_span(dots_end, spread.argument.span()) {
+        if let Some(frozen) = self.value_head_frozen_span(dots_end, argument.span()) {
             let mut inner: DocBuf = DocBuf::new();
             if needs_parens {
                 inner.push(d.text("("));
             }
-            inner.push(self.build_frozen_expression_doc(spread.argument, frozen));
+            inner.push(self.build_frozen_expression_doc(argument, frozen));
             if has_trailing_comments {
                 self.append_paren_interior_trailing_comments(
                     &mut inner,
@@ -518,7 +519,7 @@ impl<'a> Printer<'a> {
         // argument from the `...` gap, ahead of that pair, which is where the reparse reads
         // it (`Printer::left_spine_run_claim`): the gap runs to the claimed region's end.
         let claim = needs_parens
-            .then(|| self.left_spine_run_claim(spread.span, dots_end, spread.argument, || true))
+            .then(|| self.left_spine_run_claim(spread.span, dots_end, argument, || true))
             .flatten();
         let gap_end = claim.map_or(arg_start, |claim| claim.region.end.max(arg_start));
         self.with_left_spine_claim(claim, || {
@@ -528,7 +529,7 @@ impl<'a> Printer<'a> {
             // gets the continuation indent. Non-binary arguments are unaffected.
             let interior_start = self.spread_printed_interior(spread).start;
             let arg_doc = self.with_claimed_right_spine_run(interior_start, argument_end, || {
-                self.build_expression_doc_with_indent_on_break(spread.argument)
+                self.build_expression_doc_with_indent_on_break(argument)
             });
 
             // A block run the author broke AFTER, before an argument that WILL BREAK or holding a

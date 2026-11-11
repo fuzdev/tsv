@@ -51,7 +51,7 @@ impl<'a> Printer<'a> {
         self.build_paren_head_statement_doc(
             ParenHeadKind::WHILE,
             span.start,
-            stmt.test,
+            self.view.expr(stmt.test),
             stmt.body,
             ctx,
         )
@@ -79,7 +79,7 @@ impl<'a> Printer<'a> {
         self.build_paren_head_statement_doc(
             ParenHeadKind::WITH,
             span.start,
-            stmt.object,
+            self.view.expr(stmt.object),
             stmt.body,
             ctx,
         )
@@ -205,7 +205,7 @@ impl<'a> Printer<'a> {
         // Find the while keyword position for comment handling
         // Search forward from body end, skipping over comments to find the actual keyword
         let body_end = stmt.body.span().end;
-        let test_start = stmt.test.span().start;
+        let test_start = self.view.expr(stmt.test).span().start;
         let while_pos = self.find_keyword_in_range(body_end, test_start, "while");
 
         // The `}`→`while` gap: its comments and the separator before the keyword.
@@ -246,7 +246,7 @@ impl<'a> Printer<'a> {
         // after `while (` stays in place, where prettier relocates it outside the parens
         // (`OpenParenLineBlockComment::Preserve`).
         parts.push(self.build_statement_condition_doc(
-            stmt.test,
+            self.view.expr(stmt.test),
             open_paren,
             close_paren,
             OpenParenLineBlockComment::Preserve,

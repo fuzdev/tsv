@@ -44,7 +44,7 @@ fn build_import_head_doc(
     let import_end = start + "import".len() as u32;
     // Bounds every scan below: the first argument is the next real token, and no `(` or
     // phase word of this import's own lies past it.
-    let source_start = import_expr.source.span().start;
+    let source_start = printer.view.expr(import_expr.source).span().start;
 
     // The head (`import`, plus `.source` / `.defer`) and where it ends in source.
     let (head, head_end) = match import_expr.phase.as_str() {
@@ -313,8 +313,9 @@ fn build_import_args_doc(
     head: DocId,
     leading_scan_start: u32,
 ) -> DocId {
+    let source = printer.view.expr(import_expr.source);
     let d = printer.d();
-    let source_start = import_expr.source.span().start;
+    let source_start = source.span().start;
 
     // Single multiline-template specifier on the `(` line — hug it, through the same
     // builder the plain call, `new` and the member chain take. Prettier reaches it the same
@@ -350,7 +351,7 @@ fn build_import_args_doc(
     // `(`, matching the leading-comment scan above it) or in the source→options gap
     // freezes the argument that follows it. The two items are named fields rather than a
     // slice, so each asks the seam with its own gap anchor.
-    let frozen_source = printer.gap_frozen_span(leading_scan_start, import_expr.source.span());
+    let frozen_source = printer.gap_frozen_span(leading_scan_start, source.span());
 
     // Parenthesize an `in` argument inside a for-header init (`for (a = import(m,
     // (b in c));…)`); a no-op elsewhere. Dynamic-import args are hand-rolled here
@@ -360,15 +361,15 @@ fn build_import_args_doc(
     let raw_source_doc = frozen_source.map_or_else(
         || {
             printer.wrap_relational_sibling_pair(
-                import_expr.source,
-                printer.for_init_in_needs_parens(import_expr.source),
+                source,
+                printer.for_init_in_needs_parens(source),
                 printer.wrap_for_init_in(
-                    import_expr.source,
-                    printer.build_expression_doc_claiming_outermost(import_expr.source),
+                    source,
+                    printer.build_expression_doc_claiming_outermost(source),
                 ),
             )
         },
-        |frozen| printer.build_frozen_arg_doc(import_expr.source, frozen),
+        |frozen| printer.build_frozen_arg_doc(source, frozen),
     );
     // The `(`→specifier gap splits three ways: the run the `(` line keeps, the run that
     // leads the specifier, and whether the parens must open.
@@ -376,7 +377,7 @@ fn build_import_args_doc(
         printer.build_paren_leading_value_doc(leading_scan_start, source_start, raw_source_doc);
     let source_doc = leading.value;
 
-    let source_end = import_expr.source.span().end;
+    let source_end = source.span().end;
     let paren_close = span.end;
 
     let options_arg = import_expr
@@ -384,13 +385,18 @@ fn build_import_args_doc(
         .as_ref()
         .map(|options| ImportOptionsArg {
             doc: printer
-                .gap_frozen_span(source_end, options.span())
+                .gap_frozen_span(source_end, printer.view.expr(*options).span())
                 .map_or_else(
-                    || printer.wrap_for_init_in(options, printer.build_expression_doc(options)),
-                    |frozen| printer.build_frozen_arg_doc(options, frozen),
+                    || {
+                        printer.wrap_for_init_in(
+                            printer.view.expr(*options),
+                            printer.build_expression_doc(printer.view.expr(*options)),
+                        )
+                    },
+                    |frozen| printer.build_frozen_arg_doc(printer.view.expr(*options), frozen),
                 ),
-            start: options.span().start,
-            end: options.span().end,
+            start: printer.view.expr(*options).span().start,
+            end: printer.view.expr(*options).span().end,
         });
 
     // Every comment gap, and the author blank between the arguments, is answered by the
@@ -426,13 +432,13 @@ fn build_import_args_doc(
     // same `printCallArguments` as a call: a zero-parameter block arrow plus an array
     // literal stays flat. The comment conjunct is asked of the `(`→specifier gap only —
     // every other gap's comment already routed through the shared comment layout above.
-    if is_hook_callback_with_deps(import_expr.source, options)
+    if is_hook_callback_with_deps(source, printer.view.expr(*options))
         && !printer.has_comments_on_page_between(leading_scan_start, source_start)
     {
         return d.concat(&[open, source_doc, d.text(", "), options_doc, d.text(")")]);
     }
 
-    if is_expandable_object(options) {
+    if is_expandable_object(printer.view.expr(*options)) {
         // Three-state conditional group matching Prettier's expand-last-arg:
         // State 0: all flat — import('source', {with: {type: 'json'}})
         // State 1: expand-last — import('source', {\n\twith: ...\n})

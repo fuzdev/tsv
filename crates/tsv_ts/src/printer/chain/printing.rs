@@ -224,7 +224,7 @@ pub(crate) fn print_node_inner<'a>(
                     // ([`crate::printer::ArrowChainContext::Callee`]) — and on the same terms: that
                     // shape opens the pair from inside the operand's doc, so a comment in either
                     // of the pair's gaps leaves the pair to the shell builders instead.
-                    let callee_chain = is_curried_arrow_chain(expr)
+                    let callee_chain = is_curried_arrow_chain(printer.view, expr)
                         && paren_leading_start.is_some_and(|start| {
                             printer.pair_gaps_are_comment_free((start, base_start), trailing_gap)
                         });
@@ -443,6 +443,7 @@ pub(crate) fn print_node_inner<'a>(
             // self-parenthesizes via `build_sequence_doc`.
             let raw_inner = printer.build_expression_doc_claiming_outermost(expr);
             let inner = if needs_parens(
+                printer.view,
                 expr,
                 ParenContext::ComputedPropertyKey,
                 printer.in_for_init(),
@@ -762,8 +763,8 @@ fn group_forces_list_break(group: &ChainGroup<'_>, printer: &Printer<'_>) -> boo
             .nodes
             .iter()
             .filter_map(ChainNode::as_call_expression)
-            .flat_map(|call| call.arguments.iter())
-            .any(|arg| printer.span_holds_forced_list_break(arg.span()))
+            .flat_map(|call| printer.view.list(call.arguments).iter())
+            .any(|arg| printer.span_holds_forced_list_break(printer.view.expr(*arg).span()))
 }
 
 //

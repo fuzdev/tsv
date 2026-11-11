@@ -302,7 +302,7 @@ fn a_directive_name_claims_span_identity_only_when_clean() {
                 Some(AttributeNode::BindDirective(d)) => d.expression,
                 _ => panic!("{source:?}: no directive"),
             };
-            let ExpressionKind::Identifier(id) = &expression.kind else {
+            let ExpressionKind::Identifier(id) = &root.view().expr(expression).kind else {
                 panic!("{source:?}: the shorthand expression is not an Identifier");
             };
             let channel = id.ident_name();

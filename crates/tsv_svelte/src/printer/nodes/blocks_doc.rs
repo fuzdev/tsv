@@ -12,6 +12,7 @@ use crate::printer::{HeadExpr, Printer};
 use smallvec::smallvec;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
+use tsv_ts::ast::ExprView;
 
 use super::fragment_doc::LeadingEdge;
 use super::helpers::{HeadTail, each_expr_comment_end};
@@ -98,25 +99,26 @@ pub(super) struct AwaitPieces {
 /// False for a binary/logical chain (ends on an operand), a multi-segment member chain (a
 /// `.method(...)` segment, not a bare `)`), a sequence (its `)` is glued to the last operand
 /// one indent in, not at base), and an `as` / `satisfies` cast (ends on the type).
-fn ends_at_base_closer(expr: &tsv_ts::ast::Expression<'_>) -> bool {
+fn ends_at_base_closer(view: ExprView<'_>, expr: &tsv_ts::ast::Expression<'_>) -> bool {
     use tsv_ts::ast::ArrowFunctionBody;
     use tsv_ts::ast::ExpressionKind as E;
     // A callee with no nested call means the only `(` belongs to this call, so its
     // `)` lands at the tag base when the args wrap (vs. a chain, whose segments indent).
-    fn callee_has_no_call(mut e: &tsv_ts::ast::Expression<'_>) -> bool {
+    fn callee_has_no_call(view: ExprView<'_>, e: &tsv_ts::ast::Expression<'_>) -> bool {
+        let mut e = e;
         // A loop down the spine, not a recursion: a frame per link is what the stack
         // contract prices
         loop {
             match &e.kind {
                 E::Identifier(_) | E::ThisExpression(_) | E::Super(_) => return true,
-                E::MemberExpression(m) => e = m.object,
+                E::MemberExpression(m) => e = view.expr(m.object),
                 _ => return false,
             }
         }
     }
     match &expr.kind {
-        E::CallExpression(c) => callee_has_no_call(c.callee),
-        E::NewExpression(n) => callee_has_no_call(n.callee),
+        E::CallExpression(c) => callee_has_no_call(view, view.expr(c.callee)),
+        E::NewExpression(n) => callee_has_no_call(view, view.expr(n.callee)),
         // `import(…)` owns its parens outright, so it always ends at `)` — the plain
         // call arm one syntax over. (A JSDoc cast does too; see the doc comment for why
         // it is nonetheless off this list.)
@@ -131,10 +133,10 @@ fn ends_at_base_closer(expr: &tsv_ts::ast::Expression<'_>) -> bool {
         // expression ends (`() => a &&⏎\tb`), one indent in.
         E::ArrowFunctionExpression(a) => matches!(a.body, ArrowFunctionBody::BlockStatement(_)),
         // Transparent wrappers — see the doc comment above.
-        E::UnaryExpression(u) => ends_at_base_closer(u.argument),
-        E::AwaitExpression(a) => ends_at_base_closer(a.argument),
-        E::TSTypeAssertion(t) => ends_at_base_closer(t.expression),
-        E::TSNonNullExpression(t) => ends_at_base_closer(t.expression),
+        E::UnaryExpression(u) => ends_at_base_closer(view, view.expr(u.argument)),
+        E::AwaitExpression(a) => ends_at_base_closer(view, view.expr(a.argument)),
+        E::TSTypeAssertion(t) => ends_at_base_closer(view, view.expr(t.expression)),
+        E::TSNonNullExpression(t) => ends_at_base_closer(view, view.expr(t.expression)),
         _ => false,
     }
 }
@@ -317,13 +319,20 @@ fn await_shorthand(block: &ast::AwaitBlock<'_>, ws: SectionWhitespace) -> AwaitS
 /// always written in its own head; a third narrowing here owes the same argument.
 /// Pinned by `svelte/blocks/await/catch_shorthand_body_comment_prettier_divergence`.
 pub(super) fn await_expr_comment_end(
+    view: ExprView<'_>,
     block: &ast::AwaitBlock<'_>,
     shorthand: AwaitShorthand,
 ) -> u32 {
     let head_end = block.opening_tag_span.end - 1;
     match shorthand {
-        AwaitShorthand::Then => block.value.as_ref().map_or(head_end, |v| v.span().start),
-        AwaitShorthand::Catch => block.error.as_ref().map_or(head_end, |e| e.span().start),
+        AwaitShorthand::Then => block
+            .value
+            .as_ref()
+            .map_or(head_end, |v| view.expr(*v).span().start),
+        AwaitShorthand::Catch => block
+            .error
+            .as_ref()
+            .map_or(head_end, |e| view.expr(*e).span().start),
         AwaitShorthand::None => head_end,
     }
     .min(head_end)
@@ -395,7 +404,7 @@ impl<'a> Printer<'a> {
             // applies the continuation indent in place), so there is never a debt here.
             owes_continuation_indent: _,
         } = head;
-        let hug = ends_at_base_closer(expr) && !layout.opens_own_line();
+        let hug = ends_at_base_closer(self.view, expr) && !layout.opens_own_line();
         let open_doc = self.head_open_doc(open, layout.opens_own_line());
         let (close_text, clause) = closer.parts();
         let close = d.text(close_text);
@@ -669,7 +678,7 @@ impl<'a> Printer<'a> {
                 let head_expr = self.build_else_if_expr_doc(else_if, true);
                 let head = self.build_block_head(
                     ELSE_IF_BLOCK_OPEN,
-                    else_if.test,
+                    self.view.expr(else_if.test),
                     head_expr,
                     HeadCloser::BlockTag(None),
                     self.block_dangle_allowed(),
@@ -743,7 +752,7 @@ impl<'a> Printer<'a> {
         let head = self.build_block_head_expr(
             IF_BLOCK_OPEN,
             block.opening_tag_span,
-            block.test,
+            self.view.expr(block.test),
             block.opening_tag_span.end - 1,
             allow_wrapping || in_multiline_context,
             HeadTail::Delimiter,
@@ -752,7 +761,7 @@ impl<'a> Printer<'a> {
         let can_wrap = self.block_head_can_wrap(allow_wrapping, in_multiline_context);
         let head_doc = self.build_block_head(
             IF_BLOCK_OPEN,
-            block.test,
+            self.view.expr(block.test),
             head,
             HeadCloser::BlockTag(None),
             can_wrap,
@@ -850,7 +859,7 @@ impl<'a> Printer<'a> {
         self.build_block_head_expr(
             ELSE_IF_BLOCK_OPEN,
             else_if.opening_tag_span,
-            else_if.test,
+            self.view.expr(else_if.test),
             else_if.opening_tag_span.end - 1,
             in_multiline_context,
             HeadTail::Delimiter,
@@ -876,7 +885,7 @@ impl<'a> Printer<'a> {
             // as its wrapping flag, so the dangle keys on the same condition.
             let head_doc = self.build_block_head(
                 ELSE_IF_BLOCK_OPEN,
-                else_if.test,
+                self.view.expr(else_if.test),
                 head_expr,
                 HeadCloser::BlockTag(None),
                 in_multiline_context && self.block_dangle_allowed(),
@@ -980,7 +989,13 @@ impl<'a> Printer<'a> {
             return Some(self.build_prefixed_head_doc("(", key_head, self.d().text(")")));
         }
         let can_wrap = self.block_head_can_wrap(allow_wrapping, in_multiline_context);
-        Some(self.build_block_head("(", key.expression, key_head, HeadCloser::EachKey, can_wrap))
+        Some(self.build_block_head(
+            "(",
+            self.view.expr(key.expression),
+            key_head,
+            HeadCloser::EachKey,
+            can_wrap,
+        ))
     }
 
     /// Build each block doc with full context (multiline + preceding content).
@@ -996,11 +1011,11 @@ impl<'a> Printer<'a> {
         let d = self.d();
         // Build expression doc with context-dependent behavior
         let allow_wrapping = !has_preceding_breakable;
-        let expr_comment_end = each_expr_comment_end(block);
+        let expr_comment_end = each_expr_comment_end(self.view, block);
         let head = self.build_block_head_expr(
             EACH_BLOCK_OPEN,
             block.opening_tag_span,
-            block.expression,
+            self.view.expr(block.expression),
             expr_comment_end,
             allow_wrapping || in_multiline_context,
             HeadTail::of_each(block),
@@ -1026,7 +1041,7 @@ impl<'a> Printer<'a> {
         // `build_block_head`); the degenerate index/key-without-`as` cases (not
         // valid Svelte) keep hugging the expression unchanged.
         let mut clause_forced_break = key_forced_break;
-        let (head_expr, clause) = if let Some(context) = block.context {
+        let (head_expr, clause) = if let Some(context) = self.view.opt(block.context) {
             let mut clause_parts: DocBuf = smallvec![d.text("as ")];
             // A comment-broken binding pattern breaks the head the way a forced-open key does,
             // and for the same reason the verdict is asked of the pattern's own doc here: the
@@ -1066,7 +1081,7 @@ impl<'a> Printer<'a> {
         let can_wrap = self.block_head_can_wrap(allow_wrapping, in_multiline_context);
         let head_doc = self.build_block_head(
             EACH_BLOCK_OPEN,
-            block.expression,
+            self.view.expr(block.expression),
             head_expr,
             HeadCloser::BlockTag(clause),
             can_wrap,
@@ -1158,7 +1173,7 @@ impl<'a> Printer<'a> {
         match block.value {
             Some(value) => d.concat(&[
                 d.text("{:then "),
-                self.build_block_pattern_doc(value),
+                self.build_block_pattern_doc(self.view.expr(value)),
                 d.text("}"),
             ]),
             None => d.text("{:then}"),
@@ -1176,7 +1191,7 @@ impl<'a> Printer<'a> {
     /// body, which trims to an empty one, keeps it on every later pass too.
     fn await_catch_keyword(&self, block: &ast::AwaitBlock<'_>) -> Option<DocId> {
         let d = self.d();
-        if let Some(error) = block.error {
+        if let Some(error) = self.view.opt(block.error) {
             Some(d.concat(&[
                 d.text("{:catch "),
                 self.build_block_pattern_doc(error),
@@ -1200,11 +1215,17 @@ impl<'a> Printer<'a> {
         let d = self.d();
         match shorthand {
             AwaitShorthand::Then => Some(match block.value {
-                Some(value) => d.concat(&[d.text("then "), self.build_block_pattern_doc(value)]),
+                Some(value) => d.concat(&[
+                    d.text("then "),
+                    self.build_block_pattern_doc(self.view.expr(value)),
+                ]),
                 None => d.text("then"),
             }),
             AwaitShorthand::Catch => Some(match block.error {
-                Some(error) => d.concat(&[d.text("catch "), self.build_block_pattern_doc(error)]),
+                Some(error) => d.concat(&[
+                    d.text("catch "),
+                    self.build_block_pattern_doc(self.view.expr(error)),
+                ]),
                 None => d.text("catch"),
             }),
             AwaitShorthand::None => None,
@@ -1302,8 +1323,8 @@ impl<'a> Printer<'a> {
         let head = self.build_block_head_expr(
             AWAIT_BLOCK_OPEN,
             block.opening_tag_span,
-            block.expression,
-            await_expr_comment_end(block, sections.shorthand),
+            self.view.expr(block.expression),
+            await_expr_comment_end(self.view, block, sections.shorthand),
             allow_wrapping || in_multiline_context,
             HeadTail::of_await(sections.shorthand),
         );
@@ -1358,7 +1379,7 @@ impl<'a> Printer<'a> {
         // clause.
         let head_doc = self.build_block_head(
             AWAIT_BLOCK_OPEN,
-            block.expression,
+            self.view.expr(block.expression),
             head,
             HeadCloser::BlockTag(clause),
             can_wrap,
@@ -1427,7 +1448,7 @@ impl<'a> Printer<'a> {
         let head = self.build_block_head_expr(
             KEY_BLOCK_OPEN,
             block.opening_tag_span,
-            block.expression,
+            self.view.expr(block.expression),
             block.opening_tag_span.end - 1,
             allow_wrapping || in_multiline_context,
             HeadTail::Delimiter,
@@ -1436,7 +1457,7 @@ impl<'a> Printer<'a> {
         let can_wrap = self.block_head_can_wrap(allow_wrapping, in_multiline_context);
         let head_doc = self.build_block_head(
             KEY_BLOCK_OPEN,
-            block.expression,
+            self.view.expr(block.expression),
             head,
             HeadCloser::BlockTag(None),
             can_wrap,
@@ -1491,7 +1512,7 @@ impl<'a> Printer<'a> {
         let params_inner = match block.params_paren {
             Some(paren) => tsv_ts::__private::build_function_params_doc(
                 d,
-                block.parameters,
+                self.view.run(block.parameters),
                 Some(paren.start),
                 Some(paren.end),
                 &self.ts_inputs(),
@@ -1513,7 +1534,7 @@ impl<'a> Printer<'a> {
         d.group(d.concat(&[
             d.text("{#snippet "),
             // The snippet name, verbatim from the identifier expression's span.
-            d.source_span(block.expression.span(), self.source),
+            d.source_span(self.view.expr(block.expression).span(), self.source),
             type_params_part,
             params_doc,
             d.text("}"),

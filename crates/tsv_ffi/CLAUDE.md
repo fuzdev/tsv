@@ -50,7 +50,7 @@ are top-level `import`/`export` declarations, `import.meta` and a top-level `for
 
 - **Code `2`** says the caller named **no** source type, and is accepted by the
   **format exports only**, on every language: a formatter answers it with the module
-  grammar retried as a script (`tsv_ts::__private::parse_with_goal_or_fallback` — see
+  grammar retried as a script (`tsv_ts::__private::parse_with_goal_or_fallback_into` — see
   [../../docs/cli.md §Multi-File Formatting](../../docs/cli.md#multi-file-formatting)),
   and a goalless one has nothing to answer at all, while a parse export's wire carries
   a `Program.sourceType` that one settled grammar has to produce.

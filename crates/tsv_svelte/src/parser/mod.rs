@@ -40,8 +40,9 @@ pub(crate) use expression_tag::scan_to_matching_brace;
 pub(crate) fn parse_svelte<'arena>(
     source: &str,
     arena: &'arena bumpalo::Bump,
+    stores: &mut tsv_ts::ast::AstStores<'arena>,
 ) -> Result<Root<'arena>, Error> {
-    let mut parser = SvelteParser::new(source, arena)?;
+    let mut parser = SvelteParser::new(source, arena, stores)?;
     parser.parse_root()
 }
 
