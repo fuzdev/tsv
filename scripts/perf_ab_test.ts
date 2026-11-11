@@ -1,6 +1,6 @@
 /**
- * `perf:ab` over scratch git repos and fake programs: the `git ls-tree -z` listing and the strip
- * entry-point probe, the driver build's reuse rule and its copy out of the target dir, each
+ * `perf:ab` over scratch git repos and fake programs: the `git ls-tree -z` listing, the strip
+ * entry-point and driver-API probes, the driver build's reuse rule and its copy out of the target dir, each
  * driver made a program through the cache once its binary is in place, the environment each
  * child gets, and a whole run over a fake build, fake drivers and a fake `perf`. No cargo runs.
  *
@@ -23,14 +23,17 @@ import {
 	build_args,
 	BUILD_FIXED_ENV,
 	build_side,
+	DRIVER_APIS,
 	DRIVER_PASS_ENV,
 	type DriverBuild,
 	driver_binary_name,
+	driver_recipe_hash,
 	ensure_driver,
 	type PerfAbCache,
 	type PerfAbDeps,
 	run_perf_ab_command,
 	type Side,
+	tree_driver_api,
 	tree_has_strip
 } from './perf_ab.ts';
 import { build_inputs_of } from './perf_ab_verdict.ts';
@@ -126,6 +129,51 @@ test('the strip entry point is found in both of its spellings, and nothing else'
 	strictEqual(await has_strip_with(dir, 'pub fn strip_in(\n    source: &str,\n) {}\n'), true);
 	strictEqual(await has_strip_with(dir, 'pub fn strip(source: &str) {}\n'), false);
 	strictEqual(await has_strip_with(dir, 'pub fn strip_input(source: &str) {}\n'), false);
+	const mentioned =
+		'// pub fn strip_in(source: &str)\n/// see pub fn strip_in(\npub fn strip() {}\n';
+	strictEqual(await has_strip_with(dir, mentioned), false);
+});
+
+/** Commit `private_rs` as a scratch repo's `crates/tsv_ts/src/__private.rs` and ask which
+ * entry-point generation the drivers build against for the tree. */
+const driver_api_with = async (dir: FsDir, private_rs: string): Promise<string | null> => {
+	await dir.write('crates/tsv_ts/src/__private.rs', private_rs);
+	await run_git(dir, ['add', '-A']);
+	return (await tree_driver_api(make_git(), dir, await run_git(dir, ['write-tree']))).cfg;
+};
+
+test('a tree with the warm parse is the current generation, any other the oldest', async () => {
+	clear_git_repo_env();
+	await using dir = await fs.temp_dir('perf_ab_test-');
+	await run_git(dir, ['init', '--quiet']);
+	await dir.mkdir('crates/tsv_ts/src', { recursive: true });
+	const warm = "pub fn parse_folded_into<'arena>(\n    folded: &FoldedSource<'_>,\n) {}\n";
+	strictEqual(await driver_api_with(dir, warm), null);
+	const lifetime_free = "pub fn parse_folded_into(\n    folded: &FoldedSource<'_>,\n) {}\n";
+	strictEqual(await driver_api_with(dir, lifetime_free), null);
+	const bump_only = "pub fn parse_folded<'arena>(\n    arena: &'arena Bump,\n) {}\n";
+	strictEqual(await driver_api_with(dir, bump_only), 'no_stores');
+	const lookalike = 'pub fn parse_folded_into_arena(source: &str) {}\n';
+	strictEqual(await driver_api_with(dir, lookalike), 'no_stores');
+	const mentioned =
+		"// pub fn parse_folded_into<'arena>(\n    /// pub fn parse_folded_into(\npub fn parse_folded() {}\n";
+	strictEqual(await driver_api_with(dir, mentioned), 'no_stores');
+});
+
+test('an older generation differs from the current build only by its cfg', () => {
+	const [current, ...older] = DRIVER_APIS;
+	strictEqual(current!.cfg, null);
+	strictEqual(older.at(-1)!.probe, null);
+	const plain = build_args('perf_ab', current!);
+	const split = plain.indexOf('--');
+	deepStrictEqual(plain.slice(split), [
+		'--',
+		'--check-cfg',
+		`cfg(perf_ab_api, values(${older.map((api) => `"${api.cfg}"`).join(', ')}))`
+	]);
+	for (const api of older) {
+		deepStrictEqual(build_args('perf_ab', api), [...plain, '--cfg', `perf_ab_api="${api.cfg}"`]);
+	}
 });
 
 test('extract_tree extracts the named paths of a tree through git archive and tar', async () => {
@@ -162,15 +210,22 @@ const SIDE: Side = {
 	tree: 'b'.repeat(40),
 	key: KEY,
 	inputs: ['Cargo.toml', 'crates', 'src'],
-	has_strip: true
+	has_strip: true,
+	api: DRIVER_APIS[0]!
 };
 const driver_build = (kind: 'format' | 'strip'): DriverBuild => ({
 	kind,
 	source: new TextEncoder().encode(`// the ${kind} driver\n`),
-	hash: `${kind === 'format' ? '1' : '2'}`.repeat(64),
-	recipe_hash: '3'.repeat(64)
+	hash: `${kind === 'format' ? '1' : '2'}`.repeat(64)
 });
 const DRIVERS = { format: driver_build('format'), strip: driver_build('strip') };
+/** The name of `kind`'s binary for `SIDE`, whose recipe is its generation's. */
+const binary_name = async (kind: 'format' | 'strip'): Promise<string> =>
+	driver_binary_name(
+		KEY,
+		DRIVERS[kind],
+		await driver_recipe_hash(kind === 'format' ? 'perf_ab' : 'perf_ab_strip', SIDE.api)
+	);
 
 const unused = (name: string) => (): never => {
 	throw new Error(`${name} must not run`);
@@ -248,8 +303,9 @@ const ensure_deps = (build: SpawnProgram) => ({
 test('a driver whose content-addressed binary exists is reused, never rebuilt', async () => {
 	vi.spyOn(console, 'error').mockImplementation(() => undefined);
 	await using cache = await fs.temp_dir('perf_ab_test_cache-');
-	const name = driver_binary_name(KEY, DRIVERS.format);
-	strictEqual(name, `${KEY}/perf_ab-${'1'.repeat(16)}-${'3'.repeat(16)}`);
+	const name = await binary_name('format');
+	const recipe = await driver_recipe_hash('perf_ab', SIDE.api);
+	strictEqual(name, `${KEY}/perf_ab-${'1'.repeat(16)}-${recipe.slice(0, 16)}`);
 	await cache.mkdir(KEY);
 	await cache.write(name, 'built before');
 	// no snapshot, no git, no tar, no build: any of them would throw
@@ -279,9 +335,9 @@ test('a driver is built in its snapshot with the overlay, then copied out execut
 	});
 	const name = await ensure_driver(ensure_deps(build.program), cache, SIDE, DRIVERS.strip);
 	deepStrictEqual(build.calls, [
-		{ args: build_args('perf_ab_strip'), cwd: `${cache.path}/${KEY}/src` }
+		{ args: build_args('perf_ab_strip', SIDE.api), cwd: `${cache.path}/${KEY}/src` }
 	]);
-	strictEqual(name, driver_binary_name(KEY, DRIVERS.strip));
+	strictEqual(name, await binary_name('strip'));
 	strictEqual(await cache.read_text(name), 'perf_ab_strip binary');
 	strictEqual((await cache.stat(name))!.mode & 0o777, 0o755);
 	strictEqual(
@@ -299,7 +355,7 @@ test('a build that reports an executable outside the cache is refused, nothing c
 		ensure_driver(ensure_deps(build.program), cache, SIDE, DRIVERS.format),
 		(err) => err instanceof HarnessError && /\/usr\/bin\/true is not beneath/.test(err.message)
 	);
-	strictEqual(await cache.exists(driver_binary_name(KEY, DRIVERS.format)), false);
+	strictEqual(await cache.exists(await binary_name('format')), false);
 });
 
 test('a failed build, or one that reports no executable, is a harness error', async () => {
@@ -360,8 +416,8 @@ test('each driver is made a program through the cache, by its name beneath it, o
 		}
 	};
 	const binaries = await build_side(ensure_deps(build.program), cache, SIDE, DRIVERS, true);
-	const format = driver_binary_name(KEY, DRIVERS.format);
-	const strip = driver_binary_name(KEY, DRIVERS.strip);
+	const format = await binary_name('format');
+	const strip = await binary_name('strip');
 	deepStrictEqual(made, [
 		{ name: format, built: true },
 		{ name: strip, built: true }
@@ -608,9 +664,11 @@ test('a run builds each driver once, runs it beneath the cache under perf, and p
 			['../target', 'unset']
 		]
 	);
+	// the scratch workspace has no warm parse, so each side is of the oldest generation
+	const oldest = DRIVER_APIS.at(-1)!;
 	deepStrictEqual(
 		builds.map((line) => line.split('|')[0]),
-		[build_args('perf_ab').join(' '), build_args('perf_ab_strip').join(' ')]
+		[build_args('perf_ab', oldest).join(' '), build_args('perf_ab_strip', oldest).join(' ')]
 	);
 	// every counted run hands perf the driver's real path beneath the cache, after `--`
 	const counted = first.log.filter((line) =>

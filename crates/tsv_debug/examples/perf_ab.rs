@@ -6,25 +6,48 @@
 //! checkout's copy over each snapshot before building, so both sides run the same measuring
 //! code and only the measured libraries differ. That only works for a file that compiles
 //! against an old tree unchanged: an example is discovered by cargo with no manifest or
-//! subcommand registration to patch, and this one reads nothing but the language crates' stable
-//! entry points (`parse_folded` / `format_folded_in`, the carriage-return fold, `DocArena`).
+//! subcommand registration to patch, and this one reads nothing but the language crates' hidden
+//! entry points, through its `api` arms (below): the folded parse (`parse_folded`, or
+//! `parse_folded_into` into `tsv_ts::ast::AstStores` kept warm by its `Default` and `park`), the
+//! format (`format_folded_in`, through `parsed_ref` beside the stores), the carriage-return fold
+//! and `DocArena`.
 //! `profile` itself could not be overlaid — it carries every mode the subcommand grew since.
 //! A base tree that lacks one of those entry points fails the build, loudly.
+//!
+//! **One driver, one arm per entry-point generation.** The entry points this driver calls
+//! change as the parse moves from the `Bump` into stores, so the calls sit in an `api`
+//! module with one arm per generation of the trees it measures, and everything else — the
+//! walk, the timing, the statistics — is shared. The unmarked arm is the current tree's, which
+//! every `cargo check --all-targets` compiles; an older generation's arm is selected by a
+//! `perf_ab_api` cfg the task passes to this example's own compilation (`cargo rustc … --
+//! --cfg`, so no library is built differently) after probing the side's tree for it
+//! (`DRIVER_APIS` in the task). An older arm compiles only against trees of its generation and
+//! is never type-checked in the current one. When a change moves an entry point the driver
+//! calls, its arm becomes the previous generation's (a new `perf_ab_api` value, with the
+//! task's probe for it) and the unmarked arm takes the new calls.
+//!
+//! - The current arm parses TypeScript and Svelte into warm stores, taken from the previous
+//!   iteration before the timed regions and parked after them, as the CLI's `Formatter` keeps
+//!   them; CSS has no stores and parses into the `Bump` alone.
+//! - `perf_ab_api = "no_stores"`, a tree older than the parse stores, parses every language
+//!   into the `Bump` alone.
 //!
 //! Usage: `perf_ab <corpus-dir> --lang ts|svelte|css --iterations N [--parse-only]`.
 //!
 //! - The phases are `profile`'s format mode: the fold and the parse in the parse column, the
-//!   format in the format column; one AST `Bump` and one `DocArena` reused across every file and
-//!   iteration, reset between them outside the timed regions.
+//!   format in the format column; one AST `Bump`, one `DocArena` and the arm's warm stores
+//!   reused across every file and iteration, reset or parked between them outside the timed
+//!   regions.
 //! - The file set is `profile`'s directory walk (the discovery prune policy, the formattable
 //!   extensions, `input_invalid_*` dropped), filtered to the files `--lang` parses with.
 //! - `--parse-only` skips the format, so an `instructions:u` count around this process splits by
 //!   phase (format = full − parse-only); `--iterations 0` reads the files and times nothing,
 //!   which is the run's fixed cost.
 //!
-//! - The arena resets sit outside the timed regions (as in `profile`, whose wall numbers this
-//!   matches), but inside the process an `instructions:u` count covers — so the instruction
-//!   column carries the resets (the `DocArena` one lands in format = full − parse-only) and the
+//! - The arena resets and the stores' take and park sit outside the timed regions (as in
+//!   `profile`, whose wall numbers this matches), but inside the process an `instructions:u`
+//!   count covers — so the instruction column carries them (the `DocArena` reset lands in
+//!   format = full − parse-only, the take and park in parse = parse-only − fixed) and the
 //!   wall column does not. Excluding them from a process-level count is not possible, and timing
 //!   them would part the wall column from `profile`'s; a change that moves work into or out of a
 //!   reset shows in the instruction column alone.
@@ -44,7 +67,7 @@ use std::time::{Duration, Instant};
 
 use tsv_cli::cli::input::ParserType;
 use tsv_lang::doc::arena::DocArena;
-use tsv_lang::printing::normalize_carriage_returns;
+use tsv_lang::printing::{FoldedSource, normalize_carriage_returns};
 
 struct Args {
     corpus: PathBuf,
@@ -124,6 +147,7 @@ fn run(args: &Args) -> ExitCode {
 
     let mut arena = bumpalo::Bump::new();
     let mut doc_arena = DocArena::new();
+    let mut warm = api::Warm::default();
     let mut ok_files = 0usize;
     let mut bytes = 0usize;
     let mut errors = 0usize;
@@ -153,6 +177,7 @@ fn run(args: &Args) -> ExitCode {
                 args.parse_only,
                 &arena,
                 &doc_arena,
+                &mut warm,
             );
             // Teardown outside the timed regions, as `profile` does.
             arena.reset();
@@ -195,55 +220,191 @@ fn run(args: &Args) -> ExitCode {
     ExitCode::SUCCESS
 }
 
-/// One iteration of `profile`'s format mode: fold + parse timed as parse, then the format
-/// (skipped under `--parse-only`, reading zero); the third value is the formatted length.
+/// One iteration of `profile`'s format mode, in the language `parser_type` names, through the
+/// entry points of the tree this driver is built against (the `api` module).
 fn time_once(
     source: &str,
     parser_type: ParserType,
     parse_only: bool,
     arena: &bumpalo::Bump,
     doc_arena: &DocArena,
-) -> Result<(Duration, Duration, usize), String> {
-    let parse_error = |e: tsv_lang::Error| format!("parse error: {e}");
+    warm: &mut api::Warm,
+) -> Timed {
+    match parser_type {
+        ParserType::TypeScript => api::ts(source, parse_only, arena, doc_arena, warm),
+        ParserType::Svelte => api::svelte(source, parse_only, arena, doc_arena, warm),
+        ParserType::Css => api::css(source, parse_only, arena, doc_arena, warm),
+    }
+}
+
+/// One iteration's parse and format walls and the formatted length (both zero under
+/// `--parse-only`), or why the file failed.
+type Timed = Result<(Duration, Duration, usize), String>;
+
+/// The timed phases every language and every `api` arm shares: the fold and `parse` timed as
+/// the parse, then `format` (skipped under `parse_only`) as the format. `state` is what both
+/// closures read — an arm's warm stores, or nothing — handed to each in turn so neither holds
+/// it across the other.
+fn time_phases<S, P>(
+    source: &str,
+    parse_only: bool,
+    state: &mut S,
+    parse: impl FnOnce(&FoldedSource<'_>, &mut S) -> Result<P, tsv_lang::Error>,
+    format: impl FnOnce(&P, &FoldedSource<'_>, &S) -> String,
+) -> Timed {
     let t0 = Instant::now();
     let folded = normalize_carriage_returns(source);
-    match parser_type {
-        ParserType::TypeScript => {
-            let ast = tsv_ts::__private::parse_folded(&folded, None, arena).map_err(parse_error)?;
-            let parse = t0.elapsed();
-            if parse_only {
-                return Ok((parse, Duration::ZERO, 0));
-            }
-            let t1 = Instant::now();
-            let len = formatted_len(tsv_ts::__private::format_folded_in(
-                &ast, &folded, doc_arena,
-            ));
-            Ok((parse, t1.elapsed(), len))
-        }
-        ParserType::Svelte => {
-            let ast = tsv_svelte::__private::parse_folded(&folded, arena).map_err(parse_error)?;
-            let parse = t0.elapsed();
-            if parse_only {
-                return Ok((parse, Duration::ZERO, 0));
-            }
-            let t1 = Instant::now();
-            let len = formatted_len(tsv_svelte::__private::format_folded_in(
-                &ast, &folded, doc_arena,
-            ));
-            Ok((parse, t1.elapsed(), len))
-        }
-        ParserType::Css => {
-            let ast = tsv_css::__private::parse_folded(&folded, arena).map_err(parse_error)?;
-            let parse = t0.elapsed();
-            if parse_only {
-                return Ok((parse, Duration::ZERO, 0));
-            }
-            let t1 = Instant::now();
-            let len = formatted_len(tsv_css::__private::format_folded_in(
-                &ast, &folded, doc_arena,
-            ));
-            Ok((parse, t1.elapsed(), len))
-        }
+    let ast = parse(&folded, state).map_err(|e| format!("parse error: {e}"))?;
+    let parse = t0.elapsed();
+    if parse_only {
+        return Ok((parse, Duration::ZERO, 0));
+    }
+    let t1 = Instant::now();
+    let len = formatted_len(format(&ast, &folded, state));
+    Ok((parse, t1.elapsed(), len))
+}
+
+/// The entry points of the trees this driver measures: the current tree's, and under
+/// `perf_ab_api = "no_stores"` those of a tree older than the parse stores (module doc).
+///
+/// Each arm's `Warm` is what it keeps across files and iterations besides the AST `Bump`: the
+/// current arm's parked stores, taken before the timed regions and parked after them, so a
+/// parse reuses warm stores as the base arm reuses its `Bump`.
+#[cfg(not(perf_ab_api = "no_stores"))]
+mod api {
+    use super::{Timed, time_phases};
+    use tsv_lang::doc::arena::DocArena;
+    use tsv_ts::ast::AstStores;
+
+    /// The stores parked between iterations, rewound, shared by the TypeScript and Svelte
+    /// parses (a Svelte document's islands parse into `tsv_ts`'s stores).
+    #[derive(Default)]
+    pub(super) struct Warm {
+        stores: Option<AstStores<'static>>,
+    }
+
+    pub(super) fn ts(
+        source: &str,
+        parse_only: bool,
+        arena: &bumpalo::Bump,
+        doc_arena: &DocArena,
+        warm: &mut Warm,
+    ) -> Timed {
+        let mut stores: AstStores<'_> = warm.stores.take().unwrap_or_default();
+        let timed = time_phases(
+            source,
+            parse_only,
+            &mut stores,
+            |folded, stores| tsv_ts::__private::parse_folded_into(folded, None, arena, stores),
+            |program, folded, stores| {
+                let parsed = tsv_ts::__private::parsed_ref(program, stores);
+                tsv_ts::__private::format_folded_in(parsed, folded, doc_arena)
+            },
+        );
+        warm.stores = Some(stores.park());
+        timed
+    }
+
+    pub(super) fn svelte(
+        source: &str,
+        parse_only: bool,
+        arena: &bumpalo::Bump,
+        doc_arena: &DocArena,
+        warm: &mut Warm,
+    ) -> Timed {
+        let mut stores: AstStores<'_> = warm.stores.take().unwrap_or_default();
+        let timed = time_phases(
+            source,
+            parse_only,
+            &mut stores,
+            |folded, stores| tsv_svelte::__private::parse_folded_into(folded, arena, stores),
+            |root, folded, stores| {
+                let parsed = tsv_svelte::__private::parsed_ref(root, stores);
+                tsv_svelte::__private::format_folded_in(parsed, folded, doc_arena)
+            },
+        );
+        warm.stores = Some(stores.park());
+        timed
+    }
+
+    pub(super) fn css(
+        source: &str,
+        parse_only: bool,
+        arena: &bumpalo::Bump,
+        doc_arena: &DocArena,
+        _warm: &mut Warm,
+    ) -> Timed {
+        time_phases(
+            source,
+            parse_only,
+            &mut (),
+            |folded, ()| tsv_css::__private::parse_folded(folded, arena),
+            |stylesheet, folded, ()| {
+                tsv_css::__private::format_folded_in(stylesheet, folded, doc_arena)
+            },
+        )
+    }
+}
+
+/// The entry points of a tree older than the parse stores: every parse into the `Bump` alone.
+/// Built only against such a tree, never against the current one.
+#[cfg(perf_ab_api = "no_stores")]
+mod api {
+    use super::{Timed, time_phases};
+    use tsv_lang::doc::arena::DocArena;
+
+    /// Nothing is kept warm beside the `Bump`.
+    #[derive(Default)]
+    pub(super) struct Warm;
+
+    pub(super) fn ts(
+        source: &str,
+        parse_only: bool,
+        arena: &bumpalo::Bump,
+        doc_arena: &DocArena,
+        _warm: &mut Warm,
+    ) -> Timed {
+        time_phases(
+            source,
+            parse_only,
+            &mut (),
+            |folded, ()| tsv_ts::__private::parse_folded(folded, None, arena),
+            |ast, folded, ()| tsv_ts::__private::format_folded_in(ast, folded, doc_arena),
+        )
+    }
+
+    pub(super) fn svelte(
+        source: &str,
+        parse_only: bool,
+        arena: &bumpalo::Bump,
+        doc_arena: &DocArena,
+        _warm: &mut Warm,
+    ) -> Timed {
+        time_phases(
+            source,
+            parse_only,
+            &mut (),
+            |folded, ()| tsv_svelte::__private::parse_folded(folded, arena),
+            |ast, folded, ()| tsv_svelte::__private::format_folded_in(ast, folded, doc_arena),
+        )
+    }
+
+    pub(super) fn css(
+        source: &str,
+        parse_only: bool,
+        arena: &bumpalo::Bump,
+        doc_arena: &DocArena,
+        _warm: &mut Warm,
+    ) -> Timed {
+        time_phases(
+            source,
+            parse_only,
+            &mut (),
+            |folded, ()| tsv_css::__private::parse_folded(folded, arena),
+            |stylesheet, folded, ()| {
+                tsv_css::__private::format_folded_in(stylesheet, folded, doc_arena)
+            },
+        )
     }
 }
 

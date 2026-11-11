@@ -13,7 +13,28 @@
  * builds, so only the measured libraries differ (the first file's module doc says why they are
  * examples, the second's why the strip has its own). A tree without the strip's entry point
  * (`STRIP_ENTRY_POINT`, older than the strip) builds the format driver alone, and a run with
- * such a side skips the strip rows, saying so on stderr and under the table. The candidate
+ * such a side skips the strip rows, saying so on stderr and under the table.
+ *
+ * The entry points the drivers call change as the parse moves from the `Bump` into stores, so
+ * each driver keeps its calls in one `api` arm per generation (`perf_ab.rs`'s module doc), and
+ * each side's tree is probed for its generation (`DRIVER_APIS`, newest first). The current
+ * tree's arm is the unmarked one; an older generation's is selected with a `perf_ab_api` cfg
+ * passed to the example's own compilation (`build_args`: `cargo rustc … -- --cfg`, so every
+ * library builds as `cargo build` builds it). Per generation, each side runs:
+ *
+ * - current (a tree with `tsv_ts::__private::parse_folded_into`): TypeScript and Svelte parse
+ *   into warm stores, taken before each timed region and parked after it as the CLI's
+ *   `Formatter` keeps them (`parse_folded_into`, then `format_folded_in` through `parsed_ref`);
+ *   CSS parses into the `Bump` (`parse_folded`), having no stores; the strip driver parses with
+ *   `parse_with_goal_or_fallback_into` and strips with `strip_into`, into the same warm stores.
+ * - `no_stores` (any older tree, `main` before the stores among them): every language parses
+ *   into the `Bump` alone (`parse_folded`, then `format_folded_in`), and the strip driver calls
+ *   `parse_with_goal_or_fallback` and `strip_in`.
+ *
+ * Both reuse one AST `Bump` and one `DocArena` across files and iterations, reset outside the
+ * timed regions, so a side with stores keeps them warm as a side without them keeps its
+ * `Bump`. The report names each side's generation, and a run whose sides differ says so on
+ * stderr. The candidate
  * defaults to the WORKING TREE — `HEAD` plus every uncommitted change, untracked non-ignored
  * files included — snapshotted through a throwaway
  * copy of the index (`git add -A` + `git write-tree` under `GIT_INDEX_FILE`), so neither the
@@ -22,8 +43,8 @@
  * snapshot is keyed by its BUILD INPUTS — the sha256 of `git ls-tree -r -z <tree> --
  * <BUILD_INPUTS>`, the same list the archive takes, minus the overlaid drivers — so a change to
  * `tests/`, the docs, `scripts/` or a driver file reuses the built snapshot. A built driver
- * is keyed by the driver's content hash and by its build RECIPE (`build_command`, the
- * `BUILD_FIXED_ENV` variables and the `BUILD_ENV` names, hashed), so a re-run reuses both and a recipe change rebuilds both sides
+ * is keyed by the driver's content hash and by its build RECIPE (`build_args` for the side's
+ * generation, the `BUILD_FIXED_ENV` variables and the `BUILD_ENV` names, hashed), so a re-run reuses both and a recipe change rebuilds both sides
  * rather than measuring an old-recipe binary against a new one. A run keeps the
  * `KEEP_TREES` most recently used snapshots and evicts the rest. The report prints each side's
  * binary sha256, so two readings of one build can be told apart from two builds.
@@ -163,8 +184,39 @@ function driver_of(lang: Lang): DriverKind {
 /** The pattern (`git grep -E`) whose match in a tree's `crates/tsv_ts/src` says the strip
  * driver can build against it (`strip_skip_reason`): the entry point's declaration, spelled
  * `strip_in<'s>(` while its output borrowed the source and `strip_in(` since, and both
- * answer the driver's one call. */
-const STRIP_ENTRY_POINT = 'pub fn strip_in[<(]';
+ * answer the driver's one call. Anchored at the line start, where the item is declared, so a
+ * comment or doc line naming it cannot answer for it. */
+const STRIP_ENTRY_POINT = '^pub fn strip_in[<(]';
+
+/** One entry-point generation the drivers have an arm for: the `perf_ab_api` cfg value that
+ * selects its arm (`null` for the current tree's, the unmarked arm), the `git grep -E` pattern
+ * whose match in `path` says a tree is of it (`null` for the oldest, which every tree no newer
+ * probe matches is), and what its arms call, for the report. */
+export interface DriverApi {
+	cfg: string | null;
+	probe: { pattern: string; path: string } | null;
+	calls: string;
+}
+
+/** The generations the drivers' `api` arms cover, newest first; a side takes the first whose
+ * probe its tree matches (`tree_driver_api`), each probe anchored at the line start as
+ * `STRIP_ENTRY_POINT` is. The first is the current tree's and must stay
+ * so: when a change moves an entry point a driver calls, its arm takes a new `perf_ab_api`
+ * value, gets an entry here below a new first entry whose probe tells the two apart, and the
+ * workspace's `check-cfg` list names the value (`perf_ab.rs`'s module doc). */
+export const DRIVER_APIS: ReadonlyArray<DriverApi> = [
+	{
+		cfg: null,
+		probe: { pattern: '^pub fn parse_folded_into[<(]', path: 'crates/tsv_ts/src' },
+		calls:
+			'warm stores: TypeScript and Svelte parse into stores parked between iterations, CSS into the Bump'
+	},
+	{
+		cfg: 'no_stores',
+		probe: null,
+		calls: 'no stores: every parse into the Bump alone'
+	}
+];
 
 const DEFAULT_ITERATIONS = 10;
 
@@ -190,10 +242,21 @@ export const BUILD_FIXED_ENV: Readonly<Record<string, string>> = { CARGO_TARGET_
 /** The program a driver build starts, which runs cargo at idle priority (`build_args`). */
 export const BUILD_PROGRAM = 'nice';
 
-/** A driver build's arguments to `BUILD_PROGRAM`, run in the snapshot. With `BUILD_PROGRAM`,
- * `BUILD_FIXED_ENV` and `BUILD_ENV` it is the build RECIPE, whose hash names the binary
- * (`build_recipe_text`). */
-export function build_args(example: string): Array<string> {
+/** A driver build's arguments to `BUILD_PROGRAM` for a side of the generation `api`, run in the
+ * snapshot. With `BUILD_PROGRAM`, `BUILD_FIXED_ENV` and `BUILD_ENV` it is the build RECIPE, whose
+ * hash names the binary (`build_recipe_text`). `cargo rustc` rather than `cargo build` so the
+ * arm's cfg reaches the example's own compilation alone: every library builds as `cargo build`
+ * builds it, on either side, with or without one. */
+export function build_args(example: string, api: DriverApi): Array<string> {
+	const values = DRIVER_APIS.flatMap((known) => (known.cfg === null ? [] : [`"${known.cfg}"`]));
+	const arm = [
+		'--',
+		// declared on every build, as the workspace's `check-cfg` declares it, since a tree older
+		// than that declaration would warn about the older arms' `cfg` on its own build
+		'--check-cfg',
+		`cfg(perf_ab_api, values(${values.join(', ')}))`,
+		...(api.cfg === null ? [] : ['--cfg', `perf_ab_api="${api.cfg}"`])
+	];
 	return [
 		'-n',
 		'19',
@@ -201,14 +264,15 @@ export function build_args(example: string): Array<string> {
 		'-c',
 		'3',
 		'cargo',
-		'build',
+		'rustc',
 		'--release',
 		'--locked',
 		'-p',
 		'tsv_debug',
 		'--example',
 		example,
-		'--message-format=json-render-diagnostics'
+		'--message-format=json-render-diagnostics',
+		...arm
 	];
 }
 
@@ -306,6 +370,8 @@ export interface Side {
 	inputs: Array<string>;
 	/** Whether the tree has the strip driver's entry point (`STRIP_ENTRY_POINT`). */
 	has_strip: boolean;
+	/** The entry-point generation the drivers build against for this tree (`DRIVER_APIS`). */
+	api: DriverApi;
 }
 
 /** The snapshot cache a run builds into, and how it runs what it built there. */
@@ -349,7 +415,7 @@ export interface PerfAbDeps extends ExtractTreeDeps {
 async function build_inputs(
 	deps: PerfAbDeps,
 	tree: string
-): Promise<{ key: string; inputs: Array<string>; has_strip: boolean }> {
+): Promise<{ key: string; inputs: Array<string>; has_strip: boolean; api: DriverApi }> {
 	const listing = await list_tree(deps.git, deps.checkout, tree, BUILD_INPUTS);
 	const { names, missing, key_text } = build_inputs_of(
 		listing,
@@ -362,18 +428,43 @@ async function build_inputs(
 	return {
 		key: await sha256_hex(new TextEncoder().encode(key_text)),
 		inputs: names,
-		has_strip: await tree_has_strip(deps.git, deps.checkout, tree)
+		has_strip: await tree_has_strip(deps.git, deps.checkout, tree),
+		api: await tree_driver_api(deps.git, deps.checkout, tree)
 	};
 }
 
-/** Whether `tree`'s `crates/tsv_ts/src` has `STRIP_ENTRY_POINT`, run in `cwd` (`git grep`:
- * exit 1 is "no", anything but 0 or 1 an error). */
-export async function tree_has_strip(
+/** Whether `tree`'s `crates/tsv_ts/src` has `STRIP_ENTRY_POINT`, run in `cwd`. */
+export function tree_has_strip(git: SpawnProgram, cwd: FsReadDir, tree: string): Promise<boolean> {
+	return tree_matches(git, cwd, tree, STRIP_ENTRY_POINT, 'crates/tsv_ts/src');
+}
+
+/** The first of `DRIVER_APIS` whose probe `tree` matches, run in `cwd`. */
+export async function tree_driver_api(
 	git: SpawnProgram,
 	cwd: FsReadDir,
 	tree: string
+): Promise<DriverApi> {
+	for (const api of DRIVER_APIS) {
+		if (
+			api.probe === null ||
+			(await tree_matches(git, cwd, tree, api.probe.pattern, api.probe.path))
+		) {
+			return api;
+		}
+	}
+	throw new HarnessError('DRIVER_APIS ends in a probed generation, so a tree can match none');
+}
+
+/** Whether `pattern` (`git grep -E`) matches a line under `path` in `tree`, run in `cwd`
+ * (exit 1 is "no", anything but 0 or 1 an error). */
+async function tree_matches(
+	git: SpawnProgram,
+	cwd: FsReadDir,
+	tree: string,
+	pattern: string,
+	path: string
 ): Promise<boolean> {
-	const args = ['grep', '-q', '-E', STRIP_ENTRY_POINT, tree, '--', 'crates/tsv_ts/src'];
+	const args = ['grep', '-q', '-E', pattern, tree, '--', path];
 	const result = await git.out(args, { cwd });
 	const code = exit_code_of(result);
 	if (code === 0) return true;
@@ -438,20 +529,33 @@ async function evict_cache(cache: FsDir, sides: ReadonlyArray<Side>): Promise<vo
 	}
 }
 
-/** One driver as the run builds it: its source, the source's hash and its recipe's hash. */
+/** One driver as the run builds it: its source and the source's hash. */
 export interface DriverBuild {
 	kind: DriverKind;
 	source: Uint8Array;
 	hash: string;
-	recipe_hash: string;
 }
 
-/** The name, beneath the cache, of `driver`'s binary for `side`: content-addressed by the
- * side's build inputs, the driver's source and the build recipe, so a binary of that name is
- * never rebuilt. */
-export function driver_binary_name(side_key: string, driver: DriverBuild): string {
+/** The hash of `example`'s build RECIPE for a side of the generation `api`
+ * (`build_recipe_text`). */
+export async function driver_recipe_hash(example: string, api: DriverApi): Promise<string> {
+	return await sha256_hex(
+		new TextEncoder().encode(
+			build_recipe_text([BUILD_PROGRAM, ...build_args(example, api)], BUILD_FIXED_ENV, BUILD_ENV)
+		)
+	);
+}
+
+/** The name, beneath the cache, of `driver`'s binary for a side: content-addressed by the
+ * side's build inputs, the driver's source and the build recipe for the side's generation
+ * (`driver_recipe_hash`), so a binary of that name is never rebuilt. */
+export function driver_binary_name(
+	side_key: string,
+	driver: DriverBuild,
+	recipe_hash: string
+): string {
 	const { example } = DRIVERS[driver.kind];
-	return `${side_key}/${example}-${driver.hash.slice(0, 16)}-${driver.recipe_hash.slice(0, 16)}`;
+	return `${side_key}/${example}-${driver.hash.slice(0, 16)}-${recipe_hash.slice(0, 16)}`;
 }
 
 /** `path`, absolute, as a path beneath `dir`. */
@@ -475,7 +579,7 @@ export async function ensure_driver(
 	driver: DriverBuild
 ): Promise<string> {
 	const { path: driver_path, example } = DRIVERS[driver.kind];
-	const binary = driver_binary_name(side.key, driver);
+	const binary = driver_binary_name(side.key, driver, await driver_recipe_hash(example, side.api));
 	if (await cache.exists(binary)) {
 		console.error(`perf:ab: ${side.label}: reusing ${cache.path}/${binary}`);
 		return binary;
@@ -493,8 +597,10 @@ export async function ensure_driver(
 	await src.mkdir(overlay_dir, { recursive: true });
 	await src.write(driver_path, driver.source);
 
-	console.error(`perf:ab: ${side.label}: building the ${example} driver (release, idle priority)`);
-	const child = await deps.build.start(build_args(example), {
+	console.error(
+		`perf:ab: ${side.label}: building the ${example} driver (release, idle priority; ${side.api.calls})`
+	);
+	const child = await deps.build.start(build_args(example, side.api), {
 		cwd: src,
 		stdio: ['ignore', 'pipe', 'inherit']
 	});
@@ -926,16 +1032,7 @@ async function perf_ab(deps: PerfAbDeps, args: ReadonlyArray<string>): Promise<n
 		drivers[kind] = {
 			kind,
 			source,
-			hash: await sha256_hex(source),
-			recipe_hash: await sha256_hex(
-				new TextEncoder().encode(
-					build_recipe_text(
-						[BUILD_PROGRAM, ...build_args(DRIVERS[kind].example)],
-						BUILD_FIXED_ENV,
-						BUILD_ENV
-					)
-				)
-			)
+			hash: await sha256_hex(source)
 		};
 	}
 
@@ -965,6 +1062,11 @@ async function perf_ab(deps: PerfAbDeps, args: ReadonlyArray<string>): Promise<n
 	if (base.key === cand.key && base.tree !== cand.tree) {
 		console.error(
 			`perf:ab: the sides differ only outside the build inputs — one binary, measured against itself (an A/A)`
+		);
+	}
+	if (base.api !== cand.api) {
+		console.error(
+			`perf:ab: the sides call different entry points — base: ${base.api.calls}; cand: ${cand.api.calls}`
 		);
 	}
 	const strip_skip = strip_skip_reason(base.has_strip, cand.has_strip);
@@ -1136,7 +1238,9 @@ async function perf_ab(deps: PerfAbDeps, args: ReadonlyArray<string>): Promise<n
 			`binary sha256 ${sha.format}` + (sha.strip === null ? '' : `, strip ${sha.strip}`);
 		console.log(
 			`base: ${base.label}, ${sha_text(binary_sha256[0]!)}\n` +
-				`cand: ${cand.label}, ${sha_text(binary_sha256[1]!)}`
+				`      driver: ${base.api.calls}\n` +
+				`cand: ${cand.label}, ${sha_text(binary_sha256[1]!)}\n` +
+				`      driver: ${cand.api.calls}`
 		);
 		console.log(
 			`corpus: ${options.corpus} (${langs.map((lang) => `${lang} ${samples[0]![lang].file_set!.files}`).join(', ')} files` +
