@@ -124,13 +124,13 @@ The CLI uses [argh](https://crates.io/crates/argh) for declarative arg parsing:
   Behavioral changes to `format`/`parse`/`strip` in either CLI must be mirrored in the
   other and in the CLI tests of `scripts/test_npm.ts` (wasm) and
   `scripts/test_napi_npm.ts` (native) — `strip`'s rows in `scripts/strip_suite.ts`, which both run.
-- **`tsv_debug` (development)**: Uses embedded Deno sidecar for external tools
+- **`tsv_debug` (development)**: Uses a Node sidecar for external tools
   - Reuses `tsv_cli` infrastructure
   - Commands, by family (the full catalog is the root [CLAUDE.md §Debug Tooling](../CLAUDE.md#debug-tooling) and [audits.md](audits.md), not duplicated here): fixtures (`fixture_init`, `fixtures_validate`, `fixtures_update*`, `fixtures_audit`), oracles (`check`, `compare`, `ast_diff`, `canonical_parse`, `format_prettier`, `test262`, `tsc_conformance` — see [typechecker.md](typechecker.md)), the standing audit family (`comment_audit`, `gap_audit`, `census_audit`, …), the compiler harnesses (`compile_*`, `canonical_compile`, `render_compare`), the type strip (`strip`, its `--stdin` the strip-corpus side), and profiling/metrics (`profile`, `json_profile`, `arena_stats`, `buffer_sizes`, `metrics`, `line_width`, `lex_diff`)
 
-### External Tools (via Embedded Deno Sidecar)
+### External Tools (via the Sidecar)
 
-`tsv_debug` calls these external tools via an embedded Deno sidecar (spawned lazily on first use; bulk commands spawn a small pool of sidecar processes — see `crates/tsv_debug/CLAUDE.md`):
+`tsv_debug` calls these external tools via a sidecar, Node processes running `crates/tsv_debug/sidecar/sidecar.ts` in place (spawned lazily on first use; bulk commands spawn a small pool of sidecar processes — see `crates/tsv_debug/CLAUDE.md`):
 
 | tool | used by | purpose |
 | --- | --- | --- |
@@ -138,7 +138,7 @@ The CLI uses [argh](https://crates.io/crates/argh) for declarative arg parsing:
 | **svelte** | `canonical_parse`, `ast_diff`, fixture management | parse Svelte code with the official compiler |
 | **acorn** + **@sveltejs/acorn-typescript** | `canonical_parse`, `ast_diff`, fixture management | parse TypeScript code (matches Svelte's TS parser) |
 
-Versions are pinned exactly in `crates/tsv_debug/src/deno/sidecar.ts`, the source of truth (not repeated here); `benches/js/package.json` pins the same versions for the bench harness — keep the two in sync (`deno task pins:audit` gates it).
+Versions are pinned exactly in `crates/tsv_debug/sidecar/package.json`, the source of truth (not repeated here), and the whole tree in its `package-lock.json`; `benches/js/package.json` pins the same versions for the bench harness — keep the two in sync (`deno task pins:audit` gates it).
 
 ## Input Handling
 

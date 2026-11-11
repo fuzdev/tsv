@@ -1202,14 +1202,15 @@ not one of those: it fails under Deno and Node alike, so the Deno smoke sees it.
 ### Canonical baseline is coupled
 
 **Do NOT bump it as routine.** The five canonical packages (`prettier`, `svelte`,
-`acorn`, `@sveltejs/acorn-typescript`, `prettier-plugin-svelte`) are also pinned, as
-literals, in `crates/tsv_debug/src/deno/sidecar.ts` — the sidecar that generates
-every fixture's `expected.json` and `output_prettier.svelte`. The two pin sets
+`acorn`, `@sveltejs/acorn-typescript`, `prettier-plugin-svelte`) are also pinned in
+`crates/tsv_debug/sidecar/package.json`, the package of the sidecar that generates
+every fixture's `expected.json` and `output_prettier.svelte`, and its
+`package-lock.json` pins the whole tree beneath them. The two pin sets
 **must stay identical**: the bench has to measure against the same
 parser/formatter that defines fixture correctness. Agreement across all pin sites
-(sidecar `VERSIONS` + its `npm:` imports, `benches/js/package.json`, actor.rs's
-acorn import-map pin, and the sidecar `deno.lock` — which also pins the
-literal-less transitives, `LOCKED_TRANSITIVE`) — and the prettier OPTIONS, which the bench's
+(the sidecar's `package.json`, its lock — which installs each once, flat, and also pins
+the manifest-less transitives, `LOCKED_TRANSITIVE` — and `benches/js/package.json`) —
+and the prettier OPTIONS, which the bench's
 `PRETTIER_OPTIONS` (`benches/js/lib/canonical.ts`) and the sidecar's inline call must spell
 identically — is enforced by `deno task pins:audit`
 (`scripts/check_canonical_pins.ts --pins`, gated in `deno task check`).
@@ -1235,10 +1236,11 @@ compile-fixture step, and an `@sveltejs/acorn-typescript` bump moves
 `../acorn-typescript` instead:
 
 ```bash
-# 1. edit the pin sites in lockstep: benches/js/package.json + sidecar.ts (VERSIONS and
-#    its `npm:` import; the `//canonical-sync` note in package.json restates this)
+# 1. edit the pin sites in lockstep: benches/js/package.json + crates/tsv_debug/sidecar/package.json
+#    (the `//canonical-sync` note in benches/js/package.json restates this)
 deno task bench:install            # benches/js node_modules at the new pin
-deno task pins:lock                # the frozen sidecar lock (--allow-fresh only for a <24h-old release)
+deno task pins:lock                # the sidecar lock (network; --allow-fresh only for a <24h-old release)
+npm ci --prefix crates/tsv_debug/sidecar  # the sidecar refuses an install that isn't its lock's
 deno task pins:audit               # fails until LOCKED_TRANSITIVE matches the regenerated lock
 # 2. the suite checkout to the release tag (pins:audit:checkouts fails until it matches)
 git -C ../svelte fetch --tags && git -C ../svelte checkout svelte@<version>
@@ -1287,7 +1289,7 @@ the step that gets skipped. Prose that restates the pin ("pinned at svelte X",
 just moved and goes silently wrong; a single past bump left five such claims behind
 across `docs/` and two crates. A **past**-version mention is different and stays true — "Prettier
 3.9.5 tightened it", a fixture README explaining which release changed a behavior —
-so this cannot be a lint, only a read. Prefer pointing at `sidecar.ts`'s `VERSIONS`
+so this cannot be a lint, only a read. Prefer pointing at the sidecar's `package.json`
 over restating the number.
 
 Steps 3 and 4 are there because `deno task check` covers none of what they grade —

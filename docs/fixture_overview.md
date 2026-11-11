@@ -514,7 +514,7 @@ normalization forces the three kinds above, so variant↔input is not a claim th
 **Scope caveat.** R gates only `tests/fixtures`, whose variants are hand-authored to be
 render-equivalent — so it is a *regression guard*, not a discovery tool. The corpus-scale arm
 that asks the same question of **real code** is `deno task render:audit <paths>` (same oracle,
-comparing a file against its own formatted output); it needs the Deno sidecar, so it runs at
+comparing a file against its own formatted output); it needs the sidecar, so it runs at
 release cadence — a leg of `deno task conformance` over the pinned checkouts — rather than in
 `deno task check`. See [audits.md §Render-Equivalence Audit](audits.md#render-equivalence-audit-renderaudit).
 

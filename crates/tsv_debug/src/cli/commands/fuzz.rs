@@ -85,7 +85,7 @@
 //! accepted-input space, where the formatter invariants actually bite), and
 //! `--minimize` ddmin-shrinks each hard finding into a consumable reproduction.
 //!
-//! Not the differential leg (tsv-vs-canonical verdict): that needs the Deno
+//! Not the differential leg (tsv-vs-canonical verdict): that needs the
 //! sidecar. This stays pure-Rust and self-contained, matching the
 //! `test262 --gate` / `roundtrip_audit --gate` direction.
 

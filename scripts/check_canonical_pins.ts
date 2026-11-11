@@ -24,25 +24,36 @@
  * `git`, when one is on `PATH`, which reads each sibling checkout's ids. `--pins` gets
  * neither.
  *
- * **1. Pin agreement** — the canonical versions must stay IDENTICAL across five
- * places (the sync contract documented in `crates/tsv_debug/src/deno/sidecar.ts`
- * and `benches/js/package.json` `//canonical-sync`):
+ * **1. Pin agreement** — the canonical versions must stay IDENTICAL, as exact
+ * versions, across the three places that name them (the sync contract documented
+ * in `crates/tsv_debug/sidecar/sidecar.ts` and `benches/js/package.json`
+ * `//canonical-sync`):
  *
- *   1. sidecar.ts `VERSIONS` object — what `tsv_debug check` reports
- *   2. sidecar.ts static `npm:` import specifiers — what the sidecar actually runs
+ *   1. `crates/tsv_debug/sidecar/package.json` `dependencies` — the sidecar's manifest,
+ *      exactly the five canonical packages
+ *   2. the root entry of `crates/tsv_debug/sidecar/package-lock.json` — what `npm ci`
+ *      installs, and what the actor refuses an install that differs from
  *   3. benches/js/package.json `dependencies` — what the bench + conformance gates run
- *   4. actor.rs `deno_config` acorn import-map pin — the shared-acorn-instance pin
- *   5. the sidecar lockfile `crates/tsv_debug/src/deno/deno.lock` — what deno
- *      ACTUALLY resolves, so a literal the lock disagrees with is a lie
+ *
+ * and the lock installs each canonical package exactly once, at the top of its
+ * flat tree (`node_modules/<name>`), at that version. No lock entry is nested
+ * (`node_modules/a/node_modules/b`): a nested entry is a second copy of a package,
+ * and one `acorn` is what lets the TypeScript plugin extend the parser it imports.
  *
  * Drift here silently grades fixtures and corpora against a different oracle
  * than the bench measures.
+ *
+ * The sidecar's install posture rides along: its `.npmrc` must equal the root's
+ * byte for byte (npm reads only the prefix's own `.npmrc` for
+ * `npm ci --prefix crates/tsv_debug/sidecar`, so the root's `ignore-scripts` and
+ * `min-release-age` reach the sidecar only through a copy), and its `engines.node`
+ * the root's.
  *
  * The prettier OPTIONS ride along, for the same reason and at the same cadence: a
  * version and an option are both pins on what the oracle emits, and the two oracles
  * spell their options in two files (`check_prettier_option_agreement`).
  *
- * The lockfile also carries the pins nothing else can: the oracle's own
+ * The lock also carries the pins nothing else can: the oracle's own
  * transitive dependencies (`LOCKED_TRANSITIVE`). A version pinned by no literal
  * — `esrap`, which prints svelte's compiled output — can otherwise move under a
  * caret range with nothing in the repo changing.
@@ -142,14 +153,32 @@ const CANONICAL_PACKAGES = [
 	'@sveltejs/acorn-typescript'
 ] as const;
 
-const SIDECAR_PATH = 'crates/tsv_debug/src/deno/sidecar.ts';
-const ACTOR_PATH = 'crates/tsv_debug/src/deno/actor.rs';
+const SIDECAR_DIR = 'crates/tsv_debug/sidecar';
+const SIDECAR_PATH = `${SIDECAR_DIR}/sidecar.ts`;
+const SIDECAR_PKG_PATH = `${SIDECAR_DIR}/package.json`;
+const SIDECAR_LOCK_PATH = `${SIDECAR_DIR}/package-lock.json`;
+const SIDECAR_NPMRC_PATH = `${SIDECAR_DIR}/.npmrc`;
 const BENCH_PKG_PATH = 'benches/js/package.json';
-const SIDECAR_LOCK_PATH = 'crates/tsv_debug/src/deno/deno.lock';
+const ROOT_PKG_PATH = 'package.json';
+const ROOT_NPMRC_PATH = '.npmrc';
+
+/** An exact version: a range in a pin would let `npm install` resolve something else. */
+const EXACT_VERSION = /^\d+\.\d+\.\d+$/;
+
+/** The fields of a `package.json` the audit reads. */
+interface PackageJson {
+	dependencies?: Record<string, string>;
+	engines?: { node?: string };
+}
+
+/** The fields of an npm `package-lock.json` the audit reads. */
+interface PackageLock {
+	packages?: Record<string, { version?: string; dependencies?: Record<string, string> }>;
+}
 
 /**
- * Transitive npm packages the sidecar lockfile pins that NO literal pin site
- * names — the oracle's own dependencies, which float on THEIR declared ranges.
+ * Transitive npm packages the sidecar lock pins that NO manifest names — the
+ * oracle's own dependencies, which float on THEIR declared ranges.
  *
  * `esrap` is why this exists. It PRINTS the JS that svelte's `compile()`
  * returns, so it is the effective oracle for every compile fixture, yet
@@ -159,7 +188,7 @@ const SIDECAR_LOCK_PATH = 'crates/tsv_debug/src/deno/deno.lock';
  * stopped dropping a string-literal specifier's `as` alias and silently staled
  * five committed fixtures while `deno task check` stayed green.
  *
- * Bumping one of these is a deliberate oracle move: regenerate the lockfile
+ * Bumping one of these is a deliberate oracle move: regenerate the lock
  * (`deno task pins:lock`), re-validate the compile fixtures
  * (`deno task compile:fixtures:validate` — the only check that grades the
  * committed expectations against a LIVE oracle), and update the version here in
@@ -169,12 +198,10 @@ const LOCKED_TRANSITIVE: Record<string, string> = {
 	esrap: '2.4.0'
 };
 
-const escape_regex = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
 /** `name` → version per source, `null` when the source doesn't pin it. */
 interface PinSources {
-	versions_object: string | null;
-	import_specifier: string | null;
+	sidecar_package_json: string | null;
+	sidecar_lock_root: string | null;
 	bench_package_json: string | null;
 }
 
@@ -216,7 +243,7 @@ const BENCH_CANONICAL_PATH = 'benches/js/lib/canonical.ts';
  * emits — but only the version had a guard. The bench's `PRETTIER_OPTIONS`
  * (`benches/js/lib/canonical.ts`) grades every `corpus:compare:format` verdict and
  * is the denominator of every published speedup; the sidecar's inline copy
- * (`crates/tsv_debug/src/deno/sidecar.ts`) regenerates every fixture's
+ * (`crates/tsv_debug/sidecar/sidecar.ts`) regenerates every fixture's
  * `output_prettier.*`. `canonical.ts` has said "keep these two option sets
  * identical" since it was written, with nothing checking it.
  *
@@ -309,76 +336,80 @@ export async function run_check_canonical_pins(
 	deps: CheckCanonicalPinsDeps,
 	{ run_pins, run_checkouts }: PinsModes
 ): Promise<number> {
-	const sidecar = await deps.checkout.read_text(SIDECAR_PATH);
-	const actor = await deps.checkout.read_text(ACTOR_PATH);
-	const bench_pkg = JSON.parse(await deps.checkout.read_text(BENCH_PKG_PATH)) as {
-		dependencies?: Record<string, string>;
-	};
-	const bench_deps = bench_pkg.dependencies ?? {};
-	const lock_npm =
-		(
-			JSON.parse(await deps.checkout.read_text(SIDECAR_LOCK_PATH)) as {
-				npm?: Record<string, unknown>;
-			}
-		).npm ?? {};
+	const read_json = async <T>(path: string): Promise<T> =>
+		JSON.parse(await deps.checkout.read_text(path)) as T;
+	const bench_deps = (await read_json<PackageJson>(BENCH_PKG_PATH)).dependencies ?? {};
 
 	const failures: string[] = [];
 	const report: string[] = [];
 	const checkout_notes: string[] = [];
 	const drifted: string[] = [];
 
-	/**
-	 * Versions the sidecar lockfile resolves for `name`.
-	 *
-	 * Lock keys are `name@version`, optionally suffixed with the peer resolution
-	 * that disambiguates a duplicate (`prettier-plugin-svelte@4.1.1_prettier@3.9.10_svelte@5.57.3`),
-	 * and a scoped name carries its own leading `@`. Returns every match so the
-	 * caller can distinguish absent (0) from a genuinely duplicated package (>1) —
-	 * two copies of the oracle's printer in one tree would make "the pinned version"
-	 * meaningless rather than merely wrong.
-	 */
-	const locked_versions = (name: string): string[] => {
-		const prefix = `${name}@`;
-		return Object.keys(lock_npm)
-			.filter((key) => key.startsWith(prefix))
-			.map((key) => key.slice(prefix.length).split('_')[0]);
-	};
-
-	/** Assert the lockfile resolves `name` to exactly `expected`, attributing the source. */
-	const assert_locked = (name: string, expected: string, source: string): void => {
-		const found = locked_versions(name);
-		if (found.length === 0) {
-			failures.push(
-				`${name}: absent from ${SIDECAR_LOCK_PATH} — the sidecar does not resolve it; regenerate the lockfile`
-			);
-		} else if (found.length > 1) {
-			failures.push(
-				`${name}: ${SIDECAR_LOCK_PATH} resolves ${found.length} copies (${found.join(', ')}) — ` +
-					'the sidecar would run more than one, so no single version is "the" oracle'
-			);
-		} else if (found[0] !== expected) {
-			failures.push(
-				`${name}: ${SIDECAR_LOCK_PATH} resolves ${found[0]} but ${source} says ${expected} — ` +
-					'the sidecar runs the lockfile, so regenerate it or fix the pin'
-			);
-		}
-	};
-
 	if (run_pins) {
-		// The VERSIONS object body — sliced so a stray `name: 'x.y.z'` elsewhere can't match.
-		const versions_block = /const VERSIONS = \{([\s\S]*?)\} as const;/.exec(sidecar)?.[1];
-		if (!versions_block) {
-			console.error(`FAIL: could not locate the VERSIONS object in ${SIDECAR_PATH}`);
-			return 1;
+		const sidecar = await deps.checkout.read_text(SIDECAR_PATH);
+		const sidecar_pkg = await read_json<PackageJson>(SIDECAR_PKG_PATH);
+		const sidecar_deps = sidecar_pkg.dependencies ?? {};
+		const lock_packages = (await read_json<PackageLock>(SIDECAR_LOCK_PATH)).packages ?? {};
+		const lock_root_deps = lock_packages['']?.dependencies ?? {};
+
+		/** Lock keys installing `name`: `node_modules/<name>`, at the top or nested. */
+		const lock_keys = (name: string): string[] =>
+			Object.keys(lock_packages).filter(
+				(key) => key === `node_modules/${name}` || key.endsWith(`/node_modules/${name}`)
+			);
+
+		/**
+		 * Assert the lock installs `name` exactly once, at the top of the tree, at `expected`,
+		 * attributing the source. Two copies of the oracle's printer in one tree would make
+		 * "the pinned version" meaningless rather than merely wrong.
+		 */
+		const assert_locked = (name: string, expected: string, source: string): void => {
+			const keys = lock_keys(name);
+			if (keys.length === 0) {
+				failures.push(
+					`${name}: absent from ${SIDECAR_LOCK_PATH} — the sidecar does not install it; regenerate the lock`
+				);
+			} else if (keys.length > 1) {
+				failures.push(
+					`${name}: ${SIDECAR_LOCK_PATH} installs ${keys.length} copies (${keys.join(', ')}) — ` +
+						'the sidecar would run more than one, so no single version is "the" oracle'
+				);
+			} else if (keys[0] !== `node_modules/${name}`) {
+				failures.push(
+					`${name}: ${SIDECAR_LOCK_PATH} installs it nested at ${keys[0]}, not at the top of the tree`
+				);
+			} else if (lock_packages[keys[0]]?.version !== expected) {
+				failures.push(
+					`${name}: ${SIDECAR_LOCK_PATH} installs ${lock_packages[keys[0]]?.version ?? '?'} but ${source} says ${expected} — ` +
+						'the sidecar runs the lock, so regenerate it or fix the pin'
+				);
+			}
+		};
+
+		// The sidecar's manifest names the oracle and nothing else: a sixth dependency would
+		// be an input to the fixtures that no pin site tracks.
+		for (const name of Object.keys(sidecar_deps)) {
+			if (!CANONICAL_PACKAGES.some((c) => c === name)) {
+				failures.push(
+					`${name}: ${SIDECAR_PKG_PATH} depends on it, but it is not a canonical package`
+				);
+			}
+		}
+
+		// The lock's root entry names what the manifest does and nothing else: `npm ci` refuses
+		// a lock out of sync with `package.json`, so a stray name there is a broken install.
+		for (const name of Object.keys(lock_root_deps)) {
+			if (!(name in sidecar_deps)) {
+				failures.push(
+					`${name}: the root entry of ${SIDECAR_LOCK_PATH} depends on it, but ${SIDECAR_PKG_PATH} doesn't — run \`deno task pins:lock\``
+				);
+			}
 		}
 
 		for (const name of CANONICAL_PACKAGES) {
-			const escaped = escape_regex(name);
 			const pins: PinSources = {
-				versions_object:
-					new RegExp(`(?:'${escaped}'|${escaped}): '([^']+)'`).exec(versions_block)?.[1] ?? null,
-				import_specifier:
-					new RegExp(`npm:${escaped}@(\\d+\\.\\d+\\.\\d+)`).exec(sidecar)?.[1] ?? null,
+				sidecar_package_json: sidecar_deps[name] ?? null,
+				sidecar_lock_root: lock_root_deps[name] ?? null,
 				bench_package_json: bench_deps[name] ?? null
 			};
 
@@ -399,31 +430,49 @@ export async function run_check_canonical_pins(
 				continue;
 			}
 			const pinned = versions[0];
+			if (!EXACT_VERSION.test(pinned)) {
+				failures.push(`${name}: pinned as ${pinned}, not an exact version`);
+				continue;
+			}
 			report.push(`${name}@${pinned}`);
 
-			// The actor.rs import map pins acorn (so the ts plugin extends the same
-			// acorn instance) — it must ride along with the acorn pin.
-			if (name === 'acorn') {
-				const actor_pin = /npm:acorn@(\d+\.\d+\.\d+)/.exec(actor)?.[1] ?? null;
-				if (actor_pin === null) {
-					failures.push(`acorn: missing npm:acorn@x.y.z import-map pin in ${ACTOR_PATH}`);
-				} else if (actor_pin !== pinned) {
-					failures.push(
-						`acorn: ${ACTOR_PATH} import-map pin ${actor_pin} disagrees with ${pinned}`
-					);
-				}
-			}
-
-			// The sidecar RESOLVES against its lockfile, so a literal pin the lock
-			// disagrees with is a lie: the sidecar would run one version while every
-			// pin site claims another. Checked per package rather than once, so the
-			// failure names which one drifted.
+			// The sidecar RUNS what the lock installs, so a manifest pin the lock disagrees
+			// with is a lie: the sidecar would run one version while every pin site claims
+			// another. Checked per package rather than once, so the failure names which one
+			// drifted.
 			assert_locked(name, pinned, 'the canonical pin');
 		}
 
-		// The oracle's own transitive dependencies — pinned ONLY by the lockfile.
+		// The oracle's own transitive dependencies — pinned ONLY by the lock.
 		for (const [name, expected] of Object.entries(LOCKED_TRANSITIVE)) {
 			assert_locked(name, expected, 'LOCKED_TRANSITIVE in scripts/check_canonical_pins.ts');
+		}
+
+		// One copy of every package, the canonical ones and all beneath them: a nested entry
+		// is a second copy, which the per-name checks above see only for the names they ask.
+		const nested = Object.keys(lock_packages).filter((key) =>
+			/node_modules\/.*\/node_modules\//.test(key)
+		);
+		if (nested.length > 0) {
+			failures.push(
+				`${SIDECAR_LOCK_PATH} nests ${nested.join(', ')} — a second copy of a package; ` +
+					'the sidecar tree must be flat (one acorn for the parser and its TypeScript plugin)'
+			);
+		}
+
+		const npmrc = await deps.checkout.read_text(SIDECAR_NPMRC_PATH);
+		if (npmrc !== (await deps.checkout.read_text(ROOT_NPMRC_PATH))) {
+			failures.push(
+				`${SIDECAR_NPMRC_PATH} differs from ${ROOT_NPMRC_PATH} — npm reads only the prefix's own ` +
+					".npmrc for the sidecar install, so it must be a byte-for-byte copy of the root's"
+			);
+		}
+		const root_engine = (await read_json<PackageJson>(ROOT_PKG_PATH)).engines?.node;
+		if (sidecar_pkg.engines?.node !== root_engine) {
+			failures.push(
+				`${SIDECAR_PKG_PATH} engines.node is ${sidecar_pkg.engines?.node ?? '(absent)'}, ` +
+					`${ROOT_PKG_PATH}'s is ${root_engine ?? '(absent)'} — keep the two floors equal`
+			);
 		}
 
 		check_prettier_option_agreement(
@@ -514,7 +563,7 @@ export async function run_check_canonical_pins(
 		for (const f of failures) console.error(`  · ${f}`);
 		if (run_pins) {
 			console.error(
-				`  Pin sites: ${SIDECAR_PATH} (VERSIONS + imports), ${BENCH_PKG_PATH}, ${ACTOR_PATH} — edit in lockstep.`
+				`  Pin sites: ${SIDECAR_PKG_PATH} and its lock (deno task pins:lock), ${BENCH_PKG_PATH} — edit in lockstep.`
 			);
 		}
 		console.error(
@@ -533,10 +582,10 @@ export async function run_check_canonical_pins(
 	const done: string[] = [];
 	if (run_pins) {
 		done.push(
-			'canonical pins agree across sidecar VERSIONS/imports, benches/js/package.json, actor.rs, deno.lock ' +
-				`(${report.join(', ')})`
+			`canonical pins agree across ${SIDECAR_PKG_PATH}, its lock, and ${BENCH_PKG_PATH}, ` +
+				`one copy of each, flat (${report.join(', ')})`
 		);
-		// Named separately: these are pinned ONLY by the lockfile, so a green line
+		// Named separately: these are pinned ONLY by the lock, so a green line
 		// that didn't say so would leave the oracle's printer looking unguarded.
 		done.push(
 			`lockfile-only pins hold (${Object.entries(LOCKED_TRANSITIVE)

@@ -1,7 +1,7 @@
 /**
  * Canonical implementation wrappers (prettier + svelte/compiler)
  *
- * Uses the same approach as tsv_debug's Deno sidecar for consistency.
+ * Uses the same approach as tsv_debug's sidecar for consistency.
  */
 
 import { extname } from 'node:path';
@@ -38,7 +38,7 @@ const NO_PLUGINS: unknown[] = [];
 /**
  * Prettier formatting options, fixed to tsv's settings and passed explicitly on
  * every call. Mirrors the inline options in the fixture oracle
- * (`crates/tsv_debug/src/deno/sidecar.ts`), the source of truth for fixture
+ * (`crates/tsv_debug/sidecar/sidecar.ts`), the source of truth for fixture
  * correctness — tsv ships no prettier config file, so the corpus oracle reads
  * none either. Keep these two option sets identical — `deno task pins:audit` gates
  * it (a differing value OR a one-sided addition fails), so the invariant is checked

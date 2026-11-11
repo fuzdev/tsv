@@ -2,7 +2,7 @@
 
 > The standing correctness audits over the formatter, the parsers and their wire contract, the Svelte compiler, and the canonical oracles all of them are graded against — what each proves, what it is blind to, how to run it, and where it gates. The `deno task` entry points are indexed in [CLAUDE.md §Fixtures](../CLAUDE.md#fixtures-rust--deno-based); this doc is the full reference.
 
-Most audits are pure Rust (no Deno sidecar). Those gated in `deno task check` scan `tests/fixtures` — a curated, format-stable tree — so several are cheap tripwires there whose real yield is external corpora (`../prettier/tests/format`, the `../corpora` snapshot's collections, the `live` working trees): point them at real code after a printer change, or run `deno task audit:corpus`, the standing bundle for exactly that. Audits that need the feature-gated instrumentation (`_internal_swallow_check` / `_internal_comment_check`) build via the `_internal_audits` umbrella feature under `--profile corpus` — the single build world every `deno task check` audit shares (optimized + `panic = "unwind"`, so a formatter panic is caught and reported; plain `--release` is `panic = "abort"`, which kills the process). Every "build with `--profile corpus`" below means this.
+Most audits are pure Rust (no sidecar). Those gated in `deno task check` scan `tests/fixtures` — a curated, format-stable tree — so several are cheap tripwires there whose real yield is external corpora (`../prettier/tests/format`, the `../corpora` snapshot's collections, the `live` working trees): point them at real code after a printer change, or run `deno task audit:corpus`, the standing bundle for exactly that. Audits that need the feature-gated instrumentation (`_internal_swallow_check` / `_internal_comment_check`) build via the `_internal_audits` umbrella feature under `--profile corpus` — the single build world every `deno task check` audit shares (optimized + `panic = "unwind"`, so a formatter panic is caught and reported; plain `--release` is `panic = "abort"`, which kills the process). Every "build with `--profile corpus`" below means this.
 
 ⚠️ A **stack overflow** is the one failure this containment cannot reach — not a panic, so no `catch_unwind` sees it and the sweep dies outright rather than reporting one file. So `tsv_debug`'s dispatch runs on the `tsv` binary's stated stack reservation (`tsv_cli::cli::stack`), which puts the depth an audit survives out of reach of ordinary input and, more to the point, makes it the same on every machine; see [cli.md §Recursion Depth](./cli.md#recursion-depth).
 
@@ -1541,27 +1541,39 @@ asks for the install. A stale staging is refused as the package suites refuse it
 deno task pins:audit
 ```
 
-**What it proves.** That the canonical oracle is *one* version rather than five — and, since
-a version and an option are both pins on what the oracle EMITS, that the prettier OPTIONS
-agree too (`benches/js/lib/canonical.ts` `PRETTIER_OPTIONS` vs the sidecar's inline call,
-`check_prettier_option_agreement`). The five pin sites that must be identical:
+**What it proves.** That the canonical oracle is *one* version rather than several — and,
+since a version and an option are both pins on what the oracle EMITS, that the prettier
+OPTIONS agree too (`benches/js/lib/canonical.ts` `PRETTIER_OPTIONS` vs the sidecar's inline
+call, `check_prettier_option_agreement`). The three pin sites that must name each canonical
+package at one exact version:
 
-1. `sidecar.ts` `VERSIONS` — what `tsv_debug check` reports;
-2. `sidecar.ts` static `npm:` import specifiers — what the sidecar actually runs;
-3. `benches/js/package.json` `dependencies` — what the bench and conformance gates run;
-4. `actor.rs`'s `deno_config` acorn import-map pin — the shared-acorn-instance pin;
-5. the sidecar lockfile `crates/tsv_debug/src/deno/deno.lock` — what deno ACTUALLY
-   resolves, so a literal the lock disagrees with is a lie.
+1. `crates/tsv_debug/sidecar/package.json` `dependencies` — the sidecar's manifest, exactly
+   the five canonical packages;
+2. the root entry of `crates/tsv_debug/sidecar/package-lock.json` — what `npm ci` installs,
+   naming nothing the manifest doesn't;
+3. `benches/js/package.json` `dependencies` — what the bench and conformance gates run.
+
+The lock must then install each canonical package exactly once, at the top of its flat tree
+(`node_modules/<name>`), at that version, and nest nothing: a `node_modules/a/node_modules/b`
+key is a second copy of `b`, and one `acorn` is what lets the TypeScript plugin extend the
+parser it imports. The sidecar's `.npmrc` must equal the root's byte for byte (npm reads only
+the prefix's own `.npmrc` for `npm ci --prefix crates/tsv_debug/sidecar`, so the root's
+`ignore-scripts` and `min-release-age` reach the sidecar only through the copy), and its
+`engines.node` the root's.
 
 Drift here silently grades fixtures and corpora against a different oracle than the bench
-measures.
+measures. That the INSTALL is the lock's is the actor's check, made before each sidecar
+spawns (`check_install` in `crates/tsv_debug/src/deno/actor.rs`): a lock changed since the
+last `npm ci`, or an installed package whose `package.json` names another version than its
+lock entry (or is gone), is refused rather than graded against. An edit to any other file
+inside the install isn't seen.
 
 **Why it gates early in `deno task check`.** It is a **repo fact**: nothing outside the repo
 can change the verdict, so it holds on a clean checkout — and its failure invalidates the
 fixture grading `cargo test` does later in the same chain, which is the cheapest thing to
 learn first.
 
-**`LOCKED_TRANSITIVE` — the pin with no sibling.** The lockfile also pins what no literal
+**`LOCKED_TRANSITIVE` — the pin with no sibling.** The lock also pins what no manifest
 names: the oracle's own transitive dependencies, which float on THEIR declared ranges. Today
 that is `esrap`, the printer that emits the JS `svelte.compile()` returns and therefore the
 effective oracle for every compile fixture — which svelte depends on by a caret range.
@@ -1574,7 +1586,7 @@ lock, re-run `deno task compile:fixtures:validate`, update the constant, all in 
 **Blind spots.**
 
 - **Agreement is not correctness.** It proves the sites say the same thing, never that the
-  thing they say is right or current. A wrong version pinned five times passes.
+  thing they say is right or current. A wrong version pinned in every site passes.
 - **`LOCKED_TRANSITIVE` names only `esrap`.** Every other transitive dependency is pinned by
   the lock but unreviewed — a regeneration moves them silently unless someone diffs the lock.
 - **It cannot see oracle freshness.** A pin can be perfectly self-consistent and still grade
@@ -1583,12 +1595,14 @@ lock, re-run `deno task compile:fixtures:validate`, update the constant, all in 
   conformance` preflights it.
 
 **Maintenance counterpart: `deno task pins:lock`** (`scripts/regen_sidecar_lock.ts`), not an
-audit. The lock is frozen at runtime, so this is the only way it moves. `--check` reports
-drift without writing; `--allow-fresh` opts past deno's 24 h `minimumDependencyAge`
-supply-chain window, needed ONLY to take a version published in the last day (a lock made with
-it reproduces flag-free once that version ages out). `--check` is deliberately **not** gated:
-its verdict depends on what the registry offers at that moment, so it would go red the day
-upstream publishes — drift to decide about, not a broken build.
+audit: `npm install --package-lock-only` in the sidecar's directory, which resolves what
+`package.json` names and the lock doesn't hold yet and keeps every locked entry (re-resolving a
+locked transitive is deleting the lock first, its own deliberate act). It reaches the
+registry, so it's run by hand after a pin bump. `--check` asks, offline, in a scratch copy,
+whether npm would change the lock as `package.json` and the lock stand (a lock holding
+everything `package.json` names needs no registry); `--allow-fresh` opts past the `.npmrc`'s
+`min-release-age` supply-chain window, needed ONLY to take a version published in the last
+day. Not gated: `pins:audit` already holds the manifest and the lock's root entry together.
 
 ## Checkout-Alignment Audit (`pins:audit:checkouts`)
 
@@ -2169,7 +2183,7 @@ the very whitespace that carries the meaning, and authoring_audit asks the CONVE
 (do two authorings reach one fixed point), never whether that fixed point renders like the
 input.
 
-**Gating.** Needs the Deno sidecar, so NOT in `deno task check` — nor the pure-Rust
+**Gating.** Needs the sidecar, so NOT in `deno task check` — nor the pure-Rust
 `audit:corpus`. Release-gated as a leg of `deno task conformance` (the one leg that runs as a
 subprocess), scoped there to the WHOLE `../corpora` snapshot (every collection it vendors,
 placed in a corpus tier or not, since this leg pins no count) plus the version-pinned `suite`
@@ -2194,7 +2208,7 @@ class, which is why a render-visible finding earns one even when every corpus ga
 
 **What it is blind to: two misgrades in the key itself**, one in each direction, both from
 reading the compiled template rather than a rendered page (mechanics beside `HOLE` in
-`crates/tsv_debug/src/deno/sidecar.ts`; the same key grades `render_compare` and the fixture R
+`crates/tsv_debug/sidecar/sidecar.ts`; the same key grades `render_compare` and the fixture R
 rules). A **nested `<script>` / `<style>`** is pushed as a template chunk of its own, so the
 whitespace on its two sides is never merged the way the browser merges it around an element
 with no box: `a<script>…</script> b` and `a⏎<script>…</script>⏎b` are the same page but key

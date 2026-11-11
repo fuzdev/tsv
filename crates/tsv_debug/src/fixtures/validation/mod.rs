@@ -337,7 +337,7 @@ pub async fn validate_fixture(fixture: &Fixture, prettier_only: bool) -> Fixture
         }
     }
 
-    // Phase 5: Deno sidecar validations (prettier + the canonical parsers)
+    // Phase 5: sidecar validations (prettier + the canonical parsers)
     // P1, P3: Parser freshness
     validate_parser_external(&mut result, fixture, &input, input_type).await;
     // P4, canonical side: each variant parse pin still holds what the canonical

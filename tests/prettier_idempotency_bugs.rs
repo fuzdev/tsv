@@ -11,7 +11,7 @@
 
 // Every sidecar (prettier) check is grouped into ONE `#[tokio::test]`
 // (`sidecar_prettier_checks` below) for a single sequential pass over the shared,
-// process-wide Deno sidecar pool. This is organizational, not a correctness
+// process-wide sidecar pool. This is organizational, not a correctness
 // requirement: the pool's actor tasks live on a dedicated process-lifetime runtime
 // (see `deno::actor::sidecar_runtime`), so it stays safe across any number of
 // separate test runtimes. Each check is a plain `async fn` the single test awaits.

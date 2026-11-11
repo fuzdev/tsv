@@ -998,7 +998,7 @@ trigger the verbatim fallback in `.svelte`, exactly as on a pure-`.ts` run. (A
 `<script>` with **no** explicit `lang` is formatted through `babel-ts` instead,
 whose stricter TC39 decorator grammar rejects forms like `@(f()).g` that tsc
 and the `typescript` parser accept.) **Both tsv pipelines disarm this with
-`PRETTIER_DEBUG=1`** (the tsv_debug sidecar sets it on the Deno spawn; the
+`PRETTIER_DEBUG=1`** (the tsv_debug sidecar sets it on the sidecar spawn; the
 `corpus:compare:format:run` task sets it in its env), which makes the plugin
 and prettier-core rethrow — so `compare`, fixture validation,
 `fixtures_update`, and corpus runs all report a hard prettier error (with a

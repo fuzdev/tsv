@@ -1862,7 +1862,7 @@ because regex bodies are opaque, so it does not meet this section's bar and will
 
 These are bugs in **upstream/standalone `acorn-typescript`** — the non-fork npm
 package, distinct from the `@sveltejs/acorn-typescript` fork this project
-pins (`crates/tsv_debug/src/deno/sidecar.ts`) and that every other
+pins (`crates/tsv_debug/sidecar/package.json`) and that every other
 "acorn-typescript" mention in this doc refers to. They **don't affect Svelte
 users** (Svelte's fork handles them):
 

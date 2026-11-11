@@ -27,12 +27,14 @@
 #               covered by `check`.
 #
 # `check` needs Rust, Deno *and* Node: the fixture suite drives prettier + svelte
-# through a Deno sidecar (npm: specifiers pinned in
-# crates/tsv_debug/src/deno/sidecar.ts and locked by its sibling deno.lock,
-# frozen at runtime — hence the cache-hash on both below), so
-# `cargo test --workspace` panics without Deno — tests/fixtures_tests.rs
-# health-checks the sidecar first. Node runs the JS suites (`test:node`, vitest
-# over the root's npm install). wasm-pack is not needed by `check`.
+# through tsv_debug's sidecar, a Node process run in place from
+# crates/tsv_debug/sidecar (its package.json and package-lock.json pin the
+# oracle, installed by `npm ci --prefix crates/tsv_debug/sidecar`), so
+# `cargo test --workspace` panics without Node or that install —
+# tests/fixtures_tests.rs health-checks the sidecar first. Node also runs the JS
+# suites (`test:node`, vitest over the root's npm install); Deno runs the
+# `deno task` chain and the suites still on `deno test`. wasm-pack is not needed
+# by `check`.
 
 name: check
 
@@ -56,8 +58,7 @@ jobs:
   check:
     runs-on: ubuntu-latest
 
-    # The fixture suite fetches pinned npm packages at runtime (frozen to the
-    # sidecar deno.lock), so bound the job to fail fast on a registry stall or hung sidecar
+    # Bound the job to fail fast on a registry stall at an install or a hung sidecar
     # instead of running to the 6h default.
     timeout-minutes: 30
 
@@ -85,23 +86,14 @@ jobs:
       - name: Install Deno
         uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
         with:
-          # Pinned to match local: deno drives the prettier/svelte fixture oracle
-          # and `deno test`, so a floating minor could shift behavior the pinned
-          # Rust toolchain can't guard. Bump deliberately.
+          # Pinned to match local: deno runs the `deno task` chain and `deno test`,
+          # so a floating minor could shift behavior the pinned Rust toolchain
+          # can't guard. Bump deliberately. Nothing it runs here fetches a package:
+          # `test:deno` runs the node-modules-free deno tests (node: builtins +
+          # relative imports, with the root package.json kept out of view), the
+          # bench's npm tree is never installed here, and the npm installs are the
+          # `npm ci` steps below.
           deno-version: 2.9.7
-          # Round-trips DENO_DIR across runs — captures the sidecar's runtime
-          # npm fetches (prettier/svelte/acorn) since those land in DENO_DIR.
-          cache: true
-          # Key on the sidecar pins (fetched at runtime, not lockfile-pinned) so a
-          # bump invalidates the cached deps. The sidecar's prettier/svelte fetches
-          # are the only runtime npm `check` does: `test:deno` runs the
-          # node-modules-free deno tests (node: builtins + relative imports, with the
-          # root package.json kept out of view), and the bench's heavy npm tree
-          # (biome/oxc/oxfmt) is never installed here. The only deno.lock is the
-          # sidecar's (crates/tsv_debug/src/deno/deno.lock, embedded + frozen); the
-          # bench resolves npm from its package-lock.json, which this job doesn't
-          # install, and the root's install is the `npm ci` below.
-          cache-hash: ${{ hashFiles('crates/tsv_debug/src/deno/sidecar.ts', 'crates/tsv_debug/src/deno/actor.rs', 'crates/tsv_debug/src/deno/deno.lock') }}
 
       # The lockfile gate for this job, in one cheap step instead of `--locked` on
       # every cargo command. `deno task check` reaches cargo only through deno tasks
@@ -126,6 +118,13 @@ jobs:
       # scripts off by the root .npmrc.
       - name: Install npm dependencies
         run: npm ci
+
+      # The fixture oracle's tree (prettier, svelte, acorn and what they pin), which
+      # tsv_debug's sidecar runs in place under `node --permission`; install scripts
+      # off by the sidecar's own .npmrc, a copy of the root's (npm reads only the
+      # prefix's). `cargo test` (in `deno task check`) refuses a missing or stale install.
+      - name: Install the sidecar's npm dependencies
+        run: npm ci --prefix crates/tsv_debug/sidecar
 
       - name: Check
         run: deno task check
@@ -313,23 +312,26 @@ jobs:
 
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
 
-      # `cargo test --workspace` needs Deno: the fixture suite drives prettier +
-      # svelte through the Deno sidecar (see the `check` job comment; same
-      # cache-hash reasoning — the sidecar's npm pins are fetched at runtime).
+      # The N-API steps below run as `deno task test:napi` / `test:napi:npm`.
       - name: Install Deno
         uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
         with:
           # Pinned to match the check job / local. Bump deliberately.
           deno-version: 2.9.7
-          cache: true
-          cache-hash: ${{ hashFiles('crates/tsv_debug/src/deno/sidecar.ts', 'crates/tsv_debug/src/deno/actor.rs', 'crates/tsv_debug/src/deno/deno.lock') }}
 
-      # For test:napi's runner (`node --test` executes the .ts directly via
-      # native type stripping, >= 22.18). Pinned to match the artifacts job.
+      # `cargo test --workspace` needs Node: the fixture suite drives prettier +
+      # svelte through tsv_debug's sidecar, a Node process (see the `check` job
+      # comment). Also test:napi's runner (`node --test` executes the .ts directly
+      # via native type stripping, >= 22.18). Pinned to match the artifacts job.
       - name: Install Node
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24.14.1'
+
+      # The fixture oracle's tree, which the sidecar runs in place (see the `check`
+      # job); `cargo test` refuses a missing or stale install.
+      - name: Install the sidecar's npm dependencies
+        run: npm ci --prefix crates/tsv_debug/sidecar
 
       # --no-fail-fast: cargo test stops at the first failing test BINARY by
       # default, hiding every later suite — the platform burn-down wants all

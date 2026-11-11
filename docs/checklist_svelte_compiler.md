@@ -4,7 +4,7 @@ Coverage map for tsv's Svelte-to-JS compiler (`crates/tsv_svelte_compile`): whic
 
 ## Coverage
 
-The compiler targets **server (SSR) output for runes-mode components**, measured against Svelte's own `compile()` at the **sidecar pin** (`crates/tsv_debug/src/deno/sidecar.ts`'s `VERSIONS`, the single source of truth — not restated here, where it would silently go stale on the next bump) as the correctness oracle. Parity is judged on the **canonical reprint** of both sides' JS (`canonicalize_js` — an intent-erased reprint, so a byte difference is a real code difference), plus byte-equal CSS.
+The compiler targets **server (SSR) output for runes-mode components**, measured against Svelte's own `compile()` at the **sidecar pin** (`crates/tsv_debug/sidecar/package.json`, the single source of truth — not restated here, where it would silently go stale on the next bump) as the correctness oracle. Parity is judged on the **canonical reprint** of both sides' JS (`canonicalize_js` — an intent-erased reprint, so a byte difference is a real code difference), plus byte-equal CSS.
 
 **The refusal contract**: every component shape is exactly one of
 

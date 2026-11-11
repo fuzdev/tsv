@@ -13,7 +13,7 @@ Version bumps, publishing, and **`CHANGELOG.md`** are user-owned. Agents make th
 ## Priorities
 
 1. **Correctness**: Match Svelte's parser exactly — a drop-in replacement on the default span-only wire (every field but `loc` and `name_loc`); `loc` is opt-in with one definition (acorn-exact for TypeScript, Svelte's `loc` quirks not reproduced — ./docs/architecture.md#loc-lines-one-rule-per-document). The formatter tracks Prettier for the common case, diverges deliberately and catalogs it where more defensible (spec, print width, comment position, its own taste), and fixes numerous Prettier bugs. Fixtures are the source of truth — when tests fail, fix the code; when tsv diverges on purpose, the fixture records it.
-2. **Performance**: Pure Rust. Dev tools use an embedded Deno sidecar to minimize process overhead.
+2. **Performance**: Pure Rust. Dev tools reach the JS oracles through a long-running Node sidecar to minimize process overhead.
 
 ## Development Philosophy: Test-Driven Development with Fixtures
 
@@ -69,7 +69,7 @@ cargo run -p tsv_debug ast_diff tests/fixtures/path/input.svelte # verify AST eq
 
 ## Commands
 
-Tasks live in `deno.json` (the ones that run Deno, `deno task <name> <flags>`) and `package.json` (the rest, `npm run <name> -- <flags>`); `deno task` falls through to the `package.json` script when `deno.json` has no task of that name, so `deno task <name>` runs either. `npm ci` installs the JS dependencies `package-lock.json` pins into the root `node_modules`; `.npmrc` turns install scripts off. The rationale for a `package.json` script lives in ./docs/tasks.md, keyed by name; a `deno.json` task's sits beside it as its `//<name>` key.
+Tasks live in `deno.json` (the ones that run Deno, `deno task <name> <flags>`) and `package.json` (the rest, `npm run <name> -- <flags>`); `deno task` falls through to the `package.json` script when `deno.json` has no task of that name, so `deno task <name>` runs either. `npm ci` installs the JS dependencies `package-lock.json` pins into the root `node_modules`; `.npmrc` turns install scripts off. `npm ci --prefix crates/tsv_debug/sidecar` installs the fixture oracle `tsv_debug`'s sidecar runs (its own `package.json`, lock, and a copy of the root `.npmrc`, which a `--prefix` install doesn't read); `cargo test` needs it. The rationale for a `package.json` script lives in ./docs/tasks.md, keyed by name; a `deno.json` task's sits beside it as its `//<name>` key.
 
 ### Build & Development
 
@@ -116,16 +116,16 @@ cargo run -p tsv_cli strip --check --content 'enum E {}'                 # exit 
 
 ```bash
 deno task check          # full committed-tree gate (benches/js/CLAUDE.md §Gate map)
-deno task doctor         # one-pass setup check: runtimes, pins + checkout alignment, node_modules freshness, oracle
-#                          checkouts, corpus, build artifacts. Exit 1 only on MISLEADING state (pin drift, skew, stale
-#                          deps); absences warn (--strict promotes them) — except the optional experimental-typechecker
+deno task doctor         # one-pass setup check: runtimes, pins + checkout alignment, the sidecar install, node_modules
+#                          freshness, oracle checkouts, corpus, build artifacts. Exit 1 only on MISLEADING state (pin
+#                          drift, skew, stale deps) or a broken core (no cargo, node, or sidecar install); absences warn (--strict promotes them) — except the optional experimental-typechecker
 #                          tier, informational at any strictness (a BROKEN checkout there still warns)
 deno task typecheck      # cargo check
 deno task typecheck:features # cargo check of each binding crate (tsv_wasm/tsv_ffi/tsv_napi) under each single feature,
 #                          then the three language crates without the `locations` feature tsv_cli/tsv_debug unify in —
 #                          per-package builds `cargo check --workspace` and clippy's `--all-features` both miss; then
 #                          `tsv_svelte` with `smallvec/union` (a feature a consumer's graph can turn on; lib only); in `check`
-deno task typecheck:js   # deno check over the bench harness, scripts/ + the tsv_debug sidecar. NOT in `check` (node_modules)
+deno task typecheck:js   # deno check over the bench harness + scripts/. NOT in `check` (node_modules); the sidecar is in typecheck:scripts' tsc
 deno task typecheck:packages # the STAGED npm packages' .d.ts as a consumer compiles them: lean consumer modules + every
 #                          ts/js README block (checkJs) through the `exports` map (strict, nodenext + bundler; wasm
 #                          packages with the DOM lib, the napi loader and every `./locations` without). Args pick
@@ -250,15 +250,18 @@ deno task variants:audit             # `_compact`/`_spaces` variant DIRECTION: a
 #                                      a `_spaces` never empty one (bare suffixes only — a qualified name like
 #                                      `unformatted_ours_hug_spaced` is the escape hatch for a deliberately bidirectional variant)
 deno task canonicalize:audit         # canonicalize_js idempotence + output validity + comment preservation
-deno task pins:audit                 # canonical-oracle PIN AGREEMENT (a repo fact): sidecar.ts VERSIONS + npm: imports,
-#                                      benches/js/package.json, actor.rs acorn import-map and the sidecar deno.lock must be
-#                                      identical, as must the prettier OPTIONS (`benches/js/lib/canonical.ts` `PRETTIER_OPTIONS`
-#                                      + the sidecar's inline call). The lock also pins the oracle's transitive deps no literal
-#                                      names (`LOCKED_TRANSITIVE`: esrap, which PRINTS svelte's compiled JS)
-deno task pins:lock                  # REGENERATE the sidecar lockfile (crates/tsv_debug/src/deno/deno.lock) after a canonical
-#                                      pin bump — frozen at runtime, so this is the only way it moves; `--check` reports drift.
-#                                      Not a gate. `--allow-fresh` passes deno's 24h `minimumDependencyAge`, needed ONLY for a
-#                                      version published in the last day (the lock reproduces flag-free once it ages out)
+deno task pins:audit                 # canonical-oracle PIN AGREEMENT (a repo fact): crates/tsv_debug/sidecar/package.json, its
+#                                      lock's root entry and benches/js/package.json pin the five exactly and identically, the
+#                                      lock installs each once and flat (no nested node_modules key: one acorn), the sidecar's
+#                                      .npmrc and engines equal the root's, and the prettier OPTIONS agree
+#                                      (`benches/js/lib/canonical.ts` `PRETTIER_OPTIONS` + the sidecar's inline call). The lock
+#                                      also pins the oracle's transitive deps no manifest names (`LOCKED_TRANSITIVE`: esrap,
+#                                      which PRINTS svelte's compiled JS)
+deno task pins:lock                  # REGENERATE the sidecar lock (crates/tsv_debug/sidecar/package-lock.json) after a canonical
+#                                      pin bump: `npm install --package-lock-only` there (network), which keeps every locked
+#                                      entry; the actor refuses an install that differs from the lock. `--check` (offline) asks
+#                                      whether npm would change the lock. Not a gate. `--allow-fresh` passes the .npmrc's
+#                                      `min-release-age`, needed ONLY for a version published in the last day
 deno task pins:audit:checkouts       # checkout ALIGNMENT (an environment fact): a PRESENT ../svelte or ../acorn-typescript
 #                                      must match its pin (absent → skipped; commit drift warns). Gates in `deno task
 #                                      conformance`, reported by doctor — NOT in check (nothing there reads the checkouts)
@@ -541,7 +544,7 @@ deno task bench:deno:run -- --verbose   # per-file skip detail (counts always sh
 BENCH_FILTER=bits-ui BENCH_LIMIT=10 deno task bench:deno:run
 ```
 
-**Prerequisites**: `cargo install wasm-pack` + `deno task bench:install` once (needs npm/Node). Beyond that **Deno is the only hard dependency**; Node ≥ 22.18 (native TS type-stripping) for `bench:node`, Bun for `bench:bun`. The aggregate `bench` needs both and fails fast if either is missing (`bench:runtimes` preflights `bench:perf`; without it the miss would surface only after two of three siblings regenerated and `bench:compose` skipped). Its node arm probes `globalThis.Deno` rather than resolving the name — `deno task` puts a `node`→deno compat shim on PATH that would pass the check and run the harness AS Deno.
+**Prerequisites**: `cargo install wasm-pack` + `deno task bench:install` once (needs npm/Node). Beyond that the hard dependencies are Deno (the `deno task` chain) and Node (≥ 24.14: the JS suites, and the fixture oracle `cargo test` runs, installed by `npm ci --prefix crates/tsv_debug/sidecar`); Node ≥ 22.18 (native TS type-stripping) runs `bench:node`, Bun `bench:bun`. The aggregate `bench` needs both and fails fast if either is missing (`bench:runtimes` preflights `bench:perf`; without it the miss would surface only after two of three siblings regenerated and `bench:compose` skipped). Its node arm probes `globalThis.Deno` rather than resolving the name — `deno task` puts a `node`→deno compat shim on PATH that would pass the check and run the harness AS Deno.
 
 **Compares** canonical (prettier + svelte/compiler), native (FFI under Deno / N-API under Node+Bun, both profile-guided), WASM, and alternatives:
 
@@ -735,7 +738,7 @@ TDD workflow: [Development Philosophy](#development-philosophy-test-driven-devel
 
 ## Debug Tooling
 
-**tsv_debug** uses an embedded Deno sidecar for JS tools (prettier, Svelte parser, acorn), spawned on first use and reused (orders of magnitude faster than per-call spawns). Verify with `cargo run -p tsv_debug check`.
+**tsv_debug** reaches the JS tools (prettier, Svelte parser and compiler, acorn) through a sidecar: Node processes running `crates/tsv_debug/sidecar/sidecar.ts` in place under `node --permission`, spawned on first use and reused (orders of magnitude faster than per-call spawns). A `tsv_debug` binary runs the sidecar from the source tree it was built from, so it needs that tree's `npm ci --prefix crates/tsv_debug/sidecar` and a real Node first on `PATH`. Verify with `cargo run -p tsv_debug check`.
 
 ### Commands
 
@@ -966,7 +969,7 @@ The shipped language/foundation crates' external deps (`tsv_cli` adds only `argh
 
 ## Canonical References
 
-**Implementations** (versions pinned in `crates/tsv_debug/src/deno/sidecar.ts`):
+**Implementations** (versions pinned in `crates/tsv_debug/sidecar/package.json`, the whole tree in its `package-lock.json`):
 
 - Prettier (`../prettier/`) — formatting reference; read source for layout logic
 - Svelte compiler (`../svelte/`) — parsing reference

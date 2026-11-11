@@ -1,11 +1,11 @@
-//! Wire protocol types for Deno sidecar communication
+//! Wire protocol types for sidecar communication
 //!
 //! JSON-lines protocol over stdio. Matches the format expected by sidecar.ts.
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-/// Request sent to the Deno sidecar (JSON-lines over stdin)
+/// Request sent to the sidecar (JSON-lines over stdin)
 #[derive(Debug, Serialize)]
 pub(super) struct WireRequest {
     pub id: u64,
@@ -15,7 +15,7 @@ pub(super) struct WireRequest {
     pub options: Option<Value>,
 }
 
-/// Response from the Deno sidecar (JSON-lines over stdout)
+/// Response from the sidecar (JSON-lines over stdout)
 #[derive(Debug, Deserialize)]
 pub(super) struct WireResponse {
     /// Request ID. -1 indicates a malformed request error (couldn't parse request JSON)

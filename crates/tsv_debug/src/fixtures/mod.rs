@@ -186,8 +186,8 @@ pub enum CanonicalParseError {
     /// parser's syntax error from any other exception thrown inside the sidecar's handler, so a
     /// sidecar-internal JS throw reads as a rejection too.
     Rejected(String),
-    /// The sidecar never answered for the parser: deno missing, a spawn or transport failure, a
-    /// crash, a shutdown, a timeout. No verdict on the input, so a check reports it and never
+    /// The sidecar never answered for the parser: node or the sidecar's packages missing, a spawn
+    /// or transport failure, a crash, a shutdown, a timeout. No verdict on the input, so a check reports it and never
     /// grades it, and a generator never writes the rejection marker for it.
     Sidecar(DenoError),
     /// The AST parsed but did not serialize; the message is worded for a fixture result.
@@ -291,10 +291,31 @@ mod tests {
         let io = || std::io::Error::other("io");
         let response_parse = crate::json::from_str::<serde_json::Value>("{").unwrap_err();
         let errors = [
-            DenoError::TempfileCreate(io()),
-            DenoError::ScriptWrite(io()),
+            DenoError::SidecarDir {
+                dir: "sidecar".into(),
+                source: io(),
+            },
+            DenoError::SidecarNotInstalled {
+                dir: "sidecar".into(),
+            },
+            DenoError::SidecarInstallStale {
+                dir: "sidecar".into(),
+            },
+            DenoError::NodeNotFound,
+            DenoError::NodeVersionUnknown {
+                program: "node".into(),
+                output: "deno 2.9.8".to_string(),
+            },
+            DenoError::NodeTooOld {
+                program: "node".into(),
+                version: "22.18.0".to_string(),
+                floor: ">=24.14".to_string(),
+                manifest: "sidecar/package.json".into(),
+            },
+            DenoError::NotNode {
+                program: "node".into(),
+            },
             DenoError::ProcessSpawn(io()),
-            DenoError::DenoNotFound,
             DenoError::PipeMissing { pipe: "stdout" },
             DenoError::Communication(io()),
             DenoError::ResponseParse(response_parse),
@@ -311,10 +332,14 @@ mod tests {
             let rendered = error.to_string();
             let is_rejection = match &error {
                 DenoError::ToolError { .. } => true,
-                DenoError::TempfileCreate(_)
-                | DenoError::ScriptWrite(_)
+                DenoError::SidecarDir { .. }
+                | DenoError::SidecarNotInstalled { .. }
+                | DenoError::SidecarInstallStale { .. }
+                | DenoError::NodeNotFound
+                | DenoError::NodeVersionUnknown { .. }
+                | DenoError::NodeTooOld { .. }
+                | DenoError::NotNode { .. }
                 | DenoError::ProcessSpawn(_)
-                | DenoError::DenoNotFound
                 | DenoError::PipeMissing { .. }
                 | DenoError::Communication(_)
                 | DenoError::ResponseParse(_)

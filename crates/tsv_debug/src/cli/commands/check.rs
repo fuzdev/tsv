@@ -1,9 +1,9 @@
-//! check command - verify Deno sidecar is available
+//! check command - verify the sidecar is available
 
 use crate::cli::CliError;
 use argh::FromArgs;
 
-/// Verify Deno sidecar is available and show version info.
+/// Verify the sidecar is available and show version info.
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "check")]
 pub struct CheckCommand {}
@@ -13,11 +13,11 @@ impl CheckCommand {
         let rt = super::create_runtime();
         match rt.block_on(crate::deno::check()) {
             Ok(info) => {
-                println!("Deno sidecar: ok");
+                println!("Sidecar: ok");
                 println!();
                 println!("Runtime:");
-                println!("  deno:       {}", info.deno);
-                println!("  typescript: {}", info.typescript);
+                println!("  node:       {}", info.node);
+                println!("  path:       {}", info.node_path);
                 println!();
                 println!("Dependencies:");
                 println!("  prettier:              {}", info.prettier);
@@ -28,7 +28,7 @@ impl CheckCommand {
                 Ok(())
             }
             Err(e) => {
-                eprintln!("Deno sidecar: error");
+                eprintln!("Sidecar: error");
                 eprintln!();
                 eprintln!("Error: {e}");
                 let hint = e.hint();

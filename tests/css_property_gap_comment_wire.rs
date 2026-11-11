@@ -103,7 +103,7 @@ fn both_spellings_read_the_same() {
 /// Live oracle: `parseCss` agrees on the spaced spelling and produces the
 /// documented garbage on the glued one — the divergence the corpus matcher
 /// sanctions. If Svelte makes its property scan comment-opaque, this fails and the
-/// catalog entry is due for retirement (the run also needs `deno`).
+/// catalog entry is due for retirement (the run also needs the sidecar).
 #[tokio::test]
 async fn sidecar_parse_css_diverges_on_the_glued_spelling() {
     let spaced = tsv_debug::deno::parse_css(SPACED)

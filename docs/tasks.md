@@ -11,11 +11,12 @@ With a `package.json` beside it, Deno resolves a bare specifier through `node_mo
 package installed there whether the `package.json` lists it or not, and looks for `npm:`
 specifiers there instead of in its own cache; with no `node_modules`, a type check that needs
 `@types/node` or a listed package fails outright. The root-config checks that hold code free
-of npm imports (`typecheck:scripts`' Deno half, `typecheck:bench-core`, `test:deno`, and the
-sidecar half of `typecheck:js`) therefore run with `DENO_NO_PACKAGE_JSON=1`, which keeps the
-root `package.json` out of Deno's view, so a bare import still fails them and a checkout with
-no `node_modules` still passes them. `typecheck:scripts`' other half is `tsc` from
-`node_modules`, so `typecheck:scripts` as a whole needs `npm ci`.
+of npm imports (`typecheck:scripts`' Deno half, `typecheck:bench-core`, `test:deno`) therefore
+run with `DENO_NO_PACKAGE_JSON=1`, which keeps the root `package.json` out of Deno's view, so a
+bare import still fails them and a checkout with no `node_modules` still passes them.
+`typecheck:scripts`' other half is `tsc` from `node_modules` over the Node scripts and
+tsv_debug's sidecar, whose packages resolve from its own install, so `typecheck:scripts` as a
+whole needs `npm ci` and `npm ci --prefix crates/tsv_debug/sidecar`.
 
 `package.json` takes no comments, so the rationale for a script whose body can't carry its
 own lives here, one section per script. A `deno.json` task's rationale sits beside it as its
@@ -41,7 +42,7 @@ The ORACLE side of the strip fixtures (tests/fixtures_strip): re-derives each fi
 
 ## `imports:fixtures:validate`
 
-The import-record fixtures (tests/fixtures_imports): per fixture, the tree's shape, ORACLE FRESHNESS (the canonical parser's tree — acorn-typescript, Svelte's parse — walked by tsv_debug's imports_fixtures oracle, regenerated in memory, must equal the committed expected.json; a fixture marked oracle.txt walks tsv's own parse wire instead) and tsv's records. Needs the Deno sidecar, so it is NOT in `check`; `cargo test` grades tsv against the committed files alone (tests/imports_fixtures_tests.rs). `imports:fixtures:update` writes the files.
+The import-record fixtures (tests/fixtures_imports): per fixture, the tree's shape, ORACLE FRESHNESS (the canonical parser's tree — acorn-typescript, Svelte's parse — walked by tsv_debug's imports_fixtures oracle, regenerated in memory, must equal the committed expected.json; a fixture marked oracle.txt walks tsv's own parse wire instead) and tsv's records. Needs the sidecar, so it is NOT in `check`; `cargo test` grades tsv against the committed files alone (tests/imports_fixtures_tests.rs). `imports:fixtures:update` writes the files.
 
 ## `compile:corpus:compare`
 

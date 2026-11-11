@@ -173,7 +173,7 @@ test('vs_prettier: a genuine letter drop is still flagged despite case-folding',
 });
 
 test('vs_prettier: prettier-empty output never fabricates a violation', () => {
-	// The prettier Deno sidecar can return '' for a file under load. The check
+	// The prettier sidecar can return '' for a file under load. The check
 	// iterates the chars OURS deviates on and uses prettier only as a subtrahend,
 	// so an empty prettier (prettier_excess = the whole source) can only CANCEL
 	// deltas — never invent one. Such a file surfaces as a large unknown diff, not

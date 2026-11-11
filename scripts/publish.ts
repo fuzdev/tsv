@@ -100,6 +100,12 @@ import {
 	is_bump_level,
 	version_tag
 } from './release/version.ts';
+import {
+	SIDECAR_DIR,
+	SIDECAR_INSTALL_COMMAND,
+	SIDECAR_LOCK_PATH,
+	sidecar_install_state
+} from './sidecar_install.ts';
 import { format_size, gzip_size } from './size.ts';
 import { TYPECHECK_INSTALL } from './typecheck_packages.ts';
 
@@ -354,6 +360,23 @@ if (missing_typecheck_install.length > 0) {
 			'run `deno task bench:install`'
 	);
 	Deno.exit(1);
+}
+
+// Step 3's `deno task check` and Step 3b's gates grade the fixtures through tsv_debug's sidecar,
+// which refuses to run without its packages installed as its lock says — asked here so a
+// missing or stale install fails before the bump rather than halfway through Step 3
+if (!no_check) {
+	const sidecar = sidecar_install_state(Deno.readTextFileSync(SIDECAR_LOCK_PATH), (path) =>
+		exists(`${SIDECAR_DIR}/${path}`) ? Deno.readTextFileSync(`${SIDECAR_DIR}/${path}`) : null
+	);
+	if (sidecar !== 'current') {
+		console.error(
+			`  FAIL: the sidecar's packages ${sidecar === 'missing' ? 'are not installed' : 'differ from its lock'} — ` +
+				`required by Step 3's fixture oracle; run \`${SIDECAR_INSTALL_COMMAND}\``
+		);
+		Deno.exit(1);
+	}
+	console.log('  sidecar: installed as its lock says');
 }
 
 // The N-API half of the release is a different machine's: the tag Step 8 pushes triggers

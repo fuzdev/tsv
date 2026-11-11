@@ -13,5 +13,5 @@
 		"verbatimModuleSyntax": true,
 		"types": ["node"]
 	},
-	"include": ["scripts/roots/**/*.ts"]
+	"include": ["scripts/roots/**/*.ts", "crates/tsv_debug/sidecar/sidecar.ts"]
 }

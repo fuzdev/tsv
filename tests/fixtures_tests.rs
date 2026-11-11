@@ -3,7 +3,7 @@
 //! This single test runs ALL fixture validations — the same checks the
 //! `fixtures_validate` CLI command runs.
 //!
-//! Requires Deno to be installed for full validation.
+//! Requires Node and the sidecar's packages (`npm ci --prefix crates/tsv_debug/sidecar`).
 //! Run with: cargo test --workspace --test fixtures_tests
 
 use futures_util::stream::{self, StreamExt};
@@ -24,13 +24,13 @@ async fn test_all_fixtures() {
     // happen before the first sidecar call — deno::check() below spawns the pool).
     let concurrency = tsv_debug::deno::init_bulk_pool();
 
-    // Verify Deno sidecar is healthy before running tests
+    // Verify the sidecar is healthy before running tests
     // This prevents cascading failures if the sidecar dies during tests
     if let Err(e) = tsv_debug::deno::check().await {
         panic!(
-            "Deno sidecar health check failed: {e}\n\n\
+            "Sidecar health check failed: {e}\n\n\
             Hint: {}\n\n\
-            The Deno sidecar is required for fixture validation.\n\
+            The sidecar is required for fixture validation.\n\
             All {} fixture tests would fail without it.",
             e.hint(),
             fixtures::walk_fixtures(fixtures_dir).map_or(0, |f| f.len())
@@ -82,25 +82,25 @@ async fn test_all_fixtures() {
     // pinned entry must still fire — a stale one means the oracle improved)
     summary.detect_stale_benign_render_equiv();
 
-    // Detect Deno sidecar crash pattern (many actor-shutdown / crash / empty-output errors)
+    // Detect sidecar crash pattern (many actor-shutdown / crash / empty-output errors)
     let sidecar_failures = summary.count_sidecar_failures();
     assert!(
         sidecar_failures <= 5,
-        "\n\nDeno sidecar crashed during test run!\n\n\
+        "\n\nSidecar crashed during test run!\n\n\
         {sidecar_failures} fixtures failed with sidecar faults (actor shutdown, crash, or empty output).\n\
-        This indicates the Deno process died unexpectedly during validation.\n\n\
+        This indicates the sidecar's Node process died unexpectedly during validation.\n\n\
         This is an infrastructure issue, not a fixture issue.\n\
         Try running the tests again. If this persists, check:\n\
         - Available memory\n\
-        - Deno version: deno --version\n\
+        - Node version: node --version\n\
         - System logs for OOM killer or other process termination\n"
     );
 
-    // Detect Deno sidecar timeout pattern (requests taking too long)
+    // Detect sidecar timeout pattern (requests taking too long)
     let timeout_failures = summary.count_timeout_failures();
     assert!(
         timeout_failures == 0,
-        "\n\nDeno sidecar timed out during test run!\n\n\
+        "\n\nSidecar timed out during test run!\n\n\
         {timeout_failures} fixtures failed with timeout errors.\n\
         This indicates prettier/acorn is hanging on certain inputs.\n\n\
         To identify the problematic fixture, run:\n\

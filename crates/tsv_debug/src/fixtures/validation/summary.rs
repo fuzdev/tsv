@@ -141,7 +141,7 @@ impl ValidationSummary {
         self.results.iter().filter(|r| !r.is_valid())
     }
 
-    /// Count fixtures that failed due to a transient Deno sidecar fault —
+    /// Count fixtures that failed due to a transient sidecar fault —
     /// shutdown, crash, or the empty-output miss (`DenoError::EmptyOutput`)
     ///
     /// A high count indicates the sidecar malfunctioned during the test run,
@@ -160,7 +160,7 @@ impl ValidationSummary {
         self.count_failures_matching(|msg| faults.iter().any(|fault| msg.contains(fault.as_str())))
     }
 
-    /// Count fixtures that failed due to Deno sidecar timeout
+    /// Count fixtures that failed due to sidecar timeout
     ///
     /// A high count indicates the sidecar is hanging on certain inputs,
     /// possibly due to a bug in prettier/acorn or resource exhaustion.

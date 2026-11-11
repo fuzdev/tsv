@@ -1,9 +1,15 @@
-//! Embedded Deno sidecar for JS tool access
+//! The oracle sidecar for JS tool access
 //!
 //! Provides access to prettier, Svelte's parser and compiler (including the
 //! render-key oracle), the acorn-typescript parser, and Svelte's CSS parser
-//! (`parseCss`) via a lazily-spawned pool of Deno processes. No process starts
-//! until one of these functions is first called.
+//! (`parseCss`) via a lazily-spawned pool of Node processes, each running
+//! `crates/tsv_debug/sidecar/sidecar.ts` in place under `node --permission`.
+//! No process starts until one of these functions is first called.
+//!
+//! The sidecar runs from the source tree this crate was built from, so a
+//! `tsv_debug` binary needs that tree's `crates/tsv_debug/sidecar` with its
+//! packages installed (`npm ci --prefix crates/tsv_debug/sidecar`), and a real
+//! Node first on `PATH`.
 //!
 //! # Example
 //!
@@ -21,7 +27,7 @@ mod protocol;
 
 pub use error::DenoError;
 
-/// The embedded sidecar source. Re-exported so `render_browser` can assert its
+/// The sidecar's source. Re-exported so `render_browser` can assert its
 /// browser-render block-tag set still mirrors the sidecar's.
 #[cfg(test)]
 pub(crate) use actor::SIDECAR_SCRIPT;
@@ -38,7 +44,7 @@ struct ActorSlot {
     actor: RwLock<DenoActor>,
 }
 
-/// Global lazy-initialized Deno actor pool
+/// Global lazy-initialized sidecar actor pool
 static DENO_POOL: OnceCell<Vec<ActorSlot>> = OnceCell::const_new();
 
 /// Requested pool size, read once when the pool is first spawned
@@ -56,7 +62,7 @@ pub fn bulk_pool_size(concurrency: usize) -> usize {
     (concurrency / 4).clamp(1, 4)
 }
 
-/// Set the sidecar pool size (number of Deno processes).
+/// Set the sidecar pool size (number of Node processes).
 ///
 /// Each sidecar is a single-threaded JS process, so a workload that issues many
 /// concurrent calls (fixture validation) is wall-clock-bound on one process;
@@ -127,7 +133,7 @@ async fn call_tool(tool: &str, content: &str, options: Option<Value>) -> Result<
     // actor (safe: the request never left, see above).
     let mut actor = slot.actor.write().await;
     if actor.is_closed() {
-        eprintln!("[deno] respawning dead sidecar actor");
+        eprintln!("[sidecar] respawning dead sidecar actor");
         *actor = DenoActor::spawn()?;
     }
     match actor.dispatch(tool, content, options.as_ref()).await {
@@ -226,7 +232,7 @@ pub struct SvelteCompileOutput {
 /// development output.
 ///
 /// # Errors
-/// Returns an error if Deno is not available or the Svelte compiler rejects the
+/// Returns an error if the sidecar is not available or the Svelte compiler rejects the
 /// source (a compile error surfaces as [`DenoError::ToolError`]).
 pub async fn svelte_compile(
     source: &str,
@@ -245,7 +251,7 @@ pub async fn svelte_compile(
 /// * `parser` - How to determine the parser (explicit name or infer from filepath)
 ///
 /// # Errors
-/// Returns an error if Deno is not available, formatting fails, or prettier
+/// Returns an error if the sidecar is not available, formatting fails, or prettier
 /// returns empty output for non-empty input (the under-load miss — see below).
 pub async fn run_prettier(content: &str, parser: PrettierParser<'_>) -> Result<String, DenoError> {
     let options = match parser {
@@ -283,7 +289,7 @@ pub async fn run_prettier(content: &str, parser: PrettierParser<'_>) -> Result<S
 /// AST as a JSON Value (caller serializes with desired formatting)
 ///
 /// # Errors
-/// Returns an error if Deno is not available or parsing fails.
+/// Returns an error if the sidecar is not available or parsing fails.
 pub async fn parse_svelte(source: &str) -> Result<Value, DenoError> {
     call_tool("svelte-parse", source, None).await
 }
@@ -310,7 +316,7 @@ pub async fn parse_svelte(source: &str) -> Result<Value, DenoError> {
 /// `render_browser` model.
 ///
 /// # Errors
-/// Returns an error if Deno is not available or the compiler rejects the input.
+/// Returns an error if the sidecar is not available or the compiler rejects the input.
 pub async fn svelte_render_key(source: &str) -> Result<String, DenoError> {
     let result = call_tool("svelte-render-key", source, None).await?;
     result
@@ -345,7 +351,7 @@ pub async fn parse_typescript_with_goal(
 /// AST as a JSON Value (caller serializes with desired formatting)
 ///
 /// # Errors
-/// Returns an error if Deno is not available or parsing fails.
+/// Returns an error if the sidecar is not available or parsing fails.
 pub async fn parse_css(source: &str) -> Result<Value, DenoError> {
     call_tool("css-parse", source, None).await
 }
@@ -380,13 +386,13 @@ pub async fn parse_by_type_with_goal(
     }
 }
 
-/// Version information from the Deno sidecar
+/// Version information from the sidecar
 #[derive(Debug, Clone)]
 pub struct VersionInfo {
-    /// Deno runtime version
-    pub deno: String,
-    /// TypeScript version (bundled with Deno)
-    pub typescript: String,
+    /// Node version (`process.versions.node`)
+    pub node: String,
+    /// The Node executable that answered (`process.execPath`)
+    pub node_path: String,
     /// prettier version
     pub prettier: String,
     /// prettier-plugin-svelte version
@@ -399,13 +405,14 @@ pub struct VersionInfo {
     pub acorn_typescript: String,
 }
 
-/// Check that Deno sidecar is available and return version info
+/// Check that the sidecar is available and return version info
 ///
 /// This spawns the sidecar if not already running, making it useful for
 /// verifying the environment is correctly set up.
 ///
 /// # Errors
-/// Returns an error if Deno is not installed or the sidecar fails to start.
+/// Returns an error if Node or the sidecar's packages are not installed, or the
+/// sidecar fails to start.
 pub async fn check() -> Result<VersionInfo, DenoError> {
     let result = call_tool("__version_info", "", None).await?;
 
@@ -423,8 +430,8 @@ pub async fn check() -> Result<VersionInfo, DenoError> {
     };
 
     Ok(VersionInfo {
-        deno: get_str(info, "runtime"),
-        typescript: get_str(info, "typescript"),
+        node: get_str(info, "runtime"),
+        node_path: get_str(info, "exec_path"),
         prettier: get_str(deps, "prettier"),
         prettier_plugin_svelte: get_str(deps, "prettier-plugin-svelte"),
         svelte: get_str(deps, "svelte"),
@@ -437,19 +444,7 @@ pub async fn check() -> Result<VersionInfo, DenoError> {
 mod tests {
     use super::*;
 
-    /// A sidecar's launch tempfiles are gone once it has answered — the pool
-    /// never drops its actors, so nothing else would delete them.
-    fn assert_launch_files_removed(actor: &DenoActor) {
-        for path in actor.launch_paths() {
-            assert!(
-                !path.exists(),
-                "sidecar launch file must be deleted once the sidecar answers: {}",
-                path.display()
-            );
-        }
-    }
-
-    /// Test all deno tools in a single test to avoid race conditions
+    /// Test all sidecar tools in a single test to avoid race conditions
     /// with the shared static actor across multiple tokio runtimes.
     #[tokio::test]
     async fn test_deno_tools() {
@@ -457,10 +452,9 @@ mod tests {
         let result = check().await;
         assert!(result.is_ok(), "check failed: {result:?}");
         let info = result.unwrap();
-        assert!(!info.deno.is_empty());
+        assert!(!info.node.is_empty());
+        assert!(!info.node_path.is_empty());
         assert!(!info.prettier.is_empty());
-        let slot = get_slot().await.expect("pool must be initialized");
-        assert_launch_files_removed(&*slot.actor.read().await);
 
         // Test prettier
         let result = run_prettier("<div>hello</div>", PrettierParser::Parser("svelte")).await;
@@ -588,7 +582,6 @@ mod tests {
             !slot.actor.read().await.is_closed(),
             "slot must hold a live actor after the heal"
         );
-        assert_launch_files_removed(&*slot.actor.read().await);
     }
 
     #[test]

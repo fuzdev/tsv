@@ -1,0 +1,16 @@
+{
+	"name": "tsv-sidecar",
+	"description": "tsv_debug's oracle sidecar: the canonical prettier, Svelte, and acorn every fixture is baselined against, run in place under node --permission",
+	"private": true,
+	"type": "module",
+	"engines": {
+		"node": ">=24.14"
+	},
+	"dependencies": {
+		"@sveltejs/acorn-typescript": "1.0.13",
+		"acorn": "8.19.0",
+		"prettier": "3.9.10",
+		"prettier-plugin-svelte": "4.1.1",
+		"svelte": "5.57.3"
+	}
+}

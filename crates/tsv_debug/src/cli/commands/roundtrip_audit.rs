@@ -27,7 +27,7 @@
 //!    - reparses but a node was dropped / duplicated / re-typed →
 //!      [`TsvVerdict::NodeLoss`] (always a bug — the population census);
 //!    - reparses but the AST diverges → [`TsvVerdict::Divergent`] (a suspect).
-//! 2. **canonical confirm** (Svelte / acorn-typescript / parseCss via the Deno
+//! 2. **canonical confirm** (Svelte / acorn-typescript / parseCss via the
 //!    sidecar): the drop-in contract oracle. Runs on the tsv-self suspects by
 //!    default, or on **every** input-accepted file with `--canonical-all` (the
 //!    thorough gate mode — closes tsv-self's blind spot, where tsv's own parser

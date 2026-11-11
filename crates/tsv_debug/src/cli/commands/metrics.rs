@@ -185,7 +185,7 @@ fn classify_phase(crate_name: &str, file_path: &Path, src_dir: &Path) -> String 
         return "escapes".to_string();
     }
 
-    // Deno sidecar directory
+    // The sidecar module's directory
     if first_dir == "deno" {
         return "deno".to_string();
     }

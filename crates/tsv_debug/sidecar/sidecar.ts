@@ -1,23 +1,15 @@
-// Deno Sidecar for tsv_debug
-// Long-running process for JS tools. Communicates via JSON-lines over stdio.
-
-// ⚠ SYNC — each canonical version below is pinned in THREE places that must stay
-// identical: (1) this VERSIONS object, (2) the static `import` specifiers just below
-// (a static import can't interpolate a const, so the literal is repeated by necessity),
-// and (3) benches/js/package.json (read by benches/js/lib/versions.ts).
-// These can't be DRYed: the release binary embeds this file as a string and runs it
-// WITHOUT that package.json, so it can't read the bench's pins at runtime.
-// Agreement across all the pin sites (these three + actor.rs's acorn import-map
-// pin + the deno.lock beside it) is enforced by `deno task pins:audit`
-// (scripts/check_canonical_pins.ts, gated in `deno task check`).
+// tsv_debug's oracle sidecar: a long-running Node process that answers JS tool requests,
+// JSON lines over stdio. `crates/tsv_debug/src/deno/actor.rs` runs it in place from this
+// package directory under `node --permission`, with a read grant on the directory alone.
 //
-// ⚠ These literals pin only what the sidecar imports DIRECTLY. The oracle's own
-// dependencies float on THEIR declared ranges, and one of them — `esrap`, which
-// PRINTS the JS `compile()` returns — is the effective oracle for every compile
-// fixture (svelte depends on it by a caret range). That is what
-// `crates/tsv_debug/src/deno/deno.lock` exists to pin: the sidecar resolves
-// against it FROZEN, so the whole transitive tree is fixed rather than just the
-// five names here.
+// ⚠ The oracle is this package's install: `package.json` pins the five canonical packages
+// exactly, and `package-lock.json` pins the whole tree beneath them. The lock is what fixes the
+// oracle's own dependencies, which float on THEIR declared ranges, and one of them — `esrap`,
+// which PRINTS the JS `compile()` returns — is the effective oracle for every compile fixture
+// (svelte depends on it by a caret range). `benches/js/package.json` pins the same five
+// versions for the bench, and `pins:audit` (scripts/check_canonical_pins.ts, gated in
+// `deno task check`) holds the two manifests and the lock together. The actor refuses an
+// install that differs from the lock, so what runs is what the lock says.
 //
 // Bumping prettier / svelte / acorn / @sveltejs/acorn-typescript / prettier-plugin-svelte
 // is NOT a routine refresh — it re-baselines the entire fixture corpus (these tools define
@@ -25,37 +17,54 @@
 // expected_server.js). The command sequence lives in one place, docs/benchmarks.md
 // §"Canonical baseline is coupled"; follow it rather than a copy here.
 //
-// NOTE: Requires deno.json with "acorn": "npm:acorn@8.19.0" import map
-// to ensure @sveltejs/acorn-typescript uses the same acorn instance.
-const VERSIONS = {
-	prettier: '3.9.10',
-	'prettier-plugin-svelte': '4.1.1',
-	svelte: '5.57.3',
-	acorn: '8.19.0',
-	'@sveltejs/acorn-typescript': '1.0.13'
-} as const;
+// One `acorn` instance serves both the parser and the TypeScript plugin, which extends
+// `acorn.Parser` and imports `acorn` itself for its token types: npm installs the tree flat,
+// so every importer resolves the same `node_modules/acorn`, and `pins:audit` refuses a lock
+// that nests a second copy.
 
-// TODO verify there's not a better solution to use deno.json here, see the above NOTE too
-// Imports are like this because these don't have the deno.json when used by the release binary.
-// deno-lint-ignore no-import-prefix
-import * as prettier from 'npm:prettier@3.9.10';
-// deno-lint-ignore no-import-prefix
-import prettierPluginSvelte from 'npm:prettier-plugin-svelte@4.1.1';
-// deno-lint-ignore no-import-prefix
-import {
-	compile as svelteCompile,
-	parse as svelteParse,
-	parseCss
-} from 'npm:svelte@5.57.3/compiler';
-// deno-lint-ignore no-import-prefix
-import * as acorn from 'npm:acorn@8.19.0';
-// deno-lint-ignore no-import-prefix
-import { tsPlugin } from 'npm:@sveltejs/acorn-typescript@1.0.13';
-// deno-lint-ignore no-import-prefix
-import { TextLineStream } from 'jsr:@std/streams@1/text-line-stream';
+import { readFileSync } from 'node:fs';
+
+/**
+ * The exit code of a sidecar started by another runtime's `node`, which the actor reports as
+ * not Node (`NOT_NODE_EXIT` in `actor.rs`).
+ */
+const NOT_NODE_EXIT = 78;
+
+// The fixtures are baselined against this oracle as Node runs it. Deno and Bun each answer to
+// `node` in places (`deno task` puts a `node` that runs Deno on `PATH` when no Node is
+// installed) and would run the same file with a different engine, so they are refused.
+if ('Deno' in globalThis || 'Bun' in globalThis) {
+	process.stderr.write(
+		`the sidecar runs on Node alone, and ${process.execPath} is ${'Deno' in globalThis ? 'Deno' : 'Bun'}\n`
+	);
+	process.exit(NOT_NODE_EXIT);
+}
+
+// The oracle loads only past the refusal above, so another runtime never loads or evaluates it:
+// static imports would, before this module's first line runs. One `await` each, in the order
+// static imports would evaluate them.
+const prettier = await import('prettier');
+const { default: prettierPluginSvelte } = await import('prettier-plugin-svelte');
+const { compile: svelteCompile, parse: svelteParse, parseCss } = await import('svelte/compiler');
+const acorn = await import('acorn');
+const { tsPlugin } = await import('@sveltejs/acorn-typescript');
+
+/** The canonical packages, whose installed versions `__version_info` reports. */
+const ORACLES = [
+	'prettier',
+	'prettier-plugin-svelte',
+	'svelte',
+	'acorn',
+	'@sveltejs/acorn-typescript'
+] as const;
+
+/** The version of `name` as installed beside this file (its own `package.json`). */
+function installed_version(name: string): string {
+	const url = new URL(`./node_modules/${name}/package.json`, import.meta.url);
+	return (JSON.parse(readFileSync(url, 'utf8')) as { version: string }).version;
+}
 
 // Create TypeScript-enabled parser
-// deno-lint-ignore no-explicit-any
 const ParserWithTS = acorn.Parser.extend(tsPlugin() as any);
 
 // --- Svelte render key (browser-visible render fingerprint) ------------------------------
@@ -370,9 +379,9 @@ async function dispatch(
 	switch (tool) {
 		case '__version_info': {
 			return {
-				runtime: Deno.version.deno,
-				typescript: Deno.version.typescript,
-				dependencies: VERSIONS
+				runtime: process.versions.node,
+				exec_path: process.execPath,
+				dependencies: Object.fromEntries(ORACLES.map((name) => [name, installed_version(name)]))
 			};
 		}
 
@@ -469,10 +478,30 @@ async function dispatch(
 	}
 }
 
+/**
+ * Splits `input` into lines on LF alone, dropping one CR before it, and yields a last line with
+ * no LF when there is one. Not `node:readline`, which also ends a line at a lone CR and at
+ * U+2028 and U+2029: serde_json writes those two raw inside a request's strings, so a readline
+ * split would cut the request in half.
+ */
+async function* read_lines(input: AsyncIterable<string>): AsyncGenerator<string> {
+	let pending = '';
+	for await (const chunk of input) {
+		pending += chunk;
+		let start = 0;
+		let lf: number;
+		while ((lf = pending.indexOf('\n', start)) !== -1) {
+			yield pending.slice(start, pending[lf - 1] === '\r' ? lf - 1 : lf);
+			start = lf + 1;
+		}
+		pending = pending.slice(start);
+	}
+	if (pending !== '') yield pending;
+}
+
 // Main loop: read JSON-lines from stdin, process, write responses to stdout
-const lines = Deno.stdin.readable
-	.pipeThrough(new TextDecoderStream())
-	.pipeThrough(new TextLineStream());
+process.stdin.setEncoding('utf8');
+const lines = read_lines(process.stdin);
 
 for await (const line of lines) {
 	// Skip empty lines (defensive against stdin noise)

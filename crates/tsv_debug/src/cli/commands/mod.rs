@@ -80,7 +80,7 @@ use tsv_cli::cli::input::{Input, InputArgs, ParserType};
 
 /// Create a tokio runtime for async operations.
 ///
-/// Debug tools need async for Deno sidecar communication. Runtime creation
+/// Debug tools need async for sidecar communication. Runtime creation
 /// failure is unrecoverable, so panicking is appropriate.
 ///
 /// `thread_stack_size` is what makes this a `Builder` rather than `Runtime::new()`

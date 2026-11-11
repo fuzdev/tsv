@@ -53,6 +53,7 @@
 		"scripts/release/changelog_test.ts",
 		"scripts/release/plan_test.ts",
 		"scripts/release/version_test.ts",
+		"scripts/sidecar_install_test.ts",
 		"scripts/typecheck_packages_test.ts"
 	]
 }

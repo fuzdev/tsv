@@ -1,29 +1,74 @@
-//! Error types for Deno sidecar communication
+//! Error types for sidecar communication
 
 use std::io;
+use std::path::PathBuf;
 use thiserror::Error;
 
-/// Errors that can occur when communicating with the Deno sidecar
+/// The install command the install errors name, run from the checkout's root.
+const INSTALL_HINT: &str = "Install the sidecar's packages from the checkout's root: npm ci --prefix crates/tsv_debug/sidecar";
+
+/// Errors that can occur when communicating with the sidecar
 #[derive(Debug, Error)]
 pub enum DenoError {
-    /// Failed to create tempfile for sidecar script
-    #[error("failed to create tempfile for sidecar script: {0}")]
-    TempfileCreate(#[source] io::Error),
+    /// The sidecar's package directory, or its committed lock, could not be read
+    #[error("cannot read the sidecar package at {}: {source}", .dir.display())]
+    SidecarDir {
+        dir: PathBuf,
+        #[source]
+        source: io::Error,
+    },
 
-    /// Failed to write sidecar script to tempfile
-    #[error("failed to write sidecar script: {0}")]
-    ScriptWrite(#[source] io::Error),
+    /// The sidecar's packages are not installed (npm's hidden lockfile is absent)
+    #[error(
+        "the sidecar's packages are not installed in {}: run `npm ci --prefix {}`",
+        .dir.join("node_modules").display(),
+        .dir.display()
+    )]
+    SidecarNotInstalled { dir: PathBuf },
 
-    /// Failed to spawn Deno process
-    #[error("failed to spawn deno: {0}")]
+    /// The installed packages differ from the committed lock (a lock changed since the install)
+    #[error(
+        "the sidecar's installed packages in {} differ from {}: run `npm ci --prefix {}`",
+        .dir.join("node_modules").display(),
+        .dir.join("package-lock.json").display(),
+        .dir.display()
+    )]
+    SidecarInstallStale { dir: PathBuf },
+
+    /// No `node` on `PATH`
+    #[error("node not found on PATH: the sidecar runs on Node")]
+    NodeNotFound,
+
+    /// The `node` found on `PATH` printed no Node version when asked
+    #[error(
+        "{} reported no Node version: `-p process.versions.node` gave {output:?}",
+        .program.display()
+    )]
+    NodeVersionUnknown { program: PathBuf, output: String },
+
+    /// The `node` found on `PATH` is below the floor the sidecar's `package.json` states
+    #[error(
+        "{} is Node {version}, below the floor `{floor}` that `engines.node` in {} states",
+        .program.display(),
+        .manifest.display()
+    )]
+    NodeTooOld {
+        program: PathBuf,
+        version: String,
+        floor: String,
+        manifest: PathBuf,
+    },
+
+    /// The `node` found on `PATH` ran the sidecar under another runtime, which refused it
+    #[error("{} is not Node: the sidecar refused to run under it", .program.display())]
+    NotNode { program: PathBuf },
+
+    /// Failed to spawn the Node process
+    #[error("failed to spawn node: {0}")]
     ProcessSpawn(#[source] io::Error),
 
-    /// Deno not found in PATH
-    #[error("deno not found in PATH - install from https://deno.land")]
-    DenoNotFound,
-
     /// Failed to get stdio pipe
-    #[error("failed to get {pipe} pipe from deno process")]
+    #[error("failed to get {pipe} pipe from the sidecar process")]
     PipeMissing { pipe: &'static str },
 
     /// Communication error with sidecar
@@ -48,15 +93,15 @@ pub enum DenoError {
     EmptyOutput,
 
     /// Sidecar process crashed
-    #[error("deno sidecar process crashed")]
+    #[error("sidecar process crashed")]
     SidecarCrashed,
 
     /// Actor shutdown
-    #[error("deno actor shut down")]
+    #[error("sidecar actor shut down")]
     ActorShutdown,
 
     /// Request timed out
-    #[error("deno sidecar timed out after {seconds}s")]
+    #[error("sidecar timed out after {seconds}s")]
     Timeout { seconds: u64 },
 }
 
@@ -65,8 +110,19 @@ impl DenoError {
     #[must_use]
     pub fn hint(&self) -> &'static str {
         match self {
-            Self::DenoNotFound => "Install Deno: curl -fsSL https://deno.land/install.sh | sh",
-            Self::ProcessSpawn(_) => "Check that 'deno' is in your PATH",
+            Self::SidecarDir { .. } => {
+                "tsv_debug runs the sidecar in place from the source tree it was built from (crates/tsv_debug/sidecar)"
+            }
+            Self::SidecarNotInstalled { .. } | Self::SidecarInstallStale { .. } => INSTALL_HINT,
+            Self::NodeNotFound => {
+                "Install Node, at or above the floor `engines.node` states in crates/tsv_debug/sidecar/package.json, and put it on PATH"
+            }
+            Self::NodeVersionUnknown { .. } => "Check that the `node` first on PATH is Node",
+            Self::NodeTooOld { .. } => "Put a Node at or above the sidecar's floor first on PATH",
+            Self::NotNode { .. } => {
+                "Put a real Node first on PATH: with no Node installed, `deno task` puts its own `node`, which runs Deno, there"
+            }
+            Self::ProcessSpawn(_) => "Check that the `node` on PATH can be executed",
             Self::SidecarCrashed => "This may be a bug in the sidecar script",
             Self::Timeout { .. } => "The sidecar may be stuck starting up or processing a request",
             Self::EmptyOutput => {

@@ -2,13 +2,14 @@
  * `deno task doctor` — one-pass, read-only setup check for tsv's diagnostic
  * toolchain. The per-tool preflights fail loud at use time; this answers "am I
  * set up?" BEFORE a run: runtimes, the canonical-oracle pin agreement, the
- * benches/js `node_modules` (installed + fresh), the sibling oracle checkouts
+ * sidecar's install (present + matching its lock), the benches/js `node_modules`
+ * (installed + fresh), the sibling oracle checkouts
  * (presence + version skew vs the npm pins), the corpus entry lists, and which
  * build artifacts exist.
  *
  * Exit semantics: exit 1 only for states that would MISLEAD a run or break the
  * core toolchain (canonical pin drift, checkout↔pin skew, stale node_modules,
- * missing cargo) — mere absences (a checkout not cloned, an artifact not
+ * missing cargo, node, or sidecar install) — mere absences (a checkout not cloned, an artifact not
  * built) are ⚠ warnings: they fail loud on their own at use time, and plenty
  * of workflows don't need them. So a green doctor means "nothing on this
  * machine will lie to you", not "everything is installed". `--strict` promotes
@@ -35,6 +36,12 @@ import {
 } from '../benches/js/lib/harvest_stamp.ts';
 import { native_library_filename } from '../benches/js/lib/runtime.ts';
 import { type AllVersions, load_all_versions } from '../benches/js/lib/versions.ts';
+import {
+	SIDECAR_DIR,
+	SIDECAR_INSTALL_COMMAND,
+	SIDECAR_LOCK_PATH,
+	sidecar_install_state
+} from './sidecar_install.ts';
 
 let warnings = 0;
 let errors = 0;
@@ -177,8 +184,9 @@ check_ci_pin('deno', Deno.version.deno);
 
 const node_version = run_version('node');
 if (node_version === null) {
-	warn(
-		'node missing — bench:node, bench:install, test:npm, and the publish artifact tests need it'
+	fail(
+		"node missing — cargo test's fixture oracle (tsv_debug's sidecar) runs on it, and bench:node, " +
+			'bench:install, test:npm, and the publish artifact tests need it'
 	);
 } else {
 	const m = /^v(\d+)\.(\d+)/.exec(node_version);
@@ -524,7 +532,35 @@ info(
 	'freshness (artifact vs source mtimes) is enforced at run time by lib/check_artifact_freshness.ts' +
 		' (bench/corpus) and scripts/check_staged_freshness.ts (the staged npm/napi packages)'
 );
-info('Deno sidecar (fixtures/compare tooling): verify with `cargo run -p tsv_debug check`');
+
+// --- Sidecar --------------------------------------------------------------------
+
+// The fixture oracle `cargo test` and the tsv_debug fixture/compare tooling run. Its actor
+// refuses an install that isn't its lock's, so this is the same check, ahead of a run.
+section('Sidecar (the fixture oracle, run by tsv_debug)');
+const read_sidecar_file = (path: string): string | null => {
+	try {
+		return Deno.readTextFileSync(`${SIDECAR_DIR}/${path}`);
+	} catch (e) {
+		if (e instanceof Deno.errors.NotFound) return null;
+		throw e;
+	}
+};
+try {
+	const state = sidecar_install_state(Deno.readTextFileSync(SIDECAR_LOCK_PATH), read_sidecar_file);
+	if (state === 'current') ok(`${SIDECAR_DIR} installed as its lock says`);
+	else {
+		fail(
+			`${SIDECAR_DIR} ${state === 'missing' ? 'is not installed' : 'differs from its lock'} — ` +
+				`cargo test and the fixture tooling refuse to run it; run \`${SIDECAR_INSTALL_COMMAND}\``
+		);
+	}
+} catch (e) {
+	fail(
+		`cannot check ${SIDECAR_DIR}'s install (${e instanceof Error ? e.message.split('\n')[0] : e})`
+	);
+}
+info('the Node that answers: `cargo run -p tsv_debug check`');
 
 // --- Verdict --------------------------------------------------------------------
 

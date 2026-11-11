@@ -8,7 +8,7 @@
 //! `oracle.txt`). No ratchet: every failing fixture fails the test.
 //!
 //! The committed files' agreement with the oracle (the canonical parsers' trees) is
-//! `deno task imports:fixtures:validate`'s, which needs the Deno sidecar and so stays out
+//! `deno task imports:fixtures:validate`'s, which needs the sidecar and so stays out
 //! of this test.
 
 use std::path::Path;

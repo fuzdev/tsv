@@ -17,7 +17,7 @@
 
 /**
  * The BigInt half of the fixture sidecar's jsonReplacer
- * (`crates/tsv_debug/src/deno/sidecar.ts`), so the comparisons and `expected.json`
+ * (`crates/tsv_debug/sidecar/sidecar.ts`), so the comparisons and `expected.json`
  * generation agree on the values neither can serialize natively.
  *
  * ⚠️ Deliberately NOT the sidecar's whole replacer: the sidecar also substitutes U+FFFD

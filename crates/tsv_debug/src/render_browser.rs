@@ -437,7 +437,7 @@ mod tests {
     /// whitespace, so the key vouched "same page" for real render changes
     /// (`{x}{z}` vs `{x} {z}` bakes a rendered space into the template;
     /// `a{@render f()}b` vs its spaced form likewise) — the exact class the
-    /// oracle exists to refuse. Read from the embedded `sidecar.ts` source so a
+    /// oracle exists to refuse. Read from the `sidecar.ts` source so a
     /// "cleanup" back to a space (or to `\x00`, which would collide with the
     /// block-boundary sentinel `BR`) cannot land silently.
     #[test]
@@ -479,7 +479,7 @@ mod tests {
 
     /// [`BLOCK_TAGS`] must stay identical to the sidecar's own set, or the
     /// fallback arm and the authoritative compile arm would model the same
-    /// document differently. Read from the embedded `sidecar.ts` source, so the
+    /// document differently. Read from the `sidecar.ts` source, so the
     /// two cannot drift apart silently.
     #[test]
     fn sidecar_block_tags_match() {
