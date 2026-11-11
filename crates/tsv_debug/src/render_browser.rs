@@ -442,7 +442,7 @@ mod tests {
     /// block-boundary sentinel `BR`) cannot land silently.
     #[test]
     fn sidecar_hole_is_a_non_whitespace_sentinel() {
-        let source = crate::deno::SIDECAR_SCRIPT;
+        let source = crate::sidecar::SIDECAR_SCRIPT;
         let needle = "const HOLE = '";
         let start = source
             .find(needle)
@@ -483,7 +483,7 @@ mod tests {
     /// two cannot drift apart silently.
     #[test]
     fn sidecar_block_tags_match() {
-        let source = crate::deno::SIDECAR_SCRIPT;
+        let source = crate::sidecar::SIDECAR_SCRIPT;
         let start = source
             .find("const BLOCK_TAGS = new Set([")
             .expect("sidecar.ts must declare `const BLOCK_TAGS = new Set([`");

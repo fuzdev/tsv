@@ -83,8 +83,8 @@ use super::print_json_tabs;
 use super::profile::{is_svelte, resolve_seed_files_named};
 use crate::audit::panic_hook::{CapturingPanicHook, take_last_panic};
 use crate::cli::CliError;
-use crate::deno::{self, DenoError, SvelteGenerate};
 use crate::diff::{ColorChoice, DiffOptions, diff_to_string};
+use crate::sidecar::{self, SidecarError, SvelteGenerate};
 
 /// Differential compile fuzzer: generate feature cross-products from the compile
 /// fixtures and grade each against the canonical Svelte compiler.
@@ -380,10 +380,10 @@ impl CompileFuzzCommand {
         // the pure-Rust half (compile, canonicalize, diff) spreads across workers
         // while the JS half rides the small pool.
         let concurrency = if self.jobs > 0 {
-            deno::set_pool_size(deno::bulk_pool_size(self.jobs));
+            sidecar::set_pool_size(sidecar::bulk_pool_size(self.jobs));
             self.jobs
         } else {
-            deno::init_bulk_pool()
+            sidecar::init_bulk_pool()
         };
         let mut stream = futures_util::stream::iter(mutants)
             .map(|mutant| tokio::spawn(grade(mutant)))
@@ -470,9 +470,9 @@ async fn grade_source(source: &str) -> Verdict {
     };
 
     // tsv compiled — only now is the oracle worth a round trip.
-    let oracle = match deno::svelte_compile(source, SvelteGenerate::Server, false).await {
+    let oracle = match sidecar::svelte_compile(source, SvelteGenerate::Server, false).await {
         Ok(o) => o,
-        Err(DenoError::ToolError { message }) => {
+        Err(SidecarError::ToolError { message }) => {
             // A `svelte.dev/e/{code}` URL is the compiler REJECTING the source; a
             // ToolError without one is a sidecar-internal failure and must not be
             // reported as an over-acceptance (that would fail the run on a harness

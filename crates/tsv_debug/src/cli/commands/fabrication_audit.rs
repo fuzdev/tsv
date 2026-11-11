@@ -32,7 +32,7 @@ use super::profile::resolve_seed_files;
 /// ([`is_sanctioned`]) rather than snapshot lines, so the snapshot never mixes sanctioned rules
 /// with debt.
 ///
-/// Pure Rust — no Deno. Defaults to `tests/fixtures` when no paths are given.
+/// Pure Rust — no sidecar. Defaults to `tests/fixtures` when no paths are given.
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "fabrication_audit")]
 pub struct FabricationAuditCommand {

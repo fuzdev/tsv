@@ -161,10 +161,12 @@ fn property_comment_colon_one_pass_and_idempotent() {
 #[tokio::test]
 async fn sidecar_prettier_diverges() {
     for &(label, input, prettier_expected) in PRETTIER_DIVERGENCE {
-        let prettier =
-            tsv_debug::deno::run_prettier(input, tsv_debug::deno::PrettierParser::Parser("css"))
-                .await
-                .expect("prettier formatting failed");
+        let prettier = tsv_debug::sidecar::run_prettier(
+            input,
+            tsv_debug::sidecar::PrettierParser::Parser("css"),
+        )
+        .await
+        .expect("prettier formatting failed");
         assert_eq!(
             prettier, prettier_expected,
             "case `{label}`: prettier should produce the documented divergent form"

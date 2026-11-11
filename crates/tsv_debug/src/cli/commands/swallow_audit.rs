@@ -13,7 +13,7 @@ use super::profile::resolve_seed_files;
 /// Enables the render-time swallow check (`tsv_lang::doc::swallow`) and formats
 /// each file, reporting every spot where a `//` line comment is followed by
 /// content on the same physical output line (silent content loss). Pure Rust —
-/// no Deno. Defaults to `tests/fixtures` when no paths are given.
+/// no sidecar. Defaults to `tests/fixtures` when no paths are given.
 ///
 /// The corpus walk is the shared [`sweep_pristine_armed`], so the skip buckets
 /// (and the vacuity pin they feed) mean the same thing here as in the other

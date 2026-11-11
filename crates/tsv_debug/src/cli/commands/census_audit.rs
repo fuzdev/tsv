@@ -39,7 +39,7 @@ use super::profile::resolve_seed_files;
 /// corpora — its first sweep over the prettier suites found a live `as const` code swallow
 /// and four line-comment merges no other gate could see.
 ///
-/// Pure Rust — no Deno. Defaults to `tests/fixtures` when no paths are given.
+/// Pure Rust — no sidecar. Defaults to `tests/fixtures` when no paths are given.
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "census_audit")]
 pub struct CensusAuditCommand {

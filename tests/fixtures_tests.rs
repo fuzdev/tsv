@@ -21,12 +21,12 @@ async fn test_all_fixtures() {
     );
 
     // Bulk workload: spread the JS work across a small sidecar pool (init must
-    // happen before the first sidecar call — deno::check() below spawns the pool).
-    let concurrency = tsv_debug::deno::init_bulk_pool();
+    // happen before the first sidecar call — sidecar::check() below spawns the pool).
+    let concurrency = tsv_debug::sidecar::init_bulk_pool();
 
     // Verify the sidecar is healthy before running tests
     // This prevents cascading failures if the sidecar dies during tests
-    if let Err(e) = tsv_debug::deno::check().await {
+    if let Err(e) = tsv_debug::sidecar::check().await {
         panic!(
             "Sidecar health check failed: {e}\n\n\
             Hint: {}\n\n\

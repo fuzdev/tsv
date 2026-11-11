@@ -9,10 +9,10 @@ const INSTALL_HINT: &str = "Install the sidecar's packages from the checkout's r
 
 /// Errors that can occur when communicating with the sidecar
 #[derive(Debug, Error)]
-pub enum DenoError {
+pub enum SidecarError {
     /// The sidecar's package directory, or its committed lock, could not be read
     #[error("cannot read the sidecar package at {}: {source}", .dir.display())]
-    SidecarDir {
+    PackageUnreadable {
         dir: PathBuf,
         #[source]
         source: io::Error,
@@ -24,7 +24,7 @@ pub enum DenoError {
         .dir.join("node_modules").display(),
         .dir.display()
     )]
-    SidecarNotInstalled { dir: PathBuf },
+    NotInstalled { dir: PathBuf },
 
     /// The installed packages differ from the committed lock (a lock changed since the install)
     #[error(
@@ -33,7 +33,7 @@ pub enum DenoError {
         .dir.join("package-lock.json").display(),
         .dir.display()
     )]
-    SidecarInstallStale { dir: PathBuf },
+    InstallStale { dir: PathBuf },
 
     /// No `node` on `PATH`
     #[error("node not found on PATH: the sidecar runs on Node")]
@@ -94,7 +94,7 @@ pub enum DenoError {
 
     /// Sidecar process crashed
     #[error("sidecar process crashed")]
-    SidecarCrashed,
+    Crashed,
 
     /// Actor shutdown
     #[error("sidecar actor shut down")]
@@ -105,15 +105,15 @@ pub enum DenoError {
     Timeout { seconds: u64 },
 }
 
-impl DenoError {
+impl SidecarError {
     /// Get a hint for how to fix this error
     #[must_use]
     pub fn hint(&self) -> &'static str {
         match self {
-            Self::SidecarDir { .. } => {
+            Self::PackageUnreadable { .. } => {
                 "tsv_debug runs the sidecar in place from the source tree it was built from (crates/tsv_debug/sidecar)"
             }
-            Self::SidecarNotInstalled { .. } | Self::SidecarInstallStale { .. } => INSTALL_HINT,
+            Self::NotInstalled { .. } | Self::InstallStale { .. } => INSTALL_HINT,
             Self::NodeNotFound => {
                 "Install Node, at or above the floor `engines.node` states in crates/tsv_debug/sidecar/package.json, and put it on PATH"
             }
@@ -123,7 +123,7 @@ impl DenoError {
                 "Put a real Node first on PATH: with no Node installed, `deno task` puts its own `node`, which runs Deno, there"
             }
             Self::ProcessSpawn(_) => "Check that the `node` on PATH can be executed",
-            Self::SidecarCrashed => "This may be a bug in the sidecar script",
+            Self::Crashed => "This may be a bug in the sidecar script",
             Self::Timeout { .. } => "The sidecar may be stuck starting up or processing a request",
             Self::EmptyOutput => {
                 "Transient under load — re-run; if it persists, check the sidecar (tsv_debug check)"

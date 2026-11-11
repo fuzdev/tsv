@@ -1,7 +1,7 @@
 use crate::cli::CliError;
-use crate::deno::{PrettierParser, parse_svelte, run_prettier};
 use crate::diff::{ColorChoice, DiffOptions, print_diff_with_options};
 use crate::fixtures::{self, InputType};
+use crate::sidecar::{PrettierParser, parse_svelte, run_prettier};
 use argh::FromArgs;
 use std::path::Path;
 

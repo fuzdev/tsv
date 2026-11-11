@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 /// then after a lexer change re-run without `--write` to prove token-stream identity:
 /// same `(kind, start, end, decoded)` for every token of every file. Stronger than
 /// format byte-identity — it catches token-level divergence the formatter might
-/// absorb. Pure Rust, no Deno.
+/// absorb. Pure Rust, no sidecar.
 ///
 /// Covers the **context-free** `next_token` dispatch only (a raw `next_token` loop
 /// doesn't reach the parser-driven regex / template-resume paths); those stay gated

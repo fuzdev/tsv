@@ -106,7 +106,7 @@ fn both_spellings_read_the_same() {
 /// catalog entry is due for retirement (the run also needs the sidecar).
 #[tokio::test]
 async fn sidecar_parse_css_diverges_on_the_glued_spelling() {
-    let spaced = tsv_debug::deno::parse_css(SPACED)
+    let spaced = tsv_debug::sidecar::parse_css(SPACED)
         .await
         .expect("parseCss failed");
     assert_eq!(
@@ -120,7 +120,7 @@ async fn sidecar_parse_css_diverges_on_the_glued_spelling() {
         "spaced: parseCss captures the comment too"
     );
 
-    let glued = tsv_debug::deno::parse_css(GLUED)
+    let glued = tsv_debug::sidecar::parse_css(GLUED)
         .await
         .expect("parseCss failed");
     assert_eq!(

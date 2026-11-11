@@ -629,7 +629,7 @@ tsv/
 │   ├── tsv_svelte_compile/ # Svelte→JS compiler (Svelte's compile() oracle) + JS canonicalizer; consumed by tsv_debug — no shipped artifact links it
 │   ├── tsv_check/   # EXPERIMENTAL TypeScript binder + checker — may never ship (consumed only by tsv_debug)
 │   ├── tsv_cli/     # Production CLI (binary: tsv) - pure Rust
-│   ├── tsv_debug/   # Dev utilities (binary: tsv_debug) - uses Deno
+│   ├── tsv_debug/   # Dev utilities (binary: tsv_debug) - uses a Node sidecar
 │   ├── tsv_ffi/     # C FFI bindings (Deno's native path)
 │   ├── tsv_wasm/    # WASM bindings (the 3 published npm packages; bundles types/tsv_ast.d.ts + npm/locations.js; npm/cli.js is the tsv bin)
 │   └── tsv_napi/    # N-API bindings (Node/Bun native path; npm/ is the @fuzdev/tsv loader source)
@@ -852,7 +852,7 @@ deno task conformance:tsc-check         # the tsv_check conformance sweep + comm
 deno task conformance:tsc-check:update  # re-pin the run's snapshot counts after deliberate drift
 ```
 
-**Performance Profiling Commands** (pure Rust, no Deno — ./docs/performance.md):
+**Performance Profiling Commands** (pure Rust, no sidecar — ./docs/performance.md):
 
 ```bash
 cargo run -p tsv_debug profile ../corpora/collections/zzz/src/lib                    # parse vs format timing (--iterations, --json, --flow-stats)

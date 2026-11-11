@@ -1,6 +1,6 @@
 use crate::cli::CliError;
-use crate::deno;
 use crate::json::to_json_with_tabs;
+use crate::sidecar;
 use argh::FromArgs;
 use tsv_cli::cli::input::{Input, InputArgs, ParserType};
 
@@ -54,9 +54,9 @@ impl CanonicalParseCommand {
 async fn run(input: &Input, parser_type: ParserType) -> Result<String, String> {
     let content = input.content();
 
-    let ast = deno::parse_by_type(content, parser_type)
+    let ast = sidecar::parse_by_type(content, parser_type)
         .await
-        .map_err(|e| super::describe_deno_error(&e))?;
+        .map_err(|e| super::describe_sidecar_error(&e))?;
     let json = to_json_with_tabs(&ast).map_err(|e| e.to_string())?;
     Ok(format!("{json}\n"))
 }

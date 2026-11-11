@@ -1,7 +1,7 @@
 use crate::cli::CliError;
 use crate::cli::commands::{print_block, print_json_tabs};
-use crate::deno::{self, SvelteGenerate};
 use crate::diff::{DiffOptions, diff_to_string};
+use crate::sidecar::{self, SvelteGenerate};
 use argh::FromArgs;
 use tsv_cli::cli::input::{InputArgs, ParserType};
 use tsv_svelte_compile::{
@@ -86,7 +86,7 @@ impl CompileCompareCommand {
 
         // Oracle side: compile with the canonical compiler, then canonicalize.
         let rt = super::create_runtime();
-        let oracle_output = match rt.block_on(deno::svelte_compile(source, target, false)) {
+        let oracle_output = match rt.block_on(sidecar::svelte_compile(source, target, false)) {
             Ok(o) => o,
             Err(err) => {
                 eprintln!("Error: oracle compile failed: {err}");

@@ -13,7 +13,7 @@
 // (`sidecar_prettier_checks` below) for a single sequential pass over the shared,
 // process-wide sidecar pool. This is organizational, not a correctness
 // requirement: the pool's actor tasks live on a dedicated process-lifetime runtime
-// (see `deno::actor::sidecar_runtime`), so it stays safe across any number of
+// (see `sidecar::actor::sidecar_runtime`), so it stays safe across any number of
 // separate test runtimes. Each check is a plain `async fn` the single test awaits.
 
 async fn check_space_after_block_idempotency_bug() {
@@ -97,9 +97,12 @@ async fn assert_prettier_idempotency_bug(
 }
 
 async fn format_with_prettier(content: &str) -> String {
-    tsv_debug::deno::run_prettier(content, tsv_debug::deno::PrettierParser::Parser("svelte"))
-        .await
-        .expect("prettier formatting failed")
+    tsv_debug::sidecar::run_prettier(
+        content,
+        tsv_debug::sidecar::PrettierParser::Parser("svelte"),
+    )
+    .await
+    .expect("prettier formatting failed")
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -205,7 +208,7 @@ fn comment_drop_exact_output_and_idempotent() {
 /// oracle cross-check that prettier (with tsv's options) produces the same output
 /// as tsv for every typescript comment case (drop + separator-normalization),
 /// confirming each comment is real content tsv must match (mirrors
-/// `deno::tests::test_deno_tools`). Grouping them in one test is an organizational
+/// `sidecar::tests::test_sidecar_tools`). Grouping them in one test is an organizational
 /// choice for a single sequential sidecar pass — the shared sidecar pool is itself
 /// safe to use from any number of separate `#[tokio::test]`s, because its actor
 /// tasks live on a dedicated process-lifetime runtime, not on the per-test one.
@@ -218,9 +221,9 @@ async fn sidecar_prettier_checks() {
         .iter()
         .chain(SEPARATOR_NORMALIZED_COMMENT_CASES);
     for &(label, input, expected) in cases {
-        let prettier = tsv_debug::deno::run_prettier(
+        let prettier = tsv_debug::sidecar::run_prettier(
             input,
-            tsv_debug::deno::PrettierParser::Parser("typescript"),
+            tsv_debug::sidecar::PrettierParser::Parser("typescript"),
         )
         .await
         .expect("prettier formatting failed");

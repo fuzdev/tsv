@@ -113,7 +113,7 @@ cargo run --profile corpus -p tsv_debug --features _internal_audits swallow_audi
 ```
 
 Formats files with the render-time swallow check on and reports any `//` line comment followed
-by content on the same output line (silent content loss). Pure Rust, no Deno; defaults to
+by content on the same output line (silent content loss). Pure Rust, no sidecar; defaults to
 `tests/fixtures`, pass dirs/files to audit real code; exits 1 on any finding. The check lives
 in `tsv_lang::doc::swallow` behind the `_internal_swallow_check` cargo feature — off by default, so it is
 compiled out of prod wasm/cli/ffi AND default `tsv_debug` builds (profile/perf sessions measure
@@ -498,7 +498,7 @@ cargo run --profile corpus -p tsv_debug --features _internal_audits fabrication_
 ```
 
 Formats each pristine seed and reports every blank RUN the output holds that the input did
-not, minus three structurally sanctioned layout rules. Pure Rust, no Deno; defaults to
+not, minus three structurally sanctioned layout rules. Pure Rust, no sidecar; defaults to
 `tests/fixtures`. **Gated as a RATCHET** over `fabrication_audit_known.txt`, keyed by the SHAPE
 of the two lines bracketing the invented blank (`{:catch` ⇢ blank ⇢ `{/await`), not by path —
 so the snapshot is corpus-portable and states the bug rather than a location. Every line is a
@@ -542,7 +542,7 @@ The scanners are self-contained (`audit/census.rs`); the buckets are `ts` (TS-fa
 `template` (Svelte `<!-- -->`, plus every open-tag NAME and `{#…}` / `{@…}` HEAD — the
 template-head census, so a template node the PARSER consumed, which no wire-vs-wire compare
 can see, is a MISSING here). MISSING = dropped comment / node; EXTRA = duplicated/fabricated
-one; a merge or interior rewrite shows as a MISSING + EXTRA pair. Pure Rust, no Deno.
+one; a merge or interior rewrite shows as a MISSING + EXTRA pair. Pure Rust, no sidecar.
 
 **Gated as a RATCHET** over `census_audit_known.txt`, keyed (path, bucket, direction) —
 file-level, like the compile validation ratchet (the file IS the reproducer). Born EMPTY: over
@@ -597,7 +597,7 @@ cargo run --profile corpus -p tsv_debug --features _internal_audits width_audit 
 # Also: --json, --jobs N, --verbose (every line, not the per-shape rollup), --limit N, --update.
 ```
 
-Reports every output line over `PRINT_WIDTH`, rolled up by shape; pure Rust, no Deno, no
+Reports every output line over `PRINT_WIDTH`, rolled up by shape; pure Rust, no sidecar, no
 instrumentation feature. **Gated as a RATCHET** over `width_audit_known.txt` — a no-new-KINDS
 gate, NOT a debt list: unlike gaps/blanks, "zero" is not the target, since most over-width
 lines are the overruns §Print Width Philosophy sanctions. A shape found but not pinned FAILS; a
@@ -873,7 +873,7 @@ content (the "Comment-Aware Delimiter Scans" bug class); the fix is the trivia-a
 categorized in-code allow-list (ALLOW). A new scan must move onto the cursor or be consciously
 allow-listed; a migrated/reformatted scan must drop its now-stale entry (the list mirrors the
 live sites exactly). Out of scope: closure `.find(|…|)` (iterator/predicate), counting/existence
-checks, and hand byte-loops (the cursor is their sanctioned home). Pure Rust, no Deno; gated in
+checks, and hand byte-loops (the cursor is their sanctioned home). Pure Rust, no sidecar; gated in
 `deno task check` via the `scan:audit` task.
 
 ## Self-Format Audit (`format:audit`)
@@ -1563,7 +1563,7 @@ the prefix's own `.npmrc` for `npm ci --prefix crates/tsv_debug/sidecar`, so the
 
 Drift here silently grades fixtures and corpora against a different oracle than the bench
 measures. That the INSTALL is the lock's is the actor's check, made before each sidecar
-spawns (`check_install` in `crates/tsv_debug/src/deno/actor.rs`): a lock changed since the
+spawns (`check_install` in `crates/tsv_debug/src/sidecar/actor.rs`): a lock changed since the
 last `npm ci`, or an installed package whose `package.json` names another version than its
 lock entry (or is gone), is refused rather than graded against. An edit to any other file
 inside the install isn't seen.
@@ -1937,7 +1937,7 @@ spelled both ways.
 
 ```bash
 # razor_audit - walk each Svelte seed ACROSS the print-width razor and grade the
-# output at every width. Pure Rust, no Deno. Defaults to tests/fixtures, .svelte
+# output at every width. Pure Rust, no sidecar. Defaults to tests/fixtures, .svelte
 # seeds only. Exits 1 on any finding.
 cargo run --profile corpus -p tsv_debug razor_audit                 # sweep all fixtures
 cargo run --profile corpus -p tsv_debug razor_audit --width 8       # cheaper/narrower sweep
@@ -2393,7 +2393,7 @@ Snapshots the raw token stream over a corpus and diffs against a golden to prove
 identity (kind, start, end, decoded per token) after a lexer change — stronger than format
 byte-identity. Covers the context-free next_token dispatch for the TypeScript family
 (.ts/.mts/.cts/.js/.mjs/.cjs, .svelte.ts and .d.ts included — the whole family dispatches to
-one lexer) plus .css. Pure Rust, no Deno.
+one lexer) plus .css. Pure Rust, no sidecar.
 
 ## Variant Whitespace-Direction Audit (`variants:audit`)
 
@@ -2410,7 +2410,7 @@ it, so between them a fixture is squeezed from both sides. The N rules prove onl
 variant LANDS on input, never which direction it travelled from — and a wrong-way variant (a
 `_compact` padding `interface Empty {  }`, a `_spaces` stripping `h1 + p` to `h1+p`) is a
 DUPLICATE of its sibling under the other name, the direction it was meant to cover silently
-untested. Pure Rust — no Deno, no formatter run; gated in `deno task check` via the
+untested. Pure Rust — no sidecar, no formatter run; gated in `deno task check` via the
 `variants:audit` task.
 
 **The instrument.** A whitespace-only variant shares its input's non-whitespace
@@ -2508,7 +2508,7 @@ cargo run -p tsv_debug conformance_audit
 # Also: --json (machine-readable: {orphans, family, dead_links, missing_backlinks, stray_readmes})
 ```
 
-Doc/fixture integrity in one fixture walk. Pure Rust (no Deno); exits non-zero on any finding;
+Doc/fixture integrity in one fixture walk. Pure Rust (no sidecar); exits non-zero on any finding;
 gated in `deno task check`. Five checks:
 
 1. **Orphans** — every divergence-suffixed fixture must be linked in its conformance doc
@@ -2553,7 +2553,7 @@ cargo run -p tsv_debug compile_conformance_audit
 # Also: --json
 ```
 
-The compiler analog of conformance_audit, deliberately minimal. Pure Rust (no Deno); exits
+The compiler analog of conformance_audit, deliberately minimal. Pure Rust (no sidecar); exits
 non-zero on any finding; gated in `deno task check`.
 
 - **Catalog + back-link.** Any _compiled_divergence-suffixed compile fixture must be cataloged
@@ -2590,7 +2590,7 @@ TS/JS file (.ts/.js/.mts/.cts/.mjs/.cjs, .svelte.ts included) and buckets — in
 (failure), CORRUPT-OUTPUT / unreparseable reprint (failure; the canonicalizer self-validates by
 reparse), COMMENT-LOSS (failure; whitespace-normalized comment text/order before-vs-after — the
 bucket the other two are structurally blind to: a swallowed comment leaves valid, idempotent
-JS). Pure Rust (no Deno); exits 1 on any failure. Gated in `deno task check` over
+JS). Pure Rust (no sidecar); exits 1 on any failure. Gated in `deno task check` over
 tests/fixtures + tests/fixtures_compile (fast); point it at real corpora for the full sweep.
 
 ## Compile-Fixture Validation (`compile:fixtures:validate`)

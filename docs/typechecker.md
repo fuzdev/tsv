@@ -70,7 +70,7 @@ materialized `_submodules/TypeScript` corpus, and `run` additionally needs
 
 ## The harness (`tsc_conformance`)
 
-A pure-Rust harness (no Deno) over tsgo's committed `.errors.txt` baselines. The
+A pure-Rust harness (no sidecar) over tsgo's committed `.errors.txt` baselines. The
 oracle-side tools (`query` / `roundtrip` / `index`) are **zero checker code** — they
 read, re-render, and self-check the baselines and the corpus inputs. `run` and
 `check-test` drive `tsv_check` against those same baselines.

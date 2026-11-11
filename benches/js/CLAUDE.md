@@ -1828,7 +1828,7 @@ state) shows in the coverage report and skip counts without `--verbose`.
      `tsv_debug` Rust sidecar) can intermittently return empty output under load. Guards:
      `corpus_compare_format.ts` errors on semantically-empty prettier output for non-empty
      source; the prettier cache neither stores nor returns semantically-empty entries; the Rust
-     sidecar's `run_prettier` returns a hard `DenoError::EmptyOutput` instead of `Ok("")`; and
+     sidecar's `run_prettier` returns a hard `SidecarError::EmptyOutput` instead of `Ok("")`; and
      the bench itself (`lib/bench_sweep.ts` `empty_output_error` / `assert_output_present`, every
      format row) records an empty output for a non-empty input as a skip in pre-flight and throws
      in a timed sweep — otherwise an empty return during a timed sweep would silently drop that

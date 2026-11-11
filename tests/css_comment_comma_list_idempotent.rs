@@ -123,10 +123,12 @@ async fn sidecar_prettier_agrees() {
         if !has_oracle {
             continue;
         }
-        let prettier =
-            tsv_debug::deno::run_prettier(input, tsv_debug::deno::PrettierParser::Parser("css"))
-                .await
-                .expect("prettier formatting failed");
+        let prettier = tsv_debug::sidecar::run_prettier(
+            input,
+            tsv_debug::sidecar::PrettierParser::Parser("css"),
+        )
+        .await
+        .expect("prettier formatting failed");
         assert_eq!(prettier, expected, "case `{label}`: prettier should agree");
     }
 }

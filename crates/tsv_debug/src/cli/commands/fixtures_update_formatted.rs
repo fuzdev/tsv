@@ -413,7 +413,7 @@ async fn update_formatted_file(fixture: &fixtures::Fixture) -> FormattedResult {
 
     // Run prettier
     let formatted =
-        match crate::deno::run_prettier(&input, fixture.input_type().prettier_parser()).await {
+        match crate::sidecar::run_prettier(&input, fixture.input_type().prettier_parser()).await {
             Ok(f) => f,
             Err(e) => return FormattedResult::Failed(format!("Prettier error: {e}")),
         };
@@ -853,7 +853,7 @@ async fn classify_variant_chain(
     let variant_content = fixtures::read_file(&fixture.path.join(variant_name))?;
     let parser = fixture.input_type().prettier_parser();
 
-    let formatted = crate::deno::run_prettier(&variant_content, parser)
+    let formatted = crate::sidecar::run_prettier(&variant_content, parser)
         .await
         .map_err(|e| format!("Prettier error: {e}"))?;
 
@@ -865,7 +865,7 @@ async fn classify_variant_chain(
     // (a known prettier bug — e.g., `{@const x = expr) /* c */}` has an unmatched paren).
     // Don't propagate as a hard error; classify it so the caller can clean up and report
     // the prettier bug specifically.
-    let second_pass = match crate::deno::run_prettier(&formatted, parser).await {
+    let second_pass = match crate::sidecar::run_prettier(&formatted, parser).await {
         Ok(s) => s,
         Err(e) => return Ok((ChainShape::FirstPassUnparseable(e.to_string()), formatted)),
     };

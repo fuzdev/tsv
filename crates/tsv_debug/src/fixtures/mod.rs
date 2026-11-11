@@ -21,9 +21,9 @@ pub use variants::{
     unformatted_ours_filename, unformatted_ours_suffix,
 };
 
-use crate::deno::{DenoError, parse_by_type_with_goal};
 use crate::format_source::format_source_with_source_type;
 use crate::json::to_json_with_tabs;
+use crate::sidecar::{SidecarError, parse_by_type_with_goal};
 use std::fs;
 use std::path::Path;
 
@@ -181,7 +181,7 @@ pub fn path_matches_filters(relative_path: &str, filters: &[String]) -> bool {
 #[derive(Debug)]
 pub enum CanonicalParseError {
     /// The canonical parser rejected the input — the sidecar answered the request with an error
-    /// ([`DenoError::ToolError`], see [`is_canonical_rejection`]), whose rendered text this
+    /// ([`SidecarError::ToolError`], see [`is_canonical_rejection`]), whose rendered text this
     /// carries. The only variant that is a verdict on the input. The wire does not separate a
     /// parser's syntax error from any other exception thrown inside the sidecar's handler, so a
     /// sidecar-internal JS throw reads as a rejection too.
@@ -189,7 +189,7 @@ pub enum CanonicalParseError {
     /// The sidecar never answered for the parser: node or the sidecar's packages missing, a spawn
     /// or transport failure, a crash, a shutdown, a timeout. No verdict on the input, so a check reports it and never
     /// grades it, and a generator never writes the rejection marker for it.
-    Sidecar(DenoError),
+    Sidecar(SidecarError),
     /// The AST parsed but did not serialize; the message is worded for a fixture result.
     Unserializable(String),
 }
@@ -199,14 +199,14 @@ pub enum CanonicalParseError {
 ///
 /// The one statement of the rule, shared by [`canonical_expected_json`] and the
 /// `input_invalid_*` check.
-pub(crate) fn is_canonical_rejection(error: &DenoError) -> bool {
-    matches!(error, DenoError::ToolError { .. })
+pub(crate) fn is_canonical_rejection(error: &SidecarError) -> bool {
+    matches!(error, SidecarError::ToolError { .. })
 }
 
 impl CanonicalParseError {
     /// Classify a failed canonical parse by [`is_canonical_rejection`]: a rejection carries the
-    /// tool error's rendered text, and every other [`DenoError`] is a sidecar fault.
-    fn from_deno(error: DenoError) -> Self {
+    /// tool error's rendered text, and every other [`SidecarError`] is a sidecar fault.
+    fn from_sidecar(error: SidecarError) -> Self {
         if is_canonical_rejection(&error) {
             Self::Rejected(error.to_string())
         } else {
@@ -218,7 +218,7 @@ impl CanonicalParseError {
 /// The message for a sidecar fault that kept the canonical parser from answering
 /// ([`CanonicalParseError::Sidecar`]). It embeds the fault's own text, which the validation
 /// summary's sidecar-health counters match on.
-pub fn canonical_sidecar_failure(input_type: InputType, error: &DenoError) -> String {
+pub fn canonical_sidecar_failure(input_type: InputType, error: &SidecarError) -> String {
     format!(
         "canonical parser ({}) gave no verdict — sidecar failure: {error}",
         input_type.canonical_parser_name()
@@ -248,7 +248,7 @@ pub async fn canonical_expected_json(
 ) -> Result<String, CanonicalParseError> {
     let mut ast = parse_by_type_with_goal(source, input_type.parser_type(), goal)
         .await
-        .map_err(CanonicalParseError::from_deno)?;
+        .map_err(CanonicalParseError::from_sidecar)?;
     strip_locations(&mut ast);
     let json = to_json_with_tabs(&ast).map_err(|e| {
         CanonicalParseError::Unserializable(format!(
@@ -282,8 +282,8 @@ mod tests {
     use super::*;
 
     /// Only the sidecar's own answer grades an input: a tool error is a rejection, and every
-    /// other `DenoError` is a fault. Pins [`is_canonical_rejection`] — the rule both
-    /// `canonical_expected_json` and the `input_invalid_*` check read — and `from_deno`'s
+    /// other `SidecarError` is a fault. Pins [`is_canonical_rejection`] — the rule both
+    /// `canonical_expected_json` and the `input_invalid_*` check read — and `from_sidecar`'s
     /// agreement with it. The exhaustive match makes a new variant a compile error here until
     /// it is classified (and added to the list).
     #[test]
@@ -291,66 +291,66 @@ mod tests {
         let io = || std::io::Error::other("io");
         let response_parse = crate::json::from_str::<serde_json::Value>("{").unwrap_err();
         let errors = [
-            DenoError::SidecarDir {
+            SidecarError::PackageUnreadable {
                 dir: "sidecar".into(),
                 source: io(),
             },
-            DenoError::SidecarNotInstalled {
+            SidecarError::NotInstalled {
                 dir: "sidecar".into(),
             },
-            DenoError::SidecarInstallStale {
+            SidecarError::InstallStale {
                 dir: "sidecar".into(),
             },
-            DenoError::NodeNotFound,
-            DenoError::NodeVersionUnknown {
+            SidecarError::NodeNotFound,
+            SidecarError::NodeVersionUnknown {
                 program: "node".into(),
                 output: "deno 2.9.8".to_string(),
             },
-            DenoError::NodeTooOld {
+            SidecarError::NodeTooOld {
                 program: "node".into(),
                 version: "22.18.0".to_string(),
                 floor: ">=24.14".to_string(),
                 manifest: "sidecar/package.json".into(),
             },
-            DenoError::NotNode {
+            SidecarError::NotNode {
                 program: "node".into(),
             },
-            DenoError::ProcessSpawn(io()),
-            DenoError::PipeMissing { pipe: "stdout" },
-            DenoError::Communication(io()),
-            DenoError::ResponseParse(response_parse),
-            DenoError::ToolError {
+            SidecarError::ProcessSpawn(io()),
+            SidecarError::PipeMissing { pipe: "stdout" },
+            SidecarError::Communication(io()),
+            SidecarError::ResponseParse(response_parse),
+            SidecarError::ToolError {
                 message: "Unexpected token (1:1)".to_string(),
             },
-            DenoError::MissingOutput,
-            DenoError::EmptyOutput,
-            DenoError::SidecarCrashed,
-            DenoError::ActorShutdown,
-            DenoError::Timeout { seconds: 30 },
+            SidecarError::MissingOutput,
+            SidecarError::EmptyOutput,
+            SidecarError::Crashed,
+            SidecarError::ActorShutdown,
+            SidecarError::Timeout { seconds: 30 },
         ];
         for error in errors {
             let rendered = error.to_string();
             let is_rejection = match &error {
-                DenoError::ToolError { .. } => true,
-                DenoError::SidecarDir { .. }
-                | DenoError::SidecarNotInstalled { .. }
-                | DenoError::SidecarInstallStale { .. }
-                | DenoError::NodeNotFound
-                | DenoError::NodeVersionUnknown { .. }
-                | DenoError::NodeTooOld { .. }
-                | DenoError::NotNode { .. }
-                | DenoError::ProcessSpawn(_)
-                | DenoError::PipeMissing { .. }
-                | DenoError::Communication(_)
-                | DenoError::ResponseParse(_)
-                | DenoError::MissingOutput
-                | DenoError::EmptyOutput
-                | DenoError::SidecarCrashed
-                | DenoError::ActorShutdown
-                | DenoError::Timeout { .. } => false,
+                SidecarError::ToolError { .. } => true,
+                SidecarError::PackageUnreadable { .. }
+                | SidecarError::NotInstalled { .. }
+                | SidecarError::InstallStale { .. }
+                | SidecarError::NodeNotFound
+                | SidecarError::NodeVersionUnknown { .. }
+                | SidecarError::NodeTooOld { .. }
+                | SidecarError::NotNode { .. }
+                | SidecarError::ProcessSpawn(_)
+                | SidecarError::PipeMissing { .. }
+                | SidecarError::Communication(_)
+                | SidecarError::ResponseParse(_)
+                | SidecarError::MissingOutput
+                | SidecarError::EmptyOutput
+                | SidecarError::Crashed
+                | SidecarError::ActorShutdown
+                | SidecarError::Timeout { .. } => false,
             };
             assert_eq!(is_canonical_rejection(&error), is_rejection, "{rendered}");
-            match (CanonicalParseError::from_deno(error), is_rejection) {
+            match (CanonicalParseError::from_sidecar(error), is_rejection) {
                 (CanonicalParseError::Rejected(message), true) => {
                     assert_eq!(message, rendered);
                 }

@@ -53,7 +53,7 @@ use super::profile::{lang_token, resolve_seed_files};
 /// seven over-width lines. A missing seam is invisible to a check that looks for unspent
 /// seams. Do not re-derive that design without re-testing it against a reverted fix.
 ///
-/// Pure Rust — no Deno, no instrumentation feature.
+/// Pure Rust — no sidecar, no instrumentation feature.
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "width_audit")]
 pub struct WidthAuditCommand {

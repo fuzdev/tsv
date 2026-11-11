@@ -14,25 +14,25 @@
 //! # Example
 //!
 //! ```ignore
-//! use tsv_debug::deno::{self, PrettierParser};
+//! use tsv_debug::sidecar::{self, PrettierParser};
 //!
 //! // The pool is spawned lazily on first call
-//! let formatted = deno::run_prettier("<div>hi</div>", PrettierParser::Parser("svelte")).await?;
-//! let ast = deno::parse_svelte("<div>hi</div>").await?;
+//! let formatted = sidecar::run_prettier("<div>hi</div>", PrettierParser::Parser("svelte")).await?;
+//! let ast = sidecar::parse_svelte("<div>hi</div>").await?;
 //! ```
 
 mod actor;
 mod error;
 mod protocol;
 
-pub use error::DenoError;
+pub use error::SidecarError;
 
 /// The sidecar's source. Re-exported so `render_browser` can assert its
 /// browser-render block-tag set still mirrors the sidecar's.
 #[cfg(test)]
 pub(crate) use actor::SIDECAR_SCRIPT;
 
-use actor::DenoActor;
+use actor::SidecarActor;
 use serde_json::Value;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use tokio::sync::{OnceCell, RwLock, oneshot};
@@ -41,11 +41,11 @@ use tokio::sync::{OnceCell, RwLock, oneshot};
 /// finds its event loop gone (see [`call_tool`]), so a transient death can't
 /// permanently poison the slot's share of the round-robin.
 struct ActorSlot {
-    actor: RwLock<DenoActor>,
+    actor: RwLock<SidecarActor>,
 }
 
 /// Global lazy-initialized sidecar actor pool
-static DENO_POOL: OnceCell<Vec<ActorSlot>> = OnceCell::const_new();
+static SIDECAR_POOL: OnceCell<Vec<ActorSlot>> = OnceCell::const_new();
 
 /// Requested pool size, read once when the pool is first spawned
 static POOL_SIZE: AtomicUsize = AtomicUsize::new(1);
@@ -92,16 +92,16 @@ pub fn init_bulk_pool() -> usize {
 /// Requests dispatch round-robin: each actor queues concurrent requests
 /// (pending-map + per-request oneshot; the JS side processes them serially),
 /// so distribution by call count is enough to spread load.
-async fn get_slot() -> Result<&'static ActorSlot, DenoError> {
-    let pool = DENO_POOL
+async fn get_slot() -> Result<&'static ActorSlot, SidecarError> {
+    let pool = SIDECAR_POOL
         .get_or_try_init(|| async {
             (0..POOL_SIZE.load(Ordering::Relaxed))
                 .map(|_| {
                     Ok(ActorSlot {
-                        actor: RwLock::new(DenoActor::spawn()?),
+                        actor: RwLock::new(SidecarActor::spawn()?),
                     })
                 })
-                .collect::<Result<Vec<_>, DenoError>>()
+                .collect::<Result<Vec<_>, SidecarError>>()
         })
         .await?;
     let i = NEXT_ACTOR.fetch_add(1, Ordering::Relaxed) % pool.len();
@@ -116,7 +116,11 @@ async fn get_slot() -> Result<&'static ActorSlot, DenoError> {
 /// that WAS delivered and then failed — crash, timeout, tool error, empty
 /// output — fails hard to its caller, deliberately without retry, so a flaky
 /// oracle stays loud; the respawn only benefits future calls.
-async fn call_tool(tool: &str, content: &str, options: Option<Value>) -> Result<Value, DenoError> {
+async fn call_tool(
+    tool: &str,
+    content: &str,
+    options: Option<Value>,
+) -> Result<Value, SidecarError> {
     let slot = get_slot().await?;
 
     // Fast path: dispatch on the slot's live actor.
@@ -134,21 +138,21 @@ async fn call_tool(tool: &str, content: &str, options: Option<Value>) -> Result<
     let mut actor = slot.actor.write().await;
     if actor.is_closed() {
         eprintln!("[sidecar] respawning dead sidecar actor");
-        *actor = DenoActor::spawn()?;
+        *actor = SidecarActor::spawn()?;
     }
     match actor.dispatch(tool, content, options.as_ref()).await {
         Some(rx) => await_response(rx).await,
         // The fresh actor died before accepting a request — hard error.
-        None => Err(DenoError::ActorShutdown),
+        None => Err(SidecarError::ActorShutdown),
     }
 }
 
 /// Await a dispatched request's response; a dropped sender means the actor's
 /// event loop vanished without failing its pending map (e.g. a panic).
 async fn await_response(
-    rx: oneshot::Receiver<Result<Value, DenoError>>,
-) -> Result<Value, DenoError> {
-    rx.await.map_err(|_| DenoError::ActorShutdown)?
+    rx: oneshot::Receiver<Result<Value, SidecarError>>,
+) -> Result<Value, SidecarError> {
+    rx.await.map_err(|_| SidecarError::ActorShutdown)?
 }
 
 /// Specifies how prettier should determine the parser
@@ -233,15 +237,15 @@ pub struct SvelteCompileOutput {
 ///
 /// # Errors
 /// Returns an error if the sidecar is not available or the Svelte compiler rejects the
-/// source (a compile error surfaces as [`DenoError::ToolError`]).
+/// source (a compile error surfaces as [`SidecarError::ToolError`]).
 pub async fn svelte_compile(
     source: &str,
     generate: SvelteGenerate,
     dev: bool,
-) -> Result<SvelteCompileOutput, DenoError> {
+) -> Result<SvelteCompileOutput, SidecarError> {
     let options = serde_json::json!({ "generate": generate.name(), "dev": dev });
     let result = call_tool("svelte-compile", source, Some(options)).await?;
-    serde_json::from_value(result).map_err(DenoError::ResponseParse)
+    serde_json::from_value(result).map_err(SidecarError::ResponseParse)
 }
 
 /// Run prettier on content
@@ -253,7 +257,10 @@ pub async fn svelte_compile(
 /// # Errors
 /// Returns an error if the sidecar is not available, formatting fails, or prettier
 /// returns empty output for non-empty input (the under-load miss — see below).
-pub async fn run_prettier(content: &str, parser: PrettierParser<'_>) -> Result<String, DenoError> {
+pub async fn run_prettier(
+    content: &str,
+    parser: PrettierParser<'_>,
+) -> Result<String, SidecarError> {
     let options = match parser {
         PrettierParser::Parser(p) => serde_json::json!({ "parser": p }),
         PrettierParser::Filepath(f) => serde_json::json!({ "filepath": f }),
@@ -264,7 +271,7 @@ pub async fn run_prettier(content: &str, parser: PrettierParser<'_>) -> Result<S
     let output = result
         .as_str()
         .map(ToString::to_string)
-        .ok_or(DenoError::MissingOutput)?;
+        .ok_or(SidecarError::MissingOutput)?;
 
     // A (semantically) empty format of non-empty input is a prettier
     // malfunction — the documented under-load miss — never a real result.
@@ -274,7 +281,7 @@ pub async fn run_prettier(content: &str, parser: PrettierParser<'_>) -> Result<S
     // must stay loud. Mirrors the corpus compare's own guard
     // (`benches/js/corpus_compare_format.ts`).
     if output.trim().is_empty() && !content.trim().is_empty() {
-        return Err(DenoError::EmptyOutput);
+        return Err(SidecarError::EmptyOutput);
     }
 
     Ok(output)
@@ -290,7 +297,7 @@ pub async fn run_prettier(content: &str, parser: PrettierParser<'_>) -> Result<S
 ///
 /// # Errors
 /// Returns an error if the sidecar is not available or parsing fails.
-pub async fn parse_svelte(source: &str) -> Result<Value, DenoError> {
+pub async fn parse_svelte(source: &str) -> Result<Value, SidecarError> {
     call_tool("svelte-parse", source, None).await
 }
 
@@ -311,18 +318,18 @@ pub async fn parse_svelte(source: &str) -> Result<Value, DenoError> {
 /// preprocessor, experimental `await`, an illegal default export, a `bind:` to an
 /// undeclared or non-assignable target, invalid node placement. Those errors are
 /// unrelated to rendering (and `runes: false` does not avoid them). Such a
-/// rejection returns [`DenoError::ToolError`]; the render-equivalence check treats
+/// rejection returns [`SidecarError::ToolError`]; the render-equivalence check treats
 /// it as "compile unavailable" and falls back to the template-only
 /// `render_browser` model.
 ///
 /// # Errors
 /// Returns an error if the sidecar is not available or the compiler rejects the input.
-pub async fn svelte_render_key(source: &str) -> Result<String, DenoError> {
+pub async fn svelte_render_key(source: &str) -> Result<String, SidecarError> {
     let result = call_tool("svelte-render-key", source, None).await?;
     result
         .as_str()
         .map(ToString::to_string)
-        .ok_or(DenoError::MissingOutput)
+        .ok_or(SidecarError::MissingOutput)
 }
 
 /// Parse TypeScript with acorn against an explicit goal symbol.
@@ -337,7 +344,7 @@ pub async fn svelte_render_key(source: &str) -> Result<String, DenoError> {
 pub async fn parse_typescript_with_goal(
     source: &str,
     goal: tsv_ts::Goal,
-) -> Result<Value, DenoError> {
+) -> Result<Value, SidecarError> {
     let options = serde_json::json!({ "sourceType": goal.source_type() });
     call_tool("acorn-typescript-parse", source, Some(options)).await
 }
@@ -352,7 +359,7 @@ pub async fn parse_typescript_with_goal(
 ///
 /// # Errors
 /// Returns an error if the sidecar is not available or parsing fails.
-pub async fn parse_css(source: &str) -> Result<Value, DenoError> {
+pub async fn parse_css(source: &str) -> Result<Value, SidecarError> {
     call_tool("css-parse", source, None).await
 }
 
@@ -364,7 +371,7 @@ pub async fn parse_css(source: &str) -> Result<Value, DenoError> {
 pub async fn parse_by_type(
     content: &str,
     parser: tsv_cli::cli::input::ParserType,
-) -> Result<Value, DenoError> {
+) -> Result<Value, SidecarError> {
     parse_by_type_with_goal(content, parser, tsv_ts::Goal::Module).await
 }
 
@@ -377,7 +384,7 @@ pub async fn parse_by_type_with_goal(
     content: &str,
     parser: tsv_cli::cli::input::ParserType,
     goal: tsv_ts::Goal,
-) -> Result<Value, DenoError> {
+) -> Result<Value, SidecarError> {
     use tsv_cli::cli::input::ParserType;
     match parser {
         ParserType::Svelte => parse_svelte(content).await,
@@ -413,14 +420,14 @@ pub struct VersionInfo {
 /// # Errors
 /// Returns an error if Node or the sidecar's packages are not installed, or the
 /// sidecar fails to start.
-pub async fn check() -> Result<VersionInfo, DenoError> {
+pub async fn check() -> Result<VersionInfo, SidecarError> {
     let result = call_tool("__version_info", "", None).await?;
 
-    let info = result.as_object().ok_or(DenoError::MissingOutput)?;
+    let info = result.as_object().ok_or(SidecarError::MissingOutput)?;
     let deps = info
         .get("dependencies")
         .and_then(|d| d.as_object())
-        .ok_or(DenoError::MissingOutput)?;
+        .ok_or(SidecarError::MissingOutput)?;
 
     let get_str = |obj: &serde_json::Map<String, Value>, key: &str| {
         obj.get(key)
@@ -447,7 +454,7 @@ mod tests {
     /// Test all sidecar tools in a single test to avoid race conditions
     /// with the shared static actor across multiple tokio runtimes.
     #[tokio::test]
-    async fn test_deno_tools() {
+    async fn test_sidecar_tools() {
         // Test check (version info)
         let result = check().await;
         assert!(result.is_ok(), "check failed: {result:?}");

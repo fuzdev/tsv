@@ -153,7 +153,7 @@ use super::profile::{is_input_invalid_fixture, resolve_seed_files};
 ///
 /// For each seed file, injects each payload at each candidate byte offset (one at a time),
 /// formats, and reports every comment the format DROPPED or DOUBLE-PRINTED. Pure Rust — no
-/// Deno. Defaults to `tests/fixtures`; the real yield is external corpora. Exits 1 on any
+/// sidecar. Defaults to `tests/fixtures`; the real yield is external corpora. Exits 1 on any
 /// finding.
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "gap_audit")]

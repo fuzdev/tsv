@@ -1,7 +1,7 @@
 use crate::cli::CliError;
-use crate::deno;
 use crate::diff::{Color, ColorChoice, DiffOptions, diff_to_string};
 use crate::format_source::format_source_with_source_type;
+use crate::sidecar;
 use argh::FromArgs;
 use tsv_cli::cli::input::{Input, InputArgs, ParserType};
 
@@ -115,7 +115,9 @@ async fn run(
 
     // Run prettier
     let prettier =
-        match deno::run_prettier(content, deno::PrettierParser::Parser(parser_type.name())).await {
+        match sidecar::run_prettier(content, sidecar::PrettierParser::Parser(parser_type.name()))
+            .await
+        {
             Ok(output) => {
                 if verbose {
                     println!("=== Prettier ===");

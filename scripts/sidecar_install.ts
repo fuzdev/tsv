@@ -1,6 +1,6 @@
 /**
  * Whether tsv_debug's sidecar is installed as its lock says — the check the sidecar actor
- * makes before it spawns (`crates/tsv_debug/src/deno/actor.rs`, `check_install`), for the
+ * makes before it spawns (`crates/tsv_debug/src/sidecar/actor.rs`, `check_install`), for the
  * scripts that would otherwise meet its refusal halfway through a run (`doctor`, `publish`).
  *
  * `npm ci` installs exactly the lock, but only when it runs, so a lock changed since (a pin

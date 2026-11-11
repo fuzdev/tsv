@@ -1,8 +1,8 @@
 use crate::cli::CliError;
-use crate::deno::run_prettier;
 use crate::fixtures::{
     self, AuditSignature, ChainWalk, Fixture, FixtureFiles, StableFormMarker, read_file,
 };
+use crate::sidecar::run_prettier;
 use argh::FromArgs;
 use futures_util::StreamExt;
 use std::collections::HashMap;

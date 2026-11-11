@@ -1,5 +1,5 @@
 // tsv_debug's oracle sidecar: a long-running Node process that answers JS tool requests,
-// JSON lines over stdio. `crates/tsv_debug/src/deno/actor.rs` runs it in place from this
+// JSON lines over stdio. `crates/tsv_debug/src/sidecar/actor.rs` runs it in place from this
 // package directory under `node --permission`, with a read grant on the directory alone.
 //
 // ⚠ The oracle is this package's install: `package.json` pins the five canonical packages

@@ -3,7 +3,7 @@
 //! Manages a long-running Node process that handles JS tool requests.
 //! Communication is via JSON-lines over stdio.
 
-use super::error::DenoError;
+use super::error::SidecarError;
 use super::protocol::{WireRequest, WireResponse};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -53,18 +53,19 @@ fn sidecar_dir_recorded() -> PathBuf {
 }
 
 /// The sidecar's package directory, canonical (see [`canonical_dir`]).
-fn sidecar_dir() -> Result<PathBuf, DenoError> {
+fn sidecar_dir() -> Result<PathBuf, SidecarError> {
     canonical_dir(&sidecar_dir_recorded())
 }
 
 /// `dir` resolved, its symlinks followed. Node's permission model refuses a
 /// grant, or a script, reached through a symlink, so the grant and the script
 /// path are both spelled from this one resolved path.
-fn canonical_dir(dir: &Path) -> Result<PathBuf, DenoError> {
-    let canonical = std::fs::canonicalize(dir).map_err(|source| DenoError::SidecarDir {
-        dir: dir.to_path_buf(),
-        source,
-    })?;
+fn canonical_dir(dir: &Path) -> Result<PathBuf, SidecarError> {
+    let canonical =
+        std::fs::canonicalize(dir).map_err(|source| SidecarError::PackageUnreadable {
+            dir: dir.to_path_buf(),
+            source,
+        })?;
     Ok(strip_verbatim_prefix(canonical))
 }
 
@@ -109,8 +110,8 @@ fn lock_packages(text: &str) -> Option<serde_json::Map<String, Value>> {
 /// `package.json` with its lock entry's `version`, which catches a package
 /// directory removed or its version edited since. An edit to any other file
 /// inside the install passes.
-fn check_install(dir: &Path) -> Result<(), DenoError> {
-    let read_error = |source| DenoError::SidecarDir {
+fn check_install(dir: &Path) -> Result<(), SidecarError> {
+    let read_error = |source| SidecarError::PackageUnreadable {
         dir: dir.to_path_buf(),
         source,
     };
@@ -124,13 +125,13 @@ fn check_install(dir: &Path) -> Result<(), DenoError> {
     let installed = match std::fs::read_to_string(dir.join("node_modules/.package-lock.json")) {
         Ok(text) => text,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-            return Err(DenoError::SidecarNotInstalled {
+            return Err(SidecarError::NotInstalled {
                 dir: dir.to_path_buf(),
             });
         }
         Err(e) => return Err(read_error(e)),
     };
-    let stale = || DenoError::SidecarInstallStale {
+    let stale = || SidecarError::InstallStale {
         dir: dir.to_path_buf(),
     };
     if lock_packages(&installed).as_ref() != Some(&committed) {
@@ -165,9 +166,9 @@ struct NodeFloor {
 
 /// Reads the sidecar's Node floor from its `package.json`, the one place it's
 /// stated (`npm ci` only warns below it).
-fn node_floor(dir: &Path) -> Result<NodeFloor, DenoError> {
+fn node_floor(dir: &Path) -> Result<NodeFloor, SidecarError> {
     let manifest = dir.join("package.json");
-    let read_error = |source| DenoError::SidecarDir {
+    let read_error = |source| SidecarError::PackageUnreadable {
         dir: dir.to_path_buf(),
         source,
     };
@@ -228,7 +229,7 @@ fn check_node_version(
     dir: &Path,
     env: &[(&'static str, OsString)],
     limit: Duration,
-) -> Result<(), DenoError> {
+) -> Result<(), SidecarError> {
     let floor = node_floor(dir)?;
     let mut probe = std::process::Command::new(program)
         .args(["-p", "process.versions.node"])
@@ -239,29 +240,35 @@ fn check_node_version(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .map_err(DenoError::ProcessSpawn)?;
+        .map_err(SidecarError::ProcessSpawn)?;
     let deadline = std::time::Instant::now() + limit;
-    while probe.try_wait().map_err(DenoError::ProcessSpawn)?.is_none() {
+    while probe
+        .try_wait()
+        .map_err(SidecarError::ProcessSpawn)?
+        .is_none()
+    {
         if std::time::Instant::now() >= deadline {
             #[expect(clippy::let_underscore_must_use)]
             let _ = probe.kill();
             #[expect(clippy::let_underscore_must_use)]
             let _ = probe.wait();
-            return Err(DenoError::NodeVersionUnknown {
+            return Err(SidecarError::NodeVersionUnknown {
                 program: program.to_path_buf(),
                 output: format!("no answer within {}s", limit.as_secs_f64()),
             });
         }
         std::thread::sleep(Duration::from_millis(5));
     }
-    let output = probe.wait_with_output().map_err(DenoError::ProcessSpawn)?;
+    let output = probe
+        .wait_with_output()
+        .map_err(SidecarError::ProcessSpawn)?;
     let printed = String::from_utf8_lossy(&output.stdout).trim().to_owned();
     let version = output
         .status
         .success()
         .then(|| parse_node_version(&printed))
         .flatten()
-        .ok_or_else(|| DenoError::NodeVersionUnknown {
+        .ok_or_else(|| SidecarError::NodeVersionUnknown {
             program: program.to_path_buf(),
             output: if output.status.success() {
                 printed.clone()
@@ -274,7 +281,7 @@ fn check_node_version(
             },
         })?;
     if version < floor.version {
-        return Err(DenoError::NodeTooOld {
+        return Err(SidecarError::NodeTooOld {
             program: program.to_path_buf(),
             version: printed,
             floor: floor.range,
@@ -346,7 +353,7 @@ static NEXT_ID: AtomicU64 = AtomicU64::new(1);
 /// `#[tokio::test]`s, each with its own short-lived runtime. Binding the pool's
 /// tasks to whichever test runtime first initialized the pool meant the tasks
 /// were aborted the moment that test finished its runtime, so every later test
-/// pulled a now-dead actor from the pool and got [`DenoError::ActorShutdown`].
+/// pulled a now-dead actor from the pool and got [`SidecarError::ActorShutdown`].
 /// Pinning the tasks (and the child-process I/O) to this dedicated runtime
 /// decouples the pool from any caller's runtime: it lives for the whole process
 /// regardless of which runtime first touched it.
@@ -377,7 +384,7 @@ fn sidecar_runtime() -> &'static Runtime {
 /// Internal request to the actor: the wire request plus where its response goes
 struct ActorRequest {
     wire: WireRequest,
-    response_tx: oneshot::Sender<Result<Value, DenoError>>,
+    response_tx: oneshot::Sender<Result<Value, SidecarError>>,
 }
 
 /// Commands sent to the actor task
@@ -388,15 +395,15 @@ enum ActorCommand {
 
 /// Handle to communicate with the sidecar actor
 #[derive(Debug)]
-pub(super) struct DenoActor {
+pub(super) struct SidecarActor {
     tx: mpsc::Sender<ActorCommand>,
 }
 
-impl DenoActor {
+impl SidecarActor {
     /// Spawn a new sidecar actor
     ///
     /// This starts the Node process and background task for handling requests.
-    pub(super) fn spawn() -> Result<Self, DenoError> {
+    pub(super) fn spawn() -> Result<Self, SidecarError> {
         Self::spawn_in(
             &sidecar_dir()?,
             std::env::var_os("PATH").as_deref(),
@@ -412,9 +419,9 @@ impl DenoActor {
         dir: &Path,
         path_var: Option<&OsStr>,
         parent: impl Fn(&str) -> Option<OsString>,
-    ) -> Result<Self, DenoError> {
+    ) -> Result<Self, SidecarError> {
         check_install(dir)?;
-        let program = find_node(path_var).ok_or(DenoError::NodeNotFound)?;
+        let program = find_node(path_var).ok_or(SidecarError::NodeNotFound)?;
         let env = sidecar_env(parent);
         check_node_version(&program, dir, &env, VERSION_PROBE_TIMEOUT)?;
         let mut grant = OsString::from("--allow-fs-read=");
@@ -442,20 +449,20 @@ impl DenoActor {
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()
-            .map_err(DenoError::ProcessSpawn)?;
+            .map_err(SidecarError::ProcessSpawn)?;
 
         let stdin = child
             .stdin
             .take()
-            .ok_or(DenoError::PipeMissing { pipe: "stdin" })?;
+            .ok_or(SidecarError::PipeMissing { pipe: "stdin" })?;
         let stdout = child
             .stdout
             .take()
-            .ok_or(DenoError::PipeMissing { pipe: "stdout" })?;
+            .ok_or(SidecarError::PipeMissing { pipe: "stdout" })?;
         let stderr = child
             .stderr
             .take()
-            .ok_or(DenoError::PipeMissing { pipe: "stderr" })?;
+            .ok_or(SidecarError::PipeMissing { pipe: "stderr" })?;
 
         // Spawn task to log stderr
         tokio::spawn(async move {
@@ -519,7 +526,7 @@ impl DenoActor {
         tool: &str,
         content: &str,
         options: Option<&Value>,
-    ) -> Option<oneshot::Receiver<Result<Value, DenoError>>> {
+    ) -> Option<oneshot::Receiver<Result<Value, SidecarError>>> {
         let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
         let (response_tx, response_rx) = oneshot::channel();
 
@@ -553,7 +560,7 @@ impl DenoActor {
     }
 }
 
-impl Drop for DenoActor {
+impl Drop for SidecarActor {
     fn drop(&mut self) {
         // Best-effort shutdown signal, spawned on the dedicated sidecar runtime
         // so the drop doesn't depend on an ambient runtime being current (in
@@ -568,11 +575,11 @@ impl Drop for DenoActor {
 /// Internal actor state
 struct ActorState {
     child: Child,
-    /// The `node` the sidecar was started with, named by [`DenoError::NotNode`].
+    /// The `node` the sidecar was started with, named by [`SidecarError::NotNode`].
     program: PathBuf,
     stdin: BufWriter<ChildStdin>,
     line_rx: mpsc::Receiver<String>,
-    pending: HashMap<u64, oneshot::Sender<Result<Value, DenoError>>>,
+    pending: HashMap<u64, oneshot::Sender<Result<Value, SidecarError>>>,
     /// Whether the sidecar has written a stdout line yet: until it has, it is
     /// still starting, and a response waits [`STARTUP_TIMEOUT`].
     answered: bool,
@@ -580,23 +587,26 @@ struct ActorState {
 
 impl ActorState {
     /// Send a request to the sidecar
-    async fn send_request(&mut self, req: ActorRequest) -> Result<(), DenoError> {
+    async fn send_request(&mut self, req: ActorRequest) -> Result<(), SidecarError> {
         // Store the response channel
         self.pending.insert(req.wire.id, req.response_tx);
 
         // Serialize and send
         let json = serde_json::to_string(&req.wire).map_err(|e| {
-            DenoError::Communication(std::io::Error::new(std::io::ErrorKind::InvalidData, e))
+            SidecarError::Communication(std::io::Error::new(std::io::ErrorKind::InvalidData, e))
         })?;
         self.stdin
             .write_all(json.as_bytes())
             .await
-            .map_err(DenoError::Communication)?;
+            .map_err(SidecarError::Communication)?;
         self.stdin
             .write_all(b"\n")
             .await
-            .map_err(DenoError::Communication)?;
-        self.stdin.flush().await.map_err(DenoError::Communication)?;
+            .map_err(SidecarError::Communication)?;
+        self.stdin
+            .flush()
+            .await
+            .map_err(SidecarError::Communication)?;
 
         Ok(())
     }
@@ -604,7 +614,7 @@ impl ActorState {
     /// Read and dispatch a response from the sidecar
     ///
     /// Returns false on EOF (sidecar crashed)
-    async fn read_response(&mut self) -> Result<bool, DenoError> {
+    async fn read_response(&mut self) -> Result<bool, SidecarError> {
         let limit = if self.answered {
             READ_TIMEOUT
         } else {
@@ -615,7 +625,7 @@ impl ActorState {
             Ok(Some(line)) => line,
             Ok(None) => return Ok(false), // EOF - reader task ended
             Err(_) => {
-                return Err(DenoError::Timeout {
+                return Err(SidecarError::Timeout {
                     seconds: limit.as_secs(),
                 });
             }
@@ -643,7 +653,7 @@ impl ActorState {
                     "[sidecar] Raw content ({} bytes): {trimmed:?}",
                     trimmed.len()
                 );
-                return Err(DenoError::ResponseParse(e));
+                return Err(SidecarError::ResponseParse(e));
             }
         };
 
@@ -660,9 +670,9 @@ impl ActorState {
         #[expect(clippy::cast_sign_loss)]
         if let Some(tx) = self.pending.remove(&(response.id as u64)) {
             let result = if response.ok {
-                response.output.ok_or(DenoError::MissingOutput)
+                response.output.ok_or(SidecarError::MissingOutput)
             } else {
-                Err(DenoError::ToolError {
+                Err(SidecarError::ToolError {
                     message: response
                         .error
                         .unwrap_or_else(|| "Unknown error".to_string()),
@@ -675,7 +685,7 @@ impl ActorState {
     }
 
     /// Fail all pending requests
-    fn fail_all_pending(&mut self, error_fn: impl Fn() -> DenoError) {
+    fn fail_all_pending(&mut self, error_fn: impl Fn() -> SidecarError) {
         for (_, tx) in self.pending.drain() {
             let _ = tx.send(Err(error_fn()));
         }
@@ -684,19 +694,19 @@ impl ActorState {
 
 impl ActorState {
     /// Fails every pending request for a sidecar that went away (its stdout closed, or a
-    /// request couldn't be written to it): [`DenoError::NotNode`] when it exited refusing
-    /// its runtime, else [`DenoError::SidecarCrashed`]. A sidecar that refused exits before
+    /// request couldn't be written to it): [`SidecarError::NotNode`] when it exited refusing
+    /// its runtime, else [`SidecarError::Crashed`]. A sidecar that refused exits before
     /// its first read, so a request written after that fails at the write, and is told why
     /// the same way.
     async fn fail_all_pending_exited(&mut self) {
         match timeout(EXIT_TIMEOUT, self.child.wait()).await {
             Ok(Ok(status)) if status.code() == Some(NOT_NODE_EXIT) => {
                 let program = self.program.clone();
-                self.fail_all_pending(|| DenoError::NotNode {
+                self.fail_all_pending(|| SidecarError::NotNode {
                     program: program.clone(),
                 });
             }
-            _ => self.fail_all_pending(|| DenoError::SidecarCrashed),
+            _ => self.fail_all_pending(|| SidecarError::Crashed),
         }
     }
 }
@@ -733,7 +743,7 @@ async fn run_actor(mut state: ActorState, mut rx: mpsc::Receiver<ActorCommand>) 
                         }
                     }
                     Some(ActorCommand::Shutdown) | None => {
-                        state.fail_all_pending(|| DenoError::ActorShutdown);
+                        state.fail_all_pending(|| SidecarError::ActorShutdown);
                         break;
                     }
                 }
@@ -748,14 +758,14 @@ async fn run_actor(mut state: ActorState, mut rx: mpsc::Receiver<ActorCommand>) 
                         state.fail_all_pending_exited().await;
                         break;
                     }
-                    Err(DenoError::Timeout { seconds }) => {
+                    Err(SidecarError::Timeout { seconds }) => {
                         eprintln!("sidecar timed out after {seconds}s ({} requests pending)", state.pending.len());
-                        state.fail_all_pending(|| DenoError::Timeout { seconds });
+                        state.fail_all_pending(|| SidecarError::Timeout { seconds });
                         break;
                     }
                     Err(e) => {
                         eprintln!("Error reading from the sidecar: {e} ({} requests pending)", state.pending.len());
-                        state.fail_all_pending(|| DenoError::SidecarCrashed);
+                        state.fail_all_pending(|| SidecarError::Crashed);
                         break;
                     }
                 }
@@ -771,11 +781,11 @@ mod tests {
 
     /// One request on `actor`, answered.
     async fn request(
-        actor: &DenoActor,
+        actor: &SidecarActor,
         tool: &str,
         content: &str,
         options: Option<Value>,
-    ) -> Result<Value, DenoError> {
+    ) -> Result<Value, SidecarError> {
         let rx = actor
             .dispatch(tool, content, options.as_ref())
             .await
@@ -822,7 +832,7 @@ mod tests {
     /// half, and it is never answered.
     #[tokio::test]
     async fn line_and_paragraph_separators_stay_inside_their_request() {
-        let actor = DenoActor::spawn().expect("spawn the sidecar");
+        let actor = SidecarActor::spawn().expect("spawn the sidecar");
         let source = "const a = \"x\u{2028}y\u{2029}z\";\n";
         assert!(
             serde_json::to_string(source).unwrap().contains('\u{2028}'),
@@ -850,10 +860,11 @@ mod tests {
     #[test]
     fn a_missing_install_is_refused_before_the_spawn() {
         let dir = package_copy(None);
-        let error = DenoActor::spawn_in(dir.path(), std::env::var_os("PATH").as_deref(), |_| None)
-            .expect_err("no install");
+        let error =
+            SidecarActor::spawn_in(dir.path(), std::env::var_os("PATH").as_deref(), |_| None)
+                .expect_err("no install");
         assert!(
-            matches!(&error, DenoError::SidecarNotInstalled { dir: d } if d == dir.path()),
+            matches!(&error, SidecarError::NotInstalled { dir: d } if d == dir.path()),
             "{error:?}"
         );
         assert!(
@@ -874,17 +885,18 @@ mod tests {
         let stale = current.replacen("\"version\": \"2.4.0\"", "\"version\": \"2.3.1\"", 1);
         assert_ne!(stale, current, "the hidden lockfile pins esrap 2.4.0");
         let dir = package_copy(Some(&stale));
-        let error = DenoActor::spawn_in(dir.path(), std::env::var_os("PATH").as_deref(), |_| None)
-            .expect_err("a stale install");
+        let error =
+            SidecarActor::spawn_in(dir.path(), std::env::var_os("PATH").as_deref(), |_| None)
+                .expect_err("a stale install");
         assert!(
-            matches!(&error, DenoError::SidecarInstallStale { dir: d } if d == dir.path()),
+            matches!(&error, SidecarError::InstallStale { dir: d } if d == dir.path()),
             "{error:?}"
         );
 
         let unreadable = package_copy(Some("{"));
         assert!(matches!(
             check_install(unreadable.path()),
-            Err(DenoError::SidecarInstallStale { .. })
+            Err(SidecarError::InstallStale { .. })
         ));
     }
 
@@ -902,7 +914,7 @@ mod tests {
         std::fs::write(&manifest, bumped).expect("bump svelte");
         assert!(matches!(
             check_install(edited.path()),
-            Err(DenoError::SidecarInstallStale { .. })
+            Err(SidecarError::InstallStale { .. })
         ));
 
         let scoped = package_copy(Some(&current));
@@ -918,14 +930,14 @@ mod tests {
         std::fs::write(&manifest, bumped).expect("bump acorn-typescript");
         assert!(matches!(
             check_install(scoped.path()),
-            Err(DenoError::SidecarInstallStale { .. })
+            Err(SidecarError::InstallStale { .. })
         ));
 
         let removed = package_copy(Some(&current));
         std::fs::remove_dir_all(removed.path().join("node_modules/esrap")).expect("remove esrap");
         assert!(matches!(
             check_install(removed.path()),
-            Err(DenoError::SidecarInstallStale { .. })
+            Err(SidecarError::InstallStale { .. })
         ));
     }
 
@@ -961,7 +973,7 @@ mod tests {
         std::fs::write(unstated.path().join("package.json"), "{\"engines\": {}}").expect("write");
         assert!(matches!(
             node_floor(unstated.path()),
-            Err(DenoError::SidecarDir { .. })
+            Err(SidecarError::PackageUnreadable { .. })
         ));
     }
 
@@ -1000,10 +1012,10 @@ mod tests {
             format!("{}.9.9", major - 1)
         };
         let below = fake_node(&below_version);
-        let error = DenoActor::spawn_in(&dir, Some(below.path().as_os_str()), |_| None)
+        let error = SidecarActor::spawn_in(&dir, Some(below.path().as_os_str()), |_| None)
             .expect_err("a Node below the floor");
         match &error {
-            DenoError::NodeTooOld {
+            SidecarError::NodeTooOld {
                 program,
                 version,
                 floor: range,
@@ -1018,11 +1030,11 @@ mod tests {
         }
 
         let at = fake_node(&format!("{major}.{minor}.0"));
-        let actor = DenoActor::spawn_in(&dir, Some(at.path().as_os_str()), |_| None)
+        let actor = SidecarActor::spawn_in(&dir, Some(at.path().as_os_str()), |_| None)
             .expect("a Node at the floor starts");
         assert!(matches!(
             request(&actor, "__version_info", "", None).await,
-            Err(DenoError::SidecarCrashed)
+            Err(SidecarError::Crashed)
         ));
     }
 
@@ -1032,10 +1044,10 @@ mod tests {
     fn a_node_with_no_version_is_refused() {
         let dir = sidecar_dir().expect("sidecar dir");
         let bin = fake_node("deno 2.9.8");
-        let error = DenoActor::spawn_in(&dir, Some(bin.path().as_os_str()), |_| None)
+        let error = SidecarActor::spawn_in(&dir, Some(bin.path().as_os_str()), |_| None)
             .expect_err("no Node version");
         assert!(
-            matches!(&error, DenoError::NodeVersionUnknown { output, .. } if output == "deno 2.9.8"),
+            matches!(&error, SidecarError::NodeVersionUnknown { output, .. } if output == "deno 2.9.8"),
             "{error:?}"
         );
     }
@@ -1053,7 +1065,7 @@ mod tests {
         let error = check_node_version(&node, &dir, &[], Duration::from_millis(300))
             .expect_err("no answer");
         assert!(
-            matches!(&error, DenoError::NodeVersionUnknown { output, .. } if output == "no answer within 0.3s"),
+            matches!(&error, SidecarError::NodeVersionUnknown { output, .. } if output == "no answer within 0.3s"),
             "{error:?}"
         );
     }
@@ -1070,7 +1082,7 @@ mod tests {
         let dir = canonical_dir(&link).expect("canonical");
         assert_eq!(dir, sidecar_dir().expect("sidecar dir"));
         assert_ne!(dir, link);
-        let actor = DenoActor::spawn_in(&dir, std::env::var_os("PATH").as_deref(), |_| None)
+        let actor = SidecarActor::spawn_in(&dir, std::env::var_os("PATH").as_deref(), |_| None)
             .expect("spawn");
         let info = request(&actor, "__version_info", "", None)
             .await
@@ -1085,7 +1097,7 @@ mod tests {
         let output = std::process::Command::new(std::env::current_exe().expect("test binary"))
             .args([
                 "--exact",
-                "deno::actor::tests::answers_under_a_poisoned_parent_environment",
+                "sidecar::actor::tests::answers_under_a_poisoned_parent_environment",
                 "--ignored",
                 "--test-threads=1",
             ])
@@ -1111,7 +1123,7 @@ mod tests {
             std::env::var_os("NODE_OPTIONS").is_some(),
             "run by its parent test"
         );
-        let actor = DenoActor::spawn().expect("spawn the sidecar");
+        let actor = SidecarActor::spawn().expect("spawn the sidecar");
         let formatted = request(
             &actor,
             "prettier",
@@ -1138,18 +1150,18 @@ mod tests {
         let shim = tempfile::tempdir().expect("temp dir");
         let node = shim.path().join("node");
         std::os::unix::fs::symlink(&deno, &node).expect("link node to deno");
-        let actor = DenoActor::spawn_in(
+        let actor = SidecarActor::spawn_in(
             &sidecar_dir().expect("sidecar dir"),
             Some(shim.path().as_os_str()),
             |_| None,
         )
         .expect("spawn the sidecar under deno");
         match request(&actor, "__version_info", "", None).await {
-            Err(DenoError::NotNode { program }) => assert_eq!(program, node),
+            Err(SidecarError::NotNode { program }) => assert_eq!(program, node),
             other => panic!("expected NotNode, got {other:?}"),
         }
         // A request sent after the refusal fails at its write, and is told the same.
-        let late = DenoActor::spawn_in(
+        let late = SidecarActor::spawn_in(
             &sidecar_dir().expect("sidecar dir"),
             Some(shim.path().as_os_str()),
             |_| None,
@@ -1157,7 +1169,7 @@ mod tests {
         .expect("spawn the sidecar under deno");
         tokio::time::sleep(Duration::from_secs(5)).await;
         match request(&late, "__version_info", "", None).await {
-            Err(DenoError::NotNode { program }) => assert_eq!(program, node),
+            Err(SidecarError::NotNode { program }) => assert_eq!(program, node),
             other => panic!("expected NotNode for a late request, got {other:?}"),
         }
         // The refusal comes before the oracle loads: in a package whose install holds the
@@ -1169,10 +1181,10 @@ mod tests {
         )
         .expect("copy the script");
         let dir = canonical_dir(package.path()).expect("canonical temp dir");
-        let codeless = DenoActor::spawn_in(&dir, Some(shim.path().as_os_str()), |_| None)
+        let codeless = SidecarActor::spawn_in(&dir, Some(shim.path().as_os_str()), |_| None)
             .expect("spawn the sidecar under deno");
         match request(&codeless, "__version_info", "", None).await {
-            Err(DenoError::NotNode { program }) => assert_eq!(program, node),
+            Err(SidecarError::NotNode { program }) => assert_eq!(program, node),
             other => panic!("expected NotNode before any oracle import, got {other:?}"),
         }
     }
@@ -1183,11 +1195,11 @@ mod tests {
         let package = package_copy(Some(&installed_lock()));
         std::fs::write(package.path().join("sidecar.ts"), "process.exit(1);\n").expect("script");
         let dir = std::fs::canonicalize(package.path()).expect("canonical temp dir");
-        let actor = DenoActor::spawn_in(&dir, std::env::var_os("PATH").as_deref(), |_| None)
+        let actor = SidecarActor::spawn_in(&dir, std::env::var_os("PATH").as_deref(), |_| None)
             .expect("spawn");
         assert!(matches!(
             request(&actor, "__version_info", "", None).await,
-            Err(DenoError::SidecarCrashed)
+            Err(SidecarError::Crashed)
         ));
     }
 

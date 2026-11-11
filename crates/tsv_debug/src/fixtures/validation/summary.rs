@@ -6,7 +6,7 @@ use std::hash::{Hash, Hasher};
 
 use super::FixtureValidation;
 use super::errors::ValidationError;
-use crate::deno::DenoError;
+use crate::sidecar::SidecarError;
 
 /// Context for cross-fixture duplicate detection (internal use only)
 #[derive(Debug, Default)]
@@ -142,7 +142,7 @@ impl ValidationSummary {
     }
 
     /// Count fixtures that failed due to a transient sidecar fault —
-    /// shutdown, crash, or the empty-output miss (`DenoError::EmptyOutput`)
+    /// shutdown, crash, or the empty-output miss (`SidecarError::EmptyOutput`)
     ///
     /// A high count indicates the sidecar malfunctioned during the test run,
     /// causing cascading failures that aren't real fixture issues. Each fault is
@@ -152,9 +152,9 @@ impl ValidationSummary {
     /// Called from `tests/fixtures_tests.rs` (root-crate integration test).
     pub fn count_sidecar_failures(&self) -> usize {
         let faults = [
-            DenoError::ActorShutdown,
-            DenoError::SidecarCrashed,
-            DenoError::EmptyOutput,
+            SidecarError::ActorShutdown,
+            SidecarError::Crashed,
+            SidecarError::EmptyOutput,
         ]
         .map(|fault| fault.to_string());
         self.count_failures_matching(|msg| faults.iter().any(|fault| msg.contains(fault.as_str())))
@@ -167,9 +167,9 @@ impl ValidationSummary {
     ///
     /// Called from `tests/fixtures_tests.rs` (root-crate integration test).
     pub fn count_timeout_failures(&self) -> usize {
-        // `DenoError::Timeout`'s text carries the elapsed seconds, so match the head it renders
+        // `SidecarError::Timeout`'s text carries the elapsed seconds, so match the head it renders
         // before them — derived from the variant, like the faults above, never a copied literal.
-        let rendered = DenoError::Timeout { seconds: 0 }.to_string();
+        let rendered = SidecarError::Timeout { seconds: 0 }.to_string();
         let head = rendered
             .split_once(" after ")
             .map_or(rendered.as_str(), |(head, _)| head);
@@ -447,15 +447,15 @@ mod tests {
         result
     }
 
-    /// Each counter keys on its fault's own rendered text, so rewording a `DenoError` variant
+    /// Each counter keys on its fault's own rendered text, so rewording a `SidecarError` variant
     /// cannot silently zero the integration test's sidecar-health guard.
     #[test]
     fn sidecar_fault_counters_match_the_rendered_errors() {
         let mut faults = ValidationSummary::new();
         for fault in [
-            DenoError::ActorShutdown,
-            DenoError::SidecarCrashed,
-            DenoError::EmptyOutput,
+            SidecarError::ActorShutdown,
+            SidecarError::Crashed,
+            SidecarError::EmptyOutput,
         ] {
             faults.add(failed_with(&fault.to_string()));
         }
@@ -463,14 +463,16 @@ mod tests {
         assert_eq!(faults.count_timeout_failures(), 0);
 
         let mut timeouts = ValidationSummary::new();
-        timeouts.add(failed_with(&DenoError::Timeout { seconds: 30 }.to_string()));
+        timeouts.add(failed_with(
+            &SidecarError::Timeout { seconds: 30 }.to_string(),
+        ));
         assert_eq!(timeouts.count_timeout_failures(), 1);
         assert_eq!(timeouts.count_sidecar_failures(), 0);
     }
 
     /// A validation result carrying one canonical-parser sidecar failure around `fault`, the way
     /// the P1 / P3 / F7 / `input_invalid_*` checks report one.
-    fn failed_at_canonical_parser(fault: &DenoError) -> FixtureValidation {
+    fn failed_at_canonical_parser(fault: &SidecarError) -> FixtureValidation {
         let mut result = FixtureValidation::new("fixture".to_string());
         result.add_error(ValidationError::CanonicalParserSidecarFailure(
             crate::fixtures::canonical_sidecar_failure(crate::fixtures::InputType::Svelte, fault),
@@ -483,9 +485,9 @@ mod tests {
     #[test]
     fn canonical_parser_sidecar_faults_reach_the_counters() {
         for fault in [
-            DenoError::ActorShutdown,
-            DenoError::SidecarCrashed,
-            DenoError::EmptyOutput,
+            SidecarError::ActorShutdown,
+            SidecarError::Crashed,
+            SidecarError::EmptyOutput,
         ] {
             let mut summary = ValidationSummary::new();
             summary.add(failed_at_canonical_parser(&fault));
@@ -494,7 +496,7 @@ mod tests {
         }
 
         let mut timeouts = ValidationSummary::new();
-        timeouts.add(failed_at_canonical_parser(&DenoError::Timeout {
+        timeouts.add(failed_at_canonical_parser(&SidecarError::Timeout {
             seconds: 30,
         }));
         assert_eq!(timeouts.count_timeout_failures(), 1);

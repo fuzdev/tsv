@@ -1,6 +1,6 @@
 use crate::cli::CliError;
 use crate::cli::commands::{print_block, print_json_tabs};
-use crate::deno::{self, SvelteCompileOutput, SvelteGenerate};
+use crate::sidecar::{self, SvelteCompileOutput, SvelteGenerate};
 use argh::FromArgs;
 use tsv_cli::cli::input::{InputArgs, ParserType};
 
@@ -53,7 +53,11 @@ impl CanonicalCompileCommand {
         )?;
 
         let rt = super::create_runtime();
-        match rt.block_on(deno::svelte_compile(input.content(), self.target, self.dev)) {
+        match rt.block_on(sidecar::svelte_compile(
+            input.content(),
+            self.target,
+            self.dev,
+        )) {
             Ok(output) => print_output(&output, self.css, self.json),
             Err(err) => {
                 eprintln!("Error compiling: {err}");

@@ -33,7 +33,7 @@ use std::path::{Path, PathBuf};
 /// removed, rather than living on the allow-list forever — removing the last one
 /// leaves the audit green.
 ///
-/// Pure Rust — no Deno. Part of `deno task check` (via `deno task scan:audit`).
+/// Pure Rust — no sidecar. Part of `deno task check` (via `deno task scan:audit`).
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "scan_audit")]
 pub struct ScanAuditCommand {

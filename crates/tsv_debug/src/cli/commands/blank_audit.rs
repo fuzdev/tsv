@@ -152,7 +152,7 @@ use super::profile::{is_input_invalid_fixture, resolve_seed_files};
 /// formats, and reports every injection that panics, breaks idempotency, fails to reparse,
 /// corrupts a leaf, drops/double-prints a comment, or emits a 2+ blank run — plus the absorb
 /// pin over the silently-eaten blanks (the drop class the invariants don't grade). Pure Rust —
-/// no Deno. Defaults to `tests/fixtures`; the real yield is external corpora. Exits 1 on a new
+/// no sidecar. Defaults to `tests/fixtures`; the real yield is external corpora. Exits 1 on a new
 /// / stale / panic finding shape (a ratchet, like `gap_audit`) and on a new / stale absorb
 /// class.
 #[derive(FromArgs, Debug)]

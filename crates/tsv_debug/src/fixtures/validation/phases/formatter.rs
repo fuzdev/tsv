@@ -1,8 +1,8 @@
 //! F-phase formatter validation (F* rules: idempotency, prettier freshness, audit signatures).
 
-use crate::deno::run_prettier;
 use crate::diff;
 use crate::fixtures::{self, AuditSignature, ChainAnchor, ChainWalk, Fixture, read_file};
+use crate::sidecar::run_prettier;
 
 use super::super::FixtureValidation;
 use super::super::errors::{AuditSignatureStaleness, ValidationError, ValidationSuccess};

@@ -23,7 +23,7 @@
 //!
 //! ## Oracle
 //!
-//! `deno::svelte_render_key` — `svelte compile --generate server` reduced to its
+//! `sidecar::svelte_render_key` — `svelte compile --generate server` reduced to its
 //! browser-visible render (baked template text, `${…}` holed out,
 //! `<script>`/`<style>`/comments stripped, whitespace collapsed with block-boundary
 //! whitespace dropped). Equal keys prove equal renders. Because the key is
@@ -45,8 +45,8 @@ use futures_util::StreamExt;
 
 use crate::audit::vacuity::check_graded_nonzero;
 use crate::cli::CliError;
-use crate::deno;
 use crate::format_source::format_source;
+use crate::sidecar;
 use tsv_cli::cli::input::ParserType;
 
 use super::profile::{is_input_invalid_fixture, is_svelte, resolve_seed_files_named};
@@ -231,8 +231,8 @@ async fn audit_file(path: &Path) -> Outcome {
 
     // Both sides must be analyzable for the oracle to speak.
     let (Ok(before), Ok(after)) = (
-        deno::svelte_render_key(&source).await,
-        deno::svelte_render_key(&formatted).await,
+        sidecar::svelte_render_key(&source).await,
+        sidecar::svelte_render_key(&formatted).await,
     ) else {
         return Outcome::CompileSkipped;
     };

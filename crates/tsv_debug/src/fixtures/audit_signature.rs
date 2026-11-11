@@ -56,8 +56,8 @@
 
 use std::collections::HashSet;
 
-use crate::deno::{PrettierParser, run_prettier};
 use crate::fixtures::{Fixture, FixtureFiles, read_file};
+use crate::sidecar::{PrettierParser, run_prettier};
 
 /// Filename for the audit signature file, located alongside `output_prettier.*`
 pub const AUDIT_SIGNATURE_FILENAME: &str = "audit_signature.txt";

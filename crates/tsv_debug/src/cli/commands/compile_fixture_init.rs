@@ -2,8 +2,8 @@ use crate::cli::CliError;
 use crate::compile_fixtures::{
     EXPECTED_CSS, EXPECTED_SERVER_JS, INPUT_FILE, with_trailing_newline,
 };
-use crate::deno::{self, SvelteGenerate};
 use crate::fixtures::{self, InputType};
+use crate::sidecar::{self, SvelteGenerate};
 use argh::FromArgs;
 use std::path::Path;
 use tsv_svelte_compile::canonicalize_js;
@@ -62,7 +62,7 @@ impl CompileFixtureInitCommand {
 
         // Prettier-format the component so the committed input is canonical.
         let formatted =
-            match deno::run_prettier(&raw_content, InputType::Svelte.prettier_parser()).await {
+            match sidecar::run_prettier(&raw_content, InputType::Svelte.prettier_parser()).await {
                 Ok(f) => f,
                 Err(e) => {
                     eprintln!("Error: prettier formatting failed: {e}");
@@ -80,15 +80,16 @@ impl CompileFixtureInitCommand {
 
         // Compile with the deterministic oracle (server, non-dev — the parity
         // configuration `compile_compare` and validation use).
-        let compiled = match deno::svelte_compile(&formatted, SvelteGenerate::Server, false).await {
-            Ok(o) => o,
-            Err(e) => {
-                eprintln!("Error: oracle compile failed: {e}");
-                print_hint(&e);
-                eprintln!("({INPUT_FILE} was written; fix the component and re-run)");
-                return Err(CliError::Failed);
-            }
-        };
+        let compiled =
+            match sidecar::svelte_compile(&formatted, SvelteGenerate::Server, false).await {
+                Ok(o) => o,
+                Err(e) => {
+                    eprintln!("Error: oracle compile failed: {e}");
+                    print_hint(&e);
+                    eprintln!("({INPUT_FILE} was written; fix the component and re-run)");
+                    return Err(CliError::Failed);
+                }
+            };
 
         // Canonicalize the oracle JS — the committed expectation is the
         // intent-erased reprint, the same form the parity comparison uses.
@@ -132,9 +133,9 @@ impl CompileFixtureInitCommand {
     }
 }
 
-/// Print a Deno error's hint on its own line, suppressed when the error carries
+/// Print a sidecar error's hint on its own line, suppressed when the error carries
 /// none (an empty `Hint:` line is noise).
-fn print_hint(e: &deno::DenoError) {
+fn print_hint(e: &sidecar::SidecarError) {
     let hint = e.hint();
     if !hint.is_empty() {
         eprintln!("Hint: {hint}");

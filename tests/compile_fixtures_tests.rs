@@ -1,6 +1,6 @@
 //! Pure-Rust compile fixture validation — the sidecar-free slice of the compile
 //! fixture contract, so it runs in every `cargo test --workspace`. This is the
-//! offline parity gate: `compile()` needs no Deno.
+//! offline parity gate: `compile()` needs no sidecar.
 //!
 //! Per fixture in `tests/fixtures_compile/`:
 //!

@@ -54,7 +54,7 @@ use super::profile::{is_svelte, resolve_seed_files_named};
 /// reachable only at widths no fixture happens to sit at
 /// (`inline_sibling_drop_tail_wide_long_prettier_divergence`). Gated in `deno task check`.
 ///
-/// Pure Rust — no Deno. Defaults to `tests/fixtures`, `.svelte` seeds only (the class is
+/// Pure Rust — no sidecar. Defaults to `tests/fixtures`, `.svelte` seeds only (the class is
 /// Svelte inline layout; the TS and CSS printers have no fill-boundary bake).
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "razor_audit")]

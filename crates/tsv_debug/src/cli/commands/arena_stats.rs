@@ -25,7 +25,7 @@ use tsv_lang::estimated_ast_arena_capacity;
 ///   `SourceSpan` split (which text representation to target).
 ///
 /// Covers `.ts` / `.svelte.ts` / `.svelte` / `.css` (each formatted by its own
-/// printer into the shared doc arena). Pure Rust, no Deno.
+/// printer into the shared doc arena). Pure Rust, no sidecar.
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "arena_stats")]
 pub struct ArenaStatsCommand {

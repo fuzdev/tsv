@@ -135,7 +135,7 @@ use crate::audit::properties::{
 };
 use crate::audit::vacuity::check_graded_nonzero;
 use crate::cli::CliError;
-use crate::deno;
+use crate::sidecar;
 
 use super::profile::{is_input_invalid_fixture, resolve_seed_files_named};
 use super::{ResultOrder, spawn_work_stream, task_result};
@@ -716,12 +716,12 @@ async fn canonical_roundtrip(
         return (CanVerdict::Clean, None);
     };
 
-    let Ok(canon_in) = deno::parse_by_type(&source, parser).await else {
+    let Ok(canon_in) = sidecar::parse_by_type(&source, parser).await else {
         // The canonical parser rejects the input — an invalid / error fixture,
         // not a round-trip subject.
         return (CanVerdict::RejectsInput, None);
     };
-    let Ok(canon_out) = deno::parse_by_type(&formatted, parser).await else {
+    let Ok(canon_out) = sidecar::parse_by_type(&formatted, parser).await else {
         return (CanVerdict::Unreparseable, None);
     };
 

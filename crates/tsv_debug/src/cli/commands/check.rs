@@ -11,7 +11,7 @@ pub struct CheckCommand {}
 impl CheckCommand {
     pub(crate) fn run(self) -> Result<(), CliError> {
         let rt = super::create_runtime();
-        match rt.block_on(crate::deno::check()) {
+        match rt.block_on(crate::sidecar::check()) {
             Ok(info) => {
                 println!("Sidecar: ok");
                 println!();

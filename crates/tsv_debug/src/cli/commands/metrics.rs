@@ -186,8 +186,8 @@ fn classify_phase(crate_name: &str, file_path: &Path, src_dir: &Path) -> String 
     }
 
     // The sidecar module's directory
-    if first_dir == "deno" {
-        return "deno".to_string();
+    if first_dir == "sidecar" {
+        return "sidecar".to_string();
     }
 
     // tsv_debug's own subsystem directories
@@ -235,7 +235,7 @@ const PHASE_ORDER: &[&str] = &[
     "printer",
     "escapes",
     "cli",
-    "deno",
+    "sidecar",
     "fixtures",
     "test262",
     "tsc_conformance",

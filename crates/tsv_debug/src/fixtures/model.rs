@@ -1,8 +1,8 @@
 //! Fixture data model: input types, the `Fixture` struct, and
 //! divergence-suffix naming rules.
 
-use crate::deno::PrettierParser;
 use crate::fixtures::{AUDIT_SIGNATURE_FILENAME, audit_signature_variant_filename};
+use crate::sidecar::PrettierParser;
 use std::path::{Path, PathBuf};
 use tsv_cli::cli::input::ParserType;
 use tsv_ts::Goal;

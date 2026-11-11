@@ -5,11 +5,11 @@
 //! (`crate::imports_fixtures` module doc). Never tsv's collector.
 
 use crate::cli::CliError;
-use crate::deno::{self, DenoError};
 use crate::imports_fixtures::{
     IMPORTS_FIXTURES_DIR, ImportsFixture, ImportsLanguage, ORACLE_MARKER, TSV_WIRE, oracle_json,
     render_expected, tsv_wire, walk_imports_fixtures,
 };
+use crate::sidecar::{self, SidecarError};
 use argh::FromArgs;
 use futures_util::StreamExt;
 use std::path::Path;
@@ -125,14 +125,14 @@ pub(crate) async fn oracle_expected(fixture: &ImportsFixture) -> Result<serde_js
             }
             Ok(oracle)
         }
-        (None, Err(DenoError::ToolError { message })) => Err(format!(
+        (None, Err(SidecarError::ToolError { message })) => Err(format!(
             "the canonical parser rejects the input ({message}); fix it, or mark the \
              fixture with an {ORACLE_MARKER} (`{TSV_WIRE}` and a reason)"
         )),
         (Some(_), Ok(_)) => Err(format!(
             "stale {ORACLE_MARKER}: the canonical parser accepts the input — delete the marker"
         )),
-        (Some(_), Err(DenoError::ToolError { .. })) => {
+        (Some(_), Err(SidecarError::ToolError { .. })) => {
             let wire = tsv_wire(fixture.language, &source, tsv_ts::Goal::Module)
                 .or_else(|module_error| match fixture.language {
                     ImportsLanguage::TypeScript => {
@@ -144,7 +144,7 @@ pub(crate) async fn oracle_expected(fixture: &ImportsFixture) -> Result<serde_js
                 .map_err(|e| format!("tsv's parser rejects the input too: {e}"))?;
             oracle_json(fixture.language, &source, &wire)
         }
-        (_, Err(e)) => Err(super::describe_deno_error(&e)),
+        (_, Err(e)) => Err(super::describe_sidecar_error(&e)),
     }
 }
 
@@ -154,20 +154,20 @@ pub(crate) async fn oracle_expected(fixture: &ImportsFixture) -> Result<serde_js
 async fn canonical_parse(
     language: ImportsLanguage,
     source: &str,
-) -> (tsv_ts::Goal, Result<serde_json::Value, DenoError>) {
+) -> (tsv_ts::Goal, Result<serde_json::Value, SidecarError>) {
     match language {
         ImportsLanguage::TypeScript => {
-            let module = deno::parse_typescript_with_goal(source, tsv_ts::Goal::Module).await;
-            if !matches!(module, Err(DenoError::ToolError { .. })) {
+            let module = sidecar::parse_typescript_with_goal(source, tsv_ts::Goal::Module).await;
+            if !matches!(module, Err(SidecarError::ToolError { .. })) {
                 return (tsv_ts::Goal::Module, module);
             }
-            let script = deno::parse_typescript_with_goal(source, tsv_ts::Goal::Script).await;
+            let script = sidecar::parse_typescript_with_goal(source, tsv_ts::Goal::Script).await;
             match script {
                 Ok(wire) => (tsv_ts::Goal::Script, Ok(wire)),
                 // both rejected: the Module error is the one to report
                 Err(_) => (tsv_ts::Goal::Module, module),
             }
         }
-        ImportsLanguage::Svelte => (tsv_ts::Goal::Module, deno::parse_svelte(source).await),
+        ImportsLanguage::Svelte => (tsv_ts::Goal::Module, sidecar::parse_svelte(source).await),
     }
 }

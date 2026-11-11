@@ -30,7 +30,7 @@
 //! - **Compile arm (authoritative).** Compare the two sources' browser-visible
 //!   **render keys** (`svelte compile --generate server` → baked template text,
 //!   holes for `${…}`, HTML comments stripped, whitespace runs collapsed; see
-//!   `deno::svelte_render_key`). Equal keys prove equal renders. Because the key
+//!   `sidecar::svelte_render_key`). Equal keys prove equal renders. Because the key
 //!   is baked-template-only, a `<script>`/`<style>` reformatting that leaves the
 //!   template unchanged shares a key — so this arm judges the *render*, not the
 //!   code. Used whenever both sides compile.
@@ -60,10 +60,10 @@ use serde_json::Value;
 use crate::format_source::format_source;
 use tsv_cli::cli::input::ParserType;
 
-use crate::deno;
 use crate::diff;
 use crate::fixtures::{Fixture, FixtureFiles, InputType, read_file};
 use crate::render_browser::browser_normalize_pair;
+use crate::sidecar;
 
 use super::super::FixtureValidation;
 use super::super::errors::ValidationError;
@@ -264,7 +264,7 @@ pub(in crate::fixtures::validation) async fn validate_render_equivalence(
     // variant that grades against it.
     let mut input_baseline = Baseline {
         source: input,
-        key: deno::svelte_render_key(input).await.ok(),
+        key: sidecar::svelte_render_key(input).await.ok(),
         template: None,
     };
 
@@ -321,7 +321,7 @@ pub(in crate::fixtures::validation) async fn validate_render_equivalence(
         // `input`'s, which every variant in the loop above shares.
         let mut variant_baseline = Baseline {
             source: &variant_content,
-            key: deno::svelte_render_key(&variant_content).await.ok(),
+            key: sidecar::svelte_render_key(&variant_content).await.ok(),
             template: None,
         };
         grade_claim(
@@ -429,7 +429,7 @@ async fn render_equivalent(
 ) -> Verdict {
     // Compile arm (authoritative): both sides must compile to a render key.
     if let Some(input_key) = input_key
-        && let Ok(variant_key) = deno::svelte_render_key(variant).await
+        && let Ok(variant_key) = sidecar::svelte_render_key(variant).await
     {
         return if variant_key == input_key {
             Verdict::Equivalent(Oracle::Compile)
@@ -446,14 +446,14 @@ async fn render_equivalent(
     // on a side). Erase `instance`/`module`/`css` so a script/style-only
     // reformatting — which the compile arm ignores by construction — is ignored
     // here too, leaving a pure template-render compare.
-    let Ok(mut variant_ast) = deno::parse_svelte(variant).await else {
+    let Ok(mut variant_ast) = sidecar::parse_svelte(variant).await else {
         return Verdict::Indeterminate;
     };
     strip_non_template(&mut variant_ast);
 
     // Build `input`'s template-only AST once, caching it for later variants.
     if input_template.is_none() {
-        let Ok(mut v) = deno::parse_svelte(input).await else {
+        let Ok(mut v) = sidecar::parse_svelte(input).await else {
             return Verdict::Indeterminate;
         };
         strip_non_template(&mut v);

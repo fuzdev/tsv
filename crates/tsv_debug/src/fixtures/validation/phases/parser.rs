@@ -1,7 +1,7 @@
 //! P-phase parser validation plus invalid-syntax checks (P* rules + input_invalid_*).
 
-use crate::deno::parse_by_type_with_goal;
 use crate::fixtures::{self, CanonicalParseError, Fixture, FixtureFiles, InputType, read_file};
+use crate::sidecar::parse_by_type_with_goal;
 
 use super::super::FixtureValidation;
 use super::super::errors::{ValidationError, ValidationSuccess};

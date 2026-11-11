@@ -4,7 +4,6 @@
 pub mod audit;
 pub mod cli;
 pub mod compile_fixtures;
-pub mod deno;
 pub mod depth_shapes;
 pub mod diff;
 pub mod fixtures;
@@ -13,6 +12,7 @@ pub mod imports_fixtures;
 pub mod json;
 pub mod render_browser;
 pub mod render_normalize;
+pub mod sidecar;
 pub mod strip_fixtures;
 pub mod test262;
 pub mod tsc_conformance;

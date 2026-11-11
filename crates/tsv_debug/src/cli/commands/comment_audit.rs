@@ -13,7 +13,7 @@ use super::profile::resolve_seed_files;
 ///
 /// Enables the print-once comment ledger (`tsv_lang::comment_ledger`) and formats each
 /// file, reporting every comment the format DROPPED (parsed, never emitted — silent
-/// content loss) or DOUBLE-PRINTED. Pure Rust — no Deno. Defaults to `tests/fixtures`
+/// content loss) or DOUBLE-PRINTED. Pure Rust — no sidecar. Defaults to `tests/fixtures`
 /// when no paths are given.
 ///
 /// The corpus walk is the shared [`sweep_pristine_armed`], as in its twin

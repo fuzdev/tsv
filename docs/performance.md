@@ -663,7 +663,7 @@ shared arena (as the CLI/FFI/NAPI/WASM batch drivers use), the number that shows
 pre-size hint doesn't grow the batch footprint (it's bounded by actual max-file usage,
 not the hint). The static, load-independent counterpart to the timing/allocation
 tools — "what is the arena made of and how over-reserved is it" rather than "where
-does the time go". Pure Rust, no Deno; covers `.ts` / `.svelte.ts` / `.svelte` / `.css`.
+does the time go". Pure Rust, no sidecar; covers `.ts` / `.svelte.ts` / `.svelte` / `.css`.
 
 It also reports **container degeneracy** (empty/single/nested `Concat`/`Fill` — the
 node-count lever) and audits the sibling pre-sizes (output `String`, AST bump). For
@@ -709,7 +709,7 @@ linearized chain — so it carries no population of its own, and neither does th
 peeled trailing member tail, which is a pair of runs over that same buffer. Covers
 `.ts`/`.svelte.ts` AND `.svelte` (the `<script>`/`{expr}` feed the same TS-printer
 buffers). Prints percentiles + spill rate at candidate inline N. For sizing,
-exclude the prettier/svelte test suites (edge-case skew). Pure Rust, no Deno.
+exclude the prettier/svelte test suites (edge-case skew). Pure Rust, no sidecar.
 
 ```bash
 cargo run -p tsv_debug buffer_sizes ../corpora/collections/zzz/src ../corpora/collections/gro/src
@@ -733,7 +733,7 @@ from this same command** — never against a raw timing from `profile`.
 
 Refusals and parse failures are counted, not timed. Any compile self-check failure
 (`CorruptOutput`, `TypeErasureLeak`, `GeneratedNameMissing`) is a compiler bug: it prints
-`COMPILER BUG <path>: <error>` and fails the run. Pure Rust, no Deno; run with `--release`
+`COMPILER BUG <path>: <error>` and fails the run. Pure Rust, no sidecar; run with `--release`
 for anchors.
 
 ```bash

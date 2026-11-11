@@ -2,8 +2,8 @@ use crate::cli::CliError;
 use crate::cli::commands::profile::{is_pruned_dir, is_svelte};
 use crate::cli::commands::{print_json_tabs, truncate_chars};
 use crate::compile_fixtures::with_trailing_newline;
-use crate::deno::{self, DenoError, SvelteGenerate};
 use crate::diff::{ColorChoice, DiffOptions, diff_to_string};
+use crate::sidecar::{self, SidecarError, SvelteGenerate};
 use argh::FromArgs;
 use futures_util::StreamExt;
 
@@ -454,10 +454,10 @@ async fn classify(source: &str) -> Bucket {
     // Svelte compiler *rejecting* the source (legacy mode, invalid syntax,
     // TS-in-plain-script); a ToolError WITHOUT a code is a sidecar-internal
     // failure and must not inflate the oracle_rejected bucket (it would slip
-    // the exit gate). Every other DenoError is a harness/sidecar failure too.
-    let oracle = match deno::svelte_compile(source, SvelteGenerate::Server, false).await {
+    // the exit gate). Every other SidecarError is a harness/sidecar failure too.
+    let oracle = match sidecar::svelte_compile(source, SvelteGenerate::Server, false).await {
         Ok(o) => o,
-        Err(DenoError::ToolError { message }) => {
+        Err(SidecarError::ToolError { message }) => {
             return match oracle_reject_code(&message) {
                 // Over-acceptance probe: an oracle-rejected component that tsv
                 // compiles anyway is a refusal-contract gap (the `$:` class) —
@@ -1318,10 +1318,10 @@ async fn classify_census_file(path: PathBuf) -> CensusOutcome {
 /// are candidates (the parity-yield population); everything else is skipped.
 async fn classify_census(source: &str) -> CensusOutcome {
     // Oracle side. A coded rejection is out of census scope (never a parity
-    // candidate); an uncoded ToolError / other DenoError is a harness failure.
-    match deno::svelte_compile(source, SvelteGenerate::Server, false).await {
+    // candidate); an uncoded ToolError / other SidecarError is a harness failure.
+    match sidecar::svelte_compile(source, SvelteGenerate::Server, false).await {
         Ok(_) => {}
-        Err(DenoError::ToolError { message }) => {
+        Err(SidecarError::ToolError { message }) => {
             return match oracle_reject_code(&message) {
                 Some(_) => CensusOutcome::Skipped,
                 None => CensusOutcome::Error("oracle-tool", first_line(&message)),

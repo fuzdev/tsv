@@ -1,7 +1,7 @@
 use crate::cli::CliError;
-use crate::deno;
 use crate::diff::LINE_WIDTH_THRESHOLD;
 use crate::fixtures::{self, CanonicalParseError, GOAL_FILENAME, InputType, find_input_file};
+use crate::sidecar;
 use argh::FromArgs;
 use std::path::Path;
 use tsv_lang::printing::visual_width;
@@ -107,13 +107,14 @@ impl FixtureInitCommand {
         }
 
         // Format through prettier
-        let formatted = match deno::run_prettier(&raw_content, input_type.prettier_parser()).await {
-            Ok(f) => f,
-            Err(e) => {
-                eprintln!("Error: prettier formatting failed: {e}");
-                return Err(CliError::Failed);
-            }
-        };
+        let formatted =
+            match sidecar::run_prettier(&raw_content, input_type.prettier_parser()).await {
+                Ok(f) => f,
+                Err(e) => {
+                    eprintln!("Error: prettier formatting failed: {e}");
+                    return Err(CliError::Failed);
+                }
+            };
 
         // Write input file
         let input_filename = format!("input{}", input_type.extension());
@@ -126,7 +127,7 @@ impl FixtureInitCommand {
         println!("✓ {input_filename} (prettier-formatted)");
 
         // Verify idempotency
-        match deno::run_prettier(&formatted, input_type.prettier_parser()).await {
+        match sidecar::run_prettier(&formatted, input_type.prettier_parser()).await {
             Ok(reformatted) => {
                 if reformatted != formatted {
                     eprintln!(

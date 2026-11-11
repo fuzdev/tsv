@@ -312,7 +312,7 @@ pub(crate) fn truncate_chars_counted(s: &str, max: usize) -> String {
 
 /// A sidecar error's message with its remediation hint on a second line, when it has one —
 /// for a command that reports the error as text rather than printing the hint itself.
-pub(crate) fn describe_deno_error(error: &crate::deno::DenoError) -> String {
+pub(crate) fn describe_sidecar_error(error: &crate::sidecar::SidecarError) -> String {
     match error.hint() {
         "" => error.to_string(),
         hint => format!("{error}\nhint: {hint}"),
@@ -449,7 +449,7 @@ where
     Fut: Future + Send + 'static,
     Fut::Output: Send + 'static,
 {
-    let concurrency = crate::deno::init_bulk_pool();
+    let concurrency = crate::sidecar::init_bulk_pool();
     let tasks = stream::iter(items).map(move |item| tokio::spawn(work(item)));
     match order {
         ResultOrder::Input => Box::pin(tasks.buffered(concurrency)),

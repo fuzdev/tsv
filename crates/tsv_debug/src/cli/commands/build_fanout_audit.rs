@@ -31,7 +31,7 @@ use legs::{FanoutKey, Finding, InputResult};
 /// The counted legs ([`legs`]) read `tsv_lang::fanout_probe`'s counters (the
 /// `_internal_audits` feature) over the depth-limit gate's catalog, the known-bug shapes and
 /// flat runs — builds per AST node, doc nodes per byte, work-counter growth — and
-/// grade against the `fanout_audit_known.txt` ratchet. Pure Rust, no Deno.
+/// grade against the `fanout_audit_known.txt` ratchet. Pure Rust, no sidecar.
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "build_fanout_audit")]
 pub struct BuildFanoutAuditCommand {

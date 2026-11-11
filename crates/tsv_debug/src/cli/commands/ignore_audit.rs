@@ -158,8 +158,9 @@ use super::profile::{is_input_invalid_fixture, resolve_seed_files};
 /// For each seed file, at each candidate node position (one at a time), prepends the directive on
 /// its own line with the node's interior structural spaces doubled, formats, and grades the four
 /// checks; reports every `(kind, position)` that fails one, and every position that crashes the
-/// formatter. Pure Rust — no Deno. Defaults to `tests/fixtures`; the real yield is external corpora.
-/// Exits 1 on a new / stale / panic finding shape (a ratchet, like `gap_audit` / `blank_audit`).
+/// formatter. Pure Rust — no sidecar. Defaults to `tests/fixtures`; the real yield is external
+/// corpora. Exits 1 on a new / stale / panic finding shape (a ratchet, like `gap_audit` /
+/// `blank_audit`).
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "ignore_audit")]
 pub struct IgnoreAuditCommand {

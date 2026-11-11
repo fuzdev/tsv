@@ -5,8 +5,8 @@ use crate::compile_fixtures::{
     COMPILE_FIXTURES_DIR, CompileFixture, EXPECTED_SERVER_JS, walk_compile_fixtures,
     with_trailing_newline,
 };
-use crate::deno::{self, SvelteGenerate};
 use crate::diff::{DiffOptions, diff_to_string};
+use crate::sidecar::{self, SvelteGenerate};
 use argh::FromArgs;
 use futures_util::StreamExt;
 use std::path::Path;
@@ -280,7 +280,7 @@ async fn validate_fixture(fixture: &CompileFixture) -> FixtureReport {
     };
 
     // (a) Oracle freshness — sidecar-dependent.
-    let oracle_fresh = match deno::svelte_compile(&input, SvelteGenerate::Server, false).await {
+    let oracle_fresh = match sidecar::svelte_compile(&input, SvelteGenerate::Server, false).await {
         Ok(compiled) => {
             let mut fresh = true;
             match canonicalize_js(&compiled.js) {

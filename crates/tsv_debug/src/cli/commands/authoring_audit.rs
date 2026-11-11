@@ -93,7 +93,7 @@ use crate::audit::repro::{ReproCase, write_repro_case};
 use crate::audit::tally::CappedPaths;
 use crate::audit::vacuity::check_graded_nonzero;
 use crate::cli::CliError;
-use crate::deno::{PrettierParser, run_prettier};
+use crate::sidecar::{PrettierParser, run_prettier};
 
 use super::profile::{is_input_invalid_fixture, is_svelte, resolve_seed_files_named};
 

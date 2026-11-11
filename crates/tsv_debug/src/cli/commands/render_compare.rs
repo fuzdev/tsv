@@ -13,7 +13,7 @@
 //! - `identical` — the compiled server JS is byte-equal: the compiler itself erases
 //!   the difference (`clean_nodes` trimmed it away).
 //! - `cosmetic` — the compiled bytes differ but the browser-visible render key
-//!   ([`deno::svelte_render_key`]) is equal: the whitespace reaches the baked
+//!   ([`sidecar::svelte_render_key`]) is equal: the whitespace reaches the baked
 //!   template, and CSS `white-space: normal` collapses it. Same page.
 //! - `visible` — the render keys differ: the two sources render differently.
 //!
@@ -36,7 +36,7 @@
 use argh::FromArgs;
 
 use crate::cli::CliError;
-use crate::deno::{self, SvelteGenerate};
+use crate::sidecar::{self, SvelteGenerate};
 
 /// Compare the browser-visible render of two Svelte sources.
 #[derive(FromArgs, Debug)]
@@ -81,13 +81,13 @@ impl RenderCompareCommand {
 
         let rt = super::create_runtime();
         let graded = rt.block_on(async {
-            let compiled_a = deno::svelte_compile(&a, SvelteGenerate::Server, false).await?;
-            let compiled_b = deno::svelte_compile(&b, SvelteGenerate::Server, false).await?;
+            let compiled_a = sidecar::svelte_compile(&a, SvelteGenerate::Server, false).await?;
+            let compiled_b = sidecar::svelte_compile(&b, SvelteGenerate::Server, false).await?;
             if compiled_a.js == compiled_b.js {
-                return Ok::<_, deno::DenoError>((Tier::Identical, None));
+                return Ok::<_, sidecar::SidecarError>((Tier::Identical, None));
             }
-            let key_a = deno::svelte_render_key(&a).await?;
-            let key_b = deno::svelte_render_key(&b).await?;
+            let key_a = sidecar::svelte_render_key(&a).await?;
+            let key_b = sidecar::svelte_render_key(&b).await?;
             let tier = if key_a == key_b {
                 Tier::Cosmetic
             } else {

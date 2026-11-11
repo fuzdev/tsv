@@ -117,7 +117,7 @@ closed-scope/open-convention stance below.
         ↑
    ┌───────────┬─────────────┬──────────┬──────────────────┬─────────────────────┐
  tsv_cli     tsv_debug     tsv_ffi    tsv_napi           tsv_wasm
-(production) (dev, Deno)   (C FFI)    (N-API, Node/Bun)  (browser/Node/Deno)
+(production) (dev, Node)   (C FFI)    (N-API, Node/Bun)  (browser/Node/Deno)
                 ↑
             tsv_check  (experimental TypeScript binder/checker, may never ship —
                         depends on tsv_lang + tsv_ts; consumed ONLY by tsv_debug,

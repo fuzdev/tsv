@@ -1,8 +1,8 @@
 use crate::cli::CliError;
-use crate::deno;
 use crate::diff::{DiffOptions, diff_to_string};
 use crate::format_source::format_source_with_source_type;
 use crate::render_normalize::normalize_pair;
+use crate::sidecar;
 use argh::FromArgs;
 use tsv_cli::cli::input::{Input, InputArgs, ParserType};
 
@@ -157,9 +157,9 @@ async fn parse_to_value(
     content: &str,
     parser_type: ParserType,
 ) -> Result<serde_json::Value, String> {
-    deno::parse_by_type(content, parser_type)
+    sidecar::parse_by_type(content, parser_type)
         .await
-        .map_err(|e| super::describe_deno_error(&e))
+        .map_err(|e| super::describe_sidecar_error(&e))
 }
 
 /// Compare two ASTs (ignoring spans/locations).

@@ -1,6 +1,6 @@
 use crate::cli::CliError;
-use crate::deno::{PrettierParser, run_prettier};
 use crate::diff::{digit_width, expand_tabs};
+use crate::sidecar::{PrettierParser, run_prettier};
 use argh::FromArgs;
 use tsv_cli::cli::input::{Input, InputArgs, ParserType};
 use tsv_lang::TAB_WIDTH;

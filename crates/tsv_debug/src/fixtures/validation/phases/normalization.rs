@@ -2,13 +2,13 @@
 
 use std::collections::{HashMap, HashSet};
 
-use crate::deno::run_prettier;
 use crate::diff;
 use crate::fixtures::{
     self, AuditSignature, ChainAnchor, ChainWalk, Fixture, FixtureFiles, SingleFormPins,
     audit_signature_variant_suffix, classify_stable_form, read_file, unformatted_ours_filename,
     unformatted_ours_suffix,
 };
+use crate::sidecar::run_prettier;
 
 use super::super::errors::{
     AuditSignatureStaleness, UnpinnedChainReason, ValidationError, ValidationSuccess,
