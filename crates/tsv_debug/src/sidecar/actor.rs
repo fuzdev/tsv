@@ -1194,9 +1194,11 @@ mod tests {
     async fn a_sidecar_that_exits_is_a_crash() {
         let package = package_copy(Some(&installed_lock()));
         std::fs::write(package.path().join("sidecar.ts"), "process.exit(1);\n").expect("script");
-        let dir = std::fs::canonicalize(package.path()).expect("canonical temp dir");
-        let actor = SidecarActor::spawn_in(&dir, std::env::var_os("PATH").as_deref(), |_| None)
-            .expect("spawn");
+        let dir = canonical_dir(package.path()).expect("canonical temp dir");
+        let actor = SidecarActor::spawn_in(&dir, std::env::var_os("PATH").as_deref(), |name| {
+            std::env::var_os(name)
+        })
+        .expect("spawn");
         assert!(matches!(
             request(&actor, "__version_info", "", None).await,
             Err(SidecarError::Crashed)
