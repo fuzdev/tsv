@@ -1600,12 +1600,15 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 // a node only in the preserved tree (`/* c */ (x + y)`). The wire reads no
                 // claim, so the printer's tree supplies them all.
                 debug_assert!(
-                    plain.comments.len() == preserved.comments.len()
-                        && plain
-                            .comments
-                            .iter()
-                            .zip(preserved.comments)
-                            .all(|(a, b)| a.span == b.span),
+                    {
+                        let view = self.ts_stores().view();
+                        let (plain, preserved) = (
+                            view.comments(plain.comments),
+                            view.comments(preserved.comments),
+                        );
+                        plain.len() == preserved.len()
+                            && plain.iter().zip(preserved).all(|(a, b)| a.span == b.span)
+                    },
                     "a snippet head's paren-free and preserved parses collected different comments"
                 );
                 let wire = first_function_declaration(self.ts_stores(), &preserved)
@@ -1626,7 +1629,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             };
             // The comments (and their `owned_by_node` claims) are the paren-free tree's —
             // the tree the printer walks — and are merged once.
-            self.expression_comments.extend_from_slice(program.comments);
+            self.merge_island_comments(program.comments);
             type_parameters = signature_type_parameters;
             parameters = signature_parameters;
         }

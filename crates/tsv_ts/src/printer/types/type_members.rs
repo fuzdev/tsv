@@ -810,7 +810,7 @@ fn method_signature_new_key<'m>(
                 value: ast::LiteralValue::String(cooked),
                 ..
             },
-        ) if cooked.resolve(lit.span, source) == "new" => Some(lit),
+        ) if cooked.resolve(lit.span, source, view) == "new" => Some(lit),
         _ => None,
     }
 }

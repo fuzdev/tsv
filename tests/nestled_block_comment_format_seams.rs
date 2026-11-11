@@ -97,7 +97,7 @@ fn parse_still_reports_two_comments() {
     let arena = bumpalo::Bump::new();
     let program = tsv_ts::__private::parse(source, &arena).unwrap();
     assert_eq!(
-        program.comments.len(),
+        program.view().comments(program.comments).len(),
         2,
         "the wire must keep both comments"
     );

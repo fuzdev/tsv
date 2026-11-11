@@ -388,13 +388,14 @@ pub(super) fn attach_expression_list<'a>(
 /// reproduced at emit time (schema-driven), so it never perturbs the walk.
 pub(super) fn attach_script<'a>(
     script: &ast::Script<'a>,
+    view: AstView<'a>,
     attach: AttachInputs<'a>,
     html_leading_comment: Option<&ast::HtmlComment>,
 ) -> CommentAttach<'a> {
     CommentAttach::new(
         attach.source,
         IslandComments {
-            queue: script.content.comments.iter().collect(),
+            queue: view.comments(script.content.comments).iter().collect(),
             root_parent_end: None,
             root_fallback: true,
             html_leading: html_leading_comment.map(|c| c.content(attach.source)),

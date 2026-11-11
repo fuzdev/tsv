@@ -226,7 +226,7 @@ fn glued_block_sites(source: &str) -> Vec<Site> {
     };
     let bytes = source.as_bytes();
     let mut sites = Vec::new();
-    for c in program.comments {
+    for c in program.view().comments(program.comments) {
         if !c.is_block {
             continue;
         }
@@ -328,9 +328,10 @@ mod tests {
             let src = format!("const a = /*{a}*/ x;\n");
             let arena = bumpalo::Bump::new();
             let program = tsv_ts::__private::parse(&src, &arena).expect("the probe source parses");
-            assert_eq!(program.comments.len(), 1, "width {w}");
+            let comments = program.view().comments(program.comments);
+            assert_eq!(comments.len(), 1, "width {w}");
             assert!(
-                program.comments[0].owned_by_node,
+                comments[0].owned_by_node,
                 "width {w}: a glued annotation must be owned"
             );
         }

@@ -1445,7 +1445,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     fn attribute_key_string(&self, key: &ImportAttributeKey<'arena>) -> String {
         match key {
             ImportAttributeKey::Identifier(id) => match id.escaped_name {
-                Some(s) => s.to_string(),
+                Some(s) => self.stores.view().text(s).to_string(),
                 None => {
                     let start = id.span.start as usize - self.base_offset;
                     self.source[start..start + id.name_len as usize].to_string()

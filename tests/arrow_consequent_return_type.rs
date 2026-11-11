@@ -45,7 +45,7 @@ fn format(source: &str) -> String {
 fn comment_count(source: &str) -> usize {
     let arena = bumpalo::Bump::new();
     let program = tsv_ts::__private::parse(source, &arena).expect("parse failed");
-    program.comments.len()
+    program.view().comments(program.comments).len()
 }
 
 /// The `type` of the node at `pointer`, or `<none>` where nothing is.

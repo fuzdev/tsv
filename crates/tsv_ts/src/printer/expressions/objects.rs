@@ -1136,7 +1136,7 @@ impl<'a> Printer<'a> {
             }
             ExpressionKind::Literal(lit) => match &lit.value {
                 LiteralValue::String(cooked) => {
-                    let content = cooked.resolve(lit.span, self.source);
+                    let content = cooked.resolve(lit.span, self.source, self.view);
                     // For computed keys, quotes are always preserved: ["x"] prints as ['x']
                     // For non-computed keys, valid identifiers are unquoted: {"x":1} → {x:1}
                     // Escape-bearing keys keep their quotes (see `string_key_unquotes`).
@@ -1220,7 +1220,7 @@ impl<'a> Printer<'a> {
                     ..
                 },
             ) => {
-                let content = cooked.resolve(lit.span, self.source);
+                let content = cooked.resolve(lit.span, self.source, self.view);
                 self.build_string_literal_key_doc(lit, content)
             }
             _ => self.build_expression_doc(key),

@@ -2118,7 +2118,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             span.start - self.base_offset as u32,
             span.end - self.base_offset as u32,
         );
-        cooked.resolve(local, self.source)
+        cooked.resolve(local, self.source, self.stores.view())
     }
 
     /// The source text a host `span` covers (the parser's own slice, `base_offset` taken
@@ -2241,7 +2241,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         expected: &str,
     ) -> bool {
         match pid.name.escaped {
-            Some(s) => s == expected,
+            Some(s) => self.stores.view().text(s) == expected,
             None => {
                 let start = span.start as usize + 1 - self.base_offset;
                 let raw = start..start + pid.name.raw_len as usize;
@@ -4136,7 +4136,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(crate) fn parse_expression_with_comments(
         &mut self,
         end: &str,
-    ) -> Result<(ExprId, &'arena [Comment]), Error> {
+    ) -> Result<(ExprId, CommentList<'arena>), Error> {
         let expr = self.parse_expression()?.id();
         self.expect_end_of_input(end)?;
         let comments = self.take_comments();
@@ -4145,7 +4145,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     /// Hand the collected comments to the caller as an arena slice.
     /// Used when parsing expressions that need to return comments to the caller.
-    pub(crate) fn take_comments(&mut self) -> &'arena [Comment] {
+    pub(crate) fn take_comments(&mut self) -> CommentList<'arena> {
         std::mem::replace(&mut self.comments, BumpVec::new_in(self.arena)).into_bump_slice()
     }
 

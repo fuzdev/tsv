@@ -635,7 +635,7 @@ pub(crate) fn is_simple_call_argument(
             // stays source-free.
             let has_newline = view.quasis(template.quasis).iter().any(|q| {
                 q.has_newline
-                    || matches!(&q.cooked, ast::TemplateCooked::Decoded(c) if c.contains('\n'))
+                    || matches!(q.cooked, ast::TemplateCooked::Decoded(c) if view.text(c).contains('\n'))
             });
             if has_newline {
                 return false;

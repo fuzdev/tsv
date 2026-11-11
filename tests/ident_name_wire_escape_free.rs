@@ -318,7 +318,7 @@ fn a_directive_name_claims_span_identity_only_when_clean() {
                 );
             } else {
                 assert_eq!(
-                    channel.escaped,
+                    channel.escaped.map(|text| root.view().text(text)),
                     Some(name),
                     "{source:?}: carried as the escape hatch"
                 );

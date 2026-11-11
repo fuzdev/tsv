@@ -33,7 +33,7 @@ use tsv_lang::store::{Id, ListBuf, ListMark, MarkGroup, Row, Run, Store};
 
 use super::{
     ArrowFunctionExpression, AstView, CatchClause, ClassDeclaration, ClassExpression, ClassMember,
-    Decorator, ExportAllDeclaration, ExportDefaultDeclaration, ExportNamedDeclaration,
+    Comment, Decorator, ExportAllDeclaration, ExportDefaultDeclaration, ExportNamedDeclaration,
     ExportSpecifier, Expression, ForInOfLeft, ForInit, FunctionDeclaration, FunctionExpression,
     Identifier, IdentifierParamExtra, ImportAttribute, ImportDeclaration, ImportSpecifier,
     MetaProperty, ObjectPatternProperty, ObjectProperty, Program, Statement, SwitchCase,
@@ -96,6 +96,18 @@ const _: () = {
     assert!(STORE_CHECK || size_of::<Option<TyId>>() == 4);
     assert!(STORE_CHECK || size_of::<Run<TyId>>() == 8);
 };
+
+/// The family tag of the tree's text pool: the decoded and normalized strings a span of the
+/// source cannot express.
+pub enum Text {}
+
+/// One string of the tree's text — an escaped identifier's decoded name, a string literal's
+/// or a template element's decoded value, a template element's normalized raw text — read
+/// through [`AstView::text`].
+pub type PoolStr<'arena> = &'arena str;
+
+/// A program's comments, read through [`AstView::comments`].
+pub type CommentList<'arena> = &'arena [Comment];
 
 /// Declares the payload stores. Per entry: the row type's family tag and the id the tree holds,
 /// a [`PayloadStores`] field, that field's lines in `new` and `park`, and the [`AstView`]

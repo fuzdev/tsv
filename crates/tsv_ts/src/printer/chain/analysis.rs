@@ -2293,7 +2293,7 @@ mod tests {
             let lines = LineBreaks::new(source, Vec::new());
             let inputs = PrinterInputs {
                 source,
-                comments: program.comments,
+                comments: program.view().comments(program.comments),
                 view: program.view(),
                 line_table: lines.table(),
                 has_owned_comments: false,

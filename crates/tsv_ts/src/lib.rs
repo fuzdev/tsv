@@ -341,7 +341,10 @@ fn format_document_in(
 ) -> String {
     // The printer's comment VIEW: a byte-adjacent indentable pair is one comment (the rule,
     // and why it is a view rather than a parse, is `tsv_lang::merge_nestled_block_comments`).
-    let comments = tsv_lang::merge_nestled_block_comments(source, parsed.program.comments);
+    let comments = tsv_lang::merge_nestled_block_comments(
+        source,
+        parsed.view.comments(parsed.program.comments),
+    );
     // The print-once comment ledger's expectation for this document (diagnostic; see
     // `tsv_lang::comment_ledger`) — the MERGED list, which is the one the printers emit. A
     // Svelte host registers its own `Root.comments`, so an embedded `<script>` never
@@ -571,7 +574,7 @@ fn with_program_printer<R>(
     embed: EmbedContext,
     build: impl FnOnce(&printer::Printer<'_>) -> R,
 ) -> R {
-    let comments = tsv_lang::merge_nestled_block_comments(source, program.comments);
+    let comments = tsv_lang::merge_nestled_block_comments(source, view.comments(program.comments));
     let inputs = PrinterInputs::for_document(source, &comments, view, line_table);
     let mut printer = make_doc_printer(arena, &inputs, embed);
     printer.program_start = program.span.start;

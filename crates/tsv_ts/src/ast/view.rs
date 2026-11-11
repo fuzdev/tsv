@@ -12,8 +12,9 @@ use tsv_lang::store::Run;
 
 use super::stores::{PayloadStores, RunStores};
 use super::{
-    AstStores, CatchClause, CatchId, Deco, Decorator, Expr, ExprId, Expression, ForHeadId, ForInit,
-    IdentifierParamExtra, ParamExtraId, Parsed, Program, Statement, StmtId, TSType, TyId,
+    AstStores, CatchClause, CatchId, Comment, CommentList, Deco, Decorator, Expr, ExprId,
+    Expression, ForHeadId, ForInit, IdentifierParamExtra, ParamExtraId, Parsed, PoolStr, Program,
+    Statement, StmtId, TSType, TyId,
 };
 
 /// The read access every consumer of the tree holds: resolves edges and lists.
@@ -119,6 +120,18 @@ impl<'a> AstView<'a> {
     #[inline]
     pub fn opt_decorators(self, list: Option<Run<Deco>>) -> Option<&'a [Decorator]> {
         list.map(|list| self.decorators(list))
+    }
+
+    /// The text `text` names: a decoded or normalized string of the tree.
+    #[inline]
+    pub fn text(self, text: PoolStr<'a>) -> &'a str {
+        text
+    }
+
+    /// The comments of `list`: a program's.
+    #[inline]
+    pub fn comments(self, list: CommentList<'a>) -> &'a [Comment] {
+        list
     }
 
     /// The payload stores, for the accessors their macro declares beside them.

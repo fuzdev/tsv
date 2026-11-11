@@ -755,7 +755,7 @@ pub(super) fn write_name_field(
     ctx: &Ctx<'_>,
 ) {
     match name.escaped {
-        Some(s) => write_escaped_name_field(w, s),
+        Some(s) => write_escaped_name_field(w, ctx.view.text(s)),
         None => {
             let start = name_start as usize;
             let end = start + name.raw_len as usize;
@@ -919,7 +919,7 @@ fn write_literal_fields(w: &mut JsonWriter, lit: &ast::Literal<'_>, ctx: &Ctx<'_
     match &lit.value {
         ast::LiteralValue::Number(n) => write_number_value(w, *n),
         ast::LiteralValue::String(cooked) => {
-            w.string(cooked.resolve(lit.span, ctx.source));
+            w.string(cooked.resolve(lit.span, ctx.source, ctx.view));
         }
         ast::LiteralValue::BigInt => {
             let decimal = bigint_to_decimal(lit.bigint_digits(ctx.source));
@@ -1268,7 +1268,7 @@ mod tests {
             CommentAttach::new(
                 source,
                 IslandComments {
-                    queue: comments.iter().collect(),
+                    queue: stores.view().comments(comments).iter().collect(),
                     root_parent_end: None,
                     root_fallback: true,
                     html_leading: None,
