@@ -4,10 +4,12 @@
  * The runtime sibling of `ffi.ts` (Deno's `Deno.dlopen` C-FFI path): same engine
  * (`tsv_napi`, built from the same language crates), different binding boundary.
  * Loaded with `process.dlopen`, which accepts the built cdylib directly as an N-API
- * addon — no `.node` rename. The library is the profile-guided addon
+ * addon — no `.node` rename. By default the library is the profile-guided addon
  * `deno task build:bench:pgo` stages (`lib/pgo_bench.ts`): the shipped addon's own
  * pipeline (`scripts/pgo/pgo.ts`), on the workspace's unwinding `napi` profile, so the
- * bench measures what ships — its profile and its panic contract.
+ * bench measures what ships — its profile and its panic contract. A caller that grades
+ * rather than times loads a cargo profile's plain build instead, by passing its path
+ * (`napi_library_path` in `lib/tsv_artifacts.ts`).
  *
  * Unlike FFI there are no raw pointers and no manual free: napi-rs marshals the
  * JS string in and the returned `String` out. `parse_<lang>_json` returns the span-only
@@ -15,9 +17,9 @@
  * is RETURNED in the product's place as `{ok: false, error}`; only an argument refusal, the
  * size cap and a caught panic surface as thrown JS errors (napi-rs converts the
  * `napi::Error`), so there is no status out-param to read (the FFI shape). A Rust PANIC
- * surfaces the same way: every export carries `catch_unwind` and the `napi`
- * profile unwinds, so a panic throws instead of aborting the host (stack
- * overflow excepted — that still aborts).
+ * surfaces the same way: every export catches one and the `napi` profile unwinds, so a
+ * panic throws an `Error` whose message is `panic: <payload>`, the C FFI's text, instead
+ * of aborting the host (stack overflow excepted — that still aborts).
  *
  * The `parse` and `format` rows call the published API over these exports — the
  * packages' facade, wired as the `@fuzdev/tsv` loader wires it
@@ -30,8 +32,8 @@
  */
 
 import { stat } from 'node:fs/promises';
-import { pgo_bench_library_path } from './pgo_bench.ts';
 import { type EngineFailure, type EngineFn, TsvBinding } from './tsv_api.ts';
+import { napi_loaded_path, napi_rebuild_task } from './tsv_artifacts.ts';
 import type { InitScope } from './types.ts';
 
 /**
@@ -52,24 +54,34 @@ export interface NapiAddon {
 	parse_css_json: EngineFn<string | EngineFailure>;
 	parse_internal_css: EngineFn<EngineFailure | undefined>;
 	format_css: EngineFn<string | EngineFailure>;
-	// test-only panic-contract probe — present only when built with the
+	// test-only panic-contract probes — present only when built with the
 	// `panic_probe` cargo feature (`deno task test:napi`); absent in published
-	// builds, so `test_napi.ts` skips its contract test when undefined
+	// builds, so `test_napi.ts` skips its contract test when undefined. The
+	// second panics with a payload that is no string
 	__panic_probe?: () => void;
-}
-
-/** The profile-guided `tsv_napi` cdylib the bench loads (directly, as an N-API addon). */
-export function get_napi_library_path(): string {
-	return pgo_bench_library_path('napi');
+	__panic_probe_any?: () => void;
 }
 
 export class NapiImplementation extends TsvBinding {
+	/**
+	 * @param lib_path - an addon to load in place of the profile-guided one
+	 * (`napi_loaded_path(undefined)`), such as a cargo profile's plain build
+	 * (`napi_library_path(profile)`)
+	 */
+	constructor(lib_path?: string) {
+		super();
+		this.lib_path = lib_path;
+	}
+
+	private readonly lib_path: string | undefined;
+
 	async init(scope?: InitScope): Promise<void> {
-		const path = get_napi_library_path();
+		const path = this.lib_path ?? napi_loaded_path(undefined);
+		const rebuild = this.lib_path === undefined ? napi_rebuild_task(undefined) : `rebuild ${path}`;
 		try {
 			await stat(path);
 		} catch {
-			throw new Error(`N-API addon not found at ${path}. Run 'deno task build:bench:pgo' first.`);
+			throw new Error(`N-API addon not found at ${path}. Run '${rebuild}' first.`);
 		}
 		// `process.dlopen` loads a native addon from any path/extension into the
 		// passed module's `exports` — the supported way to load a `.so`/`.dylib`
@@ -103,6 +115,6 @@ export class NapiImplementation extends TsvBinding {
 		// bindings can't come to disagree about what surfacing a refusal MEANS. And the parse wire is
 		// span-only, so a stale addon whose parse still emits `loc` can't be timed as the
 		// span-only default.
-		this.probe('tsv (N-API)', { path, rebuild: 'deno task build:bench:pgo' }, scope);
+		this.probe('tsv (N-API)', { path, rebuild }, scope);
 	}
 }

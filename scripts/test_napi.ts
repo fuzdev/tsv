@@ -30,11 +30,15 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import { Worker } from 'node:worker_threads';
+import {
+	is_native_panic_error,
+	NAPI_PANIC_PROBE_MESSAGE
+} from '../benches/js/lib/divergence/panic_errors.ts';
 import type { NapiAddon } from '../benches/js/lib/napi.ts';
 import { napi_library_path } from '../benches/js/lib/tsv_artifacts.ts';
 import { create_locator } from '../crates/tsv_wasm/npm/locations.js';
 
-const lib_path = napi_library_path();
+const lib_path = napi_library_path('napi');
 if (!existsSync(lib_path)) {
 	console.error(`tsv_napi addon not found at ${lib_path}. Run 'deno task build:napi' first.`);
 	process.exit(1);
@@ -128,7 +132,7 @@ describe('tsv_napi addon (real N-API JS boundary)', () => {
 		assert.equal(addon.format_typescript(formatted), formatted);
 	});
 
-	// The panic contract: every export carries `catch_unwind` and the addon
+	// The panic contract: every export catches a panic in its body and the addon
 	// builds with the unwinding `napi` profile, so a Rust panic — always a tsv
 	// bug — must surface as a thrown JS error with the process AND the
 	// per-thread arenas still usable, never abort the host. Driven through the
@@ -137,13 +141,40 @@ describe('tsv_napi addon (real N-API JS boundary)', () => {
 	// test skips against one). The probe panics INSIDE `with_ast_arena`, so the
 	// calls after it also prove the take/park arena recovery across the real
 	// boundary.
+	//
+	// The thrown error is an `Error` whose message is exactly `panic: <payload>`, the C
+	// FFI's text, which the corpus tools' panic gate classifies (`is_native_panic_error`,
+	// whose own suite reads the same literal), and whose one own key is napi-rs's `code`,
+	// `'GenericFailure'`.
 	it(
 		'a panic surfaces as a thrown JS error and the addon stays usable',
 		{ skip: addon.__panic_probe === undefined && 'panic_probe feature not built' },
 		() => {
-			assert.throws(() => addon.__panic_probe!(), /panic/i, 'panic must throw');
+			const is_probe_panic = (message: string) => (e: unknown) => {
+				assert.ok(e instanceof Error, 'an Error');
+				assert.equal(e.constructor, Error, 'a plain Error, no subclass');
+				assert.equal(e.message, message);
+				assert.ok(is_native_panic_error(e.message), 'the panic gate classifies it');
+				assert.deepEqual(Object.entries(e), [['code', 'GenericFailure']]);
+				return true;
+			};
+			assert.throws(
+				() => addon.__panic_probe!(),
+				is_probe_panic(NAPI_PANIC_PROBE_MESSAGE),
+				'panic must throw'
+			);
 			// Repeatable: a second panic must also throw, not abort.
-			assert.throws(() => addon.__panic_probe!(), /panic/i, 'second panic must throw');
+			assert.throws(
+				() => addon.__panic_probe!(),
+				is_probe_panic(NAPI_PANIC_PROBE_MESSAGE),
+				'second panic must throw'
+			);
+			// a payload that is no string, as the C FFI renders one
+			assert.throws(
+				() => addon.__panic_probe_any!(),
+				is_probe_panic('panic: <unknown>'),
+				'a non-string payload must throw'
+			);
 			// The process survived and the arenas recovered: parse (AST arena)
 			// and format (AST + doc arenas) still produce correct output.
 			const ast = JSON.parse(addon.parse_typescript_json('const x = 1;') as string);

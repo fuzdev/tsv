@@ -4,9 +4,10 @@
  *
  * The corpus tools build tsv with `--profile corpus` (release + `panic =
  * "unwind"`) precisely so a panic in our code is CAUGHT and reported instead of
- * killing the run: `tsv_ffi`'s `catch_unwind` renders the payload as the error
- * JSON `{"error": "panic: …"}`, which `lib/ffi.ts` re-throws as an ordinary
- * `Error`. That convenience has a trap attached — the SHIPPED artifacts are
+ * killing the run: both native bindings render the payload as `panic: …`
+ * (`tsv_arena::format_panic`) — `tsv_ffi` as the error JSON `{"error": "panic: …"}`,
+ * which `lib/ffi.ts` re-throws as an ordinary `Error`, and `tsv_napi` as the message
+ * of the `Error` it throws. That convenience has a trap attached — the SHIPPED artifacts are
  * built the other way (`release`, `panic = "abort"`), so the same input aborts
  * the host process, and the WASM build reaches its host as a bare
  * `RuntimeError: unreachable`. A caught panic therefore lands in the mildest
@@ -30,13 +31,15 @@
  * carry a multi-line source code frame quoting the corpus file — content that
  * must never be able to fabricate a panic verdict.
  *
- * Three shapes, one producible today:
- *  - `panic: …` — `tsv_ffi`'s `format_panic` under `catch_unwind`, which
- *    `tsv_debug loc_wires --stdin` (the parse tool's loc arm) spells the same; the
- *    only shape either corpus tool can currently see.
- *  - `… panicked at …` — Rust's own panic-hook text, for a boundary that
- *    forwards the hook's line rather than the payload (the N-API binding, once
- *    its panic contract lands — 0.4).
+ * Three shapes:
+ *  - `panic: …` — a caught panic from either native binding (`tsv_arena::format_panic`:
+ *    `tsv_ffi`'s error payload, the message `tsv_napi`'s exports throw), and from
+ *    `tsv_debug loc_wires --stdin` (the parse tool's loc arm), whose client prefixes the
+ *    payload the same way; the shape both corpus tools see. A panic inside napi-rs's own
+ *    argument or return conversion, outside the addon's catch, is thrown by napi-rs's
+ *    `catch_unwind` backstop with the bare payload, which no pattern here matches.
+ *  - `… panicked at …` — Rust's own panic-hook text, for a boundary that forwards
+ *    the hook's line rather than the payload; no tsv binding does.
  *  - `RuntimeError: unreachable` — how a `panic = "abort"` WASM build's trap
  *    reaches a JS host.
  */
@@ -49,3 +52,11 @@ export function is_native_panic_error(message: string | null | undefined): boole
 		first_line.startsWith('RuntimeError: unreachable')
 	);
 }
+
+/**
+ * The message `tsv_napi`'s test-only `__panic_probe` export throws (the `panic_probe`
+ * cargo feature): `panic: ` and the probe's payload. `scripts/test_napi.ts` asserts the
+ * built addon throws exactly this and `panic_errors_test.ts` that it classifies, so the
+ * addon's text and the classifier read one literal.
+ */
+export const NAPI_PANIC_PROBE_MESSAGE = 'panic: tsv_napi panic probe';

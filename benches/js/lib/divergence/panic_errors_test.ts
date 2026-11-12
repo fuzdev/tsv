@@ -2,9 +2,10 @@
  * Tests for panic classification (`is_native_panic_error`).
  *
  * Pins the two directions that matter, since the verdict hard-fails a corpus run:
- *  - every shape a crossed binding boundary can produce classifies (the FFI
- *    `panic:` payload is the live one; the hook text and the WASM trap are the
- *    napi/WASM boundaries), and
+ *  - every shape a crossed binding boundary can produce classifies (the
+ *    `panic:` payload both native bindings report — the N-API probe's message is
+ *    the one `scripts/test_napi.ts` holds the built addon to; the hook text; the
+ *    WASM trap), and
  *  - an ordinary rejection does NOT — including one whose source code frame
  *    quotes a corpus file that itself talks about panics, the only way file
  *    content could otherwise fabricate a crash verdict.
@@ -12,11 +13,12 @@
 
 import { deepStrictEqual as assertEquals } from 'node:assert';
 import { test } from 'vitest';
-import { is_native_panic_error } from './panic_errors.ts';
+import { is_native_panic_error, NAPI_PANIC_PROBE_MESSAGE } from './panic_errors.ts';
 
 const panics: Array<[string, string]> = [
 	['ffi catch_unwind payload', 'panic: byte index 3 is not a char boundary'],
-	['ffi unknown payload', 'panic: <unknown>'],
+	['native unknown payload', 'panic: <unknown>'],
+	['napi probe message', NAPI_PANIC_PROBE_MESSAGE],
 	['rust panic hook line', "thread '<unnamed>' panicked at crates/tsv_ts/src/lexer/mod.rs:42:9"],
 	['wasm abort trap', 'RuntimeError: unreachable']
 ];

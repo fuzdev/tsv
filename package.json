@@ -19,6 +19,7 @@
 		"build:npm:all": "wasm-pack build crates/tsv_wasm --target web --release --out-dir pkg/all/npm && node scripts/roots/patch_npm_package.ts all",
 		"build:pgo": "node scripts/pgo/pgo.ts all --ffi --reuse",
 		"build:bench:pgo": "node scripts/roots/pgo_bench.ts",
+		"build:napi:corpus": "node scripts/roots/cargo_build.ts -p tsv_napi --profile corpus",
 		"install-cli": "cargo build --release -p tsv_cli && mkdir -p ~/.local/bin && cp target/release/tsv ~/.local/bin/tsv",
 		"clean": "cargo clean",
 		"dev": "cargo watch -x 'check --workspace' -x 'test --workspace' || echo '⚠️  cargo-watch not installed. Run: cargo install cargo-watch'",

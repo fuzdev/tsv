@@ -1278,7 +1278,10 @@ measuring a binary older than current source. `lib/check_artifact_freshness.ts` 
 before a run touches the executed artifacts (the runtime's native binding + WASM bundle — Deno:
 FFI + `pkg/all/deno`; Node: N-API + `pkg/all/nodejs`, the pair `check_executed_artifacts` composes
 for bench and smoke alike; the corpus tools run no WASM, so they guard `native_artifact_check()`
-alone), it compares their mtimes against the crate sources feeding them (plus the workspace
+alone; under Node a caller that loads a cargo profile's plain addon names the profile, a parameter
+rather than a variable, to the guard and the loader alike — `native_artifact_check(profile)` and
+`NapiImplementation(napi_library_path(profile))`, which `init_implementations({native_profile})`
+pairs — so the two cannot grade and load different files), it compares their mtimes against the crate sources feeding them (plus the workspace
 `Cargo.toml` and `Cargo.lock`, so a profile edit or a dependency bump trips it too — one list,
 `newest_workspace_file_mtime`, for this guard and its two siblings) and **aborts (exit 1)** if any
 is stale or missing.

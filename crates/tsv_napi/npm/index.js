@@ -27,9 +27,9 @@
  * loader, so the platform addon itself is always `require`d, through
  * `createRequire`; that shim is the only CommonJS left here.
  *
- * A Rust panic — always a tsv bug — surfaces as a thrown JS error (the addon
- * builds with an unwinding profile and `catch_unwind` on every export); stack
- * overflow is the one crash that still aborts the host.
+ * A Rust panic — always a tsv bug — surfaces as a thrown JS `Error` whose message
+ * is `panic: <payload>` (the addon builds with an unwinding profile and catches a
+ * panic in every export); stack overflow is the one crash that still aborts the host.
  */
 
 import { createRequire } from 'node:module';

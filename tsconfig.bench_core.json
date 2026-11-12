@@ -30,6 +30,8 @@
 		"benches/js/lib/parse_divergences.ts",
 		"benches/js/lib/perf_omit.ts",
 		"benches/js/lib/prettier_fixtures.ts",
+		"benches/js/lib/tsv_artifacts.ts",
+		"benches/js/lib/check_artifact_freshness.ts",
 		"benches/js/lib/loc_cross_grade.ts"
 	]
 }

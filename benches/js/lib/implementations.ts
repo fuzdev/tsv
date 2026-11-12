@@ -26,6 +26,7 @@ import { NativeImplementation } from './ffi.ts';
 import { NapiImplementation } from './napi.ts';
 import { WasmImplementation } from './wasm.ts';
 import { current_runtime } from './runtime.ts';
+import { napi_library_path } from './tsv_artifacts.ts';
 import { OxcImplementation } from './oxc.ts';
 import { OxcRawImplementation } from './oxc_raw.ts';
 import { OxcWasmImplementation } from './oxc_wasm.ts';
@@ -202,6 +203,13 @@ export interface InitializedImplementations extends ImplementationSet {
 export interface InitOptions {
 	/** Logger for status messages */
 	logger?: Logger;
+	/**
+	 * Under Node/Bun, the cargo profile whose plain N-API addon `native` loads
+	 * (`napi_library_path`), freshness-guarded as that build; none loads the profile-guided
+	 * addon the bench measures. Refused under Deno, whose C-FFI library follows
+	 * `TSV_FFI_PROFILE` (`native_artifact_check`).
+	 */
+	native_profile?: string;
 }
 
 // Deliberately NOT surface-scoped: every impl initializes on every run, including
@@ -332,9 +340,9 @@ async function init_optional<T extends { init: () => Promise<void> }>(
 export async function init_implementations(
 	options: InitOptions = {}
 ): Promise<InitializedImplementations> {
-	const { logger = console.log } = options;
+	const { logger = console.log, native_profile } = options;
 
-	await check_executed_artifacts();
+	await check_executed_artifacts(native_profile);
 
 	// Load all versions once from package.json
 	const versions = await load_all_versions();
@@ -346,7 +354,7 @@ export async function init_implementations(
 	// the subset whose `init()` took. Inlining these into the `optional(...)` calls
 	// would leave a failed impl's instance unreachable, and with it the only
 	// non-hand-written answer to which rows its absence removed (`complete`).
-	const complete = construct_implementations(versions);
+	const complete = construct_implementations(versions, native_profile);
 	const { canonical, native, wasm } = complete;
 
 	logger('Initializing implementations...');
@@ -470,15 +478,26 @@ export async function init_implementations(
  * `init()` runs. The two callers read it opposite ways — `init_implementations`
  * initializes every slot (and keeps this as its `complete` view), `init_row_task`
  * exactly one.
+ *
+ * @param native_profile - `InitOptions.native_profile`, read by the Node/Bun branch; a
+ * Deno caller's has already been refused by the freshness guard
  */
-function construct_implementations(versions: AllVersions): ConstructedImplementations {
+function construct_implementations(
+	versions: AllVersions,
+	native_profile?: string
+): ConstructedImplementations {
 	return {
 		versions,
 		canonical: new CanonicalImplementation(versions.canonical),
 		// The native path is runtime-specific: Deno loads the C-FFI library via
 		// Deno.dlopen; Node/Bun load the N-API addon via process.dlopen. Same engine,
 		// different binding boundary — one is instantiated per runtime.
-		native: current_runtime() === 'deno' ? new NativeImplementation() : new NapiImplementation(),
+		native:
+			current_runtime() === 'deno'
+				? new NativeImplementation()
+				: new NapiImplementation(
+						native_profile === undefined ? undefined : napi_library_path(native_profile)
+					),
 		wasm: new WasmImplementation(),
 		oxc: new OxcImplementation(versions.oxc),
 		oxc_wasm: new OxcWasmImplementation(versions.oxc_wasm),

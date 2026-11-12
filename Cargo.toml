@@ -296,9 +296,9 @@ debug-assertions = true
 overflow-checks = true
 
 # The N-API artifact's profile: full `release` optimization plus an unwinding
-# panic strategy. `tsv_napi`'s exports carry `#[napi(catch_unwind)]`, converting
-# a Rust panic into a thrown JS error — but only an unwinding profile makes the
-# catch reachable (under `panic = "abort"` the attribute is inert and a panic
+# panic strategy. `tsv_napi`'s exports catch a Rust panic and throw it as a JS
+# error — but only an unwinding profile makes the catch reachable (under
+# `panic = "abort"` the catch is inert and a panic
 # kills the HOST process: the consumer's dev server, CI step, or editor). It's a
 # named profile because `panic` cannot be overridden per-package, and flipping
 # `[profile.release]` itself would perturb the size-bounded WASM bundles and the

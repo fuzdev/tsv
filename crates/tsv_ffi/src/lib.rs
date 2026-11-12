@@ -52,7 +52,9 @@ use std::slice;
 // `catch_unwind`-caught panic). The goal-axis macros and every export body
 // (`parse_convert!`, `parse_internal!`, `parse_format!`) come from the same crate, so
 // the three bindings share ONE definition of which languages have a goal and of what
-// each export does, rather than three hand-synced copies.
+// each export does, rather than three hand-synced copies; a caught panic's text is the
+// crate's `format_panic`, the one `tsv_napi` throws.
+use tsv_arena::format_panic;
 #[cfg(feature = "format")]
 use tsv_arena::parse_format;
 #[cfg(test)]
@@ -120,17 +122,6 @@ unsafe fn with_extracted_source(
         Ok(s) => f(s),
         // SAFETY: out-param validity is the caller's contract, forwarded.
         Err(e) => unsafe { error_result(&format!("Invalid UTF-8: {e}"), out_len, out_status) },
-    }
-}
-
-/// Format a panic payload into a string for error reporting.
-fn format_panic(payload: &(dyn std::any::Any + Send)) -> String {
-    if let Some(s) = payload.downcast_ref::<&str>() {
-        format!("panic: {s}")
-    } else if let Some(s) = payload.downcast_ref::<String>() {
-        format!("panic: {s}")
-    } else {
-        "panic: <unknown>".to_string()
     }
 }
 
@@ -854,19 +845,6 @@ mod tests {
 
         // the same thread formats normally afterwards, through the real export
         assert_eq!(call(tsv_format_typescript, source), "const x = 1;\n");
-    }
-
-    // --- format_panic renders each payload variant (pure, no panic needed) ---
-
-    #[test]
-    fn format_panic_renders_payload_variants() {
-        use std::any::Any;
-        let as_str: Box<dyn Any + Send> = Box::new("boom");
-        assert_eq!(format_panic(&*as_str), "panic: boom");
-        let owned: Box<dyn Any + Send> = Box::new(String::from("kaboom"));
-        assert_eq!(format_panic(&*owned), "panic: kaboom");
-        let other: Box<dyn Any + Send> = Box::new(42i32);
-        assert_eq!(format_panic(&*other), "panic: <unknown>");
     }
 
     // --- multibyte sources survive the UTF-8 / char-offset marshalling boundary ---

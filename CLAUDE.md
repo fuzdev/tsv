@@ -147,7 +147,8 @@ deno task test:node      # vitest under Node over the suites beside their module
 #                          detectors, and each one against its own committed fixtures read through a read-only handle
 #                          (`divergence/fixture_coverage_test.ts`), format-config probe, span-only wire probe, gate_counts, bench pass plan, perf-omit
 #                          summary, Prettier-suite filter, loc tolerance rows, parse diff engine + divergence matchers, NDJSON
-#                          reader, the `tsv_debug` client over a fake child, the harvest stamps over fakes, the fixture reads
+#                          reader, the `tsv_debug` client over a fake child, the harvest stamps over fakes, the N-API addon's
+#                          path, rebuild hint and freshness check per profile, the fixture reads
 #                          over a temp tree, and `divergence:audit`'s, `bench:compose`'s and `corpus:stats`' libraries over
 #                          fakes: exit codes, streams, reads, writes) + scripts/'s (`release/changelog_test.ts` — the changelog grammar publish.ts writes and
 #                          release_notes.ts reads; `release/version_test.ts` + `release/plan_test.ts` — the version grammar and
@@ -402,7 +403,7 @@ Three binding crates:
 
 - `tsv_ffi` (C ABI) — any FFI (Deno, Python, etc.); `libtsv_ffi.so` / `.dylib` / `.dll`
 - `tsv_wasm` (wasm-bindgen) — browser, Deno, Node; format / parse / all variants via cargo features
-- `tsv_napi` (napi-rs) — Node.js / Bun native addon (`libtsv_napi.*`, loaded via `process.dlopen`), built with the `napi` profile (`release` + `panic = "unwind"` → `target/napi/`; every export is `catch_unwind`, so a panic throws a JS error instead of aborting the host). Its npm surface (`@fuzdev/tsv`, wasm-API-parity by contract) is in [Publishing](#publishing); tested per OS by `test:napi:npm`; expected to eventually subsume the WASM native path. See ./crates/tsv_napi/CLAUDE.md.
+- `tsv_napi` (napi-rs) — Node.js / Bun native addon (`libtsv_napi.*`, loaded via `process.dlopen`), built with the `napi` profile (`release` + `panic = "unwind"` → `target/napi/`; every export catches a panic, so it throws a JS `Error` whose message is `panic: <payload>`, the C FFI's text, instead of aborting the host). Its npm surface (`@fuzdev/tsv`, wasm-API-parity by contract) is in [Publishing](#publishing); tested per OS by `test:napi:npm`; expected to eventually subsume the WASM native path. See ./crates/tsv_napi/CLAUDE.md.
 
 `tsv_wasm` produces three npm packages from one crate via the `format` + `parse` + `strip` + `imports` cargo features (default = all four): `@fuzdev/tsv-format-wasm`, `@fuzdev/tsv-parse-wasm`, and `@fuzdev/tsv-wasm` (everything — the type strip's `strip_typescript` and the import records' `parse_imports_typescript` / `parse_imports_svelte` included — + the `tsv` CLI), each with its own output directory. `tsv_napi` carries the same `strip` and `imports` features in its default set; `tsv_ffi` has neither.
 
@@ -410,6 +411,7 @@ Three binding crates:
 deno task build:ffi                  # C FFI, full → target/release/libtsv_ffi.so
 deno task build:ffi:format           # C FFI, format-only (size only) → target/ffi-format/release/ (also :parse; :all builds all three)
 deno task build:napi                 # N-API addon (napi profile) → target/napi/
+deno task build:napi:corpus          # N-API addon (corpus profile: unwind, no LTO) → target/corpus/, for tools that grade under Node
 deno task build:napi:packages        # + staged npm packages (loader + host platform pkg) → crates/tsv_napi/pkg/
 deno task build:pgo                  # the PROFILE-GUIDED pair the platform packages ship (CLI + addon), trained, gated and
 #                                      staged where build:napi:packages stages the plain pair (scripts/pgo/pgo.ts; .pgo/)

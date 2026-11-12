@@ -17,14 +17,17 @@
 //! (`napi::Error`). `parse_internal_<lang>` parses without converting (benchmark-only, AST
 //! kept live via `black_box`).
 //!
-//! **Panic contract**: every export carries `#[napi(catch_unwind)]`, and the
+//! **Panic contract**: every export runs its body through [`catch_panic`], and the
 //! addon builds with the workspace `napi` profile (`release` + `panic =
 //! "unwind"`), so a Rust panic — always a tsv bug — surfaces as a thrown JS
-//! error rather than aborting the host process, and the per-thread arenas stay
-//! usable afterwards (`tsv_arena`'s take/park protocol leaves the slot empty
-//! while a call runs, so unwind and abort converge on the same state). The
-//! attribute is inert without the unwinding profile — both halves are required.
-//! Stack overflow is NOT catchable and still aborts the host.
+//! `Error` whose message is `panic: <payload>`, the text the C FFI reports
+//! (`tsv_arena::format_panic`), rather than aborting the host process, and the
+//! per-thread arenas stay usable afterwards (`tsv_arena`'s take/park protocol leaves
+//! the slot empty while a call runs, so unwind and abort converge on the same state).
+//! Each export also carries `#[napi(catch_unwind)]`, the backstop for a panic in
+//! napi-rs's own conversions. Neither catch is reachable without the unwinding
+//! profile — both halves are required. Stack overflow is NOT catchable and still
+//! aborts the host.
 //!
 //! Built as a `cdylib` and loaded by Node as a `.node` addon. The `format` /
 //! `parse` cargo features gate which entry points are emitted (mirrors
@@ -216,6 +219,43 @@ fn plain_error(env: Env, message: &str) -> napi::Error {
     built.unwrap_or_else(|_| napi::Error::from_reason(message))
 }
 
+/// Run an export's whole body, a caught panic thrown as `panic: <payload>`
+/// (`tsv_arena::format_panic`, the text `tsv_ffi` reports), so a caller that classifies a
+/// failure as a crash reads one prefix from either native binding. Every `#[napi]` export
+/// in this crate calls it around everything it does, so a panic anywhere in tsv's code
+/// reaches the host as that text.
+///
+/// The thrown error is what napi-rs builds from a `napi::Error`: an `Error` whose own
+/// `code` is `'GenericFailure'`, as the `#[napi(catch_unwind)]` attribute's own catch
+/// builds it. Only the message differs from that catch's, which takes the bare payload
+/// (and `panic from Rust code: …` for a non-string one); the attribute stays on every
+/// export as the backstop for a panic in napi-rs's own argument and return conversions,
+/// outside this catch. Both need the unwinding profile (`napi`, or `corpus` for the
+/// corpus tools' build): under an aborting one neither is reachable.
+///
+/// `AssertUnwindSafe`: the per-thread arenas recover by construction (`tsv_arena`'s
+/// take/park), and an `IgnoreStack` method that panics part way through a push leaves
+/// that stack as the panic left it, as the attribute's catch did. A panic is a tsv bug
+/// either way, reported rather than repaired.
+fn catch_panic<T>(body: impl FnOnce() -> napi::Result<T>) -> napi::Result<T> {
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(body))
+        .unwrap_or_else(|payload| Err(napi::Error::from_reason(tsv_arena::format_panic(&*payload))))
+}
+
+/// An engine export's body over its engine half (see `lang_bindings!`): the product, or the
+/// failure handed back in its place ([`Failure::into_napi`]), with a panic caught by
+/// [`catch_panic`].
+#[cfg(feature = "_internal_exports")]
+fn engine_export<T>(
+    env: &Env,
+    engine: impl FnOnce() -> Result<T, Failure>,
+) -> napi::Result<Either<T, Object<'_>>> {
+    catch_panic(|| match engine() {
+        Ok(product) => Ok(Either::A(product)),
+        Err(failure) => failure.into_napi(env).map(Either::B),
+    })
+}
+
 /// Generate `parse_<lang>_json` / `parse_internal_<lang>` / `format_<lang>` N-API
 /// functions for one language module. The `js_name` literals keep the JS export
 /// names snake_case for parity with `tsv_wasm` (napi-rs would otherwise camelCase
@@ -308,10 +348,7 @@ macro_rules! lang_bindings {
             source: String,
             source_type: Option<String>,
         ) -> napi::Result<Either<String, Object<'_>>> {
-            match $engine::parse_json(&source, source_type) {
-                Ok(json) => Ok(Either::A(json)),
-                Err(failure) => failure.into_napi(env).map(Either::B),
-            }
+            engine_export(env, || $engine::parse_json(&source, source_type))
         }
 
         /// Parse source to the internal AST only (no conversion, no
@@ -324,10 +361,7 @@ macro_rules! lang_bindings {
             source: String,
             source_type: Option<String>,
         ) -> napi::Result<Either<Undefined, Object<'_>>> {
-            match $engine::parse_internal(&source, source_type) {
-                Ok(()) => Ok(Either::A(())),
-                Err(failure) => failure.into_napi(env).map(Either::B),
-            }
+            engine_export(env, || $engine::parse_internal(&source, source_type))
         }
 
         /// Format source code and return the formatted string. The source type
@@ -341,10 +375,7 @@ macro_rules! lang_bindings {
             source: String,
             source_type: Option<String>,
         ) -> napi::Result<Either<String, Object<'_>>> {
-            match $engine::format(&source, source_type) {
-                Ok(code) => Ok(Either::A(code)),
-                Err(failure) => failure.into_napi(env).map(Either::B),
-            }
+            engine_export(env, || $engine::format(&source, source_type))
         }
     };
 }
@@ -424,10 +455,7 @@ pub fn strip_typescript(
     source: String,
     source_type: Option<String>,
 ) -> napi::Result<Either<String, Object<'_>>> {
-    match strip_typescript_engine(&source, source_type) {
-        Ok(code) => Ok(Either::A(code)),
-        Err(failure) => failure.into_napi(env).map(Either::B),
-    }
+    engine_export(env, || strip_typescript_engine(&source, source_type))
 }
 
 /// The engine half of `parse_imports_typescript` (see `lang_bindings!` for the split): the
@@ -466,10 +494,9 @@ pub fn parse_imports_typescript(
     source: String,
     source_type: Option<String>,
 ) -> napi::Result<Either<String, Object<'_>>> {
-    match parse_imports_typescript_engine(&source, source_type) {
-        Ok(json) => Ok(Either::A(json)),
-        Err(failure) => failure.into_napi(env).map(Either::B),
-    }
+    engine_export(env, || {
+        parse_imports_typescript_engine(&source, source_type)
+    })
 }
 
 /// The import records of a Svelte component (`tsv_svelte::parse_imports`), as
@@ -482,10 +509,7 @@ pub fn parse_imports_svelte(
     source: String,
     source_type: Option<String>,
 ) -> napi::Result<Either<String, Object<'_>>> {
-    match parse_imports_svelte_engine(&source, source_type) {
-        Ok(json) => Ok(Either::A(json)),
-        Err(failure) => failure.into_napi(env).map(Either::B),
-    }
+    engine_export(env, || parse_imports_svelte_engine(&source, source_type))
 }
 
 //
@@ -531,55 +555,75 @@ impl IgnoreStack {
     // `allow`, not `expect`: the lint fires without it, but through the `#[napi]` expansion
     // an expectation never registers as fulfilled.
     #[allow(clippy::new_without_default)] // napi exports the constructor
-    pub fn new() -> IgnoreStack {
-        IgnoreStack {
-            inner: tsv_ignore::IgnoreStack::new(),
-        }
+    pub fn new() -> napi::Result<IgnoreStack> {
+        catch_panic(|| {
+            Ok(IgnoreStack {
+                inner: tsv_ignore::IgnoreStack::new(),
+            })
+        })
     }
 
     /// Push one directory's `.gitignore`. `anchor` is the directory relative to
     /// the format root, `/`-separated (`""` = the root). Push shallowest-first.
     #[napi(js_name = "push_gitignore", catch_unwind)]
-    pub fn push_gitignore(&mut self, anchor: String, content: String) {
-        self.inner.push_gitignore(&anchor, &content);
+    pub fn push_gitignore(&mut self, anchor: String, content: String) -> napi::Result<()> {
+        catch_panic(|| {
+            self.inner.push_gitignore(&anchor, &content);
+            Ok(())
+        })
     }
 
     /// Pop the most recently pushed `.gitignore` layer (a traversal unwinding
     /// out of a directory).
     #[napi(js_name = "pop_gitignore", catch_unwind)]
-    pub fn pop_gitignore(&mut self) {
-        self.inner.pop_gitignore();
+    pub fn pop_gitignore(&mut self) -> napi::Result<()> {
+        catch_panic(|| {
+            self.inner.pop_gitignore();
+            Ok(())
+        })
     }
 
     /// Push one directory's `.formatignore` as an override layer, applied after every
     /// `.gitignore`. `anchor` is the directory relative to the format root (`""` = root).
     #[napi(js_name = "push_formatignore", catch_unwind)]
-    pub fn push_formatignore(&mut self, anchor: String, content: String) {
-        self.inner.push_formatignore(&anchor, &content);
+    pub fn push_formatignore(&mut self, anchor: String, content: String) -> napi::Result<()> {
+        catch_panic(|| {
+            self.inner.push_formatignore(&anchor, &content);
+            Ok(())
+        })
     }
 
     /// Push one directory's `.prettierignore` as an override layer — the file read, inside a
     /// repo, in a directory with no `.formatignore`. Matched exactly as a `.formatignore`
     /// layer is; what differs is the file a warning about one of its rules names.
     #[napi(js_name = "push_prettierignore", catch_unwind)]
-    pub fn push_prettierignore(&mut self, anchor: String, content: String) {
-        self.inner.push_prettierignore(&anchor, &content);
+    pub fn push_prettierignore(&mut self, anchor: String, content: String) -> napi::Result<()> {
+        catch_panic(|| {
+            self.inner.push_prettierignore(&anchor, &content);
+            Ok(())
+        })
     }
 
     /// Pop the most recently pushed override layer (a traversal unwinding out of a
     /// directory).
     #[napi(js_name = "pop_override", catch_unwind)]
-    pub fn pop_override(&mut self) {
-        self.inner.pop_override();
+    pub fn pop_override(&mut self) -> napi::Result<()> {
+        catch_panic(|| {
+            self.inner.pop_override();
+            Ok(())
+        })
     }
 
     /// Whether `path` (relative to the format root, `/`-separated) is ignored;
     /// `is_dir` marks directories so trailing-`/` patterns apply — a symbolic link is
     /// not one, whatever it points at, as git reads one.
     #[napi(js_name = "is_ignored", catch_unwind)]
-    pub fn is_ignored(&self, path: String, is_dir: bool) -> bool {
-        self.inner
-            .is_ignored(&path, tsv_ignore::PathKind::from_is_dir(is_dir))
+    pub fn is_ignored(&self, path: String, is_dir: bool) -> napi::Result<bool> {
+        catch_panic(|| {
+            Ok(self
+                .inner
+                .is_ignored(&path, tsv_ignore::PathKind::from_is_dir(is_dir)))
+        })
     }
 
     /// The discovery verdict for one child **directory**, delegating to
@@ -595,22 +639,24 @@ impl IgnoreStack {
     /// the common descend path, and both packages' declarations name the three tags, so
     /// the two type-check interchangeably.
     #[napi(js_name = "classify_dir", catch_unwind)]
-    pub fn classify_dir(&self, child_rel: String, heuristic_active: bool) -> String {
-        tsv_discover::classify_dir(
-            &child_rel,
-            tsv_discover::BuildOutputHeuristic::from_active(heuristic_active),
-            &self.inner,
-        )
-        .as_tag()
-        .to_string()
+    pub fn classify_dir(&self, child_rel: String, heuristic_active: bool) -> napi::Result<String> {
+        catch_panic(|| {
+            Ok(tsv_discover::classify_dir(
+                &child_rel,
+                tsv_discover::BuildOutputHeuristic::from_active(heuristic_active),
+                &self.inner,
+            )
+            .as_tag()
+            .to_string())
+        })
     }
 
     /// Whether a child **file** should be formatted (a formattable extension and
     /// not ignored). `child_rel` is the file's format-root-relative `/`-separated path
     /// (its last segment the name).
     #[napi(js_name = "should_format_file", catch_unwind)]
-    pub fn should_format_file(&self, child_rel: String) -> bool {
-        tsv_discover::should_format_file(&child_rel, &self.inner)
+    pub fn should_format_file(&self, child_rel: String) -> napi::Result<bool> {
+        catch_panic(|| Ok(tsv_discover::should_format_file(&child_rel, &self.inner)))
     }
 
     /// Whether `rel` (a format-root-relative file path) is skipped because some
@@ -621,8 +667,8 @@ impl IgnoreStack {
     /// `.gitignore` anchors, so it takes no extra arguments. Pair with
     /// `is_ignored(rel, false)` for the file-level match.
     #[napi(js_name = "is_path_pruned", catch_unwind)]
-    pub fn is_path_pruned(&self, rel: String) -> bool {
-        tsv_discover::is_path_pruned(&rel, &self.inner)
+    pub fn is_path_pruned(&self, rel: String) -> napi::Result<bool> {
+        catch_panic(|| Ok(tsv_discover::is_path_pruned(&rel, &self.inner)))
     }
 
     /// The shadow warning a walk raises on the way down to `rel` (a format-root-relative
@@ -637,12 +683,14 @@ impl IgnoreStack {
         &self,
         rel: String,
         loose_root: Option<String>,
-    ) -> Either<String, Undefined> {
-        or_undefined(tsv_discover::path_shadow_warning(
-            &rel,
-            loose_root.as_deref(),
-            &self.inner,
-        ))
+    ) -> napi::Result<Either<String, Undefined>> {
+        catch_panic(|| {
+            Ok(or_undefined(tsv_discover::path_shadow_warning(
+                &rel,
+                loose_root.as_deref(),
+                &self.inner,
+            )))
+        })
     }
 
     /// The argument error for an explicitly named **file** whose extension tsv
@@ -653,8 +701,15 @@ impl IgnoreStack {
     /// rendered extension list, so `npm/cli.js` never hand-mirrors
     /// `FORMATTABLE_EXTENSIONS`.
     #[napi(js_name = "unsupported_extension_error", catch_unwind)]
-    pub fn unsupported_extension_error(&self, path: String) -> Either<String, Undefined> {
-        or_undefined(tsv_discover::unsupported_extension_error(&path))
+    pub fn unsupported_extension_error(
+        &self,
+        path: String,
+    ) -> napi::Result<Either<String, Undefined>> {
+        catch_panic(|| {
+            Ok(or_undefined(tsv_discover::unsupported_extension_error(
+                &path,
+            )))
+        })
     }
 
     /// The shadow warning text for a pruned directory `dir` (format-root relative) — pruned
@@ -668,12 +723,14 @@ impl IgnoreStack {
         &self,
         dir: String,
         loose_root: Option<String>,
-    ) -> Either<String, Undefined> {
-        or_undefined(tsv_discover::shadow_warning(
-            &dir,
-            loose_root.as_deref(),
-            &self.inner,
-        ))
+    ) -> napi::Result<Either<String, Undefined>> {
+        catch_panic(|| {
+            Ok(or_undefined(tsv_discover::shadow_warning(
+                &dir,
+                loose_root.as_deref(),
+                &self.inner,
+            )))
+        })
     }
 
     /// The `.prettierignore`-outside-a-repo warning for the target root `dir`
@@ -689,15 +746,19 @@ impl IgnoreStack {
         in_repo: bool,
         has_prettierignore: bool,
         has_formatignore: bool,
-    ) -> Either<String, Undefined> {
-        or_undefined(tsv_discover::prettierignore_outside_repo_warning(
-            &dir,
-            tsv_discover::DirIgnoreFiles {
-                in_repo,
-                formatignore: has_formatignore,
-                prettierignore: has_prettierignore,
-            },
-        ))
+    ) -> napi::Result<Either<String, Undefined>> {
+        catch_panic(|| {
+            Ok(or_undefined(
+                tsv_discover::prettierignore_outside_repo_warning(
+                    &dir,
+                    tsv_discover::DirIgnoreFiles {
+                        in_repo,
+                        formatignore: has_formatignore,
+                        prettierignore: has_prettierignore,
+                    },
+                ),
+            ))
+        })
     }
 
     /// The heads-up when, inside a git repo, a directory holds both a
@@ -711,23 +772,25 @@ impl IgnoreStack {
         in_repo: bool,
         has_prettierignore: bool,
         has_formatignore: bool,
-    ) -> Either<String, Undefined> {
-        or_undefined(tsv_discover::prettierignore_shadowed_warning(
-            &dir,
-            tsv_discover::DirIgnoreFiles {
-                in_repo,
-                formatignore: has_formatignore,
-                prettierignore: has_prettierignore,
-            },
-        ))
+    ) -> napi::Result<Either<String, Undefined>> {
+        catch_panic(|| {
+            Ok(or_undefined(tsv_discover::prettierignore_shadowed_warning(
+                &dir,
+                tsv_discover::DirIgnoreFiles {
+                    in_repo,
+                    formatignore: has_formatignore,
+                    prettierignore: has_prettierignore,
+                },
+            )))
+        })
     }
 
     /// The warning for an in-tree `.gitignore` that is a symbolic link — which git does
     /// not follow, so its rules are not applied. `path` is the link's path. Single source
     /// of truth with the native CLI — the JS CLI never templates this string.
     #[napi(js_name = "gitignore_symlink_warning", catch_unwind)]
-    pub fn gitignore_symlink_warning(&self, path: String) -> String {
-        tsv_discover::gitignore_symlink_warning(&path)
+    pub fn gitignore_symlink_warning(&self, path: String) -> napi::Result<String> {
+        catch_panic(|| Ok(tsv_discover::gitignore_symlink_warning(&path)))
     }
 
     /// The warning for a path an argument named — a file, or a directory root — that an
@@ -744,22 +807,24 @@ impl IgnoreStack {
         rel: String,
         is_dir: bool,
         loose_root: Option<String>,
-    ) -> Either<String, Undefined> {
-        or_undefined(tsv_discover::excluded_argument_warning(
-            &display,
-            &rel,
-            tsv_ignore::PathKind::from_is_dir(is_dir),
-            loose_root.as_deref(),
-            &self.inner,
-        ))
+    ) -> napi::Result<Either<String, Undefined>> {
+        catch_panic(|| {
+            Ok(or_undefined(tsv_discover::excluded_argument_warning(
+                &display,
+                &rel,
+                tsv_ignore::PathKind::from_is_dir(is_dir),
+                loose_root.as_deref(),
+                &self.inner,
+            )))
+        })
     }
 
     /// The traversal error for a relative directory root the working directory cannot
     /// resolve (it was deleted). The receiver is unused — the refusal comes before any
     /// matcher is assembled. Single source of truth with the native CLI.
     #[napi(js_name = "unresolvable_root_error", catch_unwind)]
-    pub fn unresolvable_root_error(&self, root: String) -> String {
-        tsv_discover::unresolvable_root_error(&root)
+    pub fn unresolvable_root_error(&self, root: String) -> napi::Result<String> {
+        catch_panic(|| Ok(tsv_discover::unresolvable_root_error(&root)))
     }
 }
 
@@ -778,19 +843,30 @@ fn or_undefined(value: Option<String>) -> Either<String, Undefined> {
 /// Compiled only under the test-only `panic_probe` feature (`deno task
 /// test:napi` builds with it; published artifacts never carry it).
 /// `scripts/test_napi.ts` drives it to prove the contract end to end: the panic
-/// unwinds into `catch_unwind`, surfaces as a thrown JS error, and the process
-/// plus the per-thread arenas stay usable afterwards. It panics *inside*
-/// `with_ast_arena` so the take/park recovery is exercised with an arena
-/// genuinely in flight.
+/// unwinds into [`catch_panic`], surfaces as a thrown JS error whose message is exactly
+/// `panic: tsv_napi panic probe`, and the process plus the per-thread arenas stay usable
+/// afterwards. It panics *inside* `with_ast_arena` so the take/park recovery is exercised
+/// with an arena genuinely in flight.
 #[cfg(feature = "panic_probe")]
 #[napi(js_name = "__panic_probe", catch_unwind)]
 // `allow`, not `expect`: same `#[napi]`-expansion artifact as `IgnoreStack::new` above.
 #[allow(clippy::panic)] // panicking is the export's entire purpose
-pub fn panic_probe() {
-    with_ast_arena(|arena| {
-        let _ = arena.alloc_str("doomed");
-        panic!("tsv_napi panic probe");
-    });
+pub fn panic_probe() -> napi::Result<()> {
+    catch_panic(|| {
+        with_ast_arena(|arena| {
+            let _ = arena.alloc_str("doomed");
+            panic!("tsv_napi panic probe");
+        })
+    })
+}
+
+/// The probe's twin with a payload that is no string (`std::panic::panic_any` with an
+/// integer), which `tsv_arena::format_panic` renders `panic: <unknown>`, as the C FFI does.
+#[cfg(feature = "panic_probe")]
+#[napi(js_name = "__panic_probe_any", catch_unwind)]
+#[allow(clippy::panic)] // as `panic_probe`'s
+pub fn panic_probe_any() -> napi::Result<()> {
+    catch_panic(|| std::panic::panic_any(7_i32))
 }
 
 // Drive every entry point in-process so `cargo test` exercises the native
@@ -1305,22 +1381,23 @@ mod tests {
 
     #[test]
     #[cfg(feature = "format")]
-    fn ignore_stack_layers_and_verdicts() {
-        let mut stack = IgnoreStack::new();
-        assert!(!stack.is_ignored("dist".to_owned(), true));
-        stack.push_gitignore(String::new(), "dist/\n".to_owned());
-        assert!(stack.is_ignored("dist".to_owned(), true));
-        assert!(!stack.is_ignored("src/a.ts".to_owned(), false));
+    fn ignore_stack_layers_and_verdicts() -> napi::Result<()> {
+        let mut stack = IgnoreStack::new()?;
+        assert!(!stack.is_ignored("dist".to_owned(), true)?);
+        stack.push_gitignore(String::new(), "dist/\n".to_owned())?;
+        assert!(stack.is_ignored("dist".to_owned(), true)?);
+        assert!(!stack.is_ignored("src/a.ts".to_owned(), false)?);
         assert_eq!(
-            stack.classify_dir("node_modules".to_owned(), false),
+            stack.classify_dir("node_modules".to_owned(), false)?,
             "prune"
         );
-        assert_eq!(stack.classify_dir("src".to_owned(), false), "descend");
-        assert!(stack.should_format_file("src/a.ts".to_owned()));
-        assert!(!stack.should_format_file("src/a.txt".to_owned()));
-        assert!(stack.is_path_pruned("node_modules/x.ts".to_owned()));
-        stack.pop_gitignore();
-        assert!(!stack.is_ignored("dist".to_owned(), true));
+        assert_eq!(stack.classify_dir("src".to_owned(), false)?, "descend");
+        assert!(stack.should_format_file("src/a.ts".to_owned())?);
+        assert!(!stack.should_format_file("src/a.txt".to_owned())?);
+        assert!(stack.is_path_pruned("node_modules/x.ts".to_owned())?);
+        stack.pop_gitignore()?;
+        assert!(!stack.is_ignored("dist".to_owned(), true)?);
+        Ok(())
     }
 
     /// The maybe-a-warning methods must yield JS `undefined`, not `null`, for
@@ -1329,33 +1406,56 @@ mod tests {
     /// rather than the JS value (which only `test_napi_npm.ts` can observe).
     #[test]
     #[cfg(feature = "format")]
-    fn absent_warnings_are_the_undefined_variant() {
-        let stack = IgnoreStack::new();
+    fn absent_warnings_are_the_undefined_variant() -> napi::Result<()> {
+        let stack = IgnoreStack::new()?;
         assert!(matches!(
-            stack.unsupported_extension_error("a.ts".to_owned()),
+            stack.unsupported_extension_error("a.ts".to_owned())?,
             Either::B(())
         ));
         assert!(matches!(
-            stack.unsupported_extension_error("a.txt".to_owned()),
+            stack.unsupported_extension_error("a.txt".to_owned())?,
             Either::A(_)
         ));
         assert!(matches!(
-            stack.prettierignore_shadowed_warning("d".to_owned(), true, false, false),
+            stack.prettierignore_shadowed_warning("d".to_owned(), true, false, false)?,
             Either::B(())
         ));
         assert!(matches!(
-            stack.prettierignore_outside_repo_warning("d".to_owned(), true, true, false),
+            stack.prettierignore_outside_repo_warning("d".to_owned(), true, true, false)?,
             Either::B(())
         ));
         assert!(matches!(
-            stack.path_shadow_warning("dist/a.ts".to_owned(), None),
+            stack.path_shadow_warning("dist/a.ts".to_owned(), None)?,
             Either::B(())
         ));
-        let mut loose = IgnoreStack::new();
-        loose.push_formatignore(String::new(), "!dist/a.ts\n".to_owned());
+        let mut loose = IgnoreStack::new()?;
+        loose.push_formatignore(String::new(), "!dist/a.ts\n".to_owned())?;
         assert!(matches!(
-            loose.path_shadow_warning("dist/a.ts".to_owned(), None),
+            loose.path_shadow_warning("dist/a.ts".to_owned(), None)?,
             Either::A(_)
         ));
+        Ok(())
+    }
+
+    // --- a caught panic: `panic: <payload>`, napi-rs's GenericFailure status ---
+
+    /// What every export hands napi-rs for a panic in its body: the C FFI's text, the
+    /// status napi-rs's own catch uses (the JS error's `code`), and a body that does not
+    /// panic passed through as it returned.
+    #[test]
+    #[allow(clippy::panic)] // panicking is the case under test
+    fn catch_panic_renders_the_ffi_text() {
+        let caught = catch_panic(|| -> napi::Result<()> { panic!("boom inside {}", "the export") })
+            .unwrap_err();
+        assert_eq!(caught.reason, "panic: boom inside the export");
+        assert_eq!(caught.status, napi::Status::GenericFailure);
+        let caught =
+            catch_panic(|| -> napi::Result<()> { std::panic::panic_any(7_i32) }).unwrap_err();
+        assert_eq!(caught.reason, "panic: <unknown>");
+        assert_eq!(catch_panic(|| Ok(3)).ok(), Some(3));
+        let refused =
+            catch_panic(|| -> napi::Result<()> { Err(napi::Error::from_reason("refused")) })
+                .unwrap_err();
+        assert_eq!(refused.reason, "refused");
     }
 }

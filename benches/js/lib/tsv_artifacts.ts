@@ -10,10 +10,11 @@
  * The LOADERS are readers too, and that is the half worth stating: the guard's
  * subject has to be the file the loader actually opens, so `ffi.ts`, `napi.ts` and
  * `wasm.ts` build their paths from this module's exported builders
- * ({@link ffi_library_path}, {@link wasm_bundle_dir} / {@link wasm_bundle_path}) and
- * from `pgo_bench.ts`'s `pgo_bench_library_path` (the profile-guided native pair the
- * timed rows load) rather than re-deriving the layout. Only the two AXES a loader varies stay its
- * own — the FFI profile (`TSV_FFI_PROFILE`) and the wasm-pack target — which is
+ * ({@link ffi_library_path}, {@link napi_library_path}, {@link wasm_bundle_dir} /
+ * {@link wasm_bundle_path}) and from `pgo_bench.ts`'s `pgo_bench_library_path` (the
+ * profile-guided native pair the timed rows load) rather than re-deriving the layout. Only
+ * the AXES a loader varies stay its own — the native profile (`TSV_FFI_PROFILE` for the
+ * C FFI under Deno, a parameter for the N-API addon) and the wasm-pack target — which is
  * exactly why the freshness guard's executed-vs-size-only split can be a path
  * comparison at all: an entry differing there is a real difference, not a spelling.
  *
@@ -73,6 +74,7 @@ export interface TsvArtifact {
 
 const PROJECT_ROOT = fileURLToPath(new URL('../../..', import.meta.url)).replace(/\/$/, '');
 const FFI_LIB = native_library_filename('tsv_ffi');
+const NAPI_LIB = native_library_filename('tsv_napi');
 
 /**
  * The plain C-FFI shared library cargo builds for a profile — `corpus` for the unwinding
@@ -105,12 +107,34 @@ export function ffi_rebuild_task(profile: string | undefined): string {
 }
 
 /**
- * The plain N-API addon cargo builds — the `napi` profile (release + unwind) — which
- * `test:napi` loads. The bench's rows load the profile-guided addon instead
- * (`pgo_bench_library_path('napi')`).
+ * The plain N-API addon cargo builds for a profile: `napi` (release + unwind, the shipped
+ * profile) for the build `test:napi` loads, `corpus` for the unwinding, LTO-free build the
+ * corpus tools load. The bench's rows load the profile-guided addon instead
+ * (`pgo_bench_library_path('napi')`). The profile is the caller's axis; the layout is this
+ * module's.
  */
-export function napi_library_path(): string {
-	return `${PROJECT_ROOT}/target/napi/${native_library_filename('tsv_napi')}`;
+export function napi_library_path(profile: string): string {
+	return `${PROJECT_ROOT}/target/${profile}/${NAPI_LIB}`;
+}
+
+/**
+ * The N-API addon a process loads for a profile: the bench's profile-guided build
+ * (`pgo_bench_library_path('napi')`) when none is named, else that cargo profile's plain
+ * build under `target/` ({@link napi_library_path}). A parameter, never an environment
+ * variable: the caller that names the profile is the one that loads the addon and guards
+ * its freshness, so the two cannot disagree.
+ */
+export function napi_loaded_path(profile: string | undefined): string {
+	return profile === undefined ? pgo_bench_library_path('napi') : napi_library_path(profile);
+}
+
+/** The task that rebuilds the addon `napi_loaded_path` names for the same profile. */
+export function napi_rebuild_task(profile: string | undefined): string {
+	return profile === undefined
+		? 'deno task build:bench:pgo'
+		: profile === 'napi'
+			? 'deno task build:napi'
+			: `deno task build:napi:${profile}`;
 }
 
 /** The three wasm-pack builds, by the cargo features each selects. */

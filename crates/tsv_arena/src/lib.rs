@@ -8,7 +8,8 @@
 //! macros ([`parse_ast!`], [`parse_ast_for_format!`], [`goal_allowed!`]), the export
 //! bodies built on them ([`parse_convert!`], [`parse_internal!`], [`parse_imports_json!`],
 //! and the format path's `parse_format!`), the export [`Family`] and the string-axis decoder
-//! ([`decode_source_type`]) sit at the bottom of this file.
+//! ([`decode_source_type`]) sit at the bottom of this file. Between them is
+//! [`format_panic`], the one text both native bindings report a caught panic with.
 //!
 //! # The arenas
 //!
@@ -139,6 +140,25 @@ pub fn with_doc_arena<R>(f: impl FnOnce(&tsv_lang::doc::arena::DocArena) -> R) -
         |arena| arena.reset(),
         |arena| f(arena),
     )
+}
+
+/// The text a binding reports a caught panic with: `panic: <payload>`, the payload a
+/// `&str` or a `String` (what `panic!` carries), `panic: <unknown>` for any other
+/// (`std::panic::panic_any` with another type).
+///
+/// The two native bindings catch a panic where it crosses into the host, under their
+/// unwinding profiles: `tsv_ffi` returns this text as its error payload and `tsv_napi`
+/// throws it as the JS error's message. One spelling, so a caller that classifies a
+/// failure as a crash (the corpus tools' panic gate) reads the same prefix whichever
+/// binding it loaded.
+pub fn format_panic(payload: &(dyn std::any::Any + Send)) -> String {
+    if let Some(s) = payload.downcast_ref::<&str>() {
+        format!("panic: {s}")
+    } else if let Some(s) = payload.downcast_ref::<String>() {
+        format!("panic: {s}")
+    } else {
+        "panic: <unknown>".to_owned()
+    }
 }
 
 //
@@ -774,6 +794,17 @@ mod tests {
             decode_source_type(Some(""), true, Family::Parse, from),
             Err("invalid sourceType '' (expected 'script' or 'module')".to_owned())
         );
+    }
+
+    #[test]
+    fn format_panic_renders_payload_variants() {
+        use std::any::Any;
+        let as_str: Box<dyn Any + Send> = Box::new("boom");
+        assert_eq!(format_panic(&*as_str), "panic: boom");
+        let owned: Box<dyn Any + Send> = Box::new(String::from("kaboom"));
+        assert_eq!(format_panic(&*owned), "panic: kaboom");
+        let other: Box<dyn Any + Send> = Box::new(42i32);
+        assert_eq!(format_panic(&*other), "panic: <unknown>");
     }
 
     #[test]

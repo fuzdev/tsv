@@ -63,9 +63,8 @@ import { resolve } from 'node:path';
 import { env, exit } from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { CORE_CRATES } from './crate_lists.ts';
-import { get_napi_library_path } from './napi.ts';
 import { type PgoBenchWorld, pgo_bench_mismatch } from './pgo_bench.ts';
-import { current_runtime, wasm_target } from './runtime.ts';
+import { current_runtime, type Runtime, wasm_target } from './runtime.ts';
 import {
 	newest_crate_source_mtime,
 	newest_workspace_build_mtime,
@@ -75,6 +74,8 @@ import {
 import {
 	ffi_loaded_path,
 	ffi_rebuild_task,
+	napi_library_path,
+	napi_rebuild_task,
 	TSV_ARTIFACTS,
 	wasm_bundle_path
 } from './tsv_artifacts.ts';
@@ -294,36 +295,70 @@ export async function check_artifact_freshness(checks: readonly ArtifactCheck[])
  * Same engine, different binding boundary — which one is live is a runtime fact,
  * so it is answered here rather than at each entry point.
  *
- * The rebuild hint follows `TSV_FFI_PROFILE`: a `corpus`-profile library is
- * rebuilt by a different task than the release one, and pointing a reader at
- * `build:ffi` when their stale artifact is the corpus build is a remedy that
- * rebuilds the wrong file. That correction lived in `compare_cli.ts` alone while
- * the two copies of this block went without it.
+ * Under Node/Bun, `profile` names the cargo profile whose plain addon the caller loads
+ * (`napi_library_path(profile)`, the path it hands `NapiImplementation`), and none names
+ * the profile-guided one. Under Deno the C-FFI library follows `TSV_FFI_PROFILE`, the
+ * kept Deno row's selector, so a `profile` there is refused rather than read as a second
+ * selector for the one library.
+ *
+ * The rebuild hint follows the profile: a `corpus`-profile library is rebuilt by a
+ * different task than the release one, and pointing a reader at `build:ffi` when their
+ * stale artifact is the corpus build is a remedy that rebuilds the wrong file.
+ *
+ * @param profile - the cargo profile of the N-API addon the caller loads, or none for the
+ * profile-guided one
+ * @throws if a `profile` is named under Deno
  */
-export function native_artifact_check(): ArtifactCheck {
-	if (current_runtime() !== 'deno') {
-		return {
-			label: 'N-API (pgo)',
-			path: get_napi_library_path(),
-			binding_crates: ['tsv_napi'],
-			rebuild: TSV_ARTIFACTS.tsv_napi.rebuild,
-			pgo_world: 'napi'
-		};
+export function native_artifact_check(profile?: string): ArtifactCheck {
+	return native_artifact_check_for(current_runtime(), profile, env.TSV_FFI_PROFILE);
+}
+
+/**
+ * `native_artifact_check` over its inputs: the runtime, the N-API profile the caller
+ * names, and the `TSV_FFI_PROFILE` value the Deno branch reads.
+ *
+ * @throws if a `profile` is named under Deno
+ */
+export function native_artifact_check_for(
+	runtime: Runtime,
+	profile: string | undefined,
+	ffi_profile: string | undefined
+): ArtifactCheck {
+	if (runtime !== 'deno') {
+		return profile === undefined
+			? {
+					label: 'N-API (pgo)',
+					path: TSV_ARTIFACTS.tsv_napi.path,
+					binding_crates: TSV_ARTIFACTS.tsv_napi.binding_crates,
+					rebuild: TSV_ARTIFACTS.tsv_napi.rebuild,
+					pgo_world: 'napi'
+				}
+			: {
+					label: `N-API (${profile})`,
+					path: napi_library_path(profile),
+					binding_crates: TSV_ARTIFACTS.tsv_napi.binding_crates,
+					rebuild: napi_rebuild_task(profile)
+				};
 	}
-	const profile = env.TSV_FFI_PROFILE;
-	return profile === undefined
+	if (profile !== undefined) {
+		throw new Error(
+			`native_artifact_check: profile '${profile}' selects the N-API addon, which Deno does ` +
+				`not load; the C-FFI library follows TSV_FFI_PROFILE`
+		);
+	}
+	return ffi_profile === undefined
 		? {
 				label: 'FFI (pgo)',
-				path: ffi_loaded_path(profile),
+				path: ffi_loaded_path(ffi_profile),
 				binding_crates: ['tsv_ffi'],
 				rebuild: TSV_ARTIFACTS.tsv_ffi.rebuild,
 				pgo_world: 'ffi'
 			}
 		: {
-				label: `FFI (${profile})`,
-				path: ffi_loaded_path(profile),
+				label: `FFI (${ffi_profile})`,
+				path: ffi_loaded_path(ffi_profile),
 				binding_crates: ['tsv_ffi'],
-				rebuild: ffi_rebuild_task(profile)
+				rebuild: ffi_rebuild_task(ffi_profile)
 			};
 }
 
@@ -340,9 +375,13 @@ export function native_artifact_check(): ArtifactCheck {
  *
  * The corpus tools guard only the FFI library (they run no WASM), so they call
  * `native_artifact_check` and pass it themselves.
+ *
+ * @param native_profile - the N-API addon's cargo profile, as `native_artifact_check`
+ * takes it: what `init_implementations` was asked to load; none for the bench and smoke,
+ * which load the profile-guided addon
  */
-export async function check_executed_artifacts(): Promise<void> {
-	await check_artifact_freshness(executed_artifact_checks());
+export async function check_executed_artifacts(native_profile?: string): Promise<void> {
+	await check_artifact_freshness(executed_artifact_checks(native_profile));
 }
 
 /**
@@ -403,11 +442,15 @@ export function assert_artifacts_unchanged(expected: readonly ArtifactIdentity[]
 	}
 }
 
-/** The checks `check_executed_artifacts` runs — the runtime's native binding + its `all` bundle. */
-function executed_artifact_checks(): ArtifactCheck[] {
+/**
+ * The checks `check_executed_artifacts` runs — the runtime's native binding + its `all` bundle.
+ *
+ * @param native_profile - the N-API profile, as `native_artifact_check` takes it
+ */
+function executed_artifact_checks(native_profile?: string): ArtifactCheck[] {
 	const target = wasm_target();
 	return [
-		native_artifact_check(),
+		native_artifact_check(native_profile),
 		{
 			label: `WASM (all/${target})`,
 			// This runtime's own wasm-pack target (Deno → `deno`, Node/Bun → `nodejs`),
