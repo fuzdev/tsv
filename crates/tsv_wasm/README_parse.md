@@ -14,13 +14,13 @@ Docs and benchmarks: [tsv.fuz.dev](https://tsv.fuz.dev/). Source and conformance
 npm i @fuzdev/tsv-parse-wasm
 ```
 
-Requires Node.js 22+; Bun and Deno work too, and browsers via `init()` (below).
+Requires Node.js 22+; Bun works too, and browsers via `init()` (below).
 
 TypeScript declarations are bundled. They name the DOM lib's `fetch` and `WebAssembly` types (for `init()` and the compiled module), so a project type-checking them needs `"dom"` in its `lib`, or `skipLibCheck`.
 
 ## Usage
 
-In Node.js, Bun, and Deno, WASM is initialized synchronously at import time — zero config. In browsers and bundlers, call `await init()` once first (Vite, Webpack, and Rollup resolve the WASM asset automatically; `init_sync({ module })` is also exported for Workers and custom loading).
+In Node.js and Bun, WASM is initialized synchronously at import time — zero config. In browsers and bundlers, call `await init()` once first (Vite, Webpack, and Rollup resolve the WASM asset automatically; `init_sync({ module })` is also exported for Workers and custom loading).
 
 ```typescript
 import {parse_css, parse_svelte, parse_typescript} from '@fuzdev/tsv-parse-wasm';

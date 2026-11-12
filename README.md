@@ -101,7 +101,7 @@ Future features (unknown order):
 ## Install
 
 tsv ships to npm as a native package for Node and Bun, plus three WASM
-packages for browsers, Deno, and platforms without a prebuilt binary:
+packages for browsers and platforms without a prebuilt binary:
 
 - [`@fuzdev/tsv`](https://www.npmjs.com/package/@fuzdev/tsv) - the full tool (formatter + parser + type stripper + import records) as a prebuilt native N-API addon, shipping tsv's real native CLI binary as the `tsv` command
 - [`@fuzdev/tsv-wasm`](https://www.npmjs.com/package/@fuzdev/tsv-wasm) - the full tool with the same `tsv` CLI, as WASM
@@ -315,9 +315,11 @@ see [docs/architecture.md](docs/architecture.md).
 Dev dependencies:
 
 - [Rust](https://rust-lang.org/) - rustc, cargo
-- [Deno](https://docs.deno.com/runtime/) - see [deno.json](deno.json) for the tasks
-  - uses `npm:` imports from `svelte`, `typescript`, `acorn`,
-    `@sveltejs/acorn-typescript`, `prettier`, `prettier-plugin-svelte`
+- [Deno](https://docs.deno.com/runtime/) - runs the tasks in [deno.json](deno.json)
+- [Node.js](https://nodejs.org/) - the version `engines` names in [package.json](package.json),
+  for the JS suites and scripts and the fixture oracle `tsv_debug` runs; `npm ci` installs the
+  JS dependencies, and `npm ci --prefix crates/tsv_debug/sidecar` the oracle's (`svelte`,
+  `acorn`, `@sveltejs/acorn-typescript`, `prettier`, `prettier-plugin-svelte`)
 
 Rust dependencies are kept fairly minimal.
 See [CLAUDE.md § Rust Crates](CLAUDE.md#rust-crates-minimal-deps) for the full list.
@@ -359,7 +361,7 @@ tsv/
 │   ├── tsv_svelte_compile/ # experimental Svelte→JS compiler + JS canonicalizer (may never ship; not in any shipped artifact)
 │   ├── tsv_check/     # experimental TypeScript binder/checker (may never ship; not in any shipped artifact)
 │   ├── tsv_cli/       # unified CLI (binary: `tsv`)
-│   ├── tsv_debug/     # dev utilities (binary: `tsv_debug`, uses Deno)
+│   ├── tsv_debug/     # dev utilities (binary: `tsv_debug`; its oracle sidecar runs on Node)
 │   ├── tsv_ffi/       # C FFI bindings
 │   ├── tsv_wasm/      # WebAssembly bindings
 │   └── tsv_napi/      # N-API bindings (Node/Bun native path)

@@ -49,17 +49,16 @@
  */
 
 import type { FsReadDir } from '@fuzdev/gro/fs.ts';
-import { fs_search } from '@fuzdev/gro/fs_search.ts';
 import type { SpawnProgram } from '@fuzdev/gro/spawn.ts';
 
 import {
 	newest_crate_source_mtime,
 	newest_workspace_build_mtime,
-	type SourceMtime,
-	type SourceTree
+	type SourceMtime
 } from '../benches/js/lib/source_mtime.ts';
 import { CORE_CRATES, WASM_CRATES } from '../benches/js/lib/tsv_artifacts.ts';
 import { signal_exit_code } from './exit_code.ts';
+import { handle_source_tree } from './handle_source_tree.ts';
 
 /** The file the wrapped commands are written in, so editing a build task re-runs it. */
 const TASKS_FILE = 'package.json';
@@ -75,17 +74,6 @@ export interface RunIfStaleDeps {
 	print: (line: string) => void;
 	print_error: (line: string) => void;
 }
-
-/** A `SourceTree` over a directory handle: a symlink is listed as a file and followed by
- * `stat`, never descended into, and one the handle can't follow (an absolute target, or one
- * climbing out of the checkout) fails the walk with `outside_root`. */
-export const handle_source_tree = (dir: FsReadDir): SourceTree => ({
-	stat: async (path) => {
-		const info = await dir.stat(path);
-		return info === null ? null : { mtime_ms: info.mtime_ms, is_file: info.kind === 'file' };
-	},
-	list: async (path) => (await fs_search(dir, { path, sort: false })).map((found) => found.path)
-});
 
 /** The newest mtime across what feeds a WASM bundle (module doc). */
 const newest_source = async (checkout: FsReadDir): Promise<SourceMtime> => {

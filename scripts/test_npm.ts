@@ -623,6 +623,44 @@ console.log(JSON.stringify({ kinds, poisoned, recovered, again: healthy().ok }))
 		assert.equal(node_entry.create_locator, undefined);
 	});
 
+	it('IgnoreStack absent from the parse-only build', { skip: has_format }, () => {
+		assert.equal(node_entry.IgnoreStack, undefined);
+	});
+
+	// The discovery verdicts, called directly. The `all` package's `cli.js` drives them through
+	// the discovery-parity table; the format-only package publishes them as its discovery API and
+	// ships no CLI, so this is their one call there.
+	it('IgnoreStack: the discovery verdicts', { skip: !has_format }, () => {
+		const stack = new node_entry.IgnoreStack();
+		stack.push_gitignore('', 'build/\nignored.ts\n');
+		// an override layer can't re-include under an excluded directory (git's parent rule)
+		stack.push_formatignore('', '!build/keep.ts\n');
+		// a `.gitignore` governs this level, so every verdict here passes the heuristic off
+		assert.equal(stack.is_ignored('build/x.ts', false), true);
+		assert.equal(stack.is_ignored('build/keep.ts', false), true);
+		assert.equal(stack.is_ignored('src/x.ts', false), false);
+		assert.equal(stack.classify_dir('node_modules', false), 'prune');
+		// the inert re-include is warned of, where a plain excluded directory is pruned quietly
+		assert.equal(stack.classify_dir('build', false), 'prune_warn');
+		assert.match(stack.shadow_warning('build', undefined), /re-include under it/);
+		assert.equal(stack.classify_dir('src', false), 'descend');
+		assert.equal(stack.should_format_file('src/app.ts'), true);
+		assert.equal(stack.should_format_file('ignored.ts'), false);
+		assert.equal(stack.should_format_file('notes.md'), false);
+		stack.free();
+		// the build-output heuristic acts only where no `.gitignore` governs the level
+		const loose = new node_entry.IgnoreStack();
+		assert.equal(loose.classify_dir('dist', true), 'prune');
+		assert.equal(loose.classify_dir('dist', false), 'descend');
+		assert.equal(loose.classify_dir('src', true), 'descend');
+		loose.free();
+		const plain = new node_entry.IgnoreStack();
+		plain.push_gitignore('', 'build/\n');
+		assert.equal(plain.classify_dir('build', false), 'prune');
+		assert.equal(plain.shadow_warning('build', undefined), undefined);
+		plain.free();
+	});
+
 	// parse_X is defined as JSON.parse(parse_X_json(src)): each object parser returns its
 	// language's root, and its `_json` sibling the same tree as a string
 	it(
@@ -1288,6 +1326,60 @@ describe(`worker entry (worker.js): ${pkg_dir}`, () => {
 			worker.on('error', reject);
 		});
 		assert.equal(result, has_format ? 'const x = 1;\n' : 'Program');
+	});
+
+	// `worker.js` is `export *` from `browser.js`, so the two are ONE module instance, and one
+	// `init_sync` through either name serves both; a second copy of the wrappers would carry its
+	// own `_ready` flag and leave the other name refusing. A worker isolate is the only place
+	// either entry is still uninitialized, since this file's own `browser` import is initialized
+	// above.
+	it('an init_sync through ./worker serves browser.js: one module instance', async () => {
+		const worker_url = new URL(`../${pkg_dir}/worker.js`, import.meta.url).href;
+		const browser_url = new URL(`../${pkg_dir}/browser.js`, import.meta.url).href;
+		const exercise = has_format
+			? `browser.format_typescript('const   x=1').code`
+			: `browser.parse_typescript('const x = 1;').ast.type`;
+		// each answer caught, so a second instance reports which claim it broke
+		const source = `import {workerData, parentPort} from 'node:worker_threads';
+			const worker = await import(${JSON.stringify(worker_url)});
+			const browser = await import(${JSON.stringify(browser_url)});
+			worker.init_sync({module: workerData.module});
+			const attempt = (f) => {
+				try {
+					return f();
+				} catch (error) {
+					return error.message;
+				}
+			};
+			parentPort.postMessage({
+				same_bindings: worker.init_sync === browser.init_sync,
+				out: attempt(() => ${exercise}),
+				constructs: typeof browser.IgnoreStack === 'function'
+					? attempt(() => {
+							const stack = new browser.IgnoreStack();
+							stack.free();
+							return stack instanceof worker.IgnoreStack;
+						})
+					: null
+			});`;
+		const result = await new Promise((resolve, reject) => {
+			const worker = new Worker(source, {
+				eval: true,
+				workerData: { module: node_entry.wasm_module }
+			});
+			worker.on('message', (message) => {
+				void worker.terminate();
+				resolve(message);
+			});
+			worker.on('error', reject);
+			// a worker that exits without posting fails the case rather than hanging it
+			worker.on('exit', (code) => reject(new Error(`worker exited (${code}) before posting`)));
+		});
+		assert.deepEqual(result, {
+			same_bindings: true,
+			out: has_format ? 'const x = 1;\n' : 'Program',
+			constructs: has_format ? true : null
+		});
 	});
 });
 

@@ -169,8 +169,7 @@ the `JsValue`, a value that is not a string throws by its kind (`invalid sourceT
 expected a string ('script' or 'module'), got a number`) — where N-API refuses it at its own
 conversion. `JsValue` is wasm-bindgen's own, so the format-only build still links no
 `js-sys`. The raw `parse_<lang>` returns `{ok: true, ast}`, the object `js_sys::JSON::parse` made
-of the wire, so the bench's fairness probe and `scripts/validate_artifacts.ts`'s deno-bundle
-smoke read the raw module directly.
+of the wire, so the bench's fairness probe reads the raw module directly.
 
 **The format-only package loads no parse code.** `api.js` imports nothing;
 `api_parse.js` imports `api.js`'s reader and `locations.js`. `@fuzdev/tsv-format-wasm`
@@ -271,7 +270,7 @@ wrong shape: a one-way fuse that leaks every handle after the first recovery, fr
 included.) Gated by `scripts/test_npm.ts` (the poison-then-recover API contract, staged on a
 child process with V8's stack cut to a sliver; and both CLI paths, staged on a copy of the
 package whose shadow stack is cut to a quarter — no input the depth limits accept traps the
-shipped stack) and smoked per variant by `scripts/validate_artifacts.ts`.
+shipped stack).
 
 ## JSON-String Transport
 
@@ -545,9 +544,10 @@ fresh worker isolate.
 API, and reaches its own copy by relative path — so the SUBPATH is exercised only
 by the package suites: `scripts/test_npm.ts` drives a real worker through it by
 bare specifier, out of a temp `node_modules` (the only place the `exports` map is
-walked the way a consumer walks it, conditions included), and
-`scripts/validate_artifacts.ts` pins the same-module-instance claim under Deno by
-initializing through `./worker` and then calling `browser.js`.
+walked the way a consumer walks it, conditions included). That `./worker` is the same
+module instance as `browser.js`, so one `init_sync` through either serves both, rests on
+`worker.js` being `export *` from `browser.js`; the same suite pins it, initializing a
+fresh worker isolate through `./worker` and calling through `browser.js`.
 
 The declarations are **one file per entry**, and that is what makes
 `wasm_module` non-optional where it exists. `index.d.ts` (the Node/Bun entry)
@@ -658,9 +658,9 @@ The other is a consumer importing `.` and `./worker` into ONE thread and
 comparing across them, which the subpath exists precisely not to be — a worker
 imports it, and a bundler resolves both names to the same module.
 
-Both package
-suites smoke the class (`scripts/validate_artifacts.ts` per variant under Deno,
-`scripts/test_npm.ts` under Node — present in format/all, absent in parse-only).
+The package
+suite grades the class per variant under Node (`scripts/test_npm.ts`): absent in parse-only,
+and in format/all present, its discovery verdicts called directly.
 The wasm-bindgen-generated `tsv_wasm.d.ts` declares the class, so no
 `tsv_ast.d.ts` entry is needed (the subclass is assignable to it).
 
@@ -783,9 +783,8 @@ variant adds CLI subprocess tests), then the parse-failure table under Bun
 (`deno task test:bun <variant>`, warn-skipped without bun). The `:run` suffix — e.g.
 `test:npm:run` — skips the rebuild, as in the publish/CI pipelines, and is freshness-guarded:
 `scripts/check_staged_freshness.ts` aborts it when a staged artifact is older than its sources.
-`deno task validate:artifacts` checks tight wasm size bounds plus a Deno runtime smoke of every
-built bundle — the auto-init entries, and the two lazy ones with their not-initialized guards —
-under the same freshness guard, since `pkg/` is gitignored and a stale bundle sizes and smokes
+`deno task validate:artifacts` checks tight wasm size bounds and each package's third-party
+`NOTICE` under the same freshness guard, since `pkg/` is gitignored and a stale bundle sizes
 exactly as cleanly as a fresh one. Both run in the publish pipeline, followed by
 `deno task typecheck:packages`, which compiles the staged packages' declarations as a consumer
 does.

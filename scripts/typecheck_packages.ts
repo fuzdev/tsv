@@ -40,47 +40,51 @@
  * its fence, and grades under `nodenext` with `@types/node` (from `benches/js`) instead
  * of both resolutions. That is the one marker; any other `typecheck:` comment is an error.
  *
- * Usage: `deno task typecheck:packages [format|parse|all|napi]...` — no arguments grades
- * every staged package (a package that is not staged is skipped, and nothing staged
+ * Usage: `node scripts/roots/typecheck_packages.ts [format|parse|all|napi]...` — no arguments
+ * grades every staged package (a package that is not staged is skipped, and nothing staged
  * fails); named packages are exactly the set graded, each required. A stale staging is
  * refused as the package suites refuse it (`check_staged_freshness.ts`, the same
  * `BENCH_STALE_OK=1` override). TypeScript and `@types/node` come from
- * `benches/js/node_modules` (`deno task bench:install`); their absence fails the run.
+ * `benches/js/node_modules` (`deno task bench:install`; `scripts/typecheck_install.ts`); their
+ * absence fails the run. Every failure exits 1.
  *
- * TypeScript is loaded through `createRequire` from a computed path, so `deno check`
- * never follows it and `typecheck:scripts` stays node-modules-free.
+ * Reach: the checkout read-only, for the staged packages and the install; a temp directory,
+ * the consumer project; and the TypeScript the root loads from the install, which reads the
+ * consumer project and the install itself (`TypecheckPackagesDeps`, built by
+ * `scripts/roots/typecheck_packages.ts`).
  *
  * @module
  */
 
-import { existsSync, realpathSync } from 'node:fs';
-import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
-import { createRequire } from 'node:module';
-import { tmpdir } from 'node:os';
-import { dirname, join, relative } from 'node:path';
-import process from 'node:process';
-import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+
+import type { FsDir, FsReadDir } from '@fuzdev/gro/fs.ts';
 
 import {
-	assert_staged_fresh,
 	NAPI_LOADER_DIR,
 	napi_loader_checks,
 	type StagedCheck,
+	staged_freshness_report,
 	wasm_package_checks,
 	wasm_package_dir
 } from './check_staged_freshness.ts';
+import { copy_between } from './handle_copy.ts';
+import { handle_source_tree } from './handle_source_tree.ts';
+import { TYPECHECK_INSTALL, TYPES_ROOT, TYPESCRIPT_MODULE } from './typecheck_install.ts';
 
-const ROOT = fileURLToPath(new URL('..', import.meta.url));
-const BENCH_NODE_MODULES = `${ROOT}benches/js/node_modules`;
-const TYPESCRIPT_PATH = `${BENCH_NODE_MODULES}/typescript/lib/typescript.js`;
-const TYPES_ROOT = `${BENCH_NODE_MODULES}/@types`;
-
-/** What this check loads from the `benches/js` install, as absolute paths —
- * `scripts/publish.ts` asks for the same set in its preflight. */
-export const TYPECHECK_INSTALL: ReadonlyArray<{ what: string; path: string }> = [
-	{ what: 'typescript', path: TYPESCRIPT_PATH },
-	{ what: '@types/node', path: `${TYPES_ROOT}/node/package.json` }
-];
+/** What `run_typecheck_packages` reaches. */
+export interface TypecheckPackagesDeps {
+	/** The checkout: the staged packages and the `benches/js` install are read beneath it. */
+	checkout: FsReadDir;
+	/** Makes the consumer project, a fresh directory removed when the run ends. */
+	temp_dir: () => Promise<FsDir & AsyncDisposable>;
+	/** Loads TypeScript from `path`, checkout-relative, once the install is seen there. */
+	load_typescript: (path: string) => TypeScriptApi;
+	/** `BENCH_STALE_OK=1`: a stale staging warns instead of failing the run. */
+	stale_ok: boolean;
+	print: (line: string) => void;
+	print_error: (line: string) => void;
+}
 
 type PackageKey = 'format' | 'parse' | 'all' | 'napi';
 
@@ -686,7 +690,7 @@ function export_types(exports: unknown): Set<string> {
 }
 
 /**
- * Install each package into `consumer_dir/node_modules` as npm would — `package.json`
+ * Install each package into the consumer's `node_modules` as npm would — `package.json`
  * plus the `files` it declares — and write the consumer modules beside it.
  *
  * @returns the consumer modules, and every declaration file the packages' `exports` maps
@@ -696,42 +700,41 @@ function export_types(exports: unknown): Set<string> {
  *   `files` declares
  */
 async function stage_consumer(
-	consumer_dir: string,
+	checkout: FsReadDir,
+	consumer: FsDir,
 	packages: ReadonlyArray<PackageSpec>
 ): Promise<{ files: Array<ConsumerFile>; declarations: Array<string> }> {
-	await writeFile(
-		join(consumer_dir, 'package.json'),
+	await consumer.write(
+		'package.json',
 		JSON.stringify({ private: true, type: 'module' }, null, '\t') + '\n'
 	);
 	const files: Array<ConsumerFile> = [];
 	const declarations: Array<string> = [];
 	for (const pkg of packages) {
-		const source_dir = join(ROOT, pkg.dir);
-		const manifest = JSON.parse(await readFile(join(source_dir, 'package.json'), 'utf8')) as {
+		const manifest = JSON.parse(await checkout.read_text(`${pkg.dir}/package.json`)) as {
 			files?: Array<string>;
 			exports?: unknown;
 		};
 		if (!manifest.files) throw new Error(`${pkg.dir}/package.json declares no files`);
 		const installed = join('node_modules', pkg.name);
-		await mkdir(join(consumer_dir, installed), { recursive: true });
+		await consumer.mkdir(installed, { recursive: true });
 		for (const file of ['package.json', ...manifest.files]) {
-			if (!existsSync(join(source_dir, file))) {
+			if (!(await checkout.exists(`${pkg.dir}/${file}`))) {
 				throw new Error(
 					`${pkg.name}: the staging lacks ${pkg.dir}/${file}, which its files list declares — restage: ${pkg.rebuild}`
 				);
 			}
-			await cp(join(source_dir, file), join(consumer_dir, installed, file), { recursive: true });
+			await copy_between(checkout, `${pkg.dir}/${file}`, consumer, `${installed}/${file}`);
 		}
 		for (const types of export_types(manifest.exports)) {
 			declarations.push(join(installed, types));
 		}
-		const readme = await readFile(join(source_dir, 'README.md'), 'utf8');
+		const readme = await checkout.read_text(`${pkg.dir}/README.md`);
 		files.push(...consumer_files(pkg, readme));
 	}
 	for (const file of files) {
-		const path = join(consumer_dir, file.path);
-		await mkdir(dirname(path), { recursive: true });
-		await writeFile(path, file.content);
+		await consumer.mkdir(dirname(file.path), { recursive: true });
+		await consumer.write(file.path, file.content);
 	}
 	return { files, declarations };
 }
@@ -739,8 +742,8 @@ async function stage_consumer(
 // -- grading ------------------------------------------------------------------
 
 /** The slice of the TypeScript compiler API this uses — typed here because the module is
- * loaded at runtime from `benches/js/node_modules`, where `deno check` cannot follow. */
-interface TypeScriptApi {
+ * loaded at runtime from `benches/js/node_modules`, which no checker of the scripts sees. */
+export interface TypeScriptApi {
 	version: string;
 	convertCompilerOptionsFromJson(
 		json: Record<string, unknown>,
@@ -751,21 +754,8 @@ interface TypeScriptApi {
 	formatDiagnostics(diagnostics: ReadonlyArray<unknown>, host: unknown): string;
 }
 
-interface TypeScriptProgram {
+export interface TypeScriptProgram {
 	getSourceFiles(): ReadonlyArray<{ fileName: string }>;
-}
-
-/** Load the TypeScript the bench harness installs, or exit naming the install. */
-function load_typescript(): TypeScriptApi {
-	for (const { what, path } of TYPECHECK_INSTALL) {
-		if (!existsSync(path)) {
-			console.error(
-				`✗ ${what} is not installed at ${relative(ROOT, path)} — run \`deno task bench:install\``
-			);
-			process.exit(1);
-		}
-	}
-	return createRequire(import.meta.url)(TYPESCRIPT_PATH) as TypeScriptApi;
 }
 
 /** One compiler configuration of the matrix. */
@@ -778,7 +768,7 @@ interface ProgramKey {
 const key_label = (key: ProgramKey): string =>
 	`${key.resolution} · es2022${key.dom ? '+dom' : ''}${key.node_types ? ' · @types/node' : ''}`;
 
-const compiler_options = (key: ProgramKey): Record<string, unknown> => ({
+const compiler_options = (key: ProgramKey, types_root: string): Record<string, unknown> => ({
 	strict: true,
 	exactOptionalPropertyTypes: true,
 	noUncheckedIndexedAccess: true,
@@ -794,7 +784,7 @@ const compiler_options = (key: ProgramKey): Record<string, unknown> => ({
 	...(key.resolution === 'nodenext'
 		? { module: 'nodenext', moduleResolution: 'nodenext' }
 		: { module: 'esnext', moduleResolution: 'bundler' }),
-	...(key.node_types ? { types: ['node'], typeRoots: [TYPES_ROOT] } : { types: [] })
+	...(key.node_types ? { types: ['node'], typeRoots: [types_root] } : { types: [] })
 });
 
 /** One graded program's verdict. */
@@ -813,6 +803,7 @@ interface ProgramResult {
  */
 function grade_consumer(
 	ts: TypeScriptApi,
+	types_root: string,
 	consumer_dir: string,
 	files: ReadonlyArray<ConsumerFile>,
 	declarations: ReadonlyArray<string>
@@ -835,7 +826,10 @@ function grade_consumer(
 	const loaded = new Set<string>();
 	const results: Array<ProgramResult> = [];
 	for (const [label, { key, roots }] of groups) {
-		const converted = ts.convertCompilerOptionsFromJson(compiler_options(key), consumer_dir);
+		const converted = ts.convertCompilerOptionsFromJson(
+			compiler_options(key, types_root),
+			consumer_dir
+		);
 		if (converted.errors.length > 0) {
 			throw new Error(
 				`${label}: invalid compiler options\n${ts.formatDiagnostics(converted.errors, host)}`
@@ -857,76 +851,103 @@ function grade_consumer(
 
 // -- main ---------------------------------------------------------------------
 
-/** Which packages to grade: the named ones, or every staged one. */
-function select_packages(args: ReadonlyArray<string>): Array<PackageSpec> {
-	if (args.length > 0) {
-		const unknown = args.filter((arg) => !(arg in PACKAGES));
-		if (unknown.length > 0) {
-			console.error(
-				`✗ unknown package ${unknown.join(', ')} (expected format, parse, all or napi)`
-			);
-			process.exit(1);
+/**
+ * Type-checks the staged packages (module doc).
+ * @param argv - the packages to grade, none for every staged one
+ * @returns the exit code: `0` when every program is clean, `1` otherwise
+ */
+export async function run_typecheck_packages(
+	deps: TypecheckPackagesDeps,
+	argv: ReadonlyArray<string>
+): Promise<number> {
+	const { checkout, print, print_error } = deps;
+	for (const { what, path } of TYPECHECK_INSTALL) {
+		if (!(await checkout.exists(path))) {
+			print_error(`✗ ${what} is not installed at ${path} — run \`deno task bench:install\``);
+			return 1;
 		}
-		return [...new Set(args)].map((arg) => PACKAGES[arg as PackageKey]);
 	}
-	const staged: Array<PackageSpec> = [];
-	for (const pkg of Object.values(PACKAGES)) {
-		if (existsSync(join(ROOT, pkg.dir, 'package.json'))) staged.push(pkg);
-		else console.log(`  skip: ${pkg.name} is not staged (${pkg.dir})`);
+	const ts = deps.load_typescript(TYPESCRIPT_MODULE);
+
+	// which packages to grade: the named ones, or every staged one
+	let packages: Array<PackageSpec>;
+	if (argv.length > 0) {
+		const unknown = argv.filter((arg) => !(arg in PACKAGES));
+		if (unknown.length > 0) {
+			print_error(`✗ unknown package ${unknown.join(', ')} (expected format, parse, all or napi)`);
+			return 1;
+		}
+		packages = [...new Set(argv)].map((arg) => PACKAGES[arg as PackageKey]);
+	} else {
+		packages = [];
+		for (const pkg of Object.values(PACKAGES)) {
+			if (await checkout.exists(`${pkg.dir}/package.json`)) packages.push(pkg);
+			else print(`  skip: ${pkg.name} is not staged (${pkg.dir})`);
+		}
+		if (packages.length === 0) {
+			print_error(
+				'✗ no package is staged — run `deno task build:packages` and/or `deno task build:napi:packages`'
+			);
+			return 1;
+		}
 	}
-	if (staged.length === 0) {
-		console.error(
-			'✗ no package is staged — run `deno task build:packages` and/or `deno task build:napi:packages`'
-		);
-		process.exit(1);
+
+	// a named package that is not staged fails here too: a missing staged file is fatal
+	const freshness = await staged_freshness_report(
+		packages.flatMap((pkg) => pkg.checks),
+		{ tree: handle_source_tree(checkout), stale_ok: deps.stale_ok }
+	);
+	if (freshness !== undefined) {
+		print_error(freshness.message);
+		if (freshness.fatal) return 1;
 	}
-	return staged;
+	print(`Type-checking the staged packages' declarations with TypeScript ${ts.version}`);
+	const names = packages.map((p) => p.name).join(', ');
+	if (!(await grade(deps, ts, packages))) {
+		print_error(`\n✗ ${names}: declarations do not type-check`);
+		return 1;
+	}
+	print(`\n✓ ${names}: declarations type-check`);
+	return 0;
 }
 
 /** Stage, grade and report; true when every program is clean. */
-async function grade(ts: TypeScriptApi, packages: ReadonlyArray<PackageSpec>): Promise<boolean> {
-	// the real path, so the compiler's file names match what this reads back
-	const consumer_dir = realpathSync(await mkdtemp(join(tmpdir(), 'tsv-typecheck-packages-')));
+async function grade(
+	deps: TypecheckPackagesDeps,
+	ts: TypeScriptApi,
+	packages: ReadonlyArray<PackageSpec>
+): Promise<boolean> {
+	const { print, print_error } = deps;
+	// the handle's path is the real one, so the compiler's file names match what this reads back
+	await using consumer = await deps.temp_dir();
 	try {
-		const { files, declarations } = await stage_consumer(consumer_dir, packages);
-		const { results, unloaded } = grade_consumer(ts, consumer_dir, files, declarations);
+		const { files, declarations } = await stage_consumer(deps.checkout, consumer, packages);
+		const { results, unloaded } = grade_consumer(
+			ts,
+			join(deps.checkout.path, TYPES_ROOT),
+			consumer.path,
+			files,
+			declarations
+		);
 		let clean = true;
 		for (const result of results) {
 			if (result.error_count === 0) {
-				console.log(`  PASS: ${result.label} (${result.files} modules)`);
+				print(`  PASS: ${result.label} (${result.files} modules)`);
 			} else {
 				clean = false;
-				console.error(`  FAIL: ${result.label} — ${result.error_count} diagnostics`);
-				console.error(result.diagnostics.replace(/^/gm, '    '));
+				print_error(`  FAIL: ${result.label} — ${result.error_count} diagnostics`);
+				print_error(result.diagnostics.replace(/^/gm, '    '));
 			}
 		}
 		if (unloaded.length > 0) {
 			clean = false;
-			console.error(
+			print_error(
 				`  FAIL: declaration entry points no program loaded:\n    ${unloaded.join('\n    ')}`
 			);
 		}
 		return clean;
 	} catch (error) {
-		console.error(`  FAIL: ${error instanceof Error ? error.message : String(error)}`);
+		print_error(`  FAIL: ${error instanceof Error ? error.message : String(error)}`);
 		return false;
-	} finally {
-		await rm(consumer_dir, { recursive: true, force: true });
 	}
 }
-
-async function main(): Promise<void> {
-	const ts = load_typescript();
-	const packages = select_packages(process.argv.slice(2));
-	// a named package that is not staged fails here too: a missing staged file is fatal
-	await assert_staged_fresh(packages.flatMap((pkg) => pkg.checks));
-	console.log(`Type-checking the staged packages' declarations with TypeScript ${ts.version}`);
-	const names = packages.map((p) => p.name).join(', ');
-	if (!(await grade(ts, packages))) {
-		console.error(`\n✗ ${names}: declarations do not type-check`);
-		process.exit(1);
-	}
-	console.log(`\n✓ ${names}: declarations type-check`);
-}
-
-if (import.meta.main) await main();

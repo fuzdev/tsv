@@ -1,36 +1,40 @@
 /**
- * Validates the built WASM artifacts: binary sizes against expected ranges,
- * a Deno runtime smoke test of every built bundle, and the third-party
- * `NOTICE` each npm package must ship (`THIRD_PARTY_NOTICE`).
+ * Validates the built WASM artifacts: binary sizes against expected ranges, and the
+ * third-party `NOTICE` each npm package must ship (`THIRD_PARTY_NOTICE`).
  *
  * Size bounds are deliberately tight (~±8%) so a legitimate size change
  * fails here and gets acknowledged by updating the constants below — a
  * 100 KB regression (or win) should be visible, not absorbed by slack.
  *
- * The smoke test covers what `scripts/test_npm.ts` (Node) can't:
- * - the npm packages' `index.js` entry running under Deno (the package
- *   README claims zero-config Node/Bun/Deno)
- * - the `pkg/<variant>/deno/` bundles (the format/parse subset bundles feed
- *   nothing else that executes them — benches run only the `all` build)
- * - the two LAZY entries (`browser.js` and the `./worker` subpath): their
- *   not-initialized guards, and the one-module-instance claim `./worker`
- *   rests on
+ * It grades files, never runs one: what the packages do when loaded is the package suites'
+ * (`scripts/test_npm.ts` under Node, `scripts/test_bun.ts` under Bun). The `deno` bundles it
+ * sizes are the bench's Deno row's, sized beside the npm packages they share a `.wasm` with.
  *
  * Only validates artifacts that exist (skips unbuilt targets), but fails
  * if nothing was found at all — and refuses to grade a STALE one, since a
- * weeks-old `pkg/` sizes and smokes exactly as cleanly as a fresh one.
+ * weeks-old `pkg/` sizes exactly as cleanly as a fresh one.
  *
  * Every bundle path comes from `benches/js/lib/tsv_artifacts.ts` — the same
  * builders the bench's size table, the run-side freshness guard, the build-side
  * skip and the three loaders resolve from. A release gate that spelled the layout
  * itself would keep passing over the old location after a move, which is the one
- * failure a size/smoke gate must not have.
+ * failure a size gate must not have.
  *
- * Usage: deno task validate:artifacts
+ * Usage: node scripts/roots/validate_artifacts.ts
+ *
+ * Exits 1 when a check fails, when nothing was found to validate, or when an artifact is
+ * stale (unless `BENCH_STALE_OK=1`) or a staged file a check names is missing.
+ *
+ * Reach: the checkout read-only, and `BENCH_STALE_OK` (`ValidateArtifactsDeps`, built by
+ * `scripts/roots/validate_artifacts.ts`).
+ *
+ * @module
  */
 
 import { relative } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
+
+import type { FsReadDir } from '@fuzdev/gro/fs.ts';
 
 import {
 	CORE_CRATES,
@@ -40,39 +44,22 @@ import {
 	type WasmVariant
 } from '../benches/js/lib/tsv_artifacts.ts';
 import {
-	assert_staged_fresh,
 	type StagedCheck,
+	staged_freshness_report,
 	wasm_package_checks
 } from './check_staged_freshness.ts';
+import { handle_source_tree } from './handle_source_tree.ts';
 import { THIRD_PARTY_NOTICE } from './npm_metadata.ts';
 import { format_size } from './size.ts';
 
-let passed = 0;
-let failed = 0;
-let skipped = 0;
-
-function pass(msg: string): void {
-	console.log(`  PASS: ${msg}`);
-	passed++;
-}
-
-function fail(msg: string): void {
-	console.log(`  FAIL: ${msg}`);
-	failed++;
-}
-
-function skip(msg: string): void {
-	console.log(`  SKIP: ${msg}`);
-	skipped++;
-}
-
-function file_size(path: string | URL): number | null {
-	try {
-		return Deno.statSync(path).size;
-	} catch (error) {
-		if (!(error instanceof Deno.errors.NotFound)) throw error;
-		return null;
-	}
+/** What `run_validate_artifacts` reaches. */
+export interface ValidateArtifactsDeps {
+	/** The checkout: every artifact and source is read beneath it. */
+	checkout: FsReadDir;
+	/** `BENCH_STALE_OK=1`: a stale artifact warns instead of failing the run. */
+	stale_ok: boolean;
+	print: (line: string) => void;
+	print_error: (line: string) => void;
 }
 
 // --- WASM binary size checks ---
@@ -85,56 +72,65 @@ function file_size(path: string | URL): number | null {
 const VARIANTS = ['format', 'parse', 'all'] as const satisfies readonly WasmVariant[];
 const TARGETS = ['npm', 'deno'] as const;
 
-// --- Staleness guard ---
-//
-// Everything below reads BUILT files, and nothing about a stale one looks wrong:
-// an old bundle has a size, imports, and formats. The release path is safe by
-// construction (`publish.ts` builds first, as does CI), but the bare
-// `deno task validate:artifacts` is also how one asks "are the artifacts OK?" —
-// and against a weeks-old `pkg/` it answers about code that no longer exists.
-// (`pkg/` is gitignored, so nothing else makes its age visible.) This is the
-// same guard the staged-package tests use, over the same two lags, so the trap
-// keeps one spelling.
-//
-// Existence-gated like every check below — an unbuilt variant is skipped, not
-// failed — and `BENCH_STALE_OK=1` downgrades staleness to a warning, the one
-// knob every mtime guard in the repo shares.
-
-/** `assert_staged_fresh` takes repo-root-relative paths; the LAYOUT still comes
- * from `tsv_artifacts.ts`, so a move stays a one-place edit. */
+/** The handle takes checkout-relative paths; the LAYOUT still comes from
+ * `tsv_artifacts.ts`, so a move stays a one-place edit. */
 const repo_rel = (absolute: string): string =>
 	relative(fileURLToPath(new URL('..', import.meta.url)), absolute);
+
+/** A variant's bundle for a target, checkout-relative. */
+const bundle_path = (variant: WasmVariant, target: string): string =>
+	repo_rel(wasm_bundle_path(variant, target));
+
+/** A variant's npm staging manifest, checkout-relative. */
+const npm_manifest = (variant: WasmVariant): string =>
+	`${repo_rel(wasm_bundle_dir(variant, 'npm'))}/package.json`;
+
+/**
+ * The files any staging step leaves in a variant's npm staging, checkout-relative: those the
+ * shared checks name (the bundle and the entries), the manifest, and the worker entry. One of
+ * them present makes the staging built.
+ */
+const npm_staged_files = (variant: WasmVariant): Array<string> => [
+	...wasm_package_checks(variant).map((check) => check.staged),
+	npm_manifest(variant),
+	`${repo_rel(wasm_bundle_dir(variant, 'npm'))}/worker.js`
+];
 
 const REBUILD_TASKS = {
 	// the format variant is the unqualified one (`deno task build:wasm:deno`)
 	deno: { format: 'build:wasm:deno', parse: 'build:wasm:parse:deno', all: 'build:wasm:all:deno' }
 } as const;
 
-const freshness_checks: StagedCheck[] = [];
-for (const variant of VARIANTS) {
-	// a deno bundle is a wasm-pack output and nothing more; an npm staging is graded by
-	// the one list every reader of a staged package shares
-	const bundle = wasm_bundle_path(variant, 'deno');
-	if (file_size(bundle) !== null) {
-		freshness_checks.push({
-			label: `${variant}/deno WASM bundle`,
-			staged: repo_rel(bundle),
-			crates: [...CORE_CRATES, ...WASM_CRATES],
-			// `package.json` because the wasm-pack invocation lives there: which
-			// FEATURES a variant is built with is a task string, so editing one
-			// changes the bundle from unchanged crate sources. `run_if_stale.ts`
-			// — the build-side guard over this same artifact, off the same two
-			// crate lists — names it for that reason, and the two sides are
-			// supposed to agree on what feeds a bundle.
-			files: ['package.json'],
-			rebuild: `deno task ${REBUILD_TASKS.deno[variant]}`
-		});
+/**
+ * The freshness checks over what is built: a deno bundle is a wasm-pack output and nothing
+ * more; an npm staging is graded by the one list every reader of a staged package shares.
+ * Existence-gated like every check below, so an unbuilt variant is skipped, not failed.
+ */
+export function artifact_freshness_checks(built: {
+	deno: ReadonlySet<WasmVariant>;
+	npm: ReadonlySet<WasmVariant>;
+}): Array<StagedCheck> {
+	const checks: Array<StagedCheck> = [];
+	for (const variant of VARIANTS) {
+		if (built.deno.has(variant)) {
+			checks.push({
+				label: `${variant}/deno WASM bundle`,
+				staged: bundle_path(variant, 'deno'),
+				crates: [...CORE_CRATES, ...WASM_CRATES],
+				// `package.json` because the wasm-pack invocation lives there: which
+				// FEATURES a variant is built with is a task string, so editing one
+				// changes the bundle from unchanged crate sources. `run_if_stale.ts`
+				// — the build-side guard over this same artifact, off the same two
+				// crate lists — names it for that reason, and the two sides are
+				// supposed to agree on what feeds a bundle.
+				files: ['package.json'],
+				rebuild: `deno task ${REBUILD_TASKS.deno[variant]}`
+			});
+		}
+		if (built.npm.has(variant)) checks.push(...wasm_package_checks(variant));
 	}
-	if (file_size(wasm_bundle_path(variant, 'npm')) !== null) {
-		freshness_checks.push(...wasm_package_checks(variant));
-	}
+	return checks;
 }
-await assert_staged_fresh(freshness_checks);
 
 // Centers (deno target; npm == deno, identical `.wasm`): format 2,720,874 B, parse
 // 1,073,871 B and all 3,048,129 B, measured on one tree 2026-11-03; all carries the type
@@ -149,7 +145,7 @@ await assert_staged_fresh(freshness_checks);
 // the tight band exists to surface; recenter on it deliberately, with the cause
 // named in the commit. The retired centers and what moved them are recorded
 // elsewhere, not here.
-const BOUNDS = {
+export const BOUNDS = {
 	format: { min: 2_503_000, max: 2_938_000 },
 	parse: { min: 988_000, max: 1_160_000 },
 	all: { min: 2_804_000, max: 3_292_000 }
@@ -169,508 +165,185 @@ const BOUNDS = {
 // together, the import records its smallest part.
 //
 // At the current center: `all − format` 327,255 B; `all − parse` 1,974,258 B.
-const DELTAS = {
+export const DELTAS = {
 	format: { min: 301_000, max: 353_000 }, // all − format
 	parse: { min: 1_816_000, max: 2_132_000 } // all − parse
 };
 
-console.log('=== WASM binary sizes ===');
+/**
+ * Validates what is built (module doc).
+ * @returns the exit code: `0` when every check passed, `1` otherwise
+ */
+export async function run_validate_artifacts(deps: ValidateArtifactsDeps): Promise<number> {
+	const { checkout, print } = deps;
+	let passed = 0;
+	let failed = 0;
+	let skipped = 0;
 
-const sizes: Partial<Record<`${(typeof VARIANTS)[number]}/${(typeof TARGETS)[number]}`, number>> =
-	{};
+	const pass = (msg: string): void => {
+		print(`  PASS: ${msg}`);
+		passed++;
+	};
+	const fail = (msg: string): void => {
+		print(`  FAIL: ${msg}`);
+		failed++;
+	};
+	const skip = (msg: string): void => {
+		print(`  SKIP: ${msg}`);
+		skipped++;
+	};
+	const check = async (
+		target: string,
+		name: string,
+		assertion: () => Promise<boolean>
+	): Promise<void> => {
+		try {
+			if (await assertion()) {
+				pass(`${target} — ${name}`);
+			} else {
+				fail(`${target} — ${name} returned wrong output`);
+			}
+		} catch (error) {
+			fail(`${target} — ${name} threw: ${error}`);
+		}
+	};
+	/** The size of the entry at `path`, or `null` when nothing is there. */
+	const file_size = async (path: string): Promise<number | null> =>
+		(await checkout.stat(path))?.size ?? null;
 
-for (const target of TARGETS) {
+	// --- Staleness guard ---
+	//
+	// Everything below reads BUILT files, and nothing about a stale one looks wrong:
+	// an old bundle has a size and the notice it was staged with. The release path is safe
+	// by construction (`publish.ts` builds first, as does CI), but the bare
+	// `validate:artifacts` is also how one asks "are the artifacts OK?" — and against a
+	// weeks-old `pkg/` it answers about code that no longer exists. (`pkg/` is gitignored,
+	// so nothing else makes its age visible.) This is the same guard the staged-package
+	// tests use, over the same two lags, so the trap keeps one spelling.
+	//
+	// `BENCH_STALE_OK=1` downgrades staleness to a warning, the one knob every mtime guard
+	// in the repo shares.
+	//
+	// A deno bundle counts as built once its `.wasm` is there, an npm staging once any file a
+	// staging step writes is (`npm_staged_files`), so a staging holding some without the rest
+	// fails rather than being skipped as unbuilt.
+	const built = { deno: new Set<WasmVariant>(), npm: new Set<WasmVariant>() };
 	for (const variant of VARIANTS) {
-		const label = `${variant}/${target}` as const;
-		const size = file_size(wasm_bundle_path(variant, target));
-		if (size === null) {
-			skip(`${label} — not built`);
+		if ((await file_size(bundle_path(variant, 'deno'))) !== null) built.deno.add(variant);
+		for (const path of npm_staged_files(variant)) {
+			if ((await file_size(path)) !== null) {
+				built.npm.add(variant);
+				break;
+			}
+		}
+	}
+	const freshness = await staged_freshness_report(artifact_freshness_checks(built), {
+		tree: handle_source_tree(checkout),
+		stale_ok: deps.stale_ok
+	});
+	if (freshness !== undefined) {
+		deps.print_error(freshness.message);
+		if (freshness.fatal) return 1;
+	}
+
+	print('=== WASM binary sizes ===');
+
+	const sizes: Partial<Record<`${(typeof VARIANTS)[number]}/${(typeof TARGETS)[number]}`, number>> =
+		{};
+
+	for (const target of TARGETS) {
+		for (const variant of VARIANTS) {
+			const label = `${variant}/${target}` as const;
+			const size = await file_size(bundle_path(variant, target));
+			if (size === null) {
+				skip(`${label} — not built`);
+				continue;
+			}
+			sizes[label] = size;
+			const { min, max } = BOUNDS[variant];
+			if (size < min) {
+				fail(
+					`${label}: ${format_size(size)} (${size} B) < min ${format_size(min)} — suspiciously small`
+				);
+			} else if (size > max) {
+				fail(
+					`${label}: ${format_size(size)} (${size} B) > max ${format_size(max)} — size regression`
+				);
+			} else {
+				pass(`${label}: ${format_size(size)} (${size} B)`);
+			}
+		}
+	}
+
+	// Relative invariants per target: `all` is the superset build, so each
+	// subset must sit a stable margin below it.
+	for (const target of TARGETS) {
+		const all_bytes = sizes[`all/${target}`];
+		if (all_bytes === undefined) continue;
+		for (const variant of ['format', 'parse'] as const) {
+			const subset_bytes = sizes[`${variant}/${target}`];
+			if (subset_bytes === undefined) continue;
+			const { min, max } = DELTAS[variant];
+			const delta = all_bytes - subset_bytes;
+			if (delta < min) {
+				fail(
+					`all - ${variant} (${target}) = ${format_size(delta)} — expected ≥${format_size(
+						min
+					)} (feature gate broken?)`
+				);
+			} else if (delta > max) {
+				fail(
+					`all - ${variant} (${target}) = ${format_size(delta)} — expected ≤${format_size(
+						max
+					)} (unexpected bloat)`
+				);
+			} else {
+				pass(`all - ${variant} (${target}) = ${format_size(delta)}`);
+			}
+		}
+	}
+
+	// --- Third-party notice ---
+	//
+	// Every npm package compiles in the WHATWG entity table, whose license requires its notice
+	// in the documentation of a binary distribution (`THIRD_PARTY_NOTICE`). A package without
+	// it is not publishable, however well it sizes.
+
+	print('\n=== Third-party notice ===');
+
+	const notice_source = await checkout.read_text(THIRD_PARTY_NOTICE.source);
+	for (const variant of VARIANTS) {
+		const dir = repo_rel(wasm_bundle_dir(variant, 'npm'));
+		const label = `${variant}/npm`;
+		if (!built.npm.has(variant)) {
+			skip(`${label} NOTICE — not built`);
 			continue;
 		}
-		sizes[label] = size;
-		const { min, max } = BOUNDS[variant];
-		if (size < min) {
-			fail(
-				`${label}: ${format_size(size)} (${size} B) < min ${format_size(min)} — suspiciously small`
-			);
-		} else if (size > max) {
-			fail(
-				`${label}: ${format_size(size)} (${size} B) > max ${format_size(max)} — size regression`
-			);
-		} else {
-			pass(`${label}: ${format_size(size)} (${size} B)`);
-		}
-	}
-}
-
-// Relative invariants per target: `all` is the superset build, so each
-// subset must sit a stable margin below it.
-for (const target of TARGETS) {
-	const all_bytes = sizes[`all/${target}`];
-	if (all_bytes === undefined) continue;
-	for (const variant of ['format', 'parse'] as const) {
-		const subset_bytes = sizes[`${variant}/${target}`];
-		if (subset_bytes === undefined) continue;
-		const { min, max } = DELTAS[variant];
-		const delta = all_bytes - subset_bytes;
-		if (delta < min) {
-			fail(
-				`all - ${variant} (${target}) = ${format_size(delta)} — expected ≥${format_size(
-					min
-				)} (feature gate broken?)`
-			);
-		} else if (delta > max) {
-			fail(
-				`all - ${variant} (${target}) = ${format_size(delta)} — expected ≤${format_size(
-					max
-				)} (unexpected bloat)`
-			);
-		} else {
-			pass(`all - ${variant} (${target}) = ${format_size(delta)}`);
-		}
-	}
-}
-
-// --- Deno runtime smoke ---
-
-interface SmokeTarget {
-	label: string;
-	/** ABSOLUTE path to the module entry — `wasm_bundle_dir`'s output, imported via
-	 * `pathToFileURL` rather than resolved against a repo root here. */
-	entry: string;
-	has_format: boolean;
-	has_parse: boolean;
-	/** The type strip rides the `all` build alone (the `strip` feature). */
-	has_strip: boolean;
-	/** The import records ride the `all` build alone too (the `imports` feature). */
-	has_imports: boolean;
-	/** The published npm package (patched by `patch_npm_package.ts`) vs the raw
-	 * wasm-pack deno bundle. The facade and the pure-JS `locations.js` helper are
-	 * patched into the npm packages only, so they're checked on npm entries alone. */
-	is_npm: boolean;
-}
-
-const smoke_entries = (variant: WasmVariant): SmokeTarget[] => [
-	// npm package via its published Node entry (auto-init; Deno supports node:fs)
-	{
-		label: `${variant}/npm index.js`,
-		entry: `${wasm_bundle_dir(variant, 'npm')}/index.js`,
-		has_format: variant !== 'parse',
-		has_parse: variant !== 'format',
-		has_strip: variant === 'all',
-		has_imports: variant === 'all',
-		is_npm: true
-	},
-	// deno-target bundle (auto-init at import)
-	{
-		label: `${variant}/deno bundle`,
-		entry: `${wasm_bundle_dir(variant, 'deno')}/tsv_wasm.js`,
-		has_format: variant !== 'parse',
-		has_parse: variant !== 'format',
-		has_strip: variant === 'all',
-		has_imports: variant === 'all',
-		is_npm: false
-	}
-];
-
-const smoke_targets: SmokeTarget[] = VARIANTS.flatMap(smoke_entries);
-
-console.log('\n=== Deno runtime smoke ===');
-
-for (const {
-	label,
-	entry,
-	has_format,
-	has_parse,
-	has_strip,
-	has_imports,
-	is_npm
-} of smoke_targets) {
-	const entry_url = pathToFileURL(entry);
-	if (file_size(entry_url) === null) {
-		skip(`${label} — not built`);
-		continue;
-	}
-	let mod: Record<string, (source: string) => unknown>;
-	try {
-		mod = await import(entry_url.href);
-	} catch (error) {
-		fail(`${label} — import threw: ${error}`);
-		continue;
-	}
-	// the npm entry publishes through the facade, whose every export returns a result; the
-	// raw deno bundle returns the product itself
-	const code = (value: unknown): unknown => (is_npm ? (value as { code?: unknown }).code : value);
-	// the raw `parse_<lang>` builds its `{ok: true, ast}` result engine-side, as the facade's
-	const ast_type = (value: unknown): unknown =>
-		((value as { ast?: unknown }).ast as { type?: unknown } | undefined)?.type;
-	if (has_format) {
-		check(
-			label,
-			'format_typescript',
-			() => code(mod.format_typescript('const   x=1')) === 'const x = 1;\n'
-		);
-		check(
-			label,
-			'format_css',
-			() => code(mod.format_css('a{color:red}')) === 'a {\n\tcolor: red;\n}\n'
-		);
-		check(
-			label,
-			'format_svelte',
-			() => code(mod.format_svelte('<div   >x</div   >')) === '<div>x</div>\n'
-		);
-		check(label, 'IgnoreStack', () => {
-			const ctor = (mod as Record<string, unknown>).IgnoreStack as
-				| (new () => {
-						push_gitignore(anchor: string, content: string): void;
-						push_formatignore(anchor: string, content: string): void;
-						is_ignored(path: string, is_dir: boolean): boolean;
-						classify_dir(
-							child_rel: string,
-							heuristic_active: boolean
-						): 'descend' | 'prune' | 'prune_warn';
-						should_format_file(child_rel: string): boolean;
-						shadow_warning(dir: string, loose_root: string | undefined): string | undefined;
-				  })
-				| undefined;
-			if (!ctor) return false;
-			const stack = new ctor();
-			stack.push_gitignore('', 'build/\nignored.ts\n');
-			stack.push_formatignore('', '!build/keep.ts\n'); // override layer can't re-include under an excluded dir
-			// every `classify_dir` on THIS stack passes `heuristic_active: false`, because a
-			// `.gitignore` governs this level and `classify_dir` requires the two to agree
-			// — a pushed `.gitignore` layer with the heuristic on is a state it rejects
-			// (its `is_reincluded` override would read `.gitignore` negations). The safety
-			// nets are context-free, so `node_modules` prunes at either value; the
-			// heuristic gets its own gitignore-free stack below.
-			const gated =
-				stack.is_ignored('build/x.ts', false) &&
-				stack.is_ignored('build/keep.ts', false) &&
-				!stack.is_ignored('src/x.ts', false) &&
-				// the tsv_discover verdict methods (the format-only package's primary
-				// discovery exports)
-				stack.classify_dir('node_modules', false) === 'prune' && // safety net
-				// a rule prunes `build`, and the `!build/keep.ts` written under it is inert
-				// there (git's parent-directory rule), so the verdict carries a warning
-				// rather than being a plain prune — the caller then fetches the re-include
-				// ladder from `shadow_warning`
-				stack.classify_dir('build', false) === 'prune_warn' &&
-				!!stack.shadow_warning('build', undefined) &&
-				stack.classify_dir('src', false) === 'descend' &&
-				stack.should_format_file('src/app.ts') === true &&
-				stack.should_format_file('ignored.ts') === false && // leaf-matched ignore (should_format_file is leaf-only; build/ is kept out via classify_dir's dir prune above)
-				stack.should_format_file('notes.md') === false; // wrong extension
-			// the build-output heuristic, which is active only where no `.gitignore`
-			// governs the level — so it needs a stack with none pushed
-			const loose = new ctor();
-			return (
-				gated &&
-				loose.classify_dir('dist', true) === 'prune' &&
-				loose.classify_dir('src', true) === 'descend'
-			);
+		// a staging with its bundle and no manifest declares nothing
+		await check(label, `package.json files declares ${THIRD_PARTY_NOTICE.published}`, async () => {
+			const manifest = await checkout.read_text_if_exists(npm_manifest(variant));
+			if (manifest === null) return false;
+			const { files } = JSON.parse(manifest) as { files?: string[] };
+			return (files ?? []).includes(THIRD_PARTY_NOTICE.published);
 		});
-	} else {
-		check(label, 'format_* absent (parse-only build)', () => mod.format_typescript === undefined);
-		check(
+		await check(
 			label,
-			'IgnoreStack absent (parse-only build)',
-			() => (mod as Record<string, unknown>).IgnoreStack === undefined
+			`${THIRD_PARTY_NOTICE.published} is ${THIRD_PARTY_NOTICE.source} verbatim`,
+			async () =>
+				(await file_size(`${dir}/${THIRD_PARTY_NOTICE.published}`)) !== null &&
+				(await checkout.read_text(`${dir}/${THIRD_PARTY_NOTICE.published}`)) === notice_source
 		);
 	}
-	if (has_parse) {
-		check(
-			label,
-			'parse_typescript',
-			() => ast_type(mod.parse_typescript('const x = 1;')) === 'Program'
+
+	// --- Summary ---
+
+	print(`\n=== Artifact validation: ${passed} passed, ${failed} failed, ${skipped} skipped ===`);
+	if (failed > 0) return 1;
+	if (passed === 0) {
+		deps.print_error(
+			'FAIL: no artifacts found to validate — run `deno task build:npm:format` etc. first'
 		);
-		check(label, 'parse_svelte', () => ast_type(mod.parse_svelte('<div>x</div>')) === 'Root');
-		check(
-			label,
-			'parse_css',
-			() => ast_type(mod.parse_css('a { color: red }')) === 'StyleSheetFile'
-		);
+		return 1;
 	}
-	// The type strip, one call per outcome: through the facade's result object on the npm
-	// entry, and as the raw export's string-or-failure on the deno bundle — whose returned
-	// refusal is the `{ok: false, error}` the facade hands back as it is.
-	if (has_strip && is_npm) {
-		check(label, 'strip_typescript', () => {
-			const strip = mod.strip_typescript as unknown as (source: string) => {
-				ok: boolean;
-				code?: string;
-				error?: { kind: string; construct?: string; start: number; end?: number };
-			};
-			const ok = strip('let x: T = 1;');
-			const parse = strip('let = ;');
-			const refused = strip('x;\nenum E {}');
-			return (
-				ok.ok &&
-				ok.code === 'let x    = 1;' &&
-				!parse.ok &&
-				parse.error?.kind === 'parse' &&
-				!refused.ok &&
-				refused.error?.kind === 'unsupported' &&
-				refused.error.construct === 'enum' &&
-				refused.error.start === 3 &&
-				refused.error.end === 12
-			);
-		});
-	} else if (has_strip) {
-		check(label, 'strip_typescript (raw)', () => {
-			if (mod.strip_typescript('let x: T = 1;') !== 'let x    = 1;') return false;
-			const refused = mod.strip_typescript('x;\nenum E {}') as unknown as {
-				ok: boolean;
-				error?: { kind: string; construct?: string; start: number; end?: number };
-			};
-			return (
-				refused.ok === false &&
-				refused.error?.kind === 'unsupported' &&
-				refused.error.construct === 'enum' &&
-				refused.error.start === 3 &&
-				refused.error.end === 12
-			);
-		});
-	} else {
-		check(label, 'strip_* absent (subset build)', () => mod.strip_typescript === undefined);
-	}
-	// The import records: the facade's result object on the npm entry, the raw JSON string
-	// on the deno bundle — both engines' one boundary — and a parse failure as the result.
-	const IMPORTS_JSON =
-		'{"hasModuleSyntax":true,"imports":[{"kind":"static","start":0,"end":11,' +
-		'"specifier":{"value":"a","start":8,"end":9},"typeOnly":null,"phase":null,"attributes":null}]}';
-	if (has_imports && is_npm) {
-		check(label, 'parse_imports_typescript + parse_imports_svelte', () => {
-			const imports = mod as unknown as Record<
-				string,
-				(source: string) => { ok: boolean; error?: { kind: string } }
-			>;
-			const ok = imports.parse_imports_typescript("import 'a';");
-			const svelte = imports.parse_imports_svelte("<script>import 'a';</script>");
-			const failed = imports.parse_imports_typescript('let = ;');
-			return (
-				JSON.stringify(ok) === `{"ok":true,${IMPORTS_JSON.slice(1)}` &&
-				svelte.ok &&
-				!failed.ok &&
-				failed.error?.kind === 'parse'
-			);
-		});
-	} else if (has_imports) {
-		check(label, 'parse_imports_typescript (raw)', () => {
-			if (mod.parse_imports_typescript("import 'a';") !== IMPORTS_JSON) return false;
-			const failed = mod.parse_imports_typescript('let = ;') as { ok?: boolean };
-			return failed.ok === false && typeof mod.parse_imports_svelte === 'function';
-		});
-	} else {
-		check(
-			label,
-			'parse_imports_* absent (subset build)',
-			() => mod.parse_imports_typescript === undefined && mod.parse_imports_svelte === undefined
-		);
-	}
-	// The facade and the pure-JS reconstruction helper are patched into the npm
-	// packages only (the raw wasm-pack deno bundle carries neither), so scope this to
-	// npm entries. Parse-side analog of IgnoreStack — Deno-runtime smoke that
-	// test_npm.ts (Node) can't give: the default parse carries no `loc`, reconstruct
-	// mutates in place and adds one, and `{locations: true}` is that reconstruction.
-	if (is_npm) {
-		if (has_parse) {
-			check(label, 'reconstruct_locations + {locations: true}', () => {
-				const reconstruct = (mod as Record<string, unknown>).reconstruct_locations as
-					((ast: unknown, source: string) => { loc?: unknown }) | undefined;
-				if (typeof reconstruct !== 'function') return false;
-				const parse = (source: string, options?: { locations?: boolean }): { loc?: unknown } =>
-					(
-						mod.parse_typescript as unknown as (
-							source: string,
-							options?: { locations?: boolean }
-						) => { ast: { loc?: unknown } }
-					)(source, options).ast;
-				const ast = parse('const x = 1;');
-				if (ast.loc) return false; // the default wire is span-only
-				const out = reconstruct(ast, 'const x = 1;');
-				if (out !== ast || !out.loc) return false; // same reference (in-place) + loc added
-				return (
-					JSON.stringify(parse('const x = 1;', { locations: true }).loc) === JSON.stringify(out.loc)
-				);
-			});
-		} else {
-			check(
-				label,
-				'reconstruct_locations absent (format-only build)',
-				() => (mod as Record<string, unknown>).reconstruct_locations === undefined
-			);
-		}
-	}
-	// The trap-recovery hook is patched into the npm packages' glue only (the
-	// raw wasm-pack deno bundles aren't patched), on every variant. Deno-runtime
-	// smoke: present, callable on a healthy instance, and the swapped-in fresh
-	// instance still answers. The full poison-then-recover contract is
-	// test_npm.ts's job (Node).
-	if (is_npm) {
-		check(label, 'reinstantiate', () => {
-			const reinstantiate = (mod as Record<string, unknown>).reinstantiate;
-			if (typeof reinstantiate !== 'function') return false;
-			(reinstantiate as () => void)();
-			return has_format
-				? code(mod.format_typescript('const   x=1')) === 'const x = 1;\n'
-				: ast_type(mod.parse_typescript('const x = 1;')) === 'Program';
-		});
-	}
-}
-
-// --- Lazy-entry smoke: browser.js and the `./worker` subpath ---
-//
-// The loop above imports each package's AUTO-INIT entry. The two lazy entries
-// carry claims nothing here executed until now: that every export refuses to
-// run before `init()` with a NAMED error rather than a glue-level `TypeError`
-// (the class exports included — they take a guarded subclass, since a
-// constructor cannot take the per-call guard), and that `./worker` is the SAME
-// module instance as `browser.js` rather than a second copy of the wrappers
-// with its own `_ready` flag, so one `init_sync` serves both. `test_npm.ts`
-// covers the Node side; the singleton claim is pinned only here.
-//
-// Deliberately after the loop above rather than before it: by then the glue is
-// already initialized, so a guard that still throws is answering the entry's own
-// `_ready` flag — which is what it gates on — rather than incidentally reporting
-// an uninitialized glue.
-
-console.log('\n=== Deno runtime smoke: lazy entries ===');
-
-for (const variant of VARIANTS) {
-	const dir = wasm_bundle_dir(variant, 'npm');
-	const label = `${variant}/npm lazy entries`;
-	const worker_entry = pathToFileURL(`${dir}/worker.js`);
-	if (file_size(worker_entry) === null) {
-		skip(`${label} — not built`);
-		continue;
-	}
-	const has_format = variant !== 'parse';
-	const expected = has_format ? 'const x = 1;\n' : 'Program';
-	/** Whichever export this variant has, its result unwrapped as the auto-init loop does. */
-	const exercise = (mod: Record<string, (source: string) => unknown>): unknown =>
-		has_format
-			? (mod.format_typescript('const   x=1') as { code: string }).code
-			: (mod.parse_typescript('const x = 1;') as { ast: { type: string } }).ast.type;
-
-	let worker_mod: Record<string, (source: string) => unknown>;
-	let browser_mod: Record<string, (source: string) => unknown>;
-	try {
-		// Order is immaterial — `worker.js` is `export *` from `browser.js`, so
-		// this is one module either way and neither entry initializes anything.
-		// The subpath is named first because the guard checks below are ABOUT
-		// it; browser.js is here only to answer whether it is that same module.
-		worker_mod = await import(worker_entry.href);
-		browser_mod = await import(pathToFileURL(`${dir}/browser.js`).href);
-	} catch (error) {
-		fail(`${label} — import threw: ${error}`);
-		continue;
-	}
-
-	check(label, 'the ./worker entry exports no wasm_module', () => !('wasm_module' in worker_mod));
-	check(label, 'a function export throws the named error before init', () => {
-		try {
-			exercise(worker_mod);
-			return false;
-		} catch (error) {
-			return /WASM not initialized/.test(String((error as Error)?.message));
-		}
-	});
-	if (has_format) {
-		check(label, 'a class export throws the named error before init', () => {
-			const ctor = (worker_mod as Record<string, unknown>).IgnoreStack as new () => unknown;
-			try {
-				new ctor();
-				return false;
-			} catch (error) {
-				return /WASM not initialized/.test(String((error as Error)?.message));
-			}
-		});
-	}
-
-	const init_sync = (worker_mod as Record<string, unknown>).init_sync as
-		((options: { module: BufferSource }) => void) | undefined;
-	if (typeof init_sync !== 'function') {
-		fail(`${label} — the ./worker entry has no init_sync`);
-		continue;
-	}
-	init_sync({ module: Deno.readFileSync(`${dir}/tsv_wasm_bg.wasm`) });
-
-	check(label, 'the ./worker entry works after init_sync', () => exercise(worker_mod) === expected);
-	// The singleton claim: browser.js was never initialized through its own name.
-	check(
-		label,
-		"browser.js shares the ./worker entry's init (one module instance)",
-		() => exercise(browser_mod) === expected
-	);
-	if (has_format) {
-		check(label, 'a class export constructs after init', () => {
-			const ctor = (browser_mod as Record<string, unknown>).IgnoreStack as new () => {
-				push_gitignore(anchor: string, content: string): void;
-				is_ignored(path: string, is_dir: boolean): boolean;
-				free(): void;
-			};
-			const stack = new ctor();
-			if (!(stack instanceof ctor)) return false;
-			stack.push_gitignore('', 'build/\n');
-			const verdict = stack.is_ignored('build/x.ts', false) && !stack.is_ignored('src/x.ts', false);
-			stack.free();
-			return verdict;
-		});
-	}
-}
-
-// --- Third-party notice ---
-//
-// Every npm package compiles in the WHATWG entity table, whose license requires its notice
-// in the documentation of a binary distribution (`THIRD_PARTY_NOTICE`). A package without
-// it is not publishable, however well it sizes and smokes.
-
-console.log('\n=== Third-party notice ===');
-
-const notice_source = Deno.readTextFileSync(THIRD_PARTY_NOTICE.source);
-for (const variant of VARIANTS) {
-	const dir = wasm_bundle_dir(variant, 'npm');
-	const label = `${variant}/npm`;
-	if (file_size(`${dir}/package.json`) === null) {
-		skip(`${label} NOTICE — not built`);
-		continue;
-	}
-	const files = (JSON.parse(Deno.readTextFileSync(`${dir}/package.json`)) as { files?: string[] })
-		.files;
-	check(label, `package.json files declares ${THIRD_PARTY_NOTICE.published}`, () =>
-		(files ?? []).includes(THIRD_PARTY_NOTICE.published)
-	);
-	check(
-		label,
-		`${THIRD_PARTY_NOTICE.published} is ${THIRD_PARTY_NOTICE.source} verbatim`,
-		() =>
-			file_size(`${dir}/${THIRD_PARTY_NOTICE.published}`) !== null &&
-			Deno.readTextFileSync(`${dir}/${THIRD_PARTY_NOTICE.published}`) === notice_source
-	);
-}
-
-function check(target: string, name: string, assertion: () => boolean): void {
-	try {
-		if (assertion()) {
-			pass(`${target} — ${name}`);
-		} else {
-			fail(`${target} — ${name} returned wrong output`);
-		}
-	} catch (error) {
-		fail(`${target} — ${name} threw: ${error}`);
-	}
-}
-
-// --- Summary ---
-
-console.log(
-	`\n=== Artifact validation: ${passed} passed, ${failed} failed, ${skipped} skipped ===`
-);
-if (failed > 0) Deno.exit(1);
-if (passed === 0) {
-	console.error(
-		'FAIL: no artifacts found to validate — run `deno task build:npm:format` etc. first'
-	);
-	Deno.exit(1);
+	return 0;
 }

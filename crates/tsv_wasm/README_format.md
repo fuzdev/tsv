@@ -16,7 +16,7 @@ Docs and benchmarks: [tsv.fuz.dev](https://tsv.fuz.dev/). Source and conformance
 npm i @fuzdev/tsv-format-wasm
 ```
 
-Requires Node.js 22+; Bun and Deno work too, and browsers via `init()` (below).
+Requires Node.js 22+; Bun works too, and browsers via `init()` (below).
 
 TypeScript declarations are bundled. They name the DOM lib's `fetch` and `WebAssembly` types (for `init()` and the compiled module), so a project type-checking them needs `"dom"` in its `lib`, or `skipLibCheck`.
 
@@ -24,7 +24,7 @@ TypeScript declarations are bundled. They name the DOM lib's `fetch` and `WebAss
 
 Three formatting functions: `format_svelte`, `format_typescript`, `format_css`. Each takes a source `string` and returns a result: `{ok: true, code}` with the formatted `string`, or `{ok: false, error}` for a source it cannot format (below).
 
-### Node.js, Bun, Deno
+### Node.js, Bun
 
 Zero config — WASM is initialized synchronously at import time:
 

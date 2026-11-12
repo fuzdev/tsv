@@ -964,7 +964,7 @@ deno task engines:audit [roots...]   # --json
 **What it proves.** tsv's formatter is one Rust source compiled twice — to wasm32 for
 the npm packages, natively for `tsv_cli` and the N-API addon — and the packages state
 the equality as a contract. Nothing graded it: the fixture gate runs the native build
-alone, and `scripts/validate_artifacts.ts` smoke-tests three tiny inputs per variant,
+alone, and the package suites run a few inputs per package,
 which proves each bundle *runs*, not that it *agrees*. This copies each corpus root into
 two temp trees, formats one with the native CLI and the other with the WASM CLI, and
 requires the two runs to agree on everything observable: exit code, the changed-path

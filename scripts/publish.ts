@@ -108,7 +108,7 @@ import {
 } from './sidecar_install.ts';
 import { gzip_size, type GzipProgram } from './gzip_size.ts';
 import { format_size } from './size.ts';
-import { TYPECHECK_INSTALL } from './typecheck_packages.ts';
+import { TYPECHECK_INSTALL } from './typecheck_install.ts';
 
 /** `gzip` for `gzip_size`, run through Deno's `Command` as this script's runtime does. */
 const gzip: GzipProgram = {
@@ -639,7 +639,7 @@ for (const { label, dir } of packages) {
 
 // Step 6: Test the built artifacts
 
-console.log('\n=== Step 6: Validate built packages (sizes + Deno + Node + Bun + declarations) ===');
+console.log('\n=== Step 6: Validate built packages (sizes + Node + Bun + declarations) ===');
 await run('deno task validate:artifacts', 'deno', ['task', 'validate:artifacts']);
 // A second spelling of deno.json's `test:npm*:run` tasks (see `//test:npm:run`): a leg added
 // there must be added here too, or a publish silently skips it.

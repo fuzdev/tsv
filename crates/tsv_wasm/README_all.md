@@ -16,7 +16,7 @@ Docs and benchmarks: [tsv.fuz.dev](https://tsv.fuz.dev/). Source and conformance
 npm i -D @fuzdev/tsv-wasm
 ```
 
-Requires Node.js 22+; Bun and Deno work too, and browsers via `init()` (below).
+Requires Node.js 22+; Bun works too, and browsers via `init()` (below).
 
 TypeScript declarations are bundled. They name the DOM lib's `fetch` and `WebAssembly` types (for `init()` and the compiled module), so a project type-checking them needs `"dom"` in its `lib`, or `skipLibCheck`.
 
@@ -47,7 +47,7 @@ Large trees format across worker threads — `--jobs N` sets the count, and the 
 
 ## Library usage
 
-In Node.js, Bun, and Deno, WASM is initialized synchronously at import time — zero config. In browsers and bundlers, call `await init()` once first (Vite, Webpack, and Rollup resolve the WASM asset automatically; `init_sync({ module })` is also exported for Workers and custom loading).
+In Node.js and Bun, WASM is initialized synchronously at import time — zero config. In browsers and bundlers, call `await init()` once first (Vite, Webpack, and Rollup resolve the WASM asset automatically; `init_sync({ module })` is also exported for Workers and custom loading).
 
 ```typescript
 import {format_svelte, parse_svelte} from '@fuzdev/tsv-wasm';

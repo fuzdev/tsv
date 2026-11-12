@@ -137,29 +137,42 @@ export async function staged_staleness(
 	return undefined;
 }
 
+/** What `staged_freshness_report` found over a list of checks. */
+export interface StagedFreshnessReport {
+	/** A staged file is missing, or one is stale and staleness wasn't downgraded. */
+	fatal: boolean;
+	/** The report, written to stderr as one write: the abort's, or the downgraded warning. */
+	message: string;
+}
+
 /**
- * Abort (exit 1) when any staged artifact is missing or older than a source
- * feeding it; see the module doc for the escape hatch. Returns normally when
- * everything is fresh (or staleness was downgraded to a warning).
+ * Grade every check and return the report `assert_staged_fresh` prints, without printing or
+ * exiting, for a caller that reads the checkout through a tree of its own and returns its exit
+ * code. `undefined` when everything is fresh.
+ * @param options.tree - the checkout to read
+ * @param options.stale_ok - `BENCH_STALE_OK=1`: a stale (present but older) file warns
  */
-export async function assert_staged_fresh(checks: readonly StagedCheck[]): Promise<void> {
-	const stale_ok = env.BENCH_STALE_OK === '1';
+export async function staged_freshness_report(
+	checks: readonly StagedCheck[],
+	options: { tree: SourceTree; stale_ok: boolean }
+): Promise<StagedFreshnessReport | undefined> {
 	const findings: string[] = [];
 	let missing = false;
 
 	for (const check of checks) {
-		const staleness = await staged_staleness(check);
+		const staleness = await staged_staleness(check, options.tree);
 		if (!staleness) continue;
 		if (staleness.missing) missing = true;
 		findings.push(`  • ${staleness.reason}`);
 		findings.push(`      restage: ${check.rebuild}`);
 	}
 
-	if (findings.length === 0) return;
+	if (findings.length === 0) return undefined;
 
-	const fatal = missing || !stale_ok;
-	console.error(
-		[
+	const fatal = missing || !options.stale_ok;
+	return {
+		fatal,
+		message: [
 			'',
 			fatal
 				? '✗ Stale staged package artifacts — refusing to grade outdated code.'
@@ -175,8 +188,22 @@ export async function assert_staged_fresh(checks: readonly StagedCheck[]): Promi
 				: []),
 			''
 		].join('\n')
-	);
-	if (fatal) exit(1);
+	};
+}
+
+/**
+ * Abort (exit 1) when any staged artifact is missing or older than a source
+ * feeding it; see the module doc for the escape hatch. Returns normally when
+ * everything is fresh (or staleness was downgraded to a warning).
+ */
+export async function assert_staged_fresh(checks: readonly StagedCheck[]): Promise<void> {
+	const report = await staged_freshness_report(checks, {
+		tree: CHECKOUT_TREE,
+		stale_ok: env.BENCH_STALE_OK === '1'
+	});
+	if (report === undefined) return;
+	console.error(report.message);
+	if (report.fatal) exit(1);
 }
 
 /**
@@ -287,24 +314,49 @@ export const NAPI_PKG_ROOT = 'crates/tsv_napi/pkg';
 export const NAPI_LOADER_DIR = `${NAPI_PKG_ROOT}/napi`;
 
 /**
+ * The triple of the one platform package staged beside the loader, from what is staged: whether
+ * the loader is, and the entries of `NAPI_PKG_ROOT`. `napi_staged_triple` reads them through
+ * `node:fs`; a caller on another tree reads them itself.
+ * @returns the triple, or the message naming what is staged when the loader is absent or the
+ *   platform packages are not exactly one
+ */
+export function napi_staged_triple_of(
+	loader_staged: boolean,
+	entries: ReadonlyArray<string>
+): { ok: true; triple: string } | { ok: false; message: string } {
+	if (!loader_staged) {
+		return {
+			ok: false,
+			message: `${NAPI_LOADER_DIR} not staged. Run 'deno task build:napi:packages' first.`
+		};
+	}
+	const platform_dirs = entries.filter((d) => d !== 'napi');
+	if (platform_dirs.length !== 1) {
+		return {
+			ok: false,
+			message: `expected exactly one staged platform package under ${NAPI_PKG_ROOT}, got: ${platform_dirs.join(', ') || '(none)'}`
+		};
+	}
+	return { ok: true, triple: platform_dirs[0]! };
+}
+
+/**
  * The triple of the one platform package staged beside the loader — the BUILD script's
  * host detection, which a loader resolving its sibling by its own detection then agrees
  * with or fails. Exits naming what is staged when the loader is absent or the platform
  * packages are not exactly one.
  */
 export function napi_staged_triple(): string {
-	if (!existsSync(`${ROOT}${NAPI_LOADER_DIR}`)) {
-		console.error(`${NAPI_LOADER_DIR} not staged. Run 'deno task build:napi:packages' first.`);
+	const loader_staged = existsSync(`${ROOT}${NAPI_LOADER_DIR}`);
+	const staged = napi_staged_triple_of(
+		loader_staged,
+		loader_staged ? readdirSync(`${ROOT}${NAPI_PKG_ROOT}`) : []
+	);
+	if (!staged.ok) {
+		console.error(staged.message);
 		exit(1);
 	}
-	const platform_dirs = readdirSync(`${ROOT}${NAPI_PKG_ROOT}`).filter((d) => d !== 'napi');
-	if (platform_dirs.length !== 1) {
-		console.error(
-			`expected exactly one staged platform package under ${NAPI_PKG_ROOT}, got: ${platform_dirs.join(', ') || '(none)'}`
-		);
-		exit(1);
-	}
-	return platform_dirs[0]!;
+	return staged.triple;
 }
 
 /**
