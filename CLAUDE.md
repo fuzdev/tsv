@@ -171,7 +171,7 @@ deno task test:node      # vitest under Node over the suites beside their module
 #                          over a temp checkout, staled by every input it names, with
 #                          `benches/js/lib/source_mtime_test.ts` — the walk every mtime guard shares;
 #                          `no_package_closure_test.ts` — the scripts CI runs with no `node_modules` import no package,
-#                          and publish:crates' suites load nothing that can spawn, write, or reach the network;
+#                          and the publish and release suites load nothing that can spawn, write, or reach the network;
 #                          `cargo_env_test.ts` — what reaches
 #                          a script's cargo; `check_canonical_pins_test.ts` — pins:audit's mode flags, its no-git path, and
 #                          where its git runs; `discovery_audit_test.ts` — what discovery:audit hands git and tsv;
@@ -181,9 +181,14 @@ deno task test:node      # vitest under Node over the suites beside their module
 #                          `publish_crates_test.ts` — publish:crates' dry run end to end over fake cargo, git and
 #                          crates.io (argv per step, order, printed lines, exit codes); `publish_crates_wetrun_test.ts` —
 #                          a `--wetrun` over the same fakes: each publish's argv, the tee, the rate-limit stop and `--wait`,
-#                          the checkout asked again before each publish; `roots/package_state_test.ts` —
-#                          the cleanup's two directories on a temp tree: what it removes, and a target directory or
-#                          cargo home outside them refused); in `check` (docs/tasks.md §`test:node`)
+#                          the checkout asked again before each publish; `publish_napi_test.ts` + `release_assets_test.ts` +
+#                          `release_notes_test.ts` — the N-API publish and the GitHub Release's assets and notes over fakes
+#                          (each npm and tar argv and their order, the registry readings and retry, each refusal, the mode
+#                          re-arm, `SHA512SUMS`); `release/node_host_test.ts` — the `node:*` deps their entries hand
+#                          them, over temp files, `sh`, `tar` and `node`, and each entry left as that one call;
+#                          `roots/package_state_test.ts` — the cleanup's two directories on a temp tree: what it
+#                          removes, and a target directory or cargo home outside them refused); in `check`
+#                          (docs/tasks.md §`test:node`)
 deno task test:node:canonical # the same over `benches/js/lib/canonical_test.ts`, the canonical prettier baseline's parser
 #                          routing; needs `deno task bench:install`, so NOT in `check`
 deno task test:deno      # deno tests over the suites whose module under test calls `Deno.*`: the divergence detectors

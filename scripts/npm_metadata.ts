@@ -9,7 +9,7 @@
  * packages (a split floor is a support-contract fork, not a cosmetic drift).
  * The floor is 22 — Node 20 is EOL (2026-04) and SvelteKit 3 requires 22+, so
  * tsv's ecosystem consumers already sit there. Note 22.0 < 22.12: unflagged
- * `require(esm)` is NOT guaranteed in-range, so dynamic `import()` stays the
+ * `require` of an ES module is NOT guaranteed in-range, so dynamic `import()` stays the
  * universal CommonJS-host path (`scripts/test_napi_npm.ts` gates it).
  *
  * `license` is an SPDX expression: tsv's own code is 0BSD, and every package compiles in

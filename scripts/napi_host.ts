@@ -12,7 +12,7 @@
  * same reason.
  */
 
-/** A runtime's build target in Deno's terms (`Deno.build`): what `host_triple` reads. */
+/** A runtime's build target in Deno's terms (its `build` record): what `host_triple` reads. */
 export interface HostBuild {
 	os: string;
 	arch: string;
@@ -28,9 +28,9 @@ export const host_triple = ({ os, arch, target }: HostBuild): string => {
 	return `${os}-${cpu}`;
 };
 
-/** What `node_host_triple` reads of a Node process: `process.platform`, `process.arch`, and
- * whether its runtime reports a glibc version (`process.report`'s
- * `header.glibcVersionRuntime`, absent on musl). */
+/** What `node_host_triple` reads of a Node process: its `platform` and `arch`, and whether
+ * its runtime reports a glibc version (the process report's `header.glibcVersionRuntime`,
+ * absent on musl). */
 export interface NodeHost {
 	platform: string;
 	arch: string;

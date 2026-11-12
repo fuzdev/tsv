@@ -348,14 +348,16 @@ release side is the root [CLAUDE.md §Publishing](../../CLAUDE.md#publishing).
   every PR over the Linux host build by `check.yml`'s `artifacts` job) and the npm-shape
   test over the real artifacts (node:alpine for musl).
 - **Publish job**: gathers all six, stages the loader (`--loader-only`), and runs
-  `scripts/publish_napi.ts` — completeness (addon + CLI binary per platform) and
+  `scripts/publish_napi.ts` (from `scripts/roots/publish_napi.ts`, on Node's own modules: the
+  job holds the npm token, so it installs nothing,
+  [docs/tasks.md §`publish:napi`](../../docs/tasks.md#publishnapi)) — completeness (addon + CLI binary per platform) and
   version-lockstep checks, re-arming the CLI binaries' executable bit (artifact transport
   drops file modes — without it every posix `npx tsv` would EACCES), platforms-then-loader
   order, idempotent skip-if-published. Under `--dry-run` it skips nothing and runs
   `npm publish --dry-run` over every package, reading npm's already-published refusal as a
   pass, so the dispatch and cron rehearsals really pack the set between releases. Locally,
-  `deno task publish:napi --dry-run` (no `--` separator: deno task forwards it literally and
-  the script's `parseArgs` rejects it) proves staging + the refusal logic, then **stops at
+  `npm run publish:napi -- --dry-run` (or `deno task publish:napi --dry-run`, which forwards
+  the flag as written) proves staging + the refusal logic, then **stops at
   the partial-set refusal by design** — local staging holds only the host platform; the
   full-set rehearsal is the `workflow_dispatch` dry run.
 - **Auth**: a granular `NPM_TOKEN` secret from the bootstrap releases (trusted publishing
@@ -364,9 +366,9 @@ release side is the root [CLAUDE.md §Publishing](../../CLAUDE.md#publishing).
 - **GitHub Release** (the `release` job, after a real publish only — the tag push or a
   `dry_run=false` dispatch on the tag, never the cron or a dry run). Body: `CHANGELOG.md`'s
   stamped `## <version>` section (`scripts/release_notes.ts`; preview with
-  `deno task release:notes v<version>`). Assets: each platform package's native `tsv`
+  `npm run release:notes -- v<version>`). Assets: each platform package's native `tsv`
   binary (`tsv-<triple>`, `tsv-win32-x64.exe`) + a `SHA512SUMS` (`sha512sum -c`), pulled
-  back **from the registry** (`scripts/release_assets.ts`; `deno task release:assets v<version> --out <dir>`),
+  back **from the registry** (`scripts/release_assets.ts`; `npm run release:assets -- v<version> --out <dir>`),
   so an asset is byte-identical to what npm serves even on a recovery re-run where the
   matrix rebuilds while the publish step skips live versions; its registry reads retry for
   a bounded window, since a just-published version can lag the read path. Beside them, the
@@ -377,7 +379,9 @@ release side is the root [CLAUDE.md §Publishing](../../CLAUDE.md#publishing).
   before anything is public; `gh attestation verify <file> -R fuzdev/tsv`). The first create
   attaches the assets in the same call, so a Release is never public without them; on a
   re-run an existing Release keeps its notes, the assets re-upload with `--clobber`, and
-  the attestation is made again. The job holds the workflow's only `contents: write` and
+  the attestation is made again. A re-run, like a `dry_run=false` dispatch on the tag, runs
+  the tag's own workflow and scripts, so it recovers a fault outside the tag's tree (registry
+  lag, an outage), never one in it. The job holds the workflow's only `contents: write` and
   `attestations: write`, and no npm token. The checksum file and the attestation are this
   channel's whole integrity story; it has no signed release log of its own.
 - **`crates` job** (last, after `publish` and the Release, `release` skipped on a

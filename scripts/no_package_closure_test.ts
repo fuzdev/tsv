@@ -1,11 +1,13 @@
 /**
- * The scripts CI runs on Windows and with no `node_modules` — `build:stamped`'s entry, the
- * N-API staging's, `validate:napi`'s, and `test:bun`'s launcher — and everything each imports
- * name only `node:*` modules and relative files, never a package (docs/tasks.md §`build:stamped`,
- * §`build:napi:packages`, §`validate:napi`, §`test:bun`). And `publish:crates`' suites, which drive
- * its library over in-process fakes, load nothing that can spawn, write, or reach the network: no
- * host module, no capability-bearing `node:*` module, no ambient global. Read from the source text,
- * so it holds whatever the root config's Deno walk excludes.
+ * The scripts CI runs with no `node_modules` — on Windows, `build:stamped`'s entry, the N-API
+ * staging's, `validate:napi`'s, and `test:bun`'s launcher; in the credentialed release jobs,
+ * `publish:napi`'s, `release:notes`', and `release:assets`' — and everything each imports name
+ * only `node:*` modules and relative files, never a package (docs/tasks.md §`build:stamped`,
+ * §`build:napi:packages`, §`validate:napi`, §`test:bun`, §`publish:napi`, §`release:notes`,
+ * §`release:assets`). And the publish and release suites, which drive their libraries over
+ * in-process fakes, load nothing that can spawn, write, or reach the network: no host module, no
+ * capability-bearing `node:*` module, no ambient global. Read from the source text, so it holds
+ * whatever the root config's Deno walk excludes.
  */
 
 import { strictEqual } from 'node:assert';
@@ -83,6 +85,9 @@ const ENTRIES: Array<[entry: string, reaches: string]> = [
 	['scripts/roots/cargo_build.ts', 'scripts/cargo_build.ts'],
 	['scripts/roots/build_napi_packages.ts', 'scripts/stage_file.ts'],
 	['scripts/roots/validate_napi_artifact.ts', 'scripts/size.ts'],
+	['scripts/roots/publish_napi.ts', 'scripts/napi_host.ts'],
+	['scripts/roots/release_notes.ts', 'scripts/release/changelog.ts'],
+	['scripts/roots/release_assets.ts', 'scripts/release/node_host.ts'],
 	['scripts/test_bun.ts', 'scripts/check_staged_freshness.ts']
 ];
 
@@ -105,12 +110,16 @@ for (const [entry] of ENTRIES.filter(([entry]) => entry !== 'scripts/test_bun.ts
 	});
 }
 
-/** `publish:crates`' suites, each with a module its closure must reach. The publish script is
- * never run; these drive its library over fakes, and their closures must not be able to do more. */
+/** The suites of `publish:crates`, `publish:napi`, `release:notes`, and `release:assets`, each
+ * with a module its closure must reach. Those scripts are never run; these drive their libraries
+ * over fakes, the real publish paths included, and their closures must not be able to do more. */
 const FAKES_ONLY_SUITES: Array<[suite: string, reaches: string]> = [
 	['scripts/publish_crates_test.ts', 'scripts/release/crates.ts'],
 	['scripts/publish_crates_wetrun_test.ts', 'scripts/release/version.ts'],
-	['scripts/release/crates_test.ts', 'scripts/release/crates.ts']
+	['scripts/release/crates_test.ts', 'scripts/release/crates.ts'],
+	['scripts/publish_napi_test.ts', 'scripts/publish_napi.ts'],
+	['scripts/release_notes_test.ts', 'scripts/release/changelog.ts'],
+	['scripts/release_assets_test.ts', 'scripts/release/version.ts']
 ];
 
 /** What those closures may load: assertions, pure `node:*` helpers, the test runner, and gro's

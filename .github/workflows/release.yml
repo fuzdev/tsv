@@ -486,11 +486,6 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Install Deno
-        uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
-        with:
-          deno-version: 2.9.7
-
       # registry-url writes the .npmrc that reads NODE_AUTH_TOKEN at publish.
       - name: Install Node
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -524,6 +519,8 @@ jobs:
       # at a version already live. A missing NPM_TOKEN secret yields
       # an EMPTY token, which `npm view` (public) and `npm publish --dry-run`
       # both tolerate — so the dry-run rehearsal works before the secret exists.
+      # On Node's own modules alone, like the staging above (docs/tasks.md
+      # §`publish:napi`); npm inherits the step's whole environment.
       #
       # The two flags answer independent questions, so they key on different
       # things. `--expect-tag` follows the REF: any run whose ref is a tag must
@@ -550,7 +547,7 @@ jobs:
           else
             flags+=(--provenance)
           fi
-          deno run --allow-read --allow-write=crates/tsv_napi/pkg --allow-env --allow-run=npm scripts/publish_napi.ts "${flags[@]}"
+          node scripts/roots/publish_napi.ts "${flags[@]}"
 
   # The GitHub Release for the tag: the CHANGELOG's stamped `## <version>`
   # section as the body (scripts/release_notes.ts) and, as assets, the native
@@ -584,11 +581,9 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Install Deno
-        uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
-        with:
-          deno-version: 2.9.7
-
+      # The two scripts this job runs are on Node's own modules alone: the job holds
+      # `contents: write` and `id-token: write`, so it installs no npm dependencies
+      # (docs/tasks.md §`release:notes`, §`release:assets`).
       - name: Install Node
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -596,7 +591,7 @@ jobs:
 
       - name: Release notes
         run: |
-          deno run --allow-read scripts/release_notes.ts "$GITHUB_REF_NAME" > "$RUNNER_TEMP/release_notes.md"
+          node scripts/roots/release_notes.ts "$GITHUB_REF_NAME" > "$RUNNER_TEMP/release_notes.md"
           cat "$RUNNER_TEMP/release_notes.md"
 
       # The script's registry reads retry for a bounded window: this runs
@@ -604,8 +599,7 @@ jobs:
       # registry's read path.
       - name: Collect assets from the registry
         run: |
-          deno run --allow-read --allow-write --allow-run=npm,tar \
-            scripts/release_assets.ts "$GITHUB_REF_NAME" --out "$RUNNER_TEMP/assets"
+          node scripts/roots/release_assets.ts "$GITHUB_REF_NAME" --out "$RUNNER_TEMP/assets"
           cat "$RUNNER_TEMP/assets/SHA512SUMS"
 
       # Provenance attestation over EVERY asset — the binaries, the NOTICE and
