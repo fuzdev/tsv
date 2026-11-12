@@ -21,7 +21,6 @@ import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 
 import { CORPORA_COLLECTIONS } from '../../benches/js/lib/corpora.ts';
-import { HarnessError, ROOT, run } from '../git_snapshot.ts';
 import {
 	type Artifacts,
 	build_artifacts,
@@ -51,6 +50,7 @@ import {
 	section_status,
 	type SideInfo
 } from './report.ts';
+import { HarnessError, ROOT, run } from './deno_host.ts';
 import { corpus_identity, evict_sides, prepare_side, type Side } from './side.ts';
 import {
 	leg_bench,

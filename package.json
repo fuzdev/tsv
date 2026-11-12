@@ -195,7 +195,8 @@
 		"validate:napi": "node scripts/roots/validate_napi_artifact.ts",
 		"validate:artifacts": "node scripts/roots/validate_artifacts.ts",
 		"engines:audit": "node scripts/roots/engine_parity.ts",
-		"typecheck:packages": "node scripts/roots/typecheck_packages.ts"
+		"typecheck:packages": "node scripts/roots/typecheck_packages.ts",
+		"perf:ab": "node scripts/roots/perf_ab.ts"
 	},
 	"devDependencies": {
 		"@fuzdev/blake3-wasm": "^0.2.0",

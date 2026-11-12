@@ -220,6 +220,31 @@ test("scripts/run_if_stale.ts's closure loads no node:fs or node:crypto, and nod
 	strictEqual(loaded.join('\n'), '');
 });
 
+// `perf:ab`'s library reaches the system only through the handles its root builds: no host
+// module or `node:*` module that spawns, writes, or reads the environment loads in its closure,
+// but the corpus table's `node:fs`, which `CORPORA_COLLECTIONS` brings in and nothing here calls
+test("scripts/perf_ab.ts's closure loads no host module and nothing that spawns", () => {
+	const closure = loads_of('scripts/perf_ab.ts');
+	strictEqual(closure.files.includes('scripts/git_snapshot.ts'), true);
+	const loaded = [...closure.builtins, ...closure.packages]
+		.filter((found) => !found.type_only)
+		.filter((found) =>
+			/^(?:(?:node:)?(?:fs|child_process|process|os|net|http|https)(?:\/|$)|@fuzdev\/gro\/(?:fs|spawn|process|net|watch|fs_paths)\.ts$)/.test(
+				found.specifier
+			)
+		)
+		.filter(
+			(found) =>
+				!(found.specifier === 'node:fs/promises' && found.from === 'benches/js/lib/corpora.ts')
+		)
+		.map((found) => `${found.from}: ${found.specifier}`);
+	strictEqual(loaded.join('\n'), '');
+	strictEqual(
+		closure.files.filter((path) => AMBIENT_AUTHORITY.test(reader(CHECKOUT)(path))).join('\n'),
+		''
+	);
+});
+
 /** The packages the root `package.json` names, which CI's `check` job installs (`npm ci`). */
 const ROOT_PACKAGES: ReadonlySet<string> = new Set(
 	(['dependencies', 'devDependencies'] as const).flatMap((field) =>

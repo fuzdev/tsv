@@ -11,7 +11,6 @@ import { existsSync } from 'node:fs';
 import { copyFile, mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 
-import { HarnessError, ROOT, run, sha256_hex } from '../git_snapshot.ts';
 import { gzip_size, type GzipProgram } from '../gzip_size.ts';
 import {
 	assert_bounds_sites,
@@ -33,6 +32,7 @@ import {
 	test_run_matched,
 	type TypeRowSize
 } from './parsers.ts';
+import { HarnessError, ROOT, run, sha256_hex } from './deno_host.ts';
 import type { Leg, LegStatus, Row, Table } from './report.ts';
 import {
 	CommandLog,

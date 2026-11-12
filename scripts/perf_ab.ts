@@ -1,5 +1,5 @@
 /**
- * `deno task perf:ab <base-ref> [<cand-ref>]` — a parse / format performance A/B between two
+ * `npm run perf:ab -- <base-ref> [<cand-ref>]` — a parse / format performance A/B between two
  * trees, per language, plus the type strip's, that exits non-zero on a regression.
  *
  * ## What it measures
@@ -28,11 +28,17 @@
  * `KEEP_TREES` most recently used snapshots and evicts the rest. The report prints each side's
  * binary sha256, so two readings of one build can be told apart from two builds.
  *
- * The builds run in a cleared environment (`BUILD_ENV`): a caller's `RUSTFLAGS`,
- * `CARGO_PROFILE_*`, `RUSTUP_TOOLCHAIN` or `RUSTC_WRAPPER` would otherwise reach one side's
- * build and not the other's — a cached base built under flags the candidate never saw. Clearing
- * rather than hashing them into the cache key, because the gate measures the shipped release
- * profile and nothing else; a flag experiment is a manual `profile` A/B.
+ * The builds run in a cleared environment, gro's base set plus `BUILD_ENV`: a caller's
+ * `RUSTFLAGS`, `CARGO_PROFILE_*`, `RUSTUP_TOOLCHAIN` or `RUSTC_WRAPPER` would otherwise reach one
+ * side's build and not the other's — a cached base built under flags the candidate never saw.
+ * Clearing rather than hashing them into the cache key, because the gate measures the shipped
+ * release profile and nothing else; a flag experiment is a manual `profile` A/B. The drivers and
+ * `perf` run in a cleared environment too, gro's base set and nothing else (`DRIVER_PASS_ENV`:
+ * the drivers read only their arguments), the same for both sides, so a delta holds while the
+ * absolute numbers can sit a little off a run under a whole shell environment (its size moves
+ * the process's initial stack). Each built driver runs through a program handle made beneath
+ * the cache's directory handle once its binary is in place (`PerfAbCache.driver`), and `perf`
+ * is given that handle's path.
  *
  * Over the `../corpora` snapshot's collections, `--rounds` rounds (even, so each side goes
  * first in half of them) interleave the two sides language by language; in each, every side
@@ -75,26 +81,29 @@
  * escape, so any wall move over the threshold fails, and no instruction gate — rather than
  * refusing: a strict wall verdict is still a verdict.
  *
- * Linux only (`perf`, `ionice`). Not in `deno task check`: it builds two release trees.
+ * Linux only (`perf`, `ionice`). Not in `check`: it builds two release trees.
  *
  * @module
  */
 
-import { existsSync } from 'node:fs';
-import { copyFile, mkdir, readdir, readFile, rename, rm, stat, utimes } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
+import { resolve } from 'node:path';
+
+import type { FsDir, FsReadDir } from '@fuzdev/gro/fs.ts';
+import { is_fs_error } from '@fuzdev/gro/fs_error.ts';
+import type { FsPaths } from '@fuzdev/gro/fs_paths.ts';
+import type { SpawnProgram } from '@fuzdev/gro/spawn.ts';
 
 import { CORPORA_COLLECTIONS } from '../benches/js/lib/corpora.ts';
 import { lines_of } from '../benches/js/lib/text_lines.ts';
 import {
 	BUILD_ENV,
+	exit_code_of,
 	extract_tree,
-	git,
+	type ExtractTreeDeps,
+	format_ending,
+	git_out,
 	HarnessError,
-	kept_build_env,
 	list_tree,
-	ROOT,
-	run,
 	sha256_hex
 } from './git_snapshot.ts';
 import {
@@ -176,13 +185,16 @@ const REQUIRED_BUILD_INPUTS = ['Cargo.toml', 'crates', 'src'];
 /** The variables a driver build sets itself, the same for every snapshot. `CARGO_TARGET_DIR` is
  * relative to the build's working directory (the snapshot's `src/`), so each snapshot builds into
  * its own `target/` beside it. Part of the build RECIPE (`build_recipe_text`). */
-const BUILD_FIXED_ENV: Readonly<Record<string, string>> = { CARGO_TARGET_DIR: '../target' };
+export const BUILD_FIXED_ENV: Readonly<Record<string, string>> = { CARGO_TARGET_DIR: '../target' };
 
-/** A driver build's command line, run in the snapshot at idle priority. With `BUILD_FIXED_ENV`
- * and `BUILD_ENV` it is the build RECIPE, whose hash names the binary (`build_recipe_text`). */
-function build_command(example: string): Array<string> {
+/** The program a driver build starts, which runs cargo at idle priority (`build_args`). */
+export const BUILD_PROGRAM = 'nice';
+
+/** A driver build's arguments to `BUILD_PROGRAM`, run in the snapshot. With `BUILD_PROGRAM`,
+ * `BUILD_FIXED_ENV` and `BUILD_ENV` it is the build RECIPE, whose hash names the binary
+ * (`build_recipe_text`). */
+export function build_args(example: string): Array<string> {
 	return [
-		'nice',
 		'-n',
 		'19',
 		'ionice',
@@ -199,6 +211,11 @@ function build_command(example: string): Array<string> {
 		'--message-format=json-render-diagnostics'
 	];
 }
+
+/** The host variables a driver, and `perf` around it, is given beside gro's base environment:
+ * none, as the drivers read only their arguments, and `perf` finds its own configuration
+ * through `HOME`. The same for both sides, so the A/B delta holds. */
+export const DRIVER_PASS_ENV: ReadonlyArray<string> = [];
 
 /** A 1-minute load average above this before the run warns: something else holds a core. */
 const LOAD_WARN = 1;
@@ -219,7 +236,7 @@ interface Options {
 	json: boolean;
 }
 
-const USAGE = `usage: deno task perf:ab <base-ref> [<cand-ref>] [--rounds N] [--iterations N] [--corpus DIR] [--json]
+const USAGE = `usage: npm run perf:ab -- <base-ref> [<cand-ref>] [--rounds N] [--iterations N] [--corpus DIR] [--json]
   <cand-ref> defaults to the working tree (HEAD + uncommitted changes)
   --rounds N      interleaved base/cand rounds, even (default ${DEFAULT_ROUNDS}; an ambiguous row
                   extends the run by pairs up to ${MAX_ROUNDS})
@@ -227,7 +244,8 @@ const USAGE = `usage: deno task perf:ab <base-ref> [<cand-ref>] [--rounds N] [--
   --corpus DIR    corpus directory (default ${CORPORA_COLLECTIONS})
   --json          print the result as JSON instead of the table`;
 
-function parse_options(args: ReadonlyArray<string>): Options {
+/** The options `args` give, `'help'` for `--help`; relative paths resolve against `checkout`. */
+function parse_options(args: ReadonlyArray<string>, checkout: string): Options | 'help' {
 	const positional: Array<string> = [];
 	let rounds = DEFAULT_ROUNDS;
 	let iterations = DEFAULT_ITERATIONS;
@@ -248,16 +266,13 @@ function parse_options(args: ReadonlyArray<string>): Options {
 			if (!value) throw new HarnessError('--corpus takes a directory');
 			corpus = value;
 		} else if (arg === '--cache') {
-			// internal, for `branch:report`, which runs this script with its own permissions; the
-			// `perf:ab` task's `--allow-write` covers the default cache only
+			// internal, for `branch:report`, which keeps its runs beneath its own cache
 			const value = args[++i];
 			if (!value) throw new HarnessError('--cache takes a directory');
 			cache = value;
 		} else if (arg === '--json') json = true;
-		else if (arg === '--help' || arg === '-h') {
-			console.log(USAGE);
-			Deno.exit(0);
-		} else if (arg.startsWith('-')) throw new HarnessError(`unknown flag ${arg}`);
+		else if (arg === '--help' || arg === '-h') return 'help';
+		else if (arg.startsWith('-')) throw new HarnessError(`unknown flag ${arg}`);
 		else positional.push(arg);
 	}
 	if (positional.length < 1 || positional.length > 2) {
@@ -273,14 +288,14 @@ function parse_options(args: ReadonlyArray<string>): Options {
 		cand_ref: positional[1] ?? null,
 		rounds,
 		iterations,
-		corpus: resolve(ROOT, corpus),
-		cache: cache === null ? null : resolve(ROOT, cache),
+		corpus: resolve(checkout, corpus),
+		cache: cache === null ? null : resolve(checkout, cache),
 		json
 	};
 }
 
 /** One measured side: what it is called, the tree it builds, and that tree's build inputs. */
-interface Side {
+export interface Side {
 	label: string;
 	/** The commit, or null for a working-tree snapshot. */
 	commit: string | null;
@@ -293,13 +308,49 @@ interface Side {
 	has_strip: boolean;
 }
 
+/** The snapshot cache a run builds into, and how it runs what it built there. */
+export interface PerfAbCache {
+	/** The cache's directory: the snapshots, the built drivers, the scratch index and `perf
+	 * stat`'s output. */
+	dir: FsDir;
+	/** The built driver at `name`, a path beneath `dir`, as a program, made once its binary is
+	 * in place. */
+	driver: (name: string) => SpawnProgram;
+}
+
+/** What `run_perf_ab_command` reaches: the checkout, the paths it is given, the cache, and each
+ * program it runs, every one built by the root with the environment it gets. */
+export interface PerfAbDeps extends ExtractTreeDeps {
+	/** The checkout: the drivers' sources, the working directory of `git` and of the drivers, and
+	 * what a relative `--corpus` or `--cache` resolves against. */
+	checkout: FsReadDir;
+	/** Opens a path from outside: the corpus, and the index a linked worktree keeps outside the
+	 * checkout. */
+	fs_paths: FsPaths;
+	/** `HOME`, beneath which the default cache sits. */
+	home: string | undefined;
+	/** Opens the cache at `path`, absolute, made when missing. */
+	open_cache: (path: string) => Promise<PerfAbCache>;
+	/** `git` with `GIT_INDEX_FILE` set to `index`, for the working-tree snapshot. */
+	git_with_index: (index: string) => SpawnProgram;
+	/** `BUILD_PROGRAM`, in the build environment (`BUILD_ENV`, `BUILD_FIXED_ENV`). */
+	build: SpawnProgram;
+	/** `perf`, or `null` when it is not installed. */
+	perf: SpawnProgram | null;
+	/** `pgrep`, or `null` when it is not installed. */
+	pgrep: SpawnProgram | null;
+	/** The 1-minute load average. */
+	load_1m: () => number;
+}
+
 /** The cache key and the present build inputs of `tree`, from one recursive `git ls-tree`
  * listing of `BUILD_INPUTS` (the drivers left out: the overlay replaces them), and whether it
  * has the strip. */
 async function build_inputs(
+	deps: PerfAbDeps,
 	tree: string
 ): Promise<{ key: string; inputs: Array<string>; has_strip: boolean }> {
-	const listing = await list_tree(tree, BUILD_INPUTS);
+	const listing = await list_tree(deps.git, deps.checkout, tree, BUILD_INPUTS);
 	const { names, missing, key_text } = build_inputs_of(
 		listing,
 		REQUIRED_BUILD_INPUTS,
@@ -311,118 +362,144 @@ async function build_inputs(
 	return {
 		key: await sha256_hex(new TextEncoder().encode(key_text)),
 		inputs: names,
-		has_strip: await tree_has_strip(tree)
+		has_strip: await tree_has_strip(deps.git, deps.checkout, tree)
 	};
 }
 
 /** Whether `tree`'s `crates/tsv_ts/src` has `STRIP_ENTRY_POINT`, run in `cwd` (`git grep`:
  * exit 1 is "no", anything but 0 or 1 an error). */
-export async function tree_has_strip(tree: string, cwd: string = ROOT): Promise<boolean> {
+export async function tree_has_strip(
+	git: SpawnProgram,
+	cwd: FsReadDir,
+	tree: string
+): Promise<boolean> {
 	const args = ['grep', '-q', '-E', STRIP_ENTRY_POINT, tree, '--', 'crates/tsv_ts/src'];
-	const result = await run('git', args, { cwd });
-	if (result.code === 0) return true;
-	if (result.code === 1) return false;
+	const result = await git.out(args, { cwd });
+	const code = exit_code_of(result);
+	if (code === 0) return true;
+	if (code === 1) return false;
 	throw new HarnessError(`git ${args.join(' ')} failed:\n${result.stderr.trim()}`);
 }
 
-async function resolve_ref(ref: string): Promise<Side> {
+async function resolve_ref(deps: PerfAbDeps, ref: string): Promise<Side> {
+	const git = (args: ReadonlyArray<string>) => git_out(deps.git, deps.checkout, args);
 	const commit = await git(['rev-parse', '--verify', '--quiet', `${ref}^{commit}`]).catch(() => {
 		throw new HarnessError(`not a commit: ${ref}`);
 	});
 	const tree = await git(['rev-parse', `${commit}^{tree}`]);
-	return { label: `${ref} (${commit.slice(0, 9)})`, commit, tree, ...(await build_inputs(tree)) };
+	return {
+		label: `${ref} (${commit.slice(0, 9)})`,
+		commit,
+		tree,
+		...(await build_inputs(deps, tree))
+	};
 }
 
 /** Snapshot the working tree as a git tree object through a throwaway copy of the index. */
-async function resolve_worktree(cache: string): Promise<Side> {
-	const index = resolve(ROOT, await git(['rev-parse', '--git-path', 'index']));
-	const scratch = resolve(cache, `index.${Deno.pid}`);
-	await copyFile(index, scratch);
+async function resolve_worktree(deps: PerfAbDeps, cache: FsDir): Promise<Side> {
+	const git = (args: ReadonlyArray<string>) => git_out(deps.git, deps.checkout, args);
+	const index = resolve(deps.checkout.path, await git(['rev-parse', '--git-path', 'index']));
+	const opened = await deps.fs_paths.open_path(index);
+	const scratch = `index.${deps.pid}`;
+	await cache.write(scratch, await opened.dir.read(opened.path));
 	try {
-		const env = { GIT_INDEX_FILE: scratch };
-		await git(['add', '-A'], env);
-		const tree = await git(['write-tree'], env);
+		const scratch_git = deps.git_with_index(`${cache.path}/${scratch}`);
+		await git_out(scratch_git, deps.checkout, ['add', '-A']);
+		const tree = await git_out(scratch_git, deps.checkout, ['write-tree']);
 		const head = await git(['rev-parse', 'HEAD']);
 		const head_tree = await git(['rev-parse', 'HEAD^{tree}']);
 		const label =
 			tree === head_tree
 				? `worktree (= HEAD ${head.slice(0, 9)})`
 				: `worktree (HEAD ${head.slice(0, 9)} + changes)`;
-		return { label, commit: null, tree, ...(await build_inputs(tree)) };
+		return { label, commit: null, tree, ...(await build_inputs(deps, tree)) };
 	} finally {
-		await rm(scratch, { force: true });
+		await cache.remove(scratch, { missing_ok: true });
 	}
 }
 
 /** Keep the snapshots this run measures plus the most recently used others (`KEEP_TREES` in
  * all); delete the rest, and mark the measured ones used now. */
-async function evict_cache(cache: string, sides: ReadonlyArray<Side>): Promise<void> {
+async function evict_cache(cache: FsDir, sides: ReadonlyArray<Side>): Promise<void> {
 	const in_use = new Set(sides.map((side) => side.key));
-	const now = new Date();
+	const now = Date.now();
 	for (const tree of in_use) {
-		const dir = resolve(cache, tree);
-		if (existsSync(dir)) await utimes(dir, now, now);
+		if (await cache.exists(tree)) await cache.set_times(tree, { mtime_ms: now });
 	}
 	const trees: Array<CachedTree> = [];
-	for (const entry of await readdir(cache, { withFileTypes: true })) {
-		if (!entry.isDirectory() || !CACHE_DIR_PATTERN.test(entry.name)) continue;
-		trees.push({ name: entry.name, mtime_ms: (await stat(resolve(cache, entry.name))).mtimeMs });
+	for await (const entry of cache.list()) {
+		if (entry.kind !== 'directory' || !CACHE_DIR_PATTERN.test(entry.name)) continue;
+		const info = await cache.stat(entry.name);
+		if (info !== null) trees.push({ name: entry.name, mtime_ms: info.mtime_ms });
 	}
 	for (const name of trees_to_evict(trees, in_use)) {
 		console.error(`perf:ab: evicting cached snapshot ${name.slice(0, 12)}`);
-		await rm(resolve(cache, name), { recursive: true, force: true });
+		await cache.remove(name, { recursive: true, missing_ok: true });
 	}
 }
 
-/** `BUILD_FIXED_ENV` plus the caller's values for `BUILD_ENV`, the whole environment of a driver
- * build. */
-function build_env(): Record<string, string> {
-	return { ...BUILD_FIXED_ENV, ...kept_build_env() };
-}
-
 /** One driver as the run builds it: its source, the source's hash and its recipe's hash. */
-interface DriverBuild {
+export interface DriverBuild {
 	kind: DriverKind;
 	source: Uint8Array;
 	hash: string;
 	recipe_hash: string;
 }
 
-/** Build (or reuse) `driver` for `side`; returns the binary's path. */
-async function ensure_driver(side: Side, cache: string, driver: DriverBuild): Promise<string> {
+/** The name, beneath the cache, of `driver`'s binary for `side`: content-addressed by the
+ * side's build inputs, the driver's source and the build recipe, so a binary of that name is
+ * never rebuilt. */
+export function driver_binary_name(side_key: string, driver: DriverBuild): string {
+	const { example } = DRIVERS[driver.kind];
+	return `${side_key}/${example}-${driver.hash.slice(0, 16)}-${driver.recipe_hash.slice(0, 16)}`;
+}
+
+/** `path`, absolute, as a path beneath `dir`. */
+export function path_beneath(dir: FsReadDir, path: string): string {
+	const prefix = `${dir.path}/`;
+	if (!path.startsWith(prefix)) throw new HarnessError(`${path} is not beneath ${dir.path}`);
+	return path.slice(prefix.length);
+}
+
+/** What `ensure_driver` runs: the snapshot's extraction and the build. */
+export interface EnsureDriverDeps extends ExtractTreeDeps {
+	/** `BUILD_PROGRAM`, in the build environment. */
+	build: SpawnProgram;
+}
+
+/** Build (or reuse) `driver` for `side`; returns the binary's path beneath `cache`. */
+export async function ensure_driver(
+	deps: EnsureDriverDeps,
+	cache: FsDir,
+	side: Side,
+	driver: DriverBuild
+): Promise<string> {
 	const { path: driver_path, example } = DRIVERS[driver.kind];
-	const base = resolve(cache, side.key);
-	const binary = resolve(
-		base,
-		`${example}-${driver.hash.slice(0, 16)}-${driver.recipe_hash.slice(0, 16)}`
-	);
-	if (existsSync(binary)) {
-		console.error(`perf:ab: ${side.label}: reusing ${binary}`);
+	const binary = driver_binary_name(side.key, driver);
+	if (await cache.exists(binary)) {
+		console.error(`perf:ab: ${side.label}: reusing ${cache.path}/${binary}`);
 		return binary;
 	}
-	const src = resolve(base, 'src');
-	if (!existsSync(src)) {
+	await cache.mkdir(side.key, { recursive: true });
+	const base = cache.dir(side.key);
+	if (!(await base.exists('src'))) {
 		console.error(
 			`perf:ab: ${side.label}: snapshotting tree ${side.tree.slice(0, 12)} (build inputs ${side.key.slice(0, 12)})`
 		);
-		await extract_tree(side.tree, side.inputs, src);
+		await extract_tree(deps, side.tree, side.inputs, base, 'src');
 	}
-	const overlay = resolve(src, driver_path);
-	await mkdir(dirname(overlay), { recursive: true });
-	await Deno.writeFile(overlay, driver.source);
+	const src = base.dir('src');
+	const overlay_dir = driver_path.slice(0, driver_path.lastIndexOf('/'));
+	await src.mkdir(overlay_dir, { recursive: true });
+	await src.write(driver_path, driver.source);
 
 	console.error(`perf:ab: ${side.label}: building the ${example} driver (release, idle priority)`);
-	const [command, ...args] = build_command(example);
-	const child = new Deno.Command(command!, {
-		args,
+	const child = await deps.build.start(build_args(example), {
 		cwd: src,
-		clearEnv: true,
-		env: build_env(),
-		stdout: 'piped',
-		stderr: 'inherit'
-	}).spawn();
+		stdio: ['ignore', 'pipe', 'inherit']
+	});
 	let executable: string | null = null;
-	for await (const line of lines_of(child.stdout)) {
+	for await (const line of lines_of(child.stdout!)) {
 		let message: unknown;
 		try {
 			message = JSON.parse(line);
@@ -448,36 +525,63 @@ async function ensure_driver(side: Side, cache: string, driver: DriverBuild): Pr
 			executable = path;
 		}
 	}
-	const status = await child.status;
-	if (!status.success || executable === null) {
+	const status = await child.closed;
+	const code = exit_code_of(status);
+	if (code !== 0 || executable === null) {
 		throw new HarnessError(
-			`building the ${example} driver for ${side.label} failed (${status.success ? 'no executable reported' : `cargo exited ${status.code}`}). ` +
+			`building the ${example} driver for ${side.label} failed (${code === 0 ? 'no executable reported' : `cargo ${format_ending(status)}`}). ` +
 				`The driver compiles against each tree's language-crate entry points; a tree older than ` +
 				`those entry points cannot be measured with it.`
 		);
 	}
 	// Copied out of the target dir so a later build for another driver hash cannot replace it,
 	// under a temporary name renamed into place so an interrupted copy is never reused.
-	const partial = `${binary}.partial.${Deno.pid}`;
-	await copyFile(executable, partial);
-	await Deno.chmod(partial, 0o755);
-	await rename(partial, binary);
+	const partial = `${binary}.partial.${deps.pid}`;
+	await cache.copy(path_beneath(cache, executable), partial);
+	await cache.set_mode(partial, 0o755);
+	await cache.rename(partial, binary);
 	return binary;
 }
 
+/** A built driver: its binary's path beneath the cache, and the program that runs it. */
+export interface BuiltDriver {
+	name: string;
+	program: SpawnProgram;
+}
+
+/** One side's built drivers; `strip` is null when the strip rows are skipped. */
+export type Binaries = Record<DriverKind, BuiltDriver | null>;
+
+/** Build (or reuse) `side`'s drivers, `strip` only when `with_strip`, each made a program
+ * through the cache once its binary is in place. */
+export async function build_side(
+	deps: EnsureDriverDeps,
+	cache: PerfAbCache,
+	side: Side,
+	drivers: Readonly<Record<DriverKind, DriverBuild>>,
+	with_strip: boolean
+): Promise<Binaries> {
+	const built = async (driver: DriverBuild): Promise<BuiltDriver> => {
+		const name = await ensure_driver(deps, cache.dir, side, driver);
+		return { name, program: cache.driver(name) };
+	};
+	return {
+		format: await built(drivers.format),
+		strip: with_strip ? await built(drivers.strip) : null
+	};
+}
+
 /** Whether `perf stat -e instructions:u` works here; the reason when it does not. */
-async function probe_perf(): Promise<string | null> {
-	try {
-		const result = await run('perf', ['stat', '-x,', '-e', 'instructions:u', '--', 'true']);
-		if (!result.success) return `perf stat exited ${result.code}: ${result.stderr.trim()}`;
-		if (parse_perf_stat_instructions(result.stderr) === null) {
-			return `perf stat counted no instructions:u (${result.stderr.trim() || 'no output'})`;
-		}
-		return null;
-	} catch (err) {
-		if (err instanceof Deno.errors.NotFound) return '`perf` is not installed';
-		throw err;
+async function probe_perf(perf: SpawnProgram | null): Promise<string | null> {
+	if (perf === null) return '`perf` is not installed';
+	const result = await perf.out(['stat', '-x,', '-e', 'instructions:u', '--', 'true']);
+	if (exit_code_of(result) !== 0) {
+		return `perf stat ${format_ending(result)}: ${result.stderr.trim()}`;
 	}
+	if (parse_perf_stat_instructions(result.stderr) === null) {
+		return `perf stat counted no instructions:u (${result.stderr.trim() || 'no output'})`;
+	}
+	return null;
 }
 
 interface DriverOutput extends FileSet {
@@ -497,44 +601,58 @@ interface DriverOutput extends FileSet {
 
 type DriverMode = 'full' | 'parse' | 'fixed';
 
+/** What a driver run needs besides the driver: `perf`, where both run, and where `perf` writes. */
+interface DriverRunner {
+	checkout: FsReadDir;
+	perf: SpawnProgram | null;
+	cache: FsDir;
+	pid: number;
+	options: Options;
+}
+
 async function run_driver(
-	binary: string,
-	cache: string,
-	options: Options,
+	runner: DriverRunner,
+	driver: SpawnProgram,
 	lang: Lang,
 	mode: DriverMode,
 	use_perf: boolean
 ): Promise<DriverOutput> {
+	const { options, cache } = runner;
+	const binary = driver.path;
 	const iterations = mode === 'fixed' ? 0 : options.iterations;
 	const driver_args =
 		lang === 'strip'
 			? [options.corpus, '--iterations', String(iterations)]
 			: [options.corpus, '--lang', lang, '--iterations', String(iterations)];
 	if (mode === 'parse') driver_args.push('--parse-only');
-	const stat_file = resolve(cache, `perf_stat.${Deno.pid}.csv`);
-	const result = use_perf
-		? await run('perf', [
-				'stat',
-				'-x,',
-				'-e',
-				'instructions:u,cycles:u',
-				'-o',
-				stat_file,
-				'--',
-				binary,
-				...driver_args
-			])
-		: await run(binary, driver_args);
-	if (!result.success) {
+	const stat_file = `perf_stat.${runner.pid}.csv`;
+	const result =
+		use_perf && runner.perf !== null
+			? await runner.perf.out(
+					[
+						'stat',
+						'-x,',
+						'-e',
+						'instructions:u,cycles:u',
+						'-o',
+						`${cache.path}/${stat_file}`,
+						'--',
+						binary,
+						...driver_args
+					],
+					{ cwd: runner.checkout }
+				)
+			: await driver.out(driver_args, { cwd: runner.checkout });
+	if (exit_code_of(result) !== 0) {
 		throw new HarnessError(
-			`driver ${binary} ${driver_args.join(' ')} exited ${result.code}:\n${result.stderr.trim()}`
+			`driver ${binary} ${driver_args.join(' ')} ${format_ending(result)}:\n${result.stderr.trim()}`
 		);
 	}
 	let instructions: number | null = null;
 	let cycles: number | null = null;
 	if (use_perf) {
-		const stat_text = await readFile(stat_file, 'utf8');
-		await rm(stat_file, { force: true });
+		const stat_text = await cache.read_text(stat_file);
+		await cache.remove(stat_file, { missing_ok: true });
 		instructions = parse_perf_stat_instructions(stat_text);
 		if (instructions === null) throw new HarnessError(`perf stat counted nothing:\n${stat_text}`);
 		cycles = parse_perf_stat_counter(stat_text, 'cycles');
@@ -565,17 +683,14 @@ async function run_driver(
 	};
 }
 
-function load_1m(): number {
-	return Deno.loadavg()[0]!;
-}
-
 /** The names among `HEAVY_PROCESSES` running right now (one `pgrep` each; empty when `pgrep`
  * itself is missing). */
-async function heavy_processes(): Promise<Array<string>> {
+async function heavy_processes(pgrep: SpawnProgram | null): Promise<Array<string>> {
 	const running: Array<string> = [];
+	if (pgrep === null) return running;
 	for (const name of HEAVY_PROCESSES) {
 		try {
-			if ((await run('pgrep', ['-x', name])).success) running.push(name);
+			if (exit_code_of(await pgrep.out(['-x', name])) === 0) running.push(name);
 		} catch {
 			return running;
 		}
@@ -585,11 +700,12 @@ async function heavy_processes(): Promise<Array<string>> {
 
 /** Print a load reading plus the heavy processes running now, warning over `threshold`. */
 async function report_load(
+	pgrep: SpawnProgram | null,
 	when: 'before' | 'after',
 	load: number,
 	threshold: number
 ): Promise<void> {
-	const heavy = await heavy_processes();
+	const heavy = await heavy_processes(pgrep);
 	console.error(
 		`perf:ab: 1-minute load ${when}: ${load.toFixed(2)}` +
 			(heavy.length > 0 ? ` (running: ${heavy.join(', ')})` : '')
@@ -601,13 +717,10 @@ async function report_load(
 	}
 }
 
-/** One side's built drivers; `strip` is null when the strip rows are skipped. */
-type Binaries = Record<DriverKind, string | null>;
-
-function binary_for(binaries: Binaries, lang: Lang): string {
+function binary_for(binaries: Binaries, lang: Lang): SpawnProgram {
 	const binary = binaries[driver_of(lang)];
 	if (binary === null) throw new HarnessError(`${lang}: no ${driver_of(lang)} driver was built`);
-	return binary;
+	return binary.program;
 }
 
 interface SideSamples {
@@ -642,16 +755,16 @@ async function run_round(
 	binaries: ReadonlyArray<Binaries>,
 	sides: ReadonlyArray<Side>,
 	samples: ReadonlyArray<Record<Lang, SideSamples>>,
-	cache: string,
-	options: Options,
+	runner: DriverRunner,
 	use_perf: boolean
 ): Promise<void> {
+	const { options } = runner;
 	const order = round % 2 === 0 ? [0, 1] : [1, 0];
 	for (const lang of langs) {
 		console.error(`perf:ab: round ${round + 1} ${lang}`);
 		for (const i of order) {
 			const binary = binary_for(binaries[i]!, lang);
-			const full = await run_driver(binary, cache, options, lang, 'full', use_perf);
+			const full = await run_driver(runner, binary, lang, 'full', use_perf);
 			const s = samples[i]![lang];
 			if (s.file_set === null) {
 				s.file_set = { files: full.files, bytes: full.bytes, errors: full.errors };
@@ -673,8 +786,8 @@ async function run_round(
 			s.parse.wall_us.push(full.parse_us);
 			s.work.wall_us.push(full.work_us);
 			if (use_perf) {
-				const parse = await run_driver(binary, cache, options, lang, 'parse', use_perf);
-				const fixed = await run_driver(binary, cache, options, lang, 'fixed', use_perf);
+				const parse = await run_driver(runner, binary, lang, 'parse', use_perf);
+				const fixed = await run_driver(runner, binary, lang, 'fixed', use_perf);
 				const [parse_instructions, work_instructions] = phase_instructions(
 					lang,
 					{ full: full.instructions!, parse: parse.instructions!, fixed: fixed.instructions! },
@@ -745,37 +858,80 @@ function grade(
 	return rows;
 }
 
-async function main(): Promise<number> {
-	const options = parse_options(Deno.args);
-	if (!existsSync(options.corpus)) {
+/** Whether something is at `path`, absolute, its symlinks followed. */
+async function path_exists(fs_paths: FsPaths, path: string): Promise<boolean> {
+	try {
+		const opened = await fs_paths.open_path(path);
+		return await opened.dir.exists(opened.path);
+	} catch (err) {
+		if (is_fs_error(err, 'not_a_directory')) return false;
+		throw err;
+	}
+}
+
+/**
+ * Runs `perf:ab` with `args`, the arguments after the script, printing the report on stdout
+ * and the progress on stderr.
+ * @returns the exit code: 0 every row passes, 1 a row regressed, 2 a harness error
+ */
+export async function run_perf_ab_command(
+	deps: PerfAbDeps,
+	args: ReadonlyArray<string>
+): Promise<number> {
+	try {
+		return await perf_ab(deps, args);
+	} catch (err) {
+		if (err instanceof HarnessError) {
+			console.error(`perf:ab: error: ${err.message}`);
+			if (err.message.startsWith('expected') || err.message.startsWith('unknown flag')) {
+				console.error(USAGE);
+			}
+			return 2;
+		}
+		console.error(err);
+		return 2;
+	}
+}
+
+async function perf_ab(deps: PerfAbDeps, args: ReadonlyArray<string>): Promise<number> {
+	const options = parse_options(args, deps.checkout.path);
+	if (options === 'help') {
+		console.log(USAGE);
+		return 0;
+	}
+	if (!(await path_exists(deps.fs_paths, options.corpus))) {
 		throw new HarnessError(
 			`corpus not found: ${options.corpus} — check out fuzdev/corpora beside this repo, or pass --corpus`
 		);
 	}
 	const drivers = {} as Record<DriverKind, DriverBuild>;
 	for (const kind of DRIVER_KINDS) {
-		const driver_path = resolve(ROOT, DRIVERS[kind].path);
-		if (!existsSync(driver_path)) throw new HarnessError(`driver missing: ${driver_path}`);
-		const source = await Deno.readFile(driver_path);
+		const source = await deps.checkout.read_if_exists(DRIVERS[kind].path);
+		if (source === null) {
+			throw new HarnessError(`driver missing: ${resolve(deps.checkout.path, DRIVERS[kind].path)}`);
+		}
 		drivers[kind] = {
 			kind,
 			source,
 			hash: await sha256_hex(source),
 			recipe_hash: await sha256_hex(
 				new TextEncoder().encode(
-					build_recipe_text(build_command(DRIVERS[kind].example), BUILD_FIXED_ENV, BUILD_ENV)
+					build_recipe_text(
+						[BUILD_PROGRAM, ...build_args(DRIVERS[kind].example)],
+						BUILD_FIXED_ENV,
+						BUILD_ENV
+					)
 				)
 			)
 		};
 	}
 
-	const home = Deno.env.get('HOME');
+	const home = deps.home;
 	if (!home) throw new HarnessError('HOME is not set');
-	const cache = options.cache ?? resolve(home, '.cache/tsv/perf_ab');
-	await mkdir(cache, { recursive: true });
+	const cache = await deps.open_cache(options.cache ?? resolve(home, '.cache/tsv/perf_ab'));
 
-	const load_before = load_1m();
-	const perf_problem = await probe_perf();
+	const load_before = deps.load_1m();
+	const perf_problem = await probe_perf(deps.perf);
 	const use_perf = perf_problem === null;
 	if (!use_perf) {
 		console.error(
@@ -786,11 +942,13 @@ async function main(): Promise<number> {
 		);
 	}
 
-	const base = await resolve_ref(options.base_ref);
+	const base = await resolve_ref(deps, options.base_ref);
 	const cand =
-		options.cand_ref === null ? await resolve_worktree(cache) : await resolve_ref(options.cand_ref);
+		options.cand_ref === null
+			? await resolve_worktree(deps, cache.dir)
+			: await resolve_ref(deps, options.cand_ref);
 	const sides = [base, cand] as const;
-	await evict_cache(cache, sides);
+	await evict_cache(cache.dir, sides);
 	if (base.key === cand.key && base.tree !== cand.tree) {
 		console.error(
 			`perf:ab: the sides differ only outside the build inputs — one binary, measured against itself (an A/A)`
@@ -805,19 +963,23 @@ async function main(): Promise<number> {
 	if (strip_skip_line !== null) console.error(strip_skip_line);
 	const binaries: Array<Binaries> = [];
 	for (const side of sides) {
-		binaries.push({
-			format: await ensure_driver(side, cache, drivers.format),
-			strip: strip_skip === null ? await ensure_driver(side, cache, drivers.strip) : null
-		});
+		binaries.push(await build_side(deps, cache, side, drivers, strip_skip === null));
 	}
-	const sha256_of = async (binary: string | null): Promise<string | null> =>
-		binary === null ? null : sha256_hex(await Deno.readFile(binary));
+	const sha256_of = async (binary: BuiltDriver | null): Promise<string | null> =>
+		binary === null ? null : sha256_hex(await cache.dir.read(binary.name));
 	const binary_sha256 = await Promise.all(
 		binaries.map(async (b) => ({
 			format: await sha256_of(b.format),
 			strip: await sha256_of(b.strip)
 		}))
 	);
+	const runner: DriverRunner = {
+		checkout: deps.checkout,
+		perf: deps.perf,
+		cache: cache.dir,
+		pid: deps.pid,
+		options
+	};
 
 	// Which languages the corpus holds, per side, from a zero-iteration run (no timing).
 	const langs: Array<Lang> = [];
@@ -825,7 +987,7 @@ async function main(): Promise<number> {
 	for (const lang of LANGS) {
 		if (lang === 'strip' && strip_skip !== null) continue;
 		const [b, c] = await Promise.all(
-			binaries.map((b) => run_driver(binary_for(b, lang), cache, options, lang, 'fixed', false))
+			binaries.map((b) => run_driver(runner, binary_for(b, lang), lang, 'fixed', false))
 		);
 		const presence = lang_presence(b!.files, c!.files);
 		if (presence === 'one_sided') {
@@ -844,7 +1006,7 @@ async function main(): Promise<number> {
 
 	// Read before building, so this run's own build is not what it reports; the heavy-process
 	// check runs now, when that build has exited.
-	await report_load('before', load_before, LOAD_WARN);
+	await report_load(deps.pgrep, 'before', load_before, LOAD_WARN);
 	const samples: Array<Record<Lang, SideSamples>> = sides.map(() => ({
 		ts: empty_samples(),
 		svelte: empty_samples(),
@@ -853,7 +1015,7 @@ async function main(): Promise<number> {
 	}));
 	let rounds = 0;
 	while (rounds < options.rounds) {
-		await run_round(rounds++, langs, binaries, sides, samples, cache, options, use_perf);
+		await run_round(rounds++, langs, binaries, sides, samples, runner, use_perf);
 	}
 	let rows = grade(langs, samples);
 	while (wants_more_rounds(rows, rounds)) {
@@ -863,8 +1025,8 @@ async function main(): Promise<number> {
 		console.error(
 			`perf:ab: ${ambiguous.join(', ')} within its error of the ${WALL_REGRESSION_PCT}% line — two more rounds`
 		);
-		await run_round(rounds++, langs, binaries, sides, samples, cache, options, use_perf);
-		await run_round(rounds++, langs, binaries, sides, samples, cache, options, use_perf);
+		await run_round(rounds++, langs, binaries, sides, samples, runner, use_perf);
+		await run_round(rounds++, langs, binaries, sides, samples, runner, use_perf);
 		rows = grade(langs, samples);
 	}
 	const unsettled = unsettled_rows(rows);
@@ -875,8 +1037,8 @@ async function main(): Promise<number> {
 				`which rounds up to the ${MAX_ROUNDS}-round cap could not narrow enough — graded on the point estimate`
 		);
 	}
-	const load_after = load_1m();
-	await report_load('after', load_after, LOAD_WARN_AFTER);
+	const load_after = deps.load_1m();
+	await report_load(deps.pgrep, 'after', load_after, LOAD_WARN_AFTER);
 
 	for (const lang of langs) {
 		const [b, c] = [samples[0]![lang].file_set!, samples[1]![lang].file_set!];
@@ -988,20 +1150,4 @@ async function main(): Promise<number> {
 		console.log(passes ? 'perf:ab: PASS' : 'perf:ab: FAIL — a row regressed');
 	}
 	return passes ? 0 : 1;
-}
-
-if (import.meta.main) {
-	try {
-		Deno.exit(await main());
-	} catch (err) {
-		if (err instanceof HarnessError) {
-			console.error(`perf:ab: error: ${err.message}`);
-			if (err.message.startsWith('expected') || err.message.startsWith('unknown flag')) {
-				console.error(USAGE);
-			}
-			Deno.exit(2);
-		}
-		console.error(err);
-		Deno.exit(2);
-	}
 }

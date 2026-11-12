@@ -14,8 +14,8 @@ import { existsSync } from 'node:fs';
 import { copyFile, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { dirname, join, relative } from 'node:path';
 
-import { HarnessError, kept_build_env, ROOT } from '../git_snapshot.ts';
 import { parse_perf_stat_counter } from '../perf_ab_verdict.ts';
+import { HarnessError, kept_build_env, ROOT } from './deno_host.ts';
 import type { Artifacts } from './legs.ts';
 import { run_leg } from './legs.ts';
 import type { Leg, Row } from './report.ts';
@@ -219,13 +219,7 @@ async function run_perf_ab(
 	cache_name: string
 ): Promise<PerfAbJson> {
 	const args = [
-		'run',
-		'--allow-read',
-		'--allow-write',
-		'--allow-env',
-		'--allow-sys',
-		'--allow-run',
-		'scripts/perf_ab.ts',
+		'scripts/roots/perf_ab.ts',
 		sides[0].commit,
 		sides[1].commit,
 		'--rounds',
@@ -238,8 +232,9 @@ async function run_perf_ab(
 		join(options.cache, cache_name),
 		'--json'
 	];
-	log.record(`deno ${args.join(' ')}`);
-	const output = await new Deno.Command('deno', {
+	log.record(`node ${args.join(' ')}`);
+	// the checkout's own perf:ab, whichever refs the sides are
+	const output = await new Deno.Command('node', {
 		args,
 		cwd: ROOT,
 		stdout: 'piped',
@@ -361,7 +356,7 @@ export async function leg_plain(
 		async (log, leg) => {
 			if (options.dry_run) {
 				planned(leg, log, [
-					`deno run ... scripts/perf_ab.ts ${sides[0].commit} ${sides[1].commit} --rounds ${options.rounds} --iterations ${options.iterations} --corpus ${options.corpus} --cache <cache>/perf_ab --json`,
+					`node scripts/roots/perf_ab.ts ${sides[0].commit} ${sides[1].commit} --rounds ${options.rounds} --iterations ${options.iterations} --corpus ${options.corpus} --cache <cache>/perf_ab --json`,
 					`perf stat -e instructions:u,cycles:u -- <symbolized release tsv> format --check --jobs 1 <per-language files> (${options.rounds} interleaved rounds)`
 				]);
 				return;
@@ -433,7 +428,7 @@ export async function leg_small_files(
 		if (options.dry_run) {
 			planned(leg, log, [
 				`stage every corpus file under ${SMALL_FILE_LIMIT} bytes into <cache>/small_corpus`,
-				`deno run ... scripts/perf_ab.ts <base> <cand> --corpus <cache>/small_corpus --rounds ${options.rounds} --json`
+				`node scripts/roots/perf_ab.ts <base> <cand> --corpus <cache>/small_corpus --rounds ${options.rounds} --json`
 			]);
 			return;
 		}

@@ -179,7 +179,7 @@ Things the published numbers measure that aren't quite what they look like.
   they don't take — fair to report as "what tsv ships vs what they ship,"
   disclosed so a native-vs-native read isn't mistaken for same-build-config.
   Never mix a PGO or instrumented binary into a regression anchor series:
-  `deno task perf:ab` builds plain release drivers on both sides and stays the
+  `npm run perf:ab` builds plain release drivers on both sides and stays the
   regression instrument, so a measured change is the source's, not a training
   run's. The plain-vs-PGO delta, measured once with its method, lives in
   [performance.md §Profile-guided builds](performance.md#profile-guided-builds).

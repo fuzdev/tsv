@@ -84,6 +84,7 @@
 		"scripts/npm_api_test.ts",
 		"scripts/package_audit_test.ts",
 		"scripts/patch_npm_package_test.ts",
+		"scripts/perf_ab_test.ts",
 		"scripts/perf_ab_verdict_test.ts",
 		"scripts/pgo/bench_test.ts",
 		"scripts/pgo/depth_stack_test.ts",

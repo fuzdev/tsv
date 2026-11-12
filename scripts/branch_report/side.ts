@@ -11,8 +11,8 @@ import { existsSync } from 'node:fs';
 import { mkdir, readdir, rm, stat, utimes } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
-import { extract_tree, git, HarnessError, kept_build_env, run, ROOT } from '../git_snapshot.ts';
 import { type CachedTree, trees_to_evict } from '../perf_ab_verdict.ts';
+import { extract_tree, git, HarnessError, kept_build_env, run, ROOT } from './deno_host.ts';
 
 export type Slot = 'base' | 'cand';
 

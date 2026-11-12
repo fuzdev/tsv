@@ -6,7 +6,7 @@
  * is one `tsc` typechecks, and each is named: a directory would sweep in
  * `benches/js/lib/canonical_test.ts` and `benches/js/lib/compare_engines_test.ts`, which need
  * the bench install
- * (`vitest.canonical.config.ts`), and the suites still on `deno test` (`test:deno`). A named
+ * (`vitest.canonical.config.ts`), and the suite still on `deno test` (`test:deno`). A named
  * file that's missing fails here rather than leaving the run one suite short, and so does a
  * `_test.ts` file under `scripts/`, directly under `benches/js/`, or under its `diagnostics/`
  * or `lib/` that no runner names, which would otherwise never run.

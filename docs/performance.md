@@ -891,7 +891,7 @@ i-cache misses (2.3× plain's on the addon's TypeScript parse, against 1.18× wi
 cost-benefit inliner off). The size bands in `scripts/validate_napi_artifact.ts` (`--pgo`)
 are what catch that inliner coming back on.
 
-`deno task perf:ab` keeps comparing PLAIN builds: a profile retrained for each side would
+`perf:ab` keeps comparing PLAIN builds: a profile retrained for each side would
 make every A/B a draw of two trainings (the profile's bytes vary run to run), so source
 changes are graded without PGO and the bench reports what ships.
 
@@ -910,16 +910,16 @@ changes are graded without PGO and the bench reports what ships.
    the full `deno task bench` also runs the node conformance coverage surface — a
    pre-flight parse-coverage pass, no timed phase)
 3. **Record results** — for regression detection, use `deno task bench:deno:run -- --save-baseline` / `-- --compare-baseline` (or the `bench:node:run` / `bench:bun:run` siblings for the other runtimes)
-4. **Gate it against its base** — `deno task perf:ab <base>` ([§Gating a change against a base](#gating-a-change-against-a-base--deno-task-perfab))
+4. **Gate it against its base** — `npm run perf:ab -- <base>` ([§Gating a change against a base](#gating-a-change-against-a-base--npm-run-perfab))
 5. **Check the size axis if the change shrank a hot function** — see
    [An instruction A/B is blind to code size](#an-instruction-ab-is-blind-to-code-size); no `check` gate covers it
 
-### Gating a change against a base — `deno task perf:ab`
+### Gating a change against a base — `npm run perf:ab`
 
 ```bash
-deno task perf:ab <release-tag>    # the last release vs the working tree (HEAD + uncommitted changes)
-deno task perf:ab HEAD             # a change in progress vs the commit it sits on
-deno task perf:ab <base> <cand>    # two refs; also --rounds N (even, 6), --iterations N (10), --corpus DIR, --json
+npm run perf:ab -- <release-tag>    # the last release vs the working tree (HEAD + uncommitted changes)
+npm run perf:ab -- HEAD             # a change in progress vs the commit it sits on
+npm run perf:ab -- <base> <cand>    # two refs; also --rounds N (even, 6), --iterations N (10), --corpus DIR, --json
 ```
 
 One command for the parse/format regression check, per language (TypeScript, Svelte, CSS) ×
@@ -935,7 +935,10 @@ and `perf:ab HEAD` on one measures a binary against itself. A run keeps the few 
 recently used snapshots and evicts the rest. The report prints each side's binary sha256, so a
 reading that moved between runs can be told apart from a build that changed. The builds run in a
 cleared environment, so a `RUSTFLAGS` or `CARGO_PROFILE_*` in the caller's shell cannot reach one
-side's build and not the other's. Both sides run the **same** measuring drivers,
+side's build and not the other's. The drivers, and `perf` around them, run in a cleared
+environment too (the drivers read only their arguments), the same on both sides: the delta
+holds, while the absolute numbers can sit a little off a run under a whole shell environment,
+whose size moves a process's initial stack. Both sides run the **same** measuring drivers,
 `crates/tsv_debug/examples/perf_ab.rs` and `perf_ab_strip.rs`, copied from the current checkout
 over each snapshot: only the measured libraries differ. The format driver times exactly what
 `profile` times (fold + parse, then format; per-file medians summed per language) over

@@ -386,8 +386,8 @@ export const run_doctor = async (
 	const deno_line = await run_version(programs.deno);
 	if (deno_line === null) {
 		fail(
-			"deno missing — check's test:deno leg runs on it (the suites still on `deno test`), as do " +
-				"the bench's Deno row (bench:deno), typecheck:js, perf:ab, and branch:report"
+			"deno missing — check's test:deno leg runs on it (the suite still on `deno test`), as do " +
+				"the bench's Deno row (bench:deno), typecheck:js, and branch:report"
 		);
 	} else {
 		const deno_version = /^deno (\d+\.\d+\.\d+\S*)/.exec(deno_line)?.[1];

@@ -1,71 +1,50 @@
 /**
- * What the two-tree build harnesses share (`scripts/perf_ab.ts`, `scripts/branch_report/`): run a
- * command, query git, extract a tree from the object store and hash bytes, each failing loudly
- * through `HarnessError`. A harness builds a tree it extracted, never the checkout.
+ * What the two-tree build harnesses share: query git, extract a tree from the object store and
+ * hash bytes, each failing loudly through `HarnessError`. A harness builds a tree it extracted,
+ * never the checkout. Each operation takes the programs it runs as handles its root builds and
+ * the directories it works in as fs handles, so the root decides every child's environment.
  *
  * @module
  */
 
-import { existsSync } from 'node:fs';
-import { mkdir, rename, rm } from 'node:fs/promises';
-import { fileURLToPath } from 'node:url';
-
-export const ROOT = fileURLToPath(new URL('..', import.meta.url));
+import type { FsDir, FsReadDir } from '@fuzdev/gro/fs.ts';
+import type { SpawnProgram, SpawnResult } from '@fuzdev/gro/spawn.ts';
 
 export class HarnessError extends Error {}
 
-/** The variables a harness build keeps from the caller; everything else is cleared, so a
+/** The host variables a harness build is given beside gro's base environment (`PATH`, `HOME`,
+ * `TMPDIR`, `TERM`, `LC_ALL=C`, `NO_COLOR`, `FORCE_COLOR`); nothing else reaches it, so a
  * caller's `RUSTFLAGS`, `CARGO_PROFILE_*`, `RUSTUP_TOOLCHAIN` or `RUSTC_WRAPPER` reaches neither
  * side. Locating the toolchain needs `PATH`, `HOME` and the rustup / cargo homes;
  * `CARGO_BUILD_JOBS` only schedules the build (a release build's codegen is one unit, so the
  * artifact does not depend on it). */
-export const BUILD_ENV = ['PATH', 'HOME', 'CARGO_HOME', 'RUSTUP_HOME', 'CARGO_BUILD_JOBS'];
+export const BUILD_ENV: ReadonlyArray<string> = [
+	'PATH',
+	'HOME',
+	'CARGO_HOME',
+	'RUSTUP_HOME',
+	'CARGO_BUILD_JOBS'
+];
 
-/** The caller's values for `BUILD_ENV`, ready to extend with a build's own variables. */
-export function kept_build_env(): Record<string, string> {
-	const env: Record<string, string> = {};
-	for (const name of BUILD_ENV) {
-		const value = Deno.env.get(name);
-		if (value !== undefined) env[name] = value;
-	}
-	return env;
-}
+/** A child's exit code, or `null` when it ended any other way (a signal, a stop). */
+export const exit_code_of = (result: SpawnResult): number | null =>
+	result.kind === 'exited' ? result.code : null;
 
-export interface RunResult {
-	success: boolean;
-	code: number;
-	stdout: string;
-	stderr: string;
-}
+/** How a child ended, for a message: `exited 3`, `was killed by SIGKILL`. */
+export const format_ending = (result: SpawnResult): string => {
+	if (result.kind === 'exited') return `exited ${result.code}`;
+	if (result.kind === 'signaled') return `was killed by ${result.signal}`;
+	return `was stopped (${result.kind})`;
+};
 
-export async function run(
-	cmd: string,
-	args: ReadonlyArray<string>,
-	options: { cwd?: string; env?: Record<string, string>; clear_env?: boolean } = {}
-): Promise<RunResult> {
-	const output = await new Deno.Command(cmd, {
-		args: [...args],
-		cwd: options.cwd ?? ROOT,
-		env: options.env,
-		clearEnv: options.clear_env ?? false,
-		stdout: 'piped',
-		stderr: 'piped'
-	}).output();
-	const decoder = new TextDecoder();
-	return {
-		success: output.success,
-		code: output.code,
-		stdout: decoder.decode(output.stdout),
-		stderr: decoder.decode(output.stderr)
-	};
-}
-
-export async function git(
-	args: ReadonlyArray<string>,
-	env?: Record<string, string>
+/** Run `git args` in `cwd`; its trimmed stdout. */
+export async function git_out(
+	git: SpawnProgram,
+	cwd: FsReadDir,
+	args: ReadonlyArray<string>
 ): Promise<string> {
-	const result = await run('git', args, { env });
-	if (!result.success) {
+	const result = await git.out(args, { cwd });
+	if (exit_code_of(result) !== 0) {
 		throw new HarnessError(`git ${args.join(' ')} failed:\n${result.stderr.trim()}`);
 	}
 	return result.stdout.trim();
@@ -74,60 +53,87 @@ export async function git(
 /** The recursive, NUL-separated `git ls-tree -r -z` listing of `paths` in `tree`, run in `cwd`
  * (untrimmed: a raw path may end in whitespace). */
 export async function list_tree(
+	git: SpawnProgram,
+	cwd: FsReadDir,
 	tree: string,
-	paths: ReadonlyArray<string>,
-	cwd: string = ROOT
+	paths: ReadonlyArray<string>
 ): Promise<string> {
 	const args = ['ls-tree', '-r', '-z', tree, '--', ...paths];
-	const result = await run('git', args, { cwd });
-	if (!result.success) {
+	const result = await git.out(args, { cwd });
+	if (exit_code_of(result) !== 0) {
 		throw new HarnessError(`git ${args.join(' ')} failed:\n${result.stderr.trim()}`);
 	}
 	return result.stdout;
 }
 
-export async function sha256_hex(bytes: Uint8Array<ArrayBuffer>): Promise<string> {
-	const digest = await crypto.subtle.digest('SHA-256', bytes);
+export async function sha256_hex(bytes: Uint8Array): Promise<string> {
+	const digest = await crypto.subtle.digest('SHA-256', new Uint8Array(bytes));
 	return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-/** Extract `paths` of `tree` (its whole tree when `paths` is empty) into `dir` with `git archive
- * | tar -x`, via a per-process partial directory so an interrupted extraction is never mistaken
- * for a snapshot and two concurrent runs never share one. */
+/** What `extract_tree` runs: `git` in the checkout, `tar` in the directory it fills. */
+export interface ExtractTreeDeps {
+	git: SpawnProgram;
+	tar: SpawnProgram;
+	/** The repository the tree is read from, `git archive`'s working directory. */
+	checkout: FsReadDir;
+	/** Names the partial directory, so two concurrent runs never share one. */
+	pid: number;
+}
+
+/** Every chunk of `stream`, joined and decoded. */
+const read_text = async (stream: AsyncIterable<Uint8Array>): Promise<string> => {
+	const decoder = new TextDecoder();
+	let text = '';
+	for await (const chunk of stream) text += decoder.decode(chunk, { stream: true });
+	return text + decoder.decode();
+};
+
+/** Extract `paths` of `tree` (its whole tree when `paths` is empty) into `parent`'s `name` with
+ * `git archive | tar -x`, via a per-process partial directory so an interrupted extraction is
+ * never mistaken for a snapshot and two concurrent runs never share one. */
 export async function extract_tree(
+	deps: ExtractTreeDeps,
 	tree: string,
 	paths: ReadonlyArray<string>,
-	dir: string
+	parent: FsDir,
+	name: string
 ): Promise<void> {
-	const partial = `${dir}.partial.${Deno.pid}`;
-	await rm(partial, { recursive: true, force: true });
-	await mkdir(partial, { recursive: true });
-	const archive = new Deno.Command('git', {
-		args: ['archive', '--format=tar', tree, ...(paths.length > 0 ? ['--', ...paths] : [])],
-		cwd: ROOT,
-		stdout: 'piped',
-		stderr: 'piped'
-	}).spawn();
-	const tar = new Deno.Command('tar', {
-		args: ['-x', '-C', partial],
-		stdin: 'piped',
-		stdout: 'null',
-		stderr: 'piped'
-	}).spawn();
-	await archive.stdout.pipeTo(tar.stdin);
-	const [archive_out, tar_out] = await Promise.all([archive.output(), tar.output()]);
-	if (!archive_out.success || !tar_out.success) {
-		await rm(partial, { recursive: true, force: true });
-		const stderr = new TextDecoder().decode(
-			archive_out.success ? tar_out.stderr : archive_out.stderr
+	const partial = `${name}.partial.${deps.pid}`;
+	await parent.remove(partial, { recursive: true, missing_ok: true });
+	await parent.mkdir(partial, { recursive: true });
+	const archive = await deps.git.start(
+		['archive', '--format=tar', tree, ...(paths.length > 0 ? ['--', ...paths] : [])],
+		{ cwd: deps.checkout, stdio: ['ignore', 'pipe', 'pipe'] }
+	);
+	const tar = await deps.tar.start(['-x'], {
+		cwd: parent.dir(partial),
+		stdio: ['pipe', 'ignore', 'pipe']
+	});
+	const pump = async (): Promise<void> => {
+		for await (const chunk of archive.stdout!) {
+			if (!(await tar.stdin!.write(chunk))) break;
+		}
+		await tar.stdin!.close();
+	};
+	const [archive_stderr, tar_stderr] = await Promise.all([
+		read_text(archive.stderr!),
+		read_text(tar.stderr!),
+		pump()
+	]);
+	const [archive_result, tar_result] = await Promise.all([archive.closed, tar.closed]);
+	const archive_ok = exit_code_of(archive_result) === 0;
+	if (!archive_ok || exit_code_of(tar_result) !== 0) {
+		await parent.remove(partial, { recursive: true, missing_ok: true });
+		throw new HarnessError(
+			`extracting tree ${tree} failed:\n${(archive_ok ? tar_stderr : archive_stderr).trim()}`
 		);
-		throw new HarnessError(`extracting tree ${tree} failed:\n${stderr.trim()}`);
 	}
 	try {
-		await rename(partial, dir);
+		await parent.rename(partial, name);
 	} catch (err) {
 		// a concurrent run finished the same extraction first; its copy is the same tree
-		await rm(partial, { recursive: true, force: true });
-		if (!existsSync(dir)) throw err;
+		await parent.remove(partial, { recursive: true, missing_ok: true });
+		if (!(await parent.exists(name))) throw err;
 	}
 }

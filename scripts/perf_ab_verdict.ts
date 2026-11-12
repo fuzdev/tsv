@@ -1,5 +1,5 @@
 /**
- * The pure half of `deno task perf:ab` (`scripts/perf_ab.ts`): round statistics, the per-row
+ * The pure half of `perf:ab` (`scripts/perf_ab.ts`): round statistics, the per-row
  * verdict, the rounds policy, the file-set and cache-eviction decisions, `perf stat` output
  * parsing, and the table. No I/O, so every rule is unit-tested (`perf_ab_verdict_test.ts`).
  *

@@ -354,21 +354,21 @@ const CASES: Case[] = [
 		name: 'deno absent',
 		change: (w) => void (w.programs.deno = null),
 		mark: '✗',
-		line: "deno missing — check's test:deno leg runs on it (the suites still on `deno test`), as do the bench's Deno row (bench:deno), typecheck:js, perf:ab, and branch:report",
+		line: "deno missing — check's test:deno leg runs on it (the suite still on `deno test`), as do the bench's Deno row (bench:deno), typecheck:js, and branch:report",
 		code: 1
 	},
 	{
 		name: 'deno exiting non-zero',
 		change: (w) => void (w.programs.deno = { '--version': exited('deno 2.9.7\n', 1) }),
 		mark: '✗',
-		line: "deno missing — check's test:deno leg runs on it (the suites still on `deno test`), as do the bench's Deno row (bench:deno), typecheck:js, perf:ab, and branch:report",
+		line: "deno missing — check's test:deno leg runs on it (the suite still on `deno test`), as do the bench's Deno row (bench:deno), typecheck:js, and branch:report",
 		code: 1
 	},
 	{
 		name: 'deno failing to start',
 		change: (w) => void (w.programs.deno = { '--version': new Error('launch_failed') }),
 		mark: '✗',
-		line: "deno missing — check's test:deno leg runs on it (the suites still on `deno test`), as do the bench's Deno row (bench:deno), typecheck:js, perf:ab, and branch:report",
+		line: "deno missing — check's test:deno leg runs on it (the suite still on `deno test`), as do the bench's Deno row (bench:deno), typecheck:js, and branch:report",
 		code: 1
 	},
 	{
