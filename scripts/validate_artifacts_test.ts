@@ -13,7 +13,8 @@ import { fs, type FsDir, type FsReadDir } from '@fuzdev/gro/fs.ts';
 import { test } from 'vitest';
 
 import { fmt_mtime as fmt } from '../benches/js/lib/check_artifact_freshness.ts';
-import { CORE_CRATES, WASM_CRATES, type WasmVariant } from '../benches/js/lib/tsv_artifacts.ts';
+import { CORE_CRATES, WASM_CRATES } from '../benches/js/lib/crate_lists.ts';
+import type { WasmVariant } from '../benches/js/lib/tsv_artifacts.ts';
 import { wasm_package_checks } from './check_staged_freshness.ts';
 import { THIRD_PARTY_NOTICE } from './npm_metadata.ts';
 import {

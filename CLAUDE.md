@@ -80,7 +80,7 @@ deno task build:all        # release + ffi + build:packages + build:napi:package
 deno task build:packages   # the 6 WASM bundles: 3 publishable npm packages + their 3 deno bundles (benches); single source of truth for CI + publish.ts
 deno task build:bench      # what `bench`/`smoke` measure and EVERY bench leg builds (build:bench:pgo + the plain ffi:format/:parse size builds + 3 wasm:deno variants + wasm:all:nodejs)
 deno task build:bench:pgo  # the PROFILE-GUIDED FFI library + N-API addon every native bench row loads, staged with a stamp in
-#                            .pgo/bench/ (scripts/pgo/bench.ts → pgo.ts all --ffi --reuse: a stamp-hit takes seconds, a miss minutes)
+#                            .pgo/bench/ (scripts/roots/pgo_bench.ts → pgo.ts all --ffi --reuse: a stamp-hit takes seconds, a miss minutes)
 deno task install-cli      # build the release CLI and install it to ~/.local/bin/tsv (the local daily driver)
 deno task clean            # clean build artifacts
 cargo build --workspace [--release]   # or -p tsv_cli / -p tsv_debug
@@ -133,7 +133,8 @@ deno task typecheck:packages # the STAGED npm packages' .d.ts as a consumer comp
 #                          publish.ts Step 6 stages the napi loader and runs it over all four (docs/audits.md)
 deno task typecheck:scripts # scripts/ by the checker of the runtime each script runs on, so in `check` (nothing else
 #                          typechecks the release scripts): `tsc -p tsconfig.scripts.json` over the Node roots under
-#                          `scripts/roots/` and what they import (Node's types, no `Deno`), then deno check over the rest
+#                          `scripts/roots/`, the PGO pipeline and its drivers, and what they import (Node's types, no
+#                          `Deno`), then deno check over the rest
 #                          of scripts/, node-modules-free; that walk excludes the Node scripts (deno.json `exclude`) and
 #                          `scripts/doctor.ts`, whose corpus probe reaches node_modules
 deno task typecheck:bench-core # the node-modules-free bench modules the Deno scripts' import graph misses
@@ -171,7 +172,10 @@ deno task test:node      # vitest under Node over the suites beside their module
 #                          over a temp checkout, staled by every input it names, with
 #                          `benches/js/lib/source_mtime_test.ts` — the walk every mtime guard shares;
 #                          `no_package_closure_test.ts` — the scripts CI runs with no `node_modules` import no package,
-#                          and the publish and release suites load nothing that can spawn, write, or reach the network;
+#                          and the publish and release suites load nothing that can spawn, write, or reach the network,
+#                          over `import_closure_test.ts` — the import walk they and the PGO stamp key share;
+#                          `pgo/bench_test.ts` — build:bench:pgo over a temp checkout and a fake `node` playing the
+#                          pipeline (its argv and cwd, the copies' bytes and modes, the stamp, each refusal);
 #                          `cargo_env_test.ts` — what reaches
 #                          a script's cargo; `check_canonical_pins_test.ts` — pins:audit's mode flags, its no-git path, and
 #                          where its git runs; `discovery_audit_test.ts` — what discovery:audit hands git and tsv;

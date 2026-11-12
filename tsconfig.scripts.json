@@ -13,5 +13,11 @@
 		"verbatimModuleSyntax": true,
 		"types": ["node"]
 	},
-	"include": ["scripts/roots/**/*.ts", "crates/tsv_debug/sidecar/sidecar.ts"]
+	"include": [
+		"scripts/roots/**/*.ts",
+		"scripts/pgo/pgo.ts",
+		"scripts/pgo/addon_ops.ts",
+		"scripts/pgo/addon_depth.ts",
+		"crates/tsv_debug/sidecar/sidecar.ts"
+	]
 }

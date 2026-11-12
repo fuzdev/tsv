@@ -14,7 +14,7 @@ import { fs, type FsDir, type FsReadDir } from '@fuzdev/gro/fs.ts';
 import type { SpawnOutput, SpawnProgram } from '@fuzdev/gro/spawn.ts';
 import { test } from 'vitest';
 
-import { CORE_CRATES } from '../benches/js/lib/tsv_artifacts.ts';
+import { CORE_CRATES } from '../benches/js/lib/crate_lists.ts';
 import {
 	napi_addon_check,
 	napi_loader_checks,

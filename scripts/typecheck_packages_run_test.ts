@@ -15,7 +15,7 @@ import { join, relative } from 'node:path';
 import { fs, type FsDir } from '@fuzdev/gro/fs.ts';
 import { test } from 'vitest';
 
-import { CORE_CRATES, WASM_CRATES } from '../benches/js/lib/tsv_artifacts.ts';
+import { CORE_CRATES, WASM_CRATES } from '../benches/js/lib/crate_lists.ts';
 import { napi_loader_checks, wasm_package_checks } from './check_staged_freshness.ts';
 import { TYPECHECK_INSTALL, TYPESCRIPT_MODULE, TYPES_ROOT } from './typecheck_install.ts';
 import { run_typecheck_packages, type TypeScriptApi } from './typecheck_packages.ts';

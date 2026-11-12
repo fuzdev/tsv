@@ -62,6 +62,7 @@ import { readdir, stat } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { env, exit } from 'node:process';
 import { fileURLToPath } from 'node:url';
+import { CORE_CRATES } from './crate_lists.ts';
 import { get_napi_library_path } from './napi.ts';
 import { type PgoBenchWorld, pgo_bench_mismatch } from './pgo_bench.ts';
 import { current_runtime, wasm_target } from './runtime.ts';
@@ -72,7 +73,6 @@ import {
 	type SourceTree
 } from './source_mtime.ts';
 import {
-	CORE_CRATES,
 	ffi_loaded_path,
 	ffi_rebuild_task,
 	TSV_ARTIFACTS,

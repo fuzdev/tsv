@@ -56,12 +56,8 @@ import {
 	newest_workspace_file_mtime
 } from '../benches/js/lib/check_artifact_freshness.ts';
 import type { SourceTree } from '../benches/js/lib/source_mtime.ts';
-import {
-	CORE_CRATES,
-	WASM_CRATES,
-	wasm_bundle_dir,
-	type WasmVariant
-} from '../benches/js/lib/tsv_artifacts.ts';
+import { CORE_CRATES, WASM_CRATES } from '../benches/js/lib/crate_lists.ts';
+import { wasm_bundle_dir, type WasmVariant } from '../benches/js/lib/tsv_artifacts.ts';
 import { ALL_FAMILIES, facade_sources } from './npm_facade.ts';
 import { THIRD_PARTY_NOTICE } from './npm_metadata.ts';
 

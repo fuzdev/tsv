@@ -4,7 +4,7 @@
  * library under Deno, the N-API addon under Node and Bun — so the bench measures what
  * ships (docs/benchmarks.md §PGO).
  *
- * `scripts/pgo/bench.ts` (`deno task build:bench:pgo`) runs the PGO pipeline with the
+ * `scripts/pgo/bench.ts` (`npm run build:bench:pgo`) runs the PGO pipeline with the
  * FFI world added (`scripts/pgo/pgo.ts all --ffi`), and only once every gate has passed
  * copies the two libraries here and writes the stamp beside them: each library's sha256,
  * its profile's, and the training it came from. The copy keeps a later pipeline run
@@ -34,20 +34,28 @@ export const PGO_BENCH_WORLDS: readonly PgoBenchWorld[] = ['ffi', 'napi'];
 
 const PROJECT_ROOT = fileURLToPath(new URL('../../..', import.meta.url)).replace(/\/$/, '');
 
-/**
- * Where the gated copies live — under the PGO pipeline's own working directory (`.pgo/`,
- * gitignored), outside `target/`, which no cargo command writes into here.
- */
-export const PGO_BENCH_DIR = `${PROJECT_ROOT}/.pgo/bench`;
+/** The gated copies' directory, and the stamp beside them, beneath the PGO pipeline's own
+ * working directory (`.pgo/`, gitignored), outside `target/`, which no cargo command writes
+ * into here. */
+export const PGO_BENCH_SUBDIR = 'bench';
+export const PGO_BENCH_STAMP_NAME = 'stamp.json';
 
-export const PGO_BENCH_STAMP_PATH = `${PGO_BENCH_DIR}/stamp.json`;
+/** Where the gated copies live. */
+export const PGO_BENCH_DIR = `${PROJECT_ROOT}/.pgo/${PGO_BENCH_SUBDIR}`;
+
+export const PGO_BENCH_STAMP_PATH = `${PGO_BENCH_DIR}/${PGO_BENCH_STAMP_NAME}`;
 
 /** The stamp's shape version — bumped when a field changes, so a reader can refuse an older one. */
 export const PGO_BENCH_STAMP_VERSION = 1;
 
+/** The filename of the profile-guided library the bench loads for `world`. */
+export function pgo_bench_library_name(world: PgoBenchWorld): string {
+	return native_library_filename(world === 'ffi' ? 'tsv_ffi' : 'tsv_napi');
+}
+
 /** The profile-guided library the bench loads for `world`. */
 export function pgo_bench_library_path(world: PgoBenchWorld): string {
-	return `${PGO_BENCH_DIR}/${native_library_filename(world === 'ffi' ? 'tsv_ffi' : 'tsv_napi')}`;
+	return `${PGO_BENCH_DIR}/${pgo_bench_library_name(world)}`;
 }
 
 /** One gated library, as the stamp records it. */
@@ -76,7 +84,7 @@ export interface PgoBenchStamp {
 }
 
 /** The sha256 of a file's bytes. */
-export function sha256_file(path: string): string {
+function sha256_file(path: string): string {
 	return createHash('sha256').update(readFileSync(path)).digest('hex');
 }
 

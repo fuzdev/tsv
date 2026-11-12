@@ -1,8 +1,8 @@
 /**
- * The tsv artifacts the bench measures and reports — the crates that feed them and
- * where each build lands — stated once for the readers that must agree on them: the
- * run-side freshness guard (`check_artifact_freshness.ts`), the build-side skip
- * (`scripts/run_if_stale.ts`), the staged-package guard
+ * The tsv artifacts the bench measures and reports — where each build lands, and the crates
+ * beyond the shared core that feed it (the lists themselves are `crate_lists.ts`') — stated
+ * once for the readers that must agree on them: the
+ * run-side freshness guard (`check_artifact_freshness.ts`), the staged-package guard
  * (`scripts/check_staged_freshness.ts` via the npm test suites) and the size table
  * (`binary_sizes.ts`). A path or crate list spelled in two of them is how a guard
  * ends up vouching for an artifact the table sizes from somewhere else.
@@ -40,6 +40,7 @@
 
 import { fileURLToPath } from 'node:url';
 
+import { WASM_CRATES } from './crate_lists.ts';
 import { type PgoBenchWorld, pgo_bench_library_path } from './pgo_bench.ts';
 import { native_library_filename } from './runtime.ts';
 
@@ -48,34 +49,6 @@ import { native_library_filename } from './runtime.ts';
  * harness builds itself (`canonical_bundles.ts`) — the one kind no package ships.
  */
 export type BinaryKind = 'wasm' | 'native' | 'js';
-
-/**
- * Crates whose source compiles into EVERY measured tsv artifact (the shared
- * core): the language crates plus `tsv_arena` (all three bindings' per-thread
- * reuse). Applied as the freshness floor for every check.
- *
- * `tsv_ignore` + `tsv_discover` are deliberately NOT here — they feed only the
- * WASM bundle (the `IgnoreStack` export), not `tsv_ffi` / `tsv_napi`, so they
- * live in `WASM_CRATES`. Sharing them would false-stale the native checks: a
- * `tsv_discover` edit never rebuilds the FFI (it's not in its dependency
- * graph), so the guard would demand a rebuild that compiles nothing — one that
- * clears it only because the build tasks stamp (`scripts/cargo_build.ts`).
- *
- * Deliberately excludes the dev-tooling crates (`tsv_debug`, `tsv_cli`): they
- * don't feed the measured artifacts, and including them would force wasm
- * rebuilds on every fixture-workflow edit. (The staged guard's CLI-binary check
- * names `tsv_cli` itself where it needs it.)
- */
-export const CORE_CRATES = ['tsv_lang', 'tsv_arena', 'tsv_html', 'tsv_ts', 'tsv_css', 'tsv_svelte'];
-
-/**
- * Crates that feed the WASM bundle beyond `CORE_CRATES`: the binding crate
- * itself plus `tsv_ignore` + `tsv_discover` (the `IgnoreStack` export). Of the
- * measured bindings `tsv_ffi` links neither; `tsv_napi` links both (its `format`
- * feature, for the same export), which its own staleness row names
- * (`napi_addon_check` in `scripts/check_staged_freshness.ts`).
- */
-export const WASM_CRATES = ['tsv_wasm', 'tsv_ignore', 'tsv_discover'];
 
 /** One built tsv artifact: the size table's row, and a freshness check's subject. */
 export interface TsvArtifact {

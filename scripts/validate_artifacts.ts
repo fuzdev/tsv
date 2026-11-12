@@ -36,9 +36,8 @@ import { fileURLToPath } from 'node:url';
 
 import type { FsReadDir } from '@fuzdev/gro/fs.ts';
 
+import { CORE_CRATES, WASM_CRATES } from '../benches/js/lib/crate_lists.ts';
 import {
-	CORE_CRATES,
-	WASM_CRATES,
 	wasm_bundle_dir,
 	wasm_bundle_path,
 	type WasmVariant

@@ -54,7 +54,7 @@ import { constants as os_constants, tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-import { CORE_CRATES } from '../benches/js/lib/tsv_artifacts.ts';
+import { CORE_CRATES } from '../benches/js/lib/crate_lists.ts';
 import {
 	assert_staged_fresh,
 	NAPI_LOADER_DIR,

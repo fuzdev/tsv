@@ -521,13 +521,7 @@ export async function leg_pgo(sides: readonly [Side, Side], options: TimingOptio
 	return await run_leg('PGO interleaved pair', async (log, leg) => {
 		const corpora_root = options.corpus.replace(/\/collections\/?$/, '');
 		const pgo_args = (dir: string): Array<string> => [
-			'deno',
-			'run',
-			'--allow-read',
-			'--allow-write',
-			'--allow-env',
-			'--allow-run',
-			'--allow-sys',
+			'node',
 			'scripts/pgo/pgo.ts',
 			'all',
 			'--ffi',

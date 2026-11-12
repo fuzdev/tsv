@@ -1297,7 +1297,7 @@ the stamp does not name is refused like a missing one (`BENCH_STALE_OK=1` does n
 the report would publish a plain build as the profile-guided one); as a size-only artifact it
 is a warning. Whether `build:bench:pgo` rebuilds is the pipeline's own question, asked by
 content: `pgo.ts all --reuse` skips the build and its gates when a hash of everything that can
-change the binaries matches the stamp it wrote last (deno.json `//build:pgo`), a cache it
+change the binaries matches the stamp it wrote last (docs/tasks.md §`build:pgo`), a cache it
 shares with `deno task build:pgo`.
 
 **Behind the override: the span-only wire is probed at init.** An mtime can only
@@ -1314,7 +1314,8 @@ the run before any row is timed.
 **The size-only artifacts are graded too, as a warning.** The bench's size table
 reports every tsv build from every runtime (the other binding, the subset bundles,
 the `ffi-{format,parse}` builds — `lib/tsv_artifacts.ts`, the one table the guard,
-the build-side skip, the size table and the three LOADERS all read), and nothing
+the size table and the three LOADERS read, its crate lists from `lib/crate_lists.ts`,
+which the build-side skip reads), and nothing
 executes those, so a `:run` after a crate edit would silently publish the other
 binding's size at an older commit inside a report stamped with this one.
 `warn_stale_reported_artifacts` names each stale one before the run (never fatal —
@@ -1340,7 +1341,7 @@ free.
 (`build:wasm:deno`, `build:wasm:parse:deno`, `build:wasm:all:deno`,
 `build:wasm:all:nodejs`) ride `scripts/run_if_stale.ts`, which skips wasm-pack when
 the bundle's `.wasm` is already newer than every source feeding it
-(`lib/tsv_artifacts.ts`'s `CORE_CRATES` + `WASM_CRATES` — `tsv_wasm` plus the
+(`lib/crate_lists.ts`' `CORE_CRATES` + `WASM_CRATES` — `tsv_wasm` plus the
 `tsv_ignore`/`tsv_discover` crates behind its `IgnoreStack` export;
 imported, and walked by the guard's own walk (`lib/source_mtime.ts`), so the two sides
 can't drift; dev-tooling crates deliberately excluded so
@@ -1655,6 +1656,8 @@ benches/js/
     ├── corpus_repos.ts    # Per-source repo origin + commit — the manifest's upstream for a snapshot
     │                      # collection, git-detected for any other checkout — so the report's
     │                      # source links pin to the measured code
+    ├── crate_lists.ts     # The crate lists (`CORE_CRATES`, `WASM_CRATES`), import-free, read by the
+    │                      # guards, the artifact table and run_if_stale
     ├── diff.ts            # Line-based diff utilities (LCS algorithm)
     ├── diff_path.ts       # `get_at_path`: a diff's concrete path back to the canonical node it
     │                      # names (the parse matchers and the loc tolerance rows both read it)
@@ -1765,8 +1768,8 @@ benches/js/
     ├── tsv_api.ts         # The packages' published API over one tsv engine: the shipped facade
     │                      # (`crates/tsv_wasm/npm/api.js` + `api_parse.js`) built over a binding's flat
     │                      # exports, and `TsvBinding`, the base the three wrappers (ffi/napi/wasm) share
-    ├── tsv_artifacts.ts   # The measured tsv artifacts: crate lists + per-build path/label/rebuild, read by
-    │                      # the freshness guard, run_if_stale and the size table alike — and the path
+    ├── tsv_artifacts.ts   # The measured tsv artifacts: per-build path/label/rebuild and crates (lists
+    │                      # from crate_lists.ts), read by the freshness guard and the size table — and the path
     │                      # BUILDERS the three loaders (ffi/napi/wasm) resolve from, so what a guard
     │                      # checks is the file its loader opens
     ├── types.ts           # Shared types + `BaseImplementation` (the language-support pair)

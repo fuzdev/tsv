@@ -77,7 +77,7 @@ import { pathToFileURL } from 'node:url';
 import type { FsDir, FsReadDir } from '@fuzdev/gro/fs.ts';
 import type { SpawnProgram } from '@fuzdev/gro/spawn.ts';
 
-import { CORE_CRATES } from '../benches/js/lib/tsv_artifacts.ts';
+import { CORE_CRATES } from '../benches/js/lib/crate_lists.ts';
 import {
 	NAPI_LOADER_DIR,
 	NAPI_PKG_ROOT,

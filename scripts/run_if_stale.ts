@@ -15,9 +15,9 @@
  * from a cargo-built artifact's mtime, by dating it at the build.)
  *
  * Freshness inputs (newest mtime wins): every file under `src/`, `build.rs` and
- * `Cargo.toml` of the crates that feed the WASM bundle (`benches/js/lib/tsv_artifacts.ts`'s
+ * `Cargo.toml` of the crates that feed the WASM bundle (`benches/js/lib/crate_lists.ts`'
  * `CORE_CRATES` + `WASM_CRATES` — `tsv_wasm` plus the `tsv_ignore`/`tsv_discover`
- * IgnoreStack crates; that module states the artifact set once for every side
+ * IgnoreStack crates; that module states the crate set once for every side
  * that must agree on it, so build-side and run-side can't drift; the dev-tooling
  * crates are deliberately out, else every `tsv_debug` fixture-workflow edit would
  * force a pointless wasm rebuild), the workspace `Cargo.toml` + `Cargo.lock`
@@ -56,7 +56,7 @@ import {
 	newest_workspace_build_mtime,
 	type SourceMtime
 } from '../benches/js/lib/source_mtime.ts';
-import { CORE_CRATES, WASM_CRATES } from '../benches/js/lib/tsv_artifacts.ts';
+import { CORE_CRATES, WASM_CRATES } from '../benches/js/lib/crate_lists.ts';
 import { signal_exit_code } from './exit_code.ts';
 import { handle_source_tree } from './handle_source_tree.ts';
 

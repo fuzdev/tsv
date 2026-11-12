@@ -10,7 +10,7 @@ import { fs, type FsDir } from '@fuzdev/gro/fs.ts';
 import type { SpawnProgram, SpawnResult } from '@fuzdev/gro/spawn.ts';
 import { test } from 'vitest';
 
-import { CORE_CRATES, WASM_CRATES } from '../benches/js/lib/tsv_artifacts.ts';
+import { CORE_CRATES, WASM_CRATES } from '../benches/js/lib/crate_lists.ts';
 import { run_if_stale, type RunIfStaleDeps } from './run_if_stale.ts';
 
 const TARGET = 'crates/tsv_wasm/pkg/format/deno/tsv_wasm_bg.wasm';

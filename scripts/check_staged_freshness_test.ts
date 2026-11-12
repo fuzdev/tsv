@@ -15,7 +15,8 @@ import { dirname, join } from 'node:path';
 import { test } from 'vitest';
 
 import { node_source_tree } from '../benches/js/lib/check_artifact_freshness.ts';
-import { CORE_CRATES, WASM_CRATES, type WasmVariant } from '../benches/js/lib/tsv_artifacts.ts';
+import { CORE_CRATES, WASM_CRATES } from '../benches/js/lib/crate_lists.ts';
+import type { WasmVariant } from '../benches/js/lib/tsv_artifacts.ts';
 import {
 	NAPI_STAGING_SOURCES,
 	napi_addon_check,

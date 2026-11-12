@@ -4,7 +4,7 @@
  * make a wrong one fail rather than ship. One subcommand per step, so the release
  * workflow can run each in the environment its row needs (a container for the
  * cargo builds and the musl training, the host for staging and the merge), and
- * `all`, which runs them in order — `deno task build:pgo`, the local pipeline.
+ * `all`, which runs them in order — `npm run build:pgo`, the local pipeline.
  *
  * The steps, in order (`all`):
  *
@@ -90,9 +90,9 @@
  *     its bound (`PASS_TIMEOUT_MS`) is killed and fails as hung, never a fallback.
  *     `--no-depth` skips it locally; the release rows always run it.
  *
- * Runs under Deno (`deno task build:pgo`) and under Node ≥ 22.18 (the release rows,
- * and inside node:alpine for the musl row's training, byte-identity and depth), so it
- * uses node builtins only. Run from the repo root.
+ * Runs under Node ≥ 22.18 (`npm run build:pgo`, the release rows, inside node:alpine for the musl
+ * row's training, byte-identity and depth) on node builtins only, its Node children under the
+ * same Node, the `--ffi` world's driver under `deno` from `PATH`. Run from the repo root.
  *
  * Options: `--dir` the working directory (default `.pgo`), `--triple` the platform
  * triple (default the host's), `--corpora` the snapshot checkout (default `../corpora`),
@@ -101,7 +101,7 @@
  * file for `depth` (default the one `depth-shapes` writes under `--dir`), `--ffi` the bench's
  * third world (above), `--reuse` lets `all` skip a build its stamp says is current (`cmd_all`).
  *
- * Usage: deno task build:pgo [--dir <d>] [--triple <t>] [--corpora <root>] [--no-depth]
+ * Usage: npm run build:pgo -- [--dir <d>] [--triple <t>] [--corpora <root>] [--no-depth]
  *          [--ffi] [--reuse]
  *        node scripts/pgo/pgo.ts <corpora [--fetch]|stage --phase <p>|train|merge|
  *          gate-builds|gate-sections|byteid|byteid-ffi|depth-shapes|depth|cache-key|all> [options]
@@ -124,7 +124,6 @@ import {
 import { homedir } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
 import process from 'node:process';
-import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 
 import {
@@ -135,6 +134,7 @@ import {
 } from '../../benches/js/lib/corpora.ts';
 import { GATE_CHECKOUT_IDS } from '../../benches/js/lib/gate_counts.ts';
 import { write_shape_limits } from '../depth_shapes.ts';
+import { walk_import_closure } from '../import_closure.ts';
 import { node_host_triple } from '../napi_host.ts';
 import { type AddonRecord, is_strip_path } from './addon_ops.ts';
 import {
@@ -212,9 +212,10 @@ const fail = (message: string): never => {
 	throw new PipelineError(message);
 };
 
-/** The node binary: this process under Node, `node` from PATH under Deno. */
-const NODE = typeof Deno !== 'undefined' ? 'node' : process.execPath;
-const DENO = typeof Deno !== 'undefined' ? Deno.execPath() : 'deno';
+/** The Node the pipeline's Node children run under: this process's own. */
+const NODE = process.execPath;
+/** The runtime the `--ffi` world's driver (`ffi_ops.ts`) runs under, found on `PATH`. */
+const DENO = 'deno';
 
 /** `deno run` with what `ffi_ops.ts` needs: FFI, reading the library and the corpus, writing
  * its records, and the environment the bench's FFI wrapper reads. */
@@ -1361,20 +1362,20 @@ const workspace_closure = (packages: readonly string[]): string[] => {
 	);
 };
 
-/** The repo's own modules each entry imports, transitively — read from `deno info --json`, so
- * a driver gaining an import joins the key without an edit here. */
+/** The repo's own modules each entry imports, transitively, as paths from the repo root,
+ * `/`-separated on every platform — read from their source (`walk_import_closure`), so a driver
+ * gaining an import joins the key without an edit here. A type-only import's file joins too:
+ * its bytes are an input like any other's. A package import, or a computed `import(…)` (the
+ * drivers' import of the loader they are handed), names no repo module and is left out. */
 const import_closure = (entries: readonly string[]): string[] => {
-	const root = pathToFileURL(resolve('.') + '/').href;
-	const files = new Set<string>();
-	for (const entry of entries) {
-		const r = capture(DENO, ['info', '--json', '--no-lock', entry]);
-		if (r.status !== 0) fail(`deno info ${entry} failed: ${r.stderr}`);
-		const info = JSON.parse(r.stdout) as { modules: { specifier: string }[] };
-		for (const m of info.modules) {
-			if (m.specifier.startsWith(root)) files.add(fileURLToPath(m.specifier));
-		}
+	try {
+		return walk_import_closure(entries, {
+			read: (path) => readFileSync(path, 'utf8'),
+			follow_type_only: true
+		}).files;
+	} catch (e) {
+		return fail(`the import walk from ${entries.join(', ')} failed: ${(e as Error).message}`);
 	}
-	return [...files].map((f) => relative('.', f).split('\\').join('/'));
 };
 
 /** The modules the pipeline runs: itself, its training and gate drivers (the FFI one through
