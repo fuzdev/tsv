@@ -137,10 +137,11 @@ delta on the same row is the detector.
   pure modules (`args`, `benchmark*`, `stats`, `time`) — **no `Deno.*`, no `@std/*`**. The only genuinely
   runtime-specific files are the native loader (`ffi.ts` `Deno.dlopen` vs `napi.ts`
   `process.dlopen`) and the WASM target the loader picks. The Deno-only entry points
-  (`corpus_compare_*`, `diagnostics/*` but the node/bun `biome_heap_probe.ts`) stay Deno-idiomatic. The
+  (`corpus_compare_*`, `diagnostics/*` but the node/bun `biome_heap_probe.ts` and the Node
+  `corpus_stats.ts`) stay Deno-idiomatic. The
   core's suites are its tests: the divergence detectors plus the other dependency-free `lib/`
-  modules' (`node:assert` + relative imports), run by vitest under Node (`test:node`) but for the
-  fixture-coverage audit, whose fixture reads are Deno's (`test:deno`).
+  modules' (`node:assert` + relative imports; the fixture-coverage audit also opens a read-only
+  handle on `tests/fixtures` through `@fuzdev/gro`), run by vitest under Node (`test:node`).
 - **The native row differs by runtime, fairly.** Deno → FFI (`tsv_ffi`, via
   `Deno.dlopen`); Node/Bun → N-API (`tsv_napi`, via `process.dlopen`). Same engine,
   same per-thread arena reuse, different binding boundary. Both are **profile-guided**
@@ -641,31 +642,30 @@ operational summary.
   (`patterns.ts`, tested by `patterns_test.ts`); each pattern carries
   `conformance_sections` (which doc sections it covers) and `fixtures` (an explicit
   assertion that it detects those `*_prettier_divergence` fixtures, gated by
-  `test:deno`'s `fixture_coverage_test.ts`).
+  `test:node`'s `fixture_coverage_test.ts`).
 - **Classification**: `known` (all hunks explained), `partial` (some hunks
   unexplained), `unknown` (needs investigation), `SAFETY` (data loss).
 
 ```bash
 deno task divergence:audit [--json]
 deno task test:node
-deno task test:deno
 deno task test:node:canonical
 deno task typecheck:js
 ```
 
 - **`divergence:audit`** runs every pattern against every documented fixture's committed prettier
   forms. Coverage is COMPUTED, not read out of the `fixtures[]` arrays (those are explicit
-  assertions, gated by `test:deno`, and drift from what the detectors actually see). Exits 1 on a
-  genuine gap; listing drift is bookkeeping.
+  assertions, gated by `test:node`, and drift from what the detectors actually see). Exits 1 on a
+  genuine gap; listing drift is bookkeeping. Runs under Node (`roots/divergence_audit.ts`) over
+  read-only handles on `tests/fixtures` and `docs/` (docs/tasks.md §`divergence:audit`).
 - **`test:node`** — vitest under Node over the node-modules-free suites, gated by `deno task check`;
-  for the divergence detectors: pattern positive/negative overmatch-rejection cases and safety
-  differential cases. The suites import nothing from the bench install (`node:assert` + relative
-  imports), so CI runs them with no `bench:install` — why they're in the core `check` gate.
-- **`test:deno`** — gated by `deno task check` too: the behavioral fixture-coverage audit driving
-  each detector against its own committed fixtures (input == ours, output_prettier == prettier),
-  failing if a pattern stops claiming a hunk in a fixture it lists. It reads the fixtures through
-  `lib/divergence/fixture_cases.ts`'s Deno file reads, so it stays on `deno test` until that
-  module runs under Node.
+  for the divergence detectors: pattern positive/negative overmatch-rejection cases, safety
+  differential cases, and the behavioral fixture-coverage audit (`fixture_coverage_test.ts`)
+  driving each detector against its own committed fixtures (input == ours, output_prettier ==
+  prettier), failing if a pattern stops claiming a hunk in a fixture it lists; it reads them
+  through a read-only handle on `tests/fixtures` (`lib/divergence/fixture_io.ts`). The suites
+  import nothing from the bench install (`node:assert`, vitest, the root install's `@fuzdev/gro`,
+  relative imports), so CI runs them with no `bench:install` — why they're in the core `check` gate.
 - **`test:node:canonical`** — the canonical-oracle test under vitest, NOT gated (needs
   prettier/svelte; run after `bench:install`): asserts the prettier baseline formats with a filepath, so `.ts`
   single-type-param arrows stay `<T>` and `.svelte` ones get `<T,>`, and the `.js` → babel /
@@ -681,8 +681,8 @@ deno task typecheck:js
   The node-modules-free part of the harness IS gated, mostly for free: `deno check` walks
   transitive imports, so `typecheck:scripts`' Deno half already covers the loader/guard core
   through the graph of the scripts Deno runs (check_artifact_freshness, source_mtime, ffi, napi,
-  tsv_artifacts, runtime, types, reject_probe, locations_probe, gate_counts), and `test:deno`'s divergence suite
-  covers the detectors. The modules the Node scripts import (`scripts/roots/`) are typechecked
+  tsv_artifacts, runtime, types, reject_probe, locations_probe, gate_counts), and `test:node`'s
+  `tsc` program covers the detectors. The modules the Node scripts import (`scripts/roots/`) are typechecked
   by `typecheck:scripts`' `tsc` half, with `node_modules` in reach. `typecheck:bench-core`
   (`tsc -p tsconfig.bench_core.json`) names the modules nothing else in `check` typechecks —
   `lib/wasm.ts`, `lib/harvest_stamp.ts`, `lib/loc_wire_client.ts` (and through it
@@ -1633,14 +1633,16 @@ benches/js/
 │                          # one `tsv_debug imports --stdin` process (Node, its root in `roots/`;
 │                          # ../../docs/audits.md)
 ├── roots/                 # The Node entries over gro's host modules, each binding a library above it
-│                          # (`strip_corpus.ts`, `imports_corpus.ts`); typechecked by `tsconfig.bench.json`
+│                          # (`strip_corpus.ts`, `imports_corpus.ts`, `divergence_audit.ts`,
+│                          # `compose_reports.ts`, `corpus_stats.ts`); typechecked by `tsconfig.bench.json`,
+│                          # and the three needing no bench package by `tsconfig.scripts.json` too
 ├── compose_reports.ts     # Fold report.{deno,node,bun}.json → combined report.{json,md}
 ├── idempotency_sweep.ts   # F1 sweep over the `robustness` view (drives tsv_debug `fuzz --iterations 0`)
 ├── corpus_audit.ts        # `audit:corpus`: the pure-Rust content-loss / robustness legs over
 │                          # real code (§Gate map)
 ├── corpus_compare_format.ts  # Formatting comparison vs prettier (Deno-only entry point)
 ├── corpus_compare_parse.ts   # Parse/AST comparison vs canonical parsers (Deno-only entry point)
-├── divergence_audit.ts    # Divergence audit entry point (Deno-only)
+├── divergence_audit.ts    # Divergence audit (Node, its root in `roots/`)
 ├── diagnostics/           # diagnostic scripts — see §Diagnostic scripts
 ├── size_bundles/          # Entry modules for the canonical toolchain's size rows (parse / format /
 │                          # all) — bundled and sized, never executed (lib/canonical_bundles.ts)
@@ -1797,6 +1799,7 @@ benches/js/
         ├── expected_errors.ts # Expected-error fixtures (parse-rejection cases)
         ├── fixture_cases.ts   # Detector cases derived from the committed divergence fixtures
         │                      # (input = ours, the pinned prettier file = theirs; no sidecar)
+        ├── fixture_io.ts      # The fixture reads, over a read-only handle on tests/fixtures
         └── validation.ts  # Audit: cross-ref patterns vs conformance_prettier*.md
 ```
 

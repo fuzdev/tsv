@@ -23,30 +23,26 @@
  * vacuous — passing with no assertion executed — so that is itself a failure
  * (see the coverage assertion at the end of each test).
  *
- * Runs read-only (`--allow-read`).
+ * It reads the committed fixtures through a read-only handle on `tests/fixtures`, so it can
+ * never mutate the tree it audits.
  */
 
 import { ok as assert } from 'node:assert';
-import { detect_divergences, PATTERNS } from './patterns.ts';
-import {
-	build_cases,
-	build_context,
-	fixture_dir_exists,
-	type FixtureIo,
-	select_witnesses
-} from './fixture_cases.ts';
+import { fileURLToPath } from 'node:url';
 
-/**
- * Whether the runner granted `--allow-read`. The wired `test:deno` task grants it,
- * so the audit runs. If you invoke `deno test` manually without `--allow-read`,
- * every test announces (loudly) that it was skipped for lack of read access rather
- * than silently passing with zero detectors exercised — add `--allow-read` to
- * actually exercise the audit.
- */
-async function has_read_access(): Promise<boolean> {
-	const status = await Deno.permissions.query({ name: 'read' });
-	return status.state === 'granted';
-}
+import { fs } from '@fuzdev/gro/fs.ts';
+import { test } from 'vitest';
+
+import { detect_divergences, PATTERNS } from './patterns.ts';
+import { build_cases, build_context, type FixtureIo, select_witnesses } from './fixture_cases.ts';
+import { fixture_io } from './fixture_io.ts';
+
+/** The committed fixtures, found from this file's location. */
+const fixtures = fixture_io(
+	(
+		await fs.open_dir(fileURLToPath(new URL('../../../../tests/fixtures/', import.meta.url)))
+	).readonly()
+);
 
 // ── Witness selection (pure; no fixtures on disk involved) ──────────────────
 //
@@ -57,7 +53,7 @@ async function has_read_access(): Promise<boolean> {
 
 const svelte_ext = '.svelte';
 
-Deno.test('witnesses: output_prettier outranks every other form', () => {
+test('witnesses: output_prettier outranks every other form', () => {
 	const { rung, witnesses } = select_witnesses(
 		[
 			'input.svelte',
@@ -76,7 +72,7 @@ Deno.test('witnesses: output_prettier outranks every other form', () => {
 	assert(witnesses[0].source_file === null);
 });
 
-Deno.test('witnesses: every prettier_variant is a witness, and is its own source', () => {
+test('witnesses: every prettier_variant is a witness, and is its own source', () => {
 	const { rung, witnesses } = select_witnesses(
 		['input.svelte', 'prettier_variant_b.svelte', 'prettier_variant_a.svelte'],
 		svelte_ext
@@ -87,7 +83,7 @@ Deno.test('witnesses: every prettier_variant is a witness, and is its own source
 	for (const w of witnesses) assert(w.source_file === w.prettier_file);
 });
 
-Deno.test('witnesses: prettier_intermediate stands in when no stable form exists', () => {
+test('witnesses: prettier_intermediate stands in when no stable form exists', () => {
 	const { rung, witnesses } = select_witnesses(
 		['input.svelte', 'prettier_intermediate_parens.svelte', 'unformatted_ours_parens.svelte'],
 		svelte_ext
@@ -96,7 +92,7 @@ Deno.test('witnesses: prettier_intermediate stands in when no stable form exists
 	assert(witnesses.length === 1);
 });
 
-Deno.test('witnesses: divergent_variant outranks the N10 inference', () => {
+test('witnesses: divergent_variant outranks the N10 inference', () => {
 	// The `last_block` shape: prettier's output is stated by divergent_variant,
 	// so inferring a different one from the lone `variant_*` would be wrong.
 	const { rung, witnesses } = select_witnesses(
@@ -112,7 +108,7 @@ Deno.test('witnesses: divergent_variant outranks the N10 inference', () => {
 	assert(witnesses[0].prettier_file === 'divergent_variant_last_inline.svelte');
 });
 
-Deno.test('witnesses: N10 fires on exactly one stable form', () => {
+test('witnesses: N10 fires on exactly one stable form', () => {
 	const { rung, witnesses } = select_witnesses(
 		['input.svelte', 'variant_standalone.svelte', 'unformatted_ours_standalone.svelte'],
 		svelte_ext
@@ -122,7 +118,7 @@ Deno.test('witnesses: N10 fires on exactly one stable form', () => {
 	assert(witnesses[0].source_file === 'unformatted_ours_standalone.svelte');
 });
 
-Deno.test('witnesses: N10 refuses two stable forms rather than guessing', () => {
+test('witnesses: N10 refuses two stable forms rather than guessing', () => {
 	const { rung, witnesses } = select_witnesses(
 		['input.svelte', 'variant_a.svelte', 'variant_b.svelte', 'unformatted_ours_spaces.svelte'],
 		svelte_ext
@@ -131,18 +127,18 @@ Deno.test('witnesses: N10 refuses two stable forms rather than guessing', () => 
 	assert(witnesses.length === 0);
 });
 
-Deno.test('witnesses: N10 needs an unformatted_ours authoring to pair against', () => {
+test('witnesses: N10 needs an unformatted_ours authoring to pair against', () => {
 	const { rung } = select_witnesses(['input.svelte', 'variant_a.svelte'], svelte_ext);
 	assert(rung === 'none', `a lone variant pins no prettier output, got ${rung}`);
 });
 
-Deno.test('witnesses: a bare divergence fixture yields nothing', () => {
+test('witnesses: a bare divergence fixture yields nothing', () => {
 	const { rung, witnesses } = select_witnesses(['input.svelte', 'README.md'], svelte_ext);
 	assert(rung === 'none');
 	assert(witnesses.length === 0);
 });
 
-Deno.test('witnesses: extension match is exact, so .svelte ignores .svelte.ts siblings', () => {
+test('witnesses: extension match is exact, so .svelte ignores .svelte.ts siblings', () => {
 	// A `.svelte` fixture must not claim a `.svelte.ts` variant, nor vice versa —
 	// `endsWith` on the full suffix is what keeps the two apart.
 	const svelte = select_witnesses(['input.svelte', 'prettier_variant_a.svelte.ts'], '.svelte');
@@ -165,11 +161,12 @@ Deno.test('witnesses: extension match is exact, so .svelte ignores .svelte.ts si
 
 /** An in-memory `FixtureIo` over `{filename: content}`. */
 const memory_io = (files: Record<string, string>): FixtureIo => ({
+	dir_exists: () => true,
 	list: () => Promise.resolve(Object.keys(files).sort()),
 	read: (_path, name) => Promise.resolve(files[name] ?? null)
 });
 
-Deno.test('assembly: ours is always input, prettier is the witness content', async () => {
+test('assembly: ours is always input, prettier is the witness content', async () => {
 	const cases = await build_cases(
 		'x',
 		memory_io({ 'input.svelte': 'OURS', 'output_prettier.svelte': 'PRETTIER' })
@@ -181,7 +178,7 @@ Deno.test('assembly: ours is always input, prettier is the witness content', asy
 	assert(cases[0].source === 'OURS');
 });
 
-Deno.test('assembly: a prettier_variant is its own source, not input', async () => {
+test('assembly: a prettier_variant is its own source, not input', async () => {
 	const cases = await build_cases(
 		'x',
 		memory_io({ 'input.svelte': 'OURS', 'prettier_variant_a.svelte': 'VARIANT' })
@@ -191,7 +188,7 @@ Deno.test('assembly: a prettier_variant is its own source, not input', async () 
 	assert(cases[0].ours === 'OURS' && cases[0].prettier === 'VARIANT');
 });
 
-Deno.test('assembly: the N10 case reads source and prettier from DIFFERENT files', async () => {
+test('assembly: the N10 case reads source and prettier from DIFFERENT files', async () => {
 	// The wiring most able to be silently transposed: prettier's output is the
 	// stable form, while the source is the authoring being normalized.
 	const cases = await build_cases(
@@ -208,7 +205,7 @@ Deno.test('assembly: the N10 case reads source and prettier from DIFFERENT files
 	assert(cases[0].ours === 'OURS');
 });
 
-Deno.test('assembly: no input.* yields no_input regardless of other files', async () => {
+test('assembly: no input.* yields no_input regardless of other files', async () => {
 	const cases = await build_cases(
 		'x',
 		memory_io({ 'output_prettier.svelte': 'P', 'README.md': 'r' })
@@ -216,7 +213,7 @@ Deno.test('assembly: no input.* yields no_input regardless of other files', asyn
 	assert(cases === 'no_input', `expected no_input, got ${JSON.stringify(cases)}`);
 });
 
-Deno.test('assembly: language follows the input extension', async () => {
+test('assembly: language follows the input extension', async () => {
 	const svelte = await build_cases(
 		'x',
 		memory_io({ 'input.svelte': 'a', 'output_prettier.svelte': 'b' })
@@ -228,7 +225,7 @@ Deno.test('assembly: language follows the input extension', async () => {
 	assert(css !== 'no_input' && css[0].language === 'css');
 });
 
-Deno.test('assembly: input resolution order prefers .svelte over .svelte.ts', async () => {
+test('assembly: input resolution order prefers .svelte over .svelte.ts', async () => {
 	// INPUT_NAMES order decides the extension, which decides which variants match.
 	const cases = await build_cases(
 		'x',
@@ -316,19 +313,14 @@ const KNOWN_PARTIAL: Record<string, string> = {
  * hunk-aware classifier exists to prevent (a file with one explained and one
  * unexplained hunk is `partial`, not `known`), one level up.
  */
-Deno.test('fixture coverage: every listed fixture is FULLY explained', async () => {
-	if (!(await has_read_access())) {
-		console.warn('[fixture coverage] SKIPPED full-coverage check: no --allow-read');
-		return;
-	}
-
+test('fixture coverage: every listed fixture is FULLY explained', async () => {
 	const listed = new Set<string>();
 	for (const pattern of PATTERNS) for (const f of pattern.fixtures ?? []) listed.add(f);
 
 	const newly_partial: string[] = [];
 	const still_partial = new Set<string>();
 	for (const fixture_path of [...listed].sort()) {
-		const cases = await build_cases(fixture_path);
+		const cases = await build_cases(fixture_path, fixtures);
 		// A path with no directory / no input, or one pinning no prettier form, is
 		// the other tests' business — silence here rather than double-reporting.
 		if (cases === 'no_input' || cases.length === 0) continue;
@@ -386,15 +378,11 @@ Deno.test('fixture coverage: every listed fixture is FULLY explained', async () 
  * folded broken references in among the claimed-but-undocumented orphans, where
  * eight of them sat unnoticed.
  */
-Deno.test('fixture coverage: every listed fixture path resolves on disk', async () => {
-	if (!(await has_read_access())) {
-		console.warn('[fixture coverage] SKIPPED path check: no --allow-read');
-		return;
-	}
+test('fixture coverage: every listed fixture path resolves on disk', () => {
 	const broken: string[] = [];
 	for (const pattern of PATTERNS) {
 		for (const fixture_path of pattern.fixtures ?? []) {
-			if (!fixture_dir_exists(fixture_path)) broken.push(`${pattern.id} → ${fixture_path}`);
+			if (!fixtures.dir_exists(fixture_path)) broken.push(`${pattern.id} → ${fixture_path}`);
 		}
 	}
 	assert(
@@ -410,19 +398,10 @@ Deno.test('fixture coverage: every listed fixture path resolves on disk', async 
 for (const pattern of PATTERNS) {
 	if (!pattern.fixtures || pattern.fixtures.length === 0) continue;
 
-	Deno.test(`fixture coverage: ${pattern.id} detects its claimed fixtures`, async () => {
-		if (!(await has_read_access())) {
-			console.warn(
-				`[fixture coverage] SKIPPED ${pattern.id}: no --allow-read. The wired ` +
-					`test:deno task grants it; you're running deno test without it, so this ` +
-					`audit does nothing here. Add \`--allow-read\` (or run \`deno task test:deno\`) ` +
-					`to actually exercise the detectors against their fixtures.`
-			);
-			return;
-		}
+	test(`fixture coverage: ${pattern.id} detects its claimed fixtures`, async () => {
 		let cases_run = 0;
 		for (const fixture_path of pattern.fixtures) {
-			const cases = await build_cases(fixture_path);
+			const cases = await build_cases(fixture_path, fixtures);
 
 			if (cases === 'no_input') {
 				// A directory that exists but holds no input.*. A path with no

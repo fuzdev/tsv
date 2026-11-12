@@ -8,15 +8,20 @@
  * Usage:
  *   deno task divergence:audit
  *   deno task divergence:audit --json
+ *
+ * The library half: `run_divergence_audit` reads through the deps its root
+ * (`roots/divergence_audit.ts`) binds, read-only handles on `tests/fixtures` and `docs/`.
  */
-
-import process from 'node:process';
 
 import { args_parse, argv_parse } from '@fuzdev/fuz_util/args.ts';
 import * as s from '@fuzdev/fuz_schema/schema.ts';
 import { meta } from '@fuzdev/fuz_schema/meta.ts';
 
-import { format_audit_report, generate_audit_report } from './lib/divergence/mod.ts';
+import {
+	type AuditReportDeps,
+	format_audit_report,
+	generate_audit_report
+} from './lib/divergence/validation.ts';
 
 const AuditArgs = s.strip_object({
 	json: s.with_default(s.boolean, false),
@@ -37,21 +42,29 @@ Examples:
 `);
 }
 
-async function main(): Promise<void> {
-	const parsed = args_parse(argv_parse(process.argv.slice(2)), AuditArgs);
+/**
+ * Runs the audit over `argv` (the arguments after the script).
+ * @returns the exit code: 1 on an argument error, a broken listing, or a detection gap
+ * (a human-readable report only), else 0
+ */
+export async function run_divergence_audit(
+	deps: AuditReportDeps,
+	argv: ReadonlyArray<string>
+): Promise<number> {
+	const parsed = args_parse(argv_parse([...argv]), AuditArgs);
 	if (!parsed.ok) {
 		console.error(parsed.issues.map(s.format_issue).join('\n'));
 		print_usage();
-		Deno.exit(1);
+		return 1;
 	}
 	const args = parsed.value;
 
 	if (args.help) {
 		print_usage();
-		return;
+		return 0;
 	}
 
-	const report = await generate_audit_report();
+	const report = await generate_audit_report(deps);
 
 	if (args.json) {
 		console.log(JSON.stringify(report, null, 2));
@@ -60,12 +73,12 @@ async function main(): Promise<void> {
 		console.log('');
 
 		// A broken listing is a hard error — it points at nothing on disk. (The
-		// gate for it is `fixture_coverage_test`, in `deno task check`; reported
+		// gate for it is `fixture_coverage_test`, in `test:node`; reported
 		// here too since this audit is where a listing is read.)
 		if (report.missing_pattern_fixtures.length > 0) {
 			const count = report.missing_pattern_fixtures.reduce((n, m) => n + m.fixtures.length, 0);
 			console.log(`\x1b[31mFAIL: ${count} pattern fixture listing(s) point at no directory\x1b[0m`);
-			Deno.exit(1);
+			return 1;
 		}
 
 		// Exit non-zero on genuine detection gaps only. Coverage is partial by
@@ -83,10 +96,9 @@ async function main(): Promise<void> {
 						`unlisted in fixtures[] — bookkeeping, not a gap)`
 				);
 			}
-			Deno.exit(1);
+			return 1;
 		}
 		console.log('\x1b[32mPASS: every gradeable documented divergence is fully explained\x1b[0m');
 	}
+	return 0;
 }
-
-main();

@@ -23,11 +23,32 @@
  * and `fixtures[]` is demoted to what it is genuinely good for: an EXPLICIT
  * ASSERTION that a named pattern claims a named fixture, gated by that test.
  * A listing gap is reported as bookkeeping, not as a coverage hole.
+ *
+ * Reads only, through `AuditReportDeps`: the fixtures through a `FixtureIo`, the catalogs
+ * through a read-only handle on `docs/`.
  */
 
-import { fileURLToPath } from 'node:url';
 import { detect_divergences, PATTERNS } from './patterns.ts';
-import { build_cases, build_context, fixture_dir_exists } from './fixture_cases.ts';
+import { build_cases, build_context, type FixtureIo } from './fixture_cases.ts';
+
+/**
+ * The read-only handle on `docs/` the catalogs are read through. Declared here rather than
+ * imported, so the module imports no package; gro's `FsReadDir` satisfies it.
+ */
+export interface AuditDocs {
+	/** The directory's entries, each kind read without following a symlink. */
+	list: () => AsyncIterable<{ name: string; kind: string }>;
+	/** A file's UTF-8 text; a missing file throws like any other failure. */
+	read_text: (name: string) => Promise<string>;
+}
+
+/** What `generate_audit_report` reads. */
+export interface AuditReportDeps {
+	/** The committed fixtures, rooted at `tests/fixtures/`. */
+	fixtures: FixtureIo;
+	/** `docs/`, where the `conformance_prettier*.md` family lives. */
+	docs: AuditDocs;
+}
 
 /** A documented divergence from the `conformance_prettier*.md` family */
 export interface DocumentedDivergence {
@@ -282,30 +303,28 @@ function split_table_row(row: string): string[] {
  * behind. `conformance_audit`'s family check holds the same glob against its own
  * declared list, which is where the family is asserted; here it is only discovered.
  */
-async function conformance_prettier_docs(): Promise<string[]> {
-	const docs_dir = fileURLToPath(new URL('../../../../docs/', import.meta.url));
+async function conformance_prettier_docs(docs: AuditDocs): Promise<string[]> {
 	const names: string[] = [];
-	for await (const entry of Deno.readDir(docs_dir)) {
+	for await (const entry of docs.list()) {
 		if (
-			entry.isFile &&
+			entry.kind === 'file' &&
 			entry.name.startsWith('conformance_prettier') &&
 			entry.name.endsWith('.md')
 		) {
 			names.push(entry.name);
 		}
 	}
-	// `readDir` order is unspecified; sort so a run's output does not depend on it.
+	// listing order is unspecified; sort so a run's output does not depend on it.
 	return names.sort();
 }
 
 /**
  * Load and parse the `conformance_prettier*.md` family from the repo.
  */
-async function load_documented_divergences(): Promise<DocumentedDivergence[]> {
-	const docs_dir = fileURLToPath(new URL('../../../../docs/', import.meta.url));
+async function load_documented_divergences(docs: AuditDocs): Promise<DocumentedDivergence[]> {
 	const divergences: DocumentedDivergence[] = [];
-	for (const doc of await conformance_prettier_docs()) {
-		const content = await Deno.readTextFile(`${docs_dir}${doc}`);
+	for (const doc of await conformance_prettier_docs(docs)) {
+		const content = await docs.read_text(doc);
 		divergences.push(...parse_conformance_prettier_md(content));
 	}
 	return divergences;
@@ -329,12 +348,12 @@ async function load_documented_divergences(): Promise<DocumentedDivergence[]> {
  * can add hunks the fixture's divergence never meant to pin, so demanding every
  * witness be fully explained would fail fixtures that are correctly detected.
  */
-async function detect_fixture(fixture_path: string): Promise<FixtureDetection> {
-	if (!fixture_dir_exists(fixture_path)) {
+async function detect_fixture(fixture_path: string, io: FixtureIo): Promise<FixtureDetection> {
+	if (!io.dir_exists(fixture_path)) {
 		return { fixture_path, status: 'ungradeable', patterns: [], reason: 'missing_directory' };
 	}
 
-	const cases = await build_cases(fixture_path);
+	const cases = await build_cases(fixture_path, io);
 	if (cases === 'no_input') {
 		return { fixture_path, status: 'ungradeable', patterns: [], reason: 'no_input' };
 	}
@@ -372,8 +391,8 @@ async function detect_fixture(fixture_path: string): Promise<FixtureDetection> {
 /**
  * Generate a full audit report comparing documented divergences against detection patterns.
  */
-export async function generate_audit_report(): Promise<AuditReport> {
-	const documented = await load_documented_divergences();
+export async function generate_audit_report(deps: AuditReportDeps): Promise<AuditReport> {
+	const documented = await load_documented_divergences(deps.docs);
 	const documented_paths = new Set(documented.map((d) => d.fixture_path));
 
 	// Collect all fixtures claimed by patterns
@@ -385,7 +404,7 @@ export async function generate_audit_report(): Promise<AuditReport> {
 	// Empirical detection — the coverage question, answered by running detectors
 	const detection: FixtureDetection[] = [];
 	for (const path of documented_paths) {
-		detection.push(await detect_fixture(path));
+		detection.push(await detect_fixture(path, deps.fixtures));
 	}
 	detection.sort((a, b) => a.fixture_path.localeCompare(b.fixture_path));
 
@@ -436,7 +455,7 @@ export async function generate_audit_report(): Promise<AuditReport> {
 	for (const pattern of PATTERNS) {
 		const claimed = pattern.fixtures || [];
 		const undocumented = claimed.filter((f) => !documented_paths.has(f));
-		const missing = claimed.filter((f) => !fixture_dir_exists(f));
+		const missing = claimed.filter((f) => !deps.fixtures.dir_exists(f));
 		const orphaned = undocumented.filter((f) => !missing.includes(f));
 		if (orphaned.length > 0) {
 			orphaned_pattern_fixtures.push({ pattern_id: pattern.id, fixtures: orphaned });

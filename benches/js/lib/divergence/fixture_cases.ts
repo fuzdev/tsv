@@ -14,7 +14,8 @@
  * (does this detector still claim the fixtures it lists?), and `validation.ts`
  * asks it per fixture (does ANY detector see this documented divergence?).
  *
- * Reads only.
+ * Reads only, and only through a `FixtureIo`, which the caller builds over a read-only handle
+ * on `tests/fixtures` (`fixture_io.ts`).
  */
 
 import { ok as assert } from 'node:assert';
@@ -22,40 +23,8 @@ import { diff_lines, extract_hunks } from '../diff.ts';
 import { type DetectionContext, enrich_detection_context } from './patterns.ts';
 import type { Language } from '../types.ts';
 
-const FIXTURES_ROOT = new URL('../../../../tests/fixtures/', import.meta.url);
-
 /** Candidate input filenames, in resolution order. */
 const INPUT_NAMES = ['input.svelte', 'input.svelte.ts', 'input.ts', 'input.css'];
-
-/**
- * Whether a claimed fixture path names a real directory.
- *
- * Any error other than "not found" re-throws — a permission error must never be
- * mistaken for a missing fixture, which would report every listing as broken.
- */
-export function fixture_dir_exists(fixture_path: string): boolean {
-	try {
-		return Deno.statSync(new URL(fixture_path + '/', FIXTURES_ROOT)).isDirectory;
-	} catch (err) {
-		if (err instanceof Deno.errors.NotFound) return false;
-		throw err;
-	}
-}
-
-/**
- * Read a file, returning null only when it genuinely does not exist. Any other
- * error (notably a permission error) re-throws — a denied read must never be
- * mistaken for a missing fixture file, which would silently hollow out every
- * consumer.
- */
-async function read_if_exists(url: URL): Promise<string | null> {
-	try {
-		return await Deno.readTextFile(url);
-	} catch (err) {
-		if (err instanceof Deno.errors.NotFound) return null;
-		throw err;
-	}
-}
 
 function language_of(input_name: string): Language {
 	if (input_name.endsWith('.css')) return 'css';
@@ -84,39 +53,24 @@ export interface DetectionCase {
 }
 
 /**
- * The filesystem surface case assembly needs.
+ * The filesystem surface case assembly needs, rooted at `tests/fixtures/`, every fixture path
+ * relative to it.
  *
- * Injected rather than called directly so the assembly — which witness content
- * lands in `source` vs `ours` vs `prettier` — is testable from an in-memory
- * fixture. The test suite runs `--allow-read` only (deliberately: it must never
- * be able to mutate the tree it audits), so a temp-directory fixture is not an
- * option, and coupling the test to real fixture directories would make it
- * brittle against exactly the renames this machinery exists to catch.
+ * Injected so the assembly (which witness content lands in `source` vs `ours` vs `prettier`)
+ * is testable from an in-memory fixture: coupling the test to real fixture directories would
+ * make it brittle against exactly the renames this machinery exists to catch. Only a missing
+ * path reads as absent; any other failure throws, so a denied read is never mistaken for a
+ * missing fixture, which would report every listing as broken or silently hollow out every
+ * consumer.
  */
 export interface FixtureIo {
-	/** Filenames directly inside the fixture directory; empty when it is absent. */
+	/** Whether the path names a directory, following a symlink. */
+	dir_exists: (fixture_path: string) => boolean;
+	/** Regular-file names directly inside the fixture directory; empty when it is absent. */
 	list: (fixture_path: string) => Promise<string[]>;
 	/** File content, or null when the file does not exist. */
 	read: (fixture_path: string, name: string) => Promise<string | null>;
 }
-
-/** The real filesystem, rooted at `tests/fixtures/`. */
-const disk_io: FixtureIo = {
-	list: async (fixture_path) => {
-		const names: string[] = [];
-		try {
-			for await (const entry of Deno.readDir(new URL(fixture_path + '/', FIXTURES_ROOT))) {
-				if (entry.isFile) names.push(entry.name);
-			}
-		} catch (err) {
-			if (err instanceof Deno.errors.NotFound) return names;
-			throw err;
-		}
-		return names.sort();
-	},
-	read: (fixture_path, name) =>
-		read_if_exists(new URL(name, new URL(fixture_path + '/', FIXTURES_ROOT)))
-};
 
 /** Which rung of the precedence chain supplied a fixture's witnesses. */
 export type WitnessRung =
@@ -252,7 +206,7 @@ export function select_witnesses(
  */
 export async function build_cases(
 	fixture_path: string,
-	io: FixtureIo = disk_io
+	io: FixtureIo
 ): Promise<DetectionCase[] | 'no_input'> {
 	let input_name: string | null = null;
 	let input: string | null = null;

@@ -14,8 +14,7 @@
  * build-output prune, and no fixture prune: the snapshot's manifest owns that policy
  * as explicit `exclude` prefixes, so fixture-like bulk shows up here as a WATCH flag
  * for a human to spell into the manifest, never as a heuristic's silent drop).
- * Pure read-only; no parsing, no FFI. Deno-idiomatic like the other
- * `diagnostics/` entries.
+ * Pure read-only; no parsing, no engine.
  *
  *   deno task corpus:stats                     # perf view (the bench corpus)
  *   deno task corpus:stats --view gates        # + prettier fixture suites
@@ -24,8 +23,12 @@
  *   deno task corpus:stats --json 2>/dev/null  # machine-readable to stdout, logs to stderr
  *
  * Run directly (from repo root):
- *   deno run --allow-read --allow-env --allow-sys --config benches/js/deno.json \
- *     benches/js/diagnostics/corpus_stats.ts [dir] [--view v] [--json] [--largest N] [--big BYTES]
+ *   node benches/js/roots/corpus_stats.ts [dir] [--view v] [--json] [--largest N] [--big BYTES]
+ *
+ * The library half: `run_corpus_stats` takes the arguments its root passes in. The corpus
+ * loader it reuses reads with `node:fs`, against the working directory as the bench does (Bun
+ * runs it too), so a view's per-entry labels are relative to the working directory's parent,
+ * the frame the loader's `../corpora` entries resolve in.
  */
 
 import { parseArgs } from 'node:util';
@@ -198,9 +201,15 @@ function group_by_entry(
 		.sort((a, b) => b.stats.files - a.stats.files);
 }
 
-function main(): void {
+/**
+ * Prints the stats for `argv` (the arguments after the script). An unknown option throws, as
+ * `parseArgs` does.
+ * @returns the exit code: 1 when the run fails (a bad `--view`, nothing in scope, an unreadable
+ * corpus), its message printed, else 0
+ */
+export async function run_corpus_stats(argv: ReadonlyArray<string>): Promise<number> {
 	const { values, positionals } = parseArgs({
-		args: Deno.args,
+		args: [...argv],
 		allowPositionals: true,
 		options: {
 			view: { type: 'string', default: 'perf' },
@@ -215,10 +224,13 @@ function main(): void {
 	const to_json = values.json;
 	const log = (...a: unknown[]): void => console.error(...a); // human output → stderr (keeps --json stdout clean)
 
-	run().catch((e) => {
+	try {
+		await run();
+	} catch (e) {
 		console.error(e instanceof Error ? e.message : String(e));
-		Deno.exit(1);
-	});
+		return 1;
+	}
+	return 0;
 
 	async function run(): Promise<void> {
 		let files: SourceFile[];
@@ -335,5 +347,3 @@ function main(): void {
 		log('');
 	}
 }
-
-main();

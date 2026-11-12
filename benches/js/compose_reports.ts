@@ -13,15 +13,12 @@
  * what tsv.fuz.dev composes at the display layer.
  *
  * Runs whatever subset of reports exists (a missing runtime is skipped, not an
- * error — unless none exist). Portable (`node:` builtins) — runs under any
- * runtime.
+ * error — unless none exist). It reads and writes only through `ComposeReportsDeps`, the
+ * results directory its root (`roots/compose_reports.ts`) binds, and imports no package, so
+ * it is one of the modules `typecheck:bench-core` holds to that.
  *
  * Run: deno task bench:compose   (after one or more runtimes' reports exist)
  */
-
-import { readFile, writeFile } from 'node:fs/promises';
-import { exit } from 'node:process';
-import { fileURLToPath } from 'node:url';
 
 import { sample_sd, unstable_readings } from './lib/bench_plan.ts';
 import {
@@ -154,13 +151,31 @@ interface Report {
 	native_build?: NativeBuild | null;
 }
 
-const results_dir = fileURLToPath(new URL('./results/', import.meta.url));
+/**
+ * The results directory, `benches/js/results/`, which the composer reads its siblings from and
+ * writes `report.{json,md}` into. Declared here rather than imported, so the module imports no
+ * package; gro's `FsDir` satisfies it.
+ */
+export interface ComposeResultsDir {
+	/** The directory's absolute path, for display. */
+	readonly path: string;
+	/** A file's UTF-8 text. */
+	read_text: (path: string) => Promise<string>;
+	/** Writes a file, replacing one already there. */
+	write: (path: string, data: string) => Promise<unknown>;
+}
 
-async function read_report(runtime: Runtime): Promise<Report | null> {
-	const path = `${results_dir}report.${runtime}.json`;
+/** What `run_compose_reports` reads and writes. */
+export interface ComposeReportsDeps {
+	results: ComposeResultsDir;
+}
+
+async function read_report(results: ComposeResultsDir, runtime: Runtime): Promise<Report | null> {
+	const name = `report.${runtime}.json`;
+	const path = `${results.path}/${name}`;
 	let text: string;
 	try {
-		text = await readFile(path, 'utf8');
+		text = await results.read_text(name);
 	} catch {
 		// Absent is ordinary — the composer folds whatever exists, and a runtime
 		// nobody has run yet simply has no column.
@@ -184,881 +199,893 @@ async function read_report(runtime: Runtime): Promise<Report | null> {
 	}
 }
 
-const reports = new Map<Runtime, Report>();
-for (const r of RUNTIMES) {
-	const report = await read_report(r);
-	if (report) reports.set(r, report);
-}
-
-if (reports.size === 0) {
-	console.error(
-		'No per-runtime reports found in results/ ' +
-			'(report.deno.json / report.node.json / report.bun.json).\n' +
-			'Run `deno task bench` (or a per-runtime bench) first.'
-	);
-	exit(1);
-}
-
-/** Runtimes present, in canonical order; the first is the ratio baseline. */
-const present = RUNTIMES.filter((r) => reports.has(r));
-const base_runtime = present[0];
-
-/** One cross-runtime comparison row, keyed by `${group}/${name}`. */
-interface Row {
-	group: string;
-	name: string;
-	ops: Partial<Record<Runtime, number>>;
-	mean_ns: Partial<Record<Runtime, number>>;
-	files_iterated: Partial<Record<Runtime, number | null>>;
-	/** Per-runtime measurement noise, for `within_noise` below. */
-	cv: Partial<Record<Runtime, number>>;
-	/** Timings behind each `cv` — the precondition for trusting it. */
-	samples: Partial<Record<Runtime, number>>;
-	/** The raw-timing readings (`Entry.cv_raw` / `.drift`), where a sibling carries them. */
-	cv_raw: Partial<Record<Runtime, number>>;
-	drift: Partial<Record<Runtime, number>>;
-	raw_samples: Partial<Record<Runtime, number>>;
-	/** `Entry.pass_spread` per runtime, where a sibling carries it. */
-	pass_spread: Partial<Record<Runtime, number>>;
-	/** `Entry.pass_mean_ns` per runtime, where a sibling carries it. */
-	pass_means: Partial<Record<Runtime, number[]>>;
-	/** `Entry.files_iterated_digest` per runtime, where a sibling carries it. */
-	digest: Partial<Record<Runtime, string>>;
-}
-
-const rows = new Map<string, Row>();
-const order: string[] = [];
-for (const r of present) {
-	for (const e of reports.get(r)!.entries) {
-		// Coverage-only rows carry no timing, and this report is purely the
-		// cross-runtime THROUGHPUT view — folding one in would mint a row whose
-		// every cell is empty, and whose per-runtime delta (the whole point of the
-		// combined report) can't exist. Its coverage is already published in each
-		// per-runtime sibling.
-		if (e.ops_per_second == null || e.mean_ns == null) continue;
-		const key = `${e.group}/${e.name}`;
-		let row = rows.get(key);
-		if (!row) {
-			row = {
-				group: e.group,
-				name: e.name,
-				ops: {},
-				mean_ns: {},
-				files_iterated: {},
-				cv: {},
-				samples: {},
-				cv_raw: {},
-				drift: {},
-				raw_samples: {},
-				pass_spread: {},
-				pass_means: {},
-				digest: {}
-			};
-			rows.set(key, row);
-			order.push(key);
-		}
-		row.ops[r] = e.ops_per_second;
-		row.mean_ns[r] = e.mean_ns;
-		row.files_iterated[r] = e.files_iterated;
-		if (e.cv != null) row.cv[r] = e.cv;
-		if (e.sample_size != null) row.samples[r] = e.sample_size;
-		if (e.cv_raw != null) row.cv_raw[r] = e.cv_raw;
-		if (e.drift != null) row.drift[r] = e.drift;
-		if (e.raw_sample_size != null) row.raw_samples[r] = e.raw_sample_size;
-		if (e.pass_spread != null) row.pass_spread[r] = e.pass_spread;
-		if (e.pass_mean_ns != null) row.pass_means[r] = e.pass_mean_ns;
-		if (e.files_iterated_digest != null) row.digest[r] = e.files_iterated_digest;
+/**
+ * Composes the siblings in the results directory into `report.{json,md}` there, printing what
+ * it folded on stdout and each mixed-vintage, mixed-machine, partial, unstable, and unavailable
+ * warning on stderr.
+ * @returns the exit code: 1 when no per-runtime report exists (nothing written), else 0
+ */
+export async function run_compose_reports(deps: ComposeReportsDeps): Promise<number> {
+	const reports = new Map<Runtime, Report>();
+	for (const r of RUNTIMES) {
+		const report = await read_report(deps.results, r);
+		if (report) reports.set(r, report);
 	}
-}
 
-// Provenance per source, plus a loud flag when the siblings come from
-// different commits/versions/corpora. The composer folds whatever reports exist,
-// so a fresh `report.deno.json` can otherwise sit silently next to a stale
-// `report.node.json` — and cross-runtime ratios are only meaningful on
-// same-vintage siblings.
-const sources = present.map((r) => ({
-	runtime: r,
-	timestamp: reports.get(r)!.timestamp,
-	git_commit: reports.get(r)!.git_commit,
-	tsv: reports.get(r)!.versions?.tsv ?? null,
-	// The real-code snapshot commit — a corpus axis the tsv commit does not fix:
-	// the bench reads whatever `../corpora` has checked out, so two siblings at one
-	// tsv commit can have measured two corpora (a refresh between runs). `null` when
-	// the sibling predates the field.
-	corpus_snapshot: reports.get(r)!.corpus_snapshot?.commit ?? null,
-	machine: reports.get(r)!.machine ?? null,
-	// Per-sibling, because this is exactly a per-runtime fact: an impl that loads
-	// under Deno and not under Bun leaves a row in one sibling and none in the
-	// other, which reads as a runtime PERFORMANCE difference in a table of ratios.
-	// `null` (not `[]`) when the sibling predates the field — "not recorded" and
-	// "nothing missing" are different claims, and only one of them is safe to make.
-	unavailable: reports.get(r)!.unavailable ?? null,
-	// The profile-guided build the sibling's native rows loaded — `null` when the sibling
-	// predates the field
-	native_build: reports.get(r)!.native_build ?? null
-}));
-
-/**
- * The native build every sibling measured, when they agree on it — one stamp, so the same
- * profile-guided pair whichever binding a runtime loads — else the first recorded one,
- * with `mixed_native_build` set: siblings built from two pipeline runs measured two
- * builds, whose bytes (and so whose numbers) need not agree.
- */
-const native_builds = sources
-	.map((s) => s.native_build)
-	.filter((n): n is NativeBuild => n !== null);
-const native_build_key = (n: NativeBuild): string =>
-	n.build === 'pgo' && n.bindings !== null
-		? `pgo:${n.bindings.ffi.sha256}|${n.bindings.napi.sha256}`
-		: `${n.build}:${n.loaded.sha256}`;
-const native_build = native_builds[0] ?? null;
-// one stamp's pair, profile-guided, on every present sibling — else mixed
-const mixed_native_build =
-	native_builds.length < sources.length ||
-	native_builds.some((n) => n.build !== 'pgo') ||
-	new Set(native_builds.map(native_build_key)).size > 1;
-
-/**
- * Row names each sibling recorded as unavailable, or `null` when the sibling
- * predates the field — "not recorded" and "nothing was missing" are different
- * claims, and only one of them is safe to make.
- *
- * The ONE derivation of that fact. Both readers below take it from here rather
- * than walking `sources` again: the folded disclosure (`unavailable_by_runtime`)
- * and the staleness detector (`partial_rows`) ask the same question at different
- * fidelities — the first collapses "not recorded" into "nothing missing", the
- * second must not — and two walks would be free to drift on which one they meant.
- * Insertion order is `sources` order, so the array below stays in runtime order.
- */
-const unavailable_rows_by_runtime = new Map<Runtime, ReadonlySet<string> | null>(
-	sources.map((s) => [
-		s.runtime,
-		s.unavailable === null ? null : new Set(s.unavailable.flatMap((u) => u.rows ?? []))
-	])
-);
-
-/**
- * Every ROW a sibling recorded as unavailable, listed under the runtime that
- * recorded it — the asymmetry a reader of the folded rows would otherwise attribute
- * to speed. Siblings predating the field (`unavailable === null`) contribute
- * nothing, which is "not recorded" rather than a claim that nothing was missing.
- *
- * Rows, not impl labels, because that is the only identity that joins: a consumer
- * asking "is this blank cell a load failure?" holds a row name, and `Biome` /
- * `OXC WASM` match no row (`biome-wasm`, `oxc-parser-wasm`). A load failure that
- * cost this surface no row contributes nothing here — correctly, since no table has
- * a gap to explain.
- *
- * A sibling from the brief `version` 10–11 window recorded failures WITHOUT rows;
- * those contribute nothing here too, and unlike the cases above that is a shortfall
- * of the data rather than a claim about it. Neither version was ever a released
- * sibling — the field and its rows exist only together — so the state is only
- * reachable from a local run made mid-change, and it clears on the next full
- * `bench:perf`. Their `reason`s survive in `sources[].unavailable` either way.
- *
- * Not narrowed to the rows missing on SOME runtimes: a row absent on all of them is
- * still a shortfall of the machine that produced these reports, and the fold has no
- * row for it either way. The md line below is worded to cover both.
- */
-const unavailable_by_runtime = [...unavailable_rows_by_runtime].flatMap(([runtime, rows]) =>
-	rows === null || rows.size === 0 ? [] : [{ runtime, rows: [...rows] }]
-);
-const mixed_vintage =
-	new Set(sources.map((s) => `${s.git_commit ?? '?'}@${s.tsv ?? '?'}@${s.corpus_snapshot ?? '?'}`))
-		.size > 1;
-
-/**
- * The conformance surface's vintage, beside the perf siblings'. It is NOT folded
- * here (it is a coverage report, not a timing sibling), but it is published from
- * the same directory to the same page, and `mixed_vintage` above cannot see it —
- * so it sat at a different commit than the three perf reports, generated by an
- * older renderer, with every banner green. Read from `report.conformance.node.json`;
- * `null` when that report is absent. `stale` is the perf/conformance analog of
- * `mixed_vintage`: the conformance commit differs from SOME perf sibling's — a
- * SYMMETRIC test, so which half needs re-running is a second question
- * (`stale_vintage_side`).
- */
-async function read_conformance_vintage(): Promise<{
-	git_commit: string | null;
-	timestamp: string;
-	tsv: string | null;
-	stale: boolean;
-} | null> {
-	const path = `${results_dir}report.conformance.node.json`;
-	let text: string;
-	try {
-		text = await readFile(path, 'utf8');
-	} catch {
-		// Absent is ordinary — a machine that has never run `bench:conformance`.
-		return null;
-	}
-	let report: Report;
-	try {
-		report = JSON.parse(text) as Report;
-	} catch (e) {
-		// Same split `read_report` draws above, for the same reason: a truncated
-		// report folded as "absent" removes the vintage line entirely, so the one
-		// report this check exists to watch goes back to being invisible — which is
-		// precisely the failure it was added for.
+	if (reports.size === 0) {
 		console.error(
-			`⚠ compose: ${path} exists but is not valid JSON (${
-				e instanceof Error ? e.message : String(e)
-			}) — the conformance vintage cannot be checked. Usually an interrupted ` +
-				'run; re-run `deno task bench:conformance` to rewrite it.'
+			'No per-runtime reports found in results/ ' +
+				'(report.deno.json / report.node.json / report.bun.json).\n' +
+				'Run `deno task bench` (or a per-runtime bench) first.'
 		);
+		return 1;
+	}
+
+	/** Runtimes present, in canonical order; the first is the ratio baseline. */
+	const present = RUNTIMES.filter((r) => reports.has(r));
+	const base_runtime = present[0];
+
+	/** One cross-runtime comparison row, keyed by `${group}/${name}`. */
+	interface Row {
+		group: string;
+		name: string;
+		ops: Partial<Record<Runtime, number>>;
+		mean_ns: Partial<Record<Runtime, number>>;
+		files_iterated: Partial<Record<Runtime, number | null>>;
+		/** Per-runtime measurement noise, for `within_noise` below. */
+		cv: Partial<Record<Runtime, number>>;
+		/** Timings behind each `cv` — the precondition for trusting it. */
+		samples: Partial<Record<Runtime, number>>;
+		/** The raw-timing readings (`Entry.cv_raw` / `.drift`), where a sibling carries them. */
+		cv_raw: Partial<Record<Runtime, number>>;
+		drift: Partial<Record<Runtime, number>>;
+		raw_samples: Partial<Record<Runtime, number>>;
+		/** `Entry.pass_spread` per runtime, where a sibling carries it. */
+		pass_spread: Partial<Record<Runtime, number>>;
+		/** `Entry.pass_mean_ns` per runtime, where a sibling carries it. */
+		pass_means: Partial<Record<Runtime, number[]>>;
+		/** `Entry.files_iterated_digest` per runtime, where a sibling carries it. */
+		digest: Partial<Record<Runtime, string>>;
+	}
+
+	const rows = new Map<string, Row>();
+	const order: string[] = [];
+	for (const r of present) {
+		for (const e of reports.get(r)!.entries) {
+			// Coverage-only rows carry no timing, and this report is purely the
+			// cross-runtime THROUGHPUT view — folding one in would mint a row whose
+			// every cell is empty, and whose per-runtime delta (the whole point of the
+			// combined report) can't exist. Its coverage is already published in each
+			// per-runtime sibling.
+			if (e.ops_per_second == null || e.mean_ns == null) continue;
+			const key = `${e.group}/${e.name}`;
+			let row = rows.get(key);
+			if (!row) {
+				row = {
+					group: e.group,
+					name: e.name,
+					ops: {},
+					mean_ns: {},
+					files_iterated: {},
+					cv: {},
+					samples: {},
+					cv_raw: {},
+					drift: {},
+					raw_samples: {},
+					pass_spread: {},
+					pass_means: {},
+					digest: {}
+				};
+				rows.set(key, row);
+				order.push(key);
+			}
+			row.ops[r] = e.ops_per_second;
+			row.mean_ns[r] = e.mean_ns;
+			row.files_iterated[r] = e.files_iterated;
+			if (e.cv != null) row.cv[r] = e.cv;
+			if (e.sample_size != null) row.samples[r] = e.sample_size;
+			if (e.cv_raw != null) row.cv_raw[r] = e.cv_raw;
+			if (e.drift != null) row.drift[r] = e.drift;
+			if (e.raw_sample_size != null) row.raw_samples[r] = e.raw_sample_size;
+			if (e.pass_spread != null) row.pass_spread[r] = e.pass_spread;
+			if (e.pass_mean_ns != null) row.pass_means[r] = e.pass_mean_ns;
+			if (e.files_iterated_digest != null) row.digest[r] = e.files_iterated_digest;
+		}
+	}
+
+	// Provenance per source, plus a loud flag when the siblings come from
+	// different commits/versions/corpora. The composer folds whatever reports exist,
+	// so a fresh `report.deno.json` can otherwise sit silently next to a stale
+	// `report.node.json` — and cross-runtime ratios are only meaningful on
+	// same-vintage siblings.
+	const sources = present.map((r) => ({
+		runtime: r,
+		timestamp: reports.get(r)!.timestamp,
+		git_commit: reports.get(r)!.git_commit,
+		tsv: reports.get(r)!.versions?.tsv ?? null,
+		// The real-code snapshot commit — a corpus axis the tsv commit does not fix:
+		// the bench reads whatever `../corpora` has checked out, so two siblings at one
+		// tsv commit can have measured two corpora (a refresh between runs). `null` when
+		// the sibling predates the field.
+		corpus_snapshot: reports.get(r)!.corpus_snapshot?.commit ?? null,
+		machine: reports.get(r)!.machine ?? null,
+		// Per-sibling, because this is exactly a per-runtime fact: an impl that loads
+		// under Deno and not under Bun leaves a row in one sibling and none in the
+		// other, which reads as a runtime PERFORMANCE difference in a table of ratios.
+		// `null` (not `[]`) when the sibling predates the field — "not recorded" and
+		// "nothing missing" are different claims, and only one of them is safe to make.
+		unavailable: reports.get(r)!.unavailable ?? null,
+		// The profile-guided build the sibling's native rows loaded — `null` when the sibling
+		// predates the field
+		native_build: reports.get(r)!.native_build ?? null
+	}));
+
+	/**
+	 * The native build every sibling measured, when they agree on it — one stamp, so the same
+	 * profile-guided pair whichever binding a runtime loads — else the first recorded one,
+	 * with `mixed_native_build` set: siblings built from two pipeline runs measured two
+	 * builds, whose bytes (and so whose numbers) need not agree.
+	 */
+	const native_builds = sources
+		.map((s) => s.native_build)
+		.filter((n): n is NativeBuild => n !== null);
+	const native_build_key = (n: NativeBuild): string =>
+		n.build === 'pgo' && n.bindings !== null
+			? `pgo:${n.bindings.ffi.sha256}|${n.bindings.napi.sha256}`
+			: `${n.build}:${n.loaded.sha256}`;
+	const native_build = native_builds[0] ?? null;
+	// one stamp's pair, profile-guided, on every present sibling — else mixed
+	const mixed_native_build =
+		native_builds.length < sources.length ||
+		native_builds.some((n) => n.build !== 'pgo') ||
+		new Set(native_builds.map(native_build_key)).size > 1;
+
+	/**
+	 * Row names each sibling recorded as unavailable, or `null` when the sibling
+	 * predates the field — "not recorded" and "nothing was missing" are different
+	 * claims, and only one of them is safe to make.
+	 *
+	 * The ONE derivation of that fact. Both readers below take it from here rather
+	 * than walking `sources` again: the folded disclosure (`unavailable_by_runtime`)
+	 * and the staleness detector (`partial_rows`) ask the same question at different
+	 * fidelities — the first collapses "not recorded" into "nothing missing", the
+	 * second must not — and two walks would be free to drift on which one they meant.
+	 * Insertion order is `sources` order, so the array below stays in runtime order.
+	 */
+	const unavailable_rows_by_runtime = new Map<Runtime, ReadonlySet<string> | null>(
+		sources.map((s) => [
+			s.runtime,
+			s.unavailable === null ? null : new Set(s.unavailable.flatMap((u) => u.rows ?? []))
+		])
+	);
+
+	/**
+	 * Every ROW a sibling recorded as unavailable, listed under the runtime that
+	 * recorded it — the asymmetry a reader of the folded rows would otherwise attribute
+	 * to speed. Siblings predating the field (`unavailable === null`) contribute
+	 * nothing, which is "not recorded" rather than a claim that nothing was missing.
+	 *
+	 * Rows, not impl labels, because that is the only identity that joins: a consumer
+	 * asking "is this blank cell a load failure?" holds a row name, and `Biome` /
+	 * `OXC WASM` match no row (`biome-wasm`, `oxc-parser-wasm`). A load failure that
+	 * cost this surface no row contributes nothing here — correctly, since no table has
+	 * a gap to explain.
+	 *
+	 * A sibling from the brief `version` 10–11 window recorded failures WITHOUT rows;
+	 * those contribute nothing here too, and unlike the cases above that is a shortfall
+	 * of the data rather than a claim about it. Neither version was ever a released
+	 * sibling — the field and its rows exist only together — so the state is only
+	 * reachable from a local run made mid-change, and it clears on the next full
+	 * `bench:perf`. Their `reason`s survive in `sources[].unavailable` either way.
+	 *
+	 * Not narrowed to the rows missing on SOME runtimes: a row absent on all of them is
+	 * still a shortfall of the machine that produced these reports, and the fold has no
+	 * row for it either way. The md line below is worded to cover both.
+	 */
+	const unavailable_by_runtime = [...unavailable_rows_by_runtime].flatMap(([runtime, rows]) =>
+		rows === null || rows.size === 0 ? [] : [{ runtime, rows: [...rows] }]
+	);
+	const mixed_vintage =
+		new Set(
+			sources.map((s) => `${s.git_commit ?? '?'}@${s.tsv ?? '?'}@${s.corpus_snapshot ?? '?'}`)
+		).size > 1;
+
+	/**
+	 * The conformance surface's vintage, beside the perf siblings'. It is NOT folded
+	 * here (it is a coverage report, not a timing sibling), but it is published from
+	 * the same directory to the same page, and `mixed_vintage` above cannot see it —
+	 * so it sat at a different commit than the three perf reports, generated by an
+	 * older renderer, with every banner green. Read from `report.conformance.node.json`;
+	 * `null` when that report is absent. `stale` is the perf/conformance analog of
+	 * `mixed_vintage`: the conformance commit differs from SOME perf sibling's — a
+	 * SYMMETRIC test, so which half needs re-running is a second question
+	 * (`stale_vintage_side`).
+	 */
+	async function read_conformance_vintage(): Promise<{
+		git_commit: string | null;
+		timestamp: string;
+		tsv: string | null;
+		stale: boolean;
+	} | null> {
+		const name = 'report.conformance.node.json';
+		const path = `${deps.results.path}/${name}`;
+		let text: string;
+		try {
+			text = await deps.results.read_text(name);
+		} catch {
+			// Absent is ordinary — a machine that has never run `bench:conformance`.
+			return null;
+		}
+		let report: Report;
+		try {
+			report = JSON.parse(text) as Report;
+		} catch (e) {
+			// Same split `read_report` draws above, for the same reason: a truncated
+			// report folded as "absent" removes the vintage line entirely, so the one
+			// report this check exists to watch goes back to being invisible — which is
+			// precisely the failure it was added for.
+			console.error(
+				`⚠ compose: ${path} exists but is not valid JSON (${
+					e instanceof Error ? e.message : String(e)
+				}) — the conformance vintage cannot be checked. Usually an interrupted ` +
+					'run; re-run `deno task bench:conformance` to rewrite it.'
+			);
+			return null;
+		}
+		const git_commit = report.git_commit ?? null;
+		return {
+			git_commit,
+			timestamp: report.timestamp,
+			tsv: report.versions?.tsv ?? null,
+			stale: sources.some((s) => (s.git_commit ?? null) !== git_commit)
+		};
+	}
+	const conformance_vintage = await read_conformance_vintage();
+
+	/**
+	 * Which half of a `stale` disagreement is the OLD one, by generation timestamp — the
+	 * only ordering this process can read (compose runs without `git`, so commit ancestry
+	 * is out of reach; the timestamps are already in every report). `'conformance'` when
+	 * that report predates every perf sibling, `'perf'` when it postdates every one,
+	 * `null` when they interleave.
+	 *
+	 * Asked because `stale` is symmetric and the remedy is not: the incident that
+	 * motivated the flag had the conformance report NEWER than the perf trio, where
+	 * "behind the perf siblings — re-run `bench:conformance`" names the wrong half and
+	 * re-running it would leave the disagreement in place.
+	 */
+	const stale_vintage_side = (v: { timestamp: string }): 'conformance' | 'perf' | null => {
+		// Parsed rather than string-compared: ISO-8601 `Z` strings do order
+		// lexicographically, but only while every writer keeps that exact shape, and an
+		// unparseable stamp yields NaN here — every comparison false, so it lands on the
+		// neutral `null` instead of on a confident wrong half.
+		const at = Date.parse(v.timestamp);
+		const times = sources.map((s) => Date.parse(s.timestamp));
+		if (times.every((t) => t > at)) return 'conformance';
+		if (times.every((t) => t < at)) return 'perf';
 		return null;
-	}
-	const git_commit = report.git_commit ?? null;
-	return {
-		git_commit,
-		timestamp: report.timestamp,
-		tsv: report.versions?.tsv ?? null,
-		stale: sources.some((s) => (s.git_commit ?? null) !== git_commit)
 	};
-}
-const conformance_vintage = await read_conformance_vintage();
 
-/**
- * Which half of a `stale` disagreement is the OLD one, by generation timestamp — the
- * only ordering this process can read (compose runs without `git`, so commit ancestry
- * is out of reach; the timestamps are already in every report). `'conformance'` when
- * that report predates every perf sibling, `'perf'` when it postdates every one,
- * `null` when they interleave.
- *
- * Asked because `stale` is symmetric and the remedy is not: the incident that
- * motivated the flag had the conformance report NEWER than the perf trio, where
- * "behind the perf siblings — re-run `bench:conformance`" names the wrong half and
- * re-running it would leave the disagreement in place.
- */
-const stale_vintage_side = (v: { timestamp: string }): 'conformance' | 'perf' | null => {
-	// Parsed rather than string-compared: ISO-8601 `Z` strings do order
-	// lexicographically, but only while every writer keeps that exact shape, and an
-	// unparseable stamp yields NaN here — every comparison false, so it lands on the
-	// neutral `null` instead of on a confident wrong half.
-	const at = Date.parse(v.timestamp);
-	const times = sources.map((s) => Date.parse(s.timestamp));
-	if (times.every((t) => t > at)) return 'conformance';
-	if (times.every((t) => t < at)) return 'perf';
-	return null;
-};
+	/**
+	 * How a `stale` conformance vintage reads, and which task refreshes the old half.
+	 * `channel` picks the wording only: the md header carries a terse phrase inside a
+	 * provenance line, while the stderr warning is the one place a reader is told to go
+	 * do something, so it spells out that the perf siblings are the stale half.
+	 */
+	const stale_vintage_note = (
+		v: { timestamp: string },
+		channel: 'md' | 'stderr'
+	): { where: string; remedy: string } => {
+		switch (stale_vintage_side(v)) {
+			case 'conformance':
+				return { where: 'behind the perf siblings', remedy: 'deno task bench:conformance' };
+			case 'perf':
+				return {
+					where:
+						channel === 'stderr'
+							? 'AHEAD of the perf siblings — THEY are the stale half'
+							: 'ahead of the perf siblings',
+					remedy: 'deno task bench:perf'
+				};
+			default:
+				return {
+					where: 'at a different commit than the perf siblings',
+					remedy: 'deno task bench'
+				};
+		}
+	};
 
-/**
- * How a `stale` conformance vintage reads, and which task refreshes the old half.
- * `channel` picks the wording only: the md header carries a terse phrase inside a
- * provenance line, while the stderr warning is the one place a reader is told to go
- * do something, so it spells out that the perf siblings are the stale half.
- */
-const stale_vintage_note = (
-	v: { timestamp: string },
-	channel: 'md' | 'stderr'
-): { where: string; remedy: string } => {
-	switch (stale_vintage_side(v)) {
-		case 'conformance':
-			return { where: 'behind the perf siblings', remedy: 'deno task bench:conformance' };
-		case 'perf':
-			return {
-				where:
-					channel === 'stderr'
-						? 'AHEAD of the perf siblings — THEY are the stale half'
-						: 'ahead of the perf siblings',
-				remedy: 'deno task bench:perf'
-			};
-		default:
-			return {
-				where: 'at a different commit than the perf siblings',
-				remedy: 'deno task bench'
-			};
-	}
-};
+	/**
+	 * Rows one sibling MEASURED that another doesn't carry at all, with no load failure
+	 * on that side to explain the gap.
+	 *
+	 * The composer folds whatever reports exist, so a row added to the harness after a
+	 * sibling was last run lands in its column as a bare `—` — visually identical to a
+	 * row whose impl failed to load, which `unavailable_by_runtime` above DOES explain,
+	 * and to a language a row doesn't cover, which never reaches the group at all.
+	 * `mixed_vintage` flags the general condition; this names the rows it actually cost,
+	 * which is the part a reader of one group's table can act on.
+	 *
+	 * A runtime whose sibling predates `unavailable` is skipped rather than counted:
+	 * with nothing recorded there, an absent row can't be told from an unloadable impl,
+	 * and claiming drift would be the unsafe half of that pair. (A sibling from the
+	 * brief `version` 10–11 window records failures WITHOUT `rows`, so its absences do
+	 * read as unexplained here — the same data shortfall `unavailable_by_runtime`
+	 * carries, and it clears on the next full `bench:perf`.)
+	 */
+	const partial_rows = order
+		.map((key) => {
+			const row = rows.get(key)!;
+			const missing = present.filter((r) => {
+				if (row.ops[r] !== undefined) return false;
+				const recorded = unavailable_rows_by_runtime.get(r) ?? null;
+				return recorded !== null && !recorded.has(row.name);
+			});
+			return { group: row.group, name: row.name, missing };
+		})
+		.filter((entry) => entry.missing.length > 0);
 
-/**
- * Rows one sibling MEASURED that another doesn't carry at all, with no load failure
- * on that side to explain the gap.
- *
- * The composer folds whatever reports exist, so a row added to the harness after a
- * sibling was last run lands in its column as a bare `—` — visually identical to a
- * row whose impl failed to load, which `unavailable_by_runtime` above DOES explain,
- * and to a language a row doesn't cover, which never reaches the group at all.
- * `mixed_vintage` flags the general condition; this names the rows it actually cost,
- * which is the part a reader of one group's table can act on.
- *
- * A runtime whose sibling predates `unavailable` is skipped rather than counted:
- * with nothing recorded there, an absent row can't be told from an unloadable impl,
- * and claiming drift would be the unsafe half of that pair. (A sibling from the
- * brief `version` 10–11 window records failures WITHOUT `rows`, so its absences do
- * read as unexplained here — the same data shortfall `unavailable_by_runtime`
- * carries, and it clears on the next full `bench:perf`.)
- */
-const partial_rows = order
-	.map((key) => {
+	// Loud flag when the siblings were produced on DIFFERENT boxes — the
+	// throughput numbers are machine-relative, so cross-runtime ratios are only
+	// meaningful on same-machine siblings. Compares the HARDWARE identity only
+	// (CPU/OS/arch); `runtime_version` differs per sibling by design. Ignores
+	// siblings with no `machine` (pre-`version` 7), so a stale old sibling can't
+	// spuriously trip the flag during the transition.
+	const machine_ids = sources
+		.map((s) => (s.machine ? `${s.machine.cpu_model}|${s.machine.os}|${s.machine.arch}` : null))
+		.filter((v): v is string => v !== null);
+	const mixed_machine = machine_ids.length > 0 && new Set(machine_ids).size > 1;
+	/** The shared hardware identity (any present source has it — they agree unless
+	 * `mixed_machine`), for the one-line md disclosure. */
+	const machine = sources.find((s) => s.machine)?.machine ?? null;
+
+	/**
+	 * The COMBINED report's schema version — distinct from the per-runtime siblings'
+	 * (`bench.ts` `REPORT_SCHEMA_VERSION`), which this composer reads rather than emits.
+	 *
+	 * BUMP IT whenever a top-level field is added, removed, or has its meaning or key
+	 * names changed, and say what the new number means in one line below, so a consumer
+	 * can tell "this composer didn't record it" from "there was nothing to record".
+	 *
+	 * 11: `within_noise[]` — per-runtime deltas smaller than the combined cv of the two
+	 * measurements they divide, i.e. the cells that are not runtime effects. The first
+	 * field here that qualifies a number this report prints rather than adding one.
+	 *
+	 * 10: `partial_rows[]` — rows one sibling measured and another doesn't carry, with
+	 * no recorded load failure to explain it. Kept beside 11 rather than replaced by it,
+	 * so a reader at 11 does not find
+	 * one of the two fields undocumented at the only place this file documents them.
+	 *
+	 * 12: `within_noise[]` entries carry `samples` — `[base runtime, cell runtime]`
+	 * cleaned timing counts — and a cell is only classified when BOTH clear
+	 * `MIN_NOISE_SAMPLES`, so membership narrowed. A consumer that read 11's list as "every quiet cell" would
+	 * read 12's as the same claim, and it is a stricter one.
+	 *
+	 * 13: `conformance_vintage` — the `report.conformance.node.json` sibling's commit /
+	 * timestamp / tsv version and whether it is `stale` against the perf siblings
+	 * (`null` when that report is absent). The one report published beside these that
+	 * `mixed_vintage` could not see.
+	 *
+	 * 14: `sources[].corpus_snapshot` — the `fuzdev/corpora` commit each sibling's
+	 * real-code corpus was read from (`null` on a pre-14 sibling), and a third axis of
+	 * `mixed_vintage`: siblings at one tsv commit over two snapshots are not comparable
+	 * either.
+	 */
+	/**
+	 * 15: `unstable_cells[]` — per-runtime measurements that were not stable (cleaned or
+	 * raw cv past 10%, or |drift| past 5%), collected AHEAD of `within_noise`'s sample
+	 * gate: a MEASURED cv of 48% needs no minimum n to be believed, and the gate had
+	 * silenced exactly that cell. Rows named here are excluded from `within_noise`
+	 * (a delta under a 48% "noise" is not "no difference", it is unmeasured). And
+	 * `within_noise[]` entries now carry `runtimes: [a, b]` instead of `runtime`, one
+	 * per UNORDERED pair of present runtimes rather than per non-base runtime against
+	 * the base — the site anchors its ratio columns on node, so the bun/node pair had
+	 * no classification at all.
+	 *
+	 * 16: no field moved, but `rows[].name` did: tsv's parse rows are named for the
+	 * packages' API — `tsv` / `tsv-wasm` for the default parse and `tsv+locations` /
+	 * `tsv-wasm+locations` for `{locations: true}` — so `tsv` and `tsv-wasm` name a row
+	 * in the parse groups as well as the format ones, and a consumer must key a row on
+	 * `group` + `name`, never `name` alone.
+	 *
+	 * 17: `unstable_cells[]` entries gain `pass_spread`, and a spread past 5% trips a
+	 * cell by itself. From per-runtime report `version` 21 each row is timed in several
+	 * fresh processes and pooled, so a sibling's `cv` and `drift` are no longer readings
+	 * of one shared process: `cv` includes the variation between a row's processes, and
+	 * `drift` is its worst single pass's. `pass_spread` is `null` for a cell whose
+	 * sibling predates it.
+	 *
+	 * 18: `within_noise[]` entries carry `basis` — per side, `passes` or `sweeps` — and
+	 * `samples` counts in that unit. A sibling timed in several passes (report `version`
+	 * 21+) is read on its PASS MEANS: the spread between them is the noise, and three are
+	 * needed (`MIN_NOISE_PASSES`). Only a sibling with one pass, or from before passes,
+	 * is read on its sweep-level `cv` as in 17. A consumer that read 17's `samples` as
+	 * cleaned sweeps reads 18's wrongly on every `passes` side.
+	 *
+	 * 19: `native_build` — the build the native rows measured (each sibling's per-runtime
+	 * `native_build`, the first recorded), `mixed_native_build` when the siblings did not all
+	 * load the one stamp's profile-guided pair (two stamps, a sibling whose loaded library the
+	 * stamp does not name, or one recording none), and `sources[].native_build` per sibling.
+	 */
+	const COMBINED_SCHEMA_VERSION = 19;
+
+	// JSON: metadata + provenance per source + the comparison rows.
+	/**
+	 * The cleaned-timing count below which a SWEEP-level cv is not a usable noise
+	 * estimate — the gate for a sibling read on its sweeps (`cell_noise`).
+	 *
+	 * Ten, not the 30 `benchmark.ts` names as the central-limit floor for its Welch
+	 * test: this is a reading aid, and 30 would silence it on every row the bench
+	 * measures in seconds — most of the format surface. Ten keeps the aid where the
+	 * estimate is merely rough and withdraws it where it is arbitrary.
+	 */
+	const MIN_NOISE_SAMPLES = 10;
+
+	/**
+	 * The pass count below which a row's PASS MEANS are not a usable noise estimate —
+	 * the gate for a sibling read on its passes (`cell_noise`). The spread of two is one
+	 * degree of freedom: two passes that happen to agree say nothing about a third.
+	 */
+	const MIN_NOISE_PASSES = 3;
+
+	/** What one side of a `within_noise` cell's noise was read from. */
+	type NoiseBasis = 'passes' | 'sweeps';
+
+	/**
+	 * One runtime's noise on one row, as a relative error of its published mean, and
+	 * what it was read from — or `null` when that runtime gives no usable estimate.
+	 *
+	 * A sibling timed in several fresh processes (report `version` 21+) is read on its
+	 * PASS MEANS: its published mean is their mean, so the spread between them is the
+	 * error it is made of — what one more process of the row could have read. Its pooled
+	 * `cv` is not: that is the spread of one SWEEP, including within-process variation the
+	 * mean averages away, so it overstates the noise of the mean and would call real
+	 * runtime differences "no difference". Its sample count is not either: pooled over
+	 * the passes, it clears any sweep gate while the between-process part rests on a few
+	 * draws. So the pass means, with their own gate (`MIN_NOISE_PASSES`).
+	 *
+	 * A sibling with one pass, or from before passes, has only its sweeps: the cleaned
+	 * `cv`, behind `MIN_NOISE_SAMPLES` — both one process's readings, the best it has.
+	 */
+	const cell_noise = (
+		row: Row,
+		r: Runtime
+	): { noise: number; samples: number; basis: NoiseBasis } | null => {
+		const means = row.pass_means[r];
+		if (means !== undefined && means.length > 1) {
+			if (means.length < MIN_NOISE_PASSES) return null;
+			const mean = means.reduce((a, m) => a + m, 0) / means.length;
+			return mean > 0
+				? { noise: sample_sd(means, mean) / mean, samples: means.length, basis: 'passes' }
+				: null;
+		}
+		const cv = row.cv[r];
+		const n = row.samples[r];
+		if (cv === undefined || n === undefined || n < MIN_NOISE_SAMPLES) return null;
+		return { noise: cv, samples: n, basis: 'sweeps' };
+	};
+
+	/**
+	 * Per-runtime measurements that were not stable, so every ratio through them is
+	 * unreadable — asked BEFORE any sample gate, because this is the direction where a
+	 * cv needs no minimum n: a recorded 48% on five timings is not an estimate that
+	 * might be wrong, it is five timings that disagree. The gate on `within_noise` is
+	 * about an estimate too thin to classify by; it silenced the one cell that had to be
+	 * named.
+	 *
+	 * The rule is the per-runtime bench's own (`lib/bench_plan.ts` `unstable_readings`),
+	 * imported rather than restated, so the two reports cannot disagree about a row:
+	 * four readings, any one of which trips the cell — each only where the sibling
+	 * carries it (the raw two from report 15, the spread from 21).
+	 */
+	const unstable_cells = order.flatMap((key) => {
 		const row = rows.get(key)!;
-		const missing = present.filter((r) => {
-			if (row.ops[r] !== undefined) return false;
-			const recorded = unavailable_rows_by_runtime.get(r) ?? null;
-			return recorded !== null && !recorded.has(row.name);
-		});
-		return { group: row.group, name: row.name, missing };
-	})
-	.filter((entry) => entry.missing.length > 0);
-
-// Loud flag when the siblings were produced on DIFFERENT boxes — the
-// throughput numbers are machine-relative, so cross-runtime ratios are only
-// meaningful on same-machine siblings. Compares the HARDWARE identity only
-// (CPU/OS/arch); `runtime_version` differs per sibling by design. Ignores
-// siblings with no `machine` (pre-`version` 7), so a stale old sibling can't
-// spuriously trip the flag during the transition.
-const machine_ids = sources
-	.map((s) => (s.machine ? `${s.machine.cpu_model}|${s.machine.os}|${s.machine.arch}` : null))
-	.filter((v): v is string => v !== null);
-const mixed_machine = machine_ids.length > 0 && new Set(machine_ids).size > 1;
-/** The shared hardware identity (any present source has it — they agree unless
- * `mixed_machine`), for the one-line md disclosure. */
-const machine = sources.find((s) => s.machine)?.machine ?? null;
-
-/**
- * The COMBINED report's schema version — distinct from the per-runtime siblings'
- * (`bench.ts` `REPORT_SCHEMA_VERSION`), which this composer reads rather than emits.
- *
- * BUMP IT whenever a top-level field is added, removed, or has its meaning or key
- * names changed, and say what the new number means in one line below, so a consumer
- * can tell "this composer didn't record it" from "there was nothing to record".
- *
- * 11: `within_noise[]` — per-runtime deltas smaller than the combined cv of the two
- * measurements they divide, i.e. the cells that are not runtime effects. The first
- * field here that qualifies a number this report prints rather than adding one.
- *
- * 10: `partial_rows[]` — rows one sibling measured and another doesn't carry, with
- * no recorded load failure to explain it. Kept beside 11 rather than replaced by it,
- * so a reader at 11 does not find
- * one of the two fields undocumented at the only place this file documents them.
- *
- * 12: `within_noise[]` entries carry `samples` — `[base runtime, cell runtime]`
- * cleaned timing counts — and a cell is only classified when BOTH clear
- * `MIN_NOISE_SAMPLES`, so membership narrowed. A consumer that read 11's list as "every quiet cell" would
- * read 12's as the same claim, and it is a stricter one.
- *
- * 13: `conformance_vintage` — the `report.conformance.node.json` sibling's commit /
- * timestamp / tsv version and whether it is `stale` against the perf siblings
- * (`null` when that report is absent). The one report published beside these that
- * `mixed_vintage` could not see.
- *
- * 14: `sources[].corpus_snapshot` — the `fuzdev/corpora` commit each sibling's
- * real-code corpus was read from (`null` on a pre-14 sibling), and a third axis of
- * `mixed_vintage`: siblings at one tsv commit over two snapshots are not comparable
- * either.
- */
-/**
- * 15: `unstable_cells[]` — per-runtime measurements that were not stable (cleaned or
- * raw cv past 10%, or |drift| past 5%), collected AHEAD of `within_noise`'s sample
- * gate: a MEASURED cv of 48% needs no minimum n to be believed, and the gate had
- * silenced exactly that cell. Rows named here are excluded from `within_noise`
- * (a delta under a 48% "noise" is not "no difference", it is unmeasured). And
- * `within_noise[]` entries now carry `runtimes: [a, b]` instead of `runtime`, one
- * per UNORDERED pair of present runtimes rather than per non-base runtime against
- * the base — the site anchors its ratio columns on node, so the bun/node pair had
- * no classification at all.
- *
- * 16: no field moved, but `rows[].name` did: tsv's parse rows are named for the
- * packages' API — `tsv` / `tsv-wasm` for the default parse and `tsv+locations` /
- * `tsv-wasm+locations` for `{locations: true}` — so `tsv` and `tsv-wasm` name a row
- * in the parse groups as well as the format ones, and a consumer must key a row on
- * `group` + `name`, never `name` alone.
- *
- * 17: `unstable_cells[]` entries gain `pass_spread`, and a spread past 5% trips a
- * cell by itself. From per-runtime report `version` 21 each row is timed in several
- * fresh processes and pooled, so a sibling's `cv` and `drift` are no longer readings
- * of one shared process: `cv` includes the variation between a row's processes, and
- * `drift` is its worst single pass's. `pass_spread` is `null` for a cell whose
- * sibling predates it.
- *
- * 18: `within_noise[]` entries carry `basis` — per side, `passes` or `sweeps` — and
- * `samples` counts in that unit. A sibling timed in several passes (report `version`
- * 21+) is read on its PASS MEANS: the spread between them is the noise, and three are
- * needed (`MIN_NOISE_PASSES`). Only a sibling with one pass, or from before passes,
- * is read on its sweep-level `cv` as in 17. A consumer that read 17's `samples` as
- * cleaned sweeps reads 18's wrongly on every `passes` side.
- *
- * 19: `native_build` — the build the native rows measured (each sibling's per-runtime
- * `native_build`, the first recorded), `mixed_native_build` when the siblings did not all
- * load the one stamp's profile-guided pair (two stamps, a sibling whose loaded library the
- * stamp does not name, or one recording none), and `sources[].native_build` per sibling.
- */
-const COMBINED_SCHEMA_VERSION = 19;
-
-// JSON: metadata + provenance per source + the comparison rows.
-/**
- * The cleaned-timing count below which a SWEEP-level cv is not a usable noise
- * estimate — the gate for a sibling read on its sweeps (`cell_noise`).
- *
- * Ten, not the 30 `benchmark.ts` names as the central-limit floor for its Welch
- * test: this is a reading aid, and 30 would silence it on every row the bench
- * measures in seconds — most of the format surface. Ten keeps the aid where the
- * estimate is merely rough and withdraws it where it is arbitrary.
- */
-const MIN_NOISE_SAMPLES = 10;
-
-/**
- * The pass count below which a row's PASS MEANS are not a usable noise estimate —
- * the gate for a sibling read on its passes (`cell_noise`). The spread of two is one
- * degree of freedom: two passes that happen to agree say nothing about a third.
- */
-const MIN_NOISE_PASSES = 3;
-
-/** What one side of a `within_noise` cell's noise was read from. */
-type NoiseBasis = 'passes' | 'sweeps';
-
-/**
- * One runtime's noise on one row, as a relative error of its published mean, and
- * what it was read from — or `null` when that runtime gives no usable estimate.
- *
- * A sibling timed in several fresh processes (report `version` 21+) is read on its
- * PASS MEANS: its published mean is their mean, so the spread between them is the
- * error it is made of — what one more process of the row could have read. Its pooled
- * `cv` is not: that is the spread of one SWEEP, including within-process variation the
- * mean averages away, so it overstates the noise of the mean and would call real
- * runtime differences "no difference". Its sample count is not either: pooled over
- * the passes, it clears any sweep gate while the between-process part rests on a few
- * draws. So the pass means, with their own gate (`MIN_NOISE_PASSES`).
- *
- * A sibling with one pass, or from before passes, has only its sweeps: the cleaned
- * `cv`, behind `MIN_NOISE_SAMPLES` — both one process's readings, the best it has.
- */
-const cell_noise = (
-	row: Row,
-	r: Runtime
-): { noise: number; samples: number; basis: NoiseBasis } | null => {
-	const means = row.pass_means[r];
-	if (means !== undefined && means.length > 1) {
-		if (means.length < MIN_NOISE_PASSES) return null;
-		const mean = means.reduce((a, m) => a + m, 0) / means.length;
-		return mean > 0
-			? { noise: sample_sd(means, mean) / mean, samples: means.length, basis: 'passes' }
-			: null;
-	}
-	const cv = row.cv[r];
-	const n = row.samples[r];
-	if (cv === undefined || n === undefined || n < MIN_NOISE_SAMPLES) return null;
-	return { noise: cv, samples: n, basis: 'sweeps' };
-};
-
-/**
- * Per-runtime measurements that were not stable, so every ratio through them is
- * unreadable — asked BEFORE any sample gate, because this is the direction where a
- * cv needs no minimum n: a recorded 48% on five timings is not an estimate that
- * might be wrong, it is five timings that disagree. The gate on `within_noise` is
- * about an estimate too thin to classify by; it silenced the one cell that had to be
- * named.
- *
- * The rule is the per-runtime bench's own (`lib/bench_plan.ts` `unstable_readings`),
- * imported rather than restated, so the two reports cannot disagree about a row:
- * four readings, any one of which trips the cell — each only where the sibling
- * carries it (the raw two from report 15, the spread from 21).
- */
-const unstable_cells = order.flatMap((key) => {
-	const row = rows.get(key)!;
-	return present
-		.filter((r) => {
-			const raw = row.raw_samples[r];
-			const tripped = unstable_readings({
+		return present
+			.filter((r) => {
+				const raw = row.raw_samples[r];
+				const tripped = unstable_readings({
+					cv: row.cv[r] ?? null,
+					cv_raw: row.cv_raw[r] ?? null,
+					drift: row.drift[r] ?? null,
+					pass_spread: row.pass_spread[r] ?? null,
+					// one pass before report 21, whose siblings carry no pass means
+					raw_samples_per_pass: raw === undefined ? null : raw / (row.pass_means[r]?.length ?? 1)
+				});
+				return tripped.length > 0;
+			})
+			.map((r) => ({
+				group: row.group,
+				name: row.name,
+				runtime: r,
 				cv: row.cv[r] ?? null,
 				cv_raw: row.cv_raw[r] ?? null,
 				drift: row.drift[r] ?? null,
 				pass_spread: row.pass_spread[r] ?? null,
-				// one pass before report 21, whose siblings carry no pass means
-				raw_samples_per_pass: raw === undefined ? null : raw / (row.pass_means[r]?.length ?? 1)
-			});
-			return tripped.length > 0;
-		})
-		.map((r) => ({
-			group: row.group,
-			name: row.name,
-			runtime: r,
-			cv: row.cv[r] ?? null,
-			cv_raw: row.cv_raw[r] ?? null,
-			drift: row.drift[r] ?? null,
-			pass_spread: row.pass_spread[r] ?? null,
-			samples: row.samples[r] ?? null
-		}));
-});
-const unstable_keys = new Set(unstable_cells.map((c) => `${c.group}/${c.name}`));
+				samples: row.samples[r] ?? null
+			}));
+	});
+	const unstable_keys = new Set(unstable_cells.map((c) => `${c.group}/${c.name}`));
 
-/**
- * Per-runtime deltas that are smaller than the noise of the two measurements they
- * divide — i.e. the cells a reader must NOT read as a runtime effect.
- *
- * This report's stated subject is exactly those deltas ("A per-runtime delta on the
- * same row is the signal"), and every cell is a ratio of two sibling means, so it
- * inherits both means' noise while printing neither. A `1.15x` between two rows that
- * each wobble 10% is not a runtime difference; a `1.15x` between two 1% rows is.
- * Nothing here could tell them apart.
- *
- * The bar is the quadrature sum of the two sides' noise (`cell_noise`) — the
- * standard combination for independent relative errors, and deliberately a rough
- * one: it is a READING AID, not a significance test (that is
- * `benchmark_baseline_compare`'s Welch job, on a run this composer never sees). A
- * side with no usable estimate leaves the cell unclassified rather than assumed
- * quiet — a sibling predating the fields would otherwise read as noiseless.
- *
- * ⚠ The estimate is consumed in the direction where an OVERestimate is expensive:
- * too LARGE a noise makes a real per-runtime difference read as "no difference",
- * which is the one verdict here a reader cannot check from the table. That is why a
- * pooled sweep `cv` is not the noise of a pass-pooled mean (it is larger), and why an
- * estimate too thin to trust — a handful of sweeps, two passes — is not used at all:
- * a thin estimate errs in both directions, and three timings that happen to disagree
- * would call a real difference noise.
- *
- * In practice it confirms "no difference" (cells at ~1.00x) rather than overturning
- * a reading; it is here for the case it does overturn.
- */
-const within_noise = order.flatMap((key) => {
-	const row = rows.get(key)!;
-	const cells: Array<{
-		group: string;
-		name: string;
-		/** The two runtimes the cell divides, in canonical order — rendered as `a/b`. */
-		runtimes: [Runtime, Runtime];
-		delta: number;
-		noise: number;
-		/** What each side's noise was read from, in the same order as `runtimes`. */
-		basis: [NoiseBasis, NoiseBasis];
-		/** Each side's count in its `basis` unit (passes or cleaned sweeps) — the md's `n=a/b`. */
-		samples: [number, number];
-	}> = [];
-	// An unstable row is reported as such; a delta inside a 48% "noise" is not "no
-	// difference", it is an unmeasured cell.
-	if (unstable_keys.has(key)) return cells;
-	for (let i = 0; i < present.length; i++) {
-		for (let j = i + 1; j < present.length; j++) {
-			const a = present[i];
-			const b = present[j];
-			const a_ops = row.ops[a];
-			const b_ops = row.ops[b];
-			if (a_ops === undefined || b_ops === undefined) continue;
-			const a_noise = cell_noise(row, a);
-			const b_noise = cell_noise(row, b);
-			if (a_noise === null || b_noise === null) continue;
-			const delta = Math.abs(b_ops / a_ops - 1);
-			const noise = Math.sqrt(a_noise.noise ** 2 + b_noise.noise ** 2);
-			if (delta < noise) {
-				cells.push({
-					group: row.group,
-					name: row.name,
-					runtimes: [a, b],
-					delta,
-					noise,
-					basis: [a_noise.basis, b_noise.basis],
-					samples: [a_noise.samples, b_noise.samples]
-				});
+	/**
+	 * Per-runtime deltas that are smaller than the noise of the two measurements they
+	 * divide — i.e. the cells a reader must NOT read as a runtime effect.
+	 *
+	 * This report's stated subject is exactly those deltas ("A per-runtime delta on the
+	 * same row is the signal"), and every cell is a ratio of two sibling means, so it
+	 * inherits both means' noise while printing neither. A `1.15x` between two rows that
+	 * each wobble 10% is not a runtime difference; a `1.15x` between two 1% rows is.
+	 * Nothing here could tell them apart.
+	 *
+	 * The bar is the quadrature sum of the two sides' noise (`cell_noise`) — the
+	 * standard combination for independent relative errors, and deliberately a rough
+	 * one: it is a READING AID, not a significance test (that is
+	 * `benchmark_baseline_compare`'s Welch job, on a run this composer never sees). A
+	 * side with no usable estimate leaves the cell unclassified rather than assumed
+	 * quiet — a sibling predating the fields would otherwise read as noiseless.
+	 *
+	 * ⚠ The estimate is consumed in the direction where an OVERestimate is expensive:
+	 * too LARGE a noise makes a real per-runtime difference read as "no difference",
+	 * which is the one verdict here a reader cannot check from the table. That is why a
+	 * pooled sweep `cv` is not the noise of a pass-pooled mean (it is larger), and why an
+	 * estimate too thin to trust — a handful of sweeps, two passes — is not used at all:
+	 * a thin estimate errs in both directions, and three timings that happen to disagree
+	 * would call a real difference noise.
+	 *
+	 * In practice it confirms "no difference" (cells at ~1.00x) rather than overturning
+	 * a reading; it is here for the case it does overturn.
+	 */
+	const within_noise = order.flatMap((key) => {
+		const row = rows.get(key)!;
+		const cells: Array<{
+			group: string;
+			name: string;
+			/** The two runtimes the cell divides, in canonical order — rendered as `a/b`. */
+			runtimes: [Runtime, Runtime];
+			delta: number;
+			noise: number;
+			/** What each side's noise was read from, in the same order as `runtimes`. */
+			basis: [NoiseBasis, NoiseBasis];
+			/** Each side's count in its `basis` unit (passes or cleaned sweeps) — the md's `n=a/b`. */
+			samples: [number, number];
+		}> = [];
+		// An unstable row is reported as such; a delta inside a 48% "noise" is not "no
+		// difference", it is an unmeasured cell.
+		if (unstable_keys.has(key)) return cells;
+		for (let i = 0; i < present.length; i++) {
+			for (let j = i + 1; j < present.length; j++) {
+				const a = present[i];
+				const b = present[j];
+				const a_ops = row.ops[a];
+				const b_ops = row.ops[b];
+				if (a_ops === undefined || b_ops === undefined) continue;
+				const a_noise = cell_noise(row, a);
+				const b_noise = cell_noise(row, b);
+				if (a_noise === null || b_noise === null) continue;
+				const delta = Math.abs(b_ops / a_ops - 1);
+				const noise = Math.sqrt(a_noise.noise ** 2 + b_noise.noise ** 2);
+				if (delta < noise) {
+					cells.push({
+						group: row.group,
+						name: row.name,
+						runtimes: [a, b],
+						delta,
+						noise,
+						basis: [a_noise.basis, b_noise.basis],
+						samples: [a_noise.samples, b_noise.samples]
+					});
+				}
 			}
 		}
+		return cells;
+	});
+
+	const combined = {
+		version: COMBINED_SCHEMA_VERSION,
+		kind: 'combined' as const,
+		generated: new Date().toISOString(),
+		runtimes: present,
+		mixed_vintage,
+		conformance_vintage,
+		mixed_machine,
+		native_build,
+		mixed_native_build,
+		unavailable_by_runtime,
+		partial_rows,
+		unstable_cells,
+		within_noise,
+		sources,
+		rows: order.map((key) => {
+			const row = rows.get(key)!;
+			return {
+				group: row.group,
+				name: row.name,
+				ops_per_second: row.ops,
+				mean_ns: row.mean_ns,
+				files_iterated: row.files_iterated
+			};
+		})
+	};
+
+	// Markdown: one table per group, runtimes side by side + ratio vs base_runtime.
+	function fmt_ops(n: number | undefined): string {
+		return n === undefined ? '—' : n.toFixed(1);
 	}
-	return cells;
-});
 
-const combined = {
-	version: COMBINED_SCHEMA_VERSION,
-	kind: 'combined' as const,
-	generated: new Date().toISOString(),
-	runtimes: present,
-	mixed_vintage,
-	conformance_vintage,
-	mixed_machine,
-	native_build,
-	mixed_native_build,
-	unavailable_by_runtime,
-	partial_rows,
-	unstable_cells,
-	within_noise,
-	sources,
-	rows: order.map((key) => {
-		const row = rows.get(key)!;
-		return {
-			group: row.group,
-			name: row.name,
-			ops_per_second: row.ops,
-			mean_ns: row.mean_ns,
-			files_iterated: row.files_iterated
-		};
-	})
-};
+	function fmt_ratio(self: number | undefined, base: number | undefined): string {
+		if (self === undefined || base === undefined || base === 0) return '—';
+		return `${(self / base).toFixed(2)}x`;
+	}
 
-// Markdown: one table per group, runtimes side by side + ratio vs base_runtime.
-function fmt_ops(n: number | undefined): string {
-	return n === undefined ? '—' : n.toFixed(1);
-}
+	const others = present.filter((r) => r !== base_runtime);
 
-function fmt_ratio(self: number | undefined, base: number | undefined): string {
-	if (self === undefined || base === undefined || base === 0) return '—';
-	return `${(self / base).toFixed(2)}x`;
-}
-
-const others = present.filter((r) => r !== base_runtime);
-
-const md: string[] = [];
-md.push('# tsv benchmark results — cross-runtime\n');
-md.push(`**Generated:** ${combined.generated}\n`);
-md.push(
-	`**Runtimes:** ${present.join(', ')} ` +
-		'— each runtime’s full report is its `report.<runtime>.{json,md}` sibling.\n'
-);
-for (const s of sources) {
-	const rt_ver = s.machine ? ` ${s.machine.runtime_version}` : '';
+	const md: string[] = [];
+	md.push('# tsv benchmark results — cross-runtime\n');
+	md.push(`**Generated:** ${combined.generated}\n`);
 	md.push(
-		`- \`${s.runtime}\`${rt_ver}: ${s.git_commit ?? 'unknown commit'} @ ${s.timestamp}` +
-			`${s.tsv ? ` (tsv ${s.tsv})` : ''}` +
-			`${s.corpus_snapshot ? ` — corpora ${s.corpus_snapshot.slice(0, 9)}` : ''}`
+		`**Runtimes:** ${present.join(', ')} ` +
+			'— each runtime’s full report is its `report.<runtime>.{json,md}` sibling.\n'
 	);
-}
-if (conformance_vintage) {
-	md.push(
-		`- \`conformance\` (node, coverage-only): ${conformance_vintage.git_commit ?? 'unknown commit'} @ ` +
-			`${conformance_vintage.timestamp}${conformance_vintage.tsv ? ` (tsv ${conformance_vintage.tsv})` : ''}` +
-			(conformance_vintage.stale
-				? ` — ⚠ **${stale_vintage_note(conformance_vintage, 'md').where}**`
-				: '')
-	);
-}
-md.push('');
-if (machine) {
-	md.push(`**Machine:** ${machine.cpu_model} · ${machine.os}/${machine.arch}\n`);
-}
-if (native_build && !mixed_native_build) {
-	const verdicts = native_builds.map((n) => n.disjoint_from_timed_corpus);
-	const disjoint = verdicts.includes(false) ? false : verdicts.includes(null) ? null : true;
-	md.push(`**Native build:** ${native_build_pair_summary(native_build, disjoint)}\n`);
-} else {
 	for (const s of sources) {
+		const rt_ver = s.machine ? ` ${s.machine.runtime_version}` : '';
 		md.push(
-			`**Native build (${s.runtime}):** ${s.native_build ? native_build_summary(s.native_build) : 'not recorded'}\n`
+			`- \`${s.runtime}\`${rt_ver}: ${s.git_commit ?? 'unknown commit'} @ ${s.timestamp}` +
+				`${s.tsv ? ` (tsv ${s.tsv})` : ''}` +
+				`${s.corpus_snapshot ? ` — corpora ${s.corpus_snapshot.slice(0, 9)}` : ''}`
 		);
 	}
-}
-if (mixed_native_build) {
-	md.push(
-		'⚠ **Mixed native builds** — the siblings measured different profile-guided builds (or ' +
-			'some recorded none or a library the stamp does not name), so a native row’s ' +
-			'cross-runtime ratio mixes two binaries; re-run ' +
-			'every runtime on one build (`deno task bench:perf`).\n'
-	);
-}
-if (mixed_machine) {
-	md.push(
-		'⚠ **Mixed machines** — the sibling reports were produced on different ' +
-			'hardware, so the cross-runtime ratios are not comparable; re-run every ' +
-			'runtime on one machine (`deno task bench:perf`).\n'
-	);
-}
-if (mixed_vintage) {
-	md.push(
-		'⚠ **Mixed vintages** — the sibling reports above come from different ' +
-			'commits/versions/corpus snapshots, so the cross-runtime ratios are unreliable; re-run the ' +
-			'stale runtimes (`deno task bench:perf` refreshes all three).\n'
-	);
-}
-if (unavailable_by_runtime.length > 0) {
-	md.push(
-		'**Not measured everywhere:** ' +
-			unavailable_by_runtime.map((u) => `${u.runtime} — ${u.rows.join(', ')}`).join('; ') +
-			'. The implementation behind each row failed to load on the runtime(s) named, so it ' +
-			'contributes no measurement there — a row thinner than its neighbours, or missing ' +
-			'outright, is a load failure rather than a speed result. The per-runtime report’s ' +
-			'`unavailable` carries the impl and the cause.\n'
-	);
-}
-if (partial_rows.length > 0) {
-	md.push(
-		'**Partially measured:** ' +
-			partial_rows
-				.map((r) => `\`${r.group}/${r.name}\` (absent: ${r.missing.join(', ')})`)
-				.join('; ') +
-			'. Those runtimes recorded no load failure for the row, so its absence is unexplained — ' +
-			'usually a sibling report predating the row. Re-run the stale runtimes ' +
-			'(`deno task bench:perf`) before reading the ratios in its group.\n'
-	);
-}
-if (unstable_cells.length > 0) {
-	const pct = (v: number | null): string => (v === null ? '—' : `${(v * 100).toFixed(1)}%`);
-	md.push(
-		`**Unstable:** ${unstable_cells.length} per-runtime measurement(s) were not stable, so every ` +
-			'ratio through them is unreadable — ' +
-			unstable_cells
-				.map(
-					(c) =>
-						`\`${c.group}/${c.name}\` ${c.runtime} (cv ${pct(c.cv)}, raw ${pct(c.cv_raw)}, drift ` +
-						`${c.drift === null ? '—' : `${c.drift >= 0 ? '+' : ''}${(c.drift * 100).toFixed(1)}%`}, ` +
-						`pass spread ${pct(c.pass_spread)}, n=${c.samples ?? '—'})`
-				)
-				.join('; ') +
-			'. The cell is marked `⚠` in its table. A drift is a cost that moved WHILE the row was ' +
-			'measured (the median of the second half of its timings against the first’s — negative: it got ' +
-			'faster, still warming up; positive: it got slower, degrading); the cleaned cv cannot see ' +
-			'it, and a longer window moves such a row’s answer rather than converging it. A pass spread ' +
-			'is how far apart the row’s passes sat — each a fresh process — so a wide one is a level ' +
-			'that depends on the process the row was drawn in. Re-run the ' +
-			'runtime before reading the row, and read the per-runtime report’s §Unstable Rows for ' +
-			'the row’s own detail.\n'
-	);
-}
-if (within_noise.length > 0) {
-	md.push(
-		`**Within noise:** ${within_noise.length} per-runtime delta(s) are smaller than the two ` +
-			"measurements' combined variation, so they are not runtime effects — " +
-			within_noise
-				.map(
-					(c) =>
-						`\`${c.group}/${c.name}\` ${c.runtimes.join('/')} (${(c.delta * 100).toFixed(1)}% vs ` +
-						`${(c.noise * 100).toFixed(1)}% noise, n=${c.samples.join('/')})`
-				)
-				.join('; ') +
-			'. Read those cells as "no difference". The noise behind each side is the spread of ' +
-			"its row's pass means (`entries[].pass_mean_ns` in the per-runtime JSON) where the row " +
-			'was timed in several fresh processes, and its sweep-level `cv` only where it was not — ' +
-			"NOT that report's §Unstable Rows, which lists only rows past its own thresholds and so " +
-			'names none of these: a cell lands here whenever the delta is small relative to the ' +
-			`noise. \`n\` counts what each side was read from — passes, or cleaned sweeps for a ` +
-			`one-pass sibling — and a side under ${MIN_NOISE_PASSES} passes or ${MIN_NOISE_SAMPLES} ` +
-			'sweeps is left unclassified rather than called quiet on an estimate that thin. Every ' +
-			'pair of runtimes is classified, not only each against the ratio base, and a row named ' +
-			'under **Unstable** above is never classified here.\n'
-	);
-}
-md.push(
-	'A per-runtime delta on the same row is the signal: same engine, different ' +
-		'runtime + binding boundary (Deno → FFI, Node/Bun → N-API). Ratios are vs ' +
-		`\`${base_runtime}\` (> 1 = faster than ${base_runtime}). A group (or row) ` +
-		'flagged `⚠ files …` iterated *different per-runtime intersections* (each ' +
-		'runtime times the files all its impls passed preflight on), so a sliver ' +
-		'of the ratio can be file-set difference rather than runtime effect.\n'
-);
-
-const groups: string[] = [];
-for (const key of order) {
-	const g = rows.get(key)!.group;
-	if (!groups.includes(g)) groups.push(g);
-}
-
-/** `deno 1214 / node 1215 / bun 1217` — the per-runtime iterated counts. */
-function fmt_file_counts(fi: Row['files_iterated']): string {
-	return present.map((r) => `${r} ${fi[r] ?? '—'}`).join(' / ');
-}
-
-/**
- * Whether a row's per-runtime timed SETS differ: by path-set digest where every
- * present runtime carries one (report 15+), by count otherwise (nulls ignored). Two
- * equal counts never proved two equal sets — a runtime whose group intersection
- * lost one impl (one that runtime can't load) can time the same NUMBER of files
- * from a different set.
- */
-function files_unequal(row: Pick<Row, 'files_iterated' | 'digest'>): boolean {
-	const digests = present.map((r) => row.digest[r]).filter((v) => typeof v === 'string');
-	if (digests.length === present.length) return new Set(digests).size > 1;
-	const counts = present.map((r) => row.files_iterated[r]).filter((v) => typeof v === 'number');
-	return new Set(counts).size > 1;
-}
-
-for (const group of groups) {
-	const group_rows = order.map((key) => rows.get(key)!).filter((row) => row.group === group);
-
-	// Disclose unequal per-runtime intersections (see the header note). In
-	// intersection mode every row in a group iterates the same set, so the
-	// annotation lifts to ONE group-level line; per-row markers only remain for
-	// rows that deviate from the group pattern (union mode).
-	const signatures = new Set(group_rows.map((row) => fmt_file_counts(row.files_iterated)));
-	const uniform = signatures.size === 1;
-	const group_flagged = uniform && files_unequal(group_rows[0]);
-
-	md.push(`## ${group}\n`);
-	if (group_flagged) {
-		md.push(`⚠ files ${fmt_file_counts(group_rows[0].files_iterated)}\n`);
-	}
-	const header = [
-		'Impl',
-		...present.map((r) => `${r} sweeps/sec`),
-		...others.map((r) => `${r}/${base_runtime}`)
-	];
-	md.push(`| ${header.join(' | ')} |`);
-	md.push(`| ${header.map((_, i) => (i === 0 ? '---' : '---:')).join(' | ')} |`);
-	for (const row of group_rows) {
-		const name_cell =
-			!uniform && files_unequal(row)
-				? `${row.name} ⚠ files ${fmt_file_counts(row.files_iterated)}`
-				: row.name;
-		const unstable_here = new Set(
-			unstable_cells
-				.filter((c) => c.group === row.group && c.name === row.name)
-				.map((c) => c.runtime)
+	if (conformance_vintage) {
+		md.push(
+			`- \`conformance\` (node, coverage-only): ${conformance_vintage.git_commit ?? 'unknown commit'} @ ` +
+				`${conformance_vintage.timestamp}${conformance_vintage.tsv ? ` (tsv ${conformance_vintage.tsv})` : ''}` +
+				(conformance_vintage.stale
+					? ` — ⚠ **${stale_vintage_note(conformance_vintage, 'md').where}**`
+					: '')
 		);
-		const mark = (r: Runtime, cell: string): string => (unstable_here.has(r) ? `${cell} ⚠` : cell);
-		const cells = [
-			name_cell,
-			...present.map((r) => mark(r, fmt_ops(row.ops[r]))),
-			...others.map((r) =>
-				unstable_here.has(r) || unstable_here.has(base_runtime)
-					? `${fmt_ratio(row.ops[r], row.ops[base_runtime])} ⚠`
-					: fmt_ratio(row.ops[r], row.ops[base_runtime])
-			)
-		];
-		md.push(`| ${cells.join(' | ')} |`);
 	}
 	md.push('');
-}
+	if (machine) {
+		md.push(`**Machine:** ${machine.cpu_model} · ${machine.os}/${machine.arch}\n`);
+	}
+	if (native_build && !mixed_native_build) {
+		const verdicts = native_builds.map((n) => n.disjoint_from_timed_corpus);
+		const disjoint = verdicts.includes(false) ? false : verdicts.includes(null) ? null : true;
+		md.push(`**Native build:** ${native_build_pair_summary(native_build, disjoint)}\n`);
+	} else {
+		for (const s of sources) {
+			md.push(
+				`**Native build (${s.runtime}):** ${s.native_build ? native_build_summary(s.native_build) : 'not recorded'}\n`
+			);
+		}
+	}
+	if (mixed_native_build) {
+		md.push(
+			'⚠ **Mixed native builds** — the siblings measured different profile-guided builds (or ' +
+				'some recorded none or a library the stamp does not name), so a native row’s ' +
+				'cross-runtime ratio mixes two binaries; re-run ' +
+				'every runtime on one build (`deno task bench:perf`).\n'
+		);
+	}
+	if (mixed_machine) {
+		md.push(
+			'⚠ **Mixed machines** — the sibling reports were produced on different ' +
+				'hardware, so the cross-runtime ratios are not comparable; re-run every ' +
+				'runtime on one machine (`deno task bench:perf`).\n'
+		);
+	}
+	if (mixed_vintage) {
+		md.push(
+			'⚠ **Mixed vintages** — the sibling reports above come from different ' +
+				'commits/versions/corpus snapshots, so the cross-runtime ratios are unreliable; re-run the ' +
+				'stale runtimes (`deno task bench:perf` refreshes all three).\n'
+		);
+	}
+	if (unavailable_by_runtime.length > 0) {
+		md.push(
+			'**Not measured everywhere:** ' +
+				unavailable_by_runtime.map((u) => `${u.runtime} — ${u.rows.join(', ')}`).join('; ') +
+				'. The implementation behind each row failed to load on the runtime(s) named, so it ' +
+				'contributes no measurement there — a row thinner than its neighbours, or missing ' +
+				'outright, is a load failure rather than a speed result. The per-runtime report’s ' +
+				'`unavailable` carries the impl and the cause.\n'
+		);
+	}
+	if (partial_rows.length > 0) {
+		md.push(
+			'**Partially measured:** ' +
+				partial_rows
+					.map((r) => `\`${r.group}/${r.name}\` (absent: ${r.missing.join(', ')})`)
+					.join('; ') +
+				'. Those runtimes recorded no load failure for the row, so its absence is unexplained — ' +
+				'usually a sibling report predating the row. Re-run the stale runtimes ' +
+				'(`deno task bench:perf`) before reading the ratios in its group.\n'
+		);
+	}
+	if (unstable_cells.length > 0) {
+		const pct = (v: number | null): string => (v === null ? '—' : `${(v * 100).toFixed(1)}%`);
+		md.push(
+			`**Unstable:** ${unstable_cells.length} per-runtime measurement(s) were not stable, so every ` +
+				'ratio through them is unreadable — ' +
+				unstable_cells
+					.map(
+						(c) =>
+							`\`${c.group}/${c.name}\` ${c.runtime} (cv ${pct(c.cv)}, raw ${pct(c.cv_raw)}, drift ` +
+							`${c.drift === null ? '—' : `${c.drift >= 0 ? '+' : ''}${(c.drift * 100).toFixed(1)}%`}, ` +
+							`pass spread ${pct(c.pass_spread)}, n=${c.samples ?? '—'})`
+					)
+					.join('; ') +
+				'. The cell is marked `⚠` in its table. A drift is a cost that moved WHILE the row was ' +
+				'measured (the median of the second half of its timings against the first’s — negative: it got ' +
+				'faster, still warming up; positive: it got slower, degrading); the cleaned cv cannot see ' +
+				'it, and a longer window moves such a row’s answer rather than converging it. A pass spread ' +
+				'is how far apart the row’s passes sat — each a fresh process — so a wide one is a level ' +
+				'that depends on the process the row was drawn in. Re-run the ' +
+				'runtime before reading the row, and read the per-runtime report’s §Unstable Rows for ' +
+				'the row’s own detail.\n'
+		);
+	}
+	if (within_noise.length > 0) {
+		md.push(
+			`**Within noise:** ${within_noise.length} per-runtime delta(s) are smaller than the two ` +
+				"measurements' combined variation, so they are not runtime effects — " +
+				within_noise
+					.map(
+						(c) =>
+							`\`${c.group}/${c.name}\` ${c.runtimes.join('/')} (${(c.delta * 100).toFixed(1)}% vs ` +
+							`${(c.noise * 100).toFixed(1)}% noise, n=${c.samples.join('/')})`
+					)
+					.join('; ') +
+				'. Read those cells as "no difference". The noise behind each side is the spread of ' +
+				"its row's pass means (`entries[].pass_mean_ns` in the per-runtime JSON) where the row " +
+				'was timed in several fresh processes, and its sweep-level `cv` only where it was not — ' +
+				"NOT that report's §Unstable Rows, which lists only rows past its own thresholds and so " +
+				'names none of these: a cell lands here whenever the delta is small relative to the ' +
+				`noise. \`n\` counts what each side was read from — passes, or cleaned sweeps for a ` +
+				`one-pass sibling — and a side under ${MIN_NOISE_PASSES} passes or ${MIN_NOISE_SAMPLES} ` +
+				'sweeps is left unclassified rather than called quiet on an estimate that thin. Every ' +
+				'pair of runtimes is classified, not only each against the ratio base, and a row named ' +
+				'under **Unstable** above is never classified here.\n'
+		);
+	}
+	md.push(
+		'A per-runtime delta on the same row is the signal: same engine, different ' +
+			'runtime + binding boundary (Deno → FFI, Node/Bun → N-API). Ratios are vs ' +
+			`\`${base_runtime}\` (> 1 = faster than ${base_runtime}). A group (or row) ` +
+			'flagged `⚠ files …` iterated *different per-runtime intersections* (each ' +
+			'runtime times the files all its impls passed preflight on), so a sliver ' +
+			'of the ratio can be file-set difference rather than runtime effect.\n'
+	);
 
-await writeFile(`${results_dir}report.json`, JSON.stringify(combined, null, '\t'));
-await writeFile(`${results_dir}report.md`, md.join('\n'));
+	const groups: string[] = [];
+	for (const key of order) {
+		const g = rows.get(key)!.group;
+		if (!groups.includes(g)) groups.push(g);
+	}
 
-if (mixed_vintage) {
-	console.error(
-		'⚠ compose: sibling reports have MIXED VINTAGES (' +
-			sources
-				.map(
-					(s) =>
-						`${s.runtime}=${(s.git_commit ?? '?').slice(0, 8)}` +
-						`/corpora ${(s.corpus_snapshot ?? '?').slice(0, 8)}`
+	/** `deno 1214 / node 1215 / bun 1217` — the per-runtime iterated counts. */
+	function fmt_file_counts(fi: Row['files_iterated']): string {
+		return present.map((r) => `${r} ${fi[r] ?? '—'}`).join(' / ');
+	}
+
+	/**
+	 * Whether a row's per-runtime timed SETS differ: by path-set digest where every
+	 * present runtime carries one (report 15+), by count otherwise (nulls ignored). Two
+	 * equal counts never proved two equal sets — a runtime whose group intersection
+	 * lost one impl (one that runtime can't load) can time the same NUMBER of files
+	 * from a different set.
+	 */
+	function files_unequal(row: Pick<Row, 'files_iterated' | 'digest'>): boolean {
+		const digests = present.map((r) => row.digest[r]).filter((v) => typeof v === 'string');
+		if (digests.length === present.length) return new Set(digests).size > 1;
+		const counts = present.map((r) => row.files_iterated[r]).filter((v) => typeof v === 'number');
+		return new Set(counts).size > 1;
+	}
+
+	for (const group of groups) {
+		const group_rows = order.map((key) => rows.get(key)!).filter((row) => row.group === group);
+
+		// Disclose unequal per-runtime intersections (see the header note). In
+		// intersection mode every row in a group iterates the same set, so the
+		// annotation lifts to ONE group-level line; per-row markers only remain for
+		// rows that deviate from the group pattern (union mode).
+		const signatures = new Set(group_rows.map((row) => fmt_file_counts(row.files_iterated)));
+		const uniform = signatures.size === 1;
+		const group_flagged = uniform && files_unequal(group_rows[0]);
+
+		md.push(`## ${group}\n`);
+		if (group_flagged) {
+			md.push(`⚠ files ${fmt_file_counts(group_rows[0].files_iterated)}\n`);
+		}
+		const header = [
+			'Impl',
+			...present.map((r) => `${r} sweeps/sec`),
+			...others.map((r) => `${r}/${base_runtime}`)
+		];
+		md.push(`| ${header.join(' | ')} |`);
+		md.push(`| ${header.map((_, i) => (i === 0 ? '---' : '---:')).join(' | ')} |`);
+		for (const row of group_rows) {
+			const name_cell =
+				!uniform && files_unequal(row)
+					? `${row.name} ⚠ files ${fmt_file_counts(row.files_iterated)}`
+					: row.name;
+			const unstable_here = new Set(
+				unstable_cells
+					.filter((c) => c.group === row.group && c.name === row.name)
+					.map((c) => c.runtime)
+			);
+			const mark = (r: Runtime, cell: string): string =>
+				unstable_here.has(r) ? `${cell} ⚠` : cell;
+			const cells = [
+				name_cell,
+				...present.map((r) => mark(r, fmt_ops(row.ops[r]))),
+				...others.map((r) =>
+					unstable_here.has(r) || unstable_here.has(base_runtime)
+						? `${fmt_ratio(row.ops[r], row.ops[base_runtime])} ⚠`
+						: fmt_ratio(row.ops[r], row.ops[base_runtime])
 				)
-				.join(' ') +
-			') — cross-runtime ratios unreliable; re-run the stale runtimes.'
-	);
+			];
+			md.push(`| ${cells.join(' | ')} |`);
+		}
+		md.push('');
+	}
+
+	await deps.results.write('report.json', JSON.stringify(combined, null, '\t'));
+	await deps.results.write('report.md', md.join('\n'));
+
+	if (mixed_vintage) {
+		console.error(
+			'⚠ compose: sibling reports have MIXED VINTAGES (' +
+				sources
+					.map(
+						(s) =>
+							`${s.runtime}=${(s.git_commit ?? '?').slice(0, 8)}` +
+							`/corpora ${(s.corpus_snapshot ?? '?').slice(0, 8)}`
+					)
+					.join(' ') +
+				') — cross-runtime ratios unreliable; re-run the stale runtimes.'
+		);
+	}
+	if (conformance_vintage?.stale) {
+		const { where, remedy } = stale_vintage_note(conformance_vintage, 'stderr');
+		// The catch-all remedy IS `deno task bench`, so the usual "(or … for everything)"
+		// tail would name it twice.
+		const everything = remedy === 'deno task bench' ? '' : ' (or `deno task bench` for everything)';
+		console.error(
+			`⚠ compose: report.conformance.node.json is at ${(conformance_vintage.git_commit ?? '?').slice(0, 8)}, ` +
+				`${where} — the site publishes both from one directory; re-run ` +
+				`\`${remedy}\`${everything}.`
+		);
+	}
+	if (mixed_machine) {
+		console.error(
+			'⚠ compose: sibling reports were produced on DIFFERENT machines (' +
+				sources.map((s) => `${s.runtime}=${s.machine?.cpu_model ?? '?'}`).join(' | ') +
+				') — cross-runtime ratios are not comparable; re-run every runtime on one box.'
+		);
+	}
+	if (partial_rows.length > 0) {
+		console.error(
+			'⚠ compose: rows measured on some runtimes and ABSENT on others with no load failure (' +
+				partial_rows.map((r) => `${r.group}/${r.name}=${r.missing.join('+')}`).join(' | ') +
+				') — unexplained, usually a sibling predating the row; re-run them.'
+		);
+	}
+	if (unstable_cells.length > 0) {
+		console.error(
+			'⚠ compose: UNSTABLE measurements (' +
+				unstable_cells.map((c) => `${c.group}/${c.name}=${c.runtime}`).join(' | ') +
+				') — a cv, drift or pass spread past the bench’s thresholds; every ratio through them is unreadable. ' +
+				'Re-run those runtimes (`deno task bench:<runtime>:run && deno task bench:compose`) before publishing.'
+		);
+	}
+	if (unavailable_by_runtime.length > 0) {
+		console.error(
+			'⚠ compose: rows unavailable on some runtimes (' +
+				unavailable_by_runtime.map((u) => `${u.runtime}=${u.rows.join('+')}`).join(' | ') +
+				') — absent there because the impl behind them failed to load, not as a speed result.'
+		);
+	}
+	console.log(`Composed cross-runtime report from: ${present.join(', ')}`);
+	console.log(`  ${deps.results.path}/report.json`);
+	console.log(`  ${deps.results.path}/report.md`);
+	return 0;
 }
-if (conformance_vintage?.stale) {
-	const { where, remedy } = stale_vintage_note(conformance_vintage, 'stderr');
-	// The catch-all remedy IS `deno task bench`, so the usual "(or … for everything)"
-	// tail would name it twice.
-	const everything = remedy === 'deno task bench' ? '' : ' (or `deno task bench` for everything)';
-	console.error(
-		`⚠ compose: report.conformance.node.json is at ${(conformance_vintage.git_commit ?? '?').slice(0, 8)}, ` +
-			`${where} — the site publishes both from one directory; re-run ` +
-			`\`${remedy}\`${everything}.`
-	);
-}
-if (mixed_machine) {
-	console.error(
-		'⚠ compose: sibling reports were produced on DIFFERENT machines (' +
-			sources.map((s) => `${s.runtime}=${s.machine?.cpu_model ?? '?'}`).join(' | ') +
-			') — cross-runtime ratios are not comparable; re-run every runtime on one box.'
-	);
-}
-if (partial_rows.length > 0) {
-	console.error(
-		'⚠ compose: rows measured on some runtimes and ABSENT on others with no load failure (' +
-			partial_rows.map((r) => `${r.group}/${r.name}=${r.missing.join('+')}`).join(' | ') +
-			') — unexplained, usually a sibling predating the row; re-run them.'
-	);
-}
-if (unstable_cells.length > 0) {
-	console.error(
-		'⚠ compose: UNSTABLE measurements (' +
-			unstable_cells.map((c) => `${c.group}/${c.name}=${c.runtime}`).join(' | ') +
-			') — a cv, drift or pass spread past the bench’s thresholds; every ratio through them is unreadable. ' +
-			'Re-run those runtimes (`deno task bench:<runtime>:run && deno task bench:compose`) before publishing.'
-	);
-}
-if (unavailable_by_runtime.length > 0) {
-	console.error(
-		'⚠ compose: rows unavailable on some runtimes (' +
-			unavailable_by_runtime.map((u) => `${u.runtime}=${u.rows.join('+')}`).join(' | ') +
-			') — absent there because the impl behind them failed to load, not as a speed result.'
-	);
-}
-console.log(`Composed cross-runtime report from: ${present.join(', ')}`);
-console.log(`  ${results_dir}report.json`);
-console.log(`  ${results_dir}report.md`);

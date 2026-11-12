@@ -18,6 +18,9 @@
 		"scripts/pgo/pgo.ts",
 		"scripts/pgo/addon_ops.ts",
 		"scripts/pgo/addon_depth.ts",
-		"crates/tsv_debug/sidecar/sidecar.ts"
+		"crates/tsv_debug/sidecar/sidecar.ts",
+		"benches/js/roots/divergence_audit.ts",
+		"benches/js/roots/corpus_stats.ts",
+		"benches/js/roots/compose_reports.ts"
 	]
 }

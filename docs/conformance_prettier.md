@@ -982,7 +982,7 @@ Every pattern in `benches/js/lib/divergence/patterns.ts` links to:
 
 - `conformance_sections` — Section names from this document family (the shared frame here plus the per-language catalogs its §Catalogs table indexes)
 - `fixtures` — Fixture paths the pattern detects (enforced by the behavioral
-  fixture-coverage audit in `deno task test:deno`)
+  fixture-coverage audit in `deno task test:node`)
 
 See ./divergence_detector.md for implementation details.
 

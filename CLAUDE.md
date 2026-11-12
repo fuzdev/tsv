@@ -133,7 +133,8 @@ deno task typecheck:packages # the STAGED npm packages' .d.ts as a consumer comp
 #                          publish.ts Step 6 stages the napi loader and runs it over all four (docs/audits.md)
 deno task typecheck:scripts # scripts/ by the checker of the runtime each script runs on, so in `check` (nothing else
 #                          typechecks the release scripts): `tsc -p tsconfig.scripts.json` over the Node roots under
-#                          `scripts/roots/`, the PGO pipeline and its drivers, and what they import (Node's types, no
+#                          `scripts/roots/`, the PGO pipeline and its drivers, the bench roots needing no bench package
+#                          (`benches/js/roots/{divergence_audit,corpus_stats,compose_reports}.ts`), and what they import (Node's types, no
 #                          `Deno`), then deno check over the rest
 #                          of scripts/, node-modules-free; that walk excludes the Node scripts (deno.json `exclude`) and
 #                          `scripts/doctor.ts`, whose corpus probe reaches node_modules
@@ -144,9 +145,12 @@ deno task typecheck:bench-core # `tsc -p tsconfig.bench_core.json` over the pack
 deno task test           # cargo test
 deno task test:node      # vitest under Node over the suites beside their modules (`tsc -p tsconfig.vitest.json` first,
 #                          which typechecks them; the suites are the `_test.ts` files it names): the bench core's (divergence
-#                          detectors, format-config probe, span-only wire probe, gate_counts, bench pass plan, perf-omit
+#                          detectors, and each one against its own committed fixtures read through a read-only handle
+#                          (`divergence/fixture_coverage_test.ts`), format-config probe, span-only wire probe, gate_counts, bench pass plan, perf-omit
 #                          summary, Prettier-suite filter, loc tolerance rows, parse diff engine + divergence matchers, NDJSON
-#                          reader, the `tsv_debug` client over a fake child, the harvest stamps over fakes) + scripts/'s (`release/changelog_test.ts` — the changelog grammar publish.ts writes and
+#                          reader, the `tsv_debug` client over a fake child, the harvest stamps over fakes, the fixture reads
+#                          over a temp tree, and `divergence:audit`'s, `bench:compose`'s and `corpus:stats`' libraries over
+#                          fakes: exit codes, streams, reads, writes) + scripts/'s (`release/changelog_test.ts` — the changelog grammar publish.ts writes and
 #                          release_notes.ts reads; `release/version_test.ts` + `release/plan_test.ts` — the version grammar and
 #                          the fresh/resume plan; `branch_report/{parsers,report,timing,wasm_board}_test.ts` — the branch
 #                          report's parsers, verdicts and wasm-board extraction; `release/binstall_test.ts` — the
@@ -195,11 +199,10 @@ deno task test:node      # vitest under Node over the suites beside their module
 #                          (docs/tasks.md §`test:node`)
 deno task test:node:canonical # the same over `benches/js/lib/canonical_test.ts`, the canonical prettier baseline's parser
 #                          routing; needs `deno task bench:install`, so NOT in `check`
-deno task test:deno      # deno tests over the suites whose module under test calls `Deno.*`: the divergence detectors
-#                          against their committed fixtures (`benches/js/lib/divergence/fixture_coverage_test.ts`);
+deno task test:deno      # deno tests over the suites whose module under test calls `Deno.*`:
 #                          `perf_ab_test.ts` — perf:ab's `git ls-tree -z` listing and strip
 #                          entry-point probe over a scratch repo, with `branch_report/side_test.ts` — the corpus identity over
-#                          one, their own invocation with `--allow-write --allow-run=git` + `--allow-env` for the three
+#                          one, with `--allow-write --allow-run=git` + `--allow-env` for the three
 #                          `GIT_*` variables perf_ab_test.ts clears; in `check`
 deno task test:depth     # tests/depth_limit.rs optimized (`--profile corpus`): every shape the depth limits count, a catalog
 #                          of grammar positions each nested in itself, and a generated sweep — `check`'s scope: every pair
