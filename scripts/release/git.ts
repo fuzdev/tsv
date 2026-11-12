@@ -2,15 +2,46 @@
  * The git questions and steps a release asks of the checkout, all against `origin` and its
  * `main`, the one branch a release publishes from.
  *
+ * Two `git` handles, which the root gives two environments: `local` reads the repository
+ * (`rev-parse`, `status`, `diff`, `branch`, `log`, `rev-list`) with stdin on `/dev/null`, and
+ * `user` makes every call that reaches `origin` or writes history (`fetch`, `ls-remote`,
+ * `commit`, `tag`, `push`), with the owner's whole setup and the terminal's stdin, so ssh, a
+ * credential helper, a signing pinentry, or a hook can prompt.
+ *
+ * gro's `@fuzdev/gro/git.ts` helpers are not used: each one this module could take differs from
+ * the call here (another argv, `run` where this reads the output into its refusal, a throw where
+ * this returns a value the preflight reports).
+ *
  * @module
  */
 
-import { command_capture, command_stream } from './command.ts';
+import type { FsReadDir } from '@fuzdev/gro/fs.ts';
+import type { SpawnProgram } from '@fuzdev/gro/spawn.ts';
+
+import { type Captured, program_capture, program_stream } from './program.ts';
 import type { Result } from './result.ts';
 
+/** The checkout's `git`, as two handles, and the checkout every call runs in. */
+export interface ReleaseGit {
+	/** `git` for reads of the local repository, or `null` when there's none. */
+	local: SpawnProgram | null;
+	/** `git` for every call that reaches `origin` or writes history, or `null` when there's
+	 * none. */
+	user: SpawnProgram | null;
+	cwd: FsReadDir;
+}
+
+const git_local = (git: ReleaseGit, args: ReadonlyArray<string>): Promise<Captured> =>
+	program_capture(git.local, 'git', args, { cwd: git.cwd });
+
+const git_user = (git: ReleaseGit, args: ReadonlyArray<string>): Promise<Captured> =>
+	program_capture(git.user, 'git', args, { cwd: git.cwd, stdin: 'inherit' });
+
 /** The working tree's `git status --porcelain` lines. */
-export const git_status_lines = async (): Promise<Result<{ lines: Array<string> }>> => {
-	const status = await command_capture('git', ['status', '--porcelain']);
+export const git_status_lines = async (
+	git: ReleaseGit
+): Promise<Result<{ lines: Array<string> }>> => {
+	const status = await git_local(git, ['status', '--porcelain']);
 	if (!status.success) return { ok: false, error: `git status failed: ${status.err}` };
 	return { ok: true, lines: status.out ? status.out.split('\n') : [] };
 };
@@ -25,11 +56,13 @@ export const git_status_line_path = (line: string): string =>
  * checkout did not move between them, including a further edit to a file that was already
  * modified, which the status lines alone cannot see; an untracked file's edit is not seen.
  */
-export const git_checkout_fingerprint = async (): Promise<Result<{ fingerprint: string }>> => {
+export const git_checkout_fingerprint = async (
+	git: ReleaseGit
+): Promise<Result<{ fingerprint: string }>> => {
 	const parts = await Promise.all([
-		command_capture('git', ['rev-parse', 'HEAD']),
-		command_capture('git', ['status', '--porcelain', '--untracked-files=all']),
-		command_capture('git', ['diff', '--binary', 'HEAD'])
+		git_local(git, ['rev-parse', 'HEAD']),
+		git_local(git, ['status', '--porcelain', '--untracked-files=all']),
+		git_local(git, ['diff', '--binary', 'HEAD'])
 	]);
 	const failed = parts.find((part) => !part.success);
 	if (failed) return { ok: false, error: `could not read the checkout: ${failed.err}` };
@@ -42,30 +75,30 @@ export const git_checkout_fingerprint = async (): Promise<Result<{ fingerprint: 
 };
 
 /** The checked-out branch, `''` when `HEAD` is detached, or null when git fails. */
-export const git_current_branch = async (): Promise<string | null> => {
-	const branch = await command_capture('git', ['branch', '--show-current']);
+export const git_current_branch = async (git: ReleaseGit): Promise<string | null> => {
+	const branch = await git_local(git, ['branch', '--show-current']);
 	return branch.success ? branch.out : null;
 };
 
 /** The commit `rev` names, or null when it names none. */
-export const git_rev = async (rev: string): Promise<string | null> => {
-	const result = await command_capture('git', ['rev-parse', '-q', '--verify', `${rev}^{commit}`]);
+export const git_rev = async (git: ReleaseGit, rev: string): Promise<string | null> => {
+	const result = await git_local(git, ['rev-parse', '-q', '--verify', `${rev}^{commit}`]);
 	return result.success ? result.out : null;
 };
 
 /** The subject line of `HEAD`'s commit, or null when git fails. */
-export const git_head_subject = async (): Promise<string | null> => {
-	const result = await command_capture('git', ['log', '-1', '--format=%s']);
+export const git_head_subject = async (git: ReleaseGit): Promise<string | null> => {
+	const result = await git_local(git, ['log', '-1', '--format=%s']);
 	return result.success ? result.out : null;
 };
 
 /** Fetch `origin/main`, then count the commits `HEAD` is ahead of it and behind it. */
-export const git_fetch_and_compare_origin_main = async (): Promise<
-	Result<{ ahead: number; behind: number }>
-> => {
-	const fetched = await command_capture('git', ['fetch', 'origin', 'main']);
+export const git_fetch_and_compare_origin_main = async (
+	git: ReleaseGit
+): Promise<Result<{ ahead: number; behind: number }>> => {
+	const fetched = await git_user(git, ['fetch', 'origin', 'main']);
 	if (!fetched.success) return { ok: false, error: `git fetch origin main failed: ${fetched.err}` };
-	const counts = await command_capture('git', [
+	const counts = await git_local(git, [
 		'rev-list',
 		'--left-right',
 		'--count',
@@ -84,16 +117,17 @@ export const git_fetch_and_compare_origin_main = async (): Promise<
 };
 
 /** The commit a local tag points at, or null when there is no such tag. */
-export const git_local_tag_commit = (tag: string): Promise<string | null> =>
-	git_rev(`refs/tags/${tag}`);
+export const git_local_tag_commit = (git: ReleaseGit, tag: string): Promise<string | null> =>
+	git_rev(git, `refs/tags/${tag}`);
 
 /** The commit a tag on `origin` points at, peeled so an annotated tag names its commit; `commit`
  * is null when `origin` has no such tag. */
 export const git_remote_tag_commit = async (
+	git: ReleaseGit,
 	tag: string
 ): Promise<Result<{ commit: string | null }>> => {
 	const ref = `refs/tags/${tag}`;
-	const result = await command_capture('git', ['ls-remote', '--tags', 'origin', ref, `${ref}^{}`]);
+	const result = await git_user(git, ['ls-remote', '--tags', 'origin', ref, `${ref}^{}`]);
 	if (!result.success) return { ok: false, error: `git ls-remote origin failed: ${result.err}` };
 	const rows = result.out ? result.out.split('\n').map((row) => row.split('\t')) : [];
 	// an annotated tag lists its own object under `ref` and its commit under `ref^{}`
@@ -106,13 +140,14 @@ export const git_remote_tag_commit = async (
  * `committed` says whether a commit was made. A pathspec commit takes those paths' working-tree
  * content and nothing else, so a stray change cannot ride into it. */
 export const git_commit_paths = async (
+	git: ReleaseGit,
 	paths: ReadonlyArray<string>,
 	message: string
 ): Promise<Result<{ committed: boolean }>> => {
-	const status = await command_capture('git', ['status', '--porcelain', '--', ...paths]);
+	const status = await git_local(git, ['status', '--porcelain', '--', ...paths]);
 	if (!status.success) return { ok: false, error: `git status failed: ${status.err}` };
 	if (!status.out) return { ok: true, committed: false };
-	const committed = await command_capture('git', ['commit', '-m', message, '--', ...paths]);
+	const committed = await git_user(git, ['commit', '-m', message, '--', ...paths]);
 	if (!committed.success)
 		return { ok: false, error: `git commit failed: ${committed.err || committed.out}` };
 	return { ok: true, committed: true };
@@ -120,11 +155,22 @@ export const git_commit_paths = async (
 
 /** Create the annotated tag `tag` on `HEAD`. Annotated, because `git push --follow-tags` skips a
  * lightweight tag. */
-export const git_tag_annotated = async (tag: string): Promise<Result> => {
-	const result = await command_capture('git', ['tag', '-m', tag, tag]);
+export const git_tag_annotated = async (git: ReleaseGit, tag: string): Promise<Result> => {
+	const result = await git_user(git, ['tag', '-m', tag, tag]);
 	return result.success ? { ok: true } : { ok: false, error: `git tag failed: ${result.err}` };
 };
 
 /** Push `main` and the annotated tags it reaches to `origin`, streaming git's output. */
-export const git_push_main_with_tags = async (): Promise<boolean> =>
-	(await command_stream('git', ['push', '--follow-tags', 'origin', 'main'])).success;
+export const git_push_main_with_tags = async (
+	git: ReleaseGit,
+	print_error: (line: string) => void
+): Promise<boolean> =>
+	(
+		await program_stream(
+			git.user,
+			'git',
+			['push', '--follow-tags', 'origin', 'main'],
+			{ cwd: git.cwd },
+			print_error
+		)
+	).success;

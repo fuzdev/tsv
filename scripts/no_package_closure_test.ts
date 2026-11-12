@@ -110,16 +110,19 @@ for (const [entry] of ENTRIES.filter(([entry]) => entry !== 'scripts/test_bun.ts
 	});
 }
 
-/** The suites of `publish:crates`, `publish:napi`, `release:notes`, and `release:assets`, each
- * with a module its closure must reach. Those scripts are never run; these drive their libraries
- * over fakes, the real publish paths included, and their closures must not be able to do more. */
+/** The suites of `publish`, `publish:crates`, `publish:napi`, `release:notes`, and
+ * `release:assets`, and of the release driver's program calls, each with a module its closure
+ * must reach. Those scripts are never run; these drive their libraries over fakes, the real
+ * publish paths included, and their closures must not be able to do more. */
 const FAKES_ONLY_SUITES: Array<[suite: string, reaches: string]> = [
 	['scripts/publish_crates_test.ts', 'scripts/release/crates.ts'],
 	['scripts/publish_crates_wetrun_test.ts', 'scripts/release/version.ts'],
 	['scripts/release/crates_test.ts', 'scripts/release/crates.ts'],
 	['scripts/publish_napi_test.ts', 'scripts/publish_napi.ts'],
 	['scripts/release_notes_test.ts', 'scripts/release/changelog.ts'],
-	['scripts/release_assets_test.ts', 'scripts/release/version.ts']
+	['scripts/release_assets_test.ts', 'scripts/release/version.ts'],
+	['scripts/publish_test.ts', 'scripts/release/git.ts'],
+	['scripts/release/program_test.ts', 'scripts/release/program.ts']
 ];
 
 /** What those closures may load: assertions, pure `node:*` helpers, the test runner, and gro's

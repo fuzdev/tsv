@@ -47,6 +47,8 @@ interface Reply {
 	signal?: string;
 	stdout?: string;
 	stderr?: string;
+	/** Whether the capture was cut short. */
+	truncated?: boolean;
 }
 
 type Call =
@@ -74,7 +76,7 @@ const fake_program = (to: 'cargo' | 'git', calls: Array<Call>, replies: Replies)
 				...result,
 				stdout: reply.stdout ?? '',
 				stderr: reply.stderr ?? '',
-				truncated: false
+				truncated: reply.truncated ?? false
 			};
 		},
 		run: async (args: ReadonlyArray<string>, options?: { cwd?: unknown }) => {
@@ -483,5 +485,16 @@ test('release_checkout_refusals reads HEAD, the tag, and git status in the check
 	deepStrictEqual(await release_checkout_refusals(missing.deps, '0.8.0'), {
 		ok: false,
 		error: 'git status failed:\ngit: command not found'
+	});
+	// a status cut short is no answer: read as it stands, it could miss the dirty lines
+	const truncated = make_deps({
+		git: (args) =>
+			args[0] === 'rev-parse'
+				? { stdout: `${at}\n` }
+				: { stdout: '', stderr: 'cut', truncated: true }
+	});
+	deepStrictEqual(await release_checkout_refusals(truncated.deps, '0.8.0'), {
+		ok: false,
+		error: 'git status failed:\ncut'
 	});
 });

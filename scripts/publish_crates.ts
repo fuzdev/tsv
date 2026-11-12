@@ -76,10 +76,9 @@ import { basename, join, relative } from 'node:path';
 import { parseArgs } from 'node:util';
 
 import type { FsReadDir } from '@fuzdev/gro/fs.ts';
-import type { SpawnProgram, SpawnResult } from '@fuzdev/gro/spawn.ts';
+import type { SpawnProgram } from '@fuzdev/gro/spawn.ts';
 
 import { docs_rs_crates } from './docsrs_crates.ts';
-import { signal_exit_code } from './exit_code.ts';
 import {
 	cargo_publish_args,
 	cargo_publish_rate_limit,
@@ -99,6 +98,7 @@ import {
 	type VersionState,
 	wetrun_checkout_refusals
 } from './release/crates.ts';
+import { type Ended, program_capture, to_ended } from './release/program.ts';
 import type { Result } from './release/result.ts';
 import {
 	CARGO_PATH,
@@ -133,46 +133,6 @@ export interface PublishCratesDeps {
 	now: () => number;
 }
 
-/** A captured call: its outcome, stdout with trailing whitespace trimmed (porcelain status
- * lines open with a space), and stderr trimmed. A missing program is a failure whose `err`
- * names it. */
-interface Captured {
-	success: boolean;
-	out: string;
-	err: string;
-}
-
-/** A call's outcome and exit code, `128 + N` for a child signal `N` ended; a missing program
- * exits `127`. */
-interface Ended {
-	success: boolean;
-	code: number;
-}
-
-const to_ended = (result: SpawnResult): Ended => {
-	if (result.kind === 'exited') return { success: result.code === 0, code: result.code };
-	if (result.kind === 'signaled') return { success: false, code: signal_exit_code(result.signal) };
-	return {
-		success: false,
-		code: result.code ?? (result.signal === null ? 1 : signal_exit_code(result.signal))
-	};
-};
-
-const capture = async (
-	program: SpawnProgram | null,
-	name: string,
-	args: Array<string>,
-	cwd: FsReadDir
-): Promise<Captured> => {
-	if (program === null) return { success: false, out: '', err: `${name}: command not found` };
-	const result = await program.out(args, { cwd });
-	return {
-		success: to_ended(result).success,
-		out: result.stdout.trimEnd(),
-		err: result.stderr.trim()
-	};
-};
-
 /**
  * Why a `--wetrun` may not publish from this checkout (`wetrun_checkout_refusals`), from
  * `git rev-parse HEAD`, `git rev-parse --verify --quiet v<version>^{commit}`, and
@@ -184,7 +144,8 @@ export const release_checkout_refusals = async (
 	deps: Pick<PublishCratesDeps, 'checkout' | 'git'>,
 	version: string
 ): Promise<Result<{ refusals: Array<string> }>> => {
-	const git = (args: Array<string>) => capture(deps.git, 'git', args, deps.checkout);
+	const git = (args: Array<string>) =>
+		program_capture(deps.git, 'git', args, { cwd: deps.checkout });
 	const head = await git(['rev-parse', 'HEAD']);
 	const tag_commit = await git([
 		'rev-parse',
@@ -302,11 +263,11 @@ async function publish_crates(deps: PublishCratesDeps, args: PublishCratesArgs):
 	if (crates.length === 0) fail('no workspace crate carries a [package.metadata.docs.rs] table');
 	const names = crates.map((c) => c.name);
 
-	const metadata = await capture(
+	const metadata = await program_capture(
 		deps.cargo,
 		'cargo',
 		['metadata', '--no-deps', '--format-version', '1', '--locked'],
-		checkout
+		{ cwd: checkout }
 	);
 	if (!metadata.success) fail(`cargo metadata --locked failed:\n${metadata.err}`);
 	const { packages, target_directory } = JSON.parse(metadata.out) as {
@@ -414,7 +375,9 @@ async function publish_crates(deps: PublishCratesDeps, args: PublishCratesArgs):
 		semver_skipped.push(...order);
 	} else {
 		print('\n=== Public-API gate (cargo semver-checks, docs.rs feature sets) ===');
-		const tool = await capture(deps.cargo, 'cargo', ['semver-checks', '--version'], checkout);
+		const tool = await program_capture(deps.cargo, 'cargo', ['semver-checks', '--version'], {
+			cwd: checkout
+		});
 		if (!tool.success) {
 			fail(
 				'cargo semver-checks is not installed (`cargo install --locked cargo-semver-checks`); ' +

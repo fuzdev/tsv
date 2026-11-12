@@ -7,8 +7,11 @@
  * @module
  */
 
+import type { FsDir } from '@fuzdev/gro/fs.ts';
+import type { SpawnProgram } from '@fuzdev/gro/spawn.ts';
+
 import { CHANGELOG_PATH, changelog_stamp, type ChangelogStampOutcome } from './changelog.ts';
-import { command_capture } from './command.ts';
+import { program_capture } from './program.ts';
 import type { Result } from './result.ts';
 import { CARGO_PATH, cargo_workspace_version_set } from './version.ts';
 
@@ -20,19 +23,26 @@ export const RELEASE_PATHS: ReadonlyArray<string> = [CARGO_PATH, LOCKFILE_PATH, 
 /** The release commit's message, which a resume also reads to recognize its own commit. */
 export const release_commit_message = (version: string): string => `chore: publish v${version}`;
 
-/** Write `version` into `Cargo.toml`'s `[workspace.package]` table and every exact pin on a
- * `[workspace.dependencies]` path entry, in one write — or nothing, when the setter refuses. */
-export const bump_cargo_version = async (version: string): Promise<Result> => {
-	const next = cargo_workspace_version_set(await Deno.readTextFile(CARGO_PATH), version);
+/** Write `version` into the checkout's `Cargo.toml`, its `[workspace.package]` table and every
+ * exact pin on a `[workspace.dependencies]` path entry, in one write — or nothing, when the
+ * setter refuses. */
+export const bump_cargo_version = async (checkout: FsDir, version: string): Promise<Result> => {
+	const next = cargo_workspace_version_set(await checkout.read_text(CARGO_PATH), version);
 	if (!next.ok) return next;
-	await Deno.writeTextFile(CARGO_PATH, next.text);
+	await checkout.write(CARGO_PATH, next.text);
 	return { ok: true };
 };
 
-/** Move the lockfile's workspace members to the manifest's version. Offline: a member's
- * version is all that changes, and no registry crate may move with it. */
-export const bump_lockfile = async (): Promise<Result> => {
-	const result = await command_capture('cargo', ['update', '--workspace', '--offline']);
+/** Move the lockfile's workspace members to the manifest's version, running `cargo` in the
+ * checkout. Offline: a member's version is all that changes, and no registry crate may move
+ * with it. */
+export const bump_lockfile = async (
+	cargo: SpawnProgram | null,
+	checkout: FsDir
+): Promise<Result> => {
+	const result = await program_capture(cargo, 'cargo', ['update', '--workspace', '--offline'], {
+		cwd: checkout
+	});
 	if (!result.success)
 		return {
 			ok: false,
@@ -41,10 +51,14 @@ export const bump_lockfile = async (): Promise<Result> => {
 	return { ok: true };
 };
 
-/** Stamp the changelog's `## Unreleased` section as `version`, writing only when it changes. */
-export const bump_changelog = async (version: string): Promise<ChangelogStampOutcome> => {
-	const { outcome, text } = changelog_stamp(await Deno.readTextFile(CHANGELOG_PATH), version);
+/** Stamp the checkout changelog's `## Unreleased` section as `version`, writing only when it
+ * changes. */
+export const bump_changelog = async (
+	checkout: FsDir,
+	version: string
+): Promise<ChangelogStampOutcome> => {
+	const { outcome, text } = changelog_stamp(await checkout.read_text(CHANGELOG_PATH), version);
 	if (outcome === 'stamped' || outcome === 'stamped_without_marker')
-		await Deno.writeTextFile(CHANGELOG_PATH, text);
+		await checkout.write(CHANGELOG_PATH, text);
 	return outcome;
 };
