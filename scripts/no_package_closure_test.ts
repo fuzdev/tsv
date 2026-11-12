@@ -10,12 +10,13 @@
  * module, no ambient global. And the bench modules `typecheck:bench-core` typechecks
  * (`tsconfig.bench_core.json`'s files) import only `node:*` modules and relative files, a
  * type-only import's file included, so `tsc`, which finds a package by walking up to any
- * `node_modules`, can't let one through. Read from the source text through
+ * `node_modules`, can't let one through. And each bench root that loads no package beyond the
+ * root install's is one `typecheck:scripts`' gated program names. Read from the source text through
  * `scripts/import_closure.ts`, so it holds whatever the root config's Deno walk excludes.
  */
 
 import { strictEqual } from 'node:assert';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -210,6 +211,37 @@ test("scripts/run_if_stale.ts's closure loads no node:fs or node:crypto, and nod
 		.filter((found) => !(found.specifier === 'node:os' && found.from === 'scripts/exit_code.ts'))
 		.map((found) => `${found.from}: ${found.specifier}`);
 	strictEqual(loaded.join('\n'), '');
+});
+
+/** The packages the root `package.json` names, which CI's `check` job installs (`npm ci`). */
+const ROOT_PACKAGES: ReadonlySet<string> = new Set(
+	(['dependencies', 'devDependencies'] as const).flatMap((field) =>
+		Object.keys(JSON.parse(readFileSync(join(CHECKOUT, 'package.json'), 'utf8'))[field] ?? {})
+	)
+);
+
+/** The package a bare specifier names: its scope and name, or its name. */
+const package_name = (specifier: string): string =>
+	specifier
+		.split('/')
+		.slice(0, specifier.startsWith('@') ? 2 : 1)
+		.join('/');
+
+// a bench root that loads only the root install's packages typechecks in `typecheck:scripts`'
+// gated `tsc` program, which names each one, since the rest of `benches/js/roots/` needs the
+// bench install; one left off the list would be typechecked by the ungated `typecheck:js` alone
+test("each bench root that loads no bench package is in typecheck:scripts' program", () => {
+	const program: ReadonlyArray<string> = JSON.parse(
+		readFileSync(join(CHECKOUT, 'tsconfig.scripts.json'), 'utf8')
+	).include;
+	const root_only = readdirSync(join(CHECKOUT, 'benches/js/roots'))
+		.filter((name) => name.endsWith('.ts'))
+		.map((name) => `benches/js/roots/${name}`)
+		.filter((root) =>
+			loads_of(root).packages.every((found) => ROOT_PACKAGES.has(package_name(found.specifier)))
+		);
+	strictEqual(root_only.length > 0, true);
+	strictEqual(root_only.filter((root) => !program.includes(root)).join('\n'), '');
 });
 
 // the rows' own checks, over a scratch tree whose entry's closure plants an import where a

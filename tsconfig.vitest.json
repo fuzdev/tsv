@@ -51,6 +51,7 @@
 		"scripts/check_loc_test.ts",
 		"scripts/check_staged_freshness_test.ts",
 		"scripts/discovery_audit_test.ts",
+		"scripts/doctor_test.ts",
 		"scripts/engine_parity_test.ts",
 		"scripts/gzip_size_test.ts",
 		"scripts/import_closure_test.ts",

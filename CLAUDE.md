@@ -118,7 +118,7 @@ cargo run -p tsv_cli strip --check --content 'enum E {}'                 # exit 
 deno task check          # full committed-tree gate (benches/js/CLAUDE.md §Gate map)
 deno task doctor         # one-pass setup check: runtimes, pins + checkout alignment, the sidecar install, node_modules
 #                          freshness, oracle checkouts, corpus, build artifacts. Exit 1 only on MISLEADING state (pin
-#                          drift, skew, stale deps) or a broken core (no cargo, node, or sidecar install); absences warn (--strict promotes them) — except the optional experimental-typechecker
+#                          drift, skew, stale deps) or a broken core (no deno, cargo, or node, a node below the engines floor, or no sidecar install); absences warn (--strict promotes them) — except the optional experimental-typechecker
 #                          tier, informational at any strictness (a BROKEN checkout there still warns)
 deno task typecheck      # cargo check
 deno task typecheck:features # cargo check of each binding crate (tsv_wasm/tsv_ffi/tsv_napi) under each single feature,
@@ -136,8 +136,7 @@ deno task typecheck:scripts # scripts/ by the checker of the runtime each script
 #                          `scripts/roots/`, the PGO pipeline and its drivers, the bench roots needing no bench package
 #                          (`benches/js/roots/{divergence_audit,corpus_stats,compose_reports}.ts`), and what they import (Node's types, no
 #                          `Deno`), then deno check over the rest
-#                          of scripts/, node-modules-free; that walk excludes the Node scripts (deno.json `exclude`) and
-#                          `scripts/doctor.ts`, whose corpus probe reaches node_modules
+#                          of scripts/, node-modules-free; that walk excludes the Node scripts (deno.json `exclude`)
 deno task typecheck:bench-core # `tsc -p tsconfig.bench_core.json` over the package-free bench modules nothing else in
 #                          `check` typechecks (`lib/{wasm,harvest_stamp,loc_wire_client,fixture_documents,error_text,loc_cross_grade}.ts` +
 #                          `compose_reports.ts`, and the modules the `test:node` suites test); `scripts/no_package_closure_test.ts`

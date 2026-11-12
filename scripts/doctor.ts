@@ -1,32 +1,42 @@
 /**
- * `deno task doctor` — one-pass, read-only setup check for tsv's diagnostic
- * toolchain. The per-tool preflights fail loud at use time; this answers "am I
- * set up?" BEFORE a run: runtimes, the canonical-oracle pin agreement, the
- * sidecar's install (present + matching its lock), the benches/js `node_modules`
- * (installed + fresh), the sibling oracle checkouts
- * (presence + version skew vs the npm pins), the corpus entry lists, and which
- * build artifacts exist.
+ * `doctor` — one-pass, read-only setup check for tsv's diagnostic toolchain. The per-tool
+ * preflights fail loud at use time; this answers "am I set up?" BEFORE a run: runtimes, the
+ * canonical-oracle pin agreement, the sidecar's install (present + matching its lock), the
+ * benches/js `node_modules` (installed + fresh), the sibling oracle checkouts (presence +
+ * version skew vs the npm pins), the corpus entry lists, and which build artifacts exist.
  *
- * Exit semantics: exit 1 only for states that would MISLEAD a run or break the
- * core toolchain (canonical pin drift, checkout↔pin skew, stale node_modules,
- * missing cargo, node, or sidecar install) — mere absences (a checkout not cloned, an artifact not
- * built) are ⚠ warnings: they fail loud on their own at use time, and plenty
- * of workflows don't need them. So a green doctor means "nothing on this
- * machine will lie to you", not "everything is installed". `--strict` promotes
- * warnings to failures — the "is this machine FULLY provisioned?" mode for a
- * release box. One exception: in the explicitly optional
- * experimental-typechecker tier an ABSENCE reports as · info, never ⚠, so it
- * stays inert even under `--strict` — that oracle serves no release and no
- * ordinary dev flow, so a fully-provisioned release box legitimately lacks it.
- * A BROKEN checkout there (present, but its baselines missing) still warns:
- * that is the misleading state this tool exists to catch.
+ * Exit semantics: exit 1 only for states that would MISLEAD a run or break the core toolchain
+ * (canonical pin drift, checkout↔pin skew, stale node_modules, missing deno, cargo, or node, a
+ * node below the engines floor the scripts and the sidecar state, or a missing sidecar install)
+ * — mere absences (a checkout not cloned, an artifact not built) are ⚠ warnings: they fail loud
+ * on their own at use time, and plenty of workflows don't need them. So a green doctor means
+ * "nothing on this machine will lie to you", not "everything is installed". `--strict` promotes
+ * warnings to failures — the "is this machine FULLY provisioned?" mode for a release box. One
+ * exception: in the explicitly optional experimental-typechecker tier an ABSENCE reports as
+ * · info, never ⚠, so it stays inert even under `--strict` — that oracle serves no release and
+ * no ordinary dev flow, so a fully-provisioned release box legitimately lacks it. A BROKEN
+ * checkout there (present, but its baselines missing) still warns: that is the misleading state
+ * this tool exists to catch.
  *
- * Requires --config benches/js/deno.json (the corpus probe resolves the
- * harness's npm deps via nodeModulesDir: manual).
+ * Everything it reads, runs, and loads comes through `DoctorDeps`, which its root
+ * (`scripts/roots/doctor.ts`) binds: read-only handles on the checkout, its `target/`, and the
+ * sibling checkouts, and one program handle per tool it probes, each run only for its version
+ * (`node` also for the canonical pin audit, `git` for the checkouts' object ids and the corpus
+ * snapshot's status). The bench modules it reports through (the `node_modules` probe, the
+ * oracle pins, the corpus entry lists) are deps too: they read with `node:fs` because Bun's
+ * bench runs them.
+ *
+ * @module
  */
 
-import { probe_node_modules } from '../benches/js/lib/check_node_modules.ts';
+import { is_fs_error } from '@fuzdev/gro/fs_error.ts';
+
+import type { probe_node_modules } from '../benches/js/lib/check_node_modules.ts';
 import { CORPORA_ROOT, CORPORA_TREE, CORPORA_URL } from '../benches/js/lib/corpora.ts';
+import type {
+	corpus_missing_entries,
+	corpus_unplaced_collections
+} from '../benches/js/lib/corpus.ts';
 import { GATE_CHECKOUT_IDS } from '../benches/js/lib/gate_counts.ts';
 import {
 	checkout_hash,
@@ -36,7 +46,7 @@ import {
 } from '../benches/js/lib/harvest_stamp.ts';
 import { HARVEST_STAMPS } from '../benches/js/lib/harvest_stamp_table.ts';
 import { native_library_filename } from '../benches/js/lib/runtime.ts';
-import { type AllVersions, load_all_versions } from '../benches/js/lib/versions.ts';
+import type { AllVersions, load_all_versions } from '../benches/js/lib/versions.ts';
 import {
 	SIDECAR_DIR,
 	SIDECAR_INSTALL_COMMAND,
@@ -44,558 +54,774 @@ import {
 	sidecar_install_state
 } from './sidecar_install.ts';
 
-let warnings = 0;
-let errors = 0;
+/** A program's captured run — a gro `SpawnOutput` is one. */
+export type DoctorOutput =
+	| {
+			readonly kind: 'exited';
+			readonly code: number;
+			readonly stdout: string;
+			readonly stderr: string;
+	  }
+	| {
+			readonly kind: 'signaled' | 'timed_out' | 'aborted';
+			readonly stdout: string;
+			readonly stderr: string;
+	  };
 
-function ok(text: string): void {
-	console.log(`  ✓ ${text}`);
-}
-function warn(text: string): void {
-	warnings++;
-	console.log(`  ⚠ ${text}`);
-}
-function fail(text: string): void {
-	errors++;
-	console.log(`  ✗ ${text}`);
-}
-function info(text: string): void {
-	console.log(`  · ${text}`);
-}
-
-function section(title: string): void {
-	console.log(`\n${title}`);
+/** One program, its output captured — a gro `SpawnProgram` is one. */
+export interface DoctorProgram {
+	out(args: ReadonlyArray<string>): Promise<DoctorOutput>;
 }
 
-/** First line of `cmd --version`, or null when the binary is missing/failing. */
-function run_version(cmd: string, args: string[] = ['--version']): string | null {
-	try {
-		const out = new Deno.Command(cmd, { args, stdout: 'piped', stderr: 'piped' }).outputSync();
-		if (!out.success) return null;
-		return new TextDecoder().decode(out.stdout).trim().split('\n')[0];
-	} catch {
-		return null;
-	}
+/** Each tool doctor probes, `null` when it isn't on `PATH`. */
+export interface DoctorPrograms {
+	deno: DoctorProgram | null;
+	node: DoctorProgram | null;
+	bun: DoctorProgram | null;
+	cargo: DoctorProgram | null;
+	wasm_pack: DoctorProgram | null;
+	npm: DoctorProgram | null;
+	git: DoctorProgram | null;
 }
 
-/** Whether `git status` reports any change under `subpath` of the checkout at `repo`. */
-function git_dirty(repo: string, subpath: string): boolean {
-	try {
-		const out = new Deno.Command('git', {
-			args: ['-C', repo, 'status', '--porcelain', '--', subpath],
-			stdout: 'piped',
-			stderr: 'null'
-		}).outputSync();
-		return out.success && out.stdout.length > 0;
-	} catch {
-		return false;
-	}
+/** A directory's files, read by relative path — a gro `FsReadDir` is one. */
+export interface DoctorDir {
+	exists(path: string): Promise<boolean>;
+	read_text(path: string): Promise<string>;
+	read_text_sync(path: string): string;
+	list(path?: string): AsyncIterable<{ readonly name: string; readonly kind: string }>;
 }
 
-/** The harvest stamps' `git`, run through Deno's `Command` as this script's runtime does. */
-const stamp_git: StampGit = {
-	out: async (args) => {
-		const output = await new Deno.Command('git', {
-			args: [...args],
-			stdout: 'piped',
-			stderr: 'null'
-		}).output();
-		return { kind: 'exited', code: output.code, stdout: new TextDecoder().decode(output.stdout) };
-	}
+/** The sibling checkouts doctor reads, each opened beside the checkout by its name. */
+export const DOCTOR_SIBLINGS = [
+	'svelte',
+	'acorn-typescript',
+	'typescript',
+	'prettier',
+	'test262',
+	'wpt',
+	'typescript-go'
+] as const;
+
+export type DoctorSibling = (typeof DOCTOR_SIBLINGS)[number];
+
+/** The corpus loader's entry-list probes. */
+export interface DoctorCorpus {
+	corpus_missing_entries: typeof corpus_missing_entries;
+	corpus_unplaced_collections: typeof corpus_unplaced_collections;
+}
+
+export interface DoctorDeps {
+	/** The checkout, read-only. */
+	checkout: DoctorDir;
+	/** The checkout's `target/`, wherever a symlink puts it, or `null` when there is none. */
+	target: DoctorDir | null;
+	/** Each sibling checkout, or `null` when it can't be opened. */
+	siblings: Readonly<Record<DoctorSibling, DoctorDir | null>>;
+	programs: DoctorPrograms;
+	probe_node_modules: typeof probe_node_modules;
+	load_all_versions: typeof load_all_versions;
+	/** Loads the corpus loader, whose failure to load is itself a finding. */
+	load_corpus: () => Promise<DoctorCorpus>;
+}
+
+/** What `ci_pins` reads a pin of. */
+type PinnedTool = 'deno' | 'node';
+
+/** A `git` that never starts: a checkout id read through it is `null`, as with no checkout. */
+const NO_GIT: StampGit = {
+	out: () => Promise.reject(new Error('git missing'))
 };
 
-function exists(path: string): boolean {
-	try {
-		Deno.statSync(path);
-		return true;
-	} catch {
-		return false;
-	}
-}
-
-function read_pkg_version(path: string): string | null {
-	try {
-		const pkg = JSON.parse(Deno.readTextFileSync(path)) as { version?: string };
-		return pkg.version ?? null;
-	} catch {
-		return null;
-	}
-}
+/** The checkout's workflows, whose `<tool>-version:` pins `ci_pins` reads. */
+const WORKFLOWS_DIR = '.github/workflows';
 
 /**
- * Every `<tool>-version:` pin under `.github/workflows/`, as `file -> version`
- * pairs (one per distinct version a file carries) — empty when the directory can't
- * be read. EVERY workflow, not just `check.yml`: `release.yml` installs the
- * same runtimes for the tag-triggered publish, and a pin that drifts there is
- * graded by nothing else.
- *
- * READ from the workflows rather than mirrored into a constant here, unlike
- * `WASM_PACK_PIN` below: that one pins a calibration this repo owns (the wasm size
- * bounds), so a local constant IS its source of truth, while deno and node are
- * pinned in CI and nowhere else — a mirror would just be a second place to forget.
- * The drift this catches is one-directional and quiet: an upgraded local runtime
- * leaves CI on the old one, every gate stays green on both, and the machine that
- * produced the committed bench reports is no longer the machine CI verifies.
+ * The `engines.node` floors a Node on `PATH` is graded against, beside the bench's own
+ * type-stripping floor, and what each one is for.
  */
-function ci_pins(tool: 'deno' | 'node'): ReadonlyArray<{ file: string; version: string }> {
-	const dir = '.github/workflows';
-	const pins: Array<{ file: string; version: string }> = [];
-	try {
-		const files = [...Deno.readDirSync(dir)]
-			.filter((e) => e.isFile && /\.ya?ml$/.test(e.name))
-			.map((e) => e.name)
-			.sort();
-		for (const file of files) {
-			const yml = Deno.readTextFileSync(`${dir}/${file}`);
-			// `node-version: '24.14.1'` is quoted, `deno-version: 2.9.5` is not. EVERY
-			// occurrence, not the first: a workflow sets each pin once per job, so a
-			// bump that reached one job and not the others is its own drift — and
-			// reading only the first would report the machine aligned while a job trails.
-			const all = [...yml.matchAll(new RegExp(`${tool}-version:\\s*'?([\\d.]+)'?`, 'g'))];
-			for (const version of new Set(all.map((m) => m[1]))) pins.push({ file, version });
+const NODE_FLOORS: ReadonlyArray<{ file: string; for: string }> = [
+	{ file: 'package.json', for: 'the npm scripts on gro, this one among them' },
+	{
+		file: `${SIDECAR_DIR}/package.json`,
+		for: 'the fixture oracle `cargo test` runs, which tsv_debug refuses to start below it'
+	}
+];
+
+/** `>=major.minor[.patch]`, the floor form `engines.node` states, a missing patch `0`. */
+const parse_node_floor = (range: string): [number, number, number] | null => {
+	const m = /^>=\s*(\d+)\.(\d+)(?:\.(\d+))?$/.exec(range.trim());
+	return m === null ? null : [Number(m[1]), Number(m[2]), Number(m[3] ?? 0)];
+};
+
+/** Whether `a` is at least `b`, part by part. */
+const version_at_least = (
+	a: readonly [number, number, number],
+	b: readonly [number, number, number]
+): boolean => {
+	for (let i = 0; i < 3; i++) if (a[i] !== b[i]) return a[i]! > b[i]!;
+	return true;
+};
+
+/**
+ * Runs the check, printing each section, and returns the exit code: `1` when a check failed,
+ * or under `--strict` when one warned, else `0`.
+ * @param deps - what the checks read, run, and load
+ * @param argv - the arguments after the script; `--strict` is the one it reads
+ */
+export const run_doctor = async (
+	deps: DoctorDeps,
+	argv: ReadonlyArray<string>
+): Promise<number> => {
+	const { checkout, target, siblings, programs } = deps;
+	const stamp_git: StampGit = programs.git ?? NO_GIT;
+
+	let warnings = 0;
+	let errors = 0;
+
+	const ok = (text: string): void => {
+		console.log(`  ✓ ${text}`);
+	};
+	const warn = (text: string): void => {
+		warnings++;
+		console.log(`  ⚠ ${text}`);
+	};
+	const fail = (text: string): void => {
+		errors++;
+		console.log(`  ✗ ${text}`);
+	};
+	const info = (text: string): void => {
+		console.log(`  · ${text}`);
+	};
+	const section = (title: string): void => {
+		console.log(`\n${title}`);
+	};
+
+	/** First line of `program --version`, or null when the program is missing or failing. */
+	const run_version = async (program: DoctorProgram | null): Promise<string | null> => {
+		if (program === null) return null;
+		try {
+			const out = await program.out(['--version']);
+			if (out.kind !== 'exited' || out.code !== 0) return null;
+			return out.stdout.trim().split('\n')[0]!;
+		} catch {
+			return null;
 		}
-	} catch {
-		return [];
-	}
-	return pins;
-}
+	};
 
-/** Warn when the installed version differs from what CI pins — see `ci_pins`. */
-function check_ci_pin(tool: 'deno' | 'node', installed: string): void {
-	const pins = ci_pins(tool);
-	if (pins.length === 0) return;
-	const versions = [...new Set(pins.map((p) => p.version))];
-	if (versions.length > 1) {
+	/** Whether `git status` reports any change under `subpath` of the checkout at `repo`, without
+	 * the index refresh a plain `status` writes into that repository. */
+	const git_dirty = async (repo: string, subpath: string): Promise<boolean> => {
+		try {
+			const out = await stamp_git.out([
+				'--no-optional-locks',
+				'-C',
+				repo,
+				'status',
+				'--porcelain',
+				'--',
+				subpath
+			]);
+			return out.kind === 'exited' && out.code === 0 && out.stdout.length > 0;
+		} catch {
+			return false;
+		}
+	};
+
+	/** Whether `path` exists beneath `dir`, false for any failure to tell, as for no `dir`. */
+	const exists_in = async (dir: DoctorDir | null, path: string): Promise<boolean> => {
+		if (dir === null) return false;
+		try {
+			return await dir.exists(path);
+		} catch {
+			return false;
+		}
+	};
+
+	/** Whether the sibling checkout `name` has `path`, or is there at all with no `path`. */
+	const sibling_has = (name: DoctorSibling, path = ''): Promise<boolean> =>
+		path === '' ? Promise.resolve(siblings[name] !== null) : exists_in(siblings[name], path);
+
+	/** The `version` of the `package.json` at `path` in sibling `name`, or null. */
+	const read_pkg_version = async (name: DoctorSibling, path: string): Promise<string | null> => {
+		const dir = siblings[name];
+		if (dir === null) return null;
+		try {
+			const pkg = JSON.parse(await dir.read_text(path)) as { version?: string };
+			return pkg.version ?? null;
+		} catch {
+			return null;
+		}
+	};
+
+	/**
+	 * Every `<tool>-version:` pin under `.github/workflows/`, as `file -> version` pairs (one
+	 * per distinct version a file carries) — empty when the directory can't be read, and when no
+	 * workflow pins the tool at all. EVERY workflow, not just `check.yml`: `release.yml` installs
+	 * the runtimes it needs for the tag-triggered publish, and a pin that drifts there is graded
+	 * by nothing else.
+	 *
+	 * READ from the workflows rather than mirrored into a constant here, unlike `WASM_PACK_PIN`
+	 * below: that one pins a calibration this repo owns (the wasm size bounds), so a local
+	 * constant IS its source of truth, while deno and node are pinned in CI and nowhere else — a
+	 * mirror would just be a second place to forget. The drift this catches is one-directional
+	 * and quiet: an upgraded local runtime leaves CI on the old one, every gate stays green on
+	 * both, and the machine that produced the committed bench reports is no longer the machine CI
+	 * verifies.
+	 */
+	const ci_pins = async (
+		tool: PinnedTool
+	): Promise<ReadonlyArray<{ file: string; version: string }>> => {
+		const pins: Array<{ file: string; version: string }> = [];
+		try {
+			const files: string[] = [];
+			for await (const entry of checkout.list(WORKFLOWS_DIR)) {
+				if (entry.kind === 'file' && /\.ya?ml$/.test(entry.name)) files.push(entry.name);
+			}
+			files.sort();
+			for (const file of files) {
+				const yml = await checkout.read_text(`${WORKFLOWS_DIR}/${file}`);
+				// `node-version: '24.14.1'` is quoted, `deno-version: 2.9.5` is not. EVERY
+				// occurrence, not the first: a workflow sets each pin once per job, so a
+				// bump that reached one job and not the others is its own drift — and
+				// reading only the first would report the machine aligned while a job trails.
+				const all = [...yml.matchAll(new RegExp(`${tool}-version:\\s*'?([\\d.]+)'?`, 'g'))];
+				for (const version of new Set(all.map((m) => m[1]!))) pins.push({ file, version });
+			}
+		} catch {
+			return [];
+		}
+		return pins;
+	};
+
+	/** Warn when the installed version differs from what CI pins — see `ci_pins`. A tool no
+	 * workflow pins is graded against nothing, which an info line says. */
+	const check_ci_pin = async (tool: PinnedTool, installed: string): Promise<void> => {
+		const pins = await ci_pins(tool);
+		if (pins.length === 0) {
+			info(
+				`${tool} ${installed} — no workflow pins a ${tool}-version, so nothing grades it against CI`
+			);
+			return;
+		}
+		const versions = [...new Set(pins.map((p) => p.version))];
+		if (versions.length > 1) {
+			warn(
+				`${tool} — the workflows pin more than one version ` +
+					`(${pins.map((p) => `${p.file}: ${p.version}`).join(', ')}); ` +
+					`CI disagrees with itself about which ${tool} verifies this repo`
+			);
+			return;
+		}
+		// Exact, not `includes` as the wasm-pack check below does: both versions here are
+		// already bare (`2.9.5`, and node's `v` stripped by the caller), so a substring
+		// test would only buy the false pass where `2.9.5` matches an installed `2.9.50`.
+		if (installed === versions[0]) return;
+		const files = [...new Set(pins.map((p) => p.file))].join(' + ');
 		warn(
-			`${tool} — the workflows pin more than one version ` +
-				`(${pins.map((p) => `${p.file}: ${p.version}`).join(', ')}); ` +
-				`CI disagrees with itself about which ${tool} verifies this repo`
+			`${tool} ${installed} — differs from the ${versions[0]} that ${files} install; ` +
+				`bump the workflows (${tool}-version) so CI verifies what you develop against`
 		);
-		return;
+	};
+
+	/** Grades the Node on `PATH` against each floor in `NODE_FLOORS`, one line per floor. */
+	const check_node_floors = async (node_version: string): Promise<void> => {
+		const m = /^v(\d+)\.(\d+)\.(\d+)/.exec(node_version);
+		// an unparseable version already warned above, against the type-stripping floor
+		if (m === null) return;
+		const version: [number, number, number] = [Number(m[1]), Number(m[2]), Number(m[3])];
+		const by_range = new Map<string, Array<{ file: string; for: string }>>();
+		for (const floor of NODE_FLOORS) {
+			let range: unknown;
+			try {
+				const pkg = JSON.parse(await checkout.read_text(floor.file)) as {
+					engines?: { node?: unknown };
+				};
+				range = pkg.engines?.node;
+			} catch (e) {
+				fail(
+					`cannot read engines.node from ${floor.file} (${e instanceof Error ? e.message.split('\n')[0] : e}) — ` +
+						'the Node floor it states is ungraded'
+				);
+				continue;
+			}
+			if (typeof range !== 'string' || parse_node_floor(range) === null) {
+				fail(
+					`${floor.file} states no engines.node floor of the form >=major.minor[.patch] — ` +
+						'the Node floor it states is ungraded'
+				);
+				continue;
+			}
+			by_range.set(range, [...(by_range.get(range) ?? []), floor]);
+		}
+		for (const [range, floors] of by_range) {
+			const files = floors.map((f) => f.file).join(' + ');
+			if (version_at_least(version, parse_node_floor(range)!)) {
+				ok(`node ${node_version} meets engines.node ${range} (${files})`);
+			} else {
+				fail(
+					`node ${node_version} — below engines.node ${range} (${files}): ` +
+						floors.map((f) => f.for).join('; ')
+				);
+			}
+		}
+	};
+
+	const strict = argv.includes('--strict');
+
+	console.log(
+		`tsv doctor — diagnostic-toolchain setup check (read-only${strict ? ', --strict: warnings fail' : ''})`
+	);
+
+	// --- Runtimes -----------------------------------------------------------------
+
+	section('Runtimes');
+	// the `deno` on `PATH`: the one `deno task` and the bench's Deno row run
+	const deno_line = await run_version(programs.deno);
+	if (deno_line === null) {
+		fail(
+			'deno missing — `deno task` runs the deno.json tasks (`check` among them), and the ' +
+				"bench's Deno row (bench:deno) runs on it"
+		);
+	} else {
+		const deno_version = /^deno (\d+\.\d+\.\d+\S*)/.exec(deno_line)?.[1];
+		if (deno_version === undefined) {
+			warn(`deno — \`deno --version\` printed "${deno_line}", no Deno version`);
+		} else {
+			ok(`deno ${deno_version}`);
+			await check_ci_pin('deno', deno_version);
+		}
 	}
-	// Exact, not `includes` as the wasm-pack check below does: both versions here are
-	// already bare (`2.9.5`, and node's `v` stripped by the caller), so a substring
-	// test would only buy the false pass where `2.9.5` matches an installed `2.9.50`.
-	if (installed === versions[0]) return;
-	const files = [...new Set(pins.map((p) => p.file))].join(' + ');
-	warn(
-		`${tool} ${installed} — differs from the ${versions[0]} that ${files} install; ` +
-			`bump the workflows (${tool}-version) so CI verifies what you develop against`
-	);
-}
 
-const strict = Deno.args.includes('--strict');
+	const node_version = await run_version(programs.node);
+	if (node_version === null) {
+		fail(
+			"node missing — cargo test's fixture oracle (tsv_debug's sidecar) runs on it, and bench:node, " +
+				'bench:install, test:npm, and the publish artifact tests need it'
+		);
+	} else {
+		const m = /^v(\d+)\.(\d+)/.exec(node_version);
+		const new_enough =
+			m !== null && (Number(m[1]) > 22 || (Number(m[1]) === 22 && Number(m[2]) >= 18));
+		if (new_enough) ok(`node ${node_version} (≥ 22.18)`);
+		else
+			warn(
+				`node ${node_version} — < 22.18 lacks native TS type-stripping; the harness entries fail to parse`
+			);
+		await check_ci_pin('node', node_version.replace(/^v/, ''));
+		await check_node_floors(node_version);
+	}
 
-console.log(
-	`tsv doctor — diagnostic-toolchain setup check (read-only${strict ? ', --strict: warnings fail' : ''})`
-);
+	const bun_version = await run_version(programs.bun);
+	if (bun_version === null) {
+		warn(
+			"bun missing — bench:bun unavailable, test:bun and the package suites' Bun legs warn-skip, and a publish --wetrun fails without it (--no-check waives)"
+		);
+	} else ok(`bun ${bun_version}`);
 
-// --- Runtimes -----------------------------------------------------------------
+	const cargo_version = await run_version(programs.cargo);
+	if (cargo_version === null) fail('cargo missing — nothing Rust builds without it');
+	else ok(cargo_version);
 
-section('Runtimes');
-ok(`deno ${Deno.version.deno}`);
-check_ci_pin('deno', Deno.version.deno);
+	// The one version the repo otherwise records only in CI (`check.yml` pins the
+	// same): the published wasm sizes are produced by wasm-pack's bundled wasm-opt,
+	// and `validate_artifacts.ts`'s ±8% bounds are calibrated against this version —
+	// a different wasm-pack can move the bytes into failing bounds at publish time.
+	const WASM_PACK_PIN = '0.15.0';
+	const wasm_pack_version = await run_version(programs.wasm_pack);
+	if (wasm_pack_version === null) {
+		warn(
+			'wasm-pack missing — WASM builds (build:wasm:*, bench, publish) unavailable: cargo install wasm-pack'
+		);
+	} else if (!wasm_pack_version.includes(WASM_PACK_PIN)) {
+		warn(
+			`${wasm_pack_version} — differs from the pinned ${WASM_PACK_PIN} (check.yml + the ` +
+				`validate_artifacts.ts size-bound calibration); sizes may drift into failing bounds at publish`
+		);
+	} else ok(`${wasm_pack_version} (matches pin)`);
 
-const node_version = run_version('node');
-if (node_version === null) {
-	fail(
-		"node missing — cargo test's fixture oracle (tsv_debug's sidecar) runs on it, and bench:node, " +
-			'bench:install, test:npm, and the publish artifact tests need it'
-	);
-} else {
-	const m = /^v(\d+)\.(\d+)/.exec(node_version);
-	const new_enough =
-		m !== null && (Number(m[1]) > 22 || (Number(m[1]) === 22 && Number(m[2]) >= 18));
-	if (new_enough) ok(`node ${node_version} (≥ 22.18)`);
+	const npm_version = await run_version(programs.npm);
+	if (npm_version === null) warn('npm missing — deno task bench:install unavailable');
+	else ok(`npm ${npm_version}`);
+
+	// --- Canonical pins -----------------------------------------------------------
+
+	section('Canonical oracle pins');
+	// No mode flag = BOTH halves — the pin agreement `deno task check` gates plus the
+	// checkout alignment/drift `deno task conformance` gates. Doctor is the one place
+	// that reports them together, which is what makes an env skew visible before a
+	// conformance run rather than during one. It runs under Node, as `pins:audit` does; its
+	// commit-drift half shells out to `git rev-parse` and says so when no git is on `PATH`.
+	if (programs.node === null) {
+		fail(
+			'node missing — the canonical pin audit (scripts/roots/check_canonical_pins.ts) runs on it'
+		);
+	} else {
+		let pins: DoctorOutput | null;
+		try {
+			pins = await programs.node.out(['scripts/roots/check_canonical_pins.ts']);
+		} catch (e) {
+			pins = null;
+			fail(
+				`cannot run the canonical pin audit (${e instanceof Error ? e.message.split('\n')[0] : e})`
+			);
+		}
+		if (pins !== null) {
+			const success = pins.kind === 'exited' && pins.code === 0;
+			const pins_out = (success ? pins.stdout : pins.stderr).trim();
+			if (success) ok(pins_out);
+			else fail(pins_out.split('\n').join('\n    '));
+		}
+	}
+
+	// --- Harness deps ---------------------------------------------------------------
+
+	section('Harness deps (benches/js/node_modules)');
+	// Both this probe and `load_all_versions` below THROW when `benches/js/package.json`
+	// can't be read or parsed — the right posture for a run that would otherwise measure
+	// under placeholder labels, and the wrong one HERE: doctor's whole job is to report a
+	// broken setup, so a broken pins file must be a `✗` line, not an unhandled rejection
+	// that kills the remaining sections and the verdict. Same guard as the corpus probe.
+	try {
+		const nm = await deps.probe_node_modules();
+		if (nm.status === 'ok') {
+			ok(
+				'installed, and every exact pin (plus each `force_installed` pin) matches the installed version'
+			);
+		} else if (nm.status === 'missing') warn(nm.message);
+		else fail(`${nm.message} — reports would label OLD installed versions with the new pins`);
+	} catch (e) {
+		fail(
+			`cannot read benches/js/package.json (${e instanceof Error ? e.message.split('\n')[0] : e}) — ` +
+				'the pins are unreadable, so nothing downstream can be graded against them'
+		);
+	}
+
+	// --- Oracle checkouts -----------------------------------------------------------
+
+	section('Oracle checkouts (conformance gates / publish Step 3b)');
+	// Guarded for the same reason as the probe above: this throws on an unreadable pins
+	// file, which is a state to REPORT here rather than to die on. `null` then — the
+	// checkouts are still worth listing, but no skew can be graded against a pin nothing
+	// could read, so the per-checkout lines say that instead of claiming a match.
+	let versions: AllVersions | null = null;
+	try {
+		versions = await deps.load_all_versions();
+	} catch (e) {
+		fail(
+			`cannot read the oracle pins (${e instanceof Error ? e.message.split('\n')[0] : e}) — ` +
+				'checkout-vs-pin skew is ungraded below'
+		);
+	}
+	const pin_suffix = versions ? ', matches the pin' : '; pin unreadable';
+
+	if (await sibling_has('svelte', 'packages/svelte/tests')) {
+		const v = await read_pkg_version('svelte', 'packages/svelte/package.json');
+		if (versions && v !== null && v !== versions.canonical.svelte) {
+			warn(
+				`../svelte checkout is v${v} but the svelte oracle is pinned v${versions.canonical.svelte} — ` +
+					'suite inputs and the grading parser disagree (align the checkout or bump the pins deliberately)'
+			);
+		} else ok(`../svelte checkout (v${v ?? '?'}${pin_suffix})`);
+	} else
+		warn('../svelte checkout missing — conformance:svelte-fixtures + the corpus suites need it');
+
+	if (await sibling_has('acorn-typescript', 'test')) {
+		const v = await read_pkg_version('acorn-typescript', 'package.json');
+		if (versions && v !== null && v !== versions.canonical['@sveltejs/acorn-typescript']) {
+			warn(
+				`../acorn-typescript checkout is v${v} but the oracle is pinned ` +
+					`v${versions.canonical['@sveltejs/acorn-typescript']} — suite inputs and the grading parser disagree`
+			);
+		} else ok(`../acorn-typescript checkout (v${v ?? '?'}${pin_suffix})`);
+	} else warn('../acorn-typescript checkout missing — conformance:ts-fixtures needs it');
+
+	if (await sibling_has('typescript', 'tests/baselines/reference')) {
+		ok('../typescript checkout (baselines present)');
+	} else if (await sibling_has('typescript')) {
+		warn(
+			'../typescript present but tests/baselines/reference missing — conformance:ts-repo will FAIL (partial checkout)'
+		);
+	} else
+		warn('../typescript checkout missing — conformance:ts-repo + bench:harvest:ts-repo need it');
+
+	// Informational (NOT gated by pins:audit — see its docstring): the prettier
+	// checkout is a reading reference + corpus-suite source whose oracle output is
+	// computed live per file, and it legitimately rides `-dev` versions.
+	if (await sibling_has('prettier')) {
+		const v = await read_pkg_version('prettier', 'package.json');
+		if (versions && v !== null && v.replace(/-dev$/, '') !== versions.canonical.prettier) {
+			warn(
+				`../prettier checkout is v${v} vs pinned prettier v${versions.canonical.prettier} — its fixture ` +
+					'suites (corpus inputs) come from a different version than the live oracle (informational)'
+			);
+		} else ok(`../prettier checkout (v${v ?? '?'})`);
+	} else
+		warn(
+			'../prettier checkout missing — the corpus prettier suites + layout-reference reading need it'
+		);
+
+	if (await sibling_has('test262', 'test'))
+		ok('../test262 checkout (conformance:test262 release gate)');
 	else
 		warn(
-			`node ${node_version} — < 22.18 lacks native TS type-stripping; the harness entries fail to parse`
+			'../test262 checkout missing — conformance:test262 (the release gate, publish Step 3b) + bench:harvest:test262 need it'
 		);
-	check_ci_pin('node', node_version.replace(/^v/, ''));
-}
 
-const bun_version = run_version('bun');
-if (bun_version === null) {
-	warn(
-		"bun missing — bench:bun unavailable, test:bun and the package suites' Bun legs warn-skip, and a publish --wetrun fails without it (--no-check waives)"
-	);
-} else ok(`bun ${bun_version}`);
+	if (await sibling_has('wpt', 'css')) ok('../wpt/css checkout (sparse)');
+	else warn('../wpt/css checkout missing — bench:harvest:wpt unavailable (manual-cadence tool)');
 
-const cargo_version = run_version('cargo');
-if (cargo_version === null) fail('cargo missing — nothing Rust builds without it');
-else ok(cargo_version);
-
-// The one version the repo otherwise records only in CI (`check.yml` pins the
-// same): the published wasm sizes are produced by wasm-pack's bundled wasm-opt,
-// and `validate_artifacts.ts`'s ±8% bounds are calibrated against this version —
-// a different wasm-pack can move the bytes into failing bounds at publish time.
-const WASM_PACK_PIN = '0.15.0';
-const wasm_pack_version = run_version('wasm-pack');
-if (wasm_pack_version === null) {
-	warn(
-		'wasm-pack missing — WASM builds (build:wasm:*, bench, publish) unavailable: cargo install wasm-pack'
-	);
-} else if (!wasm_pack_version.includes(WASM_PACK_PIN)) {
-	warn(
-		`${wasm_pack_version} — differs from the pinned ${WASM_PACK_PIN} (check.yml + the ` +
-			`validate_artifacts.ts size-bound calibration); sizes may drift into failing bounds at publish`
-	);
-} else ok(`${wasm_pack_version} (matches pin)`);
-
-const npm_version = run_version('npm');
-if (npm_version === null) warn('npm missing — deno task bench:install unavailable');
-else ok(`npm ${npm_version}`);
-
-// --- Canonical pins -----------------------------------------------------------
-
-section('Canonical oracle pins');
-// No mode flag = BOTH halves — the pin agreement `deno task check` gates plus the
-// checkout alignment/drift `deno task conformance` gates. Doctor is the one place
-// that reports them together, which is what makes an env skew visible before a
-// conformance run rather than during one. It runs under Node, as `pins:audit` does; its
-// commit-drift half shells out to `git rev-parse` and says so when no git is on `PATH`.
-const pins = new Deno.Command('node', {
-	args: ['scripts/roots/check_canonical_pins.ts'],
-	stdout: 'piped',
-	stderr: 'piped'
-}).outputSync();
-const pins_out = new TextDecoder().decode(pins.success ? pins.stdout : pins.stderr).trim();
-if (pins.success) ok(pins_out);
-else fail(pins_out.split('\n').join('\n    '));
-
-// --- Harness deps ---------------------------------------------------------------
-
-section('Harness deps (benches/js/node_modules)');
-// Both this probe and `load_all_versions` below THROW when `benches/js/package.json`
-// can't be read or parsed — the right posture for a run that would otherwise measure
-// under placeholder labels, and the wrong one HERE: doctor's whole job is to report a
-// broken setup, so a broken pins file must be a `✗` line, not an unhandled rejection
-// that kills the remaining sections and the verdict. Same guard as the corpus probe.
-try {
-	const nm = await probe_node_modules();
-	if (nm.status === 'ok') {
-		ok(
-			'installed, and every exact pin (plus each `force_installed` pin) matches the installed version'
-		);
-	} else if (nm.status === 'missing') warn(nm.message);
-	else fail(`${nm.message} — reports would label OLD installed versions with the new pins`);
-} catch (e) {
-	fail(
-		`cannot read benches/js/package.json (${e instanceof Error ? e.message.split('\n')[0] : e}) — ` +
-			'the pins are unreadable, so nothing downstream can be graded against them'
-	);
-}
-
-// --- Oracle checkouts -----------------------------------------------------------
-
-section('Oracle checkouts (conformance gates / publish Step 3b)');
-// Guarded for the same reason as the probe above: this throws on an unreadable pins
-// file, which is a state to REPORT here rather than to die on. `null` then — the
-// checkouts are still worth listing, but no skew can be graded against a pin nothing
-// could read, so the per-checkout lines say that instead of claiming a match.
-let versions: AllVersions | null = null;
-try {
-	versions = await load_all_versions();
-} catch (e) {
-	fail(
-		`cannot read the oracle pins (${e instanceof Error ? e.message.split('\n')[0] : e}) — ` +
-			'checkout-vs-pin skew is ungraded below'
-	);
-}
-const pin_suffix = versions ? ', matches the pin' : '; pin unreadable';
-
-if (exists('../svelte/packages/svelte/tests')) {
-	const v = read_pkg_version('../svelte/packages/svelte/package.json');
-	if (versions && v !== null && v !== versions.canonical.svelte) {
+	// The real-code corpus snapshot: every `benched`/`gated` corpus entry reads one of
+	// its collections, and the corpus count pins were measured at the `collections/` tree
+	// id `GATE_CHECKOUT_IDS` records — so a checkout whose collections are at any
+	// other id grades a different corpus than the pins describe (a refresh re-pins;
+	// anything else is skew). The tree, not the commit: the snapshot repo's tooling
+	// commits move HEAD without moving a corpus byte.
+	const corpora_pin = GATE_CHECKOUT_IDS[CORPORA_ROOT]!.hash;
+	const corpora_head = await checkout_hash(stamp_git, { path: CORPORA_ROOT, tree: CORPORA_TREE });
+	if (corpora_head === null) {
 		warn(
-			`../svelte checkout is v${v} but the svelte oracle is pinned v${versions.canonical.svelte} — ` +
-				'suite inputs and the grading parser disagree (align the checkout or bump the pins deliberately)'
+			`${CORPORA_ROOT} checkout missing — the bench + corpus:compare gates read the real-code snapshot ` +
+				`(git clone ${CORPORA_URL} ${CORPORA_ROOT})`
 		);
-	} else ok(`../svelte checkout (v${v ?? '?'}${pin_suffix})`);
-} else warn('../svelte checkout missing — conformance:svelte-fixtures + the corpus suites need it');
-
-if (exists('../acorn-typescript/test')) {
-	const v = read_pkg_version('../acorn-typescript/package.json');
-	if (versions && v !== null && v !== versions.canonical['@sveltejs/acorn-typescript']) {
+	} else if (!corpora_head.startsWith(corpora_pin)) {
 		warn(
-			`../acorn-typescript checkout is v${v} but the oracle is pinned ` +
-				`v${versions.canonical['@sveltejs/acorn-typescript']} — suite inputs and the grading parser disagree`
+			`${CORPORA_ROOT}:${CORPORA_TREE} is at ${short_commit(corpora_head)} but the corpus pins were measured at ${corpora_pin} — ` +
+				'a snapshot refresh re-runs the corpus gates and re-pins; otherwise check out the pinned snapshot'
 		);
-	} else ok(`../acorn-typescript checkout (v${v ?? '?'}${pin_suffix})`);
-} else warn('../acorn-typescript checkout missing — conformance:ts-fixtures needs it');
-
-if (exists('../typescript/tests/baselines/reference')) {
-	ok('../typescript checkout (baselines present)');
-} else if (exists('../typescript')) {
-	warn(
-		'../typescript present but tests/baselines/reference missing — conformance:ts-repo will FAIL (partial checkout)'
-	);
-} else warn('../typescript checkout missing — conformance:ts-repo + bench:harvest:ts-repo need it');
-
-// Informational (NOT gated by pins:audit — see its docstring): the prettier
-// checkout is a reading reference + corpus-suite source whose oracle output is
-// computed live per file, and it legitimately rides `-dev` versions.
-if (exists('../prettier')) {
-	const v = read_pkg_version('../prettier/package.json');
-	if (versions && v !== null && v.replace(/-dev$/, '') !== versions.canonical.prettier) {
+	} else if (await git_dirty(CORPORA_ROOT, CORPORA_TREE)) {
+		// The gates read the working tree, so bytes the pinned commit doesn't hold would
+		// be graded under its name. Nothing in tsv writes there; a stray `tsv format` on a
+		// collection is the way this happens.
 		warn(
-			`../prettier checkout is v${v} vs pinned prettier v${versions.canonical.prettier} — its fixture ` +
-				'suites (corpus inputs) come from a different version than the live oracle (informational)'
+			`${CORPORA_ROOT} is at pinned ${corpora_pin} but ${CORPORA_TREE}/ has local modifications — ` +
+				`the corpus gates would grade bytes that commit does not hold (git -C ${CORPORA_ROOT} checkout -- ${CORPORA_TREE})`
 		);
-	} else ok(`../prettier checkout (v${v ?? '?'})`);
-} else
-	warn(
-		'../prettier checkout missing — the corpus prettier suites + layout-reference reading need it'
-	);
+	} else ok(`${CORPORA_ROOT} snapshot (${CORPORA_TREE}/ at pinned ${corpora_pin}, clean)`);
 
-if (exists('../test262/test')) ok('../test262 checkout (conformance:test262 release gate)');
-else
-	warn(
-		'../test262 checkout missing — conformance:test262 (the release gate, publish Step 3b) + bench:harvest:test262 need it'
-	);
+	// --- Optional: the experimental typechecker's oracle -----------------------------
+	//
+	// `../typescript-go` feeds ONLY the on-demand `conformance:tsc-roundtrip` /
+	// `conformance:tsc-check` tasks for the experimental `tsv_check` crate — not
+	// `deno task check`, not the release gates. A machine that never touches the
+	// typechecker needs none of it, so every finding here is a warning at most.
+	// Git-SHA-pinned (not npm-versioned), so it isn't in pins:audit either — its tsgo
+	// commit is pinned by the Rust count-pins. See docs/typechecker.md.
 
-if (exists('../wpt/css')) ok('../wpt/css checkout (sparse)');
-else warn('../wpt/css checkout missing — bench:harvest:wpt unavailable (manual-cadence tool)');
+	section('Optional — experimental typechecker oracle (on-demand tsc_conformance only)');
 
-// The real-code corpus snapshot: every `benched`/`gated` corpus entry reads one of
-// its collections, and the corpus count pins were measured at the `collections/` tree
-// id `GATE_CHECKOUT_IDS` records — so a checkout whose collections are at any
-// other id grades a different corpus than the pins describe (a refresh re-pins;
-// anything else is skew). The tree, not the commit: the snapshot repo's tooling
-// commits move HEAD without moving a corpus byte.
-const corpora_pin = GATE_CHECKOUT_IDS[CORPORA_ROOT].hash;
-const corpora_head = await checkout_hash(stamp_git, { path: CORPORA_ROOT, tree: CORPORA_TREE });
-if (corpora_head === null) {
-	warn(
-		`${CORPORA_ROOT} checkout missing — the bench + corpus:compare gates read the real-code snapshot ` +
-			`(git clone ${CORPORA_URL} ${CORPORA_ROOT})`
-	);
-} else if (!corpora_head.startsWith(corpora_pin)) {
-	warn(
-		`${CORPORA_ROOT}:${CORPORA_TREE} is at ${short_commit(corpora_head)} but the corpus pins were measured at ${corpora_pin} — ` +
-			'a snapshot refresh re-runs the corpus gates and re-pins; otherwise check out the pinned snapshot'
-	);
-} else if (git_dirty(CORPORA_ROOT, CORPORA_TREE)) {
-	// The gates read the working tree, so bytes the pinned commit doesn't hold would
-	// be graded under its name. Nothing in tsv writes there; a stray `tsv format` on a
-	// collection is the way this happens.
-	warn(
-		`${CORPORA_ROOT} is at pinned ${corpora_pin} but ${CORPORA_TREE}/ has local modifications — ` +
-			`the corpus gates would grade bytes that commit does not hold (git -C ${CORPORA_ROOT} checkout -- ${CORPORA_TREE})`
-	);
-} else ok(`${CORPORA_ROOT} snapshot (${CORPORA_TREE}/ at pinned ${corpora_pin}, clean)`);
-
-// --- Optional: the experimental typechecker's oracle -----------------------------
-//
-// `../typescript-go` feeds ONLY the on-demand `conformance:tsc-roundtrip` /
-// `conformance:tsc-check` tasks for the experimental `tsv_check` crate — not
-// `deno task check`, not the release gates. A machine that never touches the
-// typechecker needs none of it, so every finding here is a warning at most.
-// Git-SHA-pinned (not npm-versioned), so it isn't in pins:audit either — its tsgo
-// commit is pinned by the Rust count-pins. See docs/typechecker.md.
-
-section('Optional — experimental typechecker oracle (on-demand tsc_conformance only)');
-
-if (exists('../typescript-go/testdata/baselines/reference/submodule')) {
-	ok('../typescript-go checkout (tsgo baselines present)');
-} else if (exists('../typescript-go')) {
-	warn(
-		'../typescript-go present but testdata/baselines/reference/submodule missing — conformance:tsc-roundtrip would FAIL (partial checkout)'
-	);
-} else
-	info('../typescript-go checkout absent — needed only by the on-demand tsc_conformance tasks');
-
-// The tsc-check task additionally sweeps the corpus INPUTS + bundled libs (unlike
-// roundtrip, which reads only the committed baselines). The corpus is the
-// often-unmaterialized _submodules/TypeScript submodule.
-if (exists('../typescript-go')) {
-	if (exists('../typescript-go/_submodules/TypeScript/tests/cases')) {
-		ok('../typescript-go corpus inputs (_submodules/TypeScript materialized)');
-	} else {
-		info(
-			'../typescript-go corpus inputs absent — only conformance:tsc-check needs them (git submodule update --init in ../typescript-go)'
-		);
-	}
-	if (exists('../typescript-go/internal/bundled/libs')) {
-		ok('../typescript-go bundled libs present');
-	} else {
-		info(
-			'../typescript-go bundled libs (internal/bundled/libs) absent — only conformance:tsc-check needs them'
-		);
-	}
-}
-
-// --- Harvest stamps -------------------------------------------------------------
-//
-// Each stamped grade records the checkout object(s) it ran against — a HEAD commit,
-// or for the corpora snapshot its `collections/` tree id. A stamp whose recorded id
-// no longer matches the checkout means the pin it graded describes the PREVIOUS
-// corpus: `bench:pins:suites` (a `conformance` preflight) re-derives the suite pins
-// and `bench:harvest:svelte-styles` the styles one, but nothing in `check` does, so
-// name it here ahead of a release run. Only the checkout inputs are compared — the
-// oracle-version and pin inputs are `pins:audit`'s.
-//
-// Graded PER CHECKOUT, never all-or-nothing on the first absent one. Two reasons,
-// both of which the earlier short-circuit got wrong: an absent checkout would hide
-// a MOVED sibling in the same stamp (the two reject pins carry three checkouts
-// apiece), and this doctor cannot know what the task will do about the absence —
-// `css:over-acceptance:pin` reads the wpt CACHE, not `../wpt`, so it grades happily
-// with that checkout gone. So report the fact observed here, and leave the task's
-// own `--if-present` verdict to the task.
-
-section(
-	'Harvest stamps (bench:pins:suites — the pin-freshness preflight — + bench:harvest:svelte-styles)'
-);
-for (const [name, { path, task, checkouts }] of Object.entries(HARVEST_STAMPS)) {
-	const heads = await Promise.all(
-		Object.entries(checkouts).map(async ([key, input]) => ({
-			key,
-			repo: checkout_label(input),
-			head: await checkout_hash(stamp_git, input)
-		}))
-	);
-	const absent = heads.filter((h) => h.head === null);
-	const gradable = heads.filter((h) => h.head !== null);
-	// Named on every line below, so a ✓ never reads as "all three agree" when one
-	// of the three was never compared.
-	const aside =
-		absent.length === 0 ? '' : ` (${absent.map((h) => h.repo).join(', ')} not checked out)`;
-	if (gradable.length === 0) {
-		info(`${name}: no checkout to grade against${aside}`);
-		continue;
-	}
-	let recorded: Record<string, unknown>;
-	try {
-		recorded = JSON.parse(Deno.readTextFileSync(path)) as Record<string, unknown>;
-	} catch {
-		warn(`${name}: never stamped (no ${path}) — run deno task ${task}${aside}`);
-		continue;
-	}
-	// A key the stamp does not carry at all is reported as such rather than as a
-	// moved commit: that is what an input ADDED since the stamp was written looks
-	// like, and "stamped ?" reads as a corrupt SHA.
-	const moved = gradable
-		.map((h) => ({ ...h, recorded: recorded[h.key] }))
-		.filter((h) => h.recorded !== h.head);
-	if (moved.length > 0) {
+	if (await sibling_has('typescript-go', 'testdata/baselines/reference/submodule')) {
+		ok('../typescript-go checkout (tsgo baselines present)');
+	} else if (await sibling_has('typescript-go')) {
 		warn(
-			`${name}: stamp is stale for ${moved
-				.map((h) =>
-					typeof h.recorded === 'string'
-						? `${h.repo} (stamped ${short_commit(h.recorded)}, now ${short_commit(h.head!)})`
-						: `${h.repo} (no \`${h.key}\` recorded — the stamp predates that input)`
-				)
-				.join(', ')} — run deno task ${task}${aside}`
+			'../typescript-go present but testdata/baselines/reference/submodule missing — conformance:tsc-roundtrip would FAIL (partial checkout)'
 		);
-	} else ok(`${name}: stamp matches ${gradable.map((h) => h.repo).join(' + ')}${aside}`);
-}
+	} else
+		info('../typescript-go checkout absent — needed only by the on-demand tsc_conformance tasks');
 
-// --- Corpus entries -------------------------------------------------------------
-
-section('Corpus entries (gates + conformance views)');
-try {
-	const { corpus_missing_entries, corpus_unplaced_collections } =
-		await import('../benches/js/lib/corpus.ts');
-	for (const view of ['gates', 'conformance'] as const) {
-		const { missing, optional_missing, total } = await corpus_missing_entries(view);
-		if (missing.length > 0) {
-			warn(
-				`${view} view: ${missing.length}/${total} entries missing — ` +
-					`corpus:compare/bench on this view fail fast:\n      ${missing.join('\n      ')}`
+	// The tsc-check task additionally sweeps the corpus INPUTS + bundled libs (unlike
+	// roundtrip, which reads only the committed baselines). The corpus is the
+	// often-unmaterialized _submodules/TypeScript submodule.
+	if (await sibling_has('typescript-go')) {
+		if (await sibling_has('typescript-go', '_submodules/TypeScript/tests/cases')) {
+			ok('../typescript-go corpus inputs (_submodules/TypeScript materialized)');
+		} else {
+			info(
+				'../typescript-go corpus inputs absent — only conformance:tsc-check needs them (git submodule update --init in ../typescript-go)'
 			);
-		} else
-			ok(`${view} view: all ${total - optional_missing.length}/${total} required entries present`);
-		for (const o of optional_missing)
-			info(`${view} view: optional entry absent (fail-open, disclosed): ${o}`);
+		}
+		if (await sibling_has('typescript-go', 'internal/bundled/libs')) {
+			ok('../typescript-go bundled libs present');
+		} else {
+			info(
+				'../typescript-go bundled libs (internal/bundled/libs) absent — only conformance:tsc-check needs them'
+			);
+		}
 	}
-	// A collection the snapshot vendors that `COLLECTIONS` does not place is in no bench
-	// or gate view — vendored ahead of its triage, read only by the whole-snapshot sweeps.
-	// Listed so it is a standing question rather than a forgotten one.
-	const unplaced = await corpus_unplaced_collections();
-	if (unplaced.length > 0) {
-		info(
-			`${unplaced.length} snapshot collection(s) not placed (whole-snapshot sweeps only): ` +
-				unplaced.join(', ')
+
+	// --- Harvest stamps -------------------------------------------------------------
+	//
+	// Each stamped grade records the checkout object(s) it ran against — a HEAD commit,
+	// or for the corpora snapshot its `collections/` tree id. A stamp whose recorded id
+	// no longer matches the checkout means the pin it graded describes the PREVIOUS
+	// corpus: `bench:pins:suites` (a `conformance` preflight) re-derives the suite pins
+	// and `bench:harvest:svelte-styles` the styles one, but nothing in `check` does, so
+	// name it here ahead of a release run. Only the checkout inputs are compared — the
+	// oracle-version and pin inputs are `pins:audit`'s.
+	//
+	// Graded PER CHECKOUT, never all-or-nothing on the first absent one. Two reasons,
+	// both of which the earlier short-circuit got wrong: an absent checkout would hide
+	// a MOVED sibling in the same stamp (the two reject pins carry three checkouts
+	// apiece), and this doctor cannot know what the task will do about the absence —
+	// `css:over-acceptance:pin` reads the wpt CACHE, not `../wpt`, so it grades happily
+	// with that checkout gone. So report the fact observed here, and leave the task's
+	// own `--if-present` verdict to the task.
+
+	section(
+		'Harvest stamps (bench:pins:suites — the pin-freshness preflight — + bench:harvest:svelte-styles)'
+	);
+	for (const [name, { path, task, checkouts }] of Object.entries(HARVEST_STAMPS)) {
+		const heads = await Promise.all(
+			Object.entries(checkouts).map(async ([key, input]) => ({
+				key,
+				repo: checkout_label(input),
+				head: await checkout_hash(stamp_git, input)
+			}))
 		);
+		const absent = heads.filter((h) => h.head === null);
+		const gradable = heads.filter((h) => h.head !== null);
+		// Named on every line below, so a ✓ never reads as "all three agree" when one
+		// of the three was never compared.
+		const aside =
+			absent.length === 0 ? '' : ` (${absent.map((h) => h.repo).join(', ')} not checked out)`;
+		if (gradable.length === 0) {
+			info(`${name}: no checkout to grade against${aside}`);
+			continue;
+		}
+		let recorded: Record<string, unknown>;
+		try {
+			recorded = JSON.parse(await checkout.read_text(path)) as Record<string, unknown>;
+		} catch {
+			warn(`${name}: never stamped (no ${path}) — run deno task ${task}${aside}`);
+			continue;
+		}
+		// A key the stamp does not carry at all is reported as such rather than as a
+		// moved commit: that is what an input ADDED since the stamp was written looks
+		// like, and "stamped ?" reads as a corrupt SHA.
+		const moved = gradable
+			.map((h) => ({ ...h, recorded: recorded[h.key] }))
+			.filter((h) => h.recorded !== h.head);
+		if (moved.length > 0) {
+			warn(
+				`${name}: stamp is stale for ${moved
+					.map((h) =>
+						typeof h.recorded === 'string'
+							? `${h.repo} (stamped ${short_commit(h.recorded)}, now ${short_commit(h.head!)})`
+							: `${h.repo} (no \`${h.key}\` recorded — the stamp predates that input)`
+					)
+					.join(', ')} — run deno task ${task}${aside}`
+			);
+		} else ok(`${name}: stamp matches ${gradable.map((h) => h.repo).join(' + ')}${aside}`);
 	}
-} catch (e) {
-	// The entry list is derived from the snapshot's manifest, so this is also where a
-	// checkout whose manifest this reader can't take (or a placement table naming a collection
-	// the manifest dropped) surfaces — the message names which; a bare import failure is
-	// usually node_modules missing (deno task bench:install).
-	warn(`cannot load the corpus entry list: ${e instanceof Error ? e.message.split('\n')[0] : e}`);
-}
 
-// --- Build artifacts (informational) --------------------------------------------
+	// --- Corpus entries -------------------------------------------------------------
 
-section('Build artifacts (built on demand — absence is normal before a run)');
-const ffi_lib = native_library_filename('tsv_ffi');
-const napi_lib = native_library_filename('tsv_napi');
-const artifacts: [string, string][] = [
-	[`.pgo/bench/${ffi_lib}`, 'deno task build:bench:pgo (bench:deno, profile-guided)'],
-	[`.pgo/bench/${napi_lib}`, 'deno task build:bench:pgo (bench:node/bun, profile-guided)'],
-	[`target/corpus/${ffi_lib}`, 'deno task build:ffi:corpus (conformance gates)'],
-	[`target/napi/${napi_lib}`, 'deno task build:napi (test:napi)'],
-	['crates/tsv_wasm/pkg/all/deno', 'deno task build:wasm:all:deno (bench:deno)'],
-	['crates/tsv_wasm/pkg/all/nodejs', 'deno task build:wasm:all:nodejs (bench:node/bun)'],
-	['crates/tsv_wasm/pkg/all/npm', 'deno task build:npm:all (publish)']
-];
-for (const [path, task] of artifacts) {
-	if (exists(path)) ok(path);
-	else info(`${path} absent — ${task}`);
-}
-info(
-	'freshness (artifact vs source mtimes) is enforced at run time by lib/check_artifact_freshness.ts' +
-		' (bench/corpus) and scripts/check_staged_freshness.ts (the staged npm/napi packages)'
-);
-
-// --- Sidecar --------------------------------------------------------------------
-
-// The fixture oracle `cargo test` and the tsv_debug fixture/compare tooling run. Its actor
-// refuses an install that isn't its lock's, so this is the same check, ahead of a run.
-section('Sidecar (the fixture oracle, run by tsv_debug)');
-const read_sidecar_file = (path: string): string | null => {
+	section('Corpus entries (gates + conformance views)');
 	try {
-		return Deno.readTextFileSync(`${SIDECAR_DIR}/${path}`);
+		const { corpus_missing_entries, corpus_unplaced_collections } = await deps.load_corpus();
+		for (const view of ['gates', 'conformance'] as const) {
+			const { missing, optional_missing, total } = await corpus_missing_entries(view);
+			if (missing.length > 0) {
+				warn(
+					`${view} view: ${missing.length}/${total} entries missing — ` +
+						`corpus:compare/bench on this view fail fast:\n      ${missing.join('\n      ')}`
+				);
+			} else
+				ok(
+					`${view} view: all ${total - optional_missing.length}/${total} required entries present`
+				);
+			for (const o of optional_missing)
+				info(`${view} view: optional entry absent (fail-open, disclosed): ${o}`);
+		}
+		// A collection the snapshot vendors that `COLLECTIONS` does not place is in no bench
+		// or gate view — vendored ahead of its triage, read only by the whole-snapshot sweeps.
+		// Listed so it is a standing question rather than a forgotten one.
+		const unplaced = await corpus_unplaced_collections();
+		if (unplaced.length > 0) {
+			info(
+				`${unplaced.length} snapshot collection(s) not placed (whole-snapshot sweeps only): ` +
+					unplaced.join(', ')
+			);
+		}
 	} catch (e) {
-		if (e instanceof Deno.errors.NotFound) return null;
-		throw e;
+		// The entry list is derived from the snapshot's manifest, so this is also where a
+		// checkout whose manifest this reader can't take (or a placement table naming a
+		// collection the manifest dropped) surfaces — the message names which.
+		warn(`cannot load the corpus entry list: ${e instanceof Error ? e.message.split('\n')[0] : e}`);
 	}
-};
-try {
-	const state = sidecar_install_state(Deno.readTextFileSync(SIDECAR_LOCK_PATH), read_sidecar_file);
-	if (state === 'current') ok(`${SIDECAR_DIR} installed as its lock says`);
-	else {
+
+	// --- Build artifacts (informational) --------------------------------------------
+
+	section('Build artifacts (built on demand — absence is normal before a run)');
+	const ffi_lib = native_library_filename('tsv_ffi');
+	const napi_lib = native_library_filename('tsv_napi');
+	// each in the checkout, or beneath `target/` in the target handle
+	const artifacts: Array<[path: string, task: string]> = [
+		[`.pgo/bench/${ffi_lib}`, 'deno task build:bench:pgo (bench:deno, profile-guided)'],
+		[`.pgo/bench/${napi_lib}`, 'deno task build:bench:pgo (bench:node/bun, profile-guided)'],
+		[`target/corpus/${ffi_lib}`, 'deno task build:ffi:corpus (conformance gates)'],
+		[`target/napi/${napi_lib}`, 'deno task build:napi (test:napi)'],
+		['crates/tsv_wasm/pkg/all/deno', 'deno task build:wasm:all:deno (bench:deno)'],
+		['crates/tsv_wasm/pkg/all/nodejs', 'deno task build:wasm:all:nodejs (bench:node/bun)'],
+		['crates/tsv_wasm/pkg/all/npm', 'deno task build:npm:all (publish)']
+	];
+	for (const [path, task] of artifacts) {
+		const present = path.startsWith('target/')
+			? await exists_in(target, path.slice('target/'.length))
+			: await exists_in(checkout, path);
+		if (present) ok(path);
+		else info(`${path} absent — ${task}`);
+	}
+	info(
+		'freshness (artifact vs source mtimes) is enforced at run time by lib/check_artifact_freshness.ts' +
+			' (bench/corpus) and scripts/check_staged_freshness.ts (the staged npm/napi packages)'
+	);
+
+	// --- Sidecar --------------------------------------------------------------------
+
+	// The fixture oracle `cargo test` and the tsv_debug fixture/compare tooling run. Its actor
+	// refuses an install that isn't its lock's, so this is the same check, ahead of a run.
+	section('Sidecar (the fixture oracle, run by tsv_debug)');
+	const read_sidecar_file = (path: string): string | null => {
+		const full = `${SIDECAR_DIR}/${path}`;
+		// a missing file is an install's absence; any other failure to read it is thrown
+		try {
+			return checkout.read_text_sync(full);
+		} catch (e) {
+			if (is_fs_error(e, 'not_found')) return null;
+			throw e;
+		}
+	};
+	try {
+		const state = sidecar_install_state(
+			await checkout.read_text(SIDECAR_LOCK_PATH),
+			read_sidecar_file
+		);
+		if (state === 'current') ok(`${SIDECAR_DIR} installed as its lock says`);
+		else {
+			fail(
+				`${SIDECAR_DIR} ${state === 'missing' ? 'is not installed' : 'differs from its lock'} — ` +
+					`cargo test and the fixture tooling refuse to run it; run \`${SIDECAR_INSTALL_COMMAND}\``
+			);
+		}
+	} catch (e) {
 		fail(
-			`${SIDECAR_DIR} ${state === 'missing' ? 'is not installed' : 'differs from its lock'} — ` +
-				`cargo test and the fixture tooling refuse to run it; run \`${SIDECAR_INSTALL_COMMAND}\``
+			`cannot check ${SIDECAR_DIR}'s install (${e instanceof Error ? e.message.split('\n')[0] : e})`
 		);
 	}
-} catch (e) {
-	fail(
-		`cannot check ${SIDECAR_DIR}'s install (${e instanceof Error ? e.message.split('\n')[0] : e})`
-	);
-}
-info('the Node that answers: `cargo run -p tsv_debug check`');
+	info('the Node that answers: `cargo run -p tsv_debug check`');
 
-// --- Verdict --------------------------------------------------------------------
+	// --- Verdict --------------------------------------------------------------------
 
-console.log('');
-if (errors > 0) {
-	console.log(
-		`✗ doctor: ${errors} error(s), ${warnings} warning(s) — the ✗ items above would mislead a run; fix them first.`
-	);
-	Deno.exit(1);
-}
-if (warnings > 0) {
-	if (strict) {
+	console.log('');
+	if (errors > 0) {
 		console.log(
-			`✗ doctor --strict: ${warnings} warning(s) — this machine is not fully provisioned.`
+			`✗ doctor: ${errors} error(s), ${warnings} warning(s) — the ✗ items above would mislead a run; fix them first.`
 		);
-		Deno.exit(1);
+		return 1;
 	}
-	console.log(
-		`⚠ doctor: ${warnings} warning(s) — nothing misleading; the ⚠ tools fail loud on their own if used.`
-	);
-} else {
-	console.log('✓ doctor: everything present and consistent.');
-}
+	if (warnings > 0) {
+		if (strict) {
+			console.log(
+				`✗ doctor --strict: ${warnings} warning(s) — this machine is not fully provisioned.`
+			);
+			return 1;
+		}
+		console.log(
+			`⚠ doctor: ${warnings} warning(s) — nothing misleading; the ⚠ tools fail loud on their own if used.`
+		);
+	} else {
+		console.log('✓ doctor: everything present and consistent.');
+	}
+	return 0;
+};
