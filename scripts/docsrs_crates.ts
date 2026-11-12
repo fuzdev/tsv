@@ -17,7 +17,7 @@
  * inline spelling is not parsed, so its crate is not listed.
  *
  * The manifests are read through the caller's `read_text`, so the module runs on any runtime:
- * the gates pass their checkout handle's read, `publish_crates.ts` a file read of its own.
+ * the gates and `publish_crates.ts` pass their checkout handle's read.
  */
 
 /** A crate meant for docs.rs, and the docs.rs settings its manifest names. */

@@ -685,16 +685,26 @@ jobs:
         with:
           tool: cargo-semver-checks@0.51.0
 
-      - name: Install Deno
-        uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
+      # scripts/publish_crates.ts runs under Node on @fuzdev/gro's host modules
+      # (docs/tasks.md §`publish:crates`), the one script this job runs. Pinned
+      # to match the other jobs.
+      - name: Install Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          deno-version: 2.9.7
+          node-version: '24.14.1'
+
+      # The root package-lock.json's tree, install scripts off by the root .npmrc.
+      # Installed here because this job holds no token, unlike `publish` and
+      # `release`, which install nothing.
+      - name: Install npm dependencies
+        run: npm ci
 
       # `--expect-tag` follows the REF, as in the publish job. Never --wetrun.
+      # npm passes what follows `--` to the script, and nothing for an empty list.
       - name: Publish crates (dry run)
         run: |
           flags=()
           if [ "$GITHUB_REF_TYPE" = "tag" ]; then
             flags+=(--expect-tag "$GITHUB_REF_NAME")
           fi
-          deno task publish:crates "${flags[@]}"
+          npm run publish:crates -- "${flags[@]}"

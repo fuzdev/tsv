@@ -191,8 +191,15 @@ jobs:
           # Pinned to match local. Needs >= 22.18 for native .ts type stripping
           # (scripts/test_npm.ts runs under node --test directly; the N-API
           # staging, its size bands and the Bun launcher under node, importing no
-          # package). Bump deliberately.
+          # package; the crates packaging under node, on @fuzdev/gro's host
+          # modules from the install below). Bump deliberately.
           node-version: '24.14.1'
+
+      # The root package-lock.json's tree, install scripts off by the root .npmrc:
+      # the crates packaging step's script runs on @fuzdev/gro's host modules
+      # (docs/tasks.md §`publish:crates`). The job holds no token.
+      - name: Install npm dependencies
+        run: npm ci
 
       # Builds only the publishable wasm bundles (npm + deno) — exactly what
       # scripts/publish.ts builds and what validate:artifacts / test:npm consume.

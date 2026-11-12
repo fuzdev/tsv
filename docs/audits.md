@@ -1298,9 +1298,9 @@ reuses an earlier run's `package/` under the target directory and its overlay un
 the cargo home, which would verify an earlier tree's sources; the script removes both first
 — the target directory as `cargo metadata` reports it, so `CARGO_TARGET_DIR` and
 `build.target-dir` are honored — along with any overlay directory the removal empties
-(non-recursively). The task's write fence names only `target/package` and
-`$HOME/.cargo/registry/src`, so a target directory or cargo home anywhere else FAILS the run
-rather than going uncleared. The packaging build is cargo's default `dev` profile, not a
+(non-recursively). The script is granted writes beneath `target/package` and
+`$HOME/.cargo/registry/src` alone, so a target directory or cargo home anywhere else FAILS the
+run, naming the variable that moved it, rather than going uncleared. The packaging build is cargo's default `dev` profile, not a
 shipped one.
 
 **The real publish** (`--wetrun`, never in CI) refuses a checkout that is not the release:

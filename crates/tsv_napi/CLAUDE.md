@@ -381,7 +381,7 @@ release side is the root [CLAUDE.md §Publishing](../../CLAUDE.md#publishing).
   `attestations: write`, and no npm token. The checksum file and the attestation are this
   channel's whole integrity story; it has no signed release log of its own.
 - **`crates` job** (last, after `publish` and the Release, `release` skipped on a
-  rehearsal): the crates.io rehearsal, `deno task publish:crates` as a **dry run on every
+  rehearsal): the crates.io rehearsal, `npm run publish:crates` as a **dry run on every
   trigger** — packaging + the per-crate isolated build, and the `cargo semver-checks`
   public-API gate (`--expect-tag` on a tag ref). Not part of the N-API set: the crates
   publish from a maintainer's machine (root [CLAUDE.md §Publishing](../../CLAUDE.md#publishing)).

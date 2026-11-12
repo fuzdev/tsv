@@ -2,11 +2,15 @@
  * The crates.io questions a release asks, and the decisions `scripts/publish_crates.ts` makes
  * from their answers: which crates publish in which order, which are already live, what
  * `cargo semver-checks` grades each one against, and when crates.io's rate limit lets a stopped
- * publish go on. The registry is reached only through an injected `fetch`, so every decision
- * here is unit-tested offline (`crates_test.ts`).
+ * publish go on. The registry is reached only through an injected `fetch` and the filesystem
+ * only through the handles a caller passes, so every decision here is unit-tested offline
+ * (`crates_test.ts`).
  *
  * @module
  */
+
+import type { FsDir } from '@fuzdev/gro/fs.ts';
+import { is_fs_error } from '@fuzdev/gro/fs_error.ts';
 
 import type { Result } from './result.ts';
 import { type BumpLevel, version_parse, version_tag } from './version.ts';
@@ -39,6 +43,22 @@ export interface PublishedVersion {
 export type PublishedVersions = Array<PublishedVersion> | null;
 
 /**
+ * A failed `fetch` as one line, with its cause: Node's `fetch` throws `TypeError: fetch failed`
+ * and keeps why on `cause` (a DNS failure, a refused connection), which `String` drops. A cause
+ * with no message of its own, like the `AggregateError` of a host whose every address refused,
+ * reads as the errors it holds.
+ */
+const format_fetch_error = (error: unknown): string => {
+	const cause: unknown = error instanceof Error ? error.cause : undefined;
+	if (cause === undefined) return String(error);
+	const why =
+		cause instanceof AggregateError && cause.message === ''
+			? cause.errors.map(String).join('; ')
+			: String(cause);
+	return `${String(error)} (cause: ${why})`;
+};
+
+/**
  * Every version crates.io holds for `name`, or `null` when no such crate exists (a 404). Any
  * other answer — a network failure, a 5xx, a 403 for a missing `User-Agent`, a body that is
  * not the expected shape — is an error: no publish or gate decision may be made without the
@@ -55,7 +75,7 @@ export const crates_io_versions = async (
 			headers: { 'User-Agent': CRATES_IO_USER_AGENT, Accept: 'application/json' }
 		});
 	} catch (error) {
-		return { ok: false, error: `GET ${url} failed: ${String(error)}` };
+		return { ok: false, error: `GET ${url} failed: ${format_fetch_error(error)}` };
 	}
 	if (response.status === 404) {
 		await response.body?.cancel();
@@ -313,28 +333,22 @@ export const is_overlay_unpack = (
  * the only kind of parent the cleanup may touch. */
 export const is_overlay_parent = (name: string): boolean => /^-[0-9a-f]{16}$/.test(name);
 
-/** The filesystem the packaging cleanup needs, injected so the tests run it over a fake. A
- * missing path throws `Deno.errors.NotFound`; anything else that throws (a permission fence
- * included) is fatal to the caller. The real wiring is `package_state_deps_deno`. */
-export interface PackageStateDeps {
-	read_dir: (path: string) => Array<string>;
-	/** Whether `path` itself is a symlink (an lstat: never followed). */
-	is_symlink: (path: string) => boolean;
-	/** Remove `path`: a whole tree when `recursive`, else only an empty directory. */
-	remove: (path: string, recursive: boolean) => void;
-}
+/** The `$CARGO_HOME/registry/src` directory the packaging cleanup lists and removes beneath,
+ * by names relative to it. */
+export type RegistrySrcDir = Pick<FsDir, 'list' | 'stat' | 'remove'>;
 
 /**
- * The real filesystem behind `PackageStateDeps`, on Deno's own APIs so a missing path throws
- * `Deno.errors.NotFound` — the one error contract `clear_package_state` tolerates. (A `node:fs`
- * call throws a Node `ENOENT` error instead, which the cleanup would read as fatal: a cargo
- * home with no `registry/src`, as on a fresh CI runner, would fail the run.)
+ * The two places the packaging cleanup writes, as `scripts/roots/package_state.ts` grants
+ * them. A missing entry throws `FsError` `not_found`, the one failure the cleanup tolerates;
+ * anything else that throws (a refusal of a directory outside the grant included) is fatal to
+ * the caller.
  */
-export const package_state_deps_deno: PackageStateDeps = {
-	read_dir: (path) => Array.from(Deno.readDirSync(path), (entry) => entry.name),
-	is_symlink: (path) => Deno.lstatSync(path).isSymlink,
-	remove: (path, recursive) => Deno.removeSync(path, { recursive })
-};
+export interface PackageStateDeps {
+	/** Removes the target directory's `package/` and everything in it. */
+	remove_package_dir: () => Promise<void>;
+	/** `$CARGO_HOME/registry/src`, or `null` when nothing is there. */
+	registry_src: RegistrySrcDir | null;
+}
 
 /**
  * Remove what an earlier packaging at this version left for cargo to reuse: the target
@@ -342,10 +356,12 @@ export const package_state_deps_deno: PackageStateDeps = {
  * and `build.target-dir` are honored), and this release's overlay unpacks under
  * `registry_src` (`is_overlay_unpack`). An overlay parent left empty by the removal goes too,
  * by a NON-recursive remove, so it can never take content with it. A symlinked parent is
- * skipped, never followed. Returns every path
- * removed; throws on any failure but a path already gone.
+ * skipped, never followed.
+ * @param options - `package_dir` and `registry_src` are the paths the result names
+ * @returns every path removed
+ * @throws on any failure but an entry already gone
  */
-export const clear_package_state = (
+export const clear_package_state = async (
 	deps: PackageStateDeps,
 	options: {
 		package_dir: string;
@@ -353,38 +369,50 @@ export const clear_package_state = (
 		names: ReadonlyArray<string>;
 		version: string;
 	}
-): Array<string> => {
+): Promise<Array<string>> => {
 	const removed: Array<string> = [];
-	const remove = (path: string, recursive: boolean): void => {
+	const remove = async (op: () => Promise<void>, path: string): Promise<void> => {
 		try {
-			deps.remove(path, recursive);
+			await op();
 			removed.push(path);
 		} catch (error) {
-			if (!(error instanceof Deno.errors.NotFound)) throw error;
+			if (!is_fs_error(error, 'not_found')) throw error;
 		}
 	};
-	const list = (dir: string): Array<string> | null => {
+	await remove(deps.remove_package_dir, options.package_dir);
+	const src = deps.registry_src;
+	if (src === null) return removed;
+	const list = async (dir?: string): Promise<Array<string> | null> => {
+		const names: Array<string> = [];
 		try {
-			return deps.read_dir(dir);
+			for await (const entry of src.list(dir)) names.push(entry.name);
 		} catch (error) {
-			if (error instanceof Deno.errors.NotFound) return null;
+			if (is_fs_error(error, 'not_found')) return null;
 			throw error;
 		}
+		return names;
 	};
-	remove(options.package_dir, true);
-	for (const parent of list(options.registry_src) ?? []) {
+	for (const parent of (await list()) ?? []) {
 		if (!is_overlay_parent(parent)) continue;
-		const parent_path = `${options.registry_src}/${parent}`;
-		// a symlinked parent leads outside the cargo home, past a write fence that checks the
-		// path as written: cargo never makes one, so it is no unpack of ours
-		if (deps.is_symlink(parent_path)) continue;
-		const children = list(parent_path) ?? [];
+		// a symlinked parent leads outside the cargo home, which cargo never makes, so it is no
+		// unpack of ours; one gone since the listing has nothing left to clear
+		const info = await src.stat(parent, { follow: false });
+		if (info === null || info.kind === 'symlink') continue;
+		const children = (await list(parent)) ?? [];
 		const stale = children.filter((child) =>
 			is_overlay_unpack(parent, child, options.names, options.version)
 		);
 		if (stale.length === 0) continue;
-		for (const child of stale) remove(`${parent_path}/${child}`, true);
-		if ((list(parent_path) ?? ['?']).length === 0) remove(parent_path, false);
+		const parent_path = `${options.registry_src}/${parent}`;
+		for (const child of stale) {
+			await remove(
+				() => src.remove(`${parent}/${child}`, { recursive: true }),
+				`${parent_path}/${child}`
+			);
+		}
+		if (((await list(parent)) ?? ['?']).length === 0) {
+			await remove(() => src.remove(parent), parent_path);
+		}
 	}
 	return removed;
 };

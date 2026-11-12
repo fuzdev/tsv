@@ -49,6 +49,8 @@
 		"docs:audit:docsrs": "node scripts/roots/docsrs_audit.ts",
 		"deps:audit": "node scripts/roots/deps_audit.ts",
 		"package:audit": "node scripts/roots/package_audit.ts",
+		"publish:crates": "node scripts/roots/publish_crates.ts",
+		"publish:crates:package": "node scripts/roots/publish_crates.ts --no-semver-checks",
 		"roundtrip:audit:prettier": "node scripts/roots/roundtrip_audit_prettier.ts",
 		"test:audits": "cargo test -p tsv_lang --features _internal_audits --quiet",
 		"test:node": "node node_modules/.bin/tsc -p tsconfig.vitest.json && node node_modules/.bin/vitest run",
