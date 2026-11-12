@@ -201,7 +201,7 @@
 		"@fuzdev/blake3-wasm": "^0.2.0",
 		"@fuzdev/fuz_schema": "^0.5.7",
 		"@fuzdev/fuz_util": "^0.82.0",
-		"@fuzdev/gro": "^0.235.0",
+		"@fuzdev/gro": "^0.236.0",
 		"@types/node": "^24.10.1",
 		"svelte": "^5.57.2",
 		"typescript": "^6.0.3",
