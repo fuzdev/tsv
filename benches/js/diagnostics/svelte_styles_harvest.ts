@@ -36,16 +36,18 @@
  * can't see).
  *
  * Run (from repo root):
- *   deno run --allow-read --allow-write=benches/js/.cache --allow-env \
- *     --allow-sys --allow-run=git --config benches/js/deno.json \
- *     benches/js/diagnostics/svelte_styles_harvest.ts [--force]
+ *   npm run bench:harvest:svelte-styles [-- --force]
+ *
+ * `run_svelte_styles_harvest` is the library function; its root,
+ * `benches/js/roots/svelte_styles_harvest.ts`, binds its deps (`SvelteStylesHarvestDeps`).
+ *
+ * @module
  */
 
-import { mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
-import { relative, resolve, sep } from 'node:path';
+import { relative, sep } from 'node:path';
 
 import { CORPORA_COLLECTIONS, CORPORA_ROOT, CORPORA_URL } from '../lib/corpora.ts';
-import { CorpusLoader, corpus_view_paths, SVELTE_STYLES_CACHE } from '../lib/corpus.ts';
+import { SVELTE_STYLES_CACHE } from '../lib/corpus.ts';
 import { GATE_CHECKOUT_IDS, SVELTE_STYLES_BLOCKS_PIN } from '../lib/gate_counts.ts';
 import {
 	checkout_hash,
@@ -58,35 +60,37 @@ import {
 	write_stamp
 } from '../lib/harvest_stamp.ts';
 import { HARVEST_STAMPS } from '../lib/harvest_stamp_table.ts';
+import type { Logger, SourceFile } from '../lib/types.ts';
 
-/** The stamps' `git`, run through Deno's `Command` as this script's runtime does. */
-const stamp_git: StampGit = {
-	out: async (args) => {
-		const output = await new Deno.Command('git', {
-			args: [...args],
-			stdout: 'piped',
-			stderr: 'null'
-		}).output();
-		return { kind: 'exited', code: output.code, stdout: new TextDecoder().decode(output.stdout) };
-	}
-};
+/** The perf view, as `lib/corpus.ts` reads it. */
+export interface PerfCorpus {
+	/** The view's entry list (`corpus_view_paths`). */
+	view_paths(view: 'perf'): Promise<string[]>;
+	/** The view's files, streamed (`CorpusLoader.stream`). */
+	stream(logger: Logger): AsyncIterable<SourceFile>;
+}
 
-/** The stamps' file reads and writes, by path from the working directory. */
-const stamp_fs: StampWrites = {
-	exists: (path) =>
-		stat(path).then(
-			() => true,
-			() => false
-		),
-	read_text: (path) => readFile(path, 'utf8'),
-	write: (path, data) => writeFile(path, data),
-	mkdir: async (path, options) => {
-		await mkdir(path, options);
-	}
-};
+/** The cache directory, `SVELTE_STYLES_CACHE`, by names in it. */
+export interface StylesDir {
+	read_text_if_exists(name: string): Promise<string | null>;
+	write(name: string, data: string): Promise<void>;
+	/** The directory's entries, in any order. */
+	list(): AsyncIterable<{ name: string }>;
+	remove(name: string): Promise<void>;
+}
 
-/** The snapshot every perf-view `.svelte` file comes from — the tree the stamp records. */
-const collections_root = resolve(CORPORA_COLLECTIONS);
+/** What `run_svelte_styles_harvest` reaches the world through. */
+export interface SvelteStylesHarvestDeps {
+	/** `git` for the stamp's tree id. */
+	git: StampGit;
+	/** The checkout's files by project-root-relative path; writes the stamp and makes the cache. */
+	files: StampWrites;
+	corpus: PerfCorpus;
+	/** The cache the concats go to; made by the harvest before its first use. */
+	styles: StylesDir;
+	/** The snapshot's collections directory, as the loader's paths spell it beneath. */
+	collections_root: string;
+}
 
 /** Line-anchored component-level style blocks; group 1 = attrs, group 2 = content. */
 const STYLE_RE = /^<style([^>]*)>\n([\s\S]*?)^<\/style>/gm;
@@ -116,30 +120,37 @@ const dedent = (block: string): string => {
 	return lines.map((l) => (l.startsWith(prefix) ? l.slice(prefix.length) : l)).join('\n');
 };
 
-async function main(): Promise<void> {
-	const force = Deno.args.includes('--force');
+/**
+ * The harvest.
+ * @returns the exit code
+ */
+export async function run_svelte_styles_harvest(
+	deps: SvelteStylesHarvestDeps,
+	argv: ReadonlyArray<string>
+): Promise<number> {
+	const force = argv.includes('--force');
 	const stamp = HARVEST_STAMPS['svelte-styles'];
 	const tree_input = stamp.checkouts.corpora_tree;
-	const corpora_tree = await checkout_hash(stamp_git, tree_input);
+	const corpora_tree = await checkout_hash(deps.git, tree_input);
 	if (corpora_tree === null) {
 		console.error(
 			`svelte_styles_harvest: ${checkout_label(tree_input)} is not a git checkout tree — ` +
 				`the perf view reads the corpora snapshot (git clone ${CORPORA_URL} ${CORPORA_ROOT})`
 		);
-		Deno.exit(1);
+		return 1;
 	}
 	const inputs = {
 		corpora_tree,
 		blocks_pin: SVELTE_STYLES_BLOCKS_PIN,
-		perf_entries: (await corpus_view_paths('perf')).join(' '),
-		filters: await corpus_filter_fingerprint(stamp_fs, 'perf')
+		perf_entries: (await deps.corpus.view_paths('perf')).join(' '),
+		filters: await corpus_filter_fingerprint(deps.files, 'perf')
 	};
-	if (!force && (await harvest_up_to_date(stamp_fs, stamp.path, inputs, [SVELTE_STYLES_CACHE]))) {
+	if (!force && (await harvest_up_to_date(deps.files, stamp.path, inputs, [SVELTE_STYLES_CACHE]))) {
 		console.error(
 			`svelte_styles_harvest: up to date (${checkout_label(tree_input)} at ${short_commit(corpora_tree)}, ` +
 				`${SVELTE_STYLES_BLOCKS_PIN} blocks, same perf entries) — skipping; --force to re-harvest`
 		);
-		return;
+		return 0;
 	}
 
 	// The styles cache itself is a perf-view entry, so on a re-run the loader
@@ -147,10 +158,9 @@ async function main(): Promise<void> {
 	// them (and its absence on a first run is `optional`, a warning). A missing
 	// snapshot collection fails fast with the loader's clear error instead of
 	// surfacing as a misleading pin trip on a silently smaller harvest.
-	const loader = new CorpusLoader('perf');
 	const by_collection = new Map<string, { blocks: string[]; bytes: number }>();
 	let blocks = 0;
-	for await (const f of loader.stream((m) => console.error(m))) {
+	for await (const f of deps.corpus.stream((m) => console.error(m))) {
 		if (f.language !== 'svelte' || !f.path.endsWith('.svelte')) continue;
 		for (const m of f.content.matchAll(STYLE_RE)) {
 			const attrs = m[1];
@@ -158,7 +168,7 @@ async function main(): Promise<void> {
 			if (lang !== undefined && lang !== 'css') continue; // scss etc. — not CSS
 			const content = dedent(m[2].replace(/^\n+/, '').trimEnd());
 			if (content === '') continue;
-			const in_snapshot = relative(collections_root, f.path);
+			const in_snapshot = relative(deps.collections_root, f.path);
 			if (in_snapshot.startsWith('..')) {
 				// The per-collection grouping below reads the first path segment under the
 				// snapshot; a perf-view `.svelte` file from anywhere else would silently
@@ -166,7 +176,7 @@ async function main(): Promise<void> {
 				console.error(
 					`svelte_styles_harvest: perf-view .svelte file outside the snapshot: ${f.path}`
 				);
-				Deno.exit(1);
+				return 1;
 			}
 			const collection = in_snapshot.split(sep)[0];
 			const entry = by_collection.get(collection) ?? { blocks: [], bytes: 0 };
@@ -192,11 +202,10 @@ async function main(): Promise<void> {
 					: ' — a snapshot refresh moves this deliberately (re-pin SVELTE_STYLES_BLOCKS_PIN in ' +
 						'lib/gate_counts.ts beside the new tree id); otherwise check out the pinned snapshot.')
 		);
-		Deno.exit(1);
+		return 1;
 	}
 
-	const out_dir = resolve(SVELTE_STYLES_CACHE);
-	await mkdir(out_dir, { recursive: true });
+	await deps.files.mkdir(SVELTE_STYLES_CACHE, { recursive: true });
 	let written = 0;
 	let unchanged = 0;
 	const expected = new Set<string>();
@@ -207,32 +216,32 @@ async function main(): Promise<void> {
 			`/* generated by \`deno task bench:harvest:svelte-styles\` — CSS extracted from ` +
 			`${CORPORA_COLLECTIONS}/${collection}'s .svelte <style> blocks (${entry.blocks.length} blocks); do not edit */`;
 		const content = banner + '\n\n' + entry.blocks.join('\n\n') + '\n';
-		const path = resolve(out_dir, name);
-		const previous = await readFile(path, 'utf8').catch(() => null);
+		const previous = await deps.styles.read_text_if_exists(name).catch(() => null);
 		if (previous === content) {
 			unchanged++;
 			continue;
 		}
-		await writeFile(path, content);
+		await deps.styles.write(name, content);
 		written++;
 	}
 	// Delete strays so a collection that stopped contributing doesn't linger in the corpus.
+	const names: string[] = [];
+	for await (const { name } of deps.styles.list()) names.push(name);
 	let removed = 0;
-	for (const name of await readdir(out_dir)) {
+	for (const name of names) {
 		if (!expected.has(name)) {
-			await rm(resolve(out_dir, name));
+			await deps.styles.remove(name);
 			removed++;
 		}
 	}
-	await write_stamp(stamp_fs, stamp.path, inputs);
+	await write_stamp(deps.files, stamp.path, inputs);
 
 	const total_bytes = [...by_collection.values()].reduce((s, e) => s + e.bytes, 0);
 	console.error(
 		`svelte_styles_harvest: ${blocks} style blocks / ${(total_bytes / 1024).toFixed(0)} KB ` +
-			`from ${by_collection.size} collections → ${relative(resolve('.'), out_dir)}/ ` +
+			`from ${by_collection.size} collections → ${SVELTE_STYLES_CACHE}/ ` +
 			`(${written} written, ${unchanged} unchanged${removed > 0 ? `, ${removed} stray removed` : ''}; ` +
 			`stamped at ${checkout_label(tree_input)} ${short_commit(corpora_tree)})`
 	);
+	return 0;
 }
-
-await main();

@@ -24,6 +24,13 @@
 		"benches/js/roots/compose_reports.ts",
 		"benches/js/roots/wasm_format_probe.ts",
 		"benches/js/roots/wasm_glue.ts",
-		"benches/js/roots/wasm_memory_probe.ts"
+		"benches/js/roots/wasm_memory_probe.ts",
+		"benches/js/roots/corpus_audit.ts",
+		"benches/js/roots/harvest_deps.ts",
+		"benches/js/roots/harvest_test262.ts",
+		"benches/js/roots/harvest_ts_repo.ts",
+		"benches/js/roots/idempotency_sweep.ts",
+		"benches/js/roots/svelte_styles_harvest.ts",
+		"benches/js/roots/wpt_css_harvest.ts"
 	]
 }

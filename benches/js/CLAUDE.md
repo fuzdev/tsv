@@ -8,7 +8,9 @@ for statistical analysis.
 
 **Directory note:** the **runtime-neutral** JS harness — named `js`, not `deno`, because the
 same code runs under Deno, Node, and Bun ([Cross-Runtime](#cross-runtime-deno--node--bun)). The
-`corpus_compare_*` and `diagnostics/` entries stay Deno-idiomatic (`biome_heap_probe.ts` aside, a node/bun probe); `smoke` is portable.
+tools that are not the bench (the comparison tools, the harvests, `diagnostics/`) are Node
+entries under `roots/` (`facade_probe.ts` and `biome_heap_probe.ts` aside, which run under each
+runtime they name); `smoke` is portable.
 
 **Companion docs** — this file is the operational surface (what to run, what it
 grades); the reference halves live in `docs/`:
@@ -136,9 +138,8 @@ delta on the same row is the detector.
   supports them, so files and subprocesses go through them) + `@fuzdev/fuz_util`'s
   pure modules (`args`, `benchmark*`, `stats`, `time`) — **no `Deno.*`, no `@std/*`**. The only genuinely
   runtime-specific files are the native loader (`ffi.ts` `Deno.dlopen` vs `napi.ts`
-  `process.dlopen`) and the WASM target the loader picks. The Deno-only entry points
-  (`corpus_compare_*`, `diagnostics/*` but the node/bun `biome_heap_probe.ts` and the Node
-  `corpus_stats.ts`) stay Deno-idiomatic. The
+  `process.dlopen`) and the WASM target the loader picks. The tools beside the bench run
+  under Node from their roots in `roots/`, on gro's host modules. The
   core's suites are its tests: the divergence detectors plus the other dependency-free `lib/`
   modules' (`node:assert` + relative imports; the fixture-coverage audit also opens a read-only
   handle on `tests/fixtures` through `@fuzdev/gro`), run by vitest under Node (`test:node`).
@@ -933,6 +934,11 @@ deno task css:over-acceptance:pin  # CSS_REJECTS_PIN alone (oracle only, no buil
 deno task bench:harvest:svelte-styles   # perf-view .svelte <style> blocks per snapshot collection → .cache/svelte_styles/<collection>.css
 ```
 
+Each runs under Node on gro's host modules (`roots/<harvest>.ts` over `roots/harvest_deps.ts`;
+`../../docs/tasks.md` §`bench:harvest` has their reach): a harvest writes its caches and its
+stamp beneath `.cache` and nothing else, and reaches no network. Each library's suite drives it
+over fakes (in `test:node`); nothing here harvests in a test.
+
 Idempotent; warn-and-skip when the source checkout is absent. The suite legs are
 FRESHNESS-STAMPED (`lib/harvest_stamp.ts` — every stamp is listed in the `HARVEST_STAMPS` table, `lib/harvest_stamp_table.ts`,
 which the scripts read their paths from and `deno task doctor` walks): a grade whose stamped
@@ -1632,9 +1638,9 @@ benches/js/
 ├── package-lock.json      # npm lock (committed for reproducibility)
 ├── deno.json              # nodeModulesDir: manual + lock: false + exclude (npm from package.json)
 ├── install_deps.ts        # `bench:install`: npm install + force-fetch the oxc wasi binding
-├── harvest_test262.ts     # `bench:harvest:test262`: graded positives → .cache (Deno-only)
+├── harvest_test262.ts     # `bench:harvest:test262`: graded positives → .cache (Node, its root in `roots/`)
 ├── harvest_ts_repo.ts     # `bench:harvest:ts-repo`: the tsc corpus's valid + rejects lists →
-│                          # .cache (Deno-only; tsc itself is the validity oracle)
+│                          # .cache (Node, its root in `roots/`; tsc itself is the validity oracle)
 ├── bench.ts               # Benchmark entry point (runtime-neutral): the ORCHESTRATOR — starts the
 │                          # pre-flight process and one process per timed row per pass, pools
 │                          # the timings, writes the report (§Process model)
@@ -1659,15 +1665,17 @@ benches/js/
 │                          # `compose_reports.ts`, `corpus_stats.ts`, the comparison tools and the
 │                          # `conformance` driver, and `skip_triage`, whose shared bindings are
 │                          # `compare_deps.ts`, the over-acceptance tools, whose full engine set is
-│                          # `graded_implementations.ts`, and the other diagnostics, whose WASM
-│                          # glue loader is `wasm_glue.ts`); typechecked by `tsconfig.bench.json` but those whose
+│                          # `graded_implementations.ts`, the other diagnostics, whose WASM
+│                          # glue loader is `wasm_glue.ts`, the harvests, whose shared bindings
+│                          # are `harvest_deps.ts`, and the two corpus sweeps); typechecked by `tsconfig.bench.json` but those whose
 │                          # closure reaches `lib/ffi.ts` or a bench package's untyped module,
 │                          # which `typecheck:js`' `deno check` covers, and those needing no bench
 │                          # package by `tsconfig.scripts.json` too
 ├── compose_reports.ts     # Fold report.{deno,node,bun}.json → combined report.{json,md}
-├── idempotency_sweep.ts   # F1 sweep over the `robustness` view (drives tsv_debug `fuzz --iterations 0`)
+├── idempotency_sweep.ts   # F1 sweep over the `robustness` view (drives tsv_debug `fuzz --iterations 0`;
+│                          # Node, its root in `roots/`)
 ├── corpus_audit.ts        # `audit:corpus`: the pure-Rust content-loss / robustness legs over
-│                          # real code (§Gate map)
+│                          # real code (§Gate map; Node, its root in `roots/`)
 ├── corpus_compare_format.ts  # Formatting comparison vs prettier (Deno-only entry point)
 ├── corpus_compare_parse.ts   # Parse/AST comparison vs canonical parsers (Deno-only entry point)
 ├── divergence_audit.ts    # Divergence audit (Node, its root in `roots/`)
@@ -2016,9 +2024,9 @@ state) shows in the coverage report and skip counts without `--verbose`.
 These live under `diagnostics/`. Most are ad-hoc, not wired into a task. Each
 module's own doc comment is the full reference (rationale, findings, exact run
 command); the table is the index. They run under Node, each from its root in `roots/`
-(`node benches/js/roots/<script>.ts`, the library under `diagnostics/`), but for the
-harvests, which run under Deno (§Harvests), and `facade_probe.ts` and `biome_heap_probe.ts`,
-which run as they are under each runtime they name. All run from the repo root
+(`node benches/js/roots/<script>.ts`, the library under `diagnostics/`), the harvests among
+them (§Harvests), but for `facade_probe.ts` and `biome_heap_probe.ts`, which run as they are
+under each runtime they name. All run from the repo root
 (corpus/artifact paths are CWD-relative). Each library takes its engines, readers, and
 stdout as deps, so its unit suite drives it over fakes (`diagnostics/*_test.ts`, in `test:node`);
 `biome_oxfmt_diff.ts` and `wasm_json_probe.ts` have none (the first loads biome and oxfmt itself,

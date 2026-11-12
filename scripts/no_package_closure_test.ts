@@ -230,12 +230,13 @@ const package_name = (specifier: string): string =>
 // a bench root that loads only the root install's packages typechecks in `typecheck:scripts`'
 // gated `tsc` program, which names each one, since the rest of `benches/js/roots/` needs the
 // bench install; one left off the list would be typechecked by the ungated `typecheck:js` alone
+// (a suite beside the roots is no root: `tsconfig.vitest.json` names it)
 test("each bench root that loads no bench package is in typecheck:scripts' program", () => {
 	const program: ReadonlyArray<string> = JSON.parse(
 		readFileSync(join(CHECKOUT, 'tsconfig.scripts.json'), 'utf8')
 	).include;
 	const root_only = readdirSync(join(CHECKOUT, 'benches/js/roots'))
-		.filter((name) => name.endsWith('.ts'))
+		.filter((name) => name.endsWith('.ts') && !name.endsWith('_test.ts'))
 		.map((name) => `benches/js/roots/${name}`)
 		.filter((root) =>
 			loads_of(root).packages.every((found) => ROOT_PACKAGES.has(package_name(found.specifier)))

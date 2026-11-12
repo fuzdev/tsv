@@ -27,19 +27,15 @@
  * tolerance argument (`load_pinned_language_corpus`, `{ complete_for }`).
  *
  * Run (from repo root):
- *   deno run --allow-read --allow-write=benches/js/.cache --allow-env --allow-net \
- *     --allow-sys --config benches/js/deno.json \
- *     benches/js/diagnostics/prettier_jsx_harvest.ts
+ *   npm run bench:harvest:prettier-jsx [-- --force]
+ *
+ * `run_prettier_jsx_harvest` is the library function; its root,
+ * `benches/js/roots/prettier_jsx_harvest.ts`, binds its deps (`PrettierJsxHarvestDeps`).
+ *
+ * @module
  */
 
-import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
-import { relative, resolve } from 'node:path';
-
-import {
-	corpus_view_paths,
-	load_pinned_language_corpus,
-	PRETTIER_JSX_CACHE
-} from '../lib/corpus.ts';
+import { PRETTIER_JSX_CACHE } from '../lib/corpus.ts';
 import { PRETTIER_JSX_PIN } from '../lib/gate_counts.ts';
 import {
 	corpus_filter_fingerprint,
@@ -54,80 +50,73 @@ import {
 import { HARVEST_STAMPS } from '../lib/harvest_stamp_table.ts';
 import { ast_has_jsx } from '../lib/prettier_fixtures.ts';
 import { load_all_versions } from '../lib/versions.ts';
-
-/** The stamps' `git`, run through Deno's `Command` as this script's runtime does. */
-const stamp_git: StampGit = {
-	out: async (args) => {
-		const output = await new Deno.Command('git', {
-			args: [...args],
-			stdout: 'piped',
-			stderr: 'null'
-		}).output();
-		return { kind: 'exited', code: output.code, stdout: new TextDecoder().decode(output.stdout) };
-	}
-};
-
-/** The stamps' file reads and writes, by path from the working directory. */
-const stamp_fs: StampWrites = {
-	exists: (path) =>
-		stat(path).then(
-			() => true,
-			() => false
-		),
-	read_text: (path) => readFile(path, 'utf8'),
-	write: (path, data) => writeFile(path, data),
-	mkdir: async (path, options) => {
-		await mkdir(path, options);
-	}
-};
-
-const STAMP_PATH = HARVEST_STAMPS['prettier-jsx'].path;
-const PRETTIER_JS_SUITE = '../prettier/tests/format/js';
-const if_present = Deno.args.includes('--if-present');
-const force = Deno.args.includes('--force');
+import type { HarvestCorpus } from './svelte_reject_harvest.ts';
 
 /** The one member of prettier's `__debug` surface this harvest reads. */
-interface PrettierDebugParse {
+export interface PrettierDebugParse {
 	__debug: {
 		parse: (text: string, options: { parser: string }) => Promise<{ ast: unknown }>;
 	};
 }
 
-async function main(): Promise<void> {
+/** What `run_prettier_jsx_harvest` reaches the world through. */
+export interface PrettierJsxHarvestDeps {
+	/** `git` for the stamp's checkout commit. */
+	git: StampGit;
+	/** The checkout's files by project-root-relative path; writes the JSX list and the stamp. */
+	files: StampWrites;
+	corpus: HarvestCorpus;
+	/** Imports `prettier`, the oracle; rejects when it can't. */
+	import_prettier(): Promise<PrettierDebugParse>;
+}
+
+const STAMP_PATH = HARVEST_STAMPS['prettier-jsx'].path;
+const PRETTIER_JS_SUITE = '../prettier/tests/format/js';
+
+/**
+ * The harvest.
+ * @returns the exit code
+ */
+export async function run_prettier_jsx_harvest(
+	deps: PrettierJsxHarvestDeps,
+	argv: ReadonlyArray<string>
+): Promise<number> {
+	const if_present = argv.includes('--if-present');
+	const force = argv.includes('--force');
 	const versions = await load_all_versions();
 
 	// Freshness stamp: the graded files are one checkout's, the oracle is the pinned
 	// npm prettier, and the conformance view's ENTRY LIST is stamped like every
 	// other view-loading grade (see `svelte_reject_harvest.ts`).
-	const prettier_commit = await git_head(stamp_git, '../prettier');
+	const prettier_commit = await git_head(deps.git, '../prettier');
 	const stamp_inputs: StampInputs = {
 		harvest: 'prettier-jsx',
 		prettier_commit,
 		prettier_oracle: versions.canonical.prettier,
 		jsx_pin: PRETTIER_JSX_PIN,
-		conformance_entries: (await corpus_view_paths('conformance')).join(' '),
-		filters: await corpus_filter_fingerprint(stamp_fs, 'conformance')
+		conformance_entries: (await deps.corpus.view_paths('conformance')).join(' '),
+		filters: await corpus_filter_fingerprint(deps.files, 'conformance')
 	};
 	if (
 		!force &&
 		prettier_commit !== null &&
-		(await harvest_up_to_date(stamp_fs, STAMP_PATH, stamp_inputs, [PRETTIER_JSX_CACHE]))
+		(await harvest_up_to_date(deps.files, STAMP_PATH, stamp_inputs, [PRETTIER_JSX_CACHE]))
 	) {
 		console.error(
 			`prettier-jsx harvest up to date (../prettier at ${short_commit(prettier_commit)}, ` +
 				`oracle prettier@${versions.canonical.prettier}, pin ${PRETTIER_JSX_PIN}) — skipping; --force to re-harvest.`
 		);
-		return;
+		return 0;
 	}
 
 	let prettier: PrettierDebugParse;
 	try {
-		prettier = (await import('prettier')) as unknown as PrettierDebugParse;
+		prettier = await deps.import_prettier();
 	} catch (e) {
 		const msg = `prettier_jsx_harvest: could not import prettier (${e instanceof Error ? e.message : e})`;
 		if (if_present) {
 			console.error(`  ⚠ ${msg} — skipping (run \`deno task bench:install\`)`);
-			return;
+			return 0;
 		}
 		throw new Error(msg);
 	}
@@ -135,13 +124,13 @@ async function main(): Promise<void> {
 	// The un-filtered view (`apply_exclusion_caches: false` — this harvest PRODUCES
 	// one of those caches), one language, the Prettier JS suite alone, under the pin
 	// posture over that entry.
-	const files = await load_pinned_language_corpus('conformance', 'typescript', {
+	const files = await deps.corpus.load('conformance', 'typescript', {
 		if_present,
 		logger: (m) => console.error(m),
 		apply_exclusion_caches: false,
 		only: (entry_path) => entry_path === PRETTIER_JS_SUITE
 	});
-	if (files === null) return;
+	if (files === null) return 0;
 
 	const jsx: string[] = [];
 	for (const f of files) {
@@ -158,20 +147,18 @@ async function main(): Promise<void> {
 	jsx.sort();
 
 	// Pinned count (exact): see ../lib/gate_counts.ts.
-	const out = await write_pinned_path_cache(stamp_fs, {
+	const out = await write_pinned_path_cache(deps.files, {
 		cache: PRETTIER_JSX_CACHE,
 		paths: jsx,
 		pin: PRETTIER_JSX_PIN,
 		what: 'JSX files',
 		stamp: prettier_commit === null ? null : { path: STAMP_PATH, inputs: stamp_inputs }
 	});
-	if (out === null) Deno.exit(1);
+	if (out === null) return 1;
 
-	const cwd = resolve('.');
 	console.error(
 		`prettier_jsx_harvest: ${jsx.length}/${files.length} Prettier JS fixtures read as JSX by ` +
-			`prettier's babel parser → ${relative(cwd, out)}`
+			`prettier's babel parser → ${out}`
 	);
+	return 0;
 }
-
-await main();

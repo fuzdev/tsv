@@ -14,9 +14,7 @@
  * @module
  */
 
-import { GIT_LOCAL_PASS_ENV } from '@fuzdev/gro/git.ts';
 import { process } from '@fuzdev/gro/process.ts';
-import { spawn } from '@fuzdev/gro/spawn.ts';
 
 import { open_checkout } from '../../../scripts/roots/checkout.ts';
 import { run_css_over_acceptance } from '../diagnostics/css_over_acceptance.ts';
@@ -26,40 +24,16 @@ import {
 	corpus_view_paths,
 	load_pinned_language_corpus
 } from '../lib/corpus.ts';
-import type { StampGit, StampWrites } from '../lib/harvest_stamp.ts';
 import { load_all_versions } from '../lib/versions.ts';
 import { exit_with } from './compare_deps.ts';
-
-/** The one directory the tool writes beneath, as the stamp's path spells it. */
-const CACHE_DIR = 'benches/js/.cache';
-
-// with no `git` on `PATH` every commit reads as none, as for a checkout that isn't a repo
-const git: StampGit = spawn.find('git', { pass_env: GIT_LOCAL_PASS_ENV }) ?? {
-	out: () => Promise.reject(new Error('no `git` on PATH'))
-};
+import { cache_files, stamp_git } from './harvest_deps.ts';
 
 const checkout = await open_checkout();
-const readonly_checkout = checkout.readonly();
-/** The writable path beneath `CACHE_DIR`, refusing any other. */
-const cache_relative = (path: string): string => {
-	if (!path.startsWith(`${CACHE_DIR}/`)) {
-		throw new Error(`css_over_acceptance writes beneath ${CACHE_DIR} only, not ${path}`);
-	}
-	return path.slice(CACHE_DIR.length + 1);
-};
-const files: StampWrites = {
-	exists: (path) => readonly_checkout.exists(path),
-	read_text: (path) => readonly_checkout.read_text(path),
-	write: (path, data) => checkout.dir(CACHE_DIR).write(cache_relative(path), data),
-	mkdir: async (path, options) => {
-		await checkout.dir(CACHE_DIR).mkdir(cache_relative(path), options);
-	}
-};
 
 const code = await run_css_over_acceptance(
 	{
-		git,
-		files,
+		git: stamp_git(checkout),
+		files: cache_files(checkout),
 		corpus: {
 			missing_entries: corpus_missing_entries,
 			view_paths: corpus_view_paths,

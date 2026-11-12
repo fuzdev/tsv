@@ -25,27 +25,45 @@
  * Builds with `--profile corpus` (release + `panic = "unwind"`), because the fuzzer
  * drives each file under `catch_unwind` — a `panic = "abort"` release build would
  * take the process down instead of reporting the panic.
+ *
+ * `run_idempotency_sweep` is the library function; its root,
+ * `benches/js/roots/idempotency_sweep.ts`, binds its deps (`IdempotencySweepDeps`).
+ *
+ * @module
  */
 
-import { spawnSync } from 'node:child_process';
+import type { Logger } from './lib/types.ts';
 
-import { corpus_robustness_seeds } from './lib/corpus.ts';
+/** What a corpus tool's `cargo` returns: a code when it exited. */
+export type CargoStatus =
+	{ readonly kind: 'exited'; readonly code: number } | { readonly kind: string };
 
-const { dirs, live_files } = await corpus_robustness_seeds((...args) => console.error(...args));
-const seeds = [...dirs, ...live_files];
-
-if (seeds.length === 0) {
-	console.error('Error: no corpus present — nothing to sweep.');
-	process.exit(1);
+/** What `run_idempotency_sweep` reaches the world through. */
+export interface IdempotencySweepDeps {
+	/** The `robustness` view's seeds (`corpus_robustness_seeds`). */
+	seeds(logger: Logger): Promise<{ dirs: string[]; live_files: string[] }>;
+	/** `cargo` in the checkout, its output inherited. */
+	cargo: { run(args: ReadonlyArray<string>): Promise<CargoStatus> };
 }
 
-console.error(
-	`idempotency sweep over ${dirs.length} directory seeds + ${live_files.length} live-diff files\n`
-);
+/**
+ * The sweep.
+ * @returns the exit code: the sweep's own, `1` when it didn't exit or found no corpus
+ */
+export async function run_idempotency_sweep(deps: IdempotencySweepDeps): Promise<number> {
+	const { dirs, live_files } = await deps.seeds((...args) => console.error(...args));
+	const seeds = [...dirs, ...live_files];
 
-const { status } = spawnSync(
-	'cargo',
-	[
+	if (seeds.length === 0) {
+		console.error('Error: no corpus present — nothing to sweep.');
+		return 1;
+	}
+
+	console.error(
+		`idempotency sweep over ${dirs.length} directory seeds + ${live_files.length} live-diff files\n`
+	);
+
+	const status = await deps.cargo.run([
 		'run',
 		'--profile',
 		'corpus',
@@ -57,8 +75,10 @@ const { status } = spawnSync(
 		'--iterations',
 		'0',
 		...seeds
-	],
-	{ stdio: 'inherit' }
-);
+	]);
+	return exit_code_of(status) ?? 1;
+}
 
-process.exit(status ?? 1);
+/** The code `status` exited with, or `null` when it didn't exit (`spawnSync`'s `status`). */
+export const exit_code_of = (status: CargoStatus): number | null =>
+	'code' in status && status.kind === 'exited' ? status.code : null;

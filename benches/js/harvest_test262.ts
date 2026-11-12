@@ -34,10 +34,14 @@
  * result either way).
  *
  * Run from the repo root:
- *   deno run --allow-read --allow-write --allow-run=cargo benches/js/harvest_test262.ts
+ *   npm run bench:harvest:test262 [-- --force]
+ *
+ * `run_harvest_test262` is the library function; its root, `benches/js/roots/harvest_test262.ts`,
+ * binds its deps (`HarvestTest262Deps`).
+ *
+ * @module
  */
 
-import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { TEST262_POSITIVES_PIN } from './lib/gate_counts.ts';
@@ -52,81 +56,119 @@ import {
 } from './lib/harvest_stamp.ts';
 import { HARVEST_STAMPS } from './lib/harvest_stamp_table.ts';
 
-/** The stamps' `git`, run through Deno's `Command` as this script's runtime does. */
-const stamp_git: StampGit = {
-	out: async (args) => {
-		const output = await new Deno.Command('git', {
-			args: [...args],
-			stdout: 'piped',
-			stderr: 'null'
-		}).output();
-		return { kind: 'exited', code: output.code, stdout: new TextDecoder().decode(output.stdout) };
-	}
-};
+/** What `run_harvest_test262` reaches the world through. */
+export interface HarvestTest262Deps {
+	/** `git` for the stamp's checkout commit. */
+	git: StampGit;
+	/** The checkout's files by project-root-relative path; writes the path list and the stamp. */
+	files: StampWrites;
+	/** The `../test262` checkout, read for its presence alone. */
+	test262: { exists(path: string): Promise<boolean> };
+	/**
+	 * `cargo` in the checkout, its output inherited: the run that grades the suite and writes
+	 * the manifest beneath `benches/js/.cache` itself.
+	 */
+	cargo: {
+		run(
+			args: ReadonlyArray<string>
+		): Promise<{ readonly kind: string; readonly code?: number | null }>;
+	};
+}
 
-/** The stamps' file reads and writes, by path from the working directory. */
-const stamp_fs: StampWrites = {
-	exists: (path) =>
-		stat(path).then(
-			() => true,
-			() => false
-		),
-	read_text: (path) => readFile(path, 'utf8'),
-	write: (path, data) => writeFile(path, data),
-	mkdir: async (path, options) => {
-		await mkdir(path, options);
-	}
-};
-
-const TEST262_ROOT = '../test262';
+export const TEST262_ROOT = '../test262';
 const CACHE_DIR = 'benches/js/.cache';
-const MANIFEST_PATH = `${CACHE_DIR}/test262_manifest.json`;
-const FILES_PATH = `${CACHE_DIR}/test262_files.json`;
+export const TEST262_MANIFEST_PATH = `${CACHE_DIR}/test262_manifest.json`;
+export const TEST262_FILES_PATH = `${CACHE_DIR}/test262_files.json`;
 const STAMP_PATH = HARVEST_STAMPS.test262.path;
 
-const if_present = Deno.args.includes('--if-present');
-const force = Deno.args.includes('--force');
+/** One manifest row, as `tsv_debug test262 --emit-manifest` writes it. */
+export interface Test262ManifestEntry {
+	relative_path: string;
+	module: boolean;
+	strict: boolean;
+	expected: 'accept' | 'reject';
+	tsv: 'accept' | 'reject';
+}
 
-try {
-	await stat(join(TEST262_ROOT, 'test'));
-} catch {
-	if (if_present) {
-		console.error(
-			`test262 checkout not found at ${TEST262_ROOT} — skipping harvest (--if-present)`
-		);
-		Deno.exit(0);
+/** The manifest `tsv_debug test262 --emit-manifest` writes. */
+export interface Test262Manifest {
+	test262_root: string;
+	count: number;
+	tests: Test262ManifestEntry[];
+}
+
+/** One entry of the path list the corpus loader reads. */
+export interface Test262File {
+	path: string;
+	goal: 'module' | 'script';
+}
+
+/**
+ * The manifest's expected-positive tests as the corpus loader's entries, sorted by path
+ * (`localeCompare`, the order the cache has always had): the goal is the manifest's `module`
+ * flag (a `flags: [module]` test parses as a module, everything else as a script).
+ */
+export function test262_positive_files(manifest: Test262Manifest): Test262File[] {
+	return manifest.tests
+		.filter((t) => t.expected === 'accept')
+		.map((t) => ({
+			path: join(manifest.test262_root, t.relative_path),
+			goal: (t.module ? 'module' : 'script') as 'module' | 'script'
+		}))
+		.sort((a, b) => a.path.localeCompare(b.path));
+}
+
+/**
+ * The harvest.
+ * @returns the exit code
+ */
+export async function run_harvest_test262(
+	deps: HarvestTest262Deps,
+	argv: ReadonlyArray<string>
+): Promise<number> {
+	const if_present = argv.includes('--if-present');
+	const force = argv.includes('--force');
+
+	if (!(await deps.test262.exists('test'))) {
+		if (if_present) {
+			console.error(
+				`test262 checkout not found at ${TEST262_ROOT} — skipping harvest (--if-present)`
+			);
+			return 0;
+		}
+		console.error(`test262 checkout not found: ${TEST262_ROOT}`);
+		return 1;
 	}
-	console.error(`test262 checkout not found: ${TEST262_ROOT}`);
-	Deno.exit(1);
-}
 
-await mkdir(CACHE_DIR, { recursive: true });
+	await deps.files.mkdir(CACHE_DIR, { recursive: true });
 
-// Freshness stamp: skip the release-mode grade when the checkout commit and
-// pin match and both cache files exist.
-const source_commit = await git_head(stamp_git, TEST262_ROOT);
-const stamp_inputs: StampInputs = {
-	harvest: 'test262',
-	source_commit,
-	positives_pin: TEST262_POSITIVES_PIN
-};
-if (
-	!force &&
-	source_commit !== null &&
-	(await harvest_up_to_date(stamp_fs, STAMP_PATH, stamp_inputs, [FILES_PATH, MANIFEST_PATH]))
-) {
-	console.error(
-		`test262 harvest up to date (../test262 at ${short_commit(source_commit)}, ` +
-			`pin ${TEST262_POSITIVES_PIN}) — skipping; --force to re-grade.`
-	);
-	Deno.exit(0);
-}
+	// Freshness stamp: skip the release-mode grade when the checkout commit and
+	// pin match and both cache files exist.
+	const source_commit = await git_head(deps.git, TEST262_ROOT);
+	const stamp_inputs: StampInputs = {
+		harvest: 'test262',
+		source_commit,
+		positives_pin: TEST262_POSITIVES_PIN
+	};
+	if (
+		!force &&
+		source_commit !== null &&
+		(await harvest_up_to_date(deps.files, STAMP_PATH, stamp_inputs, [
+			TEST262_FILES_PATH,
+			TEST262_MANIFEST_PATH
+		]))
+	) {
+		console.error(
+			`test262 harvest up to date (../test262 at ${short_commit(source_commit)}, ` +
+				`pin ${TEST262_POSITIVES_PIN}) — skipping; --force to re-grade.`
+		);
+		return 0;
+	}
 
-// --release: the harness parses the whole ~51k-file tree to grade it; a debug
-// build is an order of magnitude slower.
-console.error('Grading test262 (cargo run --release -p tsv_debug test262 --emit-manifest)…');
-const command = new Deno.Command('cargo', {
-	args: [
+	// --release: the harness parses the whole ~51k-file tree to grade it; a debug
+	// build is an order of magnitude slower.
+	console.error('Grading test262 (cargo run --release -p tsv_debug test262 --emit-manifest)…');
+	const status = await deps.cargo.run([
 		'run',
 		'--release',
 		'-p',
@@ -136,62 +178,38 @@ const command = new Deno.Command('cargo', {
 		'--path',
 		TEST262_ROOT,
 		'--emit-manifest',
-		MANIFEST_PATH
-	],
-	stdout: 'inherit',
-	stderr: 'inherit'
-});
-const status = await command.output();
-if (!status.success) {
-	console.error('tsv_debug test262 --emit-manifest failed');
-	Deno.exit(1);
-}
+		TEST262_MANIFEST_PATH
+	]);
+	if (status.kind !== 'exited' || status.code !== 0) {
+		console.error('tsv_debug test262 --emit-manifest failed');
+		return 1;
+	}
 
-interface ManifestEntry {
-	relative_path: string;
-	module: boolean;
-	strict: boolean;
-	expected: 'accept' | 'reject';
-	tsv: 'accept' | 'reject';
-}
+	const manifest = JSON.parse(await deps.files.read_text(TEST262_MANIFEST_PATH)) as Test262Manifest;
+	const files = test262_positive_files(manifest);
 
-interface Manifest {
-	test262_root: string;
-	count: number;
-	tests: ManifestEntry[];
-}
+	// Pinned count (exact): the test262 checkout is updated deliberately, so any
+	// move in the positive set — a grading/frontmatter bug shrinking it, tsv
+	// feature-filter changes, or a checkout pull — must be re-pinned, not
+	// absorbed. Fail BEFORE writing the cache so a wrong list never replaces a
+	// good one. (The Rust runner separately pins its discovery + graded-manifest
+	// counts.) See lib/gate_counts.ts.
+	if (files.length !== TEST262_POSITIVES_PIN) {
+		console.error(
+			`FAIL: pinned count mismatch — ${files.length} expected-positive ≠ pinned ${TEST262_POSITIVES_PIN}; ` +
+				`cache not written. If the move is deliberate, re-pin in lib/gate_counts.ts.`
+		);
+		return 1;
+	}
+	await deps.files.write(TEST262_FILES_PATH, JSON.stringify(files, null, '\t'));
+	if (source_commit !== null) {
+		await write_stamp(deps.files, STAMP_PATH, stamp_inputs);
+	}
 
-const manifest = JSON.parse(await readFile(MANIFEST_PATH, 'utf8')) as Manifest;
-const positives = manifest.tests.filter((t) => t.expected === 'accept');
-// Emit `{path, goal}` — the goal is the manifest's `module` flag (a
-// `flags: [module]` test parses as a module, everything else as a script).
-const files = positives
-	.map((t) => ({
-		path: join(manifest.test262_root, t.relative_path),
-		goal: (t.module ? 'module' : 'script') as 'module' | 'script'
-	}))
-	.sort((a, b) => a.path.localeCompare(b.path));
-
-// Pinned count (exact): the test262 checkout is updated deliberately, so any
-// move in the positive set — a grading/frontmatter bug shrinking it, tsv
-// feature-filter changes, or a checkout pull — must be re-pinned, not
-// absorbed. Fail BEFORE writing the cache so a wrong list never replaces a
-// good one. (The Rust runner separately pins its discovery + graded-manifest
-// counts.) See lib/gate_counts.ts.
-if (files.length !== TEST262_POSITIVES_PIN) {
+	const module_count = manifest.tests.filter((t) => t.expected === 'accept' && t.module).length;
 	console.error(
-		`FAIL: pinned count mismatch — ${files.length} expected-positive ≠ pinned ${TEST262_POSITIVES_PIN}; ` +
-			`cache not written. If the move is deliberate, re-pin in lib/gate_counts.ts.`
+		`test262 harvest: ${files.length} expected-positive of ${manifest.count} graded tests ` +
+			`(${module_count} module-flagged) → ${TEST262_FILES_PATH}`
 	);
-	Deno.exit(1);
+	return 0;
 }
-await writeFile(FILES_PATH, JSON.stringify(files, null, '\t'));
-if (source_commit !== null) {
-	await write_stamp(stamp_fs, STAMP_PATH, stamp_inputs);
-}
-
-const module_count = positives.filter((t) => t.module).length;
-console.error(
-	`test262 harvest: ${files.length} expected-positive of ${manifest.count} graded tests ` +
-		`(${module_count} module-flagged) → ${FILES_PATH}`
-);

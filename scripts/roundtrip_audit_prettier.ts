@@ -44,6 +44,9 @@
 import type { FsReadDir } from '@fuzdev/gro/fs.ts';
 import type { SpawnProgram } from '@fuzdev/gro/spawn.ts';
 
+/** The Prettier checkout beside this one, as every path into it spells it. */
+export const PRETTIER_CHECKOUT = '../prettier';
+
 /**
  * The Prettier format suites the round-trip audit walks — the pinned, adversarial half of
  * `audit:corpus`'s corpus, shared with it so the two scopes cannot drift into meaning
@@ -60,9 +63,9 @@ import type { SpawnProgram } from '@fuzdev/gro/spawn.ts';
  * Svelte, so pointing this leg at it reaches 2 files.
  */
 export const PRETTIER_ROUNDTRIP_SUITES = [
-	'../prettier/tests/format/typescript',
-	'../prettier/tests/format/js',
-	'../prettier/tests/format/css'
+	`${PRETTIER_CHECKOUT}/tests/format/typescript`,
+	`${PRETTIER_CHECKOUT}/tests/format/js`,
+	`${PRETTIER_CHECKOUT}/tests/format/css`
 ];
 
 const log = (...args: unknown[]) => console.error(...args);

@@ -79,62 +79,35 @@
  * gates they read the unpinned working trees too — as a DIFF against the snapshot (only the files
  * that differ from or are absent in their collection; `lib/corpus.ts` `live_diff_files`), since a
  * finding fails wherever it occurs and a byte the snapshot holds has already been graded.
+ *
+ * `run_corpus_audit` is the library function; its root, `benches/js/roots/corpus_audit.ts`, binds
+ * its deps (`CorpusAuditDeps`).
+ *
+ * @module
  */
 
-import { spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import {
+	PRETTIER_CHECKOUT,
+	PRETTIER_ROUNDTRIP_SUITES
+} from '../../scripts/roundtrip_audit_prettier.ts';
 
-import { PRETTIER_ROUNDTRIP_SUITES } from '../../scripts/roundtrip_audit_prettier.ts';
+import { type CargoStatus, exit_code_of } from './idempotency_sweep.ts';
+import type { Logger } from './lib/types.ts';
 
-import { corpus_robustness_seeds } from './lib/corpus.ts';
+/** What `run_corpus_audit` reaches the world through. */
+export interface CorpusAuditDeps {
+	/** The `robustness` view's seeds (`corpus_robustness_seeds`). */
+	seeds(logger: Logger): Promise<{ dirs: string[]; live_files: string[] }>;
+	/**
+	 * The `../prettier` checkout (`PRETTIER_CHECKOUT`), read for each suite's presence alone, by
+	 * its path beneath the checkout; an absent checkout holds no suite.
+	 */
+	prettier: { exists(path: string): Promise<boolean> };
+	/** `cargo` in the checkout, its output inherited. */
+	cargo: { run(args: ReadonlyArray<string>): Promise<CargoStatus> };
+}
 
 const log = (...args: unknown[]) => console.error(...args);
-
-// Real code: the whole pinned snapshot (one root) + the svelte_styles cache + the live working
-// trees' DIFF against the snapshot (the `robustness` view) — directories and files alike are
-// seeds to the Rust audits.
-const { dirs: snapshot_dirs, live_files } = await corpus_robustness_seeds(log);
-const real_seeds = [...snapshot_dirs, ...live_files];
-
-// The version-pinned Prettier format suites (adversarial edge cases). Present-only. Shared
-// with the `roundtrip:audit:prettier` leg of `deno task check`, which audits the same suites
-// on every commit — one list, so the cheap leg and this bundle cannot drift apart.
-const prettier_suites = PRETTIER_ROUNDTRIP_SUITES.filter((p) => {
-	if (existsSync(p)) return true;
-	log(`  ⚠ prettier suite missing, skipped: ${p}`);
-	return false;
-});
-
-if (real_seeds.length === 0) {
-	log('Error: no real-code corpus present — nothing to audit.');
-	process.exit(1);
-}
-
-const all_seeds = [...real_seeds, ...prettier_suites];
-
-// Build the audit binary once (`_internal_audits` umbrella = _internal_swallow_check + _internal_comment_check), then invoke it
-// per leg via `cargo run` (a no-op re-check once built) so only `cargo` needs `--allow-run`.
-log('building --profile corpus tsv_debug (--features _internal_audits) …');
-const build = spawnSync(
-	'cargo',
-	['build', '--profile', 'corpus', '-q', '-p', 'tsv_debug', '--features', '_internal_audits'],
-	{ stdio: 'inherit' }
-);
-if (build.status !== 0) {
-	log('Error: build failed.');
-	process.exit(build.status ?? 1);
-}
-const cargo_run = [
-	'run',
-	'--profile',
-	'corpus',
-	'-q',
-	'-p',
-	'tsv_debug',
-	'--features',
-	'_internal_audits',
-	'--'
-];
 
 interface Leg {
 	name: string;
@@ -146,64 +119,124 @@ interface Leg {
 	note?: string;
 }
 
-const legs: Leg[] = [
-	{
-		name: 'roundtrip_audit --gate',
-		args: ['roundtrip_audit', '--gate'],
-		seeds: all_seeds,
-		gating: true
-	},
-	{ name: 'comment_audit', args: ['comment_audit'], seeds: all_seeds, gating: true },
-	{ name: 'swallow_audit', args: ['swallow_audit'], seeds: all_seeds, gating: true },
-	{
-		name: 'binding_audit --gate (real code)',
-		args: ['binding_audit', '--gate'],
-		seeds: real_seeds,
-		gating: true
-	},
-	{
-		name: 'binding_audit --gate (prettier suites)',
-		args: ['binding_audit', '--gate'],
-		seeds: prettier_suites,
-		gating: false,
-		note: 'report-only: a few known adversarial philosophy HARDs (plain comments tsv preserves in place)'
-	},
-	{ name: 'authoring_audit', args: ['authoring_audit'], seeds: real_seeds, gating: true },
-	{ name: 'paren_audit', args: ['paren_audit'], seeds: real_seeds, gating: true },
-	// The two as-authored ratchets that CAN hold a zero off their default corpus: with explicit
-	// paths the snapshot is not consulted and every finding fails, pinned or not.
-	{ name: 'census_audit', args: ['census_audit'], seeds: all_seeds, gating: true },
-	{ name: 'fabrication_audit', args: ['fabrication_audit'], seeds: all_seeds, gating: true },
-	{
-		name: 'fuzz --iterations 0 (F1 sweep)',
-		args: ['fuzz', '--iterations', '0'],
-		seeds: real_seeds,
-		gating: true
-	}
-];
+/**
+ * The audit.
+ * @returns the exit code
+ */
+export async function run_corpus_audit(deps: CorpusAuditDeps): Promise<number> {
+	// Real code: the whole pinned snapshot (one root) + the svelte_styles cache + the live working
+	// trees' DIFF against the snapshot (the `robustness` view) — directories and files alike are
+	// seeds to the Rust audits.
+	const { dirs: snapshot_dirs, live_files } = await deps.seeds(log);
+	const real_seeds = [...snapshot_dirs, ...live_files];
 
-let failed = false;
-for (const leg of legs) {
-	if (leg.seeds.length === 0) {
-		log(`\n─ ${leg.name}: SKIPPED (no seeds present)`);
-		continue;
-	}
-	log(`\n─ ${leg.name}${leg.gating ? '' : ' [report-only]'}${leg.note ? ` — ${leg.note}` : ''}`);
-	const { status } = spawnSync('cargo', [...cargo_run, ...leg.args, ...leg.seeds], {
-		stdio: 'inherit'
-	});
-	if (status !== 0) {
-		if (leg.gating) {
-			failed = true;
-			log(`  ✗ ${leg.name} FAILED (exit ${status})`);
+	// The version-pinned Prettier format suites (adversarial edge cases). Present-only. Shared
+	// with the `roundtrip:audit:prettier` leg of `deno task check`, which audits the same suites
+	// on every commit — one list, so the cheap leg and this bundle cannot drift apart.
+	const prettier_suites: string[] = [];
+	for (const p of PRETTIER_ROUNDTRIP_SUITES) {
+		if (await deps.prettier.exists(p.slice(`${PRETTIER_CHECKOUT}/`.length))) {
+			prettier_suites.push(p);
 		} else {
-			log(`  (report-only leg exited ${status} — not gating)`);
+			log(`  ⚠ prettier suite missing, skipped: ${p}`);
 		}
 	}
-}
 
-if (failed) {
-	log('\n✗ corpus audit found a robustness regression over real code.');
-	process.exit(1);
+	if (real_seeds.length === 0) {
+		log('Error: no real-code corpus present — nothing to audit.');
+		return 1;
+	}
+
+	const all_seeds = [...real_seeds, ...prettier_suites];
+
+	// Build the audit binary once (`_internal_audits` umbrella = _internal_swallow_check + _internal_comment_check), then invoke it
+	// per leg via `cargo run` (a no-op re-check once built).
+	log('building --profile corpus tsv_debug (--features _internal_audits) …');
+	const build = await deps.cargo.run([
+		'build',
+		'--profile',
+		'corpus',
+		'-q',
+		'-p',
+		'tsv_debug',
+		'--features',
+		'_internal_audits'
+	]);
+	const build_code = exit_code_of(build);
+	if (build_code !== 0) {
+		log('Error: build failed.');
+		return build_code ?? 1;
+	}
+	const cargo_run = [
+		'run',
+		'--profile',
+		'corpus',
+		'-q',
+		'-p',
+		'tsv_debug',
+		'--features',
+		'_internal_audits',
+		'--'
+	];
+
+	const legs: Leg[] = [
+		{
+			name: 'roundtrip_audit --gate',
+			args: ['roundtrip_audit', '--gate'],
+			seeds: all_seeds,
+			gating: true
+		},
+		{ name: 'comment_audit', args: ['comment_audit'], seeds: all_seeds, gating: true },
+		{ name: 'swallow_audit', args: ['swallow_audit'], seeds: all_seeds, gating: true },
+		{
+			name: 'binding_audit --gate (real code)',
+			args: ['binding_audit', '--gate'],
+			seeds: real_seeds,
+			gating: true
+		},
+		{
+			name: 'binding_audit --gate (prettier suites)',
+			args: ['binding_audit', '--gate'],
+			seeds: prettier_suites,
+			gating: false,
+			note: 'report-only: a few known adversarial philosophy HARDs (plain comments tsv preserves in place)'
+		},
+		{ name: 'authoring_audit', args: ['authoring_audit'], seeds: real_seeds, gating: true },
+		{ name: 'paren_audit', args: ['paren_audit'], seeds: real_seeds, gating: true },
+		// The two as-authored ratchets that CAN hold a zero off their default corpus: with explicit
+		// paths the snapshot is not consulted and every finding fails, pinned or not.
+		{ name: 'census_audit', args: ['census_audit'], seeds: all_seeds, gating: true },
+		{ name: 'fabrication_audit', args: ['fabrication_audit'], seeds: all_seeds, gating: true },
+		{
+			name: 'fuzz --iterations 0 (F1 sweep)',
+			args: ['fuzz', '--iterations', '0'],
+			seeds: real_seeds,
+			gating: true
+		}
+	];
+
+	let failed = false;
+	for (const leg of legs) {
+		if (leg.seeds.length === 0) {
+			log(`\n─ ${leg.name}: SKIPPED (no seeds present)`);
+			continue;
+		}
+		log(`\n─ ${leg.name}${leg.gating ? '' : ' [report-only]'}${leg.note ? ` — ${leg.note}` : ''}`);
+		const status = exit_code_of(await deps.cargo.run([...cargo_run, ...leg.args, ...leg.seeds]));
+		if (status !== 0) {
+			if (leg.gating) {
+				failed = true;
+				log(`  ✗ ${leg.name} FAILED (exit ${status})`);
+			} else {
+				log(`  (report-only leg exited ${status} — not gating)`);
+			}
+		}
+	}
+
+	if (failed) {
+		log('\n✗ corpus audit found a robustness regression over real code.');
+		return 1;
+	}
+	log('\n✓ corpus audit clean — no content-loss / panic / non-idempotency over real code.');
+	return 0;
 }
-log('\n✓ corpus audit clean — no content-loss / panic / non-idempotency over real code.');

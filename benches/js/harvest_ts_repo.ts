@@ -86,12 +86,15 @@
  * grading logic: after changing the filter, run with `--force`.
  *
  * Run (from the repo root):
- *   deno run --allow-read --allow-write=benches/js/.cache --allow-env --allow-run=git \
- *     --config benches/js/deno.json benches/js/harvest_ts_repo.ts
+ *   npm run bench:harvest:ts-repo [-- --force]
+ *
+ * `run_harvest_ts_repo` is the library function; its root, `benches/js/roots/harvest_ts_repo.ts`,
+ * binds its deps (`HarvestTsRepoDeps`).
+ *
+ * @module
  */
 
-import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
-import { basename, join } from 'node:path';
+import { basename } from 'node:path';
 
 import { TS_REPO_CORPUS_PIN, TS_REPO_REJECTS_PIN } from './lib/gate_counts.ts';
 import {
@@ -111,47 +114,36 @@ import {
 	has_grammar_error,
 	is_multi_file_test,
 	TS_BASELINE_DIR,
-	TS_REPO,
-	type TsCaseTree
+	TS_REPO
 } from './lib/ts_repo.ts';
-import { load_typescript, tsc_parse } from './lib/tsc.ts';
+import { tsc_parse, type TypeScriptModule } from './lib/tsc.ts';
 
-/** The stamps' `git`, run through Deno's `Command` as this script's runtime does. */
-const stamp_git: StampGit = {
-	out: async (args) => {
-		const output = await new Deno.Command('git', {
-			args: [...args],
-			stdout: 'piped',
-			stderr: 'null'
-		}).output();
-		return { kind: 'exited', code: output.code, stdout: new TextDecoder().decode(output.stdout) };
-	}
-};
+/** The `../typescript` checkout's files, read-only, by paths beneath it. */
+export interface TsRepoReads {
+	/** Whether `path` exists; `false` when the checkout itself is absent. */
+	exists(path: string): Promise<boolean>;
+	read_text(path: string): Promise<string>;
+	/** A directory's entries, in any order; rejects when it can't be read. */
+	list(path: string): AsyncIterable<{ name: string; kind: string }>;
+}
 
-/** The case tree under `root`, by path from the working directory. */
-const node_tree = (root: string): TsCaseTree => ({
-	list: async function* (path) {
-		for (const entry of await readdir(join(root, path), { withFileTypes: true })) {
-			yield { name: entry.name, kind: entry.isDirectory() ? 'directory' : 'file' };
-		}
-	}
-});
+/** What `run_harvest_ts_repo` reaches the world through. */
+export interface HarvestTsRepoDeps {
+	/** `git` for the stamp's checkout commit. */
+	git: StampGit;
+	/** The checkout's files by project-root-relative path; writes the two lists and the stamp. */
+	files: StampWrites;
+	/** The `../typescript` checkout: its cases and its baselines. */
+	typescript: TsRepoReads;
+	/** Loads the `typescript` package, the validity oracle. */
+	load_typescript(): Promise<TypeScriptModule>;
+}
 
-/** The stamps' file reads and writes, by path from the working directory. */
-const stamp_fs: StampWrites = {
-	exists: (path) =>
-		stat(path).then(
-			() => true,
-			() => false
-		),
-	read_text: (path) => readFile(path, 'utf8'),
-	write: (path, data) => writeFile(path, data),
-	mkdir: async (path, options) => {
-		await mkdir(path, options);
-	}
-};
+/** The case subtrees beneath `../typescript` the harvest walks. */
+const CASE_DIRS = ['tests/cases/conformance', 'tests/cases/compiler'];
 
-const ROOTS = [`${TS_REPO}/tests/cases/conformance`, `${TS_REPO}/tests/cases/compiler`];
+/** `TS_BASELINE_DIR` beneath the checkout. */
+const BASELINE_DIR = TS_BASELINE_DIR.slice(`${TS_REPO}/`.length);
 
 /**
  * `.d.ts` cases are SKIPPED — a property of this corpus's consumers, not of the
@@ -189,171 +181,185 @@ const STAMP_PATH = HARVEST_STAMPS.ts_repo.path;
  */
 const TS_BINARY_FILE_CODE = 1490;
 
-const if_present = Deno.args.includes('--if-present');
-const force = Deno.args.includes('--force');
-
-try {
-	await stat(join(TS_REPO, 'tests', 'cases'));
-} catch {
-	if (if_present) {
-		console.error(`typescript checkout not found at ${TS_REPO} — skipping harvest (--if-present)`);
-		Deno.exit(0);
-	}
-	console.error(`typescript checkout not found: ${TS_REPO}`);
-	Deno.exit(1);
-}
-
-const ts = await load_typescript();
-
-await mkdir(CACHE_DIR, { recursive: true });
-
-// Freshness stamp. The tsc version is an input because it IS the oracle: a tsc
-// bump can move a file between the two lists without the checkout changing.
-const source_commit = await git_head(stamp_git, TS_REPO);
-const stamp_inputs: StampInputs = {
-	harvest: 'ts_repo',
-	source_commit,
-	tsc_version: ts.version,
-	corpus_pin: TS_REPO_CORPUS_PIN,
-	rejects_pin: TS_REPO_REJECTS_PIN
-};
-if (
-	!force &&
-	source_commit !== null &&
-	(await harvest_up_to_date(stamp_fs, STAMP_PATH, stamp_inputs, [FILES_PATH, REJECTS_PATH]))
-) {
-	console.error(
-		`ts-repo harvest up to date (${TS_REPO} at ${short_commit(source_commit)}, ` +
-			`tsc ${ts.version}, pins ${TS_REPO_CORPUS_PIN}/${TS_REPO_REJECTS_PIN}) — ` +
-			`skipping; --force to re-grade.`
-	);
-	Deno.exit(0);
-}
-
-// Index every `*.errors.txt` baseline by its un-suffixed test name, so a lookup
-// gathers all target/module variants (the rule + why: lib/ts_repo.ts).
-let baseline_names: string[];
-try {
-	baseline_names = await readdir(TS_BASELINE_DIR);
-} catch (e) {
-	console.error(
-		`FAIL: cannot read ${TS_BASELINE_DIR} (${e instanceof Error ? e.message : e}) — ` +
-			`the ${TS_REPO} checkout exists but its baselines are missing (partial checkout?).`
-	);
-	Deno.exit(1);
-}
-const grammar_error_tests = new Set<string>();
-for (const name of baseline_names) {
-	if (!name.endsWith('.errors.txt')) continue;
-	const key = baseline_test_key(name);
-	if (grammar_error_tests.has(key)) continue;
-	if (has_grammar_error(await readFile(join(TS_BASELINE_DIR, name), 'utf8'))) {
-		grammar_error_tests.add(key);
-	}
-}
-
-const valid: string[] = [];
-const rejects: string[] = [];
-const discovery_skips = empty_ts_case_skips();
-const skipped = { multi_file: 0, binary: 0, unreadable: 0 };
-let baseline_rejected = 0;
 /**
- * Rejects with no `TS1xxx` baseline — the two validity readings disagreeing in the
- * direction the baselines alone can't show (`baseline_rejected` is the other). Both
- * are reported because the size of each is the argument for running tsc at all.
+ * The harvest.
+ * @returns the exit code
  */
-let rejected_without_baseline = 0;
-let scanned = 0;
+export async function run_harvest_ts_repo(
+	deps: HarvestTsRepoDeps,
+	argv: ReadonlyArray<string>
+): Promise<number> {
+	const if_present = argv.includes('--if-present');
+	const force = argv.includes('--force');
 
-for (const root of ROOTS) {
-	for await (const { path } of discover_ts_cases(
-		node_tree(root),
-		root,
-		discovery_skips,
-		DECLARATIONS
-	)) {
-		let content: string;
-		try {
-			content = await readFile(path, 'utf8');
-		} catch {
-			skipped.unreadable++;
-			continue;
-		}
-		if (is_multi_file_test(content)) {
-			skipped.multi_file++;
-			continue;
-		}
-		scanned++;
-		const { diagnostics } = tsc_parse(ts, path, content);
-		if (!diagnostics) {
+	if (!(await deps.typescript.exists('tests/cases'))) {
+		if (if_present) {
 			console.error(
-				'FAIL: tsc SourceFile has no `parseDiagnostics` — the internal field this harvest ' +
-					'grades with is gone (upstream rename?). Refusing to write a corpus every file ' +
-					'would pass into.'
+				`typescript checkout not found at ${TS_REPO} — skipping harvest (--if-present)`
 			);
-			Deno.exit(1);
+			return 0;
 		}
-		if (diagnostics.some((d) => d.code === TS_BINARY_FILE_CODE)) {
-			skipped.binary++;
-			continue;
-		}
-		const has_baseline_error = grammar_error_tests.has(basename(path, '.ts'));
-		if (diagnostics.length > 0) {
-			if (!has_baseline_error) rejected_without_baseline++;
-			rejects.push(path);
-			continue;
-		}
-		// tsc's parser accepts. The baselines get the last word on whether the file
-		// is well-formed TS: a checker-side grammar error (TS1206 and friends) keeps
-		// it out of the coverage denominator without making it over-acceptance bait.
-		if (has_baseline_error) {
-			baseline_rejected++;
-			continue;
-		}
-		valid.push(path);
+		console.error(`typescript checkout not found: ${TS_REPO}`);
+		return 1;
 	}
-}
 
-valid.sort((a, b) => a.localeCompare(b));
-rejects.sort((a, b) => a.localeCompare(b));
+	const ts = await deps.load_typescript();
 
-// Pinned counts (exact), checked BEFORE writing so a wrong list never replaces a
-// good one. Both move only on a deliberate input change — a checkout pull, a tsc
-// bump, or a grading change here. See lib/gate_counts.ts.
-const mismatches: string[] = [];
-if (valid.length !== TS_REPO_CORPUS_PIN) {
-	mismatches.push(`valid ${valid.length} ≠ pinned ${TS_REPO_CORPUS_PIN}`);
-}
-if (rejects.length !== TS_REPO_REJECTS_PIN) {
-	mismatches.push(`rejects ${rejects.length} ≠ pinned ${TS_REPO_REJECTS_PIN}`);
-}
-if (mismatches.length > 0) {
+	await deps.files.mkdir(CACHE_DIR, { recursive: true });
+
+	// Freshness stamp. The tsc version is an input because it IS the oracle: a tsc
+	// bump can move a file between the two lists without the checkout changing.
+	const source_commit = await git_head(deps.git, TS_REPO);
+	const stamp_inputs: StampInputs = {
+		harvest: 'ts_repo',
+		source_commit,
+		tsc_version: ts.version,
+		corpus_pin: TS_REPO_CORPUS_PIN,
+		rejects_pin: TS_REPO_REJECTS_PIN
+	};
+	if (
+		!force &&
+		source_commit !== null &&
+		(await harvest_up_to_date(deps.files, STAMP_PATH, stamp_inputs, [FILES_PATH, REJECTS_PATH]))
+	) {
+		console.error(
+			`ts-repo harvest up to date (${TS_REPO} at ${short_commit(source_commit)}, ` +
+				`tsc ${ts.version}, pins ${TS_REPO_CORPUS_PIN}/${TS_REPO_REJECTS_PIN}) — ` +
+				`skipping; --force to re-grade.`
+		);
+		return 0;
+	}
+
+	// Index every `*.errors.txt` baseline by its un-suffixed test name, so a lookup
+	// gathers all target/module variants (the rule + why: lib/ts_repo.ts).
+	const baseline_names: string[] = [];
+	try {
+		for await (const entry of deps.typescript.list(BASELINE_DIR)) baseline_names.push(entry.name);
+	} catch (e) {
+		console.error(
+			`FAIL: cannot read ${TS_BASELINE_DIR} (${e instanceof Error ? e.message : e}) — ` +
+				`the ${TS_REPO} checkout exists but its baselines are missing (partial checkout?).`
+		);
+		return 1;
+	}
+	const grammar_error_tests = new Set<string>();
+	for (const name of baseline_names) {
+		if (!name.endsWith('.errors.txt')) continue;
+		const key = baseline_test_key(name);
+		if (grammar_error_tests.has(key)) continue;
+		if (has_grammar_error(await deps.typescript.read_text(`${BASELINE_DIR}/${name}`))) {
+			grammar_error_tests.add(key);
+		}
+	}
+
+	const valid: string[] = [];
+	const rejects: string[] = [];
+	const discovery_skips = empty_ts_case_skips();
+	const skipped = { multi_file: 0, binary: 0, unreadable: 0 };
+	let baseline_rejected = 0;
+	/**
+	 * Rejects with no `TS1xxx` baseline — the two validity readings disagreeing in the
+	 * direction the baselines alone can't show (`baseline_rejected` is the other). Both
+	 * are reported because the size of each is the argument for running tsc at all.
+	 */
+	let rejected_without_baseline = 0;
+	let scanned = 0;
+
+	for (const case_dir of CASE_DIRS) {
+		const tree = { list: (rel: string) => deps.typescript.list(join_rel(case_dir, rel)) };
+		for await (const { path, rel } of discover_ts_cases(
+			tree,
+			`${TS_REPO}/${case_dir}`,
+			discovery_skips,
+			DECLARATIONS
+		)) {
+			let content: string;
+			try {
+				content = await deps.typescript.read_text(`${case_dir}/${rel}`);
+			} catch {
+				skipped.unreadable++;
+				continue;
+			}
+			if (is_multi_file_test(content)) {
+				skipped.multi_file++;
+				continue;
+			}
+			scanned++;
+			const { diagnostics } = tsc_parse(ts, path, content);
+			if (!diagnostics) {
+				console.error(
+					'FAIL: tsc SourceFile has no `parseDiagnostics` — the internal field this harvest ' +
+						'grades with is gone (upstream rename?). Refusing to write a corpus every file ' +
+						'would pass into.'
+				);
+				return 1;
+			}
+			if (diagnostics.some((d) => d.code === TS_BINARY_FILE_CODE)) {
+				skipped.binary++;
+				continue;
+			}
+			const has_baseline_error = grammar_error_tests.has(basename(path, '.ts'));
+			if (diagnostics.length > 0) {
+				if (!has_baseline_error) rejected_without_baseline++;
+				rejects.push(path);
+				continue;
+			}
+			// tsc's parser accepts. The baselines get the last word on whether the file
+			// is well-formed TS: a checker-side grammar error (TS1206 and friends) keeps
+			// it out of the coverage denominator without making it over-acceptance bait.
+			if (has_baseline_error) {
+				baseline_rejected++;
+				continue;
+			}
+			valid.push(path);
+		}
+	}
+
+	valid.sort((a, b) => a.localeCompare(b));
+	rejects.sort((a, b) => a.localeCompare(b));
+
+	// Pinned counts (exact), checked BEFORE writing so a wrong list never replaces a
+	// good one. Both move only on a deliberate input change — a checkout pull, a tsc
+	// bump, or a grading change here. See lib/gate_counts.ts.
+	const mismatches: string[] = [];
+	if (valid.length !== TS_REPO_CORPUS_PIN) {
+		mismatches.push(`valid ${valid.length} ≠ pinned ${TS_REPO_CORPUS_PIN}`);
+	}
+	if (rejects.length !== TS_REPO_REJECTS_PIN) {
+		mismatches.push(`rejects ${rejects.length} ≠ pinned ${TS_REPO_REJECTS_PIN}`);
+	}
+	if (mismatches.length > 0) {
+		console.error(
+			`FAIL: pinned count mismatch — ${mismatches.join(', ')}; caches not written. ` +
+				`If the move is deliberate (checkout pull, tsc bump, grading change), re-pin in ` +
+				`lib/gate_counts.ts.`
+		);
+		return 1;
+	}
+
+	await deps.files.write(FILES_PATH, JSON.stringify(valid, null, '\t') + '\n');
+	await deps.files.write(REJECTS_PATH, JSON.stringify(rejects, null, '\t') + '\n');
+	if (source_commit !== null) {
+		await write_stamp(deps.files, STAMP_PATH, stamp_inputs);
+	}
+
+	// Every bucket, so the two lists always account for the whole scan:
+	// scanned = valid + rejects + baseline_rejected + binary. The two DISAGREEMENT
+	// counts (`baseline_rejected`, `rejected_without_baseline`) are the measurement
+	// that justifies running tsc's parser instead of trusting the baselines alone —
+	// quote them from here rather than hand-maintaining them in a docstring.
 	console.error(
-		`FAIL: pinned count mismatch — ${mismatches.join(', ')}; caches not written. ` +
-			`If the move is deliberate (checkout pull, tsc bump, grading change), re-pin in ` +
-			`lib/gate_counts.ts.`
+		`ts-repo harvest (tsc ${ts.version}): ${valid.length} valid → ${FILES_PATH}; ` +
+			`${rejects.length} tsc-parser rejects → ${REJECTS_PATH}. ` +
+			`Of ${scanned} single-file .ts scanned: ${baseline_rejected} dropped by a TS1xxx baseline ` +
+			`(tsc's parser accepted, its grammar checks did not), ${rejected_without_baseline} rejected ` +
+			`with no TS1xxx baseline (the other direction), ${skipped.binary} non-UTF-8. ` +
+			`Skipped before grading: ${skipped.multi_file} @filename multi-file, ` +
+			`${discovery_skips.tsx} .tsx, ${discovery_skips.declaration} .d.ts, ` +
+			`${skipped.unreadable} unreadable.`
 	);
-	Deno.exit(1);
+	return 0;
 }
 
-await writeFile(FILES_PATH, JSON.stringify(valid, null, '\t') + '\n');
-await writeFile(REJECTS_PATH, JSON.stringify(rejects, null, '\t') + '\n');
-if (source_commit !== null) {
-	await write_stamp(stamp_fs, STAMP_PATH, stamp_inputs);
-}
-
-// Every bucket, so the two lists always account for the whole scan:
-// scanned = valid + rejects + baseline_rejected + binary. The two DISAGREEMENT
-// counts (`baseline_rejected`, `rejected_without_baseline`) are the measurement
-// that justifies running tsc's parser instead of trusting the baselines alone —
-// quote them from here rather than hand-maintaining them in a docstring.
-console.error(
-	`ts-repo harvest (tsc ${ts.version}): ${valid.length} valid → ${FILES_PATH}; ` +
-		`${rejects.length} tsc-parser rejects → ${REJECTS_PATH}. ` +
-		`Of ${scanned} single-file .ts scanned: ${baseline_rejected} dropped by a TS1xxx baseline ` +
-		`(tsc's parser accepted, its grammar checks did not), ${rejected_without_baseline} rejected ` +
-		`with no TS1xxx baseline (the other direction), ${skipped.binary} non-UTF-8. ` +
-		`Skipped before grading: ${skipped.multi_file} @filename multi-file, ` +
-		`${discovery_skips.tsx} .tsx, ${discovery_skips.declaration} .d.ts, ` +
-		`${skipped.unreadable} unreadable.`
-);
+/** `rel` beneath `dir`, `dir` itself for the empty path. */
+const join_rel = (dir: string, rel: string): string => (rel === '' ? dir : `${dir}/${rel}`);
