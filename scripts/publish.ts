@@ -786,7 +786,7 @@ async function publish(deps: PublishDeps, argv: ReadonlyArray<string>): Promise<
 				fail_hint:
 					'  Conformance gate failed. A corpus:compare:format SAFETY hit is self-verified in-run\n' +
 					'  (the native format re-runs and must reproduce byte-identically), so treat it as a real\n' +
-					'  regression; FFI corruption surfaces instead as a per-file `native format\n' +
+					'  regression; binding corruption surfaces instead as a per-file `native format\n' +
 					'  nondeterminism` error (benches/js/CLAUDE.md §Known Issues). A conformance:test262\n' +
 					'  GATE FAIL is a real positive-parse regression (or a deliberate test262 pull needing a\n' +
 					'  POSITIVE_PASSED_PIN re-pin).'

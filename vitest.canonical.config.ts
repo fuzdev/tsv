@@ -1,8 +1,9 @@
 /**
- * Vitest for `benches/js/lib/canonical_test.ts` (`npm run test:node:canonical`), run under
- * Node: the canonical prettier baseline's parser routing, which loads prettier, Svelte and
- * acorn from `benches/js/node_modules`, so it needs `npm run bench:install` and stays out of
- * `check` (`vitest.config.ts` holds the suites that don't, and says why the config refuses
+ * Vitest for the suites that load the bench install (`npm run test:node:canonical`), run under
+ * Node: `benches/js/lib/canonical_test.ts`, the canonical prettier baseline's parser routing,
+ * and `benches/js/lib/compare_engines_test.ts`, the comparison tools' engine binding. Both
+ * reach prettier, Svelte and acorn in `benches/js/node_modules`, so they need
+ * `npm run bench:install` and stay out of `check` (`vitest.config.ts` holds the suites that don't, and says why the config refuses
  * Deno).
  *
  * @module
@@ -19,5 +20,5 @@ if ('Deno' in globalThis) {
 
 export default defineConfig({
 	root: fileURLToPath(new URL('.', import.meta.url)),
-	test: { include: ['benches/js/lib/canonical_test.ts'] }
+	test: { include: ['benches/js/lib/canonical_test.ts', 'benches/js/lib/compare_engines_test.ts'] }
 });

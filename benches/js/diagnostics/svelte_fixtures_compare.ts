@@ -24,19 +24,19 @@
  * or a tracked `KNOWN_GAP`, else exit 1) and AST-shape (report-only; the
  * adversarial tree exposes edge divergences to triage into the shared
  * `DOCUMENTED_MATCHERS` or fix as writer bugs). Periodic (non-`check`) gate — needs
- * the FFI + the `svelte/compiler` oracle. Strict about setup: a missing `../svelte`
+ * the corpus N-API addon + the `svelte/compiler` oracle. Strict about setup: a missing `../svelte`
  * checkout (0 scanned) FAILS — publish Step 3b's preflight probe is the tolerance
  * point. Full-suite runs freshness-check the ledgers, enforce the exact pinned
  * counts (`lib/gate_counts.ts`), and warn on checkout↔npm-pin version skew.
  *
  * Run (from the repo root):
- *   deno task conformance:svelte-fixtures             # builds corpus FFI, then runs
- *   deno task conformance:svelte-fixtures:run         # skip rebuild (freshness-guarded)
- *   deno task conformance:svelte-fixtures:run --json 2>/dev/null > report.json
- *   deno task conformance:svelte-fixtures:run ../svelte/packages/svelte/tests/parser-modern
+ *   npm run conformance:svelte-fixtures             # builds the corpus N-API addon, then runs
+ *   npm run conformance:svelte-fixtures:run         # skip rebuild (freshness-guarded)
+ *   npm run -s conformance:svelte-fixtures:run -- --json 2>/dev/null > report.json
+ *   npm run conformance:svelte-fixtures:run -- ../svelte/packages/svelte/tests/parser-modern
  */
 
-import { type FixturesGateConfig, run_fixtures_gate } from '../lib/fixtures_gate.ts';
+import type { FixturesGateConfig } from '../lib/fixtures_gate.ts';
 import { SVELTE_FIXTURES_PINS } from '../lib/gate_counts.ts';
 import { type KnownGap, SVELTE_FIXTURE_SANCTIONS } from '../lib/parse_sanctions.ts';
 
@@ -57,7 +57,7 @@ const KNOWN_GAPS: KnownGap[] = [
 	// The freshness check fails a stale entry, so this list stays honest.
 ];
 
-/** The gate's config — exported for the `conformance.ts` single-process driver. */
+/** The gate's config, run by its root (`benches/js/roots/svelte_fixtures_compare.ts`) and the `conformance.ts` driver. */
 export const SVELTE_FIXTURES_GATE: FixturesGateConfig = {
 	title: 'Svelte-fixtures',
 	language: 'svelte',
@@ -82,7 +82,3 @@ export const SVELTE_FIXTURES_GATE: FixturesGateConfig = {
 	},
 	pins: SVELTE_FIXTURES_PINS
 };
-
-if (import.meta.main) {
-	await run_fixtures_gate(SVELTE_FIXTURES_GATE);
-}

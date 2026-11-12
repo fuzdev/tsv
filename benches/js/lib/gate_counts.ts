@@ -1,8 +1,8 @@
 /**
  * Pinned gate counts — committed EXPECTED numbers for the diagnostic gates and
  * harvests, so a change in what gets graded (a gutted or refreshed suite
- * checkout, a discovery bug, a tsv behavior change, a systemic sidecar/FFI
- * failure eating a whole language) fails loudly instead of shifting inside a
+ * checkout, a discovery bug, a tsv behavior change, a systemic sidecar, oracle, or
+ * addon failure eating a whole language) fails loudly instead of shifting inside a
  * green run. This is `scripts/validate_artifacts.ts`'s tight-bounds philosophy
  * applied to counts: every real move in a number is a deliberate, visible edit.
  *

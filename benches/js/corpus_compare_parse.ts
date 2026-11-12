@@ -16,7 +16,7 @@
  * instead of being silently absorbed. The canonical AST is serialized exactly like the fixture
  * sidecar serializes it (JSON round-trip with BigInt → string), so fixture and
  * corpus semantics match. tsv has two wires and each arm grades one. The span-only
- * arm diffs the shipped wire — the FFI's, which every binding shares (each language
+ * arm diffs the shipped wire — the N-API addon's, which every binding shares (each language
  * crate's `convert_ast_json_*`) — against that same oracle output with every `loc` /
  * `name_loc` removed: the wire's own contract (it omits exactly those keys), not a
  * tolerance; everything else is raw-diffed as above. The loc arm diffs the Rust `loc`
@@ -43,6 +43,13 @@
  *
  * Parse FAILURES (one side throws) are counted but not the focus —
  * diagnostics/skip_triage.ts is the dedicated tool for parse-gap triage.
+ *
+ * Runs under Node (`benches/js/roots/corpus_compare_parse.ts`, which binds its deps,
+ * `CorpusCompareParseDeps`): the span-only arm is the N-API addon at the `corpus` profile,
+ * the loc arm the checkout's `target/corpus/tsv_debug`. The corpus loader, which Bun's bench
+ * shares, reads through `node:*`; the pins file is a dep.
+ *
+ * @module
  */
 
 import { args_parse, argv_parse } from '@fuzdev/fuz_util/args.ts';
@@ -52,12 +59,12 @@ import { meta } from '@fuzdev/fuz_schema/meta.ts';
 import {
 	COMPARE_BASE_ARG_FIELDS,
 	type CompareFailure,
+	type CompareOutput,
 	create_compare_loader,
-	dispose_compare,
 	emit_json_stdout,
-	exit_compare_failure,
+	fail_compare,
 	gate_on_panics,
-	init_compare_implementations,
+	type InitCompareImplementations,
 	parse_language_filter,
 	redirect_logs_to_stderr,
 	rel_path,
@@ -68,7 +75,7 @@ import { is_native_panic_error } from './lib/divergence/panic_errors.ts';
 import { first_line } from './lib/error_text.ts';
 import { fixture_document } from './lib/fixture_documents.ts';
 import { corpus_missing_entries } from './lib/corpus.ts';
-import { CorpusPinTally, grade_corpus_pins } from './lib/corpus_pins.ts';
+import { CorpusPinTally, grade_corpus_pins, type PinsFile } from './lib/corpus_pins.ts';
 import { first_difference, loc_definition_violation } from './lib/loc_cross_grade.ts';
 import { LocWireClient } from './lib/loc_wire_client.ts';
 import { LOC_ROWS, type LocRow } from './lib/loc_tolerance.ts';
@@ -81,7 +88,7 @@ import {
 	preview
 } from './lib/parse_diff.ts';
 import { bigint_replacer, span_only_replacer } from './lib/span_only.ts';
-import { TSV_DEBUG_CORPUS, type TsvDebugProgram } from './lib/tsv_debug_server.ts';
+import type { TsvDebugProgram } from './lib/tsv_debug_server.ts';
 import { type Language, LANGUAGES } from './lib/types.ts';
 import {
 	type InjectKind,
@@ -90,38 +97,19 @@ import {
 	with_injected_variants
 } from './lib/wire_inject.ts';
 
-/** `tsv_debug`, started through Deno's `Command` as this script's runtime does. */
-const deno_tsv_debug = (): TsvDebugProgram => ({
-	start: async (args) => {
-		const child = new Deno.Command(TSV_DEBUG_CORPUS, {
-			args: [...args],
-			stdin: 'piped',
-			stdout: 'piped',
-			stderr: 'inherit'
-		}).spawn();
-		const writer = child.stdin.getWriter();
-		const encoder = new TextEncoder();
-		return {
-			stdin: {
-				write: async (data) => {
-					await writer.write(encoder.encode(data));
-					return true;
-				},
-				close: () => writer.close()
-			},
-			stdout: child.stdout,
-			closed: child.status.then((status) => ({ kind: 'exited' as const, code: status.code })),
-			kill: () => {
-				try {
-					child.kill();
-					return true;
-				} catch {
-					return false;
-				}
-			}
-		};
-	}
-});
+/** What `run_corpus_compare_parse` reaches beyond the corpus loader's and the oracles' reads. */
+export interface CorpusCompareParseDeps {
+	/** Loads the engines (`lib/compare_engines.ts`), behind their freshness guard. */
+	init_implementations: InitCompareImplementations;
+	/** Makes the checkout's `target/corpus/tsv_debug`, called once its freshness guard passed. */
+	open_tsv_debug: () => TsvDebugProgram;
+	/** `HOME`, for `~` and `--all`'s `~/dev`. */
+	home: string | undefined;
+	/** Where `--json` writes its report. */
+	stdout: CompareOutput;
+	/** `PARSE_PINS_FILE`; written only by `--update`, through an entry that grants it. */
+	pins: PinsFile;
+}
 
 /**
  * Injected variants per file. The cap is a blast-radius bound, not a coverage target: a
@@ -140,6 +128,8 @@ const DEFAULT_INJECT_LIMIT = 12;
  * stays recorded.
  */
 const PARSE_PINS_FILE = 'benches/js/lib/corpus_parse_pins.txt';
+/** The command that rewrites `PARSE_PINS_FILE`. */
+const PARSE_PINS_UPDATE = 'deno task corpus:compare:parse --all --update';
 const PARSE_PIN_BUCKETS = ['compared', 'tsv_errors', 'canonical_errors', 'both_errors'] as const;
 
 const CorpusCompareParseArgs = s.strip_object({
@@ -208,7 +198,7 @@ function has_non_ascii(s: string): boolean {
 
 // --- The span-only arm -----------------------------------------------------------
 //
-// tsv's span-only wire — the one every binding emits, here the FFI's — is graded against
+// tsv's span-only wire — the one every binding emits, here the N-API addon's — is graded against
 // the SAME oracle output with its line/column objects removed (`lib/span_only.ts`'s
 // `span_only_replacer`): every `loc` key and every Svelte `name_loc` key, anywhere in the
 // tree. Nothing else differs between the two tsv wires, so the arm reuses the diff engine
@@ -572,7 +562,7 @@ Usage: deno task corpus:compare:parse <path> [options]
        deno task corpus:compare:parse --all [options]
 
 Deep-diffs tsv's parse output against the canonical parsers (acorn-typescript /
-svelte / parseCss) on two arms: the shipped span-only wire (FFI) and the Rust \`loc\`
+svelte / parseCss) on two arms: the shipped span-only wire (N-API) and the Rust \`loc\`
 emitter's wire (\`tsv_debug loc_wires --stdin\`). Raw diff first, documented-divergence
 classification at the reporting layer only.
 
@@ -747,23 +737,27 @@ function print_span_row(label: string, s: SpanStats): void {
 }
 
 /**
- * The tool's entry, importable by the `conformance.ts` driver (which passes
- * `['--all']`); the CLI wrapper at the bottom feeds it the real argv. Failure
- * semantics are process-level (`Deno.exit(1)` at each gate), so a failing gate stops the
- * driver's remaining legs the way it stops this tool.
+ * The tool, as the `conformance.ts` driver runs it (passing `['--all']`, then
+ * `['tests/fixtures', '--fixtures']`); its root runs it through `corpus_compare_parse_main`.
+ * Each gate returns `1` with the engines released, so a failing gate stops the driver's
+ * remaining legs the way it stops this tool.
+ * @returns the exit code
  */
-export async function run_corpus_compare_parse(argv: string[] = Deno.args): Promise<void> {
-	const parsed = args_parse(argv_parse(argv), CorpusCompareParseArgs);
+export async function run_corpus_compare_parse(
+	deps: CorpusCompareParseDeps,
+	argv: readonly string[]
+): Promise<number> {
+	const parsed = args_parse(argv_parse([...argv]), CorpusCompareParseArgs);
 	if (!parsed.ok) {
 		console.error(parsed.issues.map(s.format_issue).join('\n'));
 		print_usage();
-		Deno.exit(1);
+		return 1;
 	}
 	const args = parsed.value;
 
 	if (args.help) {
 		print_usage();
-		return;
+		return 0;
 	}
 
 	const use_all_repos = args.all;
@@ -772,11 +766,13 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 	if (!path && !use_all_repos) {
 		console.error('Error: No path provided (use --all for all repos)\n');
 		print_usage();
-		Deno.exit(1);
+		return 1;
 	}
 
-	const base_path = resolve_compare_base_path(path, use_all_repos);
-	const filter_lang = parse_language_filter(args.filter);
+	const base_path = resolve_compare_base_path(path, use_all_repos, deps.home);
+	const filter = parse_language_filter(args.filter);
+	if (!filter.ok) return 1;
+	const filter_lang = filter.language;
 
 	const limit = args.limit;
 	const multibyte_only = args['multibyte-only'];
@@ -801,7 +797,7 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 		console.error(
 			'Error: --fixtures grades a fixture tree as authored; it takes neither --all nor --inject*'
 		);
-		Deno.exit(1);
+		return 1;
 	}
 	// The pins are a claim about the whole `gates` view as authored, so only an unnarrowed
 	// `--all` grades them, and only one may rewrite them.
@@ -811,7 +807,7 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 			'Error: --update rewrites the pins from a full run — it needs --all, and none of ' +
 				'--filter / --limit / --multibyte-only / --inject*'
 		);
-		Deno.exit(1);
+		return 1;
 	}
 	if (fixtures_mode) {
 		console.log(
@@ -829,11 +825,12 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 	console.log();
 
 	const loader = create_compare_loader(use_all_repos, base_path);
-	const impls = await init_compare_implementations();
+	const impls = await deps.init_implementations();
+	if (impls === null) return 1;
 	const { canonical, native } = impls;
 	// The loc wire ships through no binding, so the loc arm asks `tsv_debug` for it
-	// (`lib/loc_wire_client.ts`); the span-only wire is the FFI's.
-	const loc_wires = await LocWireClient.start(deno_tsv_debug);
+	// (`lib/loc_wire_client.ts`); the span-only wire is the addon's.
+	const loc_wires = await LocWireClient.start(deps.open_tsv_debug);
 
 	const loc_arm = new LocArmBooks();
 	const pin_tally = new CorpusPinTally(PARSE_PIN_BUCKETS);
@@ -1003,7 +1000,8 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 		// source-empty path (typo, moved src/) must not read as green.
 		console.log('No files found — nothing was compared.');
 		if (json_mode) {
-			emit_json_stdout(
+			await emit_json_stdout(
+				deps.stdout,
 				build_json_report(
 					loc_arm,
 					[],
@@ -1013,7 +1011,7 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 				)
 			);
 		}
-		exit_compare_failure(impls);
+		return fail_compare(impls);
 	}
 
 	const counts = LANGUAGES.map((lang) => `${lang_counts[lang]} ${lang}`).join(', ');
@@ -1102,7 +1100,8 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 	const span_undocumented_groups = span_groups.filter((g) => g.documented === null);
 
 	if (json_mode) {
-		emit_json_stdout(
+		await emit_json_stdout(
+			deps.stdout,
 			build_json_report(
 				loc_arm,
 				groups,
@@ -1119,25 +1118,28 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 	// crash as one more over-rejection. `canonical_error` files are excluded: their
 	// recorded message is the JS oracle's, which can't be a panic. The span-only arm's
 	// panics ride along — no other check of that arm reaches a file both wires reject.
-	gate_on_panics(
-		[
-			...LANGUAGES.flatMap((lang) =>
-				loc_arm.results.get(lang)!.filter((r) => r.status !== 'canonical_error')
-			),
-			...span_panics
-		],
-		impls,
-		base_path
-	);
+	if (
+		gate_on_panics(
+			[
+				...LANGUAGES.flatMap((lang) =>
+					loc_arm.results.get(lang)!.filter((r) => r.status !== 'canonical_error')
+				),
+				...span_panics
+			],
+			base_path
+		)
+	) {
+		return fail_compare(impls);
+	}
 
 	// Floor: a run where NOTHING was compared (every file parse-fail-skipped on
-	// one side) is a systemic failure, not a pass — without this, an FFI or
+	// one side) is a systemic failure, not a pass — without this, an addon or
 	// sidecar breakage would zero out `compared` and sail through green.
 	if (totals.compared === 0) {
 		console.log(
 			`\x1b[31mFAIL: 0 of ${total_processed} files compared (all parse-fail-skipped) — systemic failure or wrong corpus?\x1b[0m`
 		);
-		exit_compare_failure(impls);
+		return fail_compare(impls);
 	}
 
 	// The run's own verdicts, reported last — computed here so a red run cannot re-pin.
@@ -1164,7 +1166,8 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 		const { optional_missing } = await corpus_missing_entries('gates');
 		const pin_failures = await grade_corpus_pins({
 			file: PARSE_PINS_FILE,
-			gate: 'corpus:compare:parse',
+			pins: deps.pins,
+			update_command: PARSE_PINS_UPDATE,
 			tally: pin_tally,
 			update: args.update,
 			update_blockers: [
@@ -1184,9 +1187,9 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 		if (pin_failures.length > 0) {
 			console.log(
 				`\x1b[31mFAIL: pinned counts (${PARSE_PINS_FILE}):\n  ${pin_failures.join('\n  ')}\n` +
-					`If deliberate, re-pin with \`deno task corpus:compare:parse --all --update\`.\x1b[0m`
+					`If deliberate, re-pin with \`${PARSE_PINS_UPDATE}\`.\x1b[0m`
 			);
-			exit_compare_failure(impls);
+			return fail_compare(impls);
 		}
 	}
 
@@ -1258,14 +1261,15 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 	console.log();
 	if (failures.length > 0) {
 		console.log(`\x1b[31mFAIL: ${failures.join('; ')}\x1b[0m`);
-		exit_compare_failure(impls);
+		return fail_compare(impls);
 	} else {
 		console.log(
 			'\x1b[32mPASS: no undocumented AST diffs vs canonical, on either wire, and the loc wire is the definition\x1b[0m'
 		);
 	}
 
-	dispose_compare(impls);
+	impls.dispose();
+	return 0;
 }
 
 /**
@@ -1285,8 +1289,19 @@ function build_error_json_report(message: string): Record<string, unknown> {
 	};
 }
 
-// Guarded so the conformance driver can import `run_corpus_compare_parse` without
-// running the CLI on import.
-if (import.meta.main) {
-	run_compare_main(run_corpus_compare_parse, CorpusCompareParseArgs, build_error_json_report);
+/**
+ * The tool's command: `run_corpus_compare_parse` under the shared failure contract
+ * (`run_compare_main`), as its root runs it.
+ * @returns the exit code
+ */
+export function corpus_compare_parse_main(
+	deps: CorpusCompareParseDeps,
+	argv: readonly string[]
+): Promise<number> {
+	return run_compare_main(() => run_corpus_compare_parse(deps, argv), {
+		argv,
+		schema: CorpusCompareParseArgs,
+		build_error_report: build_error_json_report,
+		stdout: deps.stdout
+	});
 }

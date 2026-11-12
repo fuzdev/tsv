@@ -1,31 +1,29 @@
 /**
- * Shared CLI scaffolding for the corpus_compare_* entry points
- * (corpus_compare_format.ts, corpus_compare_parse.ts): common argument
- * fields, path/filter resolution, loader selection, implementation init with
- * the artifact-freshness guard, the teardown/failure contract, the shared panic
- * gate, and the --json stdout/stderr discipline.
+ * Shared CLI scaffolding for the comparison tools (`corpus_compare_format.ts`,
+ * `corpus_compare_parse.ts`, the fixtures gates, `diagnostics/ts_repo_compare.ts`): common
+ * argument fields, path/filter resolution, the loader selection, the engines a run holds and
+ * their teardown, the shared panic gate, and the `--json` stdout/stderr discipline.
  *
- * Keeping this in one place means hardening (the FFI heisenbug mitigations,
- * freshness-guard behavior, sidecar init errors) applies to every comparison
- * tool instead of drifting per-script — and a GATE that lives here cannot be
- * answered two ways by two tools, which is how the panic hole opened in the
- * first place.
+ * Keeping this in one place means hardening (freshness-guard behavior, sidecar init errors)
+ * applies to every comparison tool instead of drifting per-script — and a GATE that lives here
+ * cannot be answered two ways by two tools, which is how the panic hole opened in the first
+ * place.
+ *
+ * The tools are library functions over deps returning an exit code; their roots under
+ * `benches/js/roots/` bind gro's host modules and load the engines
+ * (`compare_engines.ts`). This module loads none of them: the engines are the structural
+ * types below, so a unit suite drives a tool over fakes.
+ *
+ * @module
  */
-
-import process from 'node:process';
 
 import { args_parse, argv_parse } from '@fuzdev/fuz_util/args.ts';
 import * as s from '@fuzdev/fuz_schema/schema.ts';
 import { meta } from '@fuzdev/fuz_schema/meta.ts';
 
 import { CorpusLoader, DirectoryLoader } from './corpus.ts';
-import { CanonicalImplementation } from './canonical.ts';
 import { is_native_panic_error } from './divergence/panic_errors.ts';
-import { NativeImplementation } from './ffi.ts';
-import { check_artifact_freshness, native_artifact_check } from './check_artifact_freshness.ts';
-import { check_node_modules } from './check_node_modules.ts';
-import { type Language, LANGUAGES } from './types.ts';
-import { load_all_versions } from './versions.ts';
+import { type Language, LANGUAGES, type ParseGoal } from './types.ts';
 
 /**
  * Schema fields shared by every corpus_compare_* tool — spread into the tool's
@@ -43,26 +41,78 @@ export const COMPARE_BASE_ARG_FIELDS = {
 	help: meta(s.with_default(s.boolean, false), { aliases: ['h'] })
 } as const;
 
+/** Where a tool writes: the process's stdout, which `--json` reserves for its report. */
+export interface CompareOutput {
+	write(data: string): Promise<unknown>;
+}
+
+/** A directory a tool reads, read-only, by paths beneath it (a gro `FsReadDir` is one). */
+export interface CompareReadDir {
+	/** The entries at `path` (the directory itself by default); rejects when it can't list. */
+	list(path?: string): AsyncIterable<{ name: string; kind: string }>;
+	read_text(path: string): Promise<string>;
+}
+
+/** The canonical oracles a comparison run holds (`lib/canonical.ts`'s implementation). */
+export interface CanonicalEngine {
+	format_async(source: string, language: Language, source_path?: string): Promise<string>;
+	parse(source: string, language: Language, goal?: ParseGoal): unknown;
+	/** The prettier-output cache, or `null` when disabled; its `stats()` line is printed. */
+	enable_format_cache(): { stats(): string } | null;
+}
+
+/** tsv, through the N-API addon a run loads (`lib/napi.ts`). */
+export interface NativeEngine {
+	format(source: string, language: Language): string;
+	parse(source: string, language: Language, goal?: ParseGoal): unknown;
+	parse_internal(source: string, language: Language, goal?: ParseGoal): void;
+}
+
+/** The pair of engines a comparison run holds open for its lifetime, and their release. */
+export interface CompareImplementations {
+	canonical: CanonicalEngine;
+	native: NativeEngine;
+	dispose(): void;
+}
+
+/**
+ * Loads a run's engines behind the artifact-freshness guard: `null` when one failed to load,
+ * having said why and how to rebuild it, so the run fails with exit 1.
+ */
+export type InitCompareImplementations = () => Promise<CompareImplementations | null>;
+
 /** Get relative path from base directory. */
 export function rel_path(file_path: string, base: string): string {
 	return file_path.startsWith(base + '/') ? file_path.slice(base.length + 1) : file_path;
 }
 
-/** Resolve the comparison base path: `~` expansion, or `~/dev` under --all. */
-export function resolve_compare_base_path(path: string | undefined, use_all: boolean): string {
-	const home_dir = Deno.env.get('HOME') ?? '';
+/**
+ * Resolve the comparison base path: `~` expansion, or `~/dev` under --all.
+ * @param home - `HOME`, read at the tool's root
+ */
+export function resolve_compare_base_path(
+	path: string | undefined,
+	use_all: boolean,
+	home: string | undefined
+): string {
+	const home_dir = home ?? '';
 	return use_all ? `${home_dir}/dev` : path!.startsWith('~') ? path!.replace('~', home_dir) : path!;
 }
 
-/** Validate a --filter value as a {@link Language}, exiting with a message if invalid. */
-export function parse_language_filter(filter: string | undefined): Language | undefined {
-	if (filter === undefined) return undefined;
+/**
+ * Validate a --filter value as a `Language`: `{ok: false}` once the error is printed, so the
+ * run fails with exit 1.
+ */
+export function parse_language_filter(
+	filter: string | undefined
+): { ok: true; language: Language | undefined } | { ok: false } {
+	if (filter === undefined) return { ok: true, language: undefined };
 	const lang = filter as Language;
 	if (!LANGUAGES.includes(lang)) {
 		console.error(`Error: Invalid filter "${filter}". Must be one of: ${LANGUAGES.join(', ')}`);
-		Deno.exit(1);
+		return { ok: false };
 	}
-	return lang;
+	return { ok: true, language: lang };
 }
 
 /**
@@ -74,8 +124,11 @@ export function redirect_logs_to_stderr(): void {
 }
 
 /** Write the buffered JSON report to stdout (the only thing on stdout in --json mode). */
-export function emit_json_stdout(report: Record<string, unknown>): void {
-	Deno.stdout.writeSync(new TextEncoder().encode(JSON.stringify(report, null, '\t') + '\n'));
+export async function emit_json_stdout(
+	stdout: CompareOutput,
+	report: Record<string, unknown>
+): Promise<void> {
+	await stdout.write(JSON.stringify(report, null, '\t') + '\n');
 }
 
 /**
@@ -90,69 +143,15 @@ export function create_compare_loader(
 	return use_all ? new CorpusLoader('gates') : new DirectoryLoader(base_path);
 }
 
-/** The pair of implementations a comparison run holds open for its lifetime. */
-export interface CompareImplementations {
-	canonical: CanonicalImplementation;
-	native: NativeImplementation;
-}
-
 /**
- * Initialize the canonical (prettier + svelte/compiler + acorn) and native
- * (FFI) implementations behind the artifact-freshness guard, exiting with a
- * profile-aware rebuild hint on failure. Callers own the teardown —
- * `dispose_compare` on the clean path, `exit_compare_failure` on every gate.
+ * Release the engines and fail — the shared failure contract of every gate in a comparison
+ * tool. Exists so a gate added later can't half-remember it: the only way to fail a run is
+ * the way that also releases the oracles and the addon's bindings.
+ * @returns the run's exit code, `1`
  */
-export async function init_compare_implementations(): Promise<CompareImplementations> {
-	// The canonical impls resolve from benches/js/node_modules — check it exists
-	// (and isn't stale) up front so the failure is the installer hint, not an
-	// opaque module-resolution error mid-init.
-	await check_node_modules();
-
-	// Refuse to measure a stale binary (the `:run` task variants skip the
-	// rebuild). Only the native library: these tools run no WASM, so the bundle's
-	// freshness is not their business. Override with BENCH_STALE_OK=1. Held in a
-	// const because the init failure below quotes the same rebuild hint — one
-	// answer to "how do I rebuild this artifact", whether it was stale or unloadable.
-	const native_check = native_artifact_check();
-	await check_artifact_freshness([native_check]);
-
-	const versions = await load_all_versions();
-	const canonical = new CanonicalImplementation(versions.canonical);
-	const native = new NativeImplementation();
-
-	try {
-		await canonical.init();
-	} catch (e) {
-		console.error(`Failed to initialize canonical implementations: ${e}`);
-		Deno.exit(1);
-	}
-
-	try {
-		await native.init();
-	} catch (e) {
-		console.error(`Failed to initialize native implementation: ${e}`);
-		console.error(`Run: ${native_check.rebuild}`);
-		Deno.exit(1);
-	}
-
-	return { canonical, native };
-}
-
-/** Release both implementations at the end of a run. */
-export function dispose_compare(impls: CompareImplementations): void {
-	impls.canonical.dispose();
-	impls.native.dispose();
-}
-
-/**
- * Tear down and exit 1 — the shared failure contract of every gate in a
- * comparison tool. Exists so a gate added later can't half-remember it: the
- * only way to fail a run is the way that also releases the sidecar and the FFI
- * handle.
- */
-export function exit_compare_failure(impls: CompareImplementations): never {
-	dispose_compare(impls);
-	Deno.exit(1);
+export function fail_compare(impls: CompareImplementations): 1 {
+	impls.dispose();
+	return 1;
 }
 
 /** A per-file failure a panic gate can grade: where it happened, and what threw. */
@@ -163,9 +162,10 @@ export interface CompareFailure {
 
 /**
  * HARD-FAIL the run on any caught panic, on every run — not just `--all`, and
- * never folded into a per-file bucket.
+ * never folded into a per-file bucket. Returns whether it tripped, the report printed; the
+ * caller then fails the run (`fail_compare`).
  *
- * The comparison tools build tsv with `--profile corpus` (`panic = "unwind"`)
+ * The comparison tools load tsv built with `--profile corpus` (`panic = "unwind"`)
  * precisely so a crash is caught and reported per file rather than killing the
  * run; the SHIPPED artifacts are `panic = "abort"` and take the host process
  * down on that same input. So a caught panic arrives in the run's mildest
@@ -180,13 +180,9 @@ export interface CompareFailure {
  * Call it AFTER the report body is printed — a panic is the headline, not a
  * reason to withhold the run's findings.
  */
-export function gate_on_panics(
-	failures: readonly CompareFailure[],
-	impls: CompareImplementations,
-	base_path: string
-): void {
+export function gate_on_panics(failures: readonly CompareFailure[], base_path: string): boolean {
 	const panics = failures.filter((f) => is_native_panic_error(f.error));
-	if (panics.length === 0) return;
+	if (panics.length === 0) return false;
 
 	console.log(
 		`\n\x1b[31mFAIL: ${panics.length} panic(s) — tsv crashed on real code ` +
@@ -196,27 +192,34 @@ export function gate_on_panics(
 		console.log(`  ${rel_path(f.path, base_path)}: ${f.error}`);
 	}
 	if (panics.length > 10) console.log(`  ... and ${panics.length - 10} more`);
-	exit_compare_failure(impls);
+	return true;
 }
 
 /**
- * Run a comparison tool's `main`, enforcing the shared failure contract: the
- * message goes to stderr, and in --json mode stdout still receives a
- * parseable error-shaped report. The --json flag is re-derived from argv here
- * because a rejection can happen before (or during) main()'s own arg parse.
+ * Run a comparison tool's entry, enforcing the shared failure contract on a throw: the
+ * message goes to stderr, and in --json mode stdout still receives a parseable error-shaped
+ * report. The --json flag is re-derived from `argv` here because a rejection can happen
+ * before (or during) the entry's own arg parse.
+ * @returns the entry's exit code, or `1` when it threw
  */
-export function run_compare_main<T extends { json: boolean }>(
-	main: () => Promise<void>,
-	schema: s.Schema<T, any>,
-	build_error_report: (message: string) => Record<string, unknown>
-): void {
-	main().catch((e) => {
+export async function run_compare_main<T extends { json: boolean }>(
+	main: () => Promise<number>,
+	options: {
+		argv: readonly string[];
+		schema: s.Schema<T, any>;
+		build_error_report: (message: string) => Record<string, unknown>;
+		stdout: CompareOutput;
+	}
+): Promise<number> {
+	try {
+		return await main();
+	} catch (e) {
 		const message = e instanceof Error ? e.message : String(e);
 		console.error(message);
-		const parsed = args_parse(argv_parse(process.argv.slice(2)), schema);
+		const parsed = args_parse(argv_parse([...options.argv]), options.schema);
 		if (parsed.ok && parsed.value.json) {
-			emit_json_stdout(build_error_report(message));
+			await emit_json_stdout(options.stdout, options.build_error_report(message));
 		}
-		Deno.exit(1);
-	});
+		return 1;
+	}
 }

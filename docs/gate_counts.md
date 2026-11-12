@@ -4,7 +4,7 @@
 > in *what gets graded* fails loudly instead of shifting inside a green run.
 
 A gutted or refreshed suite checkout, a discovery bug, a tsv behavior change, or a
-systemic sidecar/FFI failure eating a whole language all move a count. This is
+systemic sidecar, oracle, or addon failure eating a whole language all move a count. This is
 `scripts/validate_artifacts.ts`'s tight-bounds philosophy applied to counts: every
 real move in a number is a deliberate, visible edit.
 
@@ -158,8 +158,8 @@ left by getting better or worse, and what the A/B over the full corpus showed. A
 number is unauditable — the next re-pin cannot tell a recorded win from an absorbed
 regression — so the attribution is the constant's semantics, not its history.
 
-**The two corpus gates re-pin by regenerating, not by editing.** `deno task
-corpus:compare:format --all --update` and `deno task corpus:compare:parse --all --update`
+**The two corpus gates re-pin by regenerating, not by editing.** `npm run
+corpus:compare:format -- --all --update` and `deno task corpus:compare:parse --all --update`
 rewrite their pins file from the run and print every row that moved. `--update` refuses a
 narrowed run, and any run that could write a wrong table: a source absent from it (an
 un-harvested `svelte_styles` cache), a red verdict (format: SAFETY, an environment error;

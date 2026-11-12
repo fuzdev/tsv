@@ -111,7 +111,8 @@ import {
 	has_grammar_error,
 	is_multi_file_test,
 	TS_BASELINE_DIR,
-	TS_REPO
+	TS_REPO,
+	type TsCaseTree
 } from './lib/ts_repo.ts';
 import { load_typescript, tsc_parse } from './lib/tsc.ts';
 
@@ -126,6 +127,15 @@ const stamp_git: StampGit = {
 		return { kind: 'exited', code: output.code, stdout: new TextDecoder().decode(output.stdout) };
 	}
 };
+
+/** The case tree under `root`, by path from the working directory. */
+const node_tree = (root: string): TsCaseTree => ({
+	list: async function* (path) {
+		for (const entry of await readdir(join(root, path), { withFileTypes: true })) {
+			yield { name: entry.name, kind: entry.isDirectory() ? 'directory' : 'file' };
+		}
+	}
+});
 
 /** The stamps' file reads and writes, by path from the working directory. */
 const stamp_fs: StampWrites = {
@@ -256,7 +266,12 @@ let rejected_without_baseline = 0;
 let scanned = 0;
 
 for (const root of ROOTS) {
-	for await (const path of discover_ts_cases(root, discovery_skips, DECLARATIONS)) {
+	for await (const { path } of discover_ts_cases(
+		node_tree(root),
+		root,
+		discovery_skips,
+		DECLARATIONS
+	)) {
 		let content: string;
 		try {
 			content = await readFile(path, 'utf8');

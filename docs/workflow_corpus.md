@@ -10,7 +10,7 @@ fixture-first TDD flow rather than this file's hunk workflow.
 
 Exit-code notes for `--all` runs: besides SAFETY (which always gates), the
 tools fail on an empty scope, an all-errored / zero-compared run (systemic
-sidecar/FFI failure), and on the **pinned per-source counts**
+oracle or addon failure), and on the **pinned per-source counts**
 (`benches/js/lib/corpus_{format,parse}_pins.txt` — see [gate_counts.md](gate_counts.md)):
 exact pins per corpus source and language on every bucket but SAFETY (parse's `compared`
 and failure counts; format's `match`, `known`, `partial`, `unknown` and error counts — a new
@@ -170,7 +170,7 @@ DISCOVER → CATEGORIZE → CHECK FIXTURES → CREATE FIXTURE (if missing) → I
 ### Run Corpus Comparison
 
 ```bash
-# Full comparison - builds FFI first (all languages)
+# Full comparison - builds the corpus N-API addon first (all languages)
 deno task corpus:compare:format ../corpora/collections/zzz
 
 # Filtered by language
@@ -181,7 +181,7 @@ deno task corpus:compare:format ../corpora/collections/zzz --filter css
 # Verbose mode (see each file as processed)
 deno task corpus:compare:format ../corpora/collections/zzz --verbose
 
-# Skip rebuild (if FFI already up-to-date)
+# Skip rebuild (if the addon is already up to date)
 deno task corpus:compare:format:run ../corpora/collections/zzz
 
 # Machine-readable: single JSON report on stdout (stats + safety/partial/unknown/
@@ -189,10 +189,10 @@ deno task corpus:compare:format:run ../corpora/collections/zzz
 deno task corpus:compare:format:run --all --json 2>/dev/null
 ```
 
-> **Staleness footgun**: `corpus:compare:format` rebuilds the FFI (`build:ffi:corpus`)
-> before running; `corpus:compare:format:run` does **not**. Our formatted output
-> (`ours`) comes from the compiled FFI, so after a Rust change you must run the
-> rebuild variant (or `deno task build:ffi:corpus` yourself) before trusting the
+> **Staleness footgun**: `corpus:compare:format` rebuilds the N-API addon
+> (`build:napi:corpus`) before running; `corpus:compare:format:run` does **not**. Our
+> formatted output (`ours`) comes from the compiled addon, so after a Rust change you must
+> run the rebuild variant (or `npm run build:napi:corpus` yourself) before trusting the
 > numbers — otherwise `:run` compares against a stale binary and a fix appears to
 > have no effect. The safety/divergence logic itself is TypeScript and always
 > live; only the formatter output is gated on the rebuild.
@@ -516,7 +516,7 @@ Full algorithm, character sets, and how to read a violation:
 ```bash
 deno task corpus:compare:format --all [options]       # the gates corpus view
 deno task corpus:compare:format <path> [options]      # Scans <path> recursively
-deno task corpus:compare:format:run <path> [options]  # Skip FFI build (faster iteration)
+deno task corpus:compare:format:run <path> [options]  # Skip the addon build (faster iteration)
 
 Options:
   --all             Compare the gates corpus view (the ../corpora snapshot + the prettier

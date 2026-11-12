@@ -23,7 +23,7 @@
  * The shared engine (`lib/fixtures_gate.ts`) does the rest: verdict parity GATES
  * (over-rejections must be a `TS_FIXTURE_SANCTIONS` sanction or a tracked
  * `KNOWN_GAPS` entry, else exit 1), AST-shape is a report-only triage surface.
- * Periodic (non-`check`) gate — needs the FFI + the acorn-typescript oracle
+ * Periodic (non-`check`) gate — needs the corpus N-API addon + the acorn-typescript oracle
  * (node_modules) + the `../acorn-typescript/test` checkout. Strict about setup:
  * a missing root (0 scanned) FAILS — the tolerance point for machines without
  * the checkout is publish Step 3b's preflight probe, which skips the whole
@@ -33,13 +33,13 @@
  * version skew between the checkout and the pinned npm oracle.
  *
  * Run (from the repo root):
- *   deno task conformance:ts-fixtures                # builds corpus FFI, then runs
- *   deno task conformance:ts-fixtures:run            # skip rebuild (freshness-guarded)
- *   deno task conformance:ts-fixtures:run --json 2>/dev/null > report.json
- *   deno task conformance:ts-fixtures:run ../acorn-typescript/test/class_accessor
+ *   npm run conformance:ts-fixtures                # builds the corpus N-API addon, then runs
+ *   npm run conformance:ts-fixtures:run            # skip rebuild (freshness-guarded)
+ *   npm run -s conformance:ts-fixtures:run -- --json 2>/dev/null > report.json
+ *   npm run conformance:ts-fixtures:run -- ../acorn-typescript/test/class_accessor
  */
 
-import { type FixturesGateConfig, run_fixtures_gate } from '../lib/fixtures_gate.ts';
+import type { FixturesGateConfig } from '../lib/fixtures_gate.ts';
 import { TS_FIXTURES_PINS } from '../lib/gate_counts.ts';
 import { type KnownGap, TS_FIXTURE_SANCTIONS } from '../lib/parse_sanctions.ts';
 
@@ -51,7 +51,7 @@ import { type KnownGap, TS_FIXTURE_SANCTIONS } from '../lib/parse_sanctions.ts';
  */
 const KNOWN_GAPS: KnownGap[] = [];
 
-/** The gate's config — exported for the `conformance.ts` single-process driver. */
+/** The gate's config, run by its root (`benches/js/roots/ts_fixtures_compare.ts`) and the `conformance.ts` driver. */
 export const TS_FIXTURES_GATE: FixturesGateConfig = {
 	title: 'TypeScript-fixtures',
 	language: 'typescript',
@@ -70,7 +70,3 @@ export const TS_FIXTURES_GATE: FixturesGateConfig = {
 	},
 	pins: TS_FIXTURES_PINS
 };
-
-if (import.meta.main) {
-	await run_fixtures_gate(TS_FIXTURES_GATE);
-}

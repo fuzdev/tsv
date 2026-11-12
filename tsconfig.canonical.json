@@ -1,4 +1,8 @@
 {
 	"extends": "./tsconfig.vitest.json",
-	"files": ["vitest.canonical.config.ts", "benches/js/lib/canonical_test.ts"]
+	"files": [
+		"vitest.canonical.config.ts",
+		"benches/js/lib/canonical_test.ts",
+		"benches/js/lib/compare_engines_test.ts"
+	]
 }

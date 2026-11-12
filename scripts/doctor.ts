@@ -46,6 +46,11 @@ import {
 } from '../benches/js/lib/harvest_stamp.ts';
 import { HARVEST_STAMPS } from '../benches/js/lib/harvest_stamp_table.ts';
 import { native_library_filename } from '../benches/js/lib/runtime.ts';
+import {
+	COMPARE_PROFILE,
+	napi_rebuild_task,
+	napi_target_path
+} from '../benches/js/lib/tsv_artifacts.ts';
 import type { AllVersions, load_all_versions } from '../benches/js/lib/versions.ts';
 import {
 	SIDECAR_DIR,
@@ -749,8 +754,12 @@ export const run_doctor = async (
 	const artifacts: Array<[path: string, task: string]> = [
 		[`.pgo/bench/${ffi_lib}`, 'deno task build:bench:pgo (bench:deno, profile-guided)'],
 		[`.pgo/bench/${napi_lib}`, 'deno task build:bench:pgo (bench:node/bun, profile-guided)'],
-		[`target/corpus/${ffi_lib}`, 'deno task build:ffi:corpus (conformance gates)'],
-		[`target/napi/${napi_lib}`, 'deno task build:napi (test:napi)'],
+		[
+			`target/${napi_target_path(COMPARE_PROFILE)}`,
+			`${napi_rebuild_task(COMPARE_PROFILE)} (conformance gates)`
+		],
+		[`target/corpus/${ffi_lib}`, 'deno task build:ffi:corpus (over-acceptance)'],
+		[`target/${napi_target_path('napi')}`, `${napi_rebuild_task('napi')} (test:napi)`],
 		['crates/tsv_wasm/pkg/all/deno', 'deno task build:wasm:all:deno (bench:deno)'],
 		['crates/tsv_wasm/pkg/all/nodejs', 'deno task build:wasm:all:nodejs (bench:node/bun)'],
 		['crates/tsv_wasm/pkg/all/npm', 'deno task build:npm:all (publish)']

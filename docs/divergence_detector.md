@@ -303,7 +303,7 @@ all-or-nothing guard, isolates a real loss in a file that _also_ contains an
 unrelated shared normalization.
 
 The algorithm lives only in `lib/divergence/safety.ts`; it runs in-process on
-strings already in the Deno heap (source, FFI output, prettier output), so it
+strings already in the process heap (source, tsv's output, prettier output), so it
 never shells out — per-file cost is dominated by the prettier format call.
 
 **Reading a violation:** each char shows its `real` count with shared context —

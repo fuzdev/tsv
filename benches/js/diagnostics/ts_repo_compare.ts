@@ -49,9 +49,10 @@
  * is tsc's baselines over the compiler corpus. Their ledgers are kept apart.
  *
  * A leg of the blocking `conformance` aggregate (publish Step 3b). Summary to
- * stderr, full JSON to stdout with `--json`. `run_ts_repo_compare` is the importable
- * entry the `conformance.ts` single-process driver calls; the CLI guard at the
- * bottom feeds it `Deno.args`. Failure semantics are process-level (`Deno.exit(1)`).
+ * stderr, full JSON to stdout with `--json`. `run_ts_repo_compare` is the library function
+ * its root (`benches/js/roots/ts_repo_compare.ts`) and the `conformance.ts` driver run over
+ * their deps (`TsRepoCompareDeps`: the engines, read-only handles on the checkout, stdout),
+ * returning the exit code.
  *
  * Setup posture: strict — a missing `../typescript` checkout, a PARTIAL checkout
  * (baselines or the corpus subtree missing), or an empty scan all FAIL rather than
@@ -59,17 +60,20 @@
  * the tolerance point for machines without the checkout).
  *
  * Run (from the repo root):
- *   deno task conformance:ts-repo            # builds corpus FFI, then runs
- *   deno task conformance:ts-repo:run        # skip rebuild (freshness-guarded)
- *   deno task conformance:ts-repo:run --json 2>/dev/null > report.json
- *   deno task conformance:ts-repo:run -v     # every ledgered / auto-bucketed entry
- *   deno task conformance:ts-repo:run ../typescript/tests/cases/conformance/parser/ecmascript6
+ *   npm run conformance:ts-repo            # builds the corpus N-API addon, then runs
+ *   npm run conformance:ts-repo:run        # skip rebuild (freshness-guarded)
+ *   npm run -s conformance:ts-repo:run -- --json 2>/dev/null > report.json
+ *   npm run conformance:ts-repo:run -- -v  # every ledgered / auto-bucketed entry
+ *   npm run conformance:ts-repo:run -- ../typescript/tests/cases/conformance/parser/ecmascript6
  */
 
-import { readdir, readFile, stat } from 'node:fs/promises';
-import { basename, join } from 'node:path';
+import { basename } from 'node:path';
 
-import { init_compare_implementations } from '../lib/compare_cli.ts';
+import type {
+	CompareOutput,
+	CompareReadDir,
+	InitCompareImplementations
+} from '../lib/compare_cli.ts';
 import { first_line } from '../lib/error_text.ts';
 import { TS_REPO_PINS } from '../lib/gate_counts.ts';
 import { type KnownGap, TS_REPO_SANCTIONS } from '../lib/parse_sanctions.ts';
@@ -104,6 +108,19 @@ import {
  * must agree on — the parse-unit rule and the baseline rules — not the scope.
  */
 const DEFAULT_ROOT = `${TS_REPO}/tests/cases`;
+
+/** What `run_ts_repo_compare` reaches. */
+export interface TsRepoCompareDeps {
+	/** Loads the engines (`lib/compare_engines.ts`), behind their freshness guard. */
+	init_implementations: InitCompareImplementations;
+	/**
+	 * Opens a directory read-only, by a path as the gate spells it: relative to the checkout
+	 * (`../typescript/tests/cases`, a positional root), or absolute. Throws when it can't.
+	 */
+	open_dir: (path: string) => Promise<CompareReadDir>;
+	/** Where `--json` writes its report. */
+	stdout: CompareOutput;
+}
 
 /**
  * `.d.ts` cases are GRADED here: this gate hunts over-rejections, and a declaration
@@ -521,8 +538,14 @@ function gap(at: Located, tsv_error: string, entry?: LedgerEntry): Gap {
 		: { ...at, tsv_error };
 }
 
-/** The tool's entry — see the module docstring for buckets, posture, and CLI use. */
-export async function run_ts_repo_compare(argv: string[] = Deno.args): Promise<void> {
+/**
+ * The tool — see the module docstring for buckets, posture, and CLI use.
+ * @returns the exit code
+ */
+export async function run_ts_repo_compare(
+	deps: TsRepoCompareDeps,
+	argv: readonly string[]
+): Promise<number> {
 	const flags = new Set(argv.filter((a) => a.startsWith('-')));
 	const json_mode = flags.has('--json');
 	const verbose = flags.has('--verbose') || flags.has('-v');
@@ -533,13 +556,13 @@ export async function run_ts_repo_compare(argv: string[] = Deno.args): Promise<v
 	// The tolerance point for machines without the checkout is publish Step 3b's
 	// preflight probe, which skips the whole aggregate with a warning.
 	try {
-		await stat(TS_REPO);
+		await deps.open_dir(TS_REPO);
 	} catch {
 		console.error(
 			`FAIL: ${TS_REPO} checkout not found — nothing can be graded. ` +
 				`Clone microsoft/TypeScript at ${TS_REPO}.`
 		);
-		Deno.exit(1);
+		return 1;
 	}
 
 	// Index of every `*.errors.txt` baseline, keyed by its **un-suffixed** test name
@@ -547,16 +570,18 @@ export async function run_ts_repo_compare(argv: string[] = Deno.args): Promise<v
 	// compiled under multiple settings and so carry only per-variant baselines).
 	// Index once so a lookup gathers every variant.
 	const errors_baselines_by_test = new Map<string, string[]>();
-	let baseline_names: string[];
+	let baselines: CompareReadDir;
+	const baseline_names: string[] = [];
 	try {
-		baseline_names = await readdir(TS_BASELINE_DIR);
+		baselines = await deps.open_dir(TS_BASELINE_DIR);
+		for await (const entry of baselines.list()) baseline_names.push(entry.name);
 	} catch (e) {
 		console.error(
 			`FAIL: cannot read ${TS_BASELINE_DIR} (${e instanceof Error ? e.message : e}) — ` +
 				`the ${TS_REPO} checkout exists but its baselines are missing (partial/sparse checkout?). ` +
 				`The baselines ARE the oracle, so this run cannot grade anything.`
 		);
-		Deno.exit(1);
+		return 1;
 	}
 	for (const name of baseline_names) {
 		if (!name.endsWith('.errors.txt')) continue;
@@ -575,15 +600,19 @@ export async function run_ts_repo_compare(argv: string[] = Deno.args): Promise<v
 		const base = basename(file_path).replace(/\.ts$/, '');
 		const codes = new Set<string>();
 		for (const name of errors_baselines_by_test.get(base) ?? []) {
-			for (const code of grammar_error_codes(await readFile(join(TS_BASELINE_DIR, name), 'utf8'))) {
+			for (const code of grammar_error_codes(await baselines.read_text(name))) {
 				codes.add(code);
 			}
 		}
 		return [...codes].sort();
 	}
 
-	const { canonical, native } = await init_compare_implementations();
+	const impls = await deps.init_implementations();
+	if (impls === null) return 1;
+	const { canonical, native } = impls;
 	const ts = await load_typescript();
+	/** Set when tsc's parser lost the field the over-acceptance split reads; fails the run. */
+	let tsc_field_missing = false;
 
 	/** tsc's live parser over the same bytes: its diagnostics codes, and whether it read a module. */
 	function tsc_parser_verdict(
@@ -592,11 +621,14 @@ export async function run_ts_repo_compare(argv: string[] = Deno.args): Promise<v
 	): { codes: number[]; is_module: boolean } {
 		const { source_file, diagnostics } = tsc_parse(ts, file_name, content);
 		if (!diagnostics) {
-			console.error(
-				'FAIL: tsc SourceFile has no `parseDiagnostics` — the internal field this gate splits ' +
-					'over-acceptance with is gone (upstream rename?). Refusing to grade every file as accepted.'
-			);
-			Deno.exit(1);
+			if (!tsc_field_missing) {
+				console.error(
+					'FAIL: tsc SourceFile has no `parseDiagnostics` — the internal field this gate splits ' +
+						'over-acceptance with is gone (upstream rename?). Refusing to grade every file as accepted.'
+				);
+			}
+			tsc_field_missing = true;
+			return { codes: [], is_module: true };
 		}
 		return {
 			codes: [...new Set(diagnostics.map((d) => d.code))],
@@ -741,10 +773,18 @@ export async function run_ts_repo_compare(argv: string[] = Deno.args): Promise<v
 		);
 	}
 
-	for await (const path of discover_ts_cases(root, discovery_skips, DECLARATIONS)) {
+	let tree: CompareReadDir | null = null;
+	try {
+		tree = await deps.open_dir(root);
+	} catch (e) {
+		console.error(`Cannot read ${root}: ${e instanceof Error ? e.message : e}`);
+	}
+	const cases = tree === null ? [] : discover_ts_cases(tree, root, discovery_skips, DECLARATIONS);
+	for await (const { path, rel } of cases) {
+		if (tsc_field_missing) break;
 		let content: string;
 		try {
-			content = await readFile(path, 'utf8');
+			content = await tree!.read_text(rel);
 		} catch {
 			skipped.unreadable++;
 			continue;
@@ -776,8 +816,8 @@ export async function run_ts_repo_compare(argv: string[] = Deno.args): Promise<v
 		grade({ path }, content, baseline_codes);
 	}
 
-	canonical.dispose();
-	native.dispose();
+	impls.dispose();
+	if (tsc_field_missing) return 1;
 
 	// --- Report -----------------------------------------------------------------
 
@@ -795,7 +835,7 @@ export async function run_ts_repo_compare(argv: string[] = Deno.args): Promise<v
 		console.error(
 			`FAIL: 0 single-file .ts scanned under ${root} — wrong path? Nothing was graded.`
 		);
-		Deno.exit(1);
+		return 1;
 	}
 
 	const unexpected_total = buckets.gap_unexpected.length + buckets.beyond_acorn_unexpected.length;
@@ -909,7 +949,7 @@ export async function run_ts_repo_compare(argv: string[] = Deno.args): Promise<v
 				unexpected: buckets.beyond_acorn_unexpected
 			}
 		};
-		Deno.stdout.writeSync(new TextEncoder().encode(JSON.stringify(report, null, '\t') + '\n'));
+		await deps.stdout.write(JSON.stringify(report, null, '\t') + '\n');
 	}
 
 	if (unexpected_total > 0) {
@@ -918,7 +958,7 @@ export async function run_ts_repo_compare(argv: string[] = Deno.args): Promise<v
 				`Fix the parser, or add a reasoned ledger entry (this file: KNOWN_GAPS / BEYOND_ACORN_*; ` +
 				`lib/parse_sanctions.ts: TS_REPO_SANCTIONS) — docs/conformance_tsc.md §Triage.`
 		);
-		Deno.exit(1);
+		return 1;
 	}
 
 	// Full-corpus-only hygiene (a subtree run legitimately grades a slice):
@@ -934,7 +974,7 @@ export async function run_ts_repo_compare(argv: string[] = Deno.args): Promise<v
 				`\nFAIL: ${stale.length} stale ledger entr${stale.length === 1 ? 'y' : 'ies'} — matched no over-rejection:\n` +
 					stale.map((s) => `    · ${s}`).join('\n')
 			);
-			Deno.exit(1);
+			return 1;
 		}
 
 		// Pinned counts (exact): the corpus is a deliberately-updated checkout, so any
@@ -957,15 +997,12 @@ export async function run_ts_repo_compare(argv: string[] = Deno.args): Promise<v
 				`\nFAIL: pinned count mismatch — ${pin_failures.join('; ')}. If this move is deliberate ` +
 					`(checkout pull, behavior change), re-pin in lib/gate_counts.ts (see its update ritual).`
 			);
-			Deno.exit(1);
+			return 1;
 		}
 	}
 
 	console.error(
 		`\nOK: no untracked over-rejections (every tsv over-rejection is ledgered, a goal artifact, or refused by tsc's own parser).`
 	);
-}
-
-if (import.meta.main) {
-	await run_ts_repo_compare();
+	return 0;
 }

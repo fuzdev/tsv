@@ -27,8 +27,9 @@
  *   variant), which is fine — the rule under both is the same one.
  */
 
-import { readdir } from 'node:fs/promises';
 import { join } from 'node:path';
+
+import { sort_listing } from './listing_order.ts';
 
 /** The official TypeScript checkout — baselines and test cases live at fixed paths under it. */
 export const TS_REPO = '../typescript';
@@ -68,34 +69,60 @@ export function empty_ts_case_skips(): TsCaseSkips {
 export type DeclarationPolicy = 'include' | 'skip';
 
 /**
- * Every `.ts` test case under `dir`, recursively — the parse-unit rule both
+ * The tree a discovery walks, by `/`-separated paths beneath its root (`''` the root), as a
+ * read-only fs handle lists one; each consumer's root binds it.
+ */
+export interface TsCaseTree {
+	/** The directory's entries, in any order; throws, or rejects, when it can't be read. */
+	list(path: string): AsyncIterable<{ name: string; kind: string }>;
+}
+
+/** A discovered case: `path` as the run spells it (the root joined), `rel` beneath the tree. */
+export interface TsCase {
+	path: string;
+	rel: string;
+}
+
+/**
+ * Every `.ts` test case in `tree`, recursively — the parse-unit rule both
  * consumers share. `.tsx` is always filtered, `.d.ts` per `declarations`, both
  * counted into `skips` (never silently); `node_modules` is pruned, and an
- * unreadable directory is reported and skipped rather than aborting the walk.
+ * unreadable directory is reported and skipped rather than aborting the walk. Each directory
+ * is walked in `readdir`'s order (`listing_order.ts`), and only an entry of kind `directory`
+ * is descended, so a symlink is a file here.
+ *
+ * @param root - the tree's root as the run spells it, joined into each case's `path` and
+ * each report
  */
 export async function* discover_ts_cases(
-	dir: string,
+	tree: TsCaseTree,
+	root: string,
 	skips: TsCaseSkips,
-	declarations: DeclarationPolicy
-): AsyncGenerator<string> {
-	let entries;
+	declarations: DeclarationPolicy,
+	rel = ''
+): AsyncGenerator<TsCase> {
+	const dir = join(root, rel);
+	const entries: Array<{ name: string; kind: string }> = [];
 	try {
-		entries = await readdir(dir, { withFileTypes: true });
+		for await (const entry of tree.list(rel)) entries.push(entry);
 	} catch (e) {
 		console.error(`Cannot read ${dir}: ${e instanceof Error ? e.message : e}`);
 		return;
 	}
-	for (const entry of entries) {
-		const full = join(dir, entry.name);
-		if (entry.isDirectory()) {
-			if (entry.name !== 'node_modules') yield* discover_ts_cases(full, skips, declarations);
+	for (const entry of sort_listing(entries)) {
+		const entry_rel = rel === '' ? entry.name : `${rel}/${entry.name}`;
+		const found = { path: join(dir, entry.name), rel: entry_rel };
+		if (entry.kind === 'directory') {
+			if (entry.name !== 'node_modules') {
+				yield* discover_ts_cases(tree, root, skips, declarations, entry_rel);
+			}
 		} else if (entry.name.endsWith('.d.ts')) {
 			if (declarations === 'skip') skips.declaration++;
-			else yield full;
+			else yield found;
 		} else if (entry.name.endsWith('.tsx')) {
 			skips.tsx++;
 		} else if (entry.name.endsWith('.ts')) {
-			yield full;
+			yield found;
 		}
 	}
 }

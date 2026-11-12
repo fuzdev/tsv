@@ -207,7 +207,7 @@ the re-pin ritual and provenance are [gate_counts.md](./gate_counts.md).
 ## Command interface
 
 ```bash
-deno task conformance:ts-repo            # build the corpus FFI, then run the gate
+deno task conformance:ts-repo            # build the corpus N-API addon, then run the gate
 deno task conformance:ts-repo:run        # skip the rebuild (freshness-guarded; BENCH_STALE_OK=1 overrides)
 deno task conformance:ts-repo:run -v     # every ledgered and auto-attributed entry, plus the code histogram
 deno task conformance:ts-repo:run --json 2>summary.txt >report.json

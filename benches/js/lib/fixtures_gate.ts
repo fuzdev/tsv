@@ -20,19 +20,39 @@
  * every binding emits — against the oracle with its `loc` / `name_loc` stripped
  * (`lib/span_only.ts`), as `corpus:compare:parse`'s span-only arm does; `loc` itself is
  * that tool's loc arm's to grade. Verdict parity GATES; AST-shape is report-only.
+ *
+ * Runs under Node, from its gates' roots (`benches/js/roots/svelte_fixtures_compare.ts`,
+ * `benches/js/roots/ts_fixtures_compare.ts`) and the `conformance.ts` driver, which bind its
+ * deps (`FixturesGateDeps`): the suite checkout is read through read-only handles.
+ *
+ * @module
  */
 
-import { readdir, readFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 
-import { init_compare_implementations } from './compare_cli.ts';
+import type { CompareOutput, CompareReadDir, InitCompareImplementations } from './compare_cli.ts';
 import { first_line } from './error_text.ts';
 import type { GatePins } from './gate_counts.ts';
+import { sort_listing } from './listing_order.ts';
 import { type DiffEntry, diff_asts, type MatchContext } from './parse_diff.ts';
 import type { KnownGap, Sanction } from './parse_sanctions.ts';
 import { span_only_replacer } from './span_only.ts';
 import type { Language } from './types.ts';
 import { type CanonicalVersions, load_all_versions } from './versions.ts';
+
+/** What `run_fixtures_gate` reaches. */
+export interface FixturesGateDeps {
+	/** Loads the engines (`compare_engines.ts`), behind their freshness guard. */
+	init_implementations: InitCompareImplementations;
+	/**
+	 * Opens a directory read-only, by a path as the gate spells it: relative to the checkout
+	 * (`../svelte/packages/svelte/tests`, a positional root), or absolute. Throws when it
+	 * can't.
+	 */
+	open_dir: (path: string) => Promise<CompareReadDir>;
+	/** Where `--json` writes its report. */
+	stdout: CompareOutput;
+}
 
 export interface FixturesGateConfig {
 	/** Display title, e.g. `TypeScript-fixtures`. */
@@ -81,40 +101,69 @@ interface AstGroup {
 	sample: { path: string; entry: DiffEntry } | null;
 }
 
+/**
+ * The suite's inputs under `root`, depth first, each directory in `readdir`'s order
+ * (`listing_order.ts`): `path` is `root` joined with the input's path beneath it. A directory
+ * that can't be listed is reported and skipped, the root included.
+ */
 async function* discover(
+	deps: FixturesGateDeps,
 	root: string,
 	config: FixturesGateConfig
 ): AsyncGenerator<{ path: string; content: string }> {
-	let entries;
+	let dir: CompareReadDir;
 	try {
-		entries = await readdir(root, { withFileTypes: true });
+		dir = await deps.open_dir(root);
 	} catch (e) {
 		console.error(`Cannot read ${root}: ${e instanceof Error ? e.message : e}`);
 		return;
 	}
-	for (const entry of entries) {
-		const full = join(root, entry.name);
-		if (entry.isDirectory()) {
-			if (!config.prune_dir(entry.name)) yield* discover(full, config);
+	yield* discover_beneath(dir, root, '', config);
+}
+
+async function* discover_beneath(
+	dir: CompareReadDir,
+	root: string,
+	rel: string,
+	config: FixturesGateConfig
+): AsyncGenerator<{ path: string; content: string }> {
+	const entries: Array<{ name: string; kind: string }> = [];
+	try {
+		for await (const entry of dir.list(rel)) entries.push(entry);
+	} catch (e) {
+		console.error(`Cannot read ${join(root, rel)}: ${e instanceof Error ? e.message : e}`);
+		return;
+	}
+	for (const entry of sort_listing(entries)) {
+		const entry_rel = rel === '' ? entry.name : `${rel}/${entry.name}`;
+		if (entry.kind === 'directory') {
+			if (!config.prune_dir(entry.name)) yield* discover_beneath(dir, root, entry_rel, config);
 		} else if (config.input_basenames.has(entry.name)) {
-			yield { path: full, content: await readFile(full, 'utf8') };
+			yield { path: join(root, entry_rel), content: await dir.read_text(entry_rel) };
 		}
 	}
 }
 
 /**
- * Run a per-language fixtures parse-conformance gate. Reads `Deno.args`
- * (`--json`, `--verbose`/`-v`, optional positional root override), scans the
- * suite, prints a summary to stderr (+ JSON to stdout under `--json`), and
- * exits 1 on any `unexpected` over-rejection.
+ * Run a per-language fixtures parse-conformance gate over `argv` (`--json`,
+ * `--verbose`/`-v`, optional positional root override): scans the suite, prints a summary
+ * to stderr (+ JSON to stdout under `--json`), and fails on any `unexpected`
+ * over-rejection, and on a full-suite run on a stale ledger entry or a pinned count's move.
+ * @returns the exit code
  */
-export async function run_fixtures_gate(config: FixturesGateConfig): Promise<void> {
-	const flags = new Set(Deno.args.filter((a) => a.startsWith('-')));
+export async function run_fixtures_gate(
+	deps: FixturesGateDeps,
+	config: FixturesGateConfig,
+	argv: readonly string[]
+): Promise<number> {
+	const flags = new Set(argv.filter((a) => a.startsWith('-')));
 	const json_mode = flags.has('--json');
 	const verbose = flags.has('--verbose') || flags.has('-v');
-	const root = Deno.args.find((a) => !a.startsWith('-')) ?? config.default_root;
+	const root = argv.find((a) => !a.startsWith('-')) ?? config.default_root;
 
-	const { canonical, native } = await init_compare_implementations();
+	const impls = await deps.init_implementations();
+	if (impls === null) return 1;
+	const { canonical, native } = impls;
 
 	const buckets = {
 		parity: 0,
@@ -157,7 +206,7 @@ export async function run_fixtures_gate(config: FixturesGateConfig): Promise<voi
 	}
 
 	let scanned = 0;
-	for await (const file of discover(root, config)) {
+	for await (const file of discover(deps, root, config)) {
 		scanned++;
 
 		let tsv_ast: unknown;
@@ -213,8 +262,7 @@ export async function run_fixtures_gate(config: FixturesGateConfig): Promise<voi
 		}
 	}
 
-	canonical.dispose();
-	native.dispose();
+	impls.dispose();
 
 	// A run that graded nothing is a failure, not a pass — a missing suite
 	// checkout (or a typo'd subtree path) exits 1. The tolerance point for
@@ -223,25 +271,23 @@ export async function run_fixtures_gate(config: FixturesGateConfig): Promise<voi
 	// run; each gate itself is strict so a manual `deno task conformance`
 	// can't green-skip a leg.
 	if (scanned === 0) {
-		if (json_mode) {
-			Deno.stdout.writeSync(
-				new TextEncoder().encode(JSON.stringify({ root, scanned: 0 }, null, '\t') + '\n')
-			);
-		}
+		if (json_mode) await deps.stdout.write(JSON.stringify({ root, scanned: 0 }, null, '\t') + '\n');
 		console.error(
 			`\n${config.title} parse-conformance gate — root: ${root}\n` +
 				`FAIL: 0 ${config.input_noun} found — nothing was graded. ` +
 				`Clone the suite checkout (expected at ${config.default_root}), or fix the path argument.`
 		);
-		Deno.exit(1);
+		return 1;
 	}
 
 	// Oracle version-skew probe (the scan above proved the checkout exists).
 	if (config.oracle_pin) {
+		const package_json = config.oracle_pin.checkout_package_json;
 		try {
-			const checkout_pkg = JSON.parse(
-				await readFile(config.oracle_pin.checkout_package_json, 'utf8')
-			) as { version?: string };
+			const checkout_dir = await deps.open_dir(dirname(package_json));
+			const checkout_pkg = JSON.parse(await checkout_dir.read_text(basename(package_json))) as {
+				version?: string;
+			};
 			const pinned = (await load_all_versions()).canonical[config.oracle_pin.npm_package];
 			if (checkout_pkg.version && checkout_pkg.version !== pinned) {
 				console.error(
@@ -336,9 +382,7 @@ export async function run_fixtures_gate(config: FixturesGateConfig): Promise<voi
 		}
 	};
 
-	if (json_mode) {
-		Deno.stdout.writeSync(new TextEncoder().encode(JSON.stringify(report, null, '\t') + '\n'));
-	}
+	if (json_mode) await deps.stdout.write(JSON.stringify(report, null, '\t') + '\n');
 
 	if (undocumented_groups.length > 0) {
 		console.error(
@@ -355,7 +399,7 @@ export async function run_fixtures_gate(config: FixturesGateConfig): Promise<voi
 				`accepts, and it's neither sanctioned nor a tracked gap. Fix the parser, or — if tsv is correctly ` +
 				`stricter — add a reasoned sanction entry; if it's a known gap, add a KNOWN_GAPS entry.`
 		);
-		Deno.exit(1);
+		return 1;
 	}
 
 	// Full-suite-only hygiene (a subtree run legitimately grades a slice):
@@ -378,7 +422,7 @@ export async function run_fixtures_gate(config: FixturesGateConfig): Promise<voi
 					stale.map((s) => `    · ${s}`).join('\n') +
 					`\n  Delete the entry if its gap/leniency was fixed; update the pattern if upstream renamed the fixture.`
 			);
-			Deno.exit(1);
+			return 1;
 		}
 
 		// Pinned counts (exact — the suite checkout is version-gated by pins:audit
@@ -401,9 +445,10 @@ export async function run_fixtures_gate(config: FixturesGateConfig): Promise<voi
 				`\nFAIL: pinned count mismatch — ${pin_failures.join('; ')}. ` +
 					`If this move is deliberate (suite refresh, behavior change), re-pin in lib/gate_counts.ts (see its update ritual).`
 			);
-			Deno.exit(1);
+			return 1;
 		}
 	}
 
 	console.error(`\nOK: verdict parity holds (no unexpected over-rejections).`);
+	return 0;
 }

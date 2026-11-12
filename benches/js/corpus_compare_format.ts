@@ -2,14 +2,21 @@
  * Corpus comparison tool - compares our formatting against Prettier's on arbitrary codebases.
  *
  * Usage:
- *   deno task corpus:compare:format ../some-project
- *   deno task corpus:compare:format ../some-project --filter svelte
- *   deno task corpus:compare:format ../some-project --limit 100
- *   deno task corpus:compare:format ../some-project --verbose
- *   deno task corpus:compare:format ../some-project --safety-only
- *   deno task corpus:compare:format ../some-project --explain
- *   deno task corpus:compare:format ../some-project --summary   # Compact output (no diffs)
- *   deno task corpus:compare:format --all                          # All default corpus repos
+ *   npm run corpus:compare:format -- ../some-project
+ *   npm run corpus:compare:format -- ../some-project --filter svelte
+ *   npm run corpus:compare:format -- ../some-project --limit 100
+ *   npm run corpus:compare:format -- ../some-project --verbose
+ *   npm run corpus:compare:format -- ../some-project --safety-only
+ *   npm run corpus:compare:format -- ../some-project --explain
+ *   npm run corpus:compare:format -- ../some-project --summary   # Compact output (no diffs)
+ *   npm run corpus:compare:format -- --all                          # All default corpus repos
+ *
+ * Runs under Node (`benches/js/roots/corpus_compare_format.ts`, which binds its deps,
+ * `CorpusCompareFormatDeps`): tsv's side is the N-API addon at the `corpus` profile. The
+ * corpus loader and the prettier-output cache, which Bun's bench shares, read and write
+ * through `node:*` (the cache under `benches/js/.cache/prettier`); the pins file is a dep.
+ *
+ * @module
  */
 
 import { args_parse, argv_parse } from '@fuzdev/fuz_util/args.ts';
@@ -17,12 +24,12 @@ import * as s from '@fuzdev/fuz_schema/schema.ts';
 
 import {
 	COMPARE_BASE_ARG_FIELDS,
+	type CompareOutput,
 	create_compare_loader,
-	dispose_compare,
 	emit_json_stdout,
-	exit_compare_failure,
+	fail_compare,
 	gate_on_panics,
-	init_compare_implementations,
+	type InitCompareImplementations,
 	parse_language_filter,
 	redirect_logs_to_stderr,
 	rel_path,
@@ -37,7 +44,7 @@ import {
 	format_diff_for_terminal
 } from './lib/diff.ts';
 import { corpus_missing_entries } from './lib/corpus.ts';
-import { CorpusPinTally, grade_corpus_pins } from './lib/corpus_pins.ts';
+import { CorpusPinTally, grade_corpus_pins, type PinsFile } from './lib/corpus_pins.ts';
 import { type Language, LANGUAGES } from './lib/types.ts';
 import {
 	check_expected_error,
@@ -54,6 +61,8 @@ import {
  * passing run each row pins its file count too.
  */
 const FORMAT_PINS_FILE = 'benches/js/lib/corpus_format_pins.txt';
+/** The command that rewrites `FORMAT_PINS_FILE`. */
+const FORMAT_PINS_UPDATE = 'npm run corpus:compare:format -- --all --update';
 const FORMAT_PIN_BUCKETS = [
 	'match',
 	'known',
@@ -92,6 +101,18 @@ const ENVIRONMENT_ERROR_MARKERS = [
 	'native format nondeterminism',
 	'prettier returned empty output'
 ];
+
+/** What `run_corpus_compare_format` reaches beyond the corpus loader's and the oracles' reads. */
+export interface CorpusCompareFormatDeps {
+	/** Loads the engines (`lib/compare_engines.ts`), behind their freshness guard. */
+	init_implementations: InitCompareImplementations;
+	/** `HOME`, for `~` and `--all`'s `~/dev`. */
+	home: string | undefined;
+	/** Where `--json` writes its report. */
+	stdout: CompareOutput;
+	/** `FORMAT_PINS_FILE`; written only by `--update`, through an entry that grants it. */
+	pins: PinsFile;
+}
 
 const CorpusCompareArgs = s.strip_object({
 	...COMPARE_BASE_ARG_FIELDS,
@@ -230,8 +251,8 @@ function run_detection(content: string, ours: string, prettier: string, language
 
 function print_usage(): void {
 	console.log(`
-Usage: deno task corpus:compare:format <path> [options]
-       deno task corpus:compare:format --all [options]
+Usage: npm run corpus:compare:format -- <path> [options]
+       npm run corpus:compare:format -- --all [options]
 
 Arguments:
   path              Directory to scan for source files
@@ -253,14 +274,14 @@ Options:
   --help            Show this help message
 
 Examples:
-  deno task corpus:compare:format ../my-project
-  deno task corpus:compare:format ../my-project --filter svelte
-  deno task corpus:compare:format ../my-project --limit 50 --verbose
-  deno task corpus:compare:format ../my-project --exit-on-first
-  deno task corpus:compare:format ../my-project --safety-only
-  deno task corpus:compare:format ../my-project --explain
-  deno task corpus:compare:format --all --audit-patterns
-  deno task corpus:compare:format --all --summary
+  npm run corpus:compare:format -- ../my-project
+  npm run corpus:compare:format -- ../my-project --filter svelte
+  npm run corpus:compare:format -- ../my-project --limit 50 --verbose
+  npm run corpus:compare:format -- ../my-project --exit-on-first
+  npm run corpus:compare:format -- ../my-project --safety-only
+  npm run corpus:compare:format -- ../my-project --explain
+  npm run corpus:compare:format -- --all --audit-patterns
+  npm run corpus:compare:format -- --all --summary
 `);
 }
 
@@ -359,23 +380,26 @@ function build_json_report(
 }
 
 /**
- * The tool's entry, importable by the `conformance.ts` driver (which passes
- * `['--all']`); the CLI wrapper at the bottom feeds it the real argv. Failure
- * semantics are process-level (`Deno.exit(1)` at each gate), matching the old
- * `&&`-chain aggregate exactly.
+ * The tool, as the `conformance.ts` driver runs it (passing `['--all']`); its root runs it
+ * through `corpus_compare_format_main`. Each gate returns `1` with the engines released, so
+ * a failing gate stops the driver's remaining legs the way it stops this tool.
+ * @returns the exit code
  */
-export async function run_corpus_compare_format(argv: string[] = Deno.args): Promise<void> {
-	const parsed = args_parse(argv_parse(argv), CorpusCompareArgs);
+export async function run_corpus_compare_format(
+	deps: CorpusCompareFormatDeps,
+	argv: readonly string[]
+): Promise<number> {
+	const parsed = args_parse(argv_parse([...argv]), CorpusCompareArgs);
 	if (!parsed.ok) {
 		console.error(parsed.issues.map(s.format_issue).join('\n'));
 		print_usage();
-		Deno.exit(1);
+		return 1;
 	}
 	const args = parsed.value;
 
 	if (args.help) {
 		print_usage();
-		return;
+		return 0;
 	}
 
 	const use_all_repos = args.all;
@@ -384,11 +408,13 @@ export async function run_corpus_compare_format(argv: string[] = Deno.args): Pro
 	if (!path && !use_all_repos) {
 		console.error('Error: No path provided (use --all for all repos)\n');
 		print_usage();
-		Deno.exit(1);
+		return 1;
 	}
 
-	const base_path = resolve_compare_base_path(path, use_all_repos);
-	const filter_lang = parse_language_filter(args.filter);
+	const base_path = resolve_compare_base_path(path, use_all_repos, deps.home);
+	const filter = parse_language_filter(args.filter);
+	if (!filter.ok) return 1;
+	const filter_lang = filter.language;
 
 	const limit = args.limit;
 	const verbose = args.verbose;
@@ -407,7 +433,7 @@ export async function run_corpus_compare_format(argv: string[] = Deno.args): Pro
 			'Error: --update rewrites the pins from a full run — it needs --all, and none of ' +
 				'--filter / --limit / --safety-only / --strict'
 		);
-		Deno.exit(1);
+		return 1;
 	}
 
 	if (json_mode) redirect_logs_to_stderr();
@@ -427,7 +453,8 @@ export async function run_corpus_compare_format(argv: string[] = Deno.args): Pro
 	console.log();
 
 	const loader = create_compare_loader(use_all_repos, base_path);
-	const impls = await init_compare_implementations();
+	const impls = await deps.init_implementations();
+	if (impls === null) return 1;
 	const { canonical, native } = impls;
 	// Content-addressed prettier-output cache (lib/prettier_cache.ts) — the
 	// dominant cost here is prettier over ~6k mostly-unchanged files. Keyed on
@@ -574,17 +601,16 @@ export async function run_corpus_compare_format(argv: string[] = Deno.args): Pro
 				} else {
 					// Unexplained safety violations — before recording data loss,
 					// self-verify: re-run the native format and require byte-identity
-					// with the first run. The historical Deno-FFI heisenbug fabricated
-					// SAFETY by corrupting OURS non-deterministically (see
-					// lib/ffi.ts + CLAUDE.md §Known Issues); a deterministic re-run is
+					// with the first run. A binding that corrupts OURS non-deterministically
+					// fabricates SAFETY (CLAUDE.md §Known Issues); a deterministic re-run is
 					// the discriminator (a real loss reproduces, corruption doesn't).
-					// On divergence, throw — the process's FFI layer can't be trusted
+					// On divergence, throw — the process's binding can't be trusted
 					// for a verdict on this file, so it must surface as a loud error,
 					// never as a fabricated (or vanished) SAFETY finding.
 					const ours_verify = native.format(file.content, lang);
 					if (ours_verify !== ours) {
 						throw new Error(
-							'native format nondeterminism: two runs on identical input differ (FFI corruption — safety verdict unreliable)'
+							'native format nondeterminism: two runs on identical input differ (binding corruption — safety verdict unreliable)'
 						);
 					}
 					lang_stats.safety_violation++;
@@ -724,7 +750,7 @@ export async function run_corpus_compare_format(argv: string[] = Deno.args): Pro
 		}
 
 		if (should_exit) {
-			exit_compare_failure(impls);
+			return fail_compare(impls);
 		}
 	}
 
@@ -733,8 +759,9 @@ export async function run_corpus_compare_format(argv: string[] = Deno.args): Pro
 		// An empty scope is a failed comparison run, not a pass — an existing-but-
 		// source-empty path (typo, moved src/) must not read as green.
 		console.log('No files found — nothing was compared.');
-		if (json_mode) emit_json_stdout(build_json_report(results, stats, base_path));
-		exit_compare_failure(impls);
+		if (json_mode)
+			await emit_json_stdout(deps.stdout, build_json_report(results, stats, base_path));
+		return fail_compare(impls);
 	}
 
 	const counts = LANGUAGES.map((lang) => `${lang_counts[lang]} ${lang}`).join(', ');
@@ -805,13 +832,13 @@ export async function run_corpus_compare_format(argv: string[] = Deno.args): Pro
 		console.log(`  ${'total'.padEnd(12)} ${match_str} | ${detail_str}`);
 	}
 
-	// Emit the buffered JSON report now — before the FAIL Deno.exit calls below,
+	// Emit the buffered JSON report now — before the FAIL returns below,
 	// so it is always written on normal completion regardless of the final exit
 	// code. NOT written by the earlier-exiting paths: --exit-on-first (the
 	// `should_exit` block above) bails mid-stream, and init/validation failures
 	// exit before `results`/`stats` exist. The top-level `main().catch` emits a
 	// minimal error-shaped JSON report for those (and any other) rejections.
-	if (json_mode) emit_json_stdout(build_json_report(results, stats, base_path));
+	if (json_mode) await emit_json_stdout(deps.stdout, build_json_report(results, stats, base_path));
 
 	// Show divergence pattern breakdown if any detected
 	if (divergence_counts.size > 0 && (explain || verbose)) {
@@ -993,15 +1020,15 @@ export async function run_corpus_compare_format(argv: string[] = Deno.args): Pro
 	}
 
 	// Disclose cache participation so a triage reader knows which side was live
-	// (cached hits remove the prettier-side flake from repeat runs; the tsv/FFI
-	// side is always live).
+	// (cached hits remove the prettier-side flake from repeat runs; tsv's side is
+	// always live).
 	if (prettier_cache) console.log(`\n${prettier_cache.stats()}`);
 
 	// A caught panic hard-fails before the count pins — it is a robustness-bar
 	// violation, and it also explains any bucket the crashed file moved. `errors`
 	// is the only bucket a panic can reach (the expected-error branch is mode-gated
 	// above), and prettier can't panic, so this is the whole candidate set.
-	gate_on_panics(all_errors, impls, base_path);
+	if (gate_on_panics(all_errors, base_path)) return fail_compare(impls);
 
 	// Pinned counts (a full `--all` run only): exact per-source bucket counts over the gates
 	// view (`lib/corpus_pins.ts`, docs/gate_counts.md). Every file comes from a pinned
@@ -1018,7 +1045,8 @@ export async function run_corpus_compare_format(argv: string[] = Deno.args): Pro
 		const { optional_missing } = await corpus_missing_entries('gates');
 		const pin_failures = await grade_corpus_pins({
 			file: FORMAT_PINS_FILE,
-			gate: 'corpus:compare:format',
+			pins: deps.pins,
+			update_command: FORMAT_PINS_UPDATE,
 			tally: pin_tally,
 			update: args.update,
 			update_blockers: [
@@ -1042,9 +1070,9 @@ export async function run_corpus_compare_format(argv: string[] = Deno.args): Pro
 		if (pin_failures.length > 0) {
 			console.log(
 				`\n\x1b[31mFAIL: pinned counts (${FORMAT_PINS_FILE}):\n  ${pin_failures.join('\n  ')}\n` +
-					`If deliberate, re-pin with \`deno task corpus:compare:format --all --update\`.\x1b[0m`
+					`If deliberate, re-pin with \`${FORMAT_PINS_UPDATE}\`.\x1b[0m`
 			);
-			exit_compare_failure(impls);
+			return fail_compare(impls);
 		}
 	} else if (full_run) {
 		console.log('\nPins: not graded — the SAFETY violations below come first.');
@@ -1056,11 +1084,11 @@ export async function run_corpus_compare_format(argv: string[] = Deno.args): Pro
 		console.log(
 			`\x1b[31mFAIL: ${total_safety_violation} safety violations (data loss detected)\x1b[0m`
 		);
-		exit_compare_failure(impls);
+		return fail_compare(impls);
 	} else if ((total_unknown_diff > 0 || total_partial_divergence > 0) && strict) {
 		const issues = total_unknown_diff + total_partial_divergence;
 		console.log(`\x1b[31mFAIL: ${issues} unexplained differences (strict mode)\x1b[0m`);
-		exit_compare_failure(impls);
+		return fail_compare(impls);
 	} else if (total_unknown_diff > 0 || total_partial_divergence > 0) {
 		const parts: string[] = [];
 		if (total_unknown_diff > 0) parts.push(`${total_unknown_diff} unknown`);
@@ -1070,21 +1098,21 @@ export async function run_corpus_compare_format(argv: string[] = Deno.args): Pro
 		total_errors > 0 &&
 		total_match + total_known_divergence + total_expected_errors === 0
 	) {
-		// Every file errored — a systemic failure (sidecar/FFI down, wrong corpus),
+		// Every file errored — a systemic failure (an oracle or the addon down, wrong corpus),
 		// NOT a graded run. Without this floor the SAFETY differential never runs
 		// on any file and the gate would WARN + exit 0 having compared nothing.
 		console.log(
-			`\x1b[31mFAIL: all ${total_errors} files errored — nothing was compared (systemic sidecar/FFI failure?)\x1b[0m`
+			`\x1b[31mFAIL: all ${total_errors} files errored — nothing was compared (systemic oracle or addon failure?)\x1b[0m`
 		);
-		exit_compare_failure(impls);
+		return fail_compare(impls);
 	} else if (total_errors > 0) {
 		console.log(`\x1b[33mWARN: ${total_errors} errors occurred\x1b[0m`);
 	} else {
 		console.log('\x1b[32mPASS: No safety violations or unknown differences\x1b[0m');
 	}
 
-	// Cleanup
-	dispose_compare(impls);
+	impls.dispose();
+	return 0;
 }
 
 /**
@@ -1108,6 +1136,19 @@ function build_error_json_report(message: string): Record<string, unknown> {
 	};
 }
 
-if (import.meta.main) {
-	run_compare_main(run_corpus_compare_format, CorpusCompareArgs, build_error_json_report);
+/**
+ * The tool's command: `run_corpus_compare_format` under the shared failure contract
+ * (`run_compare_main`), as its root runs it.
+ * @returns the exit code
+ */
+export function corpus_compare_format_main(
+	deps: CorpusCompareFormatDeps,
+	argv: readonly string[]
+): Promise<number> {
+	return run_compare_main(() => run_corpus_compare_format(deps, argv), {
+		argv,
+		schema: CorpusCompareArgs,
+		build_error_report: build_error_json_report,
+		stdout: deps.stdout
+	});
 }

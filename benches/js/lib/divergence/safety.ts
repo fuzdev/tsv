@@ -29,7 +29,7 @@
  * The check is DIFFERENTIAL against prettier (`check_safety_vs_prettier`):
  * prettier is the source of truth, so only the loss/addition OUR output incurs
  * beyond prettier's own normalizations counts. It runs in-process on strings
- * already in the Deno heap (source, our FFI output, prettier output), so it
+ * already in the process heap (source, our output, prettier output), so it
  * never shells out and is a negligible fraction of per-file cost (prettier
  * dominates).
  */

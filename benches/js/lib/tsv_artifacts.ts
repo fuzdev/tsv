@@ -107,14 +107,32 @@ export function ffi_rebuild_task(profile: string | undefined): string {
 }
 
 /**
+ * The cargo profile the comparison tools (`compare_engines.ts`, the conformance gates) load
+ * tsv's N-API addon at: `release` with `panic = "unwind"`, so a panic is caught and graded
+ * per file rather than aborting the run. Their tasks build it first (`build:napi:corpus`).
+ * Named here, beside the layout, so `scripts/doctor.ts`, which reports that addon, reads the
+ * same value without importing the engines.
+ */
+export const COMPARE_PROFILE = 'corpus';
+
+/**
+ * The plain N-API addon cargo builds for a profile, as a path beneath `target/`: what
+ * {@link napi_library_path} names under the checkout, for a reader holding a `target/`
+ * handle rather than a path.
+ */
+export function napi_target_path(profile: string): string {
+	return `${profile}/${NAPI_LIB}`;
+}
+
+/**
  * The plain N-API addon cargo builds for a profile: `napi` (release + unwind, the shipped
- * profile) for the build `test:napi` loads, `corpus` for the unwinding, LTO-free build the
- * corpus tools load. The bench's rows load the profile-guided addon instead
- * (`pgo_bench_library_path('napi')`). The profile is the caller's axis; the layout is this
- * module's.
+ * profile) for the build `test:napi` loads, `corpus` ({@link COMPARE_PROFILE}) for the
+ * unwinding, LTO-free build the comparison tools load. The bench's rows load the
+ * profile-guided addon instead (`pgo_bench_library_path('napi')`). The profile is the
+ * caller's axis; the layout is this module's.
  */
 export function napi_library_path(profile: string): string {
-	return `${PROJECT_ROOT}/target/${profile}/${NAPI_LIB}`;
+	return `${PROJECT_ROOT}/target/${napi_target_path(profile)}`;
 }
 
 /**

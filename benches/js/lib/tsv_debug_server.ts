@@ -9,7 +9,7 @@
  * panic.
  *
  * The binary is the shared `--profile corpus` build world (`deno task build:check`), where a
- * panic unwinds and is answered as one, guarded for freshness like the FFI library. The
+ * panic unwinds and is answered as one, guarded for freshness like the N-API addon. The
  * process comes from the caller, which makes the program once the guard passes
  * (`TsvDebugProgram`, which a gro `SpawnProgram` satisfies), so the module imports no
  * package, not even for a type.

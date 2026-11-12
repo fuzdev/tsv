@@ -172,7 +172,7 @@ const healthy = (): World => ({
 		'crates/tsv_wasm/pkg/all/nodejs': null,
 		'crates/tsv_wasm/pkg/all/npm': null
 	},
-	target: { [`corpus/${FFI}`]: '', [`napi/${NAPI}`]: '' },
+	target: { [`corpus/${NAPI}`]: '', [`corpus/${FFI}`]: '', [`napi/${NAPI}`]: '' },
 	siblings: {
 		svelte: {
 			'packages/svelte/tests': null,
@@ -993,10 +993,24 @@ const CASES: Case[] = [
 		code: 0
 	},
 	{
-		name: 'a target artifact present',
+		name: "the conformance gates' addon absent",
+		change: (w) => void delete w.target![`corpus/${NAPI}`],
+		mark: '·',
+		line: `target/corpus/${NAPI} absent — deno task build:napi:corpus (conformance gates)`,
+		code: 0
+	},
+	{
+		name: "the over-acceptance tools' FFI library absent",
+		change: (w) => void delete w.target![`corpus/${FFI}`],
+		mark: '·',
+		line: `target/corpus/${FFI} absent — deno task build:ffi:corpus (over-acceptance)`,
+		code: 0
+	},
+	{
+		name: "the conformance gates' addon present",
 		change: () => {},
 		mark: '✓',
-		line: `target/corpus/${FFI}`,
+		line: `target/corpus/${NAPI}`,
 		code: 0
 	},
 	// the sidecar

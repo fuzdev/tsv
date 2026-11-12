@@ -33,7 +33,7 @@ grades); the reference halves live in `docs/`:
 | Gate | Composition | Corpus / oracle | Cadence |
 | --- | --- | --- | --- |
 | **`deno task check`** | `cargo fmt --check` · `format:audit` · `pins:audit` · `docs:audit` · `docs:audit:docsrs` · `deps:audit` · `package:audit` · `typecheck` · `typecheck:features` · `typecheck:scripts` · `typecheck:bench-core` · `conformance:audit` · `conformance:audit:compiler` · `variants:audit` · `scan:audit` · `fanout:audit` · `roundtrip:audit` · `roundtrip:audit:prettier` · `discovery:audit` · `canonicalize:audit` · `binding:audit` · `authoring:audit` · `paren:audit` · `razor:audit` · `fuzz:audit` (+ `:css` · `:ts`) · `fuzz:audit:debug` · `test:node` · `test:deno` · `cargo test` (incl. fixtures) · `test:depth` · `test:audits` · `swallow:audit` · `comments:audit` · `gaps:audit` · `blanks:audit` · `fabrication:audit` · `census:audit` · `width:audit` · `ignore:audit` · `check:ast-types` · `check:loc` · `clippy` | **committed tree only** (`tests/fixtures` + pure-Rust/Node/Deno audits, no external oracle), save the two opportunistic legs: `roundtrip:audit:prettier` (the pinned `../prettier` format suites) and `discovery:audit` (`tsv format --list` over the `../corpora` snapshot vs its committed file list) | every commit; the CI `check` job |
-| **`deno task conformance:all`** | `pins:audit:checkouts` + `bench:pins:suites` + `fixtures:validate` + `compile:fixtures:validate` preflights (then `bench:harvest:svelte-styles`, late, beside the corpus legs that read its cache, `strip:corpus:run`, the type strip vs ts-blank-space over the snapshot's TypeScript, and `imports:corpus:run`, the import records vs oxc-parser's module record over its JS/TS and Svelte), then `conformance` (one process, its FFI legs: `svelte-fixtures` · `ts-fixtures` · `ts-repo` · `corpus:compare:parse --all` · `corpus:compare:parse tests/fixtures --fixtures` · `corpus:compare:format --all`, plus `render:audit` as its one subprocess leg) **+** `conformance:test262` (pure Rust) | `../corpora` (the real-code snapshot), `../svelte`, `../acorn-typescript`, `../typescript` (tsc baselines), `../prettier`, `../prettier-plugin-svelte`, `../test262`; the **`gates`** corpus view | release; `scripts/publish.ts` **Step 3b** |
+| **`deno task conformance:all`** | `pins:audit:checkouts` + `bench:pins:suites` + `fixtures:validate` + `compile:fixtures:validate` preflights (then `bench:harvest:svelte-styles`, late, beside the corpus legs that read its cache, `strip:corpus:run`, the type strip vs ts-blank-space over the snapshot's TypeScript, and `imports:corpus:run`, the import records vs oxc-parser's module record over its JS/TS and Svelte), then `conformance` (one Node process, its N-API legs: `svelte-fixtures` · `ts-fixtures` · `ts-repo` · `corpus:compare:parse --all` · `corpus:compare:parse tests/fixtures --fixtures` · `corpus:compare:format --all`, plus `render:audit` as its one subprocess leg) **+** `conformance:test262` (pure Rust) | `../corpora` (the real-code snapshot), `../svelte`, `../acorn-typescript`, `../typescript` (tsc baselines), `../prettier`, `../prettier-plugin-svelte`, `../test262`; the **`gates`** corpus view | release; `scripts/publish.ts` **Step 3b** |
 | **`deno task bench` / `bench:conformance`** | perf throughput ×3 runtimes + compose; parse-coverage report | **`perf`** view (100%-coverage invariant) / **`conformance`** view (fixtures filtered to what their own suite calls valid + wpt/test262 harvests; coverage-only + node-only) | dev / release cadence; feeds tsv.fuz.dev |
 | **`deno task idempotency:sweep`** | `tsv_debug fuzz --iterations 0` over the corpus dirs — F1 (`format(format(x)) == format(x)`) + no-panic + structural reparse on every file **as authored**, plus the `locations` wire (no panic) and the type strip of every TypeScript-family file (no panic, position contract, idempotence) | **`robustness`** view (the WHOLE `../corpora` snapshot — every collection it vendors, placed or not — + the `svelte_styles` cache + the live working trees' DIFF against the snapshot; absent dirs skipped with a warning) | after a printer change; conformance cadence |
 | **`deno task audit:corpus`** | the pure-Rust content-loss / robustness suite over **real code**: `roundtrip_audit --gate` · `comment_audit` · `swallow_audit` · `binding_audit --gate` (real code gating; prettier suites report-only) · `authoring_audit` · `paren_audit` (both real-code-only) · `census_audit` · `fabrication_audit` (both strict-zero off their default corpus) · `fuzz --iterations 0`. `width_audit` is NOT a leg — it has no zero to grade (../../docs/audits.md §The Corpus Bundle) | **`robustness`** view (the whole snapshot + the `svelte_styles` cache + the live diff) + the pinned `../prettier` format suites (absent working trees skipped; floor = the whole `../corpora` snapshot) | release; `scripts/publish.ts` **Step 3c**; conformance cadence |
@@ -60,7 +60,7 @@ ones (`fixtures_validate`, `swallow_audit`) execute there.
 format-stable by construction, so it never exercises a content-loss / panic / reflow
 bug on real source. The extension-robustness bar is therefore two release-cadence
 gates over real code: **Step 3b**'s `corpus:compare:format --all` SAFETY (content
-loss vs prettier — needs the FFI + prettier sidecar) and **Step 3c**'s
+loss vs prettier — needs the corpus N-API addon + prettier sidecar) and **Step 3c**'s
 `audit:corpus` (the pure-Rust half: reparse-corruption, dropped/double comments,
 `//` swallows, comment re-binding, boundary-whitespace + paren-authoring
 independence, F1 idempotency, whole-comment conservation, blank fabrication,
@@ -217,7 +217,7 @@ Compare formatting output against Prettier on arbitrary codebases.
 ```bash
 deno task corpus:compare:format --all                 # the gates corpus view: ../corpora + prettier suites (§Corpus)
 deno task corpus:compare:format ../some-project       # one project, recursive — NO srcDir filtering
-deno task corpus:compare:format:run ../some-project   # skip the FFI rebuild (freshness-guarded)
+deno task corpus:compare:format:run ../some-project   # skip the addon rebuild (freshness-guarded)
 ```
 
 ⚠ For monorepos like `svelte/`, use `--all` instead, to avoid scanning test fixtures. Flags (any
@@ -229,19 +229,33 @@ per-source pins file, `lib/corpus_format_pins.txt`, from the run — `corpus:com
 the same flag for `lib/corpus_parse_pins.txt`; ../../docs/gate_counts.md §Update ritual). The
 `:run` freshness guard is §Artifact Freshness Guard; `BENCH_STALE_OK=1` overrides.
 
-**`TSV_FFI_PROFILE=corpus` lives on the `:run` task, not the wrapper.** Every corpus/conformance
-FFI entry (`corpus:compare:{format,parse}:run`, `conformance:{svelte-fixtures,ts-fixtures,ts-repo}:run`)
-selects the profile itself, so a direct run loads `target/corpus` — what the build-first wrapper
-produces — not `target/release`. It matters: `corpus` is `panic = "unwind"`, so a formatter panic
-is a reported per-file error, where `release` (`panic = "abort"`) kills the run. It also aims the
-freshness guard (same env var) at the binary actually loaded, so its verdict and rebuild hint name
-`build:ffi:corpus`. The **bench** and **smoke** tasks deliberately set no profile: unset, the
-loader opens the profile-guided library `build:bench:pgo` stages (`lib/pgo_bench.ts`) — the
-artifact they measure. A set `TSV_FFI_PROFILE` would load that cargo profile's plain build
-from `target/` instead, so the bench (its orchestrator, pre-flight and row processes) and
-smoke REFUSE one (`refuse_ffi_profile_override`); the report's `native_build` also hashes
-the library the rows loaded and calls it `pgo` only when the stamp names those bytes. The
-corpus and over-acceptance tools keep the variable — they publish no native timing.
+**The comparison tools load tsv's N-API addon at the `corpus` profile, by a parameter.** Every
+corpus/conformance comparison entry (`corpus:compare:{format,parse}:run`,
+`conformance:{svelte-fixtures,ts-fixtures,ts-repo}:run`, the `conformance` driver) is a Node root
+under `roots/` that loads its engines through `lib/compare_engines.ts`
+(`init_compare_implementations({profile: COMPARE_PROFILE})`, `corpus`, named in
+`lib/tsv_artifacts.ts` so `deno task doctor` reports the same addon), so a direct run loads
+`target/corpus/libtsv_napi.so` — what the build-first wrapper's `build:napi:corpus` produces —
+and the freshness guard grades that same file, its rebuild hint naming that task. It matters:
+`corpus` is `panic = "unwind"`, so a panic is a reported per-file `panic: <payload>` error the
+panic gate fails on, where a `panic = "abort"` build kills the run. The **bench** and **smoke**
+tasks deliberately name no profile: unset, the loaders open the profile-guided builds
+`build:bench:pgo` stages (`lib/pgo_bench.ts`) — the artifacts they measure. Under Deno a set
+`TSV_FFI_PROFILE` would load that cargo profile's plain C-FFI build from `target/` instead, so
+the bench (its orchestrator, pre-flight and row processes) and smoke REFUSE one
+(`refuse_ffi_profile_override`); the report's `native_build` also hashes the library the rows
+loaded and calls it `pgo` only when the stamp names those bytes. The over-acceptance tools still
+read the variable under Deno — they publish no native timing.
+
+The comparison tools are library functions over deps returning an exit code (the engines, `HOME`,
+stdout, the pins file, `tsv_debug`, read-only directory handles), so their unit suites drive them
+over fakes (`corpus_compare_format_test.ts`, `corpus_compare_parse_test.ts`,
+`lib/fixtures_gate_test.ts`, `conformance_test.ts`, `lib/compare_cli_test.ts`, and
+`compare_runners_test.ts`, which holds every runner they name to a task that exists;
+`lib/compare_engines_test.ts` loads the bench install, so it runs in `test:node:canonical`); the roots bind gro's host modules (`roots/compare_deps.ts`). The corpus
+loader and the prettier-output cache stay on `node:*`, since Bun's bench runs them. A directory a
+tool lists through a handle is walked in code-point order, the order Node's `readdir` gives
+(`lib/listing_order.ts`), so a report lists its files in the same order on every filesystem.
 
 `corpus:compare:format:run` sets `PRETTIER_DEBUG=1` so prettier-plugin-svelte's
 verbatim-on-error fallback (the whole `<script>` block echoed when the embedded formatter throws)
@@ -256,7 +270,7 @@ routing + the full options + the canonical-5 pins (incl. svelte, the plugin's pe
 
 - **Success-only**: errors and semantically-empty outputs are never cached (`put` rejects
   whitespace-only, `get` treats a stored whitespace-only entry as a miss), so the prettier-miss
-  heisenbug can't poison it, and hits remove the prettier-side flake from repeat runs; the tsv/FFI
+  heisenbug can't poison it, and hits remove the prettier-side flake from repeat runs; the tsv
   side stays live.
 - **Atomic writes** (temp file + `rename`), so an interrupted run can't leave a TRUNCATED entry —
   which the empty guards can't catch and every later run would read as the oracle. A failed write
@@ -325,7 +339,7 @@ deno task corpus:compare:format:run --all --json 2>/dev/null > report.json
 
 Deep-diff tsv's parse output against the canonical parsers
 (acorn-typescript / `svelte.parse` / `parseCss`) — the parser-side sibling of the
-formatting comparison. The shipped span-only wire comes from the native FFI by design:
+formatting comparison. The shipped span-only wire comes from the N-API addon by design:
 the WASM artifact rides the same Rust wire (`convert_ast_json_string`),
 differing only at the boundary, and is already exercised per-file by the bench
 preflight and `deno task smoke`. The `loc`-bearing wire ships through no binding, so
@@ -333,7 +347,7 @@ the loc arm asks one `target/corpus/tsv_debug loc_wires --stdin` process for it
 (`lib/loc_wire_client.ts`: one NDJSON request per document, a parse error or a caught
 panic answered as such, so a panic still reaches the panic gate as a panic) — which is
 why `corpus:compare:parse` and `conformance` build `build:check`'s world beside the
-corpus FFI. This is the
+corpus addon. This is the
 external oracle the internal identity gates can't provide: fixtures cover curated
 cases and the wire-JSON writer is the sole emission path, so a writer bug (e.g. an
 untranslated position field) on an uncurated shape is invisible without a
@@ -419,7 +433,7 @@ tables.
   `loc_arm.superset_kinds`, `loc_arm.span_skipped` (halves) and the definition check's `checked` /
   `violations`. An unclassified `loc` difference is an undocumented group and fails the run — a
   bug until a named row claims it.
-- **The span-only arm** grades tsv's shipped span-only wire (the FFI's parse export) in every
+- **The span-only arm** grades tsv's shipped span-only wire (the N-API addon's parse export) in every
   language: per file, deep-diffed against the oracle's output with every `loc` and `name_loc` key
   removed — the definition `tests/loc_definition.rs` encodes, and the whole of what that wire drops
   (the `character` field Svelte writes lives inside one of those). It reuses the diff engine and
@@ -472,7 +486,7 @@ does; `loc` is that tool's loc arm's to grade. All accept `-v`, `--json`, and a 
 each has a freshness-guarded `:run` variant that skips the FFI rebuild.
 
 ```bash
-deno task conformance:svelte-fixtures   # builds the corpus FFI, then runs
+deno task conformance:svelte-fixtures   # builds the corpus addon, then runs
 deno task conformance:ts-fixtures
 deno task conformance:ts-repo
 deno task conformance:ts-fixtures:run -v     # skip rebuild; + per-file gap / AST-group detail
@@ -583,12 +597,12 @@ The three gates above plus `corpus:compare:parse --all` and `corpus:compare:form
 are deliberately NOT legs — `tsv_check` is experimental and may never ship, so its
 gates stay on-demand (../../docs/typechecker.md).
 
-`deno task conformance` builds the corpus FFI (and `build:check`'s `tsv_debug`, the loc arm's
+`deno task conformance` builds the corpus addon (and `build:check`'s `tsv_debug`, the loc arm's
 loc-wire server) once and runs every leg in **ONE process** (`conformance.ts`): the canonical
 oracle modules (prettier, the svelte plugin, svelte/compiler, acorn, acorn-ts) load once via the
 module cache, each leg gets a timing line, and failure semantics match a `&&` chain exactly
-(every leg exits the process on a finding — fail-fast). `render:audit`, the lone non-JS leg, is a
-`cargo` subprocess (hence the task's `--allow-run=cargo`). The driver takes no arguments; the
+(a leg's non-zero exit code ends the run — fail-fast). `render:audit`, the lone non-JS leg, is a
+`cargo` subprocess, a program handle with cargo's variables (`CARGO_PASS_ENV`). The driver takes no arguments; the
 per-leg tasks remain the scoped/triage entries. Ahead of the driver, the task chains
 `strip:corpus:run` (the type strip vs ts-blank-space, ../../docs/audits.md §Strip Corpus
 Differential) and `imports:corpus:run` (the import records vs oxc-parser's module record,
@@ -608,7 +622,7 @@ format is re-run and must reproduce byte-identically; nondeterminism surfaces as
 loud per-file error instead — see [§Known Issues](#known-issues)). Both corpus tools
 also fail (exit 1) on a run that compared nothing: an empty scope (`No files found`)
 or an every-file-errored / every-file-parse-fail-skipped run is a systemic failure —
-sidecar/FFI down or a wrong corpus — never a pass.
+an oracle or the addon down, or a wrong corpus — never a pass.
 
 **A caught panic hard-fails both corpus tools, on every run** (not just `--all`, and never inside
 a bucket). These tools build with `--profile corpus` (`panic = "unwind"`) precisely so a crash is
@@ -1277,8 +1291,8 @@ The rebuild-skipping tasks (`bench:{deno,node,bun}:run`, `bench:conformance:run`
 measuring a binary older than current source. `lib/check_artifact_freshness.ts` guards this:
 before a run touches the executed artifacts (the runtime's native binding + WASM bundle — Deno:
 FFI + `pkg/all/deno`; Node: N-API + `pkg/all/nodejs`, the pair `check_executed_artifacts` composes
-for bench and smoke alike; the corpus tools run no WASM, so they guard `native_artifact_check()`
-alone; under Node a caller that loads a cargo profile's plain addon names the profile, a parameter
+for bench and smoke alike; the corpus tools run no WASM, so they guard
+`native_artifact_check('corpus')` alone; under Node a caller that loads a cargo profile's plain addon names the profile, a parameter
 rather than a variable, to the guard and the loader alike — `native_artifact_check(profile)` and
 `NapiImplementation(napi_library_path(profile))`, which `init_implementations({native_profile})`
 pairs — so the two cannot grade and load different files), it compares their mtimes against the crate sources feeding them (plus the workspace
@@ -1637,8 +1651,10 @@ benches/js/
 │                          # ../../docs/audits.md)
 ├── roots/                 # The Node entries over gro's host modules, each binding a library above it
 │                          # (`strip_corpus.ts`, `imports_corpus.ts`, `divergence_audit.ts`,
-│                          # `compose_reports.ts`, `corpus_stats.ts`); typechecked by `tsconfig.bench.json`,
-│                          # and the three needing no bench package by `tsconfig.scripts.json` too
+│                          # `compose_reports.ts`, `corpus_stats.ts`, the comparison tools and the
+│                          # `conformance` driver, whose shared bindings are `compare_deps.ts`);
+│                          # typechecked by `tsconfig.bench.json`, and the three needing no bench
+│                          # package by `tsconfig.scripts.json` too
 ├── compose_reports.ts     # Fold report.{deno,node,bun}.json → combined report.{json,md}
 ├── idempotency_sweep.ts   # F1 sweep over the `robustness` view (drives tsv_debug `fuzz --iterations 0`)
 ├── corpus_audit.ts        # `audit:corpus`: the pure-Rust content-loss / robustness legs over
@@ -1659,7 +1675,8 @@ benches/js/
     │                      # synthesized row family — ../../docs/benchmarks.md §Binary size reporting)
     ├── check_artifact_freshness.ts # Native/WASM artifact staleness guard (§Artifact Freshness Guard)
     ├── check_node_modules.ts # node_modules preflight: exists + every exact pin (and every `force_installed` pin) matches installed
-    ├── compare_cli.ts     # Shared scaffolding for the corpus_compare_* entry points
+    ├── compare_cli.ts     # Shared scaffolding for the comparison tools; their engines as types
+    ├── compare_engines.ts # Loads the comparison tools' engines: the N-API addon at `corpus`, the oracles
     ├── corpus.ts          # CorpusLoader + DirectoryLoader (load/stream; node: builtins) + the
     │                      # missing-entry policy every caller picks (`MissingEntryPolicy`) and the
     │                      # pinned-count front door that picks it for you (`load_pinned_language_corpus`)
@@ -1679,6 +1696,7 @@ benches/js/
     ├── fixture_documents.ts # The parse claims a fixture tree commits — what `corpus:compare:parse
     │                      # --fixtures` grades (node-modules-free)
     ├── fixtures_gate.ts   # Shared per-language parse-conformance gate engine
+    ├── listing_order.ts   # `readdir`'s order (code point), for a directory listed through a handle
     ├── format_config_probe.ts # Behavioral "did the pinned layout config LAND" check —
     │                      # one probe source + grading arm PER LANGUAGE, shared by prettier
     │                      # (the baseline) and every format impl (biome, oxfmt, dprint,
@@ -1840,8 +1858,8 @@ state) shows in the coverage report and skip counts without `--verbose`.
   as a subtrahend — so the two sides can only fail in **opposite** directions, and
   each is guarded in-harness:
   1. **Native-side corruption would fabricate a violation** (only `ours`-side
-     corruption can fake a loss). `lib/ffi.ts` uses explicit `pointer` params +
-     persistent externalized marshalling buffers, and every SAFETY finding is
+     corruption can fake a loss). The native side is the N-API addon (`lib/napi.ts`),
+     and every SAFETY finding is
      **self-verified at the verdict**: `corpus_compare_format.ts` re-runs the native
      format and requires byte-identity before recording it — corruption surfaces as a
      loud per-file `native format nondeterminism` error, never as a silent SAFETY

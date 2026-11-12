@@ -11,11 +11,11 @@
  * cadence a minute of process startup, push every source through argv or a pipe per file, and
  * report a panic as an exit code rather than as a panic.
  *
- * The verdict semantics are the FFI's, so the two arms read one verdict: a parse error
- * throws its message exactly as `tsv_ffi` renders it, and a caught
+ * The verdict semantics are the span arm's binding's, so the two arms read one verdict: a
+ * parse error throws its message exactly as the N-API addon renders it, and a caught
  * panic throws `panic: <payload>` — the shape `is_native_panic_error` recognizes, so a panic
  * on this wire still fails `gate_on_panics` rather than counting as one more rejection. The
- * `corpus` profile is what makes a panic catchable here, as it is for the FFI library.
+ * `corpus` profile is what makes a panic catchable here, as it is for the addon.
  *
  * The process is the shared `tsv_debug` client's (`tsv_debug_server.ts`): one long-lived
  * `--profile corpus` server, guarded for freshness, started from the program the caller
@@ -52,10 +52,10 @@ export class LocWireClient {
 	/**
 	 * The loc wire of `source`, parsed — or a throw carrying tsv's rejection, or
 	 * `panic: <payload>` when tsv panicked. `goal` reaches TypeScript only (`goal_for`), as
-	 * it reaches the FFI.
+	 * it reaches the addon.
 	 *
-	 * The source is sent well-formed: a lone surrogate has no UTF-8 spelling, and the FFI
-	 * path (`TextEncoder.encodeInto`) replaces one with U+FFFD — so does this, and the two
+	 * The source is sent well-formed: a lone surrogate has no UTF-8 spelling, and the addon's
+	 * string conversion replaces one with U+FFFD — so does this, and the two
 	 * wires parse the same bytes.
 	 *
 	 * Not safe for concurrent calls: requests are not serialized, so await each before the next.
