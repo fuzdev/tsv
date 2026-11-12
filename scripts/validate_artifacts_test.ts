@@ -1,10 +1,10 @@
 /**
  * `run_validate_artifacts` over a temp checkout: every line a fresh, fully built tree prints;
  * the size bounds and the deltas between variants; the third-party notice; an unbuilt variant
- * skipped, a half-built npm staging failed, and nothing built refused; and the staleness guard,
- * which dates each deno bundle by what wasm-pack builds it from and each npm staging by the
- * shared staged-package checks, refuses a stale or missing artifact, and only warns under
- * `stale_ok`.
+ * skipped, a half-built npm staging failed, and nothing built refused; the staleness guard,
+ * which dates each npm staging by the shared staged-package checks, refuses a stale or missing
+ * artifact, and only warns under `stale_ok`; and a deno-target bundle, the bench's alone, never
+ * read.
  */
 
 import { deepStrictEqual, strictEqual } from 'node:assert';
@@ -33,6 +33,8 @@ const VARIANTS: ReadonlyArray<WasmVariant> = ['format', 'parse', 'all'];
 const NOTICE = 'the WHATWG notice\n';
 
 const npm_dir = (variant: WasmVariant): string => `crates/tsv_wasm/pkg/${variant}/npm`;
+const npm_bundle = (variant: WasmVariant): string => `${npm_dir(variant)}/tsv_wasm_bg.wasm`;
+/** The bench's deno-target bundle, which the validation never reads. */
 const deno_bundle = (variant: WasmVariant): string =>
 	`crates/tsv_wasm/pkg/${variant}/deno/tsv_wasm_bg.wasm`;
 
@@ -46,8 +48,8 @@ const CENTER: Record<WasmVariant, number> = {
 
 /**
  * A checkout with every source the freshness checks name dated `T_SOURCE`, and for each
- * variant in `built`, its deno bundle and its npm staging (each staged file the checks name,
- * a `package.json` declaring `NOTICE`, and the notice) dated `T_BUILT`.
+ * variant in `built`, its npm staging (each staged file the checks name, a `package.json`
+ * declaring `NOTICE`, and the notice) dated `T_BUILT`, beside the bench's deno-target bundle.
  */
 const make_checkout = async (
 	built: ReadonlyArray<WasmVariant> = VARIANTS
@@ -145,13 +147,8 @@ const FULL_OUT = [
 	'  PASS: format/npm: 2.72 MB (2720874 B)',
 	'  PASS: parse/npm: 1.07 MB (1073871 B)',
 	'  PASS: all/npm: 3.05 MB (3048129 B)',
-	'  PASS: format/deno: 2.72 MB (2720874 B)',
-	'  PASS: parse/deno: 1.07 MB (1073871 B)',
-	'  PASS: all/deno: 3.05 MB (3048129 B)',
 	'  PASS: all - format (npm) = 327.3 KB',
 	'  PASS: all - parse (npm) = 1.97 MB',
-	'  PASS: all - format (deno) = 327.3 KB',
-	'  PASS: all - parse (deno) = 1.97 MB',
 	'\n=== Third-party notice ===',
 	'  PASS: format/npm — package.json files declares NOTICE',
 	'  PASS: format/npm — NOTICE is crates/tsv_html/NOTICE verbatim',
@@ -159,7 +156,7 @@ const FULL_OUT = [
 	'  PASS: parse/npm — NOTICE is crates/tsv_html/NOTICE verbatim',
 	'  PASS: all/npm — package.json files declares NOTICE',
 	'  PASS: all/npm — NOTICE is crates/tsv_html/NOTICE verbatim',
-	'\n=== Artifact validation: 16 passed, 0 failed, 0 skipped ==='
+	'\n=== Artifact validation: 11 passed, 0 failed, 0 skipped ==='
 ];
 
 test('a fresh, fully built checkout passes every check and prints each one', async () => {
@@ -172,15 +169,13 @@ test('a fresh, fully built checkout passes every check and prints each one', asy
 
 test('a bundle outside its band fails, naming the size and the bound', async () => {
 	await using root = await make_checkout();
-	const small = await run(sized(root.readonly(), { [deno_bundle('parse')]: BOUNDS.parse.min - 1 }));
+	const small = await run(sized(root.readonly(), { [npm_bundle('parse')]: BOUNDS.parse.min - 1 }));
 	strictEqual(small.code, 1);
 	strictEqual(
-		small.out.find((line) => line.includes('parse/deno:')),
-		'  FAIL: parse/deno: 988.0 KB (987999 B) < min 988.0 KB — suspiciously small'
+		small.out.find((line) => line.includes('parse/npm:')),
+		'  FAIL: parse/npm: 988.0 KB (987999 B) < min 988.0 KB — suspiciously small'
 	);
-	const big = await run(
-		sized(root.readonly(), { [`${npm_dir('format')}/tsv_wasm_bg.wasm`]: BOUNDS.format.max + 1 })
-	);
+	const big = await run(sized(root.readonly(), { [npm_bundle('format')]: BOUNDS.format.max + 1 }));
 	strictEqual(big.code, 1);
 	strictEqual(
 		big.out.find((line) => line.includes('format/npm:')),
@@ -189,48 +184,41 @@ test('a bundle outside its band fails, naming the size and the bound', async () 
 	// the bounds are inclusive (the deltas this moves are the next test's)
 	const edges = await run(
 		sized(root.readonly(), {
-			[deno_bundle('parse')]: BOUNDS.parse.min,
-			[deno_bundle('format')]: BOUNDS.format.max
+			[npm_bundle('parse')]: BOUNDS.parse.min,
+			[npm_bundle('format')]: BOUNDS.format.max
 		})
 	);
 	deepStrictEqual(
 		edges.out.filter((line) => / B\)$/.test(line)),
 		[
-			'  PASS: format/npm: 2.72 MB (2720874 B)',
-			'  PASS: parse/npm: 1.07 MB (1073871 B)',
-			'  PASS: all/npm: 3.05 MB (3048129 B)',
-			'  PASS: format/deno: 2.94 MB (2938000 B)',
-			'  PASS: parse/deno: 988.0 KB (988000 B)',
-			'  PASS: all/deno: 3.05 MB (3048129 B)'
+			'  PASS: format/npm: 2.94 MB (2938000 B)',
+			'  PASS: parse/npm: 988.0 KB (988000 B)',
+			'  PASS: all/npm: 3.05 MB (3048129 B)'
 		]
 	);
 });
 
-test("a subset's distance below `all` outside its band fails, per target", async () => {
+test("a subset's distance below `all` outside its band fails", async () => {
 	await using root = await make_checkout();
-	// `all` moved alone, to just under the format delta's floor: on the deno target the format
-	// delta leaves its band and the parse delta stays inside, and the npm target's both stay
+	// `all` moved alone, to just under the format delta's floor: the format delta leaves its
+	// band and the parse delta stays inside
 	const narrow = await run(
-		sized(root.readonly(), { [deno_bundle('all')]: CENTER.format + DELTAS.format.min - 1 })
+		sized(root.readonly(), { [npm_bundle('all')]: CENTER.format + DELTAS.format.min - 1 })
 	);
 	strictEqual(narrow.code, 1);
 	deepStrictEqual(
-		narrow.out.filter((line) => line.includes('(deno) =')),
+		narrow.out.filter((line) => line.includes('(npm) =')),
 		[
-			'  FAIL: all - format (deno) = 301.0 KB — expected ≥301.0 KB (feature gate broken?)',
-			'  PASS: all - parse (deno) = 1.95 MB'
+			'  FAIL: all - format (npm) = 301.0 KB — expected ≥301.0 KB (feature gate broken?)',
+			'  PASS: all - parse (npm) = 1.95 MB'
 		]
 	);
-	deepStrictEqual(
-		narrow.out.filter((line) => line.includes('(npm) =')),
-		['  PASS: all - format (npm) = 327.3 KB', '  PASS: all - parse (npm) = 1.97 MB']
-	);
 	const wide = await run(
-		sized(root.readonly(), { [deno_bundle('parse')]: CENTER.all - DELTAS.parse.max - 1 })
+		sized(root.readonly(), { [npm_bundle('parse')]: CENTER.all - DELTAS.parse.max - 1 })
 	);
 	strictEqual(
-		wide.out.find((line) => line.includes('all - parse (deno)')),
-		'  FAIL: all - parse (deno) = 2.13 MB — expected ≤2.13 MB (unexpected bloat)'
+		wide.out.find((line) => line.includes('all - parse (npm)')),
+		'  FAIL: all - parse (npm) = 2.13 MB — expected ≤2.13 MB (unexpected bloat)'
 	);
 	strictEqual(wide.code, 1);
 });
@@ -252,7 +240,7 @@ test('a package whose NOTICE is missing, differs, or is undeclared fails that ch
 			'  FAIL: all/npm — package.json files declares NOTICE returned wrong output'
 		]
 	);
-	strictEqual(out.at(-1), '\n=== Artifact validation: 13 passed, 3 failed, 0 skipped ===');
+	strictEqual(out.at(-1), '\n=== Artifact validation: 8 passed, 3 failed, 0 skipped ===');
 });
 
 test('an unbuilt variant is skipped, and its deltas with it', async () => {
@@ -264,88 +252,40 @@ test('an unbuilt variant is skipped, and its deltas with it', async () => {
 	deepStrictEqual(err, []);
 	deepStrictEqual(
 		out.filter((line) => line.includes('SKIP') || line.includes('parse')),
-		[
-			'  SKIP: parse/npm — not built',
-			'  SKIP: parse/deno — not built',
-			'  SKIP: parse/npm NOTICE — not built'
-		]
+		['  SKIP: parse/npm — not built', '  SKIP: parse/npm NOTICE — not built']
 	);
-	strictEqual(out.at(-1), '\n=== Artifact validation: 10 passed, 0 failed, 3 skipped ===');
+	strictEqual(out.at(-1), '\n=== Artifact validation: 7 passed, 0 failed, 2 skipped ===');
 });
 
 test('nothing built fails, saying so on stderr', async () => {
 	await using root = await make_checkout([]);
 	const { code, out, err } = await run(sized(root.readonly()));
 	strictEqual(code, 1);
-	strictEqual(out.at(-1), '\n=== Artifact validation: 0 passed, 0 failed, 9 skipped ===');
+	strictEqual(out.at(-1), '\n=== Artifact validation: 0 passed, 0 failed, 6 skipped ===');
 	deepStrictEqual(err, [
-		'FAIL: no artifacts found to validate — run `deno task build:npm:format` etc. first'
+		'FAIL: no artifacts found to validate — run `npm run build:npm:format` etc. first'
 	]);
 });
 
-test('the freshness checks: each deno bundle by its wasm-pack inputs, each npm staging by the shared list', () => {
-	const checks = artifact_freshness_checks({
-		deno: new Set<WasmVariant>(['parse']),
-		npm: new Set<WasmVariant>(['all'])
-	});
-	deepStrictEqual(checks, [
-		{
-			label: 'parse/deno WASM bundle',
-			staged: deno_bundle('parse'),
-			crates: [...CORE_CRATES, ...WASM_CRATES],
-			files: ['package.json'],
-			rebuild: 'deno task build:wasm:parse:deno'
-		},
+test('the freshness checks: each built npm staging by the shared list', () => {
+	deepStrictEqual(artifact_freshness_checks(new Set<WasmVariant>(['all', 'format'])), [
+		...wasm_package_checks('format'),
 		...wasm_package_checks('all')
 	]);
-	deepStrictEqual(
-		artifact_freshness_checks({ deno: new Set(VARIANTS), npm: new Set() }).map(
-			(check) => check.rebuild
-		),
-		[
-			'deno task build:wasm:deno',
-			'deno task build:wasm:parse:deno',
-			'deno task build:wasm:all:deno'
-		]
-	);
+	deepStrictEqual(artifact_freshness_checks(new Set()), []);
 });
 
-/** Every input that must stale a deno bundle: its crates' sources, the workspace files, and the
- * task file the wasm-pack flags are written in. */
-const DENO_INPUTS = [
-	...[...CORE_CRATES, ...WASM_CRATES].flatMap((crate) => [
-		`crates/${crate}/Cargo.toml`,
-		`crates/${crate}/src/lib.rs`
-	]),
-	'Cargo.toml',
-	'Cargo.lock',
-	'package.json'
-];
-
-test('a deno bundle older than any of its inputs is refused before anything is graded', async () => {
-	await using root = await make_checkout(['parse']);
-	// the npm staging's own inputs are graded by the shared list; drop it so only the deno
-	// bundle's check reads these
-	await root.remove(npm_dir('parse'), { recursive: true });
-	for (const input of DENO_INPUTS) {
-		await touch(root, input);
-		const { code, out, err } = await run(sized(root.readonly()));
-		strictEqual(code, 1, input);
-		deepStrictEqual(out, [], input);
-		strictEqual(err.length, 1, input);
-		strictEqual(
-			err[0]!.split('\n').slice(0, 4).join('\n'),
-			'\n✗ Stale staged package artifacts — refusing to grade outdated code.\n' +
-				`  • parse/deno WASM bundle: staged ${fmt(T_BUILT)}, but ` +
-				`${input.startsWith('crates/') ? input.slice('crates/'.length) : input} changed ${fmt(T_LATER)}\n` +
-				'      restage: deno task build:wasm:parse:deno',
-			input
-		);
-		await touch(root, input, T_SOURCE);
-	}
-	const fresh = await run(sized(root.readonly()));
-	strictEqual(fresh.code, 0);
-	deepStrictEqual(fresh.err, []);
+test("a deno-target bundle, the bench's alone, is never sized, dated, or required", async () => {
+	await using root = await make_checkout();
+	// out of its band and older than every source: nothing reads it
+	await touch(root, deno_bundle('parse'), T_SOURCE - 60_000);
+	const { code, out, err } = await run(sized(root.readonly(), { [deno_bundle('parse')]: 1 }));
+	deepStrictEqual(out, FULL_OUT);
+	deepStrictEqual(err, []);
+	strictEqual(code, 0);
+	// and without any, nothing changes
+	await root.remove('crates/tsv_wasm/pkg/parse/deno', { recursive: true });
+	deepStrictEqual((await run(sized(root.readonly()))).out, FULL_OUT);
 });
 
 test('an npm staging older than an input of the shared list is refused', async () => {
@@ -371,7 +311,6 @@ test('under `stale_ok` a stale artifact warns and the run grades it', async () =
 		err[0]!.split('\n')[1],
 		'⚠ Stale staged package artifacts (BENCH_STALE_OK=1 — grading anyway).'
 	);
-	strictEqual(err[0]!.includes('restage: deno task build:wasm:deno'), true);
 	strictEqual(err[0]!.includes('restage: deno task build:npm:all'), true);
 });
 
@@ -436,7 +375,7 @@ test('an npm staging holding its bundle without its manifest fails, whatever els
 			'=== WASM binary sizes ===',
 			'\n=== Third-party notice ===',
 			'  FAIL: all/npm — package.json files declares NOTICE returned wrong output',
-			'\n=== Artifact validation: 15 passed, 1 failed, 0 skipped ==='
+			'\n=== Artifact validation: 10 passed, 1 failed, 0 skipped ==='
 		]
 	);
 });
@@ -456,7 +395,7 @@ test('a staged manifest that does not parse fails its check, and the run grades 
 		),
 		true
 	);
-	strictEqual(out.at(-1), '\n=== Artifact validation: 15 passed, 1 failed, 0 skipped ===');
+	strictEqual(out.at(-1), '\n=== Artifact validation: 10 passed, 1 failed, 0 skipped ===');
 });
 
 test('a staged file the checks name that is missing is fatal under `stale_ok` too', async () => {

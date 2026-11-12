@@ -8,9 +8,8 @@
  *
  * Dry-run by default — runs all validation but does not mutate the workspace.
  * Pass `--wetrun` to bump, build, validate, publish to npm, and finalize git
- * (commit + tag + push). The build step covers the npm packages AND the deno
- * bundles — the deno bundles aren't published, but artifact validation checks
- * every built bundle, so they're rebuilt here to never gate on stale artifacts.
+ * (commit + tag + push). The build step builds the npm packages, every one rebuilt so
+ * nothing gates on a stale artifact.
  *
  * Version source of truth: `Cargo.toml [workspace.package] version` (read
  * directly by wasm-pack). The root package.json is private and carries no version;
@@ -21,10 +20,10 @@
  * — fresh or resumed, and every reason a fresh one cannot — is decided once by
  * `scripts/release/plan.ts`; the dry run warns on exactly what a wetrun refuses.
  *
- * Usage (`deno task publish`, a `deno.json` task, so no npm lifecycle can start it):
- *   deno task publish --bump patch          # dry-run (validate everything, preview the bump)
- *   deno task publish --wetrun --bump patch  # bump + check + conformance:all + audit:corpus + build + validate + publish + git
- *   deno task publish --wetrun               # resume a failed wetrun (sentinel retry only)
+ * Usage (`npm run release`, a name no npm command runs on its own; the flags follow a `--`):
+ *   npm run release -- --bump patch          # dry-run (validate everything, preview the bump)
+ *   npm run release -- --wetrun --bump patch # bump + check + conformance:all + audit:corpus + build + validate + publish + git
+ *   npm run release -- --wetrun              # resume a failed wetrun (sentinel retry only)
  *
  * Flags:
  *   --wetrun         actually mutate: bump, publish, commit, tag, push
@@ -33,7 +32,7 @@
  *                    <level> -->` marker (also required). A fresh wetrun needs
  *                    both, plus a non-empty `## Unreleased` section; a sentinel
  *                    retry runs without either.
- *   --no-check       skip `deno task check` (with the depth contract's shipped-build
+ *   --no-check       skip `npm run check` (with the depth contract's shipped-build
  *                    and WASM legs, `test:depth:napi` and Step 6's `test:depth:wasm`),
  *                    the Step 3b conformance gates, AND the
  *                    Step 3c corpus audit (faster retries; also the only way to --wetrun
@@ -59,7 +58,7 @@
  * while the gates ran refuses the publish, since the packages would describe no commit.
  *
  * Retry: a failed wetrun leaves the bump in place plus a sentinel file
- * (`scripts/release/sentinel.ts`); re-run `deno task publish --wetrun` and it resumes
+ * (`scripts/release/sentinel.ts`); re-run `npm run release -- --wetrun` and it resumes
  * from the bumped version (skipping the bump; a passed `--bump` is ignored with a
  * warning). A resume accepts a tree dirty with only the release files, one release
  * commit ahead of origin/main, and a tag on HEAD. Every mutating step is idempotent —
@@ -136,17 +135,13 @@ import { TYPECHECK_INSTALL } from './typecheck_install.ts';
  * `PATH`, which fails only the call that needs it (as a missing command did).
  */
 export interface PublishPrograms {
-	/** `deno`, for the `deno task` gates and builds, with the owner's whole environment. */
-	deno: SpawnProgram | null;
-	/** `deno` for Step 4's `build:packages`: the same environment with `TSV_BUILD_FORCE=1`
-	 * added, so no bundle is skipped as fresh. */
-	deno_build: SpawnProgram | null;
 	/** `node`, for the version probe and the loader staging. */
 	node: SpawnProgram | null;
 	/** `node` for Step 6's artifact tests of the package staged at `pkg_dir`, with the owner's
 	 * whole environment and `PKG_DIR` set to it. */
 	node_test: (pkg_dir: string) => SpawnProgram | null;
-	/** `npm`, with the owner's whole environment: its config, auth, and registry. */
+	/** `npm`, with the owner's whole environment: the `npm run` gates and builds, and npm's
+	 * config, auth, and registry. */
 	npm: SpawnProgram | null;
 	/** `git`, reading the checkout and reaching `origin` (`ReleaseGit`). */
 	git: Omit<ReleaseGit, 'cwd'>;
@@ -181,7 +176,7 @@ export interface PublishDeps {
 }
 
 const USAGE =
-	'Usage: deno task publish [--wetrun] [--bump patch|minor|major] [--no-check] [--no-git]';
+	'Usage: npm run release -- [--wetrun] [--bump patch|minor|major] [--no-check] [--no-git]';
 
 /** The oldest node Step 6 runs on — the first with native TypeScript type stripping
  * unflagged, which `node --test` needs to execute the `.ts` test files directly. */
@@ -283,7 +278,7 @@ async function publish(deps: PublishDeps, argv: ReadonlyArray<string>): Promise<
 	const exit_resumable: () => never = () => {
 		if (bumped) {
 			print_error(
-				'  The bump is in place — fix the cause and run `deno task publish --wetrun` to resume.'
+				'  The bump is in place — fix the cause and run `npm run release -- --wetrun` to resume.'
 			);
 		}
 		return exit(1);
@@ -502,7 +497,7 @@ async function publish(deps: PublishDeps, argv: ReadonlyArray<string>): Promise<
 	}
 	print(`  ${wasm_pack_version}`);
 
-	// Step 6 runs the parse-failure table under Bun (`deno task test:bun`), the one leg that
+	// Step 6 runs the parse-failure table under Bun (`npm run test:bun`), the one leg that
 	// grades the engines' returned failures under Bun — asked here so a
 	// --wetrun without bun fails before the bump. Waived like Step 3b's oracles: a dry run or
 	// --no-check warn-skips, re-warned in the final summary.
@@ -512,7 +507,7 @@ async function publish(deps: PublishDeps, argv: ReadonlyArray<string>): Promise<
 		print(`  bun: ${bun_version}`);
 	} else if (wetrun && !no_check) {
 		print_error(
-			'  FAIL: bun not found — required to run the parse-failure table under Bun (deno task test:bun). ' +
+			'  FAIL: bun not found — required to run the parse-failure table under Bun (npm run test:bun). ' +
 				'Install bun, or pass --no-check to release without it (explicitly).'
 		);
 		exit(1);
@@ -533,13 +528,13 @@ async function publish(deps: PublishDeps, argv: ReadonlyArray<string>): Promise<
 	if (missing_typecheck_install.length > 0) {
 		print_error(
 			`  FAIL: benches/js/node_modules lacks ${missing_typecheck_install.join(' + ')} — ` +
-				'required to type-check the built packages (deno task typecheck:packages); ' +
-				'run `deno task bench:install`'
+				'required to type-check the built packages (npm run typecheck:packages); ' +
+				'run `npm run bench:install`'
 		);
 		exit(1);
 	}
 
-	// Step 3's `deno task check` and Step 3b's gates grade the fixtures through tsv_debug's sidecar,
+	// Step 3's `npm run check` and Step 3b's gates grade the fixtures through tsv_debug's sidecar,
 	// which refuses to run without its packages installed as its lock says — asked here so a
 	// missing or stale install fails before the bump rather than halfway through Step 3
 	if (!no_check) {
@@ -659,7 +654,7 @@ async function publish(deps: PublishDeps, argv: ReadonlyArray<string>): Promise<
 			print_error(`\n  FAIL: ${error}`);
 			print_error(
 				'  The packages are PUBLISHED — only the release commit + tag + push is missing.\n' +
-					'  The sentinel survives this step, so `deno task publish --wetrun` resumes from here\n' +
+					'  The sentinel survives this step, so `npm run release -- --wetrun` resumes from here\n' +
 					'  (it skips straight to this step once every package is on npm). Or finalize by hand:\n' +
 					manual_finalize
 			);
@@ -697,7 +692,7 @@ async function publish(deps: PublishDeps, argv: ReadonlyArray<string>): Promise<
 	if (all_published) {
 		print(`\n  Every package is already on npm at v${version} — only git remains.`);
 		if (!wetrun) {
-			print('  Dry-run complete — `deno task publish --wetrun` finishes the release.\n');
+			print('  Dry-run complete — `npm run release -- --wetrun` finishes the release.\n');
 			return;
 		}
 		await finalize_git();
@@ -713,26 +708,26 @@ async function publish(deps: PublishDeps, argv: ReadonlyArray<string>): Promise<
 	if (no_check) {
 		print('\n=== Step 3: Check — SKIPPED (--no-check) ===');
 	} else {
-		print('\n=== Step 3: Check (deno task check) ===');
-		await run('deno task check', programs.deno, 'deno', ['task', 'check']);
+		print('\n=== Step 3: Check (npm run check) ===');
+		await run('npm run check', programs.npm, 'npm', ['run', 'check']);
 		// The depth-limit stack contract in the shipped binaries' optimization (the `napi`
 		// profile, without the profile guidance the published pair adds): `check`'s
 		// `test:depth` grades the `corpus` world, whose frames are further still from what
 		// ships. The profile-guided addon itself is graded by the release workflow on every
 		// row (docs/tasks.md §`test:depth:napi`).
-		print('\n=== Step 3: Depth contract, napi profile (deno task test:depth:napi) ===');
-		await run('deno task test:depth:napi', programs.deno, 'deno', ['task', 'test:depth:napi']);
+		print('\n=== Step 3: Depth contract, napi profile (npm run test:depth:napi) ===');
+		await run('npm run test:depth:napi', programs.npm, 'npm', ['run', 'test:depth:napi']);
 	}
 
 	// Step 3b: Conformance gates
 	//
 	// The release-cadence correctness gates that run against EXTERNAL oracles and so
-	// can't live in `deno task check`: the Svelte/TS parsers vs their own suites +
+	// can't live in `npm run check`: the Svelte/TS parsers vs their own suites +
 	// svelte/compiler / acorn-typescript / tsc baselines (conformance:svelte-fixtures
 	// / ts-fixtures / ts-repo), all three languages' AST + formatter vs the canonical
 	// parsers / prettier (corpus:compare:parse + :format, --all), and the JS parser vs
 	// test262 POSITIVES (conformance:test262, pure Rust — negatives are the deferred
-	// early-error frontier, reported not gated). `deno task conformance:all` runs the
+	// early-error frontier, reported not gated). `npm run conformance:all` runs the
 	// whole set behind its preflights (`pins:audit:checkouts`, `bench:pins:suites` —
 	// which re-derives the suite-derived count pins nothing else grades, so a corpus
 	// that moved under them fails the release rather than shipping numbers describing
@@ -744,7 +739,7 @@ async function publish(deps: PublishDeps, argv: ReadonlyArray<string>): Promise<
 	// ../test262 checkouts, the corpus legs' pinned inputs (../corpora — the real-code
 	// snapshot — plus ../prettier and ../prettier-plugin-svelte; CorpusLoader fails
 	// fast on a missing non-optional entry), and the benches/js `node_modules` sidecar
-	// (`deno task bench:install`). The probe must cover every oracle the aggregate's legs need
+	// (`npm run bench:install`). The probe must cover every oracle the aggregate's legs need
 	// — the gates themselves fail closed on a missing checkout, so the probe is the
 	// ONE tolerance point: a dry-run warn-and-skips (clean machines can still
 	// validate), but a --wetrun BLOCKS — releasing with the gates never run
@@ -755,7 +750,7 @@ async function publish(deps: PublishDeps, argv: ReadonlyArray<string>): Promise<
 		print('\n=== Step 3b: Conformance gates — SKIPPED (--no-check) ===');
 		conformance_skip_reason = '--no-check';
 	} else {
-		print('\n=== Step 3b: Conformance gates (deno task conformance:all) ===');
+		print('\n=== Step 3b: Conformance gates (npm run conformance:all) ===');
 		const missing: Array<string> = [];
 		for (const [path, what] of [
 			['../svelte/packages/svelte/tests', '../svelte checkout'],
@@ -765,7 +760,7 @@ async function publish(deps: PublishDeps, argv: ReadonlyArray<string>): Promise<
 			['../prettier/tests/format', '../prettier checkout'],
 			['../prettier-plugin-svelte/test', '../prettier-plugin-svelte checkout'],
 			[deps.corpora.collections, `${deps.corpora.root} checkout (the real-code snapshot)`],
-			['benches/js/node_modules', 'benches/js/node_modules (deno task bench:install)']
+			['benches/js/node_modules', 'benches/js/node_modules (npm run bench:install)']
 		] as const) {
 			if (!(await exists(path))) missing.push(what);
 		}
@@ -779,10 +774,10 @@ async function publish(deps: PublishDeps, argv: ReadonlyArray<string>): Promise<
 			conformance_skip_reason = `missing ${missing.join(' + ')}`;
 			print_error(
 				`  WARN: skipping — ${conformance_skip_reason}. ` +
-					'A --wetrun would FAIL here; run `deno task conformance:all` on a machine with the oracles.'
+					'A --wetrun would FAIL here; run `npm run conformance:all` on a machine with the oracles.'
 			);
 		} else {
-			await run('deno task conformance:all', programs.deno, 'deno', ['task', 'conformance:all'], {
+			await run('npm run conformance:all', programs.npm, 'npm', ['run', 'conformance:all'], {
 				fail_hint:
 					'  Conformance gate failed. A corpus:compare:format SAFETY hit is self-verified in-run\n' +
 					'  (the native format re-runs and must reproduce byte-identically), so treat it as a real\n' +
@@ -800,9 +795,9 @@ async function publish(deps: PublishDeps, argv: ReadonlyArray<string>): Promise<
 	// corpus view — the WHOLE ../corpora snapshot, every collection it vendors, plus the
 	// svelte_styles cache and the live diff of this machine's working trees against the snapshot
 	// — and the pinned Prettier suites). This is the
-	// extension-robustness bar: `tests/fixtures` is format-stable by construction, so `deno task check`
+	// extension-robustness bar: `tests/fixtures` is format-stable by construction, so `npm run check`
 	// is structurally blind to a content-loss / panic / reflow bug in real code — such bugs are found
-	// by a corpus audit or a wide fuzz seed, never by `check`. `deno task audit:corpus`
+	// by a corpus audit or a wide fuzz seed, never by `check`. `npm run audit:corpus`
 	// warn-skips absent working trees, so its reproducible floor is the whole ../corpora snapshot;
 	// like Step 3b, a --wetrun without that floor BLOCKS (releasing without the audit needs --no-check),
 	// a dry-run warn-and-skips. The FFI/prettier SAFETY half (content loss vs prettier) rides Step 3b's
@@ -812,7 +807,7 @@ async function publish(deps: PublishDeps, argv: ReadonlyArray<string>): Promise<
 		print('\n=== Step 3c: Corpus robustness audit — SKIPPED (--no-check) ===');
 		audit_corpus_skip_reason = '--no-check';
 	} else {
-		print('\n=== Step 3c: Corpus robustness audit (deno task audit:corpus) ===');
+		print('\n=== Step 3c: Corpus robustness audit (npm run audit:corpus) ===');
 		if (!(await exists(deps.corpora.collections))) {
 			audit_corpus_skip_reason = `missing ${deps.corpora.root} checkout (the real-code snapshot — the corpus floor)`;
 			if (wetrun) {
@@ -824,13 +819,13 @@ async function publish(deps: PublishDeps, argv: ReadonlyArray<string>): Promise<
 			}
 			print_error(
 				`  WARN: skipping — ${audit_corpus_skip_reason}. ` +
-					'A --wetrun would FAIL here; run `deno task audit:corpus` on a machine with the corpus.'
+					'A --wetrun would FAIL here; run `npm run audit:corpus` on a machine with the corpus.'
 			);
 		} else {
-			await run('deno task audit:corpus', programs.deno, 'deno', ['task', 'audit:corpus'], {
+			await run('npm run audit:corpus', programs.npm, 'npm', ['run', 'audit:corpus'], {
 				fail_hint:
 					'  Corpus robustness audit found a content-loss / panic / non-idempotency regression over\n' +
-					'  REAL code (what `deno task check`’s fixture-only gate cannot see). Triage the failing\n' +
+					'  REAL code (what `npm run check`’s fixture-only gate cannot see). Triage the failing\n' +
 					'  leg by name with the matching `tsv_debug` audit on the single repo it points at.'
 			});
 		}
@@ -838,18 +833,12 @@ async function publish(deps: PublishDeps, argv: ReadonlyArray<string>): Promise<
 
 	// Step 4: Build
 
-	print('\n=== Step 4: Build WASM bundles (npm + deno) ===');
+	print('\n=== Step 4: Build WASM bundles (npm) ===');
 	// Single source of truth for the publishable artifact build: the `build:packages`
-	// task in deno.json. It builds everything Step 6 validates, including the
-	// unpublished deno bundles (stale bundles must never gate or falsely pass a
-	// publish), and is ordered to group cargo feature sets (format, format, parse,
-	// parse, default, default) so the wasm crate compiles once per feature set, not
-	// once per task. CI's artifacts job runs the same task, so the two can't drift.
-	// A release build must never freshness-skip: the wasm build tasks ride
-	// scripts/run_if_stale.ts, whose mtime check can't see toolchain changes
-	// (wasm-pack/wasm-opt/rustc upgrades). `programs.deno_build` carries
-	// `TSV_BUILD_FORCE=1`, forcing the whole build step.
-	await run('deno task build:packages', programs.deno_build, 'deno', ['task', 'build:packages']);
+	// script. It builds everything Step 6 validates, one npm package per cargo feature set
+	// (format, parse, default), each a plain wasm-pack build with no freshness skip. CI's
+	// artifacts job runs the same script, so the two can't drift.
+	await run('npm run build:packages', programs.npm, 'npm', ['run', 'build:packages']);
 
 	// Step 5: Verify built packages
 
@@ -881,8 +870,8 @@ async function publish(deps: PublishDeps, argv: ReadonlyArray<string>): Promise<
 	// Step 6: Test the built artifacts
 
 	print('\n=== Step 6: Validate built packages (sizes + Node + Bun + declarations) ===');
-	await run('deno task validate:artifacts', programs.deno, 'deno', ['task', 'validate:artifacts']);
-	// A second spelling of the `test:npm*:run` tasks (see deno.json's `//test:npm:run`): a leg
+	await run('npm run validate:artifacts', programs.npm, 'npm', ['run', 'validate:artifacts']);
+	// A second spelling of the `test:npm*:run` scripts (docs/tasks.md §`test:npm:run`): a leg
 	// added there must be added here too, or a publish silently skips it.
 	for (const { label, dir } of packages) {
 		await run(`artifact tests for ${label}`, programs.node_test(dir), 'node', [
@@ -895,25 +884,26 @@ async function publish(deps: PublishDeps, argv: ReadonlyArray<string>): Promise<
 	// and tiered up (docs/tasks.md §`test:depth:wasm`). A `check`-cadence gate like Step 3's
 	// shipped-build leg, so `--no-check` skips it with that one.
 	if (no_check) {
-		print_error('  WARN: skipping deno task test:depth:wasm (--no-check)');
+		print_error('  WARN: skipping npm run test:depth:wasm (--no-check)');
 	} else {
-		await run('deno task test:depth:wasm', programs.deno, 'deno', ['task', 'test:depth:wasm']);
+		await run('npm run test:depth:wasm', programs.npm, 'npm', ['run', 'test:depth:wasm']);
 	}
 	// The parse-failure table under Bun, the one runtime that grades the engines' point
 	// properties (docs/tasks.md §`test:bun`), over the three wasm packages this script publishes —
 	// the napi engine under Bun is graded locally by `test:napi:npm`, not here. Bun's presence
 	// was settled by the preflight, so the leg requires it.
 	if (bun_skip_reason === null) {
-		await run('deno task test:bun', programs.deno, 'deno', [
-			'task',
+		await run('npm run test:bun', programs.npm, 'npm', [
+			'run',
 			'test:bun',
+			'--',
 			'--require-bun',
 			'format',
 			'parse',
 			'all'
 		]);
 	} else {
-		print_error(`  WARN: skipping deno task test:bun — ${bun_skip_reason}`);
+		print_error(`  WARN: skipping npm run test:bun — ${bun_skip_reason}`);
 	}
 	// The merged published declarations, as a consumer's compiler sees them, for every npm
 	// package this release ships. The napi loader publishes from release.yml, but its
@@ -924,9 +914,10 @@ async function publish(deps: PublishDeps, argv: ReadonlyArray<string>): Promise<
 		'scripts/roots/build_napi_packages.ts',
 		'--loader-only'
 	]);
-	await run('deno task typecheck:packages', programs.deno, 'deno', [
-		'task',
+	await run('npm run typecheck:packages', programs.npm, 'npm', [
+		'run',
 		'typecheck:packages',
+		'--',
 		'format',
 		'parse',
 		'all',
@@ -1074,7 +1065,7 @@ async function publish(deps: PublishDeps, argv: ReadonlyArray<string>): Promise<
 		// `crates` job only rehearses it, and the crates publish last, after the GitHub Release.
 		print(
 			'  The crates publish last, once that run has made the GitHub Release:\n' +
-				`  \`deno task publish:crates --wetrun\` from a clean checkout of v${version}, which it\n` +
+				`  \`npm run publish:crates -- --wetrun\` from a clean checkout of v${version}, which it\n` +
 				'  requires (its `crates` job is a dry run).'
 		);
 	}
@@ -1083,20 +1074,20 @@ async function publish(deps: PublishDeps, argv: ReadonlyArray<string>): Promise<
 		// build output, and a release whose conformance gates never ran must be the
 		// last thing on screen, not a scrolled-away footnote.
 		print_error(`\n  ⚠ Step 3b conformance gates did NOT run (${conformance_skip_reason}).`);
-		print_error('    Run `deno task conformance:all` and verify it passes for this release.');
+		print_error('    Run `npm run conformance:all` and verify it passes for this release.');
 	}
 	if (audit_corpus_skip_reason !== null) {
 		// Re-warn at the very end — same reasoning as the Step 3b re-warn: a release whose real-code
 		// robustness audit never ran must be the last thing on screen, not a scrolled-away footnote.
 		print_error(`\n  ⚠ Step 3c corpus robustness audit did NOT run (${audit_corpus_skip_reason}).`);
-		print_error('    Run `deno task audit:corpus` and verify it passes for this release.');
+		print_error('    Run `npm run audit:corpus` and verify it passes for this release.');
 	}
 	if (bun_skip_reason !== null) {
 		// Re-warn at the very end, beside the Step 3b/3c re-warns: the engines' Bun-only point
 		// properties went ungraded for this release.
 		print_error(`\n  ⚠ Step 6 parse-failure table under Bun did NOT run (${bun_skip_reason}).`);
 		print_error(
-			'    Run `deno task test:bun format parse all` with bun installed for this release.'
+			'    Run `npm run test:bun -- format parse all` with bun installed for this release.'
 		);
 	}
 	if (!wetrun) {
@@ -1104,7 +1095,7 @@ async function publish(deps: PublishDeps, argv: ReadonlyArray<string>): Promise<
 			print(`\n  Dry-run complete for v${version} — a wetrun would FAIL on the warnings above.`);
 		} else if (plan.kind === 'resume') {
 			print(`\n  Dry-run complete for v${version} — all checks passed.`);
-			print('  Run `deno task publish --wetrun` to resume the release.');
+			print('  Run `npm run release -- --wetrun` to resume the release.');
 		} else {
 			print(`\n  Dry-run complete for v${version} — all checks passed.`);
 			print(`  Run with --wetrun --bump ${plan.level} to publish v${plan.target}.`);

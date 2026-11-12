@@ -5,9 +5,9 @@
  * A named exception to the host-module rule: this entry and everything it imports use Node's
  * own `node:*` modules and no package, because CI runs `build:stamped` on Windows, where gro's
  * host modules don't run programs, and in jobs that install no `node_modules` (the `platforms`
- * and `artifacts` jobs, through `test:napi` and `test:napi:npm`). The root config's Deno walk
- * (`typecheck:scripts`) checks this module with no `node_modules` in view, so a package import
- * here or beneath it fails `check`.
+ * and `artifacts` jobs, through `test:napi` and `test:napi:npm`).
+ * `scripts/no_package_closure_test.ts` (in `test:node`) holds this module and everything beneath it
+ * to no package import.
  *
  * Cargo is the bare name `cargo`, found on `PATH` by Node's `spawn` with no shell, and inherits
  * the whole environment. The checkout is this module's own location, never the working

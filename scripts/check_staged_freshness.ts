@@ -25,8 +25,7 @@
  * once (`wasm_package_checks`, `napi_loader_checks`), so every reader of one staging — the
  * package suites, artifact validation, the napi suite's export-set parity, the engine
  * parity audit, `scripts/typecheck_packages.ts` and the Bun leg (`scripts/test_bun.ts`) — dates it by the same sources. A reader with an artifact
- * of its own (the napi platform package's CLI binary, the deno bundles, `engine_parity.ts`'s
- * native binary) adds that check beside the shared list; the platform package's addon has
+ * of its own (the napi platform package's CLI binary, `engine_parity.ts`'s native binary) adds that check beside the shared list; the platform package's addon has
  * one of its own, `napi_addon_check`, since two suites load it.
  *
  * Staleness here has two lags — the `target/` build behind the sources, and the

@@ -1426,7 +1426,7 @@ sites, and pays for itself in bytes at every one of them.** The instruction
 counter cannot see that, and neither can any gate in `deno task check` — the size
 bounds live in `scripts/validate_artifacts.ts` (the WASM bundles) and `scripts/validate_napi_artifact.ts` (`deno task validate:napi`,
 the native artifacts) — graded in CI's `artifacts` job on every PR and again at release
-(`deno task publish` Step 6, the tag-triggered N-API workflow), not in `check`.
+(`npm run release` Step 6, the tag-triggered N-API workflow), not in `check`.
 
 The worked case: rewriting the wire writer's integer emitter to end in a
 fixed-width copy instead of a runtime-length one removed a libc `memmove` call

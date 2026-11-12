@@ -1,10 +1,11 @@
 /**
  * The scripts CI runs with no `node_modules` — on Windows, `build:stamped`'s entry, the N-API
- * staging's, `validate:napi`'s, `test:bun`'s launcher, and the PGO pipeline with the drivers it
- * spawns; in the credentialed release jobs, `publish:napi`'s, `release:notes`', and
- * `release:assets`' — and everything each loads name only `node:*` modules and relative files,
- * never a package (docs/tasks.md §`build:stamped`, §`build:napi:packages`, §`validate:napi`,
- * §`test:bun`, §`build:pgo`, §`publish:napi`, §`release:notes`, §`release:assets`). And the
+ * staging's, `validate:napi`'s, `test:bun`'s launcher, the N-API suites `test:napi:run` and
+ * `test:napi:npm:run` run, and the PGO pipeline with the drivers it spawns; in the
+ * credentialed release jobs, `publish:napi`'s, `release:notes`', and `release:assets`' — and
+ * everything each loads name only `node:*` modules and relative files, never a package
+ * (docs/tasks.md §`build:stamped`, §`build:napi:packages`, §`validate:napi`, §`test:bun`,
+ * §`typecheck:scripts`, §`build:pgo`, §`publish:napi`, §`release:notes`, §`release:assets`). And the
  * publish and release suites, which drive their libraries over in-process fakes, load nothing
  * that can spawn, write, or reach the network: no host module, no capability-bearing `node:*`
  * module, no ambient global. And the bench modules `typecheck:bench-core` typechecks
@@ -12,7 +13,7 @@
  * type-only import's file included, so `tsc`, which finds a package by walking up to any
  * `node_modules`, can't let one through. And each bench root that loads no package beyond the
  * root install's is one `typecheck:scripts`' gated program names. Read from the source text through
- * `scripts/import_closure.ts`, so it holds whatever the root config's Deno walk excludes.
+ * `scripts/import_closure.ts`, since `tsc` resolves a package from any `node_modules` above.
  */
 
 import { strictEqual } from 'node:assert';
@@ -50,6 +51,8 @@ const ENTRIES: Array<[entry: string, reaches: string]> = [
 	['scripts/roots/release_notes.ts', 'scripts/release/changelog.ts'],
 	['scripts/roots/release_assets.ts', 'scripts/release/node_host.ts'],
 	['scripts/test_bun.ts', 'scripts/check_staged_freshness.ts'],
+	['scripts/test_napi.ts', 'benches/js/lib/tsv_artifacts.ts'],
+	['scripts/test_napi_npm.ts', 'scripts/parse_failure_suite.ts'],
 	['scripts/pgo/pgo.ts', 'scripts/import_closure.ts'],
 	['scripts/pgo/addon_ops.ts', 'scripts/pgo/layout.ts'],
 	['scripts/pgo/addon_depth.ts', 'scripts/depth_shapes.ts']
@@ -59,6 +62,10 @@ const ENTRIES: Array<[entry: string, reaches: string]> = [
  * why: each loads product code a step built, by its path, never a package by name. */
 const COMPUTED_IMPORTS: Record<string, { count: number; why: string }> = {
 	'scripts/test_bun.ts': { count: 1, why: 'each staged package, by its file URL, under Bun' },
+	'scripts/test_napi_npm.ts': {
+		count: 8,
+		why: 'the staged `@fuzdev/tsv` loader, its platform module, and the staged wasm package, by their file URLs'
+	},
 	'scripts/pgo/addon_ops.ts': { count: 1, why: 'the staged `@fuzdev/tsv` loader, by its path' },
 	'scripts/pgo/addon_depth.ts': { count: 1, why: 'the staged `@fuzdev/tsv` loader, by its path' },
 	'benches/js/lib/wasm.ts': {

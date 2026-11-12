@@ -35,11 +35,11 @@
  * --multibyte-only for fast iteration on it.
  *
  * Usage:
- *   deno task corpus:compare:parse ../some-project
- *   deno task corpus:compare:parse --all
- *   deno task corpus:compare:parse --all --multibyte-only
- *   deno task corpus:compare:parse --all --filter typescript --limit 100
- *   deno task corpus:compare:parse --all --json 2>/dev/null > report.json
+ *   npm run corpus:compare:parse -- ../some-project
+ *   npm run corpus:compare:parse -- --all
+ *   npm run corpus:compare:parse -- --all --multibyte-only
+ *   npm run corpus:compare:parse -- --all --filter typescript --limit 100
+ *   npm run -s corpus:compare:parse:run -- --all --json 2>/dev/null > report.json
  *
  * Parse FAILURES (one side throws) are counted but not the focus —
  * diagnostics/skip_triage.ts is the dedicated tool for parse-gap triage.
@@ -129,7 +129,7 @@ const DEFAULT_INJECT_LIMIT = 12;
  */
 const PARSE_PINS_FILE = 'benches/js/lib/corpus_parse_pins.txt';
 /** The command that rewrites `PARSE_PINS_FILE`. */
-const PARSE_PINS_UPDATE = 'deno task corpus:compare:parse --all --update';
+const PARSE_PINS_UPDATE = 'npm run corpus:compare:parse -- --all --update';
 const PARSE_PIN_BUCKETS = ['compared', 'tsv_errors', 'canonical_errors', 'both_errors'] as const;
 
 const CorpusCompareParseArgs = s.strip_object({
@@ -558,8 +558,8 @@ function build_groups(results: Map<Language, FileResult[]>): DiffGroup[] {
 
 function print_usage(): void {
 	console.log(`
-Usage: deno task corpus:compare:parse <path> [options]
-       deno task corpus:compare:parse --all [options]
+Usage: npm run corpus:compare:parse -- <path> [options]
+       npm run corpus:compare:parse -- --all [options]
 
 Deep-diffs tsv's parse output against the canonical parsers (acorn-typescript /
 svelte / parseCss) on two arms: the shipped span-only wire (N-API) and the Rust \`loc\`
@@ -587,7 +587,7 @@ Options:
                      expected_<stem>.json pins) and nothing else. A _svelte_divergence input
                      whose two parses equal its expected_ours.json / expected_svelte.json is
                      classified \`fixture_declared_divergence\` on its span differences
-                     only. What \`deno task conformance\` runs over tests/fixtures
+                     only. What \`npm run conformance\` runs over tests/fixtures
   --inject-limit <n> Injected variants per file, across all kinds (default 12).
                      0 = CENSUS: every site, no cap — the only mode whose finding set is
                      stable across fixture edits, and what wire:audit runs
@@ -597,12 +597,12 @@ Options:
   --help             Show this help message
 
 Examples:
-  deno task corpus:compare:parse --all
-  deno task corpus:compare:parse --all --multibyte-only
-  deno task corpus:compare:parse ../corpora/collections/zzz --filter typescript --limit 100
-  deno task corpus:compare:parse tests/fixtures --filter svelte --inject
-  deno task corpus:compare:parse tests/fixtures --filter svelte --inject-terminators
-  deno task corpus:compare:parse --all --json 2>/dev/null | jq '.stats.total'
+  npm run corpus:compare:parse -- --all
+  npm run corpus:compare:parse -- --all --multibyte-only
+  npm run corpus:compare:parse -- ../corpora/collections/zzz --filter typescript --limit 100
+  npm run corpus:compare:parse -- tests/fixtures --filter svelte --inject
+  npm run corpus:compare:parse -- tests/fixtures --filter svelte --inject-terminators
+  npm run -s corpus:compare:parse:run -- --all --json 2>/dev/null | jq '.stats.total'
 `);
 }
 

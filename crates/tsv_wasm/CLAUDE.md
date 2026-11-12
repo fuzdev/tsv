@@ -11,7 +11,7 @@ WebAssembly bindings for `tsv`. Three npm packages from one Rust crate via the `
   `parse_imports_svelte`, the `imports` feature), neither of which a subset enables, included —
   plus the `tsv` CLI from `npm/cli.js`
 
-Package shape, version-of-truth rule, and the `deno task publish` / `build:npm:*` commands:
+Package shape, version-of-truth rule, and the `npm run release` / `build:npm:*` commands:
 [../../CLAUDE.md §Publishing](../../CLAUDE.md#publishing).
 
 ## The npm Facade: Options & Typed Returns

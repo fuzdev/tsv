@@ -691,19 +691,21 @@ deno task typecheck:js
   single-type-param arrows stay `<T>` and `.svelte` ones get `<T,>`, and the `.js` → babel /
   `.ts` → typescript parser routing holds.
 - **`typecheck:js`** typechecks the JS/TS the repo owns that this harness and `scripts/` run,
-  which `deno task typecheck` (cargo) does not see: `tsc -p tsconfig.bench.json` over the Node
-  entries under `roots/` (a glob), then `deno check`, which takes DIRECTORIES, so
-  a new subdirectory is covered the day it appears. NOT gated, for the same reason: the harness
+  which `npm run typecheck` (cargo) does not see: `tsc -p tsconfig.bench.json` over the Node
+  entries under `roots/` (a glob), then `typecheck:deno` (the Deno row's own files: `lib/ffi.ts`
+  and `scripts/pgo/ffi_ops.ts`, which `bench:deno` also runs ahead of the row), then `deno
+  check`, which takes DIRECTORIES, so a new subdirectory is covered the day it appears. NOT
+  gated, for the same reason: the harness
   imports npm by bare specifier, and CI's `check` job installs no bench node_modules. Run it after a
   harness or scripts change. (The tsv_debug sidecar runs on Node; `typecheck:scripts`' `tsc`
   program checks it.)
 
-  The node-modules-free part of the harness IS gated, mostly for free: `deno check` walks
-  transitive imports, so `typecheck:scripts`' Deno half already covers the loader/guard core
-  through the graph of the scripts Deno runs (check_artifact_freshness, source_mtime, ffi, napi,
+  The node-modules-free part of the harness IS gated, mostly for free: `tsc` follows transitive
+  imports, so `typecheck:scripts` already covers the loader/guard core through the graph of the
+  Node scripts and package suites it holds (check_artifact_freshness, source_mtime, napi,
   tsv_artifacts, runtime, types, reject_probe, locations_probe, gate_counts), and `test:node`'s
-  `tsc` program covers the detectors. The modules the Node scripts import (`scripts/roots/`) are typechecked
-  by `typecheck:scripts`' `tsc` half, with `node_modules` in reach. `typecheck:bench-core`
+  `tsc` program covers the detectors; `lib/ffi.ts`, which only the Deno row loads, is
+  `typecheck:deno`'s, outside `check`. `typecheck:bench-core`
   (`tsc -p tsconfig.bench_core.json`) names the modules nothing else in `check` typechecks —
   `lib/wasm.ts`, `lib/harvest_stamp.ts`, `lib/loc_wire_client.ts` (and through it
   `tsv_debug_server`), `lib/fixture_documents.ts`, `lib/error_text.ts`, `compose_reports.ts`,
@@ -1382,9 +1384,8 @@ editing a build task's flags re-triggers it). Rationale: wasm-pack re-runs wasm-
 (~8–27s per bundle) even when cargo is a fully-cached no-op, so a source-unchanged
 `deno task bench` would otherwise pay ~90s of pure wasm-opt. What the check CANNOT see is a
 toolchain change (wasm-pack / wasm-opt / rustc upgrade) — after one of those, force
-with `TSV_BUILD_FORCE=1`. The publish path never skips (`publish.ts` sets
-`TSV_BUILD_FORCE=1` around `build:packages`); the `build:npm:*` tasks are
-deliberately unwrapped.
+with `TSV_BUILD_FORCE=1`. The publish path never skips: `build:packages` chains
+only the `build:npm:*` tasks, which are deliberately unwrapped.
 
 ```bash
 # After editing a crate, the fast/correct paths:

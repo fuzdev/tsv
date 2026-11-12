@@ -227,6 +227,11 @@ const git_user_answer = (world: World, args: ReadonlyArray<string>): Answer => {
 
 /** The model's answer to an `npm` call run in `cwd`. */
 const npm_answer = (world: World, args: ReadonlyArray<string>, cwd: string): Answer => {
+	if (args[0] === 'run') {
+		// `build:packages` stages every package; the other scripts are gates that pass
+		if (args[1] === 'build:packages') build_packages(world);
+		return {};
+	}
 	if (args[0] === 'whoami') return { stdout: 'owner\n' };
 	if (args.join(' ') === 'config get dry-run') return { stdout: `${world.npm_dry_run}\n` };
 	if (args[0] === 'view') {
@@ -302,10 +307,6 @@ const answer_of = (
 	if (handle === 'npm') return npm_answer(world, args, cwd);
 	if (handle === 'cargo') {
 		world.files.set('Cargo.lock', `lock ${cargo_version(world)}\n`);
-		return {};
-	}
-	if (handle === 'deno_build') {
-		build_packages(world);
 		return {};
 	}
 	return {};
@@ -403,8 +404,6 @@ const deps_of = (world: World): PublishDeps => ({
 	exists: async (path) => world.exists.has(path),
 	corpora: CORPORA,
 	programs: {
-		deno: fake_program(world, 'deno', 'deno'),
-		deno_build: fake_program(world, 'deno_build', 'deno'),
 		node: fake_program(world, 'node', 'node'),
 		node_test: (pkg_dir) => fake_program(world, `node_test[${pkg_dir}]`, 'node'),
 		npm: fake_program(world, 'npm', 'npm'),
@@ -451,7 +450,7 @@ const nothing_mutated = (calls: Array<string>): boolean =>
 		(c) =>
 			c.startsWith('write ') ||
 			c.startsWith('remove ') ||
-			c.startsWith('deno') ||
+			c.startsWith('npm run run ') ||
 			c.startsWith('cargo') ||
 			c.startsWith('npm run publish') ||
 			/^git_user out (commit|tag)|^git_user run/.test(c)
@@ -482,18 +481,18 @@ const gate_calls = (options: { no_check?: boolean } = {}): Array<string> => [
 	...(options.no_check
 		? []
 		: [
-				`deno run task check ${W}`,
-				`deno run task test:depth:napi ${W}`,
-				`deno run task conformance:all ${W}`,
-				`deno run task audit:corpus ${W}`
+				`npm run run check ${W}`,
+				`npm run run test:depth:napi ${W}`,
+				`npm run run conformance:all ${W}`,
+				`npm run run audit:corpus ${W}`
 			]),
-	`deno_build run task build:packages ${W}`,
-	`deno run task validate:artifacts ${W}`,
+	`npm run run build:packages ${W}`,
+	`npm run run validate:artifacts ${W}`,
 	...DIRS.map((dir) => `node_test[${dir}] run --test scripts/test_npm.ts ${W}`),
-	...(options.no_check ? [] : [`deno run task test:depth:wasm ${W}`]),
-	`deno run task test:bun --require-bun format parse all ${W}`,
+	...(options.no_check ? [] : [`npm run run test:depth:wasm ${W}`]),
+	`npm run run test:bun -- --require-bun format parse all ${W}`,
 	`node run scripts/roots/build_napi_packages.ts --loader-only ${W}`,
-	`deno run task typecheck:packages format parse all napi ${W}`
+	`npm run run typecheck:packages -- format parse all napi ${W}`
 ];
 
 const FINGERPRINT = [
@@ -517,7 +516,7 @@ describe('the dry run', () => {
 			...DIRS.map((dir) => `npm out publish --dry-run --access public @${ROOT}/${dir} inherit`),
 			...GZIP
 		]);
-		ok(nothing_mutated(run.calls.filter((c) => !c.startsWith('deno'))));
+		ok(nothing_mutated(run.calls.filter((c) => !c.startsWith('npm run run '))));
 		strictEqual(world.files.get('Cargo.toml'), cargo_toml('0.8.1'));
 		strictEqual(world.files.get('CHANGELOG.md'), CHANGELOG);
 		strictEqual(world.files.has('.publish-in-progress'), false);
@@ -586,7 +585,7 @@ describe('the dry run', () => {
 				'\n  Dry-run complete for v0.8.1 — a wetrun would FAIL on the warnings above.\n'
 			)
 		);
-		ok(run.calls.includes(`deno run task check ${W}`));
+		ok(run.calls.includes(`npm run run check ${W}`));
 	});
 
 	test('a resume dry run whose packages are all on npm says only git remains, exit 0', async () => {
@@ -598,10 +597,10 @@ describe('the dry run', () => {
 		strictEqual(run.code, 0, run.err);
 		ok(run.out.includes('\n  Every package is already on npm at v0.8.2 — only git remains.'));
 		ok(
-			run.out.endsWith('  Dry-run complete — `deno task publish --wetrun` finishes the release.\n')
+			run.out.endsWith('  Dry-run complete — `npm run release -- --wetrun` finishes the release.\n')
 		);
 		strictEqual(
-			run.calls.some((c) => c.startsWith('deno')),
+			run.calls.some((c) => c.startsWith('npm run run ')),
 			false
 		);
 		strictEqual(
@@ -612,7 +611,7 @@ describe('the dry run', () => {
 
 	test('the checkout moving under the gates warns a dry run', async () => {
 		const world = make_world();
-		world.overrides.set('deno task validate:artifacts', {
+		world.overrides.set('npm run validate:artifacts', {
 			answer: {},
 			sticky: false,
 			then: (w) => w.files.set('Cargo.toml', `${w.files.get('Cargo.toml')}# edited\n`)
@@ -636,7 +635,7 @@ describe('flags', () => {
 		strictEqual(
 			run.err,
 			'FAIL: unknown argument(s): --no-gti\n' +
-				'Usage: deno task publish [--wetrun] [--bump patch|minor|major] [--no-check] [--no-git]'
+				'Usage: npm run release -- [--wetrun] [--bump patch|minor|major] [--no-check] [--no-git]'
 		);
 		deepStrictEqual(run.calls, []);
 	});
@@ -660,7 +659,7 @@ describe('flags', () => {
 		const run = await publish(world, ['--wetrun', '--bump', 'patch', '--no-check']);
 		strictEqual(run.code, 0, run.err);
 		const gates = run.calls.filter(
-			(c) => / run /.test(c) && !c.startsWith('npm') && !c.startsWith('git')
+			(c) => / run /.test(c) && !c.startsWith('npm run publish') && !c.startsWith('git')
 		);
 		deepStrictEqual(
 			gates,
@@ -668,7 +667,7 @@ describe('flags', () => {
 		);
 		ok(run.out.includes('\n=== Step 3: Check — SKIPPED (--no-check) ==='));
 		ok(run.err.includes('  WARN: bun not found; waived by --no-check — Step 6 skips the Bun leg'));
-		ok(run.err.includes('  WARN: skipping deno task test:depth:wasm (--no-check)'));
+		ok(run.err.includes('  WARN: skipping npm run test:depth:wasm (--no-check)'));
 		ok(run.err.includes('\n  ⚠ Step 3b conformance gates did NOT run (--no-check).'));
 		ok(run.err.includes('\n  ⚠ Step 3c corpus robustness audit did NOT run (--no-check).'));
 		ok(
@@ -815,14 +814,14 @@ describe('the preflight', () => {
 				'  WARN: bun not found — Step 6 skips the Bun leg; a --wetrun would FAIL here'
 			)
 		);
-		ok(run.err.includes('  WARN: skipping deno task test:bun — bun not found'));
+		ok(run.err.includes('  WARN: skipping npm run test:bun — bun not found'));
 		strictEqual(
 			run.calls.some((c) => c.includes('test:bun')),
 			false
 		);
 		ok(
 			run.err.endsWith(
-				'    Run `deno task test:bun format parse all` with bun installed for this release.'
+				'    Run `npm run test:bun -- format parse all` with bun installed for this release.'
 			)
 		);
 	});
@@ -874,7 +873,7 @@ describe('the preflight', () => {
 			const run = await publish(world, ['--wetrun', '--bump', 'patch']);
 			strictEqual(run.code, 1, path);
 			strictEqual(
-				run.calls.some((c) => c.startsWith('deno_build')),
+				run.calls.some((c) => c.startsWith(`npm run run build:packages`)),
 				false,
 				path
 			);
@@ -1008,18 +1007,22 @@ describe('the wetrun', () => {
 		strictEqual(world.files.has('.publish-in-progress'), false);
 	});
 
-	test('a missing deno fails Step 3 with 127, naming the resume', async () => {
+	test('a missing npm refuses a wetrun at the preflight, before anything is bumped', async () => {
 		const world = make_world();
-		world.missing.add('deno');
+		world.missing.add('npm');
 		const run = await publish(world, ['--wetrun', '--bump', 'patch']);
 		strictEqual(run.code, 1);
 		ok(
-			run.err.endsWith(
-				'deno: command not found\n\n  FAIL: deno task check (exit code 127)\n' +
-					'  The bump is in place — fix the cause and run `deno task publish --wetrun` to resume.'
+			run.err.includes(
+				'  FAIL: not logged in to npm (run `npm login` first): npm: command not found'
 			),
 			run.err
 		);
+		ok(
+			run.err.endsWith('  Refusing to publish — nothing was changed, built, or published.'),
+			run.err
+		);
+		ok(nothing_mutated(run.calls));
 	});
 
 	test('a missing gzip fails the summary after the release is done', async () => {
@@ -1059,19 +1062,22 @@ describe('a failure at each step, and the resume', () => {
 			'audit:corpus',
 			'validate:artifacts',
 			'test:depth:wasm',
-			'test:bun --require-bun format parse all',
-			'typecheck:packages format parse all napi'
+			'test:bun -- --require-bun format parse all',
+			'typecheck:packages -- format parse all napi'
 		].map((task) => ({
-			at: `deno task ${task}`,
+			at: `npm run ${task}`,
 			fail: (w: World) =>
-				w.overrides.set(`deno task ${task}`, { answer: { code: 1 }, sticky: false }),
-			message: `  FAIL: deno task ${task.split(' ')[0]} (exit code 1)`
+				w.overrides.set(`npm run ${task}`, { answer: { code: 1 }, sticky: false }),
+			message: `  FAIL: npm run ${task.split(' ')[0]} (exit code 1)`
 		})),
 		{
 			at: 'the build',
 			fail: (w) =>
-				w.overrides.set('deno_build task build:packages', { answer: { code: 2 }, sticky: false }),
-			message: '  FAIL: deno task build:packages (exit code 2)'
+				w.overrides.set('npm run build:packages', {
+					answer: { code: 2 },
+					sticky: false
+				}),
+			message: '  FAIL: npm run build:packages (exit code 2)'
 		},
 		{
 			at: 'Step 5',
@@ -1101,7 +1107,7 @@ describe('a failure at each step, and the resume', () => {
 		{
 			at: 'the second fingerprint',
 			fail: (w) =>
-				w.overrides.set('deno task validate:artifacts', {
+				w.overrides.set('npm run validate:artifacts', {
 					answer: {},
 					sticky: false,
 					then: (world) => world.extra_status.push('?? new.txt')
@@ -1181,8 +1187,8 @@ describe('a failure at each step, and the resume', () => {
 			ok(
 				failed.err.includes(
 					git_step
-						? 'The sentinel survives this step, so `deno task publish --wetrun` resumes from here'
-						: 'The bump is in place — fix the cause and run `deno task publish --wetrun` to resume.'
+						? 'The sentinel survives this step, so `npm run release -- --wetrun` resumes from here'
+						: 'The bump is in place — fix the cause and run `npm run release -- --wetrun` to resume.'
 				),
 				failed.err
 			);
@@ -1233,7 +1239,7 @@ describe('a failure at each step, and the resume', () => {
 				// every package was on npm, so the resume went straight to the finalize
 				ok(resumed.out.includes('  Every package is already on npm at v0.8.2 — only git remains.'));
 				strictEqual(
-					resumed.calls.some((c) => c.startsWith('deno')),
+					resumed.calls.some((c) => c.startsWith('npm run run ')),
 					false
 				);
 			}
@@ -1297,7 +1303,7 @@ describe('flags spelled with a value, a suffix, or twice', () => {
 			strictEqual(
 				run.err,
 				`FAIL: unknown argument(s): ${arg}\n` +
-					'Usage: deno task publish [--wetrun] [--bump patch|minor|major] [--no-check] [--no-git]',
+					'Usage: npm run release -- [--wetrun] [--bump patch|minor|major] [--no-check] [--no-git]',
 				arg
 			);
 			deepStrictEqual(run.calls, [], arg);
@@ -1323,7 +1329,7 @@ describe('a resume whose changelog lost its section', () => {
 		ok(
 			run.err.endsWith(
 				'  FAIL: no "## Unreleased" or "## 0.8.1" in CHANGELOG.md\n' +
-					'  The bump is in place — fix the cause and run `deno task publish --wetrun` to resume.'
+					'  The bump is in place — fix the cause and run `npm run release -- --wetrun` to resume.'
 			),
 			run.err
 		);
@@ -1407,7 +1413,7 @@ describe('the registry confirms each publish', () => {
 					'  Nothing was committed, tagged, or pushed. A resume skips it once the registry lists it\n' +
 					'  and publishes it while it is absent (a registry still behind then refuses that second\n' +
 					'  publish, and the run stops here again).\n' +
-					'  The bump is in place — fix the cause and run `deno task publish --wetrun` to resume.'
+					'  The bump is in place — fix the cause and run `npm run release -- --wetrun` to resume.'
 			),
 			failed.err
 		);
@@ -1559,7 +1565,7 @@ describe('the staged manifests', () => {
 			);
 			strictEqual(
 				run.calls.some(
-					(c) => c.startsWith('npm run publish') || c.startsWith('deno run task validate')
+					(c) => c.startsWith('npm run publish') || c.startsWith('npm run run validate')
 				),
 				false
 			);

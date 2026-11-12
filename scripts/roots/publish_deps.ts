@@ -27,14 +27,13 @@ import type { PublishDeps, PublishPrograms } from '../publish.ts';
 /**
  * Each program's environment, decided one by one:
  *
- * - `deno`: the whole environment. A `deno task` gate or build is an arbitrary subtree (cargo,
- *   rustup, node, npm, bun, wasm-pack, the sidecar) that needs the owner's whole development
- *   setup; `deno_build` adds `TSV_BUILD_FORCE=1`.
  * - `node_test` (`node_test_env`): the whole environment, and `PKG_DIR`: the package suites
  *   are a test subtree of the same kind, steered by the owner's variables (`BENCH_STALE_OK`,
  *   `NODE_OPTIONS`).
- * - `npm`: the whole environment: npm's config, auth, and registry come from it and from the
- *   user's npm config.
+ * - `npm`: the whole environment. An `npm run` gate or build is an arbitrary subtree (cargo,
+ *   rustup, node, bun, wasm-pack, `deno` for `check`'s `test:deno`, the sidecar) that needs the
+ *   owner's whole development setup, and npm's config, auth, and registry come from it and from
+ *   the user's npm config.
  * - `git_user`: the whole environment: `fetch`, `ls-remote`, and `push` reach `origin` through
  *   the owner's credentials, SSH agent, askpass, and proxies, and `commit` and `tag` run their
  *   signing and hooks.
@@ -44,8 +43,6 @@ import type { PublishDeps, PublishPrograms } from '../publish.ts';
  *   `bun` (their versions), `gzip`: gro's base environment alone.
  */
 export const PUBLISH_PROGRAM_ENV = {
-	deno: { pass_env: 'all' },
-	deno_build: { pass_env: 'all', env: { TSV_BUILD_FORCE: '1' } },
 	node: {},
 	npm: { pass_env: 'all' },
 	git_local: { pass_env: GIT_LOCAL_PASS_ENV },
@@ -64,7 +61,6 @@ export const node_test_env = (pkg_dir: string): SpawnProgramOptions => ({
 
 /** The name each program is found by on `PATH`. */
 export const PUBLISH_PROGRAM_NAMES = {
-	deno: 'deno',
 	node: 'node',
 	npm: 'npm',
 	git: 'git',
@@ -104,8 +100,6 @@ export const create_publish_deps = (
 ): PublishDeps => {
 	const env = PUBLISH_PROGRAM_ENV;
 	const programs: PublishPrograms = {
-		deno: spawn.find(names.deno, env.deno),
-		deno_build: spawn.find(names.deno, env.deno_build),
 		node: spawn.find(names.node, env.node),
 		node_test: (pkg_dir) => spawn.find(names.node, node_test_env(pkg_dir)),
 		npm: spawn.find(names.npm, env.npm),

@@ -2899,26 +2899,15 @@ try {
 		}
 	});
 
-	/** The logical CPU count both bins size `--jobs` by — Rust's
-	 * `available_parallelism`, the affinity mask capped by the cgroup CPU quota —
-	 * asked of Deno, whose `navigator.hardwareConcurrency` is that count. Node's
-	 * `availableParallelism()` is the mask alone, so inside a `--cpus`-limited
-	 * container it names more CPUs than either bin prints; it stands in only where
-	 * Deno is not on PATH. Memoized: a Deno start per row would cost a few hundred
-	 * milliseconds for one fact. */
-	let logical_cpus_memo: number | undefined;
-	const logical_cpus = (): number => {
-		if (logical_cpus_memo === undefined) {
-			const deno = spawnSync('deno', ['eval', 'console.log(navigator.hardwareConcurrency)'], {
-				encoding: 'utf-8',
-				cwd: tmpdir()
-			});
-			const count = Number(deno.stdout?.trim());
-			logical_cpus_memo =
-				deno.status === 0 && Number.isInteger(count) && count > 0 ? count : availableParallelism();
-		}
-		return logical_cpus_memo;
-	};
+	/** The logical CPU count both bins size `--jobs` by — Rust's `available_parallelism`, the
+	 * affinity mask capped by the cgroup CPU quota in whole cores, floored at one. Node's
+	 * `availableParallelism()` is libuv's count, which applies the same quota (measured on
+	 * Node 24.14 and 26), so it stands for the native count with no second runtime. Where the
+	 * two differ, under a quota below one core on Node 24 (libuv then counts the mask; Node 26
+	 * floors at one, as std does) or on a Node whose libuv ignores the quota, a row graded
+	 * against this fails, its warning naming another ceiling than the one expected; nothing
+	 * falls back. */
+	const logical_cpus = (): number => availableParallelism();
 
 	/** `MAX_WORKERS_PER_LOGICAL_CPU` as cli.js spells it (the row below gates it
 	 * against `cli/stack.rs`). */
@@ -3041,9 +3030,10 @@ try {
 	});
 
 	// Under a cgroup CPU quota the ceiling follows the quota, as the native CLI's
-	// `available_parallelism` does: a 200% quota is two cores. Node's
-	// `availableParallelism()` ignores the quota, so this pins that cli.js applies it
-	// itself (`cgroup_cpu_quota`). Imposing a quota takes a user systemd instance,
+	// `available_parallelism` does: a 200% quota is two cores. On the Nodes measured,
+	// `availableParallelism()` applies the quota too, so cli.js's own read
+	// (`cgroup_cpu_quota`) is what a runtime whose count ignores it relies on; this row
+	// grades the ceiling under the quota either way. Imposing a quota takes a user systemd instance,
 	// which CI runners lack — the row skips there and runs on a developer machine.
 	it(
 		'format --jobs ceiling follows a cgroup CPU quota',

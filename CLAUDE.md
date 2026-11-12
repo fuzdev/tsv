@@ -60,7 +60,7 @@ cargo check --workspace                # fast check (no codegen)
 deno task fixtures:validate <pattern>  # targeted fixture validation (preferred for fixture work)
 deno task dev                          # watch: check + test on change (requires `cargo install cargo-watch`)
 cargo test --workspace                 # ALL tests (includes all fixtures)
-deno task check                        # full committed-tree gate: fmt, audits, typecheck, tests, clippy (benches/js/CLAUDE.md §Gate map)
+npm run check                          # full committed-tree gate: fmt, audits, typecheck, tests, clippy (benches/js/CLAUDE.md §Gate map)
 cargo run -p tsv_debug compare tests/fixtures/path/input.svelte  # diff with prettier
 cargo run -p tsv_debug ast_diff tests/fixtures/path/input.svelte # verify AST equivalence
 ```
@@ -69,7 +69,7 @@ cargo run -p tsv_debug ast_diff tests/fixtures/path/input.svelte # verify AST eq
 
 ## Commands
 
-Tasks live in `deno.json` (the ones that run Deno, `deno task <name> <flags>`, and `publish`, kept there so no npm lifecycle can start it: ./docs/tasks.md §`publish`) and `package.json` (the rest, `npm run <name> -- <flags>`); `deno task` falls through to the `package.json` script when `deno.json` has no task of that name, so `deno task <name>` runs either. `npm ci` installs the JS dependencies `package-lock.json` pins into the root `node_modules`; `.npmrc` turns install scripts off. `npm ci --prefix crates/tsv_debug/sidecar` installs the fixture oracle `tsv_debug`'s sidecar runs (its own `package.json`, lock, and a copy of the root `.npmrc`, which a `--prefix` install doesn't read); `cargo test` needs it. The rationale for a `package.json` script lives in ./docs/tasks.md, keyed by name; a `deno.json` task's sits beside it as its `//<name>` key.
+Tasks live in `package.json` (every task whose body runs no Deno itself, `npm run <name> -- <flags>`, chained with `npm run`) and `deno.json` (the few whose body runs Deno: the bench's Deno row, `typecheck:js:deno`, `test:deno`, `perf:ab`, `branch:report`, `deno task <name> <flags>`); a script reaches one of those as a `deno task <name>` leg (`check` runs `test:deno` that way). `deno task` falls through to the `package.json` script when `deno.json` has no task of that name, so `deno task <name>` runs either. The release driver is `npm run release`, a name no npm command runs on its own (./docs/tasks.md §`release`). `npm ci` installs the JS dependencies `package-lock.json` pins into the root `node_modules`; `.npmrc` turns install scripts off. `npm ci --prefix crates/tsv_debug/sidecar` installs the fixture oracle `tsv_debug`'s sidecar runs (its own `package.json`, lock, and a copy of the root `.npmrc`, which a `--prefix` install doesn't read); `cargo test` needs it. The rationale for a `package.json` script lives in ./docs/tasks.md, keyed by name; a `deno.json` task's sits beside it as its `//<name>` key.
 
 ### Build & Development
 
@@ -77,7 +77,7 @@ Tasks live in `deno.json` (the ones that run Deno, `deno task <name> <flags>`, a
 deno task build            # workspace dev build
 deno task build:release    # optimized build minus the binding crates (each builds alone so tsv_cli/tsv_debug features don't unify into them)
 deno task build:all        # release + ffi + build:packages + build:napi:packages (everything)
-deno task build:packages   # the 6 WASM bundles: 3 publishable npm packages + their 3 deno bundles (benches); single source of truth for CI + publish.ts
+npm run build:packages     # the 3 publishable npm packages (format, parse, all); single source of truth for CI + publish.ts
 deno task build:bench      # what `bench`/`smoke` measure and EVERY bench leg builds (build:bench:pgo + the plain ffi:format/:parse size builds + 3 wasm:deno variants + wasm:all:nodejs)
 deno task build:bench:pgo  # the PROFILE-GUIDED FFI library + N-API addon every native bench row loads, staged with a stamp in
 #                            .pgo/bench/ (scripts/roots/pgo_bench.ts → pgo.ts all --ffi --reuse: a stamp-hit takes seconds, a miss minutes)
@@ -112,31 +112,32 @@ cargo run -p tsv_cli strip --check --content 'enum E {}'                 # exit 
 
 ### Testing & Code Quality
 
-"In `check`" = gates in `deno task check`. A task that needs `deno task bench:install` (the bench's node_modules — CI installs none) can't gate there.
+"In `check`" = gates in `npm run check`. A task that needs `deno task bench:install` (the bench's node_modules — CI installs none) can't gate there.
 
 ```bash
-deno task check          # full committed-tree gate (benches/js/CLAUDE.md §Gate map)
+npm run check            # full committed-tree gate (benches/js/CLAUDE.md §Gate map); its one Deno task is test:deno
+#                          (cargo's `test` also runs one test with the `deno` on `PATH`)
 deno task doctor         # one-pass setup check: runtimes, pins + checkout alignment, the sidecar install, node_modules
 #                          freshness, oracle checkouts, corpus, build artifacts. Exit 1 only on MISLEADING state (pin
-#                          drift, skew, stale deps) or a broken core (no deno, cargo, or node, a node below the engines floor, or no sidecar install); absences warn (--strict promotes them) — except the optional experimental-typechecker
+#                          drift, skew, stale deps) or a broken core (no deno, npm, cargo, or node, a node below the engines floor, or no sidecar install); absences warn (--strict promotes them) — except the optional experimental-typechecker
 #                          tier, informational at any strictness (a BROKEN checkout there still warns)
 deno task typecheck      # cargo check
 deno task typecheck:features # cargo check of each binding crate (tsv_wasm/tsv_ffi/tsv_napi) under each single feature,
 #                          then the three language crates without the `locations` feature tsv_cli/tsv_debug unify in —
 #                          per-package builds `cargo check --workspace` and clippy's `--all-features` both miss; then
 #                          `tsv_svelte` with `smallvec/union` (a feature a consumer's graph can turn on; lib only); in `check`
-deno task typecheck:js   # deno check over the bench harness + scripts/. NOT in `check` (node_modules); the sidecar is in typecheck:scripts' tsc
+npm run typecheck:js     # tsc over the bench's Node roots, typecheck:deno, then typecheck:js:deno (deno check over the bench harness + scripts/). NOT in `check` (node_modules)
+deno task typecheck:deno # deno check of the bench's Deno row's own files (lib/ffi.ts, scripts/pgo/ffi_ops.ts); NOT in `check`: bench:deno and typecheck:js run it
 deno task typecheck:packages # the STAGED npm packages' .d.ts as a consumer compiles them: lean consumer modules + every
 #                          ts/js README block (checkJs) through the `exports` map (strict, nodenext + bundler; wasm
 #                          packages with the DOM lib, the napi loader and every `./locations` without). Args pick
 #                          packages (format/parse/all/napi; none = every staged one). NOT in `check` (node_modules);
 #                          publish.ts Step 6 stages the napi loader and runs it over all four (docs/audits.md)
-deno task typecheck:scripts # scripts/ by the checker of the runtime each script runs on, so in `check` (nothing else
-#                          typechecks the release scripts): `tsc -p tsconfig.scripts.json` over the Node roots under
-#                          `scripts/roots/`, the PGO pipeline and its drivers, the bench roots needing no bench package
-#                          (`benches/js/roots/{divergence_audit,corpus_stats,compose_reports}.ts`), and what they import (Node's types, no
-#                          `Deno`), then deno check over the rest
-#                          of scripts/, node-modules-free; that walk excludes the Node scripts (deno.json `exclude`)
+npm run typecheck:scripts # `tsc -p tsconfig.scripts.json`, so in `check` (nothing else typechecks the release scripts):
+#                          the Node roots under `scripts/roots/`, the PGO pipeline and its drivers, the package suites
+#                          and `depth_wasm.ts`, the bench roots needing no bench package, the sidecar, and what they
+#                          import (Node's types, no `Deno`); `scripts/no_package_closure_test.ts` holds the scripts CI
+#                          runs with no install to no package import
 deno task typecheck:bench-core # `tsc -p tsconfig.bench_core.json` over the package-free bench modules nothing else in
 #                          `check` typechecks (`lib/{wasm,harvest_stamp,loc_wire_client,fixture_documents,error_text,loc_cross_grade}.ts` +
 #                          `compose_reports.ts`, and the modules the `test:node` suites test); `scripts/no_package_closure_test.ts`
@@ -461,16 +462,16 @@ Version source of truth: `Cargo.toml` `[workspace.package] version` (read direct
 
 Package shape: wasm-pack `web` target, then `scripts/patch_npm_package.ts` adds a Node/Bun entry (sync auto-init), a browser entry (guarded `await init()`), `index.d.ts`, conditional `exports`, npm metadata, and the variant README. Every entry publishes through one hand-written facade shared with the native `@fuzdev/tsv` (`crates/tsv_wasm/npm/api.js` + `api_parse.js` + `api_strip.js`: the `(source, options?)` bags, their errors, `{locations: true}` over the span-only wire, and the `{ok, …}` result every export returns — ./crates/tsv_wasm/CLAUDE.md §The npm Facade). The export list is extracted from the generated JS, so new `lang_bindings!` languages flow through automatically.
 
-`scripts/publish.ts` orchestrates the release: preflight → bump → check → conformance:all → audit:corpus (Step 3c) → build npm packages + deno bundles → verify → artifact validation (size bounds + NOTICE + Node tests + `test:bun` over the three wasm packages + `typecheck:packages` over all four npm packages, the napi loader staged) → idempotent npm publish, each version confirmed on the registry before git → git commit + tag + push, printing a wasm size summary. It stamps CHANGELOG.md's `## Unreleased` into the released version (which the tag's GitHub Release reads back); that section must be non-empty with a `<!-- bump: <level> -->` marker matching `--bump` (both required; a fresh empty `## Unreleased` is seeded on stamp; shared grammar: `scripts/release/changelog.ts`; agents never edit it — [Releases](#releases)). A failed wetrun resumes at **every** step, git finalize included — the retry sentinel is removed only once the push lands, so re-run `--wetrun` with no `--bump`: nothing publishes twice and the tag finishes. It runs under Node on gro's host modules: its entry is `scripts/roots/publish.ts`, whose deps (`scripts/roots/publish_deps.ts`) give each program its own environment, the `deno task` gates, `npm`, and the `git` that reaches origin or writes history the whole one (docs/tasks.md §`publish`). The release logic is a library under `scripts/release/` (version, changelog, plan, bump, git, npm, sentinel, program, crates, binstall; unit-tested in `test:node`, the whole dry run and `--wetrun` of `run_publish` over fakes, the bump over copies of the real manifests, the local git calls in a temp repository): one `release_plan` decides fresh vs resumed and every reason a fresh release cannot proceed, so a dry run warns on exactly what a wetrun refuses. The preflight refuses a `HEAD` that is not exactly `origin/main` (a resume may sit one release commit ahead) and a `v<version>` tag that already exists locally or on origin (a resume's only on `HEAD`), the checkout is fingerprinted after the bump and refused if it moved before Step 7, and a resume whose packages are all on npm skips straight to the git finalize.
+`scripts/publish.ts` orchestrates the release: preflight → bump → check → conformance:all → audit:corpus (Step 3c) → build the npm packages → verify → artifact validation (size bounds + NOTICE + Node tests + `test:bun` over the three wasm packages + `typecheck:packages` over all four npm packages, the napi loader staged) → idempotent npm publish, each version confirmed on the registry before git → git commit + tag + push, printing a wasm size summary. It stamps CHANGELOG.md's `## Unreleased` into the released version (which the tag's GitHub Release reads back); that section must be non-empty with a `<!-- bump: <level> -->` marker matching `--bump` (both required; a fresh empty `## Unreleased` is seeded on stamp; shared grammar: `scripts/release/changelog.ts`; agents never edit it — [Releases](#releases)). A failed wetrun resumes at **every** step, git finalize included — the retry sentinel is removed only once the push lands, so re-run `--wetrun` with no `--bump`: nothing publishes twice and the tag finishes. It runs under Node on gro's host modules: its entry is `scripts/roots/publish.ts`, whose deps (`scripts/roots/publish_deps.ts`) give each program its own environment, `npm` (the `npm run` gates and builds, and its own config and auth) and the `git` that reaches origin or writes history the whole one (docs/tasks.md §`release`). The release logic is a library under `scripts/release/` (version, changelog, plan, bump, git, npm, sentinel, program, crates, binstall; unit-tested in `test:node`, the whole dry run and `--wetrun` of `run_publish` over fakes, the bump over copies of the real manifests, the local git calls in a temp repository): one `release_plan` decides fresh vs resumed and every reason a fresh release cannot proceed, so a dry run warns on exactly what a wetrun refuses. The preflight refuses a `HEAD` that is not exactly `origin/main` (a resume may sit one release commit ahead) and a `v<version>` tag that already exists locally or on origin (a resume's only on `HEAD`), the checkout is fingerprinted after the bump and refused if it moved before Step 7, and a resume whose packages are all on npm skips straight to the git finalize.
 
-**Conformance gates (Step 3b)** — `deno task conformance:all` (see [Corpus Comparison](#corpus-comparison)); skipped by `--no-check`. Preflights the oracles (`../svelte`, `../acorn-typescript`, `../typescript`, `../test262`, `../prettier`, `../prettier-plugin-svelte`, the `../corpora` snapshot + the `benches/js` `node_modules` sidecar): a **`--wetrun` FAILS** when any is missing (releasing without gates requires the explicit `--no-check`); a dry-run warn-skips, re-warned in the final summary. `deno task doctor` checks the same ahead of time. Only the CSS-WPT harvest stays manual. A `corpus:compare:format` SAFETY hit is self-verified in-run (the native format re-runs and must reproduce byte-identically), so treat it as real; binding nondeterminism surfaces as a loud `native format nondeterminism` per-file error instead (./benches/js/CLAUDE.md §Known Issues). A caught **panic** hard-fails either corpus tool on every run — a shipped artifact would abort the host, so it must never grade as one more per-file error.
+**Conformance gates (Step 3b)** — `npm run conformance:all` (see [Corpus Comparison](#corpus-comparison)); skipped by `--no-check`. Preflights the oracles (`../svelte`, `../acorn-typescript`, `../typescript`, `../test262`, `../prettier`, `../prettier-plugin-svelte`, the `../corpora` snapshot + the `benches/js` `node_modules` sidecar): a **`--wetrun` FAILS** when any is missing (releasing without gates requires the explicit `--no-check`); a dry-run warn-skips, re-warned in the final summary. `deno task doctor` checks the same ahead of time. Only the CSS-WPT harvest stays manual. A `corpus:compare:format` SAFETY hit is self-verified in-run (the native format re-runs and must reproduce byte-identically), so treat it as real; binding nondeterminism surfaces as a loud `native format nondeterminism` per-file error instead (./benches/js/CLAUDE.md §Known Issues). A caught **panic** hard-fails either corpus tool on every run — a shipped artifact would abort the host, so it must never grade as one more per-file error.
 
-**Bun (Step 6)** — `deno task test:bun format parse all` (the only leg grading the engines' returned failures under Bun) over the three wasm packages. Bun is preflighted in Step 1 like Step 3b's oracles: a **`--wetrun` FAILS** without bun, before the bump (`--no-check` waives); with bun the leg runs `--require-bun`; without, a dry-run (or waived wetrun) warn-skips, re-warned in the summary. `deno task doctor` reports bun. The napi engine under Bun is graded only locally (`test:napi:npm[:run]` on a machine with bun), never by a publish.
+**Bun (Step 6)** — `npm run test:bun -- format parse all` (the only leg grading the engines' returned failures under Bun) over the three wasm packages. Bun is preflighted in Step 1 like Step 3b's oracles: a **`--wetrun` FAILS** without bun, before the bump (`--no-check` waives); with bun the leg runs `--require-bun`; without, a dry-run (or waived wetrun) warn-skips, re-warned in the summary. `deno task doctor` reports bun. The napi engine under Bun is graded only locally (`test:napi:npm[:run]` on a machine with bun), never by a publish.
 
 ```bash
-deno task publish                        # dry-run: validate everything, no mutation
-deno task publish --wetrun --bump patch  # release (--bump required, must match the CHANGELOG marker)
-deno task publish --wetrun               # resume a failed wetrun (sentinel retry only)
+npm run release                          # dry-run: validate everything, no mutation
+npm run release -- --wetrun --bump patch # release (--bump required, must match the CHANGELOG marker); flags after the --
+npm run release -- --wetrun              # resume a failed wetrun (sentinel retry only)
 # Flags: --bump patch|minor|major, --no-check, --no-git
 deno task test:npm[:parse|:all]          # build the npm package + Node tests against it (:all adds CLI tests; `:run` skips the rebuild — freshness-guarded)
 deno task test:napi:npm                  # stage the napi loader + host platform package + Node tests on the packaged shape (`:run` as above)
@@ -557,7 +558,7 @@ deno task bench         # full refresh = bench:perf + bench:conformance + a clos
 deno task bench:perf    # perf surface: build the whole artifact set ONCE, then the three :run legs + compose
 deno task bench:deno    # Deno only (also bench:node / bench:bun). Each standalone leg builds the WHOLE artifact set:
 #                         every report carries the same tsv size rows, so a half-built leg would publish the other
-#                         binding's size at an older commit (deno.json `//bench:deno`; a `:run` leg warns). Warm ≈ a second
+#                         binding's size at an older commit (docs/tasks.md §`bench:deno`; a `:run` leg warns). Warm ≈ a second
 deno task bench:compose # fold per-runtime reports → combined report.{json,md}; warns when the conformance report's commit
 #                         is behind the perf siblings' (the site publishes both)
 deno task bench:deno:run   # run without rebuilding (also :node:run / :bun:run; aborts on stale artifacts)

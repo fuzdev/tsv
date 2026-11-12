@@ -27,9 +27,9 @@
  * identical sources — so after a toolchain update run once with
  * `TSV_BUILD_FORCE=1` (same blind spot as the harvest stamps' `--force`).
  *
- * The publish path must never skip: `scripts/publish.ts` sets
- * `TSV_BUILD_FORCE=1` around its `build:packages` step, so released bundles
- * are always freshly built regardless of mtimes.
+ * The published packages never pass through it: `build:packages` chains the
+ * `build:npm:*` scripts, plain wasm-pack builds, so released bundles are always
+ * freshly built regardless of mtimes.
  *
  * Usage:
  *   node scripts/roots/run_if_stale.ts --target <artifact-path> -- <command> [args...]

@@ -5,8 +5,8 @@
  * A named exception to the host-module rule: this entry and everything it imports use Node's
  * own `node:*` modules and no package, because the release workflow's `publish` job runs it
  * holding the npm token and `id-token: write`, and so installs nothing (docs/tasks.md
- * §`publish:napi`). The root config's Deno walk (`typecheck:scripts`) checks this module with
- * no `node_modules` in view, so a package import here or beneath it fails `check`.
+ * §`publish:napi`). `scripts/no_package_closure_test.ts` (in `test:node`) holds this module and
+ * everything beneath it to no package import.
  *
  * The checkout is this module's own location, never the working directory. It reads the staged
  * packages under `crates/tsv_napi/pkg/`, at directories named by the loader's

@@ -7,9 +7,8 @@
  * installed: on Windows and macOS (the `platforms` job's `test:napi:npm`), in the `artifacts`
  * job, on every release build row, `win32-x64` included (through `scripts/pgo/pgo.ts stage`),
  * and in the release `publish` job (`--loader-only`), which holds the npm credentials and so
- * installs nothing (docs/tasks.md §`build:napi:packages`). The root config's Deno walk
- * (`typecheck:scripts`) checks this module with no `node_modules` in view, so a package
- * import here or beneath it fails `check`.
+ * installs nothing (docs/tasks.md §`build:napi:packages`). `scripts/no_package_closure_test.ts` (in
+ * `test:node`) holds this module and everything beneath it to no package import.
  *
  * The checkout is this module's own location, never the working directory. Each staged copy
  * is `copyFile` (the source's mode kept) then `utimes`; the CLI binary's mode is `chmod`, which

@@ -354,21 +354,21 @@ const CASES: Case[] = [
 		name: 'deno absent',
 		change: (w) => void (w.programs.deno = null),
 		mark: '✗',
-		line: "deno missing — `deno task` runs the deno.json tasks (`check` among them), and the bench's Deno row (bench:deno) runs on it",
+		line: "deno missing — check's test:deno leg runs on it (the suites still on `deno test`), as do the bench's Deno row (bench:deno), typecheck:js, perf:ab, and branch:report",
 		code: 1
 	},
 	{
 		name: 'deno exiting non-zero',
 		change: (w) => void (w.programs.deno = { '--version': exited('deno 2.9.7\n', 1) }),
 		mark: '✗',
-		line: "deno missing — `deno task` runs the deno.json tasks (`check` among them), and the bench's Deno row (bench:deno) runs on it",
+		line: "deno missing — check's test:deno leg runs on it (the suites still on `deno test`), as do the bench's Deno row (bench:deno), typecheck:js, perf:ab, and branch:report",
 		code: 1
 	},
 	{
 		name: 'deno failing to start',
 		change: (w) => void (w.programs.deno = { '--version': new Error('launch_failed') }),
 		mark: '✗',
-		line: "deno missing — `deno task` runs the deno.json tasks (`check` among them), and the bench's Deno row (bench:deno) runs on it",
+		line: "deno missing — check's test:deno leg runs on it (the suites still on `deno test`), as do the bench's Deno row (bench:deno), typecheck:js, perf:ab, and branch:report",
 		code: 1
 	},
 	{
@@ -588,9 +588,9 @@ const CASES: Case[] = [
 	{
 		name: 'npm absent',
 		change: (w) => void (w.programs.npm = null),
-		mark: '⚠',
-		line: 'npm missing — deno task bench:install unavailable',
-		code: 0
+		mark: '✗',
+		line: 'npm missing — `npm run` runs the package.json scripts (`check` among them) and bench:install',
+		code: 1
 	},
 	// canonical pins
 	{
@@ -1091,7 +1091,7 @@ describe('the verdict', () => {
 	test('warnings alone pass, counted', async () => {
 		const world = healthy();
 		world.programs.bun = null;
-		world.programs.npm = null;
+		world.programs.wasm_pack = null;
 		const r = await run(world);
 		strictEqual(r.code, 0);
 		strictEqual(
@@ -1140,7 +1140,7 @@ describe('the verdict', () => {
 		strictEqual(r.code, 1);
 		strictEqual(
 			verdict(r),
-			'✗ doctor: 4 error(s), 4 warning(s) — the ✗ items above would mislead a run; fix them first.'
+			'✗ doctor: 5 error(s), 3 warning(s) — the ✗ items above would mislead a run; fix them first.'
 		);
 	});
 });

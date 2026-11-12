@@ -6,7 +6,7 @@
  * version skew vs the npm pins), the corpus entry lists, and which build artifacts exist.
  *
  * Exit semantics: exit 1 only for states that would MISLEAD a run or break the core toolchain
- * (canonical pin drift, checkout↔pin skew, stale node_modules, missing deno, cargo, or node, a
+ * (canonical pin drift, checkout↔pin skew, stale node_modules, missing deno, npm, cargo, or node, a
  * node below the engines floor the scripts and the sidecar state, or a missing sidecar install)
  * — mere absences (a checkout not cloned, an artifact not built) are ⚠ warnings: they fail loud
  * on their own at use time, and plenty of workflows don't need them. So a green doctor means
@@ -381,12 +381,13 @@ export const run_doctor = async (
 	// --- Runtimes -----------------------------------------------------------------
 
 	section('Runtimes');
-	// the `deno` on `PATH`: the one `deno task` and the bench's Deno row run
+	// the `deno` on `PATH`: the one `deno task` runs the deno.json tasks with, `check`'s
+	// `test:deno` among them, so a missing one still fails `check`
 	const deno_line = await run_version(programs.deno);
 	if (deno_line === null) {
 		fail(
-			'deno missing — `deno task` runs the deno.json tasks (`check` among them), and the ' +
-				"bench's Deno row (bench:deno) runs on it"
+			"deno missing — check's test:deno leg runs on it (the suites still on `deno test`), as do " +
+				"the bench's Deno row (bench:deno), typecheck:js, perf:ab, and branch:report"
 		);
 	} else {
 		const deno_version = /^deno (\d+\.\d+\.\d+\S*)/.exec(deno_line)?.[1];
@@ -446,8 +447,11 @@ export const run_doctor = async (
 	} else ok(`${wasm_pack_version} (matches pin)`);
 
 	const npm_version = await run_version(programs.npm);
-	if (npm_version === null) warn('npm missing — deno task bench:install unavailable');
-	else ok(`npm ${npm_version}`);
+	if (npm_version === null) {
+		fail(
+			'npm missing — `npm run` runs the package.json scripts (`check` among them) and bench:install'
+		);
+	} else ok(`npm ${npm_version}`);
 
 	// --- Canonical pins -----------------------------------------------------------
 

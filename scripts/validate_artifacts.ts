@@ -7,8 +7,7 @@
  * 100 KB regression (or win) should be visible, not absorbed by slack.
  *
  * It grades files, never runs one: what the packages do when loaded is the package suites'
- * (`scripts/test_npm.ts` under Node, `scripts/test_bun.ts` under Bun). The `deno` bundles it
- * sizes are the bench's Deno row's, sized beside the npm packages they share a `.wasm` with.
+ * (`scripts/test_npm.ts` under Node, `scripts/test_bun.ts` under Bun).
  *
  * Only validates artifacts that exist (skips unbuilt targets), but fails
  * if nothing was found at all — and refuses to grade a STALE one, since a
@@ -36,7 +35,6 @@ import { fileURLToPath } from 'node:url';
 
 import type { FsReadDir } from '@fuzdev/gro/fs.ts';
 
-import { CORE_CRATES, WASM_CRATES } from '../benches/js/lib/crate_lists.ts';
 import {
 	wasm_bundle_dir,
 	wasm_bundle_path,
@@ -64,21 +62,19 @@ export interface ValidateArtifactsDeps {
 // --- WASM binary size checks ---
 
 // The bundle LAYOUT is `lib/tsv_artifacts.ts`'s (`wasm_bundle_dir` /
-// `wasm_bundle_path`); what varies here is the two axes this script walks. `npm` is
-// a staging directory rather than a wasm-pack target, but it holds the same two
-// files at the same place — `patch_npm_package.ts` copies the bundle in beside the
-// entry it adds — so it rides the same builder rather than a second spelling.
+// `wasm_bundle_path`); what varies here is the variant. `npm` is a staging directory
+// rather than a wasm-pack target, but it holds the same two files at the same place —
+// `patch_npm_package.ts` copies the bundle in beside the entry it adds — so it rides the
+// same builder rather than a second spelling.
 const VARIANTS = ['format', 'parse', 'all'] as const satisfies readonly WasmVariant[];
-const TARGETS = ['npm', 'deno'] as const;
 
 /** The handle takes checkout-relative paths; the LAYOUT still comes from
  * `tsv_artifacts.ts`, so a move stays a one-place edit. */
 const repo_rel = (absolute: string): string =>
 	relative(fileURLToPath(new URL('..', import.meta.url)), absolute);
 
-/** A variant's bundle for a target, checkout-relative. */
-const bundle_path = (variant: WasmVariant, target: string): string =>
-	repo_rel(wasm_bundle_path(variant, target));
+/** A variant's npm bundle, checkout-relative. */
+const bundle_path = (variant: WasmVariant): string => repo_rel(wasm_bundle_path(variant, 'npm'));
 
 /** A variant's npm staging manifest, checkout-relative. */
 const npm_manifest = (variant: WasmVariant): string =>
@@ -95,43 +91,18 @@ const npm_staged_files = (variant: WasmVariant): Array<string> => [
 	`${repo_rel(wasm_bundle_dir(variant, 'npm'))}/worker.js`
 ];
 
-const REBUILD_TASKS = {
-	// the format variant is the unqualified one (`deno task build:wasm:deno`)
-	deno: { format: 'build:wasm:deno', parse: 'build:wasm:parse:deno', all: 'build:wasm:all:deno' }
-} as const;
-
 /**
- * The freshness checks over what is built: a deno bundle is a wasm-pack output and nothing
- * more; an npm staging is graded by the one list every reader of a staged package shares.
- * Existence-gated like every check below, so an unbuilt variant is skipped, not failed.
+ * The freshness checks over the npm stagings `built` names: the one list every reader of a
+ * staged package shares. Existence-gated like every check below, so an unbuilt variant is
+ * skipped, not failed.
  */
-export function artifact_freshness_checks(built: {
-	deno: ReadonlySet<WasmVariant>;
-	npm: ReadonlySet<WasmVariant>;
-}): Array<StagedCheck> {
-	const checks: Array<StagedCheck> = [];
-	for (const variant of VARIANTS) {
-		if (built.deno.has(variant)) {
-			checks.push({
-				label: `${variant}/deno WASM bundle`,
-				staged: bundle_path(variant, 'deno'),
-				crates: [...CORE_CRATES, ...WASM_CRATES],
-				// `package.json` because the wasm-pack invocation lives there: which
-				// FEATURES a variant is built with is a task string, so editing one
-				// changes the bundle from unchanged crate sources. `run_if_stale.ts`
-				// — the build-side guard over this same artifact, off the same two
-				// crate lists — names it for that reason, and the two sides are
-				// supposed to agree on what feeds a bundle.
-				files: ['package.json'],
-				rebuild: `deno task ${REBUILD_TASKS.deno[variant]}`
-			});
-		}
-		if (built.npm.has(variant)) checks.push(...wasm_package_checks(variant));
-	}
-	return checks;
+export function artifact_freshness_checks(built: ReadonlySet<WasmVariant>): Array<StagedCheck> {
+	return VARIANTS.filter((variant) => built.has(variant)).flatMap((variant) =>
+		wasm_package_checks(variant)
+	);
 }
 
-// Centers (deno target; npm == deno, identical `.wasm`): format 2,720,874 B, parse
+// Centers (the npm staging's `.wasm`): format 2,720,874 B, parse
 // 1,073,871 B and all 3,048,129 B, measured on one tree 2026-11-03; all carries the type
 // strip and the import records (the `strip` and `imports` features, which the umbrella alone
 // builds). Bounds are ±8% of each. The import records are about 10 KB of `all`, and no
@@ -223,15 +194,14 @@ export async function run_validate_artifacts(deps: ValidateArtifactsDeps): Promi
 	// `BENCH_STALE_OK=1` downgrades staleness to a warning, the one knob every mtime guard
 	// in the repo shares.
 	//
-	// A deno bundle counts as built once its `.wasm` is there, an npm staging once any file a
-	// staging step writes is (`npm_staged_files`), so a staging holding some without the rest
-	// fails rather than being skipped as unbuilt.
-	const built = { deno: new Set<WasmVariant>(), npm: new Set<WasmVariant>() };
+	// An npm staging counts as built once any file a staging step writes is there
+	// (`npm_staged_files`), so a staging holding some without the rest fails rather than being
+	// skipped as unbuilt.
+	const built = new Set<WasmVariant>();
 	for (const variant of VARIANTS) {
-		if ((await file_size(bundle_path(variant, 'deno'))) !== null) built.deno.add(variant);
 		for (const path of npm_staged_files(variant)) {
 			if ((await file_size(path)) !== null) {
-				built.npm.add(variant);
+				built.add(variant);
 				break;
 			}
 		}
@@ -247,58 +217,52 @@ export async function run_validate_artifacts(deps: ValidateArtifactsDeps): Promi
 
 	print('=== WASM binary sizes ===');
 
-	const sizes: Partial<Record<`${(typeof VARIANTS)[number]}/${(typeof TARGETS)[number]}`, number>> =
-		{};
+	const sizes: Partial<Record<WasmVariant, number>> = {};
 
-	for (const target of TARGETS) {
-		for (const variant of VARIANTS) {
-			const label = `${variant}/${target}` as const;
-			const size = await file_size(bundle_path(variant, target));
-			if (size === null) {
-				skip(`${label} — not built`);
-				continue;
-			}
-			sizes[label] = size;
-			const { min, max } = BOUNDS[variant];
-			if (size < min) {
-				fail(
-					`${label}: ${format_size(size)} (${size} B) < min ${format_size(min)} — suspiciously small`
-				);
-			} else if (size > max) {
-				fail(
-					`${label}: ${format_size(size)} (${size} B) > max ${format_size(max)} — size regression`
-				);
-			} else {
-				pass(`${label}: ${format_size(size)} (${size} B)`);
-			}
+	for (const variant of VARIANTS) {
+		const label = `${variant}/npm`;
+		const size = await file_size(bundle_path(variant));
+		if (size === null) {
+			skip(`${label} — not built`);
+			continue;
+		}
+		sizes[variant] = size;
+		const { min, max } = BOUNDS[variant];
+		if (size < min) {
+			fail(
+				`${label}: ${format_size(size)} (${size} B) < min ${format_size(min)} — suspiciously small`
+			);
+		} else if (size > max) {
+			fail(
+				`${label}: ${format_size(size)} (${size} B) > max ${format_size(max)} — size regression`
+			);
+		} else {
+			pass(`${label}: ${format_size(size)} (${size} B)`);
 		}
 	}
 
-	// Relative invariants per target: `all` is the superset build, so each
-	// subset must sit a stable margin below it.
-	for (const target of TARGETS) {
-		const all_bytes = sizes[`all/${target}`];
-		if (all_bytes === undefined) continue;
-		for (const variant of ['format', 'parse'] as const) {
-			const subset_bytes = sizes[`${variant}/${target}`];
-			if (subset_bytes === undefined) continue;
-			const { min, max } = DELTAS[variant];
-			const delta = all_bytes - subset_bytes;
-			if (delta < min) {
-				fail(
-					`all - ${variant} (${target}) = ${format_size(delta)} — expected ≥${format_size(
-						min
-					)} (feature gate broken?)`
-				);
-			} else if (delta > max) {
-				fail(
-					`all - ${variant} (${target}) = ${format_size(delta)} — expected ≤${format_size(
-						max
-					)} (unexpected bloat)`
-				);
-			} else {
-				pass(`all - ${variant} (${target}) = ${format_size(delta)}`);
-			}
+	// Relative invariants: `all` is the superset build, so each subset must sit a stable
+	// margin below it.
+	const all_bytes = sizes.all;
+	for (const variant of ['format', 'parse'] as const) {
+		const subset_bytes = sizes[variant];
+		if (all_bytes === undefined || subset_bytes === undefined) continue;
+		const { min, max } = DELTAS[variant];
+		const delta = all_bytes - subset_bytes;
+		if (delta < min) {
+			fail(
+				`all - ${variant} (npm) = ${format_size(delta)} — expected ≥${format_size(
+					min
+				)} (feature gate broken?)`
+			);
+		} else if (delta > max) {
+			fail(
+				`all - ${variant} (npm) = ${format_size(delta)} — expected ≤${format_size(
+					max
+				)} (unexpected bloat)`
+			);
+		} else {
+			pass(`all - ${variant} (npm) = ${format_size(delta)}`);
 		}
 	}
 
@@ -314,7 +278,7 @@ export async function run_validate_artifacts(deps: ValidateArtifactsDeps): Promi
 	for (const variant of VARIANTS) {
 		const dir = repo_rel(wasm_bundle_dir(variant, 'npm'));
 		const label = `${variant}/npm`;
-		if (!built.npm.has(variant)) {
+		if (!built.has(variant)) {
 			skip(`${label} NOTICE — not built`);
 			continue;
 		}
@@ -340,7 +304,7 @@ export async function run_validate_artifacts(deps: ValidateArtifactsDeps): Promi
 	if (failed > 0) return 1;
 	if (passed === 0) {
 		deps.print_error(
-			'FAIL: no artifacts found to validate — run `deno task build:npm:format` etc. first'
+			'FAIL: no artifacts found to validate — run `npm run build:npm:format` etc. first'
 		);
 		return 1;
 	}

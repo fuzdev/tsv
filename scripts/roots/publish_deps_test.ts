@@ -1,8 +1,8 @@
 /**
  * The deps `publish`'s entry builds (`create_publish_deps`), over a temp checkout and harmless
- * programs standing in for every one it finds (`sh`, never `npm`, `git`, or `deno`): each
+ * programs standing in for every one it finds (`sh`, never `npm` or `git`): each
  * handle's environment, its name's lookup, the existence probe beside the checkout, the
- * snapshot's paths, the pause, the print streams, the entry left as its one call, and the task
+ * snapshot's paths, the pause, the print streams, the entry left as its one call, and the script
  * that starts it, which no npm lifecycle can.
  *
  * @module
@@ -72,7 +72,6 @@ const seen = async (program: SpawnProgram | null, cwd: Parameters<SpawnProgram['
 describe('the programs', () => {
 	test('each is found by its name on PATH, and is null when it is not there', () => {
 		deepStrictEqual(PUBLISH_PROGRAM_NAMES, {
-			deno: 'deno',
 			node: 'node',
 			npm: 'npm',
 			git: 'git',
@@ -88,8 +87,6 @@ describe('the programs', () => {
 			await using dir = await fs.temp_dir('tsv_publish_deps_test_');
 			const { programs } = create_publish_deps(dir, none);
 			for (const program of [
-				programs.deno,
-				programs.deno_build,
 				programs.node,
 				programs.node_test('x'),
 				programs.npm,
@@ -107,8 +104,6 @@ describe('the programs', () => {
 
 	test('the environments, as decided', () => {
 		deepStrictEqual(PUBLISH_PROGRAM_ENV, {
-			deno: { pass_env: 'all' },
-			deno_build: { pass_env: 'all', env: { TSV_BUILD_FORCE: '1' } },
 			node: {},
 			npm: { pass_env: 'all' },
 			git_local: { pass_env: GIT_LOCAL_PASS_ENV },
@@ -131,12 +126,6 @@ describe('the programs', () => {
 		const whole = ['TSV_PUBLISH_PROBE=host', 'GIT_PUBLISH_PROBE=git', 'CARGO_PUBLISH_PROBE=cargo'];
 		const base = ['TSV_PUBLISH_PROBE=', 'GIT_PUBLISH_PROBE=', 'CARGO_PUBLISH_PROBE=', 'LC_ALL=C'];
 		const cases: Array<[string, SpawnProgram | null, Array<string>]> = [
-			['deno', programs.deno, [...whole, 'LC_ALL=en_US.UTF-8', 'TSV_BUILD_FORCE=', 'PKG_DIR=']],
-			[
-				'deno_build',
-				programs.deno_build,
-				[...whole, 'LC_ALL=en_US.UTF-8', 'TSV_BUILD_FORCE=1', 'PKG_DIR=']
-			],
 			[
 				'node_test',
 				programs.node_test('crates/tsv_wasm/pkg/all/npm'),
@@ -291,15 +280,24 @@ const NPM_LIFECYCLE_SCRIPTS = [
 ];
 
 describe('how the entry is started', () => {
-	test('by its deno.json task alone, which npm never reads', () => {
-		const tasks = JSON.parse(readFileSync(`${CHECKOUT}/deno.json`, 'utf8')).tasks;
-		strictEqual(tasks.publish, 'node scripts/roots/publish.ts');
+	const scripts: Record<string, string> = JSON.parse(
+		readFileSync(`${CHECKOUT}/package.json`, 'utf8')
+	).scripts;
+	const tasks: Record<string, string> = JSON.parse(
+		readFileSync(`${CHECKOUT}/deno.json`, 'utf8')
+	).tasks;
+
+	test('by its package.json script `release`, which only a typed `npm run release` starts', () => {
+		strictEqual(scripts.release, 'node scripts/roots/publish.ts');
+		strictEqual(NPM_LIFECYCLE_SCRIPTS.includes('release'), false);
+		// `deno task release` would run a deno.json task of the name instead
+		deepStrictEqual(
+			Object.keys(tasks).filter((name) => name === 'release' || name === 'publish'),
+			[]
+		);
 	});
 
 	test('the root package.json has no script npm or deno task starts on its own', () => {
-		const scripts: Record<string, string> = JSON.parse(
-			readFileSync(`${CHECKOUT}/package.json`, 'utf8')
-		).scripts;
 		const names = Object.keys(scripts);
 		deepStrictEqual(
 			names.filter((name) => NPM_LIFECYCLE_SCRIPTS.includes(name)),

@@ -3,8 +3,8 @@
  * for every side that must agree on them: the run-side freshness guard
  * (`check_artifact_freshness.ts`), the artifact table (`tsv_artifacts.ts`), the build-side skip
  * (`scripts/run_if_stale.ts`), the staged-package guard (`scripts/check_staged_freshness.ts`),
- * and the package gates' own staleness checks (`scripts/validate_artifacts.ts`,
- * `scripts/engine_parity.ts`, `scripts/test_napi_npm.ts`). Pure data importing nothing, so a
+ * and the package gates' own staleness checks (`scripts/engine_parity.ts`,
+ * `scripts/test_napi_npm.ts`). Pure data importing nothing, so a
  * build-side script reads the lists without loading the artifact table's `node:*` modules.
  *
  * @module

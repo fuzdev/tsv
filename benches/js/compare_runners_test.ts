@@ -1,13 +1,14 @@
 /**
- * Tests that every command the comparison tools print or document names a task that runs:
- * an `npm run <x>` needs `<x>` in `package.json`'s scripts, and a `deno task <x>` needs it in
- * `deno.json`'s tasks or in `package.json`'s, which `deno task` falls through to. A task
- * that chains a Deno-only step (`corpus:compare:parse` chains `build:check`) lives in
- * `deno.json` alone, so `npm run` cannot spell it.
+ * Tests that every command the task files, the CI workflows, and the comparison tools print or
+ * document names a task that runs: an `npm run <x>` needs `<x>` in `package.json`'s scripts,
+ * and a `deno task <x>` needs it in `deno.json`'s tasks or in `package.json`'s, which
+ * `deno task` falls through to. And the split between the two files: `deno.json` holds the
+ * tasks whose body runs Deno itself, `package.json` every other, chained with `npm run`, its
+ * one way to a Deno task a `deno task <x>` leg naming a `deno.json` task (docs/tasks.md).
  */
 
 import { deepStrictEqual, ok, strictEqual } from 'node:assert';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { afterEach, test, vi } from 'vitest';
 
 import { run_corpus_compare_format } from './corpus_compare_format.ts';
@@ -81,11 +82,11 @@ test("each runner the tools' modules and roots name runs the task it names", () 
 	}
 });
 
-test("the parse tool's usage names `deno task`, where its build-first task lives", async () => {
+test("the parse tool's usage names runners that run its tasks", async () => {
 	const lines = capture_console();
 	strictEqual(await run_corpus_compare_parse(HELP_DEPS, ['--help']), 0);
 	const usage = lines.join('\n');
-	ok(usage.includes('Usage: deno task corpus:compare:parse <path> [options]'), usage);
+	ok(usage.includes('Usage: npm run corpus:compare:parse -- <path> [options]'), usage);
 	deepStrictEqual(unrunnable(usage), []);
 });
 
@@ -95,4 +96,79 @@ test("the format tool's usage names runners that run its tasks", async () => {
 	const usage = lines.join('\n');
 	ok(usage.includes('Usage: npm run corpus:compare:format -- <path> [options]'), usage);
 	deepStrictEqual(unrunnable(usage), []);
+});
+
+/** Each task body of a task file, by name. */
+const BODIES = {
+	'package.json': read_json('package.json').scripts as Record<string, string>,
+	'deno.json': Object.fromEntries(
+		Object.entries(read_json('deno.json').tasks as Record<string, string>).filter(
+			([name]) => !name.startsWith('//')
+		)
+	)
+};
+
+/** The commands a body runs: split at `&&`, `||`, `;`, and parentheses, each with any leading
+ * `NAME=value` assignments dropped. */
+const commands_of = (body: string): string[] =>
+	body
+		.split(/&&|\|\||;|\(|\)/)
+		.map((command) => command.trim().replace(/^(?:[A-Z_][A-Z0-9_]*=\S*\s+)*/, ''))
+		.filter((command) => command !== '');
+
+/** Whether `command` runs Deno itself, rather than as the runner of a `deno.json` task. */
+const runs_deno = (command: string): boolean => /^deno (?!task )/.test(command);
+
+test('each `npm run` in a task body names a package.json script, and each `deno task` a deno.json task', () => {
+	const unresolved: string[] = [];
+	for (const [file, bodies] of Object.entries(BODIES)) {
+		for (const [name, body] of Object.entries(bodies)) {
+			for (const [command, runner, target] of body.matchAll(/\b(npm run|deno task) ([\w:.-]+)/g)) {
+				if (!(runner === 'npm run' ? NPM_SCRIPTS : DENO_TASKS).has(target!)) {
+					unresolved.push(`${file} ${name}: ${command}`);
+				}
+			}
+		}
+	}
+	deepStrictEqual(unresolved, []);
+});
+
+test('deno.json holds exactly the tasks whose body runs Deno itself', () => {
+	deepStrictEqual(
+		Object.entries(BODIES['deno.json'])
+			.filter(([, body]) => !commands_of(body).some(runs_deno))
+			.map(([name]) => name),
+		[]
+	);
+	deepStrictEqual(
+		Object.entries(BODIES['package.json'])
+			.filter(([, body]) => commands_of(body).some(runs_deno))
+			.map(([name]) => name),
+		[]
+	);
+	deepStrictEqual(
+		[...DENO_TASKS].filter((name) => !name.startsWith('//') && NPM_SCRIPTS.has(name)),
+		[]
+	);
+});
+
+test('each runner a CI workflow names runs the task it names', () => {
+	const dir = new URL('.github/workflows/', CHECKOUT);
+	for (const file of readdirSync(dir).filter((name) => name.endsWith('.yml'))) {
+		deepStrictEqual(unrunnable(readFileSync(new URL(file, dir), 'utf8')), [], file);
+	}
+});
+
+test('each `npm run` in a package.json body that passes arguments passes them after a `--`', () => {
+	// without the `--`, npm takes a flag as its own config and the script never sees it
+	const swallowing: string[] = [];
+	for (const [name, body] of Object.entries(BODIES['package.json'])) {
+		for (const [command, args] of body.matchAll(
+			/\bnpm run (?:-s )?[\w:.-]+((?: +[^\s&|;()]+)*)/g
+		)) {
+			const first = args!.trim().split(/\s+/)[0];
+			if (first !== '' && first !== '--') swallowing.push(`${name}: ${command}`);
+		}
+	}
+	deepStrictEqual(swallowing, []);
 });

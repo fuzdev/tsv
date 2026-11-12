@@ -5,9 +5,8 @@
  * A named exception to the host-module rule: this entry and everything it imports use Node's
  * own `node:*` modules and no package, because the release workflow's `release` job runs it
  * holding the repository's `contents: write` and `id-token: write`, and so installs nothing
- * (docs/tasks.md §`release:notes`). The root config's Deno walk (`typecheck:scripts`) checks
- * this module with no `node_modules` in view, so a package import here or beneath it fails
- * `check`.
+ * (docs/tasks.md §`release:notes`). `scripts/no_package_closure_test.ts` (in `test:node`) holds
+ * this module and everything beneath it to no package import.
  *
  * The checkout is this module's own location, never the working directory. It reads
  * `CHANGELOG.md`, writes nothing, and runs nothing; the notes are its only stdout. Its deps are

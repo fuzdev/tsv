@@ -19,10 +19,10 @@
  * comparison at all: an entry differing there is a real difference, not a spelling.
  *
  * The release gate is a reader too: `scripts/validate_artifacts.ts` sizes every
- * `pkg/<variant>/<target>` bundle through
- * {@link wasm_bundle_dir} / {@link wasm_bundle_path}, walking `npm` as one more
- * target — a staging directory rather than a wasm-pack one, but the same two files
- * at the same place. A size gate that spelled the layout itself would keep passing
+ * `pkg/<variant>/npm` bundle through
+ * {@link wasm_bundle_dir} / {@link wasm_bundle_path}, walking `npm` as a target —
+ * a staging directory rather than a wasm-pack one, but the same two files at the same
+ * place. A size gate that spelled the layout itself would keep passing
  * over the old location after a move.
  *
  * Still spelled elsewhere, and deliberately — the remaining places a layout move
