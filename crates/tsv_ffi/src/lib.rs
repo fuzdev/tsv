@@ -36,11 +36,14 @@
 //! # Safety
 //!
 //! These functions use raw pointers for FFI compatibility. The caller must ensure:
-//! - `source_ptr` points to valid UTF-8 data of `source_len` bytes (a null
-//!   `source_ptr` with `source_len == 0` is accepted as the empty source; a
-//!   null pointer with a non-zero length reports an error)
-//! - `out_len` points to a valid `usize` location for writing the output length
-//! - `out_status` points to a valid `u32` location for writing the status
+//! - `source_ptr` is readable for `source_len` bytes (a null `source_ptr` with
+//!   `source_len == 0` is accepted as the empty source; a null pointer with a
+//!   non-zero length is reported through [`TSV_STATUS_ERROR`]). The bytes need
+//!   not be UTF-8: invalid UTF-8 is reported through [`TSV_STATUS_ERROR`]
+//! - the source buffer is not mutated for the duration of the call
+//! - `out_len` points to a `usize` and `out_status` to a `u32`, each properly
+//!   aligned and valid for writes
+//! - neither out-param overlaps the source buffer
 //! - The returned pointer is freed exactly once via `tsv_free`
 
 use std::panic;
@@ -92,11 +95,19 @@ pub const TSV_STATUS_ERROR: u32 = 1;
 /// once either way.
 ///
 /// # Safety
-/// - `source_ptr` must point to valid UTF-8 of `source_len` bytes (a null
-///   `source_ptr` is tolerated when `source_len` is 0, and reported as an error
-///   otherwise)
-/// - `out_len` must be valid for writes of a `usize`
-/// - `out_status` must be valid for writes of a `u32`
+/// - `source_ptr` must be readable for `source_len` bytes (a null `source_ptr` is
+///   tolerated when `source_len` is 0, and reported as an error otherwise); invalid
+///   UTF-8 is reported as an error, not assumed away
+/// - the source buffer must not be mutated until this call returns: `f` borrows it
+///   as a `&str`
+/// - `out_len` must be properly aligned and valid for writes of a `usize`
+/// - `out_status` must be properly aligned and valid for writes of a `u32`
+/// - neither out-param may overlap the source buffer, which is still borrowed
+///   when they are written
+#[expect(
+    unsafe_code,
+    reason = "reads the caller's raw source buffer and forwards the out-params"
+)]
 unsafe fn with_extracted_source(
     source_ptr: *const u8,
     source_len: usize,
@@ -112,15 +123,19 @@ unsafe fn with_extracted_source(
         return f("");
     }
     if source_ptr.is_null() {
-        // SAFETY: out-param validity is the caller's contract, forwarded.
+        // SAFETY: `error_result` needs `out_len` / `out_status` aligned and valid
+        // for writes, which is this function's own contract, forwarded.
         return unsafe { error_result("Null source pointer", out_len, out_status) };
     }
-    // SAFETY: caller guarantees `source_ptr` is valid for `source_len` bytes,
-    // and the null/empty cases are handled above.
+    // SAFETY: the caller guarantees `source_ptr` is readable for `source_len` bytes
+    // (the null/empty cases are handled above), that the buffer is not mutated
+    // until this call returns (the slice, and the `&str` over it, live across
+    // `f`), and that the out-params `f`'s path writes do not overlap it.
     let bytes = unsafe { slice::from_raw_parts(source_ptr, source_len) };
     match std::str::from_utf8(bytes) {
         Ok(s) => f(s),
-        // SAFETY: out-param validity is the caller's contract, forwarded.
+        // SAFETY: `error_result` needs `out_len` / `out_status` aligned and valid
+        // for writes, which is this function's own contract, forwarded.
         Err(e) => unsafe { error_result(&format!("Invalid UTF-8: {e}"), out_len, out_status) },
     }
 }
@@ -134,7 +149,13 @@ unsafe fn with_extracted_source(
 /// the error status.
 ///
 /// # Safety
-/// Caller must ensure `source_ptr` points to valid UTF-8 of `source_len` bytes.
+/// Same contract as [`with_extracted_source`]: the source buffer readable for
+/// `source_len` bytes and unmutated for the call, both out-params properly aligned,
+/// valid for writes, and not overlapping it.
+#[expect(
+    unsafe_code,
+    reason = "forwards the caller's raw source buffer and out-params"
+)]
 unsafe fn with_source_string<F, B>(
     source_ptr: *const u8,
     source_len: usize,
@@ -147,12 +168,20 @@ where
     B: Into<Vec<u8>>,
 {
     let render = |source: &str| match panic::catch_unwind(|| f(source)) {
-        // SAFETY: out-param validity is the caller's contract.
+        // SAFETY: `bytes_to_ptr` needs `out_len` / `out_status` aligned and valid
+        // for writes, which is this function's own contract. The captured raw
+        // out-params are still valid when this closure runs: `with_extracted_source`
+        // invokes it at most once, synchronously, before returning.
         Ok(Ok(result)) => unsafe { bytes_to_ptr(result, TSV_STATUS_OK, out_len, out_status) },
+        // SAFETY: as above — the out-params are this function's contract, still
+        // valid during the synchronous call.
         Ok(Err(e)) => unsafe { error_result(&e, out_len, out_status) },
+        // SAFETY: as above — the out-params are this function's contract, still
+        // valid during the synchronous call.
         Err(payload) => unsafe { error_result(&format_panic(&*payload), out_len, out_status) },
     };
-    // SAFETY: the pointer contract is this function's own, forwarded verbatim.
+    // SAFETY: `with_extracted_source`'s contract (the source buffer and both
+    // out-params) is this function's own, forwarded verbatim.
     unsafe { with_extracted_source(source_ptr, source_len, out_len, out_status, render) }
 }
 
@@ -164,9 +193,12 @@ where
 /// about which call they describe.
 ///
 /// # Safety
-/// - `out_len` must be valid for writes of a `usize`, `out_status` for a `u32`
+/// - `out_len` must be properly aligned and valid for writes of a `usize`,
+///   `out_status` of a `u32`
+/// - neither may overlap a buffer the caller still holds a borrow of (the source)
 /// - the returned pointer owns a boxed slice of the written length, and is
 ///   released only by `tsv_free(ptr, len)` with that same length
+#[expect(unsafe_code, reason = "writes the caller's raw out-params")]
 unsafe fn bytes_to_ptr(
     payload: impl Into<Vec<u8>>,
     status: u32,
@@ -174,7 +206,9 @@ unsafe fn bytes_to_ptr(
     out_status: *mut u32,
 ) -> *mut u8 {
     let bytes = payload.into().into_boxed_slice();
-    // SAFETY: out-param validity is the caller's contract.
+    // SAFETY: the caller guarantees `out_len` is properly aligned and valid for
+    // writes of a `usize` and `out_status` of a `u32`, and that neither overlaps the
+    // still-borrowed source buffer (this function's `# Safety` contract).
     unsafe {
         *out_len = bytes.len();
         *out_status = status;
@@ -187,11 +221,12 @@ unsafe fn bytes_to_ptr(
 ///
 /// # Safety
 /// Same contract as [`bytes_to_ptr`], which renders the payload.
+#[expect(unsafe_code, reason = "forwards the caller's raw out-params")]
 unsafe fn error_result(message: &str, out_len: *mut usize, out_status: *mut u32) -> *mut u8 {
     let error = serde_json::json!({ "error": message });
     #[expect(clippy::unwrap_used)] // JSON serialization of simple object won't fail
     let json = serde_json::to_string(&error).unwrap();
-    // SAFETY: out-param validity is the caller's contract, forwarded.
+    // SAFETY: this function's contract is `bytes_to_ptr`'s, forwarded verbatim.
     unsafe { bytes_to_ptr(json, TSV_STATUS_ERROR, out_len, out_status) }
 }
 
@@ -262,9 +297,10 @@ fn ffi_source_type(
 /// C FFI functions for one language module.
 ///
 /// # Safety (applies to every generated function)
-/// - `source_ptr` must point to valid UTF-8 data of `source_len` bytes
-/// - `out_len` must point to a valid `usize` for writing output length
-/// - `out_status` must point to a valid `u32` for writing the status
+/// - `source_ptr` must be readable for `source_len` bytes (invalid UTF-8 is
+///   reported through `TSV_STATUS_ERROR`), and the buffer unmutated for the call
+/// - `out_len` must point to a properly aligned `usize` and `out_status` to a
+///   properly aligned `u32`, each valid for writes and not overlapping the source
 /// - Caller must free returned pointer via `tsv_free(ptr, *out_len)`
 // One export per (language, operation) — every one taking the same five
 // arguments. The `$goalness` axis decides only whether a non-Module source-type CODE is
@@ -297,6 +333,10 @@ macro_rules! lang_bindings {
         /// # Safety
         /// See the module-level safety contract.
         #[cfg(feature = "parse")]
+        #[expect(
+            unsafe_code,
+            reason = "a C ABI export: unmangled, over the caller's raw pointers"
+        )]
         #[unsafe(no_mangle)]
         pub unsafe extern "C" fn $parse_fn(
             source_ptr: *const u8,
@@ -305,6 +345,9 @@ macro_rules! lang_bindings {
             out_len: *mut usize,
             out_status: *mut u32,
         ) -> *mut u8 {
+            // SAFETY: `with_source_string`'s contract (the source buffer and both
+            // out-params) is this export's own, the module-level safety contract,
+            // forwarded verbatim.
             unsafe {
                 with_source_string(source_ptr, source_len, out_len, out_status, |source| {
                     // a parse export refuses the unspecified code — the wire's
@@ -330,6 +373,10 @@ macro_rules! lang_bindings {
         /// # Safety
         /// See the module-level safety contract.
         #[cfg(feature = "parse")]
+        #[expect(
+            unsafe_code,
+            reason = "a C ABI export: unmangled, over the caller's raw pointers"
+        )]
         #[unsafe(no_mangle)]
         pub unsafe extern "C" fn $parse_internal_fn(
             source_ptr: *const u8,
@@ -338,6 +385,9 @@ macro_rules! lang_bindings {
             out_len: *mut usize,
             out_status: *mut u32,
         ) -> *mut u8 {
+            // SAFETY: `with_source_string`'s contract (the source buffer and both
+            // out-params) is this export's own, the module-level safety contract,
+            // forwarded verbatim.
             unsafe {
                 with_source_string(source_ptr, source_len, out_len, out_status, |source| {
                     // parse export: the unspecified code is refused (see the first arm)
@@ -356,6 +406,10 @@ macro_rules! lang_bindings {
         /// # Safety
         /// See the module-level safety contract.
         #[cfg(feature = "format")]
+        #[expect(
+            unsafe_code,
+            reason = "a C ABI export: unmangled, over the caller's raw pointers"
+        )]
         #[unsafe(no_mangle)]
         pub unsafe extern "C" fn $format_fn(
             source_ptr: *const u8,
@@ -364,6 +418,9 @@ macro_rules! lang_bindings {
             out_len: *mut usize,
             out_status: *mut u32,
         ) -> *mut u8 {
+            // SAFETY: `with_source_string`'s contract (the source buffer and both
+            // out-params) is this export's own, the module-level safety contract,
+            // forwarded verbatim.
             unsafe {
                 with_source_string(source_ptr, source_len, out_len, out_status, |source| {
                     // only a formatter can answer the unspecified code, with the module
@@ -409,10 +466,16 @@ lang_bindings!(
 /// - `ptr` must be a pointer previously returned by a tsv_* function
 /// - `len` must be the length written to `out_len` by that function
 /// - Must be called exactly once per allocation
+#[expect(
+    unsafe_code,
+    reason = "a C ABI export: unmangled, reclaiming a buffer from a raw pointer"
+)]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn tsv_free(ptr: *mut u8, len: usize) {
     if !ptr.is_null() && len > 0 {
-        // Safety: Caller guarantees ptr was allocated by us with the given len
+        // SAFETY: the caller guarantees `ptr` / `len` are a pointer and length one
+        // export returned, not yet freed: `bytes_to_ptr` leaked them from a
+        // `Box<[u8]>` of exactly that length, so rebuilding the box is sound.
         unsafe {
             drop(Box::from_raw(std::ptr::slice_from_raw_parts_mut(ptr, len)));
         }
@@ -452,12 +515,15 @@ mod tests {
     /// payload. The converse is deliberately unasserted — a success payload is
     /// arbitrary source text, and asserting it *isn't* an error object would
     /// rebuild the content sniff this channel exists to retire.
+    #[expect(unsafe_code, reason = "drives a raw C ABI export and frees its buffer")]
     fn call_raw(f: FfiFn, bytes: &[u8], goal: u32) -> (u32, String) {
         let mut out_len: usize = 0;
         // Never a valid status, so an export that writes neither out-param is a
         // failure here rather than an inherited verdict.
         let mut out_status: u32 = u32::MAX;
-        // Safety: `bytes` is a valid slice; both out-params are live locals.
+        // SAFETY: `bytes` is a live slice, readable for its length and unmutated for
+        // the call (any bytes: invalid UTF-8 is reported, not assumed away); both
+        // out-params are aligned live locals, disjoint from it.
         let ptr = unsafe {
             f(
                 bytes.as_ptr(),
@@ -468,12 +534,12 @@ mod tests {
             )
         };
         assert!(!ptr.is_null(), "FFI returned a null pointer");
-        // Safety: the call wrote `out_len` bytes starting at `ptr`.
+        // SAFETY: the call wrote `out_len` bytes starting at `ptr`.
         let out = unsafe { slice::from_raw_parts(ptr, out_len) };
         let s = std::str::from_utf8(out)
             .expect("FFI output must be valid UTF-8")
             .to_owned();
-        // Safety: `ptr`/`out_len` came from the call above; freed exactly once.
+        // SAFETY: `ptr`/`out_len` came from the call above; freed exactly once.
         unsafe { tsv_free(ptr, out_len) };
         assert!(
             out_status == TSV_STATUS_OK || out_status == TSV_STATUS_ERROR,
@@ -816,11 +882,12 @@ mod tests {
     /// slot usable after a WASM *trap*, which no native test can raise; under an unwind
     /// a held borrow guard would have been released too.)
     #[test]
+    #[expect(unsafe_code, reason = "drives the raw helper and frees its buffer")]
     fn a_panicking_call_reports_and_leaves_the_thread_usable() {
         let source = "const   x=1";
         let mut out_len: usize = 0;
         let mut out_status: u32 = u32::MAX;
-        // Safety: `source` is a live `&str`; both out-params are live locals.
+        // SAFETY: `source` is a live `&str`; both out-params are live locals.
         let ptr = unsafe {
             with_source_string::<_, Vec<u8>>(
                 source.as_ptr(),
@@ -833,9 +900,11 @@ mod tests {
             )
         };
         assert!(!ptr.is_null());
-        // Safety: the call wrote `out_len` bytes at `ptr`; freed exactly once below.
+        // SAFETY: the call wrote `out_len` bytes at `ptr`; freed exactly once below.
         let out = unsafe { slice::from_raw_parts(ptr, out_len) };
         let rendered = std::str::from_utf8(out).expect("utf-8").to_owned();
+        // SAFETY: `ptr`/`out_len` came from the call above, and `out` (the last
+        // borrow of the buffer) is not used past this line.
         unsafe { tsv_free(ptr, out_len) };
         assert_eq!(out_status, TSV_STATUS_ERROR);
         assert_eq!(
@@ -932,13 +1001,15 @@ mod tests {
     // --- null source pointer: (null, 0) is the empty source; (null, n>0) errors ---
 
     #[test]
+    #[expect(unsafe_code, reason = "drives a raw C ABI export and frees its buffer")]
     fn null_source_pointer_is_handled() {
         let mut out_len: usize = 0;
         let mut out_status: u32 = u32::MAX;
         // (null, 0) — the empty source, as FFI hosts commonly pass it (e.g.
         // Deno's `UnsafePointer.of` on an empty typed array is null). Formats
         // to empty output, success status.
-        // SAFETY: `with_extracted_source` short-circuits before any read.
+        // SAFETY: `with_extracted_source` short-circuits on a zero length before any
+        // read; both out-params are live locals.
         let ptr = unsafe {
             tsv_format_typescript(
                 std::ptr::null(),
@@ -949,13 +1020,17 @@ mod tests {
             )
         };
         assert!(!ptr.is_null(), "FFI returned a null pointer");
+        // SAFETY: the call returned a non-null pointer (asserted above) to the
+        // `out_len` bytes it wrote.
         let out = unsafe { slice::from_raw_parts(ptr, out_len) };
         assert_eq!(out, b"", "(null, 0) must format as the empty source");
         assert_eq!(out_status, TSV_STATUS_OK);
+        // SAFETY: `ptr`/`out_len` came from the call above; freed exactly once.
         unsafe { tsv_free(ptr, out_len) };
 
         // (null, n>0) — an invalid buffer; must report an error, not UB.
-        // Safety: the null check precedes any read of the (bogus) 5 bytes.
+        // SAFETY: the null check precedes any read of the (bogus) 5 bytes; both
+        // out-params are live locals.
         let ptr = unsafe {
             tsv_format_typescript(
                 std::ptr::null(),
@@ -966,6 +1041,8 @@ mod tests {
             )
         };
         assert!(!ptr.is_null(), "FFI returned a null pointer");
+        // SAFETY: the call returned a non-null pointer (asserted above) to the
+        // `out_len` bytes of its error payload.
         let out = unsafe { slice::from_raw_parts(ptr, out_len) };
         assert_eq!(out_status, TSV_STATUS_ERROR);
         let msg = error_message(std::str::from_utf8(out).expect("error JSON is UTF-8"))
@@ -974,14 +1051,18 @@ mod tests {
             msg.contains("Null source pointer"),
             "expected a null-pointer error, got: {msg}"
         );
+        // SAFETY: `ptr`/`out_len` came from the call above; freed exactly once,
+        // after the last read of `out`.
         unsafe { tsv_free(ptr, out_len) };
     }
 
     // --- tsv_free tolerates null / zero-length (documented no-op) ---
 
     #[test]
+    #[expect(unsafe_code, reason = "calls the raw C ABI free")]
     fn tsv_free_null_and_zero_are_noops() {
-        // Safety: null and zero-length are the explicit no-op cases.
+        // SAFETY: null and zero-length are `tsv_free`'s explicit no-op cases, which
+        // touch no memory.
         unsafe {
             tsv_free(std::ptr::null_mut(), 0);
             tsv_free(std::ptr::null_mut(), 8);

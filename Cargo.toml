@@ -123,9 +123,9 @@ unreachable_pub = "warn"
 # fails instead of joining a pile of known-broken links that hides it.
 #
 # This table is the day-to-day signal (IDE, a bare `cargo doc`). The GATE is `deno task
-# docs:audit`, which re-states these as `RUSTDOCFLAGS` — `tsv_ffi` and `tsv_napi` carry
-# their own `[lints.clippy]` tables, and Cargo cannot merge that with
-# `[lints] workspace = true`, so they do not inherit this. It also runs with
+# docs:audit`, which re-states these as `RUSTDOCFLAGS` (`tsv_ffi` and `tsv_napi`, whose
+# own `[lints]` tables replace the workspace's whole, re-declare this table too, held to
+# it by `tests/lint_parity.rs`). It also runs with
 # `--document-private-items`, because this codebase's design rationale lives on PRIVATE
 # items and every stale link found so far was on one.
 broken_intra_doc_links = "deny"

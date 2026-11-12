@@ -67,8 +67,9 @@ panic_probe = []
 # `napi-derive` generates unsafe code. Cargo replaces the whole [lints] table on
 # override (no partial inherit), so the workspace lints are re-declared verbatim
 # below — only `unsafe_code` differs. Keep in sync with the root
-# [workspace.lints] block; the restriction lints (panic/unwrap_used/etc.) must
-# stay so this crate keeps the same floor as the rest of the workspace.
+# [workspace.lints] block (`tests/lint_parity.rs` holds the copy to it); the
+# restriction lints (panic/unwrap_used/etc.) must stay so this crate keeps the
+# same floor as the rest of the workspace.
 #
 # `deny`, not `allow`: `#[napi]` expands to items carrying their own
 # `#[allow(unsafe_code)]`, and an inner `allow` overrides `deny` — it cannot
@@ -87,6 +88,13 @@ unused_lifetimes = "warn"
 elided_lifetimes_in_paths = "warn"
 unused_qualifications = "warn"
 unreachable_pub = "warn"
+
+[lints.rustdoc]
+broken_intra_doc_links = "deny"
+invalid_html_tags = "deny"
+bare_urls = "deny"
+redundant_explicit_links = "deny"
+private_intra_doc_links = "allow"
 
 [lints.clippy]
 all = { level = "warn", priority = -1 }

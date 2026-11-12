@@ -33,13 +33,20 @@ format = ["tsv_arena/format"]
 # layer they emit through (each language crate's `json` feature).
 parse = ["tsv_ts/json", "tsv_css/json", "tsv_svelte/json"]
 
-# FFI requires unsafe code. Cargo replaces the whole [lints] table on
-# override (no partial inherit), so the workspace lints are re-declared
-# verbatim below — only `unsafe_code` differs. Keep in sync with the root
-# [workspace.lints] block; the restriction lints (panic/unwrap_used/etc.)
-# must stay so this crate keeps the same floor as the rest of the workspace.
+# The C ABI boundary needs `unsafe`. Cargo replaces the whole [lints] table on
+# override (no partial inherit), so the workspace lints are re-declared verbatim
+# below — only `unsafe_code` and `clippy::undocumented_unsafe_blocks` differ.
+# Keep in sync with the root [workspace.lints] block (`tests/lint_parity.rs`
+# holds the copy to it); the restriction lints (panic/unwrap_used/etc.) must
+# stay so this crate keeps the same floor as the rest of the workspace.
+#
+# `deny`, not the workspace's `forbid`: each item that needs `unsafe` — every
+# `unsafe fn`, and in edition 2024 every `#[unsafe(no_mangle)]` export too —
+# lifts the lint itself with `#[expect(unsafe_code, reason = "…")]`, which
+# `forbid` would refuse. Every other site in the crate stays a compile error, so
+# the unsafe surface is the enumerated list of those attributes.
 [lints.rust]
-unsafe_code = "allow"
+unsafe_code = "deny"
 missing_debug_implementations = "allow"
 trivial_casts = "warn"
 trivial_numeric_casts = "warn"
@@ -47,6 +54,13 @@ unused_lifetimes = "warn"
 elided_lifetimes_in_paths = "warn"
 unused_qualifications = "warn"
 unreachable_pub = "warn"
+
+[lints.rustdoc]
+broken_intra_doc_links = "deny"
+invalid_html_tags = "deny"
+bare_urls = "deny"
+redundant_explicit_links = "deny"
+private_intra_doc_links = "allow"
 
 [lints.clippy]
 all = { level = "warn", priority = -1 }
@@ -110,3 +124,5 @@ panic = "warn"
 todo = "warn"
 unreachable = "warn"
 unwrap_used = "warn"
+# every `unsafe` block carries a `// SAFETY:` comment
+undocumented_unsafe_blocks = "warn"
