@@ -34,16 +34,11 @@ const fake_dir = (files: Record<string, string>): FsReadDir =>
 			const text = files[path];
 			if (text === undefined) throw new Error(`not_found: ${path}`);
 			return text;
-		},
-		read_text_sync: (path: string) => {
-			const text = files[path];
-			if (text === undefined) throw new Error(`not_found: ${path}`);
-			return text;
-		},
-		dir: (path: string) => {
-			throw new Error(`not_found: ${path}`);
 		}
 	}) as unknown as FsReadDir;
+
+/** No sibling checkout present. */
+const no_siblings = { open: async () => null };
 
 /** The one pin site every run reads, empty: `--checkouts` alone grades none of it. */
 const PIN_SITES = {
@@ -61,7 +56,7 @@ const capture_log = () =>
 test('--checkouts without git skips the drift half and says so', async () => {
 	capture_log();
 	const code = await run_check_canonical_pins(
-		{ checkout: fake_dir(PIN_SITES), siblings: fake_dir({}), git: null },
+		{ checkout: fake_dir(PIN_SITES), siblings: no_siblings, git: null },
 		{ run_pins: false, run_checkouts: true }
 	);
 	strictEqual(code, 0);
@@ -82,7 +77,7 @@ test('--checkouts with git asks it for each sibling checkout that exists, and on
 		}
 	} as unknown as SpawnProgram;
 	const code = await run_check_canonical_pins(
-		{ checkout: fake_dir(PIN_SITES), siblings: fake_dir({}), git },
+		{ checkout: fake_dir(PIN_SITES), siblings: no_siblings, git },
 		{ run_pins: false, run_checkouts: true }
 	);
 	strictEqual(code, 0);
@@ -99,16 +94,15 @@ test('--checkouts runs git in each present sibling checkout, asking for its pinn
 	// a handle per sibling, so the test sees which directory each git call ran in
 	const handles = new Map<string, FsReadDir>();
 	const siblings = {
-		...fake_dir({}),
-		dir: (path: string) => {
+		open: async (path: string) => {
 			let handle = handles.get(path);
 			if (handle === undefined) {
-				handle = { path: `/siblings/${path}` } as unknown as FsReadDir;
+				handle = { ...fake_dir({}), path: `/siblings/${path}` } as unknown as FsReadDir;
 				handles.set(path, handle);
 			}
 			return handle;
 		}
-	} as unknown as FsReadDir;
+	};
 	const git = {
 		out: async (args: ReadonlyArray<string>, options: { cwd: unknown }) => {
 			asked.push({ args, cwd: options.cwd });
@@ -120,8 +114,8 @@ test('--checkouts runs git in each present sibling checkout, asking for its pinn
 		{ run_pins: false, run_checkouts: true }
 	);
 	const corpora = asked.find((a) => a.args.join(' ') === 'rev-parse HEAD:collections');
-	strictEqual(corpora?.cwd, handles.get('corpora'));
-	const svelte = asked.find((a) => a.cwd === handles.get('svelte'));
+	strictEqual(corpora?.cwd, handles.get('../corpora'));
+	const svelte = asked.find((a) => a.cwd === handles.get('../svelte'));
 	deepStrictEqual(svelte?.args, ['rev-parse', 'HEAD']);
 });
 

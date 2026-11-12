@@ -42,9 +42,10 @@
  *
  * ## Reach
  *
- * The directory the checkout sits in, read-only (whether `../corpora` is there), `git`, which
- * reads the snapshot's status and file list in it, and the checkout's `target/corpus/tsv`, run
- * in the checkout (`DiscoveryAuditDeps`, built by `scripts/roots/discovery_audit.ts`).
+ * The `../corpora` checkout, read-only, opened by its path, so one that is a symlink to a
+ * directory elsewhere is followed (whether the snapshot is there); `git`, which reads the
+ * snapshot's status and file list in it; and the checkout's `target/corpus/tsv`, run in the
+ * checkout (`DiscoveryAuditDeps`, built by `scripts/roots/discovery_audit.ts`).
  */
 
 import { relative, resolve } from 'node:path';
@@ -77,8 +78,11 @@ export const DISCOVERY_TSV_BIN = 'target/corpus/tsv';
 export interface DiscoveryAuditDeps {
 	/** The checkout, `tsv`'s working directory. */
 	checkout: FsReadDir;
-	/** The directory the checkout sits in, where `../corpora` is. */
-	siblings: FsReadDir;
+	/**
+	 * The `../corpora` checkout (`CORPORA_ROOT`): its handle, `git`'s working directory, or
+	 * `null` when it is absent, and whether a path beneath it exists.
+	 */
+	corpora: { open(): Promise<FsReadDir | null>; exists(path: string): Promise<boolean> };
 	/**
 	 * `git`, its stdout captured and its stderr passed through, or `null` when there is none,
 	 * which grades a present snapshot as no git checkout.
@@ -144,14 +148,13 @@ async function git(
  */
 export async function run_discovery_audit(deps: DiscoveryAuditDeps): Promise<number> {
 	const tree = CORPORA_COLLECTIONS;
-	const corpora_name = CORPORA_ROOT.slice('../'.length);
-	if (!(await deps.siblings.exists(`${corpora_name}/${CORPORA_TREE}`))) {
+	const corpora = await deps.corpora.open();
+	if (corpora === null || !(await deps.corpora.exists(CORPORA_TREE))) {
 		log(`⚠ discovery:audit NOT RUN — no ${CORPORA_ROOT} checkout.`);
 		log("  This leg checks tsv's discovery against the real-code snapshot's committed file list.");
 		log(`  Clone it beside this repo to gate it locally: git clone ${CORPORA_URL} ${CORPORA_ROOT}`);
 		return 0;
 	}
-	const corpora = deps.siblings.dir(corpora_name);
 
 	const dirty = await git(deps.git, corpora, ['status', '--porcelain', '--', CORPORA_TREE]);
 	if (dirty === null) {

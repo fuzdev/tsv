@@ -47,8 +47,11 @@
  * The run clears its output directory before writing, so `--out` is refused, with one line and
  * exit 2 before anything is opened, unless it lies strictly beneath `benches/js/.cache/`,
  * spelled relative to the checkout, apart from every other harvest's cache and stamp and from
- * the source (`to_wpt_out`); the default, `benches/js/.cache/wpt_css`, is accepted. One that
- * reaches out of the cache through a symlink is refused the same way once it's opened.
+ * the source as spelled (`to_wpt_out`); the default, `benches/js/.cache/wpt_css`, is accepted.
+ * Once the source and the output are opened, before anything is read or removed, it is refused
+ * the same way when a directory on its path beneath the cache is a symlink, when it reaches out
+ * of the cache through one, and when it overlaps the source on their real paths, however
+ * either is spelled.
  *
  * `run_wpt_css_harvest` is the library function; its root,
  * `benches/js/roots/wpt_css_harvest.ts`, binds its deps (`WptCssHarvestDeps`).
@@ -73,6 +76,8 @@ import { sort_listing } from '../lib/listing_order.ts';
 
 /** The wpt source tree, read-only, by paths beneath it. */
 export interface WptSource {
+	/** Its real path, symlinks resolved. */
+	path: string;
 	read_text(path: string): Promise<string>;
 	/** A directory's entries, in any order. */
 	list(path: string): AsyncIterable<{ name: string; kind: string }>;
@@ -80,6 +85,8 @@ export interface WptSource {
 
 /** The output directory, by paths beneath it. */
 export interface WptOut {
+	/** The absolute path it resolves to, beneath a cache whose directories are no symlinks. */
+	path: string;
 	/** Removes the directory and everything in it, if it exists. */
 	remove(): Promise<void>;
 	/** Makes `path` beneath the directory (`''`, the directory itself), with its parents. */
@@ -97,9 +104,9 @@ export interface WptCssHarvestDeps {
 	open_source(path: string): Promise<WptSource | null>;
 	/**
 	 * Opens the output directory at `path`, a project-root-relative path `to_wpt_out` accepted,
-	 * or `null` when it reaches out of `benches/js/.cache` through a symlink.
+	 * or says why it's refused: a symlink on its path beneath `benches/js/.cache`.
 	 */
-	open_out(path: string): Promise<WptOut | null>;
+	open_out(path: string): Promise<WptOut | { refused: string }>;
 	/** Where the stats JSON goes. */
 	stdout: { write(data: string): Promise<unknown> };
 }
@@ -115,9 +122,13 @@ export const WPT_OUT_USAGE_EXIT = 2;
 /** The answer `to_wpt_out` gives an `--out`. */
 export type WptOutCheck = { ok: true; path: string } | { ok: false; message: string };
 
-/** Whether the paths `a` and `b` (normalized, project-relative) are one, or one holds the other. */
-const overlaps = (a: string, b: string): boolean =>
-	a === b || a.startsWith(`${b}/`) || b.startsWith(`${a}/`);
+/** Whether the paths `a` and `b` (normalized, both relative or both absolute) are one, or one
+ * holds the other. */
+const overlaps = (a: string, b: string): boolean => holds(a, b) || holds(b, a);
+
+/** Whether the path `outer` is `inner` or a directory above it. */
+const holds = (outer: string, inner: string): boolean =>
+	outer === inner || inner.startsWith(outer.endsWith('/') ? outer : `${outer}/`);
 
 /**
  * The output directory `out` names, refusing any but a directory strictly beneath
@@ -126,8 +137,8 @@ const overlaps = (a: string, b: string): boolean =>
  * apart from every other harvest's cache and stamp, each named for its stamp (a name beneath
  * the cache that is another stamp's file, or that stamp's name alone or followed by `.` or
  * `_`, like `test262_files.json` beside `test262.stamp.json`), from wpt's own stamp, and from a
- * relative `source` (one spelled absolute is not compared). Lexical alone: `open_out` refuses a path that reaches out of the cache
- * through a symlink.
+ * relative `source` as spelled (one spelled absolute is not compared). Lexical alone: the run
+ * refuses a symlink on the path and an overlap on real paths once both are opened.
  * @param out - the `--out` value, `undefined` when the flag has none
  * @param source - the source tree as the run spells it
  * @returns the normalized project-root-relative path, or the one-line refusal
@@ -219,12 +230,15 @@ export async function run_wpt_css_harvest(
 		console.error(`wpt source root not found: ${source_root}`);
 		return 1;
 	}
-	const out = await deps.open_out(out_check.path);
-	if (out === null) {
-		console.error(
-			`wpt_css_harvest: --out ${out_dir} refused: it reaches out of ${CACHE_DIR} through a symlink`
-		);
+	const refuse_out = (why: string): number => {
+		console.error(`wpt_css_harvest: --out ${out_dir} refused: ${why}`);
 		return WPT_OUT_USAGE_EXIT;
+	};
+	const out = await deps.open_out(out_check.path);
+	if ('refused' in out) return refuse_out(out.refused);
+	// on real paths, however either is spelled: the lexical check above sees only the spelling
+	if (overlaps(out.path, source.path)) {
+		return refuse_out(`it overlaps the source, ${source_root}, at ${source.path}`);
 	}
 
 	// Freshness stamp (default source + out only — a custom run is an experiment,

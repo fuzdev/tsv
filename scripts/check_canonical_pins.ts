@@ -20,9 +20,9 @@
  * Passing neither flag runs both (what `doctor` does); passing both is the same.
  *
  * Its reach (`CheckCanonicalPinsDeps`, built by `scripts/roots/check_canonical_pins.ts`): the
- * checkout read-only; for `--checkouts`, the directory the checkout sits in read-only and
- * `git`, when one is on `PATH`, which reads each sibling checkout's ids. `--pins` gets
- * neither.
+ * checkout read-only; for `--checkouts`, the sibling checkouts read-only, each opened by its
+ * path, so one that is a symlink to a directory elsewhere is followed, and `git`, when one is on
+ * `PATH`, which reads each sibling checkout's ids. `--pins` gets neither.
  *
  * **1. Pin agreement** — the canonical versions must stay IDENTICAL, as exact
  * versions, across the three places that name them (the sync contract documented
@@ -92,6 +92,7 @@
  */
 
 import type { FsReadDir } from '@fuzdev/gro/fs.ts';
+import { is_fs_error } from '@fuzdev/gro/fs_error.ts';
 import type { SpawnProgram } from '@fuzdev/gro/spawn.ts';
 
 import { GATE_CHECKOUT_IDS } from '../benches/js/lib/gate_counts.ts';
@@ -134,10 +135,10 @@ export interface CheckCanonicalPinsDeps {
 	/** The checkout, where the pin sites are. */
 	checkout: FsReadDir;
 	/**
-	 * The directory the checkout sits in, where the sibling checkouts are (`../svelte`), read
-	 * for `--checkouts`. Unused by `--pins`.
+	 * Opens a sibling checkout by its path as the messages spell it (`../svelte`), read-only, or
+	 * `null` when it is absent, for `--checkouts`. Unused by `--pins`.
 	 */
-	siblings: FsReadDir | null;
+	siblings: { open(path: string): Promise<FsReadDir | null> } | null;
 	/**
 	 * `git`, which reads each sibling checkout's ids for the drift half, or `null` when the run
 	 * has none (`--pins`, or no git on `PATH`), which skips that half and says so.
@@ -296,12 +297,13 @@ function check_prettier_option_agreement(
 }
 
 /**
- * A sibling path as the messages spell it (`../svelte/...`) relative to the directory the
- * checkout sits in.
+ * A path into a sibling checkout as the messages spell it (`../svelte/packages/svelte/...`):
+ * the checkout's path (`../svelte`) and the path beneath it.
  */
-const to_sibling_path = (path: string): string => {
-	if (!path.startsWith('../')) throw new Error(`not a sibling path: ${path}`);
-	return path.slice('../'.length);
+const split_sibling_path = (path: string): { checkout: string; beneath: string } => {
+	const slash = path.indexOf('/', '../'.length);
+	if (!path.startsWith('../') || slash === -1) throw new Error(`not a sibling path: ${path}`);
+	return { checkout: path.slice(0, slash), beneath: path.slice(slash + 1) };
 };
 
 /**
@@ -310,16 +312,12 @@ const to_sibling_path = (path: string): string => {
  */
 const rev_parse = async (
 	git: SpawnProgram,
-	siblings: FsReadDir,
+	siblings: NonNullable<CheckCanonicalPinsDeps['siblings']>,
 	repo: string,
 	rev: string
 ): Promise<string | null> => {
-	let cwd: FsReadDir;
-	try {
-		cwd = siblings.dir(to_sibling_path(repo));
-	} catch {
-		return null;
-	}
+	const cwd = await siblings.open(repo);
+	if (cwd === null) return null;
 	try {
 		const result = await git.out(['rev-parse', rev], { cwd });
 		return result.kind === 'exited' && result.code === 0 ? result.stdout.trim() : null;
@@ -498,11 +496,19 @@ export async function run_check_canonical_pins(
 		for (const { pkg_json, npm_package } of CHECKOUT_ALIGNMENT) {
 			let checkout_version: string | undefined;
 			try {
-				checkout_version = (
-					JSON.parse(siblings.read_text_sync(to_sibling_path(pkg_json))) as { version?: string }
-				).version;
-			} catch {
-				checkout_notes.push(`${npm_package} checkout absent — alignment not checked`);
+				const { checkout, beneath } = split_sibling_path(pkg_json);
+				const dir = await siblings.open(checkout);
+				if (dir === null) throw new Error(`no checkout at ${checkout}`);
+				checkout_version = (JSON.parse(await dir.read_text(beneath)) as { version?: string })
+					.version;
+			} catch (error) {
+				if (is_fs_error(error, 'outside_root')) {
+					failures.push(
+						`${npm_package}: ${pkg_json} reaches through a symlink that is absolute or climbs out of its checkout, which is never followed — make it relative within the checkout, or link the checkout itself instead`
+					);
+				} else {
+					checkout_notes.push(`${npm_package} checkout absent — alignment not checked`);
+				}
 				continue;
 			}
 			const pinned = bench_deps[npm_package];

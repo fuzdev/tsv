@@ -36,8 +36,9 @@
  *
  * ## Reach
  *
- * The directory the checkout sits in, read-only (whether the suites are there), and `cargo`,
- * which runs the audit in the checkout with its output inherited
+ * The `../prettier` checkout, read-only, opened by its path, so one that is a symlink to a
+ * directory elsewhere is followed (whether the suites are there), and `cargo`, which runs the
+ * audit in the checkout with its output inherited
  * (`RoundtripAuditPrettierDeps`, built by `scripts/roots/roundtrip_audit_prettier.ts`).
  */
 
@@ -74,8 +75,11 @@ const log = (...args: unknown[]) => console.error(...args);
 export interface RoundtripAuditPrettierDeps {
 	/** The checkout, cargo's working directory. */
 	checkout: FsReadDir;
-	/** The directory the checkout sits in, where `../prettier` is. */
-	siblings: FsReadDir;
+	/**
+	 * The `../prettier` checkout (`PRETTIER_CHECKOUT`), read for each suite's presence alone, by
+	 * its path beneath the checkout; an absent checkout holds no suite.
+	 */
+	prettier: { exists(path: string): Promise<boolean> };
 	/** `cargo`, its output inherited. */
 	cargo: SpawnProgram;
 }
@@ -89,7 +93,8 @@ export async function run_roundtrip_audit_prettier(
 ): Promise<number> {
 	const present: string[] = [];
 	for (const suite of PRETTIER_ROUNDTRIP_SUITES) {
-		if (await deps.siblings.exists(suite.slice('../'.length))) present.push(suite);
+		if (await deps.prettier.exists(suite.slice(`${PRETTIER_CHECKOUT}/`.length)))
+			present.push(suite);
 	}
 
 	if (present.length === 0) {

@@ -16,10 +16,9 @@ import { spawn } from '@fuzdev/gro/spawn.ts';
 
 import { CARGO_PASS_ENV } from '../../../scripts/cargo_env.ts';
 import { PRETTIER_CHECKOUT } from '../../../scripts/roundtrip_audit_prettier.ts';
-import { open_checkout } from '../../../scripts/roots/checkout.ts';
+import { open_checkout, sibling_reads } from '../../../scripts/roots/checkout.ts';
 import { run_corpus_audit } from '../corpus_audit.ts';
 import { corpus_robustness_seeds } from '../lib/corpus.ts';
-import { sibling_reads } from './harvest_deps.ts';
 
 const checkout = await open_checkout();
 const cargo = spawn.program('cargo', { pass_env: CARGO_PASS_ENV });

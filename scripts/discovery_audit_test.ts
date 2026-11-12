@@ -36,14 +36,10 @@ const fake_program = (
 
 const checkout = { path: '/dev/tsv' } as unknown as FsReadDir;
 const corpora = { path: '/dev/corpora' } as unknown as FsReadDir;
-const siblings = (present: boolean) =>
-	({
-		exists: async (path: string) => present && path === 'corpora/collections',
-		dir: (path: string) => {
-			if (path !== 'corpora') throw new Error(`unexpected sibling ${path}`);
-			return corpora;
-		}
-	}) as unknown as FsReadDir;
+const corpora_reads = (present: boolean) => ({
+	open: async () => (present ? corpora : null),
+	exists: async (path: string) => present && path === 'collections'
+});
 
 test('an absent snapshot passes without running git or tsv', async () => {
 	vi.spyOn(console, 'error').mockImplementation(() => undefined);
@@ -51,7 +47,7 @@ test('an absent snapshot passes without running git or tsv', async () => {
 	const tsv = fake_program(() => ({ stdout: '', code: 0 }));
 	const code = await run_discovery_audit({
 		checkout,
-		siblings: siblings(false),
+		corpora: corpora_reads(false),
 		git: git.program,
 		tsv: tsv.program
 	});
@@ -64,7 +60,7 @@ test('a modified snapshot is refused before tsv runs', async () => {
 	const tsv = fake_program(() => ({ stdout: '', code: 0 }));
 	const code = await run_discovery_audit({
 		checkout,
-		siblings: siblings(true),
+		corpora: corpora_reads(true),
 		git: git.program,
 		tsv: tsv.program
 	});
@@ -84,7 +80,7 @@ test('git lists the snapshot in it, tsv lists it from the checkout, and agreemen
 	const tsv = fake_program(() => ({ stdout: '../corpora/collections/a.ts\n', code: 0 }));
 	const code = await run_discovery_audit({
 		checkout,
-		siblings: siblings(true),
+		corpora: corpora_reads(true),
 		git: git.program,
 		tsv: tsv.program
 	});

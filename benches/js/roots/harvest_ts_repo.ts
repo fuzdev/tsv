@@ -11,11 +11,11 @@
 
 import { process } from '@fuzdev/gro/process.ts';
 
-import { open_checkout } from '../../../scripts/roots/checkout.ts';
+import { open_checkout, sibling_reads } from '../../../scripts/roots/checkout.ts';
 import { run_harvest_ts_repo } from '../harvest_ts_repo.ts';
 import { load_typescript } from '../lib/tsc.ts';
 import { TS_REPO } from '../lib/ts_repo.ts';
-import { cache_files, sibling_reads, stamp_git } from './harvest_deps.ts';
+import { cache_files, stamp_git } from './harvest_deps.ts';
 
 const checkout = await open_checkout();
 

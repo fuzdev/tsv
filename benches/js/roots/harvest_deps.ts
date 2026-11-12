@@ -1,20 +1,19 @@
 /**
  * What the harvests' roots share, not a root itself: `git` for the stamps' checkout ids, the
  * checkout's files with writes confined beneath `benches/js/.cache`, and read-only handles on
- * the sibling checkouts a harvest reads. `css_over_acceptance.ts`'s pin leg is stamped the
- * same way, so its root binds these too, and `audit:corpus`'s root reads `../prettier` through
- * `sibling_reads`.
+ * the sibling checkouts a harvest reads (`sibling_reads`, beside the checkout's own module).
+ * `css_over_acceptance.ts`'s pin leg is stamped the same way, so its root binds these too.
  *
  * @module
  */
 
-import { resolve } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 
-import { fs, type FsDir, type FsReadDir } from '@fuzdev/gro/fs.ts';
+import type { FsDir, FsReadDir } from '@fuzdev/gro/fs.ts';
+import { is_fs_error } from '@fuzdev/gro/fs_error.ts';
 import { GIT_LOCAL_PASS_ENV } from '@fuzdev/gro/git.ts';
 import { spawn } from '@fuzdev/gro/spawn.ts';
 
-import { CHECKOUT_PATH } from '../../../scripts/roots/checkout.ts';
 import type { StampGit, StampWrites } from '../lib/harvest_stamp.ts';
 
 /** The one directory a harvest writes beneath, as every cache and stamp path spells it. */
@@ -62,37 +61,72 @@ export const cache_files = (checkout: FsDir): StampWrites => {
 	};
 };
 
-/** A sibling checkout's files, read-only, by paths beneath it. */
-export interface SiblingReads {
-	/** Whether `path` exists beneath the checkout; `false` when the checkout itself is absent. */
-	exists(path: string): Promise<boolean>;
-	read_text(path: string): Promise<string>;
-	list(path: string): AsyncIterable<{ name: string; kind: string }>;
+/** A directory beneath `HARVEST_CACHE_DIR` that a harvest clears and rewrites, by paths beneath it. */
+export interface CacheOutDir {
+	/** The absolute path it resolves to. */
+	path: string;
+	/** Removes the directory and everything in it, if it exists; a symlink, the link itself. */
+	remove(): Promise<void>;
+	/** Makes `path` beneath the directory (`''`, the directory itself), with its parents. */
+	mkdir(path: string): Promise<void>;
+	write(path: string, data: string): Promise<void>;
 }
 
 /**
- * The checkout at `path` (relative to this checkout, as the tools spell it), read-only, opened
- * once, on the first read, so an absent checkout fails the read the tool reports. It opens by
- * its path, so a checkout that is a symlink, relative or absolute, to a directory elsewhere is
- * followed, and a dangling one reads as absent; paths beneath it resolve within it.
+ * Opens the output directory at `path`, a normalized project-root-relative path strictly
+ * beneath `HARVEST_CACHE_DIR`, through a handle on the cache, or says why it's refused: a
+ * directory on its path beneath the cache is a symlink, which would lead the removal into
+ * another harvest's files, or the path reaches out of the cache through its final symlink. It
+ * reads nothing but those entries' kinds and removes nothing until `remove`.
  */
-export const sibling_reads = (path: string): SiblingReads => {
-	let dir: Promise<FsReadDir> | undefined;
-	const open = (): Promise<FsReadDir> =>
-		(dir ??= fs.open_dir(resolve(CHECKOUT_PATH, path)).then((opened) => opened.readonly()));
-	return {
-		exists: async (beneath) => {
-			let opened: FsReadDir;
-			try {
-				opened = await open();
-			} catch {
-				return false;
-			}
-			return opened.exists(beneath);
-		},
-		read_text: async (beneath) => (await open()).read_text(beneath),
-		list: async function* (beneath) {
-			yield* (await open()).list(beneath);
+export const open_cache_out = async (
+	checkout: FsDir,
+	path: string
+): Promise<CacheOutDir | { refused: string }> => {
+	const rel = cache_relative(path);
+	// opened on each call: the harvest makes the directory before its first write beneath it
+	const cache = () => checkout.dir(HARVEST_CACHE_DIR);
+	const segments = rel.split('/');
+	for (let i = 1; i < segments.length; i++) {
+		const beneath = segments.slice(0, i).join('/');
+		const stat = await checkout.stat(`${HARVEST_CACHE_DIR}/${beneath}`, { follow: false });
+		if (stat === null) break;
+		if (stat.kind === 'symlink') {
+			return { refused: `${HARVEST_CACHE_DIR}/${beneath} is a symlink` };
 		}
+	}
+	// the cache's real path, or where it will be made
+	let cache_path = join(checkout.path, HARVEST_CACHE_DIR);
+	try {
+		const dir = cache();
+		cache_path = dir.path;
+		// the cache's handle refuses a final symlink that leaves it
+		await dir.stat(rel);
+	} catch (error) {
+		if (is_fs_error(error, 'outside_root')) {
+			return { refused: `it reaches out of ${HARVEST_CACHE_DIR} through a symlink` };
+		}
+		if (!is_fs_error(error, 'not_found')) throw error;
+	}
+	const parent = dirname(rel);
+	const name = basename(rel);
+	return {
+		path: join(cache_path, rel),
+		remove: async () => {
+			try {
+				await (parent === '.' ? cache() : cache().dir(parent)).remove(name, {
+					recursive: true,
+					missing_ok: true
+				});
+			} catch (error) {
+				// the parent itself absent: nothing to remove
+				if (!is_fs_error(error, 'not_found')) throw error;
+			}
+		},
+		mkdir: async (beneath) => {
+			await checkout.mkdir(HARVEST_CACHE_DIR, { recursive: true });
+			await cache().mkdir(beneath === '' ? rel : `${rel}/${beneath}`, { recursive: true });
+		},
+		write: (beneath, data) => cache().dir(rel).write(beneath, data)
 	};
 };

@@ -14,9 +14,9 @@ import { process } from '@fuzdev/gro/process.ts';
 import { spawn } from '@fuzdev/gro/spawn.ts';
 
 import { CARGO_PASS_ENV } from '../../../scripts/cargo_env.ts';
-import { open_checkout } from '../../../scripts/roots/checkout.ts';
+import { open_checkout, sibling_reads } from '../../../scripts/roots/checkout.ts';
 import { run_harvest_test262, TEST262_ROOT } from '../harvest_test262.ts';
-import { cache_files, sibling_reads, stamp_git } from './harvest_deps.ts';
+import { cache_files, stamp_git } from './harvest_deps.ts';
 
 const checkout = await open_checkout();
 

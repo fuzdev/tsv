@@ -36,9 +36,14 @@ afterEach(() => {
 
 /** A source tree from path → content, listed in reverse insertion order (never sorted), with
  * `links` as symlink entries. */
-const fake_source = (tree: Record<string, string>, links: string[] = []): WptSource => {
+const fake_source = (
+	tree: Record<string, string>,
+	links: string[] = [],
+	path = '/dev/wpt/css'
+): WptSource => {
 	const paths = Object.keys(tree);
 	return {
+		path,
 		read_text: async (path) => {
 			const text = tree[path];
 			if (text === undefined) throw new Error(`not found: ${path}`);
@@ -80,8 +85,11 @@ const fake_deps = (
 		tree?: Record<string, string>;
 		links?: string[];
 		missing?: boolean;
-		/** `open_out` answers that the output reaches out of the cache through a symlink. */
-		out_escapes?: boolean;
+		/** Why `open_out` refuses the output, when it does. */
+		out_refused?: string;
+		/** The real paths the source and the output resolve to. */
+		source_path?: string;
+		out_path?: (path: string) => string;
 		files?: Record<string, string>;
 		commit?: string | null;
 	} = {}
@@ -96,12 +104,15 @@ const fake_deps = (
 		files,
 		open_source: async (path) => {
 			opened.push(`source ${path}`);
-			return options.missing ? null : fake_source(options.tree ?? SMALL_TREE, options.links);
+			return options.missing
+				? null
+				: fake_source(options.tree ?? SMALL_TREE, options.links, options.source_path);
 		},
 		open_out: async (path) => {
 			opened.push(`out ${path}`);
-			if (options.out_escapes) return null;
+			if (options.out_refused !== undefined) return { refused: options.out_refused };
 			return {
+				path: options.out_path?.(path) ?? `/dev/tsv/${path}`,
 				remove: async () => {
 					out_log.push('remove');
 					out_files.clear();
@@ -392,7 +403,9 @@ test('a refused --out exits 2 with one line before opening anything', async () =
 });
 
 test('an --out that leaves the cache through a symlink exits 2 before any removal', async () => {
-	const run = fake_deps({ out_escapes: true });
+	const run = fake_deps({
+		out_refused: 'it reaches out of benches/js/.cache through a symlink'
+	});
 	strictEqual(await run_wpt_css_harvest(run.deps, ['--out', 'benches/js/.cache/link']), 2);
 	deepStrictEqual(err, [
 		'wpt_css_harvest: --out benches/js/.cache/link refused: it reaches out of benches/js/.cache through a symlink'
@@ -403,7 +416,55 @@ test('an --out that leaves the cache through a symlink exits 2 before any remova
 });
 
 test('the output opens at the path to_wpt_out normalized, not as argv spells it', async () => {
-	const run = fake_deps({ out_escapes: true });
+	const run = fake_deps({
+		out_refused: 'it reaches out of benches/js/.cache through a symlink'
+	});
 	strictEqual(await run_wpt_css_harvest(run.deps, ['--out', './benches/js/.cache/x/../link/']), 2);
 	deepStrictEqual(run.opened, ['source ../wpt/css', 'out benches/js/.cache/link']);
+});
+
+test('an --out overlapping the source on real paths exits 2 before any removal, however either is spelled', async () => {
+	const cases: Array<[argv: string[], source_path: string]> = [
+		// the checkout, spelled through its parent: the output lies inside it
+		[['../tsv', '--out', 'benches/js/.cache/x'], '/dev/tsv'],
+		// spelled absolute
+		[['/dev/tsv', '--out', 'benches/js/.cache/x'], '/dev/tsv'],
+		// the source beneath the output, which the removal would delete before the walk
+		[
+			['/dev/tsv/benches/js/.cache/x/css', '--out', 'benches/js/.cache/x'],
+			'/dev/tsv/benches/js/.cache/x/css'
+		],
+		// the output itself, reached through a symlink
+		[['../wpt_link', '--out', 'benches/js/.cache/x'], '/dev/tsv/benches/js/.cache/x'],
+		// the root holds everything
+		[['/', '--out', 'benches/js/.cache/x'], '/']
+	];
+	for (const [argv, source_path] of cases) {
+		err = [];
+		const run = fake_deps({ source_path });
+		strictEqual(await run_wpt_css_harvest(run.deps, argv), 2, argv.join(' '));
+		deepStrictEqual(err, [
+			`wpt_css_harvest: --out benches/js/.cache/x refused: it overlaps the source, ${argv[0]}, at ${source_path}`
+		]);
+		deepStrictEqual(run.opened, [`source ${argv[0]}`, 'out benches/js/.cache/x']);
+		deepStrictEqual(run.out_log, []);
+		deepStrictEqual(run.files.log, []);
+		// refused before git reads the source's commit
+		deepStrictEqual((run.deps.git as ReturnType<typeof fake_stamp_git>).calls, []);
+	}
+	// beside it, apart: harvested
+	for (const source_path of [
+		'/dev/tsv/benches/js/.cache/xy',
+		'/dev/wpt',
+		'/dev/tsv/benches/js/.cache/y'
+	]) {
+		err = [];
+		const run = fake_deps({ source_path });
+		strictEqual(
+			await run_wpt_css_harvest(run.deps, ['/elsewhere', '--out', 'benches/js/.cache/x']),
+			0,
+			source_path
+		);
+		strictEqual(run.out_log[0], 'remove');
+	}
 });

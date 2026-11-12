@@ -183,6 +183,9 @@ deno task test:node      # vitest under Node over the suites beside their module
 #                          `cargo_env_test.ts` — what reaches
 #                          a script's cargo; `check_canonical_pins_test.ts` — pins:audit's mode flags, its no-git path, and
 #                          where its git runs; `discovery_audit_test.ts` — what discovery:audit hands git and tsv;
+#                          `roots/checkout_test.ts` — a sibling checkout that is a symlink followed, a dangling one
+#                          absent, a link beneath one never followed out, over real symlinks, through each tool
+#                          that reads one (audit:corpus, roundtrip:audit:prettier, discovery:audit, pins:audit:checkouts);
 #                          `package_audit_test.ts` + `check_loc_test.ts` — their checkout-relative paths;
 #                          `release/crates_test.ts` — publish:crates' order, liveness, semver baseline + release type +
 #                          feature flags and rate-limit read over a fake crates.io, and its packaging cleanup over fakes;
