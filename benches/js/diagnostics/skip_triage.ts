@@ -19,30 +19,40 @@
  *                             an over-acceptance, usually a deferred early-error
  *                             (tsv's documented posture). Reported, does not gate.
  *
- * The gate fails (exit 1) only on an **untracked over-rejection** — a tsv
- * parse gap on valid input in neither `SANCTIONED` nor `KNOWN_GAPS`. Point it at a corpus
+ * A tsv panic is none of these: the failure's mode is classified before its content
+ * (`is_native_panic_error`, the comparison tools' panic gate's classifier), so a crash lands in
+ * the `panic` bucket whatever the canonical parser said, never in `parity`.
+ *
+ * The gate fails (exit 1) on an **untracked over-rejection** — a tsv parse gap on valid input
+ * in neither `SANCTIONED` nor `KNOWN_GAPS` — and on any panic. Point it at a corpus
  * with a directory argument (defaults to the `gates` corpus view — the ../corpora snapshot + prettier suites):
  *
  *   # real source — expect green (valid code parses in both)
- *   deno run --allow-ffi --allow-read --allow-env --allow-net --allow-sys \
- *     benches/js/diagnostics/skip_triage.ts
+ *   node --disable-warning=ExperimentalWarning benches/js/roots/skip_triage.ts
  *   # svelte's own adversarial fixture suite — parity + the residual gap list
- *   deno run --allow-ffi --allow-read --allow-env --allow-net --allow-sys \
- *     benches/js/diagnostics/skip_triage.ts ../svelte/packages/svelte/tests
+ *   node --disable-warning=ExperimentalWarning benches/js/roots/skip_triage.ts ../svelte/packages/svelte/tests
  *
- * Full JSON to stdout, summary to stderr (`2>/dev/null` for a clean stream).
+ * Full JSON to stdout, summary to stderr (`2>/dev/null` for a clean stream). The engines are
+ * the comparison tools' (`lib/compare_engines.ts`): the canonical parsers and tsv's N-API addon
+ * at the `corpus` profile (`npm run build:napi:corpus`), whose unwinding panic arrives as a
+ * thrown `panic: <payload>`, so every panic in the corpus is reported, each with its file, and
+ * fails the run once the report is out. `run_skip_triage` is the library function; its root,
+ * `benches/js/roots/skip_triage.ts`, binds its deps (`SkipTriageDeps`).
+ *
+ * @module
  */
 
-import { CorpusLoader, DirectoryLoader, group_by_language } from '../lib/corpus.ts';
+import type { CompareImplementations, InitCompareImplementations } from '../lib/compare_cli.ts';
+import { group_by_language } from '../lib/corpus.ts';
+import { is_native_panic_error } from '../lib/divergence/panic_errors.ts';
 import { first_line } from '../lib/error_text.ts';
-import { init_implementations } from '../lib/implementations.ts';
 import {
 	type KnownGap,
 	type Sanction,
 	sanction_for,
 	SVELTE_FIXTURE_SANCTIONS
 } from '../lib/parse_sanctions.ts';
-import type { Language } from '../lib/types.ts';
+import type { Language, Logger, SourceFile } from '../lib/types.ts';
 
 /**
  * Over-rejections (tsv rejects, canonical accepts) that are deliberate, not
@@ -174,16 +184,15 @@ const KNOWN_GAPS: KnownGap[] = [
 	}
 ];
 
-const corpus_path = Deno.args.find((a) => !a.startsWith('-'));
-
-const [files, impls] = await Promise.all([
-	(corpus_path ? new DirectoryLoader(corpus_path) : new CorpusLoader('gates')).load((m) =>
-		console.error(m)
-	),
-	init_implementations({ logger: (m) => console.error(m) })
-]);
-const by_language = group_by_language(files);
-const langs: Language[] = ['svelte', 'typescript', 'css'];
+/** What `run_skip_triage` reaches the world through. */
+export interface SkipTriageDeps {
+	/** The files beneath `path`, or the `gates` corpus view when there is none. */
+	load_files(path: string | undefined, logger: Logger): Promise<SourceFile[]>;
+	/** tsv's N-API addon and the canonical parsers; `null` when one failed, which it reports. */
+	init_implementations: InitCompareImplementations;
+	/** Where the JSON report goes. */
+	stdout: { write(data: string): Promise<unknown> };
+}
 
 interface Entry {
 	path: string;
@@ -200,79 +209,143 @@ interface Buckets {
 	over_acceptance: Entry[];
 	/** Both reject — parity, the healthy state. */
 	parity: { path: string; tsv_error: string; canonical_error: string }[];
+	/** tsv panicked — a crash, whatever the canonical parser said; fails the gate. */
+	panic: Entry[];
 }
 
-const report: Record<string, Buckets> = {};
+/** How many panics the failure lists, as the comparison tools' panic gate does; the JSON has all. */
+const PANICS_LISTED = 10;
 
-for (const lang of langs) {
-	const buckets: Buckets = {
-		unexpected_over_rejection: [],
-		sanctioned_over_rejection: [],
-		known_gap_over_rejection: [],
-		over_acceptance: [],
-		parity: []
-	};
-	for (const f of by_language[lang]) {
-		let tsv_err: string | null = null;
-		let canon_err: string | null = null;
-		try {
-			// parse_internal suffices: only throw/no-throw is read, and it skips
-			// the full JSON materialization (Rust to_string + FFI copy + JS
-			// JSON.parse) — same $lang::parse + error surface in tsv_ffi
-			impls.native.parse_internal(f.content, lang);
-		} catch (e) {
-			tsv_err = first_line(e);
-		}
-		try {
-			impls.canonical.parse(f.content, lang);
-		} catch (e) {
-			canon_err = first_line(e);
-		}
-		if (tsv_err && !canon_err) {
-			const reason = sanction_for(SANCTIONED, f.path);
-			const gap = KNOWN_GAPS.find((g) => f.path.includes(g.pattern));
-			if (reason) {
-				buckets.sanctioned_over_rejection.push({ path: f.path, error: tsv_err, reason });
-			} else if (gap) {
-				buckets.known_gap_over_rejection.push({ path: f.path, error: tsv_err, reason: gap.reason });
-			} else {
-				buckets.unexpected_over_rejection.push({ path: f.path, error: tsv_err });
+/**
+ * Buckets every file of a corpus by parse asymmetry between tsv and the canonical parser.
+ *
+ * @param deps - the corpus, the engines, stdout
+ * @param argv - the tool's arguments: the first that isn't a flag is the corpus directory
+ * @returns the exit code: 1 on an untracked over-rejection, a panic, or an engine that failed to
+ * load, else 0
+ */
+export async function run_skip_triage(
+	deps: SkipTriageDeps,
+	argv: ReadonlyArray<string>
+): Promise<number> {
+	const corpus_path = argv.find((a) => !a.startsWith('-'));
+	const logger: Logger = (m) => console.error(m);
+
+	const [files, impls] = await Promise.all([
+		deps.load_files(corpus_path || undefined, logger),
+		deps.init_implementations()
+	]);
+	if (impls === null) return 1;
+	try {
+		return await triage(files, impls, deps);
+	} finally {
+		impls.dispose();
+	}
+}
+
+/** The buckets, the summary, the report, and the verdict, over loaded engines. */
+async function triage(
+	files: SourceFile[],
+	impls: CompareImplementations,
+	deps: SkipTriageDeps
+): Promise<number> {
+	const by_language = group_by_language(files);
+	const langs: Language[] = ['svelte', 'typescript', 'css'];
+
+	const report: Record<string, Buckets> = {};
+
+	for (const lang of langs) {
+		const buckets: Buckets = {
+			unexpected_over_rejection: [],
+			sanctioned_over_rejection: [],
+			known_gap_over_rejection: [],
+			over_acceptance: [],
+			parity: [],
+			panic: []
+		};
+		for (const f of by_language[lang]) {
+			let tsv_err: string | null = null;
+			let canon_err: string | null = null;
+			try {
+				// parse_internal suffices: only throw/no-throw is read, and it skips
+				// the full JSON materialization (Rust to_string + the binding's copy + JS
+				// JSON.parse) — the same $lang::parse and error surface
+				impls.native.parse_internal(f.content, lang);
+			} catch (e) {
+				tsv_err = first_line(e);
 			}
-		} else if (!tsv_err && canon_err) {
-			buckets.over_acceptance.push({ path: f.path, error: canon_err });
-		} else if (tsv_err && canon_err) {
-			buckets.parity.push({ path: f.path, tsv_error: tsv_err, canonical_error: canon_err });
+			// the failure's mode before its content: a crash is never a verdict on the source
+			if (tsv_err !== null && is_native_panic_error(tsv_err)) {
+				buckets.panic.push({ path: f.path, error: tsv_err });
+				continue;
+			}
+			try {
+				impls.canonical.parse(f.content, lang);
+			} catch (e) {
+				canon_err = first_line(e);
+			}
+			if (tsv_err && !canon_err) {
+				const reason = sanction_for(SANCTIONED, f.path);
+				const gap = KNOWN_GAPS.find((g) => f.path.includes(g.pattern));
+				if (reason) {
+					buckets.sanctioned_over_rejection.push({ path: f.path, error: tsv_err, reason });
+				} else if (gap) {
+					buckets.known_gap_over_rejection.push({
+						path: f.path,
+						error: tsv_err,
+						reason: gap.reason
+					});
+				} else {
+					buckets.unexpected_over_rejection.push({ path: f.path, error: tsv_err });
+				}
+			} else if (!tsv_err && canon_err) {
+				buckets.over_acceptance.push({ path: f.path, error: canon_err });
+			} else if (tsv_err && canon_err) {
+				buckets.parity.push({ path: f.path, tsv_error: tsv_err, canonical_error: canon_err });
+			}
+		}
+		report[lang] = buckets;
+	}
+
+	// Summary to stderr, full JSON to stdout.
+	let unexpected_total = 0;
+	for (const lang of langs) {
+		const b = report[lang];
+		unexpected_total += b.unexpected_over_rejection.length;
+		console.error(
+			`\n${lang}: parity(both-reject)=${b.parity.length}  ` +
+				`sanctioned-over-rejection=${b.sanctioned_over_rejection.length}  ` +
+				`known-gap-over-rejection=${b.known_gap_over_rejection.length}  ` +
+				`over-acceptance=${b.over_acceptance.length}  ` +
+				`UNEXPECTED-over-rejection=${b.unexpected_over_rejection.length}`
+		);
+		for (const e of b.unexpected_over_rejection) {
+			console.error(`    ✗ ${e.path}\n        ${e.error}`);
 		}
 	}
-	report[lang] = buckets;
-}
 
-// Summary to stderr, full JSON to stdout.
-let unexpected_total = 0;
-for (const lang of langs) {
-	const b = report[lang];
-	unexpected_total += b.unexpected_over_rejection.length;
-	console.error(
-		`\n${lang}: parity(both-reject)=${b.parity.length}  ` +
-			`sanctioned-over-rejection=${b.sanctioned_over_rejection.length}  ` +
-			`known-gap-over-rejection=${b.known_gap_over_rejection.length}  ` +
-			`over-acceptance=${b.over_acceptance.length}  ` +
-			`UNEXPECTED-over-rejection=${b.unexpected_over_rejection.length}`
-	);
-	for (const e of b.unexpected_over_rejection) {
-		console.error(`    ✗ ${e.path}\n        ${e.error}`);
+	await deps.stdout.write(JSON.stringify(report, null, 2) + '\n');
+
+	const panics = langs.flatMap((lang) => report[lang].panic);
+	if (panics.length > 0) {
+		console.error(
+			`\nFAIL: ${panics.length} panic(s) — tsv crashed on real code ` +
+				`(caught here by the corpus profile; a shipped artifact would abort the host):`
+		);
+		for (const p of panics.slice(0, PANICS_LISTED)) console.error(`  ${p.path}: ${p.error}`);
+		if (panics.length > PANICS_LISTED) {
+			console.error(`  ... and ${panics.length - PANICS_LISTED} more`);
+		}
 	}
+	if (unexpected_total > 0) {
+		console.error(
+			`\nFAIL: ${unexpected_total} untracked over-rejection(s) — tsv rejects input the ` +
+				`canonical parser accepts. Fix the parser, or add a reasoned entry to SANCTIONED ` +
+				`(a deliberate divergence — deprecated syntax or a permanent non-goal) / KNOWN_GAPS ` +
+				`(tsv wrong, a tracked gap to fix) in this file.`
+		);
+	}
+	if (panics.length > 0 || unexpected_total > 0) return 1;
+	console.error('\nOK: no un-sanctioned parse over-rejections (parity holds).');
+	return 0;
 }
-
-console.log(JSON.stringify(report, null, 2));
-
-if (unexpected_total > 0) {
-	console.error(
-		`\nFAIL: ${unexpected_total} untracked over-rejection(s) — tsv rejects input the ` +
-			`canonical parser accepts. Fix the parser, or add a reasoned entry to SANCTIONED ` +
-			`(a deliberate divergence — deprecated syntax or a permanent non-goal) / KNOWN_GAPS ` +
-			`(tsv wrong, a tracked gap to fix) in this file.`
-	);
-	Deno.exit(1);
-}
-console.error('\nOK: no un-sanctioned parse over-rejections (parity holds).');

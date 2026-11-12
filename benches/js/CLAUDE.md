@@ -231,10 +231,15 @@ the same flag for `lib/corpus_parse_pins.txt`; ../../docs/gate_counts.md §Updat
 
 **The comparison tools load tsv's N-API addon at the `corpus` profile, by a parameter.** Every
 corpus/conformance comparison entry (`corpus:compare:{format,parse}:run`,
-`conformance:{svelte-fixtures,ts-fixtures,ts-repo}:run`, the `conformance` driver) is a Node root
-under `roots/` that loads its engines through `lib/compare_engines.ts`
+`conformance:{svelte-fixtures,ts-fixtures,ts-repo}:run`, the `conformance` driver,
+`diagnostics/biome_oxfmt_diff.ts`, `diagnostics/skip_triage.ts`) is a Node root under `roots/`
+that loads its engines through `lib/compare_engines.ts`
 (`init_compare_implementations({profile: COMPARE_PROFILE})`, `corpus`, named in
-`lib/tsv_artifacts.ts` so `deno task doctor` reports the same addon), so a direct run loads
+`lib/tsv_artifacts.ts` so `deno task doctor` reports the same addon), and the tools that grade
+every implementation (`css:over-acceptance:run`, `ts-repo:over-acceptance:run`) through
+`roots/graded_implementations.ts`
+(`init_implementations({native_profile: COMPARE_PROFILE})`, beside the `nodejs` WASM bundle), so a
+direct run loads
 `target/corpus/libtsv_napi.so` — what the build-first wrapper's `build:napi:corpus` produces —
 and the freshness guard grades that same file, its rebuild hint naming that task. It matters:
 `corpus` is `panic = "unwind"`, so a panic is a reported per-file `panic: <payload>` error the
@@ -244,8 +249,8 @@ tasks deliberately name no profile: unset, the loaders open the profile-guided b
 `TSV_FFI_PROFILE` would load that cargo profile's plain C-FFI build from `target/` instead, so
 the bench (its orchestrator, pre-flight and row processes) and smoke REFUSE one
 (`refuse_ffi_profile_override`); the report's `native_build` also hashes the library the rows
-loaded and calls it `pgo` only when the stamp names those bytes. The over-acceptance tools still
-read the variable under Deno — they publish no native timing.
+loaded and calls it `pgo` only when the stamp names those bytes. No task sets the variable; the
+FFI loader (`lib/ffi.ts`) still reads it, which is what the refusal is for.
 
 The comparison tools are library functions over deps returning an exit code (the engines, `HOME`,
 stdout, the pins file, `tsv_debug`, read-only directory handles), so their unit suites drive them
@@ -1343,7 +1348,7 @@ nothing measures them; a missing one is `binary_sizes_absent`'s to record); the
 build-first tasks build the whole set, so there it is unreachable. The
 executed-vs-size-only split is a PATH comparison, which is sound only because both
 sides come from that module's builders: what remains is the two axes a loader owns
-(`TSV_FFI_PROFILE`, the wasm-pack target), where a differing path is a real
+(the N-API profile, the wasm-pack target), where a differing path is a real
 difference rather than a spelling.
 
 **The staged-package sibling: the npm test `:run` tasks abort too.**
@@ -1652,8 +1657,12 @@ benches/js/
 ├── roots/                 # The Node entries over gro's host modules, each binding a library above it
 │                          # (`strip_corpus.ts`, `imports_corpus.ts`, `divergence_audit.ts`,
 │                          # `compose_reports.ts`, `corpus_stats.ts`, the comparison tools and the
-│                          # `conformance` driver, whose shared bindings are `compare_deps.ts`);
-│                          # typechecked by `tsconfig.bench.json`, and the three needing no bench
+│                          # `conformance` driver, and `skip_triage`, whose shared bindings are
+│                          # `compare_deps.ts`, the over-acceptance tools, whose full engine set is
+│                          # `graded_implementations.ts`, and the other diagnostics, whose WASM
+│                          # glue loader is `wasm_glue.ts`); typechecked by `tsconfig.bench.json` but those whose
+│                          # closure reaches `lib/ffi.ts` or a bench package's untyped module,
+│                          # which `typecheck:js`' `deno check` covers, and those needing no bench
 │                          # package by `tsconfig.scripts.json` too
 ├── compose_reports.ts     # Fold report.{deno,node,bun}.json → combined report.{json,md}
 ├── idempotency_sweep.ts   # F1 sweep over the `robustness` view (drives tsv_debug `fuzz --iterations 0`)
@@ -2004,26 +2013,33 @@ state) shows in the coverage report and skip counts without `--verbose`.
 
 ## Diagnostic scripts
 
-These live under `diagnostics/`. Most are ad-hoc, not wired into `deno task`. Each
+These live under `diagnostics/`. Most are ad-hoc, not wired into a task. Each
 module's own doc comment is the full reference (rationale, findings, exact run
-command); the table is the index. Some import the canonical parser / oracle
-(`acorn`, `svelte/compiler`, `oxc-parser`) by bare specifier, so pass `--config
-benches/js/deno.json` to resolve them from `node_modules`; all run from the repo
-root (corpus/artifact paths are CWD-relative). The usual permission set is
-`--allow-ffi --allow-read --allow-env --allow-net --allow-sys`.
+command); the table is the index. They run under Node, each from its root in `roots/`
+(`node benches/js/roots/<script>.ts`, the library under `diagnostics/`), but for the
+harvests, which run under Deno (§Harvests), and `facade_probe.ts` and `biome_heap_probe.ts`,
+which run as they are under each runtime they name. All run from the repo root
+(corpus/artifact paths are CWD-relative). Each library takes its engines, readers, and
+stdout as deps, so its unit suite drives it over fakes (`diagnostics/*_test.ts`, in `test:node`);
+`biome_oxfmt_diff.ts` and `wasm_json_probe.ts` have none (the first loads biome and oxfmt itself,
+the second only times).
 
-**Any diagnostic that calls `init_implementations` needs BOTH tsv artifacts built,
-and fresh** — the runtime's native binding *and* its `pkg/all/<target>` WASM bundle —
-because those two plus `canonical` are REQUIRED and a load failure in any of them throws
-(§Report files), and because `init_implementations` runs the executed-artifact
-freshness guard itself (§Artifact Freshness Guard): a stale native library does not fail with
-a message when `Deno.dlopen` loads it (it can segfault at init with nothing naming the cause),
-so a stale one aborts with the rebuild hint (`BENCH_STALE_OK=1` downgrades it). That includes
-the ones that measure only the native path (`skip_triage`), where an unbuilt bundle otherwise
-fails a run that would never have touched it, with a WASM error naming nothing the script is
-about: `deno task build:bench:pgo && deno task build:wasm:all:deno` first (it reads the
-profile-guided FFI library, not `corpus`). The two with `deno task` entries — `css:over-acceptance` and
-`ts-repo:over-acceptance` — build what they need themselves.
+**Any diagnostic that loads the whole implementation set needs BOTH tsv artifacts built,
+and fresh** — the native binding *and* the `pkg/all/nodejs` WASM bundle — because those two
+plus `canonical` are REQUIRED and a load failure in any of them throws (§Report files), and
+because `init_implementations` runs the executed-artifact freshness guard itself (§Artifact
+Freshness Guard), so a stale one aborts with the rebuild hint (`BENCH_STALE_OK=1` downgrades
+it). The set's init runs one program: `rsvelte-fmt`'s platform binary from the bench install
+(`lib/rsvelte.ts`, `node:child_process` with the inherited environment plus the
+`PRETTIER_DEBUG=1` the harness sets), for its `--version` and its config, embed, and reject
+probes, though no diagnostic that loads the set reads its row. The two
+over-acceptance tools load the addon at the `corpus` profile
+(`npm run build:napi:corpus && npm run build:wasm:all:nodejs` first), so a panic is graded as a
+rejection; `wasm_json_probe` loads the bench's profile-guided addon
+(`deno task build:bench:pgo`), since the split it prints is the bench rows'. The two with tasks
+— `css:over-acceptance` and `ts-repo:over-acceptance` — build what they need themselves.
+`skip_triage` reads tsv's native verdict and the oracle's alone, so it loads the comparison
+tools' engines instead (`npm run build:napi:corpus` first), no WASM bundle and no program.
 
 Documented above, though they live here: the parse-conformance gates
 (`svelte_fixtures_compare.ts`, `ts_fixtures_compare.ts`, `ts_repo_compare.ts` →
@@ -2034,7 +2050,7 @@ Documented above, though they live here: the parse-conformance gates
 | Script | What it does | Task |
 | --- | --- | --- |
 | `corpus_stats.ts` | corpus/candidate-dir size + language + degenerate-case stats (reuses `lib/corpus.ts` filters via `stream_entry_candidate` — no fixture heuristic; fixture-like segments are WATCH flags for a manifest `exclude`) | `corpus:stats` |
-| `skip_triage.ts` | parse-**parity** gate: buckets every corpus file by *asymmetry* (`parity` / `sanctioned_over_rejection` / `over_acceptance` / `unexpected_over_rejection`), exiting 1 only on the last. Takes an optional corpus dir (defaults to the `gates` view — the `../corpora` snapshot + prettier suites); point it at Svelte's adversarial `tests/` for the residual gap list | — |
+| `skip_triage.ts` | parse-**parity** gate: buckets every corpus file by *asymmetry* (`parity` / `sanctioned_over_rejection` / `over_acceptance` / `unexpected_over_rejection`), exiting 1 on the last. A tsv panic (`is_native_panic_error`) is a crash, never a verdict: it goes to the `panic` bucket whatever the oracle said, each is listed with its file (the JSON has all, stderr the first ten), and any fails the run once the report is out (on the `corpus` addon a panic is a thrown `panic: <payload>`; a `panic = "abort"` build would abort the process with no report). Takes an optional corpus dir (defaults to the `gates` view — the `../corpora` snapshot + prettier suites); point it at Svelte's adversarial `tests/` for the residual gap list | — |
 | `test262_compare.ts` | test262 differential, tsv vs oxc-parser, from `tsv_debug test262 --emit-manifest`. Surfaces positive tsv real-bug candidates + negative early-error gaps; numbers move with the pinned oxc version. No biome — its js-api has no parser to grade. See `docs/conformance_test262.md` §Differential | — |
 | `css_over_acceptance.ts` | the `parse/css` sibling of the row below — per-tool accepts over the files `svelte/compiler`'s `parseCss` rejects, computed live from the conformance corpus (no harvest cache: nothing else consumes the list). Its reason to exist is sharper than the TS one's, because CSS is the surface that CANNOT filter to valid inputs — `parseCss` accepts malformed CSS and rejects valid modern CSS it doesn't implement, so filtering would drop files tsv also fails. The reject count is PINNED (`CSS_REJECTS_PIN`), which is what makes the reference row's grammar moving visible instead of silently reshaping the published coverage. The `svelte/compiler` row must read 0 (it built the list). `--pin-only` grades the pin alone, oracle only and stamped — the `bench:pins:suites` leg | `css:over-acceptance`, `css:over-acceptance:pin` |
 | `ts_repo_over_acceptance.ts` | per-tool OVER-ACCEPTANCE over the tsc corpus — the files tsc's own PARSER rejects (`.cache/ts_repo_rejects.json`). The axis coverage structurally cannot show: coverage counts accepts, so it can only reward permissiveness, and every conformance corpus is therefore filtered to VALID inputs. Read inverted (lower is better) and as a PROFILE, not a gate — a deferred early error is a documented tsv posture, and the per-file gate on tsv alone is `conformance:ts-repo`. The `tsc` row must read 0 (it built the list); anything else fails the run as a stale cache | `ts-repo:over-acceptance` |

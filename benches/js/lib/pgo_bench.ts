@@ -118,10 +118,10 @@ export function pgo_bench_mismatch(world: PgoBenchWorld, path: string): string |
 
 /**
  * Refuse a set `TSV_FFI_PROFILE` in a process that measures or smoke-tests the native rows.
- * The variable points the FFI loader at a cargo profile's PLAIN build under `target/` — the
- * corpus tools' knob — and a bench row timing that would be published beside a stamp that
- * names a different library. The corpus and over-acceptance tools keep it; they publish no
- * native timing.
+ * The variable points the FFI loader (`ffi.ts`, the kept Deno row's) at a cargo profile's
+ * PLAIN build under `target/`, and a bench row timing that would be published beside a stamp
+ * that names a different library. No task sets it; the loader still reads it, so the bench
+ * and smoke refuse it.
  *
  * @param entry - the refusing entry point, named in the error
  * @throws when `TSV_FFI_PROFILE` is set

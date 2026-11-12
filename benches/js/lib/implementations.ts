@@ -206,8 +206,8 @@ export interface InitOptions {
 	/**
 	 * Under Node/Bun, the cargo profile whose plain N-API addon `native` loads
 	 * (`napi_library_path`), freshness-guarded as that build; none loads the profile-guided
-	 * addon the bench measures. Refused under Deno, whose C-FFI library follows
-	 * `TSV_FFI_PROFILE` (`native_artifact_check`).
+	 * addon the bench measures. Refused under Deno, which loads the profile-guided C-FFI
+	 * library (`native_artifact_check`).
 	 */
 	native_profile?: string;
 }

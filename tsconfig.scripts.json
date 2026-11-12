@@ -21,6 +21,9 @@
 		"crates/tsv_debug/sidecar/sidecar.ts",
 		"benches/js/roots/divergence_audit.ts",
 		"benches/js/roots/corpus_stats.ts",
-		"benches/js/roots/compose_reports.ts"
+		"benches/js/roots/compose_reports.ts",
+		"benches/js/roots/wasm_format_probe.ts",
+		"benches/js/roots/wasm_glue.ts",
+		"benches/js/roots/wasm_memory_probe.ts"
 	]
 }

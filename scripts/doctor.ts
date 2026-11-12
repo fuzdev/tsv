@@ -756,12 +756,14 @@ export const run_doctor = async (
 		[`.pgo/bench/${napi_lib}`, 'deno task build:bench:pgo (bench:node/bun, profile-guided)'],
 		[
 			`target/${napi_target_path(COMPARE_PROFILE)}`,
-			`${napi_rebuild_task(COMPARE_PROFILE)} (conformance gates)`
+			`${napi_rebuild_task(COMPARE_PROFILE)} (conformance gates, over-acceptance)`
 		],
-		[`target/corpus/${ffi_lib}`, 'deno task build:ffi:corpus (over-acceptance)'],
 		[`target/${napi_target_path('napi')}`, `${napi_rebuild_task('napi')} (test:napi)`],
 		['crates/tsv_wasm/pkg/all/deno', 'deno task build:wasm:all:deno (bench:deno)'],
-		['crates/tsv_wasm/pkg/all/nodejs', 'deno task build:wasm:all:nodejs (bench:node/bun)'],
+		[
+			'crates/tsv_wasm/pkg/all/nodejs',
+			'deno task build:wasm:all:nodejs (bench:node/bun, over-acceptance)'
+		],
 		['crates/tsv_wasm/pkg/all/npm', 'deno task build:npm:all (publish)']
 	];
 	for (const [path, task] of artifacts) {

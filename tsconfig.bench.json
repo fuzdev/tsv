@@ -13,5 +13,12 @@
 		"verbatimModuleSyntax": true,
 		"types": ["node"]
 	},
-	"include": ["benches/js/roots/**/*.ts"]
+	"include": ["benches/js/roots/**/*.ts"],
+	"exclude": [
+		"benches/js/roots/graded_implementations.ts",
+		"benches/js/roots/biome_oxfmt_diff.ts",
+		"benches/js/roots/css_over_acceptance.ts",
+		"benches/js/roots/ts_repo_over_acceptance.ts",
+		"benches/js/roots/wasm_json_probe.ts"
+	]
 }

@@ -13,8 +13,8 @@
  * ({@link ffi_library_path}, {@link napi_library_path}, {@link wasm_bundle_dir} /
  * {@link wasm_bundle_path}) and from `pgo_bench.ts`'s `pgo_bench_library_path` (the
  * profile-guided native pair the timed rows load) rather than re-deriving the layout. Only
- * the AXES a loader varies stay its own — the native profile (`TSV_FFI_PROFILE` for the
- * C FFI under Deno, a parameter for the N-API addon) and the wasm-pack target — which is
+ * the AXES a loader varies stay its own — the native profile (a parameter for the N-API
+ * addon) and the wasm-pack target — which is
  * exactly why the freshness guard's executed-vs-size-only split can be a path
  * comparison at all: an entry differing there is a real difference, not a spelling.
  *
@@ -77,8 +77,7 @@ const FFI_LIB = native_library_filename('tsv_ffi');
 const NAPI_LIB = native_library_filename('tsv_napi');
 
 /**
- * The plain C-FFI shared library cargo builds for a profile — `corpus` for the unwinding
- * build the corpus tools load (`TSV_FFI_PROFILE`). The bench's timed row loads the
+ * The plain C-FFI shared library cargo builds for a profile. The bench's timed row loads the
  * profile-guided library instead (`pgo_bench_library_path('ffi')`). The profile is the
  * caller's axis; the layout is this module's.
  */
@@ -87,23 +86,25 @@ export function ffi_library_path(profile: string): string {
 }
 
 /**
- * The C-FFI library a process loads for a `TSV_FFI_PROFILE` value: the bench's
- * profile-guided build (`pgo_bench_library_path('ffi')`) when it is unset, else that cargo
- * profile's plain build under `target/` (the corpus tools set `corpus` for panic recovery).
- * The caller reads the variable, under whichever runtime it runs: `ffi.ts` under Deno, the
- * freshness guard under any.
+ * The C-FFI library `ffi.ts` loads for a `TSV_FFI_PROFILE` value: the bench's profile-guided
+ * build (`pgo_bench_library_path('ffi')`) when it is unset, else that cargo profile's plain
+ * build under `target/`. `ffi.ts` reads the variable; no task sets it, and the bench and
+ * smoke refuse a set one (`refuse_ffi_profile_override`).
  */
 export function ffi_loaded_path(profile: string | undefined): string {
 	return profile === undefined ? pgo_bench_library_path('ffi') : ffi_library_path(profile);
 }
 
-/** The task that rebuilds the library `ffi_loaded_path` names for the same profile. */
+/**
+ * The command that rebuilds the library `ffi_loaded_path` names for the same profile: the
+ * build task where one exists, else the stamped cargo build of that profile.
+ */
 export function ffi_rebuild_task(profile: string | undefined): string {
 	return profile === undefined
 		? 'deno task build:bench:pgo'
 		: profile === 'release'
 			? 'deno task build:ffi'
-			: `deno task build:ffi:${profile}`;
+			: `npm run build:stamped -- -p tsv_ffi --profile ${profile}`;
 }
 
 /**

@@ -621,12 +621,11 @@ identically across the builds, or the run aborts.
 
 ```bash
 # copy the artifact aside before editing (pkg/ is gitignored)
-cp -r crates/tsv_wasm/pkg/all/deno crates/tsv_wasm/pkg/all/deno.baseline
+cp -r crates/tsv_wasm/pkg/all/nodejs crates/tsv_wasm/pkg/all/nodejs.baseline
 # ... edit source, then rebuild and A/B:
-deno task build:wasm:all:deno
-deno run --allow-read --allow-env --allow-net --allow-sys \
-  benches/js/diagnostics/wasm_format_probe.ts \
-  --baseline crates/tsv_wasm/pkg/all/deno.baseline/tsv_wasm.js
+npm run build:wasm:all:nodejs
+node benches/js/roots/wasm_format_probe.ts \
+  --baseline crates/tsv_wasm/pkg/all/nodejs.baseline/tsv_wasm.js
 ```
 
 Defaults to `../corpora/collections/zzz/src/lib` (the corpus the native profiling tools
@@ -639,8 +638,7 @@ cheapest way to sanity-check the floor and capture a fresh baseline number
 before starting an A/B.
 
 ```bash
-deno run --allow-read --allow-env --allow-net --allow-sys \
-  benches/js/diagnostics/wasm_format_probe.ts
+node benches/js/roots/wasm_format_probe.ts
 ```
 
 Two siblings cover the other WASM axes: `wasm_memory_probe.ts` measures

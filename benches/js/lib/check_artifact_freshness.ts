@@ -72,8 +72,6 @@ import {
 	type SourceTree
 } from './source_mtime.ts';
 import {
-	ffi_loaded_path,
-	ffi_rebuild_task,
 	napi_library_path,
 	napi_rebuild_task,
 	TSV_ARTIFACTS,
@@ -297,32 +295,31 @@ export async function check_artifact_freshness(checks: readonly ArtifactCheck[])
  *
  * Under Node/Bun, `profile` names the cargo profile whose plain addon the caller loads
  * (`napi_library_path(profile)`, the path it hands `NapiImplementation`), and none names
- * the profile-guided one. Under Deno the C-FFI library follows `TSV_FFI_PROFILE`, the
- * kept Deno row's selector, so a `profile` there is refused rather than read as a second
- * selector for the one library.
+ * the profile-guided one. Under Deno, the kept bench row's runtime, the C-FFI library is the
+ * profile-guided one the row measures, so a `profile` there is refused rather than read as a
+ * selector for a library nothing loads.
  *
- * The rebuild hint follows the profile: a `corpus`-profile library is rebuilt by a
- * different task than the release one, and pointing a reader at `build:ffi` when their
- * stale artifact is the corpus build is a remedy that rebuilds the wrong file.
+ * The rebuild hint follows the profile: a `corpus`-profile addon is rebuilt by a
+ * different task than the profile-guided one, and pointing a reader at `build:bench:pgo`
+ * when their stale artifact is the corpus build is a remedy that rebuilds the wrong file.
  *
  * @param profile - the cargo profile of the N-API addon the caller loads, or none for the
  * profile-guided one
  * @throws if a `profile` is named under Deno
  */
 export function native_artifact_check(profile?: string): ArtifactCheck {
-	return native_artifact_check_for(current_runtime(), profile, env.TSV_FFI_PROFILE);
+	return native_artifact_check_for(current_runtime(), profile);
 }
 
 /**
- * `native_artifact_check` over its inputs: the runtime, the N-API profile the caller
- * names, and the `TSV_FFI_PROFILE` value the Deno branch reads.
+ * `native_artifact_check` over its inputs: the runtime and the N-API profile the caller
+ * names.
  *
  * @throws if a `profile` is named under Deno
  */
 export function native_artifact_check_for(
 	runtime: Runtime,
-	profile: string | undefined,
-	ffi_profile: string | undefined
+	profile: string | undefined
 ): ArtifactCheck {
 	if (runtime !== 'deno') {
 		return profile === undefined
@@ -343,23 +340,16 @@ export function native_artifact_check_for(
 	if (profile !== undefined) {
 		throw new Error(
 			`native_artifact_check: profile '${profile}' selects the N-API addon, which Deno does ` +
-				`not load; the C-FFI library follows TSV_FFI_PROFILE`
+				`not load; Deno loads the profile-guided C-FFI library`
 		);
 	}
-	return ffi_profile === undefined
-		? {
-				label: 'FFI (pgo)',
-				path: ffi_loaded_path(ffi_profile),
-				binding_crates: ['tsv_ffi'],
-				rebuild: TSV_ARTIFACTS.tsv_ffi.rebuild,
-				pgo_world: 'ffi'
-			}
-		: {
-				label: `FFI (${ffi_profile})`,
-				path: ffi_loaded_path(ffi_profile),
-				binding_crates: ['tsv_ffi'],
-				rebuild: ffi_rebuild_task(ffi_profile)
-			};
+	return {
+		label: 'FFI (pgo)',
+		path: TSV_ARTIFACTS.tsv_ffi.path,
+		binding_crates: TSV_ARTIFACTS.tsv_ffi.binding_crates,
+		rebuild: TSV_ARTIFACTS.tsv_ffi.rebuild,
+		pgo_world: 'ffi'
+	};
 }
 
 /**
@@ -477,8 +467,8 @@ function executed_artifact_checks(native_profile?: string): ArtifactCheck[] {
 export async function warn_stale_reported_artifacts(): Promise<void> {
 	// Both sides now come from `tsv_artifacts.ts`'s builders, so a path that DIFFERS
 	// here differs for a reason rather than by spelling — the two axes a loader owns.
-	// A `TSV_FFI_PROFILE=corpus` run executes `target/corpus` while the size table
-	// reports `target/release`, and Node/Bun execute the `nodejs` bundle while the
+	// A run naming an N-API profile executes `target/<profile>` while the size table
+	// reports the profile-guided addon, and Node/Bun execute the `nodejs` bundle while the
 	// table reports the `deno` one; in both cases the reported build really is
 	// unmeasured here, which is exactly what this warning is about. `resolve` stays
 	// as normalization, not as the thing holding the comparison together.

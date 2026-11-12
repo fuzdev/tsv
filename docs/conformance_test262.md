@@ -512,7 +512,7 @@ saved/restored at every function-like scope boundary (async → `[+Await]`, non-
 
 The pass rate above is **un-baselined** — a positive failure could be a genuine
 tsv parser gap, or a test even other parsers reject. To triage, the harness can
-emit a **manifest** of tsv's graded subset and a Deno consumer compares
+emit a **manifest** of tsv's graded subset and a Node consumer compares
 each verdict against [oxc-parser](https://github.com/oxc-project/oxc):
 
 ```bash
@@ -521,12 +521,10 @@ each verdict against [oxc-parser](https://github.com/oxc-project/oxc):
 #    filters.
 cargo run -p tsv_debug test262 --emit-manifest /tmp/t262.json
 
-# 2. Deno consumer runs oxc-parser over the same files at each test's goal
+# 2. The consumer runs oxc-parser over the same files at each test's goal
 #    (module-flagged → module, else script — mirroring tsv) and buckets the
 #    agreement. Run from the repo root:
-deno run --allow-read --allow-env --allow-ffi --allow-net --allow-sys \
-  --config benches/js/deno.json \
-  benches/js/diagnostics/test262_compare.ts --manifest /tmp/t262.json
+node benches/js/roots/test262_compare.ts --manifest /tmp/t262.json
 ```
 
 **Why oxc-parser only (no biome).** test262 is a *parse*-conformance suite, and
