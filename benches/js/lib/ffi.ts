@@ -9,8 +9,7 @@
  * C FFI, so this is the facade tsv WOULD publish over it; see `lib/tsv_api.ts`.
  */
 
-import { pgo_bench_library_path } from './pgo_bench.ts';
-import { ffi_library_path } from './tsv_artifacts.ts';
+import { ffi_loaded_path, ffi_rebuild_task } from './tsv_artifacts.ts';
 import { type EngineFn, TsvBinding } from './tsv_api.ts';
 import type { InitScope } from './types.ts';
 
@@ -110,27 +109,6 @@ type FfiFn = (
 ) => Deno.PointerValue;
 type LibSymbols = Deno.DynamicLibrary<typeof symbols>['symbols'];
 
-/**
- * The native library this process loads: the bench's profile-guided build
- * (`pgo_bench_library_path`, `deno task build:bench:pgo`) unless `TSV_FFI_PROFILE` names
- * a cargo profile, whose plain build under `target/` is loaded instead — the corpus tools
- * set `corpus` for panic recovery.
- */
-export function get_library_path(): string {
-	const profile = Deno.env.get('TSV_FFI_PROFILE');
-	return profile === undefined ? pgo_bench_library_path('ffi') : ffi_library_path(profile);
-}
-
-/** The task that rebuilds the library `get_library_path` names. */
-export function library_rebuild_task(): string {
-	const profile = Deno.env.get('TSV_FFI_PROFILE');
-	return profile === undefined
-		? 'deno task build:bench:pgo'
-		: profile === 'release'
-			? 'deno task build:ffi'
-			: `deno task build:ffi:${profile}`;
-}
-
 /** Persistent marshalling buffers + their externalized pointers (see the `symbols` comment). */
 interface MarshalState {
 	/** Receives the output byte length; written by the native side through `out_len_ptr`. */
@@ -164,7 +142,7 @@ const INITIAL_BUFFER_CAPACITY = 1 << 16;
 
 export class NativeImplementation extends TsvBinding {
 	/**
-	 * @param lib_path - a library to load in place of `get_library_path()`'s — the PGO
+	 * @param lib_path - a library to load in place of the one `ffi_loaded_path` names — the PGO
 	 * pipeline drives an instrumented build and a plain one through this class
 	 * (`scripts/pgo/ffi_ops.ts`), so they are called exactly as the bench row calls its own
 	 */
@@ -192,8 +170,11 @@ export class NativeImplementation extends TsvBinding {
 	}
 
 	async init(scope?: InitScope): Promise<void> {
-		const lib_path = this.lib_path ?? get_library_path();
-		const rebuild = this.lib_path === undefined ? library_rebuild_task() : `rebuild ${lib_path}`;
+		const lib_path = this.lib_path ?? ffi_loaded_path(Deno.env.get('TSV_FFI_PROFILE'));
+		const rebuild =
+			this.lib_path === undefined
+				? ffi_rebuild_task(Deno.env.get('TSV_FFI_PROFILE'))
+				: `rebuild ${lib_path}`;
 		try {
 			await Deno.stat(lib_path);
 		} catch {

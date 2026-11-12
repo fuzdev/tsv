@@ -45,16 +45,17 @@
  */
 
 import { cpSync, existsSync, mkdirSync, readdirSync } from 'node:fs';
-import { stat } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 import { env, exit } from 'node:process';
 import { fileURLToPath } from 'node:url';
 
 import {
+	CHECKOUT_TREE,
 	fmt_mtime,
 	newest_source_mtime,
 	newest_workspace_file_mtime
 } from '../benches/js/lib/check_artifact_freshness.ts';
+import type { SourceTree } from '../benches/js/lib/source_mtime.ts';
 import {
 	CORE_CRATES,
 	WASM_CRATES,
@@ -93,33 +94,35 @@ export interface StagedStaleness {
  * is not fresh, without aborting — the seam for a caller that wants to SKIP
  * rather than fail, which is the right posture over a package the caller does
  * not itself build. `assert_staged_fresh` is this over a list, plus the abort.
- * The one throw is a bug in the CHECK, not a verdict about the artifact: a
- * `files` entry naming a path that does not exist.
+ * The throws are about the CHECK, not verdicts about the artifact: a `files` entry
+ * naming a path that does not exist, and a staged file or source that is there but
+ * can't be read.
+ * @param tree - the checkout to read, by default the workspace's through `node:fs`
  */
-export async function staged_staleness(check: StagedCheck): Promise<StagedStaleness | undefined> {
-	let staged_ms: number;
-	try {
-		staged_ms = (await stat(`${ROOT}${check.staged}`)).mtimeMs;
-	} catch {
+export async function staged_staleness(
+	check: StagedCheck,
+	tree: SourceTree = CHECKOUT_TREE
+): Promise<StagedStaleness | undefined> {
+	const staged = await tree.stat(check.staged);
+	if (staged === null) {
 		return { missing: true, reason: `${check.label}: not staged — ${check.staged}` };
 	}
+	const staged_ms = staged.mtime_ms;
 
 	let newest = { ms: 0, path: '' };
 	if (check.crates.length > 0) {
-		newest = { ...(await newest_source_mtime(check.crates)) };
-		const workspace = await newest_workspace_file_mtime();
+		newest = { ...(await newest_source_mtime(check.crates, tree)) };
+		const workspace = await newest_workspace_file_mtime(tree);
 		if (workspace.ms > newest.ms) newest = workspace;
 	}
 	for (const file of check.files) {
-		let st;
-		try {
-			st = await stat(`${ROOT}${file}`);
-		} catch {
-			// a named source that does not exist is a typo in the check, and a typo'd
-			// path would otherwise degrade the check to no check at all
+		const st = await tree.stat(file);
+		// a named source that does not exist is a typo in the check, and a typo'd
+		// path would otherwise degrade the check to no check at all
+		if (st === null) {
 			throw new Error(`${check.label}: named source ${file} does not exist — fix the check`);
 		}
-		if (st.mtimeMs > newest.ms) newest = { ms: st.mtimeMs, path: file };
+		if (st.mtime_ms > newest.ms) newest = { ms: st.mtime_ms, path: file };
 	}
 
 	// Strict `<` so an artifact staged in the same second as its source passes.
@@ -176,11 +179,37 @@ export async function assert_staged_fresh(checks: readonly StagedCheck[]): Promi
 	if (fatal) exit(1);
 }
 
-/** The staging scripts and metadata that write a wasm package's generated entries. */
-const PATCHER_SOURCES = [
+/**
+ * The wasm patcher's sources: its entry, `scripts/roots/patch_npm_package.ts`, and every repo
+ * module that entry loads, so an edit to any of them stales what the patcher wrote.
+ * `scripts/staging_sources_test.ts` holds the list to the entry's import closure.
+ */
+export const WASM_STAGING_SOURCES = [
+	'scripts/roots/patch_npm_package.ts',
+	'scripts/roots/checkout.ts',
 	'scripts/patch_npm_package.ts',
 	'scripts/npm_facade.ts',
-	'scripts/npm_metadata.ts'
+	'scripts/npm_metadata.ts',
+	'scripts/stage_file.ts',
+	'scripts/stage_file_handle.ts',
+	'scripts/gzip_size.ts',
+	'scripts/size.ts'
+];
+
+/**
+ * The N-API staging's sources: its entry, `scripts/roots/build_napi_packages.ts`, and every
+ * repo module that entry loads, so an edit to any of them stales what the staging wrote.
+ * `scripts/staging_sources_test.ts` holds the list to the entry's import closure.
+ */
+export const NAPI_STAGING_SOURCES = [
+	'scripts/roots/build_napi_packages.ts',
+	'scripts/build_napi_packages.ts',
+	'scripts/napi_host.ts',
+	'scripts/npm_facade.ts',
+	'scripts/npm_metadata.ts',
+	'scripts/release/version.ts',
+	'scripts/stage_file.ts',
+	'scripts/size.ts'
 ];
 
 /** A wasm variant's npm staging (`scripts/patch_npm_package.ts` writes it), repo-relative. */
@@ -192,7 +221,7 @@ export function wasm_package_dir(variant: WasmVariant): string {
  * The checks that date one staged wasm package — the one list every reader of a
  * `pkg/<variant>/npm` staging grades it by (the package suite, artifact validation, the
  * napi suite's export-set parity, the engine parity audit, the declaration check, the Bun leg). One check per staging step, keyed
- * on a file that step writes: the bundle (wasm-pack, whose features are a `deno.json` task
+ * on a file that step writes: the bundle (wasm-pack, whose features are a `package.json` task
  * string), the generated entries (the patcher and its inputs), the copied facade, and for
  * the `all` variant the copied `cli.js`.
  */
@@ -206,18 +235,18 @@ export function wasm_package_checks(
 			label: `staged WASM bundle (${variant})`,
 			staged: `${dir}/tsv_wasm_bg.wasm`,
 			crates: [...CORE_CRATES, ...WASM_CRATES],
-			files: ['deno.json'],
+			files: ['package.json'],
 			rebuild
 		},
 		{
 			// the patcher derives the entries from wasm-pack's generated JS, so whatever feeds
-			// that (the crates, the feature set in deno.json) feeds them too — a wasm-pack rerun
+			// that (the crates, the feature set in package.json) feeds them too — a wasm-pack rerun
 			// the patcher did not follow must stale them, and `cli.js`, written in the same pass
 			label: `staged package entries (${variant})`,
 			staged: `${dir}/index.js`,
 			crates: [...CORE_CRATES, ...WASM_CRATES],
 			// the third-party NOTICE is copied in the same pass
-			files: [...PATCHER_SOURCES, 'deno.json', THIRD_PARTY_NOTICE.source],
+			files: [...WASM_STAGING_SOURCES, 'package.json', THIRD_PARTY_NOTICE.source],
 			rebuild
 		},
 		{
@@ -307,7 +336,7 @@ export function napi_addon_check(triple: string): StagedCheck {
 		// `tsv_discover` for the `IgnoreStack` export), so an edit there must stale it
 		crates: [...CORE_CRATES, 'tsv_napi', 'tsv_ignore', 'tsv_discover'],
 		// the third-party NOTICE beside it is staged in the same pass
-		files: ['scripts/build_napi_packages.ts', THIRD_PARTY_NOTICE.source],
+		files: [...NAPI_STAGING_SOURCES, THIRD_PARTY_NOTICE.source],
 		rebuild: 'deno task build:napi:packages'
 	};
 }
@@ -333,9 +362,7 @@ export function napi_loader_checks(): Array<StagedCheck> {
 				'crates/tsv_napi/npm/platform.js',
 				'crates/tsv_napi/npm/bin.js',
 				...facade_sources(ALL_FAMILIES),
-				'scripts/build_napi_packages.ts',
-				'scripts/npm_facade.ts',
-				'scripts/npm_metadata.ts',
+				...NAPI_STAGING_SOURCES,
 				THIRD_PARTY_NOTICE.source
 			],
 			rebuild

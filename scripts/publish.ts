@@ -106,9 +106,16 @@ import {
 	SIDECAR_LOCK_PATH,
 	sidecar_install_state
 } from './sidecar_install.ts';
-import { gzip_size } from './gzip_size.ts';
+import { gzip_size, type GzipProgram } from './gzip_size.ts';
 import { format_size } from './size.ts';
 import { TYPECHECK_INSTALL } from './typecheck_packages.ts';
+
+/** `gzip` for `gzip_size`, run through Deno's `Command` as this script's runtime does. */
+const gzip: GzipProgram = {
+	out_bytes: async (args) => ({
+		stdout: (await new Deno.Command('gzip', { args: [...args], stdout: 'piped' }).output()).stdout
+	})
+};
 
 const USAGE =
 	'Usage: deno task publish [--wetrun] [--bump patch|minor|major] [--no-check] [--no-git]';
@@ -758,7 +765,7 @@ console.log('\n=== Done ===');
 for (const { label, dir } of packages) {
 	const wasm_path = `${dir}/tsv_wasm_bg.wasm`;
 	const raw = Deno.statSync(wasm_path).size;
-	const gzipped = await gzip_size(wasm_path);
+	const gzipped = await gzip_size(gzip, wasm_path);
 	const size_note = `wasm ${format_size(raw)} (${format_size(gzipped)} gzipped wire)`;
 	console.log(
 		wetrun

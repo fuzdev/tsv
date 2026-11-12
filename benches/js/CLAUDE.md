@@ -679,8 +679,8 @@ deno task typecheck:js
 
   The node-modules-free part of the harness IS gated, mostly for free: `deno check` walks
   transitive imports, so `typecheck:scripts`' Deno half already covers the loader/guard core
-  through the graph of the scripts Deno runs (check_artifact_freshness, ffi, napi, tsv_artifacts,
-  runtime, types, reject_probe, locations_probe, gate_counts), and `test:deno`'s divergence suite
+  through the graph of the scripts Deno runs (check_artifact_freshness, source_mtime, ffi, napi,
+  tsv_artifacts, runtime, types, reject_probe, locations_probe, gate_counts), and `test:deno`'s divergence suite
   covers the detectors. The modules the Node scripts import (`scripts/roots/`) are typechecked
   by `typecheck:scripts`' `tsc` half, with `node_modules` in reach. `typecheck:bench-core` names
   the orphans nothing else Deno-checks — `lib/wasm.ts`, `lib/harvest_stamp.ts`,
@@ -1342,9 +1342,10 @@ free.
 the bundle's `.wasm` is already newer than every source feeding it
 (`lib/tsv_artifacts.ts`'s `CORE_CRATES` + `WASM_CRATES` — `tsv_wasm` plus the
 `tsv_ignore`/`tsv_discover` crates behind its `IgnoreStack` export;
-imported, so the two sides can't drift; dev-tooling crates deliberately excluded so
+imported, and walked by the guard's own walk (`lib/source_mtime.ts`), so the two sides
+can't drift; dev-tooling crates deliberately excluded so
 `tsv_debug` edits don't force wasm rebuilds — plus the workspace `Cargo.toml` +
-`Cargo.lock` and `deno.json`, so
+`Cargo.lock` and `package.json`, where those tasks live, so
 editing a build task's flags re-triggers it). Rationale: wasm-pack re-runs wasm-opt
 (~8–27s per bundle) even when cargo is a fully-cached no-op, so a source-unchanged
 `deno task bench` would otherwise pay ~90s of pure wasm-opt. What the check CANNOT see is a
@@ -1744,6 +1745,10 @@ benches/js/
     ├── runtime.ts         # Cross-runtime helpers: current_runtime / os / arch normalizers, plus the
     │                      # artifact-naming pair every loader AND guard shares — native_library_filename
     │                      # and wasm_target (the pkg/<variant>/<target>/ segment)
+    ├── source_mtime.ts    # The newest-source walk every mtime guard dates an artifact by, over a
+    │                      # reader each side binds (node:fs here, an fs handle in run_if_stale); a
+    │                      # missing path counts as absent, an unreadable one throws naming it
+    │                      # (unit-tested by source_mtime_test.ts)
     ├── swc.ts             # swc wrapper (parse-only, TS/JS; both surfaces — goal axis is `isModule`)
     ├── text_lines.ts      # `lines_of`: a byte stream's lines, linear in its length — the NDJSON
     │                      # reader `tsv_debug_server.ts` and `scripts/check_loc.ts` share

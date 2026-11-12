@@ -62,26 +62,57 @@ import { readdir, stat } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { env, exit } from 'node:process';
 import { fileURLToPath } from 'node:url';
-import { get_library_path, library_rebuild_task } from './ffi.ts';
 import { get_napi_library_path } from './napi.ts';
 import { type PgoBenchWorld, pgo_bench_mismatch } from './pgo_bench.ts';
 import { current_runtime, wasm_target } from './runtime.ts';
-import { CORE_CRATES, TSV_ARTIFACTS, wasm_bundle_path } from './tsv_artifacts.ts';
-
-/** Absolute path to the workspace `crates/` directory. */
-const CRATES_DIR = fileURLToPath(new URL('../../../crates', import.meta.url));
+import {
+	newest_crate_source_mtime,
+	newest_workspace_build_mtime,
+	type SourceMtime,
+	type SourceTree
+} from './source_mtime.ts';
+import {
+	CORE_CRATES,
+	ffi_loaded_path,
+	ffi_rebuild_task,
+	TSV_ARTIFACTS,
+	wasm_bundle_path
+} from './tsv_artifacts.ts';
 
 /** Absolute path to the workspace root, with its trailing separator. */
 const ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 
+/** Whether `error` is Node's "nothing is there". */
+const is_not_found = (error: unknown): boolean =>
+	error instanceof Error && 'code' in error && error.code === 'ENOENT';
+
 /**
- * The workspace-level files every cargo build reads beside its crates' own sources:
- * the root manifest (every `[profile.*]`, the workspace dependencies, the version) and
- * the lockfile (what those dependencies resolved to). Stated once, for every mtime
- * guard — a profile edit that staled one guard's artifact and not another's is two
- * guards disagreeing about what a build is made of.
+ * A `SourceTree` over the directory `root` through `node:fs`, a symlink followed by `stat`:
+ * nothing at a path is `null` (or no entries), any other failure throws.
+ * @param root - the tree's directory, with its trailing separator
  */
-const WORKSPACE_BUILD_FILES = ['Cargo.toml', 'Cargo.lock'];
+export const node_source_tree = (root: string): SourceTree => {
+	const stat_or_null = async (path: string) => {
+		try {
+			return await stat(`${root}${path}`);
+		} catch (error) {
+			if (is_not_found(error)) return null;
+			throw error;
+		}
+	};
+	return {
+		stat: async (path) => {
+			const st = await stat_or_null(path);
+			return st === null ? null : { mtime_ms: st.mtimeMs, is_file: st.isFile() };
+		},
+		// a directory gone during the listing throws, since what was beneath it is unknown
+		list: async (path) =>
+			(await stat_or_null(path)) === null ? [] : readdir(`${root}${path}`, { recursive: true })
+	};
+};
+
+/** The checkout as every mtime guard here reads it: through `node:fs`, from the workspace root. */
+export const CHECKOUT_TREE: SourceTree = node_source_tree(ROOT);
 
 export interface ArtifactCheck {
 	/** Human-readable label used in messages, e.g. `FFI (release)`. */
@@ -97,13 +128,6 @@ export interface ArtifactCheck {
 	rebuild: string;
 	/** A profile-guided artifact: the PGO stamp entry that must name its bytes. */
 	pgo_world?: PgoBenchWorld;
-}
-
-export interface SourceMtime {
-	/** Newest mtime in milliseconds (0 if no sources were found). */
-	ms: number;
-	/** `crates/`-relative path of the newest source, for the message. */
-	path: string;
 }
 
 interface StaleArtifact {
@@ -127,67 +151,35 @@ export function fmt_mtime(ms: number): string {
 	return `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
-const _mtime_cache = new Map<string, SourceMtime>();
+const _mtime_cache = new WeakMap<SourceTree, Map<string, SourceMtime>>();
 
 /**
- * Newest mtime across every file under `src/`, the crate's `build.rs`, and its
- * `Cargo.toml`, for the given crates. Memoized per crate set. Every file under `src/`,
- * not `*.rs` alone: a build script's or an `include_*!`'s inputs can sit there too, and
- * a walk that saw only Rust let a codegen change stale nothing on any artifact.
+ * `newest_crate_source_mtime` over `tree` (`source_mtime.ts`), memoized per tree and crate set:
+ * one run grades many artifacts off the same few crate lists.
+ * @param tree - the checkout to read, by default the workspace's through `node:fs`
  */
-export async function newest_source_mtime(crates: readonly string[]): Promise<SourceMtime> {
+export async function newest_source_mtime(
+	crates: readonly string[],
+	tree: SourceTree = CHECKOUT_TREE
+): Promise<SourceMtime> {
+	let cache = _mtime_cache.get(tree);
+	if (cache === undefined) _mtime_cache.set(tree, (cache = new Map()));
 	const key = crates.join(',');
-	const cached = _mtime_cache.get(key);
+	const cached = cache.get(key);
 	if (cached) return cached;
-
-	let newest: SourceMtime = { ms: 0, path: '' };
-	const consider = (ms: number, rel: string): void => {
-		if (ms > newest.ms) newest = { ms, path: rel };
-	};
-
-	for (const crate of crates) {
-		const root = `${CRATES_DIR}/${crate}`;
-		for (const manifest of ['Cargo.toml', 'build.rs']) {
-			try {
-				const st = await stat(`${root}/${manifest}`);
-				consider(st.mtimeMs, `${crate}/${manifest}`);
-			} catch {
-				// no such file for this crate — ignore
-			}
-		}
-		try {
-			const src = `${root}/src`;
-			for (const relative of await readdir(src, { recursive: true })) {
-				const full = `${src}/${relative}`;
-				const st = await stat(full);
-				if (!st.isFile()) continue;
-				consider(st.mtimeMs, full.slice(CRATES_DIR.length + 1));
-			}
-		} catch {
-			// crate may not have a src/ directory — ignore
-		}
-	}
-
-	_mtime_cache.set(key, newest);
+	const newest = await newest_crate_source_mtime(tree, crates);
+	cache.set(key, newest);
 	return newest;
 }
 
 /**
- * Newest mtime across `WORKSPACE_BUILD_FILES`, labeled by file name (`ms: 0` when
- * none exists). The floor every cargo-built artifact is dated against, whatever
- * crates feed it.
+ * `newest_workspace_build_mtime` over `tree` (`source_mtime.ts`).
+ * @param tree - the checkout to read, by default the workspace's through `node:fs`
  */
-export async function newest_workspace_file_mtime(): Promise<SourceMtime> {
-	let newest: SourceMtime = { ms: 0, path: '' };
-	for (const file of WORKSPACE_BUILD_FILES) {
-		try {
-			const st = await stat(`${ROOT}${file}`);
-			if (st.mtimeMs > newest.ms) newest = { ms: st.mtimeMs, path: file };
-		} catch {
-			// no lockfile (fresh clone pre-build) — the crate sources govern
-		}
-	}
-	return newest;
+export function newest_workspace_file_mtime(
+	tree: SourceTree = CHECKOUT_TREE
+): Promise<SourceMtime> {
+	return newest_workspace_build_mtime(tree);
 }
 
 /** Every check whose artifact is missing or older than the sources feeding it. */
@@ -322,16 +314,16 @@ export function native_artifact_check(): ArtifactCheck {
 	return profile === undefined
 		? {
 				label: 'FFI (pgo)',
-				path: get_library_path(),
+				path: ffi_loaded_path(profile),
 				binding_crates: ['tsv_ffi'],
 				rebuild: TSV_ARTIFACTS.tsv_ffi.rebuild,
 				pgo_world: 'ffi'
 			}
 		: {
 				label: `FFI (${profile})`,
-				path: get_library_path(),
+				path: ffi_loaded_path(profile),
 				binding_crates: ['tsv_ffi'],
-				rebuild: library_rebuild_task()
+				rebuild: ffi_rebuild_task(profile)
 			};
 }
 

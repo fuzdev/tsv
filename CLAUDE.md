@@ -158,6 +158,14 @@ deno task test:node      # vitest under Node over the suites beside their module
 #                          paths, the `target/` fence, and the cargo run over a fake cargo, its signal exits included;
 #                          `build_napi_packages_test.ts` + `validate_napi_artifact_test.ts` + `stage_file_test.ts` +
 #                          `napi_host_test.ts` — the N-API staging, its size bands and the host triple over fakes;
+#                          `patch_npm_package_test.ts` + `stage_file_handle_test.ts` + `gzip_size_test.ts` — the wasm
+#                          patcher over a synthetic wasm-pack output (what it writes, copies and prints, each refusal),
+#                          its copy across two handles, and the gzipped count; `run_if_stale_test.ts` +
+#                          `wasm_pack_env_test.ts` — the wasm build skip over a temp checkout and a fake wasm-pack, and
+#                          what reaches wasm-pack; `staging_sources_test.ts` — each staging's staleness list is its
+#                          entry's import closure; `check_staged_freshness_test.ts` — each staged-package check
+#                          over a temp checkout, staled by every input it names, with
+#                          `benches/js/lib/source_mtime_test.ts` — the walk every mtime guard shares;
 #                          `no_package_closure_test.ts` — the scripts CI runs with no `node_modules` import no package,
 #                          and publish:crates' suites load nothing that can spawn, write, or reach the network;
 #                          `cargo_env_test.ts` — what reaches

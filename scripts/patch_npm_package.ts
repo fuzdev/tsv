@@ -62,47 +62,36 @@
  * `crates/tsv_wasm/npm/cli.js` is copied into the package root and wired up as the `tsv`
  * bin.
  *
- * Usage:  patch_npm_package.ts <format|parse|all>
+ * Usage:  node scripts/roots/patch_npm_package.ts <format|parse|all>
  *
  *   format → crates/tsv_wasm/pkg/format/npm/ → @fuzdev/tsv-format-wasm
  *   parse  → crates/tsv_wasm/pkg/parse/npm/  → @fuzdev/tsv-parse-wasm
  *   all    → crates/tsv_wasm/pkg/all/npm/    → @fuzdev/tsv-wasm
+ *
+ * Reach: the checkout read-only, for the files the package copies and the facade's
+ * declarations; writes beneath the variant's staging alone, the directory wasm-pack built;
+ * and `gzip`, for the bundle's gzipped size (`PatchNpmPackageDeps`, built by
+ * `scripts/roots/patch_npm_package.ts`).
+ *
+ * @module
  */
 
+import type { FsDir, FsReadDir } from '@fuzdev/gro/fs.ts';
+
+import type { WasmVariant } from '../benches/js/lib/tsv_artifacts.ts';
 import {
 	FACADE_SOURCE_DIR,
 	LOCATIONS_EXPORT,
+	type FacadeDeclarations,
 	facade_files,
 	facade_type_names
 } from './npm_facade.ts';
 import { NPM_SHARED_METADATA, THIRD_PARTY_NOTICE } from './npm_metadata.ts';
-import { gzip_size } from './gzip_size.ts';
+import { gzip_size, type GzipProgram } from './gzip_size.ts';
 import { format_size } from './size.ts';
-import { stage_file, type StageFileDeps } from './stage_file.ts';
+import { stage_file } from './stage_file.ts';
+import { stage_file_between } from './stage_file_handle.ts';
 
-const variant = Deno.args[0];
-if (variant !== 'format' && variant !== 'parse' && variant !== 'all') {
-	console.error(`Usage: patch_npm_package.ts <format|parse|all>`);
-	Deno.exit(1);
-}
-
-const PKG_NAMES = {
-	format: '@fuzdev/tsv-format-wasm',
-	parse: '@fuzdev/tsv-parse-wasm',
-	all: '@fuzdev/tsv-wasm'
-} as const;
-const pkg_name = PKG_NAMES[variant];
-const has_format_exports = variant !== 'parse';
-const has_parse_exports = variant !== 'format';
-const has_strip_exports = variant === 'all';
-const has_imports_exports = variant === 'all';
-const pkg_root = `crates/tsv_wasm/pkg/${variant}/npm`;
-/** The staging copy's reach: Deno's copy, which keeps the source's mode, and its dates. */
-const stage_deps: StageFileDeps = {
-	copy: (from, to) => Deno.copyFile(from, to),
-	set_times: (path, { mtime_ms, atime_ms = mtime_ms }) =>
-		Deno.utime(path, new Date(atime_ms), new Date(mtime_ms))
-};
 const main_js = 'tsv_wasm.js';
 const dts_file = 'tsv_wasm.d.ts';
 /**
@@ -143,208 +132,263 @@ const api_imports_file = 'api_imports.js';
 const imports_dts = 'facade_imports.d.ts';
 /** A facade declaration file as an import specifier (`.js`, as `dts_module` explains). */
 const dts_specifier = (file: string): string => file.replace(/\.d\.ts$/, '.js');
-// The pure-JS line/column reconstruction helper (`npm/locations.js` + hand-written
-// `locations.d.ts`), which `api_parse.js` runs for `{locations: true}` and every
-// parse-capable entry also re-exports. Rides the parse-capable packages only — the
-// format-only package has no use for it. Needs no WASM init (pure computation over
-// an already-parsed AST). A whole-module re-export (no init guard), shared by
-// index.js + browser.js and both `.d.ts` (where `export *` carries the helper's
-// functions AND its types), so a new helper export reaches every entry, and
-// `@fuzdev/tsv`'s, with no list to keep.
-const locations_reexport = has_parse_exports ? `export * from './locations.js';\n` : '';
 
-// 1. Extract the public function exports from the generated JS.
+/** What `run_patch_npm_package` reaches. */
+export interface PatchNpmPackageDeps {
+	/** The checkout, read for the sources the package copies and the facade's declarations. */
+	checkout: FsReadDir;
+	/** Opens a variant's staging, `crates/tsv_wasm/pkg/<variant>/npm`, the one directory the
+	 * patcher writes; wasm-pack made it, so it throws `FsError` when it's missing. */
+	open_package: (variant: WasmVariant) => FsDir;
+	/** `gzip`, for the bundle's gzipped size, `null` when it isn't on `PATH`. */
+	gzip: GzipProgram | null;
+	print: (line: string) => void;
+	print_error: (line: string) => void;
+}
 
-const generated_js = Deno.readTextFileSync(`${pkg_root}/${main_js}`);
-const fns = [...generated_js.matchAll(/^export function (\w+)/gm)]
-	.map((m) => m[1])
-	.filter((name) => /^(format|parse|strip)_/.test(name) && !name.startsWith('parse_internal_'))
-	.sort();
+/** `deps.gzip`, or the failure a missing one is. */
+const require_gzip = (deps: PatchNpmPackageDeps): GzipProgram => {
+	if (deps.gzip === null) throw new Error('gzip is not on PATH');
+	return deps.gzip;
+};
 
-const expected_formats = ['format_css', 'format_svelte', 'format_typescript'];
-// `parse_imports_<lang>` is its own family: the `parse_` prefix would otherwise sweep it
-// into the parse family's checks and wiring
-const is_imports = (name: string): boolean => name.startsWith('parse_imports_');
-const has_format = fns.some((name) => name.startsWith('format_'));
-const has_parse = fns.some((name) => name.startsWith('parse_') && !is_imports(name));
-if (has_format_exports) {
-	for (const name of expected_formats) {
-		if (!fns.includes(name)) {
-			console.error(`FAIL: generated ${main_js} is missing expected export \`${name}\``);
-			Deno.exit(1);
-		}
+/**
+ * The patch (module doc) of the variant `argv[0]` names.
+ * @returns the exit code: `1` for a usage error or a generated bundle the patch refuses, else `0`
+ * @throws when a file it reads is missing or a write fails
+ */
+export async function run_patch_npm_package(
+	deps: PatchNpmPackageDeps,
+	argv: ReadonlyArray<string>
+): Promise<number> {
+	const { print, print_error } = deps;
+	/** A facade declaration file's exported type names, read from the checkout. */
+	const declared_type_names = async (file: FacadeDeclarations): Promise<Array<string>> =>
+		facade_type_names(file, await deps.checkout.read_text(`${FACADE_SOURCE_DIR}/${file}`));
+
+	const variant = argv[0];
+	if (variant !== 'format' && variant !== 'parse' && variant !== 'all') {
+		print_error(`Usage: patch_npm_package.ts <format|parse|all>`);
+		return 1;
 	}
-} else if (has_format) {
-	console.error(`FAIL: ${variant} variant contains format_* exports — stale build dir?`);
-	Deno.exit(1);
-}
-if (has_parse_exports && !has_parse) {
-	console.error(
-		`FAIL: ${variant} variant has no parse_* exports — was \`--features parse\` passed?`
-	);
-	Deno.exit(1);
-}
-if (!has_parse_exports && has_parse) {
-	console.error(`FAIL: ${variant} variant contains parse_* exports — stale build dir?`);
-	Deno.exit(1);
-}
-const has_strip = fns.some((name) => name.startsWith('strip_'));
-if (has_strip_exports && !fns.includes('strip_typescript')) {
-	console.error(
-		`FAIL: generated ${main_js} is missing expected export \`strip_typescript\` — was the ` +
-			`default \`strip\` feature dropped?`
-	);
-	Deno.exit(1);
-}
-if (!has_strip_exports && has_strip) {
-	console.error(`FAIL: ${variant} variant contains strip_* exports — stale build dir?`);
-	Deno.exit(1);
-}
-const expected_imports = ['parse_imports_svelte', 'parse_imports_typescript'];
-const has_imports = fns.some(is_imports);
-if (has_imports_exports) {
-	for (const name of expected_imports) {
-		if (!fns.includes(name)) {
-			console.error(
-				`FAIL: generated ${main_js} is missing expected export \`${name}\` — was the ` +
-					`default \`imports\` feature dropped?`
-			);
-			Deno.exit(1);
+
+	const PKG_NAMES = {
+		format: '@fuzdev/tsv-format-wasm',
+		parse: '@fuzdev/tsv-parse-wasm',
+		all: '@fuzdev/tsv-wasm'
+	} as const;
+	const pkg_name = PKG_NAMES[variant];
+	const has_format_exports = variant !== 'parse';
+	const has_parse_exports = variant !== 'format';
+	const has_strip_exports = variant === 'all';
+	const has_imports_exports = variant === 'all';
+	// the staging, as printed; `pkg` is the handle every write goes through
+	const pkg_root = `crates/tsv_wasm/pkg/${variant}/npm`;
+	const pkg = deps.open_package(variant);
+	const stage_deps = stage_file_between(deps.checkout, pkg);
+
+	// The pure-JS line/column reconstruction helper (`npm/locations.js` + hand-written
+	// `locations.d.ts`), which `api_parse.js` runs for `{locations: true}` and every
+	// parse-capable entry also re-exports. Rides the parse-capable packages only — the
+	// format-only package has no use for it. Needs no WASM init (pure computation over
+	// an already-parsed AST). A whole-module re-export (no init guard), shared by
+	// index.js + browser.js and both `.d.ts` (where `export *` carries the helper's
+	// functions AND its types), so a new helper export reaches every entry, and
+	// `@fuzdev/tsv`'s, with no list to keep.
+	const locations_reexport = has_parse_exports ? `export * from './locations.js';\n` : '';
+
+	// 1. Extract the public function exports from the generated JS.
+
+	const generated_js = await pkg.read_text(main_js);
+	const fns = [...generated_js.matchAll(/^export function (\w+)/gm)]
+		.map((m) => m[1])
+		.filter((name) => /^(format|parse|strip)_/.test(name) && !name.startsWith('parse_internal_'))
+		.sort();
+
+	const expected_formats = ['format_css', 'format_svelte', 'format_typescript'];
+	// `parse_imports_<lang>` is its own family: the `parse_` prefix would otherwise sweep it
+	// into the parse family's checks and wiring
+	const is_imports = (name: string): boolean => name.startsWith('parse_imports_');
+	const has_format = fns.some((name) => name.startsWith('format_'));
+	const has_parse = fns.some((name) => name.startsWith('parse_') && !is_imports(name));
+	if (has_format_exports) {
+		for (const name of expected_formats) {
+			if (!fns.includes(name)) {
+				print_error(`FAIL: generated ${main_js} is missing expected export \`${name}\``);
+				return 1;
+			}
 		}
+	} else if (has_format) {
+		print_error(`FAIL: ${variant} variant contains format_* exports — stale build dir?`);
+		return 1;
 	}
-} else if (has_imports) {
-	console.error(`FAIL: ${variant} variant contains parse_imports_* exports — stale build dir?`);
-	Deno.exit(1);
-}
-
-// wasm-bindgen emits exported structs as `export class` (e.g. IgnoreStack,
-// the discovery matcher). They re-export through the facade like functions;
-// the lazy entries wrap each in a guarded subclass so `new` before init reports
-// the same not-initialized error the function exports do (see step 3).
-const classes = [...generated_js.matchAll(/^export class (\w+)/gm)].map((m) => m[1]).sort();
-
-// 1b. Append the `reinstantiate` hook to the generated glue.
-//
-// A WASM stack overflow (input nested past the shadow stack) is
-// the one trap the instance does not survive: `__stack_pointer` is a plain
-// mutable global the trap never restores, so every later call on the instance
-// throws `memory access out of bounds` — and wasm-bindgen's `initSync`
-// short-circuits once initialized, so no public entry can recover. Only this
-// module can reach the glue's module-level `wasm` binding, which is why the
-// hook is patched in here rather than written beside the facade. It resets that
-// binding and re-runs `initSync` with the retained compiled module
-// (`wasmModule`, stored by `__wbg_finalize_init` on every init path), so
-// recovery is synchronous and pays one instantiation, never a recompile — and
-// because every glue export reads `wasm` at call time, existing bindings
-// (facade functions, a worker's wrappers) work against the fresh instance with
-// no rebind. The anchors below are asserted so a wasm-bindgen upgrade that
-// reshapes the glue fails this build loudly instead of shipping a hook that
-// silently misses.
-const glue_anchors = ['let wasmModule, wasmInstance, wasm;', 'function initSync(module)'];
-for (const anchor of glue_anchors) {
-	if (!generated_js.includes(anchor)) {
-		console.error(
-			`FAIL: generated ${main_js} lacks the \`${anchor}\` anchor the reinstantiate hook ` +
-				`patches against — did a wasm-bindgen upgrade reshape the glue?`
+	if (has_parse_exports && !has_parse) {
+		print_error(
+			`FAIL: ${variant} variant has no parse_* exports — was \`--features parse\` passed?`
 		);
-		Deno.exit(1);
+		return 1;
 	}
-}
-if (generated_js.includes('__tsv_instance_generation')) {
-	console.error(
-		`FAIL: generated ${main_js} is already patched with the reinstantiate hook — ` +
-			`re-run the wasm-pack build before patching again`
-	);
-	Deno.exit(1);
-}
-// Guard each exported class's lifecycle against a reinstantiation. Both free
-// paths — the FinalizationRegistry callback and explicit `free()` — go through
-// the LIVE `wasm` binding, so a handle minted against a discarded instance and
-// freed after a reinstantiation would free an old pointer into the NEW
-// instance: allocator corruption with no error at the point of cause. Each
-// handle is therefore stamped with the instance generation it was created
-// under (on the object for `free()`, in the registry's held value for the
-// callback — the generation must travel WITH the handle, since a module-level
-// "has any reinstantiation happened" check is a one-way fuse that would leak
-// every handle minted after the first recovery, fresh ones included). A stale
-// handle's free is a no-op that leaks the old object's bytes, which the
-// unreachable old instance leaks anyway; a current handle frees normally.
-const registry_pattern = /new FinalizationRegistry\(ptr => wasm\.(\w+)\(ptr, 1\)\)/g;
-const register_pattern = /(\w+)Finalization\.register\((\w+), \2\.__wbg_ptr, \2\)/g;
-const free_pattern =
-	/free\(\) \{\n(\s+)const ptr = this\.__destroy_into_raw\(\);\n\s+wasm\.(\w+)\(ptr, 0\);\n/g;
-// Every exported METHOD too — not only the two free paths. A method hands
-// `this.__wbg_ptr` to the live `wasm` binding, so a handle from a discarded
-// instance would read the new instance's memory at an offset that meant
-// something else entirely: a wrong `is_ignored` verdict, or a fresh trap, with
-// nothing said at the point of cause. The receiver is routed through
-// `__tsv_live`, one generation compare per call, which throws on a stale handle
-// instead. Both call shapes wasm-bindgen emits are covered: the receiver first,
-// or after the return-slot pointer (`retptr`) of a method returning a string.
-const method_pattern = /(wasm\.\w+\((?:retptr, )?)this\.__wbg_ptr/g;
-// The async init's re-check. `__wbg_init` tests `wasm !== undefined` only BEFORE its
-// awaits, so an init that overlaps another — a second `init()`, or an `initSync` that
-// ran while the fetch/compile was pending — instantiates a second instance and, when it
-// finishes last, silently replaces `wasm` without bumping the instance generation: a
-// handle minted in between then reads the new instance's memory with no stale-handle
-// error. Re-testing after the load keeps whichever instance initialized first, so the
-// late instance is simply dropped (it was never finalized, so nothing references it).
-const init_load_pattern = /^([ \t]*)(const \{ instance, module \} = await __wbg_load\(.*\);)$/gm;
-let init_load_rewrites = 0;
-let registry_rewrites = 0;
-let free_rewrites = 0;
-let method_rewrites = 0;
-/** Register sites per class — the constructor's, plus `__wrap`'s if Rust ever
- * hands one back. The count is read twice below: as a rewrite tally, and as the
- * `__wrap` tripwire the lazy entries' guarded subclass needs. */
-const register_sites = new Map<string, number>();
-const patched_glue =
-	generated_js
-		.replace(registry_pattern, (_m, free_fn) => {
-			registry_rewrites++;
-			return (
-				`new FinalizationRegistry(({ ptr, gen }) => {\n` +
-				`    // patched by patch_npm_package.ts: a pointer stamped with an older\n` +
-				`    // instance generation belongs to a discarded instance — freeing it into\n` +
-				`    // the current one would corrupt its allocator, so leak it instead\n` +
-				`    if (gen === __tsv_instance_generation) wasm.${free_fn}(ptr, 1);\n` +
-				`})`
+	if (!has_parse_exports && has_parse) {
+		print_error(`FAIL: ${variant} variant contains parse_* exports — stale build dir?`);
+		return 1;
+	}
+	const has_strip = fns.some((name) => name.startsWith('strip_'));
+	if (has_strip_exports && !fns.includes('strip_typescript')) {
+		print_error(
+			`FAIL: generated ${main_js} is missing expected export \`strip_typescript\` — was the ` +
+				`default \`strip\` feature dropped?`
+		);
+		return 1;
+	}
+	if (!has_strip_exports && has_strip) {
+		print_error(`FAIL: ${variant} variant contains strip_* exports — stale build dir?`);
+		return 1;
+	}
+	const expected_imports = ['parse_imports_svelte', 'parse_imports_typescript'];
+	const has_imports = fns.some(is_imports);
+	if (has_imports_exports) {
+		for (const name of expected_imports) {
+			if (!fns.includes(name)) {
+				print_error(
+					`FAIL: generated ${main_js} is missing expected export \`${name}\` — was the ` +
+						`default \`imports\` feature dropped?`
+				);
+				return 1;
+			}
+		}
+	} else if (has_imports) {
+		print_error(`FAIL: ${variant} variant contains parse_imports_* exports — stale build dir?`);
+		return 1;
+	}
+
+	// wasm-bindgen emits exported structs as `export class` (e.g. IgnoreStack,
+	// the discovery matcher). They re-export through the facade like functions;
+	// the lazy entries wrap each in a guarded subclass so `new` before init reports
+	// the same not-initialized error the function exports do (see step 3).
+	const classes = [...generated_js.matchAll(/^export class (\w+)/gm)].map((m) => m[1]).sort();
+
+	// 1b. Append the `reinstantiate` hook to the generated glue.
+	//
+	// A WASM stack overflow (input nested past the shadow stack) is
+	// the one trap the instance does not survive: `__stack_pointer` is a plain
+	// mutable global the trap never restores, so every later call on the instance
+	// throws `memory access out of bounds` — and wasm-bindgen's `initSync`
+	// short-circuits once initialized, so no public entry can recover. Only this
+	// module can reach the glue's module-level `wasm` binding, which is why the
+	// hook is patched in here rather than written beside the facade. It resets that
+	// binding and re-runs `initSync` with the retained compiled module
+	// (`wasmModule`, stored by `__wbg_finalize_init` on every init path), so
+	// recovery is synchronous and pays one instantiation, never a recompile — and
+	// because every glue export reads `wasm` at call time, existing bindings
+	// (facade functions, a worker's wrappers) work against the fresh instance with
+	// no rebind. The anchors below are asserted so a wasm-bindgen upgrade that
+	// reshapes the glue fails this build loudly instead of shipping a hook that
+	// silently misses.
+	const glue_anchors = ['let wasmModule, wasmInstance, wasm;', 'function initSync(module)'];
+	for (const anchor of glue_anchors) {
+		if (!generated_js.includes(anchor)) {
+			print_error(
+				`FAIL: generated ${main_js} lacks the \`${anchor}\` anchor the reinstantiate hook ` +
+					`patches against — did a wasm-bindgen upgrade reshape the glue?`
 			);
-		})
-		.replace(register_pattern, (_m, cls, obj) => {
-			register_sites.set(cls, (register_sites.get(cls) ?? 0) + 1);
-			return (
-				`${cls}Finalization.register(${obj}, ` +
-				`{ ptr: ${obj}.__wbg_ptr, gen: (${obj}.__tsv_gen = __tsv_instance_generation) }, ${obj})`
-			);
-		})
-		.replace(free_pattern, (_m, indent, free_fn) => {
-			free_rewrites++;
-			return (
-				`free() {\n` +
-				`${indent}const ptr = this.__destroy_into_raw();\n` +
-				`${indent}// patched by patch_npm_package.ts: a handle from a discarded instance is\n` +
-				`${indent}// already gone — freeing its pointer into the live one would corrupt the\n` +
-				`${indent}// allocator, so this is a no-op for it\n` +
-				`${indent}if (this.__tsv_gen === __tsv_instance_generation) wasm.${free_fn}(ptr, 0);\n`
-			);
-		})
-		.replace(method_pattern, (_m, call) => {
-			method_rewrites++;
-			return `${call}__tsv_live(this).__wbg_ptr`;
-		})
-		.replace(init_load_pattern, (_m, indent, load) => {
-			init_load_rewrites++;
-			return (
-				`${indent}${load}\n` +
-				`${indent}// patched by patch_npm_package.ts: an overlapping init (a second init, or\n` +
-				`${indent}// an initSync during the await) may have initialized the module meanwhile —\n` +
-				`${indent}// keep that instance, since replacing it would orphan every handle minted\n` +
-				`${indent}// against it\n` +
-				`${indent}if (wasm !== undefined) return wasm;`
-			);
-		}) +
-	`
+			return 1;
+		}
+	}
+	if (generated_js.includes('__tsv_instance_generation')) {
+		print_error(
+			`FAIL: generated ${main_js} is already patched with the reinstantiate hook — ` +
+				`re-run the wasm-pack build before patching again`
+		);
+		return 1;
+	}
+	// Guard each exported class's lifecycle against a reinstantiation. Both free
+	// paths — the FinalizationRegistry callback and explicit `free()` — go through
+	// the LIVE `wasm` binding, so a handle minted against a discarded instance and
+	// freed after a reinstantiation would free an old pointer into the NEW
+	// instance: allocator corruption with no error at the point of cause. Each
+	// handle is therefore stamped with the instance generation it was created
+	// under (on the object for `free()`, in the registry's held value for the
+	// callback — the generation must travel WITH the handle, since a module-level
+	// "has any reinstantiation happened" check is a one-way fuse that would leak
+	// every handle minted after the first recovery, fresh ones included). A stale
+	// handle's free is a no-op that leaks the old object's bytes, which the
+	// unreachable old instance leaks anyway; a current handle frees normally.
+	const registry_pattern = /new FinalizationRegistry\(ptr => wasm\.(\w+)\(ptr, 1\)\)/g;
+	const register_pattern = /(\w+)Finalization\.register\((\w+), \2\.__wbg_ptr, \2\)/g;
+	const free_pattern =
+		/free\(\) \{\n(\s+)const ptr = this\.__destroy_into_raw\(\);\n\s+wasm\.(\w+)\(ptr, 0\);\n/g;
+	// Every exported METHOD too — not only the two free paths. A method hands
+	// `this.__wbg_ptr` to the live `wasm` binding, so a handle from a discarded
+	// instance would read the new instance's memory at an offset that meant
+	// something else entirely: a wrong `is_ignored` verdict, or a fresh trap, with
+	// nothing said at the point of cause. The receiver is routed through
+	// `__tsv_live`, one generation compare per call, which throws on a stale handle
+	// instead. Both call shapes wasm-bindgen emits are covered: the receiver first,
+	// or after the return-slot pointer (`retptr`) of a method returning a string.
+	const method_pattern = /(wasm\.\w+\((?:retptr, )?)this\.__wbg_ptr/g;
+	// The async init's re-check. `__wbg_init` tests `wasm !== undefined` only BEFORE its
+	// awaits, so an init that overlaps another — a second `init()`, or an `initSync` that
+	// ran while the fetch/compile was pending — instantiates a second instance and, when it
+	// finishes last, silently replaces `wasm` without bumping the instance generation: a
+	// handle minted in between then reads the new instance's memory with no stale-handle
+	// error. Re-testing after the load keeps whichever instance initialized first, so the
+	// late instance is simply dropped (it was never finalized, so nothing references it).
+	const init_load_pattern = /^([ \t]*)(const \{ instance, module \} = await __wbg_load\(.*\);)$/gm;
+	let init_load_rewrites = 0;
+	let registry_rewrites = 0;
+	let free_rewrites = 0;
+	let method_rewrites = 0;
+	/** Register sites per class — the constructor's, plus `__wrap`'s if Rust ever
+	 * hands one back. The count is read twice below: as a rewrite tally, and as the
+	 * `__wrap` tripwire the lazy entries' guarded subclass needs. */
+	const register_sites = new Map<string, number>();
+	const patched_glue =
+		generated_js
+			.replace(registry_pattern, (_m, free_fn) => {
+				registry_rewrites++;
+				return (
+					`new FinalizationRegistry(({ ptr, gen }) => {\n` +
+					`    // patched by patch_npm_package.ts: a pointer stamped with an older\n` +
+					`    // instance generation belongs to a discarded instance — freeing it into\n` +
+					`    // the current one would corrupt its allocator, so leak it instead\n` +
+					`    if (gen === __tsv_instance_generation) wasm.${free_fn}(ptr, 1);\n` +
+					`})`
+				);
+			})
+			.replace(register_pattern, (_m, cls, obj) => {
+				register_sites.set(cls, (register_sites.get(cls) ?? 0) + 1);
+				return (
+					`${cls}Finalization.register(${obj}, ` +
+					`{ ptr: ${obj}.__wbg_ptr, gen: (${obj}.__tsv_gen = __tsv_instance_generation) }, ${obj})`
+				);
+			})
+			.replace(free_pattern, (_m, indent, free_fn) => {
+				free_rewrites++;
+				return (
+					`free() {\n` +
+					`${indent}const ptr = this.__destroy_into_raw();\n` +
+					`${indent}// patched by patch_npm_package.ts: a handle from a discarded instance is\n` +
+					`${indent}// already gone — freeing its pointer into the live one would corrupt the\n` +
+					`${indent}// allocator, so this is a no-op for it\n` +
+					`${indent}if (this.__tsv_gen === __tsv_instance_generation) wasm.${free_fn}(ptr, 0);\n`
+				);
+			})
+			.replace(method_pattern, (_m, call) => {
+				method_rewrites++;
+				return `${call}__tsv_live(this).__wbg_ptr`;
+			})
+			.replace(init_load_pattern, (_m, indent, load) => {
+				init_load_rewrites++;
+				return (
+					`${indent}${load}\n` +
+					`${indent}// patched by patch_npm_package.ts: an overlapping init (a second init, or\n` +
+					`${indent}// an initSync during the await) may have initialized the module meanwhile —\n` +
+					`${indent}// keep that instance, since replacing it would orphan every handle minted\n` +
+					`${indent}// against it\n` +
+					`${indent}if (wasm !== undefined) return wasm;`
+				);
+			}) +
+		`
 // ---- appended by patch_npm_package.ts ----
 
 let __tsv_instance_generation = 0;
@@ -385,226 +429,230 @@ export function reinstantiate() {
     initSync({ module });
 }
 `;
-// The async init has exactly one load site, and it must be re-checked: a reshaped
-// `__wbg_init` would otherwise reopen the overlapping-init race in silence.
-if (init_load_rewrites !== 1) {
-	console.error(
-		`FAIL: found ${init_load_rewrites} \`const { instance, module } = await __wbg_load(…);\` ` +
-			`site(s) in ${main_js}, expected exactly one (in \`__wbg_init\`) — the async init drifted ` +
-			`from the shape the overlapping-init re-check patches`
-	);
-	Deno.exit(1);
-}
-// Every method site must be routed, and none may remain: a receiver handed to
-// `wasm` any other way is a stale-handle path the guard does not cover.
-if (classes.length > 0 && method_rewrites === 0) {
-	console.error(
-		`FAIL: found ${classes.length} exported class(es) in ${main_js} but no method site handing ` +
-			`\`this.__wbg_ptr\` to \`wasm\` — the method shape drifted from the pattern the ` +
-			`stale-handle guard rewrites`
-	);
-	Deno.exit(1);
-}
-if (/wasm\.\w+\([^)]*\bthis\.__wbg_ptr/.test(patched_glue)) {
-	console.error(
-		`FAIL: a method in ${main_js} still hands \`this.__wbg_ptr\` to \`wasm\` unguarded — a ` +
-			`call shape the stale-handle guard does not recognize`
-	);
-	Deno.exit(1);
-}
-// The complement, which neither check above can see because it names no `wasm` call:
-// every raw receiver left in the glue must be a shape that never hands a pointer to
-// the live instance — `__destroy_into_raw`'s read-and-zero, the constructor's
-// assignment, its (rewritten) registration — and only `free()` may call
-// `__destroy_into_raw()`. The read is counted rather than exempted outright: the same
-// `const ptr = this.__wbg_ptr;` line in a method is exactly the aliasing to catch, as
-// is a `self`-consuming method (whose glue destroys the handle and passes the pointer
-// on) — stale-handle paths the rewrite would otherwise miss in silence.
-const raw_receivers = patched_glue
-	.split('\n')
-	.filter((line) => /\bthis\.__wbg_ptr\b/.test(line))
-	.filter(
-		(line) =>
-			!/^\s*const ptr = this\.__wbg_ptr;$/.test(line) &&
-			!/^\s*this\.__wbg_ptr = (?:0|ret(?: >>> 0)?);$/.test(line) &&
-			!/Finalization\.register\(this, \{ ptr: this\.__wbg_ptr, gen: /.test(line)
-	);
-const ptr_reads = patched_glue.match(/^\s*const ptr = this\.__wbg_ptr;$/gm)?.length ?? 0;
-const destroy_calls = patched_glue.match(/\bthis\.__destroy_into_raw\(\)/g)?.length ?? 0;
-if (raw_receivers.length > 0 || ptr_reads !== classes.length || destroy_calls !== classes.length) {
-	console.error(
-		`FAIL: ${main_js} reads a receiver the stale-handle guard does not cover — ` +
-			`${raw_receivers.length} unrecognized \`this.__wbg_ptr\` line(s)` +
-			raw_receivers.map((line) => `\n  ${line.trim()}`).join('') +
-			`\n${ptr_reads} \`const ptr = this.__wbg_ptr;\` read(s) and ${destroy_calls} ` +
-			`\`this.__destroy_into_raw()\` call(s) for ${classes.length} class(es), where each ` +
-			`class's \`__destroy_into_raw\` makes exactly one read and its \`free()\` one call`
-	);
-	Deno.exit(1);
-}
-if (registry_rewrites !== classes.length || free_rewrites !== classes.length) {
-	console.error(
-		`FAIL: rewrote ${registry_rewrites} FinalizationRegistry callback(s) and ${free_rewrites} ` +
-			`free() method(s) in ${main_js} but found ${classes.length} exported class(es) — the ` +
-			`class shape drifted from the pattern the reinstantiate guard rewrites`
-	);
-	Deno.exit(1);
-}
-// A class registers at least once (its constructor); a class that is also
-// returned from Rust registers again in its `__wrap`.
-const register_rewrites = [...register_sites.values()].reduce((sum, n) => sum + n, 0);
-if (register_rewrites < classes.length) {
-	console.error(
-		`FAIL: rewrote ${register_rewrites} FinalizationRegistry.register site(s) in ${main_js} but ` +
-			`found ${classes.length} exported class(es) — the register shape drifted from the ` +
-			`pattern the reinstantiate guard stamps`
-	);
-	Deno.exit(1);
-}
-// The `__wrap` tripwire for the lazy entries' guarded subclass (step 3). A class
-// RETURNED from Rust is wrapped by the glue's own `X.__wrap`, which builds the
-// BASE prototype — so such an instance would fail `instanceof` against the name
-// `browser.js` and `./worker` export, silently, in browsers only. No class is
-// returned today; this fails the build the day one is, rather than letting the
-// subclass quietly become wrong.
-const wrapped_classes = classes.filter((name) => (register_sites.get(name) ?? 0) > 1);
-if (wrapped_classes.length) {
-	console.error(
-		`FAIL: class(es) ${wrapped_classes.join(', ')} are RETURNED from Rust (a second ` +
-			`FinalizationRegistry.register site, in \`__wrap\`). The lazy entries wrap each class in a ` +
-			`guarded subclass, and \`__wrap\` builds the base prototype — so an instance handed back ` +
-			`from Rust would not be \`instanceof\` the class browser.js/worker.js exports. Decide how ` +
-			`those entries should present this class before shipping it.`
-	);
-	Deno.exit(1);
-}
-Deno.writeTextFileSync(`${pkg_root}/${main_js}`, patched_glue);
-console.log(`Patched ${pkg_root}/${main_js}: reinstantiate hook`);
-
-// IgnoreStack is format-gated, so it rides the format and all variants only.
-if (has_format_exports) {
-	if (!classes.includes('IgnoreStack')) {
-		console.error(`FAIL: generated ${main_js} is missing expected export \`IgnoreStack\``);
-		Deno.exit(1);
-	}
-} else if (classes.length) {
-	console.error(
-		`FAIL: ${variant} variant contains class exports (${classes.join(', ')}) — stale build dir?`
-	);
-	Deno.exit(1);
-}
-console.log(`Exports: ${[...fns, ...classes].join(', ')}`);
-
-// The facade's families, keyed by language — read off the raw export names, so a new
-// `lang_bindings!` language reaches the entries with no edit here.
-const languages_of = (pattern: RegExp): Array<string> =>
-	fns.map((name) => pattern.exec(name)?.[1]).filter((l): l is string => l !== undefined);
-const format_languages = languages_of(/^format_(\w+)$/);
-const parse_languages = languages_of(/^parse_(\w+)_json$/);
-for (const language of parse_languages) {
-	if (!fns.includes(`parse_${language}`)) {
-		console.error(
-			`FAIL: generated ${main_js} has \`parse_${language}_json\` but no \`parse_${language}\``
+	// The async init has exactly one load site, and it must be re-checked: a reshaped
+	// `__wbg_init` would otherwise reopen the overlapping-init race in silence.
+	if (init_load_rewrites !== 1) {
+		print_error(
+			`FAIL: found ${init_load_rewrites} \`const { instance, module } = await __wbg_load(…);\` ` +
+				`site(s) in ${main_js}, expected exactly one (in \`__wbg_init\`) — the async init drifted ` +
+				`from the shape the overlapping-init re-check patches`
 		);
-		Deno.exit(1);
+		return 1;
 	}
-}
-/** The names the facade publishes per family — the raw names, which it keeps. */
-const format_fns = fns.filter((name) => name.startsWith('format_'));
-const parse_fns = fns.filter((name) => name.startsWith('parse_') && !is_imports(name));
-const strip_fns = fns.filter((name) => name.startsWith('strip_'));
-const strip_languages = languages_of(/^strip_(\w+)$/);
-const imports_fns = fns.filter(is_imports);
-const imports_languages = languages_of(/^parse_imports_(\w+)$/);
+	// Every method site must be routed, and none may remain: a receiver handed to
+	// `wasm` any other way is a stale-handle path the guard does not cover.
+	if (classes.length > 0 && method_rewrites === 0) {
+		print_error(
+			`FAIL: found ${classes.length} exported class(es) in ${main_js} but no method site handing ` +
+				`\`this.__wbg_ptr\` to \`wasm\` — the method shape drifted from the pattern the ` +
+				`stale-handle guard rewrites`
+		);
+		return 1;
+	}
+	if (/wasm\.\w+\([^)]*\bthis\.__wbg_ptr/.test(patched_glue)) {
+		print_error(
+			`FAIL: a method in ${main_js} still hands \`this.__wbg_ptr\` to \`wasm\` unguarded — a ` +
+				`call shape the stale-handle guard does not recognize`
+		);
+		return 1;
+	}
+	// The complement, which neither check above can see because it names no `wasm` call:
+	// every raw receiver left in the glue must be a shape that never hands a pointer to
+	// the live instance — `__destroy_into_raw`'s read-and-zero, the constructor's
+	// assignment, its (rewritten) registration — and only `free()` may call
+	// `__destroy_into_raw()`. The read is counted rather than exempted outright: the same
+	// `const ptr = this.__wbg_ptr;` line in a method is exactly the aliasing to catch, as
+	// is a `self`-consuming method (whose glue destroys the handle and passes the pointer
+	// on) — stale-handle paths the rewrite would otherwise miss in silence.
+	const raw_receivers = patched_glue
+		.split('\n')
+		.filter((line) => /\bthis\.__wbg_ptr\b/.test(line))
+		.filter(
+			(line) =>
+				!/^\s*const ptr = this\.__wbg_ptr;$/.test(line) &&
+				!/^\s*this\.__wbg_ptr = (?:0|ret(?: >>> 0)?);$/.test(line) &&
+				!/Finalization\.register\(this, \{ ptr: this\.__wbg_ptr, gen: /.test(line)
+		);
+	const ptr_reads = patched_glue.match(/^\s*const ptr = this\.__wbg_ptr;$/gm)?.length ?? 0;
+	const destroy_calls = patched_glue.match(/\bthis\.__destroy_into_raw\(\)/g)?.length ?? 0;
+	if (
+		raw_receivers.length > 0 ||
+		ptr_reads !== classes.length ||
+		destroy_calls !== classes.length
+	) {
+		print_error(
+			`FAIL: ${main_js} reads a receiver the stale-handle guard does not cover — ` +
+				`${raw_receivers.length} unrecognized \`this.__wbg_ptr\` line(s)` +
+				raw_receivers.map((line) => `\n  ${line.trim()}`).join('') +
+				`\n${ptr_reads} \`const ptr = this.__wbg_ptr;\` read(s) and ${destroy_calls} ` +
+				`\`this.__destroy_into_raw()\` call(s) for ${classes.length} class(es), where each ` +
+				`class's \`__destroy_into_raw\` makes exactly one read and its \`free()\` one call`
+		);
+		return 1;
+	}
+	if (registry_rewrites !== classes.length || free_rewrites !== classes.length) {
+		print_error(
+			`FAIL: rewrote ${registry_rewrites} FinalizationRegistry callback(s) and ${free_rewrites} ` +
+				`free() method(s) in ${main_js} but found ${classes.length} exported class(es) — the ` +
+				`class shape drifted from the pattern the reinstantiate guard rewrites`
+		);
+		return 1;
+	}
+	// A class registers at least once (its constructor); a class that is also
+	// returned from Rust registers again in its `__wrap`.
+	const register_rewrites = [...register_sites.values()].reduce((sum, n) => sum + n, 0);
+	if (register_rewrites < classes.length) {
+		print_error(
+			`FAIL: rewrote ${register_rewrites} FinalizationRegistry.register site(s) in ${main_js} but ` +
+				`found ${classes.length} exported class(es) — the register shape drifted from the ` +
+				`pattern the reinstantiate guard stamps`
+		);
+		return 1;
+	}
+	// The `__wrap` tripwire for the lazy entries' guarded subclass (step 3). A class
+	// RETURNED from Rust is wrapped by the glue's own `X.__wrap`, which builds the
+	// BASE prototype — so such an instance would fail `instanceof` against the name
+	// `browser.js` and `./worker` export, silently, in browsers only. No class is
+	// returned today; this fails the build the day one is, rather than letting the
+	// subclass quietly become wrong.
+	const wrapped_classes = classes.filter((name) => (register_sites.get(name) ?? 0) > 1);
+	if (wrapped_classes.length) {
+		print_error(
+			`FAIL: class(es) ${wrapped_classes.join(', ')} are RETURNED from Rust (a second ` +
+				`FinalizationRegistry.register site, in \`__wrap\`). The lazy entries wrap each class in a ` +
+				`guarded subclass, and \`__wrap\` builds the base prototype — so an instance handed back ` +
+				`from Rust would not be \`instanceof\` the class browser.js/worker.js exports. Decide how ` +
+				`those entries should present this class before shipping it.`
+		);
+		return 1;
+	}
+	await pkg.write(main_js, patched_glue);
+	print(`Patched ${pkg_root}/${main_js}: reinstantiate hook`);
 
-// The types the variant's facade declares — each family's option bags and result types, and
-// the `TsvError` / `TsvParseError` every family's result carries — re-exported by NAME, so the
-// tsv_ast/locations star exports can never ambiguate them away (the TS2308 rule). The
-// format bags ride the format-capable variants alone, as their declaration file does.
-const api_types = has_format_exports ? facade_type_names(format_dts) : [];
-const error_types = facade_type_names('facade_error.d.ts');
-const api_parse_types = has_parse_exports ? facade_type_names(parse_dts) : [];
-const api_strip_types = has_strip_exports ? facade_type_names(strip_dts) : [];
-const api_imports_types = has_imports_exports ? facade_type_names(imports_dts) : [];
+	// IgnoreStack is format-gated, so it rides the format and all variants only.
+	if (has_format_exports) {
+		if (!classes.includes('IgnoreStack')) {
+			print_error(`FAIL: generated ${main_js} is missing expected export \`IgnoreStack\``);
+			return 1;
+		}
+	} else if (classes.length) {
+		print_error(
+			`FAIL: ${variant} variant contains class exports (${classes.join(', ')}) — stale build dir?`
+		);
+		return 1;
+	}
+	print(`Exports: ${[...fns, ...classes].join(', ')}`);
 
-// Every function and class the entries' `.d.ts` will re-export must actually be
-// DECLARED where it is re-exported from: the facade's functions in its hand-written
-// `facade_format.d.ts` / `facade_parse.d.ts`, the classes in the generated `tsv_wasm.d.ts` (the types
-// above are read off those declarations, so they cannot drift). Not a
-// formality: nothing ties a hand-written declaration to the export it types, and a
-// name that drifts out does NOT fail loudly downstream — without `skipLibCheck` it is
-// a TS2614 *inside the shipped package*, and WITH it (the common consumer config)
-// the export silently degrades to `any`, so the package keeps type-checking while
-// checking nothing. `deno task typecheck:packages` grades the merged `.d.ts` as a
-// consumer compiles it, but only at release (publish.ts Step 6) or on demand; this is
-// the one place the drift fails the build itself. Checked here, with the other export validations,
-// so a failure leaves no half-patched package behind.
-const generated_dts = Deno.readTextFileSync(`${pkg_root}/${dts_file}`);
-const format_dts_source = Deno.readTextFileSync(`${FACADE_SOURCE_DIR}/${format_dts}`);
-const parse_dts_source = Deno.readTextFileSync(`${FACADE_SOURCE_DIR}/${parse_dts}`);
-const strip_dts_source = Deno.readTextFileSync(`${FACADE_SOURCE_DIR}/${strip_dts}`);
-const imports_dts_source = Deno.readTextFileSync(`${FACADE_SOURCE_DIR}/${imports_dts}`);
-const undeclared = [
-	...format_fns.map((name) => [format_dts, format_dts_source, 'declare function', name] as const),
-	...parse_fns.map((name) => [parse_dts, parse_dts_source, 'declare function', name] as const),
-	...strip_fns.map((name) => [strip_dts, strip_dts_source, 'declare function', name] as const),
-	...imports_fns.map(
-		(name) => [imports_dts, imports_dts_source, 'declare function', name] as const
-	),
-	...classes.map((name) => [dts_file, generated_dts, 'class', name] as const)
-].filter(([, source, kind, name]) => !new RegExp(`^export ${kind} ${name}\\b`, 'm').test(source));
-if (undeclared.length) {
-	console.error(
-		`FAIL: missing declarations — ${undeclared.map(([file, , kind, name]) => `${kind} \`${name}\` in ${file}`).join(', ')}. ` +
-			`index.d.ts re-exports the name${undeclared.length === 1 ? '' : 's'} anyway, which ships ` +
-			`untyped under a consumer's skipLibCheck. Declare facade functions in ` +
-			`${FACADE_SOURCE_DIR}/${format_dts} / ${parse_dts} / ${strip_dts} / ${imports_dts}; a class comes from the generated ${dts_file}.`
-	);
-	Deno.exit(1);
-}
+	// The facade's families, keyed by language — read off the raw export names, so a new
+	// `lang_bindings!` language reaches the entries with no edit here.
+	const languages_of = (pattern: RegExp): Array<string> =>
+		fns.map((name) => pattern.exec(name)?.[1]).filter((l): l is string => l !== undefined);
+	const format_languages = languages_of(/^format_(\w+)$/);
+	const parse_languages = languages_of(/^parse_(\w+)_json$/);
+	for (const language of parse_languages) {
+		if (!fns.includes(`parse_${language}`)) {
+			print_error(
+				`FAIL: generated ${main_js} has \`parse_${language}_json\` but no \`parse_${language}\``
+			);
+			return 1;
+		}
+	}
+	/** The names the facade publishes per family — the raw names, which it keeps. */
+	const format_fns = fns.filter((name) => name.startsWith('format_'));
+	const parse_fns = fns.filter((name) => name.startsWith('parse_') && !is_imports(name));
+	const strip_fns = fns.filter((name) => name.startsWith('strip_'));
+	const strip_languages = languages_of(/^strip_(\w+)$/);
+	const imports_fns = fns.filter(is_imports);
+	const imports_languages = languages_of(/^parse_imports_(\w+)$/);
 
-// The facade wiring both entries share: the engine families handed to `create_*_api`
-// (each raw export under its alias `_<name>`, optionally wrapped), then the published
-// names destructured out of the result.
-const engine_table = (languages: Array<string>, raw: (language: string) => string): string =>
-	`{ ${languages.map((language) => `${language}: ${raw(language)}`).join(', ')} }`;
-// each factory is imported only where an export uses it — a parse-only entry has no
-// format functions, though its `api_parse.js` still imports `api.js`'s shared helpers
-const facade_imports =
-	(format_fns.length ? `import { create_format_api } from './${api_file}';\n` : '') +
-	(has_parse_exports ? `import { create_parse_api } from './${api_parse_file}';\n` : '') +
-	(strip_fns.length ? `import { create_strip_api } from './${api_strip_file}';\n` : '') +
-	(imports_fns.length ? `import { create_imports_api } from './${api_imports_file}';\n` : '');
-const facade_exports = (wrap: (raw: string) => string): string =>
-	(format_fns.length
-		? `export const { ${format_fns.join(', ')} } = create_format_api({\n` +
-			format_languages.map((l) => `\t${l}: ${wrap(`_format_${l}`)}`).join(',\n') +
-			`\n});\n`
-		: '') +
-	(parse_fns.length
-		? `export const { ${parse_fns.join(', ')} } = create_parse_api({\n` +
-			`\tparse: ${engine_table(parse_languages, (l) => wrap(`_parse_${l}`))},\n` +
-			`\tparse_json: ${engine_table(parse_languages, (l) => wrap(`_parse_${l}_json`))}\n});\n`
-		: '') +
-	(strip_fns.length
-		? `export const { ${strip_fns.join(', ')} } = create_strip_api(` +
-			`${engine_table(strip_languages, (l) => wrap(`_strip_${l}`))});\n`
-		: '') +
-	(imports_fns.length
-		? `export const { ${imports_fns.join(', ')} } = create_imports_api(` +
-			`${engine_table(imports_languages, (l) => wrap(`_parse_imports_${l}`))});\n`
-		: '');
+	// The types the variant's facade declares — each family's option bags and result types, and
+	// the `TsvError` / `TsvParseError` every family's result carries — re-exported by NAME, so the
+	// tsv_ast/locations star exports can never ambiguate them away (the TS2308 rule). The
+	// format bags ride the format-capable variants alone, as their declaration file does.
+	const api_types = has_format_exports ? await declared_type_names(format_dts) : [];
+	const error_types = await declared_type_names('facade_error.d.ts');
+	const api_parse_types = has_parse_exports ? await declared_type_names(parse_dts) : [];
+	const api_strip_types = has_strip_exports ? await declared_type_names(strip_dts) : [];
+	const api_imports_types = has_imports_exports ? await declared_type_names(imports_dts) : [];
 
-// 2. Create index.js — Node.js/Bun entry: auto-init via readFileSync + initSync.
-// WASM is initialized synchronously at import time, so no init guard needed.
-// The module is compiled here rather than left to `initSync` (which would
-// compile the same bytes internally) so the compiled `WebAssembly.Module` can be
-// exported: it is the one piece a worker-pool consumer cannot obtain otherwise,
-// since the `.wasm` file is not an exports entry. Handing it to a worker that
-// initializes via the `./worker` subpath means no worker recompiles — V8 shares
-// compiled wasm code across isolates, so tier-up is paid once process-wide.
+	// Every function and class the entries' `.d.ts` will re-export must actually be
+	// DECLARED where it is re-exported from: the facade's functions in its hand-written
+	// `facade_format.d.ts` / `facade_parse.d.ts`, the classes in the generated `tsv_wasm.d.ts` (the types
+	// above are read off those declarations, so they cannot drift). Not a
+	// formality: nothing ties a hand-written declaration to the export it types, and a
+	// name that drifts out does NOT fail loudly downstream — without `skipLibCheck` it is
+	// a TS2614 *inside the shipped package*, and WITH it (the common consumer config)
+	// the export silently degrades to `any`, so the package keeps type-checking while
+	// checking nothing. `deno task typecheck:packages` grades the merged `.d.ts` as a
+	// consumer compiles it, but only at release (publish.ts Step 6) or on demand; this is
+	// the one place the drift fails the build itself. Checked here, with the other export validations,
+	// so a failure leaves no half-patched package behind.
+	const generated_dts = await pkg.read_text(dts_file);
+	const format_dts_source = await deps.checkout.read_text(`${FACADE_SOURCE_DIR}/${format_dts}`);
+	const parse_dts_source = await deps.checkout.read_text(`${FACADE_SOURCE_DIR}/${parse_dts}`);
+	const strip_dts_source = await deps.checkout.read_text(`${FACADE_SOURCE_DIR}/${strip_dts}`);
+	const imports_dts_source = await deps.checkout.read_text(`${FACADE_SOURCE_DIR}/${imports_dts}`);
+	const undeclared = [
+		...format_fns.map((name) => [format_dts, format_dts_source, 'declare function', name] as const),
+		...parse_fns.map((name) => [parse_dts, parse_dts_source, 'declare function', name] as const),
+		...strip_fns.map((name) => [strip_dts, strip_dts_source, 'declare function', name] as const),
+		...imports_fns.map(
+			(name) => [imports_dts, imports_dts_source, 'declare function', name] as const
+		),
+		...classes.map((name) => [dts_file, generated_dts, 'class', name] as const)
+	].filter(([, source, kind, name]) => !new RegExp(`^export ${kind} ${name}\\b`, 'm').test(source));
+	if (undeclared.length) {
+		print_error(
+			`FAIL: missing declarations — ${undeclared.map(([file, , kind, name]) => `${kind} \`${name}\` in ${file}`).join(', ')}. ` +
+				`index.d.ts re-exports the name${undeclared.length === 1 ? '' : 's'} anyway, which ships ` +
+				`untyped under a consumer's skipLibCheck. Declare facade functions in ` +
+				`${FACADE_SOURCE_DIR}/${format_dts} / ${parse_dts} / ${strip_dts} / ${imports_dts}; a class comes from the generated ${dts_file}.`
+		);
+		return 1;
+	}
 
-const index_js = `import { readFileSync } from 'node:fs';
+	// The facade wiring both entries share: the engine families handed to `create_*_api`
+	// (each raw export under its alias `_<name>`, optionally wrapped), then the published
+	// names destructured out of the result.
+	const engine_table = (languages: Array<string>, raw: (language: string) => string): string =>
+		`{ ${languages.map((language) => `${language}: ${raw(language)}`).join(', ')} }`;
+	// each factory is imported only where an export uses it — a parse-only entry has no
+	// format functions, though its `api_parse.js` still imports `api.js`'s shared helpers
+	const facade_imports =
+		(format_fns.length ? `import { create_format_api } from './${api_file}';\n` : '') +
+		(has_parse_exports ? `import { create_parse_api } from './${api_parse_file}';\n` : '') +
+		(strip_fns.length ? `import { create_strip_api } from './${api_strip_file}';\n` : '') +
+		(imports_fns.length ? `import { create_imports_api } from './${api_imports_file}';\n` : '');
+	const facade_exports = (wrap: (raw: string) => string): string =>
+		(format_fns.length
+			? `export const { ${format_fns.join(', ')} } = create_format_api({\n` +
+				format_languages.map((l) => `\t${l}: ${wrap(`_format_${l}`)}`).join(',\n') +
+				`\n});\n`
+			: '') +
+		(parse_fns.length
+			? `export const { ${parse_fns.join(', ')} } = create_parse_api({\n` +
+				`\tparse: ${engine_table(parse_languages, (l) => wrap(`_parse_${l}`))},\n` +
+				`\tparse_json: ${engine_table(parse_languages, (l) => wrap(`_parse_${l}_json`))}\n});\n`
+			: '') +
+		(strip_fns.length
+			? `export const { ${strip_fns.join(', ')} } = create_strip_api(` +
+				`${engine_table(strip_languages, (l) => wrap(`_strip_${l}`))});\n`
+			: '') +
+		(imports_fns.length
+			? `export const { ${imports_fns.join(', ')} } = create_imports_api(` +
+				`${engine_table(imports_languages, (l) => wrap(`_parse_imports_${l}`))});\n`
+			: '');
+
+	// 2. Create index.js — Node.js/Bun entry: auto-init via readFileSync + initSync.
+	// WASM is initialized synchronously at import time, so no init guard needed.
+	// The module is compiled here rather than left to `initSync` (which would
+	// compile the same bytes internally) so the compiled `WebAssembly.Module` can be
+	// exported: it is the one piece a worker-pool consumer cannot obtain otherwise,
+	// since the `.wasm` file is not an exports entry. Handing it to a worker that
+	// initializes via the `./worker` subpath means no worker recompiles — V8 shares
+	// compiled wasm code across isolates, so tier-up is paid once process-wide.
+
+	const index_js = `import { readFileSync } from 'node:fs';
 import {
 	default as _init,
 	initSync,
@@ -637,32 +685,32 @@ ${facade_exports((raw) => raw)}
 export { reinstantiate, wasm_module${classes.map((c) => `, ${c}`).join('')} };
 ${locations_reexport}`;
 
-Deno.writeTextFileSync(`${pkg_root}/index.js`, index_js);
-console.log(`Created ${pkg_root}/index.js`);
+	await pkg.write('index.js', index_js);
+	print(`Created ${pkg_root}/index.js`);
 
-/** The `init` doc's lines, shared by browser.js and both `.d.ts`: what it is required for
- * (an engine call), and what needs no init — the facade's argument checks always, and the
- * pure-JS reconstruction helper where the variant ships it. */
-const init_doc_lines = has_parse_exports
-	? [
-			'Initialize the WASM module. Required in browsers before any engine call; the pure-JS',
-			'reconstruction helper (`create_locator`, `reconstruct_locations`) and the option and',
-			'source checks need none. No-op if already initialized; overlapping calls share one',
-			'initialization.'
-		]
-	: [
-			'Initialize the WASM module. Required in browsers before any engine call; the option',
-			'and source checks need none. No-op if already initialized; overlapping calls share one',
-			'initialization.'
-		];
-/** `init_doc_lines` as a doc comment. */
-const init_doc = `/**\n${init_doc_lines.map((line) => ` * ${line}\n`).join('')} */`;
+	/** The `init` doc's lines, shared by browser.js and both `.d.ts`: what it is required for
+	 * (an engine call), and what needs no init — the facade's argument checks always, and the
+	 * pure-JS reconstruction helper where the variant ships it. */
+	const init_doc_lines = has_parse_exports
+		? [
+				'Initialize the WASM module. Required in browsers before any engine call; the pure-JS',
+				'reconstruction helper (`create_locator`, `reconstruct_locations`) and the option and',
+				'source checks need none. No-op if already initialized; overlapping calls share one',
+				'initialization.'
+			]
+		: [
+				'Initialize the WASM module. Required in browsers before any engine call; the option',
+				'and source checks need none. No-op if already initialized; overlapping calls share one',
+				'initialization.'
+			];
+	/** `init_doc_lines` as a doc comment. */
+	const init_doc = `/**\n${init_doc_lines.map((line) => ` * ${line}\n`).join('')} */`;
 
-// 3. Create browser.js — Browser/default entry: async init() with guards.
-// Vite and other bundlers pick this via the "default" export condition and handle
-// the `new URL('./tsv_wasm_bg.wasm', import.meta.url)` pattern natively.
+	// 3. Create browser.js — Browser/default entry: async init() with guards.
+	// Vite and other bundlers pick this via the "default" export condition and handle
+	// the `new URL('./tsv_wasm_bg.wasm', import.meta.url)` pattern natively.
 
-const browser_js = `import {
+	const browser_js = `import {
 	default as _init,
 	initSync,
 ${[...fns, ...classes].map((f) => `\t${f} as _${f},`).join('\n')}
@@ -738,14 +786,14 @@ ${classes
 	)}${classes.length ? '\n\n' : ''}// the published functions: the shared facade over the guarded raw exports
 ${facade_exports((raw) => `_guarded(${raw})`)}`;
 
-Deno.writeTextFileSync(`${pkg_root}/browser.js`, browser_js);
-console.log(`Created ${pkg_root}/browser.js`);
+	await pkg.write('browser.js', browser_js);
+	print(`Created ${pkg_root}/browser.js`);
 
-// 3b. Create worker.js — the `./worker` subpath, a re-export of browser.js.
-// `export *` keeps it the SAME module instance, so `init_sync` here initializes
-// the singleton every other import of it sees. A copy of the wrappers would not.
+	// 3b. Create worker.js — the `./worker` subpath, a re-export of browser.js.
+	// `export *` keeps it the SAME module instance, so `init_sync` here initializes
+	// the singleton every other import of it sees. A copy of the wrappers would not.
 
-const worker_js = `// The \`${pkg_name}/worker\` entry: the same lazy-init exports as the browser
+	const worker_js = `// The \`${pkg_name}/worker\` entry: the same lazy-init exports as the browser
 // entry, under the name a worker reaches for. Initialize once per worker with
 // \`init_sync({module})\`, passing the \`wasm_module\` the main thread exports from
 // \`${pkg_name}\` — that shares compiled code across isolates instead of
@@ -753,44 +801,44 @@ const worker_js = `// The \`${pkg_name}/worker\` entry: the same lazy-init expor
 export * from './browser.js';
 `;
 
-Deno.writeTextFileSync(`${pkg_root}/${worker_file}`, worker_js);
-console.log(`Created ${pkg_root}/${worker_file}`);
+	await pkg.write(worker_file, worker_js);
+	print(`Created ${pkg_root}/${worker_file}`);
 
-// 4. Create the type declarations — one file per entry.
-// The facade's functions and option types re-export by name from its hand-written
-// declarations, the classes from the generated ones; init/init_sync are declared with
-// clean signatures to avoid leaking wasm-bindgen internals (InitOutput with raw
-// pointers).
+	// 4. Create the type declarations — one file per entry.
+	// The facade's functions and option types re-export by name from its hand-written
+	// declarations, the classes from the generated ones; init/init_sync are declared with
+	// clean signatures to avoid leaking wasm-bindgen internals (InitOutput with raw
+	// pointers).
 
-// wasm-bindgen declares each class's `[Symbol.dispose]()`, which names a symbol only
-// the `esnext.disposable` lib declares: a consumer on a plain `es2022` lib without
-// `skipLibCheck` gets TS2550 from inside the package. A triple-slash lib reference pulls
-// that one lib in for whoever loads the declaration, whatever their own `lib` says —
-// written only where the generated file needs it (the classes ride the format-capable
-// variants).
-const dispose_lib_reference = '/// <reference lib="esnext.disposable" />\n';
-if (
-	generated_dts.includes('[Symbol.dispose]') &&
-	!generated_dts.startsWith(dispose_lib_reference)
-) {
-	Deno.writeTextFileSync(`${pkg_root}/${dts_file}`, dispose_lib_reference + generated_dts);
-	console.log(`Patched ${pkg_root}/${dts_file}: esnext.disposable lib reference`);
-}
+	// wasm-bindgen declares each class's `[Symbol.dispose]()`, which names a symbol only
+	// the `esnext.disposable` lib declares: a consumer on a plain `es2022` lib without
+	// `skipLibCheck` gets TS2550 from inside the package. A triple-slash lib reference pulls
+	// that one lib in for whoever loads the declaration, whatever their own `lib` says —
+	// written only where the generated file needs it (the classes ride the format-capable
+	// variants).
+	const dispose_lib_reference = '/// <reference lib="esnext.disposable" />\n';
+	if (
+		generated_dts.includes('[Symbol.dispose]') &&
+		!generated_dts.startsWith(dispose_lib_reference)
+	) {
+		await pkg.write(dts_file, dispose_lib_reference + generated_dts);
+		print(`Patched ${pkg_root}/${dts_file}: esnext.disposable lib reference`);
+	}
 
-const ast_reexport = has_parse_exports ? `export type * from './tsv_ast.js';\n` : '';
-const named_reexport = (names: Array<string>, from: string, type_only: boolean): string =>
-	names.length
-		? `export ${type_only ? 'type ' : ''}{ ${names.join(', ')} } from './${from}';\n`
-		: '';
-// Everything all three entries share. `wasm_module` is deliberately NOT here:
-// only `index.js` compiles at import and exports it, so declaring it for the
-// browser and `./worker` entries would name an export that does not exist —
-// under a bundler that is a build error TypeScript said was fine, which is a
-// worse failure than a nullable type. Hence one `.d.ts` per entry, and the
-// per-condition `types` in `exports` that lets each be reached.
-const shared_dts = `${ast_reexport}${locations_reexport}${named_reexport(api_parse_types, dts_specifier(parse_dts), true)}${named_reexport(api_types, dts_specifier(format_dts), true)}${named_reexport(api_strip_types, dts_specifier(strip_dts), true)}${named_reexport(api_imports_types, dts_specifier(imports_dts), true)}${named_reexport(error_types, dts_specifier('facade_error.d.ts'), true)}${named_reexport(parse_fns, dts_specifier(parse_dts), false)}${named_reexport(format_fns, dts_specifier(format_dts), false)}${named_reexport(strip_fns, dts_specifier(strip_dts), false)}${named_reexport(imports_fns, dts_specifier(imports_dts), false)}${
-	classes.length ? `export { ${classes.join(', ')} } from '${dts_module}';\n` : ''
-}${init_doc}
+	const ast_reexport = has_parse_exports ? `export type * from './tsv_ast.js';\n` : '';
+	const named_reexport = (names: Array<string>, from: string, type_only: boolean): string =>
+		names.length
+			? `export ${type_only ? 'type ' : ''}{ ${names.join(', ')} } from './${from}';\n`
+			: '';
+	// Everything all three entries share. `wasm_module` is deliberately NOT here:
+	// only `index.js` compiles at import and exports it, so declaring it for the
+	// browser and `./worker` entries would name an export that does not exist —
+	// under a bundler that is a build error TypeScript said was fine, which is a
+	// worse failure than a nullable type. Hence one `.d.ts` per entry, and the
+	// per-condition `types` in `exports` that lets each be reached.
+	const shared_dts = `${ast_reexport}${locations_reexport}${named_reexport(api_parse_types, dts_specifier(parse_dts), true)}${named_reexport(api_types, dts_specifier(format_dts), true)}${named_reexport(api_strip_types, dts_specifier(strip_dts), true)}${named_reexport(api_imports_types, dts_specifier(imports_dts), true)}${named_reexport(error_types, dts_specifier('facade_error.d.ts'), true)}${named_reexport(parse_fns, dts_specifier(parse_dts), false)}${named_reexport(format_fns, dts_specifier(format_dts), false)}${named_reexport(strip_fns, dts_specifier(strip_dts), false)}${named_reexport(imports_fns, dts_specifier(imports_dts), false)}${
+		classes.length ? `export { ${classes.join(', ')} } from '${dts_module}';\n` : ''
+	}${init_doc}
 export declare function init(module_or_path?: {
 	module_or_path: RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
 }): Promise<void>;
@@ -817,7 +865,7 @@ export declare function init_sync(module: {
 export declare function reinstantiate(): void;
 `;
 
-const index_dts = `${shared_dts}/**
+	const index_dts = `${shared_dts}/**
  * The compiled WASM module backing this package's exports, for handing to a
  * worker (\`workerData\` / \`postMessage\`) which then initializes from it via
  * \`${pkg_name}/worker\`'s \`init_sync({module})\` — sharing compiled code across
@@ -826,172 +874,178 @@ const index_dts = `${shared_dts}/**
 export declare const wasm_module: WebAssembly.Module;
 `;
 
-Deno.writeTextFileSync(`${pkg_root}/index.d.ts`, index_dts);
-console.log(`Created ${pkg_root}/index.d.ts`);
+	await pkg.write('index.d.ts', index_dts);
+	print(`Created ${pkg_root}/index.d.ts`);
 
-// The browser and `./worker` entries: the same exports minus `wasm_module`,
-// which neither compiles. `browser.js` IS `worker.js` (the subpath re-exports
-// it), so one declaration file serves both.
-Deno.writeTextFileSync(`${pkg_root}/${browser_dts}`, shared_dts);
-console.log(`Created ${pkg_root}/${browser_dts}`);
+	// The browser and `./worker` entries: the same exports minus `wasm_module`,
+	// which neither compiles. `browser.js` IS `worker.js` (the subpath re-exports
+	// it), so one declaration file serves both.
+	await pkg.write(browser_dts, shared_dts);
+	print(`Created ${pkg_root}/${browser_dts}`);
 
-// 5. Copy the variant README, the repo LICENSE and the third-party NOTICE into the package
-// root.
+	// 5. Copy the variant README, the repo LICENSE and the third-party NOTICE into the package
+	// root.
 
-const readme_src = `crates/tsv_wasm/README_${variant}.md`;
-await stage_file(stage_deps, readme_src, `${pkg_root}/README.md`);
-console.log(`Copied ${readme_src} → ${pkg_root}/README.md`);
+	const readme_src = `crates/tsv_wasm/README_${variant}.md`;
+	await stage_file(stage_deps, readme_src, 'README.md');
+	print(`Copied ${readme_src} → ${pkg_root}/README.md`);
 
-await stage_file(stage_deps, 'LICENSE', `${pkg_root}/LICENSE`);
-console.log(`Copied LICENSE → ${pkg_root}/LICENSE`);
+	await stage_file(stage_deps, 'LICENSE', 'LICENSE');
+	print(`Copied LICENSE → ${pkg_root}/LICENSE`);
 
-// the WHATWG notice for the entity table compiled into the bundle (see THIRD_PARTY_NOTICE)
-await stage_file(
-	stage_deps,
-	THIRD_PARTY_NOTICE.source,
-	`${pkg_root}/${THIRD_PARTY_NOTICE.published}`
-);
-console.log(`Copied ${THIRD_PARTY_NOTICE.source} → ${pkg_root}/${THIRD_PARTY_NOTICE.published}`);
+	// the WHATWG notice for the entity table compiled into the bundle (see THIRD_PARTY_NOTICE)
+	await stage_file(stage_deps, THIRD_PARTY_NOTICE.source, THIRD_PARTY_NOTICE.published);
+	print(`Copied ${THIRD_PARTY_NOTICE.source} → ${pkg_root}/${THIRD_PARTY_NOTICE.published}`);
 
-// The facade the entries import — its parse half (with the reconstruction helper
-// index.js/browser.js/index.d.ts re-export, and the AST types) in the parse-capable
-// variants only, and its strip and imports halves in the `all` variant alone.
-const families = {
-	format: has_format_exports,
-	parse: has_parse_exports,
-	strip: has_strip_exports,
-	imports: has_imports_exports
-};
-for (const { published, source } of facade_files(families)) {
-	await stage_file(stage_deps, source, `${pkg_root}/${published}`);
-	console.log(`Copied ${source} → ${pkg_root}/${published}`);
-}
+	// The facade the entries import — its parse half (with the reconstruction helper
+	// index.js/browser.js/index.d.ts re-export, and the AST types) in the parse-capable
+	// variants only, and its strip and imports halves in the `all` variant alone.
+	const families = {
+		format: has_format_exports,
+		parse: has_parse_exports,
+		strip: has_strip_exports,
+		imports: has_imports_exports
+	};
+	for (const { published, source } of facade_files(families)) {
+		await stage_file(stage_deps, source, published);
+		print(`Copied ${source} → ${pkg_root}/${published}`);
+	}
 
-if (variant === 'all') {
-	// The full-tool package ships the CLI (`tsv` bin); the subsets stay pure libraries.
-	await stage_file(stage_deps, `crates/tsv_wasm/npm/${cli_file}`, `${pkg_root}/${cli_file}`);
-	console.log(`Copied crates/tsv_wasm/npm/${cli_file} → ${pkg_root}/${cli_file}`);
-}
+	if (variant === 'all') {
+		// The full-tool package ships the CLI (`tsv` bin); the subsets stay pure libraries.
+		await stage_file(stage_deps, `crates/tsv_wasm/npm/${cli_file}`, cli_file);
+		print(`Copied crates/tsv_wasm/npm/${cli_file} → ${pkg_root}/${cli_file}`);
+	}
 
-// 6. Patch package.json.
+	// 6. Patch package.json.
 
-const pkg_path = `${pkg_root}/package.json`;
-const pkg = JSON.parse(Deno.readTextFileSync(pkg_path));
+	const pkg_path = `${pkg_root}/package.json`;
+	const manifest = JSON.parse(await pkg.read_text('package.json'));
 
-pkg.name = pkg_name;
-pkg.description = {
-	format: 'formatter for Svelte, TypeScript, and CSS',
-	parse: 'parser for Svelte, TypeScript, and CSS',
-	all:
-		'formatter and parser for Svelte, TypeScript, and CSS, a TypeScript type stripper, ' +
-		'and an import-records parser'
-}[variant];
-pkg.type = 'module';
-pkg.exports = {
-	'./package.json': './package.json',
-	// `types` nests INSIDE each condition rather than sitting beside them: the
-	// two entries do not have the same exports (only the Node one compiles at
-	// import, so only it has `wasm_module`), and a single hoisted `types` would
-	// declare that export for the browser build too.
-	'.': {
-		node: {
-			types: './index.d.ts',
-			default: './index.js'
+	manifest.name = pkg_name;
+	manifest.description = {
+		format: 'formatter for Svelte, TypeScript, and CSS',
+		parse: 'parser for Svelte, TypeScript, and CSS',
+		all:
+			'formatter and parser for Svelte, TypeScript, and CSS, a TypeScript type stripper, ' +
+			'and an import-records parser'
+	}[variant];
+	manifest.type = 'module';
+	manifest.exports = {
+		'./package.json': './package.json',
+		// `types` nests INSIDE each condition rather than sitting beside them: the
+		// two entries do not have the same exports (only the Node one compiles at
+		// import, so only it has `wasm_module`), and a single hoisted `types` would
+		// declare that export for the browser build too.
+		'.': {
+			node: {
+				types: './index.d.ts',
+				default: './index.js'
+			},
+			default: {
+				types: `./${browser_dts}`,
+				default: './browser.js'
+			}
 		},
-		default: {
+		// the no-auto-init entry, reachable from Node and Bun (where the `node`
+		// condition would otherwise always resolve the auto-init one)
+		'./worker': {
 			types: `./${browser_dts}`,
-			default: './browser.js'
-		}
-	},
-	// the no-auto-init entry, reachable from Node and Bun (where the `node`
-	// condition would otherwise always resolve the auto-init one)
-	'./worker': {
-		types: `./${browser_dts}`,
-		default: `./${worker_file}`
-	},
-	// the reconstruction helper alone (a consumer holding a tree — from disk, another
-	// process, a `_json` export — reaches it without loading the engine); parse-capable
-	// variants only, like the helper itself
-	...(has_parse_exports ? { './locations': LOCATIONS_EXPORT } : {})
-};
-if (variant === 'all') {
-	// No `./` prefix: npm normalizes bin targets to bare relative paths at publish,
-	// and its change report words that normalization as the bin being "invalid and
-	// removed" (it isn't — the bin survives). Writing the normalized form avoids
-	// the scare warning on every publish.
-	pkg.bin = { tsv: cli_file };
+			default: `./${worker_file}`
+		},
+		// the reconstruction helper alone (a consumer holding a tree — from disk, another
+		// process, a `_json` export — reaches it without loading the engine); parse-capable
+		// variants only, like the helper itself
+		...(has_parse_exports ? { './locations': LOCATIONS_EXPORT } : {})
+	};
+	if (variant === 'all') {
+		// No `./` prefix: npm normalizes bin targets to bare relative paths at publish,
+		// and its change report words that normalization as the bin being "invalid and
+		// removed" (it isn't — the bin survives). Writing the normalized form avoids
+		// the scare warning on every publish.
+		manifest.bin = { tsv: cli_file };
+	}
+	manifest.files = [
+		'index.js',
+		'index.d.ts',
+		'browser.js',
+		browser_dts,
+		worker_file,
+		main_js,
+		dts_file,
+		wasm_file,
+		...facade_files(families).map((file) => file.published),
+		...(variant === 'all' ? [cli_file] : []),
+		'README.md',
+		'LICENSE',
+		THIRD_PARTY_NOTICE.published
+	];
+	manifest.keywords = [
+		'typescript',
+		'svelte',
+		'css',
+		...(has_format_exports ? ['formatter', 'prettier'] : []),
+		...(has_parse_exports ? ['parser', 'ast', 'acorn'] : []),
+		...(variant === 'all' ? ['cli', 'strip', 'imports'] : []),
+		'wasm',
+		'webassembly'
+	];
+	// The registry-identity fields shared with the N-API set (license included —
+	// wasm-pack derives 0BSD from tsv_wasm's Cargo.toml, but the bundle also compiles
+	// in tsv_html's BSD-3-Clause table, and the module is the authority so every
+	// published tsv package presents identically).
+	Object.assign(manifest, NPM_SHARED_METADATA);
+	// wasm-pack emits `sideEffects: ["./snippets/*"]`, declaring index.js
+	// side-effect-free — but its top-level readFileSync + initSync IS the side
+	// effect. Without this, a tree-shaking bundler on the `node` condition may
+	// bypass the re-export facade and skip initialization entirely.
+	manifest.sideEffects = ['./index.js'];
+
+	// wasm-pack's web-target fields point at the raw glue; `exports` supersedes them,
+	// so replace them with the Node facade for pre-`exports` resolvers (an old
+	// `moduleResolution: node10` consumer, tooling that reads `main` directly) — the
+	// same pair the N-API loader declares, so both package sets resolve alike.
+	manifest.main = 'index.js';
+	manifest.types = 'index.d.ts';
+	delete manifest.module;
+
+	await pkg.write('package.json', JSON.stringify(manifest, null, '\t') + '\n');
+	print(`Patched ${pkg_path}: name → ${manifest.name}, version ${manifest.version}`);
+
+	await print_summary(deps, pkg, pkg_root, [...manifest.files, 'package.json']);
+	return 0;
 }
-pkg.files = [
-	'index.js',
-	'index.d.ts',
-	'browser.js',
-	browser_dts,
-	worker_file,
-	main_js,
-	dts_file,
-	wasm_file,
-	...facade_files(families).map((file) => file.published),
-	...(variant === 'all' ? [cli_file] : []),
-	'README.md',
-	'LICENSE',
-	THIRD_PARTY_NOTICE.published
-];
-pkg.keywords = [
-	'typescript',
-	'svelte',
-	'css',
-	...(has_format_exports ? ['formatter', 'prettier'] : []),
-	...(has_parse_exports ? ['parser', 'ast', 'acorn'] : []),
-	...(variant === 'all' ? ['cli', 'strip', 'imports'] : []),
-	'wasm',
-	'webassembly'
-];
-// The registry-identity fields shared with the N-API set (license included —
-// wasm-pack derives 0BSD from tsv_wasm's Cargo.toml, but the bundle also compiles
-// in tsv_html's BSD-3-Clause table, and the module is the authority so every
-// published tsv package presents identically).
-Object.assign(pkg, NPM_SHARED_METADATA);
-// wasm-pack emits `sideEffects: ["./snippets/*"]`, declaring index.js
-// side-effect-free — but its top-level readFileSync + initSync IS the side
-// effect. Without this, a tree-shaking bundler on the `node` condition may
-// bypass the re-export facade and skip initialization entirely.
-pkg.sideEffects = ['./index.js'];
-
-// wasm-pack's web-target fields point at the raw glue; `exports` supersedes them,
-// so replace them with the Node facade for pre-`exports` resolvers (an old
-// `moduleResolution: node10` consumer, tooling that reads `main` directly) — the
-// same pair the N-API loader declares, so both package sets resolve alike.
-pkg.main = 'index.js';
-pkg.types = 'index.d.ts';
-delete pkg.module;
-
-Deno.writeTextFileSync(pkg_path, JSON.stringify(pkg, null, '\t') + '\n');
-console.log(`Patched ${pkg_path}: name → ${pkg.name}, version ${pkg.version}`);
-
-await print_summary(pkg_root, [...pkg.files, 'package.json']);
 
 /** Lists what actually ships (`files[]` + package.json), not everything in
  * the build dir — wasm-pack leaves strays like `tsv_wasm_bg.wasm.d.ts`. */
-async function print_summary(dir: string, files: string[]): Promise<void> {
-	const entries = files
-		.map((name) => {
-			const path = `${dir}/${name}`;
-			return { name, path, size: Deno.statSync(path).size };
-		})
-		.sort((a, b) => b.size - a.size);
+async function print_summary(
+	deps: PatchNpmPackageDeps,
+	pkg: FsReadDir,
+	dir: string,
+	files: string[]
+): Promise<void> {
+	const entries = [];
+	for (const name of files) {
+		const info = await pkg.stat(name);
+		if (info === null) throw new Error(`${dir}/${name} is missing`);
+		entries.push({ name, size: info.size });
+	}
+	entries.sort((a, b) => b.size - a.size);
 
 	const wasm = entries.find((e) => e.name.endsWith('.wasm'));
-	const wasm_gzipped = wasm ? await gzip_size(wasm.path) : null;
+	const wasm_gzipped = wasm
+		? await gzip_size(require_gzip(deps), `${pkg.path}/${wasm.name}`)
+		: null;
 
 	const name_width = Math.max(...entries.map((e) => e.name.length));
 	const size_width = Math.max(...entries.map((e) => format_size(e.size).length));
 
-	console.log(`\nPackage contents (${dir}):`);
+	deps.print(`\nPackage contents (${dir}):`);
 	for (const e of entries) {
 		const name = e.name.padEnd(name_width);
 		const size = format_size(e.size).padStart(size_width);
 		const annotation =
 			e === wasm && wasm_gzipped !== null ? `  →  ${format_size(wasm_gzipped)} gzipped` : '';
-		console.log(`  ${name}  ${size}${annotation}`);
+		deps.print(`  ${name}  ${size}${annotation}`);
 	}
 }

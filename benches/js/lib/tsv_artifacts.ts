@@ -25,12 +25,12 @@
  * over the old location after a move.
  *
  * Still spelled elsewhere, and deliberately — the remaining places a layout move
- * has to be mirrored by hand: `deno.json`'s wasm build tasks pass
+ * has to be mirrored by hand: `package.json`'s wasm build scripts pass
  * `--target <path>` to `run_if_stale.ts` (a task string can't call a function),
  * `scripts/build_napi_packages.ts` carries `target/napi/…` and `target/release/…`
  * as the DEFAULTS of flags CI overrides per target, and
- * `scripts/patch_npm_package.ts` writes the `npm` staging dir this table only
- * reads.
+ * `scripts/roots/patch_npm_package.ts` opens the `npm` staging dir this table only
+ * reads (which `scripts/patch_npm_package.ts` prints).
  *
  * Node-modules-free by construction (only `node:` builtins + `runtime.ts`): the
  * build-side scripts import it, and `typecheck:scripts` walks them on a bare
@@ -109,6 +109,26 @@ const FFI_LIB = native_library_filename('tsv_ffi');
  */
 export function ffi_library_path(profile: string): string {
 	return `${PROJECT_ROOT}/target/${profile}/${FFI_LIB}`;
+}
+
+/**
+ * The C-FFI library a process loads for a `TSV_FFI_PROFILE` value: the bench's
+ * profile-guided build (`pgo_bench_library_path('ffi')`) when it is unset, else that cargo
+ * profile's plain build under `target/` (the corpus tools set `corpus` for panic recovery).
+ * The caller reads the variable, under whichever runtime it runs: `ffi.ts` under Deno, the
+ * freshness guard under any.
+ */
+export function ffi_loaded_path(profile: string | undefined): string {
+	return profile === undefined ? pgo_bench_library_path('ffi') : ffi_library_path(profile);
+}
+
+/** The task that rebuilds the library `ffi_loaded_path` names for the same profile. */
+export function ffi_rebuild_task(profile: string | undefined): string {
+	return profile === undefined
+		? 'deno task build:bench:pgo'
+		: profile === 'release'
+			? 'deno task build:ffi'
+			: `deno task build:ffi:${profile}`;
 }
 
 /**

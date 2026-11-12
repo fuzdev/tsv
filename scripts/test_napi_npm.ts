@@ -59,6 +59,7 @@ import {
 	assert_staged_fresh,
 	NAPI_LOADER_DIR,
 	NAPI_PKG_ROOT,
+	NAPI_STAGING_SOURCES,
 	napi_addon_check,
 	napi_loader_checks,
 	napi_staged_triple,
@@ -69,7 +70,13 @@ import {
 	wasm_package_dir
 } from './check_staged_freshness.ts';
 import { cli_binary_name } from './napi_host.ts';
-import { ALL_FAMILIES, facade_files, facade_type_names } from './npm_facade.ts';
+import {
+	ALL_FAMILIES,
+	FACADE_SOURCE_DIR,
+	type FacadeDeclarations,
+	facade_files,
+	facade_type_names
+} from './npm_facade.ts';
 import { THIRD_PARTY_NOTICE } from './npm_metadata.ts';
 import { register_discovery_parity_suite } from './discovery_parity_suite.ts';
 import { register_dts_specifier_test } from './dts_specifiers.ts';
@@ -129,7 +136,7 @@ await assert_staged_fresh([
 		label: 'staged native CLI binary',
 		staged: `${pkg_root}/${triple}/${cli_binary}`,
 		crates: [...CORE_CRATES, 'tsv_cli', 'tsv_ignore', 'tsv_discover'],
-		files: ['scripts/build_napi_packages.ts'],
+		files: NAPI_STAGING_SOURCES,
 		rebuild: 'deno task build:napi:packages'
 	},
 	...napi_loader_checks()
@@ -510,26 +517,16 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 				.flatMap((m) => m[1]!.split(',').map((name) => name.trim()))
 				.filter((name) => name !== '')
 				.sort();
-		assert.deepEqual(
-			reexported('./facade_format.js'),
-			facade_type_names('facade_format.d.ts').sort()
-		);
-		assert.deepEqual(
-			reexported('./facade_parse.js'),
-			facade_type_names('facade_parse.d.ts').sort()
-		);
-		assert.deepEqual(
-			reexported('./facade_strip.js'),
-			facade_type_names('facade_strip.d.ts').sort()
-		);
-		assert.deepEqual(
-			reexported('./facade_imports.js'),
-			facade_type_names('facade_imports.d.ts').sort()
-		);
-		assert.deepEqual(
-			reexported('./facade_error.js'),
-			facade_type_names('facade_error.d.ts').sort()
-		);
+		const declared = (file: FacadeDeclarations): Array<string> =>
+			facade_type_names(
+				file,
+				readFileSync(new URL(`../${FACADE_SOURCE_DIR}/${file}`, import.meta.url), 'utf8')
+			);
+		assert.deepEqual(reexported('./facade_format.js'), declared('facade_format.d.ts').sort());
+		assert.deepEqual(reexported('./facade_parse.js'), declared('facade_parse.d.ts').sort());
+		assert.deepEqual(reexported('./facade_strip.js'), declared('facade_strip.d.ts').sort());
+		assert.deepEqual(reexported('./facade_imports.js'), declared('facade_imports.d.ts').sort());
+		assert.deepEqual(reexported('./facade_error.js'), declared('facade_error.d.ts').sort());
 	});
 
 	// The discovery matcher rides the package as a class. The `undefined`

@@ -12,7 +12,7 @@ import { copyFile, mkdir, readdir, readFile, rename, rm, stat, writeFile } from 
 import { join, resolve } from 'node:path';
 
 import { HarnessError, ROOT, run, sha256_hex } from '../git_snapshot.ts';
-import { gzip_size } from '../gzip_size.ts';
+import { gzip_size, type GzipProgram } from '../gzip_size.ts';
 import {
 	assert_bounds_sites,
 	assert_format_check_finished,
@@ -225,6 +225,13 @@ async function tool_stdout(
 	return result.stdout;
 }
 
+/** `gzip` for `gzip_size`, run through Deno's `Command` as this script's runtime does. */
+const gzip: GzipProgram = {
+	out_bytes: async (args) => ({
+		stdout: (await new Deno.Command('gzip', { args: [...args], stdout: 'piped' }).output()).stdout
+	})
+};
+
 export async function leg_wasm_sizes(
 	name: string,
 	sides: readonly [Side, Side],
@@ -237,7 +244,7 @@ export async function leg_wasm_sizes(
 			const sizes = await Promise.all(
 				sides.map(async (_side, i) => {
 					const path = artifacts[i]!.wasm[variant];
-					return { raw: (await stat(path)).size, gzip: await gzip_size(path) };
+					return { raw: (await stat(path)).size, gzip: await gzip_size(gzip, path) };
 				})
 			);
 			rows.push(

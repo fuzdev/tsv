@@ -73,6 +73,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { CORE_CRATES, wasm_bundle_dir } from '../benches/js/lib/tsv_artifacts.ts';
 import {
 	assert_staged_fresh,
+	NAPI_STAGING_SOURCES,
 	napi_addon_check,
 	napi_loader_checks,
 	napi_staged_triple,
@@ -179,10 +180,10 @@ const freshness: StagedCheck[] = [
 		label: 'native tsv_cli binary',
 		staged: repo_rel(native.path),
 		crates: [...CORE_CRATES, 'tsv_cli', 'tsv_ignore', 'tsv_discover'],
-		// the staging script copies it into the platform package, so an edit there
-		// re-stages a STAGED binary (as `scripts/test_napi_npm.ts` names for the same
+		// the N-API staging copies it into the platform package, so an edit to the staging's
+		// sources re-stages a STAGED binary (as `scripts/test_napi_npm.ts` names for the same
 		// artifact) — a `target/release` fallback it never touched is not aged by it
-		files: native.label === 'target/release' ? [] : ['scripts/build_napi_packages.ts'],
+		files: native.label === 'target/release' ? [] : NAPI_STAGING_SOURCES,
 		rebuild: 'deno task build:napi:packages'
 	},
 	// the wasm package as every reader of its staging dates it — the engine bytes

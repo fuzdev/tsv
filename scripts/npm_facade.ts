@@ -16,13 +16,13 @@
  * (`facade_format.d.ts`, not `api.d.ts`): they type the entries' re-exports, not those modules, and
  * a same-basename `.d.ts` would be read as the module's own types.
  *
- * Plain `node:` imports only: the package suites run this module under Node as well as
- * Deno.
+ * Imports nothing and reads nothing: the package suites run this module under Node as well as
+ * Deno, the N-API staging imports it on Windows with no `node_modules`, and the wasm patcher
+ * reads through directory handles, so a caller reads a declaration file itself and hands
+ * `facade_type_names` its text.
  *
  * @module
  */
-
-import { readFileSync } from 'node:fs';
 
 /** Where the facade's JS and declarations live, relative to the repo root. */
 export const FACADE_SOURCE_DIR = 'crates/tsv_wasm/npm';
@@ -130,11 +130,12 @@ export type FacadeDeclarations =
  * star exports beside them can never ambiguate one away (TS2308). Read off the source, so
  * a type added to the facade reaches every package with no list to keep.
  *
+ * @param file - the declaration file, beneath `FACADE_SOURCE_DIR`, for the error
+ * @param source - its text
  * @throws Error when the file declares none, which a declaration form the scan does not
  *   read would otherwise turn into a type silently missing from every package
  */
-export function facade_type_names(file: FacadeDeclarations): Array<string> {
-	const source = readFileSync(new URL(`../${FACADE_SOURCE_DIR}/${file}`, import.meta.url), 'utf8');
+export function facade_type_names(file: FacadeDeclarations, source: string): Array<string> {
 	const names = [...source.matchAll(/^export (?:declare )?(?:interface|type) (\w+)/gm)].map(
 		(m) => m[1]!
 	);

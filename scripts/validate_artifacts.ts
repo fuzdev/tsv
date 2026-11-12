@@ -120,13 +120,13 @@ for (const variant of VARIANTS) {
 			label: `${variant}/deno WASM bundle`,
 			staged: repo_rel(bundle),
 			crates: [...CORE_CRATES, ...WASM_CRATES],
-			// `deno.json` because the wasm-pack invocation lives there: which
+			// `package.json` because the wasm-pack invocation lives there: which
 			// FEATURES a variant is built with is a task string, so editing one
 			// changes the bundle from unchanged crate sources. `run_if_stale.ts`
 			// — the build-side guard over this same artifact, off the same two
 			// crate lists — names it for that reason, and the two sides are
 			// supposed to agree on what feeds a bundle.
-			files: ['deno.json'],
+			files: ['package.json'],
 			rebuild: `deno task ${REBUILD_TASKS.deno[variant]}`
 		});
 	}

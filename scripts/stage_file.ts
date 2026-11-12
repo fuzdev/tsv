@@ -11,7 +11,8 @@
  * same thing on every platform.
  *
  * Imports nothing, so the Windows staging entry (`scripts/roots/build_napi_packages.ts`)
- * reaches it with no `node_modules`.
+ * reaches it with no `node_modules`. Two bindings: that entry's, over `node:fs`, and the
+ * wasm patcher's, over gro's fs handles (`scripts/stage_file_handle.ts`).
  *
  * @module
  */
