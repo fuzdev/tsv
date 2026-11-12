@@ -89,11 +89,15 @@
  * Takes no arguments: the whole corpus runs in seconds, so every run is a full one. To look
  * at one file, `tsv_debug imports <path>`.
  *
+ * Runs under Node (`benches/js/roots/imports_corpus.ts`, which binds the program): its reach
+ * is the corpus and the harness's `node_modules`, read through the corpus loader and the
+ * preflight, which Bun's bench shares and so stay on `node:*`, and the checkout's
+ * `target/corpus/tsv_debug` (`ImportsCorpusDeps`). It writes nothing.
+ *
  * @module
  */
 
 import { extname, relative, resolve } from 'node:path';
-import process from 'node:process';
 
 import type {
 	ImportRecordKind,
@@ -104,7 +108,13 @@ import { CORPORA_COLLECTIONS, is_collection_path } from './lib/corpora.ts';
 import { CorpusLoader } from './lib/corpus.ts';
 import { IMPORTS_CORPUS_PINS } from './lib/gate_counts.ts';
 import { oxc_fatal_errors } from './lib/oxc.ts';
-import { TsvDebugServer } from './lib/tsv_debug_server.ts';
+import { type TsvDebugProgram, TsvDebugServer } from './lib/tsv_debug_server.ts';
+
+/** What `run_imports_corpus` reaches beyond the corpus loader's reads. */
+export interface ImportsCorpusDeps {
+	/** Makes the checkout's `target/corpus/tsv_debug`, called once its freshness guard passed. */
+	open_tsv_debug: () => TsvDebugProgram;
+}
 
 /** A check an `ACCEPTED` entry can excuse. */
 type AcceptedCheck = 'oxc_rejects' | 'records';
@@ -276,163 +286,186 @@ type ImportsReply = { imports: Omit<ImportsSuccess, 'ok'> } | { error: string } 
 // deno-lint-ignore no-explicit-any
 type Node = any;
 
-if (!('Deno' in globalThis)) {
-	console.error('Error: imports_corpus.ts runs under Deno (`deno task imports:corpus`).');
-	process.exit(1);
+/** oxc's and Svelte's parsers, loaded once the preflight passed, and the run's tally of each
+ * normalization applied. */
+interface Oracle {
+	parseSync: (typeof import('oxc-parser'))['parseSync'];
+	svelte_parse: (typeof import('svelte/compiler'))['parse'];
+	note: (n: Normalization, count?: number) => void;
 }
-
-await check_node_modules();
-const server = await TsvDebugServer.start<{ path: string; source: string }, ImportsReply>(
-	'imports'
-);
-// dynamic, so a missing node_modules reports through the preflight above
-const { parseSync } = await import('oxc-parser');
-const { parse: svelte_parse } = await import('svelte/compiler');
-const { createRequire } = await import('node:module');
-const require = createRequire(import.meta.url);
-const versions = {
-	oxc_parser: (require('oxc-parser/package.json') as { version: string }).version,
-	svelte: (require('svelte/package.json') as { version: string }).version
-};
-
-const started = performance.now();
-const collections_root = resolve(CORPORA_COLLECTIONS);
-const files = (await new CorpusLoader('gates', { only: is_collection_path }).load(() => {})).filter(
-	(f) => SCRIPT.test(f.path) || SVELTE.test(f.path)
-);
-
-console.log(
-	`imports corpus: tsv parse_imports vs oxc-parser ${versions.oxc_parser} module record ` +
-		`(svelte ${versions.svelte} finds the scripts); ${files.length} file(s) from ` +
-		CORPORA_COLLECTIONS
-);
-
-const failures: Array<string> = [];
-const accepted_fired = new Set<string>();
-const applied = new Map<Normalization, number>(NORMALIZATIONS.map((n) => [n, 0]));
-const note = (n: Normalization, count = 1): void => {
-	applied.set(n, applied.get(n)! + count);
-};
-const kinds = new Map<string, number>();
-let records = 0;
-let module_syntax = 0;
-let svelte_files = 0;
 
 /**
- * One file's verdict: `null` when the two sides agree, else the check that fired and why.
- * When `tally` is set, a file both sides parse is counted into the run's tallies — its
- * records, their kinds, its module syntax, and whether it is a component — so every tally
- * counts the same files.
+ * The differential over the whole corpus, printing its report.
+ * @returns the exit code: `1` on any failure, else `0`
  */
-async function grade(
-	file_path: string,
-	source: string,
-	tally: boolean
-): Promise<{ check: AcceptedCheck | null; message: string } | null> {
-	let reply: ImportsReply;
+export async function run_imports_corpus(deps: ImportsCorpusDeps): Promise<number> {
+	await check_node_modules();
+	const server = await TsvDebugServer.start<{ path: string; source: string }, ImportsReply>(
+		'imports',
+		deps.open_tsv_debug
+	);
+	// dynamic, so a missing node_modules reports through the preflight above
+	const { parseSync } = await import('oxc-parser');
+	const { parse: svelte_parse } = await import('svelte/compiler');
+	const { createRequire } = await import('node:module');
+	const require = createRequire(import.meta.url);
+	const versions = {
+		oxc_parser: (require('oxc-parser/package.json') as { version: string }).version,
+		svelte: (require('svelte/package.json') as { version: string }).version
+	};
+
+	const started = performance.now();
+	const collections_root = resolve(CORPORA_COLLECTIONS);
+	const files = (
+		await new CorpusLoader('gates', { only: is_collection_path }).load(() => {})
+	).filter((f) => SCRIPT.test(f.path) || SVELTE.test(f.path));
+
+	console.log(
+		`imports corpus: tsv parse_imports vs oxc-parser ${versions.oxc_parser} module record ` +
+			`(svelte ${versions.svelte} finds the scripts); ${files.length} file(s) from ` +
+			CORPORA_COLLECTIONS
+	);
+
+	const failures: Array<string> = [];
+	const accepted_fired = new Set<string>();
+	const applied = new Map<Normalization, number>(NORMALIZATIONS.map((n) => [n, 0]));
+	const note = (n: Normalization, count = 1): void => {
+		applied.set(n, applied.get(n)! + count);
+	};
+	const oracle: Oracle = { parseSync, svelte_parse, note };
+	const kinds = new Map<string, number>();
+	let records = 0;
+	let module_syntax = 0;
+	let svelte_files = 0;
+
+	/**
+	 * One file's verdict: `null` when the two sides agree, else the check that fired and why,
+	 * or `'lost'` when `tsv_debug` gave no answer (printed here; the run ends on it).
+	 * When `tally` is set, a file both sides parse is counted into the run's tallies — its
+	 * records, their kinds, its module syntax, and whether it is a component — so every tally
+	 * counts the same files.
+	 */
+	async function grade(
+		file_path: string,
+		source: string,
+		tally: boolean
+	): Promise<{ check: AcceptedCheck | null; message: string } | null | 'lost'> {
+		let reply: ImportsReply;
+		try {
+			reply = await server.ask({ path: file_path, source });
+		} catch (e) {
+			console.error(`✗ ${e instanceof Error ? e.message : e}, on ${file_path}`);
+			return 'lost';
+		}
+		if ('panic' in reply) return { check: null, message: `tsv panicked: ${reply.panic}` };
+		if ('error' in reply) {
+			return { check: null, message: `tsv's parser rejects it: ${reply.error.split('\n')[0]}` };
+		}
+		const is_svelte = SVELTE.test(file_path);
+		const theirs = is_svelte
+			? oxc_svelte(oracle, source)
+			: oxc_script(oracle, file_path, source, 0, null);
+		if (typeof theirs === 'string') {
+			// only oxc's own rejection can be accepted; a tree the harness cannot join is its bug
+			return { check: theirs.startsWith(OXC_REJECTS) ? 'oxc_rejects' : null, message: theirs };
+		}
+		const ours = reply.imports;
+		if (tally) {
+			if (is_svelte) svelte_files++;
+			records += ours.imports.length;
+			if (ours.hasModuleSyntax) module_syntax++;
+			for (const r of ours.imports) kinds.set(r.kind, (kinds.get(r.kind) ?? 0) + 1);
+		}
+		const ours_projected = ours.imports.map((r): Projected => ({
+			...r,
+			attributes: r.kind === 'dynamic' ? r.attributes : r.attributes !== null
+		}));
+		const difference = first_difference(ours_projected, theirs.imports);
+		if (difference !== null) return { check: 'records', message: difference };
+		if (ours.hasModuleSyntax !== theirs.hasModuleSyntax) {
+			return {
+				check: 'records',
+				message: `hasModuleSyntax: tsv ${ours.hasModuleSyntax}, oxc ${theirs.hasModuleSyntax}`
+			};
+		}
+		return null;
+	}
+
+	// every normalization first, on a source that needs it: a rule the corpus never exercises
+	// is still run, and must still reconcile the two sides
+	for (const probe of NORMALIZATION_PROBES) {
+		const before = applied.get(probe.normalization)!;
+		const verdict = await grade(probe.path, probe.source, false);
+		if (verdict === 'lost') {
+			server.kill();
+			return 1;
+		}
+		if (verdict !== null) {
+			failures.push(`normalization probe ${probe.normalization}: ${verdict.message}`);
+		} else if (applied.get(probe.normalization) === before) {
+			failures.push(`normalization probe ${probe.normalization}: the normalization never applied`);
+		}
+	}
+	const probe_counts = new Map(applied);
+
+	for (const file of files) {
+		const path = relative(collections_root, file.path);
+		// a lone surrogate has no UTF-8 spelling, so both sides read the replaced string
+		const verdict = await grade(file.path, file.content.toWellFormed(), true);
+		if (verdict === 'lost') {
+			server.kill();
+			return 1;
+		}
+		if (verdict === null) continue;
+		const { check, message } = verdict;
+		if (check !== null && ACCEPTED.some((a) => a.check === check && a.path === path)) {
+			accepted_fired.add(`${check}\t${path}`);
+		} else {
+			failures.push(`${path}: ${message}`);
+		}
+	}
+
 	try {
-		reply = await server.ask({ path: file_path, source });
+		await server.close();
 	} catch (e) {
-		console.error(`✗ ${e instanceof Error ? e.message : e}, on ${file_path}`);
-		process.exit(1);
+		failures.push(e instanceof Error ? e.message : String(e));
 	}
-	if ('panic' in reply) return { check: null, message: `tsv panicked: ${reply.panic}` };
-	if ('error' in reply) {
-		return { check: null, message: `tsv's parser rejects it: ${reply.error.split('\n')[0]}` };
-	}
-	const is_svelte = SVELTE.test(file_path);
-	const theirs = is_svelte ? oxc_svelte(source) : oxc_script(file_path, source, 0, null);
-	if (typeof theirs === 'string') {
-		// only oxc's own rejection can be accepted; a tree the harness cannot join is its bug
-		return { check: theirs.startsWith(OXC_REJECTS) ? 'oxc_rejects' : null, message: theirs };
-	}
-	const ours = reply.imports;
-	if (tally) {
-		if (is_svelte) svelte_files++;
-		records += ours.imports.length;
-		if (ours.hasModuleSyntax) module_syntax++;
-		for (const r of ours.imports) kinds.set(r.kind, (kinds.get(r.kind) ?? 0) + 1);
-	}
-	const ours_projected = ours.imports.map((r): Projected => ({
-		...r,
-		attributes: r.kind === 'dynamic' ? r.attributes : r.attributes !== null
-	}));
-	const difference = first_difference(ours_projected, theirs.imports);
-	if (difference !== null) return { check: 'records', message: difference };
-	if (ours.hasModuleSyntax !== theirs.hasModuleSyntax) {
-		return {
-			check: 'records',
-			message: `hasModuleSyntax: tsv ${ours.hasModuleSyntax}, oxc ${theirs.hasModuleSyntax}`
-		};
-	}
-	return null;
-}
 
-// every normalization first, on a source that needs it: a rule the corpus never exercises
-// is still run, and must still reconcile the two sides
-for (const probe of NORMALIZATION_PROBES) {
-	const before = applied.get(probe.normalization)!;
-	const verdict = await grade(probe.path, probe.source, false);
-	if (verdict !== null) {
-		failures.push(`normalization probe ${probe.normalization}: ${verdict.message}`);
-	} else if (applied.get(probe.normalization) === before) {
-		failures.push(`normalization probe ${probe.normalization}: the normalization never applied`);
+	if (files.length === 0) failures.push('the corpus is empty — nothing was graded');
+	for (const a of ACCEPTED) {
+		if (!accepted_fired.has(`${a.check}\t${a.path}`)) {
+			failures.push(`stale ACCEPTED entry (${a.check}) ${a.path}: it no longer fires`);
+		}
 	}
-}
-const probe_counts = new Map(applied);
-
-for (const file of files) {
-	const path = relative(collections_root, file.path);
-	// a lone surrogate has no UTF-8 spelling, so both sides read the replaced string
-	const verdict = await grade(file.path, file.content.toWellFormed(), true);
-	if (verdict === null) continue;
-	const { check, message } = verdict;
-	if (check !== null && ACCEPTED.some((a) => a.check === check && a.path === path)) {
-		accepted_fired.add(`${check}\t${path}`);
-	} else {
-		failures.push(`${path}: ${message}`);
+	const counts = { files: files.length, records };
+	for (const key of Object.keys(IMPORTS_CORPUS_PINS) as Array<keyof typeof IMPORTS_CORPUS_PINS>) {
+		if (counts[key] !== IMPORTS_CORPUS_PINS[key]) {
+			failures.push(
+				`pinned count mismatch: ${key} is ${counts[key]}, pinned ${IMPORTS_CORPUS_PINS[key]} ` +
+					'(benches/js/lib/gate_counts.ts IMPORTS_CORPUS_PINS; docs/gate_counts.md §Update ritual)'
+			);
+		}
 	}
-}
 
-try {
-	await server.close();
-} catch (e) {
-	failures.push(e instanceof Error ? e.message : String(e));
-}
-
-if (files.length === 0) failures.push('the corpus is empty — nothing was graded');
-for (const a of ACCEPTED) {
-	if (!accepted_fired.has(`${a.check}\t${a.path}`)) {
-		failures.push(`stale ACCEPTED entry (${a.check}) ${a.path}: it no longer fires`);
+	const by_kind = [...kinds].map(([kind, n]) => `${kind} ${n}`).join(', ');
+	const by_normalization = [...applied]
+		.map(([n, count]) => `${n} ${count - probe_counts.get(n)!}`)
+		.join(', ');
+	const seconds = ((performance.now() - started) / 1000).toFixed(1);
+	console.log(
+		`${files.length} file(s) (${svelte_files} Svelte): ${records} record(s)` +
+			(by_kind ? ` (${by_kind})` : '') +
+			`, ${module_syntax} with module syntax, ${accepted_fired.size} accepted departure(s) — ` +
+			`${seconds}s\nnormalizations applied over the corpus: ${by_normalization}`
+	);
+	if (failures.length > 0) {
+		console.error(`\n✗ ${failures.length} failure(s):`);
+		for (const f of failures) console.error(`  ${f}`);
+		return 1;
 	}
+	console.log("✓ tsv's import records agree with oxc-parser's module record, normalized");
+	return 0;
 }
-const counts = { files: files.length, records };
-for (const key of Object.keys(IMPORTS_CORPUS_PINS) as Array<keyof typeof IMPORTS_CORPUS_PINS>) {
-	if (counts[key] !== IMPORTS_CORPUS_PINS[key]) {
-		failures.push(
-			`pinned count mismatch: ${key} is ${counts[key]}, pinned ${IMPORTS_CORPUS_PINS[key]} ` +
-				'(benches/js/lib/gate_counts.ts IMPORTS_CORPUS_PINS; docs/gate_counts.md §Update ritual)'
-		);
-	}
-}
-
-const by_kind = [...kinds].map(([kind, n]) => `${kind} ${n}`).join(', ');
-const by_normalization = [...applied]
-	.map(([n, count]) => `${n} ${count - probe_counts.get(n)!}`)
-	.join(', ');
-const seconds = ((performance.now() - started) / 1000).toFixed(1);
-console.log(
-	`${files.length} file(s) (${svelte_files} Svelte): ${records} record(s)` +
-		(by_kind ? ` (${by_kind})` : '') +
-		`, ${module_syntax} with module syntax, ${accepted_fired.size} accepted departure(s) — ` +
-		`${seconds}s\nnormalizations applied over the corpus: ${by_normalization}`
-);
-if (failures.length > 0) {
-	console.error(`\n✗ ${failures.length} failure(s):`);
-	for (const f of failures) console.error(`  ${f}`);
-	process.exit(1);
-}
-console.log("✓ tsv's import records agree with oxc-parser's module record, normalized");
 
 /** The first record where the two projections part, or `null` when they agree. */
 function first_difference(ours: Projected[], theirs: Projected[]): string | null {
@@ -445,13 +478,13 @@ function first_difference(ours: Projected[], theirs: Projected[]): string | null
 }
 
 /** oxc's projection of a component's scripts, found by Svelte's `parse`, or why there is none. */
-function oxc_svelte(source: string): FileProjection | string {
+function oxc_svelte(oracle: Oracle, source: string): FileProjection | string {
 	// Svelte's `parse` strips a leading BOM, and its offsets index the stripped string, as
 	// tsv's Svelte records do
 	const text = source.startsWith('\uFEFF') ? source.slice(1) : source;
 	let ast: Node;
 	try {
-		ast = svelte_parse(text, { modern: true });
+		ast = oracle.svelte_parse(text, { modern: true });
 	} catch (e) {
 		return `svelte/compiler rejects it: ${e instanceof Error ? e.message.split('\n')[0] : e}`;
 	}
@@ -459,7 +492,7 @@ function oxc_svelte(source: string): FileProjection | string {
 	for (const script of [ast.module, ast.instance]) {
 		if (!script) continue;
 		const { start, end } = script.content as { start: number; end: number };
-		const projected = oxc_script('script.ts', text.slice(start, end), start, 'module');
+		const projected = oxc_script(oracle, 'script.ts', text.slice(start, end), start, 'module');
 		if (typeof projected === 'string') return projected;
 		merged.hasModuleSyntax ||= projected.hasModuleSyntax;
 		merged.imports.push(...projected.imports);
@@ -473,12 +506,14 @@ function oxc_svelte(source: string): FileProjection | string {
  * is none. `goal` null reads the file as tsv's unset goal does: module, retried as a script.
  */
 function oxc_script(
+	oracle: Oracle,
 	path: string,
 	text: string,
 	base: number,
 	goal: 'module' | null
 ): FileProjection | string {
-	const name = typescript_name(path);
+	const { note, parseSync } = oracle;
+	const name = typescript_name(path, note);
 	const by_extension = /\.m[jt]s$/.test(path) ? 'module' : goal;
 	let result = parseSync(name, text, { sourceType: 'module' });
 	let fatal = oxc_fatal_errors(result.errors);
@@ -695,7 +730,7 @@ function has_with_clause(text: string, from: number, to: number): boolean {
 }
 
 /** The TypeScript name oxc is handed for `path` (`javascript_as_typescript`). */
-function typescript_name(path: string): string {
+function typescript_name(path: string, note: Oracle['note']): string {
 	const extension = extname(path);
 	const typescript = { '.js': '.ts', '.mjs': '.mts', '.cjs': '.cts' }[extension];
 	if (typescript === undefined) return path;

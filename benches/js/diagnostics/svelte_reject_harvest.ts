@@ -42,6 +42,7 @@
  *     benches/js/diagnostics/svelte_reject_harvest.ts
  */
 
+import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { relative, resolve } from 'node:path';
 
 import { CanonicalImplementation } from '../lib/canonical.ts';
@@ -54,13 +55,41 @@ import { SVELTE_REJECTS_PIN } from '../lib/gate_counts.ts';
 import {
 	corpus_filter_fingerprint,
 	git_head,
-	HARVEST_STAMPS,
 	harvest_up_to_date,
 	short_commit,
+	type StampGit,
 	type StampInputs,
+	type StampWrites,
 	write_pinned_path_cache
 } from '../lib/harvest_stamp.ts';
+import { HARVEST_STAMPS } from '../lib/harvest_stamp_table.ts';
 import { load_all_versions } from '../lib/versions.ts';
+
+/** The stamps' `git`, run through Deno's `Command` as this script's runtime does. */
+const stamp_git: StampGit = {
+	out: async (args) => {
+		const output = await new Deno.Command('git', {
+			args: [...args],
+			stdout: 'piped',
+			stderr: 'null'
+		}).output();
+		return { kind: 'exited', code: output.code, stdout: new TextDecoder().decode(output.stdout) };
+	}
+};
+
+/** The stamps' file reads and writes, by path from the working directory. */
+const stamp_fs: StampWrites = {
+	exists: (path) =>
+		stat(path).then(
+			() => true,
+			() => false
+		),
+	read_text: (path) => readFile(path, 'utf8'),
+	write: (path, data) => writeFile(path, data),
+	mkdir: async (path, options) => {
+		await mkdir(path, options);
+	}
+};
 
 const STAMP_PATH = HARVEST_STAMPS['svelte-rejects'].path;
 const if_present = Deno.args.includes('--if-present');
@@ -79,21 +108,21 @@ async function main(): Promise<void> {
 	// too: a suite entry added to or dropped from the corpus entries changes what is
 	// graded while every checkout stays put, and a stamp keyed on checkouts alone
 	// would skip that re-harvest and leave the cache short under a green stamp.
-	const svelte_commit = git_head('../svelte');
+	const svelte_commit = await git_head(stamp_git, '../svelte');
 	const stamp_inputs: StampInputs = {
 		harvest: 'svelte-rejects',
 		svelte_commit,
-		prettier_commit: git_head('../prettier'),
-		prettier_plugin_svelte_commit: git_head('../prettier-plugin-svelte'),
+		prettier_commit: await git_head(stamp_git, '../prettier'),
+		prettier_plugin_svelte_commit: await git_head(stamp_git, '../prettier-plugin-svelte'),
 		svelte_oracle: versions.canonical.svelte,
 		rejects_pin: SVELTE_REJECTS_PIN,
 		conformance_entries: (await corpus_view_paths('conformance')).join(' '),
-		filters: await corpus_filter_fingerprint('conformance')
+		filters: await corpus_filter_fingerprint(stamp_fs, 'conformance')
 	};
 	if (
 		!force &&
 		svelte_commit !== null &&
-		(await harvest_up_to_date(STAMP_PATH, stamp_inputs, [SVELTE_REJECT_CACHE]))
+		(await harvest_up_to_date(stamp_fs, STAMP_PATH, stamp_inputs, [SVELTE_REJECT_CACHE]))
 	) {
 		console.error(
 			`svelte-rejects harvest up to date (../svelte at ${short_commit(svelte_commit)}, ` +
@@ -147,13 +176,14 @@ async function main(): Promise<void> {
 	// stopped rejecting (broken import/config); more means it started rejecting
 	// wholesale — either way the cache would corrupt the published coverage
 	// number. See ../lib/gate_counts.ts.
-	const out = await write_pinned_path_cache({
+	const out = await write_pinned_path_cache(stamp_fs, {
 		cache: SVELTE_REJECT_CACHE,
 		paths: rejects,
 		pin: SVELTE_REJECTS_PIN,
 		what: 'rejects',
 		stamp: svelte_commit === null ? null : { path: STAMP_PATH, inputs: stamp_inputs }
 	});
+	if (out === null) Deno.exit(1);
 
 	const cwd = resolve('.');
 	console.error(

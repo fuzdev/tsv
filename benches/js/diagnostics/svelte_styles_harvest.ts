@@ -41,21 +41,49 @@
  *     benches/js/diagnostics/svelte_styles_harvest.ts [--force]
  */
 
-import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { relative, resolve, sep } from 'node:path';
 
 import { CORPORA_COLLECTIONS, CORPORA_ROOT, CORPORA_URL } from '../lib/corpora.ts';
 import { CorpusLoader, corpus_view_paths, SVELTE_STYLES_CACHE } from '../lib/corpus.ts';
 import { GATE_CHECKOUT_IDS, SVELTE_STYLES_BLOCKS_PIN } from '../lib/gate_counts.ts';
 import {
-	HARVEST_STAMPS,
 	checkout_hash,
 	checkout_label,
 	corpus_filter_fingerprint,
 	harvest_up_to_date,
 	short_commit,
+	type StampGit,
+	type StampWrites,
 	write_stamp
 } from '../lib/harvest_stamp.ts';
+import { HARVEST_STAMPS } from '../lib/harvest_stamp_table.ts';
+
+/** The stamps' `git`, run through Deno's `Command` as this script's runtime does. */
+const stamp_git: StampGit = {
+	out: async (args) => {
+		const output = await new Deno.Command('git', {
+			args: [...args],
+			stdout: 'piped',
+			stderr: 'null'
+		}).output();
+		return { kind: 'exited', code: output.code, stdout: new TextDecoder().decode(output.stdout) };
+	}
+};
+
+/** The stamps' file reads and writes, by path from the working directory. */
+const stamp_fs: StampWrites = {
+	exists: (path) =>
+		stat(path).then(
+			() => true,
+			() => false
+		),
+	read_text: (path) => readFile(path, 'utf8'),
+	write: (path, data) => writeFile(path, data),
+	mkdir: async (path, options) => {
+		await mkdir(path, options);
+	}
+};
 
 /** The snapshot every perf-view `.svelte` file comes from — the tree the stamp records. */
 const collections_root = resolve(CORPORA_COLLECTIONS);
@@ -92,7 +120,7 @@ async function main(): Promise<void> {
 	const force = Deno.args.includes('--force');
 	const stamp = HARVEST_STAMPS['svelte-styles'];
 	const tree_input = stamp.checkouts.corpora_tree;
-	const corpora_tree = checkout_hash(tree_input);
+	const corpora_tree = await checkout_hash(stamp_git, tree_input);
 	if (corpora_tree === null) {
 		console.error(
 			`svelte_styles_harvest: ${checkout_label(tree_input)} is not a git checkout tree — ` +
@@ -104,9 +132,9 @@ async function main(): Promise<void> {
 		corpora_tree,
 		blocks_pin: SVELTE_STYLES_BLOCKS_PIN,
 		perf_entries: (await corpus_view_paths('perf')).join(' '),
-		filters: await corpus_filter_fingerprint('perf')
+		filters: await corpus_filter_fingerprint(stamp_fs, 'perf')
 	};
-	if (!force && (await harvest_up_to_date(stamp.path, inputs, [SVELTE_STYLES_CACHE]))) {
+	if (!force && (await harvest_up_to_date(stamp_fs, stamp.path, inputs, [SVELTE_STYLES_CACHE]))) {
 		console.error(
 			`svelte_styles_harvest: up to date (${checkout_label(tree_input)} at ${short_commit(corpora_tree)}, ` +
 				`${SVELTE_STYLES_BLOCKS_PIN} blocks, same perf entries) — skipping; --force to re-harvest`
@@ -196,7 +224,7 @@ async function main(): Promise<void> {
 			removed++;
 		}
 	}
-	await write_stamp(stamp.path, inputs);
+	await write_stamp(stamp_fs, stamp.path, inputs);
 
 	const total_bytes = [...by_collection.values()].reduce((s, e) => s + e.bytes, 0);
 	console.error(

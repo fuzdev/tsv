@@ -33,17 +33,27 @@
  * Takes no arguments: the whole corpus strips in seconds, so every run is a full one. To
  * look at one file, `tsv_debug strip <path>`.
  *
+ * Runs under Node (`benches/js/roots/strip_corpus.ts`, which binds the program): its reach is
+ * the corpus and the harness's `node_modules`, read through the corpus loader and the
+ * preflight, which Bun's bench shares and so stay on `node:*`, and the checkout's
+ * `target/corpus/tsv_debug` (`StripCorpusDeps`). It writes nothing.
+ *
  * @module
  */
 
 import { relative, resolve } from 'node:path';
-import process from 'node:process';
 
 import { check_node_modules } from './lib/check_node_modules.ts';
 import { CORPORA_COLLECTIONS, is_collection_path } from './lib/corpora.ts';
 import { CorpusLoader } from './lib/corpus.ts';
 import { STRIP_CORPUS_PINS } from './lib/gate_counts.ts';
-import { TsvDebugServer } from './lib/tsv_debug_server.ts';
+import { type TsvDebugProgram, TsvDebugServer } from './lib/tsv_debug_server.ts';
+
+/** What `run_strip_corpus` reaches beyond the corpus loader's reads. */
+export interface StripCorpusDeps {
+	/** Makes the checkout's `target/corpus/tsv_debug`, called once its freshness guard passed. */
+	open_tsv_debug: () => TsvDebugProgram;
+}
 
 /** A check an `ACCEPTED` entry can excuse. */
 type AcceptedCheck = 'output' | 'refusal' | 'js';
@@ -74,133 +84,139 @@ type StripReply =
 	| { error: string }
 	| { panic: string };
 
-if (!('Deno' in globalThis)) {
-	console.error('Error: strip_corpus.ts runs under Deno (`deno task strip:corpus`).');
-	process.exit(1);
-}
+/**
+ * The differential over the whole corpus, printing its report.
+ * @returns the exit code: `1` on any failure, else `0`
+ */
+export async function run_strip_corpus(deps: StripCorpusDeps): Promise<number> {
+	await check_node_modules();
+	const server = await TsvDebugServer.start<{ source: string }, StripReply>(
+		'strip',
+		deps.open_tsv_debug
+	);
+	// dynamic, so a missing node_modules reports through the preflight above
+	const { derive, js_parse_failure, ORACLE_VERSIONS } = await import('./lib/strip_oracle.ts');
 
-await check_node_modules();
-const server = await TsvDebugServer.start<{ source: string }, StripReply>('strip');
-// dynamic, so a missing node_modules reports through the preflight above
-const { derive, js_parse_failure, ORACLE_VERSIONS } = await import('./lib/strip_oracle.ts');
+	const started = performance.now();
+	const collections_root = resolve(CORPORA_COLLECTIONS);
+	const files = (
+		await new CorpusLoader('gates', { only: is_collection_path }).load(() => {})
+	).filter((f) => STRIPPABLE.test(f.path) && !DECLARATION.test(f.path));
 
-const started = performance.now();
-const collections_root = resolve(CORPORA_COLLECTIONS);
-const files = (await new CorpusLoader('gates', { only: is_collection_path }).load(() => {})).filter(
-	(f) => STRIPPABLE.test(f.path) && !DECLARATION.test(f.path)
-);
+	console.log(
+		`strip corpus: tsv_ts::strip vs ts-blank-space ${ORACLE_VERSIONS.ts_blank_space} ` +
+			`(typescript ${ORACLE_VERSIONS.typescript}); JS guard oxc-parser ` +
+			`${ORACLE_VERSIONS.oxc_parser}; ${files.length} file(s) from ${CORPORA_COLLECTIONS}`
+	);
 
-console.log(
-	`strip corpus: tsv_ts::strip vs ts-blank-space ${ORACLE_VERSIONS.ts_blank_space} ` +
-		`(typescript ${ORACLE_VERSIONS.typescript}); JS guard oxc-parser ` +
-		`${ORACLE_VERSIONS.oxc_parser}; ${files.length} file(s) from ${CORPORA_COLLECTIONS}`
-);
+	const failures: Array<string> = [];
+	const accepted_fired = new Set<string>();
+	const refusal_kinds = new Map<string, number>();
+	let outputs = 0;
+	let changed = 0;
+	let refusals = 0;
 
-const failures: Array<string> = [];
-const accepted_fired = new Set<string>();
-const refusal_kinds = new Map<string, number>();
-let outputs = 0;
-let changed = 0;
-let refusals = 0;
-
-for (const file of files) {
-	const path = relative(collections_root, file.path);
-	// a lone surrogate has no UTF-8 spelling, so both sides read the replaced string
-	const source = file.content.toWellFormed();
-	let reply: StripReply;
-	try {
-		reply = await server.ask({ source });
-	} catch (e) {
-		console.error(`✗ ${e instanceof Error ? e.message : e}, on ${path}`);
-		process.exit(1);
-	}
-	const fail = (check: AcceptedCheck | null, message: string): void => {
-		const key = `${check}\t${path}`;
-		if (check !== null && ACCEPTED.some((a) => a.check === check && a.path === path)) {
-			accepted_fired.add(key);
-			return;
+	for (const file of files) {
+		const path = relative(collections_root, file.path);
+		// a lone surrogate has no UTF-8 spelling, so both sides read the replaced string
+		const source = file.content.toWellFormed();
+		let reply: StripReply;
+		try {
+			reply = await server.ask({ source });
+		} catch (e) {
+			console.error(`✗ ${e instanceof Error ? e.message : e}, on ${path}`);
+			server.kill();
+			return 1;
 		}
-		failures.push(`${path}: ${message}`);
-	};
+		const fail = (check: AcceptedCheck | null, message: string): void => {
+			const key = `${check}\t${path}`;
+			if (check !== null && ACCEPTED.some((a) => a.check === check && a.path === path)) {
+				accepted_fired.add(key);
+				return;
+			}
+			failures.push(`${path}: ${message}`);
+		};
 
-	if ('panic' in reply) {
-		fail(null, `tsv panicked: ${reply.panic}`);
-		continue;
+		if ('panic' in reply) {
+			fail(null, `tsv panicked: ${reply.panic}`);
+			continue;
+		}
+		if ('error' in reply) {
+			fail(null, `tsv's parser rejects it: ${reply.error.split('\n')[0]}`);
+			continue;
+		}
+		let theirs;
+		try {
+			theirs = derive(source);
+		} catch (e) {
+			fail(null, `ts-blank-space cannot grade it: ${e instanceof Error ? e.message : e}`);
+			continue;
+		}
+
+		if ('refusal' in reply) {
+			refusals++;
+			const kind = reply.refusal.split('\t')[0]!;
+			refusal_kinds.set(kind, (refusal_kinds.get(kind) ?? 0) + 1);
+			if (!('refusal' in theirs)) {
+				fail('refusal', `tsv refuses (${reply.refusal.trim()}), ts-blank-space strips it`);
+			} else if (theirs.refusal !== reply.refusal) {
+				fail(
+					'refusal',
+					`tsv refuses ${reply.refusal.trim()}, ts-blank-space ${theirs.refusal.trim()}`
+				);
+			}
+			continue;
+		}
+
+		outputs++;
+		if (reply.code !== source) changed++;
+		for (const finding of reply.findings) fail(null, finding);
+		const invalid = js_parse_failure(reply.code, file.path);
+		if (invalid !== null) fail('js', `the output is not a JS module: ${invalid}`);
+		if ('refusal' in theirs) {
+			fail('refusal', `ts-blank-space refuses (${theirs.refusal.trim()}), tsv strips it`);
+		} else if (theirs.code !== reply.code) {
+			fail('output', `differs from ts-blank-space: ${first_difference(theirs.code, reply.code)}`);
+		}
 	}
-	if ('error' in reply) {
-		fail(null, `tsv's parser rejects it: ${reply.error.split('\n')[0]}`);
-		continue;
-	}
-	let theirs;
+
 	try {
-		theirs = derive(source);
+		await server.close();
 	} catch (e) {
-		fail(null, `ts-blank-space cannot grade it: ${e instanceof Error ? e.message : e}`);
-		continue;
+		failures.push(e instanceof Error ? e.message : String(e));
 	}
 
-	if ('refusal' in reply) {
-		refusals++;
-		const kind = reply.refusal.split('\t')[0]!;
-		refusal_kinds.set(kind, (refusal_kinds.get(kind) ?? 0) + 1);
-		if (!('refusal' in theirs)) {
-			fail('refusal', `tsv refuses (${reply.refusal.trim()}), ts-blank-space strips it`);
-		} else if (theirs.refusal !== reply.refusal) {
-			fail(
-				'refusal',
-				`tsv refuses ${reply.refusal.trim()}, ts-blank-space ${theirs.refusal.trim()}`
+	if (files.length === 0) failures.push('the corpus is empty — nothing was graded');
+	for (const a of ACCEPTED) {
+		if (!accepted_fired.has(`${a.check}\t${a.path}`)) {
+			failures.push(`stale ACCEPTED entry (${a.check}) ${a.path}: it no longer fires`);
+		}
+	}
+	const counts = { files: files.length, refusals };
+	for (const key of Object.keys(STRIP_CORPUS_PINS) as Array<keyof typeof STRIP_CORPUS_PINS>) {
+		if (counts[key] !== STRIP_CORPUS_PINS[key]) {
+			failures.push(
+				`pinned count mismatch: ${key} is ${counts[key]}, pinned ${STRIP_CORPUS_PINS[key]} ` +
+					'(benches/js/lib/gate_counts.ts STRIP_CORPUS_PINS; docs/gate_counts.md §Update ritual)'
 			);
 		}
-		continue;
 	}
 
-	outputs++;
-	if (reply.code !== source) changed++;
-	for (const finding of reply.findings) fail(null, finding);
-	const invalid = js_parse_failure(reply.code, file.path);
-	if (invalid !== null) fail('js', `the output is not a JS module: ${invalid}`);
-	if ('refusal' in theirs) {
-		fail('refusal', `ts-blank-space refuses (${theirs.refusal.trim()}), tsv strips it`);
-	} else if (theirs.code !== reply.code) {
-		fail('output', `differs from ts-blank-space: ${first_difference(theirs.code, reply.code)}`);
+	const kinds = [...refusal_kinds].map(([kind, n]) => `${kind} ${n}`).join(', ');
+	const seconds = ((performance.now() - started) / 1000).toFixed(1);
+	console.log(
+		`${files.length} file(s): ${outputs} stripped (${changed} changed), ${refusals} refused` +
+			(kinds ? ` (${kinds})` : '') +
+			`, ${accepted_fired.size} accepted departure(s) — ${seconds}s`
+	);
+	if (failures.length > 0) {
+		console.error(`\n✗ ${failures.length} failure(s):`);
+		for (const f of failures) console.error(`  ${f}`);
+		return 1;
 	}
+	console.log('✓ tsv strips the corpus as ts-blank-space does, but for the accepted departures');
+	return 0;
 }
-
-try {
-	await server.close();
-} catch (e) {
-	failures.push(e instanceof Error ? e.message : String(e));
-}
-
-if (files.length === 0) failures.push('the corpus is empty — nothing was graded');
-for (const a of ACCEPTED) {
-	if (!accepted_fired.has(`${a.check}\t${a.path}`)) {
-		failures.push(`stale ACCEPTED entry (${a.check}) ${a.path}: it no longer fires`);
-	}
-}
-const counts = { files: files.length, refusals };
-for (const key of Object.keys(STRIP_CORPUS_PINS) as Array<keyof typeof STRIP_CORPUS_PINS>) {
-	if (counts[key] !== STRIP_CORPUS_PINS[key]) {
-		failures.push(
-			`pinned count mismatch: ${key} is ${counts[key]}, pinned ${STRIP_CORPUS_PINS[key]} ` +
-				'(benches/js/lib/gate_counts.ts STRIP_CORPUS_PINS; docs/gate_counts.md §Update ritual)'
-		);
-	}
-}
-
-const kinds = [...refusal_kinds].map(([kind, n]) => `${kind} ${n}`).join(', ');
-const seconds = ((performance.now() - started) / 1000).toFixed(1);
-console.log(
-	`${files.length} file(s): ${outputs} stripped (${changed} changed), ${refusals} refused` +
-		(kinds ? ` (${kinds})` : '') +
-		`, ${accepted_fired.size} accepted departure(s) — ${seconds}s`
-);
-if (failures.length > 0) {
-	console.error(`\n✗ ${failures.length} failure(s):`);
-	for (const f of failures) console.error(`  ${f}`);
-	process.exit(1);
-}
-console.log('✓ tsv strips the corpus as ts-blank-space does, but for the accepted departures');
 
 /** The first line where `actual` departs from `expected`, both escaped. */
 function first_difference(expected: string, actual: string): string {

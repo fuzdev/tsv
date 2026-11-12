@@ -43,12 +43,40 @@ import { join } from 'node:path';
 import { TEST262_POSITIVES_PIN } from './lib/gate_counts.ts';
 import {
 	git_head,
-	HARVEST_STAMPS,
 	harvest_up_to_date,
 	short_commit,
+	type StampGit,
 	type StampInputs,
+	type StampWrites,
 	write_stamp
 } from './lib/harvest_stamp.ts';
+import { HARVEST_STAMPS } from './lib/harvest_stamp_table.ts';
+
+/** The stamps' `git`, run through Deno's `Command` as this script's runtime does. */
+const stamp_git: StampGit = {
+	out: async (args) => {
+		const output = await new Deno.Command('git', {
+			args: [...args],
+			stdout: 'piped',
+			stderr: 'null'
+		}).output();
+		return { kind: 'exited', code: output.code, stdout: new TextDecoder().decode(output.stdout) };
+	}
+};
+
+/** The stamps' file reads and writes, by path from the working directory. */
+const stamp_fs: StampWrites = {
+	exists: (path) =>
+		stat(path).then(
+			() => true,
+			() => false
+		),
+	read_text: (path) => readFile(path, 'utf8'),
+	write: (path, data) => writeFile(path, data),
+	mkdir: async (path, options) => {
+		await mkdir(path, options);
+	}
+};
 
 const TEST262_ROOT = '../test262';
 const CACHE_DIR = 'benches/js/.cache';
@@ -76,7 +104,7 @@ await mkdir(CACHE_DIR, { recursive: true });
 
 // Freshness stamp: skip the release-mode grade when the checkout commit and
 // pin match and both cache files exist.
-const source_commit = git_head(TEST262_ROOT);
+const source_commit = await git_head(stamp_git, TEST262_ROOT);
 const stamp_inputs: StampInputs = {
 	harvest: 'test262',
 	source_commit,
@@ -85,7 +113,7 @@ const stamp_inputs: StampInputs = {
 if (
 	!force &&
 	source_commit !== null &&
-	(await harvest_up_to_date(STAMP_PATH, stamp_inputs, [FILES_PATH, MANIFEST_PATH]))
+	(await harvest_up_to_date(stamp_fs, STAMP_PATH, stamp_inputs, [FILES_PATH, MANIFEST_PATH]))
 ) {
 	console.error(
 		`test262 harvest up to date (../test262 at ${short_commit(source_commit)}, ` +
@@ -159,7 +187,7 @@ if (files.length !== TEST262_POSITIVES_PIN) {
 }
 await writeFile(FILES_PATH, JSON.stringify(files, null, '\t'));
 if (source_commit !== null) {
-	await write_stamp(STAMP_PATH, stamp_inputs);
+	await write_stamp(stamp_fs, STAMP_PATH, stamp_inputs);
 }
 
 const module_count = positives.filter((t) => t.module).length;

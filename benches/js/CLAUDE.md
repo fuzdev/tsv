@@ -670,8 +670,9 @@ deno task typecheck:js
   prettier/svelte; run after `bench:install`): asserts the prettier baseline formats with a filepath, so `.ts`
   single-type-param arrows stay `<T>` and `.svelte` ones get `<T,>`, and the `.js` → babel /
   `.ts` → typescript parser routing holds.
-- **`typecheck:js`** typechecks the JS/TS the repo owns that Deno runs — this harness and
-  `scripts/` — which `deno task typecheck` (cargo) does not see. Takes DIRECTORIES, so
+- **`typecheck:js`** typechecks the JS/TS the repo owns that this harness and `scripts/` run,
+  which `deno task typecheck` (cargo) does not see: `tsc -p tsconfig.bench.json` over the Node
+  entries under `roots/` (a glob), then `deno check`, which takes DIRECTORIES, so
   a new subdirectory is covered the day it appears. NOT gated, for the same reason: the harness
   imports npm by bare specifier, and CI's `check` job installs no bench node_modules. Run it after a
   harness or scripts change. (The tsv_debug sidecar runs on Node; `typecheck:scripts`' `tsc`
@@ -682,16 +683,18 @@ deno task typecheck:js
   through the graph of the scripts Deno runs (check_artifact_freshness, source_mtime, ffi, napi,
   tsv_artifacts, runtime, types, reject_probe, locations_probe, gate_counts), and `test:deno`'s divergence suite
   covers the detectors. The modules the Node scripts import (`scripts/roots/`) are typechecked
-  by `typecheck:scripts`' `tsc` half, with `node_modules` in reach. `typecheck:bench-core` names
-  the orphans nothing else Deno-checks — `lib/wasm.ts`, `lib/harvest_stamp.ts`,
-  `lib/loc_wire_client.ts` (and through it `tsv_debug_server`), `lib/fixture_documents.ts`,
-  `lib/error_text.ts`, `compose_reports.ts`, `lib/loc_cross_grade.ts` (which `check:loc`
-  imports under Node), and the modules the
-  `test:node` suites test that nothing else Deno-checks (`tsc -p tsconfig.vitest.json` typechecks
-  them, but with `node_modules` in reach). It is deliberately NOT the maximal checkable set: the impl wrappers also
-  check on a bare checkout, but only because their npm imports are dynamic, and gating them would
-  impose that import style on modules whose job is loading npm (deno.json
-  `//typecheck:bench-core`).
+  by `typecheck:scripts`' `tsc` half, with `node_modules` in reach. `typecheck:bench-core`
+  (`tsc -p tsconfig.bench_core.json`) names the modules nothing else in `check` typechecks —
+  `lib/wasm.ts`, `lib/harvest_stamp.ts`, `lib/loc_wire_client.ts` (and through it
+  `tsv_debug_server`), `lib/fixture_documents.ts`, `lib/error_text.ts`, `compose_reports.ts`,
+  `lib/loc_cross_grade.ts` (which `check:loc` imports under Node), and the modules the
+  `test:node` suites test — and `scripts/no_package_closure_test.ts` holds each one's closure,
+  type-only imports followed, to `node:*` modules and relative files, which `tsc` alone, finding a
+  package in any `node_modules` above, would not. It is deliberately NOT the maximal checkable set: the impl wrappers also
+  import no package statically, but only because their npm imports are dynamic, and gating them would
+  impose that import style on modules whose job is loading npm (../../docs/tasks.md
+  §`typecheck:bench-core`). The Node entries under `roots/` and what they import are
+  `typecheck:js`' `tsc` half (`tsconfig.bench.json`), ungated like the rest of `typecheck:js`.
 
 "Documented" = every `*_prettier_divergence`-suffixed fixture linked from the
 `conformance_prettier*.md` family in any of its three anchor formats (table rows,
@@ -912,7 +915,7 @@ deno task bench:harvest:svelte-styles   # perf-view .svelte <style> blocks per s
 ```
 
 Idempotent; warn-and-skip when the source checkout is absent. The suite legs are
-FRESHNESS-STAMPED (`lib/harvest_stamp.ts` — every stamp is listed in its `HARVEST_STAMPS` table,
+FRESHNESS-STAMPED (`lib/harvest_stamp.ts` — every stamp is listed in the `HARVEST_STAMPS` table, `lib/harvest_stamp_table.ts`,
 which the scripts read their paths from and `deno task doctor` walks): a grade whose stamped
 inputs — the source checkout COMMIT(s) + the pinned count + oracle pins — are unchanged skips
 instantly (the test262 leg saves a release-mode grade; the ts-repo leg stamps the tsc VERSION too,
@@ -971,7 +974,7 @@ rejects. A contributor left out is the whole failure mode: its pull leaves the s
 and `GATE_CHECKOUT_IDS.pins` then records a provenance the grade doesn't have.
 `gate_counts_test.ts` grades that each pin names AT LEAST one checkout, which
 structurally cannot see a missing second — so the stamp's `checkouts` table
-(`lib/harvest_stamp.ts`) and that `pins` list are kept in agreement by hand.
+(`lib/harvest_stamp_table.ts`) and that `pins` list are kept in agreement by hand.
 
 A checkout is not the only kind of input. Every stamped grade that loads a corpus VIEW also
 stamps:
@@ -1623,10 +1626,14 @@ benches/js/
 │                          # outputs from ts-blank-space, cross-checked against Node's module.stripTypeScriptTypes
 │                          # (Node-only; tests/fixtures_strip/README.md)
 ├── strip_corpus.ts        # `strip:corpus`: tsv_ts::strip vs ts-blank-space over the snapshot's TypeScript, tsv's
-│                          # side from one `tsv_debug strip --stdin` process (Deno; ../../docs/audits.md)
+│                          # side from one `tsv_debug strip --stdin` process (Node, its root in `roots/`;
+│                          # ../../docs/audits.md)
 ├── imports_corpus.ts      # `imports:corpus`: parse_imports vs oxc-parser's module record over the snapshot's
 │                          # JS/TS and Svelte, every model difference a named normalization; tsv's side from
-│                          # one `tsv_debug imports --stdin` process (Deno; ../../docs/audits.md)
+│                          # one `tsv_debug imports --stdin` process (Node, its root in `roots/`;
+│                          # ../../docs/audits.md)
+├── roots/                 # The Node entries over gro's host modules, each binding a library above it
+│                          # (`strip_corpus.ts`, `imports_corpus.ts`); typechecked by `tsconfig.bench.json`
 ├── compose_reports.ts     # Fold report.{deno,node,bun}.json → combined report.{json,md}
 ├── idempotency_sweep.ts   # F1 sweep over the `robustness` view (drives tsv_debug `fuzz --iterations 0`)
 ├── corpus_audit.ts        # `audit:corpus`: the pure-Rust content-loss / robustness legs over
@@ -1675,7 +1682,9 @@ benches/js/
     ├── corpus_pins.ts     # The corpus gates' per-source pins: grammar, tally, grade/--update over
     │                      # the generated corpus_{format,parse}_pins.txt beside it (node-modules-free,
     │                      # unit-tested by corpus_pins_test.ts)
-    ├── harvest_stamp.ts   # Harvest freshness stamps (checkout ids + pins + view entry lists) + the HARVEST_STAMPS table
+    ├── harvest_stamp.ts   # Harvest freshness stamps (checkout ids + pins + view entry lists), over the
+    │                      # caller's `git` and file handles
+    ├── harvest_stamp_table.ts # The HARVEST_STAMPS table, data alone (Bun's bench, the doctor, and the harvests read it)
     ├── implementations.ts # Implementation registry (branches native FFI vs N-API by runtime)
     ├── bench_child.ts     # The orchestrator's spawn: one child at a time, blocking, its outcome
     │                      # classified; the ONE home of the bench's Deno child permissions
@@ -1764,7 +1773,8 @@ benches/js/
     │                      # `typescript` loader and parse call the harvest reuses
     ├── tsv_debug_server.ts # One long-lived `tsv_debug <command> --stdin` process asked one NDJSON
     │                      # request at a time — the client `loc_wire_client.ts`, `strip_corpus.ts`
-    │                      # and `imports_corpus.ts` share, and the `--profile corpus` binary's path
+    │                      # and `imports_corpus.ts` share, over the program the caller makes, and the
+    │                      # `--profile corpus` binary's path
     ├── tsv_api.ts         # The packages' published API over one tsv engine: the shipped facade
     │                      # (`crates/tsv_wasm/npm/api.js` + `api_parse.js`) built over a binding's flat
     │                      # exports, and `TsvBinding`, the base the three wrappers (ffi/napi/wasm) share

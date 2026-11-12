@@ -57,6 +57,8 @@
  *   deno task css:over-acceptance:pin         # the pin alone (a bench:pins:suites leg)
  */
 
+import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
+
 import { CanonicalImplementation } from '../lib/canonical.ts';
 import {
 	corpus_missing_entries,
@@ -67,15 +69,43 @@ import { CSS_REJECTS_PIN, WPT_CSS_HARVEST_PIN } from '../lib/gate_counts.ts';
 import {
 	corpus_filter_fingerprint,
 	git_head,
-	HARVEST_STAMPS,
 	harvest_up_to_date,
 	short_commit,
+	type StampGit,
 	type StampInputs,
+	type StampWrites,
 	write_stamp
 } from '../lib/harvest_stamp.ts';
+import { HARVEST_STAMPS } from '../lib/harvest_stamp_table.ts';
 import type { InitializedImplementations } from '../lib/implementations.ts';
 import { CANONICAL_PARSER_ROWS, type TsvImplementation } from '../lib/types.ts';
 import { load_all_versions } from '../lib/versions.ts';
+
+/** The stamps' `git`, run through Deno's `Command` as this script's runtime does. */
+const stamp_git: StampGit = {
+	out: async (args) => {
+		const output = await new Deno.Command('git', {
+			args: [...args],
+			stdout: 'piped',
+			stderr: 'null'
+		}).output();
+		return { kind: 'exited', code: output.code, stdout: new TextDecoder().decode(output.stdout) };
+	}
+};
+
+/** The stamps' file reads and writes, by path from the working directory. */
+const stamp_fs: StampWrites = {
+	exists: (path) =>
+		stat(path).then(
+			() => true,
+			() => false
+		),
+	read_text: (path) => readFile(path, 'utf8'),
+	write: (path, data) => writeFile(path, data),
+	mkdir: async (path, options) => {
+		await mkdir(path, options);
+	}
+};
 
 /** Sample paths kept per tool for `--verbose` — enough to see the shape, not a dump. */
 const SAMPLE_LIMIT = 8;
@@ -106,17 +136,17 @@ const STAMP_PATH = HARVEST_STAMPS['css-rejects'].path;
 // non-CSS suite joins): an entry added to or dropped from the corpus entries changes
 // the graded corpus while every checkout stays put.
 const versions = await load_all_versions();
-const svelte_commit = git_head('../svelte');
+const svelte_commit = await git_head(stamp_git, '../svelte');
 const stamp_inputs: StampInputs = {
 	harvest: 'css-rejects',
 	svelte_commit,
-	prettier_commit: git_head('../prettier'),
-	wpt_commit: git_head('../wpt'),
+	prettier_commit: await git_head(stamp_git, '../prettier'),
+	wpt_commit: await git_head(stamp_git, '../wpt'),
 	svelte_oracle: versions.canonical.svelte,
 	wpt_pin: WPT_CSS_HARVEST_PIN,
 	rejects_pin: CSS_REJECTS_PIN,
 	conformance_entries: (await corpus_view_paths('conformance')).join(' '),
-	filters: await corpus_filter_fingerprint('conformance')
+	filters: await corpus_filter_fingerprint(stamp_fs, 'conformance')
 };
 
 /**
@@ -163,7 +193,7 @@ if (
 	pin_only &&
 	!force &&
 	svelte_commit !== null &&
-	(await harvest_up_to_date(STAMP_PATH, stamp_inputs, []))
+	(await harvest_up_to_date(stamp_fs, STAMP_PATH, stamp_inputs, []))
 ) {
 	console.error(
 		`css-rejects pin up to date (../svelte at ${short_commit(svelte_commit)}, ` +
@@ -245,7 +275,7 @@ if (rejected.length !== CSS_REJECTS_PIN) {
 	Deno.exit(1);
 }
 // Stamped only once the pin check passes, so a wrong count never stamps itself fresh.
-if (svelte_commit !== null) await write_stamp(STAMP_PATH, stamp_inputs);
+if (svelte_commit !== null) await write_stamp(stamp_fs, STAMP_PATH, stamp_inputs);
 
 if (pin_only) {
 	oracle.dispose();

@@ -18,11 +18,12 @@
  * `corpus` profile is what makes a panic catchable here, as it is for the FFI library.
  *
  * The process is the shared `tsv_debug` client's (`tsv_debug_server.ts`): one long-lived
- * `--profile corpus` server, guarded for freshness, Deno-only like every corpus tool.
+ * `--profile corpus` server, guarded for freshness, started from the program the caller
+ * makes.
  */
 
 import { goal_for, type Language, type ParseGoal } from './types.ts';
-import { TsvDebugServer } from './tsv_debug_server.ts';
+import { type TsvDebugProgram, TsvDebugServer } from './tsv_debug_server.ts';
 
 /** One request line (the command's module doc). */
 type WireRequest = { language: Language; goal?: ParseGoal; source: string };
@@ -38,9 +39,14 @@ export class LocWireClient {
 		this.server = server;
 	}
 
-	/** Spawn the server, refusing a missing or stale binary (`BENCH_STALE_OK=1` overrides staleness). */
-	static async start(): Promise<LocWireClient> {
-		return new LocWireClient(await TsvDebugServer.start<WireRequest, WireReply>('loc_wires'));
+	/**
+	 * Spawn the server, refusing a missing or stale binary (`BENCH_STALE_OK=1` overrides staleness).
+	 * @param open_program - makes the `tsv_debug` program, called once the binary passed the guard
+	 */
+	static async start(open_program: () => TsvDebugProgram): Promise<LocWireClient> {
+		return new LocWireClient(
+			await TsvDebugServer.start<WireRequest, WireReply>('loc_wires', open_program)
+		);
 	}
 
 	/**

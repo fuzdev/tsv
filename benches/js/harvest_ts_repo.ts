@@ -96,12 +96,14 @@ import { basename, join } from 'node:path';
 import { TS_REPO_CORPUS_PIN, TS_REPO_REJECTS_PIN } from './lib/gate_counts.ts';
 import {
 	git_head,
-	HARVEST_STAMPS,
 	harvest_up_to_date,
 	short_commit,
+	type StampGit,
 	type StampInputs,
+	type StampWrites,
 	write_stamp
 } from './lib/harvest_stamp.ts';
+import { HARVEST_STAMPS } from './lib/harvest_stamp_table.ts';
 import {
 	baseline_test_key,
 	discover_ts_cases,
@@ -112,6 +114,32 @@ import {
 	TS_REPO
 } from './lib/ts_repo.ts';
 import { load_typescript, tsc_parse } from './lib/tsc.ts';
+
+/** The stamps' `git`, run through Deno's `Command` as this script's runtime does. */
+const stamp_git: StampGit = {
+	out: async (args) => {
+		const output = await new Deno.Command('git', {
+			args: [...args],
+			stdout: 'piped',
+			stderr: 'null'
+		}).output();
+		return { kind: 'exited', code: output.code, stdout: new TextDecoder().decode(output.stdout) };
+	}
+};
+
+/** The stamps' file reads and writes, by path from the working directory. */
+const stamp_fs: StampWrites = {
+	exists: (path) =>
+		stat(path).then(
+			() => true,
+			() => false
+		),
+	read_text: (path) => readFile(path, 'utf8'),
+	write: (path, data) => writeFile(path, data),
+	mkdir: async (path, options) => {
+		await mkdir(path, options);
+	}
+};
 
 const ROOTS = [`${TS_REPO}/tests/cases/conformance`, `${TS_REPO}/tests/cases/compiler`];
 
@@ -171,7 +199,7 @@ await mkdir(CACHE_DIR, { recursive: true });
 
 // Freshness stamp. The tsc version is an input because it IS the oracle: a tsc
 // bump can move a file between the two lists without the checkout changing.
-const source_commit = git_head(TS_REPO);
+const source_commit = await git_head(stamp_git, TS_REPO);
 const stamp_inputs: StampInputs = {
 	harvest: 'ts_repo',
 	source_commit,
@@ -182,7 +210,7 @@ const stamp_inputs: StampInputs = {
 if (
 	!force &&
 	source_commit !== null &&
-	(await harvest_up_to_date(STAMP_PATH, stamp_inputs, [FILES_PATH, REJECTS_PATH]))
+	(await harvest_up_to_date(stamp_fs, STAMP_PATH, stamp_inputs, [FILES_PATH, REJECTS_PATH]))
 ) {
 	console.error(
 		`ts-repo harvest up to date (${TS_REPO} at ${short_commit(source_commit)}, ` +
@@ -296,7 +324,7 @@ if (mismatches.length > 0) {
 await writeFile(FILES_PATH, JSON.stringify(valid, null, '\t') + '\n');
 await writeFile(REJECTS_PATH, JSON.stringify(rejects, null, '\t') + '\n');
 if (source_commit !== null) {
-	await write_stamp(STAMP_PATH, stamp_inputs);
+	await write_stamp(stamp_fs, STAMP_PATH, stamp_inputs);
 }
 
 // Every bucket, so the two lists always account for the whole scan:

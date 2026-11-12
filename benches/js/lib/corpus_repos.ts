@@ -38,7 +38,7 @@ import {
 	split_collection_path
 } from './corpora.ts';
 import type { CorpusRepoRef, CorpusSource } from './corpus.ts';
-import { HARVEST_STAMPS } from './harvest_stamp.ts';
+import { HARVEST_STAMPS } from './harvest_stamp_table.ts';
 
 const exec_file = promisify(execFile);
 

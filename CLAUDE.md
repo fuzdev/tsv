@@ -137,16 +137,16 @@ deno task typecheck:scripts # scripts/ by the checker of the runtime each script
 #                          `Deno`), then deno check over the rest
 #                          of scripts/, node-modules-free; that walk excludes the Node scripts (deno.json `exclude`) and
 #                          `scripts/doctor.ts`, whose corpus probe reaches node_modules
-deno task typecheck:bench-core # the node-modules-free bench modules the Deno scripts' import graph misses
-#                          (`lib/{wasm,harvest_stamp,loc_wire_client,fixture_documents,error_text,loc_cross_grade}.ts` +
-#                          `compose_reports.ts`, and the modules the `test:node` suites test that nothing else Deno-checks); the rest of that core
-#                          rides `typecheck:scripts` or `test:deno`. Scope rationale: deno.json's `//` note; in `check`
+deno task typecheck:bench-core # `tsc -p tsconfig.bench_core.json` over the package-free bench modules nothing else in
+#                          `check` typechecks (`lib/{wasm,harvest_stamp,loc_wire_client,fixture_documents,error_text,loc_cross_grade}.ts` +
+#                          `compose_reports.ts`, and the modules the `test:node` suites test); `scripts/no_package_closure_test.ts`
+#                          holds each one's closure to `node:*` and relative files. Scope rationale: ./docs/tasks.md; in `check`
 deno task test           # cargo test
 deno task test:node      # vitest under Node over the suites beside their modules (`tsc -p tsconfig.vitest.json` first,
 #                          which typechecks them; the suites are the `_test.ts` files it names): the bench core's (divergence
 #                          detectors, format-config probe, span-only wire probe, gate_counts, bench pass plan, perf-omit
 #                          summary, Prettier-suite filter, loc tolerance rows, parse diff engine + divergence matchers, NDJSON
-#                          reader) + scripts/'s (`release/changelog_test.ts` — the changelog grammar publish.ts writes and
+#                          reader, the `tsv_debug` client over a fake child, the harvest stamps over fakes) + scripts/'s (`release/changelog_test.ts` — the changelog grammar publish.ts writes and
 #                          release_notes.ts reads; `release/version_test.ts` + `release/plan_test.ts` — the version grammar and
 #                          the fresh/resume plan; `branch_report/{parsers,report,timing,wasm_board}_test.ts` — the branch
 #                          report's parsers, verdicts and wasm-board extraction; `release/binstall_test.ts` — the

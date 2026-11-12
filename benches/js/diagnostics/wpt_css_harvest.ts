@@ -47,12 +47,40 @@ import { basename, dirname, join, relative } from 'node:path';
 import { WPT_CSS_HARVEST_PIN } from '../lib/gate_counts.ts';
 import {
 	git_head,
-	HARVEST_STAMPS,
 	harvest_up_to_date,
 	short_commit,
+	type StampGit,
 	type StampInputs,
+	type StampWrites,
 	write_stamp
 } from '../lib/harvest_stamp.ts';
+import { HARVEST_STAMPS } from '../lib/harvest_stamp_table.ts';
+
+/** The stamps' `git`, run through Deno's `Command` as this script's runtime does. */
+const stamp_git: StampGit = {
+	out: async (args) => {
+		const output = await new Deno.Command('git', {
+			args: [...args],
+			stdout: 'piped',
+			stderr: 'null'
+		}).output();
+		return { kind: 'exited', code: output.code, stdout: new TextDecoder().decode(output.stdout) };
+	}
+};
+
+/** The stamps' file reads and writes, by path from the working directory. */
+const stamp_fs: StampWrites = {
+	exists: (path) =>
+		stat(path).then(
+			() => true,
+			() => false
+		),
+	read_text: (path) => readFile(path, 'utf8'),
+	write: (path, data) => writeFile(path, data),
+	mkdir: async (path, options) => {
+		await mkdir(path, options);
+	}
+};
 
 const OUT_DEFAULT = 'benches/js/.cache/wpt_css';
 const SOURCE_DEFAULT = '../wpt/css';
@@ -81,7 +109,7 @@ try {
 // Freshness stamp (default source + out only — a custom run is an experiment,
 // not the cache): skip when the ../wpt commit and the pinned count match.
 const stamped_run = source_root === SOURCE_DEFAULT && out_dir === OUT_DEFAULT;
-const source_commit = git_head(source_root);
+const source_commit = await git_head(stamp_git, source_root);
 const stamp_inputs: StampInputs = {
 	harvest: 'wpt-css',
 	source_commit,
@@ -91,7 +119,7 @@ if (
 	stamped_run &&
 	!force &&
 	source_commit !== null &&
-	(await harvest_up_to_date(STAMP_PATH, stamp_inputs, [out_dir]))
+	(await harvest_up_to_date(stamp_fs, STAMP_PATH, stamp_inputs, [out_dir]))
 ) {
 	console.error(
 		`wpt harvest up to date (../wpt at ${short_commit(source_commit)}, ` +
@@ -190,7 +218,7 @@ if (source_root === SOURCE_DEFAULT && stats.blocks_written !== WPT_CSS_HARVEST_P
 }
 
 if (stamped_run && source_commit !== null) {
-	await write_stamp(STAMP_PATH, stamp_inputs);
+	await write_stamp(stamp_fs, STAMP_PATH, stamp_inputs);
 }
 console.error(
 	`done: ${stats.blocks_written} blocks from ${stats.files_with_blocks} files → ${out_dir}`

@@ -1,0 +1,17 @@
+{
+	"compilerOptions": {
+		"noEmit": true,
+		"target": "esnext",
+		"module": "nodenext",
+		"moduleResolution": "nodenext",
+		"strict": true,
+		"noImplicitOverride": true,
+		"allowJs": true,
+		"allowImportingTsExtensions": true,
+		"skipLibCheck": true,
+		"erasableSyntaxOnly": true,
+		"verbatimModuleSyntax": true,
+		"types": ["node"]
+	},
+	"include": ["benches/js/roots/**/*.ts"]
+}

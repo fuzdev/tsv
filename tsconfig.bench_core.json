@@ -1,0 +1,35 @@
+{
+	"compilerOptions": {
+		"noEmit": true,
+		"target": "esnext",
+		"module": "nodenext",
+		"moduleResolution": "nodenext",
+		"strict": true,
+		"noImplicitOverride": true,
+		"allowJs": true,
+		"allowImportingTsExtensions": true,
+		"skipLibCheck": true,
+		"erasableSyntaxOnly": true,
+		"verbatimModuleSyntax": true,
+		"types": ["node"]
+	},
+	"files": [
+		"benches/js/lib/wasm.ts",
+		"benches/js/lib/harvest_stamp.ts",
+		"benches/js/lib/loc_wire_client.ts",
+		"benches/js/lib/fixture_documents.ts",
+		"benches/js/lib/error_text.ts",
+		"benches/js/compose_reports.ts",
+		"benches/js/lib/corpus_pins.ts",
+		"benches/js/lib/diff_path.ts",
+		"benches/js/lib/divergence/expected_errors.ts",
+		"benches/js/lib/divergence/panic_errors.ts",
+		"benches/js/lib/format_config_probe.ts",
+		"benches/js/lib/loc_tolerance.ts",
+		"benches/js/lib/parse_diff.ts",
+		"benches/js/lib/parse_divergences.ts",
+		"benches/js/lib/perf_omit.ts",
+		"benches/js/lib/prettier_fixtures.ts",
+		"benches/js/lib/loc_cross_grade.ts"
+	]
+}

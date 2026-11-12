@@ -7,8 +7,11 @@
  * §`test:bun`, §`build:pgo`, §`publish:napi`, §`release:notes`, §`release:assets`). And the
  * publish and release suites, which drive their libraries over in-process fakes, load nothing
  * that can spawn, write, or reach the network: no host module, no capability-bearing `node:*`
- * module, no ambient global. Read from the source text through `scripts/import_closure.ts`, so
- * it holds whatever the root config's Deno walk excludes.
+ * module, no ambient global. And the bench modules `typecheck:bench-core` typechecks
+ * (`tsconfig.bench_core.json`'s files) import only `node:*` modules and relative files, a
+ * type-only import's file included, so `tsc`, which finds a package by walking up to any
+ * `node_modules`, can't let one through. Read from the source text through
+ * `scripts/import_closure.ts`, so it holds whatever the root config's Deno walk excludes.
  */
 
 import { strictEqual } from 'node:assert';
@@ -56,7 +59,11 @@ const ENTRIES: Array<[entry: string, reaches: string]> = [
 const COMPUTED_IMPORTS: Record<string, { count: number; why: string }> = {
 	'scripts/test_bun.ts': { count: 1, why: 'each staged package, by its file URL, under Bun' },
 	'scripts/pgo/addon_ops.ts': { count: 1, why: 'the staged `@fuzdev/tsv` loader, by its path' },
-	'scripts/pgo/addon_depth.ts': { count: 1, why: 'the staged `@fuzdev/tsv` loader, by its path' }
+	'scripts/pgo/addon_depth.ts': { count: 1, why: 'the staged `@fuzdev/tsv` loader, by its path' },
+	'benches/js/lib/wasm.ts': {
+		count: 1,
+		why: "the runtime's wasm-pack glue the bench build wrote, by its path under `crates/tsv_wasm/pkg/`"
+	}
 };
 
 /** Each computed `import(…)` of `closure` past what `COMPUTED_IMPORTS` allows its file. */
@@ -82,8 +89,55 @@ for (const [entry, reaches] of ENTRIES) {
 	});
 }
 
+/** The modules `typecheck:bench-core` typechecks, `tsconfig.bench_core.json`'s files. */
+const BENCH_CORE: ReadonlyArray<string> = JSON.parse(
+	readFileSync(join(CHECKOUT, 'tsconfig.bench_core.json'), 'utf8')
+).files;
+
+/** What `module` reaches, type-only imports followed: a file only a type names must import no
+ * package either, since `tsc` resolves one wherever an install sits above it. */
+const reaches_of = (module: string, root = CHECKOUT): ImportClosure =>
+	walk_import_closure([module], { read: reader(root), follow_type_only: true });
+
+/** Each `/// <reference types="…" />` in `closure`'s files, as `<file>:<line>: <name>`: `tsc`
+ * resolves one from any `node_modules` above it, as it does a package import, and the walk
+ * counts none. */
+const type_references = (closure: ImportClosure, root: string): string =>
+	closure.files
+		.flatMap((file) =>
+			reader(root)(file)
+				.split('\n')
+				.flatMap((text, i) => {
+					const found = /^\s*\/\/\/\s*<reference\s+types\s*=\s*["']([^"']*)["']/.exec(text);
+					return found === null ? [] : [`${file}:${i + 1}: ${found[1]}`];
+				})
+		)
+		.join('\n');
+
+/** Each import of `closure` that is neither `node:*` nor a relative file, nor an allowed
+ * computed one, and each package its files name by a types reference. */
+const bench_core_violations = (closure: ImportClosure, root = CHECKOUT): string =>
+	[package_imports(closure), unlisted_computed(closure), type_references(closure, root)]
+		.filter((found) => found !== '')
+		.join('\n');
+
+test('typecheck:bench-core names modules', () => {
+	strictEqual(BENCH_CORE.length > 0, true);
+});
+
+for (const module of BENCH_CORE) {
+	test(`${module}'s closure, type-only imports followed, imports no package`, () => {
+		const closure = reaches_of(module);
+		strictEqual(closure.files.includes(module), true);
+		strictEqual(bench_core_violations(closure), '');
+	});
+}
+
 test('each computed import allowed is still there', () => {
-	const closures = ENTRIES.map(([entry]) => loads_of(entry));
+	const closures = [
+		...ENTRIES.map(([entry]) => loads_of(entry)),
+		...BENCH_CORE.map((module) => reaches_of(module))
+	];
 	for (const [file, { count }] of Object.entries(COMPUTED_IMPORTS)) {
 		const lines = new Set(
 			closures.flatMap((c) => c.computed.filter((found) => found.from === file).map((f) => f.line))
@@ -206,10 +260,28 @@ describe('the checks over a planted import', () => {
 		test(`the fakes-only rows catch ${name}`, () => {
 			strictEqual(fakes_only_violations(plant(name, lib), root), found);
 		});
+		test(`the bench-core rows catch ${name}`, () => {
+			strictEqual(bench_core_violations(reaches_of(plant(name, lib), root), root), found);
+		});
 	}
+	test('the bench-core rows follow a type-only import into its file', () => {
+		const entry = plant('type_only', "import type { X } from './types.ts';\nexport const x = 1;\n");
+		writeFileSync(join(root, 'type_only', 'types.ts'), "export type { X } from 'prettier';\n");
+		strictEqual(package_imports(loads_of(entry, root)), '');
+		strictEqual(
+			bench_core_violations(reaches_of(entry, root), root),
+			'type_only/types.ts:1: prettier'
+		);
+	});
 	test('a computed import fails the rows that allow none', () => {
 		const entry = plant('computed', 'export const x = (name: string) => import(name);\n');
 		strictEqual(unlisted_computed(loads_of(entry, root)), 'computed/lib.ts:1');
 		strictEqual(fakes_only_violations(entry, root), 'computed/lib.ts:1: import(…)');
+		strictEqual(bench_core_violations(reaches_of(entry, root), root), 'computed/lib.ts:1');
+	});
+	test('the bench-core rows catch a types reference, which the walk counts as no import', () => {
+		const entry = plant('reference', '/// <reference types="vitest" />\nexport const x = 1;\n');
+		strictEqual(package_imports(reaches_of(entry, root)), '');
+		strictEqual(bench_core_violations(reaches_of(entry, root), root), 'reference/lib.ts:1: vitest');
 	});
 });

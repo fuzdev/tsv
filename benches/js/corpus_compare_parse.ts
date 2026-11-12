@@ -81,6 +81,7 @@ import {
 	preview
 } from './lib/parse_diff.ts';
 import { bigint_replacer, span_only_replacer } from './lib/span_only.ts';
+import { TSV_DEBUG_CORPUS, type TsvDebugProgram } from './lib/tsv_debug_server.ts';
 import { type Language, LANGUAGES } from './lib/types.ts';
 import {
 	type InjectKind,
@@ -88,6 +89,39 @@ import {
 	VARIANT_MARKER,
 	with_injected_variants
 } from './lib/wire_inject.ts';
+
+/** `tsv_debug`, started through Deno's `Command` as this script's runtime does. */
+const deno_tsv_debug = (): TsvDebugProgram => ({
+	start: async (args) => {
+		const child = new Deno.Command(TSV_DEBUG_CORPUS, {
+			args: [...args],
+			stdin: 'piped',
+			stdout: 'piped',
+			stderr: 'inherit'
+		}).spawn();
+		const writer = child.stdin.getWriter();
+		const encoder = new TextEncoder();
+		return {
+			stdin: {
+				write: async (data) => {
+					await writer.write(encoder.encode(data));
+					return true;
+				},
+				close: () => writer.close()
+			},
+			stdout: child.stdout,
+			closed: child.status.then((status) => ({ kind: 'exited' as const, code: status.code })),
+			kill: () => {
+				try {
+					child.kill();
+					return true;
+				} catch {
+					return false;
+				}
+			}
+		};
+	}
+});
 
 /**
  * Injected variants per file. The cap is a blast-radius bound, not a coverage target: a
@@ -799,7 +833,7 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 	const { canonical, native } = impls;
 	// The loc wire ships through no binding, so the loc arm asks `tsv_debug` for it
 	// (`lib/loc_wire_client.ts`); the span-only wire is the FFI's.
-	const loc_wires = await LocWireClient.start();
+	const loc_wires = await LocWireClient.start(deno_tsv_debug);
 
 	const loc_arm = new LocArmBooks();
 	const pin_tally = new CorpusPinTally(PARSE_PIN_BUCKETS);

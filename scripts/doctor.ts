@@ -31,9 +31,10 @@ import { GATE_CHECKOUT_IDS } from '../benches/js/lib/gate_counts.ts';
 import {
 	checkout_hash,
 	checkout_label,
-	HARVEST_STAMPS,
-	short_commit
+	short_commit,
+	type StampGit
 } from '../benches/js/lib/harvest_stamp.ts';
+import { HARVEST_STAMPS } from '../benches/js/lib/harvest_stamp_table.ts';
 import { native_library_filename } from '../benches/js/lib/runtime.ts';
 import { type AllVersions, load_all_versions } from '../benches/js/lib/versions.ts';
 import {
@@ -89,6 +90,18 @@ function git_dirty(repo: string, subpath: string): boolean {
 		return false;
 	}
 }
+
+/** The harvest stamps' `git`, run through Deno's `Command` as this script's runtime does. */
+const stamp_git: StampGit = {
+	out: async (args) => {
+		const output = await new Deno.Command('git', {
+			args: [...args],
+			stdout: 'piped',
+			stderr: 'null'
+		}).output();
+		return { kind: 'exited', code: output.code, stdout: new TextDecoder().decode(output.stdout) };
+	}
+};
 
 function exists(path: string): boolean {
 	try {
@@ -350,7 +363,7 @@ else warn('../wpt/css checkout missing — bench:harvest:wpt unavailable (manual
 // anything else is skew). The tree, not the commit: the snapshot repo's tooling
 // commits move HEAD without moving a corpus byte.
 const corpora_pin = GATE_CHECKOUT_IDS[CORPORA_ROOT].hash;
-const corpora_head = checkout_hash({ path: CORPORA_ROOT, tree: CORPORA_TREE });
+const corpora_head = await checkout_hash(stamp_git, { path: CORPORA_ROOT, tree: CORPORA_TREE });
 if (corpora_head === null) {
 	warn(
 		`${CORPORA_ROOT} checkout missing — the bench + corpus:compare gates read the real-code snapshot ` +
@@ -433,11 +446,13 @@ section(
 	'Harvest stamps (bench:pins:suites — the pin-freshness preflight — + bench:harvest:svelte-styles)'
 );
 for (const [name, { path, task, checkouts }] of Object.entries(HARVEST_STAMPS)) {
-	const heads = Object.entries(checkouts).map(([key, input]) => ({
-		key,
-		repo: checkout_label(input),
-		head: checkout_hash(input)
-	}));
+	const heads = await Promise.all(
+		Object.entries(checkouts).map(async ([key, input]) => ({
+			key,
+			repo: checkout_label(input),
+			head: await checkout_hash(stamp_git, input)
+		}))
+	);
 	const absent = heads.filter((h) => h.head === null);
 	const gradable = heads.filter((h) => h.head !== null);
 	// Named on every line below, so a ✓ never reads as "all three agree" when one

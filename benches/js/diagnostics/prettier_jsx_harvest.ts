@@ -32,6 +32,7 @@
  *     benches/js/diagnostics/prettier_jsx_harvest.ts
  */
 
+import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { relative, resolve } from 'node:path';
 
 import {
@@ -43,14 +44,42 @@ import { PRETTIER_JSX_PIN } from '../lib/gate_counts.ts';
 import {
 	corpus_filter_fingerprint,
 	git_head,
-	HARVEST_STAMPS,
 	harvest_up_to_date,
 	short_commit,
+	type StampGit,
 	type StampInputs,
+	type StampWrites,
 	write_pinned_path_cache
 } from '../lib/harvest_stamp.ts';
+import { HARVEST_STAMPS } from '../lib/harvest_stamp_table.ts';
 import { ast_has_jsx } from '../lib/prettier_fixtures.ts';
 import { load_all_versions } from '../lib/versions.ts';
+
+/** The stamps' `git`, run through Deno's `Command` as this script's runtime does. */
+const stamp_git: StampGit = {
+	out: async (args) => {
+		const output = await new Deno.Command('git', {
+			args: [...args],
+			stdout: 'piped',
+			stderr: 'null'
+		}).output();
+		return { kind: 'exited', code: output.code, stdout: new TextDecoder().decode(output.stdout) };
+	}
+};
+
+/** The stamps' file reads and writes, by path from the working directory. */
+const stamp_fs: StampWrites = {
+	exists: (path) =>
+		stat(path).then(
+			() => true,
+			() => false
+		),
+	read_text: (path) => readFile(path, 'utf8'),
+	write: (path, data) => writeFile(path, data),
+	mkdir: async (path, options) => {
+		await mkdir(path, options);
+	}
+};
 
 const STAMP_PATH = HARVEST_STAMPS['prettier-jsx'].path;
 const PRETTIER_JS_SUITE = '../prettier/tests/format/js';
@@ -70,19 +99,19 @@ async function main(): Promise<void> {
 	// Freshness stamp: the graded files are one checkout's, the oracle is the pinned
 	// npm prettier, and the conformance view's ENTRY LIST is stamped like every
 	// other view-loading grade (see `svelte_reject_harvest.ts`).
-	const prettier_commit = git_head('../prettier');
+	const prettier_commit = await git_head(stamp_git, '../prettier');
 	const stamp_inputs: StampInputs = {
 		harvest: 'prettier-jsx',
 		prettier_commit,
 		prettier_oracle: versions.canonical.prettier,
 		jsx_pin: PRETTIER_JSX_PIN,
 		conformance_entries: (await corpus_view_paths('conformance')).join(' '),
-		filters: await corpus_filter_fingerprint('conformance')
+		filters: await corpus_filter_fingerprint(stamp_fs, 'conformance')
 	};
 	if (
 		!force &&
 		prettier_commit !== null &&
-		(await harvest_up_to_date(STAMP_PATH, stamp_inputs, [PRETTIER_JSX_CACHE]))
+		(await harvest_up_to_date(stamp_fs, STAMP_PATH, stamp_inputs, [PRETTIER_JSX_CACHE]))
 	) {
 		console.error(
 			`prettier-jsx harvest up to date (../prettier at ${short_commit(prettier_commit)}, ` +
@@ -129,13 +158,14 @@ async function main(): Promise<void> {
 	jsx.sort();
 
 	// Pinned count (exact): see ../lib/gate_counts.ts.
-	const out = await write_pinned_path_cache({
+	const out = await write_pinned_path_cache(stamp_fs, {
 		cache: PRETTIER_JSX_CACHE,
 		paths: jsx,
 		pin: PRETTIER_JSX_PIN,
 		what: 'JSX files',
 		stamp: prettier_commit === null ? null : { path: STAMP_PATH, inputs: stamp_inputs }
 	});
+	if (out === null) Deno.exit(1);
 
 	const cwd = resolve('.');
 	console.error(
