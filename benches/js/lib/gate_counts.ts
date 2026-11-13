@@ -62,8 +62,9 @@ import { CORPORA_ROOT, CORPORA_TREE } from './corpora.ts';
  * here and WARNS on a move. That is deliberately a warning, not a failure: the count pins are the
  * gate (they fail on any real move in what's graded), and this exists to make a count-pin
  * trip *diagnosable* — "the corpus moved" vs "tsv regressed" is otherwise a reverse-
- * engineering exercise. An absent checkout, or one that isn't a git repo, is skipped, so
- * clean machines and CI still pass.
+ * engineering exercise. An absent checkout is skipped, so clean machines and CI still pass;
+ * a present one git can't read (not a git checkout, the pinned subtree gone, git refusing the
+ * repository) warns beside the moves, naming what git said.
  *
  * `../corpora` is the real-code snapshot (`fuzdev/corpora`): every `benched` and
  * `gated` corpus entry reads one of its collections, and one object id pins them

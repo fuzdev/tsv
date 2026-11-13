@@ -63,8 +63,10 @@
  * / `../acorn-typescript` with the PINNED npm parser, and their
  * SANCTIONED/KNOWN_GAPS ledgers are path-keyed against those suites — a skewed
  * checkout silently grades different inputs than the oracle version defines
- * (and rots the ledgers). An ABSENT checkout is skipped with a note, so a
- * machine without the clones still passes; a PRESENT-but-mismatched one FAILS.
+ * (and rots the ledgers). An ABSENT checkout (one that can't be opened) is
+ * skipped with a note, so a machine without the clones still passes; a
+ * PRESENT-but-mismatched one FAILS, and so does a present one whose version
+ * file can't be read — a broken checkout, not a machine without one.
  * This is the HARD half of the alignment guard: the gates themselves only WARN
  * on skew (`lib/fixtures_gate.ts`) and catch it indirectly via their exact
  * `scanned` count pins, which a skew that happens not to move the count slips
@@ -84,18 +86,24 @@
  * (`GATE_CHECKOUT_IDS`), and a move is reported. Deliberately a WARNING:
  * the count pins are the gate — this exists so that when one trips, "the corpus
  * moved" is distinguishable from "tsv regressed" at a glance instead of by
- * reverse-engineering. Absent / non-git checkouts are skipped. One check here
- * FAILS instead: an entry that also records a `commit` (the snapshot the PGO
- * training fetches by commit, since a tree cannot be fetched) must name a commit
- * whose subtree is the pinned one — a disagreement between the two recorded ids,
- * whatever the checkout's HEAD (a clone that lacks the commit is noted, not graded).
+ * reverse-engineering. An absent checkout is skipped with a note; a present one in
+ * which git can't read the object (not a git checkout, the pinned subtree gone, git
+ * refusing the repository) WARNS beside the moves, naming what git said: its drift is
+ * unknown rather than absent, and no louder than a move would be. One check here FAILS
+ * on the ids themselves:
+ * an entry that also records a `commit` (the snapshot the PGO training fetches by
+ * commit, since a tree cannot be fetched) must name a commit whose subtree is the
+ * pinned one — a disagreement between the two recorded ids, whatever the
+ * checkout's HEAD (a clone that lacks the commit is noted, not graded).
  */
 
 import type { FsReadDir } from '@fuzdev/gro/fs.ts';
 import { is_fs_error } from '@fuzdev/gro/fs_error.ts';
 import type { SpawnProgram } from '@fuzdev/gro/spawn.ts';
+import { is_spawn_error } from '@fuzdev/gro/spawn_error.ts';
 
 import { GATE_CHECKOUT_IDS } from '../benches/js/lib/gate_counts.ts';
+import { BROKEN_CHECKOUT } from './sibling_text.ts';
 
 const MODE_FLAGS = ['--pins', '--checkouts'] as const;
 
@@ -306,23 +314,38 @@ const split_sibling_path = (path: string): { checkout: string; beneath: string }
 	return { checkout: path.slice(0, slash), beneath: path.slice(slash + 1) };
 };
 
+/** What `rev_parse` found: the object's id, an absent checkout, or git's failure in a present one. */
+type RevParse = { id: string } | { absent: true } | { failed: string };
+
 /**
  * Resolve a git object of a sibling checkout — `HEAD` (the commit) or `HEAD:<tree>` (a
- * subtree's id) — or `null` when it is absent / not a git repo.
+ * subtree's id). A checkout that can't be opened is absent; in one that opens, git's failure
+ * (not a git checkout, the object missing, git refusing the repository) is named by what git
+ * said, never read as absent.
  */
 const rev_parse = async (
 	git: SpawnProgram,
 	siblings: NonNullable<CheckCanonicalPinsDeps['siblings']>,
 	repo: string,
 	rev: string
-): Promise<string | null> => {
+): Promise<RevParse> => {
 	const cwd = await siblings.open(repo);
-	if (cwd === null) return null;
+	if (cwd === null) return { absent: true };
 	try {
 		const result = await git.out(['rev-parse', rev], { cwd });
-		return result.kind === 'exited' && result.code === 0 ? result.stdout.trim() : null;
-	} catch {
-		return null;
+		if (result.kind === 'exited' && result.code === 0) return { id: result.stdout.trim() };
+		const said = result.stderr.trim().split('\n')[0] ?? '';
+		const ended = result.kind === 'exited' ? `exited ${result.code}` : result.kind;
+		return { failed: `git rev-parse ${rev} ${ended}${said === '' ? '' : `: ${said}`}` };
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		// git was found on `PATH`, so a launch that fails in the checkout is most often the
+		// checkout's directory, which can't be entered, not the git binary the message names
+		return {
+			failed: is_spawn_error(error, 'launch_failed')
+				? `git rev-parse ${rev} couldn't start in it, a directory it can't enter or a git it can't run (${message})`
+				: `git rev-parse ${rev} failed: ${message}`
+		};
 	}
 };
 
@@ -342,6 +365,15 @@ export async function run_check_canonical_pins(
 	const report: string[] = [];
 	const checkout_notes: string[] = [];
 	const drifted: string[] = [];
+	/** Present checkouts whose drift git couldn't read, each with what git said. */
+	const unread: string[] = [];
+	/** Present checkouts whose version file can't be read: broken, never skew. */
+	const broken: string[] = [];
+	/** Whether a failure is a pin that disagrees, whose remedy is the pin sites. */
+	let pins_failed = false;
+	/** Whether a failure is a pin or a checkout that disagrees with one, whose remedy may be a
+	 * bump. */
+	let skewed = false;
 
 	if (run_pins) {
 		const sidecar = await deps.checkout.read_text(SIDECAR_PATH);
@@ -479,6 +511,8 @@ export async function run_check_canonical_pins(
 			failures,
 			report
 		);
+		// every failure so far is a pin site's
+		pins_failed = skewed = failures.length > 0;
 	}
 
 	if (run_checkouts) {
@@ -494,25 +528,29 @@ export async function run_check_canonical_pins(
 		}
 
 		for (const { pkg_json, npm_package } of CHECKOUT_ALIGNMENT) {
+			const { checkout, beneath } = split_sibling_path(pkg_json);
+			const dir = await siblings.open(checkout);
+			if (dir === null) {
+				checkout_notes.push(`${npm_package} checkout absent — alignment not checked`);
+				continue;
+			}
 			let checkout_version: string | undefined;
 			try {
-				const { checkout, beneath } = split_sibling_path(pkg_json);
-				const dir = await siblings.open(checkout);
-				if (dir === null) throw new Error(`no checkout at ${checkout}`);
 				checkout_version = (JSON.parse(await dir.read_text(beneath)) as { version?: string })
 					.version;
 			} catch (error) {
-				if (is_fs_error(error, 'outside_root')) {
-					failures.push(
-						`${npm_package}: ${pkg_json} reaches through a symlink that is absolute or climbs out of its checkout, which is never followed — make it relative within the checkout, or link the checkout itself instead`
-					);
-				} else {
-					checkout_notes.push(`${npm_package} checkout absent — alignment not checked`);
-				}
+				broken.push(
+					is_fs_error(error, 'outside_root')
+						? `${npm_package}: ${pkg_json} reaches through a symlink that is absolute or climbs out of its checkout, which is never followed — make it relative within the checkout, or link the checkout itself instead`
+						: `${npm_package}: ${checkout} is present but ${pkg_json} can't be read (${
+								error instanceof Error ? error.message.split('\n')[0] : String(error)
+							})`
+				);
 				continue;
 			}
 			const pinned = bench_deps[npm_package];
 			if (checkout_version !== pinned) {
+				skewed = true;
 				failures.push(
 					`${npm_package}: checkout ${pkg_json} is v${checkout_version ?? '?'} but the oracle pin is v${pinned} — ` +
 						'align the checkout to the pinned tag, or bump the canonical pins deliberately (a fixture re-baseline)'
@@ -520,8 +558,8 @@ export async function run_check_canonical_pins(
 			}
 		}
 
-		// Skipped wholesale rather than per-repo: without git every `rev_parse` would return
-		// `null`, which would read as "every checkout absent".
+		// Skipped wholesale rather than per-repo: without git every checkout would go unread,
+		// which would read as "every checkout absent".
 		if (git !== null) {
 			for (const [repo, { hash, tree, pins, commit }] of Object.entries(GATE_CHECKOUT_IDS)) {
 				// A `tree` pin compares that subtree's id at HEAD, so a commit that touches
@@ -533,27 +571,32 @@ export async function run_check_canonical_pins(
 					repo,
 					tree === undefined ? 'HEAD' : `HEAD:${tree}`
 				);
-				if (current === null) {
+				if ('absent' in current) {
 					checkout_notes.push(`${repo} absent — drift not checked`);
 					continue;
 				}
+				if ('failed' in current) {
+					unread.push(`${what}: ${repo} is present but ${current.failed}`);
+					continue;
+				}
 				// A recorded commit is what the PGO training fetches, so its tree must BE the pin —
-				// a fact about the two recorded ids, not about this checkout, hence a failure
+				// a fact about the two recorded ids, not about this checkout, hence a failure. The
+				// checkout's HEAD read, so git works there: a clone without the commit is noted.
 				if (commit !== undefined && tree !== undefined) {
 					const commit_tree = await rev_parse(git, siblings, repo, `${commit}:${tree}`);
-					if (commit_tree === null) {
+					if (!('id' in commit_tree)) {
 						checkout_notes.push(`${repo} lacks the recorded commit ${commit.slice(0, 12)}`);
-					} else if (!commit_tree.startsWith(hash)) {
+					} else if (!commit_tree.id.startsWith(hash)) {
 						failures.push(
-							`${what}: the recorded commit ${commit.slice(0, 12)} holds ${tree} ${commit_tree.slice(0, hash.length)}, ` +
+							`${what}: the recorded commit ${commit.slice(0, 12)} holds ${tree} ${commit_tree.id.slice(0, hash.length)}, ` +
 								`not the pinned ${hash} — re-record GATE_CHECKOUT_IDS' commit with its tree`
 						);
 					}
 				}
 				// The recorded ids are abbreviated, so compare on the prefix.
-				if (!current.startsWith(hash)) {
+				if (!current.id.startsWith(hash)) {
 					drifted.push(
-						`${what}: measured at ${hash}, now at ${current.slice(0, hash.length)} — pins: ${pins.join(', ')}`
+						`${what}: measured at ${hash}, now at ${current.id.slice(0, hash.length)} — pins: ${pins.join(', ')}`
 					);
 				}
 			}
@@ -564,18 +607,33 @@ export async function run_check_canonical_pins(
 	const task =
 		run_pins && run_checkouts ? 'canonical pins' : run_pins ? 'pins:audit' : 'pins:audit:checkouts';
 
-	if (failures.length > 0) {
-		console.error('FAIL: canonical version sync broken:');
-		for (const f of failures) console.error(`  · ${f}`);
-		if (run_pins) {
-			console.error(
-				`  Pin sites: ${SIDECAR_PKG_PATH} and its lock (npm run pins:lock), ${BENCH_PKG_PATH} — edit in lockstep.`
-			);
+	if (failures.length > 0 || broken.length > 0) {
+		if (failures.length > 0) {
+			console.error('FAIL: canonical version sync broken:');
+			for (const f of failures) console.error(`  · ${f}`);
+			// each remedy printed only under a failure it remedies
+			if (pins_failed) {
+				console.error(
+					`  Pin sites: ${SIDECAR_PKG_PATH} and its lock (npm run pins:lock), ${BENCH_PKG_PATH} — edit in lockstep.`
+				);
+			}
+			if (skewed) {
+				console.error(
+					'  ⚠ Bumping a canonical pin re-baselines the fixture corpus — see docs/benchmarks.md §"Canonical baseline is coupled".'
+				);
+			}
 		}
-		console.error(
-			'  ⚠ Bumping a canonical pin re-baselines the fixture corpus — see docs/benchmarks.md §"Canonical baseline is coupled".'
-		);
+		if (broken.length > 0) {
+			console.error("FAIL: a present checkout's version file can't be read:");
+			for (const b of broken) console.error(`  · ${b}`);
+			console.error(`  Each is ${BROKEN_CHECKOUT}.`);
+		}
 		return 1;
+	}
+	if (unread.length > 0) {
+		console.warn(`⚠ ${task} — drift not checked in a present checkout git can't read:`);
+		for (const u of unread) console.warn(`  · ${u}`);
+		console.warn(`  Each is ${BROKEN_CHECKOUT}.`);
 	}
 	if (drifted.length > 0) {
 		console.warn(`⚠ ${task} — checkout(s) moved since the gate counts were measured:`);

@@ -948,7 +948,8 @@ gates own that); only that discovery reaches it.
 
 **Gating.** In `npm run check` beside `roundtrip:audit:prettier`, with the same
 opportunistic posture: `../corpora` present ⇒ it gates, absent ⇒ a loud `NOT RUN` line
-and exit 0 (the CI `check` job has no sibling checkouts). An invariant, not a count pin,
+and exit 0 (the CI `check` job has no sibling checkouts). A checkout that is present without
+the snapshot's `collections/` is a broken one, not a machine without one: it says so and exits 1. An invariant, not a count pin,
 so a smaller corpus can only cost coverage. A **dirty** checkout is refused rather than
 graded — `git ls-files` describes the commit, the walk describes the disk, and a local
 modification would otherwise read as a tsv finding (`npm run doctor` reports the same
@@ -969,7 +970,9 @@ which proves each bundle *runs*, not that it *agrees*. This copies each corpus r
 two temp trees, formats one with the native CLI and the other with the WASM CLI, and
 requires the two runs to agree on everything observable: exit code, the changed-path
 list on stdout, the diagnostics on stderr, and every resulting byte on disk. Both bins
-run with the temp tree as cwd, so even the paths they print are comparable. The default
+run with the temp tree as cwd, so even the paths they print are comparable. A run a
+signal ended (an abort, a fault, an OOM kill) is a finding whatever the other side did, so
+two engines killed alike never read as agreeing. The default
 roots are `tests/fixtures` and `tests/fixtures_compile` plus `../corpora/collections`
 when the snapshot is present — the `input_invalid_*` family among them, so a refusal has to be worded alike as much as a format.
 
@@ -1616,7 +1619,8 @@ npm run pins:audit:checkouts
 version the pins say they are. The fixtures gates grade INPUTS from those suites with the
 PINNED npm parser, and their SANCTIONED / KNOWN_GAPS ledgers are path-keyed against them, so a
 skewed checkout silently grades different inputs than the oracle version defines (and rots the
-ledgers). An ABSENT checkout is skipped with a note; a PRESENT-but-mismatched one FAILS. This
+ledgers). An ABSENT checkout is skipped with a note; a PRESENT-but-mismatched one FAILS, and so
+does a present one whose version file can't be read. This
 is the hard half of the guard — the gates themselves only WARN on skew and catch it indirectly
 via their exact `scanned` count pins, which a skew that happens not to move the count slips
 past. `../prettier` is deliberately not gated: its suites' expected output is computed live per
@@ -1638,8 +1642,13 @@ compared against the id `GATE_CHECKOUT_IDS` records it was measured at
 trips "the corpus moved" is distinguishable from "tsv regressed" at a glance rather than by
 reverse-engineering.
 
-**Blind spots.** Absent or non-git checkouts are skipped, so a machine without the clones
-passes vacuously. Alignment is a version-string comparison — it says the checkout is the pinned
+A present checkout in which git can't read the recorded object (not a git checkout, the pinned
+subtree gone, git refusing the repository) WARNS beside the moves, naming what git said: its drift
+is unknown, not absent, and an unknown drift is no louder than a known one.
+
+**Blind spots.** Absent checkouts are skipped, so a machine without the clones passes
+vacuously, and a present one git can't read passes with its drift unmeasured, warned rather
+than failed. Alignment is a version-string comparison — it says the checkout is the pinned
 *release*, never that the pin is the right one — and, like
 [`pins:audit`](#canonical-pin-agreement-audit-pinsaudit), it cannot see whether the committed
 expectations that oracle produces are still fresh.
@@ -2064,7 +2073,8 @@ absent ⇒ a loud `NOT RUN` line and exit 0. That keeps `check` runnable on a ba
 `check` job has no sibling checkouts at all), and it is sound here in a way it would not be for
 a count-pinned gate — this audit asserts an invariant, so a finding fails wherever it occurs and
 a smaller corpus can only cost coverage, never soften a verdict. A *partial* `../prettier` (the
-checkout exists but a listed suite does not) warns per suite and audits the rest. The suite list
+checkout exists but a listed suite does not) warns per suite and audits the rest; one holding
+none of the suites has nothing to grade, so it names them and exits 1. The suite list
 is shared with [the corpus bundle](#the-corpus-bundle-auditcorpus) from
 `scripts/roundtrip_audit_prettier.ts`, so the cheap leg and the release-cadence one cannot drift.
 

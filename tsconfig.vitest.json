@@ -117,6 +117,7 @@
 		"scripts/roots/checkout_test.ts",
 		"scripts/roots/package_state_test.ts",
 		"scripts/roots/publish_deps_test.ts",
+		"scripts/roundtrip_audit_prettier_test.ts",
 		"scripts/run_if_stale_test.ts",
 		"scripts/sidecar_install_test.ts",
 		"scripts/stage_file_handle_test.ts",

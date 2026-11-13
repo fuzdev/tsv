@@ -328,6 +328,51 @@ test('each way the format leg can disagree is a finding of its own', async () =>
 	]);
 });
 
+/** A run a signal ended, with what it wrote before. */
+const signaled = (signal: string, stdout = '', stderr = ''): SpawnOutput => ({
+	kind: 'signaled',
+	signal,
+	stdout,
+	stderr,
+	truncated: false
+});
+
+test('an engine a signal ended is a finding, even when the other ended alike', async () => {
+	await using checkout = await make_checkout();
+	// both killed by the same signal, with the same output and the files equally untouched: every
+	// other comparison agrees
+	const killed = async (args: ReadonlyArray<string>, cwd: FsReadDir) => {
+		if (args[0] !== 'format') return undefined;
+		// the empty-scope refusal the extension set is read off answers as ever
+		for await (const _ of cwd.list()) return signaled('SIGKILL');
+		return undefined;
+	};
+	const { deps, out } = make_deps(checkout, { native: killed, wasm: killed });
+	strictEqual(await run_engine_parity(deps, ['corpus']), 1);
+	deepStrictEqual(out.slice(1, 6), [
+		'  ✗ corpus: 4 files',
+		'      native killed by SIGKILL',
+		'      wasm killed by SIGKILL',
+		'      the --list over spelled, overlapping roots: native killed by SIGKILL',
+		'      the --list over spelled, overlapping roots: wasm killed by SIGKILL'
+	]);
+});
+
+test('a strip one engine was killed on is a finding naming it, whatever the other did', async () => {
+	await using checkout = await make_checkout();
+	const { deps, out } = make_deps(checkout, {
+		native: async (args) =>
+			args[0] === 'strip' && args[1] === 'corpus/a.ts' ? signaled('SIGABRT') : undefined,
+		wasm: async (args) =>
+			args[0] === 'strip' && args[1] === 'corpus/a.ts' ? signaled('SIGABRT') : undefined
+	});
+	strictEqual(await run_engine_parity(deps, ['corpus']), 1);
+	deepStrictEqual(out.slice(2, 4), [
+		'  ✗ corpus (tsv strip): 2 files',
+		'      tsv strip corpus/a.ts: exit native 134 / wasm 134, native killed by SIGABRT, wasm killed by SIGABRT'
+	]);
+});
+
 test('past ten differing files the rest are counted, in the order the walk lists them', async () => {
 	await using checkout = await make_checkout();
 	const names = Array.from({ length: 13 }, (_, i) => `f${String(i).padStart(2, '0')}.ts`);

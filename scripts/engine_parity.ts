@@ -18,7 +18,9 @@
  * native CLI and the other with the WASM CLI, and require the two runs to agree
  * on **everything observable** — exit code, the changed-path list on stdout,
  * the diagnostics on stderr, and every resulting byte on disk. Both bins run
- * with the temp tree as cwd, so the paths they print are identical too.
+ * with the temp tree as cwd, so the paths they print are identical too. A run a
+ * signal ended (an abort, a fault, an OOM kill) is a finding of its own whatever
+ * the other side did, so two engines killed alike never read as agreeing.
  *
  * Why two trees rather than one tree twice: formatting A with native and then
  * re-running WASM over the SAME tree would only prove that native's output is a
@@ -172,9 +174,21 @@ export async function find_native_cli(
 /** One child's outcome: its exit code (`128 + N` for signal `N`) and its output. */
 export interface RunResult {
 	status: number;
+	/** The signal that ended it, when one did: a crash, never an outcome the other side can match. */
+	signal?: string;
 	stdout: string;
 	stderr: string;
 }
+
+/**
+ * A finding for each of `runs` a signal ended (an abort's `SIGABRT`, a fault's `SIGSEGV`, an
+ * OOM kill), whatever the other side did: two engines killed alike agree on nothing.
+ */
+const killed = (runs: Readonly<Record<'native' | 'wasm', RunResult>>): Array<string> =>
+	(['native', 'wasm'] as const).flatMap((side) => {
+		const { signal } = runs[side];
+		return signal === undefined ? [] : [`${side} killed by ${signal}`];
+	});
 
 /** Run `program` in `cwd` and capture its outcome. */
 async function run(
@@ -186,11 +200,18 @@ async function run(
 	if (result.truncated) {
 		throw new Error(`${program.name} ${args.join(' ')} wrote more output than is captured`);
 	}
-	let status: number;
-	if (result.kind === 'exited') status = result.code;
-	else if (result.kind === 'signaled') status = signal_exit_code(result.signal);
-	else throw new Error(`${program.name} ${args.join(' ')} was stopped (${result.kind})`);
-	return { status, stdout: result.stdout, stderr: result.stderr };
+	if (result.kind === 'exited') {
+		return { status: result.code, stdout: result.stdout, stderr: result.stderr };
+	}
+	if (result.kind === 'signaled') {
+		return {
+			status: signal_exit_code(result.signal),
+			signal: result.signal,
+			stdout: result.stdout,
+			stderr: result.stderr
+		};
+	}
+	throw new Error(`${program.name} ${args.join(' ')} was stopped (${result.kind})`);
 }
 
 interface RootReport {
@@ -397,7 +418,7 @@ export async function run_engine_parity(
 		// than the one users run. Grading the shipped host is the whole point.
 		const wasm_run = await run(node, trees[1], [wasm_cli, 'format', '.']);
 
-		const findings: string[] = [];
+		const findings: string[] = killed({ native: native_run, wasm: wasm_run });
 		if (native_run.status !== wasm_run.status) {
 			findings.push(`exit code: native ${native_run.status}, wasm ${wasm_run.status}`);
 		}
@@ -413,6 +434,9 @@ export async function run_engine_parity(
 		const LIST_ROOTS = ['format', '--list', './/', './', '.'];
 		const native_list = await run(native_bin, trees[0], LIST_ROOTS);
 		const wasm_list = await run(node, trees[1], [wasm_cli, ...LIST_ROOTS]);
+		for (const finding of killed({ native: native_list, wasm: wasm_list })) {
+			findings.push(`the --list over spelled, overlapping roots: ${finding}`);
+		}
 		if (native_list.status !== wasm_list.status || native_list.stdout !== wasm_list.stdout) {
 			findings.push('the --list over spelled, overlapping roots differs');
 		}
@@ -453,7 +477,9 @@ export async function run_engine_parity(
 					run(native_bin, checkout, ['strip', file]),
 					run(node, checkout, [wasm_cli, 'strip', file])
 				]);
+				const crashed = killed({ native: native_run, wasm: wasm_run });
 				if (
+					crashed.length === 0 &&
 					native_run.status === wasm_run.status &&
 					native_run.stdout === wasm_run.stdout &&
 					native_run.stderr === wasm_run.stderr
@@ -464,6 +490,7 @@ export async function run_engine_parity(
 				if (differing <= 10) {
 					findings.push(
 						`tsv strip ${file}: exit native ${native_run.status} / wasm ${wasm_run.status}` +
+							crashed.map((finding) => `, ${finding}`).join('') +
 							(native_run.stdout === wasm_run.stdout ? '' : ', stdout differs') +
 							(native_run.stderr === wasm_run.stderr ? '' : ', stderr differs')
 					);

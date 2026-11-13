@@ -30,7 +30,9 @@
  * checkout (the CI `check` job has no sibling checkouts), so `../corpora` is read
  * opportunistically — present, and the leg gates; absent, and it prints a loud NOT RUN
  * line and exits 0. It is an invariant check, not a count pin, so a finding fails
- * wherever it occurs and a missing checkout costs only coverage.
+ * wherever it occurs and a missing checkout costs only coverage. A checkout that is
+ * present without the snapshot's `collections/` is a broken one rather than a machine
+ * without one: it says so and exits 1.
  *
  * A DIRTY checkout is refused rather than graded: `git ls-files` describes the committed
  * tree while `tsv format --list` walks the disk, so a local modification would read as a
@@ -59,6 +61,7 @@ import {
 	CORPORA_TREE,
 	CORPORA_URL
 } from '../benches/js/lib/corpora.ts';
+import { BROKEN_CHECKOUT } from './sibling_text.ts';
 
 /**
  * The extensions `tsv format` discovers — the JS/TS family, Svelte, CSS. Restated rather
@@ -143,17 +146,24 @@ async function git(
 
 /**
  * The audit (module doc).
- * @returns the exit code: `0` when the two lists agree or no snapshot is present, else `1`
+ * @returns the exit code: `0` when the two lists agree or no checkout is present, else `1`
  * (or `tsv`'s own non-zero code)
  */
 export async function run_discovery_audit(deps: DiscoveryAuditDeps): Promise<number> {
 	const tree = CORPORA_COLLECTIONS;
 	const corpora = await deps.corpora.open();
-	if (corpora === null || !(await deps.corpora.exists(CORPORA_TREE))) {
+	if (corpora === null) {
 		log(`⚠ discovery:audit NOT RUN — no ${CORPORA_ROOT} checkout.`);
 		log("  This leg checks tsv's discovery against the real-code snapshot's committed file list.");
 		log(`  Clone it beside this repo to gate it locally: git clone ${CORPORA_URL} ${CORPORA_ROOT}`);
 		return 0;
+	}
+	if (!(await deps.corpora.exists(CORPORA_TREE))) {
+		log(
+			`Error: a ${CORPORA_ROOT} checkout is present but holds no ${CORPORA_TREE}/, the snapshot this leg grades — ` +
+				`${BROKEN_CHECKOUT} to skip the leg.`
+		);
+		return 1;
 	}
 
 	const dirty = await git(deps.git, corpora, ['status', '--porcelain', '--', CORPORA_TREE]);

@@ -31,19 +31,23 @@
  * wherever it occurs and a smaller corpus cannot silently soften a verdict — the only thing
  * absence costs is coverage, stated on stdout rather than assumed.
  *
- * A *partial* checkout is different and says so: if `../prettier` exists but a listed suite
- * does not, that is a broken checkout rather than a machine without one.
+ * A present checkout is different: if `../prettier` exists but a listed suite does not, that
+ * is a broken checkout rather than a machine without one. Missing some suites, it says which
+ * and audits the rest; missing all of them, it says so and exits 1, since it has nothing to
+ * grade.
  *
  * ## Reach
  *
  * The `../prettier` checkout, read-only, opened by its path, so one that is a symlink to a
- * directory elsewhere is followed (whether the suites are there), and `cargo`, which runs the
+ * directory elsewhere is followed (whether it and the suites are there), and `cargo`, which runs the
  * audit in the checkout with its output inherited
  * (`RoundtripAuditPrettierDeps`, built by `scripts/roots/roundtrip_audit_prettier.ts`).
  */
 
 import type { FsReadDir } from '@fuzdev/gro/fs.ts';
 import type { SpawnProgram } from '@fuzdev/gro/spawn.ts';
+
+import { BROKEN_CHECKOUT } from './sibling_text.ts';
 
 /** The Prettier checkout beside this one, as every path into it spells it. */
 export const PRETTIER_CHECKOUT = '../prettier';
@@ -76,21 +80,31 @@ export interface RoundtripAuditPrettierDeps {
 	/** The checkout, cargo's working directory. */
 	checkout: FsReadDir;
 	/**
-	 * The `../prettier` checkout (`PRETTIER_CHECKOUT`), read for each suite's presence alone, by
-	 * its path beneath the checkout; an absent checkout holds no suite.
+	 * The `../prettier` checkout (`PRETTIER_CHECKOUT`): its handle, or `null` when it is absent,
+	 * and each suite's presence, by its path beneath the checkout.
 	 */
-	prettier: { exists(path: string): Promise<boolean> };
+	prettier: { open(): Promise<FsReadDir | null>; exists(path: string): Promise<boolean> };
 	/** `cargo`, its output inherited. */
 	cargo: SpawnProgram;
 }
 
 /**
  * The leg.
- * @returns the audit's own exit code, `0` when no suite is present
+ * @returns the audit's own exit code, `0` when there is no checkout, `1` when a present one holds
+ * none of the suites
  */
 export async function run_roundtrip_audit_prettier(
 	deps: RoundtripAuditPrettierDeps
 ): Promise<number> {
+	if ((await deps.prettier.open()) === null) {
+		log(
+			`⚠ roundtrip:audit:prettier NOT RUN — no ${PRETTIER_CHECKOUT} checkout (${PRETTIER_ROUNDTRIP_SUITES.length} suites skipped).`
+		);
+		log('  This leg is the only one in `check` that reaches non-format-stable inputs.');
+		log('  Clone prettier beside this repo (see `npm run doctor`) to gate it locally.');
+		return 0;
+	}
+
 	const present: string[] = [];
 	for (const suite of PRETTIER_ROUNDTRIP_SUITES) {
 		if (await deps.prettier.exists(suite.slice(`${PRETTIER_CHECKOUT}/`.length)))
@@ -99,11 +113,9 @@ export async function run_roundtrip_audit_prettier(
 
 	if (present.length === 0) {
 		log(
-			`⚠ roundtrip:audit:prettier NOT RUN — no ../prettier checkout (${PRETTIER_ROUNDTRIP_SUITES.length} suites skipped).`
+			`Error: a ${PRETTIER_CHECKOUT} checkout is present but holds none of the suites this leg grades (${PRETTIER_ROUNDTRIP_SUITES.join(', ')}) — ${BROKEN_CHECKOUT} to skip the leg.`
 		);
-		log('  This leg is the only one in `check` that reaches non-format-stable inputs.');
-		log('  Clone prettier beside this repo (see `npm run doctor`) to gate it locally.');
-		return 0;
+		return 1;
 	}
 
 	// Present-but-incomplete is a broken checkout, not a machine without one — say so, and

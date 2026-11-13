@@ -1,6 +1,7 @@
 /**
- * `discovery_audit.ts`' grading over fakes: an absent snapshot passes unrun, a modified one is
- * refused before tsv runs, and git and tsv each run where the audit says.
+ * `discovery_audit.ts`' grading over fakes: an absent checkout passes unrun, a present one
+ * without the snapshot fails unrun, a modified snapshot is refused before tsv runs, and git and
+ * tsv each run where the audit says.
  */
 
 import { deepStrictEqual, strictEqual } from 'node:assert';
@@ -41,8 +42,9 @@ const corpora_reads = (present: boolean) => ({
 	exists: async (path: string) => present && path === 'collections'
 });
 
-test('an absent snapshot passes without running git or tsv', async () => {
-	vi.spyOn(console, 'error').mockImplementation(() => undefined);
+test('an absent checkout passes without running git or tsv, saying so', async () => {
+	const lines: Array<string> = [];
+	vi.spyOn(console, 'error').mockImplementation((line: string) => void lines.push(line));
 	const git = fake_program(() => ({ stdout: '', code: 0 }));
 	const tsv = fake_program(() => ({ stdout: '', code: 0 }));
 	const code = await run_discovery_audit({
@@ -52,6 +54,7 @@ test('an absent snapshot passes without running git or tsv', async () => {
 		tsv: tsv.program
 	});
 	deepStrictEqual([code, git.calls.length, tsv.calls.length], [0, 0, 0]);
+	strictEqual(lines[0], '⚠ discovery:audit NOT RUN — no ../corpora checkout.');
 });
 
 test('a modified snapshot is refused before tsv runs', async () => {
@@ -91,5 +94,23 @@ test('git lists the snapshot in it, tsv lists it from the checkout, and agreemen
 	});
 	deepStrictEqual(tsv.calls, [
 		{ args: ['format', '--list', '../corpora/collections'], cwd: checkout }
+	]);
+});
+
+test('a present checkout without the snapshot fails, naming what it lacks, without running git or tsv', async () => {
+	const lines: Array<string> = [];
+	vi.spyOn(console, 'error').mockImplementation((line: string) => void lines.push(line));
+	const git = fake_program(() => ({ stdout: '', code: 0 }));
+	const tsv = fake_program(() => ({ stdout: '', code: 0 }));
+	const code = await run_discovery_audit({
+		checkout,
+		corpora: { open: async () => corpora, exists: async () => false },
+		git: git.program,
+		tsv: tsv.program
+	});
+	deepStrictEqual([code, git.calls.length, tsv.calls.length], [1, 0, 0]);
+	deepStrictEqual(lines, [
+		'Error: a ../corpora checkout is present but holds no collections/, the snapshot this leg grades — ' +
+			'a broken checkout, not a machine without one; repair it, or remove it to skip the leg.'
 	]);
 });

@@ -187,8 +187,12 @@ npm run test:node        # vitest under Node over the suites beside their module
 #                          `pgo/bench_test.ts` — build:bench:pgo over a temp checkout and a fake `node` playing the
 #                          pipeline (its argv and cwd, the copies' bytes and modes, the stamp, each refusal);
 #                          `cargo_env_test.ts` — what reaches
-#                          a script's cargo; `check_canonical_pins_test.ts` — pins:audit's mode flags, its no-git path, and
-#                          where its git runs; `discovery_audit_test.ts` — what discovery:audit hands git and tsv;
+#                          a script's cargo; `check_canonical_pins_test.ts` — pins:audit's mode flags, its no-git path,
+#                          where its git runs, a present checkout's unreadable version file failing it and git failing
+#                          in one warning; `discovery_audit_test.ts` —
+#                          what discovery:audit hands git and tsv, and a present checkout without the snapshot failing it;
+#                          `roundtrip_audit_prettier_test.ts` — roundtrip:audit:prettier's absent, suiteless and partial
+#                          checkouts, what it hands cargo, and a cargo a signal ended;
 #                          `roots/checkout_test.ts` — a sibling checkout that is a symlink followed, a dangling one
 #                          absent, a link beneath one never followed out, over real symlinks, through each tool
 #                          that reads one (audit:corpus, roundtrip:audit:prettier, discovery:audit, pins:audit:checkouts);
@@ -302,7 +306,8 @@ npm run pins:lock                    # REGENERATE the sidecar lock (crates/tsv_d
 #                                      whether npm would change the lock. Not a gate. `--allow-fresh` passes the .npmrc's
 #                                      `min-release-age`, needed ONLY for a version published in the last day
 npm run pins:audit:checkouts         # checkout ALIGNMENT (an environment fact): a PRESENT ../svelte or ../acorn-typescript
-#                                      must match its pin (absent → skipped; commit drift warns). Gates in `npm run
+#                                      must match its pin (absent → skipped; a present one whose version file can't be read
+#                                      FAILS; commit drift, or git failing in a present one, warns). Gates in `npm run
 #                                      conformance`, reported by doctor — NOT in check (nothing there reads the checkouts)
 npm run format:audit                 # `tsv format --check .`; fails on a would-change file (exit 1) OR a parse error (exit 2)
 npm run docs:audit                   # rustdoc `[link]`s resolve (doc lints DENIED, private items, `--all-features`); a dead link is a STALE DOC
@@ -328,10 +333,12 @@ npm run roundtrip:audit              # format(tests/fixtures) must reparse with 
 #                                      template text) — zero-tolerance; names a dropped element where the skeleton compare only
 #                                      reported it as divergent. Pure Rust; real yield on external corpora
 npm run roundtrip:audit:prettier     # the same over the pinned prettier suites — `check`'s ONLY non-format-stable corpus, so
-#                                      the only leg there reaching a valid→unreparseable regression. Warn-skips without ../prettier
+#                                      the only leg there reaching a valid→unreparseable regression. Warn-skips without ../prettier;
+#                                      fails on a present one holding none of the suites
 npm run discovery:audit              # `tsv format --list ../corpora/collections` must name EXACTLY the snapshot's committed files
 #                                      in tsv's extensions (the corpus is the snapshot's tree, so a discovery prune can't silently
-#                                      shrink every consumer's corpus). Refuses a dirty checkout; warn-skips without ../corpora
+#                                      shrink every consumer's corpus). Refuses a dirty checkout; warn-skips without ../corpora;
+#                                      fails on a present one without collections/
 npm run check:loc                    # `loc` CROSS-GRADE: tsv's loc wire must deep-equal the shipped `locations.js` reconstruction
 #                                      of its span-only wire over every fixture input (one `tsv_debug loc_wires` process) — the
 #                                      only `check` leg grading `locations.js`; the Rust loc wire is graded by `tests/loc_definition.rs`
