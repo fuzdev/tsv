@@ -16,7 +16,7 @@ use tsv_lang::source_scan::skip_comment;
 /// `{` opens the body) or an else-if (prettier's `adjustClause` with `forceSpace`). Every
 /// other alternate takes the clause rule the consequent does — on the `else`'s line when it
 /// fits flat, dropped below it and indented when it breaks.
-fn is_else_line_alternate(stmt: &Statement<'_>) -> bool {
+fn is_else_line_alternate(stmt: &Statement) -> bool {
     matches!(
         &stmt.kind,
         StatementKind::BlockStatement(_) | StatementKind::IfStatement(_)
@@ -30,7 +30,7 @@ impl<'a> Printer<'a> {
     /// consequent uses (see `build_adjust_clause_with_comments`), never a bare hardline. The
     /// caller emits the bare `else` (no trailing space); the leading `line` supplies the
     /// separator when flat.
-    fn build_else_adjust_clause(&self, alternate: &Statement<'_>, ctx: StatementContext) -> DocId {
+    fn build_else_adjust_clause(&self, alternate: &Statement, ctx: StatementContext) -> DocId {
         let d = self.d();
         // One indent wrap; nothing continues after the alternate, so its tail falls
         // through to whatever flushes the if's own position.
@@ -45,11 +45,7 @@ impl<'a> Printer<'a> {
     /// Callers that introduce the branch across a gap want [`Self::build_branch_body_doc`],
     /// the freeze-aware wrapper; this bare form is for the gaps that provably hold no comment
     /// (and so no directive).
-    fn build_branch_statement_doc(
-        &self,
-        body: &Statement<'_>,
-        body_ctx: StatementContext,
-    ) -> DocId {
+    fn build_branch_statement_doc(&self, body: &Statement, body_ctx: StatementContext) -> DocId {
         match &body.kind {
             StatementKind::BlockStatement(block) => {
                 self.build_block_statement_expand_empty_doc(block)
@@ -64,7 +60,7 @@ impl<'a> Printer<'a> {
     fn build_branch_body_doc(
         &self,
         gap_start: u32,
-        body: &Statement<'_>,
+        body: &Statement,
         body_ctx: StatementContext,
     ) -> DocId {
         self.build_statement_head_doc(gap_start, body, || {
@@ -104,7 +100,7 @@ impl<'a> Printer<'a> {
     fn append_else_gap_and_body(
         &self,
         parts: &mut DocBuf,
-        alternate: &Statement<'_>,
+        alternate: &Statement,
         else_end: u32,
         leading_space: bool,
         ctx: StatementContext,
@@ -144,7 +140,7 @@ impl<'a> Printer<'a> {
     fn append_else_keyword_body(
         &self,
         parts: &mut DocBuf,
-        alternate: &Statement<'_>,
+        alternate: &Statement,
         leading_space: bool,
         ctx: StatementContext,
     ) {
@@ -179,7 +175,7 @@ impl<'a> Printer<'a> {
     fn append_else_clause(
         &self,
         parts: &mut DocBuf,
-        alternate: &Statement<'_>,
+        alternate: &Statement,
         else_end: Option<u32>,
         leading_space: bool,
         ctx: StatementContext,

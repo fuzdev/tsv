@@ -60,7 +60,7 @@ pub(crate) enum ModuleItemContext {
     NamespaceBody,
 }
 
-impl<'a, 'arena> Parser<'a, 'arena> {
+impl<'a> Parser<'a> {
     /// Parse a `ModuleItem`: an import/export declaration or any
     /// `StatementListItem`. Import/export declarations are valid only here — at the
     /// module top level (`parse`'s loop) and inside a TS `namespace`/`module` body, as
@@ -72,7 +72,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(crate) fn parse_module_item(
         &mut self,
         context: ModuleItemContext,
-    ) -> Result<Statement<'arena>, Error> {
+    ) -> Result<Statement, Error> {
         // A module item is a statement boundary, and `export` / `import` return below
         // without reaching `parse_statement_at`, which is where every other statement
         // ends the `<` regions of the one before it (`Parser::lt_regions_statement_base`).
@@ -130,7 +130,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// A statement is one wire level of the depth limit's nesting count, which a list of
     /// them counts once ([`Parser::statement_list`]) and [`Parser::parse_nested_statement`]
     /// counts for the one statement it takes.
-    pub(crate) fn parse_statement(&mut self) -> Result<Statement<'arena>, Error> {
+    pub(crate) fn parse_statement(&mut self) -> Result<Statement, Error> {
         self.parse_statement_at(StatementPosition::List, None)
     }
 
@@ -143,7 +143,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// with no declaration to compete with, `let` is the `IdentifierReference` its own
     /// production admits, and ASI closes the statement at it. acorn spells the same fork
     /// as the `context` parameter of `parseStatement` / `isLet`.
-    pub(super) fn parse_nested_statement(&mut self) -> Result<Statement<'arena>, Error> {
+    pub(super) fn parse_nested_statement(&mut self) -> Result<Statement, Error> {
         // one wire level: the statement (see `Parser::parse_statement`)
         self.nested(1, |p| p.parse_statement_at(StatementPosition::Single, None))
     }
@@ -155,7 +155,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         position: StatementPosition,
         module_item: Option<ModuleItemContext>,
-    ) -> Result<Statement<'arena>, Error> {
+    ) -> Result<Statement, Error> {
         // A `<` region dies at a statement boundary: what came before this statement —
         // an earlier statement, or the head this one is the body of — cannot reach a
         // `>` in it (`Parser::lt_regions_statement_base`).
@@ -461,7 +461,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ///
     /// Captures the start position before parsing so the span includes any
     /// surrounding parens: `('hello');` → span starts at `(`, not `'`.
-    fn parse_expression_statement(&mut self) -> Result<Statement<'arena>, Error> {
+    fn parse_expression_statement(&mut self) -> Result<Statement, Error> {
         let start = self.current_pos().0 as u32;
         // a bare assignment as the statement prints bare ([`Parser::self_pair`])
         // (a bare sequence takes a pair, `(a, b);`, counted as it is built)
@@ -507,7 +507,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// directive prologue is a handful of short literals.
     pub(super) fn note_directive(
         &mut self,
-        stmt: &mut Statement<'arena>,
+        stmt: &mut Statement,
         prologue: ListMark<StmtId>,
     ) -> Result<bool, Error> {
         let stmt_start = stmt.span.start;
@@ -547,7 +547,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// carries now that the body has turned strict, if it carries one. The literal's token
     /// is long gone, so the question is asked of its raw source — the same walk the
     /// string-literal seam runs (`Parser::legacy_escape_error`).
-    fn directive_legacy_escape_error(&self, stmt: &Statement<'arena>) -> Option<Error> {
+    fn directive_legacy_escape_error(&self, stmt: &Statement) -> Option<Error> {
         let StatementKind::ExpressionStatement(expr_stmt) = &stmt.kind else {
             return None;
         };

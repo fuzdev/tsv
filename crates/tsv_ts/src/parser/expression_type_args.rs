@@ -223,7 +223,7 @@ impl TypeArgScan {
     }
 }
 
-impl<'a, 'arena> Parser<'a, 'arena> {
+impl<'a> Parser<'a> {
     /// Check if current position starts type arguments: `<Type, ...>`
     ///
     /// Uses lookahead to distinguish from the comparison operator, dispatching on the

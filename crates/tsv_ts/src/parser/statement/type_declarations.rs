@@ -19,8 +19,8 @@ fn module_body_end<'a>(view: AstView<'a>, body: &TSModuleDeclarationBody) -> u32
     }
 }
 
-impl<'a, 'arena> Parser<'a, 'arena> {
-    pub(super) fn parse_type_alias_declaration(&mut self) -> Result<Statement<'arena>, Error> {
+impl<'a> Parser<'a> {
+    pub(super) fn parse_type_alias_declaration(&mut self) -> Result<Statement, Error> {
         let (start, _) = self.current_pos();
 
         // Consume 'type' contextual keyword
@@ -34,7 +34,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     fn parse_type_alias_declaration_with_start(
         &mut self,
         start: usize,
-    ) -> Result<Statement<'arena>, Error> {
+    ) -> Result<Statement, Error> {
         // Consume 'type' contextual keyword
         debug_assert_eq!(self.current_value(), "type");
         self.advance()?;
@@ -48,7 +48,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(super) fn parse_type_alias_declaration_inner(
         &mut self,
         type_start: usize,
-    ) -> Result<Statement<'arena>, Error> {
+    ) -> Result<Statement, Error> {
         self.parse_type_alias_declaration_body(type_start, false)
     }
 
@@ -57,7 +57,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         start: usize,
         declare: bool,
-    ) -> Result<Statement<'arena>, Error> {
+    ) -> Result<Statement, Error> {
         // Parse type name — a `BindingIdentifier`, so contextual type keywords
         // (`type any = …`) are valid names, matching acorn/tsc.
         let Some(id) = self.take_binding_identifier()? else {
@@ -93,16 +93,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     //
 
     /// Parse interface declaration: `interface Foo { ... }` or `interface Foo extends Bar { ... }`
-    pub(super) fn parse_interface_declaration(&mut self) -> Result<Statement<'arena>, Error> {
+    pub(super) fn parse_interface_declaration(&mut self) -> Result<Statement, Error> {
         let start = self.current_pos().0;
         self.parse_interface_declaration_body(start, false)
     }
 
     /// Parse interface declaration with an external start position (for `declare interface`)
-    fn parse_interface_declaration_with_start(
-        &mut self,
-        start: usize,
-    ) -> Result<Statement<'arena>, Error> {
+    fn parse_interface_declaration_with_start(&mut self, start: usize) -> Result<Statement, Error> {
         self.parse_interface_declaration_body(start, true)
     }
 
@@ -111,7 +108,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         start: usize,
         declare: bool,
-    ) -> Result<Statement<'arena>, Error> {
+    ) -> Result<Statement, Error> {
         let decl = self.parse_interface_declaration_struct(start, declare)?;
         let (span, decl) =
             push_spanned(&mut self.stores.payloads.interface_decls, decl, |x| x.span);
@@ -125,7 +122,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         start: usize,
         declare: bool,
-    ) -> Result<TSInterfaceDeclaration<'arena>, Error> {
+    ) -> Result<TSInterfaceDeclaration, Error> {
         // Consume 'interface' contextual keyword
         debug_assert_eq!(self.current_value(), "interface");
         self.advance()?;
@@ -258,7 +255,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     //
 
     /// Parse declare statement: `declare function`, `declare class`, `declare enum`, `declare const enum`, `declare namespace`, `declare global`, `declare var/let/const`
-    pub(super) fn parse_declare_statement(&mut self) -> Result<Statement<'arena>, Error> {
+    pub(super) fn parse_declare_statement(&mut self) -> Result<Statement, Error> {
         let start = self.current_pos().0;
 
         // Consume 'declare' contextual keyword
@@ -278,7 +275,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     /// The post-`declare` dispatch, run inside ambient context.
-    fn parse_declare_statement_kind(&mut self, start: usize) -> Result<Statement<'arena>, Error> {
+    fn parse_declare_statement_kind(&mut self, start: usize) -> Result<Statement, Error> {
         if self.had_line_terminator {
             // `declare [no LineTerminator here] <declaration>`, uniform across all eight
             // heads below. The statement path decides this one token earlier
@@ -396,7 +393,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     /// Parse declare variable: `declare const x: T;`, `declare let x: T;`, `declare var x: T;`
-    fn parse_declare_variable(&mut self, start: usize) -> Result<Statement<'arena>, Error> {
+    fn parse_declare_variable(&mut self, start: usize) -> Result<Statement, Error> {
         // Parse as a variable declaration but mark as declare
         let decl = self.parse_variable_declaration()?;
         let Statement {
@@ -432,11 +429,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// which is also what makes this position agree with every other one: the same
     /// bodiless `function*` signature already parses inside a `declare namespace`, a
     /// `declare global` and an overload set.
-    fn parse_declare_function(
-        &mut self,
-        start: usize,
-        is_async: bool,
-    ) -> Result<Statement<'arena>, Error> {
+    fn parse_declare_function(&mut self, start: usize, is_async: bool) -> Result<Statement, Error> {
         // Consume 'function' keyword
         self.advance()?;
 
@@ -491,7 +484,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Asked twice per return type, once to decide whether an ordinary predicate
     /// outranks a leading `asserts` and once to take the name, so the set they agree on
     /// is spelled here rather than at each.
-    fn try_type_predicate_subject(&mut self) -> Option<IdentName<'arena>> {
+    fn try_type_predicate_subject(&mut self) -> Option<IdentName> {
         self.try_ident_or_contextual_name()
             .or_else(|| self.this_as_name())
     }
@@ -627,11 +620,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// `implements`) and the ambient body are handled by the same code as a
     /// concrete class — no parallel parser to drift. The caller has already
     /// consumed `declare` (and `abstract`); the current token is `class`.
-    fn parse_declare_class(
-        &mut self,
-        start: usize,
-        is_abstract: bool,
-    ) -> Result<Statement<'arena>, Error> {
+    fn parse_declare_class(&mut self, start: usize, is_abstract: bool) -> Result<Statement, Error> {
         let class =
             self.parse_class_declaration_inner_with_start(true, is_abstract, start, true)?;
         let (span, class) = push_spanned(&mut self.stores.payloads.class_decls, class, |x| x.span);
@@ -647,10 +636,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// This wrapper handles the non-ambient forms (`enum`, `const enum`); the
     /// `declare` forms are parsed via `parse_enum_declaration_with_start` from
     /// `parse_declare_statement_kind`.
-    pub(super) fn parse_enum_declaration(
-        &mut self,
-        is_const: bool,
-    ) -> Result<Statement<'arena>, Error> {
+    pub(super) fn parse_enum_declaration(&mut self, is_const: bool) -> Result<Statement, Error> {
         let start = self.current_pos().0;
         self.parse_enum_declaration_with_start(is_const, false, start)
     }
@@ -660,7 +646,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         is_const: bool,
         is_declare: bool,
         start: usize,
-    ) -> Result<Statement<'arena>, Error> {
+    ) -> Result<Statement, Error> {
         // Consume 'const' if present
         if is_const {
             self.expect(&TokenKind::Keyword(KeywordKind::Const))?;
@@ -721,7 +707,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     /// Parse a single enum member: `A`, `A = 1`, `A = "value"`, `"computed" = 1`
-    fn parse_enum_member(&mut self) -> Result<TSEnumMember<'arena>, Error> {
+    fn parse_enum_member(&mut self) -> Result<TSEnumMember, Error> {
         let start = self.current_pos().0;
 
         // Parse member id: a `PropertyName` — identifier, keyword, or string
@@ -790,7 +776,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ///
     /// The `declare` forms are parsed via `parse_module_declaration_with_start`
     /// from `parse_declare_statement_kind`.
-    pub(super) fn parse_module_declaration(&mut self) -> Result<Statement<'arena>, Error> {
+    pub(super) fn parse_module_declaration(&mut self) -> Result<Statement, Error> {
         let start = self.current_pos().0;
         self.parse_module_declaration_with_start(false, start)
     }
@@ -799,7 +785,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         declare: bool,
         start: usize,
-    ) -> Result<Statement<'arena>, Error> {
+    ) -> Result<Statement, Error> {
         // Capture which keyword was used: 'namespace' or 'module'
         debug_assert!(
             matches!(self.current_kind(), TokenKind::Identifier)
@@ -903,7 +889,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         start: usize,
         declare: bool,
-    ) -> Result<Statement<'arena>, Error> {
+    ) -> Result<Statement, Error> {
         // Consume 'global' keyword
         debug_assert_eq!(self.current_value(), "global");
         let (global_start, global_end) = self.current_pos();
@@ -944,10 +930,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     fn parse_nested_module_declaration(
         &mut self,
         start: u32,
-        outer_id: Identifier<'arena>,
+        outer_id: Identifier,
         declare: bool,
         kind: TSModuleDeclarationKind,
-    ) -> Result<Statement<'arena>, Error> {
+    ) -> Result<Statement, Error> {
         self.advance()?; // consume '.'
 
         // Parse the inner declaration recursively
@@ -982,7 +968,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         start: u32,
         kind: TSModuleDeclarationKind,
-    ) -> Result<TSModuleDeclaration<'arena>, Error> {
+    ) -> Result<TSModuleDeclaration, Error> {
         // Parse namespace name (identifier or contextual type keyword for nested
         // parts, e.g. the `number` in `namespace a.number {}`).
         let Some(id) = self.take_binding_identifier()? else {

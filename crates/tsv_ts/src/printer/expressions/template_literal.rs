@@ -263,7 +263,7 @@ impl<'a> Printer<'a> {
     /// (`${(/* c */ a.b.c())?.d⏎}`), but which a re-emitted pair holds
     /// (`${(/* c */ a + b).m⏎}` keeps the block behind the member object's `(`, where it
     /// occupies nothing at the interpolation's edge).
-    fn interpolation_leading_comment_on_page(&self, gap_start: u32, expr: &Expression<'_>) -> bool {
+    fn interpolation_leading_comment_on_page(&self, gap_start: u32, expr: &Expression) -> bool {
         let start = expr.span().start;
         if self.has_comments_on_page_between(gap_start, start) {
             return true;
@@ -388,7 +388,7 @@ impl<'a> Printer<'a> {
     /// which no emitter's collect reports. See `docs/comments.md` §The three axes.
     fn is_template_softline_expression(
         view: AstView<'_>,
-        expr: &Expression<'_>,
+        expr: &Expression,
         has_comment_on_page: bool,
     ) -> bool {
         if has_comment_on_page {

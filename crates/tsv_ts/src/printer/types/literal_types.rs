@@ -71,7 +71,7 @@ impl<'a> Printer<'a> {
     /// (delimiters excluded), so `raw_span.end` is its start — an anchor that ignores both
     /// an escaped `\${` inside the quasi and a `${` buried in a trailing comment (a raw
     /// `rfind` matched the latter and dropped the comment between `${` and the type).
-    fn interp_dollar_brace_end(quasi: &TemplateElement<'_>) -> u32 {
+    fn interp_dollar_brace_end(quasi: &TemplateElement) -> u32 {
         quasi.raw_span.end + "${".len() as u32
     }
 
@@ -152,11 +152,7 @@ impl<'a> Printer<'a> {
     /// the value owns its own comment break) measures the very gap this widening moves: read
     /// unwidened there, the gate saw a comment-free `${`→`(` gap and dropped the template
     /// below the `=`, where the next pass — the shell gone — hugged it.
-    fn interp_type_and_freeze<'t>(
-        &self,
-        dollar_brace_end: u32,
-        t: &'t TSType<'t>,
-    ) -> (&'t TSType<'t>, bool)
+    fn interp_type_and_freeze<'t>(&self, dollar_brace_end: u32, t: &'t TSType) -> (&'t TSType, bool)
     where
         'a: 't,
     {
@@ -185,7 +181,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for a literal type
-    pub(super) fn build_literal_type_doc(&self, lit: &TSLiteralType<'_>) -> DocId {
+    pub(super) fn build_literal_type_doc(&self, lit: &TSLiteralType) -> DocId {
         let d = self.d();
         match lit {
             TSLiteralType::TemplateLiteral(template) => {

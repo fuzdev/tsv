@@ -136,8 +136,8 @@ impl<'a> Printer<'a> {
     fn build_assignment_tag_doc(
         &self,
         prefix: &'static str,
-        id: &Expression<'_>,
-        init: &Expression<'_>,
+        id: &Expression,
+        init: &Expression,
         span: Span,
     ) -> DocId {
         let d = self.d();
@@ -345,7 +345,7 @@ impl<'a> Printer<'a> {
     /// that appear in @const tags, delegating to tsv_ts's predicates so the
     /// rules can't drift from our own assignment printer.
     /// Prettier ref: `shouldBreakAfterOperator` (assignment.js)
-    fn const_should_break_after_op(view: AstView<'_>, expr: &Expression<'_>) -> bool {
+    fn const_should_break_after_op(view: AstView<'_>, expr: &Expression) -> bool {
         match &expr.kind {
             // Binary expressions break after `=`, UNLESS it's a logical expression
             // with an inlinable RHS (non-empty object/array). In that case, the
@@ -388,7 +388,7 @@ impl<'a> Printer<'a> {
     /// builder runs before that choice is applied, so it cannot answer the question itself.
     fn build_const_init_doc(
         &self,
-        expr: &Expression<'_>,
+        expr: &Expression,
         span_start: u32,
         span_end: u32,
         frozen: bool,
@@ -457,7 +457,7 @@ impl<'a> Printer<'a> {
     /// pre-comma comment (`{@debug x /* c */, y}`) falls through both
     /// per-identifier buckets and is dropped.
     pub(super) fn build_debug_tag_doc(&self, tag: &ast::DebugTag) -> DocId {
-        let identifiers: Vec<&Expression<'_>> = self
+        let identifiers: Vec<&Expression> = self
             .view
             .list(tag.identifiers)
             .iter()

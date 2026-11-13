@@ -57,7 +57,7 @@ fn array_pattern_gap_end(
 
 /// Check if an arrow function has a nested arrow function as its body
 /// Used for chain-tail-arrow-chain detection: `(x) => (y) => x + y`
-fn is_nested_arrow_function(view: AstView<'_>, expr: &Expression<'_>) -> bool {
+fn is_nested_arrow_function(view: AstView<'_>, expr: &Expression) -> bool {
     if let &ExpressionKind::ArrowFunctionExpression(arrow) = &expr.kind
         && let ArrowFunctionBody::Expression(body_expr) = &view.arrow_fn(arrow).body
     {
@@ -500,7 +500,7 @@ impl<'a> Printer<'a> {
     /// compound left the literal it was written as, methods and accessors included; only
     /// the layout follows the pattern. The one entry the role has: the compound
     /// assignment's left, and the literal's own builders as they recurse.
-    pub(in crate::printer) fn build_compound_target_doc(&self, expr: &Expression<'_>) -> DocId {
+    pub(in crate::printer) fn build_compound_target_doc(&self, expr: &Expression) -> DocId {
         let doc = match &expr.kind {
             ExpressionKind::ObjectExpression(obj) => {
                 self.build_object_doc_as(obj, expr.span, LiteralRole::CompoundTarget)
@@ -1917,7 +1917,7 @@ impl Printer<'_> {
     /// that break propagates too), or an own-line comment in a rest's stripped parens. The
     /// `: T` tail is not the pattern's — the twin's annotation breaks on its own — and neither
     /// is a blank line, which only a comment-broken pattern keeps.
-    pub(crate) fn block_pattern_comment_breaks(&self, expr: &Expression<'_>) -> bool {
+    pub(crate) fn block_pattern_comment_breaks(&self, expr: &Expression) -> bool {
         let (span, body_end) = match &expr.kind {
             ExpressionKind::ObjectPattern(obj) => {
                 (expr.span, self.object_pattern_tail(obj, expr.span).body_end)
@@ -1947,7 +1947,7 @@ impl Printer<'_> {
     /// The own-line half of [`Self::block_pattern_comment_breaks`], recursing into every
     /// pattern nested in `expr` — the nested pattern's own expansion is what the twin
     /// propagates out.
-    fn pattern_own_line_block_breaks(&self, expr: &Expression<'_>) -> bool {
+    fn pattern_own_line_block_breaks(&self, expr: &Expression) -> bool {
         match &expr.kind {
             ExpressionKind::ObjectPattern(obj) if !obj.properties.is_empty() => {
                 let boundary = self.object_pattern_tail(obj, expr.span).body_end;
@@ -2018,7 +2018,7 @@ impl Printer<'_> {
     /// longer on its own line — so an own-line key read on the second pass returned the
     /// pattern to one line. A value that breaks with no comment in it (an arrow's block body,
     /// an object the author opened) is still the rule a block pattern does not take.
-    fn default_value_comment_breaks(&self, value: &Expression<'_>) -> bool {
+    fn default_value_comment_breaks(&self, value: &Expression) -> bool {
         let span = value.span();
         self.has_comments_on_page_between(span.start, span.end)
             && self.d().will_break(self.build_expression_doc(value))
@@ -2028,7 +2028,7 @@ impl Printer<'_> {
     /// expanded object or array pattern, `: T` tail included, with the owned comment glued
     /// ahead of its opening delimiter claimed here, since this reaches past
     /// `build_expression_doc`. Asked only once [`Self::block_pattern_comment_breaks`] holds.
-    pub(crate) fn build_block_pattern_broken_doc(&self, expr: &Expression<'_>) -> DocId {
+    pub(crate) fn build_block_pattern_broken_doc(&self, expr: &Expression) -> DocId {
         let doc = match &expr.kind {
             // An empty pattern holds only a dangling run, which the twin's empty-brace builder
             // opens around a `//` itself.

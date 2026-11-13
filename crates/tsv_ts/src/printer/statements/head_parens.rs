@@ -28,10 +28,7 @@ use tsv_lang::Span;
 /// (parentheses/identifier.js): unlike `leftmost_no_lookahead` it does NOT descend
 /// through member/call heads (`type.foo` is unambiguous), so it fires only for a
 /// bare-identifier operand of a cast chain.
-fn strip_statement_casts<'a>(
-    view: AstView<'a>,
-    expr: &'a Expression<'a>,
-) -> Option<&'a Expression<'a>> {
+fn strip_statement_casts<'a>(view: AstView<'a>, expr: &'a Expression) -> Option<&'a Expression> {
     let mut cur = expr;
     let mut stripped = false;
     loop {
@@ -131,7 +128,7 @@ impl<'a> Printer<'a> {
     /// same division opens on the keyword and takes the shell.
     pub(in crate::printer::statements) fn expr_stmt_nested_paren_target(
         &self,
-        expression: &Expression<'_>,
+        expression: &Expression,
         text: LeftmostText,
     ) -> Option<Span> {
         let reached = leftmost_no_lookahead_reached(self.view, expression, text);
@@ -158,7 +155,7 @@ impl<'a> Printer<'a> {
     /// it a word that would open a declaration at the caller's position — or `None`.
     fn cast_head_keyword_target(
         &self,
-        expression: &Expression<'_>,
+        expression: &Expression,
         is_ambiguous: fn(&str) -> bool,
     ) -> Option<Span> {
         match strip_statement_casts(self.view, expression) {
@@ -190,7 +187,7 @@ impl<'a> Printer<'a> {
     /// wider [`Printer::for_in_of_let_head_target`] instead).
     pub(in crate::printer) fn let_bracket_head_target(
         &self,
-        expression: &Expression<'_>,
+        expression: &Expression,
     ) -> Option<Span> {
         self.let_bracket_target_of(leftmost_no_lookahead_reached(
             self.view,
@@ -202,7 +199,7 @@ impl<'a> Printer<'a> {
     /// [`Self::let_bracket_head_target`] over a printed leftmost walk already taken.
     fn let_bracket_target_of(
         &self,
-        (leftmost, is_computed_member_object): (&Expression<'_>, bool),
+        (leftmost, is_computed_member_object): (&Expression, bool),
     ) -> Option<Span> {
         let ExpressionKind::Identifier(id) = &leftmost.kind else {
             return None;
@@ -215,10 +212,7 @@ impl<'a> Printer<'a> {
     /// the `let [` restriction the init shares with a statement
     /// ([`Printer::let_bracket_head_target`]), or a word heading a cast chain that would
     /// open a declaration there ([`is_for_init_ambiguous_keyword`]).
-    pub(in crate::printer) fn for_init_head_target(
-        &self,
-        expression: &Expression<'_>,
-    ) -> Option<Span> {
+    pub(in crate::printer) fn for_init_head_target(&self, expression: &Expression) -> Option<Span> {
         self.let_bracket_head_target(expression)
             .or_else(|| self.cast_head_keyword_target(expression, is_for_init_ambiguous_keyword))
     }
@@ -233,7 +227,7 @@ impl<'a> Printer<'a> {
     /// it *moves* an author's `(let.a)` onto the identifier as `(let).a`.
     pub(in crate::printer) fn for_in_of_let_head_target(
         &self,
-        expression: &Expression<'_>,
+        expression: &Expression,
     ) -> Option<Span> {
         match &leftmost_no_lookahead(self.view, expression).kind {
             ExpressionKind::Identifier(id) if self.with_ident_name(id, |name| name == "let") => {

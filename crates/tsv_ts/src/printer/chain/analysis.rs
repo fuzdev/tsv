@@ -61,7 +61,7 @@ pub(crate) struct LinearizeInput<'i> {
 #[cfg(test)]
 fn linearize_chain<'a>(
     view: AstView<'a>,
-    expr: &'a Expression<'_>,
+    expr: &'a Expression,
     input: LinearizeInput<'_>,
 ) -> ChainNodeVec<'a> {
     let mut nodes = ChainNodeVec::new();
@@ -334,7 +334,7 @@ type ParenGap = (usize, usize, u32, u32);
 /// twice.
 pub(crate) fn chain_mid_chain_paren_gaps(
     view: AstView<'_>,
-    root: &Expression<'_>,
+    root: &Expression,
     input: LinearizeInput<'_>,
 ) -> SmallVec<[(u32, u32); 2]> {
     let mut nodes = ChainNodeVec::new();
@@ -546,7 +546,7 @@ pub(crate) fn child_stops_optional_chain(
     view: AstView<'_>,
     parent_start: u32,
     parent_optional: bool,
-    child: &Expression<'_>,
+    child: &Expression,
 ) -> bool {
     !parent_optional && parent_start < child.span().start && child.has_optional_in_chain(view)
 }
@@ -574,7 +574,7 @@ pub(crate) fn child_stops_optional_chain(
 /// for as long as the trailing half was keyed on the operand's KIND instead.
 pub(crate) fn chain_paren_leading_gap(
     view: AstView<'_>,
-    expr: &Expression<'_>,
+    expr: &Expression,
     comments: &[Comment],
 ) -> Option<(u32, u32)> {
     match &expr.kind {
@@ -673,7 +673,7 @@ fn non_null_operand_paren_leading_start(
 /// start — so the base carries its leading gap and emits it inside the parens
 /// ([`chain_paren_leading_gap`]).
 fn push_sealed_chain_base<'a>(
-    child: &'a Expression<'_>,
+    child: &'a Expression,
     parent_start: u32,
     nodes: &mut ChainNodeVec<'a>,
 ) {
@@ -728,7 +728,7 @@ const CHAIN_FRAMES: u32 = 16;
 /// halves in the same order without a frame per link.
 fn linearize_spine<'a>(
     view: AstView<'a>,
-    expr: &'a Expression<'_>,
+    expr: &'a Expression,
     input: LinearizeInput<'_>,
     nodes: &mut ChainNodeVec<'a>,
     paren_gaps: &mut Vec<ParenGap>,
@@ -740,7 +740,7 @@ fn linearize_spine<'a>(
 /// the rest of the chain goes to [`linearize_spine_loop`].
 fn linearize_link<'a>(
     view: AstView<'a>,
-    expr: &'a Expression<'_>,
+    expr: &'a Expression,
     input: LinearizeInput<'_>,
     nodes: &mut ChainNodeVec<'a>,
     paren_gaps: &mut Vec<ParenGap>,
@@ -791,7 +791,7 @@ fn linearize_link<'a>(
 #[inline(never)]
 fn linearize_spine_loop<'a>(
     view: AstView<'a>,
-    expr: &'a Expression<'_>,
+    expr: &'a Expression,
     input: LinearizeInput<'_>,
     nodes: &mut ChainNodeVec<'a>,
     paren_gaps: &mut Vec<ParenGap>,
@@ -874,7 +874,7 @@ fn linearize_spine_loop<'a>(
 #[inline(always)]
 fn push_chain_base<'a>(
     view: AstView<'_>,
-    expr: &'a Expression<'_>,
+    expr: &'a Expression,
     input: LinearizeInput<'_>,
     nodes: &mut ChainNodeVec<'a>,
 ) {
@@ -895,7 +895,7 @@ enum NonNullStep<'a> {
     /// ([`finish_non_null`]).
     Finish,
     /// The operand continues the chain: walk it, then push the `!`.
-    Descend(&'a Expression<'a>),
+    Descend(&'a Expression),
 }
 
 /// The descent half of a non-null link: push what stops the walk at the operand, or hand
@@ -1013,8 +1013,8 @@ fn member_object_step<'a>(
     span: Span,
     input: LinearizeInput<'_>,
     nodes: &mut ChainNodeVec<'a>,
-) -> Option<&'a Expression<'a>> {
-    let object: &Expression<'_> = view.expr(member.object);
+) -> Option<&'a Expression> {
+    let object: &Expression = view.expr(member.object);
     if let Some(start) = member_object_paren_leading_start(view, member, span) {
         push_sealed_chain_base(object, start, nodes);
         None
@@ -1083,7 +1083,7 @@ pub(crate) fn transparent_instantiation_callee<'a>(
 pub(crate) fn transparent_callee_sealed_chain<'a>(
     view: AstView<'a>,
     call: &'a ast::CallExpression,
-) -> Option<(&'a Expression<'a>, u32)> {
+) -> Option<(&'a Expression, u32)> {
     let inst = transparent_instantiation_callee(view, call)?;
     let open = view.expr(call.callee).span().start;
     child_stops_optional_chain(view, open, false, view.expr(inst.expression))
@@ -1120,7 +1120,7 @@ fn call_callee_step<'a>(
     span: Span,
     input: LinearizeInput<'_>,
     nodes: &mut ChainNodeVec<'a>,
-) -> Option<&'a Expression<'a>> {
+) -> Option<&'a Expression> {
     let callee = view.expr(call.callee);
     if child_stops_optional_chain(view, span.start, call.optional, callee) {
         push_sealed_chain_base(callee, span.start, nodes);
@@ -1552,7 +1552,7 @@ fn should_not_wrap<'a>(
 ///
 /// Prettier ref: `isShort` in `print/member-chain.js`
 /// Uses `name.length <= options.tabWidth` (JS .length, ASCII-only in practice)
-fn is_short_name(name: IdentName<'_>, name_start: u32, printer: &Printer<'_>) -> bool {
+fn is_short_name(name: IdentName, name_start: u32, printer: &Printer<'_>) -> bool {
     printer.with_ident_name_at(name, name_start, |name| name.len() <= TAB_WIDTH)
 }
 
@@ -1562,7 +1562,7 @@ fn is_short_name(name: IdentName<'_>, name_start: u32, printer: &Printer<'_>) ->
 /// Matches Prettier's `isFactory`: `/^[A-Z]|^[$_]+$/u` (`print/member-chain.js`)
 /// - Starts with uppercase: `Object`, `React`, `Observable`
 /// - Pure `$`/`_` identifiers: `$`, `_`, `$_`, `$__` (lodash-style)
-fn is_factory_name(name: IdentName<'_>, name_start: u32, printer: &Printer<'_>) -> bool {
+fn is_factory_name(name: IdentName, name_start: u32, printer: &Printer<'_>) -> bool {
     printer.with_ident_name_at(
         name,
         name_start,
@@ -1591,7 +1591,7 @@ fn is_factory_name(name: IdentName<'_>, name_start: u32, printer: &Printer<'_>) 
 pub(crate) fn build_linearized_chain_doc(
     nodes: &mut [ChainNode<'_>],
     long_curried: bool,
-    head_expr: &Expression<'_>,
+    head_expr: &Expression,
     chain_start: u32,
     span: Span,
     printer: &Printer<'_>,
@@ -1742,7 +1742,7 @@ pub(crate) fn build_linearized_chain_doc(
 fn chain_head_comment_window(
     view: AstView<'_>,
     nodes: &[ChainNode<'_>],
-    expr: &Expression<'_>,
+    expr: &Expression,
     chain_start: u32,
 ) -> HeadWindow {
     // The innermost widened claim's end. `paren_gap_skip` is `Some` exactly on a node
@@ -1834,7 +1834,7 @@ fn widened_claim_holes(
 ///
 /// [`chain_head_comment_window`] reads this off the linearized base node instead and
 /// keeps the walk as its debug oracle (and the fallback for a node list without one).
-fn get_chain_base_start<'a>(view: AstView<'a>, mut expr: &'a Expression<'a>) -> u32 {
+fn get_chain_base_start<'a>(view: AstView<'a>, mut expr: &'a Expression) -> u32 {
     loop {
         expr = match &expr.kind {
             ExpressionKind::MemberExpression(member) => view.expr(member.object),
@@ -1867,7 +1867,7 @@ mod tests {
         arena: &'a DocArena,
         lines: &'a LineBreaks<'a>,
         comments: &'a [Comment],
-        stores: &'a ast::AstStores<'a>,
+        stores: &'a ast::AstStores,
     ) -> Printer<'a> {
         let inputs = PrinterInputs {
             source: "",
@@ -1885,10 +1885,7 @@ mod tests {
     /// Helper to create an identifier expression. Tests fabricate spans with no
     /// backing source, so the name rides the escaped channel (pool text in `stores`,
     /// resolved regardless of span).
-    fn make_identifier<'arena>(
-        stores: &mut ast::AstStores<'arena>,
-        name: &str,
-    ) -> Expression<'arena> {
+    fn make_identifier(stores: &mut ast::AstStores, name: &str) -> Expression {
         let len = name.len() as u32;
         let ident_name = IdentName {
             escaped: Some(crate::__private::push_text(stores, name)),
@@ -1899,12 +1896,12 @@ mod tests {
     }
 
     /// Helper to create a member expression: object.property
-    fn make_member<'arena>(
-        stores: &mut ast::AstStores<'arena>,
-        object: Expression<'arena>,
+    fn make_member(
+        stores: &mut ast::AstStores,
+        object: Expression,
         property_name: &str,
         object_end: u32,
-    ) -> Expression<'arena> {
+    ) -> Expression {
         let prop_name = IdentName {
             escaped: Some(crate::__private::push_text(stores, property_name)),
             raw_len: 0,
@@ -1932,11 +1929,7 @@ mod tests {
     }
 
     /// Helper to create a call expression: callee()
-    fn make_call<'arena>(
-        stores: &mut ast::AstStores<'arena>,
-        callee: Expression<'arena>,
-        callee_end: u32,
-    ) -> Expression<'arena> {
+    fn make_call(stores: &mut ast::AstStores, callee: Expression, callee_end: u32) -> Expression {
         let callee = crate::__private::push_expression(stores, callee);
         Expression {
             kind: ExpressionKind::CallExpression(CallExpression {
@@ -2092,12 +2085,12 @@ mod tests {
         }
     }
 
-    fn make_member_node<'arena>(
-        stores: &mut ast::AstStores<'arena>,
+    fn make_member_node<'a>(
+        stores: &mut ast::AstStores,
         name: &str,
         object_end: u32,
         property_start: u32,
-    ) -> ChainNode<'arena> {
+    ) -> ChainNode<'a> {
         let ident_name = IdentName {
             escaped: Some(crate::__private::push_text(stores, name)),
             raw_len: 0,
@@ -2178,7 +2171,7 @@ mod tests {
     /// link frames — or, for `None`, by [`linearize_spine_loop`] from the first link.
     fn linearized(
         view: AstView<'_>,
-        root: &Expression<'_>,
+        root: &Expression,
         input: LinearizeInput<'_>,
         frames: Option<u32>,
     ) -> String {
@@ -2192,11 +2185,7 @@ mod tests {
 
     /// Every expression a chain test walks from: each link down the spine of `expr`, and
     /// the same for every call argument and every tagged template's tag on the way.
-    fn chain_roots<'a>(
-        view: AstView<'a>,
-        expr: &'a Expression<'a>,
-        out: &mut Vec<&'a Expression<'a>>,
-    ) {
+    fn chain_roots<'a>(view: AstView<'a>, expr: &'a Expression, out: &mut Vec<&'a Expression>) {
         out.push(expr);
         match &expr.kind {
             ExpressionKind::CallExpression(call) => {

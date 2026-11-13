@@ -49,7 +49,7 @@ pub(super) fn is_module_path_no_break(call: &ast::CallExpression, printer: &Prin
 pub(super) fn get_module_path_chain_break<'a>(
     call: &'a ast::CallExpression,
     printer: &Printer<'a>,
-) -> Option<(&'a ast::Expression<'a>, &'a ast::Identifier<'a>)> {
+) -> Option<(&'a ast::Expression, &'a ast::Identifier)> {
     // Must have exactly 1 argument that is a string literal
     if call.arguments.len() != 1
         || !is_string_literal(printer.view.expr(printer.view.list(call.arguments)[0]))

@@ -184,17 +184,17 @@ pub use expressions::{
 // 4 B) in `tsv_wasm`, the crate compiled for wasm32, and `Expression`'s and `Statement`'s
 // `Option` must stay niche-packed on both.
 #[cfg(all(test, target_pointer_width = "64"))]
-const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<Expression<'static>>() == 48);
+const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<Expression>() == 48);
 #[cfg(all(test, target_pointer_width = "64"))]
-const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<ExpressionKind<'static>>() == 40);
+const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<ExpressionKind>() == 40);
 #[cfg(test)]
-const _: () = assert!(size_of::<Option<Expression<'static>>>() == size_of::<Expression<'static>>());
+const _: () = assert!(size_of::<Option<Expression>>() == size_of::<Expression>());
 #[cfg(all(test, target_pointer_width = "64"))]
-const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<Statement<'static>>() == 48);
+const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<Statement>() == 48);
 #[cfg(all(test, target_pointer_width = "64"))]
-const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<StatementKind<'static>>() == 40);
+const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<StatementKind>() == 40);
 #[cfg(test)]
-const _: () = assert!(size_of::<Option<Statement<'static>>>() == size_of::<Statement<'static>>());
+const _: () = assert!(size_of::<Option<Statement>>() == size_of::<Statement>());
 #[cfg(all(test, target_pointer_width = "64"))]
 const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<Property>() == 20);
 #[cfg(all(test, target_pointer_width = "64"))]
@@ -206,7 +206,7 @@ const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<VariableDeclarat
 #[cfg(all(test, target_pointer_width = "64"))]
 const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<SwitchCase>() == 20);
 #[cfg(all(test, target_pointer_width = "64"))]
-const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<TSType<'static>>() == 56);
+const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<TSType>() == 56);
 // The type-edge holders every type annotation, type-argument list and type-parameter list
 // rides inline in: their `Option`s fold into the id's niche and the run's, so an absent
 // annotation or list costs no width in any of the nodes that hold one.
@@ -238,9 +238,9 @@ const _: () = assert!(
 /// wrote (the parser gathers comments on the stores' comment scratch and flushes them once,
 /// so the warm binding loops never malloc for them).
 #[derive(Debug, Clone)]
-pub struct Program<'arena> {
+pub struct Program {
     pub body: Run<StmtId>,
-    pub comments: CommentList<'arena>,
+    pub comments: CommentList,
     pub span: Span,
     /// The goal symbol this program was parsed against. Drives the public AST's
     /// `sourceType` and (eventually) the goal-specific grammar gates.
@@ -260,12 +260,12 @@ pub struct Decorator {
 
 /// Literal value type - supports numbers, strings, booleans, null, and undefined
 #[derive(Debug, Clone)]
-pub enum LiteralValue<'arena> {
+pub enum LiteralValue {
     Number(f64),
     /// String literal. The decoded value is recovered via
     /// `StringCooked::resolve(span, source, view)` (no-escape = zero-copy inner slice;
     /// escaped = pool text); the quote char via `Literal::string_quote(source)`.
-    String(StringCooked<'arena>),
+    String(StringCooked),
     /// BigInt literal: `1n`, `100n`, `0xffn`. No stored payload — digits via
     /// `Literal::bigint_digits(source)` (span minus trailing `n`); the printer
     /// re-derives from source and convert reads the source slice.
@@ -280,14 +280,14 @@ pub enum LiteralValue<'arena> {
 /// value equals the inner source slice (the literal's `span` minus the two quote
 /// bytes). Only escaped strings hold text of their own, in the stores' text pool.
 #[derive(Debug, Clone)]
-pub enum StringCooked<'arena> {
+pub enum StringCooked {
     /// Decoded value == the inner source slice (no escapes to decode).
     Verbatim,
     /// Escapes were decoded into a value distinct from the raw inner text.
-    Decoded(PoolStr<'arena>),
+    Decoded(PoolStr),
 }
 
-impl<'arena> StringCooked<'arena> {
+impl StringCooked {
     /// The decoded string value. `span` is the owning [`Literal`]'s span (the
     /// quoted token); `source` is the host document. `Verbatim` slices the inner
     /// text (zero-copy); `Decoded` reads the tree's text through `view`.
@@ -310,12 +310,12 @@ impl<'arena> StringCooked<'arena> {
 }
 
 #[derive(Debug, Clone)]
-pub struct Literal<'arena> {
-    pub value: LiteralValue<'arena>,
+pub struct Literal {
+    pub value: LiteralValue,
     pub span: Span,
 }
 
-impl<'arena> Literal<'arena> {
+impl Literal {
     /// The quote character of a string literal — the byte at the span start.
     /// (Recovered from source rather than stored.)
     #[inline]
@@ -362,8 +362,8 @@ impl<'arena> Literal<'arena> {
 /// Svelte directive name, which may hold `\`) must check the bytes and fall back
 /// to `escaped: Some`; debug builds assert the claim at the write.
 #[derive(Debug, Clone, Copy)]
-pub struct IdentName<'arena> {
-    pub escaped: Option<PoolStr<'arena>>,
+pub struct IdentName {
+    pub escaped: Option<PoolStr>,
     pub raw_len: u16,
     /// Whether the raw name is **plain one-column ASCII** — no byte at or above
     /// `0x80`. Answered by the lexer, which walked those bytes anyway and records the
@@ -380,7 +380,7 @@ pub struct IdentName<'arena> {
     pub plain_ascii: bool,
 }
 
-impl<'arena> IdentName<'arena> {
+impl IdentName {
     /// A verbatim name covering `span` exactly (keyword/synthetic sites where
     /// the token has already been consumed — the span is the name token).
     ///
@@ -406,10 +406,7 @@ impl<'arena> IdentName<'arena> {
     /// document the spans were recorded against. `IdentName` is `Copy`, so it
     /// is taken by value.
     #[inline]
-    pub fn resolve<'s>(self, span_start: u32, source: &'s str, view: AstView<'s>) -> &'s str
-    where
-        'arena: 's,
-    {
+    pub fn resolve<'s>(self, span_start: u32, source: &'s str, view: AstView<'s>) -> &'s str {
         match self.escaped {
             Some(s) => view.text(s),
             None => &source[span_start as usize..span_start as usize + self.raw_len as usize],
@@ -418,7 +415,7 @@ impl<'arena> IdentName<'arena> {
 }
 
 #[derive(Debug, Clone)]
-pub struct Identifier<'arena> {
+pub struct Identifier {
     /// The [`IdentName`] channel's escape hatch: the decoded name as pool text,
     /// `Some` only for `\u`-escaped or `raw_len`-oversized
     /// names, and for a Svelte-synthesized name holding a JSON-escaped byte (see
@@ -429,7 +426,7 @@ pub struct Identifier<'arena> {
     /// `sizeof(Expression)`, but it sets `Identifier`'s own width, which every node
     /// holding one inline pays, a type name or a statement label among them.) Read via
     /// [`Self::ident_name`].
-    pub escaped_name: Option<PoolStr<'arena>>,
+    pub escaped_name: Option<PoolStr>,
     /// The [`IdentName`] channel's `raw_len`: the raw name-token byte length
     /// (the node span may extend past the name — `?` / `!` / `: Type`).
     pub name_len: u16,
@@ -468,11 +465,11 @@ pub struct IdentifierParamExtra {
     pub decorators: Option<Run<Deco>>,
 }
 
-impl<'arena> Identifier<'arena> {
+impl Identifier {
     /// The type annotation, if this is a typed binding (`None` for a reference), its extras
     /// read through `view`.
     #[inline]
-    pub fn type_annotation(&self, view: AstView<'arena>) -> Option<&'arena TSTypeAnnotation> {
+    pub fn type_annotation<'a>(&self, view: AstView<'a>) -> Option<&'a TSTypeAnnotation> {
         view.opt_param_extra(self.extra)
             .and_then(|e| e.type_annotation.as_ref())
     }
@@ -480,7 +477,7 @@ impl<'arena> Identifier<'arena> {
     /// The parameter decorators, if any (`None` for a reference), its extras read through
     /// `view`.
     #[inline]
-    pub fn decorators(&self, view: AstView<'arena>) -> Option<&'arena [Decorator]> {
+    pub fn decorators<'a>(&self, view: AstView<'a>) -> Option<&'a [Decorator]> {
         view.opt_param_extra(self.extra)
             .and_then(|e| e.decorators)
             .map(|list| view.decorators(list))
@@ -488,7 +485,7 @@ impl<'arena> Identifier<'arena> {
 
     /// The name channel, reassembled from the flattened fields.
     #[inline]
-    pub fn ident_name(&self) -> IdentName<'arena> {
+    pub fn ident_name(&self) -> IdentName {
         IdentName {
             escaped: self.escaped_name,
             raw_len: self.name_len,
@@ -508,10 +505,7 @@ impl<'arena> Identifier<'arena> {
     /// escaped name's text, read through `view`. `source` must be the host document
     /// the spans were recorded against.
     #[inline]
-    pub fn name<'s>(&self, source: &'s str, view: AstView<'s>) -> &'s str
-    where
-        'arena: 's,
-    {
+    pub fn name<'s>(&self, source: &'s str, view: AstView<'s>) -> &'s str {
         self.ident_name().resolve(self.span.start, source, view)
     }
 
@@ -521,7 +515,7 @@ impl<'arena> Identifier<'arena> {
     /// binding that carries `?` / a type annotation / decorators, construct
     /// directly with `extra` naming a pushed [`IdentifierParamExtra`] row.
     #[inline]
-    pub fn simple(name: IdentName<'arena>, span: Span) -> Self {
+    pub fn simple(name: IdentName, span: Span) -> Self {
         Self {
             escaped_name: name.escaped,
             name_len: name.raw_len,
@@ -540,13 +534,13 @@ impl<'arena> Identifier<'arena> {
 /// DOES include the `#` character — so the verbatim name is the span minus its
 /// leading byte.
 #[derive(Debug, Clone)]
-pub struct PrivateIdentifier<'arena> {
+pub struct PrivateIdentifier {
     /// The name channel (name excludes the `#`; `raw_len` covers the name
     /// bytes after the `#`).
-    pub name: IdentName<'arena>,
+    pub name: IdentName,
 }
 
-impl<'arena> PrivateIdentifier<'arena> {
+impl PrivateIdentifier {
     /// The name's sub-span: the trailing `raw_len` bytes of `span`, the span of the
     /// `Expression` holding this node (the name token ends the span; anchoring at the
     /// end stays correct even if the parser ever tolerated separation after the `#`).
@@ -558,10 +552,7 @@ impl<'arena> PrivateIdentifier<'arena> {
     /// Resolve the name (without `#`): the raw source slice, or an escaped name's
     /// text, read through `view`. `span` is the holding `Expression`'s.
     #[inline]
-    pub fn name<'s>(&self, span: Span, source: &'s str, view: AstView<'s>) -> &'s str
-    where
-        'arena: 's,
-    {
+    pub fn name<'s>(&self, span: Span, source: &'s str, view: AstView<'s>) -> &'s str {
         self.name
             .resolve(span.end - self.name.raw_len as u32, source, view)
     }

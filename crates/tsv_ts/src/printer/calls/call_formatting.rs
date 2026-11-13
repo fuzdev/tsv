@@ -1062,7 +1062,7 @@ fn build_block_arrow_hug_states(
     callee: DocId,
     arrow: &ast::ArrowFunctionExpression,
     span: Span,
-    arg: &ast::Expression<'_>,
+    arg: &ast::Expression,
 ) -> DocId {
     let d = printer.d();
     let build = || printer.build_expression_doc(arg);
@@ -1111,9 +1111,9 @@ fn build_block_arrow_hug_states(
 fn build_ternary_arrow_hug_states(
     printer: &Printer<'_>,
     callee: DocId,
-    arg: &ast::Expression<'_>,
+    arg: &ast::Expression,
     arrow: &ast::ArrowFunctionExpression,
-    body_expr: &ast::Expression<'_>,
+    body_expr: &ast::Expression,
 ) -> DocId {
     let d = printer.d();
     let sig_doc = build_arrow_sig_doc(printer, arrow, arg.span);

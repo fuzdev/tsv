@@ -32,7 +32,7 @@ struct PropertyValueFacts {
 impl<'a> Printer<'a> {
     /// Build a Doc for a class declaration
     #[inline]
-    pub(super) fn build_class_declaration_doc(&self, decl: &ast::ClassDeclaration<'_>) -> DocId {
+    pub(super) fn build_class_declaration_doc(&self, decl: &ast::ClassDeclaration) -> DocId {
         self.build_class_declaration_doc_inner(decl, true)
     }
 
@@ -43,7 +43,7 @@ impl<'a> Printer<'a> {
     #[inline]
     pub(in crate::printer) fn build_class_declaration_without_decorators_doc(
         &self,
-        decl: &ast::ClassDeclaration<'_>,
+        decl: &ast::ClassDeclaration,
     ) -> DocId {
         self.build_class_declaration_doc_inner(decl, false)
     }
@@ -57,7 +57,7 @@ impl<'a> Printer<'a> {
     /// comment authored there is dropped.
     pub(in crate::printer) fn class_declaration_keyword_start(
         &self,
-        decl: &ast::ClassDeclaration<'_>,
+        decl: &ast::ClassDeclaration,
     ) -> u32 {
         let first_keyword = if decl.declare {
             "declare"
@@ -82,7 +82,7 @@ impl<'a> Printer<'a> {
     ///   Set to false when decorators are printed separately (e.g., before `export`).
     fn build_class_declaration_doc_inner(
         &self,
-        decl: &ast::ClassDeclaration<'_>,
+        decl: &ast::ClassDeclaration,
         include_decorators: bool,
     ) -> DocId {
         let super_class = self.view.opt(decl.super_class);
@@ -336,7 +336,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for a class member
-    fn build_class_member_doc(&self, member: &ast::ClassMember<'_>) -> DocId {
+    fn build_class_member_doc(&self, member: &ast::ClassMember) -> DocId {
         match member {
             ast::ClassMember::MethodDefinition(method) => self.build_method_definition_doc(method),
             ast::ClassMember::PropertyDefinition(prop) => self.build_property_definition_doc(prop),
@@ -408,7 +408,7 @@ impl<'a> Printer<'a> {
     /// A method, `get` / `set` accessor or constructor key is not a field key and takes the
     /// object-key rule ([`Self::build_property_key_doc`]), which unquotes a valid
     /// identifier.
-    fn build_field_key_doc(&self, key: &ast::Expression<'_>) -> DocId {
+    fn build_field_key_doc(&self, key: &ast::Expression) -> DocId {
         match &key.kind {
             ast::ExpressionKind::Literal(
                 lit @ ast::Literal {
@@ -596,7 +596,7 @@ impl<'a> Printer<'a> {
     /// unparenthesized, **unfrozen** value where the ordinary arm below printed a
     /// parenthesized, frozen one: `p = // c⏎bbb = ccc` against `p = /* c */ (bbb  =  ccc)`,
     /// the directive's whole effect gone at the first spelling.
-    fn property_value_facts(&self, value: &ast::Expression<'_>, eq_pos: u32) -> PropertyValueFacts {
+    fn property_value_facts(&self, value: &ast::Expression, eq_pos: u32) -> PropertyValueFacts {
         PropertyValueFacts {
             frozen: self.value_head_frozen_span(eq_pos + 1, value.span()),
             position_parens: self.needs_parens(value, super::ParenContext::DefaultValue),
@@ -609,7 +609,7 @@ impl<'a> Printer<'a> {
     /// chooser takes the bare expression).
     fn build_property_value_doc(
         &self,
-        value: &ast::Expression<'_>,
+        value: &ast::Expression,
         facts: PropertyValueFacts,
     ) -> DocId {
         // Every arm reaching here emits its own `= value` shell instead of routing
@@ -647,7 +647,7 @@ impl<'a> Printer<'a> {
         parts: &mut DocBuf,
         before_eq: u32,
         eq_pos: u32,
-        value: &ast::Expression<'_>,
+        value: &ast::Expression,
         facts: PropertyValueFacts,
     ) {
         let d = self.d();
@@ -751,7 +751,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for a method definition
-    fn build_method_definition_doc(&self, method: &ast::MethodDefinition<'_>) -> DocId {
+    fn build_method_definition_doc(&self, method: &ast::MethodDefinition) -> DocId {
         let key = self.view.expr(method.key);
         let d = self.d();
         let mut parts = smallvec![];

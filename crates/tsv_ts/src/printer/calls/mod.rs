@@ -511,7 +511,7 @@ pub(super) fn call_paren_open(
 /// out-of-line copy otherwise, a call per ask for what is usually one or two kind tests.
 #[expect(clippy::inline_always)]
 #[inline(always)]
-pub(in crate::printer) fn chain_has_calls(view: AstView<'_>, expr: &ast::Expression<'_>) -> bool {
+pub(in crate::printer) fn chain_has_calls(view: AstView<'_>, expr: &ast::Expression) -> bool {
     let mut expr = expr;
     loop {
         expr = match &expr.kind {
@@ -543,7 +543,7 @@ pub(super) enum CalleeParens<'a> {
     /// ordinary doc. Prettier's answer for every callee kind but the two below: a ternary,
     /// an `await`, an optional chain and a sequence callee all weld. A decorated class is
     /// the one operand that breaks this pair open instead ([`Self::build_doc`]).
-    Welded(&'a ast::Expression<'a>),
+    Welded(&'a ast::Expression),
     /// `(⏎\tx as T⏎)()` — prettier's `printBinaryCastExpression`
     /// (print/binary-cast-expression.js) gives an `as` / `satisfies` cast its own hanging
     /// group in exactly two positions: the callee of a call or `new`, and the OBJECT of a
@@ -557,7 +557,7 @@ pub(super) enum CalleeParens<'a> {
     /// shape and found byte-identical over the whole fixture suite and the whole gates corpus.
     /// The outside-the-parens helper stays for the callers that have no choice — the ones
     /// whose `(` / `)` a different seam emits, so only a body is theirs to wrap.
-    Cast(&'a ast::Expression<'a>),
+    Cast(&'a ast::Expression),
     /// `(⏎\ta &&⏎\tb⏎)()` — prettier's binaryish EARLY RETURN, `key === "callee" &&
     /// isCallOrNewExpression(parent)` (`printBinaryishExpression`, `print/binaryish.js`), taken ahead of `shouldNotIndent`
     /// and so ahead of every indent question: `group([indent([softline, ...parts]),
@@ -578,7 +578,7 @@ impl<'a> CalleeParens<'a> {
     /// caller holding one for a bare callee would emit parens the grammar never asked for.
     pub(super) fn of(
         printer: &Printer<'_>,
-        callee: &'a ast::Expression<'a>,
+        callee: &'a ast::Expression,
         context: ParenContext,
         second_type_args: Option<SecondTypeArgs>,
     ) -> Option<Self> {
@@ -650,7 +650,7 @@ impl<'a> CalleeParens<'a> {
 /// conditional), rather than breaking the call's arguments out around the arrow.
 pub(in crate::printer) fn arrow_body_hugs_call_parens(
     view: AstView<'_>,
-    body: &ast::Expression<'_>,
+    body: &ast::Expression,
 ) -> bool {
     arg_predicates::arrow_body_is_call_through_non_null(view, body)
         || arg_predicates::is_ternary_arrow_body(body)
@@ -668,7 +668,7 @@ pub(in crate::printer) fn arrow_body_hugs_call_parens(
 /// (`docs/conformance_prettier_ts.md` §Non-null callee in a member chain). A `!` over a call
 /// (`fnnn(x)!(…)`) is a curried call instead, which [`Printer::build_call_doc`] routes ahead of
 /// the chain as it routes the same call without the `!` ([`callee_is_curried_member_chain_call`]).
-pub(in crate::printer) fn is_memberish(expr: &ast::Expression<'_>) -> bool {
+pub(in crate::printer) fn is_memberish(expr: &ast::Expression) -> bool {
     matches!(
         expr.kind,
         ast::ExpressionKind::MemberExpression(_) | ast::ExpressionKind::TSNonNullExpression(_)
@@ -702,7 +702,7 @@ fn curried_run_roots_in_member_chain(view: AstView<'_>, callee: &ast::CallExpres
 /// `printCallExpression`'s `group([callee, args])` exactly as a call on `c(x)` does: the member
 /// chain ends at the innermost call either way. tsv lays the two out alike — a `!` asserts a
 /// type and nothing else — which here is prettier's layout too.
-fn callee_is_curried_member_chain_call(view: AstView<'_>, callee: &ast::Expression<'_>) -> bool {
+fn callee_is_curried_member_chain_call(view: AstView<'_>, callee: &ast::Expression) -> bool {
     let mut callee = callee;
     while let ast::ExpressionKind::TSNonNullExpression(non_null) = &callee.kind {
         callee = view.expr(non_null.expression);
@@ -720,9 +720,9 @@ fn callee_is_curried_member_chain_call(view: AstView<'_>, callee: &ast::Expressi
 /// ([`spine_first_call_within`]) cannot drift apart.
 #[expect(clippy::inline_always)]
 #[inline(always)]
-fn spine_step<'e>(
-    expr: &'e ast::Expression<'e>,
-) -> ControlFlow<Option<(&'e ast::CallExpression, Span)>, ast::ExprId> {
+fn spine_step(
+    expr: &ast::Expression,
+) -> ControlFlow<Option<(&ast::CallExpression, Span)>, ast::ExprId> {
     tsv_lang::fanout_probe::predicate();
     match &expr.kind {
         ast::ExpressionKind::MemberExpression(member) => ControlFlow::Continue(member.object),
@@ -740,7 +740,7 @@ fn spine_step<'e>(
 /// walk a bounded number of links at a time ([`spine_first_call_within`]).
 fn spine_first_call<'e>(
     view: AstView<'e>,
-    expr: &'e ast::Expression<'e>,
+    expr: &'e ast::Expression,
 ) -> Option<(&'e ast::CallExpression, Span)> {
     let mut expr = expr;
     loop {
@@ -876,7 +876,7 @@ impl<'a> Printer<'a> {
     /// callee spine merely CONTAINS such a call still linearizes it — `printMemberChain`
     /// absorbs the templates, and the curried calls, once a call of its own opens the chain
     /// (`` …o(`⏎b⏎`).p(x) ``, `…fnnn(x)(z).p()`).
-    fn spine_first_call_prints_whole(&self, expr: &ast::Expression<'_>) -> bool {
+    fn spine_first_call_prints_whole(&self, expr: &ast::Expression) -> bool {
         spine_first_call(self.view, expr).is_some_and(|(call, span)| {
             callee_is_curried_member_chain_call(self.view, self.view.expr(call.callee))
                 || self.call_takes_template_bypass(call, span)
@@ -907,7 +907,7 @@ impl<'a> Printer<'a> {
     /// this route does not print. The linearized chain places all of them.
     pub(in crate::printer) fn build_whole_call_operand_doc(
         &self,
-        operand: &ast::Expression<'_>,
+        operand: &ast::Expression,
         span: Span,
         parent_optional: bool,
     ) -> Option<DocId> {
@@ -1224,7 +1224,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for a meta property: `import.meta`, `new.target`
-    pub(super) fn build_meta_property_doc(&self, meta: &ast::MetaProperty<'_>) -> DocId {
+    pub(super) fn build_meta_property_doc(&self, meta: &ast::MetaProperty) -> DocId {
         import_expr::build_meta_property_doc(self, meta)
     }
 

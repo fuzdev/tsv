@@ -51,7 +51,7 @@ impl ArgOwner {
     fn callback_signature_refuses_hug(
         self,
         printer: &Printer<'_>,
-        arg: &ast::Expression<'_>,
+        arg: &ast::Expression,
         arg_count: usize,
     ) -> bool {
         match self {

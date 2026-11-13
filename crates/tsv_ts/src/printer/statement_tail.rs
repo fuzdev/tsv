@@ -47,7 +47,7 @@ impl<'a> Printer<'a> {
     /// the way prettier does: a statement's terminator is its tail's.
     pub(in crate::printer) fn statement_terminator<'s>(
         &self,
-        mut stmt: &'s ast::Statement<'s>,
+        mut stmt: &'s ast::Statement,
     ) -> StatementTerminator
     where
         'a: 's,
@@ -85,10 +85,7 @@ impl<'a> Printer<'a> {
     /// Conflating them cost one DOUBLE-PRINT (every `export type A = B;`) and one
     /// DROP (every `l: a();`), each found by the gap-injection audit rather than by a
     /// fixture — the authoring is one no formatted document contains.
-    fn delegated_statement<'s>(
-        &self,
-        stmt: &'s ast::Statement<'s>,
-    ) -> Option<&'s ast::Statement<'s>>
+    fn delegated_statement<'s>(&self, stmt: &'s ast::Statement) -> Option<&'s ast::Statement>
     where
         'a: 's,
     {
@@ -114,8 +111,8 @@ impl<'a> Printer<'a> {
     /// prints (a DOUBLE-PRINT).
     fn own_statement_terminator<'s>(
         &self,
-        stmt: &'s ast::Statement<'s>,
-    ) -> Result<StatementTerminator, &'s ast::Statement<'s>>
+        stmt: &'s ast::Statement,
+    ) -> Result<StatementTerminator, &'s ast::Statement>
     where
         'a: 's,
     {
@@ -169,7 +166,7 @@ impl<'a> Printer<'a> {
     /// ⚠️ The trim is over WHITESPACE ONLY — **a comment is content** here, where prettier
     /// measures its comment-STRIPPED text. The two readers absorb that difference the same
     /// way and for the same reason, each stated at its own site.
-    pub(in crate::printer) fn statement_content_end(&self, stmt: &ast::Statement<'_>) -> u32 {
+    pub(in crate::printer) fn statement_content_end(&self, stmt: &ast::Statement) -> u32 {
         let span = stmt.span();
         if self.statement_terminator(stmt) == StatementTerminator::Never {
             return span.end;
@@ -214,7 +211,7 @@ impl<'a> Printer<'a> {
     /// A kind the table calls [`StatementTerminator::Never`] has no terminator to eject at all.
     pub(in crate::printer) fn statement_hands_off_terminator_gap<'s>(
         &self,
-        mut stmt: &'s ast::Statement<'s>,
+        mut stmt: &'s ast::Statement,
     ) -> bool
     where
         'a: 's,
@@ -288,7 +285,7 @@ impl<'a> Printer<'a> {
     /// but what stops it is the first byte, walking back, that is neither whitespace nor the
     /// last byte of a comment, so a comment INSIDE the statement's content (`fn(/* c */)`) is
     /// never reached — the `)` ends the walk first.
-    pub(in crate::printer) fn statement_comment_claim_end(&self, stmt: &ast::Statement<'_>) -> u32 {
+    pub(in crate::printer) fn statement_comment_claim_end(&self, stmt: &ast::Statement) -> u32 {
         let span = stmt.span();
         if !self.statement_hands_off_terminator_gap(stmt) {
             return span.end;
@@ -419,7 +416,7 @@ impl<'a> Printer<'a> {
     #[inline(always)]
     pub(in crate::printer) fn with_statement_tail<T>(
         &self,
-        value: Option<&ast::Expression<'_>>,
+        value: Option<&ast::Expression>,
         build: impl FnOnce() -> T,
     ) -> (T, Option<u32>) {
         let outer = self.arm_statement_tail(value.map(|value| value.span().end));
@@ -486,7 +483,7 @@ impl<'a> Printer<'a> {
     /// region included, so claiming it too would print it twice. Asked only past the comment
     /// gate, so the scans cost nothing in the common case.
     #[inline]
-    fn statement_tail_region(&self, expr: &ast::Expression<'_>, end: u32) -> Option<Span> {
+    fn statement_tail_region(&self, expr: &ast::Expression, end: u32) -> Option<Span> {
         if !self.statement_tail_bytes_admit(end) {
             return None;
         }
@@ -514,7 +511,7 @@ impl<'a> Printer<'a> {
     /// [`Self::statement_tail_region`] past its byte gate, out of line.
     #[cold]
     #[inline(never)]
-    fn statement_tail_region_walk(&self, expr: &ast::Expression<'_>, end: u32) -> Option<Span> {
+    fn statement_tail_region_walk(&self, expr: &ast::Expression, end: u32) -> Option<Span> {
         // A sequence prints its operands inside a pair of its own, so the region opens where
         // they print ([`Printer::sequence_printed_end`]), past that pair's `)`.
         let start = match &expr.kind {
@@ -586,7 +583,7 @@ impl<'a> Printer<'a> {
     /// holds a run of same-line blocks.
     pub(in crate::printer) fn shell_statement_tail_region(
         &self,
-        expr: &ast::Expression<'_>,
+        expr: &ast::Expression,
         boundary_end: u32,
         retains_parens: bool,
     ) -> Option<Span> {

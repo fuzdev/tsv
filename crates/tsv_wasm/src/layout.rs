@@ -28,13 +28,13 @@ const _: () = assert!(size_of::<DocNode>() == 16);
 // The hot AST types: a 4 B pointer, `Expression`'s payload 8 B aligned and `Statement`'s
 // 4 B, and the `Option` of those two niche-packed. See the native pins in `tsv_ts`'s
 // `ast/mod.rs`.
-const _: () = assert!(size_of::<Expression<'static>>() == 48);
-const _: () = assert!(size_of::<Option<Expression<'static>>>() == size_of::<Expression<'static>>());
-const _: () = assert!(size_of::<ExpressionKind<'static>>() == 40);
-const _: () = assert!(size_of::<Statement<'static>>() == 48);
-const _: () = assert!(size_of::<Option<Statement<'static>>>() == size_of::<Statement<'static>>());
-const _: () = assert!(size_of::<StatementKind<'static>>() == 40);
-const _: () = assert!(size_of::<TSType<'static>>() == 56);
+const _: () = assert!(size_of::<Expression>() == 48);
+const _: () = assert!(size_of::<Option<Expression>>() == size_of::<Expression>());
+const _: () = assert!(size_of::<ExpressionKind>() == 40);
+const _: () = assert!(size_of::<Statement>() == 48);
+const _: () = assert!(size_of::<Option<Statement>>() == size_of::<Statement>());
+const _: () = assert!(size_of::<StatementKind>() == 40);
+const _: () = assert!(size_of::<TSType>() == 56);
 // The type-edge holders' `Option`s, folded into the id's niche and the run's. See the native
 // pins in `tsv_ts`'s `ast/mod.rs`.
 const _: () = assert!(size_of::<Option<TSTypeAnnotation>>() == size_of::<TSTypeAnnotation>());
@@ -92,7 +92,7 @@ const _: () = assert!(size_of::<ListBuf<Id<Family>>>() == 12);
 const _: () = assert!(size_of::<TextPool<Family>>() == 12);
 // The tree's text and comment handles, niche-packed as the pool's and the store's are. See the
 // native pins in `tsv_ts`'s `ast/stores.rs`.
-const _: () = assert!(size_of::<PoolStr<'static>>() == 8);
-const _: () = assert!(size_of::<Option<PoolStr<'static>>>() == 8);
-const _: () = assert!(size_of::<CommentList<'static>>() == 8);
-const _: () = assert!(size_of::<Option<CommentList<'static>>>() == 8);
+const _: () = assert!(size_of::<PoolStr>() == 8);
+const _: () = assert!(size_of::<Option<PoolStr>>() == 8);
+const _: () = assert!(size_of::<CommentList>() == 8);
+const _: () = assert!(size_of::<Option<CommentList>>() == 8);

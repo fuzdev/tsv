@@ -123,11 +123,11 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn class_heritage_positions(
         &self,
         class_keyword_start: u32,
-        id: Option<&ast::Identifier<'_>>,
+        id: Option<&ast::Identifier>,
         type_parameters: Option<&ast::TSTypeParameterDeclaration>,
-        super_class: Option<&ast::Expression<'_>>,
+        super_class: Option<&ast::Expression>,
         super_type_parameters: Option<&ast::TSTypeParameterInstantiation>,
-        implements: &[ast::TSInterfaceHeritage<'_>],
+        implements: &[ast::TSInterfaceHeritage],
     ) -> ClassHeritagePositions {
         let pre_heritage_end = type_parameters.map_or_else(
             || id.map_or(class_keyword_start + "class".len() as u32, |id| id.span.end),
@@ -185,9 +185,9 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn class_header_layout(
         &self,
         positions: &ClassHeritagePositions,
-        super_class: Option<&ast::Expression<'_>>,
+        super_class: Option<&ast::Expression>,
         super_type_parameters: Option<&ast::TSTypeParameterInstantiation>,
-        implements: &[ast::TSInterfaceHeritage<'_>],
+        implements: &[ast::TSInterfaceHeritage],
     ) -> ClassHeaderLayout {
         // The extends→`implements` gap exists only with both clauses present, which is
         // already `count > 1` in the structural rule — so that arm can only ever add to
@@ -276,9 +276,9 @@ impl<'a> Printer<'a> {
     /// computed position data (avoids duplicate binary searches).
     pub(in crate::printer) fn should_class_group_mode(
         &self,
-        super_class: Option<&ast::Expression<'_>>,
+        super_class: Option<&ast::Expression>,
         super_type_parameters: Option<&ast::TSTypeParameterInstantiation>,
-        implements: &[ast::TSInterfaceHeritage<'_>],
+        implements: &[ast::TSInterfaceHeritage],
     ) -> bool {
         let mut count = if super_class.is_some() { 1 } else { 0 };
         count += implements.len();
@@ -303,7 +303,7 @@ impl<'a> Printer<'a> {
     /// type-argument builder (the same one the `implements` clause uses).
     pub(in crate::printer) fn build_class_extends_doc(
         &self,
-        super_class: Option<&ast::Expression<'_>>,
+        super_class: Option<&ast::Expression>,
         super_type_parameters: Option<&ast::TSTypeParameterInstantiation>,
         extends_keyword_start: Option<u32>,
     ) -> Option<DocId> {
@@ -373,7 +373,7 @@ impl<'a> Printer<'a> {
     /// stripped shell down its right edge (`extends (a + (b // c⏎) // d⏎) {}`) prints in that
     /// gap ahead of the comments written after the shell, as the bare spelling's does. The
     /// superclass's own doc claims the region ([`Self::build_super_class_doc`]).
-    fn super_class_gap_start(&self, super_class: &ast::Expression<'_>) -> u32 {
+    fn super_class_gap_start(&self, super_class: &ast::Expression) -> u32 {
         self.required_pair_gap_start(super_class, || {
             self.needs_parens(super_class, super::ParenContext::SuperClass)
         })
@@ -387,7 +387,7 @@ impl<'a> Printer<'a> {
     /// `extends f<T>` and stop at the second `<` ([`super::SecondTypeArgs::Heritage`]).
     fn build_super_class_doc(
         &self,
-        super_class: &ast::Expression<'_>,
+        super_class: &ast::Expression,
         super_type_parameters: Option<&ast::TSTypeParameterInstantiation>,
     ) -> DocId {
         // The ordinary dispatch — a binary superclass takes the continuation-indent
@@ -424,7 +424,7 @@ impl<'a> Printer<'a> {
     /// and inter-item comments).
     pub(in crate::printer) fn build_class_implements_doc(
         &self,
-        implements: &[ast::TSInterfaceHeritage<'_>],
+        implements: &[ast::TSInterfaceHeritage],
         group_mode: bool,
         implements_keyword_start: Option<u32>,
     ) -> Option<DocId> {
@@ -459,7 +459,7 @@ impl<'a> Printer<'a> {
         positions: &ClassHeritagePositions,
         extends_doc: Option<DocId>,
         implements_doc: Option<DocId>,
-        implements: &[ast::TSInterfaceHeritage<'_>],
+        implements: &[ast::TSInterfaceHeritage],
         options: ClassHeaderOptions,
     ) -> DocId {
         let d = self.d();

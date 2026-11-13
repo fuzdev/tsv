@@ -13,7 +13,7 @@ use crate::ast;
 /// `ImportNamespaceSpecifier`).
 pub(super) fn write_import_specifier(
     w: &mut JsonWriter,
-    spec: &ast::ImportSpecifier<'_>,
+    spec: &ast::ImportSpecifier,
     ctx: &Ctx<'_>,
 ) {
     match spec {
@@ -44,7 +44,7 @@ pub(super) fn write_import_specifier(
 /// Emits an `ImportAttribute` node.
 pub(super) fn write_import_attribute(
     w: &mut JsonWriter,
-    attr: &ast::ImportAttribute<'_>,
+    attr: &ast::ImportAttribute,
     ctx: &Ctx<'_>,
 ) {
     node_header(w, "ImportAttribute", attr.span, ctx);
@@ -62,7 +62,7 @@ pub(super) fn write_import_attribute(
 /// `exportKind?`.
 pub(super) fn write_export_specifier(
     w: &mut JsonWriter,
-    spec: &ast::ExportSpecifier<'_>,
+    spec: &ast::ExportSpecifier,
     ctx: &Ctx<'_>,
 ) {
     node_header(w, "ExportSpecifier", spec.span, ctx);
@@ -78,7 +78,7 @@ pub(super) fn write_export_specifier(
 /// string a `Literal` node.
 pub(super) fn write_module_export_name(
     w: &mut JsonWriter,
-    name: &ast::ModuleExportName<'_>,
+    name: &ast::ModuleExportName,
     ctx: &Ctx<'_>,
 ) {
     match name {
@@ -91,7 +91,7 @@ pub(super) fn write_module_export_name(
 /// declaration).
 pub(super) fn write_export_default_value(
     w: &mut JsonWriter,
-    value: &ast::ExportDefaultValue<'_>,
+    value: &ast::ExportDefaultValue,
     ctx: &Ctx<'_>,
 ) {
     match value {

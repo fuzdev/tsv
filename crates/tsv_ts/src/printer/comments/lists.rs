@@ -547,7 +547,7 @@ impl<'a> Printer<'a> {
     /// emitted end, reaches the same spelling through [`Self::statement_claim_end_with`].
     pub(crate) fn statement_claim_end(
         &self,
-        stmt: &ast::Statement<'_>,
+        stmt: &ast::Statement,
         slots: &[ast::StmtId],
         index: usize,
         tail_target: Option<u32>,
@@ -565,7 +565,7 @@ impl<'a> Printer<'a> {
     /// the same statement a second time is the cost this saves.
     pub(crate) fn statement_claim_end_with(
         &self,
-        stmt: &ast::Statement<'_>,
+        stmt: &ast::Statement,
         slots: &[ast::StmtId],
         index: usize,
         tail_target: Option<u32>,
@@ -605,7 +605,7 @@ impl<'a> Printer<'a> {
     /// is read only when nothing was raised.
     fn statement_gap_scan_start(
         &self,
-        stmt: &ast::Statement<'_>,
+        stmt: &ast::Statement,
         slots: &[ast::StmtId],
         index: usize,
         emitted_end: impl FnOnce() -> u32,
@@ -633,7 +633,7 @@ impl<'a> Printer<'a> {
     /// a comment in the terminator gap is already inside the slice (a cataloged divergence,
     /// `docs/conformance_prettier_ignore.md` §Format-ignore directive). Handing it to the list
     /// as well prints it TWICE. The freeze is the caller's verdict, so the caller states it.
-    pub(crate) fn statement_emitted_end(&self, stmt: &ast::Statement<'_>, frozen: bool) -> u32 {
+    pub(crate) fn statement_emitted_end(&self, stmt: &ast::Statement, frozen: bool) -> u32 {
         if frozen {
             stmt.span().end
         } else {
@@ -730,7 +730,7 @@ impl<'a> Printer<'a> {
     pub(crate) fn push_statement_trailing_run(
         &self,
         parts: &mut DocBuf,
-        stmt: &ast::Statement<'_>,
+        stmt: &ast::Statement,
         slots: &[ast::StmtId],
         index: usize,
         list_end: u32,

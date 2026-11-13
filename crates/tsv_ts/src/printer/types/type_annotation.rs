@@ -51,7 +51,7 @@ pub(in crate::printer) enum AnnotationParens {
 /// [`Printer::build_required_paren_pair_operand_doc`] takes. Reads through the author's
 /// shell: `(x: T): ((y: T) => T) =>` needs the pair just as the shell-less spelling does,
 /// and the shell is redundant *as a type* — only this position requires it.
-fn arrow_return_needs_parens(printer: &Printer<'_>, ty: &TSType<'_>) -> bool {
+fn arrow_return_needs_parens(printer: &Printer<'_>, ty: &TSType) -> bool {
     matches!(unwrap_parenthesized(printer.view, ty), TSType::Function(_))
 }
 
@@ -60,7 +60,7 @@ fn arrow_return_needs_parens(printer: &Printer<'_>, ty: &TSType<'_>) -> bool {
 /// takes. A source paren after `:` is redundant *as a type* and drops under the freeze;
 /// this is exactly what [`Printer::build_frozen_single_child_doc`] hardcodes, named here
 /// so the position can select it beside the arrow-return rule.
-fn no_frozen_parens(_: &Printer<'_>, _ty: &TSType<'_>) -> bool {
+fn no_frozen_parens(_: &Printer<'_>, _ty: &TSType) -> bool {
     false
 }
 
@@ -89,7 +89,7 @@ impl<'a> Printer<'a> {
     /// synthesize one.
     pub(in crate::printer) fn build_annotation_value_doc(
         &self,
-        ty: &TSType<'_>,
+        ty: &TSType,
         parens: AnnotationParens,
     ) -> DocId {
         match parens {
@@ -333,7 +333,7 @@ impl<'a> Printer<'a> {
         &self,
         colon_end: u32,
         type_start: u32,
-        ty: &TSType<'_>,
+        ty: &TSType,
         gap_has_comments: bool,
         parens: AnnotationParens,
     ) -> DocId {
@@ -709,13 +709,13 @@ impl<'a> Printer<'a> {
     /// operator, a pair every parent the walk descends from strips. It stops ahead of a
     /// member, false branch or operand a format-ignore directive in the gap before it
     /// freezes: that child's verbatim slice prints the comments inside it itself.
-    fn type_right_spine_printed_end(&self, ty: &TSType<'_>) -> u32 {
+    fn type_right_spine_printed_end(&self, ty: &TSType) -> u32 {
         let mut ty = ty;
         loop {
             // `gap` is where the gap ahead of a child that is not a shell opens: a
             // directive there may freeze the child, and a frozen slice prints the comments
             // inside it itself, so the walk stops before it.
-            let (next, gap): (&TSType<'_>, Option<u32>) = match ty {
+            let (next, gap): (&TSType, Option<u32>) = match ty {
                 &TSType::Union(ast::TSUnionType { types, .. })
                 | &TSType::Intersection(ast::TSIntersectionType { types, .. }) => match self
                     .view
@@ -982,7 +982,7 @@ impl<'a> Printer<'a> {
 /// `readonly` and the pairs around its operand. Every keyword type answers `false`,
 /// `void` / `null` / `true` included: tsc reads those as a parenthesized type, but tsv's
 /// own parser does not, so they take the two pairs it can reread.
-fn type_has_paren_form(view: AstView<'_>, ty: &TSType<'_>) -> bool {
+fn type_has_paren_form(view: AstView<'_>, ty: &TSType) -> bool {
     match ty {
         TSType::TypeReference(r) => {
             r.type_arguments.is_some() || !matches!(r.type_name, ast::TSEntityName::Identifier(_))
@@ -1000,7 +1000,7 @@ fn type_has_paren_form(view: AstView<'_>, ty: &TSType<'_>) -> bool {
 }
 
 /// Whether `ty` is a primary type, which no position needs a pair around.
-fn type_never_needs_parens(ty: &TSType<'_>) -> bool {
+fn type_never_needs_parens(ty: &TSType) -> bool {
     matches!(
         ty,
         TSType::TypeReference(_)

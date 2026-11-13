@@ -108,7 +108,7 @@ pub(in crate::printer) struct StrippedParenHang<'t> {
     /// The type to build — the unwrapped inner where the shell WAS the value, the value
     /// unchanged where the shell sits at its leading edge (nothing to substitute) or
     /// where no hang fires at all.
-    pub(in crate::printer) value_type: &'t TSType<'t>,
+    pub(in crate::printer) value_type: &'t TSType,
     /// The comment region of a leading-edge shell that the claim above covers — from the
     /// shell's `(` to `value_start` — so the caller can suppress the shell's own copy of
     /// that run for the duration of the build
@@ -134,7 +134,7 @@ impl<'t> StrippedParenHang<'t> {
     /// format-ignore directive in the stripped shell's interior is what stripped it, and so
     /// whether the caller owes the freeze) and a frozen head's child, where the freeze is
     /// the head's own and the strip probe never ran.
-    fn for_value(value: &'t TSType<'t>, routed: bool) -> Self {
+    fn for_value(value: &'t TSType, routed: bool) -> Self {
         Self {
             value_start: value.span().start,
             value_type: value,
@@ -153,7 +153,7 @@ impl<'t> StrippedParenHang<'t> {
 pub(in crate::printer) fn prefix_operator_shell_pair(
     p: &Printer<'_>,
     operator: crate::ast::TSTypeOperatorKind,
-    operand: &TSType<'_>,
+    operand: &TSType,
 ) -> ShellPair {
     if type_operator_operand_rule(operator)(p, operand) {
         ShellPair::Kept
@@ -225,7 +225,7 @@ struct HeadRegion {
 /// the answer, or the head whose own answer is this level's.
 enum HeadStep<'t> {
     Answer(Option<HeadRegion>),
-    Descend(&'t TSType<'t>),
+    Descend(&'t TSType),
 }
 
 /// One level of [`Printer::build_postfix_type_doc`]'s chain, waiting for its element /
@@ -246,7 +246,7 @@ pub(super) enum ArrayTypeHead {
 }
 
 /// [`Printer::build_type_doc`]'s fanout probe.
-fn probe_type_build(ts_type: &TSType<'_>) {
+fn probe_type_build(ts_type: &TSType) {
     tsv_lang::fanout_probe::build(tsv_lang::fanout_probe::Build::Type, ts_type, || {
         let span = ts_type.span();
         (span.start, span.end)
@@ -299,10 +299,10 @@ pub(in crate::printer) struct KeywordValueHead<'t> {
     /// seam's (possibly widened) start.
     pub(in crate::printer) value_start: u32,
     /// The head's own child, pre-strip — the freeze slice and the trailing-lift anchor.
-    child: &'t TSType<'t>,
+    child: &'t TSType,
     /// The type to build: the child itself under a freeze, else the hang seam's
     /// (possibly paren-stripped) inner.
-    pub(in crate::printer) value_type: &'t TSType<'t>,
+    pub(in crate::printer) value_type: &'t TSType,
     /// The hang seam's [`StrippedParenHang::claimed_shell`], carried so the value
     /// builders that emit this gap's run suppress the shell's own copy of it.
     pub(in crate::printer) claimed_shell: Option<Span>,
@@ -322,7 +322,7 @@ impl<'t> KeywordValueHead<'t> {
     /// collapses to the child's own start and the value is the child itself. Scan-free
     /// by construction, which is the point: it is the head shape of the path that
     /// deliberately pays nothing.
-    pub(in crate::printer) fn without_gap(child: &'t TSType<'t>) -> Self {
+    pub(in crate::printer) fn without_gap(child: &'t TSType) -> Self {
         Self {
             gap_start: None,
             frozen: false,
@@ -370,11 +370,11 @@ impl<'a> Printer<'a> {
     /// Out of line, so its buffers stay off the frame of [`Self::build_type_doc_probed`],
     /// which every type's build recurses through.
     #[inline(never)]
-    fn build_postfix_type_doc(&self, ts_type: &TSType<'_>) -> DocId {
+    fn build_postfix_type_doc(&self, ts_type: &TSType) -> DocId {
         let mut levels: SmallVec<[PostfixLevel<'_>; 4]> = SmallVec::new();
         let mut node = ts_type;
         let head_doc = loop {
-            let (child, needs_parens): (&TSType<'_>, TypeParenRule) = match node {
+            let (child, needs_parens): (&TSType, TypeParenRule) = match node {
                 TSType::Array(arr) => match self.array_type_head(arr) {
                     ArrayTypeHead::Whole(doc) => break doc,
                     ArrayTypeHead::Element { suffix } => {
@@ -641,13 +641,13 @@ impl<'a> Printer<'a> {
     /// A `TypeReference`'s own type arguments always break internally when too wide
     /// (`Promise<LongType | null>` breaks inside the `<>`) — `build_type_arguments_doc` is the
     /// single builder for every type-argument position, so no caller has to opt into that.
-    pub(in crate::printer) fn build_type_doc(&self, ts_type: &TSType<'_>) -> DocId {
+    pub(in crate::printer) fn build_type_doc(&self, ts_type: &TSType) -> DocId {
         probe_type_build(ts_type);
         self.build_type_doc_probed(ts_type)
     }
 
     /// [`Self::build_type_doc`] past its fanout probe, which the caller has taken.
-    fn build_type_doc_probed(&self, ts_type: &TSType<'_>) -> DocId {
+    fn build_type_doc_probed(&self, ts_type: &TSType) -> DocId {
         let d = self.d();
         match ts_type {
             TSType::Keyword(kw) => d.text(kw.kind.as_str()),
@@ -1323,10 +1323,7 @@ impl<'a> Printer<'a> {
     /// paren's comment fell between the two `(`s and the caller relocated nothing,
     /// placing it non-idempotently. Mirrors `build_union_type_doc`'s
     /// `has_paren_inner_leading_line_comments` router probe.
-    pub(in crate::printer) fn stripped_paren_has_leading_line_comment(
-        &self,
-        ty: &TSType<'_>,
-    ) -> bool {
+    pub(in crate::printer) fn stripped_paren_has_leading_line_comment(&self, ty: &TSType) -> bool {
         // The narrow analog is exactly the hang predicate (a paren shell with a leading
         // line comment) PLUS the content-loss check that the run is safe to hoist — no
         // leading block, no trailing comment (`stripped_paren_leading_line_comments`
@@ -1360,7 +1357,7 @@ impl<'a> Printer<'a> {
     /// form serves the conditional-`extends` and intersection-first-member callers.
     pub(in crate::printer) fn stripped_paren_leading_line_comments(
         &self,
-        ty: &TSType<'_>,
+        ty: &TSType,
     ) -> CommentVec<'_> {
         let Some(shell) = outermost_paren(ty) else {
             return smallvec![];
@@ -1408,7 +1405,7 @@ impl<'a> Printer<'a> {
     /// deep leading gap holds one — so the two cannot drift on where that gap ends.
     pub(in crate::printer) fn stripped_paren_hang_has_breaking_leading_run(
         &self,
-        ty: &TSType<'_>,
+        ty: &TSType,
     ) -> bool {
         self.stripped_paren_hang_has_breaking_leading_run_with_pair(ty, ShellPair::Stripped)
     }
@@ -1418,7 +1415,7 @@ impl<'a> Printer<'a> {
     /// re-minting position ask, so the two cannot answer differently about one shell.
     pub(in crate::printer) fn stripped_paren_hang_has_breaking_leading_run_with_pair(
         &self,
-        ty: &TSType<'_>,
+        ty: &TSType,
         pair: ShellPair,
     ) -> bool {
         self.stripped_paren_hang_has_leading_run(ty, EdgeRun::Breaking, pair)
@@ -1429,7 +1426,7 @@ impl<'a> Printer<'a> {
     /// window.
     fn stripped_paren_hang_has_leading_run(
         &self,
-        ty: &TSType<'_>,
+        ty: &TSType,
         run: EdgeRun,
         pair: ShellPair,
     ) -> bool {
@@ -1497,7 +1494,7 @@ impl<'a> Printer<'a> {
     /// must pass the same answer to any GATE it asks about the same shell.
     pub(in crate::printer) fn keyword_value_stripped_paren_hang<'t>(
         &self,
-        value: &'t TSType<'t>,
+        value: &'t TSType,
     ) -> StrippedParenHang<'t>
     where
         'a: 't,
@@ -1509,7 +1506,7 @@ impl<'a> Printer<'a> {
     /// pair ([`ShellPair`]).
     pub(in crate::printer) fn keyword_value_stripped_paren_hang_with_pair<'t>(
         &self,
-        value: &'t TSType<'t>,
+        value: &'t TSType,
         pair: ShellPair,
     ) -> StrippedParenHang<'t>
     where
@@ -1602,14 +1599,14 @@ impl<'a> Printer<'a> {
     /// composite whose head gap holds a comment. There the two halves are one
     /// source-contiguous run and only this claim spans both, so the item's own emitter
     /// stands down on containment instead ([`Self::shell_leading_run_claimed`]).
-    pub(in crate::printer) fn leading_edge_shell_claim(&self, ty: &TSType<'_>) -> Option<Span> {
+    pub(in crate::printer) fn leading_edge_shell_claim(&self, ty: &TSType) -> Option<Span> {
         self.leading_edge_region(ty, EdgeRun::Breaking)
     }
 
     /// The leading-edge shell's comment region on either axis — one body, so the two
     /// questions cannot come to measure different windows for the same descent
     /// ([`EdgeRun`]).
-    fn leading_edge_region(&self, ty: &TSType<'_>, run: EdgeRun) -> Option<Span> {
+    fn leading_edge_region(&self, ty: &TSType, run: EdgeRun) -> Option<Span> {
         let head = self.head_stripped_paren_shell(ty, run)?;
         Some(Span::new(head.region_start, head.region_end))
     }
@@ -1636,7 +1633,7 @@ impl<'a> Printer<'a> {
     /// goes above the `| `, where the reparse binds it to the member above — so they ask
     /// [`Printer::union_gap_inline_run_start`] of these bytes, the same split the gap arm
     /// takes ([`Printer::union_member_has_leading_comments`]).
-    pub(in crate::printer) fn leading_edge_printed_run(&self, ty: &TSType<'_>) -> Option<Span> {
+    pub(in crate::printer) fn leading_edge_printed_run(&self, ty: &TSType) -> Option<Span> {
         self.leading_edge_region(ty, EdgeRun::LineOrBlock)
     }
 
@@ -1672,7 +1669,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn leading_edge_claim_and_start(
         &self,
         declined: bool,
-        ty: &TSType<'_>,
+        ty: &TSType,
     ) -> (Option<Span>, u32) {
         let claim = if declined {
             None
@@ -1694,11 +1691,7 @@ impl<'a> Printer<'a> {
     /// [`Self::with_claimed_shell_leading_run`] around the item's doc: the span moves the
     /// window, the claim silences the shell, and one without the other is a drop or a
     /// double-print. `declined` declines the widening, per that seam.
-    pub(in crate::printer) fn list_item_printed_span(
-        &self,
-        declined: bool,
-        ty: &TSType<'_>,
-    ) -> Span {
+    pub(in crate::printer) fn list_item_printed_span(&self, declined: bool, ty: &TSType) -> Span {
         let (_, start) = self.leading_edge_claim_and_start(declined, ty);
         Span::new(start, ty.span().end)
     }
@@ -1708,7 +1701,7 @@ impl<'a> Printer<'a> {
     /// Asked through the same claim the emitter uses, so a list cannot route on one window
     /// and emit on another: routing to the width path left the shell printing its own run
     /// at its own indent, which is the defect the claim exists to fix.
-    pub(in crate::printer) fn leading_edge_shell_line_comment(&self, ty: &TSType<'_>) -> bool {
+    pub(in crate::printer) fn leading_edge_shell_line_comment(&self, ty: &TSType) -> bool {
         self.leading_edge_shell_line_comment_claim(ty).is_some()
     }
 
@@ -1716,7 +1709,7 @@ impl<'a> Printer<'a> {
     /// the caller that must then EMIT that run rather than only route on it.
     pub(in crate::printer) fn leading_edge_shell_line_comment_claim(
         &self,
-        ty: &TSType<'_>,
+        ty: &TSType,
     ) -> Option<Span> {
         self.leading_edge_shell_claim(ty)
             .filter(|claim| self.has_line_comments_between(claim.start, claim.end))
@@ -1725,11 +1718,7 @@ impl<'a> Printer<'a> {
     /// The descent [`Self::head_stripped_paren_shell_step`] takes one level of, unmemoized
     /// at this level: the twin every memo hit is graded against under test (`head_memo`).
     #[cfg(test)]
-    fn head_stripped_paren_shell_uncached<'t>(
-        &self,
-        ty: &'t TSType<'t>,
-        run: EdgeRun,
-    ) -> Option<HeadRegion> {
+    fn head_stripped_paren_shell_uncached(&self, ty: &TSType, run: EdgeRun) -> Option<HeadRegion> {
         match self.head_stripped_paren_shell_step(ty, run) {
             HeadStep::Answer(found) => found,
             HeadStep::Descend(head) => self.head_stripped_paren_shell(head, run),
@@ -1798,7 +1787,7 @@ impl<'a> Printer<'a> {
     /// type, an optional element's type) — the head to descend into, so the memoized entry
     /// point ([`Self::head_stripped_paren_shell`]) iterates a chain of them (`A[][]…`,
     /// `A['k']['k']…`) rather than spending a frame per link.
-    fn head_stripped_paren_shell_step<'t>(&self, ty: &'t TSType<'t>, run: EdgeRun) -> HeadStep<'t>
+    fn head_stripped_paren_shell_step<'t>(&self, ty: &'t TSType, run: EdgeRun) -> HeadStep<'t>
     where
         'a: 't,
     {
@@ -1986,7 +1975,7 @@ impl<'a> Printer<'a> {
     /// composite needs no parens of its own only where the grammar allows it, and a
     /// parenthesized one stops the walk, since that layer prints its own `(` ahead of
     /// everything inside it ([`HeadRegion::region_end`]).
-    fn shell_printed_head_start(&self, shell: &TSType<'_>) -> u32 {
+    fn shell_printed_head_start(&self, shell: &TSType) -> u32 {
         let mut cur = unwrap_parenthesized(self.view, shell);
         let mut start = cur.span().start;
         while let Some(sole) = self.transparent_sole_member(cur) {
@@ -2027,14 +2016,14 @@ impl<'a> Printer<'a> {
     /// keyword→value seam's breaking-run branch, and the union hoist's own narrowing — and
     /// three spellings of "is this the widening shape?" are three chances to answer one
     /// question two ways.
-    fn shell_head_past_operator(&self, shell: &TSType<'_>) -> Option<u32> {
+    fn shell_head_past_operator(&self, shell: &TSType) -> Option<u32> {
         let head = self.shell_printed_head_start(shell);
         (head > unwrap_parenthesized(self.view, shell).span().start).then_some(head)
     }
 
     /// A shell whose own leading run is the claim: the region runs from the shell's `(` to
     /// where its interior starts printing ([`Self::shell_printed_head_start`]).
-    fn shell_head_region(&self, shell: &TSType<'_>) -> HeadRegion {
+    fn shell_head_region(&self, shell: &TSType) -> HeadRegion {
         HeadRegion {
             region_start: shell.span().start,
             region_end: self.shell_printed_head_start(shell),
@@ -2057,11 +2046,7 @@ impl<'a> Printer<'a> {
     ///
     /// Any comment kind claims, unlike a shell's run ([`EdgeRun`]): a block the composite
     /// would print is NOT where the seam prints it, so the seam must own it either way.
-    fn composite_head_gap_region<'t>(
-        &self,
-        head: u32,
-        first: &'t TSType<'t>,
-    ) -> Option<HeadRegion> {
+    fn composite_head_gap_region(&self, head: u32, first: &TSType) -> Option<HeadRegion> {
         self.has_comments_to_emit_between(head, first.span().start)
             .then_some(HeadRegion {
                 region_start: head,
@@ -2091,7 +2076,7 @@ impl<'a> Printer<'a> {
     /// own reparse.
     fn leading_edge_shell(
         &self,
-        head: &TSType<'_>,
+        head: &TSType,
         downstream_owns_run: bool,
         run: EdgeRun,
     ) -> Option<HeadRegion> {
@@ -2105,7 +2090,7 @@ impl<'a> Printer<'a> {
     /// whose own descent answers it ([`Self::head_stripped_paren_shell_step`]).
     fn leading_edge_shell_step<'t>(
         &self,
-        head: &'t TSType<'t>,
+        head: &'t TSType,
         downstream_owns_run: bool,
         run: EdgeRun,
     ) -> HeadStep<'t> {
@@ -2133,7 +2118,7 @@ impl<'a> Printer<'a> {
     /// ([`Self::intersection_member_run_owned_downstream`]).
     fn required_pair_head_shell_step<'t>(
         &self,
-        head: &'t TSType<'t>,
+        head: &'t TSType,
         needs_parens: TypeParenRule,
         run: EdgeRun,
     ) -> HeadStep<'t> {
@@ -2283,8 +2268,8 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn with_stripped_paren_trailing(
         &self,
         value_doc: DocId,
-        original: &TSType<'_>,
-        inner: &TSType<'_>,
+        original: &TSType,
+        inner: &TSType,
         trailing_block: TrailingBlock,
     ) -> DocId {
         self.with_stripped_paren_trailing_blank(
@@ -2303,8 +2288,8 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn with_stripped_paren_trailing_blank(
         &self,
         value_doc: DocId,
-        original: &TSType<'_>,
-        inner: &TSType<'_>,
+        original: &TSType,
+        inner: &TSType,
         trailing_block: TrailingBlock,
         blank: TrailingBlank,
     ) -> DocId {
@@ -2413,8 +2398,8 @@ impl<'a> Printer<'a> {
     /// has no claim to make.
     pub(in crate::printer) fn build_hang_value_doc(
         &self,
-        original: &TSType<'_>,
-        inner: &TSType<'_>,
+        original: &TSType,
+        inner: &TSType,
         trailing_block: TrailingBlock,
     ) -> DocId {
         self.with_stripped_paren_trailing(
@@ -2449,7 +2434,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn keyword_value_head<'t>(
         &self,
         gap_start: u32,
-        child: &'t TSType<'t>,
+        child: &'t TSType,
     ) -> KeywordValueHead<'t>
     where
         'a: 't,
@@ -2490,8 +2475,8 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn with_stripped_shell_value(
         &self,
         claimed_shell: Option<Span>,
-        original: &TSType<'_>,
-        inner: &TSType<'_>,
+        original: &TSType,
+        inner: &TSType,
         trailing_block: TrailingBlock,
         build: impl FnOnce() -> DocId,
     ) -> DocId {
@@ -2523,7 +2508,7 @@ impl<'a> Printer<'a> {
         &self,
         head: &KeywordValueHead<'t>,
         trailing_block: TrailingBlock,
-        build: impl FnOnce(&'t TSType<'t>) -> DocId,
+        build: impl FnOnce(&'t TSType) -> DocId,
     ) -> DocId {
         if head.frozen {
             self.build_frozen_single_child_doc(head.child)
@@ -2547,7 +2532,7 @@ impl<'a> Printer<'a> {
     /// optional `.qualifier` and `<type args>`, preserving comments at each
     /// boundary. Shared by `TSType::Import` and the `typeof import(...)` form
     /// (`TSTypeQueryExprName::Import`), which must format identically.
-    pub(in crate::printer) fn build_import_type_doc(&self, i: &TSImportType<'_>) -> DocId {
+    pub(in crate::printer) fn build_import_type_doc(&self, i: &TSImportType) -> DocId {
         let d = self.d();
         // Closing `)` of the `import(...)` call, skipping any inside comments.
         let after_args = i
@@ -2605,7 +2590,7 @@ impl<'a> Printer<'a> {
     ///
     /// What stays here is only the clean-region layout: flat, since prettier keeps a bare
     /// import type on one line however long the specifier is.
-    fn build_import_type_call_doc(&self, i: &TSImportType<'_>, paren_close: u32) -> DocId {
+    fn build_import_type_call_doc(&self, i: &TSImportType, paren_close: u32) -> DocId {
         let d = self.d();
         let open = d.text("import(");
         // The gap runs from the end of the `import` KEYWORD, not from a computed `(`:
@@ -2707,7 +2692,7 @@ impl<'a> Printer<'a> {
     /// exactly as a tuple or type literal does. The single predicate for the retain/strip
     /// question — that function consults this too, so an enclosing layout and the shell's
     /// own emission cannot disagree.
-    pub(in crate::printer) fn paren_retains_for_trailing_run(&self, ty: &TSType<'_>) -> bool {
+    pub(in crate::printer) fn paren_retains_for_trailing_run(&self, ty: &TSType) -> bool {
         outermost_paren(ty).is_some_and(|p| self.paren_shell_retains_for_trailing_run(p))
     }
 
@@ -2735,7 +2720,7 @@ impl<'a> Printer<'a> {
     /// would strip the shell before it ever reached here. Both asks read the one predicate.
     pub(in crate::printer) fn build_required_paren_operand_doc(
         &self,
-        ty: &TSType<'_>,
+        ty: &TSType,
         wrap: impl FnOnce(DocId) -> DocId,
     ) -> DocId {
         let operand_doc = self.build_type_doc(ty);
@@ -2752,7 +2737,7 @@ impl<'a> Printer<'a> {
     /// chain rather than re-entering [`Self::build_type_doc`].
     pub(in crate::printer) fn build_required_paren_pair_operand_doc(
         &self,
-        ty: &TSType<'_>,
+        ty: &TSType,
         needs_parens: TypeParenRule,
     ) -> DocId {
         if !needs_parens(self, ty) {
@@ -2780,7 +2765,7 @@ impl<'a> Printer<'a> {
     /// `build_open_required_paren_doc` exists to prevent, and it was reached at the
     /// required-pair positions that never asked for it — a fixed point that reparses, so no
     /// gate sees it.
-    fn build_required_paren_pair_doc(&self, ty: &TSType<'_>) -> DocId {
+    fn build_required_paren_pair_doc(&self, ty: &TSType) -> DocId {
         let d = self.d();
         if !self.paren_retains_for_trailing_run(ty)
             && let Some(run) = self.required_paren_open_run(ty)
@@ -2807,7 +2792,7 @@ impl<'a> Printer<'a> {
     /// question had two answers at sibling positions.
     pub(in crate::printer) fn required_paren_pair_opens(
         &self,
-        ty: &TSType<'_>,
+        ty: &TSType,
         needs_parens: TypeParenRule,
     ) -> bool {
         self.paren_retains_for_trailing_run(ty)
@@ -2820,7 +2805,7 @@ impl<'a> Printer<'a> {
     /// emitter, so the builder's two arms partition rather than race.
     fn required_paren_pair_opens_for_leading_run(
         &self,
-        ty: &TSType<'_>,
+        ty: &TSType,
         needs_parens: TypeParenRule,
     ) -> bool {
         !self.paren_retains_for_trailing_run(ty)
@@ -2851,7 +2836,7 @@ impl<'a> Printer<'a> {
     /// claimed that run ([`Self::leading_edge_shell`] declines outright where the pair
     /// around the shell opens), but an intersection's first-member HOIST claims the shell
     /// directly rather than by descending into it.
-    fn required_paren_open_run(&self, ty: &TSType<'_>) -> Option<RequiredParenRun> {
+    fn required_paren_open_run(&self, ty: &TSType) -> Option<RequiredParenRun> {
         // The `let` is implied by the predicate, which is itself keyed on
         // [`outermost_paren`] — it is spelled out to carry the shell here rather than have
         // the emitter re-derive the window the predicate just measured.
@@ -2900,7 +2885,7 @@ impl<'a> Printer<'a> {
     ///   There is no trailing gap: the `)` is synthesized directly after the operand.
     pub(in crate::printer) fn build_open_required_paren_doc(
         &self,
-        ty: &TSType<'_>,
+        ty: &TSType,
         run: RequiredParenRun,
     ) -> DocId {
         match run {
@@ -3186,10 +3171,7 @@ impl<'a> Printer<'a> {
     /// widens the seam's window over it and claims it, so the seam's own emitter prints the
     /// run and the composite's stands down. A frozen head is the one stop
     /// ([`Self::sole_member_peels`]).
-    pub(in crate::printer) fn unwrap_redundant_parens<'t>(
-        &self,
-        ty: &'t TSType<'t>,
-    ) -> &'t TSType<'t>
+    pub(in crate::printer) fn unwrap_redundant_parens<'t>(&self, ty: &'t TSType) -> &'t TSType
     where
         'a: 't,
     {
@@ -3209,7 +3191,7 @@ impl<'a> Printer<'a> {
     /// builds where the source spelled `| A`. Parens are NOT peeled: a shell is its own
     /// emitter ([`Self::unwrap_redundant_parens`] is the layout-decision peel that also
     /// crosses comment-free shells).
-    pub(in crate::printer) fn transparent_value<'t>(&self, ty: &'t TSType<'t>) -> &'t TSType<'t>
+    pub(in crate::printer) fn transparent_value<'t>(&self, ty: &'t TSType) -> &'t TSType
     where
         'a: 't,
     {
@@ -3236,7 +3218,7 @@ impl<'a> Printer<'a> {
 
     /// Whether `ty`, through comment-free paren layers, is a transparent one-member
     /// composite — the test for peeling such a layer in [`Self::transparent_value`].
-    fn shell_wraps_transparent_composite(&self, ty: &TSType<'_>) -> bool {
+    fn shell_wraps_transparent_composite(&self, ty: &TSType) -> bool {
         match ty {
             TSType::Parenthesized(p) => {
                 self.paren_inner_comment_flags(p) == (false, false)
@@ -3250,8 +3232,8 @@ impl<'a> Printer<'a> {
     /// else, a frozen head included ([`Self::sole_member_peels`]).
     pub(in crate::printer) fn transparent_sole_member<'t>(
         &self,
-        ty: &'t TSType<'t>,
-    ) -> Option<&'t TSType<'t>>
+        ty: &'t TSType,
+    ) -> Option<&'t TSType>
     where
         'a: 't,
     {
@@ -3299,10 +3281,7 @@ impl<'a> Printer<'a> {
     /// This is what makes the two authorings of one comment agree — `f() => // c⏎T`
     /// and `f() => (// c⏎T)` reach one fixed point instead of two, which is the
     /// `unformatted_ours_*` variants' whole claim.
-    pub(in crate::printer) fn leading_paren_unwrapped<'t>(
-        &self,
-        ty: &'t TSType<'t>,
-    ) -> &'t TSType<'t>
+    pub(in crate::printer) fn leading_paren_unwrapped<'t>(&self, ty: &'t TSType) -> &'t TSType
     where
         'a: 't,
     {

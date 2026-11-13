@@ -147,7 +147,7 @@ impl<'a> Printer<'a> {
     /// A type-parameter list item: the frozen verbatim slice under a Rule A
     /// format-ignore freeze (a `TSTypeParameter` has no paren shell, so the slice is
     /// its whole span), the ordinary parameter doc otherwise.
-    fn build_type_parameter_item_doc(&self, param: &TSTypeParameter<'_>, frozen: bool) -> DocId {
+    fn build_type_parameter_item_doc(&self, param: &TSTypeParameter, frozen: bool) -> DocId {
         if frozen {
             self.raw_source_range(param.span.start, param.span.end)
         } else {
@@ -278,10 +278,7 @@ impl<'a> Printer<'a> {
     /// and for an `infer`'s conditional constraint they're required (without them
     /// the enclosing `? :` rebinds and the result fails to parse). The `=` default
     /// position strips redundant parens. See [`Self::append_keyword_value`].
-    pub(in crate::printer) fn build_type_parameter_doc(
-        &self,
-        param: &TSTypeParameter<'_>,
-    ) -> DocId {
+    pub(in crate::printer) fn build_type_parameter_doc(&self, param: &TSTypeParameter) -> DocId {
         let d = self.d();
         let mut parts = d.pooled_docbuf();
 
@@ -882,7 +879,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn after_operator_value_nullable_union_doc(
         &self,
         value_doc: DocId,
-        value: &ast::Expression<'_>,
+        value: &ast::Expression,
     ) -> Option<DocId> {
         if self.nullable_union_type_args.borrow().is_empty() {
             return None;
@@ -905,7 +902,7 @@ impl<'a> Printer<'a> {
     /// ([`Self::value_with_nullable_union_broken`]).
     pub(in crate::printer) fn value_type_arguments<'v>(
         view: AstView<'v>,
-        value: &'v ast::Expression<'v>,
+        value: &'v ast::Expression,
     ) -> Option<&'v ast::TSTypeParameterInstantiation> {
         use ast::ExpressionKind as Kind;
         // A loop down the chain, not a recursion: a chain is as long as the spine limit lets
@@ -1259,7 +1256,7 @@ enum SoleTypeArgHug<'t> {
     /// An object type literal, hugging `<{` with its own width-aware group.
     TypeLiteral(&'t ast::TSTypeLiteral),
     /// A mapped type, hugging `<{` the same way.
-    Mapped(&'t ast::TSMappedType<'t>),
+    Mapped(&'t ast::TSMappedType),
     /// A hugged union (`{…} | null`), inlined atomically.
-    Union(&'t TSType<'t>),
+    Union(&'t TSType),
 }

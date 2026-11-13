@@ -393,7 +393,7 @@ pub fn parse_imports_into(
     source: &str,
     goal: Option<Goal>,
     arena: &bumpalo::Bump,
-    stores: &mut crate::ast::AstStores<'_>,
+    stores: &mut crate::ast::AstStores,
 ) -> Result<Imports, Error> {
     let program = crate::__private::parse_with_goal_or_fallback_into(source, goal, stores)?;
     Ok(collect_imports(&[&program], stores.view(), source, arena))
@@ -405,7 +405,7 @@ pub fn parse_imports_into(
 /// then the records' order; `has_module_syntax` answers for all of them. `arena` holds
 /// the walk's scratch, which is never read.
 pub fn collect_imports(
-    programs: &[&Program<'_>],
+    programs: &[&Program],
     view: AstView<'_>,
     source: &str,
     arena: &bumpalo::Bump,

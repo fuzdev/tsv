@@ -56,7 +56,7 @@ impl LiteralRole {
     /// leaves the shell's comments to nobody, and anchoring inside in the other prints them
     /// twice. A frozen element or value is read through its slice instead
     /// ([`Printer::element_claim_anchor`]): the slice prints the shell itself.
-    pub(in crate::printer) fn printed_end(self, view: AstView<'_>, expr: &Expression<'_>) -> u32 {
+    pub(in crate::printer) fn printed_end(self, view: AstView<'_>, expr: &Expression) -> u32 {
         match (self, &expr.kind) {
             (Self::CompoundTarget, ExpressionKind::AssignmentExpression(assign))
                 if assign.operator == ast::AssignmentOperator::Assign =>
@@ -86,7 +86,7 @@ impl LiteralRole {
 /// an `=` assignment (which it reads as a default, printed as that default). Any other value — a
 /// compound assignment the literal holds included (`[(a += b)]`) — prints as it would in
 /// any literal.
-pub(in crate::printer) fn is_compound_target_value(expr: &Expression<'_>) -> bool {
+pub(in crate::printer) fn is_compound_target_value(expr: &Expression) -> bool {
     match &expr.kind {
         ExpressionKind::ObjectExpression(_) | ExpressionKind::ArrayExpression(_) => true,
         ExpressionKind::AssignmentExpression(assign) => {
@@ -541,11 +541,7 @@ impl<'a> Printer<'a> {
     /// skipped it printed the property's chain with the continuation indent of an
     /// UNEXEMPT position while its sibling arm printed the same property flush, which is
     /// one construct with two layouts.
-    fn build_object_property_value_doc(
-        &self,
-        value: &Expression<'_>,
-        frozen: Option<Span>,
-    ) -> DocId {
+    fn build_object_property_value_doc(&self, value: &Expression, frozen: Option<Span>) -> DocId {
         self.mark_assignment_value(value);
         match frozen {
             Some(frozen) => self.build_frozen_expression_doc(value, frozen),
@@ -557,7 +553,7 @@ impl<'a> Printer<'a> {
     /// own way ([`is_compound_target_value`]) when `target` says so.
     fn build_property_value_doc_as(
         &self,
-        value: &Expression<'_>,
+        value: &Expression,
         frozen: Option<Span>,
         target: bool,
     ) -> DocId {
@@ -1101,7 +1097,7 @@ impl<'a> Printer<'a> {
     ///
     /// Prettier ref: `isObjectPropertyWithShortKey` in `print/assignment.js`
     /// Uses `getStringWidth(cleanDoc(keyDoc)) < tabWidth + MIN_OVERLAP_FOR_BREAK`
-    fn is_short_property_key(&self, key: &Expression<'_>, computed: bool) -> bool {
+    fn is_short_property_key(&self, key: &Expression, computed: bool) -> bool {
         // Prettier: MIN_OVERLAP_FOR_BREAK = 3 (`isObjectPropertyWithShortKey`, `print/assignment.js`)
         let threshold = TAB_WIDTH + super::assignment::MIN_OVERLAP_FOR_BREAK;
 
@@ -1174,7 +1170,7 @@ impl<'a> Printer<'a> {
     /// preserved — matching Prettier, which only unquotes when
     /// `rawText.slice(1, -1) === value`. Unquoting from the decoded value would
     /// silently rewrite the source text (data loss).
-    pub(in crate::printer) fn string_key_unquotes(&self, lit: &Literal<'_>, content: &str) -> bool {
+    pub(in crate::printer) fn string_key_unquotes(&self, lit: &Literal, content: &str) -> bool {
         if !is_valid_js_identifier(content) {
             return false;
         }
@@ -1192,7 +1188,7 @@ impl<'a> Printer<'a> {
     /// object property keys, import-attribute keys and enum member names.
     pub(in crate::printer) fn build_string_literal_key_doc(
         &self,
-        lit: &Literal<'_>,
+        lit: &Literal,
         content: &str,
     ) -> DocId {
         let d = self.d();
@@ -1212,7 +1208,7 @@ impl<'a> Printer<'a> {
     ///
     /// String literal keys that are valid identifiers are output without quotes.
     /// Example: `{"key": 1}` → `{key: 1}`, but `{"kebab-case": 1}` keeps quotes.
-    pub(in crate::printer) fn build_property_key_doc(&self, key: &Expression<'_>) -> DocId {
+    pub(in crate::printer) fn build_property_key_doc(&self, key: &Expression) -> DocId {
         match &key.kind {
             ExpressionKind::Literal(
                 lit @ Literal {
@@ -1241,7 +1237,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn build_type_member_key_doc(
         &self,
         search_start: u32,
-        key: &Expression<'_>,
+        key: &Expression,
         computed: bool,
     ) -> (DocId, u32) {
         if computed {
@@ -1276,7 +1272,7 @@ impl<'a> Printer<'a> {
     /// Shared by object and class computed property/method keys. (The computed
     /// member-*access* index applies the same rule inline in the chain printer,
     /// which threads `in_for_init` explicitly.)
-    pub(in crate::printer) fn build_computed_key_expr_doc(&self, key: &Expression<'_>) -> DocId {
+    pub(in crate::printer) fn build_computed_key_expr_doc(&self, key: &Expression) -> DocId {
         // The `[`→key gap cannot hang a leading cast's break — no operator line to end —
         // so the cast reflows onto the `[`'s line (`Printer::with_jsdoc_cast_cannot_hang_gap`).
         self.with_jsdoc_cast_cannot_hang_gap(key, || {
@@ -1317,7 +1313,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn build_computed_key_bracket_doc(
         &self,
         search_start: u32,
-        key: &Expression<'_>,
+        key: &Expression,
         key_paren_shell: Option<super::ParenContext>,
         ordinary: impl FnOnce() -> DocId,
     ) -> (DocId, u32) {

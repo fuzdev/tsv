@@ -45,7 +45,7 @@ pub struct Formatter {
     ast: bumpalo::Bump,
     doc: DocArena,
     /// The TypeScript stores between calls, out of the slot while one runs.
-    stores: Option<AstStores<'static>>,
+    stores: Option<AstStores>,
 }
 
 impl Formatter {
@@ -69,7 +69,7 @@ impl Formatter {
         // a panic out of the previous call left these arenas mid-document.
         self.ast.reset();
         self.doc.reset();
-        let mut stores: AstStores<'_> = self.stores.take().unwrap_or_default();
+        let mut stores: AstStores = self.stores.take().unwrap_or_default();
         let formatted = format_in(source, &self.ast, &mut stores, |_| &self.doc);
         self.stores = Some(stores.park());
         // Nothing borrowed from the AST arena outlives `format_in`, so it can rewind now,

@@ -221,7 +221,7 @@ pub(super) fn build_call_args_doc_for_chain(
 fn single_arrow_expression_body<'a>(
     view: AstView<'a>,
     call: &'a ast::CallExpression,
-) -> Option<(&'a ast::ArrowFunctionExpression, Span, &'a Expression<'a>)> {
+) -> Option<(&'a ast::ArrowFunctionExpression, Span, &'a Expression)> {
     if call.arguments.len() != 1 {
         return None;
     }
@@ -246,7 +246,7 @@ fn build_hugged_arrow_arg_doc(
     ctx: ChainArgsContext,
     arrow: &ast::ArrowFunctionExpression,
     span: Span,
-    body_expr: &Expression<'_>,
+    body_expr: &Expression,
     body_doc: DocId,
 ) -> DocId {
     let d = printer.d();

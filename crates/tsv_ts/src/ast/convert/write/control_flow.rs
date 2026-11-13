@@ -218,7 +218,7 @@ pub(super) fn write_throw_statement(
 /// Emits a `BreakStatement` node. `label` is nullable.
 pub(super) fn write_break_statement(
     w: &mut JsonWriter,
-    break_stmt: &ast::BreakStatement<'_>,
+    break_stmt: &ast::BreakStatement,
     span: Span,
     ctx: &Ctx<'_>,
 ) {
@@ -233,7 +233,7 @@ pub(super) fn write_break_statement(
 /// Emits a `ContinueStatement` node. `label` is nullable.
 pub(super) fn write_continue_statement(
     w: &mut JsonWriter,
-    continue_stmt: &ast::ContinueStatement<'_>,
+    continue_stmt: &ast::ContinueStatement,
     span: Span,
     ctx: &Ctx<'_>,
 ) {
@@ -248,7 +248,7 @@ pub(super) fn write_continue_statement(
 /// Emits a `LabeledStatement` node.
 pub(super) fn write_labeled_statement(
     w: &mut JsonWriter,
-    labeled: &ast::LabeledStatement<'_>,
+    labeled: &ast::LabeledStatement,
     span: Span,
     ctx: &Ctx<'_>,
 ) {

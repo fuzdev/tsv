@@ -272,9 +272,9 @@ mod stamp {
 /// A row that carries a lifetime names a family tag of its own, an uninhabited `enum`:
 ///
 /// ```ignore
-/// pub enum Expr {}
-/// impl Row for Expression<'_> { type Family = Expr; }
-/// pub type ExprId = Id<Expr>;
+/// pub enum NodeTag {}
+/// impl Row for Node<'_> { type Family = NodeTag; }
+/// pub type NodeId = Id<NodeTag>;
 /// ```
 ///
 /// A lifetime-free row needs no tag and is its own family, so a list of ids stores in

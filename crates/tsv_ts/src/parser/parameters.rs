@@ -9,12 +9,12 @@ use tsv_lang::{Error, Span};
 
 use super::{Checkpoint, Parser};
 
-impl<'a, 'arena> Parser<'a, 'arena> {
+impl<'a> Parser<'a> {
     /// Parse a simple parameter: identifier with optional `?`, type annotation, and default value.
     ///
     /// Accepts both regular identifiers and contextual keywords (`from`, `as`, etc.).
     /// Does NOT handle parameter property modifiers (`public`, `private`, `readonly`).
-    fn parse_simple_param(&mut self) -> Result<Expression<'arena>, Error> {
+    fn parse_simple_param(&mut self) -> Result<Expression, Error> {
         let (param_start, param_end) = self.current_pos();
         let name = self
             .try_param_name()
@@ -72,9 +72,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// its `left`.
     fn attach_param_decorators(
         &mut self,
-        mut param: Expression<'arena>,
+        mut param: Expression,
         decorators: Run<Deco>,
-    ) -> Expression<'arena> {
+    ) -> Expression {
         match &mut param.kind {
             // `@dec private a` — decorators ride the inner binding, not the
             // property wrapper. Recurse (the inner is an Identifier or, for
@@ -83,7 +83,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 let inner =
                     self.attach_param_decorators(self.expr(pp.parameter).clone(), decorators);
                 #[cfg(feature = "_internal_ast_census")]
-                tsv_lang::ast_census_probe::dead::<Expression<'arena>>(
+                tsv_lang::ast_census_probe::dead::<Expression>(
                     tsv_lang::ast_census_probe::Dead::DuplicateRoot,
                     1,
                 );
@@ -131,7 +131,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// target (`let [(a)] = x`), and the refinement cannot see a paren the internal AST
     /// has dropped. The record is cut back to where this pattern found it once the
     /// refinement has read it.
-    pub(super) fn parse_binding_pattern(&mut self) -> Result<Expression<'arena>, Error> {
+    pub(super) fn parse_binding_pattern(&mut self) -> Result<Expression, Error> {
         let mark = self.grouping_parens.len();
         let literal = self.with_context_flag(
             |p| &mut p.record_grouping_parens,
@@ -179,7 +179,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(super) fn parse_destructured_binding(
         &mut self,
         allow_optional: bool,
-    ) -> Result<Expression<'arena>, Error> {
+    ) -> Result<Expression, Error> {
         let mut pattern = self.parse_binding_pattern()?;
 
         // Optional marker `?` (parameter position only), between the pattern and
@@ -406,7 +406,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         allow_decorators: bool,
         parameter_levels: u32,
-    ) -> Result<Expression<'arena>, Error> {
+    ) -> Result<Expression, Error> {
         // Parameter decorators: `@dec1 @dec2 <param>`. Parsed up front so the
         // parameter body below can be any binding form — a parameter property
         // (`@dec private a`) or a destructuring pattern (`@dec { a }: T`), not
@@ -417,7 +417,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // run: a run read uncharged that turns out to be a property's is rewound and read
         // again with the level charged (`Parser::decorated_parameter_properties`).
         let decorators_start = self.current_pos().0 as u32;
-        let mut reread: Option<Checkpoint<'arena>> = None;
+        let mut reread: Option<Checkpoint> = None;
         let decorators: Run<Deco> = if self.check(&TokenKind::At) {
             // Reject decorators where the position forbids them (arrow
             // parameters, type-member signatures). Checked per-parameter, so
@@ -738,7 +738,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// (`base_offset` added), so it shifts back before slicing `self.source` (the
     /// local, possibly Svelte-embedded slice) — same discipline as
     /// `resolve_cooked`; `.get` keeps a stray span from panicking.
-    pub(super) fn is_this_param(&self, param: &Expression<'_>) -> bool {
+    pub(super) fn is_this_param(&self, param: &Expression) -> bool {
         let ExpressionKind::Identifier(id) = &param.kind else {
             return false;
         };

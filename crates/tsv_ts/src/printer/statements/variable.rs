@@ -39,7 +39,7 @@ impl Printer<'_> {
         &self,
         id_doc: DocId,
         init_doc: DocId,
-        init: &Expression<'_>,
+        init: &Expression,
     ) -> DocId {
         let d = self.d();
         match self.after_operator_value_nullable_union_doc(init_doc, init) {
@@ -75,13 +75,13 @@ pub(in crate::printer) struct DeclaratorEqGap {
 /// What [`Printer::build_declarator_init_doc`] needs from the position a declarator sits
 /// in. Every field is a fact the caller already has in hand: the binding's printed doc, the
 /// spans bounding its `=`, and what the gaps around that `=` hold.
-pub(in crate::printer) struct DeclaratorInitInputs<'e, 'a> {
+pub(in crate::printer) struct DeclaratorInitInputs<'e> {
     /// The declarator itself — read for its binding (the break-lhs arms rebuild the id doc
     /// with a wrapping / non-wrapping type annotation) and its definite `!`.
     pub declarator: &'e ast::VariableDeclarator,
     /// Its initializer. Passed rather than read back off `declarator.init`, since the caller
     /// has already matched on it to get here.
-    pub init: &'e Expression<'a>,
+    pub init: &'e Expression,
     /// The printed binding.
     pub id_doc: DocId,
     /// The `=` and what the gaps on either side of it hold.
@@ -120,7 +120,7 @@ impl<'a> Printer<'a> {
     /// that shape.
     pub(in crate::printer) fn build_declarator_init_doc(
         &self,
-        inputs: &DeclaratorInitInputs<'_, '_>,
+        inputs: &DeclaratorInitInputs<'_>,
         value: &dyn Fn() -> DocId,
     ) -> DocId {
         let d = self.d();
@@ -730,7 +730,7 @@ impl<'a> Printer<'a> {
     /// branch below routes its value through here, so the freeze is stated once.
     fn build_init_value_doc(
         &self,
-        init: &Expression<'_>,
+        init: &Expression,
         boundary_end: u32,
         frozen: Option<Span>,
     ) -> DocId {
@@ -821,7 +821,7 @@ impl<'a> Printer<'a> {
     ///
     /// For identifiers with `definite: true`, builds doc for `name!: type` instead of `name: type`.
     /// Uses wrapping type annotations so TypeReference type arguments break internally when needed.
-    fn build_variable_binding_doc(&self, id: &Expression<'_>, definite: bool) -> DocId {
+    fn build_variable_binding_doc(&self, id: &Expression, definite: bool) -> DocId {
         if definite {
             if let ExpressionKind::Identifier(ident) = &id.kind {
                 self.build_typed_identifier_doc(ident, true, true)
@@ -842,7 +842,7 @@ impl<'a> Printer<'a> {
     /// - `wrap_type`: use wrapping type annotation (breaks internally) vs non-wrapping (stays on one line)
     fn build_typed_identifier_doc(
         &self,
-        ident: &ast::Identifier<'_>,
+        ident: &ast::Identifier,
         definite: bool,
         wrap_type: bool,
     ) -> DocId {

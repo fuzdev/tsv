@@ -73,10 +73,7 @@ pub(super) fn find_separator_position(
 //
 
 /// Recursively unwrap TSParenthesizedType to get the inner type.
-pub(crate) fn unwrap_parenthesized<'a>(
-    view: AstView<'a>,
-    ts_type: &'a TSType<'a>,
-) -> &'a TSType<'a> {
+pub(crate) fn unwrap_parenthesized<'a>(view: AstView<'a>, ts_type: &'a TSType) -> &'a TSType {
     match ts_type {
         TSType::Parenthesized(p) => unwrap_parenthesized(view, view.ty(p.type_annotation)),
         _ => ts_type,
@@ -96,7 +93,7 @@ pub(crate) fn unwrap_parenthesized<'a>(
 /// [`is_simple_type_arg`], and the cast-seed shortness rule in
 /// [`is_hopefully_short_arg`](crate::printer::calls::arg_predicates) — so it lives here as
 /// one body rather than two spellings that could drift.
-pub(crate) fn is_simple_type(view: AstView<'_>, ty: &TSType<'_>) -> bool {
+pub(crate) fn is_simple_type(view: AstView<'_>, ty: &TSType) -> bool {
     match unwrap_parenthesized(view, ty) {
         TSType::Keyword(_) | TSType::ThisType(_) | TSType::Literal(_) => true,
         TSType::TypeReference(reference) => reference.type_arguments.is_none(),
@@ -114,7 +111,7 @@ pub(crate) fn is_simple_type(view: AstView<'_>, ty: &TSType<'_>) -> bool {
 /// caller relies on). They stay in the breakable group path — a residual divergence
 /// pending an atomic template-literal-type printer. That narrowing is this caller's alone;
 /// don't push it down into [`is_simple_type`].
-pub(crate) fn is_simple_type_arg(view: AstView<'_>, ty: &TSType<'_>) -> bool {
+pub(crate) fn is_simple_type_arg(view: AstView<'_>, ty: &TSType) -> bool {
     let unwrapped = unwrap_parenthesized(view, ty);
     is_simple_type(view, unwrapped)
         && !matches!(
@@ -162,9 +159,7 @@ pub(super) fn union_has_brace_member(view: AstView<'_>, union: &TSUnionType) -> 
 /// pair those builders emit, so the whole `(`…`)` region is one author gap. Bounding a
 /// gap scan by an inner layer's span stops it short and drops everything between the two
 /// closers (`((A | B) /* c */)[]`, `[((A | B) /* c */)?]`).
-pub(in crate::printer) fn outermost_paren<'a>(
-    ts_type: &'a TSType<'a>,
-) -> Option<&'a TSParenthesizedType> {
+pub(in crate::printer) fn outermost_paren(ts_type: &TSType) -> Option<&TSParenthesizedType> {
     match ts_type {
         TSType::Parenthesized(p) => Some(p),
         _ => None,
@@ -222,7 +217,7 @@ pub(in crate::printer) fn paren_shell_gaps(
 /// node check means unwrapping**; do not "read the raw member to match Prettier" here or
 /// at any caller.
 #[inline]
-pub(in crate::printer) fn is_huggable_type(view: AstView<'_>, ts_type: &TSType<'_>) -> bool {
+pub(in crate::printer) fn is_huggable_type(view: AstView<'_>, ts_type: &TSType) -> bool {
     matches!(
         unwrap_parenthesized(view, ts_type),
         TSType::TypeLiteral(_) | TSType::Mapped(_)
@@ -286,7 +281,7 @@ pub(super) fn union_hug_shape(view: AstView<'_>, union: &TSUnionType) -> bool {
 /// (`single_member_intersection_leading_gap_shell_run_prettier_divergence`, the
 /// `q<| /* c */ (// d⏎ P)>` case).
 #[inline]
-fn is_object_like_type(view: AstView<'_>, ts_type: &TSType<'_>) -> bool {
+fn is_object_like_type(view: AstView<'_>, ts_type: &TSType) -> bool {
     matches!(
         unwrap_parenthesized(view, ts_type),
         TSType::TypeLiteral(_) | TSType::TypeReference(_)
@@ -299,7 +294,7 @@ fn is_object_like_type(view: AstView<'_>, ts_type: &TSType<'_>) -> bool {
 /// Unwrapped for the same reason as [`is_object_like_type`] — the two are the two slots of
 /// one gate, so they move together or not at all.
 #[inline]
-fn is_void_type(view: AstView<'_>, ts_type: &TSType<'_>) -> bool {
+fn is_void_type(view: AstView<'_>, ts_type: &TSType) -> bool {
     matches!(
         unwrap_parenthesized(view, ts_type),
         TSType::Keyword(kw) if matches!(kw.kind, TSKeywordKind::Void | TSKeywordKind::Null)
@@ -350,7 +345,7 @@ pub(in crate::printer) fn intersection_has_expanding_first_type(
 /// `keyof⏎// prettier-ignore⏎| {a:1}`, which does not reparse
 /// (`union_prettier_ignore_single_member`). Taking the printer is what makes the peel
 /// impossible to leave out.
-pub(in crate::printer) type TypeParenRule = fn(&Printer<'_>, &TSType<'_>) -> bool;
+pub(in crate::printer) type TypeParenRule = fn(&Printer<'_>, &TSType) -> bool;
 
 impl<'a> Printer<'a> {
     /// The node `ts_type` PRINTS as at a paren seam — through the author's parens and every
@@ -372,7 +367,7 @@ impl<'a> Printer<'a> {
     /// needs a pair wherever a two-member composite does — the same answer the printer's
     /// own layout peel gives, which is the whole point of asking here rather than of the
     /// node.
-    pub(in crate::printer) fn printed_operand<'t>(&self, ts_type: &'t TSType<'t>) -> &'t TSType<'t>
+    pub(in crate::printer) fn printed_operand<'t>(&self, ts_type: &'t TSType) -> &'t TSType
     where
         'a: 't,
     {
@@ -386,10 +381,7 @@ impl<'a> Printer<'a> {
     /// Whether `ts_type`, a bare negative literal indexed-access object, was recorded by an
     /// enclosing array type as leading a run that holds a `[]`
     /// ([`Printer::negative_literal_pair_targets`]).
-    pub(in crate::printer) fn negative_literal_array_run_pairs(
-        &self,
-        ts_type: &TSType<'_>,
-    ) -> bool {
+    pub(in crate::printer) fn negative_literal_array_run_pairs(&self, ts_type: &TSType) -> bool {
         self.negative_literal_pair_targets.is_marked(ts_type.span())
     }
 }
@@ -402,7 +394,7 @@ impl<'a> Printer<'a> {
 /// an array suffix further out needs the pair ([`array_run_negative_literal`]).
 pub(in crate::printer) fn type_needs_parens_for_indexed_access_object(
     p: &Printer<'_>,
-    ts_type: &TSType<'_>,
+    ts_type: &TSType,
 ) -> bool {
     let inner = p.printed_operand(ts_type);
     // TypeOperator included: `(keyof T)[K]` is valid and different from `keyof T[K]`
@@ -434,7 +426,7 @@ pub(in crate::printer) fn type_needs_parens_for_indexed_access_object(
 /// (`(-1[K])[]`) is kept as written.
 pub(in crate::printer) fn type_needs_parens_for_array_element(
     p: &Printer<'_>,
-    ts_type: &TSType<'_>,
+    ts_type: &TSType,
 ) -> bool {
     let inner = p.printed_operand(ts_type);
     // TypeOperator included: `(keyof T)[]` differs from `keyof T[]`, and
@@ -465,7 +457,7 @@ pub(in crate::printer) fn type_needs_parens_for_array_element(
 /// `[…]` that follows as a computed member. So a bare `-1[]` does not parse there, and a
 /// bare `-1[K]` is the literal type `-(1[K])` — a different tree. A pair settles both
 /// parsers on tsc's reading.
-pub(in crate::printer) fn is_negative_literal(ts_type: &TSType<'_>) -> bool {
+pub(in crate::printer) fn is_negative_literal(ts_type: &TSType) -> bool {
     matches!(ts_type, TSType::Literal(TSLiteralType::UnaryExpression(_)))
 }
 
@@ -477,7 +469,7 @@ pub(in crate::printer) fn is_negative_literal(ts_type: &TSType<'_>) -> bool {
 /// first; stripped, it prints its inner, which does not lead with the literal (or the shell
 /// would have been kept). An ARRAY run never qualifies either — its leftmost literal always
 /// gains a pair ([`array_run_negative_literal`]).
-fn leads_with_bare_negative_literal(view: AstView<'_>, ts_type: &TSType<'_>) -> bool {
+fn leads_with_bare_negative_literal(view: AstView<'_>, ts_type: &TSType) -> bool {
     match ts_type {
         TSType::Literal(TSLiteralType::UnaryExpression(_)) => true,
         TSType::IndexedAccess(i) => leads_with_bare_negative_literal(view, view.ty(i.object_type)),
@@ -490,7 +482,7 @@ fn leads_with_bare_negative_literal(view: AstView<'_>, ts_type: &TSType<'_>) -> 
 /// brackets. The pair is kept: each parser reads the output as it read the input, where
 /// stripping it hands acorn-typescript a member read (`-1[]` rejected, `-1[K]` the literal
 /// `-(1[K])`) or, around a bare run, tsc's tree in place of the one acorn read.
-fn authored_pair_leads_with_bare_negative_literal(p: &Printer<'_>, ts_type: &TSType<'_>) -> bool {
+fn authored_pair_leads_with_bare_negative_literal(p: &Printer<'_>, ts_type: &TSType) -> bool {
     matches!(ts_type, TSType::Parenthesized(_))
         && leads_with_bare_negative_literal(p.view, p.printed_operand(ts_type))
 }
@@ -503,8 +495,8 @@ fn authored_pair_leads_with_bare_negative_literal(p: &Printer<'_>, ts_type: &TST
 /// own program. Descends only through BARE objects: a paren shell ends the run.
 pub(in crate::printer) fn array_run_negative_literal<'t>(
     view: AstView<'t>,
-    element: &'t TSType<'t>,
-) -> Option<&'t TSType<'t>> {
+    element: &'t TSType,
+) -> Option<&'t TSType> {
     let TSType::IndexedAccess(_) = element else {
         return None;
     };
@@ -520,10 +512,7 @@ pub(in crate::printer) fn array_run_negative_literal<'t>(
 /// (union/intersection plus the `TSTypeOperator`-case fall-through). Without
 /// parens the `?` rebinds: `[() => void?]` / `[A | B?]` are invalid or change
 /// meaning.
-pub(super) fn type_needs_parens_for_optional_element(
-    p: &Printer<'_>,
-    ts_type: &TSType<'_>,
-) -> bool {
+pub(super) fn type_needs_parens_for_optional_element(p: &Printer<'_>, ts_type: &TSType) -> bool {
     let inner = p.printed_operand(ts_type);
     matches!(
         inner,
@@ -546,10 +535,7 @@ pub(super) fn type_needs_parens_for_optional_element(
 /// keeps its parens (`(() => void) extends E ? ...`, `(A extends B ? C : D) extends E ? ...`);
 /// without them the `extends`/`?` rebinds. Union/intersection/keyof check types need
 /// none. Matches Prettier's `checkType` rule (`needs-parentheses.js`).
-pub(super) fn type_needs_parens_for_conditional_check(
-    p: &Printer<'_>,
-    ts_type: &TSType<'_>,
-) -> bool {
+pub(super) fn type_needs_parens_for_conditional_check(p: &Printer<'_>, ts_type: &TSType) -> bool {
     let inner = unwrap_parenthesized(p.view, ts_type);
     matches!(
         inner,
@@ -570,7 +556,7 @@ pub(super) fn type_needs_parens_for_conditional_check(
 /// Matches Prettier's `extendsType` rule (`needs-parentheses.js`).
 pub(super) fn type_needs_parens_for_conditional_extends(
     printer: &Printer<'_>,
-    ts_type: &TSType<'_>,
+    ts_type: &TSType,
 ) -> bool {
     match unwrap_parenthesized(printer.view, ts_type) {
         TSType::Conditional(_) => true,
@@ -589,7 +575,7 @@ pub(super) fn type_needs_parens_for_conditional_extends(
 /// and it abuts a trailing conditional `?` (so it needs parens as a nested
 /// function/constructor return in a conditional extends-type — see
 /// `return_type_is_constrained_infer`). A bare `infer U` forces neither.
-pub(super) fn is_constrained_infer(view: AstView<'_>, ts_type: &TSType<'_>) -> bool {
+pub(super) fn is_constrained_infer(view: AstView<'_>, ts_type: &TSType) -> bool {
     matches!(*ts_type, TSType::Infer(_, i) if view.infer_type(i).type_parameter.constraint.is_some())
 }
 
@@ -643,7 +629,7 @@ fn return_type_is_constrained_infer(
 /// operand, so as a type argument of a call no parser but tsc reads it back. The predicate
 /// prints bare instead, and the `readonly` type over it is the right-open one
 /// ([`is_right_open_predicate`]), paired where a token follows it.
-pub(super) fn type_needs_parens_for_prefix_operator(p: &Printer<'_>, ts_type: &TSType<'_>) -> bool {
+pub(super) fn type_needs_parens_for_prefix_operator(p: &Printer<'_>, ts_type: &TSType) -> bool {
     let inner = p.printed_operand(ts_type);
     matches!(
         inner,
@@ -663,10 +649,7 @@ pub(super) fn type_needs_parens_for_prefix_operator(p: &Printer<'_>, ts_type: &T
 
 /// [`type_needs_parens_for_prefix_operator`] under `readonly`: every operand but a
 /// predicate with a type.
-pub(super) fn type_needs_parens_for_readonly_operand(
-    p: &Printer<'_>,
-    ts_type: &TSType<'_>,
-) -> bool {
+pub(super) fn type_needs_parens_for_readonly_operand(p: &Printer<'_>, ts_type: &TSType) -> bool {
     !is_predicate_with_type(p.printed_operand(ts_type))
         && type_needs_parens_for_prefix_operator(p, ts_type)
 }
@@ -686,7 +669,7 @@ pub(in crate::printer) fn type_operator_operand_rule(
 /// Whether `ts_type` is a type predicate with a type (`this is B`): the type is a whole
 /// `Type` to tsc (`parseThisTypePredicate`), so it runs on to the right as a function
 /// type's return does.
-fn is_predicate_with_type(ts_type: &TSType<'_>) -> bool {
+fn is_predicate_with_type(ts_type: &TSType) -> bool {
     matches!(
         ts_type,
         TSType::TypePredicate(ast::TSTypePredicate {
@@ -699,7 +682,7 @@ fn is_predicate_with_type(ts_type: &TSType<'_>) -> bool {
 /// Whether `ts_type` prints running on to the right: a predicate with a type
 /// ([`is_predicate_with_type`]), or a `readonly` type over one, which prints its predicate
 /// bare ([`type_needs_parens_for_readonly_operand`]).
-fn is_right_open_predicate(p: &Printer<'_>, ts_type: &TSType<'_>) -> bool {
+fn is_right_open_predicate(p: &Printer<'_>, ts_type: &TSType) -> bool {
     match p.printed_operand(ts_type) {
         TSType::TypeOperator(o) => {
             o.operator == ast::TSTypeOperatorKind::Readonly
@@ -729,7 +712,7 @@ fn is_right_open_predicate(p: &Printer<'_>, ts_type: &TSType<'_>) -> bool {
 /// member of a union/intersection and `node.typeParameter.constraint` is set.
 pub(super) fn type_needs_parens_in_union_or_intersection(
     p: &Printer<'_>,
-    ts_type: &TSType<'_>,
+    ts_type: &TSType,
 ) -> bool {
     // A degenerate ONE-element intersection/union (`& b`, `| b` — the leading-operator
     // syntax) is transparent: it prints as just its member (prettier collapses it), so
@@ -813,7 +796,7 @@ fn annotation_holds_brace_type(
 fn signature_holds_brace_type(
     view: AstView<'_>,
     type_parameters: Option<&ast::TSTypeParameterDeclaration>,
-    params: &[ast::Expression<'_>],
+    params: &[ast::Expression],
     return_type: Option<&ast::TSTypeAnnotation>,
 ) -> bool {
     type_parameters.is_some_and(|decl| type_parameters_hold_brace_type(view, decl))
@@ -832,7 +815,7 @@ fn type_parameters_hold_brace_type(
         .any(|param| type_parameter_holds_brace_type(view, param))
 }
 
-fn type_parameter_holds_brace_type(view: AstView<'_>, param: &ast::TSTypeParameter<'_>) -> bool {
+fn type_parameter_holds_brace_type(view: AstView<'_>, param: &ast::TSTypeParameter) -> bool {
     param
         .constraint
         .is_some_and(|ty| type_holds_brace_type(view, view.ty(ty)))
@@ -854,7 +837,7 @@ fn type_arguments_hold_brace_type(
 
 /// A signature parameter's annotation. A destructuring pattern itself is not a brace type:
 /// its width break does not read back as authored, so only its annotation is walked.
-fn param_holds_brace_type(view: AstView<'_>, param: &ast::Expression<'_>) -> bool {
+fn param_holds_brace_type(view: AstView<'_>, param: &ast::Expression) -> bool {
     use ast::ExpressionKind;
     match &param.kind {
         ExpressionKind::Identifier(id) => {
@@ -876,7 +859,7 @@ fn param_holds_brace_type(view: AstView<'_>, param: &ast::Expression<'_>) -> boo
 }
 
 /// [`type_literal_members_hold_brace_type`] for one type, the type itself included.
-fn type_holds_brace_type(view: AstView<'_>, ty: &TSType<'_>) -> bool {
+fn type_holds_brace_type(view: AstView<'_>, ty: &TSType) -> bool {
     match ty {
         // An empty literal has nothing to break.
         TSType::TypeLiteral(l) => !l.members.is_empty(),

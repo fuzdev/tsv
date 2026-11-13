@@ -343,7 +343,7 @@ impl<'a> Printer<'a> {
     /// so that `})` can be aligned properly (one indent level past the base).
     pub(in crate::printer) fn build_type_doc_maybe_parens(
         &self,
-        ts_type: &TSType<'_>,
+        ts_type: &TSType,
         needs_parens: TypeParenRule,
     ) -> DocId {
         self.build_type_doc_maybe_parens_impl(
@@ -369,7 +369,7 @@ impl<'a> Printer<'a> {
     /// here. See [`Self::build_type_doc_maybe_parens_impl`]'s ⚠️.
     pub(super) fn build_optional_element_type_doc(
         &self,
-        ts_type: &TSType<'_>,
+        ts_type: &TSType,
         needs_parens: TypeParenRule,
     ) -> DocId {
         self.build_type_doc_maybe_parens_impl(
@@ -398,7 +398,7 @@ impl<'a> Printer<'a> {
     /// `intersection_paren_conditional`.
     pub(super) fn build_intersection_member_type_doc(
         &self,
-        ts_type: &TSType<'_>,
+        ts_type: &TSType,
         needs_parens: TypeParenRule,
     ) -> DocId {
         self.build_type_doc_maybe_parens_impl(
@@ -417,7 +417,7 @@ impl<'a> Printer<'a> {
     /// leading line-comment run.
     fn build_type_doc_maybe_parens_impl(
         &self,
-        ts_type: &TSType<'_>,
+        ts_type: &TSType,
         needs_parens: TypeParenRule,
         default_paren_indent: DefaultParenIndent,
         shell_leading_run: ShellLeadingRun,
@@ -523,7 +523,7 @@ impl<'a> Printer<'a> {
     /// by the array-element (`array_type_head`) and indexed-access-object arms; the
     /// indexed-access *index* uses bracket delimiters, not parens, so it expands
     /// inline rather than through here. See `type_param_fits_rhs_long`.
-    pub(super) fn build_expanded_parenthesized_union_opt(&self, ty: &TSType<'_>) -> Option<DocId> {
+    pub(super) fn build_expanded_parenthesized_union_opt(&self, ty: &TSType) -> Option<DocId> {
         // The seam's glue answer where a shell is authored — its `(`→union gap is the
         // shell's own, and a block there declines the hug at the seam
         // (`build_parenthesized_union_doc` hands a glued run into the union); a
@@ -1332,7 +1332,7 @@ impl<'a> Printer<'a> {
     /// overflows it breaks block-style (members on their own lines) rather than
     /// spilling an inner union/intersection — even inside a multi-argument list
     /// (`Map<K, { ...wide... }>`). Matches Prettier and the single-argument path.
-    pub(in crate::printer) fn build_type_doc_for_type_arg(&self, ts_type: &TSType<'_>) -> DocId {
+    pub(in crate::printer) fn build_type_doc_for_type_arg(&self, ts_type: &TSType) -> DocId {
         let d = self.d();
         match ts_type {
             TSType::TypeLiteral(t) => self.build_type_literal_doc(t),

@@ -109,28 +109,22 @@ impl<'a> PrinterInputs<'a> {
 /// reported in the caller's own coordinates (`FoldedSource::parse_with`). The fold keeps
 /// meaning everywhere in TypeScript, whose line rule ends a line at a `<CR>` already, so
 /// this is the folded parse alone; `tsv_svelte::__private::parse_folded` is the sibling that is not.
-pub fn parse_folded<'arena>(
-    folded: &FoldedSource<'_>,
-    goal: Option<Goal>,
-) -> Result<Parsed<'arena>> {
+pub fn parse_folded(folded: &FoldedSource<'_>, goal: Option<Goal>) -> Result<Parsed> {
     parsed(|stores| parse_folded_into(folded, goal, stores))
 }
 
 /// [`parse_folded`] into a caller's `stores`.
-pub fn parse_folded_into<'arena>(
+pub fn parse_folded_into(
     folded: &FoldedSource<'_>,
     goal: Option<Goal>,
-    stores: &mut AstStores<'arena>,
-) -> Result<Program<'arena>> {
+    stores: &mut AstStores,
+) -> Result<Program> {
     folded.parse_with(|text| parse_with_goal_or_fallback_into(text, goal, stores))
 }
 
 /// A warm parse's tree as a reading entry point takes it, read through `stores`.
 #[inline]
-pub fn parsed_ref<'a, 'arena: 'a>(
-    program: &'a Program<'arena>,
-    stores: &'a AstStores<'arena>,
-) -> ParsedRef<'a> {
+pub fn parsed_ref<'a>(program: &'a Program, stores: &'a AstStores) -> ParsedRef<'a> {
     ParsedRef {
         program,
         view: stores.view(),
@@ -138,9 +132,7 @@ pub fn parsed_ref<'a, 'arena: 'a>(
 }
 
 /// A one-shot parse: `parse` over fresh stores, bundled with the tree it built.
-fn parsed<'arena>(
-    parse: impl FnOnce(&mut AstStores<'arena>) -> Result<Program<'arena>>,
-) -> Result<Parsed<'arena>> {
+fn parsed(parse: impl FnOnce(&mut AstStores) -> Result<Program>) -> Result<Parsed> {
     let mut stores = AstStores::new();
     let program = parse(&mut stores)?;
     Ok(Parsed { program, stores })
@@ -258,12 +250,12 @@ pub fn format_canonical_in<'a>(
 // closure fails the higher-ranked lifetime check on `with_embedding_parser`'s `f`
 // bound (the closure lets the compiler infer it), so allow the closure here.
 #[expect(clippy::redundant_closure_for_method_calls)]
-pub fn parse_embedded<'arena>(
+pub fn parse_embedded(
     source: &str,
     base_offset: usize,
     host_nesting: u32,
-    stores: &mut AstStores<'arena>,
-) -> Result<Program<'arena>> {
+    stores: &mut AstStores,
+) -> Result<Program> {
     with_embedding_parser(
         source,
         base_offset,
@@ -296,12 +288,12 @@ pub fn parse_embedded<'arena>(
 ///
 /// As [`parse_embedded`]'s: positioned in the host document, with no point until the
 /// host fills its context.
-pub fn parse_embedded_preserve_parens<'arena>(
+pub fn parse_embedded_preserve_parens(
     source: &str,
     base_offset: usize,
     host_nesting: u32,
-    stores: &mut AstStores<'arena>,
-) -> Result<(Program<'arena>, bool)> {
+    stores: &mut AstStores,
+) -> Result<(Program, bool)> {
     with_embedding_parser(
         source,
         base_offset,
@@ -337,14 +329,14 @@ pub fn parse_embedded_preserve_parens<'arena>(
 /// host fills its context. A refusal `host_check` returns fails the parse it judged like
 /// any other error, so it is reported only where no list was given up to tsc's comparison;
 /// otherwise the acorn re-read decides, as at [`parse_embedded`].
-pub fn parse_expression_with_comments<'arena>(
+pub fn parse_expression_with_comments(
     source: &str,
     base_offset: usize,
     host_nesting: u32,
-    stores: &mut AstStores<'arena>,
+    stores: &mut AstStores,
     end: &str,
     host_check: impl Fn(AstView<'_>, ExprId) -> Result<()>,
-) -> Result<(ExprId, ast::CommentList<'arena>)> {
+) -> Result<(ExprId, ast::CommentList)> {
     with_embedding_parser(
         source,
         base_offset,
@@ -387,12 +379,12 @@ pub fn parse_expression_with_comments<'arena>(
 ///
 /// As [`parse_embedded`]'s: positioned in the host document, with no point until the
 /// host fills its context.
-pub fn parse_pattern_with_comments<'arena>(
+pub fn parse_pattern_with_comments(
     source: &str,
     base_offset: usize,
     host_nesting: u32,
-    stores: &mut AstStores<'arena>,
-) -> Result<(ExprId, ast::CommentList<'arena>)> {
+    stores: &mut AstStores,
+) -> Result<(ExprId, ast::CommentList)> {
     with_embedding_parser(
         source,
         base_offset,
@@ -414,30 +406,29 @@ pub fn parse_pattern_with_comments<'arena>(
 /// Push `expr` into `stores` and mint its id — for a host-built expression, such as a
 /// shorthand directive's synthesized identifier.
 #[inline]
-pub fn push_expression<'arena>(stores: &mut AstStores<'arena>, expr: Expression<'arena>) -> ExprId {
+pub fn push_expression(stores: &mut AstStores, expr: Expression) -> ExprId {
     #[cfg(feature = "_internal_ast_census")]
-    tsv_lang::ast_census_probe::mint::<Expression<'arena>>(1);
+    tsv_lang::ast_census_probe::mint::<Expression>(1);
     stores.exprs.push(expr)
 }
 
 /// Push `text` into `stores`' text pool and mint its handle — for a host-built name, such as
 /// a directive name a span of the source cannot spell.
 #[inline]
-pub fn push_text<'arena>(stores: &mut AstStores<'arena>, text: &str) -> ast::PoolStr<'arena> {
+pub fn push_text(stores: &mut AstStores, text: &str) -> ast::PoolStr {
     ast::PoolStr::new(stores.text.push(text))
 }
 
-/// The `FunctionDeclaration` `program`'s first statement is, its fields at the arena's
-/// lifetime — for a host that keeps parts of it (a `{#snippet}` head's wrapper, whose
-/// parameters and type parameters the block takes).
+/// The `FunctionDeclaration` `program`'s first statement is, borrowed from `stores` — for a
+/// host that keeps parts of it (a `{#snippet}` head's wrapper, whose parameters and type
+/// parameters the block takes).
 ///
-/// A read, not a view: a view's rows are typed at its own borrow of `stores`, and the host's
-/// fields outlive it. The row itself borrows `stores`, so a host that appends to them copies
+/// A read, not a view: the row borrows `stores` itself, so a host that appends to them copies
 /// the fields it keeps out first.
-pub fn first_function_declaration<'s, 'arena>(
-    stores: &'s AstStores<'arena>,
-    program: &Program<'arena>,
-) -> Option<&'s FunctionDeclaration<'arena>> {
+pub fn first_function_declaration<'s>(
+    stores: &'s AstStores,
+    program: &Program,
+) -> Option<&'s FunctionDeclaration> {
     let &first = stores.stmt_lists.slice(program.body).first()?;
     match stores.stmts.get(first).kind {
         StatementKind::FunctionDeclaration(func) => Some(stores.fn_decl_row(func)),
@@ -447,7 +438,7 @@ pub fn first_function_declaration<'s, 'arena>(
 
 /// Copy `ids` into `stores`' id-list store as one run — for a list the host gathered itself
 /// (`{@debug}`'s identifiers).
-pub fn push_expression_list(stores: &mut AstStores<'_>, ids: &[ExprId]) -> Run<ExprId> {
+pub fn push_expression_list(stores: &mut AstStores, ids: &[ExprId]) -> Run<ExprId> {
     let mark = stores.expr_list_scratch.mark();
     for &id in ids {
         stores.expr_list_scratch.push(id);
@@ -481,8 +472,8 @@ pub fn push_expression_list(stores: &mut AstStores<'_>, ids: &[ExprId]) -> Run<E
 /// nowhere (real content loss on a format round-trip), and is unreachable to every
 /// consumer that reasons about TypeScript by walking the tree. So the fallback
 /// **errors** rather than dropping.
-pub fn attach_pattern_type_annotation<'arena>(
-    stores: &mut AstStores<'arena>,
+pub fn attach_pattern_type_annotation(
+    stores: &mut AstStores,
     pattern: ExprId,
     mut ta: TSTypeAnnotation,
 ) -> Result<ExprId> {
@@ -556,8 +547,8 @@ pub fn attach_pattern_type_annotation<'arena>(
     };
     #[cfg(feature = "_internal_ast_census")]
     {
-        tsv_lang::ast_census_probe::mint::<Expression<'arena>>(1);
-        tsv_lang::ast_census_probe::dead::<Expression<'arena>>(
+        tsv_lang::ast_census_probe::mint::<Expression>(1);
+        tsv_lang::ast_census_probe::dead::<Expression>(
             tsv_lang::ast_census_probe::Dead::Superseded,
             1,
         );
@@ -580,7 +571,7 @@ pub fn attach_pattern_type_annotation<'arena>(
 /// pattern's root is always an identifier or a destructure, so no other root can carry one.
 pub fn pattern_type_annotation<'a>(
     view: AstView<'a>,
-    pattern: &'a Expression<'a>,
+    pattern: &'a Expression,
 ) -> Option<&'a TSTypeAnnotation> {
     match &pattern.kind {
         ExpressionKind::Identifier(id) => id.type_annotation(view),
@@ -602,7 +593,7 @@ pub fn pattern_type_annotation<'a>(
 /// and the wire attach each read the bare end, and each duplicated an annotation's comment
 /// (once onto a `{@const}` init, once inside an `ArrayPattern`'s brackets). One function so
 /// the two cannot answer it differently again.
-pub fn pattern_binding_end(view: AstView<'_>, pattern: &Expression<'_>) -> u32 {
+pub fn pattern_binding_end(view: AstView<'_>, pattern: &Expression) -> u32 {
     let bare_end = pattern.span().end;
     pattern_type_annotation(view, pattern).map_or(bare_end, |t| t.span.end)
 }
@@ -629,12 +620,12 @@ pub fn pattern_binding_end(view: AstView<'_>, pattern: &Expression<'_>) -> u32 {
 ///
 /// As [`parse_embedded`]'s: positioned in the host document, with no point until the
 /// host fills its context.
-pub fn parse_type_annotation_partial<'arena>(
+pub fn parse_type_annotation_partial(
     source: &str,
     base_offset: usize,
     host_nesting: u32,
-    stores: &mut AstStores<'arena>,
-) -> Result<(TSTypeAnnotation, ast::CommentList<'arena>)> {
+    stores: &mut AstStores,
+) -> Result<(TSTypeAnnotation, ast::CommentList)> {
     with_embedding_parser(
         source,
         base_offset,
@@ -672,14 +663,14 @@ pub fn parse_type_annotation_partial<'arena>(
 /// host fills its context. A refusal `host_check` returns fails the parse it judged like
 /// any other error, so it is reported only where no list was given up to tsc's comparison;
 /// otherwise the acorn re-read decides, as at [`parse_embedded`].
-pub fn parse_expression_partial_with_comments<'arena>(
+pub fn parse_expression_partial_with_comments(
     source: &str,
     base_offset: usize,
     host_nesting: u32,
-    stores: &mut AstStores<'arena>,
+    stores: &mut AstStores,
     top_level_as: TopLevelAs,
     host_check: impl Fn(AstView<'_>, ExprId, usize) -> Result<()>,
-) -> Result<(ExprId, usize, ast::CommentList<'arena>)> {
+) -> Result<(ExprId, usize, ast::CommentList)> {
     with_embedding_parser(
         source,
         base_offset,
@@ -713,11 +704,11 @@ pub fn parse_expression_partial_with_comments<'arena>(
 // The method-path form clippy suggests fails the higher-ranked lifetime check on
 // `with_embedding_parser`'s `f` bound — same reason as [`parse_embedded`]'s closure.
 #[expect(clippy::redundant_closure_for_method_calls)]
-pub fn parse_type_extent<'arena>(
+pub fn parse_type_extent(
     source: &str,
     base_offset: usize,
     host_nesting: u32,
-    stores: &mut AstStores<'arena>,
+    stores: &mut AstStores,
 ) -> Result<usize> {
     // the parse exists for its end offset: every row it builds is discarded
     #[cfg(feature = "_internal_ast_census")]
@@ -748,13 +739,13 @@ pub fn parse_type_extent<'arena>(
 /// host fills its context. A refusal `host_check` returns fails the parse it judged like
 /// any other error, so it is reported only where no list was given up to tsc's comparison;
 /// otherwise the acorn re-read decides, as at [`parse_embedded`].
-pub fn parse_statement_with_comments<'arena>(
+pub fn parse_statement_with_comments(
     source: &str,
     base_offset: usize,
     host_nesting: u32,
-    stores: &mut AstStores<'arena>,
-    host_check: impl Fn(AstView<'_>, &Statement<'arena>) -> Result<()>,
-) -> Result<(Statement<'arena>, ast::CommentList<'arena>)> {
+    stores: &mut AstStores,
+    host_check: impl Fn(AstView<'_>, &Statement) -> Result<()>,
+) -> Result<(Statement, ast::CommentList)> {
     with_embedding_parser(
         source,
         base_offset,
@@ -820,7 +811,7 @@ pub fn build_variable_declaration_doc(
 /// Set `inputs.comments` to `&[]` when no comments need to be preserved.
 pub fn build_expression_doc(
     arena: &DocArena,
-    expression: &Expression<'_>,
+    expression: &Expression,
     inputs: &PrinterInputs<'_>,
     embed: EmbedContext,
 ) -> DocId {
@@ -880,7 +871,7 @@ pub fn build_bare_sequence_operand_docs(
 /// keeps these heads.
 pub fn build_block_pattern_broken_doc(
     arena: &DocArena,
-    pattern: &Expression<'_>,
+    pattern: &Expression,
     inputs: &PrinterInputs<'_>,
     embed: EmbedContext,
 ) -> Option<DocId> {
@@ -916,7 +907,7 @@ pub fn build_block_pattern_broken_doc(
 /// host that also widened its *emitter* scan to here would print it twice.
 pub fn expression_printed_start(
     arena: &DocArena,
-    expression: &Expression<'_>,
+    expression: &Expression,
     inputs: &PrinterInputs<'_>,
 ) -> u32 {
     with_doc_printer(arena, inputs, EmbedContext::default(), |printer| {
@@ -963,7 +954,7 @@ pub fn expression_printed_start(
 /// prints it.
 pub fn build_assignment_value_expression_doc(
     arena: &DocArena,
-    expression: &Expression<'_>,
+    expression: &Expression,
     inputs: &PrinterInputs<'_>,
     embed: EmbedContext,
     value_gap_start: Option<u32>,
@@ -989,7 +980,7 @@ pub fn build_assignment_value_expression_doc(
 /// the returned doc directly, one level out.
 pub fn build_stacked_curried_chain_rhs_doc(
     arena: &DocArena,
-    expression: &Expression<'_>,
+    expression: &Expression,
     inputs: &PrinterInputs<'_>,
     embed: EmbedContext,
     operator_pos: u32,
@@ -1015,7 +1006,7 @@ pub fn build_stacked_curried_chain_rhs_doc(
 /// the run leaves to it. It is called at most once, and its doc is discarded on `None`.
 pub fn build_broke_after_operator_rhs_doc(
     arena: &DocArena,
-    expression: &Expression<'_>,
+    expression: &Expression,
     inputs: &PrinterInputs<'_>,
     embed: EmbedContext,
     operator_pos: u32,
@@ -1036,7 +1027,7 @@ pub fn build_broke_after_operator_rhs_doc(
 /// its operator ([`build_assignment_value_expression_doc`]'s `value_gap_start`), whether
 /// the chain owns that break or its heads force it
 /// ([`curried_chain_breaks_after_operator`]).
-pub fn is_curried_arrow_chain(view: AstView<'_>, expression: &Expression<'_>) -> bool {
+pub fn is_curried_arrow_chain(view: AstView<'_>, expression: &Expression) -> bool {
     printer::is_curried_arrow_chain(view, expression)
 }
 
@@ -1045,7 +1036,7 @@ pub fn is_curried_arrow_chain(view: AstView<'_>, expression: &Expression<'_>) ->
 /// its `chooseLayout` site (`chain-tail-arrow-chain`): a head with type parameters, a
 /// return type over parameters, or a non-identifier parameter. The host owes such a value a
 /// mandatory break after its operator; the heads then stack under it.
-pub fn curried_chain_breaks_after_operator(view: AstView<'_>, expression: &Expression<'_>) -> bool {
+pub fn curried_chain_breaks_after_operator(view: AstView<'_>, expression: &Expression) -> bool {
     printer::is_curried_arrow_chain_that_breaks(view, expression)
 }
 
@@ -1081,7 +1072,7 @@ pub fn build_comment_doc(
 /// Used by `tsv_svelte` for `{#snippet}` parameters.
 pub fn build_function_params_doc(
     arena: &DocArena,
-    params: &[Expression<'_>],
+    params: &[Expression],
     params_start: Option<u32>,
     trailing_comments_end: Option<u32>,
     inputs: &PrinterInputs<'_>,
@@ -1149,7 +1140,7 @@ pub fn build_type_annotation_doc(
 /// grades that agreement on every Svelte fixture.
 pub fn build_program_doc(
     arena: &DocArena,
-    program: &Program<'_>,
+    program: &Program,
     view: AstView<'_>,
     source: &str,
     line_table: LineTable<'_>,
@@ -1173,7 +1164,7 @@ pub fn build_program_doc(
 /// host-absolute offsets ([`parse_embedded`]), and `line_table` is the host's.
 pub fn build_program_body_doc(
     arena: &DocArena,
-    program: &Program<'_>,
+    program: &Program,
     view: AstView<'_>,
     source: &str,
     line_table: LineTable<'_>,
@@ -1203,10 +1194,7 @@ pub use crate::printer::{conditional_should_break_after_op, should_inline_logica
 /// wraps an `{#each}` head and a shorthand `{#await}` head in a pair when this answers
 /// `true`, the block-head twin of the pair the left of `as` / `satisfies` keeps.
 #[must_use]
-pub fn prints_ending_on_instantiation_close(
-    view: AstView<'_>,
-    expression: &Expression<'_>,
-) -> bool {
+pub fn prints_ending_on_instantiation_close(view: AstView<'_>, expression: &Expression) -> bool {
     printer::ends_with_instantiation_close(view, expression, false)
 }
 
@@ -1220,7 +1208,7 @@ pub fn prints_ending_on_instantiation_close(
 /// wraps such a tag's expression in a pair, the text-position twin of the pair
 /// [`prints_ending_on_instantiation_close`] answers for a block head.
 #[must_use]
-pub fn leading_regex_start(view: AstView<'_>, expression: &Expression<'_>) -> Option<u32> {
+pub fn leading_regex_start(view: AstView<'_>, expression: &Expression) -> Option<u32> {
     printer::leading_regex_start(view, expression)
 }
 
@@ -1348,12 +1336,12 @@ pub fn format_ast_in<'a>(
 /// # Ok(())
 /// # }
 /// ```
-pub fn parse<'arena>(source: &str) -> Result<Parsed<'arena>> {
+pub fn parse(source: &str) -> Result<Parsed> {
     parsed(|stores| parse_into(source, stores))
 }
 
 /// [`parse`] into a caller's `stores`, for a warm path that keeps them across documents.
-pub fn parse_into<'arena>(source: &str, stores: &mut AstStores<'arena>) -> Result<Program<'arena>> {
+pub fn parse_into(source: &str, stores: &mut AstStores) -> Result<Program> {
     Error::ensure_source_fits(source)?;
     parser::parse_typescript(source, stores).map_err(|e| e.with_context(source, WIRE_COORDINATES))
 }
@@ -1371,16 +1359,12 @@ pub fn parse_into<'arena>(source: &str, stores: &mut AstStores<'arena>) -> Resul
 /// rules the parser enforces parse only under a directive-free `Script`. Which
 /// constructs those are is enumerated once, on the flag that gates them
 /// (`Parser::strict`).
-pub fn parse_with_goal<'arena>(source: &str, goal: Goal) -> Result<Parsed<'arena>> {
+pub fn parse_with_goal(source: &str, goal: Goal) -> Result<Parsed> {
     parsed(|stores| parse_with_goal_into(source, goal, stores))
 }
 
 /// [`parse_with_goal`] into a caller's `stores`.
-pub fn parse_with_goal_into<'arena>(
-    source: &str,
-    goal: Goal,
-    stores: &mut AstStores<'arena>,
-) -> Result<Program<'arena>> {
+pub fn parse_with_goal_into(source: &str, goal: Goal, stores: &mut AstStores) -> Result<Program> {
     Error::ensure_source_fits(source)?;
     parser::parse_typescript_with_goal(source, goal, stores)
         .map_err(|e| e.with_context(source, WIRE_COORDINATES))
@@ -1411,20 +1395,17 @@ pub fn parse_with_goal_into<'arena>(
 /// back JS text, and no verdict of its walk reads the goal. The retry parses into the same
 /// stores with no reset between the two attempts, so a script's high-water is the failed
 /// module attempt plus the script parse — an error-path cost only.
-pub fn parse_with_goal_or_fallback<'arena>(
-    source: &str,
-    goal: Option<Goal>,
-) -> Result<Parsed<'arena>> {
+pub fn parse_with_goal_or_fallback(source: &str, goal: Option<Goal>) -> Result<Parsed> {
     parsed(|stores| parse_with_goal_or_fallback_into(source, goal, stores))
 }
 
 /// [`parse_with_goal_or_fallback`] into a caller's `stores`. A script retry appends after
 /// the failed module attempt's rows, which nothing names.
-pub fn parse_with_goal_or_fallback_into<'arena>(
+pub fn parse_with_goal_or_fallback_into(
     source: &str,
     goal: Option<Goal>,
-    stores: &mut AstStores<'arena>,
-) -> Result<Program<'arena>> {
+    stores: &mut AstStores,
+) -> Result<Program> {
     if let Some(goal) = goal {
         return parse_with_goal_into(source, goal, stores);
     }
@@ -1507,7 +1488,7 @@ pub fn convert_ast_json_string<'a>(parsed: impl Into<ParsedRef<'a>>, source: &st
 /// answers no paren question about its position, so the printer refuses one in a debug
 /// build and prints its contents bare in a release one — dropping every pair the
 /// position needs (`(x + y) * 2` → `x + y * 2`). Format the [`parse`] tree instead.
-pub fn parse_preserve_parens<'arena>(source: &str) -> Result<Parsed<'arena>> {
+pub fn parse_preserve_parens(source: &str) -> Result<Parsed> {
     parsed(|stores| {
         Error::ensure_source_fits(source)?;
         parser::parse_typescript_preserve_parens(source, stores)

@@ -209,10 +209,7 @@ impl<'a> Ctx<'a> {
     /// The preserved-paren parameter list of the `{#snippet}` block starting at
     /// `snippet_start`, when its head holds a grouping pair (`Root::snippet_wire_parameters`,
     /// ascending by that key).
-    fn snippet_wire_parameters(
-        &self,
-        snippet_start: u32,
-    ) -> Option<&'a [tsv_ts::ast::Expression<'a>]> {
+    fn snippet_wire_parameters(&self, snippet_start: u32) -> Option<&'a [tsv_ts::ast::Expression]> {
         let wire = self.snippet_wire_parameters;
         wire.binary_search_by_key(&snippet_start, |entry| entry.snippet_start)
             .ok()
@@ -483,7 +480,7 @@ fn write_fragment_node(w: &mut JsonWriter, node: &ast::FragmentNode<'_>, ctx: &C
 /// node's own span and cannot be handed two offsets from different nodes.
 fn write_generic_island(
     w: &mut JsonWriter,
-    expr: &tsv_ts::ast::Expression<'_>,
+    expr: &tsv_ts::ast::Expression,
     container_start: u32,
     range_end: u32,
     ctx: &Ctx<'_>,
@@ -514,7 +511,7 @@ fn write_generic_island(
 /// directly.
 fn write_braced_island(
     w: &mut JsonWriter,
-    expr: &tsv_ts::ast::Expression<'_>,
+    expr: &tsv_ts::ast::Expression,
     window: Span,
     ctx: &Ctx<'_>,
 ) {
@@ -1044,7 +1041,7 @@ fn write_snippet_block(w: &mut JsonWriter, block: &ast::SnippetBlock<'_>, ctx: &
 /// case fuses directly.
 fn write_snippet_name(
     w: &mut JsonWriter,
-    expr: &tsv_ts::ast::Expression<'_>,
+    expr: &tsv_ts::ast::Expression,
     container_start: u32,
     range_end: u32,
     ctx: &Ctx<'_>,
@@ -1065,7 +1062,7 @@ fn write_snippet_name(
 /// a function context whose wrapper ends past every param.
 fn write_snippet_parameters(
     w: &mut JsonWriter,
-    parameters: &[tsv_ts::ast::Expression<'_>],
+    parameters: &[tsv_ts::ast::Expression],
     container_start: u32,
     range_end: u32,
     ctx: &Ctx<'_>,
@@ -1505,7 +1502,7 @@ fn write_modifiers(w: &mut JsonWriter, modifiers: &[&str]) {
 /// a generic island when present, else `null`.
 fn write_optional_directive_expression(
     w: &mut JsonWriter,
-    expression: Option<&tsv_ts::ast::Expression<'_>>,
+    expression: Option<&tsv_ts::ast::Expression>,
     span: Span,
     ctx: &Ctx<'_>,
 ) {
@@ -1562,7 +1559,7 @@ fn write_transition_directive(w: &mut JsonWriter, d: &ast::TransitionDirective<'
 /// name`) that never carries a comment, emitted fused.
 fn write_directive_value_expression(
     w: &mut JsonWriter,
-    expr: &tsv_ts::ast::Expression<'_>,
+    expr: &tsv_ts::ast::Expression,
     has_expression_tag: bool,
     span: Span,
     ctx: &Ctx<'_>,
@@ -1868,10 +1865,10 @@ fn write_custom_element_field(w: &mut JsonWriter, attrs: &[ast::AttributeNode<'_
         if let ast::AttributeValue::ExpressionTag(expr) = v
             && let ExpressionKind::ObjectExpression(obj) = &ctx.view.expr(expr.expression).kind
         {
-            let mut tag: Option<&Expression<'_>> = None;
-            let mut props: Option<&Expression<'_>> = None;
-            let mut shadow: Option<&Expression<'_>> = None;
-            let mut extend: Option<&Expression<'_>> = None;
+            let mut tag: Option<&Expression> = None;
+            let mut props: Option<&Expression> = None;
+            let mut shadow: Option<&Expression> = None;
+            let mut extend: Option<&Expression> = None;
             for prop in ctx.view.obj_props(obj.properties) {
                 if let ObjectProperty::Property(p) = prop
                     && let ExpressionKind::Identifier(key) = &ctx.view.expr(p.key).kind
@@ -1995,7 +1992,7 @@ fn write_value_attributes(
 /// block's span: a comment attaching here
 /// necessarily starts inside the binding, and asking wider would only build an
 /// attach with nothing in its queue.
-fn write_pattern_island(w: &mut JsonWriter, expr: &tsv_ts::ast::Expression<'_>, ctx: &Ctx<'_>) {
+fn write_pattern_island(w: &mut JsonWriter, expr: &tsv_ts::ast::Expression, ctx: &Ctx<'_>) {
     let window = pattern_comment_window(ctx.view, expr);
     if !ctx.any_comment_in(window.start, window.end) {
         write_pattern_embedded(

@@ -1313,7 +1313,7 @@ impl<'a> Printer<'a> {
     /// one, so a `//` deferred to a line end still lands in JS.
     fn build_nested_script_body_doc(
         &self,
-        program: &tsv_ts::ast::Program<'_>,
+        program: &tsv_ts::ast::Program,
         view: tsv_ts::ast::AstView<'_>,
     ) -> Option<DocId> {
         // The body is raw text to the canonical parser, so the host's `Root.comments` holds

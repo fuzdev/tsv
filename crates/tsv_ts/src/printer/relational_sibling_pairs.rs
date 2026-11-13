@@ -52,8 +52,8 @@ impl ChildSlot {
 /// expression kind must settle its own children.
 fn any_expression_child<'e>(
     view: AstView<'e>,
-    expr: &'e Expression<'e>,
-    mut visit: impl FnMut(&'e Expression<'e>, ChildSlot) -> bool,
+    expr: &'e Expression,
+    mut visit: impl FnMut(&'e Expression, ChildSlot) -> bool,
 ) -> bool {
     use ChildSlot::{ArrowBody, Element, Other, PropertyValue, TemplateExpression};
     match &expr.kind {
@@ -215,7 +215,7 @@ fn any_expression_child<'e>(
 fn decorators_any<'e>(
     view: AstView<'e>,
     decorators: Option<&'e [Decorator]>,
-    visit: &mut impl FnMut(&'e Expression<'e>, ChildSlot) -> bool,
+    visit: &mut impl FnMut(&'e Expression, ChildSlot) -> bool,
 ) -> bool {
     decorators.is_some_and(|items| {
         items
@@ -234,10 +234,10 @@ fn decorators_any<'e>(
 /// free.
 fn expression_holds_binary<'e>(
     view: AstView<'e>,
-    expr: &'e Expression<'e>,
+    expr: &'e Expression,
     predicate: impl Fn(&BinaryExpression) -> bool,
 ) -> bool {
-    let mut pending: SmallVec<[&'e Expression<'e>; 16]> = smallvec![expr];
+    let mut pending: SmallVec<[&'e Expression; 16]> = smallvec![expr];
     while let Some(expr) = pending.pop() {
         if let ExpressionKind::BinaryExpression(binary) = &expr.kind
             && predicate(binary)
@@ -271,13 +271,13 @@ fn opens_region(binary: &BinaryExpression) -> bool {
 }
 
 /// Whether `expr` holds a binary `<` / `<<` ([`opens_region`]).
-fn holds_region_opener(view: AstView<'_>, expr: &Expression<'_>) -> bool {
+fn holds_region_opener(view: AstView<'_>, expr: &Expression) -> bool {
     expression_holds_binary(view, expr, opens_region)
 }
 
 /// Whether `expr` holds a binary the parser flagged as one that may close an open region
 /// (`BinaryExpression::may_close_type_arguments`).
-fn holds_region_closer(view: AstView<'_>, expr: &Expression<'_>) -> bool {
+fn holds_region_closer(view: AstView<'_>, expr: &Expression) -> bool {
     expression_holds_binary(view, expr, |binary| binary.may_close_type_arguments)
 }
 
@@ -290,7 +290,7 @@ fn holds_region_closer(view: AstView<'_>, expr: &Expression<'_>) -> bool {
 /// carrier that prints its operands itself — a `for` header's clause — prints no pair of
 /// the assignment's style, and stripped there `(x = a < b), e > (f, g)` reads as one
 /// generic call.
-fn supplies_its_own_pair(expr: &Expression<'_>) -> bool {
+fn supplies_its_own_pair(expr: &Expression) -> bool {
     matches!(
         expr.kind,
         ExpressionKind::SequenceExpression(_) | ExpressionKind::CommentBoundPair(_)
@@ -476,19 +476,19 @@ impl<'a> Printer<'a> {
     /// decides each node's own pair on the way back up, once every child has answered
     /// whether it holds a `<` / `<<` — the one order that matters, since the marks are sets
     /// and nothing the walk asks reads them.
-    fn mark_region_source_pairs<'e>(&self, expr: &'e Expression<'e>, slot: ChildSlot)
+    fn mark_region_source_pairs<'e>(&self, expr: &'e Expression, slot: ChildSlot)
     where
         'a: 'e,
     {
         /// A step of the walk: enter a child of the node at `parent` (`None` for the root),
         /// or leave the node at an index into `visited` once its children are done.
         enum Step<'e> {
-            Enter(&'e Expression<'e>, ChildSlot, Option<usize>),
+            Enter(&'e Expression, ChildSlot, Option<usize>),
             Leave(usize),
         }
         /// A node entered and not yet left: what its pair decision reads.
         struct Visited<'e> {
-            expr: &'e Expression<'e>,
+            expr: &'e Expression,
             list_end: Option<u32>,
             holds_opener: bool,
             parent: Option<usize>,
@@ -537,7 +537,7 @@ impl<'a> Printer<'a> {
 
     /// The marks [`Self::mark_region_source_pairs`] sets on entering `expr` at `slot`,
     /// ahead of its children — answering the list end its authored-pair question reads.
-    fn mark_region_node(&self, expr: &Expression<'_>, slot: ChildSlot) -> Option<u32> {
+    fn mark_region_node(&self, expr: &Expression, slot: ChildSlot) -> Option<u32> {
         // A `<` this walk covers is a chain link whose operands it walks with the slot a
         // direct chain-region walk gives them, so that chain need not walk them again
         // ([`Self::mark_relational_chain_region`]).
@@ -630,7 +630,7 @@ impl<'a> Printer<'a> {
     /// only at a position whose own delimiters are no `(` — except a call argument's, whose
     /// list `(` is the token before its first argument: `list_end`, just past the call's
     /// `)`, tells that `)` from a pair inside it.
-    fn holds_authored_pair(&self, expr: &Expression<'_>, list_end: Option<u32>) -> bool {
+    fn holds_authored_pair(&self, expr: &Expression, list_end: Option<u32>) -> bool {
         self.paren_shell_close_after(expr.span().end)
             .is_some_and(|close| list_end.is_none_or(|end| close < end))
             && self.opens_behind_paren(expr)
@@ -638,7 +638,7 @@ impl<'a> Printer<'a> {
 
     /// Whether the token before `expr` is a `(`, whitespace and comments stepped over. A
     /// span outside the source — a tree a tool built for printing — answers no.
-    fn opens_behind_paren(&self, expr: &Expression<'_>) -> bool {
+    fn opens_behind_paren(&self, expr: &Expression) -> bool {
         let start = expr.span().start;
         self.source.is_char_boundary(start as usize)
             && self.prev_significant_byte(start) == Some(b'(')
@@ -693,7 +693,7 @@ impl<'a> Printer<'a> {
     /// ([`Self::mark_region_source_pairs`]). A document-level fast gate keeps every
     /// ordinary expression off the set.
     #[inline]
-    pub(in crate::printer) fn region_withholds_pair(&self, expr: &Expression<'_>) -> bool {
+    pub(in crate::printer) fn region_withholds_pair(&self, expr: &Expression) -> bool {
         self.has_region_source_marks.get() && self.region_bare_targets.is_marked(expr.span())
     }
 
@@ -714,7 +714,7 @@ impl<'a> Printer<'a> {
     /// or a unary `-` in a region, or around an assignment's target there — a pair its
     /// position would otherwise strip.
     #[inline]
-    pub(in crate::printer) fn region_keeps_shell(&self, expr: &Expression<'_>) -> bool {
+    pub(in crate::printer) fn region_keeps_shell(&self, expr: &Expression) -> bool {
         self.has_region_source_marks.get() && self.region_kept_shell_targets.is_marked(expr.span())
     }
 
@@ -724,7 +724,7 @@ impl<'a> Printer<'a> {
     /// its own pair ([`has_leftmost_arrow_body_parens`]: `({}).x ? a : b` prints bare, the pair
     /// around the object alone) and one a region leaves bare.
     #[inline]
-    pub(in crate::printer) fn arrow_body_takes_ternary_pair(&self, body: &Expression<'_>) -> bool {
+    pub(in crate::printer) fn arrow_body_takes_ternary_pair(&self, body: &Expression) -> bool {
         matches!(body.kind, ExpressionKind::ConditionalExpression(_))
             && !has_leftmost_arrow_body_parens(self.view, body)
             && !self.region_withholds_pair(body)
@@ -737,7 +737,7 @@ impl<'a> Printer<'a> {
     /// is the kept pair when present: wrapping again would print it twice.
     pub(in crate::printer) fn wrap_relational_sibling_pair(
         &self,
-        expr: &Expression<'_>,
+        expr: &Expression,
         already_parenthesized: bool,
         doc: DocId,
     ) -> DocId {
@@ -755,7 +755,7 @@ impl<'a> Printer<'a> {
     /// an assignment operand inside the region, which a sequence prints as the pair of its own
     /// style and the region rules leave to the source (`(x = a < b), c > (d, e)`;
     /// [`Self::mark_region_source_pairs`]).
-    pub(crate) fn wrap_bare_list_operand(&self, expr: &Expression<'_>, doc: DocId) -> DocId {
+    pub(crate) fn wrap_bare_list_operand(&self, expr: &Expression, doc: DocId) -> DocId {
         if matches!(expr.kind, ExpressionKind::AssignmentExpression(_))
             && self.region_walked_elements.is_marked(expr.span())
             && !self.region_withholds_pair(expr)
@@ -773,7 +773,7 @@ impl<'a> Printer<'a> {
     /// never wrapped twice.
     pub(in crate::printer) fn build_value_doc_keeping_relational_sibling_pair(
         &self,
-        expr: &Expression<'_>,
+        expr: &Expression,
         boundary_end: u32,
     ) -> DocId {
         let kept = self.relational_sibling_pair_is_kept(expr);
@@ -785,10 +785,7 @@ impl<'a> Printer<'a> {
     /// expression never probes the set. Marks are never consumed: every layout candidate
     /// asks the same question of the same span.
     #[inline]
-    pub(in crate::printer) fn relational_sibling_pair_is_kept(
-        &self,
-        expr: &Expression<'_>,
-    ) -> bool {
+    pub(in crate::printer) fn relational_sibling_pair_is_kept(&self, expr: &Expression) -> bool {
         self.has_relational_sibling_pairs.get()
             && self.relational_sibling_pair_targets.is_marked(expr.span())
     }

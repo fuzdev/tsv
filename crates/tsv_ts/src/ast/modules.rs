@@ -13,14 +13,14 @@ use super::{
 
 /// Export named declaration: `export const x = 1;`, `export { x }`, `export { x } from "y"`
 #[derive(Debug, Clone)]
-pub struct ExportNamedDeclaration<'arena> {
+pub struct ExportNamedDeclaration {
     /// The declaration being exported (VariableDeclaration, FunctionDeclaration, ClassDeclaration)
     /// None when using specifiers
     pub declaration: Option<StmtId>,
     /// Export specifiers: `export { a, b as c }`
     pub specifiers: Run<ExportSpec>,
     /// Re-export source: `export { x } from "y"` or None for local exports
-    pub source: Option<Literal<'arena>>,
+    pub source: Option<Literal>,
     /// Import attributes: `export { x } from "y" with { type: "json" }`.
     /// `None` = no `with` clause; `Some` of an empty run = empty `with {}` (preserved,
     /// matching acorn/prettier). Only a re-export (with `source`) can carry a
@@ -42,9 +42,9 @@ pub enum ExportKind {
 
 /// Export default declaration: `export default x`, `export default function() {}`
 #[derive(Debug, Clone)]
-pub struct ExportDefaultDeclaration<'arena> {
+pub struct ExportDefaultDeclaration {
     /// The expression or declaration being exported as default
-    pub declaration: ExportDefaultValue<'arena>,
+    pub declaration: ExportDefaultValue,
 }
 
 /// Function declaration that may be ambient (TSDeclareFunction) or regular (FunctionDeclaration)
@@ -52,29 +52,29 @@ pub struct ExportDefaultDeclaration<'arena> {
 /// Used when parsing export function declarations which can be either
 /// in ambient context (declare module) or regular context.
 #[derive(Debug, Clone)]
-pub enum ExportFunctionDeclaration<'arena> {
-    Declaration(FunctionDeclaration<'arena>),
-    Declare(TSDeclareFunction<'arena>),
+pub enum ExportFunctionDeclaration {
+    Declaration(FunctionDeclaration),
+    Declare(TSDeclareFunction),
 }
 
 /// Value of export default - can be expression or declaration
 #[derive(Debug, Clone)]
-pub enum ExportDefaultValue<'arena> {
+pub enum ExportDefaultValue {
     // Variants held inline by value: the `Expression` variant already sizes this
     // enum (it is the largest), so inlining the declaration variants is free, avoids
     // a pointer-chase on the format read path, and matches `ExportFunctionDeclaration`
     // (which holds the same structs inline).
     Expression(ExprId),
-    FunctionDeclaration(FunctionDeclaration<'arena>),
+    FunctionDeclaration(FunctionDeclaration),
     /// A bodiless function declaration: a `declare function`, an overload
     /// signature, or a bodiless signature inside a `declare namespace`.
-    TSDeclareFunction(TSDeclareFunction<'arena>),
-    ClassDeclaration(ClassDeclaration<'arena>),
+    TSDeclareFunction(TSDeclareFunction),
+    ClassDeclaration(ClassDeclaration),
     /// `export default interface Foo {}` (TypeScript)
-    TSInterfaceDeclaration(TSInterfaceDeclaration<'arena>),
+    TSInterfaceDeclaration(TSInterfaceDeclaration),
 }
 
-impl ExportDefaultValue<'_> {
+impl ExportDefaultValue {
     /// The exported value's own span — where the `export default` keyword's gap ends,
     /// whichever form follows it.
     pub fn span(&self, view: AstView<'_>) -> Span {
@@ -91,13 +91,13 @@ impl ExportDefaultValue<'_> {
 /// Export all declaration: `export * from "y"` or `export * as ns from "y"`
 /// Also handles type-only: `export type * from "y"`
 #[derive(Debug, Clone)]
-pub struct ExportAllDeclaration<'arena> {
+pub struct ExportAllDeclaration {
     /// For `export * as ns from "y"`, the namespace binding name. Per ecma262
     /// `ModuleExportName : IdentifierName | StringLiteral`, so `export * as 'str' from`
     /// is also valid.
-    pub exported: Option<ModuleExportName<'arena>>,
+    pub exported: Option<ModuleExportName>,
     /// Module source
-    pub source: Literal<'arena>,
+    pub source: Literal,
     /// Import attributes: `export * from "y" with { type: "json" }`.
     /// `None` = no `with` clause; `Some` of an empty run = empty `with {}`.
     pub attributes: Option<Run<ImportAttr>>,
@@ -116,19 +116,19 @@ pub struct TSExportAssignment {
 /// Declares a global (UMD) name a module is also available under; appears in
 /// ambient `.d.ts` files.
 #[derive(Debug, Clone)]
-pub struct TSNamespaceExportDeclaration<'arena> {
+pub struct TSNamespaceExportDeclaration {
     /// The global namespace name
-    pub id: Identifier<'arena>,
+    pub id: Identifier,
 }
 
 /// Export specifier: `export { x }` or `export { x as y }` or `export { type x }`
 #[derive(Debug, Clone)]
-pub struct ExportSpecifier<'arena> {
+pub struct ExportSpecifier {
     /// Local name (what's exported from this module). A string in a re-export,
     /// e.g. `export { 'str' } from 'y'`.
-    pub local: ModuleExportName<'arena>,
+    pub local: ModuleExportName,
     /// Exported name (what it's called externally, may be same as local)
-    pub exported: ModuleExportName<'arena>,
+    pub exported: ModuleExportName,
     /// Export kind for inline type modifier: `export { type A, b }`
     pub export_kind: ExportKind,
     pub span: Span,
@@ -150,11 +150,11 @@ pub use crate::imports::ImportPhase;
 
 /// Import declaration: `import x from "y"`, `import { a, b } from "y"`, etc.
 #[derive(Debug, Clone)]
-pub struct ImportDeclaration<'arena> {
+pub struct ImportDeclaration {
     /// Import specifiers (default, named, or namespace)
     pub specifiers: Run<ImportSpec>,
     /// Module source (string literal)
-    pub source: Literal<'arena>,
+    pub source: Literal,
     /// Import attributes: `import x from "y" with { type: "json" }`.
     /// `None` = no `with` clause; `Some` of an empty run = empty `with {}`.
     pub attributes: Option<Run<ImportAttr>>,
@@ -166,32 +166,32 @@ pub struct ImportDeclaration<'arena> {
 
 /// Import specifier variants
 #[derive(Debug, Clone)]
-pub enum ImportSpecifier<'arena> {
+pub enum ImportSpecifier {
     /// Default import: `import x from "y"`
-    Default(ImportDefaultSpecifier<'arena>),
+    Default(ImportDefaultSpecifier),
     /// Named import: `import { a, b as c } from "y"`
-    Named(ImportNamedSpecifier<'arena>),
+    Named(ImportNamedSpecifier),
     /// Namespace import: `import * as ns from "y"`
-    Namespace(ImportNamespaceSpecifier<'arena>),
+    Namespace(ImportNamespaceSpecifier),
 }
 
 /// Default import specifier: `import x from "y"`
 #[derive(Debug, Clone)]
-pub struct ImportDefaultSpecifier<'arena> {
+pub struct ImportDefaultSpecifier {
     /// Local binding name
-    pub local: Identifier<'arena>,
+    pub local: Identifier,
     pub span: Span,
 }
 
 /// Named import specifier: `import { a } from "y"` or `import { a as b } from "y"`
 #[derive(Debug, Clone)]
-pub struct ImportNamedSpecifier<'arena> {
+pub struct ImportNamedSpecifier {
     /// Imported name (the name in the module). A string for arbitrary module
     /// namespace names, e.g. `import { 'str' as b } from 'y'`.
-    pub imported: ModuleExportName<'arena>,
+    pub imported: ModuleExportName,
     /// Local binding name (may be same as imported, or different for `as` renames).
     /// Always an identifier — a string imported name requires an `as` binding.
-    pub local: Identifier<'arena>,
+    pub local: Identifier,
     /// Import kind for inline type modifier: `import { type A, B } from "y"`
     pub import_kind: ImportKind,
     pub span: Span,
@@ -199,29 +199,29 @@ pub struct ImportNamedSpecifier<'arena> {
 
 /// Namespace import specifier: `import * as ns from "y"`
 #[derive(Debug, Clone)]
-pub struct ImportNamespaceSpecifier<'arena> {
+pub struct ImportNamespaceSpecifier {
     /// Local binding name
-    pub local: Identifier<'arena>,
+    pub local: Identifier,
     pub span: Span,
 }
 
 /// Import attribute: `{ type: "json" }` or `{ "resolution-mode": "import" }`
 #[derive(Debug, Clone)]
-pub struct ImportAttribute<'arena> {
-    pub key: ImportAttributeKey<'arena>,
-    pub value: Literal<'arena>,
+pub struct ImportAttribute {
+    pub key: ImportAttributeKey,
+    pub value: Literal,
     pub span: Span,
 }
 
 /// Import attribute key: a bare identifier (`type`) or a string literal
 /// (`"resolution-mode"`). Per ecma262 `AttributeKey : IdentifierName | StringLiteral`.
 #[derive(Debug, Clone)]
-pub enum ImportAttributeKey<'arena> {
-    Identifier(Identifier<'arena>),
-    Literal(Literal<'arena>),
+pub enum ImportAttributeKey {
+    Identifier(Identifier),
+    Literal(Literal),
 }
 
-impl<'arena> ImportAttributeKey<'arena> {
+impl ImportAttributeKey {
     pub fn span(&self) -> Span {
         match self {
             ImportAttributeKey::Identifier(id) => id.span,
@@ -235,12 +235,12 @@ impl<'arena> ImportAttributeKey<'arena> {
 /// arbitrary module namespace names). Used for import/export specifier names
 /// and the `export * as` namespace name. Mirrors `ImportAttributeKey`.
 #[derive(Debug, Clone)]
-pub enum ModuleExportName<'arena> {
-    Identifier(Identifier<'arena>),
-    Literal(Literal<'arena>),
+pub enum ModuleExportName {
+    Identifier(Identifier),
+    Literal(Literal),
 }
 
-impl<'arena> ModuleExportName<'arena> {
+impl ModuleExportName {
     pub fn span(&self) -> Span {
         match self {
             ModuleExportName::Identifier(id) => id.span,
@@ -251,11 +251,11 @@ impl<'arena> ModuleExportName<'arena> {
 
 /// TypeScript import equals declaration: `import x = require("y")` or `import x = A.B`
 #[derive(Debug, Clone)]
-pub struct TSImportEqualsDeclaration<'arena> {
+pub struct TSImportEqualsDeclaration {
     /// The local binding name
-    pub id: Identifier<'arena>,
+    pub id: Identifier,
     /// The module reference (either external module or entity name)
-    pub module_reference: TSModuleReference<'arena>,
+    pub module_reference: TSModuleReference,
     /// Import kind: "value" or "type"
     pub import_kind: ImportKind,
     /// Whether this is an export: `export import x = require("y")`
@@ -264,17 +264,17 @@ pub struct TSImportEqualsDeclaration<'arena> {
 
 /// Module reference: either external module reference or entity name
 #[derive(Debug, Clone)]
-pub enum TSModuleReference<'arena> {
+pub enum TSModuleReference {
     /// `require("module")`
-    ExternalModuleReference(TSExternalModuleReference<'arena>),
+    ExternalModuleReference(TSExternalModuleReference),
     /// `A.B.C` (entity name)
-    EntityName(TSEntityName<'arena>),
+    EntityName(TSEntityName),
 }
 
 /// External module reference: `require("module")`
 #[derive(Debug, Clone)]
-pub struct TSExternalModuleReference<'arena> {
+pub struct TSExternalModuleReference {
     /// The module specifier (string literal)
-    pub expression: Literal<'arena>,
+    pub expression: Literal,
     pub span: Span,
 }

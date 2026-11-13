@@ -51,8 +51,8 @@ use tsv_lang::doc::arena::DocId;
 
 /// One level of a commented non-null run ([`Printer::build_commented_non_null_operand_doc`]):
 /// the level's expression, its non-null, and its stripped-paren leading run.
-type CommentedNonNullLevel<'e, 'arena> = (
-    &'e Expression<'arena>,
+type CommentedNonNullLevel<'e> = (
+    &'e Expression,
     &'e crate::ast::TSNonNullExpression,
     Option<DocId>,
 );
@@ -107,7 +107,7 @@ impl<'a> Printer<'a> {
     /// be a single line: a comment bound to `expr`'s first token is prepended *inside*
     /// the doc, so a paren any parent synthesizes around it lands outside the pair. See
     /// `comments/owned.rs`.
-    pub(crate) fn build_expression_doc(&self, expr: &Expression<'_>) -> DocId {
+    pub(crate) fn build_expression_doc(&self, expr: &Expression) -> DocId {
         let doc = self.build_expression_doc_dispatch(expr);
         self.prepend_owned_leading_comment(expr, doc)
     }
@@ -124,7 +124,7 @@ impl<'a> Printer<'a> {
     /// there lands in their frames on the recursive call path (`f(f(f(1)))` then nests
     /// about 2% shallower); here the non-leaf path is a compare and a jump.
     #[inline(never)]
-    fn build_expression_doc_dispatch(&self, expr: &Expression<'_>) -> DocId {
+    fn build_expression_doc_dispatch(&self, expr: &Expression) -> DocId {
         match &expr.kind {
             // The full dispatch's take-and-clear of `is_expression_statement`, which a
             // leaf never re-sets (see the rule at the top of that function).
@@ -150,7 +150,7 @@ impl<'a> Printer<'a> {
     // Out of line so the dispatch front stays frameless: inlined, this arm's registers
     // are saved on entry to the front, ahead of its kind test, by every kind.
     #[inline(never)]
-    fn build_identifier_expression_doc(&self, id: &crate::ast::Identifier<'_>) -> DocId {
+    fn build_identifier_expression_doc(&self, id: &crate::ast::Identifier) -> DocId {
         // A variable reference — no `?`, no binding extra — is its name alone, the
         // answer `build_identifier_doc`'s own fast path gives, taken here without paying
         // that function's frame.
@@ -187,7 +187,7 @@ impl<'a> Printer<'a> {
     /// The root NAMES the style rather than leaning on that default, for one reason: it
     /// must override the assignment-value mark a host may have set on the same expression
     /// (`build_assignment_value_expression_doc`), which would otherwise answer flat.
-    pub(crate) fn build_root_expression_doc(&self, expr: &Expression<'_>) -> DocId {
+    pub(crate) fn build_root_expression_doc(&self, expr: &Expression) -> DocId {
         if self.embed.jsdoc_cast_cannot_hang {
             self.mark_jsdoc_cast_cannot_hang_gap(expr);
         }
@@ -309,10 +309,7 @@ impl<'a> Printer<'a> {
     /// the comment is DROPPED (`docs/comments.md` hazard 1). That is the whole reason this
     /// is a shared seam rather than one call per site: the obligation is easy to forget,
     /// and every `shouldNotIndent` position inherits it by construction.
-    pub(in crate::printer) fn build_flat_chain_expression_doc(
-        &self,
-        expr: &Expression<'_>,
-    ) -> DocId {
+    pub(in crate::printer) fn build_flat_chain_expression_doc(&self, expr: &Expression) -> DocId {
         if let ExpressionKind::BinaryExpression(binary) = &expr.kind {
             let doc = self.build_binary_chain_doc_flat(binary, expr.span);
             return self.prepend_owned_leading_comment(expr, doc);
@@ -326,7 +323,7 @@ impl<'a> Printer<'a> {
     // Out of line: inlined into its front, its frame would be paid by the leaf kinds the
     // front answers first.
     #[inline(never)]
-    fn build_expression_doc_full_dispatch(&self, expr: &Expression<'_>) -> DocId {
+    fn build_expression_doc_full_dispatch(&self, expr: &Expression) -> DocId {
         tsv_lang::fanout_probe::build(
             tsv_lang::fanout_probe::Build::Expression,
             &expr.kind,
@@ -778,7 +775,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build doc for function parameter expression, using FunctionParameter context for patterns
-    pub(super) fn build_function_parameter_doc(&self, expr: &Expression<'_>) -> DocId {
+    pub(super) fn build_function_parameter_doc(&self, expr: &Expression) -> DocId {
         match &expr.kind {
             ExpressionKind::ObjectPattern(obj) => self.with_param_decorators(
                 self.view.opt_decorators(obj.decorators),
@@ -806,7 +803,7 @@ impl<'a> Printer<'a> {
     ///
     /// Assignment expressions are wrapped in parens for clarity:
     /// `fn((a = b))` not `fn(a = b)`
-    pub(super) fn build_arg_expression_doc(&self, expr: &Expression<'_>) -> DocId {
+    pub(super) fn build_arg_expression_doc(&self, expr: &Expression) -> DocId {
         // Member-chain arg-doc sharing: a chain builds the same group flat and expanded
         // across `conditional_group` candidates; reuse the one build instead of
         // re-recursing (kills the O(4^depth) rebuild — see the `chain_arg_share_active`
@@ -820,7 +817,7 @@ impl<'a> Printer<'a> {
         })
     }
 
-    fn build_arg_expression_doc_uncached(&self, expr: &Expression<'_>) -> DocId {
+    fn build_arg_expression_doc_uncached(&self, expr: &Expression) -> DocId {
         // An assignment takes clarity parens here (`fn((a = b))`), and the claim goes
         // BENEATH them: a multi-line block glued to the assignment prints inside the pair,
         // as at every other position that parenthesizes one. Claimed around the pair, the
@@ -848,7 +845,7 @@ impl<'a> Printer<'a> {
     /// `expressions/arrays/element_multiline_block_comment_flat` — array elements share this
     /// builder). The wrapper above is the claim those arms owe, stated once here rather than
     /// per arm.
-    fn build_arg_expression_doc_body(&self, expr: &Expression<'_>) -> DocId {
+    fn build_arg_expression_doc_body(&self, expr: &Expression) -> DocId {
         match &expr.kind {
             // A `Boolean()` coercion's lone argument — the one argument position in
             // prettier's `shouldNotIndent` — arrives marked by its call printer
@@ -898,7 +895,7 @@ impl<'a> Printer<'a> {
     /// the object's INTERIOR — a comment one byte before `span.start` is outside every window
     /// it consults, so without the prepend it is DROPPED. The `_` arm needs none:
     /// `build_arg_expression_doc` routes there.
-    pub(super) fn build_arg_expression_doc_expanded(&self, expr: &Expression<'_>) -> DocId {
+    pub(super) fn build_arg_expression_doc_expanded(&self, expr: &Expression) -> DocId {
         match &expr.kind {
             ExpressionKind::ObjectExpression(obj) => self.prepend_owned_leading_comment(
                 expr,
@@ -1210,8 +1207,8 @@ impl<'a> Printer<'a> {
     /// expression; tsv keeps it in place — a documented divergence.)
     fn build_binary_cast_doc(
         &self,
-        expression: &Expression<'_>,
-        type_annotation: &TSType<'_>,
+        expression: &Expression,
+        type_annotation: &TSType,
         keyword: &'static str,
         cast_start: u32,
     ) -> DocId {
@@ -1506,7 +1503,7 @@ impl<'a> Printer<'a> {
         &self,
         keyword: &'static str,
         keyword_pos: Option<u32>,
-        type_annotation: &TSType<'_>,
+        type_annotation: &TSType,
         type_start: u32,
     ) -> Option<DocId> {
         // The discriminant first: it is free, and the overwhelmingly common cast
@@ -1540,7 +1537,7 @@ impl<'a> Printer<'a> {
         &self,
         keyword: &'static str,
         keyword_pos: Option<u32>,
-        type_annotation: &TSType<'_>,
+        type_annotation: &TSType,
         type_start: u32,
     ) -> Option<DocId> {
         // Discriminant before the gap search: it is free, and both checks only ever
@@ -1866,8 +1863,8 @@ impl<'a> Printer<'a> {
     /// and the owned leading comment [`Printer::build_expression_doc`] prepends. The
     /// expression-statement flag needs no restating: every non-null level of the dispatch
     /// hands it on unchanged.
-    fn build_commented_non_null_operand_doc(&self, operand: &Expression<'_>) -> DocId {
-        let mut levels: SmallVec<[CommentedNonNullLevel<'_, '_>; 4]> = SmallVec::new();
+    fn build_commented_non_null_operand_doc(&self, operand: &Expression) -> DocId {
+        let mut levels: SmallVec<[CommentedNonNullLevel<'_>; 4]> = SmallVec::new();
         let mut inner = operand;
         while let ExpressionKind::TSNonNullExpression(non_null) = &inner.kind {
             let argument_end = self.view.expr(non_null.expression).span().end;
@@ -1902,7 +1899,7 @@ impl<'a> Printer<'a> {
     fn lay_commented_non_null_levels(
         &self,
         doc: DocId,
-        levels: &[CommentedNonNullLevel<'_, '_>],
+        levels: &[CommentedNonNullLevel<'_>],
     ) -> DocId {
         // The levels print into ONE flat concat rather than a doc level apiece — the run's
         // length is bounded only by `SPINE_LIMIT`, and every later walk of a doc nested a
@@ -1974,7 +1971,7 @@ impl<'a> Printer<'a> {
     /// now-redundant parens (`(a?.b)!` → `a?.b!`), so they are restored per-context
     /// here. Normalizes to the `!`-outside form, matching the Sprint-2 sealed-base
     /// rendering (`push_sealed_chain_base` / the chain linearizer's non-null arm).
-    pub(crate) fn build_sealed_non_null_paren_doc(&self, expr: &Expression<'_>) -> Option<DocId> {
+    pub(crate) fn build_sealed_non_null_paren_doc(&self, expr: &Expression) -> Option<DocId> {
         let ExpressionKind::TSNonNullExpression(non_null) = &expr.kind else {
             return None;
         };
@@ -2009,7 +2006,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Check if an expression is part of a chain (member, call, or non-null)
-    fn is_chain_expression(expr: &Expression<'_>) -> bool {
+    fn is_chain_expression(expr: &Expression) -> bool {
         matches!(
             expr.kind,
             ExpressionKind::MemberExpression(_)
@@ -2020,7 +2017,7 @@ impl<'a> Printer<'a> {
 
     /// Build expression doc with indentation added to line breaks
     /// Used when expression is inside inline parens like `(expr)!`
-    pub(crate) fn build_expression_doc_with_indent_on_break(&self, expr: &Expression<'_>) -> DocId {
+    pub(crate) fn build_expression_doc_with_indent_on_break(&self, expr: &Expression) -> DocId {
         match &expr.kind {
             ExpressionKind::BinaryExpression(binary) => {
                 // Build binary chain with indented continuations

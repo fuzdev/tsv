@@ -55,7 +55,7 @@ impl<'a> Printer<'a> {
     pub(super) fn open_inter_arg_gap(
         &self,
         parts: &mut DocBuf,
-        prev_arg: &ast::Expression<'_>,
+        prev_arg: &ast::Expression,
         interior: Option<Span>,
         next_arg_start: u32,
     ) -> InterArgGap<'a> {
@@ -108,7 +108,7 @@ impl<'a> Printer<'a> {
     /// counterpart of the entry-gate hole [`any_comment_forces_expansion`] closes.
     pub(super) fn inter_arg_gap_has_comments(
         &self,
-        prev_arg: &ast::Expression<'_>,
+        prev_arg: &ast::Expression,
         next_arg_start: u32,
     ) -> bool {
         self.has_comments_to_emit_between(prev_arg.span().end, next_arg_start)
@@ -775,7 +775,7 @@ pub(super) fn emit_first_arg_leading_comments(
 pub(super) fn emit_last_arg_trailing_comments(
     printer: &Printer<'_>,
     parts: &mut DocBuf,
-    last_arg: &ast::Expression<'_>,
+    last_arg: &ast::Expression,
     interior: Option<Span>,
     paren_close: u32,
 ) {

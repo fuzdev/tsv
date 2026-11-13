@@ -476,10 +476,7 @@ fn build_import_args_doc(
 /// [`Printer::build_dotted_pair_doc`] — which emits both gaps around the `.`, the
 /// positions an author can comment in (`new /* c */.target`, `new./* c */ target`).
 /// A qualified name (`ns.Type`) is the same shape and shares that printer.
-pub(super) fn build_meta_property_doc(
-    printer: &Printer<'_>,
-    meta: &ast::MetaProperty<'_>,
-) -> DocId {
+pub(super) fn build_meta_property_doc(printer: &Printer<'_>, meta: &ast::MetaProperty) -> DocId {
     printer.build_dotted_pair_doc(
         printer.identifier_name_doc(&meta.meta),
         printer.identifier_name_doc(&meta.property),

@@ -77,7 +77,7 @@ impl<'a> Printer<'a> {
         &self,
         parts: &mut DocBuf,
         stmt: &ast::TryStatement,
-        handler: &ast::CatchClause<'_>,
+        handler: &ast::CatchClause,
     ) {
         let d = self.d();
         let catch_keyword_end = handler.span.start + "catch".len() as u32;
@@ -210,7 +210,7 @@ impl<'a> Printer<'a> {
 
     pub(in crate::printer::statements) fn build_break_statement_doc(
         &self,
-        stmt: &ast::BreakStatement<'_>,
+        stmt: &ast::BreakStatement,
         span: Span,
         gap: TerminatorGap,
     ) -> DocId {
@@ -219,7 +219,7 @@ impl<'a> Printer<'a> {
 
     pub(in crate::printer::statements) fn build_continue_statement_doc(
         &self,
-        stmt: &ast::ContinueStatement<'_>,
+        stmt: &ast::ContinueStatement,
         span: Span,
         gap: TerminatorGap,
     ) -> DocId {
@@ -231,7 +231,7 @@ impl<'a> Printer<'a> {
         &self,
         keyword: &'static str,
         span: Span,
-        label: Option<&ast::Identifier<'_>>,
+        label: Option<&ast::Identifier>,
         gap: TerminatorGap,
     ) -> DocId {
         let d = self.d();
@@ -266,7 +266,7 @@ impl<'a> Printer<'a> {
 
     pub(in crate::printer::statements) fn build_labeled_statement_doc(
         &self,
-        stmt: &ast::LabeledStatement<'_>,
+        stmt: &ast::LabeledStatement,
         ctx: StatementContext,
     ) -> DocId {
         let d = self.d();

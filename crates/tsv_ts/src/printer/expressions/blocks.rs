@@ -114,7 +114,7 @@ impl StatementBlankScan {
         &mut self,
         printer: &Printer<'_>,
         prev_end: u32,
-        stmt: &ast::Statement<'_>,
+        stmt: &ast::Statement,
         frozen: bool,
     ) {
         self.printed(
@@ -362,7 +362,7 @@ impl<'a> Printer<'a> {
     #[inline]
     pub(in crate::printer) fn statement_content_tail_blank(
         &self,
-        stmt: &ast::Statement<'_>,
+        stmt: &ast::Statement,
         frozen: bool,
     ) -> bool {
         if self.statement_tail_is_bare(stmt) {
@@ -394,7 +394,7 @@ impl<'a> Printer<'a> {
     /// is frozen, keeps its terminator gap, or hands it to the list. A lone `;` (nothing
     /// before it in the span) is left to the walk rather than argued separately.
     #[inline]
-    fn statement_tail_is_bare(&self, stmt: &ast::Statement<'_>) -> bool {
+    fn statement_tail_is_bare(&self, stmt: &ast::Statement) -> bool {
         let span = stmt.span();
         let (start, end) = (span.start as usize, span.end as usize);
         let bytes = self.source.as_bytes();
@@ -410,7 +410,7 @@ impl<'a> Printer<'a> {
     /// remaining **78 (0.04%)** reach this walk.
     #[cold]
     #[inline(never)]
-    fn statement_content_tail_blank_walk(&self, stmt: &ast::Statement<'_>, frozen: bool) -> bool {
+    fn statement_content_tail_blank_walk(&self, stmt: &ast::Statement, frozen: bool) -> bool {
         let full_end = stmt.span().end;
         let content_end = self.statement_content_end(stmt);
         if content_end == full_end {
@@ -509,7 +509,7 @@ impl<'a> Printer<'a> {
     #[expect(clippy::too_many_arguments)] // the walk's own resolved `stmt` rides beside its slot
     pub(in crate::printer) fn orphan_semi_slot(
         &self,
-        stmt: &ast::Statement<'_>,
+        stmt: &ast::Statement,
         slots: &[ast::StmtId],
         index: usize,
         list_end: u32,

@@ -12,7 +12,7 @@ use tsv_cli::json_utils::indent_json_with_tabs;
 /// `fixtures_validate` from re-parsing every fixture per phase.
 pub(crate) enum ParsedInput<'arena> {
     Svelte(tsv_svelte::ast::ParsedRoot<'arena>),
-    Ts(tsv_ts::ast::Parsed<'arena>),
+    Ts(tsv_ts::ast::Parsed),
     Css(tsv_css::ast::CssStyleSheet<'arena>),
 }
 

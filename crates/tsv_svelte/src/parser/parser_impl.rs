@@ -51,7 +51,7 @@ pub(crate) struct SvelteParser<'a, 'arena> {
     /// every embedded island. Empty only inside [`Self::with_island_stores`], the one reader:
     /// a host check runs during the embedded parse and borrows the whole parser, so the
     /// `&mut` the parse takes has to be out of the parser first.
-    stores: Option<&'a mut AstStores<'arena>>,
+    stores: Option<&'a mut AstStores>,
     pub(crate) source: &'a str, // Full original source
     pub(crate) lexer: Lexer<'a>,
     /// The current token, in document coordinates. The lexer writes it in place
@@ -191,7 +191,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     pub(crate) fn new(
         source: &'a str,
         arena: &'arena Bump,
-        stores: &'a mut AstStores<'arena>,
+        stores: &'a mut AstStores,
     ) -> Result<Self, Error> {
         let mut lexer = Lexer::new(source);
         let mut current = Token {
@@ -227,7 +227,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     #[expect(clippy::expect_used)]
     pub(crate) fn with_island_stores<T>(
         &mut self,
-        parse: impl FnOnce(&Self, &mut AstStores<'arena>) -> T,
+        parse: impl FnOnce(&Self, &mut AstStores) -> T,
     ) -> T {
         let stores = self
             .stores
@@ -240,14 +240,14 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
     /// Push an expression the parser built itself (a shorthand's synthesized identifier).
     #[inline]
-    pub(crate) fn push_ts_expr(&mut self, expr: Expression<'arena>) -> ExprId {
+    pub(crate) fn push_ts_expr(&mut self, expr: Expression) -> ExprId {
         tsv_ts::__private::push_expression(self.stores_mut(), expr)
     }
 
     /// The document's stores, for an operation outside an island parse.
     #[expect(clippy::expect_used)]
     #[inline]
-    pub(crate) fn stores_mut(&mut self) -> &mut AstStores<'arena> {
+    pub(crate) fn stores_mut(&mut self) -> &mut AstStores {
         self.stores
             .as_deref_mut()
             .expect("the island stores are out only while a `&Self` is held")
@@ -256,7 +256,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// The document's stores, read outside an island parse.
     #[expect(clippy::expect_used)]
     #[inline]
-    pub(crate) fn ts_stores(&self) -> &AstStores<'arena> {
+    pub(crate) fn ts_stores(&self) -> &AstStores {
         self.stores
             .as_deref()
             .expect("the island stores are out only while a `&Self` is held")
@@ -266,7 +266,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// document's stores.
     #[expect(clippy::expect_used)]
     #[inline]
-    pub(crate) fn merge_island_comments(&mut self, comments: tsv_ts::ast::CommentList<'arena>) {
+    pub(crate) fn merge_island_comments(&mut self, comments: tsv_ts::ast::CommentList) {
         let stores = self
             .stores
             .as_deref()
@@ -901,8 +901,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         &mut self,
         source: &str,
         base_offset: usize,
-        host_check: impl Fn(&Self, AstView<'_>, &tsv_ts::ast::Statement<'arena>) -> Result<(), Error>,
-    ) -> Result<tsv_ts::ast::Statement<'arena>, Error> {
+        host_check: impl Fn(&Self, AstView<'_>, &tsv_ts::ast::Statement) -> Result<(), Error>,
+    ) -> Result<tsv_ts::ast::Statement, Error> {
         let (stmt, comments) = self.with_island_stores(|this, stores| {
             tsv_ts::__private::parse_statement_with_comments(
                 source,

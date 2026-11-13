@@ -181,7 +181,7 @@ impl FrozenOperandPair {
     }
 }
 
-pub(in crate::printer) fn is_freeze_target(view: AstView<'_>, child: &TSType<'_>) -> bool {
+pub(in crate::printer) fn is_freeze_target(view: AstView<'_>, child: &TSType) -> bool {
     !matches!(
         unwrap_parenthesized(view, child),
         TSType::Union(_) | TSType::Intersection(_)
@@ -415,11 +415,7 @@ impl<'a> Printer<'a> {
     /// which freezes the paren-stripped INNER slice only and leaves every shell-gap
     /// comment to the head's (window-widened) emitters, so the single-print invariant
     /// holds there too.
-    pub(in crate::printer) fn single_child_frozen(
-        &self,
-        gap_start: u32,
-        child: &TSType<'_>,
-    ) -> bool {
+    pub(in crate::printer) fn single_child_frozen(&self, gap_start: u32, child: &TSType) -> bool {
         // The document-level bool first: several head sites (alias, named-tuple,
         // mapped value) ask unconditionally on hot paths, so a directive-free
         // document must pay exactly this one branch — never the paren-unwrap below
@@ -545,8 +541,8 @@ impl<'a> Printer<'a> {
     /// directive. Gated on `has_format_ignore`.
     pub(in crate::printer) fn paren_interior_routed_inner<'t>(
         &self,
-        shell: &'t TSType<'t>,
-    ) -> Option<&'t TSType<'t>>
+        shell: &'t TSType,
+    ) -> Option<&'t TSType>
     where
         'a: 't,
     {
@@ -562,7 +558,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn paren_shell_routed_inner<'t>(
         &self,
         shell: &'t ast::TSParenthesizedType,
-    ) -> Option<&'t TSType<'t>>
+    ) -> Option<&'t TSType>
     where
         'a: 't,
     {
@@ -627,7 +623,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn param_frozen_span(
         &self,
         open_paren: Option<u32>,
-        params: &[ast::Expression<'_>],
+        params: &[ast::Expression],
         i: usize,
     ) -> Option<Span> {
         if !self.has_format_ignore {
@@ -685,7 +681,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn left_spine_operand_frozen_span(
         &self,
         node_start: u32,
-        operand: &ast::Expression<'_>,
+        operand: &ast::Expression,
     ) -> Option<Span> {
         self.gap_frozen_span(node_start, operand.span())
     }
@@ -714,7 +710,7 @@ impl<'a> Printer<'a> {
     /// re-running this across a conditional group's candidates is sound.
     pub(in crate::printer) fn wrap_frozen_position_pair(
         &self,
-        operand: &ast::Expression<'_>,
+        operand: &ast::Expression,
         pair: FrozenOperandPair,
         doc: DocId,
     ) -> DocId {
@@ -739,7 +735,7 @@ impl<'a> Printer<'a> {
     /// positions. The slice half is [`Self::frozen_slice_absorbs_left_binding_suffix`].
     fn frozen_operand_pair_needed(
         &self,
-        operand: &ast::Expression<'_>,
+        operand: &ast::Expression,
         pair: FrozenOperandPair,
     ) -> bool {
         match pair {
@@ -800,7 +796,7 @@ impl<'a> Printer<'a> {
     /// every joining tail, frozen or not.
     fn frozen_slice_absorbs_left_binding_suffix(
         &self,
-        operand: &ast::Expression<'_>,
+        operand: &ast::Expression,
         ctx: ParenContext,
     ) -> bool {
         if !self.frozen_new_slice_absorbs_tail(operand) {
@@ -840,10 +836,7 @@ impl<'a> Printer<'a> {
     /// printer supplies and which both spellings absorb, and the left-spine positions
     /// ([`Self::frozen_slice_absorbs_left_binding_suffix`]), which then split on which token
     /// the slice ENDS in and which one the tail OPENS with.
-    pub(in crate::printer) fn frozen_new_slice_absorbs_tail(
-        &self,
-        expr: &ast::Expression<'_>,
-    ) -> bool {
+    pub(in crate::printer) fn frozen_new_slice_absorbs_tail(&self, expr: &ast::Expression) -> bool {
         let ast::ExpressionKind::NewExpression(new_expr) = &expr.kind else {
             return false;
         };
@@ -867,7 +860,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn build_left_spine_operand_doc(
         &self,
         node_start: u32,
-        operand: &ast::Expression<'_>,
+        operand: &ast::Expression,
         pair: FrozenOperandPair,
         ordinary: impl FnOnce() -> DocId,
     ) -> DocId {
@@ -891,7 +884,7 @@ impl<'a> Printer<'a> {
         &self,
         can_freeze: bool,
         node_start: u32,
-        operand: &ast::Expression<'_>,
+        operand: &ast::Expression,
         pair: FrozenOperandPair,
         ordinary: impl FnOnce() -> DocId,
     ) -> DocId {
@@ -934,7 +927,7 @@ impl<'a> Printer<'a> {
     /// doc reads nothing).
     pub(in crate::printer) fn frozen_chain_base_span(
         &self,
-        base: &ast::Expression<'_>,
+        base: &ast::Expression,
     ) -> Option<Span> {
         self.frozen_chain_base
             .get()
@@ -995,7 +988,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn build_value_head_doc(
         &self,
         gap_start: u32,
-        value: &ast::Expression<'_>,
+        value: &ast::Expression,
         ordinary: impl FnOnce() -> DocId,
     ) -> DocId {
         match self.value_head_frozen_span(gap_start, value.span()) {
@@ -1029,7 +1022,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn build_statement_head_doc(
         &self,
         gap_start: u32,
-        stmt: &ast::Statement<'_>,
+        stmt: &ast::Statement,
         ordinary: impl FnOnce() -> DocId,
     ) -> DocId {
         match self.gap_frozen_span(gap_start, stmt.span()) {
@@ -1207,10 +1200,7 @@ impl<'a> Printer<'a> {
     /// sat, which is prettier's answer too. Pinned by the
     /// `typescript/syntax/asi/prettier_ignore_semicolon*` family (list, case-consequent,
     /// header-body, `export`-head and detached-terminator spellings).
-    pub(in crate::printer) fn build_frozen_statement_doc(
-        &self,
-        stmt: &ast::Statement<'_>,
-    ) -> DocId {
+    pub(in crate::printer) fn build_frozen_statement_doc(&self, stmt: &ast::Statement) -> DocId {
         let (frozen, terminated) = self.frozen_statement_slice(stmt);
         let doc = self.build_frozen_node_doc(frozen);
         if terminated {
@@ -1242,7 +1232,7 @@ impl<'a> Printer<'a> {
     /// following statement needs — `const a = x // c⏎;` + `(y) => 1;` welds to
     /// `const a  =  x // c;`, which no longer parses at all. There the whole node freezes as
     /// authored, terminator included, which is both lossless and the only reparsable answer.
-    fn frozen_statement_slice(&self, stmt: &ast::Statement<'_>) -> (Span, bool) {
+    fn frozen_statement_slice(&self, stmt: &ast::Statement) -> (Span, bool) {
         let span = stmt.span();
         let terminator = self.statement_terminator(stmt);
         if terminator == StatementTerminator::Never {
@@ -1325,7 +1315,7 @@ impl<'a> Printer<'a> {
     /// spelled the bare pair here.
     pub(in crate::printer) fn build_frozen_value_doc(
         &self,
-        value: &ast::Expression<'_>,
+        value: &ast::Expression,
         frozen: Span,
         ctx: ParenContext,
     ) -> DocId {
@@ -1363,7 +1353,7 @@ impl<'a> Printer<'a> {
     #[inline]
     pub(in crate::printer) fn build_frozen_arg_doc(
         &self,
-        arg: &ast::Expression<'_>,
+        arg: &ast::Expression,
         frozen: Span,
     ) -> DocId {
         self.build_frozen_value_doc(arg, frozen, ParenContext::Argument)
@@ -1397,7 +1387,7 @@ impl<'a> Printer<'a> {
     /// [`Self::build_frozen_node_doc`] directly.
     pub(in crate::printer) fn build_frozen_expression_doc(
         &self,
-        expr: &ast::Expression<'_>,
+        expr: &ast::Expression,
         frozen: Span,
     ) -> DocId {
         let doc = self.build_frozen_node_doc(frozen);
@@ -1494,7 +1484,7 @@ impl<'a> Printer<'a> {
     /// and `raw_source_range` trims trailing whitespace).
     pub(in crate::printer) fn build_frozen_member_doc(
         &self,
-        t: &TSType<'_>,
+        t: &TSType,
         member_parens: TypeParenRule,
     ) -> DocId {
         self.build_frozen_member_doc_at(
@@ -1508,7 +1498,7 @@ impl<'a> Printer<'a> {
     /// caller that also needs the span (the heads' must-break test) resolves it once.
     fn build_frozen_member_doc_at(
         &self,
-        t: &TSType<'_>,
+        t: &TSType,
         member_parens: TypeParenRule,
         slice: Span,
     ) -> DocId {
@@ -1533,7 +1523,7 @@ impl<'a> Printer<'a> {
     ///   paren-stripped inner;
     /// - a kept, source-parenthesized member freezes whole-span (parens included); a
     ///   kept, bare member's slice is its own span (the caller re-synthesizes parens).
-    fn frozen_member_slice_span(&self, t: &TSType<'_>, member_parens: TypeParenRule) -> Span {
+    fn frozen_member_slice_span(&self, t: &TSType, member_parens: TypeParenRule) -> Span {
         let inner = unwrap_parenthesized(self.view, t);
         if self.frozen_paren_shell_has_comment(t) || member_parens(self, inner) {
             t.span()
@@ -1546,7 +1536,7 @@ impl<'a> Printer<'a> {
     /// must-break trigger: a `verbatim_source_span` is `will_break`-opaque, so a caller
     /// whose layout is width-decided forces the family broken explicitly when a frozen
     /// member is multi-line (the leading-run analog is `FirstMember.multiline`).
-    fn frozen_member_multiline(&self, t: &TSType<'_>, member_parens: TypeParenRule) -> bool {
+    fn frozen_member_multiline(&self, t: &TSType, member_parens: TypeParenRule) -> bool {
         let slice = self.frozen_member_slice_span(t, member_parens);
         !self.is_same_line(slice.start, slice.end)
     }
@@ -1557,7 +1547,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn frozen_member_forces_break(
         &self,
         frozen: bool,
-        t: &TSType<'_>,
+        t: &TSType,
         member_parens: TypeParenRule,
     ) -> bool {
         frozen && self.frozen_member_multiline(t, member_parens)
@@ -1568,7 +1558,7 @@ impl<'a> Printer<'a> {
     /// always redundant, so it drops under the freeze unless its shell holds a comment.
     /// The single-child heads take [`Self::build_frozen_single_child_doc`], the same
     /// slice plus their must-break.
-    pub(in crate::printer) fn build_frozen_list_member_doc(&self, t: &TSType<'_>) -> DocId {
+    pub(in crate::printer) fn build_frozen_list_member_doc(&self, t: &TSType) -> DocId {
         self.build_frozen_member_doc(t, |_, _| false)
     }
 
@@ -1578,7 +1568,7 @@ impl<'a> Printer<'a> {
     /// callers ask this only for an already-known-frozen member, so a width-decided
     /// caller forces its broken layout explicitly on a `true` answer (a
     /// `verbatim_source_span` is `will_break`-opaque).
-    pub(in crate::printer) fn frozen_list_member_multiline(&self, t: &TSType<'_>) -> bool {
+    pub(in crate::printer) fn frozen_list_member_multiline(&self, t: &TSType) -> bool {
         self.frozen_member_multiline(t, |_, _| false)
     }
 
@@ -1591,7 +1581,7 @@ impl<'a> Printer<'a> {
     /// flat around its printed-ignored slice.
     pub(in crate::printer) fn build_frozen_head_doc(
         &self,
-        child: &TSType<'_>,
+        child: &TSType,
         member_parens: TypeParenRule,
     ) -> DocId {
         let slice = self.frozen_member_slice_span(child, member_parens);
@@ -1605,7 +1595,7 @@ impl<'a> Printer<'a> {
     /// parens (annotation `:`, alias `=`, named-tuple `label:`, mapped value `]:`, a
     /// cast's type, a `=>` return): a source paren there is always redundant, so it
     /// drops under the freeze unless its shell holds a comment.
-    pub(in crate::printer) fn build_frozen_single_child_doc(&self, child: &TSType<'_>) -> DocId {
+    pub(in crate::printer) fn build_frozen_single_child_doc(&self, child: &TSType) -> DocId {
         self.build_frozen_head_doc(child, |_, _| false)
     }
 
@@ -1614,7 +1604,7 @@ impl<'a> Printer<'a> {
     /// frozen verbatim slice when the child is a freeze target, else the ordinarily-built
     /// child — a composite declines the freeze here and applies Rule A inside via its own
     /// leading-run walk, while the head still owns the directive's own-line emission.
-    pub(in crate::printer) fn build_routed_child_doc(&self, child: &TSType<'_>) -> DocId {
+    pub(in crate::printer) fn build_routed_child_doc(&self, child: &TSType) -> DocId {
         if is_freeze_target(self.view, child) {
             self.build_frozen_single_child_doc(child)
         } else {
@@ -1640,8 +1630,8 @@ impl<'a> Printer<'a> {
     /// [`RoutedScope::Transparent`] takes there, so the shared spelling costs it nothing.
     pub(in crate::printer) fn build_routed_inner_doc(
         &self,
-        shell: &TSType<'_>,
-        inner: &TSType<'_>,
+        shell: &TSType,
+        inner: &TSType,
         scope: RoutedScope,
     ) -> DocId {
         let inner_doc = match scope {
@@ -1665,7 +1655,7 @@ impl<'a> Printer<'a> {
     /// glued shell comment (`(/* c */ a1)`) is owned, so the to-emit axis would miss it,
     /// yet the frozen raw slice never routes it through `build_comment_doc` — it would be
     /// dropped either way, so the physical-presence question is the correct one.
-    fn frozen_paren_shell_has_comment(&self, t: &TSType<'_>) -> bool {
+    fn frozen_paren_shell_has_comment(&self, t: &TSType) -> bool {
         let Some(shell) = outermost_paren(t) else {
             return false;
         };
@@ -1687,7 +1677,7 @@ impl<'a> Printer<'a> {
     /// own layout, so — frozen verbatim (opaque) — it takes no offset.
     pub(in crate::printer) fn build_frozen_union_member_offset_doc(
         &self,
-        t: &TSType<'_>,
+        t: &TSType,
         member_parens: TypeParenRule,
     ) -> DocId {
         let d = self.d();

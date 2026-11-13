@@ -143,7 +143,7 @@ pub(in crate::parser) fn debug_assert_encloses(
 /// `yield` is only a `YieldExpression` in `[+Yield]`; outside a generator it is a
 /// (deferred) reserved-word identifier that prettier accepts as an operand, so the guard
 /// must not fire there — hence the `in_yield` gate. See the parser's `in_yield` field.
-fn is_bare_assignment_head(expr: &Expression<'_>, start: usize, in_yield: bool) -> bool {
+fn is_bare_assignment_head(expr: &Expression, start: usize, in_yield: bool) -> bool {
     let is_head = matches!(expr.kind, ExpressionKind::ArrowFunctionExpression(_))
         || (in_yield && matches!(expr.kind, ExpressionKind::YieldExpression(_)));
     is_head && start == expr.span().start as usize
@@ -309,7 +309,7 @@ pub(super) enum DirectivePrologue {
     Absent,
 }
 
-impl<'a, 'arena> Parser<'a, 'arena> {
+impl<'a> Parser<'a> {
     /// `id`'s pieces, when it is a `<` comparison.
     fn lt_child_pieces(&self, id: ExprId) -> Option<LtChild> {
         let node = self.expr(id);
@@ -731,7 +731,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 && self.chain_owes_type_argument_pair(lt, expr_start != child.span.start as usize)
             {
                 #[cfg(feature = "_internal_ast_census")]
-                tsv_lang::ast_census_probe::dead::<Expression<'arena>>(
+                tsv_lang::ast_census_probe::dead::<Expression>(
                     tsv_lang::ast_census_probe::Dead::Superseded,
                     1,
                 );
@@ -1243,7 +1243,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// (`obj.#p`) or an identifier/keyword name — keywords are valid property
     /// names (`obj.class`, `obj.if`, `obj.default()`). Returns the property
     /// expression and its end position; errors when neither follows.
-    fn parse_dot_property(&mut self) -> Result<(Expression<'arena>, usize), Error> {
+    fn parse_dot_property(&mut self) -> Result<(Expression, usize), Error> {
         if *self.current_kind() == TokenKind::Hash {
             let (private_id, span) = self.parse_private_identifier()?;
             Ok((
@@ -1962,7 +1962,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// numeric literal can occupy routes through this — an expression, an object or
     /// class key, a literal type, a `TSLiteralType`'s negated operand, and a type
     /// member's key — so the gate is stated once.
-    pub(crate) fn parse_number_or_bigint_literal(&self) -> Result<Literal<'arena>, Error> {
+    pub(crate) fn parse_number_or_bigint_literal(&self) -> Result<Literal, Error> {
         let (start, end) = self.current_pos();
         let raw = self.current_value();
         if self.strict
@@ -2688,7 +2688,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     fn parse_type_arguments_tried(
         &mut self,
         lt: u32,
-        checkpoint: &Checkpoint<'arena>,
+        checkpoint: &Checkpoint,
     ) -> Result<Option<TSTypeParameterInstantiation>, Error> {
         let (start, first) = self.parse_type_argument_list_head()?;
         if !self.check(&TokenKind::Comma) {
@@ -2850,7 +2850,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 if Self::is_bare_instantiation(self.expr(expr), start) =>
             {
                 #[cfg(feature = "_internal_ast_census")]
-                tsv_lang::ast_census_probe::dead::<Expression<'arena>>(
+                tsv_lang::ast_census_probe::dead::<Expression>(
                     tsv_lang::ast_census_probe::Dead::Superseded,
                     1,
                 );

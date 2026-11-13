@@ -81,7 +81,7 @@ pub(crate) fn next_printed_stmt<'s>(
     view: AstView<'s>,
     body: &'s [ast::StmtId],
     index: usize,
-) -> Option<&'s ast::Statement<'s>> {
+) -> Option<&'s ast::Statement> {
     body[index + 1..]
         .iter()
         .map(|s| view.stmt(*s))
@@ -96,7 +96,7 @@ pub(crate) fn next_printed_stmt<'s>(
 /// must not reach back across one.
 pub(crate) fn statement_gap_floor(
     view: AstView<'_>,
-    stmt: &ast::Statement<'_>,
+    stmt: &ast::Statement,
     slots: &[ast::StmtId],
     index: usize,
 ) -> u32 {
@@ -116,7 +116,7 @@ pub(crate) fn statement_gap_floor(
 /// - `await import(stringLiteral)`
 pub(crate) fn is_module_path_fluid_call(
     view: AstView<'_>,
-    expr: &ast::Expression<'_>,
+    expr: &ast::Expression,
     source: &str,
 ) -> bool {
     // Check for `await import(string)` — single-arg only (no options)
@@ -153,7 +153,7 @@ pub(crate) fn is_module_path_fluid_call(
 }
 
 /// Check if an expression is a string literal
-pub(crate) fn is_string_literal(expr: &ast::Expression<'_>) -> bool {
+pub(crate) fn is_string_literal(expr: &ast::Expression) -> bool {
     matches!(
         &expr.kind,
         ast::ExpressionKind::Literal(lit) if matches!(lit.value, ast::LiteralValue::String { .. })
@@ -172,7 +172,7 @@ pub(crate) fn is_string_literal(expr: &ast::Expression<'_>) -> bool {
 /// ```
 ///
 /// Prettier ref: `shouldBreakAfterOperator` (`print/assignment.js`)
-pub fn conditional_should_break_after_op(view: AstView<'_>, expr: &ast::Expression<'_>) -> bool {
+pub fn conditional_should_break_after_op(view: AstView<'_>, expr: &ast::Expression) -> bool {
     if let ast::ExpressionKind::ConditionalExpression(cond) = &expr.kind {
         // Check if test is binaryish (BinaryExpression includes logical operators like &&, ||),
         // but exclude logical expressions with inline-able RHS (non-empty object/array).
@@ -193,7 +193,7 @@ pub fn conditional_should_break_after_op(view: AstView<'_>, expr: &ast::Expressi
 /// Strings with `\<newline>` need fluid layout because:
 /// 1. They span multiple lines in source
 /// 2. Prettier always wraps the declaration for these
-pub(crate) fn is_multiline_string_literal(expr: &ast::Expression<'_>, source: &str) -> bool {
+pub(crate) fn is_multiline_string_literal(expr: &ast::Expression, source: &str) -> bool {
     if let ast::ExpressionKind::Literal(lit) = &expr.kind
         && let ast::LiteralValue::String { .. } = &lit.value
     {
@@ -329,10 +329,7 @@ pub(crate) fn template_literal_has_newlines(
 ///
 /// Combines the TemplateLiteral/TaggedTemplateExpression dispatch with the newline check.
 /// Used by call_formatting, new_expression, and arrow body formatting.
-pub(crate) fn is_multiline_template_expression(
-    view: AstView<'_>,
-    expr: &ast::Expression<'_>,
-) -> bool {
+pub(crate) fn is_multiline_template_expression(view: AstView<'_>, expr: &ast::Expression) -> bool {
     match &expr.kind {
         ast::ExpressionKind::TemplateLiteral(t) => template_literal_has_newlines(view, t),
         &ast::ExpressionKind::TaggedTemplateExpression(t) => {
@@ -353,13 +350,13 @@ pub(crate) fn is_multiline_template_expression(
 /// gaps hold) after the names to its left: neither this builder nor any later walk of its
 /// doc spends a frame per link.
 #[inline(never)]
-pub(crate) fn build_entity_name_doc(printer: &Printer<'_>, name: &ast::TSEntityName<'_>) -> DocId {
+pub(crate) fn build_entity_name_doc(printer: &Printer<'_>, name: &ast::TSEntityName) -> DocId {
     let qn = match name {
         ast::TSEntityName::Identifier(id) => return printer.identifier_name_doc(id),
         &ast::TSEntityName::QualifiedName(_, qn) => qn,
     };
-    let mut spine: SmallVec<[&ast::TSQualifiedName<'_>; 8]> = SmallVec::new();
-    let mut node: &ast::TSQualifiedName<'_> = printer.view.qual_name(qn);
+    let mut spine: SmallVec<[&ast::TSQualifiedName; 8]> = SmallVec::new();
+    let mut node: &ast::TSQualifiedName = printer.view.qual_name(qn);
     let base = loop {
         spine.push(node);
         match &node.left {

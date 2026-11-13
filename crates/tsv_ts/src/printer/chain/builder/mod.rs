@@ -1516,7 +1516,7 @@ fn build_type_arg_hug_state<'a>(
 fn last_group_single_argument<'a>(
     view: AstView<'a>,
     rest_groups: &[ChainGroup<'a>],
-) -> Option<&'a Expression<'a>> {
+) -> Option<&'a Expression> {
     let call = rest_groups
         .last()?
         .nodes
@@ -1532,7 +1532,7 @@ fn last_group_single_argument<'a>(
 /// An arrow whose grammar-parenthesized expression body is an object literal —
 /// the `.map((item) => ({ … }))` shape, the arrow spelling of the object-rooted
 /// kind set.
-fn is_arrow_with_paren_object_body(view: AstView<'_>, arg: &Expression<'_>) -> bool {
+fn is_arrow_with_paren_object_body(view: AstView<'_>, arg: &Expression) -> bool {
     matches!(
         &arg.kind,
         &ExpressionKind::ArrowFunctionExpression(arrow) if matches!(
