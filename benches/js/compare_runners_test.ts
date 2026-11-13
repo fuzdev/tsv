@@ -4,7 +4,8 @@
  * and a `deno task <x>` needs it in `deno.json`'s tasks or in `package.json`'s, which
  * `deno task` falls through to. And the split between the two files: `deno.json` holds the
  * tasks whose body runs Deno itself, `package.json` every other, chained with `npm run`, its
- * one way to a Deno task a `deno task <x>` leg naming a `deno.json` task (docs/tasks.md).
+ * one way to a Deno task a `deno task <x>` leg naming a `deno.json` task (docs/tasks.md). And
+ * that no CI workflow installs or runs Deno.
  */
 
 import { deepStrictEqual, ok, strictEqual } from 'node:assert';
@@ -152,11 +153,76 @@ test('deno.json holds exactly the tasks whose body runs Deno itself', () => {
 	);
 });
 
+/** The CI workflow files, either extension. */
+const WORKFLOW_DIR = new URL('.github/workflows/', CHECKOUT);
+const WORKFLOWS = readdirSync(WORKFLOW_DIR).filter((name) => /\.ya?ml$/i.test(name));
+
+/** `text`'s lines with YAML comments dropped: a whole-line `#`, or one after whitespace to the
+ * line's end (a shell comment, inside a `run: |` block). */
+const uncommented = (text: string): string[] =>
+	text.split(/\r?\n/).map((line) => line.replace(/(?:^|\s)#.*$/, ''));
+
+/** The package.json scripts `text` runs: `npm run <x>` and `npm run-script <x>`, with npm's
+ * flags before or after the command, npm's shorthands for `test` and `start`, and
+ * `node --run <x>`. */
+const scripts_run_by = (text: string): string[] => {
+	const flags = String.raw`(?:[ \t]+--?[\w-]+(?:(?:=|[ \t]+)(?!-)\S+)?)*`;
+	const run = new RegExp(
+		[
+			String.raw`\bnpm${flags}[ \t]+(?:run|run-script|rum|urn)${flags}[ \t]+([\w:.-]+)`,
+			String.raw`\bnpm${flags}[ \t]+(test|t|tst|start|stop|restart)\b`,
+			String.raw`\bnode${flags}[ \t]+--run(?:=|[ \t]+)([\w:.-]+)`
+		].join('|'),
+		'g'
+	);
+	return [...text.matchAll(run)].map(([, script, shorthand, node_run]) => {
+		const name = script ?? node_run ?? shorthand!;
+		return name === 't' || name === 'tst' ? 'test' : name;
+	});
+};
+
 test('each runner a CI workflow names runs the task it names', () => {
-	const dir = new URL('.github/workflows/', CHECKOUT);
-	for (const file of readdirSync(dir).filter((name) => name.endsWith('.yml'))) {
-		deepStrictEqual(unrunnable(readFileSync(new URL(file, dir), 'utf8')), [], file);
+	for (const file of WORKFLOWS) {
+		deepStrictEqual(unrunnable(readFileSync(new URL(file, WORKFLOW_DIR), 'utf8')), [], file);
 	}
+});
+
+test("no CI workflow installs or runs Deno, a prerequisite of the bench's Deno row alone", () => {
+	// any mention outside a comment: an action, an installer's `tool: deno`, an install
+	// script's URL, a path to a `deno` binary, a quoted or bare `deno` command
+	for (const file of WORKFLOWS) {
+		deepStrictEqual(
+			uncommented(readFileSync(new URL(file, WORKFLOW_DIR), 'utf8')).filter((line) =>
+				/deno/i.test(line)
+			),
+			[],
+			file
+		);
+	}
+});
+
+test('no package.json script a CI workflow runs, or any script it runs in turn, names Deno', () => {
+	const scripts = BODIES['package.json'];
+	const naming: string[] = [];
+	for (const file of WORKFLOWS) {
+		const text = uncommented(readFileSync(new URL(file, WORKFLOW_DIR), 'utf8')).join('\n');
+		const pending = scripts_run_by(text).map((name) => [name]);
+		const seen = new Set<string>();
+		for (let chain = pending.pop(); chain !== undefined; chain = pending.pop()) {
+			const name = chain.at(-1)!;
+			if (seen.has(name)) continue;
+			seen.add(name);
+			const body = scripts[name];
+			if (body === undefined) {
+				naming.push(`${file}: ${chain.join(' > ')}: no such package.json script`);
+				continue;
+			}
+			// a `deno task`, `npx deno`, `deno` by path or quoted, or a script named for Deno
+			if (/deno/i.test(body)) naming.push(`${file}: ${chain.join(' > ')}: ${body}`);
+			for (const next of scripts_run_by(body)) pending.push([...chain, next]);
+		}
+	}
+	deepStrictEqual(naming, []);
 });
 
 test('each `npm run` in a package.json body that passes arguments passes them after a `--`', () => {

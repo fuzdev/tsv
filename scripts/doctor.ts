@@ -130,14 +130,15 @@ export interface DoctorDeps {
 	load_corpus: () => Promise<DoctorCorpus>;
 }
 
-/** What `ci_pins` reads a pin of. */
-type PinnedTool = 'deno' | 'node';
+/** What `ci_pins` reads a pin of: Node alone, since no workflow installs Deno. */
+type PinnedTool = 'node';
 
-/** The line for a `deno` that is missing, or exits non-zero on `--version`: a warning: an absent
- * `deno` fails no `check` leg (one on `PATH` that fails does, in cargo's test). */
+/** The line for a `deno` that is missing, or exits non-zero on `--version`: a warning, since
+ * no `check` leg needs one (cargo's test that runs the `deno` on `PATH` skips without a working
+ * one, printing a SKIPPED line). */
 export const DENO_MISSING =
-	"deno missing — check runs without it (cargo test's a_node_that_runs_deno_is_refused passes " +
-	"untested), but the bench's Deno row (bench:deno), its canonical size rows (deno bundle), " +
+	'deno missing — check runs without it (cargo test skips a_node_that_runs_deno_is_refused, ' +
+	"saying so), as CI does, but the bench's Deno row (bench:deno), its canonical size rows (deno bundle), " +
 	"typecheck:js, and branch:report's bench leg (its Deno row, and every task of a side from before " +
 	'the tasks moved) need it';
 
@@ -276,7 +277,7 @@ export const run_doctor = async (
 	 *
 	 * READ from the workflows rather than mirrored into a constant here, unlike `WASM_PACK_PIN`
 	 * below: that one pins a calibration this repo owns (the wasm size bounds), so a local
-	 * constant IS its source of truth, while deno and node are pinned in CI and nowhere else — a
+	 * constant IS its source of truth, while node is pinned in CI and nowhere else — a
 	 * mirror would just be a second place to forget. The drift this catches is one-directional
 	 * and quiet: an upgraded local runtime leaves CI on the old one, every gate stays green on
 	 * both, and the machine that produced the committed bench reports is no longer the machine CI
@@ -294,7 +295,7 @@ export const run_doctor = async (
 			files.sort();
 			for (const file of files) {
 				const yml = await checkout.read_text(`${WORKFLOWS_DIR}/${file}`);
-				// `node-version: '24.14.1'` is quoted, `deno-version: 2.9.5` is not. EVERY
+				// `node-version: '24.14.1'` is quoted, and the pattern reads it bare too. EVERY
 				// occurrence, not the first: a workflow sets each pin once per job, so a
 				// bump that reached one job and not the others is its own drift — and
 				// reading only the first would report the machine aligned while a job trails.
@@ -327,8 +328,8 @@ export const run_doctor = async (
 			return;
 		}
 		// Exact, not `includes` as the wasm-pack check below does: both versions here are
-		// already bare (`2.9.5`, and node's `v` stripped by the caller), so a substring
-		// test would only buy the false pass where `2.9.5` matches an installed `2.9.50`.
+		// already bare (`24.14.1`, node's `v` stripped by the caller), so a substring
+		// test would only buy the false pass where `24.14.1` matches an installed `24.14.10`.
 		if (installed === versions[0]) return;
 		const files = [...new Set(pins.map((p) => p.file))].join(' + ');
 		warn(
@@ -390,8 +391,8 @@ export const run_doctor = async (
 
 	section('Runtimes');
 	// the `deno` on `PATH`: `check` runs no Deno task, so a missing one fails nothing `check` runs
-	// (cargo test's one Deno test passes without it, testing nothing); the bench's Deno row and
-	// what is typechecked or bundled under Deno need it
+	// (cargo test's one Deno test skips without it, saying so); the bench's Deno row and what is
+	// typechecked or bundled under Deno need it. No workflow installs Deno, so no pin grades it.
 	const deno_line = await run_version(programs.deno);
 	if (deno_line === null) {
 		warn(DENO_MISSING);
@@ -401,7 +402,6 @@ export const run_doctor = async (
 			warn(`deno — \`deno --version\` printed "${deno_line}", no Deno version`);
 		} else {
 			ok(`deno ${deno_version}`);
-			await check_ci_pin('deno', deno_version);
 		}
 	}
 

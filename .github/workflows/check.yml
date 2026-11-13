@@ -1,9 +1,9 @@
 # Three jobs run on every push to main and every PR:
 #
-#   check     — runs the local `deno task check` gate verbatim, so the two cannot
-#               drift: rustfmt, typecheck, the audit suite, cargo + vitest + deno tests,
+#   check     — runs the local `npm run check` gate verbatim, so the two cannot
+#               drift: rustfmt, typecheck, the audit suite, cargo + vitest tests,
 #               AST-type drift, clippy with -D warnings. The authoritative list is
-#               the `check` task in deno.json — deliberately NOT re-enumerated here,
+#               the `check` script in package.json — deliberately NOT re-enumerated here,
 #               because a hand-copied list goes stale every time an audit is added.
 #               pins:audit here is the pin-AGREEMENT half only (a repo fact, so it
 #               holds on this clean checkout); checkout alignment is the separate
@@ -26,15 +26,19 @@
 #               npm-package tests, per OS (see the job comment). Linux is
 #               covered by `check`.
 #
-# `check` needs Rust, Deno *and* Node: the fixture suite drives prettier + svelte
+# `check` needs Rust and Node: the fixture suite drives prettier + svelte
 # through tsv_debug's sidecar, a Node process run in place from
 # crates/tsv_debug/sidecar (its package.json and package-lock.json pin the
 # oracle, installed by `npm ci --prefix crates/tsv_debug/sidecar`), so
 # `cargo test --workspace` panics without Node or that install —
 # tests/fixtures_tests.rs health-checks the sidecar first. Node also runs the JS
-# suites (`test:node`, vitest over the root's npm install); Deno runs the
-# `deno task` chain and the suites still on `deno test`. wasm-pack is not needed
-# by `check`.
+# suites (`test:node`, vitest over the root's npm install) and every task, as
+# `npm run`. wasm-pack is not needed by `check`. No job installs Deno, which
+# only the bench's Deno row needs: nothing a job here runs starts it. The one
+# Rust test that runs the `deno` on PATH (a_node_that_runs_deno_is_refused)
+# skips without one, printing a SKIPPED line to the log, and its Deno-free
+# sibling (a_node_with_a_deno_global_is_refused) grades the same refusal on
+# every Unix runner (docs/tasks.md §`check`).
 
 name: check
 
@@ -83,20 +87,8 @@ jobs:
 
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
 
-      - name: Install Deno
-        uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
-        with:
-          # Pinned to match local: deno runs the `deno task` chain and `deno test`,
-          # so a floating minor could shift behavior the pinned Rust toolchain
-          # can't guard. Bump deliberately. Nothing it runs here fetches a package:
-          # `test:deno` runs the node-modules-free deno tests (node: builtins +
-          # relative imports, with the root package.json kept out of view), the
-          # bench's npm tree is never installed here, and the npm installs are the
-          # `npm ci` steps below.
-          deno-version: 2.9.7
-
       # The lockfile gate for this job, in one cheap step instead of `--locked` on
-      # every cargo command. `deno task check` reaches cargo only through deno tasks
+      # every cargo command. `npm run check` reaches cargo only through npm scripts
       # (`typecheck`, `test`, `lint`, and every `cargo run -p tsv_debug` audit), and
       # threading `--locked` through those would impose it locally too, where an
       # in-progress dependency edit legitimately moves the lock. This asks the same
@@ -122,18 +114,18 @@ jobs:
       # The fixture oracle's tree (prettier, svelte, acorn and what they pin), which
       # tsv_debug's sidecar runs in place under `node --permission`; install scripts
       # off by the sidecar's own .npmrc, a copy of the root's (npm reads only the
-      # prefix's). `cargo test` (in `deno task check`) refuses a missing or stale install.
+      # prefix's). `cargo test` (in `npm run check`) refuses a missing or stale install.
       - name: Install the sidecar's npm dependencies
         run: npm ci --prefix crates/tsv_debug/sidecar
 
       - name: Check
-        run: deno task check
+        run: npm run check
 
   # Publish-parity gate for the published sets: builds every WASM/npm artifact,
   # checks the size bounds, runs the Node package tests, and stages, tests and
   # size-checks the Linux N-API package — none of which `check` exercises, so a packaging break
   # surfaces on PRs instead of at release time. Runs the same `build:packages`
-  # task as scripts/publish.ts (6 wasm-pack release builds + wasm-opt) and the
+  # task as scripts/publish.ts (a wasm-pack release build + wasm-opt per npm package) and the
   # same `build:napi:packages` staging as release.yml, so none can drift.
   artifacts:
     runs-on: ubuntu-latest
@@ -142,7 +134,7 @@ jobs:
     # still burns the artifact build. Re-add `needs: check` to trade that
     # latency back for not spending build minutes on red PRs.
     # Generous headroom over a cold build of both published sets: the wasm half
-    # (6 wasm-pack release builds + wasm-opt; wasm-pack itself is now a prebuilt
+    # (a wasm-pack release build + wasm-opt per npm package; wasm-pack itself is now a prebuilt
     # download, not a source compile) plus the napi half's two host binaries
     # (napi-profile addon + LTO'd tsv_cli), the depth gates (the napi-profile
     # test build + full sweep, and the wasm sweep's cold and warm passes, each
@@ -178,13 +170,6 @@ jobs:
         with:
           tool: wasm-pack@0.15.0
 
-      - name: Install Deno
-        uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
-        with:
-          # Pinned to match the check job / local. Bump deliberately.
-          deno-version: 2.9.7
-          cache: true
-
       - name: Install Node
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -206,15 +191,15 @@ jobs:
       - name: Install npm dependencies
         run: npm ci
 
-      # Builds only the publishable wasm bundles (npm + deno) — exactly what
+      # Builds only the publishable wasm bundles (npm) — exactly what
       # scripts/publish.ts builds and what validate:artifacts / test:npm consume.
       # NOT `build:all`: that prepends an LTO release workspace build + FFI lib that
       # nothing here validates (publish skips them too), so they were pure overhead.
       - name: Build packages
-        run: deno task build:packages
+        run: npm run build:packages
 
       - name: Validate artifact sizes
-        run: deno task validate:artifacts
+        run: npm run validate:artifacts
 
       # All three published shapes differ (format excludes convert, parse
       # bundles the .d.ts, all ships the tsv bin), so test each. The `:run`
@@ -222,9 +207,9 @@ jobs:
       # `build:packages` above already built all six bundles.
       - name: Node package tests
         run: |
-          deno task test:npm:run
-          deno task test:npm:parse:run
-          deno task test:npm:all:run
+          npm run test:npm:run
+          npm run test:npm:parse:run
+          npm run test:npm:all:run
 
       # The N-API npm shape on LINUX — the same publish-parity reasoning as the
       # wasm half above, for the other published set. `platforms` proves macOS +
@@ -235,7 +220,7 @@ jobs:
       # matrix builds them. Builds both shipped binaries (addon on the napi
       # profile, `tsv_cli` on release), which rust-cache carries across runs.
       - name: N-API npm package test (linux)
-        run: deno task test:napi:npm
+        run: npm run test:napi:npm
 
       # The native sibling of `validate:artifacts`: the size bands for the two
       # binaries the step above staged (the napi-profile addon and the release
@@ -244,7 +229,7 @@ jobs:
       # within the linux-x64-gnu band the matrix's almalinux:8 build anchors
       # (scripts/validate_napi_artifact.ts says how close).
       - name: Validate N-API artifact sizes (linux)
-        run: deno task validate:napi
+        run: npm run validate:napi
 
       # The depth limits' stack contract in the shipped binaries' optimization —
       # the napi profile the addon above was built in (fat LTO, one codegen
@@ -254,7 +239,7 @@ jobs:
       # of the optimized frames; the published, profile-guided addon itself is
       # graded by the release matrix on every row (docs/tasks.md §`test:depth:napi`).
       - name: Depth contract, napi profile
-        run: deno task test:depth:napi
+        run: npm run test:depth:napi
 
       # ENGINE PARITY, and the only place it can run: one Rust source compiled
       # to wasm32 and natively must format to the same bytes, and this is the
@@ -263,7 +248,7 @@ jobs:
       # is the fixture trees plus, when the snapshot checkout is present, the
       # real-code one.
       - name: Engine parity (wasm vs native)
-        run: deno task engines:audit
+        run: npm run engines:audit
 
       # The depth limits' stack contract in the WASM engine, on a Node main thread:
       # every shape the native gate above generates, at its accepted depth, through
@@ -271,19 +256,19 @@ jobs:
       # come from the native test built under the napi profile the depth step above
       # already compiled (docs/tasks.md §`test:depth:wasm`).
       - name: Depth contract, WASM engine
-        run: deno task test:depth:wasm
+        run: npm run test:depth:wasm
 
       # The crates.io packaging, every commit: each publishable crate packaged
       # and built ALONE from its tarball, against its siblings' tarballs, at its
       # own default features (`cargo publish --workspace --dry-run --locked`,
-      # via `deno task publish:crates:package`). Nothing else builds a crate
+      # via `npm run publish:crates:package`). Nothing else builds a crate
       # without the workspace's feature unification, so a crate that compiles
       # only beside its siblings fails here instead of at publish. The public-API
       # gate is skipped (there is no release between releases to grade); the
       # release workflow's `crates` job runs it, and with it skipped this step
       # reads no crates.io API — only the index cargo resolves through.
       - name: Crates packaging (publish dry run)
-        run: deno task publish:crates:package
+        run: npm run publish:crates:package
 
   # Platform confidence for the native builds: the committed-tree test suite
   # (fixtures, CLI integration, the napi in-crate tests) plus the real N-API
@@ -291,7 +276,7 @@ jobs:
   # is split across the other two jobs — `check` runs `cargo test --workspace`
   # on ubuntu, `artifacts` runs the N-API npm-shape test there (the JS legs are
   # not in `check`) — so the matrix is macOS + Windows; macos-15 runners are arm64,
-  # which is also aarch64 coverage. Deliberately NOT the full `deno task check`:
+  # which is also aarch64 coverage. Deliberately NOT the full `npm run check`:
   # rustfmt/clippy/typecheck/the audits are platform-independent and already
   # gate on ubuntu — duplicating them here is wall-clock for no new signal.
   # The highest-yield surfaces per OS are path handling (tsv_ignore /
@@ -326,19 +311,16 @@ jobs:
 
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
 
-      # The N-API steps below run as `deno task test:napi` / `test:napi:npm`.
-      - name: Install Deno
-        uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
-        with:
-          # Pinned to match the check job / local. Bump deliberately.
-          deno-version: 2.9.7
-
       # `cargo test --workspace` needs Node: the fixture suite drives prettier +
       # svelte through tsv_debug's sidecar, a Node process (see the `check` job
       # comment). Also test:napi's runner (`node --test` executes the .ts directly
       # via native type stripping, >= 22.18), and test:napi:npm's staging and Bun
       # launcher, which import no package (docs/tasks.md §`build:napi:packages`,
-      # §`test:bun`). Pinned to match the artifacts job.
+      # §`test:bun`). Pinned to match the artifacts job. The N-API steps run as
+      # `npm run`, which needs no root install: npm runs each script body under
+      # the OS's script shell (`sh`; `cmd.exe` on Windows), and every body these
+      # steps reach is `&&`-joined `npm run` / `node` / `cargo` words that both
+      # shells read alike.
       - name: Install Node
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -369,11 +351,11 @@ jobs:
       # during the burn-down; its own failure still fails the job).
       - name: N-API boundary test
         if: ${{ !cancelled() }}
-        run: deno task test:napi
+        run: npm run test:napi
 
       # The staged npm shape on this OS: loader platform-resolution (per-OS
       # triple detection), the wasm-parity options surface, and the packaged
       # .node — what a real `npm i @fuzdev/tsv` consumer executes.
       - name: N-API npm package test
         if: ${{ !cancelled() }}
-        run: deno task test:napi:npm
+        run: npm run test:napi:npm

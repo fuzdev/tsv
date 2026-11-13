@@ -156,9 +156,9 @@ interface World {
 const healthy = (): World => ({
 	checkout: {
 		'.github/workflows/check.yml':
-			"jobs:\n  a:\n    deno-version: 2.9.7\n    node-version: '24.14.1'\n  b:\n    deno-version: 2.9.7\n",
+			"jobs:\n  a:\n    node-version: '24.14.1'\n  b:\n    node-version: '24.14.1'\n",
 		'.github/workflows/release.yml': "jobs:\n  a:\n    node-version: '24.14.1'\n",
-		'.github/workflows/notes.txt': 'deno-version: 1.0.0\n',
+		'.github/workflows/notes.txt': "node-version: '1.0.0'\n",
 		'package.json': JSON.stringify({ engines: { node: '>=24.14' } }),
 		'crates/tsv_debug/sidecar/package.json': JSON.stringify({ engines: { node: '>=24.14' } }),
 		'crates/tsv_debug/sidecar/package-lock.json': SIDECAR_LOCK,
@@ -380,33 +380,10 @@ const CASES: Case[] = [
 		code: 0
 	},
 	{
-		name: 'deno at a version CI does not pin',
-		change: (w) => void (w.programs.deno = version('deno 2.9.8 (stable)\n')),
-		mark: '⚠',
-		line: 'deno 2.9.8 — differs from the 2.9.7 that check.yml install; bump the workflows (deno-version) so CI verifies what you develop against',
-		code: 0
-	},
-	{
-		name: 'deno at a version that only prefixes the pin',
-		change: (w) => void (w.programs.deno = version('deno 2.9.70\n')),
-		mark: '⚠',
-		line: 'deno 2.9.70 — differs from the 2.9.7 that check.yml install; bump the workflows (deno-version) so CI verifies what you develop against',
-		code: 0
-	},
-	{
-		name: 'workflows pinning two deno versions',
-		change: (w) =>
-			void (w.checkout['.github/workflows/release.yml'] += '    deno-version: 2.9.6\n'),
-		mark: '⚠',
-		line: 'deno — the workflows pin more than one version (check.yml: 2.9.7, release.yml: 2.9.6); CI disagrees with itself about which deno verifies this repo',
-		code: 0
-	},
-	{
-		name: 'one workflow pinning two deno versions',
-		change: (w) =>
-			void (w.checkout['.github/workflows/check.yml'] += '  c:\n    deno-version: 2.9.6\n'),
-		mark: '⚠',
-		line: 'deno — the workflows pin more than one version (check.yml: 2.9.7, check.yml: 2.9.6); CI disagrees with itself about which deno verifies this repo',
+		name: 'deno at any version, which no workflow installs',
+		change: (w) => void (w.programs.deno = version('deno 3.0.0 (stable)\n')),
+		mark: '✓',
+		line: 'deno 3.0.0',
 		code: 0
 	},
 	// node
@@ -467,6 +444,31 @@ const CASES: Case[] = [
 		},
 		mark: '⚠',
 		line: 'node 26.13.0 — differs from the 24.14.1 that check.yml + release.yml install; bump the workflows (node-version) so CI verifies what you develop against',
+		code: 0
+	},
+	{
+		name: 'node at a version that only prefixes the pin',
+		change: (w) => {
+			w.programs.node!['--version'] = exited('v24.14.10\n');
+		},
+		mark: '⚠',
+		line: 'node 24.14.10 — differs from the 24.14.1 that check.yml + release.yml install; bump the workflows (node-version) so CI verifies what you develop against',
+		code: 0
+	},
+	{
+		name: 'workflows pinning two node versions',
+		change: (w) =>
+			void (w.checkout['.github/workflows/release.yml'] += "    node-version: '24.13.0'\n"),
+		mark: '⚠',
+		line: 'node — the workflows pin more than one version (check.yml: 24.14.1, release.yml: 24.14.1, release.yml: 24.13.0); CI disagrees with itself about which node verifies this repo',
+		code: 0
+	},
+	{
+		name: 'one workflow pinning two node versions',
+		change: (w) =>
+			void (w.checkout['.github/workflows/check.yml'] += "  c:\n    node-version: '24.13.0'\n"),
+		mark: '⚠',
+		line: 'node — the workflows pin more than one version (check.yml: 24.14.1, check.yml: 24.13.0, release.yml: 24.14.1); CI disagrees with itself about which node verifies this repo',
 		code: 0
 	},
 	{
@@ -1060,17 +1062,28 @@ test('a missing deno fails no check leg, so it warns, and fails only under --str
 describe('the CI pins', () => {
 	test('a tool no workflow pins is graded against nothing, and warns nothing', async () => {
 		const world = healthy();
-		world.checkout['.github/workflows/check.yml'] = "jobs:\n  a:\n    node-version: '24.14.1'\n";
-		world.programs.deno = version('deno 3.0.0\n');
+		world.checkout['.github/workflows/check.yml'] = 'jobs:\n  a:\n';
+		world.checkout['.github/workflows/release.yml'] = 'jobs:\n  a:\n';
+		world.programs.node!['--version'] = exited('v26.13.0\n');
 		const r = await run(world);
 		deepStrictEqual(marked(r.lines, '⚠'), []);
-		ok(marked(r.lines, '✓').includes('deno 3.0.0'));
 		ok(
 			marked(r.lines, '·').includes(
-				'deno 3.0.0 — no workflow pins a deno-version, so nothing grades it against CI'
+				'node 26.13.0 — no workflow pins a node-version, so nothing grades it against CI'
 			)
 		);
 		strictEqual(r.code, 0);
+		strictEqual(verdict(r), '✓ doctor: everything present and consistent.');
+	});
+
+	test('a deno-version pin grades nothing: no workflow installs Deno', async () => {
+		const world = healthy();
+		world.checkout['.github/workflows/check.yml'] += '  c:\n    deno-version: 2.9.7\n';
+		world.programs.deno = version('deno 2.9.8\n');
+		const r = await run(world);
+		deepStrictEqual(marked(r.lines, '⚠'), []);
+		ok(marked(r.lines, '✓').includes('deno 2.9.8'));
+		ok(!r.lines.some((line) => line.includes('deno-version')), r.lines.join('\n'));
 		strictEqual(verdict(r), '✓ doctor: everything present and consistent.');
 	});
 
@@ -1079,7 +1092,6 @@ describe('the CI pins', () => {
 		for (const path of Object.keys(world.checkout)) {
 			if (path.startsWith('.github/')) delete world.checkout[path];
 		}
-		world.programs.deno = version('deno 3.0.0\n');
 		world.programs.node!['--version'] = exited('v99.0.0\n');
 		const r = await run(world);
 		deepStrictEqual(marked(r.lines, '⚠'), []);
@@ -1088,11 +1100,11 @@ describe('the CI pins', () => {
 
 	test('a workflow directory entry that is no file is not read', async () => {
 		const world = healthy();
-		world.checkout['.github/workflows/sub.yml/x.yml'] = 'deno-version: 1.0.0\n';
-		world.programs.deno = version('deno 2.9.8\n');
+		world.checkout['.github/workflows/sub.yml/x.yml'] = "node-version: '1.0.0'\n";
+		world.programs.node!['--version'] = exited('v26.13.0\n');
 		const r = await run(world);
 		deepStrictEqual(marked(r.lines, '⚠'), [
-			'deno 2.9.8 — differs from the 2.9.7 that check.yml install; bump the workflows (deno-version) so CI verifies what you develop against'
+			'node 26.13.0 — differs from the 24.14.1 that check.yml + release.yml install; bump the workflows (node-version) so CI verifies what you develop against'
 		]);
 	});
 });

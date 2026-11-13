@@ -1134,28 +1134,99 @@ mod tests {
         assert_eq!(formatted.expect("prettier answers"), "<div>a</div>\n");
     }
 
+    /// Writes a skipped test's notice to the process's own stderr, past the harness's capture,
+    /// so a passing run prints it too (a `cargo test` log, CI's among them); `eprintln!` is
+    /// captured and shown only when the test fails.
+    #[cfg(unix)]
+    fn announce_skip(notice: &str) {
+        use std::io::Write as _;
+        // a notice that can't be written changes no verdict
+        let _ = writeln!(std::io::stderr(), "{notice}");
+    }
+
     /// A `node` that runs Deno (the one `deno task` puts on `PATH` with no Node installed) is
-    /// refused by the sidecar, and the actor names it. Needs `deno` on `PATH`.
+    /// refused by the sidecar, and the actor names it. Needs a working `deno` on `PATH`, which
+    /// CI doesn't install: without one it passes untested, saying so on stderr.
     #[cfg(unix)]
     #[tokio::test]
     async fn a_node_that_runs_deno_is_refused() {
+        const SKIPPED: &str = "SKIPPED sidecar::actor::tests::a_node_that_runs_deno_is_refused; \
+            the sidecar's refusal of a `node` that runs Deno is not graded on this machine";
         let Some(deno) = std::env::var_os("PATH").and_then(|path| {
             std::env::split_paths(&path)
                 .map(|dir| dir.join("deno"))
                 .find(|candidate| is_executable(candidate))
         }) else {
-            eprintln!("skipped: no deno on PATH");
+            announce_skip(&format!("⚠ deno not found on PATH — {SKIPPED}"));
             return;
         };
+        let is_deno = std::process::Command::new(&deno)
+            .arg("--version")
+            .output()
+            .is_ok_and(|out| out.status.success() && out.stdout.starts_with(b"deno "));
+        if !is_deno {
+            announce_skip(&format!(
+                "⚠ {} is no working Deno (`--version` fails or names no deno) — {SKIPPED}",
+                deno.display()
+            ));
+            return;
+        }
         let shim = tempfile::tempdir().expect("temp dir");
         let node = shim.path().join("node");
         std::os::unix::fs::symlink(&deno, &node).expect("link node to deno");
+        assert_refused_under(shim.path(), &node).await;
+    }
+
+    /// The same refusal with no Deno installed, so it is graded on every Unix machine, CI's
+    /// among them: the `node` on the sidecar's `PATH` is a wrapper that starts the real Node
+    /// with a preload defining `globalThis.Deno`, which is all the sidecar reads to tell
+    /// Deno from Node. The sidecar's script and package are the real ones, unchanged.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn a_node_with_a_deno_global_is_refused() {
+        use std::io::Write as _;
+        let real = find_node(std::env::var_os("PATH").as_deref()).expect("node on PATH");
+        let real = real.to_str().expect("a UTF-8 path to node");
+        let wrapper = format!(
+            "#!/bin/sh\nexec '{}' --import 'data:text/javascript,globalThis.Deno={{}};' \"$@\"\n",
+            real.replace('\'', r"'\''")
+        );
+        let shim = tempfile::tempdir().expect("temp dir");
+        let node = shim.path().join("node");
+        // a child writes the wrapper, so no descriptor open for writing it is ever in this
+        // process, where a fork by a concurrent test could hold it and make its exec fail
+        // with ETXTBSY
+        let mut writer = std::process::Command::new("/bin/sh")
+            .args(["-c", "cat > \"$1\" && chmod 755 \"$1\"", "sh"])
+            .arg(&node)
+            .stdin(Stdio::piped())
+            .spawn()
+            .expect("start the wrapper's writer");
+        writer
+            .stdin
+            .take()
+            .expect("the writer's stdin")
+            .write_all(wrapper.as_bytes())
+            .expect("send the wrapper");
+        assert!(
+            writer.wait().expect("the writer exits").success(),
+            "write the wrapper"
+        );
+        assert_refused_under(shim.path(), &node).await;
+    }
+
+    /// Grades the sidecar's refusal of the runtime `node` (in `shim`, the only `PATH` entry)
+    /// runs: the actor fails a request with [`SidecarError::NotNode`] naming `node`, for a
+    /// request sent at once and one sent after the sidecar exited, and the refusal comes
+    /// before the oracle loads.
+    #[cfg(unix)]
+    async fn assert_refused_under(shim: &Path, node: &Path) {
         let actor = SidecarActor::spawn_in(
             &sidecar_dir().expect("sidecar dir"),
-            Some(shim.path().as_os_str()),
+            Some(shim.as_os_str()),
             |_| None,
         )
-        .expect("spawn the sidecar under deno");
+        .expect("spawn the sidecar");
         match request(&actor, "__version_info", "", None).await {
             Err(SidecarError::NotNode { program }) => assert_eq!(program, node),
             other => panic!("expected NotNode, got {other:?}"),
@@ -1163,10 +1234,10 @@ mod tests {
         // A request sent after the refusal fails at its write, and is told the same.
         let late = SidecarActor::spawn_in(
             &sidecar_dir().expect("sidecar dir"),
-            Some(shim.path().as_os_str()),
+            Some(shim.as_os_str()),
             |_| None,
         )
-        .expect("spawn the sidecar under deno");
+        .expect("spawn the sidecar");
         tokio::time::sleep(Duration::from_secs(5)).await;
         match request(&late, "__version_info", "", None).await {
             Err(SidecarError::NotNode { program }) => assert_eq!(program, node),
@@ -1181,8 +1252,8 @@ mod tests {
         )
         .expect("copy the script");
         let dir = canonical_dir(package.path()).expect("canonical temp dir");
-        let codeless = SidecarActor::spawn_in(&dir, Some(shim.path().as_os_str()), |_| None)
-            .expect("spawn the sidecar under deno");
+        let codeless = SidecarActor::spawn_in(&dir, Some(shim.as_os_str()), |_| None)
+            .expect("spawn the sidecar");
         match request(&codeless, "__version_info", "", None).await {
             Err(SidecarError::NotNode { program }) => assert_eq!(program, node),
             other => panic!("expected NotNode before any oracle import, got {other:?}"),

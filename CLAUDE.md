@@ -112,7 +112,7 @@ cargo run -p tsv_cli strip --check --content 'enum E {}'                 # exit 
 
 ### Testing & Code Quality
 
-"In `check`" = gates in `npm run check`. A task that needs `deno task bench:install` (the bench's node_modules — CI installs none) can't gate there.
+"In `check`" = gates in `npm run check`. A task that needs `npm run bench:install` (the bench's node_modules — CI installs none) can't gate there.
 
 ```bash
 npm run check            # full committed-tree gate (benches/js/CLAUDE.md §Gate map); runs no Deno task
@@ -208,7 +208,7 @@ deno task test:node      # vitest under Node over the suites beside their module
 #                          (docs/tasks.md §`test:node`)
 deno task test:node:canonical # the same over the suites that load the bench install: `benches/js/lib/canonical_test.ts`
 #                          (the canonical prettier baseline's parser routing) and `compare_engines_test.ts` (the
-#                          comparison tools' engine binding); needs `deno task bench:install`, so NOT in `check`
+#                          comparison tools' engine binding); needs `npm run bench:install`, so NOT in `check`
 deno task test:depth     # tests/depth_limit.rs optimized (`--profile corpus`): every shape the depth limits count, a catalog
 #                          of grammar positions each nested in itself, and a generated sweep — `check`'s scope: every pair
 #                          behind the heads `a` and `a()`, a few hundred seeded triples, every commented link, the bare prefix
@@ -584,7 +584,7 @@ deno task bench:deno:run -- --verbose   # per-file skip detail (counts always sh
 BENCH_FILTER=bits-ui BENCH_LIMIT=10 deno task bench:deno:run
 ```
 
-**Prerequisites**: `cargo install wasm-pack` + `deno task bench:install` once (needs npm/Node). Beyond that the hard dependencies are Deno (the `deno task` chain) and Node (≥ 24.14: the JS suites, and the fixture oracle `cargo test` runs, installed by `npm ci --prefix crates/tsv_debug/sidecar`); Node ≥ 22.18 (native TS type-stripping) runs `bench:node`, Bun `bench:bun`. The aggregate `bench` needs both and fails fast if either is missing (`bench:runtimes` preflights `bench:perf`; without it the miss would surface only after two of three siblings regenerated and `bench:compose` skipped). Its node arm probes `globalThis.Deno` rather than resolving the name — `deno task` puts a `node`→deno compat shim on PATH that would pass the check and run the harness AS Deno.
+**Prerequisites**: `cargo install wasm-pack` + `npm run bench:install` once (needs npm/Node). Beyond that the hard dependency is Node (≥ 24.14: `npm run`, the JS suites, and the fixture oracle `cargo test` runs, installed by `npm ci --prefix crates/tsv_debug/sidecar`). Deno is the bench's alone (the Deno row, the canonical size rows' `deno bundle`, `typecheck:js`), and no CI job installs it: `check` passes without it, cargo's one test that runs the `deno` on `PATH` printing a SKIPPED line while a Deno-free sibling grades the same refusal (./docs/tasks.md §`check`). Node ≥ 22.18 (native TS type-stripping) runs `bench:node`, Bun `bench:bun`. The aggregate `bench` needs both and fails fast if either is missing (`bench:runtimes` preflights `bench:perf`; without it the miss would surface only after two of three siblings regenerated and `bench:compose` skipped). Its node arm probes `globalThis.Deno` rather than resolving the name — `deno task` puts a `node`→deno compat shim on PATH that would pass the check and run the harness AS Deno.
 
 **Compares** canonical (prettier + svelte/compiler), native (FFI under Deno / N-API under Node+Bun, both profile-guided), WASM, and alternatives:
 

@@ -25,7 +25,7 @@ grades); the reference halves live in `docs/`:
 
 ## Gate map
 
-> Which check runs which corpus/oracle, and when. `deno task check` needs only this repo — its
+> Which check runs which corpus/oracle, and when. `npm run check` needs only this repo (no Deno) — its
 > two sibling-checkout legs (`roundtrip:audit:prettier`, `discovery:audit`) widen onto
 > `../prettier` / `../corpora` when present and loud-skip when not, so a bare clone passes. Every
 > other gate *requires* sibling checkouts (`../corpora`, `../svelte`, `../acorn-typescript`,
@@ -34,7 +34,7 @@ grades); the reference halves live in `docs/`:
 
 | Gate | Composition | Corpus / oracle | Cadence |
 | --- | --- | --- | --- |
-| **`deno task check`** | `cargo fmt --check` · `format:audit` · `pins:audit` · `docs:audit` · `docs:audit:docsrs` · `deps:audit` · `package:audit` · `typecheck` · `typecheck:features` · `typecheck:scripts` · `typecheck:bench-core` · `conformance:audit` · `conformance:audit:compiler` · `variants:audit` · `scan:audit` · `fanout:audit` · `roundtrip:audit` · `roundtrip:audit:prettier` · `discovery:audit` · `canonicalize:audit` · `binding:audit` · `authoring:audit` · `paren:audit` · `razor:audit` · `fuzz:audit` (+ `:css` · `:ts`) · `fuzz:audit:debug` · `test:node` · `cargo test` (incl. fixtures) · `test:depth` · `test:audits` · `swallow:audit` · `comments:audit` · `gaps:audit` · `blanks:audit` · `fabrication:audit` · `census:audit` · `width:audit` · `ignore:audit` · `check:ast-types` · `check:loc` · `clippy` | **committed tree only** (`tests/fixtures` + pure-Rust/Node/Deno audits, no external oracle), save the two opportunistic legs: `roundtrip:audit:prettier` (the pinned `../prettier` format suites) and `discovery:audit` (`tsv format --list` over the `../corpora` snapshot vs its committed file list) | every commit; the CI `check` job |
+| **`npm run check`** | `cargo fmt --check` · `format:audit` · `pins:audit` · `docs:audit` · `docs:audit:docsrs` · `deps:audit` · `package:audit` · `typecheck` · `typecheck:features` · `typecheck:scripts` · `typecheck:bench-core` · `conformance:audit` · `conformance:audit:compiler` · `variants:audit` · `scan:audit` · `fanout:audit` · `roundtrip:audit` · `roundtrip:audit:prettier` · `discovery:audit` · `canonicalize:audit` · `binding:audit` · `authoring:audit` · `paren:audit` · `razor:audit` · `fuzz:audit` (+ `:css` · `:ts`) · `fuzz:audit:debug` · `test:node` · `cargo test` (incl. fixtures) · `test:depth` · `test:audits` · `swallow:audit` · `comments:audit` · `gaps:audit` · `blanks:audit` · `fabrication:audit` · `census:audit` · `width:audit` · `ignore:audit` · `check:ast-types` · `check:loc` · `clippy` | **committed tree only** (`tests/fixtures` + pure-Rust/Node audits, no external oracle), save the two opportunistic legs: `roundtrip:audit:prettier` (the pinned `../prettier` format suites) and `discovery:audit` (`tsv format --list` over the `../corpora` snapshot vs its committed file list) | every commit; the CI `check` job, which installs no Deno (cargo test's one Deno test skips there, printing SKIPPED) |
 | **`deno task conformance:all`** | `pins:audit:checkouts` + `bench:pins:suites` + `fixtures:validate` + `compile:fixtures:validate` preflights (then `bench:harvest:svelte-styles`, late, beside the corpus legs that read its cache, `strip:corpus:run`, the type strip vs ts-blank-space over the snapshot's TypeScript, and `imports:corpus:run`, the import records vs oxc-parser's module record over its JS/TS and Svelte), then `conformance` (one Node process, its N-API legs: `svelte-fixtures` · `ts-fixtures` · `ts-repo` · `corpus:compare:parse --all` · `corpus:compare:parse tests/fixtures --fixtures` · `corpus:compare:format --all`, plus `render:audit` as its one subprocess leg) **+** `conformance:test262` (pure Rust) | `../corpora` (the real-code snapshot), `../svelte`, `../acorn-typescript`, `../typescript` (tsc baselines), `../prettier`, `../prettier-plugin-svelte`, `../test262`; the **`gates`** corpus view | release; `scripts/publish.ts` **Step 3b** |
 | **`deno task bench` / `bench:conformance`** | perf throughput ×3 runtimes + compose; parse-coverage report | **`perf`** view (100%-coverage invariant) / **`conformance`** view (fixtures filtered to what their own suite calls valid + wpt/test262 harvests; coverage-only + node-only) | dev / release cadence; feeds tsv.fuz.dev |
 | **`deno task idempotency:sweep`** | `tsv_debug fuzz --iterations 0` over the corpus dirs — F1 (`format(format(x)) == format(x)`) + no-panic + structural reparse on every file **as authored**, plus the `locations` wire (no panic) and the type strip of every TypeScript-family file (no panic, position contract, idempotence) | **`robustness`** view (the WHOLE `../corpora` snapshot — every collection it vendors, placed or not — + the `svelte_styles` cache + the live working trees' DIFF against the snapshot; absent dirs skipped with a warning) | after a printer change; conformance cadence |
@@ -54,7 +54,7 @@ checkout alignment, oracle presence, corpus entries, build artifacts) ahead of t
 Publish re-probes per step — Step 3b's posture is under [§Pre-release
 aggregate](#pre-release-aggregate--conformance--conformanceall); Step 3c
 (`audit:corpus`) re-probes the `../corpora` snapshot (its floor) the same way, and
-the audit itself warn-skips any absent `live` working tree. CI's `check` job runs `deno task check`
+the audit itself warn-skips any absent `live` working tree. CI's `check` job runs `npm run check`
 alone — it has no sibling checkouts, so of the pinned counts only the committed-tree
 ones (`fixtures_validate`, `swallow_audit`) execute there.
 
@@ -174,7 +174,7 @@ job) and an `exclude` (per-machine `*.local.*` scratch and the generated `.cache
 `typecheck:js`). `@types/node` is a types-only devDependency so `node:` builtins type-check under
 `deno check`.
 
-**Install with `deno task bench:install`** (`install_deps.ts`), always — a plain `npm install`
+**Install with `npm run bench:install`** (`install_deps.ts`), always — a plain `npm install`
 **prunes the `@oxc-parser/binding-wasm32-wasi` binding**, which the installer force-fetches back
 (why: ../../docs/benchmarks.md §Updating dependencies). Re-run after a dep bump or a stray
 `npm install`. Every harness entry point preflights `node_modules` via
