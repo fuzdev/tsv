@@ -93,7 +93,7 @@ class PublishNapiExit extends Error {}
  * @returns the exit code: 0 once every package is published, skipped, or (under `--dry-run`)
  *   packed; 1 for an unreadable package.json, a loader with no platforms, a tag the staged
  *   version disagrees with, a partial or mismatched set, a binary whose mode didn't take, an
- *   `npm view` error that is no 404, or a failed `npm publish`
+ *   `npm view` error other than E404, or a failed `npm publish`
  * @throws `TypeError` - for a flag `parseArgs` refuses
  * @throws `Error` - for a platform package name that would put its binary outside
  *   `crates/tsv_napi/pkg/`, before its mode is set
@@ -211,15 +211,16 @@ const publish = async (
 		return { code: run.code, stdout: run.stdout.trim(), stderr: run.stderr.trim() };
 	};
 
-	/** Whether `name@version` is already on the registry; non-404 errors are fatal.
-	 * An exit-0 answer with unexpected stdout reads as NOT published — the safe
-	 * degradation, since `npm publish` itself fails loudly on a real conflict,
-	 * where aborting here would kill a release on an npm output quirk. */
+	/** Whether `name@version` is already on the registry; errors other than E404 are fatal.
+	 * `--json=false` because npm's `json` setting (an npmrc, `npm_config_json`) would print the
+	 * version JSON-quoted. An exit-0 answer with unexpected stdout reads as NOT published — the
+	 * safe degradation, since `npm publish` itself fails loudly on a real conflict, where
+	 * aborting here would kill a release on an npm output quirk. */
 	const already_published = async (name: string): Promise<boolean> => {
-		const res = await npm(['view', `${name}@${version}`, 'version']);
+		const res = await npm(['view', `${name}@${version}`, 'version', '--json=false']);
 		if (res.code === 0) return res.stdout === version;
-		if (res.stderr.includes('E404') || res.stderr.includes('404')) return false;
-		return fail(`FAIL: npm view ${name}@${version} errored (not a 404):`, res.stderr || res.stdout);
+		if (res.stderr.includes('E404')) return false;
+		return fail(`FAIL: npm view ${name}@${version} errored (not E404):`, res.stderr || res.stdout);
 	};
 
 	// Platforms first, loader last — the loader must never precede its binaries.

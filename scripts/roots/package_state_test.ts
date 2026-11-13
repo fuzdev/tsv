@@ -128,6 +128,25 @@ test('a cargo home elsewhere is read, and refused only when there is an unpack t
 	deepStrictEqual((await clear(root, { ...HOME, CARGO_HOME: 'home/.cargo' })).length, 2);
 });
 
+test('an empty CARGO_HOME is none, as cargo reads it: the cleanup clears $HOME/.cargo', async () => {
+	await using root = await make_tree([`home/.cargo/registry/src/${OVERLAY}/tsv_lang-0.7.1`]);
+	const env: PackageStateEnv = { HOME: `${root.path}/home`, CARGO_HOME: '' };
+	const registry_src = to_registry_src_path(env);
+	strictEqual(registry_src, `${root.path}/home/.cargo/registry/src`);
+	const target = `${root.path}/checkout/target`;
+	deepStrictEqual(
+		await clear_package_state(
+			await open_package_state({
+				checkout: `${root.path}/checkout`,
+				target_directory: target,
+				env
+			}),
+			{ package_dir: `${target}/package`, registry_src, names: ['tsv_lang'], version: '0.7.1' }
+		),
+		[`${registry_src}/${OVERLAY}/tsv_lang-0.7.1`, `${registry_src}/${OVERLAY}`]
+	);
+});
+
 test('registry/src that is a file fails the cleanup', async () => {
 	await using root = await make_tree(['home/.cargo/registry']);
 	await root.write('home/.cargo/registry/src', '');

@@ -96,6 +96,9 @@ interface World {
 	publishes: number;
 	/** What `npm config get dry-run` prints. */
 	npm_dry_run: string;
+	/** Whether npm's `json` setting is on (an npmrc, `npm_config_json`), which a call's
+	 * `--json=false` overrides: `whoami` and `view` then print JSON. */
+	npm_json: boolean;
 	/** Whether a real `npm publish` exits 0 having published nothing, as one under npm's
 	 * dry-run setting does. */
 	noop_publish: boolean;
@@ -143,6 +146,7 @@ const make_world = (version = '0.8.1'): World => {
 		refuse_publish: null,
 		publishes: 0,
 		npm_dry_run: 'false',
+		npm_json: false,
 		noop_publish: false,
 		lag: 0,
 		lag_left: new Map(),
@@ -232,17 +236,23 @@ const npm_answer = (world: World, args: ReadonlyArray<string>, cwd: string): Ans
 		if (args[1] === 'build:packages') build_packages(world);
 		return {};
 	}
-	if (args[0] === 'whoami') return { stdout: 'owner\n' };
+	// as npm 11 prints them; `config get` prints its value raw whatever `json` says
+	const json = world.npm_json && !args.includes('--json=false');
+	if (args[0] === 'whoami') return { stdout: json ? '"owner"\n' : 'owner\n' };
 	if (args.join(' ') === 'config get dry-run') return { stdout: `${world.npm_dry_run}\n` };
 	if (args[0] === 'view') {
 		const spec = args[1]!;
 		const version = spec.slice(spec.lastIndexOf('@') + 1);
 		const lag = world.lag_left.get(spec) ?? 0;
-		if (lag > 0) {
-			world.lag_left.set(spec, lag - 1);
-			return {};
+		if (lag > 0) world.lag_left.set(spec, lag - 1);
+		if (lag === 0 && world.published.has(spec)) {
+			return { stdout: json ? `"${version}"\n` : `${version}\n` };
 		}
-		return world.published.has(spec) ? { stdout: `${version}\n` } : {};
+		return {
+			code: 1,
+			stdout: json ? '{\n  "error": {\n    "code": "E404"\n  }\n}\n' : '',
+			stderr: `npm error code E404\nnpm error 404 No match found for version ${version}\n`
+		};
 	}
 	if (args[0] === 'publish') {
 		const dir = cwd.slice(ROOT.length + 1);
@@ -468,12 +478,14 @@ const preflight_calls = (version: string): Array<string> => [
 	`git_local out status --porcelain ${W}`,
 	`git_local out rev-parse -q --verify refs/tags/v${version}^{commit} ${W}`,
 	`git_user out ls-remote --tags origin refs/tags/v${version} refs/tags/v${version}^{} ${W} inherit`,
-	`npm out whoami ${W} inherit`,
+	`npm out whoami --json=false ${W} inherit`,
 	`npm out config get dry-run ${W} inherit`,
 	`node out --version ${W}`,
 	`wasm_pack out --version ${W}`,
 	`bun out --version ${W}`,
-	...PUBLISH_PACKAGES.map(({ label }) => `npm out view ${label}@${version} version ${W} inherit`)
+	...PUBLISH_PACKAGES.map(
+		({ label }) => `npm out view ${label}@${version} version --json=false ${W} inherit`
+	)
 ];
 
 /** Steps 3 to 6's calls, after the first fingerprint. */
@@ -696,7 +708,7 @@ describe('the preflight', () => {
 		world.extra_status = [' M src/x.rs'];
 		world.local_tags.set('v0.8.2', 'b'.repeat(40));
 		world.remote_tags.set('v0.8.2', 'b'.repeat(40));
-		world.overrides.set('npm whoami', {
+		world.overrides.set('npm whoami --json=false', {
 			answer: { code: 1, stderr: 'npm error code ENEEDAUTH\nmore' },
 			sticky: false
 		});
@@ -847,7 +859,7 @@ describe('the preflight', () => {
 
 	test('a failed registry lookup and a version already on npm refuse a dry run too', async () => {
 		const world = make_world();
-		world.overrides.set('npm view @fuzdev/tsv-parse-wasm@0.8.2 version', {
+		world.overrides.set('npm view @fuzdev/tsv-parse-wasm@0.8.2 version --json=false', {
 			answer: { code: 1, stderr: 'npm error ETIMEDOUT' },
 			sticky: false
 		});
@@ -859,11 +871,26 @@ describe('the preflight', () => {
 		live.published.add('@fuzdev/tsv-wasm@0.8.2');
 		await refuses(live, '  FAIL: @fuzdev/tsv-wasm@0.8.2 is already on npm', ['--bump', 'patch']);
 		const e404 = make_world();
-		e404.overrides.set('npm view @fuzdev/tsv-wasm@0.8.2 version', {
+		e404.overrides.set('npm view @fuzdev/tsv-wasm@0.8.2 version --json=false', {
 			answer: { code: 1, stderr: 'npm error code E404' },
 			sticky: false
 		});
 		strictEqual((await publish(e404, ['--bump', 'patch'])).code, 0);
+		// npm names its debug log by the millisecond, so any failure can print `404`
+		const e500 = make_world();
+		e500.overrides.set('npm view @fuzdev/tsv-wasm@0.8.2 version --json=false', {
+			answer: {
+				code: 1,
+				stderr:
+					'npm error code E500\nnpm error 500 Internal Server Error - GET …\n' +
+					'npm error A complete log of this run can be found in: /h/_logs/2026-11-13T08_13_00_404Z-debug-0.log\n'
+			},
+			sticky: false
+		});
+		await refuses(e500, '  FAIL: npm view @fuzdev/tsv-wasm@0.8.2 failed:\nnpm error code E500', [
+			'--bump',
+			'patch'
+		]);
 	});
 
 	test('each probed path is required: missing, it fails the run that needs it', async () => {
@@ -922,9 +949,9 @@ const wetrun_tail = (version: string): Array<string> => [
 	...gate_calls(),
 	...FINGERPRINT,
 	...PUBLISH_PACKAGES.flatMap(({ label, dir }) => [
-		`npm out view ${label}@${version} version ${W} inherit`,
+		`npm out view ${label}@${version} version --json=false ${W} inherit`,
 		`npm run publish --access public @${ROOT}/${dir}`,
-		`npm out view ${label}@${version} version ${W} inherit`
+		`npm out view ${label}@${version} version --json=false ${W} inherit`
 	]),
 	`git_local out status --porcelain -- Cargo.toml Cargo.lock CHANGELOG.md ${W}`,
 	`git_user out commit -m chore: publish v${version} -- Cargo.toml Cargo.lock CHANGELOG.md ${W} inherit`,
@@ -1118,12 +1145,12 @@ describe('a failure at each step, and the resume', () => {
 		{
 			at: "Step 7's registry read",
 			fail: (w) =>
-				w.overrides.set('npm view @fuzdev/tsv-format-wasm@0.8.2 version', {
+				w.overrides.set('npm view @fuzdev/tsv-format-wasm@0.8.2 version --json=false', {
 					answer: {},
 					sticky: false,
 					// the preflight's read of it passes; Step 7's is the one that fails
 					then: (world) =>
-						world.overrides.set('npm view @fuzdev/tsv-format-wasm@0.8.2 version', {
+						world.overrides.set('npm view @fuzdev/tsv-format-wasm@0.8.2 version --json=false', {
 							answer: { code: 1, stderr: 'npm error ECONNRESET' },
 							sticky: false
 						})
@@ -1384,7 +1411,7 @@ describe('the registry confirms each publish', () => {
 	const confirm_reads = (label: string, reads: number): Array<string> =>
 		Array.from({ length: reads }, (_, i) => [
 			...(i > 0 ? ['sleep 10000'] : []),
-			`npm out view ${label}@0.8.2 version ${W} inherit`
+			`npm out view ${label}@0.8.2 version --json=false ${W} inherit`
 		]).flat();
 
 	test('a publish that exits 0 with the version absent stops before git, resumably', async () => {
@@ -1470,7 +1497,7 @@ describe('the registry confirms each publish', () => {
 	test('a failed read while confirming is retried', async () => {
 		const world = make_world();
 		const label = PUBLISH_PACKAGES[0]!.label;
-		const view = `npm view ${label}@0.8.2 version`;
+		const view = `npm view ${label}@0.8.2 version --json=false`;
 		// the publish lands, and the confirmation's first read fails
 		world.overrides.set(`npm publish --access public`, {
 			answer: {},
@@ -1501,7 +1528,7 @@ describe('the registry confirms each publish', () => {
 			answer: {},
 			sticky: false,
 			then: (w) =>
-				w.overrides.set(`npm view ${label}@0.8.2 version`, {
+				w.overrides.set(`npm view ${label}@0.8.2 version --json=false`, {
 					answer: { code: 1, stderr: 'npm error ECONNRESET' },
 					sticky: true
 				})
@@ -1542,6 +1569,26 @@ describe('the registry confirms each publish', () => {
 		strictEqual(world.publishes, 3);
 		strictEqual(world.pushes, 1);
 		strictEqual(world.files.has('.publish-in-progress'), false);
+	});
+
+	test("npm's json setting changes no reading: each question asks npm for text", async () => {
+		const world = make_world();
+		world.npm_json = true;
+		const run = await publish(world, ['--wetrun', '--bump', 'patch']);
+		strictEqual(run.code, 0, run.err);
+		ok(run.out.includes('  npm authenticated as: owner\n'), run.out);
+		deepStrictEqual(
+			[...world.published],
+			PUBLISH_PACKAGES.map(({ label }) => `${label}@0.8.2`)
+		);
+		strictEqual(world.pushes, 1);
+		// a version already out reads as out
+		const live = make_world();
+		live.npm_json = true;
+		live.published.add('@fuzdev/tsv-wasm@0.8.2');
+		const refused = await publish(live, ['--bump', 'patch']);
+		strictEqual(refused.code, 1);
+		ok(refused.err.includes('  FAIL: @fuzdev/tsv-wasm@0.8.2 is already on npm'), refused.err);
 	});
 });
 

@@ -20,24 +20,33 @@ export interface ReleaseNpm {
 const npm_capture = (npm: ReleaseNpm, args: ReadonlyArray<string>) =>
 	program_capture(npm.program, 'npm', args, { cwd: npm.cwd, stdin: 'inherit' });
 
+/**
+ * Passed to `npm whoami` and `npm view`, whose stdout is read as text: npm's `json` setting,
+ * from an npmrc or `npm_config_json`, prints either as JSON (`"1.2.3"`), and the command line
+ * outranks every other place npm reads it from. `npm config get` prints its value raw either
+ * way.
+ */
+const NO_JSON = '--json=false';
+
 /** The logged-in npm user. */
 export const npm_whoami = async (npm: ReleaseNpm): Promise<Result<{ user: string }>> => {
-	const who = await npm_capture(npm, ['whoami']);
+	const who = await npm_capture(npm, ['whoami', NO_JSON]);
 	if (who.success) return { ok: true, user: who.out };
 	return { ok: false, error: who.err.split('\n')[0] ?? '' };
 };
 
 /**
- * Whether `name@version` is on the registry. `npm view` prints the version when it is, nothing
- * when the package exists without it, and E404 when the package does not exist; anything else
- * is a lookup failure, which no publish decision may be made without.
+ * Whether `name@version` is on the registry. `npm view` prints the version when it is, and
+ * E404 when the package or the version is absent (an exit-0 answer naming anything else is
+ * read as absent too); anything else is a lookup failure, which no publish decision may be
+ * made without.
  */
 export const npm_is_published = async (
 	npm: ReleaseNpm,
 	name: string,
 	version: string
 ): Promise<Result<{ published: boolean }>> => {
-	const view = await npm_capture(npm, ['view', `${name}@${version}`, 'version']);
+	const view = await npm_capture(npm, ['view', `${name}@${version}`, 'version', NO_JSON]);
 	if (view.success) return { ok: true, published: view.out === version };
 	if (view.err.includes('E404')) return { ok: true, published: false };
 	return { ok: false, error: `npm view ${name}@${version} failed:\n${view.err}` };

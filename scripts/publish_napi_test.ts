@@ -127,11 +127,11 @@ describe('a real publish', () => {
 			0
 		);
 		deepStrictEqual(world.npm, [
-			['view', `${GNU}@${VERSION}`, 'version'],
+			['view', `${GNU}@${VERSION}`, 'version', '--json=false'],
 			['publish', `${PKG}/linux-x64-gnu`, '--access', 'public', '--provenance'],
-			['view', `${WIN}@${VERSION}`, 'version'],
+			['view', `${WIN}@${VERSION}`, 'version', '--json=false'],
 			['publish', `${PKG}/win32-x64`, '--access', 'public', '--provenance'],
-			['view', `@fuzdev/tsv@${VERSION}`, 'version'],
+			['view', `@fuzdev/tsv@${VERSION}`, 'version', '--json=false'],
 			['publish', `${PKG}/napi`, '--access', 'public', '--provenance']
 		]);
 		deepStrictEqual(world.out, [
@@ -204,12 +204,40 @@ describe('a real publish', () => {
 		strictEqual(world.out.at(-1), `published 3, skipped 0 (of 3) at v${VERSION}`);
 	});
 
-	test('a bare 404 without the E404 code also reads as not published', async () => {
+	test("only npm's E404 reads as not published, not a 404 elsewhere in the error", async () => {
+		// npm names its debug log by the millisecond, so any failure can print `404`
+		const stderr =
+			'npm error code E500\nnpm error 500 Internal Server Error - GET …\n' +
+			'npm error A complete log of this run can be found in: /h/_logs/2026-11-13T08_13_00_404Z-debug-0.log\n';
 		const world = fake_world({
-			replies: (args) => (args[0] === 'view' ? { code: 1, stderr: '404 Not Found' } : undefined)
+			replies: (args) => (args[0] === 'view' ? { code: 1, stderr } : undefined)
 		});
-		strictEqual(await run_publish_napi(world.deps, []), 0);
-		strictEqual(world.out.at(-1), `published 3, skipped 0 (of 3) at v${VERSION}`);
+		strictEqual(await run_publish_napi(world.deps, []), 1);
+		strictEqual(world.err[0], `FAIL: npm view ${GNU}@${VERSION} errored (not E404):`);
+		deepStrictEqual(world.out, []);
+	});
+
+	test("npm's json setting changes no reading: the view asks for text", async () => {
+		// what npm 11 prints with `json` set in an npmrc or `npm_config_json`
+		const json_npm =
+			(published: ReadonlySet<string>) =>
+			(args: Array<string>): Reply | undefined => {
+				if (args[0] !== 'view') return undefined;
+				const json = !args.includes('--json=false');
+				if (published.has(args[1]!)) return { stdout: json ? `"${VERSION}"\n` : `${VERSION}\n` };
+				return {
+					code: 1,
+					stdout: json ? '{\n  "error": {\n    "code": "E404"\n  }\n}\n' : '',
+					stderr: 'npm error code E404\nnpm error 404 No match found for version 1.2.3\n'
+				};
+			};
+		const all = new Set([GNU, WIN, '@fuzdev/tsv'].map((name) => `${name}@${VERSION}`));
+		const rerun = fake_world({ replies: json_npm(all) });
+		strictEqual(await run_publish_napi(rerun.deps, []), 0);
+		strictEqual(rerun.out.at(-1), `published 0, skipped 3 (of 3) at v${VERSION}`);
+		const fresh = fake_world({ replies: json_npm(new Set()) });
+		strictEqual(await run_publish_napi(fresh.deps, []), 0);
+		strictEqual(fresh.out.at(-1), `published 3, skipped 0 (of 3) at v${VERSION}`);
 	});
 
 	test('a view error that is no 404 is fatal, before anything publishes', async () => {
@@ -218,9 +246,9 @@ describe('a real publish', () => {
 				args[0] === 'view' ? { code: 1, stderr: '  npm error code E401\n' } : undefined
 		});
 		strictEqual(await run_publish_napi(world.deps, ['--provenance']), 1);
-		deepStrictEqual(world.npm, [['view', `${GNU}@${VERSION}`, 'version']]);
+		deepStrictEqual(world.npm, [['view', `${GNU}@${VERSION}`, 'version', '--json=false']]);
 		deepStrictEqual(world.err, [
-			`FAIL: npm view ${GNU}@${VERSION} errored (not a 404):`,
+			`FAIL: npm view ${GNU}@${VERSION} errored (not E404):`,
 			'npm error code E401'
 		]);
 		deepStrictEqual(world.out, []);

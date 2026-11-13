@@ -41,9 +41,9 @@ export const PACKAGE_STATE_ENV_NAMES = [
 ] as const;
 
 /** `$CARGO_HOME/registry/src`, or `$HOME/.cargo/registry/src` with no `CARGO_HOME`, as the
- * cleanup names it. */
+ * cleanup names it. An empty `CARGO_HOME` is none, as cargo reads it. */
 export const to_registry_src_path = (env: PackageStateEnv): string =>
-	join(env.CARGO_HOME ?? join(env.HOME ?? '', '.cargo'), 'registry', 'src');
+	join(env.CARGO_HOME || join(env.HOME ?? '', '.cargo'), 'registry', 'src');
 
 /** Whether `path` is `dir` or beneath it, lexically. */
 const is_within = (dir: string, path: string): boolean => {
