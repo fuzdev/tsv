@@ -32,6 +32,9 @@
 //!   owns; the arm names no store type and no lifetime, so its text stays the same while the
 //!   stores change beneath the handle. The TypeScript parse takes the stores alone, the Svelte
 //!   parse the `Bump` beside them, and CSS has no stores and parses into the `Bump` alone.
+//! - `perf_ab_api = "strip_bump"`, a tree whose strip still takes the `Bump` for its edits, calls
+//!   this driver's entry points as the current tree does, so it builds the current arm; only the
+//!   strip driver (`perf_ab_strip.rs`) has an arm of its own for it.
 //! - `perf_ab_api = "no_warm_stores"`, a tree with the stores but no `WarmStores`, parses as the
 //!   current arm does, keeping the stores itself: taken out of an `Option` before the timed
 //!   regions and parked back into it after them.

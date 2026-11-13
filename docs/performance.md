@@ -958,7 +958,10 @@ holds that slot through `tsv_ts::__private::WarmStores`, which names no store ty
 can change beneath it without a new arm; a tree with the stores but no such handle
 (`perf_ab_api = "no_warm_stores"`) keeps them in an `Option` of the driver's own. The TypeScript
 parse takes the stores alone from that generation on, where an older warm-parse tree's
-(`perf_ab_api = "ts_parse_bump"`) also took the `Bump`.
+(`perf_ab_api = "ts_parse_bump"`) also took the `Bump`. The strip takes no `Bump` in the current
+tree, where a tree with the handle whose strip still took it for its edits
+(`perf_ab_api = "strip_bump"`) hands it the `Bump`; only the strip driver has an arm for that
+generation, the format driver's calls being the current tree's.
 On a tree older than the stores every language parses into the `Bump` alone, which is kept warm
 the same way. The report names each side's generation, and a run whose
 sides differ says so: its rows then compare two call paths as well as two libraries. A change
@@ -989,10 +992,10 @@ counts as a one-shot error, on both sides alike.
 The strip driver times what `profile --strip` times, over the files a module loader strips
 (`.ts` / `.mts` / `.cts`, no declaration file — not the TypeScript row's set, which carries
 `.js` and `.d.ts`): the parse of the author's bytes (no carriage-return fold, so the TypeScript
-format row's parse column is not this one), then `tsv_ts::__private::strip_in`, the goal read from the
+format row's parse column is not this one), then `tsv_ts::__private::strip_into`, the goal read from the
 extension as `tsv strip` reads a path; the strip column is the strip's time less the parse's, its
 walk + blank, and a refusal counts as a strip. It is its own example because it calls the strip,
-which an older tree lacks: a side without `tsv_ts::__private::strip_in` builds the format driver
+which an older tree lacks: a side without `tsv_ts::__private::strip_into` or `strip_in` builds the format driver
 alone, and the run skips the strip rows — loudly, on stderr and under the table — rather than
 failing every row. Its parse row is a null control for a change confined to the strip, which
 leaves that code identical on both sides.

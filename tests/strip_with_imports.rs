@@ -1,14 +1,14 @@
 //! The combined entry, `tsv_ts::strip_with_imports`, against its two halves: over every
 //! TypeScript input of the import and strip fixture trees, at the unset goal and at each
 //! named one, the pair is exactly `(strip(source), parse_imports(source))` wherever the
-//! strip accepts the source, and the strip's own error wherever it does not. The warm-arena
-//! primitive beneath it (`__private::strip_with_imports_in`, one arena reset between
-//! sources) returns the same.
+//! strip accepts the source, and the strip's own error wherever it does not. The warm
+//! primitives beneath the two halves (`__private::strip_into` and
+//! `__private::parse_imports_into`, one `WarmStores` rewound between sources, as the bindings
+//! keep theirs) return the same.
 
 use std::path::{Path, PathBuf};
 
-use bumpalo::Bump;
-use tsv_ts::__private::strip_with_imports_in;
+use tsv_ts::__private::{WarmStores, parse_imports_into, strip_into};
 use tsv_ts::{
     Goal, parse_imports, parse_imports_with_goal, strip, strip_with_goal, strip_with_imports,
     strip_with_imports_with_goal,
@@ -46,7 +46,7 @@ fn the_combined_entry_is_its_two_halves() {
         }
         inputs.sort();
         assert!(!inputs.is_empty(), "no TypeScript fixture inputs");
-        let mut arena = Bump::new();
+        let mut stores = WarmStores::default();
         let (mut accepted, mut refused) = (0, 0);
         for path in &inputs {
             let source = match std::fs::read_to_string(path) {
@@ -69,6 +69,16 @@ fn the_combined_entry_is_its_two_halves() {
                     assert_eq!(combined, Err(error), "{name}");
                 }
             }
+            assert_eq!(
+                stores.with(|stores| strip_into(&source, None, stores)),
+                strip(&source),
+                "{name}: the warm strip"
+            );
+            assert_eq!(
+                stores.with(|stores| parse_imports_into(&source, None, stores)),
+                parse_imports(&source),
+                "{name}: the warm imports"
+            );
             for goal in [Goal::Module, Goal::Script] {
                 let expected = strip_with_goal(&source, goal).map(|stripped| {
                     let imports = match parse_imports_with_goal(&source, goal) {
@@ -85,12 +95,6 @@ fn the_combined_entry_is_its_two_halves() {
                     "{name} at {goal:?}"
                 );
             }
-            arena.reset();
-            assert_eq!(
-                strip_with_imports_in(&source, None, &arena),
-                combined,
-                "{name}: the warm arena"
-            );
         }
         // both verdicts are graded: the trees hold sources the strip refuses
         assert!(

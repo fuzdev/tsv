@@ -46,7 +46,6 @@ _internal_ast_census = ["tsv_lang/_internal_ast_census"]
 
 [dependencies]
 tsv_lang.workspace = true
-bumpalo.workspace = true
 smallvec.workspace = true
 unicode-ident.workspace = true
 

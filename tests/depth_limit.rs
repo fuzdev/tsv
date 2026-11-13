@@ -569,10 +569,9 @@ fn run_walks_on(name: String, stack: usize, lang: Lang, source: String) {
                 );
                 let formatted = tsv_ts::format(&source).expect("formats");
                 assert_output_reparses(&name, Lang::Ts, &formatted);
-                let strip_arena = bumpalo::Bump::new();
                 // a refusal (a value namespace has runtime semantics) is a verdict, not a
                 // failure: the walk reached it
-                let stripped = tsv_ts::__private::strip_in(&source, None, &strip_arena);
+                let stripped = tsv_ts::strip(&source);
                 assert!(
                     matches!(
                         stripped,
@@ -582,17 +581,14 @@ fn run_walks_on(name: String, stack: usize, lang: Lang, source: String) {
                 );
                 // the imports walk descends into what the strip refuses, so it walks
                 // deeper than the strip on a refused shape
-                let imports_arena = bumpalo::Bump::new();
-                let imports = tsv_ts::__private::parse_imports_in(&source, None, &imports_arena);
+                let imports = tsv_ts::parse_imports(&source);
                 assert!(
                     imports.is_ok(),
                     "{name}: the imports walk failed: {imports:?}"
                 );
                 // the combined walk is the strip's, collecting: the strip's verdict, and
                 // where the strip accepts, the imports walk's records
-                let combined_arena = bumpalo::Bump::new();
-                let combined =
-                    tsv_ts::__private::strip_with_imports_in(&source, None, &combined_arena);
+                let combined = tsv_ts::strip_with_imports(&source);
                 if let (Ok((_, combined_imports)), Ok(imports)) = (&combined, &imports) {
                     assert_eq!(
                         combined_imports, imports,

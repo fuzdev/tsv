@@ -91,9 +91,11 @@ fn imports_at_path(
         })
     } else {
         let goal = tsv_ts::Goal::from_extension(path);
-        tsv_ts::__private::parse_imports_in(source, goal, arena).map(|imports| {
-            tsv_ts::__private::write_imports_json(&imports, source, tsv_ts::WIRE_COORDINATES)
-        })
+        tsv_ts::__private::parse_imports_into(source, goal, &mut tsv_ts::ast::AstStores::new()).map(
+            |imports| {
+                tsv_ts::__private::write_imports_json(&imports, source, tsv_ts::WIRE_COORDINATES)
+            },
+        )
     }
 }
 

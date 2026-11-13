@@ -14,8 +14,9 @@ the fixtures that define them are [tests/fixtures_imports/](../tests/fixtures_im
 
 - **Rust**: `tsv_ts::parse_imports(source) -> Result<Imports, Error>`, the unset goal, and
   `tsv_ts::parse_imports_with_goal(source, goal: Goal)`, exact; `tsv_svelte::parse_imports(source)`
-  for a component. Each parses into a fresh arena of its own (the bindings' warm per-thread
-  arena reaches the same walk through the hidden `__private::parse_imports_in`). `Imports` holds
+  for a component. Each parses into fresh stores of its own, a component also into a fresh
+  arena (the bindings' warm per-thread stores reach the same walk through the hidden
+  `__private::parse_imports_into`). `Imports` holds
   `records: Vec<ImportRecord>`, in source order, and `has_module_syntax`. An `ImportRecord` is
   `Copy`: spans into the source (`ByteSpan`, UTF-8 byte offsets, `span.text(source)` the slice),
   never a copy of its text; `specifier_value(source)` decodes the specifier when asked,

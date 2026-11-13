@@ -266,27 +266,25 @@ fn position(point: tsv_ts::WirePoint) -> PlainObject {
 pub fn strip_typescript(source: &str, source_type: JsValue) -> Result<JsValue, JsValue> {
     let goal =
         wasm_source_type(SourceTypeArg::read(&source_type), true, Family::Strip).map_err(err)?;
-    tsv_arena::with_ast_arena(|arena| {
-        tsv_ts::__private::with_stores(|stores| {
-            match tsv_ts::__private::strip_into(source, goal, arena, stores) {
-                Ok(stripped) => Ok(JsValue::from_str(&stripped.code)),
-                Err(tsv_ts::StripError::Parse(e)) => parse_failure(&e).into_return(),
-                // a refusal always reports; the `None` arm is unreachable, thrown with its message
-                Err(tsv_ts::StripError::Unsupported {
-                    construct, error, ..
-                }) => match error.to_report() {
-                    Some(report) => Ok(failure_result(
-                        "unsupported",
-                        Some(construct.as_str()),
-                        &report,
-                    )),
-                    None => Err(err(format!("{error:#}"))),
-                },
-                // `StripError` is `#[non_exhaustive]`: a failure this binding does not know yet is
-                // thrown with its message rather than given a `kind` the facade does not declare
-                Err(other) => Err(err(format!("{other:#}"))),
-            }
-        })
+    tsv_ts::__private::with_stores(|stores| {
+        match tsv_ts::__private::strip_into(source, goal, stores) {
+            Ok(stripped) => Ok(JsValue::from_str(&stripped.code)),
+            Err(tsv_ts::StripError::Parse(e)) => parse_failure(&e).into_return(),
+            // a refusal always reports; the `None` arm is unreachable, thrown with its message
+            Err(tsv_ts::StripError::Unsupported {
+                construct, error, ..
+            }) => match error.to_report() {
+                Some(report) => Ok(failure_result(
+                    "unsupported",
+                    Some(construct.as_str()),
+                    &report,
+                )),
+                None => Err(err(format!("{error:#}"))),
+            },
+            // `StripError` is `#[non_exhaustive]`: a failure this binding does not know yet is
+            // thrown with its message rather than given a `kind` the facade does not declare
+            Err(other) => Err(err(format!("{other:#}"))),
+        }
     })
 }
 

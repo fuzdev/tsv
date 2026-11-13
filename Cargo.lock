@@ -712,7 +712,6 @@ dependencies = [
 name = "tsv_ts"
 version = "0.8.1"
 dependencies = [
- "bumpalo",
  "smallvec",
  "tsv_lang",
  "unicode-ident",

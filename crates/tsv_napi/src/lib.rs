@@ -52,7 +52,7 @@ use tsv_arena::goal_allowed;
 use tsv_arena::parse_format;
 #[cfg(feature = "imports")]
 use tsv_arena::parse_imports_json;
-#[cfg(any(feature = "panic_probe", feature = "strip"))]
+#[cfg(feature = "panic_probe")]
 use tsv_arena::with_ast_arena;
 #[cfg(feature = "parse")]
 use tsv_arena::{parse_convert, parse_internal};
@@ -429,27 +429,25 @@ lang_bindings!(
 #[cfg(feature = "strip")]
 fn strip_typescript_engine(source: &str, source_type: Option<String>) -> Result<String, Failure> {
     let goal = napi_source_type(source_type, true, Family::Strip)?;
-    with_ast_arena(|arena| {
-        tsv_ts::__private::with_stores(|stores| {
-            match tsv_ts::__private::strip_into(source, goal, arena, stores) {
-                Ok(stripped) => Ok(stripped.code),
-                Err(tsv_ts::StripError::Parse(e)) => Err(Failure::parse(&e)),
-                // a refusal always reports; the `None` arm is unreachable, thrown with its message
-                Err(tsv_ts::StripError::Unsupported {
-                    construct, error, ..
-                }) => match error.to_report() {
-                    Some(report) => Err(Failure::Returned {
-                        kind: "unsupported",
-                        construct: Some(construct.as_str()),
-                        report,
-                    }),
-                    None => Err(Failure::Plain(format!("{error:#}"))),
-                },
-                // `StripError` is `#[non_exhaustive]`: a failure this binding does not know yet is
-                // thrown with its message rather than given a `kind` the facade does not declare
-                Err(other) => Err(Failure::Plain(format!("{other:#}"))),
-            }
-        })
+    tsv_ts::__private::with_stores(|stores| {
+        match tsv_ts::__private::strip_into(source, goal, stores) {
+            Ok(stripped) => Ok(stripped.code),
+            Err(tsv_ts::StripError::Parse(e)) => Err(Failure::parse(&e)),
+            // a refusal always reports; the `None` arm is unreachable, thrown with its message
+            Err(tsv_ts::StripError::Unsupported {
+                construct, error, ..
+            }) => match error.to_report() {
+                Some(report) => Err(Failure::Returned {
+                    kind: "unsupported",
+                    construct: Some(construct.as_str()),
+                    report,
+                }),
+                None => Err(Failure::Plain(format!("{error:#}"))),
+            },
+            // `StripError` is `#[non_exhaustive]`: a failure this binding does not know yet is
+            // thrown with its message rather than given a `kind` the facade does not declare
+            Err(other) => Err(Failure::Plain(format!("{other:#}"))),
+        }
     })
 }
 

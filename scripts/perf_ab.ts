@@ -22,12 +22,15 @@
  * passed to the example's own compilation (`build_args`: `cargo rustc … -- --cfg`, so every
  * library builds as `cargo build` builds it). Per generation, each side runs:
  *
- * - current (a tree with `tsv_ts::__private::WarmStores`): TypeScript and Svelte parse into
- *   warm stores the handle takes before each timed region and parks after it, as the CLI's
- *   `Formatter` keeps them in a slot it owns (`parse_folded_into`, then `format_folded_in`
- *   through `parsed_ref`), the TypeScript parse with no `Bump`; CSS parses into the `Bump`
- *   (`parse_folded`), having no stores; the strip driver parses with
+ * - current (a tree whose strip takes no `Bump`): TypeScript and Svelte parse into warm stores
+ *   a `tsv_ts::__private::WarmStores` handle takes before each timed region and parks after it,
+ *   as the CLI's `Formatter` keeps them in a slot it owns (`parse_folded_into`, then
+ *   `format_folded_in` through `parsed_ref`), the TypeScript parse with no `Bump`; CSS parses
+ *   into the `Bump` (`parse_folded`), having no stores; the strip driver parses with
  *   `parse_with_goal_or_fallback_into` and strips with `strip_into`, into the same warm stores.
+ * - `strip_bump` (a tree with the handle whose `strip_into` still takes the `Bump` for its
+ *   edits): as the current generation, the strip handed the `Bump` too; the format driver's
+ *   calls are the current generation's.
  * - `no_warm_stores` (a tree whose `parse_folded_into` takes no `Bump`, without the handle): as
  *   the current generation, the stores kept in an `Option` of the driver's own.
  * - `ts_parse_bump` (a tree with `parse_folded_into` whose TypeScript parse still takes the
@@ -211,11 +214,20 @@ function driver_of(lang: Lang, path: DriverPath): DriverKind {
 }
 
 /** The pattern (`git grep -E`) whose match in a tree's `crates/tsv_ts/src` says the strip
- * driver can build against it (`strip_skip_reason`): the entry point's declaration, spelled
- * `strip_in<'s>(` while its output borrowed the source and `strip_in(` since, and both
- * answer the driver's one call. Anchored at the line start, where the item is declared, so a
- * comment or doc line naming it cannot answer for it. */
-const STRIP_ENTRY_POINT = '^pub fn strip_in[<(]';
+ * driver can build against it (`strip_skip_reason`): an entry point's declaration, spelled
+ * `strip_in<'s>(` while its output borrowed the source, `strip_in(` beside `strip_into(` once
+ * the stores came, and `strip_into(` alone once the strip took no arena; each answers the
+ * driver's call for its generation (`DRIVER_APIS`). Anchored at the line start, where the item
+ * is declared, so a comment or doc line naming it cannot answer for it. */
+const STRIP_ENTRY_POINT = '^pub fn strip_in(to)?[<(]';
+
+/** The pattern (`git grep -E`) whose match in a tree's `crates/tsv_ts/Cargo.toml` says tsv_ts
+ * depends on `bumpalo`; among the trees these generations cover, one where it matches no line
+ * has a strip that takes no `Bump`, since no item of the crate can name the type. The manifest rather than a line of `strip_into`, whose
+ * declaration spans lines and whose body any edit may respell: the compiler holds the
+ * dependency's absence to its meaning. Anchored at the line start, where a dependency is
+ * declared, so a comment cannot answer for it. */
+const TS_DEPENDS_ON_BUMPALO = '^bumpalo([.]|[[:space:]]*=)';
 
 /** The pattern (`git grep -E`) whose match in a tree's `crates/tsv_ts/src` says it has the warm
  * handle the current drivers park through: `WarmStores`'s declaration, anchored at the line start
@@ -232,11 +244,12 @@ const TS_PARSE_WITHOUT_BUMP =
 
 /** One entry-point generation the drivers have an arm for: the `perf_ab_api` cfg value that
  * selects its arm (`null` for the current tree's, the unmarked arm), the `git grep -E` pattern
- * whose match in `path` says a tree is of it (`null` for the oldest, which every tree no newer
- * probe matches is), and what its arms call, for the report. */
+ * whose match in `path` says a tree is of it — with `absent`, a `path` with lines none of which
+ * it matches (`probe_matches`) — (`null` for the oldest, which every tree no newer probe matches
+ * is), and what its arms call, for the report. */
 export interface DriverApi {
 	cfg: string | null;
-	probe: { pattern: string; path: string } | null;
+	probe: { pattern: string; path: string; absent?: true } | null;
 	calls: string;
 }
 
@@ -249,9 +262,15 @@ export interface DriverApi {
 export const DRIVER_APIS: ReadonlyArray<DriverApi> = [
 	{
 		cfg: null,
+		probe: { pattern: TS_DEPENDS_ON_BUMPALO, path: 'crates/tsv_ts/Cargo.toml', absent: true },
+		calls:
+			'warm stores: TypeScript and Svelte parse into stores a WarmStores handle parks between iterations (TypeScript with no Bump), CSS into the Bump; the strip takes no Bump'
+	},
+	{
+		cfg: 'strip_bump',
 		probe: { pattern: WARM_STORES_HANDLE, path: 'crates/tsv_ts/src' },
 		calls:
-			'warm stores: TypeScript and Svelte parse into stores a WarmStores handle parks between iterations (TypeScript with no Bump), CSS into the Bump'
+			'warm stores: TypeScript and Svelte parse into stores a WarmStores handle parks between iterations (TypeScript with no Bump), CSS into the Bump; the strip takes the Bump for its edits'
 	},
 	{
 		cfg: 'no_warm_stores',
@@ -512,14 +531,27 @@ export async function tree_driver_api(
 	tree: string
 ): Promise<DriverApi> {
 	for (const api of DRIVER_APIS) {
-		if (
-			api.probe === null ||
-			(await tree_matches(git, cwd, tree, api.probe.pattern, api.probe.path))
-		) {
+		if (api.probe === null || (await probe_matches(git, cwd, tree, api.probe))) {
 			return api;
 		}
 	}
 	throw new HarnessError('DRIVER_APIS ends in a probed generation, so a tree can match none');
+}
+
+/** Whether `tree` is of a probe's generation, run in `cwd`: `pattern` matches a line under
+ * `path`, or, for an `absent` probe, `path` has lines and none of them matches — so a tree
+ * without the file is never read as the generation its absence would name. */
+async function probe_matches(
+	git: SpawnProgram,
+	cwd: FsReadDir,
+	tree: string,
+	{ pattern, path, absent }: NonNullable<DriverApi['probe']>
+): Promise<boolean> {
+	if (absent !== true) return await tree_matches(git, cwd, tree, pattern, path);
+	return (
+		(await tree_matches(git, cwd, tree, '^', path)) &&
+		!(await tree_matches(git, cwd, tree, pattern, path))
+	);
 }
 
 /** Whether `pattern` (`git grep -E`) matches a line under `path` in `tree`, run in `cwd`

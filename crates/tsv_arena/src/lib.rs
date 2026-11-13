@@ -463,12 +463,12 @@ macro_rules! parse_format {
     }};
 }
 
-/// A binding's whole **imports** export body: collect the import records of `$source` in the
-/// per-thread AST arena through the language's `__private::parse_imports_into`, and write them
-/// as the JSON every binding returns — `tsv_ts::__private::write_imports_json_string`, the
-/// one writer every language's records go through, in the language's own
-/// `WIRE_COORDINATES` — a parse error mapped through `$map_err`, the binding's own error
-/// type.
+/// A binding's whole **imports** export body: collect the import records of `$source` through
+/// the language's `__private::parse_imports_into` into the per-thread stores (Svelte's also
+/// into the per-thread AST arena, which TypeScript's leaves unread), and write them as the
+/// JSON every binding returns — `tsv_ts::__private::write_imports_json_string`, the one
+/// writer every language's records go through, in the language's own `WIRE_COORDINATES` — a
+/// parse error mapped through `$map_err`, the binding's own error type.
 ///
 /// `$goal` is the binding's decoded `Option` goal, read as the strip reads it: `goal`
 /// (TypeScript) hands it on, so an unset one is the module-then-script fallback; `nogoal`
@@ -502,9 +502,10 @@ macro_rules! parse_imports_json {
             })
         })
     }};
-    (@collect goal, $lang:ident, $source:expr, $goal:expr, $arena:expr, $stores:expr) => {
-        $lang::__private::parse_imports_into($source, $goal, $arena, $stores)
-    };
+    (@collect goal, $lang:ident, $source:expr, $goal:expr, $arena:expr, $stores:expr) => {{
+        let _ = $arena;
+        $lang::__private::parse_imports_into($source, $goal, $stores)
+    }};
     (@collect nogoal, $lang:ident, $source:expr, $goal:expr, $arena:expr, $stores:expr) => {{
         // Consume the (always-unset) goal so the binding stays used in every expansion.
         let _ = $goal;

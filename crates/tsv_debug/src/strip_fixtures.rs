@@ -446,10 +446,9 @@ pub fn check_fixture(fixture: &StripFixture) -> Vec<Finding> {
         }
     }
 
-    let arena = bumpalo::Bump::new();
-    let Ok(result) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        tsv_ts::__private::strip_in(&input, None, &arena)
-    })) else {
+    let Ok(result) =
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| tsv_ts::strip(&input)))
+    else {
         push(StripCheck::Panic, "strip panicked".to_string());
         return findings;
     };
@@ -672,10 +671,7 @@ impl std::fmt::Display for IdempotenceFailure {
 /// (ts-blank-space's and Node's bytes), so a re-strip whose every change is the blanking of
 /// such a list is not a failure ([`only_reread_type_arguments`]); any other change is.
 pub fn idempotence_failure(input: &str, code: &str) -> Option<IdempotenceFailure> {
-    let arena = bumpalo::Bump::new();
-    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        tsv_ts::__private::strip_in(code, None, &arena)
-    })) {
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| tsv_ts::strip(code))) {
         Err(payload) => Some(IdempotenceFailure::Panicked(caught_panic_report(
             payload.as_ref(),
         ))),
@@ -912,8 +908,7 @@ mod tests {
     fn a_reread_type_argument_list_is_not_an_idempotence_failure() {
         let input = "f(a < b, c as any > (d));\n";
         let code = "f(a < b, c        > (d));\n";
-        let arena = bumpalo::Bump::new();
-        let again = tsv_ts::__private::strip_in(code, None, &arena).expect("the output strips");
+        let again = tsv_ts::strip(code).expect("the output strips");
         assert_eq!(
             again.code, "f(a                 (d));\n",
             "the re-read the excuse is for"
