@@ -919,7 +919,7 @@ changes are graded without PGO and the bench reports what ships.
 ```bash
 npm run perf:ab -- <release-tag>    # the last release vs the working tree (HEAD + uncommitted changes)
 npm run perf:ab -- HEAD             # a change in progress vs the commit it sits on
-npm run perf:ab -- <base> <cand>    # two refs; also --rounds N (even, 6), --iterations N (10), --corpus DIR, --json
+npm run perf:ab -- <base> <cand>    # two refs; also --rounds N (even, 6), --iterations N (10), --corpus DIR, --one-shot, --json
 ```
 
 One command for the parse/format regression check, per language (TypeScript, Svelte, CSS) ×
@@ -968,9 +968,23 @@ names the value in the workspace's `check-cfg` list.
 
 So a side with the warm parse is measured on the warm path alone: stores reused across files in a
 slot the caller owns, as the CLI's `Formatter` runs them (the bindings run the same take and park
-over a per-thread slot instead). The one-shot free functions
-(`tsv_ts::format`, `tsv_svelte::format`), which build fresh stores on every call, are not what the
-task times.
+over a per-thread slot instead). `--one-shot` also times the public free functions a library
+caller reaches, which build fresh stores on every call — each language's `parse_to_json` and
+`format`, and the strip's `parse_imports` and `strip` (their `_with_goal` forms where the extension
+names the goal) — each a whole call with its output dropped inside the timer, in the same rounds as
+the warm runs. They run through a third driver, `crates/tsv_debug/examples/perf_ab_one_shot.rs`,
+built only with the flag: linked into a warm driver, they would move the warm path's own code,
+since the binary is optimized as one unit and the library functions both reach are then shaped
+for more callers, so the warm drivers build the same binaries with or without it. Their
+signatures are the same on every tree the task measures, so that driver has no arm per
+generation; it does call the strip, so a side without the strip refuses the flag. Those rows are
+informational: a table of their own with each verdict in parentheses, and `one_shot*` keys in the
+JSON, never the exit code, the sign-off and layout readings, the extra rounds or the noisy and
+unsettled lists. A one-shot file set that differs between the sides is a harness error, as a warm
+one is. The one-shot strip row is the whole `strip` call, its parse included, not the warm row's
+walk + blank. TypeScript's
+`parse_to_json` parses a module and never retries as a script, so a file only a script parses
+counts as a one-shot error, on both sides alike.
 
 The strip driver times what `profile --strip` times, over the files a module loader strips
 (`.ts` / `.mts` / `.cts`, no declaration file — not the TypeScript row's set, which carries

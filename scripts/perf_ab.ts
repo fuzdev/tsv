@@ -107,6 +107,22 @@
  * escape, so any wall move over the threshold fails, and no instruction gate — rather than
  * refusing: a strict wall verdict is still a verdict.
  *
+ * ## One-shot rows
+ *
+ * `--one-shot` also times the public free functions a library caller reaches, each a whole call
+ * over fresh stores with its output dropped inside the timer: `tsv_<lang>::parse_to_json` and
+ * `tsv_<lang>::format`, and `tsv_ts::parse_imports` and `tsv_ts::strip` (their `_with_goal`
+ * forms where the extension names the goal), through a third driver,
+ * `crates/tsv_debug/examples/perf_ab_one_shot.rs`, built only with the flag: linked into a warm
+ * driver, those calls would move the code the warm path runs (that file's module doc). Each
+ * round runs it beside the warm runs, a full run, a parse-only one and a zero-iteration one per
+ * side (`ONE_SHOT_PHASES`, `phase_instructions`). Both sides need the strip, which the driver
+ * calls; a run with a side older than it refuses the flag. The rows are INFORMATIONAL: printed in a table of their own with each verdict in parentheses and
+ * under the JSON's `one_shot*` keys, they never reach the exit code, the sign-off rows, the
+ * layout reading, the extra rounds or the noisy and unsettled lists, and `rows` is the same with
+ * or without the flag. TypeScript's `parse_to_json` parses a module and never retries as a
+ * script, so a file only a script parses counts as an error there, on both sides alike.
+ *
  * Linux only (`perf`, `ionice`). Not in `check`: it builds two release trees.
  *
  * @module
@@ -140,6 +156,7 @@ import {
 	CACHE_DIR_PATTERN,
 	type CachedTree,
 	DEFAULT_ROUNDS,
+	type DriverPath,
 	file_set_mismatch,
 	type FileSet,
 	format_pct,
@@ -153,10 +170,12 @@ import {
 	MAX_ROUNDS,
 	noisy_rows,
 	NOISY_SPREAD_PCT,
+	ONE_SHOT_PHASES,
 	overall_passes,
 	parse_perf_stat_counter,
 	parse_perf_stat_instructions,
 	phase_instructions,
+	type Phase,
 	render_table,
 	row_is_ambiguous,
 	row_is_settleable,
@@ -173,16 +192,21 @@ import {
 
 /** The measuring drivers, each an example overlaid on every snapshot before it builds: `format`
  * measures every language's parse + format, `strip` the type strip (its own example, so a tree
- * older than the strip still builds the format driver — `perf_ab_strip.rs`'s module doc). */
+ * older than the strip still builds the format driver — `perf_ab_strip.rs`'s module doc), and
+ * `one_shot` the public free functions behind `--one-shot` (its own example, so the warm drivers'
+ * binaries are the same with or without the flag — `perf_ab_one_shot.rs`'s module doc). */
 const DRIVERS = {
 	format: { path: 'crates/tsv_debug/examples/perf_ab.rs', example: 'perf_ab' },
-	strip: { path: 'crates/tsv_debug/examples/perf_ab_strip.rs', example: 'perf_ab_strip' }
+	strip: { path: 'crates/tsv_debug/examples/perf_ab_strip.rs', example: 'perf_ab_strip' },
+	one_shot: { path: 'crates/tsv_debug/examples/perf_ab_one_shot.rs', example: 'perf_ab_one_shot' }
 } as const;
 type DriverKind = keyof typeof DRIVERS;
-const DRIVER_KINDS: ReadonlyArray<DriverKind> = ['format', 'strip'];
+const DRIVER_KINDS: ReadonlyArray<DriverKind> = ['format', 'strip', 'one_shot'];
+/** Every driver path, the one-shot driver's included: each is overlaid, never part of a key. */
 const DRIVER_PATHS = DRIVER_KINDS.map((kind) => DRIVERS[kind].path);
 
-function driver_of(lang: Lang): DriverKind {
+function driver_of(lang: Lang, path: DriverPath): DriverKind {
+	if (path === 'one_shot') return 'one_shot';
 	return lang === 'strip' ? 'strip' : 'format';
 }
 
@@ -249,6 +273,12 @@ export const DRIVER_APIS: ReadonlyArray<DriverApi> = [
 ];
 
 const DEFAULT_ITERATIONS = 10;
+
+/** What the one-shot rows are, printed above their table and kept in the JSON beside them. */
+const ONE_SHOT_NOTE =
+	'the public free functions over fresh stores per call (parse_to_json + format; parse_imports + ' +
+	'strip), INFORMATIONAL: verdicts in parentheses, never graded. TypeScript parse_to_json parses ' +
+	'a module only, so a script-goal file counts as an error on both sides';
 
 /** The top-level tree entries a driver build reads — what a snapshot extracts AND what its
  * cache key hashes (`build_inputs`), one list for both. `Cargo.toml`, `crates` and `src` (the
@@ -328,6 +358,8 @@ interface Options {
 	/** The snapshot cache, or null for the default under `~/.cache/tsv/perf_ab`. */
 	cache: string | null;
 	json: boolean;
+	/** Whether to time the one-shot public functions too (informational rows). */
+	one_shot: boolean;
 }
 
 const USAGE = `usage: npm run perf:ab -- <base-ref> [<cand-ref>] [--rounds N] [--iterations N] [--corpus DIR] [--json]
@@ -336,6 +368,8 @@ const USAGE = `usage: npm run perf:ab -- <base-ref> [<cand-ref>] [--rounds N] [-
                   extends the run by pairs up to ${MAX_ROUNDS})
   --iterations N  iterations per file per run (default ${DEFAULT_ITERATIONS})
   --corpus DIR    corpus directory (default ${CORPORA_COLLECTIONS})
+  --one-shot      also time the public one-shot functions (fresh stores per call): informational
+                  rows in a table of their own, never graded
   --json          print the result as JSON instead of the table`;
 
 /** The options `args` give, `'help'` for `--help`; relative paths resolve against `checkout`. */
@@ -346,6 +380,7 @@ function parse_options(args: ReadonlyArray<string>, checkout: string): Options |
 	let corpus = CORPORA_COLLECTIONS;
 	let cache: string | null = null;
 	let json = false;
+	let one_shot = false;
 	const count = (flag: string, value: string | undefined): number => {
 		const n = Number(value);
 		if (!Number.isInteger(n) || n < 1) throw new HarnessError(`${flag} takes a positive integer`);
@@ -365,6 +400,7 @@ function parse_options(args: ReadonlyArray<string>, checkout: string): Options |
 			if (!value) throw new HarnessError('--cache takes a directory');
 			cache = value;
 		} else if (arg === '--json') json = true;
+		else if (arg === '--one-shot') one_shot = true;
 		else if (arg === '--help' || arg === '-h') return 'help';
 		else if (arg.startsWith('-')) throw new HarnessError(`unknown flag ${arg}`);
 		else positional.push(arg);
@@ -384,7 +420,8 @@ function parse_options(args: ReadonlyArray<string>, checkout: string): Options |
 		iterations,
 		corpus: resolve(checkout, corpus),
 		cache: cache === null ? null : resolve(checkout, cache),
-		json
+		json,
+		one_shot
 	};
 }
 
@@ -628,7 +665,7 @@ export async function ensure_driver(
 	await src.write(driver_path, driver.source);
 
 	console.error(
-		`perf:ab: ${side.label}: building the ${example} driver (release, idle priority; ${side.api.calls})`
+		`perf:ab: ${side.label}: building the ${example} driver (release, idle priority; ${driver.kind === 'one_shot' ? 'one-shot: the public free functions, the same calls on every generation' : side.api.calls})`
 	);
 	const child = await deps.build.start(build_args(example, side.api), {
 		cwd: src,
@@ -698,16 +735,22 @@ export interface BuiltDriver {
 	program: SpawnProgram;
 }
 
-/** One side's built drivers; `strip` is null when the strip rows are skipped. */
+/** One side's built drivers; `strip` is null when the strip rows are skipped, `one_shot` when
+ * the run has no `--one-shot`. */
 export type Binaries = Record<DriverKind, BuiltDriver | null>;
 
-/** Build (or reuse) `side`'s drivers, `strip` only when `with_strip`, each made a program
- * through the cache once its binary is in place. */
+/** The drivers a run builds, read from the checkout: the one-shot driver only with `--one-shot`. */
+export type DriverBuilds = Readonly<Record<'format' | 'strip', DriverBuild>> & {
+	readonly one_shot: DriverBuild | null;
+};
+
+/** Build (or reuse) `side`'s drivers, `strip` only when `with_strip` and the one-shot driver only
+ * when `drivers` holds it, each made a program through the cache once its binary is in place. */
 export async function build_side(
 	deps: EnsureDriverDeps,
 	cache: PerfAbCache,
 	side: Side,
-	drivers: Readonly<Record<DriverKind, DriverBuild>>,
+	drivers: DriverBuilds,
 	with_strip: boolean
 ): Promise<Binaries> {
 	const built = async (driver: DriverBuild): Promise<BuiltDriver> => {
@@ -716,7 +759,8 @@ export async function build_side(
 	};
 	return {
 		format: await built(drivers.format),
-		strip: with_strip ? await built(drivers.strip) : null
+		strip: with_strip ? await built(drivers.strip) : null,
+		one_shot: drivers.one_shot === null ? null : await built(drivers.one_shot)
 	};
 }
 
@@ -764,13 +808,15 @@ async function run_driver(
 	driver: SpawnProgram,
 	lang: Lang,
 	mode: DriverMode,
-	use_perf: boolean
+	use_perf: boolean,
+	path: DriverPath = 'warm'
 ): Promise<DriverOutput> {
 	const { options, cache } = runner;
 	const binary = driver.path;
 	const iterations = mode === 'fixed' ? 0 : options.iterations;
+	// the strip driver measures one language and takes no `--lang`; the one-shot driver takes all
 	const driver_args =
-		lang === 'strip'
+		lang === 'strip' && path === 'warm'
 			? [options.corpus, '--iterations', String(iterations)]
 			: [options.corpus, '--lang', lang, '--iterations', String(iterations)];
 	if (mode === 'parse') driver_args.push('--parse-only');
@@ -866,9 +912,10 @@ async function report_load(
 	}
 }
 
-function binary_for(binaries: Binaries, lang: Lang): SpawnProgram {
-	const binary = binaries[driver_of(lang)];
-	if (binary === null) throw new HarnessError(`${lang}: no ${driver_of(lang)} driver was built`);
+function binary_for(binaries: Binaries, lang: Lang, path: DriverPath = 'warm'): SpawnProgram {
+	const kind = driver_of(lang, path);
+	const binary = binaries[kind];
+	if (binary === null) throw new HarnessError(`${lang}: no ${kind} driver was built`);
 	return binary.program;
 }
 
@@ -897,64 +944,101 @@ function empty_samples(): SideSamples {
 	};
 }
 
-/** Measure one round of `langs`, `first` side first. */
+/** Measure one round of `langs`, `first` side first: each side's warm runs, then, when
+ * `one_shot_samples` is given, its one-shot runs. */
 async function run_round(
 	round: number,
 	langs: ReadonlyArray<Lang>,
 	binaries: ReadonlyArray<Binaries>,
 	sides: ReadonlyArray<Side>,
 	samples: ReadonlyArray<Record<Lang, SideSamples>>,
+	one_shot_samples: ReadonlyArray<Record<Lang, SideSamples>> | null,
 	runner: DriverRunner,
 	use_perf: boolean
 ): Promise<void> {
-	const { options } = runner;
 	const order = round % 2 === 0 ? [0, 1] : [1, 0];
 	for (const lang of langs) {
 		console.error(`perf:ab: round ${round + 1} ${lang}`);
 		for (const i of order) {
-			const binary = binary_for(binaries[i]!, lang);
-			const full = await run_driver(runner, binary, lang, 'full', use_perf);
-			const s = samples[i]![lang];
-			if (s.file_set === null) {
-				s.file_set = { files: full.files, bytes: full.bytes, errors: full.errors };
-				s.output_bytes = full.output_bytes;
-			} else {
-				const mismatch = file_set_mismatch(s.file_set, full);
-				if (mismatch !== null) {
-					throw new HarnessError(
-						`${sides[i]!.label} ${lang}: one run measured ${mismatch} — the corpus moved`
-					);
-				}
-				if (full.output_bytes !== s.output_bytes) {
-					throw new HarnessError(
-						`${sides[i]!.label} ${lang}: the output changed between runs ` +
-							`(${s.output_bytes} bytes, then ${full.output_bytes}) — a nondeterministic ${lang === 'strip' ? 'strip' : 'format'}`
-					);
-				}
-			}
-			s.parse.wall_us.push(full.parse_us);
-			s.work.wall_us.push(full.work_us);
-			if (use_perf) {
-				const parse = await run_driver(runner, binary, lang, 'parse', use_perf);
-				const fixed = await run_driver(runner, binary, lang, 'fixed', use_perf);
-				const [parse_instructions, work_instructions] = phase_instructions(
+			const label = sides[i]!.label;
+			await measure_side(
+				runner,
+				binary_for(binaries[i]!, lang),
+				lang,
+				label,
+				samples[i]![lang],
+				use_perf,
+				'warm'
+			);
+			if (one_shot_samples !== null) {
+				await measure_side(
+					runner,
+					binary_for(binaries[i]!, lang, 'one_shot'),
 					lang,
-					{ full: full.instructions!, parse: parse.instructions!, fixed: fixed.instructions! },
-					options.iterations
+					label,
+					one_shot_samples[i]![lang],
+					use_perf,
+					'one_shot'
 				);
-				s.parse.instructions.push(parse_instructions);
-				s.work.instructions.push(work_instructions);
-				if (full.cycles !== null && parse.cycles !== null && fixed.cycles !== null) {
-					const [parse_cycles, work_cycles] = phase_instructions(
-						lang,
-						{ full: full.cycles, parse: parse.cycles, fixed: fixed.cycles },
-						options.iterations
-					);
-					s.parse_cycles.push(parse_cycles);
-					s.work_cycles.push(work_cycles);
-				}
 			}
 		}
+	}
+}
+
+/**
+ * Run one side's driver for `lang` on `path` and add the round's samples to `s`: the full run,
+ * then under `perf` the parse-only run and the zero-iteration one (each driver's own: the
+ * one-shot driver is another binary, so the warm driver's fixed cost is not its).
+ */
+async function measure_side(
+	runner: DriverRunner,
+	binary: SpawnProgram,
+	lang: Lang,
+	label: string,
+	s: SideSamples,
+	use_perf: boolean,
+	path: DriverPath
+): Promise<void> {
+	const { options } = runner;
+	const which = path === 'one_shot' ? `${lang} one-shot` : lang;
+	const full = await run_driver(runner, binary, lang, 'full', use_perf, path);
+	if (s.file_set === null) {
+		s.file_set = { files: full.files, bytes: full.bytes, errors: full.errors };
+		s.output_bytes = full.output_bytes;
+	} else {
+		const mismatch = file_set_mismatch(s.file_set, full);
+		if (mismatch !== null) {
+			throw new HarnessError(`${label} ${which}: one run measured ${mismatch} — the corpus moved`);
+		}
+		if (full.output_bytes !== s.output_bytes) {
+			throw new HarnessError(
+				`${label} ${which}: the output changed between runs ` +
+					`(${s.output_bytes} bytes, then ${full.output_bytes}) — a nondeterministic ${lang === 'strip' ? 'strip' : 'format'}`
+			);
+		}
+	}
+	s.parse.wall_us.push(full.parse_us);
+	s.work.wall_us.push(full.work_us);
+	if (!use_perf) return;
+	const parse = await run_driver(runner, binary, lang, 'parse', use_perf, path);
+	const zero = await run_driver(runner, binary, lang, 'fixed', use_perf, path);
+	const [parse_instructions, work_instructions] = phase_instructions(
+		lang,
+		{ full: full.instructions!, parse: parse.instructions!, fixed: zero.instructions! },
+		options.iterations,
+		path
+	);
+	s.parse.instructions.push(parse_instructions);
+	s.work.instructions.push(work_instructions);
+	if (full.cycles !== null && parse.cycles !== null && zero.cycles !== null) {
+		const [parse_cycles, work_cycles] = phase_instructions(
+			lang,
+			{ full: full.cycles, parse: parse.cycles, fixed: zero.cycles },
+			options.iterations,
+			path
+		);
+		s.parse_cycles.push(parse_cycles);
+		s.work_cycles.push(work_cycles);
 	}
 }
 
@@ -962,7 +1046,8 @@ async function run_round(
  * output only: the verdict reads wall and instructions, never cycles. */
 function cycles_by_row(
 	langs: ReadonlyArray<Lang>,
-	samples: ReadonlyArray<Record<Lang, SideSamples>>
+	samples: ReadonlyArray<Record<Lang, SideSamples>>,
+	phases: Readonly<Record<Lang, readonly [Phase, Phase]>> = LANG_PHASES
 ): Record<string, { base: number; cand: number }> {
 	const median = (xs: ReadonlyArray<number>): number => {
 		const sorted = [...xs].sort((a, b) => a - b);
@@ -971,7 +1056,7 @@ function cycles_by_row(
 	};
 	const out: Record<string, { base: number; cand: number }> = {};
 	for (const lang of langs) {
-		const [parse_phase, work_phase] = LANG_PHASES[lang];
+		const [parse_phase, work_phase] = phases[lang];
 		for (const [phase, key] of [
 			[parse_phase, 'parse_cycles'],
 			[work_phase, 'work_cycles']
@@ -987,12 +1072,13 @@ function cycles_by_row(
 
 function grade(
 	langs: ReadonlyArray<Lang>,
-	samples: ReadonlyArray<Record<Lang, SideSamples>>
+	samples: ReadonlyArray<Record<Lang, SideSamples>>,
+	phases: Readonly<Record<Lang, readonly [Phase, Phase]>> = LANG_PHASES
 ): Array<AbRow> {
 	const rows: Array<AbRow> = [];
 	for (const lang of langs) {
 		const [b, c] = [samples[0]![lang], samples[1]![lang]];
-		const [parse_phase, work_phase] = LANG_PHASES[lang];
+		const [parse_phase, work_phase] = phases[lang];
 		for (const [phase, key] of [
 			[parse_phase, 'parse'],
 			[work_phase, 'work']
@@ -1053,18 +1139,18 @@ async function perf_ab(deps: PerfAbDeps, args: ReadonlyArray<string>): Promise<n
 			`corpus not found: ${options.corpus} — check out fuzdev/corpora beside this repo, or pass --corpus`
 		);
 	}
-	const drivers = {} as Record<DriverKind, DriverBuild>;
-	for (const kind of DRIVER_KINDS) {
+	const read_driver = async (kind: DriverKind): Promise<DriverBuild> => {
 		const source = await deps.checkout.read_if_exists(DRIVERS[kind].path);
 		if (source === null) {
 			throw new HarnessError(`driver missing: ${resolve(deps.checkout.path, DRIVERS[kind].path)}`);
 		}
-		drivers[kind] = {
-			kind,
-			source,
-			hash: await sha256_hex(source)
-		};
-	}
+		return { kind, source, hash: await sha256_hex(source) };
+	};
+	const drivers: DriverBuilds = {
+		format: await read_driver('format'),
+		strip: await read_driver('strip'),
+		one_shot: options.one_shot ? await read_driver('one_shot') : null
+	};
 
 	const home = deps.home;
 	if (!home) throw new HarnessError('HOME is not set');
@@ -1106,6 +1192,11 @@ async function perf_ab(deps: PerfAbDeps, args: ReadonlyArray<string>): Promise<n
 			: `perf:ab: ⚠️ ⚠️  STRIP ROWS SKIPPED — ${strip_skip}; the strip driver cannot build ` +
 				`against such a tree, so this run grades the format rows alone`;
 	if (strip_skip_line !== null) console.error(strip_skip_line);
+	if (options.one_shot && strip_skip !== null) {
+		throw new HarnessError(
+			`--one-shot: ${strip_skip}, and the one-shot driver calls the public strip, so it cannot build against such a tree`
+		);
+	}
 	const binaries: Array<Binaries> = [];
 	for (const side of sides) {
 		binaries.push(await build_side(deps, cache, side, drivers, strip_skip === null));
@@ -1115,7 +1206,9 @@ async function perf_ab(deps: PerfAbDeps, args: ReadonlyArray<string>): Promise<n
 	const binary_sha256 = await Promise.all(
 		binaries.map(async (b) => ({
 			format: await sha256_of(b.format),
-			strip: await sha256_of(b.strip)
+			strip: await sha256_of(b.strip),
+			// only with `--one-shot`, so a run without it prints what it always did
+			...(b.one_shot === null ? {} : { one_shot: await sha256_of(b.one_shot) })
 		}))
 	);
 	const runner: DriverRunner = {
@@ -1152,15 +1245,20 @@ async function perf_ab(deps: PerfAbDeps, args: ReadonlyArray<string>): Promise<n
 	// Read before building, so this run's own build is not what it reports; the heavy-process
 	// check runs now, when that build has exited.
 	await report_load(deps.pgrep, 'before', load_before, LOAD_WARN);
-	const samples: Array<Record<Lang, SideSamples>> = sides.map(() => ({
-		ts: empty_samples(),
-		svelte: empty_samples(),
-		css: empty_samples(),
-		strip: empty_samples()
-	}));
+	const side_samples = (): Array<Record<Lang, SideSamples>> =>
+		sides.map(() => ({
+			ts: empty_samples(),
+			svelte: empty_samples(),
+			css: empty_samples(),
+			strip: empty_samples()
+		}));
+	const samples = side_samples();
+	const one_shot_samples = options.one_shot ? side_samples() : null;
+	const round = (n: number): Promise<void> =>
+		run_round(n, langs, binaries, sides, samples, one_shot_samples, runner, use_perf);
 	let rounds = 0;
 	while (rounds < options.rounds) {
-		await run_round(rounds++, langs, binaries, sides, samples, runner, use_perf);
+		await round(rounds++);
 	}
 	let rows = grade(langs, samples);
 	while (wants_more_rounds(rows, rounds)) {
@@ -1170,8 +1268,8 @@ async function perf_ab(deps: PerfAbDeps, args: ReadonlyArray<string>): Promise<n
 		console.error(
 			`perf:ab: ${ambiguous.join(', ')} within its error of the ${WALL_REGRESSION_PCT}% line — two more rounds`
 		);
-		await run_round(rounds++, langs, binaries, sides, samples, runner, use_perf);
-		await run_round(rounds++, langs, binaries, sides, samples, runner, use_perf);
+		await round(rounds++);
+		await round(rounds++);
 		rows = grade(langs, samples);
 	}
 	const unsettled = unsettled_rows(rows);
@@ -1199,7 +1297,27 @@ async function perf_ab(deps: PerfAbDeps, args: ReadonlyArray<string>): Promise<n
 				`perf:ab: ⚠️  ${lang}: ${b.errors} files failed to parse on both sides (left out)`
 			);
 		}
+		if (one_shot_samples !== null) {
+			const [ob, oc] = [one_shot_samples[0]![lang].file_set!, one_shot_samples[1]![lang].file_set!];
+			const one_shot_mismatch = file_set_mismatch(ob, oc);
+			if (one_shot_mismatch !== null) {
+				throw new HarnessError(
+					`${lang} one-shot: the sides measured different file sets (base, then cand: ${one_shot_mismatch})`
+				);
+			}
+			if (ob.errors > 0) {
+				console.error(
+					`perf:ab: ${lang} one-shot: ${ob.errors} files failed to parse on both sides (left out)` +
+						(lang === 'ts'
+							? ` — \`parse_to_json\` parses a module and never retries as a script`
+							: '')
+				);
+			}
+		}
 	}
+	// informational: graded by the same rule for the table, never part of the verdict
+	const one_shot_rows =
+		one_shot_samples === null ? null : grade(langs, one_shot_samples, ONE_SHOT_PHASES);
 	const noisy = noisy_rows(rows);
 	for (const row of noisy) {
 		console.error(
@@ -1257,15 +1375,31 @@ async function perf_ab(deps: PerfAbDeps, args: ReadonlyArray<string>): Promise<n
 							: { row: `${layout.lang} ${layout.phase}`, wall_pct: layout.wall_pct },
 					cycles: cycles_by_row(langs, samples),
 					rows,
-					passes
+					passes,
+					...(one_shot_rows === null
+						? {}
+						: {
+								one_shot_files: Object.fromEntries(
+									langs.map((lang) => [lang, one_shot_samples![0]![lang].file_set])
+								),
+								one_shot_cycles: cycles_by_row(langs, one_shot_samples!, ONE_SHOT_PHASES),
+								one_shot_rows,
+								one_shot_note: ONE_SHOT_NOTE
+							})
 				},
 				null,
 				'\t'
 			)
 		);
 	} else {
-		const sha_text = (sha: { format: string | null; strip: string | null }): string =>
-			`binary sha256 ${sha.format}` + (sha.strip === null ? '' : `, strip ${sha.strip}`);
+		const sha_text = (sha: {
+			format: string | null;
+			strip: string | null;
+			one_shot?: string | null;
+		}): string =>
+			`binary sha256 ${sha.format}` +
+			(sha.strip === null ? '' : `, strip ${sha.strip}`) +
+			(sha.one_shot === undefined ? '' : `, one-shot ${sha.one_shot}`);
 		console.log(
 			`base: ${base.label}, ${sha_text(binary_sha256[0]!)}\n` +
 				`      driver: ${base.api.calls}\n` +
@@ -1293,6 +1427,10 @@ async function perf_ab(deps: PerfAbDeps, args: ReadonlyArray<string>): Promise<n
 		);
 		if (layout_line !== null) console.log(layout_line);
 		for (const row of sign_offs) console.log(sign_off_line(row));
+		if (one_shot_rows !== null) {
+			console.log(`\none-shot rows — ${ONE_SHOT_NOTE}\n`);
+			console.log(render_table(one_shot_rows, { informational: true }));
+		}
 		if (strip_skip_line !== null) console.log(strip_skip_line);
 		console.log(passes ? 'perf:ab: PASS' : 'perf:ab: FAIL — a row regressed');
 	}

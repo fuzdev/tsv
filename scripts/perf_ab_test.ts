@@ -39,7 +39,12 @@ import {
 	tree_driver_api,
 	tree_has_strip
 } from './perf_ab.ts';
-import { build_inputs_of } from './perf_ab_verdict.ts';
+import {
+	type AbRow,
+	build_inputs_of,
+	row_is_ambiguous,
+	row_is_settleable
+} from './perf_ab_verdict.ts';
 
 const CHECKOUT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -238,19 +243,21 @@ const SIDE: Side = {
 	has_strip: true,
 	api: DRIVER_APIS[0]!
 };
-const driver_build = (kind: 'format' | 'strip'): DriverBuild => ({
+const DRIVER_HASH_DIGITS = { format: '1', strip: '2', one_shot: '3' } as const;
+const driver_build = (kind: 'format' | 'strip' | 'one_shot'): DriverBuild => ({
 	kind,
 	source: new TextEncoder().encode(`// the ${kind} driver\n`),
-	hash: `${kind === 'format' ? '1' : '2'}`.repeat(64)
+	hash: DRIVER_HASH_DIGITS[kind].repeat(64)
 });
-const DRIVERS = { format: driver_build('format'), strip: driver_build('strip') };
+const DRIVERS = { format: driver_build('format'), strip: driver_build('strip'), one_shot: null };
+const EXAMPLES = {
+	format: 'perf_ab',
+	strip: 'perf_ab_strip',
+	one_shot: 'perf_ab_one_shot'
+} as const;
 /** The name of `kind`'s binary for `SIDE`, whose recipe is its generation's. */
-const binary_name = async (kind: 'format' | 'strip'): Promise<string> =>
-	driver_binary_name(
-		KEY,
-		DRIVERS[kind],
-		await driver_recipe_hash(kind === 'format' ? 'perf_ab' : 'perf_ab_strip', SIDE.api)
-	);
+const binary_name = async (kind: 'format' | 'strip' | 'one_shot'): Promise<string> =>
+	driver_binary_name(KEY, driver_build(kind), await driver_recipe_hash(EXAMPLES[kind], SIDE.api));
 
 const unused = (name: string) => (): never => {
 	throw new Error(`${name} must not run`);
@@ -454,7 +461,25 @@ test('each driver is made a program through the cache, by its name beneath it, o
 	// a side without the strip builds and makes the format driver alone
 	made.length = 0;
 	const without = await build_side(ensure_deps(build.program), cache, SIDE, DRIVERS, false);
-	deepStrictEqual([made.map((m) => m.name), without.strip], [[format], null]);
+	deepStrictEqual(
+		[made.map((m) => m.name), without.strip, without.one_shot],
+		[[format], null, null]
+	);
+	// the one-shot driver is built only when the run reads it
+	made.length = 0;
+	const one_shot_drivers = { ...DRIVERS, one_shot: driver_build('one_shot') };
+	const with_one_shot = await build_side(
+		ensure_deps(build.program),
+		cache,
+		SIDE,
+		one_shot_drivers,
+		true
+	);
+	const one_shot = await binary_name('one_shot');
+	deepStrictEqual(
+		[made.map((m) => m.name), with_one_shot.one_shot?.name],
+		[[format, strip, one_shot], one_shot]
+	);
 });
 
 test('a driver name that climbs out of the cache, or is absolute, is refused', async () => {
@@ -869,6 +894,320 @@ test('each side is graded on the samples its own binary measured', async () => {
 	// flat instructions, so the wall move reads as layout and the run passes: only the rows tell
 	strictEqual(run.code, 0, run.err);
 	strictEqual(parse.cand_wall_us, 3 * parse.base_wall_us, JSON.stringify(parse));
+});
+
+test('without --one-shot the one-shot driver is neither read, built nor run, and the JSON holds the keys it always has', async () => {
+	clear_git_repo_env();
+	await using workspace = await make_workspace();
+	await using tools = await make_tools();
+	await using cache = await fs.temp_dir('perf_ab_test_cache-');
+
+	const run = await run_over_fakes(workspace, tools, cache, ['HEAD', 'HEAD', '--json'], true);
+	strictEqual(run.code, 0, run.err);
+	deepStrictEqual(
+		run.log.filter((line) => line.includes('perf_ab_one_shot')),
+		[]
+	);
+	deepStrictEqual(Object.keys(JSON.parse(run.out) as object), [
+		'base',
+		'cand',
+		'strip_skipped',
+		'corpus',
+		'rounds',
+		'iterations',
+		'instructions',
+		'thresholds',
+		'load_before',
+		'load_after',
+		'files',
+		'absent',
+		'noisy',
+		'unsettled',
+		'sign_off',
+		'layout_reading',
+		'cycles',
+		'rows',
+		'passes'
+	]);
+	const { base, cand } = JSON.parse(run.out) as Record<'base' | 'cand', { binary_sha256: object }>;
+	deepStrictEqual(Object.keys(base.binary_sha256), ['format', 'strip']);
+	deepStrictEqual(Object.keys(cand.binary_sha256), ['format', 'strip']);
+});
+
+test('--one-shot refuses a side without the strip before building anything', async () => {
+	clear_git_repo_env();
+	await using workspace = await make_workspace();
+	await workspace.write('crates/tsv_ts/src/lib.rs', 'pub fn strip(source: &str) {}\n');
+	await commit_all(workspace);
+	await workspace.write('crates/tsv_ts/src/lib.rs', 'pub fn strip_in(source: &str) {}\n');
+	await workspace.write('crates/tsv_debug/examples/perf_ab_one_shot.rs', 'fn main() {}\n');
+	await commit_all(workspace);
+	await using tools = await make_tools();
+	await using cache = await fs.temp_dir('perf_ab_test_cache-');
+
+	const run = await run_over_fakes(workspace, tools, cache, ['HEAD~1', 'HEAD', '--one-shot'], true);
+	strictEqual(run.code, 2, run.err);
+	ok(run.err.includes('--one-shot: the base lacks'), run.err);
+	deepStrictEqual(
+		run.log.filter((line) => line.startsWith('-n 19 ionice')),
+		[]
+	);
+});
+
+/** A shell line setting `one_shot_cand` when `binary` (a shell word) is the one-shot driver built
+ * from the candidate's snapshot, read beside it. */
+const is_cand_one_shot = (binary: string): string =>
+	`case "${binary}" in */perf_ab_one_shot-*) grep -q candidate "$(dirname "${binary}")/src/src/lib.rs" && one_shot_cand=1 ;; esac`;
+
+/** A scratch workspace whose candidate commit carries the one-shot driver and a marked library. */
+const make_one_shot_workspace = async (): Promise<FsDir & AsyncDisposable> => {
+	const workspace = await make_workspace();
+	await workspace.write('crates/tsv_debug/examples/perf_ab_one_shot.rs', 'fn main() {}\n');
+	await workspace.write('src/lib.rs', '// the candidate\n');
+	await commit_all(workspace);
+	return workspace;
+};
+
+test('--one-shot rows are informational: a one-shot regression never fails the run', async () => {
+	clear_git_repo_env();
+	await using workspace = await make_one_shot_workspace();
+	await using tools = await make_tools();
+	const log = `${tools.path}/log`;
+	// the candidate's one-shot calls take three times the wall and twice the instructions; its
+	// warm path ties
+	await tools.write(
+		'driver.sh',
+		driver_script(log)
+			.replace(
+				'iterations=0;',
+				`one_shot_cand=''; ${is_cand_one_shot('$0')}\nparse_us=100; [ -n "$one_shot_cand" ] && parse_us=300\niterations=0;`
+			)
+			.replace('\\"parse_us\\":100', '\\"parse_us\\":$parse_us'),
+		{ mode: 0o755 }
+	);
+	await tools.write(
+		'perf',
+		perf_script(log).replace(
+			'"$@"\ncode=$?',
+			`one_shot_cand=''; ${is_cand_one_shot('$1')}\ncase " $* " in *" --iterations 0 "*) ;; *) [ -n "$one_shot_cand" ] && n=$((n * 2)) ;; esac\n"$@"\ncode=$?`
+		),
+		{ mode: 0o755 }
+	);
+	await tools.write('build.sh', stamping_build_script(`${tools.path}/driver.sh`), { mode: 0o755 });
+	await using cache = await fs.temp_dir('perf_ab_test_cache-');
+
+	const json_run = await run_over_fakes(
+		workspace,
+		tools,
+		cache,
+		['HEAD~1', 'HEAD', '--one-shot', '--json'],
+		true
+	);
+	strictEqual(json_run.code, 0, json_run.err);
+	const json = JSON.parse(json_run.out) as {
+		rows: Array<{ lang: string; phase: string; verdict: string }>;
+		one_shot_rows: Array<{
+			lang: string;
+			phase: string;
+			verdict: string;
+			base_wall_us: number;
+			cand_wall_us: number;
+			instructions_pct: number;
+		}>;
+		one_shot_files: Record<string, unknown>;
+		one_shot_cycles: Record<string, unknown>;
+		one_shot_note: string;
+		passes: boolean;
+		sign_off: Array<string>;
+		noisy: Array<string>;
+		unsettled: Array<string>;
+		layout_reading: unknown;
+	};
+	// the graded rows tie and pass; every one-shot row fails by the rule, and nothing reads it
+	ok(json.passes);
+	deepStrictEqual(
+		json.rows.map((row) => `${row.lang} ${row.phase} ${row.verdict}`),
+		[
+			'ts parse pass',
+			'ts format pass',
+			'svelte parse pass',
+			'svelte format pass',
+			'css parse pass',
+			'css format pass',
+			'strip parse pass',
+			'strip strip pass'
+		]
+	);
+	deepStrictEqual(
+		json.one_shot_rows.map((row) => `${row.lang} ${row.phase} ${row.verdict}`),
+		[
+			'ts json fail',
+			'ts format fail',
+			'svelte json fail',
+			'svelte format fail',
+			'css json fail',
+			'css format fail',
+			'strip imports fail',
+			'strip strip fail'
+		]
+	);
+	const json_row = json.one_shot_rows[0]!;
+	strictEqual(json_row.cand_wall_us, 3 * json_row.base_wall_us, JSON.stringify(json_row));
+	deepStrictEqual([json.sign_off, json.noisy, json.unsettled], [[], [], []]);
+	deepStrictEqual(Object.keys(json.one_shot_files), ['ts', 'svelte', 'css', 'strip']);
+	deepStrictEqual(Object.keys(json.one_shot_cycles).sort(), [
+		'css format',
+		'css json',
+		'strip imports',
+		'strip strip',
+		'svelte format',
+		'svelte json',
+		'ts format',
+		'ts json'
+	]);
+	ok(json.one_shot_note.includes('INFORMATIONAL'));
+	// the one-shot driver runs full, parse-only and zero iterations per language and round, its
+	// own fixed cost: 2 rounds × 2 sides × 4 languages × 3, every language named, the strip too
+	const one_shot_runs = json_run.log.filter(
+		(line) => !line.startsWith('perf ') && line.includes('/perf_ab_one_shot-')
+	);
+	strictEqual(one_shot_runs.length, 48, one_shot_runs.join('\n'));
+	strictEqual(
+		one_shot_runs.filter((line) => line.includes('--iterations 0')).length,
+		16,
+		one_shot_runs.join('\n')
+	);
+	strictEqual(
+		one_shot_runs.filter((line) => line.includes(' --lang strip ')).length,
+		12,
+		one_shot_runs.join('\n')
+	);
+	// and the warm drivers never run on the one-shot path
+	strictEqual(
+		json_run.log.filter((line) => line.includes('/perf_ab-') && line.includes('--lang strip'))
+			.length,
+		0
+	);
+
+	// the table run prints the one-shot rows in their own table, verdicts in parentheses
+	const table_run = await run_over_fakes(
+		workspace,
+		tools,
+		cache,
+		['HEAD~1', 'HEAD', '--one-shot'],
+		true
+	);
+	strictEqual(table_run.code, 0, table_run.err);
+	ok(table_run.out.endsWith('perf:ab: PASS'), table_run.out);
+	ok(table_run.out.includes('one-shot rows — '), table_run.out);
+	ok(/\| TS json +\|.*\| \(FAIL\) +\|/.test(table_run.out), table_run.out);
+});
+
+test('one-shot rows shaped like a sign-off, a layout move, noise and a near-line wall reach none of those readings', async () => {
+	clear_git_repo_env();
+	await using workspace = await make_one_shot_workspace();
+	await using tools = await make_tools();
+	const log = `${tools.path}/log`;
+	// the candidate's one-shot calls: the parse column +1.3% then +3.3% a round (paired median
+	// +2.3%, a 0.98% round spread) at +1% instructions — a sign-off-shaped, noisy row near the
+	// wall line that more rounds could settle; the second column +5% wall at flat instructions —
+	// a layout-shaped row. The warm path ties.
+	await tools.write(
+		'driver.sh',
+		driver_script(log)
+			.replace(
+				'iterations=0;',
+				[
+					`one_shot_cand=''; ${is_cand_one_shot('$0')}`,
+					'parse_us=100; work_us=200; strip_us=50',
+					'if [ -n "$one_shot_cand" ]; then',
+					'	work_us=210; strip_us=52.5',
+					'	case " $* " in',
+					'		*" --parse-only "*|*" --iterations 0 "*) ;;',
+					'		*)',
+					'			lang=strip; previous=""',
+					'			for arg in "$@"; do [ "$previous" = --lang ] && lang="$arg"; previous="$arg"; done',
+					`			count=$(cat '${tools.path}/count_'"$lang" 2>/dev/null || echo 0); count=$((count + 1))`,
+					`			echo "$count" > '${tools.path}/count_'"$lang"`,
+					'			if [ $((count % 2)) = 1 ]; then parse_us=101.3; else parse_us=103.3; fi ;;',
+					'	esac',
+					'fi',
+					'iterations=0;'
+				].join('\n')
+			)
+			.replace('\\"parse_us\\":100', '\\"parse_us\\":$parse_us')
+			.replace('\\"format_us\\":200', '\\"format_us\\":$work_us')
+			.replace('\\"strip_us\\":50', '\\"strip_us\\":$strip_us'),
+		{ mode: 0o755 }
+	);
+	await tools.write(
+		'perf',
+		perf_script(log).replace(
+			'"$@"\ncode=$?',
+			`one_shot_cand=''; ${is_cand_one_shot('$1')}\ncase " $* " in *" --iterations 0 "*) ;; *) [ -n "$one_shot_cand" ] && n=$((n + 10)) ;; esac\n"$@"\ncode=$?`
+		),
+		{ mode: 0o755 }
+	);
+	await tools.write('build.sh', stamping_build_script(`${tools.path}/driver.sh`), { mode: 0o755 });
+	await using cache = await fs.temp_dir('perf_ab_test_cache-');
+
+	const run = await run_over_fakes(
+		workspace,
+		tools,
+		cache,
+		['HEAD~1', 'HEAD', '--one-shot', '--json'],
+		true
+	);
+	strictEqual(run.code, 0, run.err);
+	const json = JSON.parse(run.out) as {
+		rounds: number;
+		rows: Array<{ lang: string; phase: string; verdict: string }>;
+		one_shot_rows: Array<{
+			lang: string;
+			phase: string;
+			verdict: string;
+			sign_off: boolean;
+			wall_pct: number;
+			base_instructions: number;
+			cand_instructions: number;
+			instructions_pct: number;
+			cand_wall_spread_pct: number;
+		}>;
+		passes: boolean;
+		sign_off: Array<string>;
+		noisy: Array<string>;
+		unsettled: Array<string>;
+		layout_reading: { row: string; wall_pct: number } | null;
+	};
+	const one_shot = (lang: string, phase: string) =>
+		json.one_shot_rows.find((row) => row.lang === lang && row.phase === phase)!;
+	// the fakes are shaped as described, so each reading below would name a one-shot row if it read
+	// them
+	const json_row = one_shot('ts', 'json');
+	strictEqual(json_row.sign_off, true, JSON.stringify(json_row));
+	strictEqual(json_row.wall_pct.toFixed(3), '2.300');
+	ok(json_row.cand_wall_spread_pct > 0.75, JSON.stringify(json_row));
+	strictEqual(json_row.instructions_pct.toFixed(3), '1.000');
+	const as_row = json_row as unknown as AbRow;
+	ok(row_is_ambiguous(as_row) && row_is_settleable(as_row), JSON.stringify(json_row));
+	strictEqual(one_shot('svelte', 'format').instructions_pct, 0);
+	strictEqual(one_shot('svelte', 'format').wall_pct.toFixed(3), '5.000');
+	// and none does: no sign-off, no noise, nothing unsettled, no extra round, a warm layout reading
+	ok(json.passes);
+	deepStrictEqual([json.sign_off, json.noisy, json.unsettled], [[], [], []]);
+	strictEqual(json.rounds, 2);
+	deepStrictEqual(json.layout_reading?.wall_pct, 0);
+	ok(
+		json.rows.some((row) => `${row.lang} ${row.phase}` === json.layout_reading!.row),
+		JSON.stringify(json.layout_reading)
+	);
+	// the one-shot strip row is the whole call: full − parse-only, never the warm strip's
+	// full − 2 × parse-only + fixed (perf counts 5000 full, 2000 parse-only, 1000 fixed, over 3
+	// iterations; the candidate 10 more on each timed one-shot run)
+	const strip = one_shot('strip', 'strip');
+	strictEqual(strip.base_instructions, (5000 - 2000) / 3);
+	strictEqual(strip.cand_instructions, (5010 - 2010) / 3);
+	strictEqual(one_shot('strip', 'imports').base_instructions, (2000 - 1000) / 3);
 });
 
 test('the root exits 2, never the regression code, when a program it needs is missing', async () => {
