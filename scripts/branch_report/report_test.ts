@@ -90,7 +90,7 @@ function report_with(
 		generated: '2026-11-08T00:00:00.000Z',
 		same_ref,
 		provenance: {
-			command_line: 'deno task branch:report HEAD HEAD',
+			command_line: 'npm run branch:report -- HEAD HEAD',
 			base: side('base'),
 			cand: side('cand'),
 			machine: { hostname: 'lap' },

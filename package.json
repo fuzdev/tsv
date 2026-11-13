@@ -44,7 +44,7 @@
 		"test": "cargo test --workspace",
 		"lint": "cargo clippy --workspace --all-features --all-targets -- -D warnings",
 		"format:audit": "npm run build:check && target/corpus/tsv format --check .",
-		"check": "cargo fmt --check && npm run format:audit && npm run pins:audit && npm run docs:audit && npm run docs:audit:docsrs && npm run deps:audit && npm run package:audit && npm run typecheck && npm run typecheck:features && npm run typecheck:scripts && npm run typecheck:bench-core && npm run conformance:audit && npm run conformance:audit:compiler && npm run variants:audit && npm run scan:audit && npm run fanout:audit && npm run roundtrip:audit && npm run roundtrip:audit:prettier && npm run discovery:audit && npm run canonicalize:audit && npm run binding:audit && npm run authoring:audit && npm run paren:audit && npm run razor:audit && npm run fuzz:audit && npm run fuzz:audit:debug && npm run test:node && deno task test:deno && npm run test && npm run test:depth && npm run test:audits && npm run swallow:audit && npm run comments:audit && npm run gaps:audit && npm run blanks:audit && npm run fabrication:audit && npm run census:audit && npm run width:audit && npm run ignore:audit && npm run check:ast-types && npm run check:loc && npm run lint",
+		"check": "cargo fmt --check && npm run format:audit && npm run pins:audit && npm run docs:audit && npm run docs:audit:docsrs && npm run deps:audit && npm run package:audit && npm run typecheck && npm run typecheck:features && npm run typecheck:scripts && npm run typecheck:bench-core && npm run conformance:audit && npm run conformance:audit:compiler && npm run variants:audit && npm run scan:audit && npm run fanout:audit && npm run roundtrip:audit && npm run roundtrip:audit:prettier && npm run discovery:audit && npm run canonicalize:audit && npm run binding:audit && npm run authoring:audit && npm run paren:audit && npm run razor:audit && npm run fuzz:audit && npm run fuzz:audit:debug && npm run test:node && npm run test && npm run test:depth && npm run test:audits && npm run swallow:audit && npm run comments:audit && npm run gaps:audit && npm run blanks:audit && npm run fabrication:audit && npm run census:audit && npm run width:audit && npm run ignore:audit && npm run check:ast-types && npm run check:loc && npm run lint",
 		"check:ast-types": "npm run build:check && node scripts/roots/check_ast_types.ts",
 		"check:loc": "npm run build:check && node scripts/roots/check_loc.ts",
 		"fixtures:init": "cargo run -p tsv_debug --quiet fixture_init",
@@ -196,7 +196,8 @@
 		"validate:artifacts": "node scripts/roots/validate_artifacts.ts",
 		"engines:audit": "node scripts/roots/engine_parity.ts",
 		"typecheck:packages": "node scripts/roots/typecheck_packages.ts",
-		"perf:ab": "node scripts/roots/perf_ab.ts"
+		"perf:ab": "node scripts/roots/perf_ab.ts",
+		"branch:report": "node scripts/roots/branch_report.ts"
 	},
 	"devDependencies": {
 		"@fuzdev/blake3-wasm": "^0.2.0",

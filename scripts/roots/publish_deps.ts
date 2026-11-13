@@ -31,7 +31,7 @@ import type { PublishDeps, PublishPrograms } from '../publish.ts';
  *   are a test subtree of the same kind, steered by the owner's variables (`BENCH_STALE_OK`,
  *   `NODE_OPTIONS`).
  * - `npm`: the whole environment. An `npm run` gate or build is an arbitrary subtree (cargo,
- *   rustup, node, bun, wasm-pack, `deno` for `check`'s `test:deno`, the sidecar) that needs the
+ *   rustup, node, bun, wasm-pack, the sidecar, and `deno` where one still runs it) that needs the
  *   owner's whole development setup, and npm's config, auth, and registry come from it and from
  *   the user's npm config.
  * - `git_user`: the whole environment: `fetch`, `ls-remote`, and `push` reach `origin` through

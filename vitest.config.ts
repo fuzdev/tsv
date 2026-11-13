@@ -6,8 +6,7 @@
  * is one `tsc` typechecks, and each is named: a directory would sweep in
  * `benches/js/lib/canonical_test.ts` and `benches/js/lib/compare_engines_test.ts`, which need
  * the bench install
- * (`vitest.canonical.config.ts`), and the suite still on `deno test` (`test:deno`). A named
- * file that's missing fails here rather than leaving the run one suite short, and so does a
+ * (`vitest.canonical.config.ts`). A named file that's missing fails here rather than leaving the run one suite short, and so does a
  * `_test.ts` file under `scripts/`, directly under `benches/js/`, or under its `diagnostics/`
  * or `lib/` that no runner names, which would otherwise never run.
  *
@@ -40,14 +39,7 @@ if (missing.length > 0) {
 
 const read_files = (name: string): Array<string> =>
 	JSON.parse(readFileSync(new URL(name, import.meta.url), 'utf8')).files;
-const deno_tasks: { tasks: Record<string, string> } = JSON.parse(
-	readFileSync(new URL('deno.json', import.meta.url), 'utf8')
-);
-const named = new Set([
-	...include,
-	...read_files('tsconfig.canonical.json'),
-	...(deno_tasks.tasks['test:deno']!.match(/\S+_test\.ts/g) ?? [])
-]);
+const named = new Set([...include, ...read_files('tsconfig.canonical.json')]);
 const unnamed = globSync(
 	['scripts/**/*_test.ts', 'benches/js/*_test.ts', 'benches/js/{diagnostics,lib}/**/*_test.ts'],
 	{
@@ -56,7 +48,7 @@ const unnamed = globSync(
 ).filter((file) => !named.has(file));
 if (unnamed.length > 0) {
 	throw Error(
-		`vitest.config.ts: suites no runner names (add each to tsconfig.vitest.json, or to \`test:deno\` while its module needs Deno): ${unnamed.join(', ')}`
+		`vitest.config.ts: suites no runner names (add each to tsconfig.vitest.json, or to tsconfig.canonical.json when it needs the bench install): ${unnamed.join(', ')}`
 	);
 }
 

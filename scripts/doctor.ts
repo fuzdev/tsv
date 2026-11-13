@@ -6,7 +6,7 @@
  * version skew vs the npm pins), the corpus entry lists, and which build artifacts exist.
  *
  * Exit semantics: exit 1 only for states that would MISLEAD a run or break the core toolchain
- * (canonical pin drift, checkout↔pin skew, stale node_modules, missing deno, npm, cargo, or node, a
+ * (canonical pin drift, checkout↔pin skew, stale node_modules, missing npm, cargo, or node, a
  * node below the engines floor the scripts and the sidecar state, or a missing sidecar install)
  * — mere absences (a checkout not cloned, an artifact not built) are ⚠ warnings: they fail loud
  * on their own at use time, and plenty of workflows don't need them. So a green doctor means
@@ -132,6 +132,14 @@ export interface DoctorDeps {
 
 /** What `ci_pins` reads a pin of. */
 type PinnedTool = 'deno' | 'node';
+
+/** The line for a `deno` that is missing, or exits non-zero on `--version`: a warning: an absent
+ * `deno` fails no `check` leg (one on `PATH` that fails does, in cargo's test). */
+export const DENO_MISSING =
+	"deno missing — check runs without it (cargo test's a_node_that_runs_deno_is_refused passes " +
+	"untested), but the bench's Deno row (bench:deno), its canonical size rows (deno bundle), " +
+	"typecheck:js, and branch:report's bench leg (its Deno row, and every task of a side from before " +
+	'the tasks moved) need it';
 
 /** A `git` that never starts: a checkout id read through it is `null`, as with no checkout. */
 const NO_GIT: StampGit = {
@@ -381,14 +389,12 @@ export const run_doctor = async (
 	// --- Runtimes -----------------------------------------------------------------
 
 	section('Runtimes');
-	// the `deno` on `PATH`: the one `deno task` runs the deno.json tasks with, `check`'s
-	// `test:deno` among them, so a missing one still fails `check`
+	// the `deno` on `PATH`: `check` runs no Deno task, so a missing one fails nothing `check` runs
+	// (cargo test's one Deno test passes without it, testing nothing); the bench's Deno row and
+	// what is typechecked or bundled under Deno need it
 	const deno_line = await run_version(programs.deno);
 	if (deno_line === null) {
-		fail(
-			"deno missing — check's test:deno leg runs on it (the suite still on `deno test`), as do " +
-				"the bench's Deno row (bench:deno), typecheck:js, and branch:report"
-		);
+		warn(DENO_MISSING);
 	} else {
 		const deno_version = /^deno (\d+\.\d+\.\d+\S*)/.exec(deno_line)?.[1];
 		if (deno_version === undefined) {

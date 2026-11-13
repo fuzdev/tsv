@@ -69,7 +69,7 @@ cargo run -p tsv_debug ast_diff tests/fixtures/path/input.svelte # verify AST eq
 
 ## Commands
 
-Tasks live in `package.json` (every task whose body runs no Deno itself, `npm run <name> -- <flags>`, chained with `npm run`) and `deno.json` (the few whose body runs Deno: the bench's Deno row, `typecheck:js:deno`, `test:deno`, `branch:report`, `deno task <name> <flags>`); a script reaches one of those as a `deno task <name>` leg (`check` runs `test:deno` that way). `deno task` falls through to the `package.json` script when `deno.json` has no task of that name, so `deno task <name>` runs either. The release driver is `npm run release`, a name no npm command runs on its own (./docs/tasks.md §`release`). `npm ci` installs the JS dependencies `package-lock.json` pins into the root `node_modules`; `.npmrc` turns install scripts off. `npm ci --prefix crates/tsv_debug/sidecar` installs the fixture oracle `tsv_debug`'s sidecar runs (its own `package.json`, lock, and a copy of the root `.npmrc`, which a `--prefix` install doesn't read); `cargo test` needs it. The rationale for a `package.json` script lives in ./docs/tasks.md, keyed by name; a `deno.json` task's sits beside it as its `//<name>` key.
+Tasks live in `package.json` (every task whose body runs no Deno itself, `npm run <name> -- <flags>`, chained with `npm run`) and `deno.json` (the few whose body runs Deno: the bench's Deno row and `typecheck:js:deno`, `deno task <name> <flags>`); a script reaches one of those as a `deno task <name>` leg (`typecheck:js` and `bench:deno` do; `check` runs none). `deno task` falls through to the `package.json` script when `deno.json` has no task of that name, so `deno task <name>` runs either. The release driver is `npm run release`, a name no npm command runs on its own (./docs/tasks.md §`release`). `npm ci` installs the JS dependencies `package-lock.json` pins into the root `node_modules`; `.npmrc` turns install scripts off. `npm ci --prefix crates/tsv_debug/sidecar` installs the fixture oracle `tsv_debug`'s sidecar runs (its own `package.json`, lock, and a copy of the root `.npmrc`, which a `--prefix` install doesn't read); `cargo test` needs it. The rationale for a `package.json` script lives in ./docs/tasks.md, keyed by name; a `deno.json` task's sits beside it as its `//<name>` key.
 
 ### Build & Development
 
@@ -115,11 +115,11 @@ cargo run -p tsv_cli strip --check --content 'enum E {}'                 # exit 
 "In `check`" = gates in `npm run check`. A task that needs `deno task bench:install` (the bench's node_modules — CI installs none) can't gate there.
 
 ```bash
-npm run check            # full committed-tree gate (benches/js/CLAUDE.md §Gate map); its one Deno task is test:deno
-#                          (cargo's `test` also runs one test with the `deno` on `PATH`)
+npm run check            # full committed-tree gate (benches/js/CLAUDE.md §Gate map); runs no Deno task
+#                          (cargo's `test` runs one test with the `deno` on `PATH`, which passes untested without one)
 deno task doctor         # one-pass setup check: runtimes, pins + checkout alignment, the sidecar install, node_modules
 #                          freshness, oracle checkouts, corpus, build artifacts. Exit 1 only on MISLEADING state (pin
-#                          drift, skew, stale deps) or a broken core (no deno, npm, cargo, or node, a node below the engines floor, or no sidecar install); absences warn (--strict promotes them) — except the optional experimental-typechecker
+#                          drift, skew, stale deps) or a broken core (no npm, cargo, or node, a node below the engines floor, or no sidecar install); absences warn (--strict promotes them) — except the optional experimental-typechecker
 #                          tier, informational at any strictness (a BROKEN checkout there still warns)
 deno task typecheck      # cargo check
 deno task typecheck:features # cargo check of each binding crate (tsv_wasm/tsv_ffi/tsv_napi) under each single feature,
@@ -153,8 +153,10 @@ deno task test:node      # vitest under Node over the suites beside their module
 #                          over a temp tree, and `divergence:audit`'s, `bench:compose`'s and `corpus:stats`' libraries over
 #                          fakes: exit codes, streams, reads, writes) + scripts/'s (`release/changelog_test.ts` — the changelog grammar publish.ts writes and
 #                          release_notes.ts reads; `release/version_test.ts` + `release/plan_test.ts` — the version grammar and
-#                          the fresh/resume plan; `branch_report/{parsers,report,timing,wasm_board}_test.ts` — the branch
-#                          report's parsers, verdicts and wasm-board extraction; `release/binstall_test.ts` — the
+#                          the fresh/resume plan; `branch_report/*_test.ts` — the branch
+#                          report's parsers, verdicts and wasm-board extraction, each side's runner per era over scratch git
+#                          repos, the corpus identity, each child's environment through the real spawn module, each leg's
+#                          missing-tool path, the bench leg and a whole report over fakes, and the WASM-memory probe; `release/binstall_test.ts` — the
 #                          binstall-table grader; `npm_api_test.ts` + `npm_api_strip_test.ts` + `npm_api_imports_test.ts` —
 #                          the npm options facade and its strip and imports halves over a fake engine;
 #                          `typecheck_packages_test.ts` — the README fence + marker grammar; `perf_ab_verdict_test.ts` —
@@ -207,10 +209,6 @@ deno task test:node      # vitest under Node over the suites beside their module
 deno task test:node:canonical # the same over the suites that load the bench install: `benches/js/lib/canonical_test.ts`
 #                          (the canonical prettier baseline's parser routing) and `compare_engines_test.ts` (the
 #                          comparison tools' engine binding); needs `deno task bench:install`, so NOT in `check`
-deno task test:deno      # deno test over the suite whose module under test calls `Deno.*`:
-#                          `branch_report/side_test.ts` — the corpus identity over a scratch repo, with
-#                          `--allow-write --allow-run=git` + `--allow-env` for the three `GIT_*` variables it
-#                          clears; in `check`
 deno task test:depth     # tests/depth_limit.rs optimized (`--profile corpus`): every shape the depth limits count, a catalog
 #                          of grammar positions each nested in itself, and a generated sweep — `check`'s scope: every pair
 #                          behind the heads `a` and `a()`, a few hundred seeded triples, every commented link, the bare prefix
@@ -611,7 +609,7 @@ cargo run --release -p tsv_debug -- profile --strip ../corpora/collections   # p
 cargo run --release -p tsv_debug -- compile_profile tests/fixtures_compile  # Svelte compile vs the format wall
 npm run perf:ab -- <base-ref> [<cand-ref>]  # parse/format A/B per language + the type strip: wall + instructions:u, exit 1 on a regression;
 #                                             cand defaults to the working tree. NOT in check (two release builds; ./docs/performance.md)
-deno task branch:report <base-ref> <cand-ref>  # one document comparing two refs: sizes, type widths, work counters; timing legs behind --timing; same ref twice is the A/A null (./docs/performance.md)
+npm run branch:report -- <base-ref> <cand-ref>  # one document comparing two refs: sizes, type widths, work counters; timing legs behind --timing; same ref twice is the A/A null (./docs/performance.md)
 ```
 
 Function-level hotspots: `perf` with the `profiling` cargo profile:

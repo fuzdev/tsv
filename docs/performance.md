@@ -1043,12 +1043,12 @@ is the stronger signal, since a disturbance can leave the load average low. Run 
 its instruction column reads flat. The JSON output also carries each row's cycles per iteration on
 each side, which the verdict never reads.
 
-### Comparing two refs in one document — `deno task branch:report`
+### Comparing two refs in one document — `npm run branch:report`
 
 ```bash
-deno task branch:report <base-ref> <cand-ref>   # sizes, type widths, work counters: report.md + report.json
-deno task branch:report <ref> <ref>             # the A/A null: the same ref built twice, every deterministic row must be identical
-deno task branch:report <base> <cand> --timing plain,pgo,bench,build-wall,small-files --aa <aa>/report.json
+npm run branch:report -- <base-ref> <cand-ref>   # sizes, type widths, work counters: report.md + report.json
+npm run branch:report -- <ref> <ref>             # the A/A null: the same ref built twice, every deterministic row must be identical
+npm run branch:report -- <base> <cand> --timing plain,pgo,bench,build-wall,small-files --aa <aa>/report.json
 ```
 
 Where `perf:ab` grades a change, `branch:report` describes one: it builds each ref from git in its
@@ -1063,11 +1063,15 @@ corpus, machine or timing setup does not count (the row reads `unfloored` and th
 non-zero), and a row without one reads `unfloored`.
 
 The tool grades what the machine gives it: a missing tool, a failed build or a ref that lacks a
-leg's input is a row in the document and a non-zero exit (2), unless `--accept-gaps`, which also
+leg's input (a task its tree doesn't declare among them) is a row in the document and a non-zero exit (2), unless `--accept-gaps`, which also
 accepts a floor mismatch and a confounded toolchain (all stay listed under Problems), and a
 deterministic row that differs on a same-ref pair exits 1 whatever the flags. The store-rows
 section is reported as not applicable until an indexed AST exists; `store_rows_section` in
-`scripts/branch_report/branch_report.ts` is its extension point.
+`scripts/branch_report/branch_report.ts` is its extension point. Each side's own tasks run as
+its tree runs them, and every child's environment the report sets is the same for both sides
+(docs/tasks.md §`branch:report`), so a pair's deltas hold while an absolute timing can sit a
+little off a run under a whole shell environment. The bench leg says `RUNNERS DIFFER` where the
+two trees start a task under different runners.
 
 ### A board is one cell of (entry point × corpus)
 
