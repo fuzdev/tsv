@@ -2976,7 +2976,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ///
     /// `Verbatim` (no escapes) carries no allocation — the decoded value equals
     /// the inner source slice (recovered later via `StringCooked::resolve(span,
-    /// source)`). `Decoded` (escapes present) holds the lexer's decoded value, copied
+    /// source, view)`). `Decoded` (escapes present) holds the lexer's decoded value, copied
     /// into the text pool when the token was received. The quote char is no longer stored — recover it via
     /// `Literal::string_quote(source)`.
     ///

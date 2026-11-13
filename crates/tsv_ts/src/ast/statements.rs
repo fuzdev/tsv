@@ -48,11 +48,11 @@ pub enum StatementKind<'arena> {
     // not because they are rare. Rarity is what makes a row of its own free, and it is
     // not the only reason to store one — the struct is copied into its store instead of
     // into the enum, so the copy volume is unchanged and the cost is one row push, while
-    // all of the file's other statement rows get narrower. Stored, a `Statement` is 56
-    // bytes — the span header over a 48-byte `StatementKind` — which is what the
+    // all of the file's other statement rows get narrower. Stored, a `Statement` is 48
+    // bytes — the span header over a 40-byte `StatementKind` — which is what the
     // `size_of` asserts in this module's parent pin. The widest inline variant is
-    // `LabeledStatement` at 40 (its inline `Identifier` label beside the body's id),
-    // ahead of `TryStatement` at 36 and the `break` / `continue` labels at 32, so the
+    // `TryStatement` at 36, ahead of `LabeledStatement` at 28 (its inline `Identifier`
+    // label beside the body's id) and the `break` / `continue` labels at 24, so the
     // ladder stops here.
     //
     // (The loop and `try` heads below hold their own heads by id for the same reason,
