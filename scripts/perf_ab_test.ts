@@ -147,7 +147,7 @@ const driver_api_with = async (dir: FsDir, private_rs: string): Promise<string |
 	return (await tree_driver_api(make_git(), dir, await run_git(dir, ['write-tree']))).cfg;
 };
 
-test('a tree whose TypeScript parse takes no Bump is the current generation, one with the warm parse alone the next, any other the oldest', async () => {
+test('a tree with the warm handle is the current generation, then no Bump in the TypeScript parse, then the warm parse alone, any other the oldest', async () => {
 	clear_git_repo_env();
 	await using dir = await fs.temp_dir('perf_ab_test-');
 	await run_git(dir, ['init', '--quiet']);
@@ -155,9 +155,14 @@ test('a tree whose TypeScript parse takes no Bump is the current generation, one
 	const body =
 		'    folded.parse_with(|text| parse_with_goal_or_fallback_into(text, goal, stores))\n';
 	const no_bump = `pub fn parse_folded_into<'arena>(\n    goal: Option<Goal>,\n) {\n${body}}\n`;
-	strictEqual(await driver_api_with(dir, no_bump), null);
+	const handle = "pub struct WarmStores {\n    parked: Option<AstStores<'static>>,\n}\n";
+	strictEqual(await driver_api_with(dir, `${handle}${no_bump}`), null);
+	strictEqual(await driver_api_with(dir, handle), null);
+	const named = `// pub struct WarmStores {\n/// pub struct WarmStores {\npub struct WarmStoresX {}\n${no_bump}`;
+	strictEqual(await driver_api_with(dir, named), 'no_warm_stores');
+	strictEqual(await driver_api_with(dir, no_bump), 'no_warm_stores');
 	const lifetime_free = `pub fn parse_folded_into(\n    goal: Option<Goal>,\n) {\n${body}}\n`;
-	strictEqual(await driver_api_with(dir, lifetime_free), null);
+	strictEqual(await driver_api_with(dir, lifetime_free), 'no_warm_stores');
 	const through_bump =
 		"pub fn parse_folded_into<'arena>(\n    arena: &'arena Bump,\n) {\n    folded.parse_with(|text| parse_with_goal_or_fallback_into(text, goal, arena, stores))\n}\n";
 	strictEqual(await driver_api_with(dir, through_bump), 'ts_parse_bump');

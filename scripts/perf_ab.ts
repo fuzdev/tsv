@@ -22,14 +22,16 @@
  * passed to the example's own compilation (`build_args`: `cargo rustc … -- --cfg`, so every
  * library builds as `cargo build` builds it). Per generation, each side runs:
  *
- * - current (a tree whose `tsv_ts::__private::parse_folded_into` takes no `Bump`): TypeScript
- *   and Svelte parse into warm stores, taken before each timed region and parked after it as
- *   the CLI's `Formatter` keeps them (`parse_folded_into`, then `format_folded_in` through
- *   `parsed_ref`), the TypeScript parse with no `Bump`; CSS parses into the `Bump`
+ * - current (a tree with `tsv_ts::__private::WarmStores`): TypeScript and Svelte parse into
+ *   warm stores the handle takes before each timed region and parks after it, as the CLI's
+ *   `Formatter` keeps them in a slot it owns (`parse_folded_into`, then `format_folded_in`
+ *   through `parsed_ref`), the TypeScript parse with no `Bump`; CSS parses into the `Bump`
  *   (`parse_folded`), having no stores; the strip driver parses with
  *   `parse_with_goal_or_fallback_into` and strips with `strip_into`, into the same warm stores.
+ * - `no_warm_stores` (a tree whose `parse_folded_into` takes no `Bump`, without the handle): as
+ *   the current generation, the stores kept in an `Option` of the driver's own.
  * - `ts_parse_bump` (a tree with `parse_folded_into` whose TypeScript parse still takes the
- *   `Bump`): as the current generation, every one of those parses handed the `Bump` too.
+ *   `Bump`): as `no_warm_stores`, every one of those parses handed the `Bump` too.
  * - `no_stores` (any older tree, `main` before the stores among them): every language parses
  *   into the `Bump` alone (`parse_folded`, then `format_folded_in`), and the strip driver calls
  *   `parse_with_goal_or_fallback` and `strip_in`.
@@ -191,6 +193,11 @@ function driver_of(lang: Lang): DriverKind {
  * comment or doc line naming it cannot answer for it. */
 const STRIP_ENTRY_POINT = '^pub fn strip_in[<(]';
 
+/** The pattern (`git grep -E`) whose match in a tree's `crates/tsv_ts/src` says it has the warm
+ * handle the current drivers park through: `WarmStores`'s declaration, anchored at the line start
+ * where the item is declared, so a comment or doc line naming it cannot answer for it. */
+const WARM_STORES_HANDLE = '^pub struct WarmStores [{]';
+
 /** The pattern (`git grep -E`) whose match in a tree's `crates/tsv_ts/src` says its TypeScript
  * parse takes no `Bump`: `__private::parse_folded_into`'s body, the folded parse handing the
  * fallback parse the stores alone. A body line rather than a declaration, because the
@@ -218,6 +225,12 @@ export interface DriverApi {
 export const DRIVER_APIS: ReadonlyArray<DriverApi> = [
 	{
 		cfg: null,
+		probe: { pattern: WARM_STORES_HANDLE, path: 'crates/tsv_ts/src' },
+		calls:
+			'warm stores: TypeScript and Svelte parse into stores a WarmStores handle parks between iterations (TypeScript with no Bump), CSS into the Bump'
+	},
+	{
+		cfg: 'no_warm_stores',
 		probe: { pattern: TS_PARSE_WITHOUT_BUMP, path: 'crates/tsv_ts/src' },
 		calls:
 			'warm stores: TypeScript and Svelte parse into stores parked between iterations (TypeScript with no Bump), CSS into the Bump'
