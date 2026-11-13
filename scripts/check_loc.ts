@@ -28,8 +28,8 @@
  * against the loc wire, key order ignored (the Rust writer places `loc` after `end`, the
  * reconstruction appends it last; the contract leaves order unspecified).
  *
- * Usage: `npm run check:loc` (builds `target/corpus/tsv_debug` first), or directly from the
- * checkout's root, `node scripts/roots/check_loc.ts [root]`, the root a path in the checkout.
+ * Usage: `npm run check:loc` (builds `target/corpus/tsv_debug` first), or directly,
+ * `node scripts/roots/check_loc.ts [root]`, the root a path in the checkout.
  *
  * Its reach: the checkout read-only (the ledger) and the checkout's `target/corpus/tsv_debug`,
  * run in it (`CheckLocDeps`, built by `scripts/roots/check_loc.ts`).

@@ -139,7 +139,11 @@ delta on the same row is the detector.
   pure modules (`args`, `benchmark*`, `stats`, `time`) — **no `Deno.*`, no `@std/*`**. The only genuinely
   runtime-specific files are the native loader (`ffi.ts` `Deno.dlopen` vs `napi.ts`
   `process.dlopen`) and the WASM target the loader picks. The tools beside the bench run
-  under Node from their roots in `roots/`, on gro's host modules. The
+  under Node from their roots in `roots/`, on gro's host modules. The corpus tools that run
+  `target/corpus/tsv_debug` (`strip:corpus:run`, `imports:corpus:run`,
+  `corpus:compare:parse:run`, `conformance`) run only from the checkout's root, where the corpus
+  loader's paths resolve, and from anywhere else say so first and exit 1; the `tsv_debug`
+  freshness guard finds the binary from its own module's location. The
   core's suites are its tests: the divergence detectors plus the other dependency-free `lib/`
   modules' (`node:assert` + relative imports; the fixture-coverage audit also opens a read-only
   handle on `tests/fixtures` through `@fuzdev/gro`), run by vitest under Node (`test:node`).

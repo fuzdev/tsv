@@ -3,11 +3,6 @@
  * location, never the working directory, with its `target/`, the programs beneath it, and the
  * sibling checkouts beside it.
  *
- * A program named by a path (`target/corpus/tsv`) is resolved by gro's spawn host module
- * against its project root, the working directory, so `checkout_program` refuses to make one
- * unless the working directory is this checkout: the binary pinned is then the checkout's own.
- * The npm scripts run from the checkout's root.
- *
  * @module
  */
 
@@ -16,6 +11,7 @@ import { fileURLToPath } from 'node:url';
 
 import { fs, type FsDir, type FsReadDir } from '@fuzdev/gro/fs.ts';
 import { is_fs_error } from '@fuzdev/gro/fs_error.ts';
+import { process } from '@fuzdev/gro/process.ts';
 import { spawn, type SpawnProgram, type SpawnProgramOptions } from '@fuzdev/gro/spawn.ts';
 
 /** The checkout's absolute path, two directories above this module. */
@@ -41,23 +37,71 @@ export const open_target = async (checkout: FsDir): Promise<FsDir> => {
 };
 
 /**
- * The program at `path` beneath the checkout, pinned for the handle's life.
- * @throws `Error` - when the working directory isn't the checkout
+ * Makes the program at `path` beneath the checkout (`target/corpus/tsv`), pinned for the
+ * handle's life, whatever the working directory.
+ * @throws `SpawnError` - `not_found` when nothing is there, naming the name it looked for and
+ *   the directory beneath which; `not_executable`, or `not_granted` for a path that leads out
+ *   of the checkout, as `spawn.program_in`
  */
-export const checkout_program = (
-	checkout: FsDir,
-	path: string,
-	options?: SpawnProgramOptions
-): SpawnProgram => {
-	// `fs.project` is the working directory, the root gro's spawn resolves `path` against
-	const cwd = fs.project.path;
-	if (cwd !== checkout.path) {
-		throw new Error(
-			`run this from the checkout's root (${checkout.path}), not ${cwd}: ` +
-				`${path} resolves against the working directory`
-		);
+export type CheckoutProgram = (path: string, options?: SpawnProgramOptions) => SpawnProgram;
+
+/**
+ * The checkout's top-level directories a setup may make a symlink to a directory elsewhere,
+ * absolute or relative: cargo's `target` (a relocated build directory) and npm's
+ * `node_modules` (an install a second tree shares).
+ */
+const LINKABLE_DIRS: ReadonlyArray<string> = ['target', 'node_modules'];
+
+/**
+ * Opens the checkout for making programs beneath it with gro's `spawn.program_in`. A path whose
+ * first segment is one of `LINKABLE_DIRS` resolves beneath that directory, opened now by its
+ * path, so one that is a symlink to a directory elsewhere is followed, as `open_target` follows
+ * `target`; one that is absent or a file is never made, and its programs are then not found
+ * beneath the checkout. Every other path, and the rest of the path beneath one of those, follows
+ * `program_in`'s rules: a relative symlink that stays inside is followed
+ * (`node_modules/.bin/tsc`), and an absolute one, a binary that is itself an absolute symlink
+ * included, is refused as `not_granted`.
+ */
+export const open_checkout_program = async (checkout: FsReadDir): Promise<CheckoutProgram> => {
+	const linked = new Map<string, FsReadDir>();
+	for (const name of LINKABLE_DIRS) {
+		try {
+			linked.set(name, (await fs.open_dir(join(checkout.path, name))).readonly());
+		} catch (error) {
+			if (!is_fs_error(error, 'not_found') && !is_fs_error(error, 'not_a_directory')) throw error;
+		}
 	}
-	return spawn.program(path, options);
+	return (path, options) => {
+		const slash = path.indexOf('/');
+		const dir = slash === -1 ? undefined : linked.get(path.slice(0, slash));
+		return dir === undefined
+			? spawn.program_in(checkout, path, options)
+			: spawn.program_in(dir, path.slice(slash + 1), options);
+	};
+};
+
+/**
+ * What a root whose reads resolve against the working directory (the corpus loader's paths, a
+ * path argument) says when it is started anywhere but the checkout's root, or `null` from there.
+ * @param checkout_path - the checkout's path, as `open_checkout` opened it
+ * @param cwd - the working directory, as gro's `fs.project` names it
+ */
+export const to_cwd_refusal = (checkout_path: string, cwd: string): string | null =>
+	cwd === checkout_path
+		? null
+		: `✗ run this from the checkout's root, ${checkout_path}, not ${cwd}: ` +
+			'the corpus and the paths it is given resolve against the working directory';
+
+/**
+ * Ends the process with exit 1, printing `to_cwd_refusal`'s message, unless the working
+ * directory is the checkout's root. A root whose reads resolve against the working directory
+ * calls it first, before any guard or loader runs.
+ */
+export const exit_unless_checkout_cwd = (checkout: FsReadDir): void => {
+	const refusal = to_cwd_refusal(checkout.path, fs.project.path);
+	if (refusal === null) return;
+	console.error(refusal);
+	process.exit(1);
 };
 
 /**

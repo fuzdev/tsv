@@ -10,6 +10,10 @@
  * packages resolve from `benches/js/node_modules`, gro from the checkout's own install above
  * it.
  *
+ * It runs from the checkout's root, where the corpus paths resolve, and refuses any other working
+ * directory first, before the freshness guard or the corpus loader runs
+ * (`exit_unless_checkout_cwd`).
+ *
  * @module
  */
 
@@ -17,7 +21,11 @@ import { process } from '@fuzdev/gro/process.ts';
 import { spawn } from '@fuzdev/gro/spawn.ts';
 
 import { CARGO_PASS_ENV } from '../../../scripts/cargo_env.ts';
-import { open_checkout } from '../../../scripts/roots/checkout.ts';
+import {
+	exit_unless_checkout_cwd,
+	open_checkout,
+	open_checkout_program
+} from '../../../scripts/roots/checkout.ts';
 import { run_conformance } from '../conformance.ts';
 import {
 	exit_with,
@@ -29,6 +37,7 @@ import {
 } from './compare_deps.ts';
 
 const checkout = await open_checkout();
+exit_unless_checkout_cwd(checkout);
 const lib = checkout.readonly().dir('benches/js/lib');
 const home = read_home();
 const stdout = process.stdout;
@@ -38,7 +47,7 @@ const code = await run_conformance(
 		ts_repo: { init_implementations, open_dir: open_readonly_dir, stdout },
 		parse: {
 			init_implementations,
-			open_tsv_debug: tsv_debug_opener(checkout),
+			open_tsv_debug: tsv_debug_opener(await open_checkout_program(checkout)),
 			home,
 			stdout,
 			pins: readonly_pins_file(lib, 'corpus_parse_pins.txt')

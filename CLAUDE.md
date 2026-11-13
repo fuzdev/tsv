@@ -196,6 +196,10 @@ npm run test:node        # vitest under Node over the suites beside their module
 #                          `roots/checkout_test.ts` — a sibling checkout that is a symlink followed, a dangling one
 #                          absent, a link beneath one never followed out, over real symlinks, through each tool
 #                          that reads one (audit:corpus, roundtrip:audit:prettier, discovery:audit, pins:audit:checkouts);
+#                          and the checkout's programs, made from any working directory, a `target` or `node_modules`
+#                          linked elsewhere followed, a binary that is itself an absolute symlink refused, and the
+#                          refusal the corpus roots (strip, imports, corpus:compare:parse, conformance) print first
+#                          when started anywhere but the checkout's root;
 #                          `package_audit_test.ts` + `check_loc_test.ts` — their checkout-relative paths;
 #                          `release/crates_test.ts` — publish:crates' order, liveness, semver baseline + release type +
 #                          feature flags and rate-limit read over a fake crates.io, and its packaging cleanup over fakes;

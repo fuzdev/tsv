@@ -17,12 +17,22 @@
  * @module
  */
 
+import { fileURLToPath } from 'node:url';
+
 import { signal_exit_code } from '../../../scripts/exit_code.ts';
 import { check_artifact_freshness } from './check_artifact_freshness.ts';
 import { lines_of } from './text_lines.ts';
 
 /** The `--profile corpus` `tsv_debug` binary `npm run build:check` builds. */
 export const TSV_DEBUG_CORPUS = 'target/corpus/tsv_debug';
+
+/**
+ * `TSV_DEBUG_CORPUS` beneath this checkout, found from this module's location, so the freshness
+ * guard dates the binary the caller's program runs whatever the working directory.
+ */
+const TSV_DEBUG_CORPUS_PATH = fileURLToPath(
+	new URL(`../../../${TSV_DEBUG_CORPUS}`, import.meta.url)
+);
 
 /**
  * What `tsv_debug` reads from the environment beyond a spawn's base: the panic hook's
@@ -91,7 +101,7 @@ export class TsvDebugServer<Request, Reply> {
 		await check_artifact_freshness([
 			{
 				label: 'tsv_debug (corpus)',
-				path: TSV_DEBUG_CORPUS,
+				path: TSV_DEBUG_CORPUS_PATH,
 				binding_crates: ['tsv_debug', 'tsv_cli'],
 				rebuild: 'npm run build:check'
 			}

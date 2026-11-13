@@ -27,9 +27,10 @@ import { spawn } from '@fuzdev/gro/spawn.ts';
 
 import { run_engine_parity } from '../engine_parity.ts';
 import { node_host_triple } from '../napi_host.ts';
-import { checkout_program, open_checkout } from './checkout.ts';
+import { open_checkout, open_checkout_program } from './checkout.ts';
 
 const checkout = await open_checkout();
+const checkout_program = await open_checkout_program(checkout);
 const report = node_process.report?.getReport() as { header?: { glibcVersionRuntime?: string } };
 const code = await run_engine_parity(
 	{
@@ -48,7 +49,7 @@ const code = await run_engine_parity(
 			arch: node_process.arch,
 			glibc: Boolean(report?.header?.glibcVersionRuntime)
 		}),
-		native_program: (path) => checkout_program(checkout, path),
+		native_program: (path) => checkout_program(path),
 		node: spawn.find('node'),
 		stale_ok: process.env.narrow(['BENCH_STALE_OK']).get('BENCH_STALE_OK') === '1',
 		print: (line) => console.log(line),

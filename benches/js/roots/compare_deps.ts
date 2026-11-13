@@ -16,7 +16,7 @@ import { resolve } from 'node:path';
 import { fs, type FsDir, type FsReadDir } from '@fuzdev/gro/fs.ts';
 import { process } from '@fuzdev/gro/process.ts';
 
-import { CHECKOUT_PATH, checkout_program } from '../../../scripts/roots/checkout.ts';
+import { CHECKOUT_PATH, type CheckoutProgram } from '../../../scripts/roots/checkout.ts';
 import type { InitCompareImplementations } from '../lib/compare_cli.ts';
 import { init_compare_implementations } from '../lib/compare_engines.ts';
 import type { PinsFile } from '../lib/corpus_pins.ts';
@@ -56,9 +56,9 @@ export const pins_file = (dir: FsDir, name: string): PinsFile => ({
 
 /** Makes the checkout's `target/corpus/tsv_debug`, with the panic hook's backtrace switches. */
 export const tsv_debug_opener =
-	(checkout: FsDir): (() => TsvDebugProgram) =>
+	(checkout_program: CheckoutProgram): (() => TsvDebugProgram) =>
 	() =>
-		checkout_program(checkout, TSV_DEBUG_CORPUS, { pass_env: TSV_DEBUG_PASS_ENV });
+		checkout_program(TSV_DEBUG_CORPUS, { pass_env: TSV_DEBUG_PASS_ENV });
 
 /** Ends the process with `code`. */
 export const exit_with = (code: number): never => process.exit(code);

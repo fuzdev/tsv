@@ -9,12 +9,21 @@
  */
 
 import { deepStrictEqual, rejects, strictEqual } from 'node:assert';
-import { afterAll, beforeAll, test } from 'vitest';
+import { fileURLToPath } from 'node:url';
+import { afterAll, beforeAll, test, vi } from 'vitest';
 
 import { fs, type FsDir } from '@fuzdev/gro/fs.ts';
 import { spawn } from '@fuzdev/gro/spawn.ts';
 
-import { type TsvDebugProgram, TsvDebugServer } from './tsv_debug_server.ts';
+import type { ArtifactCheck } from './check_artifact_freshness.ts';
+import { TSV_DEBUG_CORPUS, type TsvDebugProgram, TsvDebugServer } from './tsv_debug_server.ts';
+
+/** The checks `start` hands the freshness guard, which passes them all. */
+const guarded = vi.hoisted((): ArtifactCheck[][] => []);
+vi.mock('./check_artifact_freshness.ts', async (original) => ({
+	...(await original<typeof import('./check_artifact_freshness.ts')>()),
+	check_artifact_freshness: async (checks: ArtifactCheck[]) => void guarded.push(checks)
+}));
 
 /** The fake: `node fake.mjs <mode> --stdin`, one request line read at a time. */
 const FAKE = String.raw`
@@ -142,4 +151,13 @@ test('a process started without a piped stdin or stdout is refused, naming the c
 			message: 'target/corpus/tsv_debug echo --stdin started without piped stdio'
 		});
 	}
+});
+
+test('start dates the binary beneath this checkout, found from the module, whatever the working directory', async () => {
+	const started = await TsvDebugServer.start<{ source: string }, unknown>('echo', () => program);
+	await started.close();
+	deepStrictEqual(
+		guarded.map((checks) => checks.map((check) => check.path)),
+		[[fileURLToPath(new URL(`../../../${TSV_DEBUG_CORPUS}`, import.meta.url))]]
+	);
 });
