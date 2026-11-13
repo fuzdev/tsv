@@ -83,7 +83,8 @@
  * pins went stale unnoticed. So each checkout's git object — its HEAD, or for the
  * `../corpora` snapshot the id of its `collections/` tree — is also compared
  * against the id `benches/js/lib/gate_counts.ts` records it was measured at
- * (`GATE_CHECKOUT_IDS`), and a move is reported. Deliberately a WARNING:
+ * (`GATE_CHECKOUT_IDS`), and a move is reported, with which way a commit moved when the clone
+ * holds the measured commit (behind it is moved forward, never re-pinned). Deliberately a WARNING:
  * the count pins are the gate — this exists so that when one trips, "the corpus
  * moved" is distinguishable from "tsv regressed" at a glance instead of by
  * reverse-engineering. An absent checkout is skipped with a note; a present one in
@@ -103,7 +104,7 @@ import type { SpawnProgram } from '@fuzdev/gro/spawn.ts';
 import { is_spawn_error } from '@fuzdev/gro/spawn_error.ts';
 
 import { GATE_CHECKOUT_IDS } from '../benches/js/lib/gate_counts.ts';
-import { BROKEN_CHECKOUT } from './sibling_text.ts';
+import { BROKEN_CHECKOUT, UNREAD_CHECKOUT_REMEDY } from './sibling_text.ts';
 
 const MODE_FLAGS = ['--pins', '--checkouts'] as const;
 
@@ -349,6 +350,86 @@ const rev_parse = async (
 	}
 };
 
+/** What git answered in `cwd`: its exit code and output, or why it gave none, in git's words. */
+type GitAnswer = { code: number; stdout: string; said: string } | { failed: string };
+
+/** Ask git `args` in `cwd`. An exit is an answer, nonzero included, with git's first stderr
+ * line; a launch that throws, a signal, or a stop is `failed`, said as the unread-checkout
+ * warning says it. */
+const ask_git = async (
+	git: SpawnProgram,
+	cwd: FsReadDir,
+	args: Array<string>
+): Promise<GitAnswer> => {
+	try {
+		const result = await git.out(args, { cwd });
+		const said = result.stderr.trim().split('\n')[0] ?? '';
+		if (result.kind === 'exited') return { code: result.code, stdout: result.stdout, said };
+		return { failed: `git ${args.join(' ')} ${result.kind}${said === '' ? '' : `: ${said}`}` };
+	} catch (error) {
+		return {
+			failed: `git ${args.join(' ')} failed: ${error instanceof Error ? error.message : String(error)}`
+		};
+	}
+};
+
+/** How a drift line says git couldn't place a move, with git's words or its ending. */
+const unplaced = (args: Array<string>, answer: GitAnswer): string =>
+	'failed' in answer
+		? `direction unknown, git couldn't tell (${answer.failed})`
+		: `direction unknown, git couldn't tell (git ${args.join(' ')} exited ${answer.code}${
+				answer.said === '' ? '' : `: ${answer.said}`
+			})`;
+
+/**
+ * Which way a checkout at `head` moved from the commit `measured` its pins were measured at, as
+ * the drift line says it, asked of the clone's own objects: ahead (a pull since, which re-pins
+ * once deliberate), behind (the checkout moves forward; a re-pin there would record an older
+ * suite), diverged, or "direction unknown" with why: the measured commit isn't in this clone,
+ * the clone is shallow (its history stops at the boundary, so two commits on either side of it
+ * contain neither the other, as diverged ones do), or git couldn't tell, in its own words.
+ * Replace refs (`git replace --graft`) are ignored here, and the root keeps git from reading a
+ * legacy `info/grafts` file.
+ */
+const drift_direction = async (
+	git: SpawnProgram,
+	cwd: FsReadDir,
+	measured: string,
+	head: string
+): Promise<string> => {
+	/** Whether `ancestor` is an ancestor of `descendant`, or the line saying why git can't tell. */
+	const contains = async (ancestor: string, descendant: string): Promise<boolean | string> => {
+		// the history the pins were measured over, not a local replacement's rewrite of it
+		const args = ['--no-replace-objects', 'merge-base', '--is-ancestor', ancestor, descendant];
+		const answer = await ask_git(git, cwd, args);
+		if (!('failed' in answer) && (answer.code === 0 || answer.code === 1)) return answer.code === 0;
+		// the common reason, a clone that never fetched the measured commit, named as itself
+		const found = await ask_git(git, cwd, [
+			'rev-parse',
+			'--verify',
+			'--quiet',
+			`${measured}^{commit}`
+		]);
+		return 'code' in found && found.code === 1
+			? "direction unknown, the measured commit isn't in this clone"
+			: unplaced(args, answer);
+	};
+	const ahead = await contains(measured, head);
+	if (ahead === true) return 'ahead of it';
+	if (ahead !== false) return ahead;
+	const behind = await contains(head, measured);
+	if (behind === true) return 'behind it';
+	if (behind !== false) return behind;
+	const args = ['rev-parse', '--is-shallow-repository'];
+	const shallow = await ask_git(git, cwd, args);
+	if ('code' in shallow && shallow.code === 0) {
+		const said = shallow.stdout.trim();
+		if (said === 'false') return 'diverged from it';
+		if (said === 'true') return 'direction unknown, the clone is shallow';
+	}
+	return unplaced(args, shallow);
+};
+
 /**
  * The audit in the modes `modes` names (module doc).
  * @returns the exit code: `1` on any mismatch or missing pin, else `0`
@@ -577,6 +658,8 @@ export async function run_check_canonical_pins(
 				}
 				if ('failed' in current) {
 					unread.push(`${what}: ${repo} is present but ${current.failed}`);
+					// also on the passing line, the one line `doctor` shows of this audit
+					checkout_notes.push(`${repo} present, git can't read it — drift not checked`);
 					continue;
 				}
 				// A recorded commit is what the PGO training fetches, so its tree must BE the pin —
@@ -595,8 +678,12 @@ export async function run_check_canonical_pins(
 				}
 				// The recorded ids are abbreviated, so compare on the prefix.
 				if (!current.id.startsWith(hash)) {
+					// a tree id has no history to place it in, so only a commit pin says which way
+					const cwd = tree === undefined ? await siblings.open(repo) : null;
+					const direction =
+						cwd === null ? '' : `, ${await drift_direction(git, cwd, hash, current.id)}`;
 					drifted.push(
-						`${what}: measured at ${hash}, now at ${current.id.slice(0, hash.length)} — pins: ${pins.join(', ')}`
+						`${what}: measured at ${hash}, now at ${current.id.slice(0, hash.length)}${direction} — pins: ${pins.join(', ')}`
 					);
 				}
 			}
@@ -633,14 +720,16 @@ export async function run_check_canonical_pins(
 	if (unread.length > 0) {
 		console.warn(`⚠ ${task} — drift not checked in a present checkout git can't read:`);
 		for (const u of unread) console.warn(`  · ${u}`);
-		console.warn(`  Each is ${BROKEN_CHECKOUT}.`);
+		console.warn(`  Each one's drift is unknown, not absent: ${UNREAD_CHECKOUT_REMEDY}.`);
 	}
 	if (drifted.length > 0) {
 		console.warn(`⚠ ${task} — checkout(s) moved since the gate counts were measured:`);
 		for (const d of drifted) console.warn(`  · ${d}`);
 		console.warn(
 			'  The count pins are the gate; this is the diagnosis. If one trips, suspect corpus movement\n' +
-				'  before a tsv regression — and re-record the id in GATE_CHECKOUT_IDS when you re-pin.'
+				'  before a tsv regression. Only a deliberate pull ahead of the measured commit re-pins, and\n' +
+				'  re-records the id in GATE_CHECKOUT_IDS in the same change; any other checkout moves to the\n' +
+				'  measured commit first.'
 		);
 	}
 	const done: string[] = [];

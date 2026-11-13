@@ -3,7 +3,8 @@
  * the checkout read-only; with `--checkouts` (or no flag), also the sibling checkouts
  * read-only, each opened by its path (`open_sibling`), so one that is a symlink to a directory
  * elsewhere is followed, and `git`, found on `PATH`, with git's local variables
- * (`GIT_LOCAL_PASS_ENV`). `--pins` alone gets neither.
+ * (`GIT_LOCAL_PASS_ENV`), never reading a legacy `info/grafts` file (`GIT_GRAFT_FILE`).
+ * `--pins` alone gets neither.
  *
  * @module
  */
@@ -25,7 +26,14 @@ const code = await run_check_canonical_pins(
 	{
 		checkout: checkout.readonly(),
 		siblings: modes.run_checkouts ? { open: open_sibling } : null,
-		git: modes.run_checkouts ? spawn.find('git', { pass_env: GIT_LOCAL_PASS_ENV }) : null
+		// no legacy `info/grafts` rewrite of the clone's history: an empty graft file path names no
+		// file, so git reads none and prints no deprecation hint
+		git: modes.run_checkouts
+			? spawn.find('git', {
+					pass_env: GIT_LOCAL_PASS_ENV,
+					env: { GIT_GRAFT_FILE: '' }
+				})
+			: null
 	},
 	modes
 );

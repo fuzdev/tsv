@@ -98,6 +98,7 @@ import { basename } from 'node:path';
 
 import { TS_REPO_CORPUS_PIN, TS_REPO_REJECTS_PIN } from './lib/gate_counts.ts';
 import {
+	checkout_skew,
 	git_head,
 	harvest_up_to_date,
 	short_commit,
@@ -330,9 +331,11 @@ export async function run_harvest_ts_repo(
 	}
 	if (mismatches.length > 0) {
 		console.error(
-			`FAIL: pinned count mismatch — ${mismatches.join(', ')}; caches not written. ` +
-				`If the move is deliberate (checkout pull, tsc bump, grading change), re-pin in ` +
-				`lib/gate_counts.ts.`
+			`FAIL: pinned count mismatch — ${mismatches.join(', ')}; caches not written. ${
+				checkout_skew({ [TS_REPO]: source_commit }) ??
+				'If the move is deliberate (checkout pull, tsc bump, grading change), re-pin in ' +
+					'lib/gate_counts.ts.'
+			}`
 		);
 		return 1;
 	}

@@ -63,6 +63,7 @@ import { basename, dirname, join, posix } from 'node:path';
 
 import { WPT_CSS_HARVEST_PIN } from '../lib/gate_counts.ts';
 import {
+	checkout_skew,
 	git_head,
 	harvest_up_to_date,
 	short_commit,
@@ -340,7 +341,10 @@ export async function run_wpt_css_harvest(
 	if (source_root === WPT_SOURCE_DEFAULT && stats.blocks_written !== WPT_CSS_HARVEST_PIN) {
 		console.error(
 			`FAIL: pinned count mismatch — harvested ${stats.blocks_written} blocks ≠ pinned ${WPT_CSS_HARVEST_PIN}. ` +
-				`Removing ${out_dir}; if the move is deliberate (wpt pull), re-pin in lib/gate_counts.ts.`
+				`Removing ${out_dir}; ${
+					checkout_skew({ '../wpt': source_commit }) ??
+					'if the move is deliberate (wpt pull), re-pin in lib/gate_counts.ts.'
+				}`
 		);
 		await out.remove();
 		return 1;

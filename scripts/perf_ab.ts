@@ -527,11 +527,24 @@ export async function ensure_driver(
 	}
 	const status = await child.closed;
 	const code = exit_code_of(status);
-	if (code !== 0 || executable === null) {
+	if (code === null) {
+		// a signal or a stop ends cargo before it can say why, so neither cause below applies
 		throw new HarnessError(
-			`building the ${example} driver for ${side.label} failed (${code === 0 ? 'no executable reported' : `cargo ${format_ending(status)}`}). ` +
-				`The driver compiles against each tree's language-crate entry points; a tree older than ` +
-				`those entry points cannot be measured with it.`
+			`building the ${example} driver for ${side.label} failed (cargo ${format_ending(status)}).`
+		);
+	}
+	if (code !== 0) {
+		// cargo's stderr is inherited, so its own diagnosis is already on the terminal
+		throw new HarnessError(
+			`building the ${example} driver for ${side.label} failed (cargo ${format_ending(status)}); ` +
+				`cargo's output above says why. One possible cause: the driver compiles against each ` +
+				`tree's language-crate entry points, so a tree older than those entry points can't build it.`
+		);
+	}
+	if (executable === null) {
+		throw new HarnessError(
+			`building the ${example} driver for ${side.label} failed (no executable reported): cargo ` +
+				`exited 0 without naming the ${example} example's executable in its JSON messages.`
 		);
 	}
 	// Copied out of the target dir so a later build for another driver hash cannot replace it,

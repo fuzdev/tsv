@@ -46,6 +46,7 @@ import { join } from 'node:path';
 
 import { TEST262_POSITIVES_PIN } from './lib/gate_counts.ts';
 import {
+	checkout_skew,
 	git_head,
 	harvest_up_to_date,
 	short_commit,
@@ -197,7 +198,10 @@ export async function run_harvest_test262(
 	if (files.length !== TEST262_POSITIVES_PIN) {
 		console.error(
 			`FAIL: pinned count mismatch — ${files.length} expected-positive ≠ pinned ${TEST262_POSITIVES_PIN}; ` +
-				`cache not written. If the move is deliberate, re-pin in lib/gate_counts.ts.`
+				`cache not written. ${
+					checkout_skew({ [TEST262_ROOT]: source_commit }) ??
+					'If the move is deliberate, re-pin in lib/gate_counts.ts.'
+				}`
 		);
 		return 1;
 	}

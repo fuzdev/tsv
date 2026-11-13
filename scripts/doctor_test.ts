@@ -860,7 +860,9 @@ const CASES: Case[] = [
 			w.programs.git!['-C ../corpora rev-parse HEAD:collections'] = exited('', 128);
 		},
 		mark: '⚠',
-		line: "../corpora is present but git can't read its collections/ tree id (not a git checkout, a corrupt or unreadable one, or the snapshot gone) — a broken checkout, not a machine without one; repair it, or remove it",
+		line:
+			"../corpora is present but git can't read its collections/ tree id (not a git checkout, one git refuses, a corrupt or unreadable one, or the snapshot gone) — the snapshot is ungraded; " +
+			"make it a clone git can read (an export has no history; a repository git refuses for its owner is made yours, since listing it in git's safe.directory instead trusts its config to run commands as you; a corrupt one is cloned again), or remove it to skip what reads it",
 		code: 0
 	},
 	{

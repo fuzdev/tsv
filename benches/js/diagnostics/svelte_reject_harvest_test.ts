@@ -10,8 +10,15 @@ import { createHash } from 'node:crypto';
 import { deepStrictEqual, ok, rejects, strictEqual } from 'node:assert';
 import { afterEach, beforeEach, describe, test, vi } from 'vitest';
 
-import { PRETTIER_JSX_PIN, SVELTE_REJECTS_PIN } from '../lib/gate_counts.ts';
-import { fake_files, fake_id, fake_stamp_git, tab_json_strings } from '../lib/harvest_fakes.ts';
+import { GATE_CHECKOUT_IDS, PRETTIER_JSX_PIN, SVELTE_REJECTS_PIN } from '../lib/gate_counts.ts';
+import {
+	fake_files,
+	fake_id,
+	fake_stamp_git,
+	measured_id,
+	SKEW_TAIL,
+	tab_json_strings
+} from '../lib/harvest_fakes.ts';
 import { HARVEST_STAMPS } from '../lib/harvest_stamp_table.ts';
 import type { SourceFile, TsvImplementation } from '../lib/types.ts';
 import { load_all_versions } from '../lib/versions.ts';
@@ -199,6 +206,36 @@ describe('svelte rejects', () => {
 		);
 	});
 
+	test('a reject count off the pin with its checkouts at their measured commits names the re-pin', async () => {
+		const ids = Object.fromEntries(Object.keys(IDS).map((c) => [c, measured_id(c)]));
+		const run = fake_deps({ corpus: corpus_files(SVELTE_REJECTS_PIN - 1), ids });
+		strictEqual(await run_svelte_reject_harvest(run.deps, []), 1);
+		strictEqual(
+			err.at(-1),
+			`FAIL: pinned count mismatch — ${SVELTE_REJECTS_PIN - 1} rejects ≠ pinned ${SVELTE_REJECTS_PIN}; ` +
+				'cache not written. If the move is deliberate (suite refresh), re-pin in lib/gate_counts.ts.'
+		);
+	});
+
+	test('a reject count off the pin names whichever checkout it read is off its measured commit', async () => {
+		// each checkout the rejects are read from, not only the one the pin is named after
+		for (const checkout of Object.keys(IDS) as Array<keyof typeof IDS>) {
+			const ids = {
+				...Object.fromEntries(Object.keys(IDS).map((c) => [c, measured_id(c)])),
+				[checkout]: IDS[checkout]
+			};
+			const run = fake_deps({ corpus: corpus_files(SVELTE_REJECTS_PIN - 1), ids });
+			strictEqual(await run_svelte_reject_harvest(run.deps, []), 1);
+			deepStrictEqual(run.files.log, []);
+			strictEqual(
+				err.at(-1),
+				`FAIL: pinned count mismatch — ${SVELTE_REJECTS_PIN - 1} rejects ≠ pinned ${SVELTE_REJECTS_PIN}; ` +
+					`cache not written. ${checkout} is at ${IDS[checkout].slice(0, 9)}, not ` +
+					`${GATE_CHECKOUT_IDS[checkout]!.hash}${SKEW_TAIL}`
+			);
+		}
+	});
+
 	test('no ../svelte commit grades past any stamp and writes the list unstamped', async () => {
 		const ids = { ...IDS } as Record<string, string>;
 		delete ids['../svelte'];
@@ -248,6 +285,7 @@ describe('prettier JSX', () => {
 			files?: Record<string, string>;
 			corpus?: SourceFile[] | null;
 			import_fails?: boolean;
+			ids?: Record<string, string>;
 		} = {}
 	) => {
 		const files = fake_files({ ...FILTER_SOURCES, ...options.files });
@@ -256,7 +294,7 @@ describe('prettier JSX', () => {
 		);
 		let imports = 0;
 		const deps: PrettierJsxHarvestDeps = {
-			git: fake_stamp_git(IDS),
+			git: fake_stamp_git(options.ids ?? IDS),
 			files,
 			corpus,
 			import_prettier: async () => {
@@ -320,5 +358,25 @@ describe('prettier JSX', () => {
 		const moved = fake_deps({ corpus: corpus_files(PRETTIER_JSX_PIN - 1) });
 		strictEqual(await run_prettier_jsx_harvest(moved.deps, ['--if-present']), 1);
 		deepStrictEqual(moved.files.log, []);
+	});
+
+	test('a count off the pin names ../prettier off its measured commit, or else the re-pin', async () => {
+		const mismatch = `FAIL: pinned count mismatch — ${PRETTIER_JSX_PIN - 1} JSX files ≠ pinned ${PRETTIER_JSX_PIN}; cache not written.`;
+		const measured = fake_deps({
+			corpus: corpus_files(PRETTIER_JSX_PIN - 1),
+			ids: { '../prettier': measured_id('../prettier') }
+		});
+		strictEqual(await run_prettier_jsx_harvest(measured.deps, []), 1);
+		strictEqual(
+			err.at(-1),
+			`${mismatch} If the move is deliberate (suite refresh), re-pin in lib/gate_counts.ts.`
+		);
+		const moved = fake_deps({ corpus: corpus_files(PRETTIER_JSX_PIN - 1) });
+		strictEqual(await run_prettier_jsx_harvest(moved.deps, []), 1);
+		strictEqual(
+			err.at(-1),
+			`${mismatch} ../prettier is at ${IDS['../prettier'].slice(0, 9)}, not ` +
+				`${GATE_CHECKOUT_IDS['../prettier']!.hash}${SKEW_TAIL}`
+		);
 	});
 });

@@ -152,6 +152,7 @@ export async function run_prettier_jsx_harvest(
 		paths: jsx,
 		pin: PRETTIER_JSX_PIN,
 		what: 'JSX files',
+		checkouts: { '../prettier': prettier_commit },
 		stamp: prettier_commit === null ? null : { path: STAMP_PATH, inputs: stamp_inputs }
 	});
 	if (out === null) return 1;

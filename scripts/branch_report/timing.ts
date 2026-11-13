@@ -269,6 +269,27 @@ async function read_text(stream: AsyncIterable<Uint8Array>): Promise<string> {
 	return text + decoder.decode();
 }
 
+/** The `perf:ab` child's argv over `corpus`, as a run starts it and a dry run plans it. */
+const perf_ab_args = (
+	host: ReportHost,
+	sides: readonly [Side, Side],
+	corpus: string,
+	options: TimingOptions
+): Array<string> => [
+	PERF_AB_ENTRY,
+	sides[0].commit,
+	sides[1].commit,
+	'--rounds',
+	String(options.rounds),
+	'--iterations',
+	String(options.iterations),
+	'--corpus',
+	corpus,
+	'--cache',
+	cache_path(host, 'perf_ab'),
+	'--json'
+];
+
 async function run_perf_ab(
 	host: ReportHost,
 	sides: readonly [Side, Side],
@@ -277,20 +298,7 @@ async function run_perf_ab(
 	log: CommandLog
 ): Promise<PerfAbJson> {
 	const node = require_tool(host, 'perf_ab');
-	const args = [
-		PERF_AB_ENTRY,
-		sides[0].commit,
-		sides[1].commit,
-		'--rounds',
-		String(options.rounds),
-		'--iterations',
-		String(options.iterations),
-		'--corpus',
-		corpus,
-		'--cache',
-		cache_path(host, 'perf_ab'),
-		'--json'
-	];
+	const args = perf_ab_args(host, sides, corpus, options);
 	log.record(`node ${args.join(' ')}`);
 	const child = await node.start(args, {
 		cwd: host.checkout,
@@ -423,7 +431,7 @@ export async function leg_plain(
 		async (log, leg) => {
 			if (options.dry_run) {
 				planned(leg, log, [
-					`node ${PERF_AB_ENTRY} ${sides[0].commit} ${sides[1].commit} --rounds ${options.rounds} --iterations ${options.iterations} --corpus ${options.corpus} --cache <cache>/perf_ab --json`,
+					`node ${perf_ab_args(host, sides, options.corpus, options).join(' ')}`,
 					`perf stat -e instructions:u,cycles:u -- <symbolized release tsv> format --check --jobs 1 <per-language files> (${options.rounds} interleaved rounds)`
 				]);
 				return;
@@ -494,8 +502,8 @@ export async function leg_small_files(
 	return await run_leg(`small files (under ${SMALL_FILE_LIMIT} bytes)`, async (log, leg) => {
 		if (options.dry_run) {
 			planned(leg, log, [
-				`stage every corpus file under ${SMALL_FILE_LIMIT} bytes into <cache>/${SMALL_CORPUS}`,
-				`node ${PERF_AB_ENTRY} <base> <cand> --corpus <cache>/${SMALL_CORPUS} --rounds ${options.rounds} --json`
+				`stage every corpus file under ${SMALL_FILE_LIMIT} bytes into ${cache_path(host, SMALL_CORPUS)}`,
+				`node ${perf_ab_args(host, sides, cache_path(host, SMALL_CORPUS), options).join(' ')}`
 			]);
 			return;
 		}

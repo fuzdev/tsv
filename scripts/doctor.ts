@@ -56,7 +56,7 @@ import {
 	napi_target_path
 } from '../benches/js/lib/tsv_artifacts.ts';
 import type { AllVersions, load_all_versions } from '../benches/js/lib/versions.ts';
-import { BROKEN_CHECKOUT, link_out_message } from './sibling_text.ts';
+import { BROKEN_CHECKOUT, link_out_message, UNREAD_CHECKOUT_REMEDY } from './sibling_text.ts';
 import {
 	SIDECAR_DIR,
 	SIDECAR_INSTALL_COMMAND,
@@ -728,7 +728,7 @@ export const run_doctor = async (
 		warn(
 			programs.git === null
 				? `${CORPORA_ROOT} is present, but no git is on PATH to read its ${CORPORA_TREE}/ tree id — the snapshot is ungraded`
-				: `${CORPORA_ROOT} is present but git can't read its ${CORPORA_TREE}/ tree id (not a git checkout, a corrupt or unreadable one, or the snapshot gone) — ${BROKEN_CHECKOUT}`
+				: `${CORPORA_ROOT} is present but git can't read its ${CORPORA_TREE}/ tree id (not a git checkout, one git refuses, a corrupt or unreadable one, or the snapshot gone) — the snapshot is ungraded; ${UNREAD_CHECKOUT_REMEDY}`
 		);
 	} else if (!corpora_head.startsWith(corpora_pin)) {
 		warn(

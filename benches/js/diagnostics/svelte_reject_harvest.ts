@@ -116,12 +116,17 @@ export async function run_svelte_reject_harvest(
 	// too: a suite entry added to or dropped from the corpus entries changes what is
 	// graded while every checkout stays put, and a stamp keyed on checkouts alone
 	// would skip that re-harvest and leave the cache short under a green stamp.
-	const svelte_commit = await git_head(deps.git, '../svelte');
+	const checkouts = {
+		'../svelte': await git_head(deps.git, '../svelte'),
+		'../prettier': await git_head(deps.git, '../prettier'),
+		'../prettier-plugin-svelte': await git_head(deps.git, '../prettier-plugin-svelte')
+	};
+	const svelte_commit = checkouts['../svelte'];
 	const stamp_inputs: StampInputs = {
 		harvest: 'svelte-rejects',
 		svelte_commit,
-		prettier_commit: await git_head(deps.git, '../prettier'),
-		prettier_plugin_svelte_commit: await git_head(deps.git, '../prettier-plugin-svelte'),
+		prettier_commit: checkouts['../prettier'],
+		prettier_plugin_svelte_commit: checkouts['../prettier-plugin-svelte'],
 		svelte_oracle: versions.canonical.svelte,
 		rejects_pin: SVELTE_REJECTS_PIN,
 		conformance_entries: (await deps.corpus.view_paths('conformance')).join(' '),
@@ -189,6 +194,7 @@ export async function run_svelte_reject_harvest(
 		paths: rejects,
 		pin: SVELTE_REJECTS_PIN,
 		what: 'rejects',
+		checkouts,
 		stamp: svelte_commit === null ? null : { path: STAMP_PATH, inputs: stamp_inputs }
 	});
 	if (out === null) return 1;

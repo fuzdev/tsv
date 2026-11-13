@@ -80,6 +80,7 @@ import {
 } from '../lib/divergence/panic_errors.ts';
 import { CSS_REJECTS_PIN, WPT_CSS_HARVEST_PIN } from '../lib/gate_counts.ts';
 import {
+	checkout_skew,
 	corpus_filter_fingerprint,
 	git_head,
 	harvest_up_to_date,
@@ -213,12 +214,17 @@ export async function run_css_over_acceptance(
 	// non-CSS suite joins): an entry added to or dropped from the corpus entries changes
 	// the graded corpus while every checkout stays put.
 	const versions = await load_all_versions();
-	const svelte_commit = await git_head(deps.git, '../svelte');
+	const checkouts = {
+		'../svelte': await git_head(deps.git, '../svelte'),
+		'../prettier': await git_head(deps.git, '../prettier'),
+		'../wpt': await git_head(deps.git, '../wpt')
+	};
+	const svelte_commit = checkouts['../svelte'];
 	const stamp_inputs: StampInputs = {
 		harvest: 'css-rejects',
 		svelte_commit,
-		prettier_commit: await git_head(deps.git, '../prettier'),
-		wpt_commit: await git_head(deps.git, '../wpt'),
+		prettier_commit: checkouts['../prettier'],
+		wpt_commit: checkouts['../wpt'],
 		svelte_oracle: versions.canonical.svelte,
 		wpt_pin: WPT_CSS_HARVEST_PIN,
 		rejects_pin: CSS_REJECTS_PIN,
@@ -317,9 +323,12 @@ export async function run_css_over_acceptance(
 	if (rejected.length !== CSS_REJECTS_PIN) {
 		console.error(
 			`FAIL: the oracle rejects ${rejected.length} of ${files.length} CSS files ≠ pinned ` +
-				`${CSS_REJECTS_PIN}. Either a pinned input moved (../prettier's or ../svelte's checkout, ` +
-				`the wpt-css harvest) or svelte's parseCss changed what it accepts — re-pin CSS_REJECTS_PIN ` +
-				`in lib/gate_counts.ts deliberately, after checking which.`
+				`${CSS_REJECTS_PIN}. ${
+					checkout_skew(checkouts) ??
+					"Either a pinned input moved (../prettier's or ../svelte's checkout, the wpt-css " +
+						"harvest) or svelte's parseCss changed what it accepts — re-pin CSS_REJECTS_PIN in " +
+						'lib/gate_counts.ts deliberately, after checking which.'
+				}`
 		);
 		return 1;
 	}

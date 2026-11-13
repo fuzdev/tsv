@@ -16,8 +16,14 @@ import {
 	type Test262ManifestEntry,
 	test262_positive_files
 } from './harvest_test262.ts';
-import { TEST262_POSITIVES_PIN } from './lib/gate_counts.ts';
-import { fake_files, fake_id, fake_stamp_git } from './lib/harvest_fakes.ts';
+import { GATE_CHECKOUT_IDS, TEST262_POSITIVES_PIN } from './lib/gate_counts.ts';
+import {
+	fake_files,
+	fake_id,
+	fake_stamp_git,
+	measured_id,
+	SKEW_TAIL
+} from './lib/harvest_fakes.ts';
 import { HARVEST_STAMPS } from './lib/harvest_stamp_table.ts';
 
 const STAMP_PATH = HARVEST_STAMPS.test262.path;
@@ -212,14 +218,28 @@ test('a failed grade writes nothing', async () => {
 	}
 });
 
-test('a positive count off the pin writes nothing', async () => {
-	const { deps, files } = fake_deps({ manifest: manifest_text(TEST262_POSITIVES_PIN - 1) });
+test('a positive count off the pin at the measured commit writes nothing, naming the re-pin', async () => {
+	const { deps, files } = fake_deps({
+		manifest: manifest_text(TEST262_POSITIVES_PIN - 1),
+		commit: measured_id('../test262')
+	});
 	strictEqual(await run_harvest_test262(deps, []), 1);
 	deepStrictEqual(files.log, ['mkdir benches/js/.cache']);
 	strictEqual(
 		err.at(-1),
 		`FAIL: pinned count mismatch — ${TEST262_POSITIVES_PIN - 1} expected-positive ≠ pinned ${TEST262_POSITIVES_PIN}; ` +
 			'cache not written. If the move is deliberate, re-pin in lib/gate_counts.ts.'
+	);
+});
+
+test('a positive count off the pin in a checkout off its measured commit says so, not the re-pin', async () => {
+	const { deps } = fake_deps({ manifest: manifest_text(TEST262_POSITIVES_PIN - 1) });
+	strictEqual(await run_harvest_test262(deps, []), 1);
+	strictEqual(
+		err.at(-1),
+		`FAIL: pinned count mismatch — ${TEST262_POSITIVES_PIN - 1} expected-positive ≠ pinned ${TEST262_POSITIVES_PIN}; ` +
+			`cache not written. ../test262 is at ${COMMIT.slice(0, 9)}, not ` +
+			`${GATE_CHECKOUT_IDS['../test262']!.hash}${SKEW_TAIL}`
 	);
 });
 

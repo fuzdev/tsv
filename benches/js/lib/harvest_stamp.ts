@@ -33,6 +33,7 @@
 import { createHash } from 'node:crypto';
 import { dirname } from 'node:path';
 
+import { GATE_CHECKOUT_IDS } from './gate_counts.ts';
 import type { CheckoutInput } from './harvest_stamp_table.ts';
 
 export type StampInputs = Record<string, string | number | null>;
@@ -132,6 +133,35 @@ export function short_commit(sha: string): string {
 }
 
 /**
+ * What a pinned-count failure says first when a checkout it read is not at the commit its pins
+ * were measured at (`GATE_CHECKOUT_IDS`): such a count is the checkout's, not tsv's, and
+ * re-pinning to it would record the wrong checkout. A checkout behind the measured commit has
+ * to move forward, and one ahead of it is either a deliberate pull, which re-pins and re-records
+ * the id together, or skew; `pins:audit:checkouts` says which way each one moved.
+ * @param checkouts - each checkout the count was read from, by its `GATE_CHECKOUT_IDS` key
+ * (`../svelte`), at the commit the stamp records, or null when git read none
+ * @returns the sentence naming every moved checkout, or null when each one is at its measured
+ * commit, unread, or not in `GATE_CHECKOUT_IDS`
+ */
+export function checkout_skew(checkouts: Readonly<Record<string, string | null>>): string | null {
+	const moved = Object.entries(checkouts).flatMap(([checkout, commit]) => {
+		const measured = GATE_CHECKOUT_IDS[checkout]?.hash;
+		// the recorded ids are abbreviated, so compare on the prefix
+		return measured === undefined || commit === null || commit.startsWith(measured)
+			? []
+			: [`${checkout} is at ${short_commit(commit)}, not ${measured}`];
+	});
+	if (moved.length === 0) return null;
+	const [s, it] = moved.length === 1 ? ['', 'it'] : ['s', 'each'];
+	return (
+		`${moved.join('; ')}, the commit${s} the pin was measured at (GATE_CHECKOUT_IDS in ` +
+		`lib/gate_counts.ts): move the checkout${s} there and re-run before any re-pin. ` +
+		`\`npm run pins:audit:checkouts\` says which way ${it} moved; a deliberate pull re-pins ` +
+		'and re-records the id together.'
+	);
+}
+
+/**
  * Whether an up-to-date cache already exists: every path in `caches` is present
  * on disk AND the stamp at `stamp_path` records exactly `inputs`. The freshness
  * gate a harvest checks before doing work — the caller keeps the `--force` /
@@ -182,8 +212,9 @@ export async function write_stamp(
  * Write a harvest's path-list cache, then its stamp — only once the list's exact
  * pin holds, so a wrong cache never replaces a good one. A mismatch is printed and
  * returns null, on which the caller exits 1 however the harvest was invoked:
- * `--if-present` tolerates a MISSING input, never a moved count. `stamp` is null when a
- * checkout has no commit to record.
+ * `--if-present` tolerates a MISSING input, never a moved count. The mismatch names a checkout
+ * that moved from its measured commit (`checkout_skew`) before any re-pin. `stamp` is null when
+ * a checkout has no commit to record.
  * @returns the cache's path as given, or null on a pin mismatch
  */
 export async function write_pinned_path_cache(
@@ -194,14 +225,19 @@ export async function write_pinned_path_cache(
 		pin: number;
 		/** What the paths are, for the mismatch message (`143 rejects ≠ pinned 142`). */
 		what: string;
+		/** The checkouts the paths were read from, by `GATE_CHECKOUT_IDS` key, at their commits. */
+		checkouts: Readonly<Record<string, string | null>>;
 		stamp: { path: string; inputs: StampInputs } | null;
 	}
 ): Promise<string | null> {
-	const { cache, paths, pin, what, stamp } = options;
+	const { cache, paths, pin, what, checkouts, stamp } = options;
 	if (paths.length !== pin) {
 		console.error(
 			`FAIL: pinned count mismatch — ${paths.length} ${what} ≠ pinned ${pin}; cache not ` +
-				'written. If the move is deliberate (suite refresh), re-pin in lib/gate_counts.ts.'
+				`written. ${
+					checkout_skew(checkouts) ??
+					'If the move is deliberate (suite refresh), re-pin in lib/gate_counts.ts.'
+				}`
 		);
 		return null;
 	}

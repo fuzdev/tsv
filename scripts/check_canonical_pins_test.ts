@@ -240,8 +240,174 @@ describe('--checkouts over a present checkout', () => {
 		deepStrictEqual(run.out.slice(0, 3), [
 			"⚠ pins:audit:checkouts — drift not checked in a present checkout git can't read:",
 			"  · ../test262: ../test262 is present but git rev-parse HEAD couldn't start in it, a directory it can't enter or a git it can't run (git (/usr/bin/git): spawn /usr/bin/git EACCES)",
-			'  Each is a broken checkout, not a machine without one; repair it, or remove it.'
+			"  Each one's drift is unknown, not absent: make it a clone git can read (an export has no " +
+				"history; a repository git refuses for its owner is made yours, since listing it in git's " +
+				'safe.directory instead trusts its config to run commands as you; a corrupt one is cloned ' +
+				'again), or remove it to skip what reads it.'
 		]);
+		// the passing line, the one `doctor` shows of this audit, names it too
+		strictEqual(
+			run.out.at(-1),
+			'pins:audit:checkouts OK — checkouts aligned (svelte checkout absent — alignment not checked; ' +
+				'@sveltejs/acorn-typescript checkout absent — alignment not checked; ' +
+				'../corpora absent — drift not checked; ../svelte absent — drift not checked; ' +
+				'../acorn-typescript absent — drift not checked; ../typescript absent — drift not checked; ' +
+				'../prettier absent — drift not checked; ../prettier-plugin-svelte absent — drift not checked; ' +
+				"../wpt absent — drift not checked; ../test262 present, git can't read it — drift not checked)"
+		);
+	});
+
+	test('a moved commit pin says which way it moved, or why git cannot tell', async () => {
+		const measured = GATE_CHECKOUT_IDS['../test262']!.hash;
+		const head = 'e'.repeat(40);
+		const is_ancestor = (a: string, b: string) =>
+			`--no-replace-objects merge-base --is-ancestor ${a} ${b}`;
+		const ahead = is_ancestor(measured, head);
+		const behind = is_ancestor(head, measured);
+		const verify = `rev-parse --verify --quiet ${measured}^{commit}`;
+		const shallow = 'rev-parse --is-shallow-repository';
+		/** An exit with its stdout and stderr, a launch that throws, or a git killed by a signal. */
+		type Answer = { code: number; stdout?: string; stderr?: string } | 'throws' | 'signaled';
+		// shaped like real git: `merge-base --is-ancestor` exits 0 (holds), 1 (doesn't) or 128 (an
+		// object it can't read), `rev-parse --verify --quiet` 1 for an object the clone lacks, and
+		// `--is-shallow-repository` prints `true` or `false`
+		const cases: Array<[string, Record<string, Answer>]> = [
+			['ahead of it', { [ahead]: { code: 0 } }],
+			['behind it', { [ahead]: { code: 1 }, [behind]: { code: 0 } }],
+			[
+				'diverged from it',
+				{ [ahead]: { code: 1 }, [behind]: { code: 1 }, [shallow]: { code: 0, stdout: 'false\n' } }
+			],
+			// a shallow clone answers 1 both ways across its boundary, which says nothing
+			[
+				'direction unknown, the clone is shallow',
+				{ [ahead]: { code: 1 }, [behind]: { code: 1 }, [shallow]: { code: 0, stdout: 'true\n' } }
+			],
+			[
+				`direction unknown, git couldn't tell (git ${shallow} exited 128: fatal: not a git repository)`,
+				{
+					[ahead]: { code: 1 },
+					[behind]: { code: 1 },
+					[shallow]: { code: 128, stderr: 'fatal: not a git repository\nmore\n' }
+				}
+			],
+			[
+				"direction unknown, the measured commit isn't in this clone",
+				{
+					[ahead]: { code: 128, stderr: 'fatal: Not a valid object name\n' },
+					[verify]: { code: 1 }
+				}
+			],
+			// the measured commit is there, so git failed for another reason, said in its words
+			[
+				`direction unknown, git couldn't tell (git ${ahead} exited 128: fatal: Not a valid commit name ${head})`,
+				{
+					[ahead]: { code: 128, stderr: `fatal: Not a valid commit name ${head}\n` },
+					[verify]: { code: 0, stdout: `${measured}\n` }
+				}
+			],
+			[
+				`direction unknown, git couldn't tell (git ${ahead} failed: spawn git ENOENT)`,
+				{ [ahead]: 'throws', [verify]: { code: 0 } }
+			],
+			[
+				`direction unknown, git couldn't tell (git ${ahead} signaled)`,
+				{ [ahead]: 'signaled', [verify]: { code: 0 } }
+			],
+			[
+				`direction unknown, git couldn't tell (git ${behind} failed: spawn git ENOENT)`,
+				{ [ahead]: { code: 1 }, [behind]: 'throws', [verify]: { code: 0 } }
+			],
+			// absence is claimed only on git's own answer for it, never on a failed question
+			[
+				`direction unknown, git couldn't tell (git ${ahead} exited 128: fatal: bad object ${head})`,
+				{
+					[ahead]: { code: 128, stderr: `fatal: bad object ${head}\n` },
+					[verify]: { code: 128, stderr: 'fatal: detected dubious ownership\n' }
+				}
+			],
+			[
+				`direction unknown, git couldn't tell (git ${ahead} exited 128: fatal: bad object ${head})`,
+				{ [ahead]: { code: 128, stderr: `fatal: bad object ${head}\n` }, [verify]: 'throws' }
+			],
+			// only git's own `false` reads as diverged
+			[
+				`direction unknown, git couldn't tell (git ${shallow} exited 0)`,
+				{ [ahead]: { code: 1 }, [behind]: { code: 1 }, [shallow]: { code: 0, stdout: '' } }
+			]
+		];
+		for (const [direction, answers] of cases) {
+			const asked: string[] = [];
+			const git = {
+				out: async (args: ReadonlyArray<string>) => {
+					if (args.join(' ') === 'rev-parse HEAD') {
+						return { kind: 'exited', code: 0, stdout: `${head}\n`, stderr: '', truncated: false };
+					}
+					asked.push(args.join(' '));
+					const answer = answers[args.join(' ')] ?? { code: 2 };
+					if (answer === 'throws') throw new Error('spawn git ENOENT');
+					if (answer === 'signaled') {
+						return {
+							kind: 'signaled',
+							signal: 'SIGKILL',
+							stdout: '',
+							stderr: '',
+							truncated: false
+						};
+					}
+					const { code, stdout = '', stderr = '' } = answer;
+					return { kind: 'exited', code, stdout, stderr, truncated: false };
+				}
+			} as unknown as SpawnProgram;
+			const run = await run_checkouts(siblings_of({ '../test262': {} }), git);
+			vi.restoreAllMocks();
+			strictEqual(run.code, 0, run.err.join('\n'));
+			deepStrictEqual(run.out.slice(0, 2), [
+				'⚠ pins:audit:checkouts — checkout(s) moved since the gate counts were measured:',
+				`  · ../test262: measured at ${measured}, now at ${head.slice(0, measured.length)}, ${direction} — pins: TEST262_POSITIVES_PIN`
+			]);
+			// only the questions a case answers are asked, each of the clone's own objects
+			ok(
+				asked.every((a) => a in answers),
+				asked.join('\n')
+			);
+		}
+	});
+
+	test('a moved checkout warns that only a deliberate pull ahead re-pins', async () => {
+		const git = fake_git((args) =>
+			args[0] === 'rev-parse' ? { code: 0, stdout: `${'e'.repeat(40)}\n` } : { code: 128 }
+		);
+		const run = await run_checkouts(siblings_of({ '../test262': {} }), git);
+		strictEqual(run.code, 0, run.err.join('\n'));
+		strictEqual(
+			run.out[2],
+			'  The count pins are the gate; this is the diagnosis. If one trips, suspect corpus movement\n' +
+				'  before a tsv regression. Only a deliberate pull ahead of the measured commit re-pins, and\n' +
+				'  re-records the id in GATE_CHECKOUT_IDS in the same change; any other checkout moves to the\n' +
+				'  measured commit first.'
+		);
+		// the passing line carries no unread note for a checkout git read
+		strictEqual(run.out.length, 4);
+		ok(!run.out[3]!.includes("git can't read it"), run.out[3]);
+	});
+
+	test('a moved tree pin names no direction, a tree id having no history', async () => {
+		const CORPORA = GATE_CHECKOUT_IDS['../corpora']!;
+		const asked: string[] = [];
+		const git = fake_git((args) => {
+			asked.push(args.join(' '));
+			return args[1] === `HEAD:${CORPORA.tree}`
+				? { code: 0, stdout: `${'d'.repeat(40)}\n` }
+				: { code: 0, stdout: `${CORPORA.hash}\n` };
+		});
+		const run = await run_checkouts(siblings_of({ '../corpora': {} }), git);
+		strictEqual(run.code, 0, run.err.join('\n'));
+		strictEqual(
+			run.out[1],
+			`  · ../corpora:${CORPORA.tree}: measured at ${CORPORA.hash}, now at ${'d'.repeat(CORPORA.hash.length)} — pins: ${CORPORA.pins.join(', ')}`
+		);
+		ok(!asked.some((a) => a.includes('merge-base')), asked.join('\n'));
 	});
 
 	test('a version file missing in it fails the run as a broken checkout, no pin remedy printed', async () => {

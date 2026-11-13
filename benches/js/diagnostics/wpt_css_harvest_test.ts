@@ -9,8 +9,14 @@
 import { deepStrictEqual, ok, strictEqual } from 'node:assert';
 import { afterEach, beforeEach, describe, test, vi } from 'vitest';
 
-import { WPT_CSS_HARVEST_PIN } from '../lib/gate_counts.ts';
-import { fake_files, fake_id, fake_stamp_git } from '../lib/harvest_fakes.ts';
+import { GATE_CHECKOUT_IDS, WPT_CSS_HARVEST_PIN } from '../lib/gate_counts.ts';
+import {
+	fake_files,
+	fake_id,
+	fake_stamp_git,
+	measured_id,
+	SKEW_TAIL
+} from '../lib/harvest_fakes.ts';
 import { HARVEST_STAMPS } from '../lib/harvest_stamp_table.ts';
 import {
 	run_wpt_css_harvest,
@@ -235,7 +241,10 @@ test('the default run writes the stamp once the pin holds', async () => {
 });
 
 test('a block count off the pin removes the output and fails, unstamped', async () => {
-	const run = fake_deps({ tree: pinned_tree(WPT_CSS_HARVEST_PIN - 1) });
+	const run = fake_deps({
+		tree: pinned_tree(WPT_CSS_HARVEST_PIN - 1),
+		commit: measured_id('../wpt')
+	});
 	strictEqual(await run_wpt_css_harvest(run.deps, ['--if-present']), 1);
 	strictEqual(run.out_log.at(-1), 'remove');
 	strictEqual(run.out_files.size, 0);
@@ -245,6 +254,18 @@ test('a block count off the pin removes the output and fails, unstamped', async 
 		err.at(-1),
 		`FAIL: pinned count mismatch — harvested ${WPT_CSS_HARVEST_PIN - 1} blocks ≠ pinned ${WPT_CSS_HARVEST_PIN}. ` +
 			`Removing ${OUT}; if the move is deliberate (wpt pull), re-pin in lib/gate_counts.ts.`
+	);
+});
+
+test('a block count off the pin in a checkout off its measured commit says so, not the re-pin', async () => {
+	const run = fake_deps({ tree: pinned_tree(WPT_CSS_HARVEST_PIN - 1) });
+	strictEqual(await run_wpt_css_harvest(run.deps, ['--if-present']), 1);
+	strictEqual(run.out_log.at(-1), 'remove');
+	strictEqual(
+		err.at(-1),
+		`FAIL: pinned count mismatch — harvested ${WPT_CSS_HARVEST_PIN - 1} blocks ≠ pinned ${WPT_CSS_HARVEST_PIN}. ` +
+			`Removing ${OUT}; ../wpt is at ${COMMIT.slice(0, 9)}, not ` +
+			`${GATE_CHECKOUT_IDS['../wpt']!.hash}${SKEW_TAIL}`
 	);
 });
 

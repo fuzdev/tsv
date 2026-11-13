@@ -13,8 +13,15 @@ import {
 	run_harvest_ts_repo,
 	type TsRepoReads
 } from './harvest_ts_repo.ts';
-import { TS_REPO_CORPUS_PIN, TS_REPO_REJECTS_PIN } from './lib/gate_counts.ts';
-import { fake_files, fake_id, fake_stamp_git, tab_json_strings } from './lib/harvest_fakes.ts';
+import { GATE_CHECKOUT_IDS, TS_REPO_CORPUS_PIN, TS_REPO_REJECTS_PIN } from './lib/gate_counts.ts';
+import {
+	fake_files,
+	fake_id,
+	fake_stamp_git,
+	measured_id,
+	SKEW_TAIL,
+	tab_json_strings
+} from './lib/harvest_fakes.ts';
 import { HARVEST_STAMPS } from './lib/harvest_stamp_table.ts';
 import type { TypeScriptModule } from './lib/tsc.ts';
 
@@ -249,10 +256,10 @@ test('a tsc with no parse-diagnostics field refuses to write', async () => {
 	ok(err.at(-1)!.startsWith('FAIL: tsc SourceFile has no `parseDiagnostics`'));
 });
 
-test('a count off either pin writes nothing and names both', async () => {
+test('a count off either pin at the measured commit writes nothing, names both and the re-pin', async () => {
 	const tree = typescript_tree({ valid: TS_REPO_CORPUS_PIN + 1 });
 	tree.delete('tests/cases/conformance/b/reject1.ts');
-	const { deps, files } = fake_deps({ tree });
+	const { deps, files } = fake_deps({ tree, commit: measured_id('../typescript') });
 	strictEqual(await run_harvest_ts_repo(deps, []), 1);
 	deepStrictEqual(files.log, ['mkdir benches/js/.cache']);
 	strictEqual(
@@ -260,6 +267,17 @@ test('a count off either pin writes nothing and names both', async () => {
 		`FAIL: pinned count mismatch — valid ${TS_REPO_CORPUS_PIN + 1} ≠ pinned ${TS_REPO_CORPUS_PIN}, ` +
 			`rejects ${TS_REPO_REJECTS_PIN - 1} ≠ pinned ${TS_REPO_REJECTS_PIN}; caches not written. ` +
 			'If the move is deliberate (checkout pull, tsc bump, grading change), re-pin in lib/gate_counts.ts.'
+	);
+});
+
+test('a count off the pin in a checkout off its measured commit says so, not the re-pin', async () => {
+	const { deps } = fake_deps({ tree: typescript_tree({ valid: TS_REPO_CORPUS_PIN + 1 }) });
+	strictEqual(await run_harvest_ts_repo(deps, []), 1);
+	strictEqual(
+		err.at(-1),
+		`FAIL: pinned count mismatch — valid ${TS_REPO_CORPUS_PIN + 1} ≠ pinned ${TS_REPO_CORPUS_PIN}; ` +
+			`caches not written. ../typescript is at ${COMMIT.slice(0, 9)}, not ` +
+			`${GATE_CHECKOUT_IDS['../typescript']!.hash}${SKEW_TAIL}`
 	);
 });
 

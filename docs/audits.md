@@ -1640,11 +1640,19 @@ the id of its `collections/` tree, so the snapshot repo's tooling commits are no
 compared against the id `GATE_CHECKOUT_IDS` records it was measured at
 ([gate_counts.md](gate_counts.md)) and a move is reported, never failed: the count pins are the gate, this is the diagnosis, so when one
 trips "the corpus moved" is distinguishable from "tsv regressed" at a glance rather than by
-reverse-engineering.
+reverse-engineering. A moved commit pin says which way it moved, asked of the clone's own
+objects (`git merge-base --is-ancestor`, replace refs and grafts ignored): ahead
+of the measured commit, behind it, diverged from it, or unknown with the reason: the clone lacks
+the measured commit, the clone is shallow (its history stops at the boundary, so commits on
+either side of it would read as diverged), or git couldn't tell, in its own words. Only a deliberate pull ahead re-pins; a
+checkout behind its measured commit is moved forward, since a re-pin there would record an older
+suite. The harvests' pinned-count failures say the same first, naming any checkout they read that
+is not at its measured commit.
 
 A present checkout in which git can't read the recorded object (not a git checkout, the pinned
 subtree gone, git refusing the repository) WARNS beside the moves, naming what git said: its drift
-is unknown, not absent, and an unknown drift is no louder than a known one.
+is unknown, not absent, and an unknown drift is no louder than a known one. The passing line,
+the one `doctor` shows, names it too.
 
 **Blind spots.** Absent checkouts are skipped, so a machine without the clones passes
 vacuously, and a present one git can't read passes with its drift unmeasured, warned rather

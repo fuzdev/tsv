@@ -24,7 +24,7 @@ import {
 import { type FakeCall, fake_host, fake_program, fake_side } from './report_fakes.ts';
 import type { Leg } from './report.ts';
 import type { ReportHost, Side } from './side.ts';
-import { leg_bench, leg_pgo, leg_plain, type TimingOptions } from './timing.ts';
+import { leg_bench, leg_pgo, leg_plain, leg_small_files, type TimingOptions } from './timing.ts';
 import { BOARD_SOURCE } from './wasm_board.ts';
 
 const artifacts_of = (side: Side): Artifacts => ({
@@ -306,6 +306,26 @@ test('a perf:ab child that prints no report fails the leg on its exit, never on 
 	strictEqual(leg.reason, 'perf:ab exited 1 and printed no JSON report');
 	deepStrictEqual(w.calls[0]!.args.slice(0, 1), ['scripts/roots/perf_ab.ts']);
 	deepStrictEqual(w.calls[0]!.args.slice(-3), ['--cache', `${w.cache.path}/perf_ab`, '--json']);
+});
+
+test('a dry run plans each perf:ab child with the argv a run passes, the cache path spelled out', async () => {
+	await using w = await world();
+	const host = fake_host(w.cache, w.checkout, w.calls);
+	const options = timing_options({ dry_run: true });
+	const refs = `${'b'.repeat(40)} ${'c'.repeat(40)} --rounds 2 --iterations 10`;
+	const plain = await leg_plain(host, w.sides, w.artifacts, options);
+	strictEqual(plain.status, 'planned');
+	strictEqual(
+		plain.commands[0],
+		`node scripts/roots/perf_ab.ts ${refs} --corpus /corpora/collections --cache ${w.cache.path}/perf_ab --json`
+	);
+	const small = await leg_small_files(host, w.sides, w.artifacts, options);
+	strictEqual(small.status, 'planned');
+	deepStrictEqual(small.commands, [
+		`stage every corpus file under 400 bytes into ${w.cache.path}/small_corpus`,
+		`node scripts/roots/perf_ab.ts ${refs} --corpus ${w.cache.path}/small_corpus --cache ${w.cache.path}/perf_ab --json`
+	]);
+	deepStrictEqual(w.calls, []);
 });
 
 test('a whole report is assembled from fake measurements, its gaps listed and graded', async () => {

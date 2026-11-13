@@ -15,7 +15,7 @@ import { fs, type FsDir, type FsReadDir } from '@fuzdev/gro/fs.ts';
 import { create_fs_paths } from '@fuzdev/gro/fs_paths.ts';
 import { GIT_LOCAL_PASS_ENV } from '@fuzdev/gro/git.ts';
 import { is_spawn_error } from '@fuzdev/gro/spawn_error.ts';
-import { spawn, type SpawnChild, type SpawnProgram } from '@fuzdev/gro/spawn.ts';
+import { spawn, type SpawnChild, type SpawnProgram, type SpawnResult } from '@fuzdev/gro/spawn.ts';
 import { afterEach, test, vi } from 'vitest';
 
 import { BUILD_ENV, extract_tree, HarnessError, list_tree } from './git_snapshot.ts';
@@ -198,7 +198,7 @@ interface BuildCall {
 /** A build program that plays cargo: `play` writes the artifact and returns cargo's stdout lines. */
 const fake_build = (
 	play: (cwd: FsReadDir, args: ReadonlyArray<string>) => Promise<Array<string>>,
-	code = 0
+	ending: number | SpawnResult = 0
 ): { program: SpawnProgram; calls: Array<BuildCall> } => {
 	const calls: Array<BuildCall> = [];
 	const program: SpawnProgram = {
@@ -208,7 +208,9 @@ const fake_build = (
 			const lines = await play(options!.cwd!, args);
 			const child: SpawnChild = {
 				pid: 1,
-				closed: Promise.resolve({ kind: 'exited', code }),
+				closed: Promise.resolve(
+					typeof ending === 'number' ? { kind: 'exited', code: ending } : ending
+				),
 				stdout: chunks_of(lines),
 				stderr: null,
 				stdin: null,
@@ -310,11 +312,33 @@ test('a failed build, or one that reports no executable, is a harness error', as
 			SIDE,
 			DRIVERS.format
 		),
-		(err) => err instanceof HarnessError && /\(cargo exited 101\)/.test(err.message)
+		(err) =>
+			err instanceof HarnessError &&
+			err.message ===
+				`building the perf_ab driver for ${SIDE.label} failed (cargo exited 101); cargo's output ` +
+					"above says why. One possible cause: the driver compiles against each tree's " +
+					"language-crate entry points, so a tree older than those entry points can't build it."
 	);
 	await rejects(
 		ensure_driver(ensure_deps(fake_build(async () => []).program), cache, SIDE, DRIVERS.format),
-		(err) => err instanceof HarnessError && /\(no executable reported\)/.test(err.message)
+		(err) =>
+			err instanceof HarnessError &&
+			err.message ===
+				`building the perf_ab driver for ${SIDE.label} failed (no executable reported): cargo ` +
+					"exited 0 without naming the perf_ab example's executable in its JSON messages."
+	);
+	// a killed cargo said nothing, so the message offers no cause
+	await rejects(
+		ensure_driver(
+			ensure_deps(fake_build(async () => [], { kind: 'signaled', signal: 'SIGKILL' }).program),
+			cache,
+			SIDE,
+			DRIVERS.format
+		),
+		(err) =>
+			err instanceof HarnessError &&
+			err.message ===
+				`building the perf_ab driver for ${SIDE.label} failed (cargo was killed by SIGKILL).`
 	);
 });
 

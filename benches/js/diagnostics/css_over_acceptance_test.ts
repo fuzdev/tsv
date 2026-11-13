@@ -8,7 +8,8 @@
 import { deepStrictEqual, ok, strictEqual } from 'node:assert';
 import { afterEach, beforeEach, test, vi } from 'vitest';
 
-import { CSS_REJECTS_PIN } from '../lib/gate_counts.ts';
+import { CSS_REJECTS_PIN, GATE_CHECKOUT_IDS } from '../lib/gate_counts.ts';
+import { measured_id } from '../lib/harvest_fakes.ts';
 import { HARVEST_STAMPS } from '../lib/harvest_stamp_table.ts';
 import { TsvRejection } from '../lib/divergence/panic_errors.ts';
 import type { SourceFile, TsvImplementation } from '../lib/types.ts';
@@ -57,6 +58,8 @@ interface FakeOptions {
 	files?: SourceFile[];
 	missing?: string[];
 	git_fails?: boolean;
+	/** The commit `git` reports per checkout, over a stand-in spelled from its name. */
+	commits?: Record<string, string>;
 	impls?: (disposed: string[]) => CssOverAcceptanceImplementations;
 	oracle_fails?: boolean;
 }
@@ -77,7 +80,11 @@ const fake_deps = (world: ReturnType<typeof fake_world>, options: FakeOptions = 
 			out: async (args) =>
 				options.git_fails
 					? { kind: 'exited', code: 128, stdout: '' }
-					: { kind: 'exited', code: 0, stdout: `${args[1].slice(3).padEnd(40, '0')}\n` }
+					: {
+							kind: 'exited',
+							code: 0,
+							stdout: `${options.commits?.[args[1]] ?? args[1].slice(3).padEnd(40, '0')}\n`
+						}
 		},
 		files: {
 			exists: async (path) => world.stored.has(path),
@@ -169,6 +176,58 @@ test('a reject count off the pin fails and stamps nothing', async () => {
 	deepStrictEqual(world.writes, []);
 	strictEqual(world.out, '');
 	ok(err.some((l) => l.startsWith(`FAIL: the oracle rejects ${CSS_REJECTS_PIN - 1} of`)));
+});
+
+test('a reject count off the pin with every checkout at its measured commit names the re-pin', async () => {
+	const world = fake_world();
+	const commits = Object.fromEntries(
+		['../svelte', '../prettier', '../wpt'].map((c) => [c, measured_id(c)])
+	);
+	const deps = fake_deps(world, { files: corpus(CSS_REJECTS_PIN - 1), commits });
+	strictEqual(await run_css_over_acceptance(deps, ['--pin-only']), 1);
+	strictEqual(
+		err.at(-1),
+		`FAIL: the oracle rejects ${CSS_REJECTS_PIN - 1} of ${CSS_REJECTS_PIN + 1} CSS files ≠ pinned ` +
+			`${CSS_REJECTS_PIN}. Either a pinned input moved (../prettier's or ../svelte's checkout, the ` +
+			"wpt-css harvest) or svelte's parseCss changed what it accepts — re-pin CSS_REJECTS_PIN in " +
+			'lib/gate_counts.ts deliberately, after checking which.'
+	);
+});
+
+test('a reject count off the pin names each checkout off its measured commit instead', async () => {
+	const world = fake_world();
+	const commits = { '../svelte': 'a'.repeat(40), '../prettier': measured_id('../prettier') };
+	const deps = fake_deps(world, { files: corpus(CSS_REJECTS_PIN - 1), commits });
+	strictEqual(await run_css_over_acceptance(deps, ['--pin-only']), 1);
+	strictEqual(
+		err.at(-1),
+		`FAIL: the oracle rejects ${CSS_REJECTS_PIN - 1} of ${CSS_REJECTS_PIN + 1} CSS files ≠ pinned ` +
+			`${CSS_REJECTS_PIN}. ../svelte is at aaaaaaaaa, not ${GATE_CHECKOUT_IDS['../svelte']!.hash}; ` +
+			`../wpt is at ${'wpt'.padEnd(9, '0')}, not ${GATE_CHECKOUT_IDS['../wpt']!.hash}, the commits ` +
+			'the pin was measured at (GATE_CHECKOUT_IDS in lib/gate_counts.ts): move the checkouts there ' +
+			'and re-run before any re-pin. `npm run pins:audit:checkouts` says which way each moved; a ' +
+			'deliberate pull re-pins and re-records the id together.'
+	);
+	// ../prettier's suites are read too, so it alone off its commit is named
+	const prettier_moved = Object.fromEntries(
+		['../svelte', '../wpt'].map((c) => [c, measured_id(c)])
+	);
+	strictEqual(
+		await run_css_over_acceptance(
+			fake_deps(fake_world(), { files: corpus(CSS_REJECTS_PIN - 1), commits: prettier_moved }),
+			['--pin-only']
+		),
+		1
+	);
+	strictEqual(
+		err.at(-1),
+		`FAIL: the oracle rejects ${CSS_REJECTS_PIN - 1} of ${CSS_REJECTS_PIN + 1} CSS files ≠ pinned ` +
+			`${CSS_REJECTS_PIN}. ../prettier is at ${'prettier'.padEnd(9, '0')}, not ` +
+			`${GATE_CHECKOUT_IDS['../prettier']!.hash}, the commit the pin was measured at ` +
+			'(GATE_CHECKOUT_IDS in lib/gate_counts.ts): move the checkout there and re-run before any ' +
+			're-pin. `npm run pins:audit:checkouts` says which way it moved; a deliberate pull re-pins ' +
+			'and re-records the id together.'
+	);
 });
 
 test('an oracle row that accepts its own rejects fails the run, after stamping the pin', async () => {

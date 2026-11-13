@@ -10,8 +10,11 @@ import { test } from 'vitest';
 import type { FsDir, FsReadDir } from '@fuzdev/gro/fs.ts';
 import type { SpawnProgram } from '@fuzdev/gro/spawn.ts';
 
+import { GATE_CHECKOUT_IDS } from './gate_counts.ts';
+import { measured_id, SKEW_TAIL } from './harvest_fakes.ts';
 import {
 	checkout_hash,
+	checkout_skew,
 	corpus_filter_fingerprint,
 	git_head,
 	harvest_up_to_date,
@@ -115,7 +118,11 @@ test('write_stamp writes the inputs as tab-indented JSON with a final newline', 
 	strictEqual(fs.files.get('s.json'), '{\n\t"a": "one",\n\t"b": 2\n}\n');
 });
 
-test('a pin mismatch writes nothing, says so, and returns null', async () => {
+/** What a mismatched `write_pinned_path_cache` over `checkouts` printed, having written
+ * nothing and returned null. */
+const mismatch_printed = async (
+	checkouts: Record<string, string | null>
+): Promise<Array<unknown>> => {
 	const fs = fake_fs();
 	const printed: unknown[] = [];
 	const print_error = console.error;
@@ -127,6 +134,7 @@ test('a pin mismatch writes nothing, says so, and returns null', async () => {
 			paths: ['a', 'b'],
 			pin: 3,
 			what: 'files',
+			checkouts,
 			stamp: { path: 'benches/js/.cache/list.stamp.json', inputs: { a: 'one' } }
 		});
 	} finally {
@@ -134,10 +142,46 @@ test('a pin mismatch writes nothing, says so, and returns null', async () => {
 	}
 	strictEqual(out, null);
 	deepStrictEqual(fs.log, []);
-	deepStrictEqual(printed, [
+	return printed;
+};
+
+test('a pin mismatch at the measured commits writes nothing, names the re-pin, and returns null', async () => {
+	deepStrictEqual(await mismatch_printed({ '../svelte': measured_id('../svelte') }), [
 		'FAIL: pinned count mismatch — 2 files ≠ pinned 3; cache not written. If the move is ' +
 			'deliberate (suite refresh), re-pin in lib/gate_counts.ts.'
 	]);
+});
+
+test('a pin mismatch in a checkout off its measured commit says so instead of the re-pin', async () => {
+	deepStrictEqual(await mismatch_printed({ '../svelte': '23bb14630'.padEnd(40, '1') }), [
+		'FAIL: pinned count mismatch — 2 files ≠ pinned 3; cache not written. ../svelte is at ' +
+			`23bb14630, not ${GATE_CHECKOUT_IDS['../svelte']!.hash}${SKEW_TAIL}`
+	]);
+});
+
+test('checkout_skew names only a checkout git read off the commit its pins were measured at', () => {
+	// at the measured commit, unread, or with no recorded id: nothing to say
+	strictEqual(
+		checkout_skew({
+			'../svelte': measured_id('../svelte'),
+			'../prettier': null,
+			'../elsewhere': 'f'.repeat(40)
+		}),
+		null
+	);
+	strictEqual(checkout_skew({}), null);
+	strictEqual(
+		checkout_skew({ '../wpt': 'b'.repeat(40), '../svelte': measured_id('../svelte') }),
+		`../wpt is at bbbbbbbbb, not ${GATE_CHECKOUT_IDS['../wpt']!.hash}${SKEW_TAIL}`
+	);
+	strictEqual(
+		checkout_skew({ '../svelte': 'a'.repeat(40), '../wpt': 'b'.repeat(40) }),
+		`../svelte is at aaaaaaaaa, not ${GATE_CHECKOUT_IDS['../svelte']!.hash}; ` +
+			`../wpt is at bbbbbbbbb, not ${GATE_CHECKOUT_IDS['../wpt']!.hash}, the commits the pin was ` +
+			'measured at (GATE_CHECKOUT_IDS in lib/gate_counts.ts): move the checkouts there and re-run ' +
+			'before any re-pin. `npm run pins:audit:checkouts` says which way each moved; a deliberate ' +
+			'pull re-pins and re-records the id together.'
+	);
 });
 
 test('a held pin writes the cache, then its stamp', async () => {
@@ -147,6 +191,7 @@ test('a held pin writes the cache, then its stamp', async () => {
 		paths: ['a', 'b'],
 		pin: 2,
 		what: 'files',
+		checkouts: {},
 		stamp: { path: 'benches/js/.cache/list.stamp.json', inputs: { a: 'one' } }
 	});
 	strictEqual(out, 'benches/js/.cache/list.json');
@@ -162,6 +207,7 @@ test('a held pin writes the cache, then its stamp', async () => {
 		paths: [],
 		pin: 0,
 		what: 'files',
+		checkouts: {},
 		stamp: null
 	});
 	deepStrictEqual(unstamped.log, ['mkdir . {"recursive":true}', 'write c.json']);

@@ -6,6 +6,7 @@
  * @module
  */
 
+import { GATE_CHECKOUT_IDS } from './gate_counts.ts';
 import type { StampGit, StampWrites } from './harvest_stamp.ts';
 
 /** A `git` whose `-C <repo> rev-parse <rev>` answers `ids[repo]` (or `ids['<repo>:<tree>']`
@@ -60,6 +61,17 @@ export const fake_id = (seed: string): string =>
 		.join('')
 		.padEnd(40, '0')
 		.slice(0, 40);
+
+/** A full commit id at the one `GATE_CHECKOUT_IDS` records `checkout`'s pins were measured at. */
+export const measured_id = (checkout: string): string =>
+	GATE_CHECKOUT_IDS[checkout]!.hash.padEnd(40, '0');
+
+/** What a pinned-count failure says after naming one checkout off its measured commit,
+ * spelled out so a change to the wording fails the suites. */
+export const SKEW_TAIL =
+	', the commit the pin was measured at (GATE_CHECKOUT_IDS in lib/gate_counts.ts): move the ' +
+	'checkout there and re-run before any re-pin. `npm run pins:audit:checkouts` says which way ' +
+	'it moved; a deliberate pull re-pins and re-records the id together.';
 
 /** `values` as `JSON.stringify(values, null, '\t')` spells a list of strings, written by hand so a
  * change to the harvests' serialization fails the suites. */
