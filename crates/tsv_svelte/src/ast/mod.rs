@@ -14,13 +14,14 @@ pub(crate) mod convert;
 //
 // ## Arena allocation
 //
-// Like `tsv_ts`, the Svelte AST is allocated in a per-parse [`bumpalo::Bump`]
-// supplied by the caller. Recursive children are `&'arena T<'arena>` (not
-// `Box`), child collections are `&'arena [T<'arena>]` (not `Vec`), and decoded /
-// raw strings are `&'arena str` (not `String`) — so a whole parse (template plus
-// the embedded TS `<script>`/`{expr}` and CSS `<style>` ASTs, which share the
-// same `Bump`) is one bump-allocated graph, freed wholesale when the `Bump`
-// drops. `Style` holds a `CssStyleSheet<'arena>` borrowing that shared arena.
+// The Svelte AST is allocated in a per-parse [`bumpalo::Bump`] supplied by the
+// caller. Recursive children are `&'arena T<'arena>` (not `Box`), child
+// collections are `&'arena [T<'arena>]` (not `Vec`), and decoded / raw strings
+// are `&'arena str` (not `String`) — so the template and the embedded CSS
+// `<style>` AST, which shares the same `Bump`, are one bump-allocated graph,
+// freed wholesale when the `Bump` drops. `Style` holds a `CssStyleSheet<'arena>`
+// borrowing that shared arena. The embedded TypeScript (`<script>`, `{expr}`)
+// lives in the document's `tsv_ts` stores instead, named here by id.
 // Leaf nodes that hold only `Span`/primitives carry no lifetime
 // (`HtmlComment`, `Text`, `SvelteOptions`, the `*Tag`-with-no-expression nodes).
 

@@ -356,7 +356,7 @@ The `doc` module implements a declarative document builder inspired by prettier'
 
 ### Core Types (Arena-Based)
 
-Doc nodes live in a contiguous `DocArena`, referenced by `DocId` (a `u32` index), with child lists as `ChildRange` (start index + length) — no per-node heap allocation, no recursive `Drop` traversal. Indices suit the doc tree specifically: it's built once, rendered once, and dropped wholesale. The AST is store- and arena-allocated — `Expression`, `Statement` and `TSType` nodes and the payloads too rare to sit inline sit in per-document stores indexed by typed ids (`ExprId`, `StmtId`, `TyId`, one id per payload type), the lists built by value as runs of rows in a store per element type, decoded strings and comments in the bump arena — see [Nested AST](#nested-ast-bump-arena-not-flatindexed).
+Doc nodes live in a contiguous `DocArena`, referenced by `DocId` (a `u32` index), with child lists as `ChildRange` (start index + length) — no per-node heap allocation, no recursive `Drop` traversal. Indices suit the doc tree specifically: it's built once, rendered once, and dropped wholesale. The AST is store- and arena-allocated — `Expression`, `Statement` and `TSType` nodes and the payloads too rare to sit inline sit in per-document stores indexed by typed ids (`ExprId`, `StmtId`, `TyId`, one id per payload type), the lists built by value as runs of rows in a store per element type, TypeScript's decoded strings and comments in the same stores, and the CSS and Svelte trees in a bump arena — see [Nested AST](#nested-ast-bump-arena-not-flatindexed).
 
 ```rust
 pub enum DocNode {
