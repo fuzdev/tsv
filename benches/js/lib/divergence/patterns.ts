@@ -1214,6 +1214,9 @@ const bom_strip: DivergencePattern = {
 /** The whitespace a source may hold ahead of its content U+FEFF: ASCII's, which JS `\s` is not. */
 const LEADING_ASCII_WHITESPACE = /^[ \t\n\r\f]*/;
 
+/** How many U+FEFFs `text` holds. */
+const count_bom = (text: string): number => text.split('\uFEFF').length - 1;
+
 const leading_zwnbsp: DivergencePattern = {
 	id: 'leading_zwnbsp',
 	description: 'leading content U+FEFF kept behind a BOM; prettier drops it',
@@ -1221,15 +1224,16 @@ const leading_zwnbsp: DivergencePattern = {
 	languages: ['svelte', 'css'],
 	conformance_sections: ['Whitespace: BOM Handling'],
 	// The U+FEFF tsv keeps is a semantic char prettier drops. The detect below is byte-exact:
-	// the source holds that U+FEFF ahead of its content, and past the BOM tsv writes, the
-	// U+FEFF and (Svelte) the line it stands on, ours IS prettier's output past prettier's BOM.
+	// the source holds that U+FEFF ahead of its content, tsv lost none of the source's U+FEFFs,
+	// and past the BOM tsv writes, the U+FEFF and (Svelte) the line it stands on, ours IS
+	// prettier's output past prettier's BOM.
 	may_alter_char_frequency: true,
 	fixtures: [
 		'svelte/syntax/whitespace/leading_zwnbsp_prettier_divergence',
 		'css/tokens/whitespace/leading_zwnbsp_prettier_divergence'
 	],
 	detect(ctx) {
-		const BOM = '﻿';
+		const BOM = '\uFEFF';
 		// ours begins with the load-bearing BOM: a BOM, then the content U+FEFF it protects
 		// (`tsv_lang::printing::encode_leading_zwnbsp`)
 		if (!ctx.ours.startsWith(BOM + BOM)) return null;
@@ -1238,9 +1242,9 @@ const leading_zwnbsp: DivergencePattern = {
 		const source = ctx.source.startsWith(BOM) ? ctx.source.slice(1) : ctx.source;
 		const content = source.replace(LEADING_ASCII_WHITESPACE, '');
 		if (content[0] !== BOM) return null;
-		// and exactly one: a second U+FEFF ahead of the content, behind whitespace or not, is
-		// content too, which ours's two leading chars can't account for
-		if (content.slice(1).replace(LEADING_ASCII_WHITESPACE, '')[0] === BOM) return null;
+		// and tsv lost none of the source's U+FEFFs, nor wrote one: past the BOM it writes, ours
+		// holds as many as the source past its own, wherever the source puts them
+		if (count_bom(ctx.ours.slice(1)) !== count_bom(source)) return null;
 		// prettier dropped it, keeping at most the BOM ahead of it
 		if (ctx.prettier.startsWith(BOM + BOM)) return null;
 		const prettier_rest = ctx.prettier.startsWith(BOM) ? ctx.prettier.slice(1) : ctx.prettier;

@@ -11,10 +11,10 @@
  * It loads the corpus and initializes every implementation, checks this surface's
  * row-composition claims against the registry, and runs every row once over every
  * file — untimed — to learn what each accepts. From that it grades the run's
- * standing claims (the perf surface's full coverage, the conformance pins, byte
- * parity between tsv's bindings), fixes each group's timed file set, and writes a
- * `PreflightSnapshot`: the plan for the timed phase plus every fact the report
- * states that only this process could establish. A failed grade exits non-zero
+ * standing claims (no tsv crash on any input, the perf surface's full coverage,
+ * the conformance pins, byte parity between tsv's bindings), fixes each group's
+ * timed file set, and writes a `PreflightSnapshot`: the plan for the timed phase
+ * plus every fact the report states that only this process could establish. A failed grade exits non-zero
  * before a single row is timed.
  *
  * Then it exits, which is why it is a process of its own. The corpus and a dozen
@@ -55,7 +55,7 @@ import {
 	type VariantParityFinding,
 	write_child_result
 } from './lib/bench_protocol.ts';
-import { create_logger, empty_output_error, suppress_stderr_noise } from './lib/bench_sweep.ts';
+import { create_logger, suppress_stderr_noise } from './lib/bench_sweep.ts';
 import { collect_binary_sizes } from './lib/binary_sizes.ts';
 import {
 	check_executed_artifacts,
@@ -73,6 +73,7 @@ import {
 	group_by_language
 } from './lib/corpus.ts';
 import { detect_corpus_snapshot, enrich_source_repos } from './lib/corpus_repos.ts';
+import { panic_report_lines, type PanicEntry } from './lib/divergence/panic_errors.ts';
 import { CSS_REJECTS_PIN } from './lib/gate_counts.ts';
 import {
 	get_alternative_versions,
@@ -98,6 +99,7 @@ import {
 	rows_missing_from_payload_tiers,
 	type SourceCoverageCell
 } from './lib/report.ts';
+import { sweep_preflight_task } from './lib/preflight_sweep.ts';
 import { CANONICAL_PARSER_ROWS, type Language, LANGUAGES, type SourceFile } from './lib/types.ts';
 
 const spec = read_child_spec<PreflightSpec>();
@@ -548,15 +550,20 @@ const task_tracking_by_group: Map<string, Map<string, string>> = new Map();
  */
 const preflight_groups: PreflightGroup[] = [];
 
-function record_skip(bench_name: string, file_path: string, error: unknown): void {
+function record_skip(bench_name: string, file_path: string, error_msg: string): void {
 	if (!skipped_files.has(bench_name)) {
 		skipped_files.set(bench_name, new Map());
 	}
 	const bench_map = skipped_files.get(bench_name)!;
 	if (bench_map.has(file_path)) return;
-	const error_msg = error instanceof Error ? error.message : String(error);
 	bench_map.set(file_path, error_msg);
 }
+
+/**
+ * tsv's crashes in pre-flight, every group's (`sweep_preflight_task`): in no row's accept or
+ * skip set, and fatal once pre-flight has run.
+ */
+const tsv_crashes: PanicEntry[] = [];
 
 /**
  * Tracking keys of coverage-only tasks — measured in pre-flight, never timed.
@@ -1252,9 +1259,9 @@ const files_by_language: Record<Language, SourceFile[]> = {
 
 /**
  * Run every task once per file untimed to discover each impl's effective
- * corpus. Populates `successful_files`, `skipped_files`, and
- * `effective_corpus_size` so the caller can compute the per-group iteration
- * set (intersection or per-impl) and the report can disclose coverage.
+ * corpus (`sweep_preflight_task`). Populates `successful_files`, `skipped_files`,
+ * `tsv_crashes`, and `effective_corpus_size` so the caller can compute the per-group
+ * iteration set (intersection or per-impl) and the report can disclose coverage.
  *
  * Cost: O(impls × files), each call is one parse/format. Small relative
  * to the timed phase (which sweeps the same files for seconds per row per pass).
@@ -1281,80 +1288,32 @@ async function run_preflight(
 
 	for (let i = 0; i < tasks.length; i++) {
 		const task = tasks[i];
-		const success = new Set<string>();
-		const script_only = new Set<string>();
 		// Digests are the byte half of `check_variant_parity`, and cost nothing on a
 		// row it doesn't grade: `null` here means no hashing happens at all.
-		const digests = byte_graded_names.has(task.name) ? new Map<string, string>() : null;
-		let bytes = 0;
-		const start_ms = performance.now();
-		for (const file of files) {
-			// ONLY the impl call belongs inside the skip-recording try. Anything else
-			// in it — the digest below was — turns a HARNESS-side failure on a file the
-			// tool handled into a recorded skip against the tool. See `output_digest`.
-			let result: unknown;
-			let at_script = false;
-			try {
-				// `file.goal` is set only on the conformance surface — test262's declared
-				// goal, or a Prettier fixture's extension goal (`.mjs`, `.cts`, …); every
-				// other file leaves it undefined → the default module parse.
-				result = task.is_async
-					? await task.run_async!(file.content, language, file.goal)
-					: task.run(file.content, language, file.goal);
-			} catch (e) {
-				// A `goal_fallback` file (a TypeScript file with no goal of its own) is
-				// retried at script (`SourceFile.goal_fallback`). The retry's own failure is
-				// not the verdict — the module error is recorded, the primary reading — and
-				// a tool the goal does not reach simply rejects twice.
-				if (!file.goal_fallback) {
-					record_skip(task.tracking_key, file.path, e);
-					continue;
-				}
-				try {
-					result = task.is_async
-						? await task.run_async!(file.content, language, 'script')
-						: task.run(file.content, language, 'script');
-				} catch {
-					record_skip(task.tracking_key, file.path, e);
-					continue;
-				}
-				at_script = true;
-			}
-			// A tool-side verdict, not a harness failure: an empty output on a non-empty
-			// input is the impl declining the file without saying so, recorded as a
-			// skip against it — see `assert_output_present`.
-			const empty = empty_output_error(task.name, file, result);
-			if (empty !== null) {
-				record_skip(task.tracking_key, file.path, empty);
-				continue;
-			}
-			success.add(file.path);
-			if (at_script) script_only.add(file.path);
-			bytes += file.bytes;
-			if (digests !== null) {
-				const digest = output_digest(result);
-				if (digest !== null) {
-					digests.set(file.path, digest);
-				} else if (result !== undefined && result !== null) {
-					// An accepted output that produced no digest — see `ungraded_digests`.
-					// A nullish result is the `-internal` shape, which has nothing to
-					// grade by design and so is not a hole.
-					const seen = ungraded_digests.get(task.tracking_key);
-					if (seen) seen.count += 1;
-					else ungraded_digests.set(task.tracking_key, { count: 1, example: file.path });
-				}
-			}
-		}
+		const sweep = await sweep_preflight_task(
+			task,
+			files,
+			language,
+			byte_graded_names.has(task.name) ? output_digest : null
+		);
+		successful_files.set(task.tracking_key, sweep.accepted);
+		if (sweep.script_only.size > 0) script_only_files.set(task.tracking_key, sweep.script_only);
+		for (const [path, message] of sweep.skipped) record_skip(task.tracking_key, path, message);
+		tsv_crashes.push(...sweep.crashes);
+		if (sweep.digests !== null) output_digests.set(task.tracking_key, sweep.digests);
+		if (sweep.ungraded !== null) ungraded_digests.set(task.tracking_key, sweep.ungraded);
+		effective_corpus_size.set(task.tracking_key, {
+			processed: sweep.accepted.size,
+			total: files.length
+		});
+		effective_corpus_bytes.set(task.tracking_key, sweep.bytes);
 		// digesting included (JSON.stringify + sha1, harness work): this prices a
 		// deadline, where an over-estimate is the safe side
-		const elapsed_ms = performance.now() - start_ms;
-		successful_files.set(task.tracking_key, success);
-		if (script_only.size > 0) script_only_files.set(task.tracking_key, script_only);
-		if (digests !== null) output_digests.set(task.tracking_key, digests);
-		effective_corpus_size.set(task.tracking_key, { processed: success.size, total: files.length });
-		effective_corpus_bytes.set(task.tracking_key, bytes);
-		preflight_elapsed_ms.set(task.tracking_key, elapsed_ms);
-		log(`  [${i + 1}/${tasks.length}] ${task.name}: ${success.size}/${files.length} files`);
+		preflight_elapsed_ms.set(task.tracking_key, sweep.elapsed_ms);
+		const crashed = sweep.crashes.length > 0 ? `, ${sweep.crashes.length} crashed` : '';
+		log(
+			`  [${i + 1}/${tasks.length}] ${task.name}: ${sweep.accepted.size}/${files.length} files${crashed}`
+		);
 	}
 }
 
@@ -1539,10 +1498,19 @@ for (const lang of LANGUAGES) {
 	}
 }
 
+// A tsv crash fails the run (`lib/preflight_sweep.ts`). Listed before the parity pass,
+// which exits on its own fatal findings, and failed after it, so a crash that splits a
+// pair's accept sets is read with that pass's warning beside it.
+if (tsv_crashes.length > 0) {
+	for (const line of panic_report_lines(tsv_crashes)) console.error(line);
+}
+
 // Same-engine native/wasm variant pairs should accept identical file sets AND —
 // for tsv's own pair — produce identical bytes. A divergence is a binding-boundary
 // bug masquerading as coverage; the byte half is fatal (see the fn doc).
 check_variant_parity();
+
+if (tsv_crashes.length > 0) exit(1);
 
 // Perf corpus is real-world code every in-scope tool must fully process, so a
 // per-file pre-flight failure that isn't an explicitly-reviewed `PERF_OMITS`

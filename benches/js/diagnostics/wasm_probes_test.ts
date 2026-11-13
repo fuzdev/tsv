@@ -281,6 +281,36 @@ test('the format probe aborts an A/B where one build throws on a source the othe
 	);
 });
 
+test('the format probe aborts an A/A where the control throws on a source current formats', async () => {
+	const code = await run_wasm_format_probe(
+		{
+			load_glue: async (path) => (path === 'control.js' ? throwing_glue(type_error) : glue('')),
+			load_files: async () => FILES_WITH_REFUSED
+		},
+		['corpus', '--control', 'control.js', '--pairs', '1', '--warmup', '0']
+	);
+	strictEqual(code, 1);
+	ok(
+		err.includes('  MISMATCH d.css: current formatted, control threw (expected a string)'),
+		err.join('\n')
+	);
+	ok(err.some((l) => l.startsWith('ABORT: builds format differently')));
+	ok(!err.some((l) => l.startsWith('Probing ')), err.join('\n'));
+});
+
+test('the format probe aborts an A/A where the control formats differently', async () => {
+	const code = await run_wasm_format_probe(
+		{
+			load_glue: async (path) => glue(path === 'control.js' ? '!' : ''),
+			load_files: async () => FILES
+		},
+		['corpus', '--control', 'control.js', '--pairs', '1', '--warmup', '0']
+	);
+	strictEqual(code, 1);
+	ok(err.includes('\nbyte-identity: 0/3 identical  — 3 MISMATCH'), err.join('\n'));
+	ok(err.some((l) => l.startsWith('ABORT: builds format differently')));
+});
+
 test('the format probe skips a source every build throws the same error on', async () => {
 	const code = await run_wasm_format_probe(
 		{

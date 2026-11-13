@@ -1064,6 +1064,16 @@ test('leading_zwnbsp: positive - the one content U+FEFF behind a leading newline
 	}
 });
 
+test('leading_zwnbsp: positive - a U+FEFF inside the content, which both keep', () => {
+	const ctx = make_context(
+		`${B}${B}a {\n\tcontent: "${B}";\n}\n`,
+		`${B}a {\n\tcontent: "${B}";\n}\n`,
+		'css',
+		`${B}${B}a { content: "${B}"; }\n`
+	);
+	assertEquals(run_pattern('leading_zwnbsp', ctx)?.pattern, 'leading_zwnbsp');
+});
+
 test('leading_zwnbsp: negative - anything past the U+FEFF differing, or a U+FEFF the source never held', () => {
 	const near_misses: Array<[string, Language, string, string, string]> = [
 		// a rule tsv lost past the U+FEFF: the rest must be prettier's, byte for byte
@@ -1089,8 +1099,8 @@ test('leading_zwnbsp: negative - anything past the U+FEFF differing, or a U+FEFF
 			`${B}${B}${B}a {\n}\n`,
 			`${B}${B}a {\n}\n`
 		],
-		// exactly one content U+FEFF: a second is content too, and ours's two leading chars
-		// can't hold it, wherever the source puts it ahead of the content
+		// tsv lost a content U+FEFF: ours past its BOM must hold every one the source holds
+		// past its own, wherever the source puts them
 		[
 			'one of two content U+FEFFs dropped',
 			'css',
@@ -1118,6 +1128,41 @@ test('leading_zwnbsp: negative - anything past the U+FEFF differing, or a U+FEFF
 			`${B}${B}\n${B}<div></div>\n`,
 			`${B}${B}\n<div></div>\n`,
 			`${B}<div></div>\n`
+		],
+		// a second content U+FEFF behind a character that isn't ASCII whitespace, which both
+		// formatters drop with it: the rest agrees, but tsv lost it
+		...(['\u00a0', '\u2028', '\u200b'] as const).map(
+			(between): [string, Language, string, string, string] => [
+				`the second content U+FEFF behind U+${between.codePointAt(0)!.toString(16).toUpperCase().padStart(4, '0')}, dropped`,
+				'css',
+				`${B}${B}${between}${B}a {}\n`,
+				`${B}${B}a {\n}\n`,
+				`${B}a {\n}\n`
+			]
+		),
+		[
+			'the second content U+FEFF behind an NBSP, dropped (svelte)',
+			'svelte',
+			`${B}${B}\u00a0${B}<div></div>\n`,
+			`${B}${B}\n<div></div>\n`,
+			`${B}<div></div>\n`
+		],
+		// a U+FEFF past the content, which both formatters drop: tsv lost it all the same
+		['a trailing U+FEFF dropped', 'css', `${B}${B}a {}\n${B}`, `${B}${B}a {\n}\n`, `${B}a {\n}\n`],
+		[
+			'a U+FEFF inside the content dropped',
+			'css',
+			`${B}${B}a { content: "${B}"; }\n`,
+			`${B}${B}a {\n\tcontent: "";\n}\n`,
+			`${B}a {\n\tcontent: "";\n}\n`
+		],
+		// ours writing a U+FEFF the source never held, past the one it keeps
+		[
+			'a U+FEFF ours wrote past it',
+			'css',
+			`${B}${B}a {}\n`,
+			`${B}${B}a {\n}\n${B}`,
+			`${B}a {\n}\n${B}`
 		],
 		// the source's pair kept, but off the start: not where this pattern looks
 		['the pair moved off the start', 'css', `${B}${B}a {}\n`, `a {\n}\n${B}${B}`, `${B}a {\n}\n`],

@@ -18,8 +18,9 @@
  *     a noisy median is visible rather than hidden.
  *
  * Also a corpus byte-identity gate: a no-behavior-change perf edit must format
- * every file identically across the builds — a mismatch aborts (exit 1), since
- * timing a build that changed output is meaningless. Outcomes compare by their bytes
+ * every file identically across the builds, a `--control` copy's included — a mismatch aborts
+ * (exit 1) before anything is timed, since timing a build that changed output is meaningless,
+ * and a file one build throws on can't be timed at all. Outcomes compare by their bytes
  * (`compare_format_outcomes`): a source every build refuses, or every build throws on with the
  * same error, is skipped, untimed; a refusal or a throw on one side only is a mismatch, listed
  * with the file and what each build did. A crash in any build (`is_tsv_crash`: a trap) fails
@@ -172,7 +173,8 @@ export function format_crash_entries(
  * @param deps - the glue loader and the corpus
  * @param argv - the tool's arguments: a corpus directory, `--current`, `--baseline`,
  * `--control`, `--pairs`, `--warmup`, `--lang`
- * @returns the exit code: 1 when a build crashes or a `--baseline` formats differently, else 0
+ * @returns the exit code: 1 when a build crashes or a `--baseline` or `--control` formats
+ *   differently, else 0
  */
 export async function run_wasm_format_probe(
 	deps: WasmFormatProbeDeps,
@@ -244,7 +246,9 @@ export async function run_wasm_format_probe(
 		for (const line of panic_report_lines(crashes)) console.error(line);
 		return 1;
 	}
-	if (mismatches && baseline) {
+	// a `--control` copy is the same code, so a mismatch there fails as a baseline's does: the
+	// floor would time two builds that don't agree, and a file one of them throws on can't be timed
+	if (mismatches) {
 		console.error(
 			'ABORT: builds format differently — a no-behavior-change edit must be byte-identical.'
 		);

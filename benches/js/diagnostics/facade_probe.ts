@@ -46,9 +46,10 @@
  *   - `small`   its smallest tenth by length, the sweep repeated to a measurable pass
  *   - `tiny`    one minimal source, repeated: the fixed cost per call in nanoseconds
  *
- * A byte-identity gate runs first: every arm must return what `row` returns on every
- * file (formats compared as strings, parses as their `JSON.stringify`), since timing
- * two arms that disagree is meaningless. It also prices the facade's one O(source)
+ * A byte-identity gate runs first (`facade_identity.ts`): every arm must return what `row`
+ * returns on every file (formats compared as strings, parses as their `JSON.stringify`), since
+ * timing two arms that disagree is meaningless, and a crash in any arm (`is_tsv_crash`) fails
+ * the probe rather than dropping its file. It also prices the facade's one O(source)
  * step alone — `String.prototype.isWellFormed` over each language's files — beside the
  * count of files that hold a character outside Latin-1 (the strings a runtime stores
  * two-byte and so has to scan).
@@ -75,21 +76,24 @@ import { pathToFileURL } from 'node:url';
 import { reconstruct_locations } from '../../../crates/tsv_wasm/npm/locations.js';
 import { check_executed_artifacts } from '../lib/check_artifact_freshness.ts';
 import { CorpusLoader, group_by_language } from '../lib/corpus.ts';
+import {
+	panic_report_lines,
+	type PanicEntry,
+	TsvRejection
+} from '../lib/divergence/panic_errors.ts';
 import { NativeImplementation } from '../lib/ffi.ts';
 import { NapiImplementation } from '../lib/napi.ts';
 import { current_runtime, runtime_version, wasm_target } from '../lib/runtime.ts';
 import type { TsvBinding } from '../lib/tsv_api.ts';
 import { type Language, LANGUAGES, type SourceFile } from '../lib/types.ts';
 import { WasmImplementation } from '../lib/wasm.ts';
+import { type Call, grade_identity } from './facade_identity.ts';
 
 type Binding = 'napi' | 'ffi' | 'wasm';
 type Operation = 'parse' | 'parse+locations' | 'format';
 type SetName = 'corpus' | 'small' | 'tiny';
 type ArmName = 'row' | 'control' | 'engine' | 'package';
 type ReadingName = 'floor' | 'facade' | 'package';
-
-/** One timed call: a source in, the row's product out. */
-type Call = (source: string) => unknown;
 
 /** A package entry's published functions, by export name. */
 type Package = Record<string, (source: string, options?: object) => unknown>;
@@ -184,10 +188,13 @@ const engine_call = (impl: TsvBinding, operation: Operation, language: Language)
 	return (source) => reconstruct_locations(parse(source), source, { language });
 };
 
-/** A package result's product, unwrapped as a consumer does (and as the row does). */
+/**
+ * A package result's product, unwrapped as a consumer does (and as the row does): a failure is
+ * thrown as the `TsvRejection` it is, never read as a crash.
+ */
 const unwrap = (result: any, key: 'ast' | 'code'): unknown => {
 	if (result.ok) return result[key];
-	throw new Error(`${result.error.message}\n${result.error.frame}`);
+	throw new TsvRejection(`${result.error.message}\n${result.error.frame}`);
 };
 
 /** A package consumer's own spelling of each operation. */
@@ -266,62 +273,40 @@ const active_bindings = bindings.filter((b) => !binding_filter || b.binding === 
 const operations = OPERATIONS.filter((operation) => !op_filter || operation === op_filter);
 const sets = SETS.filter((set) => !set_filter || set === set_filter);
 
-/** What two arms must agree on: a format's string, or a parse's serialized tree. */
-const product_text = (product: unknown): string | null => {
-	if (typeof product === 'string') return product;
-	try {
-		// a pathologically deep tree overflows the recursive serializer — ungraded
-		return JSON.stringify(product);
-	} catch {
-		return null;
-	}
-};
-
-// The byte-identity gate, and the accept set every arm is timed over: the files `row`
-// takes for every operation in scope, on which every other arm returns the same bytes.
+// The byte-identity gate (`grade_identity`), and the accept set every arm is timed over: the
+// files `row` takes for every operation in scope, on which every other arm returns the same
+// bytes. A crash in any arm fails the probe once the gate has graded every cell.
 const accepted: Record<string, SourceFile[]> = {};
+const crashes: PanicEntry[] = [];
+let mismatched = false;
 for (const b of active_bindings) {
 	for (const language of languages) {
-		const kept: SourceFile[] = [];
-		let mismatches = 0;
-		let ungraded = 0;
 		const calls = operations.map((operation) => ({
+			operation,
 			row: b.arms.row!(operation, language),
-			others: [b.arms.engine, b.arms.package]
-				.filter((make) => make !== undefined)
-				.map((make) => make(operation, language))
+			others: (['engine', 'package'] as const).flatMap((arm) => {
+				const make = b.arms[arm];
+				return make === undefined ? [] : [{ arm, call: make(operation, language) }];
+			})
 		}));
-		for (const file of corpus[language]) {
-			let ok = true;
-			for (const { row, others } of calls) {
-				let expected: string | null;
-				try {
-					expected = product_text(row(file.content));
-				} catch {
-					ok = false;
-					break;
-				}
-				if (expected === null) {
-					ungraded++;
-					continue;
-				}
-				for (const other of others) {
-					if (product_text(other(file.content)) !== expected) mismatches++;
-				}
-			}
-			if (ok) kept.push(file);
-		}
-		accepted[`${b.binding}/${language}`] = kept;
+		const grade = grade_identity(`${b.binding}/${language}`, calls, corpus[language]);
+		accepted[`${b.binding}/${language}`] = grade.kept;
+		crashes.push(...grade.crashes);
+		const crashed = grade.crashes.length > 0 ? `, ${grade.crashes.length} crashed` : '';
 		log(
-			`identity ${b.binding}/${language}: ${kept.length}/${corpus[language].length} files, ` +
-				`${mismatches} mismatch${ungraded ? `, ${ungraded} ungraded` : ''}`
+			`identity ${b.binding}/${language}: ${grade.kept.length}/${corpus[language].length} files, ` +
+				`${grade.mismatches} mismatch${grade.ungraded ? `, ${grade.ungraded} ungraded` : ''}${crashed}`
 		);
-		if (mismatches) {
-			console.error('ABORT: an arm returns different bytes than the row it is compared to.');
-			exit(1);
-		}
+		if (grade.mismatches) mismatched = true;
 	}
 }
+if (crashes.length > 0) {
+	for (const line of panic_report_lines(crashes)) console.error(line);
+}
+if (mismatched) {
+	console.error('ABORT: an arm returns different bytes than the row it is compared to.');
+}
+if (crashes.length > 0 || mismatched) exit(1);
 
 //
 // Measurement

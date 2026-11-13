@@ -58,7 +58,10 @@ export class TsvRejection extends Error {}
  *    from no tsv binding.
  *
  * The C FFI's wrapper (`lib/ffi.ts`, the Deno bench row's) throws every failure itself, as
- * a plain `Error`; no tool that classifies loads it.
+ * a plain `Error`, so the bench's pre-flight and `facade_probe` read its throws by text alone.
+ * That holds because a returned message never begins `panic: ` (each starts with fixed text):
+ * the release FFI aborts on a panic, and an unwinding one (`TSV_FFI_PROFILE`, which
+ * `facade_probe` honors) reports it as `panic: …`, a crash.
  */
 export function is_tsv_crash(thrown: unknown): boolean {
 	if (thrown instanceof WebAssembly.RuntimeError) return true;

@@ -63,8 +63,9 @@ regressing, collapse the verdict.
 a pattern that has not answered the question cannot excuse content loss, and a new pattern
 is safe by omission. Declaring it is a promise that the pattern's own `detect` carries a
 content-preservation proof; the current set is `bom_strip` (byte-exact BOM prefix test),
-`leading_zwnbsp` (the source holds exactly one U+FEFF, the kept one, ahead of its content, and past it and the
-BOM tsv writes, ours is prettier's output byte for byte), `self_closing_nonvoid` (matching tag
+`leading_zwnbsp` (the source holds a U+FEFF ahead of its content, ours past the BOM tsv writes
+holds as many U+FEFFs as the source past its own, and past that BOM and the kept U+FEFF, ours is
+prettier's output byte for byte), `self_closing_nonvoid` (matching tag
 names on both sides), `comment_preserved` (the comment text must appear in ours), `css_scss_directive_number` (identical non-numeric skeleton
 *plus* equal numeric-token counts, so a number may be re-spelled but never dropped), and
 `css_line_comment_freeze` (the same skeleton-and-count proof). A

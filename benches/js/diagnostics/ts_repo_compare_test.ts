@@ -1,9 +1,10 @@
 /**
  * Tests for the TypeScript-repo gate (`ts_repo_compare.ts`) over an in-memory checkout and a
  * fake tsv: a tsv crash, at either goal, on a unit tsc's baselines accept or refuse, is graded
- * in no bucket and fails the run, listed with its engine and unit; a rejection tsv returned
- * stays a rejection whatever its text. Package-free but for tsc, a root dependency, so it gates
- * in `npm run test:node`.
+ * in no bucket and fails the run, listed with its engine and unit, beside the run's other
+ * failures too (tsc's parser losing the field the gate reads, a scan with no single-file case);
+ * a rejection tsv returned stays a rejection whatever its text. Package-free but for tsc, a root
+ * dependency, so it gates in `npm run test:node`.
  */
 
 import { deepStrictEqual, ok, strictEqual } from 'node:assert';
@@ -14,8 +15,22 @@ import { TsvRejection } from '../lib/divergence/panic_errors.ts';
 import { raise_wasm_trap } from '../lib/wasm_trap_fakes.ts';
 import { run_ts_repo_compare, type TsRepoCompareDeps } from './ts_repo_compare.ts';
 
+/** Set by a test to give the gate a tsc whose parser lost `parseDiagnostics`. */
+const tsc_mock = vi.hoisted(() => ({ diagnostics_gone: false }));
+vi.mock('../lib/tsc.ts', async (import_original) => {
+	const original = await import_original<typeof import('../lib/tsc.ts')>();
+	return {
+		...original,
+		tsc_parse: (...args: Parameters<typeof original.tsc_parse>) => {
+			const parsed = original.tsc_parse(...args);
+			return tsc_mock.diagnostics_gone ? { ...parsed, diagnostics: null } : parsed;
+		}
+	};
+});
+
 afterEach(() => {
 	vi.restoreAllMocks();
+	tsc_mock.diagnostics_gone = false;
 });
 
 const capture_console = (): string[] => {
@@ -105,12 +120,16 @@ const fake_impls = (
 	return { state, impls };
 };
 
-const deps = (impls: CompareImplementations, written: string[] = []): TsRepoCompareDeps => ({
+const deps = (
+	impls: CompareImplementations,
+	written: string[] = [],
+	cases: Record<string, string> = CASES
+): TsRepoCompareDeps => ({
 	init_implementations: async () => impls,
 	open_dir: async (path) => {
 		if (path === '../typescript') return memory_dir({ 'package.json': '{}' });
 		if (path === '../typescript/tests/baselines/reference') return memory_dir(BASELINES);
-		if (path === ROOT) return memory_dir(CASES);
+		if (path === ROOT) return memory_dir(cases);
 		throw new Error(`not_found: ${path}`);
 	},
 	stdout: { write: async (data: string) => written.push(data) }
@@ -188,4 +207,41 @@ test('a run with no crash is the gate it was', async () => {
 	strictEqual(await run_ts_repo_compare(deps(impls), [ROOT]), 0);
 	ok(lines.includes('  parity reject (tsv + tsc both reject):  1'), lines.join('\n'));
 	ok(!lines.some((l) => l.includes('panic(s)')));
+});
+
+test('a crash is listed when tsc lost the field the gate reads, a failure that ends the run early', async () => {
+	const lines = capture_console();
+	tsc_mock.diagnostics_gone = true;
+	// `a` crashes first; `b`'s over-rejection then asks tsc's parser, which has no diagnostics
+	const { impls } = fake_impls({ 'a.ts': 'panic', 'b.ts': 'reject' });
+	strictEqual(await run_ts_repo_compare(deps(impls), [ROOT]), 1);
+	ok(
+		lines.some((l) => l.startsWith('FAIL: tsc SourceFile has no `parseDiagnostics`')),
+		lines.join('\n')
+	);
+	deepStrictEqual(panic_entries(lines), [`  tsv: ${ROOT}/a.ts: panic: boom`]);
+});
+
+test('a crash is listed when no single-file case was scanned, a failure of its own', async () => {
+	const lines = capture_console();
+	// a corpus of multi-file tests alone, one of whose units crashes tsv
+	const cases = {
+		'multi.ts': '// @filename: one.ts\nexport const one = 1;\n// @filename: two.ts\ncrash;\n'
+	};
+	const impls: CompareImplementations = {
+		...fake_impls({}).impls,
+		native: {
+			format: (s) => s,
+			parse: () => ({ type: 'Program' }),
+			parse_internal: (source) => {
+				if (source.includes('crash')) raise_wasm_trap();
+			}
+		}
+	};
+	strictEqual(await run_ts_repo_compare(deps(impls, [], cases), [ROOT]), 1);
+	const zero = lines.findIndex((l) => l.startsWith('FAIL: 0 single-file .ts scanned'));
+	ok(zero >= 0, lines.join('\n'));
+	deepStrictEqual(panic_entries(lines.slice(zero)), [
+		`  tsv: ${ROOT}/multi.ts::two.ts: RuntimeError: unreachable`
+	]);
 });

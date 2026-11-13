@@ -642,8 +642,10 @@ then as "a new over-rejection".
 The gate is `gate_on_panics` in `lib/compare_cli.ts`, over the crashes each tool's catches
 classified with `is_tsv_crash` in `lib/divergence/panic_errors.ts` (one classifier, so no two
 tools can disagree; skip_triage, the over-acceptance tools, the conformance fixture gates
-(`lib/fixtures_gate.ts`, `diagnostics/ts_repo_compare.ts`), and the WASM probes take it too,
-and print the same FAIL block, `panic_report_lines`, on stderr where stdout holds their `--json`). It classifies what the catch caught, by TYPE, and only a throw
+(`lib/fixtures_gate.ts`, `diagnostics/ts_repo_compare.ts`), the bench's pre-flight
+(`lib/preflight_sweep.ts`), and the probes take it too, and print the same FAIL block,
+`panic_report_lines`, on stderr where stdout holds their `--json`). It classifies what the catch
+caught, by TYPE, and only a throw
 out of tsv's own call: a `WebAssembly.RuntimeError` is a trap, any trap; a plain `Error` whose
 message's FIRST LINE starts `panic: ` is a caught native panic; a `TsvRejection` — what the
 binding wrappers throw for a failure the engine RETURNED — never is, whatever its text, since a
@@ -826,7 +828,7 @@ A timed run is **several processes of one runtime**, started one at a time by `b
 | Process | Script | Holds | Does |
 | --- | --- | --- | --- |
 | orchestrator | `bench.ts` | no engine, no corpus | starts the others one at a time and awaits each; pools the timings; writes the report |
-| pre-flight (one) | `bench_preflight.ts` | the corpus + every implementation | runs every row once per file untimed, grades the run's standing claims (perf coverage, the conformance pins, byte parity between tsv's bindings), writes each group's timed file set and a snapshot — then exits |
+| pre-flight (one) | `bench_preflight.ts` | the corpus + every implementation | runs every row once per file untimed, grades the run's standing claims (no tsv crash, perf coverage, the conformance pins, byte parity between tsv's bindings), writes each group's timed file set and a snapshot — then exits |
 | row (one per row per pass) | `bench_row.ts` | ONE engine + that row's file set | warms, times its sweeps, reports, exits |
 
 - **Why a process per row.** Timed back to back in one process, the rows moved each other's
@@ -1779,6 +1781,8 @@ benches/js/
     │                      # (unit-tested by perf_omit_test.ts, which also pins that no entry
     │                      # tolerates a failure of tsv's own)
     ├── postcss.ts         # postcss wrapper (parse-only, CSS — the parser behind prettier's CSS printer)
+    ├── preflight_sweep.ts # One row's untimed pre-flight sweep: its accepts, skips, and tsv's
+    │                      # crashes, apart from both (unit-tested by preflight_sweep_test.ts)
     ├── prettier_fixtures.ts # What Prettier's own suites call valid — harness markers, front matter,
     │                      # and each directory's `format.test.js` verdicts, the conformance view's
     │                      # filter over the Prettier suites (unit-tested by prettier_fixtures_test.ts)
@@ -1850,7 +1854,12 @@ benches/js/
 ## Error Tracking
 
 Benchmark failures are recorded during the up-front pre-flight pass (each task runs
-once per file untimed). A timed row's process then sweeps the pre-filtered intersection
+once per file untimed, `lib/preflight_sweep.ts`). A crash in one of tsv's rows
+(`is_tsv_crash`) is no failure of this kind: it lands in no accept or skip set, and pre-flight
+lists each with its row and file in the panic gate's FAIL block and exits 1 (§Parse-Conformance
+Gates, the panic gate). Under Deno the native row is the `panic = "abort"` C FFI, so a panic
+there ends the pre-flight process instead, which fails the run as well. A timed row's process
+then sweeps the pre-filtered intersection
 (or per-impl success set under `BENCH_MODE=union`), so throws during measurement
 would be real bugs — they fail that process, and with it the run, rather than being
 silently catalogued.
@@ -2072,5 +2081,5 @@ Documented above, though they live here: the parse-conformance gates
 | `wasm_json_probe.ts` | splits parse cost into pure-parse vs materialization for native + WASM, isolating JS-side `JSON.parse` | — |
 | `wasm_format_probe.ts` | WASM **format** wall-time A/B at single-digit-% resolution (paired discipline: interleaved pairs, in-run A/A noise floor, byte-identity gate) | — |
 | `wasm_memory_probe.ts` | WASM **linear-memory high-water** for `format()` — the axis the wall-time probe can't see, and the gate for doc-IR memory work. `--cold` (per-file cold-start peak) or default steady-state | — |
-| `facade_probe.ts` | what the packages' facade costs per call over the flat exports beneath it, per binding × operation × language, and what separates a `tsv-wasm` row from the staged `@fuzdev/tsv-wasm` entry (which needs `deno task build:npm:all`). Same paired discipline (rotated interleaved arms, in-run A/A floor, byte-identity gate) over three sets — the perf corpus, its smallest tenth, one minimal source — plus the facade's one O(source) step (`isWellFormed`) priced alone. Runs under **all three runtimes** (its own load path, not `init_implementations`) | — |
+| `facade_probe.ts` | what the packages' facade costs per call over the flat exports beneath it, per binding × operation × language, and what separates a `tsv-wasm` row from the staged `@fuzdev/tsv-wasm` entry (which needs `deno task build:npm:all`). Same paired discipline (rotated interleaved arms, in-run A/A floor, byte-identity gate, `facade_identity.ts`, which a tsv crash in any arm fails) over three sets — the perf corpus, its smallest tenth, one minimal source — plus the facade's one O(source) step (`isWellFormed`) priced alone. Runs under **all three runtimes** (its own load path, not `init_implementations`) | — |
 | `biome_heap_probe.ts` | does biome's sweep time move with its leaked wasm linear memory, per runtime? N consecutive full sweeps of one format row under a reset regime (`never` / `every` / the production rule), wall beside heap size, grow count and JSC's own heap stats per sweep; `--prelude prettier,oxfmt,…` first runs the group's earlier rows in the same process — a SHARED process, which the bench no longer is (§Process model), and the state that decided the answer on bun. Runs under **node and bun** (not `deno task`: `node --expose-gc --disable-warning=ExperimentalWarning …` / `bun --expose-gc …`); what sized `RESET_GROWTH_BYTES` | — |
