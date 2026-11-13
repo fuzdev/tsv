@@ -1,8 +1,8 @@
 /**
  * `check_canonical_pins.ts`' mode flags; what `--checkouts` says when the run has no git (the
  * presence of the `git` handle is what decides whether the drift half runs); a present checkout
- * graded, and one git or a version read fails in failing the run rather than reading as absent;
- * and `--pins` over fake pin sites.
+ * graded, one whose version file can't be read failing the run and one git fails in warning,
+ * neither reading as absent; and `--pins` over fake pin sites.
  */
 
 import { deepStrictEqual, ok, strictEqual } from 'node:assert';
@@ -94,6 +94,8 @@ test('--checkouts with git asks it for each sibling checkout that exists, and on
 
 test('--checkouts runs git in each present sibling checkout, asking for its pinned object', async () => {
 	capture_log();
+	// the fake checkouts hold no version file, which fails the run; its lines aren't this test's
+	vi.spyOn(console, 'error').mockImplementation(() => {});
 	const asked: Array<{ args: ReadonlyArray<string>; cwd: unknown }> = [];
 	// a handle per sibling, so the test sees which directory each git call ran in
 	const handles = new Map<string, FsReadDir>();
@@ -278,6 +280,54 @@ describe('--checkouts over a present checkout', () => {
 		strictEqual(run.code, 1);
 		deepStrictEqual(run.err.length, 2, run.err.join('\n'));
 		ok(run.err[1]!.includes('re-record GATE_CHECKOUT_IDS'), run.err[1]);
+	});
+
+	test('a broken version file and a skewed one each print their block; git failing adds no warning to a failed run', async () => {
+		const git = fake_git((args, path) =>
+			path === '/siblings/../test262'
+				? { code: 128, stderr: 'fatal: not a git repository\n' }
+				: { code: 0, stdout: 'f'.repeat(40) }
+		);
+		const run = await run_checkouts(
+			siblings_of({
+				'../svelte': {},
+				'../acorn-typescript': { 'package.json': '{"version":"1.0.0"}' },
+				'../test262': {}
+			}),
+			git,
+			fake_dir({
+				'benches/js/package.json': JSON.stringify({
+					dependencies: { '@sveltejs/acorn-typescript': '2.0.0' }
+				})
+			})
+		);
+		strictEqual(run.code, 1);
+		deepStrictEqual(run.err, [
+			'FAIL: canonical version sync broken:',
+			'  · @sveltejs/acorn-typescript: checkout ../acorn-typescript/package.json is v1.0.0 but the oracle pin is v2.0.0 — ' +
+				'align the checkout to the pinned tag, or bump the canonical pins deliberately (a fixture re-baseline)',
+			'  ⚠ Bumping a canonical pin re-baselines the fixture corpus — see docs/benchmarks.md §"Canonical baseline is coupled".',
+			"FAIL: a present checkout's version file can't be read:",
+			"  · svelte: ../svelte is present but ../svelte/packages/svelte/package.json can't be read (not_found: packages/svelte/package.json)",
+			'  Each is a broken checkout, not a machine without one; repair it, or remove it.'
+		]);
+		deepStrictEqual(run.out, []);
+	});
+
+	test('a git the spawn module refuses for another reason is named as failing, not as unable to start', async () => {
+		const git = {
+			out: async () => {
+				throw new SpawnError('not_found', 'git', 'git: not found');
+			}
+		} as unknown as SpawnProgram;
+		const run = await run_checkouts(siblings_of({ '../test262': {} }), git);
+		strictEqual(run.code, 0, run.err.join('\n'));
+		ok(
+			run.out.includes(
+				'  · ../test262: ../test262 is present but git rev-parse HEAD failed: git: not found'
+			),
+			run.out.join('\n')
+		);
 	});
 
 	test('a version file missing or malformed in it fails the run, naming the cause', async () => {

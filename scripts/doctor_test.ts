@@ -1205,6 +1205,44 @@ describe('a present sibling that cannot say what it holds', () => {
 		ok(!marked(r.lines, '✓').some((line) => line.startsWith('../svelte checkout')));
 	});
 
+	test('each version file that fails to read warns once, never beside a check of that checkout', async () => {
+		for (const [name, path] of [
+			['acorn-typescript', 'package.json'],
+			['prettier', 'package.json']
+		] as const) {
+			const world = healthy();
+			world.sibling_dirs[name] = {
+				...fake_dir(world.siblings[name]!),
+				read_text: (p) => Promise.reject(new FsError('permission_denied', p))
+			};
+			const r = await run(world);
+			strictEqual(r.code, 0, `${name}: ${verdict(r)}`);
+			deepStrictEqual(marked(r.lines, '⚠'), [
+				`../${name} is present but ${path} can't be read (permission_denied: ${path}) — a broken checkout, not a machine without one; repair it, or remove it`
+			]);
+			ok(!marked(r.lines, '✓').some((line) => line.startsWith(`../${name} checkout`)), name);
+		}
+	});
+
+	test('a stamp input beneath a present checkout reads as absent only when a file is in the way', async () => {
+		for (const [kind, aside] of [
+			['not_a_directory', '../wpt/css not checked out'],
+			['permission_denied', "../wpt/css present, git can't read it"]
+		] as const) {
+			const world = healthy();
+			world.sibling_dirs.wpt = {
+				...fake_dir(world.siblings.wpt!),
+				exists: (path) => Promise.reject(new FsError(kind, path))
+			};
+			world.programs.git!['-C ../wpt/css rev-parse HEAD'] = exited('', 128);
+			const r = await run(world);
+			ok(
+				marked(r.lines, '·').includes(`wpt-css: no checkout to grade against (${aside})`),
+				`${kind}:\n${r.lines.join('\n')}`
+			);
+		}
+	});
+
 	test('a path that passes through a file reads as missing', async () => {
 		const world = healthy();
 		world.sibling_dirs.svelte = {

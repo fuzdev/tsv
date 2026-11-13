@@ -20,6 +20,7 @@ import { run_corpus_audit } from '../../benches/js/corpus_audit.ts';
 import { run_check_canonical_pins } from '../check_canonical_pins.ts';
 import { run_discovery_audit } from '../discovery_audit.ts';
 import { run_roundtrip_audit_prettier } from '../roundtrip_audit_prettier.ts';
+import { link_out_message } from '../sibling_text.ts';
 import { open_sibling, sibling_reads } from './checkout.ts';
 
 afterEach(() => {
@@ -122,8 +123,9 @@ describe('sibling_reads beneath the checkout', () => {
 			'in_absolute/a.js',
 			'in_climbing/a.js'
 		]) {
+			// the words `doctor` prints for the same case, so the two never drift apart
 			await rejects(reads.exists(path), {
-				message: `${join(root.path, 'sibling')}/${path} reaches through a symlink that is absolute or climbs out of ${join(root.path, 'sibling')}, which is never followed; make it relative within the checkout, or link the checkout itself instead`
+				message: link_out_message(join(root.path, 'sibling'), path)
 			});
 		}
 		await rejects(reads.read_text('out_relative/a.js'));
