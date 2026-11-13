@@ -11,6 +11,7 @@
 import { deepStrictEqual, ok, strictEqual, throws } from 'node:assert';
 
 import { fs, type FsDir } from '@fuzdev/gro/fs.ts';
+import { GIT_LOCAL_PASS_ENV } from '@fuzdev/gro/git.ts';
 import { is_spawn_error } from '@fuzdev/gro/spawn_error.ts';
 import { spawn, type SpawnProgram } from '@fuzdev/gro/spawn.ts';
 import { afterEach, test } from 'vitest';
@@ -58,10 +59,19 @@ const BASE = ['HOME', 'LC_ALL', 'PATH', 'TERM', 'TMPDIR', 'NO_COLOR', 'FORCE_COL
 const base_names = (): Array<string> =>
 	BASE.filter((name) => name === 'LC_ALL' || process.env[name] !== undefined);
 
-/** A caller environment no side should see: build flags and a stray secret. */
+/** The names a pass list names outright that a host may or may not set, beside gro's base set. */
+const HOST_NAMES = new Set(
+	[...BUILD_ENV, ...GIT_LOCAL_PASS_ENV].filter(
+		(name) => !name.includes('*') && !BASE.includes(name)
+	)
+);
+
+/** A caller environment no side should see: build flags and a stray secret. What a pass list
+ * could carry from the host (git's variables, a toolchain home, a config home) is cleared
+ * first, so the caller environment is the same on every machine. */
 const set_caller_env = (bin: FsDir): void => {
 	for (const name of Object.keys(process.env))
-		if (name.startsWith('GIT_')) delete process.env[name];
+		if (name.startsWith('GIT_') || HOST_NAMES.has(name)) delete process.env[name];
 	process.env.PATH = `${bin.path}:/usr/bin:/bin`;
 	process.env.RUSTFLAGS = '-C target-cpu=native';
 	process.env.CARGO_PROFILE_RELEASE_LTO = 'false';
