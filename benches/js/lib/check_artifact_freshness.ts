@@ -1,7 +1,7 @@
 /**
  * Artifact freshness guard for the rebuild-skipping bench/corpus/smoke tasks.
  *
- * `deno task bench` and `deno task corpus:compare:format` build the Rust + WASM
+ * `npm run bench` and `npm run corpus:compare:format` build the Rust + WASM
  * artifacts before running, so what they measure is fresh by construction. The
  * `:run` variants (`bench:deno:run` / `bench:node:run`, `corpus:compare:format:run`)
  * deliberately SKIP that build — that's the path for iterating on the measurement/reporting harness
@@ -41,7 +41,7 @@
  * Running this on the build-first tasks is harmless: a freshly built artifact
  * is newer than its sources, so the check passes silently. For a cargo-built
  * artifact that holds only because the build tasks STAMP it
- * (`scripts/cargo_build.ts`, `deno task build:stamped`): cargo keys `Cargo.lock`
+ * (`scripts/cargo_build.ts`, `npm run build:stamped`): cargo keys `Cargo.lock`
  * and a manifest by content, so one rewritten to something already built makes the
  * build a no-op that re-links the cached artifact under its original date — older
  * than the file this guard compares it to. The stamp dates the artifact at cargo's
@@ -272,9 +272,9 @@ export async function check_artifact_freshness(checks: readonly ArtifactCheck[])
 	}
 	if (fatal) {
 		lines.push('');
-		lines.push('  Rebuild everything first with a build-first task (`deno task bench` /');
+		lines.push('  Rebuild everything first with a build-first task (`npm run bench` /');
 		lines.push(
-			'  `deno task corpus:compare:format`), or `deno task build:bench` then re-run `deno task smoke`,'
+			'  `npm run corpus:compare:format`), or `npm run build:bench` then re-run `deno task smoke`,'
 		);
 		lines.push('  run the specific rebuild command(s) above, or set BENCH_STALE_OK=1 to override');
 		lines.push(
@@ -388,7 +388,7 @@ export interface ArtifactIdentity {
 /**
  * The identity of every artifact this runtime executes (`executed_artifact_checks`),
  * read from disk now. By content, not mtime: the build tasks re-stamp an artifact's
- * date on a cargo no-op (`deno task build:stamped`), so a `build:bench` that rebuilt
+ * date on a cargo no-op (`npm run build:stamped`), so a `build:bench` that rebuilt
  * nothing would otherwise read as a different binary.
  *
  * @throws if an artifact is missing — the freshness guard has already required them
@@ -449,7 +449,7 @@ function executed_artifact_checks(native_profile?: string): ArtifactCheck[] {
 			// different file (correctly graded as size-only there).
 			path: wasm_bundle_path('all', target),
 			binding_crates: TSV_ARTIFACTS.tsv_wasm.binding_crates,
-			rebuild: `deno task build:wasm:all:${target}`
+			rebuild: `npm run build:wasm:all:${target}`
 		}
 	];
 }
@@ -496,9 +496,6 @@ export async function warn_stale_reported_artifacts(): Promise<void> {
 						`${fmt_mtime(s.source_ms!)}\n      rebuild: ${s.rebuild}`
 		);
 	}
-	lines.push(
-		'  (not measured, so not fatal — `deno task build:bench` refreshes the whole set)',
-		''
-	);
+	lines.push('  (not measured, so not fatal — `npm run build:bench` refreshes the whole set)', '');
 	console.error(lines.join('\n'));
 }

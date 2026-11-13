@@ -1,7 +1,7 @@
 /**
  * `cargo build`, then date every final artifact it reports at now — the build-side
  * half of the mtime guards (`benches/js/lib/check_artifact_freshness.ts`,
- * `scripts/check_staged_freshness.ts`), and what `deno task build:stamped` runs.
+ * `scripts/check_staged_freshness.ts`), and what `npm run build:stamped` runs.
  *
  * Those guards read an artifact's mtime as WHEN IT WAS LAST BUILT and compare it
  * against the mtimes of everything feeding it. Cargo does not promise that reading. It
@@ -30,7 +30,7 @@
  * that is a `cdylib` AND an rlib (`tsv_wasm`) is left alone: its two files are one
  * unit's outputs. A `bin` has dependents too, its own package's integration tests,
  * which is harmless in the profiles the stamped tasks build (none runs tests) and the
- * reason the dev-profile `deno task build` stays a plain `cargo build`.
+ * reason the dev-profile `npm run build` stays a plain `cargo build`.
  *
  * Which files those are is cargo's to say (`--message-format=json-render-diagnostics`:
  * artifact messages on stdout, diagnostics still rendered to stderr), so no task names

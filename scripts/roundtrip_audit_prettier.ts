@@ -1,6 +1,6 @@
 /**
  * The format→reparse round-trip audit over the pinned **Prettier format suites**, as a
- * `deno task check` leg.
+ * `npm run check` leg.
  *
  * ## Why a second scope of the same audit
  *
@@ -12,7 +12,7 @@
  *
  * The class is not hypothetical. A statement-head paren strip turned `for ((let) of foo);`
  * into `for (let of foo);` — output tsv's own parser rejects — and it sat behind a green
- * `deno task check` for a whole PR. Three prettier-suite files caught it on the first run;
+ * `npm run check` for a whole PR. Three prettier-suite files caught it on the first run;
  * nothing in `tests/fixtures` could. The same sweep is a leg of `audit:corpus`, but that
  * runs at release cadence over the sibling snapshot + working trees and takes minutes.
  *
@@ -23,10 +23,10 @@
  *
  * ## Why absence is a warning, not a failure
  *
- * `deno task check` is the committed-tree gate: it must run on a bare checkout, and the CI
+ * `npm run check` is the committed-tree gate: it must run on a bare checkout, and the CI
  * `check` job has no sibling checkouts at all. So `../prettier` is read **opportunistically**
  * — present, and the leg gates; absent, and it prints a loud NOT RUN line and exits 0. The
- * suites are version-pinned reading references (`deno task doctor` reports the checkout),
+ * suites are version-pinned reading references (`npm run doctor` reports the checkout),
  * and this audit is an invariant check rather than a count-pinned gate, so a finding fails
  * wherever it occurs and a smaller corpus cannot silently soften a verdict — the only thing
  * absence costs is coverage, stated on stdout rather than assumed.
@@ -54,7 +54,7 @@ export const PRETTIER_CHECKOUT = '../prettier';
  * different things by the same name.
  *
  * Lives here rather than in `benches/js/lib/corpus.ts` (where the corpus entries are
- * declared) because this module runs inside `deno task check`, which must not import the
+ * declared) because this module runs inside `npm run check`, which must not import the
  * bench tree — that resolves npm bare specifiers out of `benches/js/node_modules`, which
  * `check` neither installs nor needs.
  *
@@ -102,7 +102,7 @@ export async function run_roundtrip_audit_prettier(
 			`⚠ roundtrip:audit:prettier NOT RUN — no ../prettier checkout (${PRETTIER_ROUNDTRIP_SUITES.length} suites skipped).`
 		);
 		log('  This leg is the only one in `check` that reaches non-format-stable inputs.');
-		log('  Clone prettier beside this repo (see `deno task doctor`) to gate it locally.');
+		log('  Clone prettier beside this repo (see `npm run doctor`) to gate it locally.');
 		return 0;
 	}
 

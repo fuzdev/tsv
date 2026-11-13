@@ -101,9 +101,9 @@ export function ffi_loaded_path(profile: string | undefined): string {
  */
 export function ffi_rebuild_task(profile: string | undefined): string {
 	return profile === undefined
-		? 'deno task build:bench:pgo'
+		? 'npm run build:bench:pgo'
 		: profile === 'release'
-			? 'deno task build:ffi'
+			? 'npm run build:ffi'
 			: `npm run build:stamped -- -p tsv_ffi --profile ${profile}`;
 }
 
@@ -150,10 +150,10 @@ export function napi_loaded_path(profile: string | undefined): string {
 /** The task that rebuilds the addon `napi_loaded_path` names for the same profile. */
 export function napi_rebuild_task(profile: string | undefined): string {
 	return profile === undefined
-		? 'deno task build:bench:pgo'
+		? 'npm run build:bench:pgo'
 		: profile === 'napi'
-			? 'deno task build:napi'
-			: `deno task build:napi:${profile}`;
+			? 'npm run build:napi'
+			: `npm run build:napi:${profile}`;
 }
 
 /** The three wasm-pack builds, by the cargo features each selects. */
@@ -194,7 +194,7 @@ export const TSV_ARTIFACTS = {
 		kind: 'native',
 		path: pgo_bench_library_path('ffi'),
 		binding_crates: ['tsv_ffi'],
-		rebuild: 'deno task build:bench:pgo',
+		rebuild: 'npm run build:bench:pgo',
 		build: 'pgo',
 		pgo_world: 'ffi'
 	},
@@ -207,7 +207,7 @@ export const TSV_ARTIFACTS = {
 		kind: 'native',
 		path: `${PROJECT_ROOT}/target/ffi-format/release/${FFI_LIB}`,
 		binding_crates: ['tsv_ffi'],
-		rebuild: 'deno task build:ffi:format',
+		rebuild: 'npm run build:ffi:format',
 		build: 'plain'
 	},
 	// The native mirror of @fuzdev/tsv-parse-wasm: keeps the parse exports + the
@@ -218,7 +218,7 @@ export const TSV_ARTIFACTS = {
 		kind: 'native',
 		path: `${PROJECT_ROOT}/target/ffi-parse/release/${FFI_LIB}`,
 		binding_crates: ['tsv_ffi'],
-		rebuild: 'deno task build:ffi:parse',
+		rebuild: 'npm run build:ffi:parse',
 		build: 'plain'
 	},
 	// The Node/Bun native path, the sibling of the FFI library Deno loads. Same
@@ -229,7 +229,7 @@ export const TSV_ARTIFACTS = {
 		kind: 'native',
 		path: pgo_bench_library_path('napi'),
 		binding_crates: ['tsv_napi'],
-		rebuild: 'deno task build:bench:pgo',
+		rebuild: 'npm run build:bench:pgo',
 		build: 'pgo',
 		pgo_world: 'napi'
 	},
@@ -241,20 +241,20 @@ export const TSV_ARTIFACTS = {
 		kind: 'wasm',
 		path: wasm_bundle_path('format', 'deno'),
 		binding_crates: WASM_CRATES,
-		rebuild: 'deno task build:wasm:deno'
+		rebuild: 'npm run build:wasm:deno'
 	},
 	tsv_parse_wasm: {
 		label: 'tsv-parse-wasm',
 		kind: 'wasm',
 		path: wasm_bundle_path('parse', 'deno'),
 		binding_crates: WASM_CRATES,
-		rebuild: 'deno task build:wasm:parse:deno'
+		rebuild: 'npm run build:wasm:parse:deno'
 	},
 	tsv_wasm: {
 		label: 'tsv-wasm',
 		kind: 'wasm',
 		path: wasm_bundle_path('all', 'deno'),
 		binding_crates: WASM_CRATES,
-		rebuild: 'deno task build:wasm:all:deno'
+		rebuild: 'npm run build:wasm:all:deno'
 	}
 } as const satisfies Record<string, TsvArtifact>;

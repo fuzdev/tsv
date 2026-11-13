@@ -1,7 +1,7 @@
 /**
  * Tests for the timed run's pass arithmetic (`bench_plan.ts`): the order each pass
  * takes a group's rows in, and what a row's passes say once pooled.
- * Dependency-free, so it gates in `deno task test:node`.
+ * Dependency-free, so it gates in `npm run test:node`.
  */
 
 import assert from 'node:assert';

@@ -18,7 +18,7 @@
  * harvest does NOT own but reads through — the corpus loader's per-file filters
  * (`corpus_filter_fingerprint`) — is stamped by every grade that loads a corpus
  * view, so a filter change re-harvests without anyone remembering `--force`.
- * Stamps live in `benches/js/.cache` (gitignored); `deno task bench:clean` wipes
+ * Stamps live in `benches/js/.cache` (gitignored); `npm run bench:clean` wipes
  * them with the caches. Which stamps exist, and where, is `harvest_stamp_table.ts`.
  *
  * Every read, write, and `git` call goes through what the caller hands in: `StampGit`, a

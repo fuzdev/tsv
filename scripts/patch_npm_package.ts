@@ -583,7 +583,7 @@ export function reinstantiate() {
 	// name that drifts out does NOT fail loudly downstream — without `skipLibCheck` it is
 	// a TS2614 *inside the shipped package*, and WITH it (the common consumer config)
 	// the export silently degrades to `any`, so the package keeps type-checking while
-	// checking nothing. `deno task typecheck:packages` grades the merged `.d.ts` as a
+	// checking nothing. `npm run typecheck:packages` grades the merged `.d.ts` as a
 	// consumer compiles it, but only at release (publish.ts Step 6) or on demand; this is
 	// the one place the drift fails the build itself. Checked here, with the other export validations,
 	// so a failure leaves no half-patched package behind.

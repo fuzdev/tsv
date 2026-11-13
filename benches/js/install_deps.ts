@@ -8,7 +8,7 @@
  * npm skips on a non-wasm32 host because its metadata declares `cpu: wasm32`.
  * Portable (node: builtins only), so `deno run` or `node` both drive it.
  *
- * Usage: deno task bench:install   (or: node benches/js/install_deps.ts)
+ * Usage: npm run bench:install   (or: node benches/js/install_deps.ts)
  */
 import { spawnSync } from 'node:child_process';
 import { dirname } from 'node:path';

@@ -107,7 +107,7 @@ test("an addon that fails to load names the profile's rebuild task and frees the
 	const errors: string[] = [];
 	vi.spyOn(console, 'error').mockImplementation((...a: unknown[]) => void errors.push(a.join(' ')));
 	strictEqual(await init_compare_implementations({ profile: 'release' }), null);
-	ok(errors.includes('Run: deno task build:napi:release'), errors.join('\n'));
+	ok(errors.includes('Run: npm run build:napi:release'), errors.join('\n'));
 	strictEqual(world.calls.at(-1), 'canonical dispose');
 });
 
@@ -118,6 +118,6 @@ test('the roots load and guard the corpus addon, the one their tasks build', asy
 		world.guarded.map((c) => c.path),
 		[CORPUS_ADDON]
 	);
-	strictEqual(world.guarded[0]!.rebuild, 'deno task build:napi:corpus');
+	strictEqual(world.guarded[0]!.rebuild, 'npm run build:napi:corpus');
 	ok(world.calls.includes(`native load ${CORPUS_ADDON}`), world.calls.join('\n'));
 });

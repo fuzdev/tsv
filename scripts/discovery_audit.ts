@@ -26,7 +26,7 @@
  *
  * ## Why absence is a warning, not a failure
  *
- * Same posture as `roundtrip:audit:prettier`: `deno task check` must run on a bare
+ * Same posture as `roundtrip:audit:prettier`: `npm run check` must run on a bare
  * checkout (the CI `check` job has no sibling checkouts), so `../corpora` is read
  * opportunistically — present, and the leg gates; absent, and it prints a loud NOT RUN
  * line and exits 0. It is an invariant check, not a count pin, so a finding fails
@@ -34,11 +34,11 @@
  *
  * A DIRTY checkout is refused rather than graded: `git ls-files` describes the committed
  * tree while `tsv format --list` walks the disk, so a local modification would read as a
- * tsv finding. `deno task doctor` reports the same state.
+ * tsv finding. `npm run doctor` reports the same state.
  *
  * Cost is ~0.1 s (pure Rust, ~6,700 files — every collection the snapshot vendors, not
  * only the ones the bench views read) on the `--profile corpus` `tsv` binary of the shared
- * build world (deno.json `//build:check`), which the `format:audit` leg has already built.
+ * build world (docs/tasks.md §`build:check`), which the `format:audit` leg has already built.
  *
  * ## Reach
  *
@@ -69,7 +69,7 @@ import {
 const TSV_EXTENSIONS = ['ts', 'mts', 'cts', 'js', 'mjs', 'cjs', 'svelte', 'css'];
 
 /**
- * The `tsv` binary of the shared `--profile corpus` build world (deno.json `//build:check`),
+ * The `tsv` binary of the shared `--profile corpus` build world (docs/tasks.md §`build:check`),
  * which the `discovery:audit` task builds before running this.
  */
 export const DISCOVERY_TSV_BIN = 'target/corpus/tsv';
@@ -183,7 +183,7 @@ export async function run_discovery_audit(deps: DiscoveryAuditDeps): Promise<num
 	// The production discovery, on the `--profile corpus` `tsv` binary. Exec'd by PATH rather
 	// than through `cargo run`: that form selects `-p tsv_cli` alone, which resolves features
 	// without `_internal_audits` and so rebuilds the whole stack into a second corpus-profile world (see
-	// deno.json `//build:check`). The `discovery:audit` task runs `build:check` ahead of this,
+	// docs/tasks.md §`build:check`). The `discovery:audit` task runs `build:check` ahead of this,
 	// so the binary is fresh on a standalone run too.
 	const list = await run_capturing_stdout(deps.tsv, ['format', '--list', tree], deps.checkout);
 	const list_status = list.code;

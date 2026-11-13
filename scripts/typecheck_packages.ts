@@ -45,7 +45,7 @@
  * fails); named packages are exactly the set graded, each required. A stale staging is
  * refused as the package suites refuse it (`check_staged_freshness.ts`, the same
  * `BENCH_STALE_OK=1` override). TypeScript and `@types/node` come from
- * `benches/js/node_modules` (`deno task bench:install`; `scripts/typecheck_install.ts`); their
+ * `benches/js/node_modules` (`npm run bench:install`; `scripts/typecheck_install.ts`); their
  * absence fails the run. Every failure exits 1.
  *
  * Reach: the checkout read-only, for the staged packages and the install; a temp directory,
@@ -119,7 +119,7 @@ const readme_check = (key: PackageKey, dir: string, source: string, rebuild: str
 
 const wasm_package = (variant: 'format' | 'parse' | 'all', name: string): PackageSpec => {
 	const dir = wasm_package_dir(variant);
-	const rebuild = `deno task build:npm:${variant}`;
+	const rebuild = `npm run build:npm:${variant}`;
 	return {
 		key: variant,
 		name,
@@ -137,7 +137,7 @@ const wasm_package = (variant: 'format' | 'parse' | 'all', name: string): Packag
 	};
 };
 
-const NAPI_REBUILD = 'deno task build:napi:packages';
+const NAPI_REBUILD = 'npm run build:napi:packages';
 
 const PACKAGES: Record<PackageKey, PackageSpec> = {
 	format: wasm_package('format', '@fuzdev/tsv-format-wasm'),
@@ -863,7 +863,7 @@ export async function run_typecheck_packages(
 	const { checkout, print, print_error } = deps;
 	for (const { what, path } of TYPECHECK_INSTALL) {
 		if (!(await checkout.exists(path))) {
-			print_error(`✗ ${what} is not installed at ${path} — run \`deno task bench:install\``);
+			print_error(`✗ ${what} is not installed at ${path} — run \`npm run bench:install\``);
 			return 1;
 		}
 	}
@@ -886,7 +886,7 @@ export async function run_typecheck_packages(
 		}
 		if (packages.length === 0) {
 			print_error(
-				'✗ no package is staged — run `deno task build:packages` and/or `deno task build:napi:packages`'
+				'✗ no package is staged — run `npm run build:packages` and/or `npm run build:napi:packages`'
 			);
 			return 1;
 		}

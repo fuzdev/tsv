@@ -22,7 +22,7 @@ export type CheckoutInput = string | { path: string; tree: string };
 export interface HarvestStamp {
 	/** Project-root-relative stamp path (under the gitignored `benches/js/.cache`). */
 	path: string;
-	/** The `deno task` that writes it — the remedy a stale-stamp message names. */
+	/** The npm script that writes it — the remedy a stale-stamp message names. */
 	task: string;
 	/** Stamp key → the checkout input (`checkout_hash` in `harvest_stamp.ts`) that key records. */
 	checkouts: Record<string, CheckoutInput>;

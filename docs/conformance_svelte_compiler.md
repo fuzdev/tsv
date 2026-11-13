@@ -48,7 +48,7 @@ budget. Any entry requires:
    document.
 3. A catalog entry below explaining exactly why matching the oracle is wrong.
 
-`compile_conformance_audit` (gated in `deno task check`) checks each
+`compile_conformance_audit` (gated in `npm run check`) checks each
 `_compiled_divergence` fixture for its catalog entry (1↔3) and its README
 back-link (2). Both checks are per-fixture, so while the catalog is empty they
 inspect nothing and gate nothing — they are a tripwire armed for the first

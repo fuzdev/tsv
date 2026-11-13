@@ -255,7 +255,7 @@ Variant files must match the input file extension:
 - Ours normalizes to input → `prettier_variant_*`
 - Ours keeps stable (not input) → `variant_*`
 - Ours rewrites to a third stable form (not input, not the form) → `divergent_variant_*`
-- Run `deno task fixtures:audit <pattern>` to classify
+- Run `npm run fixtures:audit -- <pattern>` to classify
 
 **Unformatted variants** (normalization tests) — behavior is identical across every
 extension (`.svelte`, `.svelte.ts`, `.ts`, `.css`; the extension just matches the input
@@ -298,7 +298,7 @@ The two are a matched pair of opposite claims about the same input:
 so between them a fixture is squeezed from both sides. Write both where the input supports both.
 
 The N rules prove only that a variant *lands on* input; they never ask which
-direction it travelled from. `deno task variants:audit` asks exactly that, by
+direction it travelled from. `npm run variants:audit` asks exactly that, by
 aligning the variant to the input on their shared non-whitespace character
 stream and grading each whitespace gap:
 
@@ -412,7 +412,7 @@ README.md required.
 **Variant parse pins** — `expected_<stem>.json`, named by the sibling variant it pins
 (`prettier_variant_bom.svelte` → `expected_prettier_variant_bom.json`): the canonical
 parser's AST of that variant, which tsv's parse must reproduce (P4; S24 requires the
-variant). Never hand-written — `deno task fixtures:update:parsed` regenerates it, and an
+variant). Never hand-written — `npm run fixtures:update:parsed` regenerates it, and an
 empty file of that name is how one is created. Reach for it only when the parse fact lives
 in a form `input.*` cannot hold under F1 (the in-tree cases are a leading BOM with nothing
 load-bearing behind it, which the format side strips, and a newline inside Svelte's `_ as `
@@ -424,18 +424,18 @@ their claim semantics and coexistence rules are ./fixture_overview.md rules
 F5/S18, F6/S19, F7/S20:
 
 - `prettier_nonconvergent.txt` — prettier never reaches a fixed point on the input;
-  content is free-form prose. Use only when `deno task fixtures:update:formatted`
+  content is free-form prose. Use only when `npm run fixtures:update:formatted`
   cannot converge.
 - `prettier_rejects.txt` — prettier throws on the input (parse rejection or printer
   crash); the trimmed content is the position-stripped expected-error substring
   (matched with `contains`; all prose lives in README.md). The input must be valid by
   tsv's parse oracle. Hand-author it (`fixture_init` runs prettier, which throws),
-  then `deno task fixtures:update:parsed` for `expected.json`.
+  then `npm run fixtures:update:parsed` for `expected.json`.
 - `tsv_rejects.txt` — **tsv** rejects an input the canonical parser accepts (neither
   `input_invalid_*`, which needs both to reject, nor a plain fixture, which needs tsv
   to parse). Lives in a `_svelte_divergence` dir with README + `expected_svelte.json`;
   trimmed content is the expected **tsv**-error substring. Hand-author `input.*`
-  (prettier is not consulted), then `deno task fixtures:update:parsed` generates
+  (prettier is not consulted), then `npm run fixtures:update:parsed` generates
   `expected_svelte.json` (failing loudly if the canonical parser rejects — the
   divergence would be dead). Catalog in the matching ./conformance_svelte.md §Corrections Catalog section (§TypeScript Corrections for a script parse).
 

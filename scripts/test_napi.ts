@@ -13,8 +13,8 @@
  * its consumers use. Node's native type stripping executes the `.ts` directly
  * (requires Node >= 22.18; erasable syntax only).
  *
- * Usage: node --test scripts/test_napi.ts   (or `deno task test:napi`)
- * Prerequisite: deno task build:napi:probe (the `napi` profile — release +
+ * Usage: node --test scripts/test_napi.ts   (or `npm run test:napi`)
+ * Prerequisite: npm run build:napi:probe (the `napi` profile — release +
  * unwind — with the test-only `panic_probe` feature, whose export drives the
  * panic-contract test below). Also runs against a plain `build:napi` artifact
  * (the shipped shape, no probe): the contract test then reports as skipped.
@@ -40,7 +40,7 @@ import { create_locator } from '../crates/tsv_wasm/npm/locations.js';
 
 const lib_path = napi_library_path('napi');
 if (!existsSync(lib_path)) {
-	console.error(`tsv_napi addon not found at ${lib_path}. Run 'deno task build:napi' first.`);
+	console.error(`tsv_napi addon not found at ${lib_path}. Run 'npm run build:napi' first.`);
 	process.exit(1);
 }
 
@@ -137,7 +137,7 @@ describe('tsv_napi addon (real N-API JS boundary)', () => {
 	// bug — must surface as a thrown JS error with the process AND the
 	// per-thread arenas still usable, never abort the host. Driven through the
 	// test-only `__panic_probe` export (the `panic_probe` cargo feature, which
-	// `deno task test:napi` builds; a published artifact has no probe, so this
+	// `npm run test:napi` builds; a published artifact has no probe, so this
 	// test skips against one). The probe panics INSIDE `with_ast_arena`, so the
 	// calls after it also prove the take/park arena recovery across the real
 	// boundary.

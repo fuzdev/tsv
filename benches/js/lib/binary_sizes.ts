@@ -144,12 +144,12 @@ export interface CollectedBinarySizes {
 	 * Two different facts share this list, told apart by the label. A **tsv**
 	 * variant (`tsv format (ffi)`, `tsv-parse-wasm`, …) is absent whenever its
 	 * optional build task hasn't been run, which is routine on a machine that
-	 * built only what it measures; the full `deno task bench` builds them all. A
+	 * built only what it measures; the full `npm run bench` builds them all. A
 	 * **third-party** label is absent although its impl initialized, which means
 	 * the package shipped no artifact where this module looks — a stale path here,
 	 * or an upstream layout change. The one third-party label with a benign
 	 * reading is `oxc-parser (wasm)`: its binding lives in no manifest
-	 * (`OXC_WASI_BINDING`, force-fetched by `deno task bench:install`), so a plain
+	 * (`OXC_WASI_BINDING`, force-fetched by `npm run bench:install`), so a plain
 	 * `npm install` leaves it absent with nothing else wrong.
 	 */
 	absent: string[];

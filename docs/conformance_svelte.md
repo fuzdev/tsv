@@ -23,7 +23,7 @@ The tsv parser aims for **exact AST compatibility** with Svelte's parser on ever
 
 Cases where tsv intentionally produces different AST than Svelte. Fixtures use `_svelte_divergence` suffix.
 
-**Corpus-scale enforcement**: `deno task corpus:compare:parse` deep-diffs tsv's
+**Corpus-scale enforcement**: `npm run corpus:compare:parse` deep-diffs tsv's
 parse output against the canonical parsers on real codebases and classifies
 diffs against this catalog (the `DOCUMENTED_MATCHERS` list in
 `benches/js/lib/parse_divergences.ts` covers the divergences that parse on
@@ -63,7 +63,7 @@ Corrections where the divergent input is not a **format fixed point**, so no
 fixture can exist (the Core Invariant requires an input both formatters leave
 alone — and the one that normalizes the trigger away is as often tsv as prettier:
 `color/* c */: blue` is prettier-stable, but tsv respaces it) — the corpus AST
-differential (`deno task corpus:compare:parse`) is the regression oracle, via
+differential (`npm run corpus:compare:parse`) is the regression oracle, via
 the `DOCUMENTED_MATCHERS` named below. What bytes cannot pin, a Rust test can:
 `tests/css_property_gap_comment_wire.rs` holds the property-gap reading as a
 _relation_ between parses (the two spellings agree for tsv and disagree for

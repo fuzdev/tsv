@@ -8,7 +8,7 @@
  * writers, which emit it on the loc-bearing wire, and by the shipped `locations.js`, which
  * reconstructs it in JS from the span-only wire plus the source. Neither carries a
  * hand-written expectation; each is the other's drift check. The fixtures pin the span-only
- * wire, so this is the only `deno task check` leg that grades the JS reconstruction
+ * wire, so this is the only `npm run check` leg that grades the JS reconstruction
  * (`tests/loc_definition.rs` grades the Rust loc wire against an independent reference). (Its outside
  * reference — acorn's and Svelte's own `loc` — is graded at conformance cadence by
  * `corpus:compare:parse`, whose loc arm runs this same reconstruction over the corpus.)
@@ -28,7 +28,7 @@
  * against the loc wire, key order ignored (the Rust writer places `loc` after `end`, the
  * reconstruction appends it last; the contract leaves order unspecified).
  *
- * Usage: `deno task check:loc` (builds `target/corpus/tsv_debug` first), or directly from the
+ * Usage: `npm run check:loc` (builds `target/corpus/tsv_debug` first), or directly from the
  * checkout's root, `node scripts/roots/check_loc.ts [root]`, the root a path in the checkout.
  *
  * Its reach: the checkout read-only (the ledger) and the checkout's `target/corpus/tsv_debug`,

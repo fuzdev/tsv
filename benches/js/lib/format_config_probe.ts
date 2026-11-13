@@ -305,7 +305,7 @@ export function assert_format_config_landed(
 	// `Language`, so a new language cannot be added without a probe source — but
 	// nothing would force a grading ARM to go with it, and a `void` switch that
 	// falls through would then pass every caller silently. That is the failure this
-	// module exists to prevent, one level up. `deno task typecheck:js` fails here
+	// module exists to prevent, one level up. `npm run typecheck:js` fails here
 	// until the arm exists.
 	const unhandled: never = language;
 	throw new Error(`format config probe: no grading arm for language '${String(unhandled)}'`);

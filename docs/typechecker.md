@@ -37,13 +37,13 @@ ids, SoA side columns, arena borrowing) is tsv's own.
 
 ## Gating status
 
-The `tsc_conformance` deno tasks are **on-demand tools for typechecker sessions**,
+The `tsc_conformance` tasks are **on-demand tools for typechecker sessions**,
 nothing more:
 
-- **NOT** in `deno task check` (which is external-oracle-free by design).
-- **NOT** in `deno task conformance` / `conformance:all`, and **not release-gating** —
+- **NOT** in `npm run check` (which is external-oracle-free by design).
+- **NOT** in `npm run conformance` / `conformance:all`, and **not release-gating** —
   `scripts/publish.ts` Step 3b neither runs them nor preflights their oracle.
-- `../typescript-go` is therefore **not** a release-required checkout. `deno task
+- `../typescript-go` is therefore **not** a release-required checkout. `npm run
   doctor` reports its readiness under an explicitly optional section; an absent
   checkout is informational, never a failure, even under `--strict`.
 
@@ -75,7 +75,7 @@ oracle-side tools (`query` / `roundtrip` / `index`) are **zero checker code** �
 read, re-render, and self-check the baselines and the corpus inputs. `run` and
 `check-test` drive `tsv_check` against those same baselines.
 
-Distinct from the parser-conformance surfaces: `deno task conformance:ts-repo` grades
+Distinct from the parser-conformance surfaces: `npm run conformance:ts-repo` grades
 tsv's *parser* against the tsc corpus, while this reads tsgo's *checker* error
 output — the seam `tsv_check` emits through.
 
@@ -87,9 +87,9 @@ cargo run -p tsv_debug tsc_conformance roundtrip                 # parse every b
 cargo run -p tsv_debug --quiet tsc_conformance run               # the conformance sweep over tsv_check
 cargo run -p tsv_debug --quiet tsc_conformance check-test duplicateVar --variant target=es2015  # inner dev loop: one test, diagnostics vs baseline
 cargo run -p tsv_debug tsc_conformance index                     # the corpus-INPUT side: directives, @filename units, varyBy variants
-deno task conformance:tsc-roundtrip                              # roundtrip, as a deno task
-deno task conformance:tsc-check                                  # run + writes benches/js/results/report.tsc-conformance.{json,md}
-deno task conformance:tsc-check:update                           # re-pin the count snapshot + refresh the report (full runs only; refuses a red run)
+npm run conformance:tsc-roundtrip                                # roundtrip, as an npm script
+npm run conformance:tsc-check                                    # run + writes benches/js/results/report.tsc-conformance.{json,md}
+npm run conformance:tsc-check:update                             # re-pin the count snapshot + refresh the report (full runs only; refuses a red run)
 ```
 
 Options: `--path <typescript-go>` (default `../typescript-go`) and `--json` everywhere; `--verbose`
@@ -140,7 +140,7 @@ the carve-outs. Every one of these shifts by construction — a parser fix moves
 parses, a tsgo pull moves the corpus — so they are regenerated rather than hand-edited:
 
 ```bash
-deno task conformance:tsc-check:update   # = tsc_conformance run --update
+npm run conformance:tsc-check:update     # = tsc_conformance run --update
 ```
 
 `--update` rewrites the file from the run's measured counts, prints one `old -> new`

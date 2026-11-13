@@ -15,8 +15,8 @@
  *      needs, and any OTHER package that moved with it is the oracle shifting under you;
  *   2. update `LOCKED_TRANSITIVE` in `scripts/check_canonical_pins.ts` if a pinned
  *      transitive version changed;
- *   3. re-run `deno task compile:fixtures:validate` (oracle freshness) and
- *      `deno task pins:audit`.
+ *   3. re-run `npm run compile:fixtures:validate` (oracle freshness) and
+ *      `npm run pins:audit`.
  *
  * Re-resolving a locked transitive (taking a newer `esrap` under svelte's range) is the lock's
  * deletion before this runs, its own deliberate oracle move.
@@ -113,7 +113,7 @@ export async function run_regen_sidecar_lock(
 		console.error(
 			check
 				? 'FAIL: npm could not resolve the sidecar lock offline — the lock lacks what ' +
-						'package.json names; run `deno task pins:lock` and review the diff'
+						'package.json names; run `npm run pins:lock` and review the diff'
 				: 'FAIL: `npm install --package-lock-only` could not resolve the sidecar packages'
 		);
 		return 1;
@@ -127,13 +127,13 @@ export async function run_regen_sidecar_lock(
 	if (check) {
 		console.error(
 			`FAIL: ${SIDECAR_LOCK_PATH} is not what npm resolves from package.json and the lock — ` +
-				'run `deno task pins:lock` and review the diff'
+				'run `npm run pins:lock` and review the diff'
 		);
 		return 1;
 	}
 	console.log(
-		`wrote ${SIDECAR_LOCK_PATH} — diff it, then re-run \`deno task pins:audit\` and ` +
-			`\`deno task compile:fixtures:validate\`, and reinstall the sidecar (\`${SIDECAR_INSTALL_COMMAND}\`)`
+		`wrote ${SIDECAR_LOCK_PATH} — diff it, then re-run \`npm run pins:audit\` and ` +
+			`\`npm run compile:fixtures:validate\`, and reinstall the sidecar (\`${SIDECAR_INSTALL_COMMAND}\`)`
 	);
 	return 0;
 }

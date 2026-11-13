@@ -169,7 +169,7 @@ describe('run_compose_reports', () => {
 		});
 		deepStrictEqual(err, [
 			'⚠ compose: report.conformance.node.json is at def67890, behind the perf siblings — the site ' +
-				'publishes both from one directory; re-run `deno task bench:conformance` (or `deno task ' +
+				'publishes both from one directory; re-run `npm run bench:conformance` (or `npm run ' +
 				'bench` for everything).'
 		]);
 	});

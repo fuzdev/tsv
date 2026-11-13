@@ -315,8 +315,9 @@ see [docs/architecture.md](docs/architecture.md).
 Dev dependencies:
 
 - [Rust](https://rust-lang.org/) - rustc, cargo
-- [Deno](https://docs.deno.com/runtime/) - optional, for the benchmark's Deno row (the tasks in
-  [deno.json](deno.json)); `deno task <name>` also runs any npm script, and CI installs no Deno
+- [Deno](https://docs.deno.com/runtime/) - optional, for the benchmark's Deno row alone (the
+  tasks in [deno.json](deno.json)); the checks, the release, and conformance need only Rust and
+  Node, and CI installs no Deno
 - [Node.js](https://nodejs.org/) - the version `engines` names in [package.json](package.json),
   for the JS suites and scripts and the fixture oracle `tsv_debug` runs; `npm ci` installs the
   JS dependencies, and `npm ci --prefix crates/tsv_debug/sidecar` the oracle's (`svelte`,

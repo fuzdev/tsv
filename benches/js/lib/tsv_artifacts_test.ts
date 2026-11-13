@@ -33,8 +33,8 @@ test('no profile loads the profile-guided addon the bench rows measure', () => {
 });
 
 test("each profile's rebuild hint names the task that builds its file", () => {
-	assert.strictEqual(napi_rebuild_task(undefined), 'deno task build:bench:pgo');
+	assert.strictEqual(napi_rebuild_task(undefined), 'npm run build:bench:pgo');
 	assert.strictEqual(napi_rebuild_task(undefined), TSV_ARTIFACTS.tsv_napi.rebuild);
-	assert.strictEqual(napi_rebuild_task('napi'), 'deno task build:napi');
-	assert.strictEqual(napi_rebuild_task('corpus'), 'deno task build:napi:corpus');
+	assert.strictEqual(napi_rebuild_task('napi'), 'npm run build:napi');
+	assert.strictEqual(napi_rebuild_task('corpus'), 'npm run build:napi:corpus');
 });

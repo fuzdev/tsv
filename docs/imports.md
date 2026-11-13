@@ -147,17 +147,17 @@ read off a slice.
   alone, never tsv's AST, so it grades the collector independently; the generator also runs it
   over tsv's own parse wire and requires the same records. Import phases have no canonical
   parser (acorn-typescript rejects them), so their fixtures take the walk over tsv's wire and say
-  so in an `oracle.txt`. `deno task imports:fixtures:validate` checks the committed files
+  so in an `oracle.txt`. `npm run imports:fixtures:validate` checks the committed files
   against the live oracle ([tests/fixtures_imports/README.md](../tests/fixtures_imports/README.md)).
 - **The self-check** — the same walk over every canonical tree the main fixture tree already
   pins (`tests/fixtures/**/expected.json`), compared with `parse_imports` on each input at its
   goal: sidecar-free, in every `cargo test`
   ([audits.md §Import fixture self-check](./audits.md#import-fixture-self-check-imports_self_check_tests)).
-- **The real-code differential** — `deno task imports:corpus`, tsv's records against
+- **The real-code differential** — `npm run imports:corpus`, tsv's records against
   oxc-parser's module record over the `../corpora` snapshot, every structural difference between
   the two models a named normalization
   ([audits.md §Import corpus](./audits.md#import-corpus-differential-importscorpus)).
-- **The engines, the fuzzer and the depth gate** — `deno task engines:audit` holds the WASM and
+- **The engines, the fuzzer and the depth gate** — `npm run engines:audit` holds the WASM and
   native engines to the same records; the fuzzer collects the records of every accepted mutant
   and checks their contract (sorted, disjoint or nested, in bounds, every specifier decoded);
   the depth gate walks every shape it builds at the parsers' limits

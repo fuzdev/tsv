@@ -7,7 +7,7 @@
  *
  * Hand-written canonical trees holding only the fields the matchers read, on purpose: a
  * test that parsed through the oracle would need the sidecar and stop gating in
- * `deno task check` (see `test:node`). What the real oracle writes is graded by
+ * `npm run check` (see `test:node`). What the real oracle writes is graded by
  * `corpus:compare:parse`.
  */
 

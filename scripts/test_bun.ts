@@ -16,8 +16,8 @@
  * Bun's export conditions pick is the one graded (the auto-init `node` entry; the lazy
  * `default` one would throw `WASM not initialized` on the first row).
  *
- * One file, two roles, split on `process.versions.bun`: run by Node (`npm run test:bun`,
- * or `deno task test:bun`, which runs the npm script) it is the launcher — it names the
+ * One file, two roles, split on `process.versions.bun`: run by Node (`npm run test:bun`) it
+ * is the launcher — it names the
  * packages, spawns `bun test` on itself, and warn-skips, exiting 0, where no `bun` is on the
  * PATH — or, with `--require-bun` (what a publish `--wetrun` passes), fails; run by
  * `bun test` it is the suite. Positional
@@ -31,8 +31,8 @@
  * (docs/tasks.md §`test:bun`). `bun` is the bare name on `PATH`, run with the whole
  * environment.
  *
- * Usage: deno task test:bun [--require-bun] [format|parse|all|napi ...]
- * Prerequisite: the named stagings — deno task build:npm:<variant>, build:napi:packages
+ * Usage: npm run test:bun -- [--require-bun] [format|parse|all|napi ...]
+ * Prerequisite: the named stagings — npm run build:npm:<variant>, build:napi:packages
  */
 
 import { after } from 'node:test';
@@ -122,7 +122,7 @@ async function register(packages: Array<string>): Promise<void> {
 		packages.some((p) => !(PACKAGES as ReadonlyArray<string>).includes(p))
 	) {
 		console.error(
-			`${PACKAGES_ENV} must name packages from ${PACKAGES.join(' / ')} — run through the launcher: deno task test:bun`
+			`${PACKAGES_ENV} must name packages from ${PACKAGES.join(' / ')} — run through the launcher: npm run test:bun`
 		);
 		exit(1);
 	}

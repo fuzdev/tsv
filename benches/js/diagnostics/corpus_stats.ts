@@ -16,11 +16,11 @@
  * for a human to spell into the manifest, never as a heuristic's silent drop).
  * Pure read-only; no parsing, no engine.
  *
- *   deno task corpus:stats                     # perf view (the bench corpus)
- *   deno task corpus:stats --view gates        # + prettier fixture suites
- *   deno task corpus:stats ../language-tools/packages/svelte2tsx/src  # a live candidate
- *   deno task corpus:stats ../corpora/collections/layerchart          # a materialized one
- *   deno task corpus:stats --json 2>/dev/null  # machine-readable to stdout, logs to stderr
+ *   npm run corpus:stats                       # perf view (the bench corpus)
+ *   npm run corpus:stats -- --view gates       # + prettier fixture suites
+ *   npm run corpus:stats -- ../language-tools/packages/svelte2tsx/src # a live candidate
+ *   npm run corpus:stats -- ../corpora/collections/layerchart         # a materialized one
+ *   npm run corpus:stats -- --json 2>/dev/null # machine-readable to stdout, logs to stderr
  *
  * Run directly (from repo root):
  *   node benches/js/roots/corpus_stats.ts [dir] [--view v] [--json] [--largest N] [--big BYTES]

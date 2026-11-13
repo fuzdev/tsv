@@ -49,7 +49,7 @@ rationale and fixture references.
 **Step 1: Get the next differing file**
 
 ```bash
-deno task corpus:compare:format:run --all --exit-on-first
+npm run corpus:compare:format:run -- --all --exit-on-first
 ```
 
 **Step 2: Examine the diff and compare with conformance doc**
@@ -59,7 +59,7 @@ deno task corpus:compare:format:run --all --exit-on-first
 cargo run -p tsv_debug compare ../corpora/collections/zzz/src/path/to/file.svelte
 
 # Check if the divergence detector recognizes it
-deno task corpus:compare:format:run ../corpora/collections/zzz --explain --exit-on-first
+npm run corpus:compare:format:run -- ../corpora/collections/zzz --explain --exit-on-first
 ```
 
 Compare the diff against the documented divergences (the frame plus the language's catalog —
@@ -85,8 +85,8 @@ The diff matches a documented pattern in the `conformance_prettier*.md` family, 
 3. Understand why it fails to match this specific diff
 4. Broaden the pattern (without overmatching)
 5. Add a positive test case in `patterns_test.ts` matching the new variant
-6. Verify: `deno task test:node` (all tests pass)
-7. Verify: `deno task corpus:compare:format:run --all --explain` (unknown count decreased)
+6. Verify: `npm run test:node` (all tests pass)
+7. Verify: `npm run corpus:compare:format:run -- --all --explain` (unknown count decreased)
 8. Move to next file
 
 ---
@@ -101,8 +101,8 @@ The diff does NOT match any documented pattern in the `conformance_prettier*.md`
    - If working from an **approved plan** that specifies the fixture, approval is already satisfied — proceed directly
    - Otherwise, **STOP** and present the fixture for approval before continuing
 4. Fix the code to make the fixture pass
-5. Verify no regressions with `deno task fixtures:validate`
-6. Verify corpus improvement: `deno task corpus:compare:format:run --all --explain`
+5. Verify no regressions with `npm run fixtures:validate`
+6. Verify corpus improvement: `npm run corpus:compare:format:run -- --all --explain`
 7. Move to next file
 
 ---
@@ -156,12 +156,12 @@ DISCOVER → CATEGORIZE → CHECK FIXTURES → CREATE FIXTURE (if missing) → I
 
 | Phase | What it settles | Command that drives it |
 | --- | --- | --- |
-| [1 DISCOVER](#phase-1-discover) | what differs | `deno task corpus:compare:format --all` |
-| [2 CATEGORIZE](#phase-2-categorize) | known vs partial vs unknown | `deno task corpus:compare:format --all --explain` |
+| [1 DISCOVER](#phase-1-discover) | what differs | `npm run corpus:compare:format -- --all` |
+| [2 CATEGORIZE](#phase-2-categorize) | known vs partial vs unknown | `npm run corpus:compare:format -- --all --explain` |
 | [3 CHECK FIXTURES](#phase-3-fixture-review) | is the pattern already pinned? | `find tests/fixtures -name '*pattern*' -type d` |
 | [4 CREATE FIXTURE](#phase-4-fixture-creation) | ★ the target behavior | `cargo run -p tsv_debug fixture_init …` |
-| [5 IMPLEMENT](#phase-5-implement) | the fix | `deno task fixtures:validate <pattern>` |
-| [6 VERIFY](#phase-6-verify) | improvement, no regressions | `deno task corpus:compare:format --all` |
+| [5 IMPLEMENT](#phase-5-implement) | the fix | `npm run fixtures:validate -- <pattern>` |
+| [6 VERIFY](#phase-6-verify) | improvement, no regressions | `npm run corpus:compare:format -- --all` |
 
 ---
 
@@ -171,22 +171,22 @@ DISCOVER → CATEGORIZE → CHECK FIXTURES → CREATE FIXTURE (if missing) → I
 
 ```bash
 # Full comparison - builds the corpus N-API addon first (all languages)
-deno task corpus:compare:format ../corpora/collections/zzz
+npm run corpus:compare:format -- ../corpora/collections/zzz
 
 # Filtered by language
-deno task corpus:compare:format ../corpora/collections/zzz --filter svelte
-deno task corpus:compare:format ../corpora/collections/zzz --filter typescript
-deno task corpus:compare:format ../corpora/collections/zzz --filter css
+npm run corpus:compare:format -- ../corpora/collections/zzz --filter svelte
+npm run corpus:compare:format -- ../corpora/collections/zzz --filter typescript
+npm run corpus:compare:format -- ../corpora/collections/zzz --filter css
 
 # Verbose mode (see each file as processed)
-deno task corpus:compare:format ../corpora/collections/zzz --verbose
+npm run corpus:compare:format -- ../corpora/collections/zzz --verbose
 
 # Skip rebuild (if the addon is already up to date)
-deno task corpus:compare:format:run ../corpora/collections/zzz
+npm run corpus:compare:format:run -- ../corpora/collections/zzz
 
 # Machine-readable: single JSON report on stdout (stats + safety/partial/unknown/
 # error lists), human output on stderr. Combine with --all / --safety-only / --filter.
-deno task corpus:compare:format:run --all --json 2>/dev/null
+npm run corpus:compare:format:run -- --all --json 2>/dev/null
 ```
 
 > **Staleness footgun**: `corpus:compare:format` rebuilds the N-API addon
@@ -235,13 +235,13 @@ The default output ([Examine Diffs](#examine-diffs)) is the triage view:
 
 ```bash
 # All unexplained diffs at once (recommended starting point)
-deno task corpus:compare:format --all
+npm run corpus:compare:format -- --all
 
 # Single project
-deno task corpus:compare:format ../corpora/collections/zzz
+npm run corpus:compare:format -- ../corpora/collections/zzz
 
 # Compact output without diffs
-deno task corpus:compare:format --all --summary
+npm run corpus:compare:format -- --all --summary
 ```
 
 This replaces manually running `cargo run -p tsv_debug compare <file>` on each unknown file.
@@ -252,7 +252,7 @@ This replaces manually running `cargo run -p tsv_debug compare <file>` on each u
 
 ```bash
 # Use --explain to also list known divergences with their patterns
-deno task corpus:compare:format ../corpora/collections/zzz --explain
+npm run corpus:compare:format -- ../corpora/collections/zzz --explain
 
 # Check the conformance docs for detailed rationale (frame + the language's catalog)
 cat docs/conformance_prettier.md docs/conformance_prettier_svelte.md
@@ -393,8 +393,8 @@ step, so don't hand-roll the directory, the prettier round-trip, or a separate
 
 ```bash
 cargo run -p tsv_debug fixture_init tests/fixtures/<lang>/<category>/<name> --content '<code>'
-deno task fixtures:validate <name> --prettier-only   # structure only, skips our formatter
-deno task fixtures:validate <name>                   # should FAIL — that failure is the spec
+npm run fixtures:validate -- <name> --prettier-only  # structure only, skips our formatter
+npm run fixtures:validate -- <name>                  # should FAIL — that failure is the spec
 ```
 
 Prefer `.svelte` even for TypeScript- or CSS-only patterns
@@ -459,7 +459,7 @@ covers the path it happens to reach.
 
 ```bash
 # Run fixture validation
-deno task fixtures:validate [pattern]
+npm run fixtures:validate -- [pattern]
 
 # Compare the specific file
 cargo run -p tsv_debug compare tests/fixtures/.../input.svelte
@@ -480,7 +480,7 @@ Once the fix works, add the normalization variants — both formatters must redu
 ### Re-run Corpus Comparison
 
 ```bash
-deno task corpus:compare:format ../corpora/collections/zzz --filter [language]
+npm run corpus:compare:format -- ../corpora/collections/zzz --filter [language]
 ```
 
 Confirm:
@@ -492,7 +492,7 @@ Confirm:
 ### Run Full Test Suite
 
 ```bash
-deno task check
+npm run check
 ```
 
 ---
@@ -514,9 +514,9 @@ Full algorithm, character sets, and how to read a violation:
 ### Corpus Compare Options
 
 ```bash
-deno task corpus:compare:format --all [options]       # the gates corpus view
-deno task corpus:compare:format <path> [options]      # Scans <path> recursively
-deno task corpus:compare:format:run <path> [options]  # Skip the addon build (faster iteration)
+npm run corpus:compare:format -- --all [options]      # the gates corpus view
+npm run corpus:compare:format -- <path> [options]     # Scans <path> recursively
+npm run corpus:compare:format:run -- <path> [options] # Skip the addon build (faster iteration)
 
 Options:
   --all             Compare the gates corpus view (the ../corpora snapshot + the prettier
@@ -535,8 +535,8 @@ Options:
 ### Divergence Audit
 
 ```bash
-deno task divergence:audit        # Cross-reference patterns vs conformance_prettier*.md
-deno task divergence:audit --json # Machine-readable JSON output
+npm run divergence:audit          # Cross-reference patterns vs conformance_prettier*.md
+npm run divergence:audit -- --json # Machine-readable JSON output
 ```
 
 ### Debug Commands

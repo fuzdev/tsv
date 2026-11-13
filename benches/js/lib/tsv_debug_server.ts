@@ -8,7 +8,7 @@
  * run its process startup over and over and report a panic as an exit code rather than as a
  * panic.
  *
- * The binary is the shared `--profile corpus` build world (`deno task build:check`), where a
+ * The binary is the shared `--profile corpus` build world (`npm run build:check`), where a
  * panic unwinds and is answered as one, guarded for freshness like the N-API addon. The
  * process comes from the caller, which makes the program once the guard passes
  * (`TsvDebugProgram`, which a gro `SpawnProgram` satisfies), so the module imports no
@@ -21,7 +21,7 @@ import { signal_exit_code } from '../../../scripts/exit_code.ts';
 import { check_artifact_freshness } from './check_artifact_freshness.ts';
 import { lines_of } from './text_lines.ts';
 
-/** The `--profile corpus` `tsv_debug` binary `deno task build:check` builds. */
+/** The `--profile corpus` `tsv_debug` binary `npm run build:check` builds. */
 export const TSV_DEBUG_CORPUS = 'target/corpus/tsv_debug';
 
 /**
@@ -93,7 +93,7 @@ export class TsvDebugServer<Request, Reply> {
 				label: 'tsv_debug (corpus)',
 				path: TSV_DEBUG_CORPUS,
 				binding_crates: ['tsv_debug', 'tsv_cli'],
-				rebuild: 'deno task build:check'
+				rebuild: 'npm run build:check'
 			}
 		]);
 		return TsvDebugServer.spawn(command, open_program());

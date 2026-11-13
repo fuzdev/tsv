@@ -49,9 +49,9 @@
  * not graded here. And it cannot see a divergence both engines share with each other but not with
  * prettier, which is the conformance gates' job.
  *
- * NOT in `deno task check`: it needs two built packages, and `check` builds
+ * NOT in `npm run check`: it needs two built packages, and `check` builds
  * none. It runs in CI's `artifacts` job, after the step that builds both, and
- * locally after `deno task build:npm:all && deno task build:napi:packages`.
+ * locally after `npm run build:npm:all && npm run build:napi:packages`.
  *
  * Usage: node scripts/roots/engine_parity.ts [roots...]   (--json)
  *
@@ -293,8 +293,8 @@ export async function run_engine_parity(
 	const wasm_built = await checkout.exists(WASM_CLI);
 	if (!native || !wasm_built) {
 		const missing = [
-			native ? null : 'the native tsv_cli binary (deno task build:napi:packages)',
-			wasm_built ? null : 'the wasm package (deno task build:npm:all)'
+			native ? null : 'the native tsv_cli binary (npm run build:napi:packages)',
+			wasm_built ? null : 'the wasm package (npm run build:npm:all)'
 		].filter(Boolean);
 		print_error(`✗ engine parity needs both engines built — missing: ${missing.join(', ')}`);
 		return 1;
@@ -314,7 +314,7 @@ export async function run_engine_parity(
 			// sources re-stages a STAGED binary (as `scripts/test_napi_npm.ts` names for the same
 			// artifact) — a `target/release` fallback it never touched is not aged by it
 			files: native.label === 'target/release' ? [] : NAPI_STAGING_SOURCES,
-			rebuild: 'deno task build:napi:packages'
+			rebuild: 'npm run build:napi:packages'
 		},
 		// the wasm package as every reader of its staging dates it — the engine bytes
 		// themselves included, since `cli.js` is re-copied on every patcher run and a fresh

@@ -32,8 +32,8 @@
  * POSIX-only stagings assert the degraded binary paths (non-executable →
  * warn + JS fallback, signal death → re-raise).
  *
- * Usage: node --test scripts/test_napi_npm.ts   (or `deno task test:napi:npm`)
- * Prerequisite: deno task build:napi:packages
+ * Usage: node --test scripts/test_napi_npm.ts   (or `npm run test:napi:npm`)
+ * Prerequisite: npm run build:napi:packages
  */
 
 import { after, describe, it } from 'node:test';
@@ -125,7 +125,7 @@ const cli_binary = cli_binary_name(triple);
 // `--jobs 100000`) and `test:napi:npm:run` would have tested it without a
 // word. Staged mtimes are compared directly against the SOURCES, which
 // catches both lags at once — a `target/` build behind the sources, and a
-// staged copy behind the build. `deno task test:napi:npm` (build-first)
+// staged copy behind the build. `npm run test:napi:npm` (build-first)
 // passes this for free; BENCH_STALE_OK=1 is the deliberate-stale override.
 await assert_staged_fresh([
 	// the discovery crates it names are what the parity rows over `IgnoreStack` would
@@ -137,14 +137,14 @@ await assert_staged_fresh([
 		staged: `${pkg_root}/${triple}/${cli_binary}`,
 		crates: [...CORE_CRATES, 'tsv_cli', 'tsv_ignore', 'tsv_discover'],
 		files: NAPI_STAGING_SOURCES,
-		rebuild: 'deno task build:napi:packages'
+		rebuild: 'npm run build:napi:packages'
 	},
 	...napi_loader_checks()
 ]);
 
 // The one artifact this suite READS but does not build: `@fuzdev/tsv-wasm`,
 // which the export-set parity claim below compares the loader against. Absent
-// or STALE it is skipped, not failed — `deno task test:napi:npm` cannot
+// or STALE it is skipped, not failed — `npm run test:napi:npm` cannot
 // refresh another package's staging, and the two cases are equally unusable
 // here, since an export set captured before the delta moved reads as clean.
 // Graded by the one list every reader of that staging shares
@@ -156,7 +156,7 @@ for (const check of wasm_package_checks('all')) {
 	if (wasm_parity_staleness) break;
 }
 const wasm_parity_skip: string | false = wasm_parity_staleness
-	? `${wasm_parity_staleness.reason} — restage: deno task build:npm:all`
+	? `${wasm_parity_staleness.reason} — restage: npm run build:npm:all`
 	: false;
 
 const staged = stage(true);
@@ -409,7 +409,7 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 	// pure-JS `api_parse.js` and `locations.js` are copied in from the wasm packages, so
 	// this asserts the copies landed and are WIRED: `{locations: true}` is exactly the
 	// helper's reconstruction of the default parse, in all three languages. Whether that
-	// reconstruction equals the native `loc` emitter is `deno task check:loc`'s, over
+	// reconstruction equals the native `loc` emitter is `npm run check:loc`'s, over
 	// every fixture document; the CLI section below compares it with the native binary's
 	// `parse --locations` directly.
 	it('the locations helpers ship, and {locations: true} runs them', () => {

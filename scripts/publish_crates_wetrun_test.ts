@@ -321,7 +321,7 @@ test('a rate limit without --wait stops, naming the retry time read from the tee
 	deepStrictEqual(w.sleeps, []);
 	ok(
 		w.err.includes(
-			`  STOPPED at crates.io's rate limit. Re-run \`deno task publish:crates --wetrun\` after ${RETRY}: ` +
+			`  STOPPED at crates.io's rate limit. Re-run \`npm run publish:crates -- --wetrun\` after ${RETRY}: ` +
 				'it publishes only the crates not yet live (or pass --wait to sleep through it).'
 		),
 		w.err.join('\n')

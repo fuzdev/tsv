@@ -241,7 +241,7 @@ if (total_files === 0) {
 		`Empty corpus — nothing to measure${cause.length > 0 ? `: ${cause.join(', ')}` : ''}.` +
 			(cause.length > 0
 				? '\n  The corpus loaded fine (see the counts above); the filter/limit removed every file.'
-				: '\n  Every corpus entry loaded zero files — check the paths above and `deno task doctor`.')
+				: '\n  Every corpus entry loaded zero files — check the paths above and `npm run doctor`.')
 	);
 	exit(1);
 }
@@ -715,12 +715,12 @@ function enforce_exclusion_caches(caches: ExclusionCacheState[]): void {
 			if (ALLOW_MISSING) {
 				log(`  ⚠ ${label} cache absent — tolerated (BENCH_ALLOW_MISSING=1); not comparable`);
 			} else {
-				refusals.push(`the ${label} cache is absent — run \`deno task ${task}\``);
+				refusals.push(`the ${label} cache is absent — run \`npm run ${task}\``);
 			}
 		} else if (size !== pin) {
 			refusals.push(
 				`the ${label} cache holds ${size} paths ≠ its pin ${pin} — it predates a re-pin; ` +
-					`re-run \`deno task ${task} --force\``
+					`re-run \`npm run ${task} -- --force\``
 			);
 		}
 	}
@@ -793,7 +793,7 @@ async function enforce_css_reject_pin(full_corpus: boolean): Promise<void> {
 		`Conformance corpus: parseCss rejects ${rejects} of ${files_by_language.css.length} CSS files ` +
 			`≠ pinned CSS_REJECTS_PIN ${CSS_REJECTS_PIN}. Either a pinned input moved (../prettier's, ` +
 			`../svelte's or ../wpt's checkout) or svelte's parseCss changed what it accepts — ` +
-			`re-pin in lib/gate_counts.ts deliberately, after checking which (\`deno task ` +
+			`re-pin in lib/gate_counts.ts deliberately, after checking which (\`npm run ` +
 			`css:over-acceptance:pin\` grades the same count and stamps it).`
 	);
 	exit(1);
@@ -1143,7 +1143,7 @@ function check_variant_parity(): void {
 						// Every other failure in this harness names the next action; this is the
 						// most serious one, and the outputs themselves are gone by now (the check
 						// keeps digests, not bytes), so the remedy is how to get them BACK.
-						`\n  Isolate: BENCH_FILTER=${output_mismatch_examples[0]} deno task bench:${RUNTIME}:run` +
+						`\n  Isolate: BENCH_FILTER=${output_mismatch_examples[0]} ${RUNTIME === 'deno' ? 'deno task' : 'npm run'} bench:${RUNTIME}:run` +
 						(is_oxc_raw
 							? `\n  Both sides are one \`parseSync\` call apart in lib/oxc_raw.ts and lib/oxc.ts.`
 							: `\n  Both sides are reachable per file from ${

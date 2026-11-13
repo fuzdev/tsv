@@ -1,5 +1,5 @@
 /**
- * The import corpus differential — `deno task imports:corpus`: tsv's import records
+ * The import corpus differential — `npm run imports:corpus`: tsv's import records
  * (`tsv_ts::parse_imports`, `tsv_svelte::parse_imports`) against oxc-parser's module record
  * over real code.
  *
@@ -11,7 +11,7 @@
  * are unpinned, and the counts here are pinned.
  *
  * **tsv's side** is one `tsv_debug imports --stdin` process (the `--profile corpus` build
- * `deno task build:check` makes, so a panic is caught and answered as one), returning the
+ * `npm run build:check` makes, so a panic is caught and answered as one), returning the
  * JSON a binding returns: UTF-16 offsets, the specifier decoded. **oxc's side** is
  * `parseSync`'s `module` record, joined to oxc's own tree where the record says less than the
  * projection compared (below). A component's scripts are found by Svelte's `parse` (the

@@ -16,7 +16,7 @@ Inputs the oracle itself rejects (legacy-mode syntax, invalid JS, TypeScript in 
 
 A **Refused** entry below opens with the `Refusal`'s stable **bucket key** in a code span (user-chosen identifiers shown as `{name}`), so it can be matched directly against a `compile_corpus_compare` run, which reports those keys via `Refusal::bucket_key`. `compile_conformance_audit` gates that correspondence in one direction: a quoted key no variant produces fails the audit. The reverse does not hold — this is a coverage map, not a key dump, and a variant covered by a prose paragraph rather than its own bullet is fine (the audit reports the unquoted count without gating it). Each variant also carries a human-readable `Display` message that substitutes the real name and often adds a parenthetical the key omits — the two are deliberately decoupled so a message can be reworded without shifting corpus buckets.
 
-**Verification**: `cargo run -p tsv_debug compile_fixtures_validate` (fixture parity, oracle freshness, canonicalize fixed points) and `deno task compile:corpus:compare` (corpus-scale bucketing over real repos + the Svelte test suites).
+**Verification**: `cargo run -p tsv_debug compile_fixtures_validate` (fixture parity, oracle freshness, canonicalize fixed points) and `npm run compile:corpus:compare` (corpus-scale bucketing over real repos + the Svelte test suites).
 
 **Spec References**:
 
@@ -417,7 +417,7 @@ standalone repro, none of them dropped-region-specific:
 
 > **This inventory is GATED, not just described.** Svelte's own `compiler-errors` +
 > `validator` suites — mostly deliberately invalid — are a standing corpus behind
-> `deno task compile:validation`, a path-keyed known-bug ratchet over the
+> `npm run compile:validation`, a path-keyed known-bug ratchet over the
 > over-acceptances they expose (`compile_validation_known.txt` is the count — a figure
 > repeated in prose only goes stale). A *new* over-acceptance
 > fails the gate; a pinned one that stops firing fails too, so closing a rule forces
@@ -863,7 +863,7 @@ in `fn_declared`, the whole-component union of names declared inside any functio
 subtree, which exists to compensate for `reassigned` being shadow-naive. So
 `mutation-local` sits in the `static evaluation not portable` bucket, not
 `InvalidAssignmentTarget` (which has **no** corpus member), and the corpus holds at
-0 MISMATCH / 0 over-acceptance (`deno task compile:corpus:compare` for the current
+0 MISMATCH / 0 over-acceptance (`npm run compile:corpus:compare` for the current
 parity/refused tally).
 
 Narrowing that second residual is its own slice, and the scoped set is the substrate for

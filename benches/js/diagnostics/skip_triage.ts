@@ -111,7 +111,7 @@ const KNOWN_GAPS: KnownGap[] = [
 	},
 	// wpt-css harvest (benches/js/.cache/wpt_css) — surfaced by the MANUAL wpt-css
 	// differential (`skip_triage.ts benches/js/.cache/wpt_css`, a publish ship-gate step,
-	// not in `deno task conformance`). All are malformed CSS the spec/parseCss recovers
+	// not in `npm run conformance`). All are malformed CSS the spec/parseCss recovers
 	// from and tsv grammar-correctly rejects — the same error-recovery class as the
 	// prettier-corpus entries above, verified file-by-file. The cache is derived +
 	// gitignored, so a re-harvest that drops/renames a file just leaves the entry

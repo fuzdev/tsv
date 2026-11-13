@@ -285,7 +285,7 @@ export async function run_fixtures_gate(
 	// checkout (or a typo'd subtree path) exits 1. The tolerance point for
 	// machines without the sibling checkouts is publish Step 3b's preflight
 	// probe, which skips the whole aggregate with a warning BEFORE the gates
-	// run; each gate itself is strict so a manual `deno task conformance`
+	// run; each gate itself is strict so a manual `npm run conformance`
 	// can't green-skip a leg.
 	if (scanned === 0) {
 		if (json_mode) await deps.stdout.write(JSON.stringify({ root, scanned: 0 }, null, '\t') + '\n');

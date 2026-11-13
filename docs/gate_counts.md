@@ -38,17 +38,17 @@ real move in a number is a deliberate, visible edit.
 
   **The suite-derived pins have exactly one cadence.** Every count above measured over
   a sibling checkout (the five suite harvests' plus the CSS reject count) is re-derived
-  by `deno task bench:pins:suites` and by nothing in `deno task check`, whose two
+  by `npm run bench:pins:suites` and by nothing in `npm run check`, whose two
   sibling-checkout legs (`roundtrip:audit:prettier`, `discovery:audit`) re-derive no
   pin — so a checkout that moves leaves the pin describing the previous corpus with
   every committed-tree gate green until that group runs. (The svelte-styles block count
   is the one sibling-measured pin outside that group: the same
-  stamp-and-fail-before-writing posture, re-derived by `deno task
+  stamp-and-fail-before-writing posture, re-derived by `npm run
   bench:harvest:svelte-styles`, which `conformance` chains later beside the corpus legs
   that read its cache.)
 
   Two things make that safe rather than merely documented: the group is a preflight of
-  `deno task conformance` (so a release cannot ship the old number), and each leg is
+  `npm run conformance` (so a release cannot ship the old number), and each leg is
   freshness-stamped on the git OBJECT — its HEAD commit, or for the `../corpora`
   snapshot its `collections/` tree id — of **every** checkout it reads. For the two
   reject pins that is three apiece, neither list the one the pin is named after (CSS:
@@ -70,7 +70,7 @@ real move in a number is a deliberate, visible edit.
   reject set. Three more get a weaker cache-staleness check: `TS_REPO_REJECTS_PIN` from
   `ts_repo_over_acceptance.ts`, and `SVELTE_REJECTS_PIN` / `PRETTIER_JSX_PIN` from the
   conformance coverage run, which refuses to publish over an exclusion cache whose size
-  is not its pin (`bench_preflight.ts` `enforce_exclusion_caches`). `deno task doctor` reports a
+  is not its pin (`bench_preflight.ts` `enforce_exclusion_caches`). `npm run doctor` reports a
   stamp whose recorded checkout id is behind its checkout.
 - **`benches/js/lib/corpus_format_pins.txt` + `corpus_parse_pins.txt`** — the two
   corpus gates' counts, one row per corpus SOURCE (a `../corpora` collection, a prettier
@@ -108,8 +108,8 @@ real move in a number is a deliberate, visible edit.
   gates the ON-DEMAND experimental-typechecker tasks, not a release leg. The
   drifting tsv-side counts (denominators, parse-divergence census, family
   partitions, carve-outs) live in the machine-regenerated snapshot
-  `crates/tsv_debug/src/cli/commands/tsc_conformance_pins.txt`, rewritten by `deno
-  task conformance:tsc-check:update`. The oracle-side pins (baseline / roundtrip /
+  `crates/tsv_debug/src/cli/commands/tsc_conformance_pins.txt`, rewritten by `npm
+  run conformance:tsc-check:update`. The oracle-side pins (baseline / roundtrip /
   pretty + the `INDEX_*` denominators) and the semantically-zero invariant gates
   stay hand-edited consts in `cli/commands/tsc_conformance/pins.rs`; the
   crash-exclusion count sits beside its ledger in
@@ -159,7 +159,7 @@ number is unauditable — the next re-pin cannot tell a recorded win from an abs
 regression — so the attribution is the constant's semantics, not its history.
 
 **The two corpus gates re-pin by regenerating, not by editing.** `npm run
-corpus:compare:format -- --all --update` and `deno task corpus:compare:parse --all --update`
+corpus:compare:format -- --all --update` and `npm run corpus:compare:parse -- --all --update`
 rewrite their pins file from the run and print every row that moved. `--update` refuses a
 narrowed run, and any run that could write a wrong table: a source absent from it (an
 un-harvested `svelte_styles` cache), a red verdict (format: SAFETY, an environment error;
@@ -205,7 +205,7 @@ When a checkout moves, re-record its **id** (its HEAD commit; for `../corpora`, 
 `git -C ../corpora rev-parse HEAD`, the fetchable name the release workflow's PGO training
 shallow-fetches and checks against the tree id) — that struct is the single
 provenance record for what a pin was measured against (upstream version files only bump
-at release) — and run `deno task bench:pins:suites` there too, so the suite-derived pins
+at release) — and run `npm run bench:pins:suites` there too, so the suite-derived pins
 move with it. Each entry's `pins` list is graded by
 `benches/js/lib/gate_counts_test.ts` (in `test:node`): every exported pin must be
 named by some checkout (or by the test's `UNTRACKED_PINS`, with a reason), and every

@@ -38,7 +38,7 @@
  * by `corpus:compare:format` and the `conformance.ts` driver only. NEVER the
  * bench (it times prettier) and NEVER the fixture validator (live-verification
  * by design). Disable for a session with `TSV_PRETTIER_CACHE=0`; wiped by
- * `deno task bench:clean`; unbounded (content-addressed, no eviction) — clean
+ * `npm run bench:clean`; unbounded (content-addressed, no eviction) — clean
  * when it bothers you.
  */
 

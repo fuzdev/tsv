@@ -264,7 +264,7 @@ describe('the platform package', () => {
 		const world = fake_world({ missing: [at('target/napi/libtsv_napi.so')] });
 		strictEqual(await run_build_napi_packages(world.deps, []), 1);
 		deepStrictEqual(world.err, [
-			"FAIL: cannot read the built cdylib at target/napi/libtsv_napi.so — run 'deno task build:napi' first",
+			"FAIL: cannot read the built cdylib at target/napi/libtsv_napi.so — run 'npm run build:napi' first",
 			`Error: ENOENT: no such file, copyfile '${at('target/napi/libtsv_napi.so')}'`
 		]);
 		ok(!world.calls.some(([op, from]) => op === 'copy' && from === at('target/release/tsv')));

@@ -104,7 +104,7 @@ it is. A malformed failure, or a `kind` the export never returns (a refusal from
 its product nor a failure', {cause})` — an engine bug, never a result. Both engines' results for
 one input are identical (`scripts/parse_failure_suite.ts` holds both package suites to one
 table, the refusal included, and the napi suite compares the two engines directly;
-`deno task test:bun` runs that table under Bun).
+`npm run test:bun` runs that table under Bun).
 
 Anything else an engine throws passes through as itself, THROWN: the raw engines' own
 source-type refusals, a source over the 4 GiB cap (a plain `Error`), a caught panic, a WASM
@@ -150,7 +150,7 @@ stays Rust-only.
 **Why the reader is JS.** Both package sets need it, and the native one has no WASM to host a
 Rust reader — a Rust reader would need a hand restatement in the napi loader plus a parity test.
 One shared JS reader is strictly less to drift: it is unit-tested over a fake engine by
-`scripts/npm_api_test.ts` (a `deno task test:node` suite, so it gates in `check` with no package
+`scripts/npm_api_test.ts` (an `npm run test:node` suite, so it gates in `check` with no package
 built) — its strip and imports halves by `scripts/npm_api_strip_test.ts` /
 `scripts/npm_api_imports_test.ts`, the same way — and exercised through
 the real engines by `scripts/test_npm.ts` / `scripts/test_napi_npm.ts`, whose exact-string
@@ -239,7 +239,7 @@ links whose walks spend the most shadow stack (an `as` / `satisfies` assertion, 
 template, a link that re-enters the expression printer) are set so every accepted input fits
 the 1 MiB shadow stack and a V8 main thread's own stack, cold and with its code tiered up
 under V8's default tiering —
-graded by `deno task test:depth:wasm` over every shape `tests/depth_limit.rs` generates,
+graded by `npm run test:depth:wasm` over every shape `tests/depth_limit.rs` generates,
 and measured on Node, Deno and Bun, main thread and worker
 ([docs/cli.md §Recursion Depth](../../docs/cli.md#recursion-depth)). What still overflows is
 a host stack below those.
@@ -447,8 +447,8 @@ It ships in `@fuzdev/tsv-parse-wasm`, `@fuzdev/tsv-wasm` and the native `@fuzdev
 `patch_npm_package.ts` copies it + the hand-written `npm/locations.d.ts` into the
 package root and re-exports the functions from index.js/browser.js/index.d.ts (directly,
 with no init guard — it never touches WASM). Its agreement with the Rust writer is gated at
-two cadences: `deno task check:loc` (`scripts/check_loc.ts`) deep-equals the two over every
-fixture document in `deno task check`, and `corpus:compare:parse`'s loc arm requires it of
+two cadences: `npm run check:loc` (`scripts/check_loc.ts`) deep-equals the two over every
+fixture document in `npm run check`, and `corpus:compare:parse`'s loc arm requires it of
 every corpus file before grading tsv's `loc` against the canonical parser's. The package
 suites grade the wiring — `{locations: true}` is exactly this reconstruction of the default
 parse — and `scripts/test_napi_npm.ts` deep-equals `cli.js`'s `parse --locations` against
@@ -474,7 +474,7 @@ side, i.e. in a package; in the source tree they don't, so in-repo TypeScript im
 (`benches/js/lib/loc_cross_grade.ts`). Any future hand-written
 `.d.ts` added to the parse packages faces the same rule.
 
-`deno task typecheck:packages`
+`npm run typecheck:packages`
 (`scripts/typecheck_packages.ts`) is the gate: it installs each staged package into a temp
 consumer and compiles consumer modules against the merged `.d.ts`, so a collision fails
 from both sides — the entry's own TS2308 (graded, since the consumer runs without
@@ -621,7 +621,7 @@ the file a warning names), then queries:
 **Every method has a twin on the N-API `IgnoreStack`** (`crates/tsv_napi/src/lib.rs`,
 declared in `crates/tsv_napi/npm/index.d.ts`): `npm/cli.js` ships in both packages and
 calls the same methods, and `scripts/test_napi_npm.ts` fails on a method one class has and
-the other lacks — a suite `deno task check` does not run, so add the twin in the same edit.
+the other lacks — a suite `npm run check` does not run, so add the twin in the same edit.
 The twins agree on every well-formed call, but **argument checking is each engine's own**:
 the class re-exports unwrapped (no facade reads its arguments), so a wrong-typed argument
 meets wasm-bindgen's glue on one side and napi-rs's conversion on the other, which refuse
@@ -684,9 +684,9 @@ Maintenance checklist when a writer's emitted shape changes:
    `WirePositions` (each writer's `Ctx::pos` and node-header helpers and
    `JsonWriter::span_start_end*` for offsets, `span_loc` / `loc_field` for `loc`) — a raw byte offset means
    silently untranslated positions on multibyte sources.
-6. Run `cargo test --workspace` and `deno task check:ast-types`.
+6. Run `cargo test --workspace` and `npm run check:ast-types`.
 
-`deno task check:ast-types` (in `deno task check`) runs three arms against `tsv_ast.d.ts`
+`npm run check:ast-types` (in `npm run check`) runs three arms against `tsv_ast.d.ts`
 ([docs/audits.md §Wire-Type Drift Check](../../docs/audits.md#wire-type-drift-check-checkast-types)):
 **(A)** `tsv parse --locations` on curated snippets, each output embedded as a typed literal and
 typechecked by `tsc` — excess-property checking catches drift both ways (missing/added fields,
@@ -754,7 +754,7 @@ require dual updates.
 - `npm/locations.js` + `npm/locations.d.ts` — Pure-JS line/column reconstruction for the span-only wire; ships in the parse-capable packages, run by `api_parse.js` for `{locations: true}`, re-exported from index.js/browser.js by `patch_npm_package.ts`, and exported alone as the `./locations` subpath. Also copied into the native `@fuzdev/tsv` by `scripts/build_napi_packages.ts` — this file is the single source for both, which is what the napi loader being ESM bought (see [Line/Column Reconstruction Helper](#linecolumn-reconstruction-helper-npmlocationsjs))
 - `README_format.md` — Shipped as `README.md` in `@fuzdev/tsv-format-wasm` (copied by `patch_npm_package.ts`)
 - `README_parse.md` — Shipped as `README.md` in `@fuzdev/tsv-parse-wasm` (copied by `patch_npm_package.ts`)
-- `README_all.md` — Shipped as `README.md` in `@fuzdev/tsv-wasm` (copied by `patch_npm_package.ts`). Each README's TypeScript and JavaScript blocks (```ts / ```typescript / ```js / ```javascript, the JavaScript under `checkJs`) compile against its package in `deno task typecheck:packages`, so every one must be a standalone module with its own imports; a block that only compiles under Node carries `<!-- typecheck: node -->` on the line above its fence
+- `README_all.md` — Shipped as `README.md` in `@fuzdev/tsv-wasm` (copied by `patch_npm_package.ts`). Each README's TypeScript and JavaScript blocks (```ts / ```typescript / ```js / ```javascript, the JavaScript under `checkJs`) compile against its package in `npm run typecheck:packages`, so every one must be a standalone module with its own imports; a block that only compiles under Node carries `<!-- typecheck: node -->` on the line above its fence
 - `pkg/` — Build output (gitignored), `pkg/<variant>/<target>/`
 
 ## Build Targets
@@ -778,15 +778,15 @@ variant). The npm package itself covers Node/browser/bundler consumers, so there
 standalone `web`-target build beyond it; the `nodejs`-target `pkg/all/nodejs/` build exists
 solely to feed the Node and Bun bench runners (`build:bench:node`).
 
-`deno task test:npm[:parse|:all]` builds the package, runs Node tests against it (the `all`
+`npm run test:npm[:parse|:all]` builds the package, runs Node tests against it (the `all`
 variant adds CLI subprocess tests), then the parse-failure table under Bun
-(`deno task test:bun <variant>`, warn-skipped without bun). The `:run` suffix — e.g.
+(`npm run test:bun -- <variant>`, warn-skipped without bun). The `:run` suffix — e.g.
 `test:npm:run` — skips the rebuild, as in the publish/CI pipelines, and is freshness-guarded:
 `scripts/check_staged_freshness.ts` aborts it when a staged artifact is older than its sources.
-`deno task validate:artifacts` checks tight wasm size bounds and each package's third-party
+`npm run validate:artifacts` checks tight wasm size bounds and each package's third-party
 `NOTICE` under the same freshness guard, since `pkg/` is gitignored and a stale bundle sizes
 exactly as cleanly as a fresh one. Both run in the publish pipeline, followed by
-`deno task typecheck:packages`, which compiles the staged packages' declarations as a consumer
+`npm run typecheck:packages`, which compiles the staged packages' declarations as a consumer
 does.
 
 The generated `tsv_wasm_bg.wasm.d.ts` is intentionally excluded from the

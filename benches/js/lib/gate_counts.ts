@@ -78,8 +78,8 @@ import { CORPORA_ROOT, CORPORA_TREE } from './corpora.ts';
  * harvest-derived pins named beside each checkout ({@link SVELTE_REJECTS_PIN},
  * {@link CSS_REJECTS_PIN}, {@link TS_REPO_CORPUS_PIN}, {@link TS_REPO_REJECTS_PIN},
  * {@link WPT_CSS_HARVEST_PIN}, {@link TEST262_POSITIVES_PIN}) are re-derived by
- * `deno task bench:pins:suites` — a `deno task conformance` preflight, and nothing
- * in `deno task check` — so run it in that same change rather than leaving the move
+ * `npm run bench:pins:suites` — an `npm run conformance` preflight, and nothing
+ * in `npm run check` — so run it in that same change rather than leaving the move
  * for the conformance cadence to find (docs/gate_counts.md §Where the numbers live);
  * {@link SVELTE_STYLES_BLOCKS_PIN} rides `bench:harvest:svelte-styles` the same way.
  *
@@ -93,7 +93,7 @@ import { CORPORA_ROOT, CORPORA_TREE } from './corpora.ts';
  * tree id cannot be fetched, a commit can. The PGO pipeline (`scripts/pgo/pgo.ts
  * corpora`) shallow-fetches it in the release workflow and refuses a checkout whose
  * `HEAD:<tree>` or `<commit>:<tree>` is any other tree, so a refresh that re-records
- * `hash` without moving `commit` fails there and in a local `deno task build:pgo`.
+ * `hash` without moving `commit` fails there and in a local `npm run build:pgo`.
  */
 export const GATE_CHECKOUT_IDS: Record<
 	string,
@@ -495,7 +495,7 @@ export const SVELTE_REJECTS_PIN = 145;
  * reshaping the published `parse/css` numbers.
  *
  * Derived LIVE from the corpus rather than from a harvest cache (nothing else
- * consumes the list), but graded and STAMPED like the harvests: `deno task
+ * consumes the list), but graded and STAMPED like the harvests: `npm run
  * css:over-acceptance:pin` is a `bench:pins:suites` leg, so it is re-derived on
  * the same cadence as its siblings; the full `css:over-acceptance` profile grades it
  * too, and stamps the same three checkout commits. Measured 2026-11-06: ../prettier at 1dcd0b05d, ../svelte at f9cc0975c,

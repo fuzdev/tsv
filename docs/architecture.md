@@ -702,7 +702,7 @@ span-only wire; the definition itself is graded by
 `tests/loc_definition.rs`, an independent reference over every fixture input plus the
 terminator, BOM and astral inputs no fixture can hold. The shipped JS reconstruction
 (`crates/tsv_wasm/npm/locations.js`) implements the same definition over the span-only wire,
-and `deno task check:loc` holds the two equal over every fixture input.
+and `npm run check:loc` holds the two equal over every fixture input.
 
 **The comment `value` is measured on the document too.** acorn's `onComment` dedents a
 multi-line block comment by the `[ \t]` run opening the comment's line, and Svelte reads that
@@ -1063,7 +1063,7 @@ that widens any of these enums fails the test build rather than silently fatteni
 slice element and thinning the depth limits' margin. The pins are rustc's layout, not a
 guarantee, so they compile under `cfg(test)` only and a toolchain that lays a type out
 differently never breaks a consumer's build; the wasm32 widths are pinned in `tsv_wasm`,
-which `deno task build:packages` compiles for that target. **Rarity is normally the whole of the
+which `npm run build:packages` compiles for that target. **Rarity is normally the whole of the
 argument for this rule** — boxing a *common* variant buys density and pays an
 allocation plus a pointer chase on the majority of the traffic, so it has to be
 measured rather than assumed (`Statement`'s last two heads are the one place it was,

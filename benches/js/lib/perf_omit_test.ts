@@ -1,7 +1,7 @@
 /**
  * Tests for the omissions summary the perf report publishes
  * (`summarize_group_omissions`) and the ledger's own shape. Dependency-free, so it
- * gates in `deno task test:node`.
+ * gates in `npm run test:node`.
  */
 
 import assert from 'node:assert';

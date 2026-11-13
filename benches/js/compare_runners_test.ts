@@ -1,15 +1,14 @@
 /**
- * Tests that every command the task files, the CI workflows, and the comparison tools print or
- * document names a task that runs: an `npm run <x>` needs `<x>` in `package.json`'s scripts,
- * and a `deno task <x>` needs it in `deno.json`'s tasks or in `package.json`'s, which
- * `deno task` falls through to. And the split between the two files: `deno.json` holds the
- * tasks whose body runs Deno itself, `package.json` every other, chained with `npm run`, its
- * one way to a Deno task a `deno task <x>` leg naming a `deno.json` task (docs/tasks.md). And
- * that no CI workflow installs or runs Deno.
+ * Tests that every command the task files, the CI workflows, the docs, and the scripts' and the
+ * harness's sources print or document names a task that runs: an `npm run <x>` needs `<x>` in
+ * `package.json`'s scripts, and a `deno task <x>` needs it in `deno.json`'s tasks. And the split
+ * between the two files: `deno.json` holds the tasks whose body runs Deno itself, `package.json`
+ * every other, chained with `npm run`, its one way to a Deno task a `deno task <x>` leg naming a
+ * `deno.json` task (docs/tasks.md). And that no CI workflow installs or runs Deno.
  */
 
 import { deepStrictEqual, ok, strictEqual } from 'node:assert';
-import { readdirSync, readFileSync } from 'node:fs';
+import { type Dirent, readdirSync, readFileSync } from 'node:fs';
 import { afterEach, test, vi } from 'vitest';
 
 import { run_corpus_compare_format } from './corpus_compare_format.ts';
@@ -23,36 +22,64 @@ const read_json = (path: string): Record<string, unknown> =>
 const NPM_SCRIPTS = new Set(Object.keys(read_json('package.json').scripts as object));
 const DENO_TASKS = new Set(Object.keys(read_json('deno.json').tasks as object));
 
-/** The modules of the comparison tools and their roots, whose text names their tasks. */
-const SOURCES = [
-	'benches/js/conformance.ts',
-	'benches/js/corpus_compare_format.ts',
-	'benches/js/corpus_compare_parse.ts',
-	'benches/js/diagnostics/svelte_fixtures_compare.ts',
-	'benches/js/diagnostics/ts_fixtures_compare.ts',
-	'benches/js/diagnostics/ts_repo_compare.ts',
-	'benches/js/lib/compare_cli.ts',
-	'benches/js/lib/compare_engines.ts',
-	'benches/js/lib/corpus_pins.ts',
-	'benches/js/lib/fixtures_gate.ts',
-	'benches/js/roots/compare_deps.ts',
-	'benches/js/roots/conformance.ts',
-	'benches/js/roots/corpus_compare_format.ts',
-	'benches/js/roots/corpus_compare_parse.ts',
-	'benches/js/roots/svelte_fixtures_compare.ts',
-	'benches/js/roots/ts_fixtures_compare.ts',
-	'benches/js/roots/ts_repo_compare.ts'
-];
+/** A placeholder in a task name: `${runtime}`, `<variant>`, `[:parse|:all]`, or `*`. */
+const PLACEHOLDER = String.raw`\$\{[^}\s]*\}|<[^>\s]*>|\[[^\]\s]*\]|\*`;
+
+/** A runner word and the name after it, a placeholder standing for any part of a name. */
+const RUNNER_WORD = new RegExp(
+	String.raw`\b(npm run(?: -s)?|deno task(?: -q)?) ((?:[\w:.-]|${PLACEHOLDER})+)`,
+	'g'
+);
+
+/** Whether `tasks` has the task `name` names: the name itself, or without a sentence's closing
+ * `.` or `:`, or, for a family spelled with a placeholder (`bench:${runtime}`,
+ * `build:npm:<variant>`, `fixtures:*`), one member at least and no member that only the other
+ * runner's file (`other`) has, so `npm run bench:<runtime>:run` fails on `bench:deno:run`. A
+ * name that is one placeholder alone (`<name>`) stands for any task. */
+const names_a_task = (tasks: Set<string>, other: Set<string>, name: string): boolean => {
+	const bare = name.replace(/[.:]+$/, '');
+	if (tasks.has(name) || tasks.has(bare)) return true;
+	if (!new RegExp(PLACEHOLDER).test(bare)) return false;
+	if (new RegExp(`^(?:${PLACEHOLDER})+$`).test(bare)) return true;
+	// `segment`: what a placeholder stands for, any characters, or within one `:` segment
+	const family = (segment: string) =>
+		new RegExp(
+			'^' +
+				bare
+					.split(new RegExp(`(${PLACEHOLDER})`))
+					.map((part, i) => (i % 2 === 1 ? segment : part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
+					.join('') +
+				'$'
+		);
+	const any = family('[\\w:.-]*');
+	const one = family('[\\w.-]*');
+	return (
+		[...tasks].some((task) => any.test(task)) &&
+		![...other].some((task) => !tasks.has(task) && one.test(task))
+	);
+};
+
+/** `text` with a runner word broken across lines rejoined, a comment's leading `//`, `*` or `#`
+ * on the next line dropped, so a wrapped `npm run` is read like any other. */
+const unwrapped = (text: string): string =>
+	text.replace(/\b(npm run|deno task)[ \t]*\r?\n[ \t]*(?:\/\/|\*|#)?[ \t]*/g, '$1 ');
 
 /** Each `npm run <x>` or `deno task <x>` in `text` whose `<x>` that runner cannot run. */
 const unrunnable = (text: string): string[] =>
-	[...text.matchAll(/\b(npm run(?: -s)?|deno task(?: -q)?) ([\w:.-]+)/g)]
+	[...unwrapped(text).matchAll(RUNNER_WORD)]
 		.filter(([, runner, name]) =>
 			runner!.startsWith('npm')
-				? !NPM_SCRIPTS.has(name!)
-				: !DENO_TASKS.has(name!) && !NPM_SCRIPTS.has(name!)
+				? !names_a_task(NPM_SCRIPTS, DENO_TASKS, name!)
+				: !names_a_task(DENO_TASKS, NPM_SCRIPTS, name!)
 		)
 		.map(([command]) => command);
+
+/** Each `npm run <x> -<flag>` in `text`: without a `--` first, npm takes the flag as its own
+ * config and the script never sees it. */
+const swallowed_flags = (text: string): string[] =>
+	[...unwrapped(text).matchAll(/\bnpm run(?: -s)? [\w:.-]+ +-(?!-(?:\s|$|`))[\w-]+/g)].map(
+		([command]) => command
+	);
 
 afterEach(() => {
 	vi.restoreAllMocks();
@@ -77,10 +104,125 @@ const HELP_DEPS = {
 	pins: { read: unreached, write: unreached }
 };
 
-test("each runner the tools' modules and roots name runs the task it names", () => {
-	for (const path of SOURCES) {
-		deepStrictEqual(unrunnable(readFileSync(new URL(path, CHECKOUT), 'utf8')), [], path);
+/** The checkout's paths whose runner words the docs-and-sources test leaves unread, each for
+ * its reason: none is a doc or a source a person follows for today's tasks. */
+const UNREAD_PATHS = [
+	// fixtures and their snapshots, regenerated by their own `:update` tasks
+	'tests/',
+	// the committed bench reports, rewritten by a bench run
+	'benches/js/results/',
+	// runs each side's tasks as that side's tree runs them, so a `deno task` there is what a tree
+	// from before the tasks moved runs, not a doc
+	'scripts/branch_report/',
+	// the release history, its entries as they were written
+	'CHANGELOG.md',
+	// this test's own cases
+	'benches/js/compare_runners_test.ts',
+	// its fake npm records the release driver's argv (`npm run run …`) as text, not as tasks
+	'scripts/publish_test.ts'
+];
+
+/** Directories no checkout path the test reads is under: installs and build output. */
+const UNREAD_DIRS = new Set(['node_modules', 'target', 'pkg']);
+
+/** The occurrences the test lets name no task their runner runs, each for its reason, each
+ * required to still be there, so a fixed one leaves the list. */
+const UNRUNNABLE_KEPT: Record<string, string[]> = {
+	// printed into the committed `results/report.conformance.node.md`, which only a conformance
+	// bench run rewrites: the text and the report change together
+	'benches/js/bench_preflight.ts': ['deno task ts-repo:over-acceptance'],
+	// says what `deno task` would run if `deno.json` had the name
+	'scripts/roots/publish_deps_test.ts': ['deno task release'],
+	// the website's script, run in its own checkout
+	'CLAUDE.md': ['npm run update-benchmarks'],
+	'benches/js/CLAUDE.md': ['npm run update-benchmarks'],
+	// made-up names, apart from the real ones so each test sees the value it passed
+	'benches/js/lib/compare_engines_test.ts': ['npm run build:napi:release'],
+	'benches/js/lib/corpus_pins_test.ts': ['npm run corpus:compare:test']
+};
+
+/** The checkout's docs and JS/TS sources, relative paths, but those under `UNREAD_PATHS`, a
+ * dot directory, an `UNREAD_DIRS` one, or named `*.local.*` (per-machine files). */
+const docs_and_sources = (dir = ''): string[] =>
+	readdirSync(new URL(dir === '' ? '.' : dir, CHECKOUT), { withFileTypes: true }).flatMap(
+		(entry: Dirent) => {
+			const path = dir + entry.name;
+			if (entry.name.startsWith('.') || UNREAD_PATHS.some((p) => (path + '/').startsWith(p))) {
+				return [];
+			}
+			if (entry.isDirectory()) {
+				return UNREAD_DIRS.has(entry.name) ? [] : docs_and_sources(path + '/');
+			}
+			return entry.isFile() && /\.(md|ts|js|mjs)$/.test(entry.name) && !/\.local\./.test(entry.name)
+				? [path]
+				: [];
+		}
+	);
+
+test("each runner word in the docs and the scripts' and the harness's sources runs the task it names", () => {
+	const files = docs_and_sources();
+	// the walk reached each kind of file it is for
+	for (const path of ['CLAUDE.md', 'docs/tasks.md', 'scripts/doctor.ts', 'benches/js/bench.ts']) {
+		ok(files.includes(path), path);
 	}
+	const unresolved: string[] = [];
+	for (const path of files) {
+		const found = unrunnable(readFileSync(new URL(path, CHECKOUT), 'utf8'));
+		const kept = UNRUNNABLE_KEPT[path] ?? [];
+		for (const command of kept) ok(found.includes(command), `${path}: ${command} is gone`);
+		for (const command of found)
+			if (!kept.includes(command)) unresolved.push(`${path}: ${command}`);
+	}
+	deepStrictEqual(unresolved, []);
+});
+
+/** The flags the docs pass with no `--` on purpose, to show what npm does with one. */
+const SWALLOWED_KEPT: Record<string, string[]> = {
+	'docs/tasks.md': ['npm run release --wetrun', 'npm run release --dry-run']
+};
+
+test('each `npm run` in the docs and sources that passes a flag passes it after a `--`', () => {
+	const swallowing: string[] = [];
+	for (const path of docs_and_sources()) {
+		const found = swallowed_flags(readFileSync(new URL(path, CHECKOUT), 'utf8'));
+		const kept = SWALLOWED_KEPT[path] ?? [];
+		for (const command of kept) ok(found.includes(command), `${path}: ${command} is gone`);
+		for (const command of found)
+			if (!kept.includes(command)) swallowing.push(`${path}: ${command}`);
+	}
+	deepStrictEqual(swallowing, []);
+});
+
+test('a runner word names a task, a family member, or nothing its runner runs', () => {
+	deepStrictEqual(
+		unrunnable(
+			[
+				'`npm run check`.',
+				'npm run bench:${runtime}',
+				'npm run build:npm:<variant>',
+				'npm run test:npm[:parse|:all]',
+				'npm run fixtures:*',
+				'deno task smoke',
+				'deno task <name>',
+				'npm run nonexistent',
+				'npm run smoke',
+				'deno task check',
+				'deno task nonexistent:<x>',
+				'npm run build:nonexistent:${x}',
+				'npm run bench:<runtime>:run',
+				'npm run\n * nonexistent:wrapped'
+			].join('\n')
+		),
+		[
+			'npm run nonexistent',
+			'npm run smoke',
+			'deno task check',
+			'deno task nonexistent:<x>',
+			'npm run build:nonexistent:${x}',
+			'npm run bench:<runtime>:run',
+			'npm run nonexistent:wrapped'
+		]
+	);
 });
 
 test("the parse tool's usage names runners that run its tasks", async () => {

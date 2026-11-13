@@ -11,12 +11,12 @@
 ## Quick Start
 
 - **Create a fixture** — `cargo run -p tsv_debug fixture_init <dir> --content '<code>'` or `--stdin`
-- **Validate fixtures** — `deno task fixtures:validate [pattern]`
-- **Update expected.json** — `deno task fixtures:update:parsed [pattern]`
+- **Validate fixtures** — `npm run fixtures:validate -- [pattern]`
+- **Update expected.json** — `npm run fixtures:update:parsed -- [pattern]`
 - **Compare with prettier** — `cargo run -p tsv_debug compare <file>`
 - **Test fails?** — See [Troubleshooting](#troubleshooting)
 - **Variant doesn't normalize?** — See [Prettier Variant Discovery](#unformatted-variant-doesnt-normalize-prettier-variant-discovery)
-- **Fixture design (pre-impl)** — `deno task fixtures:validate --prettier-only <pattern>` — see [fixture_workflow.md](./fixture_workflow.md#tdd-steps)
+- **Fixture design (pre-impl)** — `npm run fixtures:validate -- --prettier-only <pattern>` — see [fixture_workflow.md](./fixture_workflow.md#tdd-steps)
 
 ---
 
@@ -34,7 +34,7 @@
 > (Svelte wraps the same acorn-typescript parser), so they use `input.svelte`. When unsure, write
 > `.svelte` with `lang="ts"` and confirm it parses via `canonical_parse`.
 >
-> **Don't guess from the directory name — verify.** `deno task fixtures:ts-audit` (or
+> **Don't guess from the directory name — verify.** `npm run fixtures:ts-audit` (or
 > `cargo run -p tsv_debug ts_fixture_audit [pattern]`) embeds **every** `.ts` file in a fixture (input
 > _and_ variants) in `<script lang="ts">` and reports whether it's _necessary_ as `.ts` (byte-0
 > feature, Svelte-parse failure, or formats-differently — checked against both tsv and prettier) or
@@ -152,7 +152,7 @@ or the frame `conformance_prettier.md` itself for a §Comment Position Philosoph
 (adjust the `../` depth; name the specific catalog row in parens when the
 section is long, e.g. ``§Comment relocation (`new` to `(`)``). The
 conformance doc links forward to every divergence fixture; the back-link
-closes the loop (`deno task conformance:audit` gates it).
+closes the loop (`npm run conformance:audit` gates it).
 
 ---
 
@@ -239,7 +239,7 @@ Special case: tsv REJECTS the input but the canonical parser ACCEPTS it (a tsv o
 Note: in _prettier_divergence dirs, use unformatted_ours_*.svelte when only our formatter
 normalizes to input; plain unformatted_*.svelte is allowed (and N3-validated) when the dir
 has no output_prettier.* and prettier also normalizes the variant to input
-Tip: Use `deno task fixtures:audit <pattern>` to classify novel prettier outputs
+Tip: Use `npm run fixtures:audit -- <pattern>` to classify novel prettier outputs
 ```
 
 #### Pattern Usage Summary
@@ -247,7 +247,7 @@ Tip: Use `deno task fixtures:audit <pattern>` to classify novel prettier outputs
 - `expected.json` — Default - our parser matches the canonical parser
 - `expected_ours.json` + `expected_svelte.json` — **Intentional, permanent** parser differences (NOT implementation gaps)
 - `output_prettier.svelte` — **Intentional, permanent** formatter differences (**NEVER** "not implemented" - that's a bug to fix!)
-  - ⚠️ **It must also be a tsv fixed point** — not an F/S rule of this validator (which grades it by F2 alone: it IS prettier's output of `input`), but `deno task authoring:audit` scans every fixture `.svelte` and fails a **base-non-idempotent** file, so a `_prettier_divergence` whose prettier form tsv rewrites passes `fixtures:validate` and fails `deno task check` several gates later. It bites when prettier's form is *mangled* rather than merely different — tsv often re-mangles it. Choose the case so prettier's own output is stable on both sides; see [audits.md §Authoring-Independence Audit](./audits.md#authoring-independence-audit-authoringaudit)
+  - ⚠️ **It must also be a tsv fixed point** — not an F/S rule of this validator (which grades it by F2 alone: it IS prettier's output of `input`), but `npm run authoring:audit` scans every fixture `.svelte` and fails a **base-non-idempotent** file, so a `_prettier_divergence` whose prettier form tsv rewrites passes `fixtures:validate` and fails `npm run check` several gates later. It bites when prettier's form is *mangled* rather than merely different — tsv often re-mangles it. Choose the case so prettier's own output is stable on both sides; see [audits.md §Authoring-Independence Audit](./audits.md#authoring-independence-audit-authoringaudit)
 - `prettier_variant_*.svelte` — Prettier-stable, our formatter normalizes to input
 - `variant_*.svelte` — Both formatters keep stable, NOT normalized to input
 - `divergent_variant_*.svelte` — Prettier-stable, our formatter rewrites to a distinct third stable form (NOT input, NOT the form)
@@ -293,7 +293,7 @@ In each example `input.svelte` is the canonical form the variants normalize to.
 
 ### Fixture Validation (Automatic)
 
-`deno task fixtures:validate` validates fixture correctness.
+`npm run fixtures:validate` validates fixture correctness.
 
 ### All Validation Rules
 
@@ -371,11 +371,11 @@ prettier-svelte for formatting; variants use `.svelte.ts`).
 
 **Parser validations (P)** - Expected ASTs match parser outputs:
 
-- **P1**: `expected.json` matches the canonical parser's output with every `loc` and `name_loc` removed (fixtures pin the span-only wire; `loc` is graded by `deno task check:loc` and `corpus:compare:parse`) — Svelte's parser for `.svelte`, acorn-typescript at the fixture's goal for `.ts` / `.svelte.ts`, Svelte's `parseCss` for `.css`. The canonical parser must accept the input; a rejection fails P1. A sidecar failure (the parser never answered) is reported as an error and grades neither P1 nor P3
+- **P1**: `expected.json` matches the canonical parser's output with every `loc` and `name_loc` removed (fixtures pin the span-only wire; `loc` is graded by `npm run check:loc` and `corpus:compare:parse`) — Svelte's parser for `.svelte`, acorn-typescript at the fixture's goal for `.ts` / `.svelte.ts`, Svelte's `parseCss` for `.css`. The canonical parser must accept the input; a rejection fails P1. A sidecar failure (the parser never answered) is reported as an error and grades neither P1 nor P3
 - **P2**: `expected_ours.json` matches our parser output (divergence fixtures)
 - **P2b**: our parser output (the writer's wire JSON, tab-indented by the CLI's `--pretty` re-indenter and read back unbounded for the field-order triage) matches `expected.json` — the gate on the emission path (non-divergence fixtures)
 - **P3**: `expected_svelte.json` matches the same canonical parser, for every input type: it holds the canonical AST, or `{"error": "failed to parse"}` exactly when the canonical parser rejects the input — the marker on an input the parser accepts fails, and so does an AST on one it rejects. A sidecar failure is an error, never read as a rejection
-- **P4**: a **variant parse pin** — `expected_<stem>.json` beside a variant `<stem><ext>` — makes P1 + P2b about that variant: it must hold the canonical parser's AST of the variant (regenerated by `fixtures:update:parsed`; a canonical rejection fails it, since it holds an AST and never the marker), and our parse of the variant must reproduce it byte-strict (a semantically-equal mismatch reports as field order, like P2b). It exists for a parse fact no `input.*` can carry, because tsv's formatter always removes it, so such an input is never its own fixed point (F1): a leading BOM with nothing load-bearing behind it, which the format side strips; or a newline inside a region the canonical parser overwrites — Svelte's `_ as ` annotation window, the four UTF-16 code units before a block binding's `:` (`{#each xs as⏎éé: T}`), which tsv's formatter always joins up (prettier does not always: it keeps `{@const a1⏎: T = expr}` as written, pinned by [const_annotation_verbatim](../tests/fixtures/svelte/tags/const/const_annotation_verbatim_prettier_divergence/)) — [svelte/blocks/binding_annotation_multibyte](../tests/fixtures/svelte/blocks/binding_annotation_multibyte/); or a token the format side drops where the canonical parser's span takes it — the `;` after `export default @dec class Foo {}`, which ends acorn's export statement and which tsv's span takes too, though the formatter prints none — [after_export_default](../tests/fixtures/typescript/typescript_specific/decorators/after_export_default/). (A BOM ahead of a content U+FEFF is written back, so it is its own fixed point and an `input.*` can hold it — see [conformance_prettier.md §Whitespace: BOM Handling](./conformance_prettier.md#whitespace-bom-handling).) The pin makes the non-divergence claim only; a variant tsv parses differently from the canonical parser has no pin shape. Opt-in per variant — create one by adding an empty `expected_<stem>.json` and running `deno task fixtures:update:parsed <pattern>`, which fills it (S24 requires the variant)
+- **P4**: a **variant parse pin** — `expected_<stem>.json` beside a variant `<stem><ext>` — makes P1 + P2b about that variant: it must hold the canonical parser's AST of the variant (regenerated by `fixtures:update:parsed`; a canonical rejection fails it, since it holds an AST and never the marker), and our parse of the variant must reproduce it byte-strict (a semantically-equal mismatch reports as field order, like P2b). It exists for a parse fact no `input.*` can carry, because tsv's formatter always removes it, so such an input is never its own fixed point (F1): a leading BOM with nothing load-bearing behind it, which the format side strips; or a newline inside a region the canonical parser overwrites — Svelte's `_ as ` annotation window, the four UTF-16 code units before a block binding's `:` (`{#each xs as⏎éé: T}`), which tsv's formatter always joins up (prettier does not always: it keeps `{@const a1⏎: T = expr}` as written, pinned by [const_annotation_verbatim](../tests/fixtures/svelte/tags/const/const_annotation_verbatim_prettier_divergence/)) — [svelte/blocks/binding_annotation_multibyte](../tests/fixtures/svelte/blocks/binding_annotation_multibyte/); or a token the format side drops where the canonical parser's span takes it — the `;` after `export default @dec class Foo {}`, which ends acorn's export statement and which tsv's span takes too, though the formatter prints none — [after_export_default](../tests/fixtures/typescript/typescript_specific/decorators/after_export_default/). (A BOM ahead of a content U+FEFF is written back, so it is its own fixed point and an `input.*` can hold it — see [conformance_prettier.md §Whitespace: BOM Handling](./conformance_prettier.md#whitespace-bom-handling).) The pin makes the non-divergence claim only; a variant tsv parses differently from the canonical parser has no pin shape. Opt-in per variant — create one by adding an empty `expected_<stem>.json` and running `npm run fixtures:update:parsed -- <pattern>`, which fills it (S24 requires the variant)
 
 P2/P2b compare the span-only writer (`convert_ast_json_bytes`, the wire every binding
 ships) against `expected.json`, which P1/P3 pin to the canonical parsers (`loc`/`name_loc`
@@ -386,7 +386,7 @@ field-order error. The multibyte and `<script>`/template-comment fixtures make P
 exercise the writer's fused byte→char offset translation and island-scoped comment attach
 against the canonical oracle. A bug shared by the writer and the fixture's own `expected.json` is
 invisible here — the corpus-scale external oracle for that class is
-`deno task corpus:compare:parse` (../benches/js/CLAUDE.md §Parse
+`npm run corpus:compare:parse` (../benches/js/CLAUDE.md §Parse
 Comparison), which deep-diffs the shipped wire against the canonical parsers
 on real codebases.
 
@@ -406,7 +406,7 @@ on real codebases.
 direction it travelled from, so a `_compact` that pads and a `_spaces` that strips both
 pass here. That is a separate gate —
 [audits.md §Variant Whitespace-Direction Audit](./audits.md#variant-whitespace-direction-audit-variantsaudit),
-`deno task variants:audit`.
+`npm run variants:audit`.
 
 - **N1**: `prettier_variant_*.*`: `prettier(file) == file` (prettier idempotent, Rule 1)
 - **N2**: `prettier_variant_*.*` normalizes to input with our formatter (Rule 2)
@@ -513,10 +513,10 @@ normalization forces the three kinds above, so variant↔input is not a claim th
 
 **Scope caveat.** R gates only `tests/fixtures`, whose variants are hand-authored to be
 render-equivalent — so it is a *regression guard*, not a discovery tool. The corpus-scale arm
-that asks the same question of **real code** is `deno task render:audit <paths>` (same oracle,
+that asks the same question of **real code** is `npm run render:audit -- <paths>` (same oracle,
 comparing a file against its own formatted output); it needs the sidecar, so it runs at
-release cadence — a leg of `deno task conformance` over the pinned checkouts — rather than in
-`deno task check`. See [audits.md §Render-Equivalence Audit](audits.md#render-equivalence-audit-renderaudit).
+release cadence — a leg of `npm run conformance` over the pinned checkouts — rather than in
+`npm run check`. See [audits.md §Render-Equivalence Audit](audits.md#render-equivalence-audit-renderaudit).
 
 **Invalid syntax validations (I)** - Syntax rejection tests:
 
@@ -530,7 +530,7 @@ Validation failures include detailed error messages and fix instructions.
 
 ## Common Pitfalls
 
-1. **Stale fixtures** → Run `deno task fixtures:update` before debugging (stale files cause false failures)
+1. **Stale fixtures** → Run `npm run fixtures:update` before debugging (stale files cause false failures)
 2. **Mixing numbered/unnumbered names** → Use `Comp1`, `Comp2` not `Comp`, `Comp2` (see ./fixture_naming.md)
 3. **`unformatted_*` that prettier preserves** → `prettier_variant_*` or `variant_*` — run `fixtures:audit` to classify
 4. **`unformatted_*` in `_prettier_divergence` dirs** → Use `unformatted_ours_*.svelte` instead
@@ -559,11 +559,11 @@ Validation failures include detailed error messages and fix instructions.
 Test failing?
 │
 ├─ Parser (expected.json mismatch)
-│  ├─ Stale? → deno task fixtures:update:parsed
+│  ├─ Stale? → npm run fixtures:update:parsed
 │  └─ Real diff? → Compare: diff expected.json <(cargo run -p tsv_cli parse input.svelte --pretty)
 │
 ├─ Formatter (not idempotent / differs from prettier)
-│  ├─ Stale? → deno task fixtures:update:formatted
+│  ├─ Stale? → npm run fixtures:update:formatted
 │  ├─ Real diff? → cargo run -p tsv_debug compare input.svelte
 │  ├─ Stale prettier_nonconvergent.txt (F5)? → prettier converges now; delete the
 │  │  marker and document normally (the error's hint names which check failed)
@@ -572,7 +572,7 @@ Test failing?
 │
 └─ Normalization (unformatted_* doesn't normalize)
    └─ Check prettier: cargo run -p tsv_debug format_prettier unformatted_X.svelte --no-line-widths | diff - input.svelte
-      ├─ Prettier preserves → Use `deno task fixtures:audit` to classify
+      ├─ Prettier preserves → Use `npm run fixtures:audit` to classify
       │  ├─ Ours normalizes to input → prettier_variant_*
       │  ├─ Ours keeps stable (not input) → variant_*
       │  └─ Ours rewrites to a third stable form (not input, not the form) → divergent_variant_*
@@ -619,8 +619,8 @@ cargo run -p tsv_debug canonical_parse tests/fixtures/typescript/syntax/comments
 
 Failure → diagnostic — fix:
 
-- Parser (AST mismatch) → `diff <(jq . expected.json) <(cargo run -p tsv_cli parse input.svelte --pretty | jq .)` — May be stale: `deno task fixtures:update:parsed <pattern>`. Otherwise fix parser.
-- Formatter (not idempotent) → `cargo run -p tsv_debug compare input.svelte` — May be stale: `deno task fixtures:update:formatted`. Otherwise fix formatter — never adjust fixtures.
+- Parser (AST mismatch) → `diff <(jq . expected.json) <(cargo run -p tsv_cli parse input.svelte --pretty | jq .)` — May be stale: `npm run fixtures:update:parsed -- <pattern>`. Otherwise fix parser.
+- Formatter (not idempotent) → `cargo run -p tsv_debug compare input.svelte` — May be stale: `npm run fixtures:update:formatted`. Otherwise fix formatter — never adjust fixtures.
 - Validation (structure) → Read the error message — Delete identical files, ensure `expected.json` exists, check naming conventions.
 - Panic (`[Panic] validation panicked: panicked at <file>:<line>:<col>: …`) → the report names the panic's location — Fix the panic. It is caught per fixture: that fixture fails, named, and every other fixture is still graded (both `fixtures:validate` and `fixtures_tests` build under unwinding profiles, so the catch is reachable).
 
@@ -669,9 +669,9 @@ diff /tmp/prettier_variant.svelte /tmp/prettier_variant2.svelte
 
 3. **Update base fixture**: Add README pointing to the divergence fixture (if relevant)
 
-4. **Generate expectations**: `deno task fixtures:update:parsed feature_name_prettier_divergence`
+4. **Generate expectations**: `npm run fixtures:update:parsed -- feature_name_prettier_divergence`
 
-5. **Validate**: `deno task fixtures:validate feature_name_prettier_divergence`
+5. **Validate**: `npm run fixtures:validate -- feature_name_prettier_divergence`
 
 **Example:** See `container_spacing_prettier_divergence/` - prettier preserves compact spacing in `@container` and `@media` queries but normalizes it in `@supports`.
 
@@ -788,7 +788,7 @@ For step-by-step creation, see [fixture_workflow.md Step 6](./fixture_workflow.m
 
 ```bash
 cp output_prettier.svelte input.svelte && rm output_prettier.svelte
-deno task fixtures:update
+npm run fixtures:update
 ```
 
 - Spec defines a canonical form prettier doesn't emit — Diverge — follow the spec (document with spec refs)
@@ -812,7 +812,7 @@ byte-copy of `output_prettier.*` under a variant name: a `variant_*` copy claims
 `prettier_variant_*` copy is refused as redundant (`RedundantPrettierVariantMatchesOutputPrettier`),
 so that claim lives in README prose only. A copy also drifts silently — `fixtures:update:formatted`
 regenerates `output_prettier.*` but never a copy of it — so prefer stating the class in the README
-and reading it live with `deno task fixtures:audit -v <pattern>`, whose `output_prettier.*` row
+and reading it live with `npm run fixtures:audit -- -v <pattern>`, whose `output_prettier.*` row
 (`ours -> self` / `ours -> input` / a novel form) is the grade. A validator-computed grade of that
 row is the intended replacement for the copies.
 
@@ -901,7 +901,7 @@ cross-path discovery, and F2 for `output_prettier.*` (which skips F3 — see
 **For `audit_signature.txt` (auto-generated; only when `output_prettier.*` exists AND prettier is non-idempotent on it):**
 
 - Pins each step of prettier's chain `prettier(output_prettier)`, `prettier^2(output_prettier)`, ..., up to and including the fixed point
-- Generated/updated/removed automatically by `deno task fixtures:update:formatted` — with one refusal: a chain prettier can no longer complete (an error mid-walk) is never auto-deleted; the updater fails and keeps the existing signature for investigation
+- Generated/updated/removed automatically by `npm run fixtures:update:formatted` — with one refusal: a chain prettier can no longer complete (an error mid-walk) is never auto-deleted; the updater fails and keeps the existing signature for investigation
 - F4 byte-checks it against the live chain every run (catching pass-2+ drift F2 misses); F4b polices its ABSENCE, so deleting it fails validation
 - The audit (`fixtures:audit`) recognizes fixtures with a matching signature and stops flagging them as novel; signature drift surfaces in audit output as a regenerate prompt
 - Format: header comments, then `%%PASS=N%%` (or `%%PASS=N (fixed point)%%`) section headers separating exact pass content. Do not edit by hand — regenerate with `fixtures:update:formatted`

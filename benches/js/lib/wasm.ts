@@ -65,8 +65,7 @@ export class WasmImplementation extends TsvBinding {
 			await stat(wasm_path);
 		} catch {
 			throw new Error(
-				`WASM module not found at ${wasm_path}. ` +
-					`Run 'deno task build:wasm:all:${target}' first.`
+				`WASM module not found at ${wasm_path}. Run 'npm run build:wasm:all:${target}' first.`
 			);
 		}
 
@@ -142,7 +141,7 @@ export class WasmImplementation extends TsvBinding {
 		// stands then.
 		this.probe(
 			'tsv (WASM)',
-			{ path: wasm_path, rebuild: `deno task build:wasm:all:${target}` },
+			{ path: wasm_path, rebuild: `npm run build:wasm:all:${target}` },
 			scope
 		);
 	}

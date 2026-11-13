@@ -14,7 +14,7 @@
  * each seed: the `locations` wire of every input tsv parses (no panic), and the type
  * strip of every TypeScript-family input (no panic, the position contract, idempotence).
  *
- * Why this isn't in `deno task check`: the corpus is sibling checkouts (the snapshot
+ * Why this isn't in `npm run check`: the corpus is sibling checkouts (the snapshot
  * is not cloned in CI; the working trees are machine-dependent) and the sweep is
  * minutes, not seconds. `check`'s `fuzz:audit`
  * covers `tests/fixtures`; this covers real code, which is a different risk surface —

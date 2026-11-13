@@ -1,6 +1,6 @@
 /**
  * Diagnostic: measure WASM format wall-time with enough resolution to see the
- * single-digit-% moves that `deno task bench` folds into run noise.
+ * single-digit-% moves that `npm run bench` folds into run noise.
  *
  * The full bench times one impl per file once and reports cross-tool throughput
  * ratios — too coarse for "did killing this allocation site move WASM format

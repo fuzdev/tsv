@@ -10,7 +10,7 @@ never checks. Drops found by hand were green on `cargo test`, `comments:audit`,
 audit closes that hole mechanically: for each seed file it injects a comment into **every**
 candidate gap, one at a time, formats, and runs the ledger over the result.
 
-Pure Rust, no sidecar. Gated in `deno task check` as a **ratchet**, not a green gate.
+Pure Rust, no sidecar. Gated in `npm run check` as a **ratchet**, not a green gate.
 
 **Three detectors ride the one format.** The ledger answers "was a comment dropped or printed
 twice?"; the render-time [swallow check](audits.md#line-comment-swallow-audit-swallowaudit)
@@ -29,8 +29,8 @@ what a green run does *not* prove: see the module docs at the top of
 ## Running it
 
 ```bash
-deno task gaps:audit           # the gate: tests/fixtures, ~37 s
-deno task gaps:audit:update    # regenerate the snapshot after fixing a shape
+npm run gaps:audit             # the gate: tests/fixtures, ~37 s
+npm run gaps:audit:update      # regenerate the snapshot after fixing a shape
 
 # Directly, against a real codebase — where the real yield is:
 cargo run --profile corpus -p tsv_debug --features _internal_audits gap_audit ../corpora/collections/zzz/src
@@ -49,7 +49,7 @@ reported as the finding it is.
 | `--payload <one>` | `block` \| `line` \| `jsdoc_cast` \| `annotation` \| `multiline` |
 | `--all-bytes` | also inject strictly inside words — a diagnostic, not a stricter mode (comment interiors stay excluded) |
 | `--by-node` | also print the coarse by-`(node, edge)` rollup after the run (report-only; see [Reading a finding](#reading-a-finding)) |
-| `--rank` | print the top-N `(node, edge)` clusters as a paste-ready **markdown table** — the ranked burn-down work-list (report-only; `deno task gaps:audit:rank`) |
+| `--rank` | print the top-N `(node, edge)` clusters as a paste-ready **markdown table** — the ranked burn-down work-list (report-only; `npm run gaps:audit:rank`) |
 | `--since <baseline.json>` | print the **delta** vs a prior `--json` output: the per-cluster ranking diff, the per-shape `(kind, shape) → (count, payloads)` diff, and the seed-eligibility change (report-only) |
 | `--top N` | with `--rank`, how many clusters the table shows (default 12); a `--since` diff always lists every changed cluster |
 | `--update` | rewrite the committed snapshot (prints a `# shapes: N` stamp + a RETIRED/RE-PINNED yield line) |
@@ -130,7 +130,7 @@ can carry the block payloads too: there the injection merely reflowed the file a
 *author* wrote does the swallowing, which is the same bug reached from further away.
 
 Cost: arming the check adds roughly **+10% CPU** (measured over `tests/fixtures`: ~146 s →
-~160 s user, ~17 s → ~19 s wall) — seconds on a `deno task check` wall clock measured in
+~160 s user, ~17 s → ~19 s wall) — seconds on an `npm run check` wall clock measured in
 minutes. The rejected alternative — the full `f1_check` battery per injection — measured
 **>40x** baseline CPU: it pays `tsv_parse_to_value` twice per accepted injection and, unlike
 `blank_audit`, gap injection has no absorbed-input fast path (an injected comment must appear
@@ -281,7 +281,7 @@ The `--by-node` rollup is the raw material; three thin views make it something a
 consumes directly instead of parsing `--json` and hand-transcribing (all report-only —
 byte-identical to the gate):
 
-- **`deno task gaps:audit:rank`** (`--rank`, `--top N`) prints the top-N clusters as a
+- **`npm run gaps:audit:rank`** (`--rank`, `--top N`) prints the top-N clusters as a
   **paste-ready markdown table** — rank, `` `(node, edge)` ``, edge class, distinct gaps, hits,
   shapes, kind composition, gap share (sorted by distinct gaps) — so a burn-down's
   fattest-first work-list stays current by paste, not by re-transcription (which rots).
@@ -324,7 +324,7 @@ victim's own site for a bystander, the injection site otherwise — so the set i
 
 The pass is cheap and **lazily run**: each example costs two ledger formats (the re-splice
 and its output) plus one more for the anchor probe on a confirmed one — thousands of formats
-against the injection loop's millions — and the quiet green gate (`deno task check`'s path)
+against the injection loop's millions — and the quiet green gate (`npm run check`'s path)
 skips it entirely. The labels appear on `--report` / `--json`, on `--update`, and on any
 non-holding, narrowed, or off-corpus run.
 
@@ -374,7 +374,7 @@ moment worth naming the ones the audit couldn't reproduce.
    a comment dropped there is a different bug).
 3. **Fix the printer**, fixtures-first per the repo's TDD rule. The fix is usually to route
    the gap through a comment-aware scan rather than concatenating fixed pieces.
-4. **Re-pin**: `deno task gaps:audit:update`, and confirm the shape's line is **gone** from
+4. **Re-pin**: `npm run gaps:audit:update`, and confirm the shape's line is **gone** from
    the snapshot rather than merely changed.
 
 If a shape is genuinely pre-existing and merely newly *reached* by a fixture you added, the

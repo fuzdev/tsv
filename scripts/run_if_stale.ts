@@ -3,7 +3,7 @@
  * than every source that feeds it.
  *
  * Motivation: `wasm-pack` re-runs `wasm-opt` (~8–27s per bundle) even when
- * cargo itself is a no-op, so a fully-cached `deno task bench` still pays
+ * cargo itself is a no-op, so a fully-cached `npm run bench` still pays
  * ~90s of unconditional wasm-opt across its four bundles. This wrapper is the
  * build-side sibling of `benches/js/lib/check_artifact_freshness.ts`: the
  * `:run` tasks abort when the artifact is STALE; the wrapped build tasks skip

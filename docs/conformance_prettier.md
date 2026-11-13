@@ -7,7 +7,7 @@ The catalog is split by language; this doc holds the shared frame — terminolog
 
 ## Terminology
 
-**Matched**: tsv produces identical output to Prettier — the goal and the common case (measure current rates with `deno task corpus:compare:format --all --summary`).
+**Matched**: tsv produces identical output to Prettier — the goal and the common case (measure current rates with `npm run corpus:compare:format -- --all --summary`).
 
 **Unmatched**: tsv produces different output. The suffix `_prettier_divergence` marks these fixtures. This document explains WHY for each case.
 
@@ -968,21 +968,21 @@ protected by a character reference, not a BOM — see
 **Corpus comparison** validates formatting against Prettier on real codebases:
 
 ```bash
-deno task corpus:compare:format --all --explain           # The gates corpus view (~6,200 files: the ../corpora snapshot + prettier suites)
-deno task corpus:compare:format ../project --explain  # Single project (scans all files recursively)
+npm run corpus:compare:format -- --all --explain          # The gates corpus view (~6,200 files: the ../corpora snapshot + prettier suites)
+npm run corpus:compare:format -- ../project --explain # Single project (scans all files recursively)
 ```
 
 **Divergence audit** (static check) verifies all documented divergences have registered detectors:
 
 ```bash
-deno task divergence:audit  # Cross-refs pattern fixture lists vs this doc family (no runtime)
+npm run divergence:audit    # Cross-refs pattern fixture lists vs this doc family (no runtime)
 ```
 
 Every pattern in `benches/js/lib/divergence/patterns.ts` links to:
 
 - `conformance_sections` — Section names from this document family (the shared frame here plus the per-language catalogs its §Catalogs table indexes)
 - `fixtures` — Fixture paths the pattern detects (enforced by the behavioral
-  fixture-coverage audit in `deno task test:node`)
+  fixture-coverage audit in `npm run test:node`)
 
 See ./divergence_detector.md for implementation details.
 

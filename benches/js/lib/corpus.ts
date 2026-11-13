@@ -8,7 +8,7 @@
  * - `perf` — real-world third-party code only (the `benched` collections of the
  *   `../corpora` snapshot — each one of manifest `origin: third_party`, the author's own
  *   collections being held off the bench — whose manifest already leaves the upstreams'
- *   test fixtures behind; `*.test.ts` stays). The `deno task bench` corpus, so throughput
+ *   test fixtures behind; `*.test.ts` stays). The `npm run bench` corpus, so throughput
  *   reflects real code rather than formatter edge-case suites, and code no tsv build was
  *   tuned on — and one pinned commit names all of it.
  * - `gates` — every placed collection (`perf`'s `benched` plus the `gated` ones) +
@@ -23,7 +23,7 @@
  *   `perf` is the "every in-scope tool must fully process it" corpus (the bench's
  *   pre-flight hard-fails an unlisted failure there — see `perf_omit.ts`), `conformance` is
  *   where sub-100% coverage is the metric. The per-tool parse coverage surface
- *   (`deno task bench:conformance`).
+ *   (`npm run bench:conformance`).
  * - `robustness` — the real-code robustness sweeps' scope (`audit:corpus`,
  *   `idempotency:sweep`): the WHOLE snapshot — every collection `../corpora` vendors,
  *   placed or not, as one root, since a sweep grades an invariant rather than
@@ -402,7 +402,7 @@ export function group_by_language(files: SourceFile[]): Record<Language, SourceF
  *   manifest), plus the `svelte_styles` harvest derived from it. In `perf`, `gates` and
  *   `robustness`. Every collection there is pinned at once by the id of the snapshot's
  *   `collections/` tree, recorded in `GATE_CHECKOUT_IDS['../corpora']` and verified by
- *   `deno task pins:audit:checkouts` — real code the perf numbers reflect, AND a
+ *   `npm run pins:audit:checkouts` — real code the perf numbers reflect, AND a
  *   reproducible tier the count pins hold over.
  * - `gated` — snapshot code the correctness gates read but the bench does not: the
  *   author's own collections (manifest `origin: own`), reserved as the training input for
@@ -784,7 +784,7 @@ function assemble_entries(snapshot_entries: CorpusEntry[], live_trees: LiveTree[
 			tier: 'benched',
 			extensions: ['css'],
 			optional: true,
-			hint: 'run `deno task bench:harvest:svelte-styles`'
+			hint: 'run `npm run bench:harvest:svelte-styles`'
 		},
 		// The `own` repos as live working trees — the `live` tier, `robustness` view only,
 		// one entry per collection subpath. Optional: whichever of them this machine has cloned.
@@ -838,7 +838,7 @@ function assemble_entries(snapshot_entries: CorpusEntry[], live_trees: LiveTree[
 			tier: 'suite',
 			extensions: ['css'],
 			optional: true,
-			hint: 'run `deno task bench:harvest:wpt` (needs ../wpt)'
+			hint: 'run `npm run bench:harvest:wpt` (needs ../wpt)'
 		},
 		{
 			files_from: 'benches/js/.cache/test262_files.json',
@@ -848,7 +848,7 @@ function assemble_entries(snapshot_entries: CorpusEntry[], live_trees: LiveTree[
 			// absent cache withholds which language; `load_file_list` enforces it.
 			extensions: ['js'],
 			optional: true,
-			hint: 'run `deno task bench:harvest:test262` (needs ../test262)'
+			hint: 'run `npm run bench:harvest:test262` (needs ../test262)'
 		},
 		// The tsc corpus — TypeScript's own test cases, filtered to what tsc's parser
 		// AND tsc's `.errors.txt` baselines both call well-formed (harvest_ts_repo.ts).
@@ -864,7 +864,7 @@ function assemble_entries(snapshot_entries: CorpusEntry[], live_trees: LiveTree[
 			tier: 'suite',
 			extensions: ['ts'],
 			optional: true,
-			hint: 'run `deno task bench:harvest:ts-repo` (needs ../typescript)'
+			hint: 'run `npm run bench:harvest:ts-repo` (needs ../typescript)'
 		}
 	];
 }
@@ -1570,7 +1570,7 @@ export class CorpusLoader {
 			logger(
 				paths
 					? `  ${cache.label} cache: excluding ${paths.size} ${cache.excludes}`
-					: `  ⚠ ${cache.label} cache absent — ${cache.absent} (run \`deno task ${cache.task}\`)`
+					: `  ⚠ ${cache.label} cache absent — ${cache.absent} (run \`npm run ${cache.task}\`)`
 			);
 		}
 
@@ -1620,7 +1620,7 @@ export class CorpusLoader {
 			if (this.only === undefined && paths && excluded !== paths.size) {
 				logger(
 					`  ⚠ ${cache.label} cache drift: excluded ${excluded} of ${paths.size} ` +
-						`cached paths — re-run \`deno task ${cache.task}\``
+						`cached paths — re-run \`npm run ${cache.task}\``
 				);
 			}
 		}

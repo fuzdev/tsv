@@ -139,7 +139,7 @@ test('a binary not staged fails, naming the staging task', async () => {
 	const staging = fake_staging([LINUX], { [`${LINUX}/tsv_napi.node`]: inside(BOUNDS[LINUX]!) });
 	strictEqual(await run_validate_napi_artifact(staging.deps, []), 1);
 	deepStrictEqual(staging.err, [
-		`FAIL: crates/tsv_napi/pkg/${LINUX}/tsv not staged — run 'deno task build:napi:packages' first`
+		`FAIL: crates/tsv_napi/pkg/${LINUX}/tsv not staged — run 'npm run build:napi:packages' first`
 	]);
 });
 

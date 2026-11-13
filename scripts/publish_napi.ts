@@ -1,8 +1,7 @@
 /**
  * Publish the staged N-API npm packages — the release workflow's publish step,
- * also runnable locally with `--dry-run` (`npm run publish:napi -- --dry-run`, or
- * `deno task publish:napi --dry-run`, which forwards the flag as written). A
- * local run stages only the HOST platform package, so it deliberately ends at
+ * also runnable locally with `--dry-run` (`npm run publish:napi -- --dry-run`). A local
+ * run stages only the HOST platform package, so it deliberately ends at
  * the partial-set refusal below: staging + the refusal logic proven, nothing
  * published. The full-set rehearsal is the release workflow's dispatch dry run.
  *

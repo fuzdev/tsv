@@ -297,7 +297,7 @@ describe('how the entry is started', () => {
 		);
 	});
 
-	test('the root package.json has no script npm or deno task starts on its own', () => {
+	test("the root package.json has no script npm or Deno's task runner starts on its own", () => {
 		const names = Object.keys(scripts);
 		deepStrictEqual(
 			names.filter((name) => NPM_LIFECYCLE_SCRIPTS.includes(name)),

@@ -13,7 +13,7 @@
  *
  * Hand-written canonical trees holding only the fields the rows read, on purpose: the
  * rows are predicates over a tree's shape, and a test that parsed through the oracle
- * would need the sidecar and stop gating in `deno task check` (see `test:node`). What
+ * would need the sidecar and stop gating in `npm run check` (see `test:node`). What
  * the real oracle writes is graded by `corpus:compare:parse`.
  */
 

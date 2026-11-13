@@ -9,13 +9,13 @@ The corpus is a sibling checkout, `../typescript` (microsoft/TypeScript), pinned
 commit in `benches/js/lib/gate_counts.ts` (`GATE_CHECKOUT_IDS`). Three tools read
 it, and only the first is a gate:
 
-- **`deno task conformance:ts-repo`** — the gate this document describes. Entry:
+- **`npm run conformance:ts-repo`** — the gate this document describes. Entry:
   [`benches/js/diagnostics/ts_repo_compare.ts`](../benches/js/diagnostics/ts_repo_compare.ts).
-  A leg of `deno task conformance`, so it runs on release (publish Step 3b).
-- **`deno task bench:harvest:ts-repo`** — builds the tsc-corpus **coverage** set the
+  A leg of `npm run conformance`, so it runs on release (publish Step 3b).
+- **`npm run bench:harvest:ts-repo`** — builds the tsc-corpus **coverage** set the
   conformance bench measures every parser over ([`harvest_ts_repo.ts`](../benches/js/harvest_ts_repo.ts);
   the bench side: [benches/js/CLAUDE.md](../benches/js/CLAUDE.md) §Corpus).
-- **`deno task ts-repo:over-acceptance`** — a per-tool **profile** over the files
+- **`npm run ts-repo:over-acceptance`** — a per-tool **profile** over the files
   tsc's parser rejects, never a gate ([`ts_repo_over_acceptance.ts`](../benches/js/diagnostics/ts_repo_over_acceptance.ts)).
 
 The gate and the harvest share one vocabulary
@@ -207,11 +207,11 @@ the re-pin ritual and provenance are [gate_counts.md](./gate_counts.md).
 ## Command interface
 
 ```bash
-deno task conformance:ts-repo            # build the corpus N-API addon, then run the gate
-deno task conformance:ts-repo:run        # skip the rebuild (freshness-guarded; BENCH_STALE_OK=1 overrides)
-deno task conformance:ts-repo:run -v     # every ledgered and auto-attributed entry, plus the code histogram
-deno task conformance:ts-repo:run --json 2>summary.txt >report.json
-deno task conformance:ts-repo:run ../typescript/tests/cases/conformance/parser   # one subtree
+npm run conformance:ts-repo              # build the corpus N-API addon, then run the gate
+npm run conformance:ts-repo:run          # skip the rebuild (freshness-guarded; BENCH_STALE_OK=1 overrides)
+npm run conformance:ts-repo:run -- -v    # every ledgered and auto-attributed entry, plus the code histogram
+npm run conformance:ts-repo:run -- --json 2>summary.txt >report.json
+npm run conformance:ts-repo:run -- ../typescript/tests/cases/conformance/parser  # one subtree
 ```
 
 Summary to stderr, JSON to stdout with `--json`. A subtree run grades a slice and
@@ -297,7 +297,7 @@ signature) defer it
 
 The burn-down loop, one family per pull request, fixtures first.
 
-1. **Run** `deno task conformance:ts-repo:run -v --json 2>summary.txt >report.json`.
+1. **Run** `npm run conformance:ts-repo:run -- -v --json 2>summary.txt >report.json`.
    A red gate names each untracked over-rejection with tsv's error; the JSON carries
    every bucket.
 2. **Group** the untracked entries by tsv's error message. One message is usually one

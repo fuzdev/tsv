@@ -11,7 +11,7 @@
  * Hand-written rather than tool-produced on purpose: the graders' job is to read a
  * layout decision out of text, and a unit test that formats through the real tools
  * would test the tools instead, need their node_modules, and stop gating in
- * `deno task check` (see `test:node`). The claims about what each TOOL actually
+ * `npm run check` (see `test:node`). The claims about what each TOOL actually
  * emits at its defaults live in the module's own docs, verified by running them.
  *
  * The vacuity arms are here too — an assertion that grades nothing passes every

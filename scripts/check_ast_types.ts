@@ -262,7 +262,7 @@ const samples: Sample[] = [
 ];
 
 /**
- * The `tsv` binary of the shared `--profile corpus` build world (deno.json `//build:check`),
+ * The `tsv` binary of the shared `--profile corpus` build world (docs/tasks.md §`build:check`),
  * which the `check:ast-types` task builds before running this.
  *
  * Exec'd directly rather than through `cargo run -p tsv_cli`: arm A fans out over every
@@ -270,7 +270,7 @@ const samples: Sample[] = [
  * the workspace and contending on the build lock to run a single parse. Inside `check` the
  * dev-profile binary it wanted was already built (by `cargo test --workspace`, a few legs
  * earlier), so the cost there was the spawns rather than a compile — but a STANDALONE
- * `deno task check:ast-types` had to build it, in a profile nothing else about this gate
+ * `npm run check:ast-types` had to build it, in a profile nothing else about this gate
  * needs. The wire is the writers' output, identical under either profile and feature set
  * (the diagnostic seams are inert and touch no `write_*` — verified by diffing the two
  * binaries' `parse` output).

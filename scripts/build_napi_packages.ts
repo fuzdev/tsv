@@ -27,7 +27,7 @@
  * publish job stages the loader beside downloaded platform artifacts, on a
  * machine that built nothing. The cargo builds themselves are the
  * `build:napi` task + `cargo build -p tsv_cli --release`, chained by
- * `deno task build:napi:packages` — this script only stages files.
+ * `npm run build:napi:packages` — this script only stages files.
  *
  * Its entry is `scripts/roots/build_napi_packages.ts`, whose module doc says why this module
  * and everything it imports stay on `node:*` and relative modules, never a package. Every
@@ -274,7 +274,7 @@ export async function run_build_napi_packages(
 			artifact,
 			artifact_path,
 			`${platform_dir}/tsv_napi.node`,
-			'deno task build:napi'
+			'npm run build:napi'
 		)) ||
 		!(await copy_built(
 			'the built CLI binary',

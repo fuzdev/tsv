@@ -8,7 +8,7 @@
 // which PRINTS the JS `compile()` returns — is the effective oracle for every compile fixture
 // (svelte depends on it by a caret range). `benches/js/package.json` pins the same five
 // versions for the bench, and `pins:audit` (scripts/check_canonical_pins.ts, gated in
-// `deno task check`) holds the two manifests and the lock together. The actor refuses an
+// `npm run check`) holds the two manifests and the lock together. The actor refuses an
 // install that differs from the lock, so what runs is what the lock says.
 //
 // Bumping prettier / svelte / acorn / @sveltejs/acorn-typescript / prettier-plugin-svelte

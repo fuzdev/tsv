@@ -17,7 +17,7 @@ const PGO_NAPI = {
 	label: 'N-API (pgo)',
 	path: pgo_bench_library_path('napi'),
 	binding_crates: ['tsv_napi'],
-	rebuild: 'deno task build:bench:pgo',
+	rebuild: 'npm run build:bench:pgo',
 	pgo_world: 'napi'
 };
 
@@ -33,13 +33,13 @@ test("a profile grades that cargo profile's plain addon, with no PGO stamp to na
 			label: 'N-API (corpus)',
 			path: napi_library_path('corpus'),
 			binding_crates: ['tsv_napi'],
-			rebuild: 'deno task build:napi:corpus'
+			rebuild: 'npm run build:napi:corpus'
 		});
 		assert.deepStrictEqual(native_artifact_check_for(runtime, 'napi'), {
 			label: 'N-API (napi)',
 			path: napi_library_path('napi'),
 			binding_crates: ['tsv_napi'],
-			rebuild: 'deno task build:napi'
+			rebuild: 'npm run build:napi'
 		});
 	}
 });
@@ -49,7 +49,7 @@ test('Deno grades the profile-guided C-FFI library the bench row loads', () => {
 		label: 'FFI (pgo)',
 		path: pgo_bench_library_path('ffi'),
 		binding_crates: ['tsv_ffi'],
-		rebuild: 'deno task build:bench:pgo',
+		rebuild: 'npm run build:bench:pgo',
 		pgo_world: 'ffi'
 	});
 });
@@ -62,18 +62,25 @@ test('Deno refuses an N-API profile rather than reading it as a selector', () =>
 });
 
 test("each rebuild hint for the C-FFI loader's libraries names a task that exists", () => {
-	const tasks = new Set([
-		...Object.keys(
-			JSON.parse(readFileSync(new URL('../../../deno.json', import.meta.url), 'utf8')).tasks
+	const tasks = {
+		'deno task': new Set(
+			Object.keys(
+				JSON.parse(readFileSync(new URL('../../../deno.json', import.meta.url), 'utf8')).tasks
+			)
 		),
-		...Object.keys(
-			JSON.parse(readFileSync(new URL('../../../package.json', import.meta.url), 'utf8')).scripts
+		'npm run': new Set(
+			Object.keys(
+				JSON.parse(readFileSync(new URL('../../../package.json', import.meta.url), 'utf8')).scripts
+			)
 		)
-	]);
+	};
 	for (const profile of [undefined, 'release', 'corpus']) {
 		const hint = ffi_rebuild_task(profile);
-		const task = /^(?:deno task|npm run) (\S+)/.exec(hint)?.[1];
-		assert.ok(task !== undefined && tasks.has(task), `${hint} names no task`);
+		const [, runner, task] = /^(deno task|npm run) (\S+)/.exec(hint) ?? [];
+		assert.ok(
+			runner !== undefined && tasks[runner as keyof typeof tasks].has(task!),
+			`${hint} names no task its runner runs`
+		);
 	}
 	assert.strictEqual(
 		ffi_rebuild_task('corpus'),

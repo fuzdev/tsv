@@ -229,10 +229,10 @@ cargo run -p tsv_debug fixture_init tests/fixtures/typescript/[category]/[patter
 
 ```bash
 # First, verify fixture structure (skip our parser/formatter)
-deno task fixtures:validate [pattern] --prettier-only
+npm run fixtures:validate -- [pattern] --prettier-only
 
 # Then see our parser fail
-deno task fixtures:validate [pattern]
+npm run fixtures:validate -- [pattern]
 ```
 
 The fixture **should fail** at this point. This is correct - it defines the target behavior.
@@ -269,7 +269,7 @@ Fix the parser to handle the pattern correctly.
 
 ```bash
 # Fixture passes
-deno task fixtures:validate [pattern]
+npm run fixtures:validate -- [pattern]
 
 # Test262 tests pass
 cargo run -p tsv_debug test262 [filter] --verbose
@@ -297,8 +297,8 @@ with the new counts.
 ### Run the Gates
 
 ```bash
-deno task check                # the standing gate suite (no test262 leg)
-deno task conformance:test262  # the test262 release gate: `test262 --gate`
+npm run check                  # the standing gate suite (no test262 leg)
+npm run conformance:test262    # the test262 release gate: `test262 --gate`
 ```
 
 The release gate enforces `POSITIVE_PASSED_PIN`, a fixed positive-parse count — a fix that moves
@@ -320,10 +320,10 @@ cargo run -p tsv_cli parse --content '...' --parser typescript
 cargo run -p tsv_debug canonical_parse --content '...' --parser typescript
 
 # Validate fixture
-deno task fixtures:validate pattern
+npm run fixtures:validate -- pattern
 
 # Full validation
-deno task check
+npm run check
 ```
 
 ---

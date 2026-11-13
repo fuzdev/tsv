@@ -52,10 +52,10 @@
  * guard are `lib/strip_oracle.ts`, which the strip corpus differential (`strip_corpus.ts`)
  * shares.
  *
- * Usage (from the repo root; needs `deno task bench:install` and Node ≥ 22.18):
+ * Usage (from the repo root; needs `npm run bench:install` and Node ≥ 22.18):
  *
- *   deno task strip:fixtures:oracle [pattern...]   re-check the committed files
- *   deno task strip:fixtures:update [pattern...]   write expected.* / refusal.txt (an
+ *   npm run strip:fixtures:oracle -- [pattern...]   re-check the committed files
+ *   npm run strip:fixtures:update -- [pattern...]   write expected.* / refusal.txt (an
  *                                                  override fixture's are never written)
  *
  * Exit codes: 0 = every fixture agrees with its oracles, 1 = any mismatch.

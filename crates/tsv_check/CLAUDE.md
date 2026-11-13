@@ -9,7 +9,7 @@
 
 - **Experimental, and it may never ship.** A research crate, not a committed
   product surface: its conformance gates are on-demand only (not in
-  `deno task check`, not in `deno task conformance`, not release-gating — see
+  `npm run check`, not in `npm run conformance`, not release-gating — see
   ../../docs/typechecker.md), and the bet is allowed to come out negative.
 - **Zero cost to shipped artifacts.** No format/parse artifact links this
   crate — `tsv_cli`/`tsv_ffi`/`tsv_wasm`/`tsv_napi` never reference it; the
@@ -247,7 +247,7 @@ result is fully owned — nothing borrows out. For lib-aware checking:
   consts. Triage filters (`--test`/`--code`/`--variant`/`--family`) skip the pins;
   `--emit-manifest` and `--report` (the committed
   `benches/js/results/report.tsc-conformance.{json,md}`) serve tooling.
-  On-demand only — `deno task conformance:tsc-check`, never a release leg.
+  On-demand only — `npm run conformance:tsc-check`, never a release leg.
 - `tsv_debug profile --bind <paths>` — parse vs lower+bind timing + peak
   RSS (VmHWM); the binder's standing perf anchor form.
 - `tsv_debug tsc_conformance check-test <name> [--variant k=v] [--json]` —

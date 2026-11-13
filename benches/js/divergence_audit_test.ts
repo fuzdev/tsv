@@ -85,14 +85,14 @@ afterEach(() => {
 describe('arguments', () => {
 	test('--help prints the usage on stdout and exits 0, reading nothing', async () => {
 		strictEqual(await run_divergence_audit(untouchable, ['--help']), 0);
-		match(out.join('\n'), /Usage: deno task divergence:audit \[options\]/);
+		match(out.join('\n'), /Usage: npm run divergence:audit -- \[options\]/);
 		deepStrictEqual(err, []);
 	});
 
 	test('a bad value prints the issue on stderr and the usage on stdout, exits 1, reads nothing', async () => {
 		strictEqual(await run_divergence_audit(untouchable, ['--json=maybe']), 1);
 		strictEqual(err.length, 1);
-		match(out.join('\n'), /Usage: deno task divergence:audit/);
+		match(out.join('\n'), /Usage: npm run divergence:audit/);
 	});
 });
 

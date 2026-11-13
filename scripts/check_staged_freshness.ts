@@ -3,7 +3,7 @@
  * consume — the staged-package sibling of
  * `benches/js/lib/check_artifact_freshness.ts` (the bench/corpus `:run` guard).
  *
- * `deno task test:npm[:parse|:all]` and `deno task test:napi:npm` build first,
+ * `npm run test:npm[:parse|:all]` and `npm run test:napi:npm` build first,
  * so what they test is fresh by construction. Their `:run` variants
  * deliberately skip that build — the path for iterating on the test harness —
  * at the risk of silently testing a STALE staging: the incident this guard
@@ -11,7 +11,7 @@
  * before a behavior fix, which `test:napi:npm:run` would have green-tested
  * without a word. `scripts/validate_artifacts.ts` is the third consumer, for
  * the same reason with no `:run` split at all — it never builds, so a bare
- * `deno task validate:artifacts` grades whatever `pkg/` happens to hold.
+ * `npm run validate:artifacts` grades whatever `pkg/` happens to hold.
  *
  * Two postures, one grading. `assert_staged_fresh` ABORTS, which is right over
  * an artifact the caller's own task builds. `staged_staleness` grades one
@@ -251,7 +251,7 @@ export function wasm_package_checks(
 	variant: WasmVariant,
 	dir: string = wasm_package_dir(variant)
 ): Array<StagedCheck> {
-	const rebuild = `deno task build:npm:${variant}`;
+	const rebuild = `npm run build:npm:${variant}`;
 	return [
 		{
 			label: `staged WASM bundle (${variant})`,
@@ -322,7 +322,7 @@ export function napi_staged_triple_of(
 	if (!loader_staged) {
 		return {
 			ok: false,
-			message: `${NAPI_LOADER_DIR} not staged. Run 'deno task build:napi:packages' first.`
+			message: `${NAPI_LOADER_DIR} not staged. Run 'npm run build:napi:packages' first.`
 		};
 	}
 	const platform_dirs = entries.filter((d) => d !== 'napi');
@@ -384,7 +384,7 @@ export function napi_addon_check(triple: string): StagedCheck {
 		crates: [...CORE_CRATES, 'tsv_napi', 'tsv_ignore', 'tsv_discover'],
 		// the third-party NOTICE beside it is staged in the same pass
 		files: [...NAPI_STAGING_SOURCES, THIRD_PARTY_NOTICE.source],
-		rebuild: 'deno task build:napi:packages'
+		rebuild: 'npm run build:napi:packages'
 	};
 }
 
@@ -397,7 +397,7 @@ export function napi_addon_check(triple: string): StagedCheck {
  * are copied too and absent here — a reader that grades the README adds its own check.)
  */
 export function napi_loader_checks(): Array<StagedCheck> {
-	const rebuild = 'deno task build:napi:packages';
+	const rebuild = 'npm run build:napi:packages';
 	return [
 		{
 			label: 'staged loader',

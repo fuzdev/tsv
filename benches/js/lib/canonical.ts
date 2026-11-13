@@ -40,7 +40,7 @@ const NO_PLUGINS: unknown[] = [];
  * every call. Mirrors the inline options in the fixture oracle
  * (`crates/tsv_debug/sidecar/sidecar.ts`), the source of truth for fixture
  * correctness — tsv ships no prettier config file, so the corpus oracle reads
- * none either. Keep these two option sets identical — `deno task pins:audit` gates
+ * none either. Keep these two option sets identical — `npm run pins:audit` gates
  * it (a differing value OR a one-sided addition fails), so the invariant is checked
  * rather than merely stated.
  *

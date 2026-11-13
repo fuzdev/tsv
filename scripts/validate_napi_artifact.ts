@@ -4,7 +4,7 @@
  * `tsv` CLI binary beside it) — the native sibling of
  * `scripts/validate_artifacts.ts`'s wasm bounds, run per matrix target by the
  * release workflow, on the linux host build by check.yml's `artifacts` job, and
- * locally after `deno task build:napi:packages`.
+ * locally after `npm run build:napi:packages`.
  *
  * Deliberately tight (~±8%) around a measured value, same philosophy as the
  * wasm bounds: a legitimate size change fails the release until the constant
@@ -17,7 +17,7 @@
  * the tag.
  *
  * Two sets of bands. The plain ones grade a plain `cargo build` of both binaries —
- * what `deno task build:napi:packages` stages and check.yml's `artifacts` job builds
+ * what `npm run build:napi:packages` stages and check.yml's `artifacts` job builds
  * on every PR. `--pgo` grades the profile-guided pair that SHIPS
  * (`scripts/pgo/pgo.ts`, the release matrix): larger by the inlining a profile
  * drives, and bounded tightly for the same reason as everything here — the PGO-use
@@ -46,7 +46,7 @@ import { format_size } from './size.ts';
  * unwind), ±8% around a measured artifact — the anchor is the measured size, not a running
  * figure. One row only: the plain addon is built by check.yml's `artifacts` job alone, on
  * linux-x64-gnu (an ubuntu runner, no container), and anchored on a host
- * `deno task build:napi:packages` build, which builds it the same way. The release matrix
+ * `npm run build:napi:packages` build, which builds it the same way. The release matrix
  * builds no plain addon — every row ships and grades the PGO one (`PGO_BOUNDS`) — so no
  * other row has a band to keep honest, and a plain check of one is refused
  * (`PLAIN_ADDON_ROWS`). */
@@ -184,7 +184,7 @@ export async function run_validate_napi_artifact(
 		try {
 			size = await deps.size(join(deps.checkout, path));
 		} catch {
-			deps.print_error(`FAIL: ${path} not staged — run 'deno task build:napi:packages' first`);
+			deps.print_error(`FAIL: ${path} not staged — run 'npm run build:napi:packages' first`);
 			return false;
 		}
 		const [min, max] = bounds;

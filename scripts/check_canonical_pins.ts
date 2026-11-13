@@ -6,16 +6,16 @@
  * - `--pins` — half 1 below. A **repo fact**: whether the committed pin sites
  *   agree with each other. Nothing outside the repo can change the verdict, so
  *   it holds on a clean CI checkout, and its failure invalidates the fixture
- *   grading `cargo test` does — it belongs EARLY in `deno task check`, which is
+ *   grading `cargo test` does — it belongs EARLY in `npm run check`, which is
  *   where the `pins:audit` task runs it.
  * - `--checkouts` — halves 2 and 3. **Environment facts**: whether this
  *   machine's sibling checkouts match what the pins say they are. Nothing in
- *   `deno task check` reads those checkouts, so a skew there cannot change any
+ *   `npm run check` reads those checkouts, so a skew there cannot change any
  *   committed-tree verdict — making a `check` failure on it pure collateral
  *   damage (it halts the chain and leaves the real regressions unrun). The
  *   consumers are the conformance-cadence gates that DO read the checkouts, so
- *   the `pins:audit:checkouts` task runs it as `deno task conformance`'s
- *   preflight; `deno task doctor` reports both modes ahead of time.
+ *   the `pins:audit:checkouts` task runs it as `npm run conformance`'s
+ *   preflight; `npm run doctor` reports both modes ahead of time.
  *
  * Passing neither flag runs both (what `doctor` does); passing both is the same.
  *
@@ -73,7 +73,7 @@
  * `../prettier` is deliberately NOT gated: its fixture suites are
  * format-comparison inputs whose expected output is computed live per file by
  * the pinned npm prettier (no path-keyed ledger to rot), and the checkout
- * legitimately rides `-dev` versions — `deno task doctor` reports it instead.
+ * legitimately rides `-dev` versions — `npm run doctor` reports it instead.
  *
  * **3. Checkout drift** (warn-only) — a version string only bumps at
  * release, so upstream commits landing in between change a graded suite or
@@ -187,11 +187,11 @@ interface PackageLock {
  * compile oracle's output could change with no version in this repo changing and
  * no pin site able to see it, which is exactly what happened: esrap 2.3.1
  * stopped dropping a string-literal specifier's `as` alias and silently staled
- * five committed fixtures while `deno task check` stayed green.
+ * five committed fixtures while `npm run check` stayed green.
  *
  * Bumping one of these is a deliberate oracle move: regenerate the lock
- * (`deno task pins:lock`), re-validate the compile fixtures
- * (`deno task compile:fixtures:validate` — the only check that grades the
+ * (`npm run pins:lock`), re-validate the compile fixtures
+ * (`npm run compile:fixtures:validate` — the only check that grades the
  * committed expectations against a LIVE oracle), and update the version here in
  * the same change.
  */
@@ -252,7 +252,7 @@ const BENCH_CANONICAL_PATH = 'benches/js/lib/canonical.ts';
  * the tool is a behavioral question a text comparison can't answer — two identical
  * option sets can both be ignored after an upstream rename. `canonical.ts`'s `init`
  * probe answers it for the bench (`benches/js/lib/format_config_probe.ts`); the
- * sidecar's answer is `deno task fixtures:validate`, whose F2 arm re-formats
+ * sidecar's answer is `npm run fixtures:validate`, whose F2 arm re-formats
  * through the live oracle. This check is the repo-fact half: that the two sets are
  * the SAME set.
  */
@@ -399,7 +399,7 @@ export async function run_check_canonical_pins(
 		for (const name of Object.keys(lock_root_deps)) {
 			if (!(name in sidecar_deps)) {
 				failures.push(
-					`${name}: the root entry of ${SIDECAR_LOCK_PATH} depends on it, but ${SIDECAR_PKG_PATH} doesn't — run \`deno task pins:lock\``
+					`${name}: the root entry of ${SIDECAR_LOCK_PATH} depends on it, but ${SIDECAR_PKG_PATH} doesn't — run \`npm run pins:lock\``
 				);
 			}
 		}
@@ -569,7 +569,7 @@ export async function run_check_canonical_pins(
 		for (const f of failures) console.error(`  · ${f}`);
 		if (run_pins) {
 			console.error(
-				`  Pin sites: ${SIDECAR_PKG_PATH} and its lock (deno task pins:lock), ${BENCH_PKG_PATH} — edit in lockstep.`
+				`  Pin sites: ${SIDECAR_PKG_PATH} and its lock (npm run pins:lock), ${BENCH_PKG_PATH} — edit in lockstep.`
 			);
 		}
 		console.error(

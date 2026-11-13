@@ -6,8 +6,8 @@
  * 2. Every pattern fixture reference points to a documented divergence
  *
  * Usage:
- *   deno task divergence:audit
- *   deno task divergence:audit --json
+ *   npm run divergence:audit
+ *   npm run divergence:audit -- --json
  *
  * The library half: `run_divergence_audit` reads through the deps its root
  * (`roots/divergence_audit.ts`) binds, read-only handles on `tests/fixtures` and `docs/`.
@@ -30,15 +30,15 @@ const AuditArgs = s.strip_object({
 
 function print_usage(): void {
 	console.log(`
-Usage: deno task divergence:audit [options]
+Usage: npm run divergence:audit -- [options]
 
 Options:
   --json    Output results as JSON
   --help    Show this help message
 
 Examples:
-  deno task divergence:audit           # Human-readable report
-  deno task divergence:audit --json    # Machine-readable JSON
+  npm run divergence:audit             # Human-readable report
+  npm run divergence:audit -- --json   # Machine-readable JSON
 `);
 }
 

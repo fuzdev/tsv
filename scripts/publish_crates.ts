@@ -42,12 +42,12 @@
  *      the resume state, so there is no sentinel file.
  *
  * Usage:
- *   deno task publish:crates                       # dry run
- *   deno task publish:crates --bump minor          # dry run, grading this tree as the next minor
- *   deno task publish:crates --wetrun [--wait]     # publish (the user's, by token, at the tag)
+ *   npm run publish:crates                         # dry run
+ *   npm run publish:crates -- --bump minor         # dry run, grading this tree as the next minor
+ *   npm run publish:crates -- --wetrun [--wait]    # publish (the user's, by token, at the tag)
  *
- * Flags (through `deno task`, no `--` separator: it forwards one literally, and parseArgs
- * rejects what follows it; `npm run publish:crates -- <flags>` takes one):
+ * Flags (after npm's `--`, `npm run publish:crates -- <flags>`, which npm takes: a `--` that
+ * reaches the script makes parseArgs reject what follows it):
  *   --wetrun             publish for real, from a clean checkout of the `v<version>` tag
  *   --expect-tag <tag>   fail unless the workspace version is the tag's (`v<version>`)
  *   --bump <level>       patch | minor | major — the level the next release takes, which
@@ -491,7 +491,7 @@ async function publish_crates(deps: PublishCratesDeps, args: PublishCratesArgs):
 			const at = limit.retry_at?.toUTCString() ?? 'the time crates.io names above';
 			if (!args.wait || limit.retry_at === null) {
 				print_error(
-					`  STOPPED at crates.io's rate limit. Re-run \`deno task publish:crates --wetrun\` after ${at}: ` +
+					`  STOPPED at crates.io's rate limit. Re-run \`npm run publish:crates -- --wetrun\` after ${at}: ` +
 						'it publishes only the crates not yet live (or pass --wait to sleep through it).'
 				);
 				break;

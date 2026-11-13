@@ -15,7 +15,7 @@ authored** — so a gap no fixture puts a blank in is a gap never checked.
 For each seed file it injects a **blank line** into every candidate gap, one at a time, formats, and
 grades six policy-free invariants on the result — plus the absorb pin over the drops.
 
-Pure Rust, no sidecar. Gated in `deno task check` as a **ratchet**, not a green gate, over a live
+Pure Rust, no sidecar. Gated in `npm run check` as a **ratchet**, not a green gate, over a live
 bug family: the baseline (`blank_audit_known.txt`) is a snapshot of known bugs whose shrinking is
 the goal.
 
@@ -116,7 +116,7 @@ extension, and as-authored drops over real corpora need the blank census — bot
 Every **policy** kind is **pinned** into the ratchet (NON-IDEMPOTENT, DROPPED, DOUBLE-PRINTED,
 UNREPARSEABLE, NODE-LOSS, LEAF-CORRUPTION, BLANK-RUN) — deliberately unlike `fuzz` / `roundtrip_audit`, where
 non-idempotency is an absolute never-pinnable gate: this audit is a ratchet over a live bug family,
-so its findings must be pinnable or the gate would hard-block `deno task check`.
+so its findings must be pinnable or the gate would hard-block `npm run check`.
 Two carve-outs:
 
 - **`PANIC`** always fails and is never listed (a crash is absolute).
@@ -129,8 +129,8 @@ Two carve-outs:
 ## Running it
 
 ```bash
-deno task blanks:audit           # the gate: tests/fixtures, ~30 s
-deno task blanks:audit:update    # regenerate BOTH snapshots (bug shapes + absorb pin)
+npm run blanks:audit             # the gate: tests/fixtures, ~30 s
+npm run blanks:audit:update      # regenerate BOTH snapshots (bug shapes + absorb pin)
 
 # Directly, against a real codebase — where the real yield is:
 cargo run --profile corpus -p tsv_debug --features _internal_audits blank_audit ../corpora/collections/zzz/src
@@ -226,7 +226,7 @@ for the ledger kinds (mirroring `gap_audit`'s confidence axis) is a possible fut
 1. **Reproduce by hand** — inject a blank line at the example offset and format.
 2. **Fix the printer**, fixtures-first per the repo's TDD rule. The fix is usually to route the gap
    through a blank-aware reflow rather than assuming the gap is empty.
-3. **Re-pin**: `deno task blanks:audit:update`, and confirm the shape's line is **gone** from the
+3. **Re-pin**: `npm run blanks:audit:update`, and confirm the shape's line is **gone** from the
    snapshot rather than merely changed.
 
 If a shape is genuinely pre-existing and merely newly *reached* by a fixture you added, the same

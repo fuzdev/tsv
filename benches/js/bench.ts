@@ -10,8 +10,8 @@
  * - WASM: tsv compiled to WASM (portable, near-native)
  * - Alternatives: oxc-parser, oxfmt, biome-wasm, dprint-wasm, yuku-parser (for comparison)
  *
- * Run with: deno task bench:deno:run (Deno), deno task bench:node:run (Node) or
- * deno task bench:bun:run (Bun). The same scripts run under all three — each detects
+ * Run with: deno task bench:deno:run (Deno), npm run bench:node:run (Node) or
+ * npm run bench:bun:run (Bun). The same scripts run under all three — each detects
  * the runtime and the run writes a runtime-labeled report (report.deno.* /
  * report.node.* / report.bun.*). See benches/js/CLAUDE.md.
  *
@@ -240,7 +240,7 @@ const Args_schema = s.object({
 	verbose: s.with_default(s.boolean, false)
 });
 
-// Strip leading -- from deno task passthrough. `argv.slice(2)` (node:process) is
+// Strip a leading -- a task runner passed through. `argv.slice(2)` (node:process) is
 // the cross-runtime equivalent of `Deno.args` — Deno exposes the same shape.
 const cli_args = argv.slice(2);
 const raw_argv = cli_args[0] === '--' ? cli_args.slice(1) : cli_args;
@@ -357,7 +357,7 @@ async function run_child<TResult>(
 			console.error(
 				`  re-run it alone (from the repo root, with this run's BENCH_* environment):\n` +
 					`    ${e.command}\n` +
-					`  ${RUN_DIR} is kept for that; \`deno task bench:clean\` removes it`
+					`  ${RUN_DIR} is kept for that; \`npm run bench:clean\` removes it`
 			);
 		}
 		return exit(1);

@@ -38,7 +38,7 @@ and refusing a construct in strict code moves it the other way. A negative shift
 *finding* only when the construct is one tsv claims to reject; the positive side is
 what the release gate holds.
 
-**Release gate.** `deno task conformance:test262` (the `test262 --gate` mode,
+**Release gate.** `npm run conformance:test262` (the `test262 --gate` mode,
 folded into `conformance:all` and run by `publish.ts` Step 3b) gates exactly the
 **positive** side: it fails on any positive-parse regression, or a shift in the
 pinned positive-pass count (`POSITIVE_PASSED_PIN` in the command, mirrored by

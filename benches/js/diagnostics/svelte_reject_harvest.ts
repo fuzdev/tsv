@@ -144,7 +144,7 @@ export async function run_svelte_reject_harvest(
 	} catch (e) {
 		const msg = `svelte_reject_harvest: could not init svelte/compiler (${e instanceof Error ? e.message : e})`;
 		if (if_present) {
-			console.error(`  ⚠ ${msg} — skipping (run \`deno task bench:install\`)`);
+			console.error(`  ⚠ ${msg} — skipping (run \`npm run bench:install\`)`);
 			return 0;
 		}
 		throw new Error(msg);

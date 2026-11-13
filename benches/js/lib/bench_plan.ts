@@ -294,7 +294,7 @@ export const summarize_process_noise = (
  * the cleaned cv across the reports it was set against — so ordinary variation sits
  * nowhere near it, and a row that trips it is doing something other than varying.
  * Deliberately tighter than `benchmark_baseline_compare`'s 30% noise gate, which
- * answers another question (is a REGRESSION real) on a run a plain `deno task bench`
+ * answers another question (is a REGRESSION real) on a run a plain `npm run bench`
  * never makes.
  */
 // TODO: re-derive the calibration from the pass-pooled reports — a row's cv now

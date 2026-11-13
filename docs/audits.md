@@ -1,8 +1,8 @@
 # Audit Gates
 
-> The standing correctness audits over the formatter, the parsers and their wire contract, the Svelte compiler, and the canonical oracles all of them are graded against — what each proves, what it is blind to, how to run it, and where it gates. The `deno task` entry points are indexed in [CLAUDE.md §Fixtures](../CLAUDE.md#fixtures-rust--deno-based); this doc is the full reference.
+> The standing correctness audits over the formatter, the parsers and their wire contract, the Svelte compiler, and the canonical oracles all of them are graded against — what each proves, what it is blind to, how to run it, and where it gates. The task entry points are indexed in [CLAUDE.md §Fixtures](../CLAUDE.md#fixtures-rust--node-based); this doc is the full reference.
 
-Most audits are pure Rust (no sidecar). Those gated in `deno task check` scan `tests/fixtures` — a curated, format-stable tree — so several are cheap tripwires there whose real yield is external corpora (`../prettier/tests/format`, the `../corpora` snapshot's collections, the `live` working trees): point them at real code after a printer change, or run `deno task audit:corpus`, the standing bundle for exactly that. Audits that need the feature-gated instrumentation (`_internal_swallow_check` / `_internal_comment_check`) build via the `_internal_audits` umbrella feature under `--profile corpus` — the single build world every `deno task check` audit shares (optimized + `panic = "unwind"`, so a formatter panic is caught and reported; plain `--release` is `panic = "abort"`, which kills the process). Every "build with `--profile corpus`" below means this.
+Most audits are pure Rust (no sidecar). Those gated in `npm run check` scan `tests/fixtures` — a curated, format-stable tree — so several are cheap tripwires there whose real yield is external corpora (`../prettier/tests/format`, the `../corpora` snapshot's collections, the `live` working trees): point them at real code after a printer change, or run `npm run audit:corpus`, the standing bundle for exactly that. Audits that need the feature-gated instrumentation (`_internal_swallow_check` / `_internal_comment_check`) build via the `_internal_audits` umbrella feature under `--profile corpus` — the single build world every `npm run check` audit shares (optimized + `panic = "unwind"`, so a formatter panic is caught and reported; plain `--release` is `panic = "abort"`, which kills the process). Every "build with `--profile corpus`" below means this.
 
 ⚠️ A **stack overflow** is the one failure this containment cannot reach — not a panic, so no `catch_unwind` sees it and the sweep dies outright rather than reporting one file. So `tsv_debug`'s dispatch runs on the `tsv` binary's stated stack reservation (`tsv_cli::cli::stack`), which puts the depth an audit survives out of reach of ordinary input and, more to the point, makes it the same on every machine; see [cli.md §Recursion Depth](./cli.md#recursion-depth).
 
@@ -17,52 +17,52 @@ The Svelte compiler's *sidecar-dependent* harnesses — the corpus comparison, t
 
 | audit | task | catches | gating |
 | --- | --- | --- | --- |
-| [Swallow](#line-comment-swallow-audit-swallowaudit) | `swallow:audit` | `//` line comment followed by content on one output line (silent content loss) | `deno task check`; `audit:corpus` (real code) |
-| [Comment ledger](#comment-ledger-audit-commentsaudit) | `comments:audit` | a parsed comment DROPPED or DOUBLE-PRINTED (print-once) | `deno task check`; `audit:corpus` (real code) |
-| [Gap injection](#gap-injection-audit-gapsaudit) | `gaps:audit` | comment drops — and `//` swallows — in gaps no fixture covers | `deno task check` (ratchet) |
+| [Swallow](#line-comment-swallow-audit-swallowaudit) | `swallow:audit` | `//` line comment followed by content on one output line (silent content loss) | `npm run check`; `audit:corpus` (real code) |
+| [Comment ledger](#comment-ledger-audit-commentsaudit) | `comments:audit` | a parsed comment DROPPED or DOUBLE-PRINTED (print-once) | `npm run check`; `audit:corpus` (real code) |
+| [Gap injection](#gap-injection-audit-gapsaudit) | `gaps:audit` | comment drops — and `//` swallows — in gaps no fixture covers | `npm run check` (ratchet) |
 | [Wire injection](#wire-injection-audit-wireaudit) | `wire:audit` | a WIRE divergence from the canonical parser that only a spelling no corpus contains reveals — the parse-side sibling of gap injection | on demand (`ws` green; `terminators` ⚠️ red by design) |
-| [Blank injection](#blank-line-injection-audit-blanksaudit) | `blanks:audit` | blank-line handling: panic / idempotency / reparse (incl. node loss) / ledger / blank-run — plus the blank-DROP absorb pin (a new kind of silently-eaten blank) | `deno task check` (ratchet) |
-| [Blank fabrication](#blank-fabrication-audit-fabricationaudit) | `fabrication:audit` | a blank line the formatter INVENTS on a pristine seed (the author never wrote it) | `deno task check` (ratchet); `audit:corpus` (real code) |
-| [Comment census](#comment-census-audit-censusaudit) | `census:audit` | a comment interior lost, gained, or rewritten between raw input and raw output — parse-time drops included, which the ledger can't see | `deno task check` (ratchet); `audit:corpus` (real code) |
-| [Print width](#print-width-audit-widthaudit) | `width:audit` | a new KIND of over-width output line — the shape a hard-limit bug takes | `deno task check` (ratchet) |
-| [Ignore honoring](#ignore-directive-honoring-audit-ignoreaudit) | `ignore:audit` | `prettier-ignore` positions that silently reformat an ignored node, misbind a trailing directive, over-freeze, or lose the freeze on pass 2 | `deno task check` (ratchet) |
-| [Build fanout](#build-fanout-audit-fanoutaudit) | `fanout:audit` | exponential doc-node rebuild in nested layout candidates; a node built many times, a doc that outgrows its source, or doc-walk / source-scan / printer-predicate work growing faster than quadratic in nesting or than linear in a sibling run — over the depth gate's whole sweep, the known-bug shapes and flat runs | `deno task check` (ratchet) |
-| [Raw-find scan](#raw-find-scan-audit-scanaudit) | `scan:audit` | new raw substring scans over source (comment-blind delimiter matching) | `deno task check` |
-| [Self-format](#self-format-audit-formataudit) | `format:audit` | tsv failing to format its OWN TS/JS — a would-change file (non-idempotency) or a parse error (over-rejection) | `deno task check` |
-| [Discovery parity](#corpus-discovery-parity-audit-discoveryaudit) | `discovery:audit` | `tsv format --list` over the `../corpora` snapshot naming a different file set than the snapshot's committed tree holds in tsv's extensions — a discovery prune firing on real code, or an extension drift | `deno task check` (when `../corpora` is present) |
-| [Engine parity](#engine-parity-audit-enginesaudit) | `engines:audit` | the WASM engine and the native engine formatting — or type-stripping, or collecting the import records of — the same file to DIFFERENT bytes — a wasm32-only divergence every other gate is blind to, since they all grade the native build | CI's `artifacts` job ONLY (needs both packages built; neither `deno task check` nor the publish path compares engines) |
-| [Doc link](#doc-link-audit-docsaudit) | `docs:audit` | a doc-comment `[link]` that no longer resolves — a stale doc | `deno task check` |
-| [docs.rs build](#docsrs-build-audit-docsauditdocsrs) | `docs:audit:docsrs` | a crate meant for docs.rs whose own doc build fails at its docs.rs feature set or at its defaults — a link to an item behind a feature that build leaves off, which the all-features workspace build resolves; a public item's doc linking a private item; a dead render — a link to a hidden item, which resolves but renders a dead `#anchor` or inert bracketed code | `deno task check` |
-| [Published deps](#published-graph-dependency-audit-depsaudit) | `deps:audit` | a crate meant for publishing reaching `serde_json` through a normal or build dependency, at any feature set or target — the workspace entry's features would unify into a consumer's own `serde_json` and change how it deserializes | `deno task check` |
-| [Package contents](#package-contents-audit-packageaudit) | `package:audit` | a crate meant for publishing whose crates.io tarball lacks its `README.md`, `LICENSE` (the root's bytes) or a required `NOTICE`, ships any other Markdown (`CLAUDE.md`), links relatively from its README, or states a `rust-version` other than the pinned toolchain's major.minor — plus cargo's publishable set drifting from the shared reader's, and a binary crate's binstall table naming an asset the release workflow does not upload (or missing a shipped target) | `deno task check` |
+| [Blank injection](#blank-line-injection-audit-blanksaudit) | `blanks:audit` | blank-line handling: panic / idempotency / reparse (incl. node loss) / ledger / blank-run — plus the blank-DROP absorb pin (a new kind of silently-eaten blank) | `npm run check` (ratchet) |
+| [Blank fabrication](#blank-fabrication-audit-fabricationaudit) | `fabrication:audit` | a blank line the formatter INVENTS on a pristine seed (the author never wrote it) | `npm run check` (ratchet); `audit:corpus` (real code) |
+| [Comment census](#comment-census-audit-censusaudit) | `census:audit` | a comment interior lost, gained, or rewritten between raw input and raw output — parse-time drops included, which the ledger can't see | `npm run check` (ratchet); `audit:corpus` (real code) |
+| [Print width](#print-width-audit-widthaudit) | `width:audit` | a new KIND of over-width output line — the shape a hard-limit bug takes | `npm run check` (ratchet) |
+| [Ignore honoring](#ignore-directive-honoring-audit-ignoreaudit) | `ignore:audit` | `prettier-ignore` positions that silently reformat an ignored node, misbind a trailing directive, over-freeze, or lose the freeze on pass 2 | `npm run check` (ratchet) |
+| [Build fanout](#build-fanout-audit-fanoutaudit) | `fanout:audit` | exponential doc-node rebuild in nested layout candidates; a node built many times, a doc that outgrows its source, or doc-walk / source-scan / printer-predicate work growing faster than quadratic in nesting or than linear in a sibling run — over the depth gate's whole sweep, the known-bug shapes and flat runs | `npm run check` (ratchet) |
+| [Raw-find scan](#raw-find-scan-audit-scanaudit) | `scan:audit` | new raw substring scans over source (comment-blind delimiter matching) | `npm run check` |
+| [Self-format](#self-format-audit-formataudit) | `format:audit` | tsv failing to format its OWN TS/JS — a would-change file (non-idempotency) or a parse error (over-rejection) | `npm run check` |
+| [Discovery parity](#corpus-discovery-parity-audit-discoveryaudit) | `discovery:audit` | `tsv format --list` over the `../corpora` snapshot naming a different file set than the snapshot's committed tree holds in tsv's extensions — a discovery prune firing on real code, or an extension drift | `npm run check` (when `../corpora` is present) |
+| [Engine parity](#engine-parity-audit-enginesaudit) | `engines:audit` | the WASM engine and the native engine formatting — or type-stripping, or collecting the import records of — the same file to DIFFERENT bytes — a wasm32-only divergence every other gate is blind to, since they all grade the native build | CI's `artifacts` job ONLY (needs both packages built; neither `npm run check` nor the publish path compares engines) |
+| [Doc link](#doc-link-audit-docsaudit) | `docs:audit` | a doc-comment `[link]` that no longer resolves — a stale doc | `npm run check` |
+| [docs.rs build](#docsrs-build-audit-docsauditdocsrs) | `docs:audit:docsrs` | a crate meant for docs.rs whose own doc build fails at its docs.rs feature set or at its defaults — a link to an item behind a feature that build leaves off, which the all-features workspace build resolves; a public item's doc linking a private item; a dead render — a link to a hidden item, which resolves but renders a dead `#anchor` or inert bracketed code | `npm run check` |
+| [Published deps](#published-graph-dependency-audit-depsaudit) | `deps:audit` | a crate meant for publishing reaching `serde_json` through a normal or build dependency, at any feature set or target — the workspace entry's features would unify into a consumer's own `serde_json` and change how it deserializes | `npm run check` |
+| [Package contents](#package-contents-audit-packageaudit) | `package:audit` | a crate meant for publishing whose crates.io tarball lacks its `README.md`, `LICENSE` (the root's bytes) or a required `NOTICE`, ships any other Markdown (`CLAUDE.md`), links relatively from its README, or states a `rust-version` other than the pinned toolchain's major.minor — plus cargo's publishable set drifting from the shared reader's, and a binary crate's binstall table naming an asset the release workflow does not upload (or missing a shipped target) | `npm run check` |
 | [Crates publish rehearsal](#crates-publish-rehearsal-publishcrates) | `publish:crates` · `publish:crates:package` | a publishable crate that does not build ALONE from its tarball against its siblings' tarballs (what workspace feature unification hides); with the public-API gate, a crate whose public API breaks its published baseline at the level the version change states — a crate with no published baseline is SKIPPED loudly, never passed | CI's `artifacts` job (`publish:crates:package`, every commit); the release workflow's `crates` job (the full dry run: tag, dispatch, weekly) |
-| [Wire-type drift](#wire-type-drift-check-checkast-types) | `check:ast-types` | the shipped `tsv_ast.d.ts` no longer describing what the wire-JSON writers emit — plus a wire type it never declared at all | `deno task check` |
-| [Package declarations](#package-declaration-check-typecheckpackages) | `typecheck:packages` | a staged package's published `.d.ts` failing a consumer's strict compile — a lib the consumer did not ask for (TS2550), a name star-export ambiguation drops (TS2308), a type a package must not export, a README example that does not compile | `scripts/publish.ts` Step 6 (all four packages); on demand (needs `deno task bench:install`, so NOT in `deno task check`) |
-| [Loc cross-grade](#loc-cross-grade-checkloc) | `check:loc` | tsv's loc wire and the shipped `locations.js` reconstruction of its span-only wire disagreeing on any fixture input — the two implementations of the one `loc` definition drifting apart | `deno task check` |
-| [Pin agreement](#canonical-pin-agreement-audit-pinsaudit) | `pins:audit` | the five canonical-oracle pin sites disagreeing — including the lockfile, which alone pins the oracle's own transitive deps | `deno task check` |
-| [Checkout alignment](#checkout-alignment-audit-pinsauditcheckouts) | `pins:audit:checkouts` | a present `../svelte` / `../acorn-typescript` clone that is not the pinned version; checkout drift (warn — HEAD, or the `../corpora` snapshot's `collections/` tree id) | `deno task conformance` (preflight) |
-| [Authoring independence](#authoring-independence-audit-authoringaudit) | `authoring:audit` | two render-equivalent authorings settling on two fixed points; non-idempotency | `deno task check`; `audit:corpus` (real code) |
-| [Paren authoring](#paren-authoring-independence-audit-parenaudit) | `paren:audit` | a same-operator logical chain formatting differently from its redundantly-parenthesized twin — the class a rule left on the raw `binary.right` falls into, invisible on every paren-free authoring — and the relational `<`…`>` chain, whose pair is decided by a BYTE read a redundant shell can move | `deno task check` (with `--require-relational`); `audit:corpus` (real code, without it) |
-| [Razor sweep](#print-width-razor-sweep-razoraudit) | `razor:audit` | width-keyed layout bugs — an F1 break at some column, and the stray line-head boundary space that is its OWN fixed point | `deno task check` |
-| [Round-trip](#formatreparse-round-trip-audit-roundtripaudit) | `roundtrip:audit` · `roundtrip:audit:prettier` | formatted output the parser rejects (delimiter/structure corruption), or that DROPS / duplicates a node (the population census) | `deno task check` (fixtures always; the prettier suites when `../prettier` is present); `audit:corpus` (real code) |
-| [Binding](#commenttoken-binding-audit-bindingaudit) | `binding:audit` | a glued comment re-bound to a different subtree by a migrating paren | `deno task check`; `audit:corpus` (real code) |
-| [Render equivalence](#render-equivalence-audit-renderaudit) | `render:audit` | `tsv format` changing what a Svelte component renders | `deno task conformance` (release) |
+| [Wire-type drift](#wire-type-drift-check-checkast-types) | `check:ast-types` | the shipped `tsv_ast.d.ts` no longer describing what the wire-JSON writers emit — plus a wire type it never declared at all | `npm run check` |
+| [Package declarations](#package-declaration-check-typecheckpackages) | `typecheck:packages` | a staged package's published `.d.ts` failing a consumer's strict compile — a lib the consumer did not ask for (TS2550), a name star-export ambiguation drops (TS2308), a type a package must not export, a README example that does not compile | `scripts/publish.ts` Step 6 (all four packages); on demand (needs `npm run bench:install`, so NOT in `npm run check`) |
+| [Loc cross-grade](#loc-cross-grade-checkloc) | `check:loc` | tsv's loc wire and the shipped `locations.js` reconstruction of its span-only wire disagreeing on any fixture input — the two implementations of the one `loc` definition drifting apart | `npm run check` |
+| [Pin agreement](#canonical-pin-agreement-audit-pinsaudit) | `pins:audit` | the five canonical-oracle pin sites disagreeing — including the lockfile, which alone pins the oracle's own transitive deps | `npm run check` |
+| [Checkout alignment](#checkout-alignment-audit-pinsauditcheckouts) | `pins:audit:checkouts` | a present `../svelte` / `../acorn-typescript` clone that is not the pinned version; checkout drift (warn — HEAD, or the `../corpora` snapshot's `collections/` tree id) | `npm run conformance` (preflight) |
+| [Authoring independence](#authoring-independence-audit-authoringaudit) | `authoring:audit` | two render-equivalent authorings settling on two fixed points; non-idempotency | `npm run check`; `audit:corpus` (real code) |
+| [Paren authoring](#paren-authoring-independence-audit-parenaudit) | `paren:audit` | a same-operator logical chain formatting differently from its redundantly-parenthesized twin — the class a rule left on the raw `binary.right` falls into, invisible on every paren-free authoring — and the relational `<`…`>` chain, whose pair is decided by a BYTE read a redundant shell can move | `npm run check` (with `--require-relational`); `audit:corpus` (real code, without it) |
+| [Razor sweep](#print-width-razor-sweep-razoraudit) | `razor:audit` | width-keyed layout bugs — an F1 break at some column, and the stray line-head boundary space that is its OWN fixed point | `npm run check` |
+| [Round-trip](#formatreparse-round-trip-audit-roundtripaudit) | `roundtrip:audit` · `roundtrip:audit:prettier` | formatted output the parser rejects (delimiter/structure corruption), or that DROPS / duplicates a node (the population census) | `npm run check` (fixtures always; the prettier suites when `../prettier` is present); `audit:corpus` (real code) |
+| [Binding](#commenttoken-binding-audit-bindingaudit) | `binding:audit` | a glued comment re-bound to a different subtree by a migrating paren | `npm run check`; `audit:corpus` (real code) |
+| [Render equivalence](#render-equivalence-audit-renderaudit) | `render:audit` | `tsv format` changing what a Svelte component renders | `npm run conformance` (release) |
 | [Layout neutrality](#layout-neutrality-audit-neutrality_audit) | — | a layout gate reading comment *ownership* instead of page occupancy | dev tool (pre-ownership-change) |
-| [Fuzz](#seeded-mutational-fuzzer-fuzzaudit) | `fuzz:audit` · `fuzz:audit:debug` | panic / non-idempotency / node loss / structural divergence on arbitrary input; a panic in the `locations` wire; a type-strip panic or contract break; an import-records panic or contract break; with `:debug`, a fired `debug_assert!` or overflow check | `deno task check`; `idempotency:sweep` / `audit:corpus` (real code) |
+| [Fuzz](#seeded-mutational-fuzzer-fuzzaudit) | `fuzz:audit` · `fuzz:audit:debug` | panic / non-idempotency / node loss / structural divergence on arbitrary input; a panic in the `locations` wire; a type-strip panic or contract break; an import-records panic or contract break; with `:debug`, a fired `debug_assert!` or overflow check | `npm run check`; `idempotency:sweep` / `audit:corpus` (real code) |
 | [F1 sweep](#f1-idempotency-sweep-idempotencysweep) | `idempotency:sweep` | pass-2 reflow on real code; a panic in the `locations` wire, a type-strip panic or contract break, an import-records panic or contract break | conformance cadence |
 | [Corpus bundle](#the-corpus-bundle-auditcorpus) | `audit:corpus` | the content-loss / robustness bundle over real code | publish Step 3c |
 | [Lexer diff](#differential-lexer-harness-lex_diff) | — | token-stream drift after a lexer change | dev tool |
-| [Variant direction](#variant-whitespace-direction-audit-variantsaudit) | `variants:audit` | a `_compact` variant that ADDS whitespace, or a `_spaces` variant that REMOVES it — the pair's two directions collapsing into one | `deno task check` |
-| [Conformance audit](#conformance-audit-conformanceaudit) | `conformance:audit` | doc/fixture catalog + link integrity | `deno task check` |
-| [Compiler conformance](#compiler-conformance-audit-conformanceauditcompiler) | `conformance:audit:compiler` | compile-fixture divergence catalog + checklist ↔ `Refusal` drift | `deno task check` |
-| [Canonicalizer](#canonicalizer-audit-canonicalizeaudit) | `canonicalize:audit` | `canonicalize_js` non-idempotence / corrupt output / comment loss | `deno task check` |
-| [Compile fixtures](#compile-fixture-validation-compilefixturesvalidate) | `compile:fixtures:validate` | a stale compile expectation (oracle freshness) · tsv-vs-expected compile parity · expected-file idempotence | parity legs in `deno task check` (`cargo test`); freshness in `deno task conformance` |
-| [Strip fixtures](#strip-fixture-validation-stripfixturesvalidate) | `strip:fixtures:validate` · `strip:fixtures:oracle` | `tsv_ts::strip` departing from a fixture's output or refusal, moving a character's line or UTF-16 column or a line terminator, or not idempotent (a ratchet over known failures) · a committed expectation the oracles no longer derive, or an undeclared oracle disagreement | parity in `deno task check` (`cargo test --test strip_fixtures_tests`); the oracle check on demand (Node + `bench:install`) |
-| [Strip corpus](#strip-corpus-differential-stripcorpus) | `strip:corpus` | `tsv_ts::strip` on real TypeScript panicking, breaking the position contract or idempotence, emitting no JS module, or departing from ts-blank-space's bytes or refusals outside a reviewed list | `deno task conformance` (release) |
-| [Import self-check](#import-fixture-self-check-imports_self_check_tests) | `cargo test --test imports_self_check_tests` | `parse_imports` departing from the records an independent ESTree walk reads off the canonical trees the main fixture tree pins | `deno task check` (`cargo test`) |
-| [Import corpus](#import-corpus-differential-importscorpus) | `imports:corpus` | `parse_imports` on real TypeScript, JavaScript or Svelte panicking, rejecting the parse, or departing from oxc-parser's module record outside its named normalizations and a reviewed list | `deno task conformance` (release) |
-| [Depth limits](./cli.md#the-stack-contract) | `test:depth` · `test:depth:napi` · `test:depth:wasm` · `build:pgo`'s addon depth gate | a construct the parse leaves uncounted (an accepted input with a wire path past either limit, whatever its stack); an accepted input whose walks overflow the stack contract's thread; a walk that recurses down a flat chain's spine — every spine shape (far more links than the nesting limit allows levels, under a wire as shallow as the document's frame) runs its walks again, in an optimized build, on a thread a small fraction of the contract's, so a frame per link overflows natively where the contract's thread still fits it; an accepted input whose walks trap or throw a `RangeError` in the WASM engine on a Node main thread (cold or tiered up, under V8's default tiering); an accepted input whose calls overflow the profile-guided N-API addon as it ships, on a worker thread sized to the contract less its margin; an accepted input whose format's output does not parse again or is not its own format (a printer-added pair the parse did not charge); a depth past a limit that is not refused by the depth error. Blind to a grammar position no catalog or sweep shape builds: the gate grades constructed shapes, not the grammar. That includes a recursion a walk reaches only from some positions — a printer that nests a doc level per link leaves the doc walks (`DocArena`'s layout and break walks) recursing only where a group measures that doc, so the flat array, indexed-access and qualified-name type chains are built a second time where one does (a type argument), and the commented non-null run, already measured at an assignment, at a call argument too; a position no shape is built at stays unseen. And blind to a per-link recursion whose frame is a few machine words — under the spine thread's size over the shortest shape's links | `test:depth`: `deno task check` (`corpus` world, `check`'s scope of the sweep); `test:depth:napi`, the shipped binaries' `napi` profile without their profile guidance (which no test build can carry), over the full sweep: publish Step 3, CI `artifacts`; `test:depth:wasm`: publish Step 6, CI `artifacts`; the staged profile-guided addon (`scripts/pgo/addon_depth.ts`), over the full sweep's shapes: `build:pgo`, the release workflow on every platform row |
-| [Fixture validation](./fixture_overview.md) | `fixtures:validate` | a fixture claim no longer holding — parser/formatter parity vs the committed files · the ORACLE itself having moved (freshness, sidecar) | parity in `deno task check` (`cargo test --test fixtures_tests`); freshness in `deno task conformance` (with `bench:pins:suites`, its pin-freshness preflight) |
+| [Variant direction](#variant-whitespace-direction-audit-variantsaudit) | `variants:audit` | a `_compact` variant that ADDS whitespace, or a `_spaces` variant that REMOVES it — the pair's two directions collapsing into one | `npm run check` |
+| [Conformance audit](#conformance-audit-conformanceaudit) | `conformance:audit` | doc/fixture catalog + link integrity | `npm run check` |
+| [Compiler conformance](#compiler-conformance-audit-conformanceauditcompiler) | `conformance:audit:compiler` | compile-fixture divergence catalog + checklist ↔ `Refusal` drift | `npm run check` |
+| [Canonicalizer](#canonicalizer-audit-canonicalizeaudit) | `canonicalize:audit` | `canonicalize_js` non-idempotence / corrupt output / comment loss | `npm run check` |
+| [Compile fixtures](#compile-fixture-validation-compilefixturesvalidate) | `compile:fixtures:validate` | a stale compile expectation (oracle freshness) · tsv-vs-expected compile parity · expected-file idempotence | parity legs in `npm run check` (`cargo test`); freshness in `npm run conformance` |
+| [Strip fixtures](#strip-fixture-validation-stripfixturesvalidate) | `strip:fixtures:validate` · `strip:fixtures:oracle` | `tsv_ts::strip` departing from a fixture's output or refusal, moving a character's line or UTF-16 column or a line terminator, or not idempotent (a ratchet over known failures) · a committed expectation the oracles no longer derive, or an undeclared oracle disagreement | parity in `npm run check` (`cargo test --test strip_fixtures_tests`); the oracle check on demand (Node + `bench:install`) |
+| [Strip corpus](#strip-corpus-differential-stripcorpus) | `strip:corpus` | `tsv_ts::strip` on real TypeScript panicking, breaking the position contract or idempotence, emitting no JS module, or departing from ts-blank-space's bytes or refusals outside a reviewed list | `npm run conformance` (release) |
+| [Import self-check](#import-fixture-self-check-imports_self_check_tests) | `cargo test --test imports_self_check_tests` | `parse_imports` departing from the records an independent ESTree walk reads off the canonical trees the main fixture tree pins | `npm run check` (`cargo test`) |
+| [Import corpus](#import-corpus-differential-importscorpus) | `imports:corpus` | `parse_imports` on real TypeScript, JavaScript or Svelte panicking, rejecting the parse, or departing from oxc-parser's module record outside its named normalizations and a reviewed list | `npm run conformance` (release) |
+| [Depth limits](./cli.md#the-stack-contract) | `test:depth` · `test:depth:napi` · `test:depth:wasm` · `build:pgo`'s addon depth gate | a construct the parse leaves uncounted (an accepted input with a wire path past either limit, whatever its stack); an accepted input whose walks overflow the stack contract's thread; a walk that recurses down a flat chain's spine — every spine shape (far more links than the nesting limit allows levels, under a wire as shallow as the document's frame) runs its walks again, in an optimized build, on a thread a small fraction of the contract's, so a frame per link overflows natively where the contract's thread still fits it; an accepted input whose walks trap or throw a `RangeError` in the WASM engine on a Node main thread (cold or tiered up, under V8's default tiering); an accepted input whose calls overflow the profile-guided N-API addon as it ships, on a worker thread sized to the contract less its margin; an accepted input whose format's output does not parse again or is not its own format (a printer-added pair the parse did not charge); a depth past a limit that is not refused by the depth error. Blind to a grammar position no catalog or sweep shape builds: the gate grades constructed shapes, not the grammar. That includes a recursion a walk reaches only from some positions — a printer that nests a doc level per link leaves the doc walks (`DocArena`'s layout and break walks) recursing only where a group measures that doc, so the flat array, indexed-access and qualified-name type chains are built a second time where one does (a type argument), and the commented non-null run, already measured at an assignment, at a call argument too; a position no shape is built at stays unseen. And blind to a per-link recursion whose frame is a few machine words — under the spine thread's size over the shortest shape's links | `test:depth`: `npm run check` (`corpus` world, `check`'s scope of the sweep); `test:depth:napi`, the shipped binaries' `napi` profile without their profile guidance (which no test build can carry), over the full sweep: publish Step 3, CI `artifacts`; `test:depth:wasm`: publish Step 6, CI `artifacts`; the staged profile-guided addon (`scripts/pgo/addon_depth.ts`), over the full sweep's shapes: `build:pgo`, the release workflow on every platform row |
+| [Fixture validation](./fixture_overview.md) | `fixtures:validate` | a fixture claim no longer holding — parser/formatter parity vs the committed files · the ORACLE itself having moved (freshness, sidecar) | parity in `npm run check` (`cargo test --test fixtures_tests`); freshness in `npm run conformance` (with `bench:pins:suites`, its pin-freshness preflight) |
 
 **How a corpus-walking audit walks.** Every one — the injection audits directly, the
 as-authored ones through the shared pristine sweep — runs its per-file loop on
@@ -119,8 +119,8 @@ in `tsv_lang::doc::swallow` behind the `_internal_swallow_check` cargo feature �
 compiled out of prod wasm/cli/ffi AND default `tsv_debug` builds (profile/perf sessions measure
 production-shaped render code). The `swallow:audit` task builds it via the `_internal_audits` umbrella
 feature (`_internal_swallow_check` + `_internal_comment_check`) under `--profile corpus`; `--features _internal_swallow_check`
-alone still works for a targeted run. Gated in `deno task check` over `tests/fixtures`, and as
-a leg of `deno task audit:corpus` over the real-code corpus + the prettier suites — where the
+alone still works for a targeted run. Gated in `npm run check` over `tests/fixtures`, and as
+a leg of `npm run audit:corpus` over the real-code corpus + the prettier suites — where the
 class actually lives (the callee-position swallow sits in ONE file anywhere).
 
 **Coverage** is every render that appends to the output buffer — the main loop AND its
@@ -163,7 +163,7 @@ Reports every comment the format DROPPED (parsed, never emitted — silent conte
 DOUBLE-PRINTED; exits 1 on any finding. The ledger lives in `tsv_lang::comment_ledger` behind
 the `_internal_comment_check` cargo feature, compiled out and built exactly as its twin
 [`swallow:audit`](#line-comment-swallow-audit-swallowaudit)'s check is (`--features _internal_comment_check`
-alone works for a targeted run). Gated in `deno task check` (via `comments:audit`) over
+alone works for a targeted run). Gated in `npm run check` (via `comments:audit`) over
 `tests/fixtures`. The corpus walk is the same shared pristine-format
 sweep — same skip buckets, and a formatter panic mid-walk is caught, counted, and named with
 its input rather than killing the run (panics are reported, not gated: the panic gates own
@@ -203,14 +203,14 @@ the others nor any as-authored gate can reach. A holding run names the swallow a
 unreparseable shares on their own lines. The shapes each class has caught:
 [gap_audit.md §The UNREPARSEABLE class](./gap_audit.md#the-unreparseable-class).
 
-`deno task gaps:audit:update` regenerates the snapshot after fixing a shape (or when a new fixture merely REACHES a pre-existing one); it refuses a narrowed run.
+`npm run gaps:audit:update` regenerates the snapshot after fixing a shape (or when a new fixture merely REACHES a pre-existing one); it refuses a narrowed run.
 
 ## Wire-Injection Audit (`wire:audit`)
 
 ```bash
-deno task wire:audit                # whitespace in heads — tests/fixtures, Svelte only
-deno task wire:audit:terminators    # lone CR / U+2028 / U+2029 anywhere — same corpus
-deno task corpus:compare:parse <path> --filter svelte --inject [--inject-terminators] [--inject-limit N]
+npm run wire:audit                  # whitespace in heads — tests/fixtures, Svelte only
+npm run wire:audit:terminators      # lone CR / U+2028 / U+2029 anywhere — same corpus
+npm run corpus:compare:parse -- <path> --filter svelte --inject [--inject-terminators] [--inject-limit N]
 ```
 
 **What it proves.** That tsv's parse **wire** still matches the canonical parser after
@@ -355,7 +355,7 @@ files are controls and are dropped; only the delta is reported. Subtraction is b
   manufacture a wrong finding.
 
 ⚠️ **`terminators` is RED by design**, like `compile:fuzz` — a discovery tool with an open
-work list, not a regression gate; **`ws` is green** (below). Neither is in `deno task check`:
+work list, not a regression gate; **`ws` is green** (below). Neither is in `npm run check`:
 both need the canonical parser, so they are conformance-tier at best. Standing findings:
 
 - **`ws`** (census: **0 files**) — the family is CLEAN, and its one standing finding asked a
@@ -479,7 +479,7 @@ corpus; `--report` lists every class with its reproducer.
 Scope: TS + Svelte body; CSS deferred; string/template interiors excluded (a raw newline there
 is lexed as content, not a gap); only format fixed points injected.
 
-`deno task blanks:audit:update` regenerates both snapshots after fixing a shape (or sanctioning a new absorb class); it refuses a narrowed run. ⚠️ A fix routinely shrinks the **bug** snapshot while leaving its **absorb** line in place — the absorb key is a node edge and its reproducer only one of the textual shapes that key it, so a line goes stale only when nothing at that edge absorbs anymore. Grading a pinned absorb line means running the prettier compare by hand; [blank_audit.md](./blank_audit.md#the-absorb-pin--the-blank-drop-class) carries that harness and its traps — and grade the `--json` `absorb_variants` work-list (one row per class × textual shape) rather than the per-class reproducers, which under-report by a measured ~40×.
+`npm run blanks:audit:update` regenerates both snapshots after fixing a shape (or sanctioning a new absorb class); it refuses a narrowed run. ⚠️ A fix routinely shrinks the **bug** snapshot while leaving its **absorb** line in place — the absorb key is a node edge and its reproducer only one of the textual shapes that key it, so a line goes stale only when nothing at that edge absorbs anymore. Grading a pinned absorb line means running the prettier compare by hand; [blank_audit.md](./blank_audit.md#the-absorb-pin--the-blank-drop-class) carries that harness and its traps — and grade the `--json` `absorb_variants` work-list (one row per class × textual shape) rather than the per-class reproducers, which under-report by a measured ~40×.
 
 ## Blank-Fabrication Audit (`fabrication:audit`)
 
@@ -575,7 +575,7 @@ skipped; a format PANIC is counted, not gated (the panic gates own that class).
 - **The Svelte scanner's own attribute terminator is ASCII.** `scan_svelte_tag`'s unquoted-value run stops at `[ \t\n\r>{]`, where Svelte's `regex_invalid_unquoted_attribute_value` spells that class as JS `\s` — so a comment after a non-ASCII-separated unquoted value (`<div a=x<NBSP>/* c */>`) is read as part of the value and never counted. Symmetric, so it cannot false-positive; it is a blind spot at exactly the spellings the parser's own terminator was fixed for. The scanners are deliberately self-contained (above), so the fix is a deliberate one, not a share.
 - **An indentable block's first and last lines are over-trimmed.** prettier trims line 0's trailing edge and the last line's leading edge only, and so does tsv's emitter — but the census trims both ends of every line, so a rewrite of line 0's *leading* run or the last line's *trailing* run balances.
 
-`deno task census:audit:update` regenerates the snapshot after fixing a pinned loss site (or pinning a newly found one); it refuses a narrowed run.
+`npm run census:audit:update` regenerates the snapshot after fixing a pinned loss site (or pinning a newly found one); it refuses a narrowed run.
 
 ## Print-Width Audit (`width:audit`)
 
@@ -589,7 +589,7 @@ Why it needs its own gate: **every other gate is blind to an over-width line, by
 - **`corpus:compare:format`** — grades *against prettier*, and on the widest shape prettier emits the over-width line **itself**, so the oracle vouches for the bug.
 - **`authoring:audit` / `paren:audit`** — ask for one fixed point per document, not a good one.
 
-Two real bugs (the mid-run comment weld and its leading twin) shipped an over-width line — one of them also non-idempotent — with `deno task check` green throughout.
+Two real bugs (the mid-run comment weld and its leading twin) shipped an over-width line — one of them also non-idempotent — with `npm run check` green throughout.
 
 ```bash
 cargo run --profile corpus -p tsv_debug --features _internal_audits width_audit
@@ -605,7 +605,7 @@ pinned shape that stops firing FAILS. A narrowed run (explicit paths / `--limit`
 exits 0 without grading — the snapshot pins the full default run — and says so, so it cannot
 read as a green gate.
 
-`deno task width:audit:update` regenerates the snapshot; it refuses a narrowed run.
+`npm run width:audit:update` regenerates the snapshot; it refuses a narrowed run.
 
 **Seeds are the whole tree, and that is load-bearing.** Measuring `input.*` alone would have caught neither motivating bug: tsv holds the *correct* form stable, so the overrun appears only when formatting an **alternate authoring**. The audit therefore sweeps every file under `tests/fixtures` — `unformatted_*` / `*_variant_*` / `output_prettier.*` siblings included — and **formats** each rather than measuring it as committed. Verified, not assumed: with the mid-run comment fix reverted, all seven extra over-width lines came from `unformatted_ours_compact.svelte` and `divergent_variant_packed.svelte`, and the `input.*` side did not move at all.
 
@@ -701,7 +701,7 @@ itself whitespace the printer emits, so getting it wrong is render-visible rathe
 choice (conformance_prettier_ignore.md §Format-ignore directive). Whitespace-perturbation only
 (a quote/paren-only reformat is invisible — curated fixtures backstop those positions); only format fixed points injected.
 
-`deno task ignore:audit:update` regenerates the snapshot after adding a printer opt-in (a now-honored position goes stale → drop its line) or fixing a misbinding, over-freeze, or relocation transient; it refuses a narrowed run.
+`npm run ignore:audit:update` regenerates the snapshot after adding a printer opt-in (a now-honored position goes stale → drop its line) or fixing a misbinding, over-freeze, or relocation transient; it refuses a narrowed run.
 
 ⚠️ **Blind spot: this audit injects a DIRECTIVE, `gaps:audit` injects a COMMENT, and
 neither injects the pair — so a bug that needs both is invisible to both.** Live case,
@@ -874,12 +874,12 @@ categorized in-code allow-list (ALLOW). A new scan must move onto the cursor or 
 allow-listed; a migrated/reformatted scan must drop its now-stale entry (the list mirrors the
 live sites exactly). Out of scope: closure `.find(|…|)` (iterator/predicate), counting/existence
 checks, and hand byte-loops (the cursor is their sanctioned home). Pure Rust, no sidecar; gated in
-`deno task check` via the `scan:audit` task.
+`npm run check` via the `scan:audit` task.
 
 ## Self-Format Audit (`format:audit`)
 
 ```bash
-deno task format:audit   # `tsv format --check .` over the repo
+npm run format:audit     # `tsv format --check .` over the repo
 ```
 
 **What it proves.** Two things at once, and it fails on either:
@@ -911,7 +911,7 @@ own TS never writes stays invisible here. The injection audits (`gaps:audit`,
 `blanks:audit`) and the corpus gates are the discovery arms.
 
 **Build world.** Runs the `tsv` binary of the shared `--profile corpus` world, which
-`deno task build:check` builds — `tsv_cli` and `tsv_debug` selected in ONE cargo
+`npm run build:check` builds — `tsv_cli` and `tsv_debug` selected in ONE cargo
 invocation, so it adds no separate compile. This leg wants the `tsv` BINARY, which the
 audits' own `-p tsv_debug --features _internal_audits` selection builds only as a library; a
 `-p tsv_cli` selection of its own resolves features without `_internal_audits` and so compiles the
@@ -922,7 +922,7 @@ claim holds only while this leg and `discovery:audit` go through `build:check`.
 ## Corpus Discovery Parity Audit (`discovery:audit`)
 
 ```bash
-deno task discovery:audit
+npm run discovery:audit
 ```
 
 **What it proves.** The real-code corpus every gate and bench reads is DEFINED by the
@@ -946,19 +946,19 @@ no collection contains stays unseen until a collection carries it — the corpus
 is what widens this audit. It says nothing about what tsv does WITH a file (the corpus
 gates own that); only that discovery reaches it.
 
-**Gating.** In `deno task check` beside `roundtrip:audit:prettier`, with the same
+**Gating.** In `npm run check` beside `roundtrip:audit:prettier`, with the same
 opportunistic posture: `../corpora` present ⇒ it gates, absent ⇒ a loud `NOT RUN` line
 and exit 0 (the CI `check` job has no sibling checkouts). An invariant, not a count pin,
 so a smaller corpus can only cost coverage. A **dirty** checkout is refused rather than
 graded — `git ls-files` describes the commit, the walk describes the disk, and a local
-modification would otherwise read as a tsv finding (`deno task doctor` reports the same
-state). ~0.1 s on the `--profile corpus` `tsv` binary of the shared build world (`deno task
+modification would otherwise read as a tsv finding (`npm run doctor` reports the same
+state). ~0.1 s on the `--profile corpus` `tsv` binary of the shared build world (`npm run
 build:check`), which `format:audit` has already built.
 
 ## Engine Parity Audit (`engines:audit`)
 
 ```bash
-deno task engines:audit [roots...]   # --json
+npm run engines:audit -- [roots...]  # --json
 ```
 
 **What it proves.** tsv's formatter is one Rust source compiled twice — to wasm32 for
@@ -1010,12 +1010,12 @@ conformance gates' business, not this one.
 
 **Gating.** CI's `artifacts` job, after the N-API steps — the first point at
 which both artifacts exist (`build:packages` made the wasm one, the N-API step's
-`cargo build -p tsv_cli --release` the native one). Deliberately **not** in `deno task check`,
+`cargo build -p tsv_cli --release` the native one). Deliberately **not** in `npm run check`,
 which builds no packages — nor on the publish path: `scripts/publish.ts` runs
 `validate:artifacts`, `test:npm`, `test:bun` (the wasm packages under Bun) and
 `typecheck:packages`, which grade each bundle alone, so the one engine-agreement verdict a
 release gets is the CI run on the commit it ships. Locally:
-`deno task build:npm:all && deno task build:napi:packages` first. Both bins, the native loader and its addon are mtime-guarded like every other staged artifact,
+`npm run build:npm:all -- && npm run build:napi:packages` first. Both bins, the native loader and its addon are mtime-guarded like every other staged artifact,
 so a run against a binary from before a formatter change refuses rather than reporting a stale
 agreement. `../corpora` absent is a warn-skip (CI has no sibling checkouts); every root
 skipping is a failure, since then nothing was compared. ~7 s.
@@ -1025,7 +1025,7 @@ skipping is a failure, since then nothing was compared. ~7 s.
 ```bash
 # rustdoc over the whole workspace with the doc lints denied. No artifact is
 # consumed — the run itself is the assertion.
-deno task docs:audit
+npm run docs:audit
 ```
 
 **What it proves.** That every `[`path`]` in a doc comment still names something that
@@ -1103,7 +1103,7 @@ world the other `check` audits use, so it adds a short compile of its own.
 # one `cargo doc -p <crate> --no-deps` per crate with a [package.metadata.docs.rs] table,
 # at that table's features, plus one at its defaults where the two differ
 # (scripts/docsrs_audit.ts)
-deno task docs:audit:docsrs
+npm run docs:audit:docsrs
 ```
 
 **What it proves.** That every crate meant for docs.rs builds its docs the way docs.rs
@@ -1192,7 +1192,7 @@ output on every run.
 ```bash
 # one `cargo tree -p <crate> -e normal,build --all-features --target all` per crate with a
 # [package.metadata.docs.rs] table; fails on a denied package (scripts/deps_audit.ts)
-deno task deps:audit
+npm run deps:audit
 ```
 
 **What it proves.** That no crate meant for publishing reaches a denied package through a
@@ -1227,7 +1227,7 @@ tsv declares, which no consumer's resolution removes, so the lockfile cannot hid
 # one `cargo package --list -p <crate> --allow-dirty` per crate with a
 # [package.metadata.docs.rs] table, plus one `cargo metadata --no-deps`; no build
 # (scripts/package_audit.ts)
-deno task package:audit
+npm run package:audit
 ```
 
 **What it proves.** That each crate meant for publishing uploads what a crates.io consumer
@@ -1271,9 +1271,9 @@ included, so a run on a dirty tree grades what a publish from that tree would up
 ## Crates Publish Rehearsal (`publish:crates`)
 
 ```bash
-deno task publish:crates            # dry run: crates.io API read, semver-checks, cargo publish --dry-run
-deno task publish:crates --bump minor   # also grade an already-live version as the next minor
-deno task publish:crates:package    # the packaging half alone (semver-checks and the API read skipped, said so)
+npm run publish:crates              # dry run: crates.io API read, semver-checks, cargo publish --dry-run
+npm run publish:crates -- --bump minor  # also grade an already-live version as the next minor
+npm run publish:crates:package      # the packaging half alone (semver-checks and the API read skipped, said so)
 ```
 
 **What it proves.** That each crate meant for publishing (`scripts/docsrs_crates.ts`, checked
@@ -1311,7 +1311,7 @@ the released version and for good, source the release never had.
 ## Wire-Type Drift Check (`check:ast-types`)
 
 ```bash
-deno task check:ast-types   # scripts/check_ast_types.ts
+npm run check:ast-types     # scripts/check_ast_types.ts
 ```
 
 Three arms (below) over `crates/tsv_wasm/types/tsv_ast.d.ts`; A and C share one generated file
@@ -1405,7 +1405,7 @@ is what carries a writer change; this gate is the backstop.
 ## Loc Cross-Grade (`check:loc`)
 
 ```bash
-deno task check:loc       # builds target/corpus/tsv_debug, then scripts/check_loc.ts over tests/fixtures
+npm run check:loc         # builds target/corpus/tsv_debug, then scripts/check_loc.ts over tests/fixtures
 ```
 
 **What it proves.** That tsv's two implementations of its one `loc` definition agree: the
@@ -1418,7 +1418,7 @@ stated in [architecture.md §`loc` lines](./architecture.md#loc-lines-one-rule-p
 
 **Why it exists.** The fixtures pin the **span-only** wire (`expected*.json` is the
 canonical output with `loc` and `name_loc` stripped), so `fixtures_tests` grades no `loc` at
-all; without this leg, `deno task check` would not see a writer and the shipped helper
+all; without this leg, `npm run check` would not see a writer and the shipped helper
 drifting apart. Neither side carries a hand-written expectation — each is the other's
 drift check.
 
@@ -1470,8 +1470,8 @@ all, each by a declaration: `input_invalid_*` (it must fail both parsers) and a
 ## Package-Declaration Check (`typecheck:packages`)
 
 ```bash
-deno task typecheck:packages                         # every staged package (fails when none is)
-deno task typecheck:packages format parse all napi   # exactly these, each required (publish.ts)
+npm run typecheck:packages                           # every staged package (fails when none is)
+npm run typecheck:packages -- format parse all napi  # exactly these, each required (publish.ts)
 ```
 
 **What it proves.** That the declarations a staged npm package ships compile in a consumer
@@ -1518,8 +1518,8 @@ map names must be loaded by some program, so a subpath no consumer module reache
 than passes ungraded, and a staging missing a file its `files` declares fails naming the file.
 
 **Where it runs.** TypeScript and `@types/node` come from `benches/js/node_modules`; without
-them the task fails, pointing at `deno task bench:install`. CI installs no bench `node_modules`, so it
-is not in `deno task check`; `scripts/publish.ts` runs it in Step 6 over all four packages —
+them the task fails, pointing at `npm run bench:install`. CI installs no bench `node_modules`, so it
+is not in `npm run check`; `scripts/publish.ts` runs it in Step 6 over all four packages —
 the three wasm packages it builds, and the napi loader, which it stages for this (a file copy,
 no cargo build) although the loader itself publishes from the release workflow. Its preflight
 asks for the install. A stale staging is refused as the package suites refuse it
@@ -1538,7 +1538,7 @@ asks for the install. A stale staging is refused as the package suites refuse it
 
 ```bash
 # scripts/check_canonical_pins.ts --pins. Read-only, under Node; no build, no sidecar.
-deno task pins:audit
+npm run pins:audit
 ```
 
 **What it proves.** That the canonical oracle is *one* version rather than several — and,
@@ -1568,7 +1568,7 @@ last `npm ci`, or an installed package whose `package.json` names another versio
 lock entry (or is gone), is refused rather than graded against. An edit to any other file
 inside the install isn't seen.
 
-**Why it gates early in `deno task check`.** It is a **repo fact**: nothing outside the repo
+**Why it gates early in `npm run check`.** It is a **repo fact**: nothing outside the repo
 can change the verdict, so it holds on a clean checkout — and its failure invalidates the
 fixture grading `cargo test` does later in the same chain, which is the cheapest thing to
 learn first.
@@ -1580,8 +1580,8 @@ effective oracle for every compile fixture — which svelte depends on by a care
 Without the lock the compile oracle's output can change with no version in this repo
 changing and no pin site able to see it — esrap 2.3.1 did exactly that, ceasing to drop a
 string-literal specifier's `as` alias and silently staling committed fixtures with
-`deno task check` green. Bumping one is a deliberate oracle move — regenerate the
-lock, re-run `deno task compile:fixtures:validate`, update the constant, all in one change.
+`npm run check` green. Bumping one is a deliberate oracle move — regenerate the
+lock, re-run `npm run compile:fixtures:validate`, update the constant, all in one change.
 
 **Blind spots.**
 
@@ -1591,10 +1591,10 @@ lock, re-run `deno task compile:fixtures:validate`, update the constant, all in 
   the lock but unreviewed — a regeneration moves them silently unless someone diffs the lock.
 - **It cannot see oracle freshness.** A pin can be perfectly self-consistent and still grade
   against stale committed expectations. That is `compile:fixtures:validate`'s job — the only
-  check that grades the committed expectations against a LIVE oracle — which is why `deno task
+  check that grades the committed expectations against a LIVE oracle — which is why `npm run
   conformance` preflights it.
 
-**Maintenance counterpart: `deno task pins:lock`** (`scripts/regen_sidecar_lock.ts`), not an
+**Maintenance counterpart: `npm run pins:lock`** (`scripts/regen_sidecar_lock.ts`), not an
 audit: `npm install --package-lock-only` in the sidecar's directory, which resolves what
 `package.json` names and the lock doesn't hold yet and keeps every locked entry (re-resolving a
 locked transitive is deleting the lock first, its own deliberate act). It reaches the
@@ -1609,7 +1609,7 @@ day. Not gated: `pins:audit` already holds the manifest and the lock's root entr
 ```bash
 # the same script's other mode (--checkouts), the one that runs git: with no git on
 # PATH the drift half cannot run (the audit reports it unchecked).
-deno task pins:audit:checkouts
+npm run pins:audit:checkouts
 ```
 
 **What it proves.** That this machine's `../svelte` and `../acorn-typescript` clones are the
@@ -1623,10 +1623,10 @@ past. `../prettier` is deliberately not gated: its suites' expected output is co
 file (no path-keyed ledger to rot) and the checkout legitimately rides `-dev` versions —
 `doctor` reports it instead.
 
-**Why it is NOT in `deno task check`.** It is an **environment fact**, and nothing in `check`
+**Why it is NOT in `npm run check`.** It is an **environment fact**, and nothing in `check`
 reads those clones — so a skew there cannot change a committed-tree verdict, and failing on it
 would be pure collateral damage: the chain halts and the real regressions go unrun. It
-preflights `deno task conformance` instead, whose legs do read them; `doctor` reports both
+preflights `npm run conformance` instead, whose legs do read them; `doctor` reports both
 modes ahead of time. Passing neither flag runs both, which is what `doctor` does.
 
 **Checkout drift is warn-only, by design.** A version string only bumps at release, so upstream
@@ -1696,14 +1696,14 @@ twin (the same document, same classification) reported 2.
 FILE (one whose own format isn't a fixed point). Such a file is excluded from the authoring
 analysis (its fixed point is undefined, so the converge/diverge verdict would be meaningless),
 but the exclusion is not a reason to pass the run — that is how a whole-file reflow could sit
-here reported-but-green. Gated in `deno task check` via the `authoring:audit` task — which
+here reported-but-green. Gated in `npm run check` via the `authoring:audit` task — which
 scans tests/fixtures ONLY, so point it at a real codebase too: findings live there (a
 non-idempotent fill 2-cycle was green on fixtures while failing on ../zzz).
 
 ⚠️ **That file-level rule is a constraint on FIXTURE DESIGN, and this is the only gate that
 states it.** The walk takes every `.svelte` under tests/fixtures whose own format is claimed
 stable — `output_prettier.*` included — so a `_prettier_divergence` whose prettier form tsv
-does NOT hold stable fails `deno task check` HERE, while `fixtures:validate` (and the
+does NOT hold stable fails `npm run check` HERE, while `fixtures:validate` (and the
 `fixtures_tests` that `check`'s later `cargo test` leg runs) reports the fixture green (`fixtures:validate` grades `output_prettier` by F2 alone: it is
 prettier's output of `input`, and carries no tsv claim). It bites when prettier's form is
 *mangled* rather than merely different, since tsv often re-mangles it: prettier deletes the
@@ -1821,7 +1821,7 @@ vacuity floor is a claim about the SEED SET rather than about the audit. Nobody 
 `a < b > c` in real code: over the `../corpora` snapshot both relational rows are legitimately
 **0**, and that zero is the corpus's shape, not a class that stopped enumerating. The class
 lives in the fixture tree (`tests/fixtures/typescript/expressions/binary/relational_*`), so the
-**fixture-tree gate** — `deno task paren:audit`, which `deno task check` runs — is the one
+**fixture-tree gate** — `npm run paren:audit`, which `npm run check` runs — is the one
 invocation that passes the flag, and the **real-code leg** of `audit:corpus` deliberately does
 not. A flag rather than a `paths`-contains-`tests/fixtures` sniff: an explicit switch is
 greppable and cannot silently mean the wrong thing on a subtree run, and a **narrowed** run
@@ -1871,7 +1871,7 @@ operators exercised in each. The per-class table is printed for exactly that rea
 row is a corpus gap, not a pass — which is also why the relational rows carry a floor of their
 own rather than reading their real-code zero as coverage.
 
-It gates twice, on `tests/fixtures` in `deno task check` and over **real code** as a leg of
+It gates twice, on `tests/fixtures` in `npm run check` and over **real code** as a leg of
 [`audit:corpus`](#the-corpus-bundle-auditcorpus) — the real-code corpus carries more logical
 chains than the fixture tree, and the class it grades is one no corpus of
 formatted code can show on its own. The prettier suites are deliberately not a seed there: a few of their files
@@ -1987,7 +1987,7 @@ kinds, zero false positives; on the fixed tree it reports **0** across 45,905 gr
 break at every width where the wrapped element lays its own content out block-style — and no
 other gate can see it, because the strayed pass is reachable only at widths no fixture happens
 to sit at; the sweep reaches it past `--width 17` (`inline_sibling_drop_tail_wide_long_prettier_divergence` pins the
-razor). Green over both the fixture tree and real code, and gated in `deno task check` (~2 s at
+razor). Green over both the fixture tree and real code, and gated in `npm run check` (~2 s at
 the default width on a 12-core box — by far the heaviest as-authored walk, and the one the
 shared sweep's worker pool buys the most: ~14.6 s at `--jobs 1`).
 
@@ -1997,7 +1997,7 @@ shared sweep's worker pool buys the most: ~14.6 s at `--jobs 1`).
 cargo run -p tsv_debug roundtrip_audit                              # audit tests/fixtures
 cargo run -p tsv_debug roundtrip_audit ../prettier/tests/format/js ../corpora/collections/zzz/src
 cargo run -p tsv_debug roundtrip_audit --gate                       # the check gate (pure Rust, tests/fixtures)
-deno task roundtrip:audit:prettier                                 # the check gate's second scope (the prettier suites)
+npm run roundtrip:audit:prettier                                   # the check gate's second scope (the prettier suites)
 cargo run -p tsv_debug roundtrip_audit --gate --canonical-all ../prettier/tests/format  # thorough
 cargo run -p tsv_debug roundtrip_audit --canonical-all --verbose ../prettier/tests/format/typescript
 # Also: --no-render, --verbose (AST diff per finding), --limit N, --json
@@ -2040,7 +2040,7 @@ so point it at the delimiter-dense prettier suites for the work-list.
 (divergent is render-model noise over tests/fixtures). A bare `--gate` runs phase 1 only, via
 a population-only fast path (reparse + the node census, no skeleton / leaves; pure Rust, no
 sidecar) that censuses each side's wire BYTES and builds no AST tree at all, since the tree is
-what the skipped checks wanted — the `deno task roundtrip:audit` check gate, a cheap tripwire
+what the skipped checks wanted — the `npm run roundtrip:audit` check gate, a cheap tripwire
 over tests/fixtures with its real yield on external corpora. `--canonical-all` confirms every
 file (also guards canonical_unreparseable: tsv's parser accepting output the real parser
 rejects). The full (non-gate) run is a diagnostic: it reports every finding bucket and exits 0
@@ -2049,7 +2049,7 @@ whitespace model).
 
 ### Two scopes in `check`, and why the second one is opportunistic
 
-`deno task check` runs the audit twice: over `tests/fixtures` (`roundtrip:audit`) and over the
+`npm run check` runs the audit twice: over `tests/fixtures` (`roundtrip:audit`) and over the
 pinned Prettier format suites (`roundtrip:audit:prettier`, ~0.17 s on the binary
 the first leg already built; the first leg is ~0.9 s over `tests/fixtures`, about two thirds of
 it the format itself and the rest emitting both wires and censusing them — see the command's
@@ -2162,7 +2162,7 @@ real yield is external corpora, where JSDoc casts + annotations are dense.
 
 ```bash
 cargo run --profile corpus -p tsv_debug --quiet render_audit ../corpora/collections/zzz/src
-deno task render:audit ../svelte/packages/svelte/tests   # (--gate baked in)
+npm run render:audit -- ../svelte/packages/svelte/tests  # (--gate baked in)
 # Also: --gate (exit 1 on findings), --json, --limit N (0 = unlimited, as in every other audit)
 ```
 
@@ -2183,8 +2183,8 @@ the very whitespace that carries the meaning, and authoring_audit asks the CONVE
 (do two authorings reach one fixed point), never whether that fixed point renders like the
 input.
 
-**Gating.** Needs the sidecar, so NOT in `deno task check` — nor the pure-Rust
-`audit:corpus`. Release-gated as a leg of `deno task conformance` (the one leg that runs as a
+**Gating.** Needs the sidecar, so NOT in `npm run check` — nor the pure-Rust
+`audit:corpus`. Release-gated as a leg of `npm run conformance` (the one leg that runs as a
 subprocess), scoped there to the WHOLE `../corpora` snapshot (every collection it vendors,
 placed in a corpus tier or not, since this leg pins no count) plus the version-pinned `suite`
 checkout, so a live working tree can't move a release verdict; run it standalone on any corpus
@@ -2233,7 +2233,7 @@ formats the file with the comment made OWNED (annotation-shaped) and made ORDINA
 filler) at the SAME width — only ownership varies, so any layout difference is a gate reading
 ownership. Pure Rust, no sidecar; TS-family files only; defaults to tests/fixtures.
 
-A development / characterization tool, NOT a `deno task check` gate: it needs an
+A development / characterization tool, NOT an `npm run check` gate: it needs an
 owned/ordinary CONTRAST to detect anything, and under the "every glued block comment is owned"
 rule a run passes vacuously — its moment is BEFORE any future ownership-rule change (run it
 then, over external corpora).
@@ -2312,10 +2312,10 @@ structural_divergence — the render-model-noisy bucket that needs canonical con
 **Deterministic and CORPUS-ADD-STABLE** per `--seed` + corpus: each seed file draws mutants
 from its own path-keyed PRNG stream, scheduled round-robin, so a fixture add/remove/rename
 changes only that file's mutants (every other stream is byte-identical; a shrunken per-file
-budget trims a stream's tail, never rewrites it). The `fuzz:audit` deno task — three runs at
+budget trims a stream's tail, never rewrites it). The `fuzz:audit` task — three runs at
 fixed --seed 0 --iterations 5000: tests/fixtures as found, then `--embedded css` (the
 `fuzz:audit:css` task), then `--embedded ts` over tests/fixtures + tests/fixtures_strip +
-tests/fixtures_imports (`fuzz:audit:ts`) — is gated in `deno task check`, a cheap standing
+tests/fixtures_imports (`fuzz:audit:ts`) — is gated in `npm run check`, a cheap standing
 tripwire for every property above.
 
 **The debug leg (`fuzz:audit:debug`, also in `check`).** The same three runs with the same
@@ -2353,10 +2353,10 @@ report/dump.
 
 ## F1 Idempotency Sweep (`idempotency:sweep`)
 
-The fuzzer's pristine pass, pointed at the `robustness` corpus view (the WHOLE `../corpora` snapshot — every collection it vendors, placed or not, since the sweep grades an invariant rather than a pinned count — plus the `svelte_styles` harvest cache and the live diff: the files of this machine's working trees of the `own` repos that differ from, or are absent in, the snapshot — `lib/corpus.ts` `corpus_robustness_seeds` / `live_diff_files`) — `format(format(x)) == format(x)` on every real file, plus the pass's three other legs: the `locations` wire of every file tsv parses (no panic), the type strip of every TypeScript-family file (no panic, the position contract, idempotence) and the import records of every TypeScript-family and Svelte file (no panic, the records' contract — [the fuzzer's extra legs](#seeded-mutational-fuzzer-fuzzaudit)). NOT in `deno task check`: the corpus is machine-dependent checkouts and the sweep is minutes, not seconds. It is a different risk surface from the fixtures — a formatter can be idempotent on every curated fixture and still reflow a real component on pass 2. Run at conformance cadence, or after any printer change.
+The fuzzer's pristine pass, pointed at the `robustness` corpus view (the WHOLE `../corpora` snapshot — every collection it vendors, placed or not, since the sweep grades an invariant rather than a pinned count — plus the `svelte_styles` harvest cache and the live diff: the files of this machine's working trees of the `own` repos that differ from, or are absent in, the snapshot — `lib/corpus.ts` `corpus_robustness_seeds` / `live_diff_files`) — `format(format(x)) == format(x)` on every real file, plus the pass's three other legs: the `locations` wire of every file tsv parses (no panic), the type strip of every TypeScript-family file (no panic, the position contract, idempotence) and the import records of every TypeScript-family and Svelte file (no panic, the records' contract — [the fuzzer's extra legs](#seeded-mutational-fuzzer-fuzzaudit)). NOT in `npm run check`: the corpus is machine-dependent checkouts and the sweep is minutes, not seconds. It is a different risk surface from the fixtures — a formatter can be idempotent on every curated fixture and still reflow a real component on pass 2. Run at conformance cadence, or after any printer change.
 
 ```bash
-deno task idempotency:sweep
+npm run idempotency:sweep
 ```
 
 Absent corpus checkouts are skipped with a warning (not a failure); builds with
@@ -2364,10 +2364,10 @@ Absent corpus checkouts are skipped with a warning (not a failure); builds with
 
 ## The Corpus Bundle (`audit:corpus`)
 
-The standing content-loss / robustness gate over REAL code — the extension-robustness bar that `deno task check`'s fixture-only scope is structurally blind to: `roundtrip_audit --gate` + `comment_audit` + `swallow_audit` + `binding_audit --gate` (real gating; prettier suites report-only) + `authoring_audit` + `paren_audit` + `census_audit` + `fabrication_audit` + `fuzz --iterations 0`, over the `robustness` corpus view (the whole `../corpora` snapshot + the `svelte_styles` cache + the live working trees' diff against the snapshot) + the pinned prettier suites. Pure Rust; absent working trees warn-skip (floor = the whole snapshot). NOT in `deno task check` (machine-dependent corpus, minutes); wired into publish Step 3c alongside conformance:all's SAFETY. Run at conformance/release cadence or after a printer change. See ../benches/js/CLAUDE.md §Gate map.
+The standing content-loss / robustness gate over REAL code — the extension-robustness bar that `npm run check`'s fixture-only scope is structurally blind to: `roundtrip_audit --gate` + `comment_audit` + `swallow_audit` + `binding_audit --gate` (real gating; prettier suites report-only) + `authoring_audit` + `paren_audit` + `census_audit` + `fabrication_audit` + `fuzz --iterations 0`, over the `robustness` corpus view (the whole `../corpora` snapshot + the `svelte_styles` cache + the live working trees' diff against the snapshot) + the pinned prettier suites. Pure Rust; absent working trees warn-skip (floor = the whole snapshot). NOT in `npm run check` (machine-dependent corpus, minutes); wired into publish Step 3c alongside conformance:all's SAFETY. Run at conformance/release cadence or after a printer change. See ../benches/js/CLAUDE.md §Gate map.
 
 ```bash
-deno task audit:corpus
+npm run audit:corpus
 ```
 
 **Two of the three as-authored ratchets are legs here; the third cannot be.** `census_audit` and `fabrication_audit` both assert a **zero** — off their default corpus the snapshot is not consulted and `grade_narrowed_strictly` fails every finding, pinned or not — and the corpus currently holds that zero over the whole snapshot, at about the cost of a leg already in the bundle. The census in particular is the leg whose own module doc names external corpora as its discovery arm.
@@ -2410,7 +2410,7 @@ it, so between them a fixture is squeezed from both sides. The N rules prove onl
 variant LANDS on input, never which direction it travelled from — and a wrong-way variant (a
 `_compact` padding `interface Empty {  }`, a `_spaces` stripping `h1 + p` to `h1+p`) is a
 DUPLICATE of its sibling under the other name, the direction it was meant to cover silently
-untested. Pure Rust — no sidecar, no formatter run; gated in `deno task check` via the
+untested. Pure Rust — no sidecar, no formatter run; gated in `npm run check` via the
 `variants:audit` task.
 
 **The instrument.** A whitespace-only variant shares its input's non-whitespace
@@ -2509,7 +2509,7 @@ cargo run -p tsv_debug conformance_audit
 ```
 
 Doc/fixture integrity in one fixture walk. Pure Rust (no sidecar); exits non-zero on any finding;
-gated in `deno task check`. Five checks:
+gated in `npm run check`. Five checks:
 
 1. **Orphans** — every divergence-suffixed fixture must be linked in its conformance doc
    (_prettier_divergence → any docs/conformance_prettier*.md, _svelte_divergence →
@@ -2554,7 +2554,7 @@ cargo run -p tsv_debug compile_conformance_audit
 ```
 
 The compiler analog of conformance_audit, deliberately minimal. Pure Rust (no sidecar); exits
-non-zero on any finding; gated in `deno task check`.
+non-zero on any finding; gated in `npm run check`.
 
 - **Catalog + back-link.** Any _compiled_divergence-suffixed compile fixture must be cataloged
   in docs/conformance_svelte_compiler.md AND carry a README back-linking it. The catalog is
@@ -2590,13 +2590,13 @@ TS/JS file (.ts/.js/.mts/.cts/.mjs/.cjs, .svelte.ts included) and buckets — in
 (failure), CORRUPT-OUTPUT / unreparseable reprint (failure; the canonicalizer self-validates by
 reparse), COMMENT-LOSS (failure; whitespace-normalized comment text/order before-vs-after — the
 bucket the other two are structurally blind to: a swallowed comment leaves valid, idempotent
-JS). Pure Rust (no sidecar); exits 1 on any failure. Gated in `deno task check` over
+JS). Pure Rust (no sidecar); exits 1 on any failure. Gated in `npm run check` over
 tests/fixtures + tests/fixtures_compile (fast); point it at real corpora for the full sweep.
 
 ## Compile-Fixture Validation (`compile:fixtures:validate`)
 
 ```bash
-deno task compile:fixtures:validate   # also: --list, --json, positional filter patterns
+npm run compile:fixtures:validate     # also: --list, --json, positional filter patterns
 ```
 
 **What it proves.** Per fixture:
@@ -2617,8 +2617,8 @@ edit to an expected file.
 
 **Split gating, and the split is the point.** Checks (b) and (c) — plus "`input.svelte`
 parses" — need no sidecar, so they also run as `tests/compile_fixtures_tests.rs` in every
-`cargo test --workspace`: the offline parity gate inside `deno task check`. Check (a) cannot,
-because it calls the canonical compiler. `deno task conformance` therefore preflights the full
+`cargo test --workspace`: the offline parity gate inside `npm run check`. Check (a) cannot,
+because it calls the canonical compiler. `npm run conformance` therefore preflights the full
 command, and **that is the only place oracle freshness is graded anywhere.**
 
 **Why that split is load-bearing.** The sidecar-free slice compares tsv's output against the
@@ -2626,7 +2626,7 @@ COMMITTED file — both inside the repo. When the oracle itself moves, neither s
 slice stays green while the expectations quietly stop describing what Svelte compiles today.
 That is the same hole [`pins:audit`](#canonical-pin-agreement-audit-pinsaudit) has from the
 other end (a self-consistent pin set says nothing about freshness) — the hole the
-lockfile's `esrap` pin closes, after it went live with `deno task check` green (see
+lockfile's `esrap` pin closes, after it went live with `npm run check` green (see
 `LOCKED_TRANSITIVE` above).
 
 **Blind spots.**
@@ -2643,8 +2643,8 @@ lockfile's `esrap` pin closes, after it went live with `deno task check` green (
 ## Strip-Fixture Validation (`strip:fixtures:validate`)
 
 ```bash
-deno task strip:fixtures:validate          # also: -v, --update, positional filter patterns
-deno task strip:fixtures:oracle            # the oracle side (Node; needs bench:install)
+npm run strip:fixtures:validate            # also: -v, --update, positional filter patterns
+npm run strip:fixtures:oracle              # the oracle side (Node; needs bench:install)
 ```
 
 **What it proves.** Per fixture under `tests/fixtures_strip/`, `tsv_ts::strip` produces the
@@ -2685,7 +2685,7 @@ oracle half's verdict with no commit here — the run prints the Node version it
 ## Strip Corpus Differential (`strip:corpus`)
 
 ```bash
-deno task strip:corpus                     # builds the corpus tsv_debug; :run skips the build
+npm run strip:corpus                       # builds the corpus tsv_debug; :run skips the build
 target/corpus/tsv_debug strip <file.ts>    # one file's strip, for triage
 ```
 
@@ -2708,7 +2708,7 @@ refusal disagreement fails unless the script's `ACCEPTED` list names the file an
 reason tsv's answer stands; an entry that no longer fires fails too, as does a panic, a contract
 or idempotence finding, a tsv parse error, a TypeScript parse diagnostic (ts-blank-space then
 grades nothing), and an empty corpus. No argument narrows the run: the corpus strips in
-seconds, so every run is a full one. A `deno task conformance` leg, beside the corpus gates it
+seconds, so every run is a full one. A `npm run conformance` leg, beside the corpus gates it
 shares `../corpora` and `node_modules` with.
 
 **Blind spots.** One oracle: Node's `module.stripTypeScriptTypes` is unpinned and graded only
@@ -2751,7 +2751,7 @@ against oxc is the independent second reading.
 ## Import Corpus Differential (`imports:corpus`)
 
 ```bash
-deno task imports:corpus                   # builds the corpus tsv_debug; :run skips the build
+npm run imports:corpus                     # builds the corpus tsv_debug; :run skips the build
 target/corpus/tsv_debug imports <file>     # one file's records, for triage
 ```
 
@@ -2786,7 +2786,7 @@ the normalizations, or oxc's parser rejecting a file tsv accepts, fails unless t
 `ACCEPTED` list names the file and check with the reason tsv's answer stands; an entry that no
 longer fires fails too, as do a panic, a tsv parse error, Svelte's parser rejecting a component,
 and an empty corpus. No argument narrows the run: the corpus runs in seconds, so every run is a
-full one. A `deno task conformance` leg, beside `strip:corpus`.
+full one. A `npm run conformance` leg, beside `strip:corpus`.
 
 **Blind spots.** oxc leaves out what tsv leaves out — a type-position `import()`, ambient code —
 so the gap is shared, not graded. Attribute clause spans are not compared for a static import

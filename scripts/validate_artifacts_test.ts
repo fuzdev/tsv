@@ -311,7 +311,7 @@ test('under `stale_ok` a stale artifact warns and the run grades it', async () =
 		err[0]!.split('\n')[1],
 		'⚠ Stale staged package artifacts (BENCH_STALE_OK=1 — grading anyway).'
 	);
-	strictEqual(err[0]!.includes('restage: deno task build:npm:all'), true);
+	strictEqual(err[0]!.includes('restage: npm run build:npm:all'), true);
 });
 
 test('an npm staging that lacks its bundle is refused as missing, not skipped as unbuilt', async () => {
@@ -323,7 +323,7 @@ test('an npm staging that lacks its bundle is refused as missing, not skipped as
 	deepStrictEqual(err[0]!.split('\n').slice(1, 4), [
 		'✗ Stale staged package artifacts — refusing to grade outdated code.',
 		`  • staged WASM bundle (parse): not staged — ${npm_dir('parse')}/tsv_wasm_bg.wasm`,
-		'      restage: deno task build:npm:parse'
+		'      restage: npm run build:npm:parse'
 	]);
 });
 
@@ -407,6 +407,6 @@ test('a staged file the checks name that is missing is fatal under `stale_ok` to
 	deepStrictEqual(err[0]!.split('\n').slice(1, 4), [
 		'✗ Stale staged package artifacts — refusing to grade outdated code.',
 		`  • staged cli.js (all): not staged — ${npm_dir('all')}/cli.js`,
-		'      restage: deno task build:npm:all'
+		'      restage: npm run build:npm:all'
 	]);
 });

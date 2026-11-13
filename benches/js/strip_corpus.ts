@@ -1,5 +1,5 @@
 /**
- * The strip corpus differential — `deno task strip:corpus`: tsv's source type strip
+ * The strip corpus differential — `npm run strip:corpus`: tsv's source type strip
  * (`tsv_ts::strip`) against ts-blank-space over real code.
  *
  * **Corpus.** Every `.ts` / `.mts` / `.cts` file (`.svelte.ts` included) of the `gates` view's
@@ -12,7 +12,7 @@
  * counts here are pinned.
  *
  * **tsv's side** is one `tsv_debug strip --stdin` process (the `--profile corpus` build
- * `deno task build:check` makes, so a panic is caught and answered as one), which also grades
+ * `npm run build:check` makes, so a panic is caught and answered as one), which also grades
  * what needs tsv to grade: the position contract and idempotence (the command's module doc,
  * `crates/tsv_debug/src/cli/commands/strip.rs`).
  *

@@ -42,9 +42,9 @@ tracking the spec and what tsv needs.
 - **Committed entity table**: `src/entities_table.rs` is generated from
   `src/entities.json` (the WHATWG HTML
   [named character references list](https://html.spec.whatwg.org/entities.json),
-  name → the characters it stands for) by `deno task entities:update`. The
+  name → the characters it stands for) by `npm run entities:update`. The
   generator is the `entities_table_is_fresh` unit test (`src/entities_gen.rs`),
-  which fails when the committed file is stale, so `deno task test` gates it — and skips
+  which fails when the committed file is stale, so `npm run test` gates it — and skips
   (with an `eprintln!`) when `src/entities.json` is absent: the published crate excludes the
   JSON (`exclude` in `Cargo.toml`, graded by `package:audit`), so a test run from the tarball
   has nothing to grade the table against. The

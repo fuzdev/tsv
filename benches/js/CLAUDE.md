@@ -35,11 +35,11 @@ grades); the reference halves live in `docs/`:
 | Gate | Composition | Corpus / oracle | Cadence |
 | --- | --- | --- | --- |
 | **`npm run check`** | `cargo fmt --check` · `format:audit` · `pins:audit` · `docs:audit` · `docs:audit:docsrs` · `deps:audit` · `package:audit` · `typecheck` · `typecheck:features` · `typecheck:scripts` · `typecheck:bench-core` · `conformance:audit` · `conformance:audit:compiler` · `variants:audit` · `scan:audit` · `fanout:audit` · `roundtrip:audit` · `roundtrip:audit:prettier` · `discovery:audit` · `canonicalize:audit` · `binding:audit` · `authoring:audit` · `paren:audit` · `razor:audit` · `fuzz:audit` (+ `:css` · `:ts`) · `fuzz:audit:debug` · `test:node` · `cargo test` (incl. fixtures) · `test:depth` · `test:audits` · `swallow:audit` · `comments:audit` · `gaps:audit` · `blanks:audit` · `fabrication:audit` · `census:audit` · `width:audit` · `ignore:audit` · `check:ast-types` · `check:loc` · `clippy` | **committed tree only** (`tests/fixtures` + pure-Rust/Node audits, no external oracle), save the two opportunistic legs: `roundtrip:audit:prettier` (the pinned `../prettier` format suites) and `discovery:audit` (`tsv format --list` over the `../corpora` snapshot vs its committed file list) | every commit; the CI `check` job, which installs no Deno (cargo test's one Deno test skips there, printing SKIPPED) |
-| **`deno task conformance:all`** | `pins:audit:checkouts` + `bench:pins:suites` + `fixtures:validate` + `compile:fixtures:validate` preflights (then `bench:harvest:svelte-styles`, late, beside the corpus legs that read its cache, `strip:corpus:run`, the type strip vs ts-blank-space over the snapshot's TypeScript, and `imports:corpus:run`, the import records vs oxc-parser's module record over its JS/TS and Svelte), then `conformance` (one Node process, its N-API legs: `svelte-fixtures` · `ts-fixtures` · `ts-repo` · `corpus:compare:parse --all` · `corpus:compare:parse tests/fixtures --fixtures` · `corpus:compare:format --all`, plus `render:audit` as its one subprocess leg) **+** `conformance:test262` (pure Rust) | `../corpora` (the real-code snapshot), `../svelte`, `../acorn-typescript`, `../typescript` (tsc baselines), `../prettier`, `../prettier-plugin-svelte`, `../test262`; the **`gates`** corpus view | release; `scripts/publish.ts` **Step 3b** |
-| **`deno task bench` / `bench:conformance`** | perf throughput ×3 runtimes + compose; parse-coverage report | **`perf`** view (100%-coverage invariant) / **`conformance`** view (fixtures filtered to what their own suite calls valid + wpt/test262 harvests; coverage-only + node-only) | dev / release cadence; feeds tsv.fuz.dev |
-| **`deno task idempotency:sweep`** | `tsv_debug fuzz --iterations 0` over the corpus dirs — F1 (`format(format(x)) == format(x)`) + no-panic + structural reparse on every file **as authored**, plus the `locations` wire (no panic) and the type strip of every TypeScript-family file (no panic, position contract, idempotence) | **`robustness`** view (the WHOLE `../corpora` snapshot — every collection it vendors, placed or not — + the `svelte_styles` cache + the live working trees' DIFF against the snapshot; absent dirs skipped with a warning) | after a printer change; conformance cadence |
-| **`deno task audit:corpus`** | the pure-Rust content-loss / robustness suite over **real code**: `roundtrip_audit --gate` · `comment_audit` · `swallow_audit` · `binding_audit --gate` (real code gating; prettier suites report-only) · `authoring_audit` · `paren_audit` (both real-code-only) · `census_audit` · `fabrication_audit` (both strict-zero off their default corpus) · `fuzz --iterations 0`. `width_audit` is NOT a leg — it has no zero to grade (../../docs/audits.md §The Corpus Bundle) | **`robustness`** view (the whole snapshot + the `svelte_styles` cache + the live diff) + the pinned `../prettier` format suites (absent working trees skipped; floor = the whole `../corpora` snapshot) | release; `scripts/publish.ts` **Step 3c**; conformance cadence |
-| **`deno task render:audit <paths>`** | `render_audit --gate` — per `.svelte` file, does `tsv format` change what it RENDERS? Compares the browser-visible render key of the source vs of `format(source)`. The corpus-scale arm of the fixture **R** rules. **Needs the sidecar** (`svelte compile`), so it is deliberately not a leg of the pure-Rust `audit:corpus` — it rides `conformance` instead | standalone: any `.svelte` corpus, given explicitly. As a `conformance` leg: the WHOLE `../corpora` snapshot (every collection, placed or not — this leg pins no count, so it reads the root rather than the placed collections' entries) + the `suite` checkout, both version-pinned, so a live working tree can't move a release verdict | release (in `conformance`); standalone after a printer change |
+| **`npm run conformance:all`** | `pins:audit:checkouts` + `bench:pins:suites` + `fixtures:validate` + `compile:fixtures:validate` preflights (then `bench:harvest:svelte-styles`, late, beside the corpus legs that read its cache, `strip:corpus:run`, the type strip vs ts-blank-space over the snapshot's TypeScript, and `imports:corpus:run`, the import records vs oxc-parser's module record over its JS/TS and Svelte), then `conformance` (one Node process, its N-API legs: `svelte-fixtures` · `ts-fixtures` · `ts-repo` · `corpus:compare:parse --all` · `corpus:compare:parse tests/fixtures --fixtures` · `corpus:compare:format --all`, plus `render:audit` as its one subprocess leg) **+** `conformance:test262` (pure Rust) | `../corpora` (the real-code snapshot), `../svelte`, `../acorn-typescript`, `../typescript` (tsc baselines), `../prettier`, `../prettier-plugin-svelte`, `../test262`; the **`gates`** corpus view | release; `scripts/publish.ts` **Step 3b** |
+| **`npm run bench` / `bench:conformance`** | perf throughput ×3 runtimes + compose; parse-coverage report | **`perf`** view (100%-coverage invariant) / **`conformance`** view (fixtures filtered to what their own suite calls valid + wpt/test262 harvests; coverage-only + node-only) | dev / release cadence; feeds tsv.fuz.dev |
+| **`npm run idempotency:sweep`** | `tsv_debug fuzz --iterations 0` over the corpus dirs — F1 (`format(format(x)) == format(x)`) + no-panic + structural reparse on every file **as authored**, plus the `locations` wire (no panic) and the type strip of every TypeScript-family file (no panic, position contract, idempotence) | **`robustness`** view (the WHOLE `../corpora` snapshot — every collection it vendors, placed or not — + the `svelte_styles` cache + the live working trees' DIFF against the snapshot; absent dirs skipped with a warning) | after a printer change; conformance cadence |
+| **`npm run audit:corpus`** | the pure-Rust content-loss / robustness suite over **real code**: `roundtrip_audit --gate` · `comment_audit` · `swallow_audit` · `binding_audit --gate` (real code gating; prettier suites report-only) · `authoring_audit` · `paren_audit` (both real-code-only) · `census_audit` · `fabrication_audit` (both strict-zero off their default corpus) · `fuzz --iterations 0`. `width_audit` is NOT a leg — it has no zero to grade (../../docs/audits.md §The Corpus Bundle) | **`robustness`** view (the whole snapshot + the `svelte_styles` cache + the live diff) + the pinned `../prettier` format suites (absent working trees skipped; floor = the whole `../corpora` snapshot) | release; `scripts/publish.ts` **Step 3c**; conformance cadence |
+| **`npm run render:audit -- <paths>`** | `render_audit --gate` — per `.svelte` file, does `tsv format` change what it RENDERS? Compares the browser-visible render key of the source vs of `format(source)`. The corpus-scale arm of the fixture **R** rules. **Needs the sidecar** (`svelte compile`), so it is deliberately not a leg of the pure-Rust `audit:corpus` — it rides `conformance` instead | standalone: any `.svelte` corpus, given explicitly. As a `conformance` leg: the WHOLE `../corpora` snapshot (every collection, placed or not — this leg pins no count, so it reads the root rather than the placed collections' entries) + the `suite` checkout, both version-pinned, so a live working tree can't move a release verdict | release (in `conformance`); standalone after a printer change |
 | **Package / artifact gates** | `validate:artifacts` (wasm size bounds + NOTICE) · `test:npm[:parse\|:all]:run` · `test:napi:npm:run` · `test:bun` · `typecheck:packages` (the staged packages' declarations, as a consumer compiles them) · `engines:audit` (wasm vs native byte parity) | the STAGED npm packages (`crates/tsv_wasm/pkg/*/npm`, `crates/tsv_napi/pkg/*`), plus both fixture trees and `../corpora` for `engines:audit` | release: `scripts/publish.ts` **Step 6** (all but `test:napi:npm:run` and `engines:audit`); every commit: CI's `artifacts` job (`validate:artifacts`, the Node package suites, the napi suite, `engines:audit` — not `test:bun` or `typecheck:packages`); `release.yml` per target (the napi suite) — full reference: ../../docs/audits.md |
 
 **JS parser (test262) IS release-gated** — `conformance:test262` (`tsv_debug
@@ -49,7 +49,7 @@ early-error frontier (reported, not gated). **Only CSS-WPT grading (`../wpt`) st
 manual** — its frontier is deferred §5.5 error-recovery, and real-CSS regressions
 are already partly caught by `corpus:compare:parse` (CSS AST vs `parseCss`).
 
-**Preflight.** `deno task doctor` checks the whole chain (runtimes, canonical pins,
+**Preflight.** `npm run doctor` checks the whole chain (runtimes, canonical pins,
 checkout alignment, oracle presence, corpus entries, build artifacts) ahead of time.
 Publish re-probes per step — Step 3b's posture is under [§Pre-release
 aggregate](#pre-release-aggregate--conformance--conformanceall); Step 3c
@@ -58,7 +58,7 @@ the audit itself warn-skips any absent `live` working tree. CI's `check` job run
 alone — it has no sibling checkouts, so of the pinned counts only the committed-tree
 ones (`fixtures_validate`, `swallow_audit`) execute there.
 
-**`deno task check` cannot prove real-code robustness.** `tests/fixtures` is
+**`npm run check` cannot prove real-code robustness.** `tests/fixtures` is
 format-stable by construction, so it never exercises a content-loss / panic / reflow
 bug on real source. The extension-robustness bar is therefore two release-cadence
 gates over real code: **Step 3b**'s `corpus:compare:format --all` SAFETY (content
@@ -89,7 +89,7 @@ delta on the same row is the detector.
 
 - **Runtime-labeled sibling reports.** Each runtime writes its own
   `results/report.<runtime>.{json,md}` (+ a timestamped `…_<commit>.<runtime>.*` pair), same
-  schema, never merged. `deno task bench:compose` (`compose_reports.ts`, run at the end of
+  schema, never merged. `npm run bench:compose` (`compose_reports.ts`, run at the end of
   `bench:perf`) folds the siblings into the combined `results/report.{json,md}`, whose headline is
   the per-runtime delta on a row; tsv.fuz.dev consumes it plus `report.node.json` and
   `report.conformance.node.json` (the conformance surface's own report, outside the compose glob).
@@ -146,7 +146,7 @@ delta on the same row is the detector.
 - **The native row differs by runtime, fairly.** Deno → FFI (`tsv_ffi`, via
   `Deno.dlopen`); Node/Bun → N-API (`tsv_napi`, via `process.dlopen`). Same engine,
   same per-thread arena reuse, different binding boundary. Both are **profile-guided**
-  (`deno task build:bench:pgo`, `lib/pgo_bench.ts`): the addon is the shipped addon's own
+  (`npm run build:bench:pgo`, `lib/pgo_bench.ts`): the addon is the shipped addon's own
   pipeline, and the FFI library — which ships nowhere — a third world of it, trained as
   itself through this harness's own FFI wrapper (a profile applies only to the build it was
   trained on). Each report discloses it as `native_build`
@@ -216,9 +216,9 @@ job) and an `exclude` (per-machine `*.local.*` scratch and the generated `.cache
 Compare formatting output against Prettier on arbitrary codebases.
 
 ```bash
-deno task corpus:compare:format --all                 # the gates corpus view: ../corpora + prettier suites (§Corpus)
-deno task corpus:compare:format ../some-project       # one project, recursive — NO srcDir filtering
-deno task corpus:compare:format:run ../some-project   # skip the addon rebuild (freshness-guarded)
+npm run corpus:compare:format -- --all                # the gates corpus view: ../corpora + prettier suites (§Corpus)
+npm run corpus:compare:format -- ../some-project      # one project, recursive — NO srcDir filtering
+npm run corpus:compare:format:run -- ../some-project  # skip the addon rebuild (freshness-guarded)
 ```
 
 ⚠ For monorepos like `svelte/`, use `--all` instead, to avoid scanning test fixtures. Flags (any
@@ -236,7 +236,7 @@ corpus/conformance comparison entry (`corpus:compare:{format,parse}:run`,
 `diagnostics/biome_oxfmt_diff.ts`, `diagnostics/skip_triage.ts`) is a Node root under `roots/`
 that loads its engines through `lib/compare_engines.ts`
 (`init_compare_implementations({profile: COMPARE_PROFILE})`, `corpus`, named in
-`lib/tsv_artifacts.ts` so `deno task doctor` reports the same addon), and the tools that grade
+`lib/tsv_artifacts.ts` so `npm run doctor` reports the same addon), and the tools that grade
 every implementation (`css:over-acceptance:run`, `ts-repo:over-acceptance:run`) through
 `roots/graded_implementations.ts`
 (`init_implementations({native_profile: COMPARE_PROFILE})`, beside the `nodejs` WASM bundle), so a
@@ -283,7 +283,7 @@ routing + the full options + the canonical-5 pins (incl. svelte, the plugin's pe
   is counted, never thrown (the caller reads a throw as "prettier failed on this file"); the run
   reports `prettier cache: N hits / M misses`, plus `/ K writes FAILED` if any did.
 - **Scope**: this tool + the conformance driver only — never the bench (it times prettier), never
-  the fixture validator (live by design). `TSV_PRETTIER_CACHE=0` disables; `deno task bench:clean`
+  the fixture validator (live by design). `TSV_PRETTIER_CACHE=0` disables; `npm run bench:clean`
   wipes.
 
 Output shape (counts illustrative — read them live):
@@ -335,7 +335,7 @@ stays small regardless of corpus size. Works with `--all`, `--safety-only`, and
 reads `.safety` / `.unknown` / `.partial` / `.errors`.
 
 ```bash
-deno task corpus:compare:format:run --all --json 2>/dev/null > report.json
+npm run corpus:compare:format:run -- --all --json 2>/dev/null > report.json
 … | jq '.stats.total'        # table numbers
 … | jq -r '.safety[].path'   # files losing content
 … | jq '.safety[0].violations[0].chars'  # per-char loss (ours vs prettier; real = beyond prettier)
@@ -360,15 +360,15 @@ untranslated position field) on an uncurated shape is invisible without a
 canonical-parser comparison at corpus scale.
 
 ```bash
-deno task corpus:compare:parse --all                    # full corpus
-deno task corpus:compare:parse --all --multibyte-only   # offset-translation slice (riskiest machinery)
-deno task corpus:compare:parse ../corpora/collections/zzz --filter typescript --limit 100
-deno task corpus:compare:parse --all --json 2>/dev/null > report.json
-deno task corpus:compare:parse:run --all                # skip rebuild (freshness-guarded)
-deno task corpus:compare:parse tests/fixtures --fixtures # each fixture's parse-pinned documents (a `conformance` leg)
-deno task wire:audit
-deno task wire:audit:terminators
-deno task corpus:compare:parse <path> --filter svelte --inject --inject-terminators --inject-limit 6
+npm run corpus:compare:parse -- --all                   # full corpus
+npm run corpus:compare:parse -- --all --multibyte-only  # offset-translation slice (riskiest machinery)
+npm run corpus:compare:parse -- ../corpora/collections/zzz --filter typescript --limit 100
+npm run corpus:compare:parse -- --all --json 2>/dev/null > report.json
+npm run corpus:compare:parse:run -- --all               # skip rebuild (freshness-guarded)
+npm run corpus:compare:parse -- tests/fixtures --fixtures # each fixture's parse-pinned documents (a `conformance` leg)
+npm run wire:audit
+npm run wire:audit:terminators
+npm run corpus:compare:parse -- <path> --filter svelte --inject --inject-terminators --inject-limit 6
 ```
 
 **The wire-injection audit** (`wire:audit*`; full reference ../../docs/audits.md §Wire-Injection)
@@ -408,7 +408,7 @@ tables.
 - **The loc arm** grades tsv's loc-bearing wire (the Rust emitter, via `tsv_debug`):
   1. **The definition check**: tsv's `loc` must deep-equal the shipped
      `crates/tsv_wasm/npm/locations.js` reconstruction of its own span-only wire
-     (`lib/loc_cross_grade.ts`, the check `deno task check:loc` runs over the fixture tree).
+     (`lib/loc_cross_grade.ts`, the check `npm run check:loc` runs over the fixture tree).
      A violation is a tsv bug and fails every run, controls included.
   2. **The oracle comparison**, where `loc` has its own rules (`diff_asts`):
      - Each half (`loc.start`, `loc.end`) is graded only where both sides' offset at that half
@@ -453,7 +453,7 @@ tables.
   runs too, its controls subtracted from its variants like the loc arm's.
 
 **`--fixtures`: a fixture tree as the root.** `corpus:compare:parse tests/fixtures --fixtures` (a
-`deno task conformance` leg) grades each fixture's parse-pinned documents and nothing else — its
+`npm run conformance` leg) grades each fixture's parse-pinned documents and nothing else — its
 `input.*` at its `goal` marker's goal, plus the variants an `expected_<stem>.json` pins, the
 documents an oracle verdict is committed for (narrower than `check:loc`, which needs no oracle and
 also grades every format variant tsv parses) — so the oracle comparison reaches the `loc` rows the
@@ -492,12 +492,12 @@ does; `loc` is that tool's loc arm's to grade. All accept `-v`, `--json`, and a 
 each has a freshness-guarded `:run` variant that skips the FFI rebuild.
 
 ```bash
-deno task conformance:svelte-fixtures   # builds the corpus addon, then runs
-deno task conformance:ts-fixtures
-deno task conformance:ts-repo
-deno task conformance:ts-fixtures:run -v     # skip rebuild; + per-file gap / AST-group detail
-deno task conformance:ts-fixtures:run --json 2>/dev/null > report.json
-deno task conformance:svelte-fixtures:run ../svelte/packages/svelte/tests/parser-modern  # a subtree
+npm run conformance:svelte-fixtures     # builds the corpus addon, then runs
+npm run conformance:ts-fixtures
+npm run conformance:ts-repo
+npm run conformance:ts-fixtures:run -- -v    # skip rebuild; + per-file gap / AST-group detail
+npm run conformance:ts-fixtures:run -- --json 2>/dev/null > report.json
+npm run conformance:svelte-fixtures:run -- ../svelte/packages/svelte/tests/parser-modern # a subtree
 ```
 
 **Verdict parity buckets over-rejections** (tsv rejects what the oracle accepts)
@@ -599,11 +599,11 @@ FAIL rather than green-skipping. Pins: `TS_REPO_PINS` in `lib/gate_counts.ts`.
 
 The three gates above plus `corpus:compare:parse --all` and `corpus:compare:format
 --all` are the release-cadence correctness gates that run against external oracles
-(and so can't live in `deno task check`). The typechecker's `tsc_conformance` tasks
+(and so can't live in `npm run check`). The typechecker's `tsc_conformance` tasks
 are deliberately NOT legs — `tsv_check` is experimental and may never ship, so its
 gates stay on-demand (../../docs/typechecker.md).
 
-`deno task conformance` builds the corpus addon (and `build:check`'s `tsv_debug`, the loc arm's
+`npm run conformance` builds the corpus addon (and `build:check`'s `tsv_debug`, the loc arm's
 loc-wire server) once and runs every leg in **ONE process** (`conformance.ts`): the canonical
 oracle modules (prettier, the svelte plugin, svelte/compiler, acorn, acorn-ts) load once via the
 module cache, each leg gets a timing line, and failure semantics match a `&&` chain exactly
@@ -615,13 +615,13 @@ Differential) and `imports:corpus:run` (the import records vs oxc-parser's modul
 ../../docs/audits.md §Import Corpus Differential), each its own process: they load none of the
 canonical oracles and no FFI.
 
-`deno task conformance:all` runs the pure-Rust **test262 positive gate** FIRST, THEN
+`npm run conformance:all` runs the pure-Rust **test262 positive gate** FIRST, THEN
 the aggregate — so a positive-parse regression trips the quick gate before the
 multi-minute FFI legs run. That superset is what publish **Step 3b** runs (skipped by
 `--no-check`), after preflighting the oracles + `node_modules`: a missing one **FAILS
 a `--wetrun`**, warn-and-skips a dry-run, and any skip is re-warned in the final
 summary. The gates themselves fail closed on a missing checkout (0 scanned = FAIL),
-so a manual `deno task conformance` can't green-skip a leg. `corpus:compare:format`
+so a manual `npm run conformance` can't green-skip a leg. `corpus:compare:format`
 there gates on **SAFETY** (data loss) — the intentional style divergences are
 non-blocking WARNs, and every SAFETY finding is self-verified in-run (the native
 format is re-run and must reproduce byte-identically; nondeterminism surfaces as a
@@ -674,10 +674,10 @@ operational summary.
   unexplained), `unknown` (needs investigation), `SAFETY` (data loss).
 
 ```bash
-deno task divergence:audit [--json]
-deno task test:node
-deno task test:node:canonical
-deno task typecheck:js
+npm run divergence:audit -- [--json]
+npm run test:node
+npm run test:node:canonical
+npm run typecheck:js
 ```
 
 - **`divergence:audit`** runs every pattern against every documented fixture's committed prettier
@@ -685,7 +685,7 @@ deno task typecheck:js
   assertions, gated by `test:node`, and drift from what the detectors actually see). Exits 1 on a
   genuine gap; listing drift is bookkeeping. Runs under Node (`roots/divergence_audit.ts`) over
   read-only handles on `tests/fixtures` and `docs/` (docs/tasks.md §`divergence:audit`).
-- **`test:node`** — vitest under Node over the node-modules-free suites, gated by `deno task check`;
+- **`test:node`** — vitest under Node over the node-modules-free suites, gated by `npm run check`;
   for the divergence detectors: pattern positive/negative overmatch-rejection cases, safety
   differential cases, and the behavioral fixture-coverage audit (`fixture_coverage_test.ts`)
   driving each detector against its own committed fixtures (input == ours, output_prettier ==
@@ -747,24 +747,24 @@ from any doc;
 [divergence_detector.md §Pending work](../../docs/divergence_detector.md#pending-work)
 explains what each bucket means and which are worth closing. The subset of partial
 fixtures that a pattern also *lists* is
-ratcheted by `KNOWN_PARTIAL` in `fixture_coverage_test.ts` and gated in `deno task
+ratcheted by `KNOWN_PARTIAL` in `fixture_coverage_test.ts` and gated in `npm run
 check`: a listed fixture going partial fails, and a stale entry fails too, so it
 mirrors the live set and can only shrink.
 
 ## Benchmark Commands
 
 ```bash
-deno task bench:install   # one-time: install harness npm deps
+npm run bench:install     # one-time: install harness npm deps
 
-deno task bench           # full refresh = bench:perf + bench:conformance + a closing bench:compose
-deno task bench:perf      # perf surface: build:bench ONCE, then the three :run legs + compose
-deno task bench:deno      # Deno only (no node/bun needed)
-deno task bench:node      # Node only
-deno task bench:bun       # Bun only (executes the Node artifacts — N-API + nodejs-target WASM)
-deno task bench:compose   # fold whatever report.{deno,node,bun}.json exist → report.{json,md}
+npm run bench             # full refresh = bench:perf + bench:conformance + a closing bench:compose
+npm run bench:perf        # perf surface: build:bench ONCE, then the three :run legs + compose
+npm run bench:deno        # Deno only (no bun needed)
+npm run bench:node        # Node only
+npm run bench:bun         # Bun only (executes the Node artifacts — N-API + nodejs-target WASM)
+npm run bench:compose     # fold whatever report.{deno,node,bun}.json exist → report.{json,md}
 
-deno task bench:conformance      # bench:pins:suites + build:bench + the coverage run
-deno task bench:conformance:run  # skip harvest + rebuild (freshness-guarded)
+npm run bench:conformance        # bench:pins:suites + build:bench + the coverage run
+npm run bench:conformance:run    # skip harvest + rebuild (freshness-guarded)
 
 deno task bench:deno:run   # skip the rebuild (freshness-guarded); also :node:run / :bun:run
 deno task bench:deno:run -- --json              # JSON output (CI/tooling)
@@ -774,7 +774,7 @@ deno task bench:deno:run -- --save-report       # force-overwrite the committed 
 deno task bench:deno:run -- --save-baseline     # save current results as baseline
 deno task bench:deno:run -- --compare-baseline  # compare against saved baseline
 
-deno task bench:clean     # wipe local-only (gitignored) bench state
+npm run bench:clean       # wipe local-only (gitignored) bench state
 ```
 
 - Every bench task builds the runtime's artifacts first; `:run` skips that, guarded against stale
@@ -785,10 +785,10 @@ deno task bench:clean     # wipe local-only (gitignored) bench state
   gate): every native row means every one, so it needs `../corpora` at its pin and
   `llvm-tools-preview` like the perf legs. Each standalone leg builds the WHOLE artifact set
   (`build:bench`), not just the half it executes — every report carries the same tsv size rows
-  (deno.json `//bench:deno`); a `:run` leg warns when a size-only artifact is stale.
+  (./docs/tasks.md §`bench:deno`); a `:run` leg warns when a size-only artifact is stale.
 - `bench` closes with its own `bench:compose`: `bench:perf` composes too, but before
-  `bench:conformance` rewrites the report whose vintage the combined one carries (deno.json
-  `//bench`).
+  `bench:conformance` rewrites the report whose vintage the combined one carries
+  (./docs/tasks.md §`bench`).
 - Flags are shown for `:deno:run`, same for the others. Full runs overwrite the committed report
   anyway (`--save-report` is for limited runs); the timestamped pair is always written.
 - `bench:clean` wipes `baseline.json`, the timestamped results pairs, and the harvest caches,
@@ -873,7 +873,7 @@ A timed run is **several processes of one runtime**, started one at a time by `b
 - **A failed child ends the run** with no report written: the child has already said why, and the
   orchestrator names which child it was and prints the command that re-runs it alone against its
   spec. The run's directory is then KEPT (its spec and file set are what that command reads);
-  `deno task bench:clean` removes it.
+  `npm run bench:clean` removes it.
 - **A child that hangs after reporting** is killed and its result kept. A child's result is its
   last act, renamed into place whole, so once it exists the measurement is done and only teardown
   is left — and teardown has deadlocked (once, a Node row: result written, then parked on futexes
@@ -894,18 +894,17 @@ A timed run is **several processes of one runtime**, started one at a time by `b
   start-up, engine load and warmup, and slow rows are floor-bound in each pass. `BENCH_PASSES` is
   the dial; `BENCH_PASSES=1` is a single draw per row with no spread to report.
 
-`deno task bench` regenerates EVERY committed artifact the site consumes, reusing the node
+`npm run bench` regenerates EVERY committed artifact the site consumes, reusing the node
 artifacts the perf half just built for the coverage run. It FAILS FAST if node or bun isn't
 installed — `bench:runtimes` preflights `bench:perf` — rather than discovering the miss after two
 of the three siblings were regenerated and `bench:compose` skipped, leaving the committed combined
 report stale against fresh siblings. ⚠️ Its node arm asks what the binary IS, not whether the
 name resolves: `deno task` prepends its node-compat shim (`~/.cache/deno/node_compat_bin/node` →
-the deno binary) to PATH, so `which node` succeeds inside every deno task on a machine with no
+the deno binary) to PATH, so `which node` succeeds inside every `deno task` run on a machine with no
 node — and that shim RUNS the harness, where `current_runtime()` reports `deno` and `bench:node`
 overwrites `report.deno.*` rather than producing a node sibling. `globalThis.Deno` is the tell the
-shim cannot hide. Deno is the only hard dependency, so without node and/or bun run the
-per-runtime tasks you DO have — each writes its own sibling and `bench:compose` folds whatever
-exists.
+shim cannot hide. Without bun (or Deno, for its row), run the per-runtime tasks you DO have —
+each writes its own sibling and `bench:compose` folds whatever exists.
 
 **Conformance measurement** is per-tool PARSE COVERAGE over the fixtures-only `conformance` view →
 `report.conformance.node.{json,md}`. Specific to this surface:
@@ -932,15 +931,15 @@ overwrites `report.conformance.node.*`, so re-run `bench:conformance:run` after.
 ### Harvests
 
 ```bash
-deno task bench:harvest            # everything = :suites + :svelte-styles
-deno task bench:pins:suites        # the conformance-view group (five SUITE caches + the CSS reject pin); the pin-freshness preflight
-deno task bench:harvest:wpt        # ../wpt/css <style> blocks (outside <script>) → .cache/wpt_css
-deno task bench:harvest:test262    # graded positives → .cache/test262_files.json (runs cargo)
-deno task bench:harvest:ts-repo    # tsc-corpus valid + rejects lists → .cache/ts_repo_{files,rejects}.json
-deno task bench:harvest:svelte-rejects  # svelte/compiler-rejected Svelte files → .cache/svelte_parse_rejects.json
-deno task bench:harvest:prettier-jsx    # Prettier .js fixtures its babel parser reads as JSX → .cache/prettier_jsx_files.json
-deno task css:over-acceptance:pin  # CSS_REJECTS_PIN alone (oracle only, no build) — no cache, just the stamp
-deno task bench:harvest:svelte-styles   # perf-view .svelte <style> blocks per snapshot collection → .cache/svelte_styles/<collection>.css
+npm run bench:harvest              # everything = :suites + :svelte-styles
+npm run bench:pins:suites          # the conformance-view group (five SUITE caches + the CSS reject pin); the pin-freshness preflight
+npm run bench:harvest:wpt          # ../wpt/css <style> blocks (outside <script>) → .cache/wpt_css
+npm run bench:harvest:test262      # graded positives → .cache/test262_files.json (runs cargo)
+npm run bench:harvest:ts-repo      # tsc-corpus valid + rejects lists → .cache/ts_repo_{files,rejects}.json
+npm run bench:harvest:svelte-rejects    # svelte/compiler-rejected Svelte files → .cache/svelte_parse_rejects.json
+npm run bench:harvest:prettier-jsx      # Prettier .js fixtures its babel parser reads as JSX → .cache/prettier_jsx_files.json
+npm run css:over-acceptance:pin    # CSS_REJECTS_PIN alone (oracle only, no build) — no cache, just the stamp
+npm run bench:harvest:svelte-styles     # perf-view .svelte <style> blocks per snapshot collection → .cache/svelte_styles/<collection>.css
 ```
 
 Each runs under Node on gro's host modules (`roots/<harvest>.ts` over `roots/harvest_deps.ts`;
@@ -950,7 +949,7 @@ over fakes (in `test:node`); nothing here harvests in a test.
 
 Idempotent; warn-and-skip when the source checkout is absent. The suite legs are
 FRESHNESS-STAMPED (`lib/harvest_stamp.ts` — every stamp is listed in the `HARVEST_STAMPS` table, `lib/harvest_stamp_table.ts`,
-which the scripts read their paths from and `deno task doctor` walks): a grade whose stamped
+which the scripts read their paths from and `npm run doctor` walks): a grade whose stamped
 inputs — the source checkout COMMIT(s) + the pinned count + oracle pins — are unchanged skips
 instantly (the test262 leg saves a release-mode grade; the ts-repo leg stamps the tsc VERSION too,
 since tsc is its oracle and a bump can move a file between its two lists with the checkout
@@ -971,8 +970,8 @@ test moves the CSS this pin grades without moving it.
 
 `bench:harvest:svelte-styles` produces a `benched` entry, so it appears in the PERF and GATES
 views and never in the conformance one. Each caller therefore takes one group: `bench:perf` chains the styles harvest alone (its own view
-holds it), `bench:conformance` chains the suites alone (its holds those), and `deno
-task conformance` — whose corpus legs read the `gates` view — chains the suites as
+holds it), `bench:conformance` chains the suites alone (its holds those), and `npm
+run conformance` — whose corpus legs read the `gates` view — chains the suites as
 its PIN-FRESHNESS preflight and the styles harvest later, immediately ahead of those
 legs. `bench:harvest` runs both and stays the manual refresh-everything entry point.
 The split is also what keeps that preflight tolerant: every suite leg is
@@ -1027,7 +1026,7 @@ stamps:
   the perf view the same way).
 
 **Why the preflight exists.** Those count pins are re-derived by no other cadence —
-`deno task check` re-derives no pin; its two sibling-checkout legs (`roundtrip:audit:prettier`,
+`npm run check` re-derives no pin; its two sibling-checkout legs (`roundtrip:audit:prettier`,
 `discovery:audit`) grade properties, not counts — and a checkout that moves between
 upstream RELEASES gives `pins:audit` no version to fail on, so they could go stale unnoticed
 (the two suite-only checkouts, `../wpt` and
@@ -1320,7 +1319,7 @@ pairs — so the two cannot grade and load different files), it compares their m
 `newest_workspace_file_mtime`, for this guard and its two siblings) and **aborts (exit 1)** if any
 is stale or missing.
 The build-first tasks rebuild first, so they pass for free — for a cargo-built artifact because
-the build tasks **stamp** it (`deno task build:stamped`, `scripts/cargo_build.ts`): cargo keys
+the build tasks **stamp** it (`npm run build:stamped`, `scripts/cargo_build.ts`): cargo keys
 `Cargo.lock` and a manifest by content, so one rewritten to something already built (a version
 bump restored and re-applied, a `git reset`, a branch switched away and back) makes the build a
 no-op that re-links the cached artifact under its original date, older than the file the guard
@@ -1338,7 +1337,7 @@ the report would publish a plain build as the profile-guided one); as a size-onl
 is a warning. Whether `build:bench:pgo` rebuilds is the pipeline's own question, asked by
 content: `pgo.ts all --reuse` skips the build and its gates when a hash of everything that can
 change the binaries matches the stamp it wrote last (docs/tasks.md §`build:pgo`), a cache it
-shares with `deno task build:pgo`.
+shares with `npm run build:pgo`.
 
 **Behind the override: the span-only wire is probed at init.** An mtime can only
 say an artifact is old, not what it does, and a stale binding whose `parse_<lang>` still
@@ -1389,15 +1388,15 @@ can't drift; dev-tooling crates deliberately excluded so
 `Cargo.lock` and `package.json`, where those tasks live, so
 editing a build task's flags re-triggers it). Rationale: wasm-pack re-runs wasm-opt
 (~8–27s per bundle) even when cargo is a fully-cached no-op, so a source-unchanged
-`deno task bench` would otherwise pay ~90s of pure wasm-opt. What the check CANNOT see is a
+`npm run bench` would otherwise pay ~90s of pure wasm-opt. What the check CANNOT see is a
 toolchain change (wasm-pack / wasm-opt / rustc upgrade) — after one of those, force
 with `TSV_BUILD_FORCE=1`. The publish path never skips: `build:packages` chains
 only the `build:npm:*` tasks, which are deliberately unwrapped.
 
 ```bash
 # After editing a crate, the fast/correct paths:
-deno task bench:deno                             # rebuilds, then runs — always fresh
-deno task build:bench:pgo && deno task bench:deno:run  # rebuild the PGO pair (minutes), then :run
+npm run bench:deno                               # rebuilds, then runs — always fresh
+npm run build:bench:pgo && deno task bench:deno:run    # rebuild the PGO pair (minutes), then :run
 BENCH_STALE_OK=1 deno task bench:deno:run        # deliberately measure the current (stale) binary
 ```
 
@@ -1408,7 +1407,7 @@ non-throwing + non-empty + idempotent), exiting non-zero on any failure — to c
 totally broken" before the full bench; `corpus_compare_format` is still the real correctness gate.
 Runtime-neutral like the bench — `smoke` (Deno), `smoke:node`, `smoke:bun` each load that
 runtime's own native + WASM artifacts, so an impl-load break is caught per runtime. Like the `:run`
-tasks it skips the rebuild and is freshness-guarded (rebuild with `deno task build:bench`, or
+tasks it skips the rebuild and is freshness-guarded (rebuild with `npm run build:bench`, or
 `BENCH_STALE_OK=1`).
 
 ## Corpus
@@ -1465,7 +1464,7 @@ gates over every file.**
   CSS set additionally carries the `svelte_styles` per-collection concats harvested from those
   collections' `<style>` blocks. Nothing is pruned at load time: the snapshot's manifest already
   leaves each upstream's test-fixture subtrees behind, and `*.test.ts` files stay — tests are real
-  code. This is what `deno task bench` measures. **This framing is the source of truth for the
+  code. This is what `npm run bench` measures. **This framing is the source of truth for the
   public benchmark page's "What's measured" prose — keep them in sync.**
 
   **Every in-scope tool must process every file**, because it's code that ships: after the perf
@@ -1513,7 +1512,7 @@ gates over every file.**
   `harvest_ts_repo.ts`). Deliberately **excludes every snapshot tier**, so the conformance
   coverage surface and the perf corpus are mutually exclusive: perf is the "every in-scope tool
   must fully process it" corpus, conformance is where sub-100% coverage is the metric. This is what
-  `deno task bench:conformance` measures.
+  `npm run bench:conformance` measures.
 
   **The tsc corpus (`ts_repo_files.json`) is the TypeScript-specific set.** Without it the
   `parse/typescript` group is ~95% test262 — ECMAScript — with prettier's format fixtures as its
@@ -1956,7 +1955,7 @@ state) shows in the coverage report and skip counts without `--verbose`.
   updating the table fails the run. The fault survives at the pinned version
   (`repeat(75)` faults on every run); on a yuku bump, re-probe rather than assume — run the
   `repeat(75)` call in a child process a handful of times, and only if it never faults
-  re-add the row and run `deno task bench:conformance`.
+  re-add the row and run `npm run bench:conformance`.
 - **The oxc WASI binding's `errors` getter is CONSUME-ONCE.** On
   `@oxc-parser/binding-wasm32-wasi`, the first access to `result.errors` returns the
   real error array; every later access returns `[]` (the native `oxc-parser` package
@@ -2059,7 +2058,7 @@ probes, though no diagnostic that loads the set reads its row. The two
 over-acceptance tools load the addon at the `corpus` profile
 (`npm run build:napi:corpus && npm run build:wasm:all:nodejs` first), so a panic is caught, and
 a crash in either tsv row is graded neither way but fails the run, listed with its engine and file; `wasm_json_probe` loads the bench's profile-guided addon
-(`deno task build:bench:pgo`), since the split it prints is the bench rows'. The two with tasks
+(`npm run build:bench:pgo`), since the split it prints is the bench rows'. The two with tasks
 — `css:over-acceptance` and `ts-repo:over-acceptance` — build what they need themselves.
 `skip_triage` reads tsv's native verdict and the oracle's alone, so it loads the comparison
 tools' engines instead (`npm run build:napi:corpus` first), no WASM bundle and no program.
@@ -2081,5 +2080,5 @@ Documented above, though they live here: the parse-conformance gates
 | `wasm_json_probe.ts` | splits parse cost into pure-parse vs materialization for native + WASM, isolating JS-side `JSON.parse` | — |
 | `wasm_format_probe.ts` | WASM **format** wall-time A/B at single-digit-% resolution (paired discipline: interleaved pairs, in-run A/A noise floor, byte-identity gate) | — |
 | `wasm_memory_probe.ts` | WASM **linear-memory high-water** for `format()` — the axis the wall-time probe can't see, and the gate for doc-IR memory work. `--cold` (per-file cold-start peak) or default steady-state | — |
-| `facade_probe.ts` | what the packages' facade costs per call over the flat exports beneath it, per binding × operation × language, and what separates a `tsv-wasm` row from the staged `@fuzdev/tsv-wasm` entry (which needs `deno task build:npm:all`). Same paired discipline (rotated interleaved arms, in-run A/A floor, byte-identity gate, `facade_identity.ts`, which a tsv crash in any arm fails) over three sets — the perf corpus, its smallest tenth, one minimal source — plus the facade's one O(source) step (`isWellFormed`) priced alone. Runs under **all three runtimes** (its own load path, not `init_implementations`) | — |
+| `facade_probe.ts` | what the packages' facade costs per call over the flat exports beneath it, per binding × operation × language, and what separates a `tsv-wasm` row from the staged `@fuzdev/tsv-wasm` entry (which needs `npm run build:npm:all`). Same paired discipline (rotated interleaved arms, in-run A/A floor, byte-identity gate, `facade_identity.ts`, which a tsv crash in any arm fails) over three sets — the perf corpus, its smallest tenth, one minimal source — plus the facade's one O(source) step (`isWellFormed`) priced alone. Runs under **all three runtimes** (its own load path, not `init_implementations`) | — |
 | `biome_heap_probe.ts` | does biome's sweep time move with its leaked wasm linear memory, per runtime? N consecutive full sweeps of one format row under a reset regime (`never` / `every` / the production rule), wall beside heap size, grow count and JSC's own heap stats per sweep; `--prelude prettier,oxfmt,…` first runs the group's earlier rows in the same process — a SHARED process, which the bench no longer is (§Process model), and the state that decided the answer on bun. Runs under **node and bun** (not `deno task`: `node --expose-gc --disable-warning=ExperimentalWarning …` / `bun --expose-gc …`); what sized `RESET_GROWTH_BYTES` | — |

@@ -8,7 +8,7 @@
  * @module
  */
 
-/** The `benches/js` install (`deno task bench:install`). */
+/** The `benches/js` install (`npm run bench:install`). */
 const BENCH_NODE_MODULES = 'benches/js/node_modules';
 
 /** TypeScript's CommonJS entry in the install. */

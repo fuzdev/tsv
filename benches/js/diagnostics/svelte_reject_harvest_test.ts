@@ -169,7 +169,7 @@ describe('svelte rejects', () => {
 		strictEqual(await run_svelte_reject_harvest(skipped.deps, ['--if-present']), 0);
 		deepStrictEqual(err, [
 			'  ⚠ svelte_reject_harvest: could not init svelte/compiler (svelte missing) — skipping ' +
-				'(run `deno task bench:install`)'
+				'(run `npm run bench:install`)'
 		]);
 		const strict = fake_deps({ oracle_fails: true });
 		await rejects(run_svelte_reject_harvest(strict.deps, []), {
@@ -306,7 +306,7 @@ describe('prettier JSX', () => {
 		strictEqual(await run_prettier_jsx_harvest(skipped.deps, ['--if-present']), 0);
 		deepStrictEqual(err, [
 			'  ⚠ prettier_jsx_harvest: could not import prettier (Cannot find package) — skipping ' +
-				'(run `deno task bench:install`)'
+				'(run `npm run bench:install`)'
 		]);
 		await rejects(run_prettier_jsx_harvest(fake_deps({ import_fails: true }).deps, []), {
 			message: 'prettier_jsx_harvest: could not import prettier (Cannot find package)'

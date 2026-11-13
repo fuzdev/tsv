@@ -307,7 +307,7 @@ test('a file the files list declares that the staging lacks fails the run, namin
 	const { code, err } = await run(root, fake_typescript().ts, ['format']);
 	strictEqual(code, 1);
 	deepStrictEqual(err, [
-		`  FAIL: ${NAME}: the staging lacks ${PKG}/types, which its files list declares — restage: deno task build:npm:format`,
+		`  FAIL: ${NAME}: the staging lacks ${PKG}/types, which its files list declares — restage: npm run build:npm:format`,
 		`\n✗ ${NAME}: declarations do not type-check`
 	]);
 });
@@ -320,9 +320,7 @@ test('a missing install fails before TypeScript loads, naming the install', asyn
 		strictEqual(code, 1);
 		deepStrictEqual(out, []);
 		deepStrictEqual(loaded, []);
-		deepStrictEqual(err, [
-			`✗ ${what} is not installed at ${path} — run \`deno task bench:install\``
-		]);
+		deepStrictEqual(err, [`✗ ${what} is not installed at ${path} — run \`npm run bench:install\``]);
 	}
 });
 
@@ -340,7 +338,7 @@ test('no arguments grade every staged package and skip the rest', async () => {
 	const none = await run(root, fake_typescript().ts, []);
 	strictEqual(none.code, 1);
 	deepStrictEqual(none.err, [
-		'✗ no package is staged — run `deno task build:packages` and/or `deno task build:napi:packages`'
+		'✗ no package is staged — run `npm run build:packages` and/or `npm run build:napi:packages`'
 	]);
 });
 

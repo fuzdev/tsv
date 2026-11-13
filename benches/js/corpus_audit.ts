@@ -1,7 +1,7 @@
 /**
  * Corpus-scale content-loss / robustness audit — the standing gate over **real code**.
  *
- * `deno task check` gates `tests/fixtures`, which is format-stable by construction, so it
+ * `npm run check` gates `tests/fixtures`, which is format-stable by construction, so it
  * structurally cannot catch a content-loss / panic / non-idempotency bug in real code — every
  * such bug this cycle was found by a corpus audit or a wide fuzz seed, never by `check`. This
  * driver runs the pure-Rust content-loss audits over the `robustness` corpus view (the WHOLE ../corpora
@@ -41,7 +41,7 @@
  *   sweep below. Real code carries twice the fixture corpus's chains, and the class it gates is
  *   one a corpus of formatted code cannot otherwise show: the paren-nested authoring is exactly
  *   what tsv's own output normalizes away (docs/audits.md §Paren-Authoring Independence).
- *   Run WITHOUT `--require-relational`, which `deno task paren:audit` (the fixture-tree gate)
+ *   Run WITHOUT `--require-relational`, which `npm run paren:audit` (the fixture-tree gate)
  *   passes: that flag is the audit's per-class vacuity floor over its relational `<`…`>` sites,
  *   and it is a claim about the SEED SET rather than about the audit. Nobody writes `a < b > c`
  *   in real code, so both relational rows are legitimately 0 here and a floor over them would
@@ -131,7 +131,7 @@ export async function run_corpus_audit(deps: CorpusAuditDeps): Promise<number> {
 	const real_seeds = [...snapshot_dirs, ...live_files];
 
 	// The version-pinned Prettier format suites (adversarial edge cases). Present-only. Shared
-	// with the `roundtrip:audit:prettier` leg of `deno task check`, which audits the same suites
+	// with the `roundtrip:audit:prettier` leg of `npm run check`, which audits the same suites
 	// on every commit — one list, so the cheap leg and this bundle cannot drift apart.
 	const prettier_suites: string[] = [];
 	for (const p of PRETTIER_ROUNDTRIP_SUITES) {

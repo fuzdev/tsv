@@ -65,7 +65,7 @@
  * Flags: `--rounds N` (15), `--warmup N` (3), `--lang <language>`, `--binding
  * <napi|ffi|wasm>`, `--op <parse|parse+locations|format>`, `--set <corpus|small|tiny>`,
  * `--no-package`, `--json` (one JSON document on stdout; the tables go to stderr
- * either way). The `package` arm needs `deno task build:npm:all`.
+ * either way). The `package` arm needs `npm run build:npm:all`.
  */
 
 import { stat } from 'node:fs/promises';
@@ -247,7 +247,7 @@ if (runtime === 'deno') {
 			await stat(entry);
 		} catch {
 			console.error(
-				`staged package not found at ${entry} — run 'deno task build:npm:all', or pass --no-package`
+				`staged package not found at ${entry} — run 'npm run build:npm:all', or pass --no-package`
 			);
 			exit(1);
 		}

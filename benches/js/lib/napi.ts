@@ -5,7 +5,7 @@
  * (`tsv_napi`, built from the same language crates), different binding boundary.
  * Loaded with `process.dlopen`, which accepts the built cdylib directly as an N-API
  * addon — no `.node` rename. By default the library is the profile-guided addon
- * `deno task build:bench:pgo` stages (`lib/pgo_bench.ts`): the shipped addon's own
+ * `npm run build:bench:pgo` stages (`lib/pgo_bench.ts`): the shipped addon's own
  * pipeline (`scripts/pgo/pgo.ts`), on the workspace's unwinding `napi` profile, so the
  * bench measures what ships — its profile and its panic contract. A caller that grades
  * rather than times loads a cargo profile's plain build instead, by passing its path
@@ -55,7 +55,7 @@ export interface NapiAddon {
 	parse_internal_css: EngineFn<EngineFailure | undefined>;
 	format_css: EngineFn<string | EngineFailure>;
 	// test-only panic-contract probes — present only when built with the
-	// `panic_probe` cargo feature (`deno task test:napi`); absent in published
+	// `panic_probe` cargo feature (`npm run test:napi`); absent in published
 	// builds, so `test_napi.ts` skips its contract test when undefined. The
 	// second panics with a payload that is no string
 	__panic_probe?: () => void;

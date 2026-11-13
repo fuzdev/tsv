@@ -33,7 +33,7 @@ export const init_implementations: InitCompareImplementations = () =>
 
 /**
  * Opens a directory read-only by a path as a tool spells it: relative to the checkout, where
- * `npm run` and `deno task` run, or absolute.
+ * `npm run` runs, or absolute.
  */
 export const open_readonly_dir = async (path: string): Promise<FsReadDir> =>
 	(await fs.open_dir(resolve(CHECKOUT_PATH, path))).readonly();

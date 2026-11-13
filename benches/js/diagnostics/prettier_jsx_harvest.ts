@@ -115,7 +115,7 @@ export async function run_prettier_jsx_harvest(
 	} catch (e) {
 		const msg = `prettier_jsx_harvest: could not import prettier (${e instanceof Error ? e.message : e})`;
 		if (if_present) {
-			console.error(`  ⚠ ${msg} — skipping (run \`deno task bench:install\`)`);
+			console.error(`  ⚠ ${msg} — skipping (run \`npm run bench:install\`)`);
 			return 0;
 		}
 		throw new Error(msg);

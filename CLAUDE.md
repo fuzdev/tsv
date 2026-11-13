@@ -34,13 +34,13 @@ Version bumps, publishing, and **`CHANGELOG.md`** are user-owned. Agents make th
 1. **Create the fixture FIRST** — `fixture_init` creates `input.svelte` (prettier-formatted) and `expected.json` in one step.
    Use `.svelte` unless the feature is file-level (byte 0: hashbang, BOM). See ./docs/fixture_workflow.md#11-create-directory-and-draft.
 2. **Review the input** — read the generated `input.svelte` to verify structure (formatting is guaranteed correct).
-3. **See it fail** — `deno task fixtures:validate <pattern>` shows the failing diff.
+3. **See it fail** — `npm run fixtures:validate -- <pattern>` shows the failing diff.
 4. **⚠️ APPROVAL GATE — STOP HERE.** Show the failing diff to the user and wait for explicit
    confirmation ("lgtm", "proceed", or feedback) before writing any implementation code.
    **If feedback reworks the fixture (naming, structure, cases), redo steps 1-3 and return here —
    the gate resets on every rework.**
 5. **Implement the fix.**
-6. **Validate** — `deno task fixtures:validate <pattern>` passes.
+6. **Validate** — `npm run fixtures:validate -- <pattern>` passes.
 
 **`long` fixtures**: include BOTH a 100-char case (stays inline) and a 101-char case (breaks), at the exact boundary with the minimum content that triggers it. Iterate `fixture_init --force` and read the widths from its output — never estimate manually.
 
@@ -57,8 +57,8 @@ Version bumps, publishing, and **`CHANGELOG.md`** are user-owned. Agents make th
 
 ```bash
 cargo check --workspace                # fast check (no codegen)
-deno task fixtures:validate <pattern>  # targeted fixture validation (preferred for fixture work)
-deno task dev                          # watch: check + test on change (requires `cargo install cargo-watch`)
+npm run fixtures:validate -- <pattern> # targeted fixture validation (preferred for fixture work)
+npm run dev                            # watch: check + test on change (requires `cargo install cargo-watch`)
 cargo test --workspace                 # ALL tests (includes all fixtures)
 npm run check                          # full committed-tree gate: fmt, audits, typecheck, tests, clippy (benches/js/CLAUDE.md §Gate map)
 cargo run -p tsv_debug compare tests/fixtures/path/input.svelte  # diff with prettier
@@ -69,20 +69,20 @@ cargo run -p tsv_debug ast_diff tests/fixtures/path/input.svelte # verify AST eq
 
 ## Commands
 
-Tasks live in `package.json` (every task whose body runs no Deno itself, `npm run <name> -- <flags>`, chained with `npm run`) and `deno.json` (the few whose body runs Deno: the bench's Deno row and `typecheck:js:deno`, `deno task <name> <flags>`); a script reaches one of those as a `deno task <name>` leg (`typecheck:js` and `bench:deno` do; `check` runs none). `deno task` falls through to the `package.json` script when `deno.json` has no task of that name, so `deno task <name>` runs either. The release driver is `npm run release`, a name no npm command runs on its own (./docs/tasks.md §`release`). `npm ci` installs the JS dependencies `package-lock.json` pins into the root `node_modules`; `.npmrc` turns install scripts off. `npm ci --prefix crates/tsv_debug/sidecar` installs the fixture oracle `tsv_debug`'s sidecar runs (its own `package.json`, lock, and a copy of the root `.npmrc`, which a `--prefix` install doesn't read); `cargo test` needs it. The rationale for a `package.json` script lives in ./docs/tasks.md, keyed by name; a `deno.json` task's sits beside it as its `//<name>` key.
+Tasks live in `package.json` (every task whose body runs no Deno itself, `npm run <name> -- <flags>`, chained with `npm run`) and `deno.json` (the few whose body runs Deno: the bench's Deno row and `typecheck:js:deno`, `deno task <name> <flags>`); a script reaches one of those as a `deno task <name>` leg (`typecheck:js` and `bench:deno` do; `check` runs none). Deno is a prerequisite of those tasks alone: `check`, the release, and conformance need Rust, Node, and npm. The release driver is `npm run release`, a name no npm command runs on its own (./docs/tasks.md §`release`). `npm ci` installs the JS dependencies `package-lock.json` pins into the root `node_modules`; `.npmrc` turns install scripts off. `npm ci --prefix crates/tsv_debug/sidecar` installs the fixture oracle `tsv_debug`'s sidecar runs (its own `package.json`, lock, and a copy of the root `.npmrc`, which a `--prefix` install doesn't read); `cargo test` needs it. The rationale for a `package.json` script lives in ./docs/tasks.md, keyed by name; a `deno.json` task's sits beside it as its `//<name>` key.
 
 ### Build & Development
 
 ```bash
-deno task build            # workspace dev build
-deno task build:release    # optimized build minus the binding crates (each builds alone so tsv_cli/tsv_debug features don't unify into them)
-deno task build:all        # release + ffi + build:packages + build:napi:packages (everything)
+npm run build              # workspace dev build
+npm run build:release      # optimized build minus the binding crates (each builds alone so tsv_cli/tsv_debug features don't unify into them)
+npm run build:all          # release + ffi + build:packages + build:napi:packages (everything)
 npm run build:packages     # the 3 publishable npm packages (format, parse, all); single source of truth for CI + publish.ts
-deno task build:bench      # what `bench`/`smoke` measure and EVERY bench leg builds (build:bench:pgo + the plain ffi:format/:parse size builds + 3 wasm:deno variants + wasm:all:nodejs)
-deno task build:bench:pgo  # the PROFILE-GUIDED FFI library + N-API addon every native bench row loads, staged with a stamp in
+npm run build:bench        # what `bench`/`smoke` measure and EVERY bench leg builds (build:bench:pgo + the plain ffi:format/:parse size builds + 3 wasm:deno variants + wasm:all:nodejs)
+npm run build:bench:pgo    # the PROFILE-GUIDED FFI library + N-API addon every native bench row loads, staged with a stamp in
 #                            .pgo/bench/ (scripts/roots/pgo_bench.ts → pgo.ts all --ffi --reuse: a stamp-hit takes seconds, a miss minutes)
-deno task install-cli      # build the release CLI and install it to ~/.local/bin/tsv (the local daily driver)
-deno task clean            # clean build artifacts
+npm run install-cli        # build the release CLI and install it to ~/.local/bin/tsv (the local daily driver)
+npm run clean              # clean build artifacts
 cargo build --workspace [--release]   # or -p tsv_cli / -p tsv_debug
 ```
 
@@ -117,18 +117,18 @@ cargo run -p tsv_cli strip --check --content 'enum E {}'                 # exit 
 ```bash
 npm run check            # full committed-tree gate (benches/js/CLAUDE.md §Gate map); runs no Deno task
 #                          (cargo's `test` runs one test with the `deno` on `PATH`, which passes untested without one)
-deno task doctor         # one-pass setup check: runtimes, pins + checkout alignment, the sidecar install, node_modules
+npm run doctor           # one-pass setup check: runtimes, pins + checkout alignment, the sidecar install, node_modules
 #                          freshness, oracle checkouts, corpus, build artifacts. Exit 1 only on MISLEADING state (pin
 #                          drift, skew, stale deps) or a broken core (no npm, cargo, or node, a node below the engines floor, or no sidecar install); absences warn (--strict promotes them) — except the optional experimental-typechecker
 #                          tier, informational at any strictness (a BROKEN checkout there still warns)
-deno task typecheck      # cargo check
-deno task typecheck:features # cargo check of each binding crate (tsv_wasm/tsv_ffi/tsv_napi) under each single feature,
+npm run typecheck        # cargo check
+npm run typecheck:features # cargo check of each binding crate (tsv_wasm/tsv_ffi/tsv_napi) under each single feature,
 #                          then the three language crates without the `locations` feature tsv_cli/tsv_debug unify in —
 #                          per-package builds `cargo check --workspace` and clippy's `--all-features` both miss; then
 #                          `tsv_svelte` with `smallvec/union` (a feature a consumer's graph can turn on; lib only); in `check`
 npm run typecheck:js     # tsc over the bench's Node roots, typecheck:deno, then typecheck:js:deno (deno check over the bench harness + scripts/). NOT in `check` (node_modules)
 deno task typecheck:deno # deno check of the bench's Deno row's own files (lib/ffi.ts, scripts/pgo/ffi_ops.ts); NOT in `check`: bench:deno and typecheck:js run it
-deno task typecheck:packages # the STAGED npm packages' .d.ts as a consumer compiles them: lean consumer modules + every
+npm run typecheck:packages # the STAGED npm packages' .d.ts as a consumer compiles them: lean consumer modules + every
 #                          ts/js README block (checkJs) through the `exports` map (strict, nodenext + bundler; wasm
 #                          packages with the DOM lib, the napi loader and every `./locations` without). Args pick
 #                          packages (format/parse/all/napi; none = every staged one). NOT in `check` (node_modules);
@@ -138,12 +138,12 @@ npm run typecheck:scripts # `tsc -p tsconfig.scripts.json`, so in `check` (nothi
 #                          and `depth_wasm.ts`, the bench roots needing no bench package, the sidecar, and what they
 #                          import (Node's types, no `Deno`); `scripts/no_package_closure_test.ts` holds the scripts CI
 #                          runs with no install to no package import
-deno task typecheck:bench-core # `tsc -p tsconfig.bench_core.json` over the package-free bench modules nothing else in
+npm run typecheck:bench-core # `tsc -p tsconfig.bench_core.json` over the package-free bench modules nothing else in
 #                          `check` typechecks (`lib/{wasm,harvest_stamp,loc_wire_client,fixture_documents,error_text,loc_cross_grade}.ts` +
 #                          `compose_reports.ts`, and the modules the `test:node` suites test); `scripts/no_package_closure_test.ts`
 #                          holds each one's closure to `node:*` and relative files. Scope rationale: ./docs/tasks.md; in `check`
-deno task test           # cargo test
-deno task test:node      # vitest under Node over the suites beside their modules (`tsc -p tsconfig.vitest.json` first,
+npm run test             # cargo test
+npm run test:node        # vitest under Node over the suites beside their modules (`tsc -p tsconfig.vitest.json` first,
 #                          which typechecks them; the suites are the `_test.ts` files it names): the bench core's (divergence
 #                          detectors, and each one against its own committed fixtures read through a read-only handle
 #                          (`divergence/fixture_coverage_test.ts`), format-config probe, span-only wire probe, gate_counts, bench pass plan, perf-omit
@@ -206,10 +206,10 @@ deno task test:node      # vitest under Node over the suites beside their module
 #                          `roots/package_state_test.ts` — the cleanup's two directories on a temp tree: what it
 #                          removes, and a target directory or cargo home outside them refused); in `check`
 #                          (docs/tasks.md §`test:node`)
-deno task test:node:canonical # the same over the suites that load the bench install: `benches/js/lib/canonical_test.ts`
+npm run test:node:canonical # the same over the suites that load the bench install: `benches/js/lib/canonical_test.ts`
 #                          (the canonical prettier baseline's parser routing) and `compare_engines_test.ts` (the
 #                          comparison tools' engine binding); needs `npm run bench:install`, so NOT in `check`
-deno task test:depth     # tests/depth_limit.rs optimized (`--profile corpus`): every shape the depth limits count, a catalog
+npm run test:depth       # tests/depth_limit.rs optimized (`--profile corpus`): every shape the depth limits count, a catalog
 #                          of grammar positions each nested in itself, and a generated sweep — `check`'s scope: every pair
 #                          behind the heads `a` and `a()`, a few hundred seeded triples, every commented link, the bare prefix
 #                          pairs plus a sample of the prefix alphabet, and a sample of the decorators — at its limit: no path
@@ -218,17 +218,17 @@ deno task test:depth     # tests/depth_limit.rs optimized (`--profile corpus`): 
 #                          on nine tenths of a 2 MiB thread, its format's output
 #                          reparses and is its own format (F1), and one deeper is refused (a plain `cargo test` grades the
 #                          16 MiB debug contract over the named shapes and a stride of the sweep); in `check`
-deno task test:depth:napi # the same in the shipped binaries' optimization (`--profile napi`, fat LTO — without the profile
+npm run test:depth:napi # the same in the shipped binaries' optimization (`--profile napi`, fat LTO — without the profile
 #                          guidance the published pair adds) over the FULL sweep (every head, `TSV_DEPTH_SWEEP=full`); NOT in
 #                          `check` — publish Step 3 and CI's `artifacts` job. The profile-guided addon itself is graded by
 #                          `build:pgo` / the release matrix (scripts/pgo/addon_depth.ts; docs/tasks.md §`test:depth:napi`)
-deno task test:depth:wasm # the full sweep's shapes at the same depths through the staged `all` WASM package on a Node MAIN thread,
+npm run test:depth:wasm # the full sweep's shapes at the same depths through the staged `all` WASM package on a Node MAIN thread,
 #                          cold and tiered up — parse, format + its output's reparse and F1, the import records and the strip (scripts/depth_wasm.ts); NOT
 #                          in `check` — publish Step 6 and CI's `artifacts` job (docs/tasks.md §`test:depth:wasm`)
-deno task test:audits    # cargo test -p tsv_lang --features _internal_audits — the `_internal_swallow_check` + `_internal_comment_check` seams' own tests; in `check`
-deno task lint           # cargo clippy
-deno task entities:update # regenerate tsv_html's committed entity table from its entities.json (the generator is
-#                          a unit test that fails on a stale table, so `deno task test` gates it)
+npm run test:audits      # cargo test -p tsv_lang --features _internal_audits — the `_internal_swallow_check` + `_internal_comment_check` seams' own tests; in `check`
+npm run lint             # cargo clippy
+npm run entities:update # regenerate tsv_html's committed entity table from its entities.json (the generator is
+#                          a unit test that fails on a stale table, so `npm run test` gates it)
 cargo fmt                # Rust
 tsv format .             # the repo's own TS/JS — tsv formats itself (`--check` in the gate)
 
@@ -240,109 +240,109 @@ cargo test --workspace --test strip_fixtures_tests     # type-strip fixtures (te
 
 `cargo fmt` (Rust) and `tsv format` (TS/JS) are the repo's ONLY autoformatters and partition it; markdown and JSON are hand-maintained. **Never run `deno fmt` or `prettier` on the repo** — tsv ships no config for them, so they'd churn every file (the prettier oracles pass options inline). `tsv format` on a directory is safe: the root `.formatignore` prunes tests/fixtures/, tests/fixtures_compile/, tests/fixtures_strip/ and tests/fixtures_imports/ (deliberately not format fixed points), and a file named under them is skipped too.
 
-### Fixtures (Rust + Deno-based)
+### Fixtures (Rust + Node-based)
 
 All `fixtures:*` tasks accept positional patterns (multiple = OR); `fixtures:validate` and `fixtures:update:parsed` also take `--list`, and `fixtures:validate` `--prettier-only`.
 
 ```bash
-deno task fixtures:list              # list all fixtures
-deno task fixtures:init <dir>        # create/reinit a fixture (= `tsv_debug fixture_init`; --content/--stdin/--force/--goal)
-deno task fixtures:validate          # validate (--prettier-only skips our parser/formatter)
-deno task fixtures:update            # regenerate expected.json + output_prettier.svelte (source of truth)
-deno task fixtures:update:parsed     # expected.json only (when the parser changes)
-deno task fixtures:update:formatted  # output_prettier.svelte only
-deno task fixtures:audit             # audit _prettier_divergence fixtures (diagnostic; --all for every fixture)
-deno task fixtures:ts-audit          # which input.ts fixtures need .ts vs could be .svelte (= `ts_fixture_audit`)
-deno task compile:fixtures:init      # create/reinit a compile fixture (oracle-compiles + canonicalizes; tests/fixtures_compile)
-deno task compile:fixtures:validate  # compile fixtures: oracle freshness + expected idempotence + ours parity, all gating.
-#                                      Preflights `deno task conformance` — the ONLY place oracle freshness is graded (the
+npm run fixtures:list                # list all fixtures
+npm run fixtures:init -- <dir>       # create/reinit a fixture (= `tsv_debug fixture_init`; --content/--stdin/--force/--goal)
+npm run fixtures:validate            # validate (--prettier-only skips our parser/formatter)
+npm run fixtures:update              # regenerate expected.json + output_prettier.svelte (source of truth)
+npm run fixtures:update:parsed       # expected.json only (when the parser changes)
+npm run fixtures:update:formatted    # output_prettier.svelte only
+npm run fixtures:audit               # audit _prettier_divergence fixtures (diagnostic; --all for every fixture)
+npm run fixtures:ts-audit            # which input.ts fixtures need .ts vs could be .svelte (= `ts_fixture_audit`)
+npm run compile:fixtures:init        # create/reinit a compile fixture (oracle-compiles + canonicalizes; tests/fixtures_compile)
+npm run compile:fixtures:validate    # compile fixtures: oracle freshness + expected idempotence + ours parity, all gating.
+#                                      Preflights `npm run conformance` — the ONLY place oracle freshness is graded (the
 #                                      sidecar-free slice in cargo test compares to the COMMITTED file, so it stays green
 #                                      when tsv and the file drift from the oracle together)
-deno task strip:fixtures:validate    # tsv_ts::strip vs tests/fixtures_strip (= `cargo test --test strip_fixtures_tests`):
+npm run strip:fixtures:validate      # tsv_ts::strip vs tests/fixtures_strip (= `cargo test --test strip_fixtures_tests`):
 #                                      output, position identity, terminators, idempotence, refusals — known failures pinned
 #                                      in a ratchet (`strip:fixtures:validate:update` re-pins). See tests/fixtures_strip/README.md
-deno task strip:fixtures:update      # regenerate expected.* / refusal.txt from ts-blank-space, cross-checked against Node's
+npm run strip:fixtures:update        # regenerate expected.* / refusal.txt from ts-blank-space, cross-checked against Node's
 #                                      module.stripTypeScriptTypes (`strip:fixtures:oracle` re-checks; an `override ts-blank-space`
 #                                      fixture's hand-reviewed claim is validated, never written). Node + bench:install; NOT in check
-deno task strip:corpus               # tsv_ts::strip vs ts-blank-space over the ../corpora snapshot's TypeScript: no panic, the
+npm run strip:corpus                 # tsv_ts::strip vs ts-blank-space over the ../corpora snapshot's TypeScript: no panic, the
 #                                      position contract + idempotence, JS-valid output, byte and refusal agreement outside a
 #                                      reviewed ACCEPTED list, exact STRIP_CORPUS_PINS. A `conformance` leg; ./docs/audits.md
-deno task imports:fixtures:validate  # import records vs tests/fixtures_imports: the tree's shape, oracle freshness (the canonical
+npm run imports:fixtures:validate    # import records vs tests/fixtures_imports: the tree's shape, oracle freshness (the canonical
 #                                      parser's tree walked by tsv_debug's oracle, regenerated in memory, must equal the committed
 #                                      expected.json) and tsv's records. Sidecar, so NOT in check — `cargo test --test
 #                                      imports_fixtures_tests` grades tsv against the committed files. See tests/fixtures_imports/README.md
-deno task imports:fixtures:update    # regenerate every expected.json from the canonical parsers' trees (an `oracle.txt` fixture
+npm run imports:fixtures:update      # regenerate every expected.json from the canonical parsers' trees (an `oracle.txt` fixture
 #                                      walks tsv's own parse wire instead). Sidecar; NOT in check
-deno task imports:corpus             # parse_imports vs oxc-parser's module record over the ../corpora snapshot's JS/TS and
+npm run imports:corpus               # parse_imports vs oxc-parser's module record over the ../corpora snapshot's JS/TS and
 #                                      Svelte: no panic, no parse error, record + hasModuleSyntax agreement after named
 #                                      normalizations, outside a reviewed ACCEPTED list, exact IMPORTS_CORPUS_PINS. A
 #                                      `conformance` leg; ./docs/audits.md. Its sidecar-free sibling, in check: `cargo test
 #                                      --test imports_self_check_tests` (the oracle walk over tests/fixtures' expected.json)
 ```
 
-**Standing audit gates** — full reference ./docs/audits.md (what each proves, blind spots, flags, where it gates; its overview table maps every task). Read the relevant section before running or modifying an audit. RATCHET audits grade against a committed known-bug snapshot (`*_known.txt`); each has an `:update` task that re-pins after a fix and refuses a narrowed run. Everything below gates in `deno task check` unless noted.
+**Standing audit gates** — full reference ./docs/audits.md (what each proves, blind spots, flags, where it gates; its overview table maps every task). Read the relevant section before running or modifying an audit. RATCHET audits grade against a committed known-bug snapshot (`*_known.txt`); each has an `:update` task that re-pins after a fix and refuses a narrowed run. Everything below gates in `npm run check` unless noted.
 
 ```bash
-deno task conformance:audit          # doc/fixture integrity: divergences cataloged, every Markdown link resolves, divergence READMEs back-link, no catalog-family drift
-deno task conformance:audit:compiler # compile-fixture divergence integrity + checklist ↔ `Refusal` drift
-deno task variants:audit             # `_compact`/`_spaces` variant DIRECTION: a `_compact` may never widen a whitespace gap,
+npm run conformance:audit            # doc/fixture integrity: divergences cataloged, every Markdown link resolves, divergence READMEs back-link, no catalog-family drift
+npm run conformance:audit:compiler # compile-fixture divergence integrity + checklist ↔ `Refusal` drift
+npm run variants:audit               # `_compact`/`_spaces` variant DIRECTION: a `_compact` may never widen a whitespace gap,
 #                                      a `_spaces` never empty one (bare suffixes only — a qualified name like
 #                                      `unformatted_ours_hug_spaced` is the escape hatch for a deliberately bidirectional variant)
-deno task canonicalize:audit         # canonicalize_js idempotence + output validity + comment preservation
-deno task pins:audit                 # canonical-oracle PIN AGREEMENT (a repo fact): crates/tsv_debug/sidecar/package.json, its
+npm run canonicalize:audit           # canonicalize_js idempotence + output validity + comment preservation
+npm run pins:audit                   # canonical-oracle PIN AGREEMENT (a repo fact): crates/tsv_debug/sidecar/package.json, its
 #                                      lock's root entry and benches/js/package.json pin the five exactly and identically, the
 #                                      lock installs each once and flat (no nested node_modules key: one acorn), the sidecar's
 #                                      .npmrc and engines equal the root's, and the prettier OPTIONS agree
 #                                      (`benches/js/lib/canonical.ts` `PRETTIER_OPTIONS` + the sidecar's inline call). The lock
 #                                      also pins the oracle's transitive deps no manifest names (`LOCKED_TRANSITIVE`: esrap,
 #                                      which PRINTS svelte's compiled JS)
-deno task pins:lock                  # REGENERATE the sidecar lock (crates/tsv_debug/sidecar/package-lock.json) after a canonical
+npm run pins:lock                    # REGENERATE the sidecar lock (crates/tsv_debug/sidecar/package-lock.json) after a canonical
 #                                      pin bump: `npm install --package-lock-only` there (network), which keeps every locked
 #                                      entry; the actor refuses an install that differs from the lock. `--check` (offline) asks
 #                                      whether npm would change the lock. Not a gate. `--allow-fresh` passes the .npmrc's
 #                                      `min-release-age`, needed ONLY for a version published in the last day
-deno task pins:audit:checkouts       # checkout ALIGNMENT (an environment fact): a PRESENT ../svelte or ../acorn-typescript
-#                                      must match its pin (absent → skipped; commit drift warns). Gates in `deno task
+npm run pins:audit:checkouts         # checkout ALIGNMENT (an environment fact): a PRESENT ../svelte or ../acorn-typescript
+#                                      must match its pin (absent → skipped; commit drift warns). Gates in `npm run
 #                                      conformance`, reported by doctor — NOT in check (nothing there reads the checkouts)
-deno task format:audit               # `tsv format --check .`; fails on a would-change file (exit 1) OR a parse error (exit 2)
-deno task docs:audit                 # rustdoc `[link]`s resolve (doc lints DENIED, private items, `--all-features`); a dead link is a STALE DOC
-deno task deps:audit                 # no crate meant for publishing (a `[package.metadata.docs.rs]` table) reaches `serde_json`
+npm run format:audit                 # `tsv format --check .`; fails on a would-change file (exit 1) OR a parse error (exit 2)
+npm run docs:audit                   # rustdoc `[link]`s resolve (doc lints DENIED, private items, `--all-features`); a dead link is a STALE DOC
+npm run deps:audit                   # no crate meant for publishing (a `[package.metadata.docs.rs]` table) reaches `serde_json`
 #                                      through a normal or build edge, at any feature set or target — its workspace features
 #                                      would unify into a consumer's own `serde_json` (cargo tree, no build)
-deno task package:audit              # each publishable crate's tarball (`cargo package --list`, no build): README.md + LICENSE
+npm run package:audit                # each publishable crate's tarball (`cargo package --list`, no build): README.md + LICENSE
 #                                      (the root's bytes) + tsv_html's NOTICE ship, tsv_html's entities.json and any other
 #                                      Markdown (CLAUDE.md) do not, the license is 0BSD (tsv_html: 0BSD AND BSD-3-Clause), README
 #                                      links absolute, `rust-version` = rust-toolchain.toml's major.minor; cargo's publishable set
 #                                      = the docs.rs-table reader's; tsv_cli's binstall table names release.yml's matrix assets
-deno task docs:audit:docsrs          # each crate with a `[package.metadata.docs.rs]` table documented ALONE at that table's
+npm run docs:audit:docsrs            # each crate with a `[package.metadata.docs.rs]` table documented ALONE at that table's
 #                                      features (`cargo doc -p X --no-deps`, broken and public→private links DENIED) — the
 #                                      feature-gated link the all-features workspace build resolves; then reads this run's render
 #                                      back and FAILS on a dead render: a hidden link's dead `#anchor` or inert `[name]`
-deno task scan:audit                 # no new raw find/rfind/match_indices substring scans over source
-deno task fanout:audit               # build-fanout RATCHET: doc-node growth over nested constructs (exponential rebuild per
+npm run scan:audit                   # no new raw find/rfind/match_indices substring scans over source
+npm run fanout:audit                 # build-fanout RATCHET: doc-node growth over nested constructs (exponential rebuild per
 #                                      layout candidate), plus counted legs over the depth gate's full sweep, the known-bug
 #                                      shapes and flat runs — builds per AST node, doc nodes per byte, work-counter growth
 #                                      (doc walks, source scans, printer predicates); `_internal_fanout_check` counters, no wall-clock (:update)
-deno task roundtrip:audit            # format(tests/fixtures) must reparse with its NODE POPULATION conserved (every node by
+npm run roundtrip:audit              # format(tests/fixtures) must reparse with its NODE POPULATION conserved (every node by
 #                                      type, minus the shells/separators the formatter rewrites by design, plus every word of
 #                                      template text) — zero-tolerance; names a dropped element where the skeleton compare only
 #                                      reported it as divergent. Pure Rust; real yield on external corpora
-deno task roundtrip:audit:prettier   # the same over the pinned prettier suites — `check`'s ONLY non-format-stable corpus, so
+npm run roundtrip:audit:prettier     # the same over the pinned prettier suites — `check`'s ONLY non-format-stable corpus, so
 #                                      the only leg there reaching a valid→unreparseable regression. Warn-skips without ../prettier
-deno task discovery:audit            # `tsv format --list ../corpora/collections` must name EXACTLY the snapshot's committed files
+npm run discovery:audit              # `tsv format --list ../corpora/collections` must name EXACTLY the snapshot's committed files
 #                                      in tsv's extensions (the corpus is the snapshot's tree, so a discovery prune can't silently
 #                                      shrink every consumer's corpus). Refuses a dirty checkout; warn-skips without ../corpora
-deno task check:loc                  # `loc` CROSS-GRADE: tsv's loc wire must deep-equal the shipped `locations.js` reconstruction
+npm run check:loc                    # `loc` CROSS-GRADE: tsv's loc wire must deep-equal the shipped `locations.js` reconstruction
 #                                      of its span-only wire over every fixture input (one `tsv_debug loc_wires` process) — the
 #                                      only `check` leg grading `locations.js`; the Rust loc wire is graded by `tests/loc_definition.rs`
-deno task binding:audit              # comment↔token re-binding (HARD fails the gate, SOFT informational)
-deno task authoring:audit            # authoring-independence over Svelte boundary whitespace: one fixed point per document
-deno task paren:audit                # authoring-independence over redundant PARENS: `a ?? b ?? c` must format like the twin
+npm run binding:audit                # comment↔token re-binding (HARD fails the gate, SOFT informational)
+npm run authoring:audit              # authoring-independence over Svelte boundary whitespace: one fixed point per document
+npm run paren:audit                  # authoring-independence over redundant PARENS: `a ?? b ?? c` must format like the twin
 #                                      prettier rebalances it from (`a ?? (b ?? c)`), and `a < X > c` like `(a < X) > c` /
 #                                      `a < (X) > c`. Zero-tolerance, no ratchet (a redundant paren carries no authoring signal);
 #                                      invisible on any formatted corpus. `--require-relational` (here, not in `audit:corpus`)
 #                                      floors relational sites, which only tests/fixtures holds — a narrowed run drops it
-deno task fuzz:audit                 # seeded mutational fuzzer: no-panic + idempotency + structural reparse (node loss HARD,
+npm run fuzz:audit                   # seeded mutational fuzzer: no-panic + idempotency + structural reparse (node loss HARD,
 #                                      skeleton divergence soft); its dictionary carries `// prettier-ignore`, the only standing
 #                                      instrument composing a freeze with a comment or a paren shell. Every accepted attempt
 #                                      also writes the `locations` wire (no panic), type-strips TypeScript (no panic + the
@@ -350,48 +350,48 @@ deno task fuzz:audit                 # seeded mutational fuzzer: no-panic + idem
 #                                      (no panic + the records' contract); runs tests/fixtures as found, then `:css` / `:ts`
 #                                      (`--embedded`: every `<style>` / `<script>` body as a seed; `:ts` adds tests/fixtures_strip
 #                                      and tests/fixtures_imports)
-deno task fuzz:audit:debug           # the same three runs under `--profile corpus-debug` (debug-assertions + overflow-checks,
+npm run fuzz:audit:debug             # the same three runs under `--profile corpus-debug` (debug-assertions + overflow-checks,
 #                                      what a consumer's dev build compiles in): a fired `debug_assert!` is a caught panic finding
-deno task swallow:audit              # `//` line comment swallowing following output-line content (also over real code via audit:corpus)
-deno task comments:audit             # print-once comment ledger: DROPPED / DOUBLE-PRINTED comments
-deno task gaps:audit                 # gap-injection RATCHET (~37 s): ledger DROPPED/DOUBLE-PRINTED + SWALLOW + a bare reparse
+npm run swallow:audit                # `//` line comment swallowing following output-line content (also over real code via audit:corpus)
+npm run comments:audit               # print-once comment ledger: DROPPED / DOUBLE-PRINTED comments
+npm run gaps:audit                   # gap-injection RATCHET (~37 s): ledger DROPPED/DOUBLE-PRINTED + SWALLOW + a bare reparse
 #                                      of every output (UNREPARSEABLE — a comment moved into a slot the grammar forbids, or a
 #                                      valid output the parser over-rejects; no as-authored gate reaches it) (./docs/gap_audit.md; :update, :rank)
-deno task blanks:audit               # blank-line injection RATCHET (node loss among its pinned kinds) + the blank-DROP absorb
+npm run blanks:audit                 # blank-line injection RATCHET (node loss among its pinned kinds) + the blank-DROP absorb
 #                                      pin (a new kind of silently-eaten blank fails), ~30 s (./docs/blank_audit.md; :update)
-deno task fabrication:audit          # blank-FABRICATION on pristine seeds — the F1-blind counterpart to blanks (ratchet born EMPTY; :update)
-deno task census:audit               # comment CENSUS: raw input-vs-output trivia multisets per language (own scanners, never
+npm run fabrication:audit            # blank-FABRICATION on pristine seeds — the F1-blind counterpart to blanks (ratchet born EMPTY; :update)
+npm run census:audit                 # comment CENSUS: raw input-vs-output trivia multisets per language (own scanners, never
 #                                      parse().comments) — parse-time drops/merges/rewrites the ledger can't see; the Svelte scanner
 #                                      also counts open-tag names and `{#…}`/`{@…}` heads (roundtrip's parse-time complement) (:update)
-deno task width:audit                # print-width RATCHET: a new KIND of over-width line — the ONLY gate measuring a column.
+npm run width:audit                  # print-width RATCHET: a new KIND of over-width line — the ONLY gate measuring a column.
 #                                      ⚠️ NOT a debt list (sanctioned overruns are real); :update
-deno task ignore:audit               # `prettier-ignore` RATCHET: honoring, second-pass stability, freeze scope, trailing
+npm run ignore:audit                 # `prettier-ignore` RATCHET: honoring, second-pass stability, freeze scope, trailing
 #                                      inertness, output reparse (a freeze emitting a dead document) (:update)
-deno task razor:audit                # print-width RAZOR SWEEP: pads a text word to walk each Svelte seed across column 100,
+npm run razor:audit                  # print-width RAZOR SWEEP: pads a text word to walk each Svelte seed across column 100,
 #                                      grading F1 + the stray line-head boundary space at every width — the ONLY instrument
 #                                      varying WIDTH, and the only one seeing a mangled form that is its own fixed point
-deno task engines:audit              # ENGINE PARITY: wasm32 (under Node, the host `cli.js` ships for) and native builds must
+npm run engines:audit                # ENGINE PARITY: wasm32 (under Node, the host `cli.js` ships for) and native builds must
 #                                      produce the SAME BYTES — exit code, changed paths, diagnostics, every file — over both
 #                                      fixture trees + ../corpora when present, plus a strip leg (`tsv strip` per file on both
 #                                      bins; `strip_typescript` on both engines over ../corpora) and an imports leg
 #                                      (`parse_imports_*` on both engines over tests/fixtures_imports + ../corpora). Needs both
 #                                      packages built: NOT in check; gates in CI's `artifacts` job
-deno task render:audit <paths>       # render-equivalence over REAL Svelte (sidecar; NOT in check; release-gated via `deno task conformance`)
-deno task idempotency:sweep          # F1 sweep over the real-code corpus (minutes; NOT in check; conformance cadence)
-deno task audit:corpus               # the content-loss/robustness bundle over REAL code (publish Step 3c; NOT in check)
-deno task wire:audit                 # WIRE-INJECTION: whitespace injected into every Svelte tag/block head, the wire graded
+npm run render:audit -- <paths>      # render-equivalence over REAL Svelte (sidecar; NOT in check; release-gated via `npm run conformance`)
+npm run idempotency:sweep            # F1 sweep over the real-code corpus (minutes; NOT in check; conformance cadence)
+npm run audit:corpus                 # the content-loss/robustness bundle over REAL code (publish Step 3c; NOT in check)
+npm run wire:audit                   # WIRE-INJECTION: whitespace injected into every Svelte tag/block head, the wire graded
 #                                      against the canonical parser on both arms (loc definition check + `loc` tolerance rows,
 #                                      and span), each variant against its OWN base (a divergence fixture contributes nothing).
 #                                      A CENSUS (`--inject-limit 0`): a sample redraws on every fixture edit, so only a census is
 #                                      gradeable. Green; needs the canonical parser, so NOT in check
-deno task wire:audit:terminators     # same harness, injecting a lone CR / U+2028 / U+2029 anywhere (where ECMAScript's
+npm run wire:audit:terminators       # same harness, injecting a lone CR / U+2028 / U+2029 anywhere (where ECMAScript's
 #                                      terminators and `\n` disagree; tsv's `loc` counts `\n` alone, so the added oracle
 #                                      differences fall in the `two_line_classes` row) — grades the SPAN arm (+ the loc
 #                                      definition check) on inputs no fixture or real repo carries. Sites are document-wide,
 #                                      so it stays a strided SAMPLE and CANNOT be ratcheted. ⚠️ RED BY DESIGN
-deno task compile:corpus:compare     # compile-parity wide net over ../corpora, Svelte's suites and any `compile_corpus_compare.roots.local` roots (sidecar, on demand; ./docs/compile_tooling.md)
-deno task compile:validation         # validation-suite RATCHET over Svelte's compiler-errors + validator suites (sidecar, on demand; :update re-pins, never a MISMATCH; ./docs/compile_validation_ratchet.md)
-deno task compile:fuzz               # differential compile fuzzer over feature cross-products — a discovery tool, RED by design (sidecar, on demand; ./docs/compile_tooling.md)
+npm run compile:corpus:compare       # compile-parity wide net over ../corpora, Svelte's suites and any `compile_corpus_compare.roots.local` roots (sidecar, on demand; ./docs/compile_tooling.md)
+npm run compile:validation           # validation-suite RATCHET over Svelte's compiler-errors + validator suites (sidecar, on demand; :update re-pins, never a MISMATCH; ./docs/compile_validation_ratchet.md)
+npm run compile:fuzz                 # differential compile fuzzer over feature cross-products — a discovery tool, RED by design (sidecar, on demand; ./docs/compile_tooling.md)
 ```
 
 **Creating new fixtures** (`fixture_init` formats through prettier + generates `expected.json`; see ./docs/fixture_workflow.md, and use `--prettier-only` with `fixtures:validate` during fixture design):
@@ -413,17 +413,17 @@ Three binding crates:
 `tsv_wasm` produces three npm packages from one crate via the `format` + `parse` + `strip` + `imports` cargo features (default = all four): `@fuzdev/tsv-format-wasm`, `@fuzdev/tsv-parse-wasm`, and `@fuzdev/tsv-wasm` (everything — the type strip's `strip_typescript` and the import records' `parse_imports_typescript` / `parse_imports_svelte` included — + the `tsv` CLI), each with its own output directory. `tsv_napi` carries the same `strip` and `imports` features in its default set; `tsv_ffi` has neither.
 
 ```bash
-deno task build:ffi                  # C FFI, full → target/release/libtsv_ffi.so
-deno task build:ffi:format           # C FFI, format-only (size only) → target/ffi-format/release/ (also :parse; :all builds all three)
-deno task build:napi                 # N-API addon (napi profile) → target/napi/
-deno task build:napi:corpus          # N-API addon (corpus profile: unwind, no LTO) → target/corpus/, for tools that grade under Node
-deno task build:napi:packages        # + staged npm packages (loader + host platform pkg) → crates/tsv_napi/pkg/
-deno task build:pgo                  # the PROFILE-GUIDED pair the platform packages ship (CLI + addon), trained, gated and
+npm run build:ffi                    # C FFI, full → target/release/libtsv_ffi.so
+npm run build:ffi:format             # C FFI, format-only (size only) → target/ffi-format/release/ (also :parse; :all builds all three)
+npm run build:napi                   # N-API addon (napi profile) → target/napi/
+npm run build:napi:corpus            # N-API addon (corpus profile: unwind, no LTO) → target/corpus/, for tools that grade under Node
+npm run build:napi:packages          # + staged npm packages (loader + host platform pkg) → crates/tsv_napi/pkg/
+npm run build:pgo                    # the PROFILE-GUIDED pair the platform packages ship (CLI + addon), trained, gated and
 #                                      staged where build:napi:packages stages the plain pair (scripts/pgo/pgo.ts; .pgo/)
-deno task build:wasm:deno            # deno WASM (requires wasm-pack), format-only → pkg/format/deno/
-deno task build:wasm:parse:deno      # deno WASM, parse-only → pkg/parse/deno/
-deno task build:wasm:all:deno        # deno WASM, full (benches) → pkg/all/deno/
-deno task build:npm:format           # publishable npm package → pkg/format/npm/ (also :parse; :all adds the tsv bin)
+npm run build:wasm:deno              # deno WASM (requires wasm-pack), format-only → pkg/format/deno/
+npm run build:wasm:parse:deno        # deno WASM, parse-only → pkg/parse/deno/
+npm run build:wasm:all:deno          # deno WASM, full (benches) → pkg/all/deno/
+npm run build:npm:format             # publishable npm package → pkg/format/npm/ (also :parse; :all adds the tsv bin)
 
 # Or directly (the cargo-built `build:*` tasks above also STAMP their artifact for the `:run` freshness guards —
 # docs/tasks.md §`build:stamped`; a bare `cargo build` does not)
@@ -442,18 +442,18 @@ npm is the JS package surface (each tag's GitHub Release carries only notes + th
 
 **Naming.** Every npm name tsv publishes is kebab-case (`@fuzdev/tsv`, `@fuzdev/tsv-wasm`, `@fuzdev/tsv-format-wasm`, `@fuzdev/tsv-parse-wasm`, `@fuzdev/tsv-<triple>`) — one spelling with the `tsv-<triple>` release assets and the `fuzdev.tsv-format` VS Code extension (vsce forbids `_`), and the `-wasm` convention of tsv's Rust-tooling peers; the rule for every `@fuzdev` WASM or native-delivery package (`@fuzdev/blake3-wasm` too). Rust crates (`tsv_wasm`, `tsv_napi`) and the rest of the `@fuzdev` libraries stay snake_case; crate-derived file names inside a package (`tsv_wasm.js`, `tsv_wasm_bg.wasm`, `tsv_napi.node`) are internal and follow the crate.
 
-**The N-API set** — tsv's native distribution under the one bare name: the `@fuzdev/tsv` loader + six `@fuzdev/tsv-<triple>` platform packages, each shipping **two binaries**: the addon (`tsv_napi.node`, `napi` profile) and the real `tsv_cli` binary (`tsv`/`tsv.exe`, `release` profile). Both ship **profile-guided**: each trained as itself on its target over the `../corpora` snapshot's `origin: own` collections (the corpus the bench's perf view leaves out), rebuilt with the profile and LLVM's cost-benefit inliner off, and gated on a non-empty, fully applied profile, no instrumentation in what ships, output byte-identical to a plain build, the depth limits' stack contract in the staged addon itself, and their own size bands (`deno task build:pgo`, `scripts/pgo/pgo.ts`); the bench's native rows measure the same pipeline's builds (`deno task build:bench:pgo`, the C-FFI library as a third world trained as itself). The loader's `tsv` bin (`bin.js`) execs that binary — `npx tsv` IS the native CLI — falling back to the shared `cli.js` mirror. Staged plain by `deno task build:napi:packages`, profile-guided by `deno task build:pgo`; publishes **only** through the tag-triggered `.github/workflows/release.yml` (6-target container-pinned matrix → idempotent platforms-then-loader publish → the tag's **GitHub Release**, whose body is `CHANGELOG.md`'s stamped section and whose assets are the native binaries pulled back from the registry + `SHA512SUMS` + the third-party `NOTICE`, each attested), **never** `scripts/publish.ts`. `workflow_dispatch` is a dry-run rehearsal by default (`dry_run=false` is the failed-tag recovery path, dispatched **on the tag**); a weekly cron force-dry-runs it. Packages, triggers, gates, auth, and the Release job: ./crates/tsv_napi/CLAUDE.md §The npm packages and §Release.
+**The N-API set** — tsv's native distribution under the one bare name: the `@fuzdev/tsv` loader + six `@fuzdev/tsv-<triple>` platform packages, each shipping **two binaries**: the addon (`tsv_napi.node`, `napi` profile) and the real `tsv_cli` binary (`tsv`/`tsv.exe`, `release` profile). Both ship **profile-guided**: each trained as itself on its target over the `../corpora` snapshot's `origin: own` collections (the corpus the bench's perf view leaves out), rebuilt with the profile and LLVM's cost-benefit inliner off, and gated on a non-empty, fully applied profile, no instrumentation in what ships, output byte-identical to a plain build, the depth limits' stack contract in the staged addon itself, and their own size bands (`npm run build:pgo`, `scripts/pgo/pgo.ts`); the bench's native rows measure the same pipeline's builds (`npm run build:bench:pgo`, the C-FFI library as a third world trained as itself). The loader's `tsv` bin (`bin.js`) execs that binary — `npx tsv` IS the native CLI — falling back to the shared `cli.js` mirror. Staged plain by `npm run build:napi:packages`, profile-guided by `npm run build:pgo`; publishes **only** through the tag-triggered `.github/workflows/release.yml` (6-target container-pinned matrix → idempotent platforms-then-loader publish → the tag's **GitHub Release**, whose body is `CHANGELOG.md`'s stamped section and whose assets are the native binaries pulled back from the registry + `SHA512SUMS` + the third-party `NOTICE`, each attested), **never** `scripts/publish.ts`. `workflow_dispatch` is a dry-run rehearsal by default (`dry_run=false` is the failed-tag recovery path, dispatched **on the tag**); a weekly cron force-dry-runs it. Packages, triggers, gates, auth, and the Release job: ./crates/tsv_napi/CLAUDE.md §The npm packages and §Release.
 
 #### crates.io
 
-The members with a `[package.metadata.docs.rs]` table — `tsv_lang`, `tsv_html`, `tsv_ignore`, `tsv_discover`, `tsv_ts`, `tsv_css`, `tsv_svelte`, `tsv_cli` (`scripts/docsrs_crates.ts`, the set every crate gate shares; each other member is `publish = false`) — publish to crates.io at the workspace version, siblings pinned `=x.y.z` (the bump rewrites the pins). `scripts/publish_crates.ts` (`deno task publish:crates`, under Node on gro's host modules from `scripts/roots/publish_crates.ts`: ./docs/tasks.md §`publish:crates`) is **dry-run by default**: the crates.io API's answer per crate (a failed lookup is fatal), the public-API gate — `cargo semver-checks` per crate at its docs.rs feature set named explicitly, so the graded surface is exactly what docs.rs renders (never the tool's own feature heuristic), against the crate's **published** baseline, a crate with none **SKIPPED loudly**, never passed — then `cargo publish --workspace --locked` (`--dry-run`), which orders the crates itself. `--wetrun` publishes — only from a clean checkout of the `v<version>` tag (HEAD at its commit, empty `git status`), never from post-release source — excluding the crates already live, so a re-run resumes; crates.io rate-limits NEW crates, so a first publish stops part-way and resumes on a re-run (or `--wait`). **The publish is a maintainer's, by token, never CI's**: the release workflow's `crates` job (last, after the GitHub Release, which tsv_cli's `[package.metadata.binstall]` points at) dry-runs it on the tag, by dispatch and weekly; CI's `artifacts` job runs the packaging half on every commit (`publish:crates:package`). A crates.io trusted-publishing leg would name `.github/workflows/release.yml`. `cargo binstall tsv_cli` fetches the Release's prebuilt binary (one override per shipped Rust target, since the assets carry npm triples; the dynamically-linked musl asset stays unmapped; `package:audit` grades the table against `release.yml`'s matrix); a source build (`cargo install`) differs from it (no LTO, `panic = "unwind"`; ./docs/cli.md §Binary Structure).
+The members with a `[package.metadata.docs.rs]` table — `tsv_lang`, `tsv_html`, `tsv_ignore`, `tsv_discover`, `tsv_ts`, `tsv_css`, `tsv_svelte`, `tsv_cli` (`scripts/docsrs_crates.ts`, the set every crate gate shares; each other member is `publish = false`) — publish to crates.io at the workspace version, siblings pinned `=x.y.z` (the bump rewrites the pins). `scripts/publish_crates.ts` (`npm run publish:crates`, under Node on gro's host modules from `scripts/roots/publish_crates.ts`: ./docs/tasks.md §`publish:crates`) is **dry-run by default**: the crates.io API's answer per crate (a failed lookup is fatal), the public-API gate — `cargo semver-checks` per crate at its docs.rs feature set named explicitly, so the graded surface is exactly what docs.rs renders (never the tool's own feature heuristic), against the crate's **published** baseline, a crate with none **SKIPPED loudly**, never passed — then `cargo publish --workspace --locked` (`--dry-run`), which orders the crates itself. `--wetrun` publishes — only from a clean checkout of the `v<version>` tag (HEAD at its commit, empty `git status`), never from post-release source — excluding the crates already live, so a re-run resumes; crates.io rate-limits NEW crates, so a first publish stops part-way and resumes on a re-run (or `--wait`). **The publish is a maintainer's, by token, never CI's**: the release workflow's `crates` job (last, after the GitHub Release, which tsv_cli's `[package.metadata.binstall]` points at) dry-runs it on the tag, by dispatch and weekly; CI's `artifacts` job runs the packaging half on every commit (`publish:crates:package`). A crates.io trusted-publishing leg would name `.github/workflows/release.yml`. `cargo binstall tsv_cli` fetches the Release's prebuilt binary (one override per shipped Rust target, since the assets carry npm triples; the dynamically-linked musl asset stays unmapped; `package:audit` grades the table against `release.yml`'s matrix); a source build (`cargo install`) differs from it (no LTO, `panic = "unwind"`; ./docs/cli.md §Binary Structure).
 
 **Recovery.** crates.io never takes a version twice, yanked or not. A broken release is yanked as a **whole set** — the siblings pin each other `=x.y.z`, so yanking one crate strands every dependent pinned to it — and fixed forward by the next version through the normal flow. Every resume runs from the same tag (the `--wetrun` checkout check), so a first publish that stops part-way on a fault in the source itself cannot be finished: the crates already live stay at that version until the next release.
 
 ```bash
-deno task publish:crates                   # dry run: registry read, semver-checks (no baseline → loud SKIP), cargo publish --dry-run
-deno task publish:crates --bump minor      # also grade an already-live version as the next minor
-deno task publish:crates --wetrun [--wait] # publish (the maintainer's, from a clean v<version> checkout); re-run resumes
+npm run publish:crates                     # dry run: registry read, semver-checks (no baseline → loud SKIP), cargo publish --dry-run
+npm run publish:crates -- --bump minor     # also grade an already-live version as the next minor
+npm run publish:crates -- --wetrun [--wait] # publish (the maintainer's, from a clean v<version> checkout); re-run resumes
 ```
 
 A types-only `@fuzdev/tsv-ast` package is deferred — `import type` from `@fuzdev/tsv-parse-wasm` is zero-runtime-cost; reconsider when a real consumer appears.
@@ -464,46 +464,46 @@ Package shape: wasm-pack `web` target, then `scripts/patch_npm_package.ts` adds 
 
 `scripts/publish.ts` orchestrates the release: preflight → bump → check → conformance:all → audit:corpus (Step 3c) → build the npm packages → verify → artifact validation (size bounds + NOTICE + Node tests + `test:bun` over the three wasm packages + `typecheck:packages` over all four npm packages, the napi loader staged) → idempotent npm publish, each version confirmed on the registry before git → git commit + tag + push, printing a wasm size summary. It stamps CHANGELOG.md's `## Unreleased` into the released version (which the tag's GitHub Release reads back); that section must be non-empty with a `<!-- bump: <level> -->` marker matching `--bump` (both required; a fresh empty `## Unreleased` is seeded on stamp; shared grammar: `scripts/release/changelog.ts`; agents never edit it — [Releases](#releases)). A failed wetrun resumes at **every** step, git finalize included — the retry sentinel is removed only once the push lands, so re-run `--wetrun` with no `--bump`: nothing publishes twice and the tag finishes. It runs under Node on gro's host modules: its entry is `scripts/roots/publish.ts`, whose deps (`scripts/roots/publish_deps.ts`) give each program its own environment, `npm` (the `npm run` gates and builds, and its own config and auth) and the `git` that reaches origin or writes history the whole one (docs/tasks.md §`release`). The release logic is a library under `scripts/release/` (version, changelog, plan, bump, git, npm, sentinel, program, crates, binstall; unit-tested in `test:node`, the whole dry run and `--wetrun` of `run_publish` over fakes, the bump over copies of the real manifests, the local git calls in a temp repository): one `release_plan` decides fresh vs resumed and every reason a fresh release cannot proceed, so a dry run warns on exactly what a wetrun refuses. The preflight refuses a `HEAD` that is not exactly `origin/main` (a resume may sit one release commit ahead) and a `v<version>` tag that already exists locally or on origin (a resume's only on `HEAD`), the checkout is fingerprinted after the bump and refused if it moved before Step 7, and a resume whose packages are all on npm skips straight to the git finalize.
 
-**Conformance gates (Step 3b)** — `npm run conformance:all` (see [Corpus Comparison](#corpus-comparison)); skipped by `--no-check`. Preflights the oracles (`../svelte`, `../acorn-typescript`, `../typescript`, `../test262`, `../prettier`, `../prettier-plugin-svelte`, the `../corpora` snapshot + the `benches/js` `node_modules` sidecar): a **`--wetrun` FAILS** when any is missing (releasing without gates requires the explicit `--no-check`); a dry-run warn-skips, re-warned in the final summary. `deno task doctor` checks the same ahead of time. Only the CSS-WPT harvest stays manual. A `corpus:compare:format` SAFETY hit is self-verified in-run (the native format re-runs and must reproduce byte-identically), so treat it as real; binding nondeterminism surfaces as a loud `native format nondeterminism` per-file error instead (./benches/js/CLAUDE.md §Known Issues). A caught **panic** hard-fails either corpus tool on every run — a shipped artifact would abort the host, so it must never grade as one more per-file error.
+**Conformance gates (Step 3b)** — `npm run conformance:all` (see [Corpus Comparison](#corpus-comparison)); skipped by `--no-check`. Preflights the oracles (`../svelte`, `../acorn-typescript`, `../typescript`, `../test262`, `../prettier`, `../prettier-plugin-svelte`, the `../corpora` snapshot + the `benches/js` `node_modules` sidecar): a **`--wetrun` FAILS** when any is missing (releasing without gates requires the explicit `--no-check`); a dry-run warn-skips, re-warned in the final summary. `npm run doctor` checks the same ahead of time. Only the CSS-WPT harvest stays manual. A `corpus:compare:format` SAFETY hit is self-verified in-run (the native format re-runs and must reproduce byte-identically), so treat it as real; binding nondeterminism surfaces as a loud `native format nondeterminism` per-file error instead (./benches/js/CLAUDE.md §Known Issues). A caught **panic** hard-fails either corpus tool on every run — a shipped artifact would abort the host, so it must never grade as one more per-file error.
 
-**Bun (Step 6)** — `npm run test:bun -- format parse all` (the only leg grading the engines' returned failures under Bun) over the three wasm packages. Bun is preflighted in Step 1 like Step 3b's oracles: a **`--wetrun` FAILS** without bun, before the bump (`--no-check` waives); with bun the leg runs `--require-bun`; without, a dry-run (or waived wetrun) warn-skips, re-warned in the summary. `deno task doctor` reports bun. The napi engine under Bun is graded only locally (`test:napi:npm[:run]` on a machine with bun), never by a publish.
+**Bun (Step 6)** — `npm run test:bun -- format parse all` (the only leg grading the engines' returned failures under Bun) over the three wasm packages. Bun is preflighted in Step 1 like Step 3b's oracles: a **`--wetrun` FAILS** without bun, before the bump (`--no-check` waives); with bun the leg runs `--require-bun`; without, a dry-run (or waived wetrun) warn-skips, re-warned in the summary. `npm run doctor` reports bun. The napi engine under Bun is graded only locally (`test:napi:npm[:run]` on a machine with bun), never by a publish.
 
 ```bash
 npm run release                          # dry-run: validate everything, no mutation
 npm run release -- --wetrun --bump patch # release (--bump required, must match the CHANGELOG marker); flags after the --
 npm run release -- --wetrun              # resume a failed wetrun (sentinel retry only)
 # Flags: --bump patch|minor|major, --no-check, --no-git
-deno task test:npm[:parse|:all]          # build the npm package + Node tests against it (:all adds CLI tests; `:run` skips the rebuild — freshness-guarded)
-deno task test:napi:npm                  # stage the napi loader + host platform package + Node tests on the packaged shape (`:run` as above)
-deno task test:bun [--require-bun] [format|parse|all|napi] # the parse-failure table over the staged packages under Bun, both engines; no build,
+npm run test:npm[:parse|:all]            # build the npm package + Node tests against it (:all adds CLI tests; `:run` skips the rebuild — freshness-guarded)
+npm run test:napi:npm                    # stage the napi loader + host platform package + Node tests on the packaged shape (`:run` as above)
+npm run test:bun -- [--require-bun] [format|parse|all|napi] # the parse-failure table over the staged packages under Bun, both engines; no build,
 #                                        freshness-guarded, warn-skips without bun (`--require-bun`: fails). Each package task's `:run` chains it
-deno task validate:artifacts             # tight wasm size bounds + each package's third-party NOTICE (fails if nothing
+npm run validate:artifacts               # tight wasm size bounds + each package's third-party NOTICE (fails if nothing
 #                                        is built or what is built is STALE — `pkg/` is gitignored)
 ```
 
 `scripts/validate_artifacts.ts` holds deliberately tight (~±8%) size bounds — a legitimate binary size change fails the publish until the constants are updated, keeping size moves visible and intentional.
 
-**TS type maintenance**: `crates/tsv_wasm/types/tsv_ast.d.ts` is hand-maintained — any change to the wire JSON a writer emits (`crates/tsv_*/src/ast/convert/write*`) must update it. `deno task check:ast-types` (in `check`) catches drift three ways: the curated `tsv parse --locations` samples still type (the live writer; the only typing of the `loc` fields, since committed files are span-only); every `type` discriminant the fixture corpus produces is declared or explicitly opaque; and a computed minimal cover of every gradable field slot (`ParentType.key -> ChildType`) in the committed `expected*.json` types against the `.d.ts` — grading it against the **canonical** wire, which composed with `fixtures_tests` (`tsv == expected.json`) covers every position tsv's span-only wire emits. Per-field checklist, the Svelte-built-node rule (a node Svelte constructs is not the acorn node of the same `type` — the tell is a missing `loc` in Svelte's own wire), and the comment-attachment rule: ./crates/tsv_wasm/CLAUDE.md §TS Type Maintenance.
+**TS type maintenance**: `crates/tsv_wasm/types/tsv_ast.d.ts` is hand-maintained — any change to the wire JSON a writer emits (`crates/tsv_*/src/ast/convert/write*`) must update it. `npm run check:ast-types` (in `check`) catches drift three ways: the curated `tsv parse --locations` samples still type (the live writer; the only typing of the `loc` fields, since committed files are span-only); every `type` discriminant the fixture corpus produces is declared or explicitly opaque; and a computed minimal cover of every gradable field slot (`ParentType.key -> ChildType`) in the committed `expected*.json` types against the `.d.ts` — grading it against the **canonical** wire, which composed with `fixtures_tests` (`tsv == expected.json`) covers every position tsv's span-only wire emits. Per-field checklist, the Svelte-built-node rule (a node Svelte constructs is not the acorn node of the same `type` — the tell is a missing `loc` in Svelte's own wire), and the comment-attachment rule: ./crates/tsv_wasm/CLAUDE.md §TS Type Maintenance.
 
 ### Corpus Comparison
 
 Compare formatting against Prettier, and parse output against the canonical parsers, on real code: the `../corpora` snapshot (`fuzdev/corpora` — the author's repos, the sveltejs repos (kit, svelte, svelte.dev, language-tools), third-party Svelte libraries and CSS frameworks and neutral TypeScript (TypeScript's parser, Storybook, Continue), one collection per upstream, placed by `benches/js/lib/corpus.ts` from the snapshot's manifest; the whole `collections/` tree is pinned by git tree id in `GATE_CHECKOUT_IDS`, so a tooling commit in the snapshot repo moves nothing). Full runs enforce **pinned expected counts** over the `gates` view, exact and per corpus source (a collection, a prettier suite) and language: format `match`/`partial`/`unknown`, parse `compared`/tsv-failure counts, in generated files each gate's `--all --update` rewrites (`benches/js/lib/corpus_{format,parse}_pins.txt`); SAFETY gates over every file. A snapshot refresh is a deliberate re-pin (./docs/gate_counts.md).
 
 ```bash
-deno task corpus:compare:format ../some-project  # one project, or --all for the gates corpus (../corpora + prettier suites)
+npm run corpus:compare:format -- ../some-project # one project, or --all for the gates corpus (../corpora + prettier suites)
 # Options: --explain (patterns matched), --summary, --json (stats + safety/partial/unknown/error lists; logs → stderr)
-deno task corpus:compare:parse --all   # deep-diff parse ASTs vs acorn-typescript/svelte/parseCss
+npm run corpus:compare:parse -- --all  # deep-diff parse ASTs vs acorn-typescript/svelte/parseCss
 # Options: --multibyte-only, --filter <lang>, --limit <n>, --json
 
 # These three gates accept -v, --json, <subtree>; the two fixtures gates freshness-check their ledgers on full runs
 # (a stale sanction/known-gap entry fails) and warn on checkout↔npm version skew.
-deno task conformance:svelte-fixtures  # tsv's Svelte parser vs Svelte's own test suite (../svelte; oracle = the live modern
+npm run conformance:svelte-fixtures    # tsv's Svelte parser vs Svelte's own test suite (../svelte; oracle = the live modern
 #                                        parser). Verdict parity gates (an over-rejection must be SANCTIONED or a tracked
 #                                        KNOWN_GAP, else exit 1); AST-shape diff is report-only triage
-deno task conformance:ts-fixtures      # tsv's TS parser vs acorn-typescript's test suite (the adversarial TS edge cases).
+npm run conformance:ts-fixtures        # tsv's TS parser vs acorn-typescript's test suite (the adversarial TS edge cases).
 #                                        A missing ../acorn-typescript (0 scanned) FAILS — publish Step 3b's preflight is
 #                                        the tolerance point
-deno task conformance:ts-repo          # tsv's TS parser vs ALL of ../typescript/tests/cases (every single-file .ts + every
+npm run conformance:ts-repo            # tsv's TS parser vs ALL of ../typescript/tests/cases (every single-file .ts + every
 #                                        TS unit of the @filename tests); oracle = tsc's .errors.txt baselines (TS1xxx = a
 #                                        grammar reject), with tsc's LIVE parser splitting over-acceptance parser-level vs
 #                                        checker-side and attributing goal / encoding artifacts before an over-rejection can
@@ -511,7 +511,7 @@ deno task conformance:ts-repo          # tsv's TS parser vs ALL of ../typescript
 #                                        or not); only an UNTRACKED over-rejection fails; a missing/PARTIAL checkout or an
 #                                        empty scan FAILS. ./docs/conformance_tsc.md; operator card: ./benches/js/CLAUDE.md
 
-deno task conformance                  # pre-release aggregate, in order:
+npm run conformance                    # pre-release aggregate, in order:
 #   1. pins:audit:checkouts + bench:pins:suites — PIN-FRESHNESS: re-derives the conformance-view count pins no other
 #      cadence grades (seconds when nothing moved; each stamped leg warn-skips an absent checkout; benches/js/CLAUDE.md §Harvests)
 #   2. fixtures:validate + compile:fixtures:validate — ORACLE-FRESHNESS: `check` runs only each tree's sidecar-free slice,
@@ -524,55 +524,55 @@ deno task conformance                  # pre-release aggregate, in order:
 #      grading the `loc` tolerance rows real code rarely reaches) + corpus:compare:format --all
 #   5. render:audit over the version-pinned checkouts (a subprocess with its own sidecar)
 #   The format leg's prettier calls ride a content-addressed cache (benches/js/lib/prettier_cache.ts; TSV_PRETTIER_CACHE=0 disables)
-deno task conformance:test262          # tsv's JS parser vs test262 POSITIVES (pure Rust, `test262 --gate`); negatives (the
+npm run conformance:test262            # tsv's JS parser vs test262 POSITIVES (pure Rust, `test262 --gate`); negatives (the
 #                                        deferred early-error frontier) are reported, not gated. Exact POSITIVE_PASSED_PIN in the command
-deno task conformance:all              # the full drop-in gate = `conformance` + `conformance:test262` — what publish Step 3b
+npm run conformance:all                # the full drop-in gate = `conformance` + `conformance:test262` — what publish Step 3b
 #                                        runs. CSS-WPT harvest stays manual
 
-deno task divergence:audit         # audit divergence pattern coverage (--json)
-deno task corpus:stats             # corpus/candidate-dir sizes + language + degenerate-case stats (diagnostic; ./benches/js/CLAUDE.md)
+npm run divergence:audit           # audit divergence pattern coverage (--json)
+npm run corpus:stats               # corpus/candidate-dir sizes + language + degenerate-case stats (diagnostic; ./benches/js/CLAUDE.md)
 ```
 
-Corpus comparison builds with `--profile corpus` (optimized + `panic = "unwind"`, no LTO — panics in our code are caught and reported; also the single build world every `deno task check` audit shares, trading LTO for build time, measurably free at runtime per the profile's comment in `Cargo.toml`). Benchmarks measure what ships: every native tsv row loads a **profile-guided** build (`deno task build:bench:pgo` — the FFI library on `release`, panic=abort, LTO; the N-API addon on the shipped `napi` profile, `release` + `panic = "unwind"`, so its rows measure the shipped panic strategy), disclosed as the reports' `native_build` (./docs/benchmarks.md §Fairness caveats); the size-only FFI subset builds stay plain. `perf:ab` keeps plain builds — a regression instrument must not draw a training per side ([Publishing](#publishing), the N-API set).
+Corpus comparison builds with `--profile corpus` (optimized + `panic = "unwind"`, no LTO — panics in our code are caught and reported; also the single build world every `npm run check` audit shares, trading LTO for build time, measurably free at runtime per the profile's comment in `Cargo.toml`). Benchmarks measure what ships: every native tsv row loads a **profile-guided** build (`npm run build:bench:pgo` — the FFI library on `release`, panic=abort, LTO; the N-API addon on the shipped `napi` profile, `release` + `panic = "unwind"`, so its rows measure the shipped panic strategy), disclosed as the reports' `native_build` (./docs/benchmarks.md §Fairness caveats); the size-only FFI subset builds stay plain. `perf:ab` keeps plain builds — a regression instrument must not draw a training per side ([Publishing](#publishing), the N-API set).
 
 Divergence detection identifies the known differences documented in the `conformance_prettier*.md` family (safety checks, pattern detection, traceability). See ./benches/js/CLAUDE.md and ./docs/divergence_detector.md.
 
 ### Benchmarks
 
-**Cross-runtime.** One harness runs under **Deno, Node, and Bun**, each emitting its own runtime-labeled report (`report.{deno,node,bun}.{json,md}`, never merged); `deno task bench:compose` folds them into the combined `report.{json,md}` (what tsv.fuz.dev consumes). The native row is **FFI** under Deno, **N-API** under Node/Bun; all else is shared runtime-neutral code. ./benches/js/CLAUDE.md §Cross-Runtime.
+**Cross-runtime.** One harness runs under **Deno, Node, and Bun**, each emitting its own runtime-labeled report (`report.{deno,node,bun}.{json,md}`, never merged); `npm run bench:compose` folds them into the combined `report.{json,md}` (what tsv.fuz.dev consumes). The native row is **FFI** under Deno, **N-API** under Node/Bun; all else is shared runtime-neutral code. ./benches/js/CLAUDE.md §Cross-Runtime.
 
 **A process per row.** A timed run is several processes of one runtime: `bench.ts` orchestrates and holds nothing measured; one pre-flight process (`bench_preflight.ts`) loads the corpus and every tool to learn what each accepts, then exits; and every row is timed in a fresh process of its own (`bench_row.ts`) that loads that row's one engine — `BENCH_PASSES` times over (default 3), each pass taking a group's rows in a different order, the row's statistics pooling its passes. Rows timed back to back in one process moved each other's numbers (shared type feedback, the collector's sizing, grown wasm heaps), so nothing measured shares a process any more; each row publishes `pass_spread` and the report `process_noise`, the process-level A/A the passes give for free. ./benches/js/CLAUDE.md §Process model.
 
-**Perf vs conformance surfaces.** `bench:perf` measures a **real-world, third-party-only** corpus (framework source, third-party Svelte libraries and CSS frameworks and neutral TypeScript from the pinned `../corpora` snapshot, named by the report's `corpus_snapshot` — each placed, benched collection one of manifest `origin: third_party`; the author's own collections stay gated and swept but off the bench, held out as the training input for profile-guided native builds; one mixed set per group, disclosed by origin as `corpus_by_origin`) — the throughput headline; every in-scope tool must fully process every file or the run fails (`benches/js/lib/perf_omit.ts`), so coverage is 100% by construction. `bench:conformance` measures per-tool **parse coverage** over a **disjoint, fixtures-only** corpus (prettier suites + svelte compiler tests + the wpt-css/test262/tsc-corpus harvests) — **coverage-only and node-only by design** (no timed phase; runtime-invariant). Each set excludes what its own oracle calls invalid (the Svelte and tsc sets: what their canonical parser rejects; the prettier suites: what Prettier's specs and markers call invalid, plus harness files and the `.js` fixtures Prettier's parser reads as JSX; JS/TS suites are read module-then-script, approximating Prettier's own module-then-CommonJS retry), so each scores its oracle at 100% by construction, and the report splits coverage **per corpus source** (a group aggregate blends corpora — `parse/typescript` is mostly test262, i.e. ECMAScript). Coverage counts accepts and so rewards permissiveness; the opposite axis has inverted profiles, not gates: `deno task ts-repo:over-acceptance` (per-tool accepts over files tsc's parser rejects) and `deno task css:over-acceptance` (over files `parseCss` rejects; its reject-count pin makes movement in the deliberately unfiltered CSS reference row's grammar visible — the pin alone is `css:over-acceptance:pin`, a stamped `bench:pins:suites` leg, also graded by the coverage run). `deno task bench` = perf across all three runtimes + compose + the node coverage run. Correctness gates keep their own corpus scope. ./benches/js/CLAUDE.md §Corpus.
+**Perf vs conformance surfaces.** `bench:perf` measures a **real-world, third-party-only** corpus (framework source, third-party Svelte libraries and CSS frameworks and neutral TypeScript from the pinned `../corpora` snapshot, named by the report's `corpus_snapshot` — each placed, benched collection one of manifest `origin: third_party`; the author's own collections stay gated and swept but off the bench, held out as the training input for profile-guided native builds; one mixed set per group, disclosed by origin as `corpus_by_origin`) — the throughput headline; every in-scope tool must fully process every file or the run fails (`benches/js/lib/perf_omit.ts`), so coverage is 100% by construction. `bench:conformance` measures per-tool **parse coverage** over a **disjoint, fixtures-only** corpus (prettier suites + svelte compiler tests + the wpt-css/test262/tsc-corpus harvests) — **coverage-only and node-only by design** (no timed phase; runtime-invariant). Each set excludes what its own oracle calls invalid (the Svelte and tsc sets: what their canonical parser rejects; the prettier suites: what Prettier's specs and markers call invalid, plus harness files and the `.js` fixtures Prettier's parser reads as JSX; JS/TS suites are read module-then-script, approximating Prettier's own module-then-CommonJS retry), so each scores its oracle at 100% by construction, and the report splits coverage **per corpus source** (a group aggregate blends corpora — `parse/typescript` is mostly test262, i.e. ECMAScript). Coverage counts accepts and so rewards permissiveness; the opposite axis has inverted profiles, not gates: `npm run ts-repo:over-acceptance` (per-tool accepts over files tsc's parser rejects) and `npm run css:over-acceptance` (over files `parseCss` rejects; its reject-count pin makes movement in the deliberately unfiltered CSS reference row's grammar visible — the pin alone is `css:over-acceptance:pin`, a stamped `bench:pins:suites` leg, also graded by the coverage run). `npm run bench` = perf across all three runtimes + compose + the node coverage run. Correctness gates keep their own corpus scope. ./benches/js/CLAUDE.md §Corpus.
 
 ```bash
 # One-time: install the harness's npm deps (package.json is the source of truth; runtimes share node_modules).
 # Re-run after a dep bump or a plain `npm install` (which prunes the oxc-parser-wasm binding — benches/js/CLAUDE.md).
-deno task bench:install
+npm run bench:install
 
 deno task smoke         # fast sanity check that every formatter+parser produces output (also smoke:node / smoke:bun)
 
 # Benchmarks build the runtime's artifacts automatically.
-deno task bench         # full refresh = bench:perf + bench:conformance + a closing bench:compose (needs node AND bun;
+npm run bench           # full refresh = bench:perf + bench:conformance + a closing bench:compose (needs node AND bun;
 #                         the closing compose sees the just-rebuilt conformance report's vintage)
-deno task bench:perf    # perf surface: build the whole artifact set ONCE, then the three :run legs + compose
-deno task bench:deno    # Deno only (also bench:node / bench:bun). Each standalone leg builds the WHOLE artifact set:
+npm run bench:perf      # perf surface: build the whole artifact set ONCE, then the three :run legs + compose
+npm run bench:deno      # Deno only (also bench:node / bench:bun). Each standalone leg builds the WHOLE artifact set:
 #                         every report carries the same tsv size rows, so a half-built leg would publish the other
 #                         binding's size at an older commit (docs/tasks.md §`bench:deno`; a `:run` leg warns). Warm ≈ a second
-deno task bench:compose # fold per-runtime reports → combined report.{json,md}; warns when the conformance report's commit
+npm run bench:compose # fold per-runtime reports → combined report.{json,md}; warns when the conformance report's commit
 #                         is behind the perf siblings' (the site publishes both)
 deno task bench:deno:run   # run without rebuilding (also :node:run / :bun:run; aborts on stale artifacts)
 
 # Conformance surface: per-tool parse COVERAGE → report.conformance.node.{json,md} (entries carry null timing)
-deno task bench:conformance        # bench:pins:suites + build:bench + coverage run (also grades CSS_REJECTS_PIN)
-deno task bench:conformance:run    # skip harvest + rebuild (freshness-guarded)
-deno task bench:harvest            # regenerate every cache = bench:pins:suites + bench:harvest:svelte-styles (manual
+npm run bench:conformance          # bench:pins:suites + build:bench + coverage run (also grades CSS_REJECTS_PIN)
+npm run bench:conformance:run      # skip harvest + rebuild (freshness-guarded)
+npm run bench:harvest              # regenerate every cache = bench:pins:suites + bench:harvest:svelte-styles (manual
 #                                    refresh-everything; each caller takes only the group its corpus VIEW holds)
-deno task bench:pins:suites        # the conformance-view group: the five SUITE caches (wpt-css, test262, tsc-corpus,
+npm run bench:pins:suites          # the conformance-view group: the five SUITE caches (wpt-css, test262, tsc-corpus,
 #                                    prettier-jsx, svelte-rejects) + the CSS reject pin. All freshness-stamped (--force after
 #                                    harvest-logic changes) and `--if-present`. The PIN-FRESHNESS preflight of `conformance`;
 #                                    `doctor` reports a stamp behind its checkout
-deno task bench:harvest:svelte-styles # the PERF-view CSS cache: stamped on the ../corpora `collections/` tree id + its EXACT
+npm run bench:harvest:svelte-styles # the PERF-view CSS cache: stamped on the ../corpora `collections/` tree id + its EXACT
 #                                    block pin + the perf view's entry list (skips when none moved); REQUIRES every snapshot
 #                                    collection, so it fails rather than warn-skips. Chained by `bench:perf`, and late by
 #                                    `conformance` beside the `gates`-view legs that read it (benches/js/CLAUDE.md §Harvests)
@@ -584,7 +584,7 @@ deno task bench:deno:run -- --verbose   # per-file skip detail (counts always sh
 BENCH_FILTER=bits-ui BENCH_LIMIT=10 deno task bench:deno:run
 ```
 
-**Prerequisites**: `cargo install wasm-pack` + `npm run bench:install` once (needs npm/Node). Beyond that the hard dependency is Node (≥ 24.14: `npm run`, the JS suites, and the fixture oracle `cargo test` runs, installed by `npm ci --prefix crates/tsv_debug/sidecar`). Deno is the bench's alone (the Deno row, the canonical size rows' `deno bundle`, `typecheck:js`), and no CI job installs it: `check` passes without it, cargo's one test that runs the `deno` on `PATH` printing a SKIPPED line while a Deno-free sibling grades the same refusal (./docs/tasks.md §`check`). Node ≥ 22.18 (native TS type-stripping) runs `bench:node`, Bun `bench:bun`. The aggregate `bench` needs both and fails fast if either is missing (`bench:runtimes` preflights `bench:perf`; without it the miss would surface only after two of three siblings regenerated and `bench:compose` skipped). Its node arm probes `globalThis.Deno` rather than resolving the name — `deno task` puts a `node`→deno compat shim on PATH that would pass the check and run the harness AS Deno.
+**Prerequisites**: `cargo install wasm-pack` + `npm run bench:install` once (needs npm/Node). Beyond that `check`, the release, and conformance need Rust and Node (≥ 24.14: `npm run`, the JS suites, and the fixture oracle `cargo test` runs, installed by `npm ci --prefix crates/tsv_debug/sidecar`). Deno is the bench's alone (the Deno row, the canonical size rows' `deno bundle`, `typecheck:js`), and no CI job installs it: `check` passes without it, cargo's one test that runs the `deno` on `PATH` printing a SKIPPED line while a Deno-free sibling grades the same refusal (./docs/tasks.md §`check`). Node ≥ 22.18 (native TS type-stripping) runs `bench:node`, Bun `bench:bun`. The aggregate `bench` needs both and fails fast if either is missing (`bench:runtimes` preflights `bench:perf`; without it the miss would surface only after two of three siblings regenerated and `bench:compose` skipped). Its node arm probes `globalThis.Deno` rather than resolving the name — `deno task` puts a `node`→deno compat shim on PATH that would pass the check and run the harness AS Deno.
 
 **Compares** canonical (prettier + svelte/compiler), native (FFI under Deno / N-API under Node+Bun, both profile-guided), WASM, and alternatives:
 
@@ -718,7 +718,7 @@ TDD workflow: [Development Philosophy](#development-philosophy-test-driven-devel
    ```
 
 2. **Fixture matches prettier/Svelte** → the fixture is correct; fix our code to match.
-3. **Fixture doesn't match** → it may be outdated: `deno task fixtures:update <pattern>`.
+3. **Fixture doesn't match** → it may be outdated: `npm run fixtures:update -- <pattern>`.
 
 **CRITICAL: Never modify fixtures to work around our bugs.** Fix the code, not the fixture. Prohibited without verifying against the sources of truth: modifying `input.svelte` to avoid edge cases, removing `unformatted_*` cases, changing `expected.json` to match incorrect output, any fixture change that hides a bug.
 
@@ -754,7 +754,7 @@ TDD workflow: [Development Philosophy](#development-philosophy-test-driven-devel
 - normalization variants: `unformatted_*` / `unformatted_ours_*` / `unformatted_prettier_*`
 - `input_invalid_*` — must fail BOTH parsers, one syntax error per file
 
-**Unformatted variant rules:** same content structure as input, usually only whitespace differing; the **bare** `_compact` / `_spaces` names claim exactly that, in one direction (gated by `deno task variants:audit`; ./docs/fixture_naming.md#standard-variant-names). A variant that also flips a *token* prettier normalizes away (a trailing comma, quote style, `<br>` for `<br />`) takes a name that says so (`unformatted_no_self_closing`, `unformatted_with_closing_tag`); older bare-named variants predate the rule and the audit reports them as ungraded. Both formatters must normalize to exactly match input. For `.svelte` this is **enforced** by the render-equivalence check (R rules, ./docs/fixture_overview.md): the variant and `input` must produce the same browser-visible render via `svelte compile`, so a formatter bug that changed the render *and* landed on `input` can't pass green.
+**Unformatted variant rules:** same content structure as input, usually only whitespace differing; the **bare** `_compact` / `_spaces` names claim exactly that, in one direction (gated by `npm run variants:audit`; ./docs/fixture_naming.md#standard-variant-names). A variant that also flips a *token* prettier normalizes away (a trailing comma, quote style, `<br>` for `<br />`) takes a name that says so (`unformatted_no_self_closing`, `unformatted_with_closing_tag`); older bare-named variants predate the rule and the audit reports them as ungraded. Both formatters must normalize to exactly match input. For `.svelte` this is **enforced** by the render-equivalence check (R rules, ./docs/fixture_overview.md): the variant and `input` must produce the same browser-visible render via `svelte compile`, so a formatter bug that changed the render *and* landed on `input` can't pass green.
 
 **Quick Pattern Selection:**
 
@@ -815,11 +815,11 @@ cargo run --profile corpus -p tsv_debug compile_fuzz      # differential compile
 cargo run --release -p tsv_debug -- erase_comment_census ../corpora/collections/fuz_ui  # type-eraser comment-refusal LOWER BOUND (pure Rust)
 
 # strip - tsv_ts::strip on one file to stdout (a refusal or parse error to stderr, exit 1); --stdin answers NDJSON
-# requests `{source}` — the tsv side of `deno task strip:corpus` (benches/js/strip_corpus.ts)
+# requests `{source}` — the tsv side of `npm run strip:corpus` (benches/js/strip_corpus.ts)
 cargo run -p tsv_debug strip file.ts
 
 # imports - parse_imports on one file, as a binding returns the records; --stdin answers NDJSON requests
-# `{path, source}` — the tsv side of `deno task imports:corpus` (benches/js/imports_corpus.ts)
+# `{path, source}` — the tsv side of `npm run imports:corpus` (benches/js/imports_corpus.ts)
 cargo run -p tsv_debug imports file.ts
 
 # format_prettier - format using prettier (line widths by default; --no-line-widths to hide)
@@ -859,12 +859,12 @@ cargo run -p tsv_debug ts_fixture_audit [pattern...]
 
 # loc_wires - both parse wires (loc + span-only) of every fixture input (at its `goal`) and every
 # `expected_<stem>.json` variant, as NDJSON `{path, language, source, loc, span}` — the Rust half of
-# `deno task check:loc` (scripts/check_loc.ts reconstructs and compares). Pure Rust. --stdin answers NDJSON
+# `npm run check:loc` (scripts/check_loc.ts reconstructs and compares). Pure Rust. --stdin answers NDJSON
 # requests `{language, goal?, source}` with the loc wire (or a parse error, or a caught panic) — how
 # `corpus:compare:parse`'s loc arm reaches the loc wire, which no binding ships (benches/js/lib/loc_wire_client.ts)
 cargo run -p tsv_debug loc_wires [root]
 
-# the pure-Rust integrity audits behind their `deno task` gates (detail: ./docs/audits.md)
+# the pure-Rust integrity audits behind their `npm run` gates (detail: ./docs/audits.md)
 cargo run -p tsv_debug conformance_audit          # = conformance:audit (--json)
 cargo run -p tsv_debug compile_conformance_audit  # = conformance:audit:compiler (--json)
 cargo run -p tsv_debug variant_audit              # = variants:audit (--list, --json)
@@ -887,9 +887,9 @@ cargo run -p tsv_debug test262 [path-pattern]
 **Typechecker conformance (`tsc_conformance`) — EXPERIMENTAL, may never ship.** `tsv_check` is a from-scratch TypeScript binder + checker; no shipped artifact links it (`cargo tree -i tsv_check` → `tsv_debug`, plus the workspace root's dev-dependency), and the parser and formatter are never modified in service of it. `tsv_debug tsc_conformance` grades it against tsgo's committed `.errors.txt` baselines (`../typescript-go`, pinned in ./docs/typechecker.md) via **on-demand** tasks — none in `check`, `conformance`, or release gating, and `../typescript-go` is not a release-required oracle. ./docs/typechecker.md.
 
 ```bash
-deno task conformance:tsc-roundtrip     # baseline parse → re-render → byte-compare (zero checker code)
-deno task conformance:tsc-check         # the tsv_check conformance sweep + committed report
-deno task conformance:tsc-check:update  # re-pin the run's snapshot counts after deliberate drift
+npm run conformance:tsc-roundtrip       # baseline parse → re-render → byte-compare (zero checker code)
+npm run conformance:tsc-check           # the tsv_check conformance sweep + committed report
+npm run conformance:tsc-check:update    # re-pin the run's snapshot counts after deliberate drift
 ```
 
 **Performance Profiling Commands** (pure Rust, no sidecar — ./docs/performance.md):
@@ -904,14 +904,14 @@ cargo run -p tsv_debug arena_stats ../corpora/collections/zzz/src/lib           
 cargo run --release -p tsv_debug -- compile_profile tests/fixtures_compile  # Svelte compile against the format wall (§9)
 cargo run --release -p tsv_debug -- ast_census ../corpora/collections/zzz/src        # per-node-kind population (--bytes joins the size board, --slots, --arity) (§10)
 cargo run -p tsv_debug type_sizes                                # the `size_of` board: every public AST type's width (§10)
-cargo run --profile corpus -p tsv_debug --features _internal_audits -- build_visit_census ../corpora/collections  # doc-build dispatches per language and dispatch family; a dispatch is not an edge read (also `deno task build-visit-census`)
-cargo run --profile corpus -p tsv_debug --features _internal_ast_census -- ast_demand_census ../corpora/collections  # the parser's allocation demand per store-backed type: minted, live, rewind / clone / re-alloc waste, scratch peak, per source byte (also `deno task ast-demand-census`)
-cargo run -p tsv_debug metrics [--json]                          # line counts by crate and phase; also `deno task metrics`
+cargo run --profile corpus -p tsv_debug --features _internal_audits -- build_visit_census ../corpora/collections  # doc-build dispatches per language and dispatch family; a dispatch is not an edge read (also `npm run build-visit-census`)
+cargo run --profile corpus -p tsv_debug --features _internal_ast_census -- ast_demand_census ../corpora/collections  # the parser's allocation demand per store-backed type: minted, live, rewind / clone / re-alloc waste, scratch peak, per source byte (also `npm run ast-demand-census`)
+cargo run -p tsv_debug metrics [--json]                          # line counts by crate and phase; also `npm run metrics`
 ```
 
-The **density pair** (`ast_census` + `type_sizes`, also `deno task ast-census` / `deno task type-sizes`): a lever that narrows a type is worth `count x bytes saved`, and neither factor is guessable — `ast_census --bytes` multiplies them in one table.
+The **density pair** (`ast_census` + `type_sizes`, also `npm run ast-census` / `npm run type-sizes`): a lever that narrows a type is worth `count x bytes saved`, and neither factor is guessable — `ast_census --bytes` multiplies them in one table.
 
-**Audits** — every standing correctness gate and discovery harness (swallow, ledger, census, gap/blank injection, fabrication, ignore-honoring, fuzz, F1 sweep, render-equivalence, the corpus bundle, `lex_diff`, the compiler audits, and the rest) is cataloged in ./docs/audits.md; the `deno task` entry points are indexed in [Fixtures](#fixtures-rust--deno-based). Read the relevant section before running or modifying an audit.
+**Audits** — every standing correctness gate and discovery harness (swallow, ledger, census, gap/blank injection, fabrication, ignore-honoring, fuzz, F1 sweep, render-equivalence, the corpus bundle, `lex_diff`, the compiler audits, and the rest) is cataloged in ./docs/audits.md; the task entry points are indexed in [Fixtures](#fixtures-rust--node-based). Read the relevant section before running or modifying an audit.
 
 ## Architectural Notes
 
@@ -1000,7 +1000,7 @@ Comments live **separately from AST nodes**, in a flat `Comment` array at the ro
 The shipped language/foundation crates' external deps (`tsv_cli` adds only `argh`; dev tooling adds `tokio`, `futures-util`, `serde` with `derive`, `similar`, `tempfile` and `thiserror`; `tsv_wasm` adds `wasm-bindgen`/`js-sys`):
 
 - `zmij` — the wire writer's non-integral `f64` digits (`tsv_lang`'s `json` feature): the shortest round-trip formatter `serde_json` itself calls, called directly so the bytes stay `serde_json`'s (graded by `f64_matches_serde_json`) with no `serde_json` in the published graph
-- `serde_json` — **never a normal or build dependency of a crate meant for publishing** (every crate with a `[package.metadata.docs.rs]` table; `deno task deps:audit` gates it), because the workspace entry's `preserve_order` / `float_roundtrip` / `arbitrary_precision` features would unify into a consumer's own `serde_json` and change its deserialization. It is the dev-dependency oracle of `tsv_lang`'s writer (escaper + `f64`) and `tsv_html`'s entity-table generator, a normal dependency of the unpublished `tsv_ffi` (its `{"error": …}` payload), `tsv_debug` and the root test package. The one reader, `tsv_debug::json` (fixture gate, audits, tests), enables `unbounded_depth` — the default 128-level recursion limit refused wires the parser emits fine. `serde` itself is a dev-tooling dep (`tsv_debug`'s `derive`), out of every published library crate's normal graph with `serde_json` (`tsv_cli` reaches it through `argh` → `argh_shared`, which carries no `serde_json`)
+- `serde_json` — **never a normal or build dependency of a crate meant for publishing** (every crate with a `[package.metadata.docs.rs]` table; `npm run deps:audit` gates it), because the workspace entry's `preserve_order` / `float_roundtrip` / `arbitrary_precision` features would unify into a consumer's own `serde_json` and change its deserialization. It is the dev-dependency oracle of `tsv_lang`'s writer (escaper + `f64`) and `tsv_html`'s entity-table generator, a normal dependency of the unpublished `tsv_ffi` (its `{"error": …}` payload), `tsv_debug` and the root test package. The one reader, `tsv_debug::json` (fixture gate, audits, tests), enables `unbounded_depth` — the default 128-level recursion limit refused wires the parser emits fine. `serde` itself is a dev-tooling dep (`tsv_debug`'s `derive`), out of every published library crate's normal graph with `serde_json` (`tsv_cli` reaches it through `argh` → `argh_shared`, which carries no `serde_json`)
 - `smallvec` — stack-allocated vectors (printers + `tsv_check`)
 - `unicode-ident` / `unicode-segmentation` / `unicode-width` — XID identifiers, grapheme clustering, display width (CJK, zero-width)
 - `bumpalo` — bump arena for the internal AST (and, via `tsv_arena`, the bindings' per-thread `reset()` reuse; `tsv_check`'s caller-owned arenas follow the same contract)

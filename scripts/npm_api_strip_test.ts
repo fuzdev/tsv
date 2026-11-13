@@ -8,7 +8,7 @@
  * code, or the `{ok: false, error}` it built for a parse failure (`kind: 'parse'`) or a
  * refusal (`kind: 'unsupported'`, its `construct`), which the facade checks and hands back as
  * it is. Anything an engine throws passes through as itself. A fake engine rather than a
- * built package, so this gates in `deno task check` on a bare clone; `scripts/strip_suite.ts`
+ * built package, so this gates in `npm run check` on a bare clone; `scripts/strip_suite.ts`
  * grades the same surface through the real engines.
  */
 

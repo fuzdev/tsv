@@ -267,7 +267,7 @@ either way — where a body wrongly admitted is a loud parse error on a shape no
 A **paren shell the printer STRIPS is not part of the head at all** — so
 `a < (arr[b - 1]) > c` is graded as the arithmetic its own paren-free twin is, and
 `a < (b)!` as `a < b!`; asking the same head dispatch of the shell's content is what makes
-the two authorings of one chain reach one fixed point (`deno task paren:audit`'s
+the two authorings of one chain reach one fixed point (`npm run paren:audit`'s
 `< > operand` class enumerates exactly that pair).
 
 A shell the printer **KEEPS** is the other half of the same rule, and it is decided in the
@@ -769,7 +769,7 @@ must have got a pair, since tsv's parser is one of that output's readers — and
 spellings of one program. At a `(` head soundness is carried by the head's own shell — a kept
 shell earns the comparison a pair, a stripped one is not in the printed form and is read
 through — which is what lets that head grade its body at all; at a `{` or `[` head there is no
-such shell, so the grade stays off and the pair stands unconditionally. Independence is gated (`deno task paren:audit`); soundness has no
+such shell, so the grade stays off and the pair stands unconditionally. Independence is gated (`npm run paren:audit`); soundness has no
 gate of its own — no fixture can carry the shape, which exists only in printer output — and
 rests on the two printer disjuncts above together with the as-authored reparse legs
 (`roundtrip:audit`, `gaps:audit`, `fuzz:audit`), which see it only on the documents they

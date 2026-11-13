@@ -83,7 +83,7 @@ taken on — enough to hold a sub-percent read steady:
 2. **Add every standalone `.css` that `tsv format --list` finds** across the
    ecosystem repos — the product's own gitignore-aware scope rule, never a bare
    `find`, which pulls in minified build bundles.
-3. **Add `benches/js/.cache/svelte_styles/`** (`deno task
+3. **Add `benches/js/.cache/svelte_styles/`** (`npm run
    bench:harvest:svelte-styles`), the `.svelte` `<style>` blocks of the perf view's
    (third-party) collections, concatenated one file per collection.
 4. **Add vendored-but-authored stylesheets** — icon fonts, map widgets,
@@ -607,7 +607,7 @@ target-independent (heaptrack reads the same on either), but WASM *wall-time* is
 not: `@fuzdev/tsv-format-wasm` runs on talc (the wasm32 `#[global_allocator]` in
 `tsv_wasm`; std's default dlmalloc before the swap), whose per-call cost profile
 differs from native glibc — so an allocation-count win can move WASM format time
-even when the same change is a wash on native. The full `deno task bench` is too coarse to
+even when the same change is a wash on native. The full `npm run bench` is too coarse to
 see those single-digit-% moves; `benches/js/diagnostics/wasm_format_probe.ts` resolves
 them.
 
@@ -901,13 +901,13 @@ changes are graded without PGO and the bench reports what ships.
 
 1. **`tsv_debug profile`** on the target workload — note the phase split
 2. **`perf report --stdio`** — identify which functions are hot
-3. **Record baseline** with corpus benchmarks: `deno task bench:perf`
+3. **Record baseline** with corpus benchmarks: `npm run bench:perf`
 
 ### After an optimization
 
 1. **`tsv_debug profile`** — same workload, compare phase split
-2. **`deno task bench:perf`** — measure overall corpus impact (perf surface;
-   the full `deno task bench` also runs the node conformance coverage surface — a
+2. **`npm run bench:perf`** — measure overall corpus impact (perf surface;
+   the full `npm run bench` also runs the node conformance coverage surface — a
    pre-flight parse-coverage pass, no timed phase)
 3. **Record results** — for regression detection, use `deno task bench:deno:run -- --save-baseline` / `-- --compare-baseline` (or the `bench:node:run` / `bench:bun:run` siblings for the other runtimes)
 4. **Gate it against its base** — `npm run perf:ab -- <base>` ([§Gating a change against a base](#gating-a-change-against-a-base--npm-run-perfab))
@@ -1430,8 +1430,8 @@ a result here:
 
 **A lever that makes a hot leaf smaller or simpler gets inlined at more call
 sites, and pays for itself in bytes at every one of them.** The instruction
-counter cannot see that, and neither can any gate in `deno task check` — the size
-bounds live in `scripts/validate_artifacts.ts` (the WASM bundles) and `scripts/validate_napi_artifact.ts` (`deno task validate:napi`,
+counter cannot see that, and neither can any gate in `npm run check` — the size
+bounds live in `scripts/validate_artifacts.ts` (the WASM bundles) and `scripts/validate_napi_artifact.ts` (`npm run validate:napi`,
 the native artifacts) — graded in CI's `artifacts` job on every PR and again at release
 (`npm run release` Step 6, the tag-triggered N-API workflow), not in `check`.
 
@@ -1440,13 +1440,13 @@ fixed-width copy instead of a runtime-length one removed a libc `memmove` call
 and measured a clean **−3.2% parse-product instructions**. It also grew
 `@fuzdev/tsv-parse-wasm` **+6% raw, past its `max` bound** — the smaller body was
 now inlined at ~200 writer call sites, each carrying the fixed-width blit.
-`cargo test --workspace`, `deno task check`, an 8,257-file byte-identity diff and
+`cargo test --workspace`, `npm run check`, an 8,257-file byte-identity diff and
 the instruction A/B were **all green through the regression**.
 
 So a "make a hot leaf smaller" change ships with the size axis measured too:
 
 ```bash
-deno task build:wasm:parse:deno && deno task build:wasm:deno
+npm run build:wasm:parse:deno && npm run build:wasm:deno
 # compare raw bytes against BOUNDS in scripts/validate_artifacts.ts
 ```
 
@@ -3436,9 +3436,9 @@ explicit bulk-memory + nontrapping-float-to-int flags.
 Build all three before running benches so the sizes appear in the report:
 
 ```bash
-deno task build:wasm:deno         # format-only → pkg/format/deno/
-deno task build:wasm:parse:deno   # parse-only → pkg/parse/deno/
-deno task build:wasm:all:deno     # full (executed by the bench) → pkg/all/deno/
+npm run build:wasm:deno           # format-only → pkg/format/deno/
+npm run build:wasm:parse:deno     # parse-only → pkg/parse/deno/
+npm run build:wasm:all:deno       # full (executed by the bench) → pkg/all/deno/
 ```
 
 ## Future tools (reach for when needed)

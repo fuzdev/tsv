@@ -478,7 +478,7 @@ test('a missing engine is refused, naming each and its build', async () => {
 	strictEqual(await run_engine_parity(deps, ['corpus']), 1);
 	deepStrictEqual(native_programs, []);
 	deepStrictEqual(err, [
-		'✗ engine parity needs both engines built — missing: the native tsv_cli binary (deno task build:napi:packages), the wasm package (deno task build:npm:all)'
+		'✗ engine parity needs both engines built — missing: the native tsv_cli binary (npm run build:napi:packages), the wasm package (npm run build:npm:all)'
 	]);
 });
 
@@ -494,7 +494,7 @@ test('the staged N-API packages must be the loader and one platform package', as
 	const none = make_deps(checkout);
 	strictEqual(await run_engine_parity(none.deps, ['corpus']), 1);
 	deepStrictEqual(none.err, [
-		"crates/tsv_napi/pkg/napi not staged. Run 'deno task build:napi:packages' first."
+		"crates/tsv_napi/pkg/napi not staged. Run 'npm run build:napi:packages' first."
 	]);
 });
 

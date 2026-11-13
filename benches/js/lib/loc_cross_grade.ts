@@ -7,7 +7,7 @@
  * deep-equal the loc wire of the same parse, key order aside (the writer places `loc` after
  * `end`, the reconstruction appends it). Neither side carries a hand-written expectation;
  * each is the other's drift check. Two callers ask it: `scripts/check_loc.ts` over the
- * fixture tree (the `deno task check` leg) and `corpus_compare_parse.ts` over every corpus
+ * fixture tree (the `npm run check` leg) and `corpus_compare_parse.ts` over every corpus
  * file, ahead of grading the loc wire against the oracle — so a tolerance row there can
  * only ever excuse the oracle's departure from the definition, never tsv's.
  *

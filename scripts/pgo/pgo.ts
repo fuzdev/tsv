@@ -1125,8 +1125,8 @@ const cmd_byteid_ffi = (): void => {
 
 /** The shapes the depth gate runs, from the native test (`write_shape_limits`). The limits
  * are counts, so any build writes the same lines: the `corpus` profile, the cheapest
- * optimized one, with the audit seams `deno task test:depth` builds it with, so a local run
- * after `deno task check` reuses that build; into `CARGO_TARGET_DIR` as the caller set it.
+ * optimized one, with the audit seams `npm run test:depth` builds it with, so a local run
+ * after `npm run check` reuses that build; into `CARGO_TARGET_DIR` as the caller set it.
  * The shapes do not depend on the target, so the build is any the host can run. */
 const cmd_depth_shapes = (): void => {
 	mkdirSync(paths.depth, { recursive: true });
@@ -1202,7 +1202,7 @@ const node_copies = (): { control: string; gate: string } | { error: string } =>
  * The depth gate over the staged PGO addon (`addon_depth.ts`). On Windows the gate runs
  * under `node_copies`' gate copy and the control pass under its control copy, whose stack
  * reserves let a worker's `stackSizeMb` size its thread. The row falls back to the
- * plain-profile native gate (`deno task test:depth:napi`'s run: the shipped optimization
+ * plain-profile native gate (`npm run test:depth:napi`'s run: the shipped optimization
  * without the profile, over the full sweep) on Windows alone, when a copy cannot be made or
  * does not start, or when `addon_depth.ts` exits `CANNOT_GRADE_EXIT` with
  * `CANNOT_GRADE_LINE` on stderr (the gate's thread would land above the contract, or the

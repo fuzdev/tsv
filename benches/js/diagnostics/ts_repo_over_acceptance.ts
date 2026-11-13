@@ -139,7 +139,7 @@ export async function run_ts_repo_over_acceptance(
 		paths = JSON.parse(await deps.checkout.read_text(TS_REPO_REJECTS_PATH)) as string[];
 	} catch {
 		console.error(
-			`FAIL: ${TS_REPO_REJECTS_PATH} not found — run \`deno task bench:harvest:ts-repo\` (needs ../typescript).`
+			`FAIL: ${TS_REPO_REJECTS_PATH} not found — run \`npm run bench:harvest:ts-repo\` (needs ../typescript).`
 		);
 		return 1;
 	}
@@ -147,7 +147,7 @@ export async function run_ts_repo_over_acceptance(
 		console.error(
 			`FAIL: cache holds ${paths.length} rejects ≠ pinned ${TS_REPO_REJECTS_PIN} — the cache is ` +
 				`stale or was written by different grading logic. Re-harvest with ` +
-				`\`deno task bench:harvest:ts-repo --force\`.`
+				`\`npm run bench:harvest:ts-repo -- --force\`.`
 		);
 		return 1;
 	}
@@ -260,7 +260,7 @@ export async function run_ts_repo_over_acceptance(
 		console.error(
 			`FAIL: the tsc row accepted ${oracle.accepted} of its own rejects — the cache and the ` +
 				`installed tsc disagree (a tsc bump since the harvest?). Re-harvest with ` +
-				`\`deno task bench:harvest:ts-repo --force\` before reading these numbers.`
+				`\`npm run bench:harvest:ts-repo -- --force\` before reading these numbers.`
 		);
 	}
 	return panics.length > 0 || oracle_moved ? 1 : 0;

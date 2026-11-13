@@ -879,7 +879,7 @@ const CASES: Case[] = [
 		name: 'a stamp never written',
 		change: (w) => void delete w.checkout[HARVEST_STAMPS.test262.path],
 		mark: '⚠',
-		line: 'test262: never stamped (no benches/js/.cache/test262.stamp.json) — run deno task bench:harvest:test262',
+		line: 'test262: never stamped (no benches/js/.cache/test262.stamp.json) — run npm run bench:harvest:test262',
 		code: 0
 	},
 	{
@@ -888,14 +888,14 @@ const CASES: Case[] = [
 			w.checkout[HARVEST_STAMPS.test262.path] = JSON.stringify({ source_commit: '2'.repeat(40) });
 		},
 		mark: '⚠',
-		line: 'test262: stamp is stale for ../test262 (stamped 222222222, now bbbbbbbbb) — run deno task bench:harvest:test262',
+		line: 'test262: stamp is stale for ../test262 (stamped 222222222, now bbbbbbbbb) — run npm run bench:harvest:test262',
 		code: 0
 	},
 	{
 		name: 'a stamp missing an input',
 		change: (w) => void (w.checkout[HARVEST_STAMPS.test262.path] = '{}'),
 		mark: '⚠',
-		line: 'test262: stamp is stale for ../test262 (no `source_commit` recorded — the stamp predates that input) — run deno task bench:harvest:test262',
+		line: 'test262: stamp is stale for ../test262 (no `source_commit` recorded — the stamp predates that input) — run npm run bench:harvest:test262',
 		code: 0
 	},
 	{
@@ -985,21 +985,21 @@ const CASES: Case[] = [
 		name: 'an artifact absent',
 		change: (w) => void delete w.checkout[`.pgo/bench/${FFI}`],
 		mark: '·',
-		line: `.pgo/bench/${FFI} absent — deno task build:bench:pgo (bench:deno, profile-guided)`,
+		line: `.pgo/bench/${FFI} absent — npm run build:bench:pgo (bench:deno, profile-guided)`,
 		code: 0
 	},
 	{
 		name: 'no target directory',
 		change: (w) => void (w.target = null),
 		mark: '·',
-		line: `target/napi/${NAPI} absent — deno task build:napi (test:napi)`,
+		line: `target/napi/${NAPI} absent — npm run build:napi (test:napi)`,
 		code: 0
 	},
 	{
 		name: "the conformance gates' addon absent",
 		change: (w) => void delete w.target![`corpus/${NAPI}`],
 		mark: '·',
-		line: `target/corpus/${NAPI} absent — deno task build:napi:corpus (conformance gates, over-acceptance)`,
+		line: `target/corpus/${NAPI} absent — npm run build:napi:corpus (conformance gates, over-acceptance)`,
 		code: 0
 	},
 	{

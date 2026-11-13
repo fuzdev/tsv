@@ -14,7 +14,7 @@ Build/usage commands live in [../../CLAUDE.md §JS Bindings](../../CLAUDE.md#js-
 
 ## Local build & CI
 
-A single-platform local build (`deno task build:napi` → `cargo build -p tsv_napi --profile napi`, into `target/napi/`) is what `deno task test:napi` loads; the **Node and Bun** benchmark runners load the profile-guided build of the same profile instead (`deno task build:bench:pgo`; `benches/js/lib/napi.ts` opens it from `.pgo/bench/` directly via `process.dlopen` — no `.node` rename). CI builds and boundary-tests the addon per OS (the `platforms` job runs `deno task test:napi` + `deno task test:napi:npm` on macOS + Windows; the `artifacts` job runs `deno task test:napi:npm` on Linux — the only PR runner that reaches `platform.js`'s `is_musl()` branch). The cross-platform publish is the tag-triggered matrix workflow (see §Release), decoupled from the WASM releases — never bolted onto the single-machine `npm run release`. The native set is expected to eventually **subsume** the WASM path as tsv's primary native distribution.
+A single-platform local build (`npm run build:napi` → `cargo build -p tsv_napi --profile napi`, into `target/napi/`) is what `npm run test:napi` loads; the **Node and Bun** benchmark runners load the profile-guided build of the same profile instead (`npm run build:bench:pgo`; `benches/js/lib/napi.ts` opens it from `.pgo/bench/` directly via `process.dlopen` — no `.node` rename). CI builds and boundary-tests the addon per OS (the `platforms` job runs `npm run test:napi` + `npm run test:napi:npm` on macOS + Windows; the `artifacts` job runs `npm run test:napi:npm` on Linux — the only PR runner that reaches `platform.js`'s `is_musl()` branch). The cross-platform publish is the tag-triggered matrix workflow (see §Release), decoupled from the WASM releases — never bolted onto the single-machine `npm run release`. The native set is expected to eventually **subsume** the WASM path as tsv's primary native distribution.
 
 ## Features
 
@@ -26,7 +26,7 @@ Mirrors `tsv_ffi` / `tsv_wasm`:
 - `imports` (default) — the `parse_imports_typescript` / `parse_imports_svelte` exports (the import records, `tsv_ts::parse_imports` / `tsv_svelte::parse_imports`), as `tsv_wasm`'s `imports` feature adds them; enables `tsv_ts/json` for the records' writer
 - `panic_probe` (test-only, never default) — the `__panic_probe` and `__panic_probe_any` exports driving the panic-contract test; see §Marshalling & errors
 
-Unlike `tsv_ffi`'s and `tsv_wasm`'s, **no build task produces a single-feature `tsv_napi`** — the addon always ships every feature, and the split exists so the crate mirrors its siblings. `deno task typecheck:features` (in `check`) `cargo check`s each feature on its own, so the declared sets can't rot unbuilt; neither `cargo check --workspace` (features unified, defaults ON) nor clippy's `--all-features` union sees a subset.
+Unlike `tsv_ffi`'s and `tsv_wasm`'s, **no build task produces a single-feature `tsv_napi`** — the addon always ships every feature, and the split exists so the crate mirrors its siblings. `npm run typecheck:features` (in `check`) `cargo check`s each feature on its own, so the declared sets can't rot unbuilt; neither `cargo check --workspace` (features unified, defaults ON) nor clippy's `--all-features` union sees a subset.
 
 ## Public API
 
@@ -64,7 +64,7 @@ Outside the macro, the `format` feature also exports **`IgnoreStack`** — a `#[
 
 ## The npm packages: `@fuzdev/tsv` + platform packages
 
-Staged by `deno task build:napi:packages` (`scripts/build_napi_packages.ts`)
+Staged by `npm run build:napi:packages` (`scripts/build_napi_packages.ts`)
 into `crates/tsv_napi/pkg/` (gitignored):
 
 - **`pkg/napi/` — `@fuzdev/tsv`**, the loader: `npm/index.js` +
@@ -137,7 +137,7 @@ packages' export names, their `exports` subpaths (the wasm `./worker` is the lif
 too), and the class's keys via `Reflect.ownKeys` — a
 name-only walk would miss `[Symbol.dispose]`, which is half of what the
 sentence above claims. It runs whenever the wasm package is staged AND fresh,
-and SKIPS otherwise: `deno task test:napi:npm` does not build that package, and
+and SKIPS otherwise: `npm run test:napi:npm` does not build that package, and
 an export set captured before the delta moved reads as clean. Neither package
 exports the bench-only `parse_internal_*` family
 (`scripts/patch_npm_package.ts` filters it out of the wasm wrappers too).
@@ -185,9 +185,9 @@ napi-only file rather than as a branch inside the shared `cli.js` so the wasm
 copy stays byte-identical with no dead dispatch code — and so the wasm CLI
 can never resolve a sibling-installed native platform package by accident.
 
-Tests: `deno task test:napi:npm` stages a temp `node_modules` and drives the
-packaged shape under Node (its `:run` then chains `deno task test:bun napi`, the
-parse-failure table under Bun):
+Tests: `npm run test:napi:npm` stages a temp `node_modules` and drives the
+packaged shape under Node (its `:run` then chains `npm run test:bun -- napi`,
+the parse-failure table under Bun):
 
 - **Loader resolution by BARE SPECIFIER** — the ESM walk of the `exports` map from a cwd
   inside the staging and the CommonJS `require.resolve` walk of the same map, plus the
@@ -211,7 +211,7 @@ parse-failure table under Bun):
   error, so a Windows staging would re-enter an already-proven branch, and signal death has
   no Windows analogue.
 
-The loader's declarations are graded by `deno task typecheck:packages napi` (also part of
+The loader's declarations are graded by `npm run typecheck:packages -- napi` (also part of
 a bare `typecheck:packages` run while the loader is staged): the staged package installed
 into a temp consumer, its root, `./locations` and README examples compiled on `es2022`
 alone — no DOM lib, which pins that it declares none — under `nodenext` and `bundler`
@@ -287,7 +287,7 @@ release side is the root [CLAUDE.md §Publishing](../../CLAUDE.md#publishing).
 - **Per target**: container-pinned builds of **both** shipped binaries — the addon (`napi`
   profile) and the `tsv_cli` binary (`release`: abort + LTO; a standalone process owns its
   own crash, so the addon's unwind rationale doesn't apply) — both **profile-guided**, by
-  the steps of `scripts/pgo/pgo.ts` (`deno task build:pgo` runs them all locally): the
+  the steps of `scripts/pgo/pgo.ts` (`npm run build:pgo` runs them all locally): the
   `../corpora` snapshot is shallow-fetched at the commit `GATE_CHECKOUT_IDS` records and
   refused unless its `collections/` tree is the pinned one; the instrumented pair
   (`scripts/pgo/build.sh`, the one spelling of the PGO RUSTFLAGS) trains **on the target**,
@@ -339,11 +339,11 @@ release side is the root [CLAUDE.md §Publishing](../../CLAUDE.md#publishing).
   surviving control fails; either pass still running at its bound, `PASS_TIMEOUT_MS`, is
   killed and fails as hung, never a fallback). Every PGO build goes to `.pgo/`, outside the
   `target/` every row caches, so no profile-use build is ever restored from a cache. The bench's native rows measure the same
-  pipeline's output: `deno task build:bench:pgo` runs it locally (`pgo.ts all --ffi`, with
+  pipeline's output: `npm run build:bench:pgo` runs it locally (`pgo.ts all --ffi`, with
   the bench's C-FFI library as a third world) and stages the gated pair in `.pgo/bench/`.
   The gnu rows build in almalinux:8 → glibc 2.28 floor (Node's own binary floor), measured
   by the workflow's floor gate over both artifacts; musl in rust:alpine with `-crt-static`
-  off, both gated GLIBC-free. Then per-artifact size bounds (`scripts/roots/validate_napi_artifact.ts --triple <t> --pgo`, the entry behind `deno task validate:napi`;
+  off, both gated GLIBC-free. Then per-artifact size bounds (`scripts/roots/validate_napi_artifact.ts --triple <t> --pgo`, the entry behind `npm run validate:napi`;
   one tight anchored band per binary, a PGO set for what ships and a plain set graded on
   every PR over the Linux host build by `check.yml`'s `artifacts` job) and the npm-shape
   test over the real artifacts (node:alpine for musl).
@@ -356,8 +356,7 @@ release side is the root [CLAUDE.md §Publishing](../../CLAUDE.md#publishing).
   order, idempotent skip-if-published. Under `--dry-run` it skips nothing and runs
   `npm publish --dry-run` over every package, reading npm's already-published refusal as a
   pass, so the dispatch and cron rehearsals really pack the set between releases. Locally,
-  `npm run publish:napi -- --dry-run` (or `deno task publish:napi --dry-run`, which forwards
-  the flag as written) proves staging + the refusal logic, then **stops at
+  `npm run publish:napi -- --dry-run` proves staging + the refusal logic, then **stops at
   the partial-set refusal by design** — local staging holds only the host platform; the
   full-set rehearsal is the `workflow_dispatch` dry run.
 - **Auth**: a granular `NPM_TOKEN` secret from the bootstrap releases (trusted publishing
@@ -418,7 +417,7 @@ napi-rs marshals the JS string into a Rust `String` and the returned `String` ba
   built on `env` (`plain_error`), its own enumerable `code: 'GenericFailure'` deleted — a plain error passes through the facade as the
   same object, and a package swap must not change what a caller's `Object.keys` reads.
 
-The npm facade's `read_failure` (`crates/tsv_wasm/npm/api.js`) checks that object and hands it back as it is — the contract `tsv_wasm`'s hand-declared `Object` binding meets too. The split exists because the in-crate tests cannot construct an `Env`: they drive the engine halves and assert the `Failure` directly; `scripts/test_napi.ts` asserts the returned object across the real boundary under Node; `deno task test:bun napi` runs the parse-failure table over the staged loader under Bun — a local gate only, chained by `test:napi:npm[:run]` on a machine with bun; no publish runs it. A format's parse reads the CR-folded text, so its engine half (`tsv_arena`'s `parse_format!`) parses through the language's `parse_folded` (`FoldedSource::parse_with`), which maps the error back onto the caller's source before its span is taken; `format_svelte`'s refusal of a lone CR inside an in-tag `//` comment (`tsv_svelte::__private::parse_folded`) is an `Error::refusal` — no syntax error, spanning the CR — so it travels as `kind: 'refused'`.
+The npm facade's `read_failure` (`crates/tsv_wasm/npm/api.js`) checks that object and hands it back as it is — the contract `tsv_wasm`'s hand-declared `Object` binding meets too. The split exists because the in-crate tests cannot construct an `Env`: they drive the engine halves and assert the `Failure` directly; `scripts/test_napi.ts` asserts the returned object across the real boundary under Node; `npm run test:bun -- napi` runs the parse-failure table over the staged loader under Bun — a local gate only, chained by `test:napi:npm[:run]` on a machine with bun; no publish runs it. A format's parse reads the CR-folded text, so its engine half (`tsv_arena`'s `parse_format!`) parses through the language's `parse_folded` (`FoldedSource::parse_with`), which maps the error back onto the caller's source before its span is taken; `format_svelte`'s refusal of a lone CR inside an in-tag `//` comment (`tsv_svelte::__private::parse_folded`) is an `Error::refusal` — no syntax error, spanning the CR — so it travels as `kind: 'refused'`.
 
 **Panic contract:** a Rust panic — always a tsv bug — surfaces as a **thrown JS error**, never a host abort: an `Error` whose message is `panic: <payload>` (`panic: <unknown>` for a payload that is neither a `&str` nor a `String`), the text the C FFI reports, from the one helper both bindings call (`tsv_arena::format_panic`), and whose one own key is napi-rs's `code`, `'GenericFailure'`. Two halves, both required (unwind alone enables the catch, it does not perform it): every export runs its whole body through `catch_panic` (the engine exports through `engine_export`, which also hands back a returned failure), and the addon builds with the workspace **`napi` profile** (`release` + `panic = "unwind"`; `panic` can't be set per-package, and flipping `[profile.release]` would perturb the size-bounded WASM bundles and the abort-profile FFI/CLI artifacts). Bench, `test:napi`, and publish all use the same profile, so what is measured and tested unwinds as the shipped addon does (`test:napi` loads the plain build in `target/napi/`; the bench and the published addon are also profile-guided — §Release). Every export also keeps `#[napi(catch_unwind)]`, the backstop for a panic in napi-rs's own argument and return conversions, outside `catch_panic`: it throws the bare payload (`panic from Rust code: …` for a non-string one), which the corpus tools' panic gate would not classify, so nothing of tsv's runs under it alone. After a caught panic the per-thread arenas stay usable — `tsv_arena`'s take/park protocol leaves the thread-local slot empty while a call runs, so unwind and abort converge on the same state. **Stack overflow is not catchable** and still aborts the host. The contract is proven end to end by `scripts/test_napi.ts` via the test-only `panic_probe` feature's `__panic_probe` export (panics inside `with_ast_arena`; the test asserts the thrown error's class, exact message, own keys and classification twice, then correct parse + format output — the arena recovery at the real boundary) and `__panic_probe_any` (a payload that is no string). Published builds never enable the feature; the test skips when the export is absent.
 
@@ -442,4 +441,4 @@ Three properties a Node/Bun host inherits from this crate, none of them visible 
 - `build.rs` — `napi_build::setup()` (linker config for the addon)
 - `Cargo.toml` — `crate-type = ["cdylib"]`; `unsafe_code = "deny"`, not `allow` — `#[napi]`'s generated items carry their own `#[allow(unsafe_code)]` (an inner `allow` overrides `deny`), so the macro output compiles while any hand-written `unsafe` stays a compile error; deps `napi` + `napi-derive` (3.x) + `tsv_arena`, plus the `format`-optional `tsv_ignore` + `tsv_discover` behind `IgnoreStack`, build-dep `napi-build` (2.x). `format` → `tsv_arena/format` + those two (no direct `tsv_lang` edge: `parse_format!`'s line-terminator fold reaches it through `tsv_arena`)
 
-The in-crate test module drives the binding in-process — all three languages' engine halves × `parse_json` / `parse_internal` / `format`, plus the goal axis and its two refusals (an invalid `sourceType` string; a `sourceType` handed to a goalless language) — so `cargo test` exercises the native binding without a Node host (the WASM package suites don't cover napi). The per-language `parse` assertions check the language's own JSON root type (`Program` / `StyleSheetFile` / `Root`), which also guards the `lang_bindings!` wiring against a transposed invocation; the error tests assert a parse failure is a returned `Failure` whose frame's header prints its point, the same one from parse, `parse_internal` and format — on a CRLF source too, whose format reports the caller's coordinates; one test exercises this crate's distinctive risk — that the per-thread `with_ast_arena` / `with_doc_arena` `reset()` cleanly between back-to-back calls; a multibyte round-trip guards the char-offset boundary; and `catch_panic` is driven directly — a `String` and a non-string payload's text, napi-rs's `GenericFailure` status, a body's own result passed through. What `cargo test` can **not** reach is the napi-rs **marshalling** layer (the `#[napi]` JS-string ↔ Rust `String` conversion, the `Env`-built error and the `napi::Error` → *thrown* JS error path) — that's covered by the bench's Node runner and by `scripts/test_napi.ts` (`deno task test:napi`), which `process.dlopen`s the built addon and asserts a format, a JSON-AST parse, a returned parse failure's object (its keys, span and `loc`), a thrown argument refusal, a multibyte round-trip, the panic contract (via the `panic_probe` feature; skipped against a probe-less artifact), and the worker-thread threading contract (§Threading & host residency) across the real JS boundary.
+The in-crate test module drives the binding in-process — all three languages' engine halves × `parse_json` / `parse_internal` / `format`, plus the goal axis and its two refusals (an invalid `sourceType` string; a `sourceType` handed to a goalless language) — so `cargo test` exercises the native binding without a Node host (the WASM package suites don't cover napi). The per-language `parse` assertions check the language's own JSON root type (`Program` / `StyleSheetFile` / `Root`), which also guards the `lang_bindings!` wiring against a transposed invocation; the error tests assert a parse failure is a returned `Failure` whose frame's header prints its point, the same one from parse, `parse_internal` and format — on a CRLF source too, whose format reports the caller's coordinates; one test exercises this crate's distinctive risk — that the per-thread `with_ast_arena` / `with_doc_arena` `reset()` cleanly between back-to-back calls; a multibyte round-trip guards the char-offset boundary; and `catch_panic` is driven directly — a `String` and a non-string payload's text, napi-rs's `GenericFailure` status, a body's own result passed through. What `cargo test` can **not** reach is the napi-rs **marshalling** layer (the `#[napi]` JS-string ↔ Rust `String` conversion, the `Env`-built error and the `napi::Error` → *thrown* JS error path) — that's covered by the bench's Node runner and by `scripts/test_napi.ts` (`npm run test:napi`), which `process.dlopen`s the built addon and asserts a format, a JSON-AST parse, a returned parse failure's object (its keys, span and `loc`), a thrown argument refusal, a multibyte round-trip, the panic contract (via the `panic_probe` feature; skipped against a probe-less artifact), and the worker-thread threading contract (§Threading & host residency) across the real JS boundary.

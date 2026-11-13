@@ -8,7 +8,7 @@
  * records as a JSON string, or the `{ok: false, error}` it built for a parse failure
  * (`kind: 'parse'`), which the facade checks and hands back as it is. Anything an engine
  * throws passes through as itself. A fake engine rather than a built package, so this gates
- * in `deno task check` on a bare clone; `scripts/imports_suite.ts` grades the same surface
+ * in `npm run check` on a bare clone; `scripts/imports_suite.ts` grades the same surface
  * through the real engines.
  */
 

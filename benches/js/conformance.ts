@@ -1,5 +1,5 @@
 /**
- * The pre-release conformance aggregate in ONE process (`deno task conformance`, whose last
+ * The pre-release conformance aggregate in ONE process (`npm run conformance`, whose last
  * step runs this driver's root, `benches/js/roots/conformance.ts`):
  * the three parse-conformance gates (svelte-fixtures, ts-fixtures, ts-repo), then
  * `corpus:compare:parse` twice — `--all`, and over `tests/fixtures` (`--fixtures`:
@@ -21,7 +21,7 @@
  * grades inputs from the sibling checkouts against the PINNED npm oracle, so a
  * checkout whose version has drifted off its pin grades different inputs than the
  * oracle defines (and rots the path-keyed ledgers). That preflight is where a skew
- * blocks — `deno task check` deliberately no longer carries it, since nothing there
+ * blocks — `npm run check` deliberately no longer carries it, since nothing there
  * reads those checkouts.
  *
  * Takes NO arguments — per-leg options (subtree roots, --json, -v) live on the

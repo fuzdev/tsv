@@ -17,7 +17,7 @@
  * results directory its root (`roots/compose_reports.ts`) binds, and imports no package, so
  * it is one of the modules `typecheck:bench-core` holds to that.
  *
- * Run: deno task bench:compose   (after one or more runtimes' reports exist)
+ * Run: npm run bench:compose   (after one or more runtimes' reports exist)
  */
 
 import { sample_sd, unstable_readings } from './lib/bench_plan.ts';
@@ -193,7 +193,7 @@ async function read_report(results: ComposeResultsDir, runtime: Runtime): Promis
 			`⚠ compose: ${path} exists but is not valid JSON (${
 				e instanceof Error ? e.message : String(e)
 			}) — treating ${runtime} as absent. Usually an interrupted run; re-run ` +
-				`\`deno task bench:${runtime}\` to rewrite it.`
+				`\`npm run bench:${runtime}\` to rewrite it.`
 		);
 		return null;
 	}
@@ -216,7 +216,7 @@ export async function run_compose_reports(deps: ComposeReportsDeps): Promise<num
 		console.error(
 			'No per-runtime reports found in results/ ' +
 				'(report.deno.json / report.node.json / report.bun.json).\n' +
-				'Run `deno task bench` (or a per-runtime bench) first.'
+				'Run `npm run bench` (or a per-runtime bench) first.'
 		);
 		return 1;
 	}
@@ -428,7 +428,7 @@ export async function run_compose_reports(deps: ComposeReportsDeps): Promise<num
 				`⚠ compose: ${path} exists but is not valid JSON (${
 					e instanceof Error ? e.message : String(e)
 				}) — the conformance vintage cannot be checked. Usually an interrupted ` +
-					'run; re-run `deno task bench:conformance` to rewrite it.'
+					'run; re-run `npm run bench:conformance` to rewrite it.'
 			);
 			return null;
 		}
@@ -478,19 +478,19 @@ export async function run_compose_reports(deps: ComposeReportsDeps): Promise<num
 	): { where: string; remedy: string } => {
 		switch (stale_vintage_side(v)) {
 			case 'conformance':
-				return { where: 'behind the perf siblings', remedy: 'deno task bench:conformance' };
+				return { where: 'behind the perf siblings', remedy: 'npm run bench:conformance' };
 			case 'perf':
 				return {
 					where:
 						channel === 'stderr'
 							? 'AHEAD of the perf siblings — THEY are the stale half'
 							: 'ahead of the perf siblings',
-					remedy: 'deno task bench:perf'
+					remedy: 'npm run bench:perf'
 				};
 			default:
 				return {
 					where: 'at a different commit than the perf siblings',
-					remedy: 'deno task bench'
+					remedy: 'npm run bench'
 				};
 		}
 	};
@@ -862,21 +862,21 @@ export async function run_compose_reports(deps: ComposeReportsDeps): Promise<num
 			'⚠ **Mixed native builds** — the siblings measured different profile-guided builds (or ' +
 				'some recorded none or a library the stamp does not name), so a native row’s ' +
 				'cross-runtime ratio mixes two binaries; re-run ' +
-				'every runtime on one build (`deno task bench:perf`).\n'
+				'every runtime on one build (`npm run bench:perf`).\n'
 		);
 	}
 	if (mixed_machine) {
 		md.push(
 			'⚠ **Mixed machines** — the sibling reports were produced on different ' +
 				'hardware, so the cross-runtime ratios are not comparable; re-run every ' +
-				'runtime on one machine (`deno task bench:perf`).\n'
+				'runtime on one machine (`npm run bench:perf`).\n'
 		);
 	}
 	if (mixed_vintage) {
 		md.push(
 			'⚠ **Mixed vintages** — the sibling reports above come from different ' +
 				'commits/versions/corpus snapshots, so the cross-runtime ratios are unreliable; re-run the ' +
-				'stale runtimes (`deno task bench:perf` refreshes all three).\n'
+				'stale runtimes (`npm run bench:perf` refreshes all three).\n'
 		);
 	}
 	if (unavailable_by_runtime.length > 0) {
@@ -897,7 +897,7 @@ export async function run_compose_reports(deps: ComposeReportsDeps): Promise<num
 					.join('; ') +
 				'. Those runtimes recorded no load failure for the row, so its absence is unexplained — ' +
 				'usually a sibling report predating the row. Re-run the stale runtimes ' +
-				'(`deno task bench:perf`) before reading the ratios in its group.\n'
+				'(`npm run bench:perf`) before reading the ratios in its group.\n'
 		);
 	}
 	if (unstable_cells.length > 0) {
@@ -1046,9 +1046,9 @@ export async function run_compose_reports(deps: ComposeReportsDeps): Promise<num
 	}
 	if (conformance_vintage?.stale) {
 		const { where, remedy } = stale_vintage_note(conformance_vintage, 'stderr');
-		// The catch-all remedy IS `deno task bench`, so the usual "(or … for everything)"
+		// The catch-all remedy IS `npm run bench`, so the usual "(or … for everything)"
 		// tail would name it twice.
-		const everything = remedy === 'deno task bench' ? '' : ' (or `deno task bench` for everything)';
+		const everything = remedy === 'npm run bench' ? '' : ' (or `npm run bench` for everything)';
 		console.error(
 			`⚠ compose: report.conformance.node.json is at ${(conformance_vintage.git_commit ?? '?').slice(0, 8)}, ` +
 				`${where} — the site publishes both from one directory; re-run ` +
@@ -1074,7 +1074,7 @@ export async function run_compose_reports(deps: ComposeReportsDeps): Promise<num
 			'⚠ compose: UNSTABLE measurements (' +
 				unstable_cells.map((c) => `${c.group}/${c.name}=${c.runtime}`).join(' | ') +
 				') — a cv, drift or pass spread past the bench’s thresholds; every ratio through them is unreadable. ' +
-				'Re-run those runtimes (`deno task bench:<runtime>:run && deno task bench:compose`) before publishing.'
+				'Re-run those runtimes (`npm run bench:<runtime> && npm run bench:compose`) before publishing.'
 		);
 	}
 	if (unavailable_by_runtime.length > 0) {

@@ -138,7 +138,7 @@ The CLI uses [argh](https://crates.io/crates/argh) for declarative arg parsing:
 | **svelte** | `canonical_parse`, `ast_diff`, fixture management | parse Svelte code with the official compiler |
 | **acorn** + **@sveltejs/acorn-typescript** | `canonical_parse`, `ast_diff`, fixture management | parse TypeScript code (matches Svelte's TS parser) |
 
-Versions are pinned exactly in `crates/tsv_debug/sidecar/package.json`, the source of truth (not repeated here), and the whole tree in its `package-lock.json`; `benches/js/package.json` pins the same versions for the bench harness — keep the two in sync (`deno task pins:audit` gates it).
+Versions are pinned exactly in `crates/tsv_debug/sidecar/package.json`, the source of truth (not repeated here), and the whole tree in its `package-lock.json`; `benches/js/package.json` pins the same versions for the bench harness — keep the two in sync (`npm run pins:audit` gates it).
 
 ## Input Handling
 
@@ -554,17 +554,17 @@ measured at an assignment, is built at a call argument too. An overflow aborts t
 binary. The tenth kept in hand is the minimum margin the gate enforces: a frame that grows
 fails the gate while every accepted input still fits the contract. Frame sizes move with
 every printer change, and differ between optimizations by more than that margin, so the
-gate runs in each world it speaks for: `deno task test:depth:napi` in the shipped
+gate runs in each world it speaks for: `npm run test:depth:napi` in the shipped
 binaries' optimization (the `napi` profile, gating every release in publish.ts and every
 push in CI's `artifacts` job) over the whole sweep, but without the profile guidance the
 published pair is built with — no test build can carry that profile, whose functions are
-named by a build hash the test graph's other features change — `deno task test:depth` in `deno task check`'s
+named by a build hash the test graph's other features change — `npm run test:depth` in `npm run check`'s
 `corpus` world over a smaller one — the pairs behind two of the heads, a smaller triple
 sample, every commented link, the bare prefix pairs, a sample of the rest of the prefix
 alphabet and of the decorators — and a plain `cargo test` against the debug contract, over the
 named shapes and a fixed stride of that smaller sweep. The profile-guided addon that ships
 is graded as the binary itself: the release workflow, on every platform row, and
-`deno task build:pgo` run the whole sweep's shapes at the same depths through the staged
+`npm run build:pgo` run the whole sweep's shapes at the same depths through the staged
 addon on a `worker_threads` worker whose stack is the contract's less the tenth
 (`scripts/pgo/addon_depth.ts`), after a control pass on a far smaller thread has
 overflowed — the setting shrinks the thread below what the deepest shape needs, so it is a
@@ -578,7 +578,7 @@ reads each reserve back to print both threads. Where that still cannot grade —
 does not start, the gate's thread would exceed the contract, or the control survives on
 a thread the reserve rather than its request sized — the `win32-x64` row's profile-guided
 addon is graded by the plain-profile native gate (`test:depth:napi`'s run) instead, which
-says so in its log and as a workflow warning. A surviving control anywhere else fails the gate. `deno task test:depth:wasm` runs the
+says so in its log and as a workflow warning. A surviving control anywhere else fails the gate. `npm run test:depth:wasm` runs the
 whole sweep's shapes at the same depths through the WASM package on a Node main thread
 (below), in CI's `artifacts` job and publish's artifact validation.
 
@@ -638,7 +638,7 @@ contract holds there:
 Every row was measured with every shape `tests/depth_limit.rs` generates, at its deepest
 accepted depth, through the packages' API (parse with and without `locations`, the `_json`
 string, format, strip); the WASM main-thread row on Node is the standing gate,
-`deno task test:depth:wasm`. That gate adds the import records to the calls above and cuts
+`npm run test:depth:wasm`. That gate adds the import records to the calls above and cuts
 V8's stack to nine tenths of its default, the native gate's margin. A WASM build keeps its spilled frames on a 1 MiB shadow stack in
 linear memory (wasm-ld's default) and its call frames on the engine's native stack, about
 1 MiB on a V8 main thread — and **an engine's tier decides those frames**: V8's optimizing

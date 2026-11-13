@@ -1,8 +1,8 @@
 # Compiler Tooling
 
-> The tooling that grades `tsv_svelte_compile` against the canonical Svelte compiler — the one-file comparison tools, the wide-net corpus run and the differential fuzzer (all sidecar-dependent), plus the pure-Rust type-eraser comment census. The `deno task` entry points are indexed in [CLAUDE.md §Fixtures](../CLAUDE.md#fixtures-rust--deno-based); this doc is the full reference.
+> The tooling that grades `tsv_svelte_compile` against the canonical Svelte compiler — the one-file comparison tools, the wide-net corpus run and the differential fuzzer (all sidecar-dependent), plus the pure-Rust type-eraser comment census. The task entry points are indexed in [CLAUDE.md §Fixtures](../CLAUDE.md#fixtures-rust--node-based); this doc is the full reference.
 
-None of these run in `deno task check` — everything but the census needs the sidecar, and that gate is pure Rust; the census is a sizing tool, not a gate. The two pure-Rust compiler audits (`conformance:audit:compiler`, `canonicalize:audit`) are gated there and live in [audits.md](audits.md), as does [`compile:fixtures:validate`](audits.md#compile-fixture-validation-compilefixturesvalidate) — split across both cadences, its parity legs pure Rust in `check` and its oracle-freshness leg sidecar-bound in `conformance`. The validation-suite ratchet, which shares the corpus pipeline but grades against a committed snapshot, has its own doc: [compile_validation_ratchet.md](compile_validation_ratchet.md).
+None of these run in `npm run check` — everything but the census needs the sidecar, and that gate is pure Rust; the census is a sizing tool, not a gate. The two pure-Rust compiler audits (`conformance:audit:compiler`, `canonicalize:audit`) are gated there and live in [audits.md](audits.md), as does [`compile:fixtures:validate`](audits.md#compile-fixture-validation-compilefixturesvalidate) — split across both cadences, its parity legs pure Rust in `check` and its oracle-freshness leg sidecar-bound in `conformance`. The validation-suite ratchet, which shares the corpus pipeline but grades against a committed snapshot, has its own doc: [compile_validation_ratchet.md](compile_validation_ratchet.md).
 
 The compiler is **runes-only**, so every tool below compiles in runes mode; the parity bar throughout is `compare_canonical` over `tsv_svelte_compile::canonicalize_js` reprints (an intent-erased reprint of both sides, tolerating a comment-POSITION difference — tsv's comment placement vs the oracle's — so a remaining diff is a real code difference).
 
@@ -31,7 +31,7 @@ cargo run -p tsv_debug compile_corpus_compare <paths...>
 # Also: --list, --json, --census, --roots-file <file>
 ```
 
-The compile-parity wide net: compile every `.svelte` under the given roots with the canonical compiler (oracle) AND tsv, comparing the canonical reprints of both sides. The `compile:corpus:compare` deno task points it at the whole `../corpora` snapshot (every collection) and the Svelte suites, plus any per-machine roots listed in a gitignored `compile_corpus_compare.roots.local` at the repo root (`--roots-file`: one path per line relative to the repo root, blank lines and `#` comments skipped; a missing file adds none) — the place for live checkouts the snapshot cannot carry. Sidecar-dependent, so kept out of `deno task check`.
+The compile-parity wide net: compile every `.svelte` under the given roots with the canonical compiler (oracle) AND tsv, comparing the canonical reprints of both sides. The `compile:corpus:compare` task points it at the whole `../corpora` snapshot (every collection) and the Svelte suites, plus any per-machine roots listed in a gitignored `compile_corpus_compare.roots.local` at the repo root (`--roots-file`: one path per line relative to the repo root, blank lines and `#` comments skipped; a missing file adds none) — the place for live checkouts the snapshot cannot carry. Sidecar-dependent, so kept out of `npm run check`.
 
 **Buckets per file:**
 
@@ -61,7 +61,7 @@ folding a ~2/3-invalid corpus in would corrupt that run's `parity / achievable` 
 ```bash
 cargo run -p tsv_debug compile_corpus_compare --ratchet            # the gate
 cargo run -p tsv_debug compile_corpus_compare --ratchet --update   # re-pin
-deno task compile:validation                                       # the on-demand tasks
+npm run compile:validation                                         # the on-demand tasks
 ```
 
 ## Differential Compile Fuzzer (`compile:fuzz`)
@@ -69,11 +69,11 @@ deno task compile:validation                                       # the on-dema
 ```bash
 cargo run --profile corpus -p tsv_debug compile_fuzz                 # tests/fixtures_compile
 cargo run --profile corpus -p tsv_debug compile_fuzz --iterations 20000 --dump-dir /tmp/cf
-deno task compile:fuzz                                              # the on-demand task
+npm run compile:fuzz                                                # the on-demand task
 # Also: --seed, --max-mutations N, --limit N, --jobs N, --max-findings N, --list, --json
 ```
 
-The compiler's **adversarial leg**: generate feature cross-products from the compile fixtures and grade each mutant against the canonical compiler. `compile_corpus_compare` is a wide net over REAL components, so it exercises every feature and still misses nearly every feature PAIR — every interaction bug the fuzzer has found was corpus-invisible while the full corpus was green. Build with `--profile corpus` (release + panic=unwind) so a panic in tsv's compile is caught and REPORTED as a finding rather than killing the run. Seed paths resolve like the other corpus tools' (globs accepted, overlapping paths deduplicated). Sidecar-dependent, so NOT in `deno task check`.
+The compiler's **adversarial leg**: generate feature cross-products from the compile fixtures and grade each mutant against the canonical compiler. `compile_corpus_compare` is a wide net over REAL components, so it exercises every feature and still misses nearly every feature PAIR — every interaction bug the fuzzer has found was corpus-invisible while the full corpus was green. Build with `--profile corpus` (release + panic=unwind) so a panic in tsv's compile is caught and REPORTED as a finding rather than killing the run. Seed paths resolve like the other corpus tools' (globs accepted, overlapping paths deduplicated). Sidecar-dependent, so NOT in `npm run check`.
 
 ⚠️ **THE GATE IS CURRENTLY RED, BY DESIGN OF THE FINDINGS — not an ordinary green gate.** A `--seed 0 --iterations 20000` run reports over-acceptances across several oracle error codes plus mismatches, so it ALWAYS exits 1 today — run it for the current tally rather than trusting a figure in prose. It is a discovery tool with an open work list, not a regression gate, which is also why it is on demand. The findings are cataloged in [checklist_svelte_compiler.md](checklist_svelte_compiler.md) §The wider validation surface + §Mismatch classes under mutation. Turning it into a real gate wants a known-bug RATCHET keyed on the oracle error codes (gap_audit / blank_audit style) — the recommended follow-up.
 

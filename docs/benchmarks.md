@@ -146,7 +146,7 @@ Things the published numbers measure that aren't quite what they look like.
   under Deno and the N-API rows under Node and Bun, `+locations` and `-internal`
   included — under the same row names; there is no plain twin row. The policy:
   **(1) measure what ships** — the N-API rows load the addon the shipped
-  pipeline builds (`deno task build:bench:pgo` runs that pipeline, every gate but
+  pipeline builds (`npm run build:bench:pgo` runs that pipeline, every gate but
   the depth one). The C FFI ships in no package, so its library is profile-guided
   by the same recipe as a third training world: trained as itself, in process
   through the bench's own FFI wrapper (parse, `parse_internal`, format on every
@@ -213,9 +213,9 @@ Things the published numbers measure that aren't quite what they look like.
   TypeScript parse gap is tenths of a point on a group that is mostly test262, and
   an oracle's 100% is not an achievement. The axis coverage cannot show at all —
   over-ACCEPTANCE — has a tool per surface, both read inverted:
-  `diagnostics/ts_repo_over_acceptance.ts` (`deno task ts-repo:over-acceptance`)
+  `diagnostics/ts_repo_over_acceptance.ts` (`npm run ts-repo:over-acceptance`)
   over the files tsc's parser rejects, and `diagnostics/css_over_acceptance.ts`
-  (`deno task css:over-acceptance`) over the files `parseCss` rejects.
+  (`npm run css:over-acceptance`) over the files `parseCss` rejects.
 
   The ad-hoc timed variant (coverage flag unset) times the all-tools-pass
   intersection — an adversarial
@@ -445,7 +445,7 @@ Things the published numbers measure that aren't quite what they look like.
   and the cross-runtime report names the **within-noise** deltas whose difference is
   smaller than the combined noise of the two rows they divide. Both are reading aids,
   not significance tests — the Welch test lives in `benchmark_baseline_compare` and
-  needs `--compare-baseline`, which a plain `deno task bench` never runs.
+  needs `--compare-baseline`, which a plain `npm run bench` never runs.
   Calibration: across the reports the threshold was set against, cv ran median 1.0% /
   p90 3.1%, so 10% is ~3× the p90 rather than a round number (the live rows are each
   committed report's §Unstable Rows; a value restated here only goes stale). Those
@@ -571,7 +571,7 @@ Things the published numbers measure that aren't quite what they look like.
   `{locations: true}` cost note computes that ratio from the run's own rows. The
   reconstructed tree is the tree `tsv parse --locations` writes, in every language:
   tsv's Rust writer and `locations.js` implement one `loc` definition, held equal over
-  the fixture tree by `deno task check:loc`. On TypeScript that is acorn's AST exactly,
+  the fixture tree by `npm run check:loc`. On TypeScript that is acorn's AST exactly,
   so `+locations` against the canonical parser is the payload-matched canonical read
   (a curated line under the TypeScript and Svelte parse groups); on Svelte it is a
   superset of Svelte's own `loc` (every positioned object carries one, where Svelte's wire
@@ -888,7 +888,7 @@ prettier. Load-bearing on two axes:
   structurally because it does not validate at-rule preludes at all. tsv is a
   drop-in for `parseCss` and tracks it by design, so a postcss row above tsv is neither a tsv gap nor postcss laxity —
   it is two different grammars, and the per-source coverage table is what keeps
-  them legible. `deno task css:over-acceptance` is the axis itself — every
+  them legible. `npm run css:over-acceptance` is the axis itself — every
   `parse/css` tool scored over the files `parseCss` rejects, with the reject count
   pinned so the reference row's grammar can't move unnoticed.
 
@@ -1051,7 +1051,7 @@ with nothing else wrong.
   Node/Bun native path, the profile-guided addon from `.pgo/bench/`, built with the `napi`
   profile (`release` + `panic = "unwind"`, the shipped panic contract), so its size carries
   unwind tables the abort-profile FFI rows don't.
-  Native-kind labels name the binding (`ffi`/`napi`), not just "native". `deno task
+  Native-kind labels name the binding (`ffi`/`napi`), not just "native". `npm run
   bench` builds all of them; subset rows are omitted if those builds haven't run.
 - **prettier + the canonical parsers**: three `js bundle` rows, the one family that is
   **synthesized rather than shipped**. The canonical tools publish no single artifact
@@ -1123,7 +1123,7 @@ collects); `bench:deno:run` needs `--allow-run=git,gzip`, and gzip runs via
 
 **How resolution works on any machine.** `benches/js/package.json` pins the npm dep
 versions (the single source of truth, consumed by both runtimes) and
-`package-lock.json` pins their integrity. **Run `deno task bench:install`** to
+`package-lock.json` pins their integrity. **Run `npm run bench:install`** to
 populate `node_modules` (`npm install` plus the force-fetch of the oxc wasi
 binding). Deno reads that `node_modules` via `"nodeModulesDir": "manual"`; Node
 reads it directly. The Rust artifacts the bench builds (`tsv_ffi`, `tsv_napi`,
@@ -1135,10 +1135,10 @@ binding — re-run `bench:install`.
 ```bash
 cd benches/js && npm outdated   # current vs latest
 # bump the version in benches/js/package.json, then:
-deno task bench:install   # re-install at the new pins (+ re-fetch the oxc wasi binding)
+npm run bench:install     # re-install at the new pins (+ re-fetch the oxc wasi binding)
 deno task smoke           # confirm every impl still loads + formats (the run prints its check count)
-deno task typecheck:js    # the wrapper types still line up with the new .d.ts
-deno task bench           # regenerate report.{deno,node,bun}.* + combined report.{json,md}
+npm run typecheck:js      # the wrapper types still line up with the new .d.ts
+npm run bench             # regenerate report.{deno,node,bun}.* + combined report.{json,md}
 # commit package.json + package-lock.json + results/report.*
 ```
 
@@ -1186,14 +1186,14 @@ node -e "import('@oxc-parser/binding-wasm32-wasi').then(() => console.log('wasi 
 
 The rejection handler is the point: without it a load failure surfaces as an
 unhandled rejection rather than the one line naming the cause. Raise the
-`force_installed` pin only once that exits 0, then `deno task bench:install` to put the
+`force_installed` pin only once that exits 0, then `npm run bench:install` to put the
 tree back in agreement with `package.json`.
 
 The `deno task smoke` step above is the backstop: it names every impl that failed
 to load (`Unavailable (N) — no rows to check`) and qualifies its pass count with
 the shortfall, so a silently-dropped row shows up there instead of as a smaller
 table nobody diffed. It smokes the **Deno** loader only, though, and each runtime
-loads its own binding (`smoke:node`, `smoke:bun`, once the block's `deno task bench` step has
+loads its own binding (`smoke:node`, `smoke:bun`, once the block's `npm run bench` step has
 built their artifacts) — a break confined to another runtime surfaces a step later,
 as an `unavailable` entry in that runtime's report plus the ⚠ the bench prints when
 it publishes one short of an impl. The oxc wasi break above is
@@ -1212,11 +1212,11 @@ parser/formatter that defines fixture correctness. Agreement across all pin site
 the manifest-less transitives, `LOCKED_TRANSITIVE` — and `benches/js/package.json`) —
 and the prettier OPTIONS, which the bench's
 `PRETTIER_OPTIONS` (`benches/js/lib/canonical.ts`) and the sidecar's inline call must spell
-identically — is enforced by `deno task pins:audit`
-(`scripts/check_canonical_pins.ts --pins`, gated in `deno task check`).
+identically — is enforced by `npm run pins:audit`
+(`scripts/check_canonical_pins.ts --pins`, gated in `npm run check`).
 
-**Checkout alignment** is the same script's other mode (`deno task
-pins:audit:checkouts`), gated in `deno task conformance` and reported by `doctor`: a
+**Checkout alignment** is the same script's other mode (`npm run
+pins:audit:checkouts`), gated in `npm run conformance` and reported by `doctor`: a
 present `../svelte` / `../acorn-typescript` checkout whose version differs from its
 pin FAILS (absent checkouts are skipped, so a machine without the clones still
 passes). Align the checkout to the pinned tag, or bump the pins deliberately. The
@@ -1224,8 +1224,8 @@ two modes are split because they assert different KINDS of fact (full reference:
 [audits.md §Canonical-Pin Agreement Audit](audits.md#canonical-pin-agreement-audit-pinsaudit)
 and [§Checkout-Alignment Audit](audits.md#checkout-alignment-audit-pinsauditcheckouts)): pin agreement is a
 **repo** fact that invalidates the fixture grading `cargo test` does, so it gates the
-committed tree; alignment is an **environment** fact about suites nothing in `deno
-task check` reads, so a skew there would halt that chain without invalidating a
+committed tree; alignment is an **environment** fact about suites nothing in `npm
+run check` reads, so a skew there would halt that chain without invalidating a
 single committed-tree verdict. `../prettier` is not gated (its suites' oracle output
 is computed live per file and the checkout rides `-dev` versions); `doctor` reports
 it.
@@ -1238,21 +1238,21 @@ compile-fixture step, and an `@sveltejs/acorn-typescript` bump moves
 ```bash
 # 1. edit the pin sites in lockstep: benches/js/package.json + crates/tsv_debug/sidecar/package.json
 #    (the `//canonical-sync` note in benches/js/package.json restates this)
-deno task bench:install            # benches/js node_modules at the new pin
-deno task pins:lock                # the sidecar lock (network; --allow-fresh only for a <24h-old release)
+npm run bench:install              # benches/js node_modules at the new pin
+npm run pins:lock                  # the sidecar lock (network; --allow-fresh only for a <24h-old release)
 npm ci --prefix crates/tsv_debug/sidecar  # the sidecar refuses an install that isn't its lock's
-deno task pins:audit               # fails until LOCKED_TRANSITIVE matches the regenerated lock
+npm run pins:audit                 # fails until LOCKED_TRANSITIVE matches the regenerated lock
 # 2. the suite checkout to the release tag (pins:audit:checkouts fails until it matches)
 git -C ../svelte fetch --tags && git -C ../svelte checkout svelte@<version>
 # 3. both fixture trees
-deno task fixtures:update          # review the churn
-deno task compile:fixtures:validate  # an oracle-freshness failure is a stale expected_server.js:
-#   re-init it with `deno task compile:fixtures:init <dir>` (bare re-reads its input.svelte);
+npm run fixtures:update            # review the churn
+npm run compile:fixtures:validate    # an oracle-freshness failure is a stale expected_server.js:
+#   re-init it with `npm run compile:fixtures:init -- <dir>` (bare re-reads its input.svelte);
 #   a parity failure that survives the re-init is tsv's compiler behind the oracle
 # 4. the sidecar-cadence gates, which name every count that moved
-deno task conformance              # checkouts, suite pins, both fixture trees, the fixtures
+npm run conformance                # checkouts, suite pins, both fixture trees, the fixtures
 #   gates, corpus parse/format, render:audit
-deno task compile:validation       # not in `conformance`; `:update` re-pins only an explained move
+npm run compile:validation         # not in `conformance`; `:update` re-pins only an explained move
 # 5. prose that restated the old pin (below)
 rg '<old>' --glob '!benches/js/results/**'
 ```
@@ -1292,7 +1292,7 @@ across `docs/` and two crates. A **past**-version mention is different and stays
 so this cannot be a lint, only a read. Prefer pointing at the sidecar's `package.json`
 over restating the number.
 
-Steps 3 and 4 are there because `deno task check` covers none of what they grade —
+Steps 3 and 4 are there because `npm run check` covers none of what they grade —
 each is sidecar-dependent. `check` runs only the compile fixtures' sidecar-free
 slice, which grades tsv against the committed `expected_server.js` and so stays
 green while the oracle moves away from both; the validation ratchet's

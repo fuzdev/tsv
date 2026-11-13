@@ -20,7 +20,7 @@
  *   PKG_DIR=crates/tsv_wasm/pkg/parse/npm node --test scripts/test_npm.ts
  *   PKG_DIR=crates/tsv_wasm/pkg/all/npm node --test scripts/test_npm.ts
  *
- * Prerequisites: deno task build:npm:format (or build:npm:parse / build:npm:all)
+ * Prerequisites: npm run build:npm:format (or build:npm:parse / build:npm:all)
  */
 
 import { after, describe, it } from 'node:test';
@@ -859,7 +859,7 @@ describe(`raw engine parse failure (tsv_wasm.js): ${pkg_dir}`, () => {
 // Locations helper (locations.js, re-exported from index.js) and the `{locations: true}`
 // sugar that runs it — `loc` reconstructed from `start`/`end` + source over the span-only
 // tree every parse returns. These assert the shipped package's wiring end to end; whether
-// the reconstruction equals the Rust `loc` emitter is `deno task check:loc`'s (every
+// the reconstruction equals the Rust `loc` emitter is `npm run check:loc`'s (every
 // fixture document) and `tests/loc_definition.rs`'s, which grade the engine itself, and
 // at corpus scale the bench's `+locations` rows run it too.
 describe(`locations helper (index.js): ${pkg_dir}`, { skip: !has_parse }, () => {
@@ -987,7 +987,7 @@ describe(`locations helper (index.js): ${pkg_dir}`, { skip: !has_parse }, () => 
 	// reconstruction of the default parse in the document's language, the default parse must
 	// be that tree minus `loc` / `name_loc`, and `create_locator(...).loc_of` must agree with
 	// the reconstruction node for node, so the two entry points cannot drift apart. Whether
-	// the reconstruction equals the Rust `loc` emitter is `deno task check:loc`'s, over the
+	// the reconstruction equals the Rust `loc` emitter is `npm run check:loc`'s, over the
 	// same tree, against the native writer.
 	it('wires `{locations: true}` exactly, over every fixture source', () => {
 		const roots = [join(repo_root, 'tests/fixtures'), join(repo_root, 'tests/fixtures_compile')];

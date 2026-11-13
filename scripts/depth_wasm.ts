@@ -5,7 +5,7 @@
  *
  * A WASM build spends two stacks: its spilled frames on a 1 MiB shadow stack in linear
  * memory, and its call frames on the engine's own, about 1 MiB on a V8 main thread. The
- * native gate (`deno task test:depth:napi`) grades neither, so this one runs the package
+ * native gate (`npm run test:depth:napi`) grades neither, so this one runs the package
  * itself: for every shape, at its accepted `n`, the parse (the object form, with and
  * without `{locations: true}`, and the `_json` string), the format, the format's output
  * parsed again and formatted to itself (F1), the import records — TypeScript and Svelte,
@@ -31,14 +31,14 @@
  * run in a fixed order, the instance reinstantiated before each (`reinstantiate()`, from
  * the retained compiled module, so tiering carries across shapes), and after any throw.
  *
- * Not in `deno task check`, which builds no package: it runs in CI's `artifacts` job
+ * Not in `npm run check`, which builds no package: it runs in CI's `artifacts` job
  * after the package build and the shipped-build depth gate, and in publish's artifact
  * validation (Step 6).
  *
  * Usage: node scripts/depth_wasm.ts [--shapes <file>] [--jobs <n>] [--filter <substring>]
  *          [--pass cold|warm] [--node-flag <flag>]...
- *   (`deno task test:depth:wasm`; PKG_DIR overrides the package, default the staged `all`)
- * Prerequisite: deno task build:npm:all
+ *   (`npm run test:depth:wasm`; PKG_DIR overrides the package, default the staged `all`)
+ * Prerequisite: npm run build:npm:all
  */
 
 import { spawn } from 'node:child_process';
@@ -179,7 +179,7 @@ if (flags.has('child')) {
 	await run_child(flags);
 } else {
 	if ('Deno' in globalThis) {
-		console.error('✗ run under Node (`deno task test:depth:wasm`), whose main thread is graded');
+		console.error('✗ run under Node (`npm run test:depth:wasm`), whose main thread is graded');
 		process.exit(1);
 	}
 	if (process.env.PKG_DIR === undefined) await assert_staged_fresh(wasm_package_checks('all'));

@@ -12,7 +12,7 @@
  *
  * Hand-written ASTs rather than a real binding on purpose: the grader's job is to
  * read a wire's shape, and a test that parsed through an artifact would need one
- * built, test the artifact instead, and stop gating in `deno task check` (see
+ * built, test the artifact instead, and stop gating in `npm run check` (see
  * `test:node`). What the bindings actually emit is asked at every `init()`.
  */
 
@@ -25,7 +25,7 @@ import {
 	type LocationsProbeTarget
 } from './locations_probe.ts';
 
-const artifact = { path: 'pkg/all/probe/tsv_wasm.js', rebuild: 'deno task build:probe' };
+const artifact = { path: 'pkg/all/probe/tsv_wasm.js', rebuild: 'npm run build:napi:probe' };
 
 /** A loc-bearing wire: `loc` on the root and on a nested node inside an array. */
 const with_loc = {

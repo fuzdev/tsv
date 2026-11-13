@@ -245,8 +245,8 @@ write itself.
 Off by default (like `_internal_swallow_check`), so production builds — and default `tsv_debug`
 builds, whose profiles must measure production-shaped code — compile out the registration,
 the `DocArena` side-set, and the render hook. Output is byte-identical either way.
-`tsv_debug` forwards the feature and gates `comment_audit` behind it; `deno task
-comments:audit` drives it over `tests/fixtures` and is gated in `deno task check`.
+`tsv_debug` forwards the feature and gates `comment_audit` behind it; `npm run
+comments:audit` drives it over `tests/fixtures` and is gated in `npm run check`.
 
 ### Directive Recognition
 

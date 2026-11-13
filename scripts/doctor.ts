@@ -462,8 +462,8 @@ export const run_doctor = async (
 	// --- Canonical pins -----------------------------------------------------------
 
 	section('Canonical oracle pins');
-	// No mode flag = BOTH halves — the pin agreement `deno task check` gates plus the
-	// checkout alignment/drift `deno task conformance` gates. Doctor is the one place
+	// No mode flag = BOTH halves — the pin agreement `npm run check` gates plus the
+	// checkout alignment/drift `npm run conformance` gates. Doctor is the one place
 	// that reports them together, which is what makes an env skew visible before a
 	// conformance run rather than during one. It runs under Node, as `pins:audit` does; its
 	// commit-drift half shells out to `git rev-parse` and says so when no git is on `PATH`.
@@ -618,7 +618,7 @@ export const run_doctor = async (
 	//
 	// `../typescript-go` feeds ONLY the on-demand `conformance:tsc-roundtrip` /
 	// `conformance:tsc-check` tasks for the experimental `tsv_check` crate — not
-	// `deno task check`, not the release gates. A machine that never touches the
+	// `npm run check`, not the release gates. A machine that never touches the
 	// typechecker needs none of it, so every finding here is a warning at most.
 	// Git-SHA-pinned (not npm-versioned), so it isn't in pins:audit either — its tsgo
 	// commit is pinned by the Rust count-pins. See docs/typechecker.md.
@@ -697,7 +697,7 @@ export const run_doctor = async (
 		try {
 			recorded = JSON.parse(await checkout.read_text(path)) as Record<string, unknown>;
 		} catch {
-			warn(`${name}: never stamped (no ${path}) — run deno task ${task}${aside}`);
+			warn(`${name}: never stamped (no ${path}) — run npm run ${task}${aside}`);
 			continue;
 		}
 		// A key the stamp does not carry at all is reported as such rather than as a
@@ -714,7 +714,7 @@ export const run_doctor = async (
 							? `${h.repo} (stamped ${short_commit(h.recorded)}, now ${short_commit(h.head!)})`
 							: `${h.repo} (no \`${h.key}\` recorded — the stamp predates that input)`
 					)
-					.join(', ')} — run deno task ${task}${aside}`
+					.join(', ')} — run npm run ${task}${aside}`
 			);
 		} else ok(`${name}: stamp matches ${gradable.map((h) => h.repo).join(' + ')}${aside}`);
 	}
@@ -762,19 +762,19 @@ export const run_doctor = async (
 	const napi_lib = native_library_filename('tsv_napi');
 	// each in the checkout, or beneath `target/` in the target handle
 	const artifacts: Array<[path: string, task: string]> = [
-		[`.pgo/bench/${ffi_lib}`, 'deno task build:bench:pgo (bench:deno, profile-guided)'],
-		[`.pgo/bench/${napi_lib}`, 'deno task build:bench:pgo (bench:node/bun, profile-guided)'],
+		[`.pgo/bench/${ffi_lib}`, 'npm run build:bench:pgo (bench:deno, profile-guided)'],
+		[`.pgo/bench/${napi_lib}`, 'npm run build:bench:pgo (bench:node/bun, profile-guided)'],
 		[
 			`target/${napi_target_path(COMPARE_PROFILE)}`,
 			`${napi_rebuild_task(COMPARE_PROFILE)} (conformance gates, over-acceptance)`
 		],
 		[`target/${napi_target_path('napi')}`, `${napi_rebuild_task('napi')} (test:napi)`],
-		['crates/tsv_wasm/pkg/all/deno', 'deno task build:wasm:all:deno (bench:deno)'],
+		['crates/tsv_wasm/pkg/all/deno', 'npm run build:wasm:all:deno (bench:deno)'],
 		[
 			'crates/tsv_wasm/pkg/all/nodejs',
-			'deno task build:wasm:all:nodejs (bench:node/bun, over-acceptance)'
+			'npm run build:wasm:all:nodejs (bench:node/bun, over-acceptance)'
 		],
-		['crates/tsv_wasm/pkg/all/npm', 'deno task build:npm:all (publish)']
+		['crates/tsv_wasm/pkg/all/npm', 'npm run build:npm:all (publish)']
 	];
 	for (const [path, task] of artifacts) {
 		const present = path.startsWith('target/')

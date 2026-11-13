@@ -243,7 +243,7 @@ describe('a linked ../prettier reads as a directory, a dangling one as none', ()
 			lines: [
 				'⚠ roundtrip:audit:prettier NOT RUN — no ../prettier checkout (3 suites skipped).',
 				'  This leg is the only one in `check` that reaches non-format-stable inputs.',
-				'  Clone prettier beside this repo (see `deno task doctor`) to gate it locally.'
+				'  Clone prettier beside this repo (see `npm run doctor`) to gate it locally.'
 			],
 			calls: []
 		};

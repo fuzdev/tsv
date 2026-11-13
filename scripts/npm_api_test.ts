@@ -6,10 +6,10 @@
  * through).
  *
  * A fake engine rather than a built package on purpose: what this grades is the
- * facade's own logic, which needs no artifact — so it gates in `deno task check`
+ * facade's own logic, which needs no artifact — so it gates in `npm run check`
  * (`test:node`) on a bare clone. The package suites (`scripts/test_npm.ts`,
  * `scripts/test_napi_npm.ts`) grade the same surface through the real engines, and
- * `deno task check:loc` grades the reconstruction itself against the Rust emitter.
+ * `npm run check:loc` grades the reconstruction itself against the Rust emitter.
  */
 
 import { deepStrictEqual, strictEqual, throws } from 'node:assert';

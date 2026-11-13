@@ -131,7 +131,7 @@ export function refuse_ffi_profile_override(entry: string): void {
 	if (profile === undefined) return;
 	throw new Error(
 		`${entry}: TSV_FFI_PROFILE=${profile} is set, which loads target/${profile}'s plain FFI library — ` +
-			'the bench and smoke measure the profile-guided one (`deno task build:bench:pgo`); unset it'
+			'the bench and smoke measure the profile-guided one (`npm run build:bench:pgo`); unset it'
 	);
 }
 

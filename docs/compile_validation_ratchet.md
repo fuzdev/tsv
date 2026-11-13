@@ -26,15 +26,15 @@ reachable, hence the ratchet.
 ## Running it
 
 ```bash
-deno task compile:validation          # the gate
-deno task compile:validation:update   # re-pin after fixing (or newly refusing) findings
+npm run compile:validation            # the gate
+npm run compile:validation:update     # re-pin after fixing (or newly refusing) findings
 
 # A subtree spot-check — reported, but NOT graded (see Narrowing below):
 cargo run -p tsv_debug compile_corpus_compare --ratchet ../svelte/packages/svelte/tests/validator
 ```
 
 Sidecar-dependent (every file needs an oracle compile), so it is **not** in
-`deno task check` — the same reason `compile:corpus:compare` and `compile:fuzz` are
+`npm run check` — the same reason `compile:corpus:compare` and `compile:fuzz` are
 freestanding ([compile_tooling.md](compile_tooling.md)). It is also outside `conformance` / `conformance:all` / publish Step 3b: the
 compiler ships in no artifact.
 
@@ -173,7 +173,7 @@ snapshot file is a hard read error, never an empty set.
   a harness error appeared. Fix it; do not re-pin.
 - **`STALE`** — the finding stopped firing. Usually a win (a validation rule you ported,
   or a new refusal that covers the shape). Confirm it is a win rather than a corpus that
-  moved, then `deno task compile:validation:update`.
+  moved, then `npm run compile:validation:update`.
 - **`MISMATCH`** / **`HARNESS-ERROR`** — never pin. Each is tsv's own bug (or, for
   `read` / `oracle-sidecar`, a broken environment), not a line in the upstream-debt list.
 
@@ -188,7 +188,7 @@ retired `ORACLE-ERROR` is not an over-acceptance win, and is reported on its own
 - The key is the *finding*, not a count — so a green run proves no new finding **shape**,
   never that the compiler's validation is correct on anything outside these suites.
 - The suites are static and version-pinned to the `../svelte` checkout; a pin bump can
-  legitimately move many lines at once. `deno task pins:audit:checkouts` is what keeps the
+  legitimately move many lines at once. `npm run pins:audit:checkouts` is what keeps the
   checkout and the sidecar pin aligned.
 
 ## See Also

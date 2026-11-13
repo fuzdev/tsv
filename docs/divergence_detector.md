@@ -91,14 +91,14 @@ interface DiffHunk {
 
 ```bash
 # Compare corpus against Prettier (uses divergence detection)
-deno task corpus:compare:format ../some-project
-deno task corpus:compare:format ../some-project --explain         # Show which patterns matched
-deno task corpus:compare:format --all --audit-patterns               # Per-pattern coverage with samples
+npm run corpus:compare:format -- ../some-project
+npm run corpus:compare:format -- ../some-project --explain        # Show which patterns matched
+npm run corpus:compare:format -- --all --audit-patterns              # Per-pattern coverage with samples
 
-deno task divergence:audit        # Human-readable report
-deno task divergence:audit --json # Machine-readable JSON
+npm run divergence:audit          # Human-readable report
+npm run divergence:audit -- --json # Machine-readable JSON
 
-deno task test:node               # pattern tests and the fixture-coverage audit
+npm run test:node                 # pattern tests and the fixture-coverage audit
 ```
 
 `divergence:audit` runs every pattern against every documented fixture's committed prettier
@@ -116,11 +116,11 @@ Every pattern in `patterns.ts` includes:
 - `conformance_sections` - Which sections of the `conformance_prettier*.md` family it covers
 - `fixtures` - An **explicit assertion** that this pattern detects these
   `*_prettier_divergence` fixtures. **Enforced**: the behavioral fixture-coverage audit
-  (`fixture_coverage_test.ts`, in `deno task check`) drives each pattern against the
+  (`fixture_coverage_test.ts`, in `npm run check`) drives each pattern against the
   fixtures it lists and fails if one stops being detected, or if a listed path names no
   directory on disk.
 
-**Coverage is computed, not declared.** `deno task divergence:audit` answers "is this
+**Coverage is computed, not declared.** `npm run divergence:audit` answers "is this
 documented divergence detected?" by running `detect_divergences` — the same classifier the
 corpus comparison uses — against each fixture's committed prettier forms
 (`fixture_cases.ts`, shared with the test above — no build, no sidecar, ~0.2 s for the
@@ -156,7 +156,7 @@ falsely claimed by a pattern that cannot actually detect them.
 ## Pending work
 
 The audit's report **is** the work-list — these numbers move as detectors are widened,
-so read them live (`deno task divergence:audit`) rather than trusting the counts here.
+so read them live (`npm run divergence:audit`) rather than trusting the counts here.
 Four buckets, in rough priority order:
 
 1. **Undetected** — a documented divergence pinning a prettier form that no
@@ -255,7 +255,7 @@ language/feature pattern claims a hunk before the broad `fill_101_boundary` /
    `comment_position`
 
 `patterns.ts` is the source of truth for the full list and each pattern's
-`conformance_sections` / `fixtures`; `deno task divergence:audit` prints, per pattern,
+`conformance_sections` / `fixtures`; `npm run divergence:audit` prints, per pattern,
 both the `listed` count (its `fixtures[]` entries) and the measured `detects` count, plus
 overall detection (a `detects 0` pattern is not thereby dead — see
 [Pending work](#pending-work)). Each pattern's `detect()` returns
@@ -384,25 +384,25 @@ silently.
 A pattern that matches a hunk it shouldn't will mark a real bug (or real data loss) as
 `known`. Two layers guard against this:
 
-- **Behavioral + unit tests** (`deno task test:node`): synthetic positive cases,
+- **Behavioral + unit tests** (`npm run test:node`): synthetic positive cases,
   overmatch-**rejection** negative cases (a bug-shaped diff must return `null`), and the
   fixture-coverage audit. New patterns must add a negative for the false-positive scenario.
 - **Corpus spot-check**: per-pattern report of what each pattern claims, with sample diffs.
 
 ```bash
-deno task corpus:compare:format --all --audit-patterns   # what each pattern claims, with samples
-deno task test:node                          # unit and behavioral tests
+npm run corpus:compare:format -- --all --audit-patterns  # what each pattern claims, with samples
+npm run test:node                            # unit and behavioral tests
 ```
 
 **Audit workflow:**
 
-1. Run `deno task corpus:compare:format --all --audit-patterns` to see what each pattern claims
+1. Run `npm run corpus:compare:format -- --all --audit-patterns` to see what each pattern claims
 2. For each pattern, review the sample diffs shown
 3. If a claimed diff doesn't match the documented divergence:
    - The pattern's detection logic is too broad — tighten it (prefer reusing the shared
      `long_line_rewrapped` helper, which bundles the ours-side re-wrap guard)
    - Add a negative test case in `patterns_test.ts` for the false-positive scenario
-4. Run `deno task test:node` to verify no regressions
+4. Run `npm run test:node` to verify no regressions
 
 ## Adding New Patterns
 
@@ -445,5 +445,5 @@ const new_pattern: DivergencePattern = {
    don't list a divergence the pattern structurally can't claim (reassign it to the pattern
    that does, or leave it honestly uncovered).
 5. Add to `PATTERNS` array (respect tier ordering: specific before broad)
-6. Run `deno task test:node` to verify tests pass
-7. Run `deno task divergence:audit` to verify coverage
+6. Run `npm run test:node` to verify tests pass
+7. Run `npm run divergence:audit` to verify coverage

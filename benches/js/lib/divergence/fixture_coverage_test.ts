@@ -374,7 +374,7 @@ test('fixture coverage: every listed fixture is FULLY explained', async () => {
  * EVERY pattern (the per-pattern tests skip empty `fixtures` arrays), it reports
  * every broken reference at once instead of aborting on the first, and it is the
  * gate for a class `divergence:audit` reports but cannot enforce — that audit is
- * not part of `deno task check`, and until it grew `missing_pattern_fixtures` it
+ * not part of `npm run check`, and until it grew `missing_pattern_fixtures` it
  * folded broken references in among the claimed-but-undocumented orphans, where
  * eight of them sat unnoticed.
  */

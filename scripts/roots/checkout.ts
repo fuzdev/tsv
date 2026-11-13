@@ -6,7 +6,7 @@
  * A program named by a path (`target/corpus/tsv`) is resolved by gro's spawn host module
  * against its project root, the working directory, so `checkout_program` refuses to make one
  * unless the working directory is this checkout: the binary pinned is then the checkout's own.
- * The npm scripts and `deno task` both run from the checkout's root.
+ * The npm scripts run from the checkout's root.
  *
  * @module
  */
