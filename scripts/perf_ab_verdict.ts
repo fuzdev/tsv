@@ -76,7 +76,7 @@ export const KEEP_TREES = 6;
 export const LANGS = ['ts', 'svelte', 'css', 'strip'] as const;
 export type Lang = (typeof LANGS)[number];
 
-export const PHASES = ['parse', 'format', 'strip'] as const;
+export const PHASES = ['parse', 'format', 'strip', 'json', 'imports'] as const;
 export type Phase = (typeof PHASES)[number];
 
 /** Each language's two rows: its parse, then the work after the parse. */
@@ -86,6 +86,20 @@ export const LANG_PHASES: Readonly<Record<Lang, readonly [Phase, Phase]>> = {
 	css: ['parse', 'format'],
 	strip: ['parse', 'strip']
 };
+
+/** Each language's two one-shot rows (`--one-shot`): the public free functions a library caller
+ * reaches, each a whole call over fresh stores — `parse_to_json` then `format` through the format
+ * driver, `parse_imports` then `strip` through the strip driver. */
+export const ONE_SHOT_PHASES: Readonly<Record<Lang, readonly [Phase, Phase]>> = {
+	ts: ['json', 'format'],
+	svelte: ['json', 'format'],
+	css: ['json', 'format'],
+	strip: ['imports', 'strip']
+};
+
+/** Which calls a driver run times: the warm path the verdict grades, or the one-shot public
+ * functions (`--one-shot`), reported beside it and never graded. */
+export type DriverPath = 'warm' | 'one_shot';
 
 const LANG_LABELS: Record<Lang, string> = {
 	ts: 'TS',
@@ -105,17 +119,20 @@ export interface InstructionTotals {
 /**
  * A language's two phases' instructions per iteration, fixed cost removed. The parse is parse-only
  * less the fixed cost. A format driver's full run parses once and formats, so the format is full
- * less parse-only; the strip driver's full run parses AND strips, and the strip parses again
+ * less parse-only; the strip driver's full warm run parses AND strips, and the strip parses again
  * inside, so its walk + blank is full less twice the parse-only work (each parse-only total
- * carries the fixed cost once, so one fixed cost is added back).
+ * carries the fixed cost once, so one fixed cost is added back). On the one-shot path the strip
+ * row is the whole `strip` call, its parse included, so it splits at parse-only as a format row
+ * does.
  */
 export function phase_instructions(
 	lang: Lang,
 	totals: InstructionTotals,
-	iterations: number
+	iterations: number,
+	path: DriverPath = 'warm'
 ): [number, number] {
 	const { full, parse, fixed } = totals;
-	const work = lang === 'strip' ? full - 2 * parse + fixed : full - parse;
+	const work = lang === 'strip' && path === 'warm' ? full - 2 * parse + fixed : full - parse;
 	return [(parse - fixed) / iterations, work / iterations];
 }
 
@@ -506,13 +523,28 @@ const VERDICT_LABELS: Record<RowVerdict, string> = {
 	fail: 'FAIL'
 };
 
+/** An informational row's verdict cell: what the rule would say, in parentheses. A FAIL there
+ * names no sign-off, since nothing signs an informational row off. */
+const INFORMATIONAL_LABELS: Record<RowVerdict, string> = {
+	pass: '(pass)',
+	layout: '(LAYOUT)',
+	warn: '(WARN instr)',
+	fail: '(FAIL)'
+};
+
 /** The verdict cell: a sign-off FAIL says so. */
 function verdict_label(row: AbRow): string {
 	return row.sign_off ? 'FAIL (sign-off)' : VERDICT_LABELS[row.verdict];
 }
 
-/** The result table, Markdown-shaped so it pastes into a report as is. */
-export function render_table(rows: ReadonlyArray<AbRow>): string {
+/** The result table, Markdown-shaped so it pastes into a report as is. An `informational` table
+ * (the one-shot rows) prints each verdict in parentheses: what the rule would say, never graded. */
+export function render_table(
+	rows: ReadonlyArray<AbRow>,
+	options: { informational?: boolean } = {}
+): string {
+	const verdict_cell = (row: AbRow): string =>
+		options.informational ? INFORMATIONAL_LABELS[row.verdict] : verdict_label(row);
 	const header = [
 		'row',
 		'base wall',
@@ -531,7 +563,7 @@ export function render_table(rows: ReadonlyArray<AbRow>): string {
 		row.base_instructions === null ? '—' : format_instructions(row.base_instructions),
 		row.cand_instructions === null ? '—' : format_instructions(row.cand_instructions),
 		row.instructions_pct === null ? '—' : format_pct(row.instructions_pct),
-		verdict_label(row)
+		verdict_cell(row)
 	]);
 	const widths = header.map((h, i) => Math.max(h.length, ...body.map((cells) => cells[i]!.length)));
 	const line = (cells: ReadonlyArray<string>): string =>

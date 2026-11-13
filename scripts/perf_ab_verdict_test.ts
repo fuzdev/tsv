@@ -1,4 +1,4 @@
-import { deepStrictEqual, throws } from 'node:assert';
+import { deepStrictEqual, ok, throws } from 'node:assert';
 import { test } from 'vitest';
 
 import {
@@ -24,6 +24,7 @@ import {
 	needs_sign_off,
 	noisy_rows,
 	NOISY_SPREAD_PCT,
+	ONE_SHOT_PHASES,
 	overall_passes,
 	parse_perf_stat_counter,
 	parse_perf_stat_instructions,
@@ -558,6 +559,58 @@ test('phase_instructions: a format row splits at parse-only, the strip row parse
 	deepStrictEqual(phase_instructions('strip', strip_totals, it), [parse, walk]);
 	deepStrictEqual(LANG_PHASES.strip, ['parse', 'strip']);
 	deepStrictEqual(LANG_PHASES.ts, ['parse', 'format']);
+});
+
+test('phase_instructions: on the one-shot path every row splits at parse-only, the strip too', () => {
+	// the one-shot strip is the whole `strip` call, its own parse included: full = fixed + it ×
+	// (imports + strip), so the strip is full − parse-only, never full − 2 × parse-only + fixed
+	const [imports, strip] = [30, 45];
+	const it = 5;
+	const totals = { full: 100 + it * (imports + strip), parse: 100 + it * imports, fixed: 100 };
+	deepStrictEqual(phase_instructions('strip', totals, it, 'one_shot'), [imports, strip]);
+	deepStrictEqual(phase_instructions('ts', totals, it, 'one_shot'), [imports, strip]);
+	// and the warm path is the default, unchanged
+	deepStrictEqual(
+		phase_instructions('strip', totals, it, 'warm'),
+		phase_instructions('strip', totals, it)
+	);
+	deepStrictEqual(phase_instructions('strip', totals, it), [imports, strip - imports]);
+	deepStrictEqual(ONE_SHOT_PHASES.ts, ['json', 'format']);
+	deepStrictEqual(ONE_SHOT_PHASES.strip, ['imports', 'strip']);
+});
+
+test('render_table: an informational table puts each verdict in parentheses, nothing else', () => {
+	const rows = [
+		ab_row(
+			'ts',
+			'json',
+			{ wall_us: [1000], instructions: [1e9] },
+			{ wall_us: [1100], instructions: [1.1e9] }
+		),
+		ab_row(
+			'strip',
+			'imports',
+			{ wall_us: [500], instructions: [] },
+			{ wall_us: [500], instructions: [] }
+		),
+		ab_row(
+			'css',
+			'format',
+			{ wall_us: [1000], instructions: [1e9] },
+			{ wall_us: [1030], instructions: [1e9] }
+		)
+	];
+	const graded = render_table(rows).split('\n');
+	const informational = render_table(rows, { informational: true }).split('\n');
+	deepStrictEqual(informational.length, 5);
+	deepStrictEqual(new Set(informational.map((line) => line.length)).size, 1);
+	ok(informational[2]!.includes('TS json') && informational[2]!.includes('(FAIL)'));
+	ok(informational[3]!.includes('Strip imports') && informational[3]!.includes('(pass)'));
+	ok(informational[4]!.includes('CSS format') && informational[4]!.includes('| (LAYOUT) '));
+	// the same cells otherwise
+	const cells = (line: string): Array<string> => line.split('|').map((cell) => cell.trim());
+	deepStrictEqual(cells(informational[2]!).slice(0, -2), cells(graded[2]!).slice(0, -2));
+	deepStrictEqual(cells(graded[2]!).at(-2), 'FAIL');
 });
 
 test('strip_skip_reason: measured only when both sides have the strip', () => {
