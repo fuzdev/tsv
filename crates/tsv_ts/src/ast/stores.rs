@@ -18,8 +18,9 @@
 //! read, and the first reading of an acorn re-parse stays valid beside the second. Its
 //! scratch lists live here and not on the parser, because a parser is built per island.
 //!
-//! What outlives a parse is the empty form: [`AstStores::park`] rewinds the stores and keeps
-//! their capacity. Handles die with the parse that minted them: nothing id-shaped leaves
+//! What outlives a parse is the rewound form: [`AstStores::reset`] rewinds the stores in
+//! place, keeping each written store's slot 0 and every allocation's capacity, and never
+//! trims. Handles die with the parse that minted them: nothing id-shaped leaves
 //! [`with_stores`]'s closure or a [`Parsed`], whose stores it keeps beside the tree they
 //! belong to.
 
@@ -155,7 +156,7 @@ const _: () = {
 };
 
 /// Declares the payload stores. Per entry: the row type's family tag and the id the tree holds,
-/// a [`PayloadStores`] field, that field's lines in `new` and `park`, and the [`AstView`]
+/// a [`PayloadStores`] field, that field's lines in `new` and `reset`, and the [`AstView`]
 /// accessor that resolves one id. The entry's doc comment documents the field and the tag.
 macro_rules! payload_stores {
     (
@@ -199,11 +200,16 @@ macro_rules! payload_stores {
                 }
             }
 
-            /// Rewinds the stores, as [`AstStores::park`] does.
-            pub(crate) fn park(self) -> PayloadStores {
-                PayloadStores {
-                    $($field: self.$field.recycle(),)*
-                }
+            /// Rewinds the stores in place, as [`AstStores::reset`] does.
+            #[inline]
+            pub(crate) fn reset(&mut self) {
+                $(self.$field.reset();)*
+            }
+
+            /// Every store's shape, for the tests that read what a reset leaves.
+            #[cfg(test)]
+            fn shapes(&self, out: &mut Vec<FieldShape>) {
+                $(out.push(FieldShape::store(stringify!($field), &self.$field));)*
             }
         }
 
@@ -293,7 +299,7 @@ payload_stores! {
 
 /// Declares the value-run stores. Per entry: the element type's family tag, whose [`Run`] is
 /// the list the tree holds, a [`RunStores`] store and the scratch stack that builds its lists,
-/// their lines in `new` and `park`, the scratch's mark in [`RunMarks`], and the [`AstView`]
+/// their lines in `new` and `reset`, the scratch's mark in [`RunMarks`], and the [`AstView`]
 /// accessor that reads one list. The entry's doc comment documents the store and the tag.
 macro_rules! value_runs {
     (
@@ -343,14 +349,23 @@ macro_rules! value_runs {
                 }
             }
 
-            /// Rewinds the stores and scratch stacks, as [`AstStores::park`] does.
-            pub(crate) fn park(self) -> RunStores {
-                RunStores {
-                    $(
-                        $field: self.$field.recycle(),
-                        $scratch: self.$scratch.recycle(),
-                    )*
-                }
+            /// Rewinds the stores and scratch stacks in place, as [`AstStores::reset`] does.
+            #[inline]
+            pub(crate) fn reset(&mut self) {
+                $(
+                    self.$field.reset();
+                    self.$scratch.reset();
+                )*
+            }
+
+            /// Every store's and scratch stack's shape, for the tests that read what a reset
+            /// leaves.
+            #[cfg(test)]
+            fn shapes(&self, out: &mut Vec<FieldShape>) {
+                $(
+                    out.push(FieldShape::store(stringify!($field), &self.$field));
+                    out.push(FieldShape::scratch(stringify!($scratch), &self.$scratch));
+                )*
             }
 
             /// The current tops of the scratch stacks, their heights left for `group` to check.
@@ -591,61 +606,155 @@ impl AstStores {
         }
     }
 
-    /// Rewinds the stores, keeping their capacity in the form that can outlive the parse.
-    /// Every id and run minted so far is invalid from here on.
+    /// Rewinds the stores in place between documents. Every store once written keeps its slot
+    /// 0, so the next document's first write to it mints straight behind it; every store,
+    /// scratch stack and the pool keep their capacity. Every id, run and pool text minted so
+    /// far is invalid from here on.
     // TODO: never trims. Peak row capacity stays parked for as long as the `Formatter` or the
     // thread lives, where the AST arena's rewind releases every block but the largest while
     // idle. Rows held here instead of in the `Bump` escape that release.
-    #[must_use]
-    pub fn park(self) -> AstStores {
+    #[inline]
+    pub fn reset(&mut self) {
+        // destructured whole, so a field added to the stores without a reset here is a build
+        // error rather than growth across documents
         let Self {
             exprs,
-            mut expr_lists,
-            mut expr_opt_lists,
-            expr_scratch,
-            mut expr_list_scratch,
-            mut expr_opt_scratch,
-            stmts,
-            mut stmt_lists,
-            mut stmt_list_scratch,
-            tys,
-            mut ty_lists,
-            mut ty_list_scratch,
-            payloads,
-            runs,
-            mut text,
-            mut comments,
-            mut comment_scratch,
-        } = self;
-        expr_lists.reset();
-        expr_opt_lists.reset();
-        expr_list_scratch.reset();
-        expr_opt_scratch.reset();
-        stmt_lists.reset();
-        stmt_list_scratch.reset();
-        ty_lists.reset();
-        ty_list_scratch.reset();
-        text.reset();
-        comments.reset();
-        comment_scratch.reset();
-        AstStores {
-            exprs: exprs.recycle(),
             expr_lists,
             expr_opt_lists,
-            expr_scratch: expr_scratch.recycle(),
+            expr_scratch,
             expr_list_scratch,
             expr_opt_scratch,
-            stmts: stmts.recycle(),
+            stmts,
             stmt_lists,
             stmt_list_scratch,
-            tys: tys.recycle(),
+            tys,
             ty_lists,
             ty_list_scratch,
-            payloads: payloads.park(),
-            runs: runs.park(),
+            payloads,
+            runs,
             text,
             comments,
             comment_scratch,
+        } = self;
+        exprs.reset();
+        expr_lists.reset();
+        expr_opt_lists.reset();
+        expr_scratch.reset();
+        expr_list_scratch.reset();
+        expr_opt_scratch.reset();
+        stmts.reset();
+        stmt_lists.reset();
+        stmt_list_scratch.reset();
+        tys.reset();
+        ty_lists.reset();
+        ty_list_scratch.reset();
+        payloads.reset();
+        runs.reset();
+        text.reset();
+        comments.reset();
+        comment_scratch.reset();
+    }
+
+    /// Every store's, scratch stack's and the pool's shape, for the tests that read what a
+    /// reset leaves. Destructured whole, as [`AstStores::reset`] is, so no field is missed.
+    #[cfg(test)]
+    fn shapes(&self) -> Vec<FieldShape> {
+        let Self {
+            exprs,
+            expr_lists,
+            expr_opt_lists,
+            expr_scratch,
+            expr_list_scratch,
+            expr_opt_scratch,
+            stmts,
+            stmt_lists,
+            stmt_list_scratch,
+            tys,
+            ty_lists,
+            ty_list_scratch,
+            payloads,
+            runs,
+            text,
+            comments,
+            comment_scratch,
+        } = self;
+        let mut out = vec![
+            FieldShape::store("exprs", exprs),
+            FieldShape::store("expr_lists", expr_lists),
+            FieldShape::store("expr_opt_lists", expr_opt_lists),
+            FieldShape::scratch("expr_scratch", expr_scratch),
+            FieldShape::scratch("expr_list_scratch", expr_list_scratch),
+            FieldShape::scratch("expr_opt_scratch", expr_opt_scratch),
+            FieldShape::store("stmts", stmts),
+            FieldShape::store("stmt_lists", stmt_lists),
+            FieldShape::scratch("stmt_list_scratch", stmt_list_scratch),
+            FieldShape::store("tys", tys),
+            FieldShape::store("ty_lists", ty_lists),
+            FieldShape::scratch("ty_list_scratch", ty_list_scratch),
+            FieldShape::pool("text", text),
+            FieldShape::store("comments", comments),
+            FieldShape::scratch("comment_scratch", comment_scratch),
+        ];
+        payloads.shapes(&mut out);
+        runs.shapes(&mut out);
+        out
+    }
+}
+
+/// What a test reads of one store, scratch stack or pool: its length and its capacity.
+#[cfg(test)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct FieldShape {
+    name: &'static str,
+    kind: FieldKind,
+    len: usize,
+    capacity: usize,
+}
+
+/// Which kind of buffer a [`FieldShape`] reads, which decides its rewound length.
+#[cfg(test)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum FieldKind {
+    Store,
+    Scratch,
+    Pool,
+}
+
+#[cfg(test)]
+impl FieldShape {
+    fn store<T: Row>(name: &'static str, store: &Store<T>) -> Self {
+        Self {
+            name,
+            kind: FieldKind::Store,
+            len: store.len(),
+            capacity: store.capacity(),
+        }
+    }
+
+    fn scratch<T>(name: &'static str, scratch: &ListBuf<T>) -> Self {
+        Self {
+            name,
+            kind: FieldKind::Scratch,
+            len: scratch.len(),
+            capacity: scratch.capacity(),
+        }
+    }
+
+    fn pool<F>(name: &'static str, pool: &TextPool<F>) -> Self {
+        Self {
+            name,
+            kind: FieldKind::Pool,
+            len: pool.len(),
+            capacity: pool.capacity(),
+        }
+    }
+
+    /// The length a reset leaves: slot 0 of a store and the sentinel of a pool once written,
+    /// nothing of a scratch stack.
+    fn rewound_len(self) -> usize {
+        match self.kind {
+            FieldKind::Store | FieldKind::Pool => self.len.min(1),
+            FieldKind::Scratch => 0,
         }
     }
 }
@@ -686,15 +795,17 @@ impl Deref for Parsed {
 /// `tsv_arena`'s take-and-park protocol, here because that crate cannot name these types.
 ///
 /// The stores are out of the slot while `f` runs, so a nested call takes fresh ones and a
-/// panic out of `f` leaves the slot empty, as a new thread finds it. Parked rewound, so
-/// every id and run `f` minted is invalid once it returns.
+/// panic out of `f` leaves the slot empty, as a new thread finds it. Parked after an
+/// [`AstStores::reset`], keeping slot 0 and capacity, so every id, run and pool text `f`
+/// minted is invalid once it returns.
 pub fn with_stores<R>(f: impl FnOnce(&mut AstStores) -> R) -> R {
     thread_local! {
         static PARKED: Cell<Option<AstStores>> = const { Cell::new(None) };
     }
     let mut stores: AstStores = PARKED.with(Cell::take).unwrap_or_default();
     let result = f(&mut stores);
-    PARKED.with(|cell| cell.set(Some(stores.park())));
+    stores.reset();
+    PARKED.with(|cell| cell.set(Some(stores)));
     result
 }
 
@@ -710,12 +821,14 @@ pub struct WarmStores {
 
 impl WarmStores {
     /// Run `f` over the parked stores, or over fresh ones when there are none, and park them
-    /// rewound after it, so every id and run `f` minted is invalid once it returns. A panic out
-    /// of `f` leaves the slot empty, and the next call starts from fresh stores.
+    /// after an [`AstStores::reset`], keeping slot 0 and capacity, so every id, run and pool
+    /// text `f` minted is invalid once it returns. A panic out of `f` leaves the slot empty,
+    /// and the next call starts from fresh stores.
     pub fn with<R>(&mut self, f: impl FnOnce(&mut AstStores) -> R) -> R {
         let mut stores: AstStores = self.parked.take().unwrap_or_default();
         let result = f(&mut stores);
-        self.parked = Some(stores.park());
+        stores.reset();
+        self.parked = Some(stores);
         result
     }
 }
@@ -756,7 +869,7 @@ mod tests {
     }
 
     #[test]
-    fn a_park_rewinds_the_expression_stores() {
+    fn a_reset_rewinds_the_expression_stores() {
         let mut stores = AstStores::new();
         let id = stores.exprs.push(an_expr());
         stores.exprs.push(an_expr());
@@ -764,7 +877,7 @@ mod tests {
         stores.expr_lists.push(id);
         stores.expr_opt_lists.push(Some(id));
         stores.expr_opt_lists.push(None);
-        let mut stores = stores.park();
+        stores.reset();
         assert_eq!(with_a_row(&mut stores), 1, "the rows rewind");
         let id = stores.exprs.push(an_expr());
         assert_eq!(stores.expr_lists.push(id).index(), 1, "the id lists rewind");
@@ -776,26 +889,26 @@ mod tests {
     }
 
     #[test]
-    fn a_park_rewinds_the_statement_stores() {
+    fn a_reset_rewinds_the_statement_stores() {
         let mut stores = AstStores::new();
         let id = stores.stmts.push(a_stmt());
         stores.stmts.push(a_stmt());
         stores.stmt_lists.push(id);
         stores.stmt_lists.push(id);
-        let mut stores = stores.park();
+        stores.reset();
         let id = stores.stmts.push(a_stmt());
         assert_eq!(id.index(), 1, "the rows rewind");
         assert_eq!(stores.stmt_lists.push(id).index(), 1, "the id lists rewind");
     }
 
     #[test]
-    fn a_park_rewinds_the_type_stores() {
+    fn a_reset_rewinds_the_type_stores() {
         let mut stores = AstStores::new();
         let id = stores.tys.push(a_ty());
         stores.tys.push(a_ty());
         stores.ty_lists.push(id);
         stores.ty_lists.push(id);
-        let mut stores = stores.park();
+        stores.reset();
         let id = stores.tys.push(a_ty());
         assert_eq!(id.index(), 1, "the rows rewind");
         assert_eq!(stores.ty_lists.push(id).index(), 1, "the id lists rewind");
@@ -926,7 +1039,7 @@ try {
     }
 
     #[test]
-    fn a_park_rewinds_every_payload_store() {
+    fn a_reset_rewinds_every_payload_store() {
         let parsed = parse_with_goal(PAYLOADS, Goal::Module).expect("the payloads parse");
         let mut stores = AstStores::new();
         let first = push_every_payload(&mut stores, &parsed);
@@ -938,7 +1051,7 @@ try {
         assert!(first.iter().all(|&(_, index)| index == 1), "{first:?}");
         let second = push_every_payload(&mut stores, &parsed);
         assert!(second.iter().all(|&(_, index)| index == 2), "{second:?}");
-        let mut stores: AstStores = stores.park();
+        stores.reset();
         let parked = push_every_payload(&mut stores, &parsed);
         assert!(
             parked.iter().all(|&(_, index)| index == 1),
@@ -971,14 +1084,30 @@ class C {
     /// Flushes the first element of every value-run list `parsed` holds, as a one-row run,
     /// into its store in `stores`, and returns each store's field name with the run it minted.
     fn flush_every_run(stores: &mut AstStores, parsed: &Parsed) -> Vec<(&'static str, String)> {
+        push_every_run(stores, parsed, true)
+    }
+
+    /// Pushes the first element of every value-run list `parsed` holds onto its scratch stack
+    /// in `stores`, flushing it as a one-row run into its store when `flush` is set and
+    /// leaving it on the stack otherwise; returns each store's field name with the run it
+    /// minted, or `open`.
+    fn push_every_run(
+        stores: &mut AstStores,
+        parsed: &Parsed,
+        flush: bool,
+    ) -> Vec<(&'static str, String)> {
         let mut minted = Vec::new();
         macro_rules! flush {
             ($field:ident, $scratch:ident, $list:expr) => {{
                 let row = $list[0].clone();
                 let mark = stores.runs.$scratch.mark();
                 stores.runs.$scratch.push(row);
-                let run = flush_run(&mut stores.runs.$scratch, &mut stores.runs.$field, mark);
-                minted.push((stringify!($field), format!("{run:?}")));
+                if flush {
+                    let run = flush_run(&mut stores.runs.$scratch, &mut stores.runs.$field, mark);
+                    minted.push((stringify!($field), format!("{run:?}")));
+                } else {
+                    minted.push((stringify!($field), "open".to_owned()));
+                }
             }};
         }
         let view = parsed.view();
@@ -1083,7 +1212,7 @@ class C {
     }
 
     #[test]
-    fn a_park_rewinds_every_value_run_store() {
+    fn a_reset_rewinds_every_value_run_store() {
         let parsed = parse_with_goal(RUNS, Goal::Module).expect("the lists parse");
         let mut stores = AstStores::new();
         let first = flush_every_run(&mut stores, &parsed);
@@ -1098,12 +1227,179 @@ class C {
             second.iter().all(|(_, run)| run == "Run(2, 1)"),
             "{second:?}"
         );
-        let mut stores: AstStores = stores.park();
+        stores.reset();
         let parked = flush_every_run(&mut stores, &parsed);
         assert!(
             parked.iter().all(|(_, run)| run == "Run(1, 1)"),
             "the rows rewind: {parked:?}"
         );
+    }
+
+    /// A document that writes every store the parse fills on its own: the expression,
+    /// statement and type stores and their lists (a union for the type lists), the optional
+    /// lists (an array hole), the pool (an escaped name and a decoded string) and the comments.
+    const DOCUMENT: &str = "// a comment
+const \\u0061b = [, 1, 'c\\x41'];
+let d: { e: F } = g(h, (i) => i + 1);
+type U = V | W;
+";
+
+    /// Writes every store, scratch stack and the pool of `stores`: a sizeable parse, a row in
+    /// every payload store and a run in every value-run store, then one element left on every
+    /// scratch stack, as a parse cut short would leave it.
+    fn fill_every_field(stores: &mut AstStores) {
+        let payloads = parse_with_goal(PAYLOADS, Goal::Module).expect("the payloads parse");
+        let runs = parse_with_goal(RUNS, Goal::Module).expect("the lists parse");
+        let document = DOCUMENT.repeat(64);
+        let program = crate::__private::parse_into(&document, stores).expect("parses");
+        push_every_payload(stores, &payloads);
+        flush_every_run(stores, &runs);
+        push_every_run(stores, &runs, false);
+        let comment = stores.view().comments(program.comments)[0];
+        stores.comment_scratch.push(comment);
+        stores.expr_scratch.push(an_expr());
+        let expr = stores.exprs.push(an_expr());
+        stores.expr_list_scratch.push(expr);
+        stores.expr_opt_scratch.push(None);
+        let stmt = stores.stmts.push(a_stmt());
+        stores.stmt_list_scratch.push(stmt);
+        let ty = stores.tys.push(a_ty());
+        stores.ty_list_scratch.push(ty);
+    }
+
+    /// Asserts `filled` wrote every field, so a field nothing fills cannot pass a rewind test
+    /// by standing empty: a store past slot 0, a scratch stack holding an element, the pool
+    /// past its sentinel.
+    fn assert_every_field_written(filled: &[FieldShape]) {
+        let unwritten: Vec<_> = filled
+            .iter()
+            .filter(|shape| match shape.kind {
+                FieldKind::Store | FieldKind::Pool => shape.len <= 1,
+                FieldKind::Scratch => shape.len == 0,
+            })
+            .map(|shape| shape.name)
+            .collect();
+        assert!(
+            unwritten.is_empty(),
+            "the fill leaves these unwritten: {unwritten:?}"
+        );
+    }
+
+    /// Asserts `rewound` is `filled` after a reset: every field back at its rewound length,
+    /// slot 0 and the sentinel kept, and no capacity shrunk or grown.
+    fn assert_rewound(filled: &[FieldShape], rewound: &[FieldShape]) {
+        let expected: Vec<FieldShape> = filled
+            .iter()
+            .map(|&shape| FieldShape {
+                len: shape.rewound_len(),
+                ..shape
+            })
+            .collect();
+        assert_eq!(
+            rewound, expected,
+            "every field rewinds and keeps its capacity"
+        );
+    }
+
+    #[test]
+    fn a_reset_rewinds_every_field() {
+        let mut stores = AstStores::new();
+        fill_every_field(&mut stores);
+        let filled = stores.shapes();
+        assert_every_field_written(&filled);
+        stores.reset();
+        assert_rewound(&filled, &stores.shapes());
+    }
+
+    #[test]
+    fn park_keeps_capacity() {
+        let mut stores = AstStores::new();
+        fill_every_field(&mut stores);
+        let filled = stores.shapes();
+        assert_every_field_written(&filled);
+        stores.reset();
+        let rewound = stores.shapes();
+        assert_rewound(&filled, &rewound);
+        // slot 0 survives, so a store's next write mints at index 1 with no priming
+        assert_eq!(with_a_row(&mut stores), 1);
+        assert_eq!(
+            stores.exprs.len(),
+            2,
+            "slot 0 and the one row, nothing primed"
+        );
+        assert_eq!(stores.exprs.capacity(), rewound[0].capacity);
+    }
+
+    #[test]
+    fn a_warm_handle_parks_its_stores_with_their_capacity() {
+        let mut warm = WarmStores::default();
+        let filled = warm.with(|stores| {
+            fill_every_field(stores);
+            stores.shapes()
+        });
+        assert_every_field_written(&filled);
+        let rewound = warm.with(|stores| stores.shapes());
+        assert_rewound(&filled, &rewound);
+    }
+
+    #[test]
+    fn with_stores_parks_its_stores_with_their_capacity() {
+        let filled = with_stores(|stores: &mut AstStores| {
+            fill_every_field(stores);
+            stores.shapes()
+        });
+        assert_every_field_written(&filled);
+        let rewound = with_stores(|stores: &mut AstStores| stores.shapes());
+        assert_rewound(&filled, &rewound);
+    }
+
+    /// Whether `read` is refused as the store-check build refuses a handle from another
+    /// generation; an unstamped build reads it in bounds instead.
+    fn assert_rejected_under_the_store_check(read: impl FnOnce()) {
+        let read = std::panic::catch_unwind(std::panic::AssertUnwindSafe(read));
+        if tsv_lang::store::STORE_CHECK {
+            let message = read.expect_err("a retained handle is rejected");
+            let message = message
+                .downcast_ref::<String>()
+                .map(String::as_str)
+                .or_else(|| message.downcast_ref::<&str>().copied())
+                .expect("a panic message");
+            assert!(message.contains("store stamp mismatch"), "{message}");
+        } else {
+            assert!(read.is_ok(), "unstamped, a retained handle reads in bounds");
+        }
+    }
+
+    /// An id or a pool text kept past the park reads the next document's rows or text in
+    /// bounds; the store-check build rejects both, because the reset advances every store's
+    /// and the pool's generation.
+    #[test]
+    fn a_handle_retained_across_a_park_is_rejected_under_the_store_check() {
+        // one warm handle per kind: a rejected read panics out of `with`, which leaves the
+        // slot empty, and fresh stores would be refused as another instance
+        let mut warm = WarmStores::default();
+        let id = warm.with(|stores| {
+            with_a_row(stores);
+            stores.exprs.push(an_expr())
+        });
+        assert_rejected_under_the_store_check(|| {
+            warm.with(|stores| {
+                with_a_row(stores);
+                with_a_row(stores);
+                stores.exprs.get(id);
+            });
+        });
+        let mut warm = WarmStores::default();
+        let text = warm.with(|stores| {
+            stores.text.push("a");
+            stores.text.push("b")
+        });
+        assert_rejected_under_the_store_check(|| {
+            warm.with(|stores| {
+                stores.text.push("cd");
+                stores.text.get(text);
+            });
+        });
     }
 
     #[test]

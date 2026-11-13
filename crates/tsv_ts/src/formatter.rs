@@ -1,7 +1,7 @@
 //! [`Formatter`]: [`format()`](crate::format) and [`format_with_goal`](crate::format_with_goal)
 //! over arenas kept warm across calls.
 
-use crate::ast::AstStores;
+use crate::ast::WarmStores;
 use crate::{Goal, Result, format_in};
 use tsv_lang::doc::arena::DocArena;
 
@@ -47,7 +47,7 @@ pub struct Formatter {
     doc: DocArena,
     /// The AST stores between calls: out of the slot while one runs, so a caught panic leaves
     /// nothing half-used to carry into the next.
-    stores: Option<AstStores>,
+    stores: WarmStores,
 }
 
 impl Formatter {
@@ -57,7 +57,7 @@ impl Formatter {
     pub fn new() -> Self {
         Self {
             doc: DocArena::new(),
-            stores: None,
+            stores: WarmStores::default(),
         }
     }
 
@@ -87,10 +87,9 @@ impl Formatter {
         // nothing (its stores keep their capacity), so it waits for the next call rather
         // than following this one.
         self.doc.reset();
-        let mut stores: AstStores = self.stores.take().unwrap_or_default();
-        let formatted = format_in(source, goal, &mut stores, |_| &self.doc);
-        self.stores = Some(stores.park());
-        formatted
+        let doc = &self.doc;
+        self.stores
+            .with(|stores| format_in(source, goal, stores, |_| doc))
     }
 }
 
