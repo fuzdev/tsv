@@ -13,10 +13,10 @@ use super::expression_lookahead::{ArrowHead, scan_angle_brackets, scan_arrow_aft
 use super::scan::skip_whitespace_and_comments;
 use super::{ExprRet, Parser};
 
-impl<'a, 'arena> Parser<'a, 'arena> {
+impl<'a> Parser<'a> {
     /// A value run of the one parameter of a parenless arrow.
     #[inline]
-    fn single_param_run(&mut self, param: Expression<'arena>) -> Run<Expr> {
+    fn single_param_run(&mut self, param: Expression) -> Run<Expr> {
         let mark = self.stores.expr_scratch.mark();
         self.stores.expr_scratch.push(param);
         self.flush_expr_run(mark)

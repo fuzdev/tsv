@@ -18,17 +18,14 @@
 //! read, and the first reading of an acorn re-parse stays valid beside the second. Its
 //! scratch lists live here and not on the parser, because a parser is built per island.
 //!
-//! The stores hold rows of `'arena`, so what outlives a parse is the empty form,
-//! [`AstStores<'static>`]: [`AstStores::park`] rewinds and retypes the capacity, and
-//! covariance alone takes a parked value back to any shorter lifetime. Handles die with
-//! the parse that minted them: nothing id-shaped leaves [`with_stores`]'s closure or a
-//! [`Parsed`], whose stores it keeps beside the tree they belong to.
+//! What outlives a parse is the empty form: [`AstStores::park`] rewinds the stores and keeps
+//! their capacity. Handles die with the parse that minted them: nothing id-shaped leaves
+//! [`with_stores`]'s closure or a [`Parsed`], whose stores it keeps beside the tree they
+//! belong to.
 
 use std::cell::Cell;
 use std::fmt;
 use std::ops::Deref;
-
-use std::marker::PhantomData;
 
 use tsv_lang::store::{Id, ListBuf, ListMark, MarkGroup, PoolText, Row, Run, Store, TextPool};
 
@@ -44,10 +41,10 @@ use super::{
     TSTypeElement, TSTypeParameter, TaggedTemplateExpression, TemplateElement, VariableDeclarator,
 };
 
-/// The family tag of [`Expression`] rows, naming them without their lifetime.
+/// The family tag of [`Expression`] rows.
 pub enum Expr {}
 
-impl Row for Expression<'_> {
+impl Row for Expression {
     type Family = Expr;
 }
 
@@ -62,10 +59,10 @@ const _: () = {
     assert!(STORE_CHECK || size_of::<Run<ExprId>>() == 8);
 };
 
-/// The family tag of [`Statement`] rows, naming them without their lifetime.
+/// The family tag of [`Statement`] rows.
 pub enum Stmt {}
 
-impl Row for Statement<'_> {
+impl Row for Statement {
     type Family = Stmt;
 }
 
@@ -80,10 +77,10 @@ const _: () = {
     assert!(STORE_CHECK || size_of::<Run<StmtId>>() == 8);
 };
 
-/// The family tag of [`TSType`] rows, naming them without their lifetime.
+/// The family tag of [`TSType`] rows.
 pub enum Ty {}
 
-impl Row for TSType<'_> {
+impl Row for TSType {
     type Family = Ty;
 }
 
@@ -105,27 +102,21 @@ pub enum Text {}
 /// One string of the tree's text — an escaped identifier's decoded name, a string literal's
 /// or a template element's decoded value, a template element's normalized raw text — read
 /// through [`AstView::text`]: a handle into the stores' text pool.
-///
-/// The lifetime marks the tree the handle belongs to and holds no borrow.
 #[derive(Clone, Copy)]
 #[repr(transparent)]
-pub struct PoolStr<'arena> {
+pub struct PoolStr {
     pub(super) text: PoolText<Text>,
-    tree: PhantomData<&'arena ()>,
 }
 
-impl PoolStr<'_> {
-    /// The handle `text` names, typed at the tree's lifetime.
+impl PoolStr {
+    /// The handle `text` names.
     #[inline]
     pub(crate) fn new(text: PoolText<Text>) -> Self {
-        Self {
-            text,
-            tree: PhantomData,
-        }
+        Self { text }
     }
 }
 
-impl fmt::Debug for PoolStr<'_> {
+impl fmt::Debug for PoolStr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.text.fmt(f)
     }
@@ -133,27 +124,21 @@ impl fmt::Debug for PoolStr<'_> {
 
 /// A program's comments, read through [`AstView::comments`]: a run of the stores' comment
 /// rows.
-///
-/// The lifetime marks the tree the run belongs to and holds no borrow.
 #[derive(Clone, Copy)]
 #[repr(transparent)]
-pub struct CommentList<'arena> {
+pub struct CommentList {
     pub(super) run: Run<Comment>,
-    tree: PhantomData<&'arena ()>,
 }
 
-impl CommentList<'_> {
-    /// The list `run` names, typed at the tree's lifetime.
+impl CommentList {
+    /// The list `run` names.
     #[inline]
     pub(crate) fn new(run: Run<Comment>) -> Self {
-        Self {
-            run,
-            tree: PhantomData,
-        }
+        Self { run }
     }
 }
 
-impl fmt::Debug for CommentList<'_> {
+impl fmt::Debug for CommentList {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.run.fmt(f)
     }
@@ -163,10 +148,10 @@ impl fmt::Debug for CommentList<'_> {
 #[cfg(test)]
 const _: () = {
     use tsv_lang::store::STORE_CHECK;
-    assert!(STORE_CHECK || size_of::<PoolStr<'static>>() == 8);
-    assert!(STORE_CHECK || size_of::<Option<PoolStr<'static>>>() == 8);
-    assert!(STORE_CHECK || size_of::<CommentList<'static>>() == 8);
-    assert!(STORE_CHECK || size_of::<Option<CommentList<'static>>>() == 8);
+    assert!(STORE_CHECK || size_of::<PoolStr>() == 8);
+    assert!(STORE_CHECK || size_of::<Option<PoolStr>>() == 8);
+    assert!(STORE_CHECK || size_of::<CommentList>() == 8);
+    assert!(STORE_CHECK || size_of::<Option<CommentList>>() == 8);
 };
 
 /// Declares the payload stores. Per entry: the row type's family tag and the id the tree holds,
@@ -183,7 +168,7 @@ macro_rules! payload_stores {
         $(
             $(#[$m])*
             ///
-            /// The family tag of these rows, naming them without their lifetime.
+            /// The family tag of these rows.
             pub enum $Tag {}
 
             impl<$($lt)?> Row for $Row$(<$lt>)? {
@@ -199,14 +184,14 @@ macro_rules! payload_stores {
 
         /// The stores of the payloads too rare to sit inline in the node that refers to them,
         /// one per row type.
-        pub(crate) struct PayloadStores<'arena> {
+        pub(crate) struct PayloadStores {
             $(
                 $(#[$m])*
                 pub(crate) $field: Store<$Row$(<$lt>)?>,
             )*
         }
 
-        impl<'arena> PayloadStores<'arena> {
+        impl PayloadStores {
             /// Empty stores, allocating nothing.
             pub(crate) fn new() -> Self {
                 Self {
@@ -214,22 +199,22 @@ macro_rules! payload_stores {
                 }
             }
 
-            /// Rewinds and retypes the stores, as [`AstStores::park`] does.
-            pub(crate) fn park(self) -> PayloadStores<'static> {
+            /// Rewinds the stores, as [`AstStores::park`] does.
+            pub(crate) fn park(self) -> PayloadStores {
                 PayloadStores {
                     $($field: self.$field.recycle(),)*
                 }
             }
         }
 
-        impl<'arena> AstView<'arena> {
+        impl<'a> AstView<'a> {
             $(
                 #[doc = concat!(
                     "The [`", stringify!($Row), "`] `id` names. A miss ends in the store's shared ",
                     "cold path."
                 )]
                 #[inline]
-                pub fn $acc(self, id: $Id) -> &'arena $Row$(<$lt>)? {
+                pub fn $acc(self, id: $Id) -> &'a $Row$(<$lt>)? {
                     self.payloads().$field.get(id)
                 }
             )*
@@ -245,62 +230,62 @@ payload_stores! {
     /// Arrow functions, `() => …`: [`ArrowFunctionExpression`] rows.
     arrow_fns: ArrowFunctionExpression => ArrowFn, ArrowFnId, arrow_fn;
     /// Function expressions, `function () {}`: [`FunctionExpression`] rows.
-    fn_exprs: FunctionExpression<'arena> => FnExpr, FnExprId, fn_expr;
+    fn_exprs: FunctionExpression => FnExpr, FnExprId, fn_expr;
     /// Class expressions, `class {}`: [`ClassExpression`] rows.
-    class_exprs: ClassExpression<'arena> => ClassExpr, ClassExprId, class_expr;
+    class_exprs: ClassExpression => ClassExpr, ClassExprId, class_expr;
     /// Tagged templates, ``tag`…` ``: [`TaggedTemplateExpression`] rows.
     tagged_tpls: TaggedTemplateExpression
         => TaggedTpl, TaggedTplId, tagged_tpl;
     /// Meta properties, `import.meta` and `new.target`: [`MetaProperty`] rows.
-    meta_props: MetaProperty<'arena> => MetaProp, MetaPropId, meta_prop;
+    meta_props: MetaProperty => MetaProp, MetaPropId, meta_prop;
     /// Type aliases, `type T = …`: [`TSTypeAliasDeclaration`] rows.
-    type_aliases: TSTypeAliasDeclaration<'arena>
+    type_aliases: TSTypeAliasDeclaration
         => TypeAlias, TypeAliasId, type_alias;
     /// Interfaces, `interface I {}`: [`TSInterfaceDeclaration`] rows.
-    interface_decls: TSInterfaceDeclaration<'arena>
+    interface_decls: TSInterfaceDeclaration
         => InterfaceDecl, InterfaceDeclId, interface_decl;
     /// Bodiless function declarations, `declare function f(): T`: [`TSDeclareFunction`] rows.
-    declare_fns: TSDeclareFunction<'arena> => DeclareFn, DeclareFnId, declare_fn;
+    declare_fns: TSDeclareFunction => DeclareFn, DeclareFnId, declare_fn;
     /// Enums, `enum E {}`: [`TSEnumDeclaration`] rows.
-    enum_decls: TSEnumDeclaration<'arena> => EnumDecl, EnumDeclId, enum_decl;
+    enum_decls: TSEnumDeclaration => EnumDecl, EnumDeclId, enum_decl;
     /// Namespaces and modules, `namespace N {}`: [`TSModuleDeclaration`] rows.
-    module_decls: TSModuleDeclaration<'arena>
+    module_decls: TSModuleDeclaration
         => ModuleDecl, ModuleDeclId, module_decl;
     /// Function declarations, `function f() {}`: [`FunctionDeclaration`] rows.
-    fn_decls: FunctionDeclaration<'arena> => FnDecl, FnDeclId, fn_decl;
+    fn_decls: FunctionDeclaration => FnDecl, FnDeclId, fn_decl;
     /// Class declarations, `class C {}`: [`ClassDeclaration`] rows.
-    class_decls: ClassDeclaration<'arena> => ClassDecl, ClassDeclId, class_decl;
+    class_decls: ClassDeclaration => ClassDecl, ClassDeclId, class_decl;
     /// Named exports, `export { a }`: [`ExportNamedDeclaration`] rows.
-    export_nameds: ExportNamedDeclaration<'arena>
+    export_nameds: ExportNamedDeclaration
         => ExportNamed, ExportNamedId, export_named;
     /// Default exports, `export default …`: [`ExportDefaultDeclaration`] rows.
-    export_defaults: ExportDefaultDeclaration<'arena>
+    export_defaults: ExportDefaultDeclaration
         => ExportDefault, ExportDefaultId, export_default;
     /// Star exports, `export * from 'm'`: [`ExportAllDeclaration`] rows.
-    export_alls: ExportAllDeclaration<'arena> => ExportAll, ExportAllId, export_all;
+    export_alls: ExportAllDeclaration => ExportAll, ExportAllId, export_all;
     /// Export assignments, `export = a`: [`TSExportAssignment`] rows.
     export_assigns: TSExportAssignment
         => ExportAssign, ExportAssignId, export_assign;
     /// Imports, `import a from 'm'`: [`ImportDeclaration`] rows.
-    import_decls: ImportDeclaration<'arena>
+    import_decls: ImportDeclaration
         => ImportDecl, ImportDeclId, import_decl;
     /// Import-equals declarations, `import a = require('m')`: [`TSImportEqualsDeclaration`] rows.
-    import_equals: TSImportEqualsDeclaration<'arena>
+    import_equals: TSImportEqualsDeclaration
         => ImportEquals, ImportEqualsId, import_equals;
     /// Constructor types, `new () => T`: [`TSConstructorType`] rows.
     ctor_types: TSConstructorType => CtorType, CtorTypeId, ctor_type;
     /// Import types, `import('m')`: [`TSImportType`] rows.
-    import_types: TSImportType<'arena> => ImportType, ImportTypeId, import_type;
+    import_types: TSImportType => ImportType, ImportTypeId, import_type;
     /// Inferred types, `infer T`: [`TSInferType`] rows.
-    infer_types: TSInferType<'arena> => InferType, InferTypeId, infer_type;
+    infer_types: TSInferType => InferType, InferTypeId, infer_type;
     /// Qualified names, `A.B`: [`TSQualifiedName`] rows.
-    qual_names: TSQualifiedName<'arena> => QualName, QualNameId, qual_name;
+    qual_names: TSQualifiedName => QualName, QualNameId, qual_name;
     /// The head of a `for (…; …; …)` statement: [`ForInit`] rows.
     for_heads: ForInit => ForHead, ForHeadId, for_head;
     /// The left side of a `for … in` or `for … of`: [`ForInOfLeft`] rows.
     for_lefts: ForInOfLeft => ForLeft, ForLeftId, for_left;
     /// Catch clauses, `catch (e) {}`: [`CatchClause`] rows.
-    catches: CatchClause<'arena> => Catch, CatchId, catch;
+    catches: CatchClause => Catch, CatchId, catch;
     /// A parameter name's type annotation and decorators: [`IdentifierParamExtra`] rows.
     param_extras: IdentifierParamExtra
         => ParamExtra, ParamExtraId, param_extra;
@@ -321,7 +306,7 @@ macro_rules! value_runs {
         $(
             $(#[$m])*
             ///
-            /// The family tag of these rows, naming them without their lifetime.
+            /// The family tag of these rows.
             pub enum $Tag {}
 
             impl<$($lt)?> Row for $Row$(<$lt>)? {
@@ -331,7 +316,7 @@ macro_rules! value_runs {
 
         /// The stores of the elements of the lists built by value, one per element type, and
         /// the scratch stacks that build their lists.
-        pub(crate) struct RunStores<'arena> {
+        pub(crate) struct RunStores {
             $(
                 $(#[$m])*
                 pub(crate) $field: Store<$Row$(<$lt>)?>,
@@ -347,7 +332,7 @@ macro_rules! value_runs {
             $($field: ListMark<$Tag>,)*
         }
 
-        impl<'arena> RunStores<'arena> {
+        impl RunStores {
             /// Empty stores, allocating nothing.
             pub(crate) fn new() -> Self {
                 Self {
@@ -358,8 +343,8 @@ macro_rules! value_runs {
                 }
             }
 
-            /// Rewinds and retypes the stores and scratch stacks, as [`AstStores::park`] does.
-            pub(crate) fn park(self) -> RunStores<'static> {
+            /// Rewinds the stores and scratch stacks, as [`AstStores::park`] does.
+            pub(crate) fn park(self) -> RunStores {
                 RunStores {
                     $(
                         $field: self.$field.recycle(),
@@ -389,14 +374,14 @@ macro_rules! value_runs {
             }
         }
 
-        impl<'arena> AstView<'arena> {
+        impl<'a> AstView<'a> {
             $(
                 #[doc = concat!(
                     "The [`", stringify!($Row), "`] rows of `run`, one range check for the whole ",
                     "run. A miss ends in the store's shared cold path."
                 )]
                 #[inline]
-                pub fn $acc(self, run: Run<$Tag>) -> &'arena [$Row$(<$lt>)?] {
+                pub fn $acc(self, run: Run<$Tag>) -> &'a [$Row$(<$lt>)?] {
                     self.runs().$field.slice(run)
                 }
             )*
@@ -414,39 +399,39 @@ value_runs! {
     /// Object pattern members, `{ a: b, ...c } = d`: [`ObjectPatternProperty`] rows.
     pat_props, pat_prop_scratch: ObjectPatternProperty => PatProp, pat_props;
     /// The text pieces of a template, ``a${b}c``: [`TemplateElement`] rows.
-    quasis, quasi_scratch: TemplateElement<'arena> => Quasi, quasis;
+    quasis, quasi_scratch: TemplateElement => Quasi, quasis;
     /// Declarators, the `a = 1` of `let a = 1`: [`VariableDeclarator`] rows.
     declarators, declarator_scratch: VariableDeclarator => Declarator, declarators;
     /// The `case` and `default` clauses of a `switch`: [`SwitchCase`] rows.
     cases, case_scratch: SwitchCase => Case, cases;
     /// Import specifiers, the `a` and `{ b }` of `import a, { b } from 'm'`: [`ImportSpecifier`]
     /// rows.
-    import_specs, import_spec_scratch: ImportSpecifier<'arena>
+    import_specs, import_spec_scratch: ImportSpecifier
         => ImportSpec, import_specs;
     /// Export specifiers, the `a` of `export { a }`: [`ExportSpecifier`] rows.
-    export_specs, export_spec_scratch: ExportSpecifier<'arena>
+    export_specs, export_spec_scratch: ExportSpecifier
         => ExportSpec, export_specs;
     /// Import attributes, the `type: 'json'` of `with { type: 'json' }`: [`ImportAttribute`] rows.
-    import_attrs, import_attr_scratch: ImportAttribute<'arena>
+    import_attrs, import_attr_scratch: ImportAttribute
         => ImportAttr, import_attrs;
     /// Class members, the `m() {}` of `class C { m() {} }`: [`ClassMember`] rows.
-    class_members, class_member_scratch: ClassMember<'arena>
+    class_members, class_member_scratch: ClassMember
         => ClassMem, class_members;
     /// Type members, the `a: T` of `{ a: T }` and of an interface body: [`TSTypeElement`] rows.
     type_members, type_member_scratch: TSTypeElement
         => TypeMember, type_members;
     /// Type parameters, the `T` of `<T>`: [`TSTypeParameter`] rows.
-    type_params, type_param_scratch: TSTypeParameter<'arena>
+    type_params, type_param_scratch: TSTypeParameter
         => TypeParam, type_params;
     /// Heritage clauses, the `B` of `extends B` on an interface and of `implements B` on a
     /// class: [`TSInterfaceHeritage`] rows.
-    heritages, heritage_scratch: TSInterfaceHeritage<'arena>
+    heritages, heritage_scratch: TSInterfaceHeritage
         => Heritage, heritages;
     /// Enum members, the `A = 1` of `enum E { A = 1 }`: [`TSEnumMember`] rows.
-    enum_members, enum_member_scratch: TSEnumMember<'arena>
+    enum_members, enum_member_scratch: TSEnumMember
         => EnumMem, enum_members;
     /// Index-signature parameters, the `k: string` of `[k: string]: T`: [`Identifier`] rows.
-    index_params, index_param_scratch: Identifier<'arena>
+    index_params, index_param_scratch: Identifier
         => IndexParam, index_params;
     /// Decorators, `@d`: [`Decorator`] rows.
     decorators, decorator_scratch: Decorator => Deco, decorators;
@@ -474,21 +459,21 @@ const _: () = {
 ///
 /// A fresh one allocates nothing: a store's buffer is allocated by its first write, a
 /// scratch stack's by its first push, and the pool's by its first string.
-pub struct AstStores<'arena> {
-    pub(crate) exprs: Store<Expression<'arena>>,
+pub struct AstStores {
+    pub(crate) exprs: Store<Expression>,
     pub(crate) expr_lists: Store<ExprId>,
     pub(crate) expr_opt_lists: Store<Option<ExprId>>,
-    pub(crate) expr_scratch: ListBuf<Expression<'arena>>,
+    pub(crate) expr_scratch: ListBuf<Expression>,
     pub(crate) expr_list_scratch: ListBuf<ExprId>,
     pub(crate) expr_opt_scratch: ListBuf<Option<ExprId>>,
-    pub(crate) stmts: Store<Statement<'arena>>,
+    pub(crate) stmts: Store<Statement>,
     pub(crate) stmt_lists: Store<StmtId>,
     pub(crate) stmt_list_scratch: ListBuf<StmtId>,
-    pub(crate) tys: Store<TSType<'arena>>,
+    pub(crate) tys: Store<TSType>,
     pub(crate) ty_lists: Store<TyId>,
     pub(crate) ty_list_scratch: ListBuf<TyId>,
-    pub(crate) payloads: PayloadStores<'arena>,
-    pub(crate) runs: RunStores<'arena>,
+    pub(crate) payloads: PayloadStores,
+    pub(crate) runs: RunStores,
     /// The tree's decoded and normalized strings, read through [`PoolStr`].
     pub(crate) text: TextPool<Text>,
     /// Every comment of the document's programs, a program's read through its
@@ -499,17 +484,17 @@ pub struct AstStores<'arena> {
     pub(crate) comment_scratch: ListBuf<Comment>,
 }
 
-impl<'arena> AstStores<'arena> {
-    /// The function declaration `id` names, its fields at the arena's lifetime rather than
-    /// a view's: for the crate's own read of a row whose parts a host keeps
+impl AstStores {
+    /// The function declaration `id` names, borrowed from the stores rather than through a
+    /// view: for the crate's own read of a row whose parts a host keeps
     /// ([`crate::__private::first_function_declaration`]).
     #[inline]
-    pub(crate) fn fn_decl_row(&self, id: FnDeclId) -> &FunctionDeclaration<'arena> {
+    pub(crate) fn fn_decl_row(&self, id: FnDeclId) -> &FunctionDeclaration {
         self.payloads.fn_decls.get(id)
     }
 
-    /// A parameter name's extras, their fields at the arena's lifetime rather than a view's:
-    /// for the crate's own read of a row it rebuilds while appending to the stores
+    /// A parameter name's extras, borrowed from the stores rather than through a view: for the
+    /// crate's own read of a row it rebuilds while appending to the stores
     /// ([`crate::__private::attach_pattern_type_annotation`]).
     #[inline]
     pub(crate) fn param_extra_row(&self, id: ParamExtraId) -> &IdentifierParamExtra {
@@ -530,7 +515,7 @@ pub(crate) struct ScratchMarks {
     comments: ListMark<Comment>,
 }
 
-impl AstStores<'_> {
+impl AstStores {
     /// The current tops of the scratch stacks, every height checked against the `u32` a mark
     /// holds by one [`MarkGroup`].
     #[inline]
@@ -612,7 +597,7 @@ impl AstStores<'_> {
     // thread lives, where the AST arena's rewind releases every block but the largest while
     // idle. Rows held here instead of in the `Bump` escape that release.
     #[must_use]
-    pub fn park(self) -> AstStores<'static> {
+    pub fn park(self) -> AstStores {
         let Self {
             exprs,
             mut expr_lists,
@@ -665,13 +650,13 @@ impl AstStores<'_> {
     }
 }
 
-impl Default for AstStores<'_> {
+impl Default for AstStores {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl fmt::Debug for AstStores<'_> {
+impl fmt::Debug for AstStores {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("AstStores").finish_non_exhaustive()
     }
@@ -682,17 +667,17 @@ impl fmt::Debug for AstStores<'_> {
 /// Derefs to the [`Program`] for the tree's own fields. A reading entry point takes `&parsed`,
 /// which is also where it gets the view the tree's edges resolve through.
 #[derive(Debug)]
-pub struct Parsed<'arena> {
+pub struct Parsed {
     /// The tree.
-    pub program: Program<'arena>,
+    pub program: Program,
     /// The stores the tree's handles index.
-    pub stores: AstStores<'arena>,
+    pub stores: AstStores,
 }
 
-impl<'arena> Deref for Parsed<'arena> {
-    type Target = Program<'arena>;
+impl Deref for Parsed {
+    type Target = Program;
 
-    fn deref(&self) -> &Program<'arena> {
+    fn deref(&self) -> &Program {
         &self.program
     }
 }
@@ -703,11 +688,11 @@ impl<'arena> Deref for Parsed<'arena> {
 /// The stores are out of the slot while `f` runs, so a nested call takes fresh ones and a
 /// panic out of `f` leaves the slot empty, as a new thread finds it. Parked rewound, so
 /// every id and run `f` minted is invalid once it returns.
-pub fn with_stores<'arena, R>(f: impl FnOnce(&mut AstStores<'arena>) -> R) -> R {
+pub fn with_stores<R>(f: impl FnOnce(&mut AstStores) -> R) -> R {
     thread_local! {
-        static PARKED: Cell<Option<AstStores<'static>>> = const { Cell::new(None) };
+        static PARKED: Cell<Option<AstStores>> = const { Cell::new(None) };
     }
-    let mut stores: AstStores<'arena> = PARKED.with(Cell::take).unwrap_or_default();
+    let mut stores: AstStores = PARKED.with(Cell::take).unwrap_or_default();
     let result = f(&mut stores);
     PARKED.with(|cell| cell.set(Some(stores.park())));
     result
@@ -717,19 +702,18 @@ pub fn with_stores<'arena, R>(f: impl FnOnce(&mut AstStores<'arena>) -> R) -> R 
 /// take-and-park protocol of [`with_stores`] over the caller's slot instead of the thread's, as
 /// the `Formatter` keeps its stores.
 ///
-/// A holder names neither the store types nor their lifetime, so its code reads the same
-/// whatever the stores hold.
+/// A holder names no store type, so its code reads the same whatever the stores hold.
 #[derive(Debug, Default)]
 pub struct WarmStores {
-    parked: Option<AstStores<'static>>,
+    parked: Option<AstStores>,
 }
 
 impl WarmStores {
     /// Run `f` over the parked stores, or over fresh ones when there are none, and park them
     /// rewound after it, so every id and run `f` minted is invalid once it returns. A panic out
     /// of `f` leaves the slot empty, and the next call starts from fresh stores.
-    pub fn with<'arena, R>(&mut self, f: impl FnOnce(&mut AstStores<'arena>) -> R) -> R {
-        let mut stores: AstStores<'arena> = self.parked.take().unwrap_or_default();
+    pub fn with<R>(&mut self, f: impl FnOnce(&mut AstStores) -> R) -> R {
+        let mut stores: AstStores = self.parked.take().unwrap_or_default();
         let result = f(&mut stores);
         self.parked = Some(stores.park());
         result
@@ -749,41 +733,46 @@ mod tests {
 
     const SPAN: Span = Span { start: 0, end: 0 };
 
-    fn an_expr() -> Expression<'static> {
+    fn an_expr() -> Expression {
         Expression {
             span: SPAN,
             kind: ExpressionKind::ThisExpression(ThisExpression),
         }
     }
 
-    fn a_stmt() -> Statement<'static> {
+    fn a_stmt() -> Statement {
         Statement {
             span: SPAN,
             kind: StatementKind::EmptyStatement(EmptyStatement),
         }
     }
 
-    fn a_ty() -> TSType<'static> {
+    fn a_ty() -> TSType {
         TSType::ThisType(TSThisType { span: SPAN })
     }
 
-    fn with_a_row(stores: &mut AstStores<'_>) -> usize {
+    fn with_a_row(stores: &mut AstStores) -> usize {
         stores.exprs.push(an_expr()).index()
     }
 
     #[test]
-    fn a_parked_store_takes_back_rewound_at_a_shorter_lifetime() {
-        fn take_back<'arena>(
-            parked: AstStores<'static>,
-            _arena: &'arena bumpalo::Bump,
-        ) -> AstStores<'arena> {
-            parked
-        }
-        let bump = bumpalo::Bump::new();
-        let mut stores = take_back(AstStores::new().park(), &bump);
-        assert_eq!(with_a_row(&mut stores), 1);
-        let mut stores = take_back(stores.park(), &bump);
-        assert_eq!(with_a_row(&mut stores), 1, "the park rewinds");
+    fn a_park_rewinds_the_expression_stores() {
+        let mut stores = AstStores::new();
+        let id = stores.exprs.push(an_expr());
+        stores.exprs.push(an_expr());
+        stores.expr_lists.push(id);
+        stores.expr_lists.push(id);
+        stores.expr_opt_lists.push(Some(id));
+        stores.expr_opt_lists.push(None);
+        let mut stores = stores.park();
+        assert_eq!(with_a_row(&mut stores), 1, "the rows rewind");
+        let id = stores.exprs.push(an_expr());
+        assert_eq!(stores.expr_lists.push(id).index(), 1, "the id lists rewind");
+        assert_eq!(
+            stores.expr_opt_lists.push(Some(id)).index(),
+            1,
+            "the optional id lists rewind"
+        );
     }
 
     #[test]
@@ -842,10 +831,7 @@ try {
 
     /// Pushes a clone of every payload `parsed` holds into its store in `stores`, and returns
     /// each store's field name with the index the push minted.
-    fn push_every_payload<'a>(
-        stores: &mut AstStores<'a>,
-        parsed: &'a Parsed<'_>,
-    ) -> Vec<(&'static str, usize)> {
+    fn push_every_payload(stores: &mut AstStores, parsed: &Parsed) -> Vec<(&'static str, usize)> {
         let mut minted = Vec::new();
         macro_rules! push {
             ($field:ident, $row:expr) => {
@@ -952,7 +938,7 @@ try {
         assert!(first.iter().all(|&(_, index)| index == 1), "{first:?}");
         let second = push_every_payload(&mut stores, &parsed);
         assert!(second.iter().all(|&(_, index)| index == 2), "{second:?}");
-        let mut stores: AstStores<'_> = stores.park();
+        let mut stores: AstStores = stores.park();
         let parked = push_every_payload(&mut stores, &parsed);
         assert!(
             parked.iter().all(|&(_, index)| index == 1),
@@ -984,10 +970,7 @@ class C {
 
     /// Flushes the first element of every value-run list `parsed` holds, as a one-row run,
     /// into its store in `stores`, and returns each store's field name with the run it minted.
-    fn flush_every_run<'a>(
-        stores: &mut AstStores<'a>,
-        parsed: &'a Parsed<'_>,
-    ) -> Vec<(&'static str, String)> {
+    fn flush_every_run(stores: &mut AstStores, parsed: &Parsed) -> Vec<(&'static str, String)> {
         let mut minted = Vec::new();
         macro_rules! flush {
             ($field:ident, $scratch:ident, $list:expr) => {{
@@ -1115,7 +1098,7 @@ class C {
             second.iter().all(|(_, run)| run == "Run(2, 1)"),
             "{second:?}"
         );
-        let mut stores: AstStores<'_> = stores.park();
+        let mut stores: AstStores = stores.park();
         let parked = flush_every_run(&mut stores, &parsed);
         assert!(
             parked.iter().all(|(_, run)| run == "Run(1, 1)"),
@@ -1125,11 +1108,11 @@ class C {
 
     #[test]
     fn with_stores_hands_out_rewound_stores() {
-        with_stores(|stores: &mut AstStores<'_>| {
+        with_stores(|stores: &mut AstStores| {
             with_a_row(stores);
             with_a_row(stores);
         });
-        with_stores(|stores: &mut AstStores<'_>| {
+        with_stores(|stores: &mut AstStores| {
             assert_eq!(with_a_row(stores), 1);
         });
     }
@@ -1137,10 +1120,10 @@ class C {
     #[test]
     fn with_stores_recovers_after_a_caught_panic() {
         let caught = std::panic::catch_unwind(|| {
-            with_stores(|_: &mut AstStores<'_>| panic!("boom"));
+            with_stores(|_: &mut AstStores| panic!("boom"));
         });
         assert!(caught.is_err());
-        with_stores(|stores: &mut AstStores<'_>| {
+        with_stores(|stores: &mut AstStores| {
             assert_eq!(with_a_row(stores), 1);
         });
     }
@@ -1178,9 +1161,9 @@ class C {
 
     #[test]
     fn a_nested_with_stores_takes_fresh_stores() {
-        with_stores(|outer: &mut AstStores<'_>| {
+        with_stores(|outer: &mut AstStores| {
             with_a_row(outer);
-            with_stores(|inner: &mut AstStores<'_>| {
+            with_stores(|inner: &mut AstStores| {
                 assert_eq!(with_a_row(inner), 1, "not the stores already in use");
             });
             assert_eq!(with_a_row(outer), 2, "the outer stores are untouched");

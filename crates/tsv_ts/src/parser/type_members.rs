@@ -10,14 +10,14 @@ use tsv_lang::{Error, Span};
 
 use super::Parser;
 
-impl<'a, 'arena> Parser<'a, 'arena> {
+impl<'a> Parser<'a> {
     /// Parse the body of an index signature after `[identifier` has been consumed.
     /// Expects current token to be `:` (the colon after the parameter name).
     /// Returns the completed `TSTypeElement::IndexSignature`.
     fn parse_index_signature_body(
         &mut self,
         sig_start: usize,
-        param_name: IdentName<'arena>,
+        param_name: IdentName,
         id_start: usize,
         readonly: bool,
     ) -> Result<TSTypeElement, Error> {

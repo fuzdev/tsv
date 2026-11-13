@@ -245,7 +245,7 @@ pub fn strip_into(
     source: &str,
     goal: Option<crate::Goal>,
     arena: &bumpalo::Bump,
-    stores: &mut crate::ast::AstStores<'_>,
+    stores: &mut crate::ast::AstStores,
 ) -> Result<Stripped, StripError> {
     let program = crate::__private::parse_with_goal_or_fallback_into(source, goal, stores)
         .map_err(StripError::Parse)?;

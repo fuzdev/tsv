@@ -1164,7 +1164,7 @@ impl<'a> Printer<'a> {
     /// applies there. Positions that already route through [`fn@needs_parens`] (call
     /// args, object values, binary operands, …) get the same wrap via that path.
     #[inline]
-    pub(crate) fn wrap_for_init_in(&self, expr: &ast::Expression<'_>, doc: DocId) -> DocId {
+    pub(crate) fn wrap_for_init_in(&self, expr: &ast::Expression, doc: DocId) -> DocId {
         if self.for_init_in_needs_parens(expr) {
             self.arena.parens(doc)
         } else {
@@ -1177,7 +1177,7 @@ impl<'a> Printer<'a> {
     /// its own (the assignment RHS): the verdict [`Self::wrap_for_init_in`] wraps by, and
     /// what such a seam hands the value-gap hoist as its pair
     /// ([`Self::hoisted_owned_value_gap_run_opt`]).
-    pub(crate) fn for_init_in_needs_parens(&self, expr: &ast::Expression<'_>) -> bool {
+    pub(crate) fn for_init_in_needs_parens(&self, expr: &ast::Expression) -> bool {
         self.in_for_init.get() && is_in_binary(expr)
     }
 
@@ -1208,7 +1208,7 @@ impl<'a> Printer<'a> {
     /// wrapper.)
     pub(crate) fn wrap_frozen_for_init_in(
         &self,
-        expr: &ast::Expression<'_>,
+        expr: &ast::Expression,
         frozen: Span,
         already_parenthesized: bool,
         doc: DocId,
@@ -1267,14 +1267,14 @@ impl<'a> Printer<'a> {
     /// is what a verbatim slice decides.
     pub(crate) fn frozen_slice_hands_header_a_bare_in(
         &self,
-        expr: &ast::Expression<'_>,
+        expr: &ast::Expression,
         slice_end: u32,
     ) -> bool {
         use ast::ExpressionKind as E;
         if is_in_binary(expr) {
             return true;
         }
-        let reaches = |child: &ast::Expression<'_>| {
+        let reaches = |child: &ast::Expression| {
             !self.frozen_slice_child_is_parenthesized(child, slice_end)
                 && self.frozen_slice_hands_header_a_bare_in(child, slice_end)
         };
@@ -1311,11 +1311,7 @@ impl<'a> Printer<'a> {
     /// ends at `slice_end` — read as "the next significant byte past the child, still
     /// inside the slice, is `)`". See [`Self::frozen_slice_hands_header_a_bare_in`] for why
     /// the bound is load-bearing.
-    fn frozen_slice_child_is_parenthesized(
-        &self,
-        child: &ast::Expression<'_>,
-        slice_end: u32,
-    ) -> bool {
+    fn frozen_slice_child_is_parenthesized(&self, child: &ast::Expression, slice_end: u32) -> bool {
         next_significant_byte(self.source, child.span().end, slice_end)
             .is_some_and(|pos| self.source.as_bytes()[pos] == b')')
     }
@@ -1332,7 +1328,7 @@ impl<'a> Printer<'a> {
     /// and prints the pairs such a region keeps where the author wrote them
     /// ([`Self::region_keeps_authored_pair`]).
     #[inline]
-    pub(crate) fn needs_parens(&self, expr: &ast::Expression<'_>, ctx: ParenContext) -> bool {
+    pub(crate) fn needs_parens(&self, expr: &ast::Expression, ctx: ParenContext) -> bool {
         (needs_parens(self.view, expr, ctx, self.in_for_init.get())
             && !self.clarity_pair_is_withheld(expr, ctx)
             && !self.region_withholds_assignment_pair(expr, ctx))
@@ -1347,7 +1343,7 @@ impl<'a> Printer<'a> {
     /// ([`Self::region_keeps_shell`]).
     #[cold]
     #[inline(never)]
-    fn region_keeps_authored_pair(&self, expr: &ast::Expression<'_>, ctx: ParenContext) -> bool {
+    fn region_keeps_authored_pair(&self, expr: &ast::Expression, ctx: ParenContext) -> bool {
         self.relational_sibling_pair_is_kept(expr)
             || (matches!(
                 ctx,
@@ -1363,11 +1359,7 @@ impl<'a> Printer<'a> {
     /// arrow body — that a comma-list region prints bare ([`Self::region_withholds_pair`]).
     /// The sequence operand, which prints its pair itself, asks the region directly.
     #[inline]
-    fn region_withholds_assignment_pair(
-        &self,
-        expr: &ast::Expression<'_>,
-        ctx: ParenContext,
-    ) -> bool {
+    fn region_withholds_assignment_pair(&self, expr: &ast::Expression, ctx: ParenContext) -> bool {
         self.has_region_source_marks.get()
             && matches!(
                 ctx,
@@ -1388,7 +1380,7 @@ impl<'a> Printer<'a> {
     /// The chain linearizer answers the same question for a base that is its first
     /// call's callee, off the same marks ([`Self::linearize_input`]).
     #[cold]
-    fn clarity_pair_is_withheld(&self, expr: &ast::Expression<'_>, ctx: ParenContext) -> bool {
+    fn clarity_pair_is_withheld(&self, expr: &ast::Expression, ctx: ParenContext) -> bool {
         let takes_a_clarity_pair = match ctx {
             ParenContext::BinaryLeft { .. } | ParenContext::BinaryRight { .. } => matches!(
                 expr.kind,
@@ -1442,7 +1434,7 @@ impl<'a> Printer<'a> {
     /// only where one side of `expr` is its parent's own token, so a `(` right before and
     /// a `)` right after are a pair around `expr` itself or around a run of pairs that
     /// begins and ends on it.
-    fn source_holds_pair_around(&self, expr: &ast::Expression<'_>) -> bool {
+    fn source_holds_pair_around(&self, expr: &ast::Expression) -> bool {
         paren_shell_close_after(self.source, expr.span().end).is_some()
             && self.prev_significant_byte(expr.span().start) == Some(b'(')
     }
@@ -1454,7 +1446,7 @@ impl<'a> Printer<'a> {
     #[inline]
     pub(crate) fn needs_parens_at_operand_end(
         &self,
-        expr: &ast::Expression<'_>,
+        expr: &ast::Expression,
         ctx: ParenContext,
     ) -> bool {
         self.needs_parens(expr, ctx) || self.is_dividend_tail(expr)
@@ -1463,7 +1455,7 @@ impl<'a> Printer<'a> {
     /// Whether `expr` is a function or class expression a division's left operand ends on
     /// ([`Self::dividend_tail_targets`]).
     #[inline]
-    pub(crate) fn is_dividend_tail(&self, expr: &ast::Expression<'_>) -> bool {
+    pub(crate) fn is_dividend_tail(&self, expr: &ast::Expression) -> bool {
         matches!(
             expr.kind,
             ast::ExpressionKind::FunctionExpression(_) | ast::ExpressionKind::ClassExpression(_)
@@ -1501,7 +1493,7 @@ impl<'a> Printer<'a> {
     /// [`instantiation_keeps_pair_before_type_args`] over this printer's source.
     pub(crate) fn instantiation_keeps_pair(
         &self,
-        head: &ast::Expression<'_>,
+        head: &ast::Expression,
         follow: SecondTypeArgs,
     ) -> bool {
         instantiation_keeps_pair_before_type_args(self.view, self.source, head, follow)
@@ -1704,7 +1696,7 @@ impl<'a> Printer<'a> {
     /// positions would read each other's entries.
     pub(crate) fn chain_share_key(
         &self,
-        node: &ast::Expression<'_>,
+        node: &ast::Expression,
         builder: ShareTag,
     ) -> Option<ShareKey> {
         self.chain_share_key_of(node, node.span(), builder)
@@ -1808,7 +1800,7 @@ impl<'a> Printer<'a> {
     /// - At least one type param has nested generics OR is a conditional type
     ///
     /// Example: `Map<string, Array<number>>` - Map has 2 params, second has nested generic
-    pub(crate) fn id_has_complex_type_annotation(&self, expr: &ast::Expression<'_>) -> bool {
+    pub(crate) fn id_has_complex_type_annotation(&self, expr: &ast::Expression) -> bool {
         crate::__private::pattern_type_annotation(self.view, expr)
             .is_some_and(|ann| self.type_has_complex_annotation(self.view.ty(ann.type_annotation)))
     }
@@ -1819,7 +1811,7 @@ impl<'a> Printer<'a> {
     /// prettier's AST holds no `TSParenthesizedType`, so its predicate sees the reference /
     /// conditional directly, and a shell the output strips must not flip the layout
     /// (`(A extends B ? C : D)` as an argument, `(Map<…>)` around the annotation).
-    fn type_has_complex_annotation(&self, ts_type: &ast::TSType<'_>) -> bool {
+    fn type_has_complex_annotation(&self, ts_type: &ast::TSType) -> bool {
         match unwrap_parenthesized(self.view, ts_type) {
             ast::TSType::TypeReference(type_ref) => {
                 // Must have >1 type argument
@@ -1843,7 +1835,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Check if a type has nested type parameters or is a conditional type
-    fn type_has_nested_generics(&self, ts_type: &ast::TSType<'_>) -> bool {
+    fn type_has_nested_generics(&self, ts_type: &ast::TSType) -> bool {
         match unwrap_parenthesized(self.view, ts_type) {
             ast::TSType::TypeReference(type_ref) => {
                 // Has type arguments means nested generics
@@ -1895,7 +1887,7 @@ impl<'a> Printer<'a> {
     /// A compound operator's object LITERAL left answers it too, as the pattern prettier's
     /// parser reads there ([`Printer::build_compound_target_doc`]): a renamed property, or a
     /// shorthand with a default, which the literal holds as an `=` assignment.
-    pub(crate) fn is_complex_destructuring_target(&self, expr: &ast::Expression<'_>) -> bool {
+    pub(crate) fn is_complex_destructuring_target(&self, expr: &ast::Expression) -> bool {
         if let ast::ExpressionKind::ObjectExpression(obj) = &expr.kind {
             return obj.properties.len() > 2
                 && self
@@ -2237,7 +2229,7 @@ impl<'a> Printer<'a> {
     /// reads the gap ([`Printer::claimed_right_spine_run`]). Every reader of a member gap
     /// opens it here.
     #[inline]
-    pub(crate) fn member_gap_start(&self, object: &ast::Expression<'_>) -> u32 {
+    pub(crate) fn member_gap_start(&self, object: &ast::Expression) -> u32 {
         // Every member linearization asks; the gate is [`Self::pair_trailing_gap_start`]'s own.
         self.pair_trailing_gap_start(object)
     }
@@ -2256,7 +2248,7 @@ impl<'a> Printer<'a> {
     /// trailing emitters decline it and the gap prints it in source order, ahead of the
     /// comments written after the value.
     #[inline]
-    pub(in crate::printer) fn pair_trailing_gap_start(&self, expr: &ast::Expression<'_>) -> u32 {
+    pub(in crate::printer) fn pair_trailing_gap_start(&self, expr: &ast::Expression) -> u32 {
         // Most values asked are no head of the walk — an identifier operand, a member callee.
         if !right_spine_may_end_in_shells(expr) {
             return expr.span().end;
@@ -2266,7 +2258,7 @@ impl<'a> Printer<'a> {
 
     /// [`Self::pair_trailing_gap_start`] past its kind gate, out of line.
     #[inline(never)]
-    fn pair_trailing_gap_start_wide(&self, expr: &ast::Expression<'_>) -> u32 {
+    fn pair_trailing_gap_start_wide(&self, expr: &ast::Expression) -> u32 {
         let end = expr.span().end;
         // Only a comment inside the value can be claimed, and most values hold none.
         if !self.has_comments_to_emit_between(expr.span().start, end) {
@@ -2287,7 +2279,7 @@ impl<'a> Printer<'a> {
     /// give that spelling.
     pub(in crate::printer) fn pair_trailing_gap_start_guarded(
         &self,
-        expr: &ast::Expression<'_>,
+        expr: &ast::Expression,
         boundary_end: u32,
     ) -> u32 {
         let end = expr.span().end;
@@ -2331,7 +2323,7 @@ impl<'a> Printer<'a> {
     #[inline]
     pub(in crate::printer) fn required_pair_gap_start(
         &self,
-        expr: &ast::Expression<'_>,
+        expr: &ast::Expression,
         requires_pair: impl FnOnce() -> bool,
     ) -> u32 {
         let end = expr.span().end;
@@ -2372,10 +2364,7 @@ impl<'a> Printer<'a> {
 
     /// [`ast::Expression::paren_interior`] as the printer partitions it: a spread's from
     /// [`Self::spread_printed_interior`]. Every reader of an element's interior asks this.
-    pub(in crate::printer) fn printed_paren_interior(
-        &self,
-        e: &ast::Expression<'_>,
-    ) -> Option<Span> {
+    pub(in crate::printer) fn printed_paren_interior(&self, e: &ast::Expression) -> Option<Span> {
         match &e.kind {
             ast::ExpressionKind::SpreadElement(s) => Some(self.spread_printed_interior(s)),
             _ => e.paren_interior(self.view),
@@ -2404,7 +2393,7 @@ impl<'a> Printer<'a> {
     /// in a shell below it still defers (a known gap); a kept pair ends it at the pair's `)`; a
     /// child a format-ignore directive freezes ends it at the parent's end
     /// ([`Self::right_spine_child_frozen`]).
-    pub(in crate::printer) fn right_spine_printed_end(&self, expr: &ast::Expression<'_>) -> u32 {
+    pub(in crate::printer) fn right_spine_printed_end(&self, expr: &ast::Expression) -> u32 {
         self.right_spine_printed_end_with(expr, false)
     }
 
@@ -2414,7 +2403,7 @@ impl<'a> Printer<'a> {
     /// ([`Printer::with_statement_tail`]).
     pub(in crate::printer) fn right_spine_printed_end_with(
         &self,
-        expr: &ast::Expression<'_>,
+        expr: &ast::Expression,
         stop_at_printed_pair: bool,
     ) -> u32 {
         use ast::ExpressionKind as K;
@@ -2463,11 +2452,7 @@ impl<'a> Printer<'a> {
     /// assignment operator, `yield` — never at `parent`'s start, where a directive freezing
     /// an earlier child (a parameter, the consequent) would stop the walk as well. Behind the
     /// document-level flag, so a directive-free document never locates a delimiter.
-    fn right_spine_child_frozen(
-        &self,
-        parent: &ast::Expression<'_>,
-        child: &ast::Expression<'_>,
-    ) -> bool {
+    fn right_spine_child_frozen(&self, parent: &ast::Expression, child: &ast::Expression) -> bool {
         use ast::ExpressionKind as K;
         if !self.has_format_ignore {
             return false;
@@ -2806,7 +2791,7 @@ impl<'a> Printer<'a> {
     pub(crate) fn value_hangs_under_operator(
         &self,
         indentable_leads_value: bool,
-        value: &ast::Expression<'_>,
+        value: &ast::Expression,
     ) -> bool {
         indentable_leads_value
             || self.is_own_line_jsdoc_cast(value)
@@ -3464,7 +3449,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn matching_close_paren_of_params(
         &self,
         open: u32,
-        params: &[ast::Expression<'_>],
+        params: &[ast::Expression],
     ) -> Option<u32> {
         self.close_paren_after_params(
             open,
@@ -3614,7 +3599,7 @@ impl<'a> Printer<'a> {
     /// corpus, three of which hold a non-ASCII byte.
     pub(in crate::printer) fn ident_name_doc(
         &self,
-        name: ast::IdentName<'_>,
+        name: ast::IdentName,
         name_start: u32,
     ) -> DocId {
         let d = self.d();
@@ -3645,7 +3630,7 @@ impl<'a> Printer<'a> {
 
     /// [`Self::ident_name_doc`] for an `Identifier` node (the name is the
     /// leading token of the node span).
-    pub(in crate::printer) fn identifier_name_doc(&self, id: &ast::Identifier<'_>) -> DocId {
+    pub(in crate::printer) fn identifier_name_doc(&self, id: &ast::Identifier) -> DocId {
         self.ident_name_doc(id.ident_name(), id.span.start)
     }
 
@@ -3654,7 +3639,7 @@ impl<'a> Printer<'a> {
     /// arena string (so an escaped name still compares decoded).
     pub(in crate::printer) fn with_ident_name_at<R>(
         &self,
-        name: ast::IdentName<'_>,
+        name: ast::IdentName,
         name_start: u32,
         f: impl FnOnce(&str) -> R,
     ) -> R {
@@ -3669,7 +3654,7 @@ impl<'a> Printer<'a> {
     /// [`Self::with_ident_name_at`] for an `Identifier` node.
     pub(in crate::printer) fn with_ident_name<R>(
         &self,
-        id: &ast::Identifier<'_>,
+        id: &ast::Identifier,
         f: impl FnOnce(&str) -> R,
     ) -> R {
         self.with_ident_name_at(id.ident_name(), id.span.start, f)
@@ -3699,7 +3684,7 @@ impl<'a> Printer<'a> {
 /// only values whose printed content can end ahead of stripped grouping shells; the walk returns
 /// any other value's span end.
 #[inline]
-pub(crate) fn right_spine_may_end_in_shells(expr: &ast::Expression<'_>) -> bool {
+pub(crate) fn right_spine_may_end_in_shells(expr: &ast::Expression) -> bool {
     use ast::ExpressionKind as K;
     matches!(
         expr.kind,

@@ -34,7 +34,7 @@ impl<'a> Printer<'a> {
     pub(super) fn push_import_attributes_clause(
         &self,
         parts: &mut DocBuf,
-        attributes: Option<&[ast::ImportAttribute<'_>]>,
+        attributes: Option<&[ast::ImportAttribute]>,
         source_end: u32,
         stmt_end: u32,
     ) -> u32 {
@@ -106,7 +106,7 @@ impl<'a> Printer<'a> {
             // the bound from `brace_span` is what keeps that true — restating it here once
             // reached `stmt_end`, giving the gap a second emitter and DOUBLE-PRINTING every
             // comment in it.
-            let attr_span = |a: &ast::ImportAttribute<'_>| a.span;
+            let attr_span = |a: &ast::ImportAttribute| a.span;
             let has_expanding_comments = self
                 .has_expanding_line_comments_in_bracket_list(brace_span, attributes, attr_span)
                 || self.has_own_line_attribute_comments(attributes, brace_start, brace_close);
@@ -195,7 +195,7 @@ impl<'a> Printer<'a> {
     /// comment owned by the value counts, exactly as prettier's `hasComment(value)` does.
     fn is_single_type_attribute(
         &self,
-        attributes: &[ast::ImportAttribute<'_>],
+        attributes: &[ast::ImportAttribute],
         brace_span: Span,
     ) -> bool {
         let [attribute] = attributes else {
@@ -261,7 +261,7 @@ impl<'a> Printer<'a> {
     /// separating space, which then collapses again (non-idempotent).
     fn has_own_line_attribute_comments(
         &self,
-        attributes: &[ast::ImportAttribute<'_>],
+        attributes: &[ast::ImportAttribute],
         brace_start: u32,
         brace_close: u32,
     ) -> bool {
@@ -279,7 +279,7 @@ impl<'a> Printer<'a> {
     /// a string-literal key follows prettier's `quoteProps: as-needed` — quotes
     /// are stripped when the value is a valid identifier with no escapes
     /// (`'type'` → `type`), else kept and normalized (`'resolution-mode'`).
-    fn build_import_attribute_key_doc(&self, key: &ast::ImportAttributeKey<'_>) -> DocId {
+    fn build_import_attribute_key_doc(&self, key: &ast::ImportAttributeKey) -> DocId {
         match key {
             ast::ImportAttributeKey::Identifier(id) => self.identifier_name_doc(id),
             ast::ImportAttributeKey::Literal(lit) => {
@@ -297,7 +297,7 @@ impl<'a> Printer<'a> {
     /// Build doc for a single import attribute: `key: value`
     ///
     /// Handles comments between key, `:`, and value.
-    fn build_import_attribute_doc(&self, attr: &ast::ImportAttribute<'_>) -> DocId {
+    fn build_import_attribute_doc(&self, attr: &ast::ImportAttribute) -> DocId {
         let d = self.d();
         let key_end = attr.key.span().end;
         let value_start = attr.value.span.start;

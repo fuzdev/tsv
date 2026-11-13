@@ -168,9 +168,9 @@ impl Printer<'_> {
     /// as the recursion through this entry point did: entered outermost first, left
     /// innermost first, every level storing the one answer the chain ends on (a tail link's
     /// answer is its head's), and a memo hit ending the walk at the level it hits.
-    pub(super) fn head_stripped_paren_shell<'t>(
+    pub(super) fn head_stripped_paren_shell(
         &self,
-        ty: &'t TSType<'t>,
+        ty: &TSType,
         run: EdgeRun,
     ) -> Option<HeadRegion> {
         let outermost = self.head_memo.depth.get() == 0;

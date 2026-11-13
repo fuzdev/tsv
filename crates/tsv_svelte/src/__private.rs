@@ -42,7 +42,7 @@ pub fn parse_folded<'arena>(
 pub fn parse_folded_into<'arena>(
     folded: &tsv_lang::printing::FoldedSource<'_>,
     arena: &'arena bumpalo::Bump,
-    stores: &mut AstStores<'arena>,
+    stores: &mut AstStores,
 ) -> Result<Root<'arena>> {
     if folded.folded_lone_cr() {
         refuse_lone_cr_in_tag_line_comment(folded.original(), arena)?;
@@ -54,7 +54,7 @@ pub fn parse_folded_into<'arena>(
 #[inline]
 pub fn parsed_ref<'a, 'arena: 'a>(
     root: &'a Root<'arena>,
-    stores: &'a AstStores<'arena>,
+    stores: &'a AstStores,
 ) -> ParsedRootRef<'a> {
     ParsedRootRef {
         root,
@@ -64,7 +64,7 @@ pub fn parsed_ref<'a, 'arena: 'a>(
 
 /// A one-shot parse: `parse` over fresh stores, bundled with the tree it built.
 fn parsed<'arena>(
-    parse: impl FnOnce(&mut AstStores<'arena>) -> Result<Root<'arena>>,
+    parse: impl FnOnce(&mut AstStores) -> Result<Root<'arena>>,
 ) -> Result<ParsedRoot<'arena>> {
     let mut stores = AstStores::new();
     let root = parse(&mut stores)?;
@@ -165,7 +165,7 @@ pub fn parse<'arena>(source: &str, arena: &'arena bumpalo::Bump) -> Result<Parse
 pub fn parse_into<'arena>(
     source: &str,
     arena: &'arena bumpalo::Bump,
-    stores: &mut AstStores<'arena>,
+    stores: &mut AstStores,
 ) -> Result<Root<'arena>> {
     Error::ensure_source_fits(source)?;
     parser::parse_svelte(source, arena, stores)
@@ -189,15 +189,15 @@ pub fn parse_imports_in(source: &str, arena: &bumpalo::Bump) -> Result<Imports> 
 /// # Errors
 ///
 /// As [`crate::parse_imports`].
-pub fn parse_imports_into<'arena>(
+pub fn parse_imports_into(
     source: &str,
-    arena: &'arena bumpalo::Bump,
-    stores: &mut AstStores<'arena>,
+    arena: &bumpalo::Bump,
+    stores: &mut AstStores,
 ) -> Result<Imports> {
     let root = parse_into(source, arena, stores)?;
     let mut scripts = [root.instance, root.module];
     scripts.sort_by_key(|script| script.map(|script| script.span.start));
-    let programs: smallvec::SmallVec<[&tsv_ts::ast::Program<'_>; 2]> = scripts
+    let programs: smallvec::SmallVec<[&tsv_ts::ast::Program; 2]> = scripts
         .into_iter()
         .flatten()
         .map(|script| &script.content)

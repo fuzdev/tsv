@@ -19,7 +19,7 @@ impl<'a> Printer<'a> {
         self.arena
     }
 
-    pub(crate) fn ident_doc(&self, name: ast::IdentName<'_>, name_start: u32) -> DocId {
+    pub(crate) fn ident_doc(&self, name: ast::IdentName, name_start: u32) -> DocId {
         self.ident_name_doc(name, name_start)
     }
 
@@ -105,7 +105,7 @@ impl<'a> Printer<'a> {
         ))
     }
 
-    pub(crate) fn get_property_span(&self, expr: &ast::Expression<'_>) -> Span {
+    pub(crate) fn get_property_span(&self, expr: &ast::Expression) -> Span {
         expr.span()
     }
 

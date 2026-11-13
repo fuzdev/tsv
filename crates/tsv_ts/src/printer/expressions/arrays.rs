@@ -238,7 +238,7 @@ impl<'a> Printer<'a> {
         &self,
         arr: &'e ast::ArrayExpression,
         i: usize,
-    ) -> Option<(usize, &'e Expression<'e>)>
+    ) -> Option<(usize, &'e Expression)>
     where
         'a: 'e,
     {
@@ -597,7 +597,7 @@ impl<'a> Printer<'a> {
         arr: &ast::ArrayExpression,
         span: Span,
         idx: usize,
-        elem: &Expression<'_>,
+        elem: &Expression,
         role: LiteralRole,
     ) -> u32 {
         let frozen =
@@ -745,7 +745,7 @@ impl<'a> Printer<'a> {
     /// An element's doc in a [`LiteralRole`]: the target's own print for a value a compound
     /// target reads as a nested pattern or a default ([`is_compound_target_value`]), the
     /// argument-position doc every array element takes otherwise.
-    fn build_array_element_doc_as(&self, expr: &Expression<'_>, role: LiteralRole) -> DocId {
+    fn build_array_element_doc_as(&self, expr: &Expression, role: LiteralRole) -> DocId {
         if role == LiteralRole::CompoundTarget && is_compound_target_value(expr) {
             return self.build_list_element_doc(expr.span().start, || {
                 self.build_compound_target_doc(expr)
@@ -826,7 +826,7 @@ impl<'a> Printer<'a> {
 
     /// [`Self::is_concisely_printed_array`] read off a call ARGUMENT, which the caller holds
     /// as a bare expression: a non-array is never concisely printed.
-    pub(in crate::printer) fn arg_is_concisely_printed_array(&self, expr: &Expression<'_>) -> bool {
+    pub(in crate::printer) fn arg_is_concisely_printed_array(&self, expr: &Expression) -> bool {
         matches!(&expr.kind, ExpressionKind::ArrayExpression(arr) if self.is_concisely_printed_array(arr))
     }
 

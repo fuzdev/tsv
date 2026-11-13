@@ -22,7 +22,7 @@ use super::{
 /// `Copy`, and bound to the stores of the document whose tree it reads.
 #[derive(Clone, Copy)]
 pub struct AstView<'a> {
-    stores: &'a AstStores<'a>,
+    stores: &'a AstStores,
 }
 
 // One word, in the check build too: a walk's frame and registers are what it pays for.
@@ -32,13 +32,13 @@ const _: () = assert!(size_of::<AstView<'static>>() == size_of::<usize>());
 impl<'a> AstView<'a> {
     /// The expression `id` names. A miss ends in the store's shared cold path.
     #[inline]
-    pub fn expr(self, id: ExprId) -> &'a Expression<'a> {
+    pub fn expr(self, id: ExprId) -> &'a Expression {
         self.stores.exprs.get(id)
     }
 
     /// The expression `id` names, when it is present.
     #[inline]
-    pub fn opt(self, id: Option<ExprId>) -> Option<&'a Expression<'a>> {
+    pub fn opt(self, id: Option<ExprId>) -> Option<&'a Expression> {
         id.map(|id| self.expr(id))
     }
 
@@ -56,19 +56,19 @@ impl<'a> AstView<'a> {
 
     /// The expressions of `run`, held by value: parameter lists.
     #[inline]
-    pub fn run(self, run: Run<Expr>) -> &'a [Expression<'a>] {
+    pub fn run(self, run: Run<Expr>) -> &'a [Expression] {
         self.stores.exprs.slice(run)
     }
 
     /// The statement `id` names. A miss ends in the store's shared cold path.
     #[inline]
-    pub fn stmt(self, id: StmtId) -> &'a Statement<'a> {
+    pub fn stmt(self, id: StmtId) -> &'a Statement {
         self.stores.stmts.get(id)
     }
 
     /// The statement `id` names, when it is present.
     #[inline]
-    pub fn opt_stmt(self, id: Option<StmtId>) -> Option<&'a Statement<'a>> {
+    pub fn opt_stmt(self, id: Option<StmtId>) -> Option<&'a Statement> {
         id.map(|id| self.stmt(id))
     }
 
@@ -81,13 +81,13 @@ impl<'a> AstView<'a> {
 
     /// The type `id` names. A miss ends in the store's shared cold path.
     #[inline]
-    pub fn ty(self, id: TyId) -> &'a TSType<'a> {
+    pub fn ty(self, id: TyId) -> &'a TSType {
         self.stores.tys.get(id)
     }
 
     /// The type `id` names, when it is present.
     #[inline]
-    pub fn opt_ty(self, id: Option<TyId>) -> Option<&'a TSType<'a>> {
+    pub fn opt_ty(self, id: Option<TyId>) -> Option<&'a TSType> {
         id.map(|id| self.ty(id))
     }
 
@@ -106,7 +106,7 @@ impl<'a> AstView<'a> {
 
     /// The catch clause `id` names, when it is present.
     #[inline]
-    pub fn opt_catch(self, id: Option<CatchId>) -> Option<&'a CatchClause<'a>> {
+    pub fn opt_catch(self, id: Option<CatchId>) -> Option<&'a CatchClause> {
         id.map(|id| self.catch(id))
     }
 
@@ -129,30 +129,30 @@ impl<'a> AstView<'a> {
     /// template value, a carriage-return-folded template raw — so every name reader's common,
     /// span-identity arm stays small enough to inline where it is read.
     #[inline(never)]
-    pub fn text(self, text: PoolStr<'a>) -> &'a str {
+    pub fn text(self, text: PoolStr) -> &'a str {
         self.stores.text.get(text.text)
     }
 
     /// The comments of `list`: a program's. A miss ends in the store's shared cold path.
     #[inline]
-    pub fn comments(self, list: CommentList<'a>) -> &'a [Comment] {
+    pub fn comments(self, list: CommentList) -> &'a [Comment] {
         self.stores.comments.slice(list.run)
     }
 
     /// The payload stores, for the accessors their macro declares beside them.
     #[inline]
-    pub(super) fn payloads(self) -> &'a PayloadStores<'a> {
+    pub(super) fn payloads(self) -> &'a PayloadStores {
         &self.stores.payloads
     }
 
     /// The value-run stores, for the accessors their macro declares beside them.
     #[inline]
-    pub(super) fn runs(self) -> &'a RunStores<'a> {
+    pub(super) fn runs(self) -> &'a RunStores {
         &self.stores.runs
     }
 }
 
-impl<'arena> AstStores<'arena> {
+impl AstStores {
     /// The view reading these stores.
     #[inline]
     pub fn view(&self) -> AstView<'_> {
@@ -160,7 +160,7 @@ impl<'arena> AstStores<'arena> {
     }
 }
 
-impl<'arena> Parsed<'arena> {
+impl Parsed {
     /// The view reading this tree's stores.
     #[inline]
     pub fn view(&self) -> AstView<'_> {
@@ -173,14 +173,14 @@ impl<'arena> Parsed<'arena> {
 #[derive(Clone, Copy)]
 pub struct ParsedRef<'a> {
     /// The tree.
-    pub program: &'a Program<'a>,
+    pub program: &'a Program,
     /// The view over the stores the tree's edges index.
     pub view: AstView<'a>,
 }
 
-impl<'a, 'arena: 'a> From<&'a Parsed<'arena>> for ParsedRef<'a> {
+impl<'a> From<&'a Parsed> for ParsedRef<'a> {
     #[inline]
-    fn from(parsed: &'a Parsed<'arena>) -> Self {
+    fn from(parsed: &'a Parsed) -> Self {
         ParsedRef {
             program: &parsed.program,
             view: parsed.view(),

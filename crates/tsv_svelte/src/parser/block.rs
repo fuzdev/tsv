@@ -193,11 +193,11 @@ enum EachHeadSplit {
 /// `tsv_ts::__private::parse_type_extent`) — the caller re-reads both regions with the real
 /// iterable and binding parses, so a probe that registered anything would double it.
 /// Its type parses start at `host_nesting`, as the real ones do.
-fn each_binding_separator<'arena>(
+fn each_binding_separator(
     s: &str,
     s_offset: usize,
     host_nesting: u32,
-    stores: &mut AstStores<'arena>,
+    stores: &mut AstStores,
 ) -> EachHeadSplit {
     // Every position the walk names is a subslice of `s`, so one rule converts them all
     // and no offset is ever summed from parts. Via [`subslice_offset`] rather than a
@@ -494,7 +494,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         &self,
         content: &str,
         content_offset: usize,
-        expression: &Expression<'_>,
+        expression: &Expression,
         expr_end_pos: usize,
     ) -> Result<(), Error> {
         if strip_head_keyword(&content[expr_end_pos - content_offset..], "as").is_some() {
@@ -1544,12 +1544,12 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             })?;
             // the `function` shell around the parameters: only `func.params` is kept
             #[cfg(feature = "_internal_ast_census")]
-            tsv_lang::ast_census_probe::dead::<tsv_ts::ast::Statement<'arena>>(
+            tsv_lang::ast_census_probe::dead::<tsv_ts::ast::Statement>(
                 tsv_lang::ast_census_probe::Dead::Superseded,
                 1,
             );
             #[cfg(feature = "_internal_ast_census")]
-            tsv_lang::ast_census_probe::dead::<tsv_ts::ast::FunctionDeclaration<'arena>>(
+            tsv_lang::ast_census_probe::dead::<tsv_ts::ast::FunctionDeclaration>(
                 tsv_lang::ast_census_probe::Dead::Superseded,
                 1,
             );
@@ -1576,12 +1576,12 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                     tsv_ts::__private::parse_embedded(&wrapper, base, this.island_nesting(), stores)
                 })?;
                 #[cfg(feature = "_internal_ast_census")]
-                tsv_lang::ast_census_probe::dead::<tsv_ts::ast::Statement<'arena>>(
+                tsv_lang::ast_census_probe::dead::<tsv_ts::ast::Statement>(
                     tsv_lang::ast_census_probe::Dead::Superseded,
                     1,
                 );
                 #[cfg(feature = "_internal_ast_census")]
-                tsv_lang::ast_census_probe::dead::<tsv_ts::ast::FunctionDeclaration<'arena>>(
+                tsv_lang::ast_census_probe::dead::<tsv_ts::ast::FunctionDeclaration>(
                     tsv_lang::ast_census_probe::Dead::Superseded,
                     1,
                 );

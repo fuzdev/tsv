@@ -126,7 +126,7 @@ impl<'a> Printer<'a> {
     /// why the answer is read by `build_comment_bound_pair_lead_doc`, which its caller invokes
     /// BEFORE building the inner — a cast's own value gaps mark themselves while that inner
     /// is built, overwriting the mark that was meant for it.
-    pub(in crate::printer) fn mark_jsdoc_cast_value_gap(&self, value: &Expression<'_>) {
+    pub(in crate::printer) fn mark_jsdoc_cast_value_gap(&self, value: &Expression) {
         self.jsdoc_cast_value_gap_target.set(match &value.kind {
             ExpressionKind::CommentBoundPair(_) => Some(value.span),
             _ => None,
@@ -174,7 +174,7 @@ impl<'a> Printer<'a> {
 /// Prettier computes `canBreakLeftDoc` eagerly; on a real corpus two thirds of those
 /// answers went unread, a doc walk apiece.
 pub(crate) fn choose_layout(
-    right_expr: &Expression<'_>,
+    right_expr: &Expression,
     left: AssignmentLeft,
     can_break_left: bool,
     printer: &Printer<'_>,
@@ -301,7 +301,7 @@ pub fn should_inline_logical_expression(view: AstView<'_>, binary: &ast::BinaryE
 /// Examples that stay inline:
 ///   const f = (x: T) => (y) => expr       // an annotated identifier is still simple
 ///   const f = (): H => (y) => expr        // a return type with no parameters
-pub(crate) fn is_curried_arrow_chain_that_breaks(view: AstView<'_>, expr: &Expression<'_>) -> bool {
+pub(crate) fn is_curried_arrow_chain_that_breaks(view: AstView<'_>, expr: &Expression) -> bool {
     is_curried_arrow_chain(view, expr)
         && matches!(&expr.kind, &ExpressionKind::ArrowFunctionExpression(arrow) if arrow_chain_should_break(view, view.arrow_fn(arrow)))
 }
@@ -311,10 +311,7 @@ pub(crate) fn is_curried_arrow_chain_that_breaks(view: AstView<'_>, expr: &Expre
 /// ([`is_curried_arrow_chain_that_breaks`], which the seam breaks for instead). Such a chain
 /// takes the fluid layout and prints the operator→value gap's run behind its own softline
 /// ([`Printer::build_led_curried_chain_doc`]).
-pub(crate) fn is_curried_arrow_chain_owning_break(
-    view: AstView<'_>,
-    expr: &Expression<'_>,
-) -> bool {
+pub(crate) fn is_curried_arrow_chain_owning_break(view: AstView<'_>, expr: &Expression) -> bool {
     is_curried_arrow_chain(view, expr) && !is_curried_arrow_chain_that_breaks(view, expr)
 }
 
@@ -322,7 +319,7 @@ pub(crate) fn is_curried_arrow_chain_owning_break(
 /// arrow). The terminal body may be an expression or a block. Used to route the
 /// assignment RHS through the arrow-chain layout regardless of whether any head
 /// triggers the chain break.
-pub(crate) fn is_curried_arrow_chain(view: AstView<'_>, expr: &Expression<'_>) -> bool {
+pub(crate) fn is_curried_arrow_chain(view: AstView<'_>, expr: &Expression) -> bool {
     if let &ExpressionKind::ArrowFunctionExpression(arrow) = &expr.kind {
         matches!(
             &view.arrow_fn(arrow).body,
@@ -397,7 +394,7 @@ pub(crate) fn arrow_chain_should_break(
 /// Note: prettier does NOT include RegexLiteral here. Regex falls through to Fluid layout,
 /// which produces the same output since regex can't break internally — the declarator twin
 /// names it outright to reach the same place.
-pub(crate) fn should_break_after_operator(expr: &Expression<'_>, printer: &Printer<'_>) -> bool {
+pub(crate) fn should_break_after_operator(expr: &Expression, printer: &Printer<'_>) -> bool {
     // Unwrap wrapper expressions to get to the core
     let core_expr = unwrap_expression(printer.view, expr);
 
@@ -411,7 +408,7 @@ pub(crate) fn should_break_after_operator(expr: &Expression<'_>, printer: &Print
 }
 
 /// Unwrap wrapper expressions (TSNonNullExpression, await, unary, yield, parenthesized)
-fn unwrap_expression<'a>(view: AstView<'a>, mut expr: &'a Expression<'a>) -> &'a Expression<'a> {
+fn unwrap_expression<'a>(view: AstView<'a>, mut expr: &'a Expression) -> &'a Expression {
     loop {
         expr = match &expr.kind {
             ExpressionKind::TSNonNullExpression(non_null) => view.expr(non_null.expression),
@@ -542,7 +539,7 @@ impl Printer<'_> {
     /// callee walk, and the value's own comment read.
     pub(in crate::printer) fn mapped_type_arg_hug(
         &self,
-        value: &Expression<'_>,
+        value: &Expression,
         gap_comment_free: impl FnOnce() -> bool,
     ) -> Option<MappedTypeArgHug> {
         let mut core = value;
@@ -638,7 +635,7 @@ impl Printer<'_> {
 /// comments via `call_arg_has_comments`, complex type args).
 ///
 /// We have `DocArena::will_break()` infrastructure if a real gap ever surfaces.
-pub(crate) fn is_poorly_breakable_chain(expr: &Expression<'_>, printer: &Printer<'_>) -> bool {
+pub(crate) fn is_poorly_breakable_chain(expr: &Expression, printer: &Printer<'_>) -> bool {
     let walk = PoorlyBreakableWalk {
         printer,
         // A member-gap comment only withholds the operator break on a chain prettier
@@ -668,7 +665,7 @@ struct PoorlyBreakableWalk<'a, 'src> {
 
 fn is_poorly_breakable_chain_walk(
     view: AstView<'_>,
-    expr: &Expression<'_>,
+    expr: &Expression,
     mut deep: bool,
     walk: &PoorlyBreakableWalk<'_, '_>,
 ) -> bool {
@@ -835,7 +832,7 @@ fn is_poorly_breakable_chain_walk(
 ///
 /// Note: Prettier uses JS `.length` (UTF-16 code units) for all measurements,
 /// we use `.len()` (UTF-8 bytes). These match for ASCII (the common case).
-fn is_short_arg(view: AstView<'_>, expr: &Expression<'_>, source: &str) -> bool {
+fn is_short_arg(view: AstView<'_>, expr: &Expression, source: &str) -> bool {
     // Prettier: LONE_SHORT_ARGUMENT_THRESHOLD_RATE = 0.25
     // (`utilities/is-lone-short-argument.js`)
     let threshold = PRINT_WIDTH / 4;
@@ -901,7 +898,7 @@ fn is_short_arg(view: AstView<'_>, expr: &Expression<'_>, source: &str) -> bool 
 /// for the `is_poorly_breakable_chain` debug_assert below, and deliberately NOT the shared
 /// `is_multiline_string_literal` (a *layout* predicate, continuation-only — widening that
 /// one would change fluid-layout behavior for the over-accepted raw form).
-fn chain_has_multiline_string_arg(view: AstView<'_>, expr: &Expression<'_>, source: &str) -> bool {
+fn chain_has_multiline_string_arg(view: AstView<'_>, expr: &Expression, source: &str) -> bool {
     let mut expr = expr;
     loop {
         expr = match &expr.kind {
@@ -924,7 +921,7 @@ fn chain_has_multiline_string_arg(view: AstView<'_>, expr: &Expression<'_>, sour
 
 /// Whether an argument is a string literal whose raw span contains a newline —
 /// unwrapping unary operators like `is_short_arg` does.
-fn arg_is_multiline_string(view: AstView<'_>, expr: &Expression<'_>, source: &str) -> bool {
+fn arg_is_multiline_string(view: AstView<'_>, expr: &Expression, source: &str) -> bool {
     match &expr.kind {
         ExpressionKind::UnaryExpression(unary) => {
             arg_is_multiline_string(view, view.expr(unary.argument), source)
@@ -965,11 +962,7 @@ fn call_arg_has_comments(call: &ast::CallExpression, span: Span, printer: &Print
 /// Used for break-after-operator layout decisions: when a type assertion call has long args,
 /// we break after `=` instead of inside the call. If the call has short/trivial args, the
 /// type annotation can break instead.
-pub(crate) fn is_type_assertion_call(
-    view: AstView<'_>,
-    expr: &Expression<'_>,
-    source: &str,
-) -> bool {
+pub(crate) fn is_type_assertion_call(view: AstView<'_>, expr: &Expression, source: &str) -> bool {
     let call = match &expr.kind {
         ExpressionKind::TSAsExpression(as_expr) => match &view.expr(as_expr.expression).kind {
             ExpressionKind::CallExpression(call) => call,
@@ -992,7 +985,7 @@ pub(crate) fn is_type_assertion_call(
 }
 
 /// Check if an expression is a member-only chain (no calls).
-fn is_member_only_chain(view: AstView<'_>, expr: &Expression<'_>) -> bool {
+fn is_member_only_chain(view: AstView<'_>, expr: &Expression) -> bool {
     let mut expr = expr;
     loop {
         expr = match &expr.kind {
@@ -1015,7 +1008,7 @@ fn is_member_only_chain(view: AstView<'_>, expr: &Expression<'_>) -> bool {
 /// UNDECORATED class is on the list because a decorated one never reaches it: prettier's
 /// `shouldBreakAfterOperator` answers it first, as both of tsv's layout twins do
 /// (`class_expr_has_decorators`).
-pub(crate) fn is_simple_value(view: AstView<'_>, expr: &Expression<'_>) -> bool {
+pub(crate) fn is_simple_value(view: AstView<'_>, expr: &Expression) -> bool {
     matches!(
         &expr.kind,
         ExpressionKind::Literal(lit) if matches!(
@@ -1109,7 +1102,7 @@ impl<'a> Printer<'a> {
     /// the two declarator value builders, which build their value without it.
     ///
     /// Keyed by span and not consumed, like `mark_ternary_extra_indent`.
-    pub(crate) fn mark_assignment_value(&self, value: &Expression<'_>) {
+    pub(crate) fn mark_assignment_value(&self, value: &Expression) {
         self.assignment_value_target.set(Some(value.span()));
     }
 
@@ -1132,7 +1125,7 @@ impl<'a> Printer<'a> {
         &self,
         left_doc: DocId,
         operator: DocId,
-        right_expr: &Expression<'_>,
+        right_expr: &Expression,
         left: AssignmentLeft,
         rhs_info: RhsCommentInfo,
     ) -> DocId {
@@ -1581,7 +1574,7 @@ impl<'a> Printer<'a> {
         &self,
         left_doc: DocId,
         operator: DocId,
-        right_expr: &Expression<'_>,
+        right_expr: &Expression,
         frozen: Span,
         comments: Option<DocId>,
         boundary: Option<u32>,
@@ -1617,7 +1610,7 @@ impl<'a> Printer<'a> {
     ///
     /// Member-only chains with line comments between segments should force
     /// BreakAfterOperator layout to match Prettier's first-pass behavior.
-    pub(crate) fn has_line_comments_in_member_chain(&self, expr: &Expression<'_>) -> bool {
+    pub(crate) fn has_line_comments_in_member_chain(&self, expr: &Expression) -> bool {
         // Only check member-only chains (no calls)
         if !is_member_only_chain(self.view, expr) {
             return false;
@@ -1634,7 +1627,7 @@ impl<'a> Printer<'a> {
     /// a trailing plain member over a call base (`fn()⏎// c⏎.bar`) breaks at the
     /// comment exactly like its called twin (`.bar()`), and gating on the top
     /// node is what made only the twin hug the `=`.
-    pub(crate) fn has_line_comments_in_call_chain(&self, expr: &Expression<'_>) -> bool {
+    pub(crate) fn has_line_comments_in_call_chain(&self, expr: &Expression) -> bool {
         chain_has_calls(self.view, expr) && self.has_line_comments_in_chain(expr)
     }
 
@@ -1645,7 +1638,7 @@ impl<'a> Printer<'a> {
     /// expand internally and should not use fluid layout. The import itself handles
     /// its own expansion, so the assignment should use default layout.
     /// Handles both direct imports and `await import(...)`.
-    pub(crate) fn has_import_with_trailing_comments(&self, expr: &Expression<'_>) -> bool {
+    pub(crate) fn has_import_with_trailing_comments(&self, expr: &Expression) -> bool {
         match &expr.kind {
             ExpressionKind::ImportExpression(import) => {
                 let paren_close = expr.span.end;
@@ -1665,7 +1658,7 @@ impl<'a> Printer<'a> {
 
     /// Check for line comments in a chain (calls, members, non-null) — a loop down the
     /// spine, not a recursion, since a frame per link is what the stack contract prices.
-    fn has_line_comments_in_chain(&self, expr: &Expression<'_>) -> bool {
+    fn has_line_comments_in_chain(&self, expr: &Expression) -> bool {
         let mut expr = expr;
         // A `//` in a stripped shell the chain prints MID-CHAIN breaks the chain at the member
         // gap after its head, as one written in that gap does ([`Self::mid_chain_shell_run`]).
@@ -1807,7 +1800,7 @@ impl Printer<'_> {
     ///
     /// Asked at every operator→value seam, so the common answer is one byte: a run needs a
     /// shell at the value's start and a comment among the `(`s there.
-    fn mid_chain_shell_run(&self, expr: &Expression<'_>) -> MidChainShellRun {
+    fn mid_chain_shell_run(&self, expr: &Expression) -> MidChainShellRun {
         let start = expr.span().start;
         if self.source.as_bytes().get(start as usize) != Some(&b'(')
             || left_spine_shell_is_comment_free(self.source, start)

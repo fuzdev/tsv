@@ -78,8 +78,8 @@ impl<'a> Printer<'a> {
     /// `import { /* c */ } from 'x'`, `import { // c\n } from 'x'`.
     pub(super) fn has_empty_named_braces(
         &self,
-        decl: &ast::ImportDeclaration<'_>,
-        specifiers: &[ast::ImportSpecifier<'_>],
+        decl: &ast::ImportDeclaration,
+        specifiers: &[ast::ImportSpecifier],
         span: Span,
     ) -> bool {
         // A surviving named specifier PROVES the braces are non-empty — decide
@@ -146,7 +146,7 @@ impl<'a> Printer<'a> {
     /// inside the specifier list.
     pub(super) fn import_header_end(
         &self,
-        decl: &ast::ImportDeclaration<'_>,
+        decl: &ast::ImportDeclaration,
         span: Span,
         search_end: u32,
     ) -> u32 {
@@ -175,7 +175,7 @@ impl<'a> Printer<'a> {
     /// specifier start to avoid matching `type` inside the specifier list.
     pub(super) fn export_header_end(
         &self,
-        decl: &ast::ExportNamedDeclaration<'_>,
+        decl: &ast::ExportNamedDeclaration,
         span: Span,
         search_end: u32,
     ) -> u32 {
@@ -447,8 +447,8 @@ impl<'a> Printer<'a> {
         declaration_is_type_only: bool,
         specifier_is_type: bool,
         specifier_start: u32,
-        left: &ast::ModuleExportName<'_>,
-        right: &ast::ModuleExportName<'_>,
+        left: &ast::ModuleExportName,
+        right: &ast::ModuleExportName,
     ) -> DocId {
         let d = self.d();
         let (left_span, right_span) = (left.span(), right.span());
@@ -503,7 +503,7 @@ impl<'a> Printer<'a> {
     /// Build a doc for a `ModuleExportName`: a bare identifier emits its symbol;
     /// a string name (`'str'`) emits a quote-normalized string literal (preserved
     /// as a string — prettier keeps the form, never stripping to a bare identifier).
-    pub(super) fn build_module_export_name_doc(&self, name: &ast::ModuleExportName<'_>) -> DocId {
+    pub(super) fn build_module_export_name_doc(&self, name: &ast::ModuleExportName) -> DocId {
         match name {
             ast::ModuleExportName::Identifier(id) => self.identifier_name_doc(id),
             ast::ModuleExportName::Literal(lit) => self.build_literal_doc(lit),
@@ -513,7 +513,7 @@ impl<'a> Printer<'a> {
     /// Build a doc for a single import specifier
     pub(super) fn build_import_specifier_doc(
         &self,
-        named_spec: &ast::ImportNamedSpecifier<'_>,
+        named_spec: &ast::ImportNamedSpecifier,
         is_type_import: bool,
     ) -> DocId {
         // The local binding is always an identifier; wrap it so it shares the
@@ -531,7 +531,7 @@ impl<'a> Printer<'a> {
     /// Build a doc for a single export specifier
     pub(super) fn build_export_specifier_doc(
         &self,
-        spec: &ast::ExportSpecifier<'_>,
+        spec: &ast::ExportSpecifier,
         is_type_export: bool,
     ) -> DocId {
         self.build_renamed_specifier_doc(

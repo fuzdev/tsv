@@ -163,7 +163,7 @@ impl<'a> Printer<'a> {
         &self,
         parts: &mut DocBuf,
         paren_end: u32,
-        body: &Statement<'_>,
+        body: &Statement,
         body_ctx: StatementContext,
     ) {
         let d = self.d();
@@ -788,7 +788,7 @@ impl<'a> Printer<'a> {
     /// Where the update clause's trailing region opens: its right spine's printed end
     /// ([`Printer::pair_trailing_gap_start`]), walked through a sequence's unfrozen last
     /// operand, which prints bare in a `for` header — no envelope prints its run here.
-    fn for_update_trailing_gap_start(&self, update: &Expression<'_>) -> u32 {
+    fn for_update_trailing_gap_start(&self, update: &Expression) -> u32 {
         let end = update.span().end;
         let spine = match &update.kind {
             ExpressionKind::SequenceExpression(seq) => match self.view.list(seq.expressions) {
@@ -1157,7 +1157,7 @@ impl<'a> Printer<'a> {
         &self,
         seq: &ast::SequenceExpression,
         seq_span: Span,
-        build_elem: impl Fn(&Expression<'_>) -> DocId,
+        build_elem: impl Fn(&Expression) -> DocId,
     ) -> DocId {
         let expressions = self.view.list(seq.expressions);
         self.mark_relational_sibling_authored_pairs(expressions.iter().copied().map(Some));
@@ -1313,8 +1313,8 @@ impl<'a> Printer<'a> {
     /// `[~In]` restriction, the update clause does not.
     fn build_for_expr_clause(
         &self,
-        expr: &Expression<'_>,
-        build_elem: impl Fn(&Expression<'_>) -> DocId,
+        expr: &Expression,
+        build_elem: impl Fn(&Expression) -> DocId,
     ) -> DocId {
         if let ExpressionKind::SequenceExpression(seq) = &expr.kind {
             // A sequence's ELEMENTS are not `shouldNotIndent`: their parent is the
@@ -1334,7 +1334,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for a for loop update expression
-    fn build_for_update_doc(&self, expr: &Expression<'_>) -> DocId {
+    fn build_for_update_doc(&self, expr: &Expression) -> DocId {
         self.build_for_expr_clause(expr, |e| self.build_expression_doc(e))
     }
 
@@ -1387,8 +1387,8 @@ impl<'a> Printer<'a> {
     fn build_for_in_of_statement_with_body_doc(
         &self,
         left: &ast::ForInOfLeft,
-        right: &Expression<'_>,
-        body: &Statement<'_>,
+        right: &Expression,
+        body: &Statement,
         stmt_start: u32,
         keyword: &'static str, // `"in"` or `"of"` — a literal, so it doubles as the emitted token
         is_await: bool,        // for-of `for await`; always false for for-in
@@ -1506,7 +1506,7 @@ impl<'a> Printer<'a> {
     /// parenthesized in one and bare in the other — the same reason a ternary's two
     /// layouts share `parenthesize_ternary_branch`. A bare `build_expression_doc`
     /// in each is how the pair goes missing from both.
-    fn build_for_in_of_right_doc(&self, right: &Expression<'_>) -> DocId {
+    fn build_for_in_of_right_doc(&self, right: &Expression) -> DocId {
         // A binary iterable takes the continuation-indent default — unlike the C-style
         // header's clauses, which are `shouldNotIndent`'s own `ForStatement` term
         // (`node !== parent.body && parent.type === "ForStatement"`, which a
@@ -1532,7 +1532,7 @@ impl<'a> Printer<'a> {
     fn for_in_of_spans(
         &self,
         left: &ast::ForInOfLeft,
-        right: &Expression<'_>,
+        right: &Expression,
         keyword: &str,
         stmt_start: u32,
     ) -> ForInOfSpans {
@@ -1640,8 +1640,8 @@ impl<'a> Printer<'a> {
     #[expect(clippy::too_many_arguments)] // the breaking layout shares the inline one's prebuilt parts; a bundle would re-thread them
     fn build_for_in_of_with_line_comments(
         &self,
-        right: &Expression<'_>,
-        body: &Statement<'_>,
+        right: &Expression,
+        body: &Statement,
         keyword: &'static str, // `"in"` or `"of"`, emitted directly
         // Resolved header positions, computed once by the caller (see
         // `for_in_of_spans`) — shared with the structural-comment check and the
@@ -1801,7 +1801,7 @@ impl<'a> Printer<'a> {
     fn push_for_close_paren_and_body(
         &self,
         parts: &mut DocBuf,
-        body: &Statement<'_>,
+        body: &Statement,
         right_end: u32,
         close_paren: Option<u32>,
         body_ctx: StatementContext,

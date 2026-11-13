@@ -340,7 +340,7 @@ impl<'a> Printer<'a> {
     fn build_call_or_construct_signature_doc(
         &self,
         type_parameters: Option<&ast::TSTypeParameterDeclaration>,
-        params: &[ast::Expression<'_>],
+        params: &[ast::Expression],
         return_type: Option<&ast::TSTypeAnnotation>,
         span: ast::Span,
         new_keyword_end: Option<u32>,
@@ -445,7 +445,7 @@ impl<'a> Printer<'a> {
         &self,
         parts: &mut DocBuf,
         type_parameters: Option<&ast::TSTypeParameterDeclaration>,
-        params: &[ast::Expression<'_>],
+        params: &[ast::Expression],
         return_type: Option<&ast::TSTypeAnnotation>,
         paren_pos: Option<u32>,
     ) {
@@ -800,7 +800,7 @@ fn method_signature_new_key<'m>(
     view: AstView<'m>,
     method: &'m ast::TSMethodSignature,
     source: &str,
-) -> Option<&'m ast::Literal<'m>> {
+) -> Option<&'m ast::Literal> {
     if method.computed {
         return None;
     }

@@ -9,7 +9,7 @@ use tsv_lang::{Error, Span};
 use super::Parser;
 use crate::printer::ParenContext;
 
-impl<'a, 'arena> Parser<'a, 'arena> {
+impl<'a> Parser<'a> {
     /// Parse object literal: `{ prop: value, ... }`
     ///
     /// Supports all JS/TypeScript object literal features:
@@ -298,7 +298,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     // prev_token_end covers a parenthesized default's closing `)`
                     let assign_end = self.prev_token_end() as u32;
                     #[cfg(feature = "_internal_ast_census")]
-                    tsv_lang::ast_census_probe::dead::<Expression<'arena>>(
+                    tsv_lang::ast_census_probe::dead::<Expression>(
                         tsv_lang::ast_census_probe::Dead::DuplicateKept,
                         1,
                     );
@@ -325,7 +325,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     // that keys a node on its address (`tsv_check`'s binder) still
                     // sees two.
                     #[cfg(feature = "_internal_ast_census")]
-                    tsv_lang::ast_census_probe::dead::<Expression<'arena>>(
+                    tsv_lang::ast_census_probe::dead::<Expression>(
                         tsv_lang::ast_census_probe::Dead::DuplicateKept,
                         1,
                     );
@@ -478,7 +478,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         is_async: bool,
         is_generator: bool,
-    ) -> Result<FunctionExpression<'arena>, Error> {
+    ) -> Result<FunctionExpression, Error> {
         // Parse optional type parameters: <T, U>
         let type_parameters = self.parse_optional_type_parameters()?;
 

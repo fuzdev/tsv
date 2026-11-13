@@ -586,7 +586,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// than whitespace is kept too (the canonical parser agrees on both). So the bytes
     /// are checked here, where `escaped: None` is minted, and a name holding such a byte
     /// takes the escape hatch, where the writer escapes it.
-    fn synthesized_ident_name(&mut self, name: &str, span: Span) -> IdentName<'arena> {
+    fn synthesized_ident_name(&mut self, name: &str, span: Span) -> IdentName {
         let slice = &self.source[span.start as usize..span.end as usize];
         if slice == name && u16::try_from(name.len()).is_ok() {
             // A JSON-escaped byte (a control, `"`, `\`) disqualifies span-identity.

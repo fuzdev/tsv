@@ -77,7 +77,7 @@ fn write_arrow_body(w: &mut JsonWriter, body: &ast::ArrowFunctionBody, ctx: &Ctx
 /// the finished `parseMethod` node, so it serializes after `body`.
 pub(super) fn write_function_expression(
     w: &mut JsonWriter,
-    func: &ast::FunctionExpression<'_>,
+    func: &ast::FunctionExpression,
     ctx: &Ctx<'_>,
     type_params_last: bool,
 ) {

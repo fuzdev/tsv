@@ -1005,20 +1005,20 @@ like a row. The rest of this section describes the layout the stores were built 
 
 
 ```rust
-pub struct Program<'arena> {
+pub struct Program {
     pub body: Run<StmtId>, // the statement store's ids
-    pub comments: CommentList<'arena>, // a run of the comment store; not the per-node target
+    pub comments: CommentList, // a run of the comment store; not the per-node target
     pub span: Span,
     // no interner / symbol table — identifier names are span-identity, recovered
     // from source[span]; the rare escaped name carries a PoolStr into the text pool
 }
 
-pub struct Statement<'arena> {
+pub struct Statement {
     pub span: Span, // hoisted out of the variants: a span read is a field load
-    pub kind: StatementKind<'arena>,
+    pub kind: StatementKind,
 }
 
-pub enum StatementKind<'arena> {
+pub enum StatementKind {
     VariableDeclaration(VariableDeclaration), // small → inline by value
     IfStatement(IfStatement), // test: ExprId; consequent: StmtId
     // …
@@ -1274,10 +1274,12 @@ The closest Rust projects embody the alternative shapes, which makes the trade-o
   choice — one central `oxc_ast` crate shared by parser, linter, transformer, minifier, and
   formatter — answers a different question: many _tools_ sharing one language's AST. tsv does
   the same per language (see [Shared Parser, Divergent Tools](#shared-parser-divergent-tools));
-  the per-language crate split is the multi-language question oxc never faces. Allocation is
-  convergent: like oxc, tsv bump-allocates lifetime-threaded (`&'arena`) AST types — but
-  keeps an **inline-by-value node layout** (not size-minimized via boxing/indirection, which
-  regressed its traversal-bound formatter; see [Nested AST](#nested-ast-bump-arena-not-flatindexed)),
+  the per-language crate split is the multi-language question oxc never faces. Allocation
+  converges only in part: like oxc, tsv's CSS and Svelte trees bump-allocate
+  lifetime-threaded (`&'arena`) types, while its TypeScript tree holds ids into stores with
+  no lifetime at all — and it keeps an **inline-by-value node layout** (not size-minimized
+  via boxing/indirection, which regressed its traversal-bound formatter; see
+  [Nested AST](#nested-ast-bump-arena-not-flatindexed)),
   stays `unsafe_code = "forbid"` (safe bumpalo API only), and recovers source text via `span`
   slices rather than zero-copy atoms. The other convergences are just as real: u32 spans,
   detached comments stored flat on the program, concrete types without dyn dispatch,

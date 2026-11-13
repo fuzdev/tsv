@@ -70,15 +70,15 @@ pub(super) struct ExprFlags {
 }
 
 /// Emit an expression's wire JSON in a fresh context (not inside a chain).
-pub(super) fn write_expression(w: &mut JsonWriter, expr: &ast::Expression<'_>, ctx: &Ctx<'_>) {
+pub(super) fn write_expression(w: &mut JsonWriter, expr: &ast::Expression, ctx: &Ctx<'_>) {
     write_expression_inner(w, expr, ctx, ExprFlags::default());
 }
 
 /// Emit a JSON array of expressions (params, arguments, elements without
 /// holes) — the writer's most common list shape.
-pub(super) fn write_expressions<'a, 'arena: 'a>(
+pub(super) fn write_expressions<'a>(
     w: &mut JsonWriter,
-    items: impl IntoIterator<Item = &'a ast::Expression<'arena>>,
+    items: impl IntoIterator<Item = &'a ast::Expression>,
     ctx: &Ctx<'_>,
 ) {
     write_array(w, items, |w, e| write_expression(w, e, ctx));
@@ -113,7 +113,7 @@ fn write_expression_holes<'a>(
 #[inline(never)]
 pub(super) fn write_expression_inner(
     w: &mut JsonWriter,
-    expr: &ast::Expression<'_>,
+    expr: &ast::Expression,
     ctx: &Ctx<'_>,
     flags: ExprFlags,
 ) {
@@ -146,7 +146,7 @@ pub(super) fn write_expression_inner(
 fn write_comment_bound_pair_paren_frame(
     w: &mut JsonWriter,
     span: Span,
-    inner: &ast::Expression<'_>,
+    inner: &ast::Expression,
     ctx: &Ctx<'_>,
     flags: ExprFlags,
     attach: &CommentAttach<'_>,
@@ -163,7 +163,7 @@ fn write_comment_bound_pair_paren_frame(
 #[inline(never)]
 fn write_expression_identifier(
     w: &mut JsonWriter,
-    id: &ast::Identifier<'_>,
+    id: &ast::Identifier,
     force_optional: bool,
     ctx: &Ctx<'_>,
 ) {
@@ -233,7 +233,7 @@ fn write_binary_chain(
 #[inline(never)]
 fn write_expression_full_dispatch(
     w: &mut JsonWriter,
-    expr: &ast::Expression<'_>,
+    expr: &ast::Expression,
     ctx: &Ctx<'_>,
     flags: ExprFlags,
 ) {
@@ -599,7 +599,7 @@ enum ChainTail<'e> {
 /// its parent hands it exactly as the recursion did (`needs_chain_wrap`, `child_chain`,
 /// `flags_after_wrap`).
 #[inline(never)]
-fn write_chain(w: &mut JsonWriter, expr: &ast::Expression<'_>, ctx: &Ctx<'_>, flags: ExprFlags) {
+fn write_chain(w: &mut JsonWriter, expr: &ast::Expression, ctx: &Ctx<'_>, flags: ExprFlags) {
     let mut tails: SmallVec<[(ChainTail<'_>, Span, bool); 8]> = SmallVec::new();
     let (mut expr, mut flags) = (expr, flags);
     loop {
@@ -750,7 +750,7 @@ fn open_chain_link(
 ///
 /// Only an [`ChainState::Unresolved`] node walks: the other two states are the
 /// parent handing down an answer already established.
-fn needs_chain_wrap(view: AstView<'_>, expr: &ast::Expression<'_>, flags: ExprFlags) -> bool {
+fn needs_chain_wrap(view: AstView<'_>, expr: &ast::Expression, flags: ExprFlags) -> bool {
     flags.chain == ChainState::Unresolved && expr.has_optional_in_chain(view)
 }
 

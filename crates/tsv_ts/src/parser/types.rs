@@ -26,7 +26,7 @@ const _: () = assert!(
     tsv_lang::store::STORE_CHECK || size_of::<Result<TyRet, Error>>() == 2 * size_of::<usize>()
 );
 
-impl<'a, 'arena> Parser<'a, 'arena> {
+impl<'a> Parser<'a> {
     /// Parse a `: Type` annotation when the next token is a `:`, else `None` —
     /// the optional-annotation guard shared by variable declarations, class
     /// properties, and type members. Sites whose missing `:` is an error (e.g.
@@ -717,7 +717,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     /// Parse import type body after `import` keyword has been consumed.
     /// Parses: `('module')`, `('module', {options}).Qualifier<TypeArgs>`
-    fn parse_import_type_body(&mut self, start: usize) -> Result<TSImportType<'arena>, Error> {
+    fn parse_import_type_body(&mut self, start: usize) -> Result<TSImportType, Error> {
         // Expect '('
         self.expect(&TokenKind::ParenOpen)?;
 
@@ -848,7 +848,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// What IS common to all four is the floor `parse_entity_name_inner` enforces: the
     /// head must be a word. Leaving even that to the callers is how `typeof 5` came to
     /// parse as an `Identifier` NAMED `"5"` — a fabricated node acorn rejects outright.
-    pub(crate) fn parse_type_entity_name(&mut self) -> Result<TSEntityName<'arena>, Error> {
+    pub(crate) fn parse_type_entity_name(&mut self) -> Result<TSEntityName, Error> {
         self.parse_entity_name_inner(true)
     }
 
@@ -856,16 +856,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// (`import x = A.B.C`), where a reserved word after `.` is a syntax error —
     /// `import x = A.delete` is TS1359 for tsc and rejected by acorn. tsc's
     /// `parseEntityName(allowReservedWords: false)`.
-    pub(crate) fn parse_module_reference_entity_name(
-        &mut self,
-    ) -> Result<TSEntityName<'arena>, Error> {
+    pub(crate) fn parse_module_reference_entity_name(&mut self) -> Result<TSEntityName, Error> {
         self.parse_entity_name_inner(false)
     }
 
     fn parse_entity_name_inner(
         &mut self,
         allow_reserved_words: bool,
-    ) -> Result<TSEntityName<'arena>, Error> {
+    ) -> Result<TSEntityName, Error> {
         // The head is an `IdentifierName` at minimum — a word. Callers that need a
         // narrower head guard ahead of the call (see `parse_type_entity_name`); this
         // is the floor none of them may fall through, since `current_ident_name`
@@ -1182,7 +1180,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Parse a single function type parameter: an identifier (`x: T`), the `this`
     /// parameter (`this: T`), a destructuring pattern (`[a]?: T`, `{ a }: T`), or a
     /// rest element wrapping any of those (`...a: T[]`, `...[a]: T[]`, `...{ a }: T`).
-    fn parse_function_type_param(&mut self) -> Result<Expression<'arena>, Error> {
+    fn parse_function_type_param(&mut self) -> Result<Expression, Error> {
         // Rest parameter: `...a`, `...[a]`, `...{ a }` (with an optional annotation).
         if self.check(&TokenKind::DotDotDot) {
             let (start, _) = self.current_pos();
@@ -1327,7 +1325,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         start: usize,
         param_start: usize,
-        param_name: IdentName<'arena>,
+        param_name: IdentName,
         readonly: Option<TSMappedTypeModifier>,
     ) -> Result<TyRet, Error> {
         // Parse constraint type (e.g., `keyof T`); two wire levels: the `TSMappedType` and
@@ -1536,7 +1534,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// lexer re-classifies an escaped one as an `Identifier`), so its name reads raw.
     /// The caller keeps the keyword because the head may turn out to be a standalone
     /// type instead — see [`Parser::tuple_label_head_as_type`].
-    fn tuple_label_head(&mut self) -> Option<(IdentName<'arena>, Option<KeywordKind>)> {
+    fn tuple_label_head(&mut self) -> Option<(IdentName, Option<KeywordKind>)> {
         match self.current_kind() {
             TokenKind::Identifier => Some((self.current_ident_name(), None)),
             &TokenKind::Keyword(kw) => Some((self.current_raw_ident_name(), Some(kw))),
@@ -1562,7 +1560,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     fn tuple_label_head_as_type(
         &mut self,
         keyword: Option<KeywordKind>,
-        name: IdentName<'arena>,
+        name: IdentName,
         span: Span,
     ) -> Result<TyRet, Error> {
         if let Some(kw) = keyword {
@@ -1855,7 +1853,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     /// Parse a single type parameter: `T`, `T extends U`, or `T extends U = V`
     /// With optional modifiers: `const T`, `in T`, `out T`, `in out T`
-    fn parse_type_parameter(&mut self) -> Result<TSTypeParameter<'arena>, Error> {
+    fn parse_type_parameter(&mut self) -> Result<TSTypeParameter, Error> {
         let start = self.current_pos().0 as u32;
 
         // Parse optional modifiers: `const` (TS 5.0) and the `in`/`out` variance pair
@@ -2042,7 +2040,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 /// where the author wrote no pair (`build_tuple_element_doc`, which strips an author's pair
 /// and writes its own in its place). Read of a row the parser has pushed, before the
 /// `&mut self` call that counts the pair.
-fn is_union_element(element: &TSType<'_>) -> bool {
+fn is_union_element(element: &TSType) -> bool {
     matches!(element, TSType::Union(_))
 }
 
@@ -2082,7 +2080,7 @@ fn bare_type_takes_pair(view: AstView<'_>, ts_type: TyId, position: TypePairPosi
 }
 
 /// [`bare_type_takes_pair`]'s rule for one type.
-fn type_takes_pair(view: AstView<'_>, ty: &TSType<'_>, position: TypePairPosition) -> bool {
+fn type_takes_pair(view: AstView<'_>, ty: &TSType, position: TypePairPosition) -> bool {
     let looser = matches!(
         ty,
         TSType::Union(_)
@@ -2113,7 +2111,7 @@ fn type_takes_pair(view: AstView<'_>, ty: &TSType<'_>, position: TypePairPositio
     }
 }
 
-impl<'arena> Parser<'_, 'arena> {
+impl Parser<'_> {
     /// Count the pair the printer adds around a bare union or intersection `member` that
     /// binds looser than its neighbours ([`TypePairPosition::Member`]), a level of the
     /// output's nesting.

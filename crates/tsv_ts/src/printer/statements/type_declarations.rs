@@ -34,7 +34,7 @@ use tsv_lang::source_scan::find_char_skipping_comments;
 /// function type / reference directly. Matching the shell node instead answered "not
 /// generic" for `(<T>() => …)`, which flipped the alias from break-after-`=` to `fluid` on
 /// the authored form alone — the stripped output then took the other layout (F1).
-fn is_generic_type(view: AstView<'_>, ts_type: &TSType<'_>) -> bool {
+fn is_generic_type(view: AstView<'_>, ts_type: &TSType) -> bool {
     match unwrap_parenthesized(view, ts_type) {
         TSType::Function(f) => f.type_parameters.is_some(),
         TSType::TypeReference(r) => r.type_arguments.is_some(),
@@ -59,7 +59,7 @@ fn should_break_before_conditional_type(
 /// Takes `&Printer` for the one arm whose answer depends on comments — an array
 /// suffix owns a break point only once it prints one; see
 /// [`Printer::array_suffix_layout`].
-fn type_has_internal_breaking(printer: &Printer<'_>, ts_type: &TSType<'_>) -> bool {
+fn type_has_internal_breaking(printer: &Printer<'_>, ts_type: &TSType) -> bool {
     match ts_type {
         TSType::TypeLiteral(_)
         | TSType::Mapped(_)
@@ -140,7 +140,7 @@ impl<'a> Printer<'a> {
     /// ```
     pub(super) fn build_type_alias_declaration_doc(
         &self,
-        decl: &ast::TSTypeAliasDeclaration<'_>,
+        decl: &ast::TSTypeAliasDeclaration,
         span: Span,
         clause_tail: Option<u8>,
     ) -> DocId {
@@ -257,7 +257,7 @@ impl<'a> Printer<'a> {
     /// hanging-indent arm). Each arm asks the same predicate the value's own printer asks
     /// (`comments_force_own_line_between` / `template_literal_type_breaks_for_comment`), so the `=` can't
     /// disagree with the value about whether the value breaks.
-    fn value_owns_its_comment_break(&self, ty: &TSType<'_>) -> bool {
+    fn value_owns_its_comment_break(&self, ty: &TSType) -> bool {
         match ty {
             TSType::TypeOperator(o) => {
                 let kw_end = o.span.start + o.operator.as_str().len() as u32;
@@ -364,7 +364,7 @@ impl<'a> Printer<'a> {
     /// comment outside the base that collapses inline (`keyof /* c */ {`) leaves the base's
     /// `{` the value's first break, so it does not count; one that hangs what follows it
     /// (`[// c⏎K]`) is a break the delimiter does not own.
-    fn delimited_base_owns_comments(&self, ty: &TSType<'_>) -> bool {
+    fn delimited_base_owns_comments(&self, ty: &TSType) -> bool {
         let mut base = ty;
         loop {
             base = match base {
@@ -386,7 +386,7 @@ impl<'a> Printer<'a> {
 
     fn build_type_alias_eq_value_doc(
         &self,
-        decl: &ast::TSTypeAliasDeclaration<'_>,
+        decl: &ast::TSTypeAliasDeclaration,
         eq_pos: u32,
         has_complex_params: bool,
         lead_space: bool,
@@ -938,7 +938,7 @@ impl<'a> Printer<'a> {
     /// Uses group mode when extends has multiple items - heritage breaks when group breaks.
     pub(super) fn build_interface_declaration_doc(
         &self,
-        decl: &ast::TSInterfaceDeclaration<'_>,
+        decl: &ast::TSInterfaceDeclaration,
     ) -> DocId {
         let d = self.d();
 
@@ -1109,7 +1109,7 @@ impl<'a> Printer<'a> {
     /// Build doc for declare function with wrapping support for type parameters
     pub(super) fn build_declare_function_doc(
         &self,
-        decl: &ast::TSDeclareFunction<'_>,
+        decl: &ast::TSDeclareFunction,
         clause_tail: Option<u8>,
     ) -> DocId {
         let d = self.d();
@@ -1209,7 +1209,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build doc for entity name
-    pub(crate) fn build_entity_name_doc(&self, name: &ast::TSEntityName<'_>) -> DocId {
+    pub(crate) fn build_entity_name_doc(&self, name: &ast::TSEntityName) -> DocId {
         // Delegate to standalone function - doesn't need printer state
         build_entity_name_doc(self, name)
     }
@@ -1287,7 +1287,7 @@ impl<'a> Printer<'a> {
     /// ```
     pub(super) fn build_enum_declaration_doc(
         &self,
-        decl: &ast::TSEnumDeclaration<'_>,
+        decl: &ast::TSEnumDeclaration,
         span: Span,
     ) -> DocId {
         let d = self.d();
@@ -1464,7 +1464,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build doc for a single enum member
-    fn build_enum_member_doc(&self, member: &ast::TSEnumMember<'_>) -> DocId {
+    fn build_enum_member_doc(&self, member: &ast::TSEnumMember) -> DocId {
         let d = self.d();
         // Member id (identifier or string literal)
         let id_doc = match &member.id {
@@ -1629,7 +1629,7 @@ impl<'a> Printer<'a> {
     /// ```
     pub(super) fn build_module_declaration_doc(
         &self,
-        decl: &ast::TSModuleDeclaration<'_>,
+        decl: &ast::TSModuleDeclaration,
         clause_tail: Option<u8>,
     ) -> DocId {
         self.build_module_declaration_doc_inner(decl, true, clause_tail)
@@ -1639,7 +1639,7 @@ impl<'a> Printer<'a> {
     /// `is_root` is true for the outermost declaration (prints `namespace` keyword)
     fn build_module_declaration_doc_inner(
         &self,
-        decl: &ast::TSModuleDeclaration<'_>,
+        decl: &ast::TSModuleDeclaration,
         is_root: bool,
         clause_tail: Option<u8>,
     ) -> DocId {

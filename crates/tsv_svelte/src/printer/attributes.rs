@@ -928,7 +928,7 @@ impl<'a> Printer<'a> {
     fn build_braced_expression_doc(
         &self,
         prefix: &'static str,
-        expr: &Expression<'_>,
+        expr: &Expression,
         span_start: u32,
         span_end: u32,
     ) -> DocId {
@@ -982,7 +982,7 @@ impl<'a> Printer<'a> {
         prefix: DocId,
         name_span: Span,
         modifiers: &[&str],
-        expression: Option<&Expression<'_>>,
+        expression: Option<&Expression>,
         expression_tag_span: Option<Span>,
         value: DirectiveValue,
     ) -> DocId {
@@ -1154,7 +1154,7 @@ impl<'a> Printer<'a> {
     /// frozen arm too — see [`Printer::wrap_value_clarity_parens`].
     fn build_unprefixed_value_doc(
         &self,
-        expr: &Expression<'_>,
+        expr: &Expression,
         frozen: bool,
         host: UnprefixedHost,
     ) -> DocId {
@@ -1178,7 +1178,7 @@ impl<'a> Printer<'a> {
     /// - Broken: `={\n\t\ta &&\n\t\t\tb &&\n\t\t\tc\n\t}`
     fn build_expression_doc_parts_with_span(
         &self,
-        expr: &Expression<'_>,
+        expr: &Expression,
         tag_span: Option<Span>,
     ) -> DocBuf {
         // The verdict comes back OUT of the content builder rather than going in — it
@@ -1282,7 +1282,7 @@ impl<'a> Printer<'a> {
     /// on [`HeadExpr::owes_continuation_indent`] for whichever arm hugs.
     fn build_expression_content_with_comments(
         &self,
-        expr: &Expression<'_>,
+        expr: &Expression,
         tag_span: Option<Span>,
         host: UnprefixedHost,
     ) -> HeadExpr {
@@ -1398,7 +1398,7 @@ impl<'a> Printer<'a> {
     /// ```
     fn build_expression_doc_parts_with_span_for_bind(
         &self,
-        expr: &Expression<'_>,
+        expr: &Expression,
         tag_span: Option<Span>,
     ) -> DocBuf {
         let d = self.d();
@@ -1648,7 +1648,7 @@ impl<'a> Printer<'a> {
     /// Used for bind: directive expressions where Prettier always uses this format.
     fn build_expression_doc_parts_with_span_block_structure(
         &self,
-        expr: &Expression<'_>,
+        expr: &Expression,
         tag_span: Option<Span>,
     ) -> DocBuf {
         // Always the block form, so the freeze verdict changes nothing about the layout
@@ -1795,7 +1795,7 @@ impl<'a> Printer<'a> {
     /// apart.
     fn value_collapses_to_shorthand(
         &self,
-        expr: &Expression<'_>,
+        expr: &Expression,
         name: &str,
         tag_span: Option<Span>,
     ) -> bool {

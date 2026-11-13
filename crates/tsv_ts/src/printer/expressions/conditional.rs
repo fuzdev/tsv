@@ -15,7 +15,7 @@ use tsv_lang::{INDENT, Span};
 /// Check if an expression is a nullish coalescing expression (`??`)
 ///
 /// Prettier wraps `??` in parens when inside a ternary for clarity.
-fn is_nullish_coalescing(expr: &ast::Expression<'_>) -> bool {
+fn is_nullish_coalescing(expr: &ast::Expression) -> bool {
     matches!(
         &expr.kind,
         ast::ExpressionKind::BinaryExpression(bin)
@@ -29,7 +29,7 @@ fn is_nullish_coalescing(expr: &ast::Expression<'_>) -> bool {
 /// AST); `??` is always parenthesized under a conditional. Shared by the inline and
 /// line-comment layouts so both branch paths agree, and read by the instantiation-close
 /// walk (`ends_with_instantiation_close`), which descends into an alternate that prints bare.
-pub(in crate::printer) fn ternary_branch_needs_parens(expr: &ast::Expression<'_>) -> bool {
+pub(in crate::printer) fn ternary_branch_needs_parens(expr: &ast::Expression) -> bool {
     matches!(
         expr.kind,
         ast::ExpressionKind::TSAsExpression(_)
@@ -48,7 +48,7 @@ pub(in crate::printer) fn ternary_branch_needs_parens(expr: &ast::Expression<'_>
 /// line-comment layouts so both agree — the line-comment path must not drop the semantic
 /// arrow/yield parens — and by the test's FROZEN form, which takes its pair here too
 /// ([`FrozenOperandPair::Emitted`] at the test's freeze seam).
-pub(in crate::printer) fn ternary_test_needs_parens(expr: &ast::Expression<'_>) -> bool {
+pub(in crate::printer) fn ternary_test_needs_parens(expr: &ast::Expression) -> bool {
     is_nullish_coalescing(expr)
         || matches!(
             expr.kind,
@@ -64,7 +64,7 @@ pub(in crate::printer) fn ternary_test_needs_parens(expr: &ast::Expression<'_>) 
 
 /// [`ternary_branch_needs_parens`] less an assignment, which counts its own pair: the
 /// parser's question at a bare branch (`Parser::ternary_branch_pair`).
-pub(crate) fn ternary_branch_takes_pair(expr: &ast::Expression<'_>) -> bool {
+pub(crate) fn ternary_branch_takes_pair(expr: &ast::Expression) -> bool {
     !matches!(expr.kind, ast::ExpressionKind::AssignmentExpression(_))
         && ternary_branch_needs_parens(expr)
 }
@@ -72,7 +72,7 @@ pub(crate) fn ternary_branch_takes_pair(expr: &ast::Expression<'_>) -> bool {
 /// [`ternary_test_needs_parens`] less an assignment, which counts its own pair: the
 /// parser's question at a bare test, where only the clarity cases (`??`, `await`, `as`,
 /// `satisfies`) can stand bare.
-pub(crate) fn ternary_test_takes_pair(expr: &ast::Expression<'_>) -> bool {
+pub(crate) fn ternary_test_takes_pair(expr: &ast::Expression) -> bool {
     !matches!(expr.kind, ast::ExpressionKind::AssignmentExpression(_))
         && ternary_test_needs_parens(expr)
 }
@@ -82,7 +82,7 @@ pub(crate) fn ternary_test_takes_pair(expr: &ast::Expression<'_>) -> bool {
 /// When a template literal contains embedded newlines in its quasi strings,
 /// it should be treated as "multiline" for formatting purposes. This is used
 /// to force ternaries to break when their consequent or alternate is multiline.
-fn is_multiline_template_literal(view: AstView<'_>, expr: &ast::Expression<'_>) -> bool {
+fn is_multiline_template_literal(view: AstView<'_>, expr: &ast::Expression) -> bool {
     matches!(&expr.kind, ast::ExpressionKind::TemplateLiteral(t) if template_literal_has_newlines(view, t))
 }
 
@@ -104,7 +104,7 @@ fn is_multiline_template_literal(view: AstView<'_>, expr: &ast::Expression<'_>) 
 /// guard is not an edge case to smooth over: it is exactly why a bare
 /// `!(cond ? a : b)` keeps the hanging form in both formatters, while
 /// `!((cond ? a : b) as T)` expands.
-fn extra_indent_ternary_span(view: AstView<'_>, value: &ast::Expression<'_>) -> Option<Span> {
+fn extra_indent_ternary_span(view: AstView<'_>, value: &ast::Expression) -> Option<Span> {
     let (span, stepped) = spine_ternary(view, value)?;
     stepped.then_some(span)
 }
@@ -114,7 +114,7 @@ fn extra_indent_ternary_span(view: AstView<'_>, value: &ast::Expression<'_>) -> 
 /// the chain-base query (which does not — a *sealed* base like `(c ? a : b)!` holds the
 /// wrapper inside its own parens, so the ternary is already one step down when the base
 /// is handed over).
-fn spine_ternary(view: AstView<'_>, expr: &ast::Expression<'_>) -> Option<(Span, bool)> {
+fn spine_ternary(view: AstView<'_>, expr: &ast::Expression) -> Option<(Span, bool)> {
     let mut child = expr;
     let mut stepped = false;
     loop {
@@ -186,7 +186,7 @@ impl<'a> Printer<'a> {
     /// conditional-group variants must answer the same way every time, and a
     /// same-shaped ternary nested deeper (a call argument, an array element) never
     /// matches the recorded span, so it keeps the hanging form prettier gives it.
-    pub(in crate::printer) fn mark_ternary_extra_indent(&self, value: &ast::Expression<'_>) {
+    pub(in crate::printer) fn mark_ternary_extra_indent(&self, value: &ast::Expression) {
         self.ternary_hang_target
             .set(extra_indent_ternary_span(self.view, value));
     }
@@ -196,10 +196,7 @@ impl<'a> Printer<'a> {
     /// Asked at each site that supplies a ternary's parens (a binary cast's operand, a
     /// non-null assertion's operand), against the span
     /// [`Self::mark_ternary_extra_indent`] recorded.
-    pub(in crate::printer) fn ternary_takes_extra_indent(
-        &self,
-        expr: &ast::Expression<'_>,
-    ) -> bool {
+    pub(in crate::printer) fn ternary_takes_extra_indent(&self, expr: &ast::Expression) -> bool {
         matches!(expr.kind, ast::ExpressionKind::ConditionalExpression(_))
             && self.ternary_hang_target.get() == Some(expr.span)
     }
@@ -219,7 +216,7 @@ impl<'a> Printer<'a> {
     /// the ternary's parent is the `!`, not the member.
     pub(in crate::printer) fn chain_base_ternary(
         &self,
-        expr: &ast::Expression<'_>,
+        expr: &ast::Expression,
     ) -> Option<ChainBaseTernary> {
         let (span, stepped) = spine_ternary(self.view, expr)?;
         Some(ChainBaseTernary {
@@ -253,7 +250,7 @@ impl<'a> Printer<'a> {
     /// emitted outside the pair by the branch's own trailing-gap scan.
     fn parenthesize_ternary_branch(
         &self,
-        expr: &ast::Expression<'_>,
+        expr: &ast::Expression,
         doc: DocId,
         shell_boundary: Option<u32>,
         position_parens: bool,
@@ -308,7 +305,7 @@ impl<'a> Printer<'a> {
     /// test and the next normalized it (the block-spelled chained cell of
     /// `left_spine_paren_prettier_ignore_interior`). The whole-branch freeze above does NOT
     /// fire for it — the directive's scope is the test — which is why this is a separate term.
-    fn chained_test_shell_holds_directive(&self, branch: &ast::Expression<'_>) -> bool {
+    fn chained_test_shell_holds_directive(&self, branch: &ast::Expression) -> bool {
         match &branch.kind {
             ast::ExpressionKind::ConditionalExpression(nested) => self
                 .left_spine_operand_frozen_span(branch.span.start, self.view.expr(nested.test))
@@ -323,7 +320,7 @@ impl<'a> Printer<'a> {
     /// ([`Self::frozen_ternary_branch_doc`]) cannot drift into two answers.
     fn frozen_ternary_branch_span(
         &self,
-        expr: &ast::Expression<'_>,
+        expr: &ast::Expression,
         op_pos: Option<u32>,
     ) -> Option<Span> {
         op_pos.and_then(|p| self.value_head_frozen_span(p + 1, expr.span()))
@@ -345,7 +342,7 @@ impl<'a> Printer<'a> {
     /// renders as a verbatim slice.
     fn frozen_ternary_branch_doc(
         &self,
-        expr: &ast::Expression<'_>,
+        expr: &ast::Expression,
         op_pos: Option<u32>,
     ) -> Option<DocId> {
         let frozen = self.frozen_ternary_branch_span(expr, op_pos)?;
@@ -379,7 +376,7 @@ impl<'a> Printer<'a> {
     /// with the pair supplied by `needs-parentheses.js`); the pair is tsv's own here, so the
     /// group carries it. Every other test in `ternary_test_needs_parens` — a `??`, an `=`,
     /// an `as` — hugs flat in both tools and keeps the plain pair.
-    fn parenthesize_ternary_test(&self, expr: &ast::Expression<'_>, doc: DocId) -> DocId {
+    fn parenthesize_ternary_test(&self, expr: &ast::Expression, doc: DocId) -> DocId {
         if !ternary_test_needs_parens(expr) && !self.relational_sibling_pair_is_kept(expr) {
             return doc;
         }
@@ -443,7 +440,7 @@ impl<'a> Printer<'a> {
     fn place_nested_ternary_test(
         &self,
         nesting: TernaryNesting,
-        test: &ast::Expression<'_>,
+        test: &ast::Expression,
         build_test: impl FnOnce() -> DocId,
     ) -> DocId {
         let d = self.d();
@@ -484,7 +481,7 @@ impl<'a> Printer<'a> {
     /// Every scan over a branch gap — the line-comment and blank routing, the comment-slot
     /// gate, the run itself — reads this one bound, so none of them can see the shell's
     /// comments differently from the emitter that prints them.
-    fn branch_gap_end(&self, branch: &ast::Expression<'_>) -> u32 {
+    fn branch_gap_end(&self, branch: &ast::Expression) -> u32 {
         match &branch.kind {
             ast::ExpressionKind::ConditionalExpression(nested) => {
                 self.view.expr(nested.test).span().start
@@ -504,7 +501,7 @@ impl<'a> Printer<'a> {
     /// mirror cannot drift.
     fn breaking_branch_gap(
         &self,
-        branch: &ast::Expression<'_>,
+        branch: &ast::Expression,
         op_pos: Option<u32>,
         frozen: bool,
     ) -> (u32, u32) {
@@ -1137,7 +1134,7 @@ impl<'a> Printer<'a> {
     /// builder already does at those positions.
     fn build_frozen_kept_pair_doc(
         &self,
-        expr: &ast::Expression<'_>,
+        expr: &ast::Expression,
         frozen: Span,
         open: u32,
         close: u32,
@@ -1261,7 +1258,7 @@ impl<'a> Printer<'a> {
     /// that seam says why.
     fn build_ternary_branch_expr_doc(
         &self,
-        expr: &ast::Expression<'_>,
+        expr: &ast::Expression,
         indent_binary: bool,
         boundary_end: u32,
         position_parens: bool,

@@ -84,8 +84,8 @@ pub(in crate::parser) enum DecoratedClassExport {
 /// A class's head and body — everything between `class` and its closing brace —
 /// as `Parser::parse_class_head_and_body` hands it back, for the declaration and
 /// expression nodes to wrap. The fields are the two nodes' shared ones, by name.
-struct ClassHead<'arena> {
-    id: Option<Identifier<'arena>>,
+struct ClassHead {
+    id: Option<Identifier>,
     type_parameters: Option<TSTypeParameterDeclaration>,
     super_class: Option<ExprId>,
     super_type_parameters: Option<TSTypeParameterInstantiation>,
@@ -93,15 +93,15 @@ struct ClassHead<'arena> {
     body: ClassBody,
 }
 
-impl<'a, 'arena> Parser<'a, 'arena> {
-    pub(super) fn parse_class_declaration(&mut self) -> Result<Statement<'arena>, Error> {
+impl<'a> Parser<'a> {
+    pub(super) fn parse_class_declaration(&mut self) -> Result<Statement, Error> {
         let class = self.parse_class_declaration_inner(true, false)?;
         let (span, class) = push_spanned(&mut self.stores.payloads.class_decls, class, |x| x.span);
         Ok(Statement::from_class_declaration(span, class))
     }
 
     /// Parse an abstract class declaration: `abstract class Foo { ... }`
-    pub(super) fn parse_abstract_class(&mut self) -> Result<Statement<'arena>, Error> {
+    pub(super) fn parse_abstract_class(&mut self) -> Result<Statement, Error> {
         // Capture position of 'abstract' before consuming it
         let abstract_start = self.current_pos().0;
         debug_assert_eq!(self.current_value(), "abstract");
@@ -136,7 +136,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(super) fn parse_decorated_class(
         &mut self,
         module_item: Option<ModuleItemContext>,
-    ) -> Result<Statement<'arena>, Error> {
+    ) -> Result<Statement, Error> {
         let start = self.current_pos().0;
 
         // Parse one or more decorators
@@ -238,7 +238,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         deco_start: usize,
         decorators: Run<Deco>,
         export: DecoratedClassExport,
-    ) -> Result<ClassDeclaration<'arena>, Error> {
+    ) -> Result<ClassDeclaration, Error> {
         // `export default class {}` is the one name-optional decorated form.
         let name_required = export != DecoratedClassExport::BetweenDefault;
 
@@ -525,7 +525,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Returns `Ok(None)` for the heritage reading and for a non-binding token; the caller
     /// decides whether a missing name is an error (declaration) or fine (expression /
     /// `export default`). Shared by both class paths.
-    fn take_class_name(&mut self) -> Result<Option<Identifier<'arena>>, Error> {
+    fn take_class_name(&mut self) -> Result<Option<Identifier>, Error> {
         if self.current_value() == "implements" && self.peek_is_identifier_or_keyword() {
             return Ok(None);
         }
@@ -605,10 +605,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Everything a class carries between its `class` keyword and its closing
     /// brace: the head (name, type parameters, heritage) and the body. What the
     /// declaration and expression builders share; each wraps it in its own node.
-    fn parse_class_head_and_body(
-        &mut self,
-        name_required: bool,
-    ) -> Result<ClassHead<'arena>, Error> {
+    fn parse_class_head_and_body(&mut self, name_required: bool) -> Result<ClassHead, Error> {
         // Every part of a class is strict code (ecma262 sec-strict-mode-code), and
         // the scope opens at the `class` keyword (or earlier, at a decorator list —
         // `parse_decorators`) — ahead of the heritage clause, so
@@ -658,7 +655,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         name_required: bool,
         is_abstract: bool,
-    ) -> Result<ClassDeclaration<'arena>, Error> {
+    ) -> Result<ClassDeclaration, Error> {
         let start = self.current_pos().0;
         self.parse_class_declaration_inner_with_start(name_required, is_abstract, start, false)
     }
@@ -675,7 +672,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         is_abstract: bool,
         start: usize,
         declare: bool,
-    ) -> Result<ClassDeclaration<'arena>, Error> {
+    ) -> Result<ClassDeclaration, Error> {
         // The `class` keyword must be here. Most callers confirm it first, but the
         // modifier-prefix paths (`export default abstract`, `declare`) reach here
         // after consuming their modifier, so a missing `class` on malformed input
@@ -814,7 +811,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// structurally in either context, deferring their ambient-context early-errors
     /// (a decorator's TS1206, a body's TS1183) to diagnostics — see
     /// `parse_class_declaration_inner_with_start` and `finish_method_member`.
-    fn parse_class_member(&mut self) -> Result<ClassMember<'arena>, Error> {
+    fn parse_class_member(&mut self) -> Result<ClassMember, Error> {
         // A member boundary ends a `<` region as a statement's does.
         self.reset_lt_region_for_statement();
         let (start, _) = self.current_pos();
@@ -1142,10 +1139,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// same holds for `finish_property_member`).
     #[expect(clippy::inline_always)]
     #[inline(always)]
-    fn finish_method_member(
-        &mut self,
-        header: ClassMemberHeader,
-    ) -> Result<ClassMember<'arena>, Error> {
+    fn finish_method_member(&mut self, header: ClassMemberHeader) -> Result<ClassMember, Error> {
         let ClassMemberHeader {
             start,
             decorators,
@@ -1359,10 +1353,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// same holds for `finish_method_member`).
     #[expect(clippy::inline_always)]
     #[inline(always)]
-    fn finish_property_member(
-        &mut self,
-        header: ClassMemberHeader,
-    ) -> Result<ClassMember<'arena>, Error> {
+    fn finish_property_member(&mut self, header: ClassMemberHeader) -> Result<ClassMember, Error> {
         let ClassMemberHeader {
             start,
             decorators,
@@ -1467,7 +1458,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         decorators: Run<Deco>,
         is_static: bool,
         readonly: bool,
-    ) -> Result<ClassMember<'arena>, Error> {
+    ) -> Result<ClassMember, Error> {
         // Consume `[`
         self.expect(&TokenKind::BracketOpen)?;
 

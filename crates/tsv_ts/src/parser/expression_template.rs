@@ -73,7 +73,7 @@ fn normalize_template_cr(text: &str) -> Option<String> {
     Some(out)
 }
 
-impl<'a, 'arena> Parser<'a, 'arena> {
+impl<'a> Parser<'a> {
     /// Build the cooked value for the current template token.
     ///
     /// The lexer reports `decoded == None` both for a segment with no escapes and
@@ -98,7 +98,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         content: &str,
         content_start: usize,
         tagged: bool,
-    ) -> Result<TemplateCooked<'arena>, Error> {
+    ) -> Result<TemplateCooked, Error> {
         match self.current_decoded {
             Some(_) if tagged && find_legacy_escape(content).is_some() => {
                 Ok(TemplateCooked::Invalid)
@@ -141,7 +141,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         span: Span,
         tail: bool,
         tagged: bool,
-    ) -> Result<TemplateElement<'arena>, Error> {
+    ) -> Result<TemplateElement, Error> {
         let (content, raw_span) = template_token_content(self.current_value(), span, tail);
         let cooked = self.template_cooked(content, raw_span.start as usize, tagged)?;
         // `has_newline` asks about the SOURCE bytes — the printer walks

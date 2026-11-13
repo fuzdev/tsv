@@ -35,11 +35,7 @@ impl<'a> Printer<'a> {
     /// `<` first. A comment anywhere between the `<` and that type prints between them and
     /// is separator enough (`</* c */ <T>() => R>x`), a format-ignore directive among them.
     /// A constructor type opens with `new` / `abstract` and is never in the class.
-    pub(in crate::printer) fn angle_open_meets_angle(
-        &self,
-        open_end: u32,
-        first: &TSType<'_>,
-    ) -> bool {
+    pub(in crate::printer) fn angle_open_meets_angle(&self, open_end: u32, first: &TSType) -> bool {
         let mut ty = first;
         loop {
             ty = match ty {
@@ -60,7 +56,7 @@ impl<'a> Printer<'a> {
     /// For multiple type arg contexts, uses hugging (objects don't break independently).
     pub(in crate::printer) fn build_type_arg_doc(
         &self,
-        param: &TSType<'_>,
+        param: &TSType,
         is_multi_arg: bool,
     ) -> DocId {
         if is_multi_arg {
@@ -197,7 +193,7 @@ impl<'a> Printer<'a> {
     /// `Foo<A>` does — read as a union it failed the brace-member narrowing, took the
     /// group, and broke inside the `<>` where pass 2 (reading the bare member) breaks
     /// after the `=` instead (`union_single_member_collapse_long`).
-    pub(in crate::printer) fn type_arg_hugs(&self, gap_start: u32, ty: &TSType<'_>) -> bool {
+    pub(in crate::printer) fn type_arg_hugs(&self, gap_start: u32, ty: &TSType) -> bool {
         let ty = self.unwrap_redundant_parens(ty);
         is_simple_type_arg(self.view, ty)
             || is_huggable_type(self.view, ty)
@@ -219,7 +215,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn type_arg_is_nullable_reference_union(
         &self,
         gap_start: u32,
-        ty: &TSType<'_>,
+        ty: &TSType,
     ) -> bool {
         matches!(self.unwrap_redundant_parens(ty), TSType::Union(u)
             if !union_has_brace_member(self.view, u) && self.union_seam_hugs(gap_start, u))

@@ -20,14 +20,14 @@ use super::{
 /// some node also holds that type outside a `Statement` (see
 /// [`Statement::from_variable_declaration`]).
 #[derive(Debug, Clone)]
-pub struct Statement<'arena> {
+pub struct Statement {
     pub span: Span,
-    pub kind: StatementKind<'arena>,
+    pub kind: StatementKind,
 }
 
 /// The variant half of a [`Statement`].
 #[derive(Debug, Clone)]
-pub enum StatementKind<'arena> {
+pub enum StatementKind {
     ExpressionStatement(ExpressionStatement),
     VariableDeclaration(VariableDeclaration),
     // Stored, each a row of its own payload store named by id, unlike every inline
@@ -71,7 +71,7 @@ pub enum StatementKind<'arena> {
     ExportDefaultDeclaration(ExportDefaultId),
     ExportAllDeclaration(ExportAllId),
     TSExportAssignment(ExportAssignId),
-    TSNamespaceExportDeclaration(TSNamespaceExportDeclaration<'arena>),
+    TSNamespaceExportDeclaration(TSNamespaceExportDeclaration),
     ImportDeclaration(ImportDeclId),
     TSImportEqualsDeclaration(ImportEqualsId),
     // Control flow statements
@@ -85,14 +85,14 @@ pub enum StatementKind<'arena> {
     SwitchStatement(SwitchStatement),
     TryStatement(TryStatement),
     ThrowStatement(ThrowStatement),
-    BreakStatement(BreakStatement<'arena>),
-    ContinueStatement(ContinueStatement<'arena>),
-    LabeledStatement(LabeledStatement<'arena>),
+    BreakStatement(BreakStatement),
+    ContinueStatement(ContinueStatement),
+    LabeledStatement(LabeledStatement),
     EmptyStatement(EmptyStatement),
     DebuggerStatement(DebuggerStatement),
 }
 
-impl<'arena> Statement<'arena> {
+impl Statement {
     #[inline]
     pub fn span(&self) -> Span {
         #[cfg(debug_assertions)]
@@ -360,14 +360,14 @@ pub struct TryStatement {
 
 /// Catch clause: `catch (param) { body }`
 #[derive(Debug, Clone)]
-pub struct CatchClause<'arena> {
+pub struct CatchClause {
     /// Catch parameter, or None for `catch { }` (optional catch binding).
     ///
     /// Inline for the reason on `ForInit`: the parser builds this one as an owned
     /// value rather than through the expression spine, so an id would add a row
     /// instead of removing a copy — and a `CatchClause` is reached only through an
     /// `Option<CatchId>`, so its width sets nothing.
-    pub param: Option<Expression<'arena>>,
+    pub param: Option<Expression>,
     pub body: BlockStatement,
     pub span: Span,
 }
@@ -380,20 +380,20 @@ pub struct ThrowStatement {
 
 /// Break statement: `break` or `break label`
 #[derive(Debug, Clone)]
-pub struct BreakStatement<'arena> {
-    pub label: Option<Identifier<'arena>>,
+pub struct BreakStatement {
+    pub label: Option<Identifier>,
 }
 
 /// Continue statement: `continue` or `continue label`
 #[derive(Debug, Clone)]
-pub struct ContinueStatement<'arena> {
-    pub label: Option<Identifier<'arena>>,
+pub struct ContinueStatement {
+    pub label: Option<Identifier>,
 }
 
 /// Labeled statement: `label: statement`
 #[derive(Debug, Clone)]
-pub struct LabeledStatement<'arena> {
-    pub label: Identifier<'arena>,
+pub struct LabeledStatement {
+    pub label: Identifier,
     pub body: StmtId,
 }
 
@@ -415,9 +415,9 @@ pub struct DebuggerStatement;
 /// For `export default function() {}`, the name is optional.
 /// Declarations are hoisted and can be called before they appear in source.
 #[derive(Debug, Clone)]
-pub struct FunctionDeclaration<'arena> {
+pub struct FunctionDeclaration {
     /// Function name (required for declarations, optional for export default)
-    pub id: Option<Identifier<'arena>>,
+    pub id: Option<Identifier>,
     /// Type parameters (TypeScript generics): `function fn<T>() {}`
     pub type_parameters: Option<TSTypeParameterDeclaration>,
     /// Function parameters (Identifier, ArrayPattern, ObjectPattern, or AssignmentPattern for defaults)

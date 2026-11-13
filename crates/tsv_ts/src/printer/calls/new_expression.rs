@@ -117,7 +117,7 @@ impl<'a> Printer<'a> {
     /// [`fn@crate::printer::needs_parens`] — the unfrozen callee must keep printing bare.
     /// The left-spine positions ask that same predicate for the suffixes THEY print past a
     /// frozen slice (`.k`, `[0]`, `(1)`, `!`, `` `t` ``).
-    fn build_frozen_new_callee_doc(&self, callee: &ast::Expression<'_>, frozen: Span) -> DocId {
+    fn build_frozen_new_callee_doc(&self, callee: &ast::Expression, frozen: Span) -> DocId {
         // The position's pair also covers a call the callee holds bare
         // ([`Self::new_callee_holds_bare_call`]) — one pair either way.
         let doc = if self.new_callee_holds_bare_call(callee) {
@@ -894,10 +894,7 @@ impl<'a> Printer<'a> {
     /// pair seals, which every position on this spine keeps (`new (a?.b()).c()`,
     /// `new ((a?.b())!<T>)()`). A missed pair costs a second one outside it — never a
     /// harmless redundancy.
-    pub(in crate::printer) fn new_callee_holds_bare_call(
-        &self,
-        callee: &ast::Expression<'_>,
-    ) -> bool {
+    pub(in crate::printer) fn new_callee_holds_bare_call(&self, callee: &ast::Expression) -> bool {
         let mut callee = callee;
         use ast::ExpressionKind as E;
         // A loop down the spine, not a recursion: a chain is as long as the spine limit lets

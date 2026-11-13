@@ -81,11 +81,7 @@ pub(crate) fn write_program_bytes(parsed: ast::ParsedRef<'_>, source: &str, wire
 /// online off this emit's own node opens and closes and each node emits its
 /// assigned comments at its close; `Off` for every ordinary emission.
 #[inline]
-pub fn write_expression_embedded(
-    w: &mut JsonWriter,
-    expr: &ast::Expression<'_>,
-    env: EmbedWriter<'_>,
-) {
+pub fn write_expression_embedded(w: &mut JsonWriter, expr: &ast::Expression, env: EmbedWriter<'_>) {
     let ctx = Ctx::from_embed(env);
     expressions::write_expression(w, expr, &ctx);
 }
@@ -114,7 +110,7 @@ pub fn write_variable_declaration_embedded(
 #[inline]
 pub fn write_identifier_expression_with_character(
     w: &mut JsonWriter,
-    expr: &ast::Expression<'_>,
+    expr: &ast::Expression,
     env: EmbedWriter<'_>,
 ) {
     let ctx = Ctx::from_embed(env);
@@ -124,7 +120,7 @@ pub fn write_identifier_expression_with_character(
 /// The shared body of the shorthand/snippet-name identifier emission.
 fn write_identifier_expression_with_character_in(
     w: &mut JsonWriter,
-    expr: &ast::Expression<'_>,
+    expr: &ast::Expression,
     ctx: &Ctx<'_>,
 ) {
     if let ast::ExpressionKind::Identifier(id) = &expr.kind {
@@ -156,11 +152,7 @@ fn write_identifier_expression_with_character_in(
 /// subtree, and the annotation attaches under `annotation_comments` instead — see
 /// `Ctx::annotation_comments`.
 #[inline]
-pub fn write_pattern_embedded(
-    w: &mut JsonWriter,
-    expr: &ast::Expression<'_>,
-    env: EmbedWriter<'_>,
-) {
+pub fn write_pattern_embedded(w: &mut JsonWriter, expr: &ast::Expression, env: EmbedWriter<'_>) {
     let mut ctx = Ctx::from_embed(env);
     if let Some(ann) = crate::__private::pattern_type_annotation(ctx.view, expr) {
         ctx.pattern_ann_span = ann.span;
@@ -185,7 +177,7 @@ pub fn write_pattern_embedded(
 }
 
 /// Emit the `Program` node.
-fn write_program(w: &mut JsonWriter, program: &ast::Program<'_>, ctx: &Ctx<'_>) {
+fn write_program(w: &mut JsonWriter, program: &ast::Program, ctx: &Ctx<'_>) {
     node_header(w, "Program", program.span, ctx);
     w.raw(",\"body\":");
     write_body_array(w, ctx.view.stmt_list(program.body), ctx, |w, s| {
@@ -206,11 +198,7 @@ fn write_program(w: &mut JsonWriter, program: &ast::Program<'_>, ctx: &Ctx<'_>) 
 /// emitted exactly as a standalone `Program` is, its `loc` included (the content
 /// span's, under the host document's line table). `env.annotation_comments` is
 /// inert here — only a block pattern carries a second parse.
-pub fn write_program_embedded(
-    w: &mut JsonWriter,
-    program: &ast::Program<'_>,
-    env: EmbedWriter<'_>,
-) {
+pub fn write_program_embedded(w: &mut JsonWriter, program: &ast::Program, env: EmbedWriter<'_>) {
     let ctx = Ctx::from_embed(env);
     write_program(w, program, &ctx);
 }
@@ -750,7 +738,7 @@ pub(super) fn write_export_kind_field(
 #[inline(never)]
 pub(super) fn write_name_field(
     w: &mut JsonWriter,
-    name: ast::IdentName<'_>,
+    name: ast::IdentName,
     name_start: u32,
     ctx: &Ctx<'_>,
 ) {
@@ -851,7 +839,7 @@ pub(super) fn write_number_value(w: &mut JsonWriter, n: f64) {
 ///
 /// The common literals take [`write_literal_fields_fused`]'s single write; any
 /// it declines takes [`write_literal_fields`].
-pub(super) fn write_literal(w: &mut JsonWriter, lit: &ast::Literal<'_>, ctx: &Ctx<'_>) {
+pub(super) fn write_literal(w: &mut JsonWriter, lit: &ast::Literal, ctx: &Ctx<'_>) {
     node_header(w, "Literal", lit.span, ctx);
     #[cfg(debug_assertions)]
     let fields_from = w.as_bytes().len();
@@ -883,7 +871,7 @@ pub(super) fn write_literal(w: &mut JsonWriter, lit: &ast::Literal<'_>, ctx: &Ct
 /// decimal digits with no leading zero is the shortest form of the integer it
 /// names, so the value the parser stored prints as those same digits.
 #[inline]
-fn write_literal_fields_fused(w: &mut JsonWriter, lit: &ast::Literal<'_>, ctx: &Ctx<'_>) -> bool {
+fn write_literal_fields_fused(w: &mut JsonWriter, lit: &ast::Literal, ctx: &Ctx<'_>) -> bool {
     match lit.value {
         ast::LiteralValue::String(ast::StringCooked::Verbatim) => {
             w.try_string_value_raw(lit.span.extract(ctx.source).as_bytes())
@@ -911,7 +899,7 @@ fn write_literal_fields_fused(w: &mut JsonWriter, lit: &ast::Literal<'_>, ctx: &
 
 /// A `Literal`'s `value`, `raw` and (for a BigInt) `bigint` fields, field by
 /// field — every literal's general emission.
-fn write_literal_fields(w: &mut JsonWriter, lit: &ast::Literal<'_>, ctx: &Ctx<'_>) {
+fn write_literal_fields(w: &mut JsonWriter, lit: &ast::Literal, ctx: &Ctx<'_>) {
     w.raw(",\"value\":");
     // `bigint` is emitted only for BigInt literals (`skip_serializing_if` on
     // `Option`), and shares the decimal string with `value`.
@@ -951,7 +939,7 @@ fn write_literal_fields(w: &mut JsonWriter, lit: &ast::Literal<'_>, ctx: &Ctx<'_
 pub(super) fn write_identifier_parts(
     w: &mut JsonWriter,
     span: Span,
-    name: ast::IdentName<'_>,
+    name: ast::IdentName,
     optional: bool,
     type_annotation: Option<&ast::TSTypeAnnotation>,
     decorators: Option<&[ast::Decorator]>,
@@ -969,7 +957,7 @@ pub(super) fn write_identifier_parts(
 pub(super) fn write_identifier_parts_with_character(
     w: &mut JsonWriter,
     span: Span,
-    name: ast::IdentName<'_>,
+    name: ast::IdentName,
     optional: bool,
     type_annotation: Option<&ast::TSTypeAnnotation>,
     decorators: Option<&[ast::Decorator]>,
@@ -1000,7 +988,7 @@ pub(super) fn write_identifier_parts_with_character(
 fn write_identifier_fields(
     w: &mut JsonWriter,
     span: Span,
-    name: ast::IdentName<'_>,
+    name: ast::IdentName,
     optional: bool,
     type_annotation: Option<&ast::TSTypeAnnotation>,
     decorators: Option<&[ast::Decorator]>,
@@ -1049,7 +1037,7 @@ fn write_identifier_tail(
 /// 88 to 168 bytes, a frame paid at every level of statement nesting. Kept out of
 /// line it costs ~0.03% of the parse→JSON path's instructions on TypeScript.
 #[inline(never)]
-pub(super) fn write_identifier_plain(w: &mut JsonWriter, id: &ast::Identifier<'_>, ctx: &Ctx<'_>) {
+pub(super) fn write_identifier_plain(w: &mut JsonWriter, id: &ast::Identifier, ctx: &Ctx<'_>) {
     let name = id.ident_name();
     let name_len = name.raw_len as usize;
     if name.escaped.is_some()
@@ -1087,7 +1075,7 @@ pub(super) fn write_identifier_plain(w: &mut JsonWriter, id: &ast::Identifier<'_
 #[inline]
 pub(super) fn write_identifier_with_optional(
     w: &mut JsonWriter,
-    id: &ast::Identifier<'_>,
+    id: &ast::Identifier,
     ctx: &Ctx<'_>,
 ) {
     write_identifier_parts(w, id.span, id.ident_name(), id.optional, None, None, ctx);
@@ -1124,8 +1112,8 @@ mod tests {
     /// The sole statement of `source` as the `Identifier` its expression is.
     fn sole_identifier<'a>(
         view: ast::AstView<'a>,
-        program: &'a ast::Program<'a>,
-    ) -> &'a ast::Identifier<'a> {
+        program: &'a ast::Program,
+    ) -> &'a ast::Identifier {
         let [statement] = view.stmt_list(program.body) else {
             panic!("one statement expected");
         };

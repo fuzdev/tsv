@@ -70,7 +70,7 @@ impl<'a> Printer<'a> {
     /// the `)` (falling back to `body_start` if the paren can't be located).
     pub(in crate::printer) fn build_callable_signature_doc(
         &self,
-        params: &[ast::Expression<'_>],
+        params: &[ast::Expression],
         type_parameters: Option<&ast::TSTypeParameterDeclaration>,
         return_type: Option<&ast::TSTypeAnnotation>,
         params_start: u32,
@@ -107,7 +107,7 @@ impl<'a> Printer<'a> {
     /// `(params_doc, return_type_doc, sig_end)`.
     pub(in crate::printer) fn build_signature_params_return(
         &self,
-        params: &[ast::Expression<'_>],
+        params: &[ast::Expression],
         type_parameters: Option<&ast::TSTypeParameterDeclaration>,
         return_type: Option<&ast::TSTypeAnnotation>,
         params_start: u32,
@@ -243,10 +243,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for a function declaration
-    pub(super) fn build_function_declaration_doc(
-        &self,
-        decl: &ast::FunctionDeclaration<'_>,
-    ) -> DocId {
+    pub(super) fn build_function_declaration_doc(&self, decl: &ast::FunctionDeclaration) -> DocId {
         let d = self.d();
         let mut parts = DocBuf::new();
         let search_end = decl

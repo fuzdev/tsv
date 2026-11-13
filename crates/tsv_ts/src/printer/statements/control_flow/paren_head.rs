@@ -93,8 +93,8 @@ impl<'a> Printer<'a> {
         &self,
         kind: ParenHeadKind,
         stmt_start: u32,
-        head: &ast::Expression<'_>,
-        body: &Statement<'_>,
+        head: &ast::Expression,
+        body: &Statement,
         ctx: StatementContext,
     ) -> DocId {
         let d = self.d();

@@ -123,7 +123,7 @@ impl<'a> Printer<'a> {
         keyword: &'static str,
         keyword_start: u32,
         span_end: u32,
-        arg: &Expression<'_>,
+        arg: &Expression,
         gap: TerminatorGap,
     ) -> DocId {
         let d = self.d();
@@ -403,7 +403,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn argument_hang(
         &self,
         keyword_start: u32,
-        arg: &Expression<'_>,
+        arg: &Expression,
     ) -> ArgumentHang {
         // Own-line comment before the argument itself (`return (\n// c\nexpr)`).
         if self.has_leading_own_line_comment_in_range(
@@ -485,11 +485,7 @@ impl<'a> Printer<'a> {
     /// way the chain prints that gap ([`Self::mid_chain_shell_gap_hangs`]) rather than
     /// as a hoisted run; the walk goes on below it, since a shell deeper on the spine
     /// still leads the chain's head.
-    fn chain_has_own_line_comment(
-        &self,
-        expr: &Expression<'_>,
-        gaps: &mut SmallVec<[u32; 2]>,
-    ) -> bool {
+    fn chain_has_own_line_comment(&self, expr: &Expression, gaps: &mut SmallVec<[u32; 2]>) -> bool {
         self.chain_has_own_line_comment_below(expr, None, None, gaps)
     }
 
@@ -499,9 +495,9 @@ impl<'a> Printer<'a> {
     /// operand down print inside ([`Printer::left_spine_group_start`]).
     fn chain_has_own_line_comment_below<'e>(
         &self,
-        mut expr: &'e Expression<'e>,
-        mut chain_root: Option<&'e Expression<'e>>,
-        mut group: Option<&'e Expression<'e>>,
+        mut expr: &'e Expression,
+        mut chain_root: Option<&'e Expression>,
+        mut group: Option<&'e Expression>,
         gaps: &mut SmallVec<[u32; 2]>,
     ) -> bool
     where
@@ -807,7 +803,7 @@ impl<'a> Printer<'a> {
         &self,
         keyword: &'static str,
         keyword_end: u32,
-        arg: &Expression<'_>,
+        arg: &Expression,
         span_end: u32,
     ) -> (DocId, u32) {
         let d = self.d();
@@ -937,7 +933,7 @@ impl<'a> Printer<'a> {
         &self,
         keyword: &'static str,
         keyword_end: u32,
-        arg: &Expression<'_>,
+        arg: &Expression,
         span_end: u32,
         gap: TerminatorGap,
     ) -> DocId {
@@ -971,7 +967,7 @@ impl<'a> Printer<'a> {
     fn operand_arm_keeps_line_comment_inside(
         &self,
         keyword: &'static str,
-        arg: &Expression<'_>,
+        arg: &Expression,
     ) -> bool {
         match &arg.kind {
             ExpressionKind::BinaryExpression(_) => true,

@@ -57,7 +57,7 @@ pub(super) fn write_decorators_field(
 /// `typeParameters?`, `typeAnnotation`, `declare` (only when true).
 pub(super) fn write_type_alias_declaration(
     w: &mut JsonWriter,
-    type_alias: &ast::TSTypeAliasDeclaration<'_>,
+    type_alias: &ast::TSTypeAliasDeclaration,
     span: Span,
     ctx: &Ctx<'_>,
 ) {
@@ -78,7 +78,7 @@ pub(super) fn write_type_alias_declaration(
 /// `params`, `returnType?`, `body`.
 pub(super) fn write_function_declaration(
     w: &mut JsonWriter,
-    func_decl: &ast::FunctionDeclaration<'_>,
+    func_decl: &ast::FunctionDeclaration,
     ctx: &Ctx<'_>,
 ) {
     node_header(w, "FunctionDeclaration", func_decl.span, ctx);
@@ -105,7 +105,7 @@ pub(super) fn write_function_declaration(
 fn super_class_wrap_span(
     view: AstView<'_>,
     type_params_span: Option<Span>,
-    super_class: Option<&ast::Expression<'_>>,
+    super_class: Option<&ast::Expression>,
     super_type_parameters_end: Option<u32>,
     source: &str,
 ) -> Option<Span> {
@@ -124,7 +124,7 @@ fn super_class_wrap_span(
 /// the wrap decision. Shared by class declarations and expressions.
 fn write_super_class_fields(
     w: &mut JsonWriter,
-    super_class: Option<&ast::Expression<'_>>,
+    super_class: Option<&ast::Expression>,
     super_type_parameters: Option<&ast::TSTypeParameterInstantiation>,
     type_params_span: Option<Span>,
     ctx: &Ctx<'_>,
@@ -175,7 +175,7 @@ fn write_super_class_fields(
 /// never a type export for any other reason, so the two are the same fact.
 pub(super) fn write_class_declaration(
     w: &mut JsonWriter,
-    class_decl: &ast::ClassDeclaration<'_>,
+    class_decl: &ast::ClassDeclaration,
     ctx: &Ctx<'_>,
     declare_stamped_by_export: bool,
 ) {
@@ -212,7 +212,7 @@ pub(super) fn write_class_declaration(
 /// Emits a `ClassExpression` node (no `declare` field).
 pub(super) fn write_class_expression(
     w: &mut JsonWriter,
-    class_expr: &ast::ClassExpression<'_>,
+    class_expr: &ast::ClassExpression,
     span: Span,
     ctx: &Ctx<'_>,
 ) {
@@ -243,7 +243,7 @@ pub(super) fn write_class_expression(
 /// field.
 fn write_implements_field(
     w: &mut JsonWriter,
-    implements: &[ast::TSInterfaceHeritage<'_>],
+    implements: &[ast::TSInterfaceHeritage],
     ctx: &Ctx<'_>,
 ) {
     if implements.is_empty() {
@@ -388,7 +388,7 @@ fn modifier_scan_start(decorators: Option<&[ast::Decorator]>, span: Span) -> u32
 /// `typeParameters?` (moved here from the FunctionExpression, acorn
 /// convention), `value`, `decorators?` (attached to the finished member, so
 /// they serialize last).
-fn write_method_definition(w: &mut JsonWriter, method: &ast::MethodDefinition<'_>, ctx: &Ctx<'_>) {
+fn write_method_definition(w: &mut JsonWriter, method: &ast::MethodDefinition, ctx: &Ctx<'_>) {
     node_header(w, "MethodDefinition", method.span, ctx);
     let mut mods = [
         method.r#abstract.then_some(MemberModifier {
@@ -543,7 +543,7 @@ pub(super) fn write_type_parameter_declaration(
 /// exactly why nothing else guards it.
 pub(super) fn write_type_parameter(
     w: &mut JsonWriter,
-    param: &ast::TSTypeParameter<'_>,
+    param: &ast::TSTypeParameter,
     ctx: &Ctx<'_>,
 ) {
     node_header(w, "TSTypeParameter", param.span, ctx);
@@ -569,7 +569,7 @@ pub(super) fn write_type_parameter(
 /// `TSQualifiedName`, matching `extends`), plus `typeParameters?`.
 fn write_expression_with_type_arguments(
     w: &mut JsonWriter,
-    heritage: &ast::TSInterfaceHeritage<'_>,
+    heritage: &ast::TSInterfaceHeritage,
     ctx: &Ctx<'_>,
 ) {
     node_header(w, "TSExpressionWithTypeArguments", heritage.span, ctx);

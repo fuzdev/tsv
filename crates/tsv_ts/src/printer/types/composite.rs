@@ -54,7 +54,7 @@ struct TupleElementHead {
 /// Asking the comment-aware `unwrap_redundant_parens` here — which stops at a shell holding
 /// comments — let a comment flip the branch out of this arm and into the generic one, whose
 /// per-branch `indent` then doubled the nested conditional's own always-on indent.
-fn conditional_branch_is_nested(view: AstView<'_>, branch: &TSType<'_>) -> bool {
+fn conditional_branch_is_nested(view: AstView<'_>, branch: &TSType) -> bool {
     matches!(unwrap_parenthesized(view, branch), TSType::Conditional(_))
 }
 
@@ -90,7 +90,7 @@ enum BranchRoute<'t> {
     /// target. Without it the branch's leading run relocated ACROSS the `?` / `:`, onto a
     /// construct the comment does not document, and landed there glued (hence inert), so the
     /// second pass lost the freeze.
-    ShellInterior(&'t TSType<'t>),
+    ShellInterior(&'t TSType),
 }
 
 impl<'t> BranchRoute<'t> {
@@ -128,7 +128,7 @@ impl<'a> Printer<'a> {
     /// The two windows are disjoint by construction — the gap ends at the branch's span
     /// start, the shell interior opens just past the `(` — so the order only fixes which
     /// answer a directive in each position gets, never which of two claims wins.
-    fn branch_route<'t>(&self, gap_start: u32, branch: &'t TSType<'t>) -> BranchRoute<'t>
+    fn branch_route<'t>(&self, gap_start: u32, branch: &'t TSType) -> BranchRoute<'t>
     where
         'a: 't,
     {
@@ -172,7 +172,7 @@ impl<'a> Printer<'a> {
     fn branch_claim_and_start(
         &self,
         route: BranchRoute<'_>,
-        branch: &TSType<'_>,
+        branch: &TSType,
     ) -> (Option<Span>, u32) {
         match route {
             BranchRoute::ShellInterior(inner) => (None, inner.span().start),
@@ -209,7 +209,7 @@ impl<'a> Printer<'a> {
     /// stripped (`? (// c1⏎V extends W ? X : Y // c2⏎) : Z`), so the shell's own emitter
     /// printed the leading run at the shell's indent — the flat-layout placement the claim
     /// exists to avoid — and pass 2, the shell gone, hung the branch below it (F1).
-    fn branch_shell_retains(&self, branch: &TSType<'_>) -> bool {
+    fn branch_shell_retains(&self, branch: &TSType) -> bool {
         if conditional_branch_is_nested(self.view, branch) {
             self.nested_branch_shell_retains(branch)
         } else {
@@ -221,7 +221,7 @@ impl<'a> Printer<'a> {
     /// branch position's own rule (see [`BranchRoute`] and [`RoutedScope::Whole`]): a
     /// composite branch cannot bind the directive through the member rules, because the
     /// interposing `?` / `:` blocks their leading-run walk.
-    fn build_routed_branch_doc(&self, route: BranchRoute<'_>, branch: &TSType<'_>) -> DocId {
+    fn build_routed_branch_doc(&self, route: BranchRoute<'_>, branch: &TSType) -> DocId {
         match route {
             BranchRoute::ShellInterior(inner) => {
                 self.build_routed_inner_doc(branch, inner, RoutedScope::Whole)
@@ -473,7 +473,7 @@ impl<'a> Printer<'a> {
     /// layout.
     fn build_nested_conditional_branch_doc(
         &self,
-        branch: &TSType<'_>,
+        branch: &TSType,
         inner: &TSConditionalType,
     ) -> DocId {
         let d = self.d();
@@ -521,7 +521,7 @@ impl<'a> Printer<'a> {
     /// through `build_parenthesized_type_unwrap_doc`, which answers retain-vs-defer itself.
     /// A **trailing block** stays inline (prettier keeps `? (A extends B ? C : D /* c */)`
     /// flat), so only the leading gap consults the wider own-line gate.
-    fn nested_branch_shell_forces_break(&self, branch: &TSType<'_>) -> bool {
+    fn nested_branch_shell_forces_break(&self, branch: &TSType) -> bool {
         let Some((leading, trailing)) =
             outermost_paren(branch).map(|shell| paren_shell_gaps(self.view, shell))
         else {
@@ -547,7 +547,7 @@ impl<'a> Printer<'a> {
     /// but the statement tail follows: the same deferral carried the `//` past the `;`,
     /// where the reparse — the shell now gone — re-collapses the conditional onto one
     /// line, so the output was not a fixed point.
-    fn nested_branch_shell_retains(&self, branch: &TSType<'_>) -> bool {
+    fn nested_branch_shell_retains(&self, branch: &TSType) -> bool {
         let Some((_, trailing)) =
             outermost_paren(branch).map(|shell| paren_shell_gaps(self.view, shell))
         else {
@@ -567,7 +567,7 @@ impl<'a> Printer<'a> {
     /// `build_type_doc_maybe_parens` form (which still parenthesizes
     /// function/constructor/nested-conditional checks). Redundant comment-free
     /// parens are stripped via the shared `unwrap_redundant_parens`.
-    fn build_conditional_check_doc(&self, check: &TSType<'_>) -> DocId {
+    fn build_conditional_check_doc(&self, check: &TSType) -> DocId {
         let d = self.d();
         match self.unwrap_redundant_parens(check) {
             // `union_prints_hugged`, not the bare syntactic `union_hug_shape`: a comment
@@ -592,7 +592,7 @@ impl<'a> Printer<'a> {
     fn build_conditional_arm_doc(
         &self,
         op: &'static str,
-        branch_type: &TSType<'_>,
+        branch_type: &TSType,
         branch_doc: impl FnOnce() -> DocId,
         op_pos: Option<u32>,
         branch_start: u32,
@@ -628,7 +628,7 @@ impl<'a> Printer<'a> {
     /// (`conditional/branch_union_gap_block_comment_breaking_layout`).
     fn build_conditional_arm_tail_doc(
         &self,
-        branch_type: &TSType<'_>,
+        branch_type: &TSType,
         branch_doc: impl FnOnce() -> DocId,
         op_end: u32,
         branch_start: u32,
@@ -696,7 +696,7 @@ impl<'a> Printer<'a> {
     /// of the tail, so the union there answers from its own span.
     fn build_conditional_branch_tail_doc(
         &self,
-        branch_type: &TSType<'_>,
+        branch_type: &TSType,
         branch_doc: impl FnOnce() -> DocId,
         placement: ConditionalBranchPlacement,
         run: Option<DocId>,
@@ -1097,7 +1097,7 @@ impl<'a> Printer<'a> {
         &self,
         parts: &mut DocBuf,
         gap_start: u32,
-        branch_type: &TSType<'_>,
+        branch_type: &TSType,
         branch_start: u32,
         claim: Option<Span>,
     ) {
@@ -1303,7 +1303,7 @@ impl<'a> Printer<'a> {
     ///
     /// Built lazily by [`Self::build_conditional_branch_tail_doc`], whose union /
     /// intersection arms rebuild the branch from parts and would discard it.
-    fn build_conditional_branch_doc(&self, branch: &TSType<'_>) -> DocId {
+    fn build_conditional_branch_doc(&self, branch: &TSType) -> DocId {
         // The nested-conditional question comes FIRST, and unconditionally: routing a
         // branch through the grouped `build_type_doc` instead gave the nested
         // conditional a group of its own, so it printed FLAT inside an already-broken
@@ -1377,7 +1377,7 @@ impl<'a> Printer<'a> {
         head_end: u32,
         keyword: &'static str,
         spaced_keyword: &'static str,
-        value: &TSType<'_>,
+        value: &TSType,
     ) {
         let d = self.d();
         // A transparent one-member composite is its member here, the `|` dropped and its
@@ -1428,7 +1428,7 @@ impl<'a> Printer<'a> {
     /// - Source one-line, fits: `{[K in keyof T]: T[K]}`
     /// - Source one-line, long: `{\n\t[K in keyof T]: T[K];\n}`
     /// - Source multi-line: `{\n\t[K in keyof T]: T[K];\n}` (always)
-    pub(super) fn build_mapped_type_doc(&self, m: &TSMappedType<'_>) -> DocId {
+    pub(super) fn build_mapped_type_doc(&self, m: &TSMappedType) -> DocId {
         let d = self.d();
         // Check if source was multi-line (preserve author's formatting choice).
         //
@@ -1861,7 +1861,7 @@ impl<'a> Printer<'a> {
         &self,
         head: &KeywordValueHead<'_>,
         colon_pos: u32,
-        type_ann: &TSType<'_>,
+        type_ann: &TSType,
     ) -> DocId {
         let d = self.d();
         if self.has_line_comments_between(colon_pos + 1, head.value_start) {
@@ -2011,7 +2011,7 @@ impl<'a> Printer<'a> {
     /// is stripped, so the parens this rule adds are the ONLY ones the element can carry, and
     /// asking the raw node would make tsv's own output authoring-dependent: `[(A | B), d]`
     /// would print bare where `[A | B, d]` printed the pair, two fixed points for one program.
-    fn build_tuple_element_doc(&self, elem: &TSType<'_>, multi_element: bool) -> DocId {
+    fn build_tuple_element_doc(&self, elem: &TSType, multi_element: bool) -> DocId {
         match elem {
             TSType::Intersection(i) => self.build_intersection_type_doc(i, true, true),
             _ if multi_element
@@ -2045,7 +2045,7 @@ impl<'a> Printer<'a> {
     /// inline where their bare authoring expands, and prettier expands both.
     /// TODO: reach those by asking each element printer for the span it will emit from, rather
     /// than peeling only the top shell here.
-    fn tuple_elem<'t>(&self, ty: &'t TSType<'t>) -> &'t TSType<'t>
+    fn tuple_elem<'t>(&self, ty: &'t TSType) -> &'t TSType
     where
         'a: 't,
     {
@@ -2524,7 +2524,7 @@ impl<'a> Printer<'a> {
     /// Build doc for type query expression name
     pub(super) fn build_type_query_expr_name_doc(
         &self,
-        expr_name: &ast::TSTypeQueryExprName<'_>,
+        expr_name: &ast::TSTypeQueryExprName,
     ) -> DocId {
         match expr_name {
             ast::TSTypeQueryExprName::EntityName(entity) => self.build_entity_name_doc(entity),

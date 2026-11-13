@@ -7,8 +7,8 @@ use tsv_lang::{Error, Span};
 
 use super::super::{ExprRet, Parser};
 
-impl<'a, 'arena> Parser<'a, 'arena> {
-    pub(super) fn parse_return_statement(&mut self) -> Result<Statement<'arena>, Error> {
+impl<'a> Parser<'a> {
+    pub(super) fn parse_return_statement(&mut self) -> Result<Statement, Error> {
         let (start, _) = self.current_pos();
 
         // Consume 'return' keyword
@@ -43,7 +43,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         })
     }
 
-    pub(super) fn parse_function_declaration(&mut self) -> Result<Statement<'arena>, Error> {
+    pub(super) fn parse_function_declaration(&mut self) -> Result<Statement, Error> {
         self.parse_function_or_overload(false, None)
     }
 
@@ -64,7 +64,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         is_async: bool,
         start_override: Option<usize>,
-    ) -> Result<Statement<'arena>, Error> {
+    ) -> Result<Statement, Error> {
         let start = start_override.unwrap_or_else(|| self.current_pos().0);
 
         // Consume 'function' keyword
@@ -148,7 +148,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     /// Parse async function declaration: `async function foo() {}` or `async function* foo() {}`
-    pub(super) fn parse_async_function_declaration(&mut self) -> Result<Statement<'arena>, Error> {
+    pub(super) fn parse_async_function_declaration(&mut self) -> Result<Statement, Error> {
         let (start, _) = self.current_pos();
 
         // Consume 'async' keyword
@@ -169,7 +169,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(super) fn parse_function_declaration_or_declare(
         &mut self,
         is_async: bool,
-    ) -> Result<ExportFunctionDeclaration<'arena>, Error> {
+    ) -> Result<ExportFunctionDeclaration, Error> {
         let (start, _) = self.current_pos();
 
         // Consume 'function' keyword

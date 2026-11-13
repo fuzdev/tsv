@@ -78,7 +78,7 @@ use tsv_lang::source_scan::has_newline_before_position;
 /// it under the outer flag — hence the clear here.
 pub(super) fn build_printed_argument_doc(
     printer: &Printer<'_>,
-    arg: &ast::Expression<'_>,
+    arg: &ast::Expression,
     build: impl FnOnce() -> DocId,
 ) -> DocId {
     let outer_skip = printer.skip_arrow_chain.replace(false);
@@ -292,7 +292,7 @@ pub(super) fn wrap_call_with_will_break_guard(d: &DocArena, callee: DocId, args:
 /// Conditionals (ternaries) are included because when a call's ternary argument exceeds
 /// print width, Prettier breaks after "(" and keeps the ternary on one line (if it fits),
 /// rather than keeping "(cond" hugged and breaking the ternary at ? and :.
-pub(super) fn arg_needs_soft_wrap(arg: &ast::Expression<'_>) -> bool {
+pub(super) fn arg_needs_soft_wrap(arg: &ast::Expression) -> bool {
     matches!(
         arg.kind,
         ast::ExpressionKind::CallExpression(_)
@@ -323,7 +323,7 @@ pub(super) enum ChainArgKind {
 /// body type. A class expression is NOT huggable: prettier's `couldExpandArg` has no class
 /// arm, so a member call breaks a sole class argument onto its own line exactly as a plain
 /// call does (`calls/chain_class_arg_no_hug`).
-pub(super) fn classify_chain_arg(view: AstView<'_>, arg: &ast::Expression<'_>) -> ChainArgKind {
+pub(super) fn classify_chain_arg(view: AstView<'_>, arg: &ast::Expression) -> ChainArgKind {
     match &arg.kind {
         // Block-like expressions hug the call parens naturally
         ast::ExpressionKind::ObjectExpression(_)
@@ -432,7 +432,7 @@ fn could_expand_arrow_arg(view: AstView<'_>, arrow: &ast::ArrowFunctionExpressio
 /// are caught earlier by the conditional_group path in chain_args.rs. This
 /// HugsNaturally classification is primarily reached for arrows with
 /// TSTypeReference returns (which bypass that path) and nested arrow chains.
-fn classify_expression_body(view: AstView<'_>, expr: &ast::Expression<'_>) -> ChainArgKind {
+fn classify_expression_body(view: AstView<'_>, expr: &ast::Expression) -> ChainArgKind {
     match &expr.kind {
         // Objects and arrays hug naturally (reached mainly for typed-return arrows)
         ast::ExpressionKind::ObjectExpression(_) | ast::ExpressionKind::ArrayExpression(_) => {
@@ -453,7 +453,7 @@ fn classify_expression_body(view: AstView<'_>, expr: &ast::Expression<'_>) -> Ch
 /// (`build_arrow_doc_wrapping` clears `arrow_chain_context` before building the body — a
 /// nested curried arrow in the body must not inherit the outer chain context), so the
 /// pre-built DocId is byte-identical to what the arrow would build.
-fn build_arrow_body_like_arrow(printer: &Printer<'_>, body_expr: &ast::Expression<'_>) -> DocId {
+fn build_arrow_body_like_arrow(printer: &Printer<'_>, body_expr: &ast::Expression) -> DocId {
     let prev = printer.arrow_chain_context.replace(ArrowChainContext::None);
     let doc = printer.build_arrow_arg_body_doc(body_expr);
     printer.arrow_chain_context.set(prev);
@@ -476,7 +476,7 @@ impl Printer<'_> {
     ///
     /// A body whose leftmost token takes its own pair INSIDE it is built through that seam
     /// ([`Printer::build_inner_leftmost_parens_arrow_body_doc`]), as the whole arrow builds it.
-    pub(super) fn build_arrow_arg_body_doc(&self, body_expr: &ast::Expression<'_>) -> DocId {
+    pub(super) fn build_arrow_arg_body_doc(&self, body_expr: &ast::Expression) -> DocId {
         self.build_inner_leftmost_parens_arrow_body_doc(body_expr)
             .unwrap_or_else(|| self.build_expression_doc_claiming_outermost(body_expr))
     }
@@ -484,10 +484,7 @@ impl Printer<'_> {
     /// [`Self::build_arrow_arg_body_doc`] for the states that build their body unclaimed (the
     /// member chain's force-expanded and multi-argument states): the leftmost pair, else the
     /// plain expression doc.
-    pub(super) fn build_arrow_arg_body_doc_unclaimed(
-        &self,
-        body_expr: &ast::Expression<'_>,
-    ) -> DocId {
+    pub(super) fn build_arrow_arg_body_doc_unclaimed(&self, body_expr: &ast::Expression) -> DocId {
         self.build_inner_leftmost_parens_arrow_body_doc(body_expr)
             .unwrap_or_else(|| self.build_expression_doc(body_expr))
     }
@@ -516,7 +513,7 @@ impl Printer<'_> {
 /// `=>`→body gap takes its own state, built from its own prebuild.
 pub(super) fn prebuild_expand_last_break_body(
     printer: &Printer<'_>,
-    last_arg: Option<&ast::Expression<'_>>,
+    last_arg: Option<&ast::Expression>,
 ) -> Option<(u32, DocId)> {
     if let Some(&ast::Expression {
         kind: ast::ExpressionKind::ArrowFunctionExpression(arrow),
@@ -551,7 +548,7 @@ pub(super) fn prebuild_expand_last_break_body(
 /// because the fabricated form is its own fixed point, F1, the fuzzer, the round-trip and every
 /// comment gate were blind to it — only a prettier compare could see it. One site, so the
 /// inject doc and the hug doc cannot drift apart on it.
-fn arrow_hug_body_needs_parens(body_expr: &ast::Expression<'_>) -> bool {
+fn arrow_hug_body_needs_parens(body_expr: &ast::Expression) -> bool {
     matches!(body_expr.kind, ast::ExpressionKind::ObjectExpression(_))
 }
 
@@ -596,10 +593,10 @@ fn terminal_arrow<'a>(
 /// (`(a) => (b) => X`), the last head's. `None` for a block terminal.
 ///
 /// [`terminal_arrow`] plus the block-vs-expression split.
-fn arrow_terminal_expression_body<'arena>(
-    view: AstView<'arena>,
-    arrow: &'arena ast::ArrowFunctionExpression,
-) -> Option<&'arena ast::Expression<'arena>> {
+fn arrow_terminal_expression_body<'a>(
+    view: AstView<'a>,
+    arrow: &'a ast::ArrowFunctionExpression,
+) -> Option<&'a ast::Expression> {
     match &terminal_arrow(view, arrow).0.body {
         ast::ArrowFunctionBody::Expression(body) => Some(view.expr(*body)),
         ast::ArrowFunctionBody::BlockStatement(_) => None,
@@ -652,7 +649,7 @@ pub(super) fn arrow_body_expands_internally(
 /// on any nesting the gate happens to open.
 pub(super) fn prebuild_expand_last_obj_array_body(
     printer: &Printer<'_>,
-    last_arg: Option<&ast::Expression<'_>>,
+    last_arg: Option<&ast::Expression>,
 ) -> Option<(u32, DocId)> {
     let d = printer.d();
     let &ast::ExpressionKind::ArrowFunctionExpression(arrow) = &(last_arg?).kind else {
@@ -893,7 +890,7 @@ pub(super) struct ArrowGapBreak {
 /// carries the comment in `fn(() => () =>⏎\t// c⏎\t({ a: 1 }))`.
 pub(super) fn last_arg_arrow_gap_break(
     printer: &Printer<'_>,
-    last_arg: &ast::Expression<'_>,
+    last_arg: &ast::Expression,
 ) -> Option<ArrowGapBreak> {
     let &ast::ExpressionKind::ArrowFunctionExpression(outer) = &last_arg.kind else {
         return None;
@@ -965,7 +962,7 @@ pub(super) fn last_arg_arrow_gap_break(
 pub(super) fn arrow_body_tail_has_comments(
     printer: &Printer<'_>,
     span: Span,
-    body_expr: &ast::Expression<'_>,
+    body_expr: &ast::Expression,
 ) -> bool {
     printer.has_comments_on_page_between(body_expr.span().end, span.end)
 }
@@ -1000,7 +997,7 @@ pub(super) fn arrow_hug_refused_by_comments(
     printer: &Printer<'_>,
     arrow: &ast::ArrowFunctionExpression,
     span: Span,
-    body_expr: &ast::Expression<'_>,
+    body_expr: &ast::Expression,
 ) -> bool {
     arrow_signature_has_breaking_comments(printer, arrow, span)
         || arrow_body_tail_has_comments(printer, span, body_expr)
@@ -1096,7 +1093,7 @@ fn build_arrow_gap_break_ladder(
 fn build_arrow_gap_break_arg_docs(
     printer: &Printer<'_>,
     inject: Option<(u32, DocId)>,
-    arg: &ast::Expression<'_>,
+    arg: &ast::Expression,
     build: impl Fn() -> DocId,
 ) -> HugArgDocs {
     let Some(inject) = inject else {
@@ -1143,7 +1140,7 @@ fn build_arrow_gap_break_expanded(
 pub(super) fn build_arrow_gap_break_single_arg_doc(
     printer: &Printer<'_>,
     opener: ArgOpener,
-    arg: &ast::Expression<'_>,
+    arg: &ast::Expression,
     gap_break: &ArrowGapBreak,
     leading: Option<DocId>,
     build: impl Fn() -> DocId,
@@ -1207,7 +1204,7 @@ pub(super) fn build_arrow_gap_break_multi_arg_doc(
 /// block hook existed.
 fn prebuild_arrow_gap_break_body(
     printer: &Printer<'_>,
-    last_arg: Option<&ast::Expression<'_>>,
+    last_arg: Option<&ast::Expression>,
 ) -> Option<(u32, DocId)> {
     if let Some(obj) = prebuild_expand_last_obj_array_body(printer, last_arg) {
         return Some(obj);
@@ -1255,7 +1252,7 @@ fn prebuild_arrow_gap_break_body(
 pub(super) fn build_single_container_arg_doc(
     printer: &Printer<'_>,
     callee: DocId,
-    arg: &ast::Expression<'_>,
+    arg: &ast::Expression,
 ) -> DocId {
     let d = printer.d();
     let arg_doc = printer.build_expression_doc(arg);
@@ -1384,7 +1381,7 @@ impl HugArgDocs {
 /// state reads.
 fn build_arrow_hug_arg_docs(
     printer: &Printer<'_>,
-    arg: &ast::Expression<'_>,
+    arg: &ast::Expression,
     arrow: &ast::ArrowFunctionExpression,
     build: impl Fn() -> DocId,
 ) -> HugArgDocs {
@@ -1414,7 +1411,7 @@ fn build_arrow_hug_arg_docs(
 /// says to find syntactically, since no depth curve can separate it from the baseline.
 pub(super) fn build_arrow_hug_printed_doc(
     printer: &Printer<'_>,
-    arg: &ast::Expression<'_>,
+    arg: &ast::Expression,
     arrow: &ast::ArrowFunctionExpression,
     build: impl FnOnce() -> DocId,
 ) -> DocId {
@@ -1448,7 +1445,7 @@ pub(super) fn build_arrow_hug_printed_doc(
 pub(super) fn build_single_arrow_hug_doc(
     printer: &Printer<'_>,
     opener: ArgOpener,
-    arg: &ast::Expression<'_>,
+    arg: &ast::Expression,
     arrow: &ast::ArrowFunctionExpression,
     leading: Option<DocId>,
     build: impl Fn() -> DocId,
@@ -1511,7 +1508,7 @@ pub(super) fn build_single_arrow_hug_doc(
 /// so each further printing the state needs costs a signature and not the subtree — nested
 /// callbacks of this shape stay linear.
 pub(in crate::printer) struct AssumedParamHug<'a> {
-    arg: &'a ast::Expression<'a>,
+    arg: &'a ast::Expression,
     /// The flat sole-parameter literal's position, when the callback has one
     /// ([`flat_sole_param_literal`]).
     literal: Option<u32>,
@@ -1585,10 +1582,7 @@ impl<'a> AssumedParamHug<'a> {
     /// Under a member chain the body is shared across the chain's candidates like any
     /// argument ([`ShareTag::AssumedHugBody`]): each candidate rebuilds the call's arguments,
     /// and a body built per candidate would compound with the nesting.
-    pub(in crate::printer) fn new(
-        printer: &Printer<'_>,
-        arg: &'a ast::Expression<'a>,
-    ) -> Option<Self> {
+    pub(in crate::printer) fn new(printer: &Printer<'_>, arg: &'a ast::Expression) -> Option<Self> {
         let flat = flat_sole_param_literal(printer, arg);
         let return_hug = function_return_hug_break(printer, arg);
         let body = match (&flat, &arg.kind) {
@@ -2261,7 +2255,7 @@ pub(super) fn build_expand_last_obj_array_doc(
 /// body build ([`Printer::arrow_block_body_doc`]) or the `function`'s block.
 fn shared_callback_body_doc(
     printer: &Printer<'_>,
-    arg: &ast::Expression<'_>,
+    arg: &ast::Expression,
     body: &ast::BlockStatement,
     is_arrow: bool,
 ) -> DocId {
@@ -2281,7 +2275,7 @@ fn shared_callback_body_doc(
 /// second subtree. `None` for any other argument.
 fn prebuild_callback_block_body(
     printer: &Printer<'_>,
-    arg: &ast::Expression<'_>,
+    arg: &ast::Expression,
 ) -> Option<(u32, DocId)> {
     let (body, is_arrow) = match arg.kind {
         ast::ExpressionKind::ArrowFunctionExpression(arrow) => {
@@ -2562,7 +2556,7 @@ pub(super) fn build_ternary_arrow_hug_ladder(
     printer: &Printer<'_>,
     opener: ArgOpener,
     arrow: &ast::ArrowFunctionExpression,
-    body_expr: &ast::Expression<'_>,
+    body_expr: &ast::Expression,
     sig_doc: DocId,
     body_doc: DocId,
     printed: impl FnOnce() -> DocId,
@@ -2642,9 +2636,9 @@ pub(super) fn build_ternary_arrow_hug_ladder(
 pub(super) fn build_arrow_call_body_states(
     printer: &Printer<'_>,
     opener: ArgOpener,
-    arg: &ast::Expression<'_>,
+    arg: &ast::Expression,
     arrow: &ast::ArrowFunctionExpression,
-    body_expr: &ast::Expression<'_>,
+    body_expr: &ast::Expression,
     body_reuse: (u32, DocId),
     printed: impl FnOnce() -> DocId,
 ) -> DocId {

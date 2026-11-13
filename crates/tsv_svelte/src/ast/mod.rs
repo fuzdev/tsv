@@ -42,7 +42,7 @@ pub struct ParsedRoot<'arena> {
     /// The tree.
     pub root: Root<'arena>,
     /// The stores the tree's handles index, one instance across the document's islands.
-    pub stores: AstStores<'arena>,
+    pub stores: AstStores,
 }
 
 impl<'arena> ParsedRoot<'arena> {
@@ -2102,7 +2102,7 @@ pub struct ExpressionTag {
 /// The `context` field distinguishes between instance and module scripts.
 #[derive(Debug, Clone)]
 pub struct Script<'arena> {
-    pub content: Program<'arena>,
+    pub content: Program,
     pub attributes: &'arena [AttributeNode<'arena>],
     pub context: ScriptContext,
     pub span: Span,

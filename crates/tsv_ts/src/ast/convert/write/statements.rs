@@ -54,7 +54,7 @@ fn export_start(source: &str, span_start: u32, class_is_decorated: bool) -> u32 
 /// omits the field under acorn.
 fn write_attributes_field(
     w: &mut JsonWriter,
-    attributes: Option<&[ast::ImportAttribute<'_>]>,
+    attributes: Option<&[ast::ImportAttribute]>,
     ctx: &Ctx<'_>,
 ) {
     match attributes {
@@ -71,7 +71,7 @@ fn write_attributes_field(
 }
 
 /// Emit a `Statement`, dispatching on its variant.
-pub(super) fn write_statement(w: &mut JsonWriter, stmt: &ast::Statement<'_>, ctx: &Ctx<'_>) {
+pub(super) fn write_statement(w: &mut JsonWriter, stmt: &ast::Statement, ctx: &Ctx<'_>) {
     match &stmt.kind {
         ast::StatementKind::ExpressionStatement(expr_stmt) => {
             node_header(w, "ExpressionStatement", stmt.span, ctx);
@@ -313,7 +313,7 @@ pub(super) fn write_statement(w: &mut JsonWriter, stmt: &ast::Statement<'_>, ctx
 /// (only when true).
 pub(super) fn write_module_declaration(
     w: &mut JsonWriter,
-    decl: &ast::TSModuleDeclaration<'_>,
+    decl: &ast::TSModuleDeclaration,
     ctx: &Ctx<'_>,
 ) {
     node_header(w, "TSModuleDeclaration", decl.span, ctx);
@@ -376,7 +376,7 @@ pub(super) fn write_block_statement(
 /// by construction (and inert where there is no `declare` to place).
 fn write_exported_declaration(
     w: &mut JsonWriter,
-    stmt: &ast::Statement<'_>,
+    stmt: &ast::Statement,
     ctx: &Ctx<'_>,
     is_type_export: bool,
 ) {

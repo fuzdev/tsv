@@ -34,7 +34,7 @@ use tsv_lang::source_scan;
 /// recurses to the leaf and stops at IIFE callees/tags; this one takes a single step and
 /// asks only whether the child *starts where the parent does*. Merging them would be a
 /// behavior change, not a cleanup.
-fn left_spine_child<'x>(view: AstView<'x>, expr: &'x Expression<'x>) -> Option<&'x Expression<'x>> {
+fn left_spine_child<'x>(view: AstView<'x>, expr: &'x Expression) -> Option<&'x Expression> {
     Some(match &expr.kind {
         ExpressionKind::MemberExpression(m) => view.expr(m.object),
         ExpressionKind::CallExpression(c) => view.expr(c.callee),
@@ -66,10 +66,7 @@ fn left_spine_child<'x>(view: AstView<'x>, expr: &'x Expression<'x>) -> Option<&
 /// multi-line `@type` block hoisted in front of a `(` becomes a JSDoc cast. The value-gap
 /// hoist declines at the same pair ([`Printer::hoisted_owned_value_gap_run_opt`]), so the
 /// two readings of one seam agree.
-fn outermost_claim_child<'x>(
-    view: AstView<'x>,
-    value: &'x Expression<'x>,
-) -> Option<&'x Expression<'x>> {
+fn outermost_claim_child<'x>(view: AstView<'x>, value: &'x Expression) -> Option<&'x Expression> {
     match &value.kind {
         ExpressionKind::SequenceExpression(_) => None,
         _ => left_spine_child(view, value),
@@ -99,7 +96,7 @@ fn outermost_claim_child<'x>(
 /// short-circuit has exactly one spelling.
 fn leading_comment_bound_pair_walk<'x>(
     view: AstView<'x>,
-    expr: &'x Expression<'x>,
+    expr: &'x Expression,
 ) -> Option<(&'x ast::CommentBoundPair, Span)> {
     let start = expr.span().start;
     let mut node = expr;
@@ -148,7 +145,7 @@ impl<'a> Printer<'a> {
     /// this walk.
     fn leading_comment_bound_pair<'x>(
         &self,
-        value: &'x Expression<'x>,
+        value: &'x Expression,
     ) -> Option<(&'x ast::CommentBoundPair, Span)>
     where
         'a: 'x,
@@ -167,7 +164,7 @@ impl<'a> Printer<'a> {
     ///
     /// The walk takes every left-spine step, a shell's later-starting child included: the
     /// doc's first comment is printed by a node on that spine wherever it starts.
-    pub(crate) fn left_spine_cast_owns(&self, value: &Expression<'_>, comment: Span) -> bool {
+    pub(crate) fn left_spine_cast_owns(&self, value: &Expression, comment: Span) -> bool {
         if !self.has_owned_comments {
             return false;
         }
@@ -206,7 +203,7 @@ impl<'a> Printer<'a> {
     /// this — it would clobber the entry mark for every sibling built after it, including
     /// a left-spine cast rebuilt in a later `conditional_group` candidate; those wrap
     /// their build in [`Printer::with_jsdoc_cast_cannot_hang_gap`] instead.
-    pub(in crate::printer) fn mark_jsdoc_cast_cannot_hang_gap(&self, value: &Expression<'_>) {
+    pub(in crate::printer) fn mark_jsdoc_cast_cannot_hang_gap(&self, value: &Expression) {
         self.jsdoc_cast_cannot_hang_target
             .set(self.leading_comment_bound_pair(value).map(|(_, span)| span));
     }
@@ -221,7 +218,7 @@ impl<'a> Printer<'a> {
     /// after the key.
     pub(in crate::printer) fn with_jsdoc_cast_cannot_hang_gap(
         &self,
-        value: &Expression<'_>,
+        value: &Expression,
         build: impl FnOnce() -> DocId,
     ) -> DocId {
         let saved = self.jsdoc_cast_cannot_hang_target.get();
@@ -330,7 +327,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn hoist_owned_value_gap_run(
         &self,
         gap_start: u32,
-        value: &Expression<'_>,
+        value: &Expression,
         seam_prints_pair: bool,
         build_value: impl FnOnce(Option<DocId>) -> DocId,
     ) -> (Option<DocId>, DocId) {
@@ -363,7 +360,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn build_gap_value_doc(
         &self,
         run: Option<DocId>,
-        value: &Expression<'_>,
+        value: &Expression,
         build_value: impl FnOnce() -> DocId,
     ) -> DocId {
         self.build_value_under_hoist(run, value, || {
@@ -384,7 +381,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn build_value_under_hoist(
         &self,
         run: Option<DocId>,
-        value: &Expression<'_>,
+        value: &Expression,
         build_value: impl FnOnce() -> DocId,
     ) -> DocId {
         match run {
@@ -425,7 +422,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn hoisted_owned_value_gap_run_opt(
         &self,
         gap_start: u32,
-        value: &Expression<'_>,
+        value: &Expression,
         seam_prints_pair: bool,
     ) -> Option<DocId> {
         // ⚠️ **The licence is the CAUSE — a multi-line block on the page — not prettier's
@@ -548,7 +545,7 @@ impl<'a> Printer<'a> {
     /// a node-keyed test sees a chain's MemberExpression and misses the cast at its base.
     pub(in crate::printer) fn build_value_with_outermost_owned_comment(
         &self,
-        value: &Expression<'_>,
+        value: &Expression,
         build_value: impl FnOnce() -> DocId,
     ) -> DocId {
         self.build_doc_with_outermost_owned_comment_at(
@@ -576,7 +573,7 @@ impl<'a> Printer<'a> {
     /// carries no owned comment and the claim declines on its own.
     pub(in crate::printer) fn build_value_with_left_spine_owned_comment(
         &self,
-        value: &Expression<'_>,
+        value: &Expression,
         build: impl FnOnce() -> DocId,
     ) -> DocId {
         if left_spine_has_no_shell(self.source, value) {
@@ -596,7 +593,7 @@ impl<'a> Printer<'a> {
     /// builder passes that builder to the value form instead.
     pub(in crate::printer) fn build_expression_doc_claiming_outermost(
         &self,
-        expr: &Expression<'_>,
+        expr: &Expression,
     ) -> DocId {
         self.build_value_with_outermost_owned_comment(expr, || self.build_expression_doc(expr))
     }
@@ -620,7 +617,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn build_doc_with_outermost_owned_comment_at(
         &self,
         start: u32,
-        first_child: Option<&Expression<'_>>,
+        first_child: Option<&Expression>,
         build: impl FnOnce() -> DocId,
     ) -> DocId {
         if !self.outermost_owned_claim_applies(start, first_child) {
@@ -636,7 +633,7 @@ impl<'a> Printer<'a> {
     /// `chain::printing`'s `BaseShape`).
     pub(in crate::printer) fn value_claims_outermost_owned_comment(
         &self,
-        value: &Expression<'_>,
+        value: &Expression,
     ) -> bool {
         self.outermost_owned_claim_applies(
             value.span().start,
@@ -646,11 +643,7 @@ impl<'a> Printer<'a> {
 
     /// The four gates of the outermost-owned claim, in one place so the claim forms above,
     /// and the predicate a wrapping layout reads, cannot answer them differently.
-    fn outermost_owned_claim_applies(
-        &self,
-        start: u32,
-        first_child: Option<&Expression<'_>>,
-    ) -> bool {
+    fn outermost_owned_claim_applies(&self, start: u32, first_child: Option<&Expression>) -> bool {
         if !self.has_owned_comments {
             return false;
         }
@@ -681,7 +674,7 @@ impl<'a> Printer<'a> {
     /// doc in parens, present or future. Nothing else prints an owned comment but its
     /// prefix half ([`Self::owned_leading_comment_prefix`]), which the commented non-null
     /// run lays out for each level it builds in place of `build_expression_doc`.
-    pub(crate) fn prepend_owned_leading_comment(&self, expr: &Expression<'_>, doc: DocId) -> DocId {
+    pub(crate) fn prepend_owned_leading_comment(&self, expr: &Expression, doc: DocId) -> DocId {
         match self.owned_leading_comment_prefix(expr) {
             Some([comment, separator]) => self.d().concat(&[comment, separator, doc]),
             None => doc,
@@ -693,7 +686,7 @@ impl<'a> Printer<'a> {
     /// builder that lays a run of levels into one flat concat rather than a doc level apiece.
     pub(in crate::printer) fn owned_leading_comment_prefix(
         &self,
-        expr: &Expression<'_>,
+        expr: &Expression,
     ) -> Option<[DocId; 2]> {
         // Document-level short-circuit: no comment in this document is owned, so nothing
         // here can prepend one. Skips even the byte gate below for the ~all documents with
@@ -848,7 +841,7 @@ impl<'a> Printer<'a> {
     /// Every asker reads the same cast off [`Self::leading_comment_bound_pair`], so none can
     /// disagree about WHICH cast leads a value, and all take that lookup's document-level
     /// short-circuit.
-    pub(crate) fn is_own_line_jsdoc_cast(&self, value: &Expression<'_>) -> bool {
+    pub(crate) fn is_own_line_jsdoc_cast(&self, value: &Expression) -> bool {
         self.leading_comment_bound_pair(value)
             .is_some_and(|(cast, span)| self.jsdoc_cast_comment_own_line(cast, span))
     }
@@ -867,7 +860,7 @@ impl<'a> Printer<'a> {
     /// The left-spine walk [`Self::prepend_owned_leading_comment`] makes is irrelevant here:
     /// whichever node on the spine ends up printing the comment, they all start where `expr`
     /// does, so the position is the same.
-    pub(crate) fn owned_leading_comment_start(&self, expr: &Expression<'_>) -> Option<u32> {
+    pub(crate) fn owned_leading_comment_start(&self, expr: &Expression) -> Option<u32> {
         // Document-level short-circuit: no owned comment anywhere ⇒ no owned start
         // (and no `CommentBoundPair` exists, since a pair's comment is always owned).
         if !self.has_owned_comments {

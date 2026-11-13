@@ -31,9 +31,9 @@ use tsv_lang::source_scan::find_char_skipping_comments;
 /// so a raw read would print `(a: ({ … }))` with its group where prettier strips both.
 fn get_type_literal_from_identifier<'a>(
     view: AstView<'a>,
-    expr: &'a ast::Expression<'a>,
+    expr: &'a ast::Expression,
 ) -> Option<(
-    &'a ast::Identifier<'a>,
+    &'a ast::Identifier,
     &'a ast::TSTypeAnnotation,
     &'a ast::TSTypeLiteral,
 )> {
@@ -90,7 +90,7 @@ pub(in crate::printer) fn return_type_triggers_grouping(
 /// type-member / bodyless (`declare`, overload) signatures.
 pub(in crate::printer) fn should_group_function_parameters(
     view: AstView<'_>,
-    params: &[ast::Expression<'_>],
+    params: &[ast::Expression],
     type_parameters: Option<&ast::TSTypeParameterDeclaration>,
     return_type: Option<&ast::TSTypeAnnotation>,
     return_type_doc: Option<DocId>,
@@ -116,7 +116,7 @@ pub(in crate::printer) fn should_group_function_parameters(
 pub(in crate::printer) fn group_params_if_should(
     view: AstView<'_>,
     params_doc: DocId,
-    params: &[ast::Expression<'_>],
+    params: &[ast::Expression],
     type_parameters: Option<&ast::TSTypeParameterDeclaration>,
     return_type: Option<&ast::TSTypeAnnotation>,
     return_type_doc: Option<DocId>,
@@ -186,7 +186,7 @@ impl<'a> Printer<'a> {
     /// arm emits neither gap and must not grow an emitter for one.
     fn build_hugged_literal_param_doc(
         &self,
-        param: &ast::Expression<'_>,
+        param: &ast::Expression,
         window_has_comments: bool,
     ) -> Option<DocId> {
         let d = self.d();
@@ -295,7 +295,7 @@ impl<'a> Printer<'a> {
     /// for all three parameter builders — value, signature and function/constructor type.
     pub(in crate::printer) fn build_group_less_hugged_param_doc(
         &self,
-        param: &ast::Expression<'_>,
+        param: &ast::Expression,
         window_has_comments: bool,
     ) -> Option<DocId> {
         if let ast::ExpressionKind::ObjectPattern(obj) = &param.kind {
@@ -377,11 +377,11 @@ impl<'a> Printer<'a> {
     /// (the effective return type), `frozen` (the `=>` gap's freeze verdict) and
     /// `type_start` (that gap's window end) are all derived there, beside the claim they
     /// pair with, so the verdict, the window and the suppression cannot drift apart.
-    fn build_function_type_return_doc_claimed<'t>(
+    fn build_function_type_return_doc_claimed(
         &self,
         return_type: &ast::TSTypeAnnotation,
         leading_space: bool,
-        return_ty: &'t TSType<'t>,
+        return_ty: &TSType,
         type_start: u32,
         frozen: bool,
     ) -> DocId {
@@ -537,7 +537,7 @@ impl<'a> Printer<'a> {
         &self,
         parts: &mut DocBuf,
         type_parameters: Option<&ast::TSTypeParameterDeclaration>,
-        params: &[ast::Expression<'_>],
+        params: &[ast::Expression],
         return_type: &ast::TSTypeAnnotation,
         span_start: u32,
     ) {
@@ -638,7 +638,7 @@ impl<'a> Printer<'a> {
     /// wraps params in their own group so they stay flat when the outer group breaks.
     fn build_grouped_params_and_return_type(
         &self,
-        params: &[ast::Expression<'_>],
+        params: &[ast::Expression],
         paren_search_start: u32,
         return_type: &ast::TSTypeAnnotation,
         type_parameters: Option<&ast::TSTypeParameterDeclaration>,
@@ -866,7 +866,7 @@ impl<'a> Printer<'a> {
     /// `new // c⏎(a): A`) doesn't drag the params open.
     pub(in crate::printer) fn build_signature_params_return_group(
         &self,
-        params: &[ast::Expression<'_>],
+        params: &[ast::Expression],
         type_parameters: Option<&ast::TSTypeParameterDeclaration>,
         return_type: Option<&ast::TSTypeAnnotation>,
         paren_pos: Option<u32>,
@@ -884,7 +884,7 @@ impl<'a> Printer<'a> {
     /// one group with the `<…>` list ([`Printer::push_member_type_params_and_signature`]).
     pub(in crate::printer) fn build_signature_params_return_doc(
         &self,
-        params: &[ast::Expression<'_>],
+        params: &[ast::Expression],
         type_parameters: Option<&ast::TSTypeParameterDeclaration>,
         return_type: Option<&ast::TSTypeAnnotation>,
         paren_pos: Option<u32>,
@@ -943,7 +943,7 @@ impl<'a> Printer<'a> {
     /// TypeLiteral and interface contexts.
     pub(in crate::printer) fn build_signature_params_doc(
         &self,
-        params: &[ast::Expression<'_>],
+        params: &[ast::Expression],
         paren_pos: Option<u32>,
     ) -> DocId {
         let d = self.d();
@@ -1120,7 +1120,7 @@ impl<'a> Printer<'a> {
     /// range asked here), so a comment-free list pays one blank-line scan and nothing else.
     fn type_params_force_multiline(
         &self,
-        params: &[ast::Expression<'_>],
+        params: &[ast::Expression],
         paren_pos: Option<u32>,
         end_boundary: u32,
         comments_present: bool,
@@ -1152,7 +1152,7 @@ impl<'a> Printer<'a> {
     /// the pattern is an ordinary one, which a type-side parent breaks.
     fn build_hugged_type_param_doc(
         &self,
-        param: &ast::Expression<'_>,
+        param: &ast::Expression,
         window_has_comments: bool,
     ) -> DocId {
         self.build_group_less_hugged_param_doc(param, window_has_comments)
@@ -1173,7 +1173,7 @@ impl<'a> Printer<'a> {
     fn build_function_type_param_item_doc(
         &self,
         paren_pos: Option<u32>,
-        params: &[ast::Expression<'_>],
+        params: &[ast::Expression],
         i: usize,
     ) -> DocId {
         self.param_frozen_span(paren_pos, params, i).map_or_else(
@@ -1186,10 +1186,7 @@ impl<'a> Printer<'a> {
     ///
     /// For Identifiers, uses wrapping type annotations so generic type arguments
     /// break at print width (e.g., `param: Map<LongA, LongB>` breaks inside `<>`).
-    pub(super) fn build_function_type_param_expression_doc(
-        &self,
-        expr: &ast::Expression<'_>,
-    ) -> DocId {
+    pub(super) fn build_function_type_param_expression_doc(&self, expr: &ast::Expression) -> DocId {
         let d = self.d();
         match &expr.kind {
             ast::ExpressionKind::Identifier(id) => self.build_identifier_doc_with_wrapping_type(id),
@@ -1220,7 +1217,7 @@ impl<'a> Printer<'a> {
     /// Returns docs that should be pushed to a parts vector
     fn build_function_params_doc(
         &self,
-        params: &[ast::Expression<'_>],
+        params: &[ast::Expression],
         paren_search_start: u32,
     ) -> DocBuf {
         let d = self.d();
@@ -1385,7 +1382,7 @@ impl<'a> Printer<'a> {
     /// govern (a group around hardline-only content is a no-op, so both agree).
     fn build_type_params_multiline_parts(
         &self,
-        params: &[ast::Expression<'_>],
+        params: &[ast::Expression],
         paren_pos: Option<u32>,
     ) -> DocBuf {
         let d = self.d();

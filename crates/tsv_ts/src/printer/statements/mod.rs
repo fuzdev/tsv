@@ -202,7 +202,7 @@ impl<'a> Printer<'a> {
     /// consult it.
     pub(super) fn build_statement_doc(
         &self,
-        statement: &Statement<'_>,
+        statement: &Statement,
         ctx: StatementContext,
     ) -> DocId {
         tsv_lang::fanout_probe::build(
@@ -219,11 +219,7 @@ impl<'a> Printer<'a> {
         built
     }
 
-    fn build_statement_doc_uncounted(
-        &self,
-        statement: &Statement<'_>,
-        ctx: StatementContext,
-    ) -> DocId {
+    fn build_statement_doc_uncounted(&self, statement: &Statement, ctx: StatementContext) -> DocId {
         let d = self.d();
         match &statement.kind {
             StatementKind::ExpressionStatement(stmt) => {

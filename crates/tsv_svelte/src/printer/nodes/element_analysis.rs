@@ -90,7 +90,7 @@ impl<'a> Printer<'a> {
     /// child is a single expression tag WITHOUT break points takes the
     /// `>`-dangle hug, while break-capable content uses normal flow so the
     /// expression breaks internally first.
-    pub(super) fn expression_has_break_points(view: AstView<'_>, expr: &Expression<'_>) -> bool {
+    pub(super) fn expression_has_break_points(view: AstView<'_>, expr: &Expression) -> bool {
         match &expr.kind {
             // Ternary always has break points
             ExpressionKind::ConditionalExpression(_) => true,

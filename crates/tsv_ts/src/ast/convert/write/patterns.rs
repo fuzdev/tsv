@@ -58,7 +58,7 @@ pub(super) fn write_template_literal(
 /// `` ` `` or `${`). `cooked` is null for invalid escapes in tagged templates.
 pub(super) fn write_template_element(
     w: &mut JsonWriter,
-    element: &ast::TemplateElement<'_>,
+    element: &ast::TemplateElement,
     ctx: &Ctx<'_>,
 ) {
     let adjusted_start = element.span.start + 1;

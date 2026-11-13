@@ -38,7 +38,7 @@ enum DeclaratorSite {
     ForHead,
 }
 
-impl<'a, 'arena> Parser<'a, 'arena> {
+impl<'a> Parser<'a> {
     /// Variable kind from the current `const`/`let`/`var` keyword token.
     pub(super) fn current_variable_kind(&self) -> VariableDeclarationKind {
         match self.current_kind() {
@@ -52,7 +52,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     /// Parse a `const`/`let`/`var` declaration statement.
-    pub(super) fn parse_variable_declaration(&mut self) -> Result<Statement<'arena>, Error> {
+    pub(super) fn parse_variable_declaration(&mut self) -> Result<Statement, Error> {
         self.parse_declaration_statement(self.current_variable_kind())
     }
 
@@ -62,7 +62,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(super) fn parse_declaration_statement(
         &mut self,
         kind: VariableDeclarationKind,
-    ) -> Result<Statement<'arena>, Error> {
+    ) -> Result<Statement, Error> {
         let (start, _) = self.current_pos();
         self.eat_declaration_keyword(kind)?;
         let (declarations, _) = self.parse_declarator_list(DeclaratorSite::Statement)?;
@@ -207,9 +207,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// (see [`DeclaratorSite::ForHead`]).
     fn parse_simple_binding(
         &mut self,
-        name: IdentName<'arena>,
+        name: IdentName,
         site: DeclaratorSite,
-    ) -> Result<(Expression<'arena>, bool), Error> {
+    ) -> Result<(Expression, bool), Error> {
         let (start, end) = self.current_pos();
         self.advance()?;
 

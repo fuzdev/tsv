@@ -13,8 +13,8 @@ use super::{
 
 /// Interface declaration: `interface Foo { ... }` or `interface Foo extends Bar { ... }`
 #[derive(Debug, Clone)]
-pub struct TSInterfaceDeclaration<'arena> {
-    pub id: Identifier<'arena>,
+pub struct TSInterfaceDeclaration {
+    pub id: Identifier,
     pub type_parameters: Option<TSTypeParameterDeclaration>,
     pub extends: Run<Heritage>,
     pub body: TSInterfaceBody,
@@ -24,8 +24,8 @@ pub struct TSInterfaceDeclaration<'arena> {
 
 /// Interface heritage: `extends Foo, Bar`
 #[derive(Debug, Clone)]
-pub struct TSInterfaceHeritage<'arena> {
-    pub expression: TSEntityName<'arena>,
+pub struct TSInterfaceHeritage {
+    pub expression: TSEntityName,
     pub type_arguments: Option<TSTypeParameterInstantiation>,
     pub span: Span,
 }
@@ -42,8 +42,8 @@ pub struct TSInterfaceBody {
 /// Also used for functions inside `declare namespace` where `declare` is implicit,
 /// and for function overload signatures (no body).
 #[derive(Debug, Clone)]
-pub struct TSDeclareFunction<'arena> {
-    pub id: Identifier<'arena>,
+pub struct TSDeclareFunction {
+    pub id: Identifier,
     pub type_parameters: Option<TSTypeParameterDeclaration>,
     pub params: Run<Expr>,
     pub return_type: Option<TSTypeAnnotation>,
@@ -65,9 +65,9 @@ pub struct TSDeclareFunction<'arena> {
 /// - Declare: `declare enum Foo { A, B }` (ambient declaration)
 /// - Declare const: `declare const enum Foo { A, B }`
 #[derive(Debug, Clone)]
-pub struct TSEnumDeclaration<'arena> {
+pub struct TSEnumDeclaration {
     /// Enum name
-    pub id: Identifier<'arena>,
+    pub id: Identifier,
     /// Enum members
     pub members: Run<EnumMem>,
     /// Whether this is a const enum
@@ -80,9 +80,9 @@ pub struct TSEnumDeclaration<'arena> {
 ///
 /// Represents a single member in an enum declaration.
 #[derive(Debug, Clone)]
-pub struct TSEnumMember<'arena> {
+pub struct TSEnumMember {
     /// Member name (identifier or computed)
-    pub id: TSEnumMemberId<'arena>,
+    pub id: TSEnumMemberId,
     /// Optional initializer expression
     pub initializer: Option<ExprId>,
     /// The member's full source extent, running through a grouping paren the
@@ -93,7 +93,7 @@ pub struct TSEnumMember<'arena> {
     pub span: Span,
 }
 
-impl<'arena> TSEnumMember<'arena> {
+impl TSEnumMember {
     /// Where the member's own doc stops printing — the sibling of
     /// [`Expression::printed_end`], and the anchor every comment seam in the
     /// enum body must use.
@@ -112,13 +112,13 @@ impl<'arena> TSEnumMember<'arena> {
 
 /// Enum member id: can be an identifier or a string literal (for computed names)
 #[derive(Debug, Clone)]
-pub enum TSEnumMemberId<'arena> {
-    Identifier(Identifier<'arena>),
+pub enum TSEnumMemberId {
+    Identifier(Identifier),
     /// String literal for computed names like `"hello"` in `enum { "hello" = 1 }`
-    String(Literal<'arena>),
+    String(Literal),
 }
 
-impl<'arena> TSEnumMemberId<'arena> {
+impl TSEnumMemberId {
     pub fn span(&self) -> Span {
         match self {
             TSEnumMemberId::Identifier(id) => id.span,
@@ -133,9 +133,9 @@ impl<'arena> TSEnumMemberId<'arena> {
 /// Both produce the same AST structure. For nested namespaces like `namespace Outer.Inner`,
 /// the parser creates nested TSModuleDeclaration nodes.
 #[derive(Debug, Clone)]
-pub struct TSModuleDeclaration<'arena> {
+pub struct TSModuleDeclaration {
     /// Module/namespace name - identifier for regular namespaces, string literal for ambient modules
-    pub id: TSModuleName<'arena>,
+    pub id: TSModuleName,
     /// Module body - either a block or nested module declaration (for `A.B.C`)
     /// `None` for shorthand ambient modules: `declare module 'name';`
     pub body: Option<TSModuleDeclarationBody>,
@@ -150,14 +150,14 @@ pub struct TSModuleDeclaration<'arena> {
 
 /// Module/namespace name - can be an identifier or a string literal
 #[derive(Debug, Clone)]
-pub enum TSModuleName<'arena> {
+pub enum TSModuleName {
     /// Regular identifier: `namespace Foo { }`
-    Identifier(Identifier<'arena>),
+    Identifier(Identifier),
     /// String literal for ambient modules: `declare module 'name' { }`
-    Literal(Literal<'arena>),
+    Literal(Literal),
 }
 
-impl<'arena> TSModuleName<'arena> {
+impl TSModuleName {
     pub fn span(&self) -> Span {
         match self {
             TSModuleName::Identifier(id) => id.span,

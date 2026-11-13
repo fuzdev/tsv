@@ -152,7 +152,7 @@ pub(crate) fn build_lookup_after_operand_doc(
 }
 
 /// `expr` with every `!` peeled off.
-fn strip_non_null<'e>(view: AstView<'e>, mut expr: &'e Expression<'e>) -> &'e Expression<'e> {
+fn strip_non_null<'e>(view: AstView<'e>, mut expr: &'e Expression) -> &'e Expression {
     while let ExpressionKind::TSNonNullExpression(non_null) = &expr.kind {
         expr = view.expr(non_null.expression);
     }
@@ -205,7 +205,7 @@ impl<'a> Printer<'a> {
     /// match: the mark records the *pattern's* span, which no chain inside it shares.
     /// Prettier declines it too, one step earlier — the member's `firstNonMemberParent` is
     /// the pattern, not the assignment.
-    pub(in crate::printer) fn mark_assignment_target_member_lookups(&self, left: &Expression<'_>) {
+    pub(in crate::printer) fn mark_assignment_target_member_lookups(&self, left: &Expression) {
         self.mark_inline_every_member_lookup(match &left.kind {
             ExpressionKind::Identifier(_) => None,
             _ => Some(left.span()),
@@ -226,7 +226,7 @@ impl<'a> Printer<'a> {
     /// — declines through the span key, since neither is the callee's own span. The
     /// remaining decline, an optional-chain callee, is the reader's
     /// ([`resolve_inline_lookups`]).
-    pub(in crate::printer) fn mark_new_callee_member_lookups(&self, callee: &Expression<'_>) {
+    pub(in crate::printer) fn mark_new_callee_member_lookups(&self, callee: &Expression) {
         self.mark_inline_every_member_lookup(Some(callee.span()));
     }
 
@@ -243,7 +243,7 @@ impl<'a> Printer<'a> {
     /// Marked unconditionally for the same reason the callee mark is. The shape half of
     /// the clause — the object being a call with arguments, and the tail being that one
     /// lookup — is the chain's own to check, at the peel ([`super::builder`]).
-    pub(in crate::printer) fn mark_member_call_tail_operand(&self, operand: &Expression<'_>) {
+    pub(in crate::printer) fn mark_member_call_tail_operand(&self, operand: &Expression) {
         self.inline_member_call_tail.set(Some(operand.span()));
     }
 
@@ -258,7 +258,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn build_with_inline_every_lookup_forwarded(
         &self,
         span: Span,
-        operand: &Expression<'_>,
+        operand: &Expression,
         build: impl FnOnce() -> DocId,
     ) -> DocId {
         if self.inline_every_member_lookup.get() != Some(span) {
@@ -283,7 +283,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn build_with_inline_member_call_tail_forwarded<T>(
         &self,
         span: Span,
-        operand: &Expression<'_>,
+        operand: &Expression,
         build: impl FnOnce() -> T,
     ) -> T {
         if self.inline_member_call_tail.get() != Some(span) {

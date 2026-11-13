@@ -235,7 +235,7 @@ impl<'a> Printer<'a> {
     /// dispatch (a non-empty block is identical either way — `expand_empty` only affects the
     /// empty case). The `while` handler and `catch` inline their own block builds (extra
     /// close-paren handling / an always-block body), so they don't route through here.
-    fn build_collapsing_body_doc(&self, body: &Statement<'_>, body_ctx: StatementContext) -> DocId {
+    fn build_collapsing_body_doc(&self, body: &Statement, body_ctx: StatementContext) -> DocId {
         if let StatementKind::BlockStatement(block) = &body.kind {
             self.build_block_statement_doc(block)
         } else {
@@ -542,7 +542,7 @@ impl<'a> Printer<'a> {
         &self,
         keyword: &'static str,
         stmt_start: u32,
-        test: &Expression<'_>,
+        test: &Expression,
         grouping: HeadChainGrouping,
     ) -> (DocBuf, u32) {
         let open_paren = self.find_open_paren_after(stmt_start);
@@ -1127,7 +1127,7 @@ impl<'a> Printer<'a> {
     /// callers (`if` / `while` / `do-while`), never `switch`. Comments on the condition
     /// disable inlining upstream — the caller only reaches the bare-doc path when the
     /// condition parens hold no comments.
-    fn condition_should_inline_negation(&self, test: &Expression<'_>) -> bool {
+    fn condition_should_inline_negation(&self, test: &Expression) -> bool {
         let ExpressionKind::UnaryExpression(outer) = &test.kind else {
             return false;
         };
@@ -1169,7 +1169,7 @@ impl<'a> Printer<'a> {
     /// beside them.
     fn build_statement_condition_doc(
         &self,
-        test: &Expression<'_>,
+        test: &Expression,
         open_paren: Option<u32>,
         close_paren: Option<u32>,
         open_paren_line: OpenParenLineBlockComment,
@@ -1205,7 +1205,7 @@ impl<'a> Printer<'a> {
     /// spelling of the dispatch for switch to drift from.
     fn build_condition_group_for_parens(
         &self,
-        test: &Expression<'_>,
+        test: &Expression,
         open_paren: Option<u32>,
         close_paren: Option<u32>,
         open_paren_line: OpenParenLineBlockComment,
@@ -1232,11 +1232,7 @@ impl<'a> Printer<'a> {
     ///
     /// This group decides whether the condition breaks (operators go to new lines).
     /// Binary expressions use ungrouped version so this parent group controls their breaking.
-    fn build_condition_group(
-        &self,
-        test_expr: &Expression<'_>,
-        grouping: HeadChainGrouping,
-    ) -> DocId {
+    fn build_condition_group(&self, test_expr: &Expression, grouping: HeadChainGrouping) -> DocId {
         let d = self.d();
         let test_doc = self.build_condition_doc(test_expr, grouping);
         d.group(d.concat(&[d.indent_softline(test_doc), d.softline()]))
@@ -1359,7 +1355,7 @@ impl<'a> Printer<'a> {
         &self,
         open_paren_pos: u32,
         close_paren_pos: u32,
-        inner: &Expression<'_>,
+        inner: &Expression,
     ) -> bool {
         self.has_comments_to_emit_between(open_paren_pos + 1, inner.span().start)
             || self.has_comments_to_emit_between(inner.span().end, close_paren_pos)
@@ -1402,7 +1398,7 @@ impl<'a> Printer<'a> {
     /// ([`OpenParenLineBlockComment`], both values pinned).
     fn build_condition_group_with_comments(
         &self,
-        test_expr: &Expression<'_>,
+        test_expr: &Expression,
         open_paren_pos: u32,
         close_paren_pos: u32,
         open_paren_line: OpenParenLineBlockComment,
@@ -1573,7 +1569,7 @@ impl<'a> Printer<'a> {
     /// Non-logical operators (`<`, `===`, etc.) keep a sub-group for independent evaluation
     /// (e.g., `for (i = 0; i < len; i++)` — the `i < len` stays flat).
     /// Assignment expressions get double-parens for clarity: `while ((x = y))`
-    fn build_condition_doc(&self, expr: &Expression<'_>, grouping: HeadChainGrouping) -> DocId {
+    fn build_condition_doc(&self, expr: &Expression, grouping: HeadChainGrouping) -> DocId {
         let inner = self.build_value_with_outermost_owned_comment(expr, || match &expr.kind {
             ExpressionKind::BinaryExpression(binary)
                 if grouping == HeadChainGrouping::ParenGroupDrives =>
@@ -1600,7 +1596,7 @@ impl<'a> Printer<'a> {
     /// construct.
     pub(in crate::printer::statements::control_flow) fn wrap_statement_test_parens(
         &self,
-        expr: &Expression<'_>,
+        expr: &Expression,
         doc: DocId,
     ) -> DocId {
         if self.needs_parens(expr, super::ParenContext::StatementTest) {

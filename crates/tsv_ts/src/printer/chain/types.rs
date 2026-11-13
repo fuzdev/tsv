@@ -28,7 +28,7 @@ pub(crate) type ChainGroupVec<'a> = SmallVec<[ChainGroup<'a>; 4]>;
 /// Stack-friendly buffer of chain-node references — for the member-only and
 /// base-call flatten passes that collect `&ChainNode` before printing. `8` covers
 /// the common short chain inline; longer chains spill. `'n` is the (short) borrow
-/// of the `ChainGroup` slice; `'a` is the AST lifetime the nodes point into.
+/// of the `ChainGroup` slice; `'a` is the borrow the nodes point into.
 pub(super) type ChainNodeRefVec<'n, 'a> = SmallVec<[&'n ChainNode<'a>; 8]>;
 
 /// The facts about one call LINK that only the chain can supply — the link's own printer
@@ -90,7 +90,7 @@ pub(crate) enum ChainNode<'a> {
     /// parenthesized operand of a non-null assertion (`(x + y /* c */)!.foo`) so the
     /// comment is preserved where the author wrote it rather than dropped.
     Base {
-        expr: &'a ast::Expression<'a>,
+        expr: &'a ast::Expression,
         needs_parens: bool,
         /// Where the pair this base prints OPENS, when the base owns its own
         /// leading gap — the `(`→base run is this node's to emit rather than the
@@ -124,7 +124,7 @@ pub(crate) enum ChainNode<'a> {
     /// `property_start` is where the property identifier starts (for comment
     /// detection; also the name's span start for span-identity resolution)
     Member {
-        property: IdentName<'a>,
+        property: IdentName,
         optional: bool,
         object_end: u32,
         property_start: u32,
@@ -136,7 +136,7 @@ pub(crate) enum ChainNode<'a> {
     /// `property_start` is the `#` (comment detection); `name_start` is the
     /// name token after it (span-identity resolution).
     PrivateMember {
-        property: IdentName<'a>,
+        property: IdentName,
         optional: bool,
         object_end: u32,
         property_start: u32,
@@ -147,7 +147,7 @@ pub(crate) enum ChainNode<'a> {
     /// Computed member access: `[expr]`
     /// `bracket_end` is the position just before the closing `]` (for trailing comment detection)
     ComputedMember {
-        expr: &'a ast::Expression<'a>,
+        expr: &'a ast::Expression,
         optional: bool,
         object_end: u32,
         bracket_end: u32,
@@ -194,13 +194,13 @@ pub(crate) enum NonNullGap {
 /// (`computed_lookup_doc`), and `printMemberChain` (member-chain.js) lets a numeric lookup
 /// ride along in the current group where a non-numeric one opens a new one
 /// (`is_numeric_accessor`, used by `group_chain_nodes`).
-pub(super) fn is_numeric_index(expr: &ast::Expression<'_>) -> bool {
+pub(super) fn is_numeric_index(expr: &ast::Expression) -> bool {
     matches!(&expr.kind, ast::ExpressionKind::Literal(lit) if matches!(lit.value, LiteralValue::Number(_)))
 }
 
 impl<'a> ChainNode<'a> {
     /// Create a new base node
-    pub(crate) fn base(expr: &'a ast::Expression<'a>, needs_parens: bool) -> Self {
+    pub(crate) fn base(expr: &'a ast::Expression, needs_parens: bool) -> Self {
         Self::Base {
             expr,
             needs_parens,
@@ -214,7 +214,7 @@ impl<'a> ChainNode<'a> {
     /// optional chain reached without a `!` (`( // c⏎a?.b).ddd`,
     /// `( // c⏎a?.b)()`). `paren_leading_start` is the `(`, i.e. the enclosing
     /// member/call node's own start.
-    pub(crate) fn sealed_base(expr: &'a ast::Expression<'a>, paren_leading_start: u32) -> Self {
+    pub(crate) fn sealed_base(expr: &'a ast::Expression, paren_leading_start: u32) -> Self {
         Self::Base {
             expr,
             needs_parens: true,
@@ -232,7 +232,7 @@ impl<'a> ChainNode<'a> {
     /// inside them before `)` — the scan may find nothing (a comment-free sealed
     /// chain), in which case the printer renders bare parens.
     pub(crate) fn paren_base_before_non_null(
-        expr: &'a ast::Expression<'a>,
+        expr: &'a ast::Expression,
         paren_leading_start: u32,
         paren_comment_end: u32,
     ) -> Self {
@@ -256,7 +256,7 @@ impl<'a> ChainNode<'a> {
 
     /// Create a new member node
     pub(crate) fn member(
-        property: IdentName<'a>,
+        property: IdentName,
         optional: bool,
         object_end: u32,
         property_start: u32,
@@ -272,7 +272,7 @@ impl<'a> ChainNode<'a> {
 
     /// Create a new private member node: .#prop
     pub(crate) fn private_member(
-        property: IdentName<'a>,
+        property: IdentName,
         optional: bool,
         object_end: u32,
         property_start: u32,
@@ -290,7 +290,7 @@ impl<'a> ChainNode<'a> {
 
     /// Create a new computed member node
     pub(crate) fn computed_member(
-        expr: &'a ast::Expression<'a>,
+        expr: &'a ast::Expression,
         optional: bool,
         object_end: u32,
         bracket_end: u32,
@@ -454,7 +454,7 @@ impl<'a> ChainNode<'a> {
     }
 
     /// Get the property name channel (+ its span start) for Member nodes
-    pub(crate) const fn property(&self) -> Option<(IdentName<'a>, u32)> {
+    pub(crate) const fn property(&self) -> Option<(IdentName, u32)> {
         match self {
             Self::Member {
                 property,
@@ -485,8 +485,8 @@ impl<'a> ChainNode<'a> {
 /// so carried the whole inline array through every `groups.push`, a 240-byte move
 /// for a mean payload of 1.4 nodes.
 ///
-/// `'a` is the borrow of that buffer; `ChainNode` is covariant, so the AST
-/// lifetime it points into shortens to it at the call site and one parameter
+/// `'a` is the borrow of that buffer; `ChainNode` is covariant, so the borrow
+/// it points into shortens to it at the call site and one parameter
 /// covers both.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct ChainGroup<'a> {

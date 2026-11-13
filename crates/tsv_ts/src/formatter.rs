@@ -47,7 +47,7 @@ pub struct Formatter {
     doc: DocArena,
     /// The AST stores between calls: out of the slot while one runs, so a caught panic leaves
     /// nothing half-used to carry into the next.
-    stores: Option<AstStores<'static>>,
+    stores: Option<AstStores>,
 }
 
 impl Formatter {
@@ -87,7 +87,7 @@ impl Formatter {
         // nothing (its stores keep their capacity), so it waits for the next call rather
         // than following this one.
         self.doc.reset();
-        let mut stores: AstStores<'_> = self.stores.take().unwrap_or_default();
+        let mut stores: AstStores = self.stores.take().unwrap_or_default();
         let formatted = format_in(source, goal, &mut stores, |_| &self.doc);
         self.stores = Some(stores.park());
         formatted

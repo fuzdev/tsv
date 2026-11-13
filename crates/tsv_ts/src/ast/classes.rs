@@ -15,11 +15,11 @@ use super::{
 /// Represents a class declaration with optional superclass.
 /// For `export default class {}`, the name is optional.
 #[derive(Debug, Clone)]
-pub struct ClassDeclaration<'arena> {
+pub struct ClassDeclaration {
     /// Decorators applied to this class
     pub decorators: Option<Run<Deco>>,
     /// Class name (required for declarations, optional for export default)
-    pub id: Option<Identifier<'arena>>,
+    pub id: Option<Identifier>,
     /// Optional superclass expression (for `extends`)
     pub super_class: Option<ExprId>,
     /// Type arguments for superclass (e.g., `<T>` in `extends Base<T>`)
@@ -42,11 +42,11 @@ pub struct ClassDeclaration<'arena> {
 /// Same as ClassDeclaration but used in expression position.
 /// The name is always optional.
 #[derive(Debug, Clone)]
-pub struct ClassExpression<'arena> {
+pub struct ClassExpression {
     /// Decorators applied to this class
     pub decorators: Option<Run<Deco>>,
     /// Class name (always optional for expressions)
-    pub id: Option<Identifier<'arena>>,
+    pub id: Option<Identifier>,
     /// Optional superclass expression (for `extends`)
     pub super_class: Option<ExprId>,
     /// Type arguments for superclass (e.g., `<T>` in `extends Base<T>`)
@@ -72,14 +72,14 @@ pub struct ClassBody {
 
 /// Class member - method definition, property definition, or static block
 #[derive(Debug, Clone)]
-pub enum ClassMember<'arena> {
-    MethodDefinition(MethodDefinition<'arena>),
+pub enum ClassMember {
+    MethodDefinition(MethodDefinition),
     PropertyDefinition(PropertyDefinition),
     StaticBlock(StaticBlock),
     IndexSignature(TSIndexSignature),
 }
 
-impl<'arena> ClassMember<'arena> {
+impl ClassMember {
     pub fn span(&self) -> Span {
         match self {
             ClassMember::MethodDefinition(m) => m.span,
@@ -167,13 +167,13 @@ pub struct TSParameterProperty {
 /// Method definition in a class body: `method() { ... }` or `get x() { ... }`
 #[derive(Debug, Clone)]
 #[expect(clippy::struct_excessive_bools)] // independent flags, not a state machine
-pub struct MethodDefinition<'arena> {
+pub struct MethodDefinition {
     /// Decorators applied to this method
     pub decorators: Option<Run<Deco>>,
     /// Method name (key)
     pub key: ExprId,
     /// Method implementation (value)
-    pub value: FunctionExpression<'arena>,
+    pub value: FunctionExpression,
     /// Method kind (constructor, method, get, set)
     pub kind: MethodKind,
     /// Accessibility modifier (public, private, protected)

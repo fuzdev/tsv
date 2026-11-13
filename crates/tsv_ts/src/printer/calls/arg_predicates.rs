@@ -69,7 +69,7 @@ pub(super) fn mark_boolean_coercion_argument(printer: &Printer<'_>, call: &ast::
 ///   case, which is what keeps the transparency one level deep)
 ///
 /// Used to determine if tail args can stay inline after a function callback.
-fn is_hopefully_short_arg(view: AstView<'_>, expr: &Expression<'_>) -> bool {
+fn is_hopefully_short_arg(view: AstView<'_>, expr: &Expression) -> bool {
     match &expr.kind {
         // Prettier: if (node.type === "ParenthesizedExpression") recurse into node.expression.
         // A JSDoc cast is prettier's retained `ParenthesizedExpression` — its annotation
@@ -140,8 +140,8 @@ fn is_hopefully_short_arg(view: AstView<'_>, expr: &Expression<'_>) -> bool {
 /// `TSParenthesizedType` node — `(T)[]` reaches its check already as `T[]`.
 fn cast_is_hopefully_short(
     view: AstView<'_>,
-    type_annotation: &TSType<'_>,
-    expression: &Expression<'_>,
+    type_annotation: &TSType,
+    expression: &Expression,
 ) -> bool {
     let mut ty = unwrap_parenthesized(view, type_annotation);
     for _ in 0..2 {
@@ -169,20 +169,20 @@ fn cast_is_hopefully_short(
 enum CallLikeArguments<'a> {
     /// A call's or `new`'s callee and argument list.
     Called {
-        callee: &'a Expression<'a>,
+        callee: &'a Expression,
         arguments: &'a [ExprId],
     },
     /// A dynamic import's specifier and optional options object. It has **no callee**, and
     /// prettier's simplicity test skips the callee arm for it rather than failing on it.
     Imported {
-        source: &'a Expression<'a>,
-        options: Option<&'a Expression<'a>>,
+        source: &'a Expression,
+        options: Option<&'a Expression>,
     },
 }
 
 impl<'a> CallLikeArguments<'a> {
     /// The call-like reading of `expr`, or `None` when it is not call-like.
-    fn of(view: AstView<'a>, expr: &'a Expression<'a>) -> Option<Self> {
+    fn of(view: AstView<'a>, expr: &'a Expression) -> Option<Self> {
         match &expr.kind {
             ExpressionKind::CallExpression(call) => Some(Self::Called {
                 callee: view.expr(call.callee),
@@ -209,7 +209,7 @@ impl<'a> CallLikeArguments<'a> {
     }
 
     /// The callee whose own simplicity prettier tests, or `None` where it has none to test.
-    fn callee(self) -> Option<&'a Expression<'a>> {
+    fn callee(self) -> Option<&'a Expression> {
         match self {
             Self::Called { callee, .. } => Some(callee),
             Self::Imported { .. } => None,
@@ -217,7 +217,7 @@ impl<'a> CallLikeArguments<'a> {
     }
 
     /// Whether every argument satisfies `predicate`.
-    fn all(self, view: AstView<'a>, mut predicate: impl FnMut(&'a Expression<'a>) -> bool) -> bool {
+    fn all(self, view: AstView<'a>, mut predicate: impl FnMut(&'a Expression) -> bool) -> bool {
         match self {
             Self::Called { arguments, .. } => {
                 arguments.iter().all(|arg| predicate(view.expr(*arg)))
@@ -242,7 +242,7 @@ impl<'a> CallLikeArguments<'a> {
 /// satisfies. Callers pass `printer.has_comments_on_page_between`.
 pub(super) fn is_short_second_arg_for_expand_first<F>(
     view: AstView<'_>,
-    arg: &Expression<'_>,
+    arg: &Expression,
     leading_gap_start: u32,
     has_comments: F,
 ) -> bool
@@ -282,7 +282,7 @@ where
 /// pinned by `calls/expand_first_jsdoc_cast_second_arg`.
 fn could_expand_collection_arg<F>(
     view: AstView<'_>,
-    arg: &Expression<'_>,
+    arg: &Expression,
     leading_gap_start: u32,
     has_comments: &F,
 ) -> bool
@@ -315,10 +315,7 @@ where
 /// Matches prettier's `isCallExpression(stripChainElementWrappers(body))` in
 /// `couldExpandArg`: `(x) => fn()` and `(x) => fn()!` are both call bodies, so the
 /// arrow hugs the call's open paren rather than breaking at it.
-pub(super) fn arrow_body_is_call_through_non_null(
-    view: AstView<'_>,
-    body: &Expression<'_>,
-) -> bool {
+pub(super) fn arrow_body_is_call_through_non_null(view: AstView<'_>, body: &Expression) -> bool {
     matches!(
         strip_non_null_wrappers(view, body).kind,
         ExpressionKind::CallExpression(_)
@@ -334,7 +331,7 @@ pub(super) fn arrow_body_is_call_through_non_null(
 /// - Break: `(x) =>\n  x ? y : z,` - no parens needed, clearly arrow body
 ///
 /// Call expressions, objects, and arrays are handled by other code paths.
-pub(super) fn is_ternary_arrow_body(body: &Expression<'_>) -> bool {
+pub(super) fn is_ternary_arrow_body(body: &Expression) -> bool {
     matches!(body.kind, ExpressionKind::ConditionalExpression(_))
 }
 
@@ -348,7 +345,7 @@ pub(super) fn is_ternary_arrow_body(body: &Expression<'_>) -> bool {
 pub(super) fn arrow_body_breaks_after_space(
     printer: &Printer<'_>,
     arrow: &ast::ArrowFunctionExpression,
-    body: &Expression<'_>,
+    body: &Expression,
 ) -> bool {
     is_ternary_arrow_body(body)
         && !has_leftmost_arrow_body_parens(printer.view, body)
@@ -363,7 +360,7 @@ pub(super) fn arrow_body_breaks_after_space(
 pub(super) fn arrow_body_has_leading_own_line_comment(
     printer: &Printer<'_>,
     arrow: &ast::ArrowFunctionExpression,
-    body: &Expression<'_>,
+    body: &Expression,
 ) -> bool {
     printer
         .comments_in_source_between(arrow_token_end(arrow), body.span().start)
@@ -375,7 +372,7 @@ pub(super) fn arrow_body_has_leading_own_line_comment(
 /// Deliberately not [`could_expand_collection_arg`]: that one answers the expand-FIRST
 /// question, which looks through casts and counts comments; this one is a plain shape test
 /// on the last argument.
-pub(super) fn is_expandable_object(expr: &Expression<'_>) -> bool {
+pub(super) fn is_expandable_object(expr: &Expression) -> bool {
     matches!(&expr.kind, ExpressionKind::ObjectExpression(obj) if !obj.properties.is_empty())
 }
 
@@ -408,7 +405,7 @@ pub(super) fn last_arg_is_array_or_object(arguments: &[ExprId], printer: &Printe
 /// feeds lands on the same bytes whether the clause admits it or not. The expand-FIRST twin,
 /// where the same comment does decide, takes that gap as a parameter
 /// ([`could_expand_collection_arg`]).
-pub(super) fn is_array_or_object_unwrapped(expr: &Expression<'_>, printer: &Printer<'_>) -> bool {
+pub(super) fn is_array_or_object_unwrapped(expr: &Expression, printer: &Printer<'_>) -> bool {
     let (inner, leading_from) = unwrap_ts_type_wrappers(printer.view, expr);
     let non_empty = match &inner.kind {
         ExpressionKind::ArrayExpression(arr) => !arr.elements.is_empty(),
@@ -441,8 +438,8 @@ pub(super) fn is_array_or_object_unwrapped(expr: &Expression<'_>, printer: &Prin
 /// [`is_array_or_object_unwrapped`], which answer it differently and say why.
 fn unwrap_ts_type_wrappers<'a>(
     view: AstView<'a>,
-    mut expr: &'a Expression<'a>,
-) -> (&'a Expression<'a>, u32) {
+    mut expr: &'a Expression,
+) -> (&'a Expression, u32) {
     let mut leading_from = expr.span().start;
     loop {
         expr = match &expr.kind {
@@ -462,7 +459,7 @@ fn unwrap_ts_type_wrappers<'a>(
 /// Matches arrow functions with block bodies (`() => { ... }`) and
 /// function expressions (`function() { ... }`). These contain hardlines.
 #[inline]
-pub(super) fn is_block_function(view: AstView<'_>, expr: &Expression<'_>) -> bool {
+pub(super) fn is_block_function(view: AstView<'_>, expr: &Expression) -> bool {
     matches!(
         &expr.kind,
         &ExpressionKind::ArrowFunctionExpression(arrow)
@@ -516,8 +513,8 @@ where
 /// that printer's header list), so the shape question must have one answer for both.
 pub(super) fn is_hook_callback_with_deps(
     view: AstView<'_>,
-    callback: &Expression<'_>,
-    deps: &Expression<'_>,
+    callback: &Expression,
+    deps: &Expression,
 ) -> bool {
     matches!(
         callback.kind,
@@ -545,11 +542,7 @@ pub(super) fn is_hook_callback_with_deps(
 /// `delete`, each of which prettier leaves to its own closing `return false`.
 ///
 /// Reference: prettier's `isSimpleCallArgument` (`utilities/is-simple-call-argument.js`)
-pub(crate) fn is_simple_call_argument(
-    view: AstView<'_>,
-    expr: &Expression<'_>,
-    depth: usize,
-) -> bool {
+pub(crate) fn is_simple_call_argument(view: AstView<'_>, expr: &Expression, depth: usize) -> bool {
     if depth == 0 {
         return false;
     }
@@ -708,7 +701,7 @@ pub(crate) fn is_simple_call_argument(
 /// argument can be asked about. The other half of its gate is `isCallExpression(parent)`,
 /// which a `new` is not — so the `new` printer passes `false` to
 /// [`super::arg_wrapping::ArgOpener::lone_hug_ladder`] rather than asking this.
-pub(super) fn lone_arg_params_render_flat(view: AstView<'_>, arg: &Expression<'_>) -> bool {
+pub(super) fn lone_arg_params_render_flat(view: AstView<'_>, arg: &Expression) -> bool {
     matches!(&arg.kind, &ExpressionKind::FunctionExpression(func) if view.run(view.fn_expr(func).params).iter().all(|param| {
         matches!(&param.kind, ExpressionKind::Identifier(id) if id.type_annotation(view).is_none())
     }))
@@ -762,10 +755,7 @@ mod tests {
 
     /// Run `f` over a bare expression parsed from `src` (its spans index into `src`) and the
     /// view of the stores it was parsed into.
-    fn with_parsed<R>(
-        src: &str,
-        f: impl for<'a> FnOnce(AstView<'a>, &'a Expression<'a>) -> R,
-    ) -> R {
+    fn with_parsed<R>(src: &str, f: impl for<'a> FnOnce(AstView<'a>, &'a Expression) -> R) -> R {
         let mut stores = ast::AstStores::new();
         let (id, _) = crate::__private::parse_expression_with_comments(
             src,

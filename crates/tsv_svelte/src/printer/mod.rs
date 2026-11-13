@@ -576,7 +576,7 @@ pub(crate) fn without_fused_source_spans<R>(f: impl FnOnce() -> R) -> R {
 /// `extra.is_none()` is the load-bearing clause: a typed block binding (`{#each xs as x: T}`)
 /// keeps its span on the bare name with the annotation as a sibling, so nothing about the
 /// span says the node prints more than its name.
-fn plain_reference_span(id: &tsv_ts::ast::Identifier<'_>) -> Option<Span> {
+fn plain_reference_span(id: &tsv_ts::ast::Identifier) -> Option<Span> {
     (id.name_plain_ascii
         && id.escaped_name.is_none()
         && !id.optional
@@ -605,10 +605,7 @@ fn plain_reference_span(id: &tsv_ts::ast::Identifier<'_>) -> Option<Span> {
 /// outside the span is a block comment the path **owns** (`docs/comments.md` §Owned
 /// comments), which sits glued ahead of it — a caller that prints the span instead of
 /// building the doc owes the proof that none does.
-pub(in crate::printer) fn plain_path_span(
-    view: AstView<'_>,
-    expr: &Expression<'_>,
-) -> Option<Span> {
+pub(in crate::printer) fn plain_path_span(view: AstView<'_>, expr: &Expression) -> Option<Span> {
     let path = match &expr.kind {
         ExpressionKind::Identifier(id) => plain_reference_span(id)?,
         ExpressionKind::MemberExpression(member) if !member.computed && !member.optional => {
@@ -933,7 +930,7 @@ impl<'a> Printer<'a> {
     /// group can't flatten into the same non-convergence. Measured on branch, reverted.
     pub(in crate::printer) fn build_head_value_doc(
         &self,
-        expr: &Expression<'_>,
+        expr: &Expression,
         frozen: bool,
         embed: &EmbedContext,
     ) -> DocId {
@@ -953,7 +950,7 @@ impl<'a> Printer<'a> {
     /// The span of `expr` when it is a plain path ([`plain_path_span`]) that owns no comment
     /// and may print as its own bytes ([`fuses_source_spans`]) — the fast arm of
     /// [`Self::build_head_value_doc`].
-    pub(in crate::printer) fn fused_plain_path(&self, expr: &Expression<'_>) -> Option<Span> {
+    pub(in crate::printer) fn fused_plain_path(&self, expr: &Expression) -> Option<Span> {
         plain_path_span(self.view, expr)
             .filter(|path| !self.owns_leading_comment_at(path.start) && fuses_source_spans())
     }
@@ -997,7 +994,7 @@ impl<'a> Printer<'a> {
     /// the author's bytes, where no layout rule applies.
     pub(in crate::printer) fn build_assignment_value_doc(
         &self,
-        expr: &Expression<'_>,
+        expr: &Expression,
         frozen: bool,
         embed: &EmbedContext,
         value_gap_start: Option<u32>,
@@ -1082,7 +1079,7 @@ impl<'a> Printer<'a> {
     /// [`Self::leading_comment_docs`] must keep scanning to `span().start` or it prints the
     /// comment a second time. The two axes are the point: this asks what occupies the page,
     /// the emitter asks what it must print.
-    pub(in crate::printer) fn head_gap_end(&self, value: &Expression<'_>) -> u32 {
+    pub(in crate::printer) fn head_gap_end(&self, value: &Expression) -> u32 {
         tsv_ts::__private::expression_printed_start(self.d(), value, &self.ts_inputs())
     }
 
@@ -1133,7 +1130,7 @@ impl<'a> Printer<'a> {
     /// `const a = (b = c)`) — that site calls `build_head_value_doc` alone.
     pub(in crate::printer) fn wrap_value_clarity_parens(
         &self,
-        expr: &Expression<'_>,
+        expr: &Expression,
         value_doc: DocId,
     ) -> DocId {
         if Self::value_takes_clarity_parens(expr) {
@@ -1145,7 +1142,7 @@ impl<'a> Printer<'a> {
 
     /// Whether [`Self::wrap_value_clarity_parens`] gives the value its pair — so the
     /// value's printed form opens on a `(` of the host's own.
-    pub(in crate::printer) fn value_takes_clarity_parens(expr: &Expression<'_>) -> bool {
+    pub(in crate::printer) fn value_takes_clarity_parens(expr: &Expression) -> bool {
         matches!(expr.kind, ExpressionKind::AssignmentExpression(_))
     }
 
@@ -1280,7 +1277,7 @@ impl<'a> Printer<'a> {
         &self,
         value_doc: DocId,
         gap_start: u32,
-        value: &Expression<'_>,
+        value: &Expression,
         content_end: u32,
         frozen: bool,
     ) -> HeadExpr {
@@ -1569,7 +1566,7 @@ impl<'a> Printer<'a> {
     /// unfrozen arm of [`Self::build_head_value_doc`] under the host's own embed, spelled
     /// once there. For calls that need a custom embed context or empty comments, use the
     /// tsv_ts functions directly.
-    pub(crate) fn build_ts_expression_doc(&self, expr: &Expression<'_>) -> DocId {
+    pub(crate) fn build_ts_expression_doc(&self, expr: &Expression) -> DocId {
         self.build_head_value_doc(expr, false, &self.embed)
     }
 
@@ -1578,7 +1575,7 @@ impl<'a> Printer<'a> {
     /// see [`Self::build_head_value_doc`]). The `{#each}` key's fallback arm and the
     /// pattern printer's computed key use it; the main key arm reaches the same flag
     /// through [`Self::build_expression_doc_for_block`].
-    pub(crate) fn build_ts_expression_doc_cannot_hang(&self, expr: &Expression<'_>) -> DocId {
+    pub(crate) fn build_ts_expression_doc_cannot_hang(&self, expr: &Expression) -> DocId {
         self.build_head_value_doc(expr, false, &self.cannot_hang_embed())
     }
 

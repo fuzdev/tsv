@@ -38,7 +38,7 @@ pub(super) fn write_type_annotation(
 }
 
 /// Emit a `TSType`, dispatching on its variant.
-pub(super) fn write_type(w: &mut JsonWriter, ts_type: &ast::TSType<'_>, ctx: &Ctx<'_>) {
+pub(super) fn write_type(w: &mut JsonWriter, ts_type: &ast::TSType, ctx: &Ctx<'_>) {
     match ts_type {
         ast::TSType::Keyword(kw) => write_keyword_type(w, kw, ctx),
         ast::TSType::Literal(lit) => write_literal_type(w, lit, ctx),
@@ -259,7 +259,7 @@ fn write_mapped_type_modifier(w: &mut JsonWriter, m: ast::TSMappedTypeModifier) 
 /// Emits a `TSImportType` node (used in both type position and
 /// `typeof import(...)`). Field order: `argument`, `options?`, `qualifier?`,
 /// `typeArguments?`.
-fn write_import_type(w: &mut JsonWriter, i: &ast::TSImportType<'_>, ctx: &Ctx<'_>) {
+fn write_import_type(w: &mut JsonWriter, i: &ast::TSImportType, ctx: &Ctx<'_>) {
     node_header(w, "TSImportType", i.span, ctx);
     w.raw(",\"argument\":");
     write_literal(w, &i.argument, ctx);
@@ -276,7 +276,7 @@ fn write_import_type(w: &mut JsonWriter, i: &ast::TSImportType<'_>, ctx: &Ctx<'_
 }
 
 /// Emits a `TSLiteralType` node.
-fn write_literal_type(w: &mut JsonWriter, lit: &ast::TSLiteralType<'_>, ctx: &Ctx<'_>) {
+fn write_literal_type(w: &mut JsonWriter, lit: &ast::TSLiteralType, ctx: &Ctx<'_>) {
     match lit {
         ast::TSLiteralType::TemplateLiteral(template) => {
             node_header(w, "TSLiteralType", template.span, ctx);
@@ -351,7 +351,7 @@ fn write_keyword_type(w: &mut JsonWriter, kw: &ast::TSKeywordType, ctx: &Ctx<'_>
 }
 
 /// Emit an entity name (an `Identifier` or a `TSQualifiedName`).
-pub(super) fn write_entity_name(w: &mut JsonWriter, name: &ast::TSEntityName<'_>, ctx: &Ctx<'_>) {
+pub(super) fn write_entity_name(w: &mut JsonWriter, name: &ast::TSEntityName, ctx: &Ctx<'_>) {
     match name {
         ast::TSEntityName::Identifier(id) => write_identifier_plain(w, id, ctx),
         &ast::TSEntityName::QualifiedName(_, qn) => {
@@ -367,8 +367,8 @@ pub(super) fn write_entity_name(w: &mut JsonWriter, name: &ast::TSEntityName<'_>
 /// each name's `right` and close innermost first: the bytes, and the order of the
 /// comment-attach node events, of the recursion down the left.
 #[inline(never)]
-fn write_qualified_name(w: &mut JsonWriter, qn: &ast::TSQualifiedName<'_>, ctx: &Ctx<'_>) {
-    let mut spine: SmallVec<[&ast::TSQualifiedName<'_>; 8]> = SmallVec::new();
+fn write_qualified_name(w: &mut JsonWriter, qn: &ast::TSQualifiedName, ctx: &Ctx<'_>) {
+    let mut spine: SmallVec<[&ast::TSQualifiedName; 8]> = SmallVec::new();
     let mut node = qn;
     loop {
         node_header(w, "TSQualifiedName", node.span, ctx);
@@ -404,7 +404,7 @@ enum PostfixTypeLink<'a> {
 /// each link's index type (an indexed access) and close innermost first: the bytes, and
 /// the order of the comment-attach node events, of the recursion down that side.
 #[inline(never)]
-fn write_postfix_type_chain(w: &mut JsonWriter, ts_type: &ast::TSType<'_>, ctx: &Ctx<'_>) {
+fn write_postfix_type_chain(w: &mut JsonWriter, ts_type: &ast::TSType, ctx: &Ctx<'_>) {
     let mut spine: SmallVec<[PostfixTypeLink<'_>; 8]> = SmallVec::new();
     let mut node = ts_type;
     loop {
@@ -555,7 +555,7 @@ fn write_signature_declaration(
     node_type: &'static str,
     span: tsv_lang::Span,
     type_parameters: Option<&ast::TSTypeParameterDeclaration>,
-    params: &[ast::Expression<'_>],
+    params: &[ast::Expression],
     return_type: Option<&ast::TSTypeAnnotation>,
     ctx: &Ctx<'_>,
 ) {
@@ -618,7 +618,7 @@ pub(super) fn write_index_signature(
 /// node, so the field's position depends on `exported`.
 pub(super) fn write_interface_declaration(
     w: &mut JsonWriter,
-    iface: &ast::TSInterfaceDeclaration<'_>,
+    iface: &ast::TSInterfaceDeclaration,
     ctx: &Ctx<'_>,
     exported: bool,
 ) {
@@ -665,7 +665,7 @@ pub(super) fn write_interface_declaration(
 /// stamps the finished node, so the field's position depends on `exported`.
 pub(super) fn write_declare_function(
     w: &mut JsonWriter,
-    func: &ast::TSDeclareFunction<'_>,
+    func: &ast::TSDeclareFunction,
     ctx: &Ctx<'_>,
     exported: bool,
 ) {
@@ -691,7 +691,7 @@ pub(super) fn write_declare_function(
 /// (each: `id`, `initializer?`).
 pub(super) fn write_enum_declaration(
     w: &mut JsonWriter,
-    enum_decl: &ast::TSEnumDeclaration<'_>,
+    enum_decl: &ast::TSEnumDeclaration,
     span: tsv_lang::Span,
     ctx: &Ctx<'_>,
 ) {

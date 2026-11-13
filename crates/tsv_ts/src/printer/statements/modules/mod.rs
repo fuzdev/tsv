@@ -135,7 +135,7 @@ impl<'a> Printer<'a> {
     /// When the line exceeds print_width (100 chars), wraps to multiline format.
     pub(super) fn build_export_named_declaration_doc(
         &self,
-        decl: &ast::ExportNamedDeclaration<'_>,
+        decl: &ast::ExportNamedDeclaration,
         span: Span,
     ) -> DocId {
         let d = self.d();
@@ -345,7 +345,7 @@ impl<'a> Printer<'a> {
     fn build_export_named_decorated_class_doc(
         &self,
         span: Span,
-        class: &ast::ClassDeclaration<'_>,
+        class: &ast::ClassDeclaration,
         export_keyword_end: u32,
     ) -> Option<DocId> {
         let d = self.d();
@@ -416,7 +416,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for an export default declaration
     pub(super) fn build_export_default_declaration_doc(
         &self,
-        decl: &ast::ExportDefaultDeclaration<'_>,
+        decl: &ast::ExportDefaultDeclaration,
         span: Span,
     ) -> DocId {
         let d = self.d();
@@ -515,7 +515,7 @@ impl<'a> Printer<'a> {
     /// arrow's parameter `(`, or to anything else — is an ordinary block.
     fn export_default_leading_edge(
         &self,
-        value: &ast::Expression<'_>,
+        value: &ast::Expression,
         value_doc: DocId,
     ) -> (DocId, bool) {
         let d = self.d();
@@ -547,7 +547,7 @@ impl<'a> Printer<'a> {
     /// only the expression's own doc is swapped.
     fn build_export_default_value_doc(
         &self,
-        decl: &ast::ExportDefaultDeclaration<'_>,
+        decl: &ast::ExportDefaultDeclaration,
         span: Span,
         keyword_end: u32,
         value_span: Span,
@@ -683,7 +683,7 @@ impl<'a> Printer<'a> {
     /// value's and a frozen slice's stays flat.
     fn export_default_value_pair(
         &self,
-        expr: &ast::Expression<'_>,
+        expr: &ast::Expression,
         value_doc: DocId,
         needs_pair: bool,
         frozen: Option<Span>,
@@ -711,7 +711,7 @@ impl<'a> Printer<'a> {
     /// class an expression to tsc, so the keyword→value path keeps it.
     fn build_export_default_decorated_doc(
         &self,
-        decl: &ast::ExportDefaultDeclaration<'_>,
+        decl: &ast::ExportDefaultDeclaration,
         span: Span,
     ) -> Option<DocId> {
         let d = self.d();
@@ -813,7 +813,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for an export all declaration
     pub(super) fn build_export_all_declaration_doc(
         &self,
-        decl: &ast::ExportAllDeclaration<'_>,
+        decl: &ast::ExportAllDeclaration,
         span: Span,
     ) -> DocId {
         let d = self.d();
@@ -891,7 +891,7 @@ impl<'a> Printer<'a> {
     fn push_import_header_keyword(
         &self,
         parts: &mut DocBuf,
-        decl: &ast::ImportDeclaration<'_>,
+        decl: &ast::ImportDeclaration,
         span: Span,
         keyword: &'static str,
     ) {
@@ -910,7 +910,7 @@ impl<'a> Printer<'a> {
     /// When the line exceeds print_width (100 chars), wraps to multiline format.
     pub(super) fn build_import_declaration_doc(
         &self,
-        decl: &ast::ImportDeclaration<'_>,
+        decl: &ast::ImportDeclaration,
         span: Span,
     ) -> DocId {
         let d = self.d();
@@ -924,7 +924,7 @@ impl<'a> Printer<'a> {
         // Collect specifiers
         let mut has_default = false;
         // Inline up to 8 named specifiers (covers the common import) before spilling.
-        let mut named_specs: SmallVec<[&ast::ImportNamedSpecifier<'_>; 8]> = SmallVec::new();
+        let mut named_specs: SmallVec<[&ast::ImportNamedSpecifier; 8]> = SmallVec::new();
         let mut default_name = ast::IdentName {
             escaped: None,
             raw_len: 0,
@@ -933,7 +933,7 @@ impl<'a> Printer<'a> {
         let mut default_name_start = 0u32;
         let mut default_spec_start = 0u32;
         let mut default_spec_end = 0u32;
-        let mut namespace_spec: Option<&ast::ImportNamespaceSpecifier<'_>> = None;
+        let mut namespace_spec: Option<&ast::ImportNamespaceSpecifier> = None;
 
         for spec in specifiers {
             match spec {
@@ -1165,7 +1165,7 @@ impl<'a> Printer<'a> {
     /// Build doc for `import x = require("y")` or `import x = A.B`
     pub(super) fn build_import_equals_declaration_doc(
         &self,
-        decl: &ast::TSImportEqualsDeclaration<'_>,
+        decl: &ast::TSImportEqualsDeclaration,
         span: Span,
     ) -> DocId {
         let d = self.d();
@@ -1273,7 +1273,7 @@ impl<'a> Printer<'a> {
     /// split around (`trailingComma: 'none'`), which is exactly that helper's premise.
     fn build_external_module_reference_doc(
         &self,
-        ext_ref: &ast::TSExternalModuleReference<'_>,
+        ext_ref: &ast::TSExternalModuleReference,
     ) -> DocId {
         let d = self.d();
         // From the end of the `require` KEYWORD, not from a computed `(`: `require(` is a
@@ -1351,7 +1351,7 @@ impl<'a> Printer<'a> {
     /// `export as namespace Foo;` — TypeScript UMD global export declaration.
     pub(super) fn build_namespace_export_declaration_doc(
         &self,
-        decl: &ast::TSNamespaceExportDeclaration<'_>,
+        decl: &ast::TSNamespaceExportDeclaration,
         span: Span,
     ) -> DocId {
         let d = self.d();

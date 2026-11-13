@@ -24,16 +24,16 @@ use tsv_lang::source_scan::{TriviaProfile, find_char, find_char_skipping_comment
 /// go unseen: the gap's to-emit lookup skips an owned comment, so an empty answer there
 /// means "nothing *the gap* prints", never "nothing prints".
 #[derive(Clone, Copy)]
-pub(crate) enum ContinuationValue<'e, 'ast> {
+pub(crate) enum ContinuationValue<'e> {
     /// An ordinary expression value. Its span start bounds the gap, and its doc may lead
     /// with a comment it OWNS — which no gap lookup can see.
-    Expression(&'e ast::Expression<'ast>),
+    Expression(&'e ast::Expression),
     /// A value that owns no comment and is not an expression — a type alias's RHS, whose
     /// gap is bounded by the start alone.
     Opaque(u32),
 }
 
-impl ContinuationValue<'_, '_> {
+impl ContinuationValue<'_> {
     /// The operator→value gap's far bound: where the value's own first token begins.
     fn gap_end(self) -> u32 {
         match self {
@@ -305,11 +305,7 @@ impl<'a> Printer<'a> {
     /// [`Self::push_modifier_marker_doc`] owns (`docs/comments.md` hazard 4, the head
     /// variant). A caller that needs an unusual annotation BODY passes it to
     /// [`Self::build_binding_type_annotation_doc_with`]; nobody needs an unusual head.
-    pub(crate) fn push_identifier_head_doc(
-        &self,
-        parts: &mut DocBuf,
-        id: &ast::Identifier<'_>,
-    ) -> u32 {
+    pub(crate) fn push_identifier_head_doc(&self, parts: &mut DocBuf, id: &ast::Identifier) -> u32 {
         parts.push(self.identifier_name_doc(id));
         let search_end = id
             .type_annotation(self.view)
@@ -601,7 +597,7 @@ impl<'a> Printer<'a> {
         &self,
         name_end: u32,
         eq_pos: u32,
-        value: ContinuationValue<'_, '_>,
+        value: ContinuationValue<'_>,
         build_value: impl FnOnce() -> DocId,
     ) -> Option<DocId> {
         self.build_operator_value_continuation(name_end, eq_pos, "=", value, build_value)
@@ -640,7 +636,7 @@ impl<'a> Printer<'a> {
         head_end: u32,
         op_pos: u32,
         op_text: &'static str,
-        value: ContinuationValue<'_, '_>,
+        value: ContinuationValue<'_>,
         build_value: impl FnOnce() -> DocId,
     ) -> Option<DocId> {
         let d = self.d();
@@ -673,7 +669,7 @@ impl<'a> Printer<'a> {
     /// operator. Every other owned comment is glued to its token and prints inline
     /// (`= /* c */ v`, the ordinary arm's answer too), so the emit-axis reading is right for
     /// it — which is why this asks the cast by name rather than widening to the on-page axis.
-    fn operator_gap_run_is_own_line(&self, op_pos: u32, value: ContinuationValue<'_, '_>) -> bool {
+    fn operator_gap_run_is_own_line(&self, op_pos: u32, value: ContinuationValue<'_>) -> bool {
         match self
             .comments_to_emit_between(op_pos, value.gap_end())
             .next()
@@ -1570,7 +1566,7 @@ impl<'a> Printer<'a> {
     pub(crate) fn build_heritage_clause_doc(
         &self,
         keyword: HeritageKeyword,
-        items: &[ast::TSInterfaceHeritage<'_>],
+        items: &[ast::TSInterfaceHeritage],
         group_mode: bool,
         keyword_start: Option<u32>,
     ) -> DocId {
@@ -2109,7 +2105,7 @@ impl<'a> Printer<'a> {
 }
 
 /// End position of a heritage item (after type arguments if present).
-fn heritage_item_end(item: &ast::TSInterfaceHeritage<'_>) -> u32 {
+fn heritage_item_end(item: &ast::TSInterfaceHeritage) -> u32 {
     item.type_arguments
         .as_ref()
         .map_or_else(|| item.expression.span().end, |ta| ta.span.end)

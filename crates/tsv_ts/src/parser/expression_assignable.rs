@@ -96,7 +96,7 @@ enum CoverShape {
 impl CoverHead {
     /// Reads `expr` into its pieces, asking the two questions that walk the node's own
     /// subtree here, while the read is free.
-    fn of(view: AstView<'_>, expr: &Expression<'_>, context: AssignableContext) -> Self {
+    fn of(view: AstView<'_>, expr: &Expression, context: AssignableContext) -> Self {
         let for_head_chain = matches!(context, AssignableContext::ForHead)
             && expr.skip_type_assertions(view).has_optional_in_chain(view);
         let shape = match &expr.kind {
@@ -146,7 +146,7 @@ impl CoverHead {
     }
 }
 
-impl<'a, 'arena> Parser<'a, 'arena> {
+impl<'a> Parser<'a> {
     /// Convert an expression to an assignable pattern (cover grammar)
     ///
     /// This implements the ECMAScript "cover grammar" for assignment targets.
@@ -186,7 +186,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         head: CoverHead,
         context: AssignableContext,
-    ) -> Result<Option<Expression<'arena>>, Error> {
+    ) -> Result<Option<Expression>, Error> {
         let span = head.span;
         // A parenthesized target is no binding target: `BindingElement` and
         // `BindingRestElement` derive a `BindingIdentifier` or a nested pattern, never a
@@ -545,7 +545,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             None => Ok(ExprRet::wrap(expr)),
             Some(converted) => {
                 #[cfg(feature = "_internal_ast_census")]
-                tsv_lang::ast_census_probe::dead::<Expression<'arena>>(
+                tsv_lang::ast_census_probe::dead::<Expression>(
                     tsv_lang::ast_census_probe::Dead::Superseded,
                     1,
                 );
@@ -558,9 +558,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// read from a literal.
     pub(super) fn refine_owned_assignable(
         &mut self,
-        expr: Expression<'arena>,
+        expr: Expression,
         context: AssignableContext,
-    ) -> Result<Expression<'arena>, Error> {
+    ) -> Result<Expression, Error> {
         let head = CoverHead::of(self.stores.view(), &expr, context);
         Ok(self.refine_assignable(head, context)?.unwrap_or(expr))
     }

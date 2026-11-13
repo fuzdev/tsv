@@ -462,7 +462,7 @@ impl<'a> Printer<'a> {
     /// the whole pattern to the twin's layout, [`Self::build_block_pattern_doc`]), so there
     /// is no own-line share to split off, and one run is what lets each comment take its
     /// separator from the one before it.
-    fn build_rest_pattern_doc(&self, rest_span_start: u32, argument: &Expression<'_>) -> DocId {
+    fn build_rest_pattern_doc(&self, rest_span_start: u32, argument: &Expression) -> DocId {
         let d = self.d();
         let dots_end = rest_span_start + 3; // past "..."
         let lead = self.build_pattern_leading_comments(dots_end, argument.span().start);
@@ -476,7 +476,7 @@ impl<'a> Printer<'a> {
     fn build_pattern_key_doc(
         &self,
         computed: bool,
-        key: &Expression<'_>,
+        key: &Expression,
         prop_start: u32,
         value_start: u32,
     ) -> (DocId, u32) {
@@ -527,8 +527,8 @@ impl<'a> Printer<'a> {
         &self,
         shorthand: bool,
         computed: bool,
-        key: &Expression<'_>,
-        value: &Expression<'_>,
+        key: &Expression,
+        value: &Expression,
         prop_start: u32,
     ) -> DocId {
         let d = self.d();
@@ -703,7 +703,7 @@ impl<'a> Printer<'a> {
     /// A caller whose layout depends on whether the pattern broke asks `will_break` of this
     /// doc before wrapping it — the `{#each}` clause rides inside an `if_break`, which
     /// `will_break` cannot see through.
-    pub(super) fn build_block_pattern_doc(&self, expr: &Expression<'_>) -> DocId {
+    pub(super) fn build_block_pattern_doc(&self, expr: &Expression) -> DocId {
         if matches!(
             expr.kind,
             ExpressionKind::ObjectPattern(_) | ExpressionKind::ArrayPattern(_)
@@ -749,7 +749,7 @@ impl<'a> Printer<'a> {
     /// numeric form), where prettier-plugin-svelte preserves the author's source
     /// token — a separate deliberate divergence (see conformance_prettier_svelte.md §Svelte:
     /// destructuring literal normalization).
-    pub(super) fn build_pattern_doc(&self, expr: &Expression<'_>) -> DocId {
+    pub(super) fn build_pattern_doc(&self, expr: &Expression) -> DocId {
         match &expr.kind {
             // Comments thread through every gap so a comment in any pattern position is
             // preserved in place — a `_svelte_prettier_divergence` from prettier-plugin-svelte,
@@ -860,7 +860,7 @@ impl<'a> Printer<'a> {
     /// value's line (`{ v = a || b /* c */ }`) — the same-line block the next pass reads, which
     /// the inline pattern keeps. A `//` never reaches this: it breaks the pattern into its
     /// twin's layout first ([`Self::build_block_pattern_doc`]).
-    fn build_pattern_assignment(&self, left: &Expression<'_>, right: &Expression<'_>) -> DocId {
+    fn build_pattern_assignment(&self, left: &Expression, right: &Expression) -> DocId {
         let d = self.d();
         let left_doc = self.build_pattern_doc(left);
         let eq = self.build_pattern_delim_gap(left.span().end, right.span().start, b'=', " = ");
@@ -894,7 +894,7 @@ impl<'a> Printer<'a> {
     /// line. See [`HeadExpr`] for why the verdict travels back out rather than in.
     pub(super) fn build_expression_with_comments_doc(
         &self,
-        expr: &Expression<'_>,
+        expr: &Expression,
         span_start: u32,
         span_end: u32,
     ) -> HeadExpr {
@@ -939,7 +939,7 @@ impl<'a> Printer<'a> {
     /// it the space-less prefix and must not hug its tail onto the slice's last line.
     pub(super) fn build_expression_doc_for_block(
         &self,
-        expr: &Expression<'_>,
+        expr: &Expression,
         span_start: u32,
         span_end: u32,
         in_multiline_context: bool,
@@ -1024,7 +1024,7 @@ impl<'a> Printer<'a> {
         &self,
         open: &'static str,
         opening_tag_span: Span,
-        expr: &Expression<'_>,
+        expr: &Expression,
         comment_end: u32,
         wrapping: bool,
         tail: HeadTail,

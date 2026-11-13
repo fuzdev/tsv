@@ -19,17 +19,17 @@ use super::{
 /// dispatch over [`ExpressionKind`]; a variant struct carries no span of its own unless
 /// some node also holds that type outside an `Expression` (see [`ExpressionKind`]).
 #[derive(Debug, Clone)]
-pub struct Expression<'arena> {
+pub struct Expression {
     pub span: Span,
-    pub kind: ExpressionKind<'arena>,
+    pub kind: ExpressionKind,
 }
 
 /// The variant half of an [`Expression`].
 #[derive(Debug, Clone)]
-pub enum ExpressionKind<'arena> {
-    Literal(Literal<'arena>),
-    Identifier(Identifier<'arena>),
-    PrivateIdentifier(PrivateIdentifier<'arena>),
+pub enum ExpressionKind {
+    Literal(Literal),
+    Identifier(Identifier),
+    PrivateIdentifier(PrivateIdentifier),
     ObjectExpression(ObjectExpression),
     ArrayExpression(ArrayExpression),
     UnaryExpression(UnaryExpression),
@@ -96,7 +96,7 @@ pub enum ExpressionKind<'arena> {
     ParenthesizedExpression(ParenthesizedExpression),
 }
 
-impl<'arena> Expression<'arena> {
+impl Expression {
     #[inline]
     pub fn span(&self) -> Span {
         self.span
@@ -111,7 +111,7 @@ impl<'arena> Expression<'arena> {
     /// parameter parser's `?` / `: T` extension writes the wrapper span of an array or
     /// object pattern, which has no second span to leave behind.
     #[inline]
-    pub fn from_identifier(id: Identifier<'arena>) -> Self {
+    pub fn from_identifier(id: Identifier) -> Self {
         Self {
             span: id.span,
             kind: ExpressionKind::Identifier(id),
@@ -120,7 +120,7 @@ impl<'arena> Expression<'arena> {
 
     /// Wrap a [`Literal`] (see [`Expression::from_identifier`]).
     #[inline]
-    pub fn from_literal(lit: Literal<'arena>) -> Self {
+    pub fn from_literal(lit: Literal) -> Self {
         Self {
             span: lit.span,
             kind: ExpressionKind::Literal(lit),
@@ -213,7 +213,7 @@ impl<'arena> Expression<'arena> {
     /// `TSInstantiationExpression` (`f<T>`) is deliberately **not** peeled — it is not
     /// an assertion. Peeling is a QUESTION here, never an emission: the wire keeps the
     /// assertion node, and only convert's `unwrap_comment_bound_pairs` drops anything.
-    pub fn skip_type_assertions(&self, view: AstView<'arena>) -> &Expression<'arena> {
+    pub fn skip_type_assertions<'a>(&'a self, view: AstView<'a>) -> &'a Expression {
         match &self.kind {
             ExpressionKind::TSAsExpression(e) => view.expr(e.expression).skip_type_assertions(view),
             ExpressionKind::TSSatisfiesExpression(e) => {
@@ -238,7 +238,7 @@ impl<'arena> Expression<'arena> {
     /// against "the converted node" must look through the wrapper. Note the
     /// wrapper's own `span()` covers the parens; the public node's span is the
     /// unwrapped inner's.
-    pub fn unwrap_comment_bound_pairs(&self, view: AstView<'arena>) -> &Expression<'arena> {
+    pub fn unwrap_comment_bound_pairs<'a>(&'a self, view: AstView<'a>) -> &'a Expression {
         let mut e = self;
         while let ExpressionKind::CommentBoundPair(cast) = &e.kind {
             e = view.expr(cast.inner);
@@ -384,7 +384,7 @@ pub struct ParenthesizedExpression {
     pub expression: ExprId,
 }
 
-impl<'arena> ParenthesizedExpression {
+impl ParenthesizedExpression {
     /// The pair's contents, for a consumer of the paren-free tree — which never holds one.
     ///
     /// The exhaustive matches in the printer and the compiler keep an arm for this node
@@ -392,7 +392,7 @@ impl<'arena> ParenthesizedExpression {
     /// build refuses a tree that breaks the wire-only contract, and a release build reads
     /// through the pair rather than aborting the host.
     #[track_caller]
-    pub fn unreachable_contents(&self, view: AstView<'arena>) -> &'arena Expression<'arena> {
+    pub fn unreachable_contents<'a>(&self, view: AstView<'a>) -> &'a Expression {
         #[expect(clippy::unreachable)] // debug builds only: see the doc
         if cfg!(debug_assertions) {
             unreachable!("a ParenthesizedExpression reached a reader of the paren-free tree");
@@ -761,7 +761,7 @@ pub struct BinaryExpression {
     pub may_close_type_arguments: bool,
 }
 
-impl<'arena> BinaryExpression {
+impl BinaryExpression {
     /// The right operand of prettier's REBALANCED tree: the deepest right of the spine
     /// [`BinaryOperator::rebalances_with`] joins, which is this chain's LAST operand.
     ///
@@ -781,7 +781,7 @@ impl<'arena> BinaryExpression {
     /// (`should_group_binary_continuation`, `is_simple_call_argument`) answers the same on
     /// both trees. Verify, don't assume.
     #[must_use]
-    pub fn rebalanced_right(&self, view: AstView<'arena>) -> &'arena Expression<'arena> {
+    pub fn rebalanced_right<'a>(&self, view: AstView<'a>) -> &'a Expression {
         let mut right = view.expr(self.right);
         while let ExpressionKind::BinaryExpression(inner) = &right.kind {
             if !self.operator.rebalances_with(inner.operator) {
@@ -827,11 +827,11 @@ pub struct ImportExpression {
 
 /// Meta property: `import.meta`, `new.target`
 #[derive(Debug, Clone)]
-pub struct MetaProperty<'arena> {
+pub struct MetaProperty {
     /// The keyword: "import" or "new"
-    pub meta: Identifier<'arena>,
+    pub meta: Identifier,
     /// The property: "meta" or "target"
-    pub property: Identifier<'arena>,
+    pub property: Identifier,
 }
 
 /// Member expression: `obj.prop`, `arr[0]`
@@ -907,9 +907,9 @@ impl ArrowFunctionBody {
 /// - Anonymous function expressions: `const f = function() {}`
 /// - Named function expressions: `const f = function name() {}`
 #[derive(Debug, Clone)]
-pub struct FunctionExpression<'arena> {
+pub struct FunctionExpression {
     /// Optional function name (for named function expressions)
-    pub id: Option<Identifier<'arena>>,
+    pub id: Option<Identifier>,
     /// Type parameters (TypeScript generics): `function<T>() {}`
     pub type_parameters: Option<TSTypeParameterDeclaration>,
     /// Function parameters (Identifier, ArrayPattern, ObjectPattern, or AssignmentPattern for defaults)
@@ -1010,11 +1010,11 @@ pub struct TemplateLiteral {
 /// Only genuinely decoded values (escapes present) hold text of their own, in the stores'
 /// text pool.
 #[derive(Debug, Clone)]
-pub enum TemplateCooked<'arena> {
+pub enum TemplateCooked {
     /// Cooked value == the element's TRV (no escapes to decode).
     Verbatim,
     /// Escapes were decoded into a value distinct from the raw text.
-    Decoded(PoolStr<'arena>),
+    Decoded(PoolStr),
     /// No cooked value — an invalid escape in a TAGGED template, which ES2018
     /// permits and acorn reports as `null`. (Untagged, the same escape is a
     /// syntax error, so `Parser::template_cooked` raises there instead.)
@@ -1034,7 +1034,7 @@ pub enum TemplateCooked<'arena> {
 /// the TRV is what the WIRE reports (`value.raw`, and `String.raw` at runtime).
 /// They differ only over a `<CR>` — see `raw_trv`.
 #[derive(Debug, Clone)]
-pub struct TemplateElement<'arena> {
+pub struct TemplateElement {
     /// Span of the raw source text (escape sequences NOT decoded), delimiters
     /// excluded. The raw content is a verbatim sub-slice of source, so it is
     /// stored as a span and recovered on demand via `raw(source)` rather than
@@ -1050,10 +1050,10 @@ pub struct TemplateElement<'arena> {
     /// a 4-byte source span and a 3-character value, and `raw_span` alone cannot
     /// express it. `None` — overwhelmingly the common case — means the source
     /// slice IS the TRV, so this costs no pool text on any ordinary template.
-    pub raw_trv: Option<PoolStr<'arena>>,
+    pub raw_trv: Option<PoolStr>,
     /// The decoded value. `Verbatim` (the common no-escape case) costs no
     /// allocation — its text equals `trv(source, view)`.
-    pub cooked: TemplateCooked<'arena>,
+    pub cooked: TemplateCooked,
     /// Whether the raw SOURCE text contains a newline (precomputed so newline
     /// checks stay O(1) and source-free, matching `Comment::multiline`). Read by
     /// the printer, which walks `raw_span`, so it answers about the source
@@ -1064,7 +1064,7 @@ pub struct TemplateElement<'arena> {
     pub span: Span,
 }
 
-impl<'arena> TemplateElement<'arena> {
+impl TemplateElement {
     /// The raw source text (escape sequences NOT decoded), a delimiter-stripped
     /// sub-slice of `source` (the host document the spans were recorded against).
     /// The PRINTER's view — verbatim author bytes, `<CR>`s included.

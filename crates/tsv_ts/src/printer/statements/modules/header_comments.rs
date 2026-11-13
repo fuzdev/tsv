@@ -103,7 +103,7 @@ impl<'a> Printer<'a> {
         parts: &mut DocBuf,
         gap_start: u32,
         star_pos: u32,
-        binding: Option<&ast::ModuleExportName<'_>>,
+        binding: Option<&ast::ModuleExportName>,
     ) {
         let d = self.d();
         parts.push(self.gap_comment_continuation_tail(gap_start, star_pos, d.text("*")));
@@ -126,7 +126,7 @@ impl<'a> Printer<'a> {
     pub(super) fn build_as_binding_continuation(
         &self,
         left_end: u32,
-        binding: &ast::ModuleExportName<'_>,
+        binding: &ast::ModuleExportName,
     ) -> DocId {
         let d = self.d();
         let binding_start = binding.span().start;
@@ -261,7 +261,7 @@ impl<'a> Printer<'a> {
     pub(super) fn build_from_source_doc(
         &self,
         decl_start: u32,
-        source: &ast::Literal<'_>,
+        source: &ast::Literal,
         empty_brace_search_start: Option<u32>,
         content_end: Option<u32>,
     ) -> DocId {

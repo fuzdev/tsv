@@ -75,8 +75,8 @@ const NICHE_MIN: usize = 16;
 /// One measured type.
 pub(crate) struct TypeRow {
     pub(crate) group: &'static str,
-    /// The type's name with any lifetime argument stripped — `Expression`, not
-    /// `Expression < 'static >`, which is what `stringify!` on a type produces.
+    /// The type's name with any lifetime argument stripped — `Root`, not
+    /// `Root < 'static >`, which is what `stringify!` on a type produces.
     pub(crate) name: &'static str,
     pub(crate) size: usize,
     pub(crate) align: usize,
@@ -94,7 +94,7 @@ impl TypeRow {
 }
 
 /// Board one type. `stringify!` on a generic type token tree spaces the
-/// lifetime out (`Expression < 'static >`), so the name is cut at the `<`.
+/// lifetime out (`Root < 'static >`), so the name is cut at the `<`.
 macro_rules! row {
     ($group:expr, $t:ty) => {
         TypeRow {
@@ -246,13 +246,13 @@ pub(crate) fn board() -> Vec<TypeRow> {
             ts::BinaryOperator,
             ts::CallExpression,
             ts::ConditionalExpression,
-            ts::Expression<'static>,
-            ts::ExpressionKind<'static>,
-            ts::FunctionExpression<'static>,
+            ts::Expression,
+            ts::ExpressionKind,
+            ts::FunctionExpression,
             ts::ImportExpression,
             ts::CommentBoundPair,
             ts::MemberExpression,
-            ts::MetaProperty<'static>,
+            ts::MetaProperty,
             ts::NewExpression,
             ts::ObjectExpression,
             ts::ObjectProperty,
@@ -269,8 +269,8 @@ pub(crate) fn board() -> Vec<TypeRow> {
             ts::TSSatisfiesExpression,
             ts::TSTypeAssertion,
             ts::TaggedTemplateExpression,
-            ts::TemplateCooked<'static>,
-            ts::TemplateElement<'static>,
+            ts::TemplateCooked,
+            ts::TemplateElement,
             ts::TemplateLiteral,
             ts::ThisExpression,
             ts::UnaryExpression,
@@ -286,9 +286,9 @@ pub(crate) fn board() -> Vec<TypeRow> {
         "ts/statement",
         [
             ts::BlockStatement,
-            ts::BreakStatement<'static>,
-            ts::CatchClause<'static>,
-            ts::ContinueStatement<'static>,
+            ts::BreakStatement,
+            ts::CatchClause,
+            ts::ContinueStatement,
             ts::DebuggerStatement,
             ts::DoWhileStatement,
             ts::EmptyStatement,
@@ -298,15 +298,15 @@ pub(crate) fn board() -> Vec<TypeRow> {
             ts::ForInit,
             ts::ForOfStatement,
             ts::ForStatement,
-            ts::FunctionDeclaration<'static>,
+            ts::FunctionDeclaration,
             ts::IfStatement,
-            ts::LabeledStatement<'static>,
+            ts::LabeledStatement,
             ts::ReturnStatement,
             // a statement list's field, named `ts::Run` on the board (the cut at `<`); every
             // `Run` is this width
             ts::Run<ts::StmtId>,
-            ts::Statement<'static>,
-            ts::StatementKind<'static>,
+            ts::Statement,
+            ts::StatementKind,
             ts::StmtId,
             ts::SwitchCase,
             ts::SwitchStatement,
@@ -329,44 +329,44 @@ pub(crate) fn board() -> Vec<TypeRow> {
             ts::TSConditionalType,
             ts::TSConstructSignatureDeclaration,
             ts::TSConstructorType,
-            ts::TSEntityName<'static>,
+            ts::TSEntityName,
             ts::TSFunctionType,
-            ts::TSImportType<'static>,
+            ts::TSImportType,
             ts::TSIndexSignature,
             ts::TSIndexedAccessType,
-            ts::TSInferType<'static>,
+            ts::TSInferType,
             ts::TSIntersectionType,
             ts::TSKeywordKind,
             ts::TSKeywordType,
-            ts::TSLiteralType<'static>,
-            ts::TSMappedType<'static>,
+            ts::TSLiteralType,
+            ts::TSMappedType,
             ts::TSMappedTypeModifier,
-            ts::TSMappedTypeParameter<'static>,
+            ts::TSMappedTypeParameter,
             ts::TSMethodSignature,
-            ts::TSNamedTupleMember<'static>,
+            ts::TSNamedTupleMember,
             ts::TSOptionalType,
             ts::TSParenthesizedType,
             ts::TSPropertySignature,
-            ts::TSQualifiedName<'static>,
+            ts::TSQualifiedName,
             ts::TSRestType,
             ts::TSThisType,
             ts::TSTupleType,
-            ts::TSType<'static>,
-            ts::TSTypeAliasDeclaration<'static>,
+            ts::TSType,
+            ts::TSTypeAliasDeclaration,
             ts::TSTypeAnnotation,
             ts::TSTypeElement,
             ts::TSTypeLiteral,
             ts::TSTypeOperator,
             ts::TSTypeOperatorKind,
-            ts::TSTypeParameter<'static>,
+            ts::TSTypeParameter,
             ts::TSTypeParameterDeclaration,
             ts::TSTypeParameterInstantiation,
             ts::TSTypeParameterModifier,
             ts::TSTypeParameterModifiers,
-            ts::TSTypePredicate<'static>,
-            ts::TSTypeQuery<'static>,
-            ts::TSTypeQueryExprName<'static>,
-            ts::TSTypeReference<'static>,
+            ts::TSTypePredicate,
+            ts::TSTypeQuery,
+            ts::TSTypeQueryExprName,
+            ts::TSTypeReference,
             ts::TSUnionType,
             ts::TemplateLiteralType,
             // a type edge's field; a type list's is the `ts::Run` boarded with the statements
@@ -380,10 +380,10 @@ pub(crate) fn board() -> Vec<TypeRow> {
         [
             ts::Accessibility,
             ts::ClassBody,
-            ts::ClassDeclaration<'static>,
-            ts::ClassExpression<'static>,
-            ts::ClassMember<'static>,
-            ts::MethodDefinition<'static>,
+            ts::ClassDeclaration,
+            ts::ClassExpression,
+            ts::ClassMember,
+            ts::MethodDefinition,
             ts::MethodKind,
             ts::PropertyDefinition,
             ts::PropertyModifier,
@@ -396,18 +396,18 @@ pub(crate) fn board() -> Vec<TypeRow> {
         out,
         "ts/declaration",
         [
-            ts::TSDeclareFunction<'static>,
-            ts::TSEnumDeclaration<'static>,
-            ts::TSEnumMember<'static>,
-            ts::TSEnumMemberId<'static>,
+            ts::TSDeclareFunction,
+            ts::TSEnumDeclaration,
+            ts::TSEnumMember,
+            ts::TSEnumMemberId,
             ts::TSInterfaceBody,
-            ts::TSInterfaceDeclaration<'static>,
-            ts::TSInterfaceHeritage<'static>,
+            ts::TSInterfaceDeclaration,
+            ts::TSInterfaceHeritage,
             ts::TSModuleBlock,
-            ts::TSModuleDeclaration<'static>,
+            ts::TSModuleDeclaration,
             ts::TSModuleDeclarationBody,
             ts::TSModuleDeclarationKind,
-            ts::TSModuleName<'static>,
+            ts::TSModuleName,
         ]
     );
 
@@ -415,28 +415,28 @@ pub(crate) fn board() -> Vec<TypeRow> {
         out,
         "ts/module",
         [
-            ts::ExportAllDeclaration<'static>,
-            ts::ExportDefaultDeclaration<'static>,
-            ts::ExportDefaultValue<'static>,
-            ts::ExportFunctionDeclaration<'static>,
+            ts::ExportAllDeclaration,
+            ts::ExportDefaultDeclaration,
+            ts::ExportDefaultValue,
+            ts::ExportFunctionDeclaration,
             ts::ExportKind,
-            ts::ExportNamedDeclaration<'static>,
-            ts::ExportSpecifier<'static>,
-            ts::ImportAttribute<'static>,
-            ts::ImportAttributeKey<'static>,
-            ts::ImportDeclaration<'static>,
-            ts::ImportDefaultSpecifier<'static>,
+            ts::ExportNamedDeclaration,
+            ts::ExportSpecifier,
+            ts::ImportAttribute,
+            ts::ImportAttributeKey,
+            ts::ImportDeclaration,
+            ts::ImportDefaultSpecifier,
             ts::ImportKind,
-            ts::ImportNamedSpecifier<'static>,
-            ts::ImportNamespaceSpecifier<'static>,
+            ts::ImportNamedSpecifier,
+            ts::ImportNamespaceSpecifier,
             ts::ImportPhase,
-            ts::ImportSpecifier<'static>,
-            ts::ModuleExportName<'static>,
+            ts::ImportSpecifier,
+            ts::ModuleExportName,
             ts::TSExportAssignment,
-            ts::TSExternalModuleReference<'static>,
-            ts::TSImportEqualsDeclaration<'static>,
-            ts::TSModuleReference<'static>,
-            ts::TSNamespaceExportDeclaration<'static>,
+            ts::TSExternalModuleReference,
+            ts::TSImportEqualsDeclaration,
+            ts::TSModuleReference,
+            ts::TSNamespaceExportDeclaration,
         ]
     );
 
@@ -457,14 +457,14 @@ pub(crate) fn board() -> Vec<TypeRow> {
         "ts/common",
         [
             ts::Decorator,
-            ts::IdentName<'static>,
-            ts::Identifier<'static>,
+            ts::IdentName,
+            ts::Identifier,
             ts::IdentifierParamExtra,
-            ts::Literal<'static>,
-            ts::LiteralValue<'static>,
-            ts::PrivateIdentifier<'static>,
-            ts::Program<'static>,
-            ts::StringCooked<'static>,
+            ts::Literal,
+            ts::LiteralValue,
+            ts::PrivateIdentifier,
+            ts::Program,
+            ts::StringCooked,
         ]
     );
 
@@ -594,13 +594,13 @@ mod tests {
     }
 
     /// `stringify!` on a generic type spaces the lifetime out
-    /// (`Expression < 'static >`); the name column must show the bare type.
+    /// (`Root < 'static >`); the name column must show the bare type.
     #[test]
     fn the_name_column_strips_the_lifetime() {
         let board = board();
         let named = |n: &str| board.iter().any(|r| r.name == n);
-        assert!(named("ts::Expression"), "lifetime not stripped");
-        assert!(named("ts::Statement"));
+        assert!(named("svelte::Root"), "lifetime not stripped");
+        assert!(named("svelte::Element"));
         // A type with no lifetime parameter takes the other arm of the split.
         assert!(named("tsv_lang::Span"));
     }

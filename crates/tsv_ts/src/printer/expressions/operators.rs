@@ -665,7 +665,7 @@ impl<'a> Printer<'a> {
     /// Whether a comment the operand's printed leaf OWNS sits inside the operand's span,
     /// ahead of that leaf — in a stripped grouping shell at the head of its left spine — so
     /// the operand's doc opens with it ([`Self::build_unary_doc_gap`]'s holder pair).
-    fn owned_comment_leads_operand(&self, argument: &Expression<'_>, argument_start: u32) -> bool {
+    fn owned_comment_leads_operand(&self, argument: &Expression, argument_start: u32) -> bool {
         // No shell opens the operand, so nothing sits ahead of its leaf: the common case, one
         // byte ([`left_spine_has_no_shell`]'s test).
         if self.source.as_bytes().get(argument_start as usize) != Some(&b'(')
@@ -784,7 +784,7 @@ impl<'a> Printer<'a> {
     /// Keyed by span and not consumed, like `mark_assignment_value`. Mark immediately
     /// before building the value: the cell holds one span, so anything built in between
     /// that marks its own value would clear this one.
-    pub(in crate::printer) fn mark_flat_chain(&self, expr: &Expression<'_>) {
+    pub(in crate::printer) fn mark_flat_chain(&self, expr: &Expression) {
         self.flat_chain_target.set(Some(expr.span()));
     }
 
@@ -1722,7 +1722,7 @@ impl<'a> Printer<'a> {
     /// ordinary path.
     fn build_chain_end_operand(
         &self,
-        operand: &Expression<'_>,
+        operand: &Expression,
         parent_op: BinaryOperator,
     ) -> ChainOperand {
         let span = operand.span();
@@ -1774,7 +1774,7 @@ impl<'a> Printer<'a> {
     /// apart from the build so [`Self::binary_printed_last_operand`] reads the same answer.
     fn chain_end_operand_shape(
         &self,
-        operand: &Expression<'_>,
+        operand: &Expression,
         parent_op: BinaryOperator,
     ) -> ChainEndShape {
         let span = operand.span();
@@ -1843,7 +1843,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn binary_printed_last_operand<'e>(
         &self,
         binary: &'e ast::BinaryExpression,
-    ) -> Result<&'e Expression<'e>, u32>
+    ) -> Result<&'e Expression, u32>
     where
         'a: 'e,
     {
@@ -1884,7 +1884,7 @@ impl<'a> Printer<'a> {
     /// every comment the layers held.
     pub(in crate::printer) fn value_end_kept_pair(
         &self,
-        operand: &Expression<'_>,
+        operand: &Expression,
     ) -> Option<(u32, u32)> {
         if !self.embed.value_end_takes_no_comment {
             return None;
@@ -1960,7 +1960,7 @@ impl<'a> Printer<'a> {
     /// either ends on a token of its own or takes a pair in that position (a conditional,
     /// an arrow, an assignment, `await`, `yield`), which ends it on a `)`. The direct left
     /// operand is not recorded: its position's own rule gives it the pair.
-    fn mark_tail_of_dividend(&self, dividend: &Expression<'_>) {
+    fn mark_tail_of_dividend(&self, dividend: &Expression) {
         let mut operand = dividend;
         let mut ctx = ParenContext::BinaryLeft {
             parent_op: BinaryOperator::Slash,
@@ -2004,7 +2004,7 @@ impl<'a> Printer<'a> {
     /// (`export default (@dec class {});`).
     pub(in crate::printer) fn build_operand_pair_doc(
         &self,
-        operand: &Expression<'_>,
+        operand: &Expression,
         inner: DocId,
     ) -> DocId {
         let decorated_class = matches!(
@@ -2027,7 +2027,7 @@ impl<'a> Printer<'a> {
     /// doc, and a pair the printer mints around it then appends nothing
     /// ([`Printer::minted_pair_trailing_region`] declines a claimed region). A lone such comment
     /// keeps the operand's own placement (after a minted `)`, or trailing the statement).
-    fn operand_operator_gap_start(&self, operand: &Expression<'_>) -> u32 {
+    fn operand_operator_gap_start(&self, operand: &Expression) -> u32 {
         let end = operand.span().end;
         let start = self.pair_trailing_gap_start(operand);
         if start >= end {
@@ -2050,7 +2050,7 @@ impl<'a> Printer<'a> {
     /// Build operand with parens if needed for clarity
     pub(in crate::printer) fn build_binary_operand_doc(
         &self,
-        operand: &Expression<'_>,
+        operand: &Expression,
         parent_op: BinaryOperator,
         is_right: bool,
     ) -> DocId {
@@ -2108,7 +2108,7 @@ impl<'a> Printer<'a> {
     /// one, since the soft `line` after it stays flat in the group it prints in. The scan
     /// reads the comments to EMIT, so a block the leaf owns (glued to it, a multi-line one
     /// included) never counts: the leaf prints it, inside whatever group the leaf is in.
-    fn left_spine_run_breaks_its_line(&self, expr: &Expression<'_>) -> bool {
+    fn left_spine_run_breaks_its_line(&self, expr: &Expression) -> bool {
         let start = expr.span().start;
         let end = self.left_spine_printed_start(expr);
         if start >= end {
@@ -2144,7 +2144,7 @@ impl<'a> Printer<'a> {
     /// keyword (the run flushes where the operand's own would), so it does not count.
     pub(in crate::printer) fn minted_pair_trailing_region(
         &self,
-        operand: &Expression<'_>,
+        operand: &Expression,
         follower: MintedPairFollower,
     ) -> Option<Span> {
         let end = operand.span().end;
@@ -2177,7 +2177,7 @@ impl<'a> Printer<'a> {
     /// away from it. `should_use_arrow_chain_layout` still gates on every comment sitting in
     /// a region the chain doc emits, so an operand whose comment lands in a gap that layout
     /// has no emitter for falls through to the default path.
-    fn build_chain_aware_operand_doc(&self, operand: &Expression<'_>) -> DocId {
+    fn build_chain_aware_operand_doc(&self, operand: &Expression) -> DocId {
         if crate::printer::is_curried_arrow_chain(self.view, operand) {
             self.build_with_arrow_chain_context(
                 crate::printer::ArrowChainContext::CallArgOrBinaryish,
@@ -2207,7 +2207,7 @@ impl<'a> Printer<'a> {
     /// a directive freezes the operand, whose slice prints its stripped shells itself.
     fn build_keyword_operand_pair_doc(
         &self,
-        operand: &Expression<'_>,
+        operand: &Expression,
         ctx: ParenContext,
         shell_end: u32,
         frozen: bool,

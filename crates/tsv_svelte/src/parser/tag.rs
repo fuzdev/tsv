@@ -168,7 +168,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     fn reject_declaration_tag_statement(
         &self,
         view: AstView<'_>,
-        statement: &tsv_ts::ast::Statement<'arena>,
+        statement: &tsv_ts::ast::Statement,
         tag_content_start: usize,
         close_brace: usize,
     ) -> Result<(), Error> {
@@ -282,7 +282,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// can no longer produce a false positive.
     fn reject_multi_declarator(
         &self,
-        init: &Expression<'_>,
+        init: &Expression,
         init_str: &str,
         init_offset: usize,
     ) -> Result<(), Error> {
@@ -461,7 +461,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 /// author parenthesized it. The node says whether there is a sequence and the source
 /// whether it was bare, for the reasons `SvelteParser::reject_multi_declarator` states;
 /// the `{#each}` iterable's re-read asks it too (`SvelteParser::reparse_each_iterable`).
-pub(super) fn bare_sequence_comma(expr: &Expression<'_>, source: &str) -> Option<usize> {
+pub(super) fn bare_sequence_comma(expr: &Expression, source: &str) -> Option<usize> {
     if !matches!(expr.kind, ExpressionKind::SequenceExpression(_)) {
         return None;
     }

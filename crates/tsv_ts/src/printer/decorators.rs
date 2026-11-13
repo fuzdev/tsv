@@ -374,7 +374,7 @@ impl<'a> Printer<'a> {
     /// binding's own doc left to break — cannot express. The gate is the DECORATOR's
     /// presence, not its layout: an inline `@dec a: { … }` declines the hug exactly as an
     /// own-line one does, and the list breaks around the parameter instead.
-    pub(in crate::printer) fn param_has_decorators(&self, expr: &ast::Expression<'_>) -> bool {
+    pub(in crate::printer) fn param_has_decorators(&self, expr: &ast::Expression) -> bool {
         param_decorators(self.view, expr).is_some()
     }
 
@@ -383,10 +383,7 @@ impl<'a> Printer<'a> {
     /// Decorators precede the binding but are stored *on* it, so the binding span
     /// alone skips them — measuring a blank line to it would miscount a decorator
     /// line as an author blank line.
-    pub(in crate::printer) fn param_start_with_decorators(
-        &self,
-        expr: &ast::Expression<'_>,
-    ) -> u32 {
+    pub(in crate::printer) fn param_start_with_decorators(&self, expr: &ast::Expression) -> u32 {
         param_decorators(self.view, expr)
             .map_or_else(|| expr.span().start, |decs| decs[0].span.start)
     }
@@ -394,7 +391,7 @@ impl<'a> Printer<'a> {
     /// The source span a parameter renders from: its node span widened at the start to
     /// cover any parameter decorators (see [`Self::param_start_with_decorators`]). The
     /// span form of that position, and the slice a parameter freeze emits verbatim.
-    pub(in crate::printer) fn param_render_span(&self, expr: &ast::Expression<'_>) -> Span {
+    pub(in crate::printer) fn param_render_span(&self, expr: &ast::Expression) -> Span {
         Span::new(self.param_start_with_decorators(expr), expr.span().end)
     }
 
@@ -421,7 +418,7 @@ impl<'a> Printer<'a> {
     #[inline]
     pub(in crate::printer) fn param_binding_frozen_span(
         &self,
-        param: &ast::Expression<'_>,
+        param: &ast::Expression,
     ) -> Option<Span> {
         if !self.has_format_ignore {
             return None;
@@ -439,7 +436,7 @@ impl<'a> Printer<'a> {
     #[inline]
     pub(in crate::printer) fn build_frozen_param_binding_doc(
         &self,
-        param: &ast::Expression<'_>,
+        param: &ast::Expression,
     ) -> Option<DocId> {
         let frozen = self.param_binding_frozen_span(param)?;
         Some(self.with_param_decorators(
@@ -624,10 +621,7 @@ impl<'a> Printer<'a> {
 ///
 /// Normalized through [`non_empty_decorators`], so an undecorated parameter and a
 /// decorated one with an empty list are the same answer here as everywhere else.
-fn param_decorators<'arena>(
-    view: AstView<'arena>,
-    expr: &ast::Expression<'arena>,
-) -> Option<&'arena [ast::Decorator]> {
+fn param_decorators<'a>(view: AstView<'a>, expr: &ast::Expression) -> Option<&'a [ast::Decorator]> {
     let decorators = match &expr.kind {
         ast::ExpressionKind::Identifier(id) => id.decorators(view),
         ast::ExpressionKind::ObjectPattern(obj) => view.opt_decorators(obj.decorators),
@@ -670,14 +664,14 @@ pub(in crate::printer) fn non_empty_decorators(
 /// paths ask it too — which is why it lives here rather than beside any one of them.
 pub(in crate::printer) fn class_expr_has_decorators(
     view: AstView<'_>,
-    c: &ast::ClassExpression<'_>,
+    c: &ast::ClassExpression,
 ) -> bool {
     non_empty_decorators(view.opt_decorators(c.decorators)).is_some()
 }
 
 /// Whether `expr` is a bare-decorator member chain: an identifier, or a
 /// non-computed, non-optional member chain of identifiers down to one.
-fn is_decorator_member_expression(view: AstView<'_>, expr: &ast::Expression<'_>) -> bool {
+fn is_decorator_member_expression(view: AstView<'_>, expr: &ast::Expression) -> bool {
     let mut expr = expr;
     loop {
         match &expr.kind {
@@ -704,8 +698,8 @@ fn is_decorator_member_expression(view: AstView<'_>, expr: &ast::Expression<'_>)
 /// A wire-only parse keeps the author's grouping parens as nodes (`parse_preserve_parens`),
 /// which the printer never meets; read through them here, a callee's pair (`@(a)(…)`)
 /// answers as the parse the printer reads does.
-pub(crate) fn decorator_takes_pair(view: AstView<'_>, expr: &ast::Expression<'_>) -> bool {
-    fn unwrap<'e>(view: AstView<'e>, mut expr: &'e ast::Expression<'e>) -> &'e ast::Expression<'e> {
+pub(crate) fn decorator_takes_pair(view: AstView<'_>, expr: &ast::Expression) -> bool {
+    fn unwrap<'e>(view: AstView<'e>, mut expr: &'e ast::Expression) -> &'e ast::Expression {
         while let ast::ExpressionKind::ParenthesizedExpression(paren) = &expr.kind {
             expr = view.expr(paren.expression);
         }
@@ -722,7 +716,7 @@ pub(crate) fn decorator_takes_pair(view: AstView<'_>, expr: &ast::Expression<'_>
 
 /// Whether a decorator expression is valid without parens (see
 /// `Printer::build_decorator_expression_doc`).
-fn can_decorator_expression_unparenthesized(view: AstView<'_>, expr: &ast::Expression<'_>) -> bool {
+fn can_decorator_expression_unparenthesized(view: AstView<'_>, expr: &ast::Expression) -> bool {
     match &expr.kind {
         ast::ExpressionKind::CallExpression(call) => {
             !call.optional && is_decorator_member_expression(view, view.expr(call.callee))

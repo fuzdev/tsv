@@ -310,7 +310,7 @@ fn format_with_optional_goal(source: &str, goal: Option<Goal>) -> Result<String>
 pub(crate) fn format_in<D: std::borrow::Borrow<DocArena>>(
     source: &str,
     goal: Option<Goal>,
-    stores: &mut AstStores<'_>,
+    stores: &mut AstStores,
     doc_arena: impl FnOnce(&str) -> D,
 ) -> Result<String> {
     // The format path's line-terminator fold, ahead of the parse — see
@@ -531,12 +531,12 @@ fn wire_string(bytes: Vec<u8>) -> String {
 /// the host's to take: `source` is a slice of that document, so a context taken over it
 /// would read a host-absolute position against the wrong text and clamp it to a
 /// plausible-but-wrong point. The host fills it over the whole document instead.
-fn with_embedding_parser<'arena, T>(
+fn with_embedding_parser<T>(
     source: &str,
     base_offset: usize,
     host_nesting: u32,
-    stores: &mut AstStores<'arena>,
-    f: impl Fn(&mut parser::Parser<'_, 'arena>) -> std::result::Result<T, Error>,
+    stores: &mut AstStores,
+    f: impl Fn(&mut parser::Parser<'_>) -> std::result::Result<T, Error>,
     host_check: impl Fn(AstView<'_>, &T) -> std::result::Result<(), Error>,
 ) -> Result<T> {
     parser::parse_retrying_acorn_followers(
@@ -557,7 +557,7 @@ fn with_embedding_parser<'arena, T>(
 /// (`Printer::program_start`) — the environment `build_program_doc` documents.
 fn with_program_printer<R>(
     arena: &DocArena,
-    program: &Program<'_>,
+    program: &Program,
     view: AstView<'_>,
     source: &str,
     line_table: LineTable<'_>,

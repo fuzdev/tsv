@@ -59,7 +59,7 @@ use tsv_lang::source_scan::has_newline_before_position;
 /// is the one prettier gates on `!shouldBreakChain`, and it renders differently besides —
 /// parens in the flat form only ([`ternary_body_parens_group`]) — so each printer states it
 /// as its own arm.
-fn arrow_body_always_hugs(view: AstView<'_>, expr: &ast::Expression<'_>, source: &str) -> bool {
+fn arrow_body_always_hugs(view: AstView<'_>, expr: &ast::Expression, source: &str) -> bool {
     matches!(
         expr.kind,
         ast::ExpressionKind::SequenceExpression(_)
@@ -93,7 +93,7 @@ fn arrow_body_always_hugs(view: AstView<'_>, expr: &ast::Expression<'_>, source:
 /// Returns the node's span so the printer wraps exactly it (keyed by span, robust to a
 /// chain rebuilding its base across conditional-group variants) and never a same-shaped
 /// node nested deeper.
-fn leftmost_arrow_body_parens_span(view: AstView<'_>, expr: &ast::Expression<'_>) -> Option<Span> {
+fn leftmost_arrow_body_parens_span(view: AstView<'_>, expr: &ast::Expression) -> Option<Span> {
     if matches!(
         expr.kind,
         ast::ExpressionKind::AssignmentExpression(_) | ast::ExpressionKind::SequenceExpression(_)
@@ -237,14 +237,14 @@ fn walk_arrow_chain<'a>(
 /// parenthesize. See [`leftmost_arrow_body_parens_span`].
 pub(in crate::printer) fn has_leftmost_arrow_body_parens(
     view: AstView<'_>,
-    expr: &ast::Expression<'_>,
+    expr: &ast::Expression,
 ) -> bool {
     leftmost_arrow_body_parens_span(view, expr).is_some()
 }
 
 /// Whether the node at an arrow body's leftmost position that takes a pair is the body
 /// itself (a bare object, a bare decorated class) rather than a node inside it.
-fn arrow_body_is_its_own_leftmost_pair(view: AstView<'_>, expr: &ast::Expression<'_>) -> bool {
+fn arrow_body_is_its_own_leftmost_pair(view: AstView<'_>, expr: &ast::Expression) -> bool {
     leftmost_arrow_body_parens_span(view, expr) == Some(expr.span())
 }
 
@@ -261,7 +261,7 @@ fn arrow_body_is_its_own_leftmost_pair(view: AstView<'_>, expr: &ast::Expression
 /// Shared with the signature-param path (`build_signature_params_doc`) so bodyless
 /// declarations (declare / overload) and type-member signatures (method / call /
 /// construct) hug the lone param exactly like value-param functions do.
-fn is_huggable_pattern(view: AstView<'_>, expr: &ast::Expression<'_>) -> bool {
+fn is_huggable_pattern(view: AstView<'_>, expr: &ast::Expression) -> bool {
     match &expr.kind {
         ast::ExpressionKind::ObjectPattern(_) | ast::ExpressionKind::ArrayPattern(_) => true,
         ast::ExpressionKind::AssignmentPattern(ap) => {
@@ -419,7 +419,7 @@ pub(in crate::printer) fn arrow_signature_has_breaking_comments(
 ///   `parameters.length === 0` early return, ahead of the throw, so nothing in it refuses.
 pub(in crate::printer) fn function_signature_has_breaking_comments(
     printer: &Printer<'_>,
-    func: &ast::FunctionExpression<'_>,
+    func: &ast::FunctionExpression,
 ) -> bool {
     // Zero-comment gate, as for the arrow: both regions below lie inside
     // `[params_start, body)` — the parameter-list region ends at or before the body (at the
@@ -536,7 +536,7 @@ fn arrow_signature_will_break(
 /// as `will_break` answers it.
 fn params_cannot_force_break(
     printer: &Printer<'_>,
-    params: &[ast::Expression<'_>],
+    params: &[ast::Expression],
     start: u32,
     end: u32,
 ) -> bool {
@@ -558,7 +558,7 @@ fn params_cannot_force_break(
 /// - a rest element `...a` over a bare identifier, with a flat annotation or none;
 /// - a default `a = x` whose binding is such an identifier and whose value is a single
 ///   literal or identifier token.
-fn param_is_flat(view: AstView<'_>, param: &ast::Expression<'_>) -> bool {
+fn param_is_flat(view: AstView<'_>, param: &ast::Expression) -> bool {
     match &param.kind {
         ast::ExpressionKind::Identifier(id) => {
             id.decorators(view).unwrap_or_default().is_empty()
@@ -626,7 +626,7 @@ fn param_is_flat(view: AstView<'_>, param: &ast::Expression<'_>) -> bool {
 }
 
 /// An identifier with no annotation and no decorator — a pattern's leaf.
-fn is_bare_identifier(view: AstView<'_>, expr: &ast::Expression<'_>) -> bool {
+fn is_bare_identifier(view: AstView<'_>, expr: &ast::Expression) -> bool {
     matches!(
         &expr.kind,
         ast::ExpressionKind::Identifier(id)
@@ -655,7 +655,7 @@ fn annotation_is_flat(view: AstView<'_>, annotation: Option<&ast::TSTypeAnnotati
 /// admitted only at the annotation's top level ([`annotation_is_flat`]), so no type argument
 /// list here holds one. Template literal types (substitutions are arbitrary types), object
 /// types, function types, tuples and the rest are out.
-fn type_is_flat(view: AstView<'_>, ty: &ast::TSType<'_>) -> bool {
+fn type_is_flat(view: AstView<'_>, ty: &ast::TSType) -> bool {
     match ty {
         ast::TSType::Keyword(_)
         | ast::TSType::ThisType(_)
@@ -701,7 +701,7 @@ fn type_is_flat(view: AstView<'_>, ty: &ast::TSType<'_>) -> bool {
 /// a destructured parameter's properties).
 fn sole_param_object_type_start(
     printer: &Printer<'_>,
-    params: &[ast::Expression<'_>],
+    params: &[ast::Expression],
     open: Option<u32>,
     close: impl FnOnce() -> Option<u32>,
 ) -> Option<u32> {
@@ -715,7 +715,7 @@ fn sole_param_object_type_start(
 /// only then. Both halves are pure reads, so the order is free.
 fn sole_param_object_type<'a>(
     printer: &Printer<'a>,
-    params: &'a [ast::Expression<'a>],
+    params: &'a [ast::Expression],
     open: Option<u32>,
     close: impl FnOnce() -> Option<u32>,
 ) -> Option<&'a ast::TSTypeLiteral> {
@@ -780,7 +780,7 @@ pub(in crate::printer) struct FlatSoleParamLiteral<'a> {
 /// its own forced break, and one that does not group the parameters leaves the line to the body's.
 fn function_return_type_break(
     view: AstView<'_>,
-    func: &ast::FunctionExpression<'_>,
+    func: &ast::FunctionExpression,
 ) -> Option<AssumedBreak> {
     let return_type = func.return_type.as_ref()?;
     if !crate::printer::types::function_types::type_params_allow_grouping(
@@ -799,7 +799,7 @@ fn function_return_type_break(
 /// [`FlatSoleParamLiteral`] for `arg`, or `None`.
 pub(in crate::printer) fn flat_sole_param_literal<'a>(
     printer: &Printer<'a>,
-    arg: &'a ast::Expression<'a>,
+    arg: &'a ast::Expression,
 ) -> Option<FlatSoleParamLiteral<'a>> {
     if printer.canonical {
         return None;
@@ -888,7 +888,7 @@ pub(in crate::printer) fn flat_sole_param_literal<'a>(
 /// the refusal [`flat_sole_param_literal`] makes, so no comment rides on the assumed break.
 pub(in crate::printer) fn function_return_hug_break(
     printer: &Printer<'_>,
-    arg: &ast::Expression<'_>,
+    arg: &ast::Expression,
 ) -> Option<AssumedBreak> {
     if printer.canonical {
         return None;
@@ -919,7 +919,7 @@ pub(in crate::printer) fn function_return_hug_break(
 /// shell the printer strips — at the top, around a sole type argument, and around a hugged
 /// union's members — so the predicate reads the printed form, and a shell the author wrote
 /// cannot refuse a hug its stripped twin takes.
-fn return_type_hug_brace(printer: &Printer<'_>, ty: &ast::TSType<'_>) -> Option<AssumedBreak> {
+fn return_type_hug_brace(printer: &Printer<'_>, ty: &ast::TSType) -> Option<AssumedBreak> {
     let member_brace = |union: &ast::TSUnionType| {
         printer
             .view
@@ -944,7 +944,7 @@ fn return_type_hug_brace(printer: &Printer<'_>, ty: &ast::TSType<'_>) -> Option<
             if let &[arg] = printer.view.ty_list(args.params) {
                 let arg = printer.view.ty(arg);
                 let peeled = unwrap_parenthesized(printer.view, arg);
-                let is_shell = |ty: &ast::TSType<'_>| matches!(ty, ast::TSType::Parenthesized(_));
+                let is_shell = |ty: &ast::TSType| matches!(ty, ast::TSType::Parenthesized(_));
                 let shell = is_shell(arg)
                     || matches!(peeled, ast::TSType::Union(union)
                         if printer.view.ty_list(union.types).iter().any(|&member| is_shell(printer.view.ty(member))));
@@ -1000,7 +1000,7 @@ pub(in crate::printer) fn arrow_signature_refuses_hug(
 /// expansion of a hugged sole parameter's own object type is not read.
 fn function_signature_refuses_hug(
     printer: &Printer<'_>,
-    func: &ast::FunctionExpression<'_>,
+    func: &ast::FunctionExpression,
     arg_count: usize,
 ) -> bool {
     let params = printer.view.run(func.params);
@@ -1040,7 +1040,7 @@ fn function_signature_refuses_hug(
 
 /// A parameter `printFunction` counts toward its "every parameter is an untyped identifier"
 /// test.
-fn is_untyped_identifier_param(view: AstView<'_>, param: &ast::Expression<'_>) -> bool {
+fn is_untyped_identifier_param(view: AstView<'_>, param: &ast::Expression) -> bool {
     matches!(&param.kind, ast::ExpressionKind::Identifier(id) if id.type_annotation(view).is_none())
 }
 
@@ -1053,7 +1053,7 @@ fn is_untyped_identifier_param(view: AstView<'_>, param: &ast::Expression<'_>) -
 /// the `function` spelling ungated.
 pub(in crate::printer) fn callback_signature_refuses_hug(
     printer: &Printer<'_>,
-    arg: &ast::Expression<'_>,
+    arg: &ast::Expression,
     arg_count: usize,
 ) -> bool {
     match arg.kind {
@@ -1083,7 +1083,7 @@ pub(in crate::printer) fn callback_signature_refuses_hug(
 ///
 /// Shared with the signature-param path (`build_signature_params_doc`) — see
 /// `is_huggable_pattern`.
-fn has_huggable_type_annotation(view: AstView<'_>, expr: &ast::Expression<'_>) -> bool {
+fn has_huggable_type_annotation(view: AstView<'_>, expr: &ast::Expression) -> bool {
     match &expr.kind {
         ast::ExpressionKind::Identifier(id) => id
             .type_annotation(view)
@@ -1172,7 +1172,7 @@ impl<'a> Printer<'a> {
     /// passes `true`.
     pub(in crate::printer) fn param_delimiter_gaps_empty(
         &self,
-        param: &ast::Expression<'_>,
+        param: &ast::Expression,
         open: Option<u32>,
         close: Option<u32>,
         comments_present: bool,
@@ -1201,7 +1201,7 @@ impl<'a> Printer<'a> {
     /// and its binding form a group of their own that the hug cannot express).
     pub(in crate::printer) fn hugs_sole_parameter(
         &self,
-        params: &[ast::Expression<'_>],
+        params: &[ast::Expression],
         open: Option<u32>,
         close: Option<u32>,
         comments_present: bool,
@@ -1226,7 +1226,7 @@ impl<'a> Printer<'a> {
     /// it through the annotation's own directive route, which is also where every other
     /// annotation position (a declarator, a class property, a signature member) honors it,
     /// so declining is what keeps the sole-parameter spelling agreeing with its siblings.
-    fn param_annotation_holds_own_line_directive(&self, param: &ast::Expression<'_>) -> bool {
+    fn param_annotation_holds_own_line_directive(&self, param: &ast::Expression) -> bool {
         let ast::ExpressionKind::Identifier(id) = &param.kind else {
             return false;
         };
@@ -1321,7 +1321,7 @@ impl<'a> Printer<'a> {
     /// the no-context build every such arm already does.
     pub(in crate::printer) fn seam_break_stacks_curried_chain(
         &self,
-        value: &ast::Expression<'_>,
+        value: &ast::Expression,
         gap_start: u32,
     ) -> bool {
         if !is_curried_arrow_chain(self.view, value) {
@@ -1353,7 +1353,7 @@ impl<'a> Printer<'a> {
     /// indent — idempotent, so no fixed-point fixture saw it.
     pub(in crate::printer) fn head_forced_chain_lead(
         &self,
-        value: &ast::Expression<'_>,
+        value: &ast::Expression,
         gap_start: u32,
     ) -> HeadForcedChainLead {
         let value_start = value.span().start;
@@ -1379,7 +1379,7 @@ impl<'a> Printer<'a> {
     /// the class field and the object property cannot answer one comment four ways.
     pub(in crate::printer) fn build_hung_value_doc(
         &self,
-        value: &ast::Expression<'_>,
+        value: &ast::Expression,
         gap_start: u32,
         build: impl FnOnce() -> DocId,
     ) -> DocId {
@@ -1403,7 +1403,7 @@ impl<'a> Printer<'a> {
     /// own softline.
     pub(crate) fn build_assignment_value_root_doc(
         &self,
-        expression: &ast::Expression<'_>,
+        expression: &ast::Expression,
         value_gap_start: Option<u32>,
     ) -> DocId {
         self.mark_assignment_value(expression);
@@ -1462,7 +1462,7 @@ impl<'a> Printer<'a> {
     /// whatever indent the arm opened.
     pub(crate) fn build_stacked_curried_chain_rhs_doc(
         &self,
-        expression: &ast::Expression<'_>,
+        expression: &ast::Expression,
         operator_pos: u32,
         build_suffix: impl Fn(DocId) -> DocId,
     ) -> Option<DocId> {
@@ -1675,7 +1675,7 @@ impl<'a> Printer<'a> {
     /// one state the two report differently.
     fn arrow_body_shell_holds_comments(
         &self,
-        expr: &ast::Expression<'_>,
+        expr: &ast::Expression,
         arrow_span_end: u32,
         frozen: Option<Span>,
     ) -> bool {
@@ -1690,7 +1690,7 @@ impl<'a> Printer<'a> {
     fn build_arrow_expression_body(
         &self,
         parts: &mut DocBuf,
-        expr: &ast::Expression<'_>,
+        expr: &ast::Expression,
         arrow: &ast::ArrowFunctionExpression,
         arrow_span: Span,
         arrow_end: u32,
@@ -2132,7 +2132,7 @@ impl<'a> Printer<'a> {
         arrow: &ast::ArrowFunctionExpression,
         arrow_span: Span,
         gap_start: u32,
-        expr: &ast::Expression<'_>,
+        expr: &ast::Expression,
         hoisted_run: Option<DocId>,
         gap_run: Option<DocId>,
     ) -> DocId {
@@ -3326,10 +3326,7 @@ impl<'a> Printer<'a> {
     /// `new` uniformly — annotated or not — so there is no incoherence there to correct, and
     /// tsv already matches it on both kinds. The uniformity this predicate buys is over the
     /// *callback kind*, not over every construct that can hold one.
-    fn function_trailing_param_comment_forces_break(
-        &self,
-        func: &ast::FunctionExpression<'_>,
-    ) -> bool {
+    fn function_trailing_param_comment_forces_break(&self, func: &ast::FunctionExpression) -> bool {
         self.trailing_param_comment_forces_break(
             self.view.run(func.params),
             self.find_closing_paren(func.params_start, func.body.span.start),
@@ -3343,7 +3340,7 @@ impl<'a> Printer<'a> {
     /// disagree in the first place.
     fn trailing_param_comment_forces_break(
         &self,
-        params: &[ast::Expression<'_>],
+        params: &[ast::Expression],
         params_end: Option<u32>,
     ) -> bool {
         let (Some(last_param), Some(params_end)) = (params.last(), params_end) else {
@@ -3475,7 +3472,7 @@ impl<'a> Printer<'a> {
     /// this does not force a break for.
     fn has_trailing_line_comment_in_params(
         &self,
-        params: &[ast::Expression<'_>],
+        params: &[ast::Expression],
         trailing_comments_end: Option<u32>,
     ) -> bool {
         params.iter().enumerate().any(|(i, param)| {
@@ -3508,7 +3505,7 @@ impl<'a> Printer<'a> {
     /// (`docs/comments.md` §The element-comma seam).
     fn param_trailing_end(
         &self,
-        params: &[ast::Expression<'_>],
+        params: &[ast::Expression],
         index: usize,
         trailing_comments_end: Option<u32>,
     ) -> u32 {
@@ -3528,7 +3525,7 @@ impl<'a> Printer<'a> {
     /// arm's break instead (`=>⏎↹// c⏎↹(a, b)`), the same answer every other value seam
     /// gives a hoisted left-spine run (`Printer::left_spine_shell_has_own_line_comment`).
     /// The one predicate all three hug sites read, so they cannot part on it.
-    fn arrow_body_hugs(&self, expr: &ast::Expression<'_>) -> bool {
+    fn arrow_body_hugs(&self, expr: &ast::Expression) -> bool {
         arrow_body_always_hugs(self.view, expr, self.source)
             && !self.left_spine_shell_has_own_line_comment(expr)
     }
@@ -3543,7 +3540,7 @@ impl<'a> Printer<'a> {
     /// `(a) =>⏎\t{}.x ? b : c`, which does not reparse.
     pub(in crate::printer) fn build_leftmost_parens_arrow_body_doc(
         &self,
-        expr: &ast::Expression<'_>,
+        expr: &ast::Expression,
     ) -> Option<DocId> {
         let leftmost_span = leftmost_arrow_body_parens_span(self.view, expr)?;
         let prev = self.leftmost_pair_target.replace(Some(leftmost_span));
@@ -3558,7 +3555,7 @@ impl<'a> Printer<'a> {
     /// states print those through their own hug, which adds the pair around the whole body.
     pub(in crate::printer) fn build_inner_leftmost_parens_arrow_body_doc(
         &self,
-        expr: &ast::Expression<'_>,
+        expr: &ast::Expression,
     ) -> Option<DocId> {
         if arrow_body_is_its_own_leftmost_pair(self.view, expr) {
             return None;
@@ -3566,7 +3563,7 @@ impl<'a> Printer<'a> {
         self.build_leftmost_parens_arrow_body_doc(expr)
     }
 
-    fn build_arrow_body_doc(&self, expr: &ast::Expression<'_>) -> DocId {
+    fn build_arrow_body_doc(&self, expr: &ast::Expression) -> DocId {
         self.build_arrow_body_doc_with_leading(expr, None)
     }
 
@@ -3585,7 +3582,7 @@ impl<'a> Printer<'a> {
     /// `None` is the no-run case and adds no doc node — this is a hot path.
     fn build_arrow_body_doc_with_leading(
         &self,
-        expr: &ast::Expression<'_>,
+        expr: &ast::Expression,
         leading: Option<DocId>,
     ) -> DocId {
         let d = self.d();
@@ -3730,7 +3727,7 @@ impl<'a> Printer<'a> {
     /// takes its break arm and prints nothing.
     fn build_arrow_body_with_comments_doc(
         &self,
-        expr: &ast::Expression<'_>,
+        expr: &ast::Expression,
         sig_end: u32,
         body_start: u32,
         frozen: Option<Span>,
@@ -3794,7 +3791,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn arrow_gap_glued_block_comment(
         &self,
         arrow: &ast::ArrowFunctionExpression,
-        body: &ast::Expression<'_>,
+        body: &ast::Expression,
     ) -> Option<u32> {
         let gap_start = arrow_token_end(arrow);
         let body_start = body.span().start;
@@ -3879,7 +3876,7 @@ impl<'a> Printer<'a> {
     /// (falling back to the body start if the paren can't be located).
     fn build_function_expression_signature_doc(
         &self,
-        func: &ast::FunctionExpression<'_>,
+        func: &ast::FunctionExpression,
     ) -> (DocId, u32) {
         let d = self.d();
         let mut sig_parts = DocBuf::new();
@@ -3921,7 +3918,7 @@ impl<'a> Printer<'a> {
     /// For standalone function expressions, use `build_function_doc` instead.
     pub(in crate::printer) fn build_function_doc_body(
         &self,
-        func: &ast::FunctionExpression<'_>,
+        func: &ast::FunctionExpression,
     ) -> DocId {
         let d = self.d();
         // sig_end bounds the outer comment detection before the body.
@@ -3942,10 +3939,7 @@ impl<'a> Printer<'a> {
     /// - type parameters
     /// - parameters and return type
     /// - body
-    pub(in crate::printer) fn build_function_doc(
-        &self,
-        func: &ast::FunctionExpression<'_>,
-    ) -> DocId {
+    pub(in crate::printer) fn build_function_doc(&self, func: &ast::FunctionExpression) -> DocId {
         let d = self.d();
         let mut parts: DocBuf = DocBuf::new();
 
@@ -4011,7 +4005,7 @@ impl<'a> Printer<'a> {
     fn build_function_parameter_item_doc(
         &self,
         list_frozen: Option<Span>,
-        param: &ast::Expression<'_>,
+        param: &ast::Expression,
     ) -> DocId {
         if let Some(frozen) = list_frozen {
             return self.build_frozen_span_doc(frozen);
@@ -4030,7 +4024,7 @@ impl<'a> Printer<'a> {
     /// Used by arrow functions, function expressions, function declarations, and class methods.
     pub(crate) fn build_params_doc_with_comments(
         &self,
-        params: &[ast::Expression<'_>],
+        params: &[ast::Expression],
         params_start: Option<u32>,
         trailing_comments_end: Option<u32>,
     ) -> DocId {
@@ -4434,7 +4428,7 @@ impl<'a> Printer<'a> {
     /// separator, which is the only thing that preserves an author blank, never runs.
     pub(in crate::printer) fn has_leading_own_line_comment_in_params(
         &self,
-        params: &[ast::Expression<'_>],
+        params: &[ast::Expression],
         params_start: Option<u32>,
     ) -> bool {
         for (i, param) in params.iter().enumerate() {
@@ -4486,7 +4480,7 @@ impl<'a> Printer<'a> {
     /// left to force the break) collapsed it again.
     pub(in crate::printer) fn has_blank_line_between_params(
         &self,
-        params: &[ast::Expression<'_>],
+        params: &[ast::Expression],
     ) -> bool {
         params.windows(2).any(|pair| {
             // Measure to the next param's first decorator, not its binding — a
@@ -4626,7 +4620,7 @@ impl<'a> Printer<'a> {
         param_render_start: u32,
         prev_comma_pos: Option<u32>,
         skip_delim: Option<u32>,
-        param: &ast::Expression<'_>,
+        param: &ast::Expression,
     ) -> u32 {
         self.leading_param_comments(start, param_render_start, prev_comma_pos, skip_delim)
             .first()
@@ -4693,7 +4687,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for a class expression (`class …`, named or anonymous).
     pub(in crate::printer) fn build_class_expression_doc(
         &self,
-        class_expr: &ast::ClassExpression<'_>,
+        class_expr: &ast::ClassExpression,
         class_expr_span: Span,
     ) -> DocId {
         let super_class = self.view.opt(class_expr.super_class);

@@ -213,10 +213,10 @@ pub fn format(source: &str) -> Result<String> {
 /// then print into the doc arena `doc_arena` hands over once the parse has succeeded (handed
 /// the folded text, so a fresh one is sized to it and a failed parse never builds one).
 /// Nothing borrowed from either arena escapes: the result is owned.
-pub(crate) fn format_in<'arena, D: std::borrow::Borrow<tsv_lang::doc::arena::DocArena>>(
+pub(crate) fn format_in<D: std::borrow::Borrow<tsv_lang::doc::arena::DocArena>>(
     source: &str,
-    arena: &'arena bumpalo::Bump,
-    stores: &mut AstStores<'arena>,
+    arena: &bumpalo::Bump,
+    stores: &mut AstStores,
     doc_arena: impl FnOnce(&str) -> D,
 ) -> Result<String> {
     // The format path's line-terminator fold, ahead of the parse (see

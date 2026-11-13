@@ -257,7 +257,7 @@ impl<'s, 'b> Walk<'s, 'b> {
         }
     }
 
-    pub(crate) fn program(&mut self, program: &Program<'_>) {
+    pub(crate) fn program(&mut self, program: &Program) {
         // `statement_list`'s loop, plus the module-declaration half of `has_module_syntax`
         // asked of each top-level statement as it is walked (measured cheaper than a pass
         // of its own, and than asking at the import and export arms). The strip runs this
@@ -318,7 +318,7 @@ impl<'s, 'b> Walk<'s, 'b> {
 
     /// A static import's record, its `type_only` read by [`Self::import`] off the walk over
     /// its specifiers. None inside a namespace body.
-    fn record_import(&mut self, import: &ImportDeclaration<'_>, span: Span, type_only: TypeOnly) {
+    fn record_import(&mut self, import: &ImportDeclaration, span: Span, type_only: TypeOnly) {
         if !self.collects_static() {
             return;
         }
@@ -341,7 +341,7 @@ impl<'s, 'b> Walk<'s, 'b> {
     /// specifiers.
     fn record_re_export(
         &mut self,
-        export: &ExportNamedDeclaration<'_>,
+        export: &ExportNamedDeclaration,
         span: Span,
         type_only: TypeOnly,
     ) {
@@ -365,7 +365,7 @@ impl<'s, 'b> Walk<'s, 'b> {
         );
     }
 
-    fn record_export_all(&mut self, export: &ExportAllDeclaration<'_>, span: Span) {
+    fn record_export_all(&mut self, export: &ExportAllDeclaration, span: Span) {
         if !self.collects_static() {
             return;
         }
@@ -388,7 +388,7 @@ impl<'s, 'b> Walk<'s, 'b> {
         );
     }
 
-    fn record_import_equals(&mut self, import: &TSImportEqualsDeclaration<'_>, span: Span) {
+    fn record_import_equals(&mut self, import: &TSImportEqualsDeclaration, span: Span) {
         let TSModuleReference::ExternalModuleReference(reference) = &import.module_reference else {
             return;
         };
@@ -457,7 +457,7 @@ impl<'s, 'b> Walk<'s, 'b> {
     fn attributes_clause(
         &self,
         source_end: u32,
-        attributes: Option<&[ImportAttribute<'_>]>,
+        attributes: Option<&[ImportAttribute]>,
     ) -> Option<ByteSpan> {
         let attributes = attributes?;
         let with = self.src.next_significant(source_end);
@@ -585,13 +585,13 @@ impl<'s, 'b> Walk<'s, 'b> {
         }
     }
 
-    fn nested_statement(&mut self, statement: &Statement<'_>) {
+    fn nested_statement(&mut self, statement: &Statement) {
         self.statement(statement, statement.span, Position::Nested);
     }
 
     /// Walk `statement`, whose full extent is `outer` — its own span, or an `export`
     /// declaration's around it, which is what blanks or refuses when it is TypeScript.
-    fn statement(&mut self, statement: &Statement<'_>, outer: Span, position: Position) {
+    fn statement(&mut self, statement: &Statement, outer: Span, position: Position) {
         if self.statement_kind(statement, outer, position) {
             // a statement whose last byte is a `;` is closed, whatever its kind:
             // `statement_tail`'s every arm closes, reaches `unterminated_tail` at that same
@@ -607,12 +607,7 @@ impl<'s, 'b> Walk<'s, 'b> {
     }
 
     /// The verdict on one statement; `true` when JS stays (anything not blanked whole).
-    fn statement_kind(
-        &mut self,
-        statement: &Statement<'_>,
-        outer: Span,
-        position: Position,
-    ) -> bool {
+    fn statement_kind(&mut self, statement: &Statement, outer: Span, position: Position) -> bool {
         match &statement.kind {
             StatementKind::ExpressionStatement(s) => {
                 self.expr(self.view.expr(s.expression));
@@ -831,7 +826,7 @@ impl<'s, 'b> Walk<'s, 'b> {
 
     /// How a kept statement ends (`Walk::open`): in an expression with no `;` after it, or
     /// closed.
-    fn statement_tail(&self, statement: &Statement<'_>) -> Tail {
+    fn statement_tail(&self, statement: &Statement) -> Tail {
         let end = statement.span.end;
         match &statement.kind {
             StatementKind::ExpressionStatement(s) => {
@@ -904,7 +899,7 @@ impl<'s, 'b> Walk<'s, 'b> {
 
     /// The tail of expression `e` closing a statement or field that ends at `end`: closed by
     /// a `;` in the source or by a statement-final assertion's.
-    fn unterminated_tail(&self, e: &Expression<'_>, end: u32) -> Tail {
+    fn unterminated_tail(&self, e: &Expression, end: u32) -> Tail {
         if self.src.ends_with_semicolon(end) || self.terminated_at == Some(end) {
             Tail::Closed
         } else {
@@ -955,7 +950,7 @@ impl<'s, 'b> Walk<'s, 'b> {
     /// specifiers blank with their trailing commas.
     fn export_named(
         &mut self,
-        export: &ExportNamedDeclaration<'_>,
+        export: &ExportNamedDeclaration,
         outer: Span,
         position: Position,
     ) -> bool {
@@ -987,7 +982,7 @@ impl<'s, 'b> Walk<'s, 'b> {
 
     fn export_default(
         &mut self,
-        export: &ExportDefaultDeclaration<'_>,
+        export: &ExportDefaultDeclaration,
         outer: Span,
         position: Position,
     ) -> bool {
@@ -1026,7 +1021,7 @@ impl<'s, 'b> Walk<'s, 'b> {
     /// `import …`: `import type` blanks whole; inline `type` specifiers blank with their
     /// trailing commas, and the declaration stays even when its braces end up empty — it
     /// still loads the module, as `verbatimModuleSyntax` and both oracles have it.
-    fn import(&mut self, import: &ImportDeclaration<'_>, outer: Span, position: Position) -> bool {
+    fn import(&mut self, import: &ImportDeclaration, outer: Span, position: Position) -> bool {
         if import.import_kind == ImportKind::Type {
             self.record_import(import, outer, TypeOnly::Statement);
             self.blank_statement(outer, position);
@@ -1065,7 +1060,7 @@ impl<'s, 'b> Walk<'s, 'b> {
     /// full walk, which reads an `import.meta` as module syntax: a rare kind, kept out of the
     /// inlined set every call site tests.
     #[inline]
-    fn expr(&mut self, e: &Expression<'_>) {
+    fn expr(&mut self, e: &Expression) {
         match &e.kind {
             ExpressionKind::Literal(_)
             | ExpressionKind::RegexLiteral(_)
@@ -1085,7 +1080,7 @@ impl<'s, 'b> Walk<'s, 'b> {
     /// innermost first, the source order a recursion visits them in.
     #[inline(never)]
     fn binary_chain(&mut self, binary: &BinaryExpression) {
-        let mut rights: SmallVec<[&Expression<'_>; 8]> = SmallVec::new();
+        let mut rights: SmallVec<[&Expression; 8]> = SmallVec::new();
         rights.push(self.view.expr(binary.right));
         let mut left = self.view.expr(binary.left);
         while let ExpressionKind::BinaryExpression(inner) = &left.kind {
@@ -1105,7 +1100,7 @@ impl<'s, 'b> Walk<'s, 'b> {
     /// (bounded only by `SPINE_LIMIT`) costs a bounded stack. Only the operand's walk is
     /// counted: a link's arguments are a level of nesting, which the nesting limit bounds.
     #[inline]
-    fn link_operand(&mut self, operand: &Expression<'_>) {
+    fn link_operand(&mut self, operand: &Expression) {
         match &operand.kind {
             ExpressionKind::Literal(_)
             | ExpressionKind::RegexLiteral(_)
@@ -1122,7 +1117,7 @@ impl<'s, 'b> Walk<'s, 'b> {
     /// [`Self::link_operand`] past the leaves.
     #[expect(clippy::inline_always)]
     #[inline(always)]
-    fn link_operand_inner(&mut self, operand: &Expression<'_>) {
+    fn link_operand_inner(&mut self, operand: &Expression) {
         if self.chain_frames >= CHAIN_FRAMES && is_link(operand) {
             self.chain(operand);
         } else {
@@ -1147,9 +1142,9 @@ impl<'s, 'b> Walk<'s, 'b> {
     /// in it is followed by a binary operator. The flag keeps the loop's verdict the
     /// recursion's should that change.
     #[inline(never)]
-    fn chain(&mut self, e: &Expression<'_>) {
+    fn chain(&mut self, e: &Expression) {
         // each link with whether its grouping check refused it
-        let mut links: SmallVec<[(&Expression<'_>, bool); 16]> = SmallVec::new();
+        let mut links: SmallVec<[(&Expression, bool); 16]> = SmallVec::new();
         let mut node = e;
         let mut walks_base = true;
         loop {
@@ -1209,7 +1204,7 @@ impl<'s, 'b> Walk<'s, 'b> {
 
     /// A chain link's work past its operand ([`Self::chain`]), as [`Self::expr_inner`]
     /// does it.
-    fn link_tail(&mut self, link: &Expression<'_>) {
+    fn link_tail(&mut self, link: &Expression) {
         match &link.kind {
             ExpressionKind::CallExpression(call) => {
                 self.type_arguments(call.type_arguments.as_ref());
@@ -1264,7 +1259,7 @@ impl<'s, 'b> Walk<'s, 'b> {
     /// The full walk of expression `e`, every kind matched; [`Self::expr`] answers the leaves
     /// before reaching it.
     #[inline(never)]
-    fn expr_inner(&mut self, e: &Expression<'_>) {
+    fn expr_inner(&mut self, e: &Expression) {
         match &e.kind {
             ExpressionKind::Literal(_)
             | ExpressionKind::RegexLiteral(_)
@@ -1428,7 +1423,7 @@ impl<'s, 'b> Walk<'s, 'b> {
     /// A binding identifier's TypeScript: parameter decorators stay (walked for the type
     /// arguments in them), the optional `?` and the annotation blank. A reference carries
     /// none of these.
-    fn identifier(&mut self, id: &Identifier<'_>) {
+    fn identifier(&mut self, id: &Identifier) {
         let decorators = id.decorators(self.view);
         self.decorators(decorators);
         let annotation = id.type_annotation(self.view);
@@ -1489,7 +1484,7 @@ impl<'s, 'b> Walk<'s, 'b> {
     /// operand (past any paren around it). Where the assertion ends its statement and no `;`
     /// follows, the blank starts with a `;`. Refused where blanking would regroup the
     /// expression around it.
-    fn assertion(&mut self, span: Span, operand: &Expression<'_>, ty: &TSType<'_>, keyword: &[u8]) {
+    fn assertion(&mut self, span: Span, operand: &Expression, ty: &TSType, keyword: &[u8]) {
         if let Some(blank_from) = self.assertion_head(span, operand, ty, keyword) {
             self.link_operand(operand);
             self.assertion_tail(span, blank_from);
@@ -1503,8 +1498,8 @@ impl<'s, 'b> Walk<'s, 'b> {
     fn assertion_head(
         &mut self,
         span: Span,
-        operand: &Expression<'_>,
-        ty: &TSType<'_>,
+        operand: &Expression,
+        ty: &TSType,
         keyword: &[u8],
     ) -> Option<u32> {
         let blank_from = self.assertion_blank_start(operand, ty, keyword);
@@ -1531,12 +1526,7 @@ impl<'s, 'b> Walk<'s, 'b> {
 
     /// Where an assertion's blank starts: past the last `)` between its operand and its
     /// keyword (a paren the parser stripped from the operand), else at the operand's end.
-    fn assertion_blank_start(
-        &self,
-        operand: &Expression<'_>,
-        ty: &TSType<'_>,
-        keyword: &[u8],
-    ) -> u32 {
+    fn assertion_blank_start(&self, operand: &Expression, ty: &TSType, keyword: &[u8]) -> u32 {
         let operand_end = operand.span.end;
         let keyword_at = self
             .src
@@ -1553,18 +1543,13 @@ impl<'s, 'b> Walk<'s, 'b> {
     /// assertions, and unless parenthesized — is a binary expression whose operator binds
     /// looser than the operator after the assertion (or as tight, with `**` on either
     /// side), or a unary / `await` expression followed by `**`.
-    fn assertion_regroups(
-        &self,
-        span: Span,
-        operand: &Expression<'_>,
-        operand_wrapped: bool,
-    ) -> bool {
+    fn assertion_regroups(&self, span: Span, operand: &Expression, operand_wrapped: bool) -> bool {
         if operand_wrapped {
             return false;
         }
         let mut base = operand;
         loop {
-            let (inner, ty, keyword): (&Expression<'_>, &TSType<'_>, &[u8]) = match &base.kind {
+            let (inner, ty, keyword): (&Expression, &TSType, &[u8]) = match &base.kind {
                 ExpressionKind::TSAsExpression(a) => (
                     self.view.expr(a.expression),
                     self.view.ty(a.type_annotation),
@@ -1673,7 +1658,7 @@ impl<'s, 'b> Walk<'s, 'b> {
         self.leave_function();
     }
 
-    fn is_this_parameter(&self, param: &Expression<'_>) -> bool {
+    fn is_this_parameter(&self, param: &Expression) -> bool {
         matches!(&param.kind, ExpressionKind::Identifier(id) if id.name(self.src.text, self.view) == "this")
     }
 
@@ -1734,7 +1719,7 @@ impl<'s, 'b> Walk<'s, 'b> {
     }
 
     /// The verdict on one member; `true` when JS stays.
-    fn class_member(&mut self, member: &ClassMember<'_>) -> bool {
+    fn class_member(&mut self, member: &ClassMember) -> bool {
         // read before the member's own walk, which can reach a nested class body
         let open_field = self.open != Tail::Closed;
         match member {
@@ -1824,7 +1809,7 @@ impl<'s, 'b> Walk<'s, 'b> {
         true
     }
 
-    fn method_definition(&mut self, method: &MethodDefinition<'_>, open_field: bool) -> bool {
+    fn method_definition(&mut self, method: &MethodDefinition, open_field: bool) -> bool {
         let key = self.view.expr(method.key);
         let func = &method.value;
         // an overload signature or an abstract method or accessor: no body
@@ -1883,7 +1868,7 @@ impl<'s, 'b> Walk<'s, 'b> {
     /// the enum). An `await` in one is not a top-level one (TS1308). Out of line, as
     /// [`Self::namespace_body`]: the strip never takes it.
     #[inline(never)]
-    fn enum_initializers(&mut self, decl: &TSEnumDeclaration<'_>) {
+    fn enum_initializers(&mut self, decl: &TSEnumDeclaration) {
         self.enter_function();
         for member in self.view.enum_members(decl.members) {
             if let Some(initializer) = self.view.opt(member.initializer) {
@@ -1899,7 +1884,7 @@ impl<'s, 'b> Walk<'s, 'b> {
     /// top-level one (TS1308): tsc reads the body as function-like. Out of line: the strip
     /// never takes it, and `statement_kind` is every statement's frame.
     #[inline(never)]
-    fn namespace_body(&mut self, decl: &TSModuleDeclaration<'_>) {
+    fn namespace_body(&mut self, decl: &TSModuleDeclaration) {
         let outer_in_namespace = std::mem::replace(&mut self.in_namespace, true);
         self.enter_function();
         let mut decl = decl;
@@ -1922,7 +1907,7 @@ impl<'s, 'b> Walk<'s, 'b> {
     /// Whether a member key is an identifier spelled like a binary operator (`in`,
     /// `instanceof`): once a modifier ahead of it blanks, an open field's initializer reads
     /// the key as that operator and the next member as its right operand.
-    fn is_operator_key(&self, key: &Expression<'_>, computed: bool) -> bool {
+    fn is_operator_key(&self, key: &Expression, computed: bool) -> bool {
         !computed
             && matches!(&key.kind, ExpressionKind::Identifier(id)
                 if matches!(id.name(self.src.text, self.view), "in" | "instanceof"))
@@ -1984,7 +1969,7 @@ struct MemberModifiers {
 
 /// Whether a top-level statement is an ECMAScript module declaration: an import, or an
 /// export other than TypeScript's `export =`, `export as namespace` and `export import`.
-const fn is_module_declaration(statement: &Statement<'_>) -> bool {
+const fn is_module_declaration(statement: &Statement) -> bool {
     matches!(
         statement.kind,
         StatementKind::ImportDeclaration(_)
@@ -2018,7 +2003,7 @@ const fn string_contents(literal: Span) -> ByteSpan {
 /// Whether `e` is a chain link: a member access, a call, a `new`, a tagged template, a `!`,
 /// an instantiation or an assertion, whose operand ([`Walk::link_operand`]) runs down the
 /// chain.
-fn is_link(e: &Expression<'_>) -> bool {
+fn is_link(e: &Expression) -> bool {
     matches!(
         e.kind,
         ExpressionKind::CallExpression(_)
@@ -2041,7 +2026,7 @@ fn decorators_end(decorators: Option<&[Decorator]>, start: u32) -> u32 {
 /// The parts of a function the walk reads, from any of its node shapes.
 struct FunctionView<'n> {
     type_parameters: Option<&'n TSTypeParameterDeclaration>,
-    params: &'n [Expression<'n>],
+    params: &'n [Expression],
     /// The parameter list's `(`; `None` for a bare arrow parameter (`x => x`).
     params_open: Option<u32>,
     return_type: Option<&'n TSTypeAnnotation>,
@@ -2051,11 +2036,11 @@ struct FunctionView<'n> {
 
 enum FunctionBody<'n> {
     Block(&'n BlockStatement),
-    Expression(&'n Expression<'n>),
+    Expression(&'n Expression),
 }
 
 impl<'n> FunctionView<'n> {
-    fn declaration(view: AstView<'n>, func: &'n FunctionDeclaration<'_>) -> Self {
+    fn declaration(view: AstView<'n>, func: &'n FunctionDeclaration) -> Self {
         Self {
             type_parameters: func.type_parameters.as_ref(),
             params: view.run(func.params),
@@ -2066,7 +2051,7 @@ impl<'n> FunctionView<'n> {
         }
     }
 
-    fn expression(view: AstView<'n>, func: &'n FunctionExpression<'_>) -> Self {
+    fn expression(view: AstView<'n>, func: &'n FunctionExpression) -> Self {
         Self {
             type_parameters: func.type_parameters.as_ref(),
             params: view.run(func.params),
@@ -2097,14 +2082,14 @@ struct ClassView<'n> {
     decorators: Option<&'n [Decorator]>,
     r#abstract: bool,
     type_parameters: Option<&'n TSTypeParameterDeclaration>,
-    super_class: Option<&'n Expression<'n>>,
+    super_class: Option<&'n Expression>,
     super_type_parameters: Option<&'n TSTypeParameterInstantiation>,
-    implements: &'n [TSInterfaceHeritage<'n>],
+    implements: &'n [TSInterfaceHeritage],
     body: &'n ClassBody,
 }
 
 impl<'n> ClassView<'n> {
-    fn declaration(view: AstView<'n>, class: &'n ClassDeclaration<'_>) -> Self {
+    fn declaration(view: AstView<'n>, class: &'n ClassDeclaration) -> Self {
         Self {
             decorators: view.opt_decorators(class.decorators),
             r#abstract: class.r#abstract,
@@ -2116,7 +2101,7 @@ impl<'n> ClassView<'n> {
         }
     }
 
-    fn expression(view: AstView<'n>, class: &'n ClassExpression<'_>) -> Self {
+    fn expression(view: AstView<'n>, class: &'n ClassExpression) -> Self {
         Self {
             decorators: view.opt_decorators(class.decorators),
             r#abstract: class.r#abstract,
@@ -2132,7 +2117,7 @@ impl<'n> ClassView<'n> {
 /// How expression `e` ends when it closes a statement or field ending at `end`
 /// (`Walk::open`). Its rightmost operand decides — unless a paren the parser stripped closes
 /// it (its span ends short of `end`), which any continuation extends.
-fn expression_tail(view: AstView<'_>, e: &Expression<'_>, end: u32) -> Tail {
+fn expression_tail(view: AstView<'_>, e: &Expression, end: u32) -> Tail {
     if e.span.end != end {
         return Tail::Open;
     }
@@ -2205,7 +2190,7 @@ const fn precedence(operator: BinaryOperator) -> u8 {
 /// refused (ts-blank-space's `visitModule`): `declare global`, an ambient `module 'x'`, and
 /// a `namespace` that is `declare`d or holds no value. A `module` keyword with an
 /// identifier name is refused even when ambient, as both oracles refuse it.
-fn module_is_type_only(view: AstView<'_>, decl: &TSModuleDeclaration<'_>) -> bool {
+fn module_is_type_only(view: AstView<'_>, decl: &TSModuleDeclaration) -> bool {
     decl.global
         || matches!(decl.id, TSModuleName::Literal(_))
         || (decl.kind == TSModuleDeclarationKind::Namespace
@@ -2213,7 +2198,7 @@ fn module_is_type_only(view: AstView<'_>, decl: &TSModuleDeclaration<'_>) -> boo
 }
 
 /// Whether a `namespace`'s body holds a value (ts-blank-space's `valueNamespaceWorker`).
-fn namespace_holds_value(view: AstView<'_>, decl: &TSModuleDeclaration<'_>) -> bool {
+fn namespace_holds_value(view: AstView<'_>, decl: &TSModuleDeclaration) -> bool {
     match decl.body.as_ref() {
         None => false,
         Some(&TSModuleDeclarationBody::TSModuleDeclaration(inner)) => {
@@ -2229,7 +2214,7 @@ fn namespace_holds_value(view: AstView<'_>, decl: &TSModuleDeclaration<'_>) -> b
 
 /// A module nested in a namespace: one not spelled `namespace` (an ambient `module 'x'`,
 /// `global`, a `module` keyword) counts as a value, as ts-blank-space counts it.
-fn nested_module_holds_value(view: AstView<'_>, decl: &TSModuleDeclaration<'_>) -> bool {
+fn nested_module_holds_value(view: AstView<'_>, decl: &TSModuleDeclaration) -> bool {
     decl.global
         || decl.kind != TSModuleDeclarationKind::Namespace
         || namespace_holds_value(view, decl)
@@ -2237,7 +2222,7 @@ fn nested_module_holds_value(view: AstView<'_>, decl: &TSModuleDeclaration<'_>) 
 
 /// Whether one statement of a namespace body is a value: anything but a type alias, an
 /// interface, a type-only nested namespace, or an unexported import-equals alias.
-fn namespace_member_holds_value(view: AstView<'_>, statement: &Statement<'_>) -> bool {
+fn namespace_member_holds_value(view: AstView<'_>, statement: &Statement) -> bool {
     match &statement.kind {
         StatementKind::TSTypeAliasDeclaration(_) | StatementKind::TSInterfaceDeclaration(_) => {
             false

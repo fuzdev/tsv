@@ -47,7 +47,7 @@ const TEST_CALL_PATTERNS: &[&str] = &[
 ];
 
 /// Get the name channel (+ span start) of an identifier if it's a simple identifier
-fn get_identifier_name<'a>(expr: &ast::Expression<'a>) -> Option<(IdentName<'a>, u32, u32)> {
+fn get_identifier_name(expr: &ast::Expression) -> Option<(IdentName, u32, u32)> {
     if let ast::ExpressionKind::Identifier(id) = &expr.kind {
         Some((id.ident_name(), id.span.start, id.span.end))
     } else {
@@ -82,7 +82,7 @@ fn get_identifier_name<'a>(expr: &ast::Expression<'a>) -> Option<(IdentName<'a>,
 /// the chain root's own span start: the callee's first printed byte, the left-edge fact
 /// [`Printer::prepend_owned_leading_comment_at`] asks each caller for.
 pub(super) fn build_test_callee_flat_doc(
-    expr: &ast::Expression<'_>,
+    expr: &ast::Expression,
     printer: &Printer<'_>,
 ) -> Option<DocId> {
     let parts = get_member_chain_parts(printer.view, expr)?;
@@ -113,9 +113,9 @@ pub(super) fn build_test_callee_flat_doc(
 #[inline(never)]
 fn get_member_chain_parts<'a>(
     view: AstView<'a>,
-    expr: &ast::Expression<'a>,
-) -> Option<SmallVec<[(IdentName<'a>, u32, u32); 8]>> {
-    let mut parts: SmallVec<[(IdentName<'a>, u32, u32); 8]> = SmallVec::new();
+    expr: &ast::Expression,
+) -> Option<SmallVec<[(IdentName, u32, u32); 8]>> {
+    let mut parts: SmallVec<[(IdentName, u32, u32); 8]> = SmallVec::new();
 
     // Property names outermost first, then the base — a loop down the spine, not a
     // recursion, since a frame per link is what the stack contract prices
@@ -297,7 +297,7 @@ pub(super) fn is_test_call(call: &ast::CallExpression, printer: &Printer<'_>) ->
 /// (an escaped `te\u0073t` is `test`). The same callees qualify as for the flat callee doc
 /// ([`build_test_callee_flat_doc`], over [`get_member_chain_parts`]): an identifier root and
 /// identifier properties only.
-fn callee_is_test_pattern(view: AstView<'_>, callee: &ast::Expression<'_>, source: &str) -> bool {
+fn callee_is_test_pattern(view: AstView<'_>, callee: &ast::Expression, source: &str) -> bool {
     let mut names = [""; TEST_PATTERN_MAX_DEPTH];
     let mut depth = 0;
     let mut expr = callee;

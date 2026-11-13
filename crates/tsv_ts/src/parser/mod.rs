@@ -278,7 +278,7 @@ impl StatementFrame {
     /// every statement ([`DepthBudget::take_peak`]), so a chain is charged its own
     /// statement's, whatever came before it.
     #[inline]
-    pub(super) fn next(&mut self, parser: &mut Parser<'_, '_>) {
+    pub(super) fn next(&mut self, parser: &mut Parser<'_>) {
         self.closed += 1;
         if self.closed > ListFrame::SUMMED || parser.spine.runs_long() {
             self.statements = self.statements.max(parser.spine.take());
@@ -309,7 +309,7 @@ impl ListFrame {
     /// Open the frame of element `index` (0-based), closing the one before it — its spine
     /// count and its deepest nesting ([`DepthBudget::take_peak`]) alike.
     #[inline]
-    pub(super) fn element(&mut self, parser: &mut Parser<'_, '_>, index: usize) {
+    pub(super) fn element(&mut self, parser: &mut Parser<'_>, index: usize) {
         if index >= Self::SUMMED {
             self.greatest = self.greatest.max(parser.spine.take());
             self.peak = self.peak.max(parser.depth.take_peak(parser.grouping_depth));
@@ -319,7 +319,7 @@ impl ListFrame {
     /// Close the list: the enclosing frame takes the greatest of the elements' frames —
     /// the first of them holding what the frame counted before the list.
     #[inline]
-    pub(super) fn close(self, parser: &mut Parser<'_, '_>) {
+    pub(super) fn close(self, parser: &mut Parser<'_>) {
         if !self.greatest.is_empty() {
             parser.spine.fold(self.greatest);
         }
@@ -482,12 +482,12 @@ fn call_spine_step(view: AstView<'_>, inner: ExprId) -> ControlFlow<u32, ExprId>
 /// read makes across the rewind, and that is safe: the re-read parses the same decorator
 /// list the same way, so every surviving claim is one it makes again.
 #[derive(Clone)]
-pub(super) struct Checkpoint<'arena> {
+pub(super) struct Checkpoint {
     lexer: LexerCheckpoint,
     current: Token,
-    current_decoded: Option<PoolStr<'arena>>,
+    current_decoded: Option<PoolStr>,
     peek: Option<Token>,
-    peek_decoded: Option<PoolStr<'arena>>,
+    peek_decoded: Option<PoolStr>,
     had_line_terminator: bool,
     peek_had_line_terminator: bool,
     prev_end: usize,
@@ -551,11 +551,11 @@ pub(crate) fn push_spanned<T: Row + Clone>(
 }
 
 #[expect(clippy::struct_excessive_bools)]
-pub(crate) struct Parser<'a, 'arena> {
+pub(crate) struct Parser<'a> {
     /// The document's expression, statement, type, payload and value-run stores, its text
     /// pool and its comments, shared by every parser of the document. `'a` is the source's
-    /// lifetime, which the `&mut` takes as covariantly as the `&str`.
-    stores: &'a mut AstStores<'arena>,
+    /// lifetime, which the `&mut` borrow shares.
+    stores: &'a mut AstStores,
     source: &'a str,
     lexer: Lexer<'a>,
     /// The current token's classification + span as the lexer's 16-byte POD,
@@ -572,13 +572,13 @@ pub(crate) struct Parser<'a, 'arena> {
     /// owned `String` — the lexer decodes into a reused scratch buffer and the parser
     /// copies it out immediately, so no per-literal `String` survives. A rewind restores
     /// it as a value; the text an abandoned token pushed stays in the pool, unnamed.
-    current_decoded: Option<PoolStr<'arena>>,
+    current_decoded: Option<PoolStr>,
     /// Single-token lookahead slot, stored as the 16-byte `Token` POD with its
     /// decoded value out-of-band in `peek_decoded` (mirroring the `current` /
     /// `current_decoded` split). Consuming the peek is then a direct `Token` copy
     /// into `current` with no intermediate lookahead struct to reassemble.
     peek: Option<Token>,
-    peek_decoded: Option<PoolStr<'arena>>,
+    peek_decoded: Option<PoolStr>,
     base_offset: usize, // Offset in full source (for embedded expressions)
     /// Where this parser's comment ledger starts on the stores' comment scratch: the
     /// comments it has drained, in source order, are the frame above it
@@ -910,19 +910,19 @@ pub(crate) struct Parser<'a, 'arena> {
     pending_conditional_extends: Option<TyId>,
 }
 
-impl<'a, 'arena> Parser<'a, 'arena> {
+impl<'a> Parser<'a> {
     /// Push a finished expression and mint its id — the tail of every node builder on the
     /// expression ladder (see §The expression ladder's return currency in `expression.rs`).
     #[inline]
-    pub(in crate::parser) fn push_expr(&mut self, expr: Expression<'arena>) -> ExprId {
+    pub(in crate::parser) fn push_expr(&mut self, expr: Expression) -> ExprId {
         #[cfg(feature = "_internal_ast_census")]
-        tsv_lang::ast_census_probe::mint::<Expression<'arena>>(1);
+        tsv_lang::ast_census_probe::mint::<Expression>(1);
         self.stores.exprs.push(expr)
     }
 
     /// [`Parser::push_expr`] in the ladder's return currency.
     #[inline]
-    pub(in crate::parser) fn push_ret(&mut self, expr: Expression<'arena>) -> ExprRet {
+    pub(in crate::parser) fn push_ret(&mut self, expr: Expression) -> ExprRet {
         ExprRet::wrap(self.push_expr(expr))
     }
 
@@ -961,7 +961,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             .expr_scratch
             .flush_move(mark, &mut self.stores.exprs);
         #[cfg(feature = "_internal_ast_census")]
-        tsv_lang::ast_census_probe::mint::<Expression<'arena>>(run.len());
+        tsv_lang::ast_census_probe::mint::<Expression>(run.len());
         run
     }
 
@@ -969,9 +969,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// single edge or as a list element. Statements return by value, so the caller pushes
     /// once it has read what it needs of the value.
     #[inline]
-    pub(in crate::parser) fn push_stmt(&mut self, stmt: Statement<'arena>) -> StmtId {
+    pub(in crate::parser) fn push_stmt(&mut self, stmt: Statement) -> StmtId {
         #[cfg(feature = "_internal_ast_census")]
-        tsv_lang::ast_census_probe::mint::<Statement<'arena>>(1);
+        tsv_lang::ast_census_probe::mint::<Statement>(1);
         self.stores.stmts.push(stmt)
     }
 
@@ -989,22 +989,22 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     /// The row `id` names, as the parser reads a node it has built.
     #[inline]
-    pub(in crate::parser) fn expr(&self, id: ExprId) -> &Expression<'arena> {
+    pub(in crate::parser) fn expr(&self, id: ExprId) -> &Expression {
         self.stores.exprs.get(id)
     }
 
     /// Push a finished type and mint its id: the tail of every node builder on the type
     /// ladder (see `Parser::parse_type`).
     #[inline]
-    pub(in crate::parser) fn push_ty(&mut self, ty: TSType<'arena>) -> TyId {
+    pub(in crate::parser) fn push_ty(&mut self, ty: TSType) -> TyId {
         #[cfg(feature = "_internal_ast_census")]
-        tsv_lang::ast_census_probe::mint::<TSType<'arena>>(1);
+        tsv_lang::ast_census_probe::mint::<TSType>(1);
         self.stores.tys.push(ty)
     }
 
     /// [`Parser::push_ty`] in the type ladder's return currency.
     #[inline]
-    pub(in crate::parser) fn push_ty_ret(&mut self, ty: TSType<'arena>) -> TyRet {
+    pub(in crate::parser) fn push_ty_ret(&mut self, ty: TSType) -> TyRet {
         TyRet::wrap(self.push_ty(ty))
     }
 
@@ -1022,7 +1022,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     /// The type row `id` names, as the parser reads a type it has built.
     #[inline]
-    pub(in crate::parser) fn ty(&self, id: TyId) -> &TSType<'arena> {
+    pub(in crate::parser) fn ty(&self, id: TyId) -> &TSType {
         self.stores.tys.get(id)
     }
 
@@ -1036,7 +1036,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// the pool push and its `memcpy` call kept two callee-saved registers live in
     /// [`Parser::advance_inner`], which then saved and restored them on every token.
     #[inline]
-    fn decoded_to_pool(&mut self) -> Option<PoolStr<'arena>> {
+    fn decoded_to_pool(&mut self) -> Option<PoolStr> {
         if self.lexer.decoded_str().is_some() {
             self.copy_decoded_to_pool()
         } else {
@@ -1047,7 +1047,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// [`Parser::decoded_to_pool`]'s copy, for the rare token that decoded an escape.
     #[cold]
     #[inline(never)]
-    fn copy_decoded_to_pool(&mut self) -> Option<PoolStr<'arena>> {
+    fn copy_decoded_to_pool(&mut self) -> Option<PoolStr> {
         let decoded = self.lexer.decoded_str()?;
         Some(PoolStr::new(self.stores.text.push(decoded)))
     }
@@ -1101,12 +1101,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// into — one per parse entry point, each calling it twice — carries its own copy of
     /// those stores.
     #[inline(never)]
-    fn new(
-        source: &'a str,
-        base_offset: usize,
-        goal: Goal,
-        stores: &'a mut AstStores<'arena>,
-    ) -> Self {
+    fn new(source: &'a str, base_offset: usize, goal: Goal, stores: &'a mut AstStores) -> Self {
         let comment_mark = stores.comment_scratch.mark();
         Self {
             stores,
@@ -1797,7 +1792,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// argument list follows it (`(f<T>)<U>`, `printer::instantiation_keeps_pair_before_type_args`,
     /// whose optional-chain exception this reads past: a pair counted the output lacks).
     #[inline]
-    pub(super) fn is_bare_instantiation(operand: &Expression<'_>, start: u32) -> bool {
+    pub(super) fn is_bare_instantiation(operand: &Expression, start: u32) -> bool {
         matches!(operand.kind, ExpressionKind::TSInstantiationExpression(_))
             && operand.span().start == start
     }
@@ -2102,11 +2097,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// (possibly embedded) slice — so the span shifts back before slicing.
     /// Resolving a host span directly against `self.source` reads the wrong
     /// bytes under Svelte embedding, or panics past the slice end.
-    pub(super) fn resolve_cooked<'s>(
-        &'s self,
-        cooked: &'s StringCooked<'arena>,
-        span: Span,
-    ) -> &'s str {
+    pub(super) fn resolve_cooked<'s>(&'s self, cooked: &'s StringCooked, span: Span) -> &'s str {
         let local = Span::new(
             span.start - self.base_offset as u32,
             span.end - self.base_offset as u32,
@@ -2155,7 +2146,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// bytes) unless the token carries a decoded unicode escape
     /// (`\u0066oo` → `foo`) or is too long for `raw_len` — only those rare
     /// cases carry the pool-text escape hatch.
-    pub(super) fn current_ident_name(&mut self) -> IdentName<'arena> {
+    pub(super) fn current_ident_name(&mut self) -> IdentName {
         if let Some(decoded) = self.current_decoded {
             IdentName {
                 escaped: Some(decoded),
@@ -2177,7 +2168,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// ([`Parser::oversized_raw_name`]): inline, every call here would save and
     /// restore the registers the copy needs, on a path no real identifier
     /// takes. The copy is why every name constructor takes `&mut self`.
-    pub(super) fn current_raw_ident_name(&mut self) -> IdentName<'arena> {
+    pub(super) fn current_raw_ident_name(&mut self) -> IdentName {
         let len = self.current.end - self.current.start;
         if len > u16::MAX as u32 {
             return IdentName {
@@ -2204,7 +2195,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// recurse.
     #[cold]
     #[inline(never)]
-    fn oversized_raw_name(&mut self) -> PoolStr<'arena> {
+    fn oversized_raw_name(&mut self) -> PoolStr {
         let raw = self.current_value();
         PoolStr::new(self.stores.text.push(raw))
     }
@@ -2216,7 +2207,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// label). A plain identifier decodes unicode escapes; a keyword token is never
     /// escaped (the lexer re-classifies an escaped keyword as an `Identifier`), so it
     /// is taken verbatim.
-    pub(super) fn current_ident_name_or_await(&mut self) -> IdentName<'arena> {
+    pub(super) fn current_ident_name_or_await(&mut self) -> IdentName {
         if matches!(self.current_kind(), TokenKind::Identifier) {
             self.current_ident_name()
         } else {
@@ -2231,7 +2222,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// slice. Used to reject the reserved `#constructor` class-element name.
     pub(super) fn private_name_is(
         &self,
-        pid: &PrivateIdentifier<'_>,
+        pid: &PrivateIdentifier,
         span: Span,
         expected: &str,
     ) -> bool {
@@ -2263,7 +2254,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ///
     /// ⚠️ For a position the grammar spells `IdentifierName` — where every reserved
     /// word is valid — use [`Parser::try_identifier_name`] instead.
-    pub(super) fn try_ident_or_contextual_name(&mut self) -> Option<IdentName<'arena>> {
+    pub(super) fn try_ident_or_contextual_name(&mut self) -> Option<IdentName> {
         match self.current_kind() {
             TokenKind::Identifier => Some(self.current_ident_name()),
             TokenKind::Keyword(kw) if kw.can_be_identifier() => Some(self.current_raw_ident_name()),
@@ -2278,7 +2269,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// await(){}` / `export function await(){}` reject there, matching
     /// acorn-as-module. Other keyword-lexed names (`async`, `from`, `let`, `yield`,
     /// the type keywords) stay valid.
-    pub(super) fn try_function_name(&mut self) -> Option<IdentName<'arena>> {
+    pub(super) fn try_function_name(&mut self) -> Option<IdentName> {
         if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::Await))
             && !self.await_is_binding_name()
         {
@@ -2322,7 +2313,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
     }
 
-    pub(super) fn try_binding_name(&mut self) -> Option<IdentName<'arena>> {
+    pub(super) fn try_binding_name(&mut self) -> Option<IdentName> {
         match self.current_kind() {
             TokenKind::Identifier => Some(self.current_ident_name()),
             TokenKind::Keyword(kw) if kw.can_be_binding_name() => {
@@ -2347,7 +2338,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// namespace-segment / declare-module / enum / type-alias name parsers. The class
     /// paths capture inline instead (they additionally exclude the heritage-starting
     /// `implements`), and the import path captures the name across a following branch.
-    pub(super) fn take_binding_identifier(&mut self) -> Result<Option<Identifier<'arena>>, Error> {
+    pub(super) fn take_binding_identifier(&mut self) -> Result<Option<Identifier>, Error> {
         let Some(name) = self.try_binding_name() else {
             return Ok(None);
         };
@@ -2641,7 +2632,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// read ahead of the modifiers that may make the parameter a parameter property
     /// (`parse_parameter`).
     #[must_use]
-    pub(super) fn checkpoint(&self) -> Checkpoint<'arena> {
+    pub(super) fn checkpoint(&self) -> Checkpoint {
         // An expression head is never between the constrained-infer handoff's set
         // and its take (both sit inside one `parse_type` call), so the handoff is
         // not carried — `rewind` clears it instead.
@@ -2674,7 +2665,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// unwound, since the abandoned parse may have failed inside one. Rows and pool
     /// text the abandoned parse wrote are unreachable garbage; every context flag was
     /// restored by its own combinator on the way out.
-    pub(super) fn rewind(&mut self, checkpoint: Checkpoint<'arena>) {
+    pub(super) fn rewind(&mut self, checkpoint: Checkpoint) {
         let Checkpoint {
             lexer,
             current,
@@ -2925,7 +2916,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     /// Like `try_binding_name`, but also accepts the `this` keyword as the
     /// TypeScript `this` parameter (`function f(this: T)`, `(this: T) => U`).
-    pub(super) fn try_param_name(&mut self) -> Option<IdentName<'arena>> {
+    pub(super) fn try_param_name(&mut self) -> Option<IdentName> {
         match self.try_binding_name() {
             Some(name) => Some(name),
             None => self.this_as_name(),
@@ -2936,7 +2927,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// parameter (`function f(this: T)`) and the subject of a `this` type
     /// predicate (`this is T`, `asserts this`). `None` when the current token is
     /// not `this`; its raw text is verbatim (`this` is never escaped).
-    pub(super) fn this_as_name(&mut self) -> Option<IdentName<'arena>> {
+    pub(super) fn this_as_name(&mut self) -> Option<IdentName> {
         if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::This)) {
             Some(self.current_raw_ident_name())
         } else {
@@ -2961,7 +2952,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// *narrower* despite the broader-sounding name: it admits only the contextual
     /// keywords. Reaching for that one at an `IdentifierName` position is what made
     /// `#default` an over-rejection.
-    pub(super) fn try_identifier_name(&mut self) -> Option<IdentName<'arena>> {
+    pub(super) fn try_identifier_name(&mut self) -> Option<IdentName> {
         match self.current_kind() {
             TokenKind::Identifier => Some(self.current_ident_name()),
             TokenKind::Keyword(_) => Some(self.current_raw_ident_name()),
@@ -2986,7 +2977,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// ([`Parser::legacy_escape_error`]) rides here for every literal as its token
     /// becomes a node; the gate's one other asker is the retroactive prologue walk
     /// (`Parser::note_directive`), over literals whose tokens are already gone.
-    pub(super) fn extract_string_cooked(&self) -> Result<StringCooked<'arena>, Error> {
+    pub(super) fn extract_string_cooked(&self) -> Result<StringCooked, Error> {
         match self.current_decoded {
             Some(decoded) => {
                 if self.strict
@@ -3643,7 +3634,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// # Precondition
     /// Current token must satisfy [`Parser::current_is_identifier_or_keyword`], so
     /// callers own the "not a name here" error and its wording.
-    pub(super) fn parse_identifier_name_node(&mut self) -> Result<Identifier<'arena>, Error> {
+    pub(super) fn parse_identifier_name_node(&mut self) -> Result<Identifier, Error> {
         debug_assert!(self.current_is_identifier_or_keyword());
         let (start, end) = self.current_pos();
         let name = self.current_ident_name();
@@ -3687,9 +3678,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ///   tsv accepted them and reprinted `#a` — rewriting invalid code as valid.
     ///
     /// Returns the PrivateIdentifier beside its span, which includes the `#`.
-    pub(super) fn parse_private_identifier(
-        &mut self,
-    ) -> Result<(PrivateIdentifier<'arena>, Span), Error> {
+    pub(super) fn parse_private_identifier(&mut self) -> Result<(PrivateIdentifier, Span), Error> {
         debug_assert!(matches!(self.current_kind(), TokenKind::Hash));
         let (start, hash_end) = self.current_pos();
         self.advance()?; // consume '#'
@@ -4047,7 +4036,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
     }
 
-    pub(crate) fn parse(&mut self) -> Result<Program<'arena>, Error> {
+    pub(crate) fn parse(&mut self) -> Result<Program, Error> {
         self.parse_program()
             .map_err(|error| self.mark_await_operand_gate(error))
     }
@@ -4066,7 +4055,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
     }
 
-    fn parse_program(&mut self) -> Result<Program<'arena>, Error> {
+    fn parse_program(&mut self) -> Result<Program, Error> {
         let start = self.base_offset; // Start at base_offset for embedded contexts
 
         // The outermost strictness scope: a Script's `"use strict"` prologue turns
@@ -4139,7 +4128,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(crate) fn parse_expression_with_comments(
         &mut self,
         end: &str,
-    ) -> Result<(ExprId, CommentList<'arena>), Error> {
+    ) -> Result<(ExprId, CommentList), Error> {
         let expr = self.parse_expression()?.id();
         self.expect_end_of_input(end)?;
         let comments = self.take_comments();
@@ -4149,7 +4138,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Hand the collected comments to the caller as a [`CommentList`], flushing the ledger
     /// into the stores' comment rows. The parser drains no comment after it: every caller
     /// takes them once, at the end of its parse.
-    pub(crate) fn take_comments(&mut self) -> CommentList<'arena> {
+    pub(crate) fn take_comments(&mut self) -> CommentList {
         let stores = &mut *self.stores;
         let run = stores
             .comment_scratch
@@ -4227,7 +4216,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// rather than panicking (debug) or mis-extracting a "string" from the wrong
     /// token (release, where a bare `debug_assert!` would be elided). Surfaced by
     /// the `fuzz` gate (`tsv_debug fuzz`).
-    pub(super) fn parse_string_literal(&mut self) -> Result<Literal<'arena>, Error> {
+    pub(super) fn parse_string_literal(&mut self) -> Result<Literal, Error> {
         if !matches!(self.current_kind(), TokenKind::String) {
             return Err(self.error_expected("string literal"));
         }
@@ -4244,10 +4233,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 }
 
 /// Parse TypeScript source code into an AST in `stores`.
-pub(crate) fn parse_typescript<'arena>(
-    source: &str,
-    stores: &mut AstStores<'arena>,
-) -> Result<Program<'arena>, Error> {
+pub(crate) fn parse_typescript(source: &str, stores: &mut AstStores) -> Result<Program, Error> {
     parse_typescript_with_goal(source, Goal::Module, stores)
 }
 
@@ -4307,14 +4293,14 @@ pub(crate) fn parse_typescript<'arena>(
 // Every argument is a distinct input of the one driver both parses share; bundling two of
 // them into a struct would only move the count.
 #[expect(clippy::too_many_arguments)]
-pub(crate) fn parse_retrying_acorn_followers<'arena, T>(
+pub(crate) fn parse_retrying_acorn_followers<T>(
     source: &str,
     base_offset: usize,
     host_nesting: u32,
     goal: Goal,
-    stores: &mut AstStores<'arena>,
+    stores: &mut AstStores,
     embedded: bool,
-    f: impl Fn(&mut Parser<'_, 'arena>) -> Result<T, Error>,
+    f: impl Fn(&mut Parser<'_>) -> Result<T, Error>,
     host_check: impl Fn(AstView<'_>, &T) -> Result<(), Error>,
 ) -> Result<T, Error> {
     // Each failure carries whether the host refused it (`true`) or the parse itself did.
@@ -4385,8 +4371,8 @@ pub(crate) fn parse_retrying_acorn_followers<'arena, T>(
 /// (`crate::__private::parse_type_extent`) leaves none of them: a parser's comment ledger
 /// is dropped with it unless it was taken.
 #[inline]
-fn finish_driver_parse<'arena, T>(
-    stores: &mut AstStores<'arena>,
+fn finish_driver_parse<T>(
+    stores: &mut AstStores,
     marks: &ScratchMarks,
     outcome: Result<T, Error>,
 ) -> Result<T, Error> {
@@ -4408,11 +4394,11 @@ fn finish_driver_parse<'arena, T>(
 // `Parser::parse` (clippy's method-path suggestion) fails the higher-ranked
 // lifetime check on `parse_retrying_acorn_followers`'s `f` bound; the closure infers it.
 #[expect(clippy::redundant_closure_for_method_calls)]
-pub(crate) fn parse_typescript_with_goal<'arena>(
+pub(crate) fn parse_typescript_with_goal(
     source: &str,
     goal: Goal,
-    stores: &mut AstStores<'arena>,
-) -> Result<Program<'arena>, Error> {
+    stores: &mut AstStores,
+) -> Result<Program, Error> {
     parse_retrying_acorn_followers(
         source,
         0,
@@ -4430,10 +4416,10 @@ pub(crate) fn parse_typescript_with_goal<'arena>(
 /// `crate::__private::parse_embedded_preserve_parens` — the binding audit
 /// (`tsv_debug binding_audit`) reparses formatted output this way so the paren
 /// structure a glued comment binds to is visible in the wire JSON.
-pub(crate) fn parse_typescript_preserve_parens<'arena>(
+pub(crate) fn parse_typescript_preserve_parens(
     source: &str,
-    stores: &mut AstStores<'arena>,
-) -> Result<Program<'arena>, Error> {
+    stores: &mut AstStores,
+) -> Result<Program, Error> {
     parse_retrying_acorn_followers(
         source,
         0,

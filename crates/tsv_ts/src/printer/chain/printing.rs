@@ -44,7 +44,7 @@ enum BaseShape {
 
 impl BaseShape {
     fn of(
-        expr: &Expression<'_>,
+        expr: &Expression,
         base_ternary: Option<ChainBaseTernary>,
         followed_by_non_null: bool,
     ) -> Self {
@@ -834,7 +834,7 @@ struct MemberSpans {
 /// `add_comments_and_break` handles the first member of each rest group.
 fn print_member_access(
     printer: &Printer<'_>,
-    property: ast::IdentName<'_>,
+    property: ast::IdentName,
     spans: MemberSpans,
     optional: bool,
     is_private: bool,
