@@ -58,7 +58,7 @@ const SLOT_LIMIT: usize = u32::MAX as usize;
 /// The bytes, in whole rows, a store first written by a flush reserves on the cold arm that
 /// primes it ([`Store::prime_range`]), so a one-shot document's store takes its first lists
 /// without growing one doubling at a time, and the hot path pays nothing for the sizing. A
-/// store whose capacity already holds the request, a recycled one usually, keeps it untouched.
+/// store whose capacity already holds the request keeps it untouched.
 /// Neither a smaller nor a larger first allocation measured better on the one-shot path.
 const FIRST_ALLOC_BYTES: usize = 1024;
 
@@ -122,16 +122,6 @@ fn mint_range(len: usize, count: usize) -> Option<(NonZeroU32, u32)> {
         Some(start) if fits => Some((start, count as u32)),
         _ => None,
     }
-}
-
-/// `Vec<T>`'s allocation as a `Vec<U>`, emptied. Safe in-place collection: reuse is std's
-/// specialization and not its promise (a unit test pins it), so a toolchain without it costs a
-/// reallocation, never correctness. A lifetime change is the only intended use, so the two
-/// layouts must agree, and a mismatch fails the build.
-fn recycle_vec<T, U>(mut items: Vec<T>) -> Vec<U> {
-    const { assert!(size_of::<T>() == size_of::<U>() && align_of::<T>() == align_of::<U>()) };
-    items.clear();
-    items.into_iter().map(|_| -> U { store_miss() }).collect()
 }
 
 /// The instance and generation stamped on stores and their handles.
@@ -566,8 +556,9 @@ impl<T: Row> Store<T> {
         }
     }
 
-    /// Discards every row but slot 0, keeping capacity. Every id and run minted so far is
-    /// invalid from here on.
+    /// Discards every row but slot 0, keeping capacity and never trimming it: a store once
+    /// written stays primed, so its next write mints straight behind slot 0. Every id and run
+    /// minted so far is invalid from here on.
     #[inline]
     pub fn reset(&mut self) {
         self.rows.truncate(1);
@@ -577,21 +568,23 @@ impl<T: Row> Store<T> {
         }
     }
 
-    /// Reuses this store's capacity for a store of the same family under another lifetime,
-    /// which lets a store be parked in a `'static` slot between parses and taken back.
-    ///
-    /// The recycled store holds no rows, slot 0 included, since its old row is of the wrong
-    /// lifetime: its next write fills slot 0 again, as a new store's first does. Every id and
-    /// run minted so far is invalid from here on, as across a reset.
-    pub fn recycle<U>(self) -> Store<U>
-    where
-        U: Row<Family = T::Family>,
-    {
-        Store {
-            rows: recycle_vec(self.rows),
-            #[cfg(feature = "_internal_store_check")]
-            stamp: self.stamp.next_generation(),
-        }
+    /// The slots the store holds, slot 0 included: 0 for a store never written, 1 for one
+    /// written and reset.
+    #[doc(hidden)]
+    pub fn len(&self) -> usize {
+        self.rows.len()
+    }
+
+    /// Whether the store holds no slot at all, which only a store never written does.
+    #[doc(hidden)]
+    pub fn is_empty(&self) -> bool {
+        self.rows.is_empty()
+    }
+
+    /// The slots the store's allocation holds, for a test of what a reset keeps.
+    #[doc(hidden)]
+    pub fn capacity(&self) -> usize {
+        self.rows.capacity()
     }
 
     /// The refused arm of a push's mint, taken after the row is appended so the row itself
@@ -787,7 +780,7 @@ impl Default for MarkGroup {
 ///
 /// Under the `_internal_ast_census` feature, every change to the stack's length moves the
 /// census's open-list total of `T` (`ast_census_probe::list_delta`): a push adds one, and a
-/// pop, a flush, a truncate, a reset or a recycle takes back what it removes.
+/// pop, a flush, a truncate or a reset takes back what it removes.
 pub struct ListBuf<T> {
     items: Vec<T>,
     #[cfg(feature = "_internal_store_check")]
@@ -823,7 +816,7 @@ impl<T> ListBuf<T> {
         crate::ast_census_probe::list_delta::<T>(1);
     }
 
-    /// Empties the stack between parses, keeping capacity.
+    /// Empties the stack between parses, keeping capacity and never trimming it.
     #[inline]
     pub fn reset(&mut self) {
         #[cfg(feature = "_internal_ast_census")]
@@ -833,15 +826,22 @@ impl<T> ListBuf<T> {
         self.live.clear();
     }
 
-    /// Reuses this buffer's capacity under another element type, as [`Store::recycle`] does.
-    pub fn recycle<U>(self) -> ListBuf<U> {
-        #[cfg(feature = "_internal_ast_census")]
-        crate::ast_census_probe::list_delta::<T>(-(self.items.len() as isize));
-        ListBuf {
-            items: recycle_vec(self.items),
-            #[cfg(feature = "_internal_store_check")]
-            live: stamp::LiveMarks::default(),
-        }
+    /// The elements on the stack, every open frame's together.
+    #[doc(hidden)]
+    pub fn len(&self) -> usize {
+        self.items.len()
+    }
+
+    /// Whether the stack holds no element.
+    #[doc(hidden)]
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+
+    /// The elements the stack's allocation holds, for a test of what a reset keeps.
+    #[doc(hidden)]
+    pub fn capacity(&self) -> usize {
+        self.items.capacity()
     }
 }
 
@@ -1161,8 +1161,8 @@ impl<F> TextPool<F> {
         }
     }
 
-    /// Discards every string, keeping capacity and, once written, the sentinel. Every handle
-    /// minted so far is invalid from here on.
+    /// Discards every string, keeping capacity, never trimming it, and, once written, the
+    /// sentinel. Every handle minted so far is invalid from here on.
     #[inline]
     pub fn reset(&mut self) {
         self.text.truncate(POOL_SENTINEL.len_utf8());
@@ -1170,6 +1170,25 @@ impl<F> TextPool<F> {
         {
             self.stamp = self.stamp.next_generation();
         }
+    }
+
+    /// The bytes the pool holds, the sentinel included: 0 for a pool never written, 1 for one
+    /// written and reset.
+    #[doc(hidden)]
+    pub fn len(&self) -> usize {
+        self.text.len()
+    }
+
+    /// Whether the pool holds no byte at all, which only a pool never written does.
+    #[doc(hidden)]
+    pub fn is_empty(&self) -> bool {
+        self.text.is_empty()
+    }
+
+    /// The bytes the pool's allocation holds, for a test of what a reset keeps.
+    #[doc(hidden)]
+    pub fn capacity(&self) -> usize {
+        self.text.capacity()
     }
 
     #[inline]
@@ -1306,7 +1325,7 @@ mod tests {
     };
 
     /// Under the census, the open-list total follows the stack's length: a push adds one, and a
-    /// flush, a truncate, a reset and a recycle each take back what they remove, so a nested
+    /// flush, a truncate and a reset each take back what they remove, so a nested
     /// frame's peak sits on top of the outer frame's live prefix. A shrink that leaked would lift
     /// every later peak; none mints, the flush's caller does.
     #[cfg(feature = "_internal_ast_census")]
@@ -1338,17 +1357,11 @@ mod tests {
         for _ in 0..7 {
             scratch.push(Node("g"));
         }
-        let mut scratch: ListBuf<Node<'static>> = scratch.recycle();
+        scratch.reset();
         for _ in 0..8 {
             scratch.push(Node("h"));
         }
         scratch.reset();
-
-        // a recycle into another element type takes the open prefix back from the old one
-        scratch.push(Node("i"));
-        let mut other: ListBuf<[usize; 2]> = scratch.recycle();
-        other.push([0, 0]);
-        other.reset();
         let tally = ast_census_probe::disarm();
         let (_, row) = tally
             .rows
@@ -1471,18 +1484,19 @@ mod tests {
             (before, capacity)
         );
 
-        // a recycled store is empty, slot 0 included, so its next flush primes again
-        let mut recycled: Store<Node<'_>> = sized.recycle();
-        let (before, capacity) = (recycled.rows.as_ptr(), recycled.rows.capacity());
+        // a reset store keeps slot 0, so its next flush places its run at 1 without priming
+        sized.reset();
         let mark = scratch.mark();
         scratch.push(Node("b"));
         scratch.push(Node("c"));
-        let run = scratch.flush_move(mark, &mut recycled);
+        let run = scratch.flush_move(mark, &mut sized);
+        assert_eq!((run.start.get(), run.len()), (1, 2));
         assert_eq!(
-            (recycled.rows.as_ptr(), recycled.rows.capacity()),
+            (sized.rows.as_ptr(), sized.rows.capacity()),
             (before, capacity)
         );
-        assert_eq!(texts(&recycled, run), ["b", "c"]);
+        assert_eq!(sized.rows, [Node("a"), Node("b"), Node("c")]);
+        assert_eq!(texts(&sized, run), ["b", "c"]);
     }
 
     #[test]
@@ -1685,6 +1699,11 @@ mod tests {
             "slot 0 stays, primed by the first write"
         );
         assert_eq!(nodes.rows.capacity(), capacity);
+        assert_eq!(
+            (nodes.len(), nodes.capacity()),
+            (1, capacity),
+            "the readers agree"
+        );
         assert_eq!(nodes.push(Node("y")).index(), 1);
         assert_eq!(
             nodes.rows,
@@ -1701,43 +1720,12 @@ mod tests {
         assert_eq!(unwritten.rows.capacity(), 0);
 
         let scratch_capacity = scratch.items.capacity();
+        scratch.push(Node("z"));
+        assert_eq!(scratch.len(), 1);
         scratch.reset();
         assert!(scratch.items.is_empty());
         assert_eq!(scratch.items.capacity(), scratch_capacity);
-    }
-
-    #[test]
-    fn recycle_keeps_capacity_across_a_lifetime_change() {
-        fn into_shorter<'a>(store: Store<Node<'static>>, _text: &'a str) -> Store<Node<'a>> {
-            store.recycle()
-        }
-
-        let mut nodes = Store::with_capacity(32);
-        nodes.push(Node("a"));
-        let capacity = nodes.rows.capacity();
-        let owned = String::from("short lived");
-        let mut recycled = into_shorter(nodes, &owned);
-        assert_eq!(recycled.rows.capacity(), capacity);
-        assert!(
-            recycled.rows.is_empty(),
-            "a recycled store is empty, slot 0 included"
-        );
-        assert_eq!(
-            recycled.push(Node(&owned)).index(),
-            1,
-            "its next write primes again"
-        );
-        assert_eq!(recycled.rows, [Node("short lived"), Node("short lived")]);
-        assert_eq!(recycled.rows.capacity(), capacity);
-
-        let mut scratch: ListBuf<Node<'static>> = ListBuf::with_capacity(32);
-        let mark = scratch.mark();
-        scratch.push(Node("x"));
-        scratch.truncate(mark);
-        let capacity = scratch.items.capacity();
-        let recycled: ListBuf<Node<'_>> = scratch.recycle();
-        assert_eq!(recycled.items.capacity(), capacity);
-        assert!(recycled.items.is_empty());
+        assert_eq!((scratch.len(), scratch.capacity()), (0, scratch_capacity));
     }
 
     #[test]
@@ -2271,6 +2259,11 @@ mod tests {
         pool.reset();
         assert_eq!(pool.text, "\0");
         assert_eq!(pool.text.capacity(), capacity);
+        assert_eq!(
+            (pool.len(), pool.capacity()),
+            (1, capacity),
+            "the readers agree"
+        );
         let span = pool.push("again");
         assert_eq!(span.start.get(), 1);
         assert_eq!(pool.get(span), "again");
@@ -2432,16 +2425,6 @@ mod tests {
             let (_nodes, id) = two_row_store();
             let (other, _) = two_row_store();
             other.get(id);
-        }
-
-        #[test]
-        #[should_panic(expected = "store stamp mismatch")]
-        fn an_id_retained_across_recycle_is_rejected() {
-            let (nodes, id) = two_row_store();
-            let mut recycled: Store<Node<'_>> = nodes.recycle();
-            recycled.push(Node("c"));
-            recycled.push(Node("d"));
-            recycled.get(id);
         }
 
         fn run_of_two() -> (Store<Node<'static>>, Run<Alpha>) {

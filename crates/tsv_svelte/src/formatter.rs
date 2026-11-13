@@ -2,7 +2,7 @@
 
 use crate::{Result, format_in};
 use tsv_lang::doc::arena::DocArena;
-use tsv_ts::ast::AstStores;
+use tsv_ts::ast::WarmStores;
 
 /// Formats many Svelte sources on one thread, reusing its allocations from one source to the
 /// next.
@@ -45,7 +45,7 @@ pub struct Formatter {
     ast: bumpalo::Bump,
     doc: DocArena,
     /// The TypeScript stores between calls, out of the slot while one runs.
-    stores: Option<AstStores>,
+    stores: WarmStores,
 }
 
 impl Formatter {
@@ -55,7 +55,7 @@ impl Formatter {
         Self {
             ast: bumpalo::Bump::new(),
             doc: DocArena::new(),
-            stores: None,
+            stores: WarmStores::default(),
         }
     }
 
@@ -69,9 +69,10 @@ impl Formatter {
         // a panic out of the previous call left these arenas mid-document.
         self.ast.reset();
         self.doc.reset();
-        let mut stores: AstStores = self.stores.take().unwrap_or_default();
-        let formatted = format_in(source, &self.ast, &mut stores, |_| &self.doc);
-        self.stores = Some(stores.park());
+        let (ast, doc) = (&self.ast, &self.doc);
+        let formatted = self
+            .stores
+            .with(|stores| format_in(source, ast, stores, |_| doc));
         // Nothing borrowed from the AST arena outlives `format_in`, so it can rewind now,
         // keeping one block rather than every block the document grew. The doc arena's
         // rewind frees nothing (its stores keep their capacity), so it waits for the next
