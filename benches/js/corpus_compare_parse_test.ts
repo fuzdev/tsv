@@ -12,7 +12,9 @@ import { afterAll, afterEach, test, vi } from 'vitest';
 
 import { type CorpusCompareParseDeps, run_corpus_compare_parse } from './corpus_compare_parse.ts';
 import type { CompareImplementations } from './lib/compare_cli.ts';
+import { TsvRejection } from './lib/divergence/panic_errors.ts';
 import type { TsvDebugChild, TsvDebugProgram } from './lib/tsv_debug_server.ts';
+import { raise_wasm_trap } from './lib/wasm_trap_fakes.ts';
 import { reconstruct_locations } from '../../crates/tsv_wasm/npm/locations.js';
 
 // the binary is faked below, so its freshness is not this suite's business
@@ -46,8 +48,12 @@ const SPAN_AST = { type: 'Program', start: 0, end: 7, body: [] };
 const loc_ast = (source: string): unknown =>
 	reconstruct_locations(structuredClone(SPAN_AST), source, { language: 'typescript' });
 
-/** How the fake tsv treats a source holding `crash`: parses it, panics, or rejects every source. */
-type Mode = 'parse' | 'panic' | 'reject';
+/**
+ * How the fake tsv treats a source holding `crash`: parses it, panics (both wires), traps (the
+ * span wire, a real WASM trap), or returns a rejection whose text reads `panic: boom` (both
+ * wires); or it rejects every source.
+ */
+type Mode = 'parse' | 'panic' | 'trap' | 'panic_text' | 'reject';
 
 /** A `tsv_debug loc_wires --stdin` answering as `mode` says. */
 const fake_tsv_debug = (mode: Mode): TsvDebugProgram => ({
@@ -66,7 +72,9 @@ const fake_tsv_debug = (mode: Mode): TsvDebugProgram => ({
 								? { error: 'Unexpected token' }
 								: mode === 'panic' && source.includes('crash')
 									? { panic: 'boom' }
-									: { loc: loc_ast(source) }
+									: mode === 'panic_text' && source.includes('crash')
+										? { error: 'panic: boom' }
+										: { loc: loc_ast(source) }
 						) + '\n'
 					);
 					wake?.();
@@ -103,7 +111,11 @@ const fake_impls = (mode: Mode) => {
 			format: (source) => source,
 			parse: (source) => {
 				if (mode === 'reject') throw new Error('Unexpected token');
-				if (mode === 'panic' && source.includes('crash')) throw new Error('panic: boom');
+				if (source.includes('crash')) {
+					if (mode === 'panic') throw new Error('panic: boom');
+					if (mode === 'trap') raise_wasm_trap();
+					if (mode === 'panic_text') throw new TsvRejection('panic: boom');
+				}
 				return SPAN_AST;
 			},
 			parse_internal: () => {}
@@ -139,6 +151,26 @@ test('a native panic on both wires (one per wire) fails the run, where the bucke
 		lines.join('\n')
 	);
 	ok(lines.includes('  a.ts: panic: boom'));
+});
+
+test('a trap on the span wire is a crash too, named by its type', async () => {
+	const lines = capture_console();
+	const { deps: d, state } = deps('trap');
+	strictEqual(await run_corpus_compare_parse(d, [corpus]), 1);
+	strictEqual(state.disposed, 1);
+	ok(
+		lines.some((l) => l.includes('FAIL: 1 panic(s)')),
+		lines.join('\n')
+	);
+	ok(lines.includes('  a.ts: RuntimeError: unreachable'));
+});
+
+test("a rejection whose text reads `panic: ` is the source's verdict, not a crash", async () => {
+	const lines = capture_console();
+	const { deps: d, state } = deps('panic_text');
+	strictEqual(await run_corpus_compare_parse(d, [corpus]), 0, lines.join('\n'));
+	strictEqual(state.disposed, 1);
+	ok(!lines.some((l) => l.includes('panic(s)')));
 });
 
 test('the same run without the panic passes', async () => {

@@ -9,7 +9,9 @@ import { deepStrictEqual, ok, strictEqual } from 'node:assert';
 import { afterEach, beforeEach, test, vi } from 'vitest';
 
 import type { CompareImplementations } from '../lib/compare_cli.ts';
+import { TsvRejection } from '../lib/divergence/panic_errors.ts';
 import type { Language, SourceFile } from '../lib/types.ts';
+import { raise_wasm_trap } from '../lib/wasm_trap_fakes.ts';
 import { run_skip_triage, type SkipTriageDeps } from './skip_triage.ts';
 
 let err: string[];
@@ -29,9 +31,14 @@ const refusing = (name: string, word: string) => (source: string) => {
 	if (source.includes(word)) throw new Error(`${name} refuses\nsecond line`);
 };
 
-/** tsv's fake: refuses `TSV`, and panics on `PANIC` the way the `corpus` addon throws one. */
+/**
+ * tsv's fake: refuses `TSV`, panics on `PANIC` the way the `corpus` addon throws one, traps on
+ * `TRAP` as a WASM build does, and returns a rejection reading `panic: ` on `TEXT`.
+ */
 const fake_tsv = (source: string) => {
 	if (source.includes('PANIC')) throw new Error('panic: x\nat a frame');
+	if (source.includes('TRAP')) raise_wasm_trap();
+	if (source.includes('TEXT')) throw new TsvRejection('panic: quoted\nsecond line');
 	refusing('tsv', 'TSV')(source);
 };
 
@@ -122,6 +129,21 @@ test('a panic fails the run loud and is never parity, even where the oracle reje
 	ok(err.includes('  q.css: panic: x'));
 	ok(!err.some((l) => l.startsWith('\nOK:')));
 	strictEqual(state.disposed, 1);
+});
+
+test('a trap is a crash too, and a rejection whose text reads `panic: ` is a verdict', async () => {
+	const { deps, state } = fake_deps([
+		file('t.css', 'css', 'TRAP CANON'),
+		file('u.css', 'css', 'TEXT CANON')
+	]);
+	strictEqual(await run_skip_triage(deps, []), 1);
+	const report = JSON.parse(state.out);
+	deepStrictEqual(report.css.panic, [{ path: 't.css', error: 'RuntimeError: unreachable' }]);
+	deepStrictEqual(report.css.parity, [
+		{ path: 'u.css', tsv_error: 'panic: quoted', canonical_error: 'canon refuses' }
+	]);
+	ok(err.includes('  t.css: RuntimeError: unreachable'));
+	ok(!err.some((l) => l.includes('u.css')));
 });
 
 test('engines that fail to load fail the run before any triage', async () => {

@@ -12,9 +12,10 @@
  * report a panic as an exit code rather than as a panic.
  *
  * The verdict semantics are the span arm's binding's, so the two arms read one verdict: a
- * parse error throws its message exactly as the N-API addon renders it, and a caught
- * panic throws `panic: <payload>` — the shape `is_native_panic_error` recognizes, so a panic
- * on this wire still fails `gate_on_panics` rather than counting as one more rejection. The
+ * parse error throws its message exactly as the N-API addon renders it, as the
+ * `TsvRejection` the addon's wrapper throws, and a caught panic throws an `Error` whose
+ * message is `panic: <payload>` — what `is_tsv_crash` recognizes, so a panic on this wire
+ * still fails `gate_on_panics` rather than counting as one more rejection. The
  * `corpus` profile is what makes a panic catchable here, as it is for the addon.
  *
  * The process is the shared `tsv_debug` client's (`tsv_debug_server.ts`): one long-lived
@@ -22,6 +23,7 @@
  * makes.
  */
 
+import { TsvRejection } from './divergence/panic_errors.ts';
 import { goal_for, type Language, type ParseGoal } from './types.ts';
 import { type TsvDebugProgram, TsvDebugServer } from './tsv_debug_server.ts';
 
@@ -69,7 +71,7 @@ export class LocWireClient {
 		});
 		if ('loc' in reply) return reply.loc;
 		if ('panic' in reply) throw new Error(`panic: ${reply.panic}`);
-		throw new Error(reply.error);
+		throw new TsvRejection(reply.error);
 	}
 
 	/**

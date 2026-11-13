@@ -50,6 +50,16 @@
  * any other number means the oracle disagrees with itself and the run fails
  * rather than publishing a profile graded against a moved reference.
  *
+ * A crash in either of tsv's rows (`is_tsv_crash`: a native panic or a WASM trap) is neither
+ * an accept nor a rejection: the file leaves that row's total, and once the report is out the
+ * run lists every crash with its engine and file on stderr, in the comparison tools' panic
+ * form (`panic_report_lines`), and fails. Counted as a rejection, it would lower tsv's number
+ * without a word.
+ *
+ * A stack-exhaustion `RangeError` is counted as a rejection, not a crash: the same catch takes
+ * the oracle's rows and the harness's frames, where it names no tsv bug, and tsv's depth limit
+ * (a rejection) keeps its own engines' recursion from it.
+ *
  * Run (from the repo root):
  *   npm run css:over-acceptance               # the profile (builds the addon + WASM first)
  *   npm run -s css:over-acceptance -- --json 2>/dev/null > report.json
@@ -62,6 +72,12 @@
  * @module
  */
 
+import {
+	crash_text,
+	is_tsv_crash,
+	type PanicEntry,
+	panic_report_lines
+} from '../lib/divergence/panic_errors.ts';
 import { CSS_REJECTS_PIN, WPT_CSS_HARVEST_PIN } from '../lib/gate_counts.ts';
 import {
 	corpus_filter_fingerprint,
@@ -167,7 +183,7 @@ const accepts = (impl: TsvImplementation, source: string): boolean => {
  * @param argv - the tool's arguments: `--json`, `--verbose`/`-v`, `--pin-only`,
  * `--if-present`, `--force`
  * @returns the exit code: 0 on a pass or a skip, 1 on a moved pin, a partial corpus without
- * `--if-present`, or an oracle row that accepts its own rejects
+ * `--if-present`, an oracle row that accepts its own rejects, or a crash in a tsv row
  */
 export async function run_css_over_acceptance(
 	deps: CssOverAcceptanceDeps,
@@ -319,32 +335,45 @@ export async function run_css_over_acceptance(
 		return 0;
 	}
 
-	/** The CSS-parsing rows, in the conformance report's display order. */
-	const rows: Array<{ name: string; impl: TsvImplementation | undefined }> = [
-		{ name: ORACLE_ROW, impl: impls.canonical },
-		{ name: 'tsv', impl: impls.native },
-		{ name: 'tsv-wasm', impl: impls.wasm },
-		{ name: 'postcss', impl: impls.postcss }
+	/** The CSS-parsing rows, in the conformance report's display order; `tsv` marks tsv's engines. */
+	const rows: Array<{ name: string; impl: TsvImplementation | undefined; tsv: boolean }> = [
+		{ name: ORACLE_ROW, impl: impls.canonical, tsv: false },
+		{ name: 'tsv', impl: impls.native, tsv: true },
+		{ name: 'tsv-wasm', impl: impls.wasm, tsv: true },
+		{ name: 'postcss', impl: impls.postcss, tsv: false }
 	];
 
 	const results: Row[] = [];
-	for (const { name, impl } of rows) {
+	// tsv's crashes, each with its engine and input: graded neither way, and the run fails
+	const panics: PanicEntry[] = [];
+	for (const { name, impl, tsv } of rows) {
 		if (!impl?.supports_parse_language('css')) {
 			log(`  ⚠ skipping ${name} — not available on this machine`);
 			continue;
 		}
 		const samples: string[] = [];
 		let accepted = 0;
+		let graded = 0;
 		for (const file of rejected) {
-			if (!accepts(impl, file.content)) continue;
+			try {
+				impl.parse(file.content, 'css');
+			} catch (e) {
+				if (tsv && is_tsv_crash(e)) {
+					panics.push({ label: `${name}: ${file.path}`, error: crash_text(e) });
+				} else {
+					graded++;
+				}
+				continue;
+			}
+			graded++;
 			accepted++;
 			if (samples.length < SAMPLE_LIMIT) samples.push(file.path);
 		}
 		results.push({
 			name,
 			accepted,
-			total: rejected.length,
-			rate: accepted / rejected.length,
+			total: graded,
+			rate: accepted / graded,
 			samples
 		});
 	}
@@ -388,12 +417,16 @@ export async function run_css_over_acceptance(
 		console.error('');
 	}
 
-	if (oracle_row && oracle_row.accepted > 0) {
+	// After the report, in its stream's place (stderr; `--json`'s stdout stays one document):
+	// a crash is the headline, not a reason to withhold the run's numbers.
+	for (const line of panics.length > 0 ? panic_report_lines(panics) : []) console.error(line);
+
+	const oracle_moved = oracle_row !== undefined && oracle_row.accepted > 0;
+	if (oracle_moved) {
 		console.error(
 			`FAIL: the svelte/compiler row accepted ${oracle_row.accepted} of its own rejects — the ` +
 				`oracle disagrees with itself, so these numbers are graded against a moved reference.`
 		);
-		return 1;
 	}
-	return 0;
+	return panics.length > 0 || oracle_moved ? 1 : 0;
 }

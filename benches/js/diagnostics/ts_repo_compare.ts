@@ -48,6 +48,11 @@
  * gate's oracle is the live acorn parser over acorn's OWN `test/` suite; this one's
  * is tsc's baselines over the compiler corpus. Their ledgers are kept apart.
  *
+ * A tsv crash (`is_tsv_crash`: a native panic the corpus profile caught), at either goal, is
+ * graded in no bucket, so it can't read as reject parity, a script-goal artifact, or a
+ * ledgered gap: the run lists it with its engine and unit in the comparison tools' FAIL
+ * block (`panic_report_lines`) after the report, and fails.
+ *
  * A leg of the blocking `conformance` aggregate (publish Step 3b). Summary to
  * stderr, full JSON to stdout with `--json`. `run_ts_repo_compare` is the library function
  * its root (`benches/js/roots/ts_repo_compare.ts`) and the `conformance.ts` driver run over
@@ -74,6 +79,12 @@ import type {
 	CompareReadDir,
 	InitCompareImplementations
 } from '../lib/compare_cli.ts';
+import {
+	crash_text,
+	is_tsv_crash,
+	type PanicEntry,
+	panic_report_lines
+} from '../lib/divergence/panic_errors.ts';
 import { first_line } from '../lib/error_text.ts';
 import { TS_REPO_PINS } from '../lib/gate_counts.ts';
 import { type KnownGap, TS_REPO_SANCTIONS } from '../lib/parse_sanctions.ts';
@@ -659,6 +670,15 @@ export async function run_ts_repo_compare(
 		beyond_acorn_known: [] as Gap[],
 		beyond_acorn_unexpected: [] as Gap[]
 	};
+	/** tsv's crashes (`is_tsv_crash`), each with its engine and unit: graded in no bucket. */
+	const panics: PanicEntry[] = [];
+	/** Lists the crashes in the comparison tools' FAIL block, on stderr; true when there were any. */
+	function report_panics(): boolean {
+		if (panics.length === 0) return false;
+		console.error('');
+		for (const line of panic_report_lines(panics)) console.error(line);
+		return true;
+	}
 	/** File counts per baseline `TS1xxx` code over BOTH over-acceptance buckets. */
 	const over_acceptance_codes = new Map<string, number>();
 	// `.tsx` is filtered (and counted) inside discovery, which admits `.d.ts` here
@@ -688,6 +708,10 @@ export async function run_ts_repo_compare(
 		try {
 			native.parse_internal(content, 'typescript');
 		} catch (e) {
+			if (is_tsv_crash(e)) {
+				panics.push({ label: `tsv: ${locate(at)}`, error: crash_text(e) });
+				return;
+			}
 			tsv_err = first_line(e);
 		}
 
@@ -729,7 +753,11 @@ export async function run_ts_repo_compare(
 			let script_ok = true;
 			try {
 				native.parse_internal(content, 'typescript', 'script');
-			} catch {
+			} catch (e) {
+				if (is_tsv_crash(e)) {
+					panics.push({ label: `tsv (script goal): ${locate(at)}`, error: crash_text(e) });
+					return;
+				}
 				script_ok = false;
 			}
 			if (script_ok) {
@@ -817,7 +845,10 @@ export async function run_ts_repo_compare(
 	}
 
 	impls.dispose();
-	if (tsc_field_missing) return 1;
+	if (tsc_field_missing) {
+		report_panics();
+		return 1;
+	}
 
 	// --- Report -----------------------------------------------------------------
 
@@ -835,6 +866,7 @@ export async function run_ts_repo_compare(
 		console.error(
 			`FAIL: 0 single-file .ts scanned under ${root} — wrong path? Nothing was graded.`
 		);
+		report_panics();
 		return 1;
 	}
 
@@ -951,6 +983,10 @@ export async function run_ts_repo_compare(
 		};
 		await deps.stdout.write(JSON.stringify(report, null, '\t') + '\n');
 	}
+
+	// After the report, in its stream (stderr; `--json`'s stdout stays one document), ahead of
+	// every other verdict: a crashed unit left the buckets, so the counts below can't be read
+	if (report_panics()) return 1;
 
 	if (unexpected_total > 0) {
 		console.error(

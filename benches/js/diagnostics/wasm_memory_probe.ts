@@ -28,7 +28,9 @@
  *           this mode proves or refutes that).
  *
  * A/B two builds with --baseline (mirrors wasm_format_probe.ts): each build is a
- * separate module URL → its own instance+memory, so both load in one process.
+ * separate module URL → its own instance+memory, so both load in one process. A crash in
+ * either build (`is_tsv_crash`: a trap), in the A/B's byte-identity gate or in a measurement,
+ * fails the run, listed with the build and the file; any other throw skips the file.
  *
  *   # A/A (one build — just capture reserve + cold/steady high-water):
  *   node benches/js/roots/wasm_memory_probe.ts --cold
@@ -48,9 +50,23 @@
 
 import { CORPORA_COLLECTIONS } from '../lib/corpora.ts';
 import { group_by_language } from '../lib/corpus.ts';
+import {
+	crash_text,
+	is_tsv_crash,
+	type PanicEntry,
+	panic_report_lines
+} from '../lib/divergence/panic_errors.ts';
 import { LANGUAGES } from '../lib/types.ts';
 import type { Language, Logger, SourceFile } from '../lib/types.ts';
-import { DEFAULT_WASM_GLUE, to_format_build, type WasmGlueExports } from './wasm_format_probe.ts';
+import {
+	compare_format_outcomes,
+	DEFAULT_WASM_GLUE,
+	format_crash_entries,
+	format_outcome,
+	format_mismatch_line,
+	to_format_build,
+	type WasmGlueExports
+} from './wasm_format_probe.ts';
 
 const DEFAULT_CORPUS = `${CORPORA_COLLECTIONS}/zzz/src/lib`;
 const PAGE = 65536;
@@ -78,7 +94,7 @@ export interface WasmMemoryProbeDeps {
  * @param deps - the glue loader, the corpus, stdout
  * @param argv - the tool's arguments: a corpus directory, `--current`, `--baseline`, `--lang`,
  * `--limit`, `--cold`, `--json`
- * @returns the exit code: 1 when a `--baseline` formats differently, else 0
+ * @returns the exit code: 1 when a `--baseline` formats differently or a build crashes, else 0
  */
 export async function run_wasm_memory_probe(
 	deps: WasmMemoryProbeDeps,
@@ -104,7 +120,7 @@ export async function run_wasm_memory_probe(
 	}
 	const langs: Language[] = lang_filter ? [lang_filter] : LANGUAGES;
 
-	type FormatBuild = Record<Language, (source: string) => string>;
+	type FormatBuild = ReturnType<typeof to_format_build>;
 	interface Loaded {
 		build: FormatBuild;
 		mem: WebAssembly.Memory;
@@ -141,21 +157,40 @@ export async function run_wasm_memory_probe(
 		return s[Math.min(s.length - 1, Math.floor(p * s.length))];
 	};
 
+	/** The measurement loops' crashes (`is_tsv_crash`), each with its build and file. */
+	const measured_crashes: PanicEntry[] = [];
+	/** Records `thrown` when it is a crash; any other throw is the file's skip. */
+	const measure_crash = (label: string, file: SourceFile, thrown: unknown): void => {
+		if (is_tsv_crash(thrown)) {
+			measured_crashes.push({ label: `${label}: ${file.path}`, error: crash_text(thrown) });
+		}
+	};
+
 	// Byte-identity gate (A/B only): a memory A/B is meaningful only when both builds
 	// format identically — a pre-size/no-behavior-change edit must be byte-identical, else
 	// the peak delta is an output difference, not a reservation effect. Mirrors
-	// wasm_format_probe.ts. One warm instance each (byte-identity is instance-independent).
+	// wasm_format_probe.ts (`compare_format_outcomes`: a throw or refusal on one side only is a
+	// mismatch, a crash on either fails). One warm instance each (byte-identity is
+	// instance-independent).
 	if (baseline_path) {
 		const cur = await load_fresh(current_path);
 		const base = await load_fresh(baseline_path);
-		let mismatches = 0;
+		const labels = ['current', 'baseline'];
+		const mismatch_lines: string[] = [];
+		const crashes: PanicEntry[] = [];
 		for (const f of scoped) {
-			try {
-				if (cur.build[f.language](f.content) !== base.build[f.language](f.content)) mismatches++;
-			} catch {
-				// skip files either build rejects — measurement loops skip them too
-			}
+			const outcomes = [format_outcome(cur.build, f), format_outcome(base.build, f)];
+			const outcome = compare_format_outcomes(outcomes);
+			if (outcome === 'crash') crashes.push(...format_crash_entries(f, labels, outcomes));
+			else if (outcome === 'mismatch')
+				mismatch_lines.push(format_mismatch_line(f, labels, outcomes));
 		}
+		for (const line of mismatch_lines) console.error(line);
+		if (crashes.length > 0) {
+			for (const line of panic_report_lines(crashes)) console.error(line);
+			return 1;
+		}
+		const mismatches = mismatch_lines.length;
 		if (mismatches) {
 			console.error(
 				`ABORT: builds format differently on ${mismatches}/${scoped.length} files — ` +
@@ -196,7 +231,8 @@ export async function run_wasm_memory_probe(
 				const reserve0 = now_bytes(ld.mem);
 				try {
 					ld.build[f.language](f.content);
-				} catch {
+				} catch (e) {
+					measure_crash(b.label, f, e);
 					continue; // skip files this build rejects
 				}
 				const peak = now_bytes(ld.mem);
@@ -250,7 +286,8 @@ export async function run_wasm_memory_probe(
 			for (const f of scoped) {
 				try {
 					ld.build[f.language](f.content);
-				} catch {
+				} catch (e) {
+					measure_crash(b.label, f, e);
 					continue;
 				}
 				processed++;
@@ -281,5 +318,10 @@ export async function run_wasm_memory_probe(
 	}
 
 	if (json) await deps.stdout.write(JSON.stringify(report, null, 2) + '\n');
+	// after the report, on stderr: a build's numbers over a source it crashed on can't be read
+	if (measured_crashes.length > 0) {
+		for (const line of panic_report_lines(measured_crashes)) console.error(line);
+		return 1;
+	}
 	return 0;
 }

@@ -71,7 +71,7 @@ import {
 	resolve_compare_base_path,
 	run_compare_main
 } from './lib/compare_cli.ts';
-import { is_native_panic_error } from './lib/divergence/panic_errors.ts';
+import { crash_text, is_tsv_crash } from './lib/divergence/panic_errors.ts';
 import { first_line } from './lib/error_text.ts';
 import { fixture_document } from './lib/fixture_documents.ts';
 import { corpus_missing_entries } from './lib/corpus.ts';
@@ -835,9 +835,11 @@ export async function run_corpus_compare_parse(
 	const loc_arm = new LocArmBooks();
 	const pin_tally = new CorpusPinTally(PARSE_PIN_BUCKETS);
 	const span_arm = new SpanArmBooks();
-	// Span-wire panics, held for `gate_on_panics` beside the loc arm's failures: a file
-	// whose loc wire throws a plain rejection while the span wire panics reads as
-	// both-errored (no verdict mismatch) and is skipped, so nothing else would see it.
+	// tsv's crashes (`is_tsv_crash`), classified where each wire threw, for `gate_on_panics`:
+	// the loc wire's by language (the report's order), then the span wire's. A file whose loc
+	// wire returns a rejection while the span wire panics reads as both-errored (no verdict
+	// mismatch) and is skipped, so nothing but its own list would see that panic.
+	const loc_panics: Record<Language, CompareFailure[]> = { svelte: [], typescript: [], css: [] };
 	const span_panics: CompareFailure[] = [];
 	// The loc arm's own books: tsv's loc wire against the definition (the reconstruction of
 	// its span-only wire — any violation fails), and the oracle departures it tolerated.
@@ -888,6 +890,7 @@ export async function run_corpus_compare_parse(
 			ours = await loc_wires.parse(file.content, lang, goal);
 		} catch (e) {
 			tsv_error = first_line(e);
+			if (is_tsv_crash(e)) loc_panics[lang].push({ path: file.path, error: crash_text(e) });
 		}
 		let canonical_ast: unknown;
 		let canonical_error: string | null = null;
@@ -910,9 +913,7 @@ export async function run_corpus_compare_parse(
 			ours_span = native.parse(file.content, lang, goal);
 		} catch (e) {
 			span_error = first_line(e);
-			if (is_native_panic_error(span_error)) {
-				span_panics.push({ path: file.path, error: span_error });
-			}
+			if (is_tsv_crash(e)) span_panics.push({ path: file.path, error: crash_text(e) });
 		}
 		if ((span_error === null) !== (tsv_error === null)) {
 			span_arm.record_verdict_mismatch({
@@ -1115,19 +1116,11 @@ export async function run_corpus_compare_parse(
 	// A caught panic hard-fails ahead of the "compared nothing" floor and the
 	// count pins — a tsv-side parse failure is otherwise dimmed as "skipped", and
 	// only `--all`'s exact per-source `tsv_errors` pins would notice, reporting a
-	// crash as one more over-rejection. `canonical_error` files are excluded: their
-	// recorded message is the JS oracle's, which can't be a panic. The span-only arm's
-	// panics ride along — no other check of that arm reaches a file both wires reject.
+	// crash as one more over-rejection. Only tsv's wires are asked: the canonical
+	// side is the JS oracle. The span-only arm's panics ride along — no other check of
+	// that arm reaches a file both wires reject.
 	if (
-		gate_on_panics(
-			[
-				...LANGUAGES.flatMap((lang) =>
-					loc_arm.results.get(lang)!.filter((r) => r.status !== 'canonical_error')
-				),
-				...span_panics
-			],
-			base_path
-		)
+		gate_on_panics([...LANGUAGES.flatMap((lang) => loc_panics[lang]), ...span_panics], base_path)
 	) {
 		return fail_compare(impls);
 	}

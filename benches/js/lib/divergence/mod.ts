@@ -13,4 +13,3 @@
 export { check_safety_vs_prettier, type SafetyViolation } from './safety.ts';
 export { detect_divergences, type HunkCoverageResult } from './patterns.ts';
 export { check_expected_error } from './expected_errors.ts';
-export { is_native_panic_error } from './panic_errors.ts';

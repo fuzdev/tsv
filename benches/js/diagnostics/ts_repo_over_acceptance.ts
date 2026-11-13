@@ -32,6 +32,16 @@
  * cache after a tsc bump); the run says so and fails rather than publishing a
  * profile graded against a moved oracle.
  *
+ * A crash in either of tsv's rows (`is_tsv_crash`: a native panic or a WASM trap) is neither
+ * an accept nor a rejection: the file leaves that row's total, and once the report is out the
+ * run lists every crash with its engine and file on stderr, in the comparison tools' panic
+ * form (`panic_report_lines`), and fails. The other engines' failures stay rejections: their
+ * crashes are no verdict on tsv.
+ *
+ * A stack-exhaustion `RangeError` is counted as a rejection, not a crash: the same catch takes
+ * the oracle's rows and the harness's frames, where it names no tsv bug, and tsv's depth limit
+ * (a rejection) keeps its own engines' recursion from it.
+ *
  * Run (from the repo root):
  *   npm run ts-repo:over-acceptance
  *   npm run -s ts-repo:over-acceptance -- --json 2>/dev/null > report.json
@@ -43,6 +53,12 @@
  * @module
  */
 
+import {
+	crash_text,
+	is_tsv_crash,
+	type PanicEntry,
+	panic_report_lines
+} from '../lib/divergence/panic_errors.ts';
 import { TS_REPO_REJECTS_PIN } from '../lib/gate_counts.ts';
 import { CANONICAL_PARSER_ROWS, type Logger, type TsvImplementation } from '../lib/types.ts';
 
@@ -105,8 +121,8 @@ interface Row {
  *
  * @param deps - the checkout and `../typescript` read-only, the engines, stdout
  * @param argv - the tool's arguments: `--json`, `--verbose`/`-v`
- * @returns the exit code: 0, or 1 on a missing, moved, or unreadable cache, or a tsc row that
- * accepts its own rejects
+ * @returns the exit code: 0, or 1 on a missing, moved, or unreadable cache, a tsc row that
+ * accepts its own rejects, or a crash in a tsv row
  */
 export async function run_ts_repo_over_acceptance(
 	deps: TsRepoOverAcceptanceDeps,
@@ -152,39 +168,49 @@ export async function run_ts_repo_over_acceptance(
 
 	const impls = await deps.init_implementations(log);
 
-	/** The TS-parsing rows, in the conformance report's display order. */
-	const rows: Array<{ name: string; impl: TsvImplementation | undefined }> = [
-		{ name: ORACLE_ROW, impl: impls.tsc },
-		{ name: CANONICAL_PARSER_ROWS.typescript, impl: impls.canonical },
-		{ name: 'tsv', impl: impls.native },
-		{ name: 'tsv-wasm', impl: impls.wasm },
-		{ name: 'oxc-parser', impl: impls.oxc },
-		{ name: 'oxc-parser-wasm', impl: impls.oxc_wasm },
-		{ name: 'yuku-parser-wasm', impl: impls.yuku_wasm }
+	/** The TS-parsing rows, in the conformance report's display order; `tsv` marks tsv's engines. */
+	const rows: Array<{ name: string; impl: TsvImplementation | undefined; tsv: boolean }> = [
+		{ name: ORACLE_ROW, impl: impls.tsc, tsv: false },
+		{ name: CANONICAL_PARSER_ROWS.typescript, impl: impls.canonical, tsv: false },
+		{ name: 'tsv', impl: impls.native, tsv: true },
+		{ name: 'tsv-wasm', impl: impls.wasm, tsv: true },
+		{ name: 'oxc-parser', impl: impls.oxc, tsv: false },
+		{ name: 'oxc-parser-wasm', impl: impls.oxc_wasm, tsv: false },
+		{ name: 'yuku-parser-wasm', impl: impls.yuku_wasm, tsv: false }
 	];
 
 	const results: Row[] = [];
-	for (const { name, impl } of rows) {
+	// tsv's crashes, each with its engine and input: graded neither way, and the run fails
+	const panics: PanicEntry[] = [];
+	for (const { name, impl, tsv } of rows) {
 		if (!impl?.supports_parse_language('typescript')) {
 			log(`  ⚠ skipping ${name} — not available on this machine`);
 			continue;
 		}
 		const samples: string[] = [];
 		let accepted = 0;
+		let graded = 0;
 		for (const [path, source] of sources) {
 			try {
 				impl.parse(source, 'typescript');
-				accepted++;
-				if (samples.length < SAMPLE_LIMIT) samples.push(path);
-			} catch {
-				// A rejection is the expected outcome here.
+			} catch (e) {
+				if (tsv && is_tsv_crash(e)) {
+					panics.push({ label: `${name}: ${path}`, error: crash_text(e) });
+				} else {
+					// a rejection is the expected outcome here
+					graded++;
+				}
+				continue;
 			}
+			graded++;
+			accepted++;
+			if (samples.length < SAMPLE_LIMIT) samples.push(path);
 		}
 		results.push({
 			name,
 			accepted,
-			total: sources.size,
-			rate: accepted / sources.size,
+			total: graded,
+			rate: accepted / graded,
 			samples
 		});
 	}
@@ -225,13 +251,17 @@ export async function run_ts_repo_over_acceptance(
 		console.error('');
 	}
 
-	if (oracle && oracle.accepted > 0) {
+	// After the report, in its stream's place (stderr; `--json`'s stdout stays one document):
+	// a crash is the headline, not a reason to withhold the run's numbers.
+	for (const line of panics.length > 0 ? panic_report_lines(panics) : []) console.error(line);
+
+	const oracle_moved = oracle !== undefined && oracle.accepted > 0;
+	if (oracle_moved) {
 		console.error(
 			`FAIL: the tsc row accepted ${oracle.accepted} of its own rejects — the cache and the ` +
 				`installed tsc disagree (a tsc bump since the harvest?). Re-harvest with ` +
 				`\`deno task bench:harvest:ts-repo --force\` before reading these numbers.`
 		);
-		return 1;
 	}
-	return 0;
+	return panics.length > 0 || oracle_moved ? 1 : 0;
 }

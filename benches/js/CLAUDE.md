@@ -639,13 +639,18 @@ mildest bucket while describing the release's harshest failure. Ungated it reads
 `corpus:compare:parse` — where only `--all`'s exact per-source `tsv_errors` pins notice, and
 then as "a new over-rejection".
 
-The gate is `gate_on_panics` in `lib/compare_cli.ts` (each tool passes the failures that could be
-tsv's; the classification is shared, so the two can't disagree) over `is_native_panic_error` in
-`lib/divergence/panic_errors.ts`, matched against the message's FIRST LINE so a rejection's
-source code frame can never fabricate the verdict; only tsv can produce those shapes, since the
-oracle on the other side is JS. Classification runs BEFORE `check_expected_error` — those
-patterns key on file *content*, so a panic on a file that also holds SCSS would otherwise file as
-an expected error and vanish from the report.
+The gate is `gate_on_panics` in `lib/compare_cli.ts`, over the crashes each tool's catches
+classified with `is_tsv_crash` in `lib/divergence/panic_errors.ts` (one classifier, so no two
+tools can disagree; skip_triage, the over-acceptance tools, the conformance fixture gates
+(`lib/fixtures_gate.ts`, `diagnostics/ts_repo_compare.ts`), and the WASM probes take it too,
+and print the same FAIL block, `panic_report_lines`, on stderr where stdout holds their `--json`). It classifies what the catch caught, by TYPE, and only a throw
+out of tsv's own call: a `WebAssembly.RuntimeError` is a trap, any trap; a plain `Error` whose
+message's FIRST LINE starts `panic: ` is a caught native panic; a `TsvRejection` — what the
+binding wrappers throw for a failure the engine RETURNED — never is, whatever its text, since a
+rejection's message quotes the source; and a `RangeError` (host stack exhaustion) is no crash
+verdict, being a host limit any JS frame on the path can hit. Classification runs BEFORE
+`check_expected_error` — those patterns key on file *content*, so a panic on a file that also
+holds SCSS would otherwise file as an expected error and vanish from the report.
 
 ## Divergence Detection
 
@@ -1834,7 +1839,7 @@ benches/js/
         ├── mod.ts         # Main exports
         ├── safety.ts      # Safety check (differential char-frequency vs prettier)
         ├── patterns.ts    # Known divergence pattern detectors (with traceability)
-        ├── panic_errors.ts    # Native-panic classification (shared by both corpus tools)
+        ├── panic_errors.ts    # Crash classification: a native panic or WASM trap vs a rejection
         ├── expected_errors.ts # Expected-error fixtures (parse-rejection cases)
         ├── fixture_cases.ts   # Detector cases derived from the committed divergence fixtures
         │                      # (input = ours, the pinned prettier file = theirs; no sidecar)
@@ -2029,9 +2034,9 @@ command); the table is the index. They run under Node, each from its root in `ro
 them (§Harvests), but for `facade_probe.ts` and `biome_heap_probe.ts`, which run as they are
 under each runtime they name. All run from the repo root
 (corpus/artifact paths are CWD-relative). Each library takes its engines, readers, and
-stdout as deps, so its unit suite drives it over fakes (`diagnostics/*_test.ts`, in `test:node`);
-`biome_oxfmt_diff.ts` and `wasm_json_probe.ts` have none (the first loads biome and oxfmt itself,
-the second only times).
+stdout as deps, so its unit suite drives it over fakes (`diagnostics/*_test.ts`, in `test:node`;
+`biome_oxfmt_diff.ts` takes biome and oxfmt from its root too); `wasm_json_probe.ts` has none (it
+only times).
 
 **Any diagnostic that loads the whole implementation set needs BOTH tsv artifacts built,
 and fresh** — the native binding *and* the `pkg/all/nodejs` WASM bundle — because those two
@@ -2043,8 +2048,8 @@ it). The set's init runs one program: `rsvelte-fmt`'s platform binary from the b
 `PRETTIER_DEBUG=1` the harness sets), for its `--version` and its config, embed, and reject
 probes, though no diagnostic that loads the set reads its row. The two
 over-acceptance tools load the addon at the `corpus` profile
-(`npm run build:napi:corpus && npm run build:wasm:all:nodejs` first), so a panic is graded as a
-rejection; `wasm_json_probe` loads the bench's profile-guided addon
+(`npm run build:napi:corpus && npm run build:wasm:all:nodejs` first), so a panic is caught, and
+a crash in either tsv row is graded neither way but fails the run, listed with its engine and file; `wasm_json_probe` loads the bench's profile-guided addon
 (`deno task build:bench:pgo`), since the split it prints is the bench rows'. The two with tasks
 — `css:over-acceptance` and `ts-repo:over-acceptance` — build what they need themselves.
 `skip_triage` reads tsv's native verdict and the oracle's alone, so it loads the comparison
@@ -2059,7 +2064,7 @@ Documented above, though they live here: the parse-conformance gates
 | Script | What it does | Task |
 | --- | --- | --- |
 | `corpus_stats.ts` | corpus/candidate-dir size + language + degenerate-case stats (reuses `lib/corpus.ts` filters via `stream_entry_candidate` — no fixture heuristic; fixture-like segments are WATCH flags for a manifest `exclude`) | `corpus:stats` |
-| `skip_triage.ts` | parse-**parity** gate: buckets every corpus file by *asymmetry* (`parity` / `sanctioned_over_rejection` / `over_acceptance` / `unexpected_over_rejection`), exiting 1 on the last. A tsv panic (`is_native_panic_error`) is a crash, never a verdict: it goes to the `panic` bucket whatever the oracle said, each is listed with its file (the JSON has all, stderr the first ten), and any fails the run once the report is out (on the `corpus` addon a panic is a thrown `panic: <payload>`; a `panic = "abort"` build would abort the process with no report). Takes an optional corpus dir (defaults to the `gates` view — the `../corpora` snapshot + prettier suites); point it at Svelte's adversarial `tests/` for the residual gap list | — |
+| `skip_triage.ts` | parse-**parity** gate: buckets every corpus file by *asymmetry* (`parity` / `sanctioned_over_rejection` / `over_acceptance` / `unexpected_over_rejection`), exiting 1 on the last. A tsv crash (`is_tsv_crash`) is never a verdict: it goes to the `panic` bucket whatever the oracle said, each is listed with its file (the JSON has all, stderr the first ten), and any fails the run once the report is out (on the `corpus` addon a panic is a thrown `panic: <payload>`; a `panic = "abort"` build would abort the process with no report). Takes an optional corpus dir (defaults to the `gates` view — the `../corpora` snapshot + prettier suites); point it at Svelte's adversarial `tests/` for the residual gap list | — |
 | `test262_compare.ts` | test262 differential, tsv vs oxc-parser, from `tsv_debug test262 --emit-manifest`. Surfaces positive tsv real-bug candidates + negative early-error gaps; numbers move with the pinned oxc version. No biome — its js-api has no parser to grade. See `docs/conformance_test262.md` §Differential | — |
 | `css_over_acceptance.ts` | the `parse/css` sibling of the row below — per-tool accepts over the files `svelte/compiler`'s `parseCss` rejects, computed live from the conformance corpus (no harvest cache: nothing else consumes the list). Its reason to exist is sharper than the TS one's, because CSS is the surface that CANNOT filter to valid inputs — `parseCss` accepts malformed CSS and rejects valid modern CSS it doesn't implement, so filtering would drop files tsv also fails. The reject count is PINNED (`CSS_REJECTS_PIN`), which is what makes the reference row's grammar moving visible instead of silently reshaping the published coverage. The `svelte/compiler` row must read 0 (it built the list). `--pin-only` grades the pin alone, oracle only and stamped — the `bench:pins:suites` leg | `css:over-acceptance`, `css:over-acceptance:pin` |
 | `ts_repo_over_acceptance.ts` | per-tool OVER-ACCEPTANCE over the tsc corpus — the files tsc's own PARSER rejects (`.cache/ts_repo_rejects.json`). The axis coverage structurally cannot show: coverage counts accepts, so it can only reward permissiveness, and every conformance corpus is therefore filtered to VALID inputs. Read inverted (lower is better) and as a PROFILE, not a gate — a deferred early error is a documented tsv posture, and the per-file gate on tsv alone is `conformance:ts-repo`. The `tsc` row must read 0 (it built the list); anything else fails the run as a stale cache | `ts-repo:over-acceptance` |

@@ -1211,6 +1211,64 @@ const bom_strip: DivergencePattern = {
 	}
 };
 
+/** The whitespace a source may hold ahead of its content U+FEFF: ASCII's, which JS `\s` is not. */
+const LEADING_ASCII_WHITESPACE = /^[ \t\n\r\f]*/;
+
+const leading_zwnbsp: DivergencePattern = {
+	id: 'leading_zwnbsp',
+	description: 'leading content U+FEFF kept behind a BOM; prettier drops it',
+	// TypeScript has no such case: U+FEFF is ECMAScript whitespace, which tsv drops too
+	languages: ['svelte', 'css'],
+	conformance_sections: ['Whitespace: BOM Handling'],
+	// The U+FEFF tsv keeps is a semantic char prettier drops. The detect below is byte-exact:
+	// the source holds that U+FEFF ahead of its content, and past the BOM tsv writes, the
+	// U+FEFF and (Svelte) the line it stands on, ours IS prettier's output past prettier's BOM.
+	may_alter_char_frequency: true,
+	fixtures: [
+		'svelte/syntax/whitespace/leading_zwnbsp_prettier_divergence',
+		'css/tokens/whitespace/leading_zwnbsp_prettier_divergence'
+	],
+	detect(ctx) {
+		const BOM = '﻿';
+		// ours begins with the load-bearing BOM: a BOM, then the content U+FEFF it protects
+		// (`tsv_lang::printing::encode_leading_zwnbsp`)
+		if (!ctx.ours.startsWith(BOM + BOM)) return null;
+		// the source's own U+FEFF, ahead of its content once its one BOM is read off, so tsv
+		// kept a character it was given rather than wrote one
+		const source = ctx.source.startsWith(BOM) ? ctx.source.slice(1) : ctx.source;
+		const content = source.replace(LEADING_ASCII_WHITESPACE, '');
+		if (content[0] !== BOM) return null;
+		// and exactly one: a second U+FEFF ahead of the content, behind whitespace or not, is
+		// content too, which ours's two leading chars can't account for
+		if (content.slice(1).replace(LEADING_ASCII_WHITESPACE, '')[0] === BOM) return null;
+		// prettier dropped it, keeping at most the BOM ahead of it
+		if (ctx.prettier.startsWith(BOM + BOM)) return null;
+		const prettier_rest = ctx.prettier.startsWith(BOM) ? ctx.prettier.slice(1) : ctx.prettier;
+		// Past the two, nothing else differs: in CSS the U+FEFF leads the first selector's
+		// line; in Svelte it is a text node of its own, which stands on its own line ahead of
+		// the next sibling.
+		const ours_rest = ctx.ours.slice(2);
+		const own_line = ctx.language === 'svelte' && ours_rest === `\n${prettier_rest}`;
+		if (ours_rest !== prettier_rest && !own_line) return null;
+		// every hunk then lies in the lines the leading U+FEFF occupies: ours's first (and the
+		// one after it, for its own line), prettier's first
+		const last_ours_line = own_line ? 1 : 0;
+		const hunk_indices = find_matching_hunks(
+			ctx.hunks,
+			(h) =>
+				(h.ours_range === null || h.ours_range.end <= last_ours_line) &&
+				(h.prettier_range === null || h.prettier_range.end === 0)
+		);
+		if (hunk_indices.length === 0) return null;
+		return {
+			pattern: 'leading_zwnbsp',
+			confidence: 'certain',
+			hunk_indices,
+			reason: 'leading content U+FEFF kept behind the BOM that protects it; prettier drops it'
+		};
+	}
+};
+
 const self_closing_nonvoid: DivergencePattern = {
 	id: 'self_closing_nonvoid',
 	description: 'Non-void HTML element self-closing normalization',
@@ -5063,6 +5121,7 @@ const foreign_body_freeze: DivergencePattern = {
 export const PATTERNS: DivergencePattern[] = [
 	// 1. Language-specific narrow patterns (certain or rare)
 	bom_strip,
+	leading_zwnbsp,
 	self_closing_nonvoid,
 	attr_value_single_quote,
 	svelte_element_this_string,

@@ -8,7 +8,10 @@
  * under a root, parse each with tsv + the canonical parser, bucket by verdict
  * asymmetry (parity / over-acceptance / over-rejection → sanctioned·known-gap·
  * unexpected), deep-diff the both-accept ASTs, and emit a stderr summary + JSON
- * report, exiting 1 only on an `unexpected` over-rejection. Only the *config*
+ * report, exiting 1 on an `unexpected` over-rejection or a tsv crash. A crash
+ * (`is_tsv_crash`: a native panic the corpus profile caught) is graded in no bucket, so it
+ * can't read as parity or as a ledgered over-rejection; it is listed with its engine and
+ * input in the comparison tools' FAIL block (`panic_report_lines`) after the report. Only the *config*
  * differs (root, input basenames, prune rule, language, sanction/known-gap
  * lists). Keeping the procedure here means a fix to the gate/report logic applies
  * to every language and the gates can't drift; each script stays a docstring +
@@ -31,6 +34,12 @@
 import { basename, dirname, join } from 'node:path';
 
 import type { CompareOutput, CompareReadDir, InitCompareImplementations } from './compare_cli.ts';
+import {
+	crash_text,
+	is_tsv_crash,
+	type PanicEntry,
+	panic_report_lines
+} from './divergence/panic_errors.ts';
 import { first_line } from './error_text.ts';
 import type { GatePins } from './gate_counts.ts';
 import { sort_listing } from './listing_order.ts';
@@ -147,7 +156,7 @@ async function* discover_beneath(
 /**
  * Run a per-language fixtures parse-conformance gate over `argv` (`--json`,
  * `--verbose`/`-v`, optional positional root override): scans the suite, prints a summary
- * to stderr (+ JSON to stdout under `--json`), and fails on any `unexpected`
+ * to stderr (+ JSON to stdout under `--json`), and fails on a tsv crash, on any `unexpected`
  * over-rejection, and on a full-suite run on a stale ledger entry or a pinned count's move.
  * @returns the exit code
  */
@@ -205,6 +214,10 @@ export async function run_fixtures_gate(
 		}
 	}
 
+	// tsv's crashes (`is_tsv_crash`), each with its engine and input: graded in no bucket, and
+	// the run fails
+	const panics: PanicEntry[] = [];
+
 	let scanned = 0;
 	for await (const file of discover(deps, root, config)) {
 		scanned++;
@@ -214,6 +227,10 @@ export async function run_fixtures_gate(
 		try {
 			tsv_ast = native.parse(file.content, config.language);
 		} catch (e) {
+			if (is_tsv_crash(e)) {
+				panics.push({ label: `tsv: ${file.path}`, error: crash_text(e) });
+				continue;
+			}
 			tsv_err = first_line(e);
 		}
 
@@ -383,6 +400,14 @@ export async function run_fixtures_gate(
 	};
 
 	if (json_mode) await deps.stdout.write(JSON.stringify(report, null, '\t') + '\n');
+
+	// After the report, in its stream (stderr; `--json`'s stdout stays one document), ahead of
+	// every other verdict: a crashed file left the buckets, so the counts below can't be read
+	if (panics.length > 0) {
+		console.error('');
+		for (const line of panic_report_lines(panics)) console.error(line);
+		return 1;
+	}
 
 	if (undocumented_groups.length > 0) {
 		console.error(

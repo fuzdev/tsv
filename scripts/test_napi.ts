@@ -31,7 +31,7 @@ import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import { Worker } from 'node:worker_threads';
 import {
-	is_native_panic_error,
+	is_tsv_crash,
 	NAPI_PANIC_PROBE_MESSAGE
 } from '../benches/js/lib/divergence/panic_errors.ts';
 import type { NapiAddon } from '../benches/js/lib/napi.ts';
@@ -143,7 +143,7 @@ describe('tsv_napi addon (real N-API JS boundary)', () => {
 	// boundary.
 	//
 	// The thrown error is an `Error` whose message is exactly `panic: <payload>`, the C
-	// FFI's text, which the corpus tools' panic gate classifies (`is_native_panic_error`,
+	// FFI's text, which the corpus tools' panic gate classifies (`is_tsv_crash`,
 	// whose own suite reads the same literal), and whose one own key is napi-rs's `code`,
 	// `'GenericFailure'`.
 	it(
@@ -154,7 +154,7 @@ describe('tsv_napi addon (real N-API JS boundary)', () => {
 				assert.ok(e instanceof Error, 'an Error');
 				assert.equal(e.constructor, Error, 'a plain Error, no subclass');
 				assert.equal(e.message, message);
-				assert.ok(is_native_panic_error(e.message), 'the panic gate classifies it');
+				assert.ok(is_tsv_crash(e), 'the panic gate classifies it');
 				assert.deepEqual(Object.entries(e), [['code', 'GenericFailure']]);
 				return true;
 			};

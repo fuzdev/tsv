@@ -1,7 +1,8 @@
 /**
  * Tests for the fixtures gates' engine (`fixtures_gate.ts`) over an in-memory suite and fake
  * engines: discovery's order and pruning, the empty-suite failure and its `--json` report, an
- * unexpected over-rejection, a full-suite run's pins, and an engine that failed to load.
+ * unexpected over-rejection, a full-suite run's pins, an engine that failed to load, and a tsv
+ * crash, graded in no bucket and failing the gate whatever the oracle said.
  * Package-free, so it gates in `npm run test:node`.
  */
 
@@ -9,11 +10,13 @@ import { deepStrictEqual, ok, strictEqual } from 'node:assert';
 import { afterEach, test, vi } from 'vitest';
 
 import type { CompareImplementations, CompareReadDir } from './compare_cli.ts';
+import { TsvRejection } from './divergence/panic_errors.ts';
 import {
 	type FixturesGateConfig,
 	type FixturesGateDeps,
 	run_fixtures_gate
 } from './fixtures_gate.ts';
+import { raise_wasm_trap } from './wasm_trap_fakes.ts';
 
 afterEach(() => {
 	vi.restoreAllMocks();
@@ -68,20 +71,40 @@ const SUITE = {
 	'c/d/input.ts': 'd'
 };
 
-/** Fake engines: tsv rejects a source in `tsv_rejects`, and both parse to the same tree. */
-const fake_impls = (parsed: string[], tsv_rejects = new Set<string>()) => {
+/** How the fake tsv fails on a source: a returned rejection, a caught native panic, a trap. */
+type FakeFailure = 'reject' | 'panic' | 'trap';
+
+/**
+ * Fake engines: tsv fails on a source in `tsv_fails` as it says, the oracle rejects a source in
+ * `oracle_rejects`, and both parse the rest to the same tree.
+ */
+const fake_impls = (
+	parsed: string[],
+	tsv_fails: Iterable<string> | Map<string, FakeFailure> = [],
+	oracle_rejects = new Set<string>()
+) => {
+	const fails =
+		tsv_fails instanceof Map
+			? tsv_fails
+			: new Map([...tsv_fails].map((s): [string, FakeFailure] => [s, 'reject']));
 	const state = { disposed: 0 };
 	const impls: CompareImplementations = {
 		canonical: {
 			format_async: async (s) => s,
-			parse: () => ({ type: 'Program' }),
+			parse: (source) => {
+				if (oracle_rejects.has(source)) throw new SyntaxError('Unexpected token (1:1)');
+				return { type: 'Program' };
+			},
 			enable_format_cache: () => null
 		},
 		native: {
 			format: (s) => s,
 			parse: (source) => {
 				parsed.push(source);
-				if (tsv_rejects.has(source)) throw new Error('Unexpected token\n  at 1:1');
+				const failure = fails.get(source);
+				if (failure === 'trap') raise_wasm_trap();
+				if (failure === 'panic') throw new Error('panic: boom\n  at a frame');
+				if (failure === 'reject') throw new TsvRejection('Unexpected token\n  at 1:1');
 				return { type: 'Program' };
 			},
 			parse_internal: () => {}
@@ -139,4 +162,64 @@ test('an empty suite fails, and --json writes the zero report', async () => {
 test('an engine that failed to load fails the gate', async () => {
 	capture_console();
 	strictEqual(await run_fixtures_gate(deps(null), CONFIG, []), 1);
+});
+
+/** The gate's `--json` report's verdict, from what it wrote to stdout. */
+const verdict_of = (written: string[]): Record<string, unknown> =>
+	(JSON.parse(written.join('')) as { verdict: Record<string, unknown> }).verdict;
+
+test('a tsv crash, first and last, on inputs the oracle accepts and rejects, fails in no bucket', async () => {
+	const lines = capture_console();
+	const written: string[] = [];
+	// `a` is the first input, `d` the last; the oracle accepts `a` and rejects `d`
+	const { state, impls } = fake_impls(
+		[],
+		new Map<string, FakeFailure>([
+			['a', 'trap'],
+			['d', 'panic']
+		]),
+		new Set(['d'])
+	);
+	// a ledgered path doesn't absorb a crash either
+	const ledgered: FixturesGateConfig = {
+		...CONFIG,
+		sanctioned: [{ pattern: 'a/input.ts', reason: 'stricter' }]
+	};
+	strictEqual(await run_fixtures_gate(deps(impls, written), ledgered, ['--json']), 1);
+	strictEqual(state.disposed, 1);
+	const at = lines.findIndex((l) => l.startsWith('FAIL: 2 panic(s)'));
+	ok(at > 0, lines.join('\n'));
+	deepStrictEqual(lines.slice(at + 1), [
+		'  tsv: ../suite/a/input.ts: RuntimeError: unreachable',
+		'  tsv: ../suite/c/d/input.ts: panic: boom'
+	]);
+	ok(!lines.some((l) => l.includes('OK:')));
+	const verdict = verdict_of(written);
+	strictEqual(verdict.parity, 0);
+	strictEqual(verdict.both_accept, 1);
+	deepStrictEqual(verdict.sanctioned, []);
+	deepStrictEqual(verdict.unexpected, []);
+});
+
+test('a crash fails a run whose buckets alone would pass', async () => {
+	const lines = capture_console();
+	// `b` crashes where the oracle rejects: without the classifier, reject parity
+	const { impls } = fake_impls([], new Map<string, FakeFailure>([['b', 'panic']]), new Set(['b']));
+	const pins = { ...CONFIG, pins: { scanned: 3, both_accept: 2, over_acceptance: 0 } };
+	strictEqual(await run_fixtures_gate(deps(impls), pins, []), 1);
+	ok(lines.includes('  tsv: ../suite/b/input.ts: panic: boom'), lines.join('\n'));
+	ok(lines.includes('    parity (both reject):     0'), lines.join('\n'));
+});
+
+test('a tsv rejection whose text reads `panic: ` is a rejection: the engine returned it', async () => {
+	const lines = capture_console();
+	const { impls } = fake_impls([], [], new Set(['b']));
+	impls.native.parse = (source) => {
+		if (source === 'b') throw new TsvRejection('panic: boom\n  at a frame');
+		return { type: 'Program' };
+	};
+	const pins = { ...CONFIG, pins: { scanned: 3, both_accept: 2, over_acceptance: 0 } };
+	strictEqual(await run_fixtures_gate(deps(impls), pins, []), 0);
+	ok(lines.includes('    parity (both reject):     1'), lines.join('\n'));
+	ok(!lines.some((l) => l.includes('panic(s)')));
 });

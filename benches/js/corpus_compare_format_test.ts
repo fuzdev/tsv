@@ -17,6 +17,8 @@ import {
 	run_corpus_compare_format
 } from './corpus_compare_format.ts';
 import type { CompareImplementations } from './lib/compare_cli.ts';
+import { TsvRejection } from './lib/divergence/panic_errors.ts';
+import { raise_wasm_trap } from './lib/wasm_trap_fakes.ts';
 
 const corpus = mkdtempSync(join(tmpdir(), 'corpus_compare_format_test_'));
 // SCSS `$variable`: an expected-error pattern's content (`lib/divergence/expected_errors.ts`)
@@ -43,12 +45,18 @@ const capture_console = (): string[] => {
 	return lines;
 };
 
-/** Engines whose tsv side formats with `native_format`; prettier echoes its input. */
-const fake_impls = (native_format: (source: string) => string) => {
+/**
+ * Engines whose tsv side formats with `native_format`; prettier echoes its input, or formats
+ * with `prettier_format`.
+ */
+const fake_impls = (
+	native_format: (source: string) => string,
+	prettier_format: (source: string) => string = (source) => source
+) => {
 	const state = { disposed: 0 };
 	const impls: CompareImplementations = {
 		canonical: {
-			format_async: async (source) => source,
+			format_async: async (source) => prettier_format(source),
 			parse: () => ({}),
 			enable_format_cache: () => null
 		},
@@ -95,6 +103,43 @@ test('an ordinary rejection on that file is absorbed as expected, and the run pa
 	strictEqual(state.disposed, 1);
 	ok(lines.some((l) => l.includes('expected errors')));
 	ok(!lines.some((l) => l.includes('panic')));
+});
+
+test('a WASM trap out of the tsv call is a crash too, named by its type', async () => {
+	const lines = capture_console();
+	const { state, impls } = fake_impls((source) =>
+		source.includes('$x') ? raise_wasm_trap() : source
+	);
+	strictEqual(await run_corpus_compare_format(deps(impls), [corpus]), 1);
+	strictEqual(state.disposed, 1);
+	ok(lines.some((l) => l.includes('FAIL: 1 panic(s)')));
+	ok(lines.includes('  a.css: RuntimeError: unreachable'));
+});
+
+test("a returned rejection whose text reads `panic: ` is the source's verdict: absorbed as expected", async () => {
+	const lines = capture_console();
+	const { state, impls } = fake_impls((source) => {
+		if (!source.includes('$x')) return source;
+		throw new TsvRejection('panic: index out of bounds');
+	});
+	strictEqual(await run_corpus_compare_format(deps(impls), [corpus]), 0);
+	strictEqual(state.disposed, 1);
+	ok(lines.some((l) => l.includes('expected errors')));
+	ok(!lines.some((l) => l.includes('panic(s)')));
+});
+
+test("a throw out of prettier is no crash of tsv's, whatever it reads", async () => {
+	const lines = capture_console();
+	const { state, impls } = fake_impls(
+		(source) => source,
+		(source) => {
+			if (source.includes('$x')) throw new Error('panic: prettier wrote this');
+			return source;
+		}
+	);
+	strictEqual(await run_corpus_compare_format(deps(impls), [corpus]), 0);
+	strictEqual(state.disposed, 1);
+	ok(!lines.some((l) => l.includes('panic(s)')));
 });
 
 test('a matching run passes and releases the engines', async () => {

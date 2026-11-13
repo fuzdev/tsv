@@ -25,6 +25,7 @@
 
 import { create_format_api, PARSE_KINDS, read_failure } from '../../../crates/tsv_wasm/npm/api.js';
 import { create_parse_api } from '../../../crates/tsv_wasm/npm/api_parse.js';
+import { TsvRejection } from './divergence/panic_errors.ts';
 import { assert_binding_emits_span_only, type LocationsProbeArtifact } from './locations_probe.ts';
 import { assert_binding_reports_rejection } from './reject_probe.ts';
 import {
@@ -90,10 +91,12 @@ interface Bound {
 /**
  * A failed result as the row's rejection: the harness reads a rejection from a THROW, as it
  * does from every third-party row (`lib/reject_probe.ts`), so a row unwraps the result as a
- * consumer does and throws the failure's message. Only the failure path pays it.
+ * consumer does and throws the failure's message — as a `TsvRejection`, so the crash
+ * classifier (`is_tsv_crash`) reads it as the verdict it is whatever its text says, apart
+ * from what the engine itself threw. Only the failure path pays it.
  */
-const rejected = (error: { message: string; frame: string }): Error =>
-	new Error(`${error.message}\n${error.frame}`);
+const rejected = (error: { message: string; frame: string }): TsvRejection =>
+	new TsvRejection(`${error.message}\n${error.frame}`);
 
 // The bags a call passes, built once: a consumer writes its bag as a literal, but one
 // allocated per timed call here would be the harness's allocation charged to the row

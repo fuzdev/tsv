@@ -1016,6 +1016,159 @@ test('bom_strip: negative - no BOM in source', () => {
 	assertEquals(match, null);
 });
 
+// ─── leading_zwnbsp ─────────────────────────────────────────────────────────
+
+const B = '\ufeff';
+
+/** The four corpus readings the two fixtures give: source → [ours, prettier]. */
+const LEADING_ZWNBSP_CASES: Array<[string, Language, string, string, string]> = [
+	['css input', 'css', `${B}${B}a {\n}\n`, `${B}${B}a {\n}\n`, `${B}a {\n}\n`],
+	['css authored behind a space', 'css', ` ${B}a{}\n`, `${B}${B}a {\n}\n`, `${B}a {\n}\n`],
+	[
+		'svelte input',
+		'svelte',
+		`${B}${B}\n<div></div>\n`,
+		`${B}${B}\n<div></div>\n`,
+		`${B}<div></div>\n`
+	],
+	[
+		'svelte authored behind a space',
+		'svelte',
+		` ${B}<div></div>\n`,
+		`${B}${B}\n<div></div>\n`,
+		`<div></div>\n`
+	]
+];
+
+for (const [label, language, source, ours, prettier] of LEADING_ZWNBSP_CASES) {
+	test(`leading_zwnbsp: positive - ${label}: every hunk claimed, the SAFETY delta vouched`, () => {
+		const ctx = make_context(ours, prettier, language, source);
+		const coverage = detect_divergences(ctx);
+		assertEquals(coverage.classification, 'all_explained');
+		assertEquals(coverage.safety_vouched, true);
+		assertEquals(
+			coverage.matches.map((m) => m.pattern),
+			['leading_zwnbsp']
+		);
+	});
+}
+
+test('leading_zwnbsp: positive - the one content U+FEFF behind a leading newline, as tsv writes it', () => {
+	// the ASCII-whitespace allowance the space witness needs holds a newline the same way
+	for (const [language, source, ours, prettier] of [
+		['css', `\n${B}a{}\n`, `${B}${B}a {\n}\n`, `${B}a {\n}\n`],
+		['svelte', `\n${B}<div></div>\n`, `${B}${B}\n<div></div>\n`, `<div></div>\n`]
+	] as const) {
+		const ctx = make_context(ours, prettier, language, source);
+		assertEquals(run_pattern('leading_zwnbsp', ctx)?.pattern, 'leading_zwnbsp', language);
+	}
+});
+
+test('leading_zwnbsp: negative - anything past the U+FEFF differing, or a U+FEFF the source never held', () => {
+	const near_misses: Array<[string, Language, string, string, string]> = [
+		// a rule tsv lost past the U+FEFF: the rest must be prettier's, byte for byte
+		[
+			'content lost past it',
+			'css',
+			`${B}${B}a {}\nb {}\n`,
+			`${B}${B}a {\n}\n`,
+			`${B}a {\n}\n\nb {\n}\n`
+		],
+		// a U+FEFF the source holds after content, not ahead of it: not this divergence
+		['the source U+FEFF after content', 'css', `a${B} {}\n`, `${B}${B}a {\n}\n`, `${B}a {\n}\n`],
+		// a BOM alone in the source: tsv writing a content U+FEFF there would be fabrication
+		['a BOM alone in the source', 'css', `${B}a {}\n`, `${B}${B}a {\n}\n`, `${B}a {\n}\n`],
+		// prettier kept the U+FEFF too: whatever differs, it is not this
+		['prettier keeping it', 'css', `${B}${B}a{}\n`, `${B}${B}a {\n}\n`, `${B}${B}a {}\n`],
+		// two content U+FEFFs, of which prettier keeps one: the rest past each side's lead
+		// agrees, but prettier dropped nothing this pattern is about
+		[
+			'prettier keeping one of two',
+			'css',
+			`${B}${B}${B}a {}\n`,
+			`${B}${B}${B}a {\n}\n`,
+			`${B}${B}a {\n}\n`
+		],
+		// exactly one content U+FEFF: a second is content too, and ours's two leading chars
+		// can't hold it, wherever the source puts it ahead of the content
+		[
+			'one of two content U+FEFFs dropped',
+			'css',
+			`${B}${B}${B}a {}\n`,
+			`${B}${B}a {\n}\n`,
+			`${B}a {\n}\n`
+		],
+		[
+			'two of three content U+FEFFs dropped',
+			'css',
+			`${B}${B}${B}${B}a {}\n`,
+			`${B}${B}a {\n}\n`,
+			`${B}a {\n}\n`
+		],
+		[
+			'the second content U+FEFF, behind a newline, dropped',
+			'css',
+			`${B}${B}\n${B}a {}\n`,
+			`${B}${B}a {\n}\n`,
+			`${B}a {\n}\n`
+		],
+		[
+			'the second content U+FEFF, behind a newline, dropped (svelte)',
+			'svelte',
+			`${B}${B}\n${B}<div></div>\n`,
+			`${B}${B}\n<div></div>\n`,
+			`${B}<div></div>\n`
+		],
+		// the source's pair kept, but off the start: not where this pattern looks
+		['the pair moved off the start', 'css', `${B}${B}a {}\n`, `a {\n}\n${B}${B}`, `${B}a {\n}\n`],
+		// the reverse: prettier keeps the content U+FEFF and ours drops it
+		['the reverse direction', 'css', `${B}${B}a {}\n`, `${B}a {\n}\n`, `${B}${B}a {\n}\n`],
+		// ours without the load-bearing BOM
+		['ours without the BOM', 'css', `${B}${B}a {}\n`, `${B}a {\n}\n`, `a {\n}\n`],
+		// the own-line allowance is Svelte's: a CSS U+FEFF never stands on a line alone
+		[
+			'a CSS U+FEFF on a line of its own',
+			'css',
+			`${B}${B}a {}\n`,
+			`${B}${B}\na {\n}\n`,
+			`${B}a {\n}\n`
+		],
+		// a Svelte text node changed past the U+FEFF's line
+		[
+			'svelte content past its line',
+			'svelte',
+			`${B}${B}\n<div>x</div>\n`,
+			`${B}${B}\n<div></div>\n`,
+			`${B}<div>x</div>\n`
+		],
+		// whitespace JS counts but ASCII doesn't, ahead of the U+FEFF: an NBSP is content
+		[
+			'an NBSP ahead of it',
+			'svelte',
+			`\u00a0${B}<div></div>\n`,
+			`${B}${B}\n<div></div>\n`,
+			`<div></div>\n`
+		]
+	];
+	for (const [label, language, source, ours, prettier] of near_misses) {
+		const ctx = make_context(ours, prettier, language, source);
+		assertEquals(run_pattern('leading_zwnbsp', ctx), null, label);
+	}
+});
+
+test('leading_zwnbsp: TypeScript is no case of it — U+FEFF is ECMAScript whitespace', () => {
+	const ctx = make_context(
+		`${B}${B}const a = 1;\n`,
+		`${B}const a = 1;\n`,
+		'typescript',
+		`${B}${B}const a = 1;\n`
+	);
+	assertEquals(
+		detect_divergences(ctx).matches.some((m) => m.pattern === 'leading_zwnbsp'),
+		false
+	);
+});
+
 // ─── fill_after_inline ──────────────────────────────────────────────────────
 
 test('fill_after_inline: positive - long line with inline close tag', () => {
@@ -2949,6 +3102,7 @@ test('may_alter_char_frequency: only deliberately-declared patterns may vouch', 
 		'comment_preserved',
 		'css_line_comment_freeze',
 		'css_scss_directive_number',
+		'leading_zwnbsp',
 		'self_closing_nonvoid'
 	]);
 });

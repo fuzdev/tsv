@@ -51,9 +51,9 @@ import {
 	check_safety_vs_prettier,
 	detect_divergences,
 	type HunkCoverageResult,
-	is_native_panic_error,
 	type SafetyViolation
 } from './lib/divergence/mod.ts';
+import { crash_text, is_tsv_crash } from './lib/divergence/panic_errors.ts';
 
 /**
  * The per-source pins `--all` grades (`lib/corpus_pins.ts`): exact counts per source and
@@ -464,6 +464,8 @@ export async function run_corpus_compare_format(
 
 	// Initialize per-language tracking
 	const results: Map<Language, CompareResult[]> = new Map();
+	// The files tsv crashed on (`is_tsv_crash`), each with its `crash_text`, for the panic gate.
+	const crashes = new Map<string, string>();
 	const stats: Map<Language, LanguageStats> = new Map();
 
 	for (const lang of LANGUAGES) {
@@ -535,9 +537,21 @@ export async function run_corpus_compare_format(
 		}
 
 		let should_exit = false;
+		// tsv's own throw, held apart: the catch below also takes prettier's and the harness's,
+		// and only a throw out of tsv's call can be a crash
+		const tsv_call = { threw: false, error: undefined as unknown };
+		const format_ours = (): string => {
+			try {
+				return native.format(file.content, lang);
+			} catch (e) {
+				tsv_call.threw = true;
+				tsv_call.error = e;
+				throw e;
+			}
+		};
 		try {
 			// Format with both
-			const ours = native.format(file.content, lang);
+			const ours = format_ours();
 			// Pass the real path so the oracle routes `.js` → babel (preserves JSDoc casts)
 			// vs `.ts` → typescript — see `canonical.format_async`.
 			const prettier = await canonical.format_async(file.content, lang, file.path);
@@ -607,7 +621,7 @@ export async function run_corpus_compare_format(
 					// On divergence, throw — the process's binding can't be trusted
 					// for a verdict on this file, so it must surface as a loud error,
 					// never as a fabricated (or vanished) SAFETY finding.
-					const ours_verify = native.format(file.content, lang);
+					const ours_verify = format_ours();
 					if (ours_verify !== ours) {
 						throw new Error(
 							'native format nondeterminism: two runs on identical input differ (binding corruption — safety verdict unreliable)'
@@ -711,9 +725,9 @@ export async function run_corpus_compare_format(
 			// patterns key on the file's source, so a panic on a file that also
 			// happens to hold SCSS would file as "expected" and be dimmed out of
 			// the report entirely. A crash is never expected, whatever it crashed on.
-			const expected_check = is_native_panic_error(error_msg)
-				? null
-				: check_expected_error(file.content, lang);
+			const crashed = tsv_call.threw && is_tsv_crash(tsv_call.error);
+			if (crashed) crashes.set(file.path, crash_text(tsv_call.error));
+			const expected_check = crashed ? null : check_expected_error(file.content, lang);
 			if (expected_check?.expected) {
 				lang_stats.expected_errors++;
 				lang_results.push({
@@ -1026,9 +1040,18 @@ export async function run_corpus_compare_format(
 
 	// A caught panic hard-fails before the count pins — it is a robustness-bar
 	// violation, and it also explains any bucket the crashed file moved. `errors`
-	// is the only bucket a panic can reach (the expected-error branch is mode-gated
-	// above), and prettier can't panic, so this is the whole candidate set.
-	if (gate_on_panics(all_errors, base_path)) return fail_compare(impls);
+	// is the only bucket a crash can reach (the expected-error branch is mode-gated
+	// above), so its crashed files, in its order (smallest first), are the gate's.
+	if (
+		gate_on_panics(
+			all_errors
+				.filter((r) => crashes.has(r.path))
+				.map((r) => ({ path: r.path, error: crashes.get(r.path)! })),
+			base_path
+		)
+	) {
+		return fail_compare(impls);
+	}
 
 	// Pinned counts (a full `--all` run only): exact per-source bucket counts over the gates
 	// view (`lib/corpus_pins.ts`, docs/gate_counts.md). Every file comes from a pinned

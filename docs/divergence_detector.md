@@ -23,7 +23,7 @@ benches/js/
 │       ├── expected_errors.ts # Expected-error fixtures (parse-rejection cases)
 │       ├── fixture_cases.ts   # Drives the detectors against committed divergence fixtures
 │       ├── fixture_io.ts      # The fixture reads, over a read-only handle on tests/fixtures
-│       ├── panic_errors.ts    # Panic classification: a caught tsv CRASH vs an ordinary rejection
+│       ├── panic_errors.ts    # Crash classification: a tsv panic or WASM trap vs a rejection
 │       └── validation.ts      # Audit: cross-ref patterns vs conformance_prettier*.md
 ```
 
@@ -63,8 +63,9 @@ regressing, collapse the verdict.
 a pattern that has not answered the question cannot excuse content loss, and a new pattern
 is safe by omission. Declaring it is a promise that the pattern's own `detect` carries a
 content-preservation proof; the current set is `bom_strip` (byte-exact BOM prefix test),
-`self_closing_nonvoid` (matching tag names on both sides), `comment_preserved` (the comment
-text must appear in ours), `css_scss_directive_number` (identical non-numeric skeleton
+`leading_zwnbsp` (the source holds exactly one U+FEFF, the kept one, ahead of its content, and past it and the
+BOM tsv writes, ours is prettier's output byte for byte), `self_closing_nonvoid` (matching tag
+names on both sides), `comment_preserved` (the comment text must appear in ours), `css_scss_directive_number` (identical non-numeric skeleton
 *plus* equal numeric-token counts, so a number may be re-spelled but never dropped), and
 `css_line_comment_freeze` (the same skeleton-and-count proof). A
 pattern that legitimately changes char counts without declaring it surfaces loudly as a
@@ -236,8 +237,8 @@ to most broad** so each hunk gets the most precise explanation possible — a na
 language/feature pattern claims a hunk before the broad `fill_101_boundary` /
 `comment_position` fallbacks ever see it. Rough tiers, specific → broad:
 
-1. **Language-specific narrow patterns** — BOM stripping, self-closing normalization,
-   empty-statement removal, …
+1. **Language-specific narrow patterns** — BOM stripping, the kept leading U+FEFF,
+   self-closing normalization, empty-statement removal, …
 2. **CSS patterns** — at-rule spacing/wrapping, selectors, comments, SCSS directives, …
    (followed by `format_ignore_preserved` — directive-driven suppression, the most
    specific signal there is, placed ahead of every layout heuristic)

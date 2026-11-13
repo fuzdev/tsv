@@ -53,19 +53,25 @@ test('an unknown language filter is refused with the languages listed', () => {
 	]);
 });
 
-test('the panic gate trips on a `panic: ` failure only, and lists it relative to the base', () => {
+test('the panic gate trips on any crash it is handed, and lists each relative to the base', () => {
 	const lines = capture_console();
-	strictEqual(
-		gate_on_panics([{ path: '/b/a.ts', error: 'Unexpected token' }, { path: '/b/c.ts' }], '/b'),
-		false
-	);
+	strictEqual(gate_on_panics([], '/b'), false);
 	strictEqual(lines.length, 0);
 	strictEqual(
-		gate_on_panics([{ path: '/b/a.ts', error: 'panic: index out of bounds' }], '/b'),
+		gate_on_panics(
+			[
+				{ path: '/b/a.ts', error: 'panic: index out of bounds' },
+				{ path: '/b/c.ts', error: 'RuntimeError: unreachable' }
+			],
+			'/b'
+		),
 		true
 	);
-	strictEqual(lines.length, 2);
-	strictEqual(lines[1], '  a.ts: panic: index out of bounds');
+	deepStrictEqual(lines, [
+		'\n\x1b[31mFAIL: 2 panic(s) — tsv crashed on real code (a native panic the corpus profile caught, which a shipped artifact aborts the host on, or a WASM trap):\x1b[0m',
+		'  a.ts: panic: index out of bounds',
+		'  c.ts: RuntimeError: unreachable'
+	]);
 });
 
 test('a failed run releases the engines and exits 1', () => {

@@ -48,6 +48,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { isDeepStrictEqual } from 'node:util';
 import { Worker } from 'node:worker_threads';
 
+import { crash_text, is_tsv_crash } from '../benches/js/lib/divergence/panic_errors.ts';
 import { facade_files } from './npm_facade.ts';
 import { THIRD_PARTY_NOTICE } from './npm_metadata.ts';
 import { assert_staged_fresh, wasm_package_checks } from './check_staged_freshness.ts';
@@ -1040,7 +1041,9 @@ describe(`locations helper (index.js): ${pkg_dir}`, { skip: !has_parse }, () => 
 			let span_only;
 			try {
 				span_only = parse(language, source, options);
-			} catch {
+			} catch (e) {
+				// a crash is no rejection: the test fails on it, naming the file
+				if (is_tsv_crash(e)) throw new Error(`tsv crashed on ${file}: ${crash_text(e)}`);
 				continue; // a source tsv rejects (input_invalid_*, tsv_rejects, a non-module `.ts`)
 			}
 			// outside the `try`: a source the default parse accepts must take `{locations: true}`

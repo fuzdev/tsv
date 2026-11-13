@@ -54,6 +54,7 @@
  */
 
 import { env } from 'node:process';
+import { crash_text, is_tsv_crash } from './divergence/panic_errors.ts';
 import {
 	type BindingCall,
 	type InitScope,
@@ -267,7 +268,8 @@ export interface RejectProbeTarget {
 /**
  * Assert every operation `binding` publishes still THROWS on an invalid source, in
  * every language and at every goal it publishes a row for, failing the impl loudly
- * when one of them doesn't.
+ * when one of them doesn't, or when what it throws is a crash (`is_tsv_crash`) rather than
+ * the refusal.
  *
  * Called from the wrapper's `init()`. tsv's bindings are `init_required`, so this
  * stops the run rather than dropping a row — correct, and the same rule the
@@ -331,7 +333,14 @@ export function assert_binding_reports_rejection(
 		try {
 			run();
 			accepted = true;
-		} catch {
+		} catch (e) {
+			// a crash is no refusal: the binding's error surface holds, but tsv broke on the source
+			if (is_tsv_crash(e)) {
+				throw new Error(
+					`${binding}: ${operation}() CRASHED on a source tsv rejects (${crash_text(e)}) — a ` +
+						`panic or a trap, never the refusal this probe expects. See lib/reject_probe.ts.`
+				);
+			}
 			// The expected outcome: the binding surfaced the refusal.
 		}
 		if (accepted) {

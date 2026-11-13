@@ -26,6 +26,10 @@
  *   node benches/js/roots/biome_oxfmt_diff.ts --parser typescript --file path/to/file.ts
  *   node benches/js/roots/biome_oxfmt_diff.ts --parser typescript --files a.ts b.ts   # batch verdicts, no bodies
  *
+ * `--files` takes every path after it: the argument parser gives the flag its first path as a
+ * value and the rest as positionals, so with `--files` each positional is one more file (and a
+ * repeated `--files` adds its own).
+ *
  * `run_biome_oxfmt_diff` is the library function; its root,
  * `benches/js/roots/biome_oxfmt_diff.ts`, binds its deps (`BiomeOxfmtDiffDeps`).
  *
@@ -35,10 +39,7 @@
 import { args_parse, argv_parse } from '@fuzdev/fuz_util/args.ts';
 import * as s from '@fuzdev/fuz_schema/schema.ts';
 
-import { BiomeImplementation } from '../lib/biome.ts';
 import type { InitCompareImplementations } from '../lib/compare_cli.ts';
-import { OxcImplementation } from '../lib/oxc.ts';
-import { load_all_versions } from '../lib/versions.ts';
 import { type Language, LANGUAGE_EXTENSIONS } from '../lib/types.ts';
 
 const Args = s.strip_object({
@@ -46,17 +47,30 @@ const Args = s.strip_object({
 	parser: s.with_default(s.one_of(['typescript', 'svelte', 'css']), 'typescript'),
 	content: s.optional(s.string),
 	file: s.optional(s.string),
-	files: s.optional(s.array(s.string)),
+	// one path (`--files a.ts`, the rest positionals), or one per repeated `--files`
+	files: s.optional(s.union([s.string, s.array(s.string)])),
 	stdin: s.with_default(s.boolean, false),
 	quiet: s.with_default(s.boolean, false)
 });
 
 type Out = { text?: string; err?: string };
 
+/** The third and fourth opinions, by the names the report prints. */
+export type DiffFormatterName = 'biome' | 'oxfmt';
+
+/** One of the third-party formatters, initialized. */
+export interface DiffFormatter {
+	supports_format_language(language: Language): boolean;
+	format(source: string, language: Language): string | Promise<string>;
+	dispose(): void;
+}
+
 /** What `run_biome_oxfmt_diff` reaches the world through. */
 export interface BiomeOxfmtDiffDeps {
 	/** tsv's native binding and prettier, initialized; `null` when either failed to load. */
 	init_implementations: InitCompareImplementations;
+	/** The formatter `name` (biome's wasm, oxfmt), initialized; throws when it can't load. */
+	load_formatter(name: DiffFormatterName): Promise<DiffFormatter>;
 	/** A file's text, by the path `--file` / `--files` spells. */
 	read_file(path: string): Promise<string>;
 	/** All of stdin, as text. */
@@ -87,26 +101,25 @@ export async function run_biome_oxfmt_diff(
 	const lang = a.parser as Language;
 	const ext = LANGUAGE_EXTENSIONS[lang];
 
-	const versions = await load_all_versions();
 	const engines = await deps.init_implementations();
 	if (engines === null) return 1;
 	const { canonical, native } = engines;
-	const biome = new BiomeImplementation(versions.biome);
-	const oxc = new OxcImplementation(versions.oxc);
-	let biome_ok = true;
-	let oxc_ok = true;
-	try {
-		await biome.init();
-	} catch (e) {
-		biome_ok = false;
-		console.error(`biome unavailable: ${e}`);
-	}
-	try {
-		await oxc.init();
-	} catch (e) {
-		oxc_ok = false;
-		console.error(`oxfmt unavailable: ${e}`);
-	}
+	/** The formatter `name`, or `null` (reported) when it can't load. */
+	const load = async (name: DiffFormatterName): Promise<DiffFormatter | null> => {
+		try {
+			return await deps.load_formatter(name);
+		} catch (e) {
+			console.error(`${name} unavailable: ${e}`);
+			return null;
+		}
+	};
+	const biome = await load('biome');
+	const oxfmt = await load('oxfmt');
+	const dispose = (): void => {
+		engines.dispose();
+		biome?.dispose();
+		oxfmt?.dispose();
+	};
 
 	async function format_all(src: string): Promise<Record<string, Out>> {
 		const out: Record<string, Out> = {};
@@ -121,18 +134,15 @@ export async function run_biome_oxfmt_diff(
 		} catch (e) {
 			out.prettier = { err: String(e instanceof Error ? e.message : e) };
 		}
-		if (biome_ok && biome.supports_format_language(lang)) {
+		for (const [name, formatter] of [
+			['biome', biome],
+			['oxfmt', oxfmt]
+		] as const) {
+			if (!formatter?.supports_format_language(lang)) continue;
 			try {
-				out.biome = { text: biome.format(src, lang) };
+				out[name] = { text: await formatter.format(src, lang) };
 			} catch (e) {
-				out.biome = { err: String(e instanceof Error ? e.message : e) };
-			}
-		}
-		if (oxc_ok && oxc.supports_format_language(lang)) {
-			try {
-				out.oxfmt = { text: await oxc.format_async(src, lang) };
-			} catch (e) {
-				out.oxfmt = { err: String(e instanceof Error ? e.message : e) };
+				out[name] = { err: String(e instanceof Error ? e.message : e) };
 			}
 		}
 		return out;
@@ -160,8 +170,9 @@ export async function run_biome_oxfmt_diff(
 	}
 
 	const sources: Array<{ label: string; src: string }> = [];
-	if (a.files && a.files.length) {
-		for (const f of a.files) sources.push({ label: f, src: await deps.read_file(f) });
+	const files = a.files === undefined ? [] : [a.files, a._].flat();
+	if (files.length > 0) {
+		for (const f of files) sources.push({ label: f, src: await deps.read_file(f) });
 	} else if (a.file) {
 		sources.push({ label: a.file, src: await deps.read_file(a.file) });
 	} else if (a.stdin) {
@@ -170,13 +181,11 @@ export async function run_biome_oxfmt_diff(
 		sources.push({ label: '<content>', src: a.content });
 	} else {
 		console.error('provide --content, --stdin, --file, or --files');
-		engines.dispose();
-		if (biome_ok) biome.dispose();
-		if (oxc_ok) oxc.dispose();
+		dispose();
 		return 1;
 	}
 
-	const batch = sources.length > 1 || !!a.files;
+	const batch = sources.length > 1 || files.length > 0;
 	for (const { label, src } of sources) {
 		const out = await format_all(src);
 		if (batch || a.quiet) {
@@ -193,8 +202,6 @@ export async function run_biome_oxfmt_diff(
 		await print(`\n===== verdict =====\n${verdict(out)}`);
 	}
 
-	engines.dispose();
-	if (biome_ok) biome.dispose();
-	if (oxc_ok) oxc.dispose();
+	dispose();
 	return 0;
 }

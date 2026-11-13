@@ -20,7 +20,7 @@
  *                             (tsv's documented posture). Reported, does not gate.
  *
  * A tsv panic is none of these: the failure's mode is classified before its content
- * (`is_native_panic_error`, the comparison tools' panic gate's classifier), so a crash lands in
+ * (`is_tsv_crash`, the comparison tools' panic gate's classifier), so a crash lands in
  * the `panic` bucket whatever the canonical parser said, never in `parity`.
  *
  * The gate fails (exit 1) on an **untracked over-rejection** — a tsv parse gap on valid input
@@ -44,7 +44,7 @@
 
 import type { CompareImplementations, InitCompareImplementations } from '../lib/compare_cli.ts';
 import { group_by_language } from '../lib/corpus.ts';
-import { is_native_panic_error } from '../lib/divergence/panic_errors.ts';
+import { crash_text, is_tsv_crash, panic_report_lines } from '../lib/divergence/panic_errors.ts';
 import { first_line } from '../lib/error_text.ts';
 import {
 	type KnownGap,
@@ -213,9 +213,6 @@ interface Buckets {
 	panic: Entry[];
 }
 
-/** How many panics the failure lists, as the comparison tools' panic gate does; the JSON has all. */
-const PANICS_LISTED = 10;
-
 /**
  * Buckets every file of a corpus by parse asymmetry between tsv and the canonical parser.
  *
@@ -272,12 +269,12 @@ async function triage(
 				// JSON.parse) — the same $lang::parse and error surface
 				impls.native.parse_internal(f.content, lang);
 			} catch (e) {
+				// the failure's mode before its content: a crash is never a verdict on the source
+				if (is_tsv_crash(e)) {
+					buckets.panic.push({ path: f.path, error: crash_text(e) });
+					continue;
+				}
 				tsv_err = first_line(e);
-			}
-			// the failure's mode before its content: a crash is never a verdict on the source
-			if (tsv_err !== null && is_native_panic_error(tsv_err)) {
-				buckets.panic.push({ path: f.path, error: tsv_err });
-				continue;
 			}
 			try {
 				impls.canonical.parse(f.content, lang);
@@ -328,14 +325,11 @@ async function triage(
 
 	const panics = langs.flatMap((lang) => report[lang].panic);
 	if (panics.length > 0) {
-		console.error(
-			`\nFAIL: ${panics.length} panic(s) — tsv crashed on real code ` +
-				`(caught here by the corpus profile; a shipped artifact would abort the host):`
+		const [headline, ...entries] = panic_report_lines(
+			panics.map((p) => ({ label: p.path, error: p.error }))
 		);
-		for (const p of panics.slice(0, PANICS_LISTED)) console.error(`  ${p.path}: ${p.error}`);
-		if (panics.length > PANICS_LISTED) {
-			console.error(`  ... and ${panics.length - PANICS_LISTED} more`);
-		}
+		console.error(`\n${headline}`);
+		for (const line of entries) console.error(line);
 	}
 	if (unexpected_total > 0) {
 		console.error(

@@ -22,7 +22,7 @@ import * as s from '@fuzdev/fuz_schema/schema.ts';
 import { meta } from '@fuzdev/fuz_schema/meta.ts';
 
 import { CorpusLoader, DirectoryLoader } from './corpus.ts';
-import { is_native_panic_error } from './divergence/panic_errors.ts';
+import { panic_report_lines } from './divergence/panic_errors.ts';
 import { type Language, LANGUAGES, type ParseGoal } from './types.ts';
 
 /**
@@ -154,16 +154,16 @@ export function fail_compare(impls: CompareImplementations): 1 {
 	return 1;
 }
 
-/** A per-file failure a panic gate can grade: where it happened, and what threw. */
+/** A crash a tool's catch classified (`is_tsv_crash`): where it happened, and its `crash_text`. */
 export interface CompareFailure {
 	path: string;
-	error?: string;
+	error: string;
 }
 
 /**
  * HARD-FAIL the run on any caught panic, on every run — not just `--all`, and
- * never folded into a per-file bucket. Returns whether it tripped, the report printed; the
- * caller then fails the run (`fail_compare`).
+ * never folded into a per-file bucket. Returns whether it tripped (any `panics`), the report
+ * printed; the caller then fails the run (`fail_compare`).
  *
  * The comparison tools load tsv built with `--profile corpus` (`panic = "unwind"`)
  * precisely so a crash is caught and reported per file rather than killing the
@@ -173,25 +173,22 @@ export interface CompareFailure {
  * 2) — `errors` → a WARN at exit 0 in the format tool, a dimmed `parse-fail
  * skipped` line in the parse tool.
  *
- * Callers pass the failures that could be tsv's (the parse tool's canonical-side
- * errors are excluded there, being JS); the CLASSIFICATION lives here, in one
- * place, so the two tools cannot answer this question differently.
+ * Callers pass the crashes their catches classified, each where it was caught, so only
+ * a throw out of tsv's own call is ever asked (the format tool's catch also takes
+ * prettier's, and the parse tool's canonical side is JS); the CLASSIFICATION is one
+ * function, `is_tsv_crash`, so no two tools can answer this question differently.
  *
  * Call it AFTER the report body is printed — a panic is the headline, not a
  * reason to withhold the run's findings.
  */
-export function gate_on_panics(failures: readonly CompareFailure[], base_path: string): boolean {
-	const panics = failures.filter((f) => is_native_panic_error(f.error));
+export function gate_on_panics(panics: readonly CompareFailure[], base_path: string): boolean {
 	if (panics.length === 0) return false;
 
-	console.log(
-		`\n\x1b[31mFAIL: ${panics.length} panic(s) — tsv crashed on real code ` +
-			`(caught here by the corpus profile; a shipped artifact would abort the host):\x1b[0m`
+	const [headline, ...entries] = panic_report_lines(
+		panics.map((f) => ({ label: rel_path(f.path, base_path), error: f.error }))
 	);
-	for (const f of panics.slice(0, 10)) {
-		console.log(`  ${rel_path(f.path, base_path)}: ${f.error}`);
-	}
-	if (panics.length > 10) console.log(`  ... and ${panics.length - 10} more`);
+	console.log(`\n\x1b[31m${headline}\x1b[0m`);
+	for (const line of entries) console.log(line);
 	return true;
 }
 

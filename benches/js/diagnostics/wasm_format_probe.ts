@@ -19,7 +19,12 @@
  *
  * Also a corpus byte-identity gate: a no-behavior-change perf edit must format
  * every file identically across the builds — a mismatch aborts (exit 1), since
- * timing a build that changed output is meaningless.
+ * timing a build that changed output is meaningless. Outcomes compare by their bytes
+ * (`compare_format_outcomes`): a source every build refuses, or every build throws on with the
+ * same error, is skipped, untimed; a refusal or a throw on one side only is a mismatch, listed
+ * with the file and what each build did. A crash in any build (`is_tsv_crash`: a trap) fails
+ * the run whatever the others did, listed with the build and the file: no build's timing over
+ * a source tsv crashes on can be read.
  *
  * A/B workflow (mirrors how T2.7 A/B'd the native CLI — copy the artifact aside
  * before editing; pkg/ is gitignored):
@@ -47,11 +52,23 @@
 
 import { CORPORA_COLLECTIONS } from '../lib/corpora.ts';
 import { group_by_language } from '../lib/corpus.ts';
+import {
+	crash_text,
+	is_tsv_crash,
+	type PanicEntry,
+	panic_report_lines
+} from '../lib/divergence/panic_errors.ts';
+import { first_line } from '../lib/error_text.ts';
 import { LANGUAGES } from '../lib/types.ts';
 import type { Language, Logger, SourceFile } from '../lib/types.ts';
 
-/** A loaded WASM build: the three format entry points, keyed by language. */
-type FormatBuild = Record<Language, (source: string) => string>;
+/**
+ * A loaded WASM build: the three format entry points, keyed by language. Each returns the
+ * formatted text, or in its place the refusal the glue builds (`{ok: false, error}`), a fresh
+ * object per call — which is why outcomes are compared by `compare_format_outcomes`, never by
+ * identity.
+ */
+type FormatBuild = Record<Language, (source: string) => unknown>;
 /** Per-language sample arrays (one entry per pair). */
 type LangSamples = Record<Language, number[]>;
 
@@ -71,14 +88,82 @@ export interface WasmFormatProbeDeps {
 }
 
 /** A glue module's format entry points, keyed by language. */
-export const to_format_build = (
-	mod: WasmGlueExports
-): Record<Language, (source: string) => string> =>
+export const to_format_build = (mod: WasmGlueExports): FormatBuild =>
 	({
 		svelte: mod.format_svelte,
 		typescript: mod.format_typescript,
 		css: mod.format_css
-	}) as Record<Language, (source: string) => string>;
+	}) as FormatBuild;
+
+/** What a build threw on a source, held as its outcome (`format_outcome`). */
+export class FormatThrew {
+	readonly error: unknown;
+	constructor(error: unknown) {
+		this.error = error;
+	}
+}
+
+/**
+ * One build's outcome on one source: the formatted text, the refusal the glue returns, or
+ * what it threw (a trap, an argument refusal), held as a `FormatThrew`.
+ */
+export function format_outcome(build: FormatBuild, file: SourceFile): unknown {
+	try {
+		return build[file.language](file.content);
+	} catch (e) {
+		return new FormatThrew(e);
+	}
+}
+
+/** An outcome as the A/B reads it: what ended the call, and for a throw, its first line. */
+function describe_outcome(outcome: unknown): string {
+	if (typeof outcome === 'string') return 'formatted';
+	if (!(outcome instanceof FormatThrew)) return 'refused';
+	return is_tsv_crash(outcome.error)
+		? `crashed (${crash_text(outcome.error)})`
+		: `threw (${first_line(outcome.error)})`;
+}
+
+/**
+ * How the builds' outcomes on one source compare, by their bytes: `crash` when any build
+ * crashed on it (`is_tsv_crash`), whatever the others did; `skipped` when every build refused
+ * it, or every build threw the same error on it (the file is untimed); `identical` when every
+ * build formatted it to the same text; and `mismatch` otherwise — differing text, or builds
+ * that ended differently (one formats, refuses, or throws where another doesn't), which is a
+ * behavior change too.
+ */
+export function compare_format_outcomes(
+	outcomes: ReadonlyArray<unknown>
+): 'identical' | 'mismatch' | 'skipped' | 'crash' {
+	const ends = outcomes.map(describe_outcome);
+	if (outcomes.some((o) => o instanceof FormatThrew && is_tsv_crash(o.error))) return 'crash';
+	if (ends.some((e) => e !== ends[0])) return 'mismatch';
+	if (ends[0] !== 'formatted') return 'skipped';
+	return outcomes.every((o) => o === outcomes[0]) ? 'identical' : 'mismatch';
+}
+
+/** The A/B's line for a source the builds disagree on: the file, then what each build did. */
+export function format_mismatch_line(
+	file: SourceFile,
+	labels: ReadonlyArray<string>,
+	outcomes: ReadonlyArray<unknown>
+): string {
+	const ends = labels.map((l, i) => `${l} ${describe_outcome(outcomes[i])}`);
+	return `  MISMATCH ${file.path}: ${ends.join(', ')}`;
+}
+
+/** Each build's crash on `file` among `outcomes`, labeled `<build>: <path>` for the FAIL block. */
+export function format_crash_entries(
+	file: SourceFile,
+	labels: ReadonlyArray<string>,
+	outcomes: ReadonlyArray<unknown>
+): PanicEntry[] {
+	return outcomes.flatMap((o, i) =>
+		o instanceof FormatThrew && is_tsv_crash(o.error)
+			? [{ label: `${labels[i]}: ${file.path}`, error: crash_text(o.error) }]
+			: []
+	);
+}
 
 /**
  * Times the WASM format build at `--current` against itself, a `--control` copy, or a
@@ -87,7 +172,7 @@ export const to_format_build = (
  * @param deps - the glue loader and the corpus
  * @param argv - the tool's arguments: a corpus directory, `--current`, `--baseline`,
  * `--control`, `--pairs`, `--warmup`, `--lang`
- * @returns the exit code: 1 when a `--baseline` formats differently, else 0
+ * @returns the exit code: 1 when a build crashes or a `--baseline` formats differently, else 0
  */
 export async function run_wasm_format_probe(
 	deps: WasmFormatProbeDeps,
@@ -123,26 +208,42 @@ export async function run_wasm_format_probe(
 
 	const files = await deps.load_files(corpus_dir, (m) => console.error(m));
 
-	// Intersection: keep only files every build formats without throwing, and gate
-	// byte-identity across them (the .control copy is identical by construction; the
-	// .baseline is the real check). Timing past a mismatch would be meaningless.
-	const builds = [current, baseline, control].filter((b): b is FormatBuild => b !== null);
+	// Intersection: keep only files some build formats, skipping those every build refuses
+	// or throws the same error on, and gate byte-identity across them (the .control copy is
+	// identical by construction; the .baseline is the real check). Timing past a mismatch
+	// would be meaningless, and so would timing past a crash.
+	const labeled = [
+		{ label: 'current', build: current },
+		{ label: 'baseline', build: baseline },
+		{ label: 'control', build: control }
+	].filter((b): b is { label: string; build: FormatBuild } => b.build !== null);
+	const builds = labeled.map((b) => b.build);
+	const labels = labeled.map((b) => b.label);
 	const ok: SourceFile[] = [];
-	let mismatches = 0;
+	const mismatch_lines: string[] = [];
+	const crashes: PanicEntry[] = [];
 	for (const f of files) {
 		if (!langs.includes(f.language)) continue;
-		try {
-			const outs = builds.map((b) => b[f.language](f.content));
-			if (outs.some((o) => o !== outs[0])) mismatches++;
-			ok.push(f);
-		} catch {
-			// skip files any build rejects
+		const outcomes = builds.map((b) => format_outcome(b, f));
+		const outcome = compare_format_outcomes(outcomes);
+		if (outcome === 'crash') {
+			crashes.push(...format_crash_entries(f, labels, outcomes));
+			continue;
 		}
+		if (outcome === 'skipped') continue;
+		if (outcome === 'mismatch') mismatch_lines.push(format_mismatch_line(f, labels, outcomes));
+		ok.push(f);
 	}
+	const mismatches = mismatch_lines.length;
 	console.error(
 		`\nbyte-identity: ${ok.length - mismatches}/${ok.length} identical` +
 			(mismatches ? `  — ${mismatches} MISMATCH` : '')
 	);
+	for (const line of mismatch_lines) console.error(line);
+	if (crashes.length > 0) {
+		for (const line of panic_report_lines(crashes)) console.error(line);
+		return 1;
+	}
 	if (mismatches && baseline) {
 		console.error(
 			'ABORT: builds format differently — a no-behavior-change edit must be byte-identical.'

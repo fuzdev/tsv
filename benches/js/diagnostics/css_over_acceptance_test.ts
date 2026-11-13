@@ -10,7 +10,9 @@ import { afterEach, beforeEach, test, vi } from 'vitest';
 
 import { CSS_REJECTS_PIN } from '../lib/gate_counts.ts';
 import { HARVEST_STAMPS } from '../lib/harvest_stamp_table.ts';
+import { TsvRejection } from '../lib/divergence/panic_errors.ts';
 import type { SourceFile, TsvImplementation } from '../lib/types.ts';
+import { raise_wasm_trap } from '../lib/wasm_trap_fakes.ts';
 import {
 	type CssOverAcceptanceDeps,
 	type CssOverAcceptanceImplementations,
@@ -239,4 +241,99 @@ test('an oracle that cannot load skips under --if-present and fails otherwise', 
 			'FAIL: css-rejects pin: could not init svelte/compiler (svelte missing) — run `npm run bench:install`'
 		)
 	);
+});
+
+/**
+ * `fake_impl`, but failing on a source holding `crash` as `failure` says: the panic the
+ * `corpus` addon throws, a WASM build's trap, or a returned rejection reading `panic: `.
+ */
+const crashing_impl = (
+	disposed: string[],
+	name: string,
+	failure: 'panic' | 'trap' | 'panic_text',
+	...allows: string[]
+): TsvImplementation => {
+	const impl = fake_impl(disposed, name, ...allows);
+	return {
+		...impl,
+		parse: (source: string, language: 'css') => {
+			if (source.includes('crash')) {
+				if (failure === 'trap') raise_wasm_trap();
+				throw failure === 'panic'
+					? new Error('panic: boom\n  at a frame')
+					: new TsvRejection('panic: boom\n  at a frame');
+			}
+			return impl.parse(source, language);
+		}
+	} as TsvImplementation;
+};
+
+/** The pinned corpus with its second and third rejects marked to crash a crashing engine. */
+const crash_corpus = (): SourceFile[] =>
+	corpus().map((f, i) => (i === 1 || i === 2 ? { ...f, content: `${f.content} crash` } : f));
+
+test('a crash in a tsv row is neither an accept nor a rejection: listed with its engine, it fails the run', async () => {
+	const world = fake_world();
+	const deps = fake_deps(world, {
+		files: crash_corpus(),
+		impls: (disposed) => ({
+			canonical: fake_impl(disposed, 'canonical'),
+			native: crashing_impl(disposed, 'native', 'panic', 'lenient'),
+			wasm: crashing_impl(disposed, 'wasm', 'trap', 'lenient')
+		})
+	});
+	strictEqual(await run_css_over_acceptance(deps, ['--json']), 1);
+	const graded = CSS_REJECTS_PIN - 2;
+	// the report is still out, whole, with the crashed files in neither count
+	deepStrictEqual(JSON.parse(world.out).rows, [
+		{ name: 'svelte/compiler', accepted: 0, total: CSS_REJECTS_PIN, rate: 0 },
+		{ name: 'tsv', accepted: LENIENT, total: graded, rate: LENIENT / graded },
+		{ name: 'tsv-wasm', accepted: LENIENT, total: graded, rate: LENIENT / graded }
+	]);
+	deepStrictEqual(err, [
+		'FAIL: 4 panic(s) — tsv crashed on real code (a native panic the corpus profile caught, which a shipped artifact aborts the host on, or a WASM trap):',
+		'  tsv: c/1.css: panic: boom',
+		'  tsv: c/2.css: panic: boom',
+		'  tsv-wasm: c/1.css: RuntimeError: unreachable',
+		'  tsv-wasm: c/2.css: RuntimeError: unreachable'
+	]);
+	deepStrictEqual(world.disposed.toSorted(), ['canonical', 'native', 'wasm']);
+});
+
+test("another engine's crash text stays a rejection: only tsv's rows are gated", async () => {
+	const world = fake_world();
+	const deps = fake_deps(world, {
+		files: crash_corpus(),
+		impls: (disposed) => ({
+			canonical: fake_impl(disposed, 'canonical'),
+			postcss: crashing_impl(disposed, 'postcss', 'panic', 'bad')
+		})
+	});
+	strictEqual(await run_css_over_acceptance(deps, ['--json']), 0);
+	deepStrictEqual(JSON.parse(world.out).rows[1], {
+		name: 'postcss',
+		accepted: CSS_REJECTS_PIN - 2,
+		total: CSS_REJECTS_PIN,
+		rate: (CSS_REJECTS_PIN - 2) / CSS_REJECTS_PIN
+	});
+	ok(!err.some((l) => l.includes('panic')));
+});
+
+test('a tsv rejection whose text reads `panic: ` is a rejection: the engine returned it', async () => {
+	const world = fake_world();
+	const deps = fake_deps(world, {
+		files: crash_corpus(),
+		impls: (disposed) => ({
+			canonical: fake_impl(disposed, 'canonical'),
+			native: crashing_impl(disposed, 'native', 'panic_text', 'lenient')
+		})
+	});
+	strictEqual(await run_css_over_acceptance(deps, ['--json']), 0);
+	deepStrictEqual(JSON.parse(world.out).rows[1], {
+		name: 'tsv',
+		accepted: LENIENT,
+		total: CSS_REJECTS_PIN,
+		rate: LENIENT / CSS_REJECTS_PIN
+	});
+	deepStrictEqual(err, []);
 });
