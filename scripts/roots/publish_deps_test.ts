@@ -17,7 +17,7 @@ import { fs } from '@fuzdev/gro/fs.ts';
 import { is_fs_error } from '@fuzdev/gro/fs_error.ts';
 import { GIT_LOCAL_PASS_ENV } from '@fuzdev/gro/git.ts';
 import type { SpawnProgram } from '@fuzdev/gro/spawn.ts';
-import { afterEach, beforeEach, describe, test } from 'vitest';
+import { beforeEach, describe, test, vi } from 'vitest';
 
 import { CORPORA_COLLECTIONS, CORPORA_ROOT } from '../../benches/js/lib/corpora.ts';
 import { CARGO_PASS_ENV } from '../cargo_env.ts';
@@ -36,23 +36,22 @@ const SH = Object.fromEntries(
 	Object.keys(PUBLISH_PROGRAM_NAMES).map((key) => [key, 'sh'])
 ) as typeof PUBLISH_PROGRAM_NAMES;
 
-/** Variables set in the host for the deps to see or drop, restored after each test. */
-const PROBE = {
+/**
+ * The host environment each test runs in, stubbed before it and restored after it
+ * (`vitest.config.ts`): variables set for the deps to see or drop, and, cleared, the ones the
+ * probe reads that the handles set themselves, so the host's own `TSV_BUILD_FORCE` or `PKG_DIR`
+ * can't reach a handle that passes everything.
+ */
+const HOST_ENV: Record<string, string | undefined> = {
 	TSV_PUBLISH_PROBE: 'host',
 	GIT_PUBLISH_PROBE: 'git',
 	CARGO_PUBLISH_PROBE: 'cargo',
-	LC_ALL: 'en_US.UTF-8'
+	LC_ALL: 'en_US.UTF-8',
+	TSV_BUILD_FORCE: undefined,
+	PKG_DIR: undefined
 };
-let saved: Record<string, string | undefined>;
 beforeEach(() => {
-	saved = Object.fromEntries(Object.keys(PROBE).map((name) => [name, process.env[name]]));
-	Object.assign(process.env, PROBE);
-});
-afterEach(() => {
-	for (const [name, value] of Object.entries(saved)) {
-		if (value === undefined) delete process.env[name];
-		else process.env[name] = value;
-	}
+	for (const [name, value] of Object.entries(HOST_ENV)) vi.stubEnv(name, value);
 });
 
 /** What `program` sees: its working directory and the probed variables. */
@@ -227,7 +226,14 @@ const deps = create_publish_deps(await fs.open_dir('/'));
 deps.print('out %s');
 deps.print_error('err %s');`
 			],
-			{ cwd: CHECKOUT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }
+			// `FORCE_COLOR=0`, so a host setting both `NO_COLOR` and `FORCE_COLOR` gets no warning
+			// from Node on the stderr compared here
+			{
+				cwd: CHECKOUT,
+				env: { ...process.env, FORCE_COLOR: '0' },
+				encoding: 'utf8',
+				stdio: ['ignore', 'pipe', 'pipe']
+			}
 		);
 		deepStrictEqual([run.status, run.stdout, run.stderr], [0, 'out %s\n', 'err %s\n']);
 	});

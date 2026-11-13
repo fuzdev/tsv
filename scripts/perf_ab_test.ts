@@ -384,52 +384,58 @@ const child_env_names = async (
 /** gro's base environment, as far as this host has it. */
 const BASE_NAMES = ['PATH', 'HOME', 'TMPDIR', 'TERM', 'LC_ALL', 'NO_COLOR', 'FORCE_COLOR'];
 
+/** Two names the tests below stub, as the host had them before any test ran. */
+const HOST_STUBBED = { RUSTFLAGS: process.env.RUSTFLAGS, UNRELATED: process.env.UNRELATED };
+
+/** Stubs each of `vars` in the host for this test (`vitest.config.ts` restores them after it);
+ * `undefined` clears one. */
+const stub_env = (vars: Record<string, string | undefined>): void => {
+	for (const [name, value] of Object.entries(vars)) vi.stubEnv(name, value);
+};
+
 test('a build gets the base environment, the kept toolchain variables and its own', async () => {
-	const saved = { ...process.env };
-	try {
-		Object.assign(process.env, {
-			RUSTFLAGS: '-C target-cpu=native',
-			CARGO_PROFILE_RELEASE_LTO: 'off',
-			RUSTUP_TOOLCHAIN: 'nightly',
-			CARGO_HOME: '/tmp/perf_ab_test_cargo',
-			CARGO_TARGET_DIR: '/tmp/elsewhere',
-			UNRELATED: '1'
-		});
-		const names = await child_env_names({ pass_env: BUILD_ENV, env: BUILD_FIXED_ENV });
-		deepStrictEqual(
-			names.filter((name) => !BASE_NAMES.includes(name)).sort(),
-			['CARGO_HOME', 'CARGO_TARGET_DIR'].sort()
-		);
-		await using dir = await fs.temp_dir('perf_ab_test_env-');
-		await dir.write('value.sh', '#!/bin/sh\nprintf %s "$CARGO_TARGET_DIR"\n', { mode: 0o755 });
-		const value = await spawn
-			.program_in(dir, 'value.sh', { pass_env: BUILD_ENV, env: BUILD_FIXED_ENV })
-			.out([]);
-		strictEqual(value.stdout, '../target');
-	} finally {
-		for (const name of Object.keys(process.env)) if (!(name in saved)) delete process.env[name];
-		Object.assign(process.env, saved);
-	}
+	// a toolchain variable the pass list names that the host sets (`RUSTUP_HOME`,
+	// `CARGO_BUILD_JOBS`) would pass too, so it's cleared and the caller environment is the
+	// same on every machine
+	for (const name of BUILD_ENV) if (!BASE_NAMES.includes(name)) vi.stubEnv(name, undefined);
+	stub_env({
+		RUSTFLAGS: '-C target-cpu=native',
+		CARGO_PROFILE_RELEASE_LTO: 'off',
+		RUSTUP_TOOLCHAIN: 'nightly',
+		CARGO_HOME: '/tmp/perf_ab_test_cargo',
+		CARGO_TARGET_DIR: '/tmp/elsewhere',
+		UNRELATED: '1'
+	});
+	const names = await child_env_names({ pass_env: BUILD_ENV, env: BUILD_FIXED_ENV });
+	deepStrictEqual(
+		names.filter((name) => !BASE_NAMES.includes(name)).sort(),
+		['CARGO_HOME', 'CARGO_TARGET_DIR'].sort()
+	);
+	await using dir = await fs.temp_dir('perf_ab_test_env-');
+	await dir.write('value.sh', '#!/bin/sh\nprintf %s "$CARGO_TARGET_DIR"\n', { mode: 0o755 });
+	const value = await spawn
+		.program_in(dir, 'value.sh', { pass_env: BUILD_ENV, env: BUILD_FIXED_ENV })
+		.out([]);
+	strictEqual(value.stdout, '../target');
 });
 
 test('a driver, and perf around it, gets the base environment alone', async () => {
-	const saved = { ...process.env };
-	try {
-		Object.assign(process.env, {
-			RUSTFLAGS: '-C target-cpu=native',
-			CARGO_HOME: '/x',
-			UNRELATED: '1'
-		});
-		const names = await child_env_names({ pass_env: DRIVER_PASS_ENV });
-		deepStrictEqual(
-			names.filter((name) => !BASE_NAMES.includes(name)),
-			[]
-		);
-		ok(names.includes('LC_ALL'));
-	} finally {
-		for (const name of Object.keys(process.env)) if (!(name in saved)) delete process.env[name];
-		Object.assign(process.env, saved);
-	}
+	stub_env({ RUSTFLAGS: '-C target-cpu=native', CARGO_HOME: '/x', UNRELATED: '1' });
+	const names = await child_env_names({ pass_env: DRIVER_PASS_ENV });
+	deepStrictEqual(
+		names.filter((name) => !BASE_NAMES.includes(name)),
+		[]
+	);
+	ok(names.includes('LC_ALL'));
+});
+
+test('what the tests above stubbed in the host is restored after each', () => {
+	// tests in a file run in order, so this one runs after the stubs; `vitest.config.ts`'s
+	// `unstubEnvs` is what restores them
+	deepStrictEqual(
+		{ RUSTFLAGS: process.env.RUSTFLAGS, UNRELATED: process.env.UNRELATED },
+		HOST_STUBBED
+	);
 });
 
 // -- a whole run over a fake build, fake drivers and a fake perf -------------------------------
@@ -760,10 +766,13 @@ test('each side is graded on the samples its own binary measured', async () => {
 
 test('the root exits 2, never the regression code, when a program it needs is missing', async () => {
 	// `node` found on this `PATH`, the root run with an empty one, so `git`, the first program it
-	// makes, is missing
+	// makes, is missing; `FORCE_COLOR=0`, so a host setting both `NO_COLOR` and `FORCE_COLOR`
+	// gets no warning from Node on the stderr compared here
 	await using empty = await fs.temp_dir('perf_ab_test_path-');
 	const root = new URL('./roots/perf_ab.ts', import.meta.url).pathname;
-	const result = await spawn.program('node', { env: { PATH: empty.path } }).out([root, '--help']);
+	const result = await spawn
+		.program('node', { env: { PATH: empty.path, FORCE_COLOR: '0' } })
+		.out([root, '--help']);
 	deepStrictEqual(
 		[result.kind === 'exited' && result.code, result.stdout, result.stderr],
 		[2, '', 'perf:ab: error: not_found: no program git\n']

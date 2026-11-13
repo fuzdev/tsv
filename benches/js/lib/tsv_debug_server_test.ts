@@ -4,7 +4,8 @@
  * splitting, and the process's end are the real ones. Each mode is the `<command>` the
  * server sends: an answer per request, an answer holding U+2028 and U+2029 inside a string,
  * a partial line and an exit, an exit before answering, a stdin closed while the process
- * runs on, no answer at all, and an exit code or signal on close.
+ * runs on, no answer at all, and an exit code or signal on close. And over an in-memory child,
+ * the refusal of one started without a piped stdin or stdout.
  */
 
 import { deepStrictEqual, rejects, strictEqual } from 'node:assert';
@@ -126,4 +127,19 @@ test('a signal on close throws 128 + its number', async () => {
 	await rejects(s.close(), {
 		message: 'target/corpus/tsv_debug signal --stdin exited 137 on close'
 	});
+});
+
+test('a process started without a piped stdin or stdout is refused, naming the command', async () => {
+	const closed = new Promise<never>(() => {});
+	const stdin = { write: async () => true, close: async () => {} };
+	const stdout = (async function* () {})();
+	for (const child of [
+		{ stdin: null, stdout, closed, kill: () => true },
+		{ stdin, stdout: null, closed, kill: () => true }
+	]) {
+		const piped: TsvDebugProgram = { start: async () => child };
+		await rejects(TsvDebugServer.spawn('echo', piped), {
+			message: 'target/corpus/tsv_debug echo --stdin started without piped stdio'
+		});
+	}
 });

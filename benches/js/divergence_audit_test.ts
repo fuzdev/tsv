@@ -1,14 +1,19 @@
 /**
  * `run_divergence_audit` over in-memory deps: the exit code and stream of each outcome, what it
- * reads from `docs/`, and that an argument error reads nothing.
+ * reads from `docs/`, and that an argument error reads nothing; and over a committed fixture read
+ * through a read-only handle, how a fixture's witnesses aggregate.
  */
 
 import { deepStrictEqual, fail, match, strictEqual } from 'node:assert';
+import { fileURLToPath } from 'node:url';
 
+import { fs } from '@fuzdev/gro/fs.ts';
 import { afterEach, beforeEach, describe, test, vi } from 'vitest';
 
 import { run_divergence_audit } from './divergence_audit.ts';
-import type { FixtureIo } from './lib/divergence/fixture_cases.ts';
+import { build_cases, build_context, type FixtureIo } from './lib/divergence/fixture_cases.ts';
+import { fixture_io } from './lib/divergence/fixture_io.ts';
+import { detect_divergences } from './lib/divergence/patterns.ts';
 import type { AuditDocs, AuditReportDeps } from './lib/divergence/validation.ts';
 
 /** A documented divergence, as a catalog list item links one. */
@@ -231,4 +236,72 @@ describe('the catalog parse', () => {
 			}
 		]);
 	});
+});
+
+describe('the aggregation over a fixture’s witnesses', () => {
+	/**
+	 * Committed fixtures, each with its witnesses' classifications in the order the audit grades
+	 * them and the status they aggregate to: the best witness wins whichever comes first, and only
+	 * a partial result carries its unexplained hunks.
+	 */
+	const CASES: Array<{
+		fixture: string;
+		witnesses: Array<string>;
+		status: string;
+		partial: boolean;
+	}> = [
+		{
+			fixture: 'css/at_rules/container_long_prettier_divergence',
+			witnesses: ['all_explained', 'partial'],
+			status: 'explained',
+			partial: false
+		},
+		{
+			fixture: 'svelte/elements/special_element_newline_flow_prettier_divergence',
+			witnesses: ['none_explained', 'all_explained'],
+			status: 'explained',
+			partial: false
+		},
+		{
+			fixture:
+				'typescript/expressions/arrow/curried_chain_long_leading_comment_prettier_divergence',
+			witnesses: ['partial'],
+			status: 'partial',
+			partial: true
+		}
+	];
+
+	for (const { fixture, witnesses, status, partial } of CASES) {
+		test(`${witnesses.join(' then ')} aggregates to ${status}`, async () => {
+			const fixtures = fixture_io(
+				(
+					await fs.open_dir(fileURLToPath(new URL('../../tests/fixtures/', import.meta.url)))
+				).readonly()
+			);
+			// the precondition: the witnesses classify as listed, in the order the audit grades
+			// them, so an edit to the fixture fails here rather than defusing the test
+			const cases = await build_cases(fixture, fixtures);
+			if (cases === 'no_input') fail(`${fixture} has no input`);
+			deepStrictEqual(
+				cases.map((c) => detect_divergences(build_context(c)).classification),
+				witnesses
+			);
+
+			const name = fixture.slice(fixture.lastIndexOf('/') + 1);
+			const docs = docs_of(
+				{
+					'conformance_prettier.md': `## Section\n\n- A feature — [${name}](../tests/fixtures/${fixture})\n`
+				},
+				{ reads: [] }
+			);
+			strictEqual(await run_divergence_audit({ fixtures, docs }, ['--json']), 0);
+			const detection = (JSON.parse(out[0]!) as { detection: Array<Record<string, unknown>> })
+				.detection;
+			strictEqual(detection.length, 1);
+			strictEqual(detection[0]!.fixture_path, fixture);
+			strictEqual(detection[0]!.status, status);
+			const hunks = detection[0]!.unexplained_hunks;
+			strictEqual(partial ? typeof hunks === 'number' && hunks > 0 : hunks === undefined, true);
+		});
+	}
 });
