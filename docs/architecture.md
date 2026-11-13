@@ -1067,7 +1067,7 @@ its payload by id, a row of a store of that payload's own type:
   but the pattern wrapper's (an optional or annotated parameter's `?` / `: T` extension in
   the parameter parser), which lands on array and object patterns, carrying no second span.
   It is 48 B on wasm32 too.
-- `TSType` is **72 B** — `TSImportType`, `TSConstructorType` and `TSInferType` are
+- `TSType` is **56 B** — `TSImportType`, `TSConstructorType` and `TSInferType` are
   stored. No field holds a `TSType` by value: the type parser's deep precedence ladder
   pushes each type to the type store at its builder's tail and returns the row's id
   (`Parser::parse_type`) — the second rule below, applied to a return instead of a
@@ -1082,7 +1082,7 @@ its payload by id, a row of a store of that payload's own type:
   `TSModuleDeclaration`, `TSExportAssignment`), and one level down `ForStatement`,
   `ForOfStatement`, `ForInStatement` and `TryStatement` hold their heads by id. Each of those heads is ≤0.2% of statements on real source and a classic
   `for (;;)` is 0.05–0.22%. Rarity carries the enum from 544 B down to 96; the second rule below,
-  plus its one deliberate exception, takes it to **56 B**.
+  its one deliberate exception and a narrow `Identifier` take it to **48 B**.
 
 All three widths are pinned by `const` asserts in `ast/mod.rs`, so a variant
 that widens any of these enums fails the test build rather than silently fattening every
@@ -1153,15 +1153,15 @@ narrowed, the only variants left setting `Statement`'s width were `ImportDeclara
 (6.8–11.7% of statements) and `ExportNamedDeclaration` (2.4–4.0%) — common, not rare.
 They are stored anyway, because a stored head's construction copies the same bytes into
 its store that it would otherwise have moved into the enum, so the cost is one row push
-and the return is 24 bytes off *every other* statement slot. That took `Statement` to
-72 B, and the id edges and a narrower `Identifier` (its binding extras named by a 4 B id)
-took it to **56 B**; its widest inline variant is `LabeledStatement`, which is where the
-ladder stops. The trade is settled by measurement, not by rarity — the
-only place in the three enums where rarity is not the argument.
+and the return is 24 bytes off *every other* statement slot. With the id edges and a
+narrow `Identifier` (its binding extras named by a 4 B id, its decoded name, when it has
+one, by a handle into the text pool) `Statement` is **48 B**; its widest inline variant is
+`TryStatement`, which is where the ladder stops. The trade is settled by measurement, not
+by rarity — the only place in the three enums where rarity is not the argument.
 
 `Statement` is a header over its variant, as `Expression` is —
-`struct Statement { span, kind: StatementKind }` (`StatementKind` 48 B, set by
-`LabeledStatement` at 40) — with the same span rule: a variant struct carries no span of
+`struct Statement { span, kind: StatementKind }` (`StatementKind` 40 B, set by
+`TryStatement` at 36) — with the same span rule: a variant struct carries no span of
 its own unless some node also holds that type outside a `Statement` (`VariableDeclaration`, `BlockStatement`,
 `FunctionDeclaration`, `TSDeclareFunction`, `ClassDeclaration`,
 `TSInterfaceDeclaration`, `TSModuleDeclaration`); those are wrapped only through the
@@ -1169,8 +1169,8 @@ its own unless some node also holds that type outside a `Statement` (`VariableDe
 spans are `pub`; they stay equal because that is the only way the wrapped form is built
 and no span write reaches one of those payloads after it is wrapped. A debug build
 asserts the agreement on every `Statement::span()` read for the two held inline; the five
-held in a store take the header span from the same value their row is pushed from. On wasm32
-`Statement` is 48 B.
+held in a store take the header span from the same value their row is pushed from. `Statement`
+is 48 B on wasm32 too.
 
 `parse_expression` / `parse_assignment_expression` are the entry points these fields are
 filled from. The read side does pay one indexed load per `prop.key` / `decl.init`, which is why the trade is settled by

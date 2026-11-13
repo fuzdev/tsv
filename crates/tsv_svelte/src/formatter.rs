@@ -7,8 +7,8 @@ use tsv_ts::ast::AstStores;
 /// Formats many Svelte sources on one thread, reusing its allocations from one source to the
 /// next.
 ///
-/// [`format()`](crate::format) allocates a fresh AST arena, doc arena and expression and
-/// statement stores for every call and drops them before returning. A `Formatter` owns all
+/// [`format()`](crate::format) allocates a fresh AST arena, doc arena and TypeScript
+/// stores for every call and drops them before returning. A `Formatter` owns all
 /// three and rewinds them instead, keeping what they have grown (the AST arena keeps its
 /// largest block, the doc arena and the stores their whole capacity), so after the first few
 /// sources the work allocates almost nothing new — the shape of a driver that formats a
@@ -44,7 +44,7 @@ use tsv_ts::ast::AstStores;
 pub struct Formatter {
     ast: bumpalo::Bump,
     doc: DocArena,
-    /// The expression and statement stores between calls, out of the slot while one runs.
+    /// The TypeScript stores between calls, out of the slot while one runs.
     stores: Option<AstStores<'static>>,
 }
 
