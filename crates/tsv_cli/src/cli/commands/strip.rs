@@ -75,9 +75,7 @@ impl StripCommand {
         .resolve()
         .unwrap_or_else(|e| exit_with_error(2, format_args!("Error: {e}")));
         let source = input.content();
-        let arena =
-            bumpalo::Bump::with_capacity(tsv_lang::estimated_ast_arena_capacity(source.len()));
-        match tsv_ts::__private::strip_in(source, goal, &arena) {
+        match tsv_ts::__private::strip_into(source, goal, &mut tsv_ts::ast::AstStores::new()) {
             Ok(stripped) => {
                 if !self.check {
                     write_stdout(stripped.code.as_bytes());

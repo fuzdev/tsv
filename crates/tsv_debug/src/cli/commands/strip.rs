@@ -67,8 +67,7 @@ fn strip_file(path: &std::path::Path) -> Result<(), CliError> {
         eprintln!("Error: reading {}: {e}", path.display());
         CliError::Failed
     })?;
-    let arena = bumpalo::Bump::new();
-    match strip_at_path(path, &source, &arena) {
+    match strip_at_path(path, &source) {
         Ok(stripped) => {
             print!("{}", stripped.code);
             Ok(())
@@ -96,10 +95,9 @@ fn strip_file(path: &std::path::Path) -> Result<(), CliError> {
 fn strip_at_path(
     path: &std::path::Path,
     source: &str,
-    arena: &bumpalo::Bump,
 ) -> Result<tsv_ts::Stripped, tsv_ts::StripError> {
     let goal = tsv_ts::Goal::from_extension(path);
-    tsv_ts::__private::strip_in(source, goal, arena)
+    tsv_ts::__private::strip_into(source, goal, &mut tsv_ts::ast::AstStores::new())
 }
 
 /// One `--stdin` request (module doc).
@@ -118,8 +116,9 @@ fn serve_requests() -> Result<(), CliError> {
 
 /// The reply for one source (module doc §`--stdin`).
 fn answer(source: &str, arena: &mut bumpalo::Bump) -> serde_json::Value {
-    let result = super::catch_in_arena(arena, |arena| {
-        tsv_ts::__private::strip_in(source, None, arena).map(|stripped| {
+    // the strip takes no arena: the server's is only rewound
+    let result = super::catch_in_arena(arena, |_| {
+        tsv_ts::strip(source).map(|stripped| {
             let code = stripped.code;
             let mut findings: Vec<String> = contract_violations(source, &code)
                 .into_iter()
@@ -153,16 +152,15 @@ mod tests {
     #[test]
     fn a_path_takes_the_goal_its_extension_settles() {
         let source = "var await: number = 1;\n";
-        let arena = bumpalo::Bump::new();
         assert!(matches!(
-            strip_at_path(Path::new("w.mts"), source, &arena),
+            strip_at_path(Path::new("w.mts"), source),
             Err(tsv_ts::StripError::Parse(_))
         ));
         assert!(matches!(
-            strip_at_path(Path::new("W.MTS"), source, &arena),
+            strip_at_path(Path::new("W.MTS"), source),
             Err(tsv_ts::StripError::Parse(_))
         ));
-        let stripped = strip_at_path(Path::new("w.ts"), source, &arena).expect("the script retry");
+        let stripped = strip_at_path(Path::new("w.ts"), source).expect("the script retry");
         assert_eq!(stripped.code, "var await         = 1;\n");
     }
 }

@@ -157,20 +157,14 @@ fn display_is_one_line_and_the_alternate_is_the_full_text() {
     assert_eq!(full, format!("{}\n{}", report.message, report.frame));
 
     // the strip's parse error forwards both forms
-    let strip = {
-        let arena = bumpalo::Bump::new();
-        tsv_ts::__private::strip_in(source, None, &arena).expect_err("the source must not strip")
-    };
+    let strip = tsv_ts::strip(source).expect_err("the source must not strip");
     assert_eq!(strip.kind(), ErrorKind::Syntax);
     assert_eq!(strip.to_string(), one);
     assert_eq!(format!("{strip:#}"), full);
 
     // a strip refusal is a refusal, and its message keeps the frame
     let enumerated = "enum E { A }\n";
-    let refusal = {
-        let arena = bumpalo::Bump::new();
-        tsv_ts::__private::strip_in(enumerated, None, &arena).expect_err("an enum is refused")
-    };
+    let refusal = tsv_ts::strip(enumerated).expect_err("an enum is refused");
     assert_eq!(refusal.kind(), ErrorKind::Refusal);
     assert_eq!(refusal.to_string(), "cannot strip an enum (1:1)");
     assert!(

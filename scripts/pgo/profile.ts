@@ -63,8 +63,7 @@ export const HOT_FUNCTIONS: readonly HotFunction[] = [
 	{ path: 'tsv_svelte::__private::parse_folded_into', per: 'svelte', worlds: EVERY },
 	{ path: 'tsv_css::__private::parse', per: 'css', worlds: EVERY },
 	{ path: 'tsv_css::__private::parse_folded', per: 'css', worlds: EVERY },
-	{ path: 'tsv_ts::strip::strip_in', per: 'strip', worlds: ['cli'] },
-	{ path: 'tsv_ts::strip::strip_into', per: 'strip', worlds: ['napi'] },
+	{ path: 'tsv_ts::strip::strip_into', per: 'strip', worlds: ['cli', 'napi'] },
 	{ path: 'tsv_ts::imports::parse_imports_into', per: 'imports_typescript', worlds: ['napi'] },
 	{ path: 'tsv_svelte::__private::parse_imports_into', per: 'imports_svelte', worlds: ['napi'] }
 ];

@@ -350,7 +350,7 @@ fn profile_file(
             Mode::Bind => {
                 return Err("--bind needs tsv_check, which is outside the workspace build".into());
             }
-            Mode::Strip => profile_strip_once(&source, arena)?,
+            Mode::Strip => profile_strip_once(&source)?,
             Mode::Format => profile_once(&source, parser_type, arena, doc_arena)?,
         };
         parse_times.push(parse_dur);
@@ -423,17 +423,13 @@ fn is_strippable(path: &str) -> bool {
 /// Run one parse and one type strip of TypeScript, returning `(parse_duration,
 /// strip_duration - parse_duration)`. `tsv_ts::strip` parses inside, so its walk + blank
 /// is read as the difference; a refusal is timed like an output, since the walk ran.
-fn profile_strip_once(
-    source: &str,
-    arena: &mut bumpalo::Bump,
-) -> Result<(Duration, Duration), String> {
+fn profile_strip_once(source: &str) -> Result<(Duration, Duration), String> {
     let t0 = Instant::now();
     tsv_ts::__private::parse(source).map_err(|e| format!("parse error: {e:#}"))?;
     let parse_dur = t0.elapsed();
-    arena.reset();
 
     let t1 = Instant::now();
-    let result = tsv_ts::__private::strip_in(source, None, arena);
+    let result = tsv_ts::__private::strip_into(source, None, &mut tsv_ts::ast::AstStores::new());
     let strip_dur = t1.elapsed();
     if let Err(tsv_ts::StripError::Parse(e)) = result {
         return Err(format!("parse error: {e:#}"));

@@ -11,9 +11,9 @@ and Node's `module.stripTypeScriptTypes` share. The implementation is `tsv_ts::s
 ## Surfaces
 
 - **Rust**: `tsv_ts::strip(source) -> Result<Stripped, StripError>`, the unset goal, and
-  `tsv_ts::strip_with_goal(source, goal: Goal)`, exact; each parses into a fresh arena of
-  its own. (The bindings' warm per-thread arena reaches the same strip through the hidden
-  `__private::strip_in(source, Option<Goal>, &arena)`.) `Stripped.code` is an owned
+  `tsv_ts::strip_with_goal(source, goal: Goal)`, exact; each parses into fresh stores of
+  its own. (The bindings' warm per-thread stores reach the same strip through the hidden
+  `__private::strip_into(source, Option<Goal>, &mut stores)`.) `Stripped.code` is an owned
   `String`, the source as is when nothing is type-only. `StripError::Parse` carries the
   `Error`; `StripError::Unsupported { construct, error }` the refused construct
   (`UnsupportedConstruct::as_str` is its snake_case wire name) and the refusal as an `Error`
@@ -21,8 +21,7 @@ and Node's `module.stripTypeScriptTypes` share. The implementation is `tsv_ts::s
   `tsv_lang::Error`, so `{:#}` renders it as the CLI prints it, `message()` gives its one
   line, `span()` its byte span, and `to_report()` splits it — message, frame, span — as the
   packages return it. `tsv_ts::strip_with_imports(source) -> Result<(Stripped, Imports),
-  StripError>` (and `strip_with_imports_with_goal`; hidden warm-arena twin
-  `__private::strip_with_imports_in`) is the strip and `parse_imports` from one parse and
+  StripError>` (and `strip_with_imports_with_goal`) is the strip and `parse_imports` from one parse and
   one walk: over a source the strip accepts, exactly what the two return apart; over one
   it refuses, the strip's error and no records. Plain `strip` collects no records. Rust
   only — no binding or CLI flag exposes it.

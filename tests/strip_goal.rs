@@ -2,7 +2,7 @@
 #![expect(clippy::panic)]
 
 //! The type strip's parse goal: `tsv_ts::strip_with_goal(source, goal)` and the hidden
-//! `tsv_ts::__private::strip_in(source, goal, arena)` beneath it.
+//! `tsv_ts::__private::strip_into(source, goal, stores)` beneath it.
 //!
 //! The strip reads the goal axis as the format path does
 //! (`tsv_ts::__private::parse_with_goal_or_fallback`): a named goal is exact, and `None` —
@@ -11,8 +11,7 @@
 //! this file pins the named goals, which no fixture can (the strip fixtures carry no goal
 //! marker, and their JS-validity guard parses a module).
 
-use bumpalo::Bump;
-use tsv_ts::__private::strip_in;
+use tsv_ts::__private::{WarmStores, strip_into};
 use tsv_ts::{Goal, StripError, strip, strip_with_goal};
 
 fn stripped(source: &str, goal: Goal) -> String {
@@ -79,26 +78,27 @@ const GOAL_CASES: [&str; 4] = [
     "enum E { A }\n",
 ];
 
-/// `strip` is the unset goal: the same answer as `strip_in(…, None, …)` on a module, a
+/// `strip` is the unset goal: the same answer as `strip_into(…, None, …)` on a module, a
 /// sloppy script, and a source neither grammar takes.
 #[test]
 fn strip_is_the_unset_goal() {
+    let mut stores = WarmStores::default();
     for source in GOAL_CASES {
-        let arena = Bump::new();
-        let unset = strip_in(source, None, &arena).map(|s| s.code);
+        let unset = stores.with(|stores| strip_into(source, None, stores).map(|s| s.code));
         let bare = strip(source).map(|s| s.code);
         assert_eq!(unset, bare, "{source:?}");
     }
 }
 
-/// `strip_with_goal` is the named goal: the same answer as `strip_in(…, Some(goal), …)` at
-/// either goal, over the same sources.
+/// `strip_with_goal` is the named goal: the same answer as `strip_into(…, Some(goal), …)`
+/// at either goal, over the same sources.
 #[test]
 fn strip_with_goal_is_the_named_goal() {
+    let mut stores = WarmStores::default();
     for source in GOAL_CASES {
         for goal in [Goal::Module, Goal::Script] {
-            let arena = Bump::new();
-            let named = strip_in(source, Some(goal), &arena).map(|s| s.code);
+            let named =
+                stores.with(|stores| strip_into(source, Some(goal), stores).map(|s| s.code));
             let exact = strip_with_goal(source, goal).map(|s| s.code);
             assert_eq!(named, exact, "{source:?} at {goal:?}");
         }

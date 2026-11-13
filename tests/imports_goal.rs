@@ -8,9 +8,8 @@
 
 use std::ops::Range;
 
-use bumpalo::Bump;
 use tsv_lang::{Error, ErrorKind};
-use tsv_ts::__private::parse_imports_in;
+use tsv_ts::__private::{WarmStores, parse_imports_into};
 use tsv_ts::{Goal, ImportRecordKind, Imports, parse_imports, parse_imports_with_goal};
 
 fn imports(source: &str, goal: Option<Goal>) -> Imports {
@@ -78,18 +77,17 @@ fn outcome(result: Result<Imports, Error>) -> Outcome {
     result.map_err(|e| (e.kind(), e.span(), e.is_goal_gated(), format!("{e:#}")))
 }
 
-/// The warm-arena primitive is the one-shot functions' body, records and errors alike.
+/// The warm-stores primitive is the one-shot functions' body, records and errors alike.
 #[test]
-fn the_arena_primitive_matches() {
-    let mut arena = Bump::new();
+fn the_warm_primitive_matches() {
+    let mut stores = WarmStores::default();
     for source in [
         "import a from './a.js';\nwith (o) {}\n",
         "import a from './a.js';\nimport('./b.js');\n",
         "with (o) { import('./w.js'); }\n",
     ] {
         for goal in [None, Some(Goal::Module), Some(Goal::Script)] {
-            arena.reset();
-            let warm = outcome(parse_imports_in(source, goal, &arena));
+            let warm = outcome(stores.with(|stores| parse_imports_into(source, goal, stores)));
             let one_shot = outcome(match goal {
                 Some(goal) => parse_imports_with_goal(source, goal),
                 None => parse_imports(source),

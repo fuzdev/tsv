@@ -4,7 +4,7 @@
 //!
 //! A separate example from `perf_ab.rs` (whose module doc says why the drivers are examples)
 //! because it reads an entry point the format driver does not, the strip
-//! (`tsv_ts::__private::strip_in`, or `strip_into` with the warm stores): an older base tree
+//! (`tsv_ts::__private::strip_into` with the warm stores, or `strip_in`): an older base tree
 //! without it still builds the format driver, and the task leaves the strip row out for such a
 //! tree, saying so, rather than losing every row to a failed build.
 //!
@@ -14,15 +14,16 @@
 //!   `.ts` / `.mts` / `.cts`, no declaration file — `profile --strip`'s set.
 //! - Each iteration parses the source (`tsv_ts::__private::parse_with_goal_or_fallback_into`,
 //!   the goal read from the extension as `tsv strip` reads a path), then strips it
-//!   (`tsv_ts::__private::strip_into`, which parses again inside, into the same warm stores, its
-//!   edits in the warm arena);
+//!   (`tsv_ts::__private::strip_into`, which parses again inside, into the same warm stores);
 //!   the strip column is the strip's time less the parse's — its walk and blank. Both read
 //!   the author's bytes: the strip folds no carriage returns, so the TypeScript format row's
 //!   parse (fold + `parse_folded`) is not this one.
 //! - The calls sit in an `api` module with one arm per entry-point generation, as
 //!   `perf_ab.rs`'s do (its module doc): the current arm parses into stores a
-//!   `tsv_ts::__private::WarmStores` handle takes before each timed call and parks after it,
-//!   `perf_ab_api = "no_warm_stores"` (a tree with the stores but no such handle) does the same
+//!   `tsv_ts::__private::WarmStores` handle takes before each timed call and parks after it, and
+//!   strips with no arena; `perf_ab_api = "strip_bump"` (a tree whose strip still takes the
+//!   `Bump` for its edits beside the stores) does the same, handing the strip the `Bump`;
+//!   `perf_ab_api = "no_warm_stores"` (a tree with the stores but no such handle) does that
 //!   with the stores in an `Option` of its own, `perf_ab_api = "ts_parse_bump"` (a tree whose
 //!   parse still takes the `Bump` beside the stores) does that through the `Bump`, and
 //!   `perf_ab_api = "no_stores"`, a tree older than the stores, calls
@@ -195,10 +196,47 @@ fn timed<R>(f: impl FnOnce() -> R) -> (Duration, R) {
 /// parked stores, taken before each timed region and parked after it, as the bindings' strip
 /// keeps them.
 #[cfg(not(any(
+    perf_ab_api = "strip_bump",
     perf_ab_api = "no_warm_stores",
     perf_ab_api = "ts_parse_bump",
     perf_ab_api = "no_stores"
 )))]
+mod api {
+    use super::timed;
+    use std::time::Duration;
+
+    /// The stores parked between the timed calls, rewound.
+    pub(super) type Warm = tsv_ts::__private::WarmStores;
+
+    /// The parse's wall and whether it parsed.
+    pub(super) fn parse(
+        source: &str,
+        goal: Option<tsv_ts::Goal>,
+        _arena: &bumpalo::Bump,
+        warm: &mut Warm,
+    ) -> (Duration, bool) {
+        warm.with(|stores| {
+            timed(|| {
+                tsv_ts::__private::parse_with_goal_or_fallback_into(source, goal, stores).is_ok()
+            })
+        })
+    }
+
+    /// The strip's wall, its own parse included, and what it returned.
+    pub(super) fn strip(
+        source: &str,
+        goal: Option<tsv_ts::Goal>,
+        _arena: &bumpalo::Bump,
+        warm: &mut Warm,
+    ) -> (Duration, Result<tsv_ts::Stripped, tsv_ts::StripError>) {
+        warm.with(|stores| timed(|| tsv_ts::__private::strip_into(source, goal, stores)))
+    }
+}
+
+/// The entry points of a tree whose strip still takes the `Bump` for its edits beside the warm
+/// stores: as the current arm, the strip handed the `Bump` too. Built only against such a tree,
+/// never against the current one.
+#[cfg(perf_ab_api = "strip_bump")]
 mod api {
     use super::timed;
     use std::time::Duration;

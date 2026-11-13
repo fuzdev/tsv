@@ -358,16 +358,14 @@ pub fn parse_imports_with_goal(source: &str, goal: Goal) -> Result<Imports, Erro
     parse_imports_one_shot(source, Some(goal))
 }
 
-/// The one-shot entry points' arena: a fresh one sized to the source, dropped on return —
-/// the [`Imports`] are owned.
+/// The one-shot entry points: fresh stores, dropped on return — the [`Imports`] are owned.
 fn parse_imports_one_shot(source: &str, goal: Option<Goal>) -> Result<Imports, Error> {
-    let arena = bumpalo::Bump::with_capacity(tsv_lang::estimated_ast_arena_capacity(source.len()));
-    parse_imports_in(source, goal, &arena)
+    parse_imports_into(source, goal, &mut crate::ast::AstStores::new())
 }
 
-/// [`parse_imports`] over a caller-owned `arena` — the hidden primitive beneath
-/// [`parse_imports`] and [`parse_imports_with_goal`], for a hot loop that keeps one arena
-/// warm across sources, reset by the caller between calls.
+/// The import records parsed into a caller's `stores` — the hidden primitive beneath
+/// [`parse_imports`] and [`parse_imports_with_goal`], for a warm path that keeps the stores
+/// across sources (the bindings' per-thread stores).
 ///
 /// The parse is `__private::parse_with_goal_or_fallback`'s, as the strip's: `Some(goal)`
 /// is exact, and `None` parses at `Module`, retried at `Script` only if that fails.
@@ -375,42 +373,21 @@ fn parse_imports_one_shot(source: &str, goal: Option<Goal>) -> Result<Imports, E
 /// # Errors
 ///
 /// As [`parse_imports`].
-pub fn parse_imports_in(
-    source: &str,
-    goal: Option<Goal>,
-    arena: &bumpalo::Bump,
-) -> Result<Imports, Error> {
-    parse_imports_into(source, goal, arena, &mut crate::ast::AstStores::new())
-}
-
-/// [`parse_imports_in`] into a caller's `stores`, for a warm path that keeps them across
-/// sources.
-///
-/// # Errors
-///
-/// As [`parse_imports`].
 pub fn parse_imports_into(
     source: &str,
     goal: Option<Goal>,
-    arena: &bumpalo::Bump,
     stores: &mut crate::ast::AstStores,
 ) -> Result<Imports, Error> {
     let program = crate::__private::parse_with_goal_or_fallback_into(source, goal, stores)?;
-    Ok(collect_imports(&[&program], stores.view(), source, arena))
+    Ok(collect_imports(&[&program], stores.view(), source))
 }
 
 /// The import records of parsed `programs`, which index `source` — the hidden seam an
 /// embedding language collects through (`tsv_svelte`, over a component's two scripts,
 /// whose spans are document offsets). The programs must come in source order, which is
-/// then the records' order; `has_module_syntax` answers for all of them. `arena` holds
-/// the walk's scratch, which is never read.
-pub fn collect_imports(
-    programs: &[&Program],
-    view: AstView<'_>,
-    source: &str,
-    arena: &bumpalo::Bump,
-) -> Imports {
-    let mut walk = Walk::new(source, arena, Mode::Imports, view);
+/// then the records' order; `has_module_syntax` answers for all of them.
+pub fn collect_imports(programs: &[&Program], view: AstView<'_>, source: &str) -> Imports {
+    let mut walk = Walk::new(source, Mode::Imports, view);
     for program in programs {
         walk.program(program);
     }

@@ -11,12 +11,12 @@ use crate::ast::{
 use tsv_lang::Span;
 
 pub use crate::ast::{WarmStores, with_stores};
-pub use crate::imports::{collect_imports, parse_imports_in, parse_imports_into};
+pub use crate::imports::{collect_imports, parse_imports_into};
 #[cfg(feature = "json")]
 pub use crate::imports::{write_imports_json, write_imports_json_string};
 pub use crate::parser::TopLevelAs;
 use crate::parser::push_row;
-pub use crate::strip::{strip_in, strip_into, strip_with_imports_in};
+pub use crate::strip::strip_into;
 
 /// The per-document environment shared by every formatting entry point: the
 /// source the AST's spans index into, the comment buffer, the precomputed
@@ -1373,7 +1373,7 @@ pub fn parse_with_goal_into(source: &str, goal: Goal, stores: &mut AstStores) ->
 /// Parse TypeScript against `goal`, or — when the goal is unset — at `Module`
 /// with a `Script` retry.
 ///
-/// The **format** path's parse, and the type strip's ([`strip_in`]). `Some(goal)` is
+/// The **format** path's parse, and the type strip's ([`strip_into`]). `Some(goal)` is
 /// exact, the same parse [`parse_with_goal`] runs. `None` means the caller never named a
 /// source type (`tsv format <path>`, an editor's `format_typescript(source)`): the bare-name
 /// tier of the crate docs' [Goals](crate#goals), which also states which error is reported

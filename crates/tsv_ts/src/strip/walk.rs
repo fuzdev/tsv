@@ -29,8 +29,6 @@
 //! collects (the two walks part only inside a subtree the strip refuses). The mode is a
 //! runtime value rather than a type parameter, so the bindings link one walk.
 
-use bumpalo::Bump;
-use bumpalo::collections::Vec as BumpVec;
 use smallvec::SmallVec;
 
 use crate::ast::{
@@ -88,7 +86,7 @@ pub(crate) struct Walk<'s, 'b> {
     /// What the walk collects ([`Self::collects`]) and whether the subtrees the strip
     /// refuses are walked ([`Self::walks_refused`]).
     mode: Mode,
-    edits: BumpVec<'b, Edit>,
+    edits: Vec<Edit>,
     /// The import records, in source order — empty in [`Mode::Strip`].
     records: Vec<ImportRecord>,
     /// Whether module syntax was met: a top-level import or export declaration, an
@@ -157,12 +155,12 @@ impl Tail {
 }
 
 impl<'s, 'b> Walk<'s, 'b> {
-    pub(crate) fn new(source: &'s str, arena: &'b Bump, mode: Mode, view: AstView<'b>) -> Self {
+    pub(crate) fn new(source: &'s str, mode: Mode, view: AstView<'b>) -> Self {
         Self {
             src: Source::new(source),
             view,
             mode,
-            edits: BumpVec::new_in(arena),
+            edits: Vec::new(),
             records: Vec::new(),
             module_syntax: false,
             function_depth: 0,
@@ -177,7 +175,7 @@ impl<'s, 'b> Walk<'s, 'b> {
     }
 
     /// The collected edits, or the refusal.
-    pub(super) fn finish(self) -> Result<BumpVec<'b, Edit>, StripError> {
+    pub(super) fn finish(self) -> Result<Vec<Edit>, StripError> {
         debug_assert!(
             self.mode != Mode::Strip
                 || (self.records.is_empty() && !self.module_syntax && self.function_depth == 0),
@@ -236,7 +234,7 @@ impl<'s, 'b> Walk<'s, 'b> {
 
     /// The collected edits and import records, or the refusal — the
     /// [`Mode::StripWithImports`] product. A refusal discards the records.
-    pub(super) fn finish_with_imports(self) -> Result<(BumpVec<'b, Edit>, Imports), StripError> {
+    pub(super) fn finish_with_imports(self) -> Result<(Vec<Edit>, Imports), StripError> {
         match self.refusal {
             Some((kind, span)) => Err(StripError::unsupported(kind, self.src.text, span.range())),
             None => Ok((
@@ -505,8 +503,20 @@ impl<'s, 'b> Walk<'s, 'b> {
 
     fn blank_marked(&mut self, start: u32, end: u32, mark: Mark) {
         if start < end {
+            if self.edits.len() == self.edits.capacity() {
+                self.grow_edits();
+            }
             self.edits.push(Edit { start, end, mark });
         }
+    }
+
+    /// Room for more edits: [`EDITS_FIRST_CAPACITY`] at the first, then doubling — most
+    /// files' edits in one allocation, and none for a file with nothing type-only.
+    #[cold]
+    #[inline(never)]
+    fn grow_edits(&mut self) {
+        self.edits
+            .reserve(self.edits.capacity().max(EDITS_FIRST_CAPACITY));
     }
 
     /// Blank a statement or class member whole, `;`-led when `semicolon` — which closes what
@@ -1984,6 +1994,11 @@ const fn is_module_declaration(statement: &Statement) -> bool {
 /// the slack.
 const RECORDS_FIRST_CAPACITY: usize = 16;
 
+/// The edits' first allocation: a file's edits usually fit, and a smaller one grows,
+/// copying, in every file with more than a few type-only ranges — measured costlier than the
+/// slack. The walk builds its edits per call, with no buffer kept warm between strips.
+const EDITS_FIRST_CAPACITY: usize = 64;
+
 /// A node span as a record's.
 const fn byte_span(span: Span) -> ByteSpan {
     ByteSpan {
@@ -2301,5 +2316,27 @@ fn namespace_member_holds_value(view: AstView<'_>, statement: &Statement) -> boo
         | StatementKind::LabeledStatement(_)
         | StatementKind::EmptyStatement(_)
         | StatementKind::DebuggerStatement(_) => true,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{EDITS_FIRST_CAPACITY, Mode, Walk};
+
+    /// The edits allocate nothing for a source with nothing type-only, and
+    /// [`EDITS_FIRST_CAPACITY`] at the first edit: the growth every push goes through.
+    #[test]
+    fn the_edits_allocate_at_the_first_edit_their_first_capacity() {
+        for (source, capacity) in [
+            ("let a = 1;\n", 0),
+            ("let a: T = 1;\n", EDITS_FIRST_CAPACITY),
+        ] {
+            let program = crate::__private::parse_with_goal_or_fallback(source, None)
+                .expect("the source parses");
+            let mut walk = Walk::new(source, Mode::Strip, program.view());
+            walk.program(&program);
+            let edits = walk.finish().expect("the source strips");
+            assert_eq!(edits.capacity(), capacity, "{source:?}");
+        }
     }
 }

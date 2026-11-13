@@ -596,8 +596,7 @@ fn locations_wire(src: &str, parser: ParserType) -> bool {
 /// [`Outcome::Panic`] of [`Leg::Strip`] when the second strip of the idempotence check
 /// panicked (caught there, its location recorded by the capturing hook).
 fn strip_check(src: &str) -> (bool, Option<(Outcome, String)>) {
-    let arena = bumpalo::Bump::new();
-    let Ok(stripped) = tsv_ts::__private::strip_in(src, None, &arena) else {
+    let Ok(stripped) = tsv_ts::strip(src) else {
         return (false, None);
     };
     let code = stripped.code.as_str();
@@ -627,10 +626,7 @@ fn strip_check(src: &str) -> (bool, Option<(Outcome, String)>) {
 fn imports_check(src: &str, parser: ParserType) -> (bool, Option<String>) {
     let arena = bumpalo::Bump::new();
     let (imports, coordinates) = match parser {
-        ParserType::TypeScript => (
-            tsv_ts::__private::parse_imports_in(src, None, &arena).ok(),
-            tsv_ts::WIRE_COORDINATES,
-        ),
+        ParserType::TypeScript => (tsv_ts::parse_imports(src).ok(), tsv_ts::WIRE_COORDINATES),
         ParserType::Svelte => (
             tsv_svelte::__private::parse_imports_in(src, &arena).ok(),
             tsv_svelte::WIRE_COORDINATES,

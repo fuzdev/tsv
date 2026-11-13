@@ -12,7 +12,7 @@
 //! `module.stripTypeScriptTypes` share. They are not the Svelte compiler's: that product
 //! erases a tree, follows Svelte's own oracle, and shares no code with this one.
 //!
-//! The parse goal is the format path's (`strip_in`): a named goal is exact, and an
+//! The parse goal is the format path's (`strip_into`): a named goal is exact, and an
 //! unset one reads the source as a module, retried as a script only if that fails. No
 //! verdict below depends on the goal; a script's `with` body is one more lone statement
 //! body.
@@ -133,11 +133,10 @@ pub fn strip_with_goal(source: &str, goal: crate::Goal) -> Result<Stripped, Stri
     strip_one_shot(source, Some(goal))
 }
 
-/// The one-shot strips' arena: a fresh one sized to the source, dropped on return — the
-/// [`Stripped`] output is owned.
+/// The one-shot strips: fresh stores, dropped on return — the [`Stripped`] output is
+/// owned.
 fn strip_one_shot(source: &str, goal: Option<crate::Goal>) -> Result<Stripped, StripError> {
-    let arena = bumpalo::Bump::with_capacity(tsv_lang::estimated_ast_arena_capacity(source.len()));
-    strip_in(source, goal, &arena)
+    strip_into(source, goal, &mut crate::ast::AstStores::new())
 }
 
 /// [`strip`] and [`parse_imports`](crate::parse_imports()) in one parse and one walk: the
@@ -208,19 +207,23 @@ pub fn strip_with_imports_with_goal(
     strip_with_imports_one_shot(source, Some(goal))
 }
 
-/// [`strip_with_imports`]' arena: a fresh one sized to the source, dropped on return — the
-/// output is owned.
+/// [`strip_with_imports`] and [`strip_with_imports_with_goal`] over fresh stores, dropped on
+/// return — the output is owned. The parse is [`strip_into`]'s.
 fn strip_with_imports_one_shot(
     source: &str,
     goal: Option<crate::Goal>,
 ) -> Result<(Stripped, Imports), StripError> {
-    let arena = bumpalo::Bump::with_capacity(tsv_lang::estimated_ast_arena_capacity(source.len()));
-    strip_with_imports_in(source, goal, &arena)
+    let program =
+        crate::__private::parse_with_goal_or_fallback(source, goal).map_err(StripError::Parse)?;
+    let mut walk = walk::Walk::new(source, walk::Mode::StripWithImports, program.view());
+    walk.program(&program);
+    let (mut edits, imports) = walk.finish_with_imports()?;
+    Ok((stripped(source, &mut edits), imports))
 }
 
-/// The strip over a caller-owned `arena` — the hidden primitive beneath [`strip`] and
-/// [`strip_with_goal`], for a hot loop that keeps one arena warm across sources (the
-/// bindings' per-thread arena), reset by the caller between calls.
+/// The strip into a caller's `stores` — the hidden primitive beneath [`strip`] and
+/// [`strip_with_goal`], for a warm path that keeps the stores across sources (the bindings'
+/// per-thread stores; the CLI hands it fresh ones).
 ///
 /// The parse is `__private::parse_with_goal_or_fallback`'s: `Some(goal)` is exact, and
 /// `None` parses at `Module`, retried at `Script` only if that fails.
@@ -228,51 +231,17 @@ fn strip_with_imports_one_shot(
 /// # Errors
 ///
 /// As [`strip`].
-pub fn strip_in(
-    source: &str,
-    goal: Option<crate::Goal>,
-    arena: &bumpalo::Bump,
-) -> Result<Stripped, StripError> {
-    strip_into(source, goal, arena, &mut crate::ast::AstStores::new())
-}
-
-/// [`strip_in`] into a caller's `stores`, for a warm path that keeps them across sources.
-///
-/// # Errors
-///
-/// As [`strip`].
 pub fn strip_into(
     source: &str,
     goal: Option<crate::Goal>,
-    arena: &bumpalo::Bump,
     stores: &mut crate::ast::AstStores,
 ) -> Result<Stripped, StripError> {
     let program = crate::__private::parse_with_goal_or_fallback_into(source, goal, stores)
         .map_err(StripError::Parse)?;
-    let mut walk = walk::Walk::new(source, arena, walk::Mode::Strip, stores.view());
+    let mut walk = walk::Walk::new(source, walk::Mode::Strip, stores.view());
     walk.program(&program);
     let mut edits = walk.finish()?;
     Ok(stripped(source, &mut edits))
-}
-
-/// [`strip_with_imports`] over a caller-owned `arena` — the hidden primitive beneath
-/// [`strip_with_imports`] and [`strip_with_imports_with_goal`], as [`strip_in`] is the
-/// strip's. The parse is [`strip_in`]'s.
-///
-/// # Errors
-///
-/// As [`strip`].
-pub fn strip_with_imports_in(
-    source: &str,
-    goal: Option<crate::Goal>,
-    arena: &bumpalo::Bump,
-) -> Result<(Stripped, Imports), StripError> {
-    let program =
-        crate::__private::parse_with_goal_or_fallback(source, goal).map_err(StripError::Parse)?;
-    let mut walk = walk::Walk::new(source, arena, walk::Mode::StripWithImports, program.view());
-    walk.program(&program);
-    let (mut edits, imports) = walk.finish_with_imports()?;
-    Ok((stripped(source, &mut edits), imports))
 }
 
 /// The JS a walk's `edits` make of `source`.
@@ -506,11 +475,10 @@ mod tests {
             "const f = <T,>(a: T) => import.meta.url as string;",
             "let a: { [import('./t')]: number } = {};\nexport default a!;",
         ] {
-            let arena = bumpalo::Bump::new();
             let program = crate::__private::parse_with_goal_or_fallback(source, None)
                 .expect("the source parses");
             let code = |mode| {
-                let mut walk = super::walk::Walk::new(source, &arena, mode, program.view());
+                let mut walk = super::walk::Walk::new(source, mode, program.view());
                 walk.program(&program);
                 let mut edits = walk.finish().expect("the source strips");
                 super::blank::apply(source, &mut edits)

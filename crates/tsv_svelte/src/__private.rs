@@ -206,7 +206,6 @@ pub fn parse_imports_into(
         &programs,
         stores.view(),
         source,
-        arena,
     ))
 }
 
