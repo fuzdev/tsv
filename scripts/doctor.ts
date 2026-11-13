@@ -16,7 +16,11 @@
  * · info, never ⚠, so it stays inert even under `--strict` — that oracle serves no release and
  * no ordinary dev flow, so a fully-provisioned release box legitimately lacks it. A BROKEN
  * checkout there (present, but its baselines missing) still warns: that is the misleading state
- * this tool exists to catch.
+ * this tool exists to catch. So does a present checkout, in either tier, that can't say whether
+ * it holds what a tool reads, a read failing or a path reaching through a symlink out of it: it
+ * warns as what it is, never as a checkout not cloned. The lines that ask `git` for a
+ * checkout's id (the `../corpora` snapshot, the harvest stamps) tell a present checkout git
+ * can't read from one that isn't there the same way, by its handle.
  *
  * Everything it reads, runs, and loads comes through `DoctorDeps`, which its root
  * (`scripts/roots/doctor.ts`) binds: read-only handles on the checkout, its `target/`, and the
@@ -44,7 +48,7 @@ import {
 	short_commit,
 	type StampGit
 } from '../benches/js/lib/harvest_stamp.ts';
-import { HARVEST_STAMPS } from '../benches/js/lib/harvest_stamp_table.ts';
+import { type CheckoutInput, HARVEST_STAMPS } from '../benches/js/lib/harvest_stamp_table.ts';
 import { native_library_filename } from '../benches/js/lib/runtime.ts';
 import {
 	COMPARE_PROFILE,
@@ -52,6 +56,7 @@ import {
 	napi_target_path
 } from '../benches/js/lib/tsv_artifacts.ts';
 import type { AllVersions, load_all_versions } from '../benches/js/lib/versions.ts';
+import { BROKEN_CHECKOUT, link_out_message } from './sibling_text.ts';
 import {
 	SIDECAR_DIR,
 	SIDECAR_INSTALL_COMMAND,
@@ -97,15 +102,21 @@ export interface DoctorDir {
 	list(path?: string): AsyncIterable<{ readonly name: string; readonly kind: string }>;
 }
 
-/** The sibling checkouts doctor reads, each opened beside the checkout by its name. */
+/**
+ * The sibling checkouts doctor reads, each opened beside the checkout by its name: every one
+ * its checks read through a handle, and every one it asks `git` about, so a checkout git can't
+ * read is told from one that isn't there.
+ */
 export const DOCTOR_SIBLINGS = [
 	'svelte',
 	'acorn-typescript',
 	'typescript',
 	'prettier',
+	'prettier-plugin-svelte',
 	'test262',
 	'wpt',
-	'typescript-go'
+	'typescript-go',
+	'corpora'
 ] as const;
 
 export type DoctorSibling = (typeof DOCTOR_SIBLINGS)[number];
@@ -147,12 +158,16 @@ const NO_GIT: StampGit = {
 	out: () => Promise.reject(new Error('git missing'))
 };
 
+/** The bench's manifest, whose `engines.node` is the type-stripping floor its entries run by. */
+const BENCH_PKG_PATH = 'benches/js/package.json';
+
 /** The checkout's workflows, whose `<tool>-version:` pins `ci_pins` reads. */
 const WORKFLOWS_DIR = '.github/workflows';
 
 /**
  * The `engines.node` floors a Node on `PATH` is graded against, beside the bench's own
- * type-stripping floor, and what each one is for.
+ * type-stripping floor (`BENCH_PKG_PATH`, graded apart since only the bench needs it), and what
+ * each one is for.
  */
 const NODE_FLOORS: ReadonlyArray<{ file: string; for: string }> = [
 	{ file: 'package.json', for: 'the npm scripts on gro, this one among them' },
@@ -242,7 +257,8 @@ export const run_doctor = async (
 		}
 	};
 
-	/** Whether `path` exists beneath `dir`, false for any failure to tell, as for no `dir`. */
+	/** Whether the build artifact `path` exists beneath `dir`, false for any failure to tell, as
+	 * for no `dir`: the section listing them is informational. */
 	const exists_in = async (dir: DoctorDir | null, path: string): Promise<boolean> => {
 		if (dir === null) return false;
 		try {
@@ -252,19 +268,82 @@ export const run_doctor = async (
 		}
 	};
 
-	/** Whether the sibling checkout `name` has `path`, or is there at all with no `path`. */
-	const sibling_has = (name: DoctorSibling, path = ''): Promise<boolean> =>
-		path === '' ? Promise.resolve(siblings[name] !== null) : exists_in(siblings[name], path);
+	/**
+	 * Whether the sibling checkout `name` has `path`: `false` when the checkout is absent, or
+	 * `path` is missing or passes through a file. `null` when a present checkout can't tell,
+	 * warned as what it is, so the caller says nothing more: `path` reaching through a symlink
+	 * that is absolute or climbs out of the checkout, which no tool follows, or a read that fails.
+	 */
+	const sibling_has = async (name: DoctorSibling, path: string): Promise<boolean | null> => {
+		const dir = siblings[name];
+		if (dir === null) return false;
+		try {
+			return await dir.exists(path);
+		} catch (error) {
+			if (is_fs_error(error, 'not_a_directory')) return false;
+			warn(
+				is_fs_error(error, 'outside_root')
+					? link_out_message(`../${name}`, path)
+					: `../${name} is present but whether ${path} is in it can't be read (${
+							error instanceof Error ? error.message.split('\n')[0] : String(error)
+						}) — ${BROKEN_CHECKOUT}`
+			);
+			return null;
+		}
+	};
 
-	/** The `version` of the `package.json` at `path` in sibling `name`, or null. */
-	const read_pkg_version = async (name: DoctorSibling, path: string): Promise<string | null> => {
+	/**
+	 * The id `checkout_hash` reads for `input`, or why it has none: `absent` when the checkout
+	 * (or the directory beneath it the input names) isn't there, `unread` when it is and git
+	 * can't read it (not a git checkout, a corrupt one, the subtree gone, git refusing the
+	 * repository, or no git on `PATH`).
+	 */
+	const checkout_state = async (
+		input: CheckoutInput
+	): Promise<{ id: string } | 'absent' | 'unread'> => {
+		const id = await checkout_hash(stamp_git, input);
+		if (id !== null) return { id };
+		const [name, ...beneath] = (typeof input === 'string' ? input : input.path)
+			.slice('../'.length)
+			.split('/');
+		const dir = siblings[name as DoctorSibling] ?? null;
+		if (dir === null) return 'absent';
+		if (beneath.length === 0) return 'unread';
+		try {
+			return (await dir.exists(beneath.join('/'))) ? 'unread' : 'absent';
+		} catch (error) {
+			// a path beneath it that can't be told is the checkout's to answer for, not git's
+			return is_fs_error(error, 'not_a_directory') ? 'absent' : 'unread';
+		}
+	};
+
+	/** Why git read no id in a present checkout, as the lines naming one say it. */
+	const unread_why = programs.git === null ? 'no git on PATH to read it' : "git can't read it";
+
+	/**
+	 * The `version` of the `package.json` at `path` in the present sibling `name`, `null` when it
+	 * states none, or `undefined` when the file can't be read, warned as what it is (missing,
+	 * unparseable, unreadable, or reached through a symlink out of the checkout), so the caller
+	 * says nothing more: a checkout whose version file is broken is never graded as matching.
+	 */
+	const read_pkg_version = async (
+		name: DoctorSibling,
+		path: string
+	): Promise<string | null | undefined> => {
 		const dir = siblings[name];
 		if (dir === null) return null;
 		try {
 			const pkg = JSON.parse(await dir.read_text(path)) as { version?: string };
 			return pkg.version ?? null;
-		} catch {
-			return null;
+		} catch (error) {
+			warn(
+				is_fs_error(error, 'outside_root')
+					? link_out_message(`../${name}`, path)
+					: `../${name} is present but ${path} can't be read (${
+							error instanceof Error ? error.message.split('\n')[0] : String(error)
+						}) — ${BROKEN_CHECKOUT}`
+			);
+			return undefined;
 		}
 	};
 
@@ -381,6 +460,44 @@ export const run_doctor = async (
 		}
 	};
 
+	/**
+	 * Grades the Node on `PATH` against the bench's own floor, `BENCH_PKG_PATH`'s `engines.node`,
+	 * native TS type-stripping, which the harness entries run by: a warning, since only the bench
+	 * needs it.
+	 */
+	const check_bench_node_floor = async (node_version: string): Promise<void> => {
+		let range: unknown;
+		try {
+			const pkg = JSON.parse(await checkout.read_text(BENCH_PKG_PATH)) as {
+				engines?: { node?: unknown };
+			};
+			range = pkg.engines?.node;
+		} catch (e) {
+			warn(
+				`cannot read engines.node from ${BENCH_PKG_PATH} (${e instanceof Error ? e.message.split('\n')[0] : e}) — ` +
+					"the bench's Node floor is ungraded"
+			);
+			return;
+		}
+		const floor = typeof range === 'string' ? parse_node_floor(range) : null;
+		if (floor === null) {
+			warn(
+				`${BENCH_PKG_PATH} states no engines.node floor of the form >=major.minor[.patch] — ` +
+					"the bench's Node floor is ungraded"
+			);
+			return;
+		}
+		const stated = (range as string).replace(/^>=\s*/, '');
+		const m = /^v(\d+)\.(\d+)\.(\d+)/.exec(node_version);
+		if (m !== null && version_at_least([Number(m[1]), Number(m[2]), Number(m[3])], floor)) {
+			ok(`node ${node_version} (≥ ${stated})`);
+		} else {
+			warn(
+				`node ${node_version} — < ${stated} lacks native TS type-stripping; the harness entries fail to parse`
+			);
+		}
+	};
+
 	const strict = argv.includes('--strict');
 
 	console.log(
@@ -412,14 +529,7 @@ export const run_doctor = async (
 				'bench:install, test:npm, and the publish artifact tests need it'
 		);
 	} else {
-		const m = /^v(\d+)\.(\d+)/.exec(node_version);
-		const new_enough =
-			m !== null && (Number(m[1]) > 22 || (Number(m[1]) === 22 && Number(m[2]) >= 18));
-		if (new_enough) ok(`node ${node_version} (≥ 22.18)`);
-		else
-			warn(
-				`node ${node_version} — < 22.18 lacks native TS type-stripping; the harness entries fail to parse`
-			);
+		await check_bench_node_floor(node_version);
 		await check_ci_pin('node', node_version.replace(/^v/, ''));
 		await check_node_floors(node_version);
 	}
@@ -530,42 +640,54 @@ export const run_doctor = async (
 	}
 	const pin_suffix = versions ? ', matches the pin' : '; pin unreadable';
 
-	if (await sibling_has('svelte', 'packages/svelte/tests')) {
+	const svelte_tests = await sibling_has('svelte', 'packages/svelte/tests');
+	if (svelte_tests) {
 		const v = await read_pkg_version('svelte', 'packages/svelte/package.json');
-		if (versions && v !== null && v !== versions.canonical.svelte) {
+		if (v === undefined) {
+			// warned as what it is
+		} else if (versions && v !== null && v !== versions.canonical.svelte) {
 			warn(
 				`../svelte checkout is v${v} but the svelte oracle is pinned v${versions.canonical.svelte} — ` +
 					'suite inputs and the grading parser disagree (align the checkout or bump the pins deliberately)'
 			);
 		} else ok(`../svelte checkout (v${v ?? '?'}${pin_suffix})`);
-	} else
+	} else if (svelte_tests === false)
 		warn('../svelte checkout missing — conformance:svelte-fixtures + the corpus suites need it');
 
-	if (await sibling_has('acorn-typescript', 'test')) {
+	const acorn_ts_tests = await sibling_has('acorn-typescript', 'test');
+	if (acorn_ts_tests) {
 		const v = await read_pkg_version('acorn-typescript', 'package.json');
-		if (versions && v !== null && v !== versions.canonical['@sveltejs/acorn-typescript']) {
+		if (v === undefined) {
+			// warned as what it is
+		} else if (versions && v !== null && v !== versions.canonical['@sveltejs/acorn-typescript']) {
 			warn(
 				`../acorn-typescript checkout is v${v} but the oracle is pinned ` +
 					`v${versions.canonical['@sveltejs/acorn-typescript']} — suite inputs and the grading parser disagree`
 			);
 		} else ok(`../acorn-typescript checkout (v${v ?? '?'}${pin_suffix})`);
-	} else warn('../acorn-typescript checkout missing — conformance:ts-fixtures needs it');
+	} else if (acorn_ts_tests === false)
+		warn('../acorn-typescript checkout missing — conformance:ts-fixtures needs it');
 
-	if (await sibling_has('typescript', 'tests/baselines/reference')) {
+	const ts_baselines = await sibling_has('typescript', 'tests/baselines/reference');
+	if (ts_baselines) {
 		ok('../typescript checkout (baselines present)');
-	} else if (await sibling_has('typescript')) {
-		warn(
-			'../typescript present but tests/baselines/reference missing — conformance:ts-repo will FAIL (partial checkout)'
-		);
-	} else
-		warn('../typescript checkout missing — conformance:ts-repo + bench:harvest:ts-repo need it');
+	} else if (ts_baselines === false) {
+		if (siblings.typescript !== null) {
+			warn(
+				'../typescript present but tests/baselines/reference missing — conformance:ts-repo will FAIL (partial checkout)'
+			);
+		} else
+			warn('../typescript checkout missing — conformance:ts-repo + bench:harvest:ts-repo need it');
+	}
 
 	// Informational (NOT gated by pins:audit — see its docstring): the prettier
 	// checkout is a reading reference + corpus-suite source whose oracle output is
 	// computed live per file, and it legitimately rides `-dev` versions.
-	if (await sibling_has('prettier')) {
+	if (siblings.prettier !== null) {
 		const v = await read_pkg_version('prettier', 'package.json');
-		if (versions && v !== null && v.replace(/-dev$/, '') !== versions.canonical.prettier) {
+		if (v === undefined) {
+			// warned as what it is
+		} else if (versions && v !== null && v.replace(/-dev$/, '') !== versions.canonical.prettier) {
 			warn(
 				`../prettier checkout is v${v} vs pinned prettier v${versions.canonical.prettier} — its fixture ` +
 					'suites (corpus inputs) come from a different version than the live oracle (informational)'
@@ -576,15 +698,17 @@ export const run_doctor = async (
 			'../prettier checkout missing — the corpus prettier suites + layout-reference reading need it'
 		);
 
-	if (await sibling_has('test262', 'test'))
-		ok('../test262 checkout (conformance:test262 release gate)');
-	else
+	const test262 = await sibling_has('test262', 'test');
+	if (test262) ok('../test262 checkout (conformance:test262 release gate)');
+	else if (test262 === false)
 		warn(
 			'../test262 checkout missing — conformance:test262 (the release gate, publish Step 3b) + bench:harvest:test262 need it'
 		);
 
-	if (await sibling_has('wpt', 'css')) ok('../wpt/css checkout (sparse)');
-	else warn('../wpt/css checkout missing — bench:harvest:wpt unavailable (manual-cadence tool)');
+	const wpt_css = await sibling_has('wpt', 'css');
+	if (wpt_css) ok('../wpt/css checkout (sparse)');
+	else if (wpt_css === false)
+		warn('../wpt/css checkout missing — bench:harvest:wpt unavailable (manual-cadence tool)');
 
 	// The real-code corpus snapshot: every `benched`/`gated` corpus entry reads one of
 	// its collections, and the corpus count pins were measured at the `collections/` tree
@@ -593,11 +717,18 @@ export const run_doctor = async (
 	// anything else is skew). The tree, not the commit: the snapshot repo's tooling
 	// commits move HEAD without moving a corpus byte.
 	const corpora_pin = GATE_CHECKOUT_IDS[CORPORA_ROOT]!.hash;
-	const corpora_head = await checkout_hash(stamp_git, { path: CORPORA_ROOT, tree: CORPORA_TREE });
-	if (corpora_head === null) {
+	const corpora_state = await checkout_state({ path: CORPORA_ROOT, tree: CORPORA_TREE });
+	const corpora_head = typeof corpora_state === 'string' ? null : corpora_state.id;
+	if (corpora_state === 'absent') {
 		warn(
 			`${CORPORA_ROOT} checkout missing — the bench + corpus:compare gates read the real-code snapshot ` +
 				`(git clone ${CORPORA_URL} ${CORPORA_ROOT})`
+		);
+	} else if (corpora_head === null) {
+		warn(
+			programs.git === null
+				? `${CORPORA_ROOT} is present, but no git is on PATH to read its ${CORPORA_TREE}/ tree id — the snapshot is ungraded`
+				: `${CORPORA_ROOT} is present but git can't read its ${CORPORA_TREE}/ tree id (not a git checkout, a corrupt or unreadable one, or the snapshot gone) — ${BROKEN_CHECKOUT}`
 		);
 	} else if (!corpora_head.startsWith(corpora_pin)) {
 		warn(
@@ -625,29 +756,37 @@ export const run_doctor = async (
 
 	section('Optional — experimental typechecker oracle (on-demand tsc_conformance only)');
 
-	if (await sibling_has('typescript-go', 'testdata/baselines/reference/submodule')) {
+	const tsgo_baselines = await sibling_has(
+		'typescript-go',
+		'testdata/baselines/reference/submodule'
+	);
+	if (tsgo_baselines) {
 		ok('../typescript-go checkout (tsgo baselines present)');
-	} else if (await sibling_has('typescript-go')) {
-		warn(
-			'../typescript-go present but testdata/baselines/reference/submodule missing — conformance:tsc-roundtrip would FAIL (partial checkout)'
-		);
-	} else
-		info('../typescript-go checkout absent — needed only by the on-demand tsc_conformance tasks');
+	} else if (tsgo_baselines === false) {
+		if (siblings['typescript-go'] !== null) {
+			warn(
+				'../typescript-go present but testdata/baselines/reference/submodule missing — conformance:tsc-roundtrip would FAIL (partial checkout)'
+			);
+		} else
+			info('../typescript-go checkout absent — needed only by the on-demand tsc_conformance tasks');
+	}
 
 	// The tsc-check task additionally sweeps the corpus INPUTS + bundled libs (unlike
 	// roundtrip, which reads only the committed baselines). The corpus is the
 	// often-unmaterialized _submodules/TypeScript submodule.
-	if (await sibling_has('typescript-go')) {
-		if (await sibling_has('typescript-go', '_submodules/TypeScript/tests/cases')) {
+	if (siblings['typescript-go'] !== null) {
+		const tsgo_cases = await sibling_has('typescript-go', '_submodules/TypeScript/tests/cases');
+		if (tsgo_cases) {
 			ok('../typescript-go corpus inputs (_submodules/TypeScript materialized)');
-		} else {
+		} else if (tsgo_cases === false) {
 			info(
 				'../typescript-go corpus inputs absent — only conformance:tsc-check needs them (git submodule update --init in ../typescript-go)'
 			);
 		}
-		if (await sibling_has('typescript-go', 'internal/bundled/libs')) {
+		const tsgo_libs = await sibling_has('typescript-go', 'internal/bundled/libs');
+		if (tsgo_libs) {
 			ok('../typescript-go bundled libs present');
-		} else {
+		} else if (tsgo_libs === false) {
 			info(
 				'../typescript-go bundled libs (internal/bundled/libs) absent — only conformance:tsc-check needs them'
 			);
@@ -677,18 +816,29 @@ export const run_doctor = async (
 	);
 	for (const [name, { path, task, checkouts }] of Object.entries(HARVEST_STAMPS)) {
 		const heads = await Promise.all(
-			Object.entries(checkouts).map(async ([key, input]) => ({
-				key,
-				repo: checkout_label(input),
-				head: await checkout_hash(stamp_git, input)
-			}))
+			Object.entries(checkouts).map(async ([key, input]) => {
+				const state = await checkout_state(input);
+				return {
+					key,
+					repo: checkout_label(input),
+					state,
+					head: typeof state === 'string' ? null : state.id
+				};
+			})
 		);
-		const absent = heads.filter((h) => h.head === null);
+		const absent = heads.filter((h) => h.state === 'absent');
+		const unread = heads.filter((h) => h.state === 'unread');
 		const gradable = heads.filter((h) => h.head !== null);
 		// Named on every line below, so a ✓ never reads as "all three agree" when one
-		// of the three was never compared.
-		const aside =
-			absent.length === 0 ? '' : ` (${absent.map((h) => h.repo).join(', ')} not checked out)`;
+		// of the three was never compared, and a present checkout git can't read never as
+		// one not checked out.
+		const asides = [
+			...(absent.length === 0 ? [] : [`${absent.map((h) => h.repo).join(', ')} not checked out`]),
+			...(unread.length === 0
+				? []
+				: [`${unread.map((h) => h.repo).join(', ')} present, ${unread_why}`])
+		];
+		const aside = asides.length === 0 ? '' : ` (${asides.join('; ')})`;
 		if (gradable.length === 0) {
 			info(`${name}: no checkout to grade against${aside}`);
 			continue;

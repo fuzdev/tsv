@@ -17,7 +17,7 @@ export interface SourceMtime {
 	/** Newest mtime in milliseconds (0 if no sources were found). */
 	ms: number;
 	/** The newest source's path, for the message: `crates/`-relative for a crate's file, the
-	 * file's name for a workspace file. */
+	 * checkout-relative path for a workspace file. */
 	path: string;
 }
 
@@ -54,12 +54,15 @@ const read_source = async <T>(path: string, op: () => Promise<T>): Promise<T> =>
 
 /**
  * The workspace-level files every cargo build reads beside its crates' own sources:
- * the root manifest (every `[profile.*]`, the workspace dependencies, the version) and
- * the lockfile (what those dependencies resolved to). Stated once, for every mtime
- * guard — a profile edit that staled one guard's artifact and not another's is two
- * guards disagreeing about what a build is made of.
+ * the root manifest (every `[profile.*]`, the workspace dependencies, the version), the
+ * lockfile (what those dependencies resolved to), and the cargo config (the wasm32
+ * target's `rustflags`, the feature baseline of every wasm build). Stated once, for every
+ * mtime guard — a profile edit that staled one guard's artifact and not another's is two
+ * guards disagreeing about what a build is made of. The config's flags are scoped to wasm32
+ * today, so an edit to it stales the native artifacts too, once: a stamped build re-dates
+ * its artifact, and a re-staging its copy, but a bare `cargo build` relinks nothing for it.
  */
-export const WORKSPACE_BUILD_FILES = ['Cargo.toml', 'Cargo.lock'];
+export const WORKSPACE_BUILD_FILES = ['Cargo.toml', 'Cargo.lock', '.cargo/config.toml'];
 
 /**
  * Newest mtime across every file under `src/`, the crate's `build.rs`, and its `Cargo.toml`,
@@ -93,7 +96,7 @@ export async function newest_crate_source_mtime(
 }
 
 /**
- * Newest mtime across `WORKSPACE_BUILD_FILES`, labeled by file name (`ms: 0` when
+ * Newest mtime across `WORKSPACE_BUILD_FILES`, labeled by its path (`ms: 0` when
  * none exists). The floor every cargo-built artifact is dated against, whatever
  * crates feed it. A missing file counts as absent (a fresh clone has no lockfile before
  * its first build), and the crate sources govern.

@@ -1315,7 +1315,8 @@ for bench and smoke alike; the corpus tools run no WASM, so they guard
 rather than a variable, to the guard and the loader alike — `native_artifact_check(profile)` and
 `NapiImplementation(napi_library_path(profile))`, which `init_implementations({native_profile})`
 pairs — so the two cannot grade and load different files), it compares their mtimes against the crate sources feeding them (plus the workspace
-`Cargo.toml` and `Cargo.lock`, so a profile edit or a dependency bump trips it too — one list,
+`Cargo.toml` and `Cargo.lock` and `.cargo/config.toml`, so a profile edit, a dependency bump or a
+wasm `rustflags` change trips it too — one list,
 `newest_workspace_file_mtime`, for this guard and its two siblings) and **aborts (exit 1)** if any
 is stale or missing.
 The build-first tasks rebuild first, so they pass for free — for a cargo-built artifact because
@@ -1385,7 +1386,7 @@ the bundle's `.wasm` is already newer than every source feeding it
 imported, and walked by the guard's own walk (`lib/source_mtime.ts`), so the two sides
 can't drift; dev-tooling crates deliberately excluded so
 `tsv_debug` edits don't force wasm rebuilds — plus the workspace `Cargo.toml` +
-`Cargo.lock` and `package.json`, where those tasks live, so
+`Cargo.lock` + `.cargo/config.toml` and `package.json`, where those tasks live, so
 editing a build task's flags re-triggers it). Rationale: wasm-pack re-runs wasm-opt
 (~8–27s per bundle) even when cargo is a fully-cached no-op, so a source-unchanged
 `npm run bench` would otherwise pay ~90s of pure wasm-opt. What the check CANNOT see is a

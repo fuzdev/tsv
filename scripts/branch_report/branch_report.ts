@@ -85,7 +85,8 @@ const USAGE = `usage: npm run branch:report -- <base-ref> <cand-ref> [options]
   --timing LIST     comma list of ${TIMING_LEGS.join(',')} (off by default; timing runs need a quiet machine)
   --rounds N        interleaved rounds for timing legs, even (default 2)
   --iterations N    iterations per file for the plain perf:ab pair (default 10)
-  --bench-runtimes  comma list of deno,node,bun for the bench leg (default deno,node,bun)
+  --bench-runtimes  comma list of deno,node,bun, each at most once, for the bench leg
+                    (default deno,node,bun)
   --aa FILE         an earlier same-ref report.json, repeatable: each row's floor is its largest
                     delta across the draws; a draw from another corpus, machine or setup is void
   --no-depth-margin skip the stack-margin bisect in the depth table
@@ -158,9 +159,13 @@ function parse_options(
 		else if (arg === '--iterations') options.iterations = count(arg, args[++i]);
 		else if (arg === '--bench-runtimes') {
 			const runtimes = take(arg, args[++i]).split(',');
+			const named = new Set<string>();
 			for (const runtime of runtimes) {
 				if (!['deno', 'node', 'bun'].includes(runtime))
 					throw new HarnessError(`unknown bench runtime '${runtime}'`);
+				// a runtime named twice would run twice, merging both runs' samples into its one row
+				if (named.has(runtime)) throw new HarnessError(`bench runtime '${runtime}' named twice`);
+				named.add(runtime);
 			}
 			options.bench_runtimes = runtimes as Array<'deno' | 'node' | 'bun'>;
 		} else if (arg === '--aa') options.aa_paths.push(resolve(checkout, take(arg, args[++i])));

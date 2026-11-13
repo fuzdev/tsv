@@ -21,7 +21,7 @@
  * that must agree on it, so build-side and run-side can't drift; the dev-tooling
  * crates are deliberately out, else every `tsv_debug` fixture-workflow edit would
  * force a pointless wasm rebuild), the workspace `Cargo.toml` + `Cargo.lock`
- * (dependency bumps), and `package.json` (the wrapped command's own flags live
+ * (dependency bumps) + `.cargo/config.toml` (the wasm32 `rustflags`), and `package.json` (the wrapped command's own flags live
  * there, so editing a build task re-triggers it). What the check CANNOT see is a toolchain change —
  * a wasm-pack / wasm-opt / rustc upgrade produces different bytes from
  * identical sources — so after a toolchain update run once with

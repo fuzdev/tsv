@@ -1,8 +1,8 @@
 /**
  * `run_doctor` over in-memory deps: a provisioned machine passes clean, and each check's pass,
  * warn, and fail line and what it does to the exit code, with each probed program present,
- * absent, at another version, printing garbage, or exiting non-zero. Also what each program is
- * run with.
+ * absent, at another version, printing garbage, or exiting non-zero; a present sibling that can't
+ * say what it holds. Also what each program is run with.
  */
 
 import { deepStrictEqual, ok, strictEqual } from 'node:assert';
@@ -161,6 +161,7 @@ const healthy = (): World => ({
 		'.github/workflows/notes.txt': "node-version: '1.0.0'\n",
 		'package.json': JSON.stringify({ engines: { node: '>=24.14' } }),
 		'crates/tsv_debug/sidecar/package.json': JSON.stringify({ engines: { node: '>=24.14' } }),
+		'benches/js/package.json': JSON.stringify({ engines: { node: '>=22.18' } }),
 		'crates/tsv_debug/sidecar/package-lock.json': SIDECAR_LOCK,
 		'crates/tsv_debug/sidecar/node_modules/.package-lock.json': SIDECAR_LOCK,
 		'crates/tsv_debug/sidecar/node_modules/svelte/package.json': JSON.stringify({
@@ -182,13 +183,15 @@ const healthy = (): World => ({
 		'acorn-typescript': { test: null, 'package.json': JSON.stringify({ version: '1.0.0' }) },
 		typescript: { 'tests/baselines/reference': null },
 		prettier: { 'package.json': JSON.stringify({ version: '3.0.0-dev' }) },
+		'prettier-plugin-svelte': { 'package.json': JSON.stringify({ version: '3.0.0' }) },
 		test262: { test: null },
 		wpt: { css: null },
 		'typescript-go': {
 			'testdata/baselines/reference/submodule': null,
 			'_submodules/TypeScript/tests/cases': null,
 			'internal/bundled/libs': null
-		}
+		},
+		corpora: { 'collections/a/a.ts': '' }
 	},
 	sibling_dirs: {},
 	programs: {
@@ -409,6 +412,41 @@ const CASES: Case[] = [
 		mark: '⚠',
 		line: 'node v22.17.0 — < 22.18 lacks native TS type-stripping; the harness entries fail to parse',
 		code: 1
+	},
+	{
+		name: "node below the bench's own floor, read from its manifest",
+		change: (w) => {
+			w.programs.node!['--version'] = exited('v22.18.0\n');
+			w.checkout['benches/js/package.json'] = JSON.stringify({ engines: { node: '>=22.19' } });
+		},
+		mark: '⚠',
+		line: 'node v22.18.0 — < 22.19 lacks native TS type-stripping; the harness entries fail to parse',
+		code: 1
+	},
+	{
+		name: "node below the bench's floor by its patch",
+		change: (w) => {
+			w.programs.node!['--version'] = exited('v22.18.1\n');
+			w.checkout['benches/js/package.json'] = JSON.stringify({ engines: { node: '>=22.18.3' } });
+		},
+		mark: '⚠',
+		line: 'node v22.18.1 — < 22.18.3 lacks native TS type-stripping; the harness entries fail to parse',
+		code: 1
+	},
+	{
+		name: "the bench's floor unreadable",
+		change: (w) => void (w.checkout['benches/js/package.json'] = null),
+		mark: '⚠',
+		line: "cannot read engines.node from benches/js/package.json (not_found: benches/js/package.json) — the bench's Node floor is ungraded",
+		code: 0
+	},
+	{
+		name: "the bench's floor of another form",
+		change: (w) =>
+			void (w.checkout['benches/js/package.json'] = JSON.stringify({ engines: { node: '^22' } })),
+		mark: '⚠',
+		line: "benches/js/package.json states no engines.node floor of the form >=major.minor[.patch] — the bench's Node floor is ungraded",
+		code: 0
 	},
 	{
 		name: 'node at the type-stripping floor',
@@ -695,8 +733,15 @@ const CASES: Case[] = [
 		code: 0
 	},
 	{
-		name: '../svelte with no version to read',
+		name: '../svelte with no version file, the broken checkout the pin audit fails',
 		change: (w) => void delete w.siblings.svelte!['packages/svelte/package.json'],
+		mark: '⚠',
+		line: "../svelte is present but packages/svelte/package.json can't be read (not_found: packages/svelte/package.json) — a broken checkout, not a machine without one; repair it, or remove it",
+		code: 0
+	},
+	{
+		name: '../svelte stating no version',
+		change: (w) => void (w.siblings.svelte!['packages/svelte/package.json'] = '{}'),
 		mark: '✓',
 		line: '../svelte checkout (v?, matches the pin)',
 		code: 0
@@ -769,18 +814,18 @@ const CASES: Case[] = [
 		code: 0
 	},
 	{
-		name: 'a sibling whose reads fail, read as absent',
-		change: (w) => void (w.sibling_dirs.test262 = failing_dir),
-		mark: '⚠',
-		line: '../test262 checkout missing — conformance:test262 (the release gate, publish Step 3b) + bench:harvest:test262 need it',
-		code: 0
-	},
-	{
-		name: 'a sibling whose version read fails, its version unknown',
+		name: 'a sibling whose version read fails, warned as what it is',
 		change: (w) => {
 			const dir = fake_dir(w.siblings.prettier!);
 			w.sibling_dirs.prettier = { ...dir, read_text: failing_dir.read_text };
 		},
+		mark: '⚠',
+		line: "../prettier is present but package.json can't be read (permission_denied: x) — a broken checkout, not a machine without one; repair it, or remove it",
+		code: 0
+	},
+	{
+		name: 'a sibling stating no version, its version unknown',
+		change: (w) => void (w.siblings.prettier!['package.json'] = '{}'),
 		mark: '✓',
 		line: '../prettier checkout (v?)',
 		code: 0
@@ -802,10 +847,20 @@ const CASES: Case[] = [
 	{
 		name: '../corpora absent',
 		change: (w) => {
+			w.siblings.corpora = null;
 			w.programs.git!['-C ../corpora rev-parse HEAD:collections'] = exited('', 128);
 		},
 		mark: '⚠',
 		line: '../corpora checkout missing — the bench + corpus:compare gates read the real-code snapshot (git clone https://github.com/fuzdev/corpora ../corpora)',
+		code: 0
+	},
+	{
+		name: '../corpora present, git failing in it',
+		change: (w) => {
+			w.programs.git!['-C ../corpora rev-parse HEAD:collections'] = exited('', 128);
+		},
+		mark: '⚠',
+		line: "../corpora is present but git can't read its collections/ tree id (not a git checkout, a corrupt or unreadable one, or the snapshot gone) — a broken checkout, not a machine without one; repair it, or remove it",
 		code: 0
 	},
 	{
@@ -841,7 +896,14 @@ const CASES: Case[] = [
 		name: 'git absent',
 		change: (w) => void (w.programs.git = null),
 		mark: '⚠',
-		line: '../corpora checkout missing — the bench + corpus:compare gates read the real-code snapshot (git clone https://github.com/fuzdev/corpora ../corpora)',
+		line: '../corpora is present, but no git is on PATH to read its collections/ tree id — the snapshot is ungraded',
+		code: 0
+	},
+	{
+		name: 'git absent, a stamp graded against nothing',
+		change: (w) => void (w.programs.git = null),
+		mark: '·',
+		line: 'test262: no checkout to grade against (../test262 present, no git on PATH to read it)',
 		code: 0
 	},
 	// the experimental typechecker
@@ -901,6 +963,7 @@ const CASES: Case[] = [
 	{
 		name: 'a stamp with one of its checkouts absent',
 		change: (w) => {
+			w.siblings['prettier-plugin-svelte'] = null;
 			w.programs.git!['-C ../prettier-plugin-svelte rev-parse HEAD'] = exited('', 128);
 		},
 		mark: '✓',
@@ -910,10 +973,30 @@ const CASES: Case[] = [
 	{
 		name: 'a stamp with none of its checkouts',
 		change: (w) => {
+			w.siblings.test262 = null;
 			w.programs.git!['-C ../test262 rev-parse HEAD'] = exited('', 128);
 		},
 		mark: '·',
 		line: 'test262: no checkout to grade against (../test262 not checked out)',
+		code: 0
+	},
+	{
+		name: 'a stamp with one of its checkouts present but unread by git',
+		change: (w) => {
+			w.programs.git!['-C ../prettier-plugin-svelte rev-parse HEAD'] = exited('', 128);
+		},
+		mark: '✓',
+		line: "svelte-rejects: stamp matches ../svelte + ../prettier (../prettier-plugin-svelte present, git can't read it)",
+		code: 0
+	},
+	{
+		name: 'a stamp whose directory beneath a present checkout is missing',
+		change: (w) => {
+			w.siblings.wpt = { README: '' };
+			w.programs.git!['-C ../wpt/css rev-parse HEAD'] = exited('', 128);
+		},
+		mark: '·',
+		line: 'wpt-css: no checkout to grade against (../wpt/css not checked out)',
 		code: 0
 	},
 	// corpus entries
@@ -1048,6 +1131,91 @@ describe('each check', () => {
 			strictEqual(r.code, c.code, verdict(r));
 		});
 	}
+});
+
+describe('a present sibling that cannot say what it holds', () => {
+	test('a read that fails warns as what it is, never as a missing checkout', async () => {
+		const world = healthy();
+		world.sibling_dirs.test262 = failing_dir;
+		const r = await run(world);
+		strictEqual(r.code, 0, verdict(r));
+		deepStrictEqual(marked(r.lines, '⚠'), [
+			"../test262 is present but whether test is in it can't be read (permission_denied: x) — a broken checkout, not a machine without one; repair it, or remove it"
+		]);
+	});
+
+	test('a path beneath it through a link out of it warns as no tool following it', async () => {
+		const world = healthy();
+		world.sibling_dirs['typescript-go'] = {
+			...fake_dir(world.siblings['typescript-go']!),
+			exists: (path) =>
+				path === '_submodules/TypeScript/tests/cases'
+					? Promise.reject(new FsError('outside_root', path))
+					: Promise.resolve(true)
+		};
+		const r = await run(world);
+		strictEqual(r.code, 0, verdict(r));
+		deepStrictEqual(marked(r.lines, '⚠'), [
+			'../typescript-go/_submodules/TypeScript/tests/cases reaches through a symlink that is absolute or climbs out of ../typescript-go, which is never followed; make it relative within the checkout, or link the checkout itself instead'
+		]);
+		deepStrictEqual(
+			marked(r.lines, '·').filter((line) => line.includes('corpus inputs')),
+			[]
+		);
+	});
+
+	test('each sibling read that fails warns once per path asked, and nothing reads it as missing', async () => {
+		for (const name of [
+			'svelte',
+			'acorn-typescript',
+			'typescript',
+			'wpt',
+			'typescript-go'
+		] as const) {
+			const world = healthy();
+			world.sibling_dirs[name] = failing_dir;
+			const r = await run(world);
+			strictEqual(r.code, 0, `${name}: ${verdict(r)}`);
+			const warned = marked(r.lines, '⚠');
+			ok(warned.length > 0, name);
+			ok(
+				warned.every((line) => line.startsWith(`../${name} is present but whether `)),
+				`${name}:\n${warned.join('\n')}`
+			);
+			ok(
+				!marked(r.lines, '·').some(
+					(line) => line.includes(`../${name}`) && line.includes('absent')
+				),
+				name
+			);
+		}
+	});
+
+	test('a version file reached through a link out of it warns as no tool following it, never as matching the pin', async () => {
+		const world = healthy();
+		world.sibling_dirs.svelte = {
+			...fake_dir(world.siblings.svelte!),
+			read_text: (path) => Promise.reject(new FsError('outside_root', path))
+		};
+		const r = await run(world);
+		strictEqual(r.code, 0, verdict(r));
+		deepStrictEqual(marked(r.lines, '⚠'), [
+			'../svelte/packages/svelte/package.json reaches through a symlink that is absolute or climbs out of ../svelte, which is never followed; make it relative within the checkout, or link the checkout itself instead'
+		]);
+		ok(!marked(r.lines, '✓').some((line) => line.startsWith('../svelte checkout')));
+	});
+
+	test('a path that passes through a file reads as missing', async () => {
+		const world = healthy();
+		world.sibling_dirs.svelte = {
+			...fake_dir(world.siblings.svelte!),
+			exists: (path) => Promise.reject(new FsError('not_a_directory', path))
+		};
+		const r = await run(world);
+		deepStrictEqual(marked(r.lines, '⚠'), [
+			'../svelte checkout missing — conformance:svelte-fixtures + the corpus suites need it'
+		]);
+	});
 });
 
 test('a missing deno fails no check leg, so it warns, and fails only under --strict', async () => {

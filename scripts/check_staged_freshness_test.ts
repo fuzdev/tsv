@@ -35,7 +35,7 @@ const T_STAGED = T_SOURCE + 60_000;
 const T_LATER = T_STAGED + 60_000;
 
 const TRIPLE = 'linux-x64-gnu';
-const WORKSPACE = ['Cargo.toml', 'Cargo.lock'];
+const WORKSPACE = ['Cargo.toml', 'Cargo.lock', '.cargo/config.toml'];
 /** A crate's source as the suite writes it, and the label a walk gives it. */
 const crate_source = (crate: string): string => `crates/${crate}/src/lib.rs`;
 const label_of = (path: string): string =>

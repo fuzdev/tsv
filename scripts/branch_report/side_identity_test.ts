@@ -4,10 +4,10 @@
  * filed a side's number under the other, puts the wrong stamp in a row.
  */
 
-import { deepStrictEqual, strictEqual } from 'node:assert';
+import { deepStrictEqual, ok, strictEqual } from 'node:assert';
 
 import { fs, type FsDir } from '@fuzdev/gro/fs.ts';
-import { test } from 'vitest';
+import { test, vi } from 'vitest';
 
 import { type Artifacts, leg_wasm_memory, leg_wasm_sizes } from './legs.ts';
 import { type FakeCall, fake_host, fake_program, fake_side } from './report_fakes.ts';
@@ -140,23 +140,39 @@ test('the plain CLI pair counts each side its own CLI', async () => {
 	}
 });
 
-test('a bench runtime the report does not know is a usage error, never a gap', async () => {
-	await using cache = await fs.temp_dir('branch_report_cache-');
-	await using checkout = await fs.temp_dir('branch_report_checkout-');
-	const calls: Array<FakeCall> = [];
-	const host = fake_host(cache, checkout, calls);
-	const deps = {
-		...host,
-		home: '/home/nobody',
-		cargo_build_jobs: undefined,
-		bench_env: {},
-		open_cache: async () => host.cache,
-		open_made_dir: async () => cache,
-		load_1m: () => 0
-	};
-	const args = ['a', 'b', '--corpus', checkout.path, '--bench-runtimes', 'nod'];
-	strictEqual(await run_branch_report_command(deps, args), 2);
-	// refused before any ref is resolved
-	deepStrictEqual(calls, []);
-	strictEqual(await cache.exists('reports'), false);
+test('a bench runtime the report does not know, or one named twice, is a usage error, never a gap', async () => {
+	for (const [runtimes, refusal] of [
+		['nod', "unknown bench runtime 'nod'"],
+		// run twice, its samples would merge into one row behind a round count the report states
+		['node,deno,node', "bench runtime 'node' named twice"]
+	]) {
+		await using cache = await fs.temp_dir('branch_report_cache-');
+		await using checkout = await fs.temp_dir('branch_report_checkout-');
+		const calls: Array<FakeCall> = [];
+		const host = fake_host(cache, checkout, calls);
+		const deps = {
+			...host,
+			home: '/home/nobody',
+			cargo_build_jobs: undefined,
+			bench_env: {},
+			open_cache: async () => host.cache,
+			open_made_dir: async () => cache,
+			load_1m: () => 0
+		};
+		const errors: Array<string> = [];
+		const spy = vi
+			.spyOn(console, 'error')
+			.mockImplementation((...a: unknown[]) => void errors.push(a.join(' ')));
+		const args = ['a', 'b', '--corpus', checkout.path, '--bench-runtimes', runtimes!];
+		const code = await run_branch_report_command(deps, args);
+		spy.mockRestore();
+		strictEqual(code, 2, runtimes);
+		ok(
+			errors.some((line) => line.includes(refusal!)),
+			errors.join('\n')
+		);
+		// refused before any ref is resolved
+		deepStrictEqual(calls, [], runtimes);
+		strictEqual(await cache.exists('reports'), false, runtimes);
+	}
 });

@@ -89,12 +89,23 @@ test("a source that is there but can't be read throws, naming it", async () => {
 	}
 });
 
-test('the workspace files: the newer wins, labeled by name, a missing one absent', async () => {
+test('the workspace files: the newest wins, labeled by its path, a missing one absent', async () => {
 	deepStrictEqual(
 		await newest_workspace_build_mtime(
 			make_tree({ 'Cargo.toml': { ms: 2 }, 'Cargo.lock': { ms: 3 } })
 		),
 		{ ms: 3, path: 'Cargo.lock' }
+	);
+	// the cargo config, whose wasm32 `rustflags` every wasm build reads
+	deepStrictEqual(
+		await newest_workspace_build_mtime(
+			make_tree({
+				'Cargo.toml': { ms: 2 },
+				'Cargo.lock': { ms: 3 },
+				'.cargo/config.toml': { ms: 4 }
+			})
+		),
+		{ ms: 4, path: '.cargo/config.toml' }
 	);
 	deepStrictEqual(await newest_workspace_build_mtime(make_tree({ 'Cargo.toml': { ms: 2 } })), {
 		ms: 2,

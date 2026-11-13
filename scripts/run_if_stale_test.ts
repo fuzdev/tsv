@@ -36,7 +36,14 @@ const make_checkout = async (target = true): Promise<FsDir & AsyncDisposable> =>
 		await write(`crates/${crate}/Cargo.toml`);
 		await write(`crates/${crate}/src/lib.rs`);
 	}
-	for (const file of ['Cargo.toml', 'Cargo.lock', 'package.json', 'deno.json']) await write(file);
+	for (const file of [
+		'Cargo.toml',
+		'Cargo.lock',
+		'.cargo/config.toml',
+		'package.json',
+		'deno.json'
+	])
+		await write(file);
 	if (target) await write(TARGET, T_TARGET);
 	return root;
 };
@@ -148,6 +155,7 @@ test('each input newer than the target builds', async () => {
 		'crates/tsv_discover/src/lib.rs',
 		'Cargo.toml',
 		'Cargo.lock',
+		'.cargo/config.toml',
 		'package.json'
 	]) {
 		await using checkout = await make_checkout();

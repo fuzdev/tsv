@@ -35,8 +35,9 @@
  * platform — the staging scripts copy through `scripts/stage_file.ts`, which does.
  *
  * Each check names the crates and/or individual files that feed one staged
- * artifact; when crates are named, the workspace `Cargo.toml` + `Cargo.lock`
- * are considered too (dependency bumps rebuild the artifact). A missing staged
+ * artifact; when crates are named, the workspace build files are considered too
+ * (`Cargo.toml`, `Cargo.lock`, `.cargo/config.toml`: a profile edit, a dependency bump,
+ * or a wasm `rustflags` change rebuilds the artifact). A missing staged
  * file is always fatal; `BENCH_STALE_OK=1` — the same escape hatch as the
  * bench guard, deliberately one knob for every mtime guard — downgrades a
  * stale (present-but-older) one to a warning. What no mtime check can see is a
