@@ -952,9 +952,13 @@ generation and builds the matching arm: the current tree's is the unmarked one, 
 generation's is selected by a `perf_ab_api` cfg passed to the example's own compilation (`cargo
 rustc … -- --cfg`, so no library is built differently). On a tree with the warm parse
 (`tsv_ts::__private::parse_folded_into`), TypeScript and Svelte parse into stores kept warm across
-files, taken before each timed region and parked after it as the CLI's `Formatter` keeps them, and
-CSS, which has no stores, into the `Bump`; the current tree's TypeScript parse takes the stores
-alone, where an older warm-parse tree's (`perf_ab_api = "ts_parse_bump"`) also took the `Bump`.
+files, taken before each timed region and parked after it in a slot the driver owns, as the CLI's
+`Formatter` keeps them, and CSS, which has no stores, into the `Bump`. The current tree's driver
+holds that slot through `tsv_ts::__private::WarmStores`, which names no store type, so the stores
+can change beneath it without a new arm; a tree with the stores but no such handle
+(`perf_ab_api = "no_warm_stores"`) keeps them in an `Option` of the driver's own. The TypeScript
+parse takes the stores alone from that generation on, where an older warm-parse tree's
+(`perf_ab_api = "ts_parse_bump"`) also took the `Bump`.
 On a tree older than the stores every language parses into the `Bump` alone, which is kept warm
 the same way. The report names each side's generation, and a run whose
 sides differ says so: its rows then compare two call paths as well as two libraries. A change
@@ -962,8 +966,9 @@ that moves an entry point a driver calls moves that driver's current arm to a ne
 value, adds the probe that tells the generations apart (`DRIVER_APIS` in `scripts/perf_ab.ts`) and
 names the value in the workspace's `check-cfg` list.
 
-So a side with the warm parse is measured on the warm path alone: stores reused across files, as
-the CLI's `Formatter` and the bindings' per-thread stores run it. The one-shot free functions
+So a side with the warm parse is measured on the warm path alone: stores reused across files in a
+slot the caller owns, as the CLI's `Formatter` runs them (the bindings run the same take and park
+over a per-thread slot instead). The one-shot free functions
 (`tsv_ts::format`, `tsv_svelte::format`), which build fresh stores on every call, are not what the
 task times.
 

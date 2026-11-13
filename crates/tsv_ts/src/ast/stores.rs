@@ -713,6 +713,29 @@ pub fn with_stores<'arena, R>(f: impl FnOnce(&mut AstStores<'arena>) -> R) -> R 
     result
 }
 
+/// Stores a caller keeps warm across calls in a slot it owns, rewound between them: the
+/// take-and-park protocol of [`with_stores`] over the caller's slot instead of the thread's, as
+/// the `Formatter` keeps its stores.
+///
+/// A holder names neither the store types nor their lifetime, so its code reads the same
+/// whatever the stores hold.
+#[derive(Debug, Default)]
+pub struct WarmStores {
+    parked: Option<AstStores<'static>>,
+}
+
+impl WarmStores {
+    /// Run `f` over the parked stores, or over fresh ones when there are none, and park them
+    /// rewound after it, so every id and run `f` minted is invalid once it returns. A panic out
+    /// of `f` leaves the slot empty, and the next call starts from fresh stores.
+    pub fn with<'arena, R>(&mut self, f: impl FnOnce(&mut AstStores<'arena>) -> R) -> R {
+        let mut stores: AstStores<'arena> = self.parked.take().unwrap_or_default();
+        let result = f(&mut stores);
+        self.parked = Some(stores.park());
+        result
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1118,6 +1141,37 @@ class C {
         });
         assert!(caught.is_err());
         with_stores(|stores: &mut AstStores<'_>| {
+            assert_eq!(with_a_row(stores), 1);
+        });
+    }
+
+    #[test]
+    fn a_warm_handle_hands_its_parse_rewound_stores() {
+        let source = "const a = [b, c => d];\nfunction f(x: T) { return x; }\n";
+        let mut warm = WarmStores::default();
+        warm.with(|stores| {
+            crate::__private::parse_into(source, stores).expect("parses");
+            assert!(with_a_row(stores) > 1, "the parse filled the stores");
+        });
+        warm.with(|stores| {
+            assert_eq!(with_a_row(stores), 1, "the park rewinds");
+        });
+        warm.with(|stores| {
+            crate::__private::parse_into(source, stores).expect("parses again");
+        });
+    }
+
+    #[test]
+    fn a_warm_handle_recovers_after_a_caught_panic() {
+        let mut warm = WarmStores::default();
+        let caught = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            warm.with(|stores| {
+                with_a_row(stores);
+                panic!("boom");
+            });
+        }));
+        assert!(caught.is_err());
+        warm.with(|stores| {
             assert_eq!(with_a_row(stores), 1);
         });
     }

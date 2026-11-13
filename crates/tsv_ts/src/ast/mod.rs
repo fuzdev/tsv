@@ -42,7 +42,7 @@ pub use stores::{
     IndexParam, InferType, InferTypeId, InterfaceDecl, InterfaceDeclId, MetaProp, MetaPropId,
     ModuleDecl, ModuleDeclId, ObjProp, ParamExtra, ParamExtraId, Parsed, PatProp, PoolStr,
     QualName, QualNameId, Quasi, Stmt, StmtId, TaggedTpl, TaggedTplId, Text, Ty, TyId, TypeAlias,
-    TypeAliasId, TypeMember, TypeParam, with_stores,
+    TypeAliasId, TypeMember, TypeParam, WarmStores, with_stores,
 };
 pub use tsv_lang::store::Run;
 pub use tsv_lang::{Comment, Span};

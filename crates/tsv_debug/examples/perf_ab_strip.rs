@@ -1,4 +1,4 @@
-//! The type strip's measuring driver behind `deno task perf:ab` (`scripts/perf_ab.ts`): the
+//! The type strip's measuring driver behind `npm run perf:ab` (`scripts/perf_ab.ts`): the
 //! strippable TypeScript of a corpus, timed phase for phase the way `tsv_debug profile --strip`
 //! times it, printed as one JSON line.
 //!
@@ -20,9 +20,11 @@
 //!   the author's bytes: the strip folds no carriage returns, so the TypeScript format row's
 //!   parse (fold + `parse_folded`) is not this one.
 //! - The calls sit in an `api` module with one arm per entry-point generation, as
-//!   `perf_ab.rs`'s do (its module doc): the current arm parses into stores taken before each
-//!   timed call and parked after it, `perf_ab_api = "ts_parse_bump"` (a tree whose parse still
-//!   takes the `Bump` beside the stores) does the same through the `Bump`, and
+//!   `perf_ab.rs`'s do (its module doc): the current arm parses into stores a
+//!   `tsv_ts::__private::WarmStores` handle takes before each timed call and parks after it,
+//!   `perf_ab_api = "no_warm_stores"` (a tree with the stores but no such handle) does the same
+//!   with the stores in an `Option` of its own, `perf_ab_api = "ts_parse_bump"` (a tree whose
+//!   parse still takes the `Bump` beside the stores) does that through the `Bump`, and
 //!   `perf_ab_api = "no_stores"`, a tree older than the stores, calls
 //!   `parse_with_goal_or_fallback` and `strip_in` over the `Bump` alone. The
 //!   take, the park and the arena resets sit outside the timed regions.
@@ -190,9 +192,49 @@ fn timed<R>(f: impl FnOnce() -> R) -> (Duration, R) {
 /// is chosen).
 ///
 /// Each arm's `Warm` is what it keeps across files and iterations besides the AST `Bump`: the
-/// current arm's parked stores, taken before each timed region and parked after it, as the
-/// bindings' strip keeps them.
-#[cfg(not(any(perf_ab_api = "ts_parse_bump", perf_ab_api = "no_stores")))]
+/// parked stores, taken before each timed region and parked after it, as the bindings' strip
+/// keeps them.
+#[cfg(not(any(
+    perf_ab_api = "no_warm_stores",
+    perf_ab_api = "ts_parse_bump",
+    perf_ab_api = "no_stores"
+)))]
+mod api {
+    use super::timed;
+    use std::time::Duration;
+
+    /// The stores parked between the timed calls, rewound.
+    pub(super) type Warm = tsv_ts::__private::WarmStores;
+
+    /// The parse's wall and whether it parsed.
+    pub(super) fn parse(
+        source: &str,
+        goal: Option<tsv_ts::Goal>,
+        _arena: &bumpalo::Bump,
+        warm: &mut Warm,
+    ) -> (Duration, bool) {
+        warm.with(|stores| {
+            timed(|| {
+                tsv_ts::__private::parse_with_goal_or_fallback_into(source, goal, stores).is_ok()
+            })
+        })
+    }
+
+    /// The strip's wall, its own parse included, and what it returned.
+    pub(super) fn strip(
+        source: &str,
+        goal: Option<tsv_ts::Goal>,
+        arena: &bumpalo::Bump,
+        warm: &mut Warm,
+    ) -> (Duration, Result<tsv_ts::Stripped, tsv_ts::StripError>) {
+        warm.with(|stores| timed(|| tsv_ts::__private::strip_into(source, goal, arena, stores)))
+    }
+}
+
+/// The entry points of a tree with the stores but no `WarmStores` handle: as the current arm,
+/// the stores kept in an `Option` of the arm's own. Built only against such a tree, never
+/// against the current one.
+#[cfg(perf_ab_api = "no_warm_stores")]
 mod api {
     use super::timed;
     use std::time::Duration;

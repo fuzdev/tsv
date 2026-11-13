@@ -54,7 +54,7 @@ unused_lifetimes = "warn"
 elided_lifetimes_in_paths = "warn"
 unused_qualifications = "warn"
 unreachable_pub = "warn"
-unexpected_cfgs = { level = "warn", check-cfg = ["cfg(tsv_unported)", 'cfg(perf_ab_api, values("ts_parse_bump", "no_stores"))'] }
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(tsv_unported)", 'cfg(perf_ab_api, values("no_warm_stores", "ts_parse_bump", "no_stores"))'] }
 
 [lints.rustdoc]
 broken_intra_doc_links = "deny"
