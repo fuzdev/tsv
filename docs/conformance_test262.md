@@ -419,8 +419,8 @@ Pass rate: 0/1 (0.0%)
 **tsv grades every run each test declares, in the mode the suite declares it in.**
 Strictness is a property of the source text, not of the runner: Module code is strict
 by definition, and Script code is strict exactly once its directive prologue holds a
-`"use strict"` (see
-[CLAUDE.md §Strictness](../CLAUDE.md#strictness-module-strict-script-by-directive)).
+`"use strict"` (the parser's side of it starts at
+[§Where the parser reads strictness](#where-the-parser-reads-strictness)).
 That is the whole model, and the flags map onto it directly
 (test262/INTERPRETING.md §Strict Mode, §flags). A test can carry more than one, so
 they are read in precedence order: `module` outranks every other flag (a
@@ -507,6 +507,36 @@ module-only. This is a deliberate, spec-grounded divergence from the drop-in ora
 saved/restored at every function-like scope boundary (async → `[+Await]`, non-async
 → `[~Await]`, class static block → `[+Await]`); a side effect is that `await` as an
 *expression* in a non-async function is correctly rejected in module code too.
+
+### Where the parser reads strictness
+
+Module code is always strict (ecma262 sec-strict-mode-code); Script code is strict **iff** its directive prologue holds a `"use strict"`, as is any function body, class, or nested scope that inherits or declares it. Every **parse** entry point but the explicit `Goal::Script` parses a module, so the everyday answer is *strict* (a Svelte `<script>`, a `.ts` file). The format and strip entry points that name no goal (`format`, `tsv_ts::strip`, `--content` with no `--source-type`) read an unset goal as a *fallback* — Module first, Script only on failure — so they reach a sloppy script too ([below](#an-unset-goal-is-a-fallback)).
+
+### The three rules that move with strictness
+
+The strict-mode rules the parser enforces. The spec words each as a Static Semantics early error (only the informative Annex C restates the literal rules as disallowed productions); they reject rather than defer because tsc reports all three wherever it reads the file: its parser rejects the two literal rules (TS1121 / TS1489, TS1487 / TS1488), and its binder reports a strict `with` (TS1101) among the grammar errors it raises even in an unchecked JavaScript file (acorn rejects all three too):
+
+- the **leading-zero numeric literal** — `LegacyOctalIntegerLiteral` (`010`, base 8) and `NonOctalDecimalIntegerLiteral` (`08`) — lexed in every mode, rejected where the token becomes a node, once the enclosing code's strictness is settled;
+- the **legacy string escape** — `LegacyOctalEscapeSequence` (`"\7"`, `"\101"`, `"\0"` followed by a decimal digit) and `NonOctalDecimalEscapeSequence` (`"\8"`, `"\9"`) — decoded in every mode, rejected at the same seam (where a string-literal token becomes a node). A bare `"\0"` is the NUL escape, legal everywhere. The rule reaches backwards too: a `"use strict"` directive re-grades the prologue literals ahead of it, so `function f() { "\7"; "use strict"; }` is a syntax error (ecma262 sec-literals-string-literals);
+- the **`with` statement**, rejected at its keyword. `with` stays a `ReservedWord` in every mode (as an identifier, `with (a);` would read as a call), so only the STATEMENT moves, never the name channel.
+
+The **untagged template**'s `NotEscapeSequence` rule is mode-independent and not one of these; tsv defers it.
+
+### Annex B at both goals, and the one deferral
+
+The web-compatibility grammar (HTML-like comments, labelled function declarations, `if (a) function f(){}` hoisting, `for (var x = 1 in o)`) is "normative but optional if the ECMAScript host is not a web browser" (ecma262 sec-web-compat); tsv, a formatter and parser rather than a browser host, takes that carve-out at both goals. One deferral: `if (a) function f(){}` parses because single-statement body positions don't enforce "a declaration is not a `Statement`" at all (`if (a) const x = 1;` parses too; a **labelled** item is the one position that enforces it) — the deferred-early-error stance below, not an Annex B relaxation; listed in [checklist_typescript.md](./checklist_typescript.md) §Strictness (its "Early errors that still parse" list).
+
+### The permissive parser
+
+Strictness is one instance of a broader stance: **the parser is deliberately permissive and defers static-semantic early-errors** (the above, plus the TypeScript ambient-context rules — a `declare` member body, initializer, decorator, etc.) to the diagnostics layer, so the formatter keeps formatting everything well-formed. The **correctness oracle for what's actually an error is tsc**, not acorn-typescript (matched only for AST *shape*), but where ECMAScript defines the construct the **spec's own layering outranks tsc's in both directions** — a production (grammar parameters included) rejects, a Static Semantics early error defers — so `for ((q = a in b) => 1; ;)` parses (a parameter default is an `Initializer[+In]`) though tsc's parser reports `',' expected`. Prettier is the formatting reference only, never by itself an accept/reject signal. A few rejects stand on a floor (representability, faithful reprint) or on a line the sibling positions already draw (`<out out T>`); rows on the wrong side are known gaps, not exceptions (`get`/`set constructor` still rejects inline; a top-level `return` still parses). Full rule: [conformance_tsc.md §The reject-vs-defer line](./conformance_tsc.md#the-reject-vs-defer-line); see also [crates/tsv_ts/CLAUDE.md §Architecture Position ("Sources of truth")](../crates/tsv_ts/CLAUDE.md#architecture-position) and [conformance_svelte.md §TypeScript Corrections](./conformance_svelte.md#typescript-corrections).
+
+### The goal axis in the parser
+
+The goal is a parse-time input (which grammar symbol the parse starts from) gating four constructs of its own; strictness is what the source text says. A parse runs against `tsv_ts::Goal::{Module, Script}` (`parse_with_goal`, CLI `--source-type script|module`), **defaulting to `Module`** (Svelte hard-wires it). At `Script` goal: `await` is an ordinary identifier (`[~Await]`, tracked via the parser's `in_await` flag, save/restored at every function-like scope), and top-level `import`/`export` declarations, `import.meta` and a top-level `for await` are syntax errors. A TypeScript namespace or module body keeps its `import`/`export` at either goal (tsc decides module-ness from top-level statements alone); dynamic `import(...)` stays valid, as does a TypeScript **import-equals** (`import x = A.B` / `import x = require('y')` is neither an `ImportDeclaration` nor a `ModuleItem` — why the gate fires on the shape, not the `import` keyword).
+
+### An unset goal is a fallback
+
+**`format` and the type strip read an *unset* goal as a fallback**: `tsv_ts::__private::parse_with_goal_or_fallback` parses at `Module` and retries at `Script` only on failure — which is what reaches a legacy sloppy script through `tsv format <path>`, `tsv strip <file.ts>` and an editor's bare `format_typescript(source)` / `strip_typescript(source)`. A depth refusal (`ErrorKind::TooDeep`) is never retried: the limit is no verdict on the grammar, and a Script retry could succeed only by reading `await` as a name (`await <T>a` as `await < T > a`). When both fail: a Script retry that died on a **goal gate** (a top-level `import`/`export`, `import.meta` or top-level `for await`, marked at their sites by `Error::goal_gate`, or the operand a module reads after a top-level `await`, marked at the parse's exit) proves the file a module, and the Module error is reported wherever it sits; otherwise the error that reached **further** into the source wins, the Module one on a tie — a broken sloppy script's own typo rather than the `with` the retry admits (`tests/format_fallback_error_attribution.rs`). A path whose **extension** settles the goal names it instead: `.mjs`/`.mts` are ES modules whatever any config says, so there's no legacy script to retry for (`tsv_ts::Goal::from_extension`, applied by both `tsv` bins — for `strip`, `.mts` alone, since it refuses JavaScript paths; it can only reject a module-invalid file, never change an output). `parse` keeps the Module default at every surface — the wire's `Program.sourceType` is a claim one settled grammar must produce. See [cli.md §Multi-File Formatting](./cli.md#multi-file-formatting).
 
 ## Differential Comparison (tsv vs oxc-parser)
 
