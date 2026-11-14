@@ -522,11 +522,7 @@ impl<'a: 'e, 'e> Iterator for LeftSpineSteps<'_, 'a, 'e> {
                 && self
                     .mid_chain_gaps
                     .get_or_insert_with(|| {
-                        chain_mid_chain_paren_gaps(
-                            self.printer.view,
-                            root,
-                            self.printer.linearize_input(),
-                        )
+                        chain_mid_chain_paren_gaps(root, self.printer.linearize_input())
                     })
                     .contains(&(shell_start, child_start));
         } else if !(self.chain_root.is_some()

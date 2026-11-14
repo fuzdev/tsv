@@ -589,7 +589,7 @@ impl<'a> Printer<'a> {
                     |c| self.comment_takes_line_in_group(c) || !in_group(),
                 )
                 && (!chain_root.is_some_and(|root| {
-                    chain_mid_chain_paren_gaps(self.view, root, self.linearize_input())
+                    chain_mid_chain_paren_gaps(root, self.linearize_input())
                         .contains(&(shell_start, left_start))
                 }) || self.mid_chain_shell_gap_hangs(shell_start, left_start))
             {

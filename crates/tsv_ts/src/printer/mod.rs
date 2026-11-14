@@ -2491,7 +2491,7 @@ impl<'a> Printer<'a> {
 
     /// What the chain linearizer reads — the printer itself, and the region marks when the
     /// document has any — as one value, so no call site can hand one over without the other.
-    pub(crate) fn linearize_input(&self) -> chain::LinearizeInput<'_> {
+    pub(crate) fn linearize_input(&self) -> chain::LinearizeInput<'a, '_> {
         chain::LinearizeInput {
             printer: self,
             region_kept_shells: self

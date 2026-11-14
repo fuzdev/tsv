@@ -1794,7 +1794,6 @@ impl<'a> Printer<'a> {
             // in the linearized chain for proper segment grouping.
             let mut nodes = chain::ChainNodeVec::new();
             let long_curried = chain::linearize_chain_from_non_null_into(
-                self.view,
                 non_null_expr,
                 span,
                 self.linearize_input(),

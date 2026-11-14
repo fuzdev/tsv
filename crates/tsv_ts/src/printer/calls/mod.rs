@@ -1146,7 +1146,6 @@ impl<'a> Printer<'a> {
             // Use chain wrapping for chains (nested calls) or memberish callees
             let mut nodes = chain::ChainNodeVec::new();
             let long_curried = chain::linearize_chain_from_call_into(
-                self.view,
                 call,
                 span,
                 self.linearize_input(),
@@ -1210,7 +1209,6 @@ impl<'a> Printer<'a> {
         // Use chain-based implementation
         let mut nodes = chain::ChainNodeVec::new();
         let long_curried = chain::linearize_chain_from_member_into(
-            self.view,
             member,
             span,
             self.linearize_input(),

@@ -722,13 +722,7 @@ pub(crate) fn call_prints_as_member_chain(
     printer: &Printer<'_>,
 ) -> bool {
     let mut nodes = ChainNodeVec::new();
-    let _ = linearize_chain_from_call_into(
-        printer.view,
-        call,
-        span,
-        printer.linearize_input(),
-        &mut nodes,
-    );
+    let _ = linearize_chain_from_call_into(call, span, printer.linearize_input(), &mut nodes);
     let groups = group_chain_nodes(&nodes, printer);
     groups_exceed_cutoff(&groups, false, printer)
 }

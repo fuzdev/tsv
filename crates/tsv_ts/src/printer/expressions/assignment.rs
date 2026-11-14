@@ -1807,7 +1807,7 @@ impl Printer<'_> {
         {
             return MidChainShellRun::default();
         }
-        let gaps = chain_mid_chain_paren_gaps(self.view, expr, self.linearize_input());
+        let gaps = chain_mid_chain_paren_gaps(expr, self.linearize_input());
         let holds_line_comment = gaps.iter().any(|&(gap_start, object_start)| {
             self.comments_on_page_between(gap_start, object_start)
                 .any(|c| !c.owned_by_node && !c.is_block)
