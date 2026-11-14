@@ -707,44 +707,79 @@ impl Deref for Parsed {
     }
 }
 
+thread_local! {
+    /// This thread's parked stores. Boxed, so a take and a park each move a pointer where the
+    /// stores inline would be copied whole both ways.
+    static PARKED: Cell<Option<Box<AstStores>>> = const { Cell::new(None) };
+}
+
+/// Takes this thread's parked stores out of their slot, or fresh ones when there are none.
+/// The slot is empty until [`park_stores`] hands them back, so a second take meanwhile, and a
+/// thread that never parks them (a panic unwinding past the holder), get fresh stores.
+///
+/// The half of [`with_stores`] a holder that keeps the stores in a struct of its own calls:
+/// it owns the box for as long as it likes, and the thread still parks one store set.
+#[must_use]
+pub fn take_stores() -> Box<AstStores> {
+    PARKED.with(Cell::take).unwrap_or_default()
+}
+
+/// Parks `stores` in this thread's slot after an [`AstStores::reset`], keeping slot 0 and
+/// capacity, so every id, run and pool text minted from them is invalid from here on. Stores
+/// already in the slot are dropped.
+pub fn park_stores(mut stores: Box<AstStores>) {
+    stores.reset();
+    PARKED.with(|cell| cell.set(Some(stores)));
+}
+
 /// Run `f` over this thread's parked stores, or over fresh ones when there are none:
 /// `tsv_arena`'s take-and-park protocol, here because that crate cannot name these types.
 ///
-/// The stores are out of the slot while `f` runs, so a nested call takes fresh ones and a
-/// panic out of `f` leaves the slot empty, as a new thread finds it. Parked after an
-/// [`AstStores::reset`], keeping slot 0 and capacity, so every id, run and pool text `f`
-/// minted is invalid once it returns.
+/// The stores are out of the slot while `f` runs ([`take_stores`]), so a nested call takes
+/// fresh ones and a panic out of `f` leaves the slot empty, as a new thread finds it. Parked
+/// after an [`AstStores::reset`] ([`park_stores`]), keeping slot 0 and capacity, so every id,
+/// run and pool text `f` minted is invalid once it returns.
 pub fn with_stores<R>(f: impl FnOnce(&mut AstStores) -> R) -> R {
-    thread_local! {
-        static PARKED: Cell<Option<AstStores>> = const { Cell::new(None) };
-    }
-    let mut stores: AstStores = PARKED.with(Cell::take).unwrap_or_default();
+    let mut stores = take_stores();
     let result = f(&mut stores);
-    stores.reset();
-    PARKED.with(|cell| cell.set(Some(stores)));
+    park_stores(stores);
     result
 }
 
 /// Stores a caller keeps warm across calls in a slot it owns, rewound between them: the
 /// take-and-park protocol of [`with_stores`] over the caller's slot instead of the thread's, as
-/// the `Formatter` keeps its stores.
+/// the `Formatter` keeps its stores. The slot holds a box, so a take and a park each move a
+/// pointer.
 ///
 /// A holder names no store type, so its code reads the same whatever the stores hold.
 #[derive(Debug, Default)]
 pub struct WarmStores {
-    parked: Option<AstStores>,
+    parked: Option<Box<AstStores>>,
 }
 
 impl WarmStores {
+    /// Takes the parked stores out of the slot, or fresh ones when there are none. The slot is
+    /// empty until [`WarmStores::park`] hands them back.
+    #[must_use]
+    pub fn take(&mut self) -> Box<AstStores> {
+        self.parked.take().unwrap_or_default()
+    }
+
+    /// Parks `stores` in the slot after an [`AstStores::reset`], keeping slot 0 and capacity,
+    /// so every id, run and pool text minted from them is invalid from here on.
+    pub fn park(&mut self, mut stores: Box<AstStores>) {
+        stores.reset();
+        self.parked = Some(stores);
+    }
+
     /// Run `f` over the parked stores, or over fresh ones when there are none, and park them
     /// after an [`AstStores::reset`], keeping slot 0 and capacity, so every id, run and pool
     /// text `f` minted is invalid once it returns. A panic out of `f` leaves the slot empty,
     /// and the next call starts from fresh stores.
     pub fn with<R>(&mut self, f: impl FnOnce(&mut AstStores) -> R) -> R {
-        let mut stores: AstStores = self.parked.take().unwrap_or_default();
+        let mut stores = self.take();
         let result = f(&mut stores);
-        stores.reset();
-        self.parked = Some(stores);
+        self.park(stores);
         result
     }
 }
@@ -1267,6 +1302,64 @@ type U = V | W;
         assert_every_field_written(&filled);
         let rewound = with_stores(|stores: &mut AstStores| stores.shapes());
         assert_rewound(&filled, &rewound);
+    }
+
+    /// Where `stores` live: a take that hands back the allocation a park left reads the same
+    /// address.
+    fn address(stores: &AstStores) -> *const AstStores {
+        std::ptr::from_ref(stores)
+    }
+
+    #[test]
+    fn a_warm_handle_takes_and_parks_one_allocation() {
+        let mut warm = WarmStores::default();
+        let mut stores = warm.take();
+        fill_every_field(&mut stores);
+        let filled = stores.shapes();
+        let at = address(&stores);
+        warm.park(stores);
+        let stores = warm.take();
+        assert_eq!(
+            address(&stores),
+            at,
+            "the park and the take move the box, never the stores"
+        );
+        assert_rewound(&filled, &stores.shapes());
+        let fresh = warm.take();
+        assert_ne!(
+            address(&fresh),
+            at,
+            "the slot is empty while its stores are out"
+        );
+        assert!(fresh.shapes().iter().all(|shape| shape.capacity == 0));
+    }
+
+    #[test]
+    fn the_thread_slot_takes_and_parks_one_allocation() {
+        let mut stores = take_stores();
+        fill_every_field(&mut stores);
+        let filled = stores.shapes();
+        let at = address(&stores);
+        park_stores(stores);
+        with_stores(|stores: &mut AstStores| {
+            assert_eq!(
+                address(stores),
+                at,
+                "`with_stores` runs over the box the park left"
+            );
+            assert_rewound(&filled, &stores.shapes());
+            let fresh = take_stores();
+            assert_ne!(
+                address(&fresh),
+                at,
+                "the slot is empty while its stores are out"
+            );
+        });
+        assert_eq!(
+            address(&take_stores()),
+            at,
+            "the stores come back through the slot"
+        );
     }
 
     /// Whether `read` is refused as the store-check build refuses a handle from another

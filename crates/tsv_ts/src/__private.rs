@@ -11,7 +11,7 @@ use crate::ast::{
 use tsv_lang::Span;
 use tsv_lang::store::PoolText;
 
-pub use crate::ast::{WarmStores, with_stores};
+pub use crate::ast::{WarmStores, park_stores, take_stores, with_stores};
 pub use crate::imports::{collect_imports, parse_imports_into};
 #[cfg(feature = "json")]
 pub use crate::imports::{write_imports_json, write_imports_json_string};

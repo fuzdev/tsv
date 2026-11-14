@@ -37,7 +37,7 @@ pub use stores::{
     ExportAllId, ExportAssignId, ExportDefaultId, ExportNamedId, ExprId, FnDeclId, FnExprId,
     ForHeadId, ForLeftId, ImportDeclId, ImportEqualsId, ImportTypeId, InferTypeId, InterfaceDeclId,
     MetaPropId, ModuleDeclId, ParamExtraId, Parsed, QualNameId, StmtId, TaggedTplId, Text, TyId,
-    TypeAliasId, WarmStores, with_stores,
+    TypeAliasId, WarmStores, park_stores, take_stores, with_stores,
 };
 use tsv_lang::store::PoolText;
 pub use tsv_lang::store::Run;
