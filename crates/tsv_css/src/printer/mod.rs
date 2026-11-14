@@ -31,7 +31,7 @@ mod selectors;
 pub(crate) mod value_normalization;
 mod values;
 
-use crate::ast::{Comment, CssBlockChild, CssDeclaration, CssNode, CssStyleSheet};
+use crate::ast::{Comment, CssBlockChild, CssDeclaration, CssNode, CssParsedRef, CssView};
 use crate::lexer::{Lexer, TokenKind};
 use tsv_lang::{
     CommentFreeWindow, EmbedContext, INDENT, OutputBuffer, Span, TAB_WIDTH, comments_to_emit_from,
@@ -58,6 +58,12 @@ pub(crate) struct Printer<'a> {
     pub(crate) source: &'a str,
     /// All comments sorted by span.start
     pub(crate) comments: &'a [Comment],
+    /// Reads what the stores of the tree being printed hold.
+    #[expect(
+        dead_code,
+        reason = "the tree's lists and strings live in the arena, so no reader resolves a handle"
+    )]
+    pub(crate) view: CssView<'a>,
     /// The document's line-break table with its builder's verdict — what the two line
     /// questions below read, by a bounded scan of `source` with the table as the fallback
     /// (`printing::is_same_line_scan` and siblings).
@@ -98,6 +104,7 @@ impl<'a> Printer<'a> {
         arena: &'a DocArena,
         source: &'a str,
         comments: &'a [Comment],
+        view: CssView<'a>,
         line_table: LineTable<'a>,
     ) -> Self {
         let holds_boundary_ws = source_holds_boundary_ws(source);
@@ -105,6 +112,7 @@ impl<'a> Printer<'a> {
             arena,
             source,
             comments,
+            view,
             line_table,
             EmbedContext::default(),
             holds_boundary_ws,
@@ -121,6 +129,7 @@ impl<'a> Printer<'a> {
         arena: &'a DocArena,
         source: &'a str,
         comments: &'a [Comment],
+        view: CssView<'a>,
         line_table: LineTable<'a>,
         embed: EmbedContext,
         holds_boundary_ws: bool,
@@ -132,6 +141,7 @@ impl<'a> Printer<'a> {
             arena,
             source,
             comments,
+            view,
             line_table,
             in_keyframes: false,
             value_scope: values::ValueScope::default(),
@@ -1224,7 +1234,7 @@ fn css_terminator_len(gap: &[u8], i: usize) -> Option<usize> {
 /// instead of a silent, unregistered emit. A declaration's *value* comments are never lexed
 /// as `Comment`s, so they stay out of scope by construction.
 #[cfg(feature = "_internal_comment_check")]
-fn register_stylesheet_comments(stylesheet: &CssStyleSheet<'_>, source: &str) {
+fn register_stylesheet_comments(stylesheet: &crate::ast::CssStyleSheet<'_>, source: &str) {
     tsv_lang::comment_ledger::register_parsed(source, &stylesheet.comments);
     let mut block_comment_spans = Vec::new();
     collect_block_comment_spans(stylesheet.nodes, &mut block_comment_spans);
@@ -1266,44 +1276,41 @@ fn collect_block_child_comment_spans(children: &[CssBlockChild<'_>], out: &mut V
 
 /// Format CSS stylesheet to a string
 /// Requires source for blank line preservation and raw value extraction
-pub(crate) fn format_css(stylesheet: &CssStyleSheet<'_>, source: &str) -> String {
+pub(crate) fn format_css(parsed: CssParsedRef<'_>, source: &str) -> String {
     let arena = DocArena::for_source(source);
-    format_css_in(stylesheet, source, &arena)
+    format_css_in(parsed, source, &arena)
 }
 
 /// Format a CSS stylesheet into a caller-provided doc arena (the reuse path).
-pub(crate) fn format_css_in(
-    stylesheet: &CssStyleSheet<'_>,
-    source: &str,
-    arena: &DocArena,
-) -> String {
+pub(crate) fn format_css_in(parsed: CssParsedRef<'_>, source: &str, arena: &DocArena) -> String {
     // The document's line verdict, over the arena-parked table (one warm table across a
     // multi-file driver's files instead of a fresh Vec per file — filled only if a line
     // question falls back to it).
     let line_breaks = LineBreaks::new(source, arena.take_line_breaks_scratch());
-    format_stylesheet(stylesheet, source, line_breaks, arena)
+    format_stylesheet(parsed, source, line_breaks, arena)
 }
 
 /// [`format_css_in`] over a document the caller folded ahead of the parse: the line
 /// verdict comes from the fold's own pass (`LineBreaks::of_folded`), not a second walk.
 pub(crate) fn format_css_folded_in(
-    stylesheet: &CssStyleSheet<'_>,
+    parsed: CssParsedRef<'_>,
     folded: &FoldedSource<'_>,
     arena: &DocArena,
 ) -> String {
     let line_breaks = LineBreaks::of_folded(folded, arena.take_line_breaks_scratch());
-    format_stylesheet(stylesheet, folded.text(), line_breaks, arena)
+    format_stylesheet(parsed, folded.text(), line_breaks, arena)
 }
 
 /// The shared body of the standalone entry points: register the stylesheet's comments,
 /// build the printer on its line table, print, park the table, and write a BOM ahead of a
 /// leading content U+FEFF (`tsv_lang::printing::encode_leading_zwnbsp`).
 fn format_stylesheet(
-    stylesheet: &CssStyleSheet<'_>,
+    parsed: CssParsedRef<'_>,
     source: &str,
     line_breaks: LineBreaks<'_>,
     arena: &DocArena,
 ) -> String {
+    let stylesheet = parsed.stylesheet;
     debug_assert!(
         !source.contains('\r'),
         "a format entry point takes CR-folded text (`tsv_lang::printing::normalize_carriage_returns`)"
@@ -1314,7 +1321,13 @@ fn format_stylesheet(
     #[cfg(feature = "_internal_comment_check")]
     register_stylesheet_comments(stylesheet, source);
 
-    let mut printer = Printer::new(arena, source, &stylesheet.comments, line_breaks.table());
+    let mut printer = Printer::new(
+        arena,
+        source,
+        &stylesheet.comments,
+        parsed.view,
+        line_breaks.table(),
+    );
     printer.print_css_nodes(stylesheet.nodes);
     let output = printer.into_string();
     arena.park_line_breaks_scratch(line_breaks.into_scratch());
@@ -1332,13 +1345,14 @@ fn format_stylesheet(
 /// nodes are reclaimed at the host driver's next `DocArena::reset()` (between
 /// files) like any other island's.
 pub(crate) fn format_css_embedded_in(
-    stylesheet: &CssStyleSheet<'_>,
+    parsed: CssParsedRef<'_>,
     source: &str,
     line_table: LineTable<'_>,
     embed: EmbedContext,
     host_scan: crate::__private::HostBoundaryScan,
     arena: &DocArena,
 ) -> String {
+    let stylesheet = parsed.stylesheet;
     // Render at the host's final indentation directly (fold `base_indent_offset`
     // into the starting `indent_level`, zeroing the offset), mirroring how the
     // `<script>` embed renders the TS doc at `start_indent_level=1`. Structural
@@ -1364,6 +1378,7 @@ pub(crate) fn format_css_embedded_in(
         arena,
         source,
         &stylesheet.comments,
+        parsed.view,
         line_table,
         embed,
         host_scan.holds_boundary_ws,

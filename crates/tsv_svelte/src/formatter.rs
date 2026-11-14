@@ -1,18 +1,18 @@
 //! [`Formatter`]: [`format()`](crate::format) over arenas kept warm across calls.
 
+use crate::ast::WarmStores;
 use crate::{Result, format_in};
 use tsv_lang::doc::arena::DocArena;
-use tsv_ts::ast::WarmStores;
 
 /// Formats many Svelte sources on one thread, reusing its allocations from one source to the
 /// next.
 ///
-/// [`format()`](crate::format) allocates a fresh AST arena, doc arena and TypeScript
-/// stores for every call and drops them before returning. A `Formatter` owns all
-/// three and rewinds them instead, keeping what they have grown (the AST arena keeps its
-/// largest block, the doc arena and the stores their whole capacity), so after the first few
-/// sources the work allocates almost nothing new — the shape of a driver that formats a
-/// directory, or an editor that formats on every save. The output is exactly
+/// [`format()`](crate::format) allocates a fresh AST arena, doc arena and stores (the
+/// document's TypeScript and CSS halves) for every call and drops them before returning. A
+/// `Formatter` owns all three and rewinds them instead, keeping what they have grown (the AST
+/// arena keeps its largest block, the doc arena and the stores their whole capacity), so after
+/// the first few sources the work allocates almost nothing new — the shape of a driver that
+/// formats a directory, or an editor that formats on every save. The output is exactly
 /// [`format()`](crate::format)'s for the same source.
 ///
 /// **The arenas rewind at the start of every call**, so nothing one call leaves behind
@@ -44,7 +44,7 @@ use tsv_ts::ast::WarmStores;
 pub struct Formatter {
     ast: bumpalo::Bump,
     doc: DocArena,
-    /// The TypeScript stores between calls, out of the slot while one runs.
+    /// The document stores between calls, out of the slot while one runs.
     stores: WarmStores,
 }
 

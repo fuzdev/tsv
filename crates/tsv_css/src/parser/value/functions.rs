@@ -1,5 +1,5 @@
 use super::parser::ValueParser;
-use crate::ast::CssValue;
+use crate::ast::{CssStores, CssValue};
 #[cfg(feature = "_internal_ast_census")]
 use crate::parser::census_vec::BumpVec;
 use bumpalo::Bump;
@@ -15,6 +15,7 @@ use tsv_lang::Span;
 /// # Arguments
 /// * `args_str` - The function arguments string (e.g., "90deg, red 01%, blue 02%")
 /// * `parent_span` - The span of the arguments in the full CSS document
+/// * `stores` - The stylesheet's stores, carried beside `arena` into the arguments' parse
 ///
 /// # Returns
 /// Arena-allocated slice of parsed argument values
@@ -22,6 +23,7 @@ pub(crate) fn parse_function_arguments<'arena>(
     args_str: &str,
     parent_span: Span,
     arena: &'arena Bump,
+    stores: &mut CssStores,
 ) -> &'arena [CssValue<'arena>] {
     // Strip leading whitespace by offset, then trailing on the remaining slice — one
     // boundary scan per side (vs a `.trim()` plus a separate `.trim_start()`/`.trim_end()`
@@ -45,7 +47,7 @@ pub(crate) fn parse_function_arguments<'arena>(
     // A function's argument list IS a group, which is what lets a `:` inside it be an
     // operator (`f(a: 1.5)`) where the same byte at a declaration's top level is not.
     let parser = ValueParser::new_within(trimmed, adjusted_span, true);
-    let value = parser.parse(arena);
+    let value = parser.parse(arena, stores);
 
     // Function arguments are comma-separated, so we expect CommaSeparated
     // But if there's only one argument, it might be a single value

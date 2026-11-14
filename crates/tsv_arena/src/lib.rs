@@ -259,10 +259,10 @@ pub fn decode_source_type<G>(
 /// already rejected by the binding's own goal decoder, which reads the same tag
 /// through [`goal_allowed!`].
 ///
-/// The `$storeness` tag is the language's store axis: `stores` (TypeScript, Svelte) calls
-/// the `*_into` form with `$stores`, the one [`with_lang_stores!`] hands over; `nostores`
-/// (CSS, which has no store) calls the arena-only `parse`. The `goal` language parses
-/// into its stores alone and takes no `$arena`; the `nogoal` ones still allocate in it.
+/// The `$storeness` tag is the language's store axis, and every language is on its one
+/// value: `stores` calls the `*_into` form with `$stores`, the one [`with_lang_stores!`]
+/// hands over. The `goal` language parses into its stores alone and takes no `$arena`; the
+/// `nogoal` ones allocate in it beside their stores.
 ///
 /// `$lang` and `$arena` resolve in the caller's scope, so this crate needs no
 /// dependency on the language crates.
@@ -282,42 +282,28 @@ macro_rules! parse_ast {
         let _ = $goal;
         $lang::__private::parse_into($source, $arena, $stores)
     }};
-    (nogoal, nostores, $lang:ident, $source:expr, $goal:expr, $arena:expr, $stores:expr) => {{
-        let _ = ($goal, $stores);
-        $lang::__private::parse($source, $arena)
-    }};
 }
 
-/// Run `$body` with `$stores` bound for the `$storeness` tag: a language with stores
-/// (`stores`, TypeScript and Svelte) gets this thread's parked ones through its own
-/// `__private::with_stores`, the language with none (`nostores`, CSS) a `()` the
-/// expansion consumes. `tsv_arena` cannot park them itself, since it names no language
-/// crate's types.
+/// Run `$body` with `$stores` bound to this thread's parked stores for the language, taken
+/// and parked through its own `__private::with_stores` (Svelte's takes a TypeScript half
+/// and a CSS half from those crates' slots). `tsv_arena` cannot park them itself, since it
+/// names no language crate's types.
 #[macro_export]
 #[doc(hidden)]
 macro_rules! with_lang_stores {
     (stores, $lang:ident, |$stores:ident| $body:expr) => {
         $lang::__private::with_stores(|$stores| $body)
     };
-    (nostores, $lang:ident, |$stores:ident| $body:expr) => {{
-        let $stores = ();
-        $body
-    }};
 }
 
 /// What a language's reading entry points take for a tree `$ast` a warm parse left in
-/// `$stores`: the tree and its stores for a language with them (`stores`), the tree alone
-/// for the one without (`nostores`).
+/// `$stores`: the tree and the stores it is read through.
 #[macro_export]
 #[doc(hidden)]
 macro_rules! read_ast {
     (stores, $lang:ident, $ast:ident, $stores:ident) => {
         $lang::__private::parsed_ref(&$ast, $stores)
     };
-    (nostores, $lang:ident, $ast:ident, $stores:ident) => {{
-        let _ = $stores;
-        &$ast
-    }};
 }
 
 /// A binding's whole **parse** export body: parse `$source` through [`parse_ast!`] into the
@@ -402,7 +388,8 @@ macro_rules! parse_internal {
 /// no retry may make depend on the input.
 ///
 /// `nogoal` ignores the option exactly as [`parse_ast!`] ignores the goal — Svelte
-/// hard-wires `Module` and CSS has no goal axis, so neither has a fallback to run.
+/// hard-wires `Module` and CSS has no goal axis, so neither has a fallback to run — and
+/// parses into `$arena` beside `$stores`.
 ///
 /// ```ignore
 /// let ast = parse_ast_for_format!(goal, stores, tsv_ts, &folded, source_type, arena, stores)?;
@@ -418,10 +405,6 @@ macro_rules! parse_ast_for_format {
         // expansion.
         let _ = $goal;
         $lang::__private::parse_folded_into($folded, $arena, $stores)
-    }};
-    (nogoal, nostores, $lang:ident, $folded:expr, $goal:expr, $arena:expr, $stores:expr) => {{
-        let _ = ($goal, $stores);
-        $lang::__private::parse_folded($folded, $arena)
     }};
 }
 
@@ -677,9 +660,6 @@ mod tests {
 
     mod fake_lang {
         pub(super) mod __private {
-            pub(crate) fn parse(source: &str, arena: &str) -> String {
-                format!("parse({source}, {arena})")
-            }
             pub(crate) fn parse_into(source: &str, arena: &str, stores: &str) -> String {
                 format!("parse_into({source}, {arena}, {stores})")
             }
@@ -704,9 +684,6 @@ mod tests {
     /// A goalless language (Svelte, CSS): its format-path parse takes no goal at all.
     mod fake_goalless_lang {
         pub(super) mod __private {
-            pub(crate) fn parse_folded(folded: &str, arena: &str) -> String {
-                format!("parse_folded({folded}, {arena})")
-            }
             pub(crate) fn parse_folded_into(folded: &str, arena: &str, stores: &str) -> String {
                 format!("parse_folded_into({folded}, {arena}, {stores})")
             }
@@ -726,11 +703,6 @@ mod tests {
             ),
             "parse_into(src, arena, stores)",
             "`nogoal` must drop the goal and take the goalless entry point"
-        );
-        assert_eq!(
-            parse_ast!(nogoal, nostores, fake_lang, "src", "script", "arena", ()),
-            "parse(src, arena)",
-            "`nostores` must take the store-free entry point"
         );
     }
 
@@ -767,19 +739,6 @@ mod tests {
             "parse_folded_into(folded, arena, stores)",
             "`nogoal` must drop the option and take the goalless entry point"
         );
-        assert_eq!(
-            parse_ast_for_format!(
-                nogoal,
-                nostores,
-                fake_goalless_lang,
-                "folded",
-                None::<&str>,
-                "arena",
-                ()
-            ),
-            "parse_folded(folded, arena)",
-            "`nostores` must take the store-free entry point"
-        );
     }
 
     /// A language whose parse can fail, for the export-body macros: its goal type is `&str`,
@@ -790,8 +749,13 @@ mod tests {
             pub(crate) fn with_stores<R>(f: impl FnOnce(&str) -> R) -> R {
                 f("marker")
             }
-            pub(crate) fn parse(source: &str, _arena: &bumpalo::Bump) -> Result<String, String> {
-                parse_with_goal_into(source, "goalless", "marker")
+            /// The goalless language's parse: into the arena beside the stores.
+            pub(crate) fn parse_into(
+                source: &str,
+                _arena: &bumpalo::Bump,
+                stores: &str,
+            ) -> Result<String, String> {
+                parse_with_goal_into(source, "goalless", stores)
             }
             pub(crate) fn parse_with_goal_into(
                 source: &str,
@@ -845,7 +809,7 @@ mod tests {
         );
         let goalless: Result<String, String> = parse_convert!(
             nogoal,
-            nostores,
+            stores,
             fake_fallible_lang,
             convert,
             "src",
@@ -855,7 +819,7 @@ mod tests {
         assert_eq!(
             goalless,
             Ok(r#"convert(ast(src, "goalless"), src)"#.to_owned()),
-            "`nogoal` takes the goalless entry point"
+            "`nogoal` takes the goalless entry point, with the stores `with_stores` hands over"
         );
     }
 

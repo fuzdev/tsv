@@ -422,6 +422,7 @@ pub(crate) fn parse_declaration<'arena>(
             // the value parser's own recursion, a level a function, counted as it parses
             parser.nesting_room(),
             parser.arena,
+            parser.stores,
         )
         .map_err(|open| parser.too_deep(open as usize))?
     };
@@ -464,7 +465,7 @@ mod tests {
         source: &str,
         arena: &'arena Bump,
     ) -> Result<&'arena [CssBlockChild<'arena>], Error> {
-        let sheet = super::super::parse_css(source, 0, 0, arena)?;
+        let sheet = super::super::parse_css(source, 0, 0, arena, &mut CssStores::new())?;
         match sheet.nodes {
             [CssNode::Rule(rule)] => Ok(rule.declarations),
             nodes => panic!("{source:?}: expected one rule, got {} nodes", nodes.len()),

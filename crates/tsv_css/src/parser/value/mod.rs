@@ -13,7 +13,7 @@ pub(crate) mod parser;
 pub(crate) mod scan;
 pub(super) mod strings;
 
-use crate::ast::CssValue;
+use crate::ast::{CssStores, CssValue};
 use crate::escapes::{ends_with_live_hex_escape, trim_end_preserving_escape, trim_start_css};
 use crate::parser::value::lists::ValueSeparator;
 use bumpalo::Bump;
@@ -51,6 +51,8 @@ use strings::parse_string_literal;
 ///   `operators::split_value_run`). The caller knows it from the property name.
 /// * `room` - the function levels the parse may enter (the depth limit's count, one level
 ///   a function or parenthesized group — [`FunctionLevels`]).
+/// * `stores` - the stylesheet's stores, carried beside `arena` through the value parser's
+///   recursion.
 ///
 /// # Errors
 ///
@@ -66,6 +68,7 @@ pub(super) fn parse_value_from_source<'arena>(
     colon_is_operator: bool,
     room: u32,
     arena: &'arena Bump,
+    stores: &mut CssStores,
 ) -> Result<CssValue<'arena>, u32> {
     let value_str = source_relative_span.extract(source);
     let absolute_start = base_offset + source_relative_span.start;
@@ -112,10 +115,10 @@ pub(super) fn parse_value_from_source<'arena>(
     // parse runs unbounded, as it does outside any value's parse (`FunctionLevels::within`
     // never nests — no value parse reaches the declaration parser).
     if trimmed.len() <= room as usize {
-        return Ok(parser.parse_scanned(arena, class, group_closes_text));
+        return Ok(parser.parse_scanned(arena, stores, class, group_closes_text));
     }
     FunctionLevels::within(room, || {
-        parser.parse_scanned(arena, class, group_closes_text)
+        parser.parse_scanned(arena, stores, class, group_closes_text)
     })
 }
 
@@ -267,6 +270,7 @@ pub(crate) fn parse_single_value<'arena>(
     head_welds: bool,
     group_closes_run: bool,
     arena: &'arena Bump,
+    stores: &mut CssStores,
 ) -> CssValue<'arena> {
     // A whole-run function under a PLAIN name (`var(--a)`, `rgba(0, 0, 0, 0.5)`,
     // `-webkit-gradient(…)`) is one closed token to the splitter by construction: the name
@@ -281,7 +285,7 @@ pub(crate) fn parse_single_value<'arena>(
             operators::split_value_run(s, colon_is_operator, head_welds, arena).is_none(),
             "a plain-name function run splits: {s:?}"
         );
-        return parse_function_leaf(s, span, paren_pos, name, args, arena);
+        return parse_function_leaf(s, span, paren_pos, name, args, arena, stores);
     }
 
     // An operator run is several members, not a leaf — `12px/1.5` is a dimension, a `/`
@@ -308,7 +312,7 @@ pub(crate) fn parse_single_value<'arena>(
                 // verdict against a position the member no longer sits at (the `-` in
                 // `1.5*-` is a whole run of its own here, and a whole-run `-` IS an
                 // operator — see `operators::ValueToken::is_operator`).
-                parse_leaf_value(member, member_span, arena)
+                parse_leaf_value(member, member_span, arena, stores)
             });
         }
         return CssValue::List {
@@ -317,7 +321,7 @@ pub(crate) fn parse_single_value<'arena>(
         };
     }
 
-    parse_leaf_value(s, span, arena)
+    parse_leaf_value(s, span, arena, stores)
 }
 
 /// Classify one already-delimited value token — a string, a function or colour function,
@@ -327,7 +331,12 @@ pub(crate) fn parse_single_value<'arena>(
 /// settled, so it asks nothing about position: a member reaches it straight from the
 /// splitter, and a single-token value reaches it as the whole run. Every classifier
 /// declines an empty `s`, so an empty value is the identifier over its (empty) span.
-fn parse_leaf_value<'arena>(s: &str, span: Span, arena: &'arena Bump) -> CssValue<'arena> {
+fn parse_leaf_value<'arena>(
+    s: &str,
+    span: Span,
+    arena: &'arena Bump,
+    stores: &mut CssStores,
+) -> CssValue<'arena> {
     // String literal
     if let Some(val) = parse_string_literal(s, span, arena) {
         return val;
@@ -364,7 +373,7 @@ fn parse_leaf_value<'arena>(s: &str, span: Span, arena: &'arena Bump) -> CssValu
         && let Some(paren_pos) = bytes.iter().position(|&b| b == b'(')
         && let Some((name, args)) = extract_function_parts(s, paren_pos)
     {
-        return parse_function_leaf(s, span, paren_pos, name, args, arena);
+        return parse_function_leaf(s, span, paren_pos, name, args, arena, stores);
     }
 
     // Hex or named color
@@ -456,6 +465,7 @@ fn parse_function_leaf<'arena>(
     name: &str,
     args: &str,
     arena: &'arena Bump,
+    stores: &mut CssStores,
 ) -> CssValue<'arena> {
     // Try color function first
     if let Some(color) = parse_color_function(name, args) {
@@ -503,7 +513,7 @@ fn parse_function_leaf<'arena>(
     if !FunctionLevels::enter(span.start + paren_pos as u32) {
         return CssValue::Identifier { span };
     }
-    let args = parse_function_arguments(args, args_span, arena);
+    let args = parse_function_arguments(args, args_span, arena, stores);
     FunctionLevels::leave();
     CssValue::Function {
         name_span,
@@ -901,6 +911,7 @@ mod value_span_tests {
             false,
             256,
             &arena,
+            &mut crate::ast::CssStores::new(),
         )
         .expect("within the room")
         .span()

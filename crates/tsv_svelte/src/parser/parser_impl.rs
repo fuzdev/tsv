@@ -1,6 +1,6 @@
 // SvelteParser struct and helper methods
 
-use crate::ast::{self, FragmentNode};
+use crate::ast::{self, FragmentNode, SvelteStores};
 use crate::lexer::{Lexer, Token, TokenKind};
 #[cfg(feature = "_internal_ast_census")]
 use crate::parser::census_vec::BumpVec;
@@ -8,6 +8,7 @@ use crate::parser::element::tag_name_end;
 use bumpalo::Bump;
 #[cfg(not(feature = "_internal_ast_census"))]
 use bumpalo::collections::Vec as BumpVec;
+use tsv_css::ast::CssStores;
 use tsv_lang::store::Run;
 use tsv_lang::{Comment, DepthBudget, DepthLimit, Error, Span};
 use tsv_ts::__private::TopLevelAs;
@@ -53,6 +54,8 @@ pub(crate) struct SvelteParser<'a, 'arena> {
     /// a host check runs during the embedded parse and borrows the whole parser, so the
     /// `&mut` the parse takes has to be out of the parser first.
     stores: Option<&'a mut AstStores>,
+    /// The document's CSS stores, which the top-level `<style>`'s parse takes.
+    pub(crate) css: &'a mut CssStores,
     pub(crate) source: &'a str, // Full original source
     pub(crate) lexer: Lexer<'a>,
     /// The current token, in document coordinates. The lexer writes it in place
@@ -192,7 +195,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     pub(crate) fn new(
         source: &'a str,
         arena: &'arena Bump,
-        stores: &'a mut AstStores,
+        stores: &'a mut SvelteStores,
     ) -> Result<Self, Error> {
         let mut lexer = Lexer::new(source);
         let mut current = Token {
@@ -201,9 +204,11 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             end: 0,
         };
         lexer.next_token_into(&mut current)?;
+        let SvelteStores { ts, css } = stores;
         Ok(Self {
             arena,
-            stores: Some(stores),
+            stores: Some(&mut **ts),
+            css: &mut **css,
             source,
             lexer,
             current,

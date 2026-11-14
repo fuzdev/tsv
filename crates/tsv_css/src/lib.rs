@@ -110,7 +110,8 @@ mod printer;
 mod url;
 mod whitespace;
 
-use __private::{format_folded_in, parse_folded};
+use __private::{format_folded_in, parse_folded_into};
+use ast::CssStores;
 pub use formatter::Formatter;
 pub use tsv_lang::{Error, ErrorKind, ErrorReport, Result, STACK_SIZE, WirePoint, run_with_stack};
 use tsv_lang::{LeadingBom, LineRule, WireCoordinates};
@@ -150,26 +151,32 @@ pub fn format(source: &str) -> Result<String> {
     format_in(
         source,
         &bumpalo::Bump::new(),
+        &mut CssStores::new(),
         tsv_lang::doc::arena::DocArena::for_source,
     )
 }
 
-/// The one format path, shared by [`format()`] and [`Formatter`]: fold, parse into `arena`,
-/// then print into the doc arena `doc_arena` hands over once the parse has succeeded (handed
-/// the folded text, so a fresh one is sized to it and a failed parse never builds one).
-/// Nothing borrowed from either arena escapes: the result is owned.
+/// The one format path, shared by [`format()`] and [`Formatter`]: fold, parse into `arena`
+/// and `stores`, then print into the doc arena `doc_arena` hands over once the parse has
+/// succeeded (handed the folded text, so a fresh one is sized to it and a failed parse never
+/// builds one). Nothing borrowed from either arena or the stores escapes: the result is owned.
 pub(crate) fn format_in<D: std::borrow::Borrow<tsv_lang::doc::arena::DocArena>>(
     source: &str,
     arena: &bumpalo::Bump,
+    stores: &mut CssStores,
     doc_arena: impl FnOnce(&str) -> D,
 ) -> Result<String> {
     // The format path's line-terminator fold, ahead of the parse (see
     // `tsv_lang::printing::normalize_carriage_returns`); `parse` leaves the author's bytes
     // alone so its offsets stay a drop-in contract with `parseCss`'s.
     let folded = tsv_lang::printing::normalize_carriage_returns(source);
-    let stylesheet = parse_folded(&folded, arena)?;
+    let stylesheet = parse_folded_into(&folded, arena, stores)?;
     let doc_arena = doc_arena(folded.text());
-    Ok(format_folded_in(&stylesheet, &folded, doc_arena.borrow()))
+    Ok(format_folded_in(
+        __private::parsed_ref(&stylesheet, stores),
+        &folded,
+        doc_arena.borrow(),
+    ))
 }
 
 /// What [`parse_to_json_with`]'s wire carries. The default is [`parse_to_json`]'s: the

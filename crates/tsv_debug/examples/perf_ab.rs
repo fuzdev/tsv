@@ -8,9 +8,10 @@
 //! against an old tree unchanged: an example is discovered by cargo with no manifest or
 //! subcommand registration to patch, and this one reads nothing but the language crates' hidden
 //! entry points, through its `api` arms (below): the folded parse (`parse_folded`, or
-//! `parse_folded_into` into stores kept warm, by `tsv_ts::__private::WarmStores` or, in an older
-//! tree, by the stores' own `Default` and `park`), the format (`format_folded_in`, through
-//! `parsed_ref` beside the stores), the carriage-return fold and `DocArena`.
+//! `parse_folded_into` into stores kept warm, by each language crate's `__private::WarmStores`
+//! or, in an older tree, by the stores' own `Default` and `park`), the format
+//! (`format_folded_in`, through `parsed_ref` beside the stores), the carriage-return fold and
+//! `DocArena`.
 //! `profile` itself could not be overlaid — it carries every mode the subcommand grew since.
 //! A base tree that lacks one of those entry points fails the build, loudly.
 //!
@@ -26,18 +27,23 @@
 //! calls, its arm becomes the previous generation's (a new `perf_ab_api` value, with the
 //! task's probe for it) and the unmarked arm takes the new calls.
 //!
-//! - The current arm parses TypeScript and Svelte into warm stores through a
-//!   `tsv_ts::__private::WarmStores` handle, which takes them from the previous iteration before
-//!   the timed regions and parks them after, as the CLI's `Formatter` keeps them in a slot it
-//!   owns; the arm names no store type and no lifetime, so its text stays the same while the
-//!   stores change beneath the handle. The TypeScript parse takes the stores alone, the Svelte
-//!   parse the `Bump` beside them, and CSS has no stores and parses into the `Bump` alone.
+//! - The current arm parses every language into warm stores through a handle of the
+//!   language's own crate (`tsv_ts`, `tsv_svelte` and `tsv_css` each have a
+//!   `__private::WarmStores`), which takes them from the previous iteration before the timed
+//!   regions and parks them after, as the CLI's `Formatter` keeps them in a slot it owns; the
+//!   arm names no store type and no lifetime, so its text stays the same while the stores change
+//!   beneath the handles. The TypeScript parse takes the stores alone, the Svelte and CSS
+//!   parses the `Bump` beside them; a Svelte document's handle holds a TypeScript half and a
+//!   CSS half.
+//! - `perf_ab_api = "css_no_stores"`, a tree whose CSS has no stores, parses TypeScript and
+//!   Svelte into stores a `tsv_ts::__private::WarmStores` handle keeps (a Svelte document's
+//!   stores being TypeScript's alone) and CSS into the `Bump` alone.
 //! - `perf_ab_api = "strip_bump"`, a tree whose strip still takes the `Bump` for its edits, calls
-//!   this driver's entry points as the current tree does, so it builds the current arm; only the
+//!   this driver's entry points as a `css_no_stores` tree does, so it builds that arm; only the
 //!   strip driver (`perf_ab_strip.rs`) has an arm of its own for it.
 //! - `perf_ab_api = "no_warm_stores"`, a tree with the stores but no `WarmStores`, parses as the
-//!   current arm does, keeping the stores itself: taken out of an `Option` before the timed
-//!   regions and parked back into it after them.
+//!   `css_no_stores` arm does, keeping the stores itself: taken out of an `Option` before the
+//!   timed regions and parked back into it after them.
 //! - `perf_ab_api = "ts_parse_bump"`, a tree whose TypeScript parse still takes the `Bump`
 //!   beside the stores, parses as `no_warm_stores` does but hands the `Bump` to that parse too.
 //! - `perf_ab_api = "no_stores"`, a tree older than the parse stores, parses every language
@@ -282,10 +288,94 @@ fn time_phases<S, P>(
 /// parked stores, taken before the timed regions and parked after them, so a parse reuses warm
 /// stores as the oldest arm reuses its `Bump`.
 #[cfg(not(any(
+    perf_ab_api = "css_no_stores",
+    perf_ab_api = "strip_bump",
     perf_ab_api = "no_warm_stores",
     perf_ab_api = "ts_parse_bump",
     perf_ab_api = "no_stores"
 )))]
+mod api {
+    use super::{Timed, time_phases};
+    use tsv_lang::doc::arena::DocArena;
+
+    /// The stores parked between iterations, rewound: a handle per language, each its own
+    /// crate's. A run parses one language, so it warms one of them.
+    #[derive(Default)]
+    pub(super) struct Warm {
+        ts: tsv_ts::__private::WarmStores,
+        svelte: tsv_svelte::__private::WarmStores,
+        css: tsv_css::__private::WarmStores,
+    }
+
+    pub(super) fn ts(
+        source: &str,
+        parse_only: bool,
+        _arena: &bumpalo::Bump,
+        doc_arena: &DocArena,
+        warm: &mut Warm,
+    ) -> Timed {
+        warm.ts.with(|stores| {
+            time_phases(
+                source,
+                parse_only,
+                stores,
+                |folded, stores| tsv_ts::__private::parse_folded_into(folded, None, stores),
+                |program, folded, stores| {
+                    let parsed = tsv_ts::__private::parsed_ref(program, stores);
+                    tsv_ts::__private::format_folded_in(parsed, folded, doc_arena)
+                },
+            )
+        })
+    }
+
+    pub(super) fn svelte(
+        source: &str,
+        parse_only: bool,
+        arena: &bumpalo::Bump,
+        doc_arena: &DocArena,
+        warm: &mut Warm,
+    ) -> Timed {
+        warm.svelte.with(|stores| {
+            time_phases(
+                source,
+                parse_only,
+                stores,
+                |folded, stores| tsv_svelte::__private::parse_folded_into(folded, arena, stores),
+                |root, folded, stores| {
+                    let parsed = tsv_svelte::__private::parsed_ref(root, stores);
+                    tsv_svelte::__private::format_folded_in(parsed, folded, doc_arena)
+                },
+            )
+        })
+    }
+
+    pub(super) fn css(
+        source: &str,
+        parse_only: bool,
+        arena: &bumpalo::Bump,
+        doc_arena: &DocArena,
+        warm: &mut Warm,
+    ) -> Timed {
+        warm.css.with(|stores| {
+            time_phases(
+                source,
+                parse_only,
+                stores,
+                |folded, stores| tsv_css::__private::parse_folded_into(folded, arena, stores),
+                |stylesheet, folded, stores| {
+                    let parsed = tsv_css::__private::parsed_ref(stylesheet, stores);
+                    tsv_css::__private::format_folded_in(parsed, folded, doc_arena)
+                },
+            )
+        })
+    }
+}
+
+/// The entry points of a tree whose CSS has no stores: TypeScript and Svelte parse into stores
+/// one `tsv_ts::__private::WarmStores` handle keeps, CSS into the `Bump` alone. A tree whose
+/// strip still takes the `Bump` calls the same entry points here. Built only against such
+/// trees, never against the current one.
+#[cfg(any(perf_ab_api = "css_no_stores", perf_ab_api = "strip_bump"))]
 mod api {
     use super::{Timed, time_phases};
     use tsv_lang::doc::arena::DocArena;
@@ -355,9 +445,9 @@ mod api {
     }
 }
 
-/// The entry points of a tree with the stores but no `WarmStores` handle: as the current arm,
-/// the stores kept in an `Option` of the arm's own. Built only against such a tree, never
-/// against the current one.
+/// The entry points of a tree with the stores but no `WarmStores` handle: as the
+/// `css_no_stores` arm, the stores kept in an `Option` of the arm's own. Built only against
+/// such a tree, never against the current one.
 #[cfg(perf_ab_api = "no_warm_stores")]
 mod api {
     use super::{Timed, time_phases};

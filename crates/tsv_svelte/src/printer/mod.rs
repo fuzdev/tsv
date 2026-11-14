@@ -35,6 +35,7 @@ use smallvec::SmallVec;
 use std::cell::{Cell, OnceCell, RefCell};
 use std::fmt::Write as _;
 use std::ops::{Index, IndexMut};
+use tsv_css::ast::CssView;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::{DocArena, DocId, GroupId};
 use tsv_lang::printing::LineBreaks;
@@ -439,6 +440,8 @@ pub(crate) struct Printer<'a> {
     comments: &'a [Comment],
     /// Reads the expressions of the tree being printed.
     pub(crate) view: AstView<'a>,
+    /// Reads the stores of the top-level `<style>`'s stylesheet, for its format.
+    pub(crate) css_view: CssView<'a>,
     /// Whether any of `comments` is owned by a node (`owned_by_node`). Computed once
     /// per document at construction and handed to `tsv_ts` via `ts_inputs()`, so the
     /// embedded owned-comment path short-circuits per `{expr}` without an O(comments)
@@ -637,14 +640,15 @@ impl<'a> Printer<'a> {
         arena: &'a DocArena,
         source: &'a str,
         comments: &'a [Comment],
-        view: AstView<'a>,
+        stores: &'a ast::SvelteStores,
     ) -> Self {
         let line_breaks = LineBreaks::new(source, arena.take_line_breaks_scratch());
         Self::with_line_breaks(
             arena,
             source,
             comments,
-            view,
+            stores.view(),
+            stores.css_view(),
             EmbedContext::default(),
             line_breaks,
         )
@@ -665,6 +669,7 @@ impl<'a> Printer<'a> {
         source: &'a str,
         comments: &'a [Comment],
         view: AstView<'a>,
+        css_view: CssView<'a>,
         embed: EmbedContext,
         line_breaks: LineBreaks<'a>,
     ) -> Self {
@@ -688,6 +693,7 @@ impl<'a> Printer<'a> {
             source,
             comments,
             view,
+            css_view,
             has_owned_comments,
             has_format_ignore,
             line_breaks,
@@ -1718,6 +1724,7 @@ fn format_root<'a>(
         source,
         &comments,
         parsed.view,
+        parsed.css,
         EmbedContext::default(),
         line_breaks,
     );

@@ -13,7 +13,7 @@ use tsv_cli::json_utils::indent_json_with_tabs;
 pub(crate) enum ParsedInput<'arena> {
     Svelte(tsv_svelte::ast::ParsedRoot<'arena>),
     Ts(tsv_ts::ast::Parsed),
-    Css(tsv_css::ast::CssStyleSheet<'arena>),
+    Css(tsv_css::ast::ParsedCss<'arena>),
 }
 
 /// Parse fixture content once for the parser-side validation phases.

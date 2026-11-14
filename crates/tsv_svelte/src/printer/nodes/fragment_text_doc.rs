@@ -1581,8 +1581,8 @@ mod document_offset_tests {
         let base = 2;
         let doc = &buffer[base..buffer.len() - 2];
         let arena = DocArena::for_source(doc);
-        let stores = tsv_ts::ast::AstStores::new();
-        let printer = Printer::new(&arena, doc, &[], stores.view());
+        let stores = crate::ast::SvelteStores::new();
+        let printer = Printer::new(&arena, doc, &[], &stores);
         for start in 0..=buffer.len() {
             for end in start..=buffer.len() {
                 let Some(slice) = buffer.get(start..end) else {

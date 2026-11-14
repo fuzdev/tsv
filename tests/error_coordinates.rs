@@ -515,8 +515,14 @@ fn an_embedded_parse_error_has_no_point_until_its_host_fills_it() {
             .expect_err("a syntax error");
     assert!(error.position().is_some());
     assert!(error.wire_point().is_none());
-    let error =
-        tsv_css::__private::parse_embedded("a {", 5, 0, &arena).expect_err("a syntax error");
+    let error = tsv_css::__private::parse_embedded(
+        "a {",
+        5,
+        0,
+        &arena,
+        &mut tsv_css::ast::CssStores::new(),
+    )
+    .expect_err("a syntax error");
     assert!(error.position().is_some());
     assert!(error.wire_point().is_none());
 }

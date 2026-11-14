@@ -149,36 +149,63 @@ test('the strip entry point is found in each of its spellings, and nothing else'
 /** A tsv_ts manifest that depends on `bumpalo`, as every tree older than the current one's does. */
 const BUMPALO_MANIFEST = '[dependencies]\ntsv_lang.workspace = true\nbumpalo.workspace = true\n';
 
-/** Commit `private_rs` as a scratch repo's `crates/tsv_ts/src/__private.rs` and `manifest` as its
- * `crates/tsv_ts/Cargo.toml`, and ask which entry-point generation the drivers build against for
- * the tree. */
+/** A tsv_css `__private.rs` whose parse takes the `Bump` alone, as every tree older than the
+ * current one's does. */
+const CSS_WITHOUT_STORES = "pub fn parse_folded<'arena>(\n    arena: &'arena Bump,\n) {}\n";
+
+/** Commit `private_rs` as a scratch repo's `crates/tsv_ts/src/__private.rs`, `manifest` as its
+ * `crates/tsv_ts/Cargo.toml` and `css_private_rs` as its `crates/tsv_css/src/__private.rs`, and
+ * ask which entry-point generation the drivers build against for the tree. */
 const driver_api_with = async (
 	dir: FsDir,
 	private_rs: string,
-	manifest = BUMPALO_MANIFEST
+	manifest = BUMPALO_MANIFEST,
+	css_private_rs = CSS_WITHOUT_STORES
 ): Promise<string | null> => {
 	await dir.write('crates/tsv_ts/src/__private.rs', private_rs);
 	await dir.write('crates/tsv_ts/Cargo.toml', manifest);
+	await dir.write('crates/tsv_css/src/__private.rs', css_private_rs);
 	await run_git(dir, ['add', '-A']);
 	return (await tree_driver_api(make_git(), dir, await run_git(dir, ['write-tree']))).cfg;
 };
 
-test('a tree whose tsv_ts takes no bumpalo is the current generation, then the warm handle, then no Bump in the TypeScript parse, then the warm parse alone, any other the oldest', async () => {
+test('a tree whose CSS parses into stores is the current generation, then a tsv_ts that takes no bumpalo, then the warm handle, then no Bump in the TypeScript parse, then the warm parse alone, any other the oldest', async () => {
 	clear_git_repo_env();
 	await using dir = await fs.temp_dir('perf_ab_test-');
 	await run_git(dir, ['init', '--quiet']);
 	await dir.mkdir('crates/tsv_ts/src', { recursive: true });
+	await dir.mkdir('crates/tsv_css/src', { recursive: true });
 	const body =
 		'    folded.parse_with(|text| parse_with_goal_or_fallback_into(text, goal, stores))\n';
 	const no_bump = `pub fn parse_folded_into<'arena>(\n    goal: Option<Goal>,\n) {\n${body}}\n`;
 	const handle = "pub struct WarmStores {\n    parked: Option<AstStores<'static>>,\n}\n";
 	const free = '[dependencies]\ntsv_lang.workspace = true\nsmallvec.workspace = true\n';
-	strictEqual(await driver_api_with(dir, `${handle}${no_bump}`, free), null);
+	// the CSS warm parse answers first, in either spelling of its declaration, whatever the
+	// rest of the tree holds
+	const css_stores = "pub fn parse_folded_into<'arena>(\n    stores: &mut CssStores,\n) {}\n";
+	strictEqual(await driver_api_with(dir, `${handle}${no_bump}`, free, css_stores), null);
+	const css_lifetime_free = 'pub fn parse_folded_into(\n    stores: &mut CssStores,\n) {}\n';
+	strictEqual(await driver_api_with(dir, handle, free, css_lifetime_free), null);
+	strictEqual(await driver_api_with(dir, handle, BUMPALO_MANIFEST, css_stores), null);
+	// a comment or a lookalike naming it does not
+	const css_mentioned =
+		"// pub fn parse_folded_into<'arena>(\n/// pub fn parse_folded_into(\npub fn parse_folded_into_arena() {}\n";
+	strictEqual(
+		await driver_api_with(dir, `${handle}${no_bump}`, free, css_mentioned),
+		'css_no_stores'
+	);
+	strictEqual(await driver_api_with(dir, `${handle}${no_bump}`, free), 'css_no_stores');
 	// the manifest answers, whatever the strip's body spells
 	const respelled = '    let mut walk = Walk::new(source, Mode::Strip, view);\n';
-	strictEqual(await driver_api_with(dir, `${handle}${respelled}`, free), null);
-	strictEqual(await driver_api_with(dir, handle, `# bumpalo.workspace = true\n${free}`), null);
-	strictEqual(await driver_api_with(dir, handle, `${free}bumpalo_x.workspace = true\n`), null);
+	strictEqual(await driver_api_with(dir, `${handle}${respelled}`, free), 'css_no_stores');
+	strictEqual(
+		await driver_api_with(dir, handle, `# bumpalo.workspace = true\n${free}`),
+		'css_no_stores'
+	);
+	strictEqual(
+		await driver_api_with(dir, handle, `${free}bumpalo_x.workspace = true\n`),
+		'css_no_stores'
+	);
 	strictEqual(await driver_api_with(dir, `${handle}${respelled}`), 'strip_bump');
 	// a manifest with no line is no evidence of the current generation
 	strictEqual(await driver_api_with(dir, handle, ''), 'strip_bump');

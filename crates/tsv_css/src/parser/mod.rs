@@ -14,7 +14,7 @@ mod selectors;
 mod value;
 pub(crate) use value::operators::is_whole_value_block;
 
-use crate::ast::{Comment, CssNode, CssStyleSheet};
+use crate::ast::{Comment, CssNode, CssStores, CssStyleSheet};
 use crate::lexer::{Lexer, Token, TokenKind};
 use bumpalo::Bump;
 #[cfg(not(feature = "_internal_ast_census"))]
@@ -61,6 +61,9 @@ pub(crate) struct CssParser<'a, 'arena> {
     /// `self.bvec()` and strings via `self.alloc_str_in()` (CSS has no single-node
     /// `alloc` — every node lands in a child slice).
     pub(crate) arena: &'arena Bump,
+    /// The stylesheet's stores, handed to the value parser beside the arena. Nothing mints
+    /// from them: every node, list and string this parser builds lands in `arena`.
+    pub(crate) stores: &'a mut CssStores,
     /// A declaration located and measured speculatively by the rule/declaration
     /// disambiguation scan — its head and its value's facts — for the `parse_declaration`
     /// that immediately follows to take instead of lexing its head and re-walking its value.
@@ -80,6 +83,7 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
         base_offset: usize,
         host_nesting: u32,
         arena: &'arena Bump,
+        stores: &'a mut CssStores,
     ) -> Result<Self, Error> {
         // The lexer scans `source` (the island) but reports errors against the document
         // it sits in, so it carries the same `base_offset` the spans below are shifted by.
@@ -99,6 +103,7 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
             depth: DepthBudget::at(host_nesting),
             comments: Vec::new(),
             arena,
+            stores,
             speculative_declaration: Cell::new(None),
         })
     }
@@ -1087,8 +1092,9 @@ pub(crate) fn parse_css<'arena>(
     base_offset: usize,
     host_nesting: u32,
     arena: &'arena Bump,
+    stores: &mut CssStores,
 ) -> Result<CssStyleSheet<'arena>, Error> {
-    let mut parser = CssParser::new(source, base_offset, host_nesting, arena)?;
+    let mut parser = CssParser::new(source, base_offset, host_nesting, arena, stores)?;
     parser.parse()
 }
 
@@ -1114,7 +1120,9 @@ mod tests {
         ];
         for (source, expected) in cases {
             let arena = Bump::new();
-            let parser = CssParser::new(source, 0, 0, &arena).expect("test source lexes");
+            let mut stores = CssStores::new();
+            let parser =
+                CssParser::new(source, 0, 0, &arena, &mut stores).expect("test source lexes");
             assert_eq!(parser.current_kind(), TokenKind::Identifier, "{source:?}");
             assert_eq!(
                 parser.current_identifier_is_custom_property(),

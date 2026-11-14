@@ -4,14 +4,13 @@
 
 use super::*;
 
-use crate::ast::ParsedRootRef;
+use crate::ast::{ParsedRootRef, SvelteStores};
+/// A document's stores, their per-thread parking through the slots `tsv_ts` and `tsv_css`
+/// own, and the slot a caller owns.
+pub use crate::ast::{WarmStores, park_stores, take_stores, with_stores};
 /// The Svelte-shaped HTML answers `tsv_svelte_compile` and `tsv_debug` read — the crate's own
 /// `html` module, where each item's doc says where it departs from the spec.
 pub use crate::html::{is_mathml_element, is_svg_element, preserves_whitespace};
-/// [`tsv_ts`]'s per-thread parked stores: a Svelte document's stores are TypeScript's, one
-/// instance across its islands.
-pub use tsv_ts::__private::with_stores;
-use tsv_ts::ast::AstStores;
 
 /// Parse a document the format path folded (`tsv_lang::printing::normalize_carriage_returns`)
 /// — the parse every Svelte format entry point runs: the CLI, the bindings' `parse_format!`
@@ -42,7 +41,7 @@ pub fn parse_folded<'arena>(
 pub fn parse_folded_into<'arena>(
     folded: &tsv_lang::printing::FoldedSource<'_>,
     arena: &'arena bumpalo::Bump,
-    stores: &mut AstStores,
+    stores: &mut SvelteStores,
 ) -> Result<Root<'arena>> {
     if folded.folded_lone_cr() {
         refuse_lone_cr_in_tag_line_comment(folded.original(), arena)?;
@@ -54,19 +53,20 @@ pub fn parse_folded_into<'arena>(
 #[inline]
 pub fn parsed_ref<'a, 'arena: 'a>(
     root: &'a Root<'arena>,
-    stores: &'a AstStores,
+    stores: &'a SvelteStores,
 ) -> ParsedRootRef<'a> {
     ParsedRootRef {
         root,
         view: stores.view(),
+        css: stores.css_view(),
     }
 }
 
 /// A one-shot parse: `parse` over fresh stores, bundled with the tree it built.
 fn parsed<'arena>(
-    parse: impl FnOnce(&mut AstStores) -> Result<Root<'arena>>,
+    parse: impl FnOnce(&mut SvelteStores) -> Result<Root<'arena>>,
 ) -> Result<ParsedRoot<'arena>> {
-    let mut stores = AstStores::new();
+    let mut stores = SvelteStores::new();
     let root = parse(&mut stores)?;
     Ok(ParsedRoot { root, stores })
 }
@@ -139,9 +139,9 @@ pub fn format_ast_in<'a>(
 /// # Arguments
 ///
 /// * `source` - The Svelte component source code to parse
-/// * `arena` - The bump arena that owns the parsed graph (the template AST plus
-///   the embedded TS `<script>`/`{expr}` ASTs, which share this one `Bump`); the
-///   returned `Root<'arena>` borrows from it (caller-owns-`Bump`).
+/// * `arena` - The bump arena that owns the template AST and the embedded `<style>`
+///   stylesheet; the returned `Root<'arena>` borrows from it (caller-owns-`Bump`). The
+///   embedded TS `<script>`/`{expr}` ASTs live in the returned stores.
 ///
 /// # Returns
 ///
@@ -165,7 +165,7 @@ pub fn parse<'arena>(source: &str, arena: &'arena bumpalo::Bump) -> Result<Parse
 pub fn parse_into<'arena>(
     source: &str,
     arena: &'arena bumpalo::Bump,
-    stores: &mut AstStores,
+    stores: &mut SvelteStores,
 ) -> Result<Root<'arena>> {
     Error::ensure_source_fits(source)?;
     parser::parse_svelte(source, arena, stores)
@@ -180,7 +180,7 @@ pub fn parse_into<'arena>(
 ///
 /// As [`crate::parse_imports`].
 pub fn parse_imports_in(source: &str, arena: &bumpalo::Bump) -> Result<Imports> {
-    parse_imports_into(source, arena, &mut AstStores::new())
+    parse_imports_into(source, arena, &mut SvelteStores::new())
 }
 
 /// [`parse_imports_in`] into a caller's `stores`, for a warm path that keeps them across
@@ -192,7 +192,7 @@ pub fn parse_imports_in(source: &str, arena: &bumpalo::Bump) -> Result<Imports> 
 pub fn parse_imports_into(
     source: &str,
     arena: &bumpalo::Bump,
-    stores: &mut AstStores,
+    stores: &mut SvelteStores,
 ) -> Result<Imports> {
     let root = parse_into(source, arena, stores)?;
     let mut scripts = [root.instance, root.module];

@@ -138,7 +138,10 @@ impl<'a> Printer<'a> {
             // to its own string; only doc-node storage is shared, and the arena is
             // not reset, so the host's in-flight nodes stay valid.
             let formatted_css = tsv_css::__private::format_embedded_in(
-                &style.css_stylesheet,
+                tsv_css::ast::CssParsedRef {
+                    stylesheet: &style.css_stylesheet,
+                    view: self.css_view,
+                },
                 self.source(),
                 self.line_table(),
                 embed,

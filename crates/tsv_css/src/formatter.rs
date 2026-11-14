@@ -1,23 +1,26 @@
 //! [`Formatter`]: [`format()`](crate::format) over arenas kept warm across calls.
 
+use crate::ast::WarmStores;
 use crate::{Result, format_in};
 use tsv_lang::doc::arena::DocArena;
 
 /// Formats many CSS sources on one thread, reusing its allocations from one source to the
 /// next.
 ///
-/// [`format()`](crate::format) allocates a fresh AST arena and a fresh doc arena for every
-/// call and drops both before returning. A `Formatter` owns the pair and rewinds them
-/// instead: each rewind keeps the largest block it has grown, so after the first few
-/// sources the work allocates almost nothing new — the shape of a driver that formats a
-/// directory, or an editor that formats on every save. The output is exactly
-/// [`format()`](crate::format)'s for the same source.
+/// [`format()`](crate::format) allocates a fresh AST arena, doc arena and stores for every
+/// call and drops them before returning. A `Formatter` owns all three and rewinds them
+/// instead, keeping what they have grown (the AST arena keeps its largest block, the doc
+/// arena and the stores their whole capacity), so after the first few sources the work
+/// allocates almost nothing new — the shape of a driver that formats a directory, or an
+/// editor that formats on every save. The output is exactly [`format()`](crate::format)'s for
+/// the same source.
 ///
 /// **The arenas rewind at the start of every call**, so nothing one call leaves behind
 /// reaches the next — including a call that never returned because it panicked and the
-/// panic was caught: the next call starts from a clean arena all the same. The AST arena
+/// panic was caught: the next call starts from a clean arena all the same, and from new
+/// stores, the old ones having been out of the `Formatter` while the call ran. The AST arena
 /// is rewound once more as each call returns, which releases every block but the largest
-/// while the `Formatter` sits idle.
+/// while the `Formatter` sits idle; the stores keep their capacity.
 ///
 /// Catching that panic takes [`std::panic::AssertUnwindSafe`] around the call — a closure
 /// borrowing the `Formatter` mutably is not [`UnwindSafe`](std::panic::UnwindSafe) — and the
@@ -41,6 +44,8 @@ use tsv_lang::doc::arena::DocArena;
 pub struct Formatter {
     ast: bumpalo::Bump,
     doc: DocArena,
+    /// The stores between calls, out of the slot while one runs.
+    stores: WarmStores,
 }
 
 impl Formatter {
@@ -50,6 +55,7 @@ impl Formatter {
         Self {
             ast: bumpalo::Bump::new(),
             doc: DocArena::new(),
+            stores: WarmStores::default(),
         }
     }
 
@@ -63,7 +69,10 @@ impl Formatter {
         // a panic out of the previous call left these arenas mid-document.
         self.ast.reset();
         self.doc.reset();
-        let formatted = format_in(source, &self.ast, |_| &self.doc);
+        let (ast, doc) = (&self.ast, &self.doc);
+        let formatted = self
+            .stores
+            .with(|stores| format_in(source, ast, stores, |_| doc));
         // Nothing borrowed from the AST arena outlives `format_in`, so it can rewind now,
         // keeping one block rather than every block the document grew. The doc arena's
         // rewind frees nothing (its stores keep their capacity), so it waits for the next

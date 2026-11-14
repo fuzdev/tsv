@@ -34,13 +34,13 @@ pub(crate) use expression_tag::scan_to_matching_brace;
 
 /// Parse a Svelte file and return a Root AST node.
 ///
-/// `arena` owns the entire parsed graph (the template AST plus the embedded TS
-/// `<script>`/`{expr}` ASTs, which share this one `Bump`); the returned
-/// `Root<'arena>` borrows from it.
+/// `arena` owns the template AST and the embedded `<style>` stylesheet, which the returned
+/// `Root<'arena>` borrows from it; the embedded TS `<script>`/`{expr}` ASTs are written to
+/// the TypeScript half of `stores`.
 pub(crate) fn parse_svelte<'arena>(
     source: &str,
     arena: &'arena bumpalo::Bump,
-    stores: &mut tsv_ts::ast::AstStores,
+    stores: &mut SvelteStores,
 ) -> Result<Root<'arena>, Error> {
     let mut parser = SvelteParser::new(source, arena, stores)?;
     parser.parse_root()

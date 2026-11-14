@@ -149,6 +149,12 @@ fn write_array_open<T, const N: usize>(
 #[derive(Clone, Copy)]
 struct Ctx<'a> {
     source: &'a str,
+    /// Reads what the stores of the tree being written hold.
+    #[expect(
+        dead_code,
+        reason = "the tree's lists and strings live in the arena, so no reader resolves a handle"
+    )]
+    view: ast::CssView<'a>,
     positions: WirePositions<'a>,
     /// Whether to attach `parseCss()` `metadata` (standalone `.css`) or omit it
     /// (embedded `<style>`). Precomputed once — the two shapes are otherwise the
@@ -214,18 +220,19 @@ impl Ctx<'_> {
 /// the coordinates `crate::WIRE_COORDINATES` states. (An embedded `<style>` takes the
 /// Svelte writer's positions.)
 pub(crate) fn write_stylesheet_file_bytes(
-    stylesheet: &ast::CssStyleSheet<'_>,
+    parsed: ast::CssParsedRef<'_>,
     source: &str,
     wire: Wire,
 ) -> Vec<u8> {
     let tables = WireTables::new(source, crate::WIRE_COORDINATES, wire);
     let ctx = Ctx {
         source,
+        view: parsed.view,
         positions: tables.positions(),
         has_metadata: true,
     };
     let mut w = JsonWriter::with_capacity(tsv_lang::estimated_json_capacity(source.len(), wire));
-    write_stylesheet_file(&mut w, stylesheet, &ctx);
+    write_stylesheet_file(&mut w, parsed.stylesheet, &ctx);
     w.into_bytes()
 }
 
@@ -235,18 +242,20 @@ pub(crate) fn write_stylesheet_file_bytes(
 /// wire puts those two arrays side by side. `positions` must be the host
 /// document's (spans are in host-file coordinates, and the line table is the
 /// Svelte document's).
-pub fn write_css_children(
+pub fn write_css_children<'a>(
     w: &mut JsonWriter,
-    stylesheet: &ast::CssStyleSheet<'_>,
+    stylesheet: impl Into<ast::CssParsedRef<'a>>,
     source: &str,
     positions: WirePositions<'_>,
 ) -> CssComments {
+    let parsed = stylesheet.into();
     let ctx = Ctx {
         source,
+        view: parsed.view,
         positions,
         has_metadata: false,
     };
-    write_children(w, stylesheet, &ctx)
+    write_children(w, parsed.stylesheet, &ctx)
 }
 
 /// Emit the `comments` array `write_css_children` collected. Split from it
@@ -257,12 +266,7 @@ pub fn write_css_comments(
     source: &str,
     positions: WirePositions<'_>,
 ) {
-    let ctx = Ctx {
-        source,
-        positions,
-        has_metadata: false,
-    };
-    write_comments(w, comments, &ctx);
+    write_comments(w, comments, source, positions);
 }
 
 /// A dynamic string value, escaped byte-identical to `serde_json`: one shared out-of-line
@@ -290,7 +294,7 @@ fn write_stylesheet_file(w: &mut JsonWriter, stylesheet: &ast::CssStyleSheet<'_>
     w.raw(",\"children\":");
     let comments = write_children(w, stylesheet, ctx);
     w.raw(",\"comments\":");
-    write_comments(w, &comments, ctx);
+    write_comments(w, &comments, ctx.source, ctx.positions);
     w.raw("}");
 }
 
@@ -341,14 +345,21 @@ fn write_children(
     CssComments(out)
 }
 
-fn write_comments(w: &mut JsonWriter, comments: &CssComments, ctx: &Ctx<'_>) {
+/// Emit `comments` as the wire's `CSSComment` array. It reads no tree, only the run the
+/// `children` walk gathered, so it takes the source and the positions and no view.
+fn write_comments(
+    w: &mut JsonWriter,
+    comments: &CssComments,
+    source: &str,
+    positions: WirePositions<'_>,
+) {
     write_array(w, &comments.0, |w, c| {
         // `value` is the comment's interior — Svelte's `read_comment` reads it
         // between the delimiters it has already eaten.
         let interior = Span::new(c.span.start + 2, c.span.end - 2);
         w.raw("{\"type\":\"CSSComment\",\"value\":");
-        write_string(w, interior.extract(ctx.source));
-        w.span_start_end_field(ctx.positions, c.span.start, c.span.end);
+        write_string(w, interior.extract(source));
+        w.span_start_end_field(positions, c.span.start, c.span.end);
         if let Some(position) = c.position {
             w.raw(",\"position\":");
             w.u32(position);

@@ -5,6 +5,7 @@
 
 #[cfg(feature = "json")]
 pub(crate) mod convert;
+mod stores;
 
 // Svelte internal AST types
 //
@@ -21,17 +22,18 @@ pub(crate) mod convert;
 // `<style>` AST, which shares the same `Bump`, are one bump-allocated graph,
 // freed wholesale when the `Bump` drops. `Style` holds a `CssStyleSheet<'arena>`
 // borrowing that shared arena. The embedded TypeScript (`<script>`, `{expr}`)
-// lives in the document's `tsv_ts` stores instead, named here by id.
+// lives in the TypeScript half of the document's stores (`SvelteStores`) instead,
+// named here by id; the stores' CSS half is the top-level `<style>`'s.
 // Leaf nodes that hold only `Span`/primitives carry no lifetime
 // (`HtmlComment`, `Text`, `SvelteOptions`, the `*Tag`-with-no-expression nodes).
 
 use std::borrow::Cow;
 
-use tsv_css::ast::CssStyleSheet;
+pub use stores::{SvelteStores, WarmStores, park_stores, take_stores, with_stores};
+use tsv_css::ast::{CssStyleSheet, CssView};
 pub use tsv_lang::{Comment, Span};
 use tsv_ts::ast::{
-    AstStores, AstView, ExprId, Expression, Program, Run, TSTypeParameterDeclaration,
-    VariableDeclaration,
+    AstView, ExprId, Expression, Program, Run, TSTypeParameterDeclaration, VariableDeclaration,
 };
 
 /// A parsed Svelte document and the stores its handles index.
@@ -42,26 +44,35 @@ use tsv_ts::ast::{
 pub struct ParsedRoot<'arena> {
     /// The tree.
     pub root: Root<'arena>,
-    /// The stores the tree's handles index, one instance across the document's islands.
-    pub stores: AstStores,
+    /// The stores the tree's handles index: the TypeScript half one instance across the
+    /// document's islands, the CSS half its top-level `<style>`'s.
+    pub stores: SvelteStores,
 }
 
 impl<'arena> ParsedRoot<'arena> {
-    /// The view reading this tree's stores.
+    /// The view reading the TypeScript half of this tree's stores.
     #[inline]
     pub fn view(&self) -> AstView<'_> {
         self.stores.view()
     }
+
+    /// The view reading the CSS half of this tree's stores.
+    #[inline]
+    pub fn css_view(&self) -> CssView<'_> {
+        self.stores.css_view()
+    }
 }
 
-/// A document as a reading entry point takes it: the tree and the view its edges resolve
+/// A document as a reading entry point takes it: the tree and the views its edges resolve
 /// through.
 #[derive(Clone, Copy)]
 pub struct ParsedRootRef<'a> {
     /// The tree.
     pub root: &'a Root<'a>,
-    /// The view over the stores the tree's edges index.
+    /// The view over the TypeScript stores the tree's edges index.
     pub view: AstView<'a>,
+    /// The view over the CSS stores the top-level `<style>`'s stylesheet indexes.
+    pub css: CssView<'a>,
 }
 
 impl<'a, 'arena: 'a> From<&'a ParsedRoot<'arena>> for ParsedRootRef<'a> {
@@ -70,6 +81,7 @@ impl<'a, 'arena: 'a> From<&'a ParsedRoot<'arena>> for ParsedRootRef<'a> {
         ParsedRootRef {
             root: &parsed.root,
             view: parsed.view(),
+            css: parsed.css_view(),
         }
     }
 }

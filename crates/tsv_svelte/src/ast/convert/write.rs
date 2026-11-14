@@ -163,6 +163,7 @@ pub(crate) fn write_root_bytes(
         source,
         positions: tables.positions(),
         view: parsed.view,
+        css: parsed.css,
         snippet_wire_parameters: root.snippet_wire_parameters,
         comments: &template_comments,
         // Component-global: `lang="ts"` on any script makes *every* script emit the
@@ -181,6 +182,8 @@ struct Ctx<'a> {
     source: &'a str,
     /// Reads the expressions of the tree being written.
     view: tsv_ts::ast::AstView<'a>,
+    /// Reads the stores of the top-level `<style>`'s stylesheet, for its children's walk.
+    css: tsv_css::ast::CssView<'a>,
     /// The document's positions: the byte→UTF-16 map, and — on the wire that carries
     /// `loc` — its one line table, which every node, `name_loc`, root comment,
     /// embedded island and `<style>` node reads.
@@ -1654,7 +1657,15 @@ fn write_style_sheet(
     w.raw(",\"attributes\":");
     write_value_attributes(w, style.attributes, ctx);
     w.raw(",\"children\":");
-    let css_comments = write_css_children(w, &style.css_stylesheet, ctx.source, ctx.positions);
+    let css_comments = write_css_children(
+        w,
+        tsv_css::ast::CssParsedRef {
+            stylesheet: &style.css_stylesheet,
+            view: ctx.css,
+        },
+        ctx.source,
+        ctx.positions,
+    );
     w.raw(",\"comments\":");
     write_css_comments(w, &css_comments, ctx.source, ctx.positions);
     w.raw(",\"content\":{\"start\":");

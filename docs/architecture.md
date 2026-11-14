@@ -496,7 +496,7 @@ Script/style tag content is extracted by **raw byte scanning** for closing delim
 
 ### Multi-Language Embedding
 
-Every embedded region shares the Svelte document's allocations — the TypeScript islands its one set of `AstStores`, the markup and `<style>` its one bump arena; each embedded region gets a fresh parser instance. There is no shared symbol table — all names are span-identity, recovered from source.
+Every embedded region shares the Svelte document's allocations — the TypeScript islands its one set of `AstStores`, the markup and `<style>` its one bump arena, the top-level `<style>` also the document's `CssStores` (the two store sets are the halves of the document's `SvelteStores`); each embedded region gets a fresh parser instance. There is no shared symbol table — all names are span-identity, recovered from source.
 
 Embedded parsers track `base_offset` so spans are absolute positions in the root source, not relative to tag content. Standalone parsing passes `base_offset = 0`.
 
@@ -1029,7 +1029,14 @@ pub enum StatementKind {
 
 A TypeScript parse returns the tree with the stores it wrote (`parse(source)` → `Parsed`, or
 `*_into` a caller's warm stores); a CSS or Svelte caller owns the arena
-(`parse(source, &arena)`), and the returned AST borrows it. `format`/`convert` consume either
+(`parse(source, &arena)`), and the returned AST borrows it, bundled with its stores as well
+(`ParsedCss`, `ParsedRoot`, or `*_into` a caller's): `CssStores`, a text pool no parse writes
+to while the CSS tree lives in the arena, and `SvelteStores`, a TypeScript half and a CSS half.
+Each language crate parks its stores per thread, boxed, between documents (`with_stores`, which
+`tsv_arena`'s macros run every binding export under, and `WarmStores` for a slot the caller
+owns, as each `Formatter` does); a Svelte document's halves are the boxes `tsv_ts`'s and
+`tsv_css`'s slots hand over, so a thread parks one TypeScript store set and one CSS store set
+whatever mix of languages it parses. `format`/`convert` consume either
 into an owned `String`/JSON, so nothing borrowed escapes the call (no self-referential
 ownership — `unsafe_code = "forbid"`, safe bumpalo API only). Identifier and
 element/attribute names are **span-identity** — recovered from `source[span]` at each

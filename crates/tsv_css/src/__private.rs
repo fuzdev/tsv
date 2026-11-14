@@ -3,7 +3,10 @@
 //! nothing here is covered by semver, and any item may change or go away in any release.
 
 use super::*;
-use crate::ast::CssStyleSheet;
+use crate::ast::{CssParsedRef, CssStores, CssStyleSheet, ParsedCss};
+/// The stores' per-thread parking and the slot a caller owns (`tsv_arena`'s macros, the
+/// Svelte host and the `Formatter`s reach them here).
+pub use crate::ast::{WarmStores, park_stores, take_stores, with_stores};
 
 /// [`parse`] over a document the format path folded
 /// (`tsv_lang::printing::normalize_carriage_returns`) — the parse every CSS format entry
@@ -15,8 +18,38 @@ use crate::ast::CssStyleSheet;
 pub fn parse_folded<'arena>(
     folded: &tsv_lang::printing::FoldedSource<'_>,
     arena: &'arena bumpalo::Bump,
+) -> Result<ParsedCss<'arena>> {
+    parsed(|stores| parse_folded_into(folded, arena, stores))
+}
+
+/// [`parse_folded`] into a caller's `stores`.
+pub fn parse_folded_into<'arena>(
+    folded: &tsv_lang::printing::FoldedSource<'_>,
+    arena: &'arena bumpalo::Bump,
+    stores: &mut CssStores,
 ) -> Result<CssStyleSheet<'arena>> {
-    folded.parse_with(|text| parse(text, arena))
+    folded.parse_with(|text| parse_into(text, arena, stores))
+}
+
+/// A warm parse's tree as a reading entry point takes it, read through `stores`.
+#[inline]
+pub fn parsed_ref<'a, 'arena: 'a>(
+    stylesheet: &'a CssStyleSheet<'arena>,
+    stores: &'a CssStores,
+) -> CssParsedRef<'a> {
+    CssParsedRef {
+        stylesheet,
+        view: stores.view(),
+    }
+}
+
+/// A one-shot parse: `parse` over fresh stores, bundled with the tree it built.
+fn parsed<'arena>(
+    parse: impl FnOnce(&mut CssStores) -> Result<CssStyleSheet<'arena>>,
+) -> Result<ParsedCss<'arena>> {
+    let mut stores = CssStores::new();
+    let stylesheet = parse(&mut stores)?;
+    Ok(ParsedCss { stylesheet, stores })
 }
 
 /// Parse embedded CSS source into internal AST
@@ -35,7 +68,8 @@ pub fn parse_folded<'arena>(
 /// * `Err(Error)` - Parse error positioned in the parent file
 ///
 /// `arena` owns the returned AST's nodes (shared with the host document's arena
-/// when CSS is embedded in a Svelte `<style>`).
+/// when CSS is embedded in a Svelte `<style>`), and `stores` are the host document's CSS
+/// stores, or the caller's own for a stylesheet it parses apart from the document's.
 ///
 /// # Errors
 ///
@@ -48,20 +82,21 @@ pub fn parse_embedded<'arena>(
     base_offset: usize,
     host_nesting: u32,
     arena: &'arena bumpalo::Bump,
+    stores: &mut CssStores,
 ) -> Result<CssStyleSheet<'arena>> {
-    parser::parse_css(source, base_offset, host_nesting, arena)
+    parser::parse_css(source, base_offset, host_nesting, arena, stores)
 }
 
 /// [`format_ast_in`] over a document the caller folded ahead of the parse
 /// (`tsv_lang::printing::normalize_carriage_returns`) — the format entry points that fold
 /// (the CLI, the bindings, [`format()`]). Identical output; the document's line verdict
 /// comes from the fold's own pass instead of a second walk of the source.
-pub fn format_folded_in(
-    stylesheet: &CssStyleSheet<'_>,
+pub fn format_folded_in<'a>(
+    stylesheet: impl Into<CssParsedRef<'a>>,
     folded: &tsv_lang::printing::FoldedSource<'_>,
     arena: &tsv_lang::doc::arena::DocArena,
 ) -> String {
-    printer::format_css_folded_in(stylesheet, folded, arena)
+    printer::format_css_folded_in(stylesheet.into(), folded, arena)
 }
 
 /// Format an embedded CSS stylesheet into a caller-provided doc arena.
@@ -81,15 +116,22 @@ pub fn format_folded_in(
 ///
 /// There is no fresh-arena twin: an embedded stylesheet always has a host arena to lend,
 /// and the Svelte host is the only caller.
-pub fn format_embedded_in(
-    stylesheet: &CssStyleSheet<'_>,
+pub fn format_embedded_in<'a>(
+    stylesheet: impl Into<CssParsedRef<'a>>,
     source: &str,
     line_table: tsv_lang::printing::LineTable<'_>,
     embed: tsv_lang::EmbedContext,
     host_scan: HostBoundaryScan,
     arena: &tsv_lang::doc::arena::DocArena,
 ) -> String {
-    printer::format_css_embedded_in(stylesheet, source, line_table, embed, host_scan, arena)
+    printer::format_css_embedded_in(
+        stylesheet.into(),
+        source,
+        line_table,
+        embed,
+        host_scan,
+        arena,
+    )
 }
 
 /// A host document's answer to the CSS printer's boundary-whitespace precondition — whether
@@ -144,8 +186,8 @@ pub use crate::ast::convert::{write_css_children, write_css_comments};
 /// let formatted = format_ast(&stylesheet, css);
 /// assert_eq!(formatted, "div {\n\tcolor: red;\n}\n");
 /// ```
-pub fn format_ast(stylesheet: &CssStyleSheet<'_>, source: &str) -> String {
-    printer::format_css(stylesheet, source)
+pub fn format_ast<'a>(stylesheet: impl Into<CssParsedRef<'a>>, source: &str) -> String {
+    printer::format_css(stylesheet.into(), source)
 }
 
 /// Format into a caller-provided doc arena.
@@ -156,12 +198,12 @@ pub fn format_ast(stylesheet: &CssStyleSheet<'_>, source: &str) -> String {
 /// of a freshly allocated one, so a driver that formats many files can reuse one
 /// arena across them (`arena.reset()` between files retains the buffers). Nothing
 /// borrowed from `arena` escapes — the result is an owned `String`.
-pub fn format_ast_in(
-    stylesheet: &CssStyleSheet<'_>,
+pub fn format_ast_in<'a>(
+    stylesheet: impl Into<CssParsedRef<'a>>,
     source: &str,
     arena: &tsv_lang::doc::arena::DocArena,
 ) -> String {
-    printer::format_css_in(stylesheet, source, arena)
+    printer::format_css_in(stylesheet.into(), source, arena)
 }
 
 /// Parse CSS source into internal AST
@@ -170,7 +212,7 @@ pub fn format_ast_in(
 /// * `source` - CSS source code
 ///
 /// # Returns
-/// * `Ok(CssStyleSheet)` - Parsed AST with nodes and value comments
+/// * `Ok(ParsedCss)` - Parsed AST with nodes and value comments, and its stores
 /// * `Err(Error)` - Parse error with position and context
 ///
 /// # Example
@@ -183,10 +225,21 @@ pub fn format_ast_in(
 /// ```
 ///
 /// `arena` owns every AST node of the returned [`CssStyleSheet`]
-/// (caller-owns-`Bump`); the stylesheet borrows from it for `'arena`.
-pub fn parse<'arena>(source: &str, arena: &'arena bumpalo::Bump) -> Result<CssStyleSheet<'arena>> {
+/// (caller-owns-`Bump`); the stylesheet borrows from it for `'arena`. [`ParsedCss`] bundles
+/// it with fresh stores and derefs to it.
+pub fn parse<'arena>(source: &str, arena: &'arena bumpalo::Bump) -> Result<ParsedCss<'arena>> {
+    parsed(|stores| parse_into(source, arena, stores))
+}
+
+/// [`parse`] into a caller's `stores`, for a warm path that keeps them across stylesheets.
+pub fn parse_into<'arena>(
+    source: &str,
+    arena: &'arena bumpalo::Bump,
+    stores: &mut CssStores,
+) -> Result<CssStyleSheet<'arena>> {
     Error::ensure_source_fits(source)?;
-    parser::parse_css(source, 0, 0, arena).map_err(|e| e.with_context(source, WIRE_COORDINATES))
+    parser::parse_css(source, 0, 0, arena, stores)
+        .map_err(|e| e.with_context(source, WIRE_COORDINATES))
 }
 
 /// Convert CSS AST to compact JSON wire bytes — the **sole emission path** for its wire
@@ -201,8 +254,11 @@ pub fn parse<'arena>(source: &str, arena: &'arena bumpalo::Bump) -> Result<CssSt
 /// slices + ASCII fragments), and byte-oriented consumers skip the O(output) validation a
 /// `String` requires.
 #[cfg(feature = "json")]
-pub fn convert_ast_json_bytes(stylesheet: &CssStyleSheet<'_>, source: &str) -> Vec<u8> {
-    ast::convert::write_stylesheet_file_bytes(stylesheet, source, tsv_lang::Wire::Span)
+pub fn convert_ast_json_bytes<'a>(
+    stylesheet: impl Into<CssParsedRef<'a>>,
+    source: &str,
+) -> Vec<u8> {
+    ast::convert::write_stylesheet_file_bytes(stylesheet.into(), source, tsv_lang::Wire::Span)
 }
 
 /// Convert internal AST to compact JSON wire bytes **with** per-node `loc`.
@@ -211,11 +267,11 @@ pub fn convert_ast_json_bytes(stylesheet: &CssStyleSheet<'_>, source: &str) -> V
 /// `parseCss` emits none; tsv's is the line (1-based, LF-only) and column (0-based, UTF-16
 /// code units) of those offsets. `tsv parse --locations` writes it.
 #[cfg(feature = "locations")]
-pub fn convert_ast_json_bytes_with_locations(
-    stylesheet: &CssStyleSheet<'_>,
+pub fn convert_ast_json_bytes_with_locations<'a>(
+    stylesheet: impl Into<CssParsedRef<'a>>,
     source: &str,
 ) -> Vec<u8> {
-    ast::convert::write_stylesheet_file_bytes(stylesheet, source, tsv_lang::Wire::Loc)
+    ast::convert::write_stylesheet_file_bytes(stylesheet.into(), source, tsv_lang::Wire::Loc)
 }
 
 /// The `String` form of `convert_ast_json_bytes` for `&str` boundaries (the WASM
@@ -226,7 +282,10 @@ pub fn convert_ast_json_bytes_with_locations(
 /// span-only wire alone, and `parse_to_json_with` validates the loc-bearing bytes itself.
 #[cfg(feature = "json")]
 #[expect(clippy::expect_used)]
-pub fn convert_ast_json_string(stylesheet: &CssStyleSheet<'_>, source: &str) -> String {
+pub fn convert_ast_json_string<'a>(
+    stylesheet: impl Into<CssParsedRef<'a>>,
+    source: &str,
+) -> String {
     String::from_utf8(convert_ast_json_bytes(stylesheet, source))
         .expect("writer emits valid UTF-8 (source slices + ASCII fragments)")
 }

@@ -1244,7 +1244,7 @@ impl<'a> Printer<'a> {
         // source and line table — exactly as the top-level `<script>` / `<style>` islands
         // are, so the two positions share one formatter path and differ only in how deep the
         // body is indented. What the parse writes is local — the script's stores, the style's
-        // arena — and nothing the doc keeps borrows it (its leaves are pooled text or
+        // arena and stores — and nothing the doc keeps borrows it (its leaves are pooled text or
         // host-source spans). A raw-text `Text` never decodes, so `content` is the author's
         // bytes at `raw_span`.
         let base_offset = text.raw_span.start as usize;
@@ -1267,13 +1267,7 @@ impl<'a> Printer<'a> {
                     .and_then(|program| self.build_nested_script_body_doc(&program, view))
             }
             RawTextKind::Style => {
-                // pre-sized to the content length to avoid the bump's chunk-doubling tail
-                let arena = bumpalo::Bump::with_capacity(tsv_lang::estimated_ast_arena_capacity(
-                    content.len(),
-                ));
-                tsv_css::__private::parse_embedded(&content, base_offset, host_nesting, &arena)
-                    .ok()
-                    .and_then(|stylesheet| self.build_nested_style_body_doc(&stylesheet))
+                self.parse_nested_style_body_doc(&content, base_offset, host_nesting)
             }
         };
 
@@ -1298,6 +1292,38 @@ impl<'a> Printer<'a> {
                 d.concat(&[opening_tag, d.text_pooled(&content), closing_tag])
             }
         }
+    }
+
+    /// The body doc of a `<style>` nested in markup, from its text: the body parsed at
+    /// `base_offset` under `host_nesting` and handed to
+    /// [`Printer::build_nested_style_body_doc`]. `None` when it does not parse or prints
+    /// nothing.
+    ///
+    /// The parse's arena and stores are this body's own — the stylesheet is read through
+    /// their view, never the host document's — and this function is where they live: it is
+    /// kept out of line, so they sit in its frame and not in the fragment builder's, which
+    /// the element builders around this call are inlined into and which recurses once per
+    /// level of markup.
+    #[inline(never)]
+    fn parse_nested_style_body_doc(
+        &self,
+        content: &str,
+        base_offset: usize,
+        host_nesting: u32,
+    ) -> Option<DocId> {
+        // pre-sized to the content length to avoid the bump's chunk-doubling tail
+        let arena =
+            bumpalo::Bump::with_capacity(tsv_lang::estimated_ast_arena_capacity(content.len()));
+        let mut stores = tsv_css::ast::CssStores::new();
+        let stylesheet = tsv_css::__private::parse_embedded(
+            content,
+            base_offset,
+            host_nesting,
+            &arena,
+            &mut stores,
+        )
+        .ok()?;
+        self.build_nested_style_body_doc(tsv_css::__private::parsed_ref(&stylesheet, &stores))
     }
 
     /// The body doc of a `<script>` nested in markup: the program's own doc
@@ -1361,7 +1387,7 @@ impl<'a> Printer<'a> {
     /// it emits verbatim (the TODO in the body) would remove it with the second format.
     fn build_nested_style_body_doc(
         &self,
-        stylesheet: &tsv_css::ast::CssStyleSheet<'_>,
+        stylesheet: tsv_css::ast::CssParsedRef<'_>,
     ) -> Option<DocId> {
         let level = self.body_indent_level();
         let format_at = |level: usize| {

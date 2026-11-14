@@ -953,15 +953,18 @@ generation's is selected by a `perf_ab_api` cfg passed to the example's own comp
 rustc … -- --cfg`, so no library is built differently). On a tree with the warm parse
 (`tsv_ts::__private::parse_folded_into`), TypeScript and Svelte parse into stores kept warm across
 files, taken before each timed region and parked after it in a slot the driver owns, as the CLI's
-`Formatter` keeps them, and CSS, which has no stores, into the `Bump`. The current tree's driver
-holds that slot through `tsv_ts::__private::WarmStores`, which names no store type, so the stores
-can change beneath it without a new arm; a tree with the stores but no such handle
+`Formatter` keeps them. The current tree's driver holds one such slot per language, through each
+language crate's own `__private::WarmStores` (a Svelte document's holds a TypeScript half and a
+CSS half), which names no store type, so the stores can change beneath it without a new arm, and
+CSS parses into its stores beside the `Bump`. A tree whose CSS has no stores
+(`perf_ab_api = "css_no_stores"`) parses CSS into the `Bump` alone and Svelte into the stores
+`tsv_ts::__private::WarmStores` keeps; a tree with the stores but no such handle
 (`perf_ab_api = "no_warm_stores"`) keeps them in an `Option` of the driver's own. The TypeScript
 parse takes the stores alone from that generation on, where an older warm-parse tree's
 (`perf_ab_api = "ts_parse_bump"`) also took the `Bump`. The strip takes no `Bump` in the current
 tree, where a tree with the handle whose strip still took it for its edits
 (`perf_ab_api = "strip_bump"`) hands it the `Bump`; only the strip driver has an arm for that
-generation, the format driver's calls being the current tree's.
+generation, the format driver's calls being a `css_no_stores` tree's.
 On a tree older than the stores every language parses into the `Bump` alone, which is kept warm
 the same way. The report names each side's generation, and a run whose
 sides differ says so: its rows then compare two call paths as well as two libraries. A change

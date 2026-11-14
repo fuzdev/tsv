@@ -787,7 +787,7 @@ lang_bindings!(
 );
 lang_bindings!(
     nogoal,
-    nostores,
+    stores,
     parse_css,
     parse_css_json,
     parse_internal_css,

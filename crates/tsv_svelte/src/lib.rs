@@ -118,11 +118,10 @@ mod test_support;
 mod whitespace;
 
 use __private::{format_folded_in, parse_folded_into};
-use ast::{ParsedRoot, Root};
+use ast::{ParsedRoot, Root, SvelteStores};
 pub use formatter::Formatter;
 pub use tsv_lang::{Error, ErrorKind, ErrorReport, Result, STACK_SIZE, WirePoint, run_with_stack};
 use tsv_lang::{LeadingBom, LineRule, WireCoordinates};
-use tsv_ts::ast::AstStores;
 pub use tsv_ts::{ByteSpan, ImportPhase, ImportRecord, ImportRecordKind, Imports, TypeOnly};
 
 // `tests/public_reexports.rs` (outside this crate) names every item above through this
@@ -204,7 +203,7 @@ pub fn format(source: &str) -> Result<String> {
     format_in(
         source,
         &bumpalo::Bump::new(),
-        &mut AstStores::new(),
+        &mut SvelteStores::new(),
         tsv_lang::doc::arena::DocArena::for_source,
     )
 }
@@ -216,7 +215,7 @@ pub fn format(source: &str) -> Result<String> {
 pub(crate) fn format_in<D: std::borrow::Borrow<tsv_lang::doc::arena::DocArena>>(
     source: &str,
     arena: &bumpalo::Bump,
-    stores: &mut AstStores,
+    stores: &mut SvelteStores,
     doc_arena: impl FnOnce(&str) -> D,
 ) -> Result<String> {
     // The format path's line-terminator fold, ahead of the parse (see

@@ -412,7 +412,7 @@ lang_bindings!(
 );
 lang_bindings!(
     nogoal,
-    nostores,
+    stores,
     tsv_css,
     css_engine,
     parse_css_json,
@@ -1362,6 +1362,95 @@ mod tests {
         at_default(typescript_engine::parse_json, "const y = 2;").unwrap();
         let after_parse = at_default(format, "const   x=1").unwrap();
         assert_eq!(once, after_parse, "interleaved parse perturbed format");
+    }
+
+    // --- the per-thread stores are taken and parked across calls (warm-path soundness) ---
+
+    #[test]
+    fn warm_stores_answer_as_the_one_shot_functions_do() {
+        // Every engine half parses into stores `tsv_arena`'s macros take out of the
+        // thread's slots and park rewound: TypeScript's, CSS's, and for a Svelte document
+        // one of each. A run of documents through the assembled exports, the three
+        // languages interleaved on one thread and a failed parse among them, must answer
+        // each call as the public one-shot function does over fresh stores.
+        type OneShot = fn(&str) -> tsv_ts::Result<String>;
+        struct Engine<'a> {
+            label: &'a str,
+            sources: &'a [&'a str],
+            format: StringFn,
+            fresh_format: OneShot,
+            parse_json: StringFn,
+            fresh_parse: OneShot,
+        }
+        let large_css = "a { color: red; }\n".repeat(500);
+        let large_svelte = format!(
+            "{}<style>a {{ margin: 0 auto; }}</style>\n",
+            "<p>{a + b}</p>\n".repeat(200)
+        );
+        let css = [
+            "a { color:red }",
+            "a {",
+            large_css.as_str(),
+            "@media (min-width:1px) { b { margin:0 auto } }",
+            "c { content:'\\41' }",
+            "",
+        ];
+        let svelte = [
+            "<script>let x=[1,2]</script>\n<p>{ x }</p>\n<style>p { color:red }</style>",
+            "<style>a {</style>",
+            "<p>no style</p>",
+            large_svelte.as_str(),
+            "<script>let = ;</script><style>a { color:red }</style>",
+            "<div><style>b { color:blue }</style></div>\n<style>c { top:0 }</style>",
+        ];
+        let typescript = ["const   x=[1,2]", "const = ;", "let y = a => b"];
+        let engines = [
+            Engine {
+                label: "css",
+                sources: &css,
+                format: css_engine::format,
+                fresh_format: tsv_css::format,
+                parse_json: css_engine::parse_json,
+                fresh_parse: tsv_css::parse_to_json,
+            },
+            Engine {
+                label: "svelte",
+                sources: &svelte,
+                format: svelte_engine::format,
+                fresh_format: tsv_svelte::format,
+                parse_json: svelte_engine::parse_json,
+                fresh_parse: tsv_svelte::parse_to_json,
+            },
+            Engine {
+                label: "typescript",
+                sources: &typescript,
+                format: typescript_engine::format,
+                fresh_format: tsv_ts::format,
+                parse_json: typescript_engine::parse_json,
+                fresh_parse: tsv_ts::parse_to_json,
+            },
+        ];
+        // twice over, so the second pass runs every document on stores the first warmed
+        for pass in 0..2 {
+            for index in 0..css.len() {
+                for engine in &engines {
+                    let Some(source) = engine.sources.get(index) else {
+                        continue;
+                    };
+                    let label = engine.label;
+                    assert_eq!(
+                        at_default(engine.format, source),
+                        (engine.fresh_format)(source).map_err(|e| Failure::parse(&e)),
+                        "{label} format, pass {pass}: {source:?}"
+                    );
+                    assert_eq!(
+                        at_default(engine.parse_json, source),
+                        (engine.fresh_parse)(source).map_err(|e| Failure::parse(&e)),
+                        "{label} parse, pass {pass}: {source:?}"
+                    );
+                }
+            }
+        }
     }
 
     // --- multibyte source survives the JS-string marshalling + char-offset boundary ---

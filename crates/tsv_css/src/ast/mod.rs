@@ -9,8 +9,15 @@ pub(crate) mod convert;
 // manipulation, and formatting. The wire-JSON writer (`convert/write.rs`) emits
 // the public JSON directly from it.
 
+mod stores;
+mod view;
+
+pub use stores::{
+    CssStores, CssText, ParsedCss, WarmStores, park_stores, take_stores, with_stores,
+};
 pub use tsv_lang::Comment;
 use tsv_lang::Span;
+pub use view::{CssParsedRef, CssView};
 
 /// CSS Stylesheet - top-level container for CSS nodes and comments
 ///

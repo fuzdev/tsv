@@ -458,7 +458,7 @@ lang_bindings!(
 );
 lang_bindings!(
     nogoal,
-    nostores,
+    stores,
     tsv_parse_css,
     tsv_parse_internal_css,
     tsv_format_css,
