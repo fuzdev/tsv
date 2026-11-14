@@ -3117,7 +3117,16 @@ fn sole_template_on_its_own_line_commented(
 /// Separate so a caller that would have to *derive* the gap position before it could ask
 /// the whole question (the call dispatcher resolves a callee gap for it) can ask this
 /// first: nearly no call has the shape, and a call without it is answered here.
-#[inline]
+///
+/// Inlined at each ask, the parser's among them (`call_may_print_whole`, which prices a
+/// chain link for the depth limit): the test is the argument count and one kind test, and
+/// with [`is_multiline_template_expression`] inlined into it a plain `#[inline]` leaves it
+/// out of line there, a call for each link priced.
+#[expect(
+    clippy::inline_always,
+    reason = "an argument-count and kind test: a call would only wrap it"
+)]
+#[inline(always)]
 pub(super) fn is_sole_multiline_template_arg(view: AstView<'_>, args: &[ast::ExprId]) -> bool {
     matches!(args, [arg] if is_multiline_template_expression(view, view.expr(*arg)))
 }

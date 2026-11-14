@@ -234,7 +234,14 @@ pub(super) fn callee_gap(
 /// (`(a + (b // c⏎) // d⏎)()`) is the gap's, printed ahead of the comments written after that
 /// shell ([`Printer::required_pair_gap_start`]). Every window of [`CalleeGap`] opens from it,
 /// and the call's head claims the region from the callee's own doc.
-#[inline]
+///
+/// Inlined at each window: it is one row read ahead of a seam that takes a closure, and
+/// out of line the read and the closure's setup sit behind a call of their own.
+#[expect(
+    clippy::inline_always,
+    reason = "one row read ahead of a generic seam: a call of its own would only wrap them"
+)]
+#[inline(always)]
 pub(super) fn callee_printed_gap_start(printer: &Printer<'_>, call: &ast::CallExpression) -> u32 {
     let callee = printer.view.expr(call.callee);
     printer.required_pair_gap_start(callee, || {

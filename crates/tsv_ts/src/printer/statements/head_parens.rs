@@ -197,6 +197,15 @@ impl<'a> Printer<'a> {
     }
 
     /// [`Self::let_bracket_head_target`] over a printed leftmost walk already taken.
+    ///
+    /// Inlined at its two asks: out of line the `Option<Span>` is returned through memory,
+    /// where inlined the `None` of a leftmost node that is no identifier is a kind test in
+    /// the caller.
+    #[expect(
+        clippy::inline_always,
+        reason = "an `Option<Span>` returns through memory: inlined, a `None` is a kind test"
+    )]
+    #[inline(always)]
     fn let_bracket_target_of(
         &self,
         (leftmost, is_computed_member_object): (&Expression, bool),

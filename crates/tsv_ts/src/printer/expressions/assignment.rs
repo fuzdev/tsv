@@ -1610,6 +1610,14 @@ impl<'a> Printer<'a> {
     ///
     /// Member-only chains with line comments between segments should force
     /// BreakAfterOperator layout to match Prettier's first-pass behavior.
+    ///
+    /// Inlined at its two asks: a value that is no member-only chain is answered by the
+    /// shape test, and inlined that answer makes no call.
+    #[expect(
+        clippy::inline_always,
+        reason = "the shape test alone answers a non-chain: inlined, with no call"
+    )]
+    #[inline(always)]
     pub(crate) fn has_line_comments_in_member_chain(&self, expr: &Expression) -> bool {
         // Only check member-only chains (no calls)
         if !is_member_only_chain(self.view, expr) {

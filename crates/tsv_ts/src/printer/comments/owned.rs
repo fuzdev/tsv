@@ -548,6 +548,12 @@ impl<'a> Printer<'a> {
         value: &Expression,
         build_value: impl FnOnce() -> DocId,
     ) -> DocId {
+        // The claim's document-level short-circuit ([`Self::outermost_owned_claim_applies`]),
+        // asked here as well so that it comes ahead of the left-spine read below, which a
+        // document with no owned comment has no use for.
+        if !self.has_owned_comments {
+            return build_value();
+        }
         self.build_doc_with_outermost_owned_comment_at(
             value.span().start,
             outermost_claim_child(self.view, value),
@@ -635,10 +641,13 @@ impl<'a> Printer<'a> {
         &self,
         value: &Expression,
     ) -> bool {
-        self.outermost_owned_claim_applies(
-            value.span().start,
-            outermost_claim_child(self.view, value),
-        )
+        // The short-circuit first, for the reason
+        // [`Self::build_value_with_outermost_owned_comment`] gives.
+        self.has_owned_comments
+            && self.outermost_owned_claim_applies(
+                value.span().start,
+                outermost_claim_child(self.view, value),
+            )
     }
 
     /// The four gates of the outermost-owned claim, in one place so the claim forms above,

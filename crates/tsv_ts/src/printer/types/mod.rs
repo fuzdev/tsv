@@ -3230,6 +3230,14 @@ impl<'a> Printer<'a> {
 
     /// The sole member a one-member union / intersection prints as — `None` for anything
     /// else, a frozen head included ([`Self::sole_member_peels`]).
+    ///
+    /// Inlined at each ask: for a type that is no union or intersection the answer is the
+    /// kind test alone, which a call would only wrap.
+    #[expect(
+        clippy::inline_always,
+        reason = "a kind test unless the type is a composite: a call would only wrap it"
+    )]
+    #[inline(always)]
     pub(in crate::printer) fn transparent_sole_member<'t>(
         &self,
         ty: &'t TSType,

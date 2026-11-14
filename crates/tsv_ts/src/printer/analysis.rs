@@ -330,6 +330,14 @@ pub(crate) fn template_literal_has_newlines(
 ///
 /// Combines the TemplateLiteral/TaggedTemplateExpression dispatch with the newline check.
 /// Used by call_formatting, new_expression, and arrow body formatting.
+///
+/// Inlined at each ask: for an expression that is no template the answer is the kind test
+/// alone, which a call would only wrap.
+#[expect(
+    clippy::inline_always,
+    reason = "a kind test unless the expression is a template: a call would only wrap it"
+)]
+#[inline(always)]
 pub(crate) fn is_multiline_template_expression(view: AstView<'_>, expr: &ast::Expression) -> bool {
     match &expr.kind {
         ast::ExpressionKind::TemplateLiteral(t) => template_literal_has_newlines(view, t),
