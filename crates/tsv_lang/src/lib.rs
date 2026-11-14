@@ -45,6 +45,8 @@
 // - `store` - contiguous typed stores, their handles and the list-building scratch stack
 // - `swar` - word-at-a-time byte-search kernels shared by the line scans, the
 //   wire-JSON escape prescan, and the lexers' token-body scans
+// - `value_runs` - the `value_runs!` declaration of a language crate's stores of the
+//   lists built by value, and the field shapes a store set's tests read
 
 #[cfg(feature = "_internal_ast_census")]
 #[doc(hidden)]
@@ -91,6 +93,8 @@ pub mod store;
 // See `doc` above.
 #[expect(rustdoc::private_intra_doc_links)]
 pub mod swar;
+#[doc(hidden)]
+pub mod value_runs;
 mod whitespace;
 
 #[doc(hidden)]

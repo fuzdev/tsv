@@ -10,8 +10,9 @@
 //! [`RunStores`] holds one store per element type of a list built by value: object
 //! properties, template quasis, declarators, cases, import and export specifiers, class and
 //! type members, type parameters, heritage clauses, enum members, index-signature parameters
-//! and decorators. Each element type has a scratch stack that builds its lists, and a second
-//! macro declares the store, the scratch, the list the tree holds and its view accessor.
+//! and decorators. Each element type has a scratch stack that builds its lists, and
+//! `tsv_lang`'s `value_runs!` declares the store, the scratch, the list the tree holds and its
+//! view accessor from one entry.
 //! Every element type but [`ClassMember`], and what each holds inline, is `Copy`, so a
 //! finished list is copied into its store as a block; a class member holds its method's
 //! [`FunctionExpression`] inline, a payload row, and its lists move a row at a time. An
@@ -36,7 +37,9 @@ use std::cell::Cell;
 use std::fmt;
 use std::ops::Deref;
 
-use tsv_lang::store::{Id, ListBuf, ListMark, MarkGroup, Row, Run, Store, TextPool};
+use tsv_lang::store::{Id, ListBuf, ListMark, MarkGroup, Row, Store, TextPool};
+#[cfg(test)]
+use tsv_lang::value_runs::{FieldKind, FieldShape};
 
 use super::{
     ArrowFunctionExpression, AstView, CatchClause, ClassDeclaration, ClassExpression, ClassMember,
@@ -102,7 +105,7 @@ pub enum Text {}
 // A handle keeps its niche, so an absent string costs nothing beside a present one.
 #[cfg(test)]
 const _: () = {
-    use tsv_lang::store::{PoolText, STORE_CHECK};
+    use tsv_lang::store::{PoolText, Run, STORE_CHECK};
     assert!(STORE_CHECK || size_of::<PoolText<Text>>() == 8);
     assert!(STORE_CHECK || size_of::<Option<PoolText<Text>>>() == 8);
     assert!(STORE_CHECK || size_of::<Run<Comment>>() == 8);
@@ -241,118 +244,15 @@ payload_stores! {
     param_extras: IdentifierParamExtra => ParamExtraId, param_extra;
 }
 
-/// Declares the value-run stores. Per entry: the element type as its own family, whose [`Run`]
-/// is the list the tree holds, a [`RunStores`] store and the scratch stack that builds its
-/// lists, their lines in `new` and `reset`, the scratch's mark in [`RunMarks`], and the
-/// [`AstView`] accessor that reads one list. The entry's doc comment documents the store.
-macro_rules! value_runs {
-    (
-        $(
-            $(#[$m:meta])*
-            $field:ident, $scratch:ident : $Row:ident => $acc:ident;
-        )*
-    ) => {
-        $(
-            impl Row for $Row {
-                type Family = Self;
-            }
-        )*
+tsv_lang::value_runs! {
+    /// The stores of the elements of the lists built by value, one per element type, and the
+    /// scratch stacks that build their lists.
+    pub(crate) struct RunStores;
+    /// The tops of the value-run scratch stacks, taken together: their part of a
+    /// [`ScratchMarks`].
+    pub(crate) struct RunMarks;
+    pub view AstView::runs;
 
-        /// The stores of the elements of the lists built by value, one per element type, and
-        /// the scratch stacks that build their lists.
-        pub(crate) struct RunStores {
-            $(
-                $(#[$m])*
-                pub(crate) $field: Store<$Row>,
-                #[doc = concat!("The scratch stack that builds the lists of `", stringify!($field), "`.")]
-                pub(crate) $scratch: ListBuf<$Row>,
-            )*
-        }
-
-        /// The tops of the value-run scratch stacks, taken together: their part of a
-        /// [`ScratchMarks`].
-        #[derive(Clone, Copy)]
-        pub(crate) struct RunMarks {
-            $($field: ListMark<$Row>,)*
-        }
-
-        impl RunStores {
-            /// Empty stores, allocating nothing.
-            pub(crate) fn new() -> Self {
-                Self {
-                    $(
-                        $field: Store::new(),
-                        $scratch: ListBuf::new(),
-                    )*
-                }
-            }
-
-            /// Rewinds the stores and scratch stacks in place, as [`AstStores::reset`] does.
-            #[inline]
-            pub(crate) fn reset(&mut self) {
-                $(
-                    self.$field.reset();
-                    self.$scratch.reset();
-                )*
-            }
-
-            /// Every store's and scratch stack's shape, for the tests that read what a reset
-            /// leaves.
-            #[cfg(test)]
-            fn shapes(&self, out: &mut Vec<FieldShape>) {
-                $(
-                    out.push(FieldShape::store(stringify!($field), &self.$field));
-                    out.push(FieldShape::scratch(stringify!($scratch), &self.$scratch));
-                )*
-            }
-
-            /// The current tops of the scratch stacks, their heights left for `group` to check.
-            #[inline]
-            pub(crate) fn marks(&self, group: &mut MarkGroup) -> RunMarks {
-                RunMarks {
-                    $($field: self.$scratch.mark_in(group),)*
-                }
-            }
-
-            /// Truncates the scratch stacks to `marks`, as [`AstStores::truncate_scratch`] does.
-            #[inline]
-            pub(crate) fn truncate(&mut self, marks: &RunMarks) {
-                $(self.$scratch.truncate(marks.$field);)*
-            }
-
-            /// Empties the scratch stacks, as [`AstStores::clear_scratch`] does.
-            #[inline]
-            pub(crate) fn clear_scratch(&mut self) {
-                $(self.$scratch.reset();)*
-            }
-
-            /// Whether every scratch stack is empty.
-            #[cfg(debug_assertions)]
-            pub(crate) fn scratch_is_empty(&self) -> bool {
-                true $(&& self.$scratch.is_empty())*
-            }
-        }
-
-        impl<'a> AstView<'a> {
-            $(
-                #[doc = concat!(
-                    "The [`", stringify!($Row), "`] rows of `run`, one range check for the whole ",
-                    "run. A miss ends in the store's shared cold path."
-                )]
-                #[inline]
-                pub fn $acc(self, run: Run<$Row>) -> &'a [$Row] {
-                    self.runs().$field.slice(run)
-                }
-            )*
-        }
-
-        /// Every value-run store's field name, for the test that walks them all.
-        #[cfg(test)]
-        const RUN_FIELDS: &[&str] = &[$(stringify!($field)),*];
-    };
-}
-
-value_runs! {
     /// Object literal members, `{ a: 1, ...b }`: [`ObjectProperty`] rows.
     obj_props, obj_prop_scratch: ObjectProperty => obj_props;
     /// Object pattern members, `{ a: b, ...c } = d`: [`ObjectPatternProperty`] rows.
@@ -417,7 +317,7 @@ const _: () = {
 // list (the decorators', an import's attributes) folds into the run's start.
 #[cfg(test)]
 const _: () = {
-    use tsv_lang::store::STORE_CHECK;
+    use tsv_lang::store::{Run, STORE_CHECK};
     assert!(STORE_CHECK || size_of::<Run<Decorator>>() == 8);
     assert!(STORE_CHECK || size_of::<Option<Run<Decorator>>>() == 8);
 };
@@ -718,64 +618,6 @@ impl AstStores {
         payloads.shapes(&mut out);
         runs.shapes(&mut out);
         out
-    }
-}
-
-/// What a test reads of one store, scratch stack or pool: its length and its capacity.
-#[cfg(test)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-struct FieldShape {
-    name: &'static str,
-    kind: FieldKind,
-    len: usize,
-    capacity: usize,
-}
-
-/// Which kind of buffer a [`FieldShape`] reads, which decides its rewound length.
-#[cfg(test)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum FieldKind {
-    Store,
-    Scratch,
-    Pool,
-}
-
-#[cfg(test)]
-impl FieldShape {
-    fn store<T: Row>(name: &'static str, store: &Store<T>) -> Self {
-        Self {
-            name,
-            kind: FieldKind::Store,
-            len: store.len(),
-            capacity: store.capacity(),
-        }
-    }
-
-    fn scratch<T>(name: &'static str, scratch: &ListBuf<T>) -> Self {
-        Self {
-            name,
-            kind: FieldKind::Scratch,
-            len: scratch.len(),
-            capacity: scratch.capacity(),
-        }
-    }
-
-    fn pool<F>(name: &'static str, pool: &TextPool<F>) -> Self {
-        Self {
-            name,
-            kind: FieldKind::Pool,
-            len: pool.len(),
-            capacity: pool.capacity(),
-        }
-    }
-
-    /// The length a reset leaves: slot 0 of a store and the sentinel of a pool once written,
-    /// nothing of a scratch stack.
-    fn rewound_len(self) -> usize {
-        match self.kind {
-            FieldKind::Store | FieldKind::Pool => self.len.min(1),
-            FieldKind::Scratch => 0,
-        }
     }
 }
 
@@ -1277,7 +1119,7 @@ class C {
         let first = flush_every_run(&mut stores, &parsed);
         let mut flushed: Vec<&str> = first.iter().map(|&(field, _)| field).collect();
         flushed.sort_unstable();
-        let mut every = RUN_FIELDS.to_vec();
+        let mut every = RunStores::FIELDS.to_vec();
         every.sort_unstable();
         assert_eq!(flushed, every, "one run in every value-run store");
         assert!(first.iter().all(|(_, run)| run == "Run(1, 1)"), "{first:?}");
@@ -1411,6 +1253,36 @@ type U = V | W;
             })
             .collect();
         assert_eq!(stores.shapes(), expected);
+    }
+
+    /// `truncate_scratch` rewinds every scratch stack the stores hold to its mark, the
+    /// value-run stacks included, more than once, and leaves the element below each mark.
+    #[test]
+    fn truncate_scratch_rewinds_every_scratch_stack_to_its_mark() {
+        let mut stores = AstStores::new();
+        fill_every_field(&mut stores);
+        let marked = scratch_heights(&stores);
+        assert!(marked.iter().all(|&(_, len)| len == 1), "{marked:?}");
+        let marks = stores.scratch_marks();
+        let runs = parse_with_goal(RUNS, Goal::Module).expect("the lists parse");
+        let commented = parse_with_goal(DOCUMENT, Goal::Module).expect("parses");
+        let comment = commented.view().comments(commented.program.comments)[0];
+        for _ in 0..2 {
+            push_every_run(&mut stores, &runs, false);
+            stores.comment_scratch.push(comment);
+            stores.expr_scratch.push(an_expr());
+            let expr = stores.exprs.push(an_expr());
+            stores.expr_list_scratch.push(expr);
+            stores.expr_opt_scratch.push(None);
+            let stmt = stores.stmts.push(a_stmt());
+            stores.stmt_list_scratch.push(stmt);
+            let ty = stores.tys.push(a_ty());
+            stores.ty_list_scratch.push(ty);
+            let grown = scratch_heights(&stores);
+            assert!(grown.iter().all(|&(_, len)| len == 2), "{grown:?}");
+            stores.truncate_scratch(&marks);
+            assert_eq!(scratch_heights(&stores), marked);
+        }
     }
 
     /// The acorn re-read's two clears: a reading that fails with a list open leaves no frame
