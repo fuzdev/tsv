@@ -109,6 +109,15 @@ impl<'a> Printer<'a> {
     /// belongs to a CLAUSE BODY, printed by a site that keeps the node-owned split, so
     /// lowering the enclosing list's cursor over it would claim a comment that body already
     /// prints (a DOUBLE-PRINT).
+    ///
+    /// Inlined into each reading: out of line, its `Result` (a byte or a reference, not a
+    /// scalar pair) is returned through memory, so every step would store its answer to the
+    /// caller's stack and the caller would dispatch on it a second time.
+    #[expect(
+        clippy::inline_always,
+        reason = "one step of each reading's loop: a call would return the step through memory"
+    )]
+    #[inline(always)]
     fn own_statement_terminator<'s>(
         &self,
         stmt: &'s ast::Statement,
@@ -211,50 +220,91 @@ impl<'a> Printer<'a> {
     /// A kind the table calls [`StatementTerminator::Never`] has no terminator to eject at all.
     pub(in crate::printer) fn statement_hands_off_terminator_gap<'s>(
         &self,
-        mut stmt: &'s ast::Statement,
+        stmt: &'s ast::Statement,
     ) -> bool
     where
         'a: 's,
     {
-        // Walk to the statement that actually prints the `;` — through every DELEGATING
-        // wrapper, and through every clause-bearing HEADER to its tail-most clause body
-        // ([`Self::own_statement_terminator`] picks that body: an `if`'s alternate before its
-        // consequent, a loop's body). Both steps end at one emitter, and the answer is that
-        // emitter's.
+        // A statement that prints its own `;` is answered by the first step, which calls
+        // nothing; a wrapper or a header goes on to the walk, by a tail call.
+        match self.terminator_gap_step(stmt) {
+            Ok(hands_off) => hands_off,
+            Err(inner) => self.terminator_gap_walk(stmt, inner),
+        }
+    }
+
+    /// One step of [`Self::statement_hands_off_terminator_gap`]: the answer where `stmt`
+    /// prints its own `;`, or the statement it hands the `;` to — a DELEGATING wrapper's
+    /// inner statement ([`Self::delegated_statement`]), a clause-bearing HEADER's tail-most
+    /// clause body ([`Self::own_statement_terminator`] picks that body: an `if`'s alternate
+    /// before its consequent, a loop's body). Both steps end at one emitter, and the answer
+    /// is that emitter's.
+    #[expect(
+        clippy::inline_always,
+        reason = "a statement that prints its own `;` answers here: inlined, with no call"
+    )]
+    #[inline(always)]
+    fn terminator_gap_step<'s>(&self, stmt: &'s ast::Statement) -> Result<bool, &'s ast::Statement>
+    where
+        'a: 's,
+    {
+        // `export default`'s value is held INLINE rather than as a statement, so its kind
+        // cannot answer alone: an EXPRESSION routes through
+        // [`Printer::split_terminator_gap_comments`] and hands over, while a DECLARATION
+        // (`export default function main(): void;`) is printed by its own signature
+        // printer, which keeps the gap. Reading it as one kind double-printed every
+        // ambient default overload.
+        if let &ast::StatementKind::ExportDefaultDeclaration(decl) = &stmt.kind {
+            let decl = self.view.export_default(decl);
+            return Ok(matches!(
+                decl.declaration,
+                ast::ExportDefaultValue::Expression(_)
+            ));
+        }
+        match self.delegated_statement(stmt) {
+            Some(inner) => Err(inner),
+            None => match self.own_statement_terminator(stmt) {
+                Ok(terminator) => Ok(matches!(
+                    terminator,
+                    StatementTerminator::Always | StatementTerminator::IfAuthored
+                )),
+                Err(body) => Err(body),
+            },
+        }
+    }
+
+    /// The rest of [`Self::statement_hands_off_terminator_gap`] once `stmt` has handed its
+    /// `;` to `inner`: walk to the statement that actually prints it, a
+    /// [`Self::terminator_gap_step`] at a time.
+    ///
+    /// Out of line because the freeze test between two steps is the walk's only call that
+    /// returns: kept here, the registers it needs saved are saved for a wrapper or a header
+    /// alone, not for every statement.
+    #[inline(never)]
+    fn terminator_gap_walk<'s>(
+        &self,
+        mut stmt: &'s ast::Statement,
+        mut inner: &'s ast::Statement,
+    ) -> bool
+    where
+        'a: 's,
+    {
         loop {
-            // `export default`'s value is held INLINE rather than as a statement, so its kind
-            // cannot answer alone: an EXPRESSION routes through
-            // [`Printer::split_terminator_gap_comments`] and hands over, while a DECLARATION
-            // (`export default function main(): void;`) is printed by its own signature
-            // printer, which keeps the gap. Reading it as one kind double-printed every
-            // ambient default overload.
-            if let &ast::StatementKind::ExportDefaultDeclaration(decl) = &stmt.kind {
-                let decl = self.view.export_default(decl);
-                return matches!(decl.declaration, ast::ExportDefaultValue::Expression(_));
-            }
-            let inner = match self.delegated_statement(stmt) {
-                Some(inner) => inner,
-                None => match self.own_statement_terminator(stmt) {
-                    Ok(terminator) => {
-                        return matches!(
-                            terminator,
-                            StatementTerminator::Always | StatementTerminator::IfAuthored
-                        );
-                    }
-                    Err(body) => body,
-                },
-            };
             // ⚠️ A directive INSIDE the step freezes only the inner statement
             // (`export⏎// prettier-ignore⏎const a = 1;`, `l:⏎// prettier-ignore⏎fn();`,
             // `if (a)⏎// prettier-ignore⏎fn(  b  );`), and a frozen slice already holds its
-            // terminator-gap comment — the same reason the walk's own freeze verdict
-            // suppresses the hand-off ([`Printer::statement_emitted_end`]). The walk cannot
-            // see this one: it asks of the gap ABOVE the outermost statement, which is
-            // directive-free here.
+            // terminator-gap comment — the same reason the statement list's own freeze
+            // verdict suppresses the hand-off ([`Printer::statement_emitted_end`]). The list
+            // cannot see this one: it asks of the gap ABOVE the outermost statement, which
+            // is directive-free here.
             if self.member_gap_frozen(stmt.span().start, inner.span().start) {
                 return false;
             }
             stmt = inner;
+            inner = match self.terminator_gap_step(stmt) {
+                Ok(hands_off) => return hands_off,
+                Err(inner) => inner,
+            };
         }
     }
 
