@@ -23,6 +23,8 @@
 //! appends to the same one, so an id means the same row wherever in the document it is
 //! read, and the first reading of an acorn re-parse stays valid beside the second. Its
 //! scratch lists live here and not on the parser, because a parser is built per island.
+//! Between parses every scratch stack is empty: the parse driver leaves them so, whether the
+//! parse succeeded or failed, which is what lets the next parse begin without marking them.
 //!
 //! What outlives a parse is the rewound form: [`AstStores::reset`] rewinds the stores in
 //! place, keeping each written store's slot 0 and every allocation's capacity, and never
@@ -318,10 +320,16 @@ macro_rules! value_runs {
                 $(self.$scratch.truncate(marks.$field);)*
             }
 
-            /// Whether the scratch stacks stand at `marks`.
+            /// Empties the scratch stacks, as [`AstStores::clear_scratch`] does.
+            #[inline]
+            pub(crate) fn clear_scratch(&mut self) {
+                $(self.$scratch.reset();)*
+            }
+
+            /// Whether every scratch stack is empty.
             #[cfg(debug_assertions)]
-            pub(crate) fn is_at(&self, marks: &RunMarks) -> bool {
-                true $(&& self.$scratch.len_since(marks.$field) == 0)*
+            pub(crate) fn scratch_is_empty(&self) -> bool {
+                true $(&& self.$scratch.is_empty())*
             }
         }
 
@@ -471,8 +479,7 @@ impl AstStores {
     }
 }
 
-/// The tops of the scratch stacks, taken together: a speculation's or a discarded parse's
-/// restore point.
+/// The tops of the scratch stacks, taken together: a speculation's restore point.
 #[derive(Clone, Copy)]
 pub(crate) struct ScratchMarks {
     exprs: ListMark<Expression>,
@@ -517,23 +524,82 @@ impl AstStores {
         self.comment_scratch.truncate(marks.comments);
     }
 
-    /// Truncates the comment scratch alone to `marks`: the comments a finished parser
-    /// drained and never took are dropped with it.
-    #[inline]
-    pub(crate) fn truncate_comment_scratch(&mut self, marks: &ScratchMarks) {
-        self.comment_scratch.truncate(marks.comments);
+    /// Empties every scratch stack, discarding the frames a failed parse left open. The
+    /// stores keep their rows, as [`AstStores::truncate_scratch`] leaves them.
+    ///
+    /// Out of line and cold: it runs only behind a failed parse, and inlined it is a store
+    /// per scratch stack at each of the parse driver's failure exits, in every monomorphized
+    /// copy of the driver.
+    #[cold]
+    #[inline(never)]
+    pub(crate) fn clear_scratch(&mut self) {
+        // destructured whole, as `reset` is, so a scratch stack added to the stores without
+        // a line here is a build error rather than a frame a failed parse leaves open
+        let Self {
+            exprs: _,
+            expr_lists: _,
+            expr_opt_lists: _,
+            expr_scratch,
+            expr_list_scratch,
+            expr_opt_scratch,
+            stmts: _,
+            stmt_lists: _,
+            stmt_list_scratch,
+            tys: _,
+            ty_lists: _,
+            ty_list_scratch,
+            payloads: _,
+            runs,
+            text: _,
+            comments: _,
+            comment_scratch,
+        } = self;
+        expr_scratch.reset();
+        expr_list_scratch.reset();
+        expr_opt_scratch.reset();
+        stmt_list_scratch.reset();
+        ty_list_scratch.reset();
+        runs.clear_scratch();
+        comment_scratch.reset();
     }
 
-    /// Whether the scratch stacks stand at `marks`.
+    /// Empties the comment scratch alone: the comments a finished parser drained and never
+    /// took are dropped with it.
+    #[inline]
+    pub(crate) fn clear_comment_scratch(&mut self) {
+        self.comment_scratch.reset();
+    }
+
+    /// Whether every scratch stack is empty, as the parse driver finds and leaves them.
     #[cfg(debug_assertions)]
-    pub(crate) fn scratch_is_at(&self, marks: &ScratchMarks) -> bool {
-        self.expr_scratch.len_since(marks.exprs) == 0
-            && self.expr_list_scratch.len_since(marks.lists) == 0
-            && self.expr_opt_scratch.len_since(marks.opt_lists) == 0
-            && self.stmt_list_scratch.len_since(marks.stmt_lists) == 0
-            && self.ty_list_scratch.len_since(marks.ty_lists) == 0
-            && self.runs.is_at(&marks.runs)
-            && self.comment_scratch.len_since(marks.comments) == 0
+    pub(crate) fn scratch_is_empty(&self) -> bool {
+        // destructured whole, as `clear_scratch` is, so the check reads every stack it clears
+        let Self {
+            exprs: _,
+            expr_lists: _,
+            expr_opt_lists: _,
+            expr_scratch,
+            expr_list_scratch,
+            expr_opt_scratch,
+            stmts: _,
+            stmt_lists: _,
+            stmt_list_scratch,
+            tys: _,
+            ty_lists: _,
+            ty_list_scratch,
+            payloads: _,
+            runs,
+            text: _,
+            comments: _,
+            comment_scratch,
+        } = self;
+        expr_scratch.is_empty()
+            && expr_list_scratch.is_empty()
+            && expr_opt_scratch.is_empty()
+            && stmt_list_scratch.is_empty()
+            && ty_list_scratch.is_empty()
+            && runs.scratch_is_empty()
+            && comment_scratch.is_empty()
     }
 
     /// Empty stores for one document.
@@ -1302,6 +1368,117 @@ type U = V | W;
         assert_every_field_written(&filled);
         stores.reset();
         assert_rewound(&filled, &stores.shapes());
+    }
+
+    /// The scratch stacks' names and heights.
+    fn scratch_heights(stores: &AstStores) -> Vec<(&'static str, usize)> {
+        stores
+            .shapes()
+            .into_iter()
+            .filter(|shape| shape.kind == FieldKind::Scratch)
+            .map(|shape| (shape.name, shape.len))
+            .collect()
+    }
+
+    fn assert_scratch_empty(stores: &AstStores) {
+        let open: Vec<_> = scratch_heights(stores)
+            .into_iter()
+            .filter(|&(_, len)| len != 0)
+            .collect();
+        assert!(open.is_empty(), "open scratch frames: {open:?}");
+    }
+
+    /// `clear_scratch` empties every scratch stack the stores hold, one left open on each,
+    /// and touches nothing else: every store and the pool keep their rows, every buffer its
+    /// capacity.
+    #[test]
+    fn clear_scratch_empties_every_scratch_stack_and_nothing_else() {
+        let mut stores = AstStores::new();
+        fill_every_field(&mut stores);
+        let filled = stores.shapes();
+        assert_every_field_written(&filled);
+        #[cfg(debug_assertions)]
+        assert!(!stores.scratch_is_empty());
+        stores.clear_scratch();
+        assert_scratch_empty(&stores);
+        #[cfg(debug_assertions)]
+        assert!(stores.scratch_is_empty());
+        let expected: Vec<FieldShape> = filled
+            .iter()
+            .map(|&shape| match shape.kind {
+                FieldKind::Scratch => FieldShape { len: 0, ..shape },
+                FieldKind::Store | FieldKind::Pool => shape,
+            })
+            .collect();
+        assert_eq!(stores.shapes(), expected);
+    }
+
+    /// The acorn re-read's two clears: a reading that fails with a list open leaves no frame
+    /// behind the parse that is kept, whichever of the two it is.
+    #[test]
+    fn a_reread_parse_leaves_every_scratch_stack_empty() {
+        let mut stores = AstStores::new();
+        // tsc's comparison ends the declarator ahead of a second one that is no binding, the
+        // program's statement list open; acorn's reading parses and is kept
+        crate::__private::parse_into("g(1);\nconst a = f<T, U><V>(x);", &mut stores)
+            .expect("the re-read parses");
+        assert_scratch_empty(&stores);
+        // the first reading parses, a list kept and a list given up, and is kept: the
+        // re-read fails with a call's argument list open
+        crate::__private::parse_into("f<T><U>;\ng(1, x<T,U><T>\nax);\n", &mut stores)
+            .expect("the first reading stands");
+        assert_scratch_empty(&stores);
+        // both readings fail, each with lists open
+        crate::__private::parse_into("const a = f<T, U><V>(x), {", &mut stores)
+            .expect_err("fails twice");
+        assert_scratch_empty(&stores);
+        crate::__private::parse_into(DOCUMENT, &mut stores).expect("parses");
+        assert_scratch_empty(&stores);
+    }
+
+    /// A parse that fails with lists open — an array in an object in a call in a template,
+    /// a declarator, type members, a class body — leaves no frame behind, so the next parse
+    /// into the same stores starts over empty scratch stacks.
+    #[test]
+    fn a_failed_parse_leaves_every_scratch_stack_empty() {
+        let mut stores = AstStores::new();
+        for source in [
+            "// c\nconst a = `${f({ b: [1, , c, /* d */",
+            "let a = 1, b: { c: D; e(",
+            "@d class C { m() {} n = [",
+            "import { a, b as c } from 'm' with { type:",
+            "type T<U, V> = [U, { [k: string]:",
+            "switch (a) { case 1: enum E { A, B",
+        ] {
+            crate::__private::parse_into(source, &mut stores).expect_err("fails");
+            assert_scratch_empty(&stores);
+        }
+        crate::__private::parse_into(DOCUMENT, &mut stores).expect("parses");
+        assert_scratch_empty(&stores);
+    }
+
+    /// A parse whose caller never takes its comments leaves none on the scratch stack.
+    #[test]
+    fn a_parse_that_never_takes_its_comments_leaves_none() {
+        let mut stores = AstStores::new();
+        let end =
+            crate::__private::parse_type_extent("/* a */ A | /* b */ B // c", 0, 0, &mut stores)
+                .expect("a type");
+        assert!(end > 0);
+        assert_scratch_empty(&stores);
+        assert_eq!(stores.comments.len(), 0, "no comment became a row");
+    }
+
+    /// The parse driver's entry check, in a build that carries it: a parse handed stores
+    /// with a frame open is a caller's bug.
+    #[test]
+    #[cfg(debug_assertions)]
+    #[should_panic(expected = "a parse began over an open list frame")]
+    fn a_parse_over_an_open_frame_is_refused() {
+        let mut stores = AstStores::new();
+        let id = stores.exprs.push(an_expr());
+        stores.expr_list_scratch.push(id);
+        let _ = crate::__private::parse_into("a;", &mut stores);
     }
 
     #[test]

@@ -4328,9 +4328,14 @@ pub(crate) fn parse_retrying_acorn_followers<T>(
             .map(|()| parsed)
             .map_err(|error| (error, true))
     };
-    // the scratch's top: a parse that fails leaves frames open, and a caller may go on to
-    // another parse of the document past the failure (a goal retry, a host's own fallback)
-    let scratch_marks = stores.scratch_marks();
+    // Every scratch stack is empty between parses, so the driver marks none of them: each
+    // exit below leaves them empty again, and a caller may go on to another parse of the
+    // document past a failure (a goal retry, a host's own fallback).
+    #[cfg(debug_assertions)]
+    debug_assert!(
+        stores.scratch_is_empty(),
+        "a parse began over an open list frame"
+    );
     #[cfg(feature = "_internal_ast_census")]
     let ast_census_mark = tsv_lang::ast_census_probe::mark();
     let mut parser = Parser::new(source, base_offset, goal, stores);
@@ -4338,7 +4343,7 @@ pub(crate) fn parse_retrying_acorn_followers<T>(
     // priming drains the comments ahead of the first token, so a lexer error there leaves
     // them on the ledger
     if let Err(error) = parser.prime() {
-        return finish_driver_parse(stores, &scratch_marks, Err(error));
+        return finish_driver_parse(stores, Err(error));
     }
     let first = f(&mut parser)
         .map_err(|error| (parser.prefer_abandoned_type_arguments_error(error), false))
@@ -4346,10 +4351,11 @@ pub(crate) fn parse_retrying_acorn_followers<T>(
     if !parser.gave_up_list_to_tsc_follower
         || (first.is_ok() && !parser.kept_list_past_tsc_follower)
     {
-        return finish_driver_parse(stores, &scratch_marks, first.map_err(|(error, _)| error));
+        return finish_driver_parse(stores, first.map_err(|(error, _)| error));
     }
+    // a failed first reading leaves its open frames behind the re-read
     if first.is_err() {
-        stores.truncate_scratch(&scratch_marks);
+        stores.clear_scratch();
     }
     #[cfg(feature = "_internal_ast_census")]
     let ast_census_retry_mark = tsv_lang::ast_census_probe::mark();
@@ -4365,7 +4371,7 @@ pub(crate) fn parse_retrying_acorn_followers<T>(
         .and_then(|parsed| checked(retry.stores.view(), parsed));
     // A failed re-read leaves its open frames behind whichever parse is kept.
     if second.is_err() {
-        stores.truncate_scratch(&scratch_marks);
+        stores.clear_scratch();
     }
     // the parse kept is the second if it succeeded, else the first; the other's rows are
     // abandoned
@@ -4382,28 +4388,22 @@ pub(crate) fn parse_retrying_acorn_followers<T>(
         (Err((_, false)), Err((error, false))) if !embedded => Err(error),
         (Err((error, _)), Err(_)) => Err(error),
     };
-    finish_driver_parse(stores, &scratch_marks, outcome)
+    finish_driver_parse(stores, outcome)
 }
 
-/// The driver's exit: a failed parse leaves no open scratch frame behind it, for whatever
-/// the caller goes on to parse, and a parse that never took its comments
-/// (`crate::__private::parse_type_extent`) leaves none of them: a parser's comment ledger
-/// is dropped with it unless it was taken.
+/// The driver's exit, which leaves every scratch stack empty, as its entry found them: a
+/// failed parse leaves no open frame behind it, for whatever the caller goes on to parse,
+/// and a parse that never took its comments (`crate::__private::parse_type_extent`) leaves
+/// none of them: a parser's comment ledger is dropped with it unless it was taken. A parse
+/// that succeeded has flushed every other frame it opened.
 #[inline]
-fn finish_driver_parse<T>(
-    stores: &mut AstStores,
-    marks: &ScratchMarks,
-    outcome: Result<T, Error>,
-) -> Result<T, Error> {
+fn finish_driver_parse<T>(stores: &mut AstStores, outcome: Result<T, Error>) -> Result<T, Error> {
     if outcome.is_err() {
-        stores.truncate_scratch(marks);
+        stores.clear_scratch();
     } else {
-        stores.truncate_comment_scratch(marks);
+        stores.clear_comment_scratch();
         #[cfg(debug_assertions)]
-        debug_assert!(
-            stores.scratch_is_at(marks),
-            "a parse left an open list frame"
-        );
+        debug_assert!(stores.scratch_is_empty(), "a parse left an open list frame");
     }
     outcome
 }
