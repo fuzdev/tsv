@@ -10,9 +10,9 @@
 //! Expressions, statements, types and the payloads too rare to sit inline in the node that
 //! refers to them are rows of per-document stores ([`AstStores`]), named by id and read
 //! through an [`AstView`]; the lists built by value are runs of rows in a store per element
-//! type. The stores also hold the tree's decoded strings, in one text pool (a [`PoolStr`]
+//! type. The stores also hold the tree's decoded strings, in one text pool (a `PoolText<Text>`
 //! handle, read through [`AstView::text`]), and its comments, a program's a run of comment
-//! rows (a [`CommentList`], read through [`AstView::comments`]) — so nothing of the tree
+//! rows (a `Run<Comment>`, read through [`AstView::comments`]) — so nothing of the tree
 //! lives anywhere else, and a rewind of the stores frees all of it with no per-node `Drop`.
 //! The rare escaped identifier name is one such string ([`IdentName::escaped`]) — the AST
 //! holds no interner and needs no interner lifetime.
@@ -33,12 +33,13 @@ mod view;
 
 pub(crate) use stores::ScratchMarks;
 pub use stores::{
-    ArrowFnId, AstStores, CatchId, ClassDeclId, ClassExprId, CommentList, CtorTypeId, DeclareFnId,
-    EnumDeclId, ExportAllId, ExportAssignId, ExportDefaultId, ExportNamedId, ExprId, FnDeclId,
-    FnExprId, ForHeadId, ForLeftId, ImportDeclId, ImportEqualsId, ImportTypeId, InferTypeId,
-    InterfaceDeclId, MetaPropId, ModuleDeclId, ParamExtraId, Parsed, PoolStr, QualNameId, StmtId,
-    TaggedTplId, Text, TyId, TypeAliasId, WarmStores, with_stores,
+    ArrowFnId, AstStores, CatchId, ClassDeclId, ClassExprId, CtorTypeId, DeclareFnId, EnumDeclId,
+    ExportAllId, ExportAssignId, ExportDefaultId, ExportNamedId, ExprId, FnDeclId, FnExprId,
+    ForHeadId, ForLeftId, ImportDeclId, ImportEqualsId, ImportTypeId, InferTypeId, InterfaceDeclId,
+    MetaPropId, ModuleDeclId, ParamExtraId, Parsed, QualNameId, StmtId, TaggedTplId, Text, TyId,
+    TypeAliasId, WarmStores, with_stores,
 };
+use tsv_lang::store::PoolText;
 pub use tsv_lang::store::Run;
 pub use tsv_lang::{Comment, Span};
 pub use view::{AstView, ParsedRef};
@@ -235,7 +236,7 @@ const _: () = assert!(
 #[derive(Debug, Clone)]
 pub struct Program {
     pub body: Run<StmtId>,
-    pub comments: CommentList,
+    pub comments: Run<Comment>,
     pub span: Span,
     /// The goal symbol this program was parsed against. Drives the public AST's
     /// `sourceType` and (eventually) the goal-specific grammar gates.
@@ -279,7 +280,7 @@ pub enum StringCooked {
     /// Decoded value == the inner source slice (no escapes to decode).
     Verbatim,
     /// Escapes were decoded into a value distinct from the raw inner text.
-    Decoded(PoolStr),
+    Decoded(PoolText<Text>),
 }
 
 impl StringCooked {
@@ -334,7 +335,7 @@ impl Literal {
 /// (`\u0066oo` → `foo`), or a name too long for `raw_len` (> `u16::MAX`
 /// bytes) — or when those bytes need a JSON escape, which only a name the grammar
 /// does not vouch for can hold (a Svelte directive name like `a\b`; see below).
-/// It then carries the name as a [`PoolStr`], read through [`AstView::text`] at every
+/// It then carries the name as a `PoolText<Text>`, read through [`AstView::text`] at every
 /// consumer — no interner round-trip: for an escape, the decoded name (the parser's
 /// `current_decoded`, already in the pool); for an oversized name, its raw text
 /// copied into the pool; for a Svelte-synthesized name, its text copied into the pool
@@ -358,7 +359,7 @@ impl Literal {
 /// to `escaped: Some`; debug builds assert the claim at the write.
 #[derive(Debug, Clone, Copy)]
 pub struct IdentName {
-    pub escaped: Option<PoolStr>,
+    pub escaped: Option<PoolText<Text>>,
     pub raw_len: u16,
     /// Whether the raw name is **plain one-column ASCII** — no byte at or above
     /// `0x80`. Answered by the lexer, which walked those bytes anyway and records the
@@ -421,7 +422,7 @@ pub struct Identifier {
     /// `sizeof(Expression)`, but it sets `Identifier`'s own width, which every node
     /// holding one inline pays, a type name or a statement label among them.) Read via
     /// [`Self::ident_name`].
-    pub escaped_name: Option<PoolStr>,
+    pub escaped_name: Option<PoolText<Text>>,
     /// The [`IdentName`] channel's `raw_len`: the raw name-token byte length
     /// (the node span may extend past the name — `?` / `!` / `: Type`).
     pub name_len: u16,

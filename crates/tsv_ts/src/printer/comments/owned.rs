@@ -48,7 +48,7 @@ fn left_spine_child<'x>(view: AstView<'x>, expr: &'x Expression) -> Option<&'x E
         // directly instead of routing the `AssignmentPattern` through the seam.
         ExpressionKind::AssignmentPattern(a) => view.expr(a.left),
         &ExpressionKind::TaggedTemplateExpression(t) => view.expr(view.tagged_tpl(t).tag),
-        ExpressionKind::SequenceExpression(s) => view.expr(*view.list(s.expressions).first()?),
+        ExpressionKind::SequenceExpression(s) => view.expr(*view.expr_list(s.expressions).first()?),
         ExpressionKind::TSNonNullExpression(n) => view.expr(n.expression),
         ExpressionKind::TSAsExpression(a) => view.expr(a.expression),
         ExpressionKind::TSSatisfiesExpression(s) => view.expr(s.expression),

@@ -352,7 +352,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             let view = self.ts_view();
             match &view.expr(expr).kind {
                 ExpressionKind::SequenceExpression(seq) => {
-                    for &element in view.list(seq.expressions) {
+                    for &element in view.expr_list(seq.expressions) {
                         self.require_debug_identifier(view, element)?;
                         identifiers.push(element);
                     }
@@ -369,7 +369,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                     if let ExpressionKind::SequenceExpression(seq) =
                         &view.expr(expr).unwrap_comment_bound_pairs(view).kind
                     {
-                        for &element in view.list(seq.expressions) {
+                        for &element in view.expr_list(seq.expressions) {
                             self.require_debug_identifier(view, element)?;
                         }
                     } else {

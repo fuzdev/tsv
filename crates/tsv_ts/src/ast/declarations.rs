@@ -104,7 +104,7 @@ impl TSEnumMember {
     /// where nothing else emits — a DROPPED comment
     /// (`docs/comments.md` §The element-comma seam).
     pub fn printed_end(&self, view: AstView<'_>) -> u32 {
-        view.opt(self.initializer)
+        view.opt_expr(self.initializer)
             .map_or_else(|| self.id.span().end, |e| e.printed_end(view))
     }
 }

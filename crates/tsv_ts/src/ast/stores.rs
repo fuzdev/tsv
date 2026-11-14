@@ -28,7 +28,7 @@ use std::cell::Cell;
 use std::fmt;
 use std::ops::Deref;
 
-use tsv_lang::store::{Id, ListBuf, ListMark, MarkGroup, PoolText, Row, Run, Store, TextPool};
+use tsv_lang::store::{Id, ListBuf, ListMark, MarkGroup, Row, Run, Store, TextPool};
 
 use super::{
     ArrowFunctionExpression, AstView, CatchClause, ClassDeclaration, ClassExpression, ClassMember,
@@ -91,59 +91,14 @@ const _: () = {
 /// source cannot express.
 pub enum Text {}
 
-/// One string of the tree's text — an escaped identifier's decoded name, a string literal's
-/// or a template element's decoded value, a template element's normalized raw text — read
-/// through [`AstView::text`]: a handle into the stores' text pool.
-#[derive(Clone, Copy)]
-#[repr(transparent)]
-pub struct PoolStr {
-    pub(super) text: PoolText<Text>,
-}
-
-impl PoolStr {
-    /// The handle `text` names.
-    #[inline]
-    pub(crate) fn new(text: PoolText<Text>) -> Self {
-        Self { text }
-    }
-}
-
-impl fmt::Debug for PoolStr {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.text.fmt(f)
-    }
-}
-
-/// A program's comments, read through [`AstView::comments`]: a run of the stores' comment
-/// rows.
-#[derive(Clone, Copy)]
-#[repr(transparent)]
-pub struct CommentList {
-    pub(super) run: Run<Comment>,
-}
-
-impl CommentList {
-    /// The list `run` names.
-    #[inline]
-    pub(crate) fn new(run: Run<Comment>) -> Self {
-        Self { run }
-    }
-}
-
-impl fmt::Debug for CommentList {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.run.fmt(f)
-    }
-}
-
 // A handle keeps its niche, so an absent string costs nothing beside a present one.
 #[cfg(test)]
 const _: () = {
-    use tsv_lang::store::STORE_CHECK;
-    assert!(STORE_CHECK || size_of::<PoolStr>() == 8);
-    assert!(STORE_CHECK || size_of::<Option<PoolStr>>() == 8);
-    assert!(STORE_CHECK || size_of::<CommentList>() == 8);
-    assert!(STORE_CHECK || size_of::<Option<CommentList>>() == 8);
+    use tsv_lang::store::{PoolText, STORE_CHECK};
+    assert!(STORE_CHECK || size_of::<PoolText<Text>>() == 8);
+    assert!(STORE_CHECK || size_of::<Option<PoolText<Text>>>() == 8);
+    assert!(STORE_CHECK || size_of::<Run<Comment>>() == 8);
+    assert!(STORE_CHECK || size_of::<Option<Run<Comment>>>() == 8);
 };
 
 /// Declares the payload stores. Per entry: the row type as its own family and the id the tree
@@ -449,10 +404,11 @@ pub struct AstStores {
     pub(crate) ty_list_scratch: ListBuf<TyId>,
     pub(crate) payloads: PayloadStores,
     pub(crate) runs: RunStores,
-    /// The tree's decoded and normalized strings, read through [`PoolStr`].
+    /// The tree's decoded and normalized strings, each a `PoolText<Text>` read through
+    /// [`AstView::text`].
     pub(crate) text: TextPool<Text>,
-    /// Every comment of the document's programs, a program's read through its
-    /// [`CommentList`].
+    /// Every comment of the document's programs, a program's named by its `Run<Comment>` and
+    /// read through [`AstView::comments`].
     pub(crate) comments: Store<Comment>,
     /// The comments a parser has drained and not yet handed over: one frame per parser,
     /// opened when it is built and flushed into [`AstStores::comments`] when it takes them.
@@ -962,7 +918,7 @@ try {
                 &StatementKind::FunctionDeclaration(x) => {
                     let x = view.fn_decl(x);
                     push!(fn_decls, *x);
-                    for param in view.run(x.params) {
+                    for param in view.exprs(x.params) {
                         if let ExpressionKind::Identifier(name) = &param.kind
                             && let Some(extra) = view.opt_param_extra(name.extra)
                         {

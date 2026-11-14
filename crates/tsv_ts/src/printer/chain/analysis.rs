@@ -449,14 +449,14 @@ fn template_preempts_chain_redirect(
     call.arguments.len() == 1
         && is_multiline_template_expression(
             printer.view,
-            printer.view.expr(printer.view.list(call.arguments)[0]),
+            printer.view.expr(printer.view.expr_list(call.arguments)[0]),
         )
         && !sole_template_on_its_own_line(
             printer,
             call_paren_open(printer, call, span),
             printer
                 .view
-                .expr(printer.view.list(call.arguments)[0])
+                .expr(printer.view.expr_list(call.arguments)[0])
                 .span()
                 .start,
         )
@@ -2190,7 +2190,7 @@ mod tests {
         match &expr.kind {
             ExpressionKind::CallExpression(call) => {
                 chain_roots(view, view.expr(call.callee), out);
-                for argument in view.list(call.arguments) {
+                for argument in view.expr_list(call.arguments) {
                     let argument = view.expr(*argument);
                     chain_roots(view, argument, out);
                 }

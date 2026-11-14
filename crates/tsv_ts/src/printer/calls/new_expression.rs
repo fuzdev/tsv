@@ -251,7 +251,7 @@ impl<'a> Printer<'a> {
         // which is what the head/args split below is for — and on the unsplit path, every
         // `new` without a comment in that gap, the head is handed straight through.
         let Some((split_start, paren)) =
-            super::paren_split_for(self, paren_open, self.view.list(new_expr.arguments))
+            super::paren_split_for(self, paren_open, self.view.expr_list(new_expr.arguments))
         else {
             return self.build_new_args_doc(new_expr, span, callee_with_types, paren_open);
         };
@@ -271,7 +271,7 @@ impl<'a> Printer<'a> {
         callee_with_types: DocId,
         paren_open: u32,
     ) -> DocId {
-        let arguments = self.view.list(new_expr.arguments);
+        let arguments = self.view.expr_list(new_expr.arguments);
         self.mark_relational_sibling_authored_pairs(arguments.iter().copied().map(Some));
         let d = self.d();
 
@@ -690,7 +690,7 @@ impl<'a> Printer<'a> {
         let has_trailing_comments_no_gap_line = new_has_comments
             && self
                 .view
-                .list(new_expr.arguments)
+                .expr_list(new_expr.arguments)
                 .last()
                 .is_some_and(|last_arg| {
                     let arg_end = self.view.expr(*last_arg).span().end;

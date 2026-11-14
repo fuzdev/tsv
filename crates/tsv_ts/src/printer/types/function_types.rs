@@ -523,7 +523,7 @@ impl<'a> Printer<'a> {
         self.append_type_params_and_signature(
             &mut parts,
             f.type_parameters.as_ref(),
-            self.view.run(f.params),
+            self.view.exprs(f.params),
             &f.return_type,
             f.span.start,
         );
@@ -573,7 +573,7 @@ impl<'a> Printer<'a> {
         self.append_type_params_and_signature(
             &mut sig_parts,
             c.type_parameters.as_ref(),
-            self.view.run(c.params),
+            self.view.exprs(c.params),
             &c.return_type,
             c.span.start,
         );

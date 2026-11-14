@@ -85,7 +85,7 @@ impl<'a> Printer<'a> {
         decl: &ast::ClassDeclaration,
         include_decorators: bool,
     ) -> DocId {
-        let super_class = self.view.opt(decl.super_class);
+        let super_class = self.view.opt_expr(decl.super_class);
         let d = self.d();
 
         // The first keyword after any decorators (declare/abstract/class) is where this
@@ -538,7 +538,7 @@ impl<'a> Printer<'a> {
         };
 
         // Value if present - use assignment layout (matches prettier's printAssignment)
-        if let Some(value) = self.view.opt(prop.value) {
+        if let Some(value) = self.view.opt_expr(prop.value) {
             let before_eq = prop
                 .type_annotation
                 .as_ref()
@@ -873,7 +873,7 @@ impl<'a> Printer<'a> {
         // Parameters and return type - shared callable-signature builder (same path
         // as function declarations; MethodDefinition.value is field-identical).
         let (sig_doc, sig_end) = self.build_callable_signature_doc(
-            self.view.run(method.value.params),
+            self.view.exprs(method.value.params),
             method.value.type_parameters.as_ref(),
             method.value.return_type.as_ref(),
             method.value.params_start,

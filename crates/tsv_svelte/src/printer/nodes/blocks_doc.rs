@@ -1043,7 +1043,7 @@ impl<'a> Printer<'a> {
         // `build_block_head`); the degenerate index/key-without-`as` cases (not
         // valid Svelte) keep hugging the expression unchanged.
         let mut clause_forced_break = key_forced_break;
-        let (head_expr, clause) = if let Some(context) = self.view.opt(block.context) {
+        let (head_expr, clause) = if let Some(context) = self.view.opt_expr(block.context) {
             let mut clause_parts: DocBuf = smallvec![d.text("as ")];
             // A comment-broken binding pattern breaks the head the way a forced-open key does,
             // and for the same reason the verdict is asked of the pattern's own doc here: the
@@ -1193,7 +1193,7 @@ impl<'a> Printer<'a> {
     /// body, which trims to an empty one, keeps it on every later pass too.
     fn await_catch_keyword(&self, block: &ast::AwaitBlock<'_>) -> Option<DocId> {
         let d = self.d();
-        if let Some(error) = self.view.opt(block.error) {
+        if let Some(error) = self.view.opt_expr(block.error) {
             Some(d.concat(&[
                 d.text("{:catch "),
                 self.build_block_pattern_doc(error),
@@ -1514,7 +1514,7 @@ impl<'a> Printer<'a> {
         let params_inner = match block.params_paren {
             Some(paren) => tsv_ts::__private::build_function_params_doc(
                 d,
-                self.view.run(block.parameters),
+                self.view.exprs(block.parameters),
                 Some(paren.start),
                 Some(paren.end),
                 &self.ts_inputs(),

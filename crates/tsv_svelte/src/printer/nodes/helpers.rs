@@ -801,14 +801,14 @@ impl<'a> Printer<'a> {
             }
             ExpressionKind::ArrayPattern(arr) => {
                 let brackets = self.build_array_brackets(
-                    self.view.opt_list(arr.elements),
+                    self.view.expr_opt_list(arr.elements),
                     expr.span.start,
                     expr.span.end,
                 );
                 self.append_pattern_type_annotation(brackets, arr.type_annotation.as_ref())
             }
             ExpressionKind::ArrayExpression(arr) => self.build_array_brackets(
-                self.view.opt_list(arr.elements),
+                self.view.expr_opt_list(arr.elements),
                 expr.span.start,
                 expr.span.end,
             ),

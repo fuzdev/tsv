@@ -691,7 +691,7 @@ impl<'a> Printer<'a> {
         let open_doc = self.head_open_doc(EACH_BLOCK_OPEN, head.layout.opens_own_line());
         let mut opening: DocBuf = smallvec![open_doc, head.doc];
 
-        if let Some(context) = self.view.opt(block.context) {
+        if let Some(context) = self.view.opt_expr(block.context) {
             opening.push(d.text(" as "));
             let pattern_doc = self.build_block_pattern_doc(context);
             opening.push(pattern_doc);

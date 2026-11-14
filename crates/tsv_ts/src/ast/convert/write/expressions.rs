@@ -298,7 +298,7 @@ fn write_expression_full_dispatch(
         ast::ExpressionKind::ArrayExpression(arr) => {
             node_header(w, "ArrayExpression", expr.span, ctx);
             w.raw(",\"elements\":");
-            super::write_body_array_holes(w, ctx.view.opt_list(arr.elements), ctx, |w, e| {
+            super::write_body_array_holes(w, ctx.view.expr_opt_list(arr.elements), ctx, |w, e| {
                 write_expression(w, ctx.view.expr(*e), ctx);
             });
             close_node(w, "ArrayExpression", expr.span, ctx);
@@ -377,7 +377,7 @@ fn write_expression_full_dispatch(
             write_expressions(
                 w,
                 ctx.view
-                    .list(seq.expressions)
+                    .expr_list(seq.expressions)
                     .iter()
                     .map(|e| ctx.view.expr(*e)),
                 ctx,
@@ -429,7 +429,7 @@ fn write_expression_full_dispatch(
                 ctx,
             );
             w.raw(",\"elements\":");
-            write_expression_holes(w, ctx.view.opt_list(arr.elements), ctx);
+            write_expression_holes(w, ctx.view.expr_opt_list(arr.elements), ctx);
             if arr.optional {
                 w.raw(",\"optional\":true");
             }
@@ -510,7 +510,7 @@ fn write_expression_full_dispatch(
                     Some(opts) => write_expression(w, ctx.view.expr(*opts), ctx),
                     None => w.raw("null"),
                 }
-            } else if let Some(opts) = ctx.view.opt(import_expr.options) {
+            } else if let Some(opts) = ctx.view.opt_expr(import_expr.options) {
                 w.raw(",\"arguments\":[");
                 write_expression(w, opts, ctx);
                 w.raw("]");

@@ -89,7 +89,7 @@ pub(super) fn write_function_declaration(
     write_function_flags_fields(w, func_decl.generator, func_decl.r#async);
     write_type_parameters_field(w, func_decl.type_parameters.as_ref(), ctx);
     w.raw(",\"params\":");
-    write_expressions(w, ctx.view.run(func_decl.params), ctx);
+    write_expressions(w, ctx.view.exprs(func_decl.params), ctx);
     write_return_type_field(w, func_decl.return_type.as_ref(), ctx);
     w.raw(",\"body\":");
     write_block_statement(w, &func_decl.body, ctx);
@@ -195,7 +195,7 @@ pub(super) fn write_class_declaration(
     write_type_parameters_field(w, class_decl.type_parameters.as_ref(), ctx);
     write_super_class_fields(
         w,
-        ctx.view.opt(class_decl.super_class),
+        ctx.view.opt_expr(class_decl.super_class),
         class_decl.super_type_parameters.as_ref(),
         class_decl.type_parameters.as_ref().map(|tp| tp.span),
         ctx,
@@ -228,7 +228,7 @@ pub(super) fn write_class_expression(
     write_type_parameters_field(w, class_expr.type_parameters.as_ref(), ctx);
     write_super_class_fields(
         w,
-        ctx.view.opt(class_expr.super_class),
+        ctx.view.opt_expr(class_expr.super_class),
         class_expr.super_type_parameters.as_ref(),
         class_expr.type_parameters.as_ref().map(|tp| tp.span),
         ctx,
@@ -442,7 +442,7 @@ fn write_method_definition(w: &mut JsonWriter, method: &ast::MethodDefinition, c
     });
     write_function_flags_fields(w, func.generator, func.r#async);
     w.raw(",\"params\":");
-    write_expressions(w, ctx.view.run(func.params), ctx);
+    write_expressions(w, ctx.view.exprs(func.params), ctx);
     write_return_type_field(w, func.return_type.as_ref(), ctx);
     if let Some(body) = body {
         w.raw(",\"body\":");

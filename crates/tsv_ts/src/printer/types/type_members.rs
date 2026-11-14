@@ -274,7 +274,7 @@ impl<'a> Printer<'a> {
         self.push_member_type_params_and_signature(
             &mut parts,
             method.type_parameters.as_ref(),
-            self.view.run(method.params),
+            self.view.exprs(method.params),
             method.return_type.as_ref(),
             paren_pos,
         );
@@ -300,7 +300,7 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         self.build_call_or_construct_signature_doc(
             call.type_parameters.as_ref(),
-            self.view.run(call.params),
+            self.view.exprs(call.params),
             call.return_type.as_ref(),
             call.span,
             None,
@@ -318,7 +318,7 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         self.build_call_or_construct_signature_doc(
             ctor.type_parameters.as_ref(),
-            self.view.run(ctor.params),
+            self.view.exprs(ctor.params),
             ctor.return_type.as_ref(),
             ctor.span,
             Some(ctor.span.start + "new".len() as u32),

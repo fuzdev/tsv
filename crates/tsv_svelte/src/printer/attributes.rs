@@ -1013,7 +1013,7 @@ impl<'a> Printer<'a> {
             self.d().text("on:"),
             dir.name_span,
             dir.modifiers,
-            self.view.opt(dir.expression),
+            self.view.opt_expr(dir.expression),
             dir.expression_tag_span,
             DirectiveValue::Always,
         )
@@ -1081,7 +1081,7 @@ impl<'a> Printer<'a> {
             self.d().text("use:"),
             dir.name_span,
             dir.modifiers,
-            self.view.opt(dir.expression),
+            self.view.opt_expr(dir.expression),
             dir.expression_tag_span,
             DirectiveValue::Always,
         )
@@ -1093,7 +1093,7 @@ impl<'a> Printer<'a> {
             self.d().text(dir.direction.prefix_with_colon()),
             dir.name_span,
             dir.modifiers,
-            self.view.opt(dir.expression),
+            self.view.opt_expr(dir.expression),
             dir.expression_tag_span,
             DirectiveValue::Always,
         )
@@ -1105,7 +1105,7 @@ impl<'a> Printer<'a> {
             self.d().text("animate:"),
             dir.name_span,
             dir.modifiers,
-            self.view.opt(dir.expression),
+            self.view.opt_expr(dir.expression),
             dir.expression_tag_span,
             DirectiveValue::Always,
         )
@@ -1117,7 +1117,7 @@ impl<'a> Printer<'a> {
             self.d().text("let:"),
             dir.name_span,
             dir.modifiers,
-            self.view.opt(dir.expression),
+            self.view.opt_expr(dir.expression),
             dir.expression_tag_span,
             DirectiveValue::Shorthand,
         )
@@ -1497,7 +1497,7 @@ impl<'a> Printer<'a> {
         // `() => a, (v) => (a = v)` on one line under a leading comment).
         let first_start = self
             .view
-            .expr(self.view.list(seq.expressions)[0])
+            .expr(self.view.expr_list(seq.expressions)[0])
             .span()
             .start;
         // An honored directive in the `{`→value gap leads the SEQUENCE node, not its first
@@ -1524,7 +1524,7 @@ impl<'a> Printer<'a> {
         } else {
             let last_end = self
                 .view
-                .expr(self.view.list(seq.expressions)[seq.expressions.len() - 1])
+                .expr(self.view.expr_list(seq.expressions)[seq.expressions.len() - 1])
                 .span()
                 .end;
             (self.build_bind_sequence_operands_doc(seq), last_end)
@@ -1550,7 +1550,7 @@ impl<'a> Printer<'a> {
     /// break only when they overflow or carry an interior forced break (a mid line comment,
     /// a block-body arrow). Matches prettier.
     fn build_bind_sequence_operands_doc(&self, seq: &tsv_ts::ast::SequenceExpression) -> DocId {
-        let expressions = self.view.list(seq.expressions);
+        let expressions = self.view.expr_list(seq.expressions);
         let d = self.d();
         let bytes = self.source.as_bytes();
         // Rule A: an honored directive in the comma gap freezes the operand after it. The
@@ -1567,7 +1567,7 @@ impl<'a> Printer<'a> {
         let mut prev_doc = None;
         for (i, (sub_expr, doc)) in self
             .view
-            .list(seq.expressions)
+            .expr_list(seq.expressions)
             .iter()
             .zip(operands)
             .enumerate()
@@ -1626,12 +1626,12 @@ impl<'a> Printer<'a> {
             |i| {
                 !frozen_at(i)
                     && self
-                        .fused_plain_path(self.view.expr(self.view.list(seq.expressions)[i]))
+                        .fused_plain_path(self.view.expr(self.view.expr_list(seq.expressions)[i]))
                         .is_none()
             },
         );
         self.view
-            .list(seq.expressions)
+            .expr_list(seq.expressions)
             .iter()
             .zip(built)
             .enumerate()

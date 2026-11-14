@@ -2371,7 +2371,7 @@ pub(super) fn build_expand_first_arg_doc(
         tail_parts.push(printer.build_arg_expression_doc(arg));
         prev_end = arg.span().end;
     }
-    if let Some(last_arg) = printer.view.opt(arguments.last().copied()) {
+    if let Some(last_arg) = printer.view.opt_expr(arguments.last().copied()) {
         // No argument here is frozen: this layout builds each through
         // `build_arg_expression_doc`, so the interior is the argument's own.
         emit_last_arg_trailing_comments(
@@ -2943,7 +2943,7 @@ pub(super) fn first_arg_signature_refuses_expand_first(
     args: &[ast::ExprId],
 ) -> bool {
     matches!(
-        printer.view.opt(args.first().copied()),
+        printer.view.opt_expr(args.first().copied()),
         Some(&ast::Expression { span, kind: ast::ExpressionKind::ArrowFunctionExpression(arrow) })
             if arrow_signature_refuses_hug(printer, printer.view.arrow_fn(arrow), span)
                 || printer.arrow_empty_params_hold_comments(printer.view.arrow_fn(arrow))

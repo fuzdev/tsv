@@ -417,7 +417,7 @@ impl<'s, 'b> Walk<'s, 'b> {
             self.record_dynamic(import, span);
         }
         self.expr(self.view.expr(import.source));
-        if let Some(options) = self.view.opt(import.options) {
+        if let Some(options) = self.view.opt_expr(import.options) {
             self.expr(options);
         }
     }
@@ -670,7 +670,7 @@ impl<'s, 'b> Walk<'s, 'b> {
                 true
             }
             StatementKind::ReturnStatement(s) => {
-                if let Some(argument) = self.view.opt(s.argument) {
+                if let Some(argument) = self.view.opt_expr(s.argument) {
                     self.expr(argument);
                 }
                 true
@@ -745,10 +745,10 @@ impl<'s, 'b> Walk<'s, 'b> {
                         ForInit::Expression(e) => self.expr(self.view.expr(*e)),
                     }
                 }
-                if let Some(test) = self.view.opt(s.test) {
+                if let Some(test) = self.view.opt_expr(s.test) {
                     self.expr(test);
                 }
-                if let Some(update) = self.view.opt(s.update) {
+                if let Some(update) = self.view.opt_expr(s.update) {
                     self.expr(update);
                 }
                 self.nested_statement(self.view.stmt(s.body));
@@ -942,7 +942,7 @@ impl<'s, 'b> Walk<'s, 'b> {
                     self.blank(bang, bang + 1);
                 }
             }
-            if let Some(init) = self.view.opt(declarator.init) {
+            if let Some(init) = self.view.opt_expr(declarator.init) {
                 self.expr(init);
             }
         }
@@ -1218,14 +1218,14 @@ impl<'s, 'b> Walk<'s, 'b> {
         match &link.kind {
             ExpressionKind::CallExpression(call) => {
                 self.type_arguments(call.type_arguments.as_ref());
-                for argument in self.view.list(call.arguments) {
+                for argument in self.view.expr_list(call.arguments) {
                     let argument = self.view.expr(*argument);
                     self.expr(argument);
                 }
             }
             ExpressionKind::NewExpression(new) => {
                 self.type_arguments(new.type_arguments.as_ref());
-                for argument in self.view.list(new.arguments) {
+                for argument in self.view.expr_list(new.arguments) {
                     self.expr(self.view.expr(*argument));
                 }
             }
@@ -1233,7 +1233,7 @@ impl<'s, 'b> Walk<'s, 'b> {
             &ExpressionKind::TaggedTemplateExpression(tagged) => {
                 let tagged = self.view.tagged_tpl(tagged);
                 self.type_arguments(tagged.type_arguments.as_ref());
-                for expression in self.view.list(tagged.quasi.expressions) {
+                for expression in self.view.expr_list(tagged.quasi.expressions) {
                     let expression = self.view.expr(*expression);
                     self.expr(expression);
                 }
@@ -1289,7 +1289,7 @@ impl<'s, 'b> Walk<'s, 'b> {
                 }
             }
             ExpressionKind::ArrayExpression(array) => {
-                for element in self.view.opt_list(array.elements).iter().flatten() {
+                for element in self.view.expr_opt_list(array.elements).iter().flatten() {
                     let element = self.view.expr(*element);
                     self.expr(element);
                 }
@@ -1300,14 +1300,14 @@ impl<'s, 'b> Walk<'s, 'b> {
             ExpressionKind::CallExpression(call) => {
                 self.link_operand(self.view.expr(call.callee));
                 self.type_arguments(call.type_arguments.as_ref());
-                for argument in self.view.list(call.arguments) {
+                for argument in self.view.expr_list(call.arguments) {
                     self.expr(self.view.expr(*argument));
                 }
             }
             ExpressionKind::NewExpression(new) => {
                 self.link_operand(self.view.expr(new.callee));
                 self.type_arguments(new.type_arguments.as_ref());
-                for argument in self.view.list(new.arguments) {
+                for argument in self.view.expr_list(new.arguments) {
                     self.expr(self.view.expr(*argument));
                 }
             }
@@ -1334,7 +1334,7 @@ impl<'s, 'b> Walk<'s, 'b> {
             }
             ExpressionKind::SpreadElement(spread) => self.expr(self.view.expr(spread.argument)),
             ExpressionKind::TemplateLiteral(template) => {
-                for expression in self.view.list(template.expressions) {
+                for expression in self.view.expr_list(template.expressions) {
                     let expression = self.view.expr(*expression);
                     self.expr(expression);
                 }
@@ -1343,7 +1343,7 @@ impl<'s, 'b> Walk<'s, 'b> {
                 let tagged = self.view.tagged_tpl(tagged);
                 self.link_operand(self.view.expr(tagged.tag));
                 self.type_arguments(tagged.type_arguments.as_ref());
-                for expression in self.view.list(tagged.quasi.expressions) {
+                for expression in self.view.expr_list(tagged.quasi.expressions) {
                     self.expr(self.view.expr(*expression));
                 }
             }
@@ -1352,12 +1352,12 @@ impl<'s, 'b> Walk<'s, 'b> {
                 self.expr(self.view.expr(e.argument));
             }
             ExpressionKind::YieldExpression(e) => {
-                if let Some(argument) = self.view.opt(e.argument) {
+                if let Some(argument) = self.view.opt_expr(e.argument) {
                     self.expr(argument);
                 }
             }
             ExpressionKind::SequenceExpression(sequence) => {
-                for expression in self.view.list(sequence.expressions) {
+                for expression in self.view.expr_list(sequence.expressions) {
                     self.expr(self.view.expr(*expression));
                 }
             }
@@ -1377,7 +1377,7 @@ impl<'s, 'b> Walk<'s, 'b> {
             }
             ExpressionKind::ArrayPattern(pattern) => {
                 self.decorators(self.view.opt_decorators(pattern.decorators));
-                for element in self.view.opt_list(pattern.elements).iter().flatten() {
+                for element in self.view.expr_opt_list(pattern.elements).iter().flatten() {
                     self.expr(self.view.expr(*element));
                 }
                 self.pattern_tail(e.span, pattern.optional, pattern.type_annotation.as_ref());
@@ -1811,7 +1811,7 @@ impl<'s, 'b> Walk<'s, 'b> {
         if let Some(annotation) = annotation {
             self.blank_span(annotation.span);
         }
-        if let Some(value) = self.view.opt(property.value) {
+        if let Some(value) = self.view.opt_expr(property.value) {
             self.enter_function();
             self.expr(value);
             self.leave_function();
@@ -1881,7 +1881,7 @@ impl<'s, 'b> Walk<'s, 'b> {
     fn enum_initializers(&mut self, decl: &TSEnumDeclaration) {
         self.enter_function();
         for member in self.view.enum_members(decl.members) {
-            if let Some(initializer) = self.view.opt(member.initializer) {
+            if let Some(initializer) = self.view.opt_expr(member.initializer) {
                 self.expr(initializer);
             }
         }
@@ -2058,7 +2058,7 @@ impl<'n> FunctionView<'n> {
     fn declaration(view: AstView<'n>, func: &'n FunctionDeclaration) -> Self {
         Self {
             type_parameters: func.type_parameters.as_ref(),
-            params: view.run(func.params),
+            params: view.exprs(func.params),
             params_open: Some(func.params_start),
             return_type: func.return_type.as_ref(),
             body: FunctionBody::Block(&func.body),
@@ -2069,7 +2069,7 @@ impl<'n> FunctionView<'n> {
     fn expression(view: AstView<'n>, func: &'n FunctionExpression) -> Self {
         Self {
             type_parameters: func.type_parameters.as_ref(),
-            params: view.run(func.params),
+            params: view.exprs(func.params),
             params_open: Some(func.params_start),
             return_type: func.return_type.as_ref(),
             body: FunctionBody::Block(&func.body),
@@ -2080,7 +2080,7 @@ impl<'n> FunctionView<'n> {
     fn arrow(view: AstView<'n>, arrow: &'n ArrowFunctionExpression) -> Self {
         Self {
             type_parameters: arrow.type_parameters.as_ref(),
-            params: view.run(arrow.params),
+            params: view.exprs(arrow.params),
             params_open: arrow.params_start,
             return_type: arrow.return_type.as_ref(),
             body: match &arrow.body {
@@ -2109,7 +2109,7 @@ impl<'n> ClassView<'n> {
             decorators: view.opt_decorators(class.decorators),
             r#abstract: class.r#abstract,
             type_parameters: class.type_parameters.as_ref(),
-            super_class: view.opt(class.super_class),
+            super_class: view.opt_expr(class.super_class),
             super_type_parameters: class.super_type_parameters.as_ref(),
             implements: view.heritages(class.implements),
             body: &class.body,
@@ -2121,7 +2121,7 @@ impl<'n> ClassView<'n> {
             decorators: view.opt_decorators(class.decorators),
             r#abstract: class.r#abstract,
             type_parameters: class.type_parameters.as_ref(),
-            super_class: view.opt(class.super_class),
+            super_class: view.opt_expr(class.super_class),
             super_type_parameters: class.super_type_parameters.as_ref(),
             implements: view.heritages(class.implements),
             body: &class.body,
@@ -2158,7 +2158,7 @@ fn expression_tail(view: AstView<'_>, e: &Expression, end: u32) -> Tail {
             expression_tail(view, view.expr(conditional.alternate), end)
         }
         ExpressionKind::SequenceExpression(sequence) => view
-            .list(sequence.expressions)
+            .expr_list(sequence.expressions)
             .last()
             .map_or(Tail::Open, |last| {
                 expression_tail(view, view.expr(*last), end)

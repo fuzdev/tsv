@@ -307,7 +307,7 @@ impl<'a> Printer<'a> {
         // past the `:` to trail the label. A frozen test's slice prints its shells itself.
         let mut head_end = Self::case_head_end(self.view, case);
 
-        if let Some(test) = self.view.opt(case.test) {
+        if let Some(test) = self.view.opt_expr(case.test) {
             // An assignment takes clarity parens here exactly as it does in a statement
             // test — prettier parenthesizes an `AssignmentExpression` in every position
             // outside its own allowlist (a for init/update, an expression statement, an

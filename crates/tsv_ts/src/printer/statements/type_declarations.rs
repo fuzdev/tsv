@@ -1167,7 +1167,7 @@ impl<'a> Printer<'a> {
         // generic — and a long type-param list breaking above doesn't drag the params
         // open (they stay inline when `>(a, b): R` fits).
         let sig_doc = self.build_signature_params_return_group(
-            self.view.run(decl.params),
+            self.view.exprs(decl.params),
             decl.type_parameters.as_ref(),
             decl.return_type.as_ref(),
             paren_pos,
@@ -1483,7 +1483,7 @@ impl<'a> Printer<'a> {
         };
 
         // Initializer: ` = value`
-        if let Some(init) = self.view.opt(member.initializer) {
+        if let Some(init) = self.view.opt_expr(member.initializer) {
             // Extract comments between `=` and initializer value
             let id_end = member.id.span().end;
             let init_start = init.span().start;

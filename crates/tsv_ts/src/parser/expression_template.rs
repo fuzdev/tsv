@@ -2,7 +2,7 @@
 // the single `TemplateElement` constructor every template site builds through —
 // expression AND type templates, head/middle/tail/no-substitution alike.
 
-use crate::ast::{PoolStr, Run, TemplateCooked, TemplateElement, TemplateLiteral};
+use crate::ast::{Run, TemplateCooked, TemplateElement, TemplateLiteral};
 use crate::lexer::TokenKind;
 use crate::lexer::escapes::find_legacy_escape;
 use tsv_lang::{Error, Span};
@@ -174,14 +174,14 @@ impl<'a> Parser<'a> {
             TemplateCooked::Decoded(_) => {
                 let decoded = crate::lexer::escapes::decode_string_escapes(&trv)
                     .map_err(|e| e.shift_position(raw_span.start as usize))?;
-                TemplateCooked::Decoded(PoolStr::new(self.stores.text.push(&decoded)))
+                TemplateCooked::Decoded(self.stores.text.push(&decoded))
             }
             verbatim_or_invalid => verbatim_or_invalid,
         };
 
         Ok(TemplateElement {
             raw_span,
-            raw_trv: Some(PoolStr::new(self.stores.text.push(&trv))),
+            raw_trv: Some(self.stores.text.push(&trv)),
             cooked,
             has_newline,
             tail,

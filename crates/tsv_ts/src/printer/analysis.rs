@@ -133,7 +133,8 @@ pub(crate) fn is_module_path_fluid_call(
     };
 
     // Must have exactly 1 argument that is a string literal
-    if call.arguments.len() != 1 || !is_string_literal(view.expr(view.list(call.arguments)[0])) {
+    if call.arguments.len() != 1 || !is_string_literal(view.expr(view.expr_list(call.arguments)[0]))
+    {
         return false;
     }
 
@@ -296,7 +297,7 @@ fn pattern_nesting_depth(view: AstView<'_>, obj: &ast::ObjectPattern) -> usize {
 fn array_pattern_nesting_depth(view: AstView<'_>, arr: &ast::ArrayPattern) -> usize {
     let mut max_depth = 1;
 
-    for elem in view.opt_list(arr.elements).iter().flatten() {
+    for elem in view.expr_opt_list(arr.elements).iter().flatten() {
         let nested_depth = match &view.expr(*elem).kind {
             ast::ExpressionKind::ObjectPattern(nested_obj) => {
                 1 + pattern_nesting_depth(view, nested_obj)

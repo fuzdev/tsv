@@ -97,14 +97,14 @@ fn any_expression_child<'e>(
                     })
         }
         ExpressionKind::ArrayExpression(array) => view
-            .opt_list(array.elements)
+            .expr_opt_list(array.elements)
             .iter()
             .flatten()
             .any(|child| visit(view.expr(*child), Element { list_end: None })),
         ExpressionKind::ArrayPattern(array) => {
             decorators_any(view, view.opt_decorators(array.decorators), &mut visit)
                 || view
-                    .opt_list(array.elements)
+                    .expr_opt_list(array.elements)
                     .iter()
                     .flatten()
                     .any(|child| visit(view.expr(*child), Other))
@@ -113,7 +113,7 @@ fn any_expression_child<'e>(
             let list_end = Some(expr.span.end);
             visit(view.expr(call.callee), Other)
                 || view
-                    .list(call.arguments)
+                    .expr_list(call.arguments)
                     .iter()
                     .any(|child| visit(view.expr(*child), Element { list_end }))
         }
@@ -121,7 +121,7 @@ fn any_expression_child<'e>(
             let list_end = Some(expr.span.end);
             visit(view.expr(new.callee), Other)
                 || view
-                    .list(new.arguments)
+                    .expr_list(new.arguments)
                     .iter()
                     .any(|child| visit(view.expr(*child), Element { list_end }))
         }
@@ -135,7 +135,7 @@ fn any_expression_child<'e>(
         }
         &ExpressionKind::ArrowFunctionExpression(arrow) => {
             let arrow = view.arrow_fn(arrow);
-            view.run(arrow.params)
+            view.exprs(arrow.params)
                 .iter()
                 .any(|child| visit(child, Other))
                 || match &arrow.body {
@@ -144,7 +144,7 @@ fn any_expression_child<'e>(
                 }
         }
         &ExpressionKind::FunctionExpression(function) => view
-            .run(view.fn_expr(function).params)
+            .exprs(view.fn_expr(function).params)
             .iter()
             .any(|child| visit(child, Other)),
         &ExpressionKind::ClassExpression(class) => {
@@ -163,18 +163,18 @@ fn any_expression_child<'e>(
             .argument
             .is_some_and(|child| visit(view.expr(child), Other)),
         ExpressionKind::SequenceExpression(sequence) => view
-            .list(sequence.expressions)
+            .expr_list(sequence.expressions)
             .iter()
             .any(|child| visit(view.expr(*child), Element { list_end: None })),
         ExpressionKind::TemplateLiteral(template) => view
-            .list(template.expressions)
+            .expr_list(template.expressions)
             .iter()
             .any(|child| visit(view.expr(*child), TemplateExpression)),
         &ExpressionKind::TaggedTemplateExpression(tagged) => {
             let tagged = view.tagged_tpl(tagged);
             visit(view.expr(tagged.tag), Other)
                 || view
-                    .list(tagged.quasi.expressions)
+                    .expr_list(tagged.quasi.expressions)
                     .iter()
                     .any(|child| visit(view.expr(*child), TemplateExpression))
         }
@@ -324,7 +324,7 @@ impl<'a> Printer<'a> {
         + ExactSizeIterator,
     ) {
         let view = self.view;
-        let elements = elements.map(move |element| view.opt(element));
+        let elements = elements.map(move |element| view.opt_expr(element));
         let len = elements.len();
         if len < 2 {
             return;

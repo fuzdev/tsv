@@ -459,7 +459,7 @@ impl<'a> Printer<'a> {
     pub(super) fn build_debug_tag_doc(&self, tag: &ast::DebugTag) -> DocId {
         let identifiers: Vec<&Expression> = self
             .view
-            .list(tag.identifiers)
+            .expr_list(tag.identifiers)
             .iter()
             .map(|&id| self.view.expr(id))
             .collect();

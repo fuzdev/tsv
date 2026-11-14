@@ -761,19 +761,19 @@ fn type_element_holds_brace_type(view: AstView<'_>, member: &ast::TSTypeElement)
         TSTypeElement::MethodSignature(m) => signature_holds_brace_type(
             view,
             m.type_parameters.as_ref(),
-            view.run(m.params),
+            view.exprs(m.params),
             m.return_type.as_ref(),
         ),
         TSTypeElement::CallSignature(c) => signature_holds_brace_type(
             view,
             c.type_parameters.as_ref(),
-            view.run(c.params),
+            view.exprs(c.params),
             c.return_type.as_ref(),
         ),
         TSTypeElement::ConstructSignature(c) => signature_holds_brace_type(
             view,
             c.type_parameters.as_ref(),
-            view.run(c.params),
+            view.exprs(c.params),
             c.return_type.as_ref(),
         ),
         TSTypeElement::IndexSignature(i) => {
@@ -884,7 +884,7 @@ fn type_holds_brace_type(view: AstView<'_>, ty: &TSType) -> bool {
         TSType::Function(f) => signature_holds_brace_type(
             view,
             f.type_parameters.as_ref(),
-            view.run(f.params),
+            view.exprs(f.params),
             Some(&f.return_type),
         ),
         &TSType::Constructor(_, c) => {
@@ -892,7 +892,7 @@ fn type_holds_brace_type(view: AstView<'_>, ty: &TSType) -> bool {
             signature_holds_brace_type(
                 view,
                 c.type_parameters.as_ref(),
-                view.run(c.params),
+                view.exprs(c.params),
                 Some(&c.return_type),
             )
         }

@@ -3,7 +3,8 @@
 //! Contains the Expression enum and all expression types including
 //! operators, literals, function expressions, and TypeScript type assertions.
 
-use crate::ast::{AstView, PoolStr};
+use crate::ast::{AstView, Text};
+use tsv_lang::store::PoolText;
 use tsv_lang::{Comment, Span};
 
 use super::{
@@ -1014,7 +1015,7 @@ pub enum TemplateCooked {
     /// Cooked value == the element's TRV (no escapes to decode).
     Verbatim,
     /// Escapes were decoded into a value distinct from the raw text.
-    Decoded(PoolStr),
+    Decoded(PoolText<Text>),
     /// No cooked value — an invalid escape in a TAGGED template, which ES2018
     /// permits and acorn reports as `null`. (Untagged, the same escape is a
     /// syntax error, so `Parser::template_cooked` raises there instead.)
@@ -1050,7 +1051,7 @@ pub struct TemplateElement {
     /// a 4-byte source span and a 3-character value, and `raw_span` alone cannot
     /// express it. `None` — overwhelmingly the common case — means the source
     /// slice IS the TRV, so this costs no pool text on any ordinary template.
-    pub raw_trv: Option<PoolStr>,
+    pub raw_trv: Option<PoolText<Text>>,
     /// The decoded value. `Verbatim` (the common no-escape case) costs no
     /// allocation — its text equals `trv(source, view)`.
     pub cooked: TemplateCooked,

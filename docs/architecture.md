@@ -752,7 +752,7 @@ present). Two kinds of owned data remain on nodes, both deliberate:
   (escape sequences resolved). Both the `tsv_ts` and `tsv_css` string literals hold a
   `StringCooked` whose common `Verbatim` arm is span-recovered and allocation-free; only
   the `Decoded` arm — which a span can't reconstruct — holds text of its own, copied once
-  at parse: into the stores' text pool in `tsv_ts` (a `PoolStr`), into the arena as an
+  at parse: into the stores' text pool in `tsv_ts` (a `PoolText<Text>`), into the arena as an
   `&'arena str` in `tsv_css`.
   Don't "restore" a `Decoded` value to span extraction — verify a field is a *verbatim*
   source slice before assuming it's a redundant copy.
@@ -777,7 +777,7 @@ check every producer stores the verbatim bytes.**
 
 ## Comment Handling
 
-Comments are stored **separately from AST nodes** in a flat comment array at each root level (`Program.comments` — a `CommentList`, a run of the document stores' comment rows read through `AstView::comments`; `CssStyleSheet.comments` and `Root.comments` — `Vec<Comment>`). This is the "detached model" used by prettier.
+Comments are stored **separately from AST nodes** in a flat comment array at each root level (`Program.comments` — a `Run<Comment>`, a run of the document stores' comment rows read through `AstView::comments`; `CssStyleSheet.comments` and `Root.comments` — `Vec<Comment>`). This is the "detached model" used by prettier.
 
 ### Core Type
 
@@ -999,18 +999,18 @@ new row and the old one is orphaned. The payloads too rare to sit inline in the 
 refers to them (`ArrowFunctionExpression`, `FunctionDeclaration`, `TSImportType` and their
 fellows, a `for` head, a catch clause, a parameter name's extras) are rows too, one store per
 payload type, each named by an id of its own type (`ArrowFnId`, `FnDeclId`, `ImportTypeId`,
-…). The stores also hold the tree's decoded strings, in one text pool a `PoolStr` names, and
-its comments, a run of comment rows per program (`CommentList`), each read through the view
+…). The stores also hold the tree's decoded strings, in one text pool a `PoolText<Text>` names, and
+its comments, a run of comment rows per program (`Run<Comment>`), each read through the view
 like a row. The rest of this section describes the layout the stores were built to keep.
 
 
 ```rust
 pub struct Program {
     pub body: Run<StmtId>, // the statement store's ids
-    pub comments: CommentList, // a run of the comment store; not the per-node target
+    pub comments: Run<Comment>, // a run of the comment store; not the per-node target
     pub span: Span,
     // no interner / symbol table — identifier names are span-identity, recovered
-    // from source[span]; the rare escaped name carries a PoolStr into the text pool
+    // from source[span]; the rare escaped name carries a PoolText<Text> into the text pool
 }
 
 pub struct Statement {

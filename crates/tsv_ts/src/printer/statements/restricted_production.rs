@@ -822,7 +822,7 @@ impl<'a> Printer<'a> {
         // where the run keeps the line the hang gave it.
         let (arg_start, claim) = match &arg.kind {
             ExpressionKind::SequenceExpression(seq) => {
-                let head = self.view.expr(self.view.list(seq.expressions)[0]);
+                let head = self.view.expr(self.view.expr_list(seq.expressions)[0]);
                 // Keyed on the empty span at the keyword's end, which is no node's.
                 let claim = self.left_spine_run_claim(
                     Span::new(keyword_end, keyword_end),

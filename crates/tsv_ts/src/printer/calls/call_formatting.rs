@@ -319,7 +319,7 @@ fn build_call_args_doc(
     callee: DocId,
     head: &CallHead,
 ) -> DocId {
-    let arguments = printer.view.list(call.arguments);
+    let arguments = printer.view.expr_list(call.arguments);
     let d = printer.d();
     let &CallHead {
         gap,
@@ -386,7 +386,7 @@ fn build_call_args_doc(
         // Check for trailing comments on last arg. The empty-args case returned
         // above, so `arguments` is non-empty here and `.last()` is always `Some`.
         #[expect(clippy::unreachable)] // empty args already returned above ⇒ last() is Some
-        let Some(last_arg) = printer.view.opt(arguments.last().copied()) else {
+        let Some(last_arg) = printer.view.opt_expr(arguments.last().copied()) else {
             unreachable!("a test call requires arguments");
         };
         let paren_close = span.end;
@@ -412,7 +412,7 @@ fn build_call_args_doc(
         // reasoning in docs/conformance_prettier.md §Print Width Philosophy.
         let arg_docs: DocBuf = printer
             .view
-            .list(call.arguments)
+            .expr_list(call.arguments)
             .iter()
             .enumerate()
             .map(|(i, arg)| {
@@ -504,7 +504,7 @@ fn build_call_args_doc(
     let has_trailing_block_comment = call_has_comments
         && printer
             .view
-            .list(call.arguments)
+            .expr_list(call.arguments)
             .last()
             .is_some_and(|last_arg| {
                 printer
@@ -546,7 +546,7 @@ fn build_call_args_doc(
             d.join(
                 printer
                     .view
-                    .list(call.arguments)
+                    .expr_list(call.arguments)
                     .iter()
                     .map(|arg| printer.build_expression_doc(printer.view.expr(*arg))),
                 ", ",
@@ -749,7 +749,7 @@ fn try_single_arg_comment_paths(
     callee: DocId,
     paren_open: u32,
 ) -> Option<DocId> {
-    let arguments = printer.view.list(call.arguments);
+    let arguments = printer.view.expr_list(call.arguments);
     let d = printer.d();
     let first_arg = printer.view.expr(arguments[0]);
     let arg_start = first_arg.span().start;
@@ -865,7 +865,7 @@ fn try_single_arg_hug(
     call: &ast::CallExpression,
     callee: DocId,
 ) -> Option<DocId> {
-    let arguments = printer.view.list(call.arguments);
+    let arguments = printer.view.expr_list(call.arguments);
     let d = printer.d();
     let arg = printer.view.expr(arguments[0]);
 
@@ -1144,7 +1144,7 @@ fn build_call_with_arg_comments(
     has_trailing_block_comment: bool,
     call_has_comments: bool,
 ) -> Option<DocId> {
-    let arguments = printer.view.list(call.arguments);
+    let arguments = printer.view.expr_list(call.arguments);
     let d = printer.d();
 
     // Zero-comment fast gate: this path only fires when the argument list has
@@ -1171,7 +1171,7 @@ fn build_call_with_arg_comments(
     let has_own_line_trailing_block =
         printer
             .view
-            .list(call.arguments)
+            .expr_list(call.arguments)
             .last()
             .is_some_and(|last_arg| {
                 let search_start = printer.view.expr(*last_arg).span().end;

@@ -8,6 +8,7 @@ use crate::parser::element::tag_name_end;
 use bumpalo::Bump;
 #[cfg(not(feature = "_internal_ast_census"))]
 use bumpalo::collections::Vec as BumpVec;
+use tsv_lang::store::Run;
 use tsv_lang::{Comment, DepthBudget, DepthLimit, Error, Span};
 use tsv_ts::__private::TopLevelAs;
 use tsv_ts::__private::{is_id_continue, is_id_start};
@@ -266,7 +267,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// document's stores.
     #[expect(clippy::expect_used)]
     #[inline]
-    pub(crate) fn merge_island_comments(&mut self, comments: tsv_ts::ast::CommentList) {
+    pub(crate) fn merge_island_comments(&mut self, comments: Run<Comment>) {
         let stores = self
             .stores
             .as_deref()

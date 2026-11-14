@@ -76,10 +76,14 @@ fn call_has_breaking_single_arg(call: &CallExpression, printer: &Printer<'_>) ->
         return false;
     }
     let d = printer.arena();
-    match &printer.view.expr(printer.view.list(call.arguments)[0]).kind {
+    match &printer
+        .view
+        .expr(printer.view.expr_list(call.arguments)[0])
+        .kind
+    {
         ExpressionKind::ObjectExpression(_) | ExpressionKind::ArrayExpression(_) => {
             let arg_doc = printer
-                .build_expression_doc(printer.view.expr(printer.view.list(call.arguments)[0]));
+                .build_expression_doc(printer.view.expr(printer.view.expr_list(call.arguments)[0]));
             d.will_break(arg_doc)
         }
         // Object/array-body arrows (typed or not) are expandable per prettier's
@@ -1044,7 +1048,7 @@ fn build_return_hug_state<'a>(
         .iter()
         .rev()
         .find_map(ChainNode::as_call_expression)?;
-    let [_, .., last] = printer.view.list(call.arguments) else {
+    let [_, .., last] = printer.view.expr_list(call.arguments) else {
         return None;
     };
     function_return_hug_break(printer, printer.view.expr(*last))?;
@@ -1288,7 +1292,7 @@ fn build_assumed_param_hug_state<'a>(
     let callback = |arg: &crate::ast::ExprId| {
         flat_sole_param_literal(printer, printer.view.expr(*arg)).is_some()
     };
-    let (arg, separator) = match printer.view.list(call.arguments) {
+    let (arg, separator) = match printer.view.expr_list(call.arguments) {
         [.., last] if callback(last) => (*last, None),
         [first, _] if callback(first) => (*first, Some(d.text(","))),
         _ => return None,
@@ -1373,7 +1377,7 @@ fn build_arrow_comment_line_state<'a>(
     })?;
     let arg = printer
         .view
-        .expr(*printer.view.list(call.arguments).last()?);
+        .expr(*printer.view.expr_list(call.arguments).last()?);
     let &ExpressionKind::ArrowFunctionExpression(arrow) = &arg.kind else {
         return None;
     };
@@ -1523,7 +1527,7 @@ fn last_group_single_argument<'a>(
         .iter()
         .rev()
         .find_map(ChainNode::as_call_expression)?;
-    match view.list(call.arguments) {
+    match view.expr_list(call.arguments) {
         [arg] => Some(view.expr(*arg)),
         _ => None,
     }
@@ -1556,7 +1560,7 @@ fn other_calls_have_function_arguments<'a>(
     rest_groups: &[ChainGroup<'a>],
 ) -> bool {
     let takes_function_argument = |call: &CallExpression| {
-        view.list(call.arguments).iter().any(|a| {
+        view.expr_list(call.arguments).iter().any(|a| {
             matches!(
                 view.expr(*a).kind,
                 ExpressionKind::FunctionExpression(_) | ExpressionKind::ArrowFunctionExpression(_)

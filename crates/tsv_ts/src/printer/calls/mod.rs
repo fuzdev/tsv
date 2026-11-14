@@ -202,9 +202,14 @@ pub(super) fn callee_gap(
         let start = callee.span().end;
         // [`paren_split_for`]'s own gate, over the gap it would be asked about.
         let gap_start = args_side_start(call, start);
-        if printer.view.list(call.arguments).first().is_none_or(|arg| {
-            printer.gap_known_comment_free(gap_start, printer.view.expr(*arg).span().start)
-        }) {
+        if printer
+            .view
+            .expr_list(call.arguments)
+            .first()
+            .is_none_or(|arg| {
+                printer.gap_known_comment_free(gap_start, printer.view.expr(*arg).span().start)
+            })
+        {
             let plain = CalleeGap {
                 owned_pair: false,
                 trailing_gap: None,
@@ -308,7 +313,7 @@ fn call_paren_split(
     if call.optional {
         return None;
     }
-    paren_split_for(printer, gap_start, printer.view.list(call.arguments))
+    paren_split_for(printer, gap_start, printer.view.expr_list(call.arguments))
 }
 
 /// [`call_paren_split`] over any argument list — the `new` expression's head asks it too, its
@@ -447,7 +452,7 @@ fn call_optional(
         || {
             printer
                 .view
-                .list(call.arguments)
+                .expr_list(call.arguments)
                 .first()
                 .map_or(span.end, |arg| printer.view.expr(*arg).span().start)
         },
@@ -461,7 +466,7 @@ fn call_optional(
         printer,
         start,
         question + OPTIONAL_TOKEN_LEN,
-        printer.view.list(call.arguments),
+        printer.view.expr_list(call.arguments),
     ) {
         return CallOptional::Unsplit;
     }
@@ -793,7 +798,7 @@ pub(crate) fn call_may_print_whole(view: AstView<'_>, call: ast::ExprId) -> bool
         return false;
     };
     callee_is_curried_member_chain_call(view, view.expr(call.callee))
-        || is_sole_multiline_template_arg(view, view.list(call.arguments))
+        || is_sole_multiline_template_arg(view, view.expr_list(call.arguments))
 }
 
 /// Whether `call`'s callee is a call taking more arguments than `call` does, and `call` takes
@@ -836,7 +841,7 @@ impl<'a> Printer<'a> {
     ) -> bool {
         // The shape test comes first: it reads the argument list alone, where the rest
         // needs the callee gap resolved to know where the `(` follows.
-        is_sole_multiline_template_arg(self.view, self.view.list(call.arguments))
+        is_sole_multiline_template_arg(self.view, self.view.expr_list(call.arguments))
             && self.call_takes_template_bypass_beyond_shape(call, span)
     }
 
@@ -849,7 +854,7 @@ impl<'a> Printer<'a> {
         span: Span,
     ) -> bool {
         let paren_open = call_paren_open(self, call, span);
-        multiline_template_hug_applies(self, self.view.list(call.arguments), paren_open)
+        multiline_template_hug_applies(self, self.view.expr_list(call.arguments), paren_open)
             && !self.has_line_comments_between(span.start, paren_open)
     }
 
@@ -1001,14 +1006,14 @@ impl<'a> Printer<'a> {
         // Skip when the inner call has array/object args — those may force multiline,
         // and the chain formatter handles that correctly via group(oneLine).
         if let ast::ExpressionKind::CallExpression(inner) = &callee.kind {
-            let inner_has_multiline_arg = self.view.list(inner.arguments).iter().any(|arg| {
+            let inner_has_multiline_arg = self.view.expr_list(inner.arguments).iter().any(|arg| {
                 matches!(
                     self.view.expr(*arg).kind,
                     ast::ExpressionKind::ArrayExpression(_)
                         | ast::ExpressionKind::ObjectExpression(_)
                 )
             });
-            let any_arg_empty_line = any_arg_empty_line(self.view.list(call.arguments), self);
+            let any_arg_empty_line = any_arg_empty_line(self.view.expr_list(call.arguments), self);
             let paren_open = callee.span().end;
             // Whole-call comment-presence gate (one binary search over the argument
             // window); short-circuits the comment predicates below and threads into
@@ -1024,7 +1029,7 @@ impl<'a> Printer<'a> {
             if call.type_arguments.is_none()
                 && !call.optional
                 && call.arguments.len() >= 2
-                && self.view.list(call
+                && self.view.expr_list(call
                     .arguments
                     ).last()
                     .is_some_and(|arg| is_block_function(self.view, self.view.expr(*arg)))
@@ -1032,7 +1037,7 @@ impl<'a> Printer<'a> {
                 && !(call_has_comments
                     && any_comment_forces_expansion(call, span, self, paren_open))
                 && !(call_has_comments
-                    && last_arg_has_comments(self.view.list(call.arguments), self, span.end, paren_open))
+                    && last_arg_has_comments(self.view.expr_list(call.arguments), self, span.end, paren_open))
                 && !inner_has_multiline_arg
                 // A long-curried callee prints its list without a group, which this route —
                 // printing the callee whole — cannot express. The chain path prints it.
@@ -1040,7 +1045,7 @@ impl<'a> Printer<'a> {
                 // The hug renders the callback's signature head on this line, so a
                 // signature that will break refuses it here as at every expand-last site;
                 // the fall-through breaks every argument out.
-                && !self.view.list(call.arguments).last().is_some_and(|arg| {
+                && !self.view.expr_list(call.arguments).last().is_some_and(|arg| {
                     callback_signature_refuses_hug(self, self.view.expr(*arg), call.arguments.len())
                 })
             {
@@ -1051,13 +1056,13 @@ impl<'a> Printer<'a> {
                 // Leading comments before first arg are handled inside build_args_split_last
                 let assumed = self
                     .view
-                    .list(call.arguments)
+                    .expr_list(call.arguments)
                     .last()
                     .and_then(|last| AssumedParamHug::new(self, self.view.expr(*last)));
                 let (head_parts, last_arg_doc, all_args_broken) =
                     AssumedParamHug::sharing(assumed.as_ref(), self, || {
                         build_args_split_last(
-                            self.view.list(call.arguments),
+                            self.view.expr_list(call.arguments),
                             self,
                             paren_open,
                             call_has_comments,
@@ -1071,7 +1076,7 @@ impl<'a> Printer<'a> {
                         arg_wrapping::build_joined_argument_doc(
                             self,
                             paren_open,
-                            self.view.list(call.arguments),
+                            self.view.expr_list(call.arguments),
                             last_index,
                         )
                     })

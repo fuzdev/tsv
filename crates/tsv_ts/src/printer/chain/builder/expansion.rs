@@ -216,7 +216,7 @@ pub(super) fn call_has_complex_args<'a>(view: AstView<'_>, node: &ChainNode<'a>)
         return false;
     };
     // Check if any argument is NOT simple (using Prettier's depth-limited check)
-    view.list(call.arguments)
+    view.expr_list(call.arguments)
         .iter()
         .any(|arg| !is_simple_call_argument(view, view.expr(*arg), 2))
 }

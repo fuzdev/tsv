@@ -287,7 +287,7 @@ impl<'a> Printer<'a> {
 
         // Signature (params + return type) in a single group
         let (sig_doc, sig_end) = self.build_callable_signature_doc(
-            self.view.run(decl.params),
+            self.view.exprs(decl.params),
             decl.type_parameters.as_ref(),
             decl.return_type.as_ref(),
             decl.params_start,

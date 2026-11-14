@@ -8,13 +8,12 @@
 //! reaches a row through a load of the store's slice header and an indexed load, and holds one
 //! register for the view.
 
-use tsv_lang::store::Run;
+use tsv_lang::store::{PoolText, Run};
 
 use super::stores::{PayloadStores, RunStores};
 use super::{
-    AstStores, CatchClause, CatchId, Comment, CommentList, Decorator, ExprId, Expression,
-    ForHeadId, ForInit, IdentifierParamExtra, ParamExtraId, Parsed, PoolStr, Program, Statement,
-    StmtId, TSType, TyId,
+    AstStores, CatchClause, CatchId, Comment, Decorator, ExprId, Expression, ForHeadId, ForInit,
+    IdentifierParamExtra, ParamExtraId, Parsed, Program, Statement, StmtId, TSType, Text, TyId,
 };
 
 /// The read access every consumer of the tree holds: resolves edges and lists.
@@ -38,25 +37,25 @@ impl<'a> AstView<'a> {
 
     /// The expression `id` names, when it is present.
     #[inline]
-    pub fn opt(self, id: Option<ExprId>) -> Option<&'a Expression> {
+    pub fn opt_expr(self, id: Option<ExprId>) -> Option<&'a Expression> {
         id.map(|id| self.expr(id))
     }
 
     /// The ids of `list`: call and `new` arguments, sequence and template expressions.
     #[inline]
-    pub fn list(self, list: Run<ExprId>) -> &'a [ExprId] {
+    pub fn expr_list(self, list: Run<ExprId>) -> &'a [ExprId] {
         self.stores.expr_lists.slice(list)
     }
 
     /// The ids of `list`, holes included: array elements and array-pattern elements.
     #[inline]
-    pub fn opt_list(self, list: Run<Option<ExprId>>) -> &'a [Option<ExprId>] {
+    pub fn expr_opt_list(self, list: Run<Option<ExprId>>) -> &'a [Option<ExprId>] {
         self.stores.expr_opt_lists.slice(list)
     }
 
     /// The expressions of `run`, held by value: parameter lists.
     #[inline]
-    pub fn run(self, run: Run<Expression>) -> &'a [Expression] {
+    pub fn exprs(self, run: Run<Expression>) -> &'a [Expression] {
         self.stores.exprs.slice(run)
     }
 
@@ -129,14 +128,14 @@ impl<'a> AstView<'a> {
     /// template value, a carriage-return-folded template raw — so every name reader's common,
     /// span-identity arm stays small enough to inline where it is read.
     #[inline(never)]
-    pub fn text(self, text: PoolStr) -> &'a str {
-        self.stores.text.get(text.text)
+    pub fn text(self, text: PoolText<Text>) -> &'a str {
+        self.stores.text.get(text)
     }
 
     /// The comments of `list`: a program's. A miss ends in the store's shared cold path.
     #[inline]
-    pub fn comments(self, list: CommentList) -> &'a [Comment] {
-        self.stores.comments.slice(list.run)
+    pub fn comments(self, list: Run<Comment>) -> &'a [Comment] {
+        self.stores.comments.slice(list)
     }
 
     /// The payload stores, for the accessors their macro declares beside them.

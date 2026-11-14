@@ -763,7 +763,7 @@ fn group_forces_list_break(group: &ChainGroup<'_>, printer: &Printer<'_>) -> boo
             .nodes
             .iter()
             .filter_map(ChainNode::as_call_expression)
-            .flat_map(|call| printer.view.list(call.arguments).iter())
+            .flat_map(|call| printer.view.expr_list(call.arguments).iter())
             .any(|arg| printer.span_holds_forced_list_break(printer.view.expr(*arg).span()))
 }
 

@@ -189,7 +189,7 @@ pub(super) fn test_call_flat_gaps_clear(
     // gates nothing. Canonical reference: `build_params_doc_with_comments`.
     let Some(last_start) = printer
         .view
-        .list(call.arguments)
+        .expr_list(call.arguments)
         .last()
         .map(|a| printer.view.expr(*a).span().start)
     else {
@@ -210,17 +210,17 @@ fn test_call_gaps_have_comments(
 ) -> bool {
     printer
         .view
-        .list(call.arguments)
+        .expr_list(call.arguments)
         .first()
         .is_some_and(|first| {
             printer.has_comments_to_emit_between(paren_open, printer.view.expr(*first).span().start)
         })
-        || has_inter_argument_comments_slice(printer.view.list(call.arguments), printer)
+        || has_inter_argument_comments_slice(printer.view.expr_list(call.arguments), printer)
 }
 
 /// Check if a call expression is a test function call that should stay on one line
 pub(super) fn is_test_call(call: &ast::CallExpression, printer: &Printer<'_>) -> bool {
-    let arguments = printer.view.list(call.arguments);
+    let arguments = printer.view.expr_list(call.arguments);
     // Optional calls (`describe?.(...)`) are never test calls — they format like
     // a normal call (wrap when long), preserving the `?.`. Mirrors prettier's
     // isTestCall guard (`utilities/test-libraries.js`: `node.optional` → false).

@@ -307,7 +307,7 @@ fn bare_param_sharing_arrow_start(
     if arrow.params_start.is_some() {
         return None;
     }
-    let start = view.run(arrow.params).first()?.span().start;
+    let start = view.exprs(arrow.params).first()?.span().start;
     (start == span.start).then_some(start)
 }
 
@@ -490,7 +490,7 @@ fn arrow_signature_will_break(
     let window_start = arrow.params_start.unwrap_or(span.start);
     if params_cannot_force_break(
         printer,
-        printer.view.run(arrow.params),
+        printer.view.exprs(arrow.params),
         window_start,
         arrow.arrow_token,
     ) {
@@ -501,7 +501,7 @@ fn arrow_signature_will_break(
     } else {
         sole_param_object_type_start(
             printer,
-            printer.view.run(arrow.params),
+            printer.view.exprs(arrow.params),
             arrow.params_start,
             || printer.arrow_params_end(arrow),
         )
@@ -590,7 +590,7 @@ fn param_is_flat(view: AstView<'_>, param: &ast::Expression) -> bool {
                 .unwrap_or_default()
                 .is_empty()
                 && annotation_is_flat(view, pattern.type_annotation.as_ref())
-                && view.opt_list(pattern.elements).iter().all(|element| {
+                && view.expr_opt_list(pattern.elements).iter().all(|element| {
                     element
                         .as_ref()
                         .is_none_or(|element| match &view.expr(*element).kind {
@@ -812,7 +812,7 @@ pub(in crate::printer) fn flat_sole_param_literal<'a>(
             };
             let literal = sole_param_object_type(
                 printer,
-                printer.view.run(arrow.params),
+                printer.view.exprs(arrow.params),
                 arrow.params_start,
                 || printer.arrow_params_end(arrow),
             )?;
@@ -822,7 +822,7 @@ pub(in crate::printer) fn flat_sole_param_literal<'a>(
             let func = printer.view.fn_expr(func);
             let literal = sole_param_object_type(
                 printer,
-                printer.view.run(func.params),
+                printer.view.exprs(func.params),
                 Some(func.params_start),
                 || {
                     printer
@@ -1003,7 +1003,7 @@ fn function_signature_refuses_hug(
     func: &ast::FunctionExpression,
     arg_count: usize,
 ) -> bool {
-    let params = printer.view.run(func.params);
+    let params = printer.view.exprs(func.params);
     if function_signature_has_breaking_comments(printer, func) {
         return true;
     }
@@ -1011,7 +1011,7 @@ fn function_signature_refuses_hug(
         || !(arg_count > 1
             || printer
                 .view
-                .run(func.params)
+                .exprs(func.params)
                 .iter()
                 .all(|param| is_untyped_identifier_param(printer.view, param)))
     {
@@ -3140,13 +3140,13 @@ impl<'a> Printer<'a> {
             // and every comment around it is the arrow's: before it the arrow's own, after
             // it the pre-`=>` gap's.
             if self.region_param_is_bare(arrow, span)
-                && let [param] = self.view.run(arrow.params)
+                && let [param] = self.view.exprs(arrow.params)
             {
                 self.test_call_flat_params.set(false);
                 return self.build_function_parameter_doc(param);
             }
             self.build_params_doc_with_comments(
-                self.view.run(arrow.params),
+                self.view.exprs(arrow.params),
                 arrow.params_start,
                 self.arrow_params_end(arrow),
             )
@@ -3194,7 +3194,12 @@ impl<'a> Printer<'a> {
             .as_ref()
             .map(|tp| tp.span.start)
             .or(arrow.params_start)
-            .or_else(|| self.view.run(arrow.params).first().map(|p| p.span().start))
+            .or_else(|| {
+                self.view
+                    .exprs(arrow.params)
+                    .first()
+                    .map(|p| p.span().start)
+            })
             .unwrap_or_else(|| arrow.body.span(self.view).start);
         parts.push(self.build_keyword_to_name_comments(span.start, head_start));
     }
@@ -3220,11 +3225,11 @@ impl<'a> Printer<'a> {
             // Find closing `)` to get accurate boundary
             Some(params_start) => self.close_paren_after_params(
                 params_start,
-                self.view.run(arrow.params).last().map(|p| p.span().end),
+                self.view.exprs(arrow.params).last().map(|p| p.span().end),
                 arrow.body.span(self.view).start,
             ),
             // No parens (single param arrow like `x => x`) - use param end
-            None => self.view.run(arrow.params).last().map(|p| p.span().end),
+            None => self.view.exprs(arrow.params).last().map(|p| p.span().end),
         }
     }
 
@@ -3296,7 +3301,7 @@ impl<'a> Printer<'a> {
         arrow: &ast::ArrowFunctionExpression,
     ) -> bool {
         self.trailing_param_comment_forces_break(
-            self.view.run(arrow.params),
+            self.view.exprs(arrow.params),
             self.arrow_params_end(arrow),
         )
     }
@@ -3328,7 +3333,7 @@ impl<'a> Printer<'a> {
     /// *callback kind*, not over every construct that can hold one.
     fn function_trailing_param_comment_forces_break(&self, func: &ast::FunctionExpression) -> bool {
         self.trailing_param_comment_forces_break(
-            self.view.run(func.params),
+            self.view.exprs(func.params),
             self.find_closing_paren(func.params_start, func.body.span.start),
         )
     }
@@ -3896,7 +3901,7 @@ impl<'a> Printer<'a> {
         // parameter list along with it (`function <⏎// c⏎T>(⏎x: T⏎)`), which the declaration
         // and class-method paths — the same signature, through the same helper — never did.
         let (sig_doc, sig_end) = self.build_callable_signature_doc(
-            self.view.run(func.params),
+            self.view.exprs(func.params),
             func.type_parameters.as_ref(),
             func.return_type.as_ref(),
             func.params_start,
@@ -4690,7 +4695,7 @@ impl<'a> Printer<'a> {
         class_expr: &ast::ClassExpression,
         class_expr_span: Span,
     ) -> DocId {
-        let super_class = self.view.opt(class_expr.super_class);
+        let super_class = self.view.opt_expr(class_expr.super_class);
         let d = self.d();
 
         // With a decorated class expression (`@dec class {}`), span.start points

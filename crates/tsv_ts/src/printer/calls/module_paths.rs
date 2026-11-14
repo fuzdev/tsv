@@ -19,7 +19,7 @@ use crate::ast;
 pub(super) fn is_module_path_no_break(call: &ast::CallExpression, printer: &Printer<'_>) -> bool {
     // Must have exactly 1 argument that is a string literal
     if call.arguments.len() != 1
-        || !is_string_literal(printer.view.expr(printer.view.list(call.arguments)[0]))
+        || !is_string_literal(printer.view.expr(printer.view.expr_list(call.arguments)[0]))
     {
         return false;
     }
@@ -52,7 +52,7 @@ pub(super) fn get_module_path_chain_break<'a>(
 ) -> Option<(&'a ast::Expression, &'a ast::Identifier)> {
     // Must have exactly 1 argument that is a string literal
     if call.arguments.len() != 1
-        || !is_string_literal(printer.view.expr(printer.view.list(call.arguments)[0]))
+        || !is_string_literal(printer.view.expr(printer.view.expr_list(call.arguments)[0]))
     {
         return None;
     }

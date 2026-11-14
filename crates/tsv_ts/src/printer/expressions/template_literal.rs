@@ -64,7 +64,7 @@ impl<'a> Printer<'a> {
 
             // Interpolation
             if i < template.expressions.len() {
-                let expr = self.view.expr(self.view.list(template.expressions)[i]);
+                let expr = self.view.expr(self.view.expr_list(template.expressions)[i]);
                 let next_quasi = &self.view.quasis(template.quasis)[i + 1];
 
                 // Calculate indent size from quasi text (Prettier's getIndentSize)

@@ -327,7 +327,7 @@ impl<'a> Parser<'a> {
                     parser
                         .stores
                         .view()
-                        .opt_list(elements)
+                        .expr_opt_list(elements)
                         .get(i)
                         .copied()
                         .flatten()

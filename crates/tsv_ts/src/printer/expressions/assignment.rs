@@ -355,7 +355,7 @@ pub(crate) fn arrow_chain_should_break(
     // 2. type_params (generics)
     // 3. any param that's not a simple identifier
     let has_non_identifier_param = view
-        .run(arrow.params)
+        .exprs(arrow.params)
         .iter()
         .any(|p| !matches!(p.kind, ExpressionKind::Identifier(_)));
 
@@ -701,7 +701,7 @@ fn is_poorly_breakable_chain_walk(
                     || (call.arguments.len() == 1
                         && is_short_arg(
                             view,
-                            view.expr(view.list(call.arguments)[0]),
+                            view.expr(view.expr_list(call.arguments)[0]),
                             printer.source,
                         )
                         && !call_arg_has_comments(call, expr.span, printer));
@@ -904,7 +904,7 @@ fn chain_has_multiline_string_arg(view: AstView<'_>, expr: &Expression, source: 
         expr = match &expr.kind {
             ExpressionKind::CallExpression(call) => {
                 if view
-                    .list(call.arguments)
+                    .expr_list(call.arguments)
                     .iter()
                     .any(|arg| arg_is_multiline_string(view, view.expr(*arg), source))
                 {
@@ -981,7 +981,7 @@ pub(crate) fn is_type_assertion_call(view: AstView<'_>, expr: &Expression, sourc
     // (Trivial = empty args OR single short arg)
     !(call.arguments.is_empty()
         || call.arguments.len() == 1
-            && is_short_arg(view, view.expr(view.list(call.arguments)[0]), source))
+            && is_short_arg(view, view.expr(view.expr_list(call.arguments)[0]), source))
 }
 
 /// Check if an expression is a member-only chain (no calls).
@@ -1703,7 +1703,7 @@ impl<'a> Printer<'a> {
                         .map_or_else(|| self.view.expr(call.callee).span().end, |ta| ta.span.end);
                     let args_gap_end = self
                         .view
-                        .list(call.arguments)
+                        .expr_list(call.arguments)
                         .first()
                         .map_or(expr.span.end, |arg| self.view.expr(*arg).span().start);
                     let callee_gap_breaks = self

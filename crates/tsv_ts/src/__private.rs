@@ -5,10 +5,11 @@
 use super::*;
 use crate::ast::{
     AstStores, AstView, ExprId, Expression, ExpressionKind, FunctionDeclaration, Parsed, ParsedRef,
-    Program, Run, Statement, StatementKind, TSTypeAnnotation, TSTypeParameterDeclaration,
+    Program, Run, Statement, StatementKind, TSTypeAnnotation, TSTypeParameterDeclaration, Text,
     VariableDeclaration,
 };
 use tsv_lang::Span;
+use tsv_lang::store::PoolText;
 
 pub use crate::ast::{WarmStores, with_stores};
 pub use crate::imports::{collect_imports, parse_imports_into};
@@ -336,7 +337,7 @@ pub fn parse_expression_with_comments(
     stores: &mut AstStores,
     end: &str,
     host_check: impl Fn(AstView<'_>, ExprId) -> Result<()>,
-) -> Result<(ExprId, ast::CommentList)> {
+) -> Result<(ExprId, Run<ast::Comment>)> {
     with_embedding_parser(
         source,
         base_offset,
@@ -384,7 +385,7 @@ pub fn parse_pattern_with_comments(
     base_offset: usize,
     host_nesting: u32,
     stores: &mut AstStores,
-) -> Result<(ExprId, ast::CommentList)> {
+) -> Result<(ExprId, Run<ast::Comment>)> {
     with_embedding_parser(
         source,
         base_offset,
@@ -415,8 +416,8 @@ pub fn push_expression(stores: &mut AstStores, expr: Expression) -> ExprId {
 /// Push `text` into `stores`' text pool and mint its handle — for a host-built name, such as
 /// a directive name a span of the source cannot spell.
 #[inline]
-pub fn push_text(stores: &mut AstStores, text: &str) -> ast::PoolStr {
-    ast::PoolStr::new(stores.text.push(text))
+pub fn push_text(stores: &mut AstStores, text: &str) -> PoolText<Text> {
+    stores.text.push(text)
 }
 
 /// The `FunctionDeclaration` `program`'s first statement is, borrowed from `stores` — for a
@@ -625,7 +626,7 @@ pub fn parse_type_annotation_partial(
     base_offset: usize,
     host_nesting: u32,
     stores: &mut AstStores,
-) -> Result<(TSTypeAnnotation, ast::CommentList)> {
+) -> Result<(TSTypeAnnotation, Run<ast::Comment>)> {
     with_embedding_parser(
         source,
         base_offset,
@@ -670,7 +671,7 @@ pub fn parse_expression_partial_with_comments(
     stores: &mut AstStores,
     top_level_as: TopLevelAs,
     host_check: impl Fn(AstView<'_>, ExprId, usize) -> Result<()>,
-) -> Result<(ExprId, usize, ast::CommentList)> {
+) -> Result<(ExprId, usize, Run<ast::Comment>)> {
     with_embedding_parser(
         source,
         base_offset,
@@ -745,7 +746,7 @@ pub fn parse_statement_with_comments(
     host_nesting: u32,
     stores: &mut AstStores,
     host_check: impl Fn(AstView<'_>, &Statement) -> Result<()>,
-) -> Result<(Statement, ast::CommentList)> {
+) -> Result<(Statement, Run<ast::Comment>)> {
     with_embedding_parser(
         source,
         base_offset,
@@ -848,9 +849,12 @@ pub fn build_bare_sequence_operand_docs(
 ) -> Vec<Option<DocId>> {
     with_doc_printer(arena, inputs, embed, |printer| {
         printer.mark_relational_sibling_authored_pairs(
-            view.list(sequence.expressions).iter().copied().map(Some),
+            view.expr_list(sequence.expressions)
+                .iter()
+                .copied()
+                .map(Some),
         );
-        view.list(sequence.expressions)
+        view.expr_list(sequence.expressions)
             .iter()
             .enumerate()
             .map(|(i, expr)| {

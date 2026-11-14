@@ -39,7 +39,7 @@ pub(super) fn write_arrow_function_expression(
     if generic_async {
         write_type_parameters_field(w, arrow.type_parameters.as_ref(), ctx);
         w.raw(",\"params\":");
-        write_expressions(w, ctx.view.run(arrow.params), ctx);
+        write_expressions(w, ctx.view.exprs(arrow.params), ctx);
         write_return_type_field(w, arrow.return_type.as_ref(), ctx);
         w.raw_pick(
             arrow.body.is_expression(),
@@ -55,7 +55,7 @@ pub(super) fn write_arrow_function_expression(
             b",\"id\":null,\"expression\":false,\"generator\":false,\"async\":",
         );
         w.raw_pick(arrow.r#async, b"true,\"params\":", b"false,\"params\":");
-        write_expressions(w, ctx.view.run(arrow.params), ctx);
+        write_expressions(w, ctx.view.exprs(arrow.params), ctx);
         w.raw(",\"body\":");
         write_arrow_body(w, &arrow.body, ctx);
         write_type_parameters_field(w, arrow.type_parameters.as_ref(), ctx);
@@ -91,7 +91,7 @@ pub(super) fn write_function_expression(
         write_type_parameters_field(w, func.type_parameters.as_ref(), ctx);
     }
     w.raw(",\"params\":");
-    write_expressions(w, ctx.view.run(func.params), ctx);
+    write_expressions(w, ctx.view.exprs(func.params), ctx);
     write_return_type_field(w, func.return_type.as_ref(), ctx);
     w.raw(",\"body\":");
     write_block_statement(w, &func.body, ctx);
@@ -118,7 +118,7 @@ pub(super) fn write_new_expression(
     write_expressions(
         w,
         ctx.view
-            .list(new_expr.arguments)
+            .expr_list(new_expr.arguments)
             .iter()
             .map(|e| ctx.view.expr(*e)),
         ctx,
@@ -161,7 +161,7 @@ pub(super) fn write_call_expression_tail(
     write_expressions(
         w,
         ctx.view
-            .list(call.arguments)
+            .expr_list(call.arguments)
             .iter()
             .map(|e| ctx.view.expr(*e)),
         ctx,

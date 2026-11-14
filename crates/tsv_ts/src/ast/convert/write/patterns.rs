@@ -41,7 +41,7 @@ pub(super) fn write_template_literal(
     write_expressions(
         w,
         ctx.view
-            .list(template.expressions)
+            .expr_list(template.expressions)
             .iter()
             .map(|e| ctx.view.expr(*e)),
         ctx,

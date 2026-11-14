@@ -325,7 +325,7 @@ pub(super) fn has_inter_argument_comments(
     call: &ast::CallExpression,
     printer: &Printer<'_>,
 ) -> bool {
-    has_inter_argument_comments_slice(printer.view.list(call.arguments), printer)
+    has_inter_argument_comments_slice(printer.view.expr_list(call.arguments), printer)
 }
 
 /// Check if there are comments between arguments in a slice
@@ -480,7 +480,7 @@ pub(super) fn any_comment_forces_expansion(
     paren_open: u32,
 ) -> bool {
     any_comment_forces_expansion_slice(
-        printer.view.list(call.arguments),
+        printer.view.expr_list(call.arguments),
         printer,
         paren_open,
         span.end,
@@ -578,7 +578,7 @@ pub(super) fn last_arg_has_comments(
     call_end: u32,
     paren_open: u32,
 ) -> bool {
-    let Some(last) = printer.view.opt(arguments.last().copied()) else {
+    let Some(last) = printer.view.opt_expr(arguments.last().copied()) else {
         return false;
     };
     let last_start = last.span().start;
@@ -652,7 +652,7 @@ pub(super) fn first_arg_has_any_comments(
     // The routing step is what keeps the hugging spelling (`}, /* c */ b`) out of the run:
     // there the block leads the next argument, prettier's `hasComment(firstArg)` is false,
     // and the hug is correct.
-    if let Some(second) = printer.view.opt(arguments.get(1).copied()) {
+    if let Some(second) = printer.view.opt_expr(arguments.get(1).copied()) {
         let gap =
             PartitionedComments::for_routed_arg_gap(printer, first.span().end, second.span().start);
         return gap.has_trailing_comments();
@@ -671,7 +671,7 @@ pub(super) fn has_trailing_comments_on_args(
     span: Span,
     printer: &Printer<'_>,
 ) -> bool {
-    has_trailing_line_comments_slice(printer.view.list(call.arguments), span.end, printer)
+    has_trailing_line_comments_slice(printer.view.expr_list(call.arguments), span.end, printer)
 }
 
 /// Check if there are trailing line comments on any arguments (generic version)

@@ -755,7 +755,7 @@ impl<'a> Printer<'a> {
         span: Span,
         gap: TerminatorGap,
     ) -> DocId {
-        let Some(arg) = self.view.opt(ret.argument) else {
+        let Some(arg) = self.view.opt_expr(ret.argument) else {
             // No argument: a bare keyword closed by `;` (interior comments handled
             // there) — `return; /* c */` etc.
             return self.build_bare_keyword_terminator_doc("return", span, gap);

@@ -645,7 +645,7 @@ impl<'a> Parser<'a> {
         params: Run<Expression>,
         allow_this_param: bool,
     ) -> Result<(), Error> {
-        let params = self.stores.view().run(params);
+        let params = self.stores.view().exprs(params);
         let mut expected = if is_getter { 0 } else { 1 };
         if allow_this_param && params.first().is_some_and(|p| self.is_this_param(p)) {
             expected += 1;
@@ -688,7 +688,7 @@ impl<'a> Parser<'a> {
         let is_getter = matches!(kind, MethodKind::Get);
         self.check_accessor_param_arity(is_getter, params, false)?;
         if !is_getter {
-            let params = self.stores.view().run(params);
+            let params = self.stores.view().exprs(params);
             if self.is_this_param(&params[0]) {
                 return Err(
                     self.error_msg("'get' and 'set' accessors cannot declare 'this' parameters")
@@ -715,7 +715,7 @@ impl<'a> Parser<'a> {
     /// *overload* keep their defaults (all acorn-accepts). Function *types* reject
     /// defaults already via their own param parser (`parse_function_type_params`).
     pub(super) fn check_signature_params(&self, params: Run<Expression>) -> Result<(), Error> {
-        for param in self.stores.view().run(params) {
+        for param in self.stores.view().exprs(params) {
             if !matches!(
                 param.kind,
                 ExpressionKind::Identifier(_)

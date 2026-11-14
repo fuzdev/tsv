@@ -213,7 +213,7 @@ impl<'a> Ctx<'a> {
         let wire = self.snippet_wire_parameters;
         wire.binary_search_by_key(&snippet_start, |entry| entry.snippet_start)
             .ok()
-            .map(|i| self.view.run(wire[i].parameters))
+            .map(|i| self.view.exprs(wire[i].parameters))
     }
 
     /// The shared inputs for an embedded `tsv_ts` writer — this document's `source`,
@@ -1025,7 +1025,7 @@ fn write_snippet_block(w: &mut JsonWriter, block: &ast::SnippetBlock<'_>, ctx: &
     write_snippet_parameters(
         w,
         ctx.snippet_wire_parameters(block.span.start)
-            .unwrap_or_else(|| ctx.view.run(block.parameters)),
+            .unwrap_or_else(|| ctx.view.exprs(block.parameters)),
         block.span.start,
         range_end,
         ctx,
@@ -1123,7 +1123,7 @@ fn write_debug_tag(w: &mut JsonWriter, tag: &ast::DebugTag, ctx: &Ctx<'_>) {
     // paren-inclusive spans are what give the discarded-wrapper bounds below
     // canonical's own values. The cast-free common case borrows the parsed
     // slice untouched.
-    let entries = ctx.view.list(tag.identifiers);
+    let entries = ctx.view.expr_list(tag.identifiers);
     let spliced = if entries.iter().any(|&entry| {
         matches!(
             ctx.view
@@ -1142,7 +1142,7 @@ fn write_debug_tag(w: &mut JsonWriter, tag: &ast::DebugTag, ctx: &Ctx<'_>) {
                 .kind
             {
                 tsv_ts::ast::ExpressionKind::SequenceExpression(seq) => {
-                    flat.extend_from_slice(ctx.view.list(seq.expressions));
+                    flat.extend_from_slice(ctx.view.expr_list(seq.expressions));
                 }
                 _ => flat.push(entry),
             }
@@ -1519,7 +1519,7 @@ macro_rules! expression_directive_writer {
         fn $fn_name(w: &mut JsonWriter, d: &ast::$ty<'_>, ctx: &Ctx<'_>) {
             write_directive_head(w, stringify!($ty), d.span, d.name_span, d.head_span, ctx);
             w.raw(",\"expression\":");
-            write_optional_directive_expression(w, ctx.view.opt(d.expression), d.span, ctx);
+            write_optional_directive_expression(w, ctx.view.opt_expr(d.expression), d.span, ctx);
             w.raw(",\"modifiers\":");
             write_modifiers(w, d.modifiers);
             w.raw("}");
@@ -1542,7 +1542,7 @@ fn write_transition_directive(w: &mut JsonWriter, d: &ast::TransitionDirective<'
         ctx,
     );
     w.raw(",\"expression\":");
-    write_optional_directive_expression(w, ctx.view.opt(d.expression), d.span, ctx);
+    write_optional_directive_expression(w, ctx.view.opt_expr(d.expression), d.span, ctx);
     w.raw(",\"modifiers\":");
     write_modifiers(w, d.modifiers);
     w.raw(",\"intro\":");

@@ -211,7 +211,7 @@ pub(in crate::printer) enum SeqLayout {
 /// Both ends were re-derived at three sites apiece, in two parallel builders and their shared
 /// envelope. That is the shape such a pair drifts through, so the ends are named here once.
 pub(super) fn sequence_operand_run(view: AstView<'_>, seq: &ast::SequenceExpression) -> (u32, u32) {
-    let operands = view.list(seq.expressions);
+    let operands = view.expr_list(seq.expressions);
     (
         view.expr(operands[0]).span().start,
         view.expr(operands[operands.len() - 1]).span().end,
@@ -2425,7 +2425,7 @@ impl<'a> Printer<'a> {
         } else {
             "yield"
         };
-        let Some(arg) = self.view.opt(yield_expr.argument) else {
+        let Some(arg) = self.view.opt_expr(yield_expr.argument) else {
             return d.text(keyword);
         };
 
@@ -2685,11 +2685,11 @@ impl<'a> Printer<'a> {
         i: usize,
     ) -> DocId {
         let d = self.d();
-        let expr = self.view.expr(self.view.list(seq.expressions)[i]);
+        let expr = self.view.expr(self.view.expr_list(seq.expressions)[i]);
         let frozen = if i > 0 {
             self.gap_frozen_span(
                 self.view
-                    .expr(self.view.list(seq.expressions)[i - 1])
+                    .expr(self.view.expr_list(seq.expressions)[i - 1])
                     .span()
                     .end,
                 expr.span(),
@@ -2846,7 +2846,7 @@ impl<'a> Printer<'a> {
         // on that operand's left spine leads the whole sequence, floated out ahead of the
         // `(` with the edge (`Printer::left_spine_run_claim`). `Bare` prints no envelope:
         // the enclosing construct owns the edge.
-        let claim = match (parens, self.view.list(seq.expressions).first()) {
+        let claim = match (parens, self.view.expr_list(seq.expressions).first()) {
             (SeqParens::Bare, _) | (_, None) => None,
             (_, Some(first)) => {
                 self.left_spine_run_claim(seq_span, seq_span.start, self.view.expr(*first), || true)
@@ -2867,7 +2867,11 @@ impl<'a> Printer<'a> {
         layout: SeqLayout,
     ) -> DocId {
         self.mark_relational_sibling_authored_pairs(
-            self.view.list(seq.expressions).iter().copied().map(Some),
+            self.view
+                .expr_list(seq.expressions)
+                .iter()
+                .copied()
+                .map(Some),
         );
         // Where this builder's comment scans open: the FIRST OPERAND, never `seq_span.start`.
         // The leading edge between the two — the grouping `(` the parser stripped from that
@@ -2990,10 +2994,10 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn sequence_printed_end(&self, seq: &ast::SequenceExpression) -> u32 {
         let mut seq = seq;
         loop {
-            let [.., before, last] = self.view.list(seq.expressions) else {
+            let [.., before, last] = self.view.expr_list(seq.expressions) else {
                 return self
                     .view
-                    .list(seq.expressions)
+                    .expr_list(seq.expressions)
                     .last()
                     .map_or(0, |e| self.view.expr(*e).span().end);
             };
@@ -3178,7 +3182,7 @@ impl<'a> Printer<'a> {
         let body = self.build_doc_with_outermost_owned_comment_at(
             seq_span.start,
             self.view
-                .opt(self.view.list(seq.expressions).first().copied()),
+                .opt_expr(self.view.expr_list(seq.expressions).first().copied()),
             || {
                 self.build_sequence_operand_run_doc(
                     seq,
@@ -3228,7 +3232,7 @@ impl<'a> Printer<'a> {
         // Where the first operand's docs end — the continuation indent starts here, never
         // at the run's own start (see `build_sequence_layout_doc`).
         let mut first_end = 0;
-        for (i, expr) in self.view.list(seq.expressions).iter().enumerate() {
+        for (i, expr) in self.view.expr_list(seq.expressions).iter().enumerate() {
             let is_last = i + 1 == n;
             let expr_start = self.view.expr(*expr).span().start;
             let expr_end = self.view.expr(*expr).span().end;
@@ -3248,7 +3252,7 @@ impl<'a> Printer<'a> {
                 if seq_has_comments {
                     let prev_end = self
                         .view
-                        .expr(self.view.list(seq.expressions)[i - 1])
+                        .expr(self.view.expr_list(seq.expressions)[i - 1])
                         .span()
                         .end;
                     if let Some(comma) = self.find_comma_after(prev_end) {
@@ -3402,7 +3406,7 @@ impl<'a> Printer<'a> {
             self.build_doc_with_outermost_owned_comment_at(
                 span.start,
                 self.view
-                    .opt(self.view.list(seq.expressions).first().copied()),
+                    .opt_expr(self.view.expr_list(seq.expressions).first().copied()),
                 || {
                     self.build_sequence_line_comment_run_doc(
                         seq,
@@ -3437,7 +3441,7 @@ impl<'a> Printer<'a> {
         layout: SeqLayout,
         run_end: u32,
     ) -> DocId {
-        let expressions = self.view.list(seq.expressions);
+        let expressions = self.view.expr_list(seq.expressions);
         let keep_trailing_inside = matches!(parens, SeqParens::KeepInside);
         let d = self.d();
         let n = seq.expressions.len();

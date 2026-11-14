@@ -7,7 +7,7 @@ use crate::lexer::{KeywordKind, Lexer, LexerCheckpoint, Token, TokenKind, is_es_
 use crate::printer::ParenContext;
 use std::collections::BTreeSet;
 use std::ops::ControlFlow;
-use tsv_lang::store::{Id, IdRet, ListBuf, ListMark, Row, Store};
+use tsv_lang::store::{Id, IdRet, ListBuf, ListMark, PoolText, Row, Store};
 use tsv_lang::{DepthBudget, DepthLimit, Error, Span, SpineCount};
 
 /// What the expression ladder's parse functions return: see §The expression ladder's return
@@ -485,9 +485,9 @@ fn call_spine_step(view: AstView<'_>, inner: ExprId) -> ControlFlow<u32, ExprId>
 pub(super) struct Checkpoint {
     lexer: LexerCheckpoint,
     current: Token,
-    current_decoded: Option<PoolStr>,
+    current_decoded: Option<PoolText<Text>>,
     peek: Option<Token>,
-    peek_decoded: Option<PoolStr>,
+    peek_decoded: Option<PoolText<Text>>,
     had_line_terminator: bool,
     peek_had_line_terminator: bool,
     prev_end: usize,
@@ -568,21 +568,21 @@ pub(crate) struct Parser<'a> {
     /// only), mirroring the lexer's split.
     current: Token,
     /// Decoded string/identifier value for the current token (escape paths only),
-    /// copied into the text pool at receipt so it is a `Copy` [`PoolStr`] rather than an
+    /// copied into the text pool at receipt so it is a `Copy` `PoolText<Text>` rather than an
     /// owned `String` — the lexer decodes into a reused scratch buffer and the parser
     /// copies it out immediately, so no per-literal `String` survives. A rewind restores
     /// it as a value; the text an abandoned token pushed stays in the pool, unnamed.
-    current_decoded: Option<PoolStr>,
+    current_decoded: Option<PoolText<Text>>,
     /// Single-token lookahead slot, stored as the 16-byte `Token` POD with its
     /// decoded value out-of-band in `peek_decoded` (mirroring the `current` /
     /// `current_decoded` split). Consuming the peek is then a direct `Token` copy
     /// into `current` with no intermediate lookahead struct to reassemble.
     peek: Option<Token>,
-    peek_decoded: Option<PoolStr>,
+    peek_decoded: Option<PoolText<Text>>,
     base_offset: usize, // Offset in full source (for embedded expressions)
     /// Where this parser's comment ledger starts on the stores' comment scratch: the
     /// comments it has drained, in source order, are the frame above it
-    /// ([`Parser::comments`]), handed over as a [`CommentList`] by `take_comments`. The
+    /// ([`Parser::comments`]), handed over as a `Run<Comment>` by `take_comments`. The
     /// scratch keeps its capacity across documents, so a warm parse never allocates for
     /// comments.
     comment_mark: ListMark<Comment>,
@@ -1030,7 +1030,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Copy the lexer's just-produced decoded value (escape paths only) into the
-    /// text pool, yielding a `Copy` [`PoolStr`]. The lexer decodes into a reused
+    /// text pool, yielding a `Copy` `PoolText<Text>`. The lexer decodes into a reused
     /// scratch that the next lex overwrites, so this runs immediately after each
     /// lex; `None` for the common escape-free token. One copy into the pool, the only
     /// one on the escape path.
@@ -1039,7 +1039,7 @@ impl<'a> Parser<'a> {
     /// the pool push and its `memcpy` call kept two callee-saved registers live in
     /// [`Parser::advance_inner`], which then saved and restored them on every token.
     #[inline]
-    fn decoded_to_pool(&mut self) -> Option<PoolStr> {
+    fn decoded_to_pool(&mut self) -> Option<PoolText<Text>> {
         if self.lexer.decoded_str().is_some() {
             self.copy_decoded_to_pool()
         } else {
@@ -1050,9 +1050,9 @@ impl<'a> Parser<'a> {
     /// [`Parser::decoded_to_pool`]'s copy, for the rare token that decoded an escape.
     #[cold]
     #[inline(never)]
-    fn copy_decoded_to_pool(&mut self) -> Option<PoolStr> {
+    fn copy_decoded_to_pool(&mut self) -> Option<PoolText<Text>> {
         let decoded = self.lexer.decoded_str()?;
-        Some(PoolStr::new(self.stores.text.push(decoded)))
+        Some(self.stores.text.push(decoded))
     }
 
     /// The comments this parser has drained so far, in source order: its ledger.
@@ -1956,7 +1956,7 @@ impl<'a> Parser<'a> {
                     view.expr(c.callee).kind,
                     ExpressionKind::CallExpression(_) | ExpressionKind::TSNonNullExpression(_)
                 ) || matches!(
-                    view.list(c.arguments),
+                    view.expr_list(c.arguments),
                     [argument] if matches!(
                         view.expr(*argument).kind,
                         ExpressionKind::TemplateLiteral(_)
@@ -2198,9 +2198,9 @@ impl<'a> Parser<'a> {
     /// recurse.
     #[cold]
     #[inline(never)]
-    fn oversized_raw_name(&mut self) -> PoolStr {
+    fn oversized_raw_name(&mut self) -> PoolText<Text> {
         let raw = self.current_value();
-        PoolStr::new(self.stores.text.push(raw))
+        self.stores.text.push(raw)
     }
 
     /// Name channel for the current token, which the caller has already verified
@@ -4131,17 +4131,17 @@ impl<'a> Parser<'a> {
     pub(crate) fn parse_expression_with_comments(
         &mut self,
         end: &str,
-    ) -> Result<(ExprId, CommentList), Error> {
+    ) -> Result<(ExprId, Run<Comment>), Error> {
         let expr = self.parse_expression()?.id();
         self.expect_end_of_input(end)?;
         let comments = self.take_comments();
         Ok((expr, comments))
     }
 
-    /// Hand the collected comments to the caller as a [`CommentList`], flushing the ledger
+    /// Hand the collected comments to the caller as a `Run<Comment>`, flushing the ledger
     /// into the stores' comment rows. The parser drains no comment after it: every caller
     /// takes them once, at the end of its parse.
-    pub(crate) fn take_comments(&mut self) -> CommentList {
+    pub(crate) fn take_comments(&mut self) -> Run<Comment> {
         let stores = &mut *self.stores;
         let run = stores
             .comment_scratch
@@ -4150,7 +4150,7 @@ impl<'a> Parser<'a> {
         if !run.is_empty() {
             tsv_lang::ast_census_probe::mint::<Comment>(run.len());
         }
-        CommentList::new(run)
+        run
     }
 
     /// Parse a single assignment expression and return position where parsing stopped.

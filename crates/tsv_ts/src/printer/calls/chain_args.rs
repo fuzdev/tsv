@@ -225,7 +225,7 @@ fn single_arrow_expression_body<'a>(
     if call.arguments.len() != 1 {
         return None;
     }
-    let arg = view.expr(view.list(call.arguments)[0]);
+    let arg = view.expr(view.expr_list(call.arguments)[0]);
     let &ExpressionKind::ArrowFunctionExpression(arrow) = &arg.kind else {
         return None;
     };
@@ -332,7 +332,7 @@ fn build_call_args_doc_for_chain_impl(
     facts: ChainCall,
     force_expand: bool,
 ) -> DocId {
-    let arguments = printer.view.list(call.arguments);
+    let arguments = printer.view.expr_list(call.arguments);
     let ChainCall {
         own_call_layout,
         ungroup_args,
@@ -378,7 +378,7 @@ fn build_call_args_doc_for_chain_impl(
     let has_trailing_block_comments = call_has_comments
         && printer
             .view
-            .list(call.arguments)
+            .expr_list(call.arguments)
             .last()
             .is_some_and(|last| {
                 printer.has_comments_to_emit_between(printer.view.expr(*last).span().end, span.end)
@@ -562,7 +562,7 @@ fn build_chain_args_force_expand(
     ctx: ChainArgsContext,
     head: ChainHead,
 ) -> DocId {
-    let arguments = printer.view.list(call.arguments);
+    let arguments = printer.view.expr_list(call.arguments);
     let d = printer.d();
     let ChainArgsContext {
         paren_open,
@@ -885,7 +885,7 @@ fn build_chain_args_single(
     // plain-call / `new` one read through it.
     let opener = ArgOpener::chain(prefix);
 
-    let arg = printer.view.expr(printer.view.list(call.arguments)[0]);
+    let arg = printer.view.expr(printer.view.expr_list(call.arguments)[0]);
     let arrow = match arg.kind {
         ExpressionKind::ArrowFunctionExpression(arrow) => Some(printer.view.arrow_fn(arrow)),
         _ => None,
@@ -1374,7 +1374,7 @@ fn build_chain_args_multi(
     head: ChainHead,
 ) -> DocId {
     let d = printer.d();
-    let arguments = printer.view.list(call.arguments);
+    let arguments = printer.view.expr_list(call.arguments);
     let ChainArgsContext {
         paren_open,
         prefix,
@@ -1496,7 +1496,7 @@ fn build_chain_args_multi(
     if call.arguments.len() >= 2
         && !comments_force_expansion
         && !(has_any_comments && last_arg_commented)
-        && let Some(&Expression { span: arrow_span, kind: ExpressionKind::ArrowFunctionExpression(arrow) }) = printer.view.opt(arguments.last().copied())
+        && let Some(&Expression { span: arrow_span, kind: ExpressionKind::ArrowFunctionExpression(arrow) }) = printer.view.opt_expr(arguments.last().copied())
         && let arrow = printer.view.arrow_fn(arrow)
         && let ast::ArrowFunctionBody::Expression(body_expr) = &arrow.body
         // …and it reads the body through prettier's `stripChainElementWrappers`, so a call
@@ -1512,8 +1512,10 @@ fn build_chain_args_multi(
         // Expand-last arrow with a call body: build the body ONCE and inject it so the
         // whole-arrow arg doc reuses it (the break-body state below reuses it too) —
         // building it in both places recurses into itself → O(2^depth).
-        let body_reuse =
-            prebuild_expand_last_break_body(printer, printer.view.opt(arguments.last().copied()));
+        let body_reuse = prebuild_expand_last_break_body(
+            printer,
+            printer.view.opt_expr(arguments.last().copied()),
+        );
         let inject_prev = body_reuse.map(|(span, doc)| printer.inject_arrow_body(span, doc));
 
         let (head_parts, last_arg_doc, all_args_broken) =
@@ -1658,11 +1660,11 @@ fn build_chain_args_multi(
         // Prettier blocks expand-last for 2-arg arrow+array (React hook pattern)
         && !(call.arguments.len() == 2
             && matches!(
-                printer.view.opt(arguments.first().copied()),
+                printer.view.opt_expr(arguments.first().copied()),
                 Some(Expression { kind: ExpressionKind::ArrowFunctionExpression(_), .. })
             )
             && matches!(
-                printer.view.opt(arguments.last().copied()),
+                printer.view.opt_expr(arguments.last().copied()),
                 Some(Expression { kind: ExpressionKind::ArrayExpression(_), .. })
             ))
         && !last_two_args_same_type(printer.view, arguments)

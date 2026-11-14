@@ -1430,7 +1430,7 @@ impl<'a> Parser<'a> {
         let expressions = self.flush_expr_list(mark);
         #[cfg(debug_assertions)]
         {
-            let list = self.stores.view().list(expressions);
+            let list = self.stores.view().expr_list(expressions);
             if let (Some(&first), Some(&last)) = (list.first(), list.last()) {
                 debug_assert_encloses(self.stores.view(), span.start, span.end, first, last);
             }

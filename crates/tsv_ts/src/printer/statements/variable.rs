@@ -339,7 +339,7 @@ impl<'a> Printer<'a> {
         let is_call_with_trailing_comments =
             if let ExpressionKind::CallExpression(call) = &init.kind {
                 self.view
-                    .list(call.arguments)
+                    .expr_list(call.arguments)
                     .last()
                     .is_some_and(|last_arg| {
                         self.has_line_comments_between(
@@ -1091,7 +1091,7 @@ impl<'a> Printer<'a> {
             self.arrow_variable_type_args.set(arrow_variable_args);
 
             // Initializer with comment handling around =
-            if let Some(init) = self.view.opt(declarator.init) {
+            if let Some(init) = self.view.opt_expr(declarator.init) {
                 let mut id_end = self.view.expr(declarator.id).span().end;
                 let init_start = init.span().start;
                 // With definite assignment but no type annotation (`let a! = x`), the id

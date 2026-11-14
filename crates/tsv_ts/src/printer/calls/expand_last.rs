@@ -103,7 +103,7 @@ pub(super) fn try_expand_last_arg(
     }
     let opener = ArgOpener::callee(d, callee);
 
-    let last_arg = printer.view.opt(arguments.last().copied());
+    let last_arg = printer.view.opt_expr(arguments.last().copied());
     let last_is_function = matches!(
         last_arg,
         Some(ast::Expression {
@@ -171,7 +171,7 @@ pub(super) fn try_expand_last_arg(
     // here and is the only shape where the two answers are observable.
     if arguments.len() == 2
         && matches!(
-            printer.view.opt(arguments.first().copied()),
+            printer.view.opt_expr(arguments.first().copied()),
             Some(ast::Expression {
                 kind: ast::ExpressionKind::ArrowFunctionExpression(_),
                 ..

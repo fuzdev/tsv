@@ -125,7 +125,9 @@ fn left_side_child<'e>(
         ExpressionKind::ConditionalExpression(cond) => view.expr(cond.test),
         ExpressionKind::BinaryExpression(binary) => view.expr(binary.left),
         ExpressionKind::AssignmentExpression(assign) => view.expr(assign.left),
-        ExpressionKind::SequenceExpression(seq) => view.expr(*view.list(seq.expressions).first()?),
+        ExpressionKind::SequenceExpression(seq) => {
+            view.expr(*view.expr_list(seq.expressions).first()?)
+        }
         _ => return None,
     })
 }
@@ -328,7 +330,7 @@ pub(in crate::printer) fn printed_left_spine_step<'e>(
 fn shell_content_end(view: AstView<'_>, expr: &ast::Expression) -> u32 {
     match &expr.kind {
         ast::ExpressionKind::SequenceExpression(seq) => view
-            .list(seq.expressions)
+            .expr_list(seq.expressions)
             .last()
             .map_or_else(|| expr.span().end, |last| view.expr(*last).span().end),
         _ => expr.span().end,

@@ -673,7 +673,7 @@ impl<'a> Printer<'a> {
             }
         }
 
-        if let Some(test) = self.view.opt(stmt.test) {
+        if let Some(test) = self.view.opt_expr(stmt.test) {
             // Wrap in group so binary chains (Ungrouped mode) have a tight parent
             // to evaluate fit against — matching how if/while use build_condition_group.
             // Without this, logical operators break with the for-header group (too wide)
@@ -723,7 +723,7 @@ impl<'a> Printer<'a> {
             );
         }
 
-        if let Some(update) = self.view.opt(stmt.update) {
+        if let Some(update) = self.view.opt_expr(stmt.update) {
             // The stripped shells' run is the trailing emitter's below: claimed, so the
             // clause's own trailing emitters decline it.
             let gap = update_gap.unwrap_or_else(|| update.span().end);
@@ -791,7 +791,7 @@ impl<'a> Printer<'a> {
     fn for_update_trailing_gap_start(&self, update: &Expression) -> u32 {
         let end = update.span().end;
         let spine = match &update.kind {
-            ExpressionKind::SequenceExpression(seq) => match self.view.list(seq.expressions) {
+            ExpressionKind::SequenceExpression(seq) => match self.view.expr_list(seq.expressions) {
                 // Only a last operand with nothing but its own stripped shells behind it:
                 // a comment between it and the sequence's end is the sequence's. A last
                 // operand a comma-gap directive freezes prints its shells in its own slice.
@@ -1159,7 +1159,7 @@ impl<'a> Printer<'a> {
         seq_span: Span,
         build_elem: impl Fn(&Expression) -> DocId,
     ) -> DocId {
-        let expressions = self.view.list(seq.expressions);
+        let expressions = self.view.expr_list(seq.expressions);
         self.mark_relational_sibling_authored_pairs(expressions.iter().copied().map(Some));
         // A MULTI-LINE block the FIRST operand OWNS prints ahead of the run, outside the
         // layout's group ([`Printer::build_doc_with_outermost_owned_comment_at`]) — the
@@ -1169,7 +1169,7 @@ impl<'a> Printer<'a> {
         // prints it too. Only the BREAK differs, and the two agree once it is gone.
         self.build_doc_with_outermost_owned_comment_at(
             seq_span.start,
-            self.view.opt(expressions.first().copied()),
+            self.view.opt_expr(expressions.first().copied()),
             || {
                 let d = self.d();
                 let last = seq.expressions.len() - 1;
@@ -2161,7 +2161,7 @@ impl<'a> Printer<'a> {
                         continue;
                     }
                     let id_doc = self.build_expression_doc(self.view.expr(declarator.id));
-                    let one = if let Some(init) = self.view.opt(declarator.init) {
+                    let one = if let Some(init) = self.view.opt_expr(declarator.init) {
                         let id_end = self.view.expr(declarator.id).span().end;
                         let init_start = init.span().start;
                         let eq_pos = self.find_equals_position(id_end, init_start);

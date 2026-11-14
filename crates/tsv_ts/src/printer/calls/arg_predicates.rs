@@ -52,7 +52,7 @@ fn is_boolean_type_coercion(call: &ast::CallExpression, printer: &Printer<'_>) -
 /// every other call, `new Boolean(…)` included.
 pub(super) fn mark_boolean_coercion_argument(printer: &Printer<'_>, call: &ast::CallExpression) {
     if is_boolean_type_coercion(call, printer) {
-        printer.mark_flat_chain(printer.view.expr(printer.view.list(call.arguments)[0]));
+        printer.mark_flat_chain(printer.view.expr(printer.view.expr_list(call.arguments)[0]));
     }
 }
 
@@ -186,15 +186,15 @@ impl<'a> CallLikeArguments<'a> {
         match &expr.kind {
             ExpressionKind::CallExpression(call) => Some(Self::Called {
                 callee: view.expr(call.callee),
-                arguments: view.list(call.arguments),
+                arguments: view.expr_list(call.arguments),
             }),
             ExpressionKind::NewExpression(new_expr) => Some(Self::Called {
                 callee: view.expr(new_expr.callee),
-                arguments: view.list(new_expr.arguments),
+                arguments: view.expr_list(new_expr.arguments),
             }),
             ExpressionKind::ImportExpression(import_expr) => Some(Self::Imported {
                 source: view.expr(import_expr.source),
-                options: view.opt(import_expr.options),
+                options: view.opt_expr(import_expr.options),
             }),
             _ => None,
         }
@@ -634,7 +634,7 @@ pub(crate) fn is_simple_call_argument(view: AstView<'_>, expr: &Expression, dept
                 return false;
             }
             // Check all expressions are simple at reduced depth
-            view.list(template.expressions)
+            view.expr_list(template.expressions)
                 .iter()
                 .all(|e| is_simple_call_argument(view, view.expr(*e), depth - 1))
         }
@@ -655,10 +655,12 @@ pub(crate) fn is_simple_call_argument(view: AstView<'_>, expr: &Expression, dept
         }
 
         // Arrays: simple if all elements are simple (None = hole, which is simple)
-        ExpressionKind::ArrayExpression(arr) => view.opt_list(arr.elements).iter().all(|elem| {
-            elem.as_ref()
-                .is_none_or(|e| is_simple_call_argument(view, view.expr(*e), depth - 1))
-        }),
+        ExpressionKind::ArrayExpression(arr) => {
+            view.expr_opt_list(arr.elements).iter().all(|elem| {
+                elem.as_ref()
+                    .is_none_or(|e| is_simple_call_argument(view, view.expr(*e), depth - 1))
+            })
+        }
 
         // Unary expressions with simple operands. Prettier's
         // `simpleCallArgumentUnaryOperators` is exactly these four — `typeof`, `void` and
@@ -702,7 +704,7 @@ pub(crate) fn is_simple_call_argument(view: AstView<'_>, expr: &Expression, dept
 /// which a `new` is not — so the `new` printer passes `false` to
 /// [`super::arg_wrapping::ArgOpener::lone_hug_ladder`] rather than asking this.
 pub(super) fn lone_arg_params_render_flat(view: AstView<'_>, arg: &Expression) -> bool {
-    matches!(&arg.kind, &ExpressionKind::FunctionExpression(func) if view.run(view.fn_expr(func).params).iter().all(|param| {
+    matches!(&arg.kind, &ExpressionKind::FunctionExpression(func) if view.exprs(view.fn_expr(func).params).iter().all(|param| {
         matches!(&param.kind, ExpressionKind::Identifier(id) if id.type_annotation(view).is_none())
     }))
 }
@@ -734,7 +736,7 @@ pub(super) fn is_function_composition_args(view: AstView<'_>, arguments: &[ExprI
             }
         } else if let ExpressionKind::CallExpression(call) = &arg.kind {
             // Check if this call has any function/arrow arguments
-            if view.list(call.arguments).iter().any(|child_arg| {
+            if view.expr_list(call.arguments).iter().any(|child_arg| {
                 matches!(
                     view.expr(*child_arg).kind,
                     ExpressionKind::ArrowFunctionExpression(_)
@@ -776,7 +778,7 @@ mod tests {
             Expression {
                 kind: ExpressionKind::CallExpression(call),
                 ..
-            } => f(view, view.list(call.arguments)),
+            } => f(view, view.expr_list(call.arguments)),
             other => panic!("expected a call expression, got: {other:?}"),
         })
     }

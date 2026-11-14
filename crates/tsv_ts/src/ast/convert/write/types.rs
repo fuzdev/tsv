@@ -80,7 +80,7 @@ pub(super) fn write_type(w: &mut JsonWriter, ts_type: &ast::TSType, ctx: &Ctx<'_
             node_header(w, "TSFunctionType", f.span, ctx);
             write_type_parameters_field(w, f.type_parameters.as_ref(), ctx);
             w.raw(",\"parameters\":");
-            write_expressions(w, ctx.view.run(f.params), ctx);
+            write_expressions(w, ctx.view.exprs(f.params), ctx);
             w.raw(",\"typeAnnotation\":");
             write_type_annotation(w, &f.return_type, ctx);
             close_node(w, "TSFunctionType", f.span, ctx);
@@ -92,7 +92,7 @@ pub(super) fn write_type(w: &mut JsonWriter, ts_type: &ast::TSType, ctx: &Ctx<'_
             w.bool(c.abstract_);
             write_type_parameters_field(w, c.type_parameters.as_ref(), ctx);
             w.raw(",\"parameters\":");
-            write_expressions(w, ctx.view.run(c.params), ctx);
+            write_expressions(w, ctx.view.exprs(c.params), ctx);
             w.raw(",\"typeAnnotation\":");
             write_type_annotation(w, &c.return_type, ctx);
             close_node(w, "TSConstructorType", c.span, ctx);
@@ -263,7 +263,7 @@ fn write_import_type(w: &mut JsonWriter, i: &ast::TSImportType, ctx: &Ctx<'_>) {
     node_header(w, "TSImportType", i.span, ctx);
     w.raw(",\"argument\":");
     write_literal(w, &i.argument, ctx);
-    if let Some(o) = ctx.view.opt(i.options) {
+    if let Some(o) = ctx.view.opt_expr(i.options) {
         w.raw(",\"options\":");
         write_expression(w, o, ctx);
     }
@@ -515,7 +515,7 @@ fn write_type_element(w: &mut JsonWriter, elem: &ast::TSTypeElement, ctx: &Ctx<'
             }
             write_type_parameters_field(w, m.type_parameters.as_ref(), ctx);
             w.raw(",\"parameters\":");
-            write_expressions(w, ctx.view.run(m.params), ctx);
+            write_expressions(w, ctx.view.exprs(m.params), ctx);
             write_type_annotation_field(w, m.return_type.as_ref(), ctx);
             if !getset {
                 w.raw(",\"kind\":\"method\"");
@@ -528,7 +528,7 @@ fn write_type_element(w: &mut JsonWriter, elem: &ast::TSTypeElement, ctx: &Ctx<'
                 "TSCallSignatureDeclaration",
                 c.span,
                 c.type_parameters.as_ref(),
-                ctx.view.run(c.params),
+                ctx.view.exprs(c.params),
                 c.return_type.as_ref(),
                 ctx,
             );
@@ -539,7 +539,7 @@ fn write_type_element(w: &mut JsonWriter, elem: &ast::TSTypeElement, ctx: &Ctx<'
                 "TSConstructSignatureDeclaration",
                 c.span,
                 c.type_parameters.as_ref(),
-                ctx.view.run(c.params),
+                ctx.view.exprs(c.params),
                 c.return_type.as_ref(),
                 ctx,
             );
@@ -678,7 +678,7 @@ pub(super) fn write_declare_function(
     write_function_flags_fields(w, func.generator, func.r#async);
     write_type_parameters_field(w, func.type_parameters.as_ref(), ctx);
     w.raw(",\"params\":");
-    write_expressions(w, ctx.view.run(func.params), ctx);
+    write_expressions(w, ctx.view.exprs(func.params), ctx);
     super::write_return_type_field(w, func.return_type.as_ref(), ctx);
     if func.declare && exported {
         w.raw(",\"declare\":true");
@@ -712,7 +712,7 @@ pub(super) fn write_enum_declaration(
             ast::TSEnumMemberId::Identifier(id) => write_identifier_plain(w, id, ctx),
             ast::TSEnumMemberId::String(lit) => write_literal(w, lit, ctx),
         }
-        if let Some(init) = ctx.view.opt(member.initializer) {
+        if let Some(init) = ctx.view.opt_expr(member.initializer) {
             w.raw(",\"initializer\":");
             write_expression(w, init, ctx);
         }

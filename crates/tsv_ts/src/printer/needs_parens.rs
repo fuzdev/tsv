@@ -996,7 +996,7 @@ fn needs_parens_expression_statement(view: AstView<'_>, expr: &Expression) -> bo
         ),
         // Sequence: check the first expression
         ExpressionKind::SequenceExpression(seq) => view
-            .list(seq.expressions)
+            .expr_list(seq.expressions)
             .first()
             .is_some_and(|first| needs_parens_expression_statement(view, view.expr(*first))),
         _ => false,
@@ -1096,10 +1096,12 @@ pub(crate) fn leftmost_no_lookahead_reached<'a>(
                     (view.expr(m.object), m.computed && !m.optional)
                 }
                 ExpressionKind::ConditionalExpression(c) => (view.expr(c.test), false),
-                ExpressionKind::SequenceExpression(s) => match view.list(s.expressions).first() {
-                    Some(&first) => (view.expr(first), false),
-                    None => return (expr, computed_member_object),
-                },
+                ExpressionKind::SequenceExpression(s) => {
+                    match view.expr_list(s.expressions).first() {
+                        Some(&first) => (view.expr(first), false),
+                        None => return (expr, computed_member_object),
+                    }
+                }
                 // IIFEs (`(function () {})()` / `` (function () {})`x` ``) are already
                 // parenthesized by their callee/tag, so prettier stops the walk there.
                 ExpressionKind::CallExpression(call) => {
