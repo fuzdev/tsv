@@ -1098,37 +1098,44 @@ impl<'a> Printer<'a> {
     /// Prettier ref: `isObjectPropertyWithShortKey` in `print/assignment.js`
     /// Uses `getStringWidth(cleanDoc(keyDoc)) < tabWidth + MIN_OVERLAP_FOR_BREAK`
     fn is_short_property_key(&self, key: &Expression, computed: bool) -> bool {
-        // Prettier: MIN_OVERLAP_FOR_BREAK = 3 (`isObjectPropertyWithShortKey`, `print/assignment.js`)
-        let threshold = TAB_WIDTH + super::assignment::MIN_OVERLAP_FOR_BREAK;
+        // Prettier: cleanDoc reduces identifier keys to their name string.
+        //
+        // ⭐ **A plain-ASCII name is not measured at all.** An identifier holds no
+        // `\t` and no `\n`, so a plain-ASCII one is one column a byte and its width
+        // IS `raw_len` — the answer the lexer already recorded
+        // (`IdentName::plain_ascii`, the same claim `Printer::ident_name_doc`
+        // spends). Three quarters of every `visual_width` call a TypeScript format
+        // run makes are this arm (51,042 of 67,654 on a 1,666-file corpus, mean 7.3
+        // bytes — too short for either of `visual_width`'s vector loops to engage),
+        // and it asks only whether the width is under the threshold. Answered here, ahead
+        // of every key that is measured, so this arm calls nothing.
+        if let ExpressionKind::Identifier(id) = &key.kind {
+            let name = id.ident_name();
+            if name.escaped.is_none() && name.plain_ascii {
+                // Graded on every key in every debug build: over-claiming is a silent
+                // layout error (a key deemed short that is not), under-claiming
+                // silently retires the lever.
+                debug_assert_eq!(
+                    name.raw_len as usize,
+                    self.with_ident_name_at(name, id.span.start, |s| visual_width(s, TAB_WIDTH)),
+                    "a plain-ASCII key's `raw_len` disagrees with its measured width"
+                );
+                return key_width_is_short(name.raw_len as usize, computed);
+            }
+        }
+        self.is_short_measured_property_key(key, computed)
+    }
 
+    /// [`Self::is_short_property_key`] for a key whose width has to be measured: every key
+    /// but a plain-ASCII identifier.
+    ///
+    /// Out of line because measuring calls: kept apart, those calls and the registers
+    /// saved around them stay off the plain identifier's path.
+    #[inline(never)]
+    fn is_short_measured_property_key(&self, key: &Expression, computed: bool) -> bool {
         let base_width = match &key.kind {
-            // Prettier: cleanDoc reduces identifier keys to their name string.
-            //
-            // ⭐ **A plain-ASCII name is not measured at all.** An identifier holds no
-            // `\t` and no `\n`, so a plain-ASCII one is one column a byte and its width
-            // IS `raw_len` — the answer the lexer already recorded
-            // (`IdentName::plain_ascii`, the same claim `Printer::ident_name_doc`
-            // spends). Three quarters of every `visual_width` call a TypeScript format
-            // run makes are this arm (51,042 of 67,654 on a 1,666-file corpus, mean 7.3
-            // bytes — too short for either of `visual_width`'s vector loops to engage),
-            // and it asks only whether the width is under `threshold`.
             ExpressionKind::Identifier(id) => {
-                let name = id.ident_name();
-                if name.escaped.is_none() && name.plain_ascii {
-                    // Graded on every key in every debug build: over-claiming is a silent
-                    // layout error (a key deemed short that is not), under-claiming
-                    // silently retires the lever.
-                    debug_assert_eq!(
-                        name.raw_len as usize,
-                        self.with_ident_name_at(name, id.span.start, |s| visual_width(
-                            s, TAB_WIDTH
-                        )),
-                        "a plain-ASCII key's `raw_len` disagrees with its measured width"
-                    );
-                    name.raw_len as usize
-                } else {
-                    self.with_ident_name_at(name, id.span.start, |s| visual_width(s, TAB_WIDTH))
-                }
+                self.with_ident_name(id, |s| visual_width(s, TAB_WIDTH))
             }
             ExpressionKind::Literal(lit) => match &lit.value {
                 LiteralValue::String(cooked) => {
@@ -1153,14 +1160,7 @@ impl<'a> Printer<'a> {
             // Prettier's cleanDoc can't reduce them to strings, so it returns false.
             _ => return false,
         };
-
-        let total_width = if computed {
-            base_width + 2 // Add brackets
-        } else {
-            base_width
-        };
-
-        total_width < threshold
+        key_width_is_short(base_width, computed)
     }
 
     /// A quoted string key may be unquoted only when its *raw* source (escape
@@ -1450,4 +1450,17 @@ impl<'a> Printer<'a> {
         )
         .map_or(pos + 1, |p| p as u32)
     }
+}
+
+/// Whether a property key `base_width` columns wide, in brackets when `computed`, is short
+/// ([`Printer::is_short_property_key`]).
+fn key_width_is_short(base_width: usize, computed: bool) -> bool {
+    // Prettier: MIN_OVERLAP_FOR_BREAK = 3 (`isObjectPropertyWithShortKey`, `print/assignment.js`)
+    let threshold = TAB_WIDTH + super::assignment::MIN_OVERLAP_FOR_BREAK;
+    let total_width = if computed {
+        base_width + 2 // Add brackets
+    } else {
+        base_width
+    };
+    total_width < threshold
 }

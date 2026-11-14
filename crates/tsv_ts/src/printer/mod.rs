@@ -101,6 +101,7 @@ use tsv_lang::{
         OperandAnchor, PAREN_HOP_NEEDLES, TriviaProfile, has_newline_before_position,
         is_hop_needle, skip_regex_literal, skip_trivia,
     },
+    store::PoolText,
 };
 
 /// Which builder a chain-share entry belongs to — the builder half of the share key's tag,
@@ -3636,7 +3637,11 @@ impl<'a> Printer<'a> {
 
     /// Run `f` over a name channel resolved at `name_start` — the compare/width
     /// seam. Span-identity names borrow the source slice; an escaped name compares its
-    /// arena string (so an escaped name still compares decoded).
+    /// pool text (so an escaped name still compares decoded).
+    ///
+    /// The escaped arm is handed whole to [`Self::with_escaped_name`]: a caller whose
+    /// answer is `f`'s leaves by that call, so its span-identity path keeps nothing live
+    /// across a call and saves no register for one.
     pub(in crate::printer) fn with_ident_name_at<R>(
         &self,
         name: ast::IdentName,
@@ -3644,11 +3649,22 @@ impl<'a> Printer<'a> {
         f: impl FnOnce(&str) -> R,
     ) -> R {
         match name.escaped {
-            Some(s) => f(self.view.text(s)),
+            Some(escaped) => self.with_escaped_name(escaped, f),
             None => {
                 f(&self.source[name_start as usize..name_start as usize + name.raw_len as usize])
             }
         }
+    }
+
+    /// [`Self::with_ident_name_at`]'s escaped arm: `f` over the name's decoded text.
+    ///
+    /// Cold and out of line, the text read and `f` together, so the read's call sits in
+    /// no caller's body. Taken only for a name its span cannot spell: one written with a
+    /// `\u` escape, one longer than the name channel's length field, or a synthesized one.
+    #[cold]
+    #[inline(never)]
+    fn with_escaped_name<R>(&self, escaped: PoolText<ast::Text>, f: impl FnOnce(&str) -> R) -> R {
+        f(self.view.text(escaped))
     }
 
     /// [`Self::with_ident_name_at`] for an `Identifier` node.

@@ -51,6 +51,18 @@ fn is_boolean_type_coercion(call: &ast::CallExpression, printer: &Printer<'_>) -
 /// same `printCallArguments`, where the parent is still the `Boolean(…)` call. A no-op for
 /// every other call, `new Boolean(…)` included.
 pub(super) fn mark_boolean_coercion_argument(printer: &Printer<'_>, call: &ast::CallExpression) {
+    // Two of the coercion's own conditions, asked first: they read nothing through the
+    // view, and a call expression that fails one makes no call here.
+    if call.optional || call.arguments.len() != 1 {
+        return;
+    }
+    mark_argument_if_boolean_coercion(printer, call);
+}
+
+/// [`mark_boolean_coercion_argument`] past its pre-test: the whole predicate, then the mark.
+/// Out of line so the pre-test is all a call site carries.
+#[inline(never)]
+fn mark_argument_if_boolean_coercion(printer: &Printer<'_>, call: &ast::CallExpression) {
     if is_boolean_type_coercion(call, printer) {
         printer.mark_flat_chain(printer.view.expr(printer.view.expr_list(call.arguments)[0]));
     }

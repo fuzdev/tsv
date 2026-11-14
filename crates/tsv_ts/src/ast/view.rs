@@ -126,7 +126,9 @@ impl<'a> AstView<'a> {
     ///
     /// Out of line because only the rare text reads it — an escaped name, a decoded string or
     /// template value, a carriage-return-folded template raw — so every name reader's common,
-    /// span-identity arm stays small enough to inline where it is read.
+    /// span-identity arm stays small enough to inline where it is read. A reader that works
+    /// on past the call saves registers across it on that span-identity arm too, so the printer's
+    /// name seam hands its escaped arm whole to a cold function of its own.
     #[inline(never)]
     pub fn text(self, text: PoolText<Text>) -> &'a str {
         self.stores.text.get(text)

@@ -220,7 +220,6 @@ fn test_call_gaps_have_comments(
 
 /// Check if a call expression is a test function call that should stay on one line
 pub(super) fn is_test_call(call: &ast::CallExpression, printer: &Printer<'_>) -> bool {
-    let arguments = printer.view.expr_list(call.arguments);
     // Optional calls (`describe?.(...)`) are never test calls — they format like
     // a normal call (wrap when long), preserving the `?.`. Mirrors prettier's
     // isTestCall guard (`utilities/test-libraries.js`: `node.optional` → false).
@@ -229,10 +228,21 @@ pub(super) fn is_test_call(call: &ast::CallExpression, printer: &Printer<'_>) ->
     }
 
     // Must have 2-3 arguments
-    let arg_count = call.arguments.len();
-    if !(2..=3).contains(&arg_count) {
+    if !(2..=3).contains(&call.arguments.len()) {
         return false;
     }
+    is_test_call_by_arguments(call, printer)
+}
+
+/// The rest of [`is_test_call`] for a non-optional call of two or three arguments: the
+/// argument shapes, then the callee's name.
+///
+/// Out of line so the two tests above, which read nothing through the view, are all that
+/// a call site carries: a call they refuse costs it no call.
+#[inline(never)]
+fn is_test_call_by_arguments(call: &ast::CallExpression, printer: &Printer<'_>) -> bool {
+    let arguments = printer.view.expr_list(call.arguments);
+    let arg_count = arguments.len();
 
     // First argument must be a string or template literal
     let first_is_string = match &printer.view.expr(arguments[0]).kind {
@@ -297,6 +307,11 @@ pub(super) fn is_test_call(call: &ast::CallExpression, printer: &Printer<'_>) ->
 /// (an escaped `te\u0073t` is `test`). The same callees qualify as for the flat callee doc
 /// ([`build_test_callee_flat_doc`], over [`get_member_chain_parts`]): an identifier root and
 /// identifier properties only.
+///
+/// Out of line, and reached by a tail call: the walk keeps a name array and reads names
+/// through calls, so inlined it would have [`is_test_call_by_arguments`] save registers
+/// ahead of its argument tests, for the calls those tests refuse as well.
+#[inline(never)]
 fn callee_is_test_pattern(view: AstView<'_>, callee: &ast::Expression, source: &str) -> bool {
     let mut names = [""; TEST_PATTERN_MAX_DEPTH];
     let mut depth = 0;
