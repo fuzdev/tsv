@@ -518,7 +518,7 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         // The local binding is always an identifier; wrap it so it shares the
         // `ModuleExportName`-based renamed-specifier renderer with the imported name.
-        let local = ast::ModuleExportName::Identifier(named_spec.local.clone());
+        let local = ast::ModuleExportName::Identifier(named_spec.local);
         self.build_renamed_specifier_doc(
             is_type_import,
             named_spec.import_kind == ast::ImportKind::Type,

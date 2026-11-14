@@ -414,7 +414,7 @@ pub struct ObjectExpression {
 }
 
 /// Object property - either a regular property or a spread element
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum ObjectProperty {
     Property(Property),
     SpreadElement(SpreadElement),
@@ -931,7 +931,7 @@ pub struct FunctionExpression {
 /// Spread element: `...expr`
 ///
 /// Used in array literals (`[...arr]`) and object literals (`{...obj}`)
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct SpreadElement {
     pub argument: ExprId,
     pub span: Span,
@@ -977,7 +977,7 @@ impl PropertyKind {
 /// parser's expression spine already returns the id of the node it pushed, so an inline
 /// slot would be a copy *out of* the store rather than the place the node lives — see
 /// the density note in `ast/mod.rs`.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct Property {
     pub key: ExprId,
     pub value: ExprId,
@@ -1010,7 +1010,7 @@ pub struct TemplateLiteral {
 /// text equals the element's TRV, recovered via `TemplateElement::trv`.
 /// Only genuinely decoded values (escapes present) hold text of their own, in the stores'
 /// text pool.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum TemplateCooked {
     /// Cooked value == the element's TRV (no escapes to decode).
     Verbatim,
@@ -1034,7 +1034,7 @@ pub enum TemplateCooked {
 /// source text is what the PRINTER emits (it reproduces the author's bytes);
 /// the TRV is what the WIRE reports (`value.raw`, and `String.raw` at runtime).
 /// They differ only over a `<CR>` — see `raw_trv`.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct TemplateElement {
     /// Span of the raw source text (escape sequences NOT decoded), delimiters
     /// excluded. The raw content is a verbatim sub-slice of source, so it is

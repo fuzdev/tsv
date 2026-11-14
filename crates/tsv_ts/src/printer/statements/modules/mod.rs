@@ -1031,7 +1031,7 @@ impl<'a> Printer<'a> {
                 // An import namespace binding is always an identifier; wrap it to share
                 // the `ModuleExportName`-based renderer — and the whole star emitter —
                 // with the export-all side.
-                let binding = ast::ModuleExportName::Identifier(ns_spec.local.clone());
+                let binding = ast::ModuleExportName::Identifier(ns_spec.local);
                 self.push_namespace_star_binding(
                     &mut parts,
                     gap_start,

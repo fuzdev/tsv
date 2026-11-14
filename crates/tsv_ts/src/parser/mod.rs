@@ -516,10 +516,26 @@ pub(crate) fn push_row<T: Row + Clone>(store: &mut Store<T>, row: T) -> Id<T::Fa
 }
 
 /// Flush the list opened at `mark` on `scratch` into `store` and mint its run: where a list
-/// built by value becomes rows. A free function over the two field paths, as [`push_row`] is,
-/// so a caller can flush while it holds a disjoint borrow of the other stores.
+/// built by value becomes rows, copied rather than moved a row at a time
+/// (`ListBuf::flush_copy_short`: counted together, most of these lists hold one element). A
+/// free function over the two field paths, as [`push_row`] is, so a caller can flush while it
+/// holds a disjoint borrow of the other stores.
 #[inline]
-pub(crate) fn flush_run<T: Row + Clone>(
+pub(crate) fn flush_run<T: Row + Copy>(
+    scratch: &mut ListBuf<T>,
+    store: &mut Store<T>,
+    mark: ListMark<T::Family>,
+) -> Run<T::Family> {
+    let run = scratch.flush_copy_short(mark, store);
+    #[cfg(feature = "_internal_ast_census")]
+    tsv_lang::ast_census_probe::mint::<T>(run.len());
+    run
+}
+
+/// [`flush_run`] for an element type that is not `Copy`, moved a row at a time
+/// (`ListBuf::flush_move`): the class members, whose method holds its function inline.
+#[inline]
+pub(crate) fn flush_run_move<T: Row + Clone>(
     scratch: &mut ListBuf<T>,
     store: &mut Store<T>,
     mark: ListMark<T::Family>,

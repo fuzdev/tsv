@@ -22,7 +22,7 @@ pub struct TSInterfaceDeclaration {
 }
 
 /// Interface heritage: `extends Foo, Bar`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct TSInterfaceHeritage {
     pub expression: TSEntityName,
     pub type_arguments: Option<TSTypeParameterInstantiation>,
@@ -78,7 +78,7 @@ pub struct TSEnumDeclaration {
 /// TypeScript enum member: `A`, `A = 1`, `A = "value"`
 ///
 /// Represents a single member in an enum declaration.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct TSEnumMember {
     /// Member name (identifier or computed)
     pub id: TSEnumMemberId,
@@ -110,7 +110,7 @@ impl TSEnumMember {
 }
 
 /// Enum member id: can be an identifier or a string literal (for computed names)
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum TSEnumMemberId {
     Identifier(Identifier),
     /// String literal for computed names like `"hello"` in `enum { "hello" = 1 }`

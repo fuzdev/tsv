@@ -340,7 +340,7 @@ pub struct SwitchStatement {
 }
 
 /// Switch case: `case test: consequent` or `default: consequent`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct SwitchCase {
     /// Test expression, or None for `default:`
     pub test: Option<ExprId>,
@@ -492,7 +492,7 @@ pub struct VariableDeclaration {
 /// Both slots are ids rather than inline `Expression`s, for the density reason on
 /// [`super::Property`] — 160 B → 20 on every element of every `declarations` slice, and
 /// no row added, because the parser's expression spine already hands back the id.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct VariableDeclarator {
     /// The binding pattern (Identifier, ArrayPattern, or ObjectPattern)
     pub id: ExprId,

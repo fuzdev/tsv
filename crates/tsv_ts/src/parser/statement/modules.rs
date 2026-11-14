@@ -821,7 +821,7 @@ impl<'a> Parser<'a> {
                 && self.current_value() == "type"
             {
                 let parts = self.parse_type_specifier_parts(/* is_import */ false)?;
-                let local = ModuleExportName::Identifier(parts.left.clone());
+                let local = ModuleExportName::Identifier(parts.left);
                 let exported = parts
                     .right
                     .unwrap_or(ModuleExportName::Identifier(parts.left));
@@ -914,7 +914,7 @@ impl<'a> Parser<'a> {
             self.advance()?; // consume 'as'
             self.parse_module_export_name("identifier after 'as'")?
         } else {
-            local.clone()
+            local
         };
 
         // Each name carries its own end via its span; the specifier ends at the
@@ -978,7 +978,7 @@ impl<'a> Parser<'a> {
             // A string imported name has no valid binding without `as` —
             // reject (matches acorn).
             match &imported {
-                ModuleExportName::Identifier(id) => (id.clone(), imp_end),
+                ModuleExportName::Identifier(id) => (*id, imp_end),
                 ModuleExportName::Literal(_) => {
                     return Err(self.error_expected_after("'as'", "string import name"));
                 }
@@ -1251,7 +1251,7 @@ impl<'a> Parser<'a> {
                         Some(ModuleExportName::Literal(_)) => {
                             unreachable!("import rename target is never a string literal")
                         }
-                        None => parts.left.clone(),
+                        None => parts.left,
                     };
                     self.stores
                         .runs

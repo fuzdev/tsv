@@ -247,7 +247,7 @@ pub struct Program {
 ///
 /// The expression can be an identifier (`@foo`), call expression (`@foo()`),
 /// or member expression (`@foo.bar`).
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct Decorator {
     /// The decorator expression (identifier, call, or member expression)
     pub expression: ExprId,
@@ -255,7 +255,7 @@ pub struct Decorator {
 }
 
 /// Literal value type - supports numbers, strings, booleans, null, and undefined
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum LiteralValue {
     Number(f64),
     /// String literal. The decoded value is recovered via
@@ -275,7 +275,7 @@ pub enum LiteralValue {
 /// `Verbatim` (the common no-escape case) carries **no allocation** — the decoded
 /// value equals the inner source slice (the literal's `span` minus the two quote
 /// bytes). Only escaped strings hold text of their own, in the stores' text pool.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum StringCooked {
     /// Decoded value == the inner source slice (no escapes to decode).
     Verbatim,
@@ -305,7 +305,7 @@ impl StringCooked {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct Literal {
     pub value: LiteralValue,
     pub span: Span,
@@ -410,7 +410,7 @@ impl IdentName {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct Identifier {
     /// The [`IdentName`] channel's escape hatch: the decoded name as pool text,
     /// `Some` only for `\u`-escaped or `raw_len`-oversized

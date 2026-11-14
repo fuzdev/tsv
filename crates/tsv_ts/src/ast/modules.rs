@@ -122,7 +122,7 @@ pub struct TSNamespaceExportDeclaration {
 }
 
 /// Export specifier: `export { x }` or `export { x as y }` or `export { type x }`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct ExportSpecifier {
     /// Local name (what's exported from this module). A string in a re-export,
     /// e.g. `export { 'str' } from 'y'`.
@@ -165,7 +165,7 @@ pub struct ImportDeclaration {
 }
 
 /// Import specifier variants
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum ImportSpecifier {
     /// Default import: `import x from "y"`
     Default(ImportDefaultSpecifier),
@@ -176,7 +176,7 @@ pub enum ImportSpecifier {
 }
 
 /// Default import specifier: `import x from "y"`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct ImportDefaultSpecifier {
     /// Local binding name
     pub local: Identifier,
@@ -184,7 +184,7 @@ pub struct ImportDefaultSpecifier {
 }
 
 /// Named import specifier: `import { a } from "y"` or `import { a as b } from "y"`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct ImportNamedSpecifier {
     /// Imported name (the name in the module). A string for arbitrary module
     /// namespace names, e.g. `import { 'str' as b } from 'y'`.
@@ -198,7 +198,7 @@ pub struct ImportNamedSpecifier {
 }
 
 /// Namespace import specifier: `import * as ns from "y"`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct ImportNamespaceSpecifier {
     /// Local binding name
     pub local: Identifier,
@@ -206,7 +206,7 @@ pub struct ImportNamespaceSpecifier {
 }
 
 /// Import attribute: `{ type: "json" }` or `{ "resolution-mode": "import" }`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct ImportAttribute {
     pub key: ImportAttributeKey,
     pub value: Literal,
@@ -215,7 +215,7 @@ pub struct ImportAttribute {
 
 /// Import attribute key: a bare identifier (`type`) or a string literal
 /// (`"resolution-mode"`). Per ecma262 `AttributeKey : IdentifierName | StringLiteral`.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum ImportAttributeKey {
     Identifier(Identifier),
     Literal(Literal),
@@ -234,7 +234,7 @@ impl ImportAttributeKey {
 /// Per ecma262 `ModuleExportName : IdentifierName | StringLiteral` (ES2022
 /// arbitrary module namespace names). Used for import/export specifier names
 /// and the `export * as` namespace name. Mirrors `ImportAttributeKey`.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum ModuleExportName {
     Identifier(Identifier),
     Literal(Literal),

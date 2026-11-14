@@ -12,6 +12,12 @@
 //! type members, type parameters, heritage clauses, enum members, index-signature parameters
 //! and decorators. Each element type has a scratch stack that builds its lists, and a second
 //! macro declares the store, the scratch, the list the tree holds and its view accessor.
+//! Every element type but [`ClassMember`], and what each holds inline, is `Copy`, so a
+//! finished list is copied into its store as a block; a class member holds its method's
+//! [`FunctionExpression`] inline, a payload row, and its lists move a row at a time. An
+//! element is read in place, through the slice its accessor returns: `rows[i]` by value is
+//! a copy of the whole row, where the same line over an expression, a statement, a type or
+//! a payload does not compile, those being `Clone` only.
 //!
 //! [`AstStores`] is one document's: every parse of a document, embedded islands included,
 //! appends to the same one, so an id means the same row wherever in the document it is
@@ -169,6 +175,12 @@ macro_rules! payload_stores {
         /// Every payload store's field name, for the test that walks them all.
         #[cfg(test)]
         const PAYLOAD_FIELDS: &[&str] = &[$(stringify!($field)),*];
+
+        // A payload is `Clone` only, so none is copied by reading it.
+        #[cfg(test)]
+        const _: () = {
+            $(let () = <$Row as NotCopy<_>>::PIN;)*
+        };
     };
 }
 
@@ -366,6 +378,32 @@ value_runs! {
     /// Decorators, `@d`: [`Decorator`] rows.
     decorators, decorator_scratch: Decorator => decorators;
 }
+
+/// Pins a type as not `Copy`: `<T as NotCopy<_>>::PIN` names one impl while `T` is not `Copy`
+/// and is ambiguous, a build error, once it is.
+#[cfg(test)]
+trait NotCopy<Marker> {
+    const PIN: () = ();
+}
+
+#[cfg(test)]
+impl<T> NotCopy<()> for T {}
+
+#[cfg(test)]
+impl<T: Copy> NotCopy<u8> for T {}
+
+// The rows an id names are `Clone` only, their variant halves with them, as is the one list
+// element that holds a payload inline: `*view.expr(id)`, `view.expr(id).kind` and
+// `view.class_members(run)[i]` by value do not compile, so no such row is copied by reading it.
+#[cfg(test)]
+const _: () = {
+    let () = <Expression as NotCopy<_>>::PIN;
+    let () = <super::ExpressionKind as NotCopy<_>>::PIN;
+    let () = <Statement as NotCopy<_>>::PIN;
+    let () = <super::StatementKind as NotCopy<_>>::PIN;
+    let () = <TSType as NotCopy<_>>::PIN;
+    let () = <ClassMember as NotCopy<_>>::PIN;
+};
 
 // Every value run is a `Run<F>`, which lays out alike for every family `F`, and an absent
 // list (the decorators', an import's attributes) folds into the run's start.
@@ -793,7 +831,7 @@ mod tests {
         EmptyStatement, ExpressionKind, Span, StatementKind, TSEntityName, TSThisType,
         TSTypeElement, ThisExpression,
     };
-    use crate::parser::flush_run;
+    use crate::parser::{flush_run, flush_run_move};
 
     const SPAN: Span = Span { start: 0, end: 0 };
 
@@ -1049,12 +1087,14 @@ class C {
     ) -> Vec<(&'static str, String)> {
         let mut minted = Vec::new();
         macro_rules! flush {
-            ($field:ident, $scratch:ident, $list:expr) => {{
-                let row = $list[0].clone();
+            ($field:ident, $scratch:ident, $list:expr) => {
+                flush!($field, $scratch, $list[0], flush_run)
+            };
+            ($field:ident, $scratch:ident, $row:expr, $flush:ident) => {{
                 let mark = stores.runs.$scratch.mark();
-                stores.runs.$scratch.push(row);
+                stores.runs.$scratch.push($row);
                 if flush {
-                    let run = flush_run(&mut stores.runs.$scratch, &mut stores.runs.$field, mark);
+                    let run = $flush(&mut stores.runs.$scratch, &mut stores.runs.$field, mark);
                     minted.push((stringify!($field), format!("{run:?}")));
                 } else {
                     minted.push((stringify!($field), "open".to_owned()));
@@ -1150,10 +1190,12 @@ class C {
                     let x = view.class_decl(x);
                     let decorators = x.decorators.expect("decorators");
                     flush!(decorators, decorator_scratch, view.decorators(decorators));
+                    // the one element type that is not `Copy`
                     flush!(
                         class_members,
                         class_member_scratch,
-                        view.class_members(x.body.body)
+                        view.class_members(x.body.body)[0].clone(),
+                        flush_run_move
                     );
                 }
                 other => panic!("an unexpected statement: {other:?}"),

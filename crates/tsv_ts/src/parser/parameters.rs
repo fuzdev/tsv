@@ -92,7 +92,7 @@ impl<'a> Parser<'a> {
             }
             ExpressionKind::Identifier(id) => {
                 // a new row: the extras the annotation rode in stay behind as an orphan
-                let type_annotation = id.type_annotation(self.stores.view()).cloned();
+                let type_annotation = id.type_annotation(self.stores.view()).copied();
                 id.extra = Some(push_row(
                     &mut self.stores.payloads.param_extras,
                     IdentifierParamExtra {

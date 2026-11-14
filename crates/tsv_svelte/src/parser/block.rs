@@ -1606,7 +1606,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                     .params;
                 let func = first_function_declaration(self.ts_stores(), &plain)
                     .ok_or_else(signature_error)?;
-                let signature = (func.type_parameters.clone(), func.params);
+                let signature = (func.type_parameters, func.params);
                 self.snippet_wire_parameters.push(SnippetWireParameters {
                     snippet_start: start as u32,
                     parameters: wire,
@@ -1615,7 +1615,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             } else {
                 let func = first_function_declaration(self.ts_stores(), &preserved)
                     .ok_or_else(signature_error)?;
-                (preserved, (func.type_parameters.clone(), func.params))
+                (preserved, (func.type_parameters, func.params))
             };
             // The comments (and their `owned_by_node` claims) are the paren-free tree's —
             // the tree the printer walks — and are merged once.

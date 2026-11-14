@@ -33,7 +33,7 @@ pub struct ObjectPattern {
 }
 
 /// Object pattern property - either a regular property or a rest element
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum ObjectPatternProperty {
     Property(Property),
     RestElement(RestElement),
@@ -128,7 +128,7 @@ pub struct AssignmentPattern {
 /// Collects remaining elements in array or object destructuring:
 /// - `const [a, ...rest] = arr` (rest gets remaining array elements)
 /// - `const {a, ...rest} = obj` (rest gets remaining properties)
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct RestElement {
     /// The binding for the rest (typically an identifier)
     pub argument: ExprId,

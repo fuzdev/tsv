@@ -274,7 +274,7 @@ impl<'a> Parser<'a> {
                         .view()
                         .obj_props(source_properties)
                         .get(i)
-                        .cloned()
+                        .copied()
                 };
                 let mark = self.stores.runs.pat_prop_scratch.mark();
                 let last_index = source_properties.len().saturating_sub(1);

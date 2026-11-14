@@ -992,7 +992,9 @@ and intersection members, tuple elements, type arguments, template-literal types
 template quasis, declarators, `switch` cases, import and export specifiers, class and type
 members, type parameters, decorators and the rest) is a value run over a store of its element
 type (`Run<ObjectProperty>`, `Run<VariableDeclarator>`, …), built on that type's scratch stack
-and flushed into the store when the list closes. A reader reaches them through an `AstView`, one word holding a
+and flushed into the store when the list closes (the element types but `ClassMember` are `Copy`
+and flush as a block; the expressions, statements, types and payloads are `Clone` only, so
+none is copied by reading it). A reader reaches them through an `AstView`, one word holding a
 reference to the stores; a store row, once pushed, is never edited or truncated, so a parser
 that replaces a node (a cover-grammar conversion, an annotated binding pattern) appends the
 new row and the old one is orphaned. The payloads too rare to sit inline in the node that

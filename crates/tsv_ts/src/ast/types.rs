@@ -15,7 +15,7 @@ use super::{
 ///
 /// Represents the full type annotation including the colon. The span covers the
 /// entire annotation (`: number`), while the inner type covers just the type (`number`).
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct TSTypeAnnotation {
     pub type_annotation: TyId,
     pub span: Span,
@@ -367,7 +367,7 @@ pub struct TSTypeReference {
 }
 
 /// Entity name: `Foo` or `Foo.Bar.Baz`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum TSEntityName {
     Identifier(Identifier),
     /// The qualified name's span inline beside its id, so [`TSEntityName::span`] reads it
@@ -393,14 +393,14 @@ pub struct TSQualifiedName {
 }
 
 /// Type parameter instantiation: `<T, U>` (for type arguments)
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct TSTypeParameterInstantiation {
     pub params: Run<TyId>,
     pub span: Span,
 }
 
 /// Type parameter declaration: `<T, U>` (for declaring type parameters)
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct TSTypeParameterDeclaration {
     pub params: Run<TSTypeParameter>,
     /// Position of trailing comma if present (e.g., `<T,>`)
@@ -478,7 +478,7 @@ impl TSTypeParameterModifiers {
 
 /// Single type parameter: `T`, `T extends U`, or `T extends U = V`
 /// With optional modifiers: `const T`, `in T`, `out T`, `in out T`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct TSTypeParameter {
     pub name: Identifier,
     pub constraint: Option<TyId>,
@@ -496,7 +496,7 @@ pub struct TSTypeLiteral {
 }
 
 /// Type element - member of a type literal or interface
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum TSTypeElement {
     PropertySignature(TSPropertySignature),
     MethodSignature(TSMethodSignature),
@@ -545,7 +545,7 @@ impl TSTypeElement {
 }
 
 /// Property signature: `prop: T` or `prop?: T` or `readonly prop: T`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct TSPropertySignature {
     pub key: ExprId,
     pub computed: bool,
@@ -556,7 +556,7 @@ pub struct TSPropertySignature {
 }
 
 /// Method signature: `method(): T` or `method<T>(x: T): T` or `get x(): T` or `set x(v: T)`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct TSMethodSignature {
     pub key: ExprId,
     pub computed: bool,
@@ -573,7 +573,7 @@ pub struct TSMethodSignature {
 }
 
 /// Call signature: `(): T` or `<T>(): T` or `(x: A): T`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct TSCallSignatureDeclaration {
     pub type_parameters: Option<TSTypeParameterDeclaration>,
     pub params: Run<Expression>,
@@ -582,7 +582,7 @@ pub struct TSCallSignatureDeclaration {
 }
 
 /// Construct signature: `new (): T` or `new <T>(): T` or `new (x: A): T`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct TSConstructSignatureDeclaration {
     pub type_parameters: Option<TSTypeParameterDeclaration>,
     pub params: Run<Expression>,
@@ -593,7 +593,7 @@ pub struct TSConstructSignatureDeclaration {
 /// Index signature: `[key: string]: T`, or typeless `[key: string]` (the value
 /// type annotation is optional — a typeless form is a deferred tsc checker error
 /// (TS1021), not a parse error; acorn parses it and omits `typeAnnotation`).
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct TSIndexSignature {
     pub parameters: Run<Identifier>,
     pub type_annotation: Option<TSTypeAnnotation>,

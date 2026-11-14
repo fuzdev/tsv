@@ -2854,7 +2854,7 @@ impl<'a> Parser<'a> {
                     tsv_lang::ast_census_probe::Dead::Superseded,
                     1,
                 );
-                (inst.expression, Some(inst.type_arguments.clone()))
+                (inst.expression, Some(inst.type_arguments))
             }
             _ => (expr, None),
         }

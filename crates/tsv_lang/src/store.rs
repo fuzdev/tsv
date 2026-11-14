@@ -12,7 +12,9 @@
 //!
 //! A [`Run`] names consecutive rows. [`ListBuf`] builds a run: list elements go on a scratch
 //! stack, one shared by every open list of the same element type, and a flush copies one
-//! finished frame into the store. A frame is a [`ListMark`] held in a local of the code building
+//! finished frame into the store: as a block for a `Copy` row ([`ListBuf::flush_copy`], or
+//! [`ListBuf::flush_copy_short`] where most frames hold one row), a row at a time for any
+//! other ([`ListBuf::flush_move`]). A frame is a [`ListMark`] held in a local of the code building
 //! the list, so nested lists are last-in-first-out by construction and nothing counts depth.
 //! A rewind needs only the mark taken before the speculation. A mark is typed by its family, so
 //! a mark of one buffer cannot be handed to another's.
@@ -947,10 +949,41 @@ impl<T: Row> ListBuf<T> {
         self.items.truncate(mark.index());
     }
 
-    /// Copies the frame above `mark` into `into` and truncates the stack back to `mark`. An
-    /// empty frame returns [`Run::EMPTY`] and does not touch `into`.
+    /// Copies the frame above `mark` into `into` as one block and truncates the stack back to
+    /// `mark`. An empty frame returns [`Run::EMPTY`] and does not touch `into`.
     #[inline]
     pub fn flush_copy(&mut self, mark: ListMark<T::Family>, into: &mut Store<T>) -> Run<T::Family>
+    where
+        T: Copy,
+    {
+        self.flush_copy_frame(mark, into, false)
+    }
+
+    /// [`ListBuf::flush_copy`] for a buffer whose frames are mostly one row long: a one-row
+    /// frame is stored as a push stores it, a move of the row's own width, where the block
+    /// copy of a frame whose length is known only at run time is a `memcpy` call whatever
+    /// the length. A longer frame takes the block copy.
+    #[inline]
+    pub fn flush_copy_short(
+        &mut self,
+        mark: ListMark<T::Family>,
+        into: &mut Store<T>,
+    ) -> Run<T::Family>
+    where
+        T: Copy,
+    {
+        self.flush_copy_frame(mark, into, true)
+    }
+
+    /// The copying flush, with or without the one-row arm. Each caller passes `one_row_arm`
+    /// as a literal, so the arm exists only in the form that names it.
+    #[inline]
+    fn flush_copy_frame(
+        &mut self,
+        mark: ListMark<T::Family>,
+        into: &mut Store<T>,
+        one_row_arm: bool,
+    ) -> Run<T::Family>
     where
         T: Copy,
     {
@@ -964,15 +997,19 @@ impl<T: Row> ListBuf<T> {
             store_miss();
         };
         let run = into.mint_run(count, || frame.first());
-        into.rows.extend_from_slice(frame);
+        match frame {
+            [only] if one_row_arm => into.rows.push(*only),
+            _ => into.rows.extend_from_slice(frame),
+        }
         self.items.truncate(mark.index());
         #[cfg(feature = "_internal_ast_census")]
         crate::ast_census_probe::list_delta::<T>(-(count as isize));
         run
     }
 
-    /// Moves the frame above `mark` into `into` and truncates the stack back to `mark`. An
-    /// empty frame returns [`Run::EMPTY`] and does not touch `into`.
+    /// Moves the frame above `mark` into `into`, a row at a time, and truncates the stack back
+    /// to `mark`: the flush of a row type that is not `Copy`. An empty frame returns
+    /// [`Run::EMPTY`] and does not touch `into`.
     #[inline]
     pub fn flush_move(&mut self, mark: ListMark<T::Family>, into: &mut Store<T>) -> Run<T::Family>
     where
@@ -1632,6 +1669,49 @@ mod tests {
         scratch.push(Node("y"));
         scratch.flush_move(mark, &mut nodes);
         assert_eq!(scratch.items, [Node("below")]);
+    }
+
+    /// The three flushes differ only in how the rows travel: for a frame of any length, into a
+    /// store never written or already written, each leaves the same rows, mints the same run
+    /// and takes the same elements off the stack.
+    #[test]
+    fn every_flush_places_the_same_rows() {
+        const NAMES: [&str; 5] = ["a", "b", "c", "d", "e"];
+        type Rows = Vec<Node<'static>>;
+        fn flushed(
+            written: bool,
+            len: usize,
+            flush: impl FnOnce(
+                &mut ListBuf<Node<'static>>,
+                ListMark<Alpha>,
+                &mut Store<Node<'static>>,
+            ) -> Run<Alpha>,
+        ) -> (Rows, (u32, usize), Rows) {
+            let mut nodes = store();
+            if written {
+                nodes.push(Node("first"));
+            }
+            let mut scratch = ListBuf::new();
+            scratch.push(Node("below"));
+            let mark = scratch.mark();
+            for name in &NAMES[..len] {
+                scratch.push(Node(name));
+            }
+            let run = flush(&mut scratch, mark, &mut nodes);
+            (nodes.rows, (run.start.get(), run.len()), scratch.items)
+        }
+        for written in [false, true] {
+            for len in 0..=NAMES.len() {
+                let moved = flushed(written, len, ListBuf::flush_move);
+                let copied = flushed(written, len, ListBuf::flush_copy);
+                let short = flushed(written, len, ListBuf::flush_copy_short);
+                assert_eq!(copied, moved, "written {written}, {len} rows");
+                assert_eq!(short, moved, "written {written}, {len} rows");
+                assert_eq!(moved.2, [Node("below")]);
+                let rows_before = if written { 2 } else { usize::from(len > 0) };
+                assert_eq!(moved.0.len(), rows_before + len);
+            }
+        }
     }
 
     #[test]

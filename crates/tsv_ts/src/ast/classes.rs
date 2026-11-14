@@ -72,6 +72,10 @@ pub struct ClassBody {
 }
 
 /// Class member - method definition, property definition, or static block
+///
+/// `Clone` only, where every other element of a value run is `Copy`: a method holds its
+/// function inline, a row an id names elsewhere, so a member read by value stays a compile
+/// error and a class body's run is flushed by move.
 #[derive(Debug, Clone)]
 pub enum ClassMember {
     MethodDefinition(MethodDefinition),
