@@ -96,7 +96,7 @@ impl<'a> Parser<'a> {
 
         // Parse parameter list (in the function's own `[Await]`/`[Yield]` context —
         // async/generator params are `[+Await]`/`[+Yield]`).
-        let params: Run<Expr> =
+        let params: Run<Expression> =
             self.with_fn_context(is_async, is_generator, Self::parse_parameter_list)?;
 
         // Check for return type annotation
@@ -204,7 +204,7 @@ impl<'a> Parser<'a> {
         let (params_start, _) = self.current_pos();
 
         // Parse parameter list (in the function's own `[Await]`/`[Yield]` context).
-        let params: Run<Expr> =
+        let params: Run<Expression> =
             self.with_fn_context(is_async, is_generator, Self::parse_parameter_list)?;
 
         // Check for return type annotation
@@ -335,7 +335,7 @@ impl<'a> Parser<'a> {
         // expression sits in a for-header init.
         let (params, return_type, body) = self.with_fn_context(is_async, is_generator, |p| {
             p.with_body_frame(|p| {
-                let params: Run<Expr> = p.parse_parameter_list()?;
+                let params: Run<Expression> = p.parse_parameter_list()?;
                 let return_type = p.parse_optional_return_type()?;
                 // three wire levels: the `FunctionExpression`, its body's `BlockStatement`
                 // and its statements — a declaration's own level is its statement's

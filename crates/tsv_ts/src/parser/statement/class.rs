@@ -1,11 +1,11 @@
 // Class declaration parsing
 
 use crate::ast::{
-    Accessibility, BlockStatement, ClassBody, ClassDeclaration, ClassExpression, ClassMember, Deco,
+    Accessibility, BlockStatement, ClassBody, ClassDeclaration, ClassExpression, ClassMember,
     Decorator, ExportDefaultDeclaration, ExportDefaultValue, ExportKind, ExportNamedDeclaration,
-    ExprId, Expression, ExpressionKind, FunctionExpression, Heritage, Identifier, Literal,
-    LiteralValue, MethodDefinition, MethodKind, PropertyDefinition, PropertyModifier, Run,
-    Statement, StatementKind, StaticBlock, TSIndexSignature, TSTypeParameterDeclaration,
+    ExprId, Expression, ExpressionKind, FunctionExpression, Identifier, Literal, LiteralValue,
+    MethodDefinition, MethodKind, PropertyDefinition, PropertyModifier, Run, Statement,
+    StatementKind, StaticBlock, TSIndexSignature, TSInterfaceHeritage, TSTypeParameterDeclaration,
     TSTypeParameterInstantiation,
 };
 use crate::lexer::{KeywordKind, TokenKind};
@@ -40,7 +40,7 @@ pub(in crate::parser) enum DecoratorListKind {
 #[expect(clippy::struct_excessive_bools)] // independent modifier flags, not a state machine
 struct ClassMemberHeader {
     start: usize,
-    decorators: Run<Deco>,
+    decorators: Run<Decorator>,
     accessibility: Option<Accessibility>,
     is_static: bool,
     is_declare: bool,
@@ -89,7 +89,7 @@ struct ClassHead {
     type_parameters: Option<TSTypeParameterDeclaration>,
     super_class: Option<ExprId>,
     super_type_parameters: Option<TSTypeParameterInstantiation>,
-    implements: Run<Heritage>,
+    implements: Run<TSInterfaceHeritage>,
     body: ClassBody,
 }
 
@@ -236,7 +236,7 @@ impl<'a> Parser<'a> {
     pub(super) fn finish_decorated_class(
         &mut self,
         deco_start: usize,
-        decorators: Run<Deco>,
+        decorators: Run<Decorator>,
         export: DecoratedClassExport,
     ) -> Result<ClassDeclaration, Error> {
         // `export default class {}` is the one name-optional decorated form.
@@ -361,7 +361,7 @@ impl<'a> Parser<'a> {
     pub(super) fn finish_decorated_class_expression(
         &mut self,
         start: usize,
-        decorators: Run<Deco>,
+        decorators: Run<Decorator>,
         r#abstract: bool,
     ) -> Result<ExprRet, Error> {
         if r#abstract {
@@ -398,7 +398,7 @@ impl<'a> Parser<'a> {
     pub(in crate::parser) fn parse_decorators(
         &mut self,
         kind: DecoratorListKind,
-    ) -> Result<Run<Deco>, Error> {
+    ) -> Result<Run<Decorator>, Error> {
         match kind {
             DecoratorListKind::Class => self.with_strict_class_scope(Self::parse_decorator_run),
             DecoratorListKind::Parameter => self.parse_decorator_run(),
@@ -408,7 +408,7 @@ impl<'a> Parser<'a> {
     /// The run itself: `@dec` until the `@`s stop. Split out so
     /// [`parse_decorators`](Self::parse_decorators) can hand it to the strict-scope
     /// combinator or call it bare, one spelling either way.
-    fn parse_decorator_run(&mut self) -> Result<Run<Deco>, Error> {
+    fn parse_decorator_run(&mut self) -> Result<Run<Decorator>, Error> {
         let mark = self.stores.runs.decorator_scratch.mark();
 
         while *self.current_kind() == TokenKind::At {
@@ -561,7 +561,7 @@ impl<'a> Parser<'a> {
     fn parse_class_expression_from(
         &mut self,
         start: usize,
-        decorators: Option<Run<Deco>>,
+        decorators: Option<Run<Decorator>>,
         r#abstract: bool,
     ) -> Result<ExprRet, Error> {
         // Consume 'class' keyword
@@ -624,7 +624,7 @@ impl<'a> Parser<'a> {
             let (super_class, super_type_parameters) = p.parse_optional_extends_clause()?;
 
             // Parse optional `implements` clause
-            let implements: Run<Heritage> = if p.eat_contextual_keyword("implements")? {
+            let implements: Run<TSInterfaceHeritage> = if p.eat_contextual_keyword("implements")? {
                 p.parse_interface_heritage_list()?
             } else {
                 Run::EMPTY
@@ -1455,7 +1455,7 @@ impl<'a> Parser<'a> {
     pub(in crate::parser) fn parse_class_index_signature(
         &mut self,
         start: usize,
-        decorators: Run<Deco>,
+        decorators: Run<Decorator>,
         is_static: bool,
         readonly: bool,
     ) -> Result<ClassMember, Error> {

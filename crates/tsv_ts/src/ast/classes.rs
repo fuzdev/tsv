@@ -6,8 +6,9 @@
 use tsv_lang::Span;
 
 use super::{
-    ClassMem, Deco, ExprId, FunctionExpression, Heritage, Identifier, Run, StmtId,
-    TSIndexSignature, TSTypeAnnotation, TSTypeParameterDeclaration, TSTypeParameterInstantiation,
+    Decorator, ExprId, FunctionExpression, Identifier, Run, StmtId, TSIndexSignature,
+    TSInterfaceHeritage, TSTypeAnnotation, TSTypeParameterDeclaration,
+    TSTypeParameterInstantiation,
 };
 
 /// Class declaration: `class Foo { ... }` or `class Foo extends Bar { ... }`
@@ -17,7 +18,7 @@ use super::{
 #[derive(Debug, Clone)]
 pub struct ClassDeclaration {
     /// Decorators applied to this class
-    pub decorators: Option<Run<Deco>>,
+    pub decorators: Option<Run<Decorator>>,
     /// Class name (required for declarations, optional for export default)
     pub id: Option<Identifier>,
     /// Optional superclass expression (for `extends`)
@@ -25,7 +26,7 @@ pub struct ClassDeclaration {
     /// Type arguments for superclass (e.g., `<T>` in `extends Base<T>`)
     pub super_type_parameters: Option<TSTypeParameterInstantiation>,
     /// Implements clause for declare class: `implements Foo, Bar`
-    pub implements: Run<Heritage>,
+    pub implements: Run<TSInterfaceHeritage>,
     /// Class body containing methods and properties
     pub body: ClassBody,
     /// Whether this is a declare class (ambient declaration)
@@ -44,7 +45,7 @@ pub struct ClassDeclaration {
 #[derive(Debug, Clone)]
 pub struct ClassExpression {
     /// Decorators applied to this class
-    pub decorators: Option<Run<Deco>>,
+    pub decorators: Option<Run<Decorator>>,
     /// Class name (always optional for expressions)
     pub id: Option<Identifier>,
     /// Optional superclass expression (for `extends`)
@@ -52,7 +53,7 @@ pub struct ClassExpression {
     /// Type arguments for superclass (e.g., `<T>` in `extends Base<T>`)
     pub super_type_parameters: Option<TSTypeParameterInstantiation>,
     /// Implements clause: `implements Foo, Bar`
-    pub implements: Run<Heritage>,
+    pub implements: Run<TSInterfaceHeritage>,
     /// Class body containing methods and properties
     pub body: ClassBody,
     /// Whether this is an abstract class
@@ -66,7 +67,7 @@ pub struct ClassExpression {
 /// Contains the methods and properties of a class.
 #[derive(Debug, Clone)]
 pub struct ClassBody {
-    pub body: Run<ClassMem>,
+    pub body: Run<ClassMember>,
     pub span: Span,
 }
 
@@ -96,7 +97,7 @@ pub struct StaticBlock {
     /// Decorators in front of the block (`@a static {}`). No decorator grammar
     /// reaches a static block (tsc's checker reports TS1206); acorn keeps the list
     /// and tsv defers the error, so the list is kept and printed.
-    pub decorators: Option<Run<Deco>>,
+    pub decorators: Option<Run<Decorator>>,
     pub body: Run<StmtId>,
     pub span: Span,
 }
@@ -169,7 +170,7 @@ pub struct TSParameterProperty {
 #[expect(clippy::struct_excessive_bools)] // independent flags, not a state machine
 pub struct MethodDefinition {
     /// Decorators applied to this method
-    pub decorators: Option<Run<Deco>>,
+    pub decorators: Option<Run<Decorator>>,
     /// Method name (key)
     pub key: ExprId,
     /// Method implementation (value)
@@ -214,7 +215,7 @@ pub enum PropertyModifier {
 #[derive(Debug, Clone)]
 pub struct PropertyDefinition {
     /// Decorators applied to this property
-    pub decorators: Option<Run<Deco>>,
+    pub decorators: Option<Run<Decorator>>,
     /// Property name (key)
     pub key: ExprId,
     /// Type annotation (e.g., `: number` in `a: number = 0;`)

@@ -7,8 +7,8 @@ use crate::ast::AstView;
 use tsv_lang::Span;
 
 use super::{
-    ClassDeclaration, ExportSpec, ExprId, FunctionDeclaration, Identifier, ImportAttr, ImportSpec,
-    Literal, Run, StmtId, TSDeclareFunction, TSEntityName, TSInterfaceDeclaration,
+    ClassDeclaration, ExprId, FunctionDeclaration, Identifier, Literal, Run, StmtId,
+    TSDeclareFunction, TSEntityName, TSInterfaceDeclaration,
 };
 
 /// Export named declaration: `export const x = 1;`, `export { x }`, `export { x } from "y"`
@@ -18,14 +18,14 @@ pub struct ExportNamedDeclaration {
     /// None when using specifiers
     pub declaration: Option<StmtId>,
     /// Export specifiers: `export { a, b as c }`
-    pub specifiers: Run<ExportSpec>,
+    pub specifiers: Run<ExportSpecifier>,
     /// Re-export source: `export { x } from "y"` or None for local exports
     pub source: Option<Literal>,
     /// Import attributes: `export { x } from "y" with { type: "json" }`.
     /// `None` = no `with` clause; `Some` of an empty run = empty `with {}` (preserved,
     /// matching acorn/prettier). Only a re-export (with `source`) can carry a
     /// clause (spec: `WithClause` attaches to `export ExportFromClause FromClause`).
-    pub attributes: Option<Run<ImportAttr>>,
+    pub attributes: Option<Run<ImportAttribute>>,
     /// Export kind: "value" for regular exports, "type" for type-only exports
     pub export_kind: ExportKind,
 }
@@ -100,7 +100,7 @@ pub struct ExportAllDeclaration {
     pub source: Literal,
     /// Import attributes: `export * from "y" with { type: "json" }`.
     /// `None` = no `with` clause; `Some` of an empty run = empty `with {}`.
-    pub attributes: Option<Run<ImportAttr>>,
+    pub attributes: Option<Run<ImportAttribute>>,
     /// Export kind: "value" or "type" (for `export type * from`)
     pub export_kind: ExportKind,
 }
@@ -152,12 +152,12 @@ pub use crate::imports::ImportPhase;
 #[derive(Debug, Clone)]
 pub struct ImportDeclaration {
     /// Import specifiers (default, named, or namespace)
-    pub specifiers: Run<ImportSpec>,
+    pub specifiers: Run<ImportSpecifier>,
     /// Module source (string literal)
     pub source: Literal,
     /// Import attributes: `import x from "y" with { type: "json" }`.
     /// `None` = no `with` clause; `Some` of an empty run = empty `with {}`.
-    pub attributes: Option<Run<ImportAttr>>,
+    pub attributes: Option<Run<ImportAttribute>>,
     /// Import kind: "value" or "type" (for `import type { ... }`)
     pub import_kind: ImportKind,
     /// Import phase: `Source`/`Defer` for `import source …` / `import defer …`.

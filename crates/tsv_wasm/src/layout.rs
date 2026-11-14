@@ -13,9 +13,9 @@ use tsv_lang::store::{Id, IdRet, ListBuf, ListMark, PoolText, Run, Store, StoreV
 use tsv_svelte::ast::{AttributeNode, Element, ExpressionTag, FragmentNode};
 use tsv_ts::Error;
 use tsv_ts::ast::{
-    CommentList, Expr, ExprId, Expression, ExpressionKind, ObjectPatternProperty, ObjectProperty,
+    CommentList, ExprId, Expression, ExpressionKind, ObjectPatternProperty, ObjectProperty,
     PoolStr, Property, Statement, StatementKind, StmtId, SwitchCase, TSType, TSTypeAnnotation,
-    TSTypeParameterDeclaration, TSTypeParameterInstantiation, Ty, TyId, VariableDeclarator,
+    TSTypeParameterDeclaration, TSTypeParameterInstantiation, TyId, VariableDeclarator,
 };
 
 // `DocContext` rides inline in `DocNode::WithContext`; see its native pin in `tsv_lang`
@@ -52,8 +52,8 @@ const _: () = assert!(size_of::<VariableDeclarator>() == 20);
 const _: () = assert!(size_of::<SwitchCase>() == 20);
 // The ladders' return currency: an id word plus the pointer-sized `Error` is two words. See
 // the native pins in `tsv_ts`'s `parser/expression.rs` and `parser/types.rs`.
-const _: () = assert!(size_of::<Result<IdRet<Expr>, Error>>() == 2 * size_of::<usize>());
-const _: () = assert!(size_of::<Result<IdRet<Ty>, Error>>() == 2 * size_of::<usize>());
+const _: () = assert!(size_of::<Result<IdRet<Expression>, Error>>() == 2 * size_of::<usize>());
+const _: () = assert!(size_of::<Result<IdRet<TSType>, Error>>() == 2 * size_of::<usize>());
 // The CSS numeric carriers, 4-aligned through `PackedF64`. See the native `ColorChannel` and
 // `CssValue` pins in `tsv_css`'s `ast/mod.rs`.
 const _: () = assert!(size_of::<ColorChannel>() == 12);

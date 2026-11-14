@@ -4,8 +4,8 @@
 
 use crate::ast::{
     ArrayPattern, AssignmentOperator, AssignmentPattern, AstView, ExprId, Expression,
-    ExpressionKind, ObjProp, ObjectPattern, ObjectPatternProperty, ObjectProperty, Property,
-    PropertyKind, RestElement, Run,
+    ExpressionKind, ObjectPattern, ObjectPatternProperty, ObjectProperty, Property, PropertyKind,
+    RestElement, Run,
 };
 use tsv_lang::{Error, Span};
 
@@ -68,7 +68,7 @@ enum CoverShape {
     Identifier,
     Member,
     Object {
-        properties: Run<ObjProp>,
+        properties: Run<ObjectProperty>,
         spread_trailing_comma: bool,
     },
     Array {

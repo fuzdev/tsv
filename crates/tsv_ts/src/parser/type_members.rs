@@ -81,7 +81,7 @@ impl<'a> Parser<'a> {
     /// Parse a run of type members up to (but not consuming) the closing `}`.
     /// Each member's span is extended over a trailing `;`/`,` separator when one
     /// is present. Shared by type literals (`{ … }`) and interface bodies.
-    pub(in crate::parser) fn parse_type_members(&mut self) -> Result<Run<TypeMember>, Error> {
+    pub(in crate::parser) fn parse_type_members(&mut self) -> Result<Run<TSTypeElement>, Error> {
         let mark = self.stores.runs.type_member_scratch.mark();
         // the members are siblings (`ListFrame`)
         let mut frame = self.list_frame();

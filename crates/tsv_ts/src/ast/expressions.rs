@@ -7,9 +7,9 @@ use crate::ast::{AstView, PoolStr};
 use tsv_lang::{Comment, Span};
 
 use super::{
-    ArrayPattern, ArrowFnId, AssignmentPattern, BlockStatement, ClassExprId, Expr, ExprId,
-    FnExprId, Identifier, Literal, MetaPropId, ObjProp, ObjectPattern, PrivateIdentifier, Quasi,
-    RestElement, Run, TSParameterProperty, TSTypeAnnotation, TSTypeParameterDeclaration,
+    ArrayPattern, ArrowFnId, AssignmentPattern, BlockStatement, ClassExprId, ExprId, FnExprId,
+    Identifier, Literal, MetaPropId, ObjectPattern, PrivateIdentifier, RestElement, Run,
+    TSParameterProperty, TSTypeAnnotation, TSTypeParameterDeclaration,
     TSTypeParameterInstantiation, TaggedTplId, TyId,
 };
 
@@ -403,7 +403,7 @@ impl ParenthesizedExpression {
 
 #[derive(Debug, Clone)]
 pub struct ObjectExpression {
-    pub properties: Run<ObjProp>,
+    pub properties: Run<ObjectProperty>,
     /// `true` when a trailing comma follows a final spread property (`{...a,}`).
     /// Valid in an object *literal*, but a syntax error once the literal is
     /// refined to an object pattern — the grammar's rest property admits no
@@ -861,7 +861,7 @@ pub struct ArrowFunctionExpression {
     /// Type parameters (TypeScript generics): `<T>() => ...`
     pub type_parameters: Option<TSTypeParameterDeclaration>,
     /// Function parameters (Identifier, ArrayPattern, ObjectPattern, or AssignmentPattern for defaults)
-    pub params: Run<Expr>,
+    pub params: Run<Expression>,
     pub body: ArrowFunctionBody,
     /// Return type annotation (TypeScript): (): number => ...
     pub return_type: Option<TSTypeAnnotation>,
@@ -913,7 +913,7 @@ pub struct FunctionExpression {
     /// Type parameters (TypeScript generics): `function<T>() {}`
     pub type_parameters: Option<TSTypeParameterDeclaration>,
     /// Function parameters (Identifier, ArrayPattern, ObjectPattern, or AssignmentPattern for defaults)
-    pub params: Run<Expr>,
+    pub params: Run<Expression>,
     /// Return type annotation (e.g., `: number` in `function fn(): number {}`)
     pub return_type: Option<TSTypeAnnotation>,
     /// Function body (block statement with statements)
@@ -998,7 +998,7 @@ pub struct Property {
 /// - expressions: [b, d]
 #[derive(Debug, Clone)]
 pub struct TemplateLiteral {
-    pub quasis: Run<Quasi>,
+    pub quasis: Run<TemplateElement>,
     pub expressions: Run<ExprId>,
     pub span: Span,
 }

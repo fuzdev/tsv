@@ -6,7 +6,7 @@
 use crate::ast::AstView;
 use tsv_lang::Span;
 
-use super::{Deco, ExprId, PatProp, Property, Run, TSTypeAnnotation};
+use super::{Decorator, ExprId, Property, Run, TSTypeAnnotation};
 
 /// Object pattern for destructuring: `{a, b}`, `{a: x, b: y}`, `{...rest}`
 ///
@@ -21,7 +21,7 @@ use super::{Deco, ExprId, PatProp, Property, Run, TSTypeAnnotation};
 /// - Rest: `{...rest}` (collect remaining properties)
 #[derive(Debug, Clone)]
 pub struct ObjectPattern {
-    pub properties: Run<PatProp>,
+    pub properties: Run<ObjectPatternProperty>,
     /// Optional destructuring-pattern parameter (`{a}?`). Only ever set in a
     /// parameter position; the `?` extends the expression's span and precedes `type_annotation`.
     pub optional: bool,
@@ -29,7 +29,7 @@ pub struct ObjectPattern {
     /// Parameter decorators (`@dec { a }: T`). Only set in a parameter position;
     /// emitted last in the wire, matching acorn (which attaches a parameter's
     /// decorators to its top-level binding node).
-    pub decorators: Option<Run<Deco>>,
+    pub decorators: Option<Run<Decorator>>,
 }
 
 /// Object pattern property - either a regular property or a rest element
@@ -100,7 +100,7 @@ pub struct ArrayPattern {
     pub type_annotation: Option<TSTypeAnnotation>,
     /// Parameter decorators (`@dec [a]: T`). Only set in a parameter position;
     /// emitted last in the wire, matching acorn.
-    pub decorators: Option<Run<Deco>>,
+    pub decorators: Option<Run<Decorator>>,
 }
 
 /// Assignment pattern for default values in destructuring: `a = 1`
@@ -120,7 +120,7 @@ pub struct AssignmentPattern {
     /// Parameter decorators (`@dec a = 1`, `@dec { a } = {}`). Only set in a
     /// parameter position; emitted last in the wire — acorn attaches a decorated
     /// default parameter's decorators to the `AssignmentPattern`, not its `left`.
-    pub decorators: Option<Run<Deco>>,
+    pub decorators: Option<Run<Decorator>>,
 }
 
 /// Rest element in destructuring: `...rest`

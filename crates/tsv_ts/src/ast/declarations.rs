@@ -6,9 +6,8 @@
 use tsv_lang::Span;
 
 use super::{
-    AstView, EnumMem, Expr, ExprId, Heritage, Identifier, Literal, ModuleDeclId, Run, StmtId,
-    TSEntityName, TSTypeAnnotation, TSTypeParameterDeclaration, TSTypeParameterInstantiation,
-    TypeMember,
+    AstView, ExprId, Expression, Identifier, Literal, ModuleDeclId, Run, StmtId, TSEntityName,
+    TSTypeAnnotation, TSTypeElement, TSTypeParameterDeclaration, TSTypeParameterInstantiation,
 };
 
 /// Interface declaration: `interface Foo { ... }` or `interface Foo extends Bar { ... }`
@@ -16,7 +15,7 @@ use super::{
 pub struct TSInterfaceDeclaration {
     pub id: Identifier,
     pub type_parameters: Option<TSTypeParameterDeclaration>,
-    pub extends: Run<Heritage>,
+    pub extends: Run<TSInterfaceHeritage>,
     pub body: TSInterfaceBody,
     pub declare: bool,
     pub span: Span,
@@ -33,7 +32,7 @@ pub struct TSInterfaceHeritage {
 /// Interface body: `{ members }`
 #[derive(Debug, Clone)]
 pub struct TSInterfaceBody {
-    pub body: Run<TypeMember>,
+    pub body: Run<TSTypeElement>,
     pub span: Span,
 }
 
@@ -45,7 +44,7 @@ pub struct TSInterfaceBody {
 pub struct TSDeclareFunction {
     pub id: Identifier,
     pub type_parameters: Option<TSTypeParameterDeclaration>,
-    pub params: Run<Expr>,
+    pub params: Run<Expression>,
     pub return_type: Option<TSTypeAnnotation>,
     /// Whether to print the `declare` keyword.
     /// True for top-level `declare function`, false inside `declare namespace`.
@@ -69,7 +68,7 @@ pub struct TSEnumDeclaration {
     /// Enum name
     pub id: Identifier,
     /// Enum members
-    pub members: Run<EnumMem>,
+    pub members: Run<TSEnumMember>,
     /// Whether this is a const enum
     pub r#const: bool,
     /// Whether this is an ambient declaration (declare enum)

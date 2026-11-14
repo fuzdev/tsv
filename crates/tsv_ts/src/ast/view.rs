@@ -12,9 +12,9 @@ use tsv_lang::store::Run;
 
 use super::stores::{PayloadStores, RunStores};
 use super::{
-    AstStores, CatchClause, CatchId, Comment, CommentList, Deco, Decorator, Expr, ExprId,
-    Expression, ForHeadId, ForInit, IdentifierParamExtra, ParamExtraId, Parsed, PoolStr, Program,
-    Statement, StmtId, TSType, TyId,
+    AstStores, CatchClause, CatchId, Comment, CommentList, Decorator, ExprId, Expression,
+    ForHeadId, ForInit, IdentifierParamExtra, ParamExtraId, Parsed, PoolStr, Program, Statement,
+    StmtId, TSType, TyId,
 };
 
 /// The read access every consumer of the tree holds: resolves edges and lists.
@@ -56,7 +56,7 @@ impl<'a> AstView<'a> {
 
     /// The expressions of `run`, held by value: parameter lists.
     #[inline]
-    pub fn run(self, run: Run<Expr>) -> &'a [Expression] {
+    pub fn run(self, run: Run<Expression>) -> &'a [Expression] {
         self.stores.exprs.slice(run)
     }
 
@@ -118,7 +118,7 @@ impl<'a> AstView<'a> {
 
     /// The decorators of `list`, when the holder has a list: absent and empty are distinct.
     #[inline]
-    pub fn opt_decorators(self, list: Option<Run<Deco>>) -> Option<&'a [Decorator]> {
+    pub fn opt_decorators(self, list: Option<Run<Decorator>>) -> Option<&'a [Decorator]> {
         list.map(|list| self.decorators(list))
     }
 

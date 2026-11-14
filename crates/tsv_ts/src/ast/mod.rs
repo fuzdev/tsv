@@ -33,16 +33,11 @@ mod view;
 
 pub(crate) use stores::ScratchMarks;
 pub use stores::{
-    ArrowFn, ArrowFnId, AstStores, Case, Catch, CatchId, ClassDecl, ClassDeclId, ClassExpr,
-    ClassExprId, ClassMem, CommentList, CtorType, CtorTypeId, Declarator, DeclareFn, DeclareFnId,
-    Deco, EnumDecl, EnumDeclId, EnumMem, ExportAll, ExportAllId, ExportAssign, ExportAssignId,
-    ExportDefault, ExportDefaultId, ExportNamed, ExportNamedId, ExportSpec, Expr, ExprId, FnDecl,
-    FnDeclId, FnExpr, FnExprId, ForHead, ForHeadId, ForLeft, ForLeftId, Heritage, ImportAttr,
-    ImportDecl, ImportDeclId, ImportEquals, ImportEqualsId, ImportSpec, ImportType, ImportTypeId,
-    IndexParam, InferType, InferTypeId, InterfaceDecl, InterfaceDeclId, MetaProp, MetaPropId,
-    ModuleDecl, ModuleDeclId, ObjProp, ParamExtra, ParamExtraId, Parsed, PatProp, PoolStr,
-    QualName, QualNameId, Quasi, Stmt, StmtId, TaggedTpl, TaggedTplId, Text, Ty, TyId, TypeAlias,
-    TypeAliasId, TypeMember, TypeParam, WarmStores, with_stores,
+    ArrowFnId, AstStores, CatchId, ClassDeclId, ClassExprId, CommentList, CtorTypeId, DeclareFnId,
+    EnumDeclId, ExportAllId, ExportAssignId, ExportDefaultId, ExportNamedId, ExprId, FnDeclId,
+    FnExprId, ForHeadId, ForLeftId, ImportDeclId, ImportEqualsId, ImportTypeId, InferTypeId,
+    InterfaceDeclId, MetaPropId, ModuleDeclId, ParamExtraId, Parsed, PoolStr, QualNameId, StmtId,
+    TaggedTplId, Text, TyId, TypeAliasId, WarmStores, with_stores,
 };
 pub use tsv_lang::store::Run;
 pub use tsv_lang::{Comment, Span};
@@ -158,7 +153,7 @@ pub use expressions::{
 // nothing. The expression LISTS whose elements come off the spine hold ids — call and
 // `new` arguments and sequence and template expressions (`Run<ExprId>`), array-literal
 // and array-pattern elements (`Run<Option<ExprId>>`) — and the parameter lists are value
-// runs over the expression store itself (`Run<Expr>`), `CatchClause`'s case. The
+// runs over the expression store itself (`Run<Expression>`), `CatchClause`'s case. The
 // statement lists — program, block, `case`, static-block and namespace bodies — hold ids
 // too (`Run<StmtId>`), as the single statement edges do (`StmtId`): every statement is a
 // row of the statement store. So do the type lists — union and intersection members, tuple
@@ -168,8 +163,8 @@ pub use expressions::{
 // members and patterns' members, template quasis, declarators, `switch` cases, import and
 // export specifiers and import attributes, class and type members, type parameters,
 // heritage clauses, enum members, index-signature parameters, decorators — are value runs
-// (`Run<ObjProp>`, `Run<Declarator>`, …): the run's rows ARE the elements, one store per
-// element type (`ast/stores.rs`).
+// (`Run<ObjectProperty>`, `Run<VariableDeclarator>`, …): the run's rows ARE the elements, one
+// store per element type (`ast/stores.rs`).
 //
 // `Expression` and `Statement` are each a header over their variant (`span` +
 // `ExpressionKind` / `StatementKind`), so a span read is a field load rather than a
@@ -462,7 +457,7 @@ pub struct Identifier {
 #[derive(Debug, Clone)]
 pub struct IdentifierParamExtra {
     pub type_annotation: Option<TSTypeAnnotation>,
-    pub decorators: Option<Run<Deco>>,
+    pub decorators: Option<Run<Decorator>>,
 }
 
 impl Identifier {

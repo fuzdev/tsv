@@ -137,12 +137,13 @@ impl<'a> Parser<'a> {
         let type_parameters = self.parse_optional_type_parameters()?;
 
         // Parse optional extends clause
-        let extends: Run<Heritage> = if self.check(&TokenKind::Keyword(KeywordKind::Extends)) {
-            self.advance()?;
-            self.parse_interface_heritage_list()?
-        } else {
-            Run::EMPTY
-        };
+        let extends: Run<TSInterfaceHeritage> =
+            if self.check(&TokenKind::Keyword(KeywordKind::Extends)) {
+                self.advance()?;
+                self.parse_interface_heritage_list()?
+            } else {
+                Run::EMPTY
+            };
 
         // Parse interface body
         let body = self.parse_interface_body()?;
@@ -161,7 +162,7 @@ impl<'a> Parser<'a> {
     /// Parse interface heritage list: `Foo, Bar<T>`
     pub(in crate::parser) fn parse_interface_heritage_list(
         &mut self,
-    ) -> Result<Run<Heritage>, Error> {
+    ) -> Result<Run<TSInterfaceHeritage>, Error> {
         let mark = self.stores.runs.heritage_scratch.mark();
 
         // the heritages are siblings (`ListFrame`)

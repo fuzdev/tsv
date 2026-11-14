@@ -3,7 +3,7 @@
 // Pratt kernel in `expression.rs` calls into these; they never call back into it.
 
 use crate::ast::{
-    ArrowFunctionBody, ArrowFunctionExpression, Expr, Expression, ExpressionKind, Identifier, Run,
+    ArrowFunctionBody, ArrowFunctionExpression, Expression, ExpressionKind, Identifier, Run,
 };
 use crate::lexer::TokenKind;
 use crate::parser::push_row;
@@ -16,7 +16,7 @@ use super::{ExprRet, Parser};
 impl<'a> Parser<'a> {
     /// A value run of the one parameter of a parenless arrow.
     #[inline]
-    fn single_param_run(&mut self, param: Expression) -> Run<Expr> {
+    fn single_param_run(&mut self, param: Expression) -> Run<Expression> {
         let mark = self.stores.expr_scratch.mark();
         self.stores.expr_scratch.push(param);
         self.flush_expr_run(mark)
@@ -382,31 +382,31 @@ impl<'a> Parser<'a> {
 
         // Parse parameter list or single parameter
         // Note: with type parameters, must have parentheses
-        let (params, params_start): (Run<Expr>, Option<u32>) = if self.check(&TokenKind::ParenOpen)
-        {
-            let (paren_pos, _) = self.current_pos();
-            (
-                // Async arrow params are `[+Await]`.
-                self.with_fn_context(true, false, Self::parse_parameter_list_no_decorators)?,
-                Some(paren_pos as u32),
-            )
-        } else if type_parameters.is_none() && matches!(self.current_kind(), TokenKind::Identifier)
-        {
-            // Single parameter without parens: `async x => ...`
-            // (Not allowed with type parameters)
-            let (id_start, id_end) = self.current_pos();
-            let name = self.current_ident_name();
-            // its levels in the format's output, `async (x) => …` (the depth limit's count)
-            self.nested(2, |_| Ok(()))?;
-            self.advance()?;
-            let params = self.single_param_run(Expression::from_identifier(Identifier::simple(
-                name,
-                Span::new(id_start as u32, id_end as u32),
-            )));
-            (params, None)
-        } else {
-            return Err(self.error_expected_after("'(' or identifier", "async"));
-        };
+        let (params, params_start): (Run<Expression>, Option<u32>) =
+            if self.check(&TokenKind::ParenOpen) {
+                let (paren_pos, _) = self.current_pos();
+                (
+                    // Async arrow params are `[+Await]`.
+                    self.with_fn_context(true, false, Self::parse_parameter_list_no_decorators)?,
+                    Some(paren_pos as u32),
+                )
+            } else if type_parameters.is_none()
+                && matches!(self.current_kind(), TokenKind::Identifier)
+            {
+                // Single parameter without parens: `async x => ...`
+                // (Not allowed with type parameters)
+                let (id_start, id_end) = self.current_pos();
+                let name = self.current_ident_name();
+                // its levels in the format's output, `async (x) => …` (the depth limit's count)
+                self.nested(2, |_| Ok(()))?;
+                self.advance()?;
+                let params = self.single_param_run(Expression::from_identifier(
+                    Identifier::simple(name, Span::new(id_start as u32, id_end as u32)),
+                ));
+                (params, None)
+            } else {
+                return Err(self.error_expected_after("'(' or identifier", "async"));
+            };
 
         // Check for return type annotation or type predicate
         let return_type = self.parse_optional_return_type()?;

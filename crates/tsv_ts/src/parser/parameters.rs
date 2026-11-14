@@ -73,7 +73,7 @@ impl<'a> Parser<'a> {
     fn attach_param_decorators(
         &mut self,
         mut param: Expression,
-        decorators: Run<Deco>,
+        decorators: Run<Decorator>,
     ) -> Expression {
         match &mut param.kind {
             // `@dec private a` — decorators ride the inner binding, not the
@@ -285,7 +285,7 @@ impl<'a> Parser<'a> {
     /// constructor, object-literal methods, and ambient `declare function`s —
     /// every position acorn's `parseAssignableListItem` parses decorators in.
     /// Consumes both opening and closing parentheses.
-    pub(super) fn parse_parameter_list(&mut self) -> Result<Run<Expr>, Error> {
+    pub(super) fn parse_parameter_list(&mut self) -> Result<Run<Expression>, Error> {
         self.parse_parameter_list_inner(true, 1)
     }
 
@@ -302,7 +302,7 @@ impl<'a> Parser<'a> {
     /// are not valid here" (TS1206) from its checker. So the uniform rejection here does
     /// not rest on tsc's parser, and the reject-vs-defer line (`docs/conformance_tsc.md`)
     /// normally defers a checker-raised rule.
-    pub(super) fn parse_parameter_list_no_decorators(&mut self) -> Result<Run<Expr>, Error> {
+    pub(super) fn parse_parameter_list_no_decorators(&mut self) -> Result<Run<Expression>, Error> {
         self.parse_parameter_list_inner(false, 1)
     }
 
@@ -315,7 +315,7 @@ impl<'a> Parser<'a> {
     /// `check_signature_params` then rejects — it is that one level, and what nests below
     /// it is charged where it is parsed: a pattern's own levels, a rest parameter's
     /// pattern at the rest, a parameter property's binding inside the property.
-    pub(super) fn parse_signature_parameter_list(&mut self) -> Result<Run<Expr>, Error> {
+    pub(super) fn parse_signature_parameter_list(&mut self) -> Result<Run<Expression>, Error> {
         self.parse_parameter_list_inner(false, 0)
     }
 
@@ -342,7 +342,7 @@ impl<'a> Parser<'a> {
         &mut self,
         allow_decorators: bool,
         parameter_levels: u32,
-    ) -> Result<Run<Expr>, Error> {
+    ) -> Result<Run<Expression>, Error> {
         self.expect(&TokenKind::ParenOpen)?;
         self.enter_grouping()?;
 
@@ -418,7 +418,7 @@ impl<'a> Parser<'a> {
         // again with the level charged (`Parser::decorated_parameter_properties`).
         let decorators_start = self.current_pos().0 as u32;
         let mut reread: Option<Checkpoint> = None;
-        let decorators: Run<Deco> = if self.check(&TokenKind::At) {
+        let decorators: Run<Decorator> = if self.check(&TokenKind::At) {
             // Reject decorators where the position forbids them (arrow
             // parameters, type-member signatures). Checked per-parameter, so
             // a mid-list decorator (`(a, @dec b)`) rejects too.
@@ -642,7 +642,7 @@ impl<'a> Parser<'a> {
     pub(super) fn check_accessor_param_arity(
         &self,
         is_getter: bool,
-        params: Run<Expr>,
+        params: Run<Expression>,
         allow_this_param: bool,
     ) -> Result<(), Error> {
         let params = self.stores.view().run(params);
@@ -683,7 +683,7 @@ impl<'a> Parser<'a> {
     pub(super) fn check_type_member_accessor_params(
         &self,
         kind: MethodKind,
-        params: Run<Expr>,
+        params: Run<Expression>,
     ) -> Result<(), Error> {
         let is_getter = matches!(kind, MethodKind::Get);
         self.check_accessor_param_arity(is_getter, params, false)?;
@@ -714,7 +714,7 @@ impl<'a> Parser<'a> {
     /// *ambient* declaration (`declare function f(v = 1)`, TS1039 deferred), and an
     /// *overload* keep their defaults (all acorn-accepts). Function *types* reject
     /// defaults already via their own param parser (`parse_function_type_params`).
-    pub(super) fn check_signature_params(&self, params: Run<Expr>) -> Result<(), Error> {
+    pub(super) fn check_signature_params(&self, params: Run<Expression>) -> Result<(), Error> {
         for param in self.stores.view().run(params) {
             if !matches!(
                 param.kind,

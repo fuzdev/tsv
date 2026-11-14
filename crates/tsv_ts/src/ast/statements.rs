@@ -7,10 +7,10 @@
 use tsv_lang::Span;
 
 use super::{
-    Case, CatchId, ClassDeclId, Declarator, DeclareFnId, EnumDeclId, ExportAllId, ExportAssignId,
-    ExportDefaultId, ExportNamedId, Expr, ExprId, Expression, FnDeclId, ForHeadId, ForLeftId,
-    Identifier, ImportDeclId, ImportEqualsId, InterfaceDeclId, ModuleDeclId, Run, StmtId,
-    TSNamespaceExportDeclaration, TSTypeAnnotation, TSTypeParameterDeclaration, TypeAliasId,
+    CatchId, ClassDeclId, DeclareFnId, EnumDeclId, ExportAllId, ExportAssignId, ExportDefaultId,
+    ExportNamedId, ExprId, Expression, FnDeclId, ForHeadId, ForLeftId, Identifier, ImportDeclId,
+    ImportEqualsId, InterfaceDeclId, ModuleDeclId, Run, StmtId, TSNamespaceExportDeclaration,
+    TSTypeAnnotation, TSTypeParameterDeclaration, TypeAliasId,
 };
 
 /// Statement node: the span every variant shares, beside the variant itself.
@@ -336,7 +336,7 @@ pub struct WithStatement {
 #[derive(Debug, Clone)]
 pub struct SwitchStatement {
     pub discriminant: ExprId,
-    pub cases: Run<Case>,
+    pub cases: Run<SwitchCase>,
 }
 
 /// Switch case: `case test: consequent` or `default: consequent`
@@ -421,7 +421,7 @@ pub struct FunctionDeclaration {
     /// Type parameters (TypeScript generics): `function fn<T>() {}`
     pub type_parameters: Option<TSTypeParameterDeclaration>,
     /// Function parameters (Identifier, ArrayPattern, ObjectPattern, or AssignmentPattern for defaults)
-    pub params: Run<Expr>,
+    pub params: Run<Expression>,
     /// Return type annotation (e.g., `: number` in `function fn(): number {}`)
     pub return_type: Option<TSTypeAnnotation>,
     /// Function body (block statement with statements)
@@ -481,7 +481,7 @@ impl VariableDeclarationKind {
 #[derive(Debug, Clone)]
 pub struct VariableDeclaration {
     pub kind: VariableDeclarationKind,
-    pub declarations: Run<Declarator>,
+    pub declarations: Run<VariableDeclarator>,
     /// Whether this is an ambient declaration (`declare const x: T;`)
     pub declare: bool,
     pub span: Span,

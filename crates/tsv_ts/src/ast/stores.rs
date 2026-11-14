@@ -5,7 +5,7 @@
 //! inline in the node that refers to it: the function, class and declaration payloads, the
 //! constructor, import and `infer` types, qualified names, a `for` head, a `for … in` / `for …
 //! of` left side, a catch clause and a parameter name's extras. One macro declares each such
-//! store with its family tag, the id the tree holds and its view accessor.
+//! store with the id the tree holds and its view accessor.
 //!
 //! [`RunStores`] holds one store per element type of a list built by value: object
 //! properties, template quasis, declarators, cases, import and export specifiers, class and
@@ -42,15 +42,12 @@ use super::{
     TSTypeElement, TSTypeParameter, TaggedTemplateExpression, TemplateElement, VariableDeclarator,
 };
 
-/// The family tag of [`Expression`] rows.
-pub enum Expr {}
-
 impl Row for Expression {
-    type Family = Expr;
+    type Family = Self;
 }
 
 /// A handle to one [`Expression`] row.
-pub type ExprId = Id<Expr>;
+pub type ExprId = Id<Expression>;
 
 #[cfg(test)]
 const _: () = {
@@ -60,15 +57,12 @@ const _: () = {
     assert!(STORE_CHECK || size_of::<Run<ExprId>>() == 8);
 };
 
-/// The family tag of [`Statement`] rows.
-pub enum Stmt {}
-
 impl Row for Statement {
-    type Family = Stmt;
+    type Family = Self;
 }
 
 /// A handle to one [`Statement`] row.
-pub type StmtId = Id<Stmt>;
+pub type StmtId = Id<Statement>;
 
 #[cfg(test)]
 const _: () = {
@@ -78,15 +72,12 @@ const _: () = {
     assert!(STORE_CHECK || size_of::<Run<StmtId>>() == 8);
 };
 
-/// The family tag of [`TSType`] rows.
-pub enum Ty {}
-
 impl Row for TSType {
-    type Family = Ty;
+    type Family = Self;
 }
 
 /// A handle to one [`TSType`] row.
-pub type TyId = Id<Ty>;
+pub type TyId = Id<TSType>;
 
 #[cfg(test)]
 const _: () = {
@@ -155,32 +146,26 @@ const _: () = {
     assert!(STORE_CHECK || size_of::<Option<CommentList>>() == 8);
 };
 
-/// Declares the payload stores. Per entry: the row type's family tag and the id the tree holds,
-/// a [`PayloadStores`] field, that field's lines in `new` and `reset`, and the [`AstView`]
-/// accessor that resolves one id. The entry's doc comment documents the field and the tag.
+/// Declares the payload stores. Per entry: the row type as its own family and the id the tree
+/// holds, a [`PayloadStores`] field, that field's lines in `new` and `reset`, and the
+/// [`AstView`] accessor that resolves one id. The entry's doc comment documents the field.
 macro_rules! payload_stores {
     (
         $(
             $(#[$m:meta])*
-            $field:ident : $Row:ident $(<$lt:lifetime>)?
-                => $Tag:ident, $Id:ident, $acc:ident;
+            $field:ident : $Row:ident => $Id:ident, $acc:ident;
         )*
     ) => {
         $(
-            $(#[$m])*
-            ///
-            /// The family tag of these rows.
-            pub enum $Tag {}
-
-            impl<$($lt)?> Row for $Row$(<$lt>)? {
-                type Family = $Tag;
+            impl Row for $Row {
+                type Family = Self;
             }
 
             #[doc = concat!(
-                "A handle to one [`", stringify!($Tag), "`] row, read through [`AstView::",
+                "A handle to one [`", stringify!($Row), "`] row, read through [`AstView::",
                 stringify!($acc), "`]."
             )]
-            pub type $Id = Id<$Tag>;
+            pub type $Id = Id<$Row>;
         )*
 
         /// The stores of the payloads too rare to sit inline in the node that refers to them,
@@ -188,7 +173,7 @@ macro_rules! payload_stores {
         pub(crate) struct PayloadStores {
             $(
                 $(#[$m])*
-                pub(crate) $field: Store<$Row$(<$lt>)?>,
+                pub(crate) $field: Store<$Row>,
             )*
         }
 
@@ -220,7 +205,7 @@ macro_rules! payload_stores {
                     "cold path."
                 )]
                 #[inline]
-                pub fn $acc(self, id: $Id) -> &'a $Row$(<$lt>)? {
+                pub fn $acc(self, id: $Id) -> &'a $Row {
                     self.payloads().$field.get(id)
                 }
             )*
@@ -234,89 +219,73 @@ macro_rules! payload_stores {
 
 payload_stores! {
     /// Arrow functions, `() => …`: [`ArrowFunctionExpression`] rows.
-    arrow_fns: ArrowFunctionExpression => ArrowFn, ArrowFnId, arrow_fn;
+    arrow_fns: ArrowFunctionExpression => ArrowFnId, arrow_fn;
     /// Function expressions, `function () {}`: [`FunctionExpression`] rows.
-    fn_exprs: FunctionExpression => FnExpr, FnExprId, fn_expr;
+    fn_exprs: FunctionExpression => FnExprId, fn_expr;
     /// Class expressions, `class {}`: [`ClassExpression`] rows.
-    class_exprs: ClassExpression => ClassExpr, ClassExprId, class_expr;
+    class_exprs: ClassExpression => ClassExprId, class_expr;
     /// Tagged templates, ``tag`…` ``: [`TaggedTemplateExpression`] rows.
-    tagged_tpls: TaggedTemplateExpression
-        => TaggedTpl, TaggedTplId, tagged_tpl;
+    tagged_tpls: TaggedTemplateExpression => TaggedTplId, tagged_tpl;
     /// Meta properties, `import.meta` and `new.target`: [`MetaProperty`] rows.
-    meta_props: MetaProperty => MetaProp, MetaPropId, meta_prop;
+    meta_props: MetaProperty => MetaPropId, meta_prop;
     /// Type aliases, `type T = …`: [`TSTypeAliasDeclaration`] rows.
-    type_aliases: TSTypeAliasDeclaration
-        => TypeAlias, TypeAliasId, type_alias;
+    type_aliases: TSTypeAliasDeclaration => TypeAliasId, type_alias;
     /// Interfaces, `interface I {}`: [`TSInterfaceDeclaration`] rows.
-    interface_decls: TSInterfaceDeclaration
-        => InterfaceDecl, InterfaceDeclId, interface_decl;
+    interface_decls: TSInterfaceDeclaration => InterfaceDeclId, interface_decl;
     /// Bodiless function declarations, `declare function f(): T`: [`TSDeclareFunction`] rows.
-    declare_fns: TSDeclareFunction => DeclareFn, DeclareFnId, declare_fn;
+    declare_fns: TSDeclareFunction => DeclareFnId, declare_fn;
     /// Enums, `enum E {}`: [`TSEnumDeclaration`] rows.
-    enum_decls: TSEnumDeclaration => EnumDecl, EnumDeclId, enum_decl;
+    enum_decls: TSEnumDeclaration => EnumDeclId, enum_decl;
     /// Namespaces and modules, `namespace N {}`: [`TSModuleDeclaration`] rows.
-    module_decls: TSModuleDeclaration
-        => ModuleDecl, ModuleDeclId, module_decl;
+    module_decls: TSModuleDeclaration => ModuleDeclId, module_decl;
     /// Function declarations, `function f() {}`: [`FunctionDeclaration`] rows.
-    fn_decls: FunctionDeclaration => FnDecl, FnDeclId, fn_decl;
+    fn_decls: FunctionDeclaration => FnDeclId, fn_decl;
     /// Class declarations, `class C {}`: [`ClassDeclaration`] rows.
-    class_decls: ClassDeclaration => ClassDecl, ClassDeclId, class_decl;
+    class_decls: ClassDeclaration => ClassDeclId, class_decl;
     /// Named exports, `export { a }`: [`ExportNamedDeclaration`] rows.
-    export_nameds: ExportNamedDeclaration
-        => ExportNamed, ExportNamedId, export_named;
+    export_nameds: ExportNamedDeclaration => ExportNamedId, export_named;
     /// Default exports, `export default …`: [`ExportDefaultDeclaration`] rows.
-    export_defaults: ExportDefaultDeclaration
-        => ExportDefault, ExportDefaultId, export_default;
+    export_defaults: ExportDefaultDeclaration => ExportDefaultId, export_default;
     /// Star exports, `export * from 'm'`: [`ExportAllDeclaration`] rows.
-    export_alls: ExportAllDeclaration => ExportAll, ExportAllId, export_all;
+    export_alls: ExportAllDeclaration => ExportAllId, export_all;
     /// Export assignments, `export = a`: [`TSExportAssignment`] rows.
-    export_assigns: TSExportAssignment
-        => ExportAssign, ExportAssignId, export_assign;
+    export_assigns: TSExportAssignment => ExportAssignId, export_assign;
     /// Imports, `import a from 'm'`: [`ImportDeclaration`] rows.
-    import_decls: ImportDeclaration
-        => ImportDecl, ImportDeclId, import_decl;
+    import_decls: ImportDeclaration => ImportDeclId, import_decl;
     /// Import-equals declarations, `import a = require('m')`: [`TSImportEqualsDeclaration`] rows.
-    import_equals: TSImportEqualsDeclaration
-        => ImportEquals, ImportEqualsId, import_equals;
+    import_equals: TSImportEqualsDeclaration => ImportEqualsId, import_equals;
     /// Constructor types, `new () => T`: [`TSConstructorType`] rows.
-    ctor_types: TSConstructorType => CtorType, CtorTypeId, ctor_type;
+    ctor_types: TSConstructorType => CtorTypeId, ctor_type;
     /// Import types, `import('m')`: [`TSImportType`] rows.
-    import_types: TSImportType => ImportType, ImportTypeId, import_type;
+    import_types: TSImportType => ImportTypeId, import_type;
     /// Inferred types, `infer T`: [`TSInferType`] rows.
-    infer_types: TSInferType => InferType, InferTypeId, infer_type;
+    infer_types: TSInferType => InferTypeId, infer_type;
     /// Qualified names, `A.B`: [`TSQualifiedName`] rows.
-    qual_names: TSQualifiedName => QualName, QualNameId, qual_name;
+    qual_names: TSQualifiedName => QualNameId, qual_name;
     /// The head of a `for (…; …; …)` statement: [`ForInit`] rows.
-    for_heads: ForInit => ForHead, ForHeadId, for_head;
+    for_heads: ForInit => ForHeadId, for_head;
     /// The left side of a `for … in` or `for … of`: [`ForInOfLeft`] rows.
-    for_lefts: ForInOfLeft => ForLeft, ForLeftId, for_left;
+    for_lefts: ForInOfLeft => ForLeftId, for_left;
     /// Catch clauses, `catch (e) {}`: [`CatchClause`] rows.
-    catches: CatchClause => Catch, CatchId, catch;
+    catches: CatchClause => CatchId, catch;
     /// A parameter name's type annotation and decorators: [`IdentifierParamExtra`] rows.
-    param_extras: IdentifierParamExtra
-        => ParamExtra, ParamExtraId, param_extra;
+    param_extras: IdentifierParamExtra => ParamExtraId, param_extra;
 }
 
-/// Declares the value-run stores. Per entry: the element type's family tag, whose [`Run`] is
-/// the list the tree holds, a [`RunStores`] store and the scratch stack that builds its lists,
-/// their lines in `new` and `reset`, the scratch's mark in [`RunMarks`], and the [`AstView`]
-/// accessor that reads one list. The entry's doc comment documents the store and the tag.
+/// Declares the value-run stores. Per entry: the element type as its own family, whose [`Run`]
+/// is the list the tree holds, a [`RunStores`] store and the scratch stack that builds its
+/// lists, their lines in `new` and `reset`, the scratch's mark in [`RunMarks`], and the
+/// [`AstView`] accessor that reads one list. The entry's doc comment documents the store.
 macro_rules! value_runs {
     (
         $(
             $(#[$m:meta])*
-            $field:ident, $scratch:ident : $Row:ident $(<$lt:lifetime>)?
-                => $Tag:ident, $acc:ident;
+            $field:ident, $scratch:ident : $Row:ident => $acc:ident;
         )*
     ) => {
         $(
-            $(#[$m])*
-            ///
-            /// The family tag of these rows.
-            pub enum $Tag {}
-
-            impl<$($lt)?> Row for $Row$(<$lt>)? {
-                type Family = $Tag;
+            impl Row for $Row {
+                type Family = Self;
             }
         )*
 
@@ -325,9 +294,9 @@ macro_rules! value_runs {
         pub(crate) struct RunStores {
             $(
                 $(#[$m])*
-                pub(crate) $field: Store<$Row$(<$lt>)?>,
+                pub(crate) $field: Store<$Row>,
                 #[doc = concat!("The scratch stack that builds the lists of `", stringify!($field), "`.")]
-                pub(crate) $scratch: ListBuf<$Row$(<$lt>)?>,
+                pub(crate) $scratch: ListBuf<$Row>,
             )*
         }
 
@@ -335,7 +304,7 @@ macro_rules! value_runs {
         /// [`ScratchMarks`].
         #[derive(Clone, Copy)]
         pub(crate) struct RunMarks {
-            $($field: ListMark<$Tag>,)*
+            $($field: ListMark<$Row>,)*
         }
 
         impl RunStores {
@@ -396,7 +365,7 @@ macro_rules! value_runs {
                     "run. A miss ends in the store's shared cold path."
                 )]
                 #[inline]
-                pub fn $acc(self, run: Run<$Tag>) -> &'a [$Row$(<$lt>)?] {
+                pub fn $acc(self, run: Run<$Row>) -> &'a [$Row] {
                     self.runs().$field.slice(run)
                 }
             )*
@@ -410,46 +379,37 @@ macro_rules! value_runs {
 
 value_runs! {
     /// Object literal members, `{ a: 1, ...b }`: [`ObjectProperty`] rows.
-    obj_props, obj_prop_scratch: ObjectProperty => ObjProp, obj_props;
+    obj_props, obj_prop_scratch: ObjectProperty => obj_props;
     /// Object pattern members, `{ a: b, ...c } = d`: [`ObjectPatternProperty`] rows.
-    pat_props, pat_prop_scratch: ObjectPatternProperty => PatProp, pat_props;
+    pat_props, pat_prop_scratch: ObjectPatternProperty => pat_props;
     /// The text pieces of a template, ``a${b}c``: [`TemplateElement`] rows.
-    quasis, quasi_scratch: TemplateElement => Quasi, quasis;
+    quasis, quasi_scratch: TemplateElement => quasis;
     /// Declarators, the `a = 1` of `let a = 1`: [`VariableDeclarator`] rows.
-    declarators, declarator_scratch: VariableDeclarator => Declarator, declarators;
+    declarators, declarator_scratch: VariableDeclarator => declarators;
     /// The `case` and `default` clauses of a `switch`: [`SwitchCase`] rows.
-    cases, case_scratch: SwitchCase => Case, cases;
+    cases, case_scratch: SwitchCase => cases;
     /// Import specifiers, the `a` and `{ b }` of `import a, { b } from 'm'`: [`ImportSpecifier`]
     /// rows.
-    import_specs, import_spec_scratch: ImportSpecifier
-        => ImportSpec, import_specs;
+    import_specs, import_spec_scratch: ImportSpecifier => import_specs;
     /// Export specifiers, the `a` of `export { a }`: [`ExportSpecifier`] rows.
-    export_specs, export_spec_scratch: ExportSpecifier
-        => ExportSpec, export_specs;
+    export_specs, export_spec_scratch: ExportSpecifier => export_specs;
     /// Import attributes, the `type: 'json'` of `with { type: 'json' }`: [`ImportAttribute`] rows.
-    import_attrs, import_attr_scratch: ImportAttribute
-        => ImportAttr, import_attrs;
+    import_attrs, import_attr_scratch: ImportAttribute => import_attrs;
     /// Class members, the `m() {}` of `class C { m() {} }`: [`ClassMember`] rows.
-    class_members, class_member_scratch: ClassMember
-        => ClassMem, class_members;
+    class_members, class_member_scratch: ClassMember => class_members;
     /// Type members, the `a: T` of `{ a: T }` and of an interface body: [`TSTypeElement`] rows.
-    type_members, type_member_scratch: TSTypeElement
-        => TypeMember, type_members;
+    type_members, type_member_scratch: TSTypeElement => type_members;
     /// Type parameters, the `T` of `<T>`: [`TSTypeParameter`] rows.
-    type_params, type_param_scratch: TSTypeParameter
-        => TypeParam, type_params;
+    type_params, type_param_scratch: TSTypeParameter => type_params;
     /// Heritage clauses, the `B` of `extends B` on an interface and of `implements B` on a
     /// class: [`TSInterfaceHeritage`] rows.
-    heritages, heritage_scratch: TSInterfaceHeritage
-        => Heritage, heritages;
+    heritages, heritage_scratch: TSInterfaceHeritage => heritages;
     /// Enum members, the `A = 1` of `enum E { A = 1 }`: [`TSEnumMember`] rows.
-    enum_members, enum_member_scratch: TSEnumMember
-        => EnumMem, enum_members;
+    enum_members, enum_member_scratch: TSEnumMember => enum_members;
     /// Index-signature parameters, the `k: string` of `[k: string]: T`: [`Identifier`] rows.
-    index_params, index_param_scratch: Identifier
-        => IndexParam, index_params;
+    index_params, index_param_scratch: Identifier => index_params;
     /// Decorators, `@d`: [`Decorator`] rows.
-    decorators, decorator_scratch: Decorator => Deco, decorators;
+    decorators, decorator_scratch: Decorator => decorators;
 }
 
 // Every value run is a `Run<F>`, which lays out alike for every family `F`, and an absent
@@ -457,8 +417,8 @@ value_runs! {
 #[cfg(test)]
 const _: () = {
     use tsv_lang::store::STORE_CHECK;
-    assert!(STORE_CHECK || size_of::<Run<Deco>>() == 8);
-    assert!(STORE_CHECK || size_of::<Option<Run<Deco>>>() == 8);
+    assert!(STORE_CHECK || size_of::<Run<Decorator>>() == 8);
+    assert!(STORE_CHECK || size_of::<Option<Run<Decorator>>>() == 8);
 };
 
 // Every payload id is an `Id<F>`, which lays out alike for every family `F`.
@@ -521,7 +481,7 @@ impl AstStores {
 /// restore point.
 #[derive(Clone, Copy)]
 pub(crate) struct ScratchMarks {
-    exprs: ListMark<Expr>,
+    exprs: ListMark<Expression>,
     lists: ListMark<ExprId>,
     opt_lists: ListMark<Option<ExprId>>,
     stmt_lists: ListMark<StmtId>,

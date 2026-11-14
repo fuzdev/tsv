@@ -1348,7 +1348,7 @@ impl<'a> Parser<'a> {
     /// `None` when there is no `with` clause; `Some(run)` when one is present —
     /// `Some` of an empty run for an empty `with {}`, which is preserved
     /// (acorn/prettier keep it).
-    fn parse_import_attributes(&mut self) -> Result<Option<Run<ImportAttr>>, Error> {
+    fn parse_import_attributes(&mut self) -> Result<Option<Run<ImportAttribute>>, Error> {
         // The `WithClause`'s own `with` token. It is the reserved word (a `ReservedWord`
         // barred from every name position — see `KeywordKind::With`), spelled out by this
         // production rather than read as an identifier, so match the keyword token.

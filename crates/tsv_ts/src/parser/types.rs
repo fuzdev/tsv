@@ -1138,7 +1138,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse function type parameters, up to (not including) the closing `)`.
-    fn parse_function_type_params(&mut self) -> Result<Run<Expr>, Error> {
+    fn parse_function_type_params(&mut self) -> Result<Run<Expression>, Error> {
         let mark = self.stores.expr_scratch.mark();
 
         // two wire levels each: the function type over its parameters, and the parameter

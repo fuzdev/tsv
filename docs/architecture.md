@@ -983,7 +983,7 @@ wholesale when the arena drops, with no per-node `Drop`.
 embedded islands. An edge to an expression is an `ExprId`, an index into the
 `Store<Expression>`; a child list is a `Run` over a store of ids (`Run<ExprId>`: call and
 `new` arguments, sequence and template expressions; `Run<Option<ExprId>>`: array and
-array-pattern elements) or a value run over the expression store itself (`Run<Expr>`:
+array-pattern elements) or a value run over the expression store itself (`Run<Expression>`:
 parameter lists). A statement edge is a `StmtId` into the `Store<Statement>`, and every
 statement list (a program's, a block's, a `case`'s, a static block's, a namespace's body) a
 `Run<StmtId>`. A type edge is a `TyId` into the `Store<TSType>`, and every type list (union
@@ -991,8 +991,8 @@ and intersection members, tuple elements, type arguments, template-literal types
 `Run<TyId>`. A list whose elements are built whole and stand nowhere else (object members,
 template quasis, declarators, `switch` cases, import and export specifiers, class and type
 members, type parameters, decorators and the rest) is a value run over a store of its element
-type (`Run<ObjProp>`, `Run<Declarator>`, …), built on that type's scratch stack and flushed
-into the store when the list closes. A reader reaches them through an `AstView`, one word holding a
+type (`Run<ObjectProperty>`, `Run<VariableDeclarator>`, …), built on that type's scratch stack
+and flushed into the store when the list closes. A reader reaches them through an `AstView`, one word holding a
 reference to the stores; a store row, once pushed, is never edited or truncated, so a parser
 that replaces a node (a cover-grammar conversion, an annotated binding pattern) appends the
 new row and the old one is orphaned. The payloads too rare to sit inline in the node that
@@ -1137,7 +1137,7 @@ whose own width was two such slots take it:
   array-literal and array-pattern elements `Run<Option<ExprId>>` (a hole stays `None`; the
   `Option` is niche-packed) — a 4 B element where a by-value one is the whole `Expression`
   (48 B on both targets). A spread element, built fresh rather than returned by
-  the ladder, is pushed once to join them. The parameter lists are value runs (`Run<Expr>`),
+  the ladder, is pushed once to join them. The parameter lists are value runs (`Run<Expression>`),
   which are rows of the expression store: their elements are built by the parser as
   values (a binding pattern, or an expression converted to one), so an id list would add
   a hop for no row saved.

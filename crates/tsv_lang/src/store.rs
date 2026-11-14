@@ -17,9 +17,9 @@
 //! A rewind needs only the mark taken before the speculation. A mark is typed by its family, so
 //! a mark of one buffer cannot be handed to another's.
 //!
-//! Ids and runs are parameterized by a family tag, not by the row type, because a row may carry
-//! a lifetime that the rows and stores holding the handle cannot name. A family is a
-//! `'static` type, stated once per row type through [`Row`]; see there for the choices.
+//! Ids and runs are parameterized by a family, a `'static` type stated once per row type
+//! through [`Row`]: the row type itself, or a tag of its own where the row carries a lifetime
+//! that the rows and stores holding the handle cannot name; see there for the choices.
 //!
 //! [`TextPool`] holds strings a span of the source cannot express. A [`PoolText`] is its handle,
 //! and `Option<PoolText>` tells an absent string from a present empty one. A pool and its
@@ -257,7 +257,7 @@ mod stamp {
     }
 }
 
-/// The family of a row type: the `'static` tag its [`Id`]s and [`Run`]s are parameterized by.
+/// The family of a row type: the `'static` type its [`Id`]s and [`Run`]s are parameterized by.
 ///
 /// A row that carries a lifetime names a family tag of its own, an uninhabited `enum`:
 ///
@@ -274,7 +274,7 @@ mod stamp {
 /// One family belongs to exactly one row type, lifetimes aside. The type system cannot stop two
 /// row types claiming the same tag, and an id of one would then read the other's store.
 pub trait Row {
-    /// The tag; `'static`, so no handle can name a row's lifetime.
+    /// The family; `'static`, so no handle can name a row's lifetime.
     type Family: 'static;
 }
 
@@ -315,7 +315,7 @@ impl<F> Id<F> {
     }
 }
 
-// Not derived: a derive would bound each impl on `F`, which is an uninhabited tag.
+// Not derived: a derive would bound each impl on `F`, which is a row type or an uninhabited tag.
 impl<F> Clone for Id<F> {
     #[inline]
     fn clone(&self) -> Self {

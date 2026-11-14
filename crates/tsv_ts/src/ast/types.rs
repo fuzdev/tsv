@@ -7,8 +7,8 @@ use crate::lexer::KeywordKind;
 use tsv_lang::Span;
 
 use super::{
-    CtorTypeId, Deco, Expr, ExprId, IdentName, Identifier, ImportTypeId, IndexParam, InferTypeId,
-    Literal, MethodKind, QualNameId, Quasi, Run, TyId, TypeMember, TypeParam, UnaryExpression,
+    CtorTypeId, Decorator, ExprId, Expression, IdentName, Identifier, ImportTypeId, InferTypeId,
+    Literal, MethodKind, QualNameId, Run, TemplateElement, TyId, UnaryExpression,
 };
 
 /// TypeScript type annotation node (e.g., `: number` in `const a: number = 5`)
@@ -335,7 +335,7 @@ impl TSLiteralType {
 /// Used in TypeScript template literal types.
 #[derive(Debug, Clone)]
 pub struct TemplateLiteralType {
-    pub quasis: Run<Quasi>,
+    pub quasis: Run<TemplateElement>,
     pub types: Run<TyId>,
     pub span: Span,
 }
@@ -402,7 +402,7 @@ pub struct TSTypeParameterInstantiation {
 /// Type parameter declaration: `<T, U>` (for declaring type parameters)
 #[derive(Debug, Clone)]
 pub struct TSTypeParameterDeclaration {
-    pub params: Run<TypeParam>,
+    pub params: Run<TSTypeParameter>,
     /// Position of trailing comma if present (e.g., `<T,>`)
     pub trailing_comma: Option<u32>,
     pub span: Span,
@@ -491,7 +491,7 @@ pub struct TSTypeParameter {
 /// Type literal (object type): `{ prop: T; method(): U }`
 #[derive(Debug, Clone)]
 pub struct TSTypeLiteral {
-    pub members: Run<TypeMember>,
+    pub members: Run<TSTypeElement>,
     pub span: Span,
 }
 
@@ -567,7 +567,7 @@ pub struct TSMethodSignature {
     /// Method kind: method, get, or set (for accessor signatures in type literals)
     pub kind: MethodKind,
     pub type_parameters: Option<TSTypeParameterDeclaration>,
-    pub params: Run<Expr>,
+    pub params: Run<Expression>,
     pub return_type: Option<TSTypeAnnotation>,
     pub span: Span,
 }
@@ -576,7 +576,7 @@ pub struct TSMethodSignature {
 #[derive(Debug, Clone)]
 pub struct TSCallSignatureDeclaration {
     pub type_parameters: Option<TSTypeParameterDeclaration>,
-    pub params: Run<Expr>,
+    pub params: Run<Expression>,
     pub return_type: Option<TSTypeAnnotation>,
     pub span: Span,
 }
@@ -585,7 +585,7 @@ pub struct TSCallSignatureDeclaration {
 #[derive(Debug, Clone)]
 pub struct TSConstructSignatureDeclaration {
     pub type_parameters: Option<TSTypeParameterDeclaration>,
-    pub params: Run<Expr>,
+    pub params: Run<Expression>,
     pub return_type: Option<TSTypeAnnotation>,
     pub span: Span,
 }
@@ -595,12 +595,12 @@ pub struct TSConstructSignatureDeclaration {
 /// (TS1021), not a parse error; acorn parses it and omits `typeAnnotation`).
 #[derive(Debug, Clone)]
 pub struct TSIndexSignature {
-    pub parameters: Run<IndexParam>,
+    pub parameters: Run<Identifier>,
     pub type_annotation: Option<TSTypeAnnotation>,
     /// Decorators in front of a class index signature (`@a [k: string]: T;`).
     /// No decorator grammar reaches one (tsc's checker reports TS1206); acorn keeps
     /// the list and tsv defers the error. Always `None` in a type literal or interface.
-    pub decorators: Option<Run<Deco>>,
+    pub decorators: Option<Run<Decorator>>,
     pub is_static: bool,
     pub readonly: bool,
     pub span: Span,
@@ -610,7 +610,7 @@ pub struct TSIndexSignature {
 #[derive(Debug, Clone)]
 pub struct TSFunctionType {
     pub type_parameters: Option<TSTypeParameterDeclaration>,
-    pub params: Run<Expr>,
+    pub params: Run<Expression>,
     // Inline by value rather than behind a reference: `TSTypeAnnotation` is a span and the id
     // of its type's row, held inline everywhere else (`Option<TSTypeAnnotation>`), so a
     // reference here would put a pointer-chase ahead of the store read on the format read
@@ -624,7 +624,7 @@ pub struct TSFunctionType {
 pub struct TSConstructorType {
     pub abstract_: bool,
     pub type_parameters: Option<TSTypeParameterDeclaration>,
-    pub params: Run<Expr>,
+    pub params: Run<Expression>,
     // Inline by value — see `TSFunctionType.return_type`.
     pub return_type: TSTypeAnnotation,
     pub span: Span,

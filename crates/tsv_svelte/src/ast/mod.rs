@@ -30,7 +30,8 @@ use std::borrow::Cow;
 use tsv_css::ast::CssStyleSheet;
 pub use tsv_lang::{Comment, Span};
 use tsv_ts::ast::{
-    AstStores, AstView, Expr, ExprId, Program, Run, TSTypeParameterDeclaration, VariableDeclaration,
+    AstStores, AstView, ExprId, Expression, Program, Run, TSTypeParameterDeclaration,
+    VariableDeclaration,
 };
 
 /// A parsed Svelte document and the stores its handles index.
@@ -125,7 +126,7 @@ pub struct Root<'arena> {
 pub struct SnippetWireParameters {
     /// The snippet block's `span.start` — the key the writer finds the list by.
     pub snippet_start: u32,
-    pub parameters: Run<Expr>,
+    pub parameters: Run<Expression>,
 }
 
 /// Svelte Fragment - container for template nodes
@@ -298,7 +299,7 @@ pub struct SnippetBlock<'arena> {
     /// with the same text parses to, so the printer and the compiler read the head exactly
     /// as they read that signature, re-deriving every grouping pair from precedence. The
     /// wire's own shape of a head that holds a pair is [`Root::snippet_wire_parameters`].
-    pub parameters: Run<Expr>,
+    pub parameters: Run<Expression>,
     /// Source span of the parameter parens: `start` is the `(`, `end` is the `)`
     /// (for leading / dangling / trailing comment lookup when printing parameters).
     /// `None` only if no `(` was found (malformed).

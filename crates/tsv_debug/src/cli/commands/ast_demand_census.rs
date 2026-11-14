@@ -14,7 +14,7 @@
 //! allocation counts one, a flushed list counts its length. A list of references reads
 //! `Id<T> (ids)` and an `Option` of one `Option<Id<T>> (ids)` (references read the same way); those are id lists, not rows of
 //! `T`, whose nodes are counted where they were allocated. A pattern is an `Expression` row,
-//! and an array pattern's elements an id list with holes, `Option<Id<Expr>> (ids)`, where a
+//! and an array pattern's elements an id list with holes, `Option<Id<Expression>> (ids)`, where a
 //! hole is a row too.
 //!
 //! - `minted`: every row placed, whatever became of it.
@@ -604,7 +604,7 @@ mod tests {
         assert_eq!(expr.moved_inline, 0);
         assert_eq!(expr.superseded, 1, "the array");
         assert_eq!(expr.live(), 4, "a, x, the pattern's row, the assignment");
-        let ids = row(&census, "tsv_ts", "Option<Id<Expr>> (ids)");
+        let ids = row(&census, "tsv_ts", "Option<Id<Expression>> (ids)");
         assert_eq!(
             (ids.minted, ids.superseded),
             (2, 1),
@@ -660,11 +660,13 @@ mod tests {
 
     #[test]
     fn a_reference_list_row_names_its_element_as_ids() {
-        let key = store_key("tsv_lang::store::Id<tsv_ts::ast::stores::Expr>");
-        assert_eq!(key.label, "Id<Expr> (ids)");
+        let key = store_key("tsv_lang::store::Id<tsv_ts::ast::expressions::Expression>");
+        assert_eq!(key.label, "Id<Expression> (ids)");
         assert_eq!(key.krate, "tsv_ts");
-        let opt = store_key("core::option::Option<tsv_lang::store::Id<tsv_ts::ast::stores::Expr>>");
-        assert_eq!(opt.label, "Option<Id<Expr>> (ids)");
+        let opt = store_key(
+            "core::option::Option<tsv_lang::store::Id<tsv_ts::ast::expressions::Expression>>",
+        );
+        assert_eq!(opt.label, "Option<Id<Expression>> (ids)");
         let value = store_key("core::option::Option<tsv_ts::ast::expressions::Expression>");
         assert_eq!(value.label, "Option<Expression>");
         let plain = store_key("tsv_ts::ast::statements::Statement");
@@ -691,7 +693,7 @@ mod tests {
     #[test]
     fn a_store_scratch_counts_the_outer_prefix_under_a_nested_list() {
         let census = census_of("f(a, g(b, c));", ParserType::TypeScript);
-        let ids = row(&census, "tsv_ts", "Id<Expr> (ids)");
+        let ids = row(&census, "tsv_ts", "Id<Expression> (ids)");
         assert_eq!(ids.minted, 4, "the outer call's two, the inner call's two");
         assert_eq!(ids.scratch_peak_max_for_test(), 3);
     }

@@ -12,10 +12,10 @@ use tsv_lang::{DepthBudget, DepthLimit, Error, Span, SpineCount};
 
 /// What the expression ladder's parse functions return: see §The expression ladder's return
 /// currency in `expression.rs`.
-pub(in crate::parser) type ExprRet = IdRet<Expr>;
+pub(in crate::parser) type ExprRet = IdRet<Expression>;
 
 /// What the type ladder's parse functions return: see `Parser::parse_type` in `types.rs`.
-pub(in crate::parser) type TyRet = IdRet<Ty>;
+pub(in crate::parser) type TyRet = IdRet<TSType>;
 
 // Import parsing implementations
 mod expression;
@@ -955,7 +955,10 @@ impl<'a> Parser<'a> {
 
     /// Flush the value run opened at `mark` into the expression store.
     #[inline]
-    pub(in crate::parser) fn flush_expr_run(&mut self, mark: ListMark<Expr>) -> Run<Expr> {
+    pub(in crate::parser) fn flush_expr_run(
+        &mut self,
+        mark: ListMark<Expression>,
+    ) -> Run<Expression> {
         let run = self
             .stores
             .expr_scratch
