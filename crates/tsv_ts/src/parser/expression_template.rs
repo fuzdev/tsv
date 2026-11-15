@@ -5,9 +5,9 @@
 use crate::ast::{Run, TemplateCooked, TemplateElement, TemplateLiteral};
 use crate::lexer::TokenKind;
 use crate::lexer::escapes::find_legacy_escape;
-use tsv_lang::{Error, Span};
+use tsv_lang::{Error, Span, store::flush_run};
 
-use super::{Parser, flush_run};
+use super::Parser;
 
 /// The delimiter-stripped content of a template token, and its source span.
 ///

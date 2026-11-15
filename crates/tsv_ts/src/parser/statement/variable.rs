@@ -2,9 +2,9 @@
 
 use crate::ast::*;
 use crate::lexer::{KeywordKind, TokenKind};
-use tsv_lang::{Error, Span};
+use tsv_lang::{Error, Span, store::flush_run};
 
-use super::super::{Parser, flush_run};
+use super::super::Parser;
 
 /// Where a variable declarator sits — the two grammar parameters a variable
 /// statement and a `for` head disagree on follow from it.

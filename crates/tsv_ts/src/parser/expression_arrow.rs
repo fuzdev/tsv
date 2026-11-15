@@ -6,7 +6,7 @@ use crate::ast::{
     ArrowFunctionBody, ArrowFunctionExpression, Expression, ExpressionKind, Identifier, Run,
 };
 use crate::lexer::TokenKind;
-use crate::parser::push_row;
+use tsv_lang::store::push_row;
 use tsv_lang::{Error, Span};
 
 use super::expression_lookahead::{ArrowHead, scan_angle_brackets, scan_arrow_after_identifier};

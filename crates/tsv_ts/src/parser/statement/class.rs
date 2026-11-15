@@ -9,8 +9,8 @@ use crate::ast::{
     TSTypeParameterInstantiation,
 };
 use crate::lexer::{KeywordKind, TokenKind};
-use crate::parser::{flush_run, flush_run_move, push_row, push_spanned};
 use crate::printer::ParenContext;
+use tsv_lang::store::{flush_run, flush_run_move, push_row, push_spanned};
 use tsv_lang::{Error, Span};
 
 use super::super::{ExprRet, Parser};

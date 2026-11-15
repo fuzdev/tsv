@@ -7,7 +7,7 @@ use crate::lexer::{KeywordKind, Lexer, LexerCheckpoint, Token, TokenKind, is_es_
 use crate::printer::ParenContext;
 use std::collections::BTreeSet;
 use std::ops::ControlFlow;
-use tsv_lang::store::{Id, IdRet, ListBuf, ListMark, PoolText, Row, Store};
+use tsv_lang::store::{IdRet, ListMark, PoolText, push_row};
 use tsv_lang::{DepthBudget, DepthLimit, Error, Span, SpineCount};
 
 /// What the expression ladder's parse functions return: see §The expression ladder's return
@@ -503,67 +503,6 @@ pub(super) struct Checkpoint {
     scratch_marks: ScratchMarks,
     #[cfg(feature = "_internal_ast_census")]
     ast_census_mark: u32,
-}
-
-/// Push `row` into its payload store and mint its id: where a payload too rare to sit inline
-/// becomes a row. A free function over the store's field path, so a caller can push while it
-/// holds a disjoint borrow of the other stores.
-#[inline]
-pub(crate) fn push_row<T: Row + Clone>(store: &mut Store<T>, row: T) -> Id<T::Family> {
-    #[cfg(feature = "_internal_ast_census")]
-    tsv_lang::ast_census_probe::mint::<T>(1);
-    store.push(row)
-}
-
-/// Flush the list opened at `mark` on `scratch` into `store` and mint its run: where a list
-/// built by value becomes rows, copied rather than moved a row at a time
-/// (`ListBuf::flush_copy_short`: counted together, most of these lists hold one element). A
-/// free function over the two field paths, as [`push_row`] is, so a caller can flush while it
-/// holds a disjoint borrow of the other stores.
-#[inline]
-pub(crate) fn flush_run<T: Row + Copy>(
-    scratch: &mut ListBuf<T>,
-    store: &mut Store<T>,
-    mark: ListMark<T::Family>,
-) -> Run<T::Family> {
-    let run = scratch.flush_copy_short(mark, store);
-    #[cfg(feature = "_internal_ast_census")]
-    tsv_lang::ast_census_probe::mint::<T>(run.len());
-    run
-}
-
-/// [`flush_run`] for an element type that is not `Copy`, moved a row at a time
-/// (`ListBuf::flush_move`): the class members, whose method holds its function inline.
-#[inline]
-pub(crate) fn flush_run_move<T: Row + Clone>(
-    scratch: &mut ListBuf<T>,
-    store: &mut Store<T>,
-    mark: ListMark<T::Family>,
-) -> Run<T::Family> {
-    let run = scratch.flush_move(mark, store);
-    #[cfg(feature = "_internal_ast_census")]
-    tsv_lang::ast_census_probe::mint::<T>(run.len());
-    run
-}
-
-/// [`push_row`] for a payload that keeps a span of its own, read by `span_of`: returns that
-/// span, read before the push, beside the id, for the header of the node that wraps the id
-/// (`Statement::from_variable_declaration`). A debug build re-reads the stored row, which
-/// checks only that storing the row kept its span.
-#[inline]
-pub(crate) fn push_spanned<T: Row + Clone>(
-    store: &mut Store<T>,
-    row: T,
-    span_of: fn(&T) -> Span,
-) -> (Span, Id<T::Family>) {
-    let span = span_of(&row);
-    let id = push_row(store, row);
-    debug_assert_eq!(
-        span,
-        span_of(store.get(id)),
-        "a wrapped payload's span disagrees with its header"
-    );
-    (span, id)
 }
 
 #[expect(clippy::struct_excessive_bools)]

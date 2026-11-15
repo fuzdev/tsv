@@ -3,7 +3,7 @@
 
 use crate::ast::*;
 use crate::lexer::{KeywordKind, TokenKind};
-use crate::parser::{flush_run, push_spanned};
+use tsv_lang::store::{flush_run, push_spanned};
 use tsv_lang::{Error, Span};
 
 use super::Parser;

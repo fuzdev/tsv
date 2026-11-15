@@ -2,7 +2,7 @@
 
 use crate::ast::*;
 use crate::lexer::{KeywordKind, TokenKind};
-use crate::parser::{flush_run, push_row};
+use tsv_lang::store::{flush_run, push_row};
 use tsv_lang::{Error, Span};
 
 use super::super::{Parser, RootEnd};

@@ -12,10 +12,10 @@ use crate::ast::{
     UpdateOperator, YieldExpression,
 };
 use crate::lexer::{KeywordKind, TokenKind};
-use crate::parser::push_row;
 use crate::printer::ParenContext;
 use tsv_lang::printing::visual_width;
 use tsv_lang::source_scan;
+use tsv_lang::store::push_row;
 use tsv_lang::{Error, Span, TAB_WIDTH};
 
 use super::expression_lookahead::{

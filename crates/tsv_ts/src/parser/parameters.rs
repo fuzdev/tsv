@@ -3,8 +3,8 @@
 use crate::ast::*;
 use crate::lexer::{KeywordKind, TokenKind};
 use crate::parser::expression_assignable::AssignableContext;
-use crate::parser::push_row;
 use crate::parser::statement::DecoratorListKind;
+use tsv_lang::store::push_row;
 use tsv_lang::{Error, Span};
 
 use super::{Checkpoint, Parser};

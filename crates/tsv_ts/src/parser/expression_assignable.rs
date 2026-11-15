@@ -7,9 +7,9 @@ use crate::ast::{
     ExpressionKind, ObjectPattern, ObjectPatternProperty, ObjectProperty, Property, PropertyKind,
     RestElement, Run,
 };
-use tsv_lang::{Error, Span};
+use tsv_lang::{Error, Span, store::flush_run};
 
-use super::{ExprRet, Parser, flush_run};
+use super::{ExprRet, Parser};
 
 /// Which assignable position `refine_assignable` is converting for — the axis that
 /// decides whether a type-assertion or JSDoc-cast target is allowed, and what a

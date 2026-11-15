@@ -739,7 +739,7 @@ mod tests {
         EmptyStatement, ExpressionKind, Span, StatementKind, TSEntityName, TSThisType,
         TSTypeElement, ThisExpression,
     };
-    use crate::parser::{flush_run, flush_run_move};
+    use tsv_lang::store::{flush_run, flush_run_move};
 
     const SPAN: Span = Span { start: 0, end: 0 };
 

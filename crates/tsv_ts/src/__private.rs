@@ -16,8 +16,8 @@ pub use crate::imports::{collect_imports, parse_imports_into};
 #[cfg(feature = "json")]
 pub use crate::imports::{write_imports_json, write_imports_json_string};
 pub use crate::parser::TopLevelAs;
-use crate::parser::push_row;
 pub use crate::strip::strip_into;
+use tsv_lang::store::push_row;
 
 /// The per-document environment shared by every formatting entry point: the
 /// source the AST's spans index into, the comment buffer, the precomputed
