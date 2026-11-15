@@ -9,7 +9,7 @@
  */
 
 import { GIT_LOCAL_PASS_ENV } from '@fuzdev/gro/git.ts';
-import { process } from '@fuzdev/gro/process.ts';
+import { set_exit_code } from '@fuzdev/gro/exit.ts';
 import { spawn } from '@fuzdev/gro/spawn.ts';
 
 import { CORPORA_ROOT } from '../../benches/js/lib/corpora.ts';
@@ -24,4 +24,4 @@ const code = await run_discovery_audit({
 	git: spawn.find('git', { pass_env: GIT_LOCAL_PASS_ENV }),
 	tsv: checkout_program(DISCOVERY_TSV_BIN)
 });
-process.set_exit_code(code);
+set_exit_code(code);

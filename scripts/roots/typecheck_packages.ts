@@ -16,7 +16,9 @@ import { createRequire } from 'node:module';
 import { join } from 'node:path';
 
 import { fs } from '@fuzdev/gro/fs.ts';
-import { process } from '@fuzdev/gro/process.ts';
+import { env } from '@fuzdev/gro/env.ts';
+import { args } from '@fuzdev/gro/args.ts';
+import { set_exit_code } from '@fuzdev/gro/exit.ts';
 
 import { run_typecheck_packages, type TypeScriptApi } from '../typecheck_packages.ts';
 import { open_checkout } from './checkout.ts';
@@ -28,10 +30,10 @@ const code = await run_typecheck_packages(
 		temp_dir: () => fs.temp_dir('tsv-typecheck-packages-'),
 		load_typescript: (path) =>
 			createRequire(import.meta.url)(join(checkout.path, path)) as TypeScriptApi,
-		stale_ok: process.env.narrow(['BENCH_STALE_OK']).get('BENCH_STALE_OK') === '1',
+		stale_ok: env.narrow(['BENCH_STALE_OK']).get('BENCH_STALE_OK') === '1',
 		print: (line) => console.log(line),
 		print_error: (line) => console.error(line)
 	},
-	process.args
+	args
 );
-process.set_exit_code(code);
+set_exit_code(code);

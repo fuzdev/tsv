@@ -105,6 +105,7 @@ import { is_spawn_error } from '@fuzdev/gro/spawn_error.ts';
 
 import { GATE_CHECKOUT_IDS } from '../benches/js/lib/gate_counts.ts';
 import { BROKEN_CHECKOUT, UNREAD_CHECKOUT_REMEDY } from './sibling_text.ts';
+import { format_error_detail } from '@fuzdev/gro/error_detail.ts';
 
 const MODE_FLAGS = ['--pins', '--checkouts'] as const;
 
@@ -339,7 +340,7 @@ const rev_parse = async (
 		const ended = result.kind === 'exited' ? `exited ${result.code}` : result.kind;
 		return { failed: `git rev-parse ${rev} ${ended}${said === '' ? '' : `: ${said}`}` };
 	} catch (error) {
-		const message = error instanceof Error ? error.message : String(error);
+		const message = format_error_detail(error);
 		// git was found on `PATH`, so a launch that fails in the checkout is most often the
 		// checkout's directory, which can't be entered, not the git binary the message names
 		return {
@@ -368,7 +369,7 @@ const ask_git = async (
 		return { failed: `git ${args.join(' ')} ${result.kind}${said === '' ? '' : `: ${said}`}` };
 	} catch (error) {
 		return {
-			failed: `git ${args.join(' ')} failed: ${error instanceof Error ? error.message : String(error)}`
+			failed: `git ${args.join(' ')} failed: ${format_error_detail(error)}`
 		};
 	}
 };
@@ -623,9 +624,9 @@ export async function run_check_canonical_pins(
 				broken.push(
 					is_fs_error(error, 'outside_root')
 						? `${npm_package}: ${pkg_json} reaches through a symlink that is absolute or climbs out of its checkout, which is never followed — make it relative within the checkout, or link the checkout itself instead`
-						: `${npm_package}: ${checkout} is present but ${pkg_json} can't be read (${
-								error instanceof Error ? error.message.split('\n')[0] : String(error)
-							})`
+						: `${npm_package}: ${checkout} is present but ${pkg_json} can't be read (${format_error_detail(
+								error
+							)})`
 				);
 				continue;
 			}

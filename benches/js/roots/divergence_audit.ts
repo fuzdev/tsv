@@ -6,7 +6,8 @@
  * @module
  */
 
-import { process } from '@fuzdev/gro/process.ts';
+import { args } from '@fuzdev/gro/args.ts';
+import { set_exit_code } from '@fuzdev/gro/exit.ts';
 
 import { open_checkout } from '../../../scripts/roots/checkout.ts';
 import { run_divergence_audit } from '../divergence_audit.ts';
@@ -15,6 +16,6 @@ import { fixture_io } from '../lib/divergence/fixture_io.ts';
 const checkout = (await open_checkout()).readonly();
 const code = await run_divergence_audit(
 	{ fixtures: fixture_io(checkout.dir('tests/fixtures')), docs: checkout.dir('docs') },
-	process.args
+	args
 );
-process.set_exit_code(code);
+set_exit_code(code);

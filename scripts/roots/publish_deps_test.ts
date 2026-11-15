@@ -247,10 +247,11 @@ deps.print_error('err %s');`
 			.trim();
 		strictEqual(
 			code,
-			'process.set_exit_code(await run_publish(create_publish_deps(await open_checkout()), process.args));'
+			'set_exit_code(await run_publish(create_publish_deps(await open_checkout()), args));'
 		);
 		deepStrictEqual(source.match(/^import [^;]*;$/gm), [
-			"import { process } from '@fuzdev/gro/process.ts';",
+			"import { set_exit_code } from '@fuzdev/gro/exit.ts';",
+			"import { args } from '@fuzdev/gro/args.ts';",
 			"import { run_publish } from '../publish.ts';",
 			"import { open_checkout } from './checkout.ts';",
 			"import { create_publish_deps } from './publish_deps.ts';"

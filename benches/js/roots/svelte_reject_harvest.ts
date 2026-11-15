@@ -10,7 +10,8 @@
  * @module
  */
 
-import { process } from '@fuzdev/gro/process.ts';
+import { args } from '@fuzdev/gro/args.ts';
+import { exit } from '@fuzdev/gro/exit.ts';
 
 import { open_checkout } from '../../../scripts/roots/checkout.ts';
 import { run_svelte_reject_harvest } from '../diagnostics/svelte_reject_harvest.ts';
@@ -31,6 +32,6 @@ const code = await run_svelte_reject_harvest(
 			return canonical;
 		}
 	},
-	process.args
+	args
 );
-process.exit(code);
+exit(code);

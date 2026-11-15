@@ -12,7 +12,8 @@
 
 import { resolve } from 'node:path';
 
-import { process } from '@fuzdev/gro/process.ts';
+import { args } from '@fuzdev/gro/args.ts';
+import { exit } from '@fuzdev/gro/exit.ts';
 
 import { CHECKOUT_PATH, open_checkout } from '../../../scripts/roots/checkout.ts';
 import { run_svelte_styles_harvest } from '../diagnostics/svelte_styles_harvest.ts';
@@ -40,6 +41,6 @@ const code = await run_svelte_styles_harvest(
 		},
 		collections_root: resolve(CHECKOUT_PATH, CORPORA_COLLECTIONS)
 	},
-	process.args
+	args
 );
-process.exit(code);
+exit(code);

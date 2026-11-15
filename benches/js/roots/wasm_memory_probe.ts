@@ -7,7 +7,9 @@
  * @module
  */
 
-import { process } from '@fuzdev/gro/process.ts';
+import { stdout } from '@fuzdev/gro/stdout.ts';
+import { args } from '@fuzdev/gro/args.ts';
+import { exit } from '@fuzdev/gro/exit.ts';
 
 import { run_wasm_memory_probe } from '../diagnostics/wasm_memory_probe.ts';
 import { DirectoryLoader } from '../lib/corpus.ts';
@@ -17,8 +19,8 @@ const code = await run_wasm_memory_probe(
 	{
 		load_fresh_glue,
 		load_files: (path, logger) => new DirectoryLoader(path).load(logger),
-		stdout: process.stdout
+		stdout: stdout
 	},
-	process.args
+	args
 );
-process.exit(code);
+exit(code);

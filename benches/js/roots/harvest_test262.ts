@@ -10,7 +10,8 @@
  * @module
  */
 
-import { process } from '@fuzdev/gro/process.ts';
+import { args } from '@fuzdev/gro/args.ts';
+import { exit } from '@fuzdev/gro/exit.ts';
 import { spawn } from '@fuzdev/gro/spawn.ts';
 
 import { CARGO_PASS_ENV } from '../../../scripts/cargo_env.ts';
@@ -31,6 +32,6 @@ const code = await run_harvest_test262(
 				spawn.program('cargo', { pass_env: CARGO_PASS_ENV }).run(args, { cwd: checkout })
 		}
 	},
-	process.args
+	args
 );
-process.exit(code);
+exit(code);

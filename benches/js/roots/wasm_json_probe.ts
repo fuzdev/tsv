@@ -12,7 +12,7 @@
  * @module
  */
 
-import { process } from '@fuzdev/gro/process.ts';
+import { exit } from '@fuzdev/gro/exit.ts';
 
 import { run_wasm_json_probe } from '../diagnostics/wasm_json_probe.ts';
 import { CorpusLoader } from '../lib/corpus.ts';
@@ -22,4 +22,4 @@ await run_wasm_json_probe({
 	load_files: (logger) => new CorpusLoader('gates').load(logger),
 	init_implementations: (logger) => init_implementations({ logger })
 });
-process.exit(0);
+exit(0);

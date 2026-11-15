@@ -14,7 +14,8 @@
  * @module
  */
 
-import { process } from '@fuzdev/gro/process.ts';
+import { stdout } from '@fuzdev/gro/stdout.ts';
+import { args } from '@fuzdev/gro/args.ts';
 
 import {
 	exit_unless_checkout_cwd,
@@ -37,9 +38,9 @@ const code = await corpus_compare_parse_main(
 		init_implementations,
 		open_tsv_debug: tsv_debug_opener(await open_checkout_program(checkout)),
 		home: read_home(),
-		stdout: process.stdout,
+		stdout: stdout,
 		pins: pins_file(checkout.dir('benches/js/lib'), 'corpus_parse_pins.txt')
 	},
-	process.args
+	args
 );
 exit_with(code);

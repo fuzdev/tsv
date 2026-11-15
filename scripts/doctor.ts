@@ -63,6 +63,7 @@ import {
 	SIDECAR_LOCK_PATH,
 	sidecar_install_state
 } from './sidecar_install.ts';
+import { format_error_causes } from '@fuzdev/gro/error_detail.ts';
 
 /** A program's captured run — a gro `SpawnOutput` is one. */
 export type DoctorOutput =
@@ -284,9 +285,9 @@ export const run_doctor = async (
 			warn(
 				is_fs_error(error, 'outside_root')
 					? link_out_message(`../${name}`, path)
-					: `../${name} is present but whether ${path} is in it can't be read (${
-							error instanceof Error ? error.message.split('\n')[0] : String(error)
-						}) — ${BROKEN_CHECKOUT}`
+					: `../${name} is present but whether ${path} is in it can't be read (${first_line_detail(
+							error
+						)}) — ${BROKEN_CHECKOUT}`
 			);
 			return null;
 		}
@@ -339,9 +340,9 @@ export const run_doctor = async (
 			warn(
 				is_fs_error(error, 'outside_root')
 					? link_out_message(`../${name}`, path)
-					: `../${name} is present but ${path} can't be read (${
-							error instanceof Error ? error.message.split('\n')[0] : String(error)
-						}) — ${BROKEN_CHECKOUT}`
+					: `../${name} is present but ${path} can't be read (${first_line_detail(
+							error
+						)}) — ${BROKEN_CHECKOUT}`
 			);
 			return undefined;
 		}
@@ -433,7 +434,7 @@ export const run_doctor = async (
 				range = pkg.engines?.node;
 			} catch (e) {
 				fail(
-					`cannot read engines.node from ${floor.file} (${e instanceof Error ? e.message.split('\n')[0] : e}) — ` +
+					`cannot read engines.node from ${floor.file} (${first_line_detail(e)}) — ` +
 						'the Node floor it states is ungraded'
 				);
 				continue;
@@ -474,7 +475,7 @@ export const run_doctor = async (
 			range = pkg.engines?.node;
 		} catch (e) {
 			warn(
-				`cannot read engines.node from ${BENCH_PKG_PATH} (${e instanceof Error ? e.message.split('\n')[0] : e}) — ` +
+				`cannot read engines.node from ${BENCH_PKG_PATH} (${first_line_detail(e)}) — ` +
 					"the bench's Node floor is ungraded"
 			);
 			return;
@@ -587,9 +588,7 @@ export const run_doctor = async (
 			pins = await programs.node.out(['scripts/roots/check_canonical_pins.ts']);
 		} catch (e) {
 			pins = null;
-			fail(
-				`cannot run the canonical pin audit (${e instanceof Error ? e.message.split('\n')[0] : e})`
-			);
+			fail(`cannot run the canonical pin audit (${first_line_detail(e)})`);
 		}
 		if (pins !== null) {
 			const success = pins.kind === 'exited' && pins.code === 0;
@@ -617,7 +616,7 @@ export const run_doctor = async (
 		else fail(`${nm.message} — reports would label OLD installed versions with the new pins`);
 	} catch (e) {
 		fail(
-			`cannot read benches/js/package.json (${e instanceof Error ? e.message.split('\n')[0] : e}) — ` +
+			`cannot read benches/js/package.json (${first_line_detail(e)}) — ` +
 				'the pins are unreadable, so nothing downstream can be graded against them'
 		);
 	}
@@ -634,7 +633,7 @@ export const run_doctor = async (
 		versions = await deps.load_all_versions();
 	} catch (e) {
 		fail(
-			`cannot read the oracle pins (${e instanceof Error ? e.message.split('\n')[0] : e}) — ` +
+			`cannot read the oracle pins (${first_line_detail(e)}) — ` +
 				'checkout-vs-pin skew is ungraded below'
 		);
 	}
@@ -902,7 +901,7 @@ export const run_doctor = async (
 		// The entry list is derived from the snapshot's manifest, so this is also where a
 		// checkout whose manifest this reader can't take (or a placement table naming a
 		// collection the manifest dropped) surfaces — the message names which.
-		warn(`cannot load the corpus entry list: ${e instanceof Error ? e.message.split('\n')[0] : e}`);
+		warn(`cannot load the corpus entry list: ${first_line_detail(e)}`);
 	}
 
 	// --- Build artifacts (informational) --------------------------------------------
@@ -966,9 +965,7 @@ export const run_doctor = async (
 			);
 		}
 	} catch (e) {
-		fail(
-			`cannot check ${SIDECAR_DIR}'s install (${e instanceof Error ? e.message.split('\n')[0] : e})`
-		);
+		fail(`cannot check ${SIDECAR_DIR}'s install (${first_line_detail(e)})`);
 	}
 	info('the Node that answers: `cargo run -p tsv_debug check`');
 
@@ -995,4 +992,15 @@ export const run_doctor = async (
 		console.log('✓ doctor: everything present and consistent.');
 	}
 	return 0;
+};
+
+/**
+ * The first line of a caught value's message, then the causes a host module
+ * error carries (its message is only `kind: target`), so a check's one-line
+ * note keeps what the OS said.
+ */
+const first_line_detail = (error: unknown): string => {
+	const head = error instanceof Error ? error.message.split('\n')[0] : String(error);
+	const causes = format_error_causes(error);
+	return causes === null ? head! : `${head} (${causes})`;
 };

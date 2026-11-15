@@ -10,7 +10,8 @@
 import { basename, dirname } from 'node:path';
 
 import type { FsReadDir } from '@fuzdev/gro/fs.ts';
-import { process } from '@fuzdev/gro/process.ts';
+import { stdout } from '@fuzdev/gro/stdout.ts';
+import { args } from '@fuzdev/gro/args.ts';
 import { parseSync } from 'oxc-parser';
 
 import { run_test262_compare } from '../diagnostics/test262_compare.ts';
@@ -28,8 +29,8 @@ await run_test262_compare(
 			};
 		},
 		parse_sync: parseSync,
-		stdout: process.stdout
+		stdout: stdout
 	},
-	process.args
+	args
 );
 exit_with(0);

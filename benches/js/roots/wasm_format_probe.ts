@@ -7,7 +7,8 @@
  * @module
  */
 
-import { process } from '@fuzdev/gro/process.ts';
+import { args } from '@fuzdev/gro/args.ts';
+import { exit } from '@fuzdev/gro/exit.ts';
 
 import { run_wasm_format_probe } from '../diagnostics/wasm_format_probe.ts';
 import { DirectoryLoader } from '../lib/corpus.ts';
@@ -18,6 +19,6 @@ const code = await run_wasm_format_probe(
 		load_glue: async (path) => (await load_fresh_glue(path)).exports,
 		load_files: (path, logger) => new DirectoryLoader(path).load(logger)
 	},
-	process.args
+	args
 );
-process.exit(code);
+exit(code);

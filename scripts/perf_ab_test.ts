@@ -799,6 +799,6 @@ test('the root exits 2, never the regression code, when a program it needs is mi
 		.out([root, '--help']);
 	deepStrictEqual(
 		[result.kind === 'exited' && result.code, result.stdout, result.stderr],
-		[2, '', 'perf:ab: error: not_found: no program git\n']
+		[2, '', 'perf:ab: error: not_found: git (no program git)\n']
 	);
 });

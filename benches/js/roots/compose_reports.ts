@@ -6,10 +6,10 @@
  * @module
  */
 
-import { process } from '@fuzdev/gro/process.ts';
+import { set_exit_code } from '@fuzdev/gro/exit.ts';
 
 import { open_checkout } from '../../../scripts/roots/checkout.ts';
 import { run_compose_reports } from '../compose_reports.ts';
 
 const checkout = await open_checkout();
-process.set_exit_code(await run_compose_reports({ results: checkout.dir('benches/js/results') }));
+set_exit_code(await run_compose_reports({ results: checkout.dir('benches/js/results') }));

@@ -10,16 +10,17 @@
  */
 
 import { GIT_LOCAL_PASS_ENV } from '@fuzdev/gro/git.ts';
-import { process } from '@fuzdev/gro/process.ts';
+import { args } from '@fuzdev/gro/args.ts';
+import { exit, set_exit_code } from '@fuzdev/gro/exit.ts';
 import { spawn } from '@fuzdev/gro/spawn.ts';
 
 import { parse_pins_args, run_check_canonical_pins } from '../check_canonical_pins.ts';
 import { open_checkout, open_sibling } from './checkout.ts';
 
-const modes = parse_pins_args(process.args);
+const modes = parse_pins_args(args);
 if ('error' in modes) {
 	console.error(modes.error);
-	process.exit(1);
+	exit(1);
 }
 const checkout = await open_checkout();
 const code = await run_check_canonical_pins(
@@ -37,4 +38,4 @@ const code = await run_check_canonical_pins(
 	},
 	modes
 );
-process.set_exit_code(code);
+set_exit_code(code);

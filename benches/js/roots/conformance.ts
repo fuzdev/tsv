@@ -17,7 +17,8 @@
  * @module
  */
 
-import { process } from '@fuzdev/gro/process.ts';
+import { stdout } from '@fuzdev/gro/stdout.ts';
+import { args } from '@fuzdev/gro/args.ts';
 import { spawn } from '@fuzdev/gro/spawn.ts';
 
 import { CARGO_PASS_ENV } from '../../../scripts/cargo_env.ts';
@@ -40,7 +41,6 @@ const checkout = await open_checkout();
 exit_unless_checkout_cwd(checkout);
 const lib = checkout.readonly().dir('benches/js/lib');
 const home = read_home();
-const stdout = process.stdout;
 const code = await run_conformance(
 	{
 		fixtures: { init_implementations, open_dir: open_readonly_dir, stdout },
@@ -60,6 +60,6 @@ const code = await run_conformance(
 		},
 		cargo: spawn.program('cargo', { pass_env: CARGO_PASS_ENV })
 	},
-	process.args
+	args
 );
 exit_with(code);

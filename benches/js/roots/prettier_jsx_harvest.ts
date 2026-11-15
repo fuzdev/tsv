@@ -11,7 +11,8 @@
  * @module
  */
 
-import { process } from '@fuzdev/gro/process.ts';
+import { args } from '@fuzdev/gro/args.ts';
+import { exit } from '@fuzdev/gro/exit.ts';
 
 import { open_checkout } from '../../../scripts/roots/checkout.ts';
 import {
@@ -30,6 +31,6 @@ const code = await run_prettier_jsx_harvest(
 		corpus: { view_paths: corpus_view_paths, load: load_pinned_language_corpus },
 		import_prettier: async () => (await import('prettier')) as unknown as PrettierDebugParse
 	},
-	process.args
+	args
 );
-process.exit(code);
+exit(code);

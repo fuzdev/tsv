@@ -7,7 +7,7 @@
  * @module
  */
 
-import { process } from '@fuzdev/gro/process.ts';
+import { set_exit_code } from '@fuzdev/gro/exit.ts';
 
 import { AST_TYPES_TSV_BIN, run_check_ast_types } from '../check_ast_types.ts';
 import { open_checkout, open_checkout_program } from './checkout.ts';
@@ -20,4 +20,4 @@ const code = await run_check_ast_types({
 	tsv: checkout_program(AST_TYPES_TSV_BIN),
 	tsc: checkout_program('node_modules/.bin/tsc')
 });
-process.set_exit_code(code);
+set_exit_code(code);

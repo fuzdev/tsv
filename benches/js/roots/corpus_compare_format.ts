@@ -9,7 +9,8 @@
  * @module
  */
 
-import { process } from '@fuzdev/gro/process.ts';
+import { stdout } from '@fuzdev/gro/stdout.ts';
+import { args } from '@fuzdev/gro/args.ts';
 
 import { open_checkout } from '../../../scripts/roots/checkout.ts';
 import { corpus_compare_format_main } from '../corpus_compare_format.ts';
@@ -20,9 +21,9 @@ const code = await corpus_compare_format_main(
 	{
 		init_implementations,
 		home: read_home(),
-		stdout: process.stdout,
+		stdout: stdout,
 		pins: pins_file(checkout.dir('benches/js/lib'), 'corpus_format_pins.txt')
 	},
-	process.args
+	args
 );
 exit_with(code);

@@ -22,7 +22,9 @@ import node_process from 'node:process';
 
 import { fs } from '@fuzdev/gro/fs.ts';
 import { is_fs_error } from '@fuzdev/gro/fs_error.ts';
-import { process } from '@fuzdev/gro/process.ts';
+import { env } from '@fuzdev/gro/env.ts';
+import { args } from '@fuzdev/gro/args.ts';
+import { set_exit_code } from '@fuzdev/gro/exit.ts';
 import { spawn } from '@fuzdev/gro/spawn.ts';
 
 import { run_engine_parity } from '../engine_parity.ts';
@@ -51,10 +53,10 @@ const code = await run_engine_parity(
 		}),
 		native_program: (path) => checkout_program(path),
 		node: spawn.find('node'),
-		stale_ok: process.env.narrow(['BENCH_STALE_OK']).get('BENCH_STALE_OK') === '1',
+		stale_ok: env.narrow(['BENCH_STALE_OK']).get('BENCH_STALE_OK') === '1',
 		print: (line) => console.log(line),
 		print_error: (line) => console.error(line)
 	},
-	process.args
+	args
 );
-process.set_exit_code(code);
+set_exit_code(code);

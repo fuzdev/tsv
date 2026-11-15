@@ -7,8 +7,9 @@
  * @module
  */
 
-import { process } from '@fuzdev/gro/process.ts';
+import { set_exit_code } from '@fuzdev/gro/exit.ts';
+import { args } from '@fuzdev/gro/args.ts';
 
 import { run_corpus_stats } from '../diagnostics/corpus_stats.ts';
 
-process.set_exit_code(await run_corpus_stats(process.args));
+set_exit_code(await run_corpus_stats(args));

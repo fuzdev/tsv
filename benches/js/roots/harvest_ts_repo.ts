@@ -9,7 +9,8 @@
  * @module
  */
 
-import { process } from '@fuzdev/gro/process.ts';
+import { args } from '@fuzdev/gro/args.ts';
+import { exit } from '@fuzdev/gro/exit.ts';
 
 import { open_checkout, sibling_reads } from '../../../scripts/roots/checkout.ts';
 import { run_harvest_ts_repo } from '../harvest_ts_repo.ts';
@@ -26,6 +27,6 @@ const code = await run_harvest_ts_repo(
 		typescript: sibling_reads(TS_REPO),
 		load_typescript
 	},
-	process.args
+	args
 );
-process.exit(code);
+exit(code);

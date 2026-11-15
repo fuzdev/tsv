@@ -16,7 +16,10 @@ import { pathToFileURL } from 'node:url';
 
 import { fs } from '@fuzdev/gro/fs.ts';
 import { create_fs_paths } from '@fuzdev/gro/fs_paths.ts';
-import { process } from '@fuzdev/gro/process.ts';
+import { args } from '@fuzdev/gro/args.ts';
+import { stdout } from '@fuzdev/gro/stdout.ts';
+import { stderr } from '@fuzdev/gro/stderr.ts';
+import { set_exit_code } from '@fuzdev/gro/exit.ts';
 
 import {
 	measure_wasm_memory,
@@ -37,7 +40,7 @@ const read = async (path: string): Promise<Uint8Array> => {
 
 let code = 1;
 try {
-	const { glue, list, surface } = parse_wasm_memory_args(process.args);
+	const { glue, list, surface } = parse_wasm_memory_args(args);
 	const bytes = await read(glue.replace(/tsv_wasm\.js$/, 'tsv_wasm_bg.wasm'));
 	let instances = 0;
 	const instantiate = async (): Promise<WasmInstance> => {
@@ -54,9 +57,9 @@ try {
 		list,
 		surface
 	);
-	await process.stdout.write(`${JSON.stringify(result)}\n`);
+	await stdout.write(`${JSON.stringify(result)}\n`);
 	code = 0;
 } catch (err) {
-	await process.stderr.write(`wasm_memory: ${err instanceof Error ? err.message : String(err)}\n`);
+	await stderr.write(`wasm_memory: ${err instanceof Error ? err.message : String(err)}\n`);
 }
-process.set_exit_code(code);
+set_exit_code(code);

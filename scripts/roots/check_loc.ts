@@ -6,7 +6,8 @@
  * @module
  */
 
-import { process } from '@fuzdev/gro/process.ts';
+import { args } from '@fuzdev/gro/args.ts';
+import { set_exit_code } from '@fuzdev/gro/exit.ts';
 
 import { CHECK_LOC_TSV_DEBUG, run_check_loc } from '../check_loc.ts';
 import { open_checkout, open_checkout_program } from './checkout.ts';
@@ -18,6 +19,6 @@ const code = await run_check_loc(
 		checkout: checkout.readonly(),
 		tsv_debug: checkout_program(CHECK_LOC_TSV_DEBUG)
 	},
-	process.args
+	args
 );
-process.set_exit_code(code);
+set_exit_code(code);

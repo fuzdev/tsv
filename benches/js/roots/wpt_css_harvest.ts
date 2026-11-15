@@ -15,7 +15,9 @@ import { resolve } from 'node:path';
 
 import { fs } from '@fuzdev/gro/fs.ts';
 import { is_fs_error } from '@fuzdev/gro/fs_error.ts';
-import { process } from '@fuzdev/gro/process.ts';
+import { stdout } from '@fuzdev/gro/stdout.ts';
+import { args } from '@fuzdev/gro/args.ts';
+import { exit } from '@fuzdev/gro/exit.ts';
 
 import { CHECKOUT_PATH, open_checkout } from '../../../scripts/roots/checkout.ts';
 import { run_wpt_css_harvest } from '../diagnostics/wpt_css_harvest.ts';
@@ -36,8 +38,8 @@ const code = await run_wpt_css_harvest(
 			}
 		},
 		open_out: (path) => open_cache_out(checkout, path),
-		stdout: process.stdout
+		stdout: stdout
 	},
-	process.args
+	args
 );
-process.exit(code);
+exit(code);

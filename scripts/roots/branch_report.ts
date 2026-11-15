@@ -26,7 +26,10 @@ import { loadavg } from 'node:os';
 
 import { fs, type FsDir, type FsReadDir } from '@fuzdev/gro/fs.ts';
 import { create_fs_paths, type FsPaths } from '@fuzdev/gro/fs_paths.ts';
-import { process } from '@fuzdev/gro/process.ts';
+import { env } from '@fuzdev/gro/env.ts';
+import { pid } from '@fuzdev/gro/pid.ts';
+import { args } from '@fuzdev/gro/args.ts';
+import { set_exit_code } from '@fuzdev/gro/exit.ts';
 import { spawn } from '@fuzdev/gro/spawn.ts';
 
 import {
@@ -59,22 +62,22 @@ const fs_paths = create_fs_paths(fs);
 
 /** Every handle the run takes; `git` or `tar` missing from `PATH` throws here. */
 const create_deps = async (): Promise<BranchReportDeps> => {
-	const env = process.env.narrow(['HOME', 'CARGO_BUILD_JOBS', ...BENCH_NARROWING_ENV]);
+	const vars = env.narrow(['HOME', 'CARGO_BUILD_JOBS', ...BENCH_NARROWING_ENV]);
 	const bench_env: Record<string, string> = {};
 	for (const name of BENCH_NARROWING_ENV) {
-		const value = env.get(name);
+		const value = vars.get(name);
 		if (value !== undefined) bench_env[name] = value;
 	}
 	return {
 		checkout: (await open_checkout()).readonly(),
 		fs_paths,
-		home: env.get('HOME'),
-		cargo_build_jobs: env.get('CARGO_BUILD_JOBS'),
+		home: vars.get('HOME'),
+		cargo_build_jobs: vars.get('CARGO_BUILD_JOBS'),
 		bench_env,
 		open_cache: async (path) => create_report_cache(spawn, await open_made_dir(fs_paths, path)),
 		open_made_dir: (path) => open_made_dir(fs_paths, path),
 		...create_report_programs({ spawn, usr_bin: await open_usr_bin() }),
-		pid: process.pid,
+		pid: pid,
 		load_1m: () => loadavg()[0]!
 	};
 };
@@ -82,8 +85,8 @@ const create_deps = async (): Promise<BranchReportDeps> => {
 // a run that can't start is a harness error, exit 2, as every failure but a deterministic diff
 let code = 2;
 try {
-	code = await run_branch_report_command(await create_deps(), process.args);
+	code = await run_branch_report_command(await create_deps(), args);
 } catch (err) {
 	console.error(`branch:report: error: ${err instanceof Error ? err.message : String(err)}`);
 }
-process.set_exit_code(code);
+set_exit_code(code);

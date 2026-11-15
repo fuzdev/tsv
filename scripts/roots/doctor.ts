@@ -26,7 +26,8 @@ import { dirname, join } from 'node:path';
 
 import { fs, type FsReadDir } from '@fuzdev/gro/fs.ts';
 import { GIT_LOCAL_PASS_ENV } from '@fuzdev/gro/git.ts';
-import { process } from '@fuzdev/gro/process.ts';
+import { args } from '@fuzdev/gro/args.ts';
+import { set_exit_code } from '@fuzdev/gro/exit.ts';
 import { spawn, type SpawnProgram, type SpawnProgramOptions } from '@fuzdev/gro/spawn.ts';
 import { is_spawn_error } from '@fuzdev/gro/spawn_error.ts';
 
@@ -92,6 +93,6 @@ const code = await run_doctor(
 		load_all_versions,
 		load_corpus: () => import('../../benches/js/lib/corpus.ts')
 	},
-	process.args
+	args
 );
-process.set_exit_code(code);
+set_exit_code(code);

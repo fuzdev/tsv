@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 
 import { fs, type FsDir, type FsReadDir } from '@fuzdev/gro/fs.ts';
 import { is_fs_error } from '@fuzdev/gro/fs_error.ts';
-import { process } from '@fuzdev/gro/process.ts';
+import { exit } from '@fuzdev/gro/exit.ts';
 import { spawn, type SpawnProgram, type SpawnProgramOptions } from '@fuzdev/gro/spawn.ts';
 
 /** The checkout's absolute path, two directories above this module. */
@@ -101,7 +101,7 @@ export const exit_unless_checkout_cwd = (checkout: FsReadDir): void => {
 	const refusal = to_cwd_refusal(checkout.path, fs.project.path);
 	if (refusal === null) return;
 	console.error(refusal);
-	process.exit(1);
+	exit(1);
 };
 
 /**

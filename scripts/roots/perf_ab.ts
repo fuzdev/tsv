@@ -30,7 +30,11 @@ import { loadavg } from 'node:os';
 import { fs, type FsDir } from '@fuzdev/gro/fs.ts';
 import { create_fs_paths, type FsPaths } from '@fuzdev/gro/fs_paths.ts';
 import { GIT_LOCAL_PASS_ENV } from '@fuzdev/gro/git.ts';
-import { process } from '@fuzdev/gro/process.ts';
+import { env } from '@fuzdev/gro/env.ts';
+import { format_error_detail } from '@fuzdev/gro/error_detail.ts';
+import { pid } from '@fuzdev/gro/pid.ts';
+import { args } from '@fuzdev/gro/args.ts';
+import { set_exit_code } from '@fuzdev/gro/exit.ts';
 import { spawn } from '@fuzdev/gro/spawn.ts';
 
 import { BUILD_ENV } from '../git_snapshot.ts';
@@ -59,7 +63,7 @@ const fs_paths = create_fs_paths(fs);
 const create_deps = async (): Promise<PerfAbDeps> => ({
 	checkout: (await open_checkout()).readonly(),
 	fs_paths,
-	home: process.env.narrow(['HOME']).get('HOME'),
+	home: env.narrow(['HOME']).get('HOME'),
 	open_cache: async (path): Promise<PerfAbCache> => {
 		const cache = await open_made_dir(fs_paths, path);
 		return {
@@ -74,15 +78,15 @@ const create_deps = async (): Promise<PerfAbDeps> => ({
 	build: spawn.program(BUILD_PROGRAM, { pass_env: BUILD_ENV, env: BUILD_FIXED_ENV }),
 	perf: spawn.find('perf', { pass_env: DRIVER_PASS_ENV }),
 	pgrep: spawn.find('pgrep'),
-	pid: process.pid,
+	pid: pid,
 	load_1m: () => loadavg()[0]!
 });
 
 // exit 1 is a regression verdict, so a run that can't start is a harness error, exit 2
 let code = 2;
 try {
-	code = await run_perf_ab_command(await create_deps(), process.args);
+	code = await run_perf_ab_command(await create_deps(), args);
 } catch (err) {
-	console.error(`perf:ab: error: ${err instanceof Error ? err.message : String(err)}`);
+	console.error(`perf:ab: error: ${format_error_detail(err)}`);
 }
-process.set_exit_code(code);
+set_exit_code(code);

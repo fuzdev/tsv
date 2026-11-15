@@ -9,15 +9,16 @@
  * @module
  */
 
-import { process } from '@fuzdev/gro/process.ts';
+import { stdout } from '@fuzdev/gro/stdout.ts';
+import { args } from '@fuzdev/gro/args.ts';
 
 import { SVELTE_FIXTURES_GATE } from '../diagnostics/svelte_fixtures_compare.ts';
 import { run_fixtures_gate } from '../lib/fixtures_gate.ts';
 import { exit_with, init_implementations, open_readonly_dir } from './compare_deps.ts';
 
 const code = await run_fixtures_gate(
-	{ init_implementations, open_dir: open_readonly_dir, stdout: process.stdout },
+	{ init_implementations, open_dir: open_readonly_dir, stdout: stdout },
 	SVELTE_FIXTURES_GATE,
-	process.args
+	args
 );
 exit_with(code);

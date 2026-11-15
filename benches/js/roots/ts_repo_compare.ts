@@ -8,13 +8,14 @@
  * @module
  */
 
-import { process } from '@fuzdev/gro/process.ts';
+import { stdout } from '@fuzdev/gro/stdout.ts';
+import { args } from '@fuzdev/gro/args.ts';
 
 import { run_ts_repo_compare } from '../diagnostics/ts_repo_compare.ts';
 import { exit_with, init_implementations, open_readonly_dir } from './compare_deps.ts';
 
 const code = await run_ts_repo_compare(
-	{ init_implementations, open_dir: open_readonly_dir, stdout: process.stdout },
-	process.args
+	{ init_implementations, open_dir: open_readonly_dir, stdout: stdout },
+	args
 );
 exit_with(code);

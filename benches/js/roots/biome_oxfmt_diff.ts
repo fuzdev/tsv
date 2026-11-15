@@ -11,7 +11,9 @@
 
 import { basename, dirname } from 'node:path';
 
-import { process } from '@fuzdev/gro/process.ts';
+import { stdin } from '@fuzdev/gro/stdin.ts';
+import { stdout } from '@fuzdev/gro/stdout.ts';
+import { args } from '@fuzdev/gro/args.ts';
 
 import {
 	type DiffFormatter,
@@ -52,11 +54,11 @@ const code = await run_biome_oxfmt_diff(
 		read_stdin: async () => {
 			const decoder = new TextDecoder();
 			let text = '';
-			for await (const chunk of process.stdin) text += decoder.decode(chunk, { stream: true });
+			for await (const chunk of stdin) text += decoder.decode(chunk, { stream: true });
 			return text + decoder.decode();
 		},
-		stdout: process.stdout
+		stdout: stdout
 	},
-	process.args
+	args
 );
 exit_with(code);

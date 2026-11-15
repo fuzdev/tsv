@@ -14,7 +14,8 @@
 import { resolve } from 'node:path';
 
 import { fs, type FsDir, type FsReadDir } from '@fuzdev/gro/fs.ts';
-import { process } from '@fuzdev/gro/process.ts';
+import { env } from '@fuzdev/gro/env.ts';
+import { exit } from '@fuzdev/gro/exit.ts';
 
 import { CHECKOUT_PATH, type CheckoutProgram } from '../../../scripts/roots/checkout.ts';
 import type { InitCompareImplementations } from '../lib/compare_cli.ts';
@@ -39,7 +40,7 @@ export const open_readonly_dir = async (path: string): Promise<FsReadDir> =>
 	(await fs.open_dir(resolve(CHECKOUT_PATH, path))).readonly();
 
 /** `HOME`, the one variable the tools read for a path (`~`, `--all`'s `~/dev`). */
-export const read_home = (): string | undefined => process.env.narrow(['HOME']).get('HOME');
+export const read_home = (): string | undefined => env.narrow(['HOME']).get('HOME');
 
 /** The pins file `name` in `dir`, read-only. */
 export const readonly_pins_file = (dir: FsReadDir, name: string): PinsFile => ({
@@ -61,4 +62,4 @@ export const tsv_debug_opener =
 		checkout_program(TSV_DEBUG_CORPUS, { pass_env: TSV_DEBUG_PASS_ENV });
 
 /** Ends the process with `code`. */
-export const exit_with = (code: number): never => process.exit(code);
+export const exit_with = (code: number): never => exit(code);

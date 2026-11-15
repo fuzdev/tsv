@@ -11,7 +11,7 @@
  * @module
  */
 
-import { process } from '@fuzdev/gro/process.ts';
+import { exit } from '@fuzdev/gro/exit.ts';
 import { spawn } from '@fuzdev/gro/spawn.ts';
 
 import { CARGO_PASS_ENV } from '../../../scripts/cargo_env.ts';
@@ -28,4 +28,4 @@ const code = await run_corpus_audit({
 	prettier: sibling_reads(PRETTIER_CHECKOUT),
 	cargo: { run: (args) => cargo.run(args, { cwd: checkout }) }
 });
-process.exit(code);
+exit(code);

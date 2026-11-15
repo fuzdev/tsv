@@ -9,7 +9,8 @@
  * @module
  */
 
-import { process } from '@fuzdev/gro/process.ts';
+import { stdout } from '@fuzdev/gro/stdout.ts';
+import { args } from '@fuzdev/gro/args.ts';
 
 import { run_skip_triage } from '../diagnostics/skip_triage.ts';
 import { CorpusLoader, DirectoryLoader } from '../lib/corpus.ts';
@@ -20,8 +21,8 @@ const code = await run_skip_triage(
 		load_files: (path, logger) =>
 			(path === undefined ? new CorpusLoader('gates') : new DirectoryLoader(path)).load(logger),
 		init_implementations,
-		stdout: process.stdout
+		stdout: stdout
 	},
-	process.args
+	args
 );
 exit_with(code);

@@ -228,18 +228,16 @@ describe('--checkouts over a present checkout', () => {
 	test('a git that can not start in it warns naming the directory first, not the binary', async () => {
 		const git = {
 			out: async () => {
-				throw new SpawnError(
-					'launch_failed',
-					'git',
-					'git (/usr/bin/git): spawn /usr/bin/git EACCES'
-				);
+				throw new SpawnError('launch_failed', 'git', {
+					cause: new Error('spawn /usr/bin/git EACCES')
+				});
 			}
 		} as unknown as SpawnProgram;
 		const run = await run_checkouts(siblings_of({ '../test262': {} }), git);
 		strictEqual(run.code, 0, run.err.join('\n'));
 		deepStrictEqual(run.out.slice(0, 3), [
 			"⚠ pins:audit:checkouts — drift not checked in a present checkout git can't read:",
-			"  · ../test262: ../test262 is present but git rev-parse HEAD couldn't start in it, a directory it can't enter or a git it can't run (git (/usr/bin/git): spawn /usr/bin/git EACCES)",
+			"  · ../test262: ../test262 is present but git rev-parse HEAD couldn't start in it, a directory it can't enter or a git it can't run (launch_failed: git (spawn /usr/bin/git EACCES))",
 			"  Each one's drift is unknown, not absent: make it a clone git can read (an export has no " +
 				"history; a repository git refuses for its owner is made yours, since listing it in git's " +
 				'safe.directory instead trusts its config to run commands as you; a corrupt one is cloned ' +
@@ -483,14 +481,14 @@ describe('--checkouts over a present checkout', () => {
 	test('a git the spawn module refuses for another reason is named as failing, not as unable to start', async () => {
 		const git = {
 			out: async () => {
-				throw new SpawnError('not_found', 'git', 'git: not found');
+				throw new SpawnError('not_found', 'git');
 			}
 		} as unknown as SpawnProgram;
 		const run = await run_checkouts(siblings_of({ '../test262': {} }), git);
 		strictEqual(run.code, 0, run.err.join('\n'));
 		ok(
 			run.out.includes(
-				'  · ../test262: ../test262 is present but git rev-parse HEAD failed: git: not found'
+				'  · ../test262: ../test262 is present but git rev-parse HEAD failed: not_found: git'
 			),
 			run.out.join('\n')
 		);

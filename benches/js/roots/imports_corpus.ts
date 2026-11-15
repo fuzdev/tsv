@@ -12,7 +12,7 @@
  * @module
  */
 
-import { process } from '@fuzdev/gro/process.ts';
+import { set_exit_code } from '@fuzdev/gro/exit.ts';
 
 import {
 	exit_unless_checkout_cwd,
@@ -28,4 +28,4 @@ const checkout_program = await open_checkout_program(checkout);
 const code = await run_imports_corpus({
 	open_tsv_debug: () => checkout_program(TSV_DEBUG_CORPUS, { pass_env: TSV_DEBUG_PASS_ENV })
 });
-process.set_exit_code(code);
+set_exit_code(code);

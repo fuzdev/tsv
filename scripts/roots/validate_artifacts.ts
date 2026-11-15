@@ -8,7 +8,8 @@
  * @module
  */
 
-import { process } from '@fuzdev/gro/process.ts';
+import { env } from '@fuzdev/gro/env.ts';
+import { set_exit_code } from '@fuzdev/gro/exit.ts';
 
 import { run_validate_artifacts } from '../validate_artifacts.ts';
 import { open_checkout } from './checkout.ts';
@@ -16,8 +17,8 @@ import { open_checkout } from './checkout.ts';
 const checkout = await open_checkout();
 const code = await run_validate_artifacts({
 	checkout: checkout.readonly(),
-	stale_ok: process.env.narrow(['BENCH_STALE_OK']).get('BENCH_STALE_OK') === '1',
+	stale_ok: env.narrow(['BENCH_STALE_OK']).get('BENCH_STALE_OK') === '1',
 	print: (line) => console.log(line),
 	print_error: (line) => console.error(line)
 });
-process.set_exit_code(code);
+set_exit_code(code);

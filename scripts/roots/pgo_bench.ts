@@ -16,7 +16,8 @@
 
 import node_process from 'node:process';
 
-import { process } from '@fuzdev/gro/process.ts';
+import { env } from '@fuzdev/gro/env.ts';
+import { set_exit_code } from '@fuzdev/gro/exit.ts';
 import { spawn } from '@fuzdev/gro/spawn.ts';
 
 import { node_host_triple } from '../napi_host.ts';
@@ -32,9 +33,9 @@ const code = await run_pgo_bench({
 		arch: node_process.arch,
 		glibc: Boolean(report?.header?.glibcVersionRuntime)
 	}),
-	force: process.env.narrow(['TSV_BUILD_FORCE']).get('TSV_BUILD_FORCE') === '1',
+	force: env.narrow(['TSV_BUILD_FORCE']).get('TSV_BUILD_FORCE') === '1',
 	now: () => new Date(),
 	print: (line) => console.log(line),
 	print_error: (line) => console.error(line)
 });
-process.set_exit_code(code);
+set_exit_code(code);

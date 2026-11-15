@@ -16,6 +16,7 @@ import { afterEach, describe, test, vi } from 'vitest';
 import { fs, type FsDir, type FsReadDir } from '@fuzdev/gro/fs.ts';
 import { spawn, type SpawnProgram } from '@fuzdev/gro/spawn.ts';
 import { is_spawn_error } from '@fuzdev/gro/spawn_error.ts';
+import { format_error_detail } from '@fuzdev/gro/error_detail.ts';
 
 import { run_corpus_audit } from '../../benches/js/corpus_audit.ts';
 import { run_check_canonical_pins } from '../check_canonical_pins.ts';
@@ -554,20 +555,24 @@ describe('open_checkout_program', () => {
 				ok(false, `${message}: made`);
 			} catch (error) {
 				ok(is_spawn_error(error, 'not_found'), String(error));
-				strictEqual(error.message, message);
+				strictEqual(format_error_detail(error), message);
 			}
 		};
 		// no target: looked for beneath the checkout, which gains none
-		await assert_not_found(`not_found: no program target/corpus/tsv beneath ${checkout.path}`);
+		await assert_not_found(
+			`not_found: target/corpus/tsv (no program target/corpus/tsv beneath ${checkout.path})`
+		);
 		strictEqual(await root.exists('checkout/target'), false);
 		// a target that is a file reads as none
 		await root.write('checkout/target', '');
-		await assert_not_found(`not_found: no program target/corpus/tsv beneath ${checkout.path}`);
+		await assert_not_found(
+			`not_found: target/corpus/tsv (no program target/corpus/tsv beneath ${checkout.path})`
+		);
 		// a target without the binary: looked for beneath target
 		await root.remove('checkout/target');
 		await root.mkdir('checkout/target/corpus', { recursive: true });
 		await assert_not_found(
-			`not_found: no program corpus/tsv beneath ${join(checkout.path, 'target')}`
+			`not_found: corpus/tsv (no program corpus/tsv beneath ${join(checkout.path, 'target')})`
 		);
 	});
 });

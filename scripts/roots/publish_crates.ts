@@ -18,7 +18,10 @@
 
 import { GIT_LOCAL_PASS_ENV } from '@fuzdev/gro/git.ts';
 import { net } from '@fuzdev/gro/net.ts';
-import { process } from '@fuzdev/gro/process.ts';
+import { env } from '@fuzdev/gro/env.ts';
+import { stderr } from '@fuzdev/gro/stderr.ts';
+import { args } from '@fuzdev/gro/args.ts';
+import { set_exit_code } from '@fuzdev/gro/exit.ts';
 import { spawn } from '@fuzdev/gro/spawn.ts';
 
 import { CARGO_PASS_ENV } from '../cargo_env.ts';
@@ -31,8 +34,8 @@ import {
 	to_registry_src_path
 } from './package_state.ts';
 
-const env_handle = process.env.narrow(PACKAGE_STATE_ENV_NAMES);
-const env: PackageStateEnv = Object.fromEntries(
+const env_handle = env.narrow(PACKAGE_STATE_ENV_NAMES);
+const package_env: PackageStateEnv = Object.fromEntries(
 	PACKAGE_STATE_ENV_NAMES.map((name) => [name, env_handle.get(name)])
 );
 
@@ -44,15 +47,15 @@ const code = await run_publish_crates(
 		cargo: spawn.find('cargo', { pass_env: CARGO_PASS_ENV }),
 		git: spawn.find('git', { pass_env: GIT_LOCAL_PASS_ENV }),
 		registry: { fetch },
-		registry_src_path: to_registry_src_path(env),
+		registry_src_path: to_registry_src_path(package_env),
 		open_package_state: (target_directory) =>
-			open_package_state({ checkout: checkout.path, target_directory, env }),
+			open_package_state({ checkout: checkout.path, target_directory, env: package_env }),
 		print: (line) => console.log(line),
 		print_error: (line) => console.error(line),
-		write_error: (bytes) => process.stderr.write(bytes),
+		write_error: (bytes) => stderr.write(bytes),
 		sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
 		now: () => Date.now()
 	},
-	process.args
+	args
 );
-process.set_exit_code(code);
+set_exit_code(code);

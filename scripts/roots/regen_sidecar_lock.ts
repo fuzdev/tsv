@@ -8,7 +8,8 @@
  */
 
 import { fs } from '@fuzdev/gro/fs.ts';
-import { process } from '@fuzdev/gro/process.ts';
+import { exit, set_exit_code } from '@fuzdev/gro/exit.ts';
+import { args } from '@fuzdev/gro/args.ts';
 import { spawn } from '@fuzdev/gro/spawn.ts';
 
 import { run_regen_sidecar_lock } from '../regen_sidecar_lock.ts';
@@ -27,10 +28,10 @@ const NPM_PROXY_ENV = [
 const npm = spawn.find('npm', { pass_env: NPM_PROXY_ENV });
 if (npm === null) {
 	console.error('FAIL: npm is not on PATH');
-	process.exit(1);
+	exit(1);
 }
 const checkout = await open_checkout();
-const check = process.args.includes('--check');
+const check = args.includes('--check');
 await using scratch = check ? await fs.temp_dir('tsv-sidecar-lock-') : null;
-const code = await run_regen_sidecar_lock({ checkout, scratch, npm }, process.args);
-process.set_exit_code(code);
+const code = await run_regen_sidecar_lock({ checkout, scratch, npm }, args);
+set_exit_code(code);

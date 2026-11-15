@@ -11,7 +11,8 @@
  * @module
  */
 
-import { process } from '@fuzdev/gro/process.ts';
+import { args } from '@fuzdev/gro/args.ts';
+import { set_exit_code } from '@fuzdev/gro/exit.ts';
 import { spawn } from '@fuzdev/gro/spawn.ts';
 
 import { run_patch_npm_package } from '../patch_npm_package.ts';
@@ -26,6 +27,6 @@ const code = await run_patch_npm_package(
 		print: (line) => console.log(line),
 		print_error: (line) => console.error(line)
 	},
-	process.args
+	args
 );
-process.set_exit_code(code);
+set_exit_code(code);

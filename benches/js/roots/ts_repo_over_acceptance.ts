@@ -10,7 +10,8 @@
  */
 
 import type { FsReadDir } from '@fuzdev/gro/fs.ts';
-import { process } from '@fuzdev/gro/process.ts';
+import { stdout } from '@fuzdev/gro/stdout.ts';
+import { args } from '@fuzdev/gro/args.ts';
 
 import {
 	run_ts_repo_over_acceptance,
@@ -30,8 +31,8 @@ const code = await run_ts_repo_over_acceptance(
 				(await (typescript ??= open_readonly_dir(TS_REPO_CHECKOUT))).read_text(path)
 		},
 		init_implementations: init_graded_implementations,
-		stdout: process.stdout
+		stdout: stdout
 	},
-	process.args
+	args
 );
 exit_with(code);

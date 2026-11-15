@@ -14,7 +14,8 @@
  * @module
  */
 
-import { process } from '@fuzdev/gro/process.ts';
+import { stdout } from '@fuzdev/gro/stdout.ts';
+import { args } from '@fuzdev/gro/args.ts';
 
 import { open_checkout } from '../../../scripts/roots/checkout.ts';
 import { run_css_over_acceptance } from '../diagnostics/css_over_acceptance.ts';
@@ -47,8 +48,8 @@ const code = await run_css_over_acceptance(
 		// imported on the call, so the pin leg never loads the engines' modules
 		init_implementations: async (logger) =>
 			(await import('./graded_implementations.ts')).init_graded_implementations(logger),
-		stdout: process.stdout
+		stdout: stdout
 	},
-	process.args
+	args
 );
 exit_with(code);
