@@ -1289,10 +1289,11 @@ impl<'a> Printer<'a> {
     /// nothing.
     ///
     /// The parse's arena and stores are this body's own — the stylesheet is read through
-    /// their view, never the host document's — and this function is where they live: it is
-    /// kept out of line, so they sit in its frame and not in the fragment builder's, which
-    /// the element builders around this call are inlined into and which recurses once per
-    /// level of markup.
+    /// their view, never the host document's, and nothing the parse mints reaches past the
+    /// doc built from it — and this function is where they live: it is kept out of line, so
+    /// they sit in its frame and never in the fragment builder's, which recurses once per
+    /// level of markup and which the optimizer is free to inline the element builders around
+    /// this call into.
     #[inline(never)]
     fn parse_nested_style_body_doc(
         &self,

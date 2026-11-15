@@ -1,9 +1,9 @@
 //! CSS escape sequence decoding.
 
+use crate::ast::CssText;
 use crate::whitespace::is_css_whitespace;
-use bumpalo::Bump;
-use bumpalo::collections::String as BumpString;
 use std::borrow::Cow;
+use tsv_lang::store::{PoolText, TextPool};
 
 /// Decode CSS escape sequences in a string.
 ///
@@ -18,8 +18,8 @@ use std::borrow::Cow;
 /// only an input that actually contains `\` is decoded into an owned `String`.
 ///
 /// This is the decoder's **reference** form. The parser decodes a string literal
-/// through [`decode_escape_sequences_in`], which builds the same text in the document's
-/// arena and is held to this one (a debug assertion at its call site, and a generated
+/// through [`decode_escape_sequences_in`], which builds the same text in the stylesheet's
+/// text pool and is held to this one (a debug assertion at its call site, and a generated
 /// test here); [`decodes_to_ascii_ignore_case`] is held to it the same way. Nothing in a
 /// release build calls it.
 pub(crate) fn decode_escape_sequences(source: &str) -> Cow<'_, str> {
@@ -77,70 +77,70 @@ pub(crate) fn decode_escape_sequences(source: &str) -> Cow<'_, str> {
 }
 
 /// [`decode_escape_sequences`] for a string literal's payload, decoded straight into the
-/// document's arena: `None` for the escape-free string (one byte search and no
-/// allocation), else the decoded text, built where it will live rather than in a
+/// stylesheet's text pool: `None` for the escape-free string (one byte search and nothing
+/// written), else the decoded text's handle, written where it will live rather than in a
 /// heap `String` copied over afterwards.
 #[inline]
-pub(crate) fn decode_escape_sequences_in<'arena>(
+pub(crate) fn decode_escape_sequences_in(
     source: &str,
-    arena: &'arena Bump,
-) -> Option<&'arena str> {
+    pool: &mut TextPool<CssText>,
+) -> Option<PoolText<CssText>> {
     if !source.as_bytes().contains(&b'\\') {
         return None;
     }
-    Some(decode_escapes_into_arena(source, arena))
+    Some(decode_escapes_into_pool(source, pool))
 }
 
 /// The decode behind [`decode_escape_sequences_in`], for a source that holds a `\` —
 /// [`decode_escape_sequences`]'s rules, arm for arm. Out of line, so the walk's locals
 /// stay out of the value parser's frame.
 #[inline(never)]
-fn decode_escapes_into_arena<'arena>(source: &str, arena: &'arena Bump) -> &'arena str {
-    // An escape never decodes to more bytes than it spells: `\` plus n hex digits names a
-    // code point below 16^n, whose UTF-8 is at most n bytes for n <= 4 and four bytes for
-    // five or six digits; a simple escape drops its `\`; a trailing `\` is itself.
-    let mut result = BumpString::with_capacity_in(source.len(), arena);
-    let mut chars = source.chars().peekable();
+fn decode_escapes_into_pool(source: &str, pool: &mut TextPool<CssText>) -> PoolText<CssText> {
+    pool.push_with(|result| {
+        // An escape never decodes to more bytes than it spells: `\` plus n hex digits names
+        // a code point below 16^n, whose UTF-8 is at most n bytes for n <= 4 and four bytes
+        // for five or six digits; a simple escape drops its `\`; a trailing `\` is itself.
+        result.reserve(source.len());
+        let mut chars = source.chars().peekable();
 
-    while let Some(ch) = chars.next() {
-        if ch != '\\' {
-            result.push(ch);
-            continue;
-        }
-        let Some(&next_ch) = chars.peek() else {
-            // Trailing backslash
-            result.push('\\');
-            break;
-        };
-        if !next_ch.is_ascii_hexdigit() {
-            // Simple escape: \X → X
-            result.push(next_ch);
-            chars.next();
-            continue;
-        }
-        // Hex escape: one to six digits, one optional CSS-whitespace terminator, and
-        // nothing at all for a value that names no scalar (a surrogate, past U+10FFFF).
-        let mut code_point: u32 = 0;
-        for _ in 0..6 {
-            match chars.peek().and_then(|d| d.to_digit(16)) {
-                Some(d) => {
-                    code_point = code_point * 16 + d;
-                    chars.next();
+        while let Some(ch) = chars.next() {
+            if ch != '\\' {
+                result.push(ch);
+                continue;
+            }
+            let Some(&next_ch) = chars.peek() else {
+                // Trailing backslash
+                result.push('\\');
+                break;
+            };
+            if !next_ch.is_ascii_hexdigit() {
+                // Simple escape: \X → X
+                result.push(next_ch);
+                chars.next();
+                continue;
+            }
+            // Hex escape: one to six digits, one optional CSS-whitespace terminator, and
+            // nothing at all for a value that names no scalar (a surrogate, past U+10FFFF).
+            let mut code_point: u32 = 0;
+            for _ in 0..6 {
+                match chars.peek().and_then(|d| d.to_digit(16)) {
+                    Some(d) => {
+                        code_point = code_point * 16 + d;
+                        chars.next();
+                    }
+                    None => break,
                 }
-                None => break,
+            }
+            if let Some(&ws) = chars.peek()
+                && is_css_whitespace(ws)
+            {
+                chars.next();
+            }
+            if let Some(c) = char::from_u32(code_point) {
+                result.push(c);
             }
         }
-        if let Some(&ws) = chars.peek()
-            && is_css_whitespace(ws)
-        {
-            chars.next();
-        }
-        if let Some(c) = char::from_u32(code_point) {
-            result.push(c);
-        }
-    }
-
-    result.into_bump_str()
+    })
 }
 
 /// Whether `c` is a character [`trim_end_preserving_escape`] must hand back to an escape
@@ -487,7 +487,7 @@ mod tests {
         assert_eq!(decode_escape_sequences(r"\01F4A9"), "💩");
     }
 
-    /// The arena decoder against the reference, over every sequence of up to three
+    /// The pool decoder against the reference, over every sequence of up to three
     /// fragments drawn from each escape kind at each edge: hex escapes of one to six
     /// digits and a seventh that is content, every whitespace terminator (CRLF is two
     /// code points, so only its CR is taken), a value past U+10FFFF, a surrogate and
@@ -495,7 +495,7 @@ mod tests {
     /// non-ASCII character, a lone backslash (trailing when it comes last, which also
     /// makes EOF fall mid-escape), and plain neighbours, ASCII and not.
     #[test]
-    fn the_arena_decoder_matches_the_reference_decoder() {
+    fn the_pool_decoder_matches_the_reference_decoder() {
         let fragments = [
             "a",
             "é",
@@ -524,17 +524,17 @@ mod tests {
             "\\g",
             "\\é",
         ];
-        let arena = Bump::new();
+        let mut pool = TextPool::new();
         let mut decoded_cases = 0u32;
         let mut check = |source: &str| {
             let reference = decode_escape_sequences(source);
-            match (decode_escape_sequences_in(source, &arena), &reference) {
+            match (decode_escape_sequences_in(source, &mut pool), &reference) {
                 (None, Cow::Borrowed(_)) => {}
                 (Some(decoded), Cow::Owned(reference)) => {
-                    assert_eq!(decoded, reference, "{source:?}");
+                    assert_eq!(pool.get(decoded), reference, "{source:?}");
                     decoded_cases += 1;
                 }
-                (ours, _) => panic!("{source:?}: arena {ours:?}, reference {reference:?}"),
+                (ours, _) => panic!("{source:?}: pool {ours:?}, reference {reference:?}"),
             }
         };
         check("");

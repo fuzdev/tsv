@@ -14,15 +14,12 @@ mod selectors;
 mod value;
 pub(crate) use value::operators::is_whole_value_block;
 
-use crate::ast::{Comment, CssNode, CssStores, CssStyleSheet};
+use crate::ast::{Comment, CssNode, CssStores, CssStyleSheet, CssText};
 use crate::lexer::{Lexer, Token, TokenKind};
 use bumpalo::Bump;
-#[cfg(not(feature = "_internal_ast_census"))]
-use bumpalo::collections::Vec as BumpVec;
-#[cfg(feature = "_internal_ast_census")]
-use census_vec::BumpVec;
 use decl_scan::{ScannedDeclaration, TerminatorKind};
 use std::cell::Cell;
+use tsv_lang::store::{PoolText, flush_run_move};
 use tsv_lang::{DepthBudget, DepthLimit, Error, NESTING_LIMIT, Span};
 
 pub(crate) struct CssParser<'a, 'arena> {
@@ -34,11 +31,11 @@ pub(crate) struct CssParser<'a, 'arena> {
     /// and [`current_end`](Self::current_end), the last two widening its `u32` offsets to the
     /// `usize` every `source` index takes.
     current: Token,
-    /// Decoded value for the current token (only set for escaped identifiers),
-    /// copied into the AST arena at receipt so it is a `Copy` `&'arena str` rather
-    /// than an owned `String` — the lexer decodes into a reused scratch buffer and
-    /// the parser arena-copies it immediately, so no per-identifier `String` survives.
-    current_decoded: Option<&'arena str>,
+    /// Decoded value for the current token (only set for escaped identifiers), pushed into
+    /// the stores' text pool at receipt so it is a `Copy` handle rather than an owned
+    /// `String` — the lexer decodes into a reused scratch buffer and the parser copies it
+    /// into the pool immediately, so no per-identifier `String` survives.
+    current_decoded: Option<PoolText<CssText>>,
     /// One-token lookahead. Holds the raw lexer token; the decoded value of an
     /// escaped peeked identifier stays **parked on the lexer scratch** (claimed at
     /// consume time in `advance`), so this slot carries no decode.
@@ -55,14 +52,14 @@ pub(crate) struct CssParser<'a, 'arena> {
     /// spine, so only the nesting half is used.
     depth: DepthBudget,
     pub(crate) comments: Vec<Comment>,
-    /// Bump arena that owns every AST node this parser allocates. Supplied by
-    /// the caller (caller-owns-`Bump`); the returned `CssStyleSheet<'arena>`
-    /// borrows from it. `&'arena Bump` is `Copy`; nodes are gathered via
-    /// `self.bvec()` and strings via `self.alloc_str_in()` (CSS has no single-node
-    /// `alloc` — every node lands in a child slice).
+    /// Bump arena the value parser's operator-run token buffer is built in (`ValueToken`,
+    /// `value::operators`), supplied by the caller (caller-owns-`Bump`). `&'arena Bump` is
+    /// `Copy`. Nothing of the tree lives in it.
     pub(crate) arena: &'arena Bump,
-    /// The stylesheet's stores, handed to the value parser beside the arena. Nothing mints
-    /// from them: every node, list and string this parser builds lands in `arena`.
+    /// The stylesheet's stores, which every list and string this parser builds lands in:
+    /// each list through its element type's scratch stack, flushed into that type's store as
+    /// a run when it closes, and each string in the text pool. Handed to the value parser
+    /// beside the arena.
     pub(crate) stores: &'a mut CssStores,
     /// A declaration located and measured speculatively by the rule/declaration
     /// disambiguation scan — its head and its value's facts — for the `parse_declaration`
@@ -89,9 +86,7 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
         // it sits in, so it carries the same `base_offset` the spans below are shifted by.
         let mut lexer = Lexer::at_offset(source, base_offset);
         let token = lexer.next_token()?;
-        let decoded = lexer
-            .decoded_str()
-            .map(|s| -> &'arena str { arena.alloc_str(s) });
+        let decoded = lexer.decoded_str().map(|s| stores.text.push(s));
         Ok(Self {
             source,
             lexer,
@@ -147,51 +142,41 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
         }
     }
 
-    /// Create an empty `BumpVec` whose backing buffer lives in the **arena** —
-    /// the preferred way to gather children. Build it in the parse loop, then
-    /// `.into_bump_slice()` to store the field (zero-copy: the buffer is already
-    /// arena-owned). Carries its own `Copy` `&'arena Bump`, so pushing
-    /// `parse_x(self)?` inside the loop does not borrow `self`.
+    /// The current token's source text, pushed into the stores' text pool: for a node that
+    /// keeps the token's verbatim spelling as text of its own.
     #[inline]
-    pub(crate) fn bvec<T>(&self) -> BumpVec<'arena, T> {
-        BumpVec::new_in(self.arena)
+    pub(crate) fn push_current_value(&mut self) -> PoolText<CssText> {
+        let source = self.source;
+        self.stores
+            .text
+            .push(&source[self.current_start()..self.current_end()])
     }
 
-    /// Copy a string (a decoded value or a verbatim source slice) into the
-    /// arena. One copy into the arena; the returned `&'arena str` is stored
-    /// inline on the AST node in place of an owned `String`.
-    #[inline]
-    pub(crate) fn alloc_str_in(&self, s: &str) -> &'arena str {
-        self.arena.alloc_str(s)
-    }
-
-    /// Copy the lexer's just-produced decoded value (escaped identifiers only) into
-    /// the AST arena, yielding a `Copy` `&'arena str`. The lexer decodes into a
-    /// reused scratch that the next lex overwrites, so this runs immediately after
-    /// each lex; `None` for the common escape-free token. One copy into the arena —
-    /// the same copy the old owned-`String` path made, now the only allocation the
-    /// parser retains on the escape path.
+    /// Copy the lexer's just-produced decoded value (escaped identifiers only) into the
+    /// stores' text pool, yielding a `Copy` handle. The lexer decodes into a reused scratch
+    /// that the next lex overwrites, so this runs immediately after each lex; `None` for the
+    /// common escape-free token. One copy into the pool, the only one the parser keeps on
+    /// the escape path.
     ///
-    /// Only the test inlines; the copy is [`CssParser::copy_decoded_to_arena`]'s. Inlined,
-    /// the bump allocation and its `memcpy` call kept callee-saved registers live in
+    /// Only the test inlines; the copy is [`CssParser::copy_decoded_to_pool`]'s. Inlined,
+    /// the pool push and its `memcpy` call kept callee-saved registers live in
     /// [`CssParser::advance`], which then saved and restored them on every token.
     #[inline]
-    fn decoded_to_arena(&self) -> Option<&'arena str> {
+    fn decoded_to_pool(&mut self) -> Option<PoolText<CssText>> {
         if self.lexer.decoded_str().is_some() {
-            self.copy_decoded_to_arena()
+            self.copy_decoded_to_pool()
         } else {
             None
         }
     }
 
-    /// [`CssParser::decoded_to_arena`]'s copy, for the rare token that decoded an escape.
-    /// It hands back the string alone, which returns in registers.
+    /// [`CssParser::decoded_to_pool`]'s copy, for the rare token that decoded an escape.
+    /// It hands back the handle alone, which returns in registers.
     #[cold]
     #[inline(never)]
-    fn copy_decoded_to_arena(&self) -> Option<&'arena str> {
-        self.lexer
-            .decoded_str()
-            .map(|s| -> &'arena str { self.arena.alloc_str(s) })
+    fn copy_decoded_to_pool(&mut self) -> Option<PoolText<CssText>> {
+        let text = &mut self.stores.text;
+        self.lexer.decoded_str().map(|s| text.push(s))
     }
 
     /// Add a comment to the comments Vec
@@ -245,18 +230,18 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
         // The token comes either from the lookahead slot (lexed during a prior
         // `peek_kind()`) or fresh from the lexer. In both cases the decoded escape
         // value of the most-recently-lexed token is parked on the lexer's scratch and
-        // arena-copied below — for the peeked token nothing re-lexes between the peek
-        // and this consume, so the scratch is still intact. Without this copy a
+        // copied into the pool below — for the peeked token nothing re-lexes between the
+        // peek and this consume, so the scratch is still intact. Without this copy a
         // peeked-then-consumed escaped identifier would silently lose its decode and
         // fall back to the verbatim slice. Near-free: `decoded_str` is `None` for the
-        // common no-escape token, so `decoded_to_arena` allocates nothing.
+        // common no-escape token, so `decoded_to_pool` writes nothing.
         match self.peek.take() {
             Some(token) => self.current = token,
             // Lexed straight into the current slot (`&mut self.current` is disjoint from
             // `&mut self.lexer`), so no intermediate token is returned and re-scattered.
             None => self.lexer.next_token_into(&mut self.current)?,
         }
-        self.current_decoded = self.decoded_to_arena();
+        self.current_decoded = self.decoded_to_pool();
         Ok(())
     }
 
@@ -439,7 +424,7 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
                 // a digit as readily as to a letter, so `{<NBSP>0%` must come back a
                 // `<percentage-token>` and not an identifier.
                 self.current = self.lexer.token_at(at)?;
-                self.current_decoded = self.decoded_to_arena();
+                self.current_decoded = self.decoded_to_pool();
                 return Ok(());
             }
             // The whole identifier was the run — there is no name here at all. Consume it
@@ -876,7 +861,10 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
     /// slice, so callers gate on the kind first (as they already did).
     #[inline]
     pub(crate) fn current_identifier(&self) -> &str {
-        self.current_decoded.unwrap_or_else(|| self.current_value())
+        match self.current_decoded {
+            Some(decoded) => self.stores.text.get(decoded),
+            None => self.current_value(),
+        }
     }
 
     /// Whether the current identifier's resolved text begins `--` — a custom property's name
@@ -887,7 +875,7 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
     #[inline]
     pub(in crate::parser) fn current_identifier_is_custom_property(&self) -> bool {
         match self.current_decoded {
-            Some(decoded) => decoded.starts_with("--"),
+            Some(decoded) => self.stores.text.get(decoded).starts_with("--"),
             None => self
                 .source
                 .as_bytes()
@@ -896,16 +884,16 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
         }
     }
 
-    /// The current identifier's resolved text as an `&'arena str`, for callers that
-    /// store it as an owned node field. When the identifier was escaped the decoded
-    /// value already lives in the arena (`current_decoded`), so it is returned
-    /// directly — no second copy; otherwise the verbatim source slice is copied in.
-    /// Prefer over `alloc_str_in(current_identifier())`, which re-copies the decoded
-    /// value on the escape path.
+    /// The current identifier's resolved text as a pool handle, for callers that store it
+    /// as a node field. When the identifier was escaped the decoded value is already in the
+    /// pool (`current_decoded`), so its handle is returned directly — no second copy;
+    /// otherwise the verbatim source slice is pushed.
     #[inline]
-    pub(crate) fn current_identifier_in_arena(&self) -> &'arena str {
-        self.current_decoded
-            .unwrap_or_else(|| self.arena.alloc_str(self.current_value()))
+    pub(crate) fn current_identifier_in_pool(&mut self) -> PoolText<CssText> {
+        match self.current_decoded {
+            Some(decoded) => decoded,
+            None => self.push_current_value(),
+        }
     }
 
     /// The current token's kind.
@@ -1040,8 +1028,8 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
         Error::invalid_syntax(format!("Unexpected {what}"), self.current_pos())
     }
 
-    pub(crate) fn parse(&mut self) -> Result<CssStyleSheet<'arena>, Error> {
-        let mut nodes = self.bvec();
+    pub(crate) fn parse(&mut self) -> Result<CssStyleSheet, Error> {
+        let mark = self.stores.runs.node_scratch.mark();
 
         // The stylesheet body is a `read_body` boundary: whitespace, `/*` comments,
         // and legacy `<!-- ... -->` markers may separate items. `skip_html_comment_markers`
@@ -1061,22 +1049,27 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
             if self.check(TokenKind::AtSign) {
                 // Top-level at-rules are not nested in rules
                 let atrule = atrules::parse_atrule(self, false)?;
-                nodes.push(CssNode::Atrule(atrule));
+                self.stores.runs.node_scratch.push(CssNode::Atrule(atrule));
                 self.skip_html_comment_markers()?;
                 continue;
             }
 
             // Parse rules (selector { declarations })
             let node = declarations::parse_rule(self, false)?;
-            nodes.push(CssNode::Rule(node));
+            self.stores.runs.node_scratch.push(CssNode::Rule(node));
 
             self.skip_html_comment_markers()?;
         }
 
         // Comments are already sorted by span.start since we add them in order during parsing
 
+        let nodes = flush_run_move(
+            &mut self.stores.runs.node_scratch,
+            &mut self.stores.runs.nodes,
+            mark,
+        );
         Ok(CssStyleSheet {
-            nodes: nodes.into_bump_slice(),
+            nodes,
             comments: std::mem::take(&mut self.comments),
         })
     }
@@ -1087,15 +1080,32 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
 ///
 /// `host_nesting` is the nesting the host document has spent around the stylesheet (`0`
 /// standalone), the start of this parse's depth count.
-pub(crate) fn parse_css<'arena>(
+///
+/// Every scratch stack is empty between parses, so the driver marks none of them: it finds
+/// them empty and leaves them so, whether the parse succeeded — which flushed every frame it
+/// opened — or failed, leaving open frames the exit clears, for whatever the caller goes on to
+/// parse into the same stores.
+pub(crate) fn parse_css(
     source: &str,
     base_offset: usize,
     host_nesting: u32,
-    arena: &'arena Bump,
+    arena: &Bump,
     stores: &mut CssStores,
-) -> Result<CssStyleSheet<'arena>, Error> {
-    let mut parser = CssParser::new(source, base_offset, host_nesting, arena, stores)?;
-    parser.parse()
+) -> Result<CssStyleSheet, Error> {
+    #[cfg(debug_assertions)]
+    debug_assert!(
+        stores.scratch_is_empty(),
+        "a parse began over an open list frame"
+    );
+    let outcome = CssParser::new(source, base_offset, host_nesting, arena, stores)
+        .and_then(|mut parser| parser.parse());
+    if outcome.is_err() {
+        stores.clear_scratch();
+    } else {
+        #[cfg(debug_assertions)]
+        debug_assert!(stores.scratch_is_empty(), "a parse left an open list frame");
+    }
+    outcome
 }
 
 #[cfg(test)]

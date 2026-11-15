@@ -587,7 +587,7 @@ impl<'a> Printer<'a> {
     /// CONTENT (`color: a<NBSP>b`); with no child at all the floor is the `{`.
     pub(crate) fn write_block_tail_boundary_ws(
         &mut self,
-        children: &[CssBlockChild<'_>],
+        children: &[CssBlockChild],
         block_span: Span,
     ) {
         let from = children

@@ -174,6 +174,25 @@ mod tests {
         assert_ne!(typescript_mint_mark(&mut used.ts), fresh);
     }
 
+    /// Where the CSS half mints next, as a parse's tree names it: its runs and its property's
+    /// pool text, the same for fresh stores and rewound ones, another for stores still holding
+    /// a stylesheet's lists and strings.
+    fn css_mint_mark(stores: &mut CssStores) -> String {
+        let arena = bumpalo::Bump::new();
+        format!(
+            "{:?}",
+            tsv_css::__private::parse_into("a { b: c(d, e); }", &arena, stores)
+        )
+    }
+
+    #[test]
+    fn the_css_mint_mark_tells_used_stores_from_fresh_ones() {
+        let fresh = css_mint_mark(&mut CssStores::new());
+        let mut used = SvelteStores::new();
+        outputs(DOCUMENT, &mut used).expect("parses");
+        assert_ne!(css_mint_mark(&mut used.css), fresh);
+    }
+
     /// One warm handle over a run of documents gives what fresh stores give for each: across
     /// a document that fails to parse in its markup, in its `<script>` and in its `<style>`,
     /// across documents with and without a `<style>`, and with one nested in markup. The
@@ -292,6 +311,38 @@ mod tests {
             with_stores(|stores| typescript_mint_mark(&mut stores.ts)),
             fresh
         );
+    }
+
+    /// The park rewinds what a document's `<style>` wrote: the next stylesheet mints where
+    /// fresh stores do, through an owned slot and through the thread's.
+    #[test]
+    fn a_park_rewinds_the_css_half() {
+        let fresh = css_mint_mark(&mut CssStores::new());
+        let mut warm = WarmStores::default();
+        warm.with(|stores| outputs(DOCUMENT, stores))
+            .expect("parses");
+        assert_eq!(warm.with(|stores| css_mint_mark(&mut stores.css)), fresh);
+        with_stores(|stores| outputs(DOCUMENT, stores)).expect("parses");
+        assert_eq!(with_stores(|stores| css_mint_mark(&mut stores.css)), fresh);
+    }
+
+    /// A `<style>` nested in markup is parsed as the document formats, into stores of its own,
+    /// and read through their view: its escaped property names are its own pool's text, beside
+    /// the top-level `<style>`'s in the document's. Read through the document's view instead,
+    /// a nested property would resolve against the other pool — a stamp mismatch under the
+    /// store-check build, another stylesheet's bytes in bounds outside it.
+    #[test]
+    fn a_nested_style_reads_its_own_stores() {
+        let source = "<style>p { c\\6flor: red; }</style>\n\
+                      <div><style>a { content: '\\41'; c\\6flor: blue; }</style></div>\n";
+        let expected = "<div>\n\t<style>\n\t\ta {\n\t\t\tcontent: '\\41';\n\t\t\tc\\6flor: blue;\n\t\t}\n\t</style>\n</div>\n\n<style>\n\tp {\n\t\tc\\6flor: red;\n\t}\n</style>\n";
+        let (_, formatted) = outputs(source, &mut SvelteStores::new()).expect("parses");
+        assert_eq!(formatted, expected);
+        let mut warm = WarmStores::default();
+        for _ in 0..2 {
+            let (_, formatted) = warm.with(|stores| outputs(source, stores)).expect("parses");
+            assert_eq!(formatted, expected);
+        }
     }
 
     /// A panic out of the closure parks nothing: the stores it held are dropped with its

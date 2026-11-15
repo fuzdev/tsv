@@ -284,7 +284,7 @@ fn write_keyed_string<const K: usize>(w: &mut JsonWriter, lead: &[u8; K], s: &st
 
 /// The standalone `StyleSheetFile` root: `type`, `start` (0), `end` (source
 /// length), `children`, `comments`.
-fn write_stylesheet_file(w: &mut JsonWriter, stylesheet: &ast::CssStyleSheet<'_>, ctx: &Ctx<'_>) {
+fn write_stylesheet_file(w: &mut JsonWriter, stylesheet: &ast::CssStyleSheet, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"StyleSheetFile\",\"start\":");
     w.span_start_end(ctx.positions, 0, ctx.source.len() as u32);
     w.raw(",\"children\":");
@@ -327,7 +327,7 @@ pub struct CssComments(Vec<WireComment>);
 /// sets it.
 fn write_children(
     w: &mut JsonWriter,
-    stylesheet: &ast::CssStyleSheet<'_>,
+    stylesheet: &ast::CssStyleSheet,
     ctx: &Ctx<'_>,
 ) -> CssComments {
     let mut out = Vec::new();
@@ -369,7 +369,7 @@ fn write_comments(
 /// Emit a CSS node (a `Rule` or an `Atrule`).
 fn write_node(
     w: &mut JsonWriter,
-    node: &ast::CssNode<'_>,
+    node: &ast::CssNode,
     ctx: &Ctx<'_>,
     comments: &mut Vec<WireComment>,
 ) {
@@ -387,7 +387,7 @@ fn write_node(
 /// alone — is an append of its own, since which one it is varies by document.
 fn write_rule(
     w: &mut JsonWriter,
-    rule: &ast::CssRule<'_>,
+    rule: &ast::CssRule,
     ctx: &Ctx<'_>,
     comments: &mut Vec<WireComment>,
 ) {
@@ -414,7 +414,7 @@ fn write_rule(
 /// constructs the two literals differently). `Atrule` carries no `metadata`.
 fn write_atrule(
     w: &mut JsonWriter,
-    atrule: &ast::CssAtrule<'_>,
+    atrule: &ast::CssAtrule,
     ctx: &Ctx<'_>,
     comments: &mut Vec<WireComment>,
 ) {
@@ -463,7 +463,7 @@ fn write_atrule(
 // which the CSS fixtures and the parse-corpus gate stand on, so it wants its own
 // change and its own verdict on that claim.
 fn collect_prelude_comments(
-    atrule: &ast::CssAtrule<'_>,
+    atrule: &ast::CssAtrule,
     source: &str,
     comments: &mut Vec<WireComment>,
 ) {
@@ -481,7 +481,7 @@ fn collect_prelude_comments(
 fn write_block(
     w: &mut JsonWriter,
     block_span: Span,
-    children: &[ast::CssBlockChild<'_>],
+    children: &[ast::CssBlockChild],
     ctx: &Ctx<'_>,
     comments: &mut Vec<WireComment>,
 ) {
@@ -512,7 +512,7 @@ fn write_block(
 
 fn write_block_child(
     w: &mut JsonWriter,
-    child: &ast::CssBlockChild<'_>,
+    child: &ast::CssBlockChild,
     ctx: &Ctx<'_>,
     comments: &mut Vec<WireComment>,
 ) {
@@ -545,7 +545,7 @@ struct DeclarationSplit<'a> {
     value_start: u32,
 }
 
-fn split_declaration<'a>(decl: &ast::CssDeclaration<'_>, source: &'a str) -> DeclarationSplit<'a> {
+fn split_declaration<'a>(decl: &ast::CssDeclaration, source: &'a str) -> DeclarationSplit<'a> {
     let content_end = decl
         .important_end
         .map_or(decl.span.end, |e| e.max(decl.span.end));
@@ -582,7 +582,7 @@ fn split_declaration<'a>(decl: &ast::CssDeclaration<'_>, source: &'a str) -> Dec
 /// keeps each recorded `position` indexing the very `value` emitted here.
 fn write_declaration(
     w: &mut JsonWriter,
-    decl: &ast::CssDeclaration<'_>,
+    decl: &ast::CssDeclaration,
     ctx: &Ctx<'_>,
     comments: &mut Vec<WireComment>,
 ) {
@@ -609,19 +609,19 @@ fn write_declaration(
 
 /// Emits a `SelectorList` node (rule preludes — parsed non-forgivingly, no
 /// `Invalid`).
-fn write_selector_list(w: &mut JsonWriter, sl: &ast::SelectorList<'_>, ctx: &Ctx<'_>) {
+fn write_selector_list(w: &mut JsonWriter, sl: &ast::SelectorList, ctx: &Ctx<'_>) {
     write_selector_list_inner(w, sl, ctx, false);
 }
 
 /// Emits a `SelectorList` node for pseudo-class args — drops complex selectors
 /// containing a forgiving-parse `Invalid`.
-fn write_selector_list_filtered(w: &mut JsonWriter, sl: &ast::SelectorList<'_>, ctx: &Ctx<'_>) {
+fn write_selector_list_filtered(w: &mut JsonWriter, sl: &ast::SelectorList, ctx: &Ctx<'_>) {
     write_selector_list_inner(w, sl, ctx, true);
 }
 
 fn write_selector_list_inner(
     w: &mut JsonWriter,
-    sl: &ast::SelectorList<'_>,
+    sl: &ast::SelectorList,
     ctx: &Ctx<'_>,
     filter_invalid: bool,
 ) {
@@ -645,7 +645,7 @@ fn write_selector_list_inner(
 }
 
 /// Emits a `ComplexSelector` node.
-fn write_complex_selector(w: &mut JsonWriter, c: &ast::ComplexSelector<'_>, ctx: &Ctx<'_>) {
+fn write_complex_selector(w: &mut JsonWriter, c: &ast::ComplexSelector, ctx: &Ctx<'_>) {
     ctx.head(
         w,
         b"{\"type\":\"ComplexSelector\",\"start\":",
@@ -669,7 +669,7 @@ fn write_complex_selector(w: &mut JsonWriter, c: &ast::ComplexSelector<'_>, ctx:
 /// The trailing `start`/`end` burst is one in-place window, led by the `]` that
 /// closes `selectors` and stopping before `metadata` for `write_rule`'s reason (module
 /// doc, §The `start`/`end` bursts).
-fn write_relative_selector(w: &mut JsonWriter, r: &ast::RelativeSelector<'_>, ctx: &Ctx<'_>) {
+fn write_relative_selector(w: &mut JsonWriter, r: &ast::RelativeSelector, ctx: &Ctx<'_>) {
     // The combinator-less head — the first compound of every selector — is one literal
     // through the `selectors` array's `[`.
     match (&r.combinator, &r.combinator_span) {
@@ -699,7 +699,7 @@ fn write_combinator(w: &mut JsonWriter, name: &'static str, span: Span, ctx: &Ct
 }
 
 /// Emit a simple selector (type/universal/class/id/nesting/attribute/pseudo/percentage).
-fn write_simple_selector(w: &mut JsonWriter, simple: &ast::SimpleSelector<'_>, ctx: &Ctx<'_>) {
+fn write_simple_selector(w: &mut JsonWriter, simple: &ast::SimpleSelector, ctx: &Ctx<'_>) {
     match simple {
         ast::SimpleSelector::Type {
             namespace_span,
@@ -913,12 +913,7 @@ fn write_named_selector(w: &mut JsonWriter, name: &str, span: Span, ctx: &Ctx<'_
 
 /// Emit a functional pseudo-class's or pseudo-element's args (an `Nth` node, a
 /// nested `SelectorList`, or a `::part()` ident run projected onto one).
-#[expect(
-    clippy::explicit_auto_deref,
-    reason = "a view accessor takes a list or string field by value, which a store handle \
-              needs dereferenced; only the field's identity alias auto-derefs"
-)]
-fn write_pseudo_args(w: &mut JsonWriter, args: &ast::PseudoClassArgs<'_>, ctx: &Ctx<'_>) {
+fn write_pseudo_args(w: &mut JsonWriter, args: &ast::PseudoClassArgs, ctx: &Ctx<'_>) {
     match args {
         ast::PseudoClassArgs::Nth {
             value,

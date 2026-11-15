@@ -2,6 +2,7 @@ use super::CssParser;
 use crate::ast::*;
 use crate::lexer::TokenKind;
 use crate::whitespace::boundary_split_offset;
+use tsv_lang::store::PoolText;
 use tsv_lang::{Error, Span};
 
 /// Parse attribute selector: `[attr]`, `[attr="value"]`, `[attr^="prefix"]`
@@ -18,10 +19,10 @@ use tsv_lang::{Error, Span};
 /// `[attr |= 'v']` is a name→`<attr-matcher>` gap (allowed — the brackets bound it), and
 /// the two are told apart only by the token after the `|`. So whitespace is skipped there
 /// and **reported**, and the `<wq-name>` reading rejects retroactively.
-pub(crate) fn parse_attribute_selector<'arena>(
-    parser: &mut CssParser<'_, 'arena>,
+pub(crate) fn parse_attribute_selector(
+    parser: &mut CssParser<'_, '_>,
     start: usize,
-) -> Result<SimpleSelector<'arena>, Error> {
+) -> Result<SimpleSelector, Error> {
     parser.expect(TokenKind::LeftBracket)?;
     // `[` is its own `allow_whitespace()` juncture (`read_selector`'s attribute arm skips
     // before the name), so the run belongs to neither the bracket nor the name. Looped with
@@ -219,9 +220,9 @@ fn parse_attribute_matcher_and_value(
 /// `i<NBSP>`. The reader ends the flag at the letters and re-seats past them, so the skip
 /// below steps the run exactly as it steps a run the lexer tokenized on its own. Read from
 /// the RAW token for the same reason: an escaped spelling (`\69`) is no flag to that regex.
-fn parse_attribute_flags<'arena>(
-    parser: &mut CssParser<'_, 'arena>,
-) -> Result<Option<&'arena str>, Error> {
+fn parse_attribute_flags(
+    parser: &mut CssParser<'_, '_>,
+) -> Result<Option<PoolText<CssText>>, Error> {
     if !parser.check(TokenKind::Identifier) {
         return Ok(None);
     }
@@ -234,7 +235,7 @@ fn parse_attribute_flags<'arena>(
     if !(flag.eq_ignore_ascii_case("i") || flag.eq_ignore_ascii_case("s")) {
         return Ok(None);
     }
-    let flag = parser.alloc_str_in(flag);
+    let flag = parser.stores.text.push(flag);
     parser.advance_from(start + letters)?;
     // `read_selector`'s `allow_whitespace()` between the flags and `]`.
     parser.skip_boundary_whitespace_registering_comments()?;

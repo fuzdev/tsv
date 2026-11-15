@@ -18,6 +18,7 @@ use crate::escapes::{ends_with_live_hex_escape, trim_end_preserving_escape, trim
 use crate::parser::value::lists::ValueSeparator;
 use bumpalo::Bump;
 use tsv_lang::Span;
+use tsv_lang::store::flush_run;
 
 // The per-kind parsers the dispatch below calls. Internal to the value parser — like
 // `classify_separators`, none of them is part of the crate's surface.
@@ -59,7 +60,7 @@ use strings::parse_string_literal;
 /// The host offset of the `(` whose function would enter past `room`, the parse
 /// abandoned there.
 #[expect(clippy::too_many_arguments)]
-pub(super) fn parse_value_from_source<'arena>(
+pub(super) fn parse_value_from_source(
     source: &str,
     source_relative_span: Span,
     base_offset: u32,
@@ -67,9 +68,9 @@ pub(super) fn parse_value_from_source<'arena>(
     group_closes_value: bool,
     colon_is_operator: bool,
     room: u32,
-    arena: &'arena Bump,
+    arena: &Bump,
     stores: &mut CssStores,
-) -> Result<CssValue<'arena>, u32> {
+) -> Result<CssValue, u32> {
     let value_str = source_relative_span.extract(source);
     let absolute_start = base_offset + source_relative_span.start;
 
@@ -263,15 +264,15 @@ fn locate_value(value_str: &str) -> Option<(&str, usize)> {
 /// `group_closes_run` is the declaration scan's word that the run's first parenthesized
 /// group closes on its last byte ([`plain_function_parts`]); `false` is "not known".
 #[inline]
-pub(crate) fn parse_single_value<'arena>(
+pub(crate) fn parse_single_value(
     s: &str,
     span: Span,
     colon_is_operator: bool,
     head_welds: bool,
     group_closes_run: bool,
-    arena: &'arena Bump,
+    arena: &Bump,
     stores: &mut CssStores,
-) -> CssValue<'arena> {
+) -> CssValue {
     // A whole-run function under a PLAIN name (`var(--a)`, `rgba(0, 0, 0, 0.5)`,
     // `-webkit-gradient(…)`) is one closed token to the splitter by construction: the name
     // holds no byte that ends a word, and the run ends at the group's own `)`. So it is read
@@ -295,14 +296,14 @@ pub(crate) fn parse_single_value<'arena>(
     // with a number without being one dimension. It answers `None` for a single-token
     // OPERAND run, which is nearly every value, so the leaf path below is untouched.
     if let Some(tokens) = operators::split_value_run(s, colon_is_operator, head_welds, arena) {
-        let mut values = crate::parser::BumpVec::with_capacity_in(tokens.len(), arena);
+        let mark = stores.runs.value_scratch.mark();
         for token in tokens {
             let member = &s[token.start..token.end];
             let member_span = Span {
                 start: span.start + token.start as u32,
                 end: span.start + token.end as u32,
             };
-            values.push(if token.is_operator {
+            let member = if token.is_operator {
                 CssValue::Operator { span: member_span }
             } else {
                 // Every operand is re-classified from scratch, which is what gets the
@@ -313,12 +314,15 @@ pub(crate) fn parse_single_value<'arena>(
                 // `1.5*-` is a whole run of its own here, and a whole-run `-` IS an
                 // operator — see `operators::ValueToken::is_operator`).
                 parse_leaf_value(member, member_span, arena, stores)
-            });
+            };
+            stores.runs.value_scratch.push(member);
         }
-        return CssValue::List {
-            values: values.into_bump_slice(),
-            span,
-        };
+        let values = flush_run(
+            &mut stores.runs.value_scratch,
+            &mut stores.runs.values,
+            mark,
+        );
+        return CssValue::List { values, span };
     }
 
     parse_leaf_value(s, span, arena, stores)
@@ -331,14 +335,9 @@ pub(crate) fn parse_single_value<'arena>(
 /// settled, so it asks nothing about position: a member reaches it straight from the
 /// splitter, and a single-token value reaches it as the whole run. Every classifier
 /// declines an empty `s`, so an empty value is the identifier over its (empty) span.
-fn parse_leaf_value<'arena>(
-    s: &str,
-    span: Span,
-    arena: &'arena Bump,
-    stores: &mut CssStores,
-) -> CssValue<'arena> {
+fn parse_leaf_value(s: &str, span: Span, arena: &Bump, stores: &mut CssStores) -> CssValue {
     // String literal
-    if let Some(val) = parse_string_literal(s, span, arena) {
+    if let Some(val) = parse_string_literal(s, span, stores) {
         return val;
     }
 
@@ -458,15 +457,15 @@ fn plain_function_parts(s: &str, paren_pos: usize, group_closes_run: bool) -> Op
 
 /// The function or colour-function leaf `s` is, given the `name` and `args` its
 /// `(` at `paren_pos` splits it into.
-fn parse_function_leaf<'arena>(
+fn parse_function_leaf(
     s: &str,
     span: Span,
     paren_pos: usize,
     name: &str,
     args: &str,
-    arena: &'arena Bump,
+    arena: &Bump,
     stores: &mut CssStores,
-) -> CssValue<'arena> {
+) -> CssValue {
     // Try color function first
     if let Some(color) = parse_color_function(name, args) {
         return CssValue::Color { color, span };

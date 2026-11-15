@@ -18,19 +18,18 @@ mod stores;
 // The Svelte AST is allocated in a per-parse [`bumpalo::Bump`] supplied by the
 // caller. Recursive children are `&'arena T<'arena>` (not `Box`), child
 // collections are `&'arena [T<'arena>]` (not `Vec`), and decoded / raw strings
-// are `&'arena str` (not `String`) — so the template and the embedded CSS
-// `<style>` AST, which shares the same `Bump`, are one bump-allocated graph,
-// freed wholesale when the `Bump` drops. `Style` holds a `CssStyleSheet<'arena>`
-// borrowing that shared arena. The embedded TypeScript (`<script>`, `{expr}`)
-// lives in the TypeScript half of the document's stores (`SvelteStores`) instead,
-// named here by id; the stores' CSS half is the top-level `<style>`'s.
+// are `&'arena str` (not `String`) — so the template is one bump-allocated graph,
+// freed wholesale when the `Bump` drops. The embedded TypeScript (`<script>`,
+// `{expr}`) lives in the TypeScript half of the document's stores (`SvelteStores`)
+// instead, named here by id, and the top-level `<style>`'s `CssStyleSheet` in the
+// CSS half, its lists and strings named by run and pool text.
 // Leaf nodes that hold only `Span`/primitives carry no lifetime
 // (`HtmlComment`, `Text`, `SvelteOptions`, the `*Tag`-with-no-expression nodes).
 
 use std::borrow::Cow;
 
 pub use stores::{SvelteStores, WarmStores, park_stores, take_stores, with_stores};
-use tsv_css::ast::{CssStyleSheet, CssView};
+use tsv_css::ast::{CssParsedRef, CssStyleSheet, CssView};
 pub use tsv_lang::{Comment, Span};
 use tsv_ts::ast::{
     AstView, ExprId, Expression, Program, Run, TSTypeParameterDeclaration, VariableDeclaration,
@@ -2149,9 +2148,21 @@ pub struct Style<'arena> {
     pub span: Span,         // Full <style>...</style> span
     pub content_span: Span, // Just the CSS text inside the tags
     pub attributes: &'arena [AttributeNode<'arena>],
-    /// Parsed CSS stylesheet (nodes + value comments), bump-allocated in the
-    /// shared document `Bump` (`tsv_css` is arena-native).
-    pub css_stylesheet: CssStyleSheet<'arena>,
+    /// Parsed CSS stylesheet (nodes + value comments), its lists and strings in the CSS
+    /// half of the document's stores.
+    pub css_stylesheet: CssStyleSheet,
+}
+
+impl Style<'_> {
+    /// The stylesheet as a CSS reading entry point takes it, paired with `css`, the view of
+    /// the document's CSS half, which is where its handles resolve.
+    #[inline]
+    pub(crate) fn css_parsed<'a>(&'a self, css: CssView<'a>) -> CssParsedRef<'a> {
+        CssParsedRef {
+            stylesheet: &self.css_stylesheet,
+            view: css,
+        }
+    }
 }
 
 // Widths of the slice-multiplied Svelte AST enums and the tag every attribute value and

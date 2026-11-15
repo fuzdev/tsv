@@ -73,7 +73,7 @@ impl<'a> Printer<'a> {
     /// conformance_prettier_css.md §CSS: Comments). Its items still wrap at the print
     /// width, where prettier leaves a comment-bearing selector as written (the cataloged
     /// print-width divergence, conformance_prettier_css.md §CSS: Selectors).
-    pub(super) fn print_selector_list(&mut self, list: &ast::SelectorList<'_>) {
+    pub(super) fn print_selector_list(&mut self, list: &ast::SelectorList) {
         let selectors = self.view.complex_selectors(list.selectors);
         if selectors.is_empty() {
             return;
@@ -130,7 +130,7 @@ impl<'a> Printer<'a> {
     /// [`Self::build_paren_selector_list_inner`] — the builder `:is()`'s argument uses.
     pub(super) fn print_selector_list_nested(
         &mut self,
-        list: &ast::SelectorList<'_>,
+        list: &ast::SelectorList,
         paren: Span,
         reserve: usize,
     ) {
@@ -168,7 +168,7 @@ impl<'a> Printer<'a> {
     /// are interleaved on each side the two claims did not already print in place.
     pub(super) fn build_paren_selector_list_inner(
         &self,
-        list: &ast::SelectorList<'_>,
+        list: &ast::SelectorList,
         paren: Span,
     ) -> DocId {
         let d = self.d();
@@ -193,7 +193,7 @@ impl<'a> Printer<'a> {
     /// form used inside pseudo arguments and `@scope`. Each selector is a full
     /// complex-selector doc; the group around it (added by the caller) decides
     /// whether the `line`s flatten to `, ` or break one-per-line.
-    fn build_nested_selector_list_doc(&self, list: &ast::SelectorList<'_>) -> DocId {
+    fn build_nested_selector_list_doc(&self, list: &ast::SelectorList) -> DocId {
         self.build_comma_list_doc(self.view.complex_selectors(list.selectors), true)
     }
 
@@ -217,7 +217,7 @@ impl<'a> Printer<'a> {
     /// selectors.
     pub(super) fn build_comma_list_doc(
         &self,
-        selectors: &[ast::ComplexSelector<'_>],
+        selectors: &[ast::ComplexSelector],
         breakable: bool,
     ) -> DocId {
         let d = self.d();
@@ -281,7 +281,7 @@ impl<'a> Printer<'a> {
     /// selector that would overflow once the punctuation lands breaks, while a line a
     /// later break ends (the head before a broken pseudo's argument list) is measured
     /// without it.
-    fn print_complex_selector(&mut self, complex: &ast::ComplexSelector<'_>, suffix: usize) {
+    fn print_complex_selector(&mut self, complex: &ast::ComplexSelector, suffix: usize) {
         let doc = self.build_complex_selector_doc(complex);
         self.write_arena_doc_reserving(doc, suffix);
     }
@@ -296,7 +296,7 @@ impl<'a> Printer<'a> {
     /// combinators and indent continuation lines (and any pseudo args on them) one
     /// level. A single compound needs no group/indent — its only break point is a
     /// pseudo's own arg group, which is self-contained.
-    pub(super) fn build_complex_selector_doc(&self, complex: &ast::ComplexSelector<'_>) -> DocId {
+    pub(super) fn build_complex_selector_doc(&self, complex: &ast::ComplexSelector) -> DocId {
         // A comment at a combinator boundary (between compounds, or glued between two
         // simple selectors of one compound) takes the interleaving path: the comment is
         // re-emitted at its authored position with the surrounding gap whitespace
@@ -447,10 +447,7 @@ impl<'a> Printer<'a> {
     /// A **descendant** combinator's span is the whitespace itself (it ends where the next
     /// compound starts), so it is deliberately not a floor: its gap belongs to the compound
     /// that follows it, whole.
-    fn compound_anchor_floor(
-        rel: &ast::RelativeSelector<'_>,
-        prev_end: Option<u32>,
-    ) -> Option<u32> {
+    fn compound_anchor_floor(rel: &ast::RelativeSelector, prev_end: Option<u32>) -> Option<u32> {
         match (rel.combinator, rel.combinator_span) {
             (Some(c), Some(cs)) if c != ast::Combinator::Descendant => Some(cs.end),
             _ => prev_end,
@@ -473,7 +470,7 @@ impl<'a> Printer<'a> {
     /// can an `Nth` term — `selector_run_edge`). Included in the returned string rather
     /// than left to the two callers, which is what keeps them from disagreeing about it the
     /// way they once disagreed about the run itself.
-    fn pre_comma_boundary_ws(&self, prev: &ast::ComplexSelector<'_>, next_start: u32) -> String {
+    fn pre_comma_boundary_ws(&self, prev: &ast::ComplexSelector, next_start: u32) -> String {
         let prev_end = prev.span.end;
         // An all-ASCII gap can hold no member; settle before the comma scan (see
         // `spell_gap`, whose own guard this mirrors one step earlier — bounds check
@@ -507,7 +504,7 @@ impl<'a> Printer<'a> {
     /// space ahead of the run would be an insertion the author did not write and prettier
     /// does not make (`:is(2n<NBSP>)`). The name predicate alone cannot tell — an An+B ends
     /// in a digit or an `n`, both of which continue a name.
-    fn selector_run_edge(&self, complex: &ast::ComplexSelector<'_>) -> Edge {
+    fn selector_run_edge(&self, complex: &ast::ComplexSelector) -> Edge {
         let ends_in_nth = self
             .view
             .relative_selectors(complex.children)
@@ -523,7 +520,7 @@ impl<'a> Printer<'a> {
 
     /// [`Self::selector_run_edge`] for the run a selector LIST's `)` gap restores: the list's
     /// last selector decides. An empty list has no name to close.
-    fn list_run_edge(&self, list: &ast::SelectorList<'_>) -> Edge {
+    fn list_run_edge(&self, list: &ast::SelectorList) -> Edge {
         self.view
             .complex_selectors(list.selectors)
             .last()
@@ -555,7 +552,7 @@ impl<'a> Printer<'a> {
         &self,
         head: Cow<'v, str>,
         value_span: Span,
-        selectors: &ast::SelectorList<'_>,
+        selectors: &ast::SelectorList,
     ) -> NthOf<'v> {
         let plain = |head| NthOf {
             head,
@@ -626,7 +623,7 @@ impl<'a> Printer<'a> {
     /// simple selector's span (a pseudo's `(...)` args) is NOT a boundary comment and is
     /// left to the normal builder's own normalize path. Drives the verbatim freeze in
     /// `build_complex_selector_doc`.
-    fn complex_has_boundary_comment(&self, complex: &ast::ComplexSelector<'_>) -> bool {
+    fn complex_has_boundary_comment(&self, complex: &ast::ComplexSelector) -> bool {
         // Every gap the loop below probes lies inside the selector's own span, and a
         // comment registers only when it sits fully inside the queried range — so a
         // comment-free selector has no boundary comment. One probe answers that, instead
@@ -656,10 +653,7 @@ impl<'a> Printer<'a> {
     /// glued (no spaces) so a compound never reads as a descendant `.a .b`. The selector
     /// renders inline (explicit spaces, no combinator break points), matching the
     /// comment-bearing selector-list rule that never applies the always-break.
-    fn build_complex_selector_doc_with_comments(
-        &self,
-        complex: &ast::ComplexSelector<'_>,
-    ) -> DocId {
+    fn build_complex_selector_doc_with_comments(&self, complex: &ast::ComplexSelector) -> DocId {
         let d = self.d();
         let mut parts = DocBuf::new();
         let mut prev_end = complex.span.start;
@@ -1395,7 +1389,7 @@ impl<'a> Printer<'a> {
     /// trailing terminator whitespace.
     fn build_simple_selector_doc(
         &self,
-        simple: &ast::SimpleSelector<'_>,
+        simple: &ast::SimpleSelector,
         is_last_in_compound: bool,
     ) -> DocId {
         let d = self.d();
@@ -1542,7 +1536,7 @@ impl<'a> Printer<'a> {
         &self,
         span: Span,
         name_end: u32,
-        args: Option<&ast::PseudoClassArgs<'_>>,
+        args: Option<&ast::PseudoClassArgs>,
         is_last_in_compound: bool,
     ) -> DocId {
         let d = self.d();
@@ -1605,12 +1599,7 @@ impl<'a> Printer<'a> {
     /// `:nth-child(... of S)`) wrap as `group("(" indent(softline join) softline ")")`
     /// — inline when they fit, one-per-line indented when they don't. `::part()` idents
     /// and identifier args never break.
-    #[expect(
-        clippy::explicit_auto_deref,
-        reason = "a view accessor takes a list or string field by value, which a store handle \
-                  needs dereferenced; only the field's identity alias auto-derefs"
-    )]
-    fn build_pseudo_args_doc(&self, args: &ast::PseudoClassArgs<'_>) -> DocId {
+    fn build_pseudo_args_doc(&self, args: &ast::PseudoClassArgs) -> DocId {
         let d = self.d();
         match args {
             ast::PseudoClassArgs::SelectorList { selectors, span } => {
@@ -2048,7 +2037,7 @@ impl<'a> Printer<'a> {
 
 /// Where a selector list's first selector begins — the anchor whose lead gap a container
 /// claims ([`Printer::claim_lead_gap`]).
-pub(super) fn first_anchor(list: &ast::SelectorList<'_>, view: ast::CssView<'_>) -> u32 {
+pub(super) fn first_anchor(list: &ast::SelectorList, view: ast::CssView<'_>) -> u32 {
     view.complex_selectors(list.selectors)
         .first()
         .map_or(list.span.start, |complex| complex.span.start)

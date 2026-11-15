@@ -48,7 +48,7 @@ pub(super) enum ValueOperator {
 
 impl ValueOperator {
     /// The operator this member is, or `None` when the member is an operand.
-    fn of(value: &CssValue<'_>, source: &str) -> Option<Self> {
+    fn of(value: &CssValue, source: &str) -> Option<Self> {
         let CssValue::Operator { span } = value else {
             return None;
         };
@@ -185,7 +185,7 @@ ascii_keyword_set! {
 /// A named or hex colour is one: postcss gives `red` and `#fff` a `value-word` node and
 /// only flags them, where tsv folds the flag into the node kind. An `rgb()` / `hsl()`
 /// colour is a **function** there, so it answers [`is_func_member`] instead.
-fn is_word_member(value: &CssValue<'_>) -> bool {
+fn is_word_member(value: &CssValue) -> bool {
     matches!(
         value,
         CssValue::Identifier { .. }
@@ -203,7 +203,7 @@ fn is_word_member(value: &CssValue<'_>) -> bool {
 /// rides the number node there (`20%`, `5px` are both `value-number`, measured), which is
 /// exactly what tsv's [`CssValue::Dimension`] is, and the `isHex` flag postcss puts on a
 /// word is the [`Color::Hex`] tsv folds into the node kind.
-fn is_number_or_hex_member(value: &CssValue<'_>) -> bool {
+fn is_number_or_hex_member(value: &CssValue) -> bool {
     matches!(
         value,
         CssValue::Dimension { .. }
@@ -219,7 +219,7 @@ fn is_number_or_hex_member(value: &CssValue<'_>) -> bool {
 /// ⚠️ A **nameless** group is not: postcss gives `(1.5)` a `value-paren_group`, a node
 /// neither this nor [`is_word_member`] claims, and the whole of the operator-before-group
 /// rule turns on that. A colour *function* is one, tsv having folded it into `Color`.
-fn is_func_member(value: &CssValue<'_>, source: &str) -> bool {
+fn is_func_member(value: &CssValue, source: &str) -> bool {
     match value {
         CssValue::Function { name_span, .. } => !name_span.extract(source).is_empty(),
         CssValue::Color {
@@ -233,7 +233,7 @@ fn is_func_member(value: &CssValue<'_>, source: &str) -> bool {
 
 /// Could this member stand where a `font` shorthand's font-size does — prettier's
 /// `isPossibleFontSize`, the operand its `/` carve-out keys on?
-fn is_possible_font_size(value: &CssValue<'_>, source: &str) -> bool {
+fn is_possible_font_size(value: &CssValue, source: &str) -> bool {
     match value {
         CssValue::Dimension { .. } => true,
         CssValue::Function { name_span, .. } => {
@@ -251,7 +251,7 @@ fn is_possible_font_size(value: &CssValue<'_>, source: &str) -> bool {
 /// trigger — not an operator, and not a one-byte word, which is what the lone `@` and
 /// the `{` / `}` members are ([`is_word_spelled`])? Any other one-byte identifier
 /// (`a`) answers `false` too and simply takes the full rule.
-fn is_plain_operand(value: &CssValue<'_>) -> bool {
+fn is_plain_operand(value: &CssValue) -> bool {
     match value {
         CssValue::Operator { .. } => false,
         CssValue::Identifier { span } => span.end - span.start != 1,
@@ -262,7 +262,7 @@ fn is_plain_operand(value: &CssValue<'_>) -> bool {
 /// Is this member a word spelled exactly `text` — the `{`, `}` and lone `@` members
 /// the run splitter emits, which postcss also carries as `value-word` nodes keyed on
 /// their text (`isLeftCurlyBraceNode`, `isRightCurlyBraceNode`, the empty `atword`)?
-fn is_word_spelled(value: &CssValue<'_>, source: &str, text: &str) -> bool {
+fn is_word_spelled(value: &CssValue, source: &str, text: &str) -> bool {
     matches!(value, CssValue::Identifier { span } if span.extract(source) == text)
 }
 
@@ -310,7 +310,7 @@ fn operator_glue_merges(op: ValueOperator, next: &str) -> bool {
 /// which is the whole of tsv's divergence at a parenthesized group, whose node prettier
 /// synthesizes without one and therefore can only ever read as "not glued". See
 /// [conformance_prettier_css.md §CSS: Values](../../../../docs/conformance_prettier_css.md#css-values).
-fn authored_glued(prev: &CssValue<'_>, next: &CssValue<'_>) -> bool {
+fn authored_glued(prev: &CssValue, next: &CssValue) -> bool {
     prev.span().end == next.span().start
 }
 
@@ -327,7 +327,7 @@ impl<'a> Printer<'a> {
     /// nothing by it: this printer builds no line-comment text and tags no comment doc
     /// (its comments are recorded where they are written), so a rendered value text only
     /// ever reached the swallow check as content after a `//` this printer cannot emit.
-    pub(super) fn print_css_value(&mut self, value: &CssValue<'_>) {
+    pub(super) fn print_css_value(&mut self, value: &CssValue) {
         let doc = self.build_css_value_doc(value);
         if let Some(span) = self.arena.as_source_span_text(doc) {
             let source = self.source;
@@ -359,7 +359,7 @@ impl<'a> Printer<'a> {
     ///
     /// Alias for `print_css_value` - kept for semantic clarity in call sites.
     #[inline]
-    pub(super) fn print_nested_value(&mut self, value: &CssValue<'_>) {
+    pub(super) fn print_nested_value(&mut self, value: &CssValue) {
         self.print_css_value(value);
     }
 
@@ -393,7 +393,7 @@ impl<'a> Printer<'a> {
     /// Main entry point for value formatting. Dispatches to specialized doc
     /// builders for each value type. Handles source fidelity by extracting
     /// from source where appropriate.
-    pub(super) fn build_css_value_doc(&self, value: &CssValue<'_>) -> DocId {
+    pub(super) fn build_css_value_doc(&self, value: &CssValue) -> DocId {
         self.build_css_value_doc_in(value, self.value_ctx())
     }
 
@@ -411,19 +411,14 @@ impl<'a> Printer<'a> {
     /// ([`ValueCtx`]) — an enclosing `calc()` and the `font`/custom-property carve-out.
     /// Neither is a property of the value, so both ride down the recursion rather than
     /// being re-derived at each level.
-    #[expect(
-        clippy::explicit_auto_deref,
-        reason = "a view accessor takes a list or string field by value, which a store handle \
-                  needs dereferenced; only the field's identity alias auto-derefs"
-    )]
-    pub(super) fn build_css_value_doc_in(&self, value: &CssValue<'_>, ctx: ValueCtx) -> DocId {
+    pub(super) fn build_css_value_doc_in(&self, value: &CssValue, ctx: ValueCtx) -> DocId {
         match value {
             CssValue::Identifier { span } => self.build_identifier_doc(*span),
             // The operator's single byte, verbatim. Whether a space stands beside it is
             // the enclosing list's question, never this node's (`value_gap_is_glued`).
             // The byte is one of `ValueOperator`'s ASCII spellings, so its width is 1.
             CssValue::Operator { span } => self.plain_span_doc(*span),
-            CssValue::String { content, span } => self.build_string_doc(content, *span),
+            CssValue::String { content, span } => self.build_string_doc(*content, *span),
             CssValue::Dimension { span } => self.build_dimension_doc(*span),
             CssValue::Color { color, span } => self.build_color_doc(color, *span),
             CssValue::Function {
@@ -513,7 +508,7 @@ impl<'a> Printer<'a> {
     /// `build_identifier_doc` and the plain-declaration-value path
     /// (`extract_string_value`); the decoded `content` is only the fallback when the
     /// span is unavailable.
-    fn build_string_doc(&self, content: &StringCooked<'_>, span: Span) -> DocId {
+    fn build_string_doc(&self, content: StringCooked, span: Span) -> DocId {
         if span.end_usize() <= self.source.len() {
             let raw = span.extract(self.source);
             // The span covers the full literal including quotes (see
@@ -529,7 +524,7 @@ impl<'a> Printer<'a> {
         // Fallback: span unavailable (never in practice — spans index the printer's
         // source). Re-emit the decoded content; a `Verbatim` value has no recoverable
         // text without its span, so emit nothing (mirrors `build_identifier_doc`).
-        match *content {
+        match content {
             StringCooked::Decoded(s) => self
                 .d()
                 .text_pooled(&format_string_literal(self.view.text(s), '\'')),
@@ -623,15 +618,10 @@ impl<'a> Printer<'a> {
     /// `value/mod.rs::extract_function_parts`), and it takes every rule above unchanged —
     /// the name simply emits nothing. `url` / `var` recognition refuses it on length, so no
     /// arm needs a clause for it.
-    #[expect(
-        clippy::explicit_auto_deref,
-        reason = "a view accessor takes a list or string field by value, which a store handle \
-                  needs dereferenced; only the field's identity alias auto-derefs"
-    )]
     pub(super) fn build_value_function_doc(
         &self,
         name_span: Span,
-        args: &[CssValue<'_>],
+        args: &[CssValue],
         span: Span,
         ctx: ValueCtx,
     ) -> DocId {
@@ -798,11 +788,7 @@ impl<'a> Printer<'a> {
     ///     (100vw - var(--a))
     /// )
     /// ```
-    pub(super) fn build_space_fill_value_doc(
-        &self,
-        values: &[CssValue<'_>],
-        ctx: ValueCtx,
-    ) -> DocId {
+    pub(super) fn build_space_fill_value_doc(&self, values: &[CssValue], ctx: ValueCtx) -> DocId {
         let d = self.d();
         let parts = self.build_space_fill_parts(values, ctx);
         d.group(d.indent(d.fill(&parts)))
@@ -891,7 +877,7 @@ impl<'a> Printer<'a> {
     /// operator ending a line, which reads back as a different run on the next pass.
     fn build_value_member_parts(
         &self,
-        values: &[CssValue<'_>],
+        values: &[CssValue],
         ctx: ValueCtx,
         separator: DocId,
     ) -> DocBuf {
@@ -933,7 +919,7 @@ impl<'a> Printer<'a> {
 
     /// Build a doc for a space-separated value list — the **flat** spelling of
     /// [`Self::build_value_member_parts`].
-    pub(super) fn build_value_list_doc(&self, values: &[CssValue<'_>], ctx: ValueCtx) -> DocId {
+    pub(super) fn build_value_list_doc(&self, values: &[CssValue], ctx: ValueCtx) -> DocId {
         let d = self.d();
         let parts = self.build_value_member_parts(values, ctx, d.text(" "));
         d.concat(&parts)
@@ -943,7 +929,7 @@ impl<'a> Printer<'a> {
     ///
     /// `[val1, line, val2, line, val3]`, suitable for `DocArena::fill`, used by both
     /// declaration wrapping and function-argument wrapping.
-    pub(super) fn build_space_fill_parts(&self, values: &[CssValue<'_>], ctx: ValueCtx) -> DocBuf {
+    pub(super) fn build_space_fill_parts(&self, values: &[CssValue], ctx: ValueCtx) -> DocBuf {
         let d = self.d();
         self.build_value_member_parts(values, ctx, d.line())
     }
@@ -971,12 +957,7 @@ impl<'a> Printer<'a> {
     /// `@`, `{` or `}` there — so a gap between two members that are neither
     /// ([`is_plain_operand`]) takes the separator, and is answered before any of the
     /// arms' source reads. That is most gaps: a value list is mostly operands.
-    pub(super) fn value_gap_is_glued(
-        &self,
-        values: &[CssValue<'_>],
-        i: usize,
-        ctx: ValueCtx,
-    ) -> bool {
+    pub(super) fn value_gap_is_glued(&self, values: &[CssValue], i: usize, ctx: ValueCtx) -> bool {
         if let Some(next) = values.get(i + 1)
             && is_plain_operand(&values[i])
             && is_plain_operand(next)
@@ -992,7 +973,7 @@ impl<'a> Printer<'a> {
 
     /// [`Self::value_gap_is_glued`]'s arms, in prettier's order — the whole rule, which
     /// the gate in front of it answers for a gap no arm can glue.
-    fn value_gap_is_glued_by_rule(&self, values: &[CssValue<'_>], i: usize, ctx: ValueCtx) -> bool {
+    fn value_gap_is_glued_by_rule(&self, values: &[CssValue], i: usize, ctx: ValueCtx) -> bool {
         let source = self.source;
         let current = &values[i];
         let Some(next) = values.get(i + 1) else {
@@ -1066,8 +1047,8 @@ impl<'a> Printer<'a> {
             return true;
         }
 
-        let is_word = |v: Option<&CssValue<'_>>| v.is_some_and(is_word_member);
-        let is_func = |v: Option<&CssValue<'_>>| v.is_some_and(|v| is_func_member(v, source));
+        let is_word = |v: Option<&CssValue>| v.is_some_and(is_word_member);
+        let is_func = |v: Option<&CssValue>| v.is_some_and(|v| is_func_member(v, source));
         let require_space_before = is_func(next_next)
             || is_word(next_next)
             || is_func(Some(current))
@@ -1173,7 +1154,7 @@ impl<'a> Printer<'a> {
     /// (`CssValue::CommaSeparated`), `" "` for the `url()` string-plus-comment region.
     pub(crate) fn build_separated_values_doc(
         &self,
-        values: &[CssValue<'_>],
+        values: &[CssValue],
         sep: &'static str,
     ) -> DocId {
         self.d()

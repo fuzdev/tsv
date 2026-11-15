@@ -20,7 +20,7 @@ use crate::whitespace::Edge;
 
 impl<'a> Printer<'a> {
     /// Format a CSS rule (selector + declarations block)
-    pub(super) fn print_css_rule(&mut self, rule: &ast::CssRule<'_>) {
+    pub(super) fn print_css_rule(&mut self, rule: &ast::CssRule) {
         // Format selector (uses selectors module). A trailing hex-escape terminator
         // (`.\1F600 ` before `{`) is dropped at the selector leaf, so the block
         // separator below can't double it.

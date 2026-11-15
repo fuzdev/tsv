@@ -1303,9 +1303,9 @@ impl fmt::Write for PoolWriter<'_> {
     }
 }
 
-/// Push `row` into its payload store and mint its id: where a payload too rare to sit inline
-/// becomes a row. A free function over the store's field path, so a caller can push while it
-/// holds a disjoint borrow of the other stores.
+/// Push `row` into its store and mint its id: where a node a tree refers to by id becomes a
+/// row. A free function over the store's field path, so a caller can push while it holds a
+/// disjoint borrow of the other stores.
 #[inline]
 pub fn push_row<T: Row + Clone>(store: &mut Store<T>, row: T) -> Id<T::Family> {
     #[cfg(feature = "_internal_ast_census")]
@@ -1314,10 +1314,10 @@ pub fn push_row<T: Row + Clone>(store: &mut Store<T>, row: T) -> Id<T::Family> {
 }
 
 /// Flush the list opened at `mark` on `scratch` into `store` and mint its run: where a list
-/// built by value becomes rows, copied rather than moved a row at a time
-/// (`ListBuf::flush_copy_short`: counted together, most of these lists hold one element). A
-/// free function over the two field paths, as [`push_row`] is, so a caller can flush while it
-/// holds a disjoint borrow of the other stores.
+/// built by value becomes rows, copied as a block rather than moved a row at a time
+/// (`ListBuf::flush_copy_short`, whose one-row frame is stored as a push stores it). A free
+/// function over the two field paths, as [`push_row`] is, so a caller can flush while it holds
+/// a disjoint borrow of the other stores.
 #[inline]
 pub fn flush_run<T: Row + Copy>(
     scratch: &mut ListBuf<T>,
@@ -1331,7 +1331,7 @@ pub fn flush_run<T: Row + Copy>(
 }
 
 /// [`flush_run`] for an element type that is not `Copy`, moved a row at a time
-/// (`ListBuf::flush_move`): the class members, whose method holds its function inline.
+/// (`ListBuf::flush_move`): an element that holds a `Clone`-only node inline.
 #[inline]
 pub fn flush_run_move<T: Row + Clone>(
     scratch: &mut ListBuf<T>,
@@ -1344,10 +1344,9 @@ pub fn flush_run_move<T: Row + Clone>(
     run
 }
 
-/// [`push_row`] for a payload that keeps a span of its own, read by `span_of`: returns that
-/// span, read before the push, beside the id, for the header of the node that wraps the id
-/// (`Statement::from_variable_declaration`). A debug build re-reads the stored row, which
-/// checks only that storing the row kept its span.
+/// [`push_row`] for a row that keeps a span of its own, read by `span_of`: returns that span,
+/// read before the push, beside the id, for the header of the node that wraps the id. A debug
+/// build re-reads the stored row, which checks only that storing the row kept its span.
 #[inline]
 pub fn push_spanned<T: Row + Clone>(
     store: &mut Store<T>,

@@ -1,11 +1,8 @@
 use super::parser::ValueParser;
 use crate::ast::{CssStores, CssValue};
-#[cfg(feature = "_internal_ast_census")]
-use crate::parser::census_vec::BumpVec;
 use bumpalo::Bump;
-#[cfg(not(feature = "_internal_ast_census"))]
-use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::Span;
+use tsv_lang::store::{Run, flush_run};
 
 /// Parse function arguments as comma-separated values
 ///
@@ -18,13 +15,13 @@ use tsv_lang::Span;
 /// * `stores` - The stylesheet's stores, carried beside `arena` into the arguments' parse
 ///
 /// # Returns
-/// Arena-allocated slice of parsed argument values
-pub(crate) fn parse_function_arguments<'arena>(
+/// The run of parsed argument values
+pub(crate) fn parse_function_arguments(
     args_str: &str,
     parent_span: Span,
-    arena: &'arena Bump,
+    arena: &Bump,
     stores: &mut CssStores,
-) -> &'arena [CssValue<'arena>] {
+) -> Run<CssValue> {
     // Strip leading whitespace by offset, then trailing on the remaining slice — one
     // boundary scan per side (vs a `.trim()` plus a separate `.trim_start()`/`.trim_end()`
     // recomputing the same two boundaries). The trailing trim stops at an escaped
@@ -34,7 +31,7 @@ pub(crate) fn parse_function_arguments<'arena>(
     let trimmed = crate::escapes::trim_end_preserving_escape(&args_str[trim_start_offset..]);
 
     if trimmed.is_empty() {
-        return &[];
+        return Run::EMPTY;
     }
 
     // Calculate adjusted span for trimmed args (same logic as parse_value_from_source)
@@ -52,12 +49,16 @@ pub(crate) fn parse_function_arguments<'arena>(
     // Function arguments are comma-separated, so we expect CommaSeparated
     // But if there's only one argument, it might be a single value
     match value {
-        // Already an arena slice — return it directly (zero copy)
+        // Already a run of the stores — return it directly (zero copy)
         CssValue::CommaSeparated { values, .. } => values,
         single => {
-            let mut v = BumpVec::new_in(arena);
-            v.push(single);
-            v.into_bump_slice()
+            let mark = stores.runs.value_scratch.mark();
+            stores.runs.value_scratch.push(single);
+            flush_run(
+                &mut stores.runs.value_scratch,
+                &mut stores.runs.values,
+                mark,
+            )
         }
     }
 }

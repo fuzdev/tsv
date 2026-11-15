@@ -303,7 +303,7 @@ fn starts_with_url_open(s: &str) -> bool {
 /// whitespace preserved, then trimmed). Applied to all source-extracted variants;
 /// `Values` is built from parsed tokens that never contained comments.
 pub(super) fn convert_prelude_to_string<'src>(
-    prelude: &ast::PreludeValue<'_>,
+    prelude: &ast::PreludeValue,
     source: &'src str,
 ) -> Cow<'src, str> {
     match prelude {
@@ -338,7 +338,7 @@ pub(super) fn convert_prelude_to_string<'src>(
 
 /// Check if a complex selector contains Invalid simple selectors (from forgiving parsing)
 pub(super) fn selector_contains_invalid(
-    complex: &ast::ComplexSelector<'_>,
+    complex: &ast::ComplexSelector,
     view: ast::CssView<'_>,
 ) -> bool {
     for relative in view.relative_selectors(complex.children) {

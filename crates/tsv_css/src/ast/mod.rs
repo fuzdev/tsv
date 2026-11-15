@@ -17,10 +17,8 @@ pub use stores::{
 };
 pub use tsv_lang::Comment;
 use tsv_lang::Span;
-pub use view::{
-    ComplexSelectorRun, ConditionPartRun, ConditionSegmentRun, CssBlockChildRun, CssNodeRun,
-    CssParsedRef, CssValueRun, CssView, PoolStr, RelativeSelectorRun, SimpleSelectorRun, SpanRun,
-};
+use tsv_lang::store::{PoolText, Run};
+pub use view::{CssParsedRef, CssView};
 
 /// CSS Stylesheet - top-level container for CSS nodes and comments
 ///
@@ -28,9 +26,9 @@ pub use view::{
 /// This matches the TS/Svelte pattern and enables efficient range queries
 /// using `comments_to_emit_in_range()` from tsv_lang.
 #[derive(Debug, Clone)]
-pub struct CssStyleSheet<'arena> {
+pub struct CssStyleSheet {
     /// CSS nodes (rules, at-rules) - no longer includes Comment variant
-    pub nodes: CssNodeRun<'arena>,
+    pub nodes: Run<CssNode>,
 
     /// Top-level detached comments (between rules), sorted by span.start.
     ///
@@ -46,17 +44,17 @@ pub struct CssStyleSheet<'arena> {
     pub comments: Vec<Comment>,
 }
 
-impl<'arena> CssStyleSheet<'arena> {
+impl CssStyleSheet {
     /// Create a new empty stylesheet
     pub fn new() -> Self {
         Self {
-            nodes: &[],
+            nodes: Run::EMPTY,
             comments: Vec::new(),
         }
     }
 }
 
-impl Default for CssStyleSheet<'_> {
+impl Default for CssStyleSheet {
     fn default() -> Self {
         Self::new()
     }
@@ -66,12 +64,12 @@ impl Default for CssStyleSheet<'_> {
 ///
 /// Comments are stored separately in `CssStyleSheet.comments` and looked up by position.
 #[derive(Debug, Clone)]
-pub enum CssNode<'arena> {
-    Rule(CssRule<'arena>),
-    Atrule(CssAtrule<'arena>), // @media, @keyframes, @supports, etc.
+pub enum CssNode {
+    Rule(CssRule),
+    Atrule(CssAtrule), // @media, @keyframes, @supports, etc.
 }
 
-impl CssNode<'_> {
+impl CssNode {
     pub fn span(&self) -> Span {
         match self {
             CssNode::Rule(rule) => rule.span,
@@ -82,11 +80,11 @@ impl CssNode<'_> {
 
 /// CSS Rule - selector with declaration block
 #[derive(Debug, Clone)]
-pub struct CssRule<'arena> {
-    pub selector: SelectorList<'arena>,
-    pub block_span: Span, // Span of the block including braces
-    pub declarations: CssBlockChildRun<'arena>, // Declarations and comments
-    pub span: Span,       // Full rule span
+pub struct CssRule {
+    pub selector: SelectorList,
+    pub block_span: Span,                 // Span of the block including braces
+    pub declarations: Run<CssBlockChild>, // Declarations and comments
+    pub span: Span,                       // Full rule span
 }
 
 //
@@ -107,24 +105,25 @@ pub struct CssRule<'arena> {
 
 /// Selector list - comma-separated selectors
 #[derive(Debug, Clone, Copy)]
-pub struct SelectorList<'arena> {
-    pub selectors: ComplexSelectorRun<'arena>,
+pub struct SelectorList {
+    pub selectors: Run<ComplexSelector>,
     pub span: Span,
 }
 
 /// Complex selector - one or more relative selectors connected by combinators
-#[derive(Debug, Clone)]
-pub struct ComplexSelector<'arena> {
-    pub children: RelativeSelectorRun<'arena>,
+#[derive(Debug, Clone, Copy)]
+pub struct ComplexSelector {
+    pub children: Run<RelativeSelector>,
     pub span: Span,
 }
 
 /// Relative selector - combinator + simple selectors
-#[derive(Debug, Clone)]
-pub struct RelativeSelector<'arena> {
+#[derive(Debug, Clone, Copy)]
+pub struct RelativeSelector {
     pub combinator: Option<Combinator>,
     pub combinator_span: Option<Span>, // Position of the combinator symbol
-    pub selectors: SimpleSelectorRun<'arena>,
+    /// The compound's simple selectors. Empty for a combinator with no compound after it.
+    pub selectors: Run<SimpleSelector>,
     pub span: Span,
 }
 
@@ -154,8 +153,8 @@ impl Combinator {
 }
 
 /// Simple selector - the atomic units that make up a complex selector
-#[derive(Debug, Clone)]
-pub enum SimpleSelector<'arena> {
+#[derive(Debug, Clone, Copy)]
+pub enum SimpleSelector {
     Type {
         /// Span of the `<ns-prefix>`'s leading token — the `svg` of `svg|rect`, the `*`
         /// of `*|div`, or an EMPTY span at the `|` of `|div` — and `None` for a bare type
@@ -197,7 +196,7 @@ pub enum SimpleSelector<'arena> {
         /// wire and the scoping compiler derive their text via [`attribute_value_text`];
         /// the printer re-quotes from the raw form.
         value_span: Option<Span>,
-        flags: Option<PoolStr<'arena>>, // i (case-insensitive), s (case-sensitive)
+        flags: Option<PoolText<CssText>>, // i (case-insensitive), s (case-sensitive)
         span: Span,
     },
     // Pseudo selectors carry no `name` field: the name is recovered verbatim from `span`
@@ -206,7 +205,7 @@ pub enum SimpleSelector<'arena> {
     // be a redundant copy that, for identity escapes (`:f\oo`), disagrees with the public
     // (Svelte) form anyway.
     PseudoClass {
-        args: Option<PseudoClassArgs<'arena>>,
+        args: Option<PseudoClassArgs>,
         /// End of the name token, from the parser rather than from a scan of `span`.
         /// A functional pseudo's name runs to the `<function-token>`'s `(` — which is
         /// **not** the first `(` in the span, since an identity escape can put one
@@ -216,7 +215,7 @@ pub enum SimpleSelector<'arena> {
         span: Span,
     },
     PseudoElement {
-        args: Option<PseudoClassArgs<'arena>>,
+        args: Option<PseudoClassArgs>,
         /// End of the name token, as [`Self::PseudoClass`]'s.
         name_end: u32,
         span: Span,
@@ -253,7 +252,7 @@ pub enum SimpleSelector<'arena> {
     },
 }
 
-impl SimpleSelector<'_> {
+impl SimpleSelector {
     /// Get the span of this simple selector.
     pub fn span(&self) -> Span {
         match self {
@@ -309,8 +308,8 @@ pub fn attribute_value_text(source: &str, value_span: Span) -> &str {
 ///
 /// Stores semantic data (what the args mean), not output structure.
 /// Conversion layer generates Svelte's wrapper format.
-#[derive(Debug, Clone)]
-pub enum PseudoClassArgs<'arena> {
+#[derive(Debug, Clone, Copy)]
+pub enum PseudoClassArgs {
     /// Nth expression for :nth-child(), :nth-of-type(), :nth-last-child(), :nth-last-of-type()
     ///
     /// Values: "2n + 1", "odd", "even", "3", "-n+6", etc.
@@ -319,8 +318,8 @@ pub enum PseudoClassArgs<'arena> {
     /// covers just the trimmed An+B text, so the printer can find the comments
     /// in the gaps around it (before the An+B, around `of`, after the list)
     Nth {
-        value: PoolStr<'arena>,
-        of_selector: Option<SelectorList<'arena>>,
+        value: PoolText<CssText>,
+        of_selector: Option<SelectorList>,
         span: Span,
         value_span: Span,
     },
@@ -331,10 +330,7 @@ pub enum PseudoClassArgs<'arena> {
     /// Used for logical combinations, relational selectors, and `::slotted()` — whose
     /// spec grammar is `<compound-selector>` but which parseCss parses (and tsv
     /// reproduces) as a lenient `<complex-selector-list>`.
-    SelectorList {
-        selectors: SelectorList<'arena>,
-        span: Span,
-    },
+    SelectorList { selectors: SelectorList, span: Span },
 
     /// Part names for ::part() pseudo-element
     ///
@@ -363,12 +359,12 @@ pub enum PseudoClassArgs<'arena> {
     /// but a plain ident run — must move the projection in the same breath, or the
     /// wire goes wrong rather than merely different.
     Part {
-        ident_spans: SpanRun<'arena>, // One span per space-separated part name
+        ident_spans: Run<Span>, // One span per space-separated part name
         span: Span,
     },
 }
 
-impl PseudoClassArgs<'_> {
+impl PseudoClassArgs {
     /// Get the span of the pseudo-class/pseudo-element arguments
     pub fn span(&self) -> Span {
         match self {
@@ -412,17 +408,17 @@ impl AttributeMatcher {
 /// - `value`: Rich semantic AST for manipulation, formatting, linting
 /// - Source text extracted via span when needed (e.g., for JSON output)
 #[derive(Debug, Clone)]
-pub struct CssDeclaration<'arena> {
+pub struct CssDeclaration {
     /// Property name, **escape-decoded** (spec-canonical `<ident-token>` value, e.g. `\63 olor`
     /// → `color`; CSS Syntax §4.3.11). This is NOT a verbatim slice of `span`, so it is kept as
-    /// an arena string rather than recovered from a span (a span would silently un-decode it).
+    /// pool text rather than recovered from a span (a span would silently un-decode it).
     /// Used internally for the `--`-prefix check, keyword matches (`grid*`), and inline-width
     /// math. The printer's *output* and the public AST both emit the **raw** property text from
     /// source instead (`extract_property_name` / convert), preserving escapes — a documented
     /// Svelte quirk. So decoded(internal) / raw(output+public) is intentional (the
     /// spec-vs-Svelte escape-encoding split).
-    pub property: PoolStr<'arena>,
-    pub value: CssValue<'arena>, // Semantic representation (normalized)
+    pub property: PoolText<CssText>,
+    pub value: CssValue, // Semantic representation (normalized)
     /// End position including !important (span.end excludes it for the formatter).
     /// `None` means no !important. Use `is_important()` for the bool check.
     pub important_end: Option<u32>,
@@ -442,7 +438,7 @@ pub struct CssDeclaration<'arena> {
     pub has_block_comment: bool,
 }
 
-impl CssDeclaration<'_> {
+impl CssDeclaration {
     pub fn is_important(&self) -> bool {
         self.important_end.is_some()
     }
@@ -476,29 +472,13 @@ impl CssDeclaration<'_> {
 ///
 /// `Verbatim` (the common no-escape case) carries **no allocation** — the decoded
 /// value equals the inner source slice (the literal's `span` minus the two quote
-/// bytes). Only strings with escape sequences own arena bytes.
-#[derive(Debug, Clone)]
-pub enum StringCooked<'arena> {
+/// bytes). Only strings with escape sequences own text in the stores' pool.
+#[derive(Debug, Clone, Copy)]
+pub enum StringCooked {
     /// Decoded value == the inner source slice (no escapes to decode).
     Verbatim,
     /// Escapes were decoded into a value distinct from the raw inner text.
-    Decoded(PoolStr<'arena>),
-}
-
-impl<'arena> StringCooked<'arena> {
-    /// The decoded string value. `span` is the owning [`CssValue::String`]'s span
-    /// (the quoted literal); `source` is the host document. `Verbatim` slices the
-    /// inner text (zero-copy); `Decoded` reads the tree's text through `view`.
-    #[inline]
-    pub fn resolve<'s>(&'s self, span: Span, source: &'s str, view: CssView<'s>) -> &'s str {
-        match *self {
-            StringCooked::Verbatim => {
-                let raw = span.extract(source);
-                &raw[1..raw.len() - 1]
-            }
-            StringCooked::Decoded(decoded) => view.text(decoded),
-        }
-    }
+    Decoded(PoolText<CssText>),
 }
 
 /// CSS value - right-hand side of a declaration
@@ -506,8 +486,15 @@ impl<'arena> StringCooked<'arena> {
 /// Internal representation optimized for traversal and manipulation.
 /// Converted to public JSON AST via the convert layer (see ast/convert/mod.rs).
 /// Never serialized directly - serde not needed!
-#[derive(Debug, Clone)]
-pub enum CssValue<'arena> {
+///
+/// `#[repr(u8)]`, with `span` the first field of every variant: the tag is a plain byte at
+/// the front, and every variant's span sits at the same offset behind it, so a `match`
+/// reads the tag with no decode and [`CssValue::span`] is one load. Left to the compiler,
+/// the 4-aligned layout puts the tag in a niche of `Color`'s channels and scatters the span
+/// across five offsets, and every `match` on a value decodes the tag first.
+#[derive(Debug, Clone, Copy)]
+#[repr(u8)]
+pub enum CssValue {
     /// Identifier: auto, bold, inherit, currentColor, etc.
     ///
     /// The text is recovered verbatim from `span` at print time
@@ -523,27 +510,24 @@ pub enum CssValue<'arena> {
     /// first byte of `span` (`source[span.start]`), not stored. `content` carries the
     /// *decoded* value for the defensive span-unavailable fallback only: `Verbatim`
     /// for no-escape strings (zero alloc), `Decoded` when escapes were applied.
-    String {
-        content: StringCooked<'arena>,
-        span: Span,
-    },
+    String { span: Span, content: StringCooked },
 
     /// Number with optional unit: 10, 10px, 1.5em, 50%, etc.
     ///
     /// The variant tag classifies the token as a dimension (vs an identifier) so the
     /// printer applies number normalization; the numeric value and unit text are
     /// recovered verbatim from `span` at print time (`build_dimension_doc`), so they
-    /// are not stored — span-for-verbatim (see the arena string-representation idiom).
+    /// are not stored — span-for-verbatim (see the string-representation idiom).
     Dimension { span: Span },
 
     /// Color - various formats (rgb, hsl, hex, named)
-    Color { color: Color, span: Span },
+    Color { span: Span, color: Color },
 
     /// Function call: calc(), var(), rgb(), url(), etc.
     ///
     /// `name_span` is the **verbatim** span of the text before `(` — span-for-verbatim,
     /// like `Identifier` and `Dimension`, so the author's bytes reach the output
-    /// unchanged and no name is copied into the arena. The value subtree is
+    /// unchanged and no name is copied into the pool. The value subtree is
     /// source-faithful, never re-serialized (see `convert/mod.rs`), which is what lets a
     /// span stand in for the text: an escape-spelled name (`\6c ayer(`) prints as
     /// written rather than decoded, matching prettier. Unlike `CssAtrule.name` /
@@ -552,9 +536,9 @@ pub enum CssValue<'arena> {
     /// Recognition (`url`, `var`) reads the span and decodes only when it holds a `\`
     /// — see `printer::values::function_name_is`.
     Function {
-        name_span: Span,
-        args: CssValueRun<'arena>,
         span: Span,
+        name_span: Span,
+        args: Run<CssValue>,
     },
 
     /// An `@import` prelude's `supports()` call, whose argument is parsed as the
@@ -574,9 +558,9 @@ pub enum CssValue<'arena> {
     /// text because its printer spells the condition rather than the name, and the copy
     /// is an `@import` prelude's alone.
     SupportsCondition {
-        name: PoolStr<'arena>,
-        condition: ConditionQuery<'arena>,
         span: Span,
+        name: PoolText<CssText>,
+        condition: ConditionQuery,
     },
 
     /// A value **operator** token — `/`, `*`, `+`, `-` or `:` — split out of a run by
@@ -592,19 +576,13 @@ pub enum CssValue<'arena> {
     Operator { span: Span },
 
     /// Space-separated list of values
-    List {
-        values: CssValueRun<'arena>,
-        span: Span,
-    },
+    List { span: Span, values: Run<CssValue> },
 
     /// Comma-separated list of values
-    CommaSeparated {
-        values: CssValueRun<'arena>,
-        span: Span,
-    },
+    CommaSeparated { span: Span, values: Run<CssValue> },
 }
 
-impl CssValue<'_> {
+impl CssValue {
     /// Get the span of this value
     pub fn span(&self) -> Span {
         match self {
@@ -689,8 +667,8 @@ impl AngleUnit {
 ///
 /// `Named`/`Hex` carry no text: it is recovered verbatim from the enclosing
 /// `CssValue::Color.span` at print time (span-for-verbatim), so `Color` holds no
-/// arena reference and needs no lifetime.
-#[derive(Debug, Clone)]
+/// text of its own.
+#[derive(Debug, Clone, Copy)]
 pub enum Color {
     /// Named color: red, blue, currentColor, etc.
     Named,
@@ -746,17 +724,14 @@ pub enum Color {
 /// - @media, @container: raw condition strings
 /// - @keyframes: raw animation name
 #[derive(Debug, Clone)]
-pub enum PreludeValue<'arena> {
+pub enum PreludeValue {
     /// Structured values (for @import): a `url()`/string head and `layer`/`supports()`
     /// calls, then the rest of the prelude to its end as one verbatim `Identifier` tail —
     /// the media-query list when the author wrote one, any other value otherwise
     /// (`parse_import_prelude`).
     /// Example: `url('styles.css') layer(base) screen` → [Function(url), Function(layer),
     /// Identifier(screen)]
-    Values {
-        values: CssValueRun<'arena>,
-        span: Span,
-    },
+    Values { values: Run<CssValue>, span: Span },
 
     /// Raw prelude (for `@keyframes`, `@layer`, `@namespace`, `@page`, … — at-rules with
     /// no `property: value` / media-query grammar). `content` is the **printer-facing**
@@ -766,7 +741,7 @@ pub enum PreludeValue<'arena> {
     /// from `span` (source-verbatim), so `content` never feeds the AST.
     /// Example: `@layer` → `a , b`; `@keyframes` → `my-anim`.
     Raw {
-        content: PoolStr<'arena>,
+        content: PoolText<CssText>,
         span: Span,
     },
 
@@ -778,8 +753,8 @@ pub enum PreludeValue<'arena> {
     /// may be empty or hold `Invalid` items — the printer re-emits them verbatim.
     /// Example: `@scope (.card) to (.footer)` → root: Some([.card]), limit: Some([.footer])
     Selectors {
-        root: Option<ScopeClause<'arena>>,
-        limit: Option<ScopeLimit<'arena>>,
+        root: Option<ScopeClause>,
+        limit: Option<ScopeLimit>,
         span: Span,
     },
 
@@ -793,7 +768,7 @@ pub enum PreludeValue<'arena> {
     CustomSelector {
         /// The `:--name` span, from the `:` through the ident.
         name: Span,
-        list: SelectorList<'arena>,
+        list: SelectorList,
         /// The prelude's raw-reader span: first token after the at-rule name to the
         /// `;` / `{` terminator (trailing whitespace included), the same bounds the `Raw`
         /// arm captures, so routing between the two moves no wire byte.
@@ -803,21 +778,20 @@ pub enum PreludeValue<'arena> {
     /// @supports condition (structured for line-width wrapping)
     /// Example: `(display: grid) and (flex: 1)` → parts connected by `and`/`or`
     Supports {
-        condition: ConditionQuery<'arena>,
+        condition: ConditionQuery,
         span: Span,
     },
 
     /// @container query (structured for line-width wrapping)
     /// Example: `sidebar (min-width: 100px) and (max-width: 200px)`
     Container {
-        /// Optional container name (e.g., "sidebar"), **escape-decoded** (spec-canonical
-        /// `<ident-token>`). Printer-only — convert emits the whole prelude from `span`
-        /// (raw), not this field. Kept as an arena string (not a span) because the span
-        /// holds the raw escaped form, which would diverge from the decoded value; same
-        /// category as `CssAtrule.name`.
-        name: Option<PoolStr<'arena>>,
+        /// Optional container name (e.g., "sidebar"), the name token's **source** spelling
+        /// (`\73 idebar` stays escaped): the printer writes it as is and measures the
+        /// prelude's head by its length. Printer-only — convert emits the whole prelude from
+        /// `span` (raw), not this field.
+        name: Option<PoolText<CssText>>,
         /// The condition parts connected by `and`/`or`
-        condition: ConditionQuery<'arena>,
+        condition: ConditionQuery,
         span: Span,
     },
 
@@ -830,7 +804,7 @@ pub enum PreludeValue<'arena> {
     /// Fully structuring preludes (vs. this raw form) is a deferred design option
     /// — see docs/architecture.md § "Red-Green Trees (Deferred)".
     Media {
-        content: PoolStr<'arena>,
+        content: PoolText<CssText>,
         span: Span,
     },
 }
@@ -844,8 +818,8 @@ pub enum PreludeValue<'arena> {
 /// same wrapping `:is()` args use. Wire-ignored (the prelude is extracted from the
 /// `Selectors` `span`, comments stripped).
 #[derive(Debug, Clone)]
-pub struct ScopeClause<'arena> {
-    pub list: SelectorList<'arena>,
+pub struct ScopeClause {
+    pub list: SelectorList,
     /// The clause's full `(…)` span (end one past `)`, the pseudo-arg convention).
     pub paren: Span,
 }
@@ -854,10 +828,10 @@ pub struct ScopeClause<'arena> {
 /// printer can tell a between-clause comment before `to` from an after-`to` one) plus
 /// the limit `ScopeClause`. Present iff the source has a `to` clause.
 #[derive(Debug, Clone)]
-pub struct ScopeLimit<'arena> {
+pub struct ScopeLimit {
     /// The `to` keyword span (a case-insensitive grammar keyword, lowercased at print).
     pub to_span: Span,
-    pub clause: ScopeClause<'arena>,
+    pub clause: ScopeClause,
 }
 
 /// A boolean condition query — the structured prelude shared by `@supports`
@@ -865,10 +839,10 @@ pub struct ScopeLimit<'arena> {
 /// grammars are identical. Structured (rather than raw) so the printer can wrap
 /// at `and`/`or` boundaries, keeping the keyword on the current line and the
 /// condition on the next.
-#[derive(Debug, Clone)]
-pub struct ConditionQuery<'arena> {
+#[derive(Debug, Clone, Copy)]
+pub struct ConditionQuery {
     /// The condition parts connected by `and`/`or`
-    pub parts: ConditionPartRun<'arena>,
+    pub parts: Run<ConditionPart>,
     /// The run of boolean operators the reader consumed but could not bind, with the
     /// comments between them, in source order and source case (`(a: b) /* c */ and`).
     ///
@@ -887,7 +861,7 @@ pub struct ConditionQuery<'arena> {
     /// the operators keep their authored positions (`/* c */ and` and `and /* c */` are
     /// distinct), and it is the query's **span** that makes it whole: the span reaches
     /// past the run, so the wire prelude (`span.extract`) carries it too.
-    pub trailing_operators: Option<PoolStr<'arena>>,
+    pub trailing_operators: Option<PoolText<CssText>>,
 }
 
 /// One piece of a `ConditionPart`'s content.
@@ -905,31 +879,28 @@ pub struct ConditionQuery<'arena> {
 /// production decides whether the *condition* is true, which is not a formatting
 /// question.
 #[derive(Debug, Clone, Copy)]
-pub enum ConditionSegment<'arena> {
+pub enum ConditionSegment {
     /// Normalized condition text (`(display: `, `selector(`, `)`, …).
-    Text(PoolStr<'arena>),
+    Text(PoolText<CssText>),
     /// A `selector()` argument, parsed as the selectors it is, with the function's `(…)` span
     /// (end one past the `)`, the pseudo-argument convention) — the bounds of the gaps between
     /// the parens and the list, where the printer claims a boundary run the parser stepped
     /// (`selector(a <NBSP>)`) as it does in a pseudo-class's argument list.
-    Selectors {
-        list: SelectorList<'arena>,
-        paren: Span,
-    },
+    Selectors { list: SelectorList, paren: Span },
 }
 
 /// A single part of a `ConditionQuery` (one `(prop: val)` term, optionally
 /// `not`-prefixed or function-style like `selector(...)`).
-#[derive(Debug, Clone)]
-pub struct ConditionPart<'arena> {
+#[derive(Debug, Clone, Copy)]
+pub struct ConditionPart {
     /// The run of connectors this part binds to (None for a first part with no leading
     /// connector).
-    pub connector: Option<ConnectorRun<'arena>>,
+    pub connector: Option<ConnectorRun>,
     /// The condition content (e.g., `(display: grid)` or `not (color: red)`) as a
     /// run of segments — one `Text` segment unless the part holds a `selector()`
     /// argument. A leading `not` keeps its source case (preserved like the
     /// connectors).
-    pub segments: ConditionSegmentRun<'arena>,
+    pub segments: Run<ConditionSegment>,
     /// From the part's first token to its last — never over the gap ahead of it, which the
     /// query reader steps (whitespace, a boundary run, comments) before the part begins.
     pub span: Span,
@@ -941,7 +912,7 @@ pub struct ConditionPart<'arena> {
 /// One value because the three are meaningless apart — a kind with no text, or a span for a
 /// run that never landed, are states a part must not be able to hold.
 #[derive(Debug, Clone, Copy)]
-pub struct ConnectorRun<'arena> {
+pub struct ConnectorRun {
     /// The **last** connector of the run, normalized to the `And`/`Or` enum for logic (which
     /// side of it the gap's comments split to).
     pub kind: ConditionConnector,
@@ -958,7 +929,7 @@ pub struct ConnectorRun<'arena> {
     /// gap sweep print it a second time. Comments *outside* the run (before its first word,
     /// after its last) stay registered and are claimed by that sweep, which is what keeps
     /// them on their authored side of the run.
-    pub text: PoolStr<'arena>,
+    pub text: PoolText<CssText>,
     /// From the run's first word to its last: the bound that splits the gap between two
     /// parts into the side before the run and the side after it, each of which the printer
     /// claims on its own.
@@ -972,7 +943,7 @@ pub enum ConditionConnector {
     Or,
 }
 
-impl PreludeValue<'_> {
+impl PreludeValue {
     pub fn span(&self) -> Span {
         match self {
             PreludeValue::Values { span, .. } => *span,
@@ -988,15 +959,15 @@ impl PreludeValue<'_> {
 
 /// At-rule (@media, @keyframes, @supports, @import, @layer, @font-face, etc.)
 #[derive(Debug, Clone)]
-pub struct CssAtrule<'arena> {
+pub struct CssAtrule {
     /// At-rule name without `@` (e.g., "media", "keyframes"), **escape-decoded**
     /// (spec-canonical `<at-keyword-token>`, CSS Syntax §4.3.3 — `@\6d edia` → `"media"`),
     /// the form every at-rule dispatch compares against. The printer emits `name_span`
     /// instead, and the wire writer half-decodes `name_span` the way parseCss does. Kept
-    /// as an arena string, NOT recovered from `span`: the span holds the raw escaped
+    /// as pool text, NOT recovered from `span`: the span holds the raw escaped
     /// bytes, so a span read would silently un-decode the name for every dispatch. Same
     /// category as `CssDeclaration.property` / `Container.name`.
-    pub name: PoolStr<'arena>,
+    pub name: PoolText<CssText>,
 
     /// Source span of the name token (the `<ident>` after `@`, delimiter-excluded).
     /// The **printer** emits the name from this span, not from decoded `name`: an
@@ -1009,15 +980,15 @@ pub struct CssAtrule<'arena> {
     pub name_span: Span,
 
     /// Prelude value (structured for @import, raw string for others)
-    pub prelude: PreludeValue<'arena>,
+    pub prelude: PreludeValue,
 
     /// Block contents (Some for conditional/descriptor, None for statement at-rules)
-    pub block: Option<CssAtruleBlock<'arena>>,
+    pub block: Option<CssAtruleBlock>,
 
     pub span: Span,
 }
 
-impl CssAtrule<'_> {
+impl CssAtrule {
     /// The at-rule's **public-AST prelude** — the exact string Svelte's parser exposes as
     /// `node.prelude` (its `read_value(...).trim()`, block comments elided). Routes through
     /// the wire-JSON prelude reconstruction ([`convert_prelude_to_string`]), the single
@@ -1040,27 +1011,27 @@ impl CssAtrule<'_> {
 
 /// At-rule block - can contain rules, declarations, or nested at-rules
 #[derive(Debug, Clone)]
-pub struct CssAtruleBlock<'arena> {
+pub struct CssAtruleBlock {
     /// Block children - mixture depends on at-rule type
     ///
     /// @media, @supports, @layer: `Vec<CssNode>` (rules + nested at-rules)
     /// @font-face, @page: `Vec<CssDeclaration>` (declarations only)
     ///
     /// We store as `Vec<CssBlockChild>` to support both:
-    pub children: CssBlockChildRun<'arena>,
+    pub children: Run<CssBlockChild>,
     pub span: Span,
 }
 
 /// At-rule block child - can be rule, declaration, or nested at-rule
 #[derive(Debug, Clone)]
-pub enum CssBlockChild<'arena> {
-    Rule(CssRule<'arena>),
-    Declaration(CssDeclaration<'arena>),
-    Atrule(CssAtrule<'arena>),
+pub enum CssBlockChild {
+    Rule(CssRule),
+    Declaration(CssDeclaration),
+    Atrule(CssAtrule),
     Comment(Comment),
 }
 
-impl CssBlockChild<'_> {
+impl CssBlockChild {
     pub fn span(&self) -> Span {
         match self {
             CssBlockChild::Rule(rule) => rule.span,
@@ -1073,16 +1044,23 @@ impl CssBlockChild<'_> {
 
 // The numeric carriers' 64-bit widths are pinned here under `cfg(test)`, where a toolchain that
 // lays a type out differently fails `cargo test`; the wasm32 widths are pinned in `tsv_wasm`.
-// On 64-bit targets `CssValue` is also a dispatch shape: its widest variant, `Color`, fits
-// behind a plain tag only while `ColorChannel`'s number is 4-aligned. A wider `Color` moves
-// the discriminant into the channel tag's niche, and every `match` on a value then decodes
-// it first.
+// `CssValue` is also a dispatch shape: its widest variant, `Color`, fits behind its explicit tag
+// byte only while `ColorChannel`'s number is 4-aligned, and a wider `Color` widens every value.
 #[cfg(all(test, target_pointer_width = "64"))]
 const _: () = assert!(size_of::<ColorChannel>() == 12);
 #[cfg(all(test, target_pointer_width = "64"))]
 const _: () = assert!(size_of::<Color>() == 52);
 #[cfg(all(test, target_pointer_width = "64"))]
-const _: () = assert!(size_of::<CssValue<'static>>() == 64);
+const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<CssValue>() == 64);
+
+// An optional list-bearing node folds its absence into its run's niche: an absent `of S`, an
+// absent block, an absent connector run cost nothing beside a present one.
+#[cfg(test)]
+const _: () = {
+    assert!(size_of::<Option<SelectorList>>() == size_of::<SelectorList>());
+    assert!(size_of::<Option<CssAtruleBlock>>() == size_of::<CssAtruleBlock>());
+    assert!(size_of::<Option<ConnectorRun>>() == size_of::<ConnectorRun>());
+};
 
 #[cfg(test)]
 mod tests {

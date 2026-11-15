@@ -1,6 +1,5 @@
-use crate::ast::{CssValue, StringCooked};
+use crate::ast::{CssStores, CssValue, StringCooked};
 use crate::escapes;
-use bumpalo::Bump;
 use std::borrow::Cow;
 use tsv_lang::Span;
 
@@ -20,11 +19,11 @@ use tsv_lang::Span;
 /// - Conversion: Re-applies Svelte quirks when generating public JSON AST
 ///
 /// This matches TypeScript's architecture and keeps the internal AST clean.
-pub(crate) fn parse_string_literal<'arena>(
+pub(crate) fn parse_string_literal(
     s: &str,
     span: Span,
-    arena: &'arena Bump,
-) -> Option<CssValue<'arena>> {
+    stores: &mut CssStores,
+) -> Option<CssValue> {
     let bytes = s.as_bytes();
     if let Some(&quote) = bytes.first()
         && (quote == b'"' || quote == b'\'')
@@ -34,19 +33,21 @@ pub(crate) fn parse_string_literal<'arena>(
         let raw_content = &s[1..s.len() - 1];
 
         // Decode CSS escape sequences. No-escape strings stay `Verbatim` (zero alloc —
-        // the printer recovers the text from `span`); only escaped strings own arena
-        // bytes. The quote char is recovered from `source[span.start]`, not stored.
-        let content = match escapes::decode_escape_sequences_in(raw_content, arena) {
+        // the printer recovers the text from `span`); only escaped strings own pool
+        // text. The quote char is recovered from `source[span.start]`, not stored.
+        let content = match escapes::decode_escape_sequences_in(raw_content, &mut stores.text) {
             None => StringCooked::Verbatim,
             Some(decoded) => StringCooked::Decoded(decoded),
         };
         debug_assert!(
             match (&content, escapes::decode_escape_sequences(raw_content)) {
                 (StringCooked::Verbatim, Cow::Borrowed(_)) => true,
-                (StringCooked::Decoded(decoded), Cow::Owned(reference)) => **decoded == reference,
+                (StringCooked::Decoded(decoded), Cow::Owned(reference)) => {
+                    stores.text.get(*decoded) == reference
+                }
                 _ => false,
             },
-            "the arena decoder left the reference decoder on {raw_content:?}"
+            "the pool decoder left the reference decoder on {raw_content:?}"
         );
 
         return Some(CssValue::String { content, span });
@@ -84,9 +85,8 @@ fn quoted_string_spans_all(bytes: &[u8]) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{parse_string_literal, quoted_string_spans_all};
-    use crate::ast::{CssValue, StringCooked};
+    use crate::ast::{CssStores, CssValue, StringCooked};
     use crate::escapes::decode_escape_sequences;
-    use bumpalo::Bump;
     use std::borrow::Cow;
     use tsv_lang::Span;
 
@@ -111,20 +111,20 @@ mod tests {
             r"\\",
             r"é\é",
         ];
-        let arena = Bump::new();
+        let mut stores = CssStores::new();
         for body in bodies {
             for quote in ['"', '\''] {
                 let literal = format!("{quote}{body}{quote}");
                 let span = Span::new(0, literal.len() as u32);
                 let Some(CssValue::String { content, .. }) =
-                    parse_string_literal(&literal, span, &arena)
+                    parse_string_literal(&literal, span, &mut stores)
                 else {
                     panic!("{literal:?} is one string");
                 };
                 match (content, decode_escape_sequences(body)) {
                     (StringCooked::Verbatim, Cow::Borrowed(_)) => {}
                     (StringCooked::Decoded(decoded), Cow::Owned(reference)) => {
-                        assert_eq!(decoded, reference, "{literal:?}");
+                        assert_eq!(stores.view().text(decoded), reference, "{literal:?}");
                     }
                     (content, reference) => panic!("{literal:?}: {content:?} vs {reference:?}"),
                 }
@@ -136,7 +136,7 @@ mod tests {
                 ] {
                     let span = Span::new(0, open.len() as u32);
                     assert!(
-                        parse_string_literal(&open, span, &arena).is_none(),
+                        parse_string_literal(&open, span, &mut stores).is_none(),
                         "{open:?} is not one closed string"
                     );
                 }

@@ -27,7 +27,7 @@ struct MultilinePlan<'v> {
     hoisted: Option<Span>,
     /// Element 0's own content members once the hoisted run is cut away. `None` when
     /// nothing was hoisted, and then element 0 prints whole.
-    first_members: Option<&'v [CssValue<'v>]>,
+    first_members: Option<&'v [CssValue]>,
 }
 
 /// How a grid property's multi-row value lays out, decided once — the grid twin of
@@ -41,7 +41,7 @@ struct GridMultirowPlan<'v> {
     /// between them, in source order. Which member opens a row is `grid_row_opens_at`'s
     /// question — the source line read against the value rule's glue — asked again at
     /// emit time.
-    members: &'v [CssValue<'v>],
+    members: &'v [CssValue],
 }
 
 /// Is this comma-list element the **empty** one — the nothing between two top-level
@@ -52,7 +52,7 @@ struct GridMultirowPlan<'v> {
 /// CSS Syntax 3's comma-list algorithm produces a group for it — so it is never dropped;
 /// what it *does* need is a layout rule of its own, since every other break trigger is
 /// phrased in terms of an element holding more than one node and this one holds none.
-pub(super) fn is_empty_element(value: &CssValue<'_>) -> bool {
+pub(super) fn is_empty_element(value: &CssValue) -> bool {
     matches!(value, CssValue::Identifier { span } if span.start >= span.end)
 }
 
@@ -104,11 +104,7 @@ fn peel_leading_comment_run<'s>(words: &mut Vec<&'s str>) -> Vec<&'s str> {
 /// The `<media-query-list>` is the one construct where the deletion *is* correct, because
 /// mediaqueries-4 §Syntax delegates to the split itself; that path has its own reader
 /// (`atrules::media_query_list`) and never comes here.
-pub(super) fn list_has_closing_comma(
-    source: &str,
-    values: &[CssValue<'_>],
-    list_end: usize,
-) -> bool {
+pub(super) fn list_has_closing_comma(source: &str, values: &[CssValue], list_end: usize) -> bool {
     let Some(last) = values.last() else {
         return false;
     };
@@ -135,7 +131,7 @@ fn property_is_font_shorthand(property: &str) -> bool {
 /// (`Printer::declaration_tail`) and the emit (`Printer::write_important_tail`).
 fn for_each_important_tail_piece(
     source: &str,
-    decl: &ast::CssDeclaration<'_>,
+    decl: &ast::CssDeclaration,
     mut emit: impl FnMut(&str),
 ) {
     let bytes = source.as_bytes();
@@ -174,7 +170,7 @@ impl<'a> Printer<'a> {
     /// (`for_each_important_tail_piece`) — so the wrap check counts exactly the bytes
     /// the emit appends. A value carrying `!important` therefore reserves the tail and
     /// wraps when it would overrun the print width, matching prettier.
-    fn declaration_tail(&self, decl: &ast::CssDeclaration<'_>) -> String {
+    fn declaration_tail(&self, decl: &ast::CssDeclaration) -> String {
         let mut out = String::new();
         if decl.is_important() {
             for_each_important_tail_piece(self.source, decl, |piece| out.push_str(piece));
@@ -194,7 +190,7 @@ impl<'a> Printer<'a> {
     /// the flag test and the `;\n` write inline; the tail is written piece by piece into
     /// the output from a cold body, with no intermediate `String`.
     #[inline]
-    fn write_declaration_end(&mut self, decl: &ast::CssDeclaration<'_>) {
+    fn write_declaration_end(&mut self, decl: &ast::CssDeclaration) {
         if decl.is_important() {
             self.write_important_tail(decl);
         }
@@ -204,7 +200,7 @@ impl<'a> Printer<'a> {
     /// [`Self::write_declaration_end`]'s `!important` arm.
     #[cold]
     #[inline(never)]
-    fn write_important_tail(&mut self, decl: &ast::CssDeclaration<'_>) {
+    fn write_important_tail(&mut self, decl: &ast::CssDeclaration) {
         let source = self.source;
         for_each_important_tail_piece(source, decl, |piece| self.write(piece));
     }
@@ -214,7 +210,7 @@ impl<'a> Printer<'a> {
     /// separator already supplies.
     #[cold]
     #[inline(never)]
-    fn write_important_tail_after_separator(&mut self, decl: &ast::CssDeclaration<'_>) {
+    fn write_important_tail_after_separator(&mut self, decl: &ast::CssDeclaration) {
         let source = self.source;
         let mut first = true;
         for_each_important_tail_piece(source, decl, |piece| {
@@ -232,7 +228,7 @@ impl<'a> Printer<'a> {
     /// value's, or the `!important` tail's (the keyword or a comment after it), which the
     /// span stops short of — so the tail is the author's bytes too (`a:!important/* c */`),
     /// and only the `;` is regenerated. Shared by the rule and at-rule block loops.
-    pub(super) fn write_format_ignore_declaration(&mut self, decl: &ast::CssDeclaration<'_>) {
+    pub(super) fn write_format_ignore_declaration(&mut self, decl: &ast::CssDeclaration) {
         let end = match decl.important_end {
             Some(important_end) => {
                 // Past the tail's trivia to the terminator, then back over its whitespace.
@@ -265,7 +261,7 @@ impl<'a> Printer<'a> {
     /// breaks; putting each element on its own line is also the layout that makes an empty
     /// one visible rather than hiding it in a run of commas.
     /// Functions are NOT checked here - they use doc-based wrapping with group/softline.
-    fn any_value_needs_own_line(&self, values: &[CssValue<'_>]) -> bool {
+    fn any_value_needs_own_line(&self, values: &[CssValue]) -> bool {
         values
             .iter()
             .any(|v| matches!(v, CssValue::List { .. }) || is_empty_element(v))
@@ -279,12 +275,7 @@ impl<'a> Printer<'a> {
     /// authoring-dependent on a shape nothing else in CSS honors (`margin:⏎1px 2px`,
     /// `color:⏎red` and `translate(⏎1px,⏎2px)` all collapse), and which no fixture relied
     /// on. Pinned by `comma_separated`'s `unformatted_authored_break` variant.
-    #[expect(
-        clippy::explicit_auto_deref,
-        reason = "a view accessor takes a list or string field by value, which a store handle \
-                  needs dereferenced; only the field's identity alias auto-derefs"
-    )]
-    fn multiline_plan<'v>(&self, decl: &'v ast::CssDeclaration<'v>) -> Option<MultilinePlan<'v>>
+    fn multiline_plan<'v>(&self, decl: &'v ast::CssDeclaration) -> Option<MultilinePlan<'v>>
     where
         'a: 'v,
     {
@@ -333,8 +324,8 @@ impl<'a> Printer<'a> {
     /// is postcss `raws.between` material, not value content.
     fn comma_list_should_break(
         &self,
-        decl: &ast::CssDeclaration<'_>,
-        values: &[CssValue<'_>],
+        decl: &ast::CssDeclaration,
+        values: &[CssValue],
         content_start: Option<u32>,
     ) -> bool {
         if !decl.has_block_comment {
@@ -361,16 +352,11 @@ impl<'a> Printer<'a> {
     ///
     /// Gated on the O(1) `has_block_comment`, so a comment-free comma list — the common
     /// case — never pays the lex.
-    #[expect(
-        clippy::explicit_auto_deref,
-        reason = "a view accessor takes a list or string field by value, which a store handle \
-                  needs dereferenced; only the field's identity alias auto-derefs"
-    )]
     fn hoistable_leading_run<'v>(
         &self,
-        decl: &ast::CssDeclaration<'_>,
-        values: &'v [CssValue<'v>],
-    ) -> Option<(Span, &'v [CssValue<'v>])>
+        decl: &ast::CssDeclaration,
+        values: &'v [CssValue],
+    ) -> Option<(Span, &'v [CssValue])>
     where
         'a: 'v,
     {
@@ -392,9 +378,9 @@ impl<'a> Printer<'a> {
     /// Gated on the O(1) `has_block_comment`, so a comment-free value never pays the lex.
     fn hoistable_leading_run_of<'v>(
         &self,
-        decl: &ast::CssDeclaration<'_>,
-        members: &'v [CssValue<'v>],
-    ) -> Option<(Span, &'v [CssValue<'v>])> {
+        decl: &ast::CssDeclaration,
+        members: &'v [CssValue],
+    ) -> Option<(Span, &'v [CssValue])> {
         if !decl.has_block_comment {
             return None;
         }
@@ -416,10 +402,7 @@ impl<'a> Printer<'a> {
     ///
     /// `None` also covers an all-comment element (no member is at or after
     /// `content_start`), which is the comment-only element 0 case above.
-    fn content_members<'v>(
-        members: &'v [CssValue<'v>],
-        content_start: u32,
-    ) -> Option<&'v [CssValue<'v>]> {
+    fn content_members(members: &[CssValue], content_start: u32) -> Option<&[CssValue]> {
         let kept = members
             .iter()
             .position(|member| member.span().start >= content_start)?;
@@ -448,12 +431,7 @@ impl<'a> Printer<'a> {
     ///
     /// Value comments aren't in the CSS AST, so a comment-bearing list isn't routed
     /// here (the dispatch guard); it stays on the source-extracting comment path.
-    #[expect(
-        clippy::explicit_auto_deref,
-        reason = "a view accessor takes a list or string field by value, which a store handle \
-                  needs dereferenced; only the field's identity alias auto-derefs"
-    )]
-    fn print_decl_value_list(&mut self, decl: &ast::CssDeclaration<'_>) {
+    fn print_decl_value_list(&mut self, decl: &ast::CssDeclaration) {
         debug_assert!(
             matches!(
                 decl.value,
@@ -492,7 +470,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Format a CSS declaration (property: value;)
-    pub(super) fn print_css_declaration(&mut self, decl: &ast::CssDeclaration<'_>) {
+    pub(super) fn print_css_declaration(&mut self, decl: &ast::CssDeclaration) {
         // The `font` / custom-property gap rule is this declaration's, so it is set here
         // and cleared at the end rather than threaded through the value builders. Saved
         // and restored like `in_keyframes`, so a nested context cannot leak it.
@@ -509,12 +487,7 @@ impl<'a> Printer<'a> {
         self.value_scope = was_scope;
     }
 
-    #[expect(
-        clippy::explicit_auto_deref,
-        reason = "a view accessor takes a list or string field by value, which a store handle \
-                  needs dereferenced; only the field's identity alias auto-derefs"
-    )]
-    fn print_css_declaration_in(&mut self, decl: &ast::CssDeclaration<'_>) {
+    fn print_css_declaration_in(&mut self, decl: &ast::CssDeclaration) {
         self.write_indent();
 
         // The block-child juncture's boundary run (`a {<NBSP>color: red }`,
@@ -610,7 +583,7 @@ impl<'a> Printer<'a> {
     /// The comment-free check is a byte compare on the value's first bytes; only a
     /// declaration that both carries a block comment (`has_block_comment`, O(1)) and opens
     /// its value with one pays the run lex.
-    fn progid_opaque_value(&self, decl: &ast::CssDeclaration<'_>) -> Option<(Option<Span>, u32)> {
+    fn progid_opaque_value(&self, decl: &ast::CssDeclaration) -> Option<(Option<Span>, u32)> {
         fn starts_with_progid(text: &str) -> bool {
             text.as_bytes()
                 .get(..7)
@@ -643,7 +616,7 @@ impl<'a> Printer<'a> {
     /// the `;` is the one thing trimmed, as postcss's `raw()` trims it too.
     fn print_decl_progid_opaque(
         &mut self,
-        decl: &ast::CssDeclaration<'_>,
+        decl: &ast::CssDeclaration,
         run: Option<Span>,
         content_start: u32,
     ) {
@@ -692,11 +665,7 @@ impl<'a> Printer<'a> {
 
     /// Print declaration with multiline formatting, per the layout `multiline_plan`
     /// already decided.
-    fn print_decl_multiline<'v>(
-        &mut self,
-        decl: &'v ast::CssDeclaration<'v>,
-        plan: MultilinePlan<'v>,
-    ) {
+    fn print_decl_multiline<'v>(&mut self, decl: &'v ast::CssDeclaration, plan: MultilinePlan<'v>) {
         self.write_broken_value_head(plan.hoisted);
         self.indent_level += 1;
         let ctx = self.value_ctx();
@@ -717,10 +686,10 @@ impl<'a> Printer<'a> {
     /// hex color, a unit's case and a quote answer the same with a comment as without.
     fn print_decl_function(
         &mut self,
-        decl: &ast::CssDeclaration<'_>,
+        decl: &ast::CssDeclaration,
         decl_source: &str,
         name_span: Span,
-        args: &[CssValue<'_>],
+        args: &[CssValue],
         span: Span,
     ) {
         if self.has_value_comments_in_decl(decl) {
@@ -750,10 +719,10 @@ impl<'a> Printer<'a> {
     /// comments in the source's positions — never its number, hex, unit or quote spellings.
     fn print_decl_function_with_comments(
         &mut self,
-        decl: &ast::CssDeclaration<'_>,
+        decl: &ast::CssDeclaration,
         decl_source: &str,
         name_span: Span,
-        args: &[CssValue<'_>],
+        args: &[CssValue],
         span: Span,
     ) {
         // Width check uses the source the emit will produce, comments included, since the
@@ -816,12 +785,7 @@ impl<'a> Printer<'a> {
     /// break-after-the-colon group over a greedy element fill — via
     /// `build_comma_fill_doc_from_text`. The two are told apart by the AST's value kind, not
     /// the text: a comma inside a function's parens is not a list.
-    #[expect(
-        clippy::explicit_auto_deref,
-        reason = "a view accessor takes a list or string field by value, which a store handle \
-                  needs dereferenced; only the field's identity alias auto-derefs"
-    )]
-    fn print_decl_with_comments(&mut self, decl: &ast::CssDeclaration<'_>, decl_source: &str) {
+    fn print_decl_with_comments(&mut self, decl: &ast::CssDeclaration, decl_source: &str) {
         let normalized =
             value_normalization::extract_value_with_comments(decl_source, decl.colon_pos());
         let is_comma_list = matches!(
@@ -899,7 +863,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Print declaration with string value
-    fn print_decl_string(&mut self, decl: &ast::CssDeclaration<'_>, decl_source: &str) {
+    fn print_decl_string(&mut self, decl: &ast::CssDeclaration, decl_source: &str) {
         // The original quote is the first byte of the string value's span (recovered
         // from source, not stored).
         let quote = self.source.as_bytes()[decl.value.span().start_usize()] as char;
@@ -926,14 +890,14 @@ impl<'a> Printer<'a> {
     /// value-kind flip (see `tests/css_property_comment_colon_idempotent.rs`).
     fn property_colon_needs_leading_space(
         &self,
-        decl: &ast::CssDeclaration<'_>,
+        decl: &ast::CssDeclaration,
         property: &str,
     ) -> bool {
         decl.has_block_comment && property.contains("/*")
     }
 
     /// Print declaration with default formatting
-    fn print_decl_default(&mut self, decl: &ast::CssDeclaration<'_>) {
+    fn print_decl_default(&mut self, decl: &ast::CssDeclaration) {
         // The property→colon separator's leading space (for a comment-bearing property)
         // is emitted once in `print_css_declaration`; every path writes the bare `: `.
         self.write(": ");
@@ -979,15 +943,7 @@ impl<'a> Printer<'a> {
     /// `comment_is_element`), so the rows are readable from the AST plus source
     /// positions, and the emitter prints them through the same leaf printers the
     /// comment-free value uses — no text path, and nothing to keep in step with one.
-    #[expect(
-        clippy::explicit_auto_deref,
-        reason = "a view accessor takes a list or string field by value, which a store handle \
-                  needs dereferenced; only the field's identity alias auto-derefs"
-    )]
-    fn grid_multirow_plan<'v>(
-        &self,
-        decl: &'v ast::CssDeclaration<'v>,
-    ) -> Option<GridMultirowPlan<'v>>
+    fn grid_multirow_plan<'v>(&self, decl: &'v ast::CssDeclaration) -> Option<GridMultirowPlan<'v>>
     where
         'a: 'v,
     {
@@ -1033,7 +989,7 @@ impl<'a> Printer<'a> {
     /// escaped newline does not advance prettier's count either, but the scan here does not
     /// step over it. That cell is already a different divergence — tsv expands a function
     /// holding such a string on every property — so the row read is not what decides it.
-    fn grid_row_breaks_before(&self, prev: &CssValue<'_>, next: &CssValue<'_>) -> bool {
+    fn grid_row_breaks_before(&self, prev: &CssValue, next: &CssValue) -> bool {
         let from = if matches!(prev, CssValue::String { .. }) {
             prev.span().end_usize()
         } else {
@@ -1055,7 +1011,7 @@ impl<'a> Printer<'a> {
     /// own: its interior newline ends the row whatever is glued behind it, where
     /// prettier's operator arm keeps the run on the comment's last line
     /// (`/* c⏎d */-[y]`).
-    fn grid_row_opens_at(&self, members: &[CssValue<'_>], i: usize, ctx: ValueCtx) -> bool {
+    fn grid_row_opens_at(&self, members: &[CssValue], i: usize, ctx: ValueCtx) -> bool {
         let (prev, next) = (&members[i - 1], &members[i]);
         if !self.grid_row_breaks_before(prev, next) {
             return false;
@@ -1082,7 +1038,7 @@ impl<'a> Printer<'a> {
     /// `grid_row_opens_at`'s, the question the plan asked.
     fn print_decl_grid_multirow<'v>(
         &mut self,
-        decl: &'v ast::CssDeclaration<'v>,
+        decl: &'v ast::CssDeclaration,
         plan: GridMultirowPlan<'v>,
     ) {
         self.write_broken_value_head(plan.hoisted);
@@ -1133,15 +1089,10 @@ impl<'a> Printer<'a> {
     /// one-per-line and greedy packing. A list that does *not* break is not routed here at
     /// all: it takes `print_decl_value_list`'s self-deciding doc (or, with comments,
     /// `print_decl_with_comments`), which does its own width-based wrapping.
-    #[expect(
-        clippy::explicit_auto_deref,
-        reason = "a view accessor takes a list or string field by value, which a store handle \
-                  needs dereferenced; only the field's identity alias auto-derefs"
-    )]
     fn print_css_value_multiline<'v>(
         &mut self,
-        value: &'v CssValue<'v>,
-        first_members: Option<&'v [CssValue<'v>]>,
+        value: &'v CssValue,
+        first_members: Option<&'v [CssValue]>,
         ctx: ValueCtx,
     ) {
         debug_assert!(
@@ -1218,17 +1169,7 @@ impl<'a> Printer<'a> {
     ///
     /// The bare fill: the `;` reserve and the break-after-the-colon group are the caller's
     /// (`build_broken_head_value_decl_doc`).
-    #[expect(
-        clippy::explicit_auto_deref,
-        reason = "a view accessor takes a list or string field by value, which a store handle \
-                  needs dereferenced; only the field's identity alias auto-derefs"
-    )]
-    fn build_comma_fill_doc(
-        &self,
-        values: &[CssValue<'_>],
-        list_end: usize,
-        ctx: ValueCtx,
-    ) -> DocId {
+    fn build_comma_fill_doc(&self, values: &[CssValue], list_end: usize, ctx: ValueCtx) -> DocId {
         let d = self.d();
         let mut parts = DocBuf::new();
         for (i, val) in values.iter().enumerate() {
@@ -1321,7 +1262,7 @@ impl<'a> Printer<'a> {
     ///
     /// Used when a function has comments in its arguments and needs wrapping.
     /// Extracts each argument from the source string to preserve comments.
-    fn print_function_args_from_source(&mut self, span: Span, args: &[CssValue<'_>]) {
+    fn print_function_args_from_source(&mut self, span: Span, args: &[CssValue]) {
         // Extract function args content from the function's OWN span, or fall back to
         // semantic printing — lossy, so asserted unreachable: a parsed function's span is in
         // bounds and holds its `(`, and neither the fixtures, the injection audits nor the
@@ -1480,7 +1421,7 @@ impl<'a> Printer<'a> {
     /// always holds its `(`. It exists so an impossible state degrades instead of
     /// panicking; if a shape ever *does* reach it, the fix is to make the slice total, not
     /// to improve this.
-    fn print_function_args_semantic(&mut self, args: &[CssValue<'_>]) {
+    fn print_function_args_semantic(&mut self, args: &[CssValue]) {
         for (i, arg) in args.iter().enumerate() {
             self.write_indent();
             self.print_nested_value(arg);

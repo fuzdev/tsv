@@ -3,6 +3,7 @@ use crate::ast::*;
 use crate::lexer::TokenKind;
 use crate::parser::selectors::{parse_complex_selector_list, parse_forgiving_selector_list};
 use crate::whitespace::{Comments, Edge, holds_boundary_member, spell_run};
+use tsv_lang::store::{PoolText, Run, flush_run};
 use tsv_lang::{Error, Span};
 
 /// Whether the current token is a CSS `<function-token>` — an identifier
@@ -48,13 +49,16 @@ fn at_selector_function(parser: &CssParser<'_, '_>) -> bool {
 /// returned `Ok`: `parse_complex_selector` stops at the first token it cannot
 /// continue with rather than erroring, so `Ok` alone would also accept a selector
 /// followed by garbage.
-fn parse_selector_argument<'arena>(
-    parser: &mut CssParser<'_, 'arena>,
+fn parse_selector_argument(
+    parser: &mut CssParser<'_, '_>,
     arg_start: usize,
     comments_len: usize,
-) -> Result<Option<SelectorList<'arena>>, Error> {
+) -> Result<Option<SelectorList>, Error> {
     #[cfg(feature = "_internal_ast_census")]
     let ast_census_mark = tsv_lang::ast_census_probe::mark();
+    // A failed list leaves the frames it opened on the scratch stacks, above the part's own
+    // and the query's, so the rewind takes every stack back to here.
+    let scratch_marks = parser.stores.scratch_marks();
     match parse_complex_selector_list(parser) {
         Ok(list) if parser.check(TokenKind::RightParen) => return Ok(Some(list)),
         // a depth limit is no verdict on the argument (see `parse_forgiving_selector_list`)
@@ -63,6 +67,7 @@ fn parse_selector_argument<'arena>(
     }
     #[cfg(feature = "_internal_ast_census")]
     tsv_lang::ast_census_probe::rewind(ast_census_mark);
+    parser.stores.truncate_scratch(&scratch_marks);
     parser.rewind_to(arg_start, comments_len)?;
     Ok(None)
 }
@@ -384,16 +389,16 @@ pub(super) enum ConditionReader {
 /// - `(display: grid) and (flex: 1)` - conjunction
 /// - `not (color: red)` - negation
 /// - `(a) and (b) or (c)` - mixed (parsed left-to-right)
-pub(super) fn parse_condition_query<'arena>(
-    parser: &mut CssParser<'_, 'arena>,
+pub(super) fn parse_condition_query(
+    parser: &mut CssParser<'_, '_>,
     reader: ConditionReader,
-) -> Result<(ConditionQuery<'arena>, Span), Error> {
+) -> Result<(ConditionQuery, Span), Error> {
     // The prelude's head, when it opens on a boundary run: stepped before the span begins,
     // like the ASCII whitespace the at-rule already stepped, so the span starts where the
     // canonical (trimmed) prelude does. The printer claims the run from the name's end.
     parser.skip_boundary_whitespace()?;
     let start = parser.base_offset() + parser.current_start();
-    let mut parts = parser.bvec();
+    let mark = parser.stores.runs.condition_part_scratch.mark();
     let mut current_connector: Option<ConditionConnector> = None;
     let mut end_pos = start;
     // What the loop has consumed since the last part — the connector run a part binds
@@ -452,7 +457,7 @@ pub(super) fn parse_condition_query<'arena>(
                 .zip(run.connector_run())
                 .map(|(kind, (text, span))| ConnectorRun {
                     kind,
-                    text: parser.alloc_str_in(text),
+                    text: parser.stores.text.push(text),
                     span,
                 });
         let part_start = parser.span_pos(parser.current_start());
@@ -461,7 +466,7 @@ pub(super) fn parse_condition_query<'arena>(
                 end_pos = end;
                 run.bind(parser.comments.len());
                 if let Some(part) = part {
-                    parts.push(part);
+                    parser.stores.runs.condition_part_scratch.push(part);
                 }
             }
             // Not a valid condition part, so the query ends here; the caller reports
@@ -476,7 +481,7 @@ pub(super) fn parse_condition_query<'arena>(
                         end: end as u32,
                     };
                     if let Some(comments_len) =
-                        run.push_operator(consumed, parser.comments.len(), source)
+                        run.push_operator(&consumed, parser.comments.len(), source)
                     {
                         parser.comments.truncate(comments_len);
                     }
@@ -496,7 +501,7 @@ pub(super) fn parse_condition_query<'arena>(
     let trailing_operators = run.finish().map(|(text, comments_len, source_end)| {
         parser.comments.truncate(comments_len);
         end_pos = end_pos.max(source_end as usize);
-        parser.alloc_str_in(text)
+        parser.stores.text.push(text)
     });
 
     let span = Span {
@@ -504,9 +509,14 @@ pub(super) fn parse_condition_query<'arena>(
         end: end_pos as u32,
     };
 
+    let parts = flush_run(
+        &mut parser.stores.runs.condition_part_scratch,
+        &mut parser.stores.runs.condition_parts,
+        mark,
+    );
     Ok((
         ConditionQuery {
-            parts: parts.into_bump_slice(),
+            parts,
             trailing_operators,
         },
         span,
@@ -514,12 +524,12 @@ pub(super) fn parse_condition_query<'arena>(
 }
 
 /// What one `parse_condition_part` call produced.
-enum ConditionPartOutcome<'arena> {
+enum ConditionPartOutcome {
     /// A parsed part — `None` when its content came out empty, which records nothing
     /// but has still consumed tokens. `end` is the widened end position; `closed` is
     /// false only when the content ran to end-of-input without the part's own `)`.
     Parsed {
-        part: Option<ConditionPart<'arena>>,
+        part: Option<ConditionPart>,
         end: usize,
         closed: bool,
     },
@@ -528,7 +538,7 @@ enum ConditionPartOutcome<'arena> {
     /// consumes before it can tell, and content the query owes back rather than drops;
     /// `None` on the ordinary path, where nothing was consumed. `end` is the widened end.
     NotAPart {
-        consumed: Option<&'arena str>,
+        consumed: Option<String>,
         end: usize,
     },
 }
@@ -540,12 +550,12 @@ enum ConditionPartOutcome<'arena> {
 ///
 /// `end_pos` is the query's end position so far, widened by the part and handed back
 /// in the outcome.
-fn parse_condition_part<'arena>(
-    parser: &mut CssParser<'_, 'arena>,
-    connector: Option<ConnectorRun<'arena>>,
+fn parse_condition_part(
+    parser: &mut CssParser<'_, '_>,
+    connector: Option<ConnectorRun>,
     mut end_pos: usize,
     reader: ConditionReader,
-) -> Result<ConditionPartOutcome<'arena>, Error> {
+) -> Result<ConditionPartOutcome, Error> {
     let part_start = parser.span_pos(parser.current_start());
     // One growable buffer instead of a `Vec<String>` of per-token / per-space pieces
     // joined at the end (mirrors `parse_raw_prelude_content` and
@@ -554,10 +564,6 @@ fn parse_condition_part<'arena>(
     // collapse unit) so `truncate` strips exactly those, never a token's own
     // escape-terminator space — the old `Vec` "last part is `\" \"`" test, exactly.
     let mut part_buf = String::new();
-    // The part's content. Everything lands in `part_buf` and flushes to one `Text`
-    // segment, except a `selector()` argument, which is parsed as a selector and
-    // rides its own segment for the printer to hand to the selector printer.
-    let mut segments = parser.bvec();
     let mut trailing_spaces: usize = 0;
     let mut paren_depth: usize = 0;
     // `Some(depth)` while inside a `selector()` argument the selector parse
@@ -634,14 +640,24 @@ fn parse_condition_part<'arena>(
         // as the operator-with-no-operand it is, rather than being dropped with the
         // buffer.
         let consumed = (!part_buf.is_empty()).then(|| {
-            parser
-                .alloc_str_in(part_buf.trim_end_matches(crate::whitespace::is_boundary_whitespace))
+            let trimmed = part_buf
+                .trim_end_matches(crate::whitespace::is_boundary_whitespace)
+                .len();
+            part_buf.truncate(trimmed);
+            part_buf
         });
         return Ok(ConditionPartOutcome::NotAPart {
             consumed,
             end: end_pos,
         });
     }
+
+    // The part's content. Everything lands in `part_buf` and flushes to one `Text`
+    // segment, except a `selector()` argument, which is parsed as a selector and
+    // rides its own segment for the printer to hand to the selector printer.
+    let mark = parser.stores.runs.condition_segment_scratch.mark();
+    // Whether every segment so far is empty text — the part records nothing then.
+    let mut all_empty = true;
 
     // Whether the part's own closing `)` was reached. False means the content ran
     // to end-of-input unterminated, which only the `supports()` caller cares about
@@ -674,14 +690,29 @@ fn parse_condition_part<'arena>(
             let comments_len = parser.comments.len();
             if let Some(list) = parse_selector_argument(parser, arg_start, comments_len)? {
                 if !part_buf.is_empty() {
-                    segments.push(ConditionSegment::Text(parser.alloc_str_in(&part_buf)));
+                    // Never the part's last segment — the selectors and their `)` follow —
+                    // but its first when nothing precedes it, whose start is trimmed (see
+                    // the part's last segment, below).
+                    let first = parser.stores.runs.condition_segment_scratch.len_since(mark) == 0;
+                    let text = if first {
+                        part_buf.trim_start_matches(crate::whitespace::is_boundary_whitespace)
+                    } else {
+                        &part_buf
+                    };
+                    let text = ConditionSegment::Text(parser.stores.text.push(text));
+                    parser.stores.runs.condition_segment_scratch.push(text);
                     part_buf.clear();
                 }
+                all_empty = false;
                 let paren = Span {
                     start: paren_start,
                     end: parser.span_pos(parser.current_end()),
                 };
-                segments.push(ConditionSegment::Selectors { list, paren });
+                parser
+                    .stores
+                    .runs
+                    .condition_segment_scratch
+                    .push(ConditionSegment::Selectors { list, paren });
                 // Seated on the closing `)`; the `(` it matches was consumed above,
                 // so the two cancel and `paren_depth` never saw either.
                 part_buf.push(')');
@@ -904,26 +935,41 @@ fn parse_condition_part<'arena>(
     // run on every pass. Same lesson as the declaration's property→colon trim
     // (`trim_property_part`) — a printer-facing trim beside a boundary claim owes the claim's
     // class.
+    //
+    // A pool text cannot be narrowed once written, so each segment is trimmed before its
+    // push: the part's first at its start (here, or above when a selector follows it), and
+    // its last — this one, which every part holding a selector segment ends on, its `)` —
+    // at its end.
     if !part_buf.is_empty() {
-        segments.push(ConditionSegment::Text(parser.alloc_str_in(&part_buf)));
+        let mut text = part_buf.trim_end_matches(crate::whitespace::is_boundary_whitespace);
+        if parser.stores.runs.condition_segment_scratch.len_since(mark) == 0 {
+            text = text.trim_start_matches(crate::whitespace::is_boundary_whitespace);
+        }
+        all_empty &= text.is_empty();
+        let text = ConditionSegment::Text(parser.stores.text.push(text));
+        parser.stores.runs.condition_segment_scratch.push(text);
     }
-    if let Some(ConditionSegment::Text(first)) = segments.first_mut() {
-        *first = first.trim_start_matches(crate::whitespace::is_boundary_whitespace);
-    }
-    if let Some(ConditionSegment::Text(last)) = segments.last_mut() {
-        *last = last.trim_end_matches(crate::whitespace::is_boundary_whitespace);
-    }
-    let is_empty = segments
-        .iter()
-        .all(|segment| matches!(segment, ConditionSegment::Text(text) if text.is_empty()));
-    let part = (!is_empty).then(|| ConditionPart {
-        connector,
-        segments: segments.into_bump_slice(),
-        span: Span {
-            start: part_start,
-            end: end_pos as u32,
-        },
-    });
+    let part = if all_empty {
+        // A part reaches here only past its `(`, which lands in its text, so it is never
+        // empty; were it, its segments would stay on the scratch stack under whatever the
+        // query pushes next, so they are discarded rather than left open.
+        parser.stores.runs.condition_segment_scratch.truncate(mark);
+        None
+    } else {
+        let segments = flush_run(
+            &mut parser.stores.runs.condition_segment_scratch,
+            &mut parser.stores.runs.condition_segments,
+            mark,
+        );
+        Some(ConditionPart {
+            connector,
+            segments,
+            span: Span {
+                start: part_start,
+                end: end_pos as u32,
+            },
+        })
+    };
 
     Ok(ConditionPartOutcome::Parsed {
         part,
@@ -950,9 +996,9 @@ fn parse_condition_part<'arena>(
 /// Returns with the parser just past the matching `)`, or `None` when the argument is
 /// not a parenthesized part or never closed — the caller reports the unterminated
 /// function.
-pub(super) fn parse_supports_function_condition<'arena>(
-    parser: &mut CssParser<'_, 'arena>,
-) -> Result<Option<(ConditionQuery<'arena>, Span)>, Error> {
+pub(super) fn parse_supports_function_condition(
+    parser: &mut CssParser<'_, '_>,
+) -> Result<Option<(ConditionQuery, Span)>, Error> {
     let start = parser.base_offset() + parser.current_start();
     let ConditionPartOutcome::Parsed {
         part,
@@ -963,16 +1009,21 @@ pub(super) fn parse_supports_function_condition<'arena>(
         return Ok(None);
     };
 
-    let mut parts = parser.bvec();
+    let mark = parser.stores.runs.condition_part_scratch.mark();
     if let Some(part) = part {
-        parts.push(part);
+        parser.stores.runs.condition_part_scratch.push(part);
     }
+    let parts = flush_run(
+        &mut parser.stores.runs.condition_part_scratch,
+        &mut parser.stores.runs.condition_parts,
+        mark,
+    );
     Ok(Some((
         ConditionQuery {
             // The query loop never runs here, so nothing can go unbound: the one part is
             // the function's parenthesized argument, and an operator inside it is the
             // part's own text.
-            parts: parts.into_bump_slice(),
+            parts,
             trailing_operators: None,
         },
         Span {
@@ -992,9 +1043,9 @@ pub(super) fn parse_supports_function_condition<'arena>(
 /// - `(min-width: 100px) and (max-width: 200px)` - no name, conjunction
 /// - `sidebar (min-width: 100px)` - named container
 /// - `sidebar (min-width: 100px) and (max-width: 200px)` - named container with conjunction
-pub(super) fn parse_container_prelude<'arena>(
-    parser: &mut CssParser<'_, 'arena>,
-) -> Result<(Option<&'arena str>, ConditionQuery<'arena>, Span), Error> {
+pub(super) fn parse_container_prelude(
+    parser: &mut CssParser<'_, '_>,
+) -> Result<(Option<PoolText<CssText>>, ConditionQuery, Span), Error> {
     // A boundary run at the prelude's head is stepped before the name is read — it is no
     // name (`@container <NBSP> x (…)`) — and before the span begins, so the span opens on the
     // name, where the printer reads it from (`prelude.start + name.len()`). The printer claims
@@ -1011,8 +1062,8 @@ pub(super) fn parse_container_prelude<'arena>(
         && !is_function_token(parser)
         && !is_boolean_operator_keyword(parser.current_identifier())
     {
-        // Copy into the arena only on the path that stores the name as a node.
-        let name = parser.alloc_str_in(parser.current_value());
+        // Pushed into the pool only on the path that stores the name as a node.
+        let name = parser.push_current_value();
         parser.advance()?;
         // The name→condition gap is the query's first gap, so it steps the boundary class
         // too (`skip_gap_registering_comments`); the printer claims the run from the name.
@@ -1044,10 +1095,7 @@ pub(super) fn parse_container_prelude<'arena>(
 /// or invalid list — `@scope ()`, `@scope (.a, , .b)`, `@scope (.)` — parses (each is
 /// kept verbatim), matching parseCss (which captures the prelude raw) and prettier.
 /// `what` names the clause for the unterminated-`)` error.
-fn parse_scope_clause<'arena>(
-    parser: &mut CssParser<'_, 'arena>,
-    what: &str,
-) -> Result<ScopeClause<'arena>, Error> {
+fn parse_scope_clause(parser: &mut CssParser<'_, '_>, what: &str) -> Result<ScopeClause, Error> {
     let paren_start = parser.span_pos(parser.current_start());
     parser.advance()?; // consume '('
     // Both gaps inside the parens step the boundary class (the list's own start and its
@@ -1086,9 +1134,7 @@ fn parse_scope_clause<'arena>(
 /// The span covers the authored prelude (first clause start to last `)`); when both
 /// clauses are absent it is a zero-width span at the cursor, so the public AST's
 /// `prelude` string extracts to `""` (matching parseCss).
-pub(super) fn parse_scope_prelude<'arena>(
-    parser: &mut CssParser<'_, 'arena>,
-) -> Result<PreludeValue<'arena>, Error> {
+pub(super) fn parse_scope_prelude(parser: &mut CssParser<'_, '_>) -> Result<PreludeValue, Error> {
     // Leading gap comments (`@scope /* c */ …`) register here: the shared at-rule
     // name skip in `parse_atrule` is a plain skip that stops at a comment, so a leading
     // comment is the current token on entry. Capturing `start` *after* this keeps it out
@@ -1190,14 +1236,17 @@ fn scope_to_keyword_len(parser: &CssParser<'_, '_>) -> Option<usize> {
 /// with no name, or a list the strict parser rejects is kept verbatim. The span is the
 /// raw reader's in both arms — first token to the terminator — so the wire prelude is the
 /// same bytes either way.
-pub(super) fn parse_custom_selector_prelude<'arena>(
-    parser: &mut CssParser<'_, 'arena>,
-) -> Result<PreludeValue<'arena>, Error> {
+pub(super) fn parse_custom_selector_prelude(
+    parser: &mut CssParser<'_, '_>,
+) -> Result<PreludeValue, Error> {
     // The raw offset the replay restarts from, and the registrations it discards.
     let prelude_start_raw = parser.current_start();
     let comments_len = parser.comments.len();
     #[cfg(feature = "_internal_ast_census")]
     let ast_census_mark = tsv_lang::ast_census_probe::mark();
+    // A list the selector parser rejects leaves the frames it opened on the scratch stacks,
+    // so the replay rewinds every stack to here first.
+    let scratch_marks = parser.stores.scratch_marks();
     let span_start = parser.span_pos(prelude_start_raw);
 
     if let Some((name, list)) = parse_custom_selector_head_and_list(parser)? {
@@ -1216,6 +1265,7 @@ pub(super) fn parse_custom_selector_prelude<'arena>(
 
     #[cfg(feature = "_internal_ast_census")]
     tsv_lang::ast_census_probe::rewind(ast_census_mark);
+    parser.stores.truncate_scratch(&scratch_marks);
     parser.rewind_to(prelude_start_raw, comments_len)?;
     let (content, span) = super::raw::parse_raw_prelude_content(parser, false, false)?;
     Ok(PreludeValue::Raw { content, span })
@@ -1224,9 +1274,9 @@ pub(super) fn parse_custom_selector_prelude<'arena>(
 /// The structured half of `parse_custom_selector_prelude`: the `:--name`, its gap, and
 /// the list. `None` for any prelude that is not that shape, leaving the parser wherever
 /// the mismatch was found — the caller rewinds.
-fn parse_custom_selector_head_and_list<'arena>(
-    parser: &mut CssParser<'_, 'arena>,
-) -> Result<Option<(Span, SelectorList<'arena>)>, Error> {
+fn parse_custom_selector_head_and_list(
+    parser: &mut CssParser<'_, '_>,
+) -> Result<Option<(Span, SelectorList)>, Error> {
     // Leading gap: `@custom-selector /* c */ :--a` (the shared name skip in `parse_atrule`
     // is a plain whitespace skip, so a leading comment is the current token on entry). It
     // steps the boundary class like every structural prelude gap, or a run there
@@ -1314,13 +1364,10 @@ fn parse_custom_selector_head_and_list<'arena>(
 /// `<media-query>`", so an entry that matches no `<media-query>` — an empty one included —
 /// is a grammar mismatch that §"Error Handling" replaces with `not all`, never a parse
 /// error.
-pub(super) fn parse_import_prelude<'arena>(
-    parser: &mut CssParser<'_, 'arena>,
-) -> Result<PreludeValue<'arena>, Error> {
+pub(super) fn parse_import_prelude(parser: &mut CssParser<'_, '_>) -> Result<PreludeValue, Error> {
     // Raw offset of the prelude's first token, for the raw fallback below.
     let prelude_start_raw = parser.current_start();
     let start = parser.span_pos(parser.current_start());
-    let mut values = parser.bvec();
 
     // Register a leading comment between `@import` and the first value (e.g.
     // `@import /* c */ url(...)`). Svelte strips it from the prelude string; the printer
@@ -1338,6 +1385,8 @@ pub(super) fn parse_import_prelude<'arena>(
         return super::reconsume_prelude_as_raw(parser, prelude_start_raw);
     }
 
+    let mark = parser.stores.runs.value_scratch.mark();
+
     // The two head openers the loop below does not take: a bare string, and an unquoted
     // url-token. A function opens the head through the loop like any later one.
     if let TokenKind::String { .. } = parser.current_kind() {
@@ -1345,7 +1394,7 @@ pub(super) fn parse_import_prelude<'arena>(
         // (span-for-verbatim, zero alloc); the quote char from `source[span.start]`.
         let value_start = parser.span_pos(parser.current_start());
         let value_end = parser.span_pos(parser.current_end());
-        values.push(CssValue::String {
+        parser.stores.runs.value_scratch.push(CssValue::String {
             content: StringCooked::Verbatim,
             span: Span {
                 start: value_start,
@@ -1390,12 +1439,12 @@ pub(super) fn parse_import_prelude<'arena>(
             "a url-token with no `(`: {:?}",
             parser.current_value()
         );
-        values.push(CssValue::Function {
+        parser.stores.runs.value_scratch.push(CssValue::Function {
             name_span: Span {
                 start: value_start,
                 end: value_start + name_len as u32,
             },
-            args: &[],
+            args: Run::EMPTY,
             span: Span {
                 start: value_start,
                 end: value_end,
@@ -1409,13 +1458,14 @@ pub(super) fn parse_import_prelude<'arena>(
     parser.skip_boundary_whitespace_registering_comments()?;
     while !parser.at_prelude_end() {
         if is_function_token(parser) {
-            values.push(parse_function_value(parser)?);
+            let function = parse_function_value(parser)?;
+            parser.stores.runs.value_scratch.push(function);
         } else if parser.check(TokenKind::Identifier) && parser.current_identifier() == "layer" {
             // Bare "layer" keyword (without function call); text recovered from
             // `span` at print time (span-for-verbatim).
             let value_start = parser.span_pos(parser.current_start());
             let value_end = parser.span_pos(parser.current_end());
-            values.push(CssValue::Identifier {
+            parser.stores.runs.value_scratch.push(CssValue::Identifier {
                 span: Span {
                     start: value_start,
                     end: value_end,
@@ -1445,18 +1495,29 @@ pub(super) fn parse_import_prelude<'arena>(
             parser.advance()?;
         }
 
-        values.push(CssValue::Identifier {
+        let tail = CssValue::Identifier {
             span: Span {
                 start: tail_start,
                 end: parser.span_pos(tail_local_end),
             },
-        });
+        };
+        parser.stores.runs.value_scratch.push(tail);
     }
 
-    let end = values.last().map_or(start, |v| v.span().end);
-
+    let end = parser
+        .stores
+        .runs
+        .value_scratch
+        .frame(mark)
+        .last()
+        .map_or(start, |v| v.span().end);
+    let values = flush_run(
+        &mut parser.stores.runs.value_scratch,
+        &mut parser.stores.runs.values,
+        mark,
+    );
     Ok(PreludeValue::Values {
-        values: values.into_bump_slice(),
+        values,
         span: Span { start, end },
     })
 }
@@ -1547,10 +1608,34 @@ fn consume_function_args(parser: &mut CssParser<'_, '_>) -> Result<Option<Span>,
     Ok(start.map(|start| Span { start, end }))
 }
 
+/// Which of the functions an `@import` prelude structures a function value is, read off its
+/// decoded name ASCII case-insensitively.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ImportFunction {
+    Supports,
+    Url,
+    Layer,
+    /// Any other function, consumed opaquely.
+    Other,
+}
+
+impl ImportFunction {
+    /// The function `name` (decoded) names.
+    fn of(name: &str) -> Self {
+        if name.eq_ignore_ascii_case("supports") {
+            ImportFunction::Supports
+        } else if name.eq_ignore_ascii_case("url") {
+            ImportFunction::Url
+        } else if name.eq_ignore_ascii_case("layer") {
+            ImportFunction::Layer
+        } else {
+            ImportFunction::Other
+        }
+    }
+}
+
 /// Parse a function value (e.g., url(), layer(), supports())
-fn parse_function_value<'arena>(
-    parser: &mut CssParser<'_, 'arena>,
-) -> Result<CssValue<'arena>, Error> {
+fn parse_function_value(parser: &mut CssParser<'_, '_>) -> Result<CssValue, Error> {
     let value_start = parser.span_pos(parser.current_start());
 
     // Get function name (current token should be identifier). Kept verbatim from
@@ -1559,12 +1644,11 @@ fn parse_function_value<'arena>(
     // case-insensitive" — css-values-4 §"Functional Notations"), so `SUPPORTS(a:b)`
     // and `LAYER( a )` normalize like their lowercase spellings rather than falling
     // through to the opaque unknown-function path.
-    let name = if parser.check(TokenKind::Identifier) {
-        parser.current_identifier_in_arena()
-    } else {
+    if !parser.check(TokenKind::Identifier) {
         return Err(parser.error_expected("function name"));
-    };
-    // Recognition below is on the DECODED `name` (`\6c ayer(` is a `layer()`), but what
+    }
+    let function = ImportFunction::of(parser.current_identifier());
+    // Recognition is on the DECODED name (`\6c ayer(` is a `layer()`), but what
     // reaches the output is the author's own bytes: the value subtree is source-faithful,
     // so the stored name is this span, never the decoded text (prettier preserves the
     // escape too).
@@ -1574,8 +1658,8 @@ fn parse_function_value<'arena>(
     };
     // `supports()` keeps a text name (its printer prints the condition, not a span), so
     // the same fact reaches it as the verbatim token slice — the copy is an `@import`
-    // prelude's alone.
-    let name_verbatim = parser.alloc_str_in(parser.current_value());
+    // prelude's alone, taken in its arm from the token's raw offsets.
+    let name_raw = (parser.current_start(), parser.current_end());
 
     parser.advance()?; // consume function name
 
@@ -1587,12 +1671,14 @@ fn parse_function_value<'arena>(
     // `supports()` is read *before* the `(` is consumed: that paren is the condition
     // part's own opening paren (see `parse_supports_function_condition`), which is what
     // lets the bare `<declaration>` alternative reuse the parenthesized-part grammar.
-    if name.eq_ignore_ascii_case("supports") {
+    if function == ImportFunction::Supports {
         let Some((condition, condition_span)) = parse_supports_function_condition(parser)? else {
             return Err(parser.error_expected("')' to close function"));
         };
+        let source = parser.source();
+        let name = parser.stores.text.push(&source[name_raw.0..name_raw.1]);
         return Ok(CssValue::SupportsCondition {
-            name: name_verbatim,
+            name,
             condition,
             span: Span {
                 start: value_start,
@@ -1604,9 +1690,9 @@ fn parse_function_value<'arena>(
     parser.advance()?; // consume '('
 
     // For @import functions (url, layer, supports), parse arguments based on function type
-    let mut args = parser.bvec();
+    let mark = parser.stores.runs.value_scratch.mark();
 
-    if name.eq_ignore_ascii_case("url") {
+    if function == ImportFunction::Url {
         // url() - parse the URL argument (string or bare URL)
         parser.skip_whitespace()?;
         if let TokenKind::String { .. } = parser.current_kind() {
@@ -1614,7 +1700,7 @@ fn parse_function_value<'arena>(
             let arg_end = parser.span_pos(parser.current_end());
             // Bare string arg — inner text recovered verbatim from `span` at print
             // time (span-for-verbatim, zero alloc); quote char from `source[span.start]`.
-            args.push(CssValue::String {
+            parser.stores.runs.value_scratch.push(CssValue::String {
                 content: StringCooked::Verbatim,
                 span: Span {
                     start: arg_start,
@@ -1635,7 +1721,13 @@ fn parse_function_value<'arena>(
             // follows (past whitespace — a comment is not whitespace, css-syntax §4.3.4),
             // so a leading comment makes the whole thing an opaque `<url-token>` whose
             // contents this function never sees.
-            args.extend(take_comment_run(parser)?.map(|span| CssValue::Identifier { span }));
+            if let Some(span) = take_comment_run(parser)? {
+                parser
+                    .stores
+                    .runs
+                    .value_scratch
+                    .push(CssValue::Identifier { span });
+            }
         } else {
             // Unquoted bare URL (`url(a.css)`, `url(a.css?x=1)`): an opaque token run
             // up to ')'. Leave args empty — both the public-AST conversion and the
@@ -1644,7 +1736,7 @@ fn parse_function_value<'arena>(
                 parser.advance()?;
             }
         }
-    } else if name.eq_ignore_ascii_case("layer") {
+    } else if function == ImportFunction::Layer {
         // `layer(<layer-name>)` — css-cascade-5 §layer-names spells the argument
         // `<ident> [ '.' <ident> ]*`, so the DOTTED form is the primary one and a single
         // identifier token cannot bound it. Reading one and stopping made every other
@@ -1659,7 +1751,13 @@ fn parse_function_value<'arena>(
         // A whitespace-only argument (`layer()`) yields `None`, leaving `args` empty and
         // routing the printer to its verbatim function span, the form this arm already
         // produced.
-        args.extend(consume_function_args(parser)?.map(|span| CssValue::Identifier { span }));
+        if let Some(span) = consume_function_args(parser)? {
+            parser
+                .stores
+                .runs
+                .value_scratch
+                .push(CssValue::Identifier { span });
+        }
     } else {
         // Other unknown functions (e.g. `scope((.a) to (.b))`, css-cascade-6 scoped
         // `@import`) — consume the args opaquely. Args stay empty: the printer and the
@@ -1675,9 +1773,14 @@ fn parse_function_value<'arena>(
     let value_end = parser.span_pos(parser.current_end());
     parser.advance()?; // consume ')'
 
+    let args = flush_run(
+        &mut parser.stores.runs.value_scratch,
+        &mut parser.stores.runs.values,
+        mark,
+    );
     Ok(CssValue::Function {
         name_span,
-        args: args.into_bump_slice(),
+        args,
         span: Span {
             start: value_start,
             end: value_end,

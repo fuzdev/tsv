@@ -6,13 +6,14 @@ use super::selectors::{
 use crate::ast::*;
 use crate::lexer::TokenKind;
 use crate::whitespace::is_boundary_whitespace;
+use tsv_lang::store::flush_run;
 use tsv_lang::{Error, Span};
 
 /// Parse pseudo-class or pseudo-element: :hover, ::before, :nth-child(2n+1)
-pub(crate) fn parse_pseudo_selector<'arena>(
-    parser: &mut CssParser<'_, 'arena>,
+pub(crate) fn parse_pseudo_selector(
+    parser: &mut CssParser<'_, '_>,
     start: usize,
-) -> Result<SimpleSelector<'arena>, Error> {
+) -> Result<SimpleSelector, Error> {
     parser.advance()?; // consume first :
     // selectors-4 forbids white space "between the ':'s, or between the ':' and
     // <ident-token> or <function-token>" — and a comment is not a `<whitespace-token>`,
@@ -35,7 +36,7 @@ pub(crate) fn parse_pseudo_selector<'arena>(
     // Classify the argument grammar from the DECODED name (`:nth-child` → Nth,
     // `:is`/`:not` → SelectorList) while the name token is still current, so
     // `current_identifier()`'s decoded borrow is consumed immediately — the classify
-    // returns a `Copy` `PseudoArgKind` and no arena copy of the name is made. The
+    // returns a `Copy` `PseudoArgKind` and no copy of the name is made. The
     // decoded name (not the raw source slice) must drive dispatch: `:\69s(…)` decodes
     // to `is` and must route to the forgiving grammar, so raw-source dispatch would
     // regress escaped names. The name is NOT stored on the node either: it's recovered
@@ -129,7 +130,7 @@ enum SelectorListGrammar {
 /// The argument grammar a pseudo-class/element uses, chosen once from the (lowercased)
 /// pseudo name by `classify_pseudo_args`. Threaded into `parse_pseudo_args` as a `Copy`
 /// descriptor so dispatch never re-consults the name string — which lets the name be
-/// classified while its token is still current, avoiding a per-pseudo arena copy of the
+/// classified while its token is still current, avoiding a per-pseudo copy of the
 /// never-stored name.
 #[derive(Clone, Copy)]
 enum PseudoArgKind {
@@ -214,10 +215,10 @@ fn classify_pseudo_args(pseudo_name: &str, is_pseudo_element: bool) -> PseudoArg
 /// selector list sets `in_pseudo_args` locally (a bare `<an+b>` term in `S` reads as an
 /// `Nth`, matching `:not()`'s strict list). `::part` takes a bare ident list and never
 /// needs it.
-fn parse_pseudo_args<'arena>(
-    parser: &mut CssParser<'_, 'arena>,
+fn parse_pseudo_args(
+    parser: &mut CssParser<'_, '_>,
     arg_kind: PseudoArgKind,
-) -> Result<(Option<PseudoClassArgs<'arena>>, u32), Error> {
+) -> Result<(Option<PseudoClassArgs>, u32), Error> {
     parser.expect(TokenKind::LeftParen)?;
 
     let args_start = parser.current_start();
@@ -233,9 +234,9 @@ fn parse_pseudo_args<'arena>(
 /// Run `f` with `in_pseudo_args` set, restoring the previous value afterward (on both
 /// the ok and error paths). Nested pseudo-class args (`:is(:not(2n))`) restore to the
 /// outer `true`, and the top level returns to `false`.
-fn with_pseudo_args<'arena, R>(
-    parser: &mut CssParser<'_, 'arena>,
-    f: impl FnOnce(&mut CssParser<'_, 'arena>) -> Result<R, Error>,
+fn with_pseudo_args<R>(
+    parser: &mut CssParser<'_, '_>,
+    f: impl FnOnce(&mut CssParser<'_, '_>) -> Result<R, Error>,
 ) -> Result<R, Error> {
     let saved = parser.in_pseudo_args;
     parser.in_pseudo_args = true;
@@ -251,11 +252,11 @@ fn with_pseudo_args<'arena, R>(
 /// the `SelectorList` args spanning `args_start..)`. The shared tail of the
 /// `:is()`/`:not()`-family path, the `:nth-*()` selector-list fallback, and the
 /// unknown-pseudo selector path.
-fn finish_selector_list_args<'arena>(
-    parser: &mut CssParser<'_, 'arena>,
+fn finish_selector_list_args(
+    parser: &mut CssParser<'_, '_>,
     args_start: usize,
-    selectors: SelectorList<'arena>,
-) -> Result<(Option<PseudoClassArgs<'arena>>, u32), Error> {
+    selectors: SelectorList,
+) -> Result<(Option<PseudoClassArgs>, u32), Error> {
     parser.skip_boundary_whitespace_registering_comments()?;
     let end = parser.expect_and_capture(TokenKind::RightParen)?;
     Ok((
@@ -275,16 +276,16 @@ fn finish_selector_list_args<'arena>(
 /// a comment between two idents reads as whitespace, splitting the run — parseCss
 /// rejects it. `value_span` covers the identifier run (first ident start .. last
 /// ident end) so the printer locates the gap comments around it (mirrors `Nth`).
-fn parse_part_args<'arena>(
-    parser: &mut CssParser<'_, 'arena>,
+fn parse_part_args(
+    parser: &mut CssParser<'_, '_>,
     args_start: usize,
-) -> Result<(Option<PseudoClassArgs<'arena>>, u32), Error> {
+) -> Result<(Option<PseudoClassArgs>, u32), Error> {
     parser.skip_boundary_whitespace_registering_comments()?;
 
     // One span per name: the printer emits each name verbatim from its span, finds
     // comments in the interior gaps between them, and derives the whole-run span
     // (first start .. last end); the wire projects the run from them too.
-    let mut ident_spans: crate::parser::BumpVec<'_, Span> = parser.bvec();
+    let mark = parser.stores.runs.part_span_scratch.mark();
 
     // Parse space-separated identifiers
     while !parser.check(TokenKind::RightParen) && !parser.check(TokenKind::Eof) {
@@ -292,16 +293,17 @@ fn parse_part_args<'arena>(
             return Err(parser.error_msg("::part() requires identifier arguments"));
         }
 
-        ident_spans.push(Span {
+        let ident = Span {
             start: parser.span_pos(parser.current_start()),
             end: parser.span_pos(parser.current_end()),
-        });
+        };
+        parser.stores.runs.part_span_scratch.push(ident);
         parser.advance()?;
 
         parser.skip_boundary_whitespace_registering_comments()?;
     }
 
-    if ident_spans.is_empty() {
+    if parser.stores.runs.part_span_scratch.len_since(mark) == 0 {
         return Err(parser.error_msg_at(
             "::part() requires at least one identifier",
             parser.base_offset() + args_start,
@@ -310,9 +312,14 @@ fn parse_part_args<'arena>(
 
     let end = parser.expect_and_capture(TokenKind::RightParen)?;
 
+    let ident_spans = flush_run(
+        &mut parser.stores.runs.part_span_scratch,
+        &mut parser.stores.runs.part_spans,
+        mark,
+    );
     Ok((
         Some(PseudoClassArgs::Part {
-            ident_spans: ident_spans.into_bump_slice(),
+            ident_spans,
             span: Span {
                 start: parser.span_pos(args_start),
                 end,
@@ -327,22 +334,22 @@ fn parse_part_args<'arena>(
 /// `inside_pseudo_class` gate) — wrapping the per-`grammar` `parse_selector_list_args`.
 /// Shared by the four selector-list pseudo families (`:has()`, `:is()`/`:where()`, the
 /// `:not()` group, `::slotted()`).
-fn selector_list_args<'arena>(
-    parser: &mut CssParser<'_, 'arena>,
+fn selector_list_args(
+    parser: &mut CssParser<'_, '_>,
     args_start: usize,
     grammar: SelectorListGrammar,
-) -> Result<(Option<PseudoClassArgs<'arena>>, u32), Error> {
+) -> Result<(Option<PseudoClassArgs>, u32), Error> {
     with_pseudo_args(parser, |p| parse_selector_list_args(p, args_start, grammar))
 }
 
 /// Parse the selector list inside a selector-list pseudo argument per its `grammar` (see
 /// `SelectorListGrammar`), then finish with the trailing-comment + `)` capture.
 /// Leading/trailing gap comments are registered so the printer interleaves them.
-fn parse_selector_list_args<'arena>(
-    parser: &mut CssParser<'_, 'arena>,
+fn parse_selector_list_args(
+    parser: &mut CssParser<'_, '_>,
     args_start: usize,
     grammar: SelectorListGrammar,
-) -> Result<(Option<PseudoClassArgs<'arena>>, u32), Error> {
+) -> Result<(Option<PseudoClassArgs>, u32), Error> {
     // Register a leading comment (`:is(/* c */ .a)`) so the printer interleaves it.
     parser.skip_boundary_whitespace_registering_comments()?;
 
@@ -374,10 +381,10 @@ fn parse_selector_list_args<'arena>(
 /// the trimmed An+B so the printer can find the surrounding gap comments. The `of S`
 /// list is parsed with `in_pseudo_args` set (see the call site), so it accepts the same
 /// bare `<number>`/`<an+b>` terms a direct functional-pseudo arg does.
-fn parse_nth_args<'arena>(
-    parser: &mut CssParser<'_, 'arena>,
+fn parse_nth_args(
+    parser: &mut CssParser<'_, '_>,
     args_start: usize,
-) -> Result<(Option<PseudoClassArgs<'arena>>, u32), Error> {
+) -> Result<(Option<PseudoClassArgs>, u32), Error> {
     parser.skip_boundary_whitespace_registering_comments()?;
     let anb_start = parser.current_start();
 
@@ -406,11 +413,12 @@ fn parse_nth_args<'arena>(
     let anb_raw = &parser.source()[anb_start..anb_end];
     let anb_trimmed_start =
         anb_start + (anb_raw.len() - anb_raw.trim_start_matches(is_boundary_whitespace).len());
-    let anb_value = parser.alloc_str_in(anb_raw.trim_matches(is_boundary_whitespace));
+    let anb_trimmed = anb_raw.trim_matches(is_boundary_whitespace);
     let value_span = Span {
         start: parser.span_pos(anb_trimmed_start),
-        end: parser.span_pos(anb_trimmed_start + anb_value.len()),
+        end: parser.span_pos(anb_trimmed_start + anb_trimmed.len()),
     };
+    let anb_value = parser.stores.text.push(anb_trimmed);
 
     // Re-seat the lexer at the terminator: on the `)` itself, or just past the `of`
     // letters so the boundary skip below steps whatever follows them — the run inside the
@@ -459,10 +467,10 @@ fn parse_nth_args<'arena>(
 /// parse the argument as a complex selector list first (the common case, sharing
 /// `:is()`'s printer arm which already interleaves gap comments); if that fails the
 /// argument isn't a selector, so skip to the matching `)` and return `None`.
-fn parse_unknown_args<'arena>(
-    parser: &mut CssParser<'_, 'arena>,
+fn parse_unknown_args(
+    parser: &mut CssParser<'_, '_>,
     args_start: usize,
-) -> Result<(Option<PseudoClassArgs<'arena>>, u32), Error> {
+) -> Result<(Option<PseudoClassArgs>, u32), Error> {
     // Register leading/trailing gap comments (`:current(/* c */ .a)`); the
     // built `SelectorList` args share `:is()`'s printer arm, which already
     // interleaves them, so this path is parser-only.
@@ -470,6 +478,9 @@ fn parse_unknown_args<'arena>(
 
     #[cfg(feature = "_internal_ast_census")]
     let ast_census_mark = tsv_lang::ast_census_probe::mark();
+    // A failed list leaves the frames it opened on the scratch stacks, above the enclosing
+    // compound's, so its recovery rewinds every stack to here.
+    let scratch_marks = parser.stores.scratch_marks();
     // Try to parse as a selector list (complex selectors, strict parsing)
     match parse_complex_selector_list(parser) {
         Ok(selector_list) => finish_selector_list_args(parser, args_start, selector_list),
@@ -478,6 +489,7 @@ fn parse_unknown_args<'arena>(
         Err(_) => {
             #[cfg(feature = "_internal_ast_census")]
             tsv_lang::ast_census_probe::rewind(ast_census_mark);
+            parser.stores.truncate_scratch(&scratch_marks);
             // Parsing as selector list failed - skip arguments
             // This handles pseudo-classes with non-selector arguments
             let mut depth = 1;

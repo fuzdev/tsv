@@ -4,8 +4,6 @@
 // Tracks (start, end) ranges within that source instead of creating substrings.
 
 use crate::ast::{CssStores, CssValue};
-#[cfg(feature = "_internal_ast_census")]
-use crate::parser::census_vec::BumpVec;
 use crate::parser::value::cursor::ValueCursor;
 use crate::parser::value::lists::{ValueSeparator, classify_separators};
 use crate::parser::value::scan::{
@@ -13,9 +11,8 @@ use crate::parser::value::scan::{
 };
 use crate::whitespace::is_css_whitespace;
 use bumpalo::Bump;
-#[cfg(not(feature = "_internal_ast_census"))]
-use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::Span;
+use tsv_lang::store::{ListMark, Run, flush_run};
 
 /// [`ValueParser::fast_scan`]'s skip table. Beyond the structural set — which already
 /// carries the comment introducer (`/`) — it must see both separators it classifies on,
@@ -100,9 +97,9 @@ pub(crate) struct ValueParser<'a> {
 }
 
 /// Outcome of `ValueParser::fast_scan` — the single-pass classification of a value.
-enum FastScan<'arena> {
+enum FastScan {
     /// A top-level comma was found; the comma list is already split and parsed.
-    Comma(&'arena [CssValue<'arena>]),
+    Comma(Run<CssValue>),
     /// No comma but a top-level whitespace run — a whitespace list.
     Whitespace,
     /// Neither a comma nor top-level whitespace — a single leaf value.
@@ -215,7 +212,7 @@ impl<'a> ValueParser<'a> {
         &self,
         range_start: usize,
         range_end: usize,
-        values: &[CssValue<'_>],
+        values: &[CssValue],
     ) -> ValueParser<'a> {
         let mut sub = self.sub_parser(range_start, range_end);
         sub.head_welds = (values.is_empty() && self.head_welds)
@@ -231,7 +228,7 @@ impl<'a> ValueParser<'a> {
     /// and the splitter mints that one-token run as an operator member too
     /// ([`super::operators::split_value_run`]), so the node kind answers here as well
     /// (`a - +b` → `a - +b`, `a / +b` → `a / +b`) and nothing is read back off the bytes.
-    fn member_is_operator(&self, value: &CssValue<'_>) -> bool {
+    fn member_is_operator(&self, value: &CssValue) -> bool {
         // Spans are absolute; the member is inside this range, so both offsets clear
         // `base_offset` (a debug underflow here would be a span from another document).
         let text = |span: Span| {
@@ -281,11 +278,7 @@ impl<'a> ValueParser<'a> {
     /// ASCII-whitespace boundary comes off (identical to what the fast path would
     /// produce) while a non-ASCII space (NBSP, em space) is kept as leaf content,
     /// never dropped.
-    pub(crate) fn parse<'arena>(
-        &self,
-        arena: &'arena Bump,
-        stores: &mut CssStores,
-    ) -> CssValue<'arena> {
+    pub(crate) fn parse(&self, arena: &Bump, stores: &mut CssStores) -> CssValue {
         self.parse_classified(arena, stores, None)
     }
 
@@ -311,12 +304,12 @@ impl<'a> ValueParser<'a> {
     /// construction, and [`Self::push_comma_segment`], which records its segment's class
     /// during the fused pass. [`Self::unclassified_path_builds_leaf`] is the claim a
     /// `Some(None)` from any of them is held to.
-    pub(crate) fn parse_classified<'arena>(
+    pub(crate) fn parse_classified(
         &self,
-        arena: &'arena Bump,
+        arena: &Bump,
         stores: &mut CssStores,
         class: Option<ValueSeparator>,
-    ) -> CssValue<'arena> {
+    ) -> CssValue {
         self.parse_scanned(arena, stores, class, false)
     }
 
@@ -326,13 +319,13 @@ impl<'a> ValueParser<'a> {
     /// It rides to the function leaf's paren scan, which it answers
     /// (`plain_function_parts`); `false` is "not known" and is what every other caller
     /// passes. Read only beside a leaf class — the claim is about the whole text.
-    pub(crate) fn parse_scanned<'arena>(
+    pub(crate) fn parse_scanned(
         &self,
-        arena: &'arena Bump,
+        arena: &Bump,
         stores: &mut CssStores,
         class: Option<ValueSeparator>,
         group_closes_text: bool,
-    ) -> CssValue<'arena> {
+    ) -> CssValue {
         let text = self.text();
         let bytes = text.as_bytes();
 
@@ -426,7 +419,7 @@ impl<'a> ValueParser<'a> {
     /// [`Self::fast_scan`] for the debug-assertion oracles, over stores of its own: an oracle
     /// re-reads a text the parse reads once, so it hands the scan nothing of the stylesheet's
     /// to write to, and a debug build's stores hold what a release build's do.
-    fn oracle_scan<'arena>(&self, text: &str, arena: &'arena Bump) -> FastScan<'arena> {
+    fn oracle_scan(&self, text: &str, arena: &Bump) -> FastScan {
         self.fast_scan(text, arena, &mut CssStores::new())
     }
 
@@ -446,17 +439,14 @@ impl<'a> ValueParser<'a> {
     /// track it, and a quoted string — which those two walk under a quote flag — is
     /// hopped whole to the same end (`quoted_run_end`), so for a comment-free value the
     /// comma split is byte-for-byte identical to the two-pass result.
-    fn fast_scan<'arena>(
-        &self,
-        text: &str,
-        arena: &'arena Bump,
-        stores: &mut CssStores,
-    ) -> FastScan<'arena> {
+    fn fast_scan(&self, text: &str, arena: &Bump, stores: &mut CssStores) -> FastScan {
         let bytes = text.as_bytes();
         let mut in_parens: u32 = 0;
         let mut ws_seen = false;
 
-        let mut values: BumpVec<'arena, CssValue<'arena>> = BumpVec::new_in(arena);
+        // The comma list's frame, opened at the first top-level comma: only a comma pushes to
+        // it, so a value holding none — most values — opens no frame at all.
+        let mut frame: Option<ListMark<CssValue>> = None;
         let mut seg_start = 0usize; // start of the current comma segment
         // The segment's separator class, recorded in passing so its element need not
         // re-derive it: `lead_end` is where a top-level whitespace byte would still
@@ -465,7 +455,6 @@ impl<'a> ValueParser<'a> {
         // element when it falls before the element's trimmed end, trailing otherwise.
         let mut lead_end = 0usize;
         let mut seg_ws = usize::MAX;
-        let mut any_comma = false;
 
         let mut i = 0;
         while i < bytes.len() {
@@ -498,6 +487,12 @@ impl<'a> ValueParser<'a> {
             // Comment-bearing values are rare enough that teaching the fused pass to skip
             // them would buy nothing the fallback doesn't already get right.
             if is_comment_start(bytes, i) {
+                // The fallback re-splits the value from its start, so the elements pushed
+                // before the comment go with this frame: left on the scratch stack, they
+                // would land in whatever list encloses the value.
+                if let Some(mark) = frame {
+                    stores.runs.value_scratch.truncate(mark);
+                }
                 return FastScan::Comment;
             }
 
@@ -536,8 +531,8 @@ impl<'a> ValueParser<'a> {
                 b'(' => in_parens += 1,
                 b')' => in_parens = in_parens.saturating_sub(1),
                 b',' if top => {
-                    self.push_comma_segment(&mut values, text, seg_start, i, seg_ws, arena, stores);
-                    any_comma = true;
+                    let mark = *frame.get_or_insert_with(|| stores.runs.value_scratch.mark());
+                    self.push_comma_segment(mark, text, seg_start, i, seg_ws, arena, stores);
                     seg_start = i + 1;
                     lead_end = i + 1;
                     seg_ws = usize::MAX;
@@ -556,20 +551,16 @@ impl<'a> ValueParser<'a> {
             i += 1;
         }
 
-        if any_comma {
+        if let Some(mark) = frame {
             // Final segment runs to EOF (`ve_raw == text.len()`). Every comma-terminated
-            // segment pushed an element (an empty one the sentinel), so `values` is
+            // segment pushed an element (an empty one the sentinel), so the frame is
             // non-empty here and the leaf guard cannot arm.
-            self.push_comma_segment(
-                &mut values,
-                text,
-                seg_start,
-                bytes.len(),
-                seg_ws,
-                arena,
-                stores,
-            );
-            FastScan::Comma(values.into_bump_slice())
+            self.push_comma_segment(mark, text, seg_start, bytes.len(), seg_ws, arena, stores);
+            FastScan::Comma(flush_run(
+                &mut stores.runs.value_scratch,
+                &mut stores.runs.values,
+                mark,
+            ))
         } else if ws_seen {
             FastScan::Whitespace
         } else {
@@ -591,14 +582,14 @@ impl<'a> ValueParser<'a> {
         clippy::too_many_arguments,
         reason = "the scan's cursor state, the arena and the stores, each read by the element built"
     )]
-    fn push_comma_segment<'arena>(
+    fn push_comma_segment(
         &self,
-        values: &mut BumpVec<'arena, CssValue<'arena>>,
+        mark: ListMark<CssValue>,
         text: &str,
         seg_start: usize,
         seg_end: usize,
         seg_ws: usize,
-        arena: &'arena Bump,
+        arena: &Bump,
         stores: &mut CssStores,
     ) {
         let seg = &text[seg_start..seg_end];
@@ -623,19 +614,23 @@ impl<'a> ValueParser<'a> {
             // the authored list, and in a declaration that turns a dead declaration
             // (`linear-gradient(red,,blue)`, which the UA drops) into a live one.
             if seg_end < text.len() {
-                values.push(CssValue::Identifier {
+                let empty = CssValue::Identifier {
                     span: self.sub_parser(value_start, value_start).absolute_span(),
-                });
+                };
+                stores.runs.value_scratch.push(empty);
             }
             return;
         }
         let value_end = value_start + core.len();
-        let sub = self.element_parser(value_start, value_end, values);
+        // The list read so far, which the element's head reads its weld off.
+        let open = stores.runs.value_scratch.frame(mark);
+        let first = open.is_empty();
+        let sub = self.element_parser(value_start, value_end, open);
         // Same guard as `split_top_level`: a first non-empty element whose raw end
         // reaches EOF is parsed as a single leaf (the classify/cursor disagreement
         // safety, reachable only via leading delimiters — `fast_scan` never runs on a
         // comment-bearing value).
-        let node = if values.is_empty() && seg_end == text.len() {
+        let node = if first && seg_end == text.len() {
             sub.parse_single(arena, stores)
         } else {
             let class = if seg_ws < value_end {
@@ -645,15 +640,11 @@ impl<'a> ValueParser<'a> {
             };
             sub.parse_classified(arena, stores, Some(class))
         };
-        values.push(node);
+        stores.runs.value_scratch.push(node);
     }
 
     /// Parse comma-separated values: "a, b, c"
-    fn parse_comma_separated<'arena>(
-        &self,
-        arena: &'arena Bump,
-        stores: &mut CssStores,
-    ) -> CssValue<'arena> {
+    fn parse_comma_separated(&self, arena: &Bump, stores: &mut CssStores) -> CssValue {
         CssValue::CommaSeparated {
             values: self.split_top_level(
                 arena,
@@ -667,11 +658,7 @@ impl<'a> ValueParser<'a> {
     }
 
     /// Parse space-separated values: "a b c"
-    fn parse_space_separated<'arena>(
-        &self,
-        arena: &'arena Bump,
-        stores: &mut CssStores,
-    ) -> CssValue<'arena> {
+    fn parse_space_separated(&self, arena: &Bump, stores: &mut CssStores) -> CssValue {
         CssValue::List {
             values: self.split_top_level(
                 arena,
@@ -713,14 +700,14 @@ impl<'a> ValueParser<'a> {
     ///
     /// The comma split does **not** take this rule — `/* c */ a, b` is two comma elements,
     /// and the run belongs to the first.
-    fn split_top_level<'arena, F>(
+    fn split_top_level<F>(
         &self,
-        arena: &'arena Bump,
+        arena: &Bump,
         stores: &mut CssStores,
         is_delimiter: F,
         skip: &[bool; 256],
         kind: SplitKind,
-    ) -> &'arena [CssValue<'arena>]
+    ) -> Run<CssValue>
     where
         F: Fn(char) -> bool,
     {
@@ -735,7 +722,7 @@ impl<'a> ValueParser<'a> {
         let text = self.text();
         let bytes = text.as_bytes();
         let mut cursor = ValueCursor::new(text);
-        let mut values = BumpVec::new_in(arena);
+        let mark = stores.runs.value_scratch.mark();
 
         loop {
             let pos = cursor.skip_whitespace();
@@ -748,9 +735,10 @@ impl<'a> ValueParser<'a> {
             // whitespace-separated comment already had — the printer emits it verbatim
             // from its span, so the interior is never re-tokenized.
             if comment_is_element && let Some(run_end) = comment_run_end(bytes, pos) {
-                values.push(CssValue::Identifier {
+                let comment = CssValue::Identifier {
                     span: self.sub_parser(pos, run_end).absolute_span(),
-                });
+                };
+                stores.runs.value_scratch.push(comment);
                 cursor.set_position(run_end);
                 continue;
             }
@@ -764,19 +752,22 @@ impl<'a> ValueParser<'a> {
                 // `push_comma_segment`'s arm — see it for the spec basis). Only a
                 // comma-terminated stretch reaches here: the loop breaks on EOF above,
                 // so the nothing after a *final* comma never becomes one.
-                values.push(CssValue::Identifier {
+                let empty = CssValue::Identifier {
                     span: self.sub_parser(value_start, value_start).absolute_span(),
-                });
+                };
+                stores.runs.value_scratch.push(empty);
             } else if value_end > value_start {
-                // Non-empty value
-                let sub_parser = self.element_parser(value_start, value_end, &values);
+                // Non-empty value; its head reads its weld off the list read so far
+                let open = stores.runs.value_scratch.frame(mark);
+                let first = open.is_empty();
+                let sub_parser = self.element_parser(value_start, value_end, open);
                 // Progress guard: the cursor reached EOF without finding a
                 // delimiter (`value_end_raw == text.len()`) and this is the only
                 // element, so the whole range is a single value — `classify_separators`
                 // and the cursor disagreed (a value opening with a delimiter, e.g.
                 // `,a b`). Re-`parse()`ing the identical range would re-classify it the
                 // same way and recurse forever, so parse it as a leaf instead.
-                let parsed = if values.is_empty() && value_end_raw == text.len() {
+                let parsed = if first && value_end_raw == text.len() {
                     sub_parser.parse_single(arena, stores)
                 } else {
                     // Recursive, but same source!
@@ -789,11 +780,17 @@ impl<'a> ValueParser<'a> {
                 // holds no top-level whitespace or comma by construction, so the only
                 // thing that can come back as a `List` here is such a run
                 // (`super::parse_single_value`'s first arm).
+                //
+                // The run's members are copied onto this list's open frame from the store
+                // the run was flushed into, the run itself left an orphan there.
                 match parsed {
                     CssValue::List { values: run, .. } if kind == SplitKind::Whitespace => {
-                        values.extend_from_slice(run);
+                        let runs = &mut stores.runs;
+                        for &member in runs.values.slice(run) {
+                            runs.value_scratch.push(member);
+                        }
                     }
-                    v => values.push(v),
+                    v => stores.runs.value_scratch.push(v),
                 }
             }
 
@@ -807,7 +804,11 @@ impl<'a> ValueParser<'a> {
             }
         }
 
-        values.into_bump_slice()
+        flush_run(
+            &mut stores.runs.value_scratch,
+            &mut stores.runs.values,
+            mark,
+        )
     }
 
     /// Build a leaf (single value) from already-trimmed `text`.
@@ -817,12 +818,7 @@ impl<'a> ValueParser<'a> {
     /// Identifier text is recovered from `span` at print time, so the fallback
     /// stores no copied string.
     #[inline]
-    fn build_leaf<'arena>(
-        &self,
-        text: &'a str,
-        arena: &'arena Bump,
-        stores: &mut CssStores,
-    ) -> CssValue<'arena> {
+    fn build_leaf(&self, text: &'a str, arena: &Bump, stores: &mut CssStores) -> CssValue {
         self.build_scanned_leaf(text, false, arena, stores)
     }
 
@@ -833,13 +829,13 @@ impl<'a> ValueParser<'a> {
     /// value parser from here, so a second frame between the two is a frame on every
     /// level of a nested value.
     #[inline(never)]
-    fn build_scanned_leaf<'arena>(
+    fn build_scanned_leaf(
         &self,
         text: &'a str,
         group_closes_text: bool,
-        arena: &'arena Bump,
+        arena: &Bump,
         stores: &mut CssStores,
-    ) -> CssValue<'arena> {
+    ) -> CssValue {
         let span = self.absolute_span();
         super::parse_single_value(
             text,
@@ -861,11 +857,7 @@ impl<'a> ValueParser<'a> {
     /// is leaf content and stays, so the text handed to `build_leaf` still matches
     /// `span` (trimming it would desync the two and drop a string element — see the
     /// helper).
-    fn parse_single<'arena>(
-        &self,
-        arena: &'arena Bump,
-        stores: &mut CssStores,
-    ) -> CssValue<'arena> {
+    fn parse_single(&self, arena: &Bump, stores: &mut CssStores) -> CssValue {
         let text = self.text();
         self.build_leaf(crate::escapes::trim_css(text), arena, stores)
     }
@@ -1120,6 +1112,34 @@ mod tests {
             assert_eq!(values.len(), 1);
             assert_eq!(values[0].span().extract(source), source);
         }
+    }
+
+    /// A function whose arguments hold a comma before a comment, as a member of a list: the
+    /// fast pass reads the arguments up to the comment, pushing an element at the comma, and
+    /// hands them to the fallback, which re-splits them from their start. The element the
+    /// fast pass pushed goes with its frame, so the list holds the identifier and the
+    /// function and nothing between them — and the grid printer, which lays the members out
+    /// row by row, prints the value as written.
+    #[test]
+    fn a_scan_handed_to_the_fallback_leaves_no_element_behind() {
+        let source = "x f(a, b /*c*/, d)";
+        let arena = Bump::new();
+        let span = Span {
+            start: 0,
+            end: source.len() as u32,
+        };
+        let mut stores = CssStores::new();
+        let value = ValueParser::new(source, span).parse(&arena, &mut stores);
+        let CssValue::List { values, .. } = value else {
+            panic!("expected a space-separated list, got {value:?}");
+        };
+        let values = stores.view().values(values);
+        let got: Vec<&str> = values.iter().map(|v| v.span().extract(source)).collect();
+        assert_eq!(got, ["x", "f(a, b /*c*/, d)"]);
+        assert!(matches!(values[1], CssValue::Function { .. }));
+
+        let grid = "a {\n\tgrid-template-columns:\n\t\t[x] f(a, b /*c*/, d)\n\t\tauto;\n}\n";
+        assert_eq!(crate::format(grid).expect("formats"), grid);
     }
 
     #[test]

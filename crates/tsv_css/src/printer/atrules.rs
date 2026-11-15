@@ -114,7 +114,7 @@ fn first_line_width(text: &str) -> usize {
 
 /// Where an at-rule's prelude region ends: its block's `{`, or its statement's `;` — the far
 /// end of the gap after the prelude's last token.
-fn prelude_region_end(atrule: &ast::CssAtrule<'_>) -> u32 {
+fn prelude_region_end(atrule: &ast::CssAtrule) -> u32 {
     atrule
         .block
         .as_ref()
@@ -173,12 +173,7 @@ fn prelude_fill_context(reserve: usize) -> DocContext {
 
 impl<'a> Printer<'a> {
     /// Format a CSS at-rule (@media, @keyframes, @supports, etc.)
-    #[expect(
-        clippy::explicit_auto_deref,
-        reason = "a view accessor takes a list or string field by value, which a store handle \
-                  needs dereferenced; only the field's identity alias auto-derefs"
-    )]
-    pub(super) fn print_css_atrule(&mut self, atrule: &ast::CssAtrule<'_>) {
+    pub(super) fn print_css_atrule(&mut self, atrule: &ast::CssAtrule) {
         // A block child's own `allow_comment_or_whitespace` juncture: the run before the `@`
         // was skipped by the parser and this head is rebuilt from parts, so nothing else can
         // carry it. A rule child gets the same claim from its selector's first compound
@@ -522,9 +517,9 @@ impl<'a> Printer<'a> {
     fn write_condition_prelude(
         &mut self,
         kind: ConditionKind<'_>,
-        condition: &ast::ConditionQuery<'_>,
+        condition: &ast::ConditionQuery,
         span: Span,
-        atrule: &ast::CssAtrule<'_>,
+        atrule: &ast::CssAtrule,
     ) {
         if self.view.condition_parts(condition.parts).is_empty() {
             // Bounds the prelude region rather than the condition: the span's end is the
@@ -573,8 +568,8 @@ impl<'a> Printer<'a> {
     fn print_condition_query(
         &mut self,
         kind: ConditionKind<'_>,
-        condition: &ast::ConditionQuery<'_>,
-        atrule: &ast::CssAtrule<'_>,
+        condition: &ast::ConditionQuery,
+        atrule: &ast::CssAtrule,
         prelude_span: Span,
     ) {
         // The partless prelude is `write_condition_prelude`'s, this function's one caller
@@ -637,15 +632,10 @@ impl<'a> Printer<'a> {
     /// unbreakable, and an over-width `supports()` has to break somewhere. Peeling
     /// restores the `group("(" indent(softline …) softline ")")` shape every other
     /// function value takes, so this position's break point is the ordinary one.
-    #[expect(
-        clippy::explicit_auto_deref,
-        reason = "a view accessor takes a list or string field by value, which a store handle \
-                  needs dereferenced; only the field's identity alias auto-derefs"
-    )]
     pub(super) fn build_supports_condition_doc(
         &self,
         name: &str,
-        condition: &ast::ConditionQuery<'_>,
+        condition: &ast::ConditionQuery,
     ) -> DocId {
         let d = self.d();
         // A `supports()` argument is exactly one part; an empty query means the parse
@@ -653,37 +643,26 @@ impl<'a> Printer<'a> {
         let Some(part) = self.view.condition_parts(condition.parts).first() else {
             return d.text_pooled(name);
         };
-        let last = self
-            .view
-            .condition_segments(part.segments)
-            .len()
-            .saturating_sub(1);
-        let mut inner = DocBuf::with_capacity(self.view.condition_segments(part.segments).len());
-        for (i, segment) in self
-            .view
-            .condition_segments(part.segments)
-            .iter()
-            .enumerate()
-        {
+        let segments = self.view.condition_segments(part.segments);
+        let last = segments.len().saturating_sub(1);
+        let mut inner = DocBuf::with_capacity(segments.len());
+        for (i, segment) in segments.iter().enumerate() {
             // The first and last segments are `Text` by construction — the part opens
             // on the `(` and closes on the `)` — so the strip guards never fire.
-            let peeled = match segment {
-                ast::ConditionSegment::Text(text) => {
-                    let mut text: &str = self.view.text(*text);
+            let doc = match segment {
+                &ast::ConditionSegment::Text(text) => {
+                    let mut text = self.view.text(text);
                     if i == 0 {
                         text = text.strip_prefix('(').unwrap_or(text);
                     }
                     if i == last {
                         text = text.strip_suffix(')').unwrap_or(text);
                     }
-                    // TODO: a segment built here holds the peeled text as a string of its own;
-                    // once segments hold pool text, which the printer cannot write, the text arm
-                    // takes the peeled `&str` directly instead.
-                    ast::ConditionSegment::Text(text)
+                    self.build_condition_text_doc(ConditionKind::Supports, text)
                 }
-                selectors => *selectors,
+                selectors => self.build_condition_segment_doc(ConditionKind::Supports, selectors),
             };
-            inner.push(self.build_condition_segment_doc(ConditionKind::Supports, &peeled));
+            inner.push(doc);
         }
         let inner = d.concat(&inner);
         d.group(d.concat(&[
@@ -697,34 +676,21 @@ impl<'a> Printer<'a> {
 
     /// Build the doc for one condition part segment.
     ///
-    /// `@supports` values are number-normalized (`.5px` → `0.5px`) and their hex colors
-    /// lowercased (`#FFF` → `#fff`); `@container` is emitted verbatim, both matching
-    /// prettier. A `selector()` argument prints through the selector printer — the one
-    /// a rule's own selector uses, so the same selector formats the same way in both
-    /// positions. `remove_lines` keeps it on the prelude's line: a selector's combinator
-    /// and pseudo-arg break points belong to a rule's selector list, not to a condition,
-    /// whose own wrapping is the `and`/`or` fill.
-    #[expect(
-        clippy::explicit_auto_deref,
-        reason = "a view accessor takes a list or string field by value, which a store handle \
-                  needs dereferenced; only the field's identity alias auto-derefs"
-    )]
+    /// A text segment prints through [`Self::build_condition_text_doc`]. A `selector()`
+    /// argument prints through the selector printer — the one a rule's own selector uses,
+    /// so the same selector formats the same way in both positions. `remove_lines` keeps it
+    /// on the prelude's line: a selector's combinator and pseudo-arg break points belong to
+    /// a rule's selector list, not to a condition, whose own wrapping is the `and`/`or`
+    /// fill.
     fn build_condition_segment_doc(
         &self,
         kind: ConditionKind<'_>,
-        segment: &ast::ConditionSegment<'_>,
+        segment: &ast::ConditionSegment,
     ) -> DocId {
         let d = self.d();
         match segment {
-            ast::ConditionSegment::Text(text) => {
-                if kind.normalizes() {
-                    d.text_pooled(&value_normalization::normalize_value_text(
-                        self.view.text(*text),
-                        ValueReader::Value,
-                    ))
-                } else {
-                    d.text_pooled(self.view.text(*text))
-                }
+            &ast::ConditionSegment::Text(text) => {
+                self.build_condition_text_doc(kind, self.view.text(text))
             }
             // The selector printer's own comma seam, so a comment beside a list comma
             // (`selector(.a, /* c */ .b)`) partitions the gap exactly as it does in a
@@ -735,6 +701,24 @@ impl<'a> Printer<'a> {
             ast::ConditionSegment::Selectors { list, paren } => {
                 d.remove_lines(self.build_paren_selector_list_inner(list, *paren))
             }
+        }
+    }
+
+    /// Build the doc for a condition part's normalized text: a text segment's, or the part
+    /// of one a caller narrowed (a `supports()` argument's segments, its parens peeled).
+    ///
+    /// `@supports` values are number-normalized (`.5px` → `0.5px`) and their hex colors
+    /// lowercased (`#FFF` → `#fff`); `@container` is emitted verbatim, both matching
+    /// prettier.
+    fn build_condition_text_doc(&self, kind: ConditionKind<'_>, text: &str) -> DocId {
+        let d = self.d();
+        if kind.normalizes() {
+            d.text_pooled(&value_normalization::normalize_value_text(
+                text,
+                ValueReader::Value,
+            ))
+        } else {
+            d.text_pooled(text)
         }
     }
 
@@ -761,7 +745,7 @@ impl<'a> Printer<'a> {
     fn build_condition_query_doc(
         &self,
         kind: ConditionKind<'_>,
-        condition: &ast::ConditionQuery<'_>,
+        condition: &ast::ConditionQuery,
         name_end_pos: u32,
         (prelude_span, region_end): (Span, u32),
         reserve: usize,
@@ -769,7 +753,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let parts = self.view.condition_parts(condition.parts);
 
-        let content_doc = |part: &ast::ConditionPart<'_>| {
+        let content_doc = |part: &ast::ConditionPart| {
             let part_segments = self.view.condition_segments(part.segments);
             let mut segments = DocBuf::with_capacity(part_segments.len());
             for segment in part_segments {
@@ -782,7 +766,7 @@ impl<'a> Printer<'a> {
         // included, since a connector with no operand on its LEFT still binds the part on
         // its right (`@supports and (a: b)`, `@container name and (a: b)`). Split at that
         // run like every later gap, so its comments and runs stay on their authored side.
-        let leading_first = |part: &ast::ConditionPart<'_>| -> DocId {
+        let leading_first = |part: &ast::ConditionPart| -> DocId {
             let mut head = DocBuf::new();
             match part.connector {
                 None => self.push_condition_gap_ahead(&mut head, name_end_pos, part.span.start),
@@ -974,10 +958,10 @@ impl<'a> Printer<'a> {
     /// `None` when the query has neither, so a caller need not concat an empty doc.
     fn condition_tail_doc(
         &self,
-        last: &ast::ConditionPart<'_>,
+        last: &ast::ConditionPart,
         prelude_span: Span,
         region_end: u32,
-        condition: &ast::ConditionQuery<'_>,
+        condition: &ast::ConditionQuery,
     ) -> Option<DocId> {
         let d = self.d();
         let mut tail = DocBuf::new();
@@ -1011,7 +995,7 @@ impl<'a> Printer<'a> {
     /// It can never collide with the tail gap's claim beside it. A comment inside the run
     /// is carried *by* the run (the parser un-registers it there), and the gap the claim
     /// reads starts where the run ends.
-    fn trailing_operators_doc(&self, condition: &ast::ConditionQuery<'_>) -> Option<DocId> {
+    fn trailing_operators_doc(&self, condition: &ast::ConditionQuery) -> Option<DocId> {
         let trailing_operators = condition.trailing_operators?;
         let d = self.d();
         Some(d.concat(&[
@@ -1109,9 +1093,9 @@ impl<'a> Printer<'a> {
     /// claims a boundary run the parser stepped there ([`Self::prelude_gap_text`]).
     fn write_scope_prelude(
         &mut self,
-        root: Option<&ast::ScopeClause<'_>>,
-        limit: Option<&ast::ScopeLimit<'_>>,
-        atrule: &ast::CssAtrule<'_>,
+        root: Option<&ast::ScopeClause>,
+        limit: Option<&ast::ScopeLimit>,
+        atrule: &ast::CssAtrule,
     ) {
         // Right bound of the pre-`{` gap: the block's `{`, or the `;` of a block-less
         // `@scope` (not valid CSS, but accepted like any prelude).
@@ -1229,9 +1213,9 @@ impl<'a> Printer<'a> {
     fn write_custom_selector_prelude(
         &mut self,
         name: Span,
-        list: &ast::SelectorList<'_>,
+        list: &ast::SelectorList,
         span: Span,
-        atrule: &ast::CssAtrule<'_>,
+        atrule: &ast::CssAtrule,
     ) {
         // Leading gap: from the at-rule name's end — the `@custom-selector` token can hold
         // no comment, so this never reaches into the name — to the `:--name`.

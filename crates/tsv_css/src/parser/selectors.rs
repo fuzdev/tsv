@@ -1,11 +1,7 @@
 use super::CssParser;
 use crate::ast::*;
 use crate::lexer::TokenKind;
-#[cfg(feature = "_internal_ast_census")]
-use crate::parser::census_vec::BumpVec;
-use bumpalo::Bump;
-#[cfg(not(feature = "_internal_ast_census"))]
-use bumpalo::collections::Vec as BumpVec;
+use tsv_lang::store::{Run, flush_run};
 use tsv_lang::{Error, Span};
 
 /// Register comment(s) sitting between a complex selector and its `,` separator
@@ -45,10 +41,10 @@ fn skip_comments_before_comma(parser: &mut CssParser<'_, '_>) -> Result<(), Erro
 /// semantics — it wraps parse errors as `Invalid` selectors, terminates on `)` rather than
 /// `{`, registers comments unconditionally, and skips no `<!-- -->` markers — so folding it
 /// in would distort this helper rather than dedup it.
-fn parse_selector_list_with<'arena>(
-    parser: &mut CssParser<'_, 'arena>,
-    parse_item: fn(&mut CssParser<'_, 'arena>) -> Result<ComplexSelector<'arena>, Error>,
-) -> Result<SelectorList<'arena>, Error> {
+fn parse_selector_list_with(
+    parser: &mut CssParser<'_, '_>,
+    parse_item: fn(&mut CssParser<'_, '_>) -> Result<ComplexSelector, Error>,
+) -> Result<SelectorList, Error> {
     // `read_selector_list` opens with `allow_comment_or_whitespace` and takes its `start`
     // only after it, so the list opens on the NAME. `parse_complex_selector` skips the same
     // run a moment later, which is why every name already agrees — but the list's own
@@ -58,12 +54,12 @@ fn parse_selector_list_with<'arena>(
     // pseudo-class argument nothing has stepped it yet, so this skip is load-bearing.
     parser.skip_boundary_whitespace()?;
     let start = parser.span_pos(parser.current_start());
-    let mut selectors = parser.bvec();
+    let mark = parser.stores.runs.complex_selector_scratch.mark();
 
     // Parse the first selector; a selector list always has at least one.
     let first = parse_item(parser)?;
     let mut end = first.span.end;
-    selectors.push(first);
+    parser.stores.runs.complex_selector_scratch.push(first);
 
     // Parse each additional selector after its comma.
     loop {
@@ -84,11 +80,16 @@ fn parse_selector_list_with<'arena>(
         parser.skip_html_comment_markers()?;
         let sel = parse_item(parser)?;
         end = sel.span.end;
-        selectors.push(sel);
+        parser.stores.runs.complex_selector_scratch.push(sel);
     }
 
+    let selectors = flush_run(
+        &mut parser.stores.runs.complex_selector_scratch,
+        &mut parser.stores.runs.complex_selectors,
+        mark,
+    );
     Ok(SelectorList {
-        selectors: selectors.into_bump_slice(),
+        selectors,
         span: Span { start, end },
     })
 }
@@ -105,9 +106,9 @@ fn parse_selector_list_with<'arena>(
 /// - :is(), :where(), :not() pseudo-classes
 ///
 /// See: CSS Selectors Level 4 - `<complex-selector-list>` vs `<relative-selector-list>`
-pub(crate) fn parse_complex_selector_list<'arena>(
-    parser: &mut CssParser<'_, 'arena>,
-) -> Result<SelectorList<'arena>, Error> {
+pub(crate) fn parse_complex_selector_list(
+    parser: &mut CssParser<'_, '_>,
+) -> Result<SelectorList, Error> {
     parse_selector_list_with(parser, parse_complex_selector)
 }
 
@@ -136,15 +137,17 @@ pub(crate) fn parse_complex_selector_list<'arena>(
 /// Public AST conversion filters them out for Svelte compatibility.
 ///
 /// See: CSS Selectors Level 4 - `<forgiving-selector-list>`
-pub(crate) fn parse_forgiving_selector_list<'arena>(
-    parser: &mut CssParser<'_, 'arena>,
-) -> Result<SelectorList<'arena>, Error> {
+pub(crate) fn parse_forgiving_selector_list(
+    parser: &mut CssParser<'_, '_>,
+) -> Result<SelectorList, Error> {
     // The list's own `start`, past the boundary run — see `parse_selector_list_with`, whose
     // capture this mirrors. `:is()`/`:where()` reach here straight from the `(`, so this is
     // the only skip standing between the run and the `args.start` the wire emits.
     parser.skip_boundary_whitespace()?;
     let start = parser.span_pos(parser.current_start());
-    let mut selectors = parser.bvec();
+    let mark = parser.stores.runs.complex_selector_scratch.mark();
+    // The last selector's end: the loop pushes one before it can stop.
+    let mut end: u32;
 
     loop {
         let selector_start = parser.base_offset() + parser.current_start();
@@ -152,26 +155,29 @@ pub(crate) fn parse_forgiving_selector_list<'arena>(
 
         #[cfg(feature = "_internal_ast_census")]
         let ast_census_mark = tsv_lang::ast_census_probe::mark();
+        // A failed selector leaves the frames it opened on the scratch stacks — this list's
+        // own among the ones below them — so its recovery rewinds every stack to here.
+        let scratch_marks = parser.stores.scratch_marks();
         // Try to parse a selector
-        match parse_complex_selector(parser) {
-            Ok(selector) => {
-                selectors.push(selector);
-            }
+        let selector = match parse_complex_selector(parser) {
+            Ok(selector) => selector,
             // a depth limit is no verdict on the selector: forgiving it would keep a raw
             // reading chosen for the stack's sake
             Err(error) if error.kind() == tsv_lang::ErrorKind::TooDeep => return Err(error),
             Err(_) => {
                 #[cfg(feature = "_internal_ast_census")]
                 tsv_lang::ast_census_probe::rewind(ast_census_mark);
+                parser.stores.truncate_scratch(&scratch_marks);
                 // Parse error - advance past the invalid selector and wrap as Invalid
                 // (its raw text is recovered from the span at print time).
                 extract_selector_until_comma_or_end(parser, source_start)?;
                 let selector_end = parser.base_offset() + parser.current_start();
 
-                let invalid = create_invalid_selector(parser.arena, selector_start, selector_end);
-                selectors.push(invalid);
+                create_invalid_selector(parser.stores, selector_start, selector_end)
             }
-        }
+        };
+        end = selector.span.end;
+        parser.stores.runs.complex_selector_scratch.push(selector);
 
         // Check for comma (more selectors) or end of list. Register comments so the
         // printer can interleave them (forgiving lists carry leading/comma/trailing
@@ -189,41 +195,48 @@ pub(crate) fn parse_forgiving_selector_list<'arena>(
         }
     }
 
-    // Calculate end position from last selector, or use start if empty
-    let end = selectors.last().map_or(start, |s| s.span.end);
-
+    let selectors = flush_run(
+        &mut parser.stores.runs.complex_selector_scratch,
+        &mut parser.stores.runs.complex_selectors,
+        mark,
+    );
     Ok(SelectorList {
-        selectors: selectors.into_bump_slice(),
+        selectors,
         span: Span { start, end },
     })
 }
 
 /// Create an Invalid ComplexSelector from span positions (the raw text is
 /// recovered verbatim from `span` at print time).
-fn create_invalid_selector<'arena>(
-    arena: &'arena Bump,
-    start: usize,
-    end: usize,
-) -> ComplexSelector<'arena> {
+fn create_invalid_selector(stores: &mut CssStores, start: usize, end: usize) -> ComplexSelector {
     let span = Span {
         start: start as u32,
         end: end as u32,
     };
 
-    let mut simple = BumpVec::new_in(arena);
-    simple.push(SimpleSelector::Invalid { span });
-    let mut children = BumpVec::new_in(arena);
-    children.push(RelativeSelector {
+    let runs = &mut stores.runs;
+    let mark = runs.simple_selector_scratch.mark();
+    runs.simple_selector_scratch
+        .push(SimpleSelector::Invalid { span });
+    let selectors = flush_run(
+        &mut runs.simple_selector_scratch,
+        &mut runs.simple_selectors,
+        mark,
+    );
+    let mark = runs.relative_selector_scratch.mark();
+    runs.relative_selector_scratch.push(RelativeSelector {
         combinator: None,
         combinator_span: None,
-        selectors: simple.into_bump_slice(),
+        selectors,
         span,
     });
+    let children = flush_run(
+        &mut runs.relative_selector_scratch,
+        &mut runs.relative_selectors,
+        mark,
+    );
 
-    ComplexSelector {
-        children: children.into_bump_slice(),
-        span,
-    }
+    ComplexSelector { children, span }
 }
 
 /// Extract raw text until we reach the next comma or end of selector list.
@@ -292,9 +305,9 @@ fn extract_selector_until_comma_or_end<'a>(
 /// valid only in a relative context) is a static-semantic rule deferred to diagnostics.
 ///
 /// See: CSS Selectors Level 4 - `<relative-selector-list>`
-pub(crate) fn parse_relative_selector_list<'arena>(
-    parser: &mut CssParser<'_, 'arena>,
-) -> Result<SelectorList<'arena>, Error> {
+pub(crate) fn parse_relative_selector_list(
+    parser: &mut CssParser<'_, '_>,
+) -> Result<SelectorList, Error> {
     parse_selector_list_with(parser, parse_complex_selector)
 }
 
@@ -316,15 +329,17 @@ pub(crate) fn parse_relative_selector_list<'arena>(
 /// - `div > span` - combinator in the middle
 ///
 /// See: CSS Selectors Level 4 - `<complex-selector>` vs `<relative-selector>`
-pub(crate) fn parse_complex_selector<'arena>(
-    parser: &mut CssParser<'_, 'arena>,
-) -> Result<ComplexSelector<'arena>, Error> {
+pub(crate) fn parse_complex_selector(
+    parser: &mut CssParser<'_, '_>,
+) -> Result<ComplexSelector, Error> {
     // The list's own start is an `allow_comment_or_whitespace` juncture — before the first
     // selector and after every `,` — and the skip must precede the capture, since this
     // offset becomes the rule's, the prelude's and the selector's `start`.
     parser.skip_boundary_whitespace()?;
     let start = parser.span_pos(parser.current_start());
-    let mut children = parser.bvec();
+    let mark = parser.stores.runs.relative_selector_scratch.mark();
+    // The last relative selector's end: the loop ends only past a compound.
+    let mut end: u32;
 
     // The first compound MAY begin with an explicit combinator (`> span`, a nested/`:has()`
     // relative selector or a top-level leading combinator parseCss accepts).
@@ -363,12 +378,16 @@ pub(crate) fn parse_complex_selector<'arena>(
             && !pseudo_arg_terminal_nth(parser)
             && let Some(next) = explicit_combinator_kind(parser.current_kind())
         {
-            children.push(RelativeSelector {
-                combinator: Some(c),
-                combinator_span: Some(c_span),
-                selectors: &[],
-                span: c_span,
-            });
+            parser
+                .stores
+                .runs
+                .relative_selector_scratch
+                .push(RelativeSelector {
+                    combinator: Some(c),
+                    combinator_span: Some(c_span),
+                    selectors: Run::EMPTY,
+                    span: c_span,
+                });
             let next_span = Span {
                 start: parser.span_pos(parser.current_start()),
                 end: parser.span_pos(parser.current_end()),
@@ -384,7 +403,8 @@ pub(crate) fn parse_complex_selector<'arena>(
         // errors here on the missing compound, which both parsers reject.
         let (combinator, combinator_span) = pending.unzip();
         let child = parse_relative_selector(parser, combinator, combinator_span)?;
-        children.push(child);
+        end = child.span.end;
+        parser.stores.runs.relative_selector_scratch.push(child);
 
         // Continue with the next combinator, or stop. The loop ends at `{`/`,`/`)`/EOF or
         // when no further combinator follows; a gap comment is registered inside
@@ -406,8 +426,11 @@ pub(crate) fn parse_complex_selector<'arena>(
 
     // The complex selector ends at its last relative selector (always a compound — a
     // combinator run ends in one, else `parse_relative_selector` errored above).
-    let children = children.into_bump_slice();
-    let end = children.last().map_or(start, |rel| rel.span.end);
+    let children = flush_run(
+        &mut parser.stores.runs.relative_selector_scratch,
+        &mut parser.stores.runs.relative_selectors,
+        mark,
+    );
     Ok(ComplexSelector {
         children,
         span: Span { start, end },
@@ -635,11 +658,11 @@ fn compound_continues_across_comments(parser: &CssParser<'_, '_>) -> Result<bool
 }
 
 /// Parse a relative selector: combinator + simple selectors
-fn parse_relative_selector<'arena>(
-    parser: &mut CssParser<'_, 'arena>,
+fn parse_relative_selector(
+    parser: &mut CssParser<'_, '_>,
     combinator: Option<Combinator>,
     combinator_span: Option<Span>,
-) -> Result<RelativeSelector<'arena>, Error> {
+) -> Result<RelativeSelector, Error> {
     // Ahead of the capture below, which is this compound's `start` when no combinator
     // precedes it — see `skip_boundary_whitespace`.
     parser.skip_boundary_whitespace()?;
@@ -648,12 +671,12 @@ fn parse_relative_selector<'arena>(
         || parser.base_offset() + parser.current_start(),
         |s| s.start_usize(),
     );
-    let mut selectors = parser.bvec();
+    let mark = parser.stores.runs.simple_selector_scratch.mark();
 
     // Parse one or more simple selectors
     loop {
         let simple = parse_simple_selector(parser)?;
-        selectors.push(simple);
+        parser.stores.runs.simple_selector_scratch.push(simple);
 
         // A glued comment run (`.a/* c */.b`, `.a/* c *//* d */.b`) between two simple
         // selectors is inter-token trivia that keeps them in one compound — with no
@@ -694,14 +717,19 @@ fn parse_relative_selector<'arena>(
 
     let end = parser.span_pos(parser.current_start());
 
-    if selectors.is_empty() {
+    if parser.stores.runs.simple_selector_scratch.len_since(mark) == 0 {
         return Err(parser.error_expected_at("selector", start));
     }
 
+    let selectors = flush_run(
+        &mut parser.stores.runs.simple_selector_scratch,
+        &mut parser.stores.runs.simple_selectors,
+        mark,
+    );
     Ok(RelativeSelector {
         combinator,
         combinator_span,
-        selectors: selectors.into_bump_slice(),
+        selectors,
         span: Span {
             start: start as u32,
             end,
@@ -724,9 +752,9 @@ fn is_simple_selector_chain(parser: &CssParser<'_, '_>) -> bool {
 }
 
 /// Parse a simple selector: type, class, id, attribute, pseudo-class, pseudo-element
-pub(crate) fn parse_simple_selector<'arena>(
-    parser: &mut CssParser<'_, 'arena>,
-) -> Result<SimpleSelector<'arena>, Error> {
+pub(crate) fn parse_simple_selector(
+    parser: &mut CssParser<'_, '_>,
+) -> Result<SimpleSelector, Error> {
     let start = parser.base_offset() + parser.current_start();
 
     // Inside functional pseudo-class args, a `<number>`/`<an+b>` term (followed by
@@ -757,7 +785,7 @@ pub(crate) fn parse_simple_selector<'arena>(
         TokenKind::Identifier => {
             // Type selector: div, span, etc. Could also be a namespace prefix:
             // svg|rect, svg|*. Both forms recover their text verbatim from `span` at
-            // print time, so nothing is copied into the arena either way.
+            // print time, so nothing is copied into the text pool either way.
             if matches!(parser.peek_past_comments()?, TokenKind::Pipe) {
                 // Namespace prefix: identifier|element. A comment may split either of the
                 // `<wq-name>`'s junctures (`svg/* c */|rect`, `svg|/* c */rect`) — it is
@@ -802,7 +830,7 @@ pub(crate) fn parse_simple_selector<'arena>(
                 })
             } else {
                 // No namespace, just a regular type selector; its text is recovered
-                // from `span` at print time, so nothing is copied into the arena.
+                // from `span` at print time, so nothing is copied into the text pool.
                 parser.advance()?;
                 let end = parser.span_pos(parser.current_start());
                 Ok(SimpleSelector::Type {
@@ -826,7 +854,7 @@ pub(crate) fn parse_simple_selector<'arena>(
                 return Err(parser.error_expected_after("class name", "."));
             }
             // The class name's text is recovered from `span` at print time, so
-            // nothing is copied into the arena.
+            // nothing is copied into the text pool.
             let end = parser.span_pos(parser.current_end());
             parser.advance()?;
             Ok(SimpleSelector::Class {
@@ -843,7 +871,7 @@ pub(crate) fn parse_simple_selector<'arena>(
                 return Err(parser.error_expected_after("ID name", "#"));
             }
             // The ID name's text is recovered from `span` at print time, so nothing
-            // is copied into the arena.
+            // is copied into the text pool.
             let end = parser.span_pos(parser.current_end());
             parser.advance()?;
             Ok(SimpleSelector::Id {
@@ -884,7 +912,7 @@ pub(crate) fn parse_simple_selector<'arena>(
                 }
 
                 // The element name's text is recovered from `span` at print time, so
-                // nothing is copied into the arena.
+                // nothing is copied into the text pool.
                 let span = Span {
                     start: start as u32,
                     end: parser.span_pos(parser.current_end()),
@@ -965,7 +993,7 @@ pub(crate) fn parse_simple_selector<'arena>(
             // Must be followed by an identifier (element name) or asterisk (universal)
             if parser.check(TokenKind::Identifier) {
                 // The element name's text is recovered from `span` at print time, so
-                // nothing is copied into the arena.
+                // nothing is copied into the text pool.
                 let end = parser.span_pos(parser.current_end());
                 parser.advance()?;
 

@@ -15,28 +15,25 @@ pub use crate::ast::{WarmStores, park_stores, take_stores, with_stores};
 /// everywhere in CSS, whose syntax normalizes a `<CR>` to `<LF>` itself (css-syntax-3
 /// §Preprocessing the input stream), so this is the folded parse alone;
 /// `tsv_svelte::__private::parse_folded` is the sibling that is not.
-pub fn parse_folded<'arena>(
+pub fn parse_folded(
     folded: &tsv_lang::printing::FoldedSource<'_>,
-    arena: &'arena bumpalo::Bump,
-) -> Result<ParsedCss<'arena>> {
+    arena: &bumpalo::Bump,
+) -> Result<ParsedCss> {
     parsed(|stores| parse_folded_into(folded, arena, stores))
 }
 
 /// [`parse_folded`] into a caller's `stores`.
-pub fn parse_folded_into<'arena>(
+pub fn parse_folded_into(
     folded: &tsv_lang::printing::FoldedSource<'_>,
-    arena: &'arena bumpalo::Bump,
+    arena: &bumpalo::Bump,
     stores: &mut CssStores,
-) -> Result<CssStyleSheet<'arena>> {
+) -> Result<CssStyleSheet> {
     folded.parse_with(|text| parse_into(text, arena, stores))
 }
 
 /// A warm parse's tree as a reading entry point takes it, read through `stores`.
 #[inline]
-pub fn parsed_ref<'a, 'arena: 'a>(
-    stylesheet: &'a CssStyleSheet<'arena>,
-    stores: &'a CssStores,
-) -> CssParsedRef<'a> {
+pub fn parsed_ref<'a>(stylesheet: &'a CssStyleSheet, stores: &'a CssStores) -> CssParsedRef<'a> {
     CssParsedRef {
         stylesheet,
         view: stores.view(),
@@ -44,9 +41,7 @@ pub fn parsed_ref<'a, 'arena: 'a>(
 }
 
 /// A one-shot parse: `parse` over fresh stores, bundled with the tree it built.
-fn parsed<'arena>(
-    parse: impl FnOnce(&mut CssStores) -> Result<CssStyleSheet<'arena>>,
-) -> Result<ParsedCss<'arena>> {
+fn parsed(parse: impl FnOnce(&mut CssStores) -> Result<CssStyleSheet>) -> Result<ParsedCss> {
     let mut stores = CssStores::new();
     let stylesheet = parse(&mut stores)?;
     Ok(ParsedCss { stylesheet, stores })
@@ -67,9 +62,10 @@ fn parsed<'arena>(
 /// * `Ok(CssStyleSheet)` - Parsed AST with nodes and value comments
 /// * `Err(Error)` - Parse error positioned in the parent file
 ///
-/// `arena` owns the returned AST's nodes (shared with the host document's arena
-/// when CSS is embedded in a Svelte `<style>`), and `stores` are the host document's CSS
-/// stores, or the caller's own for a stylesheet it parses apart from the document's.
+/// `arena` holds the parse's scratch (the host document's arena when CSS is embedded in a
+/// Svelte `<style>`), and `stores` are the host document's CSS stores, or the caller's own
+/// for a stylesheet it parses apart from the document's: every list and string of the
+/// returned tree lives in them.
 ///
 /// # Errors
 ///
@@ -77,13 +73,13 @@ fn parsed<'arena>(
 /// point — [`Error::wire_point`] is `None` — until the host fills its context over
 /// the whole document ([`Error::with_context`], as `tsv_svelte::__private::parse` does): a
 /// context taken over `source`, a slice, would read that position against the wrong text.
-pub fn parse_embedded<'arena>(
+pub fn parse_embedded(
     source: &str,
     base_offset: usize,
     host_nesting: u32,
-    arena: &'arena bumpalo::Bump,
+    arena: &bumpalo::Bump,
     stores: &mut CssStores,
-) -> Result<CssStyleSheet<'arena>> {
+) -> Result<CssStyleSheet> {
     parser::parse_css(source, base_offset, host_nesting, arena, stores)
 }
 
@@ -224,19 +220,19 @@ pub fn format_ast_in<'a>(
 /// let stylesheet = parse(css, &arena).expect("Failed to parse CSS");
 /// ```
 ///
-/// `arena` owns every AST node of the returned [`CssStyleSheet`]
-/// (caller-owns-`Bump`); the stylesheet borrows from it for `'arena`. [`ParsedCss`] bundles
-/// it with fresh stores and derefs to it.
-pub fn parse<'arena>(source: &str, arena: &'arena bumpalo::Bump) -> Result<ParsedCss<'arena>> {
+/// Every list and string of the returned [`CssStyleSheet`] lives in the stores [`ParsedCss`]
+/// bundles with it, fresh for this parse; it derefs to the stylesheet. `arena` holds the
+/// parse's scratch (caller-owns-`Bump`).
+pub fn parse(source: &str, arena: &bumpalo::Bump) -> Result<ParsedCss> {
     parsed(|stores| parse_into(source, arena, stores))
 }
 
 /// [`parse`] into a caller's `stores`, for a warm path that keeps them across stylesheets.
-pub fn parse_into<'arena>(
+pub fn parse_into(
     source: &str,
-    arena: &'arena bumpalo::Bump,
+    arena: &bumpalo::Bump,
     stores: &mut CssStores,
-) -> Result<CssStyleSheet<'arena>> {
+) -> Result<CssStyleSheet> {
     Error::ensure_source_fits(source)?;
     parser::parse_css(source, 0, 0, arena, stores)
         .map_err(|e| e.with_context(source, WIRE_COORDINATES))

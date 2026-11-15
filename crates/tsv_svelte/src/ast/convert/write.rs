@@ -1657,15 +1657,7 @@ fn write_style_sheet(
     w.raw(",\"attributes\":");
     write_value_attributes(w, style.attributes, ctx);
     w.raw(",\"children\":");
-    let css_comments = write_css_children(
-        w,
-        tsv_css::ast::CssParsedRef {
-            stylesheet: &style.css_stylesheet,
-            view: ctx.css,
-        },
-        ctx.source,
-        ctx.positions,
-    );
+    let css_comments = write_css_children(w, style.css_parsed(ctx.css), ctx.source, ctx.positions);
     w.raw(",\"comments\":");
     write_css_comments(w, &css_comments, ctx.source, ctx.positions);
     w.raw(",\"content\":{\"start\":");

@@ -57,8 +57,8 @@ const _: () = assert!(size_of::<Result<IdRet<TSType>, Error>>() == 2 * size_of::
 // The CSS numeric carriers, 4-aligned through `PackedF64`. See the native `ColorChannel` and
 // `CssValue` pins in `tsv_css`'s `ast/mod.rs`.
 const _: () = assert!(size_of::<ColorChannel>() == 12);
-const _: () = assert!(size_of::<CssValue<'static>>() == 60);
-const _: () = assert!(size_of::<SimpleSelector<'static>>() == 60);
+const _: () = assert!(size_of::<CssValue>() == 64);
+const _: () = assert!(size_of::<SimpleSelector>() == 60);
 // The Svelte nodes. See the native pins in `tsv_svelte`'s `ast/mod.rs`.
 const _: () = assert!(size_of::<Element<'static>>() == 40);
 const _: () = assert!(size_of::<FragmentNode<'static>>() == 80);

@@ -356,7 +356,7 @@ The `doc` module implements a declarative document builder inspired by prettier'
 
 ### Core Types (Arena-Based)
 
-Doc nodes live in a contiguous `DocArena`, referenced by `DocId` (a `u32` index), with child lists as `ChildRange` (start index + length) — no per-node heap allocation, no recursive `Drop` traversal. Indices suit the doc tree specifically: it's built once, rendered once, and dropped wholesale. The AST is store- and arena-allocated — `Expression`, `Statement` and `TSType` nodes and the payloads too rare to sit inline sit in per-document stores indexed by typed ids (`ExprId`, `StmtId`, `TyId`, one id per payload type), the lists built by value as runs of rows in a store per element type, TypeScript's decoded strings and comments in the same stores, and the CSS and Svelte trees in a bump arena — see [Nested AST](#nested-ast-bump-arena-not-flatindexed).
+Doc nodes live in a contiguous `DocArena`, referenced by `DocId` (a `u32` index), with child lists as `ChildRange` (start index + length) — no per-node heap allocation, no recursive `Drop` traversal. Indices suit the doc tree specifically: it's built once, rendered once, and dropped wholesale. The AST is store- and arena-allocated — `Expression`, `Statement` and `TSType` nodes and the payloads too rare to sit inline sit in per-document stores indexed by typed ids (`ExprId`, `StmtId`, `TyId`, one id per payload type), the lists built by value as runs of rows in a store per element type, TypeScript's decoded strings and comments in the same stores, the CSS tree's lists and strings in stores of its own, and the Svelte tree in a bump arena — see [Nested AST](#nested-ast-bump-arena-not-flatindexed).
 
 ```rust
 pub enum DocNode {
@@ -496,7 +496,7 @@ Script/style tag content is extracted by **raw byte scanning** for closing delim
 
 ### Multi-Language Embedding
 
-Every embedded region shares the Svelte document's allocations — the TypeScript islands its one set of `AstStores`, the markup and `<style>` its one bump arena, the top-level `<style>` also the document's `CssStores` (the two store sets are the halves of the document's `SvelteStores`); each embedded region gets a fresh parser instance. There is no shared symbol table — all names are span-identity, recovered from source.
+Every embedded region shares the Svelte document's allocations — the TypeScript islands its one set of `AstStores`, the markup its one bump arena, the top-level `<style>` the document's `CssStores` (the two store sets are the halves of the document's `SvelteStores`); each embedded region gets a fresh parser instance. There is no shared symbol table — all names are span-identity, recovered from source.
 
 Embedded parsers track `base_offset` so spans are absolute positions in the root source, not relative to tag content. Standalone parsing passes `base_offset = 0`.
 
@@ -752,8 +752,8 @@ present). Two kinds of owned data remain on nodes, both deliberate:
   (escape sequences resolved). Both the `tsv_ts` and `tsv_css` string literals hold a
   `StringCooked` whose common `Verbatim` arm is span-recovered and allocation-free; only
   the `Decoded` arm — which a span can't reconstruct — holds text of its own, copied once
-  at parse: into the stores' text pool in `tsv_ts` (a `PoolText<Text>`), into the arena as an
-  `&'arena str` in `tsv_css`.
+  at parse into the stores' text pool: a `PoolText<Text>` in `tsv_ts`, a `PoolText<CssText>` in
+  `tsv_css`.
   Don't "restore" a `Decoded` value to span extraction — verify a field is a *verbatim*
   source slice before assuming it's a redundant copy.
 - **Precomputed derived scalars** — a node caches a small derived value (a `bool`/
@@ -869,9 +869,9 @@ A `format-ignore` / `prettier-ignore` comment suppresses formatting of the const
 
 Native tsv runs on the system allocator — no `#[global_allocator]`, no alternative-allocator dependency. The one exception is WebAssembly: `tsv_wasm` sets a wasm32-gated `#[global_allocator]` to [talc](https://github.com/SFBdragon/talc) (its `WasmGrowAndExtend` source), replacing std's default dlmalloc — the WASM format path is allocation-bound enough that the allocator itself was a measured wall, and the extend source holds the long-lived instance's linear-memory high-water at dlmalloc parity. The performance posture is otherwise structural: each layer avoids allocation by design rather than allocating faster.
 
-**Lexing — spans, not strings.** Tokens store `u32` byte offsets (`start`, `end`) into the source, never slices or copies — `Token` is a small POD (16 B; tsv_svelte's 12 B) that a byte cursor over the source emits. The exception is deliberate: a string literal's decoded value is materialized only when it actually contains escape sequences, decoded into a **reused scratch buffer held out-of-band on the lexer** (`Lexer::decode_scratch`, borrowed via `decoded_str` and copied out at receipt — into the stores' text pool in `tsv_ts`, into the AST arena in `tsv_css`) so no per-literal `String` allocates and the per-token `Token` stays pointer-free. Comments are spans too — the token carries a `content_start` and the `Comment` node a `content_span`, recovered from source on demand and never copied. On the parser's hot path (`advance`, plus the CSS and Svelte lookaheads) the lexers write the token in place into the parser's slot (`next_token_into`) rather than returning a by-value `Result<Token, Error>` through a stack slot the parser would reload and re-scatter; other TS and CSS callers take it by value (`next_token`); the Svelte lexer has no by-value form.
+**Lexing — spans, not strings.** Tokens store `u32` byte offsets (`start`, `end`) into the source, never slices or copies — `Token` is a small POD (16 B; tsv_svelte's 12 B) that a byte cursor over the source emits. The exception is deliberate: a string literal's decoded value is materialized only when it actually contains escape sequences, decoded into a **reused scratch buffer held out-of-band on the lexer** (`Lexer::decode_scratch`, borrowed via `decoded_str` and copied out at receipt — into the stores' text pool in `tsv_ts` and `tsv_css`) so no per-literal `String` allocates and the per-token `Token` stays pointer-free. Comments are spans too — the token carries a `content_start` and the `Comment` node a `content_span`, recovered from source on demand and never copied. On the parser's hot path (`advance`, plus the CSS and Svelte lookaheads) the lexers write the token in place into the parser's slot (`next_token_into`) rather than returning a by-value `Result<Token, Error>` through a stack slot the parser would reload and re-scatter; other TS and CSS callers take it by value (`next_token`); the Svelte lexer has no by-value form.
 
-**Internal AST — TypeScript in stores, CSS and Svelte in a bump arena, span-identity names, no raw text.** TypeScript's expressions, statements, types and rare wide payloads are rows of per-document stores named by typed ids; a child list is a `Run` over a store (of ids, or of the elements themselves for a list built by value); TypeScript's decoded strings and comments live in the same stores, so its whole tree is there; CSS's and Svelte's own nodes are allocated in a per-parse bump arena; in both, small children are kept inline by value (see [Nested AST](#nested-ast-bump-arena-not-flatindexed) for the layout rationale). Identifier names are span-identity — an `IdentName` records the raw name-token length and the name is re-sliced from source; only the rare `\u`-escaped (or oversized) name carries its decoded form, as pool text. Svelte element/attribute names are span-identity too (`source[name_span]`, `.trim()` for the padded-`{ shorthand }` edge), so there is no shared symbol table anywhere. Raw source text is never duplicated into the AST — printers re-slice via `span.extract(source)`; the few deliberate stored-raw caches are cataloged in [Source-Based Printing](#source-based-printing). What remains as owned data is genuinely decoded: string-literal values (only when escaped) and the like, copied once into the text pool (TypeScript) or the arena (CSS, Svelte).
+**Internal AST — TypeScript and CSS in stores, Svelte in a bump arena, span-identity names, no raw text.** TypeScript's expressions, statements, types and rare wide payloads are rows of per-document stores named by typed ids; a child list is a `Run` over a store (of ids, or of the elements themselves for a list built by value); TypeScript's decoded strings and comments live in the same stores, so its whole tree is there; every CSS list is a value run over a store of its element type and every CSS string pool text, in a stylesheet's stores; Svelte's own nodes are allocated in a per-parse bump arena; in all three, small children are kept inline by value (see [Nested AST](#nested-ast-bump-arena-not-flatindexed) for the layout rationale). Identifier names are span-identity — an `IdentName` records the raw name-token length and the name is re-sliced from source; only the rare `\u`-escaped (or oversized) name carries its decoded form, as pool text. Svelte element/attribute names are span-identity too (`source[name_span]`, `.trim()` for the padded-`{ shorthand }` edge), so there is no shared symbol table anywhere. Raw source text is never duplicated into the AST — printers re-slice via `span.extract(source)`; the few deliberate stored-raw caches are cataloged in [Source-Based Printing](#source-based-printing). What remains as owned data is genuinely decoded: string-literal values (only when escaped) and the like, copied once into the text pool (TypeScript, CSS) or the arena (Svelte).
 
 **Svelte template nodes — contiguous storage.** Fragment children are an `&'arena [FragmentNode]` slice of enum values rather than boxed nodes, keeping siblings contiguous in arena memory for the printer's traversal loops.
 
@@ -974,9 +974,11 @@ Decisions made during development with rationale preserved for future reference.
 ### Nested AST (Bump-Arena, Not Flat/Indexed)
 
 tsv's TypeScript tree lives in per-document stores named by typed ids (below), its decoded
-strings and comments included, so a TypeScript parse takes no arena. The CSS and Svelte
-trees sit in a **per-parse bump arena** (`bumpalo`), tied to the program lifetime, freed
-wholesale when the arena drops, with no per-node `Drop`.
+strings and comments included, so a TypeScript parse takes no arena. The CSS tree's lists
+and strings live in a stylesheet's `CssStores` (below); its parse still takes an arena, for
+the value parser's operator-run token buffer alone. The Svelte tree sits in a **per-parse
+bump arena** (`bumpalo`), tied to the program lifetime, freed wholesale when the arena drops,
+with no per-node `Drop`.
 
 **`Expression`, `Statement` and `TSType` nodes and the rare payloads are the exceptions: they live in `AstStores`**
 (`ast/stores.rs`), one per document, kept beside the tree in a `Parsed` and shared across a Svelte component's
@@ -1003,7 +1005,14 @@ fellows, a `for` head, a catch clause, a parameter name's extras) are rows too, 
 payload type, each named by an id of its own type (`ArrowFnId`, `FnDeclId`, `ImportTypeId`,
 …). The stores also hold the tree's decoded strings, in one text pool a `PoolText<Text>` names, and
 its comments, a run of comment rows per program (`Run<Comment>`), each read through the view
-like a row. The rest of this section describes the layout the stores were built to keep.
+like a row. The CSS tree takes the same shape for its lists and strings: each of its list
+types (a stylesheet's nodes, a block's children, the three selector levels, a `::part()`'s
+name spans, a value list's members, a condition's parts and segments) is a value run over a
+`CssStores` store of its element type, built on that type's scratch stack (every element type
+`Copy` and flushed as a block but `CssNode` and `CssBlockChild`, which hold a rule or an at-rule
+inline and move a row at a time), and every string it keeps as text of its own is a
+`PoolText<CssText>`, all read through a `CssView`. The rest of this section describes the
+layout the stores were built to keep.
 
 
 ```rust
@@ -1029,9 +1038,10 @@ pub enum StatementKind {
 
 A TypeScript parse returns the tree with the stores it wrote (`parse(source)` → `Parsed`, or
 `*_into` a caller's warm stores); a CSS or Svelte caller owns the arena
-(`parse(source, &arena)`), and the returned AST borrows it, bundled with its stores as well
-(`ParsedCss`, `ParsedRoot`, or `*_into` a caller's): `CssStores`, a text pool no parse writes
-to while the CSS tree lives in the arena, and `SvelteStores`, a TypeScript half and a CSS half.
+(`parse(source, &arena)`), the returned tree bundled with its stores as well (`ParsedCss`,
+`ParsedRoot`, or `*_into` a caller's): `CssStores`, which hold every list and string of the
+CSS tree, and `SvelteStores`, a TypeScript half and a CSS half, beside the Svelte tree
+that borrows the arena.
 Each language crate parks its stores per thread, boxed, between documents (`with_stores`, which
 `tsv_arena`'s macros run every binding export under, and `WarmStores` for a slot the caller
 owns, as each `Formatter` does); a Svelte document's halves are the boxes `tsv_ts`'s and
@@ -1284,9 +1294,9 @@ The closest Rust projects embody the alternative shapes, which makes the trade-o
   formatter — answers a different question: many _tools_ sharing one language's AST. tsv does
   the same per language (see [Shared Parser, Divergent Tools](#shared-parser-divergent-tools));
   the per-language crate split is the multi-language question oxc never faces. Allocation
-  converges only in part: like oxc, tsv's CSS and Svelte trees bump-allocate
-  lifetime-threaded (`&'arena`) types, while its TypeScript tree holds ids into stores with
-  no lifetime at all — and it keeps an **inline-by-value node layout** (not size-minimized
+  converges only in part: like oxc, tsv's Svelte tree bump-allocates lifetime-threaded
+  (`&'arena`) types, while its TypeScript and CSS trees hold ids and runs into stores with no
+  lifetime at all — and it keeps an **inline-by-value node layout** (not size-minimized
   via boxing/indirection, which regressed its traversal-bound formatter; see
   [Nested AST](#nested-ast-bump-arena-not-flatindexed)),
   stays `unsafe_code = "forbid"` (safe bumpalo API only), and recovers source text via `span`

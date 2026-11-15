@@ -285,7 +285,7 @@ impl<'a> Printer<'a> {
     /// at its three sites, so each ask paid a call, four callee-saved pushes and the epilogue
     /// for a one-byte answer.
     #[inline]
-    pub(crate) fn has_value_comments_in_decl(&self, decl: &CssDeclaration<'_>) -> bool {
+    pub(crate) fn has_value_comments_in_decl(&self, decl: &CssDeclaration) -> bool {
         // Free O(1) negative gate: `has_block_comment` (recorded at parse time from the
         // lexer's comment tokens) is false iff no `/* … */` appears anywhere in the
         // declaration — property→colon gap or value/`!important`/trailing region. No block
@@ -303,7 +303,7 @@ impl<'a> Printer<'a> {
     /// that holds a block comment somewhere: the colon scan, the `/*` substring check and the
     /// value re-lex.
     #[inline(never)]
-    fn has_value_comments_in_decl_scan(&self, decl: &CssDeclaration<'_>) -> bool {
+    fn has_value_comments_in_decl_scan(&self, decl: &CssDeclaration) -> bool {
         let decl_source = decl.span.extract(self.source);
         let value_start = decl.colon_pos() + 1;
         let value_part = &decl_source[value_start..];
@@ -633,7 +633,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Print a list of CSS nodes (rules) with comments interspersed by position
-    pub(crate) fn print_css_nodes(&mut self, nodes: &[CssNode<'_>]) {
+    pub(crate) fn print_css_nodes(&mut self, nodes: &[CssNode]) {
         // Use comment index for efficient traversal (comments are sorted)
         let mut comment_idx = 0;
         let mut prev_end: u32 = 0;
@@ -876,7 +876,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Print a single CSS node
-    fn print_css_node(&mut self, node: &CssNode<'_>) {
+    fn print_css_node(&mut self, node: &CssNode) {
         match node {
             CssNode::Rule(rule) => self.print_css_rule(rule),
             CssNode::Atrule(atrule) => self.print_css_atrule(atrule),
@@ -970,7 +970,7 @@ impl<'a> Printer<'a> {
     /// This consolidates the repeated pattern across rules.rs and atrules.rs.
     pub(crate) fn try_print_inline_comments(
         &mut self,
-        children: &[CssBlockChild<'_>],
+        children: &[CssBlockChild],
         current_idx: usize,
         prev_end: u32,
     ) -> usize {
@@ -998,7 +998,7 @@ impl<'a> Printer<'a> {
     /// re-add it after. Delegates the per-comment loop so the two stay in lockstep.
     pub(crate) fn try_print_inline_comments_after_decl(
         &mut self,
-        children: &[CssBlockChild<'_>],
+        children: &[CssBlockChild],
         current_idx: usize,
         prev_end: u32,
     ) -> usize {
@@ -1032,9 +1032,9 @@ impl<'a> Printer<'a> {
     /// directive (it hardcoded `false`, skipping both honor and reset).
     pub(crate) fn print_decl_with_inline_comments(
         &mut self,
-        children: &[CssBlockChild<'_>],
+        children: &[CssBlockChild],
         index: usize,
-        decl: &CssDeclaration<'_>,
+        decl: &CssDeclaration,
         format_ignore_next: &mut bool,
     ) -> usize {
         if std::mem::take(format_ignore_next) {
@@ -1061,7 +1061,7 @@ impl<'a> Printer<'a> {
     /// didn't"; with a single routine there is no "another".
     pub(crate) fn print_css_block_children(
         &mut self,
-        children: &[CssBlockChild<'_>],
+        children: &[CssBlockChild],
         start_index: usize,
     ) {
         let mut i = start_index;
@@ -1144,7 +1144,7 @@ impl<'a> Printer<'a> {
     /// previous sibling's trailing `;` (not included in declaration spans).
     pub(crate) fn has_blank_line_before_child(
         &self,
-        children: &[CssBlockChild<'_>],
+        children: &[CssBlockChild],
         index: usize,
     ) -> bool {
         let Some(prev) = children.get(index.wrapping_sub(1)) else {
@@ -1244,7 +1244,7 @@ fn register_stylesheet_comments(parsed: CssParsedRef<'_>, source: &str) {
 
 /// Collect the spans of every in-block `CssBlockChild::Comment` under the top-level nodes.
 #[cfg(feature = "_internal_comment_check")]
-fn collect_block_comment_spans(nodes: &[CssNode<'_>], view: CssView<'_>, out: &mut Vec<Span>) {
+fn collect_block_comment_spans(nodes: &[CssNode], view: CssView<'_>, out: &mut Vec<Span>) {
     for node in nodes {
         match node {
             CssNode::Rule(rule) => {
@@ -1271,7 +1271,7 @@ fn collect_block_comment_spans(nodes: &[CssNode<'_>], view: CssView<'_>, out: &m
 /// and at-rule blocks.
 #[cfg(feature = "_internal_comment_check")]
 fn collect_block_child_comment_spans(
-    children: &[CssBlockChild<'_>],
+    children: &[CssBlockChild],
     view: CssView<'_>,
     out: &mut Vec<Span>,
 ) {

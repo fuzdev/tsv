@@ -261,8 +261,7 @@ pub fn parse_to_json(source: &str) -> Result<String> {
 
 /// [`parse_to_json`] under `options`: whether the wire carries `loc`.
 ///
-/// Each call parses into a fresh arena sized to the source, dropped once the wire is
-/// written.
+/// Each call parses into fresh stores, dropped once the wire is written.
 ///
 /// ```
 /// # fn main() -> tsv_css::Result<()> {

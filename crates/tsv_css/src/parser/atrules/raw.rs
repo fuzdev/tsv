@@ -1,10 +1,12 @@
 use std::borrow::Cow;
 
 use super::{CssParser, is_boolean_operator};
+use crate::ast::CssText;
 use crate::lexer::TokenKind;
 use crate::url::trim_url_raw;
 use crate::whitespace::{Comments, Edge, holds_boundary_member, spell_run};
 use tsv_lang::printing::format_string_literal;
+use tsv_lang::store::PoolText;
 use tsv_lang::{Error, Span};
 
 /// Build the raw at-rule prelude string (used for both the printer and, for the media
@@ -19,14 +21,14 @@ use tsv_lang::{Error, Span};
 /// The flag is printer-facing only: the prelude *span* is the same either way and
 /// `convert` emits the wire from the span, so routing a name between the two modes moves
 /// no wire byte.
-pub(super) fn parse_raw_prelude_content<'arena>(
-    parser: &mut CssParser<'_, 'arena>,
+pub(super) fn parse_raw_prelude_content(
+    parser: &mut CssParser<'_, '_>,
     normalize_whitespace: bool,
     // `@namespace` normalizes string / `url()` quotes to prettier's single-quote form
     // (`"x"` → `'x'`, `url("x")` → `url('x')`, per the `singleQuote` option — the same
     // as declaration values and `@import`); other raw at-rules keep quotes verbatim.
     normalize_quotes: bool,
-) -> Result<(&'arena str, Span), Error> {
+) -> Result<(PoolText<CssText>, Span), Error> {
     // Add spaces around boolean operators (and, or, not) and after ':' for prettier compatibility
     let prelude_start_raw = parser.current_start();
     let prelude_start = parser.span_pos(prelude_start_raw);
@@ -413,7 +415,7 @@ pub(super) fn parse_raw_prelude_content<'arena>(
             &prelude,
         )
         .unwrap_or(prelude);
-    let content = parser.alloc_str_in(crate::escapes::trim_css(&prelude));
+    let content = parser.stores.text.push(crate::escapes::trim_css(&prelude));
     let prelude_end = parser.span_pos(parser.current_start());
     let span = Span {
         start: prelude_start,

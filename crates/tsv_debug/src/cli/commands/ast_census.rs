@@ -919,7 +919,7 @@ mod tests {
                 count: 10,
                 size: None,
             },
-            // Defined in both `tsv_ts` and `tsv_css` at different widths.
+            // Defined in both `tsv_ts` and `tsv_css`, whose widths need not agree.
             Row {
                 name: "StringCooked".to_owned(),
                 count: 10,
@@ -937,7 +937,7 @@ mod tests {
         // `StringCooked` resolves only if the two crates happen to agree; the
         // assertion is that the join never picks one of two disagreeing widths.
         let ts = size_of::<tsv_ts::ast::StringCooked>();
-        let css = size_of::<tsv_css::ast::StringCooked<'_>>();
+        let css = size_of::<tsv_css::ast::StringCooked>();
         assert_eq!(rows[1].size, (ts == css).then_some(ts));
     }
 }

@@ -2,6 +2,7 @@ use super::CssParser;
 use super::decl_scan::{DeclarationHead, ScannedDeclaration};
 use crate::ast::*;
 use crate::lexer::{TokenKind, read_ident_continuation};
+use tsv_lang::store::flush_run_move;
 use tsv_lang::{Error, Span};
 
 /// Check if we're looking at the start of a nested rule (selector) rather than a declaration.
@@ -61,19 +62,13 @@ pub(crate) fn is_nested_rule_start(parser: &CssParser<'_, '_>) -> Result<bool, E
 ///
 /// When `nested` is true, the selector list allows leading combinators (CSS Nesting relative selectors).
 /// For example: `> .child {}`, `+ .sibling {}`, `~ .general {}`
-pub(crate) fn parse_rule<'arena>(
-    parser: &mut CssParser<'_, 'arena>,
-    nested: bool,
-) -> Result<CssRule<'arena>, Error> {
+pub(crate) fn parse_rule(parser: &mut CssParser<'_, '_>, nested: bool) -> Result<CssRule, Error> {
     // two wire levels: the `Rule` and its `Block` (the depth limit's count)
     parser.nested(2, |p| parse_rule_body(p, nested))
 }
 
 /// [`parse_rule`] inside its depth levels.
-fn parse_rule_body<'arena>(
-    parser: &mut CssParser<'_, 'arena>,
-    nested: bool,
-) -> Result<CssRule<'arena>, Error> {
+fn parse_rule_body(parser: &mut CssParser<'_, '_>, nested: bool) -> Result<CssRule, Error> {
     // Ahead of the capture: this offset becomes the rule's AND its prelude's `start`, both
     // of which sit past a boundary whitespace run in `parseCss` (see
     // `skip_boundary_whitespace`). Two of the three callers reach here having already
@@ -94,11 +89,15 @@ fn parse_rule_body<'arena>(
     };
 
     // Capture any comments after selector (before {)
-    let mut declarations = parser.bvec();
+    let mark = parser.stores.runs.block_child_scratch.mark();
     parser.skip_whitespace()?;
     while matches!(parser.current_kind(), TokenKind::Comment) {
         let comment = parser.parse_block_comment()?;
-        declarations.push(CssBlockChild::Comment(comment));
+        parser
+            .stores
+            .runs
+            .block_child_scratch
+            .push(CssBlockChild::Comment(comment));
         parser.skip_whitespace()?;
     }
 
@@ -119,7 +118,11 @@ fn parse_rule_body<'arena>(
 
         if matches!(parser.current_kind(), TokenKind::Comment) {
             let comment = parser.parse_block_comment()?;
-            declarations.push(CssBlockChild::Comment(comment));
+            parser
+                .stores
+                .runs
+                .block_child_scratch
+                .push(CssBlockChild::Comment(comment));
             continue;
         }
 
@@ -128,7 +131,11 @@ fn parse_rule_body<'arena>(
             // Parse nested at-rule (e.g., @media inside a rule)
             // Pass true for nested_in_rule since we're inside a regular rule's declaration block
             let nested_atrule = super::atrules::parse_atrule(parser, true)?;
-            declarations.push(CssBlockChild::Atrule(nested_atrule));
+            parser
+                .stores
+                .runs
+                .block_child_scratch
+                .push(CssBlockChild::Atrule(nested_atrule));
             parser.skip_whitespace()?;
             continue;
         }
@@ -137,7 +144,11 @@ fn parse_rule_body<'arena>(
         if is_nested_rule_start(parser)? {
             // Parse nested rule recursively (nested rules allow leading combinators)
             let nested_rule = parse_rule(parser, true)?;
-            declarations.push(CssBlockChild::Rule(nested_rule));
+            parser
+                .stores
+                .runs
+                .block_child_scratch
+                .push(CssBlockChild::Rule(nested_rule));
             parser.skip_whitespace()?;
             continue;
         }
@@ -145,7 +156,11 @@ fn parse_rule_body<'arena>(
         // Otherwise, parse as declaration
         if parser.check(TokenKind::Identifier) {
             let decl = parse_declaration(parser)?;
-            declarations.push(CssBlockChild::Declaration(decl));
+            parser
+                .stores
+                .runs
+                .block_child_scratch
+                .push(CssBlockChild::Declaration(decl));
         } else {
             // Skip unexpected tokens
             parser.advance()?;
@@ -160,13 +175,18 @@ fn parse_rule_body<'arena>(
     let block_end = parser.span_pos(parser.current_end());
     parser.advance()?; // consume }
 
+    let declarations = flush_run_move(
+        &mut parser.stores.runs.block_child_scratch,
+        &mut parser.stores.runs.block_children,
+        mark,
+    );
     Ok(CssRule {
         selector,
         block_span: Span {
             start: block_start,
             end: block_end,
         },
-        declarations: declarations.into_bump_slice(),
+        declarations,
         span: Span {
             start,
             end: block_end,
@@ -224,15 +244,16 @@ fn lex_declaration_head(
 /// fail at the colon.
 ///
 /// Returns the whole name — decoded, as every property is in the internal AST (the wire
-/// re-slices the raw source) — and where it ends. Cold: the caller asks the `*` byte inline,
+/// re-slices the raw source) — and where it ends. The caller pushes the name into the pool
+/// once `head`'s borrow of the parser has ended. Cold: the caller asks the `*` byte inline,
 /// so this frame's `String`s stay out of `parse_declaration`'s.
 #[cold]
 #[inline(never)]
-fn extend_wildcard_name<'arena>(
-    parser: &CssParser<'_, 'arena>,
+fn extend_wildcard_name(
+    parser: &CssParser<'_, '_>,
     head: &str,
     head_end: usize,
-) -> Result<(&'arena str, usize), Error> {
+) -> Result<(String, usize), Error> {
     let source = parser.source();
     let mut name = String::from(head);
     let mut pos = head_end;
@@ -247,7 +268,7 @@ fn extend_wildcard_name<'arena>(
             break;
         }
     }
-    Ok((parser.arena.alloc_str(&name), pos))
+    Ok((name, pos))
 }
 
 /// The debug oracle for a head settled from the bytes: the token head must reach the same
@@ -268,9 +289,7 @@ fn assert_token_head_agrees(
 }
 
 /// Parse a CSS declaration: `property: value;`
-pub(crate) fn parse_declaration<'arena>(
-    parser: &mut CssParser<'_, 'arena>,
-) -> Result<CssDeclaration<'arena>, Error> {
+pub(crate) fn parse_declaration(parser: &mut CssParser<'_, '_>) -> Result<CssDeclaration, Error> {
     let start = parser.base_offset() + parser.current_start();
 
     // Parse property
@@ -283,9 +302,11 @@ pub(crate) fn parse_declaration<'arena>(
     let (property, property_end) = if is_custom_property
         && parser.source().as_bytes().get(parser.current_end()) == Some(&b'*')
     {
-        extend_wildcard_name(parser, parser.current_identifier(), parser.current_end())?
+        let (name, end) =
+            extend_wildcard_name(parser, parser.current_identifier(), parser.current_end())?;
+        (parser.stores.text.push(&name), end)
     } else {
-        (parser.current_identifier_in_arena(), parser.current_end())
+        (parser.current_identifier_in_pool(), parser.current_end())
     };
 
     // Locate the value and scan it to its terminator (`;` / `}` at depth zero, or EOF),
@@ -466,7 +487,7 @@ mod tests {
         source: &str,
         arena: &'a Bump,
         stores: &'a mut CssStores,
-    ) -> Result<(&'a [CssBlockChild<'a>], CssView<'a>), Error> {
+    ) -> Result<(&'a [CssBlockChild], CssView<'a>), Error> {
         let sheet = super::super::parse_css(source, 0, 0, arena, stores)?;
         let view = stores.view();
         match view.nodes(sheet.nodes) {

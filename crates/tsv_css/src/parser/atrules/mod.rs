@@ -11,6 +11,7 @@ pub(super) use super::CssParser;
 
 use crate::ast::*;
 use crate::lexer::TokenKind;
+use tsv_lang::store::{PoolText, flush_run_move};
 use tsv_lang::{Error, Span};
 
 use self::preludes::{
@@ -45,6 +46,78 @@ pub(super) fn is_boolean_operator_keyword(ident: &str) -> bool {
         || ident.eq_ignore_ascii_case("not")
 }
 
+/// What an at-rule's name routes to: the prelude reader that reads it, and whether its block
+/// is a rule list. Read off the decoded name, ASCII case-insensitively (CSS Syntax 3), so
+/// `@MEDIA` and `@Font-Face` route as their lowercase spellings do.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum AtruleKind {
+    Import,
+    Scope,
+    CustomSelector,
+    Supports,
+    Container,
+    Media,
+    CustomMedia,
+    Namespace,
+    Layer,
+    StartingStyle,
+    FontFeatureValues,
+    /// `@keyframes` and its vendor-prefixed spellings ([`is_keyframes_atrule`]).
+    Keyframes,
+    /// Any other name: a raw prelude, and a block read child by child.
+    Other,
+}
+
+impl AtruleKind {
+    /// The kind `name` (decoded) names.
+    fn of(name: &str) -> Self {
+        const NAMED: [(&str, AtruleKind); 11] = [
+            ("import", AtruleKind::Import),
+            ("scope", AtruleKind::Scope),
+            ("custom-selector", AtruleKind::CustomSelector),
+            ("supports", AtruleKind::Supports),
+            ("container", AtruleKind::Container),
+            ("media", AtruleKind::Media),
+            ("custom-media", AtruleKind::CustomMedia),
+            ("namespace", AtruleKind::Namespace),
+            ("layer", AtruleKind::Layer),
+            ("starting-style", AtruleKind::StartingStyle),
+            ("font-feature-values", AtruleKind::FontFeatureValues),
+        ];
+        if is_keyframes_atrule(name) {
+            return AtruleKind::Keyframes;
+        }
+        NAMED
+            .iter()
+            .find(|(spelling, _)| name.eq_ignore_ascii_case(spelling))
+            .map_or(AtruleKind::Other, |&(_, kind)| kind)
+    }
+
+    /// Whether the at-rule's block is a rule list at the top level: the conditional group
+    /// rules, `@layer`, `@starting-style`, `@font-feature-values` and the keyframes.
+    fn holds_rules(self) -> bool {
+        matches!(
+            self,
+            AtruleKind::Media
+                | AtruleKind::Supports
+                | AtruleKind::Layer
+                | AtruleKind::Container
+                | AtruleKind::StartingStyle
+                | AtruleKind::FontFeatureValues
+                | AtruleKind::Keyframes
+        )
+    }
+}
+
+/// The error for a token no block child starts with, inside the at-rule `name` names: the
+/// name read back from the pool, lowercased as the dispatch reads it.
+#[cold]
+#[inline(never)]
+fn unexpected_block_token(parser: &CssParser<'_, '_>, name: PoolText<CssText>) -> Error {
+    let name = parser.stores.text.get(name).to_ascii_lowercase();
+    parser.error_unexpected(&format!("token in @{name} block"))
+}
+
 /// Check if current token is a CSS boolean operator keyword (and, or, not)
 pub(super) fn is_boolean_operator(parser: &CssParser<'_, '_>) -> bool {
     if let TokenKind::Identifier = parser.current_kind() {
@@ -57,19 +130,19 @@ pub(super) fn is_boolean_operator(parser: &CssParser<'_, '_>) -> bool {
 /// Parse a CSS at-rule: `@media (...) { ... }` or `@import "...";`
 ///
 /// `nested_in_rule`: true if this at-rule is nested inside a regular rule's declaration block
-pub(crate) fn parse_atrule<'arena>(
-    parser: &mut CssParser<'_, 'arena>,
+pub(crate) fn parse_atrule(
+    parser: &mut CssParser<'_, '_>,
     nested_in_rule: bool,
-) -> Result<CssAtrule<'arena>, Error> {
+) -> Result<CssAtrule, Error> {
     // two wire levels: the `Atrule` and its `Block` (the depth limit's count)
     parser.nested(2, |p| parse_atrule_body(p, nested_in_rule))
 }
 
 /// [`parse_atrule`] inside its depth levels.
-fn parse_atrule_body<'arena>(
-    parser: &mut CssParser<'_, 'arena>,
+fn parse_atrule_body(
+    parser: &mut CssParser<'_, '_>,
     nested_in_rule: bool,
-) -> Result<CssAtrule<'arena>, Error> {
+) -> Result<CssAtrule, Error> {
     let start = parser.span_pos(parser.current_start());
 
     // Expect @ symbol
@@ -80,10 +153,17 @@ fn parse_atrule_body<'arena>(
         return Err(parser.error_expected_after("at-rule name", "@"));
     }
 
+    // At-rule names are ASCII case-insensitive (CSS Syntax 3); dispatch on the name
+    // ASCII case-folded so `@MEDIA`/`@Font-Face` route to the right prelude/block
+    // grammar instead of the raw fall-through. Classified off the decoded text before
+    // anything is pushed, so no borrow of it outlives this statement. The stored `name`
+    // keeps its source case (the public AST matches Svelte, which preserves it —
+    // `@SUPPORTS` → `"name": "SUPPORTS"`); the printer lowercases it for output.
+    let kind = AtruleKind::of(parser.current_identifier());
     // Internal AST: use decoded value (spec-compliant). The name token's source
     // span is captured too — the printer emits the name from source (escape-
     // preserving), not from the decoded string (which may hold a raw control char).
-    let name = parser.current_identifier_in_arena();
+    let name = parser.current_identifier_in_pool();
     let name_span = Span {
         start: parser.span_pos(parser.current_start()),
         end: parser.span_pos(parser.current_end()),
@@ -92,19 +172,6 @@ fn parse_atrule_body<'arena>(
 
     parser.skip_whitespace()?;
 
-    // At-rule names are ASCII case-insensitive (CSS Syntax 3); dispatch on the
-    // lowercased name so `@MEDIA`/`@Font-Face` route to the right prelude/block
-    // grammar instead of the raw fall-through. The stored `name` keeps its source
-    // case (the public AST matches Svelte, which preserves it — `@SUPPORTS` →
-    // `"name": "SUPPORTS"`); the printer lowercases it for output.
-    let name_lc_owned;
-    let name_lc: &str = if name.bytes().any(|b| b.is_ascii_uppercase()) {
-        name_lc_owned = name.to_ascii_lowercase();
-        &name_lc_owned
-    } else {
-        name
-    };
-
     // Raw source offset of the first prelude token — for the conditional-at-rule raw
     // fallback after the dispatch. Captured before any prelude parsing consumes tokens.
     let prelude_start_raw = parser.current_start();
@@ -112,28 +179,28 @@ fn parse_atrule_body<'arena>(
     let ast_census_mark = tsv_lang::ast_census_probe::mark();
 
     // Parse prelude based on at-rule type
-    let prelude = if name_lc == "import" {
+    let prelude = if kind == AtruleKind::Import {
         // Parse @import prelude structurally: a `url()`/string head, `layer`/`supports()`
         // calls, then one verbatim tail (the media-query list, or whatever else the author
         // wrote) to the prelude end. Nothing here rejects short of the prelude's own end —
         // parseCss stores any prelude raw — so the fallback below is not needed; only an
         // empty prelude takes the raw path internally.
         parse_import_prelude(parser)?
-    } else if name_lc == "scope" {
+    } else if kind == AtruleKind::Scope {
         // Parse @scope prelude as structured selector lists (`PreludeValue::Selectors`).
         parse_scope_prelude(parser)?
-    } else if name_lc == "custom-selector" {
+    } else if kind == AtruleKind::CustomSelector {
         // `@custom-selector :--name <selector-list>` — the third prelude reader (the
         // selector printer), the one standard-CSS at-rule prettier routes to
         // `parseSelector`. Dispatched on the lowercased name like every at-rule here;
         // prettier's own test is case-sensitive (a cataloged divergence). Falls back to
         // the raw prelude internally when the shape does not match.
         parse_custom_selector_prelude(parser)?
-    } else if name_lc == "supports" {
+    } else if kind == AtruleKind::Supports {
         // Parse @supports prelude as structured conditions (for line-width wrapping)
         let (condition, span) = parse_condition_query(parser, ConditionReader::Value)?;
         PreludeValue::Supports { condition, span }
-    } else if name_lc == "container" {
+    } else if kind == AtruleKind::Container {
         // Parse @container prelude as structured conditions (for line-width wrapping)
         let (name, condition, span) = parse_container_prelude(parser)?;
         PreludeValue::Container {
@@ -141,7 +208,7 @@ fn parse_atrule_body<'arena>(
             condition,
             span,
         }
-    } else if matches!(name_lc, "media" | "custom-media") {
+    } else if matches!(kind, AtruleKind::Media | AtruleKind::CustomMedia) {
         // Parse @media as raw string to preserve comments
         // Wrapping is handled in the printer by finding and/or boundaries
         // Fully structuring preludes is a deferred design option — see
@@ -167,7 +234,7 @@ fn parse_atrule_body<'arena>(
         // `url()` quotes to single quotes, so it takes the normalizing path. The public AST
         // stays source-verbatim either way (the printer-facing `content` is what differs);
         // see `convert/mod.rs`.
-        let is_namespace = name_lc == "namespace";
+        let is_namespace = kind == AtruleKind::Namespace;
         let (content, span) = parse_raw_prelude_content(parser, is_namespace, is_namespace)?;
         PreludeValue::Raw { content, span }
     };
@@ -188,11 +255,7 @@ fn parse_atrule_body<'arena>(
     // where only the verbatim reader, whose ends are spelled as gaps, keeps each where it was.
     let partless_with_run = match &prelude {
         PreludeValue::Supports { condition, .. } | PreludeValue::Container { condition, .. } => {
-            parser
-                .stores
-                .view()
-                .condition_parts(condition.parts)
-                .is_empty()
+            condition.parts.is_empty()
                 && crate::whitespace::holds_boundary_member(
                     parser.source(),
                     prelude_start_raw,
@@ -201,7 +264,7 @@ fn parse_atrule_body<'arena>(
         }
         _ => false,
     };
-    let prelude = if matches!(name_lc, "supports" | "container")
+    let prelude = if matches!(kind, AtruleKind::Supports | AtruleKind::Container)
         && (!parser.at_prelude_end() || partless_with_run)
     {
         #[cfg(feature = "_internal_ast_census")]
@@ -213,7 +276,7 @@ fn parse_atrule_body<'arena>(
 
     // Parse block (if present)
     let (block, end) = if parser.check(TokenKind::LeftBrace) {
-        let block = parse_atrule_block(parser, name_lc, nested_in_rule)?;
+        let block = parse_atrule_block(parser, kind, name, nested_in_rule)?;
         let end = block.span.end;
         (Some(block), end)
     } else if parser.check(TokenKind::Semicolon) {
@@ -250,10 +313,10 @@ fn parse_atrule_body<'arena>(
 /// (whose printer emits it as-is and whose convert extracts it from `span`). This
 /// matches parseCss (which stores an unstructurable prelude raw) and prettier (which
 /// prints it verbatim); see the call sites for the CSS-Syntax rationale.
-pub(super) fn reconsume_prelude_as_raw<'arena>(
-    parser: &mut CssParser<'_, 'arena>,
+pub(super) fn reconsume_prelude_as_raw(
+    parser: &mut CssParser<'_, '_>,
     prelude_start_raw: usize,
-) -> Result<PreludeValue<'arena>, Error> {
+) -> Result<PreludeValue, Error> {
     // Re-read from the prelude's first token, so its ends are observed over all of it. The
     // registry keeps everything the abandoned reader registered (the truncation is to its own
     // length): only the cursor moves. Every token is taken verbatim, so the output length at a
@@ -287,8 +350,9 @@ pub(super) fn reconsume_prelude_as_raw<'arena>(
         .as_deref()
         .map_or(trimmed, |respelled| crate::escapes::trim_css(respelled));
 
+    let content = parser.stores.text.push(content);
     Ok(PreludeValue::Raw {
-        content: parser.alloc_str_in(content),
+        content,
         span: Span {
             start: parser.span_pos(content_start_raw),
             end: parser.span_pos(content_end_raw),
@@ -302,12 +366,14 @@ pub(super) fn reconsume_prelude_as_raw<'arena>(
 /// - @keyframes: contains keyframe blocks (rules with percentage/from/to selectors)
 /// - @font-face, @page: contain declarations
 ///
+/// `kind` is the at-rule's name classified, and `name` the name itself, for an error.
 /// `nested_in_rule`: true if this at-rule is nested inside a regular rule's declaration block
-fn parse_atrule_block<'arena>(
-    parser: &mut CssParser<'_, 'arena>,
-    atrule_name: &str,
+fn parse_atrule_block(
+    parser: &mut CssParser<'_, '_>,
+    kind: AtruleKind,
+    name: PoolText<CssText>,
     nested_in_rule: bool,
-) -> Result<CssAtruleBlock<'arena>, Error> {
+) -> Result<CssAtruleBlock, Error> {
     let start = parser.span_pos(parser.current_start());
 
     // Expect {
@@ -319,7 +385,7 @@ fn parse_atrule_block<'arena>(
     // stylesheet-body and style-rule-block form, not an at-rule-block one.
     parser.skip_boundary_whitespace()?;
 
-    let mut children = parser.bvec();
+    let mark = parser.stores.runs.block_child_scratch.mark();
 
     // Determine what content to expect based on at-rule type and nesting context
     // When nested inside a rule, at-rules that normally contain rules should contain declarations instead
@@ -329,11 +395,7 @@ fn parse_atrule_block<'arena>(
     // `> p` is valid) and bare declarations apply to `:scope`. It therefore flows
     // through the generic fallback below (relative rules via `parse_rule(nested)`
     // + declarations), not this non-relative rule-list path.
-    let expect_rules = (matches!(
-        atrule_name,
-        "media" | "supports" | "layer" | "container" | "starting-style" | "font-feature-values"
-    ) || is_keyframes_atrule(atrule_name))
-        && !nested_in_rule;
+    let expect_rules = kind.holds_rules() && !nested_in_rule;
     // Everything that is NOT a top-level rule-list block flows through the generic
     // block-agnostic fallback below (`parse_block_child`), which disambiguates a bare
     // declaration from a nested rule via `is_nested_rule_start()` per CSS Syntax 3
@@ -352,7 +414,11 @@ fn parse_atrule_block<'arena>(
     while !parser.check(TokenKind::RightBrace) && !parser.check(TokenKind::Eof) {
         if matches!(parser.current_kind(), TokenKind::Comment) {
             let comment = parser.parse_block_comment()?;
-            children.push(CssBlockChild::Comment(comment));
+            parser
+                .stores
+                .runs
+                .block_child_scratch
+                .push(CssBlockChild::Comment(comment));
             continue;
         }
 
@@ -363,7 +429,11 @@ fn parse_atrule_block<'arena>(
             // context, so its block holds declarations (per CSS Nesting). Outside a
             // rule, `nested_in_rule` is false and this stays a normal at-rule block.
             let atrule = parse_atrule(parser, nested_in_rule)?;
-            children.push(CssBlockChild::Atrule(atrule));
+            parser
+                .stores
+                .runs
+                .block_child_scratch
+                .push(CssBlockChild::Atrule(atrule));
             parser.skip_boundary_whitespace()?;
             continue;
         }
@@ -376,7 +446,8 @@ fn parse_atrule_block<'arena>(
         // keeps the non-relative selector grammar so keyframe stops (`0%`, `from`) and
         // top-level complex selectors parse unchanged.
         if expect_rules {
-            children.push(parse_block_child(parser, false, atrule_name)?);
+            let child = parse_block_child(parser, false, name)?;
+            parser.stores.runs.block_child_scratch.push(child);
             parser.skip_boundary_whitespace()?;
             continue;
         }
@@ -385,7 +456,8 @@ fn parse_atrule_block<'arena>(
         // `@font-face`, unknown at-rules, `@scope`): declaration-vs-rule disambiguation
         // via `is_nested_rule_start`. `true` allows a leading combinator (a `> .child {}`
         // relative selector in a `@scope` body).
-        children.push(parse_block_child(parser, true, atrule_name)?);
+        let child = parse_block_child(parser, true, name)?;
+        parser.stores.runs.block_child_scratch.push(child);
         parser.skip_boundary_whitespace()?;
     }
 
@@ -396,8 +468,13 @@ fn parse_atrule_block<'arena>(
     let end = parser.span_pos(parser.current_end());
     parser.advance()?; // consume }
 
+    let children = flush_run_move(
+        &mut parser.stores.runs.block_child_scratch,
+        &mut parser.stores.runs.block_children,
+        mark,
+    );
     Ok(CssAtruleBlock {
-        children: children.into_bump_slice(),
+        children,
         span: Span { start, end },
     })
 }
@@ -408,11 +485,11 @@ fn parse_atrule_block<'arena>(
 /// selector grammar for the rule case: `false` = non-relative (top-level rule-list
 /// blocks — conditional groups, keyframes), `true` = relative (nested-declarations
 /// contexts — unknown at-rules, `@scope` — where a leading combinator is valid).
-fn parse_block_child<'arena>(
-    parser: &mut CssParser<'_, 'arena>,
+fn parse_block_child(
+    parser: &mut CssParser<'_, '_>,
     allow_relative_selectors: bool,
-    atrule_name: &str,
-) -> Result<CssBlockChild<'arena>, Error> {
+    name: PoolText<CssText>,
+) -> Result<CssBlockChild, Error> {
     if super::declarations::is_nested_rule_start(parser)? {
         Ok(CssBlockChild::Rule(super::declarations::parse_rule(
             parser,
@@ -423,6 +500,6 @@ fn parse_block_child<'arena>(
             super::declarations::parse_declaration(parser)?,
         ))
     } else {
-        Err(parser.error_unexpected(&format!("token in @{atrule_name} block")))
+        Err(unexpected_block_token(parser, name))
     }
 }
