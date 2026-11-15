@@ -42,10 +42,9 @@ impl<'a> Printer<'a> {
         // Inline-print any comments between the selector and opening brace — unless the
         // claim above already printed them in place. block_span.start is the position of the
         // opening brace, so a leading child whose span precedes it is a pre-brace comment.
+        let declarations = self.view.block_children(rule.declarations);
         let mut start_index = 0;
-        while let Some(ast::CssBlockChild::Comment(comment)) =
-            self.view.block_children(rule.declarations).get(start_index)
-        {
+        while let Some(ast::CssBlockChild::Comment(comment)) = declarations.get(start_index) {
             if comment.span.start >= rule.block_span.start {
                 break;
             }
@@ -67,17 +66,14 @@ impl<'a> Printer<'a> {
         // block-body routine (also used by at-rule blocks). `start_index` skips
         // the pre-brace comments consumed inline above.
         self.indent_level += 1;
-        self.print_css_block_children(self.view.block_children(rule.declarations), start_index);
+        self.print_css_block_children(declarations, start_index);
         self.indent_level -= 1;
 
         self.write_indent();
         // The block's own children only: a pre-brace comment is a child too, and flooring the
         // tail's sweep on one would reach back across the `{` and print the pre-brace run a
         // second time, inside the block, on every pass.
-        self.write_block_tail_boundary_ws(
-            &self.view.block_children(rule.declarations)[start_index..],
-            rule.block_span,
-        );
+        self.write_block_tail_boundary_ws(&declarations[start_index..], rule.block_span);
         self.write("}");
     }
 }

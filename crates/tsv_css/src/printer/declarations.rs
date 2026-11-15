@@ -289,12 +289,13 @@ impl<'a> Printer<'a> {
         'a: 'v,
     {
         // Only comma-separated values with multiple items.
-        let values = match &decl.value {
-            CssValue::CommaSeparated { values, .. } if self.view.values(*values).len() > 1 => {
-                self.view.values(*values)
-            }
-            _ => return None,
+        let CssValue::CommaSeparated { values, .. } = &decl.value else {
+            return None;
         };
+        let values = self.view.values(*values);
+        if values.len() <= 1 {
+            return None;
+        }
 
         // Custom properties skip structure-based multiline (one-per-line for List values).
         // They take the self-deciding width path via `print_decl_value_list` instead.
@@ -998,8 +999,8 @@ impl<'a> Printer<'a> {
         };
         // An all-comment value has no content to hoist away from and declines the hoist
         // (`leading_value_comment_run`), so its comments stay members.
-        let hoist = self.hoistable_leading_run_of(decl, self.view.values(*values));
         let all = self.view.values(*values);
+        let hoist = self.hoistable_leading_run_of(decl, all);
         let members = hoist.map_or(all, |(_, members)| members);
         if members.len() < 2 {
             return None;
@@ -1155,9 +1156,9 @@ impl<'a> Printer<'a> {
             return;
         };
 
-        let closing_comma =
-            list_has_closing_comma(self.source, self.view.values(*values), span.end_usize());
-        for (i, val) in self.view.values(*values).iter().enumerate() {
+        let values = self.view.values(*values);
+        let closing_comma = list_has_closing_comma(self.source, values, span.end_usize());
+        for (i, val) in values.iter().enumerate() {
             self.write_indent();
             // Every item reserves what its own line ends with, so a wrappable item breaks
             // that many columns early rather than letting the terminator push the line to
@@ -1167,7 +1168,7 @@ impl<'a> Printer<'a> {
             // List value self-wraps via `build_space_fill_value_doc`'s
             // `group(indent(fill))`; a non-List value (e.g. a gradient function) wraps via
             // its own value group.
-            let reserve = if closing_comma && i == self.view.values(*values).len() - 1 {
+            let reserve = if closing_comma && i == values.len() - 1 {
                 2
             } else {
                 1
@@ -1189,7 +1190,7 @@ impl<'a> Printer<'a> {
                 self.build_css_value_doc(val)
             };
             self.write_arena_doc_reserving(doc, reserve);
-            if i < self.view.values(*values).len() - 1 {
+            if i < values.len() - 1 {
                 self.write(",\n");
             }
         }

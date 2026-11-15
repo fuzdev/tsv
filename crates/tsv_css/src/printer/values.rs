@@ -438,12 +438,13 @@ impl<'a> Printer<'a> {
                 self.build_value_list_doc(self.view.values(*values), ctx)
             }
             CssValue::CommaSeparated { values, span } => {
-                let joined = self.build_separated_values_doc(self.view.values(*values), ", ");
+                let values = self.view.values(*values);
+                let joined = self.build_separated_values_doc(values, ", ");
                 // Joining N elements writes N-1 commas, so an authored closing comma —
                 // one that terminated no element — is spelled back here.
                 if super::declarations::list_has_closing_comma(
                     self.source,
-                    self.view.values(*values),
+                    values,
                     span.end_usize(),
                 ) {
                     let d = self.d();

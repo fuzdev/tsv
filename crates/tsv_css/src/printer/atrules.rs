@@ -199,87 +199,100 @@ impl<'a> Printer<'a> {
 
         // Print prelude based on type
         match &atrule.prelude {
-            ast::PreludeValue::Values { values, span } if !self.view.values(*values).is_empty() => {
-                self.write(" ");
-                // Special handling for @import with media query (last value may need
-                // wrapping). At-rule names are case-insensitive (`@IMPORT` too).
-                let is_import = self.view.text(atrule.name).eq_ignore_ascii_case("import");
-                // Track the source position after the previous value so comments in the
-                // gaps (before the first value, between values) can be reconstructed.
-                // Svelte strips these from the prelude string; prettier preserves them
-                // with single-space padding, so we interleave them here.
-                let mut prev_end = span.start;
-                for (i, value) in self.view.values(*values).iter().enumerate() {
-                    // A value that opens with a comma is a `<media-query-list>` whose
-                    // first query is empty; the comma glues to the component before it.
-                    let glue_next =
-                        self.source.as_bytes().get(value.span().start as usize) == Some(&b',');
-                    self.write_import_gap_comments(prev_end, value.span().start, i > 0, glue_next);
-                    // The verbatim tail of an `@import` prelude — its last value when the
-                    // parser read one (`parse_import_prelude`): the media condition in the
-                    // common case, but any value the author put after the structured head,
-                    // or the whole prelude when it leads with no url/string. A bare `layer`
-                    // keyword is the other `Identifier` and lands here only when it is last,
-                    // where the normalization below is inert on it.
-                    if is_import
-                        && i == self.view.values(*values).len() - 1
-                        && let ast::CssValue::Identifier {
-                            span: value_span, ..
-                        } = value
-                    {
-                        // Normalize from source (comment-aware) so embedded comments and
-                        // their spacing survive (`screen /* c */ and (...)`).
-                        let normalized = value_normalization::normalize_css_whitespace(
-                            value_span.extract(self.source),
+            ast::PreludeValue::Values { values, span } => {
+                let values = self.view.values(*values);
+                if !values.is_empty() {
+                    self.write(" ");
+                    // Special handling for @import with media query (last value may need
+                    // wrapping). At-rule names are case-insensitive (`@IMPORT` too).
+                    let is_import = self.view.text(atrule.name).eq_ignore_ascii_case("import");
+                    // Track the source position after the previous value so comments in the
+                    // gaps (before the first value, between values) can be reconstructed.
+                    // Svelte strips these from the prelude string; prettier preserves them
+                    // with single-space padding, so we interleave them here.
+                    let mut prev_end = span.start;
+                    for (i, value) in values.iter().enumerate() {
+                        // A value that opens with a comma is a `<media-query-list>` whose
+                        // first query is empty; the comma glues to the component before it.
+                        let glue_next =
+                            self.source.as_bytes().get(value.span().start as usize) == Some(&b',');
+                        self.write_import_gap_comments(
+                            prev_end,
+                            value.span().start,
+                            i > 0,
+                            glue_next,
                         );
-                        // The whole media condition routes here, not only a wrappable one:
-                        // this is the single place the prelude's value normalization runs,
-                        // so a condition that skips it comes out raw (`(a: .50PX)` stayed
-                        // `.50PX` where prettier gives `0.5px`, and the identical condition
-                        // joined by an `and` normalized). `print_import_media_query` picks
-                        // the layout for every shape itself — a one-entry list and a
-                        // comment-bearing one take the `and`/`or` wrap, only a
-                        // comment-free comma list takes the fill (which splits on
-                        // whitespace and would shatter a `/* … */`).
-                        self.print_import_media_query(&normalized);
+                        // The verbatim tail of an `@import` prelude — its last value when the
+                        // parser read one (`parse_import_prelude`): the media condition in the
+                        // common case, but any value the author put after the structured head,
+                        // or the whole prelude when it leads with no url/string. A bare `layer`
+                        // keyword is the other `Identifier` and lands here only when it is last,
+                        // where the normalization below is inert on it.
+                        if is_import
+                            && i == values.len() - 1
+                            && let ast::CssValue::Identifier {
+                                span: value_span, ..
+                            } = value
+                        {
+                            // Normalize from source (comment-aware) so embedded comments and
+                            // their spacing survive (`screen /* c */ and (...)`).
+                            let normalized = value_normalization::normalize_css_whitespace(
+                                value_span.extract(self.source),
+                            );
+                            // The whole media condition routes here, not only a wrappable one:
+                            // this is the single place the prelude's value normalization runs,
+                            // so a condition that skips it comes out raw (`(a: .50PX)` stayed
+                            // `.50PX` where prettier gives `0.5px`, and the identical condition
+                            // joined by an `and` normalized). `print_import_media_query` picks
+                            // the layout for every shape itself — a one-entry list and a
+                            // comment-bearing one take the `and`/`or` wrap, only a
+                            // comment-free comma list takes the fill (which splits on
+                            // whitespace and would shatter a `/* … */`).
+                            self.print_import_media_query(&normalized);
+                            prev_end = value.span().end;
+                            continue;
+                        }
+                        // Doc-based formatting normalizes quotes and spacing. The last
+                        // value is followed by the rule's `;`, so reserve it — a value
+                        // group that can break (`supports(…)`, `layer(…)`) must break one
+                        // column sooner, the same boundary the media-query fill above
+                        // already measures for itself. Without it a 101-char
+                        // `@import … supports(…);` sat one char over print width.
+                        let reserve = usize::from(i == values.len() - 1 && atrule.block.is_none());
+                        let doc = self.build_css_value_doc(value);
+                        self.write_arena_doc_reserving(doc, reserve);
                         prev_end = value.span().end;
-                        continue;
                     }
-                    // Doc-based formatting normalizes quotes and spacing. The last
-                    // value is followed by the rule's `;`, so reserve it — a value
-                    // group that can break (`supports(…)`, `layer(…)`) must break one
-                    // column sooner, the same boundary the media-query fill above
-                    // already measures for itself. Without it a 101-char
-                    // `@import … supports(…);` sat one char over print width.
-                    let reserve = usize::from(
-                        i == self.view.values(*values).len() - 1 && atrule.block.is_none(),
-                    );
-                    let doc = self.build_css_value_doc(value);
-                    self.write_arena_doc_reserving(doc, reserve);
-                    prev_end = value.span().end;
+                    // Trailing comments between the last value and the `;` (e.g.
+                    // `@import 'a.css' /* c */;`) — or the gap claimed whole, flush against the
+                    // `;`, where it holds a boundary run (`@import 'a.css' <NBSP>;`).
+                    self.write_prelude_gap(prev_end, prelude_region_end(atrule), Edge::Flush);
                 }
-                // Trailing comments between the last value and the `;` (e.g.
-                // `@import 'a.css' /* c */;`) — or the gap claimed whole, flush against the
-                // `;`, where it holds a boundary run (`@import 'a.css' <NBSP>;`).
-                self.write_prelude_gap(prev_end, prelude_region_end(atrule), Edge::Flush);
             }
-            ast::PreludeValue::Raw { content, span } if !self.view.text(*content).is_empty() => {
-                // `content` is already verbatim (internal whitespace + comments preserved,
-                // outer-trimmed, `url()` inner-trimmed) from the parser's non-normalized
-                // raw path, so it matches prettier as-is — no comment-spacing rewrite.
-                // Embedded newlines survive under Svelte `<style>` because the CSS renders
-                // at its final indent (no post-hoc line re-indent to compound them).
-                //
-                // The prelude's comments ride out inside `content`, never reaching a
-                // comment emitter — see `tsv_lang::comment_ledger`. (They *are* registered
-                // in the stylesheet's flat list; the parser records them while reading the
-                // prelude and also bakes them into `content`.)
-                #[cfg(feature = "_internal_comment_check")]
-                tsv_lang::comment_ledger::record_verbatim_range(self.source, span.start, span.end);
-                #[cfg(not(feature = "_internal_comment_check"))]
-                let _ = span;
-                self.write(" ");
-                self.write(self.view.text(*content));
+            ast::PreludeValue::Raw { content, span } => {
+                let content = self.view.text(*content);
+                if !content.is_empty() {
+                    // `content` is already verbatim (internal whitespace + comments preserved,
+                    // outer-trimmed, `url()` inner-trimmed) from the parser's non-normalized
+                    // raw path, so it matches prettier as-is — no comment-spacing rewrite.
+                    // Embedded newlines survive under Svelte `<style>` because the CSS renders
+                    // at its final indent (no post-hoc line re-indent to compound them).
+                    //
+                    // The prelude's comments ride out inside `content`, never reaching a
+                    // comment emitter — see `tsv_lang::comment_ledger`. (They *are* registered
+                    // in the stylesheet's flat list; the parser records them while reading the
+                    // prelude and also bakes them into `content`.)
+                    #[cfg(feature = "_internal_comment_check")]
+                    tsv_lang::comment_ledger::record_verbatim_range(
+                        self.source,
+                        span.start,
+                        span.end,
+                    );
+                    #[cfg(not(feature = "_internal_comment_check"))]
+                    let _ = span;
+                    self.write(" ");
+                    self.write(content);
+                }
             }
             ast::PreludeValue::Supports { condition, span } => {
                 // @supports conditions are declarations, so prettier normalizes
@@ -300,9 +313,12 @@ impl<'a> Printer<'a> {
                     atrule,
                 );
             }
-            ast::PreludeValue::Media { content, .. } if !self.view.text(*content).is_empty() => {
-                self.write(" ");
-                self.print_media_prelude(self.view.text(*content), atrule.block.is_some());
+            ast::PreludeValue::Media { content, .. } => {
+                let content = self.view.text(*content);
+                if !content.is_empty() {
+                    self.write(" ");
+                    self.print_media_prelude(content, atrule.block.is_some());
+                }
             }
             ast::PreludeValue::CustomSelector { name, list, span } => {
                 self.write_custom_selector_prelude(*name, list, *span, atrule);
@@ -310,7 +326,6 @@ impl<'a> Printer<'a> {
             ast::PreludeValue::Selectors { root, limit, .. } => {
                 self.write_scope_prelude(root.as_ref(), limit.as_ref(), atrule);
             }
-            _ => {}
         }
 
         if let Some(block) = &atrule.block {
@@ -324,14 +339,16 @@ impl<'a> Printer<'a> {
             // Inside an `@keyframes` block, `from`/`to` selectors are case-insensitive
             // keywords (lowercased by the selector printer); save/restore so a stray
             // nested context can't leak the flag.
+            let name = self.view.text(atrule.name);
             let was_in_keyframes = self.in_keyframes;
-            self.in_keyframes = crate::parser::is_keyframes_atrule(self.view.text(atrule.name));
+            self.in_keyframes = crate::parser::is_keyframes_atrule(name);
             // The same save/restore for `@utility`, whose body's values glue a trailing
             // `*` (see `Printer::in_utility_at_rule`).
             let was_in_utility = self.value_scope.in_utility_at_rule;
             self.value_scope.in_utility_at_rule =
-                was_in_utility || self.view.text(atrule.name).eq_ignore_ascii_case("utility");
-            self.print_css_block_children(self.view.block_children(block.children), 0);
+                was_in_utility || name.eq_ignore_ascii_case("utility");
+            let children = self.view.block_children(block.children);
+            self.print_css_block_children(children, 0);
             self.value_scope.in_utility_at_rule = was_in_utility;
             self.in_keyframes = was_in_keyframes;
             self.indent_level -= 1;
@@ -342,7 +359,7 @@ impl<'a> Printer<'a> {
             // newline here, and the closing `}` is written at the outer indent.
             // Prettier renders an empty at-rule block as `{\n}` (no blank line inside).
             self.write_indent();
-            self.write_block_tail_boundary_ws(self.view.block_children(block.children), block.span);
+            self.write_block_tail_boundary_ws(children, block.span);
             self.write("}");
         } else {
             self.write(";");
@@ -753,9 +770,9 @@ impl<'a> Printer<'a> {
         let parts = self.view.condition_parts(condition.parts);
 
         let content_doc = |part: &ast::ConditionPart<'_>| {
-            let mut segments =
-                DocBuf::with_capacity(self.view.condition_segments(part.segments).len());
-            for segment in self.view.condition_segments(part.segments) {
+            let part_segments = self.view.condition_segments(part.segments);
+            let mut segments = DocBuf::with_capacity(part_segments.len());
+            for segment in part_segments {
                 segments.push(self.build_condition_segment_doc(kind, segment));
             }
             d.concat(&segments)
