@@ -337,9 +337,12 @@ pub(super) fn convert_prelude_to_string<'src>(
 }
 
 /// Check if a complex selector contains Invalid simple selectors (from forgiving parsing)
-pub(super) fn selector_contains_invalid(complex: &ast::ComplexSelector<'_>) -> bool {
-    for relative in complex.children {
-        for simple in relative.selectors {
+pub(super) fn selector_contains_invalid(
+    complex: &ast::ComplexSelector<'_>,
+    view: ast::CssView<'_>,
+) -> bool {
+    for relative in view.relative_selectors(complex.children) {
+        for simple in view.simple_selectors(relative.selectors) {
             if matches!(simple, ast::SimpleSelector::Invalid { .. }) {
                 return true;
             }

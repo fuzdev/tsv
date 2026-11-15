@@ -279,17 +279,27 @@ impl<'a> Printer<'a> {
     /// authoring-dependent on a shape nothing else in CSS honors (`margin:⏎1px 2px`,
     /// `color:⏎red` and `translate(⏎1px,⏎2px)` all collapse), and which no fixture relied
     /// on. Pinned by `comma_separated`'s `unformatted_authored_break` variant.
-    fn multiline_plan<'v>(&self, decl: &'v ast::CssDeclaration<'v>) -> Option<MultilinePlan<'v>> {
+    #[expect(
+        clippy::explicit_auto_deref,
+        reason = "a view accessor takes a list or string field by value, which a store handle \
+                  needs dereferenced; only the field's identity alias auto-derefs"
+    )]
+    fn multiline_plan<'v>(&self, decl: &'v ast::CssDeclaration<'v>) -> Option<MultilinePlan<'v>>
+    where
+        'a: 'v,
+    {
         // Only comma-separated values with multiple items.
         let values = match &decl.value {
-            CssValue::CommaSeparated { values, .. } if values.len() > 1 => *values,
+            CssValue::CommaSeparated { values, .. } if self.view.values(*values).len() > 1 => {
+                self.view.values(*values)
+            }
             _ => return None,
         };
 
         // Custom properties skip structure-based multiline (one-per-line for List values).
         // They take the self-deciding width path via `print_decl_value_list` instead.
         // See fixture: declaration_long_multiline (continuation indent for space-separated items)
-        if decl.property.starts_with("--") {
+        if self.view.text(decl.property).starts_with("--") {
             return None;
         }
 
@@ -350,18 +360,26 @@ impl<'a> Printer<'a> {
     ///
     /// Gated on the O(1) `has_block_comment`, so a comment-free comma list — the common
     /// case — never pays the lex.
+    #[expect(
+        clippy::explicit_auto_deref,
+        reason = "a view accessor takes a list or string field by value, which a store handle \
+                  needs dereferenced; only the field's identity alias auto-derefs"
+    )]
     fn hoistable_leading_run<'v>(
         &self,
         decl: &ast::CssDeclaration<'_>,
         values: &'v [CssValue<'v>],
-    ) -> Option<(Span, &'v [CssValue<'v>])> {
+    ) -> Option<(Span, &'v [CssValue<'v>])>
+    where
+        'a: 'v,
+    {
         let CssValue::List {
             values: members, ..
         } = values.first()?
         else {
             return None;
         };
-        self.hoistable_leading_run_of(decl, members)
+        self.hoistable_leading_run_of(decl, self.view.values(*members))
     }
 
     /// The leading comment run of this declaration's value, paired with the `members` at
@@ -429,6 +447,11 @@ impl<'a> Printer<'a> {
     ///
     /// Value comments aren't in the CSS AST, so a comment-bearing list isn't routed
     /// here (the dispatch guard); it stays on the source-extracting comment path.
+    #[expect(
+        clippy::explicit_auto_deref,
+        reason = "a view accessor takes a list or string field by value, which a store handle \
+                  needs dereferenced; only the field's identity alias auto-derefs"
+    )]
     fn print_decl_value_list(&mut self, decl: &ast::CssDeclaration<'_>) {
         debug_assert!(
             matches!(
@@ -440,13 +463,14 @@ impl<'a> Printer<'a> {
         let ctx = self.value_ctx();
         let doc = match &decl.value {
             CssValue::CommaSeparated { values, span } => {
-                let fill = self.build_comma_fill_doc(values, span.end_usize(), ctx);
+                let fill =
+                    self.build_comma_fill_doc(self.view.values(*values), span.end_usize(), ctx);
                 self.build_broken_head_value_decl_doc(fill, &[])
             }
             CssValue::List { values, .. } => {
-                let parts = self.build_space_fill_parts(values, ctx);
+                let parts = self.build_space_fill_parts(self.view.values(*values), ctx);
                 let fill = self.d().fill(&parts);
-                if Self::is_grid_row_property(decl.property) {
+                if Self::is_grid_row_property(self.view.text(decl.property)) {
                     self.build_broken_head_value_decl_doc(fill, &[])
                 } else {
                     self.build_space_value_decl_doc(fill)
@@ -472,7 +496,7 @@ impl<'a> Printer<'a> {
         // and cleared at the end rather than threaded through the value builders. Saved
         // and restored like `in_keyframes`, so a nested context cannot leak it.
         let was_scope = self.value_scope;
-        self.value_scope.font_shorthand = property_is_font_shorthand(decl.property);
+        self.value_scope.font_shorthand = property_is_font_shorthand(self.view.text(decl.property));
         // The whole-value `{…}` block keeps its own braces spaced as authored
         // (`ValueScope::whole_value_block`); read off the value's text, since the block's
         // braces are ordinary members once parsed.
@@ -484,6 +508,11 @@ impl<'a> Printer<'a> {
         self.value_scope = was_scope;
     }
 
+    #[expect(
+        clippy::explicit_auto_deref,
+        reason = "a view accessor takes a list or string field by value, which a store handle \
+                  needs dereferenced; only the field's identity alias auto-derefs"
+    )]
     fn print_css_declaration_in(&mut self, decl: &ast::CssDeclaration<'_>) {
         self.write_indent();
 
@@ -547,7 +576,13 @@ impl<'a> Printer<'a> {
             span,
         } = &decl.value
         {
-            self.print_decl_function(decl, decl_source, *name_span, args, *span);
+            self.print_decl_function(
+                decl,
+                decl_source,
+                *name_span,
+                self.view.values(*args),
+                *span,
+            );
         } else if self.has_value_comments_in_decl(decl) {
             self.print_decl_with_comments(decl, decl_source);
         } else if matches!(&decl.value, CssValue::String { .. }) {
@@ -736,7 +771,7 @@ impl<'a> Printer<'a> {
         // comment's byte inflation is excluded by `visual_width`; the ` !important` tail is
         // counted via `declaration_tail` (the same pieces the emit writes) so an important
         // value wraps rather than overrunning the print width. `: ` is 2 cols, `;` is 1.
-        let inline_len = visual_width(decl.property, TAB_WIDTH)
+        let inline_len = visual_width(self.view.text(decl.property), TAB_WIDTH)
             + 2
             + visual_width(&func_normalized, TAB_WIDTH)
             + visual_width(&self.declaration_tail(decl), TAB_WIDTH)
@@ -780,17 +815,24 @@ impl<'a> Printer<'a> {
     /// break-after-the-colon group over a greedy element fill — via
     /// `build_comma_fill_doc_from_text`. The two are told apart by the AST's value kind, not
     /// the text: a comma inside a function's parens is not a list.
+    #[expect(
+        clippy::explicit_auto_deref,
+        reason = "a view accessor takes a list or string field by value, which a store handle \
+                  needs dereferenced; only the field's identity alias auto-derefs"
+    )]
     fn print_decl_with_comments(&mut self, decl: &ast::CssDeclaration<'_>, decl_source: &str) {
         let normalized =
             value_normalization::extract_value_with_comments(decl_source, decl.colon_pos());
-        let is_comma_list =
-            matches!(&decl.value, CssValue::CommaSeparated { values, .. } if values.len() > 1);
+        let is_comma_list = matches!(
+            &decl.value,
+            CssValue::CommaSeparated { values, .. } if self.view.values(*values).len() > 1
+        );
         if is_comma_list {
             let doc = self.build_comma_fill_doc_from_text(&normalized);
             self.write_arena_doc(doc);
         } else {
             let mut parts = value_normalization::split_by_space_preserving_parens(&normalized);
-            let doc = if Self::is_grid_row_property(decl.property) {
+            let doc = if Self::is_grid_row_property(self.view.text(decl.property)) {
                 // The leading run is the colon's, as on the comma shape; an all-comment
                 // value is not peeled, so its comments stay the rows they are.
                 let leading_run = peel_leading_comment_run(&mut parts);
@@ -936,11 +978,19 @@ impl<'a> Printer<'a> {
     /// `comment_is_element`), so the rows are readable from the AST plus source
     /// positions, and the emitter prints them through the same leaf printers the
     /// comment-free value uses — no text path, and nothing to keep in step with one.
+    #[expect(
+        clippy::explicit_auto_deref,
+        reason = "a view accessor takes a list or string field by value, which a store handle \
+                  needs dereferenced; only the field's identity alias auto-derefs"
+    )]
     fn grid_multirow_plan<'v>(
         &self,
         decl: &'v ast::CssDeclaration<'v>,
-    ) -> Option<GridMultirowPlan<'v>> {
-        if !Self::is_grid_row_property(decl.property) {
+    ) -> Option<GridMultirowPlan<'v>>
+    where
+        'a: 'v,
+    {
+        if !Self::is_grid_row_property(self.view.text(decl.property)) {
             return None;
         }
         let CssValue::List { values, .. } = &decl.value else {
@@ -948,8 +998,9 @@ impl<'a> Printer<'a> {
         };
         // An all-comment value has no content to hoist away from and declines the hoist
         // (`leading_value_comment_run`), so its comments stay members.
-        let hoist = self.hoistable_leading_run_of(decl, values);
-        let members = hoist.map_or(*values, |(_, members)| members);
+        let hoist = self.hoistable_leading_run_of(decl, self.view.values(*values));
+        let all = self.view.values(*values);
+        let members = hoist.map_or(all, |(_, members)| members);
         if members.len() < 2 {
             return None;
         }
@@ -1081,6 +1132,11 @@ impl<'a> Printer<'a> {
     /// one-per-line and greedy packing. A list that does *not* break is not routed here at
     /// all: it takes `print_decl_value_list`'s self-deciding doc (or, with comments,
     /// `print_decl_with_comments`), which does its own width-based wrapping.
+    #[expect(
+        clippy::explicit_auto_deref,
+        reason = "a view accessor takes a list or string field by value, which a store handle \
+                  needs dereferenced; only the field's identity alias auto-derefs"
+    )]
     fn print_css_value_multiline<'v>(
         &mut self,
         value: &'v CssValue<'v>,
@@ -1099,8 +1155,9 @@ impl<'a> Printer<'a> {
             return;
         };
 
-        let closing_comma = list_has_closing_comma(self.source, values, span.end_usize());
-        for (i, val) in values.iter().enumerate() {
+        let closing_comma =
+            list_has_closing_comma(self.source, self.view.values(*values), span.end_usize());
+        for (i, val) in self.view.values(*values).iter().enumerate() {
             self.write_indent();
             // Every item reserves what its own line ends with, so a wrappable item breaks
             // that many columns early rather than letting the terminator push the line to
@@ -1110,7 +1167,7 @@ impl<'a> Printer<'a> {
             // List value self-wraps via `build_space_fill_value_doc`'s
             // `group(indent(fill))`; a non-List value (e.g. a gradient function) wraps via
             // its own value group.
-            let reserve = if closing_comma && i == values.len() - 1 {
+            let reserve = if closing_comma && i == self.view.values(*values).len() - 1 {
                 2
             } else {
                 1
@@ -1125,14 +1182,14 @@ impl<'a> Printer<'a> {
                 // gone from `first_members`, so the run prints exactly once.
                 let members = match first_members {
                     Some(members) if i == 0 => members,
-                    _ => list_values,
+                    _ => self.view.values(*list_values),
                 };
                 self.build_space_fill_value_doc(members, ctx)
             } else {
                 self.build_css_value_doc(val)
             };
             self.write_arena_doc_reserving(doc, reserve);
-            if i < values.len() - 1 {
+            if i < self.view.values(*values).len() - 1 {
                 self.write(",\n");
             }
         }
@@ -1160,6 +1217,11 @@ impl<'a> Printer<'a> {
     ///
     /// The bare fill: the `;` reserve and the break-after-the-colon group are the caller's
     /// (`build_broken_head_value_decl_doc`).
+    #[expect(
+        clippy::explicit_auto_deref,
+        reason = "a view accessor takes a list or string field by value, which a store handle \
+                  needs dereferenced; only the field's identity alias auto-derefs"
+    )]
     fn build_comma_fill_doc(
         &self,
         values: &[CssValue<'_>],
@@ -1176,7 +1238,7 @@ impl<'a> Printer<'a> {
             {
                 // Space-separated values: build as group(indent(fill([sub1, line, sub2])))
                 // so fill can break within items with continuation indent
-                let sub_parts = self.build_space_fill_parts(list_values, ctx);
+                let sub_parts = self.build_space_fill_parts(self.view.values(*list_values), ctx);
                 let sub_fill = d.fill(&sub_parts);
                 let sub_indented = d.indent(sub_fill);
                 parts.push(d.group(sub_indented));

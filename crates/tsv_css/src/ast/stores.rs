@@ -226,14 +226,14 @@ mod tests {
     fn a_reset_rewinds_every_field() {
         let mut stores = CssStores::new();
         let text = fill_every_field(&mut stores);
-        assert_eq!(stores.view().text(text), "a pooled string");
+        assert_eq!(stores.text.get(text), "a pooled string");
         let filled = stores.shapes();
         assert_every_field_written(&filled);
         stores.reset();
         assert_rewound(&filled, &stores.shapes());
         // the next stylesheet's first string lands where the last one's did
         let again = fill_every_field(&mut stores);
-        assert_eq!(stores.view().text(again), "a pooled string");
+        assert_eq!(stores.text.get(again), "a pooled string");
         assert_eq!(stores.shapes(), filled);
     }
 
@@ -341,7 +341,7 @@ mod tests {
         assert_rejected_under_the_store_check(|| {
             warm.with(|stores| {
                 stores.text.push("cd");
-                stores.view().text(text);
+                stores.text.get(text);
             });
         });
     }

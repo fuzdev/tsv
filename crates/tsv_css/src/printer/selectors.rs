@@ -74,28 +74,35 @@ impl<'a> Printer<'a> {
     /// width, where prettier leaves a comment-bearing selector as written (the cataloged
     /// print-width divergence, conformance_prettier_css.md §CSS: Selectors).
     pub(super) fn print_selector_list(&mut self, list: &ast::SelectorList<'_>) {
-        if list.selectors.is_empty() {
+        if self.view.complex_selectors(list.selectors).is_empty() {
             return;
         }
         // What the rule writes after its selector on the last line: the block's ` {`.
         let block_open = " {".len();
         if self.has_comments_to_emit_between(list.span.start, list.span.end) {
             // The inline form: its last line is the list's, the ` {` behind it.
-            let doc = self.build_comma_list_doc(list.selectors, false);
+            let doc = self.build_comma_list_doc(self.view.complex_selectors(list.selectors), false);
             self.write_arena_doc_reserving(doc, block_open);
             return;
         }
-        if list.selectors.len() >= 2 {
+        if self.view.complex_selectors(list.selectors).len() >= 2 {
             // Top-level list: each selector on its own line, a non-last one's last line
             // ending in the `,` this loop writes, the last one's in the ` {`.
-            let last = list.selectors.len() - 1;
-            for (i, complex) in list.selectors.iter().enumerate() {
+            let last = self.view.complex_selectors(list.selectors).len() - 1;
+            for (i, complex) in self
+                .view
+                .complex_selectors(list.selectors)
+                .iter()
+                .enumerate()
+            {
                 if i > 0 {
                     // The comment-free twin of `build_comma_list_doc`'s pre-comma
                     // preservation — this loop writes its `,` directly, so it owes the same
                     // run (`@keyframes k { 0%<NBSP>, 50% {…} }`).
-                    let kept =
-                        self.pre_comma_boundary_ws(&list.selectors[i - 1], complex.span.start);
+                    let kept = self.pre_comma_boundary_ws(
+                        &self.view.complex_selectors(list.selectors)[i - 1],
+                        complex.span.start,
+                    );
                     if !kept.is_empty() {
                         self.write(&kept);
                     }
@@ -106,7 +113,10 @@ impl<'a> Printer<'a> {
                 self.print_complex_selector(complex, suffix);
             }
         } else {
-            self.print_complex_selector(&list.selectors[0], block_open);
+            self.print_complex_selector(
+                &self.view.complex_selectors(list.selectors)[0],
+                block_open,
+            );
         }
     }
 
@@ -134,7 +144,7 @@ impl<'a> Printer<'a> {
         paren: Span,
         reserve: usize,
     ) {
-        if list.selectors.is_empty() {
+        if self.view.complex_selectors(list.selectors).is_empty() {
             return;
         }
         let d = self.d();
@@ -172,7 +182,7 @@ impl<'a> Printer<'a> {
         paren: Span,
     ) -> DocId {
         let d = self.d();
-        let lead = self.claim_lead_gap(paren.start, first_anchor(list), Edge::Flush);
+        let lead = self.claim_lead_gap(paren.start, first_anchor(list, self.view), Edge::Flush);
         let inner = self.build_nested_selector_list_doc(list);
         let kept = self.spell_gap_before_closer(list.span.end, paren, self.list_run_edge(list));
         let inner = self.wrap_args_gap_comments(
@@ -194,7 +204,7 @@ impl<'a> Printer<'a> {
     /// complex-selector doc; the group around it (added by the caller) decides
     /// whether the `line`s flatten to `, ` or break one-per-line.
     fn build_nested_selector_list_doc(&self, list: &ast::SelectorList<'_>) -> DocId {
-        self.build_comma_list_doc(list.selectors, true)
+        self.build_comma_list_doc(self.view.complex_selectors(list.selectors), true)
     }
 
     /// Build a comma-joined selector-list doc with comments interleaved at each comma
@@ -311,12 +321,21 @@ impl<'a> Printer<'a> {
         }
         let d = self.d();
         let mut parts = DocBuf::new();
-        for (i, rel) in complex.children.iter().enumerate() {
+        for (i, rel) in self
+            .view
+            .relative_selectors(complex.children)
+            .iter()
+            .enumerate()
+        {
             // Everything this relative selector may preserve lies past the previous one's
             // end — see `preserved_boundary_ws`. Spelled exactly as the comment-bearing twin
             // spells it, since the two answer the same question and a floor that differs
             // between them is the bug this floor exists for.
-            let floor = (i > 0).then(|| complex.children[i - 1].span.end);
+            let floor = (i > 0).then(|| {
+                self.view.relative_selectors(complex.children)[i - 1]
+                    .span
+                    .end
+            });
             let anchor_floor = Self::compound_anchor_floor(rel, floor);
             if let Some(combinator) = rel.combinator {
                 // A preserved anchorless combinator (an empty compound — a consecutive
@@ -324,7 +343,7 @@ impl<'a> Printer<'a> {
                 // no trailing space: the following relative selector's separator supplies
                 // the single space, so the run reads `> > .a`, not `>  > .a`. Such an RS
                 // always carries an explicit combinator (Descendant is never anchorless).
-                if rel.selectors.is_empty() {
+                if self.view.simple_selectors(rel.selectors).is_empty() {
                     // The symbol is this compound's only anchor, so it carries the gap's run
                     // too — the arm that forgot it was the one juncture of the family with no
                     // restore at all (`:has(<NBSP>> > a)`).
@@ -374,8 +393,8 @@ impl<'a> Printer<'a> {
                     parts.push(self.combinator_separator_doc(combinator));
                 }
             }
-            let n = rel.selectors.len();
-            for (j, simple) in rel.selectors.iter().enumerate() {
+            let n = self.view.simple_selectors(rel.selectors).len();
+            for (j, simple) in self.view.simple_selectors(rel.selectors).iter().enumerate() {
                 if j == 0 {
                     let kept = self.gap_boundary_ws(anchor_floor, simple.span().start);
                     if !kept.is_empty() {
@@ -386,7 +405,7 @@ impl<'a> Printer<'a> {
             }
         }
         let body = d.concat(&parts);
-        if complex.children.len() > 1 {
+        if self.view.relative_selectors(complex.children).len() > 1 {
             d.group(d.indent(body))
         } else {
             body
@@ -503,10 +522,11 @@ impl<'a> Printer<'a> {
     /// does not make (`:is(2n<NBSP>)`). The name predicate alone cannot tell — an An+B ends
     /// in a digit or an `n`, both of which continue a name.
     fn selector_run_edge(&self, complex: &ast::ComplexSelector<'_>) -> Edge {
-        let ends_in_nth = complex
-            .children
+        let ends_in_nth = self
+            .view
+            .relative_selectors(complex.children)
             .last()
-            .and_then(|relative| relative.selectors.last())
+            .and_then(|relative| self.view.simple_selectors(relative.selectors).last())
             .is_some_and(|simple| matches!(simple, ast::SimpleSelector::Nth { .. }));
         if ends_in_nth {
             Edge::Presence
@@ -518,7 +538,8 @@ impl<'a> Printer<'a> {
     /// [`Self::selector_run_edge`] for the run a selector LIST's `)` gap restores: the list's
     /// last selector decides. An empty list has no name to close.
     fn list_run_edge(&self, list: &ast::SelectorList<'_>) -> Edge {
-        list.selectors
+        self.view
+            .complex_selectors(list.selectors)
             .last()
             .map_or(Edge::Presence, |complex| self.selector_run_edge(complex))
     }
@@ -581,24 +602,24 @@ impl<'a> Printer<'a> {
         // separator itself. A member-free gap gets the keyword's own space, its comments
         // leading `S` as they always have.
         let mut after = String::new();
-        let comments_after = match self.claim_lead_gap(of_end, first_anchor(selectors), Edge::Flush)
-        {
-            Some(lead) => {
-                let spaced = self.source[of_end as usize..].starts_with(|c: char| {
-                    crate::whitespace::is_boundary_whitespace(c)
-                        && !crate::whitespace::is_boundary_only_whitespace(c)
-                });
-                if spaced {
-                    after.push(' ');
+        let comments_after =
+            match self.claim_lead_gap(of_end, first_anchor(selectors, self.view), Edge::Flush) {
+                Some(lead) => {
+                    let spaced = self.source[of_end as usize..].starts_with(|c: char| {
+                        crate::whitespace::is_boundary_whitespace(c)
+                            && !crate::whitespace::is_boundary_only_whitespace(c)
+                    });
+                    if spaced {
+                        after.push(' ');
+                    }
+                    after.push_str(&lead);
+                    String::new()
                 }
-                after.push_str(&lead);
-                String::new()
-            }
-            None => {
-                after.push(' ');
-                self.comment_blocks_in_range(of_end, selectors.span.start)
-            }
-        };
+                None => {
+                    after.push(' ');
+                    self.comment_blocks_in_range(of_end, selectors.span.start)
+                }
+            };
         let head = if before.is_empty() {
             head
         } else {
@@ -628,8 +649,8 @@ impl<'a> Printer<'a> {
             return false;
         }
         let mut prev_end = complex.span.start;
-        for rel in complex.children {
-            for simple in rel.selectors {
+        for rel in self.view.relative_selectors(complex.children) {
+            for simple in self.view.simple_selectors(rel.selectors) {
                 let span = simple.span();
                 if self.has_comments_to_emit_between(prev_end, span.start) {
                     return true;
@@ -656,14 +677,19 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let mut parts = DocBuf::new();
         let mut prev_end = complex.span.start;
-        for (i, rel) in complex.children.iter().enumerate() {
+        for (i, rel) in self
+            .view
+            .relative_selectors(complex.children)
+            .iter()
+            .enumerate()
+        {
             // A preserved anchorless combinator (empty compound — a consecutive combinator
             // like the leading `>` of `> > .a`) has no simple selector to anchor `first_start`
             // on. Emit any comment in the gap before it, then the combinator symbol with no
             // trailing space (the next relative selector's separator supplies the space, and
             // its before-range picks up any comment sitting after this combinator).
             let floor = (i > 0).then_some(prev_end);
-            if rel.selectors.is_empty() {
+            if self.view.simple_selectors(rel.selectors).is_empty() {
                 if let Some(combinator) = rel.combinator {
                     if i > 0 {
                         // Explicit space (this path renders inline, no `line()` break points).
@@ -693,7 +719,7 @@ impl<'a> Printer<'a> {
                 prev_end = rel.span.end;
                 continue;
             }
-            let first_start = rel.selectors[0].span().start;
+            let first_start = self.view.simple_selectors(rel.selectors)[0].span().start;
             if let Some(combinator) = rel.combinator {
                 if i == 0 {
                     // Leading combinator (`:has(> /* c */ img)`): the run ahead of the
@@ -741,8 +767,8 @@ impl<'a> Printer<'a> {
                 );
             }
             let anchor_floor = Self::compound_anchor_floor(rel, floor);
-            let n = rel.selectors.len();
-            for (j, simple) in rel.selectors.iter().enumerate() {
+            let n = self.view.simple_selectors(rel.selectors).len();
+            for (j, simple) in self.view.simple_selectors(rel.selectors).iter().enumerate() {
                 let sspan = simple.span();
                 if j == 0 {
                     // The same claim the comment-free twin makes, through the same helper:
@@ -1592,6 +1618,11 @@ impl<'a> Printer<'a> {
     /// `:nth-child(... of S)`) wrap as `group("(" indent(softline join) softline ")")`
     /// — inline when they fit, one-per-line indented when they don't. `::part()` idents
     /// and identifier args never break.
+    #[expect(
+        clippy::explicit_auto_deref,
+        reason = "a view accessor takes a list or string field by value, which a store handle \
+                  needs dereferenced; only the field's identity alias auto-derefs"
+    )]
     fn build_pseudo_args_doc(&self, args: &ast::PseudoClassArgs<'_>) -> DocId {
         let d = self.d();
         match args {
@@ -1610,7 +1641,8 @@ impl<'a> Printer<'a> {
                 // become `/* a - b */`). Prettier prints the whole *selector* verbatim
                 // whenever it holds a comment — its selector parser gives up before
                 // reaching the An+B — so that spelling is a parser artifact, not a rule.
-                let normalized = self.normalize_an_plus_b_before_gap(value, value_span.end);
+                let normalized =
+                    self.normalize_an_plus_b_before_gap(self.view.text(*value), value_span.end);
                 // Comments in the gaps around the An+B text are not part of `value`;
                 // interleave them like the SelectorList arm above — unless the gap holds a
                 // boundary member, which `normalize_an_plus_b` would otherwise drop with the
@@ -1699,13 +1731,15 @@ impl<'a> Printer<'a> {
                 // end (`ident_spans` is non-empty — the parser rejects empty
                 // `::part()`); leading/trailing comments sit outside it.
                 let run_span = Span {
-                    start: ident_spans[0].start,
-                    end: ident_spans[ident_spans.len() - 1].end,
+                    start: self.view.part_spans(*ident_spans)[0].start,
+                    end: self.view.part_spans(*ident_spans)
+                        [self.view.part_spans(*ident_spans).len() - 1]
+                        .end,
                 };
                 // Interleave any interior comments between the names, then wrap the
                 // leading/trailing comments outside the run
                 // (`::part(/* lead */ a /* mid */ b /* trail */)`).
-                let run = self.build_part_idents_doc(ident_spans, run_span);
+                let run = self.build_part_idents_doc(self.view.part_spans(*ident_spans), run_span);
                 // The runs the argument-list start and the `)` gap skipped — `::part` rebuilds
                 // its names from spans, so nothing else carries them. Each is claimed whole,
                 // its comments in place, and the comment wrapper below then leaves that side
@@ -2028,8 +2062,8 @@ impl<'a> Printer<'a> {
 
 /// Where a selector list's first selector begins — the anchor whose lead gap a container
 /// claims ([`Printer::claim_lead_gap`]).
-pub(super) fn first_anchor(list: &ast::SelectorList<'_>) -> u32 {
-    list.selectors
+pub(super) fn first_anchor(list: &ast::SelectorList<'_>, view: ast::CssView<'_>) -> u32 {
+    view.complex_selectors(list.selectors)
         .first()
         .map_or(list.span.start, |complex| complex.span.start)
 }

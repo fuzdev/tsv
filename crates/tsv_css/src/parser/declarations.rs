@@ -460,14 +460,17 @@ mod tests {
     use super::*;
     use bumpalo::Bump;
 
-    /// The block children of the one rule `source` holds.
-    fn rule_children<'arena>(
+    /// The block children of the one rule `source` holds, and the view they are read
+    /// through.
+    fn rule_children<'a>(
         source: &str,
-        arena: &'arena Bump,
-    ) -> Result<&'arena [CssBlockChild<'arena>], Error> {
-        let sheet = super::super::parse_css(source, 0, 0, arena, &mut CssStores::new())?;
-        match sheet.nodes {
-            [CssNode::Rule(rule)] => Ok(rule.declarations),
+        arena: &'a Bump,
+        stores: &'a mut CssStores,
+    ) -> Result<(&'a [CssBlockChild<'a>], CssView<'a>), Error> {
+        let sheet = super::super::parse_css(source, 0, 0, arena, stores)?;
+        let view = stores.view();
+        match view.nodes(sheet.nodes) {
+            [CssNode::Rule(rule)] => Ok((view.block_children(rule.declarations), view)),
             nodes => panic!("{source:?}: expected one rule, got {} nodes", nodes.len()),
         }
     }
@@ -497,11 +500,12 @@ mod tests {
         for (decl, property) in cases {
             let source = format!("div {{ {decl} }}");
             let arena = Bump::new();
-            let children = rule_children(&source, &arena)
+            let mut stores = CssStores::new();
+            let (children, view) = rule_children(&source, &arena, &mut stores)
                 .unwrap_or_else(|error| panic!("{source:?}: {error:?}"));
             match children {
                 [CssBlockChild::Declaration(declaration)] => {
-                    assert_eq!(declaration.property, property, "{source:?}");
+                    assert_eq!(view.text(declaration.property), property, "{source:?}");
                 }
                 _ => panic!("{source:?}: expected one declaration"),
             }
@@ -529,7 +533,10 @@ mod tests {
         ] {
             let source = format!("div {{ {decl} }}");
             let arena = Bump::new();
-            assert!(rule_children(&source, &arena).is_err(), "{source:?} parsed");
+            assert!(
+                rule_children(&source, &arena, &mut CssStores::new()).is_err(),
+                "{source:?} parsed"
+            );
         }
     }
 
@@ -543,7 +550,8 @@ mod tests {
         ] {
             let source = format!("div {{ {nested} }}");
             let arena = Bump::new();
-            let children = rule_children(&source, &arena)
+            let mut stores = CssStores::new();
+            let (children, _) = rule_children(&source, &arena, &mut stores)
                 .unwrap_or_else(|error| panic!("{source:?}: {error:?}"));
             assert!(
                 matches!(children, [CssBlockChild::Rule(_)]),

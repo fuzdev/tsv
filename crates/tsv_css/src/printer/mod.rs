@@ -59,10 +59,6 @@ pub(crate) struct Printer<'a> {
     /// All comments sorted by span.start
     pub(crate) comments: &'a [Comment],
     /// Reads what the stores of the tree being printed hold.
-    #[expect(
-        dead_code,
-        reason = "the tree's lists and strings live in the arena, so no reader resolves a handle"
-    )]
     pub(crate) view: CssView<'a>,
     /// The document's line-break table with its builder's verdict — what the two line
     /// questions below read, by a bounded scan of `source` with the table as the fallback
@@ -1234,22 +1230,37 @@ fn css_terminator_len(gap: &[u8], i: usize) -> Option<usize> {
 /// instead of a silent, unregistered emit. A declaration's *value* comments are never lexed
 /// as `Comment`s, so they stay out of scope by construction.
 #[cfg(feature = "_internal_comment_check")]
-fn register_stylesheet_comments(stylesheet: &crate::ast::CssStyleSheet<'_>, source: &str) {
+fn register_stylesheet_comments(parsed: CssParsedRef<'_>, source: &str) {
+    let stylesheet = parsed.stylesheet;
     tsv_lang::comment_ledger::register_parsed(source, &stylesheet.comments);
     let mut block_comment_spans = Vec::new();
-    collect_block_comment_spans(stylesheet.nodes, &mut block_comment_spans);
+    collect_block_comment_spans(
+        parsed.view.nodes(stylesheet.nodes),
+        parsed.view,
+        &mut block_comment_spans,
+    );
     tsv_lang::comment_ledger::register_parsed_spans(source, block_comment_spans);
 }
 
 /// Collect the spans of every in-block `CssBlockChild::Comment` under the top-level nodes.
 #[cfg(feature = "_internal_comment_check")]
-fn collect_block_comment_spans(nodes: &[CssNode<'_>], out: &mut Vec<Span>) {
+fn collect_block_comment_spans(nodes: &[CssNode<'_>], view: CssView<'_>, out: &mut Vec<Span>) {
     for node in nodes {
         match node {
-            CssNode::Rule(rule) => collect_block_child_comment_spans(rule.declarations, out),
+            CssNode::Rule(rule) => {
+                collect_block_child_comment_spans(
+                    view.block_children(rule.declarations),
+                    view,
+                    out,
+                );
+            }
             CssNode::Atrule(atrule) => {
                 if let Some(block) = &atrule.block {
-                    collect_block_child_comment_spans(block.children, out);
+                    collect_block_child_comment_spans(
+                        view.block_children(block.children),
+                        view,
+                        out,
+                    );
                 }
             }
         }
@@ -1259,14 +1270,28 @@ fn collect_block_comment_spans(nodes: &[CssNode<'_>], out: &mut Vec<Span>) {
 /// Recurse a block's children, collecting `Comment` spans and descending into nested rules
 /// and at-rule blocks.
 #[cfg(feature = "_internal_comment_check")]
-fn collect_block_child_comment_spans(children: &[CssBlockChild<'_>], out: &mut Vec<Span>) {
+fn collect_block_child_comment_spans(
+    children: &[CssBlockChild<'_>],
+    view: CssView<'_>,
+    out: &mut Vec<Span>,
+) {
     for child in children {
         match child {
             CssBlockChild::Comment(comment) => out.push(comment.span),
-            CssBlockChild::Rule(rule) => collect_block_child_comment_spans(rule.declarations, out),
+            CssBlockChild::Rule(rule) => {
+                collect_block_child_comment_spans(
+                    view.block_children(rule.declarations),
+                    view,
+                    out,
+                );
+            }
             CssBlockChild::Atrule(atrule) => {
                 if let Some(block) = &atrule.block {
-                    collect_block_child_comment_spans(block.children, out);
+                    collect_block_child_comment_spans(
+                        view.block_children(block.children),
+                        view,
+                        out,
+                    );
                 }
             }
             CssBlockChild::Declaration(_) => {}
@@ -1319,7 +1344,7 @@ fn format_stylesheet(
     // plus in-block `CssBlockChild::Comment` AST nodes (diagnostic; see
     // `tsv_lang::comment_ledger`).
     #[cfg(feature = "_internal_comment_check")]
-    register_stylesheet_comments(stylesheet, source);
+    register_stylesheet_comments(parsed, source);
 
     let mut printer = Printer::new(
         arena,
@@ -1328,7 +1353,7 @@ fn format_stylesheet(
         parsed.view,
         line_breaks.table(),
     );
-    printer.print_css_nodes(stylesheet.nodes);
+    printer.print_css_nodes(parsed.view.nodes(stylesheet.nodes));
     let output = printer.into_string();
     arena.park_line_breaks_scratch(line_breaks.into_scratch());
     // A content U+FEFF at output byte 0 needs a BOM ahead of it, or the next read strips it.
@@ -1367,7 +1392,7 @@ pub(crate) fn format_css_embedded_in(
     // `tsv_lang::comment_ledger`). The Svelte host's `Root.comments` deliberately excludes
     // `<style>` comments, so this is their only registration.
     #[cfg(feature = "_internal_comment_check")]
-    register_stylesheet_comments(stylesheet, source);
+    register_stylesheet_comments(parsed, source);
 
     let base = embed.base_indent_offset;
     let embed = EmbedContext {
@@ -1384,6 +1409,6 @@ pub(crate) fn format_css_embedded_in(
         host_scan.holds_boundary_ws,
     );
     printer.indent_level = base;
-    printer.print_css_nodes(stylesheet.nodes);
+    printer.print_css_nodes(parsed.view.nodes(stylesheet.nodes));
     printer.into_string()
 }

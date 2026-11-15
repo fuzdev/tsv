@@ -120,7 +120,9 @@ impl<'a> Printer<'a> {
         }
 
         // Format CSS content if present (nodes or comments)
-        if !style.css_stylesheet.nodes.is_empty() || !style.css_stylesheet.comments.is_empty() {
+        if !self.css_view.nodes(style.css_stylesheet.nodes).is_empty()
+            || !style.css_stylesheet.comments.is_empty()
+        {
             self.write("\n");
 
             // Pass the entire source to the CSS printer (CSS node spans are

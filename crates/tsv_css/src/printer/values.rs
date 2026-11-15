@@ -411,6 +411,11 @@ impl<'a> Printer<'a> {
     /// ([`ValueCtx`]) — an enclosing `calc()` and the `font`/custom-property carve-out.
     /// Neither is a property of the value, so both ride down the recursion rather than
     /// being re-derived at each level.
+    #[expect(
+        clippy::explicit_auto_deref,
+        reason = "a view accessor takes a list or string field by value, which a store handle \
+                  needs dereferenced; only the field's identity alias auto-derefs"
+    )]
     pub(super) fn build_css_value_doc_in(&self, value: &CssValue<'_>, ctx: ValueCtx) -> DocId {
         match value {
             CssValue::Identifier { span } => self.build_identifier_doc(*span),
@@ -425,18 +430,20 @@ impl<'a> Printer<'a> {
                 name_span,
                 args,
                 span,
-            } => self.build_value_function_doc(*name_span, args, *span, ctx),
+            } => self.build_value_function_doc(*name_span, self.view.values(*args), *span, ctx),
             CssValue::SupportsCondition {
                 name, condition, ..
-            } => self.build_supports_condition_doc(name, condition),
-            CssValue::List { values, .. } => self.build_value_list_doc(values, ctx),
+            } => self.build_supports_condition_doc(self.view.text(*name), condition),
+            CssValue::List { values, .. } => {
+                self.build_value_list_doc(self.view.values(*values), ctx)
+            }
             CssValue::CommaSeparated { values, span } => {
-                let joined = self.build_separated_values_doc(values, ", ");
+                let joined = self.build_separated_values_doc(self.view.values(*values), ", ");
                 // Joining N elements writes N-1 commas, so an authored closing comma —
                 // one that terminated no element — is spelled back here.
                 if super::declarations::list_has_closing_comma(
                     self.source,
-                    values,
+                    self.view.values(*values),
                     span.end_usize(),
                 ) {
                     let d = self.d();
@@ -521,8 +528,10 @@ impl<'a> Printer<'a> {
         // Fallback: span unavailable (never in practice — spans index the printer's
         // source). Re-emit the decoded content; a `Verbatim` value has no recoverable
         // text without its span, so emit nothing (mirrors `build_identifier_doc`).
-        match content {
-            StringCooked::Decoded(s) => self.d().text_pooled(&format_string_literal(s, '\'')),
+        match *content {
+            StringCooked::Decoded(s) => self
+                .d()
+                .text_pooled(&format_string_literal(self.view.text(s), '\'')),
             StringCooked::Verbatim => self.d().text(""),
         }
     }
@@ -613,6 +622,11 @@ impl<'a> Printer<'a> {
     /// `value/mod.rs::extract_function_parts`), and it takes every rule above unchanged —
     /// the name simply emits nothing. `url` / `var` recognition refuses it on length, so no
     /// arm needs a clause for it.
+    #[expect(
+        clippy::explicit_auto_deref,
+        reason = "a view accessor takes a list or string field by value, which a store handle \
+                  needs dereferenced; only the field's identity alias auto-derefs"
+    )]
     pub(super) fn build_value_function_doc(
         &self,
         name_span: Span,
@@ -740,7 +754,7 @@ impl<'a> Printer<'a> {
             // use fill with line() separators so content can break at operators.
             // Matches prettier's group(indent(fill(parts))) pattern.
             if let CssValue::List { values, .. } = arg {
-                inner_parts.push(self.build_space_fill_value_doc(values, ctx));
+                inner_parts.push(self.build_space_fill_value_doc(self.view.values(*values), ctx));
             } else {
                 inner_parts.push(self.build_css_value_doc_in(arg, ctx));
             }

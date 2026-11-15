@@ -150,10 +150,6 @@ fn write_array_open<T, const N: usize>(
 struct Ctx<'a> {
     source: &'a str,
     /// Reads what the stores of the tree being written hold.
-    #[expect(
-        dead_code,
-        reason = "the tree's lists and strings live in the arena, so no reader resolves a handle"
-    )]
     view: ast::CssView<'a>,
     positions: WirePositions<'a>,
     /// Whether to attach `parseCss()` `metadata` (standalone `.css`) or omit it
@@ -335,7 +331,9 @@ fn write_children(
     ctx: &Ctx<'_>,
 ) -> CssComments {
     let mut out = Vec::new();
-    write_array(w, stylesheet.nodes, |w, n| write_node(w, n, ctx, &mut out));
+    write_array(w, ctx.view.nodes(stylesheet.nodes), |w, n| {
+        write_node(w, n, ctx, &mut out);
+    });
     out.extend(stylesheet.comments.iter().map(|c| WireComment {
         span: c.span,
         position: None,
@@ -396,7 +394,13 @@ fn write_rule(
     w.raw("{\"type\":\"Rule\",\"prelude\":");
     write_selector_list(w, &rule.selector, ctx);
     w.raw(",\"block\":");
-    write_block(w, rule.block_span, rule.declarations, ctx, comments);
+    write_block(
+        w,
+        rule.block_span,
+        ctx.view.block_children(rule.declarations),
+        ctx,
+        comments,
+    );
     ctx.tail(w, b",", rule.span.start, rule.span.end, b"");
     if ctx.has_metadata {
         w.raw(RULE_META_CLOSE);
@@ -427,7 +431,13 @@ fn write_atrule(
     collect_prelude_comments(atrule, ctx.source, comments);
     w.raw(",\"block\":");
     write_or_null(w, atrule.block.as_ref(), |w, b| {
-        write_block(w, b.span, b.children, ctx, comments);
+        write_block(
+            w,
+            b.span,
+            ctx.view.block_children(b.children),
+            ctx,
+            comments,
+        );
     });
     w.raw("}");
 }
@@ -625,9 +635,10 @@ fn write_selector_list_inner(
     write_array_open(
         w,
         b"",
-        sl.selectors
+        ctx.view
+            .complex_selectors(sl.selectors)
             .iter()
-            .filter(|c| !filter_invalid || !selector_contains_invalid(c)),
+            .filter(|c| !filter_invalid || !selector_contains_invalid(c, ctx.view)),
         |w, c| write_complex_selector(w, c, ctx),
     );
     w.raw("]}");
@@ -642,7 +653,7 @@ fn write_complex_selector(w: &mut JsonWriter, c: &ast::ComplexSelector<'_>, ctx:
         c.span.end,
         b",\"children\":[",
     );
-    write_array_open(w, b"", c.children, |w, r| {
+    write_array_open(w, b"", ctx.view.relative_selectors(c.children), |w, r| {
         write_relative_selector(w, r, ctx);
     });
     if ctx.has_metadata {
@@ -669,7 +680,9 @@ fn write_relative_selector(w: &mut JsonWriter, r: &ast::RelativeSelector<'_>, ct
         }
         _ => w.raw("{\"type\":\"RelativeSelector\",\"combinator\":null,\"selectors\":["),
     }
-    write_array_open(w, b"", r.selectors, |w, s| write_simple_selector(w, s, ctx));
+    write_array_open(w, b"", ctx.view.simple_selectors(r.selectors), |w, s| {
+        write_simple_selector(w, s, ctx);
+    });
     ctx.tail(w, b"],", r.span.start, r.span.end, b"");
     if ctx.has_metadata {
         w.raw(RELATIVE_META_CLOSE);
@@ -757,7 +770,9 @@ fn write_simple_selector(w: &mut JsonWriter, simple: &ast::SimpleSelector<'_>, c
             w.raw(",\"value\":");
             write_or_null(w, value.as_ref(), |w, v| write_string(w, v));
             w.raw(",\"flags\":");
-            write_or_null(w, flags.as_ref(), |w, f| write_string(w, f));
+            write_or_null(w, flags.as_ref(), |w, &f| {
+                write_string(w, ctx.view.text(f));
+            });
             if let Some(ns) = &namespace {
                 w.raw(",\"namespace\":");
                 write_string(w, ns);
@@ -898,6 +913,11 @@ fn write_named_selector(w: &mut JsonWriter, name: &str, span: Span, ctx: &Ctx<'_
 
 /// Emit a functional pseudo-class's or pseudo-element's args (an `Nth` node, a
 /// nested `SelectorList`, or a `::part()` ident run projected onto one).
+#[expect(
+    clippy::explicit_auto_deref,
+    reason = "a view accessor takes a list or string field by value, which a store handle \
+              needs dereferenced; only the field's identity alias auto-derefs"
+)]
 fn write_pseudo_args(w: &mut JsonWriter, args: &ast::PseudoClassArgs<'_>, ctx: &Ctx<'_>) {
     match args {
         ast::PseudoClassArgs::Nth {
@@ -925,7 +945,7 @@ fn write_pseudo_args(w: &mut JsonWriter, args: &ast::PseudoClassArgs<'_>, ctx: &
             let public_span = Span::new(value_span.start, content_end);
             write_wrap_single_selector(w, public_span, ctx, |w, ctx| {
                 w.raw("{\"type\":\"Nth\",\"value\":");
-                write_string(w, value);
+                write_string(w, ctx.view.text(*value));
                 w.span_start_end_field(ctx.positions, public_span.start, public_span.end);
                 if let Some(sel) = of_selector {
                     w.raw(",\"selector\":");
@@ -938,7 +958,7 @@ fn write_pseudo_args(w: &mut JsonWriter, args: &ast::PseudoClassArgs<'_>, ctx: &
             write_selector_list_filtered(w, selectors, ctx);
         }
         ast::PseudoClassArgs::Part { ident_spans, .. } => {
-            write_part_args(w, ident_spans, ctx);
+            write_part_args(w, ctx.view.part_spans(*ident_spans), ctx);
         }
     }
 }

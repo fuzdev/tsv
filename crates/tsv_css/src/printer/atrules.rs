@@ -173,6 +173,11 @@ fn prelude_fill_context(reserve: usize) -> DocContext {
 
 impl<'a> Printer<'a> {
     /// Format a CSS at-rule (@media, @keyframes, @supports, etc.)
+    #[expect(
+        clippy::explicit_auto_deref,
+        reason = "a view accessor takes a list or string field by value, which a store handle \
+                  needs dereferenced; only the field's identity alias auto-derefs"
+    )]
     pub(super) fn print_css_atrule(&mut self, atrule: &ast::CssAtrule<'_>) {
         // A block child's own `allow_comment_or_whitespace` juncture: the run before the `@`
         // was skipped by the parser and this head is rebuilt from parts, so nothing else can
@@ -194,17 +199,17 @@ impl<'a> Printer<'a> {
 
         // Print prelude based on type
         match &atrule.prelude {
-            ast::PreludeValue::Values { values, span } if !values.is_empty() => {
+            ast::PreludeValue::Values { values, span } if !self.view.values(*values).is_empty() => {
                 self.write(" ");
                 // Special handling for @import with media query (last value may need
                 // wrapping). At-rule names are case-insensitive (`@IMPORT` too).
-                let is_import = atrule.name.eq_ignore_ascii_case("import");
+                let is_import = self.view.text(atrule.name).eq_ignore_ascii_case("import");
                 // Track the source position after the previous value so comments in the
                 // gaps (before the first value, between values) can be reconstructed.
                 // Svelte strips these from the prelude string; prettier preserves them
                 // with single-space padding, so we interleave them here.
                 let mut prev_end = span.start;
-                for (i, value) in values.iter().enumerate() {
+                for (i, value) in self.view.values(*values).iter().enumerate() {
                     // A value that opens with a comma is a `<media-query-list>` whose
                     // first query is empty; the comma glues to the component before it.
                     let glue_next =
@@ -217,7 +222,7 @@ impl<'a> Printer<'a> {
                     // keyword is the other `Identifier` and lands here only when it is last,
                     // where the normalization below is inert on it.
                     if is_import
-                        && i == values.len() - 1
+                        && i == self.view.values(*values).len() - 1
                         && let ast::CssValue::Identifier {
                             span: value_span, ..
                         } = value
@@ -246,7 +251,9 @@ impl<'a> Printer<'a> {
                     // column sooner, the same boundary the media-query fill above
                     // already measures for itself. Without it a 101-char
                     // `@import … supports(…);` sat one char over print width.
-                    let reserve = usize::from(i == values.len() - 1 && atrule.block.is_none());
+                    let reserve = usize::from(
+                        i == self.view.values(*values).len() - 1 && atrule.block.is_none(),
+                    );
                     let doc = self.build_css_value_doc(value);
                     self.write_arena_doc_reserving(doc, reserve);
                     prev_end = value.span().end;
@@ -256,7 +263,7 @@ impl<'a> Printer<'a> {
                 // `;`, where it holds a boundary run (`@import 'a.css' <NBSP>;`).
                 self.write_prelude_gap(prev_end, prelude_region_end(atrule), Edge::Flush);
             }
-            ast::PreludeValue::Raw { content, span } if !content.is_empty() => {
+            ast::PreludeValue::Raw { content, span } if !self.view.text(*content).is_empty() => {
                 // `content` is already verbatim (internal whitespace + comments preserved,
                 // outer-trimmed, `url()` inner-trimmed) from the parser's non-normalized
                 // raw path, so it matches prettier as-is — no comment-spacing rewrite.
@@ -272,7 +279,7 @@ impl<'a> Printer<'a> {
                 #[cfg(not(feature = "_internal_comment_check"))]
                 let _ = span;
                 self.write(" ");
-                self.write(content);
+                self.write(self.view.text(*content));
             }
             ast::PreludeValue::Supports { condition, span } => {
                 // @supports conditions are declarations, so prettier normalizes
@@ -286,16 +293,16 @@ impl<'a> Printer<'a> {
             } => {
                 self.write_condition_prelude(
                     ConditionKind::Container {
-                        name: name.as_deref(),
+                        name: name.map(|name| self.view.text(name)),
                     },
                     condition,
                     *span,
                     atrule,
                 );
             }
-            ast::PreludeValue::Media { content, .. } if !content.is_empty() => {
+            ast::PreludeValue::Media { content, .. } if !self.view.text(*content).is_empty() => {
                 self.write(" ");
-                self.print_media_prelude(content, atrule.block.is_some());
+                self.print_media_prelude(self.view.text(*content), atrule.block.is_some());
             }
             ast::PreludeValue::CustomSelector { name, list, span } => {
                 self.write_custom_selector_prelude(*name, list, *span, atrule);
@@ -318,13 +325,13 @@ impl<'a> Printer<'a> {
             // keywords (lowercased by the selector printer); save/restore so a stray
             // nested context can't leak the flag.
             let was_in_keyframes = self.in_keyframes;
-            self.in_keyframes = crate::parser::is_keyframes_atrule(atrule.name);
+            self.in_keyframes = crate::parser::is_keyframes_atrule(self.view.text(atrule.name));
             // The same save/restore for `@utility`, whose body's values glue a trailing
             // `*` (see `Printer::in_utility_at_rule`).
             let was_in_utility = self.value_scope.in_utility_at_rule;
             self.value_scope.in_utility_at_rule =
-                was_in_utility || atrule.name.eq_ignore_ascii_case("utility");
-            self.print_css_block_children(block.children, 0);
+                was_in_utility || self.view.text(atrule.name).eq_ignore_ascii_case("utility");
+            self.print_css_block_children(self.view.block_children(block.children), 0);
             self.value_scope.in_utility_at_rule = was_in_utility;
             self.in_keyframes = was_in_keyframes;
             self.indent_level -= 1;
@@ -335,7 +342,7 @@ impl<'a> Printer<'a> {
             // newline here, and the closing `}` is written at the outer indent.
             // Prettier renders an empty at-rule block as `{\n}` (no blank line inside).
             self.write_indent();
-            self.write_block_tail_boundary_ws(block.children, block.span);
+            self.write_block_tail_boundary_ws(self.view.block_children(block.children), block.span);
             self.write("}");
         } else {
             self.write(";");
@@ -502,7 +509,7 @@ impl<'a> Printer<'a> {
         span: Span,
         atrule: &ast::CssAtrule<'_>,
     ) {
-        if condition.parts.is_empty() {
+        if self.view.condition_parts(condition.parts).is_empty() {
             // Bounds the prelude region rather than the condition: the span's end is the
             // empty condition's own and stops short of a trailing comment, and its start
             // can too, so the walk runs from the at-keyword (which no comment can sit
@@ -520,7 +527,7 @@ impl<'a> Printer<'a> {
             let pieces = [
                 kind.name(),
                 (!comments.is_empty()).then_some(comments.as_str()),
-                condition.trailing_operators,
+                condition.trailing_operators.map(|t| self.view.text(t)),
             ];
             for piece in pieces.into_iter().flatten() {
                 self.write(" ");
@@ -557,7 +564,7 @@ impl<'a> Printer<'a> {
         // — it owns the name→prelude separator too, for the same reason. Everything below
         // may therefore assume a part exists.
         debug_assert!(
-            !condition.parts.is_empty(),
+            !self.view.condition_parts(condition.parts).is_empty(),
             "a partless condition prelude is write_condition_prelude's to print"
         );
         // Where the first part's gap begins: the at-rule name's end, or the container name's.
@@ -613,6 +620,11 @@ impl<'a> Printer<'a> {
     /// unbreakable, and an over-width `supports()` has to break somewhere. Peeling
     /// restores the `group("(" indent(softline …) softline ")")` shape every other
     /// function value takes, so this position's break point is the ordinary one.
+    #[expect(
+        clippy::explicit_auto_deref,
+        reason = "a view accessor takes a list or string field by value, which a store handle \
+                  needs dereferenced; only the field's identity alias auto-derefs"
+    )]
     pub(super) fn build_supports_condition_doc(
         &self,
         name: &str,
@@ -621,23 +633,35 @@ impl<'a> Printer<'a> {
         let d = self.d();
         // A `supports()` argument is exactly one part; an empty query means the parse
         // found nothing to record.
-        let Some(part) = condition.parts.first() else {
+        let Some(part) = self.view.condition_parts(condition.parts).first() else {
             return d.text_pooled(name);
         };
-        let last = part.segments.len().saturating_sub(1);
-        let mut inner = DocBuf::with_capacity(part.segments.len());
-        for (i, segment) in part.segments.iter().enumerate() {
+        let last = self
+            .view
+            .condition_segments(part.segments)
+            .len()
+            .saturating_sub(1);
+        let mut inner = DocBuf::with_capacity(self.view.condition_segments(part.segments).len());
+        for (i, segment) in self
+            .view
+            .condition_segments(part.segments)
+            .iter()
+            .enumerate()
+        {
             // The first and last segments are `Text` by construction — the part opens
             // on the `(` and closes on the `)` — so the strip guards never fire.
             let peeled = match segment {
                 ast::ConditionSegment::Text(text) => {
-                    let mut text: &str = text;
+                    let mut text: &str = self.view.text(*text);
                     if i == 0 {
                         text = text.strip_prefix('(').unwrap_or(text);
                     }
                     if i == last {
                         text = text.strip_suffix(')').unwrap_or(text);
                     }
+                    // TODO: a segment built here holds the peeled text as a string of its own;
+                    // once segments hold pool text, which the printer cannot write, the text arm
+                    // takes the peeled `&str` directly instead.
                     ast::ConditionSegment::Text(text)
                 }
                 selectors => *selectors,
@@ -663,6 +687,11 @@ impl<'a> Printer<'a> {
     /// positions. `remove_lines` keeps it on the prelude's line: a selector's combinator
     /// and pseudo-arg break points belong to a rule's selector list, not to a condition,
     /// whose own wrapping is the `and`/`or` fill.
+    #[expect(
+        clippy::explicit_auto_deref,
+        reason = "a view accessor takes a list or string field by value, which a store handle \
+                  needs dereferenced; only the field's identity alias auto-derefs"
+    )]
     fn build_condition_segment_doc(
         &self,
         kind: ConditionKind<'_>,
@@ -673,11 +702,11 @@ impl<'a> Printer<'a> {
             ast::ConditionSegment::Text(text) => {
                 if kind.normalizes() {
                     d.text_pooled(&value_normalization::normalize_value_text(
-                        text,
+                        self.view.text(*text),
                         ValueReader::Value,
                     ))
                 } else {
-                    d.text_pooled(text)
+                    d.text_pooled(self.view.text(*text))
                 }
             }
             // The selector printer's own comma seam, so a comment beside a list comma
@@ -721,11 +750,12 @@ impl<'a> Printer<'a> {
         reserve: usize,
     ) -> DocId {
         let d = self.d();
-        let parts = condition.parts;
+        let parts = self.view.condition_parts(condition.parts);
 
         let content_doc = |part: &ast::ConditionPart<'_>| {
-            let mut segments = DocBuf::with_capacity(part.segments.len());
-            for segment in part.segments {
+            let mut segments =
+                DocBuf::with_capacity(self.view.condition_segments(part.segments).len());
+            for segment in self.view.condition_segments(part.segments) {
                 segments.push(self.build_condition_segment_doc(kind, segment));
             }
             d.concat(&segments)
@@ -744,7 +774,7 @@ impl<'a> Printer<'a> {
                     // side below: a run glued to its FRONT (`<NBSP>and`) is one identifier to
                     // css-syntax-3, and a space here would split it into a run and a keyword.
                     self.push_condition_gap_ahead(&mut head, name_end_pos, connector.span.start);
-                    head.push(d.text_pooled(connector.text));
+                    head.push(d.text_pooled(self.view.text(connector.text)));
                     // ⚠️ The space is the NAME SEPARATOR, not decoration: a connector is an
                     // identifier, and `read_identifier` takes every code point at or above
                     // U+00A0 as content, so a boundary run emitted flush after one re-parses as
@@ -811,7 +841,7 @@ impl<'a> Printer<'a> {
                 }
                 // Emit the connector run's source text (`AND` stays `AND`), preserved like
                 // prettier.
-                sep.push(d.text_pooled(connector.text));
+                sep.push(d.text_pooled(self.view.text(connector.text)));
                 sep.push(d.line());
             } else {
                 match before {
@@ -967,7 +997,10 @@ impl<'a> Printer<'a> {
     fn trailing_operators_doc(&self, condition: &ast::ConditionQuery<'_>) -> Option<DocId> {
         let trailing_operators = condition.trailing_operators?;
         let d = self.d();
-        Some(d.concat(&[d.text(" "), d.text_pooled(trailing_operators)]))
+        Some(d.concat(&[
+            d.text(" "),
+            d.text_pooled(self.view.text(trailing_operators)),
+        ]))
     }
 
     /// Reconstruct comments sitting in an `@import` prelude gap (before a value).
@@ -1195,7 +1228,7 @@ impl<'a> Printer<'a> {
         // backward scan would reach into the NAME, which a run glued to it is part of, and
         // print that run a second time (`:--x<NBSP> a` → `:--x<NBSP> <NBSP> a`, growing every
         // pass). So the anchor stands down whatever the gap holds.
-        let anchor = first_anchor(list);
+        let anchor = first_anchor(list, self.view);
         self.claimed_lead.set(Some(anchor));
         let kept = self.spell_gap_items(name.end, anchor, Edge::Presence, Edge::Presence);
         if kept.is_empty() {
@@ -1220,7 +1253,7 @@ impl<'a> Printer<'a> {
         } else {
             parts.push(d.text_pooled(&kept));
         }
-        parts.push(self.build_comma_list_doc(list.selectors, true));
+        parts.push(self.build_comma_list_doc(self.view.complex_selectors(list.selectors), true));
         let doc = d.group(d.indent(d.concat(&parts)));
 
         // The terminator follows the group on its last line: `;` for the statement form,

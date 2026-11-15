@@ -1092,10 +1092,12 @@ mod tests {
                 start: 0,
                 end: source.len() as u32,
             };
-            let value = ValueParser::new(source, span).parse(&arena, &mut CssStores::new());
+            let mut stores = CssStores::new();
+            let value = ValueParser::new(source, span).parse(&arena, &mut stores);
             let CssValue::List { values, .. } = value else {
                 panic!("expected a space-separated list for {source:?}, got {value:?}");
             };
+            let values = stores.view().values(values);
             let got: Vec<&str> = values.iter().map(|v| v.span().extract(source)).collect();
             assert_eq!(got, want, "member split for {source:?}");
         }
@@ -1109,10 +1111,12 @@ mod tests {
                 start: 0,
                 end: source.len() as u32,
             };
-            let value = ValueParser::new(source, span).parse(&arena, &mut CssStores::new());
+            let mut stores = CssStores::new();
+            let value = ValueParser::new(source, span).parse(&arena, &mut stores);
             let CssValue::List { values, .. } = value else {
                 panic!("expected a list for the comment-only {source:?}, got {value:?}");
             };
+            let values = stores.view().values(values);
             assert_eq!(values.len(), 1);
             assert_eq!(values[0].span().extract(source), source);
         }
@@ -1293,9 +1297,11 @@ mod tests {
         let parser = ValueParser::new(source, span);
 
         let arena = Bump::new();
-        let value = parser.parse(&arena, &mut CssStores::new());
+        let mut stores = CssStores::new();
+        let value = parser.parse(&arena, &mut stores);
         assert!(matches!(value, CssValue::CommaSeparated { .. }));
         if let CssValue::CommaSeparated { values, .. } = value {
+            let values = stores.view().values(values);
             assert_eq!(values.len(), 3);
         }
     }
@@ -1307,9 +1313,11 @@ mod tests {
         let parser = ValueParser::new(source, span);
 
         let arena = Bump::new();
-        let value = parser.parse(&arena, &mut CssStores::new());
+        let mut stores = CssStores::new();
+        let value = parser.parse(&arena, &mut stores);
         assert!(matches!(value, CssValue::List { .. }));
         if let CssValue::List { values, .. } = value {
+            let values = stores.view().values(values);
             assert_eq!(values.len(), 3);
         }
     }
@@ -1325,9 +1333,11 @@ mod tests {
         let parser = ValueParser::new(source, span);
 
         let arena = Bump::new();
-        let value = parser.parse(&arena, &mut CssStores::new());
+        let mut stores = CssStores::new();
+        let value = parser.parse(&arena, &mut stores);
         assert!(matches!(value, CssValue::CommaSeparated { .. }));
         if let CssValue::CommaSeparated { values, .. } = value {
+            let values = stores.view().values(values);
             assert_eq!(values.len(), 2);
             // Verify both values parsed correctly
             assert!(matches!(values[0], CssValue::List { .. }));
@@ -1343,9 +1353,11 @@ mod tests {
         let parser = ValueParser::new(source, span);
 
         let arena = Bump::new();
-        let value = parser.parse(&arena, &mut CssStores::new());
+        let mut stores = CssStores::new();
+        let value = parser.parse(&arena, &mut stores);
         assert!(matches!(value, CssValue::List { .. }));
         if let CssValue::List { values, .. } = value {
+            let values = stores.view().values(values);
             assert_eq!(values.len(), 4); // "0", "2px", "4px", "rgba(...)"
             // Last value should be a color (rgba is recognized as color function)
             assert!(matches!(values[3], CssValue::Color { .. }));
@@ -1360,12 +1372,14 @@ mod tests {
         let parser = ValueParser::new(source, span);
 
         let arena = Bump::new();
-        let value = parser.parse(&arena, &mut CssStores::new());
+        let mut stores = CssStores::new();
+        let value = parser.parse(&arena, &mut stores);
         assert!(matches!(value, CssValue::Function { .. }));
         if let CssValue::Function {
             name_span, args, ..
         } = value
         {
+            let args = stores.view().values(args);
             assert_eq!(name_span.extract(source), "linear-gradient");
             // Arguments should have accurate spans pointing to original source
             assert_eq!(args.len(), 3); // "90deg", "red 01%", "blue 02%"
@@ -1385,9 +1399,11 @@ mod tests {
         let parser = ValueParser::new(source, span);
 
         let arena = Bump::new();
-        let value = parser.parse(&arena, &mut CssStores::new());
+        let mut stores = CssStores::new();
+        let value = parser.parse(&arena, &mut stores);
         assert!(matches!(value, CssValue::CommaSeparated { .. }));
         if let CssValue::CommaSeparated { values, .. } = value {
+            let values = stores.view().values(values);
             assert_eq!(values.len(), 3);
             assert!(
                 matches!(values[1], CssValue::Identifier { span } if span.start == span.end),
@@ -1397,12 +1413,12 @@ mod tests {
 
         // A *closing* comma produces no further group (the algorithm stops once the
         // input is empty), so `a,` is the one-element list `[a]`.
-        let trailing =
-            ValueParser::new("a,", Span { start: 0, end: 2 }).parse(&arena, &mut CssStores::new());
+        let mut stores = CssStores::new();
+        let trailing = ValueParser::new("a,", Span { start: 0, end: 2 }).parse(&arena, &mut stores);
         let CssValue::CommaSeparated { values, .. } = trailing else {
             panic!("expected a comma list");
         };
-        assert_eq!(values.len(), 1);
+        assert_eq!(stores.view().values(values).len(), 1);
     }
 
     #[test]
@@ -1412,9 +1428,11 @@ mod tests {
         let parser = ValueParser::new(source, span);
 
         let arena = Bump::new();
-        let value = parser.parse(&arena, &mut CssStores::new());
+        let mut stores = CssStores::new();
+        let value = parser.parse(&arena, &mut stores);
         assert!(matches!(value, CssValue::CommaSeparated { .. }));
         if let CssValue::CommaSeparated { values, .. } = value {
+            let values = stores.view().values(values);
             assert_eq!(values.len(), 2);
             // Spans should exclude trailing whitespace
         }
@@ -1457,10 +1475,12 @@ mod tests {
         let parser = ValueParser::new(source, span);
 
         let arena = Bump::new();
-        let value = parser.parse(&arena, &mut CssStores::new());
+        let mut stores = CssStores::new();
+        let value = parser.parse(&arena, &mut stores);
         assert!(matches!(value, CssValue::CommaSeparated { .. }));
 
         if let CssValue::CommaSeparated { values, .. } = value {
+            let values = stores.view().values(values);
             assert_eq!(values.len(), 3);
 
             // Each value should have correct span
@@ -1509,10 +1529,12 @@ mod tests {
         let parser = ValueParser::new(source, span);
 
         let arena = Bump::new();
-        let value = parser.parse(&arena, &mut CssStores::new());
+        let mut stores = CssStores::new();
+        let value = parser.parse(&arena, &mut stores);
         let CssValue::CommaSeparated { values, .. } = value else {
             panic!("expected a comma list, got {value:?}");
         };
+        let values = stores.view().values(values);
         assert_eq!(values.len(), 2);
         // Element 0 is `/* ( */ a` — the comment is ONE member, so its interior is
         // never re-tokenized.
@@ -1525,6 +1547,7 @@ mod tests {
                 values[0]
             );
         };
+        let members = stores.view().values(members);
         assert_eq!(members.len(), 2);
         assert_eq!(members[0].span().extract(source), "/* ( */");
         assert!(matches!(values[1], CssValue::Identifier { .. }));
@@ -1544,10 +1567,12 @@ mod tests {
         let parser = ValueParser::new(source, span);
 
         let arena = Bump::new();
-        let value = parser.parse(&arena, &mut CssStores::new());
+        let mut stores = CssStores::new();
+        let value = parser.parse(&arena, &mut stores);
         let CssValue::List { values, .. } = value else {
             panic!("expected a space-separated list, got {value:?}");
         };
+        let values = stores.view().values(values);
         assert_eq!(values.len(), 2);
         assert_eq!(values[0].span().extract(source), "f(a /* c */ b)");
         assert!(parser.unclassified_path_builds_leaf("f(a /* c */ b)", &arena));
@@ -1568,10 +1593,12 @@ mod tests {
         let parser = ValueParser::new(source, span);
 
         let arena = Bump::new();
-        let value = parser.parse(&arena, &mut CssStores::new());
+        let mut stores = CssStores::new();
+        let value = parser.parse(&arena, &mut stores);
         let CssValue::CommaSeparated { values, .. } = value else {
             panic!("expected a comma list, got {value:?}");
         };
+        let values = stores.view().values(values);
         assert_eq!(values.len(), 2);
         assert_eq!(
             values[0].span().extract(source),
@@ -1588,15 +1615,18 @@ mod tests {
         let parser = ValueParser::new(source, span);
 
         let arena = Bump::new();
-        let value = parser.parse(&arena, &mut CssStores::new());
+        let mut stores = CssStores::new();
+        let value = parser.parse(&arena, &mut stores);
         assert!(matches!(value, CssValue::CommaSeparated { .. }));
 
         if let CssValue::CommaSeparated { values, .. } = value {
+            let values = stores.view().values(values);
             assert_eq!(values.len(), 2);
 
             // First value: "0 2px 4px rgba(0, 0, 0, 0.1)"
             assert!(matches!(values[0], CssValue::List { .. }));
-            if let CssValue::List { values: parts, .. } = &values[0] {
+            if let &CssValue::List { values: parts, .. } = &values[0] {
+                let parts = stores.view().values(parts);
                 assert_eq!(parts.len(), 4);
                 // Last part should be a color (rgba recognized as color)
                 assert!(matches!(parts[3], CssValue::Color { .. }));

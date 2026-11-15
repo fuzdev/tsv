@@ -188,7 +188,11 @@ fn parse_atrule_body<'arena>(
     // where only the verbatim reader, whose ends are spelled as gaps, keeps each where it was.
     let partless_with_run = match &prelude {
         PreludeValue::Supports { condition, .. } | PreludeValue::Container { condition, .. } => {
-            condition.parts.is_empty()
+            parser
+                .stores
+                .view()
+                .condition_parts(condition.parts)
+                .is_empty()
                 && crate::whitespace::holds_boundary_member(
                     parser.source(),
                     prelude_start_raw,
