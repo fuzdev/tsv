@@ -67,7 +67,7 @@
 //! expression). The walk still descends into their elements.
 //!
 //! ⚠️ **The wire is not the internal AST, so a row is not a slice field.** The
-//! census reads what the writer emits; where that differs from `&'arena [T]`:
+//! census reads what the writer emits; where that differs from the internal lists:
 //!
 //! - **Only an array counts.** A field that is sometimes `null`, a boolean or an
 //!   object counts only when it is an array. `Attribute.value` is the one where
