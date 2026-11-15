@@ -844,6 +844,37 @@ fn a_nested_raw_text_body_past_the_budget_prints_verbatim_on_the_contract_stack(
     });
 }
 
+/// The deepest markup at which a nested `<script>` or `<style>` body still parses and
+/// formats: the printer's parse of the body and the doc built from it, on top of every
+/// level of the markup's own walk, within the contract's stack. One element deeper, the
+/// body keeps its author's bytes.
+#[test]
+fn a_nested_raw_text_body_at_the_budget_formats_on_the_contract_stack() {
+    on_thread("contract raw text formats".to_owned(), gate_stack(), || {
+        for raw in ["<script>x = [1];</script>", "<style>a { b: c(1); }</style>"] {
+            let at = |elements: usize| {
+                format!(
+                    "{}{raw}{}\n",
+                    rep("<div>", elements),
+                    rep("</div>", elements)
+                )
+            };
+            // every element is two wire levels, so half the limit is past any accepted depth
+            let deepest = (1..NESTING_LIMIT as usize / 2)
+                .rev()
+                .find(|&elements| {
+                    tsv_svelte::format(&at(elements)).is_ok_and(|out| !out.contains(raw))
+                })
+                .unwrap_or_else(|| panic!("{raw}: the body formats at no depth"));
+            let deeper = tsv_svelte::format(&at(deepest + 1)).expect("formats");
+            assert!(
+                deeper.contains(raw),
+                "{raw}: one element past the deepest formatted body ({deepest}) formats it too"
+            );
+        }
+    });
+}
+
 /// The spine count bounds a path, not a document: a long list of short chains — a data
 /// table, a minified sequence, a long body — is charged one element's chains, never their
 /// total. Each source holds thousands of siblings of a few links each, several times the

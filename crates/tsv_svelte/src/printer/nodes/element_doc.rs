@@ -1253,18 +1253,7 @@ impl<'a> Printer<'a> {
         let host_nesting = self.nested_raw_text_nesting.get();
         let body = match kind {
             RawTextKind::Script => {
-                // Its own stores: nothing it mints reaches past the doc built from it.
-                let mut stores = AstStores::new();
-                let parsed = tsv_ts::__private::parse_embedded(
-                    &content,
-                    base_offset,
-                    host_nesting,
-                    &mut stores,
-                );
-                let view = stores.view();
-                parsed
-                    .ok()
-                    .and_then(|program| self.build_nested_script_body_doc(&program, view))
+                self.parse_nested_script_body_doc(&content, base_offset, host_nesting)
             }
             RawTextKind::Style => {
                 self.parse_nested_style_body_doc(&content, base_offset, host_nesting)
@@ -1324,6 +1313,29 @@ impl<'a> Printer<'a> {
         )
         .ok()?;
         self.build_nested_style_body_doc(tsv_css::__private::parsed_ref(&stylesheet, &stores))
+    }
+
+    /// The body doc of a `<script>` nested in markup, from its text: the body parsed at
+    /// `base_offset` under `host_nesting` and handed to
+    /// [`Printer::build_nested_script_body_doc`]. `None` when it does not parse or prints
+    /// nothing.
+    ///
+    /// The parse's stores are this body's own — nothing it mints reaches past the doc built
+    /// from it — and this function is where they live: it is kept out of line, so they sit in
+    /// its frame and never in the fragment builder's, which recurses once per level of markup
+    /// and which the optimizer is free to inline the element builders around this call into.
+    #[inline(never)]
+    fn parse_nested_script_body_doc(
+        &self,
+        content: &str,
+        base_offset: usize,
+        host_nesting: u32,
+    ) -> Option<DocId> {
+        let mut stores = AstStores::new();
+        let program =
+            tsv_ts::__private::parse_embedded(content, base_offset, host_nesting, &mut stores)
+                .ok()?;
+        self.build_nested_script_body_doc(&program, stores.view())
     }
 
     /// The body doc of a `<script>` nested in markup: the program's own doc

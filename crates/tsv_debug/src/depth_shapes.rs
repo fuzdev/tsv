@@ -1478,6 +1478,26 @@ fn construct_shapes() -> Vec<Shape> {
             "</div>",
             "\n",
         ),
+        // a `<script>` and a `<style>` nested at the markup's deepest nesting: raw text to the
+        // parse, so the printer parses each body there, starting at the markup's depth — which
+        // at the accepted depth leaves the body no budget, so its parse is refused and it
+        // prints verbatim (a body formats a few levels shallower)
+        svelte(
+            "svelte_elements_around_script",
+            "",
+            "<div>",
+            "<script>x = [1];</script>",
+            "</div>",
+            "\n",
+        ),
+        svelte(
+            "svelte_elements_around_style",
+            "",
+            "<div>",
+            "<style>a { b: c(1); }</style>",
+            "</div>",
+            "\n",
+        ),
         shape(
             "svelte_elements_around_spine",
             Lang::Svelte,
