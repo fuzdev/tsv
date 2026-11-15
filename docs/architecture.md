@@ -975,8 +975,8 @@ Decisions made during development with rationale preserved for future reference.
 
 tsv's TypeScript tree lives in per-document stores named by typed ids (below), its decoded
 strings and comments included, so a TypeScript parse takes no arena. The CSS tree's lists
-and strings live in a stylesheet's `CssStores` (below); its parse still takes an arena, for
-the value parser's operator-run token buffer alone. The Svelte tree sits in a **per-parse
+and strings live in a stylesheet's `CssStores` (below); its parse still takes an arena, and
+allocates nothing in it. The Svelte tree sits in a **per-parse
 bump arena** (`bumpalo`), tied to the program lifetime, freed wholesale when the arena drops,
 with no per-node `Drop`.
 

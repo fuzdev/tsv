@@ -62,10 +62,10 @@ fn parsed(parse: impl FnOnce(&mut CssStores) -> Result<CssStyleSheet>) -> Result
 /// * `Ok(CssStyleSheet)` - Parsed AST with nodes and value comments
 /// * `Err(Error)` - Parse error positioned in the parent file
 ///
-/// `arena` holds the parse's scratch (the host document's arena when CSS is embedded in a
-/// Svelte `<style>`), and `stores` are the host document's CSS stores, or the caller's own
-/// for a stylesheet it parses apart from the document's: every list and string of the
-/// returned tree lives in them.
+/// `arena` is the caller's (the host document's arena when CSS is embedded in a Svelte
+/// `<style>`), and nothing is allocated in it; `stores` are the host document's CSS stores,
+/// or the caller's own for a stylesheet it parses apart from the document's: every list and
+/// string of the returned tree lives in them.
 ///
 /// # Errors
 ///
@@ -221,8 +221,8 @@ pub fn format_ast_in<'a>(
 /// ```
 ///
 /// Every list and string of the returned [`CssStyleSheet`] lives in the stores [`ParsedCss`]
-/// bundles with it, fresh for this parse; it derefs to the stylesheet. `arena` holds the
-/// parse's scratch (caller-owns-`Bump`).
+/// bundles with it, fresh for this parse; it derefs to the stylesheet. Nothing is allocated
+/// in `arena` (caller-owns-`Bump`).
 pub fn parse(source: &str, arena: &bumpalo::Bump) -> Result<ParsedCss> {
     parsed(|stores| parse_into(source, arena, stores))
 }

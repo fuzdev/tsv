@@ -1318,6 +1318,16 @@ fn construct_shapes() -> Vec<Shape> {
             ")",
             "; }\n",
         ),
+        // a function inside an operator run at every level: the run's members are parsed as
+        // they are read, so each level holds the run's frame beside the function's
+        css_value(
+            "css_value_operator_run",
+            "a { width: ",
+            "calc(1*",
+            "1px",
+            ")",
+            "; }\n",
+        ),
         // the value parser reads an unquoted `url(`'s interior as nested groups, though the
         // lexer's url-token ends at its first `)`: every spelling of it, and the positions a
         // value takes

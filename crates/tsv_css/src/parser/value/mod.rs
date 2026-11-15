@@ -283,7 +283,7 @@ pub(crate) fn parse_single_value(
         && let Some((name, args)) = plain_function_parts(s, paren_pos, group_closes_run)
     {
         debug_assert!(
-            operators::split_value_run(s, colon_is_operator, head_welds, arena).is_none(),
+            operators::split_value_run(s, colon_is_operator, head_welds).is_none(),
             "a plain-name function run splits: {s:?}"
         );
         return parse_function_leaf(s, span, paren_pos, name, args, arena, stores);
@@ -295,37 +295,58 @@ pub(crate) fn parse_single_value(
     // misread: `(1.5)(2.5)` ends in a `)` without being one function, and `1.5/2.5` starts
     // with a number without being one dimension. It answers `None` for a single-token
     // OPERAND run, which is nearly every value, so the leaf path below is untouched.
-    if let Some(tokens) = operators::split_value_run(s, colon_is_operator, head_welds, arena) {
-        let mark = stores.runs.value_scratch.mark();
-        for token in tokens {
-            let member = &s[token.start..token.end];
-            let member_span = Span {
-                start: span.start + token.start as u32,
-                end: span.start + token.end as u32,
-            };
-            let member = if token.is_operator {
-                CssValue::Operator { span: member_span }
-            } else {
-                // Every operand is re-classified from scratch, which is what gets the
-                // number after the operator to its normalizer — but only its LEAF kind is
-                // still open: the splitter already said this member is one operand token,
-                // and asking it again over the member's own bytes would re-derive that
-                // verdict against a position the member no longer sits at (the `-` in
-                // `1.5*-` is a whole run of its own here, and a whole-run `-` IS an
-                // operator — see `operators::ValueToken::is_operator`).
-                parse_leaf_value(member, member_span, arena, stores)
-            };
-            stores.runs.value_scratch.push(member);
-        }
-        let values = flush_run(
-            &mut stores.runs.value_scratch,
-            &mut stores.runs.values,
-            mark,
-        );
-        return CssValue::List { values, span };
+    if let Some(members) = operators::split_value_run(s, colon_is_operator, head_welds) {
+        return parse_operator_run(members, span, arena, stores);
     }
 
     parse_leaf_value(s, span, arena, stores)
+}
+
+/// The `List` an operator run is: each member as the splitter reads it, an operand
+/// classified as its own leaf, pushed onto the value scratch and flushed as the run's list.
+///
+/// The members are pulled one at a time, each operand parsed before the next member is
+/// read — a function operand's arguments split runs of their own, each read by its own
+/// cursor and flushed off the scratch before this run pushes the operand.
+///
+/// Out of line, so the cursor lives in this frame rather than in
+/// `ValueParser::build_scanned_leaf`'s: that frame is on every level of a nested value,
+/// this one only on a level that goes through an operator run.
+#[inline(never)]
+fn parse_operator_run(
+    members: operators::RunMembers<'_>,
+    span: Span,
+    arena: &Bump,
+    stores: &mut CssStores,
+) -> CssValue {
+    let s = members.run();
+    let mark = stores.runs.value_scratch.mark();
+    for token in members {
+        let member = &s[token.start..token.end];
+        let member_span = Span {
+            start: span.start + token.start as u32,
+            end: span.start + token.end as u32,
+        };
+        let member = if token.is_operator {
+            CssValue::Operator { span: member_span }
+        } else {
+            // Every operand is re-classified from scratch, which is what gets the
+            // number after the operator to its normalizer — but only its LEAF kind is
+            // still open: the splitter already said this member is one operand token,
+            // and asking it again over the member's own bytes would re-derive that
+            // verdict against a position the member no longer sits at (the `-` in
+            // `1.5*-` is a whole run of its own here, and a whole-run `-` IS an
+            // operator — see `operators::ValueToken::is_operator`).
+            parse_leaf_value(member, member_span, arena, stores)
+        };
+        stores.runs.value_scratch.push(member);
+    }
+    let values = flush_run(
+        &mut stores.runs.value_scratch,
+        &mut stores.runs.values,
+        mark,
+    );
+    CssValue::List { values, span }
 }
 
 /// Classify one already-delimited value token — a string, a function or colour function,
@@ -1016,5 +1037,127 @@ mod function_levels_tests {
             (u32::MAX, u32::MAX),
             "the count it found is restored"
         );
+    }
+}
+
+#[cfg(test)]
+mod operator_run_tests {
+    use super::parse_value_from_source;
+    use crate::ast::{CssStores, CssValue};
+    use tsv_lang::Span;
+
+    /// Every operator run's members in `value`'s tree, in the order the parse splits them
+    /// (a run before the runs of its operands), each member spelled as its span's text and
+    /// an operator tagged `op`. A run is a `List` whose members tile its span with no gap
+    /// between them, which a whitespace list's never do.
+    fn split_runs(value: &CssValue, source: &str, stores: &CssStores, out: &mut Vec<Vec<String>>) {
+        let text = |span: Span| &source[span.start as usize..span.end as usize];
+        match value {
+            CssValue::List { values, span } => {
+                let values = stores.runs.values.slice(*values);
+                let tiles = values.first().is_some_and(|v| v.span().start == span.start)
+                    && values.last().is_some_and(|v| v.span().end == span.end)
+                    && values
+                        .windows(2)
+                        .all(|w| w[0].span().end == w[1].span().start);
+                if tiles {
+                    out.push(
+                        values
+                            .iter()
+                            .map(|v| match v {
+                                CssValue::Operator { span } => format!("op {}", text(*span)),
+                                v => text(v.span()).to_owned(),
+                            })
+                            .collect(),
+                    );
+                }
+                for v in values {
+                    split_runs(v, source, stores, out);
+                }
+            }
+            CssValue::CommaSeparated { values, .. } | CssValue::Function { args: values, .. } => {
+                for v in stores.runs.values.slice(*values) {
+                    split_runs(v, source, stores, out);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// `source` parsed whole as a custom property's value (a `:` is an operator) or a plain
+    /// one, into `stores`, and its operator runs ([`split_runs`]).
+    fn runs_in(source: &str, colon_is_operator: bool, stores: &mut CssStores) -> Vec<Vec<String>> {
+        let arena = bumpalo::Bump::new();
+        let span = Span {
+            start: 0,
+            end: source.len() as u32,
+        };
+        let value = parse_value_from_source(
+            source,
+            span,
+            0,
+            None,
+            false,
+            colon_is_operator,
+            u32::MAX,
+            &arena,
+            stores,
+        )
+        .expect("within the room");
+        let mut out = Vec::new();
+        split_runs(&value, source, stores, &mut out);
+        out
+    }
+
+    /// Runs nested three deep in function operands, a run straight after a nested one,
+    /// sibling runs, a run of one operator, a run that does not split, and an empty value.
+    const CASES: &[(&str, bool, &[&[&str]])] = &[
+        (
+            "1.5*f(2.5/g(3.5+h(4.5-5)))-k(6*7)",
+            false,
+            &[
+                &["1.5", "op *", "f(2.5/g(3.5+h(4.5-5)))", "op -", "k(6*7)"],
+                &["2.5", "op /", "g(3.5+h(4.5-5))"],
+                &["3.5", "op +", "h(4.5-5)"],
+                &["4.5", "op -", "5"],
+                &["6", "op *", "7"],
+            ],
+        ),
+        (
+            "12px/1.5 a(1*b(2/3))+4 c(5:6)",
+            false,
+            // a whitespace list splices its elements' runs into its own members, so only
+            // the runs inside the functions' arguments are lists of their own
+            &[
+                &["1", "op *", "b(2/3)"],
+                &["2", "op /", "3"],
+                &["5", "op :", "6"],
+            ],
+        ),
+        (
+            "a:+b f(1*2)/(3+4)",
+            true,
+            &[&["1", "op *", "2"], &["3", "op +", "4"]],
+        ),
+        ("/", false, &[&["op /"]]),
+        ("f(a:-)", false, &[&["a", "op :", "op -"]]),
+        ("red", false, &[]),
+        ("", false, &[]),
+    ];
+
+    /// Each run reads back exactly its own members, a run its operand opens and drains
+    /// in the middle of it included, and the value scratch is empty once the parse is done.
+    #[test]
+    fn nested_operator_runs_read_back_their_own_members() {
+        let mut stores = CssStores::new();
+        for &(source, colon_is_operator, expected) in CASES {
+            let runs = runs_in(source, colon_is_operator, &mut stores);
+            let expected: Vec<Vec<String>> = expected
+                .iter()
+                .map(|run| run.iter().map(|&m| m.to_owned()).collect())
+                .collect();
+            assert_eq!(runs, expected, "{source:?}");
+            assert!(stores.scratch_is_empty(), "{source:?}");
+        }
     }
 }

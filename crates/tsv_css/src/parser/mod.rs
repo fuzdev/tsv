@@ -1,9 +1,5 @@
 // CSS parser - parse CSS content from <style> tags
 
-#[cfg(feature = "_internal_ast_census")]
-mod census_vec {
-    tsv_lang::ast_census_vec!();
-}
 mod atrules;
 pub(crate) use atrules::is_keyframes_atrule;
 mod attributes;
@@ -52,9 +48,9 @@ pub(crate) struct CssParser<'a, 'arena> {
     /// spine, so only the nesting half is used.
     depth: DepthBudget,
     pub(crate) comments: Vec<Comment>,
-    /// Bump arena the value parser's operator-run token buffer is built in (`ValueToken`,
-    /// `value::operators`), supplied by the caller (caller-owns-`Bump`). `&'arena Bump` is
-    /// `Copy`. Nothing of the tree lives in it.
+    /// The caller's bump arena (caller-owns-`Bump`), handed to the value parser. `&'arena
+    /// Bump` is `Copy`. Nothing is allocated in it: the tree lives in the stores, and an
+    /// operator run's members are read one at a time (`value::operators::RunMembers`).
     pub(crate) arena: &'arena Bump,
     /// The stylesheet's stores, which every list and string this parser builds lands in:
     /// each list through its element type's scratch stack, flushed into that type's store as

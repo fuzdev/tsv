@@ -63,12 +63,6 @@
 //   nothing welds after a `:` either — a `colon` node is no operator for a sign to bind to
 //   (`--x: a:+b` → `a: + b`).
 
-#[cfg(feature = "_internal_ast_census")]
-use crate::parser::census_vec::BumpVec;
-use bumpalo::Bump;
-#[cfg(not(feature = "_internal_ast_census"))]
-use bumpalo::collections::Vec as BumpVec;
-
 use super::scan::{comment_end, is_comment_start, matching_close_paren};
 use crate::escapes::escape_len;
 use crate::lexer::{hyphen_starts_own_token, string_end};
@@ -280,8 +274,8 @@ pub(crate) struct ValueToken {
     pub(crate) is_operator: bool,
 }
 
-/// The members `run` splits into, or `None` when it is a single **operand** token —
-/// the overwhelmingly common case, which allocates nothing and leaves the caller's
+/// The members `run` splits into, read one at a time ([`RunMembers`]), or `None` when it is
+/// a single **operand** token — the overwhelmingly common case, which leaves the caller's
 /// existing leaf classification untouched. A run that is a single token which IS an
 /// operator still splits, into that one member: a whitespace-delimited `/`, `:` or `-`
 /// element (`1.5 / 2.5`, `--x: a : b`) is an operator node to postcss like any other, and
@@ -303,12 +297,11 @@ pub(crate) struct ValueToken {
 /// splits (which is what keeps `inset: a\+b` on its cataloged divergence), a `/*` opens a
 /// comment rather than a division, and an operator inside a function's arguments belongs
 /// to that function's own run.
-pub(crate) fn split_value_run<'arena>(
+pub(crate) fn split_value_run(
     run: &str,
     colon_is_operator: bool,
     head_welds: bool,
-    arena: &'arena Bump,
-) -> Option<BumpVec<'arena, ValueToken>> {
+) -> Option<RunMembers<'_>> {
     let bytes = run.as_bytes();
     // A run holding no byte that could open a boundary is the common case, and one pass
     // that can only answer "no" is cheaper than the tokenizer's state machine. A run that
@@ -323,12 +316,12 @@ pub(crate) fn split_value_run<'arena>(
     };
     if !may_split {
         debug_assert!(
-            tokenize_run(run, colon_is_operator, head_welds, arena).is_none(),
+            tokenize_run(run, colon_is_operator, head_welds).is_none(),
             "the refusal pass declined a run that splits: {run:?}"
         );
         return None;
     }
-    tokenize_run(run, colon_is_operator, head_welds, arena)
+    tokenize_run(run, colon_is_operator, head_welds)
 }
 
 /// Does `bytes` open on a [`TokenKind::Word`] — an ASCII letter, `_` or `#`, a `-` before
@@ -391,51 +384,89 @@ fn any_byte_has(bytes: &[u8], bit: u8) -> bool {
 }
 
 /// The tokenizer behind [`split_value_run`], without its refusal pass.
-fn tokenize_run<'arena>(
-    run: &str,
-    colon_is_operator: bool,
-    head_welds: bool,
-    arena: &'arena Bump,
-) -> Option<BumpVec<'arena, ValueToken>> {
-    let len = run.len();
-    if len == 0 {
+///
+/// Reads the first member and nothing more: that settles the verdict, and the rest of the
+/// run is read by the [`RunMembers`] it hands back, as the caller pulls it.
+fn tokenize_run(run: &str, colon_is_operator: bool, head_welds: bool) -> Option<RunMembers<'_>> {
+    if run.is_empty() {
         return None;
     }
     let mut i = 0usize;
     // What stands to the left of `i` (see [`Preceding`]).
     let mut previous = Preceding::Head;
 
-    // The first member alone settles the common case — a run that is one operand token —
-    // before any `Vec` is minted. A one-token run splits only when that token is an
-    // operator (the whitespace-delimited element above). The verdict is the splitter's own
-    // — read back off the bytes, the `-a` in `1.5*-a` would be minted as an operator it is
-    // not (see [`ValueToken::is_operator`]).
+    // The first member alone settles the common case — a run that is one operand token. A
+    // one-token run splits only when that token is an operator (the whitespace-delimited
+    // element above). The verdict is the splitter's own — read back off the bytes, the `-a`
+    // in `1.5*-a` would be minted as an operator it is not (see [`ValueToken::is_operator`]).
     let first = next_member(run, &mut i, &mut previous, colon_is_operator, head_welds);
-    if i == len && !first.is_operator {
+    if i == run.len() && !first.is_operator {
         return None;
     }
-    // In the document's arena rather than the heap: the members are read once, straight
-    // into the `List` the caller builds there, and a heap `Vec` paid a free for each.
-    let mut tokens = BumpVec::with_capacity_in(4, arena);
-    tokens.push(first);
-    while i < len {
-        tokens.push(next_member(
-            run,
-            &mut i,
-            &mut previous,
-            colon_is_operator,
-            head_welds,
-        ));
+    Some(RunMembers {
+        run,
+        i,
+        previous,
+        colon_is_operator,
+        head_welds,
+        first: Some(first),
+    })
+}
+
+/// The members of a run that splits, in order, each read as it is pulled — no buffer
+/// holds them. The tokenizer's whole state is the position, what stands to the left of it
+/// and the two flags, and a member is read off `run` alone, so the caller can parse each
+/// operand (a function's arguments splitting runs of their own included) before the next
+/// member is read: a nested run is read by a `RunMembers` of its own, over its own text.
+///
+/// The first member was read ahead by [`tokenize_run`] for the verdict and is handed out
+/// first rather than read again.
+pub(crate) struct RunMembers<'r> {
+    run: &'r str,
+    /// One past the last member read.
+    i: usize,
+    /// What stands to the left of `i` (see [`Preceding`]).
+    previous: Preceding,
+    colon_is_operator: bool,
+    head_welds: bool,
+    /// The member the verdict read, until it is pulled.
+    first: Option<ValueToken>,
+}
+
+impl<'r> RunMembers<'r> {
+    /// The run the members are read from, which every member's offsets index.
+    pub(crate) fn run(&self) -> &'r str {
+        self.run
     }
-    Some(tokens)
+}
+
+impl Iterator for RunMembers<'_> {
+    type Item = ValueToken;
+
+    #[inline]
+    fn next(&mut self) -> Option<ValueToken> {
+        if let Some(first) = self.first.take() {
+            return Some(first);
+        }
+        if self.i == self.run.len() {
+            return None;
+        }
+        Some(next_member(
+            self.run,
+            &mut self.i,
+            &mut self.previous,
+            self.colon_is_operator,
+            self.head_welds,
+        ))
+    }
 }
 
 /// Read the member at `*i`, leaving `*i` one past it and `previous` naming it.
 ///
 /// ⚠️ `inline(always)`, not `inline`, and the difference is measured: under a plain
 /// `#[inline]` it outlines with `scan_token` folded into it, and the tokenizer's two call
-/// sites each pay the call — about +2.8% cycles on the CSS parse-and-wire path with
-/// instructions flat.
+/// sites (the verdict's first member, [`RunMembers`]'s every later one) each pay the call —
+/// about +2.8% cycles on the CSS parse-and-wire path with instructions flat.
 #[expect(clippy::inline_always)]
 #[inline(always)]
 fn next_member(
@@ -823,10 +854,8 @@ mod tests {
     }
 
     fn split_at(run: &str, colon_is_operator: bool, head_welds: bool) -> Option<Vec<String>> {
-        let arena = bumpalo::Bump::new();
-        split_value_run(run, colon_is_operator, head_welds, &arena).map(|tokens| {
+        split_value_run(run, colon_is_operator, head_welds).map(|tokens| {
             tokens
-                .into_iter()
                 .map(|t| {
                     let text = &run[t.start..t.end];
                     if t.is_operator {
@@ -1239,5 +1268,125 @@ mod tests {
     fn an_unbalanced_paren_swallows_the_run() {
         assert_eq!(split("1.5/(2.5", false).unwrap(), ["1.5", "op /", "(2.5"]);
         assert_eq!(split("(1.5", false), None);
+    }
+
+    /// One member as the tests spell it: its text, an operator tagged `op`.
+    fn spelled(run: &str, token: &super::ValueToken) -> String {
+        let text = &run[token.start..token.end];
+        if token.is_operator {
+            format!("op {text}")
+        } else {
+            text.to_owned()
+        }
+    }
+
+    /// Every run `run` splits into, read the way the value parser reads them: each operand
+    /// that is a function or a group opens its arguments as a run of its own (a group's
+    /// interior — a `:` an operator, no head weld), streamed to its end BEFORE the enclosing
+    /// run's next member is pulled. The runs come back in the order they open.
+    fn stream_nested(
+        run: &str,
+        colon_is_operator: bool,
+        head_welds: bool,
+        out: &mut Vec<Vec<String>>,
+    ) {
+        let Some(members) = split_value_run(run, colon_is_operator, head_welds) else {
+            return;
+        };
+        let at = out.len();
+        out.push(Vec::new());
+        for token in members {
+            out[at].push(spelled(run, &token));
+            let text = &run[token.start..token.end];
+            if !token.is_operator
+                && text.ends_with(')')
+                && let Some(open) = text.find('(')
+            {
+                stream_nested(&text[open + 1..text.len() - 1], true, false, out);
+            }
+        }
+    }
+
+    fn nested(run: &str) -> Vec<Vec<String>> {
+        let mut out = Vec::new();
+        stream_nested(run, false, true, &mut out);
+        out
+    }
+
+    /// A run streamed while the runs it encloses are opened and drained under it, three
+    /// deep: each reads back exactly its own members, the outer one resuming where it
+    /// stood.
+    #[test]
+    fn a_nested_run_streams_while_the_outer_one_is_open() {
+        assert_eq!(
+            nested("1.5*f(2.5/g(3.5+h(4.5-5)))-k(6*7)"),
+            [
+                &["1.5", "op *", "f(2.5/g(3.5+h(4.5-5)))", "op -", "k(6*7)"][..],
+                &["2.5", "op /", "g(3.5+h(4.5-5))"],
+                &["3.5", "op +", "h(4.5-5)"],
+                &["4.5", "op -", "5"],
+                &["6", "op *", "7"],
+            ]
+        );
+        // a `:` and a sign inside the inner runs read their own position, not the outer's
+        assert_eq!(
+            nested("+a(b:+c(1*-d))/2"),
+            [
+                &["+a(b:+c(1*-d))", "op /", "2"][..],
+                &["b", "op :", "op +", "c(1*-d)"],
+                &["1", "op *", "-d"],
+            ]
+        );
+    }
+
+    /// A run straight after a nested one — a closed group, then an operator, then a group
+    /// of its own — reads on from the first group's `)` once that group's run is drained.
+    #[test]
+    fn a_run_straight_after_a_nested_one_reads_on() {
+        assert_eq!(
+            nested("f(1*2)/(3+4)"),
+            [
+                &["f(1*2)", "op /", "(3+4)"][..],
+                &["1", "op *", "2"],
+                &["3", "op +", "4"],
+            ]
+        );
+        assert_eq!(
+            nested("(1*2)(3/4)5"),
+            [
+                &["(1*2)", "(3/4)", "5"][..],
+                &["1", "op *", "2"],
+                &["3", "op /", "4"],
+            ]
+        );
+    }
+
+    /// An empty run is no run, and a run of one operator is that one member.
+    #[test]
+    fn an_empty_run_and_a_one_operator_run() {
+        for (colon_is_operator, head_welds) in [(false, false), (false, true), (true, false)] {
+            assert_eq!(split_at("", colon_is_operator, head_welds), None);
+            for op in ["/", "*", "+", "-"] {
+                assert_eq!(
+                    split_at(op, colon_is_operator, head_welds).unwrap(),
+                    [format!("op {op}")]
+                );
+            }
+        }
+        assert_eq!(split_at(":", true, false).unwrap(), ["op :"]);
+        assert_eq!(split_at(":", false, false), None);
+    }
+
+    /// The cursor hands out each member once and then stays drained, the member the
+    /// verdict read included.
+    #[test]
+    fn a_drained_cursor_stays_drained() {
+        for run in ["/", "1.5/2.5", "f(1*2)/(3+4)"] {
+            let mut members = split_value_run(run, true, false).expect("splits");
+            let read: Vec<String> = members.by_ref().map(|t| spelled(run, &t)).collect();
+            assert!(!read.is_empty());
+            assert!(members.next().is_none(), "{run:?}");
+            assert!(members.next().is_none(), "{run:?}");
+        }
     }
 }
