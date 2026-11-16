@@ -271,7 +271,7 @@ fn serve_requests() -> Result<(), CliError> {
 
 /// The reply line for one request — `Err` only for a request no binding would accept
 /// (an unknown goal, a goal on a goalless language).
-fn answer(request: &WireRequest, arena: &mut bumpalo::Bump) -> Result<Vec<u8>, String> {
+fn answer(request: &WireRequest) -> Result<Vec<u8>, String> {
     let language = request.language;
     let goal = match request.goal.as_deref() {
         None => tsv_ts::Goal::Module,
@@ -286,7 +286,7 @@ fn answer(request: &WireRequest, arena: &mut bumpalo::Bump) -> Result<Vec<u8>, S
         }
     };
     let source = request.source.as_str();
-    let parsed = super::catch_in_arena(arena, |_| -> Result<Vec<u8>, String> {
+    let parsed = super::catch_request_panic(|| -> Result<Vec<u8>, String> {
         Ok(match language {
             WireLanguage::Svelte => {
                 let ast = tsv_svelte::__private::parse(source).map_err(|e| format!("{e:#}"))?;

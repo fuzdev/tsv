@@ -5,7 +5,6 @@ use crate::cli::commands::profile::{percentile, resolve_profile_files};
 use tsv_cli::cli::input::ParserType;
 use tsv_lang::doc::DocText;
 use tsv_lang::doc::arena::{DocArena, DocNode};
-use tsv_lang::estimated_ast_arena_capacity;
 
 /// Histogram the `DocArena` node population produced by formatting a corpus — the
 /// data behind the doc-IR memory levers (node-size shrink, the arena pre-size
@@ -103,27 +102,16 @@ struct Stats {
     fill_single: u64,
     group_total: u64,
     group_of_group: u64,
-    /// Sibling pre-size heuristics (same capacity-only audit as nodes/children):
-    /// the output `String` (`estimated_output_capacity`) and the parse-side AST
-    /// bump (`estimated_ast_arena_capacity`). `output_estimated` sums the former;
-    /// `bump_allocated` sums bumpalo's `allocated_bytes()` for the *production
-    /// pre-sized* bump (so it reads how over/under the current hint runs, NOT the
-    /// AST's demand).
+    /// Sibling pre-size heuristic (same capacity-only audit as nodes/children):
+    /// the output `String` (`estimated_output_capacity`). `output_estimated` sums it.
     output_bytes: u64,
     output_capacity: u64,
     output_estimated: u64,
-    bump_allocated: u64,
-    /// Per-file calibration distributions for the two sibling pre-sizes.
+    /// Per-file calibration distribution for the output pre-size.
     /// `output_per_node` = output bytes / node count — the multiplier
     /// `estimated_output_capacity` (= `k * nodes.len()`) must clear at its chosen
-    /// percentile so the dense tail doesn't realloc. `bump_demand` = an
-    /// *un-pre-sized* `Bump::new()`'s `allocated_bytes()` / source len — the AST's
-    /// actual byte demand (≤2× inflated by bumpalo chunk doubling), the signal
-    /// `estimated_ast_arena_capacity` must clear (the `bump_allocated` aggregate
-    /// above is pre-size-dominated, so it can't calibrate itself). Sorted before
-    /// reporting.
+    /// percentile so the dense tail doesn't realloc. Sorted before reporting.
     output_per_node: Vec<f64>,
-    bump_demand: Vec<f64>,
 }
 
 impl ArenaStatsCommand {
@@ -177,7 +165,6 @@ impl ArenaStatsCommand {
         stats.node_density.sort_by(f64::total_cmp);
         stats.children_density.sort_by(f64::total_cmp);
         stats.output_per_node.sort_by(f64::total_cmp);
-        stats.bump_demand.sort_by(f64::total_cmp);
 
         if self.json {
             print_json(&stats, parse_errors, read_errors);
@@ -279,28 +266,11 @@ fn run_reuse(files: &[std::path::PathBuf], list_errors: bool) -> Result<(), CliE
     Ok(())
 }
 
-/// Parse `source` into an un-pre-sized bump and return its `allocated_bytes()` —
-/// bumpalo's grow-to-fit total, a proxy for the AST's true byte demand (inflated
-/// ≤2× by chunk doubling off the default first chunk). Only used to calibrate
-/// `estimated_ast_arena_capacity`; the AST is dropped with the bump. Returns 0 if
-/// the parse fails (the caller's first parse already succeeded, so it won't here), and
-/// always for every language now, whose parses write their stores and allocate in no bump.
-fn measure_bump_demand(source: &str, parser: ParserType) -> u64 {
-    let bump = bumpalo::Bump::new();
-    let ok = match parser {
-        ParserType::TypeScript => tsv_ts::__private::parse(source).is_ok(),
-        ParserType::Svelte => tsv_svelte::__private::parse(source).is_ok(),
-        ParserType::Css => tsv_css::__private::parse(source).is_ok(),
-    };
-    if ok { bump.allocated_bytes() as u64 } else { 0 }
-}
-
 /// Format one already-read file into a fresh arena and fold its node population into
 /// `stats`. A parse failure returns `Err(msg)` (counted/listed by the caller, which also
 /// owns the read and counts an unreadable file apart), never aborting the walk.
 #[expect(clippy::cast_precision_loss)]
 fn collect_file(source: &str, parser: ParserType, stats: &mut Stats) -> Result<(), String> {
-    let bump = bumpalo::Bump::with_capacity(estimated_ast_arena_capacity(source.len()));
     let arena = DocArena::for_source(source);
 
     // the shipped format path: fold, parse the folded text, format it
@@ -325,13 +295,6 @@ fn collect_file(source: &str, parser: ParserType, stats: &mut Stats) -> Result<(
     // `estimated_output_capacity()` reads the now-final `nodes.len()`, so this is
     // exactly the reservation render used.
     stats.output_estimated += arena.estimated_output_capacity() as u64;
-    stats.bump_allocated += bump.allocated_bytes() as u64;
-    // Demand signal for `estimated_ast_arena_capacity` calibration: re-parse into
-    // an UN-pre-sized bump so `allocated_bytes()` tracks bumpalo's own grow-to-fit
-    // (≤2× the true demand via chunk doubling), not the production pre-size the
-    // `bump` above carries. Second parse; the AST is discarded. Parse already
-    // succeeded above, so this cannot fail.
-    let demand = measure_bump_demand(source, parser);
 
     let nodes = arena.borrow_nodes();
     let children = arena.borrow_children();
@@ -347,7 +310,6 @@ fn collect_file(source: &str, parser: ParserType, stats: &mut Stats) -> Result<(
     stats
         .output_per_node
         .push(output.len() as f64 / nodes.len().max(1) as f64);
-    stats.bump_demand.push(demand as f64 / len);
     let children_slice = children.as_slice();
     for n in nodes.iter() {
         let kind = classify_node(n);
@@ -513,12 +475,6 @@ fn print_report(s: &Stats, parse_errors: usize, read_errors: usize) {
         s.output_bytes as f64 / s.output_estimated.max(1) as f64,
     );
     density_line("per-file output/node  ", &s.output_per_node);
-    eprintln!(
-        "  ast_bump: {:>9} B allocated  ({:.2}×source; production pre-size, NOT demand)",
-        s.bump_allocated,
-        s.bump_allocated as f64 / s.bytes.max(1) as f64,
-    );
-    density_line("per-file bump demand/B", &s.bump_demand);
     eprintln!();
 
     eprintln!("  DocNode variants (share of all nodes):");
@@ -602,7 +558,7 @@ fn print_json(s: &Stats, parse_errors: usize, read_errors: usize) {
         s.group_of_group,
     );
     println!(
-        "{{\"files\":{},\"bytes\":{},\"nodes\":{},\"capacity\":{},\"children\":{},\"children_capacity\":{},\"output_bytes\":{},\"output_capacity\":{},\"output_estimated\":{},\"bump_allocated\":{},\"node_density\":{},\"children_density\":{},\"output_per_node\":{},\"bump_demand\":{},\"parse_errors\":{parse_errors},\"read_errors\":{read_errors},\"node_variants\":{},\"text_variants\":{},\"degeneracy\":{}}}",
+        "{{\"files\":{},\"bytes\":{},\"nodes\":{},\"capacity\":{},\"children\":{},\"children_capacity\":{},\"output_bytes\":{},\"output_capacity\":{},\"output_estimated\":{},\"node_density\":{},\"children_density\":{},\"output_per_node\":{},\"parse_errors\":{parse_errors},\"read_errors\":{read_errors},\"node_variants\":{},\"text_variants\":{},\"degeneracy\":{}}}",
         s.files,
         s.bytes,
         s.nodes,
@@ -612,11 +568,9 @@ fn print_json(s: &Stats, parse_errors: usize, read_errors: usize) {
         s.output_bytes,
         s.output_capacity,
         s.output_estimated,
-        s.bump_allocated,
         density_json(&s.node_density),
         density_json(&s.children_density),
         density_json(&s.output_per_node),
-        density_json(&s.bump_demand),
         hist_json(&table_kinds(NODE_KINDS, &s.node_hist), &s.node_hist),
         hist_json(&table_kinds(TEXT_KINDS, &s.text_hist), &s.text_hist),
         degeneracy,

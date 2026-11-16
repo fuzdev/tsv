@@ -72,21 +72,19 @@ impl ProfileCommand {
 
         let mut results = Vec::new();
 
-        // One AST `Bump` and one `DocArena` reused across every file and
-        // iteration with `reset()` between them — the same lifecycle as
-        // `tsv_cli format`'s worker loop and the bindings' `tsv_arena`
-        // thread-locals, so the measured phases are product-shaped (arena
-        // growth amortizes across the corpus instead of recurring per call).
-        let mut arena = bumpalo::Bump::new();
+        // One `DocArena` reused across every file and iteration with `reset()`
+        // between them — the doc arena's lifecycle in `tsv_cli format`'s worker
+        // loop and the bindings' `tsv_arena` thread-local, so the format phase is
+        // product-shaped (arena growth amortizes across the corpus instead of
+        // recurring per call). Every parse is one-shot: fresh stores per call.
         let mut doc_arena = tsv_lang::doc::arena::DocArena::new();
 
         for path in &files {
-            match profile_file(path, self.iterations, mode, &mut arena, &mut doc_arena) {
+            match profile_file(path, self.iterations, mode, &mut doc_arena) {
                 Ok(result) => results.push(result),
                 Err(err) => {
                     eprintln!("Error profiling {}: {err}", path.display());
-                    // A failed iteration bails before its in-loop resets.
-                    arena.reset();
+                    // A failed iteration bails before its in-loop reset.
                     doc_arena.reset();
                 }
             }
@@ -316,7 +314,7 @@ fn files_label(n: usize) -> String {
 
 /// Profile a single file: parse and format N times, return median timing.
 ///
-/// The arenas are shared across the whole run (see `run`); the owned
+/// The doc arena is shared across the whole run (see `run`); the owned
 /// `tsv_*::format` entry would instead allocate and drop a fresh `DocArena`
 /// inside the timed region — a per-call teardown (`drop_in_place<Vec<DocNode>>`)
 /// no production hot path pays per file.
@@ -324,7 +322,6 @@ fn profile_file(
     path: &Path,
     iterations: usize,
     mode: Mode,
-    arena: &mut bumpalo::Bump,
     doc_arena: &mut tsv_lang::doc::arena::DocArena,
 ) -> Result<FileResult, String> {
     let source = std::fs::read_to_string(path).map_err(|e| format!("read error: {e}"))?;
@@ -342,7 +339,7 @@ fn profile_file(
         let (parse_dur, format_dur) = match mode {
             #[cfg(tsv_unported)]
             Mode::Bind => {
-                let (parse_dur, format_dur, stats) = profile_bind_once(&source, arena)?;
+                let (parse_dur, format_dur, stats) = profile_bind_once(&source)?;
                 bind_stats = Some(stats); // deterministic — any iteration's copy
                 (parse_dur, format_dur)
             }
@@ -358,7 +355,6 @@ fn profile_file(
         render_times.push(tsv_lang::phase_timing::take_render_time());
         // Arena teardown outside the timed regions, mirroring how arena setup is
         // excluded: the timers isolate parse/format work proper.
-        arena.reset();
         doc_arena.reset();
     }
 
@@ -385,12 +381,9 @@ fn profile_file(
 /// `(parse_duration, bind_duration, flow_counters)`. The bind phase runs the
 /// `tsv_check` binder (SoA walk + symbol bind) over the parsed program.
 #[cfg(tsv_unported)]
-fn profile_bind_once(
-    source: &str,
-    arena: &bumpalo::Bump,
-) -> Result<(Duration, Duration, BindStats), String> {
+fn profile_bind_once(source: &str) -> Result<(Duration, Duration, BindStats), String> {
     let t0 = Instant::now();
-    let ast = tsv_ts::__private::parse(source, arena).map_err(|e| format!("parse error: {e:#}"))?;
+    let ast = tsv_ts::__private::parse(source).map_err(|e| format!("parse error: {e:#}"))?;
     let parse_dur = t0.elapsed();
 
     let t1 = Instant::now();
@@ -446,7 +439,7 @@ fn profile_strip_once(source: &str) -> Result<(Duration, Duration), String> {
 /// The fold is timed in the parse column — it runs ahead of the parse, and its pass takes
 /// the document's line verdict the format then reads instead of walking the source again.
 ///
-/// Arenas are caller-owned and reset between iterations (see `profile_file`);
+/// The doc arena is caller-owned and reset between iterations (see `profile_file`);
 /// setup/teardown stays outside both timed regions.
 ///
 /// `examples/perf_ab.rs` (the `deno task perf:ab` driver) times these same phases in a

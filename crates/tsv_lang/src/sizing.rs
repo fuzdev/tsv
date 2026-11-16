@@ -1,5 +1,5 @@
-// Sizing heuristics for allocation pre-sizing — the wire-JSON output buffer,
-// a bump arena sized to a document's AST, and the wire writer's line-start table.
+// Sizing heuristics for allocation pre-sizing — the wire-JSON output buffer and
+// the wire writer's line-start table.
 
 use crate::location::Wire;
 
@@ -34,33 +34,6 @@ pub fn estimated_json_capacity(source_len: usize, wire: Wire) -> usize {
         Wire::Loc => LOC_JSON_BYTES_PER_SOURCE_BYTE,
     };
     source_len.saturating_mul(per_byte).max(128)
-}
-
-/// Bump-arena pre-size floor, in bytes per source byte, for the internal AST.
-///
-/// This is a deliberate *partial* pre-size, not the AST's true footprint — the
-/// bump-allocated AST (nodes inline-by-value, child slices, arena-copied
-/// strings) runs to roughly 30–50 bytes per source byte in practice. Sizing the
-/// `Bump` to 16x up front folds the first several chunk-doubling `malloc`s a
-/// fresh `Bump::new()` would pay (512 B first chunk, then doubling) into one
-/// allocation — a small win on the WASM-format wall (dlmalloc) and native.
-/// Provisioning all the way to true demand buys nothing measurable: it does not
-/// change the allocation *count*, only trims the chunk-grow tail, and the batch
-/// drivers reuse one arena across files (`Bump::reset()`), so cold-start sizing
-/// is moot after the first file.
-const AST_ARENA_BYTES_PER_SOURCE_BYTE: usize = 16;
-
-/// Pre-size estimate (in bytes) for a bump arena sized to a document's internal
-/// AST, given the source length.
-///
-/// No parse takes an arena — every language parses into its own stores — so the
-/// one reader is `tsv_debug`'s arena audit, which sizes its `bumpalo::Bump` with
-/// it. The floor covers tiny sources whose AST is mostly fixed-size envelope, so a
-/// one-line input still gets one chunk, not several.
-pub fn estimated_ast_arena_capacity(source_len: usize) -> usize {
-    source_len
-        .saturating_mul(AST_ARENA_BYTES_PER_SOURCE_BYTE)
-        .max(512)
 }
 
 /// Source bytes per line assumed when pre-sizing a line-start table — a

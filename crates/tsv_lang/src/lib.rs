@@ -37,8 +37,7 @@
 // - `doc` - document builder primitives for prettier-compatible formatting
 // - `printing` - shared printing utilities for printers
 // - `source_scan` - trivia-aware source scanning between AST nodes
-// - `estimated_json_capacity` / `estimated_ast_arena_capacity` - pre-size heuristics
-//   for the wire-JSON output buffer and a bump arena sized to a document's AST
+// - `estimated_json_capacity` - pre-size heuristic for the wire-JSON output buffer
 // - `JsonWriter` - shared wire-JSON emission substrate (`_json` feature)
 // - `FxHasher` / `FxHashMap` / `FxHashSet` - dep-free multiply-xor hasher for the
 //   side tables
@@ -136,7 +135,7 @@ pub use location::{LeadingBom, LineRule, WireCoordinates};
 #[doc(hidden)]
 pub use output::{OutputBuffer, write_indent};
 #[doc(hidden)]
-pub use sizing::{estimated_ast_arena_capacity, estimated_json_capacity};
+pub use sizing::estimated_json_capacity;
 #[doc(hidden)]
 pub use span::Span;
 pub use stack::{STACK_SIZE, run_with_stack};

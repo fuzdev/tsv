@@ -664,14 +664,10 @@ tools — "what is the arena made of and how over-reserved is it" rather than "w
 does the time go". Pure Rust, no sidecar; covers `.ts` / `.svelte.ts` / `.svelte` / `.css`.
 
 It also reports **container degeneracy** (empty/single/nested `Concat`/`Fill` — the
-node-count lever) and audits the sibling pre-sizes (output `String`, AST bump). For
-those two it prints per-file calibration distributions: **output/node** (the multiplier
+node-count lever) and audits the sibling pre-size (the output `String`): it prints a
+per-file calibration distribution, **output/node** (the multiplier
 `estimated_output_capacity = k · nodes.len()` must clear at its percentile so the dense
-tail doesn't realloc) and **bump demand/byte** (an *un-pre-sized* `Bump::new()`'s
-`allocated_bytes()` per source byte — the AST's byte demand, since the production
-`bump_allocated` figure is dominated by the pre-size, not demand; note bumpalo never
-copies on chunk growth, so the bump pre-size is a malloc-count/peak knob, not a
-memcpy-churn one). `--list-errors` prints the path + error for every file the walk
+tail doesn't realloc). `--list-errors` prints the path + error for every file the walk
 skips — `parse-fail`, or `read-fail` for an unreadable file, counted apart in the
 report — the fast native first pass for finding tsv parse over-rejections (a file the
 canonical parser accepts but tsv rejects is a real gap; most corpus rejects are

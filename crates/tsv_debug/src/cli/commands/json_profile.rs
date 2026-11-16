@@ -1,11 +1,12 @@
-//! Profile the parse→JSON emission path (the bindings' parse path).
+//! Profile the parse→JSON emission path, one-shot (fresh stores per parse).
 //!
 //! Every binding's `parse_<lang>` (`tsv_ffi`'s `tsv_parse_<lang>` among them) runs
-//! `parse` + `convert_ast_json_bytes` — the span-only wire. This command
-//! times those two phases per file across a corpus; `--locations` times the Rust `loc`
-//! emitter instead (`convert_ast_json_bytes_with_locations`, what `tsv parse --locations`
-//! writes). Either writer walks the internal AST once and emits the final char-space wire
-//! JSON directly, so there are no sub-steps to decompose: just `parse` and `write`.
+//! `parse` + `convert_ast_json_bytes` — the span-only wire — over stores it keeps warm
+//! per thread; this command times those two phases per file across a corpus, each parse
+//! over fresh stores. `--locations` times the Rust `loc` emitter instead
+//! (`convert_ast_json_bytes_with_locations`, what `tsv parse --locations` writes). Either
+//! writer walks the internal AST once and emits the final char-space wire JSON directly, so
+//! there are no sub-steps to decompose: just `parse` and `write`.
 //! `--json` names the writer it timed in its `wire` field (`span` / `loc`).
 //!
 //! Run with `--release`; debug-build numbers aren't meaningful.

@@ -306,7 +306,7 @@ Methodology, results tracking and the `perf` recipe (the `profiling` cargo profi
 cargo run --release -p tsv_debug -- profile ../corpora/collections/zzz/src/lib        # parse vs format timing (--iterations, --json, --flow-stats)
 cargo run --release -p tsv_debug -- profile --bind ../corpora/collections/zzz/src     # parse vs lower+bind timing (TS-only) + peak RSS
 cargo run --release -p tsv_debug -- profile --strip ../corpora/collections            # parse vs the type strip's walk + blank (.ts/.mts/.cts, no .d.ts)
-cargo run --release -p tsv_debug -- json_profile ../corpora/collections/zzz/src/lib   # the bindings' parse path: parse vs span-only wire write (--locations: the loc emitter)
+cargo run --release -p tsv_debug -- json_profile ../corpora/collections/zzz/src/lib   # the one-shot parse vs the span-only wire write (--locations: the loc emitter)
 cargo run --release -p tsv_debug -- compile_profile tests/fixtures_compile            # Svelte compile vs the format wall
 cargo run -p tsv_debug buffer_sizes ../corpora/collections/zzz/src                    # printer SmallVec sizing histograms
 cargo run -p tsv_debug arena_stats ../corpora/collections/zzz/src/lib                 # DocArena node-population + memory audit (--reuse, --list-errors)

@@ -104,15 +104,14 @@ struct ImportsRequest {
 
 /// Answer import requests until stdin closes (module doc §`--stdin`).
 fn serve_requests() -> Result<(), CliError> {
-    super::serve_ndjson("imports", |request: &ImportsRequest, arena| {
-        serde_json::to_vec(&answer(&request.path, &request.source, arena))
-            .map_err(|e| e.to_string())
+    super::serve_ndjson("imports", |request: &ImportsRequest| {
+        serde_json::to_vec(&answer(&request.path, &request.source)).map_err(|e| e.to_string())
     })
 }
 
 /// The reply for one source (module doc §`--stdin`).
-fn answer(path: &Path, source: &str, arena: &mut bumpalo::Bump) -> serde_json::Value {
-    match super::catch_in_arena(arena, |_| imports_at_path(path, source)) {
+fn answer(path: &Path, source: &str) -> serde_json::Value {
+    match super::catch_request_panic(|| imports_at_path(path, source)) {
         Ok(Ok(bytes)) => serde_json::json!({ "imports": crate::json::wire_value(&bytes) }),
         Ok(Err(e)) => serde_json::json!({ "error": format!("{e:#}") }),
         Err(message) => serde_json::json!({ "panic": message }),

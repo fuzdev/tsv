@@ -109,15 +109,14 @@ struct StripRequest {
 
 /// Answer strip requests until stdin closes (module doc §`--stdin`).
 fn serve_requests() -> Result<(), CliError> {
-    super::serve_ndjson("strip", |request: &StripRequest, arena| {
-        serde_json::to_vec(&answer(&request.source, arena)).map_err(|e| e.to_string())
+    super::serve_ndjson("strip", |request: &StripRequest| {
+        serde_json::to_vec(&answer(&request.source)).map_err(|e| e.to_string())
     })
 }
 
 /// The reply for one source (module doc §`--stdin`).
-fn answer(source: &str, arena: &mut bumpalo::Bump) -> serde_json::Value {
-    // the strip takes no arena: the server's is only rewound
-    let result = super::catch_in_arena(arena, |_| {
+fn answer(source: &str) -> serde_json::Value {
+    let result = super::catch_request_panic(|| {
         tsv_ts::strip(source).map(|stripped| {
             let code = stripped.code;
             let mut findings: Vec<String> = contract_violations(source, &code)
