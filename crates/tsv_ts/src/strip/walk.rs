@@ -20,13 +20,15 @@
 //! `has_module_syntax` is set where its evidence is met. A [`Mode::Imports`] walk also
 //! descends into the four value subtrees the strip refuses without walking — an enum's
 //! member initializers, a value namespace's body, an `export =` operand and a regrouping
-//! assertion's operand — and is otherwise the same walk; its edits and refusal are never
-//! read. A [`Mode::Strip`] walk collects nothing: it pushes no
-//! record and tracks no module syntax, each site asking the mode with a branch, so the
-//! edits and the refusal are the same in every mode and the strip pays for no record. A
-//! [`Mode::StripWithImports`] walk is the strip's walk collecting as it goes: the strip's
-//! edits and refusal, and, over a source the strip accepts, the records an imports walk
-//! collects (the two walks part only inside a subtree the strip refuses). The mode is a
+//! assertion's operand — and is otherwise the same walk, but that it pushes no edit: nothing
+//! reads them, so the out-of-line arm a full list takes ([`Walk::push_edit_growing`]) gives
+//! its list no room, and the list stays empty and allocates nothing. Its refusal, never read
+//! either, is still recorded: a field written in place at a construct the strip refuses,
+//! which allocates nothing. A [`Mode::Strip`] walk collects nothing: it pushes no record and
+//! tracks no module syntax, each site asking the mode with a branch, so the strip pays for no
+//! record. A [`Mode::StripWithImports`] walk is the strip's walk collecting as it goes: the
+//! strip's edits and refusal, and, over a source the strip accepts, the records an imports
+//! walk collects (the two walks part only inside a subtree the strip refuses). The mode is a
 //! runtime value rather than a type parameter, so the bindings link one walk.
 
 use smallvec::SmallVec;
@@ -69,7 +71,7 @@ pub(crate) enum Mode {
     /// a refused strip has no output.
     Strip,
     /// `parse_imports`: the records are collected, and the subtrees the strip refuses are
-    /// walked for theirs.
+    /// walked for theirs. No edit is pushed: nothing reads them.
     Imports,
     /// `strip_with_imports`: the strip's walk, collecting the records as it goes. The
     /// subtrees the strip refuses are not walked: a refusal returns no records either, so
@@ -86,6 +88,8 @@ pub(crate) struct Walk<'s, 'b> {
     /// What the walk collects ([`Self::collects`]) and whether the subtrees the strip
     /// refuses are walked ([`Self::walks_refused`]).
     mode: Mode,
+    /// The ranges to blank, the strip's product — empty in [`Mode::Imports`], whose list is
+    /// given no room ([`Self::push_edit_growing`]).
     edits: Vec<Edit>,
     /// The import records, in source order — empty in [`Mode::Strip`].
     records: Vec<ImportRecord>,
@@ -156,11 +160,23 @@ impl Tail {
 
 impl<'s, 'b> Walk<'s, 'b> {
     pub(crate) fn new(source: &'s str, mode: Mode, view: AstView<'b>) -> Self {
+        Self::with_edits(source, mode, view, Vec::new())
+    }
+
+    /// [`Walk::new`] collecting its edits into `edits`, an empty list whose capacity the walk
+    /// reuses: a warm strip's parked list (`super::strip_into`).
+    pub(super) fn with_edits(
+        source: &'s str,
+        mode: Mode,
+        view: AstView<'b>,
+        edits: Vec<Edit>,
+    ) -> Self {
+        debug_assert!(edits.is_empty(), "a walk starts with no edit");
         Self {
             src: Source::new(source),
             view,
             mode,
-            edits: Vec::new(),
+            edits,
             records: Vec::new(),
             module_syntax: false,
             function_depth: 0,
@@ -174,17 +190,19 @@ impl<'s, 'b> Walk<'s, 'b> {
         }
     }
 
-    /// The collected edits, or the refusal.
-    pub(super) fn finish(self) -> Result<Vec<Edit>, StripError> {
+    /// The collected edits, and the refusal if the walk refused. The edits come back either
+    /// way, so a caller keeping the list for its next strip keeps it across a refusal too.
+    pub(super) fn finish(self) -> (Vec<Edit>, Result<(), StripError>) {
         debug_assert!(
             self.mode != Mode::Strip
                 || (self.records.is_empty() && !self.module_syntax && self.function_depth == 0),
             "a strip walk collects nothing"
         );
-        match self.refusal {
+        let verdict = match self.refusal {
             Some((kind, span)) => Err(StripError::unsupported(kind, self.src.text, span.range())),
-            None => Ok(self.edits),
-        }
+            None => Ok(()),
+        };
+        (self.edits, verdict)
     }
 
     /// Whether the walk collects import records and module syntax: every walk but a
@@ -249,6 +267,7 @@ impl<'s, 'b> Walk<'s, 'b> {
 
     /// The import records, whatever the walk refused — the [`Mode::Imports`] product.
     pub(crate) fn into_imports(self) -> Imports {
+        debug_assert!(self.edits.is_empty(), "an imports walk pushes no edit");
         Imports {
             records: self.records,
             has_module_syntax: self.module_syntax,
@@ -504,19 +523,29 @@ impl<'s, 'b> Walk<'s, 'b> {
     fn blank_marked(&mut self, start: u32, end: u32, mark: Mark) {
         if start < end {
             if self.edits.len() == self.edits.capacity() {
-                self.grow_edits();
+                self.push_edit_growing(start, end, mark);
+            } else {
+                self.edits.push(Edit { start, end, mark });
             }
-            self.edits.push(Edit { start, end, mark });
         }
     }
 
-    /// Room for more edits: [`EDITS_FIRST_CAPACITY`] at the first, then doubling — most
-    /// files' edits in one allocation, and none for a file with nothing type-only.
+    /// A push onto a full edit list: room for it — [`EDITS_FIRST_CAPACITY`] at the first,
+    /// then doubling, so most files' edits take one allocation and a file with nothing
+    /// type-only none — and the edit. Out of line and taking the whole push, so the common
+    /// push, onto a list the branch here has found room in, is a store: no growth check of
+    /// `Vec::push`'s own, no call its callers would save registers around, no test of the
+    /// mode. A [`Mode::Imports`] walk, whose edits nothing reads, gets neither: its list stays
+    /// empty, so each range it would blank ends here.
     #[cold]
     #[inline(never)]
-    fn grow_edits(&mut self) {
+    fn push_edit_growing(&mut self, start: u32, end: u32, mark: Mark) {
+        if self.mode == Mode::Imports {
+            return;
+        }
         self.edits
             .reserve(self.edits.capacity().max(EDITS_FIRST_CAPACITY));
+        self.edits.push(Edit { start, end, mark });
     }
 
     /// Blank a statement or class member whole, `;`-led when `semicolon` — which closes what
@@ -1996,8 +2025,9 @@ const RECORDS_FIRST_CAPACITY: usize = 16;
 
 /// The edits' first allocation: a file's edits usually fit, and a smaller one grows,
 /// copying, in every file with more than a few type-only ranges — measured costlier than the
-/// slack. The walk builds its edits per call, with no buffer kept warm between strips.
-const EDITS_FIRST_CAPACITY: usize = 64;
+/// slack. A one-shot strip's list is fresh and grows from here on every call; a warm strip's
+/// is the thread's parked one (`super::strip_into`), grown from here once and reused after.
+pub(super) const EDITS_FIRST_CAPACITY: usize = 64;
 
 /// A node span as a record's.
 const fn byte_span(span: Span) -> ByteSpan {
@@ -2335,8 +2365,26 @@ mod tests {
                 .expect("the source parses");
             let mut walk = Walk::new(source, Mode::Strip, program.view());
             walk.program(&program);
-            let edits = walk.finish().expect("the source strips");
+            let (edits, verdict) = walk.finish();
+            verdict.expect("the source strips");
             assert_eq!(edits.capacity(), capacity, "{source:?}");
+        }
+    }
+
+    /// An imports walk allocates no edit list and pushes no edit, over a source whose strip
+    /// blanks more ranges than the first capacity holds.
+    #[test]
+    fn an_imports_walk_allocates_no_edits() {
+        let source = "let a: T = 1;\n".repeat(EDITS_FIRST_CAPACITY + 1);
+        let program = crate::__private::parse_with_goal_or_fallback(&source, None)
+            .expect("the source parses");
+        for (mode, len) in [(Mode::Strip, EDITS_FIRST_CAPACITY + 1), (Mode::Imports, 0)] {
+            let mut walk = Walk::new(&source, mode, program.view());
+            walk.program(&program);
+            let (edits, verdict) = walk.finish();
+            verdict.expect("the source strips");
+            assert_eq!(edits.len(), len);
+            assert_eq!(edits.capacity() == 0, len == 0);
         }
     }
 }

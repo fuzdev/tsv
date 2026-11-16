@@ -62,12 +62,16 @@ mod blank;
 mod scan;
 pub(crate) mod walk;
 
+use std::cell::Cell;
 use std::fmt;
 use std::ops::Range;
 
 use tsv_lang::{Error, ErrorKind, ErrorReport};
 
+use crate::ast::{AstView, Program};
 use crate::imports::Imports;
+
+use blank::Edit;
 
 /// Strip the types from TypeScript `source`, keeping every surviving character at its line
 /// and UTF-16 column.
@@ -136,11 +140,10 @@ pub fn strip_with_goal(source: &str, goal: crate::Goal) -> Result<Stripped, Stri
 /// The one-shot strips: fresh stores sized for `source` ([`crate::ast::AstStores::for_source`]),
 /// dropped on return — the [`Stripped`] output is owned.
 fn strip_one_shot(source: &str, goal: Option<crate::Goal>) -> Result<Stripped, StripError> {
-    strip_into(
-        source,
-        goal,
-        &mut crate::ast::AstStores::for_source(source.len()),
-    )
+    let mut stores = crate::ast::AstStores::for_source(source.len());
+    let program = crate::__private::parse_with_goal_or_fallback_into(source, goal, &mut stores)
+        .map_err(StripError::Parse)?;
+    strip_program(source, &program, stores.view(), Vec::new()).1
 }
 
 /// [`strip`] and [`parse_imports`](crate::parse_imports()) in one parse and one walk: the
@@ -225,9 +228,12 @@ fn strip_with_imports_one_shot(
     Ok((stripped(source, &mut edits), imports))
 }
 
-/// The strip into a caller's `stores` — the hidden primitive beneath [`strip`] and
-/// [`strip_with_goal`], for a warm path that keeps the stores across sources (the bindings'
-/// per-thread stores; the CLI hands it fresh ones).
+/// The strip into a caller's `stores` — the hidden warm twin of [`strip`] and
+/// [`strip_with_goal`], for a path that keeps the stores across sources (the bindings'
+/// per-thread stores; the CLI hands it fresh ones). The walk's edit list is the thread's
+/// parked one (`PARKED_EDITS`), taken for the call and parked back cleared, so a thread
+/// stripping source after source allocates it once; the one-shot pair walks into a fresh
+/// list and leaves the parked one alone.
 ///
 /// The parse is `__private::parse_with_goal_or_fallback`'s: `Some(goal)` is exact, and
 /// `None` parses at `Module`, retried at `Script` only if that fails.
@@ -242,15 +248,43 @@ pub fn strip_into(
 ) -> Result<Stripped, StripError> {
     let program = crate::__private::parse_with_goal_or_fallback_into(source, goal, stores)
         .map_err(StripError::Parse)?;
-    let mut walk = walk::Walk::new(source, walk::Mode::Strip, stores.view());
-    walk.program(&program);
-    let mut edits = walk.finish()?;
-    Ok(stripped(source, &mut edits))
+    let edits = PARKED_EDITS.with(Cell::take);
+    let (edits, result) = strip_program(source, &program, stores.view(), edits);
+    PARKED_EDITS.with(|parked| parked.set(edits));
+    result
+}
+
+thread_local! {
+    /// This thread's parked edit list: [`strip_into`] takes it out for its walk and parks it
+    /// back cleared, keeping its capacity, as a store keeps its own across a park, and like
+    /// theirs it is never trimmed. Empty until the thread's first strip with an edit; a call
+    /// that panics or traps with the list taken leaves the slot empty, and the next strip
+    /// starts a fresh one. A slot of the thread's rather than a field of
+    /// [`crate::ast::AstStores`]: every package's stores — the format and parse builds',
+    /// which never strip, and a Svelte document's TypeScript half — would carry that field and
+    /// drop it, where this slot is linked by the strip alone.
+    static PARKED_EDITS: Cell<Vec<Edit>> = const { Cell::new(Vec::new()) };
+}
+
+/// The strip of parsed `program`, its edits collected into `edits` (empty, its capacity
+/// reused), which come back cleared beside the result — a refused strip's too.
+fn strip_program(
+    source: &str,
+    program: &Program,
+    view: AstView<'_>,
+    edits: Vec<Edit>,
+) -> (Vec<Edit>, Result<Stripped, StripError>) {
+    let mut walk = walk::Walk::with_edits(source, walk::Mode::Strip, view, edits);
+    walk.program(program);
+    let (mut edits, verdict) = walk.finish();
+    let result = verdict.map(|()| stripped(source, &mut edits));
+    edits.clear();
+    (edits, result)
 }
 
 /// The JS a walk's `edits` make of `source`.
 #[inline]
-fn stripped(source: &str, edits: &mut [blank::Edit]) -> Stripped {
+fn stripped(source: &str, edits: &mut [Edit]) -> Stripped {
     // nothing type-only: the source is the JS, copied once with no walk over the edits
     let code = if edits.is_empty() {
         source.to_owned()
@@ -467,10 +501,11 @@ impl std::error::Error for StripError {
 mod tests {
     use super::{StripError, UnsupportedConstruct, strip};
 
-    /// A collecting walk blanks what the strip's walk blanks: the mode adds records, never
-    /// an edit, over a source the strip does not refuse.
+    /// A strip collecting the records blanks what the strip's walk blanks — the mode adds
+    /// records, never an edit, over a source the strip does not refuse — and an imports walk,
+    /// whose edits nothing reads, pushes none.
     #[test]
-    fn the_imports_mode_edits_as_the_strip_does() {
+    fn the_combined_mode_edits_as_the_strip_does_and_the_imports_mode_not_at_all() {
         for source in [
             "import a, {type B} from './a';\nexport * as c from './c' with {type: 'json'};",
             "import type {T} from './t';\nimport {type U} from './u';\nexport type {V} from './v';",
@@ -481,17 +516,16 @@ mod tests {
         ] {
             let program = crate::__private::parse_with_goal_or_fallback(source, None)
                 .expect("the source parses");
-            let code = |mode| {
+            let edits = |mode| {
                 let mut walk = super::walk::Walk::new(source, mode, program.view());
                 walk.program(&program);
-                let mut edits = walk.finish().expect("the source strips");
-                super::blank::apply(source, &mut edits)
+                let (edits, verdict) = walk.finish();
+                verdict.expect("the source strips");
+                edits
             };
-            assert_eq!(
-                code(super::walk::Mode::Imports),
-                code(super::walk::Mode::Strip),
-                "{source:?}"
-            );
+            let code = |mode| super::blank::apply(source, &mut edits(mode));
+            let imports = edits(super::walk::Mode::Imports);
+            assert_eq!((imports.len(), imports.capacity()), (0, 0), "{source:?}");
             assert_eq!(
                 code(super::walk::Mode::StripWithImports),
                 code(super::walk::Mode::Strip),
@@ -531,6 +565,64 @@ mod tests {
             );
             assert!(strip(source).is_err(), "{source:?} is not refused");
         }
+    }
+
+    /// The thread's parked edit list, read in place: its address and capacity. A parked list
+    /// is always empty.
+    fn parked_edits() -> (*const super::Edit, usize) {
+        super::PARKED_EDITS.with(|parked| {
+            let edits = parked.take();
+            assert!(
+                edits.is_empty(),
+                "a parked edit list holds {} edits",
+                edits.len()
+            );
+            let shape = (edits.as_ptr(), edits.capacity());
+            parked.set(edits);
+            shape
+        })
+    }
+
+    /// A warm strip keeps its edit list across sources and stores: the thread's first strip
+    /// with an edit allocates it, every later one — a refused one, one with nothing
+    /// type-only, one into other stores — reuses that allocation, and each strips as a
+    /// one-shot strip does, which leaves the parked list alone.
+    #[test]
+    fn warm_strips_reuse_the_parked_edits_and_strip_as_a_one_shot_does() {
+        let sources = [
+            "let a: T = 1;\n",
+            "function f<T>(a: T): T { return a; }\nlet b = 1 as T;\n",
+            "enum E { A }\nlet c: T;\n",
+            "let d = 1;\n",
+            "let e =",
+        ];
+        assert_eq!(
+            parked_edits().1,
+            0,
+            "nothing is parked before the thread's first strip"
+        );
+        let mut first = crate::__private::WarmStores::default();
+        let mut second = crate::__private::WarmStores::default();
+        let mut parked = None;
+        for round in 0..2 {
+            for source in sources {
+                let stores = if round == 0 { &mut first } else { &mut second };
+                let warm = stores.with(|stores| super::strip_into(source, None, stores));
+                let before = parked_edits();
+                assert_eq!(warm, strip(source), "{source:?}");
+                assert_eq!(parked_edits(), before, "a one-shot strip parks nothing");
+                match parked {
+                    None if before.1 != 0 => parked = Some(before),
+                    None => {}
+                    Some(parked) => assert_eq!(before, parked, "{source:?} reallocated"),
+                }
+            }
+        }
+        assert_eq!(
+            parked.map(|(_, capacity)| capacity),
+            Some(super::walk::EDITS_FIRST_CAPACITY),
+            "the first edit allocates the first capacity"
+        );
     }
 
     fn strip_error(source: &str) -> StripError {

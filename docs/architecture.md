@@ -1272,8 +1272,8 @@ Share parser and AST across tools; let each tool add its own layers:
 
 The type strip ([strip.md](strip.md)) and the import records ([imports.md](imports.md)) are
 one walk over the internal AST (`tsv_ts/src/strip/walk.rs`), run in a **mode** chosen at the
-call: `Strip` collects the strip's edits and no record, `Imports` the records (its edits are
-never read), and `StripWithImports` (`tsv_ts::strip_with_imports`) both, from one parse. The
+call: `Strip` collects the strip's edits and no record, `Imports` the records and no edit,
+and `StripWithImports` (`tsv_ts::strip_with_imports`) both, from one parse. The
 walk already visits every node a record comes from — each import and export declaration, every
 `import(…)`, the import-equals it refuses — and already knows which subtrees are types and
 which code is ambient, so a record is a push at an arm it has; a second walker would restate

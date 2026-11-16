@@ -571,9 +571,11 @@ impl AstStores {
     /// Rewinds the stores in place between documents. Every store once written keeps its slot
     /// 0, so the next document's first write to it mints straight behind it; every store,
     /// scratch stack and the pool keep their capacity. Every id, run and pool text minted so
-    /// far is invalid from here on.
+    /// far is invalid from here on. The type strip's edit list is not among them:
+    /// `__private::strip_into` parks it per thread, cleared, and it keeps its capacity as
+    /// these keep theirs.
     // TODO: never trims. Peak row capacity stays parked for as long as the `Formatter` or the
-    // thread lives, with nothing released while idle.
+    // thread lives, with nothing released while idle — the strip's per-thread edit list too.
     #[inline]
     pub fn reset(&mut self) {
         // destructured whole, so a field added to the stores without a reset here is a build
