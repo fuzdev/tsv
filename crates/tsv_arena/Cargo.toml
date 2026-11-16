@@ -2,27 +2,24 @@
 name = "tsv_arena"
 version.workspace = true
 edition.workspace = true
-description = "Shared substrate for tsv's bindings: per-thread reusable arenas and the goal axis"
+description = "Shared substrate for tsv's bindings: the per-thread reusable doc arena and the goal axis"
 license.workspace = true
 repository.workspace = true
 publish = false
 
 [dependencies]
-bumpalo.workspace = true
 # Only the `format` feature needs tsv_lang — `with_doc_arena`'s `DocArena` type and
 # `parse_format!`'s line-terminator fold (reached through the hidden `__tsv_lang`
 # re-export, so the bindings' code needs no tsv_lang edge for it; tsv_wasm keeps one for
 # its wasm32 layout pins) — so the dep is optional and pulled by `format`: a parse-only
-# binding gets just `with_ast_arena`.
+# binding gets neither.
 tsv_lang = { workspace = true, optional = true }
 
 [features]
 # `format` adds the reusable doc arena (`with_doc_arena`) and `parse_format!`, both
-# over tsv_lang;
-# `with_ast_arena` is always available. Default-on
-# so a standalone `cargo test -p tsv_arena` exercises every helper; the binding
-# crates set `default-features = false` and re-enable `format` from their own
-# `format` feature.
+# over tsv_lang. Default-on so a standalone `cargo test -p tsv_arena` exercises
+# them; the binding crates set `default-features = false` and re-enable `format`
+# from their own `format` feature.
 default = ["format"]
 format = ["dep:tsv_lang"]
 

@@ -1,48 +1,43 @@
-//! The substrate tsv's three bindings share: per-thread reusable arenas for the
-//! hot loop, and the goal axis their exports are generated over.
+//! The substrate tsv's three bindings share: the per-thread reusable doc arena for the
+//! format hot loop, and the goal axis their exports are generated over.
 //!
 //! Both halves are here for one reason — `tsv_ffi`, `tsv_napi` and `tsv_wasm`
 //! would otherwise hand-sync them, and each encodes a contract too subtle to
 //! keep three copies of honest (see the crate's CLAUDE.md §Why this crate
-//! exists). The arenas are the bulk of it and are described below; the goal
-//! macros ([`parse_ast!`], [`parse_ast_for_format!`], [`goal_allowed!`]), the export
-//! bodies built on them ([`parse_convert!`], [`parse_internal!`], [`parse_imports_json!`],
-//! and the format path's `parse_format!`), the export [`Family`] and the string-axis decoder
+//! exists). The doc arena is described below; the goal macros ([`parse_ast!`],
+//! [`parse_ast_for_format!`], [`goal_allowed!`]), the export bodies built on them
+//! ([`parse_convert!`], [`parse_internal!`], [`parse_imports_json!`], and the format path's
+//! `parse_format!`), the export [`Family`] and the string-axis decoder
 //! ([`decode_source_type`]) sit at the bottom of this file. Between them is
 //! [`format_panic`], the one text both native bindings report a caught panic with.
 //!
-//! # The arenas
+//! # The doc arena
 //!
-//! The bindings (`tsv_ffi`, `tsv_napi`, `tsv_wasm`) are invoked once per file
-//! in tight loops — formatters, editor save hooks, benchmarks. Allocating a
-//! fresh arena per call (and freeing it at call end) churns the allocator's
-//! heap high-water on *every* call, which is measurable through a host FFI /
-//! N-API / WASM layer even when the engine work is unchanged. Instead each
-//! thread keeps one arena and `reset()`s it between calls: `reset()` rewinds to
-//! the start of the backing memory and retains the largest chunk, so once a
-//! thread warms to its high-water mark there is no per-call malloc/free (this
-//! supersedes per-call `with_capacity` pre-sizing — the first few calls pay the
-//! chunk-growth tail once, then it amortizes to zero). WASM is single-threaded,
-//! so its thread-local is effectively a module static; the reuse is sound there
-//! for the same reason (the per-file work is consumed before the next `reset()`).
+//! The format path is invoked once per file in tight loops — formatters, editor
+//! save hooks, benchmarks. Allocating a fresh doc arena per call (and freeing it
+//! at call end) churns the allocator's heap high-water on *every* call, which is
+//! measurable through a host FFI / N-API / WASM layer even when the engine work
+//! is unchanged. Instead each thread keeps one `DocArena` ([`with_doc_arena`],
+//! behind the `format` feature) and `reset()`s it between calls: `reset()`
+//! rewinds the arena and retains its capacity, so once a thread warms to its
+//! high-water mark there is no per-call malloc/free. WASM is single-threaded, so
+//! its thread-local is effectively a module static; the reuse is sound there for
+//! the same reason (the per-file work is consumed before the next `reset()`).
 //!
-//! Two reusables, gated to match the bindings' `format` / `parse` split:
-//!
-//! - [`with_ast_arena`] — a `bumpalo::Bump`. Always available; no export body
-//!   takes it, since every language parses into stores of its own.
-//! - [`with_doc_arena`] — the format-time doc IR arena (`DocArena`). Behind the
-//!   `format` feature.
+//! No parse takes an arena from this crate: every language parses into stores of
+//! its own, which each language crate parks per thread itself
+//! (`tsv_ts::__private::with_stores`).
 //!
 //! # Soundness
 //!
-//! Both helpers hand `f` a shared `&Arena` and `reset()` it at the *start* of
-//! the next call. The caller must fully consume the per-file work inside `f`
-//! and return an owned value (a formatted `String`, a JSON `String`, or `()`),
-//! so nothing borrowed from the arena outlives the next call's `reset()`.
+//! [`with_doc_arena`] hands `f` a shared `&DocArena` and `reset()`s it at the
+//! *start* of the next call. The caller must fully consume the per-file work
+//! inside `f` and return an owned value (a formatted `String`), so nothing
+//! borrowed from the arena outlives the next call's `reset()`.
 //!
 //! # Abort safety: take and park, never a held guard
 //!
-//! Each helper **takes** its arena out of the thread-local for the duration of
+//! The helper **takes** the arena out of the thread-local for the duration of
 //! `f` and **parks** it back afterwards — the same protocol `DocArena` uses for
 //! its own `render_scratch`, and the reason is the same shape of hazard read at
 //! a coarser grain.
@@ -63,20 +58,20 @@
 //! why the native tests below are a faithful proxy for the abort case.
 //!
 //! The cost is that a panicking call loses its thread's *warm* arena rather than
-//! keeping the high-water chunk; the next call re-warms. Correctness on a path
-//! that should never run beats capacity retention on it.
+//! keeping its capacity; the next call re-warms. Correctness on a path that
+//! should never run beats capacity retention on it.
 //!
-//! Re-entrancy follows from the same protocol: re-entering the *same* helper
+//! Re-entrancy follows from the same protocol: re-entering [`with_doc_arena`]
 //! inside its own closure finds an empty slot and builds a **fresh** arena
 //! (fresh-fallback — correct, costing one allocation), rather than panicking as
 //! a guard-based version did. It is still worth avoiding for the allocation:
 //! a nested parse *during* formatting — the Svelte printer reparsing a
 //! `<style>` or `<script>` nested in markup — takes no per-thread arena at all
-//! (its stores are local to the parse), and should keep it that way. (Nesting
-//! [`with_doc_arena`] inside [`with_ast_arena`] is not re-entrancy at all —
-//! distinct thread-locals, and exactly the format path.)
+//! (its stores are local to the parse), and should keep it that way.
 
+#[cfg(feature = "format")]
 use std::cell::Cell;
+#[cfg(feature = "format")]
 use std::thread::LocalKey;
 
 /// `tsv_lang`, re-exported for [`parse_format!`]'s expansion alone: a macro's paths
@@ -90,9 +85,10 @@ pub use tsv_lang as __tsv_lang;
 /// is empty — first call, or a prior call that panicked), `reset` it, run `f`
 /// over it, and park it back.
 ///
-/// The single implementation of the take/park protocol both helpers rely on;
+/// The implementation of the take/park protocol [`with_doc_arena`] relies on;
 /// see the [module docs](crate) for why the arena must not stay in the slot
 /// while `f` runs.
+#[cfg(feature = "format")]
 fn with_parked_arena<T: 'static, R>(
     slot: &'static LocalKey<Cell<Option<T>>>,
     make: impl FnOnce() -> T,
@@ -106,29 +102,16 @@ fn with_parked_arena<T: 'static, R>(
     result
 }
 
-/// Run `f` with a per-thread reusable AST arena (a `bumpalo::Bump`).
-///
-/// See the [module docs](crate) for the reuse rationale, the take/park
-/// protocol, and the soundness contract on what `f` may return.
-pub fn with_ast_arena<R>(f: impl FnOnce(&bumpalo::Bump) -> R) -> R {
-    // Parked by value: a `Bump` is 24 bytes (a chunk pointer and its limits),
-    // so the take/park moves are free — the chunks themselves never move.
-    thread_local! {
-        static AST_ARENA: Cell<Option<bumpalo::Bump>> = const { Cell::new(None) };
-    }
-    with_parked_arena(&AST_ARENA, bumpalo::Bump::new, bumpalo::Bump::reset, f)
-}
-
 /// Run `f` with a per-thread reusable doc arena (a `DocArena`).
 ///
-/// The `format` path's analogue of [`with_ast_arena`]; see the
-/// [module docs](crate). Gated behind the `format` feature (the only consumer
-/// of the doc IR), which pulls `tsv_lang` for the `DocArena` type.
+/// See the [module docs](crate) for the reuse rationale, the take/park protocol and the
+/// soundness contract on what `f` may return. Gated behind the `format` feature (the only
+/// consumer of the doc IR), which pulls `tsv_lang` for the `DocArena` type.
 #[cfg(feature = "format")]
 pub fn with_doc_arena<R>(f: impl FnOnce(&tsv_lang::doc::arena::DocArena) -> R) -> R {
-    // Parked **behind a `Box`**, unlike the AST arena: a `DocArena` is hundreds of
-    // bytes by value (its stores' headers and scratch buffers; the static cache is
-    // already boxed), so parking it directly would copy it in and out on every call.
+    // Parked **behind a `Box`**: a `DocArena` is hundreds of bytes by value (its stores'
+    // headers and scratch buffers; the static cache is already boxed), so parking it
+    // directly would copy it in and out on every call.
     // Boxed, take/park moves one pointer and `f` still receives a plain `&DocArena`.
     thread_local! {
         static DOC_ARENA: Cell<Option<Box<tsv_lang::doc::arena::DocArena>>> =
@@ -496,17 +479,6 @@ mod tests {
     // allocates into the (reset) arena and returns an OWNED value, so the next
     // call's `reset()` can never observe a live borrow.
 
-    #[test]
-    fn ast_arena_is_reusable_across_calls() {
-        let first = with_ast_arena(|arena| arena.alloc_str("first").to_owned());
-        let second = with_ast_arena(|arena| arena.alloc_str("second").to_owned());
-        assert_eq!(first, "first", "first call's result");
-        assert_eq!(
-            second, "second",
-            "second call must see a clean, reset arena"
-        );
-    }
-
     #[cfg(feature = "format")]
     #[test]
     fn doc_arena_is_reusable_across_calls() {
@@ -539,29 +511,11 @@ mod tests {
     // equivalence is the property to keep; a refactor that reintroduces held
     // state breaks it silently, since native tests would still pass.
 
-    #[test]
-    fn ast_arena_recovers_after_caught_panic() {
-        // The panic-then-call-again sequence: one bad file must not brick the
-        // instance for every file after it (the WASM `tsv` bin's failure mode).
-        let caught = std::panic::catch_unwind(|| {
-            with_ast_arena(|arena| {
-                let _ = arena.alloc_str("doomed");
-                panic!("boom");
-            })
-        });
-        assert!(
-            caught.is_err(),
-            "the panic must propagate out of the helper"
-        );
-        let after = with_ast_arena(|arena| arena.alloc_str("after").to_owned());
-        assert_eq!(after, "after", "arena must be usable after a caught panic");
-    }
-
     #[cfg(feature = "format")]
     #[test]
     fn doc_arena_recovers_after_caught_panic() {
-        // The doc arena's twin of the above — the format path takes both arenas,
-        // so both must be abort-safe or the brick just moves.
+        // The panic-then-call-again sequence: one bad file must not brick the
+        // instance for every file after it (the WASM `tsv` bin's failure mode).
         let caught = std::panic::catch_unwind(|| {
             with_doc_arena(|arena| {
                 let _ = arena.text_pooled("doomed");
@@ -579,35 +533,16 @@ mod tests {
         assert_eq!(after, "after", "arena must be usable after a caught panic");
     }
 
+    #[cfg(feature = "format")]
     #[test]
-    fn ast_arena_slot_is_empty_while_in_use() {
+    fn doc_arena_slot_is_empty_while_in_use() {
         // The structural claim behind abort safety, asserted directly: while `f`
         // runs, the thread-local holds nothing. A nested call therefore gets a
         // *distinct* arena (fresh-fallback) instead of resetting the outer one
         // under its feet or panicking on a held guard — and a trap out of `f`
-        // leaves the slot exactly as a fresh thread finds it.
-        with_ast_arena(|outer| {
-            let outer_addr = std::ptr::from_ref(outer);
-            let outer_str = outer.alloc_str("outer");
-            with_ast_arena(|inner| {
-                assert_ne!(
-                    std::ptr::from_ref(inner),
-                    outer_addr,
-                    "a nested call must not receive the arena already in use"
-                );
-                let _ = inner.alloc_str("inner");
-            });
-            assert_eq!(outer_str, "outer", "the outer arena must be untouched");
-        });
-        let after = with_ast_arena(|arena| arena.alloc_str("after").to_owned());
-        assert_eq!(after, "after", "the slot must be usable after nesting");
-    }
-
-    #[cfg(feature = "format")]
-    #[test]
-    fn doc_arena_slot_is_empty_while_in_use() {
-        // The doc arena's twin — and the one place the `Box` indirection could
-        // hide a mistake, since `f` receives a `&DocArena` either way.
+        // leaves the slot exactly as a fresh thread finds it. The `Box`
+        // indirection is the one place this could hide a mistake, since `f`
+        // receives a `&DocArena` either way.
         with_doc_arena(|outer| {
             let outer_addr = std::ptr::from_ref(outer);
             with_doc_arena(|inner| {

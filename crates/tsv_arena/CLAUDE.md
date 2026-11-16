@@ -1,25 +1,24 @@
 # tsv_arena
 
-> The substrate tsv's three bindings share: per-thread reusable arenas for the hot loop, and the goal axis their exports are generated over.
+> The substrate tsv's three bindings share: the per-thread reusable doc arena for the format hot loop, and the goal axis their exports are generated over.
 
 ## Why this crate exists
 
-The bindings (`tsv_ffi`, `tsv_napi`, `tsv_wasm`) are invoked once per file in tight loops (formatters, editor save hooks, benchmarks). A fresh arena allocated and freed per call churns the allocator's heap high-water on *every* call — measurable through a host FFI / N-API / WASM layer even when the engine work is unchanged. `tsv_arena` keeps **one arena per thread** and `reset()`s it between calls (rewind the bump pointer, retain the largest chunk), so a warm thread does no per-call malloc/free.
+The bindings (`tsv_ffi`, `tsv_napi`, `tsv_wasm`) are invoked once per file in tight loops (formatters, editor save hooks, benchmarks). A fresh doc arena allocated and freed per call churns the allocator's heap high-water on *every* call — measurable through a host FFI / N-API / WASM layer even when the engine work is unchanged. `tsv_arena` keeps **one doc arena per thread** and `reset()`s it between calls (rewind it, retain its capacity), so a warm thread does no per-call malloc/free. No parse takes an arena from here: every language parses into stores its own crate parks per thread.
 
-It's a crate rather than inline copies the bindings would hand-sync: the helpers are tiny but encode a subtle soundness contract (nothing borrowed may outlive the next call's `reset()`); a single home keeps that contract from drifting.
+It's a crate rather than inline copies the bindings would hand-sync: the helper is tiny but encodes a subtle soundness contract (nothing borrowed may outlive the next call's `reset()`); a single home keeps that contract from drifting.
 
 **The same argument is why the goal macros are here too.** Each binding spells the parse goal in its host's idiom — a `u32` code, a trailing optional string — but *which languages have a goal axis at all* is one fact, and three copies of it agree only until one is edited. So the crate's scope is the bindings' shared substrate, not arenas specifically; the name predates the second half.
 
-**Not in `tsv_lang`:** the foundation crate deliberately doesn't depend on `bumpalo` (the AST `Bump` is passed *into* the language crates), and a thread-local hot-loop reuse policy is a binding concern, not a language primitive — putting it there would invert the layering.
+**Not in `tsv_lang`:** a thread-local hot-loop reuse policy is a binding concern, not a language primitive — putting it there would invert the layering.
 
 ## API
 
-- `with_ast_arena(f)` — runs `f` with a per-thread `bumpalo::Bump`. **Always available.** No export body takes it: every language parses into stores, so the macros reach no AST arena; the panic probes and the FFI tests do.
 - `with_doc_arena(f)` — runs `f` with a per-thread `DocArena` (the format-time doc IR). Behind the **`format`** feature, which pulls `tsv_lang` for the type.
 
-Both `reset()` at the *start* of each call; `f` must return an owned value (a formatted `String`, a JSON `String`, or `()`) so nothing borrowed escapes. Full rationale + soundness in the `src/lib.rs` module docs.
+It `reset()`s the arena at the *start* of each call; `f` must return an owned value (a formatted `String`) so nothing borrowed escapes. Full rationale + soundness in the `src/lib.rs` module docs.
 
-Plus the goal-axis macros and the export bodies built on them, `#[macro_export]`ed; `parse_ast!`, `parse_ast_for_format!`, `goal_allowed!`, `parse_convert!`, `parse_internal!` and `parse_imports_json!` are feature-independent (the first three generate no code of their own; the three bodies need no arena), `parse_format!` needs the `format` feature:
+Plus the goal-axis macros and the export bodies built on them, `#[macro_export]`ed; `parse_ast!`, `parse_ast_for_format!`, `goal_allowed!`, `parse_convert!`, `parse_internal!` and `parse_imports_json!` are feature-independent (the first three generate no code of their own; the three bodies need no doc arena), `parse_format!` needs the `format` feature:
 
 - `parse_ast!($goalness, $lang, $source, $goal, $stores)` — the per-language parse call: every language has stores, the `*_into` entry point's `$stores`, and parses into them alone. `goal` (TypeScript) threads the decoded goal; `nogoal` (Svelte, CSS) drops it. `$lang` resolves in the *caller's* scope, so this crate depends on no language crate.
 - `with_lang_stores!($lang, |stores| body)` (hidden) — runs `body` under `$lang::__private::with_stores` (the language crate's own take-and-park of its stores, since this crate can name no language type; Svelte's takes a TypeScript half and a CSS half from those crates' slots, and its own half from its own).
@@ -41,21 +40,21 @@ The load-bearing property is that **one `$goalness` tag drives every macro**: a 
 
 ## Abort safety: take and park
 
-Each helper **takes** its arena out of the thread-local for the call and **parks** it back after — it never holds a `RefCell` borrow guard across `f`. This is the load-bearing decision in the crate; the argument (a WASM trap runs no `Drop` but leaves the instance callable, so a held guard bricks every later call) is in the `src/lib.rs` module docs, along with the two consequences — a panicking call loses its warm arena, and re-entrancy gets a fresh fallback rather than a panic.
+`with_doc_arena` **takes** its arena out of the thread-local for the call and **parks** it back after — it never holds a `RefCell` borrow guard across `f`. This is the load-bearing decision in the crate; the argument (a WASM trap runs no `Drop` but leaves the instance callable, so a held guard bricks every later call) is in the `src/lib.rs` module docs, along with the two consequences — a panicking call loses its thread's warm arena, and re-entrancy gets a fresh fallback rather than a panic.
 
 What the module docs don't carry, because it is evidence rather than rationale:
 
 - **Measured end-to-end on the built `format` bundle** with a temporary panicking export: with a held guard, a trap made every subsequent `format_typescript` throw; with take/park, calls after the trap return correct output.
-- The change is **byte-identical and faster** on the WASM format path (measure with `benches/js/diagnostics/wasm_format_probe.ts`). Two effects are inseparable by construction: dropping the borrow guard, and the `const { Cell::new(None) }` thread-local init that only becomes possible once the parked state is `None` (`Bump::new()` is not `const`, so the old form necessarily used std's lazy thread-local storage — a state check per access; the new one is eager, on wasm a plain static).
+- The change is **byte-identical and faster** on the WASM format path (measure with `benches/js/diagnostics/wasm_format_probe.ts`). Two effects are inseparable by construction: dropping the borrow guard, and the `const { Cell::new(None) }` thread-local init that only becomes possible once the parked state is `None` (a non-`const` initializer necessarily uses std's lazy thread-local storage — a state check per access; the `const` one is eager, on wasm a plain static).
 
 ## Features
 
 - `format` (default) — adds `with_doc_arena`, `parse_format!` + the optional `tsv_lang` dep, re-exported `#[doc(hidden)]` as `__tsv_lang` so `parse_format!`'s expansion reaches `tsv_lang::printing::normalize_carriage_returns` as `$crate::__tsv_lang::…` — a macro path resolves in the *caller's* crate, and this keeps the bindings free of a `tsv_lang` edge of their own.
 
-The **workspace dependency entry is `default-features = false`**, so a binding gets only `with_ast_arena` by default and re-enables `format` from its own `format` feature — that's what keeps the parse-only binding build from pulling `tsv_lang`. A standalone `cargo test -p tsv_arena` uses the crate's own `default = ["format"]`, so both helpers are exercised.
+The **workspace dependency entry is `default-features = false`**, so a binding gets neither the doc arena nor `tsv_lang` by default and re-enables `format` from its own `format` feature — that's what keeps the parse-only binding build from pulling `tsv_lang`. A standalone `cargo test -p tsv_arena` uses the crate's own `default = ["format"]`, so the doc arena is exercised.
 
 ## Consumers
 
-`tsv_ffi`, `tsv_napi`, and `tsv_wasm`. Each maps its `format` feature to `tsv_arena/format` and builds every export body inside its `lang_bindings!` from the same `parse_convert!` / `parse_internal!` / `parse_format!` set over one `goal_allowed!` tag — the format export reaches the doc arena through `parse_format!`, and no export body reaches the AST arena; `tsv_napi` and `tsv_wasm` build their two imports exports from `parse_imports_json!`. What stays the binding's own is its host's idiom: decoding the source type and building the error it reports.
+`tsv_ffi`, `tsv_napi`, and `tsv_wasm`. Each maps its `format` feature to `tsv_arena/format` and builds every export body inside its `lang_bindings!` from the same `parse_convert!` / `parse_internal!` / `parse_format!` set over one `goal_allowed!` tag — the format export reaches the doc arena through `parse_format!`; `tsv_napi` and `tsv_wasm` build their two imports exports from `parse_imports_json!`. What stays the binding's own is its host's idiom: decoding the source type and building the error it reports.
 
-For the two **native** bindings the win is heap-churn through the host FFI/N-API layer. For **`tsv_wasm`** it's the per-call `Bump`/`DocArena` allocation in the sandbox (the documented WASM-format allocation-count lever) — a **byte-identical warm format speedup** (measure with `benches/js/diagnostics/wasm_format_probe.ts`), with a negligible cold single-shot cost (one un-pre-sized first allocation; even `npm/cli.js` is warm after its first file) and a negligible bundle-size cost.
+For the two **native** bindings the win is heap-churn through the host FFI/N-API layer. For **`tsv_wasm`** it's the per-call `DocArena` allocation in the sandbox (the documented WASM-format allocation-count lever) — a **byte-identical warm format speedup** (measure with `benches/js/diagnostics/wasm_format_probe.ts`), with a negligible cold single-shot cost (one un-pre-sized first allocation; even `npm/cli.js` is warm after its first file) and a negligible bundle-size cost.

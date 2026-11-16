@@ -135,12 +135,12 @@ describe('tsv_napi addon (real N-API JS boundary)', () => {
 	// The panic contract: every export catches a panic in its body and the addon
 	// builds with the unwinding `napi` profile, so a Rust panic — always a tsv
 	// bug — must surface as a thrown JS error with the process AND the
-	// per-thread arenas still usable, never abort the host. Driven through the
+	// per-thread state still usable, never abort the host. Driven through the
 	// test-only `__panic_probe` export (the `panic_probe` cargo feature, which
 	// `npm run test:napi` builds; a published artifact has no probe, so this
-	// test skips against one). The probe panics INSIDE `with_ast_arena`, so the
-	// calls after it also prove the take/park arena recovery across the real
-	// boundary.
+	// test skips against one). The probe panics INSIDE the language stores' slot (and the doc
+	// arena's, with `format`), so the calls after it also prove the take/park
+	// recovery across the real boundary.
 	//
 	// The thrown error is an `Error` whose message is exactly `panic: <payload>`, the C
 	// FFI's text, which the corpus tools' panic gate classifies (`is_tsv_crash`,

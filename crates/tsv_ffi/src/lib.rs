@@ -49,9 +49,9 @@
 use std::panic;
 use std::slice;
 
-// Per-thread reusable arenas live in the shared `tsv_arena` crate (used by both
-// native bindings — see its module docs for the reuse rationale + soundness;
-// the FFI path additionally relies on `reset()` recovering cleanly after a
+// The per-thread reusable doc arena lives in the shared `tsv_arena` crate (used by
+// both native bindings — see its module docs for the reuse rationale + soundness;
+// the FFI path additionally relies on its take/park leaving the slot usable after a
 // `catch_unwind`-caught panic). The goal-axis macros and every export body
 // (`parse_convert!`, `parse_internal!`, `parse_format!`) come from the same crate, so
 // the three bindings share ONE definition of which languages have a goal and of what
@@ -60,8 +60,6 @@ use std::slice;
 use tsv_arena::format_panic;
 #[cfg(feature = "format")]
 use tsv_arena::parse_format;
-#[cfg(test)]
-use tsv_arena::with_ast_arena;
 #[cfg(any(feature = "parse", feature = "format"))]
 use tsv_arena::{Family, goal_allowed};
 #[cfg(feature = "parse")]
@@ -876,9 +874,9 @@ mod tests {
     /// held here at this crate's own boundary: a panic inside `f` (the dev profile
     /// unwinds) yields `TSV_STATUS_ERROR` with the `panic: …` envelope, both
     /// out-params written exactly as on any other error, and the next call on the
-    /// same thread succeeds. The arena itself does not survive: `with_ast_arena` had
-    /// taken it out of its slot for the call, so the unwind drops it and leaves the
-    /// slot empty, and the next call builds a fresh one. (Take/park is what keeps the
+    /// same thread succeeds. The stores do not survive: `with_stores` had taken them
+    /// out of their slot for the call, so the unwind drops them and leaves the
+    /// slot empty, and the next call builds fresh ones. (Take/park is what keeps the
     /// slot usable after a WASM *trap*, which no native test can raise; under an unwind
     /// a held borrow guard would have been released too.)
     #[test]
@@ -895,7 +893,7 @@ mod tests {
                 &raw mut out_len,
                 &raw mut out_status,
                 |_| -> Result<Vec<u8>, String> {
-                    with_ast_arena(|_arena| panic!("boom inside the arena"))
+                    tsv_ts::__private::with_stores(|_stores| panic!("boom inside the stores"))
                 },
             )
         };
@@ -909,7 +907,7 @@ mod tests {
         assert_eq!(out_status, TSV_STATUS_ERROR);
         assert_eq!(
             error_message(&rendered).as_deref(),
-            Some("panic: boom inside the arena")
+            Some("panic: boom inside the stores")
         );
 
         // the same thread formats normally afterwards, through the real export

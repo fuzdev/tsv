@@ -14,8 +14,8 @@ crate-type = ["cdylib"]
 tsv_svelte = { workspace = true }
 tsv_ts = { workspace = true }
 tsv_css = { workspace = true }
-# Per-thread reusable AST/doc arenas, shared with tsv_napi. The workspace entry
-# is default-features = false (AST-arena helper only), so the parse-only build
+# The per-thread reusable doc arena and the goal-axis macros, shared with tsv_napi. The
+# workspace entry is default-features = false, so the parse-only build
 # doesn't pull tsv_lang (the doc-arena helper's dep); the `format` feature below
 # re-enables it.
 tsv_arena = { workspace = true }

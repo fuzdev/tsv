@@ -27,13 +27,13 @@
 
 use wasm_bindgen::prelude::*;
 
-// Per-thread reusable AST/doc arenas, shared with the native bindings via the
+// The per-thread reusable doc arena, shared with the native bindings via the
 // `tsv_arena` crate. WASM is single-threaded, so the thread-local is effectively
-// a module static: the arena's high-water chunk is retained across calls and
-// `reset()` rewinds it, removing the per-call `Bump` / `DocArena` allocation (the
+// a module static: the arena's capacity is retained across calls and
+// `reset()` rewinds it, removing the per-call `DocArena` allocation (the
 // documented WASM-format allocation-count lever). Soundness matches the native
-// bindings — the AST/doc are fully consumed into an owned return value before the
-// next call's `reset()`, and both helpers park their arena outside the
+// bindings — the doc is fully consumed into an owned return value before the
+// next call's `reset()`, and the helper parks its arena outside the
 // thread-local while it is in use, so a trap here leaves a callable instance
 // (see `tsv_arena`'s §Abort safety — this is the target that made it necessary).
 // The goal-axis macros and every export body (`parse_convert!`, `parse_internal!`,

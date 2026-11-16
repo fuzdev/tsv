@@ -86,7 +86,7 @@ tsv/
 ├── tsv_check    # experimental TypeScript binder/checker, may never ship (uses tsv_ts + tsv_lang; consumed only by tsv_debug)
 ├── tsv_cli      # Production CLI binary (pure Rust)
 ├── tsv_debug    # Dev utilities (uses a Node sidecar for JS tools)
-├── tsv_arena    # Shared binding substrate: per-thread reusable AST/doc arenas + the goal axis
+├── tsv_arena    # Shared binding substrate: the per-thread reusable doc arena + the goal axis
 ├── tsv_ffi      # C FFI bindings
 ├── tsv_napi     # N-API bindings (Node/Bun native path)
 └── tsv_wasm     # WebAssembly bindings
@@ -128,9 +128,9 @@ closed-scope/open-convention stance below.
 
    tsv_cli, tsv_wasm, and tsv_napi also consume tsv_discover (→ tsv_ignore).
    tsv_ffi, tsv_napi, and tsv_wasm also consume tsv_arena — the shared
-   binding substrate: per-thread reusable AST/doc arenas (→ bumpalo;
-   → tsv_lang under `format`) plus the goal-axis macros and the
-   parse/format export bodies built on them.
+   binding substrate: the per-thread reusable doc arena (→ tsv_lang
+   under `format`) plus the goal-axis macros and the parse/format
+   export bodies built on them.
 ```
 
 ### Design Rationale

@@ -356,7 +356,7 @@ TypeScript formatting is identical for standalone `.ts` and Svelte-embedded TS: 
 tsv/
 ├── crates/
 │   ├── tsv_lang/    # Foundation (span, location, error, doc builder, printing utils)
-│   ├── tsv_arena/   # Shared binding substrate (tsv_ffi, tsv_napi, tsv_wasm): per-thread reusable AST/doc arenas + the goal axis
+│   ├── tsv_arena/   # Shared binding substrate (tsv_ffi, tsv_napi, tsv_wasm): the per-thread reusable doc arena + the goal axis
 │   ├── tsv_html/    # HTML spec data: named character references
 │   ├── tsv_ignore/  # gitignore-aware matcher: hierarchical .gitignore + .formatignore/.prettierignore
 │   ├── tsv_discover/# file-discovery policy (build-output heuristic + safety nets) over tsv_ignore
@@ -599,7 +599,7 @@ The shipped language/foundation crates' external deps (`tsv_cli` adds only `argh
 - `serde_json` — **never a normal or build dependency of a crate meant for publishing** (every crate with a `[package.metadata.docs.rs]` table; `npm run deps:audit` gates it), because the workspace entry's `preserve_order` / `float_roundtrip` / `arbitrary_precision` features would unify into a consumer's own `serde_json` and change its deserialization. It is the dev-dependency oracle of `tsv_lang`'s writer and `tsv_html`'s entity-table generator, and a normal dependency of the unpublished `tsv_ffi`, `tsv_debug` and the root test package; the one reader, `tsv_debug::json`, enables `unbounded_depth`. `serde` itself is a dev-tooling dep, out of every published library crate's normal graph (`tsv_cli` reaches it through `argh` → `argh_shared`, which carries no `serde_json`)
 - `smallvec` — stack-allocated vectors (printers + `tsv_check`)
 - `unicode-ident` / `unicode-segmentation` / `unicode-width` — XID identifiers, grapheme clustering, display width (CJK, zero-width)
-- `bumpalo` — no parse takes it (every tree — TypeScript, CSS, Svelte — lives in its own stores); what remains is `tsv_arena`'s `with_ast_arena` (the panic probes and the FFI tests) and the dev tooling (`tsv_debug`; `tsv_check` and `tsv_svelte_compile`, outside the workspace build)
+- `bumpalo` — no parse takes it (every tree — TypeScript, CSS, Svelte — lives in its own stores); what remains is the dev tooling (`tsv_debug`'s census interner and the old-generation arms of its `perf:ab` drivers) and the crates outside the workspace build (`tsv_check`, `tsv_svelte_compile`)
 - `talc` — WASM global allocator (`tsv_wasm`, wasm32-only target dep): pure-Rust `no_std`, replacing dlmalloc; the `WasmGrowAndExtend` source keeps the warm instance's linear-memory high-water at dlmalloc parity. Pulls `lock_api` + `allocator-api2` (+ `scopeguard`) into the wasm32 graph only
 - `napi` / `napi-derive` / `napi-build` — N-API bindings for `tsv_napi` (tsv-scoped carve-out)
 

@@ -38,7 +38,7 @@ use napi::bindgen_prelude::Undefined;
 use napi::bindgen_prelude::{Either, JsObjectValue, Object};
 use napi::{Env, JsValue};
 use napi_derive::napi;
-// Per-thread reusable arenas live in the shared `tsv_arena` crate (used by both
+// The per-thread reusable doc arena lives in the shared `tsv_arena` crate (used by both
 // native bindings — see its module docs for the reuse rationale + soundness).
 // The goal-axis macros and every export body (`parse_convert!`, `parse_internal!`,
 // `parse_format!`, `parse_imports_json!`) come from the same crate, so the bindings
@@ -52,8 +52,6 @@ use tsv_arena::goal_allowed;
 use tsv_arena::parse_format;
 #[cfg(feature = "imports")]
 use tsv_arena::parse_imports_json;
-#[cfg(feature = "panic_probe")]
-use tsv_arena::with_ast_arena;
 #[cfg(feature = "parse")]
 use tsv_arena::{parse_convert, parse_internal};
 
@@ -844,18 +842,25 @@ fn or_undefined(value: Option<String>) -> Either<String, Undefined> {
 /// test:napi` builds with it; published artifacts never carry it).
 /// `scripts/test_napi.ts` drives it to prove the contract end to end: the panic
 /// unwinds into [`catch_panic`], surfaces as a thrown JS error whose message is exactly
-/// `panic: tsv_napi panic probe`, and the process plus the per-thread arenas stay usable
-/// afterwards. It panics *inside* `with_ast_arena` so the take/park recovery is exercised
-/// with an arena genuinely in flight.
+/// `panic: tsv_napi panic probe`, and the process plus the per-thread state stay usable
+/// afterwards. It panics *inside* the language stores' slot (`with_stores`), and inside
+/// the doc arena's under `format`, so the take/park recovery is exercised with that state
+/// genuinely in flight.
 #[cfg(feature = "panic_probe")]
 #[napi(js_name = "__panic_probe", catch_unwind)]
 // `allow`, not `expect`: same `#[napi]`-expansion artifact as `IgnoreStack::new` above.
 #[allow(clippy::panic)] // panicking is the export's entire purpose
 pub fn panic_probe() -> napi::Result<()> {
     catch_panic(|| {
-        with_ast_arena(|arena| {
-            let _ = arena.alloc_str("doomed");
-            panic!("tsv_napi panic probe");
+        tsv_ts::__private::with_stores(|_stores| -> napi::Result<()> {
+            #[cfg(feature = "format")]
+            {
+                tsv_arena::with_doc_arena(|_arena| panic!("tsv_napi panic probe"))
+            }
+            #[cfg(not(feature = "format"))]
+            {
+                panic!("tsv_napi panic probe")
+            }
         })
     })
 }

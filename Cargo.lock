@@ -573,7 +573,6 @@ dependencies = [
 name = "tsv_arena"
 version = "0.8.1"
 dependencies = [
- "bumpalo",
  "tsv_lang",
 ]
 

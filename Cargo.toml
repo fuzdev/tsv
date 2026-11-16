@@ -29,12 +29,12 @@ repository = "https://github.com/fuzdev/tsv"
 [workspace.dependencies]
 # Foundation
 tsv_lang = { path = "crates/tsv_lang", version = "=0.8.1" }
-# Per-thread reusable arenas for the bindings' hot loop (shared by tsv_ffi,
-# tsv_napi, and tsv_wasm). default-features = false here so consumers stay lean
-# by default — the AST-arena helper only; each binding re-enables `format` (the
-# doc-arena helper, which pulls tsv_lang) from its own `format` feature. A
-# standalone `cargo test -p tsv_arena` still uses the crate's own `default =
-# ["format"]`, so both helpers are exercised there.
+# The bindings' shared substrate: the per-thread doc arena for the format hot loop
+# and the goal-axis macros (shared by tsv_ffi, tsv_napi, and tsv_wasm).
+# default-features = false here so a parse-only binding pulls no tsv_lang; each
+# binding re-enables `format` (the doc-arena helper, which pulls tsv_lang) from
+# its own `format` feature. A standalone `cargo test -p tsv_arena` still uses the
+# crate's own `default = ["format"]`, so the doc arena is exercised there.
 tsv_arena = { path = "crates/tsv_arena", default-features = false }
 tsv_html = { path = "crates/tsv_html", version = "=0.8.1" }
 tsv_ignore = { path = "crates/tsv_ignore", version = "=0.8.1" }
@@ -62,7 +62,7 @@ napi = "3.16.1"
 napi-derive = "3.5.7"
 napi-build = "2.6.0"
 # Bump arena. No parse takes one (every language's tree lives in its own
-# stores): `tsv_arena`'s `with_ast_arena` and the dev tooling are what remain.
+# stores): `tsv_debug` and the crates outside the workspace build are what remain.
 # Safe API only — `unsafe_code = "forbid"`.
 bumpalo = { version = "3.20.3", features = ["collections"] }
 # Async runtime + combinators — dev/debug tooling only (tsv_debug, integration tests)

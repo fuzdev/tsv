@@ -67,8 +67,8 @@ tsv_css.workspace = true
 # Named only by the wasm32 layout pins (`src/layout.rs`): the doc arena's types live
 # here. No features — every build already links it through the language crates.
 tsv_lang.workspace = true
-# Per-thread reusable AST/doc arenas (shared with the native bindings). The
-# workspace entry is default-features = false (AST-arena helper only); the
+# The per-thread reusable doc arena and the goal-axis macros (shared with the native
+# bindings). The workspace entry is default-features = false; the
 # `format` feature adds `tsv_arena/format` for the reusable doc arena. WASM is
 # single-threaded, so the thread-local reuse is sound and removes the per-call
 # arena allocation.
