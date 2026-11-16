@@ -126,8 +126,12 @@ impl SvelteOwn {
     /// slot 0, so the next document's first write to it mints straight behind it; every
     /// store, scratch stack and the pool keep their capacity. Every run and pool text minted
     /// so far is invalid from here on.
-    // TODO: never trims. Peak row capacity stays parked for as long as the `Formatter` or the
-    // thread lives, with nothing released while idle.
+    ///
+    /// Nothing is ever trimmed. The capacity a holder's largest document grew stays parked
+    /// for as long as the holder keeps the stores — what lets a warm loop parse without
+    /// allocating — and dropping the stores is what releases it: a `Formatter` dropped, a
+    /// binding's thread retired, a WASM instance replaced. The TypeScript and CSS halves keep
+    /// the same rule.
     #[inline]
     pub(crate) fn reset(&mut self) {
         // destructured whole, so a field added to the stores without a reset here is a build

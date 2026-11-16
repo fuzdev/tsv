@@ -23,6 +23,11 @@ use tsv_lang::doc::arena::DocArena;
 /// borrowing the `Formatter` mutably is not [`UnwindSafe`](std::panic::UnwindSafe) — and the
 /// rewind is what makes the assertion sound.
 ///
+/// **Nothing is trimmed**: the capacity the largest source so far grew stays with the
+/// `Formatter` for as long as it lives — that reuse is the point. Drop it to give the memory
+/// back (after an outsized source, say) and start a new one; the output is the same either
+/// way.
+///
 /// A `Formatter` is [`Send`], so it can move to (or be created on) a worker thread, but
 /// not [`Sync`]: give each thread its own.
 ///

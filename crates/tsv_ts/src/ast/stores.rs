@@ -571,11 +571,14 @@ impl AstStores {
     /// Rewinds the stores in place between documents. Every store once written keeps its slot
     /// 0, so the next document's first write to it mints straight behind it; every store,
     /// scratch stack and the pool keep their capacity. Every id, run and pool text minted so
-    /// far is invalid from here on. The type strip's edit list is not among them:
-    /// `__private::strip_into` parks it per thread, cleared, and it keeps its capacity as
-    /// these keep theirs.
-    // TODO: never trims. Peak row capacity stays parked for as long as the `Formatter` or the
-    // thread lives, with nothing released while idle — the strip's per-thread edit list too.
+    /// far is invalid from here on.
+    ///
+    /// Nothing is ever trimmed. The capacity a holder's largest document grew stays parked
+    /// for as long as the holder keeps the stores — what lets a warm loop parse without
+    /// allocating — and dropping the stores is what releases it: a `Formatter` dropped, a
+    /// binding's thread retired, a WASM instance replaced. The type strip's edit list is not
+    /// among these stores but keeps the same rule: `__private::strip_into` parks it per
+    /// thread, cleared, until the thread exits.
     #[inline]
     pub fn reset(&mut self) {
         // destructured whole, so a field added to the stores without a reset here is a build

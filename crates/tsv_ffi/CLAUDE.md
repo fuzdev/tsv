@@ -8,6 +8,8 @@ Depends on `tsv_ts`, `tsv_css`, `tsv_svelte`. The C-ABI path, for Deno FFI, Pyth
 
 The bindings parse into per-thread stores (each language crate's `__private::with_stores`), kept warm between calls rather than allocated fresh per call: they are invoked once per file in tight loops, and per-call malloc/free churns the system allocator's heap high-water measurably through a host FFI layer. The `format` path also reuses a **per-thread doc arena** (`with_doc_arena`, the same shape over `DocArena`, calling each language's `format_folded_in` — the fold ahead of the parse hands its line verdict to the printer, so a document is walked once). The doc arena helper lives in [`tsv_arena`](../tsv_arena/), one copy for all three bindings. This crate's `format` feature maps to `tsv_arena/format`, which pulls `tsv_lang` for the `DocArena` type and the line-terminator fold `parse_format!` runs — re-exported by `tsv_arena`, so this crate has no `tsv_lang` edge of its own and the parse-only build stays lean.
 
+**The per-thread stores and doc arena keep the capacity their thread's largest input grew, by design.** Each only rewinds between calls — the reuse above — and there is no trim entry point: the per-file loop that capacity serves is the loop a trim would be paid from. A host releases it by ending the thread its calls ran on (a worker it then retires), which drops that thread's stores and arena with it.
+
 Build/usage commands live in [../../CLAUDE.md §JS Bindings](../../CLAUDE.md#js-bindings).
 
 ## Features
