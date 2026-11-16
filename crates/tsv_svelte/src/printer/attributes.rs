@@ -963,7 +963,7 @@ impl<'a> Printer<'a> {
     /// The head every directive starts with — `prefix` + name + `|modifier` run — as the
     /// parts buffer the caller appends its value to. The name is a span-identity source
     /// slice, so the emitted text is the author's.
-    fn directive_head_parts(&self, prefix: DocId, name_span: Span, modifiers: &[&str]) -> DocBuf {
+    fn directive_head_parts(&self, prefix: DocId, name_span: Span, modifiers: &[Span]) -> DocBuf {
         let d = self.d();
         let mut parts: DocBuf = smallvec![prefix, d.source_span(name_span, self.source)];
         parts.extend(self.build_modifiers_doc(modifiers));
@@ -981,7 +981,7 @@ impl<'a> Printer<'a> {
         &self,
         prefix: DocId,
         name_span: Span,
-        modifiers: &[&str],
+        modifiers: &[Span],
         expression: Option<&Expression>,
         expression_tag_span: Option<Span>,
         value: DirectiveValue,
@@ -1127,11 +1127,12 @@ impl<'a> Printer<'a> {
     // Shared helpers
     //
 
-    /// Build Doc parts for modifiers: `|mod1|mod2`
-    fn build_modifiers_doc(&self, modifiers: &[&str]) -> DocBuf {
+    /// Build Doc parts for modifiers: `|mod1|mod2`, each modifier its own source span (the
+    /// author's bytes, as the name is).
+    fn build_modifiers_doc(&self, modifiers: &[Span]) -> DocBuf {
         modifiers
             .iter()
-            .flat_map(|m| [self.d().text("|"), self.d().text_pooled(m)])
+            .flat_map(|&m| [self.d().text("|"), self.d().source_span(m, self.source)])
             .collect()
     }
 

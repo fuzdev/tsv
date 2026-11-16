@@ -338,9 +338,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         BumpVec::new_in(self.arena)
     }
 
-    /// Allocate a string (raw or decoded) in the arena as `&'arena str` — used
-    /// for the Svelte directive names / modifiers / raw parameter text that were
-    /// owned `String`s pre-arena. One copy into the arena.
+    /// Allocate a string in the arena as `&'arena str` — used for a `{#snippet}` head's raw
+    /// type-parameter text. One copy into the arena.
     #[inline]
     pub(crate) fn alloc_str_in(&self, s: &str) -> &'arena str {
         self.arena.alloc_str(s)

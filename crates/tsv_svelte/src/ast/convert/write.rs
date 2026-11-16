@@ -712,11 +712,13 @@ fn write_special_element(w: &mut JsonWriter, elem: &ast::SpecialElement<'_>, ctx
 /// The form is read off [`ast::SpecialThis`], never sniffed back out of the source: it
 /// is the parser's own answer, and a second way to ask the same question is a second way to
 /// get it wrong.
-fn write_special_tag(w: &mut JsonWriter, this: &ast::SpecialThis<'_>, ctx: &Ctx<'_>) {
+fn write_special_tag(w: &mut JsonWriter, this: &ast::SpecialThis, ctx: &Ctx<'_>) {
     match this {
-        ast::SpecialThis::Plain { content, span } => {
+        ast::SpecialThis::Plain(text) => {
+            let content = text.data(ctx.source);
+            let span = text.span;
             w.raw("{\"type\":\"Literal\",\"value\":");
-            w.string(content);
+            w.string(&content);
             w.raw(",\"raw\":");
             // Svelte reports the raw as a single-quoted string regardless of source.
             w.string(&format!("'{content}'"));
@@ -913,7 +915,7 @@ fn write_each_block(w: &mut JsonWriter, block: &ast::EachBlock<'_>, ctx: &Ctx<'_
     });
     if let Some(index) = block.index {
         w.raw(",\"index\":");
-        w.string(index);
+        w.string(index.extract(ctx.source));
     }
     if let Some(key) = &block.key {
         w.raw(",\"key\":");
@@ -1496,9 +1498,9 @@ fn write_directive_head(
     }
 }
 
-/// The `modifiers` array (arena `&str`s → JSON strings).
-fn write_modifiers(w: &mut JsonWriter, modifiers: &[&str]) {
-    write_array(w, modifiers, |w, m| w.string(m));
+/// The `modifiers` array (each modifier's source span → a JSON string of its bytes).
+fn write_modifiers(w: &mut JsonWriter, modifiers: &[Span], source: &str) {
+    write_array(w, modifiers, |w, m| w.string(m.extract(source)));
 }
 
 /// An optional directive expression (`on:`/`use:`/`transition:`/`animate:`/`let:`):
@@ -1524,7 +1526,7 @@ macro_rules! expression_directive_writer {
             w.raw(",\"expression\":");
             write_optional_directive_expression(w, ctx.view.opt_expr(d.expression), d.span, ctx);
             w.raw(",\"modifiers\":");
-            write_modifiers(w, d.modifiers);
+            write_modifiers(w, d.modifiers, ctx.source);
             w.raw("}");
         }
     };
@@ -1547,7 +1549,7 @@ fn write_transition_directive(w: &mut JsonWriter, d: &ast::TransitionDirective<'
     w.raw(",\"expression\":");
     write_optional_directive_expression(w, ctx.view.opt_expr(d.expression), d.span, ctx);
     w.raw(",\"modifiers\":");
-    write_modifiers(w, d.modifiers);
+    write_modifiers(w, d.modifiers, ctx.source);
     w.raw(",\"intro\":");
     w.bool(d.direction.has_intro());
     w.raw(",\"outro\":");
@@ -1593,7 +1595,7 @@ fn write_bind_directive(w: &mut JsonWriter, d: &ast::BindDirective<'_>, ctx: &Ct
         ctx,
     );
     w.raw(",\"modifiers\":");
-    write_modifiers(w, d.modifiers);
+    write_modifiers(w, d.modifiers, ctx.source);
     w.raw("}");
 }
 
@@ -1608,7 +1610,7 @@ fn write_class_directive(w: &mut JsonWriter, d: &ast::ClassDirective<'_>, ctx: &
         ctx,
     );
     w.raw(",\"modifiers\":");
-    write_modifiers(w, d.modifiers);
+    write_modifiers(w, d.modifiers, ctx.source);
     w.raw("}");
 }
 
@@ -1617,7 +1619,7 @@ fn write_class_directive(w: &mut JsonWriter, d: &ast::ClassDirective<'_>, ctx: &
 fn write_style_directive(w: &mut JsonWriter, d: &ast::StyleDirective<'_>, ctx: &Ctx<'_>) {
     write_directive_head(w, "StyleDirective", d.span, d.name_span, d.head_span, ctx);
     w.raw(",\"modifiers\":");
-    write_modifiers(w, d.modifiers);
+    write_modifiers(w, d.modifiers, ctx.source);
     w.raw(",\"value\":");
     match &d.value {
         ast::StyleDirectiveValue::True => w.raw("true"),

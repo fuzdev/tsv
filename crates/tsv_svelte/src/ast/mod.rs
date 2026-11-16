@@ -156,7 +156,17 @@ pub struct Fragment<'arena> {
 /// All variants are inline by value: the layout favors traversal locality over
 /// node size (boxing the fat variants added a pointer-chase on hot format-read
 /// paths that cost more than the slice-density win).
+///
+/// On 64-bit targets the tag is explicit (`repr(u32)`), a plain value at the front that a
+/// `match` reads with no decode. Left to the compiler, the layout puts the tag in a niche
+/// of `SnippetBlock`'s fields once every other variant fits around them, and every `match`
+/// on a node — the printer's hottest dispatch — decodes the tag first. `u32` rather than
+/// `u8`: an eight-aligned variant's payload starts at offset 8 whatever the tag's width,
+/// and the compiler's own non-niche layout of this enum gives its tag four of those bytes,
+/// so `u32` is that layout exactly (`u8` is the same size but measurably slower). wasm32
+/// keeps the compiler's layout, where the explicit tag would widen the node.
 #[derive(Debug, Clone)]
+#[cfg_attr(target_pointer_width = "64", repr(u32))]
 pub enum FragmentNode<'arena> {
     Element(Element<'arena>),
     SpecialElement(SpecialElement<'arena>),
@@ -223,7 +233,9 @@ pub struct IfBlock<'arena> {
 pub struct EachBlock<'arena> {
     pub expression: ExprId,
     pub context: Option<ExprId>, // Pattern (identifier or destructuring), None if no `as`
-    pub index: Option<&'arena str>,
+    /// The `, index` binding's name — a bare identifier, so a **verbatim** source slice,
+    /// recovered via `span.extract(source)`.
+    pub index: Option<Span>,
     pub key: Option<EachKey>,
     pub body: Fragment<'arena>,
     pub fallback: Option<Fragment<'arena>>,
@@ -405,8 +417,11 @@ pub struct OnDirective<'arena> {
     /// `name_span.extract(source)`. Distinct from `head_span` below, which is the whole
     /// directive head token ("on:click|preventDefault", prefix + name + modifiers).
     pub name_span: Span,
-    pub expression: Option<ExprId>,       // Handler function
-    pub modifiers: &'arena [&'arena str], // "preventDefault", "stopPropagation", etc.
+    pub expression: Option<ExprId>, // Handler function
+    /// One span per `|modifier` after the name (`preventDefault`, `stopPropagation`, …), each a
+    /// **verbatim** source slice like `name_span`, recovered via `span.extract(source)`. The
+    /// `|` separators are not part of any span; an empty modifier (`on:click|`) is an empty span.
+    pub modifiers: &'arena [Span],
     pub span: Span,
     /// Span of the whole directive head (`on:click|preventDefault`); used as `name_loc`.
     pub head_span: Span,
@@ -423,7 +438,7 @@ pub struct BindDirective<'arena> {
     /// Span of the property name only (e.g. "value") — verbatim source slice (see `OnDirective`).
     pub name_span: Span,
     pub expression: ExprId, // Binding target (always present - auto-generated for shorthand)
-    pub modifiers: &'arena [&'arena str], // Unofficial — no official modifier support; preserved verbatim
+    pub modifiers: &'arena [Span], // Unofficial — no official modifier support; preserved verbatim
     pub span: Span,
     pub head_span: Span,
     /// Span of the expression tag `{...}` for comment lookup (None for shorthand bindings)
@@ -439,7 +454,7 @@ pub struct ClassDirective<'arena> {
     /// Span of the class name only (e.g. "class1") — verbatim source slice (see `OnDirective`).
     pub name_span: Span,
     pub expression: ExprId, // Condition (always present - auto-generated for shorthand)
-    pub modifiers: &'arena [&'arena str], // Unofficial — no official modifier support; preserved verbatim
+    pub modifiers: &'arena [Span], // Unofficial — no official modifier support; preserved verbatim
     pub span: Span,
     pub head_span: Span,
     /// Span of the expression tag `{...}` for comment lookup (None for shorthand)
@@ -457,7 +472,7 @@ pub struct StyleDirective<'arena> {
     /// `OnDirective`).
     pub name_span: Span,
     pub value: StyleDirectiveValue<'arena>, // true, ExpressionTag, or mixed text/expressions
-    pub modifiers: &'arena [&'arena str],   // "important"
+    pub modifiers: &'arena [Span],          // "important"
     pub span: Span,
     pub head_span: Span,
 }
@@ -481,7 +496,7 @@ pub struct UseDirective<'arena> {
     /// Span of the action name only (e.g. "action") — verbatim source slice (see `OnDirective`).
     pub name_span: Span,
     pub expression: Option<ExprId>, // Parameters passed to the action
-    pub modifiers: &'arena [&'arena str], // Unofficial — no official modifier support; preserved verbatim
+    pub modifiers: &'arena [Span],  // Unofficial — no official modifier support; preserved verbatim
     pub span: Span,
     pub head_span: Span,
     /// Span of the expression tag `{...}` for comment lookup (None if no expression)
@@ -541,9 +556,9 @@ impl TransitionDirection {
 pub struct TransitionDirective<'arena> {
     /// Span of the transition name only (e.g. "fade") — verbatim source slice (see `OnDirective`).
     pub name_span: Span,
-    pub expression: Option<ExprId>,       // Transition parameters
-    pub modifiers: &'arena [&'arena str], // "local", "global"
-    pub direction: TransitionDirection,   // Which animations to run
+    pub expression: Option<ExprId>,     // Transition parameters
+    pub modifiers: &'arena [Span],      // "local", "global"
+    pub direction: TransitionDirection, // Which animations to run
     pub span: Span,
     pub head_span: Span,
     /// Span of the expression tag `{...}` for comment lookup (None if no expression)
@@ -557,8 +572,8 @@ pub struct TransitionDirective<'arena> {
 pub struct AnimateDirective<'arena> {
     /// Span of the animation name only (e.g. "flip") — verbatim source slice (see `OnDirective`).
     pub name_span: Span,
-    pub expression: Option<ExprId>,       // Animation parameters
-    pub modifiers: &'arena [&'arena str], // Unofficial — no official modifier support; preserved verbatim
+    pub expression: Option<ExprId>, // Animation parameters
+    pub modifiers: &'arena [Span],  // Unofficial — no official modifier support; preserved verbatim
     pub span: Span,
     pub head_span: Span,
     /// Span of the expression tag `{...}` for comment lookup (None if no expression)
@@ -573,7 +588,7 @@ pub struct LetDirective<'arena> {
     /// Span of the slot-prop name only (e.g. "item") — verbatim source slice (see `OnDirective`).
     pub name_span: Span,
     pub expression: Option<ExprId>, // Local binding pattern (Identifier, ArrayPattern, ObjectPattern)
-    pub modifiers: &'arena [&'arena str], // Unofficial — no official modifier support; preserved verbatim
+    pub modifiers: &'arena [Span],  // Unofficial — no official modifier support; preserved verbatim
     pub span: Span,
     pub head_span: Span,
     /// Span of the expression tag `{...}` for comment lookup (None if no expression)
@@ -689,32 +704,30 @@ impl SpecialElementTag {
 /// The asymmetry is Svelte's — `<svelte:element this="div">` merely *warns*, deliberately
 /// preserving Svelte 4 behavior, where the component errors.
 #[derive(Debug, Clone)]
-pub enum SpecialThis<'arena> {
+pub enum SpecialThis {
     /// `this={expr}` — the expression form. The tag's span covers the braces, so the
     /// printer emits it as the `{…}` attribute value it is.
     Braced(ExpressionTag),
     /// `this="value"` — the plain HTML-attribute form. No braces (so no gap a comment could
-    /// occupy) and **no expression parse at all**: the value is the attribute's decoded
-    /// text, held as such. Svelte's wire reports it as a `Literal`, which the writer emits
-    /// from these two fields directly — synthesizing an `ExpressionKind::Literal` here only to
-    /// take it apart again at every consumer bought nothing but an unreachable arm in each
-    /// of their matches.
-    Plain {
-        /// Decoded attribute text (entities resolved, quotes stripped).
-        content: &'arena str,
-        /// Span of that text in source — no quotes, so `raw` is not recoverable from it.
-        span: Span,
-    },
+    /// occupy) and **no expression parse at all**: the value is the attribute's own `Text`
+    /// (its first value chunk), held as such, so its decoded value is [`Text::data`] in the
+    /// attribute context — entities resolved, quotes stripped — and its `span` the text's
+    /// span in source, inside the quotes (the author's quoting is not recoverable from it; the
+    /// wire's `raw` is Svelte's own re-quoting). Svelte's wire reports it as a `Literal`,
+    /// which the writer emits from that text directly —
+    /// synthesizing an `ExpressionKind::Literal` here only to take it apart again at every
+    /// consumer bought nothing but an unreachable arm in each of their matches.
+    Plain(Text),
 }
 
-impl<'arena> SpecialThis<'arena> {
+impl SpecialThis {
     /// Span of the bound value: the braced form's expression, or the plain form's text.
     /// Both sit hard against whatever delimits them, so this is the region a comment can
     /// be adjacent to.
     pub fn span(&self, view: AstView<'_>) -> Span {
         match self {
             Self::Braced(tag) => view.expr(tag.expression).span(),
-            Self::Plain { span, .. } => *span,
+            Self::Plain(text) => text.span,
         }
     }
 
@@ -723,7 +736,7 @@ impl<'arena> SpecialThis<'arena> {
     pub fn braces(&self) -> Option<Span> {
         match self {
             Self::Braced(tag) => Some(tag.span),
-            Self::Plain { .. } => None,
+            Self::Plain(_) => None,
         }
     }
 }
@@ -740,7 +753,7 @@ impl<'arena> SpecialThis<'arena> {
 /// Variants that require additional data (SvelteElement, SvelteComponent) carry it
 /// directly, eliminating the need for Option fields on the parent struct.
 #[derive(Debug, Clone)]
-pub enum SpecialElementKind<'arena> {
+pub enum SpecialElementKind {
     /// `<svelte:head>` - inject content into document head
     SvelteHead,
     /// `<svelte:window>` - bind to window events/properties
@@ -750,7 +763,7 @@ pub enum SpecialElementKind<'arena> {
     /// `<svelte:document>` - bind to document events
     SvelteDocument,
     /// `<svelte:element this={tag}>` - dynamic element tag
-    SvelteElement { tag: SpecialThis<'arena> },
+    SvelteElement { tag: SpecialThis },
     /// `<svelte:component this={Component}>` - dynamic component (legacy). Always the
     /// braced form: a missing or non-`{expression}` `this` is rejected at parse, as Svelte
     /// does — so unlike `<svelte:element>` there is no plain-string variant to model.
@@ -767,7 +780,7 @@ pub enum SpecialElementKind<'arena> {
     TitleElement,
 }
 
-impl<'arena> SpecialElementKind<'arena> {
+impl SpecialElementKind {
     /// Whether this special element is a block-level element (forces line breaks).
     ///
     /// Block elements: `svelte:head`, `svelte:window`, `svelte:body`, `svelte:document`
@@ -865,7 +878,7 @@ impl<'arena> SpecialElementKind<'arena> {
     /// serialize differently: the plain-string `this="x"` is a fused Svelte-style `Literal`,
     /// the braced `this={x}` an island. Which form it is, is the binding's own structure —
     /// the writer must not re-derive it from the source bytes.
-    pub fn tag(&self) -> Option<&SpecialThis<'arena>> {
+    pub fn tag(&self) -> Option<&SpecialThis> {
         match self {
             Self::SvelteElement { tag } => Some(tag),
             _ => None,
@@ -897,7 +910,7 @@ impl<'arena> SpecialElementKind<'arena> {
 /// is stored in the `SpecialElementKind` enum, not as Option fields here.
 #[derive(Debug, Clone)]
 pub struct SpecialElement<'arena> {
-    pub kind: SpecialElementKind<'arena>,
+    pub kind: SpecialElementKind,
     pub attributes: &'arena [AttributeNode<'arena>],
     pub fragment: Fragment<'arena>,
     pub span: Span,

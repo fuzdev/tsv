@@ -697,11 +697,11 @@ impl<'a> Printer<'a> {
             opening.push(pattern_doc);
             if let Some(index) = block.index {
                 opening.push(d.text(", "));
-                opening.push(d.text_pooled(index));
+                opening.push(d.source_span(index, self.source));
             }
         } else if let Some(index) = block.index {
             opening.push(d.text(", "));
-            opening.push(d.text_pooled(index));
+            opening.push(d.source_span(index, self.source));
         }
 
         if let Some(key) = &block.key {

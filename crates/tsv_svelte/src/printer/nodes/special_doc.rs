@@ -406,12 +406,12 @@ impl<'a> Printer<'a> {
 
     /// Build doc for a `<svelte:element>` `this=` binding (for inline doc building), which
     /// unlike the component's may also be a plain string.
-    fn build_this_attr_doc_for_inline(&self, this: &ast::SpecialThis<'_>) -> DocId {
+    fn build_this_attr_doc_for_inline(&self, this: &ast::SpecialThis) -> DocId {
         let d = self.d();
 
         let content = match this {
             ast::SpecialThis::Braced(tag) => return self.build_this_braced_doc(tag),
-            ast::SpecialThis::Plain { content, .. } => content,
+            ast::SpecialThis::Plain(text) => text.data(self.source),
         };
 
         // `this="value"`: a plain HTML attribute, printed as one. Same delimiter rule as any
@@ -425,7 +425,7 @@ impl<'a> Printer<'a> {
         };
         let mut w = d.pool_writer();
         w.push_str(open);
-        w.push_str(content);
+        w.push_str(&content);
         w.push(close);
         w.finish_text()
     }

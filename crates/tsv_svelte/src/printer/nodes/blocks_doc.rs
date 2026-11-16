@@ -1053,7 +1053,7 @@ impl<'a> Printer<'a> {
             clause_parts.push(pattern_doc);
             if let Some(index) = block.index {
                 clause_parts.push(d.text(", "));
-                clause_parts.push(d.text_pooled(index));
+                clause_parts.push(d.source_span(index, self.source));
             }
             if let Some(kd) = key_doc {
                 clause_parts.push(d.text(" "));
@@ -1065,7 +1065,7 @@ impl<'a> Printer<'a> {
             let mut e: DocBuf = smallvec![head.doc];
             if let Some(index) = block.index {
                 e.push(d.text(", "));
-                e.push(d.text_pooled(index));
+                e.push(d.source_span(index, self.source));
             }
             if let Some(kd) = key_doc {
                 e.push(d.text(" "));

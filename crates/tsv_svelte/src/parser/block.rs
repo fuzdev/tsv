@@ -269,15 +269,16 @@ fn await_head_clause(after_expr: &str) -> Option<(AwaitClause, &str)> {
 /// Return type for parse_each_binding: (context, index, key, consumed_end).
 /// `consumed_end` is the absolute source offset just past the last token the binding
 /// consumed — the caller rejects any non-whitespace between it and the closing `}`.
-type EachBindingResult<'arena> = (ExprId, Option<&'arena str>, Option<EachKey>, usize);
+type EachBindingResult = (ExprId, Option<Span>, Option<EachKey>, usize);
 
 /// Return type for parse_index_and_key_after_context: (index, key, consumed_end).
-type IndexAndKeyResult<'arena> = (Option<&'arena str>, Option<EachKey>, usize);
+type IndexAndKeyResult = (Option<Span>, Option<EachKey>, usize);
 
 /// An `{#each}` head's ", index" / "(key)" tail as `SvelteParser::split_index_and_key`
 /// reads it — the key bounded by its parens but not yet parsed.
 struct EachIndexAndKey<'s> {
-    index: Option<&'s str>,
+    /// The index name's span — `read_identifier`'s verbatim slice of the source.
+    index: Option<Span>,
     key: Option<EachKeyRegion<'s>>,
     /// Absolute offset just past the last token the tail consumed.
     consumed_end: usize,
@@ -695,7 +696,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         &mut self,
         binding: &str,
         binding_offset: usize,
-    ) -> Result<EachBindingResult<'arena>, Error> {
+    ) -> Result<EachBindingResult, Error> {
         // Calculate leading whitespace and adjust offset accordingly
         let leading_ws = binding.len() - binding.trim_start_matches(is_svelte_ws).len();
         // A trailing trim here cannot clip a line comment the way a head's does
@@ -826,9 +827,9 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         &mut self,
         remaining: &str,
         remaining_offset: usize,
-    ) -> Result<IndexAndKeyResult<'arena>, Error> {
+    ) -> Result<IndexAndKeyResult, Error> {
         let tail = self.split_index_and_key(remaining, remaining_offset)?;
-        let index = tail.index.map(|name| self.alloc_str_in(name));
+        let index = tail.index;
         let key = match tail.key {
             Some(region) => Some(EachKey {
                 expression: self.parse_ts_expression(region.expr_str, region.expr_offset, "')'")?,
@@ -876,7 +877,9 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             // identifier".
             let idx_offset = offset + 1 + comma_ws;
             if let Some(name) = self.read_identifier(after_comma_trimmed, idx_offset)? {
-                index = Some(name);
+                let span = Span::new(idx_offset as u32, (idx_offset + name.len()) as u32);
+                debug_assert_eq!(span.extract(self.source), name);
+                index = Some(span);
                 rest = &after_comma_trimmed[name.len()..];
                 rest_offset = idx_offset + name.len();
                 consumed_end = rest_offset;
@@ -1991,6 +1994,37 @@ mod tests {
                 "{input:?}"
             );
             assert_eq!(&input[..run.len()], run, "{input:?}");
+        }
+    }
+
+    /// An `{#each}` index is the span of its name in the source, with or without a context,
+    /// a key or a destructuring pattern, a non-ASCII name, a line break before it, or a
+    /// byte-order mark shifting the document's offsets.
+    #[test]
+    fn each_index_is_the_span_of_its_name() {
+        use crate::ast::FragmentNode;
+
+        for (source, index) in [
+            ("{#each xs as x}{/each}", None),
+            ("{#each xs as x, i}{/each}", Some("i")),
+            ("{#each xs, i}{/each}", Some("i")),
+            ("{#each xs, i (i)}{/each}", Some("i")),
+            ("{#each xs as { a, b }, idx (a)}{/each}", Some("idx")),
+            ("{#each xs as [a], j}{/each}", Some("j")),
+            (
+                "{#each xs as x ,\r\n\u{e9}t\u{e9} (x)}{/each}",
+                Some("\u{e9}t\u{e9}"),
+            ),
+            ("\u{feff}{#each xs as x , $i}{/each}", Some("$i")),
+            ("{#each xs as x (x)}{/each}", None),
+        ] {
+            let arena = Bump::new();
+            let parsed = crate::__private::parse(source, &arena)
+                .unwrap_or_else(|e| panic!("{source:?}: {e:?}"));
+            let FragmentNode::EachBlock(block) = &parsed.fragment.nodes[0] else {
+                panic!("{source:?}: not an each block");
+            };
+            assert_eq!(block.index.map(|s| s.extract(source)), index, "{source:?}");
         }
     }
 }

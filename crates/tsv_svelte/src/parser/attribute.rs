@@ -367,12 +367,21 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             start: name_start as u32,
             end: (name_start + directive_name.len()) as u32,
         };
+        // Each modifier is a verbatim source slice too, held as its span: the parts follow
+        // the name in `full_name`, each after its own `|` (one byte), so a part starts one
+        // past where the previous one ended.
         let mut modifiers_vec = self.bvec();
+        let mut part_end = name_start + directive_name.len();
         for m in parts {
-            let m: &'arena str = self.alloc_str_in(m);
-            modifiers_vec.push(m);
+            let part_start = part_end + 1;
+            part_end = part_start + m.len();
+            debug_assert_eq!(&self.source[part_start..part_end], m);
+            modifiers_vec.push(Span {
+                start: part_start as u32,
+                end: part_end as u32,
+            });
         }
-        let modifiers: &'arena [&'arena str] = modifiers_vec.into_bump_slice();
+        let modifiers: &'arena [Span] = modifiers_vec.into_bump_slice();
 
         if directive_name.is_empty() {
             return Err(self.error_msg_at(
@@ -627,7 +636,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     fn parse_style_directive(
         &mut self,
         name_span: Span,
-        modifiers: &'arena [&'arena str],
+        modifiers: &'arena [Span],
         start: usize,
         name_end: usize,
         head_span: Span,
@@ -1403,6 +1412,79 @@ mod tests {
         ] {
             let source = format!("{name}{tail}");
             assert_eq!(attr_name_end(&source, 0), name.len(), "{source:?}");
+        }
+    }
+
+    /// Every directive keeps each `|modifier` as the span of its own bytes in the source —
+    /// no `|`, nothing decoded — whatever the modifier holds (nothing, non-ASCII) and wherever
+    /// the document's offsets start (a leading byte-order mark shifts them).
+    #[test]
+    fn directive_modifiers_are_spans_of_their_source_bytes() {
+        use crate::ast::{AttributeNode, FragmentNode};
+        use tsv_lang::Span;
+
+        fn modifiers<'a>(node: &'a AttributeNode<'_>) -> &'a [Span] {
+            match node {
+                AttributeNode::OnDirective(d) => d.modifiers,
+                AttributeNode::BindDirective(d) => d.modifiers,
+                AttributeNode::ClassDirective(d) => d.modifiers,
+                AttributeNode::StyleDirective(d) => d.modifiers,
+                AttributeNode::UseDirective(d) => d.modifiers,
+                AttributeNode::TransitionDirective(d) => d.modifiers,
+                AttributeNode::AnimateDirective(d) => d.modifiers,
+                AttributeNode::LetDirective(d) => d.modifiers,
+                other => panic!("not a directive: {other:?}"),
+            }
+        }
+
+        let prefixes = [
+            "on",
+            "bind",
+            "class",
+            "style",
+            "use",
+            "transition",
+            "in",
+            "out",
+            "animate",
+            "let",
+        ];
+        let lists: [&[&str]; 7] = [
+            &[],
+            &["once"],
+            &[""],
+            &["", ""],
+            &["preventDefault", "", "capture"],
+            &["\u{e9}t\u{e9}", "\u{1f600}"],
+            &["a", "b", "c", "d"],
+        ];
+        for bom in ["", "\u{feff}"] {
+            for prefix in prefixes {
+                for list in lists {
+                    let mut head = format!("{prefix}:x");
+                    for m in list {
+                        head.push('|');
+                        head.push_str(m);
+                    }
+                    let source = format!("{bom}<div {head}></div>");
+                    let arena = bumpalo::Bump::new();
+                    let parsed = crate::__private::parse(&source, &arena)
+                        .unwrap_or_else(|e| panic!("{source:?}: {e:?}"));
+                    let FragmentNode::Element(element) = &parsed.fragment.nodes[0] else {
+                        panic!("{source:?}: not an element");
+                    };
+                    let spans = modifiers(&element.attributes[0]);
+                    let texts: Vec<&str> = spans.iter().map(|s| s.extract(&source)).collect();
+                    assert_eq!(texts, list, "{source:?}");
+                    for span in spans {
+                        assert_eq!(
+                            source.as_bytes()[span.start as usize - 1],
+                            b'|',
+                            "{source:?}"
+                        );
+                    }
+                }
+            }
         }
     }
 }

@@ -267,14 +267,14 @@ impl ImplicitClose {
 /// non-`{expression}` being rejected as it is parsed — so what survives for the component is
 /// always an `ExpressionTag`. One enum rather than a pair of `Option`s because the forms are
 /// mutually exclusive: a value can't be built that claims to be both.
-enum SpecialThisBinding<'arena> {
+enum SpecialThisBinding {
     /// Nothing bound: either no `this` was written, or the one that was is valueless
     /// (`<svelte:element this>`). The two need no distinction — Svelte rejects both under
     /// the one `svelte_element_missing_this`, and because the binding is taken **by index**
     /// a valueless `this` cannot hand its position to a later one.
     Absent,
     /// `<svelte:element this={tag}>` / `<svelte:element this="div">`.
-    Element(SpecialThis<'arena>),
+    Element(SpecialThis),
     /// `<svelte:component this={Comp}>`.
     Component(ExpressionTag),
 }
@@ -284,10 +284,7 @@ enum SpecialThisBinding<'arena> {
 ///
 /// Only the *first* `this` is lifted — a repeated one stays in the attribute list, as an
 /// ordinary attribute of that name.
-type SpecialElementAttrs<'arena> = (
-    BumpVec<'arena, AttributeNode<'arena>>,
-    SpecialThisBinding<'arena>,
-);
+type SpecialElementAttrs<'arena> = (BumpVec<'arena, AttributeNode<'arena>>, SpecialThisBinding);
 
 impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// Whether an attribute list carries a `shadowrootmode` attribute (by name). On a
@@ -626,9 +623,9 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     fn build_special_element_kind(
         &self,
         tag: SpecialElementTag,
-        this: SpecialThisBinding<'arena>,
+        this: SpecialThisBinding,
         name_span: Span,
-    ) -> Result<SpecialElementKind<'arena>, Error> {
+    ) -> Result<SpecialElementKind, Error> {
         Ok(match tag {
             SpecialElementTag::SvelteElement => {
                 // A missing `this` and a valueless one are both `Absent` — Svelte reports
@@ -709,13 +706,12 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 Some(AttributeValue::ExpressionTag(et)) => {
                     SpecialThisBinding::Element(SpecialThis::Braced(et.clone()))
                 }
-                // String value: no expression is parsed, so keep the decoded text itself. It
-                // is copied once into the arena (the source slice carries entities and no
-                // quotes, so it is not a verbatim slice of it).
-                Some(AttributeValue::Text(t)) => SpecialThisBinding::Element(SpecialThis::Plain {
-                    content: self.alloc_str_in(&t.data(source)),
-                    span: t.span,
-                }),
+                // String value: no expression is parsed, so keep the text itself. Its decoded
+                // value is read where it is used (`Text::data`, in the attribute context the
+                // text was parsed in), never copied out of the source.
+                Some(AttributeValue::Text(t)) => {
+                    SpecialThisBinding::Element(SpecialThis::Plain(t.clone()))
+                }
                 None => SpecialThisBinding::Absent,
             }
         } else {
@@ -1502,5 +1498,49 @@ mod tests {
             assert!(!is_root_slot_meta_tag(name), "<{name}>");
         }
         assert!(RootOnlyMetaTag::from_tag_name("svelte:options").is_some());
+    }
+
+    /// A plain `<svelte:element this=…>` holds the attribute's own first `Text` chunk: its
+    /// span is the source text inside the quotes, and its value decodes on demand
+    /// (`Text::data`) in the attribute context.
+    #[test]
+    fn svelte_element_plain_this_holds_its_text() {
+        use crate::ast::{FragmentNode, SpecialThis};
+
+        for (source, raw, data) in [
+            ("<svelte:element this=\"div\" />", Some("div"), Some("div")),
+            ("<svelte:element this='div' />", Some("div"), Some("div")),
+            ("<svelte:element this=div />", Some("div"), Some("div")),
+            (
+                "<svelte:element this=\"d&#105;v\" />",
+                Some("d&#105;v"),
+                Some("div"),
+            ),
+            (
+                "<svelte:element this=\"a&amp;b\" />",
+                Some("a&amp;b"),
+                Some("a&b"),
+            ),
+            ("<svelte:element this=\"a{b}\" />", Some("a"), Some("a")),
+            ("<svelte:element this=\"\" />", Some(""), Some("")),
+            ("<svelte:element this={tag} />", None, None),
+        ] {
+            let arena = bumpalo::Bump::new();
+            let parsed = crate::__private::parse(source, &arena)
+                .unwrap_or_else(|e| panic!("{source:?}: {e:?}"));
+            let FragmentNode::SpecialElement(element) = &parsed.fragment.nodes[0] else {
+                panic!("{source:?}: not a special element");
+            };
+            let this = element.kind.tag().expect("`<svelte:element>` binds `this`");
+            let (got_raw, got_data) = match this {
+                SpecialThis::Plain(text) => {
+                    assert_eq!(text.span.extract(source), text.raw(source), "{source:?}");
+                    (Some(text.raw(source)), Some(text.data(source).into_owned()))
+                }
+                SpecialThis::Braced(_) => (None, None),
+            };
+            assert_eq!(got_raw, raw, "{source:?}");
+            assert_eq!(got_data.as_deref(), data, "{source:?}");
+        }
     }
 }
