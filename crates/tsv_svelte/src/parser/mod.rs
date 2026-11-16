@@ -102,13 +102,13 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                         if module.is_some() {
                             return Err(self.error_duplicate("module script"));
                         }
-                        module = Some(self.alloc(script));
+                        module = Some(script);
                     }
                     ScriptContext::Default => {
                         if instance.is_some() {
                             return Err(self.error_duplicate("instance script"));
                         }
-                        instance = Some(self.alloc(script));
+                        instance = Some(script);
                     }
                 }
             } else if self.check(TokenKind::LeftAngle) && self.is_next_tag("style")? {
@@ -122,7 +122,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 if css.is_some() {
                     return Err(self.error_duplicate("style tag"));
                 }
-                css = Some(self.alloc(style));
+                css = Some(style);
             } else {
                 // Regular markup: capture text and parse elements/expressions/comments
 
@@ -191,10 +191,10 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // Collect all comments from scripts and template expressions
         let mut comments = Vec::new();
         let view = self.ts_stores().view();
-        if let Some(script) = instance {
+        if let Some(script) = &instance {
             comments.extend_from_slice(view.comments(script.content.comments));
         }
-        if let Some(script) = module {
+        if let Some(script) = &module {
             comments.extend_from_slice(view.comments(script.content.comments));
         }
         // Add expression comments collected during template parsing

@@ -51,7 +51,7 @@ fn script_lang<'s>(script: &ast::Script<'_>, source: &'s str) -> Option<&'s str>
 /// A `<script>` with no `lang` attribute doesn't decide; nor does `<style lang=…>`.
 pub(super) fn component_is_typescript(root: &ast::Root<'_>, source: &str) -> bool {
     // The two top-level scripts in source order — the first one carrying a `lang` decides.
-    let mut scripts = [root.module, root.instance];
+    let mut scripts = [root.module.as_ref(), root.instance.as_ref()];
     scripts.sort_by_key(|s| s.map_or(u32::MAX, |script| script.span.start));
     scripts
         .into_iter()

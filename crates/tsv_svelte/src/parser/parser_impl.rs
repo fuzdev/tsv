@@ -43,9 +43,9 @@ pub(crate) struct SvelteParser<'a, 'arena> {
     /// Bump arena that owns every AST node this parser allocates — the template
     /// AST and (via the embedding APIs that receive `&'arena Bump`) the embedded
     /// TS `<script>`/`{expr}` ASTs. Supplied by the caller; the returned
-    /// `Root<'arena>` borrows from it. `&'arena Bump` is `Copy`, so `self.alloc(owned)`
-    /// and `self.arena.alloc(self.parse_x()?)` (even while `&mut self` is held — the
-    /// field read borrows the `Bump`, not `self`) both work directly; lift it into a
+    /// `Root<'arena>` borrows from it. `&'arena Bump` is `Copy`, so
+    /// `self.arena.alloc(self.parse_x()?)` works even while `&mut self` is held — the
+    /// field read borrows the `Bump`, not `self`; lift it into a
     /// local (`let arena = self.arena;`) only when several allocations in one method
     /// share it.
     pub(crate) arena: &'arena Bump,
@@ -317,16 +317,6 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     #[inline(never)]
     fn too_deep(&self) -> Error {
         Error::too_deep(DepthLimit::Nesting, self.current_start())
-    }
-
-    /// Allocate a single AST node in the arena, returning a shared `&'arena`
-    /// reference (replaces `Box::new`). Zero-copy: `Bump::alloc` moves the value
-    /// into arena memory.
-    #[inline]
-    pub(crate) fn alloc<T>(&self, val: T) -> &'arena T {
-        #[cfg(feature = "_internal_ast_census")]
-        tsv_lang::ast_census_probe::mint::<T>(1);
-        self.arena.alloc(val)
     }
 
     /// A growable vector that builds AST-node collections **directly in the

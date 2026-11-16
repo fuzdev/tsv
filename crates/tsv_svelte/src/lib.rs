@@ -400,10 +400,10 @@ fn wire_string(bytes: Vec<u8>) -> String {
 #[cfg(feature = "json")]
 pub(crate) fn script_content_spans(root: &Root<'_>) -> Vec<(u32, u32)> {
     let mut script_spans: Vec<(u32, u32)> = Vec::new();
-    if let Some(script) = root.instance {
+    if let Some(script) = &root.instance {
         script_spans.push((script.content.span.start, script.content.span.end));
     }
-    if let Some(script) = root.module {
+    if let Some(script) = &root.module {
         script_spans.push((script.content.span.start, script.content.span.end));
     }
     script_spans

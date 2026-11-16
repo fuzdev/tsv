@@ -100,9 +100,13 @@ impl<'arena> std::ops::Deref for ParsedRoot<'arena> {
 #[derive(Debug, Clone)]
 pub struct Root<'arena> {
     pub fragment: Fragment<'arena>,
-    pub instance: Option<&'arena Script<'arena>>,
-    pub module: Option<&'arena Script<'arena>>,
-    pub css: Option<&'arena Style<'arena>>,
+    /// The top-level instance `<script>`, held by value like `css`.
+    pub instance: Option<Script<'arena>>,
+    /// The top-level `<script module>`, held by value like `css`.
+    pub module: Option<Script<'arena>>,
+    /// The top-level `<style>`. Owned, so the stylesheet's comment buffer drops with the
+    /// document rather than staying behind in the arena, whose values never drop.
+    pub css: Option<Style<'arena>>,
     /// `<svelte:options>` configuration (not part of fragment)
     pub options: Option<SvelteOptions<'arena>>,
     /// All comments from scripts and template expressions.

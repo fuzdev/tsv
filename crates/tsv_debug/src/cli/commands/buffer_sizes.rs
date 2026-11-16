@@ -142,10 +142,10 @@ fn collect_file(
             // The instance/module `<script>` programs feed the same import
             // printer; `Root.comments` unifies every script + `{expr}` comment
             // (the exact population `render.rs` renders).
-            if let Some(script) = root.instance {
+            if let Some(script) = &root.instance {
                 collect_imports(root.view(), script.content.body, named_specs);
             }
-            if let Some(script) = root.module {
+            if let Some(script) = &root.module {
                 collect_imports(root.view(), script.content.body, named_specs);
             }
             collect_comments(&root.comments, source, comment_lines);

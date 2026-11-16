@@ -242,15 +242,15 @@ fn embedded_bodies(src: &str, lang: EmbeddedSeeds) -> Vec<(&'static str, String)
     };
     match lang {
         EmbeddedSeeds::Css => {
-            if let Some(style) = root.css {
+            if let Some(style) = &root.css {
                 push("#style", style.content_span);
             }
         }
         EmbeddedSeeds::Ts => {
-            if let Some(script) = root.instance {
+            if let Some(script) = &root.instance {
                 push("#script", script.content.span);
             }
-            if let Some(script) = root.module {
+            if let Some(script) = &root.module {
                 push("#module", script.content.span);
             }
         }

@@ -195,7 +195,7 @@ pub fn parse_imports_into(
     stores: &mut SvelteStores,
 ) -> Result<Imports> {
     let root = parse_into(source, arena, stores)?;
-    let mut scripts = [root.instance, root.module];
+    let mut scripts = [root.instance.as_ref(), root.module.as_ref()];
     scripts.sort_by_key(|script| script.map(|script| script.span.start));
     let programs: smallvec::SmallVec<[&tsv_ts::ast::Program; 2]> = scripts
         .into_iter()

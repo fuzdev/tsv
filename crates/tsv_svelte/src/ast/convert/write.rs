@@ -398,12 +398,12 @@ fn write_root(w: &mut JsonWriter, root: &ast::Root<'_>, ctx: &Ctx<'_>) {
         write_root_comment(w, c, ctx);
     });
     // Svelte assigns `module` before `instance` on the root.
-    if let Some(script) = root.module {
+    if let Some(script) = &root.module {
         let comment = find_preceding_comment(script.span.start);
         w.raw(",\"module\":");
         write_script(w, script, comment, ctx);
     }
-    if let Some(script) = root.instance {
+    if let Some(script) = &root.instance {
         let comment = find_preceding_comment(script.span.start);
         w.raw(",\"instance\":");
         write_script(w, script, comment, ctx);

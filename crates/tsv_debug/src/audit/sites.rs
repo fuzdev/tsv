@@ -285,7 +285,7 @@ fn svelte_internal_regions(source: &str) -> InternalRegions {
     };
     let mut named = Vec::new();
     walk(root.view(), &root.fragment, &mut named);
-    let frozen = [root.instance, root.module]
+    let frozen = [root.instance.as_ref(), root.module.as_ref()]
         .into_iter()
         .flatten()
         .filter(|script| EmbeddedLang::Script.is_frozen(script.attributes, source))
