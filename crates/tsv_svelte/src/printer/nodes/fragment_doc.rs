@@ -157,7 +157,7 @@ impl<'a> Printer<'a> {
     /// [`Printer::handle_content_text_child`] had been handed, and to measure `content_bounds`
     /// against a slice neither of them saw. Reach for [`Self::boundary_trimmed`] when the slice
     /// is all you want.
-    fn boundary_trimmed_bounds(nodes: &[FragmentNode<'_>]) -> Option<(usize, usize)> {
+    fn boundary_trimmed_bounds(nodes: &[FragmentNode]) -> Option<(usize, usize)> {
         let start = nodes.iter().position(|n| !n.is_whitespace_only_text())?;
         let end = nodes
             .iter()
@@ -169,9 +169,7 @@ impl<'a> Printer<'a> {
     /// [`Self::boundary_trimmed_bounds`] as the slice itself — for the readers that ask a
     /// content-shape question of the whole run and never need the indices back
     /// (`element_analysis`'s multiline scan, [`Self::content_holds_interior_blank`]).
-    pub(super) fn boundary_trimmed<'n, 'x>(
-        nodes: &'n [FragmentNode<'x>],
-    ) -> Option<&'n [FragmentNode<'x>]> {
+    pub(super) fn boundary_trimmed(nodes: &[FragmentNode]) -> Option<&[FragmentNode]> {
         let (start, end) = Self::boundary_trimmed_bounds(nodes)?;
         Some(&nodes[start..end])
     }
@@ -212,7 +210,7 @@ impl<'a> Printer<'a> {
     ///   [`LeadingEdge::Trimmed`] for every caller but the root range tail.
     pub(super) fn build_nodes_doc_trimmed(
         &self,
-        nodes: &[FragmentNode<'_>],
+        nodes: &[FragmentNode],
         multiline: bool,
         leading_edge: LeadingEdge,
     ) -> DocId {
@@ -670,7 +668,7 @@ impl<'a> Printer<'a> {
     /// grew `build_nodes_doc_trimmed`'s frame, which is on the element-nesting recursion
     /// path.
     #[inline(never)]
-    pub(super) fn is_own_line_declaration(&self, nodes: &[FragmentNode<'_>], i: usize) -> bool {
+    pub(super) fn is_own_line_declaration(&self, nodes: &[FragmentNode], i: usize) -> bool {
         nodes[i].is_declaration() && self.declaration_owns_its_line(nodes, i)
     }
 
@@ -678,7 +676,7 @@ impl<'a> Printer<'a> {
     /// NOT glued to content on both sides.
     #[cold]
     #[inline(never)]
-    fn declaration_owns_its_line(&self, nodes: &[FragmentNode<'_>], i: usize) -> bool {
+    fn declaration_owns_its_line(&self, nodes: &[FragmentNode], i: usize) -> bool {
         !(self.glued_to_content(nodes, i, true) && self.glued_to_content(nodes, i, false))
     }
 
@@ -745,7 +743,7 @@ impl<'a> Printer<'a> {
     /// `<title>`-as-content-end control, whose `<b>` twin welds in the identical shape).
     pub(super) fn is_hoisted_edge_separator(
         &self,
-        nodes: &[FragmentNode<'_>],
+        nodes: &[FragmentNode],
         i: usize,
         bounds: (usize, usize),
     ) -> bool {
@@ -782,7 +780,7 @@ impl<'a> Printer<'a> {
     /// The one question both emitters ask of a neighbour: *did that node already supply the break
     /// between us?* Asking it as two separate predicates is how a node that already owns its line
     /// picks up a second break — the failure mode this whole path keeps returning to.
-    fn owns_own_line(&self, nodes: &[FragmentNode<'_>], i: usize) -> bool {
+    fn owns_own_line(&self, nodes: &[FragmentNode], i: usize) -> bool {
         self.is_block_element_at(nodes, i) || self.is_own_line_declaration(nodes, i)
     }
 
@@ -807,7 +805,7 @@ impl<'a> Printer<'a> {
     /// that keeps its glue — so a reader that asked the node-only
     /// [`Self::is_block_element_node`] would give the element its line back on one side of the
     /// seam and split the glued boundary the rest of the walk kept.
-    pub(super) fn is_glued_global_element(&self, nodes: &[FragmentNode<'_>], i: usize) -> bool {
+    pub(super) fn is_glued_global_element(&self, nodes: &[FragmentNode], i: usize) -> bool {
         matches!(&nodes[i], FragmentNode::SpecialElement(se) if se.kind.is_global())
             && self.glued_to_content(nodes, i, true)
             && self.glued_to_content(nodes, i, false)
@@ -816,7 +814,7 @@ impl<'a> Printer<'a> {
     /// Whether the block-classified node at `i` does not own a block line there: a
     /// [global element glued on both sides](Self::is_glued_global_element) or a
     /// [nested `<script>` / `<style>` that keeps its glue](Self::is_glued_raw_text_element).
-    pub(super) fn is_glued_block_exception(&self, nodes: &[FragmentNode<'_>], i: usize) -> bool {
+    pub(super) fn is_glued_block_exception(&self, nodes: &[FragmentNode], i: usize) -> bool {
         self.is_glued_global_element(nodes, i) || self.is_glued_raw_text_element(nodes, i)
     }
 
@@ -824,13 +822,13 @@ impl<'a> Printer<'a> {
     /// answer, except for a [glued block exception](Self::is_glued_block_exception) (a global
     /// element glued on both sides, or a nested `<script>` / `<style>` that keeps its glue),
     /// which does not own a block line there.
-    pub(super) fn is_block_element_at(&self, nodes: &[FragmentNode<'_>], i: usize) -> bool {
+    pub(super) fn is_block_element_at(&self, nodes: &[FragmentNode], i: usize) -> bool {
         self.is_block_element_node(&nodes[i]) && !self.is_glued_block_exception(nodes, i)
     }
 
     /// [`Self::is_block_fragment_node`] asked of the node at `i` in its sibling list — see
     /// [`Self::is_block_element_at`].
-    pub(super) fn is_block_fragment_at(&self, nodes: &[FragmentNode<'_>], i: usize) -> bool {
+    pub(super) fn is_block_fragment_at(&self, nodes: &[FragmentNode], i: usize) -> bool {
         self.is_block_fragment_node(&nodes[i]) && !self.is_glued_block_exception(nodes, i)
     }
 
@@ -838,7 +836,7 @@ impl<'a> Printer<'a> {
     /// a [glued block exception](Self::is_glued_block_exception) (a global element glued on both
     /// sides, or a nested `<script>` / `<style>` that keeps its glue), which flows as an inline
     /// element does.
-    pub(super) fn is_inline_el_or_comp_at(&self, nodes: &[FragmentNode<'_>], i: usize) -> bool {
+    pub(super) fn is_inline_el_or_comp_at(&self, nodes: &[FragmentNode], i: usize) -> bool {
         self.is_inline_el_or_comp(&nodes[i]) || self.is_glued_block_exception(nodes, i)
     }
 
@@ -848,7 +846,7 @@ impl<'a> Printer<'a> {
     /// A *lone* declaration counts too: it touches only the fragment's boundaries, which are
     /// not content, so it is not glued and takes its line all the same — the host goes
     /// multiline (`{#if cond}{@const x = 1}{/if}` formats to the own-line form).
-    pub(super) fn has_own_line_declaration(&self, nodes: &[FragmentNode<'_>]) -> bool {
+    pub(super) fn has_own_line_declaration(&self, nodes: &[FragmentNode]) -> bool {
         (0..nodes.len()).any(|i| self.is_own_line_declaration(nodes, i))
     }
 
@@ -857,7 +855,7 @@ impl<'a> Printer<'a> {
     ///
     // Recognition lives in `tsv_lang::is_format_ignore_directive` — the single source of
     // truth for the directive set, shared across all three language printers.
-    pub(super) fn is_format_ignore_comment(node: &FragmentNode<'_>, source: &str) -> bool {
+    pub(super) fn is_format_ignore_comment(node: &FragmentNode, source: &str) -> bool {
         matches!(node, FragmentNode::Comment(c) if is_format_ignore_directive(c.content(source)))
     }
 
@@ -883,7 +881,7 @@ impl<'a> Printer<'a> {
     /// hugged and wrap the text after the node against the closing delimiter, and the second
     /// would read those lines as authored and go block-style
     /// (`syntax/prettier_ignore/multiline_inline_parent_long_prettier_divergence`).
-    fn format_ignore_raw_doc(&self, node: &FragmentNode<'_>, frozen: Span) -> Option<DocId> {
+    fn format_ignore_raw_doc(&self, node: &FragmentNode, frozen: Span) -> Option<DocId> {
         if let FragmentNode::Text(text) = node
             && text.is_collapsible_ws_only
         {
@@ -923,7 +921,7 @@ impl<'a> Printer<'a> {
     /// ([`Self::implied_end_trailing_ws`]). The leading half has no element twin — an element's
     /// span opens at its `<`
     /// (`syntax/prettier_ignore/implied_end_tag_gap_prettier_divergence`).
-    fn format_ignore_frozen_span(&self, node: &FragmentNode<'_>, trailing_owned: bool) -> Span {
+    fn format_ignore_frozen_span(&self, node: &FragmentNode, trailing_owned: bool) -> Span {
         let span = node.span();
         let trailing = match node {
             FragmentNode::Text(text) if trailing_owned => {
@@ -944,7 +942,7 @@ impl<'a> Printer<'a> {
     /// whitespace-preserving one (`<pre>`, `<textarea>`), where it is content: a chain through one
     /// keeps its run, and the slice is closed explicitly instead
     /// ([`Self::implied_end_closers_through_ws_sensitive`]).
-    fn implied_end_trailing_ws(&self, elem: &ast::Element<'_>) -> u32 {
+    fn implied_end_trailing_ws(&self, elem: &ast::Element) -> u32 {
         let mut innermost = elem;
         for elem in Self::last_descendant_chain(self.svelte, elem) {
             if elem.facts.is_ws_sensitive() {
@@ -965,8 +963,8 @@ impl<'a> Printer<'a> {
     /// can still carry an explicit end tag: every other member's span ends at its last child's.
     fn last_descendant_chain<'n>(
         view: SvelteView<'n>,
-        elem: &'n ast::Element<'n>,
-    ) -> impl Iterator<Item = &'n ast::Element<'n>> + Clone {
+        elem: &'n ast::Element,
+    ) -> impl Iterator<Item = &'n ast::Element> + Clone {
         std::iter::successors(Some(elem), move |elem| {
             match view.nodes(elem.fragment.nodes).last() {
                 Some(FragmentNode::Element(child)) if child.span.end == elem.span.end => {
@@ -979,7 +977,7 @@ impl<'a> Printer<'a> {
 
     /// Whether `elem`'s end tag is implied: its span ends where its last child does, or right
     /// after its own start tag when it has none (not a void or self-closed element).
-    fn is_implied_end(&self, elem: &ast::Element<'_>) -> bool {
+    fn is_implied_end(&self, elem: &ast::Element) -> bool {
         match self.svelte.nodes(elem.fragment.nodes).last() {
             Some(child) => child.span().end == elem.span.end,
             None => {
@@ -1005,7 +1003,7 @@ impl<'a> Printer<'a> {
     /// reaches no `<pre>` gives up its trailing run instead ([`Self::implied_end_trailing_ws`]),
     /// keeping the author's implied form
     /// (`syntax/prettier_ignore/implied_end_tag_gap_prettier_divergence`).
-    fn implied_end_closers_through_ws_sensitive(&self, elem: &ast::Element<'_>) -> Option<DocId> {
+    fn implied_end_closers_through_ws_sensitive(&self, elem: &ast::Element) -> Option<DocId> {
         let implied_chain = Self::last_descendant_chain(self.svelte, elem)
             .take_while(|elem| self.is_implied_end(elem));
         if !implied_chain
@@ -1052,7 +1050,7 @@ impl<'a> Printer<'a> {
     /// text, and an implied end tag leaves none — so a block follower breaks whatever the slice
     /// ends in. An inline follower (`<rt>` closing an `<rt>`) prints nothing beside it, and there
     /// the slice's run is the boundary and stays.
-    fn format_ignore_trailing_boundary_owned(&self, nodes: &[FragmentNode<'_>], i: usize) -> bool {
+    fn format_ignore_trailing_boundary_owned(&self, nodes: &[FragmentNode], i: usize) -> bool {
         let Some(next) = nodes.get(i + 1) else {
             return true;
         };
@@ -1067,7 +1065,7 @@ impl<'a> Printer<'a> {
     /// blank line — the Tier-2 signal the boundary that replaces it then owes, exactly as
     /// `handle_content_text_child`'s `next_owns_line` arm owes it. Empty (and so `false`) when
     /// nothing was dropped.
-    fn format_ignore_dropped_trailing_blank(&self, node: &FragmentNode<'_>, frozen: Span) -> bool {
+    fn format_ignore_dropped_trailing_blank(&self, node: &FragmentNode, frozen: Span) -> bool {
         let dropped = &self.source[frozen.end as usize..node.span().end as usize];
         dropped.matches('\n').count() >= 2
     }
@@ -1195,7 +1193,7 @@ impl<'a> Printer<'a> {
     /// is about neighbours it never sees), so delegating a content text would read back as
     /// "breaks the run" and cut every run at its own prose — the one thing the run exists to
     /// find.
-    pub(super) fn breaks_inline_run(&self, nodes: &[FragmentNode<'_>], i: usize) -> bool {
+    pub(super) fn breaks_inline_run(&self, nodes: &[FragmentNode], i: usize) -> bool {
         match &nodes[i] {
             FragmentNode::Text(t) if t.is_collapsible_ws_only => t.newline_count >= 2,
             FragmentNode::Text(_) => false,
@@ -1239,7 +1237,7 @@ impl<'a> Printer<'a> {
     /// the node belongs to, so a one-word node that ends a real sentence flows with it. Pinned
     /// by `elements/inline_sibling_newline_label_hold_prettier_divergence` (the label shapes
     /// held, the two-word cliff and the one-word sentence tail flowing).
-    fn prose_words(&self, node: &FragmentNode<'_>) -> usize {
+    fn prose_words(&self, node: &FragmentNode) -> usize {
         match node {
             FragmentNode::Text(t) if !t.is_collapsible_ws_only => {
                 if Self::text_is_separator_like(t, self.source) {
@@ -1288,7 +1286,7 @@ impl<'a> Printer<'a> {
     /// [`Self::run_is_prose`] grades. The one counter for both readers of a run:
     /// [`Self::scan_inline_run`] over the run it has just bounded, and
     /// `Printer::content_is_reflowable_fill` over an element's already-bounded content.
-    pub(super) fn run_prose_words(&self, nodes: &[FragmentNode<'_>]) -> usize {
+    pub(super) fn run_prose_words(&self, nodes: &[FragmentNode]) -> usize {
         let mut words = 0;
         for node in nodes {
             words = words.max(self.prose_words(node));
@@ -1319,7 +1317,7 @@ impl<'a> Printer<'a> {
     /// rescan would cost on a long all-flowing run (a generated per-token `<span>` list). A
     /// run-breaking node at `start` is its own one-node span: the loop stops immediately and the
     /// `max` advances the cursor past it, so the caller cannot stall on it.
-    fn scan_inline_run(&self, nodes: &[FragmentNode<'_>], start: usize) -> (usize, usize) {
+    fn scan_inline_run(&self, nodes: &[FragmentNode], start: usize) -> (usize, usize) {
         let mut end = start;
         while end < nodes.len() && !self.breaks_inline_run(nodes, end) {
             // An authored blank line bounds the run wherever the parser put it. Between two
@@ -1358,7 +1356,7 @@ impl<'a> Printer<'a> {
     /// Pre-gated on the parse-time `newline_count` (saturating at 2, source-free), which bounds
     /// either edge run: no blank line anywhere in `raw` means none at an edge of it, so the
     /// common node never reaches `source` at all.
-    fn text_edge_has_blank(&self, node: &FragmentNode<'_>, leading: bool) -> bool {
+    fn text_edge_has_blank(&self, node: &FragmentNode, leading: bool) -> bool {
         match node {
             FragmentNode::Text(t) if !t.is_collapsible_ws_only && t.newline_count >= 2 => {
                 let raw = t.raw(self.source);
@@ -1393,7 +1391,7 @@ impl<'a> Printer<'a> {
     /// ⚠️ [`Self::content_holds_interior_blank`] asks NEITHER: it is about whether a blank
     /// survives into the OUTPUT, a question about the emitters, where these two are about where a
     /// run ends in the input.
-    pub(super) fn text_edge_blank(&self, node: &FragmentNode<'_>) -> bool {
+    pub(super) fn text_edge_blank(&self, node: &FragmentNode) -> bool {
         self.text_edge_has_blank(node, true) || self.text_edge_has_blank(node, false)
     }
 
@@ -1431,7 +1429,7 @@ impl<'a> Printer<'a> {
     /// interior and survives — the answer the element twin (`<div>a⏎⏎{@debug cond}⏎⏎b</div>`)
     /// already gave under both formatters, and which a hugged block body used to lose along with
     /// every other body blank.
-    fn content_holds_interior_blank(&self, nodes: &[FragmentNode<'_>]) -> bool {
+    fn content_holds_interior_blank(&self, nodes: &[FragmentNode]) -> bool {
         // The emitters answer against the boundary-TRIMMED slice (`build_nodes_doc_trimmed`'s
         // own first act), so this gate reads that same slice — an index into `nodes` names a
         // different node than the one the emitter was asked about, and `bounds` below would be
@@ -1523,7 +1521,7 @@ impl<'a> Printer<'a> {
     /// newline does still decide and which is preserved — so the convergence target is the
     /// multiline form, never a collapsed one-liner. See
     /// [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).
-    fn sibling_newline_flows(&self, nodes: &[FragmentNode<'_>], i: usize) -> bool {
+    fn sibling_newline_flows(&self, nodes: &[FragmentNode], i: usize) -> bool {
         let node = &nodes[i];
         match node {
             // A tag has fixed width and no structure to protect — always flows.
@@ -1559,7 +1557,7 @@ impl<'a> Printer<'a> {
     #[inline]
     pub(super) fn neighbour_newline_flows(
         &self,
-        nodes: &[FragmentNode<'_>],
+        nodes: &[FragmentNode],
         neighbour: Option<usize>,
     ) -> bool {
         neighbour.is_some_and(|j| self.sibling_newline_flows(nodes, j))
@@ -1591,7 +1589,7 @@ impl<'a> Printer<'a> {
         newlines: usize,
         run_has_prose: bool,
         separator_like_text: bool,
-        nodes: &[FragmentNode<'_>],
+        nodes: &[FragmentNode],
         neighbour: Option<usize>,
     ) -> bool {
         newlines == 1
@@ -1676,7 +1674,7 @@ impl<'a> Printer<'a> {
     /// prettier-plugin-svelte (`isBlockElement`): an HTML block element, a block special
     /// element, or a block component. Excludes control-flow blocks (`{#if}` etc. — they
     /// separate via the whitespace-break path) and inline elements/components.
-    pub(super) fn is_block_element_node(&self, node: &FragmentNode<'_>) -> bool {
+    pub(super) fn is_block_element_node(&self, node: &FragmentNode) -> bool {
         matches!(
             node,
             FragmentNode::Element(_) | FragmentNode::SpecialElement(_)
@@ -1701,7 +1699,7 @@ impl<'a> Printer<'a> {
     ///   every node that owns its line gives its follower.
     fn handle_block_child(
         &self,
-        trimmed_nodes: &[FragmentNode<'_>],
+        trimmed_nodes: &[FragmentNode],
         i: usize,
         force_break: bool,
         child_docs: &mut DocBuf,
@@ -1762,7 +1760,7 @@ impl<'a> Printer<'a> {
     /// renders no box, a nested `<script>` / `<style>` with a body, which the compiler keeps.
     /// Each of the three owns its line only where that is render-free, never when glued to
     /// content on both sides ([`Self::owns_own_line`]).
-    fn owes_break_after(&self, trimmed_nodes: &[FragmentNode<'_>], i: usize) -> bool {
+    fn owes_break_after(&self, trimmed_nodes: &[FragmentNode], i: usize) -> bool {
         debug_assert!(
             self.owns_own_line(trimmed_nodes, i),
             "only a node that owns its own line owes the break after it"
@@ -1807,7 +1805,7 @@ impl<'a> Printer<'a> {
     /// must still break its params and dangle the `}`).
     fn handle_own_line_tag(
         &self,
-        trimmed_nodes: &[FragmentNode<'_>],
+        trimmed_nodes: &[FragmentNode],
         i: usize,
         child_docs: &mut DocBuf,
     ) {
@@ -1850,7 +1848,7 @@ impl<'a> Printer<'a> {
     /// boundaries; prettier's `printChildren` model — block-child softlines + `forceBreakContent`,
     /// `splitTextToDocs` boundary hardlines, the control-flow-block `in_multiline_context` /
     /// root-inline-run dispatch, and the sibling-`>` dangle).
-    pub(crate) fn build_nodes_doc_multiline(&self, nodes: &[FragmentNode<'_>]) -> DocId {
+    pub(crate) fn build_nodes_doc_multiline(&self, nodes: &[FragmentNode]) -> DocId {
         self.build_nodes_doc_trimmed(nodes, true, LeadingEdge::Trimmed)
     }
 
@@ -1863,7 +1861,7 @@ impl<'a> Printer<'a> {
     /// boundary IN FRONT of it: the marker belongs to the freeze, so it stays on the line the
     /// frozen slice ends on ([`LeadingEdge::Glued`]), and a text fused behind it breaks at its
     /// first internal space instead of dropping the marker to a fresh line.
-    pub(crate) fn build_range_tail_doc(&self, nodes: &[FragmentNode<'_>]) -> DocId {
+    pub(crate) fn build_range_tail_doc(&self, nodes: &[FragmentNode]) -> DocId {
         self.build_nodes_doc_trimmed(nodes, true, LeadingEdge::Glued)
     }
 
@@ -1898,7 +1896,7 @@ impl<'a> Printer<'a> {
     /// element parent, so this runs only for the container's own content — a nested `{#each}` body
     /// builds through the ordinary path (its parent is the block, not the container), matching the
     /// compiler.
-    pub(super) fn build_container_content_doc(&self, nodes: &[FragmentNode<'_>]) -> DocId {
+    pub(super) fn build_container_content_doc(&self, nodes: &[FragmentNode]) -> DocId {
         let _fragment = self.enter_fragment();
         let d = self.d();
         let mut parts = d.pooled_docbuf();
@@ -1976,7 +1974,7 @@ impl<'a> Printer<'a> {
     ///
     /// Components are NOT treated as blocks - like Prettier, they're printed inline.
     /// The line structure comes from whitespace in text nodes, not from node types.
-    pub(super) fn is_block_fragment_node(&self, node: &FragmentNode<'_>) -> bool {
+    pub(super) fn is_block_fragment_node(&self, node: &FragmentNode) -> bool {
         match node {
             // Defer to the one block-element adapter (component + script/style overlay).
             FragmentNode::Element(el) => self.is_block_element(el),
@@ -2004,7 +2002,7 @@ impl<'a> Printer<'a> {
     /// root) already expands and keeps it. It is the body's CONTENT that decides this, never its
     /// boundary spelling, which is render-free and stays width's alone (§Svelte: Blocks,
     /// body-expand). Pinned by `blocks/body_blank_break_prettier_divergence`.
-    pub(super) fn fragment_should_force_break_content(&self, nodes: &[FragmentNode<'_>]) -> bool {
+    pub(super) fn fragment_should_force_break_content(&self, nodes: &[FragmentNode]) -> bool {
         let non_ws_count = nodes
             .iter()
             .filter(|n| !n.is_whitespace_only_text())
@@ -2020,11 +2018,7 @@ impl<'a> Printer<'a> {
     /// boundary before such an element trims to a collapsible `group([line, element])`) and by
     /// `handle_block_child` (the `idx + 2` inline-element lookahead). The broader
     /// element-or-component flow set is [`Self::is_inline_el_or_comp`].
-    pub(super) fn next_is_inline_element(
-        &self,
-        trimmed_nodes: &[FragmentNode<'_>],
-        i: usize,
-    ) -> bool {
+    pub(super) fn next_is_inline_element(&self, trimmed_nodes: &[FragmentNode], i: usize) -> bool {
         match trimmed_nodes.get(i + 1) {
             Some(FragmentNode::Element(el)) => {
                 el.kind != ast::ElementKind::Component && !self.is_block_element(el)
@@ -2046,7 +2040,7 @@ impl<'a> Printer<'a> {
     /// holding it in only ONE arm is the two-pass cycle `bug371` hit. A **block** component is
     /// excluded for the same reason `next_is_inline_element` excludes block elements: it owns its
     /// own line already.
-    pub(super) fn next_is_component(&self, trimmed_nodes: &[FragmentNode<'_>], i: usize) -> bool {
+    pub(super) fn next_is_component(&self, trimmed_nodes: &[FragmentNode], i: usize) -> bool {
         matches!(trimmed_nodes.get(i + 1), Some(FragmentNode::Element(el))
             if el.kind == ast::ElementKind::Component && !self.is_block_element(el))
     }
@@ -2065,7 +2059,7 @@ impl<'a> Printer<'a> {
     /// and those two answer a *prettier-parity* one, so narrowing one of them must not silently
     /// narrow this. Keep the three definitions independent, and when one moves, ask whether the
     /// identity still holds.
-    pub(super) fn is_inline_el_or_comp(&self, node: &FragmentNode<'_>) -> bool {
+    pub(super) fn is_inline_el_or_comp(&self, node: &FragmentNode) -> bool {
         matches!(
             node,
             FragmentNode::Element(_) | FragmentNode::SpecialElement(_)
@@ -2075,7 +2069,7 @@ impl<'a> Printer<'a> {
     /// Build a doc for a single fragment node.
     ///
     /// Returns None for whitespace-only text nodes that should be skipped.
-    pub(super) fn build_fragment_node_doc(&self, node: &FragmentNode<'_>) -> Option<DocId> {
+    pub(super) fn build_fragment_node_doc(&self, node: &FragmentNode) -> Option<DocId> {
         self.build_fragment_node_doc_impl(node, false, false)
     }
 
@@ -2084,7 +2078,7 @@ impl<'a> Printer<'a> {
     /// HEAD: it lets a head past print width wrap and dangle its `}` (`block_head_can_wrap`).
     /// The body's inline-vs-dropped choice is width's alone either way, and a space-only body
     /// boundary is trimmed in both contexts.
-    fn build_fragment_node_doc_in_multiline(&self, node: &FragmentNode<'_>) -> Option<DocId> {
+    fn build_fragment_node_doc_in_multiline(&self, node: &FragmentNode) -> Option<DocId> {
         self.build_fragment_node_doc_impl(node, true, false)
     }
 
@@ -2094,7 +2088,7 @@ impl<'a> Printer<'a> {
     /// to ensure earlier content breaks before the condition.
     fn build_fragment_node_doc_with_preceding_context(
         &self,
-        node: &FragmentNode<'_>,
+        node: &FragmentNode,
         has_preceding_breakable: bool,
     ) -> Option<DocId> {
         self.build_fragment_node_doc_impl(node, false, has_preceding_breakable)
@@ -2102,7 +2096,7 @@ impl<'a> Printer<'a> {
 
     fn build_fragment_node_doc_impl(
         &self,
-        node: &FragmentNode<'_>,
+        node: &FragmentNode,
         in_multiline_context: bool,
         has_preceding_breakable: bool,
     ) -> Option<DocId> {
@@ -2155,7 +2149,7 @@ impl<'a> Printer<'a> {
     /// (`build_fragment_node_doc_impl`) and the sibling-`>` dangle (`build_block_node_doc_with_gt`).
     fn build_control_flow_block_doc(
         &self,
-        node: &FragmentNode<'_>,
+        node: &FragmentNode,
         in_multiline_context: bool,
         has_preceding_breakable: bool,
         gt_prefix: Option<DocId>,
@@ -2195,7 +2189,7 @@ impl<'a> Printer<'a> {
     /// Dispatch a control-flow block, threading a preceding sibling's split-off closing `>`
     /// (`gt`) into its expanding layout (in-multiline context, no preceding breakable — the
     /// dangle path forces both). See `build_control_flow_block_doc` and the caller's gate.
-    fn build_block_node_doc_with_gt(&self, node: &FragmentNode<'_>, gt: DocId) -> Option<DocId> {
+    fn build_block_node_doc_with_gt(&self, node: &FragmentNode, gt: DocId) -> Option<DocId> {
         self.build_control_flow_block_doc(node, true, false, Some(gt))
     }
 

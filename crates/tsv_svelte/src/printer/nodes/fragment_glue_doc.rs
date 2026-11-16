@@ -41,7 +41,7 @@ impl<'a> Printer<'a> {
     /// ([`Self::glued_to_content`]) therefore deliberately does NOT use this test; the layout
     /// callers here read "not glued" across such a gap and merely decline a dangle, which is
     /// layout-conservative rather than a render change.
-    fn byte_glued(a: &FragmentNode<'_>, b: &FragmentNode<'_>) -> bool {
+    fn byte_glued(a: &FragmentNode, b: &FragmentNode) -> bool {
         a.span().end == b.span().start
     }
 
@@ -87,7 +87,7 @@ impl<'a> Printer<'a> {
     /// supplies the break itself.
     pub(super) fn leading_boundary_glued(
         &self,
-        nodes: &[FragmentNode<'_>],
+        nodes: &[FragmentNode],
         idx: usize,
         content_start: usize,
         leading_edge: LeadingEdge,
@@ -149,12 +149,7 @@ impl<'a> Printer<'a> {
     /// `multiline` is the fragment walk's own arm, which decides whether an own-line declaration
     /// takes its line — a snippet that does is declined here. On `true` the block is the next
     /// node the walk visits, and its first dispatch arm emits the `>`.
-    fn block_sibling_takes_gt(
-        &self,
-        nodes: &[FragmentNode<'_>],
-        last: usize,
-        multiline: bool,
-    ) -> bool {
+    fn block_sibling_takes_gt(&self, nodes: &[FragmentNode], last: usize, multiline: bool) -> bool {
         let (Some(prev), Some(block)) = (nodes.get(last), nodes.get(last + 1)) else {
             return false;
         };
@@ -173,7 +168,7 @@ impl<'a> Printer<'a> {
     /// else the node's ordinary doc. `None` when the node builds nothing.
     pub(super) fn build_inline_unit(
         &self,
-        nodes: &[FragmentNode<'_>],
+        nodes: &[FragmentNode],
         i: usize,
         multiline: bool,
     ) -> Option<InlineUnit> {
@@ -214,7 +209,7 @@ impl<'a> Printer<'a> {
     /// glued-both-text shape holds and the element is the flat hug-both (`Soft`) form.
     pub(super) fn try_build_glued_both_text_dangle(
         &self,
-        nodes: &[FragmentNode<'_>],
+        nodes: &[FragmentNode],
         i: usize,
     ) -> Option<DocId> {
         let node = nodes.get(i)?;
@@ -271,7 +266,7 @@ impl<'a> Printer<'a> {
     /// walk-back-and-rebuild at each element would be O(length²).
     pub(super) fn try_build_glued_element_run(
         &self,
-        trimmed_nodes: &[FragmentNode<'_>],
+        trimmed_nodes: &[FragmentNode],
         i: usize,
         multiline: bool,
     ) -> Option<InlineUnit> {
@@ -324,7 +319,7 @@ impl<'a> Printer<'a> {
     /// - **Directive** — a `<!-- prettier-ignore -->` / `format-ignore` comment must reach the
     ///   per-node path so it suppresses its target; absorbing it into a glued unit would format the
     ///   very node it means to pin.
-    fn glued_comment_run_end(&self, nodes: &[FragmentNode<'_>], i: usize) -> Option<usize> {
+    fn glued_comment_run_end(&self, nodes: &[FragmentNode], i: usize) -> Option<usize> {
         if !matches!(nodes.get(i)?, FragmentNode::Comment(_)) {
             return None;
         }
@@ -360,7 +355,7 @@ impl<'a> Printer<'a> {
     /// `comment_glued_next_flow`).
     pub(super) fn glued_comment_run_element(
         &self,
-        nodes: &[FragmentNode<'_>],
+        nodes: &[FragmentNode],
         i: usize,
     ) -> Option<usize> {
         let end = self.glued_comment_run_end(nodes, i)?;
@@ -386,7 +381,7 @@ impl<'a> Printer<'a> {
     /// ([`Self::text_glued_before`]). Without that the spaced boundary would be fused too, welding a
     /// run that has a perfectly good break point (`fill_after_comment_spaced_long_prettier_divergence`
     /// is the fixture that says so).
-    fn glued_comment_run_text(&self, nodes: &[FragmentNode<'_>], i: usize) -> Option<usize> {
+    fn glued_comment_run_text(&self, nodes: &[FragmentNode], i: usize) -> Option<usize> {
         let end = self.glued_comment_run_end(nodes, i)?;
         matches!(&nodes[end], FragmentNode::Text(t)
             if !t.is_collapsible_ws_only && Self::text_glued_before(t.raw(self.source)))
@@ -400,7 +395,7 @@ impl<'a> Printer<'a> {
     /// terminator claimed it.
     fn build_glued_comment_run_doc(
         &self,
-        nodes: &[FragmentNode<'_>],
+        nodes: &[FragmentNode],
         start: usize,
         end: usize,
     ) -> Option<DocId> {
@@ -425,7 +420,7 @@ impl<'a> Printer<'a> {
     /// prefix.
     pub(super) fn try_build_glued_comment_prefixed_element(
         &self,
-        nodes: &[FragmentNode<'_>],
+        nodes: &[FragmentNode],
         i: usize,
         multiline: bool,
     ) -> Option<InlineUnit> {
@@ -454,7 +449,7 @@ impl<'a> Printer<'a> {
     /// a `fill` breaks between its items — so the only place a prefix is safe is *inside* item 0.
     pub(super) fn try_build_glued_comment_prefix_for_text(
         &self,
-        nodes: &[FragmentNode<'_>],
+        nodes: &[FragmentNode],
         i: usize,
     ) -> Option<(DocId, usize)> {
         let text_idx = self.glued_comment_run_text(nodes, i)?;
@@ -500,7 +495,7 @@ impl<'a> Printer<'a> {
     /// preparation.
     fn build_glued_element_run(
         &self,
-        nodes: &[FragmentNode<'_>],
+        nodes: &[FragmentNode],
         start: usize,
         end: usize,
         shed_requested: bool,

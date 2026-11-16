@@ -360,7 +360,7 @@ impl Printer<'_> {
     /// spelled as one too ([`glued_seam_respell`]).
     pub(super) fn lifted_runs_source(
         &self,
-        root: &ast::Root<'_>,
+        root: &ast::Root,
         sections: &HoistedComments,
     ) -> Option<String> {
         let mut runs = self.section_runs(root, sections);
@@ -508,13 +508,12 @@ impl Printer<'_> {
     /// it.
     fn section_runs(
         &self,
-        root: &ast::Root<'_>,
+        root: &ast::Root,
         sections: &HoistedComments,
     ) -> SmallVec<[LiftedRun; 4]> {
         let nodes = self.svelte.nodes(root.fragment.nodes);
         let travels = sections.travelling(nodes.len());
-        let is_content =
-            |i: usize, n: &FragmentNode<'_>| !(n.is_whitespace_only_text() || travels[i]);
+        let is_content = |i: usize, n: &FragmentNode| !(n.is_whitespace_only_text() || travels[i]);
         let content = nodes
             .iter()
             .enumerate()
@@ -545,7 +544,7 @@ impl Printer<'_> {
         section_span: Span,
         section: HoistedSection,
         sections: &HoistedComments,
-        fragment: &ast::Fragment<'_>,
+        fragment: &ast::Fragment,
     ) -> LiftedRun {
         let comments = &sections[section];
         let comment_span =

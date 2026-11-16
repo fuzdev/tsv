@@ -139,8 +139,8 @@ pub const WIRE_COORDINATES: WireCoordinates =
     WireCoordinates::new(LineRule::Lf, LeadingBom::Elided);
 
 /// `parse_folded`'s refusal: parse the author's own bytes, and refuse the first in-tag `//`
-/// comment that holds a lone `<CR>`. Its parse lands in `arena` beside the folded one, which
-/// the caller resets with it — a cost only a document holding a lone `<CR>` pays.
+/// comment that holds a lone `<CR>`. Its parse lands in stores of its own, dropped as it
+/// returns — a cost only a document holding a lone `<CR>` pays.
 #[cold]
 #[inline(never)]
 fn refuse_lone_cr_in_tag_line_comment(source: &str, arena: &bumpalo::Bump) -> Result<()> {
@@ -315,8 +315,7 @@ pub fn parse_to_json(source: &str) -> Result<String> {
 
 /// [`parse_to_json`] under `options`: whether the wire carries `loc`.
 ///
-/// Each call parses into a fresh arena sized to the source, dropped once the wire is
-/// written.
+/// Each call parses into fresh stores, dropped once the wire is written.
 ///
 /// ```
 /// # fn main() -> tsv_svelte::Result<()> {
@@ -398,7 +397,7 @@ fn wire_string(bytes: Vec<u8>) -> String {
 /// outside them are template expression comments. The wire writer partitions
 /// the root comment list on it.
 #[cfg(feature = "json")]
-pub(crate) fn script_content_spans(root: &Root<'_>) -> Vec<(u32, u32)> {
+pub(crate) fn script_content_spans(root: &Root) -> Vec<(u32, u32)> {
     let mut script_spans: Vec<(u32, u32)> = Vec::new();
     if let Some(script) = &root.instance {
         script_spans.push((script.content.span.start, script.content.span.end));

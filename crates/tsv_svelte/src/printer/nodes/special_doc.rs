@@ -25,7 +25,7 @@ impl<'a> Printer<'a> {
     /// multiline for block children (`<slot><div>a</div><div>b</div></slot>` on one line, where
     /// `<span>` expands), a special path that dangles its tag delimiters where regular elements
     /// are block-style.
-    pub(super) fn build_special_element_doc(&self, element: &ast::SpecialElement<'_>) -> DocId {
+    pub(super) fn build_special_element_doc(&self, element: &ast::SpecialElement) -> DocId {
         let tag_name = element.kind.tag_name();
         let name = self.d().text(tag_name);
 
@@ -72,7 +72,7 @@ impl<'a> Printer<'a> {
     /// they lay out.
     fn special_element_parts<'e>(
         view: SvelteView<'e>,
-        element: &'e ast::SpecialElement<'e>,
+        element: &'e ast::SpecialElement,
         name: DocId,
     ) -> ElementParts<'e> {
         ElementParts {
@@ -110,7 +110,7 @@ impl<'a> Printer<'a> {
     /// caller then builds its ordinary doc.
     pub(super) fn build_special_close_gt_dangle(
         &self,
-        element: &ast::SpecialElement<'_>,
+        element: &ast::SpecialElement,
     ) -> Option<DocId> {
         if element.kind.preserves_content_whitespace() {
             return None;
@@ -173,7 +173,7 @@ impl<'a> Printer<'a> {
     fn build_title_content_doc(
         &self,
         name: DocId,
-        nodes: &[ast::FragmentNode<'_>],
+        nodes: &[ast::FragmentNode],
         attr_docs: &[DocId],
         emission: AttrListEmission,
     ) -> DocId {
@@ -216,7 +216,7 @@ impl<'a> Printer<'a> {
     /// pins the same kinds outside the family, where this builder does not run.
     pub(super) fn build_ws_sensitive_special_element_doc(
         &self,
-        element: &ast::SpecialElement<'_>,
+        element: &ast::SpecialElement,
     ) -> DocId {
         let nodes = self.svelte.nodes(element.fragment.nodes);
         if nodes.is_empty() {
@@ -253,7 +253,7 @@ impl<'a> Printer<'a> {
     /// so it needs a fixtures-first pass, not a delete.
     fn build_special_empty_doc(
         &self,
-        element: &ast::SpecialElement<'_>,
+        element: &ast::SpecialElement,
         tag_name: &'static str,
         attr_docs: &[DocId],
         ctx: &ElementContext,
@@ -317,7 +317,7 @@ impl<'a> Printer<'a> {
     /// (line-separated) layout, `d.text(" ")` for hug mode (space-separated).
     pub(super) fn build_special_element_attrs_doc(
         &self,
-        element: &ast::SpecialElement<'_>,
+        element: &ast::SpecialElement,
         separator: DocId,
     ) -> ElementAttrsDoc {
         let attributes = self.svelte.attributes(element.attributes);

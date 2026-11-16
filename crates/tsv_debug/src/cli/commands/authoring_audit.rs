@@ -237,7 +237,7 @@ fn svelte_sites(f: &str) -> Option<Vec<Site>> {
 /// toggled).
 fn collect_sites(
     view: SvelteView<'_>,
-    nodes: &[FragmentNode<'_>],
+    nodes: &[FragmentNode],
     src: &str,
     ws_sig: bool,
     out: &mut Vec<Site>,
@@ -313,7 +313,7 @@ const BOUNDARY_FORMS: [&str; 3] = ["", " ", "\n"];
 /// Caller must have excluded whitespace-significant subtrees (`<pre>`/`<textarea>`),
 /// where this run is literal content and the mutation would change the render.
 fn collect_boundary_sites(
-    nodes: &[FragmentNode<'_>],
+    nodes: &[FragmentNode],
     src: &str,
     kinds: (SiteKind, SiteKind),
     out: &mut Vec<Site>,
@@ -390,7 +390,7 @@ fn push_boundary_forms(start: usize, end: usize, src: &str, kind: SiteKind, out:
 /// Inside `<pre>`/`<textarea>` the run is literal, so only the inter-sibling family applies.
 fn collect_block_fragment(
     view: SvelteView<'_>,
-    fragment: &tsv_svelte::ast::Fragment<'_>,
+    fragment: &tsv_svelte::ast::Fragment,
     src: &str,
     ws_sig: bool,
     out: &mut Vec<Site>,
@@ -403,7 +403,7 @@ fn collect_block_fragment(
 
 /// Is this alternate the `{:else if …}` form — one nested `IfBlock` that spans the rest
 /// of the chain, closing tag included — rather than a real `{:else}` fragment?
-fn is_elseif_chain(view: SvelteView<'_>, alternate: &tsv_svelte::ast::Fragment<'_>) -> bool {
+fn is_elseif_chain(view: SvelteView<'_>, alternate: &tsv_svelte::ast::Fragment) -> bool {
     matches!(view.nodes(alternate.nodes), [FragmentNode::IfBlock(b)] if b.elseif)
 }
 
@@ -411,7 +411,7 @@ fn is_elseif_chain(view: SvelteView<'_>, alternate: &tsv_svelte::ast::Fragment<'
 /// significance.
 fn recurse_children(
     view: SvelteView<'_>,
-    node: &FragmentNode<'_>,
+    node: &FragmentNode,
     src: &str,
     ws_sig: bool,
     out: &mut Vec<Site>,

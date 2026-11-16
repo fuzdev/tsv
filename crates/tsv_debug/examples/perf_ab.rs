@@ -33,8 +33,8 @@
 //!   regions and parks them after, as the CLI's `Formatter` keeps them in a slot it owns; the
 //!   arm names no store type and no lifetime, so its text stays the same while the stores change
 //!   beneath the handles. The TypeScript and CSS parses take the stores alone, the Svelte
-//!   parse the `Bump` beside them; a Svelte document's handle holds a TypeScript half and a
-//!   CSS half.
+//!   parse the `Bump` beside them; a Svelte document's handle holds its own half, a
+//!   TypeScript half and a CSS half.
 //! - `perf_ab_api = "css_bump"`, a tree whose CSS has stores but whose parse still takes the
 //!   `Bump`: as the current arm, the CSS parse handed the `Bump` too.
 //! - `perf_ab_api = "css_no_stores"`, a tree whose CSS has no stores, parses TypeScript and

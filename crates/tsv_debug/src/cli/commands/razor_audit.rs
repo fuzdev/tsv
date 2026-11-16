@@ -428,7 +428,7 @@ fn line_head_boundary_spaces(source: &str) -> Vec<(usize, String)> {
 fn for_each_eligible_text(source: &str, f: &mut dyn FnMut(&str, usize)) {
     fn walk(
         view: SvelteView<'_>,
-        frag: &Fragment<'_>,
+        frag: &Fragment,
         source: &str,
         preserve: bool,
         f: &mut dyn FnMut(&str, usize),
@@ -526,7 +526,7 @@ fn for_each_eligible_text(source: &str, f: &mut dyn FnMut(&str, usize)) {
 /// text) or a frozen-language `<template>`. Mirrors the two leading arms of
 /// `build_element_doc`: the body is the author's bytes, so its whitespace is never the
 /// formatter's to answer for.
-fn emits_verbatim_body(view: SvelteView<'_>, element: &Element<'_>, source: &str) -> bool {
+fn emits_verbatim_body(view: SvelteView<'_>, element: &Element, source: &str) -> bool {
     let name = element.name(source);
     // The frozen-template arm asks the printer's own predicate rather than a copy of it. A
     // copy here would have to track what the printer reads the `lang` value OFF — the decoded

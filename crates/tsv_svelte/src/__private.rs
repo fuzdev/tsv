@@ -30,19 +30,19 @@ pub use crate::html::{is_mathml_element, is_svg_element, preserves_whitespace};
 /// holding a lone `<CR>` is refused ([`Error::refusal`], at the `<CR>` but no syntax
 /// error — the document is valid Svelte). A `<CR><LF>` is one line break in both readings,
 /// and a document the fold rewrote no lone `<CR>` in pays nothing.
-pub fn parse_folded<'arena>(
+pub fn parse_folded(
     folded: &tsv_lang::printing::FoldedSource<'_>,
-    arena: &'arena bumpalo::Bump,
-) -> Result<ParsedRoot<'arena>> {
+    arena: &bumpalo::Bump,
+) -> Result<ParsedRoot> {
     parsed(|stores| parse_folded_into(folded, arena, stores))
 }
 
 /// [`parse_folded`] into a caller's `stores`.
-pub fn parse_folded_into<'arena>(
+pub fn parse_folded_into(
     folded: &tsv_lang::printing::FoldedSource<'_>,
-    arena: &'arena bumpalo::Bump,
+    arena: &bumpalo::Bump,
     stores: &mut SvelteStores,
-) -> Result<Root<'arena>> {
+) -> Result<Root> {
     if folded.folded_lone_cr() {
         refuse_lone_cr_in_tag_line_comment(folded.original(), arena)?;
     }
@@ -51,10 +51,7 @@ pub fn parse_folded_into<'arena>(
 
 /// A warm parse's tree as a reading entry point takes it, read through `stores`.
 #[inline]
-pub fn parsed_ref<'a, 'arena: 'a>(
-    root: &'a Root<'arena>,
-    stores: &'a SvelteStores,
-) -> ParsedRootRef<'a> {
+pub fn parsed_ref<'a>(root: &'a Root, stores: &'a SvelteStores) -> ParsedRootRef<'a> {
     ParsedRootRef {
         root,
         view: stores.view(),
@@ -62,9 +59,7 @@ pub fn parsed_ref<'a, 'arena: 'a>(
 }
 
 /// A one-shot parse: `parse` over fresh stores, bundled with the tree it built.
-fn parsed<'arena>(
-    parse: impl FnOnce(&mut SvelteStores) -> Result<Root<'arena>>,
-) -> Result<ParsedRoot<'arena>> {
+fn parsed(parse: impl FnOnce(&mut SvelteStores) -> Result<Root>) -> Result<ParsedRoot> {
     let mut stores = SvelteStores::new();
     let root = parse(&mut stores)?;
     Ok(ParsedRoot { root, stores })
@@ -138,9 +133,9 @@ pub fn format_ast_in<'a>(
 /// # Arguments
 ///
 /// * `source` - The Svelte component source code to parse
-/// * `arena` - The bump arena that owns the template AST and the embedded `<style>`
-///   stylesheet; the returned `Root<'arena>` borrows from it (caller-owns-`Bump`). The
-///   embedded TS `<script>`/`{expr}` ASTs live in the returned stores.
+/// * `arena` - A caller-owned bump arena the parse does not read. The whole tree — the
+///   template's lists and strings, the embedded TS `<script>`/`{expr}` ASTs and the
+///   top-level `<style>`'s stylesheet — lives in the returned stores.
 ///
 /// # Returns
 ///
@@ -156,16 +151,12 @@ pub fn format_ast_in<'a>(
 /// # Ok(())
 /// # }
 /// ```
-pub fn parse<'arena>(source: &str, arena: &'arena bumpalo::Bump) -> Result<ParsedRoot<'arena>> {
+pub fn parse(source: &str, arena: &bumpalo::Bump) -> Result<ParsedRoot> {
     parsed(|stores| parse_into(source, arena, stores))
 }
 
 /// [`parse`] into a caller's `stores`, for a warm path that keeps them across documents.
-pub fn parse_into<'arena>(
-    source: &str,
-    arena: &'arena bumpalo::Bump,
-    stores: &mut SvelteStores,
-) -> Result<Root<'arena>> {
+pub fn parse_into(source: &str, arena: &bumpalo::Bump, stores: &mut SvelteStores) -> Result<Root> {
     Error::ensure_source_fits(source)?;
     parser::parse_svelte(source, arena, stores)
         .map_err(|e| e.with_context(source, WIRE_COORDINATES))

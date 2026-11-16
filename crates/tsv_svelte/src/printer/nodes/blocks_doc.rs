@@ -206,7 +206,7 @@ impl SectionWhitespace {
     /// Read from the **source** text, never its decoded value: `&#32;` decodes to a space the
     /// compiler trims, yet dropping or folding the section would erase authored bytes, so it
     /// is content here — as is an NBSP, a form feed (outside the compiler's class) or a comment.
-    fn renders_nothing(self, view: SvelteView<'_>, fragment: &Fragment<'_>) -> bool {
+    fn renders_nothing(self, view: SvelteView<'_>, fragment: &Fragment) -> bool {
         let nodes = view.nodes(fragment.nodes);
         match self {
             Self::Trimmed => nodes.iter().all(FragmentNode::is_whitespace_only_text),
@@ -234,24 +234,24 @@ pub(super) enum AwaitShorthand {
 /// [`SectionWhitespace`] of the builder that prints it: every section decision — the head's
 /// shorthand clause, which keywords the tail carries, which bodies print — reads this one
 /// answer, so no two can answer for different contexts.
-pub(super) struct AwaitSections<'b, 'a> {
+pub(super) struct AwaitSections<'b> {
     pub(super) shorthand: AwaitShorthand,
     /// The pending section, unless absent or folded into the head: a shorthand head folded it
     /// away because it renders nothing, so it prints nothing in every layout — an empty body
     /// there would still take its own line once the block expands.
-    pub(super) pending: Option<&'b Fragment<'a>>,
+    pub(super) pending: Option<&'b Fragment>,
     /// The `{:then}` section, unless absent or rendering nothing ([`then_has_content`]), which
     /// drops it — keyword, binding and body.
-    pub(super) then: Option<&'b Fragment<'a>>,
+    pub(super) then: Option<&'b Fragment>,
     /// The `{:catch}` section whenever the block has one, an empty one included
     /// ([`Printer::await_catch_keyword`]).
-    pub(super) catch: Option<&'b Fragment<'a>>,
+    pub(super) catch: Option<&'b Fragment>,
 }
 
-impl<'b, 'a> AwaitSections<'b, 'a> {
+impl<'b> AwaitSections<'b> {
     pub(super) fn classify(
         view: SvelteView<'_>,
-        block: &'b ast::AwaitBlock<'a>,
+        block: &'b ast::AwaitBlock,
         ws: SectionWhitespace,
     ) -> Self {
         let shorthand = await_shorthand(view, block, ws);
@@ -276,11 +276,7 @@ impl<'b, 'a> AwaitSections<'b, 'a> {
 /// absent and an empty `then` both render nothing on resolve, and the `value` binding is unused.
 /// (A `:catch` is *not* dropped when empty: an empty `{:catch}` still handles a rejection, and
 /// without one the client runtime rethrows it — see [`Printer::await_catch_keyword`].)
-fn then_has_content(
-    view: SvelteView<'_>,
-    block: &ast::AwaitBlock<'_>,
-    ws: SectionWhitespace,
-) -> bool {
+fn then_has_content(view: SvelteView<'_>, block: &ast::AwaitBlock, ws: SectionWhitespace) -> bool {
     block
         .then
         .as_ref()
@@ -300,7 +296,7 @@ fn then_has_content(
 /// the fold skips it to the `:catch`.
 fn await_shorthand(
     view: SvelteView<'_>,
-    block: &ast::AwaitBlock<'_>,
+    block: &ast::AwaitBlock,
     ws: SectionWhitespace,
 ) -> AwaitShorthand {
     let has_pending_body = block.pending.as_ref().is_some_and(|p| {
@@ -342,7 +338,7 @@ fn await_shorthand(
 /// Pinned by `svelte/blocks/await/catch_shorthand_body_comment_prettier_divergence`.
 pub(super) fn await_expr_comment_end(
     view: AstView<'_>,
-    block: &ast::AwaitBlock<'_>,
+    block: &ast::AwaitBlock,
     shorthand: AwaitShorthand,
 ) -> u32 {
     let head_end = block.opening_tag_span.end - 1;
@@ -655,7 +651,7 @@ impl<'a> Printer<'a> {
 
     /// Whether every if-block branch (consequent, each `{:else if}` consequent,
     /// `{:else}`) is inline-authored — the precondition for the body-expand fast path.
-    fn if_branches_all_inline(&self, block: &ast::IfBlock<'_>) -> bool {
+    fn if_branches_all_inline(&self, block: &ast::IfBlock) -> bool {
         let mut all_inline = self.fragment_inline_authored(&block.consequent);
         let mut alt = block.alternate.as_ref();
         while let Some(a) = alt {
@@ -688,7 +684,7 @@ impl<'a> Printer<'a> {
     /// expanded tails are both composed from these shared pieces by
     /// [`Self::compose_if_tail`], so a nested body is built once rather than once per
     /// form (a per-form build would rebuild it twice, compounding to O(2^depth)).
-    fn build_if_pieces(&self, block: &ast::IfBlock<'_>) -> Vec<IfPiece> {
+    fn build_if_pieces(&self, block: &ast::IfBlock) -> Vec<IfPiece> {
         let mut pieces = vec![IfPiece::Consequent(
             self.build_section_body_doc(&block.consequent),
         )];
@@ -761,7 +757,7 @@ impl<'a> Printer<'a> {
     /// the authored-multiline tail dangles it via `dangle_gt`.
     pub(super) fn build_if_block_doc_with_full_context(
         &self,
-        block: &ast::IfBlock<'_>,
+        block: &ast::IfBlock,
         in_multiline_context: bool,
         has_preceding_breakable: bool,
         gt_prefix: Option<DocId>,
@@ -836,13 +832,13 @@ impl<'a> Printer<'a> {
     /// content, or a block-form `{:else}{#if}{/if}` (`elseif: false`): that form is
     /// preserved verbatim rather than collapsed — matching prettier, which keeps the
     /// two distinct (collapsing would be information loss).
-    pub(super) fn get_flattenable_else_if<'arena>(
-        view: SvelteView<'arena>,
-        alt: &Fragment<'arena>,
-    ) -> Option<&'arena ast::IfBlock<'arena>> {
+    pub(super) fn get_flattenable_else_if<'v>(
+        view: SvelteView<'v>,
+        alt: &Fragment,
+    ) -> Option<&'v ast::IfBlock> {
         // The block is read through `view`, so the returned reference is tied to the
         // view, not to `alt`.
-        let mut if_block: Option<&'arena ast::IfBlock<'arena>> = None;
+        let mut if_block: Option<&'v ast::IfBlock> = None;
 
         for node in view.nodes(alt.nodes) {
             match node {
@@ -876,7 +872,7 @@ impl<'a> Printer<'a> {
     /// chars past the opening-tag span.
     pub(super) fn build_else_if_expr_doc(
         &self,
-        else_if: &ast::IfBlock<'_>,
+        else_if: &ast::IfBlock,
         in_multiline_context: bool,
     ) -> HeadExpr {
         self.build_block_head_expr(
@@ -894,7 +890,7 @@ impl<'a> Printer<'a> {
     /// line. The expansion is construct-wide, *not* re-derived per branch, because hug
     /// is all-or-nothing: a branch that renders inline still drops to its own line once
     /// any sibling branch went multiline (see `fragment_inline_authored`).
-    fn build_if_alternate_doc(&self, alt: &Fragment<'_>, in_multiline_context: bool) -> DocId {
+    fn build_if_alternate_doc(&self, alt: &Fragment, in_multiline_context: bool) -> DocId {
         let d = self.d();
         // Check if this can be flattened to {:else if ...}
         if let Some(else_if) = Self::get_flattenable_else_if(self.svelte, alt) {
@@ -933,7 +929,7 @@ impl<'a> Printer<'a> {
 
     /// Whether the each block's body and its optional `{:else}` fallback are both
     /// inline-authored — the precondition for the body-expand fast path.
-    fn each_branches_all_inline(&self, block: &ast::EachBlock<'_>) -> bool {
+    fn each_branches_all_inline(&self, block: &ast::EachBlock) -> bool {
         let mut all_inline = self.fragment_inline_authored(&block.body);
         if let Some(fallback) = &block.fallback {
             all_inline &= self.fragment_inline_authored(fallback);
@@ -945,7 +941,7 @@ impl<'a> Printer<'a> {
     /// (mode-agnostic), for composition into both expanding-construct tails by
     /// [`Self::compose_each_tail`] — so a nested body is built once rather than once
     /// per form (a per-form build would rebuild it twice, compounding to O(2^depth)).
-    fn build_each_pieces(&self, block: &ast::EachBlock<'_>) -> (DocId, Option<DocId>) {
+    fn build_each_pieces(&self, block: &ast::EachBlock) -> (DocId, Option<DocId>) {
         let body = self.build_section_body_doc(&block.body);
         let fallback = block
             .fallback
@@ -1003,7 +999,7 @@ impl<'a> Printer<'a> {
     /// inert here — it is spelled to keep the key and its tag one answer.)
     fn build_each_key_doc(
         &self,
-        block: &ast::EachBlock<'_>,
+        block: &ast::EachBlock,
         allow_wrapping: bool,
         in_multiline_context: bool,
     ) -> Option<DocId> {
@@ -1027,7 +1023,7 @@ impl<'a> Printer<'a> {
     /// `gt_prefix`: see `build_if_block_doc_with_full_context`.
     pub(super) fn build_each_block_doc_with_full_context(
         &self,
-        block: &ast::EachBlock<'_>,
+        block: &ast::EachBlock,
         in_multiline_context: bool,
         has_preceding_breakable: bool,
         gt_prefix: Option<DocId>,
@@ -1173,7 +1169,7 @@ impl<'a> Printer<'a> {
     /// block-style. `<pre>`/`<textarea>` never reach here — they are dispatched to
     /// the whitespace-sensitive builder, where the boundary is literal and the hug
     /// mandatory.
-    fn fragment_inline_authored(&self, frag: &Fragment<'_>) -> bool {
+    fn fragment_inline_authored(&self, frag: &Fragment) -> bool {
         !self.fragment_boundary_newline(frag, true)
             && !self.fragment_boundary_newline(frag, false)
             && !self.fragment_should_force_break_content(self.svelte.nodes(frag.nodes))
@@ -1185,7 +1181,7 @@ impl<'a> Printer<'a> {
     /// the shared prettier-shaped builder. One builder for a glued and a space-only
     /// authoring of the same body, so both reach one fixed point by construction.
     ///
-    fn build_section_body_doc(&self, fragment: &Fragment<'_>) -> DocId {
+    fn build_section_body_doc(&self, fragment: &Fragment) -> DocId {
         self.build_nodes_doc_trimmed(
             self.svelte.nodes(fragment.nodes),
             false,
@@ -1196,7 +1192,7 @@ impl<'a> Printer<'a> {
     /// The `{:then …}` keyword doc — `{:then value}` if a `then` value binds, else
     /// `{:then}`. Whether to emit it is the caller's decision: a then-section that renders
     /// nothing drops it ([`AwaitSections::then`]), and a `then`-shorthand carries it in the head.
-    fn await_then_keyword(&self, block: &ast::AwaitBlock<'_>) -> DocId {
+    fn await_then_keyword(&self, block: &ast::AwaitBlock) -> DocId {
         let d = self.d();
         match block.value {
             Some(value) => d.concat(&[
@@ -1217,7 +1213,7 @@ impl<'a> Printer<'a> {
     /// and a rejection renders the (empty) section; without one Svelte's client runtime
     /// rethrows the rejection. So a bare, body-less `{:catch}` is kept — and a whitespace-only
     /// body, which trims to an empty one, keeps it on every later pass too.
-    fn await_catch_keyword(&self, block: &ast::AwaitBlock<'_>) -> Option<DocId> {
+    fn await_catch_keyword(&self, block: &ast::AwaitBlock) -> Option<DocId> {
         let d = self.d();
         if let Some(error) = self.view.opt_expr(block.error) {
             Some(d.concat(&[
@@ -1237,7 +1233,7 @@ impl<'a> Printer<'a> {
     /// shared by the ordinary and the whitespace-sensitive builders.
     pub(super) fn build_await_clause(
         &self,
-        block: &ast::AwaitBlock<'_>,
+        block: &ast::AwaitBlock,
         shorthand: AwaitShorthand,
     ) -> Option<DocId> {
         let d = self.d();
@@ -1266,9 +1262,9 @@ impl<'a> Printer<'a> {
     /// whitespace-sensitive builder's glued concatenation.
     pub(super) fn build_await_pieces(
         &self,
-        block: &ast::AwaitBlock<'_>,
-        sections: &AwaitSections<'_, '_>,
-        body: impl Fn(&Fragment<'_>) -> DocId,
+        block: &ast::AwaitBlock,
+        sections: &AwaitSections<'_>,
+        body: impl Fn(&Fragment) -> DocId,
     ) -> AwaitPieces {
         let shorthand = sections.shorthand;
         AwaitPieces {
@@ -1336,7 +1332,7 @@ impl<'a> Printer<'a> {
     /// space-only / newline tails dangle it via `dangle_gt`.
     pub(super) fn build_await_block_doc_with_full_context(
         &self,
-        block: &ast::AwaitBlock<'_>,
+        block: &ast::AwaitBlock,
         in_multiline_context: bool,
         has_preceding_breakable: bool,
         gt_prefix: Option<DocId>,
@@ -1469,7 +1465,7 @@ impl<'a> Printer<'a> {
     /// `gt_prefix`: see `build_if_block_doc_with_full_context`.
     pub(super) fn build_key_block_doc_with_full_context(
         &self,
-        block: &ast::KeyBlock<'_>,
+        block: &ast::KeyBlock,
         in_multiline_context: bool,
         has_preceding_breakable: bool,
         gt_prefix: Option<DocId>,
@@ -1518,7 +1514,7 @@ impl<'a> Printer<'a> {
 
     /// The opening tag `{#snippet name<T>(params)}` — one group, so the body can expand when
     /// the params wrap. Shared by the ordinary and the whitespace-sensitive builders.
-    pub(super) fn build_snippet_opening_doc(&self, block: &ast::SnippetBlock<'_>) -> DocId {
+    pub(super) fn build_snippet_opening_doc(&self, block: &ast::SnippetBlock) -> DocId {
         let d = self.d();
         // Type parameters (generics). They route through tsv_ts's type-parameter printer
         // (constraints, defaults, modifiers, interior comments, width-based wrapping of a
@@ -1583,7 +1579,7 @@ impl<'a> Printer<'a> {
     /// `fragment_inline_authored`).
     pub(super) fn build_snippet_block_doc_with_full_context(
         &self,
-        block: &ast::SnippetBlock<'_>,
+        block: &ast::SnippetBlock,
         gt_prefix: Option<DocId>,
     ) -> DocId {
         let d = self.d();

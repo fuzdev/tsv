@@ -510,7 +510,7 @@ impl<'a> Printer<'a> {
     /// `is_html`: true for HTML elements, enables class attribute whitespace normalization.
     pub(super) fn build_attribute_node_doc(
         &self,
-        node: &ast::AttributeNode<'_>,
+        node: &ast::AttributeNode,
         is_html: bool,
     ) -> DocId {
         match node {
@@ -535,7 +535,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for a single attribute (name="value" or name or {shorthand})
     ///
     /// `is_html`: true for HTML elements, enables class attribute whitespace normalization.
-    pub(super) fn build_attribute_doc(&self, attr: &ast::Attribute<'_>, is_html: bool) -> DocId {
+    pub(super) fn build_attribute_doc(&self, attr: &ast::Attribute, is_html: bool) -> DocId {
         let d = self.d();
         let Some(value_parts) = self.svelte.opt_attribute_values(attr.value) else {
             // Boolean attribute
@@ -644,7 +644,7 @@ impl<'a> Printer<'a> {
     /// [`Printer::is_shorthand_attribute`] says the general builder prints the shorthand.
     fn attribute_source_span(
         &self,
-        attr: &ast::Attribute<'_>,
+        attr: &ast::Attribute,
         value: &[ast::AttributeValue],
         is_html: bool,
     ) -> Option<Span> {
@@ -1014,7 +1014,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for on:event directive
-    fn build_on_directive_doc(&self, dir: &ast::OnDirective<'_>) -> DocId {
+    fn build_on_directive_doc(&self, dir: &ast::OnDirective) -> DocId {
         self.build_directive_doc(
             self.d().text("on:"),
             dir.name_span,
@@ -1026,7 +1026,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for bind:prop directive
-    fn build_bind_directive_doc(&self, dir: &ast::BindDirective<'_>) -> DocId {
+    fn build_bind_directive_doc(&self, dir: &ast::BindDirective) -> DocId {
         self.build_directive_doc(
             self.d().text("bind:"),
             dir.name_span,
@@ -1038,7 +1038,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for class:name directive
-    fn build_class_directive_doc(&self, dir: &ast::ClassDirective<'_>) -> DocId {
+    fn build_class_directive_doc(&self, dir: &ast::ClassDirective) -> DocId {
         self.build_directive_doc(
             self.d().text("class:"),
             dir.name_span,
@@ -1050,12 +1050,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for style:prop directive
-    #[expect(
-        clippy::explicit_auto_deref,
-        reason = "a view accessor takes a list or string field by value, which a store handle \
-                  needs dereferenced; only the field's identity alias auto-derefs"
-    )]
-    fn build_style_directive_doc(&self, dir: &ast::StyleDirective<'_>) -> DocId {
+    fn build_style_directive_doc(&self, dir: &ast::StyleDirective) -> DocId {
         let d = self.d();
         let name = dir.name_span.extract(self.source);
         let mut parts = self.directive_head_parts(
@@ -1092,7 +1087,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for use:action directive
-    fn build_use_directive_doc(&self, dir: &ast::UseDirective<'_>) -> DocId {
+    fn build_use_directive_doc(&self, dir: &ast::UseDirective) -> DocId {
         self.build_directive_doc(
             self.d().text("use:"),
             dir.name_span,
@@ -1104,7 +1099,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for transition/in/out directive
-    fn build_transition_directive_doc(&self, dir: &ast::TransitionDirective<'_>) -> DocId {
+    fn build_transition_directive_doc(&self, dir: &ast::TransitionDirective) -> DocId {
         self.build_directive_doc(
             self.d().text(dir.direction.prefix_with_colon()),
             dir.name_span,
@@ -1116,7 +1111,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for animate:name directive
-    fn build_animate_directive_doc(&self, dir: &ast::AnimateDirective<'_>) -> DocId {
+    fn build_animate_directive_doc(&self, dir: &ast::AnimateDirective) -> DocId {
         self.build_directive_doc(
             self.d().text("animate:"),
             dir.name_span,
@@ -1128,7 +1123,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for let:name directive
-    fn build_let_directive_doc(&self, dir: &ast::LetDirective<'_>) -> DocId {
+    fn build_let_directive_doc(&self, dir: &ast::LetDirective) -> DocId {
         self.build_directive_doc(
             self.d().text("let:"),
             dir.name_span,
@@ -1774,7 +1769,7 @@ impl<'a> Printer<'a> {
     /// spelling (`name="{name}"`) parses to the same single tag and so collapses too.
     fn is_shorthand_attribute(
         &self,
-        attr: &ast::Attribute<'_>,
+        attr: &ast::Attribute,
         value_parts: &[ast::AttributeValue],
     ) -> bool {
         let [ast::AttributeValue::ExpressionTag(expr_tag)] = value_parts else {

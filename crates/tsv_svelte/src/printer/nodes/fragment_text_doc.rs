@@ -129,7 +129,7 @@ impl<'a> Printer<'a> {
     ///
     /// These tags use the leading/trailing line fill approach instead of group wrapping,
     /// because group wrapping forces line breaks after multiline expressions.
-    fn is_tag_node(node: &FragmentNode<'_>) -> bool {
+    fn is_tag_node(node: &FragmentNode) -> bool {
         matches!(
             node,
             FragmentNode::ExpressionTag(_) | FragmentNode::HtmlTag(_) | FragmentNode::RenderTag(_)
@@ -159,7 +159,7 @@ impl<'a> Printer<'a> {
     /// and `i`, so where it is computed is a cost question only.
     pub(super) fn handle_text_child(
         &self,
-        trimmed_nodes: &[FragmentNode<'_>],
+        trimmed_nodes: &[FragmentNode],
         i: usize,
         ctx: TextChildContext,
         child_docs: &mut DocBuf,
@@ -192,7 +192,7 @@ impl<'a> Printer<'a> {
     /// are two handlers. `text` is `trimmed_nodes[i]`, already known collapsible-whitespace-only.
     fn handle_separator_text_child(
         &self,
-        trimmed_nodes: &[FragmentNode<'_>],
+        trimmed_nodes: &[FragmentNode],
         i: usize,
         text: &Text,
         ctx: TextChildContext,
@@ -579,7 +579,7 @@ impl<'a> Printer<'a> {
     /// collapsible-whitespace-only.
     fn handle_content_text_child(
         &self,
-        trimmed_nodes: &[FragmentNode<'_>],
+        trimmed_nodes: &[FragmentNode],
         i: usize,
         text: &Text,
         ctx: TextChildContext,

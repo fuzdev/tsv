@@ -60,9 +60,9 @@ const _: () = assert!(size_of::<ColorChannel>() == 12);
 const _: () = assert!(size_of::<CssValue>() == 64);
 const _: () = assert!(size_of::<SimpleSelector>() == 60);
 // The Svelte nodes. See the native pins in `tsv_svelte`'s `ast/mod.rs`.
-const _: () = assert!(size_of::<Element<'static>>() == 40);
-const _: () = assert!(size_of::<FragmentNode<'static>>() == 80);
-const _: () = assert!(size_of::<AttributeNode<'static>>() == 52);
+const _: () = assert!(size_of::<Element>() == 40);
+const _: () = assert!(size_of::<FragmentNode>() == 80);
+const _: () = assert!(size_of::<AttributeNode>() == 52);
 const _: () = assert!(size_of::<ExpressionTag>() == 12);
 
 enum Family {}

@@ -2,6 +2,7 @@
 
 use crate::ast::*;
 use crate::lexer::TokenKind;
+use tsv_lang::store::Run;
 use tsv_lang::{Error, Span};
 
 use super::find_raw_text_close;
@@ -9,7 +10,7 @@ use super::parser_impl::SvelteParser;
 
 impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// Parse a script tag: `<script lang="ts">...</script>`
-    pub(crate) fn parse_script_tag(&mut self) -> Result<Script<'arena>, Error> {
+    pub(crate) fn parse_script_tag(&mut self) -> Result<Script, Error> {
         let start = self.current_start();
 
         // Expect <
@@ -46,7 +47,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         let content = &self.source[content_start..content_end];
 
         // Parse content with TypeScript parser (base offset); the embedded
-        // program shares this document's arena.
+        // program shares this document's TypeScript stores.
         let program = self.with_island_stores(|this, stores| {
             tsv_ts::__private::parse_embedded(content, content_start, this.island_nesting(), stores)
         })?;
@@ -60,11 +61,11 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // Module scripts can be specified as:
         //   - <script module> (boolean attribute)
         //   - <script context="module"> (string attribute)
-        let context = Self::detect_script_context(&attributes, self.source);
+        let context = self.detect_script_context(attributes);
 
         Ok(Script {
             content: program,
-            attributes: attributes.into_bump_slice(),
+            attributes,
             context,
             span: Span {
                 start: start as u32,
@@ -74,8 +75,9 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     }
 
     /// Detect whether a script is a module script based on its attributes
-    fn detect_script_context(attributes: &[AttributeNode<'_>], source: &str) -> ScriptContext {
-        for attr_node in attributes {
+    fn detect_script_context(&self, attributes: Run<AttributeNode>) -> ScriptContext {
+        let (runs, source) = (&self.own.runs, self.source);
+        for attr_node in runs.attributes.slice(attributes) {
             // Only process Attribute nodes (not AttachTag or directives)
             let attr = match attr_node {
                 AttributeNode::Attribute(attr) => attr,
@@ -101,8 +103,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
             // Check for context="module": <script context="module">
             if name == "context"
-                && let Some(values) = &attr.value
-                && let Some(AttributeValue::Text(text)) = values.first()
+                && let Some(value) = attr.value
+                && let Some(AttributeValue::Text(text)) = runs.attribute_values.slice(value).first()
                 && text.data(source) == "module"
             {
                 return ScriptContext::Module;

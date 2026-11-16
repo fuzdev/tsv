@@ -7,8 +7,8 @@ use crate::lexer::TokenKind;
 use crate::whitespace::is_svelte_ws;
 use tsv_lang::source_scan::TriviaProfile;
 use tsv_lang::{Error, Span};
-use tsv_ts::ast::ExprId;
 use tsv_ts::ast::{AstView, Expression, ExpressionKind};
+use tsv_ts::ast::{ExprId, Run};
 
 use super::parser_impl::SvelteParser;
 use super::subslice_offset;
@@ -17,7 +17,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// Parse a template tag starting with {@
     ///
     /// Dispatches to specific tag parsers based on the keyword.
-    pub(crate) fn parse_template_tag(&mut self) -> Result<FragmentNode<'arena>, Error> {
+    pub(crate) fn parse_template_tag(&mut self) -> Result<FragmentNode, Error> {
         let start = self.current_start();
 
         // We're at {@, consume it
@@ -71,14 +71,14 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     }
 
     /// Parse an html tag: {@html expression}
-    fn parse_html_tag(&mut self, start: usize) -> Result<FragmentNode<'arena>, Error> {
+    fn parse_html_tag(&mut self, start: usize) -> Result<FragmentNode, Error> {
         let (expression, span) =
             self.parse_keyword_expression_tag(start, "html", |_, _, _| Ok(()))?;
         Ok(FragmentNode::HtmlTag(HtmlTag { expression, span }))
     }
 
     /// Parse a const tag: {@const name = expression}
-    fn parse_const_tag(&mut self, start: usize) -> Result<FragmentNode<'arena>, Error> {
+    fn parse_const_tag(&mut self, start: usize) -> Result<FragmentNode, Error> {
         let tag_content_start = self.current_end();
         let (tag_content, after_close) = self.scan_block_tag_content(tag_content_start)?;
 
@@ -119,7 +119,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// At a `{` (`LeftBrace`), parse either a `{const}`/`{let}` declaration tag
     /// or an ordinary `{expr}` mustache, whichever the lookahead indicates.
     /// Shared by the root, element-children, and block-children fragment loops.
-    pub(crate) fn parse_brace_tag(&mut self) -> Result<FragmentNode<'arena>, Error> {
+    pub(crate) fn parse_brace_tag(&mut self) -> Result<FragmentNode, Error> {
         if self.opens_declaration_tag() {
             self.parse_declaration_tag(self.current_start())
         } else {
@@ -132,10 +132,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// strings), so this delegates and rejects only a comment trailing the
     /// declaration before `}`, which Svelte does not allow. `{@const}` keeps its
     /// own `parse_const_tag`.
-    pub(crate) fn parse_declaration_tag(
-        &mut self,
-        start: usize,
-    ) -> Result<FragmentNode<'arena>, Error> {
+    pub(crate) fn parse_declaration_tag(&mut self, start: usize) -> Result<FragmentNode, Error> {
         let tag_content_start = self.current_end();
         let (tag_content, after_close) = self.scan_block_tag_content(tag_content_start)?;
 
@@ -309,7 +306,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// Unlike Prettier (which strips comments), we preserve TS comments in debug
     /// tags; parsing via `parse_ts_expression` collects them into `Root.comments`
     /// for lookup by span.
-    fn parse_debug_tag(&mut self, start: usize) -> Result<FragmentNode<'arena>, Error> {
+    fn parse_debug_tag(&mut self, start: usize) -> Result<FragmentNode, Error> {
         let tag_content_start = self.current_end();
         let (tag_content, after_close) = self.scan_block_tag_content(tag_content_start)?;
 
@@ -323,7 +320,9 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         let rest = &tag_content["debug".len()..];
         let rest_offset = tag_content_start + "debug".len();
 
-        let mut identifiers = self.bvec();
+        // The identifier list: a sequence's own element list, or a one-element list of the
+        // whole expression, or none.
+        let mut identifiers = Run::EMPTY;
 
         // `{@debug}` — only whitespace before `}` — means "debug all" (no
         // identifiers). Svelte's `regex_whitespace_with_closing_curly_brace`
@@ -350,12 +349,12 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             // top-level separator, so the parenthesized form is one
             // `SequenceExpression`); a single expression is a one-element list.
             let view = self.ts_view();
-            match &view.expr(expr).kind {
+            let sequence = match &view.expr(expr).kind {
                 ExpressionKind::SequenceExpression(seq) => {
                     for &element in view.expr_list(seq.expressions) {
                         self.require_debug_identifier(view, element)?;
-                        identifiers.push(element);
                     }
+                    Some(seq.expressions)
                 }
                 _ => {
                     // A JSDoc cast around the whole comma list validates per
@@ -375,12 +374,14 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                     } else {
                         self.require_debug_identifier(view, expr)?;
                     }
-                    identifiers.push(expr);
+                    None
                 }
-            }
+            };
+            identifiers = match sequence {
+                Some(elements) => elements,
+                None => tsv_ts::__private::push_expression_list(self.stores_mut(), &[expr]),
+            };
         }
-
-        let identifiers = tsv_ts::__private::push_expression_list(self.stores_mut(), &identifiers);
 
         Ok(FragmentNode::DebugTag(DebugTag {
             identifiers,
@@ -432,7 +433,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// a comment, so `{@render /** @type {A} */ (fn())}` is a call to both
     /// parsers. The stored expression keeps the wrapper — the printer reproduces
     /// the authored cast from it.
-    fn parse_render_tag(&mut self, start: usize) -> Result<FragmentNode<'arena>, Error> {
+    fn parse_render_tag(&mut self, start: usize) -> Result<FragmentNode, Error> {
         // The refusal runs inside the expression's parse, so tsc's comparison reading of
         // `{@render f<T, U><V>(x)}` — a sequence — is re-read as acorn-typescript's call
         // (`parse_ts_expression_checked`).

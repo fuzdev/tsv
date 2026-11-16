@@ -43,7 +43,7 @@ pub(super) enum HeadTail {
 
 impl HeadTail {
     /// An `{#each}` head is followed by its `as` exactly when it binds a context.
-    pub(super) fn of_each(block: &EachBlock<'_>) -> Self {
+    pub(super) fn of_each(block: &EachBlock) -> Self {
         if block.context.is_some() {
             Self::Keyword
         } else {
@@ -81,7 +81,7 @@ impl HeadTail {
 /// author wrote past the body — and both answer the one question this seam asks: how far into
 /// the head does the expression's comment range reach, without spanning text someone else
 /// prints.
-pub(super) fn each_expr_comment_end(view: AstView<'_>, block: &EachBlock<'_>) -> u32 {
+pub(super) fn each_expr_comment_end(view: AstView<'_>, block: &EachBlock) -> u32 {
     match block.context {
         Some(context) => view.expr(context).span().start,
         None => view.expr(block.expression).span().end,
@@ -92,7 +92,7 @@ pub(super) fn each_expr_comment_end(view: AstView<'_>, block: &EachBlock<'_>) ->
 ///
 /// Control flow blocks can hug adjacent inline content when directly adjacent,
 /// unlike HTML block elements (`<div>`, `<p>`) which get their own lines.
-pub(crate) fn is_control_flow_block(node: &FragmentNode<'_>) -> bool {
+pub(crate) fn is_control_flow_block(node: &FragmentNode) -> bool {
     matches!(
         node,
         FragmentNode::IfBlock(_)
@@ -107,7 +107,7 @@ pub(crate) fn is_control_flow_block(node: &FragmentNode<'_>) -> bool {
 ///
 /// Only if/each/key blocks force expansion. Await blocks do NOT - they stay inline
 /// in block elements (e.g., `<div>{#await promise}loading{/await}</div>` stays inline).
-pub(super) fn is_expanding_control_flow_block(node: &FragmentNode<'_>) -> bool {
+pub(super) fn is_expanding_control_flow_block(node: &FragmentNode) -> bool {
     matches!(
         node,
         FragmentNode::IfBlock(_) | FragmentNode::EachBlock(_) | FragmentNode::KeyBlock(_)
@@ -118,7 +118,7 @@ pub(super) fn is_expanding_control_flow_block(node: &FragmentNode<'_>) -> bool {
 ///
 /// This is a convenience function combining `is_expanding_control_flow_block` and
 /// `has_expanding_block_in_await` checks that are commonly used together.
-pub(super) fn has_any_expanding_blocks(view: SvelteView<'_>, nodes: &[FragmentNode<'_>]) -> bool {
+pub(super) fn has_any_expanding_blocks(view: SvelteView<'_>, nodes: &[FragmentNode]) -> bool {
     nodes.iter().any(is_expanding_control_flow_block) || has_expanding_block_in_await(view, nodes)
 }
 
@@ -131,7 +131,7 @@ pub(super) fn has_any_expanding_blocks(view: SvelteView<'_>, nodes: &[FragmentNo
 ///
 /// Single source of truth for the `has_preceding_breakable` test in `fragment_doc`'s node
 /// loops and for [`has_control_flow_after_sibling`]'s breakable-sibling gate.
-pub(super) fn is_inline_content(node: &FragmentNode<'_>) -> bool {
+pub(super) fn is_inline_content(node: &FragmentNode) -> bool {
     matches!(
         node,
         FragmentNode::Element(_)
@@ -164,7 +164,7 @@ pub(super) fn is_inline_content(node: &FragmentNode<'_>) -> bool {
 /// site), so the snippet half matters only for a snippet glued to content on both sides —
 /// which keeps the author's line and still wants the one-pass resolution after a
 /// breakable sibling.
-pub(super) fn has_control_flow_after_sibling(nodes: &[FragmentNode<'_>]) -> bool {
+pub(super) fn has_control_flow_after_sibling(nodes: &[FragmentNode]) -> bool {
     let mut seen_breakable = false;
     for node in nodes {
         if node.is_whitespace_only_text() {
@@ -188,9 +188,7 @@ pub(super) fn has_control_flow_after_sibling(nodes: &[FragmentNode<'_>]) -> bool
 /// block at what it lays out: [`has_expanding_block_in_await`], and the element analysis's
 /// block-flow cause (`Printer::block_flow_cause`), which reads the sections the way the block
 /// builder does.
-pub(super) fn control_flow_sections<'n, 'a>(
-    node: &'n FragmentNode<'a>,
-) -> [Option<&'n Fragment<'a>>; 3] {
+pub(super) fn control_flow_sections(node: &FragmentNode) -> [Option<&Fragment>; 3] {
     match node {
         FragmentNode::IfBlock(b) => [Some(&b.consequent), b.alternate.as_ref(), None],
         FragmentNode::EachBlock(b) => [Some(&b.body), b.fallback.as_ref(), None],
@@ -211,7 +209,7 @@ pub(super) fn control_flow_sections<'n, 'a>(
 /// This function recursively checks nested await blocks, so deeply nested
 /// structures like `{#await p1}{#await p2}{#if c}...{/if}{/await}{/await}`
 /// are also detected.
-fn has_expanding_block_in_await(view: SvelteView<'_>, nodes: &[FragmentNode<'_>]) -> bool {
+fn has_expanding_block_in_await(view: SvelteView<'_>, nodes: &[FragmentNode]) -> bool {
     nodes.iter().any(|n| {
         matches!(n, FragmentNode::AwaitBlock(_))
             && control_flow_sections(n).into_iter().flatten().any(|f| {
@@ -1095,7 +1093,7 @@ mod tests {
 
     /// Parse a Svelte template and hand its top-level fragment nodes to `f`, with the view
     /// they are read through.
-    fn with_nodes<R>(src: &str, f: impl FnOnce(SvelteView<'_>, &[FragmentNode<'_>]) -> R) -> R {
+    fn with_nodes<R>(src: &str, f: impl FnOnce(SvelteView<'_>, &[FragmentNode]) -> R) -> R {
         let arena = bumpalo::Bump::new();
         let parsed = crate::__private::parse(src, &arena).expect("template should parse");
         let view = parsed.view();

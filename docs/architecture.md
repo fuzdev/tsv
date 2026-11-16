@@ -356,7 +356,7 @@ The `doc` module implements a declarative document builder inspired by prettier'
 
 ### Core Types (Arena-Based)
 
-Doc nodes live in a contiguous `DocArena`, referenced by `DocId` (a `u32` index), with child lists as `ChildRange` (start index + length) — no per-node heap allocation, no recursive `Drop` traversal. Indices suit the doc tree specifically: it's built once, rendered once, and dropped wholesale. The AST is store- and arena-allocated — `Expression`, `Statement` and `TSType` nodes and the payloads too rare to sit inline sit in per-document stores indexed by typed ids (`ExprId`, `StmtId`, `TyId`, one id per payload type), the lists built by value as runs of rows in a store per element type, TypeScript's decoded strings and comments in the same stores, the CSS tree's lists and strings in stores of its own, and the Svelte tree in a bump arena — see [Nested AST](#nested-ast-bump-arena-not-flatindexed).
+Doc nodes live in a contiguous `DocArena`, referenced by `DocId` (a `u32` index), with child lists as `ChildRange` (start index + length) — no per-node heap allocation, no recursive `Drop` traversal. Indices suit the doc tree specifically: it's built once, rendered once, and dropped wholesale. The AST is store-allocated — `Expression`, `Statement` and `TSType` nodes and the payloads too rare to sit inline sit in per-document stores indexed by typed ids (`ExprId`, `StmtId`, `TyId`, one id per payload type), the lists built by value as runs of rows in a store per element type, TypeScript's decoded strings and comments in the same stores, the CSS tree's lists and strings in stores of its own, and the Svelte tree's lists and strings in stores of its own too — see [Nested AST](#nested-ast-bump-arena-not-flatindexed).
 
 ```rust
 pub enum DocNode {
@@ -496,7 +496,7 @@ Script/style tag content is extracted by **raw byte scanning** for closing delim
 
 ### Multi-Language Embedding
 
-Every embedded region shares the Svelte document's allocations — the TypeScript islands its one set of `AstStores`, the markup its one bump arena, the top-level `<style>` the document's `CssStores` (the two store sets are the halves of the document's `SvelteStores`); each embedded region gets a fresh parser instance. There is no shared symbol table — all names are span-identity, recovered from source.
+Every embedded region shares the Svelte document's allocations — the TypeScript islands its one set of `AstStores`, the markup its own stores (`SvelteOwn`), the top-level `<style>` the document's `CssStores` (the three are the halves of the document's `SvelteStores`); each embedded region gets a fresh parser instance. There is no shared symbol table — all names are span-identity, recovered from source.
 
 Embedded parsers track `base_offset` so spans are absolute positions in the root source, not relative to tag content. Standalone parsing passes `base_offset = 0`.
 
@@ -871,9 +871,9 @@ Native tsv runs on the system allocator — no `#[global_allocator]`, no alterna
 
 **Lexing — spans, not strings.** Tokens store `u32` byte offsets (`start`, `end`) into the source, never slices or copies — `Token` is a small POD (16 B; tsv_svelte's 12 B) that a byte cursor over the source emits. The exception is deliberate: a string literal's decoded value is materialized only when it actually contains escape sequences, decoded into a **reused scratch buffer held out-of-band on the lexer** (`Lexer::decode_scratch`, borrowed via `decoded_str` and copied out at receipt — into the stores' text pool in `tsv_ts` and `tsv_css`) so no per-literal `String` allocates and the per-token `Token` stays pointer-free. Comments are spans too — the token carries a `content_start` and the `Comment` node a `content_span`, recovered from source on demand and never copied. On the parser's hot path (`advance`, plus the CSS and Svelte lookaheads) the lexers write the token in place into the parser's slot (`next_token_into`) rather than returning a by-value `Result<Token, Error>` through a stack slot the parser would reload and re-scatter; other TS and CSS callers take it by value (`next_token`); the Svelte lexer has no by-value form.
 
-**Internal AST — TypeScript and CSS in stores, Svelte in a bump arena, span-identity names, no raw text.** TypeScript's expressions, statements, types and rare wide payloads are rows of per-document stores named by typed ids; a child list is a `Run` over a store (of ids, or of the elements themselves for a list built by value); TypeScript's decoded strings and comments live in the same stores, so its whole tree is there; every CSS list is a value run over a store of its element type and every CSS string pool text, in a stylesheet's stores; Svelte's own nodes are allocated in a per-parse bump arena; in all three, small children are kept inline by value (see [Nested AST](#nested-ast-bump-arena-not-flatindexed) for the layout rationale). Identifier names are span-identity — an `IdentName` records the raw name-token length and the name is re-sliced from source; only the rare `\u`-escaped (or oversized) name carries its decoded form, as pool text. Svelte element/attribute names are span-identity too (`source[name_span]`, `.trim()` for the padded-`{ shorthand }` edge), so there is no shared symbol table anywhere. Raw source text is never duplicated into the AST — printers re-slice via `span.extract(source)`; the few deliberate stored-raw caches are cataloged in [Source-Based Printing](#source-based-printing). What remains as owned data is genuinely decoded: string-literal values (only when escaped) and the like, copied once into the text pool (TypeScript, CSS) or the arena (Svelte).
+**Internal AST — in stores, span-identity names, no raw text.** TypeScript's expressions, statements, types and rare wide payloads are rows of per-document stores named by typed ids; a child list is a `Run` over a store (of ids, or of the elements themselves for a list built by value); TypeScript's decoded strings and comments live in the same stores, so its whole tree is there; every CSS list is a value run over a store of its element type and every CSS string pool text, in a stylesheet's stores; every Svelte template list is a value run in a document's own stores, and the one string it keeps as text of its own is pool text there; in all three, small children are kept inline by value (see [Nested AST](#nested-ast-bump-arena-not-flatindexed) for the layout rationale). Identifier names are span-identity — an `IdentName` records the raw name-token length and the name is re-sliced from source; only the rare `\u`-escaped (or oversized) name carries its decoded form, as pool text. Svelte element/attribute names are span-identity too (`source[name_span]`, `.trim()` for the padded-`{ shorthand }` edge), so there is no shared symbol table anywhere. Raw source text is never duplicated into the AST — printers re-slice via `span.extract(source)`; the few deliberate stored-raw caches are cataloged in [Source-Based Printing](#source-based-printing). What remains as owned data is genuinely decoded: string-literal values (only when escaped) and the like, copied once into the text pool.
 
-**Svelte template nodes — contiguous storage.** Fragment children are an `&'arena [FragmentNode]` slice of enum values rather than boxed nodes, keeping siblings contiguous in arena memory for the printer's traversal loops.
+**Svelte template nodes — contiguous storage.** Fragment children are a `Run<FragmentNode>` of enum values rather than boxed nodes, keeping siblings contiguous in their store for the printer's traversal loops.
 
 **Doc building — the doc arena.** All doc nodes live in a contiguous `DocArena` (two flat `Vec`s: nodes and child lists, plus the text pool and a boxed direct-mapped static cache), referenced by `u32` `DocId`s — no per-node heap allocation, no drop glue (`DocNode` is trivially droppable, `const`-asserted). Static text is **interned per document**: repeated `text(",")` calls return one shared `DocId` instead of allocating per call — sound because statics are position-free at render, nodes are append-only, and no consumer keys on an interned node's identity (the identity-keyed tables — the keyed-group map, the swallow/comment side-sets — key only on nodes that are never interned).
 
@@ -976,8 +976,8 @@ Decisions made during development with rationale preserved for future reference.
 tsv's TypeScript tree lives in per-document stores named by typed ids (below), its decoded
 strings and comments included, so a TypeScript parse takes no arena. The CSS tree's lists
 and strings live in a stylesheet's `CssStores` (below), so a CSS parse takes no arena
-either. The Svelte tree sits in a **per-parse bump arena** (`bumpalo`), tied to the program
-lifetime, freed wholesale when the arena drops, with no per-node `Drop`.
+either, and the Svelte template's lists and strings live in the own half of a document's
+`SvelteStores` (below), so no Svelte node is in an arena either.
 
 **`Expression`, `Statement` and `TSType` nodes and the rare payloads are the exceptions: they live in `AstStores`**
 (`ast/stores.rs`), one per document, kept beside the tree in a `Parsed` and shared across a Svelte component's
@@ -1010,8 +1010,14 @@ name spans, a value list's members, a condition's parts and segments) is a value
 `CssStores` store of its element type, built on that type's scratch stack (every element type
 `Copy` and flushed as a block but `CssNode` and `CssBlockChild`, which hold a rule or an at-rule
 inline and move a row at a time), and every string it keeps as text of its own is a
-`PoolText<CssText>`, all read through a `CssView`. The rest of this section describes the
-layout the stores were built to keep.
+`PoolText<CssText>`, all read through a `CssView`. The Svelte template takes it too: each of
+its list types (a fragment's nodes, an element's attributes, an attribute's value parts, a
+directive's modifier spans, the wire's `{#snippet}` parameter lists) is a value run over a
+store of its element type in the own half of the document's `SvelteStores` (`SvelteOwn`),
+built on that type's scratch stack (every element type `Copy` and flushed as a block but
+`FragmentNode`, which holds an element or a block inline and moves a row at a time), and the
+one string it keeps as text of its own a `PoolText<SvelteText>`, all read through a
+`SvelteView`. The rest of this section describes the layout the stores were built to keep.
 
 
 ```rust
@@ -1037,14 +1043,15 @@ pub enum StatementKind {
 
 A TypeScript parse returns the tree with the stores it wrote (`parse(source)` → `Parsed`, or
 `*_into` a caller's warm stores); a CSS parse does the same (`ParsedCss`, with the `CssStores`
-that hold every list and string of the CSS tree), and only a Svelte caller owns the arena
-(`parse(source, &arena)`), the returned tree bundled with its `SvelteStores` (a TypeScript half
-and a CSS half; `ParsedRoot`, or `*_into` a caller's) beside the tree that borrows the arena.
+that hold every list and string of the CSS tree), and a Svelte parse too, its tree bundled
+with its `SvelteStores` (its own half, a TypeScript half and a CSS half; `ParsedRoot`, or
+`*_into` a caller's).
 Each language crate parks its stores per thread, boxed, between documents (`with_stores`, which
 `tsv_arena`'s macros run every binding export under, and `WarmStores` for a slot the caller
-owns, as each `Formatter` does); a Svelte document's halves are the boxes `tsv_ts`'s and
-`tsv_css`'s slots hand over, so a thread parks one TypeScript store set and one CSS store set
-whatever mix of languages it parses. `format`/`convert` consume either
+owns, as each `Formatter` does); a Svelte document's language halves are the boxes `tsv_ts`'s
+and `tsv_css`'s slots hand over, and its own half the box `tsv_svelte`'s slot hands over, so a
+thread parks one TypeScript store set and one CSS store set whatever mix of languages it
+parses. `format`/`convert` consume either
 into an owned `String`/JSON, so nothing borrowed escapes the call (no self-referential
 ownership — `unsafe_code = "forbid"`, safe bumpalo API only). Identifier and
 element/attribute names are **span-identity** — recovered from `source[span]` at each
@@ -1057,7 +1064,7 @@ before; only genuinely recursive children and the rare wide payloads sit behind 
 Inline fields are
 *not* indirected to shrink node size in general — the formatter is traversal-bound,
 and the extra pointer-chases that size-minimization adds on hot traversal paths cost
-more than the cache-density they buy. (The arena allocation itself is the win; the
+more than the cache-density they buy. (The contiguous allocation itself is the win; the
 node *layout* favors traversal locality over byte size.)
 
 **The deliberate exceptions are two density rules, because an enum's width is the
@@ -1218,11 +1225,10 @@ them widens that margin too, as a side effect rather than the goal.
 `MultiArrayList`) were benchmarked early in development and were slower —
 traversal replaced direct pointer/reference access with index lookups, and a
 formatter traverses constantly. That comparison is what the stores
-reopen: a store read is a load of the store's slice header and one indexed load, and the other
-families keep direct `&'arena` access while eliminating per-node `malloc`/`free` and
-improving locality (nodes are bump-allocated in ≈parse order, which approximates
-traversal order). The `DocArena` (the doc-builder IR) is the index-arena precedent
-for the build-once/render-once doc tree.
+reopen: a store read is a load of the store's slice header and one indexed load, and the
+stores eliminate per-node `malloc`/`free` and keep locality (rows are pushed in ≈parse
+order, which approximates traversal order). The `DocArena` (the doc-builder IR) is the
+index-arena precedent for the build-once/render-once doc tree.
 
 **Still open (separate axis):** re-run the **flat/indexed structure** comparison
 on the mature codebase — an independent question from allocation strategy (the
@@ -1292,9 +1298,9 @@ The closest Rust projects embody the alternative shapes, which makes the trade-o
   formatter — answers a different question: many _tools_ sharing one language's AST. tsv does
   the same per language (see [Shared Parser, Divergent Tools](#shared-parser-divergent-tools));
   the per-language crate split is the multi-language question oxc never faces. Allocation
-  converges only in part: like oxc, tsv's Svelte tree bump-allocates lifetime-threaded
-  (`&'arena`) types, while its TypeScript and CSS trees hold ids and runs into stores with no
-  lifetime at all — and it keeps an **inline-by-value node layout** (not size-minimized
+  diverges here: where oxc bump-allocates lifetime-threaded (`&'arena`) types, tsv's
+  TypeScript, CSS and Svelte trees hold ids and runs into stores with no lifetime at all —
+  and it keeps an **inline-by-value node layout** (not size-minimized
   via boxing/indirection, which regressed its traversal-bound formatter; see
   [Nested AST](#nested-ast-bump-arena-not-flatindexed)),
   stays `unsafe_code = "forbid"` (safe bumpalo API only), and recovers source text via `span`

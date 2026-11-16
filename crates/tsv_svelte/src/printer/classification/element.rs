@@ -22,7 +22,7 @@ impl<'a> Printer<'a> {
     /// on separate lines. Empty `<script>`/`<style>` remain inline. This is the NODE-only answer:
     /// such an element renders no box, so where a break beside it would render, the positional
     /// readers lay it out as a glued inline element instead (`Printer::is_glued_raw_text_element`).
-    pub(crate) fn is_block_element(&self, element: &ast::Element<'_>) -> bool {
+    pub(crate) fn is_block_element(&self, element: &ast::Element) -> bool {
         // Components are treated as inline, not block
         if element.kind == ElementKind::Component {
             return false;
@@ -52,7 +52,7 @@ impl<'a> Printer<'a> {
 /// is the one arm that collapses) and the whitespace-sensitive head
 /// (`build_whitespace_sensitive_element_doc`, where an empty body takes the empty element's
 /// layouts). Two spellings of it would let them answer differently for the same element.
-pub(crate) fn has_raw_content(view: ast::SvelteView<'_>, element: &ast::Element<'_>) -> bool {
+pub(crate) fn has_raw_content(view: ast::SvelteView<'_>, element: &ast::Element) -> bool {
     use crate::ast::FragmentNode;
     view.nodes(element.fragment.nodes)
         .iter()
@@ -66,11 +66,7 @@ mod tests {
     use crate::html;
 
     /// Find the first child element of `parent` whose resolved tag name is `tag`.
-    fn child<'a>(
-        printer: &Printer<'a>,
-        parent: &ast::Element<'a>,
-        tag: &str,
-    ) -> &'a ast::Element<'a> {
+    fn child<'a>(printer: &Printer<'a>, parent: &ast::Element, tag: &str) -> &'a ast::Element {
         printer
             .svelte
             .nodes(parent.fragment.nodes)

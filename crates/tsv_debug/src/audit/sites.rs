@@ -163,7 +163,7 @@ fn svelte_internal_regions(source: &str) -> InternalRegions {
         }
     }
 
-    fn attributes(attrs: &[AttributeNode<'_>], out: &mut Vec<(usize, usize)>) {
+    fn attributes(attrs: &[AttributeNode], out: &mut Vec<(usize, usize)>) {
         for a in attrs {
             match a {
                 // `{...rest}` / `{@attach f()}` — brace-delimited, like an ExpressionTag.
@@ -195,7 +195,7 @@ fn svelte_internal_regions(source: &str) -> InternalRegions {
         }
     }
 
-    fn walk(view: SvelteView<'_>, frag: &Fragment<'_>, out: &mut Vec<(usize, usize)>) {
+    fn walk(view: SvelteView<'_>, frag: &Fragment, out: &mut Vec<(usize, usize)>) {
         for node in view.nodes(frag.nodes) {
             match node {
                 FragmentNode::IfBlock(b) => {

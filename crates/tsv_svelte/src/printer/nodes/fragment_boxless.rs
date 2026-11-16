@@ -122,7 +122,7 @@ impl FragmentGlue {
 
 impl<'a> Printer<'a> {
     /// The render class of a fragment node for the break-freeness scans.
-    fn boxless_class(&self, node: &FragmentNode<'_>) -> Class {
+    fn boxless_class(&self, node: &FragmentNode) -> Class {
         match node {
             FragmentNode::Comment(_) => Class::Transparent,
             n if n.is_compiler_hoisted() => Class::Transparent,
@@ -142,7 +142,7 @@ impl<'a> Printer<'a> {
 
     /// Compute a fragment's [`FragmentGlue`] from its nodes and edges — one forward and one
     /// backward pass for each scan.
-    fn compute_fragment_glue(&self, nodes: &[FragmentNode<'_>], edges: EdgeFree) -> FragmentGlue {
+    fn compute_fragment_glue(&self, nodes: &[FragmentNode], edges: EdgeFree) -> FragmentGlue {
         let n = nodes.len();
         let classes: Vec<Class> = nodes.iter().map(|node| self.boxless_class(node)).collect();
 
@@ -241,13 +241,13 @@ impl<'a> Printer<'a> {
     /// assertion checks it, since such a run would be handed an edge it does not have. A run
     /// no index covers — a document the index skipped, or a printer that formatted no
     /// document — reads edges that absorb nothing.
-    fn fragment_glue(&self, nodes: &[FragmentNode<'_>]) -> Rc<FragmentGlue> {
+    fn fragment_glue(&self, nodes: &[FragmentNode]) -> Rc<FragmentGlue> {
         let addr = nodes.as_ptr() as usize;
         let key = (addr, nodes.len());
         if let Some(glue) = self.fragment_glue_cache.borrow().get(&key) {
             return Rc::clone(glue);
         }
-        let size = size_of::<FragmentNode<'_>>();
+        let size = size_of::<FragmentNode>();
         let index = self.fragment_edges.borrow();
         let fragment = index
             .range(..=addr)
@@ -319,12 +319,7 @@ impl<'a> Printer<'a> {
     /// its own whitespace text node (or a text's own edge), which the arms above answer — a
     /// byte gap between consecutive fragment nodes is never render-whitespace. Pinned by
     /// [root_script_gap](../../../../../tests/fixtures/svelte/tags/root_script_gap/).
-    pub(super) fn glued_to_content(
-        &self,
-        nodes: &[FragmentNode<'_>],
-        i: usize,
-        before: bool,
-    ) -> bool {
+    pub(super) fn glued_to_content(&self, nodes: &[FragmentNode], i: usize, before: bool) -> bool {
         let glue = self.fragment_glue(nodes);
         if before {
             glue.glued_before[i]
@@ -341,7 +336,7 @@ impl<'a> Printer<'a> {
     /// in the same inline formatting context: `a<script>…</script>b` renders `ab`, and a break on
     /// either side renders a space. The block-boundary licence a block box earns does not reach
     /// it.
-    pub(super) fn is_boxless_raw_text_element(&self, node: &FragmentNode<'_>) -> bool {
+    pub(super) fn is_boxless_raw_text_element(&self, node: &FragmentNode) -> bool {
         matches!(node, FragmentNode::Element(el)
             if el.facts.is_raw_text() && self.is_block_element(el))
     }
@@ -356,7 +351,7 @@ impl<'a> Printer<'a> {
     /// other such elements) between. The compiler trims whitespace at a fragment's content edge
     /// too, but only up to the first node it keeps, and this element is one it keeps. See
     /// [`EdgeFree`] for which edges are line-box edges.
-    pub(super) fn is_glued_raw_text_element(&self, nodes: &[FragmentNode<'_>], i: usize) -> bool {
+    pub(super) fn is_glued_raw_text_element(&self, nodes: &[FragmentNode], i: usize) -> bool {
         self.is_boxless_raw_text_element(&nodes[i]) && self.fragment_glue(nodes).inline_laid[i]
     }
 
@@ -374,13 +369,13 @@ impl<'a> Printer<'a> {
     /// tag's body edges feed nothing but flags within that body's subtree. Without one, the
     /// edges that absorb nothing — what an unindexed slice reads — give every flag the answer
     /// the index would.
-    pub(crate) fn index_fragment_edges(&self, root: &Root<'_>) {
+    pub(crate) fn index_fragment_edges(&self, root: &Root) {
         if root.holds_nested_raw_text {
             self.index_fragment(self.svelte.nodes(root.fragment.nodes), EdgeFree::default());
         }
     }
 
-    fn index_fragment(&self, nodes: &[FragmentNode<'_>], edges: EdgeFree) {
+    fn index_fragment(&self, nodes: &[FragmentNode], edges: EdgeFree) {
         if nodes.is_empty() {
             return;
         }

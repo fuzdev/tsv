@@ -28,7 +28,7 @@ use std::borrow::Cow;
 /// purpose; `tests/fixtures/svelte/attributes/lang_entity` holds both answers.
 fn script_lang<'s>(
     view: ast::SvelteView<'_>,
-    script: &ast::Script<'_>,
+    script: &ast::Script,
     source: &'s str,
 ) -> Option<&'s str> {
     for attr_node in view.attributes(script.attributes) {
@@ -54,7 +54,7 @@ fn script_lang<'s>(
 /// A `<script>` with no `lang` attribute doesn't decide; nor does `<style lang=…>`.
 pub(super) fn component_is_typescript(
     view: ast::SvelteView<'_>,
-    root: &ast::Root<'_>,
+    root: &ast::Root,
     source: &str,
 ) -> bool {
     // The two top-level scripts in source order — the first one carrying a `lang` decides.
@@ -73,7 +73,7 @@ pub(super) fn component_is_typescript(
 /// (scalar props + `customElement`) without materializing a typed options struct.
 pub(super) fn find_option_values<'a>(
     view: ast::SvelteView<'a>,
-    attrs: &[ast::AttributeNode<'a>],
+    attrs: &[ast::AttributeNode],
     name: &str,
     source: &str,
 ) -> Option<&'a [ast::AttributeValue]> {
@@ -109,7 +109,7 @@ pub(super) fn text_value<'src>(
 /// `pub(super)` — shared with the wire-JSON writer's fused `<svelte:options>`.
 pub(super) fn bool_option(
     view: ast::SvelteView<'_>,
-    attrs: &[ast::AttributeNode<'_>],
+    attrs: &[ast::AttributeNode],
     name: &str,
     source: &str,
 ) -> Option<bool> {

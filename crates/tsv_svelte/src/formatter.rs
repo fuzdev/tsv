@@ -8,7 +8,7 @@ use tsv_lang::doc::arena::DocArena;
 /// next.
 ///
 /// [`format()`](crate::format) allocates a fresh AST arena, doc arena and stores (the
-/// document's TypeScript and CSS halves) for every call and drops them before returning. A
+/// document's own, TypeScript and CSS halves) for every call and drops them before returning. A
 /// `Formatter` owns all three and rewinds them instead, keeping what they have grown (the AST
 /// arena keeps its largest block, the doc arena and the stores their whole capacity), so after
 /// the first few sources the work allocates almost nothing new — the shape of a driver that

@@ -56,7 +56,7 @@ fn escape_free(name: &str) -> bool {
 }
 
 /// Every plain attribute's name.
-fn attributes<'s>(attrs: &[AttributeNode<'_>], source: &'s str, out: &mut Vec<&'s str>) {
+fn attributes<'s>(attrs: &[AttributeNode], source: &'s str, out: &mut Vec<&'s str>) {
     for node in attrs {
         if let AttributeNode::Attribute(attr) = node {
             out.push(attr.name(source));
@@ -69,16 +69,11 @@ fn attributes<'s>(attrs: &[AttributeNode<'_>], source: &'s str, out: &mut Vec<&'
 /// claim.
 fn graded_names<'s>(
     view: SvelteView<'_>,
-    nodes: &[FragmentNode<'_>],
+    nodes: &[FragmentNode],
     source: &'s str,
     out: &mut Vec<&'s str>,
 ) {
-    fn element<'s>(
-        view: SvelteView<'_>,
-        el: &Element<'_>,
-        source: &'s str,
-        out: &mut Vec<&'s str>,
-    ) {
+    fn element<'s>(view: SvelteView<'_>, el: &Element, source: &'s str, out: &mut Vec<&'s str>) {
         let name = el.name(source);
         assert!(
             el.kind == ElementKind::Component || escape_free(name),
@@ -101,7 +96,7 @@ fn graded_names<'s>(
 }
 
 /// The names a root holds outside its fragment: the top-level `<script>` / `<style>` heads.
-fn root_names<'s>(view: SvelteView<'_>, root: &Root<'_>, source: &'s str, out: &mut Vec<&'s str>) {
+fn root_names<'s>(view: SvelteView<'_>, root: &Root, source: &'s str, out: &mut Vec<&'s str>) {
     let heads = root
         .instance
         .iter()

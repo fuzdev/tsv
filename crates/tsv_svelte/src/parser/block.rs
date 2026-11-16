@@ -4,9 +4,10 @@
 
 use crate::ast::*;
 use crate::lexer::TokenKind;
-use crate::parser::element::{ElementParent, ParsedElement};
+use crate::parser::element::ElementParent;
 use crate::whitespace::is_svelte_ws;
 use tsv_lang::source_scan::{TriviaProfile, skip_trivia_run};
+use tsv_lang::store::PoolText;
 use tsv_lang::{Error, Span};
 use tsv_ts::__private::{TopLevelAs, first_function_declaration};
 use tsv_ts::ast::ExprId;
@@ -115,7 +116,7 @@ const AWAIT_BODY_STOPS: &[&str] = &["then", "catch", "await"];
 
 /// What one `{#await}` clause holds: its fragment and its binding pattern, kept together
 /// so filling a clause and asking whether it is filled cannot name different slots.
-type AwaitSlot<'arena> = (Option<Fragment<'arena>>, Option<ExprId>);
+type AwaitSlot = (Option<Fragment>, Option<ExprId>);
 
 /// The TypeScript assertion keywords, each paired with whether it can BE a `{#each}`
 /// binding separator. Both continue an assertion chain; only `as` is spelled the way
@@ -296,14 +297,14 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// Parse a control flow block starting with {#
     ///
     /// Dispatches to specific block parsers based on the keyword.
-    pub(crate) fn parse_block(&mut self) -> Result<FragmentNode<'arena>, Error> {
+    pub(crate) fn parse_block(&mut self) -> Result<FragmentNode, Error> {
         // two wire levels: the block and the `Fragment` its children sit in (the depth
         // limit's count)
         self.nested(2, Self::parse_block_body)
     }
 
     /// [`Self::parse_block`] inside its depth levels.
-    fn parse_block_body(&mut self) -> Result<FragmentNode<'arena>, Error> {
+    fn parse_block_body(&mut self) -> Result<FragmentNode, Error> {
         let start = self.current_start();
 
         // We're at {#, consume it
@@ -325,7 +326,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     }
 
     /// Parse an if block: {#if test}...{:else if test}...{:else}...{/if}
-    fn parse_if_block(&mut self, start: usize) -> Result<FragmentNode<'arena>, Error> {
+    fn parse_if_block(&mut self, start: usize) -> Result<FragmentNode, Error> {
         self.parse_if_block_inner(start, false)
     }
 
@@ -334,7 +335,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         &mut self,
         start: usize,
         is_elseif: bool,
-    ) -> Result<FragmentNode<'arena>, Error> {
+    ) -> Result<FragmentNode, Error> {
         // Get the content start position (after {# or {:)
         let tag_content_start = self.current_end();
 
@@ -389,10 +390,10 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 // two wire levels: the `alternate` fragment and the nested `IfBlock` in it
                 let elseif_block =
                     self.nested(2, |p| p.parse_if_block_inner(elseif_start, true))?;
-                let mut nodes = self.bvec();
-                nodes.push(elseif_block);
+                let mark = self.own.runs.node_scratch.mark();
+                self.push_node(elseif_block);
                 Some(Fragment {
-                    nodes: nodes.into_bump_slice(),
+                    nodes: self.flush_nodes(mark),
                 })
             } else if is_else {
                 // {:else} - parse else branch
@@ -419,9 +420,10 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
         // Determine end position
         // For {:else if}, the nested IfBlock already consumed {/if}, so use its end position
-        // For all other cases (no alternate, {:else}, {:else}{#if}), consume {/if} ourselves
+        // For all other cases (no alternate, {:else}, {:else}{#if}), consume {/if} ourselves.
+        // The alternate is a run flushed above, read back from its store.
         let elseif_end = alternate.as_ref().and_then(|alt| {
-            if let Some(FragmentNode::IfBlock(inner)) = alt.nodes.first()
+            if let Some(FragmentNode::IfBlock(inner)) = self.own.runs.nodes.slice(alt.nodes).first()
                 && inner.elseif
             {
                 return Some(inner.span.end as usize);
@@ -512,7 +514,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     }
 
     /// Parse an each block: {#each expression as context, index (key)}...{:else}...{/each}
-    fn parse_each_block(&mut self, start: usize) -> Result<FragmentNode<'arena>, Error> {
+    fn parse_each_block(&mut self, start: usize) -> Result<FragmentNode, Error> {
         // Get the content start position (after {#)
         let tag_content_start = self.current_end();
 
@@ -922,7 +924,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     }
 
     /// Parse an await block: {#await expression}...{:then value}...{:catch error}...{/await}
-    fn parse_await_block(&mut self, start: usize) -> Result<FragmentNode<'arena>, Error> {
+    fn parse_await_block(&mut self, start: usize) -> Result<FragmentNode, Error> {
         // Get the content start position (after {#)
         let tag_content_start = self.current_end();
 
@@ -1010,8 +1012,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // One `(fragment, binding)` pair per clause, so the fill and the filled-check
         // always name the same slot. Keeping them as four independent locals is what let
         // the guard be added to one arm and not the other.
-        let mut then_slot: AwaitSlot<'arena> = (None, None);
-        let mut catch_slot: AwaitSlot<'arena> = (None, None);
+        let mut then_slot: AwaitSlot = (None, None);
+        let mut catch_slot: AwaitSlot = (None, None);
         let mut pending = None;
 
         // The first body belongs to whichever clause the head named.
@@ -1110,7 +1112,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         &mut self,
         keyword: &str,
         stop_keywords: &[&str],
-    ) -> Result<(Option<Fragment<'arena>>, Option<ExprId>), Error> {
+    ) -> Result<(Option<Fragment>, Option<ExprId>), Error> {
         let tag_start = self.current_end();
         let (tag_content, content_start) = self.scan_block_tag_content(tag_start)?;
         // The value is absent only when the `}` follows the keyword directly (`{:then}`).
@@ -1358,7 +1360,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     }
 
     /// Parse a key block: {#key expression}...{/key}
-    fn parse_key_block(&mut self, start: usize) -> Result<FragmentNode<'arena>, Error> {
+    fn parse_key_block(&mut self, start: usize) -> Result<FragmentNode, Error> {
         // Get the content start position (after {#)
         let tag_content_start = self.current_end();
 
@@ -1400,7 +1402,11 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
     /// Parse a snippet block: {#snippet name(params)}...{/snippet}
     /// Also handles TypeScript generics: `{#snippet name<T>(params)}`
-    fn parse_snippet_block(&mut self, start: usize) -> Result<FragmentNode<'arena>, Error> {
+    ///
+    /// Out of line: its head is the widest of the block heads, and inlined into the block
+    /// dispatch its locals would size the frame every block's recursion passes through.
+    #[inline(never)]
+    fn parse_snippet_block(&mut self, start: usize) -> Result<FragmentNode, Error> {
         // Get the content start position (after {#)
         let tag_content_start = self.current_end();
 
@@ -1451,7 +1457,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // there through the matching `)`.
         let after_name = content[name_len..].trim_start_matches(is_svelte_ws);
         let head_start = content.len() - after_name.len();
-        let (after_generic, type_params_raw): (usize, Option<&'arena str>) =
+        let (after_generic, type_params_raw): (usize, Option<PoolText<SvelteText>>) =
             if after_name.starts_with('<') {
                 // `type_params_raw` is the raw inner text — feeds the public AST's `typeParams`
                 // string (Svelte stores it raw too) and the parse-failure fallback.
@@ -1459,7 +1465,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                     self.find_matching_angle_bracket(content, content_offset, head_start)?;
                 (
                     close_pos + 1,
-                    Some(self.alloc_str_in(&content[head_start + 1..close_pos])),
+                    Some(self.own.text.push(&content[head_start + 1..close_pos])),
                 )
             } else {
                 (head_start, None)
@@ -1610,10 +1616,13 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 let func = first_function_declaration(self.ts_stores(), &plain)
                     .ok_or_else(signature_error)?;
                 let signature = (func.type_parameters, func.params);
-                self.snippet_wire_parameters.push(SnippetWireParameters {
-                    snippet_start: start as u32,
-                    parameters: wire,
-                });
+                self.own
+                    .runs
+                    .wire_param_scratch
+                    .push(SnippetWireParameters {
+                        snippet_start: start as u32,
+                        parameters: wire,
+                    });
                 (plain, signature)
             } else {
                 let func = first_function_declaration(self.ts_stores(), &preserved)
@@ -1714,13 +1723,13 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         &mut self,
         stop_keywords: &[&str],
         content_start: usize,
-    ) -> Result<Fragment<'arena>, Error> {
-        let mut nodes = self.bvec();
+    ) -> Result<Fragment, Error> {
+        let mark = self.own.runs.node_scratch.mark();
         let mut last_end = content_start;
 
         loop {
             // Capture text gaps
-            self.capture_text_if_gap(last_end, &mut nodes)?;
+            self.capture_text_if_gap(last_end)?;
 
             if self.check(TokenKind::Eof) {
                 break;
@@ -1750,42 +1759,36 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             if self.check(TokenKind::Comment) {
                 let comment = self.parse_comment()?;
                 last_end = comment.span.end_usize();
-                nodes.push(FragmentNode::Comment(comment));
+                self.push_node(FragmentNode::Comment(comment));
             } else if self.check(TokenKind::LeftAngle) {
                 // Check if closing tag
                 if self.is_next_token(TokenKind::Slash)? {
                     break;
                 }
-                match self.parse_element_or_special(ElementParent::Nested)? {
-                    ParsedElement::Element(elem) => {
-                        last_end = elem.span.end_usize();
-                        nodes.push(FragmentNode::Element(elem));
-                    }
-                    ParsedElement::SpecialElement(elem) => {
-                        last_end = elem.span.end_usize();
-                        nodes.push(FragmentNode::SpecialElement(elem));
-                    }
-                }
+                let element = self.parse_element_or_special(ElementParent::Nested)?;
+                last_end = self.push_parsed_element(element);
             } else if self.check(TokenKind::LeftBrace) {
                 let tag = self.parse_brace_tag()?;
                 last_end = tag.span().end_usize();
-                nodes.push(tag);
+                self.push_node(tag);
             } else if self.check(TokenKind::BlockOpen) {
                 let block = self.parse_block()?;
                 last_end = block.span().end_usize();
-                nodes.push(block);
+                self.push_node(block);
             } else if self.check(TokenKind::TagOpen) {
                 let tag = self.parse_template_tag()?;
                 last_end = tag.span().end_usize();
-                nodes.push(tag);
+                self.push_node(tag);
             } else {
                 // Unknown token - might be text content that wasn't captured
                 break;
             }
         }
 
+        // Every way out of the loop is a `break`, so this one flush closes the frame on
+        // every `Ok` return.
         Ok(Fragment {
-            nodes: nodes.into_bump_slice(),
+            nodes: self.flush_nodes(mark),
         })
     }
 }

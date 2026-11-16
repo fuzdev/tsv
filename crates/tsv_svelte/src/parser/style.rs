@@ -8,7 +8,7 @@ use super::find_raw_text_close;
 use super::parser_impl::SvelteParser;
 
 impl<'a, 'arena> SvelteParser<'a, 'arena> {
-    pub(crate) fn parse_style_tag(&mut self) -> Result<Style<'arena>, Error> {
+    pub(crate) fn parse_style_tag(&mut self) -> Result<Style, Error> {
         let start = self.current_start();
 
         // Expect <
@@ -60,7 +60,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 start: content_start as u32,
                 end: content_end as u32,
             },
-            attributes: attributes.into_bump_slice(),
+            attributes,
             css_stylesheet,
         })
     }

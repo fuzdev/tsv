@@ -101,7 +101,7 @@ impl ElementKind {
 /// `name` is the tag-name doc, reused by both the opening and the closing tag (a span-identity
 /// `source_span` slice for a regular element, static text for a `svelte:*` one).
 #[derive(Clone, Copy)]
-pub(super) struct ElementParts<'arena> {
+pub(super) struct ElementParts<'a> {
     pub(super) name: DocId,
     pub(super) kind: ElementKind,
     /// Void element (`<br>`, `<img>`) — no closing tag
@@ -111,7 +111,7 @@ pub(super) struct ElementParts<'arena> {
     /// A whitespace-collapsing container (`<table>`, `<select>`, …): the compiler removes
     /// inter-sibling whitespace entirely, so the content lays out block-style with it trimmed.
     pub(super) collapses_child_ws: bool,
-    pub(super) nodes: &'arena [FragmentNode<'arena>],
+    pub(super) nodes: &'a [FragmentNode],
     pub(super) span: Span,
 }
 
@@ -252,7 +252,7 @@ impl ThisClaim {
     pub(in crate::printer) fn new(
         name_end: u32,
         value: Span,
-        attrs: &[ast::AttributeNode<'_>],
+        attrs: &[ast::AttributeNode],
     ) -> Self {
         let head_gap_end = attrs
             .iter()
@@ -355,7 +355,7 @@ pub(super) struct ElementContext {
 /// (the children, the tags). Carried whole so a caller that must decide a role before building
 /// (the G2 glued run) prepares each element once and builds only the arm it takes.
 pub(super) struct PreparedElement<'e> {
-    pub(super) element: &'e ast::Element<'e>,
+    pub(super) element: &'e ast::Element,
     pub(super) class: TagClass,
     pub(super) parts: ElementParts<'e>,
     pub(super) ctx: ElementContext,
@@ -461,7 +461,7 @@ impl<'a> Printer<'a> {
 
     /// Unpack an element's parse-time name facts (`Element::facts`) into the printer's per-tag
     /// view. The single classifier — both element entry points go through it, so they cannot drift.
-    pub(super) fn classify_tag(&self, element: &ast::Element<'_>) -> TagClass {
+    pub(super) fn classify_tag(&self, element: &ast::Element) -> TagClass {
         let facts = element.facts;
         // Element kind, matching prettier-plugin-svelte's isInlineElement = !isBlockElement:
         // elements NOT in the block list (table cells included) use inline formatting.
@@ -493,7 +493,7 @@ impl<'a> Printer<'a> {
     /// Project a regular element onto the shared [`ElementParts`] view.
     pub(super) fn element_parts<'e>(
         &self,
-        element: &'e ast::Element<'e>,
+        element: &'e ast::Element,
         class: TagClass,
     ) -> ElementParts<'e>
     where
@@ -518,7 +518,7 @@ impl<'a> Printer<'a> {
     /// 1. Analyze: Compute all formatting-relevant properties
     /// 2. Classify: Determine layout strategy (void, empty, hug modes, etc.)
     /// 3. Build: Construct doc based on layout
-    pub(super) fn build_element_doc(&self, element: &ast::Element<'_>) -> DocId {
+    pub(super) fn build_element_doc(&self, element: &ast::Element) -> DocId {
         let class = self.classify_tag(element);
         let is_html = element.kind == ast::ElementKind::Html;
 
@@ -567,7 +567,7 @@ impl<'a> Printer<'a> {
     /// and whose attribute docs are already built: its parts, analysis and layout.
     fn prepare_element<'e>(
         &self,
-        element: &'e ast::Element<'e>,
+        element: &'e ast::Element,
         class: TagClass,
         attr_docs: DocBuf,
     ) -> PreparedElement<'e>
@@ -603,7 +603,7 @@ impl<'a> Printer<'a> {
     /// Phase 3 of [`Self::build_element_doc`]: the element's ordinary doc, built from its layout.
     fn build_element_layout_doc(
         &self,
-        element: &ast::Element<'_>,
+        element: &ast::Element,
         class: TagClass,
         parts: &ElementParts<'_>,
         ctx: &ElementContext,
@@ -661,7 +661,7 @@ impl<'a> Printer<'a> {
     /// Children are not built here: each role builds them once, for the arm it takes.
     pub(super) fn prepare_sibling_element<'e>(
         &self,
-        element: &'e ast::Element<'e>,
+        element: &'e ast::Element,
     ) -> Option<PreparedElement<'e>>
     where
         'a: 'e,
@@ -698,7 +698,7 @@ impl<'a> Printer<'a> {
     /// dangle state, so there is no role for it to play here.
     pub(super) fn build_inline_element_close_gt_dangle(
         &self,
-        element: &ast::Element<'_>,
+        element: &ast::Element,
     ) -> Option<DocId> {
         // Every state reads the flat hug-both (`Soft`) content layout; any other shape keeps
         // the element and its `>` intact.
@@ -1064,7 +1064,7 @@ impl<'a> Printer<'a> {
     /// multiline, `>` and `</tag>` go on separate lines (matching Prettier behavior).
     fn build_empty_element_doc(
         &self,
-        element: &ast::Element<'_>,
+        element: &ast::Element,
         opening_tag: DocId,
         has_attrs: bool,
         kind: ElementKind,
@@ -1127,7 +1127,7 @@ impl<'a> Printer<'a> {
     /// Build a doc for a `<template>` element in a frozen language (e.g., `lang="pug"`).
     /// Content is preserved raw — we can't format non-HTML template languages.
     /// Format: `<template lang="pug">\n{raw content}\n</template>`
-    fn build_frozen_template_doc(&self, element: &ast::Element<'_>) -> DocId {
+    fn build_frozen_template_doc(&self, element: &ast::Element) -> DocId {
         let d = self.d();
         let name_doc = d.source_span(element.name_span, self.source);
 
@@ -1190,7 +1190,7 @@ impl<'a> Printer<'a> {
     fn build_raw_content_element_doc(
         &self,
         kind: RawTextKind,
-        element: &ast::Element<'_>,
+        element: &ast::Element,
         attr_docs: DocBuf,
     ) -> DocId {
         let d = self.d();
@@ -1469,7 +1469,7 @@ impl<'a> Printer<'a> {
     /// `is_html`: true for HTML elements, enables class attribute whitespace normalization.
     pub(super) fn build_element_attrs_doc(
         &self,
-        attrs: &[ast::AttributeNode<'_>],
+        attrs: &[ast::AttributeNode],
         separator: DocId,
         name_end: u32,
         open_tag_end: u32,
@@ -1512,7 +1512,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn push_attrs_with_comments(
         &self,
         docs: &mut DocBuf,
-        attrs: &[ast::AttributeNode<'_>],
+        attrs: &[ast::AttributeNode],
         separator: DocId,
         gaps: AttrGaps,
         is_html: bool,

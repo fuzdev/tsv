@@ -2,20 +2,13 @@
 
 use crate::ast::*;
 use crate::lexer::TokenKind;
-use crate::parser::element::{ElementParent, ParsedElement, RootOnlyMetaTag};
+use crate::parser::element::{ElementParent, RootOnlyMetaTag};
 use crate::whitespace::{is_svelte_ws, skip_svelte_ws, svelte_ws_width_at};
-#[cfg(not(feature = "_internal_ast_census"))]
-use bumpalo::collections::Vec as BumpVec;
-#[cfg(feature = "_internal_ast_census")]
-use census_vec::BumpVec;
 use tsv_lang::source_scan::{TriviaProfile, skip_template_literal, skip_trivia};
+use tsv_lang::store::flush_run;
 use tsv_lang::{Error, Span};
 
 // Module declarations
-#[cfg(feature = "_internal_ast_census")]
-mod census_vec {
-    tsv_lang::ast_census_vec!();
-}
 mod attribute;
 mod block;
 mod element;
@@ -34,16 +27,37 @@ pub(crate) use expression_tag::scan_to_matching_brace;
 
 /// Parse a Svelte file and return a Root AST node.
 ///
-/// `arena` owns the template AST and the embedded `<style>` stylesheet, which the returned
-/// `Root<'arena>` borrows from it; the embedded TS `<script>`/`{expr}` ASTs are written to
-/// the TypeScript half of `stores`.
-pub(crate) fn parse_svelte<'arena>(
+/// The template's lists and strings are written to the own half of `stores`, the embedded TS
+/// `<script>`/`{expr}` ASTs to its TypeScript half and the top-level `<style>`'s stylesheet to
+/// its CSS half. `arena` is not read.
+///
+/// Every scratch stack of the own half is empty between parses, so the driver marks none of
+/// them: it finds them empty and leaves them so, whether the parse succeeded — which flushed
+/// every frame it opened — or failed, leaving open frames the exit clears, for whatever the
+/// caller goes on to parse into the same stores. The TypeScript and CSS halves are left so
+/// by their own drivers.
+pub(crate) fn parse_svelte(
     source: &str,
-    arena: &'arena bumpalo::Bump,
+    arena: &bumpalo::Bump,
     stores: &mut SvelteStores,
-) -> Result<Root<'arena>, Error> {
-    let mut parser = SvelteParser::new(source, arena, stores)?;
-    parser.parse_root()
+) -> Result<Root, Error> {
+    #[cfg(debug_assertions)]
+    debug_assert!(
+        stores.own.scratch_is_empty(),
+        "a parse began over an open list frame"
+    );
+    let outcome =
+        SvelteParser::new(source, arena, stores).and_then(|mut parser| parser.parse_root());
+    if outcome.is_err() {
+        stores.own.clear_scratch();
+    } else {
+        #[cfg(debug_assertions)]
+        debug_assert!(
+            stores.own.scratch_is_empty(),
+            "a parse left an open list frame"
+        );
+    }
+    outcome
 }
 
 impl<'a, 'arena> SvelteParser<'a, 'arena> {
@@ -51,12 +65,12 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     ///
     /// Script and style tags can appear in any order, before/after/between markup.
     /// This parser handles all orderings by parsing linearly and categorizing nodes.
-    pub(crate) fn parse_root(&mut self) -> Result<Root<'arena>, Error> {
+    pub(crate) fn parse_root(&mut self) -> Result<Root, Error> {
         let mut instance = None;
         let mut module = None;
         let mut css = None;
         let mut options = None;
-        let mut fragment_nodes = self.bvec();
+        let mark = self.own.runs.node_scratch.mark();
         // Start gap tracking where the lexer's cursor starts: past a leading byte-order mark
         let mut last_end = tsv_lang::leading_bom_len(self.source);
 
@@ -65,7 +79,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             // Check for svelte:options tag (must come first, before other special handling)
             if self.check(TokenKind::LeftAngle) && self.is_next_tag("svelte:options")? {
                 // Capture any text before the options tag
-                self.capture_text_if_gap(last_end, &mut fragment_nodes)?;
+                self.capture_text_if_gap(last_end)?;
 
                 // The root-only rule, where Svelte raises it — on the tag name, ahead of
                 // the attributes. It is what makes this the component's only one.
@@ -84,7 +98,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             // Check for script or style tags
             } else if self.check(TokenKind::LeftAngle) && self.is_next_tag("script")? {
                 // Capture any text before the script tag
-                self.capture_text_if_gap(last_end, &mut fragment_nodes)?;
+                self.capture_text_if_gap(last_end)?;
 
                 // Parse script tag
                 let script = self.parse_script_tag()?;
@@ -113,7 +127,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 }
             } else if self.check(TokenKind::LeftAngle) && self.is_next_tag("style")? {
                 // Capture any text before the style tag
-                self.capture_text_if_gap(last_end, &mut fragment_nodes)?;
+                self.capture_text_if_gap(last_end)?;
 
                 // Parse style tag
                 let style = self.parse_style_tag()?;
@@ -127,35 +141,27 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 // Regular markup: capture text and parse elements/expressions/comments
 
                 // Capture any leading text
-                self.capture_text_if_gap(last_end, &mut fragment_nodes)?;
+                self.capture_text_if_gap(last_end)?;
 
                 if self.check(TokenKind::Comment) {
                     let comment = self.parse_comment()?;
                     last_end = comment.span.end_usize();
-                    fragment_nodes.push(FragmentNode::Comment(comment));
+                    self.push_node(FragmentNode::Comment(comment));
                 } else if self.check(TokenKind::LeftAngle) {
-                    match self.parse_element_or_special(ElementParent::Root)? {
-                        ParsedElement::Element(elem) => {
-                            last_end = elem.span.end_usize();
-                            fragment_nodes.push(FragmentNode::Element(elem));
-                        }
-                        ParsedElement::SpecialElement(elem) => {
-                            last_end = elem.span.end_usize();
-                            fragment_nodes.push(FragmentNode::SpecialElement(elem));
-                        }
-                    }
+                    let element = self.parse_element_or_special(ElementParent::Root)?;
+                    last_end = self.push_parsed_element(element);
                 } else if self.check(TokenKind::LeftBrace) {
                     let tag = self.parse_brace_tag()?;
                     last_end = tag.span().end_usize();
-                    fragment_nodes.push(tag);
+                    self.push_node(tag);
                 } else if self.check(TokenKind::BlockOpen) {
                     let block = self.parse_block()?;
                     last_end = block.span().end_usize();
-                    fragment_nodes.push(block);
+                    self.push_node(block);
                 } else if self.check(TokenKind::TagOpen) {
                     let tag = self.parse_template_tag()?;
                     last_end = tag.span().end_usize();
-                    fragment_nodes.push(tag);
+                    self.push_node(tag);
                 } else {
                     return Err(self.error_msg(&format!(
                         "Unexpected token in markup: {}",
@@ -180,12 +186,12 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 // Only capture up to the end of non-whitespace content
                 let end_pos = last_end + trimmed.len();
                 let text = self.parse_text(last_end, end_pos)?;
-                fragment_nodes.push(FragmentNode::Text(text));
+                self.push_node(FragmentNode::Text(text));
             }
         }
 
         let fragment = Fragment {
-            nodes: fragment_nodes.into_bump_slice(),
+            nodes: self.flush_nodes(mark),
         };
 
         // Collect all comments from scripts and template expressions
@@ -207,11 +213,11 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // the style node via `write_css_comments`, matching where parseCss puts them —
         // so they are never merged into `Root.comments`.
 
-        let snippet_wire_parameters = std::mem::replace(
-            &mut self.snippet_wire_parameters,
-            BumpVec::new_in(self.arena),
-        )
-        .into_bump_slice();
+        let snippet_wire_parameters = flush_run(
+            &mut self.own.runs.wire_param_scratch,
+            &mut self.own.runs.wire_params,
+            self.snippet_wire_parameters,
+        );
 
         Ok(Root {
             fragment,
@@ -231,7 +237,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// svelte:options has no children, but it may be written with an explicit closing tag
     /// (`<svelte:options></svelte:options>`), whose `>` the span must reach.
     /// It configures component behavior via attributes like `runes`, `customElement`, etc.
-    fn parse_svelte_options(&mut self) -> Result<SvelteOptions<'arena>, Error> {
+    fn parse_svelte_options(&mut self) -> Result<SvelteOptions, Error> {
         let start = self.current_start();
 
         // Parse opening: <svelte:options
@@ -269,7 +275,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         };
 
         Ok(SvelteOptions {
-            attributes: attributes.into_bump_slice(),
+            attributes,
             span: Span {
                 start: start as u32,
                 end,

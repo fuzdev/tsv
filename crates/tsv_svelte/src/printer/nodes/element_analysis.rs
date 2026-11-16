@@ -78,7 +78,7 @@ struct MultilineInputs {
 /// It has one reader and needs no mirror predicting what a width-broken element's OUTPUT
 /// re-parses as: the tail boundary's space spelling is decided per width at every site, and its
 /// newline spelling reads the actual render (the flow probe).
-fn content_is_text_only(nodes: &[FragmentNode<'_>]) -> bool {
+fn content_is_text_only(nodes: &[FragmentNode]) -> bool {
     nodes.iter().all(|n| matches!(n, FragmentNode::Text(_)))
 }
 
@@ -168,7 +168,7 @@ impl<'a> Printer<'a> {
     /// Used to detect when parent elements need multiline formatting due to
     /// block-level children. Components, `svelte:*` elements and control flow blocks don't
     /// trigger this - only actual HTML block elements like `<div>`, `<p>`, etc.
-    fn is_block_element_child_at(&self, nodes: &[FragmentNode<'_>], i: usize) -> bool {
+    fn is_block_element_child_at(&self, nodes: &[FragmentNode], i: usize) -> bool {
         matches!(nodes[i], FragmentNode::Element(_)) && self.is_block_element_at(nodes, i)
     }
 
@@ -254,7 +254,7 @@ impl<'a> Printer<'a> {
     /// Takes the already-trimmed content run (the caller shares
     /// [`Printer::boundary_trimmed`]'s trim), so the boundary-trim scan is not repeated per
     /// reader.
-    fn content_is_reflowable_fill(&self, run: &[FragmentNode<'_>]) -> bool {
+    fn content_is_reflowable_fill(&self, run: &[FragmentNode]) -> bool {
         let source = self.source;
 
         // One run, or nothing to reflow as one — see the doc comment. The two terms partition the
@@ -306,7 +306,7 @@ impl<'a> Printer<'a> {
     /// copy of these rules to keep in step.
     fn has_source_breaks_in_content(
         &self,
-        nodes: &[FragmentNode<'_>],
+        nodes: &[FragmentNode],
         kind: ElementKind,
         boundary: BoundaryBreaks,
     ) -> bool {
@@ -554,7 +554,7 @@ impl<'a> Printer<'a> {
     /// otherwise inert: every arm answers the same "multiline", so the *fact* is order-independent.
     fn compute_multiline_cause(
         &self,
-        nodes: &[FragmentNode<'_>],
+        nodes: &[FragmentNode],
         inputs: MultilineInputs,
     ) -> MultilineCause {
         let MultilineInputs {
@@ -662,7 +662,7 @@ impl<'a> Printer<'a> {
     /// See conformance_prettier_svelte.md §Svelte: Blocks (Sibling `>` dangle).
     ///
     /// [`PreparedElement::gt_dangle_boundary`]: super::element_doc::PreparedElement::gt_dangle_boundary
-    fn block_flow_cause(&self, nodes: &[FragmentNode<'_>]) -> MultilineCause {
+    fn block_flow_cause(&self, nodes: &[FragmentNode]) -> MultilineCause {
         if self.block_sections_force_break(nodes) {
             return MultilineCause::Structural;
         }
@@ -689,7 +689,7 @@ impl<'a> Printer<'a> {
     /// section around it open too. The walk stops at an element — [`control_flow_sections`] is
     /// empty for one — whose content is that element's own structure, answered by its own
     /// analysis.
-    fn block_sections_force_break(&self, nodes: &[FragmentNode<'_>]) -> bool {
+    fn block_sections_force_break(&self, nodes: &[FragmentNode]) -> bool {
         nodes.iter().any(|n| {
             control_flow_sections(n).into_iter().flatten().any(|f| {
                 let nodes = self.svelte.nodes(f.nodes);

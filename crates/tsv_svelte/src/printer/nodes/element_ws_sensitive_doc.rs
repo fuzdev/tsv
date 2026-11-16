@@ -118,7 +118,7 @@ impl<'a> Printer<'a> {
     /// unchanged.
     pub(super) fn build_whitespace_sensitive_element_doc(
         &self,
-        element: &ast::Element<'_>,
+        element: &ast::Element,
         attrs: ElementAttrsDoc,
     ) -> DocId {
         // A `<textarea>`'s content is RCDATA, read as a sequence (see
@@ -132,7 +132,7 @@ impl<'a> Printer<'a> {
 
     fn build_whitespace_sensitive_element_doc_inner(
         &self,
-        element: &ast::Element<'_>,
+        element: &ast::Element,
         attrs: ElementAttrsDoc,
     ) -> DocId {
         let ElementAttrsDoc {
@@ -314,7 +314,7 @@ impl<'a> Printer<'a> {
     pub(super) fn build_verbatim_content_doc(
         &self,
         name: DocId,
-        nodes: &[FragmentNode<'_>],
+        nodes: &[FragmentNode],
         attr_docs: &[DocId],
         emission: AttrListEmission,
         edges: ContentEdges,
@@ -339,8 +339,8 @@ impl<'a> Printer<'a> {
     /// inject a *collapsible* space", and inside a whitespace-PRESERVING subtree the same
     /// bytes are literal content. Same character class, different claim; folding them would
     /// let a change to one silently retarget the other.
-    pub(super) fn ws_sensitive_content_edges(&self, nodes: &[FragmentNode<'_>]) -> ContentEdges {
-        let text_raw = |node: Option<&FragmentNode<'_>>| match node {
+    pub(super) fn ws_sensitive_content_edges(&self, nodes: &[FragmentNode]) -> ContentEdges {
+        let text_raw = |node: Option<&FragmentNode>| match node {
             Some(FragmentNode::Text(text)) => Some(text.raw(self.source)),
             _ => None,
         };
@@ -511,10 +511,7 @@ impl<'a> Printer<'a> {
     ///
     /// Range markers stay ordinary comments here, as inside any element: a range takes effect
     /// only at the top level of the template.
-    pub(super) fn build_whitespace_sensitive_content_doc(
-        &self,
-        nodes: &[FragmentNode<'_>],
-    ) -> DocId {
+    pub(super) fn build_whitespace_sensitive_content_doc(&self, nodes: &[FragmentNode]) -> DocId {
         let _fragment = self.enter_fragment();
         // Whitespace is significant here (`<pre>`/`<textarea>`): a block must not
         // dangle its `}` or expand its body — that would inject rendered whitespace.
@@ -560,7 +557,7 @@ impl<'a> Printer<'a> {
     ///   whitespace-sensitively.
     /// - **Expressions and other blocks**: format normally; the per-container body-indent
     ///   level is applied collectively by `build_whitespace_sensitive_content_doc`, not here.
-    fn build_whitespace_sensitive_node_doc(&self, node: &FragmentNode<'_>) -> DocId {
+    fn build_whitespace_sensitive_node_doc(&self, node: &FragmentNode) -> DocId {
         let d = self.d();
         match node {
             // Text: preserve exact whitespace (significant in pre/textarea)
@@ -610,7 +607,7 @@ impl<'a> Printer<'a> {
     /// Emits block structure inline without added whitespace. Body nodes are
     /// formatted with whitespace-sensitive content formatting to preserve
     /// significant whitespace.
-    fn build_ws_sensitive_if_block_doc(&self, block: &ast::IfBlock<'_>) -> DocId {
+    fn build_ws_sensitive_if_block_doc(&self, block: &ast::IfBlock) -> DocId {
         let d = self.d();
         // Pass false for in_multiline_context: inside whitespace-sensitive elements,
         // block expressions must not wrap (adding line breaks changes visible content)
@@ -641,7 +638,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build if alternate (else/else-if) for whitespace-sensitive context.
-    fn build_ws_sensitive_if_alternate(&self, alt: &Fragment<'_>, parts: &mut DocBuf) {
+    fn build_ws_sensitive_if_alternate(&self, alt: &Fragment, parts: &mut DocBuf) {
         let d = self.d();
 
         // Check if this can be flattened to {:else if ...}
@@ -672,7 +669,7 @@ impl<'a> Printer<'a> {
     ///
     /// Emits block structure inline without added whitespace. Body nodes are
     /// formatted with whitespace-sensitive content formatting.
-    fn build_ws_sensitive_each_block_doc(&self, block: &ast::EachBlock<'_>) -> DocId {
+    fn build_ws_sensitive_each_block_doc(&self, block: &ast::EachBlock) -> DocId {
         let d = self.d();
         let expr_comment_end = each_expr_comment_end(self.view, block);
         // Pass false for in_multiline_context: expressions must not wrap in ws-sensitive context
@@ -739,7 +736,7 @@ impl<'a> Printer<'a> {
     ///
     /// Every section decision reads [`SectionWhitespace::Preserved`]: here a whitespace-only
     /// section is rendered text, so only a section with no nodes may fold into the head or drop.
-    fn build_ws_sensitive_await_block_doc(&self, block: &ast::AwaitBlock<'_>) -> DocId {
+    fn build_ws_sensitive_await_block_doc(&self, block: &ast::AwaitBlock) -> DocId {
         let d = self.d();
         let sections = AwaitSections::classify(self.svelte, block, SectionWhitespace::Preserved);
         // Pass false for in_multiline_context: expressions must not wrap in ws-sensitive context
@@ -781,7 +778,7 @@ impl<'a> Printer<'a> {
 
     /// Build a key block doc for whitespace-sensitive context (inside `<pre>`): the head may
     /// open around a comment, the body stays glued to its tags.
-    fn build_ws_sensitive_key_block_doc(&self, block: &ast::KeyBlock<'_>) -> DocId {
+    fn build_ws_sensitive_key_block_doc(&self, block: &ast::KeyBlock) -> DocId {
         let d = self.d();
         // Pass false for in_multiline_context: expressions must not wrap in ws-sensitive context
         let head = self.build_block_head_expr(
@@ -801,7 +798,7 @@ impl<'a> Printer<'a> {
     /// Build a snippet block doc for whitespace-sensitive context (inside `<pre>`): the
     /// opening tag is the ordinary one (its parameters may open around a comment), the body
     /// stays glued to its tags.
-    fn build_ws_sensitive_snippet_block_doc(&self, block: &ast::SnippetBlock<'_>) -> DocId {
+    fn build_ws_sensitive_snippet_block_doc(&self, block: &ast::SnippetBlock) -> DocId {
         let d = self.d();
         let opening_doc = self.build_snippet_opening_doc(block);
         let body_doc =

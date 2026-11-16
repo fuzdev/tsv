@@ -18,7 +18,7 @@ impl<'a> Printer<'a> {
     /// Uses Doc-based integration instead of string post-processing. The Doc system
     /// naturally handles template literals correctly: `indent(doc)` only affects `Line` docs
     /// (hardline, softline, line), not newlines inside `text()` which output as-is.
-    pub(super) fn print_script(&mut self, script: &ast::Script<'_>) {
+    pub(super) fn print_script(&mut self, script: &ast::Script) {
         // Check if script had any original content (including whitespace)
         let had_content = script.content.span.start != script.content.span.end;
 
@@ -108,7 +108,7 @@ impl<'a> Printer<'a> {
     /// Formats the `<style>` tag with its CSS content.
     /// The CSS is formatted using the CSS printer with indentation.
     /// For non-CSS languages (less, scss, etc.), content is preserved raw.
-    pub(super) fn print_style(&mut self, style: &ast::Style<'_>) {
+    pub(super) fn print_style(&mut self, style: &ast::Style) {
         // Check if there was any original content (including whitespace)
         let had_content = style.content_span.start != style.content_span.end;
 
@@ -191,7 +191,7 @@ impl<'a> Printer<'a> {
     /// builder. Every other tag head, including `<svelte:options>`, goes through
     /// `Printer::push_attrs_with_comments`, which probes the gaps. Do not reach for this one
     /// from a head whose attributes come from the ordinary `read_attribute`.
-    fn build_section_attrs_doc(&self, attributes: &[ast::AttributeNode<'_>]) -> DocId {
+    fn build_section_attrs_doc(&self, attributes: &[ast::AttributeNode]) -> DocId {
         let d = self.d();
         let mut parts: DocBuf = DocBuf::with_capacity(attributes.len() * 2);
         for attr in attributes {
@@ -214,7 +214,7 @@ impl<'a> Printer<'a> {
     fn write_section_opening_tag(
         &mut self,
         tag_name: &str,
-        attributes: &[ast::AttributeNode<'_>],
+        attributes: &[ast::AttributeNode],
         has_content: bool,
     ) {
         if attributes.is_empty() {

@@ -1,15 +1,11 @@
 // Attribute parsing
 
-#[cfg(feature = "_internal_ast_census")]
-use crate::parser::census_vec::BumpVec;
-#[cfg(not(feature = "_internal_ast_census"))]
-use bumpalo::collections::Vec as BumpVec;
-
 use crate::ast::*;
 use crate::lexer::TokenKind;
 use crate::whitespace::{
     brace_interior_start, char_at, is_svelte_ws, name_run_end, skip_svelte_ws,
 };
+use tsv_lang::store::{ListBuf, ListMark, Run, flush_run};
 use tsv_lang::{Error, Span};
 use tsv_ts::ast::ExprId;
 use tsv_ts::ast::{Expression, IdentName, Identifier};
@@ -152,26 +148,37 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// - Attach tags: `{@attach expr}` (Svelte 5.29+)
     /// - Spread attributes: `{...obj}` (Svelte 3+)
     /// - Shorthand attributes: `{name}` (equivalent to `name={name}`)
-    pub(crate) fn parse_attributes(
-        &mut self,
-    ) -> Result<BumpVec<'arena, AttributeNode<'arena>>, Error> {
-        self.parse_attributes_inner(AttributeReader::Element)
+    ///
+    /// The list is flushed into its run here, at the end of the tag head, so no attribute
+    /// frame stays open across the element's children.
+    pub(crate) fn parse_attributes(&mut self) -> Result<Run<AttributeNode>, Error> {
+        let mark = self.parse_attribute_frame(AttributeReader::Element)?;
+        Ok(self.flush_attributes(mark))
     }
 
     /// Parse the attribute list of a top-level `<script>` / `<style>` tag head, which Svelte
     /// reads with [`AttributeReader::Static`] — no comments, no spread/shorthand/attach, no
     /// directives, and a raw value in which `{a: A}` is literal text rather than an expression.
-    pub(crate) fn parse_attributes_literal(
-        &mut self,
-    ) -> Result<BumpVec<'arena, AttributeNode<'arena>>, Error> {
-        self.parse_attributes_inner(AttributeReader::Static)
+    pub(crate) fn parse_attributes_literal(&mut self) -> Result<Run<AttributeNode>, Error> {
+        let mark = self.parse_attribute_frame(AttributeReader::Static)?;
+        Ok(self.flush_attributes(mark))
     }
 
-    fn parse_attributes_inner(
+    /// Flush the attribute frame `mark` opened into its run.
+    #[inline]
+    pub(crate) fn flush_attributes(&mut self, mark: ListMark<AttributeNode>) -> Run<AttributeNode> {
+        let runs = &mut self.own.runs;
+        flush_run(&mut runs.attribute_scratch, &mut runs.attributes, mark)
+    }
+
+    /// Read an attribute list onto a frame of the attribute scratch stack, returning its mark
+    /// with the frame still open, for a caller that edits the list before it flushes it
+    /// ([`Self::flush_attributes`]).
+    pub(crate) fn parse_attribute_frame(
         &mut self,
         reader: AttributeReader,
-    ) -> Result<BumpVec<'arena, AttributeNode<'arena>>, Error> {
-        let mut attributes = self.bvec();
+    ) -> Result<ListMark<AttributeNode>, Error> {
+        let mark = self.own.runs.attribute_scratch.mark();
 
         loop {
             // Skip JS comments (// and /* */) between attributes. `read_static_attribute` has
@@ -192,20 +199,18 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
             if reader == AttributeReader::Element && self.current_token_opens_a_brace_attribute() {
                 // Element attribute reader: `{@attach}`, `{...spread}`, or `{shorthand}`.
-                if self.check(TokenKind::TagOpen) {
-                    attributes.push(AttributeNode::AttachTag(self.parse_attach_tag()?));
+                let node = if self.check(TokenKind::TagOpen) {
+                    AttributeNode::AttachTag(self.parse_attach_tag()?)
                 } else {
                     // Peek ahead to distinguish spread `{...obj}` from shorthand `{name}`.
                     let next_char = self.peek_char_after_brace();
                     if next_char == Some('.') {
-                        attributes.push(AttributeNode::SpreadAttribute(
-                            self.parse_spread_attribute()?,
-                        ));
+                        AttributeNode::SpreadAttribute(self.parse_spread_attribute()?)
                     } else {
-                        attributes
-                            .push(AttributeNode::Attribute(self.parse_shorthand_attribute()?));
+                        AttributeNode::Attribute(self.parse_shorthand_attribute()?)
                     }
-                }
+                };
+                self.own.runs.attribute_scratch.push(node);
             } else if self.current_token_starts_attribute_name() {
                 // A name run. What the lexer made of its first character is not the question —
                 // an Identifier token, a symbol the lexer tokenized alone (`<p }>`), or the
@@ -213,13 +218,14 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 // `parse_attribute_or_directive` reads the raw run from `current_start` either
                 // way. `>`/`/` (tag close) and, for the element reader, `{`/`<` are peeled off
                 // above.
-                attributes.push(self.parse_attribute_or_directive(reader)?);
+                let node = self.parse_attribute_or_directive(reader)?;
+                self.own.runs.attribute_scratch.push(node);
             } else {
                 return Err(self.error_expected_found("attribute name or '>'"));
             }
         }
 
-        Ok(attributes)
+        Ok(mark)
     }
 
     /// Does the current token open a `{`-led attribute — `{@attach}`, `{...spread}`, or
@@ -308,7 +314,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     fn parse_attribute_or_directive(
         &mut self,
         reader: AttributeReader,
-    ) -> Result<AttributeNode<'arena>, Error> {
+    ) -> Result<AttributeNode, Error> {
         // Read the full attribute/directive name as Svelte's `read_tag` does — a raw run from
         // `current_start` up to a token-ending char (`/[\s=/>"']/`), so a name the lexer split
         // or over-ran (`ysc%%gibberish`, `{ #a}`) is whole before the directive `:` split and
@@ -346,7 +352,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         full_name: &str,
         colon_idx: usize,
         name_end: usize,
-    ) -> Result<AttributeNode<'arena>, Error> {
+    ) -> Result<AttributeNode, Error> {
         let start = self.current_start();
         let head_span = Span {
             start: start as u32,
@@ -370,18 +376,19 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // Each modifier is a verbatim source slice too, held as its span: the parts follow
         // the name in `full_name`, each after its own `|` (one byte), so a part starts one
         // past where the previous one ended.
-        let mut modifiers_vec = self.bvec();
+        let runs = &mut self.own.runs;
+        let mark = runs.modifier_scratch.mark();
         let mut part_end = name_start + directive_name.len();
         for m in parts {
             let part_start = part_end + 1;
             part_end = part_start + m.len();
             debug_assert_eq!(&self.source[part_start..part_end], m);
-            modifiers_vec.push(Span {
+            runs.modifier_scratch.push(Span {
                 start: part_start as u32,
                 end: part_end as u32,
             });
         }
-        let modifiers: &'arena [Span] = modifiers_vec.into_bump_slice();
+        let modifiers = flush_run(&mut runs.modifier_scratch, &mut runs.modifiers, mark);
 
         if directive_name.is_empty() {
             return Err(self.error_msg_at(
@@ -556,11 +563,11 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             Ok((expr_tag.expression, expr_tag.span))
         } else if self.check(TokenKind::String) {
             // Quoted mustache form: "{expr}" — must be exactly one ExpressionTag
-            // with no text parts. Popping the lone element extracts it owned.
-            let mut parts = self.parse_attribute_value()?;
-            if parts.len() == 1
-                && let Some(AttributeValue::ExpressionTag(expr_tag)) = parts.pop()
-            {
+            // with no text parts. The lone part is copied out and its frame discarded.
+            let mark = self.parse_attribute_value()?;
+            let scratch = &mut self.own.runs.attribute_value_scratch;
+            if let [AttributeValue::ExpressionTag(expr_tag)] = *scratch.frame(mark) {
+                scratch.truncate(mark);
                 Ok((expr_tag.expression, expr_tag.span))
             } else {
                 Err(self.error_msg(
@@ -636,11 +643,11 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     fn parse_style_directive(
         &mut self,
         name_span: Span,
-        modifiers: &'arena [Span],
+        modifiers: Run<Span>,
         start: usize,
         name_end: usize,
         head_span: Span,
-    ) -> Result<AttributeNode<'arena>, Error> {
+    ) -> Result<AttributeNode, Error> {
         // Check for = (directive with value)
         let value = if self.check(TokenKind::Equals) {
             self.advance()?; // consume =
@@ -652,27 +659,32 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 StyleDirectiveValue::ExpressionTag(expr_tag)
             } else if self.check(TokenKind::String) {
                 // Parse string value like "red" or quoted mustache like "{value}"
-                let mut parts = self.parse_attribute_value()?;
+                let mark = self.parse_attribute_value()?;
                 // A lone quoted mustache "{expr}" becomes an ExpressionTag (quotes
-                // stripped); any other shape (text, multiple parts) stays as raw
-                // value parts. Pop the last element to test/extract it owned.
-                match parts.pop() {
-                    Some(AttributeValue::ExpressionTag(expr_tag)) if parts.is_empty() => {
-                        StyleDirectiveValue::ExpressionTag(expr_tag)
-                    }
-                    popped => {
-                        // Not a lone ExpressionTag: restore the popped part and keep
-                        // everything as raw value parts.
-                        if let Some(part) = popped {
-                            parts.push(part);
-                        }
-                        StyleDirectiveValue::Parts(parts.into_bump_slice())
-                    }
+                // stripped), copied out and its frame discarded; any other shape (text,
+                // multiple parts) stays as raw value parts.
+                let runs = &mut self.own.runs;
+                if let [AttributeValue::ExpressionTag(expr_tag)] =
+                    *runs.attribute_value_scratch.frame(mark)
+                {
+                    runs.attribute_value_scratch.truncate(mark);
+                    StyleDirectiveValue::ExpressionTag(expr_tag)
+                } else {
+                    StyleDirectiveValue::Parts(flush_run(
+                        &mut runs.attribute_value_scratch,
+                        &mut runs.attribute_values,
+                        mark,
+                    ))
                 }
             } else if self.check(TokenKind::Identifier) {
                 // Unquoted value: style:background=green
-                let parts = self.parse_unquoted_attribute_value()?;
-                StyleDirectiveValue::Parts(parts.into_bump_slice())
+                let mark = self.parse_unquoted_attribute_value()?;
+                let runs = &mut self.own.runs;
+                StyleDirectiveValue::Parts(flush_run(
+                    &mut runs.attribute_value_scratch,
+                    &mut runs.attribute_values,
+                    mark,
+                ))
             } else {
                 return Err(
                     self.error_msg("Style directive value must be an expression or quoted string")
@@ -685,16 +697,22 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
         // Calculate end position
         // For ExpressionTag from quoted mustache ("{expr}"), skip past the closing quote
-        let end = match &value {
+        let end = match value {
             StyleDirectiveValue::ExpressionTag(et) => {
                 self.end_past_optional_quote(et.span.end_usize())
             }
-            StyleDirectiveValue::Parts(parts) => parts.last().map_or(name_end, |p| match p {
-                AttributeValue::Text(t) => self.end_past_optional_quote(t.span.end_usize()),
-                AttributeValue::ExpressionTag(et) => {
-                    self.end_past_optional_quote(et.span.end_usize())
-                }
-            }),
+            StyleDirectiveValue::Parts(parts) => self
+                .own
+                .runs
+                .attribute_values
+                .slice(parts)
+                .last()
+                .map_or(name_end, |p| match p {
+                    AttributeValue::Text(t) => self.end_past_optional_quote(t.span.end_usize()),
+                    AttributeValue::ExpressionTag(et) => {
+                        self.end_past_optional_quote(et.span.end_usize())
+                    }
+                }),
             StyleDirectiveValue::True => name_end,
         };
 
@@ -864,7 +882,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// Equivalent to: name={name}
     ///
     /// The content must be a valid identifier.
-    fn parse_shorthand_attribute(&mut self) -> Result<Attribute<'arena>, Error> {
+    fn parse_shorthand_attribute(&mut self) -> Result<Attribute, Error> {
         let start = self.current_start();
 
         // We're at '{', scan forward to find the closing '}'
@@ -943,11 +961,18 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // Advance the lexer past the entire {name} construct
         self.advance_to_position(end)?;
 
-        let mut value_vec = self.bvec();
-        value_vec.push(AttributeValue::ExpressionTag(expression_tag));
+        let runs = &mut self.own.runs;
+        let mark = runs.attribute_value_scratch.mark();
+        runs.attribute_value_scratch
+            .push(AttributeValue::ExpressionTag(expression_tag));
+        let value = flush_run(
+            &mut runs.attribute_value_scratch,
+            &mut runs.attribute_values,
+            mark,
+        );
 
         Ok(Attribute {
-            value: Some(value_vec.into_bump_slice()),
+            value: Some(value),
             span: Span {
                 start: start as u32,
                 end: end as u32,
@@ -961,7 +986,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         name_start: usize,
         name_end: usize,
         reader: AttributeReader,
-    ) -> Result<Attribute<'arena>, Error> {
+    ) -> Result<Attribute, Error> {
         // The name was already read as a Svelte `read_tag` run by the caller; it starts at
         // an Identifier token but may extend past it over special chars (`a%b`). The name is
         // span-identity (`source[name_span]`); just resync the lexer past it.
@@ -977,10 +1002,17 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             self.advance()?; // consume =
 
             // Parse attribute value (string or expression)
-            let value = self.parse_attribute_value()?;
+            let mark = self.parse_attribute_value()?;
 
-            // Find the end position from the last value part
-            let value_end = if let Some(last_part) = value.last() {
+            // Find the end position from the last value part, read off the open frame
+            let last_part = self
+                .own
+                .runs
+                .attribute_value_scratch
+                .frame(mark)
+                .last()
+                .copied();
+            let value_end = if let Some(last_part) = last_part {
                 match last_part {
                     AttributeValue::Text(text) => {
                         // For quoted strings, Text span covers content only (without quotes),
@@ -995,9 +1027,15 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             } else {
                 return Err(self.error_msg("Attribute value is empty"));
             };
+            let runs = &mut self.own.runs;
+            let value = flush_run(
+                &mut runs.attribute_value_scratch,
+                &mut runs.attribute_values,
+                mark,
+            );
 
             Ok(Attribute {
-                value: Some(value.into_bump_slice()),
+                value: Some(value),
                 span: Span {
                     start: start as u32,
                     end: value_end as u32,
@@ -1037,7 +1075,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         &mut self,
         start: usize,
         name_end: usize,
-    ) -> Result<Attribute<'arena>, Error> {
+    ) -> Result<Attribute, Error> {
         let name_span = Span {
             start: start as u32,
             end: name_end as u32,
@@ -1051,12 +1089,19 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         }
 
         let (text, value_end) = self.read_static_attribute_value(name_end + 1)?;
-        let mut parts = self.bvec();
-        parts.push(AttributeValue::Text(text));
+        let runs = &mut self.own.runs;
+        let mark = runs.attribute_value_scratch.mark();
+        runs.attribute_value_scratch
+            .push(AttributeValue::Text(text));
+        let value = flush_run(
+            &mut runs.attribute_value_scratch,
+            &mut runs.attribute_values,
+            mark,
+        );
         self.advance_to_position(value_end)?;
 
         Ok(Attribute {
-            value: Some(parts.into_bump_slice()),
+            value: Some(value),
             span: Span {
                 start: start as u32,
                 end: value_end as u32,
@@ -1123,10 +1168,11 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     }
 
     /// Parse attribute value (e.g., `"ts"`, `{expr}`, or unquoted `value`)
-    /// Returns a `Vec<AttributeValue>` to support mixed text/expressions
-    pub(crate) fn parse_attribute_value(
-        &mut self,
-    ) -> Result<BumpVec<'arena, AttributeValue>, Error> {
+    ///
+    /// Pushes the value's parts — mixed text and expressions — onto a frame of the value
+    /// scratch stack and returns its mark with the frame still open: the caller reads it,
+    /// then flushes it into a run or discards it.
+    pub(crate) fn parse_attribute_value(&mut self) -> Result<ListMark<AttributeValue>, Error> {
         // Any value not starting with a quote is unquoted, read as a Svelte
         // `read_sequence` — a run of Text + {expr} chunks to the terminator regex.
         // Covers a bare identifier (`data-attr=value`), a single expression
@@ -1136,7 +1182,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             return self.parse_unquoted_attribute_value();
         }
 
-        let mut parts = self.bvec();
+        let mark = self.own.runs.attribute_value_scratch.mark();
 
         // Extract string content (without quotes)
         let (token_start, token_end) = self.current_pos();
@@ -1155,17 +1201,13 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // whole content is one Text — the split below would find exactly this, empty
         // content included (its empty Text is the same node either way).
         if holds_no_brace {
-            let span = Span {
-                start: content_start as u32,
-                end: content_end as u32,
-            };
-            parts.push(AttributeValue::Text(Text::new(
-                span,
-                TextDecoding::AttributeValue,
-                span,
+            push_value_text(
+                &mut self.own.runs.attribute_value_scratch,
                 self.source,
-            )));
-            return Ok(parts);
+                content_start,
+                content_end,
+            );
+            return Ok(mark);
         }
 
         // Scan the quoted value as a sequence of Text and {expr} chunks. Each
@@ -1184,31 +1226,31 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 pos += 1;
             }
             if pos > text_start {
-                let span = Span {
-                    start: text_start as u32,
-                    end: pos as u32,
-                };
-                parts.push(AttributeValue::Text(Text::new(
-                    span,
-                    TextDecoding::AttributeValue,
-                    span,
+                push_value_text(
+                    &mut self.own.runs.attribute_value_scratch,
                     self.source,
-                )));
+                    text_start,
+                    pos,
+                );
             }
 
             if pos < content_end && source_bytes[pos] == b'{' {
                 let tag =
                     self.parse_sequence_expression_tag_at(pos, SequenceLocation::AttributeValue)?;
                 pos = tag.span.end as usize;
-                parts.push(AttributeValue::ExpressionTag(tag));
+                self.own
+                    .runs
+                    .attribute_value_scratch
+                    .push(AttributeValue::ExpressionTag(tag));
             }
         }
 
         // If no parts were created (empty string or quote mismatch), create empty text.
         // `raw` is empty here even when the node span covers a stray byte (e.g. a
         // literal `{`), so `raw_span` is an empty span, not the node span.
-        if parts.is_empty() {
-            parts.push(AttributeValue::Text(Text::new(
+        let scratch = &mut self.own.runs.attribute_value_scratch;
+        if scratch.len_since(mark) == 0 {
+            scratch.push(AttributeValue::Text(Text::new(
                 Span {
                     start: content_start as u32,
                     end: content_start as u32,
@@ -1222,7 +1264,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             )));
         }
 
-        Ok(parts)
+        Ok(mark)
     }
 
     /// Parse an unquoted attribute value as a Svelte `read_sequence`.
@@ -1243,30 +1285,24 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// The [`AttributeReader::Static`] twin of this is
     /// [`read_static_attribute_value`](Self::read_static_attribute_value), whose terminator
     /// set is far laxer and whose `{` is never an expression.
+    ///
+    /// Like [`Self::parse_attribute_value`], returns the mark of the frame its parts are on,
+    /// still open.
     pub(crate) fn parse_unquoted_attribute_value(
         &mut self,
-    ) -> Result<BumpVec<'arena, AttributeValue>, Error> {
+    ) -> Result<ListMark<AttributeValue>, Error> {
         // `src`/`bytes` borrow the source data (lifetime `'a`), so they stay valid
         // across the `&mut self` `parse_expression_tag_at` call below.
         let src = self.source;
         let bytes = src.as_bytes();
         let start = self.current_start();
-        let mut parts: BumpVec<'arena, AttributeValue> = self.bvec();
+        let mark = self.own.runs.attribute_value_scratch.mark();
         let mut text_start = start;
         let mut pos = start;
 
-        let flush_text = |parts: &mut BumpVec<'arena, AttributeValue>, from: usize, to: usize| {
+        let flush_text = |parser: &mut Self, from: usize, to: usize| {
             if to > from {
-                let span = Span {
-                    start: from as u32,
-                    end: to as u32,
-                };
-                parts.push(AttributeValue::Text(Text::new(
-                    span,
-                    TextDecoding::AttributeValue,
-                    span,
-                    src,
-                )));
+                push_value_text(&mut parser.own.runs.attribute_value_scratch, src, from, to);
             }
         };
 
@@ -1285,7 +1321,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             // attribute as a QUOTED one, output `svelte compile` rejects. Stepping by
             // `width` is what keeps `char_at` on a character boundary.
             let Some((c, width)) = char_at(src, pos) else {
-                flush_text(&mut parts, text_start, pos);
+                flush_text(self, text_start, pos);
                 break;
             };
             let terminated = match c {
@@ -1294,13 +1330,13 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 _ => is_svelte_ws(c),
             };
             if terminated {
-                flush_text(&mut parts, text_start, pos);
+                flush_text(self, text_start, pos);
                 break;
             }
 
             // An `{expr}` chunk starts a new part.
             if c == '{' {
-                flush_text(&mut parts, text_start, pos);
+                flush_text(self, text_start, pos);
                 // Parse the `{expr}` without disturbing the lexer (it handles nested
                 // braces, strings, comments, and regex that a raw byte scan cannot);
                 // we own the cursor and sync the lexer once below.
@@ -1308,7 +1344,10 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                     self.parse_sequence_expression_tag_at(pos, SequenceLocation::AttributeValue)?;
                 pos = tag.span.end as usize;
                 text_start = pos;
-                parts.push(AttributeValue::ExpressionTag(tag));
+                self.own
+                    .runs
+                    .attribute_value_scratch
+                    .push(AttributeValue::ExpressionTag(tag));
                 continue;
             }
 
@@ -1324,8 +1363,23 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // tag) and `advance_to_position` re-lexes the terminator in tag mode.
         self.advance_to_position(pos)?;
 
-        Ok(parts)
+        Ok(mark)
     }
+}
+
+/// Push the attribute-value `Text` covering `[from, to)` of `source` onto `scratch`: a quoted
+/// or unquoted value's text chunk, which decodes with attribute-context rules.
+fn push_value_text(scratch: &mut ListBuf<AttributeValue>, source: &str, from: usize, to: usize) {
+    let span = Span {
+        start: from as u32,
+        end: to as u32,
+    };
+    scratch.push(AttributeValue::Text(Text::new(
+        span,
+        TextDecoding::AttributeValue,
+        span,
+        source,
+    )));
 }
 
 #[cfg(test)]
@@ -1423,7 +1477,7 @@ mod tests {
         use crate::ast::{AttributeNode, FragmentNode, SvelteView};
         use tsv_lang::Span;
 
-        fn modifiers<'a>(view: SvelteView<'a>, node: &AttributeNode<'a>) -> &'a [Span] {
+        fn modifiers<'a>(view: SvelteView<'a>, node: &AttributeNode) -> &'a [Span] {
             let modifiers = match node {
                 AttributeNode::OnDirective(d) => d.modifiers,
                 AttributeNode::BindDirective(d) => d.modifiers,

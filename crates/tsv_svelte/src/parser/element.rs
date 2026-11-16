@@ -1,15 +1,12 @@
 // Element parsing
 
-#[cfg(feature = "_internal_ast_census")]
-use crate::parser::census_vec::BumpVec;
-#[cfg(not(feature = "_internal_ast_census"))]
-use bumpalo::collections::Vec as BumpVec;
-
 use crate::ast::*;
 use crate::lexer::TokenKind;
 use crate::whitespace::{char_at, is_svelte_ws, name_run_end};
+use tsv_lang::store::Run;
 use tsv_lang::{Error, Span};
 
+use super::attribute::AttributeReader;
 use super::expression_tag::SequenceLocation;
 use super::parser_impl::SvelteParser;
 use super::{find_exact_tag_close, rcdata_close_at};
@@ -211,9 +208,9 @@ fn is_tag_name_tail_run(tail: &str) -> bool {
 }
 
 /// Result type for parsing elements - either a regular element or a special element.
-pub(crate) enum ParsedElement<'arena> {
-    Element(Element<'arena>),
-    SpecialElement(SpecialElement<'arena>),
+pub(crate) enum ParsedElement {
+    Element(Element),
+    SpecialElement(SpecialElement),
 }
 
 /// Where an opening tag ended, as [`SvelteParser::read_opening_tag_end`] read it.
@@ -284,14 +281,15 @@ enum SpecialThisBinding {
 ///
 /// Only the *first* `this` is lifted — a repeated one stays in the attribute list, as an
 /// ordinary attribute of that name.
-type SpecialElementAttrs<'arena> = (BumpVec<'arena, AttributeNode<'arena>>, SpecialThisBinding);
+type SpecialElementAttrs = (Run<AttributeNode>, SpecialThisBinding);
 
 impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// Whether an attribute list carries a `shadowrootmode` attribute (by name). On a
     /// RegularElement this marks a declarative-shadow-root template, so descendant `<slot>`s are
     /// ordinary elements rather than `SlotElement`s — mirrors Svelte's
     /// `parent_is_shadowroot_template` (`1-parse/state/element.js`).
-    fn attrs_have_shadowrootmode(&self, attributes: &[AttributeNode<'arena>]) -> bool {
+    fn attrs_have_shadowrootmode(&self, attributes: Run<AttributeNode>) -> bool {
+        let attributes = self.own.runs.attributes.slice(attributes);
         attributes.iter().any(|attr| {
             matches!(attr, AttributeNode::Attribute(a) if a.name(self.source) == "shadowrootmode")
         })
@@ -335,7 +333,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     pub(crate) fn parse_element_or_special(
         &mut self,
         parent: ElementParent,
-    ) -> Result<ParsedElement<'arena>, Error> {
+    ) -> Result<ParsedElement, Error> {
         // two wire levels: the element and the `Fragment` its children sit in (the depth
         // limit's count)
         self.nested(2, |p| p.parse_element_or_special_body(parent))
@@ -345,7 +343,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     fn parse_element_or_special_body(
         &mut self,
         parent: ElementParent,
-    ) -> Result<ParsedElement<'arena>, Error> {
+    ) -> Result<ParsedElement, Error> {
         let start = self.current_start();
 
         // Parse opening tag: <tag>
@@ -475,7 +473,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         tag_name: &'a str,
         facts: TagFacts,
         name_span: Span,
-    ) -> Result<ParsedElement<'arena>, Error> {
+    ) -> Result<ParsedElement, Error> {
         // Parse attributes
         let attributes = self.parse_attributes()?;
 
@@ -485,13 +483,11 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
         // Resolve this element's children and end offset. The four content regimes differ
         // only in how they produce `(nodes, end)`; the element is assembled once below.
-        let (nodes, end): (&'arena [FragmentNode<'arena>], u32) = if facts.is_void()
-            || opening.self_closing
-        {
+        let (nodes, end): (Run<FragmentNode>, u32) = if facts.is_void() || opening.self_closing {
             // Void and self-closing elements have no children or closing tag
             // (classification lives in `crate::html`, shared with the printer).
             self.advance()?; // consume >
-            (&[], opening.after_gt as u32)
+            (Run::EMPTY, opening.after_gt as u32)
         } else if facts.is_raw_text() {
             // Nested <style>/<script> are raw text (not parsed as Svelte template) —
             // per Svelte docs, "the <style> tag will be inserted as-is into the DOM".
@@ -499,15 +495,14 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             self.nested_raw_text_nesting = self.nested_raw_text_nesting.max(self.island_nesting());
             let child_nodes = self.parse_raw_text_content(tag_name, opening.after_gt, start)?;
             let end = self.parse_closing_tag(tag_name)?;
-            (child_nodes.into_bump_slice(), end)
+            (child_nodes, end)
         } else if tag_name == "textarea" {
             // <textarea> is RCDATA: raw text with live {expr} interpolation up to a
             // whitespace/attribute-tolerant </textarea…>, where `<` is literal text
             // (never a nested element). Svelte's sole RCDATA element — a sibling of the
             // <script>/<style> raw-text branch above, but interleaving Text +
             // ExpressionTag chunks.
-            let (child_nodes, end) = self.parse_rcdata_content(opening.after_gt, start)?;
-            (child_nodes.into_bump_slice(), end)
+            self.parse_rcdata_content(opening.after_gt, start)?
         } else {
             // Parse children. Only HTML elements participate in HTML5 implicit tag
             // closing (Svelte gates auto-close on `parent.type === 'RegularElement'`);
@@ -521,27 +516,26 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             // `shadowrootmode` turns on shadow-root-template context for its subtree
             // (`parent_is_shadowroot_template`).
             let in_shadow = self.in_shadowroot_template
-                || (is_html && self.attrs_have_shadowrootmode(&attributes));
+                || (is_html && self.attrs_have_shadowrootmode(attributes));
             let implicit_close = if is_html {
                 ImplicitClose::for_html_element(tag_name)
             } else {
                 ImplicitClose::Never
             };
-            let (child_nodes, end) = self.parse_children_in_context(
+            self.parse_children_in_context(
                 false,
                 in_shadow,
                 tag_name,
                 opening.after_gt,
                 start,
                 implicit_close,
-            )?;
-            (child_nodes.into_bump_slice(), end)
+            )?
         };
 
         Ok(ParsedElement::Element(Element {
             kind: facts.element_kind(),
             facts,
-            attributes: attributes.into_bump_slice(),
+            attributes,
             fragment: Fragment { nodes },
             span: Span {
                 start: start as u32,
@@ -558,7 +552,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         start: usize,
         name_span: Span,
         tag: SpecialElementTag,
-    ) -> Result<ParsedElement<'arena>, Error> {
+    ) -> Result<ParsedElement, Error> {
         // Parse attributes, extracting `this` for SvelteElement and SvelteComponent
         let (attributes, this) = self.parse_special_element_attributes(tag)?;
 
@@ -570,9 +564,9 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
         // Resolve children and end offset, then assemble once — the two content regimes here
         // are the same shape as the regular element's four above.
-        let (nodes, end): (&'arena [FragmentNode<'arena>], u32) = if opening.self_closing {
+        let (nodes, end): (Run<FragmentNode>, u32) = if opening.self_closing {
             // Self-closing special elements have no children or closing tag
-            (&[], opening.after_gt as u32)
+            (Run::EMPTY, opening.after_gt as u32)
         } else {
             // Parse children. Special elements (`svelte:*`, `slot`, …) are not HTML
             // RegularElements, so they never auto-close (`ImplicitClose::Never`) — a
@@ -583,20 +577,19 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             // `parent_is_head`/`parent_is_shadowroot_template` only stop at a
             // RegularElement/Component), so both flags carry through unchanged otherwise.
             let in_head = tag == SpecialElementTag::SvelteHead || self.in_svelte_head;
-            let (child_nodes, end) = self.parse_children_in_context(
+            self.parse_children_in_context(
                 in_head,
                 self.in_shadowroot_template,
                 tag.tag_name(),
                 opening.after_gt,
                 start,
                 ImplicitClose::Never,
-            )?;
-            (child_nodes.into_bump_slice(), end)
+            )?
         };
 
         Ok(ParsedElement::SpecialElement(SpecialElement {
             kind,
-            attributes: attributes.into_bump_slice(),
+            attributes,
             fragment: Fragment { nodes },
             span: Span {
                 start: start as u32,
@@ -669,48 +662,58 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// nor a replacement" structural: there is no second chance to give away. It stays an
     /// ordinary attribute, and the uniqueness check that would otherwise reject it is waived
     /// for exactly this name (`<svelte:element bind:this this=…>` is legal).
+    ///
+    /// Out of line: it runs once per special element, ahead of the children, and inlined into
+    /// the element body its frame would sit on the element recursion.
+    #[inline(never)]
     fn parse_special_element_attributes(
         &mut self,
         tag: SpecialElementTag,
-    ) -> Result<SpecialElementAttrs<'arena>, Error> {
-        let mut attributes = self.parse_attributes()?;
-
+    ) -> Result<SpecialElementAttrs, Error> {
         // Nine of the eleven special tags never bind a `this`; for them the list is already
         // the answer.
         if !tag.takes_this() {
-            return Ok((attributes, SpecialThisBinding::Absent));
+            return Ok((self.parse_attributes()?, SpecialThisBinding::Absent));
         }
+        let mark = self.parse_attribute_frame(AttributeReader::Element)?;
 
-        // Svelte's `findIndex`. Compare the span-identity name directly — no per-attribute
-        // `String`.
+        // Svelte's `findIndex`, over the frame still open. Compare the span-identity name
+        // directly — no per-attribute `String` — and bind what the binding needs of the
+        // attribute: its start and its value, a run flushed before the attribute was pushed.
         let source = self.source;
-        let found = attributes
+        let runs = &self.own.runs;
+        let found = runs
+            .attribute_scratch
+            .frame(mark)
             .iter()
             .enumerate()
             .find_map(|(i, node)| match node {
-                AttributeNode::Attribute(a) if a.name(source) == "this" => Some((i, a)),
+                AttributeNode::Attribute(a) if a.name(source) == "this" => {
+                    Some((i, a.span.start, a.value))
+                }
                 _ => None,
             });
-        let Some((index, a)) = found else {
-            return Ok((attributes, SpecialThisBinding::Absent));
+        let Some((index, attribute_start, value)) = found else {
+            return Ok((self.flush_attributes(mark), SpecialThisBinding::Absent));
         };
+        let value = value.map(|value| runs.attribute_values.slice(value));
 
         let this = if tag == SpecialElementTag::SvelteElement {
             // Svelte keeps chunk[0] and warns (`svelte_element_invalid_this`) when the value
             // is not a lone `{expression}` — a Svelte 4 behaviour it preserves on purpose. A
             // valueless `this` is the one it rejects, which it leaves to
             // [`Self::build_special_element_kind`].
-            match a.value.and_then(<[_]>::first) {
+            match value.and_then(<[_]>::first) {
                 // Keep the whole tag, not just its expression: the `{…}` span is where the
                 // printer looks for comments.
-                Some(AttributeValue::ExpressionTag(et)) => {
-                    SpecialThisBinding::Element(SpecialThis::Braced(et.clone()))
+                Some(&AttributeValue::ExpressionTag(et)) => {
+                    SpecialThisBinding::Element(SpecialThis::Braced(et))
                 }
                 // String value: no expression is parsed, so keep the text itself. Its decoded
                 // value is read where it is used (`Text::data`, in the attribute context the
                 // text was parsed in), never copied out of the source.
-                Some(AttributeValue::Text(t)) => {
-                    SpecialThisBinding::Element(SpecialThis::Plain(t.clone()))
+                Some(&AttributeValue::Text(t)) => {
+                    SpecialThisBinding::Element(SpecialThis::Plain(t))
                 }
                 None => SpecialThisBinding::Absent,
             }
@@ -719,20 +722,23 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             // `is_expression_attribute`: exactly one chunk, and an `{expression}`. A bare
             // `this`, a string, or a multi-chunk value (`this="a{b}"`, `this={a}{b}`) is
             // rejected outright — where `<svelte:element>` above merely warns.
-            let Some([AttributeValue::ExpressionTag(et)]) = a.value else {
+            let Some(&[AttributeValue::ExpressionTag(et)]) = value else {
                 return Err(self.error_msg_at(
                     "Invalid component definition — must be an `{expression}`",
-                    a.span.start as usize,
+                    attribute_start as usize,
                 ));
             };
             // Keep the whole tag — see the `svelte:element` arm above.
-            SpecialThisBinding::Component(et.clone())
+            SpecialThisBinding::Component(et)
         };
 
-        // Svelte's `splice`: the binding leaves the list, everything else keeps its place.
-        attributes.remove(index);
+        // Svelte's `splice`: the binding leaves the list, everything else keeps its place. The
+        // spliced attribute's value stays behind in its store, a run no node names.
+        let scratch = &mut self.own.runs.attribute_scratch;
+        scratch.frame_mut(mark)[index..].rotate_left(1);
+        let _spliced = scratch.pop(mark);
 
-        Ok((attributes, this))
+        Ok((self.flush_attributes(mark), this))
     }
 
     /// Parse an element's children under a given ancestor context (`in_svelte_head` /
@@ -748,7 +754,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         opening_tag_end: usize,
         start: usize,
         implicit_close: ImplicitClose,
-    ) -> Result<(BumpVec<'arena, FragmentNode<'arena>>, u32), Error> {
+    ) -> Result<(Run<FragmentNode>, u32), Error> {
         let saved_head = self.in_svelte_head;
         let saved_shadow = self.in_shadowroot_template;
         self.in_svelte_head = in_svelte_head;
@@ -759,8 +765,10 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         result
     }
 
-    /// Parse children until this element's end is resolved, returning the child
-    /// nodes and the element's end byte offset. The end is either past this
+    /// Parse children until this element's end is resolved, returning the run of the child
+    /// nodes and the element's end byte offset. The child frame is flushed on every way
+    /// out that returns `Ok`: an unflushed one would be absorbed by the parent's flush, its
+    /// nodes becoming the parent's. The end is either past this
     /// element's own `</tag>` (consumed here via `parse_closing_tag`) or, under
     /// HTML5 implicit tag closing, the offset of the `<` that triggered the implicit
     /// close (an ancestor's `</other>` or an auto-closing sibling `<next>`, left
@@ -775,22 +783,22 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         opening_tag_end: usize,
         start: usize,
         implicit_close: ImplicitClose,
-    ) -> Result<(BumpVec<'arena, FragmentNode<'arena>>, u32), Error> {
-        let mut child_nodes = self.bvec();
+    ) -> Result<(Run<FragmentNode>, u32), Error> {
+        let mark = self.own.runs.node_scratch.mark();
         let mut last_end = opening_tag_end;
 
         loop {
             // Capture text/whitespace gaps between tokens
-            self.capture_text_if_gap(last_end, &mut child_nodes)?;
+            self.capture_text_if_gap(last_end)?;
 
             if self.check(TokenKind::Comment) {
                 let comment = self.parse_comment()?;
                 last_end = comment.span.end_usize();
-                child_nodes.push(FragmentNode::Comment(comment));
+                self.push_node(FragmentNode::Comment(comment));
             } else if self.check(TokenKind::LeftBrace) {
                 let tag = self.parse_brace_tag()?;
                 last_end = tag.span().end_usize();
-                child_nodes.push(tag);
+                self.push_node(tag);
             } else if self.check(TokenKind::LeftAngle) {
                 // A `<…>` may end this element rather than nest inside it. Both
                 // auto-close paths leave the triggering `<` unconsumed for the
@@ -809,7 +817,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                     } else {
                         self.parse_closing_tag(tag_name)?
                     };
-                    return Ok((child_nodes, end));
+                    return Ok((self.flush_nodes(mark), end));
                 }
                 // An opening tag `<next>` that the auto-close table says closes
                 // this element — leave it for the parent to adopt as a sibling. Only an element
@@ -819,28 +827,20 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 if implicit_close == ImplicitClose::AlsoAtNextTag
                     && self.next_open_tag_closes(tag_name)?
                 {
-                    return Ok((child_nodes, self.current_start() as u32));
+                    let end = self.current_start() as u32;
+                    return Ok((self.flush_nodes(mark), end));
                 }
                 // Parse child element (may be special or regular)
                 let child = self.parse_element_or_special(ElementParent::Nested)?;
-                match child {
-                    ParsedElement::Element(elem) => {
-                        last_end = elem.span.end_usize();
-                        child_nodes.push(FragmentNode::Element(elem));
-                    }
-                    ParsedElement::SpecialElement(elem) => {
-                        last_end = elem.span.end_usize();
-                        child_nodes.push(FragmentNode::SpecialElement(elem));
-                    }
-                }
+                last_end = self.push_parsed_element(child);
             } else if self.check(TokenKind::BlockOpen) {
                 let block = self.parse_block()?;
                 last_end = block.span().end_usize();
-                child_nodes.push(block);
+                self.push_node(block);
             } else if self.check(TokenKind::TagOpen) {
                 let tag = self.parse_template_tag()?;
                 last_end = tag.span().end_usize();
-                child_nodes.push(tag);
+                self.push_node(tag);
             } else if self.check(TokenKind::Eof) {
                 return Err(self.error_unclosed_element(tag_name, start));
             } else {
@@ -963,13 +963,13 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
     /// Parse raw text content for nested `<style>` and `<script>` elements.
     /// These elements should not have their content parsed as Svelte template syntax.
-    /// Returns a single Text node with the raw content, or empty vec if no content.
+    /// Returns the run of the single Text node holding the raw content, which may be empty.
     fn parse_raw_text_content(
         &mut self,
         tag_name: &str,
         content_start: usize,
         element_start: usize,
-    ) -> Result<BumpVec<'arena, FragmentNode<'arena>>, Error> {
+    ) -> Result<Run<FragmentNode>, Error> {
         // Nested raw-text uses an EXACT `</tag>` close (no `\s*` before `>`), matching
         // Svelte's generic element parser — unlike a top-level `<script>`/`<style>`, which
         // reads via the whitespace-tolerant `find_raw_text_close`. See that function.
@@ -990,14 +990,10 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             start: content_start as u32,
             end: content_end as u32,
         };
-        let mut nodes = self.bvec();
-        nodes.push(FragmentNode::Text(Text::new(
-            span,
-            TextDecoding::Raw,
-            span,
-            self.source,
-        )));
-        Ok(nodes)
+        let text = Text::new(span, TextDecoding::Raw, span, self.source);
+        let mark = self.own.runs.node_scratch.mark();
+        self.push_node(FragmentNode::Text(text));
+        Ok(self.flush_nodes(mark))
     }
 
     /// Parse RCDATA content for `<textarea>` — Svelte's sole RCDATA element (verified
@@ -1008,7 +1004,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// (`1-parse/state/element.js`): scan the content bytes, flushing `Text` chunks and,
     /// at each `{`, parsing an `ExpressionTag`.
     ///
-    /// Returns the child nodes and the element end (byte offset past the close tag's `>`),
+    /// Returns the run of the child nodes and the element end (byte offset past the close
+    /// tag's `>`),
     /// and repositions the lexer there. Not routed through `parse_closing_tag` — the close
     /// tag may carry whitespace/attributes (`</textarea data-x >`) that its exact
     /// tokenization rejects.
@@ -1016,11 +1013,11 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         &mut self,
         content_start: usize,
         element_start: usize,
-    ) -> Result<(BumpVec<'arena, FragmentNode<'arena>>, u32), Error> {
+    ) -> Result<(Run<FragmentNode>, u32), Error> {
         // `&'a [u8]` borrowed from the immutable source, so it survives the `&mut self`
         // expression-tag parse below (its lifetime is the source's, not this borrow's).
         let bytes = self.source.as_bytes();
-        let mut nodes = self.bvec();
+        let mark = self.own.runs.node_scratch.mark();
         let mut chunk_start = content_start;
         let mut i = content_start;
 
@@ -1028,7 +1025,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             // A `</textarea…>` at `i` ends the RCDATA (checked first, like `read_sequence`'s
             // `done()`); flush the pending text and stop.
             if let Some((close_lt, close_gt)) = rcdata_close_at(self.source, i, b"textarea") {
-                self.push_rcdata_text(&mut nodes, chunk_start, close_lt);
+                self.push_rcdata_text(chunk_start, close_lt);
                 break close_gt;
             }
             match bytes.get(i) {
@@ -1041,12 +1038,12 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 // `parse_expression_tag_at`, matching Svelte's reject. A `{#`/`{@` is not an
                 // expression here at all: it is rejected first, like Svelte's `read_sequence`.
                 Some(b'{') => {
-                    self.push_rcdata_text(&mut nodes, chunk_start, i);
+                    self.push_rcdata_text(chunk_start, i);
                     let tag =
                         self.parse_sequence_expression_tag_at(i, SequenceLocation::InsideTextarea)?;
                     i = tag.span.end as usize;
                     chunk_start = i;
-                    nodes.push(FragmentNode::ExpressionTag(tag));
+                    self.push_node(FragmentNode::ExpressionTag(tag));
                 }
                 // Any other byte (including `<`) is literal RCDATA text.
                 Some(_) => i += 1,
@@ -1060,29 +1057,20 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // bare-text sibling (`</textarea>x`) can never lex as a tag's Identifier.
         self.lexer.inside_tag = false;
         self.advance_to_position(end)?;
-        Ok((nodes, end as u32))
+        Ok((self.flush_nodes(mark), end as u32))
     }
 
     /// Push a `Text` chunk covering `[start, end)`, skipping it when empty (Svelte's
     /// `flush`: an empty chunk emits no node). RCDATA text decodes with attribute-value
     /// rules — Svelte hardcodes `decode_character_references(raw, true)` in `read_sequence`.
-    fn push_rcdata_text(
-        &self,
-        nodes: &mut BumpVec<'arena, FragmentNode<'arena>>,
-        start: usize,
-        end: usize,
-    ) {
+    fn push_rcdata_text(&mut self, start: usize, end: usize) {
         if end > start {
             let span = Span {
                 start: start as u32,
                 end: end as u32,
             };
-            nodes.push(FragmentNode::Text(Text::new(
-                span,
-                TextDecoding::AttributeValue,
-                span,
-                self.source,
-            )));
+            let text = Text::new(span, TextDecoding::AttributeValue, span, self.source);
+            self.push_node(FragmentNode::Text(text));
         }
     }
 }

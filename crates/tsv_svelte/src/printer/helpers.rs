@@ -12,18 +12,14 @@ impl<'a> Printer<'a> {
     /// formatter trims it, so a space-authored body must reach the same layout as the
     /// glued authoring. Content that is itself multiline (a component with wrapping
     /// attrs) still counts as inline — only the boundary run speaks for the boundary.
-    pub(super) fn is_inline_fragment(&self, fragment: &Fragment<'_>) -> bool {
+    pub(super) fn is_inline_fragment(&self, fragment: &Fragment) -> bool {
         !self.fragment_boundary_newline(fragment, true)
             && !self.fragment_boundary_newline(fragment, false)
     }
 
     /// Whether the fragment's boundary whitespace run is newline-authored — the node-slice
     /// predicate [`Printer::nodes_boundary_newline`] over the fragment's nodes.
-    pub(super) fn fragment_boundary_newline(
-        &self,
-        fragment: &Fragment<'_>,
-        is_leading: bool,
-    ) -> bool {
+    pub(super) fn fragment_boundary_newline(&self, fragment: &Fragment, is_leading: bool) -> bool {
         self.nodes_boundary_newline(self.svelte.nodes(fragment.nodes), is_leading)
     }
 
@@ -46,11 +42,7 @@ impl<'a> Printer<'a> {
     /// edge either, and a whitespace-only text is all edge, so any newline it has is there.
     /// Only a content text holding a newline walks its edge run ([`edge_run_holds_newline`]).
     #[inline]
-    pub(super) fn nodes_boundary_newline(
-        &self,
-        nodes: &[FragmentNode<'_>],
-        is_leading: bool,
-    ) -> bool {
+    pub(super) fn nodes_boundary_newline(&self, nodes: &[FragmentNode], is_leading: bool) -> bool {
         let node = if is_leading {
             nodes.first()
         } else {

@@ -6,47 +6,18 @@
 //! through the CSS view ([`SvelteView::css`]). The view is one word, so a walk holds one
 //! register for it.
 //!
-//! The template still holds its lists as slices and its strings as `str`s in the caller's
-//! arena, spelled with the aliases here, each one's accessor returning its argument; the
-//! aliases name what the stores will hold in their place — a `Run` over a store of the
-//! element type, and a pool text.
+//! A list is a `Run` over the store of its element type in the own half, read as a slice
+//! through the accessor the stores' macro declares beside them (`nodes`, `attributes`,
+//! `attribute_values`, `modifiers`, `wire_params`, and [`SvelteView::opt_attribute_values`]
+//! for an attribute's optional value); a string is a `PoolText<SvelteText>` in the own half's
+//! text pool, read through [`SvelteView::text`].
 
 use tsv_css::ast::CssView;
+use tsv_lang::store::{PoolText, Run};
 use tsv_ts::ast::AstView;
 
-use super::{
-    AttributeNode, AttributeValue, FragmentNode, ParsedRoot, SnippetWireParameters, Span,
-    SvelteStores,
-};
-
-/// A fragment's nodes, read through [`SvelteView::nodes`].
-// TODO: `Run<FragmentNode>`.
-pub type FragmentNodeRun<'a> = &'a [FragmentNode<'a>];
-
-/// An element's, a special element's, `<svelte:options>`'s, a `<script>`'s or a `<style>`'s
-/// attributes and directives, read through [`SvelteView::attributes`].
-// TODO: `Run<AttributeNode>`.
-pub type AttributeNodeRun<'a> = &'a [AttributeNode<'a>];
-
-/// An attribute's or a style directive's value parts, read through
-/// [`SvelteView::attribute_values`] (or [`SvelteView::opt_attribute_values`] for an
-/// attribute's optional value).
-// TODO: `Run<AttributeValue>`.
-pub type AttributeValueRun<'a> = &'a [AttributeValue];
-
-/// The spans of a directive's modifiers, read through [`SvelteView::modifiers`].
-// TODO: `Run<Span>`.
-pub type SpanRun<'a> = &'a [Span];
-
-/// The wire's parameter lists of the `{#snippet}` heads that hold a grouping pair, read
-/// through [`SvelteView::wire_params`].
-// TODO: `Run<SnippetWireParameters>`.
-pub type SnippetWireParametersRun<'a> = &'a [SnippetWireParameters];
-
-/// One string the template keeps as text of its own rather than as a span — a `{#snippet}`
-/// head's raw generics — read through [`SvelteView::text`].
-// TODO: a pool text.
-pub type PoolStr<'a> = &'a str;
+use super::stores::SvelteRuns;
+use super::{AttributeValue, ParsedRoot, SvelteStores, SvelteText};
 
 /// The read access every consumer of the document holds: resolves the template's lists and
 /// strings, and hands out the views of the embedded TypeScript and CSS.
@@ -74,49 +45,26 @@ impl<'a> SvelteView<'a> {
         self.stores.css.view()
     }
 
-    /// The elements of `list`: a fragment's nodes.
+    /// The template's list stores, for the accessors their macro declares beside them.
     #[inline]
-    pub fn nodes(self, list: FragmentNodeRun<'a>) -> &'a [FragmentNode<'a>] {
-        list
-    }
-
-    /// The elements of `list`: an element's or a section's attributes and directives.
-    #[inline]
-    pub fn attributes(self, list: AttributeNodeRun<'a>) -> &'a [AttributeNode<'a>] {
-        list
-    }
-
-    /// The elements of `list`: an attribute's or a style directive's value parts.
-    #[inline]
-    pub fn attribute_values(self, list: AttributeValueRun<'a>) -> &'a [AttributeValue] {
-        list
+    pub(super) fn runs(self) -> &'a SvelteRuns {
+        &self.stores.own.runs
     }
 
     /// The elements of `list`, when it is present: an attribute's value parts.
     #[inline]
     pub fn opt_attribute_values(
         self,
-        list: Option<AttributeValueRun<'a>>,
+        list: Option<Run<AttributeValue>>,
     ) -> Option<&'a [AttributeValue]> {
         list.map(|list| self.attribute_values(list))
     }
 
-    /// The elements of `list`: a directive's modifier spans.
+    /// The text `text` names: a string the template keeps as its own. A miss ends in the
+    /// pool's shared cold path.
     #[inline]
-    pub fn modifiers(self, list: SpanRun<'a>) -> &'a [Span] {
-        list
-    }
-
-    /// The elements of `list`: the wire's `{#snippet}` parameter lists.
-    #[inline]
-    pub fn wire_params(self, list: SnippetWireParametersRun<'a>) -> &'a [SnippetWireParameters] {
-        list
-    }
-
-    /// The text `text` names: a string the template keeps as its own.
-    #[inline]
-    pub fn text(self, text: PoolStr<'a>) -> &'a str {
-        text
+    pub fn text(self, text: PoolText<SvelteText>) -> &'a str {
+        self.stores.own.text.get(text)
     }
 }
 
@@ -128,7 +76,7 @@ impl SvelteStores {
     }
 }
 
-impl ParsedRoot<'_> {
+impl ParsedRoot {
     /// The view reading this tree's stores.
     #[inline]
     pub fn view(&self) -> SvelteView<'_> {

@@ -10,22 +10,22 @@ use tsv_cli::json_utils::indent_json_with_tabs;
 /// The parser-side validation phases (expected.json comparison, the tabbed
 /// serialization) all need the same AST — sharing one parse keeps
 /// `fixtures_validate` from re-parsing every fixture per phase.
-pub(crate) enum ParsedInput<'arena> {
-    Svelte(tsv_svelte::ast::ParsedRoot<'arena>),
+pub(crate) enum ParsedInput {
+    Svelte(tsv_svelte::ast::ParsedRoot),
     Ts(tsv_ts::ast::Parsed),
     Css(tsv_css::ast::ParsedCss),
 }
 
 /// Parse fixture content once for the parser-side validation phases.
 ///
-/// `arena` owns a Svelte input's markup AST and must outlive the returned `ParsedInput`
-/// (caller-owns-`Bump`).
-pub(crate) fn parse_input<'arena>(
+/// `arena` is the Svelte parse's caller-owned arena, which it no longer reads: every input's
+/// tree lives in the stores the returned `ParsedInput` holds.
+pub(crate) fn parse_input(
     content: &str,
     input_type: InputType,
     goal: tsv_ts::Goal,
-    arena: &'arena bumpalo::Bump,
-) -> Result<ParsedInput<'arena>, String> {
+    arena: &bumpalo::Bump,
+) -> Result<ParsedInput, String> {
     match input_type {
         InputType::Svelte => tsv_svelte::__private::parse(content, arena)
             .map(ParsedInput::Svelte)
@@ -70,7 +70,7 @@ impl InputAstPaths {
 /// re-indenter — the `--pretty` route, so the gate exercises it on every
 /// fixture. `expected.json` — pinned to the canonical parser by the P1/P3
 /// freshness checks — is the oracle these phases compare against.
-pub(crate) fn input_ast_paths(parsed: &ParsedInput<'_>, content: &str) -> InputAstPaths {
+pub(crate) fn input_ast_paths(parsed: &ParsedInput, content: &str) -> InputAstPaths {
     let wire = match parsed {
         ParsedInput::Svelte(ast) => tsv_svelte::__private::convert_ast_json_bytes(ast, content),
         ParsedInput::Ts(ast) => tsv_ts::__private::convert_ast_json_bytes(ast, content),

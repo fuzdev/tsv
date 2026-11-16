@@ -93,7 +93,7 @@ impl HoistedSection {
     }
 
     /// The section's span in `root`, `None` when the component has no such section.
-    fn span_in(self, root: &ast::Root<'_>) -> Option<Span> {
+    fn span_in(self, root: &ast::Root) -> Option<Span> {
         match self {
             Self::Options => root.options.as_ref().map(|s| s.span),
             Self::ModuleScript => root.module.as_ref().map(|s| s.span),
@@ -175,7 +175,7 @@ type FrozenSections = [bool; 4];
 
 /// The four root sections in canonical print order ([`HoistedSection::ALL`]), each with its
 /// span when the component has it.
-fn root_sections(root: &ast::Root<'_>) -> [(Option<Span>, HoistedSection); 4] {
+fn root_sections(root: &ast::Root) -> [(Option<Span>, HoistedSection); 4] {
     HoistedSection::ALL.map(|section| (section.span_in(root), section))
 }
 
@@ -201,7 +201,7 @@ struct IgnoreRanges {
 }
 
 impl IgnoreRanges {
-    fn new(nodes: &[FragmentNode<'_>], source: &str) -> Self {
+    fn new(nodes: &[FragmentNode], source: &str) -> Self {
         let markers: Vec<Option<RangeMarker>> = nodes
             .iter()
             .map(|n| match n {
@@ -258,7 +258,7 @@ struct CommentScan<'r> {
 }
 
 impl<'r> CommentScan<'r> {
-    fn new(view: SvelteView<'_>, fragment: &ast::Fragment<'_>, ranges: &'r IgnoreRanges) -> Self {
+    fn new(view: SvelteView<'_>, fragment: &ast::Fragment, ranges: &'r IgnoreRanges) -> Self {
         let nodes = view.nodes(fragment.nodes);
         let mut next_barrier = vec![None; nodes.len()];
         let mut barrier = None;
@@ -715,7 +715,7 @@ impl<'a> Printer<'a> {
     /// Whether `node` is a control-flow block the root marked as part of a single-line inline
     /// run — see [`Printer::root_inline_run_block_starts`]. Read by `build_nodes_doc_multiline`
     /// to build the block in inline (inner-break) rather than multiline (body-drop) context.
-    pub(crate) fn is_root_inline_run_block(&self, node: &FragmentNode<'_>) -> bool {
+    pub(crate) fn is_root_inline_run_block(&self, node: &FragmentNode) -> bool {
         self.root_inline_run_block_starts
             .borrow()
             .contains(&node.span().start)
@@ -1807,7 +1807,7 @@ fn format_root<'a>(
 /// (`tsv_lang::printing::encode_leading_zwnbsp`).
 fn print_document(
     mut printer: Printer<'_>,
-    root: &ast::Root<'_>,
+    root: &ast::Root,
     sections: &HoistedComments,
     frozen: FrozenSections,
 ) -> String {
@@ -1932,11 +1932,7 @@ fn format_lifted_runs(
 /// `{#await}` / `{#key}` / `{#snippet}` block bodies). The print-once comment ledger reads
 /// only the span, so no `HtmlComment` need be manufactured into a `Comment`.
 #[cfg(feature = "_internal_comment_check")]
-fn collect_html_comment_spans(
-    view: SvelteView<'_>,
-    fragment: &ast::Fragment<'_>,
-    out: &mut Vec<Span>,
-) {
+fn collect_html_comment_spans(view: SvelteView<'_>, fragment: &ast::Fragment, out: &mut Vec<Span>) {
     for node in view.nodes(fragment.nodes) {
         match node {
             FragmentNode::Comment(comment) => out.push(comment.span),
@@ -2035,12 +2031,7 @@ impl<'a> Printer<'a> {
     /// freezes the module script alone). The nearest NODE rather than the section's travelling
     /// run, because a directive inside a `format-ignore` range never travels (the range prints
     /// it where it stands) and still freezes the section below it.
-    fn section_is_frozen(
-        &self,
-        fragment: &ast::Fragment<'_>,
-        section: Span,
-        hoisted: &[Span],
-    ) -> bool {
+    fn section_is_frozen(&self, fragment: &ast::Fragment, section: Span, hoisted: &[Span]) -> bool {
         let nodes = self.svelte.nodes(fragment.nodes);
         let above = nodes.partition_point(|n| n.span().end <= section.start);
         let Some(FragmentNode::Comment(comment)) = nodes[..above]
@@ -2058,7 +2049,7 @@ impl<'a> Printer<'a> {
 
     /// Every section's freeze verdict ([`Self::section_is_frozen`]) — `<svelte:options>`
     /// takes none, since it always prints normalized.
-    fn frozen_sections(&self, root: &ast::Root<'_>) -> FrozenSections {
+    fn frozen_sections(&self, root: &ast::Root) -> FrozenSections {
         let hoisted: SmallVec<[Span; 4]> = root_sections(root)
             .into_iter()
             .filter_map(|(span, _)| span)
@@ -2071,7 +2062,7 @@ impl<'a> Printer<'a> {
 
     /// The root fragment's [`IgnoreRanges`], paired on first ask and kept for the document —
     /// every reader asks of the one root this printer formats.
-    fn ignore_ranges(&self, root_fragment: &ast::Fragment<'_>) -> &IgnoreRanges {
+    fn ignore_ranges(&self, root_fragment: &ast::Fragment) -> &IgnoreRanges {
         let ranges = self
             .ignore_ranges
             .get_or_init(|| IgnoreRanges::new(self.svelte.nodes(root_fragment.nodes), self.source));
@@ -2093,7 +2084,7 @@ impl<'a> Printer<'a> {
     fn classify_fragment_comment(
         comment: &ast::HtmlComment,
         comment_idx: usize,
-        root: &ast::Root<'_>,
+        root: &ast::Root,
         scan: &CommentScan<'_>,
     ) -> Option<HoistedSection> {
         // format-ignore-start/end mark ranges within the template —
@@ -2164,7 +2155,7 @@ impl<'a> Printer<'a> {
     /// to the template (`None`) or to [`HoistedSection::Options`]. Range markers and comments
     /// inside a frozen range are excluded for the same reasons the leading classification
     /// excludes them.
-    fn region_end_trails(&self, root: &ast::Root<'_>) -> [Option<usize>; 4] {
+    fn region_end_trails(&self, root: &ast::Root) -> [Option<usize>; 4] {
         let nodes = self.svelte.nodes(root.fragment.nodes);
         let bytes = self.source.as_bytes();
         root_sections(root).map(|(span, _)| {
@@ -2195,7 +2186,7 @@ impl<'a> Printer<'a> {
     /// in a release build.
     fn fragment_comment<'f>(
         view: SvelteView<'f>,
-        fragment: &ast::Fragment<'f>,
+        fragment: &ast::Fragment,
         idx: usize,
     ) -> Option<&'f ast::HtmlComment> {
         let comment = match &view.nodes(fragment.nodes)[idx] {
@@ -2227,7 +2218,7 @@ impl<'a> Printer<'a> {
     fn print_comment_run(
         &mut self,
         comment_indices: &[usize],
-        fragment: &ast::Fragment<'_>,
+        fragment: &ast::Fragment,
     ) -> Option<u32> {
         let mut prev_end: Option<u32> = None;
         for &i in comment_indices {
@@ -2246,7 +2237,7 @@ impl<'a> Printer<'a> {
     fn print_region_end_trail(
         &mut self,
         trail: Option<usize>,
-        fragment: &ast::Fragment<'_>,
+        fragment: &ast::Fragment,
         section_end: u32,
     ) {
         if let Some(idx) = trail
@@ -2275,7 +2266,7 @@ impl<'a> Printer<'a> {
     fn print_section_comments(
         &mut self,
         comment_indices: &[usize],
-        fragment: &ast::Fragment<'_>,
+        fragment: &ast::Fragment,
         section_start: u32,
     ) -> bool {
         let Some(last_end) = self.print_comment_run(comment_indices, fragment) else {
@@ -2294,7 +2285,7 @@ impl<'a> Printer<'a> {
     /// confirmed against the classification (the plugin's precedence — see
     /// [`Self::region_end_trails`]); each candidate names one section and each section at most
     /// one candidate, so a confirmed trail is written exactly once.
-    fn hoisted_comments(&self, root: &ast::Root<'_>) -> HoistedComments {
+    fn hoisted_comments(&self, root: &ast::Root) -> HoistedComments {
         let trails = self.region_end_trails(root);
         let mut sections = HoistedComments::default();
         let scan = CommentScan::new(
@@ -2339,7 +2330,7 @@ impl<'a> Printer<'a> {
     /// move is tsv's, so the respell completes it.
     fn template_tail_respell(
         &self,
-        root: &ast::Root<'_>,
+        root: &ast::Root,
         sections: &HoistedComments,
     ) -> Option<(usize, char)> {
         if root.css.is_some() {
@@ -2390,11 +2381,7 @@ impl<'a> Printer<'a> {
     /// A region-end trail is stepped over (it is the section's own, already placed); a range
     /// marker or a comment inside a frozen range ends the run, since moving either would move
     /// the freeze.
-    fn style_trailing_comments(
-        &self,
-        root: &ast::Root<'_>,
-        sections: &HoistedComments,
-    ) -> Vec<usize> {
+    fn style_trailing_comments(&self, root: &ast::Root, sections: &HoistedComments) -> Vec<usize> {
         let mut run: Vec<usize> = Vec::new();
         if root.css.is_none() {
             return run;
@@ -2431,12 +2418,7 @@ impl<'a> Printer<'a> {
     /// Comments travel with the section they immediately precede in source order — and a
     /// `#endregion` marker directly after a section travels below it
     /// ([`Self::region_end_trails`]).
-    fn print_root(
-        &mut self,
-        root: &ast::Root<'_>,
-        sections: &HoistedComments,
-        frozen: FrozenSections,
-    ) {
+    fn print_root(&mut self, root: &ast::Root, sections: &HoistedComments, frozen: FrozenSections) {
         // Sections are lifted off the fragment and printed at canonical positions, but a
         // `format-ignore` range's verbatim slice is raw source and would re-emit any that sits
         // inside it — see `build_ignore_range_doc`.
@@ -2546,7 +2528,7 @@ impl<'a> Printer<'a> {
     /// ordinary `read_attribute` like any other, comments included, so it goes through the
     /// same [`Printer::push_attrs_with_comments`] the pipeline uses. Doc-based from there on,
     /// for width-aware wrapping.
-    fn print_svelte_options(&mut self, options: &ast::SvelteOptions<'_>) {
+    fn print_svelte_options(&mut self, options: &ast::SvelteOptions) {
         let d = self.d();
         // Built before the empty check, not after: the attribute list can be empty and still
         // carry comments (`<svelte:options /* c */ />`), and an early return keyed on
@@ -2618,7 +2600,7 @@ impl<'a> Printer<'a> {
     ///   `format-ignore` is handled by the shared builder itself.)
     fn print_root_fragment(
         &mut self,
-        fragment: &ast::Fragment<'_>,
+        fragment: &ast::Fragment,
         skip_indices: &[usize],
         hoisted: &[Span],
     ) {
@@ -2634,7 +2616,7 @@ impl<'a> Printer<'a> {
         // `/[^ \t\r\n]/` matches U+00A0, so the node is not whitespace-only and survives:
         // `\u{a0}<div>block</div>` compiles to `<!---->\u{a0}<div>…`). prettier deletes it too,
         // so only the compiler oracle sees it — `svelte/elements/root_leading_nbsp_prettier_divergence`.
-        let skippable = |i: usize, n: &FragmentNode<'_>| {
+        let skippable = |i: usize, n: &FragmentNode| {
             skip_indices.contains(&i)
                 || matches!(n, FragmentNode::Text(t) if t.is_collapsible_ws_only)
         };
@@ -2736,7 +2718,7 @@ impl<'a> Printer<'a> {
 
     /// One root segment's doc: a range's tail ([`Printer::build_range_tail_doc`]) when its end
     /// marker heads it, else the shared multiline builder.
-    fn build_segment_doc(&self, nodes: &[FragmentNode<'_>], range_tail: bool) -> DocId {
+    fn build_segment_doc(&self, nodes: &[FragmentNode], range_tail: bool) -> DocId {
         if range_tail {
             self.build_range_tail_doc(nodes)
         } else {
@@ -2812,7 +2794,7 @@ impl<'a> Printer<'a> {
     /// [`Printer::root_inline_run_block_starts`]. A *multi-line* run (its content text spans
     /// source lines) keeps the multiline layout, so its blocks are left unmarked. Span-keyed,
     /// so only root-level run blocks are affected.
-    fn mark_root_inline_run_blocks(&self, nodes: &[FragmentNode<'_>]) {
+    fn mark_root_inline_run_blocks(&self, nodes: &[FragmentNode]) {
         let mut marks = self.root_inline_run_block_starts.borrow_mut();
         marks.clear();
         let mut i = 0;
@@ -2850,7 +2832,7 @@ impl<'a> Printer<'a> {
     /// relaying it here would relocate the author's blank onto the seam.
     fn hoisted_comment_separator(
         &self,
-        nodes: &[FragmentNode<'_>],
+        nodes: &[FragmentNode],
         comment_idx: usize,
     ) -> Option<DocId> {
         if comment_idx + 1 >= nodes.len() {
@@ -2889,13 +2871,9 @@ impl<'a> Printer<'a> {
     /// sequences return `None`, keeping the per-node path's behavior for them.
     ///
     /// Returns `Some(end_idx)` (inclusive) for a qualifying run, else `None`.
-    fn detect_root_inline_run(
-        &self,
-        nodes: &[FragmentNode<'_>],
-        start_idx: usize,
-    ) -> Option<usize> {
+    fn detect_root_inline_run(&self, nodes: &[FragmentNode], start_idx: usize) -> Option<usize> {
         let is_content_text =
-            |n: &FragmentNode<'_>| matches!(n, FragmentNode::Text(t) if !t.is_collapsible_ws_only);
+            |n: &FragmentNode| matches!(n, FragmentNode::Text(t) if !t.is_collapsible_ws_only);
 
         // The start must be a node that can participate in a run.
         let start = &nodes[start_idx];
@@ -2944,7 +2922,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Check if a fragment node can participate in an inline run (as start or intermediate node).
-    fn is_inline_run_node(&self, node: &FragmentNode<'_>) -> bool {
+    fn is_inline_run_node(&self, node: &FragmentNode) -> bool {
         match node {
             FragmentNode::ExpressionTag(_)
             | FragmentNode::HtmlTag(_)

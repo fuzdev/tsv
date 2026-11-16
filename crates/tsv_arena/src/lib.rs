@@ -293,8 +293,8 @@ macro_rules! parse_ast {
 
 /// Run `$body` with `$stores` bound to this thread's parked stores for the language, taken
 /// and parked through its own `__private::with_stores` (Svelte's takes a TypeScript half
-/// and a CSS half from those crates' slots). `tsv_arena` cannot park them itself, since it
-/// names no language crate's types.
+/// and a CSS half from those crates' slots, and its own half from its own). `tsv_arena`
+/// cannot park them itself, since it names no language crate's types.
 #[macro_export]
 #[doc(hidden)]
 macro_rules! with_lang_stores {

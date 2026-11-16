@@ -1,15 +1,11 @@
 // SvelteParser struct and helper methods
 
-use crate::ast::{self, FragmentNode, SvelteStores};
+use crate::ast::{self, FragmentNode, SvelteOwn, SvelteStores};
 use crate::lexer::{Lexer, Token, TokenKind};
-#[cfg(feature = "_internal_ast_census")]
-use crate::parser::census_vec::BumpVec;
-use crate::parser::element::tag_name_end;
+use crate::parser::element::{ParsedElement, tag_name_end};
 use bumpalo::Bump;
-#[cfg(not(feature = "_internal_ast_census"))]
-use bumpalo::collections::Vec as BumpVec;
 use tsv_css::ast::CssStores;
-use tsv_lang::store::Run;
+use tsv_lang::store::{ListMark, Run, flush_run_move};
 use tsv_lang::{Comment, DepthBudget, DepthLimit, Error, Span};
 use tsv_ts::__private::TopLevelAs;
 use tsv_ts::__private::{is_id_continue, is_id_start};
@@ -40,14 +36,9 @@ fn expression_comment(
 }
 
 pub(crate) struct SvelteParser<'a, 'arena> {
-    /// Bump arena that owns every AST node this parser allocates — the template
-    /// AST and (via the embedding APIs that receive `&'arena Bump`) the embedded
-    /// TS `<script>`/`{expr}` ASTs. Supplied by the caller; the returned
-    /// `Root<'arena>` borrows from it. `&'arena Bump` is `Copy`, so
-    /// `self.arena.alloc(self.parse_x()?)` works even while `&mut self` is held — the
-    /// field read borrows the `Bump`, not `self`; lift it into a
-    /// local (`let arena = self.arena;`) only when several allocations in one method
-    /// share it.
+    /// The caller's bump arena, which nothing reads: the template's lists live in the own
+    /// half of the stores.
+    #[expect(dead_code, reason = "kept until the caller's arena parameter goes")]
     pub(crate) arena: &'arena Bump,
     /// The document's TypeScript stores, one instance across the template and
     /// every embedded island. Empty only inside [`Self::with_island_stores`], the one reader:
@@ -56,6 +47,9 @@ pub(crate) struct SvelteParser<'a, 'arena> {
     stores: Option<&'a mut AstStores>,
     /// The document's CSS stores, which the top-level `<style>`'s parse takes.
     pub(crate) css: &'a mut CssStores,
+    /// The document's own stores: the template's lists, built on their scratch stacks, and
+    /// its text pool.
+    pub(crate) own: &'a mut SvelteOwn,
     pub(crate) source: &'a str, // Full original source
     pub(crate) lexer: Lexer<'a>,
     /// The current token, in document coordinates. The lexer writes it in place
@@ -69,10 +63,11 @@ pub(crate) struct SvelteParser<'a, 'arena> {
     pub(crate) peek: Option<Token>,
     /// TS comments collected from template expressions (e.g., {@debug /* comment */ a})
     pub(crate) expression_comments: Vec<Comment>,
-    /// The wire-only parameter lists of the `{#snippet}` heads that hold a grouping pair,
-    /// in read order — which is source order, since a head is read before its body. See
+    /// The frame the wire-only parameter lists of the `{#snippet}` heads that hold a
+    /// grouping pair are pushed onto, open for the whole parse: in read order — which is
+    /// source order, since a head is read before its body. See
     /// [`ast::SnippetWireParameters`].
-    pub(crate) snippet_wire_parameters: BumpVec<'arena, ast::SnippetWireParameters>,
+    pub(crate) snippet_wire_parameters: ListMark<ast::SnippetWireParameters>,
     /// True while the nearest *element* ancestor is `<svelte:head>` — mirrors Svelte's
     /// `parent_is_head` (`1-parse/state/element.js`): set entering a head's children, reset by a
     /// nested RegularElement/Component, transparent through other special elements and blocks.
@@ -113,7 +108,7 @@ const ISLAND_LEVELS: u32 = 2;
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct EmbeddedParseMark {
     comments: usize,
-    snippet_wire_parameters: usize,
+    snippet_wire_parameters: ListMark<ast::SnippetWireParameters>,
     #[cfg(feature = "_internal_ast_census")]
     ast_census_mark: u32,
 }
@@ -204,17 +199,19 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             end: 0,
         };
         lexer.next_token_into(&mut current)?;
-        let SvelteStores { ts, css } = stores;
+        let SvelteStores { ts, css, own } = stores;
+        let snippet_wire_parameters = own.runs.wire_param_scratch.mark();
         Ok(Self {
             arena,
             stores: Some(&mut **ts),
             css: &mut **css,
+            own: &mut **own,
             source,
             lexer,
             current,
             peek: None,
             expression_comments: Vec::new(),
-            snippet_wire_parameters: BumpVec::new_in(arena),
+            snippet_wire_parameters,
             in_svelte_head: false,
             in_shadowroot_template: false,
             root_only_meta_tags_seen: 0,
@@ -319,20 +316,41 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         Error::too_deep(DepthLimit::Nesting, self.current_start())
     }
 
-    /// A growable vector that builds AST-node collections **directly in the
-    /// arena**. Build it in the parse loop, then `.into_bump_slice()` to store
-    /// the field (zero-copy). Carries its own `Copy` `&'arena Bump`, so pushing
-    /// into it inside a `&mut self` method does NOT borrow `self`.
+    /// Push `node` onto the fragment frame in progress, opened by the caller with a mark on
+    /// the node scratch stack. Built whole before the push, so a frame its build opened is
+    /// flushed first.
     #[inline]
-    pub(crate) fn bvec<T>(&self) -> BumpVec<'arena, T> {
-        BumpVec::new_in(self.arena)
+    pub(crate) fn push_node(&mut self, node: FragmentNode) {
+        self.own.runs.node_scratch.push(node);
     }
 
-    /// Allocate a string in the arena as `&'arena str` — used for a `{#snippet}` head's raw
-    /// type-parameter text. One copy into the arena.
+    /// Push a parsed element or special element onto the fragment frame in progress,
+    /// returning the end of its span.
     #[inline]
-    pub(crate) fn alloc_str_in(&self, s: &str) -> &'arena str {
-        self.arena.alloc_str(s)
+    pub(crate) fn push_parsed_element(&mut self, element: ParsedElement) -> usize {
+        match element {
+            ParsedElement::Element(elem) => {
+                let end = elem.span.end_usize();
+                self.push_node(FragmentNode::Element(elem));
+                end
+            }
+            ParsedElement::SpecialElement(elem) => {
+                let end = elem.span.end_usize();
+                self.push_node(FragmentNode::SpecialElement(elem));
+                end
+            }
+        }
+    }
+
+    /// Flush the fragment frame `mark` opened into its run.
+    ///
+    /// Out of line, where the compiler leaves it today: it is called from the fragment builders
+    /// on the element and block recursions, and a later inlining of its row-at-a-time move
+    /// would widen every one of those recursive frames.
+    #[inline(never)]
+    pub(crate) fn flush_nodes(&mut self, mark: ListMark<FragmentNode>) -> Run<FragmentNode> {
+        let runs = &mut self.own.runs;
+        flush_run_move(&mut runs.node_scratch, &mut runs.nodes, mark)
     }
 
     pub(crate) fn advance(&mut self) -> Result<(), Error> {
@@ -462,14 +480,11 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
     /// Parse a text node if there's a gap between the last position and current position.
     /// The Svelte lexer skips whitespace, so gaps represent text/whitespace content.
-    pub(crate) fn capture_text_if_gap(
-        &self,
-        last_end: usize,
-        nodes: &mut BumpVec<'arena, FragmentNode<'arena>>,
-    ) -> Result<(), Error> {
+    /// The node is pushed onto the fragment frame in progress.
+    pub(crate) fn capture_text_if_gap(&mut self, last_end: usize) -> Result<(), Error> {
         if self.current_start() > last_end {
             let text = self.parse_text(last_end, self.current_start())?;
-            nodes.push(FragmentNode::Text(text));
+            self.push_node(FragmentNode::Text(text));
         }
         Ok(())
     }
@@ -872,7 +887,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     pub(crate) fn embedded_parse_mark(&self) -> EmbeddedParseMark {
         EmbeddedParseMark {
             comments: self.expression_comments.len(),
-            snippet_wire_parameters: self.snippet_wire_parameters.len(),
+            snippet_wire_parameters: self.own.runs.wire_param_scratch.mark(),
             #[cfg(feature = "_internal_ast_census")]
             ast_census_mark: tsv_lang::ast_census_probe::mark(),
         }
@@ -884,7 +899,9 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         #[cfg(feature = "_internal_ast_census")]
         tsv_lang::ast_census_probe::rewind(mark.ast_census_mark);
         self.expression_comments.truncate(mark.comments);
-        self.snippet_wire_parameters
+        self.own
+            .runs
+            .wire_param_scratch
             .truncate(mark.snippet_wire_parameters);
     }
 
