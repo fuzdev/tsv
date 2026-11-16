@@ -46,8 +46,7 @@ const LEADING: &str = "leadingComments";
 /// Every `list` (`trailingComments` / `leadingComments`) in the template, keyed by its
 /// owner's path.
 fn attachments(src: &str, list: &str) -> Vec<Attachment> {
-    let arena = bumpalo::Bump::new();
-    let ast = tsv_svelte::__private::parse(src, &arena).expect("component should parse");
+    let ast = tsv_svelte::__private::parse(src).expect("component should parse");
     let json =
         tsv_debug::json::wire_value(&tsv_svelte::__private::convert_ast_json_bytes(&ast, src));
     let mut out = Vec::new();

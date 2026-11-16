@@ -35,11 +35,10 @@ fn format_all(source: &str, parser: ParserType, label: &str) -> String {
     assert!(via_cli.is_ok(), "{label}: Formatter failed: {via_cli:?}");
     let via_cli = via_cli.expect("asserted Ok above");
 
-    let arena = bumpalo::Bump::new();
     let doc_arena = tsv_lang::doc::arena::DocArena::for_source(source);
     let (via_str, via_format, via_format_in) = match parser {
         ParserType::Svelte => {
-            let ast = tsv_svelte::__private::parse(source, &arena).expect("svelte parse");
+            let ast = tsv_svelte::__private::parse(source).expect("svelte parse");
             (
                 tsv_svelte::format(source).expect("svelte format"),
                 tsv_svelte::__private::format_ast(&ast, source),

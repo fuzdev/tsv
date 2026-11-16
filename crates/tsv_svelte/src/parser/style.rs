@@ -7,7 +7,7 @@ use tsv_lang::{Error, Span};
 use super::find_raw_text_close;
 use super::parser_impl::SvelteParser;
 
-impl<'a, 'arena> SvelteParser<'a, 'arena> {
+impl<'a> SvelteParser<'a> {
     pub(crate) fn parse_style_tag(&mut self) -> Result<Style, Error> {
         let start = self.current_start();
 

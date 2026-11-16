@@ -23,7 +23,6 @@
 //! invalid fixture is CSS, a table of invalid CSS. Each synthetic case also names where its
 //! error sits, so the error's byte `position` is graded as well as the point taken from it.
 
-use bumpalo::Bump;
 use std::path::Path;
 use tsv_debug::fixtures;
 use tsv_lang::Error;
@@ -59,10 +58,9 @@ fn reference_point(source: &str, position: usize, language: Language) -> (u32, u
 /// no source type is named — module, retried as a script — so the parse and the format
 /// it is compared with report from the same grammar.
 fn parse_error(source: &str, language: Language) -> Option<Error> {
-    let arena = Bump::new();
     match language {
         Language::TypeScript => tsv_ts::__private::parse_with_goal_or_fallback(source, None).err(),
-        Language::Svelte => tsv_svelte::__private::parse(source, &arena).err(),
+        Language::Svelte => tsv_svelte::__private::parse(source).err(),
         Language::Css => tsv_css::__private::parse(source).err(),
     }
 }
@@ -577,7 +575,6 @@ fn the_point_of_every_wire_position_is_its_loc() {
     let mut graded = 0;
     let mut failures = Vec::new();
     for &(language, source) in cases {
-        let arena = Bump::new();
         let (wire, coordinates) = match language {
             Language::TypeScript => (
                 tsv_ts::__private::convert_ast_json_bytes_with_locations(
@@ -588,7 +585,7 @@ fn the_point_of_every_wire_position_is_its_loc() {
             ),
             Language::Svelte => (
                 tsv_svelte::__private::convert_ast_json_bytes_with_locations(
-                    &tsv_svelte::__private::parse(source, &arena).expect("parses"),
+                    &tsv_svelte::__private::parse(source).expect("parses"),
                     source,
                 ),
                 tsv_svelte::WIRE_COORDINATES,

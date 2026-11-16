@@ -260,8 +260,7 @@ pub(in crate::fixtures::validation) fn validate_variant_parse_pins_ours(
 ) {
     let mut matched = 0;
     for pin in pins {
-        let arena = bumpalo::Bump::new();
-        let parsed = match parse_input(&pin.variant, input_type, fixture.goal(), &arena) {
+        let parsed = match parse_input(&pin.variant, input_type, fixture.goal()) {
             Ok(parsed) => parsed,
             Err(message) => {
                 result.add_error(ValidationError::ParserVariantError {
@@ -375,9 +374,8 @@ pub(in crate::fixtures::validation) fn validate_tsv_rejects(
         return;
     }
 
-    let arena = bumpalo::Bump::new();
     let parse_result: Result<(), String> = match input_type {
-        InputType::Svelte => tsv_svelte::__private::parse(input, &arena)
+        InputType::Svelte => tsv_svelte::__private::parse(input)
             .map(|_| ())
             .map_err(|e| format!("{e:#}")),
         InputType::SvelteTs | InputType::TypeScript => {
@@ -490,9 +488,7 @@ pub(in crate::fixtures::validation) async fn validate_invalid_syntax(
         };
 
         // Check our parser
-        let arena = bumpalo::Bump::new();
-        let ours_failed =
-            parse_input(&variant_content, input_type, fixture.goal(), &arena).is_err();
+        let ours_failed = parse_input(&variant_content, input_type, fixture.goal()).is_err();
 
         // Check canonical parser
         let canonical_failed = match parse_by_type_with_goal(

@@ -38,7 +38,7 @@
 // - `printing` - shared printing utilities for printers
 // - `source_scan` - trivia-aware source scanning between AST nodes
 // - `estimated_json_capacity` / `estimated_ast_arena_capacity` - pre-size heuristics
-//   for the wire-JSON output buffer and the parse-time bump arena
+//   for the wire-JSON output buffer and a bump arena sized to a document's AST
 // - `JsonWriter` - shared wire-JSON emission substrate (`_json` feature)
 // - `FxHasher` / `FxHashMap` / `FxHashSet` - dep-free multiply-xor hasher for the
 //   side tables

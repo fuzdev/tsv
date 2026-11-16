@@ -255,10 +255,9 @@ pub(crate) fn wires_and_reference(
     input_type: InputType,
     goal: tsv_ts::Goal,
 ) -> (Value, Vec<u8>, Reference) {
-    let arena = bumpalo::Bump::new();
     let (loc, span, rule, elide_bom) = match input_type {
         InputType::Svelte => {
-            let ast = tsv_svelte::__private::parse(source, &arena).expect("Svelte input parses");
+            let ast = tsv_svelte::__private::parse(source).expect("Svelte input parses");
             let (rule, elide_bom) = wire_rule(false);
             (
                 tsv_svelte::__private::convert_ast_json_bytes_with_locations(&ast, source),

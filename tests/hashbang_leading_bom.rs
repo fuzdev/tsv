@@ -36,13 +36,12 @@ fn a_file_reads_a_hashbang_behind_its_bom() {
 
 #[test]
 fn a_script_reads_no_hashbang_behind_a_bom() {
-    let arena = bumpalo::Bump::new();
     for source in [
         format!("<script>{BOM}#!/x\nlet a;</script>"),
         format!("<script lang=\"ts\">{BOM}#!/x\nlet a;</script>"),
     ] {
         assert!(
-            tsv_svelte::__private::parse(&source, &arena).is_err(),
+            tsv_svelte::__private::parse(&source).is_err(),
             "accepted: {source:?}"
         );
     }
@@ -52,7 +51,6 @@ fn a_script_reads_no_hashbang_behind_a_bom() {
 fn an_island_opening_on_a_hashbang_is_rejected() {
     // A hashbang opens only a whole source text. A `<script>` or a template expression is never
     // that, so a `#!` at its first byte is no hashbang, and Svelte's parser rejects it too.
-    let arena = bumpalo::Bump::new();
     for source in [
         "<script>#!/x\nlet a;</script>",
         "<script lang=\"ts\">#!/x\nlet a;</script>",
@@ -61,7 +59,7 @@ fn an_island_opening_on_a_hashbang_is_rejected() {
         "{@html #!x\ncontent}",
     ] {
         assert!(
-            tsv_svelte::__private::parse(source, &arena).is_err(),
+            tsv_svelte::__private::parse(source).is_err(),
             "accepted: {source:?}"
         );
     }

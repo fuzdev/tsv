@@ -262,8 +262,7 @@ fn svelte_tree(source: &str) -> Value {
             _ => {}
         }
     }
-    let arena = bumpalo::Bump::new();
-    let root = tsv_svelte::__private::parse(source, &arena).expect("the component parses");
+    let root = tsv_svelte::__private::parse(source).expect("the component parses");
     let mut value = tsv_debug::json::wire_value(&tsv_svelte::__private::convert_ast_json_bytes(
         &root, source,
     ));

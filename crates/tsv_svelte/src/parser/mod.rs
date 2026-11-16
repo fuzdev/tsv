@@ -29,25 +29,20 @@ pub(crate) use expression_tag::scan_to_matching_brace;
 ///
 /// The template's lists and strings are written to the own half of `stores`, the embedded TS
 /// `<script>`/`{expr}` ASTs to its TypeScript half and the top-level `<style>`'s stylesheet to
-/// its CSS half. `arena` is not read.
+/// its CSS half.
 ///
 /// Every scratch stack of the own half is empty between parses, so the driver marks none of
 /// them: it finds them empty and leaves them so, whether the parse succeeded — which flushed
 /// every frame it opened — or failed, leaving open frames the exit clears, for whatever the
 /// caller goes on to parse into the same stores. The TypeScript and CSS halves are left so
 /// by their own drivers.
-pub(crate) fn parse_svelte(
-    source: &str,
-    arena: &bumpalo::Bump,
-    stores: &mut SvelteStores,
-) -> Result<Root, Error> {
+pub(crate) fn parse_svelte(source: &str, stores: &mut SvelteStores) -> Result<Root, Error> {
     #[cfg(debug_assertions)]
     debug_assert!(
         stores.own.scratch_is_empty(),
         "a parse began over an open list frame"
     );
-    let outcome =
-        SvelteParser::new(source, arena, stores).and_then(|mut parser| parser.parse_root());
+    let outcome = SvelteParser::new(source, stores).and_then(|mut parser| parser.parse_root());
     if outcome.is_err() {
         stores.own.clear_scratch();
     } else {
@@ -60,7 +55,7 @@ pub(crate) fn parse_svelte(
     outcome
 }
 
-impl<'a, 'arena> SvelteParser<'a, 'arena> {
+impl<'a> SvelteParser<'a> {
     /// Parse the root node of a Svelte file
     ///
     /// Script and style tags can appear in any order, before/after/between markup.

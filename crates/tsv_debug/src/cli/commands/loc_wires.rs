@@ -193,8 +193,7 @@ enum Failure {
 /// The record for one document after its `path`: `,"language":…,"source":…,"loc":…,"span":…}`.
 fn record(path: &Path, input_type: InputType, goal: tsv_ts::Goal) -> Result<Vec<u8>, Failure> {
     let source = fixtures::read_file(path).map_err(Failure::Read)?;
-    let arena = bumpalo::Bump::new();
-    let parsed = parse_input(&source, input_type, goal, &arena).map_err(Failure::Parse)?;
+    let parsed = parse_input(&source, input_type, goal).map_err(Failure::Parse)?;
     let (language, loc, span) = match &parsed {
         ParsedInput::Svelte(ast) => (
             "svelte",
@@ -287,11 +286,10 @@ fn answer(request: &WireRequest, arena: &mut bumpalo::Bump) -> Result<Vec<u8>, S
         }
     };
     let source = request.source.as_str();
-    let parsed = super::catch_in_arena(arena, |arena| -> Result<Vec<u8>, String> {
+    let parsed = super::catch_in_arena(arena, |_| -> Result<Vec<u8>, String> {
         Ok(match language {
             WireLanguage::Svelte => {
-                let ast =
-                    tsv_svelte::__private::parse(source, arena).map_err(|e| format!("{e:#}"))?;
+                let ast = tsv_svelte::__private::parse(source).map_err(|e| format!("{e:#}"))?;
                 tsv_svelte::__private::convert_ast_json_bytes_with_locations(&ast, source)
             }
             WireLanguage::Typescript => {

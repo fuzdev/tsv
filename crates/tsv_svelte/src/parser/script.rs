@@ -8,7 +8,7 @@ use tsv_lang::{Error, Span};
 use super::find_raw_text_close;
 use super::parser_impl::SvelteParser;
 
-impl<'a, 'arena> SvelteParser<'a, 'arena> {
+impl<'a> SvelteParser<'a> {
     /// Parse a script tag: `<script lang="ts">...</script>`
     pub(crate) fn parse_script_tag(&mut self) -> Result<Script, Error> {
         let start = self.current_start();

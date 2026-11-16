@@ -19,8 +19,7 @@ fn format(source: &str) -> String {
 }
 
 fn svelte_format(source: &str) -> String {
-    let arena = bumpalo::Bump::new();
-    let root = tsv_svelte::__private::parse(source, &arena).expect("component should parse");
+    let root = tsv_svelte::__private::parse(source).expect("component should parse");
     tsv_svelte::__private::format_ast(&root, source)
 }
 

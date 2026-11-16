@@ -37,9 +37,7 @@
 
 /// The one comment's dedented wire `value` — the field `onComment` writes.
 fn comment_value(src: &str) -> String {
-    let arena = bumpalo::Bump::new();
-    let ast =
-        tsv_svelte::__private::parse(src, &arena).expect("parser should accept the component");
+    let ast = tsv_svelte::__private::parse(src).expect("parser should accept the component");
     let json =
         tsv_debug::json::wire_value(&tsv_svelte::__private::convert_ast_json_bytes(&ast, src));
     let comments = json["comments"]

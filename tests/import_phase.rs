@@ -40,16 +40,14 @@
 
 /// tsv parses + formats `input` to itself, then re-formats stably (idempotent).
 fn assert_ours_stable(input: &str) {
-    let arena = bumpalo::Bump::new();
-    let ast = tsv_svelte::__private::parse(input, &arena).expect("parse failed");
+    let ast = tsv_svelte::__private::parse(input).expect("parse failed");
     let output = tsv_svelte::__private::format_ast(&ast, input);
     assert_eq!(
         output, input,
         "printer should keep import-phase syntax stable"
     );
 
-    let arena_twice = bumpalo::Bump::new();
-    let ast_twice = tsv_svelte::__private::parse(&output, &arena_twice).expect("reparse failed");
+    let ast_twice = tsv_svelte::__private::parse(&output).expect("reparse failed");
     let output_twice = tsv_svelte::__private::format_ast(&ast_twice, &output);
     assert_eq!(output, output_twice, "printer should be idempotent");
 }
@@ -99,9 +97,8 @@ fn static_import_source_binding_stable() {
 /// flip to `assert_ours_stable` if/when the disambiguation is tightened to accept
 /// it. See `docs/conformance_svelte.md` §Import-phase proposals.
 fn assert_ours_rejects(input: &str) {
-    let arena = bumpalo::Bump::new();
     assert!(
-        tsv_svelte::__private::parse(input, &arena).is_err(),
+        tsv_svelte::__private::parse(input).is_err(),
         "expected parse rejection (pinned divergence)"
     );
 }

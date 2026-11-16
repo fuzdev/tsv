@@ -531,8 +531,7 @@ impl AstStores {
     /// scratch stack and the pool keep their capacity. Every id, run and pool text minted so
     /// far is invalid from here on.
     // TODO: never trims. Peak row capacity stays parked for as long as the `Formatter` or the
-    // thread lives, where the AST arena's rewind releases every block but the largest while
-    // idle. Rows held here instead of in the `Bump` escape that release.
+    // thread lives, with nothing released while idle.
     #[inline]
     pub fn reset(&mut self) {
         // destructured whole, so a field added to the stores without a reset here is a build

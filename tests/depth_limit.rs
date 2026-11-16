@@ -120,11 +120,10 @@ fn on_thread<T: Send + 'static>(
 
 /// The parse of `source` — `Ok` or its error's message.
 fn parse(lang: Lang, source: &str) -> Result<(), String> {
-    let arena = bumpalo::Bump::new();
     match lang {
         Lang::Ts => tsv_ts::__private::parse(source).map(drop),
         Lang::Css => tsv_css::__private::parse(source).map(drop),
-        Lang::Svelte => tsv_svelte::__private::parse(source, &arena).map(drop),
+        Lang::Svelte => tsv_svelte::__private::parse(source).map(drop),
     }
     .map_err(|e| e.to_string())
 }
@@ -133,7 +132,6 @@ fn parse(lang: Lang, source: &str) -> Result<(), String> {
 /// parens for the count (`parse_preserve_parens`), since each one is a level of the
 /// parse's recursion though the default wire drops it.
 fn wire_counts(lang: Lang, source: &str) -> WireCounts {
-    let arena = bumpalo::Bump::new();
     let wire = match lang {
         Lang::Ts => tsv_ts::__private::convert_ast_json_bytes(
             &tsv_ts::__private::parse_preserve_parens(source).expect("parses"),
@@ -144,7 +142,7 @@ fn wire_counts(lang: Lang, source: &str) -> WireCounts {
             source,
         ),
         Lang::Svelte => tsv_svelte::__private::convert_ast_json_bytes(
-            &tsv_svelte::__private::parse(source, &arena).expect("parses"),
+            &tsv_svelte::__private::parse(source).expect("parses"),
             source,
         ),
     };
@@ -331,11 +329,10 @@ enum Verdict {
 }
 
 fn verdict(lang: Lang, source: &str) -> Verdict {
-    let arena = bumpalo::Bump::new();
     let result = match lang {
         Lang::Ts => tsv_ts::__private::parse(source).map(drop),
         Lang::Css => tsv_css::__private::parse(source).map(drop),
-        Lang::Svelte => tsv_svelte::__private::parse(source, &arena).map(drop),
+        Lang::Svelte => tsv_svelte::__private::parse(source).map(drop),
     };
     match result {
         Ok(()) => Verdict::Accepted,
@@ -558,7 +555,6 @@ const _: () = assert!(
 /// [`run_walks`] on a thread of `stack` bytes named `name`.
 fn run_walks_on(name: String, stack: usize, lang: Lang, source: String) {
     on_thread(name.clone(), stack, move || {
-        let arena = bumpalo::Bump::new();
         match lang {
             Lang::Ts => {
                 let program = tsv_ts::__private::parse(&source).expect("parses");
@@ -612,7 +608,7 @@ fn run_walks_on(name: String, stack: usize, lang: Lang, source: String) {
                 assert_output_reparses(&name, Lang::Css, &formatted);
             }
             Lang::Svelte => {
-                let root = tsv_svelte::__private::parse(&source, &arena).expect("parses");
+                let root = tsv_svelte::__private::parse(&source).expect("parses");
                 assert!(!tsv_svelte::__private::convert_ast_json_bytes(&root, &source).is_empty());
                 assert!(
                     !tsv_svelte::__private::convert_ast_json_bytes_with_locations(&root, &source)
@@ -620,8 +616,7 @@ fn run_walks_on(name: String, stack: usize, lang: Lang, source: String) {
                 );
                 let formatted = tsv_svelte::format(&source).expect("formats");
                 assert_output_reparses(&name, Lang::Svelte, &formatted);
-                let imports_arena = bumpalo::Bump::new();
-                let imports = tsv_svelte::__private::parse_imports_in(&source, &imports_arena);
+                let imports = tsv_svelte::parse_imports(&source);
                 assert!(
                     imports.is_ok(),
                     "{name}: the imports walk failed: {imports:?}"

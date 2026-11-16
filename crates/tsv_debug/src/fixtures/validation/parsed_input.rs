@@ -16,18 +16,15 @@ pub(crate) enum ParsedInput {
     Css(tsv_css::ast::ParsedCss),
 }
 
-/// Parse fixture content once for the parser-side validation phases.
-///
-/// `arena` is the Svelte parse's caller-owned arena, which it no longer reads: every input's
-/// tree lives in the stores the returned `ParsedInput` holds.
+/// Parse fixture content once for the parser-side validation phases. Every input's tree
+/// lives in the stores the returned `ParsedInput` holds.
 pub(crate) fn parse_input(
     content: &str,
     input_type: InputType,
     goal: tsv_ts::Goal,
-    arena: &bumpalo::Bump,
 ) -> Result<ParsedInput, String> {
     match input_type {
-        InputType::Svelte => tsv_svelte::__private::parse(content, arena)
+        InputType::Svelte => tsv_svelte::__private::parse(content)
             .map(ParsedInput::Svelte)
             .map_err(|e| format!("Parse error: {e:?}")),
         InputType::SvelteTs | InputType::TypeScript => {

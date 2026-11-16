@@ -32,11 +32,12 @@
 //!   `__private::WarmStores`), which takes them from the previous iteration before the timed
 //!   regions and parks them after, as the CLI's `Formatter` keeps them in a slot it owns; the
 //!   arm names no store type and no lifetime, so its text stays the same while the stores change
-//!   beneath the handles. The TypeScript and CSS parses take the stores alone, the Svelte
-//!   parse the `Bump` beside them; a Svelte document's handle holds its own half, a
-//!   TypeScript half and a CSS half.
+//!   beneath the handles. Every parse takes the stores alone; a Svelte document's handle
+//!   holds its own half, a TypeScript half and a CSS half.
+//! - `perf_ab_api = "svelte_bump"`, a tree whose Svelte parse still takes the `Bump` beside the
+//!   stores: as the current arm, the Svelte parse handed the `Bump` too.
 //! - `perf_ab_api = "css_bump"`, a tree whose CSS has stores but whose parse still takes the
-//!   `Bump`: as the current arm, the CSS parse handed the `Bump` too.
+//!   `Bump`: as the `svelte_bump` arm, the CSS parse handed the `Bump` too.
 //! - `perf_ab_api = "css_no_stores"`, a tree whose CSS has no stores, parses TypeScript and
 //!   Svelte into stores a `tsv_ts::__private::WarmStores` handle keeps (a Svelte document's
 //!   stores being TypeScript's alone) and CSS into the `Bump` alone.
@@ -290,6 +291,7 @@ fn time_phases<S, P>(
 /// parked stores, taken before the timed regions and parked after them, so a parse reuses warm
 /// stores as the oldest arm reuses its `Bump`.
 #[cfg(not(any(
+    perf_ab_api = "svelte_bump",
     perf_ab_api = "css_bump",
     perf_ab_api = "css_no_stores",
     perf_ab_api = "strip_bump",
@@ -297,6 +299,87 @@ fn time_phases<S, P>(
     perf_ab_api = "ts_parse_bump",
     perf_ab_api = "no_stores"
 )))]
+mod api {
+    use super::{Timed, time_phases};
+    use tsv_lang::doc::arena::DocArena;
+
+    /// The stores parked between iterations, rewound: a handle per language, each its own
+    /// crate's. A run parses one language, so it warms one of them.
+    #[derive(Default)]
+    pub(super) struct Warm {
+        ts: tsv_ts::__private::WarmStores,
+        svelte: tsv_svelte::__private::WarmStores,
+        css: tsv_css::__private::WarmStores,
+    }
+
+    pub(super) fn ts(
+        source: &str,
+        parse_only: bool,
+        _arena: &bumpalo::Bump,
+        doc_arena: &DocArena,
+        warm: &mut Warm,
+    ) -> Timed {
+        warm.ts.with(|stores| {
+            time_phases(
+                source,
+                parse_only,
+                stores,
+                |folded, stores| tsv_ts::__private::parse_folded_into(folded, None, stores),
+                |program, folded, stores| {
+                    let parsed = tsv_ts::__private::parsed_ref(program, stores);
+                    tsv_ts::__private::format_folded_in(parsed, folded, doc_arena)
+                },
+            )
+        })
+    }
+
+    pub(super) fn svelte(
+        source: &str,
+        parse_only: bool,
+        _arena: &bumpalo::Bump,
+        doc_arena: &DocArena,
+        warm: &mut Warm,
+    ) -> Timed {
+        warm.svelte.with(|stores| {
+            time_phases(
+                source,
+                parse_only,
+                stores,
+                tsv_svelte::__private::parse_folded_into,
+                |root, folded, stores| {
+                    let parsed = tsv_svelte::__private::parsed_ref(root, stores);
+                    tsv_svelte::__private::format_folded_in(parsed, folded, doc_arena)
+                },
+            )
+        })
+    }
+
+    pub(super) fn css(
+        source: &str,
+        parse_only: bool,
+        _arena: &bumpalo::Bump,
+        doc_arena: &DocArena,
+        warm: &mut Warm,
+    ) -> Timed {
+        warm.css.with(|stores| {
+            time_phases(
+                source,
+                parse_only,
+                stores,
+                tsv_css::__private::parse_folded_into,
+                |stylesheet, folded, stores| {
+                    let parsed = tsv_css::__private::parsed_ref(stylesheet, stores);
+                    tsv_css::__private::format_folded_in(parsed, folded, doc_arena)
+                },
+            )
+        })
+    }
+}
+
+/// The entry points of a tree whose CSS and TypeScript parse into stores alone but whose Svelte
+/// parse still takes the `Bump`: as the current arm, the Svelte parse handed the `Bump` too.
+/// Built only against such trees, never against the current one.
+#[cfg(perf_ab_api = "svelte_bump")]
 mod api {
     use super::{Timed, time_phases};
     use tsv_lang::doc::arena::DocArena;
@@ -375,7 +458,7 @@ mod api {
 }
 
 /// The entry points of a tree whose CSS has stores but whose parse still takes the `Bump`: as
-/// the current arm, the CSS parse handed the `Bump` too. Built only against such trees, never
+/// the `svelte_bump` arm, the CSS parse handed the `Bump` too. Built only against such trees, never
 /// against the current one.
 #[cfg(perf_ab_api = "css_bump")]
 mod api {

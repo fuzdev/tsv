@@ -31,8 +31,7 @@ fn format(source: &str) -> String {
 }
 
 fn parse_svelte_json(source: &str) -> Value {
-    let arena = bumpalo::Bump::new();
-    let root = tsv_svelte::__private::parse(source, &arena).expect("parse failed");
+    let root = tsv_svelte::__private::parse(source).expect("parse failed");
     tsv_debug::json::wire_value(&tsv_svelte::__private::convert_ast_json_bytes(
         &root, source,
     ))
@@ -434,8 +433,7 @@ fn a_svelte_head_tsc_reads_keeps_the_comparison() {
         ),
     ] {
         let source = format!("{TS}{template}");
-        let arena = bumpalo::Bump::new();
-        let error = tsv_svelte::__private::parse(&source, &arena).expect_err(template);
+        let error = tsv_svelte::__private::parse(&source).expect_err(template);
         assert!(error.to_string().contains(message), "{template:?}: {error}");
     }
 }
@@ -470,8 +468,7 @@ fn a_svelte_head_both_readings_refuse_reports_acorns_error() {
         ),
     ] {
         let source = format!("{TS}{template}");
-        let arena = bumpalo::Bump::new();
-        let error = tsv_svelte::__private::parse(&source, &arena).expect_err(template);
+        let error = tsv_svelte::__private::parse(&source).expect_err(template);
         assert!(error.to_string().contains(message), "{template:?}: {error}");
         assert_eq!(
             error.position(),
@@ -501,8 +498,7 @@ fn a_svelte_head_both_readings_refuse_reports_acorns_error() {
             "junk };",
         ),
     ] {
-        let arena = bumpalo::Bump::new();
-        let error = tsv_svelte::__private::parse(source, &arena).expect_err(source);
+        let error = tsv_svelte::__private::parse(source).expect_err(source);
         assert!(error.to_string().contains(message), "{source:?}: {error}");
         assert_eq!(
             error.position(),

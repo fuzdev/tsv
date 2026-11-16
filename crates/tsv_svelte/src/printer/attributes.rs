@@ -1882,8 +1882,7 @@ mod tests {
             "{@debug a /* c */}",
         ];
         for source in sources {
-            let arena = bumpalo::Bump::new();
-            let root = crate::__private::parse(source, &arena)
+            let root = crate::__private::parse(source)
                 .unwrap_or_else(|e| panic!("parse failed for {source:?}: {e}"));
             assert!(
                 !root.comments.is_empty(),
@@ -1927,8 +1926,7 @@ mod tests {
             "<div><!--nested--></div>",
         ];
         for source in sources {
-            let arena = bumpalo::Bump::new();
-            let root = crate::__private::parse(source, &arena)
+            let root = crate::__private::parse(source)
                 .unwrap_or_else(|e| panic!("parse failed for {source:?}: {e}"));
             let mut seen = 0;
             let mut stack = vec![&root.fragment];

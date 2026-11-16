@@ -283,7 +283,7 @@ enum SpecialThisBinding {
 /// ordinary attribute of that name.
 type SpecialElementAttrs = (Run<AttributeNode>, SpecialThisBinding);
 
-impl<'a, 'arena> SvelteParser<'a, 'arena> {
+impl<'a> SvelteParser<'a> {
     /// Whether an attribute list carries a `shadowrootmode` attribute (by name). On a
     /// RegularElement this marks a declarative-shadow-root template, so descendant `<slot>`s are
     /// ordinary elements rather than `SlotElement`s — mirrors Svelte's
@@ -1513,9 +1513,8 @@ mod tests {
             ("<svelte:element this=\"\" />", Some(""), Some("")),
             ("<svelte:element this={tag} />", None, None),
         ] {
-            let arena = bumpalo::Bump::new();
-            let parsed = crate::__private::parse(source, &arena)
-                .unwrap_or_else(|e| panic!("{source:?}: {e:?}"));
+            let parsed =
+                crate::__private::parse(source).unwrap_or_else(|e| panic!("{source:?}: {e:?}"));
             let FragmentNode::SpecialElement(element) =
                 &parsed.view().nodes(parsed.fragment.nodes)[0]
             else {

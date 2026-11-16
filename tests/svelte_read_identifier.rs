@@ -91,8 +91,7 @@ const RESERVED_WORDS: &[&str] = &[
 const NEAR_MISSES: &[&str] = &["of", "async", "get", "set", "from", "as", "undefined"];
 
 fn parse_error(source: &str) -> Option<String> {
-    let arena = bumpalo::Bump::new();
-    tsv_svelte::__private::parse(source, &arena)
+    tsv_svelte::__private::parse(source)
         .err()
         .map(|e| e.to_string())
 }

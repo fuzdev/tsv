@@ -66,8 +66,7 @@ fn imports_file(path: &Path) -> Result<(), CliError> {
         eprintln!("Error: reading {}: {e}", path.display());
         CliError::Failed
     })?;
-    let arena = bumpalo::Bump::new();
-    let bytes = imports_at_path(path, &source, &arena).map_err(|e| {
+    let bytes = imports_at_path(path, &source).map_err(|e| {
         eprintln!("parse error: {e:#}");
         CliError::Failed
     })?;
@@ -77,16 +76,12 @@ fn imports_file(path: &Path) -> Result<(), CliError> {
 
 /// The records of `source` read from `path`, as the JSON a binding returns: a `.svelte`
 /// path reads a component, any other TypeScript at the goal its extension settles.
-fn imports_at_path(
-    path: &Path,
-    source: &str,
-    arena: &bumpalo::Bump,
-) -> Result<Vec<u8>, tsv_lang::Error> {
+fn imports_at_path(path: &Path, source: &str) -> Result<Vec<u8>, tsv_lang::Error> {
     let is_svelte = path
         .extension()
         .is_some_and(|extension| extension.eq_ignore_ascii_case("svelte"));
     if is_svelte {
-        tsv_svelte::__private::parse_imports_in(source, arena).map(|imports| {
+        tsv_svelte::parse_imports(source).map(|imports| {
             tsv_ts::__private::write_imports_json(&imports, source, tsv_svelte::WIRE_COORDINATES)
         })
     } else {
@@ -117,7 +112,7 @@ fn serve_requests() -> Result<(), CliError> {
 
 /// The reply for one source (module doc §`--stdin`).
 fn answer(path: &Path, source: &str, arena: &mut bumpalo::Bump) -> serde_json::Value {
-    match super::catch_in_arena(arena, |arena| imports_at_path(path, source, arena)) {
+    match super::catch_in_arena(arena, |_| imports_at_path(path, source)) {
         Ok(Ok(bytes)) => serde_json::json!({ "imports": crate::json::wire_value(&bytes) }),
         Ok(Err(e)) => serde_json::json!({ "error": format!("{e:#}") }),
         Err(message) => serde_json::json!({ "panic": message }),

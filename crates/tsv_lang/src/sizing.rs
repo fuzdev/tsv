@@ -1,5 +1,5 @@
 // Sizing heuristics for allocation pre-sizing — the wire-JSON output buffer,
-// the parse-time bump arena, and the wire writer's line-start table.
+// a bump arena sized to a document's AST, and the wire writer's line-start table.
 
 use crate::location::Wire;
 
@@ -50,12 +50,13 @@ pub fn estimated_json_capacity(source_len: usize, wire: Wire) -> usize {
 /// is moot after the first file.
 const AST_ARENA_BYTES_PER_SOURCE_BYTE: usize = 16;
 
-/// Pre-size estimate (in bytes) for the parse-time bump arena that owns the
-/// internal AST, given the source length.
+/// Pre-size estimate (in bytes) for a bump arena sized to a document's internal
+/// AST, given the source length.
 ///
-/// Feed to `bumpalo::Bump::with_capacity(...)` at each parse entry point
-/// (caller-owns-`Bump`). The floor covers tiny sources whose AST is mostly
-/// fixed-size envelope, so a one-line input still gets one chunk, not several.
+/// No parse takes an arena — every language parses into its own stores — so the
+/// one reader is `tsv_debug`'s arena audit, which sizes its `bumpalo::Bump` with
+/// it. The floor covers tiny sources whose AST is mostly fixed-size envelope, so a
+/// one-line input still gets one chunk, not several.
 pub fn estimated_ast_arena_capacity(source_len: usize) -> usize {
     source_len
         .saturating_mul(AST_ARENA_BYTES_PER_SOURCE_BYTE)

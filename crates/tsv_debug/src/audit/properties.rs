@@ -157,14 +157,13 @@ pub(crate) fn tsv_parse_to_value(source: &str, parser: ParserType) -> Option<Val
 /// than widening this one — the whole point of the narrower product is that the audits never
 /// query the line table.
 pub(crate) fn tsv_parse_to_wire_bytes(source: &str, parser: ParserType) -> Option<Vec<u8>> {
-    let arena = bumpalo::Bump::new();
     match parser {
         ParserType::TypeScript => {
             let ast = tsv_ts::__private::parse_with_goal_or_fallback(source, None).ok()?;
             Some(tsv_ts::__private::convert_ast_json_bytes(&ast, source))
         }
         ParserType::Svelte => {
-            let ast = tsv_svelte::__private::parse(source, &arena).ok()?;
+            let ast = tsv_svelte::__private::parse(source).ok()?;
             Some(tsv_svelte::__private::convert_ast_json_bytes(&ast, source))
         }
         ParserType::Css => {
@@ -187,12 +186,11 @@ pub(crate) fn tsv_parse_to_wire_bytes(source: &str, parser: ParserType) -> Optio
 /// gated the same way — a default-feature build would otherwise warn it unused.
 #[cfg(feature = "_internal_comment_check")]
 pub(crate) fn tsv_parses(source: &str, parser: ParserType) -> bool {
-    let arena = bumpalo::Bump::new();
     match parser {
         ParserType::TypeScript => {
             tsv_ts::__private::parse_with_goal_or_fallback(source, None).is_ok()
         }
-        ParserType::Svelte => tsv_svelte::__private::parse(source, &arena).is_ok(),
+        ParserType::Svelte => tsv_svelte::__private::parse(source).is_ok(),
         ParserType::Css => tsv_css::__private::parse(source).is_ok(),
     }
 }

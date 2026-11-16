@@ -224,8 +224,7 @@ fn flip_run(run: &str) -> Option<(bool, &'static str)> {
 // dispatch here by the file's `ParserType`. They serve as a passing baseline: the
 // idempotency invariant predicts those embedded triggers are each self-stable.
 fn svelte_sites(f: &str) -> Option<Vec<Site>> {
-    let arena = bumpalo::Bump::new();
-    let root = tsv_svelte::__private::parse(f, &arena).ok()?;
+    let root = tsv_svelte::__private::parse(f).ok()?;
     let view = root.view();
     let mut sites = Vec::new();
     collect_sites(view, view.nodes(root.fragment.nodes), f, false, &mut sites);

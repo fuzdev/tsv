@@ -17,10 +17,9 @@
 
 /// The rendered error for `source`: its message line and its `line:col` header.
 fn error(source: &str) -> (String, String) {
-    let arena = bumpalo::Bump::new();
     let rendered = format!(
         "{:#}",
-        tsv_svelte::__private::parse(source, &arena).expect_err("the head must not parse")
+        tsv_svelte::__private::parse(source).expect_err("the head must not parse")
     );
     let mut lines = rendered.lines();
     let message = lines.next().expect("a message line").to_owned();

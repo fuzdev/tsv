@@ -6,7 +6,6 @@
 //! (`__private::parse*` + `__private::convert_ast_json_*`, what the bindings and the CLI
 //! call), the same error, and `JsonOptions`'s defaults equal to the bare form's.
 
-use bumpalo::Bump;
 use tsv_ts::Goal;
 
 const TS: [&str; 3] = [
@@ -121,8 +120,7 @@ fn css_parse_to_json_is_the_span_wire() {
 #[test]
 fn svelte_parse_to_json_is_the_span_wire() {
     for source in SVELTE {
-        let arena = Bump::new();
-        let ast = tsv_svelte::__private::parse(source, &arena).expect("parses");
+        let ast = tsv_svelte::__private::parse(source).expect("parses");
         let span = utf8(tsv_svelte::__private::convert_ast_json_bytes(&ast, source));
         let loc = utf8(tsv_svelte::__private::convert_ast_json_bytes_with_locations(&ast, source));
         assert_eq!(
@@ -141,7 +139,6 @@ fn svelte_parse_to_json_is_the_span_wire() {
 
 #[test]
 fn a_parse_error_is_the_hidden_parse_error() {
-    let arena = Bump::new();
     let cases: [(&str, Result<String, tsv_ts::Error>, tsv_ts::Error); 3] = [
         (
             "ts",
@@ -156,7 +153,7 @@ fn a_parse_error_is_the_hidden_parse_error() {
         (
             "svelte",
             tsv_svelte::parse_to_json("<div>{</div>"),
-            tsv_svelte::__private::parse("<div>{</div>", &arena).expect_err("invalid"),
+            tsv_svelte::__private::parse("<div>{</div>").expect_err("invalid"),
         ),
     ];
     for (lang, one_shot, hidden) in cases {

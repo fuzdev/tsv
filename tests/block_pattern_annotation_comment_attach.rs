@@ -46,8 +46,7 @@ type Case<'a> = (&'a str, &'a str, &'a [(&'a str, &'static str, &'a str)]);
 
 /// Every attached comment in the template.
 fn attachments(src: &str) -> Vec<Attachment> {
-    let arena = bumpalo::Bump::new();
-    let ast = tsv_svelte::__private::parse(src, &arena).expect("component should parse");
+    let ast = tsv_svelte::__private::parse(src).expect("component should parse");
     let json =
         tsv_debug::json::wire_value(&tsv_svelte::__private::convert_ast_json_bytes(&ast, src));
     let mut out = Vec::new();

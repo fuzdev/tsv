@@ -30,23 +30,19 @@ pub use crate::html::{is_mathml_element, is_svg_element, preserves_whitespace};
 /// holding a lone `<CR>` is refused ([`Error::refusal`], at the `<CR>` but no syntax
 /// error — the document is valid Svelte). A `<CR><LF>` is one line break in both readings,
 /// and a document the fold rewrote no lone `<CR>` in pays nothing.
-pub fn parse_folded(
-    folded: &tsv_lang::printing::FoldedSource<'_>,
-    arena: &bumpalo::Bump,
-) -> Result<ParsedRoot> {
-    parsed(|stores| parse_folded_into(folded, arena, stores))
+pub fn parse_folded(folded: &tsv_lang::printing::FoldedSource<'_>) -> Result<ParsedRoot> {
+    parsed(|stores| parse_folded_into(folded, stores))
 }
 
 /// [`parse_folded`] into a caller's `stores`.
 pub fn parse_folded_into(
     folded: &tsv_lang::printing::FoldedSource<'_>,
-    arena: &bumpalo::Bump,
     stores: &mut SvelteStores,
 ) -> Result<Root> {
     if folded.folded_lone_cr() {
-        refuse_lone_cr_in_tag_line_comment(folded.original(), arena)?;
+        refuse_lone_cr_in_tag_line_comment(folded.original())?;
     }
-    folded.parse_with(|text| parse_into(text, arena, stores))
+    folded.parse_with(|text| parse_into(text, stores))
 }
 
 /// A warm parse's tree as a reading entry point takes it, read through `stores`.
@@ -100,8 +96,7 @@ pub fn format_folded_in<'a>(
 /// ```
 /// # fn main() -> tsv_svelte::Result<()> {
 /// let source = "<div>Hello</div>";
-/// let arena = bumpalo::Bump::new();
-/// let ast = tsv_svelte::__private::parse(source, &arena)?;
+/// let ast = tsv_svelte::__private::parse(source)?;
 /// let formatted = tsv_svelte::__private::format_ast(&ast, source);
 /// # Ok(())
 /// # }
@@ -133,9 +128,9 @@ pub fn format_ast_in<'a>(
 /// # Arguments
 ///
 /// * `source` - The Svelte component source code to parse
-/// * `arena` - A caller-owned bump arena the parse does not read. The whole tree — the
-///   template's lists and strings, the embedded TS `<script>`/`{expr}` ASTs and the
-///   top-level `<style>`'s stylesheet — lives in the returned stores.
+///
+/// The whole tree — the template's lists and strings, the embedded TS `<script>`/`{expr}`
+/// ASTs and the top-level `<style>`'s stylesheet — lives in the returned stores.
 ///
 /// # Returns
 ///
@@ -146,45 +141,28 @@ pub fn format_ast_in<'a>(
 ///
 /// ```
 /// # fn main() -> tsv_svelte::Result<()> {
-/// let arena = bumpalo::Bump::new();
-/// let ast = tsv_svelte::__private::parse("<div>Hello</div>", &arena)?;
+/// let ast = tsv_svelte::__private::parse("<div>Hello</div>")?;
 /// # Ok(())
 /// # }
 /// ```
-pub fn parse(source: &str, arena: &bumpalo::Bump) -> Result<ParsedRoot> {
-    parsed(|stores| parse_into(source, arena, stores))
+pub fn parse(source: &str) -> Result<ParsedRoot> {
+    parsed(|stores| parse_into(source, stores))
 }
 
 /// [`parse`] into a caller's `stores`, for a warm path that keeps them across documents.
-pub fn parse_into(source: &str, arena: &bumpalo::Bump, stores: &mut SvelteStores) -> Result<Root> {
+pub fn parse_into(source: &str, stores: &mut SvelteStores) -> Result<Root> {
     Error::ensure_source_fits(source)?;
-    parser::parse_svelte(source, arena, stores)
-        .map_err(|e| e.with_context(source, WIRE_COORDINATES))
+    parser::parse_svelte(source, stores).map_err(|e| e.with_context(source, WIRE_COORDINATES))
 }
 
-/// [`crate::parse_imports`] over a caller-owned `arena` — the hidden primitive beneath it,
-/// for a hot loop that keeps one arena warm across sources, reset by the caller between
-/// calls.
-///
-/// # Errors
-///
-/// As [`crate::parse_imports`].
-pub fn parse_imports_in(source: &str, arena: &bumpalo::Bump) -> Result<Imports> {
-    parse_imports_into(source, arena, &mut SvelteStores::new())
-}
-
-/// [`parse_imports_in`] into a caller's `stores`, for a warm path that keeps them across
+/// [`crate::parse_imports`] into a caller's `stores`, for a warm path that keeps them across
 /// documents.
 ///
 /// # Errors
 ///
 /// As [`crate::parse_imports`].
-pub fn parse_imports_into(
-    source: &str,
-    arena: &bumpalo::Bump,
-    stores: &mut SvelteStores,
-) -> Result<Imports> {
-    let root = parse_into(source, arena, stores)?;
+pub fn parse_imports_into(source: &str, stores: &mut SvelteStores) -> Result<Imports> {
+    let root = parse_into(source, stores)?;
     let mut scripts = [root.instance.as_ref(), root.module.as_ref()];
     scripts.sort_by_key(|script| script.map(|script| script.span.start));
     let programs: smallvec::SmallVec<[&tsv_ts::ast::Program; 2]> = scripts
@@ -228,8 +206,7 @@ pub fn parse_imports_into(
 /// ```
 /// # fn main() -> tsv_svelte::Result<()> {
 /// let source = "<div>Hello</div>";
-/// let arena = bumpalo::Bump::new();
-/// let ast = tsv_svelte::__private::parse(source, &arena)?;
+/// let ast = tsv_svelte::__private::parse(source)?;
 /// let wire = tsv_svelte::__private::convert_ast_json_bytes(&ast, source);
 /// # Ok(())
 /// # }

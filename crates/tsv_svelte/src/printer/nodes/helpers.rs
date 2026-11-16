@@ -1094,8 +1094,7 @@ mod tests {
     /// Parse a Svelte template and hand its top-level fragment nodes to `f`, with the view
     /// they are read through.
     fn with_nodes<R>(src: &str, f: impl FnOnce(SvelteView<'_>, &[FragmentNode]) -> R) -> R {
-        let arena = bumpalo::Bump::new();
-        let parsed = crate::__private::parse(src, &arena).expect("template should parse");
+        let parsed = crate::__private::parse(src).expect("template should parse");
         let view = parsed.view();
         f(view, view.nodes(parsed.fragment.nodes))
     }

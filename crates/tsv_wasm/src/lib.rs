@@ -644,7 +644,7 @@ fn wasm_source_type(
 /// how the parse ended without one: `Result<String, Failure>`.
 #[cfg(feature = "parse")]
 macro_rules! wire_json {
-    ($goalness:ident, $arenaness:ident, $lang:ident, $source:expr, $source_type:expr) => {
+    ($goalness:ident, $lang:ident, $source:expr, $source_type:expr) => {
         wasm_source_type(
             SourceTypeArg::read(&$source_type),
             goal_allowed!($goalness),
@@ -654,7 +654,6 @@ macro_rules! wire_json {
         .and_then(|goal| {
             parse_convert!(
                 $goalness,
-                $arenaness,
                 $lang,
                 convert_ast_json_string,
                 $source,
@@ -676,15 +675,14 @@ macro_rules! wire_json {
 /// packages' hand-written facade (`npm/api.js` + `facade_format.d.ts`), shared with the
 /// native `@fuzdev/tsv`; the declarations wasm-bindgen generates here type only the
 /// raw module.
-// The bodies parse the source into a per-thread AST arena and run the
+// The bodies parse the source into per-thread stores and run the
 // conversion/format/no-op over it. Every language crate is interner-free
 // (identifier and element/attribute names are span-identity), so these are
 // uniform across svelte/typescript/css — no per-language arity split. WASM is
-// single-threaded, so the arena thread-local is a module static.
+// single-threaded, so the thread-local stores are a module static.
 macro_rules! lang_bindings {
     (
         $goalness:ident,
-        $arenaness:ident,
         $parse_fn:ident,
         $parse_json_fn:ident,
         $parse_internal_fn:ident,
@@ -697,7 +695,7 @@ macro_rules! lang_bindings {
         #[cfg(feature = "parse")]
         #[wasm_bindgen]
         pub fn $parse_fn(source: &str, source_type: JsValue) -> Result<JsValue, JsValue> {
-            let json = match wire_json!($goalness, $arenaness, $lang, source, source_type) {
+            let json = match wire_json!($goalness, $lang, source, source_type) {
                 Ok(json) => json,
                 Err(failure) => return failure.into_return(),
             };
@@ -716,7 +714,7 @@ macro_rules! lang_bindings {
         #[cfg(feature = "parse")]
         #[wasm_bindgen]
         pub fn $parse_json_fn(source: &str, source_type: JsValue) -> Result<JsValue, JsValue> {
-            match wire_json!($goalness, $arenaness, $lang, source, source_type) {
+            match wire_json!($goalness, $lang, source, source_type) {
                 Ok(json) => Ok(JsValue::from(json)),
                 Err(failure) => failure.into_return(),
             }
@@ -734,7 +732,7 @@ macro_rules! lang_bindings {
             )
             .map_err(err)?;
             let parsed: Result<(), Failure> =
-                parse_internal!($goalness, $arenaness, $lang, source, goal, |e: Error| {
+                parse_internal!($goalness, $lang, source, goal, |e: Error| {
                     parse_failure(&e)
                 });
             match parsed {
@@ -756,7 +754,7 @@ macro_rules! lang_bindings {
             )
             .map_err(err)?;
             let formatted: Result<String, Failure> =
-                parse_format!($goalness, $arenaness, $lang, source, goal, |e: Error| {
+                parse_format!($goalness, $lang, source, goal, |e: Error| {
                     parse_failure(&e)
                 });
             match formatted {
@@ -769,7 +767,6 @@ macro_rules! lang_bindings {
 
 lang_bindings!(
     nogoal,
-    arena,
     parse_svelte,
     parse_svelte_json,
     parse_internal_svelte,
@@ -778,7 +775,6 @@ lang_bindings!(
 );
 lang_bindings!(
     goal,
-    noarena,
     parse_typescript,
     parse_typescript_json,
     parse_internal_typescript,
@@ -787,7 +783,6 @@ lang_bindings!(
 );
 lang_bindings!(
     nogoal,
-    noarena,
     parse_css,
     parse_css_json,
     parse_internal_css,

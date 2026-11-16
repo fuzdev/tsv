@@ -15,7 +15,7 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use tsv_cli::cli::input::ParserType;
-use tsv_lang::{Wire, estimated_ast_arena_capacity};
+use tsv_lang::Wire;
 
 use super::profile::{format_duration, format_size, lang_token, median_us, resolve_profile_files};
 use crate::cli::CliError;
@@ -158,9 +158,6 @@ fn profile_once(
     steps: &mut StepDurations,
     meta: &mut Option<IterMeta>,
 ) -> Result<(), String> {
-    // Arena allocated outside the timed region so its setup isn't counted.
-    let arena = bumpalo::Bump::with_capacity(estimated_ast_arena_capacity(source.len()));
-
     let bytes = match parser_type {
         ParserType::TypeScript => {
             let t = Instant::now();
@@ -177,8 +174,8 @@ fn profile_once(
         }
         ParserType::Svelte => {
             let t = Instant::now();
-            let ast = tsv_svelte::__private::parse(source, &arena)
-                .map_err(|e| format!("parse error: {e:#}"))?;
+            let ast =
+                tsv_svelte::__private::parse(source).map_err(|e| format!("parse error: {e:#}"))?;
             steps.parse.push(t.elapsed());
             let t = Instant::now();
             let bytes = match wire {

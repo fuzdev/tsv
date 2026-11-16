@@ -125,7 +125,7 @@ impl DirectiveType {
     }
 }
 
-impl<'a, 'arena> SvelteParser<'a, 'arena> {
+impl<'a> SvelteParser<'a> {
     /// Return `end + 1` if the byte at `end` is a quote character, else `end`.
     ///
     /// Used when the last value part of a quoted attribute is an ExpressionTag:
@@ -1522,8 +1522,7 @@ mod tests {
                         head.push_str(m);
                     }
                     let source = format!("{bom}<div {head}></div>");
-                    let arena = bumpalo::Bump::new();
-                    let parsed = crate::__private::parse(&source, &arena)
+                    let parsed = crate::__private::parse(&source)
                         .unwrap_or_else(|e| panic!("{source:?}: {e:?}"));
                     let view = parsed.view();
                     let FragmentNode::Element(element) = &view.nodes(parsed.fragment.nodes)[0]

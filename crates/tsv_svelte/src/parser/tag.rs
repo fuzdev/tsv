@@ -13,7 +13,7 @@ use tsv_ts::ast::{ExprId, Run};
 use super::parser_impl::SvelteParser;
 use super::subslice_offset;
 
-impl<'a, 'arena> SvelteParser<'a, 'arena> {
+impl<'a> SvelteParser<'a> {
     /// Parse a template tag starting with {@
     ///
     /// Dispatches to specific tag parsers based on the keyword.

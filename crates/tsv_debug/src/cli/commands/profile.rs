@@ -351,7 +351,7 @@ fn profile_file(
                 return Err("--bind needs tsv_check, which is outside the workspace build".into());
             }
             Mode::Strip => profile_strip_once(&source)?,
-            Mode::Format => profile_once(&source, parser_type, arena, doc_arena)?,
+            Mode::Format => profile_once(&source, parser_type, doc_arena)?,
         };
         parse_times.push(parse_dur);
         format_times.push(format_dur);
@@ -455,7 +455,6 @@ fn profile_strip_once(source: &str) -> Result<(Duration, Duration), String> {
 fn profile_once(
     source: &str,
     parser_type: ParserType,
-    arena: &bumpalo::Bump,
     doc_arena: &tsv_lang::doc::arena::DocArena,
 ) -> Result<(Duration, Duration), String> {
     let parse_error = |e: tsv_lang::Error| format!("parse error: {e:#}");
@@ -471,7 +470,7 @@ fn profile_once(
             Ok((parse_dur, t1.elapsed()))
         }
         ParserType::Svelte => {
-            let ast = tsv_svelte::__private::parse_folded(&folded, arena).map_err(parse_error)?;
+            let ast = tsv_svelte::__private::parse_folded(&folded).map_err(parse_error)?;
             let parse_dur = t0.elapsed();
 
             let t1 = Instant::now();

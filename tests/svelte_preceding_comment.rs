@@ -28,8 +28,7 @@ use serde_json::Value;
 /// `content.leadingComments[0].value` or the stylesheet's `content.comment.data`. Svelte
 /// spells the same decision two ways, so one accessor keeps the table below flat.
 fn attached_comment(src: &str) -> Option<String> {
-    let arena = bumpalo::Bump::new();
-    let ast = tsv_svelte::__private::parse(src, &arena).expect("component should parse");
+    let ast = tsv_svelte::__private::parse(src).expect("component should parse");
     let json =
         tsv_debug::json::wire_value(&tsv_svelte::__private::convert_ast_json_bytes(&ast, src));
     for key in ["instance", "module"] {
@@ -153,8 +152,7 @@ fn a_lifted_tag_between_stops_the_walk_the_sanctioned_stance() {
             "instance",
         ),
     ] {
-        let arena = bumpalo::Bump::new();
-        let ast = tsv_svelte::__private::parse(src, &arena).expect("component should parse");
+        let ast = tsv_svelte::__private::parse(src).expect("component should parse");
         let json =
             tsv_debug::json::wire_value(&tsv_svelte::__private::convert_ast_json_bytes(&ast, src));
         let comment_of = |key: &str| -> Option<String> {

@@ -23,9 +23,7 @@ use serde_json::Value;
 
 /// Parse `src` and return its first `Attribute` wire node.
 fn first_attribute(src: &str) -> Value {
-    let arena = bumpalo::Bump::new();
-    let ast =
-        tsv_svelte::__private::parse(src, &arena).expect("parser should accept the component");
+    let ast = tsv_svelte::__private::parse(src).expect("parser should accept the component");
     let json = tsv_debug::json::wire_value(
         &tsv_svelte::__private::convert_ast_json_bytes_with_locations(&ast, src),
     );

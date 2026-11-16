@@ -2841,7 +2841,7 @@ impl DocArena {
     /// Clears every backing store (nodes, children, and the fitting memos) but
     /// keeps each `Vec`'s allocated capacity, so a driver that formats many
     /// files allocates the buffers once and rewinds between files — the doc-IR
-    /// analogue of the per-call AST `Bump::reset()` reuse in the FFI/CLI
+    /// analogue of the stores' reuse in the FFI/CLI
     /// bindings. Only the first file (and any that grow past the high-water
     /// mark) pays a (re)allocation; the rest reuse the retained buffers.
     ///

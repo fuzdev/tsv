@@ -37,8 +37,7 @@ const RAW_CONTENT_OPENERS: &[(&str, &str, &str)] = &[
 ];
 
 fn wire(source: &str) -> Value {
-    let arena = bumpalo::Bump::new();
-    let ast = tsv_svelte::__private::parse(source, &arena).expect("the document should parse");
+    let ast = tsv_svelte::__private::parse(source).expect("the document should parse");
     tsv_debug::json::wire_value(&tsv_svelte::__private::convert_ast_json_bytes(&ast, source))
 }
 
@@ -145,9 +144,8 @@ fn opener_in_template_or_top_level_content_still_rejects() {
         "<style><!-- x</style>",
         "<script><!-- x</script>",
     ] {
-        let arena = bumpalo::Bump::new();
         assert!(
-            tsv_svelte::__private::parse(source, &arena).is_err(),
+            tsv_svelte::__private::parse(source).is_err(),
             "{source:?} should be rejected"
         );
     }

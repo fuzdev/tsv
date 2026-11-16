@@ -149,7 +149,12 @@ test('the strip entry point is found in each of its spellings, and nothing else'
 /** A tsv_ts manifest that depends on `bumpalo`, as every tree older than the current one's does. */
 const BUMPALO_MANIFEST = '[dependencies]\ntsv_lang.workspace = true\nbumpalo.workspace = true\n';
 
-/** A tsv_css manifest that depends on `bumpalo`, as every tree older than the current one's
+/** A tsv_svelte manifest that depends on `bumpalo`, as every tree older than the current one's
+ * does. */
+const SVELTE_BUMPALO_MANIFEST =
+	'[dependencies]\ntsv_lang.workspace = true\nbumpalo.workspace = true\n';
+
+/** A tsv_css manifest that depends on `bumpalo`, as every tree older than the newer ones
  * does. */
 const CSS_BUMPALO_MANIFEST =
 	'[dependencies]\ntsv_lang.workspace = true\nbumpalo.workspace = true\n';
@@ -159,46 +164,91 @@ const CSS_BUMPALO_MANIFEST =
 const CSS_WITHOUT_STORES = "pub fn parse_folded<'arena>(\n    arena: &'arena Bump,\n) {}\n";
 
 /** Commit `private_rs` as a scratch repo's `crates/tsv_ts/src/__private.rs`, `manifest` as its
- * `crates/tsv_ts/Cargo.toml`, `css_private_rs` as its `crates/tsv_css/src/__private.rs` and
- * `css_manifest` as its `crates/tsv_css/Cargo.toml`, and ask which entry-point generation the
+ * `crates/tsv_ts/Cargo.toml`, `css_private_rs` as its `crates/tsv_css/src/__private.rs`,
+ * `css_manifest` as its `crates/tsv_css/Cargo.toml` and `svelte_manifest` as its
+ * `crates/tsv_svelte/Cargo.toml`, and ask which entry-point generation the
  * drivers build against for the tree. */
 const driver_api_with = async (
 	dir: FsDir,
 	private_rs: string,
 	manifest = BUMPALO_MANIFEST,
 	css_private_rs = CSS_WITHOUT_STORES,
-	css_manifest = CSS_BUMPALO_MANIFEST
+	css_manifest = CSS_BUMPALO_MANIFEST,
+	svelte_manifest = SVELTE_BUMPALO_MANIFEST
 ): Promise<string | null> => {
 	await dir.write('crates/tsv_ts/src/__private.rs', private_rs);
 	await dir.write('crates/tsv_ts/Cargo.toml', manifest);
 	await dir.write('crates/tsv_css/src/__private.rs', css_private_rs);
 	await dir.write('crates/tsv_css/Cargo.toml', css_manifest);
+	await dir.write('crates/tsv_svelte/Cargo.toml', svelte_manifest);
 	await run_git(dir, ['add', '-A']);
 	return (await tree_driver_api(make_git(), dir, await run_git(dir, ['write-tree']))).cfg;
 };
 
-test('a tree whose tsv_css takes no bumpalo is the current generation, then one whose CSS parses into stores, then a tsv_ts that takes no bumpalo, then the warm handle, then no Bump in the TypeScript parse, then the warm parse alone, any other the oldest', async () => {
+test('a tree whose tsv_svelte takes no bumpalo is the current generation, then one whose tsv_css takes none, then one whose CSS parses into stores, then a tsv_ts that takes no bumpalo, then the warm handle, then no Bump in the TypeScript parse, then the warm parse alone, any other the oldest', async () => {
 	clear_git_repo_env();
 	await using dir = await fs.temp_dir('perf_ab_test-');
 	await run_git(dir, ['init', '--quiet']);
 	await dir.mkdir('crates/tsv_ts/src', { recursive: true });
 	await dir.mkdir('crates/tsv_css/src', { recursive: true });
+	await dir.mkdir('crates/tsv_svelte/src', { recursive: true });
 	const body =
 		'    folded.parse_with(|text| parse_with_goal_or_fallback_into(text, goal, stores))\n';
 	const no_bump = `pub fn parse_folded_into<'arena>(\n    goal: Option<Goal>,\n) {\n${body}}\n`;
 	const handle = "pub struct WarmStores {\n    parked: Option<AstStores<'static>>,\n}\n";
 	const free = '[dependencies]\ntsv_lang.workspace = true\nsmallvec.workspace = true\n';
 	const css_stores = "pub fn parse_folded_into<'arena>(\n    stores: &mut CssStores,\n) {}\n";
-	// a tsv_css that takes no bumpalo answers first, whatever the rest of the tree holds
-	const css_free = '[dependencies]\ntsv_lang.workspace = true\n';
-	strictEqual(await driver_api_with(dir, handle, free, css_stores, css_free), null);
+	// a tsv_svelte that takes no bumpalo answers first, whatever the rest of the tree holds
+	const svelte_free = '[dependencies]\ntsv_lang.workspace = true\n';
+	const css_free = svelte_free;
 	strictEqual(
-		await driver_api_with(dir, handle, free, css_stores, `# bumpalo.workspace = true\n${css_free}`),
+		await driver_api_with(dir, handle, free, css_stores, CSS_BUMPALO_MANIFEST, svelte_free),
 		null
 	);
 	strictEqual(
-		await driver_api_with(dir, handle, free, css_stores, `${css_free}bumpalo_x.workspace = true\n`),
+		await driver_api_with(
+			dir,
+			handle,
+			free,
+			css_stores,
+			CSS_BUMPALO_MANIFEST,
+			`# bumpalo.workspace = true\n${svelte_free}`
+		),
 		null
+	);
+	strictEqual(
+		await driver_api_with(
+			dir,
+			handle,
+			free,
+			css_stores,
+			CSS_BUMPALO_MANIFEST,
+			`${svelte_free}bumpalo_x.workspace = true\n`
+		),
+		null
+	);
+	strictEqual(
+		await driver_api_with(
+			dir,
+			handle,
+			free,
+			css_stores,
+			css_free,
+			`${svelte_free}bumpalo = { workspace = true }\n`
+		),
+		'svelte_bump'
+	);
+	// a manifest with no line is no evidence of the current generation
+	strictEqual(await driver_api_with(dir, handle, free, css_stores, css_free, ''), 'svelte_bump');
+	// a tsv_css that takes no bumpalo answers next, whatever the rest of the tree holds
+	strictEqual(await driver_api_with(dir, handle, free, css_stores, css_free), 'svelte_bump');
+	strictEqual(
+		await driver_api_with(dir, handle, free, css_stores, `# bumpalo.workspace = true\n${css_free}`),
+		'svelte_bump'
+	);
+	strictEqual(
+		await driver_api_with(dir, handle, free, css_stores, `${css_free}bumpalo_x.workspace = true\n`),
+		'svelte_bump'
 	);
 	strictEqual(
 		await driver_api_with(
@@ -256,6 +306,11 @@ test('a tree whose tsv_css takes no bumpalo is the current generation, then one 
 	await run_git(dir, ['add', '-A']);
 	const css_unmanifested = await run_git(dir, ['write-tree']);
 	strictEqual((await tree_driver_api(make_git(), dir, css_unmanifested)).cfg, 'strip_bump');
+	// nor is a tree without a tsv_svelte manifest
+	await dir.remove('crates/tsv_svelte/Cargo.toml');
+	await run_git(dir, ['add', '-A']);
+	const svelte_unmanifested = await run_git(dir, ['write-tree']);
+	strictEqual((await tree_driver_api(make_git(), dir, svelte_unmanifested)).cfg, 'strip_bump');
 	await rejects(tree_driver_api(make_git(), dir, '0'.repeat(40)), HarnessError);
 	const named = `// pub struct WarmStores {\n/// pub struct WarmStores {\npub struct WarmStoresX {}\n${no_bump}`;
 	strictEqual(await driver_api_with(dir, named), 'no_warm_stores');

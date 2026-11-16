@@ -819,7 +819,7 @@ pub(crate) struct Printer<'a> {
     ///   inside the same window a hit reads.
     ///
     /// Active only between `enter_chain_arg_share`/`exit_chain_arg_share` (the outermost
-    /// `build_chain_doc`); the pointer is stable, the AST arena being immutable during
+    /// `build_chain_doc`); the pointer is stable, the stores being immutable during
     /// formatting. The store itself is the doc arena's parked
     /// [`DocArena::chain_share_store`] — a linear tier for the common chain of a few
     /// entries, a hashed tier for the rare deep one — cleared at both enter and exit, so

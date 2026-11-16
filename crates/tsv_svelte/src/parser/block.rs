@@ -293,7 +293,7 @@ struct EachKeyRegion<'s> {
     span: Span,
 }
 
-impl<'a, 'arena> SvelteParser<'a, 'arena> {
+impl<'a> SvelteParser<'a> {
     /// Parse a control flow block starting with {#
     ///
     /// Dispatches to specific block parsers based on the keyword.
@@ -1827,15 +1827,13 @@ fn snippet_params_close(bytes: &[u8], open: usize) -> Option<usize> {
 #[cfg(test)]
 mod tests {
     use super::{EachHeadSplit, each_binding_separator, is_svelte_ws, strip_head_keyword};
-    use bumpalo::Bump;
     use tsv_ts::ast::AstStores;
 
     /// A head whose parens the bytewise close-scan counts past the parser's own, with a `//`
     /// swallowing the wrapper's ` {}`: its first statement is a body-less declaration.
     #[test]
     fn a_snippet_head_with_no_function_body_reports_its_signature() {
-        let arena = Bump::new();
-        let error = crate::__private::parse("{#snippet f(a = \"(\")//b)\n}x{/snippet}", &arena)
+        let error = crate::__private::parse("{#snippet f(a = \"(\")//b)\n}x{/snippet}")
             .expect_err("the head holds no function declaration");
         assert_eq!(error.message(), "Expected snippet signature");
         assert_eq!(error.position(), Some("{#snippet f".len()));
@@ -2021,9 +2019,8 @@ mod tests {
             ("\u{feff}{#each xs as x , $i}{/each}", Some("$i")),
             ("{#each xs as x (x)}{/each}", None),
         ] {
-            let arena = Bump::new();
-            let parsed = crate::__private::parse(source, &arena)
-                .unwrap_or_else(|e| panic!("{source:?}: {e:?}"));
+            let parsed =
+                crate::__private::parse(source).unwrap_or_else(|e| panic!("{source:?}: {e:?}"));
             let FragmentNode::EachBlock(block) = &parsed.view().nodes(parsed.fragment.nodes)[0]
             else {
                 panic!("{source:?}: not an each block");

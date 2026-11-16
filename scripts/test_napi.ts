@@ -194,9 +194,8 @@ describe('tsv_napi addon (real N-API JS boundary)', () => {
 	//      process. A non-context-aware addon either refuses to load there or
 	//      corrupts state shared across contexts, and nothing else in the suite
 	//      loads the addon twice.
-	//   2. **The per-thread arenas.** Every export runs inside `with_ast_arena` /
-	//      `with_doc_arena` (crate `tsv_arena`), which are thread-local and reused
-	//      across calls. Single-threaded tests cannot distinguish "per thread" from
+	//   2. **The per-thread arenas.** Every export runs over thread-local stores and
+	//      `with_doc_arena` (crate `tsv_arena`), reused across calls. Single-threaded tests cannot distinguish "per thread" from
 	//      "one global", so a change that made an arena shared would pass everything
 	//      else and corrupt output only under concurrency — the failure mode a
 	//      consumer hits in a worker pool and never in CI.

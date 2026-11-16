@@ -161,7 +161,7 @@ impl Formatter {
     pub fn format(&mut self, source: &str) -> Result<String, Error>;
 }
 // `__private` (hidden; the bindings, the CLI and the dev tooling)
-pub fn parse(source: &str) -> Result<Parsed, Error>; // Svelte's also takes the caller's arena
+pub fn parse(source: &str) -> Result<Parsed, Error>;
 pub fn format_ast(ast: &InternalAst, source: &str) -> String;
 pub fn convert_ast_json_bytes(ast: &InternalAst, source: &str) -> Vec<u8>;
 pub fn convert_ast_json_string(ast: &InternalAst, source: &str) -> String;
@@ -879,7 +879,7 @@ Native tsv runs on the system allocator — no `#[global_allocator]`, no alterna
 
 The hottest statics (the punctuation that is three quarters of a run's `text()` calls) and the stateless singleton nodes — `empty()`, the four `Line` kinds, `LineSuffixBoundary`, `BreakParent`, `FlushBreak`, the flow-probe sentinel — form a **prelude** seeded at fixed ids ahead of every document (by the constructors and `reset()`), so a literal `text(",")` or a `line()` folds to a constant with no lookup. A delimiter or operator a builder *receives* is therefore passed as a `DocId` built at the caller: a `&'static str` parameter reaches `text()` as a runtime value and pays the prelude's switch at every call. A `Line` node carries no mode or indent (the enclosing render command supplies both per visit) — the layout analog of "statics are position-free" — so every `line()` in a document is one node. Every other static goes through the static cache, mapping a `&'static str`'s address to its precomputed visual width and the current document's node for it.
 
-The single-shot `format()` path pre-sizes one arena from source length (~2 nodes per source byte, text pool at source/8; `DocArena::with_source_size_hint`) and drops it after rendering. Multi-file drivers (each language crate's public `Formatter`, which the CLI's dir-walk workers hold, and the FFI/NAPI/WASM bindings) instead reuse one arena across calls via `DocArena::reset()` — the doc-IR analogue of the per-call AST `Bump::reset()` — clearing the node/child/text-pool/memo stores while retaining capacity (the static cache's width halves deliberately survive, keyed on `'static` string addresses; its interned node halves are invalidated in O(1) by the reset's generation bump). The printers borrow `&DocArena` so the caller owns the reusable one (`__private::format_ast_in` is the borrowed-arena entry point).
+The single-shot `format()` path pre-sizes one arena from source length (~2 nodes per source byte, text pool at source/8; `DocArena::with_source_size_hint`) and drops it after rendering. Multi-file drivers (each language crate's public `Formatter`, which the CLI's dir-walk workers hold, and the FFI/NAPI/WASM bindings) instead reuse one arena across calls via `DocArena::reset()` — the doc-IR analogue of the parse stores' reuse — clearing the node/child/text-pool/memo stores while retaining capacity (the static cache's width halves deliberately survive, keyed on `'static` string addresses; its interned node halves are invalidated in O(1) by the reset's generation bump). The printers borrow `&DocArena` so the caller owns the reusable one (`__private::format_ast_in` is the borrowed-arena entry point).
 
 The builders' transient parts-lists are pooled the same way: wide-list builders (statement / object / array / parameter / specifier lists) draw a `DocBuf` from a recursion-safe arena free-list (`pooled_docbuf()`) instead of a fresh `SmallVec` per call, collapsing a document's many list-assembly spills into a handful of long-lived reused buffers (byte-identical; allocation only). Parts produced one at a time go through `DocArena::concat_iter`, which pulls three before opening any buffer — most assemblies hold one or two parts, and a one-part concat is its part — so the common case builds no buffer (byte-identical too: parts are pulled in the order a `collect` would build them).
 
@@ -977,7 +977,7 @@ tsv's TypeScript tree lives in per-document stores named by typed ids (below), i
 strings and comments included, so a TypeScript parse takes no arena. The CSS tree's lists
 and strings live in a stylesheet's `CssStores` (below), so a CSS parse takes no arena
 either, and the Svelte template's lists and strings live in the own half of a document's
-`SvelteStores` (below), so no Svelte node is in an arena either.
+`SvelteStores` (below), so a Svelte parse takes none and no Svelte node is in an arena.
 
 **`Expression`, `Statement` and `TSType` nodes and the rare payloads are the exceptions: they live in `AstStores`**
 (`ast/stores.rs`), one per document, kept beside the tree in a `Parsed` and shared across a Svelte component's
@@ -1053,7 +1053,7 @@ and `tsv_css`'s slots hand over, and its own half the box `tsv_svelte`'s slot ha
 thread parks one TypeScript store set and one CSS store set whatever mix of languages it
 parses. `format`/`convert` consume either
 into an owned `String`/JSON, so nothing borrowed escapes the call (no self-referential
-ownership — `unsafe_code = "forbid"`, safe bumpalo API only). Identifier and
+ownership — `unsafe_code = "forbid"`). Identifier and
 element/attribute names are **span-identity** — recovered from `source[span]` at each
 consumer, with the rare escaped name carried as pool text — so no name-table lifetime lands
 on the AST or the parser.
@@ -1303,7 +1303,7 @@ The closest Rust projects embody the alternative shapes, which makes the trade-o
   and it keeps an **inline-by-value node layout** (not size-minimized
   via boxing/indirection, which regressed its traversal-bound formatter; see
   [Nested AST](#nested-ast-bump-arena-not-flatindexed)),
-  stays `unsafe_code = "forbid"` (safe bumpalo API only), and recovers source text via `span`
+  stays `unsafe_code = "forbid"`, and recovers source text via `span`
   slices rather than zero-copy atoms. The other convergences are just as real: u32 spans,
   detached comments stored flat on the program, concrete types without dyn dispatch,
   prettier-style doc IR.

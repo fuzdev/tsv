@@ -171,8 +171,7 @@ use serde_json::Value;
 /// Every named CSS node in the wire, in emission order: selectors by `name`, declarations by
 /// `property`. Enough to say which side of a boundary a character landed on.
 fn named_nodes(src: &str) -> Vec<(String, String)> {
-    let arena = bumpalo::Bump::new();
-    let ast = tsv_svelte::__private::parse(src, &arena).expect("component should parse");
+    let ast = tsv_svelte::__private::parse(src).expect("component should parse");
     let json =
         tsv_debug::json::wire_value(&tsv_svelte::__private::convert_ast_json_bytes(&ast, src));
     let mut out = Vec::new();
@@ -205,8 +204,7 @@ fn collect(node: &Value, out: &mut Vec<(String, String)>) {
 
 /// Whether tsv accepts the component at all.
 fn parses(src: &str) -> bool {
-    let arena = bumpalo::Bump::new();
-    tsv_svelte::__private::parse(src, &arena).is_ok()
+    tsv_svelte::__private::parse(src).is_ok()
 }
 
 fn component(style: &str) -> String {
@@ -666,8 +664,7 @@ fn a_run_moves_neither_an_argument_lists_start_nor_a_combinators_end() {
 
 /// Every `start` of a pseudo-class/element argument list in the wire, in emission order.
 fn pseudo_args_starts(src: &str) -> Vec<u64> {
-    let arena = bumpalo::Bump::new();
-    let ast = tsv_svelte::__private::parse(src, &arena).expect("component should parse");
+    let ast = tsv_svelte::__private::parse(src).expect("component should parse");
     let json =
         tsv_debug::json::wire_value(&tsv_svelte::__private::convert_ast_json_bytes(&ast, src));
     let mut out = Vec::new();
@@ -689,8 +686,7 @@ fn pseudo_args_starts(src: &str) -> Vec<u64> {
 
 /// Every `Combinator`'s `end` in the wire, in emission order.
 fn combinator_ends(src: &str) -> Vec<u64> {
-    let arena = bumpalo::Bump::new();
-    let ast = tsv_svelte::__private::parse(src, &arena).expect("component should parse");
+    let ast = tsv_svelte::__private::parse(src).expect("component should parse");
     let json =
         tsv_debug::json::wire_value(&tsv_svelte::__private::convert_ast_json_bytes(&ast, src));
     let mut out = Vec::new();
@@ -1314,8 +1310,7 @@ fn declaration_values(src: &str) -> Vec<String> {
 /// The `named_nodes` collector reports a node by its NAME; the attribute and declaration
 /// claims are about a node's `value` (or `flags`), a different key on the same walk.
 fn wire_field_values(src: &str, ty: &str, field: &str) -> Vec<String> {
-    let arena = bumpalo::Bump::new();
-    let ast = tsv_svelte::__private::parse(src, &arena).expect("component should parse");
+    let ast = tsv_svelte::__private::parse(src).expect("component should parse");
     let json =
         tsv_debug::json::wire_value(&tsv_svelte::__private::convert_ast_json_bytes(&ast, src));
     let mut out = Vec::new();
@@ -1348,8 +1343,7 @@ fn utf16_offset_of(src: &str, needle: &str) -> u64 {
 /// any a pseudo-class argument opens. The offset a rule, its prelude and its first complex
 /// selector all share, and the one a name-level assertion cannot see.
 fn selector_list_starts(src: &str) -> Vec<u64> {
-    let arena = bumpalo::Bump::new();
-    let ast = tsv_svelte::__private::parse(src, &arena).expect("component should parse");
+    let ast = tsv_svelte::__private::parse(src).expect("component should parse");
     let json =
         tsv_debug::json::wire_value(&tsv_svelte::__private::convert_ast_json_bytes(&ast, src));
     let mut found = Vec::new();
@@ -1380,8 +1374,7 @@ fn selector_list_start(src: &str) -> u64 {
 /// Every CSS comment in the wire, by value — the assertion the named-node collector cannot
 /// make, since a comment is not a named node.
 fn css_comment_values(src: &str) -> Vec<String> {
-    let arena = bumpalo::Bump::new();
-    let ast = tsv_svelte::__private::parse(src, &arena).expect("component should parse");
+    let ast = tsv_svelte::__private::parse(src).expect("component should parse");
     let json =
         tsv_debug::json::wire_value(&tsv_svelte::__private::convert_ast_json_bytes(&ast, src));
     let mut out = Vec::new();

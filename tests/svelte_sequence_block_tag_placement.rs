@@ -36,8 +36,7 @@
 #![expect(clippy::literal_string_with_formatting_args)]
 
 fn parse_error(source: &str) -> Option<String> {
-    let arena = bumpalo::Bump::new();
-    tsv_svelte::__private::parse(source, &arena)
+    tsv_svelte::__private::parse(source)
         .err()
         .map(|e| e.to_string())
 }

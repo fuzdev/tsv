@@ -63,9 +63,8 @@ fn svelte_format_ok(source: &str, label: &str) -> String {
 /// The rendered `tsv parse` error for `source` — what a refusal-free format failure of the
 /// author's bytes must report, message and position alike.
 fn svelte_parse_error(source: &str) -> String {
-    let arena = bumpalo::Bump::new();
-    let error = tsv_svelte::__private::parse(source, &arena)
-        .expect_err("the author's bytes must not parse");
+    let error =
+        tsv_svelte::__private::parse(source).expect_err("the author's bytes must not parse");
     format!("{error:#}")
 }
 
@@ -74,8 +73,7 @@ fn a_lone_cr_in_an_in_tag_line_comment_refuses_rather_than_mint_an_attribute() {
     // The author's document is a `div` with NO attributes — Svelte's reader runs the comment
     // past the `<CR>` to the `\n` — and the fold would print a real `class` attribute.
     let source = "<div // c\rclass=\"x\"\n>hi</div>\n";
-    let arena = bumpalo::Bump::new();
-    tsv_svelte::__private::parse(source, &arena).expect("the author's bytes are valid Svelte");
+    tsv_svelte::__private::parse(source).expect("the author's bytes are valid Svelte");
 
     let error = svelte_format_error(source);
     let mut lines = error.lines();
@@ -163,9 +161,8 @@ fn a_lone_cr_anywhere_else_in_a_svelte_document_still_formats() {
             "<div\rclass=\"x\"\rid=\"y\">hi</div>\n",
         ),
     ] {
-        let arena = bumpalo::Bump::new();
         assert!(
-            tsv_svelte::__private::parse(source, &arena).is_ok(),
+            tsv_svelte::__private::parse(source).is_ok(),
             "{label}: the author's bytes must parse for this to be a control"
         );
         let formatted = svelte_format_ok(source, label);

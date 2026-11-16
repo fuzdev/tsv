@@ -8,7 +8,6 @@ use crate::cli::CliError;
 use crate::cli::commands::profile::lang_token;
 use tsv_cli::cli::input::ParserType;
 use tsv_lang::doc::arena::DocArena;
-use tsv_lang::estimated_ast_arena_capacity;
 use tsv_lang::fanout_probe::{self, BUDGET_EXCEEDED, Budget};
 
 mod legs;
@@ -632,11 +631,10 @@ struct ConstructResult {
 /// Format `source` into a fresh arena and return the number of doc nodes built
 /// (including any wasted per-candidate rebuilds).
 fn doc_node_count(source: &str, parser: ParserType) -> Result<usize, String> {
-    let bump = bumpalo::Bump::with_capacity(estimated_ast_arena_capacity(source.len()));
     let doc_arena = DocArena::for_source(source);
     match parser {
         ParserType::Svelte => {
-            let ast = tsv_svelte::__private::parse(source, &bump).map_err(|e| format!("{e:#}"))?;
+            let ast = tsv_svelte::__private::parse(source).map_err(|e| format!("{e:#}"))?;
             let _ = tsv_svelte::__private::format_ast_in(&ast, source, &doc_arena);
         }
         ParserType::TypeScript => {

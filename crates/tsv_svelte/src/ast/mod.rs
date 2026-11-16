@@ -94,7 +94,7 @@ pub struct Root {
     /// The top-level `<script module>`, held by value like `css`.
     pub module: Option<Script>,
     /// The top-level `<style>`. Owned, so the stylesheet's comment buffer drops with the
-    /// document rather than staying behind in the arena, whose values never drop.
+    /// document.
     pub css: Option<Style>,
     /// `<svelte:options>` configuration (not part of fragment)
     pub options: Option<SvelteOptions>,
@@ -2667,8 +2667,7 @@ mod lang_attribute_tests {
         // Nested rather than top-level: the reader is position-independent, and nested
         // raw-text content is parsed by nobody, so the body need not be valid TS/CSS.
         let src = format!("<div>{open_tag}x</{tag}></div>");
-        let arena = bumpalo::Bump::new();
-        let ast = crate::__private::parse(&src, &arena).expect("parses");
+        let ast = crate::__private::parse(&src).expect("parses");
         let view = ast.view();
         let attrs = raw_text_attributes(view, view.nodes(ast.fragment.nodes), tag, &src)
             .expect("the raw-text element");

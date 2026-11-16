@@ -51,15 +51,13 @@ fn format(source: &str) -> String {
 }
 
 fn svelte_format(source: &str) -> String {
-    let arena = bumpalo::Bump::new();
-    let root = tsv_svelte::__private::parse(source, &arena).expect("component should parse");
+    let root = tsv_svelte::__private::parse(source).expect("component should parse");
     tsv_svelte::__private::format_ast(&root, source)
 }
 
 /// The shape of the first template expression tag's expression, from tsv's Svelte wire.
 fn template_expression_shape(source: &str) -> String {
-    let arena = bumpalo::Bump::new();
-    let root = tsv_svelte::__private::parse(source, &arena).expect("component should parse");
+    let root = tsv_svelte::__private::parse(source).expect("component should parse");
     let json = tsv_debug::json::wire_value(&tsv_svelte::__private::convert_ast_json_bytes(
         &root, source,
     ));

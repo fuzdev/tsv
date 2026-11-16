@@ -22,16 +22,17 @@
  * passed to the example's own compilation (`build_args`: `cargo rustc … -- --cfg`, so every
  * library builds as `cargo build` builds it). Per generation, each side runs:
  *
- * - current (a tree whose CSS parse takes no `Bump`): every language parses into warm stores a
- *   handle of its own crate (`tsv_ts`, `tsv_svelte` and `tsv_css` each have a
+ * - current (a tree whose Svelte parse takes no `Bump`): every language parses into warm stores
+ *   a handle of its own crate (`tsv_ts`, `tsv_svelte` and `tsv_css` each have a
  *   `__private::WarmStores`) takes before each timed region and parks after it, as the CLI's
  *   `Formatter` keeps them in a slot it owns (`parse_folded_into`, then `format_folded_in`
- *   through `parsed_ref`), the TypeScript and CSS parses with no `Bump`, the Svelte parse with
- *   the `Bump` beside the stores; the strip driver parses with
+ *   through `parsed_ref`), every parse with no `Bump`; the strip driver parses with
  *   `parse_with_goal_or_fallback_into` and strips with `strip_into`, into TypeScript's warm
  *   stores.
- * - `css_bump` (a tree whose CSS has stores but whose parse still takes the `Bump`): as the
- *   current generation, the CSS parse handed the `Bump` too.
+ * - `svelte_bump` (a tree whose Svelte parse still takes the `Bump` beside the stores): as the
+ *   current generation, the Svelte parse handed the `Bump` too.
+ * - `css_bump` (a tree whose CSS has stores but whose parse still takes the `Bump`): as
+ *   `svelte_bump`, the CSS parse handed the `Bump` too.
  * - `css_no_stores` (a tree whose strip takes no `Bump` and whose CSS has no stores): as the
  *   current generation for TypeScript and the strip; Svelte parses into the stores
  *   `tsv_ts::__private::WarmStores` keeps, and CSS into the `Bump` alone (`parse_folded`).
@@ -230,8 +231,8 @@ const STRIP_ENTRY_POINT = '^pub fn strip_in(to)?[<(]';
 
 /** The pattern (`git grep -E`) whose match in a crate's `Cargo.toml` says the crate depends on
  * `bumpalo`; among the trees these generations cover, a tsv_ts manifest where it matches no line
- * has a strip that takes no `Bump`, and a tsv_css one a parse that takes none — no item of the
- * crate can name the type. The manifest rather than a line of `strip_into`, whose
+ * has a strip that takes no `Bump`, and a tsv_css or tsv_svelte one a parse that takes none — no
+ * item of the crate can name the type. The manifest rather than a line of `strip_into`, whose
  * declaration spans lines and whose body any edit may respell: the compiler holds the
  * dependency's absence to its meaning. Anchored at the line start, where a dependency is
  * declared, so a comment cannot answer for it. */
@@ -277,6 +278,12 @@ export interface DriverApi {
 export const DRIVER_APIS: ReadonlyArray<DriverApi> = [
 	{
 		cfg: null,
+		probe: { pattern: DEPENDS_ON_BUMPALO, path: 'crates/tsv_svelte/Cargo.toml', absent: true },
+		calls:
+			'warm stores: every language parses into stores a WarmStores handle of its own crate parks between iterations, with no Bump; the strip takes no Bump'
+	},
+	{
+		cfg: 'svelte_bump',
 		probe: { pattern: DEPENDS_ON_BUMPALO, path: 'crates/tsv_css/Cargo.toml', absent: true },
 		calls:
 			'warm stores: every language parses into stores a WarmStores handle of its own crate parks between iterations (TypeScript and CSS with no Bump, Svelte beside it); the strip takes no Bump'

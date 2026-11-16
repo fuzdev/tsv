@@ -5,7 +5,6 @@ use crate::cli::CliError;
 use crate::cli::commands::profile::{percentile, resolve_profile_files};
 use tsv_cli::cli::input::ParserType;
 use tsv_lang::Comment;
-use tsv_lang::estimated_ast_arena_capacity;
 use tsv_ts::ast::{AstView, ImportSpecifier, Run, StatementKind, StmtId};
 
 /// Histogram the print-time buffer-size distributions used to tune the TS
@@ -125,7 +124,6 @@ fn collect_file(
     // the text the shipped format path parses and prints: carriage returns folded
     let folded = tsv_lang::printing::normalize_carriage_returns(&read);
     let source = folded.text();
-    let arena = bumpalo::Bump::with_capacity(estimated_ast_arena_capacity(source.len()));
 
     match parser {
         ParserType::TypeScript => {
@@ -138,7 +136,7 @@ fn collect_file(
             drop(tsv_ts::__private::format_ast(&ast, source));
         }
         ParserType::Svelte => {
-            let root = tsv_svelte::__private::parse(source, &arena).map_err(|_| ())?;
+            let root = tsv_svelte::__private::parse(source).map_err(|_| ())?;
             // The instance/module `<script>` programs feed the same import
             // printer; `Root.comments` unifies every script + `{expr}` comment
             // (the exact population `render.rs` renders).

@@ -497,9 +497,8 @@ mod tests {
     fn convert_ts(body: &str) -> Value {
         let source = format!("<script lang=\"ts\">\n{body}\n</script>");
         // Test inputs are hardcoded valid sources; a parse failure should panic
-        let arena = bumpalo::Bump::new();
         #[expect(clippy::expect_used)]
-        let root = crate::__private::parse(&source, &arena).expect("parse");
+        let root = crate::__private::parse(&source).expect("parse");
         #[expect(clippy::expect_used)]
         serde_json::from_slice(&crate::__private::convert_ast_json_bytes(&root, &source))
             .expect("wire")
@@ -521,9 +520,8 @@ mod tests {
 
     /// Parse a whole component and return the public JSON AST.
     fn convert_component(source: &str) -> Value {
-        let arena = bumpalo::Bump::new();
         #[expect(clippy::expect_used)]
-        let root = crate::__private::parse(source, &arena).expect("parse");
+        let root = crate::__private::parse(source).expect("parse");
         #[expect(clippy::expect_used)]
         serde_json::from_slice(&crate::__private::convert_ast_json_bytes(&root, source))
             .expect("wire")
@@ -576,10 +574,9 @@ mod tests {
     /// from the correct one without this case.
     #[test]
     fn expression_tag_nel_gap_is_rejected_not_crossed() {
-        let arena = bumpalo::Bump::new();
         let source = "<div>{expr\u{85}/* c */}</div>";
         assert!(
-            crate::__private::parse(source, &arena).is_err(),
+            crate::__private::parse(source).is_err(),
             "U+0085 is not JS `\\s`, so it cannot open a gap acorn scans across"
         );
     }
@@ -718,8 +715,7 @@ mod tests {
         /// identically.
         #[expect(clippy::expect_used)]
         fn assert_placements(source: &str, expected: &[(&str, u64, u64, &'static str, &str)]) {
-            let arena = bumpalo::Bump::new();
-            let root = crate::__private::parse(source, &arena).expect("parse");
+            let root = crate::__private::parse(source).expect("parse");
             let expected: Vec<Placement> = expected
                 .iter()
                 .map(|&(node, start, end, key, value)| {

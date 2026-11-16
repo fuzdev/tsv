@@ -3,7 +3,6 @@
 use crate::ast::{self, FragmentNode, SvelteOwn, SvelteStores};
 use crate::lexer::{Lexer, Token, TokenKind};
 use crate::parser::element::{ParsedElement, tag_name_end};
-use bumpalo::Bump;
 use tsv_css::ast::CssStores;
 use tsv_lang::store::{ListMark, Run, flush_run_move};
 use tsv_lang::{Comment, DepthBudget, DepthLimit, Error, Span};
@@ -35,11 +34,7 @@ fn expression_comment(
     comment
 }
 
-pub(crate) struct SvelteParser<'a, 'arena> {
-    /// The caller's bump arena, which nothing reads: the template's lists live in the own
-    /// half of the stores.
-    #[expect(dead_code, reason = "kept until the caller's arena parameter goes")]
-    pub(crate) arena: &'arena Bump,
+pub(crate) struct SvelteParser<'a> {
     /// The document's TypeScript stores, one instance across the template and
     /// every embedded island. Empty only inside [`Self::with_island_stores`], the one reader:
     /// a host check runs during the embedded parse and borrows the whole parser, so the
@@ -186,12 +181,8 @@ fn is_reserved_word(name: &str) -> bool {
     )
 }
 
-impl<'a, 'arena> SvelteParser<'a, 'arena> {
-    pub(crate) fn new(
-        source: &'a str,
-        arena: &'arena Bump,
-        stores: &'a mut SvelteStores,
-    ) -> Result<Self, Error> {
+impl<'a> SvelteParser<'a> {
+    pub(crate) fn new(source: &'a str, stores: &'a mut SvelteStores) -> Result<Self, Error> {
         let mut lexer = Lexer::new(source);
         let mut current = Token {
             kind: TokenKind::Eof,
@@ -202,7 +193,6 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         let SvelteStores { ts, css, own } = stores;
         let snippet_wire_parameters = own.runs.wire_param_scratch.mark();
         Ok(Self {
-            arena,
             stores: Some(&mut **ts),
             css: &mut **css,
             own: &mut **own,

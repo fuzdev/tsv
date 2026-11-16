@@ -119,8 +119,7 @@ fn ts_holds(source: &str, goal: tsv_ts::Goal, decoded: &str, hits: usize) {
 /// Parse `source` as a Svelte component and return both wire variants.
 #[track_caller]
 fn svelte_wires(source: &str) -> [Vec<u8>; 2] {
-    let arena = bumpalo::Bump::new();
-    let root = tsv_svelte::__private::parse(source, &arena)
+    let root = tsv_svelte::__private::parse(source)
         .unwrap_or_else(|e| panic!("parse failed for {source:?}: {e}"));
     [
         tsv_svelte::__private::convert_ast_json_bytes_with_locations(&root, source),
@@ -290,8 +289,7 @@ fn a_directive_name_claims_span_identity_only_when_clean() {
             ("a\u{7f}b", true),
         ] {
             let source = format!("<div {directive}:{name}></div>\n");
-            let arena = bumpalo::Bump::new();
-            let root = tsv_svelte::__private::parse(&source, &arena)
+            let root = tsv_svelte::__private::parse(&source)
                 .unwrap_or_else(|e| panic!("parse failed for {source:?}: {e}"));
             let view = root.view();
             let Some(FragmentNode::Element(element)) = view.nodes(root.fragment.nodes).first()

@@ -163,7 +163,6 @@ mod tests {
                     continue;
                 };
                 let parser = ParserType::from_extension(&path.to_string_lossy());
-                let arena = bumpalo::Bump::new();
                 let wires: Vec<Vec<u8>> = match parser {
                     ParserType::TypeScript => {
                         let Ok(ast) = tsv_ts::__private::parse(&source) else {
@@ -175,7 +174,7 @@ mod tests {
                         ]
                     }
                     ParserType::Svelte => {
-                        let Ok(ast) = tsv_svelte::__private::parse(&source, &arena) else {
+                        let Ok(ast) = tsv_svelte::__private::parse(&source) else {
                             continue;
                         };
                         vec![

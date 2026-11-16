@@ -27,7 +27,7 @@ impl SequenceLocation {
     }
 }
 
-impl<'a, 'arena> SvelteParser<'a, 'arena> {
+impl<'a> SvelteParser<'a> {
     /// Parse an expression tag `{expression}` at the current lexer position, then
     /// advance the lexer past the closing `}`.
     ///
@@ -252,11 +252,9 @@ fn head_keyword_end(bytes: &[u8], start: usize) -> usize {
 
 #[cfg(test)]
 mod tests {
-    use bumpalo::Bump;
 
     fn parses(source: &str) -> bool {
-        let arena = Bump::new();
-        crate::__private::parse(source, &arena).is_ok()
+        crate::__private::parse(source).is_ok()
     }
 
     /// Every island scan begins as a whole expression (`tsv_ts::__private::ACORN_ISLAND_GRAMMAR`):

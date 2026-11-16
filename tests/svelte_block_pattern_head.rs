@@ -173,8 +173,7 @@ fn unmatched_pattern_bracket_reports_at_the_bracket() {
         ("<p>hi</p>\n{#if c}{@const [a = 1}{/if}", "[a = 1}"),
     ];
     for (src, at) in INVALID {
-        let arena = bumpalo::Bump::new();
-        let Err(err) = tsv_svelte::__private::parse(src, &arena) else {
+        let Err(err) = tsv_svelte::__private::parse(src) else {
             panic!("tsv should reject `{src}`");
         };
         assert_eq!(

@@ -112,8 +112,7 @@ fn root_names<'s>(view: SvelteView<'_>, root: &Root, source: &'s str, out: &mut 
 /// among them. Returns the AST names, or `None` when the parser rejects the source.
 #[track_caller]
 fn grade(source: &str) -> Option<Vec<String>> {
-    let arena = bumpalo::Bump::new();
-    let root = tsv_svelte::__private::parse(source, &arena).ok()?;
+    let root = tsv_svelte::__private::parse(source).ok()?;
     let mut names = Vec::new();
     let view = root.view();
     root_names(view, &root, source, &mut names);

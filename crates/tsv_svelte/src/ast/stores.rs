@@ -127,8 +127,7 @@ impl SvelteOwn {
     /// store, scratch stack and the pool keep their capacity. Every run and pool text minted
     /// so far is invalid from here on.
     // TODO: never trims. Peak row capacity stays parked for as long as the `Formatter` or the
-    // thread lives, where the AST arena's rewind releases every block but the largest while
-    // idle. Rows held here instead of in a bump arena escape that release.
+    // thread lives, with nothing released while idle.
     #[inline]
     pub(crate) fn reset(&mut self) {
         // destructured whole, so a field added to the stores without a reset here is a build
@@ -330,9 +329,7 @@ mod tests {
 
     /// The wire and the formatted output of `source`, or its error, through `stores`.
     fn outputs(source: &str, stores: &mut SvelteStores) -> Result<(Vec<u8>, String), String> {
-        let arena = bumpalo::Bump::new();
-        let root =
-            crate::__private::parse_into(source, &arena, stores).map_err(|e| format!("{e:#}"))?;
+        let root = crate::__private::parse_into(source, stores).map_err(|e| format!("{e:#}"))?;
         let parsed = crate::__private::parsed_ref(&root, stores);
         let wire = crate::__private::convert_ast_json_bytes(parsed, source);
         let formatted = crate::__private::format_ast(parsed, source);
@@ -618,8 +615,7 @@ mod tests {
     fn fill_own(stores: &mut SvelteStores) {
         let document = OWN_DOCUMENT.repeat(16);
         outputs(&document, stores).expect("the document parses");
-        let arena = bumpalo::Bump::new();
-        let parsed = crate::__private::parse(OWN_DOCUMENT, &arena).expect("the document parses");
+        let parsed = crate::__private::parse(OWN_DOCUMENT).expect("the document parses");
         let view = parsed.view();
         let node = view.nodes(parsed.fragment.nodes)[0].clone();
         let FragmentNode::Element(element) = &node else {
@@ -763,12 +759,10 @@ mod tests {
             "<textarea>a{b}",
             "{#await p}<p>{:then v}<span>{v}",
         ] {
-            crate::__private::parse_into(source, &bumpalo::Bump::new(), &mut stores)
-                .expect_err(source);
+            crate::__private::parse_into(source, &mut stores).expect_err(source);
             assert_own_scratch_empty(&stores);
         }
-        crate::__private::parse_into(OWN_DOCUMENT, &bumpalo::Bump::new(), &mut stores)
-            .expect("parses");
+        crate::__private::parse_into(OWN_DOCUMENT, &mut stores).expect("parses");
         assert_own_scratch_empty(&stores);
     }
 
@@ -780,7 +774,7 @@ mod tests {
     fn a_parse_over_an_open_frame_is_refused() {
         let mut stores = SvelteStores::new();
         stores.own.runs.modifier_scratch.push(Span::new(0, 0));
-        let _ = crate::__private::parse_into("<p></p>", &bumpalo::Bump::new(), &mut stores);
+        let _ = crate::__private::parse_into("<p></p>", &mut stores);
     }
 
     /// The tree's outline: each node's kind and, for an element, its name, attributes and
@@ -873,16 +867,12 @@ mod tests {
         ];
         let mut warm = WarmStores::default();
         for (source, expected) in cases {
-            let arena = bumpalo::Bump::new();
-            let parsed = crate::__private::parse(source, &arena).expect(source);
+            let parsed = crate::__private::parse(source).expect(source);
             assert_eq!(outline(&parsed, source), expected, "{source:?}");
             let cut = &source[..source.len() - 2];
-            let _ = warm.with(|stores| {
-                crate::__private::parse_into(cut, &bumpalo::Bump::new(), stores).map(|_| ())
-            });
+            let _ = warm.with(|stores| crate::__private::parse_into(cut, stores).map(|_| ()));
             let reused = warm.with(|stores| {
-                let arena = bumpalo::Bump::new();
-                let root = crate::__private::parse_into(source, &arena, stores).expect(source);
+                let root = crate::__private::parse_into(source, stores).expect(source);
                 let parsed = crate::ast::ParsedRoot {
                     root,
                     stores: std::mem::take(stores),
@@ -893,10 +883,8 @@ mod tests {
             });
             assert_eq!(reused, expected, "{source:?} through a warm handle");
         }
-        let arena = bumpalo::Bump::new();
         let parsed = crate::__private::parse(
             "{#snippet s(a = (1))}{#snippet t(b = (2))}x{/snippet}{/snippet}",
-            &arena,
         )
         .expect("parses");
         assert_eq!(
@@ -927,14 +915,8 @@ mod tests {
         for source in sources {
             let fresh = crate::format(source).map_err(|e| format!("{e:#}"));
             let reused = warm.with(|stores| {
-                let arena = bumpalo::Bump::new();
-                crate::format_in(
-                    source,
-                    &arena,
-                    stores,
-                    tsv_lang::doc::arena::DocArena::for_source,
-                )
-                .map_err(|e| format!("{e:#}"))
+                crate::format_in(source, stores, tsv_lang::doc::arena::DocArena::for_source)
+                    .map_err(|e| format!("{e:#}"))
             });
             assert_eq!(reused, fresh, "{source:?}");
         }

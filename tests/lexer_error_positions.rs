@@ -26,8 +26,6 @@
 //! past the end of the source, where the context clamps it to the end of the document — a
 //! location no case's token sits at, so the assertion names the drift.
 
-use bumpalo::Bump;
-
 #[path = "support/utf16_lines.rs"]
 mod utf16_lines;
 use utf16_lines::{line_column, line_starts, wire_rule, wire_text};
@@ -57,8 +55,7 @@ fn location(rendered: &str) -> (usize, usize, String) {
 }
 
 fn svelte_error(source: &str) -> (usize, usize, String) {
-    let arena = Bump::new();
-    let err = tsv_svelte::__private::parse(source, &arena).expect_err("the input must not parse");
+    let err = tsv_svelte::__private::parse(source).expect_err("the input must not parse");
     location(&format!("{err:#}"))
 }
 

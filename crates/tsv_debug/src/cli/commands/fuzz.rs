@@ -229,8 +229,7 @@ impl EmbeddedSeeds {
 /// `<style>` content, or the instance and module `<script>` contents. A seed tsv cannot
 /// parse yields nothing (its regions are not known), as does an empty body.
 fn embedded_bodies(src: &str, lang: EmbeddedSeeds) -> Vec<(&'static str, String)> {
-    let arena = bumpalo::Bump::new();
-    let Ok(root) = tsv_svelte::__private::parse(src, &arena) else {
+    let Ok(root) = tsv_svelte::__private::parse(src) else {
         return Vec::new();
     };
     let mut bodies = Vec::new();
@@ -573,12 +572,11 @@ fn attempt(src: &str, parser: ParserType, render: bool, last: &mut LastInput) ->
 /// leg's property is that writing them does not panic (`deno task check:loc` grades
 /// their content over the fixtures).
 fn locations_wire(src: &str, parser: ParserType) -> bool {
-    let arena = bumpalo::Bump::new();
     let wire = match parser {
         ParserType::TypeScript => tsv_ts::__private::parse_with_goal_or_fallback(src, None)
             .ok()
             .map(|ast| tsv_ts::__private::convert_ast_json_bytes_with_locations(&ast, src)),
-        ParserType::Svelte => tsv_svelte::__private::parse(src, &arena)
+        ParserType::Svelte => tsv_svelte::__private::parse(src)
             .ok()
             .map(|ast| tsv_svelte::__private::convert_ast_json_bytes_with_locations(&ast, src)),
         ParserType::Css => tsv_css::__private::parse(src)
@@ -624,11 +622,10 @@ fn strip_check(src: &str) -> (bool, Option<(Outcome, String)>) {
 /// bindings do (`write_imports_json`, in the language's wire coordinates), and check
 /// their contract. Returns whether they were collected, and the joined breaks.
 fn imports_check(src: &str, parser: ParserType) -> (bool, Option<String>) {
-    let arena = bumpalo::Bump::new();
     let (imports, coordinates) = match parser {
         ParserType::TypeScript => (tsv_ts::parse_imports(src).ok(), tsv_ts::WIRE_COORDINATES),
         ParserType::Svelte => (
-            tsv_svelte::__private::parse_imports_in(src, &arena).ok(),
+            tsv_svelte::parse_imports(src).ok(),
             tsv_svelte::WIRE_COORDINATES,
         ),
         ParserType::Css => return (false, None),

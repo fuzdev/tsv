@@ -288,7 +288,6 @@ fn engine_export<T>(
 macro_rules! lang_bindings {
     (
         $goalness:ident,
-        $arenaness:ident,
         $lang:ident,
         $engine:ident,
         $parse_json_fn:ident, $parse_json_js:literal,
@@ -310,7 +309,6 @@ macro_rules! lang_bindings {
                 let goal = napi_source_type(source_type, goal_allowed!($goalness), Family::Parse)?;
                 parse_convert!(
                     $goalness,
-                    $arenaness,
                     $lang,
                     convert_ast_json_string,
                     source,
@@ -326,9 +324,7 @@ macro_rules! lang_bindings {
                 source_type: Option<String>,
             ) -> Result<(), Failure> {
                 let goal = napi_source_type(source_type, goal_allowed!($goalness), Family::Parse)?;
-                parse_internal!($goalness, $arenaness, $lang, source, goal, |e| {
-                    Failure::parse(&e)
-                })
+                parse_internal!($goalness, $lang, source, goal, |e| { Failure::parse(&e) })
             }
 
             /// The formatted source.
@@ -338,9 +334,7 @@ macro_rules! lang_bindings {
                 source_type: Option<String>,
             ) -> Result<String, Failure> {
                 let goal = napi_source_type(source_type, goal_allowed!($goalness), Family::Format)?;
-                parse_format!($goalness, $arenaness, $lang, source, goal, |e| {
-                    Failure::parse(&e)
-                })
+                parse_format!($goalness, $lang, source, goal, |e| { Failure::parse(&e) })
             }
         }
 
@@ -388,7 +382,6 @@ macro_rules! lang_bindings {
 
 lang_bindings!(
     nogoal,
-    arena,
     tsv_svelte,
     svelte_engine,
     parse_svelte_json,
@@ -400,7 +393,6 @@ lang_bindings!(
 );
 lang_bindings!(
     goal,
-    noarena,
     tsv_ts,
     typescript_engine,
     parse_typescript_json,
@@ -412,7 +404,6 @@ lang_bindings!(
 );
 lang_bindings!(
     nogoal,
-    noarena,
     tsv_css,
     css_engine,
     parse_css_json,
@@ -1349,12 +1340,12 @@ mod tests {
 
     #[test]
     fn repeated_calls_reuse_arenas() {
-        // This crate's distinctive risk: `with_ast_arena` / `with_doc_arena`
-        // keep one arena per thread and `reset()` it at the start of each call,
-        // so nothing built in a prior call may leak past the next reset. Two
-        // back-to-back formats on a warm arena must produce identical output,
-        // and interleaving a parse (which drives the AST arena on its own)
-        // between them must not perturb the format result.
+        // This crate's distinctive risk: `with_doc_arena` and the language
+        // crates' parked stores keep one set per thread and reset it at the
+        // start of each call, so nothing built in a prior call may leak past
+        // the next reset. Two back-to-back formats on a warm arena must produce
+        // identical output, and interleaving a parse (which drives the stores
+        // on its own) between them must not perturb the format result.
         let format = typescript_engine::format;
         let once = at_default(format, "const   x=1").unwrap();
         let twice = at_default(format, "const   x=1").unwrap();

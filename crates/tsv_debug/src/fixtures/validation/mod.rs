@@ -296,10 +296,7 @@ pub async fn validate_fixture(fixture: &Fixture, prettier_only: bool) -> Fixture
     // Phases 2-4: Our parser/formatter validation (skip in prettier_only mode)
     if !prettier_only {
         // Phases 2/2b share one parse of the input (and one wire emission).
-        // The arena owns the internal AST and must outlive `parsed`
-        // (caller-owns-`Bump`).
-        let arena = bumpalo::Bump::new();
-        match parse_input(&input, input_type, fixture.goal(), &arena) {
+        match parse_input(&input, input_type, fixture.goal()) {
             Ok(parsed) => {
                 let paths = input_ast_paths(&parsed, &input);
                 // Phase 2: Our Parser validation - P2 (pure Rust)

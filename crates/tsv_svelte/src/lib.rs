@@ -143,8 +143,8 @@ pub const WIRE_COORDINATES: WireCoordinates =
 /// returns — a cost only a document holding a lone `<CR>` pays.
 #[cold]
 #[inline(never)]
-fn refuse_lone_cr_in_tag_line_comment(source: &str, arena: &bumpalo::Bump) -> Result<()> {
-    let root = __private::parse(source, arena)?;
+fn refuse_lone_cr_in_tag_line_comment(source: &str) -> Result<()> {
+    let root = __private::parse(source)?;
     let bytes = source.as_bytes();
     for comment in &root.comments {
         // Only the template reader's `//` runs to a `\n` alone; acorn's and the CSS
@@ -202,19 +202,17 @@ fn refuse_lone_cr_in_tag_line_comment(source: &str, arena: &bumpalo::Bump) -> Re
 pub fn format(source: &str) -> Result<String> {
     format_in(
         source,
-        &bumpalo::Bump::new(),
         &mut SvelteStores::new(),
         tsv_lang::doc::arena::DocArena::for_source,
     )
 }
 
-/// The one format path, shared by [`format()`] and [`Formatter`]: fold, parse into `arena`,
+/// The one format path, shared by [`format()`] and [`Formatter`]: fold, parse into `stores`,
 /// then print into the doc arena `doc_arena` hands over once the parse has succeeded (handed
 /// the folded text, so a fresh one is sized to it and a failed parse never builds one).
-/// Nothing borrowed from either arena escapes: the result is owned.
+/// Nothing borrowed from the doc arena escapes: the result is owned.
 pub(crate) fn format_in<D: std::borrow::Borrow<tsv_lang::doc::arena::DocArena>>(
     source: &str,
-    arena: &bumpalo::Bump,
     stores: &mut SvelteStores,
     doc_arena: impl FnOnce(&str) -> D,
 ) -> Result<String> {
@@ -222,7 +220,7 @@ pub(crate) fn format_in<D: std::borrow::Borrow<tsv_lang::doc::arena::DocArena>>(
     // `tsv_lang::printing::normalize_carriage_returns`); `parse` leaves the author's bytes
     // alone so its offsets stay a drop-in contract with Svelte's.
     let folded = tsv_lang::printing::normalize_carriage_returns(source);
-    let root = parse_folded_into(&folded, arena, stores)?;
+    let root = parse_folded_into(&folded, stores)?;
     let doc_arena = doc_arena(folded.text());
     Ok(format_folded_in(
         __private::parsed_ref(&root, stores),
@@ -332,8 +330,7 @@ pub fn parse_to_json(source: &str) -> Result<String> {
 /// A parse error.
 #[cfg(feature = "json")]
 pub fn parse_to_json_with(source: &str, options: JsonOptions) -> Result<String> {
-    let arena = bumpalo::Bump::with_capacity(tsv_lang::estimated_ast_arena_capacity(source.len()));
-    let ast = __private::parse(source, &arena)?;
+    let ast = __private::parse(source)?;
     #[cfg(feature = "locations")]
     if options.locations {
         return Ok(wire_string(
@@ -379,8 +376,7 @@ pub fn parse_to_json_with(source: &str, options: JsonOptions) -> Result<String> 
 ///
 /// A parse error.
 pub fn parse_imports(source: &str) -> Result<Imports> {
-    let arena = bumpalo::Bump::with_capacity(tsv_lang::estimated_ast_arena_capacity(source.len()));
-    __private::parse_imports_in(source, &arena)
+    __private::parse_imports_into(source, &mut SvelteStores::new())
 }
 
 /// The wire's bytes as the `String` they are: the writer emits source slices and ASCII

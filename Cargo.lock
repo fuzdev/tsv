@@ -582,7 +582,6 @@ name = "tsv_cli"
 version = "0.8.1"
 dependencies = [
  "argh",
- "bumpalo",
  "tsv_css",
  "tsv_discover",
  "tsv_ignore",
@@ -681,7 +680,6 @@ dependencies = [
 name = "tsv_svelte"
 version = "0.8.1"
 dependencies = [
- "bumpalo",
  "serde_json",
  "smallvec",
  "tsv_css",
@@ -694,7 +692,6 @@ dependencies = [
 name = "tsv_tests"
 version = "0.8.1"
 dependencies = [
- "bumpalo",
  "futures-util",
  "serde_json",
  "tokio",

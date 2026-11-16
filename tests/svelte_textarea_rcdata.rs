@@ -29,9 +29,7 @@ use serde_json::Value;
 /// leaves — enough to pin the RCDATA structure (which children are Text vs
 /// ExpressionTag) and the close-tolerant element `end`.
 fn rcdata_skeleton(src: &str) -> String {
-    let arena = bumpalo::Bump::new();
-    let ast =
-        tsv_svelte::__private::parse(src, &arena).expect("parser should accept <textarea> RCDATA");
+    let ast = tsv_svelte::__private::parse(src).expect("parser should accept <textarea> RCDATA");
     let json =
         tsv_debug::json::wire_value(&tsv_svelte::__private::convert_ast_json_bytes(&ast, src));
     let nodes = json["fragment"]["nodes"]
@@ -63,9 +61,7 @@ fn reduce(nodes: &[Value]) -> String {
 
 /// The `raw` / `data` of the first `<textarea>`'s first `Text` child.
 fn first_textarea_text(src: &str) -> (String, String) {
-    let arena = bumpalo::Bump::new();
-    let ast =
-        tsv_svelte::__private::parse(src, &arena).expect("parser should accept <textarea> RCDATA");
+    let ast = tsv_svelte::__private::parse(src).expect("parser should accept <textarea> RCDATA");
     let json =
         tsv_debug::json::wire_value(&tsv_svelte::__private::convert_ast_json_bytes(&ast, src));
     let text = &json["fragment"]["nodes"][0]["fragment"]["nodes"][0];
@@ -141,16 +137,14 @@ fn near_miss_close_stays_text() {
 /// Svelte (which also rejects the malformed brace).
 #[test]
 fn unterminated_expression_rejected() {
-    let arena = bumpalo::Bump::new();
-    assert!(tsv_svelte::__private::parse("<textarea>{foo</textarea>", &arena).is_err());
+    assert!(tsv_svelte::__private::parse("<textarea>{foo</textarea>").is_err());
 }
 
 /// A close-less `<textarea>` (EOF before any `</textarea…>`) is rejected, matching
 /// Svelte's `unexpected_eof`.
 #[test]
 fn unclosed_textarea_rejected() {
-    let arena = bumpalo::Bump::new();
-    assert!(tsv_svelte::__private::parse("<textarea>abc</textarea", &arena).is_err());
+    assert!(tsv_svelte::__private::parse("<textarea>abc</textarea").is_err());
 }
 
 /// RCDATA text decodes character references with attribute-value rules — Svelte's

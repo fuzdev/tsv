@@ -2037,9 +2037,8 @@ mod tests {
 
     /// Parse full Svelte source and return its span-only wire.
     fn convert_svelte(source: &str) -> Value {
-        let arena = bumpalo::Bump::new();
         // Test inputs are hardcoded valid sources; a parse failure should panic
-        let root = crate::__private::parse(source, &arena).expect("parse");
+        let root = crate::__private::parse(source).expect("parse");
         serde_json::from_slice(&crate::__private::convert_ast_json_bytes(&root, source))
             .expect("wire")
     }
@@ -2047,8 +2046,7 @@ mod tests {
     /// Parse full Svelte source and return its loc-bearing wire.
     #[cfg(feature = "locations")]
     fn convert_svelte_with_locations(source: &str) -> Value {
-        let arena = bumpalo::Bump::new();
-        let root = crate::__private::parse(source, &arena).expect("parse");
+        let root = crate::__private::parse(source).expect("parse");
         serde_json::from_slice(&crate::__private::convert_ast_json_bytes_with_locations(
             &root, source,
         ))
@@ -2156,8 +2154,7 @@ mod tests {
     /// a childless component.
     #[test]
     fn element_and_attribute_shapes_write_these_bytes() {
-        let arena = bumpalo::Bump::new();
-        let root = crate::__private::parse(SHAPES, &arena).expect("parse");
+        let root = crate::__private::parse(SHAPES).expect("parse");
         let wire = crate::__private::convert_ast_json_bytes(&root, SHAPES);
         let expected = concat!(
             r#"{"css":null,"js":[],"start":0,"end":111,"type":"Root","fragment":{"type":"Fragment","#,
@@ -2225,8 +2222,7 @@ mod tests {
     #[test]
     fn positions_survive_every_digit_width() {
         let wires = |source: &str| {
-            let arena = bumpalo::Bump::new();
-            let root = crate::__private::parse(source, &arena).expect("parse");
+            let root = crate::__private::parse(source).expect("parse");
             [
                 #[cfg(feature = "locations")]
                 crate::__private::convert_ast_json_bytes_with_locations(&root, source),

@@ -165,8 +165,7 @@ fn uses_divergence_pattern(fixture: &fixtures::Fixture) -> bool {
 /// Our parser's AST for a fixture input, in the exact bytes an `expected_ours.json` holds —
 /// the same derivation the validator's parser phases compare against.
 fn our_json(fixture: &fixtures::Fixture, source: &str) -> Result<String, String> {
-    let arena = bumpalo::Bump::new();
-    let parsed = parse_input(source, fixture.input_type(), fixture.goal(), &arena)
+    let parsed = parse_input(source, fixture.input_type(), fixture.goal())
         .map_err(|e| format!("Our parser: {e}"))?;
     Ok(input_ast_paths(&parsed, source).ast_json_tabs)
 }

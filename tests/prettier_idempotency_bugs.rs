@@ -76,8 +76,7 @@ async fn assert_prettier_idempotency_bug(
     );
 
     // Verify our printer produces stable output in one pass
-    let arena = bumpalo::Bump::new();
-    let our_ast = tsv_svelte::__private::parse(input, &arena).expect("parse failed");
+    let our_ast = tsv_svelte::__private::parse(input).expect("parse failed");
     let our_output = tsv_svelte::__private::format_ast(&our_ast, input);
 
     assert_eq!(
@@ -86,9 +85,7 @@ async fn assert_prettier_idempotency_bug(
     );
 
     // Verify our printer is idempotent
-    let arena_twice = bumpalo::Bump::new();
-    let our_ast_twice =
-        tsv_svelte::__private::parse(&our_output, &arena_twice).expect("parse failed");
+    let our_ast_twice = tsv_svelte::__private::parse(&our_output).expect("parse failed");
     let our_output_twice = tsv_svelte::__private::format_ast(&our_ast_twice, &our_output);
     assert_eq!(
         our_output, our_output_twice,
