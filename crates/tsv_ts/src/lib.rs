@@ -299,7 +299,12 @@ pub fn format_with_goal(source: &str, goal: Goal) -> Result<String> {
 }
 
 fn format_with_optional_goal(source: &str, goal: Option<Goal>) -> Result<String> {
-    format_in(source, goal, &mut AstStores::new(), DocArena::for_source)
+    format_in(
+        source,
+        goal,
+        &mut AstStores::for_source(source.len()),
+        DocArena::for_source,
+    )
 }
 
 /// The one format path, shared by the one-shot functions and [`Formatter`]: fold, parse into

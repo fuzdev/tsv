@@ -330,11 +330,28 @@ const _: () = {
     assert!(STORE_CHECK || size_of::<Option<ParamExtraId>>() == 4);
 };
 
+/// Source bytes per expression row [`AstStores::for_source`] reserves. This and the two rates
+/// below are TypeScript's own: calibrated against the rows a parse of real-code TypeScript
+/// writes to each store per source byte, file by file, and set a little denser than the
+/// typical file.
+const SOURCE_BYTES_PER_EXPRESSION: usize = 9;
+
+/// Source bytes per statement row [`AstStores::for_source`] reserves.
+const SOURCE_BYTES_PER_STATEMENT: usize = 59;
+
+/// Source bytes per type row [`AstStores::for_source`] reserves.
+const SOURCE_BYTES_PER_TYPE: usize = 148;
+
+/// The longest source [`AstStores::for_source`] sizes its reservation by, above every
+/// real-code file the rates were calibrated on.
+const SIZED_SOURCE_BYTES_MAX: usize = 1 << 20;
+
 /// One document's expression, statement, type, payload and value-run stores, the scratch
 /// stacks that build their lists, its text pool and its comments.
 ///
-/// A fresh one allocates nothing: a store's buffer is allocated by its first write, a
-/// scratch stack's by its first push, and the pool's by its first string.
+/// Stores from [`AstStores::new`] allocate nothing: a store's buffer is allocated by its first
+/// write, a scratch stack's by its first push, and the pool's by its first string.
+/// [`AstStores::for_source`] reserves the three busiest stores for a document's length.
 pub struct AstStores {
     pub(crate) exprs: Store<Expression>,
     pub(crate) expr_lists: Store<ExprId>,
@@ -523,6 +540,31 @@ impl AstStores {
             text: TextPool::new(),
             comments: Store::new(),
             comment_scratch: ListBuf::new(),
+        }
+    }
+
+    /// Empty stores for one document of `source_len` bytes, the three a parse writes the most
+    /// rows to — the expressions, statements and types — reserved from that length up front:
+    /// the stores of a one-shot call, whose rows would otherwise grow from `Vec`'s minimum one
+    /// doubling at a time, each a reallocation that copies the rows so far. Every other store
+    /// allocates on its first write, as [`AstStores::new`]'s do: most payloads are written by
+    /// a minority of documents, and a reservation a document never writes to is an allocation
+    /// it would not have made.
+    ///
+    /// The rates sit a little above what a typical file of that length writes, so most
+    /// documents parse within the reservation and a denser one pays one doubling. A source
+    /// past [`SIZED_SOURCE_BYTES_MAX`] is sized as one that long: the reservation is made
+    /// before the parse reads a byte, so its size stays bounded whatever the input, and a
+    /// longer document's stores grow from there. Capacity only — a parse into these stores
+    /// mints the same ids and builds the same tree as one into [`AstStores::new`]'s.
+    #[must_use]
+    pub fn for_source(source_len: usize) -> Self {
+        let sized = source_len.min(SIZED_SOURCE_BYTES_MAX);
+        Self {
+            exprs: Store::with_capacity(sized / SOURCE_BYTES_PER_EXPRESSION),
+            stmts: Store::with_capacity(sized / SOURCE_BYTES_PER_STATEMENT),
+            tys: Store::with_capacity(sized / SOURCE_BYTES_PER_TYPE),
+            ..Self::new()
         }
     }
 
@@ -1369,6 +1411,46 @@ type U = V | W;
             "slot 0 and the one row, nothing primed"
         );
         assert_eq!(stores.exprs.capacity(), rewound[0].capacity);
+    }
+
+    #[test]
+    fn a_one_shot_parse_reserves_its_busiest_stores_for_the_source() {
+        // a comment carries most of the bytes, so the parse writes under half the rows each
+        // store reserves, and a store grown from empty by doubling would stay below them
+        let source = format!("/*{}*/\nlet a: A = b;\n", " ".repeat(4096));
+        let parsed = parse_with_goal(&source, Goal::Module).expect("parses");
+        let shapes = parsed.stores.shapes();
+        for (name, reserved) in [
+            ("exprs", source.len() / SOURCE_BYTES_PER_EXPRESSION),
+            ("stmts", source.len() / SOURCE_BYTES_PER_STATEMENT),
+            ("tys", source.len() / SOURCE_BYTES_PER_TYPE),
+        ] {
+            let shape = shapes
+                .iter()
+                .find(|shape| shape.name == name)
+                .expect("a store of the stores");
+            assert!(
+                shape.len > 0 && 2 * shape.len <= reserved,
+                "{name}: the parse writes {} rows of the {reserved} reserved",
+                shape.len
+            );
+            assert!(
+                shape.capacity >= reserved,
+                "{name}: a one-shot parse's stores are reserved for its source, {} < {reserved}",
+                shape.capacity
+            );
+        }
+    }
+
+    #[test]
+    fn stores_for_no_source_allocate_nothing_and_the_reservation_is_bounded() {
+        let empty = AstStores::for_source(0).shapes();
+        assert!(empty.iter().all(|shape| shape.capacity == 0), "{empty:?}");
+        assert_eq!(
+            AstStores::for_source(usize::MAX).shapes(),
+            AstStores::for_source(SIZED_SOURCE_BYTES_MAX).shapes(),
+            "a source past the bound reserves what one at the bound does"
+        );
     }
 
     #[test]

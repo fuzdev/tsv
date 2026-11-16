@@ -202,7 +202,7 @@ fn refuse_lone_cr_in_tag_line_comment(source: &str) -> Result<()> {
 pub fn format(source: &str) -> Result<String> {
     format_in(
         source,
-        &mut SvelteStores::new(),
+        &mut SvelteStores::for_source(source.len()),
         tsv_lang::doc::arena::DocArena::for_source,
     )
 }
@@ -330,7 +330,12 @@ pub fn parse_to_json(source: &str) -> Result<String> {
 /// A parse error.
 #[cfg(feature = "json")]
 pub fn parse_to_json_with(source: &str, options: JsonOptions) -> Result<String> {
-    let ast = __private::parse(source)?;
+    // fresh stores sized for the document, as every one-shot call's; `__private::parse` keeps
+    // growing its own from empty, since the printer re-parses a whole document through it
+    // inside a format call, the bindings' warm ones included
+    let mut stores = SvelteStores::for_source(source.len());
+    let root = __private::parse_into(source, &mut stores)?;
+    let ast = ParsedRoot { root, stores };
     #[cfg(feature = "locations")]
     if options.locations {
         return Ok(wire_string(
@@ -376,7 +381,7 @@ pub fn parse_to_json_with(source: &str, options: JsonOptions) -> Result<String> 
 ///
 /// A parse error.
 pub fn parse_imports(source: &str) -> Result<Imports> {
-    __private::parse_imports_into(source, &mut SvelteStores::new())
+    __private::parse_imports_into(source, &mut SvelteStores::for_source(source.len()))
 }
 
 /// The wire's bytes as the `String` they are: the writer emits source slices and ASCII

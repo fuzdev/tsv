@@ -422,7 +422,12 @@ fn profile_strip_once(source: &str) -> Result<(Duration, Duration), String> {
     let parse_dur = t0.elapsed();
 
     let t1 = Instant::now();
-    let result = tsv_ts::__private::strip_into(source, None, &mut tsv_ts::ast::AstStores::new());
+    // stores sized for the source, as `tsv_ts::strip`'s and the parse column's are
+    let result = tsv_ts::__private::strip_into(
+        source,
+        None,
+        &mut tsv_ts::ast::AstStores::for_source(source.len()),
+    );
     let strip_dur = t1.elapsed();
     if let Err(tsv_ts::StripError::Parse(e)) = result {
         return Err(format!("parse error: {e:#}"));

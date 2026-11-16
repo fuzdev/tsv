@@ -75,7 +75,8 @@ impl StripCommand {
         .resolve()
         .unwrap_or_else(|e| exit_with_error(2, format_args!("Error: {e}")));
         let source = input.content();
-        match tsv_ts::__private::strip_into(source, goal, &mut tsv_ts::ast::AstStores::new()) {
+        let mut stores = tsv_ts::ast::AstStores::for_source(source.len());
+        match tsv_ts::__private::strip_into(source, goal, &mut stores) {
             Ok(stripped) => {
                 if !self.check {
                     write_stdout(stripped.code.as_bytes());

@@ -133,10 +133,14 @@ pub fn strip_with_goal(source: &str, goal: crate::Goal) -> Result<Stripped, Stri
     strip_one_shot(source, Some(goal))
 }
 
-/// The one-shot strips: fresh stores, dropped on return — the [`Stripped`] output is
-/// owned.
+/// The one-shot strips: fresh stores sized for `source` ([`crate::ast::AstStores::for_source`]),
+/// dropped on return — the [`Stripped`] output is owned.
 fn strip_one_shot(source: &str, goal: Option<crate::Goal>) -> Result<Stripped, StripError> {
-    strip_into(source, goal, &mut crate::ast::AstStores::new())
+    strip_into(
+        source,
+        goal,
+        &mut crate::ast::AstStores::for_source(source.len()),
+    )
 }
 
 /// [`strip`] and [`parse_imports`](crate::parse_imports()) in one parse and one walk: the

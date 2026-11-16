@@ -192,7 +192,8 @@ thread_local! {
 /// hands over, and the template's own half, a box this crate's slot hands over.
 ///
 /// Fresh ones allocate the three boxes and nothing beside them: each store's buffer is
-/// allocated by its first write.
+/// allocated by its first write ([`SvelteStores::for_source`] also reserves the TypeScript
+/// half's busiest stores).
 #[derive(Debug, Default)]
 pub struct SvelteStores {
     /// The rows of the document's embedded TypeScript, one instance across its islands.
@@ -208,6 +209,20 @@ impl SvelteStores {
     #[must_use]
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Empty stores for one document of `source_len` bytes, the TypeScript half's busiest
+    /// stores reserved for that length (`tsv_ts::ast::AstStores::for_source`): the stores of a
+    /// one-shot call. The document's length bounds the bytes of its scripts and template
+    /// expressions, so it sizes the half from above. The CSS half and the template's own
+    /// stores are each first written by a flush, which sizes that first allocation itself.
+    #[must_use]
+    pub(crate) fn for_source(source_len: usize) -> Self {
+        Self {
+            ts: Box::new(AstStores::for_source(source_len)),
+            css: Box::default(),
+            own: Box::default(),
+        }
     }
 
     /// Rewinds the three halves in place between documents, each keeping its capacity. Every

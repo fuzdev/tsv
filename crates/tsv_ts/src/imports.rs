@@ -358,9 +358,14 @@ pub fn parse_imports_with_goal(source: &str, goal: Goal) -> Result<Imports, Erro
     parse_imports_one_shot(source, Some(goal))
 }
 
-/// The one-shot entry points: fresh stores, dropped on return — the [`Imports`] are owned.
+/// The one-shot entry points: fresh stores sized for `source`
+/// ([`crate::ast::AstStores::for_source`]), dropped on return — the [`Imports`] are owned.
 fn parse_imports_one_shot(source: &str, goal: Option<Goal>) -> Result<Imports, Error> {
-    parse_imports_into(source, goal, &mut crate::ast::AstStores::new())
+    parse_imports_into(
+        source,
+        goal,
+        &mut crate::ast::AstStores::for_source(source.len()),
+    )
 }
 
 /// The import records parsed into a caller's `stores` — the hidden primitive beneath

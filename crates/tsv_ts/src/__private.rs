@@ -111,7 +111,9 @@ impl<'a> PrinterInputs<'a> {
 /// meaning everywhere in TypeScript, whose line rule ends a line at a `<CR>` already, so
 /// this is the folded parse alone; `tsv_svelte::__private::parse_folded` is the sibling that is not.
 pub fn parse_folded(folded: &FoldedSource<'_>, goal: Option<Goal>) -> Result<Parsed> {
-    parsed(|stores| parse_folded_into(folded, goal, stores))
+    parsed(folded.text().len(), |stores| {
+        parse_folded_into(folded, goal, stores)
+    })
 }
 
 /// [`parse_folded`] into a caller's `stores`.
@@ -132,9 +134,13 @@ pub fn parsed_ref<'a>(program: &'a Program, stores: &'a AstStores) -> ParsedRef<
     }
 }
 
-/// A one-shot parse: `parse` over fresh stores, bundled with the tree it built.
-fn parsed(parse: impl FnOnce(&mut AstStores) -> Result<Program>) -> Result<Parsed> {
-    let mut stores = AstStores::new();
+/// A one-shot parse: `parse` over fresh stores sized for a source of `source_len` bytes
+/// ([`AstStores::for_source`]), bundled with the tree it built.
+fn parsed(
+    source_len: usize,
+    parse: impl FnOnce(&mut AstStores) -> Result<Program>,
+) -> Result<Parsed> {
+    let mut stores = AstStores::for_source(source_len);
     let program = parse(&mut stores)?;
     Ok(Parsed { program, stores })
 }
@@ -1341,7 +1347,7 @@ pub fn format_ast_in<'a>(
 /// # }
 /// ```
 pub fn parse(source: &str) -> Result<Parsed> {
-    parsed(|stores| parse_into(source, stores))
+    parsed(source.len(), |stores| parse_into(source, stores))
 }
 
 /// [`parse`] into a caller's `stores`, for a warm path that keeps them across documents.
@@ -1364,7 +1370,9 @@ pub fn parse_into(source: &str, stores: &mut AstStores) -> Result<Program> {
 /// constructs those are is enumerated once, on the flag that gates them
 /// (`Parser::strict`).
 pub fn parse_with_goal(source: &str, goal: Goal) -> Result<Parsed> {
-    parsed(|stores| parse_with_goal_into(source, goal, stores))
+    parsed(source.len(), |stores| {
+        parse_with_goal_into(source, goal, stores)
+    })
 }
 
 /// [`parse_with_goal`] into a caller's `stores`.
@@ -1400,7 +1408,9 @@ pub fn parse_with_goal_into(source: &str, goal: Goal, stores: &mut AstStores) ->
 /// stores with no reset between the two attempts, so a script's high-water is the failed
 /// module attempt plus the script parse — an error-path cost only.
 pub fn parse_with_goal_or_fallback(source: &str, goal: Option<Goal>) -> Result<Parsed> {
-    parsed(|stores| parse_with_goal_or_fallback_into(source, goal, stores))
+    parsed(source.len(), |stores| {
+        parse_with_goal_or_fallback_into(source, goal, stores)
+    })
 }
 
 /// [`parse_with_goal_or_fallback`] into a caller's `stores`. A script retry appends after
@@ -1493,7 +1503,7 @@ pub fn convert_ast_json_string<'a>(parsed: impl Into<ParsedRef<'a>>, source: &st
 /// build and prints its contents bare in a release one — dropping every pair the
 /// position needs (`(x + y) * 2` → `x + y * 2`). Format the [`parse`] tree instead.
 pub fn parse_preserve_parens(source: &str) -> Result<Parsed> {
-    parsed(|stores| {
+    parsed(source.len(), |stores| {
         Error::ensure_source_fits(source)?;
         parser::parse_typescript_preserve_parens(source, stores)
             .map_err(|e| e.with_context(source, WIRE_COORDINATES))
