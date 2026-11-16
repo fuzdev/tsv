@@ -58,7 +58,6 @@ pub fn parsed_ref<'a, 'arena: 'a>(
     ParsedRootRef {
         root,
         view: stores.view(),
-        css: stores.css_view(),
     }
 }
 
@@ -204,7 +203,7 @@ pub fn parse_imports_into(
         .collect();
     Ok(tsv_ts::__private::collect_imports(
         &programs,
-        stores.view(),
+        stores.view().ts(),
         source,
     ))
 }

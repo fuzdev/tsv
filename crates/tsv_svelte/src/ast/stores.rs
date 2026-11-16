@@ -11,8 +11,8 @@
 //! [`with_stores`]'s closure or a `ParsedRoot`, whose stores it keeps beside the tree they
 //! belong to.
 
-use tsv_css::ast::{CssStores, CssView};
-use tsv_ts::ast::{AstStores, AstView};
+use tsv_css::ast::CssStores;
+use tsv_ts::ast::AstStores;
 
 /// One document's stores: a TypeScript half and a CSS half, each a box its own crate's slot
 /// hands over.
@@ -42,18 +42,6 @@ impl SvelteStores {
         let Self { ts, css } = self;
         ts.reset();
         css.reset();
-    }
-
-    /// The view reading the TypeScript half: the document's expressions and programs.
-    #[inline]
-    pub fn view(&self) -> AstView<'_> {
-        self.ts.view()
-    }
-
-    /// The view reading the CSS half: the top-level `<style>`'s stylesheet.
-    #[inline]
-    pub fn css_view(&self) -> CssView<'_> {
-        self.css.view()
     }
 }
 

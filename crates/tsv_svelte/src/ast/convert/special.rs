@@ -9,7 +9,6 @@
 
 use crate::ast;
 use std::borrow::Cow;
-use tsv_ts::ast::AstView;
 
 /// A script tag's `lang` attribute value, if it carries one (`<script lang="ts">` → `Some("ts")`,
 /// plain `<script>` → `None`).
@@ -27,14 +26,18 @@ use tsv_ts::ast::AstView;
 /// [`ast::EmbeddedLang::is_frozen`], which asks what language the body is in — decodes
 /// and calls the same spelling `ts`. Two questions, two readers, on
 /// purpose; `tests/fixtures/svelte/attributes/lang_entity` holds both answers.
-fn script_lang<'s>(script: &ast::Script<'_>, source: &'s str) -> Option<&'s str> {
-    for attr_node in script.attributes {
+fn script_lang<'s>(
+    view: ast::SvelteView<'_>,
+    script: &ast::Script<'_>,
+    source: &'s str,
+) -> Option<&'s str> {
+    for attr_node in view.attributes(script.attributes) {
         let ast::AttributeNode::Attribute(attr) = attr_node else {
             continue;
         };
         let name = attr.name(source);
         if name == "lang"
-            && let Some(values) = &attr.value
+            && let Some(values) = view.opt_attribute_values(attr.value)
             && let Some(ast::AttributeValue::Text(text)) = values.first()
         {
             return Some(text.raw(source));
@@ -49,14 +52,18 @@ fn script_lang<'s>(script: &ast::Script<'_>, source: &'s str) -> Option<&'s str>
 /// (module *and* instance) emits the acorn-typescript wire shape. So a plain `<script>` alongside
 /// a `lang="ts"` sibling still emits `importKind`/`exportKind = "value"` and omits `attributes`.
 /// A `<script>` with no `lang` attribute doesn't decide; nor does `<style lang=…>`.
-pub(super) fn component_is_typescript(root: &ast::Root<'_>, source: &str) -> bool {
+pub(super) fn component_is_typescript(
+    view: ast::SvelteView<'_>,
+    root: &ast::Root<'_>,
+    source: &str,
+) -> bool {
     // The two top-level scripts in source order — the first one carrying a `lang` decides.
     let mut scripts = [root.module.as_ref(), root.instance.as_ref()];
     scripts.sort_by_key(|s| s.map_or(u32::MAX, |script| script.span.start));
     scripts
         .into_iter()
         .flatten()
-        .find_map(|script| script_lang(script, source))
+        .find_map(|script| script_lang(view, script, source))
         .is_some_and(|lang| lang == "ts")
 }
 
@@ -64,16 +71,17 @@ pub(super) fn component_is_typescript(root: &ast::Root<'_>, source: &str) -> boo
 ///
 /// `pub(super)` so the wire-JSON writer reproduces `<svelte:options>` extraction
 /// (scalar props + `customElement`) without materializing a typed options struct.
-pub(super) fn find_option_values<'arena>(
-    attrs: &[ast::AttributeNode<'arena>],
+pub(super) fn find_option_values<'a>(
+    view: ast::SvelteView<'a>,
+    attrs: &[ast::AttributeNode<'a>],
     name: &str,
     source: &str,
-) -> Option<&'arena [ast::AttributeValue]> {
+) -> Option<&'a [ast::AttributeValue]> {
     attrs.iter().find_map(|attr| {
         if let ast::AttributeNode::Attribute(attr) = attr
             && attr.name(source) == name
         {
-            attr.value
+            view.opt_attribute_values(attr.value)
         } else {
             None
         }
@@ -100,7 +108,7 @@ pub(super) fn text_value<'src>(
 ///
 /// `pub(super)` — shared with the wire-JSON writer's fused `<svelte:options>`.
 pub(super) fn bool_option(
-    view: AstView<'_>,
+    view: ast::SvelteView<'_>,
     attrs: &[ast::AttributeNode<'_>],
     name: &str,
     source: &str,
@@ -109,12 +117,12 @@ pub(super) fn bool_option(
         if let ast::AttributeNode::Attribute(attr) = attr
             && attr.name(source) == name
         {
-            match &attr.value {
+            match view.opt_attribute_values(attr.value) {
                 None => Some(true),
                 Some(values) => values.iter().find_map(|v| {
                     if let ast::AttributeValue::ExpressionTag(expr) = v
                         && let tsv_ts::ast::ExpressionKind::Literal(lit) =
-                            &view.expr(expr.expression).kind
+                            &view.ts().expr(expr.expression).kind
                         && let tsv_ts::ast::LiteralValue::Boolean(b) = lit.value
                     {
                         Some(b)

@@ -370,7 +370,7 @@ impl Printer<'_> {
         // A section inside a `format-ignore` range travels with no comments (the range keeps
         // every comment in it where it stands), and leaves the range through the cuts the
         // range's own verbatim slice makes ([`range_cuts`]).
-        let nodes = &root.fragment.nodes;
+        let nodes = self.svelte.nodes(root.fragment.nodes);
         let ranges: SmallVec<[Span; 2]> = self
             .ignore_ranges(&root.fragment)
             .pairs
@@ -511,7 +511,7 @@ impl Printer<'_> {
         root: &ast::Root<'_>,
         sections: &HoistedComments,
     ) -> SmallVec<[LiftedRun; 4]> {
-        let nodes = &root.fragment.nodes;
+        let nodes = self.svelte.nodes(root.fragment.nodes);
         let travels = sections.travelling(nodes.len());
         let is_content =
             |i: usize, n: &FragmentNode<'_>| !(n.is_whitespace_only_text() || travels[i]);
@@ -548,7 +548,8 @@ impl Printer<'_> {
         fragment: &ast::Fragment<'_>,
     ) -> LiftedRun {
         let comments = &sections[section];
-        let comment_span = |i: usize| Self::fragment_comment(fragment, i).map(|c| c.span);
+        let comment_span =
+            |i: usize| Self::fragment_comment(self.svelte, fragment, i).map(|c| c.span);
         let mut pieces: SmallVec<[Span; 4]> = comments
             .leading
             .iter()

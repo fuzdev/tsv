@@ -1528,7 +1528,9 @@ mod tests {
             let arena = bumpalo::Bump::new();
             let parsed = crate::__private::parse(source, &arena)
                 .unwrap_or_else(|e| panic!("{source:?}: {e:?}"));
-            let FragmentNode::SpecialElement(element) = &parsed.fragment.nodes[0] else {
+            let FragmentNode::SpecialElement(element) =
+                &parsed.view().nodes(parsed.fragment.nodes)[0]
+            else {
                 panic!("{source:?}: not a special element");
             };
             let this = element.kind.tag().expect("`<svelte:element>` binds `this`");

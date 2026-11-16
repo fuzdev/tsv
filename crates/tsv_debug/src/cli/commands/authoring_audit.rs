@@ -84,7 +84,7 @@ use std::path::{Path, PathBuf};
 
 use crate::format_source::format_source;
 use tsv_cli::cli::input::ParserType;
-use tsv_svelte::ast::{FragmentNode, is_collapsible_ws_char, text_edge_ws};
+use tsv_svelte::ast::{FragmentNode, SvelteView, is_collapsible_ws_char, text_edge_ws};
 
 use crate::audit::excerpt::line_context;
 use crate::audit::panic_hook::SuppressedPanicHook;
@@ -226,15 +226,22 @@ fn flip_run(run: &str) -> Option<(bool, &'static str)> {
 fn svelte_sites(f: &str) -> Option<Vec<Site>> {
     let arena = bumpalo::Bump::new();
     let root = tsv_svelte::__private::parse(f, &arena).ok()?;
+    let view = root.view();
     let mut sites = Vec::new();
-    collect_sites(root.fragment.nodes, f, false, &mut sites);
+    collect_sites(view, view.nodes(root.fragment.nodes), f, false, &mut sites);
     Some(sites)
 }
 
 /// Recurse the fragment tree collecting safe toggle sites. `ws_sig` is set once
 /// inside a `<pre>`/`<textarea>` subtree (whitespace is then literal — never
 /// toggled).
-fn collect_sites(nodes: &[FragmentNode<'_>], src: &str, ws_sig: bool, out: &mut Vec<Site>) {
+fn collect_sites(
+    view: SvelteView<'_>,
+    nodes: &[FragmentNode<'_>],
+    src: &str,
+    ws_sig: bool,
+    out: &mut Vec<Site>,
+) {
     let len = nodes.len();
     for (i, node) in nodes.iter().enumerate() {
         if !ws_sig && let FragmentNode::Text(_) = node {
@@ -287,7 +294,7 @@ fn collect_sites(nodes: &[FragmentNode<'_>], src: &str, ws_sig: bool, out: &mut 
                 }
             }
         }
-        recurse_children(node, src, ws_sig, out);
+        recurse_children(view, node, src, ws_sig, out);
     }
 }
 
@@ -382,26 +389,33 @@ fn push_boundary_forms(start: usize, end: usize, src: &str, kind: SiteKind, out:
 /// content, and its boundary is equally render-free — so it gets both site families.
 /// Inside `<pre>`/`<textarea>` the run is literal, so only the inter-sibling family applies.
 fn collect_block_fragment(
+    view: SvelteView<'_>,
     fragment: &tsv_svelte::ast::Fragment<'_>,
     src: &str,
     ws_sig: bool,
     out: &mut Vec<Site>,
 ) {
     if !ws_sig {
-        collect_boundary_sites(fragment.nodes, src, BLOCK_BOUNDARY, out);
+        collect_boundary_sites(view.nodes(fragment.nodes), src, BLOCK_BOUNDARY, out);
     }
-    collect_sites(fragment.nodes, src, ws_sig, out);
+    collect_sites(view, view.nodes(fragment.nodes), src, ws_sig, out);
 }
 
 /// Is this alternate the `{:else if …}` form — one nested `IfBlock` that spans the rest
 /// of the chain, closing tag included — rather than a real `{:else}` fragment?
-fn is_elseif_chain(alternate: &tsv_svelte::ast::Fragment<'_>) -> bool {
-    matches!(alternate.nodes, [FragmentNode::IfBlock(b)] if b.elseif)
+fn is_elseif_chain(view: SvelteView<'_>, alternate: &tsv_svelte::ast::Fragment<'_>) -> bool {
+    matches!(view.nodes(alternate.nodes), [FragmentNode::IfBlock(b)] if b.elseif)
 }
 
 /// Descend into a node's child fragments, propagating (and entering) whitespace
 /// significance.
-fn recurse_children(node: &FragmentNode<'_>, src: &str, ws_sig: bool, out: &mut Vec<Site>) {
+fn recurse_children(
+    view: SvelteView<'_>,
+    node: &FragmentNode<'_>,
+    src: &str,
+    ws_sig: bool,
+    out: &mut Vec<Site>,
+) {
     match node {
         FragmentNode::Element(el) => {
             let tag = el.name_span.extract(src).to_ascii_lowercase();
@@ -409,9 +423,9 @@ fn recurse_children(node: &FragmentNode<'_>, src: &str, ws_sig: bool, out: &mut 
             // The content boundary is render-free only outside `<pre>`/`<textarea>`, where
             // it is literal content and the dangle is mandatory.
             if !child_ws_sig {
-                collect_boundary_sites(el.fragment.nodes, src, ELEMENT_BOUNDARY, out);
+                collect_boundary_sites(view.nodes(el.fragment.nodes), src, ELEMENT_BOUNDARY, out);
             }
-            collect_sites(el.fragment.nodes, src, child_ws_sig, out);
+            collect_sites(view, view.nodes(el.fragment.nodes), src, child_ws_sig, out);
         }
         FragmentNode::SpecialElement(el) => {
             // One special kind preserves whitespace — a `<svelte:head>` `<title>`, whose
@@ -425,38 +439,38 @@ fn recurse_children(node: &FragmentNode<'_>, src: &str, ws_sig: bool, out: &mut 
             // vanishingly rare and not worth a special case here).
             let child_ws_sig = ws_sig || el.kind.preserves_content_whitespace();
             if !child_ws_sig {
-                collect_boundary_sites(el.fragment.nodes, src, ELEMENT_BOUNDARY, out);
+                collect_boundary_sites(view.nodes(el.fragment.nodes), src, ELEMENT_BOUNDARY, out);
             }
-            collect_sites(el.fragment.nodes, src, child_ws_sig, out);
+            collect_sites(view, view.nodes(el.fragment.nodes), src, child_ws_sig, out);
         }
         FragmentNode::IfBlock(b) => {
-            collect_block_fragment(&b.consequent, src, ws_sig, out);
+            collect_block_fragment(view, &b.consequent, src, ws_sig, out);
             if let Some(alt) = &b.alternate {
                 // An `{:else if}` chain is an alternate holding one nested `IfBlock` whose
                 // span runs from `{:else if` through the closing `{/if}` — so that fragment
                 // has no boundary of its own to probe (splicing at its edges would land
                 // outside the block). Recurse only; the nested block's own branches are
                 // probed when we reach it.
-                if is_elseif_chain(alt) {
-                    collect_sites(alt.nodes, src, ws_sig, out);
+                if is_elseif_chain(view, alt) {
+                    collect_sites(view, view.nodes(alt.nodes), src, ws_sig, out);
                 } else {
-                    collect_block_fragment(alt, src, ws_sig, out);
+                    collect_block_fragment(view, alt, src, ws_sig, out);
                 }
             }
         }
         FragmentNode::EachBlock(b) => {
-            collect_block_fragment(&b.body, src, ws_sig, out);
+            collect_block_fragment(view, &b.body, src, ws_sig, out);
             if let Some(fb) = &b.fallback {
-                collect_block_fragment(fb, src, ws_sig, out);
+                collect_block_fragment(view, fb, src, ws_sig, out);
             }
         }
         FragmentNode::AwaitBlock(b) => {
             for frag in [&b.pending, &b.then, &b.catch].into_iter().flatten() {
-                collect_block_fragment(frag, src, ws_sig, out);
+                collect_block_fragment(view, frag, src, ws_sig, out);
             }
         }
-        FragmentNode::KeyBlock(b) => collect_block_fragment(&b.fragment, src, ws_sig, out),
-        FragmentNode::SnippetBlock(b) => collect_block_fragment(&b.body, src, ws_sig, out),
+        FragmentNode::KeyBlock(b) => collect_block_fragment(view, &b.fragment, src, ws_sig, out),
+        FragmentNode::SnippetBlock(b) => collect_block_fragment(view, &b.body, src, ws_sig, out),
         // Leaf fragment nodes (no child fragment): text, comments, expression /
         // html / const / declaration / debug / render tags.
         _ => {}

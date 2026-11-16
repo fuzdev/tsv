@@ -168,7 +168,7 @@ impl<'a> Printer<'a> {
         // `elements/pre_self_closing_kinds_prettier_divergence`.
         let can_self_close = class.kind.is_component() || class.is_foreign || class.is_namespaced;
         if can_self_close
-            && element.fragment.nodes.is_empty()
+            && self.svelte.nodes(element.fragment.nodes).is_empty()
             && attr_docs.is_empty()
             && self.span_was_self_closing(element.span)
         {
@@ -186,12 +186,13 @@ impl<'a> Printer<'a> {
         // so it takes the empty element's layouts — `<strong></strong>`'s, not a content head
         // whose delimiters have nothing between them to protect. The same reading the block
         // classification makes of it, from the same helper.
-        let has_content = has_raw_content(element);
+        let has_content = has_raw_content(self.svelte, element);
 
         // Which delimiters the content lets move — one read per boundary, see
         // [`ContentEdges`]; a nested raw-text element's closing tag never splits
         // ([`ContentEdges::with_whole_close`]).
-        let content_edges = self.ws_sensitive_content_edges(element.fragment.nodes);
+        let content_edges =
+            self.ws_sensitive_content_edges(self.svelte.nodes(element.fragment.nodes));
         let edges = if class.raw_text.is_some() {
             content_edges.with_whole_close()
         } else {
@@ -207,7 +208,7 @@ impl<'a> Printer<'a> {
         if (is_inline || emission.ends_with_line_comment) && has_content {
             return self.build_verbatim_content_doc(
                 name_doc,
-                element.fragment.nodes,
+                self.svelte.nodes(element.fragment.nodes),
                 &attr_docs,
                 emission,
                 edges,
@@ -223,15 +224,16 @@ impl<'a> Printer<'a> {
         if !is_inline && has_content && !attr_docs.is_empty() {
             // Check if content is "simple" - single expression tag without internal break points
             // Complex content (function calls, ternaries, etc.) should break internally first
-            let is_simple_content = element.fragment.nodes.len() == 1
+            let is_simple_content = self.svelte.nodes(element.fragment.nodes).len() == 1
                 && matches!(
-                    &element.fragment.nodes[0],
+                    &self.svelte.nodes(element.fragment.nodes)[0],
                     FragmentNode::ExpressionTag(expr) if !Self::expression_has_break_points(self.view, self.view.expr(expr.expression))
                 );
 
             if is_simple_content {
-                let content_doc =
-                    self.build_whitespace_sensitive_content_doc(element.fragment.nodes);
+                let content_doc = self.build_whitespace_sensitive_content_doc(
+                    self.svelte.nodes(element.fragment.nodes),
+                );
 
                 // Inner group decides if `>` needs to break to new line
                 let closing_and_content = d.group(d.concat(&[
@@ -298,7 +300,8 @@ impl<'a> Printer<'a> {
 
         // Build content preserving text whitespace but formatting expressions/blocks
         let opening_tag = self.build_ws_sensitive_open_tag_doc(name_doc, &attr_docs, emission);
-        let content_doc = self.build_whitespace_sensitive_content_doc(element.fragment.nodes);
+        let content_doc =
+            self.build_whitespace_sensitive_content_doc(self.svelte.nodes(element.fragment.nodes));
 
         d.concat(&[opening_tag, content_doc, self.end_tag(name_doc)])
     }
@@ -579,7 +582,7 @@ impl<'a> Printer<'a> {
                 let ws_is_html = element.kind == ast::ElementKind::Html;
                 // Always use whitespace-sensitive path when nested inside whitespace-sensitive elements
                 let attrs = self.build_element_attrs_doc(
-                    element.attributes,
+                    self.svelte.attributes(element.attributes),
                     self.d().line(),
                     element.name_span.end,
                     element.open_tag_end,
@@ -629,7 +632,8 @@ impl<'a> Printer<'a> {
             HeadTail::Delimiter,
         );
 
-        let body_doc = self.build_whitespace_sensitive_content_doc(block.consequent.nodes);
+        let body_doc =
+            self.build_whitespace_sensitive_content_doc(self.svelte.nodes(block.consequent.nodes));
 
         // The `}` hugs the frozen slice's last line here, as it does on every
         // dangle-suppressed path — inside a whitespace-significant element the dangle is
@@ -650,10 +654,12 @@ impl<'a> Printer<'a> {
         let d = self.d();
 
         // Check if this can be flattened to {:else if ...}
-        if let Some(else_if) = Self::get_flattenable_else_if(alt) {
+        if let Some(else_if) = Self::get_flattenable_else_if(self.svelte, alt) {
             let head = self.build_else_if_expr_doc(else_if, false);
 
-            let body_doc = self.build_whitespace_sensitive_content_doc(else_if.consequent.nodes);
+            let body_doc = self.build_whitespace_sensitive_content_doc(
+                self.svelte.nodes(else_if.consequent.nodes),
+            );
             parts.push(self.head_open_doc(ELSE_IF_BLOCK_OPEN, head.layout.opens_own_line()));
             parts.push(head.doc);
             parts.push(d.text("}"));
@@ -666,7 +672,7 @@ impl<'a> Printer<'a> {
         }
 
         // Plain {:else}
-        let body_doc = self.build_whitespace_sensitive_content_doc(alt.nodes);
+        let body_doc = self.build_whitespace_sensitive_content_doc(self.svelte.nodes(alt.nodes));
         parts.push(d.text("{:else}"));
         parts.push(body_doc);
     }
@@ -715,13 +721,15 @@ impl<'a> Printer<'a> {
 
         opening.push(d.text("}"));
 
-        let body_doc = self.build_whitespace_sensitive_content_doc(block.body.nodes);
+        let body_doc =
+            self.build_whitespace_sensitive_content_doc(self.svelte.nodes(block.body.nodes));
 
         let opening_concat = d.concat(&opening);
         let mut parts: DocBuf = smallvec![opening_concat, body_doc];
 
         if let Some(fallback) = &block.fallback {
-            let fallback_doc = self.build_whitespace_sensitive_content_doc(fallback.nodes);
+            let fallback_doc =
+                self.build_whitespace_sensitive_content_doc(self.svelte.nodes(fallback.nodes));
             parts.push(d.text("{:else}"));
             parts.push(fallback_doc);
         }
@@ -742,7 +750,7 @@ impl<'a> Printer<'a> {
     /// section is rendered text, so only a section with no nodes may fold into the head or drop.
     fn build_ws_sensitive_await_block_doc(&self, block: &ast::AwaitBlock<'_>) -> DocId {
         let d = self.d();
-        let sections = AwaitSections::classify(block, SectionWhitespace::Preserved);
+        let sections = AwaitSections::classify(self.svelte, block, SectionWhitespace::Preserved);
         // Pass false for in_multiline_context: expressions must not wrap in ws-sensitive context
         let head = self.build_block_head_expr(
             AWAIT_BLOCK_OPEN,
@@ -763,7 +771,7 @@ impl<'a> Printer<'a> {
         // Glued in print order, not through `compose_await_tail`: its inline form indents each
         // body, and the body builder here already carries its own container indent.
         let pieces = self.build_await_pieces(block, &sections, |f| {
-            self.build_whitespace_sensitive_content_doc(f.nodes)
+            self.build_whitespace_sensitive_content_doc(self.svelte.nodes(f.nodes))
         });
         parts.extend(
             [
@@ -794,7 +802,8 @@ impl<'a> Printer<'a> {
             HeadTail::Delimiter,
         );
         let open_doc = self.head_open_doc(KEY_BLOCK_OPEN, head.layout.opens_own_line());
-        let body_doc = self.build_whitespace_sensitive_content_doc(block.fragment.nodes);
+        let body_doc =
+            self.build_whitespace_sensitive_content_doc(self.svelte.nodes(block.fragment.nodes));
         d.concat(&[open_doc, head.doc, d.text("}"), body_doc, d.text("{/key}")])
     }
 
@@ -804,7 +813,8 @@ impl<'a> Printer<'a> {
     fn build_ws_sensitive_snippet_block_doc(&self, block: &ast::SnippetBlock<'_>) -> DocId {
         let d = self.d();
         let opening_doc = self.build_snippet_opening_doc(block);
-        let body_doc = self.build_whitespace_sensitive_content_doc(block.body.nodes);
+        let body_doc =
+            self.build_whitespace_sensitive_content_doc(self.svelte.nodes(block.body.nodes));
         d.concat(&[opening_doc, body_doc, d.text("{/snippet}")])
     }
 }

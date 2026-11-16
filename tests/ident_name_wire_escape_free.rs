@@ -293,15 +293,17 @@ fn a_directive_name_claims_span_identity_only_when_clean() {
             let arena = bumpalo::Bump::new();
             let root = tsv_svelte::__private::parse(&source, &arena)
                 .unwrap_or_else(|e| panic!("parse failed for {source:?}: {e}"));
-            let Some(FragmentNode::Element(element)) = root.fragment.nodes.first() else {
+            let view = root.view();
+            let Some(FragmentNode::Element(element)) = view.nodes(root.fragment.nodes).first()
+            else {
                 panic!("{source:?}: no element");
             };
-            let expression = match element.attributes.first() {
+            let expression = match view.attributes(element.attributes).first() {
                 Some(AttributeNode::ClassDirective(d)) => d.expression,
                 Some(AttributeNode::BindDirective(d)) => d.expression,
                 _ => panic!("{source:?}: no directive"),
             };
-            let ExpressionKind::Identifier(id) = &root.view().expr(expression).kind else {
+            let ExpressionKind::Identifier(id) = &view.ts().expr(expression).kind else {
                 panic!("{source:?}: the shorthand expression is not an Identifier");
             };
             let channel = id.ident_name();
@@ -317,7 +319,7 @@ fn a_directive_name_claims_span_identity_only_when_clean() {
                 );
             } else {
                 assert_eq!(
-                    channel.escaped.map(|text| root.view().text(text)),
+                    channel.escaped.map(|text| view.ts().text(text)),
                     Some(name),
                     "{source:?}: carried as the escape hatch"
                 );

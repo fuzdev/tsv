@@ -376,7 +376,7 @@ impl<'a> Printer<'a> {
     /// the index would.
     pub(crate) fn index_fragment_edges(&self, root: &Root<'_>) {
         if root.holds_nested_raw_text {
-            self.index_fragment(root.fragment.nodes, EdgeFree::default());
+            self.index_fragment(self.svelte.nodes(root.fragment.nodes), EdgeFree::default());
         }
     }
 
@@ -426,7 +426,7 @@ impl<'a> Printer<'a> {
                         start: block,
                         end: block,
                     };
-                    self.index_fragment(el.fragment.nodes, e);
+                    self.index_fragment(self.svelte.nodes(el.fragment.nodes), e);
                 }
                 FragmentNode::SpecialElement(se) => {
                     // A global element's content never joins the page's line boxes.
@@ -435,31 +435,35 @@ impl<'a> Printer<'a> {
                         start: global,
                         end: global,
                     };
-                    self.index_fragment(se.fragment.nodes, e);
+                    self.index_fragment(self.svelte.nodes(se.fragment.nodes), e);
                 }
                 FragmentNode::IfBlock(b) => {
                     // An `{:else if}` is an `IfBlock` inside the alternate, whose edges it reads
                     // from there.
                     let e = outside(i);
-                    self.index_fragment(b.consequent.nodes, e);
+                    self.index_fragment(self.svelte.nodes(b.consequent.nodes), e);
                     if let Some(alt) = &b.alternate {
-                        self.index_fragment(alt.nodes, e);
+                        self.index_fragment(self.svelte.nodes(alt.nodes), e);
                     }
                 }
                 FragmentNode::AwaitBlock(b) => {
                     let e = outside(i);
                     for f in [&b.pending, &b.then, &b.catch].into_iter().flatten() {
-                        self.index_fragment(f.nodes, e);
+                        self.index_fragment(self.svelte.nodes(f.nodes), e);
                     }
                 }
-                FragmentNode::KeyBlock(b) => self.index_fragment(b.fragment.nodes, outside(i)),
+                FragmentNode::KeyBlock(b) => {
+                    self.index_fragment(self.svelte.nodes(b.fragment.nodes), outside(i));
+                }
                 FragmentNode::EachBlock(b) => {
-                    self.index_fragment(b.body.nodes, none);
+                    self.index_fragment(self.svelte.nodes(b.body.nodes), none);
                     if let Some(f) = &b.fallback {
-                        self.index_fragment(f.nodes, outside(i));
+                        self.index_fragment(self.svelte.nodes(f.nodes), outside(i));
                     }
                 }
-                FragmentNode::SnippetBlock(b) => self.index_fragment(b.body.nodes, none),
+                FragmentNode::SnippetBlock(b) => {
+                    self.index_fragment(self.svelte.nodes(b.body.nodes), none);
+                }
                 _ => {}
             }
         }

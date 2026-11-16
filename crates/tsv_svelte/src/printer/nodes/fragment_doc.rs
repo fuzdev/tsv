@@ -13,7 +13,7 @@
 
 use super::fragment_text_doc::TextChildContext;
 use super::helpers::{is_control_flow_block, is_inline_content};
-use crate::ast::{self, FragmentNode};
+use crate::ast::{self, FragmentNode, SvelteView};
 use crate::printer::{Printer, text};
 use tsv_lang::Span;
 use tsv_lang::doc::{DocBuf, arena::DocId};
@@ -946,13 +946,13 @@ impl<'a> Printer<'a> {
     /// ([`Self::implied_end_closers_through_ws_sensitive`]).
     fn implied_end_trailing_ws(&self, elem: &ast::Element<'_>) -> u32 {
         let mut innermost = elem;
-        for elem in Self::last_descendant_chain(elem) {
+        for elem in Self::last_descendant_chain(self.svelte, elem) {
             if elem.facts.is_ws_sensitive() {
                 return 0;
             }
             innermost = elem;
         }
-        match innermost.fragment.nodes.last() {
+        match self.svelte.nodes(innermost.fragment.nodes).last() {
             Some(FragmentNode::Text(text)) if text.span.end == innermost.span.end => {
                 ast::text_edge_ws(text.raw(self.source), false).len() as u32
             }
@@ -963,19 +963,24 @@ impl<'a> Printer<'a> {
     /// The element and each last descendant that ends where its parent ends, outermost first —
     /// the chain one implied closer can close (`<li><b>a⏎</ul>` closes both). Only the innermost
     /// can still carry an explicit end tag: every other member's span ends at its last child's.
-    fn last_descendant_chain<'s, 'n>(
-        elem: &'s ast::Element<'n>,
-    ) -> impl Iterator<Item = &'s ast::Element<'n>> + Clone {
-        std::iter::successors(Some(elem), |elem| match elem.fragment.nodes.last() {
-            Some(FragmentNode::Element(child)) if child.span.end == elem.span.end => Some(child),
-            _ => None,
+    fn last_descendant_chain<'n>(
+        view: SvelteView<'n>,
+        elem: &'n ast::Element<'n>,
+    ) -> impl Iterator<Item = &'n ast::Element<'n>> + Clone {
+        std::iter::successors(Some(elem), move |elem| {
+            match view.nodes(elem.fragment.nodes).last() {
+                Some(FragmentNode::Element(child)) if child.span.end == elem.span.end => {
+                    Some(child)
+                }
+                _ => None,
+            }
         })
     }
 
     /// Whether `elem`'s end tag is implied: its span ends where its last child does, or right
     /// after its own start tag when it has none (not a void or self-closed element).
     fn is_implied_end(&self, elem: &ast::Element<'_>) -> bool {
-        match elem.fragment.nodes.last() {
+        match self.svelte.nodes(elem.fragment.nodes).last() {
             Some(child) => child.span().end == elem.span.end,
             None => {
                 elem.span.end == elem.open_tag_end + 1
@@ -1001,8 +1006,8 @@ impl<'a> Printer<'a> {
     /// keeping the author's implied form
     /// (`syntax/prettier_ignore/implied_end_tag_gap_prettier_divergence`).
     fn implied_end_closers_through_ws_sensitive(&self, elem: &ast::Element<'_>) -> Option<DocId> {
-        let implied_chain =
-            Self::last_descendant_chain(elem).take_while(|elem| self.is_implied_end(elem));
+        let implied_chain = Self::last_descendant_chain(self.svelte, elem)
+            .take_while(|elem| self.is_implied_end(elem));
         if !implied_chain
             .clone()
             .any(|elem| elem.facts.is_ws_sensitive())

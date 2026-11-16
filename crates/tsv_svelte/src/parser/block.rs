@@ -2021,7 +2021,8 @@ mod tests {
             let arena = Bump::new();
             let parsed = crate::__private::parse(source, &arena)
                 .unwrap_or_else(|e| panic!("{source:?}: {e:?}"));
-            let FragmentNode::EachBlock(block) = &parsed.fragment.nodes[0] else {
+            let FragmentNode::EachBlock(block) = &parsed.view().nodes(parsed.fragment.nodes)[0]
+            else {
                 panic!("{source:?}: not an each block");
             };
             assert_eq!(block.index.map(|s| s.extract(source)), index, "{source:?}");

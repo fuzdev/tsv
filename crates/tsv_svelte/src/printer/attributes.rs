@@ -544,7 +544,7 @@ impl<'a> Printer<'a> {
         // branches below.
         let name_doc = d.source_span(attr.name_span, self.source);
 
-        if let Some(value_parts) = &attr.value {
+        if let Some(value_parts) = self.svelte.opt_attribute_values(attr.value) {
             // Check for shorthand: {name}
             if self.is_shorthand_attribute(attr, value_parts) {
                 return d.braces(name_doc);
@@ -644,7 +644,7 @@ impl<'a> Printer<'a> {
         if !super::fuses_source_spans() {
             return None;
         }
-        let value = attr.value?;
+        let value = self.svelte.opt_attribute_values(attr.value)?;
         let bytes = self.source.as_bytes();
         let name = attr.name_span;
         let name_end = name.end as usize;
@@ -1012,7 +1012,7 @@ impl<'a> Printer<'a> {
         self.build_directive_doc(
             self.d().text("on:"),
             dir.name_span,
-            dir.modifiers,
+            self.svelte.modifiers(dir.modifiers),
             self.view.opt_expr(dir.expression),
             dir.expression_tag_span,
             DirectiveValue::Always,
@@ -1024,7 +1024,7 @@ impl<'a> Printer<'a> {
         self.build_directive_doc(
             self.d().text("bind:"),
             dir.name_span,
-            dir.modifiers,
+            self.svelte.modifiers(dir.modifiers),
             Some(self.view.expr(dir.expression)),
             dir.expression_tag_span,
             DirectiveValue::ShorthandBind,
@@ -1036,7 +1036,7 @@ impl<'a> Printer<'a> {
         self.build_directive_doc(
             self.d().text("class:"),
             dir.name_span,
-            dir.modifiers,
+            self.svelte.modifiers(dir.modifiers),
             Some(self.view.expr(dir.expression)),
             dir.expression_tag_span,
             DirectiveValue::Shorthand,
@@ -1044,10 +1044,19 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for style:prop directive
+    #[expect(
+        clippy::explicit_auto_deref,
+        reason = "a view accessor takes a list or string field by value, which a store handle \
+                  needs dereferenced; only the field's identity alias auto-derefs"
+    )]
     fn build_style_directive_doc(&self, dir: &ast::StyleDirective<'_>) -> DocId {
         let d = self.d();
         let name = dir.name_span.extract(self.source);
-        let mut parts = self.directive_head_parts(d.text("style:"), dir.name_span, dir.modifiers);
+        let mut parts = self.directive_head_parts(
+            d.text("style:"),
+            dir.name_span,
+            self.svelte.modifiers(dir.modifiers),
+        );
         match &dir.value {
             ast::StyleDirectiveValue::True => {}
             ast::StyleDirectiveValue::ExpressionTag(tag) => {
@@ -1062,6 +1071,7 @@ impl<'a> Printer<'a> {
                 }
             }
             ast::StyleDirectiveValue::Parts(value_parts) => {
+                let value_parts = self.svelte.attribute_values(*value_parts);
                 // The same quoted-value assembly `build_attribute_doc`'s general path takes —
                 // shared delimiter choice, one doc per part — with the CSS policy for the parts.
                 let (open, close) = self.attribute_value_delims(value_parts);
@@ -1080,7 +1090,7 @@ impl<'a> Printer<'a> {
         self.build_directive_doc(
             self.d().text("use:"),
             dir.name_span,
-            dir.modifiers,
+            self.svelte.modifiers(dir.modifiers),
             self.view.opt_expr(dir.expression),
             dir.expression_tag_span,
             DirectiveValue::Always,
@@ -1092,7 +1102,7 @@ impl<'a> Printer<'a> {
         self.build_directive_doc(
             self.d().text(dir.direction.prefix_with_colon()),
             dir.name_span,
-            dir.modifiers,
+            self.svelte.modifiers(dir.modifiers),
             self.view.opt_expr(dir.expression),
             dir.expression_tag_span,
             DirectiveValue::Always,
@@ -1104,7 +1114,7 @@ impl<'a> Printer<'a> {
         self.build_directive_doc(
             self.d().text("animate:"),
             dir.name_span,
-            dir.modifiers,
+            self.svelte.modifiers(dir.modifiers),
             self.view.opt_expr(dir.expression),
             dir.expression_tag_span,
             DirectiveValue::Always,
@@ -1116,7 +1126,7 @@ impl<'a> Printer<'a> {
         self.build_directive_doc(
             self.d().text("let:"),
             dir.name_span,
-            dir.modifiers,
+            self.svelte.modifiers(dir.modifiers),
             self.view.opt_expr(dir.expression),
             dir.expression_tag_span,
             DirectiveValue::Shorthand,
@@ -1922,7 +1932,7 @@ mod tests {
             let mut seen = 0;
             let mut stack = vec![&root.fragment];
             while let Some(fragment) = stack.pop() {
-                for node in fragment.nodes {
+                for node in root.view().nodes(fragment.nodes) {
                     match node {
                         FragmentNode::Comment(comment) => {
                             seen += 1;

@@ -8,7 +8,7 @@ use tsv_cli::cli::input::ParserType;
 use tsv_lang::{
     is_format_ignore_directive, is_format_ignore_range_end, is_format_ignore_range_start,
 };
-use tsv_svelte::ast::{Element, Fragment, FragmentNode, TextDecoding};
+use tsv_svelte::ast::{Element, Fragment, FragmentNode, SvelteView, TextDecoding};
 
 use crate::audit::excerpt::first_line_diff;
 use crate::audit::sweep::{PristineSweep, sort_findings_by_path, sweep_pristine};
@@ -426,10 +426,16 @@ fn line_head_boundary_spaces(source: &str) -> Vec<(usize, String)> {
 ///   every sibling between the markers. Missing the range form was a real false-positive class
 ///   caught on the first run: it accused 476 lines of the author's own frozen bytes.
 fn for_each_eligible_text(source: &str, f: &mut dyn FnMut(&str, usize)) {
-    fn walk(frag: &Fragment<'_>, source: &str, preserve: bool, f: &mut dyn FnMut(&str, usize)) {
+    fn walk(
+        view: SvelteView<'_>,
+        frag: &Fragment<'_>,
+        source: &str,
+        preserve: bool,
+        f: &mut dyn FnMut(&str, usize),
+    ) {
         let mut frozen = false;
         let mut in_frozen_range = false;
-        for node in frag.nodes {
+        for node in view.nodes(frag.nodes) {
             // The node freeze applies to the next node that is not whitespace-only text,
             // mirroring `format_ignore_raw_doc`; the range freeze spans every sibling between
             // its markers.
@@ -467,37 +473,37 @@ fn for_each_eligible_text(source: &str, f: &mut dyn FnMut(&str, usize)) {
                     }
                 }
                 FragmentNode::Element(e) => {
-                    if !emits_verbatim_body(e, source) {
+                    if !emits_verbatim_body(view, e, source) {
                         let child_preserve =
                             preserve || tsv_svelte::__private::preserves_whitespace(e.name(source));
-                        walk(&e.fragment, source, child_preserve, f);
+                        walk(view, &e.fragment, source, child_preserve, f);
                     }
                 }
                 FragmentNode::SpecialElement(e) => {
                     // A head `<title>` is the one special kind whose content the printer
                     // emits verbatim, so its leading runs are the author's bytes.
                     let child_preserve = preserve || e.kind.preserves_content_whitespace();
-                    walk(&e.fragment, source, child_preserve, f);
+                    walk(view, &e.fragment, source, child_preserve, f);
                 }
                 FragmentNode::IfBlock(b) => {
-                    walk(&b.consequent, source, preserve, f);
+                    walk(view, &b.consequent, source, preserve, f);
                     if let Some(alt) = &b.alternate {
-                        walk(alt, source, preserve, f);
+                        walk(view, alt, source, preserve, f);
                     }
                 }
                 FragmentNode::EachBlock(b) => {
-                    walk(&b.body, source, preserve, f);
+                    walk(view, &b.body, source, preserve, f);
                     if let Some(fallback) = &b.fallback {
-                        walk(fallback, source, preserve, f);
+                        walk(view, fallback, source, preserve, f);
                     }
                 }
                 FragmentNode::AwaitBlock(b) => {
                     for frag in [&b.pending, &b.then, &b.catch].into_iter().flatten() {
-                        walk(frag, source, preserve, f);
+                        walk(view, frag, source, preserve, f);
                     }
                 }
-                FragmentNode::KeyBlock(b) => walk(&b.fragment, source, preserve, f),
-                FragmentNode::SnippetBlock(b) => walk(&b.body, source, preserve, f),
+                FragmentNode::KeyBlock(b) => walk(view, &b.fragment, source, preserve, f),
+                FragmentNode::SnippetBlock(b) => walk(view, &b.body, source, preserve, f),
                 FragmentNode::Comment(_)
                 | FragmentNode::ExpressionTag(_)
                 | FragmentNode::HtmlTag(_)
@@ -513,20 +519,20 @@ fn for_each_eligible_text(source: &str, f: &mut dyn FnMut(&str, usize)) {
     let Ok(root) = tsv_svelte::__private::parse(source, &arena) else {
         return;
     };
-    walk(&root.fragment, source, false, f);
+    walk(root.view(), &root.fragment, source, false, f);
 }
 
 /// Whether the printer emits this element's body **verbatim** — `<script>` / `<style>` (raw
 /// text) or a frozen-language `<template>`. Mirrors the two leading arms of
 /// `build_element_doc`: the body is the author's bytes, so its whitespace is never the
 /// formatter's to answer for.
-fn emits_verbatim_body(element: &Element<'_>, source: &str) -> bool {
+fn emits_verbatim_body(view: SvelteView<'_>, element: &Element<'_>, source: &str) -> bool {
     let name = element.name(source);
     // The frozen-template arm asks the printer's own predicate rather than a copy of it. A
     // copy here would have to track what the printer reads the `lang` value OFF — the decoded
     // text, not the raw bytes — and the copy that stood here did not, so `lang="&#112;ug"`
     // would have been a frozen body to the printer and a graded one to this audit.
-    name == "script" || name == "style" || element.is_frozen_template(source)
+    name == "script" || name == "style" || element.is_frozen_template(view, source)
 }
 
 fn is_collapsible(c: char) -> bool {

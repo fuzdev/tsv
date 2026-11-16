@@ -6,7 +6,7 @@
 // - svelte:fragment, svelte:boundary
 // - slot, title
 
-use crate::ast::{self, SpecialElementKind};
+use crate::ast::{self, SpecialElementKind, SvelteView};
 use crate::printer::Printer;
 use tsv_lang::doc::{DocBuf, arena::DocId};
 
@@ -41,16 +41,18 @@ impl<'a> Printer<'a> {
         // which for this one kind deletes rendered bytes. It leaves **before**
         // `analyze_element` because it reads nothing that stage produces — its head comes from
         // the whitespace-sensitive family and its content from the source.
-        if element.kind.preserves_content_whitespace() && !element.fragment.nodes.is_empty() {
+        if element.kind.preserves_content_whitespace()
+            && !self.svelte.nodes(element.fragment.nodes).is_empty()
+        {
             return self.build_title_content_doc(
                 name,
-                element.fragment.nodes,
+                self.svelte.nodes(element.fragment.nodes),
                 &attr_docs,
                 emission,
             );
         }
 
-        let parts = Self::special_element_parts(element, name);
+        let parts = Self::special_element_parts(self.svelte, element, name);
         let ctx = self.analyze_element(&parts, &attr_docs);
 
         match self.compute_element_layout(&parts, &ctx) {
@@ -73,6 +75,7 @@ impl<'a> Printer<'a> {
     /// [`Self::build_special_close_gt_dangle`], so the two cannot disagree about the element
     /// they lay out.
     fn special_element_parts<'e>(
+        view: SvelteView<'e>,
         element: &'e ast::SpecialElement<'e>,
         name: DocId,
     ) -> ElementParts<'e> {
@@ -96,7 +99,7 @@ impl<'a> Printer<'a> {
             // resolves to (even `<svelte:element this="table">`). Inter-sibling whitespace stays
             // significant.
             collapses_child_ws: false,
-            nodes: element.fragment.nodes,
+            nodes: view.nodes(element.fragment.nodes),
             span: element.span,
         }
     }
@@ -120,7 +123,7 @@ impl<'a> Printer<'a> {
         let attr_docs = self
             .build_special_element_attrs_doc(element, self.d().line())
             .docs;
-        let parts = Self::special_element_parts(element, name);
+        let parts = Self::special_element_parts(self.svelte, element, name);
         let ctx = self.analyze_element(&parts, &attr_docs);
         self.compute_element_layout(&parts, &ctx)
             .is_soft()
@@ -219,7 +222,7 @@ impl<'a> Printer<'a> {
         &self,
         element: &ast::SpecialElement<'_>,
     ) -> DocId {
-        let nodes = element.fragment.nodes;
+        let nodes = self.svelte.nodes(element.fragment.nodes);
         if nodes.is_empty() {
             return self.build_special_element_doc(element);
         }
@@ -348,13 +351,19 @@ impl<'a> Printer<'a> {
         .map(|(doc, value)| {
             (
                 doc,
-                ThisClaim::new(element.name_span.end, value, element.attributes),
+                ThisClaim::new(
+                    element.name_span.end,
+                    value,
+                    self.svelte.attributes(element.attributes),
+                ),
             )
         });
         let claimed = synthesized_this.map(|(_, claim)| claim);
 
         // Pre-allocate: 2 docs per attr (separator + attr), plus the synthesized `this={…}`.
-        let capacity = (element.attributes.len() + usize::from(synthesized_this.is_some())) * 2;
+        let capacity = (self.svelte.attributes(element.attributes).len()
+            + usize::from(synthesized_this.is_some()))
+            * 2;
         let mut docs: DocBuf = DocBuf::with_capacity(capacity);
 
         if let Some((this_doc, claim)) = synthesized_this {
@@ -378,7 +387,7 @@ impl<'a> Printer<'a> {
         let normalize_class = matches!(element.kind, SpecialElementKind::SvelteElement { .. });
         let emission = self.push_attrs_with_comments(
             &mut docs,
-            element.attributes,
+            self.svelte.attributes(element.attributes),
             separator,
             AttrGaps {
                 first_range_start: element.name_span.end,

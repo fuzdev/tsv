@@ -162,13 +162,14 @@ pub(crate) fn write_root_bytes(
     let ctx = Ctx {
         source,
         positions: tables.positions(),
-        view: parsed.view,
-        css: parsed.css,
-        snippet_wire_parameters: root.snippet_wire_parameters,
+        svelte: parsed.view,
+        view: parsed.view.ts(),
+        css: parsed.view.css(),
+        snippet_wire_parameters: parsed.view.wire_params(root.snippet_wire_parameters),
         comments: &template_comments,
         // Component-global: `lang="ts"` on any script makes *every* script emit the
         // acorn-typescript wire shape (Svelte's single `this.ts` flag).
-        component_is_ts: component_is_typescript(root, source),
+        component_is_ts: component_is_typescript(parsed.view, root, source),
     };
 
     let mut w = JsonWriter::with_capacity(estimated_json_capacity(source.len(), wire));
@@ -180,6 +181,8 @@ pub(crate) fn write_root_bytes(
 #[derive(Clone, Copy)]
 struct Ctx<'a> {
     source: &'a str,
+    /// Reads the template's lists and strings, and hands out the two views below.
+    svelte: ast::SvelteView<'a>,
     /// Reads the expressions of the tree being written.
     view: tsv_ts::ast::AstView<'a>,
     /// Reads the stores of the top-level `<style>`'s stylesheet, for its children's walk.
@@ -299,8 +302,8 @@ impl<'a> Ctx<'a> {
 /// attach uses so a sibling expression context (`{:else if}`) doesn't bleed into a
 /// block's own expression window.
 #[inline]
-fn fragment_first_start(fragment: &ast::Fragment<'_>) -> Option<u32> {
-    fragment.nodes.first().map(|n| n.span().start)
+fn fragment_first_start(view: ast::SvelteView<'_>, fragment: &ast::Fragment<'_>) -> Option<u32> {
+    view.nodes(fragment.nodes).first().map(|n| n.span().start)
 }
 
 /// Whether the byte immediately before `pos` is a quote — the discriminator
@@ -345,12 +348,13 @@ fn preceded_by_quote(source: &str, pos: u32) -> bool {
 /// tests/svelte_preceding_comment.rs, whose controls fail if a future rewrite reproduces the
 /// walk faithfully and reopens the duplication.
 fn preceding_comment<'a>(
-    root: &'a ast::Root<'_>,
+    view: ast::SvelteView<'a>,
+    root: &'a ast::Root<'a>,
     tag_start: u32,
     source: &str,
 ) -> Option<&'a ast::HtmlComment> {
     let mut expected_end = tag_start;
-    for node in root.fragment.nodes.iter().rev() {
+    for node in view.nodes(root.fragment.nodes).iter().rev() {
         let span = node.span();
         // Nodes after the tag did not exist when Svelte's walk ran (it runs mid-parse, off
         // the fragment built so far), so they are skipped rather than allowed to stop it.
@@ -378,7 +382,8 @@ fn preceding_comment<'a>(
 fn write_root(w: &mut JsonWriter, root: &ast::Root<'_>, ctx: &Ctx<'_>) {
     let source = ctx.source;
 
-    let find_preceding_comment = |tag_start: u32| preceding_comment(root, tag_start, source);
+    let find_preceding_comment =
+        |tag_start: u32| preceding_comment(ctx.svelte, root, tag_start, source);
 
     w.raw("{\"css\":");
     write_or_null(w, root.css.as_ref(), |w, style| {
@@ -444,7 +449,9 @@ fn write_root_comment(w: &mut JsonWriter, comment: &Comment, ctx: &Ctx<'_>) {
 /// Emits a `Fragment` node.
 fn write_fragment(w: &mut JsonWriter, fragment: &ast::Fragment<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"Fragment\",\"nodes\":");
-    write_array(w, fragment.nodes, |w, n| write_fragment_node(w, n, ctx));
+    write_array(w, ctx.svelte.nodes(fragment.nodes), |w, n| {
+        write_fragment_node(w, n, ctx);
+    });
     w.raw("}");
 }
 
@@ -623,14 +630,15 @@ fn write_element(w: &mut JsonWriter, elem: &ast::Element<'_>, ctx: &Ctx<'_>) {
     }
     // The constant stretch between two of the element's dynamic parts is one append,
     // and an empty attribute list rides the one that opens the fragment.
-    if elem.attributes.is_empty() {
+    let attributes = ctx.svelte.attributes(elem.attributes);
+    if attributes.is_empty() {
         w.raw(",\"attributes\":[],\"fragment\":{\"type\":\"Fragment\",\"nodes\":[");
     } else {
         w.raw(",\"attributes\":[");
-        write_items(w, elem.attributes, |w, a| write_attribute_node(w, a, ctx));
+        write_items(w, attributes, |w, a| write_attribute_node(w, a, ctx));
         w.raw("],\"fragment\":{\"type\":\"Fragment\",\"nodes\":[");
     }
-    let nodes = elem.fragment.nodes;
+    let nodes = ctx.svelte.nodes(elem.fragment.nodes);
     // A `<textarea>`'s content is read with the attribute-value sequence
     // machinery in the canonical parser, whose `Text` literal leads with the
     // positions (`{start, end, type, raw, data}`). Asked only of an element with
@@ -677,7 +685,9 @@ fn write_special_element(w: &mut JsonWriter, elem: &ast::SpecialElement<'_>, ctx
         write_name_loc_field(w, elem.name_span, lines);
     }
     w.raw(",\"attributes\":");
-    write_array(w, elem.attributes, |w, a| write_attribute_node(w, a, ctx));
+    write_array(w, ctx.svelte.attributes(elem.attributes), |w, a| {
+        write_attribute_node(w, a, ctx);
+    });
     w.raw(",\"fragment\":");
     write_fragment(w, &elem.fragment, ctx);
     // `<svelte:element this={…}>` tag. A plain-string `this="x"` is a
@@ -876,7 +886,7 @@ fn write_if_block(w: &mut JsonWriter, block: &ast::IfBlock<'_>, ctx: &Ctx<'_>) {
         w.raw("{\"type\":\"IfBlock\",\"elseif\":false,\"start\":");
         w.span_start_end(ctx.positions, block.span.start, block.span.end);
     }
-    let range_end = fragment_first_start(&block.consequent).unwrap_or(block.span.end);
+    let range_end = fragment_first_start(ctx.svelte, &block.consequent).unwrap_or(block.span.end);
     w.raw(",\"test\":");
     write_generic_island(
         w,
@@ -898,7 +908,7 @@ fn write_if_block(w: &mut JsonWriter, block: &ast::IfBlock<'_>, ctx: &Ctx<'_>) {
 fn write_each_block(w: &mut JsonWriter, block: &ast::EachBlock<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"EachBlock\",\"start\":");
     w.span_start_end(ctx.positions, block.span.start, block.span.end);
-    let range_end = fragment_first_start(&block.body).unwrap_or(block.span.end);
+    let range_end = fragment_first_start(ctx.svelte, &block.body).unwrap_or(block.span.end);
     w.raw(",\"expression\":");
     write_generic_island(
         w,
@@ -953,7 +963,7 @@ fn write_await_block(w: &mut JsonWriter, block: &ast::AwaitBlock<'_>, ctx: &Ctx<
     ]
     .into_iter()
     .flatten()
-    .filter_map(fragment_first_start)
+    .filter_map(|fragment| fragment_first_start(ctx.svelte, fragment))
     .min()
     .unwrap_or(block.span.end);
     w.raw(",\"expression\":");
@@ -979,6 +989,7 @@ fn write_await_block(w: &mut JsonWriter, block: &ast::AwaitBlock<'_>, ctx: &Ctx<
     // is `None` here yet must still emit an (empty) Fragment — hence the flag.
     match block.pending.as_ref() {
         Some(fragment) => write_fragment(w, fragment, ctx),
+        // TODO: a construction site — an empty `FragmentNodeRun` once fragments are runs.
         None if block.pending_block => write_fragment(w, &ast::Fragment { nodes: &[] }, ctx),
         None => w.raw("null"),
     }
@@ -993,7 +1004,7 @@ fn write_await_block(w: &mut JsonWriter, block: &ast::AwaitBlock<'_>, ctx: &Ctx<
 fn write_key_block(w: &mut JsonWriter, block: &ast::KeyBlock<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"KeyBlock\",\"start\":");
     w.span_start_end(ctx.positions, block.span.start, block.span.end);
-    let range_end = fragment_first_start(&block.fragment).unwrap_or(block.span.end);
+    let range_end = fragment_first_start(ctx.svelte, &block.fragment).unwrap_or(block.span.end);
     w.raw(",\"expression\":");
     write_generic_island(
         w,
@@ -1013,7 +1024,7 @@ fn write_key_block(w: &mut JsonWriter, block: &ast::KeyBlock<'_>, ctx: &Ctx<'_>)
 fn write_snippet_block(w: &mut JsonWriter, block: &ast::SnippetBlock<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"SnippetBlock\",\"start\":");
     w.span_start_end(ctx.positions, block.span.start, block.span.end);
-    let range_end = fragment_first_start(&block.body).unwrap_or(block.span.end);
+    let range_end = fragment_first_start(ctx.svelte, &block.body).unwrap_or(block.span.end);
     w.raw(",\"expression\":");
     write_snippet_name(
         w,
@@ -1024,7 +1035,7 @@ fn write_snippet_block(w: &mut JsonWriter, block: &ast::SnippetBlock<'_>, ctx: &
     );
     if let Some(type_params) = block.type_params_raw {
         w.raw(",\"typeParams\":");
-        w.string(type_params);
+        w.string(ctx.svelte.text(type_params));
     }
     w.raw(",\"parameters\":");
     write_snippet_parameters(
@@ -1410,7 +1421,7 @@ fn write_attribute(w: &mut JsonWriter, attr: &ast::Attribute<'_>, ctx: &Ctx<'_>)
         write_name_loc_field(w, attr.name_span, lines);
     }
     // A boolean attribute's `true` closes the node in the same constant.
-    let Some(values) = attr.value else {
+    let Some(values) = ctx.svelte.opt_attribute_values(attr.value) else {
         w.raw(",\"value\":true}");
         return;
     };
@@ -1526,7 +1537,7 @@ macro_rules! expression_directive_writer {
             w.raw(",\"expression\":");
             write_optional_directive_expression(w, ctx.view.opt_expr(d.expression), d.span, ctx);
             w.raw(",\"modifiers\":");
-            write_modifiers(w, d.modifiers, ctx.source);
+            write_modifiers(w, ctx.svelte.modifiers(d.modifiers), ctx.source);
             w.raw("}");
         }
     };
@@ -1549,7 +1560,7 @@ fn write_transition_directive(w: &mut JsonWriter, d: &ast::TransitionDirective<'
     w.raw(",\"expression\":");
     write_optional_directive_expression(w, ctx.view.opt_expr(d.expression), d.span, ctx);
     w.raw(",\"modifiers\":");
-    write_modifiers(w, d.modifiers, ctx.source);
+    write_modifiers(w, ctx.svelte.modifiers(d.modifiers), ctx.source);
     w.raw(",\"intro\":");
     w.bool(d.direction.has_intro());
     w.raw(",\"outro\":");
@@ -1595,7 +1606,7 @@ fn write_bind_directive(w: &mut JsonWriter, d: &ast::BindDirective<'_>, ctx: &Ct
         ctx,
     );
     w.raw(",\"modifiers\":");
-    write_modifiers(w, d.modifiers, ctx.source);
+    write_modifiers(w, ctx.svelte.modifiers(d.modifiers), ctx.source);
     w.raw("}");
 }
 
@@ -1610,16 +1621,21 @@ fn write_class_directive(w: &mut JsonWriter, d: &ast::ClassDirective<'_>, ctx: &
         ctx,
     );
     w.raw(",\"modifiers\":");
-    write_modifiers(w, d.modifiers, ctx.source);
+    write_modifiers(w, ctx.svelte.modifiers(d.modifiers), ctx.source);
     w.raw("}");
 }
 
 /// Emits a `StyleDirective` node. Field order: `start, end, type, name,
 /// name_loc, modifiers, value`.
+#[expect(
+    clippy::explicit_auto_deref,
+    reason = "a view accessor takes a list or string field by value, which a store handle \
+              needs dereferenced; only the field's identity alias auto-derefs"
+)]
 fn write_style_directive(w: &mut JsonWriter, d: &ast::StyleDirective<'_>, ctx: &Ctx<'_>) {
     write_directive_head(w, "StyleDirective", d.span, d.name_span, d.head_span, ctx);
     w.raw(",\"modifiers\":");
-    write_modifiers(w, d.modifiers, ctx.source);
+    write_modifiers(w, ctx.svelte.modifiers(d.modifiers), ctx.source);
     w.raw(",\"value\":");
     match &d.value {
         ast::StyleDirectiveValue::True => w.raw("true"),
@@ -1634,7 +1650,9 @@ fn write_style_directive(w: &mut JsonWriter, d: &ast::StyleDirective<'_>, ctx: &
             }
         }
         ast::StyleDirectiveValue::Parts(parts) => {
-            write_array(w, *parts, |w, p| write_attribute_value(w, p, ctx));
+            write_array(w, ctx.svelte.attribute_values(*parts), |w, p| {
+                write_attribute_value(w, p, ctx);
+            });
         }
     }
     w.raw("}");
@@ -1657,7 +1675,7 @@ fn write_style_sheet(
     w.raw("{\"type\":\"StyleSheet\",\"start\":");
     w.span_start_end(ctx.positions, style.span.start, style.span.end);
     w.raw(",\"attributes\":");
-    write_value_attributes(w, style.attributes, ctx);
+    write_value_attributes(w, ctx.svelte.attributes(style.attributes), ctx);
     w.raw(",\"children\":");
     let css_comments = write_css_children(w, style.css_parsed(ctx.css), ctx.source, ctx.positions);
     w.raw(",\"comments\":");
@@ -1723,7 +1741,7 @@ fn write_script(
         .map_or(CommentMode::Off, CommentAttach::mode);
     write_program_embedded(w, &script.content, ctx.embed(mode));
     w.raw(",\"attributes\":");
-    write_value_attributes(w, script.attributes, ctx);
+    write_value_attributes(w, ctx.svelte.attributes(script.attributes), ctx);
     w.raw("}");
 }
 
@@ -1731,36 +1749,36 @@ fn write_script(
 /// attributes` then the skip-if-none `runes, immutable, css, accessors,
 /// preserveWhitespace, namespace, customElement` (no `type`).
 fn write_svelte_options(w: &mut JsonWriter, options: &ast::SvelteOptions<'_>, ctx: &Ctx<'_>) {
-    let attrs = options.attributes;
+    let attrs = ctx.svelte.attributes(options.attributes);
     w.span_start_end_object(ctx.positions, options.span.start, options.span.end);
     w.raw(",\"attributes\":");
     write_value_attributes(w, attrs, ctx);
-    if let Some(runes) = bool_option(ctx.view, attrs, "runes", ctx.source) {
+    if let Some(runes) = bool_option(ctx.svelte, attrs, "runes", ctx.source) {
         w.raw(",\"runes\":");
         w.bool(runes);
     }
-    if let Some(immutable) = bool_option(ctx.view, attrs, "immutable", ctx.source) {
+    if let Some(immutable) = bool_option(ctx.svelte, attrs, "immutable", ctx.source) {
         w.raw(",\"immutable\":");
         w.bool(immutable);
     }
-    if let Some(css) =
-        find_option_values(attrs, "css", ctx.source).and_then(|v| text_value(v, ctx.source))
+    if let Some(css) = find_option_values(ctx.svelte, attrs, "css", ctx.source)
+        .and_then(|v| text_value(v, ctx.source))
     {
         w.raw(",\"css\":");
         w.string(&css);
     }
-    if let Some(accessors) = bool_option(ctx.view, attrs, "accessors", ctx.source) {
+    if let Some(accessors) = bool_option(ctx.svelte, attrs, "accessors", ctx.source) {
         w.raw(",\"accessors\":");
         w.bool(accessors);
     }
     if let Some(preserve_whitespace) =
-        bool_option(ctx.view, attrs, "preserveWhitespace", ctx.source)
+        bool_option(ctx.svelte, attrs, "preserveWhitespace", ctx.source)
     {
         w.raw(",\"preserveWhitespace\":");
         w.bool(preserve_whitespace);
     }
-    if let Some(namespace) =
-        find_option_values(attrs, "namespace", ctx.source).and_then(|v| text_value(v, ctx.source))
+    if let Some(namespace) = find_option_values(ctx.svelte, attrs, "namespace", ctx.source)
+        .and_then(|v| text_value(v, ctx.source))
     {
         w.raw(",\"namespace\":");
         w.string(&namespace);
@@ -1862,7 +1880,7 @@ fn write_custom_element_props(
 /// writer, so their offsets translate like any template `{expr}`).
 fn write_custom_element_field(w: &mut JsonWriter, attrs: &[ast::AttributeNode<'_>], ctx: &Ctx<'_>) {
     use tsv_ts::ast::{Expression, ExpressionKind, LiteralValue, ObjectProperty};
-    let Some(values) = find_option_values(attrs, "customElement", ctx.source) else {
+    let Some(values) = find_option_values(ctx.svelte, attrs, "customElement", ctx.source) else {
         return;
     };
     for v in values {

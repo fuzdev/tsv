@@ -6,6 +6,7 @@
 #[cfg(feature = "json")]
 pub(crate) mod convert;
 mod stores;
+mod view;
 
 // Svelte internal AST types
 //
@@ -16,15 +17,16 @@ mod stores;
 // ## Arena allocation
 //
 // The Svelte AST is allocated in a per-parse [`bumpalo::Bump`] supplied by the
-// caller. Recursive children are `&'arena T<'arena>` (not `Box`), child
-// collections are `&'arena [T<'arena>]` (not `Vec`), and decoded / raw strings
-// are `&'arena str` (not `String`) — so the template is one bump-allocated graph,
-// freed wholesale when the `Bump` drops. The embedded TypeScript (`<script>`,
-// `{expr}`) lives in the TypeScript half of the document's stores (`SvelteStores`)
-// instead, named here by id, and the top-level `<style>`'s `CssStyleSheet` in the
-// CSS half, its lists and strings named by run and pool text.
-// Leaf nodes that hold only `Span`/primitives carry no lifetime
-// (`HtmlComment`, `Text`, `SvelteOptions`, the `*Tag`-with-no-expression nodes).
+// caller. Child collections are `&'arena` slices (not `Vec`) and the one
+// stored string an `&'arena str` (not `String`), each spelled by an alias in
+// `view.rs` and read through `SvelteView`'s accessor for it — so the template is
+// one bump-allocated graph, freed wholesale when the `Bump` drops. The embedded
+// TypeScript (`<script>`, `{expr}`) lives in the TypeScript half of the
+// document's stores (`SvelteStores`) instead, named here by id, and the top-level
+// `<style>`'s `CssStyleSheet` in the CSS half, its lists and strings named by run
+// and pool text.
+// Leaf nodes, which hold no list, carry no lifetime (`HtmlComment`, `Text`,
+// `AttributeValue`, every `*Tag`).
 
 use std::borrow::Cow;
 
@@ -33,6 +35,10 @@ use tsv_css::ast::{CssParsedRef, CssStyleSheet, CssView};
 pub use tsv_lang::{Comment, Span};
 use tsv_ts::ast::{
     AstView, ExprId, Expression, Program, Run, TSTypeParameterDeclaration, VariableDeclaration,
+};
+pub use view::{
+    AttributeNodeRun, AttributeValueRun, FragmentNodeRun, PoolStr, SnippetWireParametersRun,
+    SpanRun, SvelteView,
 };
 
 /// A parsed Svelte document and the stores its handles index.
@@ -48,30 +54,15 @@ pub struct ParsedRoot<'arena> {
     pub stores: SvelteStores,
 }
 
-impl<'arena> ParsedRoot<'arena> {
-    /// The view reading the TypeScript half of this tree's stores.
-    #[inline]
-    pub fn view(&self) -> AstView<'_> {
-        self.stores.view()
-    }
-
-    /// The view reading the CSS half of this tree's stores.
-    #[inline]
-    pub fn css_view(&self) -> CssView<'_> {
-        self.stores.css_view()
-    }
-}
-
-/// A document as a reading entry point takes it: the tree and the views its edges resolve
-/// through.
+/// A document as a reading entry point takes it: the tree and the view its lists and edges
+/// resolve through.
 #[derive(Clone, Copy)]
 pub struct ParsedRootRef<'a> {
     /// The tree.
     pub root: &'a Root<'a>,
-    /// The view over the TypeScript stores the tree's edges index.
-    pub view: AstView<'a>,
-    /// The view over the CSS stores the top-level `<style>`'s stylesheet indexes.
-    pub css: CssView<'a>,
+    /// The view over the stores the tree's handles index, and through it the views of the
+    /// TypeScript and CSS halves.
+    pub view: SvelteView<'a>,
 }
 
 impl<'a, 'arena: 'a> From<&'a ParsedRoot<'arena>> for ParsedRootRef<'a> {
@@ -80,7 +71,6 @@ impl<'a, 'arena: 'a> From<&'a ParsedRoot<'arena>> for ParsedRootRef<'a> {
         ParsedRootRef {
             root: &parsed.root,
             view: parsed.view(),
-            css: parsed.css_view(),
         }
     }
 }
@@ -115,7 +105,7 @@ pub struct Root<'arena> {
     /// The wire's parameter lists for the `{#snippet}` heads that hold a grouping pair,
     /// ascending by [`SnippetWireParameters::snippet_start`] — see
     /// [`SnippetWireParameters`].
-    pub snippet_wire_parameters: &'arena [SnippetWireParameters],
+    pub snippet_wire_parameters: SnippetWireParametersRun<'arena>,
     /// Whether the parser read a `<script>` / `<style>` nested in the markup — a raw-text
     /// element anywhere in `fragment`, as opposed to the lifted top-level `instance` /
     /// `module` / `css`. Recorded where the parser already knows it, so the printer can skip
@@ -150,7 +140,7 @@ pub struct SnippetWireParameters {
 /// Used both at the root level and as children of elements.
 #[derive(Debug, Clone)]
 pub struct Fragment<'arena> {
-    pub nodes: &'arena [FragmentNode<'arena>],
+    pub nodes: FragmentNodeRun<'arena>,
 }
 
 /// Svelte template node types
@@ -321,7 +311,7 @@ pub struct SnippetBlock<'arena> {
     /// Raw inner text of the generics (`T extends X` for `<T extends X>`),
     /// always set when generics are present. Feeds the public AST's `typeParams`
     /// string, matching Svelte's parser (which stores it raw too).
-    pub type_params_raw: Option<&'arena str>,
+    pub type_params_raw: Option<PoolStr<'arena>>,
     /// Function parameters (patterns), **paren-free**: the tree a `function` signature
     /// with the same text parses to, so the printer and the compiler read the head exactly
     /// as they read that signature, re-deriving every grouping pair from precedence. The
@@ -425,7 +415,7 @@ pub struct OnDirective<'arena> {
     /// One span per `|modifier` after the name (`preventDefault`, `stopPropagation`, …), each a
     /// **verbatim** source slice like `name_span`, recovered via `span.extract(source)`. The
     /// `|` separators are not part of any span; an empty modifier (`on:click|`) is an empty span.
-    pub modifiers: &'arena [Span],
+    pub modifiers: SpanRun<'arena>,
     pub span: Span,
     /// Span of the whole directive head (`on:click|preventDefault`); used as `name_loc`.
     pub head_span: Span,
@@ -442,7 +432,7 @@ pub struct BindDirective<'arena> {
     /// Span of the property name only (e.g. "value") — verbatim source slice (see `OnDirective`).
     pub name_span: Span,
     pub expression: ExprId, // Binding target (always present - auto-generated for shorthand)
-    pub modifiers: &'arena [Span], // Unofficial — no official modifier support; preserved verbatim
+    pub modifiers: SpanRun<'arena>, // Unofficial — no official modifier support; preserved verbatim
     pub span: Span,
     pub head_span: Span,
     /// Span of the expression tag `{...}` for comment lookup (None for shorthand bindings)
@@ -458,7 +448,7 @@ pub struct ClassDirective<'arena> {
     /// Span of the class name only (e.g. "class1") — verbatim source slice (see `OnDirective`).
     pub name_span: Span,
     pub expression: ExprId, // Condition (always present - auto-generated for shorthand)
-    pub modifiers: &'arena [Span], // Unofficial — no official modifier support; preserved verbatim
+    pub modifiers: SpanRun<'arena>, // Unofficial — no official modifier support; preserved verbatim
     pub span: Span,
     pub head_span: Span,
     /// Span of the expression tag `{...}` for comment lookup (None for shorthand)
@@ -476,7 +466,7 @@ pub struct StyleDirective<'arena> {
     /// `OnDirective`).
     pub name_span: Span,
     pub value: StyleDirectiveValue<'arena>, // true, ExpressionTag, or mixed text/expressions
-    pub modifiers: &'arena [Span],          // "important"
+    pub modifiers: SpanRun<'arena>,         // "important"
     pub span: Span,
     pub head_span: Span,
 }
@@ -489,7 +479,7 @@ pub enum StyleDirectiveValue<'arena> {
     /// Pure expression: `style:color={value}`
     ExpressionTag(ExpressionTag),
     /// Mixed value (string with possible expressions): `style:color="red"`
-    Parts(&'arena [AttributeValue]),
+    Parts(AttributeValueRun<'arena>),
 }
 
 /// UseDirective - action (`use:action={params}`)
@@ -500,7 +490,7 @@ pub struct UseDirective<'arena> {
     /// Span of the action name only (e.g. "action") — verbatim source slice (see `OnDirective`).
     pub name_span: Span,
     pub expression: Option<ExprId>, // Parameters passed to the action
-    pub modifiers: &'arena [Span],  // Unofficial — no official modifier support; preserved verbatim
+    pub modifiers: SpanRun<'arena>, // Unofficial — no official modifier support; preserved verbatim
     pub span: Span,
     pub head_span: Span,
     /// Span of the expression tag `{...}` for comment lookup (None if no expression)
@@ -561,7 +551,7 @@ pub struct TransitionDirective<'arena> {
     /// Span of the transition name only (e.g. "fade") — verbatim source slice (see `OnDirective`).
     pub name_span: Span,
     pub expression: Option<ExprId>,     // Transition parameters
-    pub modifiers: &'arena [Span],      // "local", "global"
+    pub modifiers: SpanRun<'arena>,     // "local", "global"
     pub direction: TransitionDirection, // Which animations to run
     pub span: Span,
     pub head_span: Span,
@@ -577,7 +567,7 @@ pub struct AnimateDirective<'arena> {
     /// Span of the animation name only (e.g. "flip") — verbatim source slice (see `OnDirective`).
     pub name_span: Span,
     pub expression: Option<ExprId>, // Animation parameters
-    pub modifiers: &'arena [Span],  // Unofficial — no official modifier support; preserved verbatim
+    pub modifiers: SpanRun<'arena>, // Unofficial — no official modifier support; preserved verbatim
     pub span: Span,
     pub head_span: Span,
     /// Span of the expression tag `{...}` for comment lookup (None if no expression)
@@ -592,7 +582,7 @@ pub struct LetDirective<'arena> {
     /// Span of the slot-prop name only (e.g. "item") — verbatim source slice (see `OnDirective`).
     pub name_span: Span,
     pub expression: Option<ExprId>, // Local binding pattern (Identifier, ArrayPattern, ObjectPattern)
-    pub modifiers: &'arena [Span],  // Unofficial — no official modifier support; preserved verbatim
+    pub modifiers: SpanRun<'arena>, // Unofficial — no official modifier support; preserved verbatim
     pub span: Span,
     pub head_span: Span,
     /// Span of the expression tag `{...}` for comment lookup (None if no expression)
@@ -915,7 +905,7 @@ impl SpecialElementKind {
 #[derive(Debug, Clone)]
 pub struct SpecialElement<'arena> {
     pub kind: SpecialElementKind,
-    pub attributes: &'arena [AttributeNode<'arena>],
+    pub attributes: AttributeNodeRun<'arena>,
     pub fragment: Fragment<'arena>,
     pub span: Span,
     pub name_span: Span,
@@ -930,7 +920,7 @@ pub struct SpecialElement<'arena> {
 /// Stored separately from the fragment in `Root.options`.
 #[derive(Debug, Clone)]
 pub struct SvelteOptions<'arena> {
-    pub attributes: &'arena [AttributeNode<'arena>],
+    pub attributes: AttributeNodeRun<'arena>,
     pub span: Span,
     /// End of the `svelte:options` tag name — where the attribute list's first gap begins.
     /// Kept from the parse rather than derived from `span.start` + the tag's length, so no
@@ -1373,7 +1363,7 @@ pub struct Element<'arena> {
     /// beside `kind`, so it costs no extra size; the printer reads it instead of re-deriving.
     /// Crate-internal like [`TagFacts`] — derived from `name`, not part of the public wire AST.
     pub(crate) facts: TagFacts,
-    pub attributes: &'arena [AttributeNode<'arena>],
+    pub attributes: AttributeNodeRun<'arena>,
     pub fragment: Fragment<'arena>,
     pub span: Span,
     pub name_span: Span,
@@ -1401,8 +1391,8 @@ impl Element<'_> {
     /// [`lang_attribute`]: the decoded text, not the raw bytes). The template question stays on
     /// the parse-time [`TagFacts`] bitfield, so the printer's hot paths keep the field load
     /// rather than re-comparing the tag name.
-    pub fn is_frozen_template(&self, source: &str) -> bool {
-        self.facts.is_template() && EmbeddedLang::Template.is_frozen(self.attributes, source)
+    pub fn is_frozen_template(&self, view: SvelteView<'_>, source: &str) -> bool {
+        self.facts.is_template() && EmbeddedLang::Template.is_frozen(view, self.attributes, source)
     }
 }
 
@@ -1431,14 +1421,18 @@ impl Element<'_> {
 /// TypeScript body to *this* reader and NOT TypeScript to the wire, and `convert`'s
 /// `script_lang` deliberately stays a separate raw-keyed reader rather than sharing this one.
 /// Pinned by `tests/fixtures/svelte/attributes/lang_entity`, which holds both answers.
-fn lang_attribute<'s>(attributes: &[AttributeNode<'_>], source: &'s str) -> Option<Cow<'s, str>> {
+fn lang_attribute<'s>(
+    view: SvelteView<'_>,
+    attributes: AttributeNodeRun<'_>,
+    source: &'s str,
+) -> Option<Cow<'s, str>> {
     let mut type_value = None;
-    for attr_node in attributes {
+    for attr_node in view.attributes(attributes) {
         if let AttributeNode::Attribute(attr) = attr_node {
             let name = attr.name(source);
             let is_lang = name == "lang";
             if (is_lang || name == "type")
-                && let Some(value_parts) = attr.value
+                && let Some(value_parts) = view.opt_attribute_values(attr.value)
             {
                 for part in value_parts {
                     if let AttributeValue::Text(text) = part {
@@ -1529,8 +1523,13 @@ impl EmbeddedLang {
     /// parseable files. A *nested* body is raw text to both parsers and carries no such
     /// guarantee — which is why the freeze it takes is verbatim rather than anything that
     /// would rewrite it.
-    pub fn is_frozen(self, attributes: &[AttributeNode<'_>], source: &str) -> bool {
-        lang_attribute(attributes, source)
+    pub fn is_frozen(
+        self,
+        view: SvelteView<'_>,
+        attributes: AttributeNodeRun<'_>,
+        source: &str,
+    ) -> bool {
+        lang_attribute(view, attributes, source)
             .is_some_and(|lang| !self.formattable_langs().contains(&lang.as_ref()))
     }
 }
@@ -1591,7 +1590,7 @@ const _: () = assert!(size_of::<Element<'static>>() == 56);
 /// Detection is implicit: check if name matches expression identifier.
 #[derive(Debug, Clone)]
 pub struct Attribute<'arena> {
-    pub value: Option<&'arena [AttributeValue]>,
+    pub value: Option<AttributeValueRun<'arena>>,
     pub span: Span,
     pub name_span: Span,
 }
@@ -2132,7 +2131,7 @@ pub struct ExpressionTag {
 #[derive(Debug, Clone)]
 pub struct Script<'arena> {
     pub content: Program,
-    pub attributes: &'arena [AttributeNode<'arena>],
+    pub attributes: AttributeNodeRun<'arena>,
     pub context: ScriptContext,
     pub span: Span,
 }
@@ -2164,7 +2163,7 @@ impl ScriptContext {
 pub struct Style<'arena> {
     pub span: Span,         // Full <style>...</style> span
     pub content_span: Span, // Just the CSS text inside the tags
-    pub attributes: &'arena [AttributeNode<'arena>],
+    pub attributes: AttributeNodeRun<'arena>,
     /// Parsed CSS stylesheet (nodes + value comments), its lists and strings in the CSS
     /// half of the document's stores.
     pub css_stylesheet: CssStyleSheet,
@@ -2663,23 +2662,27 @@ mod lang_attribute_tests {
         let src = format!("<div>{open_tag}x</{tag}></div>");
         let arena = bumpalo::Bump::new();
         let ast = crate::__private::parse(&src, &arena).expect("parses");
-        let attrs =
-            raw_text_attributes(ast.fragment.nodes, tag, &src).expect("the raw-text element");
+        let view = ast.view();
+        let attrs = raw_text_attributes(view, view.nodes(ast.fragment.nodes), tag, &src)
+            .expect("the raw-text element");
         (
-            EmbeddedLang::Style.is_frozen(attrs, &src),
-            EmbeddedLang::Script.is_frozen(attrs, &src),
+            EmbeddedLang::Style.is_frozen(view, attrs, &src),
+            EmbeddedLang::Script.is_frozen(view, attrs, &src),
         )
     }
 
     /// The attribute list of the first `<tag>` element in the tree.
     fn raw_text_attributes<'a>(
+        view: super::SvelteView<'a>,
         nodes: &'a [super::FragmentNode<'a>],
         tag: &str,
         source: &str,
-    ) -> Option<&'a [super::AttributeNode<'a>]> {
+    ) -> Option<super::AttributeNodeRun<'a>> {
         nodes.iter().find_map(|node| match node {
             super::FragmentNode::Element(el) if el.name(source) == tag => Some(el.attributes),
-            super::FragmentNode::Element(el) => raw_text_attributes(el.fragment.nodes, tag, source),
+            super::FragmentNode::Element(el) => {
+                raw_text_attributes(view, view.nodes(el.fragment.nodes), tag, source)
+            }
             _ => None,
         })
     }

@@ -7,7 +7,7 @@
 // look like Rust format args but are valid Svelte template syntax.
 #![expect(clippy::literal_string_with_formatting_args)]
 
-use crate::ast::{self, Fragment, FragmentNode};
+use crate::ast::{self, Fragment, FragmentNode, SvelteView};
 use crate::printer::{HeadExpr, Printer};
 use smallvec::smallvec;
 use tsv_lang::doc::DocBuf;
@@ -206,13 +206,11 @@ impl SectionWhitespace {
     /// Read from the **source** text, never its decoded value: `&#32;` decodes to a space the
     /// compiler trims, yet dropping or folding the section would erase authored bytes, so it
     /// is content here — as is an NBSP, a form feed (outside the compiler's class) or a comment.
-    fn renders_nothing(self, fragment: &Fragment<'_>) -> bool {
+    fn renders_nothing(self, view: SvelteView<'_>, fragment: &Fragment<'_>) -> bool {
+        let nodes = view.nodes(fragment.nodes);
         match self {
-            Self::Trimmed => fragment
-                .nodes
-                .iter()
-                .all(FragmentNode::is_whitespace_only_text),
-            Self::Preserved => fragment.nodes.is_empty(),
+            Self::Trimmed => nodes.iter().all(FragmentNode::is_whitespace_only_text),
+            Self::Preserved => nodes.is_empty(),
         }
     }
 }
@@ -251,15 +249,22 @@ pub(super) struct AwaitSections<'b, 'a> {
 }
 
 impl<'b, 'a> AwaitSections<'b, 'a> {
-    pub(super) fn classify(block: &'b ast::AwaitBlock<'a>, ws: SectionWhitespace) -> Self {
-        let shorthand = await_shorthand(block, ws);
+    pub(super) fn classify(
+        view: SvelteView<'_>,
+        block: &'b ast::AwaitBlock<'a>,
+        ws: SectionWhitespace,
+    ) -> Self {
+        let shorthand = await_shorthand(view, block, ws);
         Self {
             shorthand,
             pending: block
                 .pending
                 .as_ref()
                 .filter(|_| shorthand == AwaitShorthand::None),
-            then: block.then.as_ref().filter(|_| then_has_content(block, ws)),
+            then: block
+                .then
+                .as_ref()
+                .filter(|_| then_has_content(view, block, ws)),
             catch: block.catch.as_ref(),
         }
     }
@@ -271,8 +276,15 @@ impl<'b, 'a> AwaitSections<'b, 'a> {
 /// absent and an empty `then` both render nothing on resolve, and the `value` binding is unused.
 /// (A `:catch` is *not* dropped when empty: an empty `{:catch}` still handles a rejection, and
 /// without one the client runtime rethrows it — see [`Printer::await_catch_keyword`].)
-fn then_has_content(block: &ast::AwaitBlock<'_>, ws: SectionWhitespace) -> bool {
-    block.then.as_ref().is_some_and(|t| !ws.renders_nothing(t))
+fn then_has_content(
+    view: SvelteView<'_>,
+    block: &ast::AwaitBlock<'_>,
+    ws: SectionWhitespace,
+) -> bool {
+    block
+        .then
+        .as_ref()
+        .is_some_and(|t| !ws.renders_nothing(view, t))
 }
 
 /// Classify an await block's head shorthand. See [`AwaitShorthand`].
@@ -286,13 +298,21 @@ fn then_has_content(block: &ast::AwaitBlock<'_>, ws: SectionWhitespace) -> bool 
 ///
 /// A `:then` that renders nothing is not a survivor (it is dropped, see [`then_has_content`]), so
 /// the fold skips it to the `:catch`.
-fn await_shorthand(block: &ast::AwaitBlock<'_>, ws: SectionWhitespace) -> AwaitShorthand {
+fn await_shorthand(
+    view: SvelteView<'_>,
+    block: &ast::AwaitBlock<'_>,
+    ws: SectionWhitespace,
+) -> AwaitShorthand {
     let has_pending_body = block.pending.as_ref().is_some_and(|p| {
-        !ws.renders_nothing(p) || p.nodes.iter().any(FragmentNode::is_boundary_break)
+        !ws.renders_nothing(view, p)
+            || view
+                .nodes(p.nodes)
+                .iter()
+                .any(FragmentNode::is_boundary_break)
     });
     if has_pending_body {
         AwaitShorthand::None
-    } else if then_has_content(block, ws) {
+    } else if then_has_content(view, block, ws) {
         AwaitShorthand::Then
     } else if block.error.is_some() || block.catch.is_some() {
         AwaitShorthand::Catch
@@ -639,7 +659,7 @@ impl<'a> Printer<'a> {
         let mut all_inline = self.fragment_inline_authored(&block.consequent);
         let mut alt = block.alternate.as_ref();
         while let Some(a) = alt {
-            if let Some(else_if) = Self::get_flattenable_else_if(a) {
+            if let Some(else_if) = Self::get_flattenable_else_if(self.svelte, a) {
                 all_inline &= self.fragment_inline_authored(&else_if.consequent);
                 alt = else_if.alternate.as_ref();
             } else {
@@ -674,7 +694,7 @@ impl<'a> Printer<'a> {
         )];
         let mut alt = block.alternate.as_ref();
         while let Some(a) = alt {
-            if let Some(else_if) = Self::get_flattenable_else_if(a) {
+            if let Some(else_if) = Self::get_flattenable_else_if(self.svelte, a) {
                 // Build the else-if head with wrapping enabled so it can dangle within the
                 // expanded form; in the inline form its head group resolves flat (no dangle).
                 let head_expr = self.build_else_if_expr_doc(else_if, true);
@@ -792,7 +812,7 @@ impl<'a> Printer<'a> {
         // expands). The consequent body is built only here — the fast path above builds
         // its own (shared) pieces, so building it eagerly made that path build the
         // consequent twice, keeping the nested-block fanout exponential.
-        let body_doc = self.build_nodes_doc_multiline(block.consequent.nodes);
+        let body_doc = self.build_nodes_doc_multiline(self.svelte.nodes(block.consequent.nodes));
         let indented_body = self.indent_body_expand(body_doc, true);
 
         let mut parts: DocBuf = smallvec![head_doc, indented_body];
@@ -817,13 +837,14 @@ impl<'a> Printer<'a> {
     /// preserved verbatim rather than collapsed — matching prettier, which keeps the
     /// two distinct (collapsing would be information loss).
     pub(super) fn get_flattenable_else_if<'arena>(
+        view: SvelteView<'arena>,
         alt: &Fragment<'arena>,
     ) -> Option<&'arena ast::IfBlock<'arena>> {
-        // The boxed `IfBlock` variant is a `&'arena` pointer, so the returned
-        // reference is tied to the arena, not to `alt`.
+        // The block is read through `view`, so the returned reference is tied to the
+        // view, not to `alt`.
         let mut if_block: Option<&'arena ast::IfBlock<'arena>> = None;
 
-        for node in alt.nodes {
+        for node in view.nodes(alt.nodes) {
             match node {
                 FragmentNode::IfBlock(b) => {
                     if if_block.is_some() {
@@ -876,11 +897,12 @@ impl<'a> Printer<'a> {
     fn build_if_alternate_doc(&self, alt: &Fragment<'_>, in_multiline_context: bool) -> DocId {
         let d = self.d();
         // Check if this can be flattened to {:else if ...}
-        if let Some(else_if) = Self::get_flattenable_else_if(alt) {
+        if let Some(else_if) = Self::get_flattenable_else_if(self.svelte, alt) {
             // {:else if condition}
             let head_expr = self.build_else_if_expr_doc(else_if, in_multiline_context);
 
-            let body_doc = self.build_nodes_doc_multiline(else_if.consequent.nodes);
+            let body_doc =
+                self.build_nodes_doc_multiline(self.svelte.nodes(else_if.consequent.nodes));
             let indented_body = self.indent_body_expand(body_doc, true);
 
             // `build_else_if_expr_doc` builds the condition with `in_multiline_context`
@@ -903,7 +925,7 @@ impl<'a> Printer<'a> {
         }
 
         // Plain {:else}
-        let body_doc = self.build_nodes_doc_multiline(alt.nodes);
+        let body_doc = self.build_nodes_doc_multiline(self.svelte.nodes(alt.nodes));
         let indented_body = self.indent_body_expand(body_doc, true);
 
         d.concat(&[d.text("{:else}"), indented_body])
@@ -1110,7 +1132,7 @@ impl<'a> Printer<'a> {
         // is not inline-authored, so the construct always expands). Bodies are built
         // only here — the fast path above builds its own shared pieces, so building
         // them eagerly would build each body twice (the nested-block fanout).
-        let body_doc = self.build_nodes_doc_multiline(block.body.nodes);
+        let body_doc = self.build_nodes_doc_multiline(self.svelte.nodes(block.body.nodes));
         let indented_body = self.indent_body_expand(body_doc, true);
 
         let mut parts: DocBuf = smallvec![head_doc, indented_body];
@@ -1118,7 +1140,7 @@ impl<'a> Printer<'a> {
         if let Some(fallback) = &block.fallback {
             parts.push(d.hardline());
             parts.push(d.text("{:else}"));
-            let fallback_doc = self.build_nodes_doc_multiline(fallback.nodes);
+            let fallback_doc = self.build_nodes_doc_multiline(self.svelte.nodes(fallback.nodes));
             parts.push(self.indent_body_expand(fallback_doc, true));
         }
 
@@ -1154,7 +1176,7 @@ impl<'a> Printer<'a> {
     fn fragment_inline_authored(&self, frag: &Fragment<'_>) -> bool {
         !self.fragment_boundary_newline(frag, true)
             && !self.fragment_boundary_newline(frag, false)
-            && !self.fragment_should_force_break_content(frag.nodes)
+            && !self.fragment_should_force_break_content(self.svelte.nodes(frag.nodes))
     }
 
     /// Build a block-section body for the inline/expanding fast path: boundary
@@ -1164,7 +1186,11 @@ impl<'a> Printer<'a> {
     /// authoring of the same body, so both reach one fixed point by construction.
     ///
     fn build_section_body_doc(&self, fragment: &Fragment<'_>) -> DocId {
-        self.build_nodes_doc_trimmed(fragment.nodes, false, LeadingEdge::Trimmed)
+        self.build_nodes_doc_trimmed(
+            self.svelte.nodes(fragment.nodes),
+            false,
+            LeadingEdge::Trimmed,
+        )
     }
 
     /// The `{:then …}` keyword doc — `{:then value}` if a `then` value binds, else
@@ -1319,7 +1345,7 @@ impl<'a> Printer<'a> {
         // Outside `<pre>`: a whitespace-only section renders nothing. Classified once; every
         // section decision below reads this one answer.
         let ws = SectionWhitespace::Trimmed;
-        let sections = AwaitSections::classify(block, ws);
+        let sections = AwaitSections::classify(self.svelte, block, ws);
         // Build expression doc with context-dependent behavior
         let allow_wrapping = !has_preceding_breakable;
         let head = self.build_block_head_expr(
@@ -1345,9 +1371,13 @@ impl<'a> Printer<'a> {
         // `{:catch}` in the tail — still takes the block form below. On the fast path an empty
         // catch is always the head's `catch` shorthand (the pending folded, the `{:then}`
         // dropped), so a block with no other printed section is the section-less block.
-        let has_section = sections.pending.is_some_and(|p| !ws.renders_nothing(p))
+        let has_section = sections
+            .pending
+            .is_some_and(|p| !ws.renders_nothing(self.svelte, p))
             || sections.then.is_some()
-            || sections.catch.is_some_and(|c| !ws.renders_nothing(c));
+            || sections
+                .catch
+                .is_some_and(|c| !ws.renders_nothing(self.svelte, c));
         // A space-only section is inline-authored (its boundary is render-free and gets
         // trimmed by `build_section_body_doc`); only a newline-authored section falls
         // through to the newline tail below. This one reads every AUTHORED section, a dropped
@@ -1414,7 +1444,7 @@ impl<'a> Printer<'a> {
         let expand = !all_sections_inline;
         let pieces = self.build_await_pieces(block, &sections, |f| {
             if expand {
-                self.build_nodes_doc_multiline(f.nodes)
+                self.build_nodes_doc_multiline(self.svelte.nodes(f.nodes))
             } else {
                 d.empty()
             }
@@ -1475,7 +1505,7 @@ impl<'a> Printer<'a> {
         }
 
         // Newline-authored body: it and `{/key}` each keep their own line.
-        let body_doc = self.build_nodes_doc_multiline(block.fragment.nodes);
+        let body_doc = self.build_nodes_doc_multiline(self.svelte.nodes(block.fragment.nodes));
         let parts: DocBuf = smallvec![
             head_doc,
             self.indent_body_expand(body_doc, true),
@@ -1574,7 +1604,7 @@ impl<'a> Printer<'a> {
         }
 
         // Newline-authored body: it and `{/snippet}` each keep their own line.
-        let body_doc = self.build_nodes_doc_multiline(block.body.nodes);
+        let body_doc = self.build_nodes_doc_multiline(self.svelte.nodes(block.body.nodes));
         let parts: DocBuf = smallvec![
             opening_doc,
             self.indent_body_expand(body_doc, true),

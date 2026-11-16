@@ -17,7 +17,6 @@
 //! parser cannot answer "is this a comment context" for Svelte markup.
 
 use tsv_cli::cli::input::ParserType;
-use tsv_ts::ast::AstView;
 
 use crate::audit::properties::{Utf16ToByte, tsv_parse_to_value};
 
@@ -144,7 +143,7 @@ struct InternalRegions {
 /// them exactly as it does a word interior. The same covers `{⟨⟩#if` and `{#⟨⟩if`.
 fn svelte_internal_regions(source: &str) -> InternalRegions {
     use tsv_svelte::ast::{
-        AttributeNode, EmbeddedLang, Fragment, FragmentNode, SpecialElementKind,
+        AttributeNode, EmbeddedLang, Fragment, FragmentNode, SpecialElementKind, SvelteView,
     };
 
     /// A `{…}`-delimited construct: its interior, both delimiters excluded.
@@ -196,8 +195,8 @@ fn svelte_internal_regions(source: &str) -> InternalRegions {
         }
     }
 
-    fn walk(view: AstView<'_>, frag: &Fragment<'_>, out: &mut Vec<(usize, usize)>) {
-        for node in frag.nodes {
+    fn walk(view: SvelteView<'_>, frag: &Fragment<'_>, out: &mut Vec<(usize, usize)>) {
+        for node in view.nodes(frag.nodes) {
             match node {
                 FragmentNode::IfBlock(b) => {
                     interior(b.opening_tag_span, out);
@@ -235,7 +234,7 @@ fn svelte_internal_regions(source: &str) -> InternalRegions {
                 FragmentNode::DebugTag(t) => interior(t.span, out),
                 FragmentNode::RenderTag(t) => interior(t.span, out),
                 FragmentNode::Element(e) => {
-                    attributes(e.attributes, out);
+                    attributes(view.attributes(e.attributes), out);
                     walk(view, &e.fragment, out);
                 }
                 FragmentNode::SpecialElement(e) => {
@@ -249,9 +248,11 @@ fn svelte_internal_regions(source: &str) -> InternalRegions {
                     // unprobed **silently**, which is the exact failure this walk exists to
                     // fix. Let it break the build instead.
                     match &e.kind {
-                        SpecialElementKind::SvelteElement { tag } => push_span(tag.span(view), out),
+                        SpecialElementKind::SvelteElement { tag } => {
+                            push_span(tag.span(view.ts()), out);
+                        }
                         SpecialElementKind::SvelteComponent { expression } => {
-                            push_span(view.expr(expression.expression).span(), out);
+                            push_span(view.ts().expr(expression.expression).span(), out);
                         }
                         SpecialElementKind::SvelteHead
                         | SpecialElementKind::SvelteWindow
@@ -263,7 +264,7 @@ fn svelte_internal_regions(source: &str) -> InternalRegions {
                         | SpecialElementKind::SvelteBoundary
                         | SpecialElementKind::TitleElement => {}
                     }
-                    attributes(e.attributes, out);
+                    attributes(view.attributes(e.attributes), out);
                     walk(view, &e.fragment, out);
                 }
                 FragmentNode::ExpressionTag(_)
@@ -288,7 +289,7 @@ fn svelte_internal_regions(source: &str) -> InternalRegions {
     let frozen = [root.instance.as_ref(), root.module.as_ref()]
         .into_iter()
         .flatten()
-        .filter(|script| EmbeddedLang::Script.is_frozen(script.attributes, source))
+        .filter(|script| EmbeddedLang::Script.is_frozen(root.view(), script.attributes, source))
         .map(|script| {
             (
                 script.content.span.start as usize,

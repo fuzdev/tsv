@@ -34,7 +34,7 @@ impl<'a> Printer<'a> {
         // formats on its own lines. An empty <script></script> / <style></style>
         // stays inline (prettier parity). The raw-text parser always emits one
         // (possibly empty) Text node, so node-presence alone is not "has content".
-        if facts.is_raw_text() && has_raw_content(element) {
+        if facts.is_raw_text() && has_raw_content(self.svelte, element) {
             return true;
         }
 
@@ -52,11 +52,9 @@ impl<'a> Printer<'a> {
 /// is the one arm that collapses) and the whitespace-sensitive head
 /// (`build_whitespace_sensitive_element_doc`, where an empty body takes the empty element's
 /// layouts). Two spellings of it would let them answer differently for the same element.
-pub(crate) fn has_raw_content(element: &ast::Element<'_>) -> bool {
+pub(crate) fn has_raw_content(view: ast::SvelteView<'_>, element: &ast::Element<'_>) -> bool {
     use crate::ast::FragmentNode;
-    element
-        .fragment
-        .nodes
+    view.nodes(element.fragment.nodes)
         .iter()
         .any(|node| !matches!(node, FragmentNode::Text(t) if t.raw_span.range().is_empty()))
 }
@@ -68,14 +66,14 @@ mod tests {
     use crate::html;
 
     /// Find the first child element of `parent` whose resolved tag name is `tag`.
-    fn child<'p, 'arena>(
-        printer: &Printer<'_>,
-        parent: &'p ast::Element<'arena>,
+    fn child<'a>(
+        printer: &Printer<'a>,
+        parent: &ast::Element<'a>,
         tag: &str,
-    ) -> &'p ast::Element<'arena> {
-        parent
-            .fragment
-            .nodes
+    ) -> &'a ast::Element<'a> {
+        printer
+            .svelte
+            .nodes(parent.fragment.nodes)
             .iter()
             .find_map(|n| match n {
                 FragmentNode::Element(el) if el.name(printer.source) == tag => Some(el),
@@ -90,9 +88,8 @@ mod tests {
         let arena = bumpalo::Bump::new();
         let root = crate::__private::parse(src, &arena).expect("template should parse");
         let doc_arena = tsv_lang::doc::arena::DocArena::for_source(src);
-        let stores = ast::SvelteStores::new();
-        let printer = Printer::new(&doc_arena, src, &[], &stores);
-        let div = match &root.fragment.nodes[0] {
+        let printer = Printer::new(&doc_arena, src, &[], &root.stores);
+        let div = match &printer.svelte.nodes(root.fragment.nodes)[0] {
             FragmentNode::Element(el) => el,
             other => panic!("expected a <div>, got: {other:?}"),
         };
@@ -116,9 +113,8 @@ mod tests {
         let arena = bumpalo::Bump::new();
         let root = crate::__private::parse(src, &arena).expect("template should parse");
         let doc_arena = tsv_lang::doc::arena::DocArena::for_source(src);
-        let stores = ast::SvelteStores::new();
-        let printer = Printer::new(&doc_arena, src, &[], &stores);
-        let div = match &root.fragment.nodes[0] {
+        let printer = Printer::new(&doc_arena, src, &[], &root.stores);
+        let div = match &printer.svelte.nodes(root.fragment.nodes)[0] {
             FragmentNode::Element(el) => el,
             other => panic!("expected a <div>, got: {other:?}"),
         };
@@ -137,9 +133,8 @@ mod tests {
         let arena = bumpalo::Bump::new();
         let root = crate::__private::parse(src, &arena).expect("template should parse");
         let doc_arena = tsv_lang::doc::arena::DocArena::for_source(src);
-        let stores = ast::SvelteStores::new();
-        let printer = Printer::new(&doc_arena, src, &[], &stores);
-        let div = match &root.fragment.nodes[0] {
+        let printer = Printer::new(&doc_arena, src, &[], &root.stores);
+        let div = match &printer.svelte.nodes(root.fragment.nodes)[0] {
             FragmentNode::Element(el) => el,
             other => panic!("expected a <div>, got: {other:?}"),
         };

@@ -143,10 +143,10 @@ fn collect_file(
             // printer; `Root.comments` unifies every script + `{expr}` comment
             // (the exact population `render.rs` renders).
             if let Some(script) = &root.instance {
-                collect_imports(root.view(), script.content.body, named_specs);
+                collect_imports(root.view().ts(), script.content.body, named_specs);
             }
             if let Some(script) = &root.module {
-                collect_imports(root.view(), script.content.body, named_specs);
+                collect_imports(root.view().ts(), script.content.body, named_specs);
             }
             collect_comments(&root.comments, source, comment_lines);
             #[cfg(feature = "_internal_buffer_stats")]

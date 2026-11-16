@@ -1420,11 +1420,11 @@ mod tests {
     /// the document's offsets start (a leading byte-order mark shifts them).
     #[test]
     fn directive_modifiers_are_spans_of_their_source_bytes() {
-        use crate::ast::{AttributeNode, FragmentNode};
+        use crate::ast::{AttributeNode, FragmentNode, SvelteView};
         use tsv_lang::Span;
 
-        fn modifiers<'a>(node: &'a AttributeNode<'_>) -> &'a [Span] {
-            match node {
+        fn modifiers<'a>(view: SvelteView<'a>, node: &AttributeNode<'a>) -> &'a [Span] {
+            let modifiers = match node {
                 AttributeNode::OnDirective(d) => d.modifiers,
                 AttributeNode::BindDirective(d) => d.modifiers,
                 AttributeNode::ClassDirective(d) => d.modifiers,
@@ -1434,7 +1434,8 @@ mod tests {
                 AttributeNode::AnimateDirective(d) => d.modifiers,
                 AttributeNode::LetDirective(d) => d.modifiers,
                 other => panic!("not a directive: {other:?}"),
-            }
+            };
+            view.modifiers(modifiers)
         }
 
         let prefixes = [
@@ -1470,10 +1471,12 @@ mod tests {
                     let arena = bumpalo::Bump::new();
                     let parsed = crate::__private::parse(&source, &arena)
                         .unwrap_or_else(|e| panic!("{source:?}: {e:?}"));
-                    let FragmentNode::Element(element) = &parsed.fragment.nodes[0] else {
+                    let view = parsed.view();
+                    let FragmentNode::Element(element) = &view.nodes(parsed.fragment.nodes)[0]
+                    else {
                         panic!("{source:?}: not an element");
                     };
-                    let spans = modifiers(&element.attributes[0]);
+                    let spans = modifiers(view, &view.attributes(element.attributes)[0]);
                     let texts: Vec<&str> = spans.iter().map(|s| s.extract(&source)).collect();
                     assert_eq!(texts, list, "{source:?}");
                     for span in spans {

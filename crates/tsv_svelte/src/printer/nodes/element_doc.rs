@@ -495,7 +495,10 @@ impl<'a> Printer<'a> {
         &self,
         element: &'e ast::Element<'e>,
         class: TagClass,
-    ) -> ElementParts<'e> {
+    ) -> ElementParts<'e>
+    where
+        'a: 'e,
+    {
         ElementParts {
             name: self.d().source_span(element.name_span, self.source),
             kind: class.kind,
@@ -504,7 +507,7 @@ impl<'a> Printer<'a> {
             // self-closing (prettier's `didSelfClose`).
             can_self_close: class.kind.is_component() || class.is_foreign || class.is_namespaced,
             collapses_child_ws: class.collapses_child_ws,
-            nodes: element.fragment.nodes,
+            nodes: self.svelte.nodes(element.fragment.nodes),
             span: element.span,
         }
     }
@@ -521,7 +524,7 @@ impl<'a> Printer<'a> {
 
         // Build attribute docs (needed for all paths)
         let attrs = self.build_element_attrs_doc(
-            element.attributes,
+            self.svelte.attributes(element.attributes),
             self.d().line(),
             element.name_span.end,
             element.open_tag_end,
@@ -535,7 +538,7 @@ impl<'a> Printer<'a> {
 
         // Frozen-language <template> elements (e.g., <template lang="pug">)
         // preserve content raw — we can't format non-HTML template languages
-        if element.is_frozen_template(self.source) {
+        if element.is_frozen_template(self.svelte, self.source) {
             return self.build_frozen_template_doc(element);
         }
 
@@ -567,7 +570,10 @@ impl<'a> Printer<'a> {
         element: &'e ast::Element<'e>,
         class: TagClass,
         attr_docs: DocBuf,
-    ) -> PreparedElement<'e> {
+    ) -> PreparedElement<'e>
+    where
+        'a: 'e,
+    {
         let parts = self.element_parts(element, class);
         let ctx = self.analyze_element(&parts, &attr_docs);
         let layout = self.compute_element_layout(&parts, &ctx);
@@ -656,11 +662,14 @@ impl<'a> Printer<'a> {
     pub(super) fn prepare_sibling_element<'e>(
         &self,
         element: &'e ast::Element<'e>,
-    ) -> Option<PreparedElement<'e>> {
+    ) -> Option<PreparedElement<'e>>
+    where
+        'a: 'e,
+    {
         let class = self.classify_tag(element);
         if class.raw_text.is_some()
             || class.is_ws_sensitive
-            || element.is_frozen_template(self.source)
+            || element.is_frozen_template(self.svelte, self.source)
         {
             return None;
         }
@@ -669,7 +678,7 @@ impl<'a> Printer<'a> {
         // trailing `//`'s `break_parent` moves it off the comment's line unaided.
         let attr_docs = self
             .build_element_attrs_doc(
-                element.attributes,
+                self.svelte.attributes(element.attributes),
                 self.d().line(),
                 element.name_span.end,
                 element.open_tag_end,
@@ -1073,7 +1082,7 @@ impl<'a> Printer<'a> {
             // The `>` takes a hardline of its own here, so a trailing `//` cannot swallow it.
             let hug_attrs = self
                 .build_element_attrs_doc(
-                    element.attributes,
+                    self.svelte.attributes(element.attributes),
                     self.d().text(" "),
                     element.name_span.end,
                     element.open_tag_end,
@@ -1091,7 +1100,7 @@ impl<'a> Printer<'a> {
             // State 3: Full multiline - attrs on separate lines, > on new line
             let multiline_attrs = self
                 .build_element_attrs_doc(
-                    element.attributes,
+                    self.svelte.attributes(element.attributes),
                     self.d().line(),
                     element.name_span.end,
                     element.open_tag_end,
@@ -1132,7 +1141,7 @@ impl<'a> Printer<'a> {
         // Foreign template elements are always HTML, so is_html=true.
         let attr_docs = self
             .build_element_attrs_doc(
-                element.attributes,
+                self.svelte.attributes(element.attributes),
                 d.line(),
                 element.name_span.end,
                 element.open_tag_end,
@@ -1154,7 +1163,7 @@ impl<'a> Printer<'a> {
         // indentation is part of a whitespace-significant language) and a `hardline` (so the
         // closing tag takes the element's own indent). An empty fragment gets no body and no
         // newlines at all: `<template lang="pug"></template>`.
-        let nodes = element.fragment.nodes;
+        let nodes = self.svelte.nodes(element.fragment.nodes);
         if let (Some(first), Some(last)) = (nodes.first(), nodes.last()) {
             parts.push(self.frozen_body_doc(Span::new(first.span().start, last.span().end)));
         }
@@ -1201,8 +1210,8 @@ impl<'a> Printer<'a> {
         // the one arm that collapses. A body of *whitespace* is not this arm: it keeps a
         // delimiter break at every other position and here too. Otherwise the content is the
         // single Text child.
-        let text = match element.fragment.nodes.first() {
-            Some(FragmentNode::Text(text)) if has_raw_content(element) => text,
+        let text = match self.svelte.nodes(element.fragment.nodes).first() {
+            Some(FragmentNode::Text(text)) if has_raw_content(self.svelte, element) => text,
             _ => return d.concat(&[opening_tag, closing_tag]),
         };
 
@@ -1216,7 +1225,10 @@ impl<'a> Printer<'a> {
         // are indentation-significant, and shifting such a body off column 0 changes what it
         // says, the same corruption in miniature as reprinting a less body with the CSS
         // printer (`@color: red;` → `@color : red;`).
-        if kind.lang().is_frozen(element.attributes, self.source) {
+        if kind
+            .lang()
+            .is_frozen(self.svelte, element.attributes, self.source)
+        {
             // `raw_span`, not `span`: what rides out is the author's own bytes. The two
             // coincide on a raw-text `Text` (no decode), and naming the raw one says so.
             return d.concat(&[

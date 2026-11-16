@@ -22,7 +22,7 @@
 //!
 //! The corpus cannot stand in: over the real-code corpus no name needs an escape.
 
-use tsv_svelte::ast::{AttributeNode, Element, ElementKind, FragmentNode, Root};
+use tsv_svelte::ast::{AttributeNode, Element, ElementKind, FragmentNode, Root, SvelteView};
 
 /// Every `"name":` string field in the wire, read off the BYTES: each literal must be
 /// exactly `serde_json`'s spelling of the value it decodes to. Returns the decoded values.
@@ -67,23 +67,33 @@ fn attributes<'s>(attrs: &[AttributeNode<'_>], source: &'s str, out: &mut Vec<&'
 /// Every attribute and element name in the element tree (elements nested in elements; the
 /// walk does not descend into blocks), each `RegularElement` name held to the escape-free
 /// claim.
-fn graded_names<'s>(nodes: &[FragmentNode<'_>], source: &'s str, out: &mut Vec<&'s str>) {
-    fn element<'s>(el: &Element<'_>, source: &'s str, out: &mut Vec<&'s str>) {
+fn graded_names<'s>(
+    view: SvelteView<'_>,
+    nodes: &[FragmentNode<'_>],
+    source: &'s str,
+    out: &mut Vec<&'s str>,
+) {
+    fn element<'s>(
+        view: SvelteView<'_>,
+        el: &Element<'_>,
+        source: &'s str,
+        out: &mut Vec<&'s str>,
+    ) {
         let name = el.name(source);
         assert!(
             el.kind == ElementKind::Component || escape_free(name),
             "{source:?}: the RegularElement name {name:?} needs an escape"
         );
         out.push(name);
-        attributes(el.attributes, source, out);
-        graded_names(el.fragment.nodes, source, out);
+        attributes(view.attributes(el.attributes), source, out);
+        graded_names(view, view.nodes(el.fragment.nodes), source, out);
     }
     for node in nodes {
         match node {
-            FragmentNode::Element(el) => element(el, source, out),
+            FragmentNode::Element(el) => element(view, el, source, out),
             FragmentNode::SpecialElement(el) => {
-                attributes(el.attributes, source, out);
-                graded_names(el.fragment.nodes, source, out);
+                attributes(view.attributes(el.attributes), source, out);
+                graded_names(view, view.nodes(el.fragment.nodes), source, out);
             }
             _ => {}
         }
@@ -91,14 +101,14 @@ fn graded_names<'s>(nodes: &[FragmentNode<'_>], source: &'s str, out: &mut Vec<&
 }
 
 /// The names a root holds outside its fragment: the top-level `<script>` / `<style>` heads.
-fn root_names<'s>(root: &Root<'_>, source: &'s str, out: &mut Vec<&'s str>) {
+fn root_names<'s>(view: SvelteView<'_>, root: &Root<'_>, source: &'s str, out: &mut Vec<&'s str>) {
     let heads = root
         .instance
         .iter()
         .chain(root.module.iter())
         .map(|s| s.attributes);
     for attrs in heads.chain(root.css.iter().map(|s| s.attributes)) {
-        attributes(attrs, source, out);
+        attributes(view.attributes(attrs), source, out);
     }
 }
 
@@ -110,8 +120,9 @@ fn grade(source: &str) -> Option<Vec<String>> {
     let arena = bumpalo::Bump::new();
     let root = tsv_svelte::__private::parse(source, &arena).ok()?;
     let mut names = Vec::new();
-    root_names(&root, source, &mut names);
-    graded_names(root.fragment.nodes, source, &mut names);
+    let view = root.view();
+    root_names(view, &root, source, &mut names);
+    graded_names(view, view.nodes(root.fragment.nodes), source, &mut names);
     for bytes in [
         tsv_svelte::__private::convert_ast_json_bytes_with_locations(&root, source),
         tsv_svelte::__private::convert_ast_json_bytes(&root, source),

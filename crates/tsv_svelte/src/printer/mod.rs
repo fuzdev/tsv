@@ -29,7 +29,7 @@ mod nodes;
 mod script_style;
 mod text;
 
-use crate::ast::{self, FragmentNode};
+use crate::ast::{self, FragmentNode, SvelteView};
 use nodes::AttrGaps;
 use smallvec::SmallVec;
 use std::cell::{Cell, OnceCell, RefCell};
@@ -258,8 +258,8 @@ struct CommentScan<'r> {
 }
 
 impl<'r> CommentScan<'r> {
-    fn new(fragment: &ast::Fragment<'_>, ranges: &'r IgnoreRanges) -> Self {
-        let nodes = &fragment.nodes;
+    fn new(view: SvelteView<'_>, fragment: &ast::Fragment<'_>, ranges: &'r IgnoreRanges) -> Self {
+        let nodes = view.nodes(fragment.nodes);
         let mut next_barrier = vec![None; nodes.len()];
         let mut barrier = None;
         for i in (0..nodes.len()).rev() {
@@ -438,6 +438,8 @@ pub(crate) struct Printer<'a> {
     pub(crate) source: &'a str,
     /// Comments from scripts and template expressions
     comments: &'a [Comment],
+    /// Reads the template's lists and strings, and hands out the two views below.
+    pub(crate) svelte: SvelteView<'a>,
     /// Reads the expressions of the tree being printed.
     pub(crate) view: AstView<'a>,
     /// Reads the stores of the top-level `<style>`'s stylesheet, for its format.
@@ -648,7 +650,6 @@ impl<'a> Printer<'a> {
             source,
             comments,
             stores.view(),
-            stores.css_view(),
             EmbedContext::default(),
             line_breaks,
         )
@@ -668,11 +669,11 @@ impl<'a> Printer<'a> {
         arena: &'a DocArena,
         source: &'a str,
         comments: &'a [Comment],
-        view: AstView<'a>,
-        css_view: CssView<'a>,
+        svelte: SvelteView<'a>,
         embed: EmbedContext,
         line_breaks: LineBreaks<'a>,
     ) -> Self {
+        let view = svelte.ts();
         // The two document-level presence flags come from the one scan `tsv_ts` owns
         // (`PrinterInputs::for_document`); `ts_inputs()` copies them per island.
         let tsv_ts::__private::PrinterInputs {
@@ -692,8 +693,9 @@ impl<'a> Printer<'a> {
             arena,
             source,
             comments,
+            svelte,
             view,
-            css_view,
+            css_view: svelte.css(),
             has_owned_comments,
             has_format_ignore,
             line_breaks,
@@ -1724,7 +1726,6 @@ fn format_root<'a>(
         source,
         &comments,
         parsed.view,
-        parsed.css,
         EmbedContext::default(),
         line_breaks,
     );
@@ -1795,7 +1796,7 @@ fn format_root<'a>(
     {
         tsv_lang::comment_ledger::register_parsed(source, &comments);
         let mut html_comment_spans = Vec::new();
-        collect_html_comment_spans(&root.fragment, &mut html_comment_spans);
+        collect_html_comment_spans(parsed.view, &root.fragment, &mut html_comment_spans);
         tsv_lang::comment_ledger::register_parsed_spans(source, html_comment_spans);
     }
 
@@ -1931,37 +1932,41 @@ fn format_lifted_runs(
 /// `{#await}` / `{#key}` / `{#snippet}` block bodies). The print-once comment ledger reads
 /// only the span, so no `HtmlComment` need be manufactured into a `Comment`.
 #[cfg(feature = "_internal_comment_check")]
-fn collect_html_comment_spans(fragment: &ast::Fragment<'_>, out: &mut Vec<Span>) {
-    for node in fragment.nodes {
+fn collect_html_comment_spans(
+    view: SvelteView<'_>,
+    fragment: &ast::Fragment<'_>,
+    out: &mut Vec<Span>,
+) {
+    for node in view.nodes(fragment.nodes) {
         match node {
             FragmentNode::Comment(comment) => out.push(comment.span),
-            FragmentNode::Element(el) => collect_html_comment_spans(&el.fragment, out),
-            FragmentNode::SpecialElement(el) => collect_html_comment_spans(&el.fragment, out),
+            FragmentNode::Element(el) => collect_html_comment_spans(view, &el.fragment, out),
+            FragmentNode::SpecialElement(el) => collect_html_comment_spans(view, &el.fragment, out),
             FragmentNode::IfBlock(block) => {
-                collect_html_comment_spans(&block.consequent, out);
+                collect_html_comment_spans(view, &block.consequent, out);
                 if let Some(alternate) = &block.alternate {
-                    collect_html_comment_spans(alternate, out);
+                    collect_html_comment_spans(view, alternate, out);
                 }
             }
             FragmentNode::EachBlock(block) => {
-                collect_html_comment_spans(&block.body, out);
+                collect_html_comment_spans(view, &block.body, out);
                 if let Some(fallback) = &block.fallback {
-                    collect_html_comment_spans(fallback, out);
+                    collect_html_comment_spans(view, fallback, out);
                 }
             }
             FragmentNode::AwaitBlock(block) => {
                 if let Some(pending) = &block.pending {
-                    collect_html_comment_spans(pending, out);
+                    collect_html_comment_spans(view, pending, out);
                 }
                 if let Some(then) = &block.then {
-                    collect_html_comment_spans(then, out);
+                    collect_html_comment_spans(view, then, out);
                 }
                 if let Some(catch) = &block.catch {
-                    collect_html_comment_spans(catch, out);
+                    collect_html_comment_spans(view, catch, out);
                 }
             }
-            FragmentNode::KeyBlock(block) => collect_html_comment_spans(&block.fragment, out),
-            FragmentNode::SnippetBlock(block) => collect_html_comment_spans(&block.body, out),
+            FragmentNode::KeyBlock(block) => collect_html_comment_spans(view, &block.fragment, out),
+            FragmentNode::SnippetBlock(block) => collect_html_comment_spans(view, &block.body, out),
             _ => {}
         }
     }
@@ -2036,7 +2041,7 @@ impl<'a> Printer<'a> {
         section: Span,
         hoisted: &[Span],
     ) -> bool {
-        let nodes = &fragment.nodes;
+        let nodes = self.svelte.nodes(fragment.nodes);
         let above = nodes.partition_point(|n| n.span().end <= section.start);
         let Some(FragmentNode::Comment(comment)) = nodes[..above]
             .iter()
@@ -2069,10 +2074,10 @@ impl<'a> Printer<'a> {
     fn ignore_ranges(&self, root_fragment: &ast::Fragment<'_>) -> &IgnoreRanges {
         let ranges = self
             .ignore_ranges
-            .get_or_init(|| IgnoreRanges::new(root_fragment.nodes, self.source));
+            .get_or_init(|| IgnoreRanges::new(self.svelte.nodes(root_fragment.nodes), self.source));
         debug_assert_eq!(
             ranges.nodes_addr,
-            root_fragment.nodes.as_ptr() as usize,
+            self.svelte.nodes(root_fragment.nodes).as_ptr() as usize,
             "the ignore ranges pair one root fragment per printer"
         );
         ranges
@@ -2160,7 +2165,7 @@ impl<'a> Printer<'a> {
     /// inside a frozen range are excluded for the same reasons the leading classification
     /// excludes them.
     fn region_end_trails(&self, root: &ast::Root<'_>) -> [Option<usize>; 4] {
-        let nodes = &root.fragment.nodes;
+        let nodes = self.svelte.nodes(root.fragment.nodes);
         let bytes = self.source.as_bytes();
         root_sections(root).map(|(span, _)| {
             let end = span?.end as usize;
@@ -2189,10 +2194,11 @@ impl<'a> Printer<'a> {
     /// asserted under the fixture suite, skipped (never a panic — this is the shipped printer)
     /// in a release build.
     fn fragment_comment<'f>(
-        fragment: &'f ast::Fragment<'_>,
+        view: SvelteView<'f>,
+        fragment: &ast::Fragment<'f>,
         idx: usize,
     ) -> Option<&'f ast::HtmlComment> {
-        let comment = match &fragment.nodes[idx] {
+        let comment = match &view.nodes(fragment.nodes)[idx] {
             FragmentNode::Comment(comment) => Some(comment),
             _ => None,
         };
@@ -2225,7 +2231,7 @@ impl<'a> Printer<'a> {
     ) -> Option<u32> {
         let mut prev_end: Option<u32> = None;
         for &i in comment_indices {
-            let Some(comment) = Self::fragment_comment(fragment, i) else {
+            let Some(comment) = Self::fragment_comment(self.svelte, fragment, i) else {
                 continue;
             };
             self.print_comment_line(comment, prev_end);
@@ -2244,7 +2250,7 @@ impl<'a> Printer<'a> {
         section_end: u32,
     ) {
         if let Some(idx) = trail
-            && let Some(comment) = Self::fragment_comment(fragment, idx)
+            && let Some(comment) = Self::fragment_comment(self.svelte, fragment, idx)
         {
             self.print_comment_line(comment, Some(section_end));
         }
@@ -2291,9 +2297,13 @@ impl<'a> Printer<'a> {
     fn hoisted_comments(&self, root: &ast::Root<'_>) -> HoistedComments {
         let trails = self.region_end_trails(root);
         let mut sections = HoistedComments::default();
-        let scan = CommentScan::new(&root.fragment, self.ignore_ranges(&root.fragment));
+        let scan = CommentScan::new(
+            self.svelte,
+            &root.fragment,
+            self.ignore_ranges(&root.fragment),
+        );
 
-        for (i, node) in root.fragment.nodes.iter().enumerate() {
+        for (i, node) in self.svelte.nodes(root.fragment.nodes).iter().enumerate() {
             if let FragmentNode::Comment(comment) = node {
                 let section = Self::classify_fragment_comment(comment, i, root, &scan);
                 if matches!(section, None | Some(HoistedSection::Options))
@@ -2335,7 +2345,7 @@ impl<'a> Printer<'a> {
         if root.css.is_some() {
             return None;
         }
-        let nodes = &root.fragment.nodes;
+        let nodes = self.svelte.nodes(root.fragment.nodes);
         let mut tail = None;
         for (i, node) in nodes.iter().enumerate().rev() {
             match node {
@@ -2389,7 +2399,7 @@ impl<'a> Printer<'a> {
         if root.css.is_none() {
             return run;
         }
-        let nodes = &root.fragment.nodes;
+        let nodes = self.svelte.nodes(root.fragment.nodes);
         let travels = sections.travelling(nodes.len());
         for (i, node) in nodes.iter().enumerate().rev() {
             match node {
@@ -2481,12 +2491,17 @@ impl<'a> Printer<'a> {
         }
 
         // Format template fragment (if not empty)
-        let has_content = root.fragment.nodes.iter().enumerate().any(|(i, node)| {
-            if printed_comment_indices.contains(&i) {
-                return false;
-            }
-            !matches!(node, FragmentNode::Text(text) if text.is_collapsible_ws_only)
-        });
+        let has_content = self
+            .svelte
+            .nodes(root.fragment.nodes)
+            .iter()
+            .enumerate()
+            .any(|(i, node)| {
+                if printed_comment_indices.contains(&i) {
+                    return false;
+                }
+                !matches!(node, FragmentNode::Text(text) if text.is_collapsible_ws_only)
+            });
 
         if has_content {
             if has_previous_section {
@@ -2537,10 +2552,11 @@ impl<'a> Printer<'a> {
         // carry comments (`<svelte:options /* c */ />`), and an early return keyed on
         // `attributes.is_empty()` deletes them — the comment-blind alternate arm, at the one
         // tag whose head is printed from here rather than from the element pipeline.
-        let mut parts: DocBuf = DocBuf::with_capacity(options.attributes.len() * 2);
+        let mut parts: DocBuf =
+            DocBuf::with_capacity(self.svelte.attributes(options.attributes).len() * 2);
         self.push_attrs_with_comments(
             &mut parts,
-            options.attributes,
+            self.svelte.attributes(options.attributes),
             d.line(),
             AttrGaps {
                 first_range_start: options.name_end,
@@ -2622,8 +2638,9 @@ impl<'a> Printer<'a> {
             skip_indices.contains(&i)
                 || matches!(n, FragmentNode::Text(t) if t.is_collapsible_ws_only)
         };
-        let Some(start) = fragment
-            .nodes
+        let Some(start) = self
+            .svelte
+            .nodes(fragment.nodes)
             .iter()
             .enumerate()
             .position(|(i, n)| !skippable(i, n))
@@ -2631,13 +2648,14 @@ impl<'a> Printer<'a> {
             return;
         };
         // `rposition` finds at least `start`, so the fallback never triggers (panic-free).
-        let end = fragment
-            .nodes
+        let end = self
+            .svelte
+            .nodes(fragment.nodes)
             .iter()
             .enumerate()
             .rposition(|(i, n)| !skippable(i, n))
             .unwrap_or(start);
-        let nodes = &fragment.nodes[start..=end];
+        let nodes = &self.svelte.nodes(fragment.nodes)[start..=end];
 
         // Mark single-line-run control-flow blocks so the shared builder inner-breaks them (B4).
         self.mark_root_inline_run_blocks(nodes);

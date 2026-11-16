@@ -23,7 +23,11 @@ impl<'a> Printer<'a> {
         let had_content = script.content.span.start != script.content.span.end;
 
         // Opening tag with doc-based attribute wrapping
-        self.write_section_opening_tag("script", script.attributes, had_content);
+        self.write_section_opening_tag(
+            "script",
+            self.svelte.attributes(script.attributes),
+            had_content,
+        );
 
         // A frozen-language body (`lang="coffee"`, `type="application/json"`, …) freezes:
         // the author's bytes ride out verbatim between the two delimiter newlines —
@@ -32,7 +36,7 @@ impl<'a> Printer<'a> {
         // runs acorn on every script body regardless of `lang`, and so does tsv), so its JS
         // comments are registered on the print-once ledger and the slice must declare
         // them. See `ast::EmbeddedLang` for the allowlist.
-        if ast::EmbeddedLang::Script.is_frozen(script.attributes, self.source) {
+        if ast::EmbeddedLang::Script.is_frozen(self.svelte, script.attributes, self.source) {
             return self.write_frozen_section("script", script.content.span);
         }
 
@@ -109,13 +113,17 @@ impl<'a> Printer<'a> {
         let had_content = style.content_span.start != style.content_span.end;
 
         // Opening tag with doc-based attribute wrapping
-        self.write_section_opening_tag("style", style.attributes, had_content);
+        self.write_section_opening_tag(
+            "style",
+            self.svelte.attributes(style.attributes),
+            had_content,
+        );
 
         // A frozen-language body freezes: the author's bytes ride out verbatim between the
         // two delimiter lines — the same shape the `<script>` and `<template>` freezes give
         // their bodies, and prettier's `preformattedBody`. The shared gate reads the DECODED
         // value (`lang="&#99;ss"` is css) — see `ast::EmbeddedLang`.
-        if ast::EmbeddedLang::Style.is_frozen(style.attributes, self.source) {
+        if ast::EmbeddedLang::Style.is_frozen(self.svelte, style.attributes, self.source) {
             return self.write_frozen_section("style", style.content_span);
         }
 

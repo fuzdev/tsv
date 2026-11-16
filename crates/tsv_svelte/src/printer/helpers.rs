@@ -24,7 +24,7 @@ impl<'a> Printer<'a> {
         fragment: &Fragment<'_>,
         is_leading: bool,
     ) -> bool {
-        self.nodes_boundary_newline(fragment.nodes, is_leading)
+        self.nodes_boundary_newline(self.svelte.nodes(fragment.nodes), is_leading)
     }
 
     /// Whether the boundary whitespace **run** at one edge of `nodes` (the leading run of

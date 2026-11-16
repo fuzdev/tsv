@@ -5,7 +5,7 @@
 // used in inline run grouping and multiline formatting decisions.
 
 use super::blocks_doc::AwaitShorthand;
-use crate::ast::{EachBlock, EachKey, Fragment, FragmentNode};
+use crate::ast::{EachBlock, EachKey, Fragment, FragmentNode, SvelteView};
 use crate::printer::{CommentRun, HeadExpr, Printer};
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::doc::DocBuf;
@@ -118,8 +118,8 @@ pub(super) fn is_expanding_control_flow_block(node: &FragmentNode<'_>) -> bool {
 ///
 /// This is a convenience function combining `is_expanding_control_flow_block` and
 /// `has_expanding_block_in_await` checks that are commonly used together.
-pub(super) fn has_any_expanding_blocks(nodes: &[FragmentNode<'_>]) -> bool {
-    nodes.iter().any(is_expanding_control_flow_block) || has_expanding_block_in_await(nodes)
+pub(super) fn has_any_expanding_blocks(view: SvelteView<'_>, nodes: &[FragmentNode<'_>]) -> bool {
+    nodes.iter().any(is_expanding_control_flow_block) || has_expanding_block_in_await(view, nodes)
 }
 
 /// Whether a fragment node is inline content (a non-text node that participates in fill).
@@ -211,12 +211,14 @@ pub(super) fn control_flow_sections<'n, 'a>(
 /// This function recursively checks nested await blocks, so deeply nested
 /// structures like `{#await p1}{#await p2}{#if c}...{/if}{/await}{/await}`
 /// are also detected.
-fn has_expanding_block_in_await(nodes: &[FragmentNode<'_>]) -> bool {
+fn has_expanding_block_in_await(view: SvelteView<'_>, nodes: &[FragmentNode<'_>]) -> bool {
     nodes.iter().any(|n| {
         matches!(n, FragmentNode::AwaitBlock(_))
             && control_flow_sections(n).into_iter().flatten().any(|f| {
-                f.nodes.iter().any(is_expanding_control_flow_block)
-                    || has_expanding_block_in_await(f.nodes)
+                view.nodes(f.nodes)
+                    .iter()
+                    .any(is_expanding_control_flow_block)
+                    || has_expanding_block_in_await(view, view.nodes(f.nodes))
             })
     })
 }
@@ -1090,52 +1092,47 @@ fn element_printed_end(interior: Option<Span>, end: u32) -> u32 {
 #[cfg(test)]
 mod tests {
     use super::{has_any_expanding_blocks, is_control_flow_block, is_expanding_control_flow_block};
-    use crate::ast::FragmentNode;
+    use crate::ast::{FragmentNode, SvelteView};
 
-    /// Parse a Svelte template and return its top-level fragment nodes. The
-    /// nodes borrow the caller-owned `arena`, so each test holds the `Bump`.
-    fn parse_nodes<'arena>(
-        arena: &'arena bumpalo::Bump,
-        src: &str,
-    ) -> &'arena [FragmentNode<'arena>] {
-        // The nodes borrow only the arena, so the returned slice is self-contained —
-        // these tests inspect node structure, not name text.
-        crate::__private::parse(src, arena)
-            .expect("template should parse")
-            .fragment
-            .nodes
+    /// Parse a Svelte template and hand its top-level fragment nodes to `f`, with the view
+    /// they are read through.
+    fn with_nodes<R>(src: &str, f: impl FnOnce(SvelteView<'_>, &[FragmentNode<'_>]) -> R) -> R {
+        let arena = bumpalo::Bump::new();
+        let parsed = crate::__private::parse(src, &arena).expect("template should parse");
+        let view = parsed.view();
+        f(view, view.nodes(parsed.fragment.nodes))
     }
 
     #[test]
     fn control_flow_classification_await_is_not_expanding() {
-        let arena = bumpalo::Bump::new();
-        let if_nodes = parse_nodes(&arena, "{#if c}x{/if}");
-        assert!(is_control_flow_block(&if_nodes[0]));
-        assert!(is_expanding_control_flow_block(&if_nodes[0]));
+        with_nodes("{#if c}x{/if}", |_, if_nodes| {
+            assert!(is_control_flow_block(&if_nodes[0]));
+            assert!(is_expanding_control_flow_block(&if_nodes[0]));
+        });
 
-        let await_nodes = parse_nodes(&arena, "{#await p}x{/await}");
-        assert!(is_control_flow_block(&await_nodes[0]));
-        // Await blocks are control-flow but do NOT force expansion.
-        assert!(!is_expanding_control_flow_block(&await_nodes[0]));
+        with_nodes("{#await p}x{/await}", |_, await_nodes| {
+            assert!(is_control_flow_block(&await_nodes[0]));
+            // Await blocks are control-flow but do NOT force expansion.
+            assert!(!is_expanding_control_flow_block(&await_nodes[0]));
+        });
     }
 
     #[test]
     fn expanding_block_detected_through_nested_awaits() {
-        let arena = bumpalo::Bump::new();
         // An if directly inside an await is detected.
-        assert!(has_any_expanding_blocks(parse_nodes(
-            &arena,
-            "{#await p}{#if c}x{/if}{/await}"
-        )));
+        assert!(with_nodes(
+            "{#await p}{#if c}x{/if}{/await}",
+            has_any_expanding_blocks
+        ));
         // ...and through a second level of await nesting (recursion).
-        assert!(has_any_expanding_blocks(parse_nodes(
-            &arena,
-            "{#await p}{#await q}{#if c}x{/if}{/await}{/await}"
-        )));
+        assert!(with_nodes(
+            "{#await p}{#await q}{#if c}x{/if}{/await}{/await}",
+            has_any_expanding_blocks
+        ));
         // An await with only inline/element content does NOT expand.
-        assert!(!has_any_expanding_blocks(parse_nodes(
-            &arena,
-            "{#await p}<span>x</span>{/await}"
-        )));
+        assert!(!with_nodes(
+            "{#await p}<span>x</span>{/await}",
+            has_any_expanding_blocks
+        ));
     }
 }
