@@ -2552,11 +2552,11 @@ impl<'a> Printer<'a> {
         // carry comments (`<svelte:options /* c */ />`), and an early return keyed on
         // `attributes.is_empty()` deletes them — the comment-blind alternate arm, at the one
         // tag whose head is printed from here rather than from the element pipeline.
-        let mut parts: DocBuf =
-            DocBuf::with_capacity(self.svelte.attributes(options.attributes).len() * 2);
+        let attributes = self.svelte.attributes(options.attributes);
+        let mut parts: DocBuf = DocBuf::with_capacity(attributes.len() * 2);
         self.push_attrs_with_comments(
             &mut parts,
-            self.svelte.attributes(options.attributes),
+            attributes,
             d.line(),
             AttrGaps {
                 first_range_start: options.name_end,
@@ -2638,9 +2638,8 @@ impl<'a> Printer<'a> {
             skip_indices.contains(&i)
                 || matches!(n, FragmentNode::Text(t) if t.is_collapsible_ws_only)
         };
-        let Some(start) = self
-            .svelte
-            .nodes(fragment.nodes)
+        let all_nodes = self.svelte.nodes(fragment.nodes);
+        let Some(start) = all_nodes
             .iter()
             .enumerate()
             .position(|(i, n)| !skippable(i, n))
@@ -2648,14 +2647,12 @@ impl<'a> Printer<'a> {
             return;
         };
         // `rposition` finds at least `start`, so the fallback never triggers (panic-free).
-        let end = self
-            .svelte
-            .nodes(fragment.nodes)
+        let end = all_nodes
             .iter()
             .enumerate()
             .rposition(|(i, n)| !skippable(i, n))
             .unwrap_or(start);
-        let nodes = &self.svelte.nodes(fragment.nodes)[start..=end];
+        let nodes = &all_nodes[start..=end];
 
         // Mark single-line-run control-flow blocks so the shared builder inner-breaks them (B4).
         self.mark_root_inline_run_blocks(nodes);

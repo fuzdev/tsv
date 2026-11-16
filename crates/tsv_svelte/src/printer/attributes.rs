@@ -537,57 +537,56 @@ impl<'a> Printer<'a> {
     /// `is_html`: true for HTML elements, enables class attribute whitespace normalization.
     pub(super) fn build_attribute_doc(&self, attr: &ast::Attribute<'_>, is_html: bool) -> DocId {
         let d = self.d();
-        if let Some(span) = self.attribute_source_span(attr, is_html) {
+        let Some(value_parts) = self.svelte.opt_attribute_values(attr.value) else {
+            // Boolean attribute
+            return d.source_span(attr.name_span, self.source);
+        };
+        if let Some(span) = self.attribute_source_span(attr, value_parts, is_html) {
             return self.plain_source_span_doc(span);
         }
         // Span-identity attribute name (`source[name_span]`), reused across the
         // branches below.
         let name_doc = d.source_span(attr.name_span, self.source);
 
-        if let Some(value_parts) = self.svelte.opt_attribute_values(attr.value) {
-            // Check for shorthand: {name}
-            if self.is_shorthand_attribute(attr, value_parts) {
-                return d.braces(name_doc);
-            }
-
-            // Normalize whitespace in class attributes on HTML elements
-            let normalize_class = is_html && attr.name(self.source) == "class";
-
-            // Fast path: a single value part (the common `name="x"` / `name={x}`).
-            // Build with a stack array instead of the per-attribute `parts` buffer.
-            if value_parts.len() == 1 {
-                let value_doc = if normalize_class {
-                    self.build_class_attribute_value_doc(&value_parts[0], true)
-                } else {
-                    self.build_attribute_value_doc(&value_parts[0])
-                };
-                return if matches!(value_parts[0], ast::AttributeValue::ExpressionTag(_)) {
-                    d.concat(&[name_doc, d.text("="), value_doc])
-                } else {
-                    let (open, close) = self.attribute_value_delims(value_parts);
-                    d.concat(&[name_doc, open, value_doc, close])
-                };
-            }
-
-            // General path: a multi-part value is always a quoted string (a pure
-            // `{expr}` value is single-part and handled by the fast path above).
-            let (open, close) = self.attribute_value_delims(value_parts);
-            let mut parts: DocBuf = smallvec![name_doc, open];
-            let last_idx = value_parts.len().saturating_sub(1);
-            for (i, part) in value_parts.iter().enumerate() {
-                if normalize_class {
-                    parts.push(self.build_class_attribute_value_doc(part, i == last_idx));
-                } else {
-                    parts.push(self.build_attribute_value_doc(part));
-                }
-            }
-            parts.push(close);
-
-            d.concat(&parts)
-        } else {
-            // Boolean attribute
-            name_doc
+        // Check for shorthand: {name}
+        if self.is_shorthand_attribute(attr, value_parts) {
+            return d.braces(name_doc);
         }
+
+        // Normalize whitespace in class attributes on HTML elements
+        let normalize_class = is_html && attr.name(self.source) == "class";
+
+        // Fast path: a single value part (the common `name="x"` / `name={x}`).
+        // Build with a stack array instead of the per-attribute `parts` buffer.
+        if value_parts.len() == 1 {
+            let value_doc = if normalize_class {
+                self.build_class_attribute_value_doc(&value_parts[0], true)
+            } else {
+                self.build_attribute_value_doc(&value_parts[0])
+            };
+            return if matches!(value_parts[0], ast::AttributeValue::ExpressionTag(_)) {
+                d.concat(&[name_doc, d.text("="), value_doc])
+            } else {
+                let (open, close) = self.attribute_value_delims(value_parts);
+                d.concat(&[name_doc, open, value_doc, close])
+            };
+        }
+
+        // General path: a multi-part value is always a quoted string (a pure
+        // `{expr}` value is single-part and handled by the fast path above).
+        let (open, close) = self.attribute_value_delims(value_parts);
+        let mut parts: DocBuf = smallvec![name_doc, open];
+        let last_idx = value_parts.len().saturating_sub(1);
+        for (i, part) in value_parts.iter().enumerate() {
+            if normalize_class {
+                parts.push(self.build_class_attribute_value_doc(part, i == last_idx));
+            } else {
+                parts.push(self.build_attribute_value_doc(part));
+            }
+        }
+        parts.push(close);
+
+        d.concat(&parts)
     }
 
     /// The span of an attribute that prints as **its own source bytes**, when it is one — so
@@ -597,6 +596,9 @@ impl<'a> Printer<'a> {
     /// matches their sum only where a width is a byte count (a tab is columns, and a
     /// non-ASCII character is measured by grapheme cluster, which can reach across the part
     /// boundary a fused text erases).
+    ///
+    /// `value` is the attribute's value parts, read once by the caller (a boolean attribute has
+    /// none and prints as its name).
     ///
     /// Each shape below qualifies, and every clause is one thing the general builder would
     /// otherwise do to the bytes.
@@ -640,11 +642,15 @@ impl<'a> Printer<'a> {
     /// ([`plain_path_span`](super::plain_path_span) — plain ASCII with no escape, and with
     /// the `{` directly ahead of it it owns no comment), and
     /// [`Printer::is_shorthand_attribute`] says the general builder prints the shorthand.
-    fn attribute_source_span(&self, attr: &ast::Attribute<'_>, is_html: bool) -> Option<Span> {
+    fn attribute_source_span(
+        &self,
+        attr: &ast::Attribute<'_>,
+        value: &[ast::AttributeValue],
+        is_html: bool,
+    ) -> Option<Span> {
         if !super::fuses_source_spans() {
             return None;
         }
-        let value = self.svelte.opt_attribute_values(attr.value)?;
         let bytes = self.source.as_bytes();
         let name = attr.name_span;
         let name_end = name.end as usize;

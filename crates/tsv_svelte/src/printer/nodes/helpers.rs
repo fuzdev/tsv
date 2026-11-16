@@ -215,10 +215,9 @@ fn has_expanding_block_in_await(view: SvelteView<'_>, nodes: &[FragmentNode<'_>]
     nodes.iter().any(|n| {
         matches!(n, FragmentNode::AwaitBlock(_))
             && control_flow_sections(n).into_iter().flatten().any(|f| {
-                view.nodes(f.nodes)
-                    .iter()
-                    .any(is_expanding_control_flow_block)
-                    || has_expanding_block_in_await(view, view.nodes(f.nodes))
+                let nodes = view.nodes(f.nodes);
+                nodes.iter().any(is_expanding_control_flow_block)
+                    || has_expanding_block_in_await(view, nodes)
             })
     })
 }

@@ -41,15 +41,11 @@ impl<'a> Printer<'a> {
         // which for this one kind deletes rendered bytes. It leaves **before**
         // `analyze_element` because it reads nothing that stage produces — its head comes from
         // the whitespace-sensitive family and its content from the source.
-        if element.kind.preserves_content_whitespace()
-            && !self.svelte.nodes(element.fragment.nodes).is_empty()
-        {
-            return self.build_title_content_doc(
-                name,
-                self.svelte.nodes(element.fragment.nodes),
-                &attr_docs,
-                emission,
-            );
+        if element.kind.preserves_content_whitespace() {
+            let nodes = self.svelte.nodes(element.fragment.nodes);
+            if !nodes.is_empty() {
+                return self.build_title_content_doc(name, nodes, &attr_docs, emission);
+            }
         }
 
         let parts = Self::special_element_parts(self.svelte, element, name);
@@ -324,6 +320,7 @@ impl<'a> Printer<'a> {
         element: &ast::SpecialElement<'_>,
         separator: DocId,
     ) -> ElementAttrsDoc {
+        let attributes = self.svelte.attributes(element.attributes);
         // `<svelte:element>` / `<svelte:component>` carry their `this` binding in the kind
         // rather than in `attributes` — every other special element has none. The two build
         // apart because their types differ: the component's `this` is always braced, the
@@ -351,19 +348,13 @@ impl<'a> Printer<'a> {
         .map(|(doc, value)| {
             (
                 doc,
-                ThisClaim::new(
-                    element.name_span.end,
-                    value,
-                    self.svelte.attributes(element.attributes),
-                ),
+                ThisClaim::new(element.name_span.end, value, attributes),
             )
         });
         let claimed = synthesized_this.map(|(_, claim)| claim);
 
         // Pre-allocate: 2 docs per attr (separator + attr), plus the synthesized `this={…}`.
-        let capacity = (self.svelte.attributes(element.attributes).len()
-            + usize::from(synthesized_this.is_some()))
-            * 2;
+        let capacity = (attributes.len() + usize::from(synthesized_this.is_some())) * 2;
         let mut docs: DocBuf = DocBuf::with_capacity(capacity);
 
         if let Some((this_doc, claim)) = synthesized_this {
@@ -387,7 +378,7 @@ impl<'a> Printer<'a> {
         let normalize_class = matches!(element.kind, SpecialElementKind::SvelteElement { .. });
         let emission = self.push_attrs_with_comments(
             &mut docs,
-            self.svelte.attributes(element.attributes),
+            attributes,
             separator,
             AttrGaps {
                 first_range_start: element.name_span.end,

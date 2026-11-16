@@ -155,6 +155,7 @@ impl<'a> Printer<'a> {
             let parts = self.element_parts(element, class);
             return self.build_void_element_doc(&parts, &attr_docs, class.is_declaration);
         }
+        let nodes = self.svelte.nodes(element.fragment.nodes);
 
         // Whether an authored `/>` may survive — the SAME question the regular element path
         // asks, for the same reason. Whitespace-sensitivity is about the literalness of
@@ -168,7 +169,7 @@ impl<'a> Printer<'a> {
         // `elements/pre_self_closing_kinds_prettier_divergence`.
         let can_self_close = class.kind.is_component() || class.is_foreign || class.is_namespaced;
         if can_self_close
-            && self.svelte.nodes(element.fragment.nodes).is_empty()
+            && nodes.is_empty()
             && attr_docs.is_empty()
             && self.span_was_self_closing(element.span)
         {
@@ -191,8 +192,7 @@ impl<'a> Printer<'a> {
         // Which delimiters the content lets move — one read per boundary, see
         // [`ContentEdges`]; a nested raw-text element's closing tag never splits
         // ([`ContentEdges::with_whole_close`]).
-        let content_edges =
-            self.ws_sensitive_content_edges(self.svelte.nodes(element.fragment.nodes));
+        let content_edges = self.ws_sensitive_content_edges(nodes);
         let edges = if class.raw_text.is_some() {
             content_edges.with_whole_close()
         } else {
@@ -206,13 +206,7 @@ impl<'a> Printer<'a> {
         // both tags — two whitespace-sensitive elements answering one question with two
         // layouts would be a distinction with no source in the elements.
         if (is_inline || emission.ends_with_line_comment) && has_content {
-            return self.build_verbatim_content_doc(
-                name_doc,
-                self.svelte.nodes(element.fragment.nodes),
-                &attr_docs,
-                emission,
-                edges,
-            );
+            return self.build_verbatim_content_doc(name_doc, nodes, &attr_docs, emission, edges);
         }
 
         // Block whitespace-sensitive elements with content and attrs (pre with content)
@@ -224,16 +218,14 @@ impl<'a> Printer<'a> {
         if !is_inline && has_content && !attr_docs.is_empty() {
             // Check if content is "simple" - single expression tag without internal break points
             // Complex content (function calls, ternaries, etc.) should break internally first
-            let is_simple_content = self.svelte.nodes(element.fragment.nodes).len() == 1
+            let is_simple_content = nodes.len() == 1
                 && matches!(
-                    &self.svelte.nodes(element.fragment.nodes)[0],
+                    &nodes[0],
                     FragmentNode::ExpressionTag(expr) if !Self::expression_has_break_points(self.view, self.view.expr(expr.expression))
                 );
 
             if is_simple_content {
-                let content_doc = self.build_whitespace_sensitive_content_doc(
-                    self.svelte.nodes(element.fragment.nodes),
-                );
+                let content_doc = self.build_whitespace_sensitive_content_doc(nodes);
 
                 // Inner group decides if `>` needs to break to new line
                 let closing_and_content = d.group(d.concat(&[
@@ -300,8 +292,7 @@ impl<'a> Printer<'a> {
 
         // Build content preserving text whitespace but formatting expressions/blocks
         let opening_tag = self.build_ws_sensitive_open_tag_doc(name_doc, &attr_docs, emission);
-        let content_doc =
-            self.build_whitespace_sensitive_content_doc(self.svelte.nodes(element.fragment.nodes));
+        let content_doc = self.build_whitespace_sensitive_content_doc(nodes);
 
         d.concat(&[opening_tag, content_doc, self.end_tag(name_doc)])
     }

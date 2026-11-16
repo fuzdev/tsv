@@ -692,8 +692,9 @@ impl<'a> Printer<'a> {
     fn block_sections_force_break(&self, nodes: &[FragmentNode<'_>]) -> bool {
         nodes.iter().any(|n| {
             control_flow_sections(n).into_iter().flatten().any(|f| {
-                self.fragment_should_force_break_content(self.svelte.nodes(f.nodes))
-                    || self.block_sections_force_break(self.svelte.nodes(f.nodes))
+                let nodes = self.svelte.nodes(f.nodes);
+                self.fragment_should_force_break_content(nodes)
+                    || self.block_sections_force_break(nodes)
             })
         })
     }

@@ -1075,6 +1075,7 @@ impl<'a> Printer<'a> {
         let closing = d.concat(&[d.text("></"), name_doc, d.text(">")]);
 
         if has_attrs && (kind.is_inline() || kind.is_component()) {
+            let attributes = self.svelte.attributes(element.attributes);
             // State 1: All inline
             let inline_state = d.concat(&[opening_tag, closing]);
 
@@ -1082,7 +1083,7 @@ impl<'a> Printer<'a> {
             // The `>` takes a hardline of its own here, so a trailing `//` cannot swallow it.
             let hug_attrs = self
                 .build_element_attrs_doc(
-                    self.svelte.attributes(element.attributes),
+                    attributes,
                     self.d().text(" "),
                     element.name_span.end,
                     element.open_tag_end,
@@ -1100,7 +1101,7 @@ impl<'a> Printer<'a> {
             // State 3: Full multiline - attrs on separate lines, > on new line
             let multiline_attrs = self
                 .build_element_attrs_doc(
-                    self.svelte.attributes(element.attributes),
+                    attributes,
                     self.d().line(),
                     element.name_span.end,
                     element.open_tag_end,
