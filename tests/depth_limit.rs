@@ -123,7 +123,7 @@ fn parse(lang: Lang, source: &str) -> Result<(), String> {
     let arena = bumpalo::Bump::new();
     match lang {
         Lang::Ts => tsv_ts::__private::parse(source).map(drop),
-        Lang::Css => tsv_css::__private::parse(source, &arena).map(drop),
+        Lang::Css => tsv_css::__private::parse(source).map(drop),
         Lang::Svelte => tsv_svelte::__private::parse(source, &arena).map(drop),
     }
     .map_err(|e| e.to_string())
@@ -140,7 +140,7 @@ fn wire_counts(lang: Lang, source: &str) -> WireCounts {
             source,
         ),
         Lang::Css => tsv_css::__private::convert_ast_json_bytes(
-            &tsv_css::__private::parse(source, &arena).expect("parses"),
+            &tsv_css::__private::parse(source).expect("parses"),
             source,
         ),
         Lang::Svelte => tsv_svelte::__private::convert_ast_json_bytes(
@@ -334,7 +334,7 @@ fn verdict(lang: Lang, source: &str) -> Verdict {
     let arena = bumpalo::Bump::new();
     let result = match lang {
         Lang::Ts => tsv_ts::__private::parse(source).map(drop),
-        Lang::Css => tsv_css::__private::parse(source, &arena).map(drop),
+        Lang::Css => tsv_css::__private::parse(source).map(drop),
         Lang::Svelte => tsv_svelte::__private::parse(source, &arena).map(drop),
     };
     match result {
@@ -602,7 +602,7 @@ fn run_walks_on(name: String, stack: usize, lang: Lang, source: String) {
                 );
             }
             Lang::Css => {
-                let sheet = tsv_css::__private::parse(&source, &arena).expect("parses");
+                let sheet = tsv_css::__private::parse(&source).expect("parses");
                 assert!(!tsv_css::__private::convert_ast_json_bytes(&sheet, &source).is_empty());
                 assert!(
                     !tsv_css::__private::convert_ast_json_bytes_with_locations(&sheet, &source)
@@ -1101,8 +1101,7 @@ fn a_css_value_past_the_limit_is_refused_at_the_paren_that_passes_it() {
             rep(")", 300),
             if pre.is_empty() { "" } else { ")" }
         );
-        let arena = bumpalo::Bump::new();
-        let error = tsv_css::__private::parse(&source, &arena).expect_err("refused");
+        let error = tsv_css::__private::parse(&source).expect_err("refused");
         assert_eq!(error.kind(), tsv_lang::ErrorKind::TooDeep, "{error:#}");
         let at = error.position().expect("located");
         let value_start = source.find(": ").expect("value") + 2;

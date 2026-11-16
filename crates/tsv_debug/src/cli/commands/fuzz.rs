@@ -581,7 +581,7 @@ fn locations_wire(src: &str, parser: ParserType) -> bool {
         ParserType::Svelte => tsv_svelte::__private::parse(src, &arena)
             .ok()
             .map(|ast| tsv_svelte::__private::convert_ast_json_bytes_with_locations(&ast, src)),
-        ParserType::Css => tsv_css::__private::parse(src, &arena)
+        ParserType::Css => tsv_css::__private::parse(src)
             .ok()
             .map(|ast| tsv_css::__private::convert_ast_json_bytes_with_locations(&ast, src)),
     };

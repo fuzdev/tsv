@@ -19,7 +19,7 @@ use tsv_lang::{Error, Span};
 ///
 /// For identifiers, we need to look ahead: if next non-whitespace/comment token is `:`, it's a declaration.
 /// Custom-property identifiers (`--*`) are always declarations and bypass the lookahead.
-pub(crate) fn is_nested_rule_start(parser: &CssParser<'_, '_>) -> Result<bool, Error> {
+pub(crate) fn is_nested_rule_start(parser: &CssParser<'_>) -> Result<bool, Error> {
     match parser.current_kind() {
         // Unambiguous selector start tokens
         TokenKind::Ampersand
@@ -62,13 +62,13 @@ pub(crate) fn is_nested_rule_start(parser: &CssParser<'_, '_>) -> Result<bool, E
 ///
 /// When `nested` is true, the selector list allows leading combinators (CSS Nesting relative selectors).
 /// For example: `> .child {}`, `+ .sibling {}`, `~ .general {}`
-pub(crate) fn parse_rule(parser: &mut CssParser<'_, '_>, nested: bool) -> Result<CssRule, Error> {
+pub(crate) fn parse_rule(parser: &mut CssParser<'_>, nested: bool) -> Result<CssRule, Error> {
     // two wire levels: the `Rule` and its `Block` (the depth limit's count)
     parser.nested(2, |p| parse_rule_body(p, nested))
 }
 
 /// [`parse_rule`] inside its depth levels.
-fn parse_rule_body(parser: &mut CssParser<'_, '_>, nested: bool) -> Result<CssRule, Error> {
+fn parse_rule_body(parser: &mut CssParser<'_>, nested: bool) -> Result<CssRule, Error> {
     // Ahead of the capture: this offset becomes the rule's AND its prelude's `start`, both
     // of which sit past a boundary whitespace run in `parseCss` (see
     // `skip_boundary_whitespace`). Two of the three callers reach here having already
@@ -206,7 +206,7 @@ fn parse_rule_body(parser: &mut CssParser<'_, '_>, nested: bool) -> Result<CssRu
 /// it for a wildcard custom-property name ([`extend_wildcard_name`]), whose `*` runs the
 /// lexer tokenizes apart.
 fn lex_declaration_head(
-    parser: &mut CssParser<'_, '_>,
+    parser: &mut CssParser<'_>,
     property_end: usize,
 ) -> Result<DeclarationHead, Error> {
     parser.advance_from(property_end)?;
@@ -250,7 +250,7 @@ fn lex_declaration_head(
 #[cold]
 #[inline(never)]
 fn extend_wildcard_name(
-    parser: &CssParser<'_, '_>,
+    parser: &CssParser<'_>,
     head: &str,
     head_end: usize,
 ) -> Result<(String, usize), Error> {
@@ -276,7 +276,7 @@ fn extend_wildcard_name(
 /// seat that follows every head undoes.
 #[cfg(debug_assertions)]
 fn assert_token_head_agrees(
-    parser: &mut CssParser<'_, '_>,
+    parser: &mut CssParser<'_>,
     property_end: usize,
     head: DeclarationHead,
 ) {
@@ -289,7 +289,7 @@ fn assert_token_head_agrees(
 }
 
 /// Parse a CSS declaration: `property: value;`
-pub(crate) fn parse_declaration(parser: &mut CssParser<'_, '_>) -> Result<CssDeclaration, Error> {
+pub(crate) fn parse_declaration(parser: &mut CssParser<'_>) -> Result<CssDeclaration, Error> {
     let start = parser.base_offset() + parser.current_start();
 
     // Parse property
@@ -442,7 +442,6 @@ pub(crate) fn parse_declaration(parser: &mut CssParser<'_, '_>) -> Result<CssDec
             is_custom_property,
             // the value parser's own recursion, a level a function, counted as it parses
             parser.nesting_room(),
-            parser.arena,
             parser.stores,
         )
         .map_err(|open| parser.too_deep(open as usize))?
@@ -479,16 +478,14 @@ pub(crate) fn parse_declaration(parser: &mut CssParser<'_, '_>) -> Result<CssDec
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bumpalo::Bump;
 
     /// The block children of the one rule `source` holds, and the view they are read
     /// through.
     fn rule_children<'a>(
         source: &str,
-        arena: &'a Bump,
         stores: &'a mut CssStores,
     ) -> Result<(&'a [CssBlockChild], CssView<'a>), Error> {
-        let sheet = super::super::parse_css(source, 0, 0, arena, stores)?;
+        let sheet = super::super::parse_css(source, 0, 0, stores)?;
         let view = stores.view();
         match view.nodes(sheet.nodes) {
             [CssNode::Rule(rule)] => Ok((view.block_children(rule.declarations), view)),
@@ -520,9 +517,8 @@ mod tests {
         ];
         for (decl, property) in cases {
             let source = format!("div {{ {decl} }}");
-            let arena = Bump::new();
             let mut stores = CssStores::new();
-            let (children, view) = rule_children(&source, &arena, &mut stores)
+            let (children, view) = rule_children(&source, &mut stores)
                 .unwrap_or_else(|error| panic!("{source:?}: {error:?}"));
             match children {
                 [CssBlockChild::Declaration(declaration)] => {
@@ -553,9 +549,8 @@ mod tests {
             "--a-*\u{80}: x",
         ] {
             let source = format!("div {{ {decl} }}");
-            let arena = Bump::new();
             assert!(
-                rule_children(&source, &arena, &mut CssStores::new()).is_err(),
+                rule_children(&source, &mut CssStores::new()).is_err(),
                 "{source:?} parsed"
             );
         }
@@ -570,9 +565,8 @@ mod tests {
             "*:hover { color: red }",
         ] {
             let source = format!("div {{ {nested} }}");
-            let arena = Bump::new();
             let mut stores = CssStores::new();
-            let (children, _) = rule_children(&source, &arena, &mut stores)
+            let (children, _) = rule_children(&source, &mut stores)
                 .unwrap_or_else(|error| panic!("{source:?}: {error:?}"));
             assert!(
                 matches!(children, [CssBlockChild::Rule(_)]),

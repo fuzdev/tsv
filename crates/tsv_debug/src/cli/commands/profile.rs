@@ -479,7 +479,7 @@ fn profile_once(
             Ok((parse_dur, t1.elapsed()))
         }
         ParserType::Css => {
-            let ast = tsv_css::__private::parse_folded(&folded, arena).map_err(parse_error)?;
+            let ast = tsv_css::__private::parse_folded(&folded).map_err(parse_error)?;
             let parse_dur = t0.elapsed();
 
             let t1 = Instant::now();

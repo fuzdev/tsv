@@ -99,8 +99,7 @@ fn json_options_default_is_new() {
 #[test]
 fn css_parse_to_json_is_the_span_wire() {
     for source in CSS {
-        let arena = Bump::new();
-        let ast = tsv_css::__private::parse(source, &arena).expect("parses");
+        let ast = tsv_css::__private::parse(source).expect("parses");
         let span = utf8(tsv_css::__private::convert_ast_json_bytes(&ast, source));
         let loc = utf8(tsv_css::__private::convert_ast_json_bytes_with_locations(
             &ast, source,
@@ -152,7 +151,7 @@ fn a_parse_error_is_the_hidden_parse_error() {
         (
             "css",
             tsv_css::parse_to_json("a { color: red;"),
-            tsv_css::__private::parse("a { color: red;", &arena).expect_err("invalid"),
+            tsv_css::__private::parse("a { color: red;").expect_err("invalid"),
         ),
         (
             "svelte",

@@ -192,8 +192,8 @@ fn profile_once(
         }
         ParserType::Css => {
             let t = Instant::now();
-            let ast = tsv_css::__private::parse(source, &arena)
-                .map_err(|e| format!("parse error: {e:#}"))?;
+            let ast =
+                tsv_css::__private::parse(source).map_err(|e| format!("parse error: {e:#}"))?;
             steps.parse.push(t.elapsed());
             let t = Instant::now();
             let bytes = match wire {

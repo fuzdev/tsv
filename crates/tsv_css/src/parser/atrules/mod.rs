@@ -113,13 +113,13 @@ impl AtruleKind {
 /// name read back from the pool, lowercased as the dispatch reads it.
 #[cold]
 #[inline(never)]
-fn unexpected_block_token(parser: &CssParser<'_, '_>, name: PoolText<CssText>) -> Error {
+fn unexpected_block_token(parser: &CssParser<'_>, name: PoolText<CssText>) -> Error {
     let name = parser.stores.text.get(name).to_ascii_lowercase();
     parser.error_unexpected(&format!("token in @{name} block"))
 }
 
 /// Check if current token is a CSS boolean operator keyword (and, or, not)
-pub(super) fn is_boolean_operator(parser: &CssParser<'_, '_>) -> bool {
+pub(super) fn is_boolean_operator(parser: &CssParser<'_>) -> bool {
     if let TokenKind::Identifier = parser.current_kind() {
         is_boolean_operator_keyword(parser.current_identifier())
     } else {
@@ -131,7 +131,7 @@ pub(super) fn is_boolean_operator(parser: &CssParser<'_, '_>) -> bool {
 ///
 /// `nested_in_rule`: true if this at-rule is nested inside a regular rule's declaration block
 pub(crate) fn parse_atrule(
-    parser: &mut CssParser<'_, '_>,
+    parser: &mut CssParser<'_>,
     nested_in_rule: bool,
 ) -> Result<CssAtrule, Error> {
     // two wire levels: the `Atrule` and its `Block` (the depth limit's count)
@@ -139,10 +139,7 @@ pub(crate) fn parse_atrule(
 }
 
 /// [`parse_atrule`] inside its depth levels.
-fn parse_atrule_body(
-    parser: &mut CssParser<'_, '_>,
-    nested_in_rule: bool,
-) -> Result<CssAtrule, Error> {
+fn parse_atrule_body(parser: &mut CssParser<'_>, nested_in_rule: bool) -> Result<CssAtrule, Error> {
     let start = parser.span_pos(parser.current_start());
 
     // Expect @ symbol
@@ -314,7 +311,7 @@ fn parse_atrule_body(
 /// matches parseCss (which stores an unstructurable prelude raw) and prettier (which
 /// prints it verbatim); see the call sites for the CSS-Syntax rationale.
 pub(super) fn reconsume_prelude_as_raw(
-    parser: &mut CssParser<'_, '_>,
+    parser: &mut CssParser<'_>,
     prelude_start_raw: usize,
 ) -> Result<PreludeValue, Error> {
     // Re-read from the prelude's first token, so its ends are observed over all of it. The
@@ -369,7 +366,7 @@ pub(super) fn reconsume_prelude_as_raw(
 /// `kind` is the at-rule's name classified, and `name` the name itself, for an error.
 /// `nested_in_rule`: true if this at-rule is nested inside a regular rule's declaration block
 fn parse_atrule_block(
-    parser: &mut CssParser<'_, '_>,
+    parser: &mut CssParser<'_>,
     kind: AtruleKind,
     name: PoolText<CssText>,
     nested_in_rule: bool,
@@ -486,7 +483,7 @@ fn parse_atrule_block(
 /// blocks — conditional groups, keyframes), `true` = relative (nested-declarations
 /// contexts — unknown at-rules, `@scope` — where a leading combinator is valid).
 fn parse_block_child(
-    parser: &mut CssParser<'_, '_>,
+    parser: &mut CssParser<'_>,
     allow_relative_selectors: bool,
     name: PoolText<CssText>,
 ) -> Result<CssBlockChild, Error> {

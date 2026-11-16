@@ -1,6 +1,5 @@
 use super::parser::ValueParser;
 use crate::ast::{CssStores, CssValue};
-use bumpalo::Bump;
 use tsv_lang::Span;
 use tsv_lang::store::{Run, flush_run};
 
@@ -12,14 +11,13 @@ use tsv_lang::store::{Run, flush_run};
 /// # Arguments
 /// * `args_str` - The function arguments string (e.g., "90deg, red 01%, blue 02%")
 /// * `parent_span` - The span of the arguments in the full CSS document
-/// * `stores` - The stylesheet's stores, carried beside `arena` into the arguments' parse
+/// * `stores` - The stylesheet's stores, carried into the arguments' parse
 ///
 /// # Returns
 /// The run of parsed argument values
 pub(crate) fn parse_function_arguments(
     args_str: &str,
     parent_span: Span,
-    arena: &Bump,
     stores: &mut CssStores,
 ) -> Run<CssValue> {
     // Strip leading whitespace by offset, then trailing on the remaining slice — one
@@ -44,7 +42,7 @@ pub(crate) fn parse_function_arguments(
     // A function's argument list IS a group, which is what lets a `:` inside it be an
     // operator (`f(a: 1.5)`) where the same byte at a declaration's top level is not.
     let parser = ValueParser::new_within(trimmed, adjusted_span, true);
-    let value = parser.parse(arena, stores);
+    let value = parser.parse(stores);
 
     // Function arguments are comma-separated, so we expect CommaSeparated
     // But if there's only one argument, it might be a single value

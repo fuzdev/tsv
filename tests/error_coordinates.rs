@@ -63,7 +63,7 @@ fn parse_error(source: &str, language: Language) -> Option<Error> {
     match language {
         Language::TypeScript => tsv_ts::__private::parse_with_goal_or_fallback(source, None).err(),
         Language::Svelte => tsv_svelte::__private::parse(source, &arena).err(),
-        Language::Css => tsv_css::__private::parse(source, &arena).err(),
+        Language::Css => tsv_css::__private::parse(source).err(),
     }
 }
 
@@ -509,20 +509,14 @@ fn escape_errors_point_at_their_backslash() {
 /// fills the context over the whole document).
 #[test]
 fn an_embedded_parse_error_has_no_point_until_its_host_fills_it() {
-    let arena = Bump::new();
     let error =
         tsv_ts::__private::parse_embedded("let = ;", 5, 0, &mut tsv_ts::ast::AstStores::new())
             .expect_err("a syntax error");
     assert!(error.position().is_some());
     assert!(error.wire_point().is_none());
-    let error = tsv_css::__private::parse_embedded(
-        "a {",
-        5,
-        0,
-        &arena,
-        &mut tsv_css::ast::CssStores::new(),
-    )
-    .expect_err("a syntax error");
+    let error =
+        tsv_css::__private::parse_embedded("a {", 5, 0, &mut tsv_css::ast::CssStores::new())
+            .expect_err("a syntax error");
     assert!(error.position().is_some());
     assert!(error.wire_point().is_none());
 }
@@ -601,7 +595,7 @@ fn the_point_of_every_wire_position_is_its_loc() {
             ),
             Language::Css => (
                 tsv_css::__private::convert_ast_json_bytes_with_locations(
-                    &tsv_css::__private::parse(source, &arena).expect("parses"),
+                    &tsv_css::__private::parse(source).expect("parses"),
                     source,
                 ),
                 tsv_css::WIRE_COORDINATES,

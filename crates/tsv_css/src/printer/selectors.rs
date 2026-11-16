@@ -2261,7 +2261,6 @@ mod tests {
     /// that can't be a fixture — parseCss rejects a combinator-boundary comment).
     #[test]
     fn preserved_consecutive_combinator_printing_is_stable() {
-        use bumpalo::Bump;
         for input in [
             "> > .a { color: red }",
             "+ ~ .d { color: red }",
@@ -2270,11 +2269,9 @@ mod tests {
             ".a > /* c */ > .b { color: red }",
             "> > /* c */ .a { color: red }",
         ] {
-            let arena = Bump::new();
-            let ast = crate::__private::parse(input, &arena).expect("parses");
+            let ast = crate::__private::parse(input).expect("parses");
             let once = crate::__private::format_ast(&ast, input);
-            let arena2 = Bump::new();
-            let ast2 = crate::__private::parse(&once, &arena2).expect("reparses");
+            let ast2 = crate::__private::parse(&once).expect("reparses");
             let twice = crate::__private::format_ast(&ast2, &once);
             assert_eq!(once, twice, "not idempotent for {input:?}");
         }

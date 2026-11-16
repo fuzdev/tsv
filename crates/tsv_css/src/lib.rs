@@ -150,19 +150,18 @@ pub const WIRE_COORDINATES: WireCoordinates =
 pub fn format(source: &str) -> Result<String> {
     format_in(
         source,
-        &bumpalo::Bump::new(),
         &mut CssStores::new(),
         tsv_lang::doc::arena::DocArena::for_source,
     )
 }
 
-/// The one format path, shared by [`format()`] and [`Formatter`]: fold, parse into `arena`
-/// and `stores`, then print into the doc arena `doc_arena` hands over once the parse has
+/// The one format path, shared by [`format()`] and [`Formatter`]: fold, parse into
+/// `stores`, then print into the doc arena `doc_arena` hands over once the parse has
 /// succeeded (handed the folded text, so a fresh one is sized to it and a failed parse never
-/// builds one). Nothing borrowed from either arena or the stores escapes: the result is owned.
+/// builds one). Nothing borrowed from the stores or the doc arena escapes: the result is
+/// owned.
 pub(crate) fn format_in<D: std::borrow::Borrow<tsv_lang::doc::arena::DocArena>>(
     source: &str,
-    arena: &bumpalo::Bump,
     stores: &mut CssStores,
     doc_arena: impl FnOnce(&str) -> D,
 ) -> Result<String> {
@@ -170,7 +169,7 @@ pub(crate) fn format_in<D: std::borrow::Borrow<tsv_lang::doc::arena::DocArena>>(
     // `tsv_lang::printing::normalize_carriage_returns`); `parse` leaves the author's bytes
     // alone so its offsets stay a drop-in contract with `parseCss`'s.
     let folded = tsv_lang::printing::normalize_carriage_returns(source);
-    let stylesheet = parse_folded_into(&folded, arena, stores)?;
+    let stylesheet = parse_folded_into(&folded, stores)?;
     let doc_arena = doc_arena(folded.text());
     Ok(format_folded_in(
         __private::parsed_ref(&stylesheet, stores),
@@ -278,8 +277,7 @@ pub fn parse_to_json(source: &str) -> Result<String> {
 /// A parse error.
 #[cfg(feature = "json")]
 pub fn parse_to_json_with(source: &str, options: JsonOptions) -> Result<String> {
-    let arena = bumpalo::Bump::with_capacity(tsv_lang::estimated_ast_arena_capacity(source.len()));
-    let ast = __private::parse(source, &arena)?;
+    let ast = __private::parse(source)?;
     #[cfg(feature = "locations")]
     if options.locations {
         return Ok(wire_string(

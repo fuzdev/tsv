@@ -644,7 +644,7 @@ fn wasm_source_type(
 /// how the parse ended without one: `Result<String, Failure>`.
 #[cfg(feature = "parse")]
 macro_rules! wire_json {
-    ($goalness:ident, $storeness:ident, $lang:ident, $source:expr, $source_type:expr) => {
+    ($goalness:ident, $arenaness:ident, $lang:ident, $source:expr, $source_type:expr) => {
         wasm_source_type(
             SourceTypeArg::read(&$source_type),
             goal_allowed!($goalness),
@@ -654,7 +654,7 @@ macro_rules! wire_json {
         .and_then(|goal| {
             parse_convert!(
                 $goalness,
-                $storeness,
+                $arenaness,
                 $lang,
                 convert_ast_json_string,
                 $source,
@@ -684,7 +684,7 @@ macro_rules! wire_json {
 macro_rules! lang_bindings {
     (
         $goalness:ident,
-        $storeness:ident,
+        $arenaness:ident,
         $parse_fn:ident,
         $parse_json_fn:ident,
         $parse_internal_fn:ident,
@@ -697,7 +697,7 @@ macro_rules! lang_bindings {
         #[cfg(feature = "parse")]
         #[wasm_bindgen]
         pub fn $parse_fn(source: &str, source_type: JsValue) -> Result<JsValue, JsValue> {
-            let json = match wire_json!($goalness, $storeness, $lang, source, source_type) {
+            let json = match wire_json!($goalness, $arenaness, $lang, source, source_type) {
                 Ok(json) => json,
                 Err(failure) => return failure.into_return(),
             };
@@ -716,7 +716,7 @@ macro_rules! lang_bindings {
         #[cfg(feature = "parse")]
         #[wasm_bindgen]
         pub fn $parse_json_fn(source: &str, source_type: JsValue) -> Result<JsValue, JsValue> {
-            match wire_json!($goalness, $storeness, $lang, source, source_type) {
+            match wire_json!($goalness, $arenaness, $lang, source, source_type) {
                 Ok(json) => Ok(JsValue::from(json)),
                 Err(failure) => failure.into_return(),
             }
@@ -734,7 +734,7 @@ macro_rules! lang_bindings {
             )
             .map_err(err)?;
             let parsed: Result<(), Failure> =
-                parse_internal!($goalness, $storeness, $lang, source, goal, |e: Error| {
+                parse_internal!($goalness, $arenaness, $lang, source, goal, |e: Error| {
                     parse_failure(&e)
                 });
             match parsed {
@@ -756,7 +756,7 @@ macro_rules! lang_bindings {
             )
             .map_err(err)?;
             let formatted: Result<String, Failure> =
-                parse_format!($goalness, $storeness, $lang, source, goal, |e: Error| {
+                parse_format!($goalness, $arenaness, $lang, source, goal, |e: Error| {
                     parse_failure(&e)
                 });
             match formatted {
@@ -769,7 +769,7 @@ macro_rules! lang_bindings {
 
 lang_bindings!(
     nogoal,
-    stores,
+    arena,
     parse_svelte,
     parse_svelte_json,
     parse_internal_svelte,
@@ -778,7 +778,7 @@ lang_bindings!(
 );
 lang_bindings!(
     goal,
-    stores,
+    noarena,
     parse_typescript,
     parse_typescript_json,
     parse_internal_typescript,
@@ -787,7 +787,7 @@ lang_bindings!(
 );
 lang_bindings!(
     nogoal,
-    stores,
+    noarena,
     parse_css,
     parse_css_json,
     parse_internal_css,

@@ -956,8 +956,9 @@ files, taken before each timed region and parked after it in a slot the driver o
 `Formatter` keeps them. The current tree's driver holds one such slot per language, through each
 language crate's own `__private::WarmStores` (a Svelte document's holds a TypeScript half and a
 CSS half), which names no store type, so the stores can change beneath it without a new arm, and
-CSS parses into its stores beside the `Bump`. A tree whose CSS has no stores
-(`perf_ab_api = "css_no_stores"`) parses CSS into the `Bump` alone and Svelte into the stores
+CSS parses into its stores alone, as TypeScript does. A tree whose CSS parse still takes the `Bump`
+beside its stores (`perf_ab_api = "css_bump"`) hands it the `Bump` too; a tree whose CSS has no
+stores (`perf_ab_api = "css_no_stores"`) parses CSS into the `Bump` alone and Svelte into the stores
 `tsv_ts::__private::WarmStores` keeps; a tree with the stores but no such handle
 (`perf_ab_api = "no_warm_stores"`) keeps them in an `Option` of the driver's own. The TypeScript
 parse takes the stores alone from that generation on, where an older warm-parse tree's

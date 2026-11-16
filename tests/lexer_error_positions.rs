@@ -68,8 +68,7 @@ fn ts_error(source: &str) -> (usize, usize, String) {
 }
 
 fn css_error(source: &str) -> (usize, usize, String) {
-    let arena = Bump::new();
-    let err = tsv_css::__private::parse(source, &arena).expect_err("the input must not parse");
+    let err = tsv_css::__private::parse(source).expect_err("the input must not parse");
     location(&format!("{err:#}"))
 }
 

@@ -331,7 +331,7 @@ fn scan_rule_or_declaration_and_value_bytes(
 /// gap walk from there found the `:`. The byte head's second half runs here
 /// ([`head_after_colon`]); its decline declines the byte scan outright.
 fn scan_rule_or_declaration(
-    parser: &CssParser<'_, '_>,
+    parser: &CssParser<'_>,
     from: usize,
     colon: usize,
     gap_comment: bool,
@@ -377,7 +377,7 @@ fn scan_rule_or_declaration(
 
 /// The rule-or-declaration verdict where the byte scan declined: the token walk, with the
 /// stash cleared, so `parse_declaration` lexes its head and scans the value itself.
-fn rule_or_declaration_by_tokens(parser: &CssParser<'_, '_>, from: usize) -> Result<bool, Error> {
+fn rule_or_declaration_by_tokens(parser: &CssParser<'_>, from: usize) -> Result<bool, Error> {
     parser.stash_declaration(None);
     scan_rule_or_declaration_tokens(parser.source(), parser.base_offset(), from)
 }
@@ -442,7 +442,7 @@ fn scan_rule_or_declaration_tokens(
 ///
 /// In debug the token lookahead runs behind a `:` the bytes found and must agree, so the
 /// test suite proves the equivalence.
-pub(super) fn identifier_child_is_rule(parser: &CssParser<'_, '_>) -> Result<bool, Error> {
+pub(super) fn identifier_child_is_rule(parser: &CssParser<'_>) -> Result<bool, Error> {
     let bytes = parser.source().as_bytes();
     let from = parser.current_end();
     match colon_after_trivia(bytes, from) {
@@ -508,7 +508,7 @@ fn colon_after_trivia(bytes: &[u8], from: usize) -> Option<(usize, bool)> {
 /// has a different oracle: the reference walk never classifies, so a declined value gets
 /// `None` and the value parser derives its own as it always did. See `scan_value_core`.
 pub(super) fn scan_value(
-    parser: &CssParser<'_, '_>,
+    parser: &CssParser<'_>,
     value_start: usize,
 ) -> Result<(ValueFacts, Option<ValueSeparator>), Error> {
     let source = parser.source();
@@ -1362,7 +1362,6 @@ mod tests {
             "important",
         ];
         const HEAD: &str = "a{b:";
-        let mut arena = bumpalo::Bump::new();
         let mut spent = 0u32;
         let mut grade = |value: &str| {
             let source = format!("{HEAD}{value}");
@@ -1375,10 +1374,9 @@ mod tests {
                     spent += u32::from(closes);
                 }
             }
-            arena.reset();
             // An `Err` is a rejected stylesheet, which is most of these; the parse is run
             // for the assertions inside it.
-            let _ = crate::__private::parse(&source, &arena);
+            let _ = crate::__private::parse(&source);
         };
 
         let mut value = String::new();
@@ -1597,9 +1595,8 @@ mod tests {
     /// the verdict (`true` = a nested rule), and whether it left a declaration stashed for
     /// that identifier — which it does exactly where the byte walks located the declaration.
     fn identifier_child(source: &str) -> (bool, bool) {
-        let arena = bumpalo::Bump::new();
         let mut stores = crate::ast::CssStores::new();
-        let parser = CssParser::new(source, 0, 0, &arena, &mut stores).expect("test source lexes");
+        let parser = CssParser::new(source, 0, 0, &mut stores).expect("test source lexes");
         assert_eq!(parser.current_kind(), TokenKind::Identifier);
         let is_rule = identifier_child_is_rule(&parser).expect("test source disambiguates");
         let stashed = parser.take_declaration(parser.current_end()).is_some();
@@ -1781,14 +1778,12 @@ mod tests {
             "@media x{a{color: url( \n",
             "\n\ta {\n\t\tcolor: url(x;\n\t}\n",
         ] {
-            let arena = bumpalo::Bump::new();
-            let err = crate::__private::parse(source, &arena).expect_err(source);
+            let err = crate::__private::parse(source).expect_err(source);
             assert!(
                 err.to_string().contains("Expected '}'"),
                 "{source:?}: {err}"
             );
         }
-        let arena = bumpalo::Bump::new();
-        assert!(crate::__private::parse("a{color: url(x)}", &arena).is_ok());
+        assert!(crate::__private::parse("a{color: url(x)}").is_ok());
     }
 }

@@ -18,7 +18,7 @@ pub(crate) enum ParsedInput<'arena> {
 
 /// Parse fixture content once for the parser-side validation phases.
 ///
-/// `arena` owns the internal AST and must outlive the returned `ParsedInput`
+/// `arena` owns a Svelte input's markup AST and must outlive the returned `ParsedInput`
 /// (caller-owns-`Bump`).
 pub(crate) fn parse_input<'arena>(
     content: &str,
@@ -35,7 +35,7 @@ pub(crate) fn parse_input<'arena>(
                 .map(ParsedInput::Ts)
                 .map_err(|e| format!("Parse error: {e:?}"))
         }
-        InputType::Css => tsv_css::__private::parse(content, arena)
+        InputType::Css => tsv_css::__private::parse(content)
             .map(ParsedInput::Css)
             .map_err(|e| format!("Parse error: {e:?}")),
     }

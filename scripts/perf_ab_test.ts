@@ -149,27 +149,35 @@ test('the strip entry point is found in each of its spellings, and nothing else'
 /** A tsv_ts manifest that depends on `bumpalo`, as every tree older than the current one's does. */
 const BUMPALO_MANIFEST = '[dependencies]\ntsv_lang.workspace = true\nbumpalo.workspace = true\n';
 
+/** A tsv_css manifest that depends on `bumpalo`, as every tree older than the current one's
+ * does. */
+const CSS_BUMPALO_MANIFEST =
+	'[dependencies]\ntsv_lang.workspace = true\nbumpalo.workspace = true\n';
+
 /** A tsv_css `__private.rs` whose parse takes the `Bump` alone, as every tree older than the
  * current one's does. */
 const CSS_WITHOUT_STORES = "pub fn parse_folded<'arena>(\n    arena: &'arena Bump,\n) {}\n";
 
 /** Commit `private_rs` as a scratch repo's `crates/tsv_ts/src/__private.rs`, `manifest` as its
- * `crates/tsv_ts/Cargo.toml` and `css_private_rs` as its `crates/tsv_css/src/__private.rs`, and
- * ask which entry-point generation the drivers build against for the tree. */
+ * `crates/tsv_ts/Cargo.toml`, `css_private_rs` as its `crates/tsv_css/src/__private.rs` and
+ * `css_manifest` as its `crates/tsv_css/Cargo.toml`, and ask which entry-point generation the
+ * drivers build against for the tree. */
 const driver_api_with = async (
 	dir: FsDir,
 	private_rs: string,
 	manifest = BUMPALO_MANIFEST,
-	css_private_rs = CSS_WITHOUT_STORES
+	css_private_rs = CSS_WITHOUT_STORES,
+	css_manifest = CSS_BUMPALO_MANIFEST
 ): Promise<string | null> => {
 	await dir.write('crates/tsv_ts/src/__private.rs', private_rs);
 	await dir.write('crates/tsv_ts/Cargo.toml', manifest);
 	await dir.write('crates/tsv_css/src/__private.rs', css_private_rs);
+	await dir.write('crates/tsv_css/Cargo.toml', css_manifest);
 	await run_git(dir, ['add', '-A']);
 	return (await tree_driver_api(make_git(), dir, await run_git(dir, ['write-tree']))).cfg;
 };
 
-test('a tree whose CSS parses into stores is the current generation, then a tsv_ts that takes no bumpalo, then the warm handle, then no Bump in the TypeScript parse, then the warm parse alone, any other the oldest', async () => {
+test('a tree whose tsv_css takes no bumpalo is the current generation, then one whose CSS parses into stores, then a tsv_ts that takes no bumpalo, then the warm handle, then no Bump in the TypeScript parse, then the warm parse alone, any other the oldest', async () => {
 	clear_git_repo_env();
 	await using dir = await fs.temp_dir('perf_ab_test-');
 	await run_git(dir, ['init', '--quiet']);
@@ -180,13 +188,36 @@ test('a tree whose CSS parses into stores is the current generation, then a tsv_
 	const no_bump = `pub fn parse_folded_into<'arena>(\n    goal: Option<Goal>,\n) {\n${body}}\n`;
 	const handle = "pub struct WarmStores {\n    parked: Option<AstStores<'static>>,\n}\n";
 	const free = '[dependencies]\ntsv_lang.workspace = true\nsmallvec.workspace = true\n';
-	// the CSS warm parse answers first, in either spelling of its declaration, whatever the
-	// rest of the tree holds
 	const css_stores = "pub fn parse_folded_into<'arena>(\n    stores: &mut CssStores,\n) {}\n";
-	strictEqual(await driver_api_with(dir, `${handle}${no_bump}`, free, css_stores), null);
+	// a tsv_css that takes no bumpalo answers first, whatever the rest of the tree holds
+	const css_free = '[dependencies]\ntsv_lang.workspace = true\n';
+	strictEqual(await driver_api_with(dir, handle, free, css_stores, css_free), null);
+	strictEqual(
+		await driver_api_with(dir, handle, free, css_stores, `# bumpalo.workspace = true\n${css_free}`),
+		null
+	);
+	strictEqual(
+		await driver_api_with(dir, handle, free, css_stores, `${css_free}bumpalo_x.workspace = true\n`),
+		null
+	);
+	strictEqual(
+		await driver_api_with(
+			dir,
+			handle,
+			free,
+			css_stores,
+			`${css_free}bumpalo = { workspace = true }\n`
+		),
+		'css_bump'
+	);
+	// a manifest with no line is no evidence of the current generation
+	strictEqual(await driver_api_with(dir, handle, free, css_stores, ''), 'css_bump');
+	// the CSS warm parse answers next, in either spelling of its declaration, whatever the
+	// rest of the tree holds
+	strictEqual(await driver_api_with(dir, `${handle}${no_bump}`, free, css_stores), 'css_bump');
 	const css_lifetime_free = 'pub fn parse_folded_into(\n    stores: &mut CssStores,\n) {}\n';
-	strictEqual(await driver_api_with(dir, handle, free, css_lifetime_free), null);
-	strictEqual(await driver_api_with(dir, handle, BUMPALO_MANIFEST, css_stores), null);
+	strictEqual(await driver_api_with(dir, handle, free, css_lifetime_free), 'css_bump');
+	strictEqual(await driver_api_with(dir, handle, BUMPALO_MANIFEST, css_stores), 'css_bump');
 	// a comment or a lookalike naming it does not
 	const css_mentioned =
 		"// pub fn parse_folded_into<'arena>(\n/// pub fn parse_folded_into(\npub fn parse_folded_into_arena() {}\n";
@@ -220,6 +251,11 @@ test('a tree whose CSS parses into stores is the current generation, then a tsv_
 	await run_git(dir, ['add', '-A']);
 	const unmanifested = await run_git(dir, ['write-tree']);
 	strictEqual((await tree_driver_api(make_git(), dir, unmanifested)).cfg, 'strip_bump');
+	// and a tree without a tsv_css manifest is no evidence of the newest one either
+	await dir.remove('crates/tsv_css/Cargo.toml');
+	await run_git(dir, ['add', '-A']);
+	const css_unmanifested = await run_git(dir, ['write-tree']);
+	strictEqual((await tree_driver_api(make_git(), dir, css_unmanifested)).cfg, 'strip_bump');
 	await rejects(tree_driver_api(make_git(), dir, '0'.repeat(40)), HarnessError);
 	const named = `// pub struct WarmStores {\n/// pub struct WarmStores {\npub struct WarmStoresX {}\n${no_bump}`;
 	strictEqual(await driver_api_with(dir, named), 'no_warm_stores');

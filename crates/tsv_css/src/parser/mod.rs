@@ -12,13 +12,12 @@ pub(crate) use value::operators::is_whole_value_block;
 
 use crate::ast::{Comment, CssNode, CssStores, CssStyleSheet, CssText};
 use crate::lexer::{Lexer, Token, TokenKind};
-use bumpalo::Bump;
 use decl_scan::{ScannedDeclaration, TerminatorKind};
 use std::cell::Cell;
 use tsv_lang::store::{PoolText, flush_run_move};
 use tsv_lang::{DepthBudget, DepthLimit, Error, NESTING_LIMIT, Span};
 
-pub(crate) struct CssParser<'a, 'arena> {
+pub(crate) struct CssParser<'a> {
     source: &'a str,
     lexer: Lexer<'a>,
     /// The current token. A fresh lex in [`advance`](Self::advance) has the lexer write it
@@ -48,14 +47,9 @@ pub(crate) struct CssParser<'a, 'arena> {
     /// spine, so only the nesting half is used.
     depth: DepthBudget,
     pub(crate) comments: Vec<Comment>,
-    /// The caller's bump arena (caller-owns-`Bump`), handed to the value parser. `&'arena
-    /// Bump` is `Copy`. Nothing is allocated in it: the tree lives in the stores, and an
-    /// operator run's members are read one at a time (`value::operators::RunMembers`).
-    pub(crate) arena: &'arena Bump,
     /// The stylesheet's stores, which every list and string this parser builds lands in:
     /// each list through its element type's scratch stack, flushed into that type's store as
-    /// a run when it closes, and each string in the text pool. Handed to the value parser
-    /// beside the arena.
+    /// a run when it closes, and each string in the text pool. Handed to the value parser.
     pub(crate) stores: &'a mut CssStores,
     /// A declaration located and measured speculatively by the rule/declaration
     /// disambiguation scan — its head and its value's facts — for the `parse_declaration`
@@ -70,12 +64,11 @@ pub(crate) struct CssParser<'a, 'arena> {
     speculative_declaration: Cell<Option<(usize, ScannedDeclaration)>>,
 }
 
-impl<'a, 'arena> CssParser<'a, 'arena> {
+impl<'a> CssParser<'a> {
     pub(crate) fn new(
         source: &'a str,
         base_offset: usize,
         host_nesting: u32,
-        arena: &'arena Bump,
         stores: &'a mut CssStores,
     ) -> Result<Self, Error> {
         // The lexer scans `source` (the island) but reports errors against the document
@@ -93,7 +86,6 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
             in_pseudo_args: false,
             depth: DepthBudget::at(host_nesting),
             comments: Vec::new(),
-            arena,
             stores,
             speculative_declaration: Cell::new(None),
         })
@@ -1085,7 +1077,6 @@ pub(crate) fn parse_css(
     source: &str,
     base_offset: usize,
     host_nesting: u32,
-    arena: &Bump,
     stores: &mut CssStores,
 ) -> Result<CssStyleSheet, Error> {
     #[cfg(debug_assertions)]
@@ -1093,7 +1084,7 @@ pub(crate) fn parse_css(
         stores.scratch_is_empty(),
         "a parse began over an open list frame"
     );
-    let outcome = CssParser::new(source, base_offset, host_nesting, arena, stores)
+    let outcome = CssParser::new(source, base_offset, host_nesting, stores)
         .and_then(|mut parser| parser.parse());
     if outcome.is_err() {
         stores.clear_scratch();
@@ -1125,10 +1116,8 @@ mod tests {
             ("\\-x: 1", false),
         ];
         for (source, expected) in cases {
-            let arena = Bump::new();
             let mut stores = CssStores::new();
-            let parser =
-                CssParser::new(source, 0, 0, &arena, &mut stores).expect("test source lexes");
+            let parser = CssParser::new(source, 0, 0, &mut stores).expect("test source lexes");
             assert_eq!(parser.current_kind(), TokenKind::Identifier, "{source:?}");
             assert_eq!(
                 parser.current_identifier_is_custom_property(),

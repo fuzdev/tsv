@@ -35,8 +35,7 @@ const SPACED: &str = "a {\n\tcolor /* c */ : blue;\n}\n";
 
 /// The wire JSON tsv's CLI/FFI/WASM parse surfaces all emit.
 fn wire(source: &str) -> serde_json::Value {
-    let arena = bumpalo::Bump::new();
-    let stylesheet = tsv_css::__private::parse(source, &arena).expect("parse failed");
+    let stylesheet = tsv_css::__private::parse(source).expect("parse failed");
     tsv_debug::json::wire_value(&tsv_css::__private::convert_ast_json_bytes(
         &stylesheet,
         source,

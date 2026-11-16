@@ -47,7 +47,7 @@ fn format_all(source: &str, parser: ParserType, label: &str) -> String {
             )
         }
         ParserType::Css => {
-            let ast = tsv_css::__private::parse(source, &arena).expect("css parse");
+            let ast = tsv_css::__private::parse(source).expect("css parse");
             (
                 tsv_css::format(source).expect("css format"),
                 tsv_css::__private::format_ast(&ast, source),

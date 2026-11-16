@@ -11,7 +11,7 @@ use tsv_lang::{Error, Span};
 
 /// Parse pseudo-class or pseudo-element: :hover, ::before, :nth-child(2n+1)
 pub(crate) fn parse_pseudo_selector(
-    parser: &mut CssParser<'_, '_>,
+    parser: &mut CssParser<'_>,
     start: usize,
 ) -> Result<SimpleSelector, Error> {
     parser.advance()?; // consume first :
@@ -148,7 +148,7 @@ enum PseudoArgKind {
 
 /// Classify a pseudo-class/element's argument grammar from its name (see `PseudoArgKind`).
 /// A pure name → grammar mapping, split out of `parse_pseudo_args` so it can run against
-/// the still-current name token (its decoded borrow is consumed immediately, so no arena
+/// the still-current name token (its decoded borrow is consumed immediately, so no
 /// copy of the name is needed).
 ///
 /// `is_pseudo_element` distinguishes `::slotted`/`::part` (the real pseudo-elements) from a
@@ -216,7 +216,7 @@ fn classify_pseudo_args(pseudo_name: &str, is_pseudo_element: bool) -> PseudoArg
 /// `Nth`, matching `:not()`'s strict list). `::part` takes a bare ident list and never
 /// needs it.
 fn parse_pseudo_args(
-    parser: &mut CssParser<'_, '_>,
+    parser: &mut CssParser<'_>,
     arg_kind: PseudoArgKind,
 ) -> Result<(Option<PseudoClassArgs>, u32), Error> {
     parser.expect(TokenKind::LeftParen)?;
@@ -235,8 +235,8 @@ fn parse_pseudo_args(
 /// the ok and error paths). Nested pseudo-class args (`:is(:not(2n))`) restore to the
 /// outer `true`, and the top level returns to `false`.
 fn with_pseudo_args<R>(
-    parser: &mut CssParser<'_, '_>,
-    f: impl FnOnce(&mut CssParser<'_, '_>) -> Result<R, Error>,
+    parser: &mut CssParser<'_>,
+    f: impl FnOnce(&mut CssParser<'_>) -> Result<R, Error>,
 ) -> Result<R, Error> {
     let saved = parser.in_pseudo_args;
     parser.in_pseudo_args = true;
@@ -253,7 +253,7 @@ fn with_pseudo_args<R>(
 /// `:is()`/`:not()`-family path, the `:nth-*()` selector-list fallback, and the
 /// unknown-pseudo selector path.
 fn finish_selector_list_args(
-    parser: &mut CssParser<'_, '_>,
+    parser: &mut CssParser<'_>,
     args_start: usize,
     selectors: SelectorList,
 ) -> Result<(Option<PseudoClassArgs>, u32), Error> {
@@ -277,7 +277,7 @@ fn finish_selector_list_args(
 /// rejects it. `value_span` covers the identifier run (first ident start .. last
 /// ident end) so the printer locates the gap comments around it (mirrors `Nth`).
 fn parse_part_args(
-    parser: &mut CssParser<'_, '_>,
+    parser: &mut CssParser<'_>,
     args_start: usize,
 ) -> Result<(Option<PseudoClassArgs>, u32), Error> {
     parser.skip_boundary_whitespace_registering_comments()?;
@@ -335,7 +335,7 @@ fn parse_part_args(
 /// Shared by the four selector-list pseudo families (`:has()`, `:is()`/`:where()`, the
 /// `:not()` group, `::slotted()`).
 fn selector_list_args(
-    parser: &mut CssParser<'_, '_>,
+    parser: &mut CssParser<'_>,
     args_start: usize,
     grammar: SelectorListGrammar,
 ) -> Result<(Option<PseudoClassArgs>, u32), Error> {
@@ -346,7 +346,7 @@ fn selector_list_args(
 /// `SelectorListGrammar`), then finish with the trailing-comment + `)` capture.
 /// Leading/trailing gap comments are registered so the printer interleaves them.
 fn parse_selector_list_args(
-    parser: &mut CssParser<'_, '_>,
+    parser: &mut CssParser<'_>,
     args_start: usize,
     grammar: SelectorListGrammar,
 ) -> Result<(Option<PseudoClassArgs>, u32), Error> {
@@ -382,7 +382,7 @@ fn parse_selector_list_args(
 /// list is parsed with `in_pseudo_args` set (see the call site), so it accepts the same
 /// bare `<number>`/`<an+b>` terms a direct functional-pseudo arg does.
 fn parse_nth_args(
-    parser: &mut CssParser<'_, '_>,
+    parser: &mut CssParser<'_>,
     args_start: usize,
 ) -> Result<(Option<PseudoClassArgs>, u32), Error> {
     parser.skip_boundary_whitespace_registering_comments()?;
@@ -468,7 +468,7 @@ fn parse_nth_args(
 /// `:is()`'s printer arm which already interleaves gap comments); if that fails the
 /// argument isn't a selector, so skip to the matching `)` and return `None`.
 fn parse_unknown_args(
-    parser: &mut CssParser<'_, '_>,
+    parser: &mut CssParser<'_>,
     args_start: usize,
 ) -> Result<(Option<PseudoClassArgs>, u32), Error> {
     // Register leading/trailing gap comments (`:current(/* c */ .a)`); the

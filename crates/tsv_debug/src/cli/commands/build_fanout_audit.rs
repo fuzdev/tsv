@@ -644,7 +644,7 @@ fn doc_node_count(source: &str, parser: ParserType) -> Result<usize, String> {
             let _ = tsv_ts::__private::format_ast_in(&ast, source, &doc_arena);
         }
         ParserType::Css => {
-            let ast = tsv_css::__private::parse(source, &bump).map_err(|e| format!("{e:#}"))?;
+            let ast = tsv_css::__private::parse(source).map_err(|e| format!("{e:#}"))?;
             let _ = tsv_css::__private::format_ast_in(&ast, source, &doc_arena);
         }
     }

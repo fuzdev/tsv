@@ -178,10 +178,9 @@ mod tests {
     /// pool text, the same for fresh stores and rewound ones, another for stores still holding
     /// a stylesheet's lists and strings.
     fn css_mint_mark(stores: &mut CssStores) -> String {
-        let arena = bumpalo::Bump::new();
         format!(
             "{:?}",
-            tsv_css::__private::parse_into("a { b: c(d, e); }", &arena, stores)
+            tsv_css::__private::parse_into("a { b: c(d, e); }", stores)
         )
     }
 
@@ -256,8 +255,7 @@ mod tests {
         assert_eq!(svelte.0, ts, "the box the TypeScript document parked");
         let _held = decoys();
         let css = tsv_css::__private::with_stores(|stores| {
-            let arena = bumpalo::Bump::new();
-            tsv_css::__private::parse_into("a { color: red; }", &arena, stores).expect("parses");
+            tsv_css::__private::parse_into("a { color: red; }", stores).expect("parses");
             css_address(stores)
         });
         assert_eq!(css, svelte.1, "the box the Svelte document parked");
@@ -370,13 +368,11 @@ mod tests {
             "the TypeScript slot hands out clean stores"
         );
         let css = tsv_css::__private::with_stores(|stores| {
-            let arena = bumpalo::Bump::new();
-            tsv_css::__private::parse_into("a { color: red; }", &arena, stores)
+            tsv_css::__private::parse_into("a { color: red; }", stores)
                 .map(|sheet| format!("{sheet:?}"))
                 .map_err(|e| format!("{e:#}"))
         });
-        let arena = bumpalo::Bump::new();
-        let fresh_css = tsv_css::__private::parse("a { color: red; }", &arena)
+        let fresh_css = tsv_css::__private::parse("a { color: red; }")
             .map(|parsed| format!("{:?}", parsed.stylesheet))
             .map_err(|e| format!("{e:#}"));
         assert_eq!(css, fresh_css, "the CSS slot hands out clean stores");

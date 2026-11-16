@@ -161,7 +161,7 @@ impl Formatter {
     pub fn format(&mut self, source: &str) -> Result<String, Error>;
 }
 // `__private` (hidden; the bindings, the CLI and the dev tooling)
-pub fn parse<'a>(source: &str, arena: &'a Bump) -> Result<InternalAst<'a>, Error>;
+pub fn parse(source: &str) -> Result<Parsed, Error>; // Svelte's also takes the caller's arena
 pub fn format_ast(ast: &InternalAst, source: &str) -> String;
 pub fn convert_ast_json_bytes(ast: &InternalAst, source: &str) -> Vec<u8>;
 pub fn convert_ast_json_string(ast: &InternalAst, source: &str) -> String;
@@ -975,10 +975,9 @@ Decisions made during development with rationale preserved for future reference.
 
 tsv's TypeScript tree lives in per-document stores named by typed ids (below), its decoded
 strings and comments included, so a TypeScript parse takes no arena. The CSS tree's lists
-and strings live in a stylesheet's `CssStores` (below); its parse still takes an arena, and
-allocates nothing in it. The Svelte tree sits in a **per-parse
-bump arena** (`bumpalo`), tied to the program lifetime, freed wholesale when the arena drops,
-with no per-node `Drop`.
+and strings live in a stylesheet's `CssStores` (below), so a CSS parse takes no arena
+either. The Svelte tree sits in a **per-parse bump arena** (`bumpalo`), tied to the program
+lifetime, freed wholesale when the arena drops, with no per-node `Drop`.
 
 **`Expression`, `Statement` and `TSType` nodes and the rare payloads are the exceptions: they live in `AstStores`**
 (`ast/stores.rs`), one per document, kept beside the tree in a `Parsed` and shared across a Svelte component's
@@ -1037,11 +1036,10 @@ pub enum StatementKind {
 ```
 
 A TypeScript parse returns the tree with the stores it wrote (`parse(source)` → `Parsed`, or
-`*_into` a caller's warm stores); a CSS or Svelte caller owns the arena
-(`parse(source, &arena)`), the returned tree bundled with its stores as well (`ParsedCss`,
-`ParsedRoot`, or `*_into` a caller's): `CssStores`, which hold every list and string of the
-CSS tree, and `SvelteStores`, a TypeScript half and a CSS half, beside the Svelte tree
-that borrows the arena.
+`*_into` a caller's warm stores); a CSS parse does the same (`ParsedCss`, with the `CssStores`
+that hold every list and string of the CSS tree), and only a Svelte caller owns the arena
+(`parse(source, &arena)`), the returned tree bundled with its `SvelteStores` (a TypeScript half
+and a CSS half; `ParsedRoot`, or `*_into` a caller's) beside the tree that borrows the arena.
 Each language crate parks its stores per thread, boxed, between documents (`with_stores`, which
 `tsv_arena`'s macros run every binding export under, and `WarmStores` for a slot the caller
 owns, as each `Formatter` does); a Svelte document's halves are the boxes `tsv_ts`'s and

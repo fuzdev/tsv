@@ -168,7 +168,7 @@ pub(crate) fn tsv_parse_to_wire_bytes(source: &str, parser: ParserType) -> Optio
             Some(tsv_svelte::__private::convert_ast_json_bytes(&ast, source))
         }
         ParserType::Css => {
-            let ast = tsv_css::__private::parse(source, &arena).ok()?;
+            let ast = tsv_css::__private::parse(source).ok()?;
             Some(tsv_css::__private::convert_ast_json_bytes(&ast, source))
         }
     }
@@ -193,7 +193,7 @@ pub(crate) fn tsv_parses(source: &str, parser: ParserType) -> bool {
             tsv_ts::__private::parse_with_goal_or_fallback(source, None).is_ok()
         }
         ParserType::Svelte => tsv_svelte::__private::parse(source, &arena).is_ok(),
-        ParserType::Css => tsv_css::__private::parse(source, &arena).is_ok(),
+        ParserType::Css => tsv_css::__private::parse(source).is_ok(),
     }
 }
 

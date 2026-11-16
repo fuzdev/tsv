@@ -22,7 +22,7 @@ use tsv_lang::{Error, Span};
 /// `convert` emits the wire from the span, so routing a name between the two modes moves
 /// no wire byte.
 pub(super) fn parse_raw_prelude_content(
-    parser: &mut CssParser<'_, '_>,
+    parser: &mut CssParser<'_>,
     normalize_whitespace: bool,
     // `@namespace` normalizes string / `url()` quotes to prettier's single-quote form
     // (`"x"` → `'x'`, `url("x")` → `url('x')`, per the `singleQuote` option — the same
@@ -458,7 +458,7 @@ impl PreludeEnds {
     /// end (zero for a reader that keeps its text verbatim).
     pub(super) fn observe(
         &mut self,
-        parser: &CssParser<'_, '_>,
+        parser: &CssParser<'_>,
         out_len: usize,
         trailing_spaces: usize,
     ) {

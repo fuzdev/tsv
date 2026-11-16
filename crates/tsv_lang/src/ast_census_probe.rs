@@ -307,8 +307,8 @@ pub fn list_delta<T>(delta: isize) {
 }
 
 /// The parser's list wrapper: `BumpVec<'bump, T>` over `bumpalo::collections::Vec`, feeding
-/// [`mint`] at flush and [`list_delta`] at every length change. Expanded in each parser
-/// crate behind the feature (`tsv_lang` has no `bumpalo` of its own, and a dependency for
+/// [`mint`] at flush and [`list_delta`] at every length change. Expanded in tsv_svelte's
+/// parser behind the feature (`tsv_lang` has no `bumpalo` of its own, and a dependency for
 /// the sake of a diagnostic is not worth having).
 ///
 /// Lengths are reconciled at each observation point, so an edit through `DerefMut`

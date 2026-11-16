@@ -6,7 +6,7 @@ use crate::keyword_set::ascii_keyword_set;
 /// Parse a color value: hex, named, rgb(), hsl(), etc.
 ///
 /// `Hex`/`Named` carry no text — their source is recovered from the value's span at
-/// print time — so this only classifies and needs no arena.
+/// print time — so this only classifies and allocates nothing.
 pub(crate) fn parse_color(s: &str) -> Option<Color> {
     // Hex color: #RGB, #RGBA, #RRGGBB, or #RRGGBBAA. `is_hex_color_body` (shared with
     // the printer's value-text normalizer) also requires the body be all hex digits,

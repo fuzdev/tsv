@@ -14,8 +14,7 @@
 
 /// The wire `name` of the stylesheet's first at-rule.
 fn atrule_name(source: &str) -> String {
-    let arena = bumpalo::Bump::new();
-    let stylesheet = tsv_css::__private::parse(source, &arena).expect("parse failed");
+    let stylesheet = tsv_css::__private::parse(source).expect("parse failed");
     let wire = tsv_debug::json::wire_value(&tsv_css::__private::convert_ast_json_bytes(
         &stylesheet,
         source,

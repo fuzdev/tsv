@@ -1244,7 +1244,7 @@ impl<'a> Printer<'a> {
         // source and line table — exactly as the top-level `<script>` / `<style>` islands
         // are, so the two positions share one formatter path and differ only in how deep the
         // body is indented. What the parse writes is local — the script's stores, the style's
-        // arena and stores — and nothing the doc keeps borrows it (its leaves are pooled text or
+        // stores — and nothing the doc keeps borrows it (its leaves are pooled text or
         // host-source spans). A raw-text `Text` never decodes, so `content` is the author's
         // bytes at `raw_span`.
         let base_offset = text.raw_span.start as usize;
@@ -1288,7 +1288,7 @@ impl<'a> Printer<'a> {
     /// [`Printer::build_nested_style_body_doc`]. `None` when it does not parse or prints
     /// nothing.
     ///
-    /// The parse's arena and stores are this body's own — the stylesheet is read through
+    /// The parse's stores are this body's own — the stylesheet is read through
     /// their view, never the host document's, and nothing the parse mints reaches past the
     /// doc built from it — and this function is where they live: it is kept out of line, so
     /// they sit in its frame and never in the fragment builder's, which recurses once per
@@ -1301,18 +1301,10 @@ impl<'a> Printer<'a> {
         base_offset: usize,
         host_nesting: u32,
     ) -> Option<DocId> {
-        // pre-sized to the content length to avoid the bump's chunk-doubling tail
-        let arena =
-            bumpalo::Bump::with_capacity(tsv_lang::estimated_ast_arena_capacity(content.len()));
         let mut stores = tsv_css::ast::CssStores::new();
-        let stylesheet = tsv_css::__private::parse_embedded(
-            content,
-            base_offset,
-            host_nesting,
-            &arena,
-            &mut stores,
-        )
-        .ok()?;
+        let stylesheet =
+            tsv_css::__private::parse_embedded(content, base_offset, host_nesting, &mut stores)
+                .ok()?;
         self.build_nested_style_body_doc(tsv_css::__private::parsed_ref(&stylesheet, &stores))
     }
 

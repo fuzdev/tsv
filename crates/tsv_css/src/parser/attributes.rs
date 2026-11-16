@@ -20,7 +20,7 @@ use tsv_lang::{Error, Span};
 /// the two are told apart only by the token after the `|`. So whitespace is skipped there
 /// and **reported**, and the `<wq-name>` reading rejects retroactively.
 pub(crate) fn parse_attribute_selector(
-    parser: &mut CssParser<'_, '_>,
+    parser: &mut CssParser<'_>,
     start: usize,
 ) -> Result<SimpleSelector, Error> {
     parser.expect(TokenKind::LeftBracket)?;
@@ -194,7 +194,7 @@ pub(crate) fn parse_attribute_selector(
 /// closing `]` immediately yields `(None, None)` (bare `[attr]`); otherwise a
 /// matcher (`=`, `~=`, `|=`, `^=`, `$=`, `*=`) and its value.
 fn parse_attribute_matcher_and_value(
-    parser: &mut CssParser<'_, '_>,
+    parser: &mut CssParser<'_>,
 ) -> Result<(Option<AttributeMatcher>, Option<Span>), Error> {
     if parser.check(TokenKind::RightBracket) {
         Ok((None, None)) // Just [attr]
@@ -220,9 +220,7 @@ fn parse_attribute_matcher_and_value(
 /// `i<NBSP>`. The reader ends the flag at the letters and re-seats past them, so the skip
 /// below steps the run exactly as it steps a run the lexer tokenized on its own. Read from
 /// the RAW token for the same reason: an escaped spelling (`\69`) is no flag to that regex.
-fn parse_attribute_flags(
-    parser: &mut CssParser<'_, '_>,
-) -> Result<Option<PoolText<CssText>>, Error> {
+fn parse_attribute_flags(parser: &mut CssParser<'_>) -> Result<Option<PoolText<CssText>>, Error> {
     if !parser.check(TokenKind::Identifier) {
         return Ok(None);
     }
@@ -253,7 +251,7 @@ fn parse_attribute_flags(
 /// ends the span at the split (`boundary_split_offset`) and re-seats there, so the skip below
 /// steps the run as it steps one the lexer tokenized on its own; the head of the token was
 /// stepped by the matcher→value juncture before it was read.
-fn parse_attribute_value(parser: &mut CssParser<'_, '_>) -> Result<Option<Span>, Error> {
+fn parse_attribute_value(parser: &mut CssParser<'_>) -> Result<Option<Span>, Error> {
     let (start, mut end) = (parser.current_start(), parser.current_end());
     match parser.current_kind() {
         TokenKind::Identifier => {
@@ -283,7 +281,7 @@ fn parse_attribute_value(parser: &mut CssParser<'_, '_>) -> Result<Option<Span>,
 /// The two components of a two-character matcher are separate `<delim-token>`s (css-syntax-3
 /// gives none of `~ | ^ $ =` a case in *consume a token*), so a comment may sit between them
 /// — but a `<whitespace-token>` may not, which is why only comments are skipped.
-fn parse_attribute_matcher(parser: &mut CssParser<'_, '_>) -> Result<AttributeMatcher, Error> {
+fn parse_attribute_matcher(parser: &mut CssParser<'_>) -> Result<AttributeMatcher, Error> {
     let matcher = match parser.current_kind() {
         TokenKind::Equals => AttributeMatcher::Exact, // =
         TokenKind::Tilde => {

@@ -324,7 +324,7 @@ mod census {
         match parser {
             ParserType::TypeScript => tsv_ts::__private::parse(source).is_ok(),
             ParserType::Svelte => tsv_svelte::__private::parse(source, &arena).is_ok(),
-            ParserType::Css => tsv_css::__private::parse(source, &arena).is_ok(),
+            ParserType::Css => tsv_css::__private::parse(source).is_ok(),
         }
     }
 

@@ -10,7 +10,6 @@ use crate::parser::value::scan::{
     comment_run_end, is_comment_start, is_value_separator, quoted_run_end, value_skip_table,
 };
 use crate::whitespace::is_css_whitespace;
-use bumpalo::Bump;
 use tsv_lang::Span;
 use tsv_lang::store::{ListMark, Run, flush_run};
 
@@ -278,8 +277,8 @@ impl<'a> ValueParser<'a> {
     /// ASCII-whitespace boundary comes off (identical to what the fast path would
     /// produce) while a non-ASCII space (NBSP, em space) is kept as leaf content,
     /// never dropped.
-    pub(crate) fn parse(&self, arena: &Bump, stores: &mut CssStores) -> CssValue {
-        self.parse_classified(arena, stores, None)
+    pub(crate) fn parse(&self, stores: &mut CssStores) -> CssValue {
+        self.parse_classified(stores, None)
     }
 
     /// [`Self::parse`], with the value's separator class supplied instead of derived.
@@ -306,11 +305,10 @@ impl<'a> ValueParser<'a> {
     /// `Some(None)` from any of them is held to.
     pub(crate) fn parse_classified(
         &self,
-        arena: &Bump,
         stores: &mut CssStores,
         class: Option<ValueSeparator>,
     ) -> CssValue {
-        self.parse_scanned(arena, stores, class, false)
+        self.parse_scanned(stores, class, false)
     }
 
     /// [`Self::parse_classified`] for the declaration scan, which states one more thing
@@ -321,7 +319,6 @@ impl<'a> ValueParser<'a> {
     /// passes. Read only beside a leaf class — the claim is about the whole text.
     pub(crate) fn parse_scanned(
         &self,
-        arena: &Bump,
         stores: &mut CssStores,
         class: Option<ValueSeparator>,
         group_closes_text: bool,
@@ -350,30 +347,30 @@ impl<'a> ValueParser<'a> {
             match class {
                 Some(ValueSeparator::None) => {
                     debug_assert!(
-                        self.unclassified_path_builds_leaf(text, arena),
+                        self.unclassified_path_builds_leaf(text),
                         "caller called {text:?} separator-free, the unclassified path disagreed"
                     );
-                    return self.build_scanned_leaf(text, group_closes_text, arena, stores);
+                    return self.build_scanned_leaf(text, group_closes_text, stores);
                 }
                 Some(ValueSeparator::Whitespace) => {
                     debug_assert!(
-                        matches!(self.oracle_scan(text, arena), FastScan::Whitespace),
+                        matches!(self.oracle_scan(text), FastScan::Whitespace),
                         "caller called {text:?} whitespace-separated, fast_scan disagreed"
                     );
-                    return self.parse_space_separated(arena, stores);
+                    return self.parse_space_separated(stores);
                 }
                 Some(ValueSeparator::Comma) | None => {}
             }
 
-            match self.fast_scan(text, arena, stores) {
+            match self.fast_scan(text, stores) {
                 FastScan::Comma(values) => {
                     return CssValue::CommaSeparated {
                         values,
                         span: self.absolute_span(),
                     };
                 }
-                FastScan::Whitespace => return self.parse_space_separated(arena, stores),
-                FastScan::Leaf => return self.build_leaf(text, arena, stores),
+                FastScan::Whitespace => return self.parse_space_separated(stores),
+                FastScan::Leaf => return self.build_leaf(text, stores),
                 // A `/* */` comment was found — defer to the comment-aware path.
                 FastScan::Comment => {}
             }
@@ -388,9 +385,9 @@ impl<'a> ValueParser<'a> {
             };
         }
         match classify_separators(trimmed) {
-            ValueSeparator::Comma => self.parse_comma_separated(arena, stores),
-            ValueSeparator::Whitespace => self.parse_space_separated(arena, stores),
-            ValueSeparator::None => self.parse_single(arena, stores),
+            ValueSeparator::Comma => self.parse_comma_separated(stores),
+            ValueSeparator::Whitespace => self.parse_space_separated(stores),
+            ValueSeparator::None => self.parse_single(stores),
         }
     }
 
@@ -405,8 +402,8 @@ impl<'a> ValueParser<'a> {
     /// takes that second arm whenever a comment sits inside its parens
     /// (`f(a /* c */ b)`), which the declaration's boundary scan never reports (it
     /// withholds the class on any comment). The debug-assertion oracle for every caller.
-    fn unclassified_path_builds_leaf(&self, text: &str, arena: &Bump) -> bool {
-        match self.oracle_scan(text, arena) {
+    fn unclassified_path_builds_leaf(&self, text: &str) -> bool {
+        match self.oracle_scan(text) {
             FastScan::Leaf => true,
             FastScan::Comment => {
                 crate::escapes::trim_css(text).len() == text.len()
@@ -419,8 +416,8 @@ impl<'a> ValueParser<'a> {
     /// [`Self::fast_scan`] for the debug-assertion oracles, over stores of its own: an oracle
     /// re-reads a text the parse reads once, so it hands the scan nothing of the stylesheet's
     /// to write to, and a debug build's stores hold what a release build's do.
-    fn oracle_scan(&self, text: &str, arena: &Bump) -> FastScan {
-        self.fast_scan(text, arena, &mut CssStores::new())
+    fn oracle_scan(&self, text: &str) -> FastScan {
+        self.fast_scan(text, &mut CssStores::new())
     }
 
     /// One fused pass over the (already-trimmed) value `text`, doing the work of
@@ -439,7 +436,7 @@ impl<'a> ValueParser<'a> {
     /// track it, and a quoted string — which those two walk under a quote flag — is
     /// hopped whole to the same end (`quoted_run_end`), so for a comment-free value the
     /// comma split is byte-for-byte identical to the two-pass result.
-    fn fast_scan(&self, text: &str, arena: &Bump, stores: &mut CssStores) -> FastScan {
+    fn fast_scan(&self, text: &str, stores: &mut CssStores) -> FastScan {
         let bytes = text.as_bytes();
         let mut in_parens: u32 = 0;
         let mut ws_seen = false;
@@ -532,7 +529,7 @@ impl<'a> ValueParser<'a> {
                 b')' => in_parens = in_parens.saturating_sub(1),
                 b',' if top => {
                     let mark = *frame.get_or_insert_with(|| stores.runs.value_scratch.mark());
-                    self.push_comma_segment(mark, text, seg_start, i, seg_ws, arena, stores);
+                    self.push_comma_segment(mark, text, seg_start, i, seg_ws, stores);
                     seg_start = i + 1;
                     lead_end = i + 1;
                     seg_ws = usize::MAX;
@@ -555,7 +552,7 @@ impl<'a> ValueParser<'a> {
             // Final segment runs to EOF (`ve_raw == text.len()`). Every comma-terminated
             // segment pushed an element (an empty one the sentinel), so the frame is
             // non-empty here and the leaf guard cannot arm.
-            self.push_comma_segment(mark, text, seg_start, bytes.len(), seg_ws, arena, stores);
+            self.push_comma_segment(mark, text, seg_start, bytes.len(), seg_ws, stores);
             FastScan::Comma(flush_run(
                 &mut stores.runs.value_scratch,
                 &mut stores.runs.values,
@@ -578,10 +575,6 @@ impl<'a> ValueParser<'a> {
     /// holds no comment (`fast_scan` returns at the first comment, before the segment
     /// holding it is pushed) and no top-level comma, so a top-level whitespace byte inside
     /// the element makes it a whitespace list and none makes it a single leaf.
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "the scan's cursor state, the arena and the stores, each read by the element built"
-    )]
     fn push_comma_segment(
         &self,
         mark: ListMark<CssValue>,
@@ -589,7 +582,6 @@ impl<'a> ValueParser<'a> {
         seg_start: usize,
         seg_end: usize,
         seg_ws: usize,
-        arena: &Bump,
         stores: &mut CssStores,
     ) {
         let seg = &text[seg_start..seg_end];
@@ -631,37 +623,30 @@ impl<'a> ValueParser<'a> {
         // safety, reachable only via leading delimiters — `fast_scan` never runs on a
         // comment-bearing value).
         let node = if first && seg_end == text.len() {
-            sub.parse_single(arena, stores)
+            sub.parse_single(stores)
         } else {
             let class = if seg_ws < value_end {
                 ValueSeparator::Whitespace
             } else {
                 ValueSeparator::None
             };
-            sub.parse_classified(arena, stores, Some(class))
+            sub.parse_classified(stores, Some(class))
         };
         stores.runs.value_scratch.push(node);
     }
 
     /// Parse comma-separated values: "a, b, c"
-    fn parse_comma_separated(&self, arena: &Bump, stores: &mut CssStores) -> CssValue {
+    fn parse_comma_separated(&self, stores: &mut CssStores) -> CssValue {
         CssValue::CommaSeparated {
-            values: self.split_top_level(
-                arena,
-                stores,
-                |c| c == ',',
-                &COMMA_SKIP,
-                SplitKind::Comma,
-            ),
+            values: self.split_top_level(stores, |c| c == ',', &COMMA_SKIP, SplitKind::Comma),
             span: self.absolute_span(),
         }
     }
 
     /// Parse space-separated values: "a b c"
-    fn parse_space_separated(&self, arena: &Bump, stores: &mut CssStores) -> CssValue {
+    fn parse_space_separated(&self, stores: &mut CssStores) -> CssValue {
         CssValue::List {
             values: self.split_top_level(
-                arena,
                 stores,
                 is_css_whitespace,
                 &CSS_WS_SKIP,
@@ -702,7 +687,6 @@ impl<'a> ValueParser<'a> {
     /// and the run belongs to the first.
     fn split_top_level<F>(
         &self,
-        arena: &Bump,
         stores: &mut CssStores,
         is_delimiter: F,
         skip: &[bool; 256],
@@ -768,10 +752,10 @@ impl<'a> ValueParser<'a> {
                 // `,a b`). Re-`parse()`ing the identical range would re-classify it the
                 // same way and recurse forever, so parse it as a leaf instead.
                 let parsed = if first && value_end_raw == text.len() {
-                    sub_parser.parse_single(arena, stores)
+                    sub_parser.parse_single(stores)
                 } else {
                     // Recursive, but same source!
-                    sub_parser.parse_classified(arena, stores, element_class)
+                    sub_parser.parse_classified(stores, element_class)
                 };
                 // An operator run is FLATTENED into the list around it, because the
                 // separator rule reads across the element boundary: `1.5 /2.5` is a
@@ -818,8 +802,8 @@ impl<'a> ValueParser<'a> {
     /// Identifier text is recovered from `span` at print time, so the fallback
     /// stores no copied string.
     #[inline]
-    fn build_leaf(&self, text: &'a str, arena: &Bump, stores: &mut CssStores) -> CssValue {
-        self.build_scanned_leaf(text, false, arena, stores)
+    fn build_leaf(&self, text: &'a str, stores: &mut CssStores) -> CssValue {
+        self.build_scanned_leaf(text, false, stores)
     }
 
     /// [`Self::build_leaf`] carrying [`Self::parse_scanned`]'s `group_closes_text`.
@@ -833,7 +817,6 @@ impl<'a> ValueParser<'a> {
         &self,
         text: &'a str,
         group_closes_text: bool,
-        arena: &Bump,
         stores: &mut CssStores,
     ) -> CssValue {
         let span = self.absolute_span();
@@ -843,7 +826,6 @@ impl<'a> ValueParser<'a> {
             self.colon_is_operator,
             self.head_welds,
             group_closes_text,
-            arena,
             stores,
         )
     }
@@ -857,9 +839,9 @@ impl<'a> ValueParser<'a> {
     /// is leaf content and stays, so the text handed to `build_leaf` still matches
     /// `span` (trimming it would desync the two and drop a string element — see the
     /// helper).
-    fn parse_single(&self, arena: &Bump, stores: &mut CssStores) -> CssValue {
+    fn parse_single(&self, stores: &mut CssStores) -> CssValue {
         let text = self.text();
-        self.build_leaf(crate::escapes::trim_css(text), arena, stores)
+        self.build_leaf(crate::escapes::trim_css(text), stores)
     }
 }
 
@@ -920,7 +902,6 @@ mod tests {
         ];
 
         for (text, want_comma, want_ws) in cases {
-            let arena = Bump::new();
             let span = Span {
                 start: 0,
                 end: text.len() as u32,
@@ -943,11 +924,11 @@ mod tests {
 
             // 2. `fast_scan` — the fused single pass. Its verdict must match.
             let fast_comma = matches!(
-                parser.fast_scan(text, &arena, &mut CssStores::new()),
+                parser.fast_scan(text, &mut CssStores::new()),
                 FastScan::Comma(_)
             );
             let fast_ws = matches!(
-                parser.fast_scan(text, &arena, &mut CssStores::new()),
+                parser.fast_scan(text, &mut CssStores::new()),
                 FastScan::Whitespace
             );
             assert_eq!(
@@ -1036,7 +1017,6 @@ mod tests {
             // `fast_scan` has no comment state of its own — it recognizes the comment and
             // hands the value to the two-pass path graded above. Pin the bail, since the
             // fused pass's own verdict is never consulted for such a value.
-            let arena = Bump::new();
             let span = Span {
                 start: 0,
                 end: text.len() as u32,
@@ -1044,7 +1024,7 @@ mod tests {
             let parser = ValueParser::new(text, span);
             assert!(
                 matches!(
-                    parser.fast_scan(text, &arena, &mut CssStores::new()),
+                    parser.fast_scan(text, &mut CssStores::new()),
                     FastScan::Comment
                 ),
                 "fast_scan must bail to the two-pass path for {text:?}"
@@ -1079,13 +1059,12 @@ mod tests {
             // its argument list is never split here.
             ("a f(x/* c */y)", vec!["a", "f(x/* c */y)"]),
         ] {
-            let arena = Bump::new();
             let span = Span {
                 start: 0,
                 end: source.len() as u32,
             };
             let mut stores = CssStores::new();
-            let value = ValueParser::new(source, span).parse(&arena, &mut stores);
+            let value = ValueParser::new(source, span).parse(&mut stores);
             let CssValue::List { values, .. } = value else {
                 panic!("expected a space-separated list for {source:?}, got {value:?}");
             };
@@ -1098,13 +1077,12 @@ mod tests {
         // consecutive comments fold (§4.3.2 loops), and the member's own leaf printer
         // spaces their interior, so folding costs nothing at emit.
         for source in ["/* c */", "/* c *//* d */"] {
-            let arena = Bump::new();
             let span = Span {
                 start: 0,
                 end: source.len() as u32,
             };
             let mut stores = CssStores::new();
-            let value = ValueParser::new(source, span).parse(&arena, &mut stores);
+            let value = ValueParser::new(source, span).parse(&mut stores);
             let CssValue::List { values, .. } = value else {
                 panic!("expected a list for the comment-only {source:?}, got {value:?}");
             };
@@ -1123,13 +1101,12 @@ mod tests {
     #[test]
     fn a_scan_handed_to_the_fallback_leaves_no_element_behind() {
         let source = "x f(a, b /*c*/, d)";
-        let arena = Bump::new();
         let span = Span {
             start: 0,
             end: source.len() as u32,
         };
         let mut stores = CssStores::new();
-        let value = ValueParser::new(source, span).parse(&arena, &mut stores);
+        let value = ValueParser::new(source, span).parse(&mut stores);
         let CssValue::List { values, .. } = value else {
             panic!("expected a space-separated list, got {value:?}");
         };
@@ -1298,9 +1275,7 @@ mod tests {
         let source = "auto";
         let span = Span { start: 0, end: 4 };
         let parser = ValueParser::new(source, span);
-
-        let arena = Bump::new();
-        let value = parser.parse(&arena, &mut CssStores::new());
+        let value = parser.parse(&mut CssStores::new());
         assert!(matches!(value, CssValue::Identifier { .. }));
         if let CssValue::Identifier { span } = value {
             assert_eq!(span.extract(source), "auto");
@@ -1315,10 +1290,8 @@ mod tests {
             end: 116,
         };
         let parser = ValueParser::new(source, span);
-
-        let arena = Bump::new();
         let mut stores = CssStores::new();
-        let value = parser.parse(&arena, &mut stores);
+        let value = parser.parse(&mut stores);
         assert!(matches!(value, CssValue::CommaSeparated { .. }));
         if let CssValue::CommaSeparated { values, .. } = value {
             let values = stores.view().values(values);
@@ -1331,10 +1304,8 @@ mod tests {
         let source = "10px 20px 30px";
         let span = Span { start: 0, end: 14 };
         let parser = ValueParser::new(source, span);
-
-        let arena = Bump::new();
         let mut stores = CssStores::new();
-        let value = parser.parse(&arena, &mut stores);
+        let value = parser.parse(&mut stores);
         assert!(matches!(value, CssValue::List { .. }));
         if let CssValue::List { values, .. } = value {
             let values = stores.view().values(values);
@@ -1351,10 +1322,8 @@ mod tests {
             end: 154,
         };
         let parser = ValueParser::new(source, span);
-
-        let arena = Bump::new();
         let mut stores = CssStores::new();
-        let value = parser.parse(&arena, &mut stores);
+        let value = parser.parse(&mut stores);
         assert!(matches!(value, CssValue::CommaSeparated { .. }));
         if let CssValue::CommaSeparated { values, .. } = value {
             let values = stores.view().values(values);
@@ -1371,10 +1340,8 @@ mod tests {
         let source = "0 2px 4px rgba(0, 0, 0, 0.1)";
         let span = Span { start: 0, end: 28 };
         let parser = ValueParser::new(source, span);
-
-        let arena = Bump::new();
         let mut stores = CssStores::new();
-        let value = parser.parse(&arena, &mut stores);
+        let value = parser.parse(&mut stores);
         assert!(matches!(value, CssValue::List { .. }));
         if let CssValue::List { values, .. } = value {
             let values = stores.view().values(values);
@@ -1390,10 +1357,8 @@ mod tests {
         let source = "linear-gradient(90deg, red 01%, blue 02%)";
         let span = Span { start: 0, end: 42 };
         let parser = ValueParser::new(source, span);
-
-        let arena = Bump::new();
         let mut stores = CssStores::new();
-        let value = parser.parse(&arena, &mut stores);
+        let value = parser.parse(&mut stores);
         assert!(matches!(value, CssValue::Function { .. }));
         if let CssValue::Function {
             name_span, args, ..
@@ -1417,10 +1382,8 @@ mod tests {
         let source = "a,,c";
         let span = Span { start: 0, end: 4 };
         let parser = ValueParser::new(source, span);
-
-        let arena = Bump::new();
         let mut stores = CssStores::new();
-        let value = parser.parse(&arena, &mut stores);
+        let value = parser.parse(&mut stores);
         assert!(matches!(value, CssValue::CommaSeparated { .. }));
         if let CssValue::CommaSeparated { values, .. } = value {
             let values = stores.view().values(values);
@@ -1434,7 +1397,7 @@ mod tests {
         // A *closing* comma produces no further group (the algorithm stops once the
         // input is empty), so `a,` is the one-element list `[a]`.
         let mut stores = CssStores::new();
-        let trailing = ValueParser::new("a,", Span { start: 0, end: 2 }).parse(&arena, &mut stores);
+        let trailing = ValueParser::new("a,", Span { start: 0, end: 2 }).parse(&mut stores);
         let CssValue::CommaSeparated { values, .. } = trailing else {
             panic!("expected a comma list");
         };
@@ -1446,10 +1409,8 @@ mod tests {
         let source = "red  ,  blue  ";
         let span = Span { start: 0, end: 14 };
         let parser = ValueParser::new(source, span);
-
-        let arena = Bump::new();
         let mut stores = CssStores::new();
-        let value = parser.parse(&arena, &mut stores);
+        let value = parser.parse(&mut stores);
         assert!(matches!(value, CssValue::CommaSeparated { .. }));
         if let CssValue::CommaSeparated { values, .. } = value {
             let values = stores.view().values(values);
@@ -1463,9 +1424,7 @@ mod tests {
         let source = "  auto  ";
         let span = Span { start: 0, end: 8 };
         let parser = ValueParser::new(source, span);
-
-        let arena = Bump::new();
-        let value = parser.parse(&arena, &mut CssStores::new());
+        let value = parser.parse(&mut CssStores::new());
         assert!(matches!(value, CssValue::Identifier { .. }));
         if let CssValue::Identifier { span } = value {
             assert_eq!(span.extract(source).trim(), "auto");
@@ -1493,10 +1452,8 @@ mod tests {
         let source = "a, b, c";
         let span = Span { start: 0, end: 7 };
         let parser = ValueParser::new(source, span);
-
-        let arena = Bump::new();
         let mut stores = CssStores::new();
-        let value = parser.parse(&arena, &mut stores);
+        let value = parser.parse(&mut stores);
         assert!(matches!(value, CssValue::CommaSeparated { .. }));
 
         if let CssValue::CommaSeparated { values, .. } = value {
@@ -1526,9 +1483,7 @@ mod tests {
             end: source.len() as u32,
         };
         let parser = ValueParser::new(source, span);
-
-        let arena = Bump::new();
-        let value = parser.parse(&arena, &mut CssStores::new());
+        let value = parser.parse(&mut CssStores::new());
         assert!(matches!(value, CssValue::Identifier { .. }));
     }
 
@@ -1547,10 +1502,8 @@ mod tests {
             end: source.len() as u32,
         };
         let parser = ValueParser::new(source, span);
-
-        let arena = Bump::new();
         let mut stores = CssStores::new();
-        let value = parser.parse(&arena, &mut stores);
+        let value = parser.parse(&mut stores);
         let CssValue::CommaSeparated { values, .. } = value else {
             panic!("expected a comma list, got {value:?}");
         };
@@ -1585,17 +1538,15 @@ mod tests {
             end: source.len() as u32,
         };
         let parser = ValueParser::new(source, span);
-
-        let arena = Bump::new();
         let mut stores = CssStores::new();
-        let value = parser.parse(&arena, &mut stores);
+        let value = parser.parse(&mut stores);
         let CssValue::List { values, .. } = value else {
             panic!("expected a space-separated list, got {value:?}");
         };
         let values = stores.view().values(values);
         assert_eq!(values.len(), 2);
         assert_eq!(values[0].span().extract(source), "f(a /* c */ b)");
-        assert!(parser.unclassified_path_builds_leaf("f(a /* c */ b)", &arena));
+        assert!(parser.unclassified_path_builds_leaf("f(a /* c */ b)"));
         assert_eq!(values[1].span().extract(source), "x");
     }
 
@@ -1611,10 +1562,8 @@ mod tests {
             end: source.len() as u32,
         };
         let parser = ValueParser::new(source, span);
-
-        let arena = Bump::new();
         let mut stores = CssStores::new();
-        let value = parser.parse(&arena, &mut stores);
+        let value = parser.parse(&mut stores);
         let CssValue::CommaSeparated { values, .. } = value else {
             panic!("expected a comma list, got {value:?}");
         };
@@ -1633,10 +1582,8 @@ mod tests {
         let source = "0 2px 4px rgba(0, 0, 0, 0.1),\n    0 4px 8px rgba(0, 0, 0, 0.2)";
         let span = Span { start: 0, end: 63 };
         let parser = ValueParser::new(source, span);
-
-        let arena = Bump::new();
         let mut stores = CssStores::new();
-        let value = parser.parse(&arena, &mut stores);
+        let value = parser.parse(&mut stores);
         assert!(matches!(value, CssValue::CommaSeparated { .. }));
 
         if let CssValue::CommaSeparated { values, .. } = value {

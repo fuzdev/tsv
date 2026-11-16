@@ -278,7 +278,7 @@ pub(crate) fn wires_and_reference(
             )
         }
         InputType::Css => {
-            let ast = tsv_css::__private::parse(source, &arena).expect("CSS input parses");
+            let ast = tsv_css::__private::parse(source).expect("CSS input parses");
             let (rule, elide_bom) = wire_rule(false);
             (
                 tsv_css::__private::convert_ast_json_bytes_with_locations(&ast, source),

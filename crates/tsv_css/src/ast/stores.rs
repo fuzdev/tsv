@@ -132,7 +132,7 @@ impl CssStores {
     /// so far is invalid from here on.
     // TODO: never trims. Peak row capacity stays parked for as long as the `Formatter` or the
     // thread lives, where the AST arena's rewind releases every block but the largest while
-    // idle. Rows held here instead of in the `Bump` escape that release.
+    // idle. Rows held here instead of in a bump arena escape that release.
     #[inline]
     pub fn reset(&mut self) {
         // destructured whole, so a field added to the stores without a reset here is a build
@@ -332,8 +332,7 @@ mod tests {
 
     /// The first element of each list of [`DOCUMENT`]'s parse.
     fn one_of_each() -> OneOfEach {
-        let arena = bumpalo::Bump::new();
-        let parsed = crate::__private::parse(DOCUMENT, &arena).expect("the document parses");
+        let parsed = crate::__private::parse(DOCUMENT).expect("the document parses");
         let view = parsed.view();
         let node = view.nodes(parsed.nodes)[0].clone();
         let CssNode::Atrule(CssAtrule {
@@ -402,9 +401,8 @@ mod tests {
     /// pushed last, whose handle is returned.
     fn fill_every_field(stores: &mut CssStores) -> PoolText<CssText> {
         let rows = one_of_each();
-        let arena = bumpalo::Bump::new();
         let document = DOCUMENT.repeat(16);
-        crate::__private::parse_into(&document, &arena, stores).expect("the document parses");
+        crate::__private::parse_into(&document, stores).expect("the document parses");
         push_one_of_each(stores, &rows);
         stores.text.push("a pooled string")
     }
@@ -551,12 +549,10 @@ mod tests {
             "@import url(a) supports((b: c)",
             "a, b > c d:not(e f",
         ] {
-            let arena = bumpalo::Bump::new();
-            crate::__private::parse_into(source, &arena, &mut stores).expect_err(source);
+            crate::__private::parse_into(source, &mut stores).expect_err(source);
             assert_scratch_empty(&stores);
         }
-        let arena = bumpalo::Bump::new();
-        crate::__private::parse_into(DOCUMENT, &arena, &mut stores).expect("parses");
+        crate::__private::parse_into(DOCUMENT, &mut stores).expect("parses");
         assert_scratch_empty(&stores);
     }
 
@@ -574,8 +570,7 @@ mod tests {
             "@custom-selector :--x .c .; a {}",
         ] {
             let mut stores = CssStores::new();
-            let arena = bumpalo::Bump::new();
-            let sheet = crate::__private::parse_into(source, &arena, &mut stores).expect(source);
+            let sheet = crate::__private::parse_into(source, &mut stores).expect(source);
             assert_scratch_empty(&stores);
             let view = stores.view();
             let rule = match view.nodes(sheet.nodes).last() {
@@ -607,8 +602,7 @@ mod tests {
     fn a_parse_over_an_open_frame_is_refused() {
         let mut stores = CssStores::new();
         stores.runs.part_span_scratch.push(Span::new(0, 0));
-        let arena = bumpalo::Bump::new();
-        let _ = crate::__private::parse_into("a {}", &arena, &mut stores);
+        let _ = crate::__private::parse_into("a {}", &mut stores);
     }
 
     #[test]
@@ -796,14 +790,12 @@ mod tests {
         ];
         let mut warm = WarmStores::default();
         for source in sources {
-            let arena = bumpalo::Bump::new();
             let reused = warm.with(|stores| {
-                crate::__private::parse_into(source, &arena, stores)
+                crate::__private::parse_into(source, stores)
                     .map(|sheet| format!("{sheet:?}"))
                     .map_err(|e| format!("{e:#}"))
             });
-            let fresh_arena = bumpalo::Bump::new();
-            let fresh = crate::__private::parse(source, &fresh_arena)
+            let fresh = crate::__private::parse(source)
                 .map(|parsed| format!("{:?}", parsed.stylesheet))
                 .map_err(|e| format!("{e:#}"));
             assert_eq!(reused, fresh, "{source:?}");

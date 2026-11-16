@@ -186,7 +186,7 @@ mod tests {
                         ]
                     }
                     ParserType::Css => {
-                        let Ok(ast) = tsv_css::__private::parse(&source, &arena) else {
+                        let Ok(ast) = tsv_css::__private::parse(&source) else {
                             continue;
                         };
                         vec![

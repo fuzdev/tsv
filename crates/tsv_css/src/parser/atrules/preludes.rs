@@ -18,7 +18,7 @@ use tsv_lang::{Error, Span};
 /// identifier followed by a parenthesis — and every reader of that rule in this file
 /// asks it here, so a condition part, a container name and a value function cannot
 /// disagree about what a function is.
-fn is_function_token(parser: &CssParser<'_, '_>) -> bool {
+fn is_function_token(parser: &CssParser<'_>) -> bool {
     parser.check(TokenKind::Identifier) && {
         let end_pos = parser.current_end();
         parser.source.get(end_pos..=end_pos) == Some("(")
@@ -31,7 +31,7 @@ fn is_function_token(parser: &CssParser<'_, '_>) -> bool {
 ///
 /// The name is matched ASCII case-insensitively, css-values-4's other half of the
 /// same section: "like keywords, function names are ASCII case-insensitive".
-fn at_selector_function(parser: &CssParser<'_, '_>) -> bool {
+fn at_selector_function(parser: &CssParser<'_>) -> bool {
     is_function_token(parser) && parser.current_identifier().eq_ignore_ascii_case("selector")
 }
 
@@ -50,7 +50,7 @@ fn at_selector_function(parser: &CssParser<'_, '_>) -> bool {
 /// continue with rather than erroring, so `Ok` alone would also accept a selector
 /// followed by garbage.
 fn parse_selector_argument(
-    parser: &mut CssParser<'_, '_>,
+    parser: &mut CssParser<'_>,
     arg_start: usize,
     comments_len: usize,
 ) -> Result<Option<SelectorList>, Error> {
@@ -112,7 +112,7 @@ fn needs_separator_before(prev: Option<TokenKind>, trailing_spaces: usize) -> bo
 /// spelled in place (`crate::whitespace::spell_run`), so a run between two operators
 /// (`and <NBSP> or`) rides the connector run's text with the comments around it.
 fn skip_gap_registering_comments(
-    parser: &mut CssParser<'_, '_>,
+    parser: &mut CssParser<'_>,
     end: &mut usize,
     run: &mut OperatorRun,
 ) -> Result<(), Error> {
@@ -390,7 +390,7 @@ pub(super) enum ConditionReader {
 /// - `not (color: red)` - negation
 /// - `(a) and (b) or (c)` - mixed (parsed left-to-right)
 pub(super) fn parse_condition_query(
-    parser: &mut CssParser<'_, '_>,
+    parser: &mut CssParser<'_>,
     reader: ConditionReader,
 ) -> Result<(ConditionQuery, Span), Error> {
     // The prelude's head, when it opens on a boundary run: stepped before the span begins,
@@ -551,7 +551,7 @@ enum ConditionPartOutcome {
 /// `end_pos` is the query's end position so far, widened by the part and handed back
 /// in the outcome.
 fn parse_condition_part(
-    parser: &mut CssParser<'_, '_>,
+    parser: &mut CssParser<'_>,
     connector: Option<ConnectorRun>,
     mut end_pos: usize,
     reader: ConditionReader,
@@ -997,7 +997,7 @@ fn parse_condition_part(
 /// not a parenthesized part or never closed — the caller reports the unterminated
 /// function.
 pub(super) fn parse_supports_function_condition(
-    parser: &mut CssParser<'_, '_>,
+    parser: &mut CssParser<'_>,
 ) -> Result<Option<(ConditionQuery, Span)>, Error> {
     let start = parser.base_offset() + parser.current_start();
     let ConditionPartOutcome::Parsed {
@@ -1044,7 +1044,7 @@ pub(super) fn parse_supports_function_condition(
 /// - `sidebar (min-width: 100px)` - named container
 /// - `sidebar (min-width: 100px) and (max-width: 200px)` - named container with conjunction
 pub(super) fn parse_container_prelude(
-    parser: &mut CssParser<'_, '_>,
+    parser: &mut CssParser<'_>,
 ) -> Result<(Option<PoolText<CssText>>, ConditionQuery, Span), Error> {
     // A boundary run at the prelude's head is stepped before the name is read — it is no
     // name (`@container <NBSP> x (…)`) — and before the span begins, so the span opens on the
@@ -1095,7 +1095,7 @@ pub(super) fn parse_container_prelude(
 /// or invalid list — `@scope ()`, `@scope (.a, , .b)`, `@scope (.)` — parses (each is
 /// kept verbatim), matching parseCss (which captures the prelude raw) and prettier.
 /// `what` names the clause for the unterminated-`)` error.
-fn parse_scope_clause(parser: &mut CssParser<'_, '_>, what: &str) -> Result<ScopeClause, Error> {
+fn parse_scope_clause(parser: &mut CssParser<'_>, what: &str) -> Result<ScopeClause, Error> {
     let paren_start = parser.span_pos(parser.current_start());
     parser.advance()?; // consume '('
     // Both gaps inside the parens step the boundary class (the list's own start and its
@@ -1134,7 +1134,7 @@ fn parse_scope_clause(parser: &mut CssParser<'_, '_>, what: &str) -> Result<Scop
 /// The span covers the authored prelude (first clause start to last `)`); when both
 /// clauses are absent it is a zero-width span at the cursor, so the public AST's
 /// `prelude` string extracts to `""` (matching parseCss).
-pub(super) fn parse_scope_prelude(parser: &mut CssParser<'_, '_>) -> Result<PreludeValue, Error> {
+pub(super) fn parse_scope_prelude(parser: &mut CssParser<'_>) -> Result<PreludeValue, Error> {
     // Leading gap comments (`@scope /* c */ …`) register here: the shared at-rule
     // name skip in `parse_atrule` is a plain skip that stops at a comment, so a leading
     // comment is the current token on entry. Capturing `start` *after* this keeps it out
@@ -1202,7 +1202,7 @@ pub(super) fn parse_scope_prelude(parser: &mut CssParser<'_, '_>) -> Result<Prel
 /// `parseCss` stores in its raw prelude either way. Reading it there is what keeps
 /// `(.a) to<NBSP>(.b)` a limit clause — the printer spells the run back glued to the keyword,
 /// as authored. The split is `whitespace::boundary_split_offset`, the attribute value's.
-fn scope_to_keyword_len(parser: &CssParser<'_, '_>) -> Option<usize> {
+fn scope_to_keyword_len(parser: &CssParser<'_>) -> Option<usize> {
     if !parser.check(TokenKind::Identifier) {
         return None;
     }
@@ -1237,7 +1237,7 @@ fn scope_to_keyword_len(parser: &CssParser<'_, '_>) -> Option<usize> {
 /// raw reader's in both arms — first token to the terminator — so the wire prelude is the
 /// same bytes either way.
 pub(super) fn parse_custom_selector_prelude(
-    parser: &mut CssParser<'_, '_>,
+    parser: &mut CssParser<'_>,
 ) -> Result<PreludeValue, Error> {
     // The raw offset the replay restarts from, and the registrations it discards.
     let prelude_start_raw = parser.current_start();
@@ -1275,7 +1275,7 @@ pub(super) fn parse_custom_selector_prelude(
 /// the list. `None` for any prelude that is not that shape, leaving the parser wherever
 /// the mismatch was found — the caller rewinds.
 fn parse_custom_selector_head_and_list(
-    parser: &mut CssParser<'_, '_>,
+    parser: &mut CssParser<'_>,
 ) -> Result<Option<(Span, SelectorList)>, Error> {
     // Leading gap: `@custom-selector /* c */ :--a` (the shared name skip in `parse_atrule`
     // is a plain whitespace skip, so a leading comment is the current token on entry). It
@@ -1364,7 +1364,7 @@ fn parse_custom_selector_head_and_list(
 /// `<media-query>`", so an entry that matches no `<media-query>` — an empty one included —
 /// is a grammar mismatch that §"Error Handling" replaces with `not all`, never a parse
 /// error.
-pub(super) fn parse_import_prelude(parser: &mut CssParser<'_, '_>) -> Result<PreludeValue, Error> {
+pub(super) fn parse_import_prelude(parser: &mut CssParser<'_>) -> Result<PreludeValue, Error> {
     // Raw offset of the prelude's first token, for the raw fallback below.
     let prelude_start_raw = parser.current_start();
     let start = parser.span_pos(parser.current_start());
@@ -1553,7 +1553,7 @@ fn url_token_has_unclosed_paren(text: &str) -> bool {
 /// [`CssParser::skip_boundary_whitespace_and_comments`]): the span re-emits them verbatim, and
 /// registering would additionally offer them to the `@import` prelude's gap emitters, which
 /// print between the parsed values — outside this function, where they would print twice.
-fn take_comment_run(parser: &mut CssParser<'_, '_>) -> Result<Option<Span>, Error> {
+fn take_comment_run(parser: &mut CssParser<'_>) -> Result<Option<Span>, Error> {
     let mut start = None;
     let mut end = 0u32;
     loop {
@@ -1588,7 +1588,7 @@ fn take_comment_run(parser: &mut CssParser<'_, '_>) -> Result<Option<Span>, Erro
 ///
 /// The single definition of how far a prelude function's arguments reach — the `layer()`
 /// arm reads the span, the `<general-enclosed>` arm only needs the seek.
-fn consume_function_args(parser: &mut CssParser<'_, '_>) -> Result<Option<Span>, Error> {
+fn consume_function_args(parser: &mut CssParser<'_>) -> Result<Option<Span>, Error> {
     let mut start = None;
     let mut end = 0u32;
     let mut depth: u32 = 0;
@@ -1635,7 +1635,7 @@ impl ImportFunction {
 }
 
 /// Parse a function value (e.g., url(), layer(), supports())
-fn parse_function_value(parser: &mut CssParser<'_, '_>) -> Result<CssValue, Error> {
+fn parse_function_value(parser: &mut CssParser<'_>) -> Result<CssValue, Error> {
     let value_start = parser.span_pos(parser.current_start());
 
     // Get function name (current token should be identifier). Kept verbatim from

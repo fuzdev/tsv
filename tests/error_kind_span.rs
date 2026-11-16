@@ -23,8 +23,7 @@ fn svelte_parse_error(source: &str) -> Error {
 }
 
 fn css_parse_error(source: &str) -> Error {
-    let arena = bumpalo::Bump::new();
-    tsv_css::__private::parse(source, &arena).expect_err("the source must not parse")
+    tsv_css::__private::parse(source).expect_err("the source must not parse")
 }
 
 #[test]

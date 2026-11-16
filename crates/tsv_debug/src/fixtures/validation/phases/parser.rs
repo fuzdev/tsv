@@ -385,7 +385,7 @@ pub(in crate::fixtures::validation) fn validate_tsv_rejects(
                 .map(|_| ())
                 .map_err(|e| format!("{e:#}"))
         }
-        InputType::Css => tsv_css::__private::parse(input, &arena)
+        InputType::Css => tsv_css::__private::parse(input)
             .map(|_| ())
             .map_err(|e| format!("{e:#}")),
     };

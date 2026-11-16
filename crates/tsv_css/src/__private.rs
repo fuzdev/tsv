@@ -15,20 +15,16 @@ pub use crate::ast::{WarmStores, park_stores, take_stores, with_stores};
 /// everywhere in CSS, whose syntax normalizes a `<CR>` to `<LF>` itself (css-syntax-3
 /// §Preprocessing the input stream), so this is the folded parse alone;
 /// `tsv_svelte::__private::parse_folded` is the sibling that is not.
-pub fn parse_folded(
-    folded: &tsv_lang::printing::FoldedSource<'_>,
-    arena: &bumpalo::Bump,
-) -> Result<ParsedCss> {
-    parsed(|stores| parse_folded_into(folded, arena, stores))
+pub fn parse_folded(folded: &tsv_lang::printing::FoldedSource<'_>) -> Result<ParsedCss> {
+    parsed(|stores| parse_folded_into(folded, stores))
 }
 
 /// [`parse_folded`] into a caller's `stores`.
 pub fn parse_folded_into(
     folded: &tsv_lang::printing::FoldedSource<'_>,
-    arena: &bumpalo::Bump,
     stores: &mut CssStores,
 ) -> Result<CssStyleSheet> {
-    folded.parse_with(|text| parse_into(text, arena, stores))
+    folded.parse_with(|text| parse_into(text, stores))
 }
 
 /// A warm parse's tree as a reading entry point takes it, read through `stores`.
@@ -62,10 +58,9 @@ fn parsed(parse: impl FnOnce(&mut CssStores) -> Result<CssStyleSheet>) -> Result
 /// * `Ok(CssStyleSheet)` - Parsed AST with nodes and value comments
 /// * `Err(Error)` - Parse error positioned in the parent file
 ///
-/// `arena` is the caller's (the host document's arena when CSS is embedded in a Svelte
-/// `<style>`), and nothing is allocated in it; `stores` are the host document's CSS stores,
-/// or the caller's own for a stylesheet it parses apart from the document's: every list and
-/// string of the returned tree lives in them.
+/// `stores` are the host document's CSS stores, or the caller's own for a stylesheet it
+/// parses apart from the document's: every list and string of the returned tree lives in
+/// them.
 ///
 /// # Errors
 ///
@@ -77,10 +72,9 @@ pub fn parse_embedded(
     source: &str,
     base_offset: usize,
     host_nesting: u32,
-    arena: &bumpalo::Bump,
     stores: &mut CssStores,
 ) -> Result<CssStyleSheet> {
-    parser::parse_css(source, base_offset, host_nesting, arena, stores)
+    parser::parse_css(source, base_offset, host_nesting, stores)
 }
 
 /// [`format_ast_in`] over a document the caller folded ahead of the parse
@@ -177,8 +171,7 @@ pub use crate::ast::convert::{write_css_children, write_css_comments};
 /// use tsv_css::__private::{format_ast, parse};
 ///
 /// let css = "div{color:red;}";
-/// let arena = bumpalo::Bump::new();
-/// let stylesheet = parse(css, &arena).expect("Failed to parse CSS");
+/// let stylesheet = parse(css).expect("Failed to parse CSS");
 /// let formatted = format_ast(&stylesheet, css);
 /// assert_eq!(formatted, "div {\n\tcolor: red;\n}\n");
 /// ```
@@ -216,26 +209,19 @@ pub fn format_ast_in<'a>(
 /// use tsv_css::__private::parse;
 ///
 /// let css = "div { color: red; }";
-/// let arena = bumpalo::Bump::new();
-/// let stylesheet = parse(css, &arena).expect("Failed to parse CSS");
+/// let stylesheet = parse(css).expect("Failed to parse CSS");
 /// ```
 ///
 /// Every list and string of the returned [`CssStyleSheet`] lives in the stores [`ParsedCss`]
-/// bundles with it, fresh for this parse; it derefs to the stylesheet. Nothing is allocated
-/// in `arena` (caller-owns-`Bump`).
-pub fn parse(source: &str, arena: &bumpalo::Bump) -> Result<ParsedCss> {
-    parsed(|stores| parse_into(source, arena, stores))
+/// bundles with it, fresh for this parse; it derefs to the stylesheet.
+pub fn parse(source: &str) -> Result<ParsedCss> {
+    parsed(|stores| parse_into(source, stores))
 }
 
 /// [`parse`] into a caller's `stores`, for a warm path that keeps them across stylesheets.
-pub fn parse_into(
-    source: &str,
-    arena: &bumpalo::Bump,
-    stores: &mut CssStores,
-) -> Result<CssStyleSheet> {
+pub fn parse_into(source: &str, stores: &mut CssStores) -> Result<CssStyleSheet> {
     Error::ensure_source_fits(source)?;
-    parser::parse_css(source, 0, 0, arena, stores)
-        .map_err(|e| e.with_context(source, WIRE_COORDINATES))
+    parser::parse_css(source, 0, 0, stores).map_err(|e| e.with_context(source, WIRE_COORDINATES))
 }
 
 /// Convert CSS AST to compact JSON wire bytes — the **sole emission path** for its wire

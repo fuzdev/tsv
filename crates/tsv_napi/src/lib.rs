@@ -288,7 +288,7 @@ fn engine_export<T>(
 macro_rules! lang_bindings {
     (
         $goalness:ident,
-        $storeness:ident,
+        $arenaness:ident,
         $lang:ident,
         $engine:ident,
         $parse_json_fn:ident, $parse_json_js:literal,
@@ -310,7 +310,7 @@ macro_rules! lang_bindings {
                 let goal = napi_source_type(source_type, goal_allowed!($goalness), Family::Parse)?;
                 parse_convert!(
                     $goalness,
-                    $storeness,
+                    $arenaness,
                     $lang,
                     convert_ast_json_string,
                     source,
@@ -326,7 +326,7 @@ macro_rules! lang_bindings {
                 source_type: Option<String>,
             ) -> Result<(), Failure> {
                 let goal = napi_source_type(source_type, goal_allowed!($goalness), Family::Parse)?;
-                parse_internal!($goalness, $storeness, $lang, source, goal, |e| {
+                parse_internal!($goalness, $arenaness, $lang, source, goal, |e| {
                     Failure::parse(&e)
                 })
             }
@@ -338,7 +338,7 @@ macro_rules! lang_bindings {
                 source_type: Option<String>,
             ) -> Result<String, Failure> {
                 let goal = napi_source_type(source_type, goal_allowed!($goalness), Family::Format)?;
-                parse_format!($goalness, $storeness, $lang, source, goal, |e| {
+                parse_format!($goalness, $arenaness, $lang, source, goal, |e| {
                     Failure::parse(&e)
                 })
             }
@@ -388,7 +388,7 @@ macro_rules! lang_bindings {
 
 lang_bindings!(
     nogoal,
-    stores,
+    arena,
     tsv_svelte,
     svelte_engine,
     parse_svelte_json,
@@ -400,7 +400,7 @@ lang_bindings!(
 );
 lang_bindings!(
     goal,
-    stores,
+    noarena,
     tsv_ts,
     typescript_engine,
     parse_typescript_json,
@@ -412,7 +412,7 @@ lang_bindings!(
 );
 lang_bindings!(
     nogoal,
-    stores,
+    noarena,
     tsv_css,
     css_engine,
     parse_css_json,

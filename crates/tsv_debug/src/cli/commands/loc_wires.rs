@@ -300,7 +300,7 @@ fn answer(request: &WireRequest, arena: &mut bumpalo::Bump) -> Result<Vec<u8>, S
                 tsv_ts::__private::convert_ast_json_bytes_with_locations(&ast, source)
             }
             WireLanguage::Css => {
-                let ast = tsv_css::__private::parse(source, arena).map_err(|e| format!("{e:#}"))?;
+                let ast = tsv_css::__private::parse(source).map_err(|e| format!("{e:#}"))?;
                 tsv_css::__private::convert_ast_json_bytes_with_locations(&ast, source)
             }
         })

@@ -22,14 +22,12 @@
 use serde_json::Value;
 
 fn parse_json(src: &str) -> Value {
-    let arena = bumpalo::Bump::new();
-    let ast = tsv_css::__private::parse(src, &arena).expect("parser should accept the CSS");
+    let ast = tsv_css::__private::parse(src).expect("parser should accept the CSS");
     tsv_debug::json::wire_value(&tsv_css::__private::convert_ast_json_bytes(&ast, src))
 }
 
 fn accepts(src: &str) -> bool {
-    let arena = bumpalo::Bump::new();
-    tsv_css::__private::parse(src, &arena).is_ok()
+    tsv_css::__private::parse(src).is_ok()
 }
 
 /// Top-level `children` count (rules + at-rules).
@@ -38,8 +36,7 @@ fn child_count(src: &str) -> usize {
 }
 
 fn format(src: &str) -> String {
-    let arena = bumpalo::Bump::new();
-    let ast = tsv_css::__private::parse(src, &arena).expect("parser should accept the CSS");
+    let ast = tsv_css::__private::parse(src).expect("parser should accept the CSS");
     tsv_css::__private::format_ast(&ast, src)
 }
 

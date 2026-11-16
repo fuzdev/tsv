@@ -232,7 +232,7 @@ fn run_reuse(files: &[std::path::PathBuf], list_errors: bool) -> Result<(), CliE
             ParserType::Svelte => tsv_svelte::__private::parse_folded(&folded, &bump).map(|ast| {
                 let _ = tsv_svelte::__private::format_folded_in(&ast, &folded, a);
             }),
-            ParserType::Css => tsv_css::__private::parse_folded(&folded, &bump).map(|ast| {
+            ParserType::Css => tsv_css::__private::parse_folded(&folded).map(|ast| {
                 let _ = tsv_css::__private::format_folded_in(&ast, &folded, a);
             }),
         }
@@ -285,13 +285,13 @@ fn run_reuse(files: &[std::path::PathBuf], list_errors: bool) -> Result<(), CliE
 /// ≤2× by chunk doubling off the default first chunk). Only used to calibrate
 /// `estimated_ast_arena_capacity`; the AST is dropped with the bump. Returns 0 if
 /// the parse fails (the caller's first parse already succeeded, so it won't here), and
-/// always for TypeScript, whose parse writes its stores and allocates in no bump.
+/// always for TypeScript and CSS, whose parses write their stores and allocate in no bump.
 fn measure_bump_demand(source: &str, parser: ParserType) -> u64 {
     let bump = bumpalo::Bump::new();
     let ok = match parser {
         ParserType::TypeScript => tsv_ts::__private::parse(source).is_ok(),
         ParserType::Svelte => tsv_svelte::__private::parse(source, &bump).is_ok(),
-        ParserType::Css => tsv_css::__private::parse(source, &bump).is_ok(),
+        ParserType::Css => tsv_css::__private::parse(source).is_ok(),
     };
     if ok { bump.allocated_bytes() as u64 } else { 0 }
 }
@@ -317,7 +317,7 @@ fn collect_file(source: &str, parser: ParserType, stats: &mut Stats) -> Result<(
             tsv_svelte::__private::format_folded_in(&ast, &folded, &arena)
         }
         ParserType::Css => {
-            let ast = tsv_css::__private::parse_folded(&folded, &bump).map_err(parse_error)?;
+            let ast = tsv_css::__private::parse_folded(&folded).map_err(parse_error)?;
             tsv_css::__private::format_folded_in(&ast, &folded, &arena)
         }
     };

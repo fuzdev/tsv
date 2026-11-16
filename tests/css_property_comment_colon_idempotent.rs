@@ -127,8 +127,7 @@ const PRETTIER_DIVERGENCE: &[(&str, &str, &str)] = &[
 ];
 
 fn format_css(source: &str) -> String {
-    let arena = bumpalo::Bump::new();
-    let stylesheet = tsv_css::__private::parse(source, &arena).expect("parse failed");
+    let stylesheet = tsv_css::__private::parse(source).expect("parse failed");
     tsv_css::__private::format_ast(&stylesheet, source)
 }
 

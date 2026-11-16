@@ -77,7 +77,7 @@ pub(crate) struct Lexer<'a> {
     /// `has_decoded` is the presence flag `decoded_str` reads; it is cleared at the
     /// top of every token's scan (`next_token_into_local`) and by `seek`, so it
     /// reflects only the current token, and set by the escaped-identifier path.
-    /// `advance`/`new` copy the borrowed scratch into the AST arena right after
+    /// `advance`/`new` copy the borrowed scratch into the stores' text pool right after
     /// lexing; `peek_kind` leaves it parked here for the matching `advance`-from-cache to
     /// claim, so a peeked escaped identifier keeps its decode (nothing re-lexes
     /// between the peek and its consume, so the scratch is intact). The scratch is
@@ -132,8 +132,8 @@ impl<'a> Lexer<'a> {
     /// The decoded value of the most recently produced token, if it required escape
     /// processing (only escaped identifiers do); `None` for the common escape-free
     /// token. Borrows the parked `decode_scratch` — valid until the next token is
-    /// lexed (which may overwrite it), so the parser copies it into its AST arena
-    /// immediately after each lex (`CssParser::decoded_to_arena`) rather than holding
+    /// lexed (which may overwrite it), so the parser copies it into the stores' text pool
+    /// immediately after each lex (`CssParser::decoded_to_pool`) rather than holding
     /// the borrow.
     #[inline]
     pub(crate) fn decoded_str(&self) -> Option<&str> {
