@@ -1,4 +1,4 @@
-//! Parser allocation demand over a corpus: how many nodes of each arena-allocated type a
+//! Parser allocation demand over a corpus: how many nodes of each store-backed type a
 //! parse builds, per source byte, and how much of it the finished tree keeps.
 //!
 //! [`super::ast_census`] walks the wire, so it counts survivors. This counts what the parser
@@ -10,19 +10,19 @@
 //!
 //! # What a row is
 //!
-//! One row per element type a parser placed in its arena, named by that type: a single
-//! allocation counts one, a flushed list counts its length. A list of references reads
-//! `Id<T> (ids)` and an `Option` of one `Option<Id<T>> (ids)` (references read the same way); those are id lists, not rows of
-//! `T`, whose nodes are counted where they were allocated. A pattern is an `Expression` row,
-//! and an array pattern's elements an id list with holes, `Option<Id<Expression>> (ids)`, where a
-//! hole is a row too.
+//! One row per element type a parser placed in its stores, named by that type: a single
+//! push counts one, a flushed list counts its length. A list of references reads
+//! `Id<T> (ids)` and an `Option` of one `Option<Id<T>> (ids)` (references read the same
+//! way); those are id lists, not rows of `T`, whose nodes are counted where they were
+//! allocated. A pattern is an `Expression` row, and an array pattern's elements an id list
+//! with holes, `Option<Id<Expression>> (ids)`, where a hole is a row too.
 //!
 //! - `minted`: every row placed, whatever became of it.
 //! - `abandoned`: minted inside a parse a rewind threw away (TypeScript's checkpoint
 //!   rewinds and whole-parse retry, Svelte's each-head re-parse and type-extent scan, CSS's
 //!   prelude and selector retries).
 //! - `dup_dead`: rows stranded by the by-value clone class whose copy was allocated again:
-//!   an expression copied out of the arena and placed elsewhere, its original then
+//!   an expression copied out of its store and placed elsewhere, its original then
 //!   unreachable (a computed object key, `{@debug}`'s elements and the sequence they came
 //!   from).
 //! - `superseded`: rows replaced by a re-allocation (the `<` node's lazy re-allocation, a
@@ -30,7 +30,7 @@
 //!   instantiation's node), or a wrapper the parse discards (the `function` shell around a
 //!   `{#snippet}` head's parameters).
 //! - `moved_inline`: rows stranded by a by-value move into a parent's own slot: the node is
-//!   alive inside its parent, the arena row is not (a class field's initializer, a
+//!   alive inside its parent, the store row is not (a class field's initializer, a
 //!   computed class or interface key, an enum initializer, `export default` / `export =`,
 //!   a decorator, a `for` head, an array pattern's unchanged element). Not waste; a by-value
 //!   slot that became a store edge would make this a row.
@@ -47,8 +47,7 @@
 //! - `scratch_peak`: the largest total of open list prefixes of this type at any moment,
 //!   maximum over files, and the same per source byte (summed per-file peaks over bytes).
 //!   Counted on every store's scratch (`ListBuf`: the expression, statement and type id
-//!   lists, the parameter value runs, the lists built by value) and for the comment lists
-//!   built in the arena (the census's `BumpVec`).
+//!   lists, the parameter value runs, the lists built by value, the comment ledger).
 //! - `wire` / `delta`: the wire's count of the node named like the row, when the wire has
 //!   one, and `live - wire`. Rows with no wire name (`Expression`, `Statement`, `TSType`,
 //!   `ObjectProperty`, the id lists) leave it blank, and a row whose wire name is shared by a

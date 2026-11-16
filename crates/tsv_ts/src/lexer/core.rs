@@ -531,7 +531,7 @@ impl<'a> Lexer<'a> {
 
     /// Return the cursor to `checkpoint`, un-reading every token lexed since. The
     /// decode scratch is left as the abandoned tokens overwrote it and flagged
-    /// absent: the parser drains a decoded value into its arena at the lex that
+    /// absent: the parser drains a decoded value into its text pool at the lex that
     /// produced it, so nothing reads the scratch for a token it did not just lex,
     /// and the next token-producing call resets the flag either way.
     pub(crate) fn rewind(&mut self, checkpoint: LexerCheckpoint) {

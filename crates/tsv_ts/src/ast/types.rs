@@ -747,7 +747,7 @@ pub struct TSMappedType {
 #[derive(Debug, Clone)]
 pub struct TSMappedTypeParameter {
     /// The parameter name (just the string, not an `Identifier`) — span-identity
-    /// with the arena-string escaped fallback, like every identifier name. `span`
+    /// with the pooled escaped fallback, like every identifier name. `span`
     /// covers exactly the name token (`K`; the constraint is a sibling field),
     /// so the verbatim name is the leading `raw_len` bytes at `span.start`.
     pub name: IdentName,

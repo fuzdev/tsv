@@ -1,8 +1,8 @@
 /**
  * `npm run branch:report -- <base-ref> <cand-ref>` — one document comparing two commits on every
  * axis a merge read needs: artifact sizes, type widths and work counters deterministically, with
- * build wall and timing behind flags, and the store-rows section left open (it exists once the
- * indexed-store port does). Each ref is built from git in its own tree and target directory
+ * build wall and timing behind flags, and the store-rows section left open (no leg reads the
+ * stores' counters yet). Each ref is built from git in its own tree and target directory
  * (`side.ts`); the same ref on both sides is the A/A null, built twice, and its report is the
  * floor a later run's timing rows take (`--aa`).
  *
@@ -281,7 +281,7 @@ function store_rows_section(): Section {
 		id: 'store_rows',
 		status: 'not_applicable',
 		reason:
-			'the AST is arena-allocated, so there are no stores, rows or capacities to count. ' +
+			'no leg reads the row, capacity or growth counters of the stores yet. ' +
 			'Extension point: `store_rows_section` in scripts/branch_report/branch_report.ts',
 		legs: []
 	};

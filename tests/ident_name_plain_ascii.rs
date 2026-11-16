@@ -190,7 +190,7 @@ else C;
     }
 }
 
-/// A `\u` escape puts the name in the arena instead of the source, so it takes the
+/// A `\u` escape puts the name in the text pool instead of the source, so it takes the
 /// pooled-text arm and must never claim the flag — including when the escape decodes to
 /// an ASCII character, where the decoded name and the raw span differ in LENGTH.
 #[test]

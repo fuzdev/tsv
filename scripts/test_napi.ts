@@ -175,8 +175,8 @@ describe('tsv_napi addon (real N-API JS boundary)', () => {
 				is_probe_panic('panic: <unknown>'),
 				'a non-string payload must throw'
 			);
-			// The process survived and the arenas recovered: parse (AST arena)
-			// and format (AST + doc arenas) still produce correct output.
+			// The process survived and the per-thread state recovered: parse (the
+			// stores) and format (the stores + the doc arena) still produce correct output.
 			const ast = JSON.parse(addon.parse_typescript_json('const x = 1;') as string);
 			assert.equal(ast.type, 'Program', 'parse must work after a panic');
 			assert.equal(

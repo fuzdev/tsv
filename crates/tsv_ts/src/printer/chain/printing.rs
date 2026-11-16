@@ -842,7 +842,7 @@ fn print_member_access(
 ) -> DocId {
     let d = printer.arena();
     // Build member doc without format! allocation — span-identity source slice
-    // (or the escaped name's arena string)
+    // (or the escaped name's pooled text)
     let prop_doc = printer.ident_doc(property, spans.name_start);
     let member_doc = match (optional, is_private) {
         (false, false) => d.concat(&[d.text("."), prop_doc]),

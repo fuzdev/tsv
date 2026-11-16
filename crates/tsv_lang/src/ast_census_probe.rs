@@ -5,10 +5,10 @@
 //! `tsv_debug ast_census` walks the wire, so it sees the survivors of a parse. The stores a
 //! parse fills are sized by what it **builds**, and two things a survivor count cannot see
 //! are in that number: the nodes a speculative parse built before a rewind, and the nodes
-//! the cover grammar and the by-value expression boundary leave behind in the arena when
+//! the cover grammar and the by-value expression boundary leave behind in a store when
 //! they clone a node out of it. This module records both, per element type:
 //!
-//! - [`mint`]: every node placed in the arena, one single allocation or the rows of one
+//! - [`mint`]: every node placed in a store, one single push or the rows of one
 //!   flushed list, keyed by the Rust type (`std::any::type_name`).
 //! - [`mark`] / [`rewind`]: a mint log with a truncation point. A rewind moves everything
 //!   minted since its mark to `abandoned`. A nested rewind's own entries are already gone
@@ -32,16 +32,16 @@ use crate::FxHashMap;
 /// What a [`dead`] call claims about the node it names.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Dead {
-    /// The node was cloned out of the arena by value, and the original is now unreachable: the
+    /// The node was cloned out of its store by value, and the original is now unreachable: the
     /// by-value expression boundary.
     DuplicateRoot,
-    /// A new allocation replaced the node: a field changed on a node already in the arena, or
+    /// A new row replaced the node: a field changed on a node already in a store, or
     /// a cover-grammar literal converted to its pattern.
     Superseded,
     /// Duplicated, and both copies stay reachable (a shorthand property's key and value). Not
     /// waste: the parse's own tree holds both. Counted so a store row count reads honestly.
     DuplicateKept,
-    /// Cloned out of the arena into a parent that holds it by value: the arena row is
+    /// Cloned out of its store into a parent that holds it by value: the store row is
     /// stranded, but the node is alive inside its parent (a class field's initializer, an
     /// enum initializer, an `export default` value). Not waste: a by-value slot that became a
     /// store edge would make this a row.
@@ -65,7 +65,7 @@ pub struct Row {
     pub duplicate_kept: u64,
     /// Rows stranded by a by-value move into a parent's own slot ([`Dead::MovedInline`]).
     pub moved_inline: u64,
-    /// Nodes built by value in a parent's slot, never placed in the arena ([`built_inline`]):
+    /// Nodes built by value in a parent's slot, never placed in a store ([`built_inline`]):
     /// no row here, counted so the slot is visible as demand.
     pub built_inline: u64,
     /// The largest total of open list prefixes of this element type at any moment.
@@ -178,7 +178,7 @@ fn dead_field(row: &mut Row, class: Dead) -> &mut u64 {
     }
 }
 
-/// Record `rows` nodes of `T` placed in the arena: one single allocation (`rows == 1`) or
+/// Record `rows` nodes of `T` placed in a store: one single push (`rows == 1`) or
 /// one flushed list.
 pub fn mint<T>(rows: usize) {
     with_state(|state| {
@@ -203,7 +203,7 @@ pub fn dead<T>(class: Dead, rows: usize) {
     });
 }
 
-/// Record `rows` nodes of `T` built by value in a parent's slot and never placed in the arena.
+/// Record `rows` nodes of `T` built by value in a parent's slot and never placed in a store.
 pub fn built_inline<T>(rows: usize) {
     with_state(|state| {
         let index = state.index_of::<T>() as u32;

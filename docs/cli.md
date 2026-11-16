@@ -689,11 +689,10 @@ returns its own concrete node struct, whose wrapping temporary the
 compiler merges with its sibling arms'. The printer answers the same pressure the same
 way — the chain entry points fill a caller-owned `ChainNodeVec` rather than returning one.
 The node enums answer it by density: a variant wide enough to set its enum's size on its
-own, and rare enough that an arena allocation apiece is free, holds its payload by
-reference (`Expression`'s five widest variants, `TSType`'s three, `Statement`'s rare
-declaration heads), and a by-value field that only copies a node out of the arena
-borrows it instead (`Property`, `VariableDeclarator`, every `Expression`-holding statement
-head). The `size_of` asserts beside the AST pin those widths, so a variant that widens an
+own, and rare enough that a store row apiece is free, holds its payload by id
+(`Expression`'s five widest variants, `TSType`'s three, `Statement`'s rare declaration
+heads), and a by-value field that would only copy a node out of a store holds its id
+instead (`Property`, `VariableDeclarator`, every `Expression`-holding statement head). The `size_of` asserts beside the AST pin those widths, so a variant that widens an
 enum fails the test build (`cargo test`) instead of quietly eating the limits' margin (each
 is rustc's layout, so `cfg(test)`-only; the wasm32 widths are pinned in `tsv_wasm`); the
 margin itself is graded by `tests/depth_limit.rs`.

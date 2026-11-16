@@ -8,9 +8,8 @@
 //!
 //! # What a visit is
 //!
-//! ⚠️ **A visit is one dispatch, not one `&'arena T` read**, and no total here bounds those
-//! reads in either direction. A read through such a reference is an auto-deref, which leaves
-//! no site to hook. A visit may read several of its node's edges, and the printers' layout
+//! ⚠️ **A visit is one dispatch, not one edge read**, and no total here bounds those reads
+//! in either direction. A visit may read several of its node's edges, and the printers' layout
 //! predicates (paren decisions, shape tests, chain analysis, comment gates) read edges with
 //! no dispatch at all. The other way, a node reached through a by-value slot or a by-value
 //! list element reads no edge of its own: it costs at most one read per list, or none. The

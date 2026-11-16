@@ -712,8 +712,8 @@ pub struct BinaryExpression {
     ///
     /// Set LAZILY, at the `>` that would close the region rather than at the `<`: the
     /// verdict is a fact about the join of the two tokens, and a `<` with no `>` over it —
-    /// every ordinary comparison — must not pay the scan. The node is already in the arena
-    /// by then, so the parser re-allocates this one node to set the bit.
+    /// every ordinary comparison — must not pay the scan. The node is already a store row
+    /// by then, so the parser pushes it again with the bit set, orphaning the old row.
     ///
     /// `false` on every other operator, and free in the struct's existing padding.
     pub relexes_as_type_arguments: bool,

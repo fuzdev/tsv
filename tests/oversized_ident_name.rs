@@ -2,7 +2,7 @@
 #![expect(clippy::expect_used, clippy::panic)]
 
 //! An identifier name too long for `IdentName`'s `raw_len` (a `u16`) keeps its text as
-//! the arena-copied escape hatch instead of as a length over the node's span, and this
+//! the pool-copied escape hatch instead of as a length over the node's span, and this
 //! file grades that arm at the boundary: a name of 65535 bytes is the longest the length
 //! holds, 65536 and 65537 are the first two that take the copy.
 //!
