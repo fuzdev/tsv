@@ -22,6 +22,10 @@ use self::raw::parse_raw_prelude_content;
 
 /// Check if an at-rule name is a keyframes rule (including vendor-prefixed versions)
 /// e.g., "keyframes", "-webkit-keyframes", "-moz-keyframes"
+///
+/// The set is spelled twice, here for the printer and in [`AtruleKind::of`]'s `Keyframes` arms
+/// for the parser, so the two change together; the module's unit test grades both against one
+/// table.
 pub(crate) fn is_keyframes_atrule(name: &str) -> bool {
     // At-rule names are ASCII case-insensitive (CSS Syntax 3), so `@KEYFRAMES` and
     // `@-WEBKIT-Keyframes` are keyframes too. Callers pass either the raw name (the
@@ -69,28 +73,39 @@ enum AtruleKind {
 }
 
 impl AtruleKind {
-    /// The kind `name` (decoded) names.
+    /// The kind `name` (decoded) names. The name is folded to ASCII lowercase once, into a
+    /// buffer as long as the longest spelling (a longer name is none of them), and compared
+    /// against each spelling of its own length. The `Keyframes` arms spell the set
+    /// [`is_keyframes_atrule`] also spells, for the printer: the two change together.
     fn of(name: &str) -> Self {
-        const NAMED: [(&str, AtruleKind); 11] = [
-            ("import", AtruleKind::Import),
-            ("scope", AtruleKind::Scope),
-            ("custom-selector", AtruleKind::CustomSelector),
-            ("supports", AtruleKind::Supports),
-            ("container", AtruleKind::Container),
-            ("media", AtruleKind::Media),
-            ("custom-media", AtruleKind::CustomMedia),
-            ("namespace", AtruleKind::Namespace),
-            ("layer", AtruleKind::Layer),
-            ("starting-style", AtruleKind::StartingStyle),
-            ("font-feature-values", AtruleKind::FontFeatureValues),
-        ];
-        if is_keyframes_atrule(name) {
-            return AtruleKind::Keyframes;
+        let name = name.as_bytes();
+        let mut buf = [0u8; "font-feature-values".len()];
+        let Some(folded) = buf.get_mut(..name.len()) else {
+            return AtruleKind::Other;
+        };
+        for (dst, byte) in folded.iter_mut().zip(name) {
+            *dst = byte.to_ascii_lowercase();
         }
-        NAMED
-            .iter()
-            .find(|(spelling, _)| name.eq_ignore_ascii_case(spelling))
-            .map_or(AtruleKind::Other, |&(_, kind)| kind)
+        let is = |spelling: &[u8]| *folded == *spelling;
+        match name.len() {
+            5 if is(b"scope") => AtruleKind::Scope,
+            5 if is(b"media") => AtruleKind::Media,
+            5 if is(b"layer") => AtruleKind::Layer,
+            6 if is(b"import") => AtruleKind::Import,
+            8 if is(b"supports") => AtruleKind::Supports,
+            9 if is(b"container") => AtruleKind::Container,
+            9 if is(b"namespace") => AtruleKind::Namespace,
+            9 if is(b"keyframes") => AtruleKind::Keyframes,
+            12 if is(b"custom-media") => AtruleKind::CustomMedia,
+            12 if is(b"-o-keyframes") => AtruleKind::Keyframes,
+            13 if is(b"-ms-keyframes") => AtruleKind::Keyframes,
+            14 if is(b"starting-style") => AtruleKind::StartingStyle,
+            14 if is(b"-moz-keyframes") => AtruleKind::Keyframes,
+            15 if is(b"custom-selector") => AtruleKind::CustomSelector,
+            17 if is(b"-webkit-keyframes") => AtruleKind::Keyframes,
+            19 if is(b"font-feature-values") => AtruleKind::FontFeatureValues,
+            _ => AtruleKind::Other,
+        }
     }
 
     /// Whether the at-rule's block is a rule list at the top level: the conditional group
@@ -498,5 +513,113 @@ fn parse_block_child(
         ))
     } else {
         Err(unexpected_block_token(parser, name))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{AtruleKind, is_keyframes_atrule};
+
+    /// The spellings other than the keyframes', as a plain table.
+    const NAMED: [(&str, AtruleKind); 11] = [
+        ("import", AtruleKind::Import),
+        ("scope", AtruleKind::Scope),
+        ("custom-selector", AtruleKind::CustomSelector),
+        ("supports", AtruleKind::Supports),
+        ("container", AtruleKind::Container),
+        ("media", AtruleKind::Media),
+        ("custom-media", AtruleKind::CustomMedia),
+        ("namespace", AtruleKind::Namespace),
+        ("layer", AtruleKind::Layer),
+        ("starting-style", AtruleKind::StartingStyle),
+        ("font-feature-values", AtruleKind::FontFeatureValues),
+    ];
+
+    /// The keyframes spellings: `@keyframes` and its vendor-prefixed forms.
+    const KEYFRAMES: [&str; 5] = [
+        "keyframes",
+        "-webkit-keyframes",
+        "-moz-keyframes",
+        "-o-keyframes",
+        "-ms-keyframes",
+    ];
+
+    /// The plain reading `AtruleKind::of` and [`is_keyframes_atrule`] must agree with: an
+    /// ASCII-case-insensitive scan of the keyframes spellings, then of the table.
+    fn reference(name: &str) -> AtruleKind {
+        if KEYFRAMES
+            .iter()
+            .any(|spelling| name.eq_ignore_ascii_case(spelling))
+        {
+            return AtruleKind::Keyframes;
+        }
+        NAMED
+            .iter()
+            .find(|(spelling, _)| name.eq_ignore_ascii_case(spelling))
+            .map_or(AtruleKind::Other, |&(_, kind)| kind)
+    }
+
+    fn check(name: &str) {
+        let expected = reference(name);
+        assert!(
+            AtruleKind::of(name) == expected,
+            "`AtruleKind::of` disagreed with the plain scan on {name:?}"
+        );
+        assert!(
+            is_keyframes_atrule(name) == (expected == AtruleKind::Keyframes),
+            "`is_keyframes_atrule` disagreed with the plain scan on {name:?}"
+        );
+    }
+
+    #[test]
+    fn of_agrees_with_a_plain_scan_of_the_spellings() {
+        let keyframes = KEYFRAMES.map(|spelling| (spelling, AtruleKind::Keyframes));
+        for &(spelling, kind) in NAMED.iter().chain(&keyframes) {
+            assert!(AtruleKind::of(spelling) == kind, "{spelling} lost its kind");
+            assert!(AtruleKind::of(&spelling.to_ascii_uppercase()) == kind);
+            let mut mixed = spelling.to_string();
+            mixed[..2].make_ascii_uppercase();
+            assert!(AtruleKind::of(&mixed) == kind, "{mixed} lost its kind");
+
+            // One byte longer or shorter, at either end.
+            check(&format!("{spelling}s"));
+            check(&format!("x{spelling}"));
+            check(&spelling[1..]);
+            check(&spelling[..spelling.len() - 1]);
+            // Same length, each byte with its ASCII case bit flipped: a letter's other case
+            // (still the spelling), a `-` turned into a carriage return (no longer it).
+            for i in 0..spelling.len() {
+                let mut flipped = spelling.as_bytes().to_vec();
+                flipped[i] ^= 0x20;
+                check(std::str::from_utf8(&flipped).unwrap());
+                // Same length, each byte swapped for another ASCII byte: no longer the spelling.
+                let mut swapped = spelling.as_bytes().to_vec();
+                swapped[i] ^= 0x01;
+                check(std::str::from_utf8(&swapped).unwrap());
+            }
+            // A non-ASCII character in place of a letter: the fold is ASCII-only, so a
+            // character Unicode would case-map to the letter does not match it.
+            check(&spelling.replacen('e', "é", 1));
+            check(&spelling.replacen('k', "\u{212A}", 1));
+            check(&spelling.replacen('s', "\u{17F}", 1));
+            check(&spelling.replacen('i', "\u{130}", 1));
+        }
+        let longest = "font-feature-values".len();
+        for name in [
+            "",
+            "-",
+            "font-face",
+            "page",
+            "tailwind",
+            "apply",
+            "font-feature-values-x",
+            "FONT-FEATURE-VALUES-",
+            "\u{0}",
+            "m\u{0}dia",
+            &"a".repeat(longest + 1),
+            &"-webkit-keyframes".repeat(4),
+        ] {
+            check(name);
+        }
     }
 }
