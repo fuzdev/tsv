@@ -1075,12 +1075,13 @@ size on its own taxes the whole tree, while the hop to a stored payload is paid 
 where that variant is actually spelled. Where such a variant is also **rare**, it holds
 its payload by id, a row of a store of that payload's own type:
 
-- `Expression` is **48 B**, not 176 — `ClassExpression`, `FunctionExpression`,
+- `Expression` is **44 B** — `ClassExpression`, `FunctionExpression`,
   `ArrowFunctionExpression`, `MetaProperty` and `TaggedTemplateExpression` are stored.
   Together they are ~3% of expressions in real source (the two widest, ~0.02%). The
-  next-widest variant is `CallExpression`, and it is 14–21% of expressions, which is
-  where the ladder stops. `Expression` is a header over its variant —
-  `struct Expression { span, kind: ExpressionKind }` (`ExpressionKind` 40 B) — so reading
+  next-widest variants are `ArrayPattern`, `ObjectPattern` and `CallExpression`, at one
+  width, and `CallExpression` is 14–21% of expressions, which is where the ladder stops.
+  `Expression` is a header over its variant —
+  `struct Expression { span, kind: ExpressionKind }` (`ExpressionKind` 36 B) — so reading
   an expression's span is a field load rather than a dispatch over the variants. A
   variant struct carries no span of its own unless some node also holds that type
   outside an `Expression` (`Identifier`, `Literal`, `TemplateLiteral`, `RestElement`,
@@ -1090,8 +1091,8 @@ its payload by id, a row of a store of that payload's own type:
   that is the only way the wrapped form is built and no span is written after construction
   but the pattern wrapper's (an optional or annotated parameter's `?` / `: T` extension in
   the parameter parser), which lands on array and object patterns, carrying no second span.
-  It is 48 B on wasm32 too.
-- `TSType` is **56 B** — `TSImportType`, `TSConstructorType` and `TSInferType` are
+  It is 44 B on wasm32 too.
+- `TSType` is **52 B** — `TSImportType`, `TSConstructorType` and `TSInferType` are
   stored. No field holds a `TSType` by value: the type parser's deep precedence ladder
   pushes each type to the type store at its builder's tail and returns the row's id
   (`Parser::parse_type`) — the second rule below, applied to a return instead of a
@@ -1160,7 +1161,7 @@ whose own width was two such slots take it:
   `new` arguments, sequence and template-literal expressions are `Run<ExprId>`, and
   array-literal and array-pattern elements `Run<Option<ExprId>>` (a hole stays `None`; the
   `Option` is niche-packed) — a 4 B element where a by-value one is the whole `Expression`
-  (48 B on both targets). A spread element, built fresh rather than returned by
+  (44 B on both targets). A spread element, built fresh rather than returned by
   the ladder, is pushed once to join them. The parameter lists are value runs (`Run<Expression>`),
   which are rows of the expression store: their elements are built by the parser as
   values (a binding pattern, or an expression converted to one), so an id list would add

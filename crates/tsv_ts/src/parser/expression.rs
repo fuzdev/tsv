@@ -5,8 +5,8 @@ use crate::ast::{
     BinaryOperator, BlockStatement, CallExpression, CommentBoundPair, CommentBoundPairKind,
     ConditionalExpression, ExprId, Expression, ExpressionKind, IdentName, Identifier,
     ImportExpression, ImportPhase, Literal, LiteralValue, MemberExpression, MetaProperty,
-    NewExpression, ParenthesizedExpression, RegexLiteral, Run, SequenceExpression, SpreadElement,
-    StmtId, Super, TSAsExpression, TSInstantiationExpression, TSNonNullExpression,
+    NewExpression, PackedF64, ParenthesizedExpression, RegexLiteral, Run, SequenceExpression,
+    SpreadElement, StmtId, Super, TSAsExpression, TSInstantiationExpression, TSNonNullExpression,
     TSSatisfiesExpression, TSTypeAssertion, TSTypeParameterInstantiation, TaggedTemplateExpression,
     TemplateLiteral, ThisExpression, UnaryExpression, UnaryOperator, UpdateExpression,
     UpdateOperator, YieldExpression,
@@ -85,7 +85,7 @@ const BP_UNARY: u8 = 29;
 // ⚠️ The frame is what the id buys as much as the return. LLVM gives each sret call
 // site its own stack slot and does not merge them across match arms, and a frame is sized
 // once for its widest arm — so a dispatcher with N arms that each call a `parse_*` returning
-// a bare `Expression` (48 B) reserves N × 48 B at **every** recursion level, whichever arm
+// a bare `Expression` (44 B) reserves N × 44 B at **every** recursion level, whichever arm
 // it takes. `Parser::parse_prefix_expression` and `Parser::parse_primary_expression` are
 // those dispatchers, and both sit on the paren / call / member / object-literal cycle, so
 // their slots set the stack every nesting level costs, which the depth limits' margin is
@@ -1988,7 +1988,7 @@ impl<'a> Parser<'a> {
             let number = parse_number_literal(raw)
                 .map_err(|_| self.error_msg_at(&format!("Invalid number: {raw}"), start))?;
             Ok(Literal {
-                value: LiteralValue::Number(number),
+                value: LiteralValue::Number(PackedF64::new(number)),
                 span: Span::new(start as u32, end as u32),
             })
         }

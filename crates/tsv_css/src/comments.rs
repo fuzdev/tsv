@@ -53,7 +53,7 @@ pub(crate) fn comment_end_checked(bytes: &[u8], i: usize) -> Option<usize> {
 /// that must tell the two cases apart.
 ///
 /// A byte loop rather than `find("*/")` so no scanner grows a raw substring scan over
-/// source (`deno task scan:audit`).
+/// source (`npm run scan:audit`).
 pub(crate) fn comment_end(bytes: &[u8], i: usize) -> usize {
     comment_end_checked(bytes, i).unwrap_or(bytes.len())
 }

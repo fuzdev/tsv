@@ -3,7 +3,7 @@
 //! Each language crate pins its 64-bit widths under `cfg(test)`, where a toolchain that
 //! lays a type out differently fails `cargo test` rather than a consumer's build. A
 //! test build never targets wasm32, so the 32-bit widths are pinned here instead: this
-//! crate is not published, and `deno task build:packages` compiles it for wasm32, so a
+//! crate is not published, and `npm run build:packages` compiles it for wasm32, so a
 //! change that widens one of these fails the package build.
 
 use tsv_css::ast::{ColorChannel, CssValue, SimpleSelector};
@@ -25,16 +25,16 @@ const _: () = assert!(size_of::<DocContext>() == 4);
 // width), where the locality and allocator budget matters most. See the native pin in
 // `tsv_lang`'s `doc/arena.rs` for the drivers.
 const _: () = assert!(size_of::<DocNode>() == 16);
-// The hot AST types: a 4 B pointer, `Expression`'s payload 8 B aligned and `Statement`'s
-// 4 B, and the `Option` of those two niche-packed. See the native pins in `tsv_ts`'s
+// The hot AST types: a 4 B pointer, `Expression`'s and `Statement`'s payloads 4 B aligned,
+// and the `Option` of those two niche-packed. See the native pins in `tsv_ts`'s
 // `ast/mod.rs`.
-const _: () = assert!(size_of::<Expression>() == 48);
+const _: () = assert!(size_of::<Expression>() == 44);
 const _: () = assert!(size_of::<Option<Expression>>() == size_of::<Expression>());
-const _: () = assert!(size_of::<ExpressionKind>() == 40);
+const _: () = assert!(size_of::<ExpressionKind>() == 36);
 const _: () = assert!(size_of::<Statement>() == 48);
 const _: () = assert!(size_of::<Option<Statement>>() == size_of::<Statement>());
 const _: () = assert!(size_of::<StatementKind>() == 40);
-const _: () = assert!(size_of::<TSType>() == 56);
+const _: () = assert!(size_of::<TSType>() == 52);
 // The type-edge holders' `Option`s, folded into the id's niche and the run's. See the native
 // pins in `tsv_ts`'s `ast/mod.rs`.
 const _: () = assert!(size_of::<Option<TSTypeAnnotation>>() == size_of::<TSTypeAnnotation>());

@@ -39,6 +39,7 @@ pub use stores::{
     MetaPropId, ModuleDeclId, ParamExtraId, Parsed, QualNameId, StmtId, TaggedTplId, Text, TyId,
     TypeAliasId, WarmStores, park_stores, take_stores, with_stores,
 };
+pub use tsv_lang::packed::PackedF64;
 use tsv_lang::store::PoolText;
 pub use tsv_lang::store::Run;
 pub use tsv_lang::{Comment, Span};
@@ -176,13 +177,13 @@ pub use expressions::{
 // layout, not a guarantee, so it compiles under `cfg(test)` only: a toolchain that lays them
 // out differently fails `cargo test` here, never a consumer's build. The counts are
 // pointer-width-relative and the doc's measurements are x86-64; every width here is also
-// pinned on wasm32 (a 4 B pointer; `Expression`'s payload is 8 B aligned, `Statement`'s
-// 4 B) in `tsv_wasm`, the crate compiled for wasm32, and `Expression`'s and `Statement`'s
-// `Option` must stay niche-packed on both.
+// pinned on wasm32 (a 4 B pointer; `Expression`'s and `Statement`'s payloads 4 B aligned,
+// the number literal's `f64` held as a [`PackedF64`]) in `tsv_wasm`, the crate compiled
+// for wasm32, and `Expression`'s and `Statement`'s `Option` must stay niche-packed on both.
 #[cfg(all(test, target_pointer_width = "64"))]
-const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<Expression>() == 48);
+const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<Expression>() == 44);
 #[cfg(all(test, target_pointer_width = "64"))]
-const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<ExpressionKind>() == 40);
+const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<ExpressionKind>() == 36);
 #[cfg(test)]
 const _: () = assert!(size_of::<Option<Expression>>() == size_of::<Expression>());
 #[cfg(all(test, target_pointer_width = "64"))]
@@ -202,7 +203,7 @@ const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<VariableDeclarat
 #[cfg(all(test, target_pointer_width = "64"))]
 const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<SwitchCase>() == 20);
 #[cfg(all(test, target_pointer_width = "64"))]
-const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<TSType>() == 56);
+const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<TSType>() == 52);
 // The type-edge holders every type annotation, type-argument list and type-parameter list
 // rides inline in: their `Option`s fold into the id's niche and the run's, so an absent
 // annotation or list costs no width in any of the nodes that hold one.
@@ -257,7 +258,7 @@ pub struct Decorator {
 /// Literal value type - supports numbers, strings, booleans, null, and undefined
 #[derive(Debug, Clone, Copy)]
 pub enum LiteralValue {
-    Number(f64),
+    Number(PackedF64),
     /// String literal. The decoded value is recovered via
     /// `StringCooked::resolve(span, source, view)` (no-escape = zero-copy inner slice;
     /// escaped = pool text); the quote char via `Literal::string_quote(source)`.

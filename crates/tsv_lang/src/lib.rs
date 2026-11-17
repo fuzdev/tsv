@@ -42,6 +42,7 @@
 // - `FxHasher` / `FxHashMap` / `FxHashSet` - dep-free multiply-xor hasher for the
 //   side tables
 // - `store` - contiguous typed stores, their handles and the list-building scratch stack
+// - `packed` - `PackedF64`, an `f64` at 4-byte alignment for the AST enums that hold one
 // - `swar` - word-at-a-time byte-search kernels shared by the line scans, the
 //   wire-JSON escape prescan, and the lexers' token-body scans
 // - `value_runs` - the `value_runs!` declaration of a language crate's stores of the
@@ -73,6 +74,8 @@ mod hash;
 mod json_writer;
 mod location;
 mod output;
+#[doc(hidden)]
+pub mod packed;
 #[doc(hidden)]
 pub mod phase_timing;
 #[doc(hidden)]

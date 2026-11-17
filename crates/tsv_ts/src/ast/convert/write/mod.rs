@@ -905,7 +905,7 @@ fn write_literal_fields(w: &mut JsonWriter, lit: &ast::Literal, ctx: &Ctx<'_>) {
     // `Option`), and shares the decimal string with `value`.
     let mut bigint: Option<String> = None;
     match &lit.value {
-        ast::LiteralValue::Number(n) => write_number_value(w, *n),
+        ast::LiteralValue::Number(n) => write_number_value(w, n.get()),
         ast::LiteralValue::String(cooked) => {
             w.string(cooked.resolve(lit.span, ctx.source, ctx.view));
         }

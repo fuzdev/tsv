@@ -30,8 +30,8 @@ pub struct DocContext {
 // `DocContext` is stored **inline** in `DocNode::WithContext`, whose size is `const`-asserted per
 // target — 16 B on wasm32, the tightest budget and the one the shipped npm packages build under
 // (that pin, and this struct's own wasm32 one, live in `tsv_wasm`, the one crate compiled for
-// wasm32). Nothing in `deno task check` builds wasm32, so without this assert a context that
-// outgrows the budget passes every gate and fails only at `deno task build:packages` (it already
+// wasm32). Nothing in `npm run check` builds wasm32, so without this assert a context that
+// outgrows the budget passes every gate and fails only at `npm run build:packages` (it already
 // did once: growing the context blew the `DocNode` assert, invisibly to the whole gate chain).
 //
 // This pins the cost **here**, natively, where a field would be added. `WithContext`'s payload is

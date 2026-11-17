@@ -45,12 +45,13 @@ pub enum ExpressionKind {
     // each is rare enough that the extra row is free — over 8 MB of real TypeScript, `ClassExpression` and
     // `TaggedTemplateExpression` occur 0.000% of the time, `FunctionExpression`
     // 0.004–0.019%, `MetaProperty` 0.000–0.014%, and `ArrowFunctionExpression`
-    // 3.0–3.8%. Inline they would make an `Expression` 176 bytes instead of 64, and
-    // that width is paid on every `Expression` SLOT in the tree — both of a
+    // 3.0–3.8%. Inline, the widest of them would set the width of every `Expression`,
+    // and that width is paid on every `Expression` SLOT in the tree — both of a
     // `Property`'s, both of a `VariableDeclarator`'s, and every row of a value run —
-    // not just on the rare node that needs it. The next-widest inline variant is
-    // `ObjectPattern`, and `CallExpression` at 40 bytes is 14–21% of expressions, so the
-    // ladder stops here: storing it would tax the common path.
+    // not just on the rare node that needs it. The next-widest inline variants are
+    // `ArrayPattern`, `ObjectPattern` and `CallExpression`, at one width, and
+    // `CallExpression` is 14–21% of expressions, so the ladder stops here: storing it
+    // would tax the common path.
     //
     // The store hop this adds is on the rare read, and the parser's recursion is
     // unaffected either way — it threads expressions by id (every `parse_*` on its
