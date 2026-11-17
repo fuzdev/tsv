@@ -82,7 +82,7 @@ fn linearize_chain<'a>(expr: &'a Expression, input: LinearizeInput<'a, '_>) -> C
 
 // The three typed entry points below fill a caller-owned `ChainNodeVec` — the `&mut` the
 // walkers already take — rather than returning one. A `ChainNodeVec` is an inline
-// array of eight 56-byte `ChainNode`s and a chain holds ~3 (p50 = 3, mean 2.82 over 40,239
+// array of eight 48-byte `ChainNode`s and a chain holds ~3 (p50 = 3, mean 2.82 over 40,239
 // chains a fuz_app pass — `buffer_sizes`), so a by-value return copies the WHOLE array,
 // length-independently, into a second slot the caller reserves to receive it; the caller's
 // local is where the buffer has to live either way. That slot lands in

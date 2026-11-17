@@ -515,7 +515,7 @@ allocation sites are responsible — glibc's allocator is diffuse from the CPU
 side. `heaptrack` attributes every allocation to its call site, answering
 "swap the allocator" vs "fix the hot sites" (the AST-allocation design it
 validated:
-[architecture.md §Nested AST](./architecture.md#nested-ast-bump-arena-not-flatindexed)).
+[architecture.md §Nested AST](./architecture.md#nested-ast-in-stores-inline-by-value-recursive-edges-by-id)).
 
 ```bash
 # Record (build with the profiling profile for symbols)

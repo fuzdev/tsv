@@ -423,7 +423,7 @@ fn build_short_chain_doc<'a>(
 /// the one `ChainNodeVec` the linearizer built — but a [`ChainGroup`] is a bare
 /// sub-slice carrying no absolute offset into that buffer, and joining two adjacent
 /// slices needs `slice::from_raw_parts` (`unsafe_code` is `forbid`ed). So the PAIR is
-/// the tail, rather than a `ChainNodeVec` copy of it: collecting one put a 464-byte
+/// the tail, rather than a `ChainNodeVec` copy of it: collecting one put a 400-byte
 /// buffer in [`build_chain_doc_impl`]'s frame — which is on the expression recursion
 /// cycle — to carry a mean of 0.02 nodes.
 #[derive(Debug, Clone, Copy)]
