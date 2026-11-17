@@ -630,7 +630,7 @@ impl<'a> Printer<'a> {
         let mut parts: DocBuf = smallvec![open_doc, head.doc, d.text("}"), body_doc];
 
         if let Some(alt) = &block.alternate {
-            self.build_ws_sensitive_if_alternate(alt, &mut parts);
+            self.build_ws_sensitive_if_alternate(*alt, &mut parts);
         }
 
         parts.push(d.text("{/if}"));
@@ -638,7 +638,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build if alternate (else/else-if) for whitespace-sensitive context.
-    fn build_ws_sensitive_if_alternate(&self, alt: &Fragment, parts: &mut DocBuf) {
+    fn build_ws_sensitive_if_alternate(&self, alt: Fragment, parts: &mut DocBuf) {
         let d = self.d();
 
         // Check if this can be flattened to {:else if ...}
@@ -654,7 +654,7 @@ impl<'a> Printer<'a> {
             parts.push(body_doc);
 
             if let Some(nested_alt) = &else_if.alternate {
-                self.build_ws_sensitive_if_alternate(nested_alt, parts);
+                self.build_ws_sensitive_if_alternate(*nested_alt, parts);
             }
             return;
         }

@@ -30,6 +30,9 @@ use super::arena::DocId;
 /// A share key: the AST node's address (stable — nothing adds to the store or arena holding a
 /// printed node while the printer runs) and the consumer's builder tag, which names the
 /// builder asking and the printer state it asks under, so a hit is byte-identical to a rebuild.
+/// The address is the node's in its store: a consumer keys a reference into the store — one
+/// an accessor returned, or a field of it — never a copy, whose stack slot another node can
+/// reuse.
 pub type ShareKey = (usize, u8);
 
 /// Entries one scope may hold in the linear tier before the hashed tier takes over —

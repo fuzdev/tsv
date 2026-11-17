@@ -41,7 +41,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for a TypeScript export assignment
     pub(super) fn build_export_assignment_doc(
         &self,
-        decl: &ast::TSExportAssignment,
+        decl: ast::TSExportAssignment,
         span: Span,
     ) -> DocId {
         let expression = self.view.expr(decl.expression);

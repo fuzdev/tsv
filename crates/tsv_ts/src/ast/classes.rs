@@ -15,7 +15,7 @@ use super::{
 ///
 /// Represents a class declaration with optional superclass.
 /// For `export default class {}`, the name is optional.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct ClassDeclaration {
     /// Decorators applied to this class
     pub decorators: Option<Run<Decorator>>,
@@ -42,7 +42,7 @@ pub struct ClassDeclaration {
 ///
 /// Same as ClassDeclaration but used in expression position.
 /// The name is always optional.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct ClassExpression {
     /// Decorators applied to this class
     pub decorators: Option<Run<Decorator>>,
@@ -65,18 +65,14 @@ pub struct ClassExpression {
 /// Class body: `{ constructor() {} method() {} prop = value; }`
 ///
 /// Contains the methods and properties of a class.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct ClassBody {
     pub body: Run<ClassMember>,
     pub span: Span,
 }
 
 /// Class member - method definition, property definition, or static block
-///
-/// `Clone` only, where every other element of a value run is `Copy`: a method holds its
-/// function inline, a row an id names elsewhere, so a member read by value stays a compile
-/// error and a class body's run is flushed by move.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum ClassMember {
     MethodDefinition(MethodDefinition),
     PropertyDefinition(PropertyDefinition),
@@ -96,7 +92,7 @@ impl ClassMember {
 }
 
 /// Static initialization block in a class: `static { ... }` (ES2022)
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct StaticBlock {
     /// Decorators in front of the block (`@a static {}`). No decorator grammar
     /// reaches a static block (tsc's checker reports TS1206); acorn keeps the list
@@ -157,7 +153,7 @@ impl Accessibility {
 }
 
 /// TypeScript parameter property in constructor: `constructor(public x: number)`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct TSParameterProperty {
     /// Accessibility modifier: public, private, protected
     pub accessibility: Option<Accessibility>,
@@ -170,7 +166,7 @@ pub struct TSParameterProperty {
 }
 
 /// Method definition in a class body: `method() { ... }` or `get x() { ... }`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 #[expect(clippy::struct_excessive_bools)] // independent flags, not a state machine
 pub struct MethodDefinition {
     /// Decorators applied to this method
@@ -216,7 +212,7 @@ pub enum PropertyModifier {
 ///
 /// Unlike methods, properties use `=` for initialization.
 #[expect(clippy::struct_excessive_bools)]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct PropertyDefinition {
     /// Decorators applied to this property
     pub decorators: Option<Run<Decorator>>,

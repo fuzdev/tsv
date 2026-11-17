@@ -2006,7 +2006,7 @@ impl<'a> Printer<'a> {
     /// would pull the statement's own terminator-gap comments inside the parens.
     fn build_shell_sequence_doc(
         &self,
-        seq: &ast::SequenceExpression,
+        seq: ast::SequenceExpression,
         span: Span,
         expr_end: u32,
         boundary_end: u32,
@@ -2201,7 +2201,7 @@ impl<'a> Printer<'a> {
                 let mut pair: DocBuf = smallvec![
                     d.text("("),
                     run,
-                    self.build_sequence_doc_bare(seq, expr.span, expr_end),
+                    self.build_sequence_doc_bare(*seq, expr.span, expr_end),
                     d.text(")"),
                 ];
                 // The operand→keyword window holds single-line blocks at most here (the
@@ -2280,7 +2280,7 @@ impl<'a> Printer<'a> {
             // printer takes the owned-comment claim ([`Self::build_sequence_doc_bare`] →
             // the run form), so this arm needs none.
             ast::ExpressionKind::SequenceExpression(seq) => {
-                self.build_sequence_doc_bare(seq, expr.span, expr_end)
+                self.build_sequence_doc_bare(*seq, expr.span, expr_end)
             }
             // A MULTI-LINE block the operand OWNS prints just inside this shell's `(`,
             // outside the operand's own group
@@ -3215,7 +3215,7 @@ impl<'a> Printer<'a> {
                     .collapsed_grouping_close(span_end, boundary_end)
                     .is_some())
         {
-            self.sequence_printed_end(seq)
+            self.sequence_printed_end(*seq)
         } else {
             span_end
         };
@@ -3294,12 +3294,12 @@ impl<'a> Printer<'a> {
                 None if tail == ShellTail::ForClauseSeparator
                     && self.shell_gap_holds_unplaceable_comment(expr_end, boundary_end) =>
                 {
-                    let inner = self.build_sequence_doc_bare(seq, expr.span, expr_end);
+                    let inner = self.build_sequence_doc_bare(*seq, expr.span, expr_end);
                     self.build_kept_paren_shell_doc(inner, expr_end, boundary_end)
                         .unwrap_or_else(|| self.d().parens(inner))
                 }
                 None => self.build_shell_sequence_doc(
-                    seq,
+                    *seq,
                     expr.span,
                     expr_end,
                     boundary_end,
@@ -3551,7 +3551,7 @@ impl<'a> Printer<'a> {
         // this method would re-wrap them (`() => ((1, 2, 3) /* c */)`). `layout` is the
         // caller's: an arrow body hangs its operands, the ASI-shell operands align.
         if let ast::ExpressionKind::SequenceExpression(seq) = &expr.kind {
-            return self.build_shell_sequence_doc(seq, expr.span, expr_end, boundary_end, layout);
+            return self.build_shell_sequence_doc(*seq, expr.span, expr_end, boundary_end, layout);
         }
 
         // The pair's run opens where the value's PRINTED content ends: a comment written last

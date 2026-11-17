@@ -106,7 +106,7 @@ pub(super) fn write_for_of_statement(
 /// Emits a `WhileStatement` node.
 pub(super) fn write_while_statement(
     w: &mut JsonWriter,
-    while_stmt: &ast::WhileStatement,
+    while_stmt: ast::WhileStatement,
     span: Span,
     ctx: &Ctx<'_>,
 ) {
@@ -121,7 +121,7 @@ pub(super) fn write_while_statement(
 /// Emits a `WithStatement` node. Field order: `object`, `body`.
 pub(super) fn write_with_statement(
     w: &mut JsonWriter,
-    with_stmt: &ast::WithStatement,
+    with_stmt: ast::WithStatement,
     span: Span,
     ctx: &Ctx<'_>,
 ) {
@@ -136,7 +136,7 @@ pub(super) fn write_with_statement(
 /// Emits a `DoWhileStatement` node. Field order: `body`, `test`.
 pub(super) fn write_do_while_statement(
     w: &mut JsonWriter,
-    do_while: &ast::DoWhileStatement,
+    do_while: ast::DoWhileStatement,
     span: Span,
     ctx: &Ctx<'_>,
 ) {
@@ -205,7 +205,7 @@ pub(super) fn write_try_statement(
 /// Emits a `ThrowStatement` node.
 pub(super) fn write_throw_statement(
     w: &mut JsonWriter,
-    throw_stmt: &ast::ThrowStatement,
+    throw_stmt: ast::ThrowStatement,
     span: Span,
     ctx: &Ctx<'_>,
 ) {

@@ -80,8 +80,7 @@ impl<'a> Parser<'a> {
             // property wrapper. Recurse (the inner is an Identifier or, for
             // `@dec private a = 1`, an AssignmentPattern).
             ExpressionKind::TSParameterProperty(pp) => {
-                let inner =
-                    self.attach_param_decorators(self.expr(pp.parameter).clone(), decorators);
+                let inner = self.attach_param_decorators(*self.expr(pp.parameter), decorators);
                 #[cfg(feature = "_internal_ast_census")]
                 tsv_lang::ast_census_probe::dead::<Expression>(
                     tsv_lang::ast_census_probe::Dead::DuplicateRoot,

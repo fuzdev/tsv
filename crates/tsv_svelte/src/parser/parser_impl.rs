@@ -4,7 +4,7 @@ use crate::ast::{self, FragmentNode, SvelteOwn, SvelteStores};
 use crate::lexer::{Lexer, Token, TokenKind};
 use crate::parser::element::{ParsedElement, tag_name_end};
 use tsv_css::ast::CssStores;
-use tsv_lang::store::{ListMark, Run, flush_run_move};
+use tsv_lang::store::{ListMark, Run, flush_run};
 use tsv_lang::{Comment, DepthBudget, DepthLimit, Error, Span};
 use tsv_ts::__private::TopLevelAs;
 use tsv_ts::__private::{is_id_continue, is_id_start};
@@ -334,13 +334,13 @@ impl<'a> SvelteParser<'a> {
 
     /// Flush the fragment frame `mark` opened into its run.
     ///
-    /// Out of line, where the compiler leaves it today: it is called from the fragment builders
-    /// on the element and block recursions, and a later inlining of its row-at-a-time move
-    /// would widen every one of those recursive frames.
+    /// Out of line: it is called from the fragment builders on the element and block
+    /// recursions, and an inlining of the flush would widen every one of those recursive
+    /// frames.
     #[inline(never)]
     pub(crate) fn flush_nodes(&mut self, mark: ListMark<FragmentNode>) -> Run<FragmentNode> {
         let runs = &mut self.own.runs;
-        flush_run_move(&mut runs.node_scratch, &mut runs.nodes, mark)
+        flush_run(&mut runs.node_scratch, &mut runs.nodes, mark)
     }
 
     pub(crate) fn advance(&mut self) -> Result<(), Error> {

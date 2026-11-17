@@ -1433,12 +1433,12 @@ impl<'a> Printer<'a> {
             {
                 return smallvec![
                     d.text("="),
-                    self.build_bind_sequence_with_comments_doc(seq, expr.span, span),
+                    self.build_bind_sequence_with_comments_doc(*seq, expr.span, span),
                 ];
             }
 
             let len = seq.expressions.len();
-            let operands = self.build_bind_operand_docs(seq, |_| false);
+            let operands = self.build_bind_operand_docs(*seq, |_| false);
 
             // Build items: each expression with trailing comma (except last)
             let items: DocBuf = operands
@@ -1495,7 +1495,7 @@ impl<'a> Printer<'a> {
     /// `value_sequence_trailing_comment` divergence fixture).
     fn build_bind_sequence_with_comments_doc(
         &self,
-        seq: &tsv_ts::ast::SequenceExpression,
+        seq: tsv_ts::ast::SequenceExpression,
         span: Span,
         tag_span: Span,
     ) -> DocId {
@@ -1561,7 +1561,7 @@ impl<'a> Printer<'a> {
     /// forced break in the surrounding `{ }` (a leading comment) doesn't break them — they
     /// break only when they overflow or carry an interior forced break (a mid line comment,
     /// a block-body arrow). Matches prettier.
-    fn build_bind_sequence_operands_doc(&self, seq: &tsv_ts::ast::SequenceExpression) -> DocId {
+    fn build_bind_sequence_operands_doc(&self, seq: tsv_ts::ast::SequenceExpression) -> DocId {
         let expressions = self.view.expr_list(seq.expressions);
         let d = self.d();
         let bytes = self.source.as_bytes();
@@ -1626,13 +1626,13 @@ impl<'a> Printer<'a> {
     /// its frozen slice, and a plain path as its own bytes.
     fn build_bind_operand_docs(
         &self,
-        seq: &tsv_ts::ast::SequenceExpression,
+        seq: tsv_ts::ast::SequenceExpression,
         frozen_at: impl Fn(usize) -> bool,
     ) -> Vec<DocId> {
         let built = tsv_ts::__private::build_bare_sequence_operand_docs(
             self.view,
             self.d(),
-            seq,
+            &seq,
             &self.ts_inputs(),
             self.embed,
             |i| {

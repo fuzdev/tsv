@@ -310,7 +310,7 @@ impl<'a> ChainNode<'a> {
     /// linearization entry points cannot hand the node different ones.
     pub(crate) fn non_null(
         view: AstView<'_>,
-        non_null: &ast::TSNonNullExpression,
+        non_null: ast::TSNonNullExpression,
         span: Span,
     ) -> Self {
         Self::NonNull {

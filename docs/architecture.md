@@ -993,9 +993,9 @@ and intersection members, tuple elements, type arguments, template-literal types
 template quasis, declarators, `switch` cases, import and export specifiers, class and type
 members, type parameters, decorators and the rest) is a value run over a store of its element
 type (`Run<ObjectProperty>`, `Run<VariableDeclarator>`, …), built on that type's scratch stack
-and flushed into the store when the list closes (the element types but `ClassMember` are `Copy`
-and flush as a block; the expressions, statements, types and payloads are `Clone` only, so
-none is copied by reading it). A reader reaches them through an `AstView`, one word holding a
+and flushed into the store as a block when the list closes (every row type is `Copy`, the
+expressions, statements, types and payloads with the elements, so a row read by value is a
+copy of the whole row). A reader reaches them through an `AstView`, one word holding a
 reference to the stores; a store row, once pushed, is never edited or truncated, so a parser
 that replaces a node (a cover-grammar conversion, an annotated binding pattern) appends the
 new row and the old one is orphaned. The payloads too rare to sit inline in the node that
@@ -1008,14 +1008,12 @@ like a row. The CSS tree takes the same shape for its lists and strings: each of
 types (a stylesheet's nodes, a block's children, the three selector levels, a `::part()`'s
 name spans, a value list's members, a condition's parts and segments) is a value run over a
 `CssStores` store of its element type, built on that type's scratch stack (every element type
-`Copy` and flushed as a block but `CssNode` and `CssBlockChild`, which hold a rule or an at-rule
-inline and move a row at a time), and every string it keeps as text of its own is a
+`Copy` and flushed as a block), and every string it keeps as text of its own is a
 `PoolText<CssText>`, all read through a `CssView`. The Svelte template takes it too: each of
 its list types (a fragment's nodes, an element's attributes, an attribute's value parts, a
 directive's modifier spans, the wire's `{#snippet}` parameter lists) is a value run over a
 store of its element type in the own half of the document's `SvelteStores` (`SvelteOwn`),
-built on that type's scratch stack (every element type `Copy` and flushed as a block but
-`FragmentNode`, which holds an element or a block inline and moves a row at a time), and the
+built on that type's scratch stack (every element type `Copy` and flushed as a block), and the
 one string it keeps as text of its own a `PoolText<SvelteText>`, all read through a
 `SvelteView`. The rest of this section describes the layout the stores were built to keep.
 

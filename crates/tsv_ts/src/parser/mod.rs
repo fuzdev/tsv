@@ -908,7 +908,7 @@ impl<'a> Parser<'a> {
         run
     }
 
-    /// Flush the value run opened at `mark` into the expression store.
+    /// Flush the value run opened at `mark` into the expression store (`ListBuf::flush_copy`).
     #[inline]
     pub(in crate::parser) fn flush_expr_run(
         &mut self,
@@ -917,7 +917,7 @@ impl<'a> Parser<'a> {
         let run = self
             .stores
             .expr_scratch
-            .flush_move(mark, &mut self.stores.exprs);
+            .flush_copy(mark, &mut self.stores.exprs);
         #[cfg(feature = "_internal_ast_census")]
         tsv_lang::ast_census_probe::mint::<Expression>(run.len());
         run

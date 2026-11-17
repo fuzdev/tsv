@@ -12,10 +12,11 @@
 //!
 //! A [`Run`] names consecutive rows. [`ListBuf`] builds a run: list elements go on a scratch
 //! stack, one shared by every open list of the same element type, and a flush copies one
-//! finished frame into the store: as a block for a `Copy` row ([`ListBuf::flush_copy`], or
-//! [`ListBuf::flush_copy_short`] where most frames hold one row), a row at a time for any
-//! other ([`ListBuf::flush_move`]). A frame is a [`ListMark`] held in a local of the code building
-//! the list, so nested lists are last-in-first-out by construction and nothing counts depth.
+//! finished frame into the store as a block ([`ListBuf::flush_copy`], or
+//! [`ListBuf::flush_copy_short`] where most frames hold one row): a row is `Copy`, so neither
+//! a flush nor a store's first write clones one. A frame is a [`ListMark`] held in a local of
+//! the code building the list, so nested lists are last-in-first-out by construction and
+//! nothing counts depth.
 //! A rewind needs only the mark taken before the speculation. A mark is typed by its family, so
 //! a mark of one buffer cannot be handed to another's.
 //!
@@ -515,12 +516,12 @@ impl<T: Row> Store<T> {
         }
     }
 
-    /// Appends `row` and mints its id. On a store's first write `row` lands in slot 0 and its
-    /// clone in slot 1, the slot the id names.
+    /// Appends `row` and mints its id. On a store's first write `row` lands in slot 0 and a
+    /// copy of it in slot 1, the slot the id names.
     #[inline]
     pub fn push(&mut self, row: T) -> Id<T::Family>
     where
-        T: Clone,
+        T: Copy,
     {
         let index = mint_index(self.rows.len());
         self.rows.push(row);
@@ -591,7 +592,7 @@ impl<T: Row> Store<T> {
 
     /// The refused arm of a push's mint, taken after the row is appended so the row itself
     /// never has its address taken: a store whose only row is the one just pushed (it was not
-    /// yet written) appends a clone of it, so slot 0 holds the original and index 1 its clone;
+    /// yet written) appends a copy of it, so slot 0 holds the original and index 1 its copy;
     /// a store already written is past the last index. Out of line and cold, reading only the
     /// store, so a push's inlined tail keeps the base shape: the row is stored straight into
     /// its slot, and nothing is held across a call.
@@ -599,10 +600,10 @@ impl<T: Row> Store<T> {
     #[inline(never)]
     fn prime_after_first_push(&mut self) -> NonZeroU32
     where
-        T: Clone,
+        T: Copy,
     {
         let first = match self.rows.as_slice() {
-            [only] => only.clone(),
+            [only] => *only,
             _ => store_overflow(),
         };
         self.rows.push(first);
@@ -610,7 +611,7 @@ impl<T: Row> Store<T> {
     }
 
     /// The refused arm of a flush's mint, as [`Store::prime_after_first_push`] is a push's: a
-    /// store not yet written fills slot 0 with a clone of `first`, the frame's first row, and
+    /// store not yet written fills slot 0 with a copy of `first`, the frame's first row, and
     /// mints the run behind it; a store already written, or a run that cannot fit, overflows.
     /// The store's first allocation is sized here, to [`FIRST_ALLOC_BYTES`] of rows or the
     /// run and its slot 0, whichever is more; capacity that already holds that is kept.
@@ -618,7 +619,7 @@ impl<T: Row> Store<T> {
     #[inline(never)]
     fn prime_range(&mut self, first: Option<&T>, count: usize) -> (NonZeroU32, u32)
     where
-        T: Clone,
+        T: Copy,
     {
         let Some(first) = first.filter(|_| self.rows.is_empty()) else {
             store_overflow();
@@ -629,7 +630,7 @@ impl<T: Row> Store<T> {
             store_overflow();
         };
         self.rows.reserve(first_alloc_rows::<T>().max(count + 1));
-        self.rows.push(first.clone());
+        self.rows.push(*first);
         range
     }
 
@@ -643,7 +644,7 @@ impl<T: Row> Store<T> {
         first: impl FnOnce() -> Option<&'r T>,
     ) -> Run<T::Family>
     where
-        T: Clone + 'r,
+        T: Copy + 'r,
     {
         let (start, len) = match mint_range(self.rows.len(), count) {
             Some(range) => range,
@@ -1006,27 +1007,6 @@ impl<T: Row> ListBuf<T> {
         crate::ast_census_probe::list_delta::<T>(-(count as isize));
         run
     }
-
-    /// Moves the frame above `mark` into `into`, a row at a time, and truncates the stack back
-    /// to `mark`: the flush of a row type that is not `Copy`. An empty frame returns
-    /// [`Run::EMPTY`] and does not touch `into`.
-    #[inline]
-    pub fn flush_move(&mut self, mark: ListMark<T::Family>, into: &mut Store<T>) -> Run<T::Family>
-    where
-        T: Clone,
-    {
-        #[cfg(feature = "_internal_store_check")]
-        self.live.pop_through(mark.seq);
-        let count = self.len_since(mark);
-        if count == 0 {
-            return Run::EMPTY;
-        }
-        let run = into.mint_run(count, || self.items.get(mark.index()));
-        into.rows.extend(self.items.drain(mark.index()..));
-        #[cfg(feature = "_internal_ast_census")]
-        crate::ast_census_probe::list_delta::<T>(-(count as isize));
-        run
-    }
 }
 
 /// A handle to one string of a [`TextPool`] of the family `F`. `Option<PoolText<F>>` keeps the
@@ -1307,17 +1287,17 @@ impl fmt::Write for PoolWriter<'_> {
 /// row. A free function over the store's field path, so a caller can push while it holds a
 /// disjoint borrow of the other stores.
 #[inline]
-pub fn push_row<T: Row + Clone>(store: &mut Store<T>, row: T) -> Id<T::Family> {
+pub fn push_row<T: Row + Copy>(store: &mut Store<T>, row: T) -> Id<T::Family> {
     #[cfg(feature = "_internal_ast_census")]
     crate::ast_census_probe::mint::<T>(1);
     store.push(row)
 }
 
 /// Flush the list opened at `mark` on `scratch` into `store` and mint its run: where a list
-/// built by value becomes rows, copied as a block rather than moved a row at a time
-/// (`ListBuf::flush_copy_short`, whose one-row frame is stored as a push stores it). A free
-/// function over the two field paths, as [`push_row`] is, so a caller can flush while it holds
-/// a disjoint borrow of the other stores.
+/// built by value becomes rows, copied as a block (`ListBuf::flush_copy_short`, whose one-row
+/// frame is stored as a push stores it). A free function over the two field paths, as
+/// [`push_row`] is, so a caller can flush while it holds a disjoint borrow of the other
+/// stores.
 #[inline]
 pub fn flush_run<T: Row + Copy>(
     scratch: &mut ListBuf<T>,
@@ -1330,25 +1310,11 @@ pub fn flush_run<T: Row + Copy>(
     run
 }
 
-/// [`flush_run`] for an element type that is not `Copy`, moved a row at a time
-/// (`ListBuf::flush_move`): an element that holds a `Clone`-only node inline.
-#[inline]
-pub fn flush_run_move<T: Row + Clone>(
-    scratch: &mut ListBuf<T>,
-    store: &mut Store<T>,
-    mark: ListMark<T::Family>,
-) -> Run<T::Family> {
-    let run = scratch.flush_move(mark, store);
-    #[cfg(feature = "_internal_ast_census")]
-    crate::ast_census_probe::mint::<T>(run.len());
-    run
-}
-
 /// [`push_row`] for a row that keeps a span of its own, read by `span_of`: returns that span,
 /// read before the push, beside the id, for the header of the node that wraps the id. A debug
 /// build re-reads the stored row, which checks only that storing the row kept its span.
 #[inline]
-pub fn push_spanned<T: Row + Clone>(
+pub fn push_spanned<T: Row + Copy>(
     store: &mut Store<T>,
     row: T,
     span_of: fn(&T) -> crate::Span,
@@ -1441,7 +1407,7 @@ mod tests {
             scratch.push(Node("c"));
         }
         // the peak so far: the outer two under the inner three
-        scratch.flush_move(inner, &mut nodes);
+        scratch.flush_copy(inner, &mut nodes);
         scratch.push(Node("d"));
         let speculation = scratch.mark();
         scratch.push(Node("e"));
@@ -1533,7 +1499,7 @@ mod tests {
         let mark = scratch.mark();
         scratch.push(Node("a"));
         scratch.push(Node("b"));
-        let run = scratch.flush_move(mark, &mut nodes);
+        let run = scratch.flush_copy(mark, &mut nodes);
         assert_eq!((run.start.get(), run.len()), (1, 2));
         assert_eq!(nodes.rows, [Node("a"), Node("a"), Node("b")]);
         assert_eq!(texts(&nodes, run), ["a", "b"]);
@@ -1554,7 +1520,7 @@ mod tests {
         let mark = scratch.mark();
         scratch.push(Node("a"));
         scratch.push(Node("b"));
-        scratch.flush_move(mark, &mut nodes);
+        scratch.flush_copy(mark, &mut nodes);
         assert!(first_alloc_rows::<Node<'static>>() > 4);
         assert!(nodes.rows.capacity() >= first_alloc_rows::<Node<'static>>());
 
@@ -1586,7 +1552,7 @@ mod tests {
         let mark = scratch.mark();
         scratch.push(Node("b"));
         scratch.push(Node("c"));
-        let run = scratch.flush_move(mark, &mut sized);
+        let run = scratch.flush_copy(mark, &mut sized);
         assert_eq!((run.start.get(), run.len()), (1, 2));
         assert_eq!(
             (sized.rows.as_ptr(), sized.rows.capacity()),
@@ -1618,7 +1584,7 @@ mod tests {
         for index in 0..count {
             scratch.push(Node(WORDS[index % WORDS.len()]));
         }
-        let run = scratch.flush_move(mark, &mut nodes);
+        let run = scratch.flush_copy(mark, &mut nodes);
         assert_eq!((run.start.get(), run.len()), (1, count));
         assert_eq!(nodes.rows.len(), count + 1);
         assert_eq!(
@@ -1659,10 +1625,10 @@ mod tests {
         nodes.push(Node("a"));
         let (rows, capacity) = (nodes.rows.len(), nodes.rows.capacity());
         let mut scratch = ListBuf::new();
-        let moved = scratch.mark();
+        let short = scratch.mark();
         let copied = scratch.mark();
         assert_eq!(scratch.flush_copy(copied, &mut nodes), Run::EMPTY);
-        assert_eq!(scratch.flush_move(moved, &mut nodes), Run::EMPTY);
+        assert_eq!(scratch.flush_copy_short(short, &mut nodes), Run::EMPTY);
         assert_eq!((nodes.rows.len(), nodes.rows.capacity()), (rows, capacity));
     }
 
@@ -1670,10 +1636,10 @@ mod tests {
     fn an_empty_frame_leaves_a_store_never_written_unprimed() {
         let mut nodes = store();
         let mut scratch = ListBuf::new();
-        let moved = scratch.mark();
+        let short = scratch.mark();
         let copied = scratch.mark();
         assert_eq!(scratch.flush_copy(copied, &mut nodes), Run::EMPTY);
-        assert_eq!(scratch.flush_move(moved, &mut nodes), Run::EMPTY);
+        assert_eq!(scratch.flush_copy_short(short, &mut nodes), Run::EMPTY);
         assert!(nodes.rows.is_empty());
         assert_eq!(nodes.rows.capacity(), 0);
     }
@@ -1700,14 +1666,14 @@ mod tests {
         scratch.push(Node("b"));
         scratch.push(Node("c"));
         assert_eq!(scratch.len_since(inner), 2);
-        let inner_run = scratch.flush_move(inner, &mut nodes);
+        let inner_run = scratch.flush_copy(inner, &mut nodes);
         scratch.push(Node("d"));
         let second_inner = scratch.mark();
         scratch.push(Node("e"));
         let second_run = scratch.flush_copy(second_inner, &mut nodes);
         scratch.push(Node("f"));
         assert_eq!(scratch.len_since(outer), 3);
-        let outer_run = scratch.flush_move(outer, &mut nodes);
+        let outer_run = scratch.flush_copy(outer, &mut nodes);
 
         assert_eq!(texts(&nodes, inner_run), ["b", "c"]);
         assert_eq!(texts(&nodes, second_run), ["e"]);
@@ -1727,13 +1693,14 @@ mod tests {
 
         let mark = scratch.mark();
         scratch.push(Node("y"));
-        scratch.flush_move(mark, &mut nodes);
+        scratch.flush_copy(mark, &mut nodes);
         assert_eq!(scratch.items, [Node("below")]);
     }
 
-    /// The three flushes differ only in how the rows travel: for a frame of any length, into a
-    /// store never written or already written, each leaves the same rows, mints the same run
-    /// and takes the same elements off the stack.
+    /// The two flushes differ only in how a one-row frame travels: for a frame of any length,
+    /// into a store never written or already written, each leaves the rows a row-at-a-time
+    /// push would (a first write primes slot 0 with the frame's first row), mints the run over
+    /// them and takes the frame, and nothing below it, off the stack.
     #[test]
     fn every_flush_places_the_same_rows() {
         const NAMES: [&str; 5] = ["a", "b", "c", "d", "e"];
@@ -1762,14 +1729,31 @@ mod tests {
         }
         for written in [false, true] {
             for len in 0..=NAMES.len() {
-                let moved = flushed(written, len, ListBuf::flush_move);
-                let copied = flushed(written, len, ListBuf::flush_copy);
-                let short = flushed(written, len, ListBuf::flush_copy_short);
-                assert_eq!(copied, moved, "written {written}, {len} rows");
-                assert_eq!(short, moved, "written {written}, {len} rows");
-                assert_eq!(moved.2, [Node("below")]);
-                let rows_before = if written { 2 } else { usize::from(len > 0) };
-                assert_eq!(moved.0.len(), rows_before + len);
+                let mut rows: Rows = if written {
+                    vec![Node("first"), Node("first")]
+                } else if len > 0 {
+                    vec![Node(NAMES[0])]
+                } else {
+                    Vec::new()
+                };
+                let rows_before = rows.len();
+                rows.extend(NAMES[..len].iter().map(|&name| Node(name)));
+                let run = if len > 0 {
+                    (u32::try_from(rows_before).unwrap(), len)
+                } else {
+                    (Run::<Alpha>::EMPTY.start.get(), 0)
+                };
+                let expected = (rows, run, vec![Node("below")]);
+                assert_eq!(
+                    flushed(written, len, ListBuf::flush_copy),
+                    expected,
+                    "flush_copy, written {written}, {len} rows"
+                );
+                assert_eq!(
+                    flushed(written, len, ListBuf::flush_copy_short),
+                    expected,
+                    "flush_copy_short, written {written}, {len} rows"
+                );
             }
         }
     }
@@ -1817,7 +1801,7 @@ mod tests {
         assert_eq!(scratch.len_since(outer), 1);
 
         scratch.push(Node("b"));
-        let run = scratch.flush_move(outer, &mut nodes);
+        let run = scratch.flush_copy(outer, &mut nodes);
         assert_eq!(texts(&nodes, run), ["a", "b"]);
     }
 
@@ -1999,8 +1983,8 @@ mod tests {
         scratch.push(Node("a"));
         let inner = scratch.mark();
         scratch.push(Node("b"));
-        scratch.flush_move(outer, &mut nodes);
-        scratch.flush_move(inner, &mut nodes);
+        scratch.flush_copy(outer, &mut nodes);
+        scratch.flush_copy(inner, &mut nodes);
     }
 
     #[test]
@@ -2134,7 +2118,7 @@ mod tests {
             "the outer frame is untouched"
         );
         scratch.push(Node("d"));
-        let inner_run = scratch.flush_move(inner, &mut nodes);
+        let inner_run = scratch.flush_copy(inner, &mut nodes);
         assert_eq!(texts(&nodes, inner_run), ["d"]);
         assert_eq!(scratch.pop(outer), Some(Node("a")));
         assert_eq!(scratch.pop(outer), None);
@@ -2168,8 +2152,8 @@ mod tests {
         assert_eq!(scratch.pop(outer), Some(Node("a")));
         scratch.push(Node("x"));
         scratch.push(Node("y"));
-        let inner_run = scratch.flush_move(inner, &mut nodes);
-        let outer_run = scratch.flush_move(outer, &mut nodes);
+        let inner_run = scratch.flush_copy(inner, &mut nodes);
+        let outer_run = scratch.flush_copy(outer, &mut nodes);
         assert_eq!(texts(&nodes, inner_run), ["y"]);
         assert_eq!(texts(&nodes, outer_run), ["x"]);
     }
@@ -2260,7 +2244,7 @@ mod tests {
         scratch.push(Node("spec again"));
         scratch.truncate(checkpoint);
         scratch.push(Node("kept"));
-        let run = scratch.flush_move(frame, &mut nodes);
+        let run = scratch.flush_copy(frame, &mut nodes);
         assert_eq!(texts(&nodes, run), ["a", "kept"]);
     }
 
@@ -2276,14 +2260,14 @@ mod tests {
         let inner = scratch.mark();
         scratch.push(Node("c"));
         let inner_run = scratch.flush_copy(inner, &mut nodes);
-        let outer_run = scratch.flush_move(outer, &mut nodes);
+        let outer_run = scratch.flush_copy(outer, &mut nodes);
         assert_eq!(texts(&nodes, inner_run), ["c"]);
         assert_eq!(texts(&nodes, outer_run), ["a", "b"]);
 
         // The stack beneath stays usable.
         let next = scratch.mark();
         scratch.push(Node("d"));
-        let next_run = scratch.flush_move(next, &mut nodes);
+        let next_run = scratch.flush_copy(next, &mut nodes);
         assert_eq!(texts(&nodes, next_run), ["d"]);
     }
 
@@ -2648,9 +2632,9 @@ mod tests {
             let mut scratch = ListBuf::new();
             let inner = scratch.mark();
             scratch.push(Node("b"));
-            scratch.flush_move(inner, &mut nodes);
+            scratch.flush_copy(inner, &mut nodes);
             scratch.push(Node("c"));
-            scratch.flush_move(inner, &mut nodes);
+            scratch.flush_copy(inner, &mut nodes);
         }
 
         #[test]
@@ -2662,10 +2646,10 @@ mod tests {
             scratch.push(Node("a"));
             let inner = scratch.mark();
             scratch.push(Node("b"));
-            scratch.flush_move(outer, &mut nodes);
+            scratch.flush_copy(outer, &mut nodes);
             scratch.push(Node("p"));
             scratch.push(Node("q"));
-            scratch.flush_move(inner, &mut nodes);
+            scratch.flush_copy(inner, &mut nodes);
         }
 
         #[test]
@@ -2675,7 +2659,7 @@ mod tests {
             let mut scratch = ListBuf::new();
             let inner = scratch.mark();
             scratch.push(Node("b"));
-            scratch.flush_move(inner, &mut nodes);
+            scratch.flush_copy(inner, &mut nodes);
             scratch.push(Node("c"));
             let _ = scratch.frame(inner);
         }
@@ -2690,7 +2674,7 @@ mod tests {
             scratch.reset();
             scratch.push(Node("new1"));
             scratch.push(Node("new2"));
-            scratch.flush_move(mark, &mut nodes);
+            scratch.flush_copy(mark, &mut nodes);
         }
 
         #[test]
@@ -2746,7 +2730,7 @@ mod tests {
             let mut scratch = ListBuf::new();
             let inner = scratch.mark();
             scratch.push(Node("b"));
-            scratch.flush_move(inner, &mut nodes);
+            scratch.flush_copy(inner, &mut nodes);
             scratch.push(Node("c"));
             let _ = scratch.frame_mut(inner);
         }

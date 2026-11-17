@@ -253,7 +253,7 @@ pub(super) fn write_conditional_expression(
 /// Emits an `AwaitExpression` node.
 pub(super) fn write_await_expression(
     w: &mut JsonWriter,
-    await_expr: &ast::AwaitExpression,
+    await_expr: ast::AwaitExpression,
     span: Span,
     ctx: &Ctx<'_>,
 ) {
@@ -267,7 +267,7 @@ pub(super) fn write_await_expression(
 /// (nullable).
 pub(super) fn write_yield_expression(
     w: &mut JsonWriter,
-    yield_expr: &ast::YieldExpression,
+    yield_expr: ast::YieldExpression,
     span: Span,
     ctx: &Ctx<'_>,
 ) {

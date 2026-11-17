@@ -428,7 +428,7 @@ fn line_head_boundary_spaces(source: &str) -> Vec<(usize, String)> {
 fn for_each_eligible_text(source: &str, f: &mut dyn FnMut(&str, usize)) {
     fn walk(
         view: SvelteView<'_>,
-        frag: &Fragment,
+        frag: Fragment,
         source: &str,
         preserve: bool,
         f: &mut dyn FnMut(&str, usize),
@@ -476,34 +476,34 @@ fn for_each_eligible_text(source: &str, f: &mut dyn FnMut(&str, usize)) {
                     if !emits_verbatim_body(view, e, source) {
                         let child_preserve =
                             preserve || tsv_svelte::__private::preserves_whitespace(e.name(source));
-                        walk(view, &e.fragment, source, child_preserve, f);
+                        walk(view, e.fragment, source, child_preserve, f);
                     }
                 }
                 FragmentNode::SpecialElement(e) => {
                     // A head `<title>` is the one special kind whose content the printer
                     // emits verbatim, so its leading runs are the author's bytes.
                     let child_preserve = preserve || e.kind.preserves_content_whitespace();
-                    walk(view, &e.fragment, source, child_preserve, f);
+                    walk(view, e.fragment, source, child_preserve, f);
                 }
                 FragmentNode::IfBlock(b) => {
-                    walk(view, &b.consequent, source, preserve, f);
+                    walk(view, b.consequent, source, preserve, f);
                     if let Some(alt) = &b.alternate {
-                        walk(view, alt, source, preserve, f);
+                        walk(view, *alt, source, preserve, f);
                     }
                 }
                 FragmentNode::EachBlock(b) => {
-                    walk(view, &b.body, source, preserve, f);
+                    walk(view, b.body, source, preserve, f);
                     if let Some(fallback) = &b.fallback {
-                        walk(view, fallback, source, preserve, f);
+                        walk(view, *fallback, source, preserve, f);
                     }
                 }
                 FragmentNode::AwaitBlock(b) => {
                     for frag in [&b.pending, &b.then, &b.catch].into_iter().flatten() {
-                        walk(view, frag, source, preserve, f);
+                        walk(view, *frag, source, preserve, f);
                     }
                 }
-                FragmentNode::KeyBlock(b) => walk(view, &b.fragment, source, preserve, f),
-                FragmentNode::SnippetBlock(b) => walk(view, &b.body, source, preserve, f),
+                FragmentNode::KeyBlock(b) => walk(view, b.fragment, source, preserve, f),
+                FragmentNode::SnippetBlock(b) => walk(view, b.body, source, preserve, f),
                 FragmentNode::Comment(_)
                 | FragmentNode::ExpressionTag(_)
                 | FragmentNode::HtmlTag(_)
@@ -518,7 +518,7 @@ fn for_each_eligible_text(source: &str, f: &mut dyn FnMut(&str, usize)) {
     let Ok(root) = tsv_svelte::__private::parse(source) else {
         return;
     };
-    walk(root.view(), &root.fragment, source, false, f);
+    walk(root.view(), root.fragment, source, false, f);
 }
 
 /// Whether the printer emits this element's body **verbatim** — `<script>` / `<style>` (raw

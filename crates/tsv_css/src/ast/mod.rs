@@ -64,7 +64,7 @@ impl Default for CssStyleSheet {
 /// CSS AST node types
 ///
 /// Comments are stored separately in `CssStyleSheet.comments` and looked up by position.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum CssNode {
     Rule(CssRule),
     Atrule(CssAtrule), // @media, @keyframes, @supports, etc.
@@ -80,7 +80,7 @@ impl CssNode {
 }
 
 /// CSS Rule - selector with declaration block
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct CssRule {
     pub selector: SelectorList,
     pub block_span: Span,                 // Span of the block including braces
@@ -408,7 +408,7 @@ impl AttributeMatcher {
 /// Maintains semantic representation:
 /// - `value`: Rich semantic AST for manipulation, formatting, linting
 /// - Source text extracted via span when needed (e.g., for JSON output)
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct CssDeclaration {
     /// Property name, **escape-decoded** (spec-canonical `<ident-token>` value, e.g. `\63 olor`
     /// → `color`; CSS Syntax §4.3.11). This is NOT a verbatim slice of `span`, so it is kept as
@@ -700,7 +700,7 @@ pub enum Color {
 /// - @supports: structured conditions for line-width wrapping
 /// - @media, @container: raw condition strings
 /// - @keyframes: raw animation name
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum PreludeValue {
     /// Structured values (for @import): a `url()`/string head and `layer`/`supports()`
     /// calls, then the rest of the prelude to its end as one verbatim `Identifier` tail —
@@ -794,7 +794,7 @@ pub enum PreludeValue {
 /// (`@scope (/* c */ .a)`), which the printer re-emits via `comments_to_emit_in_range` — the
 /// same wrapping `:is()` args use. Wire-ignored (the prelude is extracted from the
 /// `Selectors` `span`, comments stripped).
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct ScopeClause {
     pub list: SelectorList,
     /// The clause's full `(…)` span (end one past `)`, the pseudo-arg convention).
@@ -804,7 +804,7 @@ pub struct ScopeClause {
 /// The `@scope` limit clause: `to (<scope-end>)`. Carries the `to` keyword span (so the
 /// printer can tell a between-clause comment before `to` from an after-`to` one) plus
 /// the limit `ScopeClause`. Present iff the source has a `to` clause.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct ScopeLimit {
     /// The `to` keyword span (a case-insensitive grammar keyword, lowercased at print).
     pub to_span: Span,
@@ -935,7 +935,7 @@ impl PreludeValue {
 }
 
 /// At-rule (@media, @keyframes, @supports, @import, @layer, @font-face, etc.)
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct CssAtrule {
     /// At-rule name without `@` (e.g., "media", "keyframes"), **escape-decoded**
     /// (spec-canonical `<at-keyword-token>`, CSS Syntax §4.3.3 — `@\6d edia` → `"media"`),
@@ -987,7 +987,7 @@ impl CssAtrule {
 }
 
 /// At-rule block - can contain rules, declarations, or nested at-rules
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct CssAtruleBlock {
     /// Block children - mixture depends on at-rule type
     ///
@@ -1000,7 +1000,7 @@ pub struct CssAtruleBlock {
 }
 
 /// At-rule block child - can be rule, declaration, or nested at-rule
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum CssBlockChild {
     Rule(CssRule),
     Declaration(CssDeclaration),

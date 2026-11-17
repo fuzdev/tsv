@@ -257,13 +257,13 @@ pub(super) fn write_statement(w: &mut JsonWriter, stmt: &ast::Statement, ctx: &C
             write_for_of_statement(w, for_of, stmt.span, ctx);
         }
         ast::StatementKind::WhileStatement(while_stmt) => {
-            write_while_statement(w, while_stmt, stmt.span, ctx);
+            write_while_statement(w, *while_stmt, stmt.span, ctx);
         }
         ast::StatementKind::DoWhileStatement(do_while) => {
-            write_do_while_statement(w, do_while, stmt.span, ctx);
+            write_do_while_statement(w, *do_while, stmt.span, ctx);
         }
         ast::StatementKind::WithStatement(with_stmt) => {
-            write_with_statement(w, with_stmt, stmt.span, ctx);
+            write_with_statement(w, *with_stmt, stmt.span, ctx);
         }
         ast::StatementKind::SwitchStatement(switch_stmt) => {
             write_switch_statement(w, switch_stmt, stmt.span, ctx);
@@ -272,7 +272,7 @@ pub(super) fn write_statement(w: &mut JsonWriter, stmt: &ast::Statement, ctx: &C
             write_try_statement(w, try_stmt, stmt.span, ctx);
         }
         ast::StatementKind::ThrowStatement(throw_stmt) => {
-            write_throw_statement(w, throw_stmt, stmt.span, ctx);
+            write_throw_statement(w, *throw_stmt, stmt.span, ctx);
         }
         ast::StatementKind::BreakStatement(break_stmt) => {
             write_break_statement(w, break_stmt, stmt.span, ctx);

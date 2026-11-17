@@ -258,7 +258,7 @@ struct CommentScan<'r> {
 }
 
 impl<'r> CommentScan<'r> {
-    fn new(view: SvelteView<'_>, fragment: &ast::Fragment, ranges: &'r IgnoreRanges) -> Self {
+    fn new(view: SvelteView<'_>, fragment: ast::Fragment, ranges: &'r IgnoreRanges) -> Self {
         let nodes = view.nodes(fragment.nodes);
         let mut next_barrier = vec![None; nodes.len()];
         let mut barrier = None;
@@ -526,7 +526,10 @@ pub(crate) struct Printer<'a> {
     /// Each fragment's extent and content-edge answer (`nodes::IndexedFragment`), keyed by the
     /// address of its first node — indexed once per document, top down, by
     /// [`Printer::index_fragment_edges`], since a block tag's body reads its edges from where the
-    /// tag sits in its parent. A run of a fragment finds its fragment by address.
+    /// tag sits in its parent. A run of a fragment finds its fragment by address — the slice's
+    /// address in the store, so a reader hands over a slice of the store — one an accessor
+    /// returned, or a sub-slice of it — never one over a copied node, whose stack slot another
+    /// node can reuse.
     fragment_edges: RefCell<std::collections::BTreeMap<usize, nodes::IndexedFragment>>,
     /// Each node slice's glue flags (`nodes::FragmentGlue`), computed on first ask.
     fragment_glue_cache: RefCell<FxHashMap<(usize, usize), std::rc::Rc<nodes::FragmentGlue>>>,
@@ -2029,7 +2032,7 @@ impl<'a> Printer<'a> {
     /// freezes the module script alone). The nearest NODE rather than the section's travelling
     /// run, because a directive inside a `format-ignore` range never travels (the range prints
     /// it where it stands) and still freezes the section below it.
-    fn section_is_frozen(&self, fragment: &ast::Fragment, section: Span, hoisted: &[Span]) -> bool {
+    fn section_is_frozen(&self, fragment: ast::Fragment, section: Span, hoisted: &[Span]) -> bool {
         let nodes = self.svelte.nodes(fragment.nodes);
         let above = nodes.partition_point(|n| n.span().end <= section.start);
         let Some(FragmentNode::Comment(comment)) = nodes[..above]
@@ -2054,7 +2057,7 @@ impl<'a> Printer<'a> {
             .collect();
         root_sections(root).map(|(span, section)| {
             section != HoistedSection::Options
-                && span.is_some_and(|span| self.section_is_frozen(&root.fragment, span, &hoisted))
+                && span.is_some_and(|span| self.section_is_frozen(root.fragment, span, &hoisted))
         })
     }
 
@@ -2184,7 +2187,7 @@ impl<'a> Printer<'a> {
     /// in a release build.
     fn fragment_comment<'f>(
         view: SvelteView<'f>,
-        fragment: &ast::Fragment,
+        fragment: ast::Fragment,
         idx: usize,
     ) -> Option<&'f ast::HtmlComment> {
         let comment = match &view.nodes(fragment.nodes)[idx] {
@@ -2216,7 +2219,7 @@ impl<'a> Printer<'a> {
     fn print_comment_run(
         &mut self,
         comment_indices: &[usize],
-        fragment: &ast::Fragment,
+        fragment: ast::Fragment,
     ) -> Option<u32> {
         let mut prev_end: Option<u32> = None;
         for &i in comment_indices {
@@ -2235,7 +2238,7 @@ impl<'a> Printer<'a> {
     fn print_region_end_trail(
         &mut self,
         trail: Option<usize>,
-        fragment: &ast::Fragment,
+        fragment: ast::Fragment,
         section_end: u32,
     ) {
         if let Some(idx) = trail
@@ -2264,7 +2267,7 @@ impl<'a> Printer<'a> {
     fn print_section_comments(
         &mut self,
         comment_indices: &[usize],
-        fragment: &ast::Fragment,
+        fragment: ast::Fragment,
         section_start: u32,
     ) -> bool {
         let Some(last_end) = self.print_comment_run(comment_indices, fragment) else {
@@ -2288,7 +2291,7 @@ impl<'a> Printer<'a> {
         let mut sections = HoistedComments::default();
         let scan = CommentScan::new(
             self.svelte,
-            &root.fragment,
+            root.fragment,
             self.ignore_ranges(&root.fragment),
         );
 
@@ -2442,9 +2445,9 @@ impl<'a> Printer<'a> {
         // Format svelte:options (if present) - always first
         if let Some(options) = &root.options {
             let comments = &sections[HoistedSection::Options];
-            self.print_section_comments(&comments.leading, &root.fragment, options.span.start);
+            self.print_section_comments(&comments.leading, root.fragment, options.span.start);
             self.print_svelte_options(options);
-            self.print_region_end_trail(comments.trail, &root.fragment, options.span.end);
+            self.print_region_end_trail(comments.trail, root.fragment, options.span.end);
             has_previous_section = true;
         }
 
@@ -2458,14 +2461,14 @@ impl<'a> Printer<'a> {
                 if has_previous_section {
                     self.write("\n"); // Blank line between sections
                 }
-                self.print_section_comments(&comments.leading, &root.fragment, script.span.start);
+                self.print_section_comments(&comments.leading, root.fragment, script.span.start);
                 if frozen[section.slot()] {
                     self.write_verbatim_span(script.span);
                     self.write("\n");
                 } else {
                     self.print_script(script);
                 }
-                self.print_region_end_trail(comments.trail, &root.fragment, script.span.end);
+                self.print_region_end_trail(comments.trail, root.fragment, script.span.end);
                 has_previous_section = true;
             }
         }
@@ -2487,7 +2490,7 @@ impl<'a> Printer<'a> {
             if has_previous_section {
                 self.write("\n"); // Blank line between sections
             }
-            self.print_root_fragment(&root.fragment, &printed_comment_indices, &hoisted);
+            self.print_root_fragment(root.fragment, &printed_comment_indices, &hoisted);
             self.write("\n"); // Template needs explicit newline
             has_previous_section = true;
         }
@@ -2499,7 +2502,7 @@ impl<'a> Printer<'a> {
                 self.write("\n"); // Blank line between sections
             }
             if self
-                .print_comment_run(&style_trailing, &root.fragment)
+                .print_comment_run(&style_trailing, root.fragment)
                 .is_some()
             {
                 // The run stands off the style's own leading run (or the tag) by a blank line —
@@ -2508,14 +2511,14 @@ impl<'a> Printer<'a> {
                 self.write("\n");
             }
             let comments = &sections[HoistedSection::Style];
-            self.print_section_comments(&comments.leading, &root.fragment, style.span.start);
+            self.print_section_comments(&comments.leading, root.fragment, style.span.start);
             if ignore_style {
                 self.write_verbatim_span(style.span);
                 self.write("\n");
             } else {
                 self.print_style(style);
             }
-            self.print_region_end_trail(comments.trail, &root.fragment, style.span.end);
+            self.print_region_end_trail(comments.trail, root.fragment, style.span.end);
         }
     }
 
@@ -2598,7 +2601,7 @@ impl<'a> Printer<'a> {
     ///   `format-ignore` is handled by the shared builder itself.)
     fn print_root_fragment(
         &mut self,
-        fragment: &ast::Fragment,
+        fragment: ast::Fragment,
         skip_indices: &[usize],
         hoisted: &[Span],
     ) {
@@ -2640,7 +2643,7 @@ impl<'a> Printer<'a> {
         // The ranges are paired over the whole fragment; the slice drops only whitespace text and
         // section comments, and a range marker is never a section comment (it pins itself to the
         // template), so every marker is in the slice and the pairing is the slice's own.
-        let ranges = self.ignore_ranges(fragment);
+        let ranges = self.ignore_ranges(&fragment);
         debug_assert!(
             skip_indices.iter().all(|&k| ranges.markers[k].is_none()),
             "a range marker never travels with a section"

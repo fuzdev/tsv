@@ -241,6 +241,10 @@ impl<'a> Printer<'a> {
     /// assertion checks it, since such a run would be handed an edge it does not have. A run
     /// no index covers — a document the index skipped, or a printer that formatted no
     /// document — reads edges that absorb nothing.
+    ///
+    /// The cache and the index key a slice by its address in the store: pass a slice of the
+    /// store — one an accessor returned, or a sub-slice of it — never one over a copied node,
+    /// whose stack slot another node can reuse.
     fn fragment_glue(&self, nodes: &[FragmentNode]) -> Rc<FragmentGlue> {
         let addr = nodes.as_ptr() as usize;
         let key = (addr, nodes.len());

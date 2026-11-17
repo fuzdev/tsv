@@ -19,14 +19,14 @@ use super::{
 /// dispatch over [`StatementKind`]; a variant struct carries no span of its own unless
 /// some node also holds that type outside a `Statement` (see
 /// [`Statement::from_variable_declaration`]).
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct Statement {
     pub span: Span,
     pub kind: StatementKind,
 }
 
 /// The variant half of a [`Statement`].
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum StatementKind {
     ExpressionStatement(ExpressionStatement),
     VariableDeclaration(VariableDeclaration),
@@ -202,7 +202,7 @@ impl Statement {
 /// recursion already returns the row it pushed, so an inline slot would be a copy OUT of
 /// that row, leaving the stored one dead. Naming the slot by id removes the copy and adds
 /// nothing; it is not the rare-variant boxing trade above, and needs no rarity argument.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct ExpressionStatement {
     pub expression: ExprId,
     /// True when this is a directive prologue entry — an unparenthesized
@@ -218,7 +218,7 @@ pub struct ExpressionStatement {
 /// - Function bodies
 /// - If/else bodies (future)
 /// - Loop bodies (future)
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct BlockStatement {
     pub body: Run<StmtId>,
     pub span: Span,
@@ -227,7 +227,7 @@ pub struct BlockStatement {
 /// Return statement: `return expr;` or `return;`
 ///
 /// The argument is optional for void returns.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct ReturnStatement {
     pub argument: Option<ExprId>,
 }
@@ -237,7 +237,7 @@ pub struct ReturnStatement {
 //
 
 /// If statement: `if (test) consequent` or `if (test) consequent else alternate`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct IfStatement {
     pub test: ExprId,
     pub consequent: StmtId,
@@ -255,7 +255,7 @@ pub struct IfStatement {
 /// enum's size on its own. The same trade is taken by `ForInStatement`,
 /// `ForOfStatement` and `TryStatement`; the frequent declaration variants above keep
 /// their inline layout, where it is the right way round.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct ForStatement {
     /// Initialization: variable declaration or expression (or None)
     pub init: Option<ForHeadId>,
@@ -270,7 +270,7 @@ pub struct ForStatement {
 ///
 /// `ForInit` is itself a row of its own store, reached only through `Option<ForHeadId>`,
 /// so its width sets nothing.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum ForInit {
     VariableDeclaration(VariableDeclaration),
     Expression(ExprId),
@@ -279,7 +279,7 @@ pub enum ForInit {
 /// For-in statement: `for (left in right) body`
 ///
 /// Head slots are ids for the density reason on `ForStatement`.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct ForInStatement {
     /// Left side: variable declaration or expression pattern
     pub left: ForLeftId,
@@ -290,7 +290,7 @@ pub struct ForInStatement {
 /// For-of statement: `for (left of right) body`
 ///
 /// Head slots are ids for the density reason on `ForStatement`.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct ForOfStatement {
     /// Left side: variable declaration or expression pattern
     pub left: ForLeftId,
@@ -305,35 +305,35 @@ pub struct ForOfStatement {
 /// The `Pattern` arm stays inline for the reason on `ForInit`: its producer returns an
 /// owned `Expression`, and this enum is a row of its own store, reached only through a
 /// `ForLeftId`.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum ForInOfLeft {
     VariableDeclaration(VariableDeclaration),
     Pattern(ExprId),
 }
 
 /// While statement: `while (test) body`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct WhileStatement {
     pub test: ExprId,
     pub body: StmtId,
 }
 
 /// Do-while statement: `do body while (test)`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct DoWhileStatement {
     pub body: StmtId,
     pub test: ExprId,
 }
 
 /// With statement: `with (object) body` — sloppy-mode Script code only.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct WithStatement {
     pub object: ExprId,
     pub body: StmtId,
 }
 
 /// Switch statement: `switch (discriminant) { cases }`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct SwitchStatement {
     pub discriminant: ExprId,
     pub cases: Run<SwitchCase>,
@@ -349,7 +349,7 @@ pub struct SwitchCase {
 }
 
 /// Try statement: `try { block } catch (param) { handler } finally { finalizer }`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct TryStatement {
     pub block: BlockStatement,
     /// An id rather than an inline `CatchClause` for the density reason on
@@ -359,7 +359,7 @@ pub struct TryStatement {
 }
 
 /// Catch clause: `catch (param) { body }`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct CatchClause {
     /// Catch parameter, or None for `catch { }` (optional catch binding).
     ///
@@ -373,36 +373,36 @@ pub struct CatchClause {
 }
 
 /// Throw statement: `throw argument`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct ThrowStatement {
     pub argument: ExprId,
 }
 
 /// Break statement: `break` or `break label`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct BreakStatement {
     pub label: Option<Identifier>,
 }
 
 /// Continue statement: `continue` or `continue label`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct ContinueStatement {
     pub label: Option<Identifier>,
 }
 
 /// Labeled statement: `label: statement`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct LabeledStatement {
     pub label: Identifier,
     pub body: StmtId,
 }
 
 /// Empty statement: `;`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct EmptyStatement;
 
 /// Debugger statement: `debugger;`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct DebuggerStatement;
 
 //
@@ -414,7 +414,7 @@ pub struct DebuggerStatement;
 /// For regular declarations, the id (function name) is required.
 /// For `export default function() {}`, the name is optional.
 /// Declarations are hoisted and can be called before they appear in source.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct FunctionDeclaration {
     /// Function name (required for declarations, optional for export default)
     pub id: Option<Identifier>,
@@ -478,7 +478,7 @@ impl VariableDeclarationKind {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct VariableDeclaration {
     pub kind: VariableDeclarationKind,
     pub declarations: Run<VariableDeclarator>,

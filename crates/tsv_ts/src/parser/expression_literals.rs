@@ -306,7 +306,7 @@ impl<'a> Parser<'a> {
                         PropertyKind::Init,
                         {
                             let span = Span::new(self.expr(key).span().start, assign_end);
-                            let left = self.push_expr(self.expr(key).clone());
+                            let left = self.push_expr(*self.expr(key));
                             self.push_expr(Expression {
                                 span,
                                 kind: ExpressionKind::AssignmentExpression(AssignmentExpression {
@@ -331,7 +331,7 @@ impl<'a> Parser<'a> {
                     );
                     (
                         PropertyKind::Init,
-                        self.push_expr(self.expr(key).clone()),
+                        self.push_expr(*self.expr(key)),
                         true,
                         false,
                     )

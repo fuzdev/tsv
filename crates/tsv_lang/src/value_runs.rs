@@ -65,8 +65,7 @@ use crate::store::{ListBuf, Row, Store, TextPool};
 /// assertions, `scratch_is_empty`. A test build of the caller also gets `shapes`, every
 /// field's [`FieldShape`] in declaration order, and `FIELDS`, the store fields' names. The
 /// macro places no bound on an element type beyond [`Row`]: which flush a list takes
-/// (`ListBuf::flush_copy`, `flush_copy_short` or `flush_move`) is the choice of the code that
-/// builds it.
+/// (`ListBuf::flush_copy` or `flush_copy_short`) is the choice of the code that builds it.
 ///
 /// A scratch stack with no store (a buffer framed and truncated, never flushed) is not a value
 /// run and has no entry: it stays a field of the caller's own store struct, beside the
@@ -292,9 +291,8 @@ mod tests {
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
     struct Leaf(u32);
 
-    /// A `Clone`-only element holding a list of its own type and a string of the pool, flushed
-    /// a row at a time.
-    #[derive(Clone, Debug, PartialEq, Eq)]
+    /// An element holding a list of its own type and a string of the pool.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
     struct Branch {
         name: PoolText<Words>,
         children: Run<Branch>,
@@ -335,7 +333,7 @@ mod tests {
 
         /// `Copy` rows, read through the view.
         leaves, leaf_scratch: Leaf => leaves;
-        /// `Clone`-only rows, each holding a list of its own type.
+        /// Rows each holding a list of its own type.
         branches, branch_scratch: Branch => branches;
         /// Rows with no accessor.
         tokens, token_scratch: Token;
@@ -414,11 +412,11 @@ mod tests {
         stores.lists.name_scratch.push(name);
         let mark = stores.lists.branch_scratch.mark();
         let row = branch(stores, "filled", Run::EMPTY);
-        stores.lists.branch_scratch.push(row.clone());
+        stores.lists.branch_scratch.push(row);
         stores
             .lists
             .branch_scratch
-            .flush_move(mark, &mut stores.lists.branches);
+            .flush_copy(mark, &mut stores.lists.branches);
         stores.lists.leaf_scratch.push(Leaf(0));
         stores.lists.branch_scratch.push(row);
         stores.lists.token_scratch.push(Token(0));
@@ -496,20 +494,20 @@ mod tests {
         let grandchildren = stores
             .lists
             .branch_scratch
-            .flush_move(innermost, &mut stores.lists.branches);
+            .flush_copy(innermost, &mut stores.lists.branches);
         let b2 = branch(&mut stores, "b2", grandchildren);
         stores.lists.branch_scratch.push(b2);
         let children = stores
             .lists
             .branch_scratch
-            .flush_move(inner, &mut stores.lists.branches);
+            .flush_copy(inner, &mut stores.lists.branches);
 
         let b = branch(&mut stores, "b", children);
         stores.lists.branch_scratch.push(b);
         let top = stores
             .lists
             .branch_scratch
-            .flush_move(outer, &mut stores.lists.branches);
+            .flush_copy(outer, &mut stores.lists.branches);
 
         assert_eq!(names(&stores, top), ["a", "b"]);
         assert_eq!(names(&stores, children), ["b1", "b2"]);
@@ -599,7 +597,7 @@ mod tests {
         let leaves = lists.leaf_scratch.flush_copy(leaf_frame, &mut lists.leaves);
         let branches = lists
             .branch_scratch
-            .flush_move(branch_frame, &mut lists.branches);
+            .flush_copy(branch_frame, &mut lists.branches);
         assert_eq!(stores.view().leaves(leaves), [Leaf(1)]);
         assert_eq!(names(&stores, branches), ["kept"]);
     }

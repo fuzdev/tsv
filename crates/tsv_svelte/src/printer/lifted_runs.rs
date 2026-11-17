@@ -530,7 +530,7 @@ impl Printer<'_> {
         let mut runs = SmallVec::new();
         for (span, section) in root_sections(root) {
             let Some(span) = span else { continue };
-            let mut run = self.lifted_run(span, section, sections, &root.fragment);
+            let mut run = self.lifted_run(span, section, sections, root.fragment);
             run.between = content
                 .is_some_and(|(start, end)| start < run.extent.start && run.extent.end < end);
             runs.push(run);
@@ -544,7 +544,7 @@ impl Printer<'_> {
         section_span: Span,
         section: HoistedSection,
         sections: &HoistedComments,
-        fragment: &ast::Fragment,
+        fragment: ast::Fragment,
     ) -> LiftedRun {
         let comments = &sections[section];
         let comment_span =

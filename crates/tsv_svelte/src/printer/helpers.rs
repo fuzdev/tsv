@@ -12,14 +12,14 @@ impl<'a> Printer<'a> {
     /// formatter trims it, so a space-authored body must reach the same layout as the
     /// glued authoring. Content that is itself multiline (a component with wrapping
     /// attrs) still counts as inline — only the boundary run speaks for the boundary.
-    pub(super) fn is_inline_fragment(&self, fragment: &Fragment) -> bool {
+    pub(super) fn is_inline_fragment(&self, fragment: Fragment) -> bool {
         !self.fragment_boundary_newline(fragment, true)
             && !self.fragment_boundary_newline(fragment, false)
     }
 
     /// Whether the fragment's boundary whitespace run is newline-authored — the node-slice
     /// predicate [`Printer::nodes_boundary_newline`] over the fragment's nodes.
-    pub(super) fn fragment_boundary_newline(&self, fragment: &Fragment, is_leading: bool) -> bool {
+    pub(super) fn fragment_boundary_newline(&self, fragment: Fragment, is_leading: bool) -> bool {
         self.nodes_boundary_newline(self.svelte.nodes(fragment.nodes), is_leading)
     }
 

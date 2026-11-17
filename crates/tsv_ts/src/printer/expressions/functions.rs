@@ -3666,7 +3666,7 @@ impl<'a> Printer<'a> {
         // unemitted and falls the whole chain through to that same default layout). A
         // third route into this builder would owe the same gate.
         if let ast::ExpressionKind::SequenceExpression(seq) = &expr.kind {
-            return prepend(self.build_sequence_doc(seq, expr.span, SeqLayout::Hanging));
+            return prepend(self.build_sequence_doc(*seq, expr.span, SeqLayout::Hanging));
         }
 
         // Standard cases: objects and assignments always need parens.

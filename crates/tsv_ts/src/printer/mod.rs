@@ -1705,6 +1705,10 @@ impl<'a> Printer<'a> {
 
     /// [`Self::chain_share_key`] for an AST node of any kind, `span` being the source its doc
     /// prints — the range an [assumed break](Self::assumed_break) is checked against.
+    ///
+    /// The key is the node's address in its store: pass a reference into the store — one an
+    /// accessor returned, or a field of it — never a copy, whose stack slot another node can
+    /// reuse.
     pub(crate) fn chain_share_key_of<T>(
         &self,
         node: &T,

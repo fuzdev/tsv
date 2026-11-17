@@ -1155,7 +1155,7 @@ impl<'a> Printer<'a> {
     /// is gone rather than duplicated.
     fn build_for_sequence_clause_doc(
         &self,
-        seq: &ast::SequenceExpression,
+        seq: ast::SequenceExpression,
         seq_span: Span,
         build_elem: impl Fn(&Expression) -> DocId,
     ) -> DocId {
@@ -1321,7 +1321,7 @@ impl<'a> Printer<'a> {
             // sequence, not the `for`, so a binary element keeps the continuation-indent
             // default — which is why the mark below is on the clause and not inside
             // `build_elem`.
-            return self.build_for_sequence_clause_doc(seq, expr.span, build_elem);
+            return self.build_for_sequence_clause_doc(*seq, expr.span, build_elem);
         }
         // The clause itself is `shouldNotIndent`'s own `ForStatement` term (`node !==
         // parent.body && parent.type === "ForStatement"`, `shouldNotIndent` in `print/binaryish.js`), so a binary

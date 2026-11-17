@@ -5,9 +5,8 @@
 //! block children, the three selector levels, a `::part()`'s name spans, the values and the
 //! condition parts and segments — each with the scratch stack that builds its lists, which
 //! `tsv_lang`'s `value_runs!` declares from one entry per element type; and a text pool, for
-//! the strings a span of the source cannot express. Every element type is `Copy` but the two
-//! that hold a rule or an at-rule inline ([`CssNode`], [`CssBlockChild`]), so a finished list is
-//! copied into its store as a block, and those two move a row at a time.
+//! the strings a span of the source cannot express. Every element type is `Copy`, so a
+//! finished list is copied into its store as a block.
 //!
 //! Between parses every scratch stack is empty: the parse driver leaves them so, whether the
 //! parse succeeded or failed, which is what lets the next parse begin without marking them.
@@ -74,29 +73,6 @@ tsv_lang::value_runs! {
     /// list's members, an `@import` prelude's values: [`CssValue`] rows.
     values, value_scratch: CssValue => values;
 }
-
-/// Pins a type as not `Copy`: `<T as NotCopy<_>>::PIN` names one impl while `T` is not `Copy`
-/// and is ambiguous, a build error, once it is.
-#[cfg(test)]
-trait NotCopy<Marker> {
-    const PIN: () = ();
-}
-
-#[cfg(test)]
-impl<T> NotCopy<()> for T {}
-
-#[cfg(test)]
-impl<T: Copy> NotCopy<u8> for T {}
-
-// The two list elements that hold a rule or an at-rule inline are `Clone` only, so
-// `view.nodes(run)[i]` and `view.block_children(run)[i]` by value do not compile and no such
-// row is copied by reading it; their lists move into their stores a row at a time. Every other
-// element type is `Copy`, its lists flushed as a block.
-#[cfg(test)]
-const _: () = {
-    let () = <CssNode as NotCopy<_>>::PIN;
-    let () = <CssBlockChild as NotCopy<_>>::PIN;
-};
 
 // Every list is a `Run<F>`, which lays out alike for every family `F`, and an absent list folds
 // into the run's start.
@@ -336,7 +312,7 @@ mod tests {
     fn one_of_each() -> OneOfEach {
         let parsed = crate::__private::parse(DOCUMENT).expect("the document parses");
         let view = parsed.view();
-        let node = view.nodes(parsed.nodes)[0].clone();
+        let node = view.nodes(parsed.nodes)[0];
         let CssNode::Atrule(CssAtrule {
             prelude: PreludeValue::Supports { condition, .. },
             block: Some(block),
@@ -347,7 +323,7 @@ mod tests {
         };
         let condition_part = view.condition_parts(condition.parts)[0];
         let condition_segment = view.condition_segments(condition_part.segments)[0];
-        let block_child = view.block_children(block.children)[0].clone();
+        let block_child = view.block_children(block.children)[0];
         let CssBlockChild::Rule(rule) = &block_child else {
             panic!("an unexpected child: {block_child:?}");
         };
@@ -387,8 +363,8 @@ mod tests {
     /// Pushes one element onto every scratch stack, each left open.
     fn push_one_of_each(stores: &mut CssStores, rows: &OneOfEach) {
         let runs = &mut stores.runs;
-        runs.node_scratch.push(rows.node.clone());
-        runs.block_child_scratch.push(rows.block_child.clone());
+        runs.node_scratch.push(rows.node);
+        runs.block_child_scratch.push(rows.block_child);
         runs.complex_selector_scratch.push(rows.complex_selector);
         runs.relative_selector_scratch.push(rows.relative_selector);
         runs.simple_selector_scratch.push(rows.simple_selector);

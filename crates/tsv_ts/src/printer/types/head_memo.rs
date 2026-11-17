@@ -72,9 +72,9 @@ pub(super) mod test_memo_after {
     }
 }
 
-/// One memoized answer's key: the node (by address — two nodes never share one, and a
-/// span can be shared by a node and its sole member), the axis, and the claim the answer
-/// was read under.
+/// One memoized answer's key: the node (by its address in its store — two nodes never share
+/// one, and a span can be shared by a node and its sole member), the axis, and the claim the
+/// answer was read under.
 type HeadKey = (usize, EdgeRun, Option<(u32, u32)>);
 
 /// One descent's answer, as the memo stores it.
@@ -168,6 +168,9 @@ impl Printer<'_> {
     /// as the recursion through this entry point did: entered outermost first, left
     /// innermost first, every level storing the one answer the chain ends on (a tail link's
     /// answer is its head's), and a memo hit ending the walk at the level it hits.
+    ///
+    /// The memo's key is the node's address in its store: pass the reference an accessor
+    /// returned, never a copy — a copy keys a stack slot another node can reuse.
     pub(super) fn head_stripped_paren_shell(
         &self,
         ty: &TSType,

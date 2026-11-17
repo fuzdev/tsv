@@ -162,7 +162,7 @@ pub(crate) fn linearize_chain_from_member_into<'a>(
 /// trailing-comment branch), so only the comment-free case arrives here. Nested
 /// non-nulls go through the walk's own step ([`non_null_step`]), which does gate.
 pub(crate) fn linearize_chain_from_non_null_into<'a>(
-    non_null: &'a ast::TSNonNullExpression,
+    non_null: ast::TSNonNullExpression,
     span: Span,
     input: LinearizeInput<'a, '_>,
     nodes: &mut ChainNodeVec<'a>,
@@ -588,7 +588,7 @@ pub(crate) fn chain_paren_leading_gap(
                 .map(|start| (start, view.expr(call.callee).span().start))
         }
         ExpressionKind::TSNonNullExpression(non_null) => {
-            non_null_operand_paren_leading_start(view, non_null, expr.span, comments)
+            non_null_operand_paren_leading_start(view, *non_null, expr.span, comments)
                 .map(|start| (start, view.expr(non_null.expression).span().start))
         }
         _ => None,
@@ -644,7 +644,7 @@ pub(crate) fn tag_paren_leading_start(
 /// linearizer's arm, whose condition this is.
 fn non_null_operand_paren_leading_start(
     view: AstView<'_>,
-    non_null: &ast::TSNonNullExpression,
+    non_null: ast::TSNonNullExpression,
     span: Span,
     comments: &[Comment],
 ) -> Option<u32> {
@@ -926,7 +926,7 @@ fn non_null_step<'a>(
     //   left to parenthesize at print time.
     let inner = view.expr(non_null.expression);
     if let Some(start) =
-        non_null_operand_paren_leading_start(view, non_null, span, input.printer.comments)
+        non_null_operand_paren_leading_start(view, *non_null, span, input.printer.comments)
     {
         nodes.push(ChainNode::paren_base_before_non_null(
             inner, start, span.end,
@@ -978,7 +978,7 @@ fn finish_non_null(
         {
             *followed_by_non_null = true;
         }
-        nodes.push(ChainNode::non_null(view, non_null, span));
+        nodes.push(ChainNode::non_null(view, *non_null, span));
     }
 }
 

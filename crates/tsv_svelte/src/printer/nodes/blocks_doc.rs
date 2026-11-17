@@ -206,7 +206,7 @@ impl SectionWhitespace {
     /// Read from the **source** text, never its decoded value: `&#32;` decodes to a space the
     /// compiler trims, yet dropping or folding the section would erase authored bytes, so it
     /// is content here — as is an NBSP, a form feed (outside the compiler's class) or a comment.
-    fn renders_nothing(self, view: SvelteView<'_>, fragment: &Fragment) -> bool {
+    fn renders_nothing(self, view: SvelteView<'_>, fragment: Fragment) -> bool {
         let nodes = view.nodes(fragment.nodes);
         match self {
             Self::Trimmed => nodes.iter().all(FragmentNode::is_whitespace_only_text),
@@ -280,7 +280,7 @@ fn then_has_content(view: SvelteView<'_>, block: &ast::AwaitBlock, ws: SectionWh
     block
         .then
         .as_ref()
-        .is_some_and(|t| !ws.renders_nothing(view, t))
+        .is_some_and(|t| !ws.renders_nothing(view, *t))
 }
 
 /// Classify an await block's head shorthand. See [`AwaitShorthand`].
@@ -300,7 +300,7 @@ fn await_shorthand(
     ws: SectionWhitespace,
 ) -> AwaitShorthand {
     let has_pending_body = block.pending.as_ref().is_some_and(|p| {
-        !ws.renders_nothing(view, p)
+        !ws.renders_nothing(view, *p)
             || view
                 .nodes(p.nodes)
                 .iter()
@@ -652,14 +652,14 @@ impl<'a> Printer<'a> {
     /// Whether every if-block branch (consequent, each `{:else if}` consequent,
     /// `{:else}`) is inline-authored — the precondition for the body-expand fast path.
     fn if_branches_all_inline(&self, block: &ast::IfBlock) -> bool {
-        let mut all_inline = self.fragment_inline_authored(&block.consequent);
+        let mut all_inline = self.fragment_inline_authored(block.consequent);
         let mut alt = block.alternate.as_ref();
         while let Some(a) = alt {
-            if let Some(else_if) = Self::get_flattenable_else_if(self.svelte, a) {
-                all_inline &= self.fragment_inline_authored(&else_if.consequent);
+            if let Some(else_if) = Self::get_flattenable_else_if(self.svelte, *a) {
+                all_inline &= self.fragment_inline_authored(else_if.consequent);
                 alt = else_if.alternate.as_ref();
             } else {
-                all_inline &= self.fragment_inline_authored(a);
+                all_inline &= self.fragment_inline_authored(*a);
                 alt = None;
             }
         }
@@ -686,11 +686,11 @@ impl<'a> Printer<'a> {
     /// form (a per-form build would rebuild it twice, compounding to O(2^depth)).
     fn build_if_pieces(&self, block: &ast::IfBlock) -> Vec<IfPiece> {
         let mut pieces = vec![IfPiece::Consequent(
-            self.build_section_body_doc(&block.consequent),
+            self.build_section_body_doc(block.consequent),
         )];
         let mut alt = block.alternate.as_ref();
         while let Some(a) = alt {
-            if let Some(else_if) = Self::get_flattenable_else_if(self.svelte, a) {
+            if let Some(else_if) = Self::get_flattenable_else_if(self.svelte, *a) {
                 // Build the else-if head with wrapping enabled so it can dangle within the
                 // expanded form; in the inline form its head group resolves flat (no dangle).
                 let head_expr = self.build_else_if_expr_doc(else_if, true);
@@ -701,11 +701,11 @@ impl<'a> Printer<'a> {
                     HeadCloser::BlockTag(None),
                     self.block_dangle_allowed(),
                 );
-                let body = self.build_section_body_doc(&else_if.consequent);
+                let body = self.build_section_body_doc(else_if.consequent);
                 pieces.push(IfPiece::ElseIf { head, body });
                 alt = else_if.alternate.as_ref();
             } else {
-                pieces.push(IfPiece::Else(self.build_section_body_doc(a)));
+                pieces.push(IfPiece::Else(self.build_section_body_doc(*a)));
                 alt = None;
             }
         }
@@ -815,7 +815,7 @@ impl<'a> Printer<'a> {
 
         if let Some(alt) = &block.alternate {
             parts.push(d.hardline());
-            parts.push(self.build_if_alternate_doc(alt, in_multiline_context));
+            parts.push(self.build_if_alternate_doc(*alt, in_multiline_context));
         }
 
         parts.push(d.hardline());
@@ -834,7 +834,7 @@ impl<'a> Printer<'a> {
     /// two distinct (collapsing would be information loss).
     pub(super) fn get_flattenable_else_if<'v>(
         view: SvelteView<'v>,
-        alt: &Fragment,
+        alt: Fragment,
     ) -> Option<&'v ast::IfBlock> {
         // The block is read through `view`, so the returned reference is tied to the
         // view, not to `alt`.
@@ -890,7 +890,7 @@ impl<'a> Printer<'a> {
     /// line. The expansion is construct-wide, *not* re-derived per branch, because hug
     /// is all-or-nothing: a branch that renders inline still drops to its own line once
     /// any sibling branch went multiline (see `fragment_inline_authored`).
-    fn build_if_alternate_doc(&self, alt: &Fragment, in_multiline_context: bool) -> DocId {
+    fn build_if_alternate_doc(&self, alt: Fragment, in_multiline_context: bool) -> DocId {
         let d = self.d();
         // Check if this can be flattened to {:else if ...}
         if let Some(else_if) = Self::get_flattenable_else_if(self.svelte, alt) {
@@ -914,7 +914,7 @@ impl<'a> Printer<'a> {
 
             if let Some(nested_alt) = &else_if.alternate {
                 parts.push(d.hardline());
-                parts.push(self.build_if_alternate_doc(nested_alt, in_multiline_context));
+                parts.push(self.build_if_alternate_doc(*nested_alt, in_multiline_context));
             }
 
             return d.concat(&parts);
@@ -930,9 +930,9 @@ impl<'a> Printer<'a> {
     /// Whether the each block's body and its optional `{:else}` fallback are both
     /// inline-authored — the precondition for the body-expand fast path.
     fn each_branches_all_inline(&self, block: &ast::EachBlock) -> bool {
-        let mut all_inline = self.fragment_inline_authored(&block.body);
+        let mut all_inline = self.fragment_inline_authored(block.body);
         if let Some(fallback) = &block.fallback {
-            all_inline &= self.fragment_inline_authored(fallback);
+            all_inline &= self.fragment_inline_authored(*fallback);
         }
         all_inline
     }
@@ -942,11 +942,11 @@ impl<'a> Printer<'a> {
     /// [`Self::compose_each_tail`] — so a nested body is built once rather than once
     /// per form (a per-form build would rebuild it twice, compounding to O(2^depth)).
     fn build_each_pieces(&self, block: &ast::EachBlock) -> (DocId, Option<DocId>) {
-        let body = self.build_section_body_doc(&block.body);
+        let body = self.build_section_body_doc(block.body);
         let fallback = block
             .fallback
             .as_ref()
-            .map(|f| self.build_section_body_doc(f));
+            .map(|f| self.build_section_body_doc(*f));
         (body, fallback)
     }
 
@@ -1169,7 +1169,7 @@ impl<'a> Printer<'a> {
     /// block-style. `<pre>`/`<textarea>` never reach here — they are dispatched to
     /// the whitespace-sensitive builder, where the boundary is literal and the hug
     /// mandatory.
-    fn fragment_inline_authored(&self, frag: &Fragment) -> bool {
+    fn fragment_inline_authored(&self, frag: Fragment) -> bool {
         !self.fragment_boundary_newline(frag, true)
             && !self.fragment_boundary_newline(frag, false)
             && !self.fragment_should_force_break_content(self.svelte.nodes(frag.nodes))
@@ -1181,7 +1181,7 @@ impl<'a> Printer<'a> {
     /// the shared prettier-shaped builder. One builder for a glued and a space-only
     /// authoring of the same body, so both reach one fixed point by construction.
     ///
-    fn build_section_body_doc(&self, fragment: &Fragment) -> DocId {
+    fn build_section_body_doc(&self, fragment: Fragment) -> DocId {
         self.build_nodes_doc_trimmed(
             self.svelte.nodes(fragment.nodes),
             false,
@@ -1369,11 +1369,11 @@ impl<'a> Printer<'a> {
         // dropped), so a block with no other printed section is the section-less block.
         let has_section = sections
             .pending
-            .is_some_and(|p| !ws.renders_nothing(self.svelte, p))
+            .is_some_and(|p| !ws.renders_nothing(self.svelte, *p))
             || sections.then.is_some()
             || sections
                 .catch
-                .is_some_and(|c| !ws.renders_nothing(self.svelte, c));
+                .is_some_and(|c| !ws.renders_nothing(self.svelte, *c));
         // A space-only section is inline-authored (its boundary is render-free and gets
         // trimmed by `build_section_body_doc`); only a newline-authored section falls
         // through to the newline tail below. This one reads every AUTHORED section, a dropped
@@ -1383,7 +1383,7 @@ impl<'a> Printer<'a> {
         let all_sections_inline = [&block.pending, &block.then, &block.catch]
             .into_iter()
             .filter_map(Option::as_ref)
-            .all(|f| self.fragment_inline_authored(f));
+            .all(|f| self.fragment_inline_authored(*f));
         // Uniform body-drop: when every present section is inline-authored, the body +
         // `{:then}`/`{:catch}` keywords + `{/await}` drop to their own lines on overflow —
         // chosen by width in `build_expanding_construct`, whatever the context. What the
@@ -1418,7 +1418,7 @@ impl<'a> Printer<'a> {
         // their own lines when the head wraps, chosen in one pass by `build_expanding_construct`.
         if has_section && all_sections_inline {
             let pieces =
-                self.build_await_pieces(block, &sections, |f| self.build_section_body_doc(f));
+                self.build_await_pieces(block, &sections, |f| self.build_section_body_doc(*f));
             let inline_tail = self.compose_await_tail(&pieces, false);
             let multiline_tail = self.compose_await_tail(&pieces, true);
             return self.build_expanding_construct(
@@ -1495,8 +1495,8 @@ impl<'a> Printer<'a> {
         // Inline-authored (no newline-authored boundary, no forced break; a space-only
         // boundary is render-free and gets trimmed by the body builder): expand the
         // body + `{/key}` when the head wraps (or the construct overflows).
-        if self.fragment_inline_authored(&block.fragment) {
-            let body_doc = self.build_section_body_doc(&block.fragment);
+        if self.fragment_inline_authored(block.fragment) {
+            let body_doc = self.build_section_body_doc(block.fragment);
             return self.build_expanding_block(head_doc, body_doc, close, gt_prefix);
         }
 
@@ -1585,7 +1585,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
         // Inline-authored = no newline-authored boundary and no forced break; a
         // space-only boundary is render-free and gets trimmed by the body builder.
-        let is_inline = self.fragment_inline_authored(&block.body);
+        let is_inline = self.fragment_inline_authored(block.body);
 
         let opening_doc = self.build_snippet_opening_doc(block);
 
@@ -1594,7 +1594,7 @@ impl<'a> Printer<'a> {
         // exceeds width) — uniformly, including paramless snippets. Measured against the
         // opening group above.
         if is_inline {
-            let body_doc = self.build_section_body_doc(&block.body);
+            let body_doc = self.build_section_body_doc(block.body);
             let close = d.text("{/snippet}");
             return self.build_expanding_block(opening_doc, body_doc, close, gt_prefix);
         }

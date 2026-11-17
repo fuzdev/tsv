@@ -210,7 +210,7 @@ pub(in crate::printer) enum SeqLayout {
 ///
 /// Both ends were re-derived at three sites apiece, in two parallel builders and their shared
 /// envelope. That is the shape such a pair drifts through, so the ends are named here once.
-pub(super) fn sequence_operand_run(view: AstView<'_>, seq: &ast::SequenceExpression) -> (u32, u32) {
+pub(super) fn sequence_operand_run(view: AstView<'_>, seq: ast::SequenceExpression) -> (u32, u32) {
     let operands = view.expr_list(seq.expressions);
     (
         view.expr(operands[0]).span().start,
@@ -242,7 +242,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for an update expression
     pub(in crate::printer) fn build_update_doc(
         &self,
-        update: &ast::UpdateExpression,
+        update: ast::UpdateExpression,
         update_span: Span,
     ) -> DocId {
         let argument = self.view.expr(update.argument);
@@ -2251,7 +2251,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for an await expression
     pub(in crate::printer) fn build_await_doc(
         &self,
-        await_expr: &ast::AwaitExpression,
+        await_expr: ast::AwaitExpression,
         await_expr_span: Span,
     ) -> DocId {
         let argument = self.view.expr(await_expr.argument);
@@ -2330,7 +2330,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for a yield expression
     pub(in crate::printer) fn build_yield_doc(
         &self,
-        yield_expr: &ast::YieldExpression,
+        yield_expr: ast::YieldExpression,
         yield_expr_span: Span,
     ) -> DocId {
         let Some(target) = self.yield_operand_class_pair_target(yield_expr, yield_expr_span) else {
@@ -2380,7 +2380,7 @@ impl<'a> Printer<'a> {
     // every one of those followers reads.
     fn yield_operand_class_pair_target(
         &self,
-        yield_expr: &ast::YieldExpression,
+        yield_expr: ast::YieldExpression,
         yield_expr_span: Span,
     ) -> Option<Span> {
         let arg = self
@@ -2416,7 +2416,7 @@ impl<'a> Printer<'a> {
     /// [`Self::build_yield_doc`] once its leftmost-class target is set.
     fn build_yield_doc_inner(
         &self,
-        yield_expr: &ast::YieldExpression,
+        yield_expr: ast::YieldExpression,
         yield_expr_span: Span,
     ) -> DocId {
         let d = self.d();
@@ -2599,7 +2599,7 @@ impl<'a> Printer<'a> {
     /// since tsv has no parent pointer to read it from.
     pub(in crate::printer) fn build_sequence_doc(
         &self,
-        seq: &ast::SequenceExpression,
+        seq: ast::SequenceExpression,
         span: Span,
         layout: SeqLayout,
     ) -> DocId {
@@ -2632,7 +2632,7 @@ impl<'a> Printer<'a> {
     /// pass either way, so counting it here costs the first pass its fixed point).
     pub(in crate::printer) fn build_sequence_doc_bare(
         &self,
-        seq: &ast::SequenceExpression,
+        seq: ast::SequenceExpression,
         span: Span,
         trailing_end: u32,
     ) -> DocId {
@@ -2652,7 +2652,7 @@ impl<'a> Printer<'a> {
     /// it falls *outside* `seq.span` (the grouping parens aren't part of the node).
     pub(in crate::printer) fn build_sequence_doc_value(
         &self,
-        seq: &ast::SequenceExpression,
+        seq: ast::SequenceExpression,
         span: Span,
         trailing_end: u32,
         layout: SeqLayout,
@@ -2680,7 +2680,7 @@ impl<'a> Printer<'a> {
     /// node span alone would drop them and change what the operand means.
     fn build_sequence_operand_doc(
         &self,
-        seq: &ast::SequenceExpression,
+        seq: ast::SequenceExpression,
         span: Span,
         i: usize,
     ) -> DocId {
@@ -2775,7 +2775,7 @@ impl<'a> Printer<'a> {
     /// holds that gap prints it.
     fn build_sequence_envelope_doc(
         &self,
-        seq: &ast::SequenceExpression,
+        seq: ast::SequenceExpression,
         span: Span,
         body: DocId,
         parens: SeqParens,
@@ -2836,7 +2836,7 @@ impl<'a> Printer<'a> {
 
     fn build_sequence_doc_inner(
         &self,
-        seq: &ast::SequenceExpression,
+        seq: ast::SequenceExpression,
         seq_span: Span,
         trailing_end: u32,
         parens: SeqParens,
@@ -2860,7 +2860,7 @@ impl<'a> Printer<'a> {
     /// [`Self::build_sequence_doc_inner`] under its left-spine claim.
     fn build_sequence_doc_claimed(
         &self,
-        seq: &ast::SequenceExpression,
+        seq: ast::SequenceExpression,
         seq_span: Span,
         trailing_end: u32,
         parens: SeqParens,
@@ -2991,7 +2991,7 @@ impl<'a> Printer<'a> {
     /// sequence's own end, with nothing but `)`s and trivia between. The walk stops at an
     /// operand a format-ignore directive in its comma gap freezes, whose slice prints its own
     /// shells ([`Printer::gap_frozen_span`], the predicate the operand's own build asks).
-    pub(in crate::printer) fn sequence_printed_end(&self, seq: &ast::SequenceExpression) -> u32 {
+    pub(in crate::printer) fn sequence_printed_end(&self, seq: ast::SequenceExpression) -> u32 {
         let mut seq = seq;
         loop {
             let [.., before, last] = self.view.expr_list(seq.expressions) else {
@@ -3006,7 +3006,7 @@ impl<'a> Printer<'a> {
                 return last.span().end;
             }
             match &last.kind {
-                ExpressionKind::SequenceExpression(inner) => seq = inner,
+                ExpressionKind::SequenceExpression(inner) => seq = *inner,
                 _ => return self.right_spine_printed_end(last),
             }
         }
@@ -3078,7 +3078,7 @@ impl<'a> Printer<'a> {
     // second pass reads the block in this region and adds the shell. Taking the nested
     // region here instead moves the cast and update spellings to two passes: their second
     // puts the block back inside the pair.
-    fn sequence_tight_run(&self, seq: &ast::SequenceExpression, span: Span) -> Option<Span> {
+    fn sequence_tight_run(&self, seq: ast::SequenceExpression, span: Span) -> Option<Span> {
         if !self.is_tight_follower_operand(span) {
             return None;
         }
@@ -3156,7 +3156,7 @@ impl<'a> Printer<'a> {
     #[expect(clippy::too_many_arguments)] // the run's source bounds travel beside its span
     fn build_sequence_doc_block_path(
         &self,
-        seq: &ast::SequenceExpression,
+        seq: ast::SequenceExpression,
         seq_span: Span,
         interior_start: u32,
         last_operand_end: u32,
@@ -3208,7 +3208,7 @@ impl<'a> Printer<'a> {
     #[expect(clippy::too_many_arguments)] // the run's four source bounds travel beside its span
     fn build_sequence_operand_run_doc(
         &self,
-        seq: &ast::SequenceExpression,
+        seq: ast::SequenceExpression,
         span: Span,
         interior_start: u32,
         last_operand_end: u32,
@@ -3371,7 +3371,7 @@ impl<'a> Printer<'a> {
 
     fn build_sequence_doc_with_line_comments(
         &self,
-        seq: &ast::SequenceExpression,
+        seq: ast::SequenceExpression,
         span: Span,
         trailing_end: u32,
         parens: SeqParens,
@@ -3434,7 +3434,7 @@ impl<'a> Printer<'a> {
     /// ([`Self::sequence_inside_run`]), from which the claimed shells print as the gap.
     fn build_sequence_line_comment_run_doc(
         &self,
-        seq: &ast::SequenceExpression,
+        seq: ast::SequenceExpression,
         span: Span,
         trailing_end: u32,
         parens: SeqParens,

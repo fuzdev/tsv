@@ -1447,7 +1447,7 @@ impl<'s, 'b> Walk<'s, 'b> {
                 self.blank(e.span.end - 1, e.span.end);
             }
             ExpressionKind::TSParameterProperty(property) => {
-                self.parameter_property(e.span, property);
+                self.parameter_property(e.span, *property);
                 self.expr(self.view.expr(property.parameter));
             }
             ExpressionKind::ImportExpression(import) => self.import_expression(import, e.span),
@@ -1624,7 +1624,7 @@ impl<'s, 'b> Walk<'s, 'b> {
     }
 
     /// `constructor(public x)` and its kin: refused, the span the first modifier.
-    fn parameter_property(&mut self, span: Span, property: &TSParameterProperty) {
+    fn parameter_property(&mut self, span: Span, property: TSParameterProperty) {
         let end = self.view.expr(property.parameter).span.start;
         let keywords = [
             property.accessibility.map(|a| a.as_str().as_bytes()),

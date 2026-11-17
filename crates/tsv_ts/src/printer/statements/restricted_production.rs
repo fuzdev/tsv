@@ -261,7 +261,7 @@ impl<'a> Printer<'a> {
                 .collapsed_grouping_close(argument_end, span_end)
                 .unwrap_or(argument_end);
             let seq_doc =
-                self.build_sequence_doc_value(seq, arg.span, grouping_close, SeqLayout::Hanging);
+                self.build_sequence_doc_value(*seq, arg.span, grouping_close, SeqLayout::Hanging);
             let rhs_doc = self.prepend_opt(inline_comments, seq_doc);
             let rhs_doc = match leading_break(rhs_doc) {
                 LeadingBreak::Hard => {
@@ -319,7 +319,7 @@ impl<'a> Printer<'a> {
             // `shouldIndentSequenceExpression` covers both keywords, so the operands hang
             // inside the parens; only the trailing-comment side differs, and `throw` floats
             // it out, which is the default paren mode.
-            self.build_sequence_doc(seq, arg.span, SeqLayout::Hanging)
+            self.build_sequence_doc(*seq, arg.span, SeqLayout::Hanging)
         } else {
             self.build_expression_doc(arg)
         };
@@ -864,7 +864,7 @@ impl<'a> Printer<'a> {
             Some(frozen) => self.build_frozen_node_doc(frozen),
             None => match &arg.kind {
                 ExpressionKind::SequenceExpression(seq) => {
-                    self.build_sequence_doc_bare(seq, arg.span, arg.span.end)
+                    self.build_sequence_doc_bare(*seq, arg.span, arg.span.end)
                 }
                 // A return/throw argument is `shouldNotIndent` (`print/binaryish.js`) whichever
                 // form it takes: these hanging parens supply the one level, exactly as the

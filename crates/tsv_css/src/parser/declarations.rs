@@ -2,7 +2,7 @@ use super::CssParser;
 use super::decl_scan::{DeclarationHead, ScannedDeclaration};
 use crate::ast::*;
 use crate::lexer::{TokenKind, read_ident_continuation};
-use tsv_lang::store::flush_run_move;
+use tsv_lang::store::flush_run;
 use tsv_lang::{Error, Span};
 
 /// Check if we're looking at the start of a nested rule (selector) rather than a declaration.
@@ -175,7 +175,7 @@ fn parse_rule_body(parser: &mut CssParser<'_>, nested: bool) -> Result<CssRule, 
     let block_end = parser.span_pos(parser.current_end());
     parser.advance()?; // consume }
 
-    let declarations = flush_run_move(
+    let declarations = flush_run(
         &mut parser.stores.runs.block_child_scratch,
         &mut parser.stores.runs.block_children,
         mark,

@@ -39,7 +39,7 @@ pub struct TSTypeAnnotation {
 /// precedence ladder already pushed, since each level returns one (see `Parser::parse_type`).
 /// The widest inline variants are `TSTypeReference` / `TSTypeQuery` / `TSMappedType` /
 /// `TSFunctionType`, and `TSTypeReference` is the common case, so the ladder stops there.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum TSType {
     /// Primitive type keywords (number, string, boolean, etc.)
     Keyword(TSKeywordType),
@@ -121,7 +121,7 @@ impl TSType {
 }
 
 /// TypeScript array type: `number[]`, `string[]`, etc.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct TSArrayType {
     /// The element type of the array
     pub element_type: TyId,
@@ -129,7 +129,7 @@ pub struct TSArrayType {
 }
 
 /// TypeScript indexed access type: `T[K]`, `Obj["key"]`, `T[keyof T]`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct TSIndexedAccessType {
     /// The object type being indexed
     pub object_type: TyId,
@@ -291,7 +291,7 @@ impl TSKeywordKind {
 ///
 /// Represents a type alias that creates a new name for an existing type.
 /// Supports template literal types: `type X = \`hello\``
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct TSTypeAliasDeclaration {
     pub id: Identifier,
     pub type_parameters: Option<TSTypeParameterDeclaration>,
@@ -303,7 +303,7 @@ pub struct TSTypeAliasDeclaration {
 ///
 /// Used for template literal types: `type X = \`hello\``
 /// Also supports string, number, boolean, null, undefined literals as types.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum TSLiteralType {
     TemplateLiteral(TemplateLiteralType),
     /// String literal type: `"hello"`, `'world'`
@@ -333,7 +333,7 @@ impl TSLiteralType {
 ///
 /// Similar to TemplateLiteral but interpolations contain types, not expressions.
 /// Used in TypeScript template literal types.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct TemplateLiteralType {
     pub quasis: Run<TemplateElement>,
     pub types: Run<TyId>,
@@ -345,21 +345,21 @@ pub struct TemplateLiteralType {
 //
 
 /// Union type: `A | B | C`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct TSUnionType {
     pub types: Run<TyId>,
     pub span: Span,
 }
 
 /// Intersection type: `A & B & C`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct TSIntersectionType {
     pub types: Run<TyId>,
     pub span: Span,
 }
 
 /// Type reference: `SomeType` or `Array<T>`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct TSTypeReference {
     pub type_name: TSEntityName,
     pub type_arguments: Option<TSTypeParameterInstantiation>,
@@ -385,7 +385,7 @@ impl TSEntityName {
 }
 
 /// Qualified name: `Foo.Bar`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct TSQualifiedName {
     pub left: TSEntityName,
     pub right: Identifier,
@@ -489,7 +489,7 @@ pub struct TSTypeParameter {
 }
 
 /// Type literal (object type): `{ prop: T; method(): U }`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct TSTypeLiteral {
     pub members: Run<TSTypeElement>,
     pub span: Span,
@@ -607,7 +607,7 @@ pub struct TSIndexSignature {
 }
 
 /// Function type: `(x: T) => U` or `<T>(x: T) => U`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct TSFunctionType {
     pub type_parameters: Option<TSTypeParameterDeclaration>,
     pub params: Run<Expression>,
@@ -620,7 +620,7 @@ pub struct TSFunctionType {
 }
 
 /// Constructor type: `new () => T` or `abstract new <T>() => T`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct TSConstructorType {
     pub abstract_: bool,
     pub type_parameters: Option<TSTypeParameterDeclaration>,
@@ -631,14 +631,14 @@ pub struct TSConstructorType {
 }
 
 /// Tuple type: `[T, U, V]`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct TSTupleType {
     pub element_types: Run<TyId>,
     pub span: Span,
 }
 
 /// Rest type in tuples: `...T`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct TSRestType {
     /// The type being spread
     pub type_annotation: TyId,
@@ -646,7 +646,7 @@ pub struct TSRestType {
 }
 
 /// Optional type in tuples: `T?`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct TSOptionalType {
     /// The type that is optional
     pub type_annotation: TyId,
@@ -654,7 +654,7 @@ pub struct TSOptionalType {
 }
 
 /// Named tuple member: `label: T` or `label?: T`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct TSNamedTupleMember {
     /// The label identifier
     pub label: Identifier,
@@ -669,7 +669,7 @@ pub struct TSNamedTupleMember {
 ///
 /// Used in the extends clause of conditional types to introduce a type variable
 /// that can be inferred from the matched type.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct TSInferType {
     /// The type parameter being inferred
     pub type_parameter: TSTypeParameter,
@@ -677,20 +677,20 @@ pub struct TSInferType {
 }
 
 /// This type: `this` used as a type
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct TSThisType {
     pub span: Span,
 }
 
 /// Parenthesized type: `(T)`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct TSParenthesizedType {
     pub type_annotation: TyId,
     pub span: Span,
 }
 
 /// Conditional type: `T extends U ? V : W`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct TSConditionalType {
     pub check_type: TyId,
     pub extends_type: TyId,
@@ -702,7 +702,7 @@ pub struct TSConditionalType {
 /// Type predicate: `x is T` or `asserts x is T`
 ///
 /// Used for type guards and assertion functions.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct TSTypePredicate {
     /// The parameter name being checked (e.g., `x` in `x is string`)
     pub parameter_name: Identifier,
@@ -728,7 +728,7 @@ pub enum TSMappedTypeModifier {
     Minus,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct TSMappedType {
     /// The type parameter with constraint: `K in keyof T`
     pub type_parameter: TSMappedTypeParameter,
@@ -744,7 +744,7 @@ pub struct TSMappedType {
 }
 
 /// Type parameter in a mapped type: `K in keyof T`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct TSMappedTypeParameter {
     /// The parameter name (just the string, not an `Identifier`) — span-identity
     /// with the pooled escaped fallback, like every identifier name. `span`
@@ -757,7 +757,7 @@ pub struct TSMappedTypeParameter {
 }
 
 /// Type operator: `keyof T`, `unique symbol`, `readonly T`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct TSTypeOperator {
     /// The operator: "keyof", "unique", "readonly"
     pub operator: TSTypeOperatorKind,
@@ -785,7 +785,7 @@ impl TSTypeOperatorKind {
 }
 
 /// Import type: `import('module')` or `import('module', {with: {...}}).Qualifier<T>`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct TSImportType {
     /// The module specifier (string literal)
     pub argument: Literal,
@@ -804,7 +804,7 @@ pub struct TSImportType {
 /// - `Identifier` for `typeof x`
 /// - `TSQualifiedName` for `typeof Foo.bar`
 /// - `TSImportType` for `typeof import("module")`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum TSTypeQueryExprName {
     /// Entity name (Identifier or QualifiedName): `typeof x`, `typeof Foo.bar`
     EntityName(TSEntityName),
@@ -824,7 +824,7 @@ impl TSTypeQueryExprName {
 /// Type query: `typeof x`, `typeof Foo.bar`, `typeof import("module")`, `typeof Array<T>`
 ///
 /// Gets the type of a value expression.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct TSTypeQuery {
     /// The expression whose type is being queried
     pub expr_name: TSTypeQueryExprName,

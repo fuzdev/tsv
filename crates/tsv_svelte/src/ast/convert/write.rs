@@ -303,7 +303,7 @@ impl<'a> Ctx<'a> {
 /// attach uses so a sibling expression context (`{:else if}`) doesn't bleed into a
 /// block's own expression window.
 #[inline]
-fn fragment_first_start(view: ast::SvelteView<'_>, fragment: &ast::Fragment) -> Option<u32> {
+fn fragment_first_start(view: ast::SvelteView<'_>, fragment: ast::Fragment) -> Option<u32> {
     view.nodes(fragment.nodes).first().map(|n| n.span().start)
 }
 
@@ -394,7 +394,7 @@ fn write_root(w: &mut JsonWriter, root: &ast::Root, ctx: &Ctx<'_>) {
     w.raw(",\"js\":[],\"start\":");
     w.span_start_end(ctx.positions, 0, source.len() as u32);
     w.raw(",\"type\":\"Root\",\"fragment\":");
-    write_fragment(w, &root.fragment, ctx);
+    write_fragment(w, root.fragment, ctx);
     w.raw(",\"options\":");
     write_or_null(w, root.options.as_ref(), |w, opts| {
         write_svelte_options(w, opts, ctx);
@@ -448,7 +448,7 @@ fn write_root_comment(w: &mut JsonWriter, comment: &Comment, ctx: &Ctx<'_>) {
 }
 
 /// Emits a `Fragment` node.
-fn write_fragment(w: &mut JsonWriter, fragment: &ast::Fragment, ctx: &Ctx<'_>) {
+fn write_fragment(w: &mut JsonWriter, fragment: ast::Fragment, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"Fragment\",\"nodes\":");
     write_array(w, ctx.svelte.nodes(fragment.nodes), |w, n| {
         write_fragment_node(w, n, ctx);
@@ -690,7 +690,7 @@ fn write_special_element(w: &mut JsonWriter, elem: &ast::SpecialElement, ctx: &C
         write_attribute_node(w, a, ctx);
     });
     w.raw(",\"fragment\":");
-    write_fragment(w, &elem.fragment, ctx);
+    write_fragment(w, elem.fragment, ctx);
     // `<svelte:element this={…}>` tag. A plain-string `this="x"` is a
     // Svelte-style `Literal` (single-quoted `raw`) that carries no
     // expression parse, so no template comment can attach — emit it fused.
@@ -887,7 +887,7 @@ fn write_if_block(w: &mut JsonWriter, block: &ast::IfBlock, ctx: &Ctx<'_>) {
         w.raw("{\"type\":\"IfBlock\",\"elseif\":false,\"start\":");
         w.span_start_end(ctx.positions, block.span.start, block.span.end);
     }
-    let range_end = fragment_first_start(ctx.svelte, &block.consequent).unwrap_or(block.span.end);
+    let range_end = fragment_first_start(ctx.svelte, block.consequent).unwrap_or(block.span.end);
     w.raw(",\"test\":");
     write_generic_island(
         w,
@@ -897,7 +897,7 @@ fn write_if_block(w: &mut JsonWriter, block: &ast::IfBlock, ctx: &Ctx<'_>) {
         ctx,
     );
     w.raw(",\"consequent\":");
-    write_fragment(w, &block.consequent, ctx);
+    write_fragment(w, block.consequent, ctx);
     w.raw(",\"alternate\":");
     write_optional_fragment(w, block.alternate.as_ref(), ctx);
     w.raw("}");
@@ -909,7 +909,7 @@ fn write_if_block(w: &mut JsonWriter, block: &ast::IfBlock, ctx: &Ctx<'_>) {
 fn write_each_block(w: &mut JsonWriter, block: &ast::EachBlock, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"EachBlock\",\"start\":");
     w.span_start_end(ctx.positions, block.span.start, block.span.end);
-    let range_end = fragment_first_start(ctx.svelte, &block.body).unwrap_or(block.span.end);
+    let range_end = fragment_first_start(ctx.svelte, block.body).unwrap_or(block.span.end);
     w.raw(",\"expression\":");
     write_generic_island(
         w,
@@ -919,7 +919,7 @@ fn write_each_block(w: &mut JsonWriter, block: &ast::EachBlock, ctx: &Ctx<'_>) {
         ctx,
     );
     w.raw(",\"body\":");
-    write_fragment(w, &block.body, ctx);
+    write_fragment(w, block.body, ctx);
     w.raw(",\"context\":");
     write_or_null(w, block.context.as_ref(), |w, c| {
         write_pattern_island(w, ctx.view.expr(*c), ctx);
@@ -947,7 +947,7 @@ fn write_each_block(w: &mut JsonWriter, block: &ast::EachBlock, ctx: &Ctx<'_>) {
     }
     if let Some(fallback) = &block.fallback {
         w.raw(",\"fallback\":");
-        write_fragment(w, fallback, ctx);
+        write_fragment(w, *fallback, ctx);
     }
     w.raw("}");
 }
@@ -964,7 +964,7 @@ fn write_await_block(w: &mut JsonWriter, block: &ast::AwaitBlock, ctx: &Ctx<'_>)
     ]
     .into_iter()
     .flatten()
-    .filter_map(|fragment| fragment_first_start(ctx.svelte, fragment))
+    .filter_map(|fragment| fragment_first_start(ctx.svelte, *fragment))
     .min()
     .unwrap_or(block.span.end);
     w.raw(",\"expression\":");
@@ -989,8 +989,8 @@ fn write_await_block(w: &mut JsonWriter, block: &ast::AwaitBlock, ctx: &Ctx<'_>)
     // so an empty block-form pending (`{#await x}{/await}`, `{#await x}{:then v}…`)
     // is `None` here yet must still emit an (empty) Fragment — hence the flag.
     match block.pending.as_ref() {
-        Some(fragment) => write_fragment(w, fragment, ctx),
-        None if block.pending_block => write_fragment(w, &ast::Fragment { nodes: Run::EMPTY }, ctx),
+        Some(fragment) => write_fragment(w, *fragment, ctx),
+        None if block.pending_block => write_fragment(w, ast::Fragment { nodes: Run::EMPTY }, ctx),
         None => w.raw("null"),
     }
     w.raw(",\"then\":");
@@ -1004,7 +1004,7 @@ fn write_await_block(w: &mut JsonWriter, block: &ast::AwaitBlock, ctx: &Ctx<'_>)
 fn write_key_block(w: &mut JsonWriter, block: &ast::KeyBlock, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"KeyBlock\",\"start\":");
     w.span_start_end(ctx.positions, block.span.start, block.span.end);
-    let range_end = fragment_first_start(ctx.svelte, &block.fragment).unwrap_or(block.span.end);
+    let range_end = fragment_first_start(ctx.svelte, block.fragment).unwrap_or(block.span.end);
     w.raw(",\"expression\":");
     write_generic_island(
         w,
@@ -1014,7 +1014,7 @@ fn write_key_block(w: &mut JsonWriter, block: &ast::KeyBlock, ctx: &Ctx<'_>) {
         ctx,
     );
     w.raw(",\"fragment\":");
-    write_fragment(w, &block.fragment, ctx);
+    write_fragment(w, block.fragment, ctx);
     w.raw("}");
 }
 
@@ -1024,7 +1024,7 @@ fn write_key_block(w: &mut JsonWriter, block: &ast::KeyBlock, ctx: &Ctx<'_>) {
 fn write_snippet_block(w: &mut JsonWriter, block: &ast::SnippetBlock, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"SnippetBlock\",\"start\":");
     w.span_start_end(ctx.positions, block.span.start, block.span.end);
-    let range_end = fragment_first_start(ctx.svelte, &block.body).unwrap_or(block.span.end);
+    let range_end = fragment_first_start(ctx.svelte, block.body).unwrap_or(block.span.end);
     w.raw(",\"expression\":");
     write_snippet_name(
         w,
@@ -1047,7 +1047,7 @@ fn write_snippet_block(w: &mut JsonWriter, block: &ast::SnippetBlock, ctx: &Ctx<
         ctx,
     );
     w.raw(",\"body\":");
-    write_fragment(w, &block.body, ctx);
+    write_fragment(w, block.body, ctx);
     w.raw("}");
 }
 
@@ -2024,7 +2024,7 @@ fn write_pattern_island(w: &mut JsonWriter, expr: &tsv_ts::ast::Expression, ctx:
 /// A fragment or `null` (the `AwaitBlock` branch fields and `IfBlock`'s
 /// `alternate`, no skip).
 fn write_optional_fragment(w: &mut JsonWriter, fragment: Option<&ast::Fragment>, ctx: &Ctx<'_>) {
-    write_or_null(w, fragment, |w, f| write_fragment(w, f, ctx));
+    write_or_null(w, fragment, |w, f| write_fragment(w, *f, ctx));
 }
 
 // The tests that read `name_loc` / `loc` need `tsv_lang`'s `_locations` feature — on in every

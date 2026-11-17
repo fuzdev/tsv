@@ -14,9 +14,8 @@
 //! the one string the template keeps as text of its own. It has a slot of its own in this
 //! crate.
 //!
-//! Every list element type is `Copy` but [`FragmentNode`], which holds an element or a block
-//! inline: a finished list of any other type is copied into its store as a block, and a
-//! fragment moves a row at a time.
+//! Every list element type is `Copy`, so a finished list is copied into its store as a
+//! block.
 //!
 //! Between parses every scratch stack is empty: the parse driver leaves them so, whether the
 //! parse succeeded or failed, which is what lets the next parse begin without marking them.
@@ -70,28 +69,6 @@ tsv_lang::value_runs! {
     /// [`SnippetWireParameters`] rows.
     wire_params, wire_param_scratch: SnippetWireParameters => wire_params;
 }
-
-/// Pins a type as not `Copy`: `<T as NotCopy<_>>::PIN` names one impl while `T` is not `Copy`
-/// and is ambiguous, a build error, once it is.
-#[cfg(test)]
-trait NotCopy<Marker> {
-    const PIN: () = ();
-}
-
-#[cfg(test)]
-impl<T> NotCopy<()> for T {}
-
-#[cfg(test)]
-impl<T: Copy> NotCopy<u8> for T {}
-
-// The one list element that holds an element or a block inline is `Clone` only, so
-// `view.nodes(run)[i]` by value does not compile and no such row is copied by reading it; its
-// lists move into their store a row at a time. Every other element type is `Copy`, its lists
-// flushed as a block.
-#[cfg(test)]
-const _: () = {
-    let () = <FragmentNode as NotCopy<_>>::PIN;
-};
 
 // Every list is a `Run<F>`, which lays out alike for every family `F`, and an absent list folds
 // into the run's start.
@@ -636,7 +613,7 @@ mod tests {
         outputs(&document, stores).expect("the document parses");
         let parsed = crate::__private::parse(OWN_DOCUMENT).expect("the document parses");
         let view = parsed.view();
-        let node = view.nodes(parsed.fragment.nodes)[0].clone();
+        let node = view.nodes(parsed.fragment.nodes)[0];
         let FragmentNode::Element(element) = &node else {
             panic!("an unexpected node: {node:?}");
         };

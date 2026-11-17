@@ -214,7 +214,7 @@ impl<'a> Printer<'a> {
         {
             // `build_sequence_doc` is not `build_expression_doc`, so the owned leading
             // comment seam is this caller's too, exactly as in the binary arm above.
-            let doc = self.build_sequence_doc(seq, expr.span, SeqLayout::Indented);
+            let doc = self.build_sequence_doc(*seq, expr.span, SeqLayout::Indented);
             return self.prepend_owned_leading_comment(expr, doc);
         }
         self.build_expression_doc(expr)
@@ -362,7 +362,7 @@ impl<'a> Printer<'a> {
             }
             ExpressionKind::ArrayExpression(arr) => self.build_array_doc(arr, expr.span),
             ExpressionKind::UnaryExpression(unary) => self.build_unary_doc(unary),
-            ExpressionKind::UpdateExpression(update) => self.build_update_doc(update, expr.span),
+            ExpressionKind::UpdateExpression(update) => self.build_update_doc(*update, expr.span),
             ExpressionKind::BinaryExpression(binary) => {
                 self.build_binary_chain_doc(binary, expr.span)
             }
@@ -426,17 +426,17 @@ impl<'a> Printer<'a> {
                 self.build_tagged_template_doc(self.view.tagged_tpl(tagged), expr.span)
             }
             ExpressionKind::AwaitExpression(await_expr) => {
-                self.build_await_doc(await_expr, expr.span)
+                self.build_await_doc(*await_expr, expr.span)
             }
             ExpressionKind::YieldExpression(yield_expr) => {
-                self.build_yield_doc(yield_expr, expr.span)
+                self.build_yield_doc(*yield_expr, expr.span)
             }
             // Prettier's default layout arm. The three positions that take another
             // (`ExpressionStatement`, the `for` head, a `return`/`throw` argument or arrow
             // body) intercept their sequence before this dispatch, since the layout is the
             // parent's question and this dispatch cannot see one.
             ExpressionKind::SequenceExpression(seq) => {
-                self.build_sequence_doc(seq, expr.span, SeqLayout::Aligned)
+                self.build_sequence_doc(*seq, expr.span, SeqLayout::Aligned)
             }
             ExpressionKind::RegexLiteral(regex) => self.build_regex_doc(regex),
             ExpressionKind::ThisExpression(_) => d.text("this"),
@@ -461,7 +461,7 @@ impl<'a> Printer<'a> {
             ),
             ExpressionKind::RestElement(rest) => self.build_rest_element_doc(rest),
             ExpressionKind::TSTypeAssertion(type_assert) => {
-                self.build_ts_type_assertion_doc(type_assert, expr.span)
+                self.build_ts_type_assertion_doc(*type_assert, expr.span)
             }
             ExpressionKind::TSAsExpression(as_expr) => self.build_binary_cast_doc(
                 self.view.expr(as_expr.expression),
@@ -480,7 +480,7 @@ impl<'a> Printer<'a> {
             }
             ExpressionKind::TSNonNullExpression(non_null_expr) => {
                 self.is_expression_statement.set(was_expr_stmt);
-                self.build_ts_non_null_doc(non_null_expr, expr.span)
+                self.build_ts_non_null_doc(*non_null_expr, expr.span)
             }
             ExpressionKind::ImportExpression(import_expr) => {
                 self.build_import_expression_doc(import_expr, expr.span)
@@ -489,7 +489,7 @@ impl<'a> Printer<'a> {
                 self.build_meta_property_doc(self.view.meta_prop(meta))
             }
             ExpressionKind::TSParameterProperty(param_prop) => {
-                self.build_ts_parameter_property_doc(param_prop, expr.span)
+                self.build_ts_parameter_property_doc(*param_prop, expr.span)
             }
             ExpressionKind::CommentBoundPair(cast) => {
                 self.build_comment_bound_pair_doc(cast, expr.span)
@@ -657,7 +657,7 @@ impl<'a> Printer<'a> {
                     ..
                 },
                 None,
-            ) => operators::sequence_operand_run(self.view, seq),
+            ) => operators::sequence_operand_run(self.view, *seq),
             // Any other unfrozen inner: the interior run opens where the inner's PRINTED
             // content ends ([`Printer::pair_trailing_gap_start`]), so a comment written last in
             // a stripped shell down its right spine prints inside this pair, ahead of a run
@@ -677,7 +677,7 @@ impl<'a> Printer<'a> {
                 // reparse then read a cast around a redundant shell
                 // (`jsdoc_type_cast_sequence`).
                 ExpressionKind::SequenceExpression(seq) => {
-                    self.build_sequence_doc_bare(seq, inner.span, trail_start)
+                    self.build_sequence_doc_bare(*seq, inner.span, trail_start)
                 }
                 _ => self.with_claimed_right_spine_run(trail_start, inner.span().end, || {
                     self.build_expression_doc(inner)
@@ -915,7 +915,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for a TypeScript angle-bracket type assertion: `<Type>expr`
     fn build_ts_type_assertion_doc(
         &self,
-        type_assert: &crate::ast::TSTypeAssertion,
+        type_assert: crate::ast::TSTypeAssertion,
         type_assert_span: Span,
     ) -> DocId {
         let expression = self.view.expr(type_assert.expression);
@@ -1647,7 +1647,7 @@ impl<'a> Printer<'a> {
     /// ```
     fn build_ts_non_null_doc(
         &self,
-        non_null_expr: &crate::ast::TSNonNullExpression,
+        non_null_expr: crate::ast::TSNonNullExpression,
         span: Span,
     ) -> DocId {
         let expression = self.view.expr(non_null_expr.expression);
@@ -1909,7 +1909,7 @@ impl<'a> Printer<'a> {
         let mut prefix: SmallVec<[DocId; 4]> = SmallVec::new();
         let mut parts: DocBuf = smallvec![doc];
         for &(level, non_null, leading) in levels.iter().rev() {
-            self.push_commented_non_null_suffix(&mut parts, non_null, level.span.end);
+            self.push_commented_non_null_suffix(&mut parts, *non_null, level.span.end);
             if let Some(lead) = leading {
                 prefix.push(lead);
             }
@@ -1935,7 +1935,7 @@ impl<'a> Printer<'a> {
     fn push_commented_non_null_suffix(
         &self,
         parts: &mut DocBuf,
-        non_null: &crate::ast::TSNonNullExpression,
+        non_null: crate::ast::TSNonNullExpression,
         end: u32,
     ) {
         self.append_trailing_paren_comments(
@@ -1951,7 +1951,7 @@ impl<'a> Printer<'a> {
     fn close_commented_non_null_doc(
         &self,
         operand_doc: DocId,
-        non_null: &crate::ast::TSNonNullExpression,
+        non_null: crate::ast::TSNonNullExpression,
         span: Span,
     ) -> DocId {
         let mut parts: DocBuf = smallvec![operand_doc];
@@ -2301,7 +2301,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for a TypeScript parameter property
     fn build_ts_parameter_property_doc(
         &self,
-        param_prop: &crate::ast::TSParameterProperty,
+        param_prop: crate::ast::TSParameterProperty,
         param_prop_span: Span,
     ) -> DocId {
         let mut parts: DocBuf = DocBuf::new();

@@ -10,7 +10,7 @@ use crate::ast::{
 };
 use crate::lexer::{KeywordKind, TokenKind};
 use crate::printer::ParenContext;
-use tsv_lang::store::{flush_run, flush_run_move, push_row, push_spanned};
+use tsv_lang::store::{flush_run, push_row, push_spanned};
 use tsv_lang::{Error, Span};
 
 use super::super::{ExprRet, Parser};
@@ -742,7 +742,7 @@ impl<'a> Parser<'a> {
                 p.stores.runs.class_member_scratch.push(member);
             }
             frame.close(p);
-            Ok(flush_run_move(
+            Ok(flush_run(
                 &mut p.stores.runs.class_member_scratch,
                 &mut p.stores.runs.class_members,
                 mark,

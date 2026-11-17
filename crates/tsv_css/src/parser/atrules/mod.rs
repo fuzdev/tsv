@@ -11,7 +11,7 @@ pub(super) use super::CssParser;
 
 use crate::ast::*;
 use crate::lexer::TokenKind;
-use tsv_lang::store::{PoolText, flush_run_move};
+use tsv_lang::store::{PoolText, flush_run};
 use tsv_lang::{Error, Span};
 
 use self::preludes::{
@@ -480,7 +480,7 @@ fn parse_atrule_block(
     let end = parser.span_pos(parser.current_end());
     parser.advance()?; // consume }
 
-    let children = flush_run_move(
+    let children = flush_run(
         &mut parser.stores.runs.block_child_scratch,
         &mut parser.stores.runs.block_children,
         mark,

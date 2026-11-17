@@ -137,7 +137,7 @@ pub struct SnippetWireParameters {
 ///
 /// A fragment contains a sequence of template nodes (elements, text, expressions).
 /// Used both at the root level and as children of elements.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct Fragment {
     pub nodes: Run<FragmentNode>,
 }
@@ -157,7 +157,7 @@ pub struct Fragment {
 /// `u8`: every variant is four-aligned, so its payload starts at offset 4 whatever the tag's
 /// width, and a `u32` tag fills those four bytes where a `u8` one leaves three of padding.
 /// wasm32 keeps the compiler's layout, where the explicit tag would widen the node.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 #[cfg_attr(target_pointer_width = "64", repr(u32))]
 pub enum FragmentNode {
     Element(Element),
@@ -187,7 +187,7 @@ pub enum FragmentNode {
 ///
 /// Note: `content` mirrors `tsv_lang::Comment` and `CssComment` for naming
 /// consistency. The public AST uses `data` (Svelte's naming) via conversion.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct HtmlComment {
     /// Span of the content between `<!--` and `-->` in the host source; text via `content`.
     pub content_span: Span,
@@ -206,7 +206,7 @@ impl HtmlComment {
 ///
 /// Represents {#if test}...{:else if test}...{:else}...{/if} blocks.
 /// The `elseif` field is true for {:else if} branches (nested in alternate).
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct IfBlock {
     pub elseif: bool,
     pub test: ExprId,
@@ -221,7 +221,7 @@ pub struct IfBlock {
 ///
 /// Represents {#each expression as context, index (key)}...{:else}...{/each} blocks.
 /// Also supports {#each expression} and {#each expression, index} without `as`.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct EachBlock {
     pub expression: ExprId,
     pub context: Option<ExprId>, // Pattern (identifier or destructuring), None if no `as`
@@ -245,7 +245,7 @@ pub struct EachBlock {
 /// them had to invent a fallback for a state the parser never produces — three of
 /// them did, and one silently widened its comment window back over the binding
 /// pattern.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct EachKey {
     pub expression: ExprId,
     /// Span of the key INCLUDING its parentheses — `(` through past `)`.
@@ -256,7 +256,7 @@ pub struct EachKey {
 ///
 /// Represents {#await expression}...{:then value}...{:catch error}...{/await} blocks.
 /// Also supports shorthand: {#await expression then value}...{/await}
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct AwaitBlock {
     pub expression: ExprId,
     pub value: Option<ExprId>, // Pattern for :then binding
@@ -285,7 +285,7 @@ pub struct AwaitBlock {
 ///
 /// Represents {#key expression}...{/key} blocks.
 /// Forces re-creation of contents when expression changes.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct KeyBlock {
     pub expression: ExprId,
     pub fragment: Fragment,
@@ -298,7 +298,7 @@ pub struct KeyBlock {
 ///
 /// Represents {#snippet name(params)}...{/snippet} blocks.
 /// Defines a reusable chunk of markup that can be rendered with {@render}.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct SnippetBlock {
     pub expression: ExprId, // Snippet name (Identifier)
     /// Parsed generic type parameters (`<T extends X = Y>`), routed through
@@ -329,7 +329,7 @@ pub struct SnippetBlock {
 ///
 /// Represents {@html expression} tags.
 /// Injects raw HTML content without escaping.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct HtmlTag {
     pub expression: ExprId,
     pub span: Span,
@@ -340,7 +340,7 @@ pub struct HtmlTag {
 /// Represents {@const name = expression} tags.
 /// Declares a local constant within a block scope.
 /// The `id` is the pattern (identifier or destructuring) and `init` is the value.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct ConstTag {
     pub id: ExprId,   // Pattern (identifier or destructuring)
     pub init: ExprId, // Initializer expression
@@ -353,7 +353,7 @@ pub struct ConstTag {
 /// a TS `VariableDeclaration` parsed, printed, and converted by `tsv_ts`, so
 /// multiple declarators, comments, and every bracket/string case are handled
 /// natively. (`{@const}` is a separate `ConstTag` on its own path.)
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct DeclarationTag {
     pub declaration: VariableDeclaration,
     pub span: Span,
@@ -368,7 +368,7 @@ pub struct DeclarationTag {
 /// Note: Unlike Prettier (which strips comments), we preserve TS comments
 /// within debug tags. Comments are stored in `Root.comments` and looked
 /// up by span during formatting. This is an intentional divergence.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct DebugTag {
     pub identifiers: Run<ExprId>, // List of identifiers to debug
     pub span: Span,
@@ -378,7 +378,7 @@ pub struct DebugTag {
 ///
 /// Represents {@render fn()} or {@render fn?.()} tags.
 /// Renders a snippet, optionally with arguments.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct RenderTag {
     pub expression: ExprId, // CallExpression or ChainExpression
     pub span: Span,
@@ -695,7 +695,7 @@ impl SpecialElementTag {
 /// non-`{expression}` `this` is a parse error), so it carries an `ExpressionTag` directly.
 /// The asymmetry is Svelte's — `<svelte:element this="div">` merely *warns*, deliberately
 /// preserving Svelte 4 behavior, where the component errors.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum SpecialThis {
     /// `this={expr}` — the expression form. The tag's span covers the braces, so the
     /// printer emits it as the `{…}` attribute value it is.
@@ -744,7 +744,7 @@ impl SpecialThis {
 ///
 /// Variants that require additional data (SvelteElement, SvelteComponent) carry it
 /// directly, eliminating the need for Option fields on the parent struct.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum SpecialElementKind {
     /// `<svelte:head>` - inject content into document head
     SvelteHead,
@@ -900,7 +900,7 @@ impl SpecialElementKind {
 ///
 /// Variant-specific data (tag for SvelteElement, expression for SvelteComponent)
 /// is stored in the `SpecialElementKind` enum, not as Option fields here.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct SpecialElement {
     pub kind: SpecialElementKind,
     pub attributes: Run<AttributeNode>,
@@ -1354,7 +1354,7 @@ impl TagFacts {
 ///
 /// Represents an HTML element or Svelte component in the template.
 /// Elements have a name, attributes, and child nodes in a fragment.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct Element {
     pub kind: ElementKind,
     /// Name-derived classification, computed once at parse (see [`TagFacts`]). Occupies padding

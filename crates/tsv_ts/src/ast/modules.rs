@@ -12,7 +12,7 @@ use super::{
 };
 
 /// Export named declaration: `export const x = 1;`, `export { x }`, `export { x } from "y"`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct ExportNamedDeclaration {
     /// The declaration being exported (VariableDeclaration, FunctionDeclaration, ClassDeclaration)
     /// None when using specifiers
@@ -41,7 +41,7 @@ pub enum ExportKind {
 }
 
 /// Export default declaration: `export default x`, `export default function() {}`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct ExportDefaultDeclaration {
     /// The expression or declaration being exported as default
     pub declaration: ExportDefaultValue,
@@ -51,14 +51,14 @@ pub struct ExportDefaultDeclaration {
 ///
 /// Used when parsing export function declarations which can be either
 /// in ambient context (declare module) or regular context.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum ExportFunctionDeclaration {
     Declaration(FunctionDeclaration),
     Declare(TSDeclareFunction),
 }
 
 /// Value of export default - can be expression or declaration
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum ExportDefaultValue {
     // Variants held inline by value: the `Expression` variant already sizes this
     // enum (it is the largest), so inlining the declaration variants is free, avoids
@@ -90,7 +90,7 @@ impl ExportDefaultValue {
 
 /// Export all declaration: `export * from "y"` or `export * as ns from "y"`
 /// Also handles type-only: `export type * from "y"`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct ExportAllDeclaration {
     /// For `export * as ns from "y"`, the namespace binding name. Per ecma262
     /// `ModuleExportName : IdentifierName | StringLiteral`, so `export * as 'str' from`
@@ -107,7 +107,7 @@ pub struct ExportAllDeclaration {
 
 /// TypeScript export assignment: `export = value;`
 /// CommonJS-style export for TypeScript modules
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct TSExportAssignment {
     pub expression: ExprId,
 }
@@ -115,7 +115,7 @@ pub struct TSExportAssignment {
 /// TypeScript UMD namespace export: `export as namespace Foo;`
 /// Declares a global (UMD) name a module is also available under; appears in
 /// ambient `.d.ts` files.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct TSNamespaceExportDeclaration {
     /// The global namespace name
     pub id: Identifier,
@@ -149,7 +149,7 @@ pub enum ImportKind {
 pub use crate::imports::ImportPhase;
 
 /// Import declaration: `import x from "y"`, `import { a, b } from "y"`, etc.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct ImportDeclaration {
     /// Import specifiers (default, named, or namespace)
     pub specifiers: Run<ImportSpecifier>,
@@ -250,7 +250,7 @@ impl ModuleExportName {
 }
 
 /// TypeScript import equals declaration: `import x = require("y")` or `import x = A.B`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct TSImportEqualsDeclaration {
     /// The local binding name
     pub id: Identifier,
@@ -263,7 +263,7 @@ pub struct TSImportEqualsDeclaration {
 }
 
 /// Module reference: either external module reference or entity name
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum TSModuleReference {
     /// `require("module")`
     ExternalModuleReference(TSExternalModuleReference),
@@ -272,7 +272,7 @@ pub enum TSModuleReference {
 }
 
 /// External module reference: `require("module")`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct TSExternalModuleReference {
     /// The module specifier (string literal)
     pub expression: Literal,

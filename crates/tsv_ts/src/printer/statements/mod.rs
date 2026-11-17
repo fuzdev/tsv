@@ -223,7 +223,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
         match &statement.kind {
             StatementKind::ExpressionStatement(stmt) => {
-                self.build_expression_statement_doc(stmt, statement.span, ctx)
+                self.build_expression_statement_doc(*stmt, statement.span, ctx)
             }
             StatementKind::VariableDeclaration(decl) => {
                 self.build_variable_declaration_doc(decl, Some(ctx.terminator_gap()))
@@ -233,7 +233,7 @@ impl<'a> Printer<'a> {
                 self.build_type_alias_declaration_doc(decl, statement.span, ctx.clause_tail())
             }
             StatementKind::ReturnStatement(ret) => {
-                self.build_return_statement_doc(ret, statement.span, ctx.terminator_gap())
+                self.build_return_statement_doc(*ret, statement.span, ctx.terminator_gap())
             }
             // A statement-position block (bare `{ }`, a labeled block's body, or a
             // block nested directly in another block) expands its empty form to `{\n}`,
@@ -263,7 +263,7 @@ impl<'a> Printer<'a> {
             }
             &StatementKind::TSExportAssignment(decl) => {
                 let decl = self.view.export_assign(decl);
-                self.build_export_assignment_doc(decl, statement.span)
+                self.build_export_assignment_doc(*decl, statement.span)
             }
             StatementKind::TSNamespaceExportDeclaration(decl) => {
                 self.build_namespace_export_declaration_doc(decl, statement.span)
@@ -290,20 +290,20 @@ impl<'a> Printer<'a> {
                 self.build_for_of_statement_doc(stmt, statement.span, ctx)
             }
             StatementKind::WhileStatement(stmt) => {
-                self.build_while_statement_doc(stmt, statement.span, ctx)
+                self.build_while_statement_doc(*stmt, statement.span, ctx)
             }
             StatementKind::DoWhileStatement(stmt) => {
-                self.build_do_while_statement_doc(stmt, statement.span, ctx)
+                self.build_do_while_statement_doc(*stmt, statement.span, ctx)
             }
             StatementKind::WithStatement(stmt) => {
-                self.build_with_statement_doc(stmt, statement.span, ctx)
+                self.build_with_statement_doc(*stmt, statement.span, ctx)
             }
             StatementKind::SwitchStatement(stmt) => {
                 self.build_switch_statement_doc(stmt, statement.span)
             }
             StatementKind::TryStatement(stmt) => self.build_try_statement_doc(stmt, statement.span),
             StatementKind::ThrowStatement(stmt) => {
-                self.build_throw_statement_doc(stmt, statement.span, ctx.terminator_gap())
+                self.build_throw_statement_doc(*stmt, statement.span, ctx.terminator_gap())
             }
             StatementKind::BreakStatement(stmt) => {
                 self.build_break_statement_doc(stmt, statement.span, ctx.terminator_gap())
@@ -342,7 +342,7 @@ impl<'a> Printer<'a> {
     /// directive-prologue entry) plus the `;` and the comments bound to it.
     fn build_expression_statement_doc(
         &self,
-        stmt: &ast::ExpressionStatement,
+        stmt: ast::ExpressionStatement,
         span: Span,
         ctx: StatementContext,
     ) -> DocId {
@@ -466,7 +466,7 @@ impl<'a> Printer<'a> {
     /// directive is a bare string literal by grammar, so the literal's span start is the
     /// statement's first printed byte — the left-edge fact
     /// [`Printer::prepend_owned_leading_comment_at`] asks each caller for.
-    fn build_directive_doc(&self, stmt: &ast::ExpressionStatement) -> DocId {
+    fn build_directive_doc(&self, stmt: ast::ExpressionStatement) -> DocId {
         let d = self.d();
         let span = self.view.expr(stmt.expression).span();
         let text = d.text_pooled(&format_directive(span.extract(self.source)));
@@ -478,7 +478,7 @@ impl<'a> Printer<'a> {
     #[inline]
     fn build_expression_statement_expr_doc(
         &self,
-        stmt: &ast::ExpressionStatement,
+        stmt: ast::ExpressionStatement,
         nested_paren: Option<Span>,
     ) -> DocId {
         self.expr_stmt_paren_target.set(nested_paren);
@@ -493,7 +493,7 @@ impl<'a> Printer<'a> {
             Expression {
                 span,
                 kind: ExpressionKind::SequenceExpression(seq),
-            } => self.build_sequence_doc(seq, *span, SeqLayout::Indented),
+            } => self.build_sequence_doc(*seq, *span, SeqLayout::Indented),
             // Everything else takes the ordinary dispatch, which is where a
             // binary picks up the continuation indent an `ExpressionStatement`
             // parent gets from prettier's fall-through (a labeled statement's
@@ -521,7 +521,7 @@ impl<'a> Printer<'a> {
     /// source would drop what it declined to claim, or double what it handed over.
     fn build_expression_statement_value_doc(
         &self,
-        stmt: &ast::ExpressionStatement,
+        stmt: ast::ExpressionStatement,
         span: Span,
         in_program_or_block: bool,
     ) -> (DocId, u32) {
@@ -751,7 +751,7 @@ impl<'a> Printer<'a> {
     /// gap (threaded through the restricted production's own emitters).
     fn build_return_statement_doc(
         &self,
-        ret: &ast::ReturnStatement,
+        ret: ast::ReturnStatement,
         span: Span,
         gap: TerminatorGap,
     ) -> DocId {

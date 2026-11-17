@@ -670,7 +670,7 @@ impl<'a> Printer<'a> {
             control_flow_sections(n)
                 .into_iter()
                 .flatten()
-                .any(|f| !self.is_inline_fragment(f))
+                .any(|f| !self.is_inline_fragment(*f))
         });
         if authored_section_break {
             MultilineCause::SourceBreaks

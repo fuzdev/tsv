@@ -456,7 +456,7 @@ pub struct Identifier {
 /// decorators a binding identifier carries. A row of its own store, named by
 /// `Identifier.extra` only at the few binding sites that set it; absent (`None`, folded
 /// into the id's niche) for every reference.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct IdentifierParamExtra {
     pub type_annotation: Option<TSTypeAnnotation>,
     pub decorators: Option<Run<Decorator>>,
@@ -530,7 +530,7 @@ impl Identifier {
 /// The name does NOT include the `#` prefix, while the holding `Expression`'s span
 /// DOES include the `#` character — so the verbatim name is the span minus its
 /// leading byte.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct PrivateIdentifier {
     /// The name channel (name excludes the `#`; `raw_len` covers the name
     /// bytes after the `#`).

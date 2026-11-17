@@ -366,10 +366,10 @@ fn write_expression_full_dispatch(
             close_node(w, "TaggedTemplateExpression", expr.span, ctx);
         }
         ast::ExpressionKind::AwaitExpression(await_expr) => {
-            write_await_expression(w, await_expr, expr.span, ctx);
+            write_await_expression(w, *await_expr, expr.span, ctx);
         }
         ast::ExpressionKind::YieldExpression(yield_expr) => {
-            write_yield_expression(w, yield_expr, expr.span, ctx);
+            write_yield_expression(w, *yield_expr, expr.span, ctx);
         }
         ast::ExpressionKind::SequenceExpression(seq) => {
             node_header(w, "SequenceExpression", expr.span, ctx);

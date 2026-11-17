@@ -14,7 +14,7 @@ use crate::ast::{Comment, CssNode, CssStores, CssStyleSheet, CssText};
 use crate::lexer::{Lexer, Token, TokenKind};
 use decl_scan::{ScannedDeclaration, TerminatorKind};
 use std::cell::Cell;
-use tsv_lang::store::{PoolText, flush_run_move};
+use tsv_lang::store::{PoolText, flush_run};
 use tsv_lang::{DepthBudget, DepthLimit, Error, NESTING_LIMIT, Span};
 
 pub(crate) struct CssParser<'a> {
@@ -1051,7 +1051,7 @@ impl<'a> CssParser<'a> {
 
         // Comments are already sorted by span.start since we add them in order during parsing
 
-        let nodes = flush_run_move(
+        let nodes = flush_run(
             &mut self.stores.runs.node_scratch,
             &mut self.stores.runs.nodes,
             mark,

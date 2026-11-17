@@ -389,7 +389,7 @@ fn push_boundary_forms(start: usize, end: usize, src: &str, kind: SiteKind, out:
 /// Inside `<pre>`/`<textarea>` the run is literal, so only the inter-sibling family applies.
 fn collect_block_fragment(
     view: SvelteView<'_>,
-    fragment: &tsv_svelte::ast::Fragment,
+    fragment: tsv_svelte::ast::Fragment,
     src: &str,
     ws_sig: bool,
     out: &mut Vec<Site>,
@@ -402,7 +402,7 @@ fn collect_block_fragment(
 
 /// Is this alternate the `{:else if …}` form — one nested `IfBlock` that spans the rest
 /// of the chain, closing tag included — rather than a real `{:else}` fragment?
-fn is_elseif_chain(view: SvelteView<'_>, alternate: &tsv_svelte::ast::Fragment) -> bool {
+fn is_elseif_chain(view: SvelteView<'_>, alternate: tsv_svelte::ast::Fragment) -> bool {
     matches!(view.nodes(alternate.nodes), [FragmentNode::IfBlock(b)] if b.elseif)
 }
 
@@ -443,33 +443,33 @@ fn recurse_children(
             collect_sites(view, view.nodes(el.fragment.nodes), src, child_ws_sig, out);
         }
         FragmentNode::IfBlock(b) => {
-            collect_block_fragment(view, &b.consequent, src, ws_sig, out);
+            collect_block_fragment(view, b.consequent, src, ws_sig, out);
             if let Some(alt) = &b.alternate {
                 // An `{:else if}` chain is an alternate holding one nested `IfBlock` whose
                 // span runs from `{:else if` through the closing `{/if}` — so that fragment
                 // has no boundary of its own to probe (splicing at its edges would land
                 // outside the block). Recurse only; the nested block's own branches are
                 // probed when we reach it.
-                if is_elseif_chain(view, alt) {
+                if is_elseif_chain(view, *alt) {
                     collect_sites(view, view.nodes(alt.nodes), src, ws_sig, out);
                 } else {
-                    collect_block_fragment(view, alt, src, ws_sig, out);
+                    collect_block_fragment(view, *alt, src, ws_sig, out);
                 }
             }
         }
         FragmentNode::EachBlock(b) => {
-            collect_block_fragment(view, &b.body, src, ws_sig, out);
+            collect_block_fragment(view, b.body, src, ws_sig, out);
             if let Some(fb) = &b.fallback {
-                collect_block_fragment(view, fb, src, ws_sig, out);
+                collect_block_fragment(view, *fb, src, ws_sig, out);
             }
         }
         FragmentNode::AwaitBlock(b) => {
             for frag in [&b.pending, &b.then, &b.catch].into_iter().flatten() {
-                collect_block_fragment(view, frag, src, ws_sig, out);
+                collect_block_fragment(view, *frag, src, ws_sig, out);
             }
         }
-        FragmentNode::KeyBlock(b) => collect_block_fragment(view, &b.fragment, src, ws_sig, out),
-        FragmentNode::SnippetBlock(b) => collect_block_fragment(view, &b.body, src, ws_sig, out),
+        FragmentNode::KeyBlock(b) => collect_block_fragment(view, b.fragment, src, ws_sig, out),
+        FragmentNode::SnippetBlock(b) => collect_block_fragment(view, b.body, src, ws_sig, out),
         // Leaf fragment nodes (no child fragment): text, comments, expression /
         // html / const / declaration / debug / render tags.
         _ => {}

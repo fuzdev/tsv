@@ -19,14 +19,14 @@ use super::{
 /// The span is hoisted out of the variants so reading it is a field load rather than a
 /// dispatch over [`ExpressionKind`]; a variant struct carries no span of its own unless
 /// some node also holds that type outside an `Expression` (see [`ExpressionKind`]).
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct Expression {
     pub span: Span,
     pub kind: ExpressionKind,
 }
 
 /// The variant half of an [`Expression`].
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum ExpressionKind {
     Literal(Literal),
     Identifier(Identifier),
@@ -332,7 +332,7 @@ impl Expression {
 /// `ParenthesizedExpression`). Distinct from a bare grouping paren, the wrapper
 /// is opaque to layout heuristics (expand-last etc.), mirroring how acorn's
 /// `ParenthesizedExpression` hides the inner type in prettier-plugin-svelte.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct CommentBoundPair {
     pub inner: ExprId,
     /// The comment glued to `span.start` — the `@type`/`@satisfies` comment of a cast, or
@@ -381,7 +381,7 @@ pub enum CommentBoundPairKind {
 /// other consumer the paren-free tree, the one a `function` signature with the same text
 /// parses to. A pair answers no paren question about its position, so a printer handed
 /// one prints `(x + y) * 2` as `x + y * 2`.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct ParenthesizedExpression {
     pub expression: ExprId,
 }
@@ -403,7 +403,7 @@ impl ParenthesizedExpression {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct ObjectExpression {
     pub properties: Run<ObjectProperty>,
     /// `true` when a trailing comma follows a final spread property (`{...a,}`).
@@ -468,7 +468,7 @@ impl ObjectProperty {
 ///
 /// Elements are wrapped in Option to support sparse arrays like `[1,,3]`
 /// where missing elements are represented as None.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct ArrayExpression {
     pub elements: Run<Option<ExprId>>,
     /// `true` when a trailing comma follows a final spread element (`[...a,]`).
@@ -502,7 +502,7 @@ impl UpdateOperator {
 /// Used for increment and decrement operations. The `prefix` field
 /// indicates whether the operator appears before (true) or after (false)
 /// the argument.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct UpdateExpression {
     pub operator: UpdateOperator,
     pub argument: ExprId,
@@ -547,7 +547,7 @@ impl UnaryOperator {
 }
 
 /// Unary expression: `-x`, `+x`, `!x`, etc.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct UnaryExpression {
     pub operator: UnaryOperator,
     pub argument: ExprId,
@@ -681,7 +681,7 @@ impl BinaryOperator {
 }
 
 /// Binary expression: `a + b`, `x && y`, etc.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct BinaryExpression {
     pub left: ExprId,
     pub operator: BinaryOperator,
@@ -796,7 +796,7 @@ impl BinaryExpression {
 }
 
 /// Call expression: `foo()`, `obj.method(arg1, arg2)`, `fn<T>()`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct CallExpression {
     pub callee: ExprId,
     pub type_arguments: Option<TSTypeParameterInstantiation>,
@@ -809,7 +809,7 @@ pub struct CallExpression {
 /// Constructor call with the `new` keyword. The callee is typically an
 /// identifier or member expression, and arguments are optional.
 /// Type arguments like `new Map<K, V>()` are stored in `type_arguments`.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct NewExpression {
     pub callee: ExprId,
     pub type_arguments: Option<TSTypeParameterInstantiation>,
@@ -818,7 +818,7 @@ pub struct NewExpression {
 
 /// Dynamic import expression: `import('module')` or `import('module', options)`,
 /// optionally phased as `import.source(…)` / `import.defer(…)`.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct ImportExpression {
     pub source: ExprId,
     /// Optional second argument for import attributes: `{with: {type: 'json'}}`
@@ -828,7 +828,7 @@ pub struct ImportExpression {
 }
 
 /// Meta property: `import.meta`, `new.target`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct MetaProperty {
     /// The keyword: "import" or "new"
     pub meta: Identifier,
@@ -837,7 +837,7 @@ pub struct MetaProperty {
 }
 
 /// Member expression: `obj.prop`, `arr[0]`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct MemberExpression {
     pub object: ExprId,
     pub property: ExprId,
@@ -846,7 +846,7 @@ pub struct MemberExpression {
 }
 
 /// Conditional (ternary) expression: `a ? b : c`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct ConditionalExpression {
     pub test: ExprId,
     pub consequent: ExprId,
@@ -858,7 +858,7 @@ pub struct ConditionalExpression {
 /// Supports both expression bodies and block bodies:
 /// - Expression body: `x => x + 1` (body is Expression)
 /// - Block body: `x => { return x + 1; }` (body is BlockStatement)
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct ArrowFunctionExpression {
     /// Type parameters (TypeScript generics): `<T>() => ...`
     pub type_parameters: Option<TSTypeParameterDeclaration>,
@@ -880,7 +880,7 @@ pub struct ArrowFunctionExpression {
 }
 
 /// Arrow function body - either an expression or a block statement
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum ArrowFunctionBody {
     /// Expression body: `() => expr`
     Expression(ExprId),
@@ -908,7 +908,7 @@ impl ArrowFunctionBody {
 /// - Method shorthand in objects: `{ foo() { return 1; } }`
 /// - Anonymous function expressions: `const f = function() {}`
 /// - Named function expressions: `const f = function name() {}`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct FunctionExpression {
     /// Optional function name (for named function expressions)
     pub id: Option<Identifier>,
@@ -998,7 +998,7 @@ pub struct Property {
 /// For a template like `a ${b} c ${d} e`:
 /// - quasis: ["a ", " c ", " e"]
 /// - expressions: [b, d]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct TemplateLiteral {
     pub quasis: Run<TemplateElement>,
     pub expressions: Run<ExprId>,
@@ -1093,7 +1093,7 @@ impl TemplateElement {
 /// The tag is called with the template's static parts and interpolated values.
 /// When the tag has type arguments (e.g., `tag<T>\`content\``), they are stored
 /// separately rather than wrapping the tag in `TSInstantiationExpression`.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct TaggedTemplateExpression {
     pub tag: ExprId,
     pub type_arguments: Option<TSTypeParameterInstantiation>,
@@ -1104,7 +1104,7 @@ pub struct TaggedTemplateExpression {
 ///
 /// Used in async functions to wait for a Promise to resolve.
 /// The argument is the expression being awaited.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct AwaitExpression {
     pub argument: ExprId,
 }
@@ -1115,7 +1115,7 @@ pub struct AwaitExpression {
 /// - `yield` with no argument yields undefined
 /// - `yield value` yields the given value
 /// - `yield* iterable` delegates to another generator/iterable
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct YieldExpression {
     /// The value to yield (None for `yield` with no argument)
     pub argument: Option<ExprId>,
@@ -1127,7 +1127,7 @@ pub struct YieldExpression {
 ///
 /// Evaluates all expressions left to right, returns the last value.
 /// Created by the comma operator at expression level.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct SequenceExpression {
     pub expressions: Run<ExprId>,
 }
@@ -1138,7 +1138,7 @@ pub struct SequenceExpression {
 /// Unlike strings, regex patterns are NOT decoded - escape sequences are preserved.
 ///
 /// TODO: Add regex validation (pattern is valid, flags are valid and unique)
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct RegexLiteral {
     /// Span of the pattern between the slashes (e.g., "\\d+"). The pattern is a
     /// verbatim sub-slice of source (escape sequences preserved, never decoded),
@@ -1167,7 +1167,7 @@ impl RegexLiteral {
 }
 
 /// This expression: `this`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct ThisExpression;
 
 /// Super expression: `super`
@@ -1177,7 +1177,7 @@ pub struct ThisExpression;
 /// - `super.method()` calls a parent method
 /// - `super.prop` accesses a parent property
 /// - `super[expr]` computed property access on parent
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct Super;
 
 /// TypeScript angle-bracket type assertion: `<Type>expr`
@@ -1186,7 +1186,7 @@ pub struct Super;
 /// incompatible with JSX (looks like a JSX element).
 ///
 /// Example: `<string>someValue`, `<T>a`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct TSTypeAssertion {
     /// The target type
     pub type_annotation: TyId,
@@ -1200,7 +1200,7 @@ pub struct TSTypeAssertion {
 /// Unlike angle-bracket syntax (`<Type>expr`), this works in JSX/TSX.
 ///
 /// Note: `as const` is represented as a type reference with name "const".
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct TSAsExpression {
     /// The expression being type-asserted
     pub expression: ExprId,
@@ -1215,7 +1215,7 @@ pub struct TSAsExpression {
 ///
 /// Example: `{ a: 1 } satisfies Record<string, number>` keeps type `{ a: number }`
 /// but verifies it's compatible with `Record<string, number>`.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct TSSatisfiesExpression {
     /// The expression being checked
     pub expression: ExprId,
@@ -1230,7 +1230,7 @@ pub struct TSSatisfiesExpression {
 /// just provides type arguments to a generic function/class reference.
 ///
 /// Example: `const boundF = f<number>;` gives `f` with type parameter bound to `number`.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct TSInstantiationExpression {
     /// The expression being instantiated
     pub expression: ExprId,
@@ -1244,7 +1244,7 @@ pub struct TSInstantiationExpression {
 /// This is a compile-time assertion that has no runtime effect.
 ///
 /// Example: `document.getElementById("app")!`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct TSNonNullExpression {
     /// The expression being asserted non-null
     pub expression: ExprId,
@@ -1275,7 +1275,7 @@ impl TSNonNullExpression {
 /// - Member assignment: `obj.x = 1`
 /// - Destructuring: `{a, b} = obj`, `[x, y] = arr`
 /// - Compound assignment: `x += 1` (uses AssignmentOperator)
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct AssignmentExpression {
     /// The assignment target (identifier, member expression, or pattern)
     pub left: ExprId,

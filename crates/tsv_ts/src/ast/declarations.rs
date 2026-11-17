@@ -11,7 +11,7 @@ use super::{
 };
 
 /// Interface declaration: `interface Foo { ... }` or `interface Foo extends Bar { ... }`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct TSInterfaceDeclaration {
     pub id: Identifier,
     pub type_parameters: Option<TSTypeParameterDeclaration>,
@@ -30,7 +30,7 @@ pub struct TSInterfaceHeritage {
 }
 
 /// Interface body: `{ members }`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct TSInterfaceBody {
     pub body: Run<TSTypeElement>,
     pub span: Span,
@@ -40,7 +40,7 @@ pub struct TSInterfaceBody {
 ///
 /// Also used for functions inside `declare namespace` where `declare` is implicit,
 /// and for function overload signatures (no body).
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct TSDeclareFunction {
     pub id: Identifier,
     pub type_parameters: Option<TSTypeParameterDeclaration>,
@@ -63,7 +63,7 @@ pub struct TSDeclareFunction {
 /// - Const: `const enum Foo { A, B }` (inlined at compile time)
 /// - Declare: `declare enum Foo { A, B }` (ambient declaration)
 /// - Declare const: `declare const enum Foo { A, B }`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct TSEnumDeclaration {
     /// Enum name
     pub id: Identifier,
@@ -131,7 +131,7 @@ impl TSEnumMemberId {
 /// The `module` keyword is the older syntax, while `namespace` is the modern syntax.
 /// Both produce the same AST structure. For nested namespaces like `namespace Outer.Inner`,
 /// the parser creates nested TSModuleDeclaration nodes.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct TSModuleDeclaration {
     /// Module/namespace name - identifier for regular namespaces, string literal for ambient modules
     pub id: TSModuleName,
@@ -148,7 +148,7 @@ pub struct TSModuleDeclaration {
 }
 
 /// Module/namespace name - can be an identifier or a string literal
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum TSModuleName {
     /// Regular identifier: `namespace Foo { }`
     Identifier(Identifier),
@@ -175,7 +175,7 @@ pub enum TSModuleDeclarationKind {
 }
 
 /// Body of a TypeScript module declaration
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum TSModuleDeclarationBody {
     /// Block body with statements: `namespace A { ... }`
     TSModuleBlock(TSModuleBlock),
@@ -184,7 +184,7 @@ pub enum TSModuleDeclarationBody {
 }
 
 /// TypeScript module block: the `{ ... }` part of a namespace/module declaration
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct TSModuleBlock {
     /// Statements inside the module block
     pub body: Run<StmtId>,

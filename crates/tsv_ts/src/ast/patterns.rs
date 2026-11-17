@@ -19,7 +19,7 @@ use super::{Decorator, ExprId, Property, Run, TSTypeAnnotation};
 /// - Renamed: `{a: x}` (bind obj.a to variable x)
 /// - Default values: `{a = 1}` (use 1 if obj.a is undefined)
 /// - Rest: `{...rest}` (collect remaining properties)
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct ObjectPattern {
     pub properties: Run<ObjectPatternProperty>,
     /// Optional destructuring-pattern parameter (`{a}?`). Only ever set in a
@@ -90,7 +90,7 @@ impl ObjectPatternProperty {
 /// - Default values: `[a = 1]`
 /// - Rest: `[...rest]`
 /// - Holes: `[a, , b]` (skip element at index 1)
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct ArrayPattern {
     /// Elements are Option to support holes like `[a, , b]`
     pub elements: Run<Option<ExprId>>,
@@ -111,7 +111,7 @@ pub struct ArrayPattern {
 /// - `function foo({a = 1}) {}`
 ///
 /// The left side is the binding pattern, the right side is the default value.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct AssignmentPattern {
     /// The binding (identifier or nested pattern)
     pub left: ExprId,
