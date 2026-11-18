@@ -13,9 +13,10 @@ Each `## Unreleased` section must be non-empty and carry a
 ## Unreleased
 <!-- bump: patch -->
 
-- chore: the internal TypeScript AST lives in per-document stores named by typed ids, with
-  decoded text in a pool, instead of bump-arena references; formatted output and the parse
-  wire are unchanged, and the hidden Rust `ast` / `__private` items change shape with it
+- chore: the internal TypeScript, CSS and Svelte ASTs live in per-document stores named by
+  typed ids, with decoded text in a pool, instead of bump-arena references; formatted output
+  and the parse wire are unchanged, the hidden Rust `ast` / `__private` items change shape
+  with it, and the crates no longer depend on `bumpalo`
 
 ## 0.8.1
 
