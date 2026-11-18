@@ -90,6 +90,9 @@ const fake_world = (
 		npm?: (args: Array<string>, attempt: number) => Reply | undefined;
 		tar?: (args: Array<string>) => Reply | undefined;
 		packages?: Record<string, { filename: string; tarball: Tarball }>;
+		/** How `npm pack --json` reports: an array (npm 11 and older, the default) or an object
+		 * keyed by package name (npm 12). */
+		pack_report?: 'array' | 'object';
 	} = {}
 ): FakeWorld => {
 	const calls: Array<Array<unknown>> = [];
@@ -133,7 +136,14 @@ const fake_world = (
 						`${args[args.indexOf('--pack-destination') + 1]}/${packed.filename}`,
 						packed.tarball
 					);
-					return reply({ stdout: JSON.stringify([{ filename: packed.filename }]) });
+					const report = { name, filename: packed.filename };
+					return reply({
+						stdout: JSON.stringify(
+							options.pack_report === 'object' ? { [name]: report } : [report],
+							null,
+							2
+						)
+					});
 				}
 				throw new Error(`unexpected npm ${key}`);
 			},
@@ -217,6 +227,16 @@ const pack = (name: string) => [
 	'--json'
 ];
 
+/** The message `JSON.parse` throws for `text`, which the engine words. */
+const json_error = (text: string): string => {
+	try {
+		JSON.parse(text);
+	} catch (error) {
+		return (error as Error).message;
+	}
+	throw new Error(`${text} is JSON`);
+};
+
 /** The files under `dir`, by name, as text. */
 const files_in = (world: FakeWorld, dir: string): Record<string, string | undefined> =>
 	Object.fromEntries(
@@ -273,6 +293,18 @@ describe('a collection', () => {
 		]);
 		deepStrictEqual(world.err, []);
 		deepStrictEqual(world.sleeps, []);
+	});
+
+	test("reads npm 12's pack report, an object keyed by package name", async () => {
+		const world = fake_world({ pack_report: 'object' });
+		strictEqual(await run_release_assets(world.deps, [`v${VERSION}`, '--out', OUT]), 0);
+		deepStrictEqual(world.err, []);
+		deepStrictEqual(files_in(world, OUT), {
+			NOTICE: 'notice',
+			SHA512SUMS: `${ABC_SHA512}  tsv-linux-x64-gnu\n${EMPTY_SHA512}  tsv-win32-x64.exe\n`,
+			'tsv-linux-x64-gnu': 'abc',
+			'tsv-win32-x64.exe': ''
+		});
 	});
 
 	test('makes --out, then one temp dir, and removes the temp dir before the sums', async () => {
@@ -433,6 +465,20 @@ describe('refusals', () => {
 		for (const [stdout, message] of [
 			['[]', `FAIL: npm pack ${GNU}@${VERSION} reported no tarball`],
 			['[{}]', `FAIL: npm pack ${GNU}@${VERSION} reported no tarball`],
+			['{}', `FAIL: npm pack ${GNU}@${VERSION} reported no tarball`],
+			[
+				'npm warn x',
+				`FAIL: npm pack ${GNU}@${VERSION} printed no report: npm pack --json printed no JSON: ${json_error('npm warn x')}`
+			],
+			[
+				'null',
+				`FAIL: npm pack ${GNU}@${VERSION} printed no report: npm pack --json printed neither an array nor an object: null`
+			],
+			[`{"${GNU}": {}}`, `FAIL: npm pack ${GNU}@${VERSION} reported no tarball`],
+			[
+				`{"${GNU}": {"filename": "../x.tgz"}}`,
+				`FAIL: npm pack ${GNU}@${VERSION} reported ../x.tgz, which is no file name`
+			],
 			[
 				'[{"filename": "../x.tgz"}]',
 				`FAIL: npm pack ${GNU}@${VERSION} reported ../x.tgz, which is no file name`

@@ -92,6 +92,7 @@
 		"scripts/npm_api_imports_test.ts",
 		"scripts/npm_api_strip_test.ts",
 		"scripts/npm_api_test.ts",
+		"scripts/npm_metadata_test.ts",
 		"scripts/package_audit_test.ts",
 		"scripts/patch_npm_package_test.ts",
 		"scripts/perf_ab_test.ts",

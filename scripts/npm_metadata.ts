@@ -1,4 +1,13 @@
 /**
+ * What every published tsv package shares on the registry: its identity metadata and its
+ * third-party notice. Also home to the reader of `npm pack --json`'s output, whose shape differs
+ * across npm majors, so the release-asset collector (`scripts/release_assets.ts`) and the N-API
+ * package test (`scripts/test_napi_npm.ts`) read it one way.
+ *
+ * @module
+ */
+
+/**
  * The npm registry-identity metadata shared by EVERY published tsv package —
  * the three wasm packages (`scripts/patch_npm_package.ts`) and the N-API set's
  * loader + platform packages (`scripts/build_napi_packages.ts`). One source so
@@ -53,3 +62,34 @@ export const THIRD_PARTY_NOTICE = {
 	source: 'crates/tsv_html/NOTICE',
 	published: 'NOTICE'
 } as const;
+
+/** One package's report in `npm pack --json`'s output, as far as the scripts read it. Every
+ * field is optional: the output is npm's, not ours, and a reader checks what it uses. */
+export interface NpmPackReport {
+	filename?: string;
+	files?: Array<{ path: string; size: number; mode: number }>;
+}
+
+/**
+ * The per-package reports in `npm pack --json`'s stdout, in npm's order. npm 11 and older print
+ * an array of reports; npm 12 prints an object keyed by package name, dry run or not. Both
+ * shapes are read because the release workflow's pinned Node ships the older npm while a local
+ * checkout may run the newer one.
+ *
+ * @throws `Error` - when the output is no JSON, or JSON of neither shape
+ */
+export const npm_pack_reports = (stdout: string): Array<NpmPackReport> => {
+	let parsed: unknown;
+	try {
+		parsed = JSON.parse(stdout);
+	} catch (error) {
+		throw new Error(
+			`npm pack --json printed no JSON: ${error instanceof Error ? error.message : String(error)}`
+		);
+	}
+	if (Array.isArray(parsed)) return parsed as Array<NpmPackReport>;
+	if (typeof parsed === 'object' && parsed !== null) {
+		return Object.values(parsed) as Array<NpmPackReport>;
+	}
+	throw new Error(`npm pack --json printed neither an array nor an object: ${stdout}`);
+};

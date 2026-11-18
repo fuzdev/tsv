@@ -77,7 +77,7 @@ import {
 	facade_files,
 	facade_type_names
 } from './npm_facade.ts';
-import { THIRD_PARTY_NOTICE } from './npm_metadata.ts';
+import { npm_pack_reports, THIRD_PARTY_NOTICE } from './npm_metadata.ts';
 import { register_discovery_parity_suite } from './discovery_parity_suite.ts';
 import { register_dts_specifier_test } from './dts_specifiers.ts';
 import { register_facade_surface_suite } from './facade_surface_suite.ts';
@@ -962,15 +962,16 @@ describe('cli (bin.js): the tsv bin dispatching to the native CLI binary', () =>
 			shell: process.platform === 'win32'
 		});
 		assert.equal(result.status, 0, result.stderr);
-		const [report] = JSON.parse(result.stdout);
-		const entry = report.files.find((f: { path: string }) => f.path === cli_binary);
+		const [report] = npm_pack_reports(result.stdout);
+		assert.ok(report?.files, `npm pack reported no file list:\n${result.stdout}`);
+		const entry = report.files.find((f) => f.path === cli_binary);
 		assert.ok(entry, `${cli_binary} missing from the packed file list`);
 		if (posix) {
 			assert.ok(entry.mode & 0o111, `packed mode ${entry.mode.toString(8)} is not executable`);
 		}
 		// the binaries' third-party notice rides in the same tarball
 		assert.ok(
-			report.files.some((f: { path: string }) => f.path === THIRD_PARTY_NOTICE.published),
+			report.files.some((f) => f.path === THIRD_PARTY_NOTICE.published),
 			`${THIRD_PARTY_NOTICE.published} missing from the packed file list`
 		);
 	});

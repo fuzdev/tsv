@@ -58,7 +58,7 @@ import { join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 
 import { cli_binary_name, release_asset_name } from './napi_host.ts';
-import { THIRD_PARTY_NOTICE } from './npm_metadata.ts';
+import { type NpmPackReport, npm_pack_reports, THIRD_PARTY_NOTICE } from './npm_metadata.ts';
 import type { CapturedRun } from './release/node_host.ts';
 import { version_from_tag } from './release/version.ts';
 
@@ -230,16 +230,22 @@ const collect = async (deps: ReleaseAssetsDeps, version: string, out_dir: string
 			// npm versions apply to `npm pack` past its `@fuzdev/*` exclusion, and the version this
 			// packs was published moments ago, so it would read as no matching version; a flag
 			// outranks every config file and the environment
-			const packed = JSON.parse(
-				await capture_npm([
-					'pack',
-					`${pkg}@${version}`,
-					'--min-release-age=0',
-					'--pack-destination',
-					pack_dir,
-					'--json'
-				])
-			) as Array<{ filename?: string }>;
+			const stdout = await capture_npm([
+				'pack',
+				`${pkg}@${version}`,
+				'--min-release-age=0',
+				'--pack-destination',
+				pack_dir,
+				'--json'
+			]);
+			let packed: Array<NpmPackReport>;
+			try {
+				packed = npm_pack_reports(stdout);
+			} catch (error) {
+				throw new Error(
+					`npm pack ${pkg}@${version} printed no report: ${error instanceof Error ? error.message : String(error)}`
+				);
+			}
 			const filename = packed[0]?.filename;
 			if (!filename) throw new Error(`npm pack ${pkg}@${version} reported no tarball`);
 			if (filename === '.' || filename === '..' || /[/\\]/.test(filename)) {
