@@ -83,7 +83,7 @@ pub(crate) enum Mode {
 /// and the state the hazard substitutions read.
 pub(crate) struct Walk<'s, 'b> {
     src: Source<'s>,
-    /// Reads the expressions of the tree being walked.
+    /// Resolves the tree's ids, runs and pool text.
     view: AstView<'b>,
     /// What the walk collects ([`Self::collects`]) and whether the subtrees the strip
     /// refuses are walked ([`Self::walks_refused`]).
@@ -2351,7 +2351,7 @@ fn namespace_member_holds_value(view: AstView<'_>, statement: &Statement) -> boo
 
 #[cfg(test)]
 mod tests {
-    use super::{EDITS_FIRST_CAPACITY, Mode, Walk};
+    use super::{EDITS_FIRST_CAPACITY, Mode, RECORDS_FIRST_CAPACITY, Walk};
 
     /// The edits allocate nothing for a source with nothing type-only, and
     /// [`EDITS_FIRST_CAPACITY`] at the first edit: the growth every push goes through.
@@ -2368,6 +2368,23 @@ mod tests {
             let (edits, verdict) = walk.finish();
             verdict.expect("the source strips");
             assert_eq!(edits.capacity(), capacity, "{source:?}");
+        }
+    }
+
+    /// The records allocate nothing for a source with no module request, and
+    /// [`RECORDS_FIRST_CAPACITY`] at the first record: the growth every record goes through.
+    #[test]
+    fn the_records_allocate_at_the_first_record_their_first_capacity() {
+        for (source, capacity) in [
+            ("let a = 1;\n", 0),
+            ("import a from 'a';\n", RECORDS_FIRST_CAPACITY),
+        ] {
+            let program = crate::__private::parse_with_goal_or_fallback(source, None)
+                .expect("the source parses");
+            let mut walk = Walk::new(source, Mode::Imports, program.view());
+            walk.program(&program);
+            let imports = walk.into_imports();
+            assert_eq!(imports.records.capacity(), capacity, "{source:?}");
         }
     }
 

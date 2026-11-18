@@ -20,8 +20,9 @@ pub use crate::strip::strip_into;
 use tsv_lang::store::push_row;
 
 /// The per-document environment shared by every formatting entry point: the
-/// source the AST's spans index into, the comment buffer, the precomputed
-/// line breaks and the three document-level flags computed beside them.
+/// source the AST's spans index into, the comment buffer, the view its tree resolves
+/// through, the precomputed line breaks and the document-level facts computed
+/// beside them.
 /// Bundling these keeps the printer constructor — and the
 /// `tsv_svelte` embedding call sites — from re-threading the same values. The
 /// [`EmbedContext`] and the expression/program being printed vary per call, so
@@ -31,7 +32,7 @@ pub struct PrinterInputs<'a> {
     pub source: &'a str,
     /// Detached comment buffer for the document.
     pub comments: &'a [ast::Comment],
-    /// Reads the expressions of the tree being printed.
+    /// Resolves the tree's ids, runs and pool text.
     pub view: AstView<'a>,
     /// The document's line-break table with its verdict (`tsv_lang::printing::LineBreaks`):
     /// when every line terminator is a `\n` the printer's three line questions
@@ -460,6 +461,9 @@ pub fn push_expression_list(stores: &mut AstStores, ids: &[ExprId]) -> Run<ExprI
 
 /// Attach a `: T` annotation to a **Svelte block-position** binding pattern
 /// (`{#each xs as p: T}`, `{:then p: T}`, `{:catch p: T}`, `{@const p: T = v}`).
+///
+/// Returns the annotated pattern's id, a new row: `pattern` stays the bare binding, so
+/// the caller keeps the returned id.
 ///
 /// **The span stays on the bare pattern** — for every kind — and the wire writer
 /// widens the emitted `end` to `type_annotation.end` (a `max`, so a signature

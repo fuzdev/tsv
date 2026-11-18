@@ -125,7 +125,8 @@ npm run test:depth       # tests/depth_limit.rs optimized: every shape the depth
 #                          both wires + format + imports + strip on the stack contract's thread, and one deeper is refused; in `check`
 npm run test:depth:napi  # the same in the shipped binaries' optimization over the FULL sweep; NOT in `check` (publish Step 3, CI `artifacts`)
 npm run test:depth:wasm  # the same shapes through the staged `all` WASM package; NOT in `check` (publish Step 6, CI `artifacts`)
-npm run test:audits      # cargo test -p tsv_lang --features _internal_audits — the audit seams' own tests; in `check`
+npm run test:audits      # the language crates' tests with tsv_lang's `_internal_audits` on — the audit seams' own tests
+#                          and the store check's arms of the stores tests; in `check`
 npm run lint             # cargo clippy
 npm run entities:update  # regenerate tsv_html's committed entity table from its entities.json (a unit test fails on a stale table)
 cargo fmt                # Rust
@@ -304,10 +305,10 @@ Methodology, results tracking and the `perf` recipe (the `profiling` cargo profi
 
 ```bash
 cargo run --release -p tsv_debug -- profile ../corpora/collections/zzz/src/lib        # parse vs format timing (--iterations, --json, --flow-stats)
-cargo run --release -p tsv_debug -- profile --bind ../corpora/collections/zzz/src     # parse vs lower+bind timing (TS-only) + peak RSS
+cargo run --release -p tsv_debug -- profile --bind ../corpora/collections/zzz/src     # parse vs lower+bind timing (TS-only) + peak RSS; not run while tsv_check is outside the build
 cargo run --release -p tsv_debug -- profile --strip ../corpora/collections            # parse vs the type strip's walk + blank (.ts/.mts/.cts, no .d.ts)
 cargo run --release -p tsv_debug -- json_profile ../corpora/collections/zzz/src/lib   # the one-shot parse vs the span-only wire write (--locations: the loc emitter)
-cargo run --release -p tsv_debug -- compile_profile tests/fixtures_compile            # Svelte compile vs the format wall
+cargo run --release -p tsv_debug -- compile_profile tests/fixtures_compile            # Svelte compile vs the format wall; not run while tsv_svelte_compile is outside the build
 cargo run -p tsv_debug buffer_sizes ../corpora/collections/zzz/src                    # printer SmallVec sizing histograms
 cargo run -p tsv_debug arena_stats ../corpora/collections/zzz/src/lib                 # DocArena node-population + memory audit (--reuse, --list-errors)
 npm run ast-census -- ../corpora/collections/zzz/src   # per-node-kind population (--bytes joins the size board, --slots, --arity)
@@ -382,7 +383,7 @@ tsv/
 
 **Outside the workspace build:** `tsv_svelte_compile` and `tsv_check` stay on disk but are currently not workspace members, so nothing builds or tests them. The `tsv_debug` code that needs them is compiled out behind the never-set `tsv_unported` cfg: `compile_compare`, `compile_conformance_audit`, `compile_corpus_compare`, `compile_fixture_init`, `compile_fixtures_validate`, `compile_fuzz`, `compile_profile`, `canonicalize_audit`, `erase_comment_census` and `tsc_conformance` exit as an unrecognized argument, `profile --bind` exits with an error, and the `npm run` scripts that call them (`compile:*`, `conformance:tsc-*`, `conformance:audit:compiler`, `canonicalize:audit`) do not run. `npm run check` and `npm run conformance` leave those legs out. `canonical_compile` and `render_compare` need only the sidecar and still run, and `tests/fixtures_compile` stays as format input for `engines:audit` and the npm tests.
 
-**Crate pattern** (tsv_ts, tsv_css, tsv_svelte): `lib.rs` (public API: `parse_to_json()` / `parse_to_json_with(JsonOptions)`, `format()`, `Formatter` (`format()` over warm arenas, for many sources on one thread), and the re-exported `run_with_stack` / `STACK_SIZE`; the AST-taking `__private::parse()` / `__private::convert_ast_json_bytes()` beneath them), `ast/` (internal AST + the wire-JSON writer), `lexer/`, `parser/`, `printer/` (uses the tsv_lang doc builder), and escapes (tsv_ts's `lexer/escapes.rs`, tsv_css's `escapes.rs`; Svelte delegates to TS/CSS). `tsv_ts` and `tsv_css` also export embedding APIs for `tsv_svelte` (`parse_embedded` + embedded-formatting variants); `tsv_ts` additionally exports the `build_*_doc` functions. That plumbing, and each language crate's `parse_folded` / `format_folded_in` (the format path `tsv_arena`'s macros call), lives in a `#[doc(hidden)] pub mod __private` — reachable by the sibling crates, not public API.
+**Crate pattern** (tsv_ts, tsv_css, tsv_svelte): `lib.rs` (public API: `parse_to_json()` / `parse_to_json_with(JsonOptions)`, `format()`, `Formatter` (`format()` over a warm doc arena and stores, for many sources on one thread), and the re-exported `run_with_stack` / `STACK_SIZE`; the AST-taking `__private::parse()` / `__private::convert_ast_json_bytes()` beneath them), `ast/` (internal AST + the wire-JSON writer), `lexer/`, `parser/`, `printer/` (uses the tsv_lang doc builder), and escapes (tsv_ts's `lexer/escapes.rs`, tsv_css's `escapes.rs`; Svelte delegates to TS/CSS). `tsv_ts` and `tsv_css` also export embedding APIs for `tsv_svelte` (`parse_embedded` + embedded-formatting variants); `tsv_ts` additionally exports the `build_*_doc` functions. That plumbing, and each language crate's `parse_folded` / `format_folded_in` (the format path `tsv_arena`'s macros call), lives in a `#[doc(hidden)] pub mod __private` — reachable by the sibling crates, not public API.
 
 ### Conformance
 
@@ -575,7 +576,7 @@ Worked example + full design: ./docs/architecture.md §Two-AST Design.
 
 ### Comment Handling: Detached Model
 
-Comments live **separately from AST nodes**, in a flat `Comment` array at the root (`Program.comments`, `CssStyleSheet.comments`, `Root.comments`) — a `Copy` POD of spans + flags whose text is recovered via `Comment::content(source)` — and the printer finds them by span position. Glued block comments are **owned** (`owned_by_node`): printed by the node they're bound to, not the enclosing gap. **Ownership is a fact about who PRINTS a comment, never about whether it EXISTS.** A lookup names one of three axes (`tsv_lang::comment`):
+Comments live **separately from AST nodes**, in a flat `Comment` list at the root (`Program.comments`, a `Run<Comment>` over the TypeScript stores; `CssStyleSheet.comments` and `Root.comments`, `Vec`s) — a `Copy` POD of spans + flags whose text is recovered via `Comment::content(source)` — and the printer finds them by span position. Glued block comments are **owned** (`owned_by_node`): printed by the node they're bound to, not the enclosing gap. **Ownership is a fact about who PRINTS a comment, never about whether it EXISTS.** A lookup names one of three axes (`tsv_lang::comment`):
 
 | axis | question | owned comments | who asks |
 | --- | --- | --- | --- |

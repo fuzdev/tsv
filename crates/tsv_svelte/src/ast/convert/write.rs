@@ -184,7 +184,8 @@ struct Ctx<'a> {
     source: &'a str,
     /// Reads the template's lists and strings, and hands out the two views below.
     svelte: ast::SvelteView<'a>,
-    /// Reads the expressions of the tree being written.
+    /// Resolves the ids, runs and pool text of the document's TypeScript (its scripts and
+    /// template expressions).
     view: tsv_ts::ast::AstView<'a>,
     /// Reads the stores of the top-level `<style>`'s stylesheet, for its children's walk.
     css: tsv_css::ast::CssView<'a>,

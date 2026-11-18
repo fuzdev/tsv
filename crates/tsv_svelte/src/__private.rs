@@ -84,7 +84,7 @@ pub fn format_folded_in<'a>(
 ///
 /// # Arguments
 ///
-/// * `root` - The Svelte AST to format
+/// * `parsed` - The parsed document (a `&ParsedRoot`, or a `ParsedRootRef` from a warm parse)
 /// * `source` - The original source code (for blank line preservation and escape sequences)
 ///
 /// # Returns

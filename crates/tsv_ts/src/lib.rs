@@ -2,7 +2,7 @@
 //! wire JSON — part of [tsv](https://github.com/fuzdev/tsv).
 //!
 //! [`format()`] formats one source in one call; a [`Formatter`] formats many on one thread,
-//! keeping its arenas warm between calls. The formatter is non-configurable: Prettier's style
+//! keeping its allocations warm between calls. The formatter is non-configurable: Prettier's style
 //! with a print width of 100, tabs, single quotes and no trailing commas. Formatting output is
 //! not frozen — it changes between releases as formatting bugs are fixed.
 //!
@@ -19,7 +19,7 @@
 //! assert_eq!(format("const x=42;")?, "const x = 42;\n");
 //! // ...or at exactly one goal, with no retry
 //! assert!(format_with_goal("with (a) b;", Goal::Module).is_err());
-//! // Many sources on one thread: a `Formatter` keeps its arenas warm between calls
+//! // Many sources on one thread: a `Formatter` keeps its allocations warm between calls
 //! let mut formatter = Formatter::new();
 //! assert_eq!(formatter.format("let y=1")?, "let y = 1;\n");
 //!

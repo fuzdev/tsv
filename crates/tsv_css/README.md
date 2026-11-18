@@ -3,8 +3,8 @@
 CSS formatting and parsing to the wire JSON of Svelte's `parseCss` — part of
 [tsv](https://github.com/fuzdev/tsv) ([tsv.fuz.dev](https://tsv.fuz.dev/)).
 
-- `format` formats one source; a `Formatter` formats many on one thread, keeping its arenas
-  warm between calls.
+- `format` formats one source; a `Formatter` formats many on one thread, keeping its
+  allocations warm between calls.
 - `parse_to_json` parses to the wire JSON AST (the default `json` feature).
 - `run_with_stack` runs a call on a thread reserving `STACK_SIZE`, for a thread whose stack
   may be too small for the deepest input tsv accepts.
@@ -14,7 +14,7 @@ use tsv_css::{Formatter, format};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(format("a{color:red}")?, "a {\n\tcolor: red;\n}\n");
-    let mut formatter = Formatter::new(); // warm arenas, for many sources on one thread
+    let mut formatter = Formatter::new(); // warm allocations, for many sources on one thread
     assert_eq!(formatter.format("b{margin:0}")?, "b {\n\tmargin: 0;\n}\n");
     Ok(())
 }

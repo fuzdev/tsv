@@ -306,7 +306,7 @@ pub(crate) struct Printer<'a> {
     pub(crate) source: &'a str,
     /// Comments from the program (for printing leading/trailing comments)
     pub(crate) comments: &'a [ast::Comment],
-    /// Reads the expressions of the tree being printed.
+    /// Resolves the tree's ids, runs and pool text.
     pub(crate) view: ast::AstView<'a>,
     /// Whether any comment in this document is owned by a node (`owned_by_node`).
     /// Document-level presence flag (from `PrinterInputs`), computed once per document
@@ -768,12 +768,12 @@ pub(crate) struct Printer<'a> {
     /// Save/restored around each clause, so a nested header's clause cannot answer for the
     /// outer one.
     pub(crate) for_clause_end: Cell<Option<u32>>,
-    /// Whether the scoped argument share for member-chain building is active: an AST
-    /// node's pointer **plus a build tag** ([`ShareTag`]) → the `DocId` already built
+    /// Whether the scoped argument share for member-chain building is active: an AST node's
+    /// address in its store **plus a build tag** ([`ShareTag`]) → the `DocId` already built
     /// for it. A member chain renders the same group **flat** (`print_group`) and
-    /// **expanded** (`print_group_expanded`) across `conditional_group` candidates;
-    /// without sharing, each recursive build runs once per candidate and a nested chain
-    /// in a call arg compounds to O(4^depth) — the member-chain rebuild blowup.
+    /// **expanded** (`print_group_expanded`) across `conditional_group` candidates; without
+    /// sharing, each recursive build runs once per candidate and a nested chain in a call
+    /// arg compounds to O(4^depth) — the member-chain rebuild blowup.
     ///
     /// **The tag is what makes a hit byte-identical.** A given node is reached under
     /// identical Printer state in both candidates *except* for `skip_arrow_chain` /

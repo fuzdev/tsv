@@ -341,7 +341,7 @@ The import-record fixtures (tests/fixtures_imports): per fixture, the tree's sha
 
 ## `compile:corpus:compare`
 
-Roots: the WHOLE ../corpora snapshot (every collection it vendors — the author's repos, the framework source, the third-party Svelte libraries — one root, so a new collection is in scope the day it lands), then Svelte's own runtime/snapshot/SSR/css suites, then any per-machine roots in the gitignored `compile_corpus_compare.roots.local` (one path per line, `#` comments; live checkouts the snapshot cannot carry). A missing roots file adds none; a missing positional root fails the run.
+Roots: the WHOLE ../corpora snapshot (every collection it vendors — the author's repos, the framework source, the third-party Svelte libraries — one root, so a new collection is in scope the day it lands), then Svelte's own runtime/snapshot/SSR/css suites, then any per-machine roots in the gitignored `compile_corpus_compare.roots.local` (one path per line, `#` comments; live checkouts the snapshot cannot carry). A missing roots file adds none; a missing positional root fails the run. Not runnable while `tsv_svelte_compile` is outside the workspace build (CLAUDE.md §Project Structure).
 
 ## `test:node`
 

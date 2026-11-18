@@ -248,6 +248,9 @@ pub(crate) fn board() -> Vec<TypeRow> {
             ts::ConditionalExpression,
             ts::Expression,
             ts::ExpressionKind,
+            // an expression edge's field (an `Option<ExprId>` is its width, the niche held);
+            // an expression list's is the `ts::Run` boarded with the statements
+            ts::ExprId,
             ts::FunctionExpression,
             ts::ImportExpression,
             ts::CommentBoundPair,

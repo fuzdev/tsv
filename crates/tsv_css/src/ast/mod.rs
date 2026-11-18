@@ -24,11 +24,12 @@ pub use view::{CssParsedRef, CssView};
 /// CSS Stylesheet - top-level container for CSS nodes and comments
 ///
 /// Comments are stored in a separate Vec, sorted by span.start.
-/// This matches the TS/Svelte pattern and enables efficient range queries
-/// using `comments_to_emit_in_range()` from tsv_lang.
+/// This matches Svelte's `Root` (a TypeScript `Program`'s comments ride its stores as a
+/// `Run<Comment>`) and enables efficient range queries using `comments_to_emit_in_range()`
+/// from tsv_lang.
 #[derive(Debug, Clone)]
 pub struct CssStyleSheet {
-    /// CSS nodes (rules, at-rules) - no longer includes Comment variant
+    /// CSS nodes (rules, at-rules); comments are not among them
     pub nodes: Run<CssNode>,
 
     /// Top-level detached comments (between rules), sorted by span.start.
@@ -991,10 +992,10 @@ impl CssAtrule {
 pub struct CssAtruleBlock {
     /// Block children - mixture depends on at-rule type
     ///
-    /// @media, @supports, @layer: `Vec<CssNode>` (rules + nested at-rules)
-    /// @font-face, @page: `Vec<CssDeclaration>` (declarations only)
+    /// @media, @supports, @layer: rules + nested at-rules
+    /// @font-face, @page: declarations only
     ///
-    /// We store as `Vec<CssBlockChild>` to support both:
+    /// One `Run<CssBlockChild>` holds either.
     pub children: Run<CssBlockChild>,
     pub span: Span,
 }

@@ -114,15 +114,16 @@ The tools, in order of use:
 ### 1. `tsv_debug profile` — phase timing
 
 Measures parse vs format timing across files. Pure Rust, no external dependencies.
-The `--bind` form instead measures parse vs lower+bind timing through the
-`tsv_check` crate (the experimental typechecker, which may never ship — see
-[typechecker.md](typechecker.md); TypeScript files only) and reports peak RSS
-(`VmHWM` from `/proc/self/status`) — the binder's standing perf-anchor form;
-add `--flow-stats` for its deterministic flow-construction counters. The
-`--strip` form times `tsv_ts::strip` over what a module loader strips (`.ts` /
-`.mts` / `.cts`, no declaration file): the strip parses inside, so its second
-column is the strip's time less the parse's — the walk and the blanking copy —
-and `total` is the whole strip.
+The `--bind` form (not run while `tsv_check` is outside the workspace build —
+[CLAUDE.md §Project Structure](../CLAUDE.md#project-structure)) instead measures
+parse vs lower+bind timing through the `tsv_check` crate (the experimental
+typechecker, which may never ship — see [typechecker.md](typechecker.md);
+TypeScript files only) and reports peak RSS (`VmHWM` from `/proc/self/status`) —
+the binder's standing perf-anchor form; add `--flow-stats` for its deterministic
+flow-construction counters. The `--strip` form times `tsv_ts::strip` over what a
+module loader strips (`.ts` / `.mts` / `.cts`, no declaration file): the strip
+parses inside, so its second column is the strip's time less the parse's — the
+walk and the blanking copy — and `total` is the whole strip.
 
 ```bash
 # Profile a directory
@@ -713,6 +714,9 @@ cargo run -p tsv_debug buffer_sizes <paths> --json
 
 ### 9. `tsv_debug compile_profile` — Svelte compile against the format wall
 
+Not run while `tsv_svelte_compile` is outside the workspace build
+([CLAUDE.md §Project Structure](../CLAUDE.md#project-structure)).
+
 Times the Svelte compiler (`tsv_svelte_compile::compile`) per file and reports it
 as a **ratio** against parsing plus formatting the same file. The ratio is the
 point: it says how many times the format wall a compile costs, which is the cheap
@@ -721,8 +725,8 @@ frame is ~2–3× for an all-linear pipeline.
 
 The two rows deliberately keep different shapes, so the number means what it says:
 `compile` is the whole **cold per-call** cost (the compiler has no warm arena-reuse
-entry point, so that *is* its production shape), while `parse + format` uses warm
-`reset()`-reuse arenas (the `tsv_cli` shape). **Compare ratios only against ratios
+entry point, so that *is* its production shape), while `parse + format` reuses warm
+state across iterations (the `tsv_cli` shape). **Compare ratios only against ratios
 from this same command** — never against a raw timing from `profile`.
 
 Refusals and parse failures are counted, not timed. Any compile self-check failure
@@ -761,10 +765,13 @@ rustc's layout rather than a guarantee, so those guards compile in the test buil
 only (`cargo test` fails on a moved pin, a consumer's build never does), and the
 wasm32 widths are pinned in `tsv_wasm`, compiled for wasm32 by `build:packages`;
 only the niche guards a `#[repr(transparent)]` guarantees (`Error` and its
-`Result<()>`, `Option<GroupId>`) stay in every build. The `<=` bounds (`ShareEntry`,
-`PeeledTail`), upper bounds a smaller layout still satisfies, are test-build guards too:
-at zero slack, a toolchain that lays either out wider must fail `cargo test`, not a
-consumer's build.
+`Result<()>`, `Option<GroupId>`) and `PackedF64`'s `repr(C, packed(4))` size and
+alignment stay in every build. The `<=` bounds (`ShareEntry`, `PeeledTail`), upper
+bounds a smaller layout still satisfies, are test-build guards too: at zero slack, a
+toolchain that lays either out wider must fail `cargo test`, not a consumer's build.
+The AST width pins are written `STORE_CHECK || size_of::<T>() == N`, so a test build
+carrying `_internal_store_check` (`test:audits`, and `lint`'s `--all-features` pass) skips
+them: its handles are wider.
 
 `ast_census` counts, per node kind, what a parse over a corpus actually builds.
 `--bytes` joins each row against that board by name and prints `count × size`,
@@ -1013,9 +1020,9 @@ the reads), subtracted so a phase's count is its own work — a sliver of the Ty
 count, but a large share of CSS's, whose small corpus parses in little more than the fixed cost.
 The strip driver's full run parses twice an iteration (once timed alone, once inside the strip),
 so the strip's count is the full run less twice the parse-only run, plus the fixed cost once.
-The instruction column also carries the arena resets between iterations, which the wall timers
-leave out as `profile` does: a process-level count cannot exclude them, and timing them would part
-the wall column from `profile`'s.
+The instruction column also carries the doc arena's and the stores' resets between iterations,
+which the wall timers leave out as `profile` does: a process-level count cannot exclude them, and
+timing them would part the wall column from `profile`'s.
 
 The wall delta is **paired**: each round's two back-to-back runs give a candidate/base ratio, and
 the row grades the median of those ratios, so drift that moves both runs of a round cancels inside

@@ -2,7 +2,7 @@
 //! [tsv](https://github.com/fuzdev/tsv).
 //!
 //! [`format()`] formats one component in one call; a [`Formatter`] formats many on one
-//! thread, keeping its arenas warm between calls. Each `<script>`, `<style>` and template
+//! thread, keeping its allocations warm between calls. Each `<script>`, `<style>` and template
 //! expression is formatted by [`tsv_ts`](https://docs.rs/tsv_ts) or
 //! [`tsv_css`](https://docs.rs/tsv_css) as part of one document. The formatter is
 //! non-configurable: Prettier's style with a print width of 100, tabs, single quotes and no

@@ -60,10 +60,11 @@ pub enum ExportFunctionDeclaration {
 /// Value of export default - can be expression or declaration
 #[derive(Debug, Clone, Copy)]
 pub enum ExportDefaultValue {
-    // Variants held inline by value: the `Expression` variant already sizes this
-    // enum (it is the largest), so inlining the declaration variants is free, avoids
-    // a pointer-chase on the format read path, and matches `ExportFunctionDeclaration`
-    // (which holds the same structs inline).
+    // Variants held inline by value: the enum lives only in an `ExportDefaultDeclaration`,
+    // a row of its own payload store reached through an `ExportDefaultId`, so its width
+    // sets nothing beside it; inlining the declaration variants avoids a store hop on the
+    // format read path and matches `ExportFunctionDeclaration` (which holds the same
+    // structs inline).
     Expression(ExprId),
     FunctionDeclaration(FunctionDeclaration),
     /// A bodiless function declaration: a `declare function`, an overload

@@ -24,7 +24,7 @@ impl<'a> Parser<'a> {
     /// - Empty objects: `{}`
     ///
     /// Returns the node beside its span rather than a bare `Expression`, so the caller
-    /// wrapping it keeps no 72 B value in its frame (§The expression ladder's return
+    /// wrapping it keeps no `Expression` in its frame (§The expression ladder's return
     /// currency).
     pub(super) fn parse_object_expression(&mut self) -> Result<(ObjectExpression, Span), Error> {
         let (start, _) = self.current_pos();

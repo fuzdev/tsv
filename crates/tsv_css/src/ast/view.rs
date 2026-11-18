@@ -1,8 +1,8 @@
 //! How a stylesheet's readers reach what its stores hold.
 //!
-//! One [`CssView`] serves the whole tree: every list the tree holds and every string it keeps
-//! as text of its own is read through the view. The view is one word, so a walk holds one
-//! register for it.
+//! One [`CssView`] serves the whole tree: every list the tree holds (the stylesheet's
+//! top-level comments aside, a `Vec` read directly) and every string it keeps as text of its
+//! own is read through the view. The view is one word, so a walk holds one register for it.
 //!
 //! A list is a `Run` over the store of its element type, read as a slice through the accessor
 //! the stores' macro declares beside them (`nodes`, `block_children`, `complex_selectors`,

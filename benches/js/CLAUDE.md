@@ -149,11 +149,11 @@ delta on the same row is the detector.
   handle on `tests/fixtures` through `@fuzdev/gro`), run by vitest under Node (`test:node`).
 - **The native row differs by runtime, fairly.** Deno → FFI (`tsv_ffi`, via
   `Deno.dlopen`); Node/Bun → N-API (`tsv_napi`, via `process.dlopen`). Same engine,
-  same per-thread arena reuse, different binding boundary. Both are **profile-guided**
-  (`npm run build:bench:pgo`, `lib/pgo_bench.ts`): the addon is the shipped addon's own
-  pipeline, and the FFI library — which ships nowhere — a third world of it, trained as
-  itself through this harness's own FFI wrapper (a profile applies only to the build it was
-  trained on). Each report discloses it as `native_build`
+  same per-thread doc arena and store reuse, different binding boundary. Both are
+  **profile-guided** (`npm run build:bench:pgo`, `lib/pgo_bench.ts`): the addon is the
+  shipped addon's own pipeline, and the FFI library — which ships nowhere — a third world of
+  it, trained as itself through this harness's own FFI wrapper (a profile applies only to the
+  build it was trained on). Each report discloses it as `native_build`
   (../../docs/benchmarks.md §Fairness caveats, the PGO entry).
 - **The WASM row uses each runtime's own wasm-pack target bundle** (same
   `tsv_wasm_bg.wasm`, different JS glue) — Deno the `deno` target, Node the `nodejs`

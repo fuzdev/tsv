@@ -1518,7 +1518,7 @@ impl<'a> Parser<'a> {
                 left,
                 operator,
                 right,
-                // Set only by the lazy `>` reading in the loop, which re-allocates the node.
+                // Set only by the lazy `>` reading in the loop, which pushes the node again.
                 relexes_as_type_arguments: false,
                 may_close_type_arguments,
             }),
@@ -2272,7 +2272,7 @@ impl<'a> Parser<'a> {
             });
         }
 
-        // Grouping parens are normally discarded (the inner's own allocation flows
+        // Grouping parens are normally discarded (the inner's own row flows
         // through, paren-free like acorn/Svelte). Two positions preserve them as an
         // explicit wrapper node spanning `(`…`)` — the same bounds as the extent a
         // containing expression reads for a discarded pair:

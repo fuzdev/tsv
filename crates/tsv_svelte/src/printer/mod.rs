@@ -440,7 +440,8 @@ pub(crate) struct Printer<'a> {
     comments: &'a [Comment],
     /// Reads the template's lists and strings, and hands out the two views below.
     pub(crate) svelte: SvelteView<'a>,
-    /// Reads the expressions of the tree being printed.
+    /// Resolves the ids, runs and pool text of the document's TypeScript (its scripts and
+    /// template expressions).
     pub(crate) view: AstView<'a>,
     /// Reads the stores of the top-level `<style>`'s stylesheet, for its format.
     pub(crate) css_view: CssView<'a>,

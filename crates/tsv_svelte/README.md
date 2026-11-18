@@ -4,8 +4,8 @@ Svelte formatting and parsing to the wire JSON of Svelte's modern parser (TypeSc
 CSS in `<style>`) — part of [tsv](https://github.com/fuzdev/tsv)
 ([tsv.fuz.dev](https://tsv.fuz.dev/)).
 
-- `format` formats one source; a `Formatter` formats many on one thread, keeping its arenas
-  warm between calls.
+- `format` formats one source; a `Formatter` formats many on one thread, keeping its
+  allocations warm between calls.
 - `parse_to_json` parses to the wire JSON AST (the default `json` feature).
 - `parse_imports` lists the modules the component's two `<script>` blocks request, in source
   order.
@@ -17,7 +17,7 @@ use tsv_svelte::{Formatter, format};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(format("<p  class=\"a\">x</p>")?, "<p class=\"a\">x</p>\n");
-    let mut formatter = Formatter::new(); // warm arenas, for many sources on one thread
+    let mut formatter = Formatter::new(); // warm allocations, for many sources on one thread
     assert_eq!(formatter.format("<script>let y=1</script>")?, "<script>\n\tlet y = 1;\n</script>\n");
     Ok(())
 }

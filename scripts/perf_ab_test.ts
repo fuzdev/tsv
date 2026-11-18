@@ -146,18 +146,9 @@ test('the strip entry point is found in each of its spellings, and nothing else'
 	strictEqual(await has_strip_with(dir, mentioned), false);
 });
 
-/** A tsv_ts manifest that depends on `bumpalo`, as every tree older than the current one's does. */
+/** A language crate's manifest that depends on `bumpalo`, as each of tsv_ts's, tsv_css's and
+ * tsv_svelte's did in the trees older than the generation that dropped it. */
 const BUMPALO_MANIFEST = '[dependencies]\ntsv_lang.workspace = true\nbumpalo.workspace = true\n';
-
-/** A tsv_svelte manifest that depends on `bumpalo`, as every tree older than the current one's
- * does. */
-const SVELTE_BUMPALO_MANIFEST =
-	'[dependencies]\ntsv_lang.workspace = true\nbumpalo.workspace = true\n';
-
-/** A tsv_css manifest that depends on `bumpalo`, as every tree older than the newer ones
- * does. */
-const CSS_BUMPALO_MANIFEST =
-	'[dependencies]\ntsv_lang.workspace = true\nbumpalo.workspace = true\n';
 
 /** A tsv_css `__private.rs` whose parse takes the `Bump` alone, as every tree older than the
  * current one's does. */
@@ -173,8 +164,8 @@ const driver_api_with = async (
 	private_rs: string,
 	manifest = BUMPALO_MANIFEST,
 	css_private_rs = CSS_WITHOUT_STORES,
-	css_manifest = CSS_BUMPALO_MANIFEST,
-	svelte_manifest = SVELTE_BUMPALO_MANIFEST
+	css_manifest = BUMPALO_MANIFEST,
+	svelte_manifest = BUMPALO_MANIFEST
 ): Promise<string | null> => {
 	await dir.write('crates/tsv_ts/src/__private.rs', private_rs);
 	await dir.write('crates/tsv_ts/Cargo.toml', manifest);
@@ -202,7 +193,7 @@ test('a tree whose tsv_svelte takes no bumpalo is the current generation, then o
 	const svelte_free = '[dependencies]\ntsv_lang.workspace = true\n';
 	const css_free = svelte_free;
 	strictEqual(
-		await driver_api_with(dir, handle, free, css_stores, CSS_BUMPALO_MANIFEST, svelte_free),
+		await driver_api_with(dir, handle, free, css_stores, BUMPALO_MANIFEST, svelte_free),
 		null
 	);
 	strictEqual(
@@ -211,7 +202,7 @@ test('a tree whose tsv_svelte takes no bumpalo is the current generation, then o
 			handle,
 			free,
 			css_stores,
-			CSS_BUMPALO_MANIFEST,
+			BUMPALO_MANIFEST,
 			`# bumpalo.workspace = true\n${svelte_free}`
 		),
 		null
@@ -222,7 +213,7 @@ test('a tree whose tsv_svelte takes no bumpalo is the current generation, then o
 			handle,
 			free,
 			css_stores,
-			CSS_BUMPALO_MANIFEST,
+			BUMPALO_MANIFEST,
 			`${svelte_free}bumpalo_x.workspace = true\n`
 		),
 		null

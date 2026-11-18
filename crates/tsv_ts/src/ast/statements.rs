@@ -201,7 +201,7 @@ impl Statement {
 /// `Expression`-holding statement head takes the same shape. The expression parser's
 /// recursion already returns the row it pushed, so an inline slot would be a copy OUT of
 /// that row, leaving the stored one dead. Naming the slot by id removes the copy and adds
-/// nothing; it is not the rare-variant boxing trade above, and needs no rarity argument.
+/// nothing; it is not the rare-variant store trade above, and needs no rarity argument.
 #[derive(Debug, Clone, Copy)]
 pub struct ExpressionStatement {
     pub expression: ExprId,
@@ -302,9 +302,7 @@ pub struct ForOfStatement {
 
 /// Left side of for-in/for-of: either a variable declaration or expression pattern
 ///
-/// The `Pattern` arm stays inline for the reason on `ForInit`: its producer returns an
-/// owned `Expression`, and this enum is a row of its own store, reached only through a
-/// `ForLeftId`.
+/// A row of its own store, reached only through a `ForLeftId`, so its width sets nothing.
 #[derive(Debug, Clone, Copy)]
 pub enum ForInOfLeft {
     VariableDeclaration(VariableDeclaration),
@@ -363,8 +361,8 @@ pub struct TryStatement {
 pub struct CatchClause {
     /// Catch parameter, or None for `catch { }` (optional catch binding).
     ///
-    /// Inline for the reason on `ForInit`: the parser builds this one as an owned
-    /// value rather than through the expression spine, so an id would add a row
+    /// Inline by value: the parser builds this one as an owned value rather than
+    /// through the expression spine, so an id would add a row
     /// instead of removing a copy — and a `CatchClause` is reached only through an
     /// `Option<CatchId>`, so its width sets nothing.
     pub param: Option<Expression>,
@@ -490,8 +488,9 @@ pub struct VariableDeclaration {
 /// One declarator of a variable declaration: `x`, `x = init`, `{a, b} = init`.
 ///
 /// Both slots are ids rather than inline `Expression`s, for the density reason on
-/// [`super::Property`] — 160 B → 20 on every element of every `declarations` slice, and
-/// no row added, because the parser's expression spine already hands back the id.
+/// [`super::Property`] — 20 B on every element of every `declarations` run (inline, it
+/// would carry two 44 B `Expression`s), and no row added, because the parser's
+/// expression spine already hands back the id.
 #[derive(Debug, Clone, Copy)]
 pub struct VariableDeclarator {
     /// The binding pattern (Identifier, ArrayPattern, or ObjectPattern)

@@ -7,7 +7,7 @@ use crate::lexer::TokenKind;
 use crate::parser::element::ElementParent;
 use crate::whitespace::is_svelte_ws;
 use tsv_lang::source_scan::{TriviaProfile, skip_trivia_run};
-use tsv_lang::store::PoolText;
+use tsv_lang::store::{PoolText, Run};
 use tsv_lang::{Error, Span};
 use tsv_ts::__private::{TopLevelAs, first_function_declaration};
 use tsv_ts::ast::ExprId;
@@ -1523,7 +1523,7 @@ impl<'a> SvelteParser<'a> {
         // was lossy twice over: the wire emits no parameters at all, and the printer
         // reflowed the kept text.
         let mut type_parameters: Option<tsv_ts::ast::TSTypeParameterDeclaration> = None;
-        let mut parameters: tsv_ts::ast::Run<Expression> = tsv_ts::ast::Run::EMPTY;
+        let mut parameters: Run<Expression> = Run::EMPTY;
         if type_params_raw.is_some() || !params_str.trim_matches(is_svelte_ws).is_empty() {
             // The head runs from where the signature begins (`<` or `(`) through the `)`.
             let head_slice = &content[head_start..=close_paren];

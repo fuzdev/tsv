@@ -1,4 +1,5 @@
-//! [`Formatter`]: [`format()`](crate::format) over arenas kept warm across calls.
+//! [`Formatter`]: [`format()`](crate::format) over a doc arena and stores kept warm across
+//! calls.
 
 use crate::ast::WarmStores;
 use crate::{Result, format_in};
@@ -60,7 +61,7 @@ impl Formatter {
         }
     }
 
-    /// [`format()`](crate::format) on this formatter's arenas.
+    /// [`format()`](crate::format) on this formatter's doc arena and stores.
     ///
     /// # Errors
     ///
@@ -68,7 +69,7 @@ impl Formatter {
     pub fn format(&mut self, source: &str) -> Result<String> {
         // The rewind is the contract, and it sits ahead of the work: a caller that caught
         // a panic out of the previous call left this arena mid-document. Its rewind frees
-        // nothing (its stores keep their capacity), so it waits for the next call rather
+        // nothing (its buffers keep their capacity), so it waits for the next call rather
         // than following this one.
         self.doc.reset();
         let doc = &self.doc;

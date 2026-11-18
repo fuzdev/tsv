@@ -13,9 +13,9 @@
 //! type. The stores also hold the tree's decoded strings, in one text pool (a `PoolText<Text>`
 //! handle, read through [`AstView::text`]), and its comments, a program's a run of comment
 //! rows (a `Run<Comment>`, read through [`AstView::comments`]) — so nothing of the tree
-//! lives anywhere else, and a rewind of the stores frees all of it with no per-node `Drop`.
-//! The rare escaped identifier name is one such string ([`IdentName::escaped`]) — the AST
-//! holds no interner and needs no interner lifetime.
+//! lives anywhere else, and a rewind of the stores retires all of it at once, with no
+//! per-node `Drop`. The rare escaped identifier name is one such string
+//! ([`IdentName::escaped`]) — the AST holds no interner and needs no interner lifetime.
 
 #[cfg(feature = "json")]
 pub(crate) mod convert;
@@ -136,7 +136,7 @@ pub use expressions::{
 // `ExportNamedDeclaration` — are stored despite NOT being rare (6.8–11.7% and 2.4–4.0%
 // of statements): they are simply the last two rungs of the ladder, and a stored head's
 // construction copies the same bytes into its store that it would have moved into the
-// enum, so the cost is one row push against 24 bytes off every other statement slot.
+// enum, so the cost is one row push against a narrower slot for every other statement.
 //
 // The LIST-ELEMENT containers whose own width was inline `Expression`s —
 // `Property` (an object literal's `key: value`, and a destructuring pattern's),
@@ -148,25 +148,26 @@ pub use expressions::{
 // expression spine already returns a pushed row's id, so an inline slot would be a COPY
 // OUT of the store rather than a place the node lives. Naming the slots by id removes
 // that copy instead of adding a row, and takes the element every object-literal and
-// declarator list moves from 160 B to 20 (`ObjectPatternProperty` 28, its `RestElement`
-// arm setting it). `CatchClause` keeps its inline `param` deliberately: it is built by
-// the parser as an owned value rather than through the spine, so an id there would ADD a
-// row, and `CatchClause` is reached only through an `Option<CatchId>` so its width sets
-// nothing. The expression LISTS whose elements come off the spine hold ids — call and
-// `new` arguments and sequence and template expressions (`Run<ExprId>`), array-literal
-// and array-pattern elements (`Run<Option<ExprId>>`) — and the parameter lists are value
-// runs over the expression store itself (`Run<Expression>`), `CatchClause`'s case. The
-// statement lists — program, block, `case`, static-block and namespace bodies — hold ids
-// too (`Run<StmtId>`), as the single statement edges do (`StmtId`): every statement is a
-// row of the statement store. So do the type lists — union and intersection members, tuple
-// elements, template-literal interpolations, type arguments (`Run<TyId>`) — and the single
-// type edges (`TyId`): the type ladder pushes every type it parses, so each is a row of the
-// type store. The lists whose elements are built whole and stand nowhere else — object
-// members and patterns' members, template quasis, declarators, `switch` cases, import and
-// export specifiers and import attributes, class and type members, type parameters,
-// heritage clauses, enum members, index-signature parameters, decorators — are value runs
-// (`Run<ObjectProperty>`, `Run<VariableDeclarator>`, …): the run's rows ARE the elements, one
-// store per element type (`ast/stores.rs`).
+// declarator list moves to 20 B (inline, it would carry two 44 B `Expression`s;
+// `ObjectPatternProperty` 28, its `RestElement` arm setting it). `CatchClause` keeps its
+// inline `param` deliberately: it is built by the parser as an owned value rather than
+// through the spine, so an id there would ADD a row, and `CatchClause` is reached only
+// through an `Option<CatchId>` so its width sets nothing. The expression LISTS whose
+// elements come off the spine hold ids — call and `new` arguments and sequence and
+// template expressions (`Run<ExprId>`), array-literal and array-pattern elements
+// (`Run<Option<ExprId>>`) — and the parameter lists are value runs over the expression
+// store itself (`Run<Expression>`), `CatchClause`'s case. The statement lists — program,
+// block, `case`, static-block and namespace bodies — hold ids too (`Run<StmtId>`), as the
+// single statement edges do (`StmtId`): every statement is a row of the statement store.
+// So do the type lists — union and intersection members, tuple elements, template-literal
+// interpolations, type arguments (`Run<TyId>`) — and the single type edges (`TyId`): the
+// type ladder pushes every type it parses, so each is a row of the type store. The lists
+// whose elements are built whole and stand nowhere else — object members and patterns'
+// members, template quasis, declarators, `switch` cases, import and export specifiers and
+// import attributes, class and type members, type parameters, heritage clauses, enum
+// members, index-signature parameters, decorators — are value runs (`Run<ObjectProperty>`,
+// `Run<VariableDeclarator>`, …): the run's rows ARE the elements, one store per element
+// type (`ast/stores.rs`).
 //
 // `Expression` and `Statement` are each a header over their variant (`span` +
 // `ExpressionKind` / `StatementKind`), so a span read is a field load rather than a
@@ -231,9 +232,10 @@ const _: () = assert!(
 
 /// Program node - the root of the AST
 ///
-/// Returned by value from `parse`; `body` and `comments` are runs of the stores the parse
-/// wrote (the parser gathers comments on the stores' comment scratch and flushes them once,
-/// so the warm binding loops never malloc for them).
+/// Returned by value from a parse into stores (`Parsed` bundles it with them); `body` and
+/// `comments` are runs of the stores the parse wrote (the parser gathers comments on the
+/// stores' comment scratch and flushes them once, so the warm binding loops never malloc
+/// for them).
 #[derive(Debug, Clone)]
 pub struct Program {
     pub body: Run<StmtId>,

@@ -252,7 +252,7 @@ impl CommentMode<'_> {
 pub struct EmbedWriter<'a> {
     pub source: &'a str,
     pub positions: WirePositions<'a>,
-    /// Reads the expressions of the tree being written.
+    /// Resolves the tree's ids, runs and pool text.
     pub view: ast::AstView<'a>,
     pub comments: CommentMode<'a>,
     /// The canonical parser for this document — see `Ctx::vanilla_acorn`. It is
@@ -273,7 +273,7 @@ pub struct EmbedWriter<'a> {
 pub(super) struct Ctx<'a> {
     pub(super) source: &'a str,
     pub(super) positions: WirePositions<'a>,
-    /// Reads the expressions of the tree being written.
+    /// Resolves the tree's ids, runs and pool text.
     pub(super) view: ast::AstView<'a>,
     /// The span of a Svelte block pattern's **top-level** `TSTypeAnnotation` — the
     /// one Svelte reads with a *second* acorn parse (`read_type_annotation`'s `_ as `

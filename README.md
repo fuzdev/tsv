@@ -167,7 +167,7 @@ The library crates are on crates.io, one per language -
 and [`tsv_svelte`](https://docs.rs/tsv_svelte) - each self-contained, with the same functions:
 
 ```rust
-// format one source; a `Formatter` formats many on one thread, keeping its arenas warm
+// format one source; a `Formatter` formats many on one thread, keeping its allocations warm
 let code = tsv_ts::format("const x=42;")?; // "const x = 42;\n"
 let code = tsv_css::format("a{color:red}")?; // "a {\n\tcolor: red;\n}\n"
 let code = tsv_svelte::format("<p   class=\"a\">x</p>")?; // "<p class=\"a\">x</p>\n"

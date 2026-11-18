@@ -370,8 +370,8 @@ impl AstStores {
 #[derive(Clone, Copy)]
 pub(crate) struct ScratchMarks {
     exprs: ListMark<Expression>,
-    lists: ListMark<ExprId>,
-    opt_lists: ListMark<Option<ExprId>>,
+    expr_lists: ListMark<ExprId>,
+    expr_opt_lists: ListMark<Option<ExprId>>,
     stmt_lists: ListMark<StmtId>,
     ty_lists: ListMark<TyId>,
     runs: RunMarks,
@@ -386,8 +386,8 @@ impl AstStores {
         let mut group = MarkGroup::new();
         let marks = ScratchMarks {
             exprs: self.expr_scratch.mark_in(&mut group),
-            lists: self.expr_list_scratch.mark_in(&mut group),
-            opt_lists: self.expr_opt_scratch.mark_in(&mut group),
+            expr_lists: self.expr_list_scratch.mark_in(&mut group),
+            expr_opt_lists: self.expr_opt_scratch.mark_in(&mut group),
             stmt_lists: self.stmt_list_scratch.mark_in(&mut group),
             ty_lists: self.ty_list_scratch.mark_in(&mut group),
             runs: self.runs.marks(&mut group),
@@ -403,8 +403,8 @@ impl AstStores {
     #[inline]
     pub(crate) fn truncate_scratch(&mut self, marks: &ScratchMarks) {
         self.expr_scratch.truncate(marks.exprs);
-        self.expr_list_scratch.truncate(marks.lists);
-        self.expr_opt_scratch.truncate(marks.opt_lists);
+        self.expr_list_scratch.truncate(marks.expr_lists);
+        self.expr_opt_scratch.truncate(marks.expr_opt_lists);
         self.stmt_list_scratch.truncate(marks.stmt_lists);
         self.ty_list_scratch.truncate(marks.ty_lists);
         self.runs.truncate(&marks.runs);

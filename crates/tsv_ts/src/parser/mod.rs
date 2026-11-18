@@ -2918,15 +2918,13 @@ impl<'a> Parser<'a> {
         }
     }
 
-    /// Extract string literal content and quote character from current token.
+    /// Decoded form of the current string-literal token, as a [`StringCooked`]. Assumes the
+    /// current token is `TokenKind::String`.
     ///
-    /// Assumes current token is `TokenKind::String`. Returns `(content, quote)` where:
-    /// Decoded form of the current string-literal token, as a [`StringCooked`].
-    ///
-    /// `Verbatim` (no escapes) carries no allocation — the decoded value equals
-    /// the inner source slice (recovered later via `StringCooked::resolve(span,
-    /// source, view)`). `Decoded` (escapes present) holds the lexer's decoded value, copied
-    /// into the text pool when the token was received. The quote char is no longer stored — recover it via
+    /// `Verbatim` (no escapes) carries no allocation — the decoded value equals the inner
+    /// source slice (recovered later via `StringCooked::resolve(span, source, view)`).
+    /// `Decoded` (escapes present) holds the lexer's decoded value, copied into the text pool
+    /// when the token was received. The quote char is not stored — recover it via
     /// `Literal::string_quote(source)`.
     ///
     /// Every string literal in the grammar is consumed here — an expression, an object or

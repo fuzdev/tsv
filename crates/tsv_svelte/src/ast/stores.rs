@@ -507,6 +507,34 @@ mod tests {
         assert_eq!(with_stores(|stores| css_mint_mark(&mut stores.css)), fresh);
     }
 
+    /// A pool text kept past the park reads the next document's text in bounds; the
+    /// store-check build rejects it, because the reset advances the pool's generation.
+    #[test]
+    fn a_handle_retained_across_a_park_is_rejected_under_the_store_check() {
+        let mut warm = WarmStores::default();
+        let text = warm.with(|stores| {
+            stores.own.text.push("a");
+            stores.own.text.push("b")
+        });
+        let read = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            warm.with(|stores| {
+                stores.own.text.push("cd");
+                stores.view().text(text).to_owned()
+            })
+        }));
+        if tsv_lang::store::STORE_CHECK {
+            let payload = read.expect_err("a retained handle is rejected");
+            let message = payload
+                .downcast_ref::<String>()
+                .map(String::as_str)
+                .or_else(|| payload.downcast_ref::<&str>().copied())
+                .expect("a panic message");
+            assert!(message.contains("store stamp mismatch"), "{message}");
+        } else {
+            assert_eq!(read.expect("unstamped, it reads in bounds"), "d");
+        }
+    }
+
     /// A `<style>` nested in markup is parsed as the document formats, into stores of its own,
     /// and read through their view: its escaped property names are its own pool's text, beside
     /// the top-level `<style>`'s in the document's. Read through the document's view instead,

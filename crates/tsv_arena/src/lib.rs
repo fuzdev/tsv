@@ -238,9 +238,9 @@ pub fn decode_source_type<G>(
 ///
 /// The `$goalness` tag is the language's goal axis, fixed at the
 /// `lang_bindings!` invocation: `goal` (TypeScript) threads the decoded goal
-/// into `__private::parse_with_goal`; `nogoal` (Svelte, CSS) ignores it — a set goal is
-/// already rejected by the binding's own goal decoder, which reads the same tag
-/// through [`goal_allowed!`].
+/// into `__private::parse_with_goal_into`; `nogoal` (Svelte, CSS) ignores it and calls
+/// `__private::parse_into` — a set goal is already rejected by the binding's own goal
+/// decoder, which reads the same tag through [`goal_allowed!`].
 ///
 /// `$lang` resolves in the caller's scope, so this crate needs no dependency on the
 /// language crates. Every language parses into the stores [`with_lang_stores!`] hands over as

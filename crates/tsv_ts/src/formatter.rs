@@ -1,5 +1,5 @@
 //! [`Formatter`]: [`format()`](crate::format) and [`format_with_goal`](crate::format_with_goal)
-//! over arenas kept warm across calls.
+//! over a doc arena and stores kept warm across calls.
 
 use crate::ast::WarmStores;
 use crate::{Goal, Result, format_in};
@@ -66,8 +66,8 @@ impl Formatter {
         }
     }
 
-    /// [`format()`](crate::format) on this formatter's arenas: no source type named, so
-    /// `Module`, retried at `Script` only if that fails ([Goals](crate#goals)).
+    /// [`format()`](crate::format) on this formatter's doc arena and stores: no source type
+    /// named, so `Module`, retried at `Script` only if that fails ([Goals](crate#goals)).
     ///
     /// # Errors
     ///
@@ -76,8 +76,8 @@ impl Formatter {
         self.format_with_optional_goal(source, None)
     }
 
-    /// [`format_with_goal`](crate::format_with_goal) on this formatter's arenas: exactly
-    /// `goal`, with no fallback.
+    /// [`format_with_goal`](crate::format_with_goal) on this formatter's doc arena and stores:
+    /// exactly `goal`, with no fallback.
     ///
     /// # Errors
     ///
@@ -89,7 +89,7 @@ impl Formatter {
     fn format_with_optional_goal(&mut self, source: &str, goal: Option<Goal>) -> Result<String> {
         // The rewind is the contract, and it sits ahead of the work: a caller that caught
         // a panic out of the previous call left this arena mid-document. Its rewind frees
-        // nothing (its stores keep their capacity), so it waits for the next call rather
+        // nothing (its buffers keep their capacity), so it waits for the next call rather
         // than following this one.
         self.doc.reset();
         let doc = &self.doc;

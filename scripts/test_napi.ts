@@ -21,8 +21,8 @@
  *
  * Two host-level contracts live here that no in-crate test can reach: the panic
  * contract (a Rust panic must throw, not abort) and the THREADING contract (the
- * addon must load in a worker thread, and its thread-local arenas must stay
- * thread-local under concurrency). Both are properties of the shipped artifact
+ * addon must load in a worker thread, and its thread-local stores and doc arena must
+ * stay thread-local under concurrency). Both are properties of the shipped artifact
  * rather than of the engine, which is why they are asserted at this boundary.
  */
 
@@ -194,11 +194,12 @@ describe('tsv_napi addon (real N-API JS boundary)', () => {
 	//      process. A non-context-aware addon either refuses to load there or
 	//      corrupts state shared across contexts, and nothing else in the suite
 	//      loads the addon twice.
-	//   2. **The per-thread arenas.** Every export runs over thread-local stores and
-	//      `with_doc_arena` (crate `tsv_arena`), reused across calls. Single-threaded tests cannot distinguish "per thread" from
-	//      "one global", so a change that made an arena shared would pass everything
-	//      else and corrupt output only under concurrency — the failure mode a
-	//      consumer hits in a worker pool and never in CI.
+	//   2. **The per-thread state.** Every export runs over thread-local stores and
+	//      `with_doc_arena` (crate `tsv_arena`), reused across calls. Single-threaded
+	//      tests cannot distinguish "per thread" from "one global", so a change that
+	//      made the stores or the doc arena shared would pass everything else and
+	//      corrupt output only under concurrency — the failure mode a consumer hits
+	//      in a worker pool and never in CI.
 	//
 	// Each worker formats and parses in a loop and reports the DISTINCT outputs it
 	// observed; a torn or interleaved result shows up as a second distinct value,
@@ -257,8 +258,8 @@ for (let i = 0; i < workerData.iterations; i++) {
 	css.add(addon.format_css('a{color:red}'));
 	parsed_types.add(JSON.parse(addon.parse_typescript_json('const x = 1;')).type);
 	// A failure on every iteration too: the error path leaves through the same
-	// arenas, so an arena the error path fails to park would surface as a
-	// corrupted result on the NEXT iteration rather than as a failure here.
+	// per-thread stores and doc arena, so state the error path fails to park would
+	// surface as a corrupted result on the NEXT iteration rather than as a failure here.
 	const failed = addon.format_typescript('const = ;');
 	if (typeof failed === 'object' && failed !== null && failed.ok === false) errors++;
 }

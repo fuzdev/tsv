@@ -551,7 +551,7 @@ impl<'a> Parser<'a> {
     ///
     /// The decorators are a parameter rather than a post-hoc patch so the node is
     /// built once, in place: a builder that hands a bare `Expression` back for its
-    /// caller to fix up makes that caller hold the 64 B value across the push.
+    /// caller to fix up makes that caller hold the `Expression` across the push.
     ///
     /// `None` and `Some(Run::EMPTY)` are **different wire shapes** — the field is
     /// omitted for the first and emitted as `[]` for the second (`write_decorators_field`)

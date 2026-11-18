@@ -22,8 +22,9 @@
 //! "unwind"`), so a Rust panic — always a tsv bug — surfaces as a thrown JS
 //! `Error` whose message is `panic: <payload>`, the text the C FFI reports
 //! (`tsv_arena::format_panic`), rather than aborting the host process, and the
-//! per-thread arenas stay usable afterwards (`tsv_arena`'s take/park protocol leaves
-//! the slot empty while a call runs, so unwind and abort converge on the same state).
+//! per-thread doc arena and stores stay usable afterwards (each slot's take/park —
+//! `tsv_arena`'s for the doc arena, the language crates' `with_stores` for the stores —
+//! leaves it empty while a call runs, so unwind and abort converge on the same state).
 //! Each export also carries `#[napi(catch_unwind)]`, the backstop for a panic in
 //! napi-rs's own conversions. Neither catch is reachable without the unwinding
 //! profile — both halves are required. Stack overflow is NOT catchable and still
@@ -231,7 +232,7 @@ fn plain_error(env: Env, message: &str) -> napi::Error {
 /// outside this catch. Both need the unwinding profile (`napi`, or `corpus` for the
 /// corpus tools' build): under an aborting one neither is reachable.
 ///
-/// `AssertUnwindSafe`: the per-thread arenas recover by construction (`tsv_arena`'s
+/// `AssertUnwindSafe`: the per-thread doc arena and stores recover by construction (their
 /// take/park), and an `IgnoreStack` method that panics part way through a push leaves
 /// that stack as the panic left it, as the attribute's catch did. A panic is a tsv bug
 /// either way, reported rather than repaired.

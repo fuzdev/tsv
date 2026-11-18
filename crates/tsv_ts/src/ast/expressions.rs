@@ -973,11 +973,11 @@ impl PropertyKind {
 /// Object property: `{ key: value }` — and, reused verbatim, a destructuring
 /// pattern's property (`ObjectPatternProperty::Property`).
 ///
-/// Both slots are ids rather than inline `Expression`s, which takes the element every
-/// object literal and every object pattern moves from 160 B to 20. It costs no row: the
-/// parser's expression spine already returns the id of the node it pushed, so an inline
-/// slot would be a copy *out of* the store rather than the place the node lives — see
-/// the density note in `ast/mod.rs`.
+/// Both slots are ids rather than inline `Expression`s, which takes an object literal's
+/// element (`ObjectProperty`) to 20 B and an object pattern's (`ObjectPatternProperty`) to
+/// 28 (inline, a `Property` would carry two 44 B `Expression`s). It costs no row: the parser's expression spine already returns the id
+/// of the node it pushed, so an inline slot would be a copy *out of* the store rather than
+/// the place the node lives — see the density note in `ast/mod.rs`.
 #[derive(Debug, Clone, Copy)]
 pub struct Property {
     pub key: ExprId,

@@ -466,10 +466,12 @@ fn format_one(
 /// its language — the work a pool worker hands to `drain` (`cli/pool.rs`) for each file it
 /// claims.
 ///
-/// A `Formatter` keeps its doc arena and stores warm across calls and rewinds them between
-/// calls, so only a worker's first file of a language (and any that grows past that
-/// language's high-water mark) pays the allocation; the rest reuse it. One per language because each crate keeps its own; created lazily so a worker
-/// that never meets a language holds nothing for it.
+/// A `Formatter` keeps its doc arena and stores warm across calls — the doc arena rewound at
+/// the start of each call, the stores taken out for it and parked rewound after — so only a
+/// worker's first file of a language (and any that grows past that language's high-water
+/// mark) pays an allocation; the rest reuse what it grew. One per language because each
+/// language crate keeps its own stores; created lazily so a worker that never meets a
+/// language holds nothing for it.
 #[derive(Default)]
 struct WorkerFormatters {
     ts: Option<tsv_ts::Formatter>,

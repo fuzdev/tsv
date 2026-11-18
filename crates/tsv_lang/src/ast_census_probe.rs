@@ -21,8 +21,9 @@
 //!   are not minted.
 //!
 //! A row's type name is whatever `type_name` prints: an element type stored by value
-//! (`tsv_ts::ast::expressions::Expression`), a ref list's element (`&…Expression`), an
-//! `Option` of either. The command turns those names into store rows.
+//! (`tsv_ts::ast::expressions::Expression`), an id list's element
+//! (`tsv_lang::store::Id<…Expression>`), an `Option` of either. The command turns those names
+//! into store rows.
 
 use std::any::type_name;
 use std::cell::RefCell;

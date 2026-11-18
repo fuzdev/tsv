@@ -363,7 +363,7 @@ impl<'a> SvelteParser<'a> {
         let after_colon = &full_name[colon_idx + 1..];
         let mut parts = after_colon.split('|');
         // The name is a verbatim source slice (HTML/Svelte attribute names are never
-        // entity-decoded), so it's stored as a span — not an arena copy. `start` is the
+        // entity-decoded), so it's stored as a span — not a pool copy. `start` is the
         // attribute-name token start and `full_name` is that raw token, so the name occupies
         // `source[start + colon_idx + 1 .. + name.len()]`. The borrow lives only for this
         // method (the AST stores `name_span`, not the string).

@@ -1,4 +1,5 @@
-//! [`Formatter`]: [`format()`](crate::format) over an arena and stores kept warm across calls.
+//! [`Formatter`]: [`format()`](crate::format) over a doc arena and stores kept warm across
+//! calls.
 
 use crate::ast::WarmStores;
 use crate::{Result, format_in};
@@ -59,7 +60,7 @@ impl Formatter {
         }
     }
 
-    /// [`format()`](crate::format) on this formatter's arena and stores.
+    /// [`format()`](crate::format) on this formatter's doc arena and stores.
     ///
     /// # Errors
     ///

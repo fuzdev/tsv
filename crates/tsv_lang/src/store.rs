@@ -274,6 +274,9 @@ mod stamp {
 /// `Store<ExprId>` and is read through a `Run<ExprId>`, and a list with holes through
 /// `Run<Option<ExprId>>`, with no parallel API.
 ///
+/// Every row type the language crates store is lifetime-free, so each is its own family; a tag
+/// is for a row that carries a lifetime, as this module's tests' `Node<'a>` does.
+///
 /// One family belongs to exactly one row type, lifetimes aside. The type system cannot stop two
 /// row types claiming the same tag, and an id of one would then read the other's store.
 pub trait Row {
@@ -2359,10 +2362,10 @@ mod tests {
 
     #[test]
     #[should_panic(expected = "store miss")]
-    fn a_span_off_a_character_boundary_misses_rather_than_slice_panics() {
+    fn a_text_off_a_character_boundary_misses_rather_than_slice_panics() {
         let mut pool = fresh_pool();
-        let span = pool.push("é");
-        let torn = PoolText { len: 1, ..span };
+        let text = pool.push("é");
+        let torn = PoolText { len: 1, ..text };
         pool.get(torn);
     }
 
@@ -2388,9 +2391,9 @@ mod tests {
             (1, capacity),
             "the readers agree"
         );
-        let span = pool.push("again");
-        assert_eq!(span.start.get(), 1);
-        assert_eq!(pool.get(span), "again");
+        let text = pool.push("again");
+        assert_eq!(text.start.get(), 1);
+        assert_eq!(pool.get(text), "again");
     }
 
     #[test]
@@ -2685,42 +2688,42 @@ mod tests {
 
         #[test]
         #[should_panic(expected = "store stamp mismatch")]
-        fn a_span_retained_across_reset_is_rejected_in_bounds() {
+        fn a_text_retained_across_reset_is_rejected_in_bounds() {
             let mut pool = fresh_pool();
-            let span = pool.push("abc");
+            let text = pool.push("abc");
             pool.reset();
             pool.push("xyz");
-            pool.get(span);
+            pool.get(text);
         }
 
         #[test]
         #[should_panic(expected = "store stamp mismatch")]
-        fn a_span_from_another_pool_is_rejected_in_bounds() {
+        fn a_text_from_another_pool_is_rejected_in_bounds() {
             let mut pool = fresh_pool();
             let mut other = fresh_pool();
-            let span = pool.push("abc");
+            let text = pool.push("abc");
             other.push("xyz");
-            other.get(span);
+            other.get(text);
         }
 
         #[test]
         #[should_panic(expected = "store stamp mismatch")]
-        fn a_written_span_from_another_pool_is_rejected_in_bounds() {
+        fn a_written_text_from_another_pool_is_rejected_in_bounds() {
             let mut pool = fresh_pool();
             let mut other = fresh_pool();
-            let span = pool.push_with(|writer| writer.push_str("abc"));
+            let text = pool.push_with(|writer| writer.push_str("abc"));
             other.push("xyz");
-            other.get(span);
+            other.get(text);
         }
 
         #[test]
         #[should_panic(expected = "store stamp mismatch")]
-        fn a_written_span_retained_across_reset_is_rejected_in_bounds() {
+        fn a_written_text_retained_across_reset_is_rejected_in_bounds() {
             let mut pool = fresh_pool();
-            let span = pool.push_with(|writer| writer.push_str("abc"));
+            let text = pool.push_with(|writer| writer.push_str("abc"));
             pool.reset();
             pool.push_with(|writer| writer.push_str("xyz"));
-            pool.get(span);
+            pool.get(text);
         }
 
         #[test]
@@ -2749,11 +2752,11 @@ mod tests {
         }
 
         #[test]
-        fn a_present_empty_span_reads_empty_in_any_pool() {
+        fn a_present_empty_text_reads_empty_in_any_pool() {
             let mut pool = fresh_pool();
             let other = fresh_pool();
-            let span = pool.push("");
-            assert_eq!(other.get(span), "");
+            let text = pool.push("");
+            assert_eq!(other.get(text), "");
         }
     }
 }

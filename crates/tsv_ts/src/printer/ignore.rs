@@ -1074,9 +1074,8 @@ impl<'a> Printer<'a> {
     }
 
     /// [`Self::args_frozen_span`] over an ELEMENT slot slice — an array literal's or
-    /// array pattern's `elements`, where a slot may be a HOLE (elision). Generic over the
-    /// slot's element: the literal holds `Option<&Expression>`, the pattern
-    /// `Option<Expression>`.
+    /// array pattern's `elements`, where a slot may be a HOLE (elision) — both read as one
+    /// run of `Option<ExprId>` slots (`AstView::expr_opt_list`).
     ///
     /// A hole never freezes: it has no span for a verbatim slice to cover. And a run of
     /// holes before slot `i` contributes only its commas, so the gap window keeps the

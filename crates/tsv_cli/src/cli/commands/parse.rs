@@ -111,6 +111,7 @@ fn parse_to_json(
     // where the parser stops.
     // Every tree lives in the stores its parse returns; convert produces owned JSON, so
     // nothing borrowed escapes this function.
+
     // The goal applies only to TypeScript; svelte is always a module and css has
     // no goal.
     let bytes = match parser_type {

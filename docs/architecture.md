@@ -82,8 +82,8 @@ tsv/
 ├── tsv_ts       # TypeScript parser/formatter (standalone)
 ├── tsv_css      # CSS parser/formatter (standalone)
 ├── tsv_svelte   # Svelte parser/formatter (uses tsv_ts + tsv_css)
-├── tsv_svelte_compile # experimental Svelte→JS compiler + JS canonicalizer (uses tsv_svelte + tsv_ts + tsv_css; consumed only by tsv_debug and the integration tests)
-├── tsv_check    # experimental TypeScript binder/checker, may never ship (uses tsv_ts + tsv_lang; consumed only by tsv_debug)
+├── tsv_svelte_compile # experimental Svelte→JS compiler + JS canonicalizer (uses tsv_svelte + tsv_ts + tsv_css; currently outside the workspace build)
+├── tsv_check    # experimental TypeScript binder/checker, may never ship (uses tsv_ts + tsv_lang; currently outside the workspace build)
 ├── tsv_cli      # Production CLI binary (pure Rust)
 ├── tsv_debug    # Dev utilities (uses a Node sidecar for JS tools)
 ├── tsv_arena    # Shared binding substrate: the per-thread reusable doc arena + the goal axis
@@ -120,11 +120,11 @@ closed-scope/open-convention stance below.
 (production) (dev, Node)   (C FFI)    (N-API, Node/Bun)  (browser/Node/Deno)
                 ↑
             tsv_check  (experimental TypeScript binder/checker, may never ship —
-                        depends on tsv_lang + tsv_ts; consumed ONLY by tsv_debug,
-                        so no shipped format/parse artifact links it)
+                        depends on tsv_lang + tsv_ts; currently outside the workspace build,
+                        and no shipped format/parse artifact links it)
             tsv_svelte_compile  (experimental Svelte→JS compiler + JS canonicalizer —
                         depends on tsv_lang + tsv_ts + tsv_css + tsv_svelte;
-                        consumed ONLY by tsv_debug and the integration tests, so no shipped artifact links it)
+                        currently outside the workspace build, and no shipped artifact links it)
 
    tsv_cli, tsv_wasm, and tsv_napi also consume tsv_discover (→ tsv_ignore).
    tsv_ffi, tsv_napi, and tsv_wasm also consume tsv_arena — the shared
@@ -139,7 +139,7 @@ closed-scope/open-convention stance below.
 
 **Compile-Time Isolation** — Cargo prevents circular dependencies. CSS changes don't trigger TypeScript recompilation.
 
-**Clean API Boundaries** — Each language exports `parse_to_json()` / `parse_to_json_with(JsonOptions)`, `format()` and a `Formatter` (`format()` over arenas kept warm across calls), over the hidden AST-taking `__private::parse()` and `__private::convert_ast_json_bytes()` / `convert_ast_json_string()` (the span-only wire every binding ships; `convert_ast_json_bytes_with_locations` adds `loc`; no shipped crate reads the wire back — `tsv_debug::json` is the one reader). tsv_ts and tsv_css also carry hidden embedding APIs in `__private` (`parse_embedded`, expression formatting, `build_*_doc`) used by tsv_svelte for nested language support.
+**Clean API Boundaries** — Each language exports `parse_to_json()` / `parse_to_json_with(JsonOptions)`, `format()` and a `Formatter` (`format()` over a doc arena and stores kept warm across calls), over the hidden AST-taking `__private::parse()` and `__private::convert_ast_json_bytes()` / `convert_ast_json_string()` (the span-only wire every binding ships; `convert_ast_json_bytes_with_locations` adds `loc`; no shipped crate reads the wire back — `tsv_debug::json` is the one reader). tsv_ts and tsv_css also carry hidden embedding APIs in `__private` (`parse_embedded`, expression formatting, `build_*_doc`) used by tsv_svelte for nested language support.
 
 **Scalability** — New capabilities land as crate additions (`tsv_ffi`, `tsv_wasm`, `tsv_napi`, `tsv_arena`, `tsv_ignore` + `tsv_discover`, the experimental, may-never-ship `tsv_check` / `tsv_svelte_compile`; `tsv_linter`/`tsv_lsp`/`tsv_md` planned).
 
@@ -155,17 +155,22 @@ trait:
 pub fn parse_to_json(source: &str) -> Result<String, Error>;
 pub fn parse_to_json_with(source: &str, options: JsonOptions) -> Result<String, Error>;
 pub fn format(source: &str) -> Result<String, Error>;
-pub struct Formatter; // many sources on one thread, arenas kept warm
+pub struct Formatter; // many sources on one thread, doc arena and stores kept warm
 impl Formatter {
     pub fn new() -> Self;
     pub fn format(&mut self, source: &str) -> Result<String, Error>;
 }
-// `__private` (hidden; the bindings, the CLI and the dev tooling)
+// `__private` (hidden; the bindings, the CLI and the dev tooling). `Parsed` is the tree with
+// its stores, `ParsedRef` the tree and the view it reads them through (a `&Parsed` converts);
+// each language names its own pair (`ParsedCss` / `CssParsedRef`, `ParsedRoot` / `ParsedRootRef`)
 pub fn parse(source: &str) -> Result<Parsed, Error>;
-pub fn format_ast(ast: &InternalAst, source: &str) -> String;
-pub fn convert_ast_json_bytes(ast: &InternalAst, source: &str) -> Vec<u8>;
-pub fn convert_ast_json_string(ast: &InternalAst, source: &str) -> String;
-pub fn convert_ast_json_bytes_with_locations(ast: &InternalAst, source: &str) -> Vec<u8>;
+pub fn format_ast<'a>(parsed: impl Into<ParsedRef<'a>>, source: &str) -> String;
+pub fn convert_ast_json_bytes<'a>(parsed: impl Into<ParsedRef<'a>>, source: &str) -> Vec<u8>;
+pub fn convert_ast_json_string<'a>(parsed: impl Into<ParsedRef<'a>>, source: &str) -> String;
+pub fn convert_ast_json_bytes_with_locations<'a>(
+    parsed: impl Into<ParsedRef<'a>>,
+    source: &str,
+) -> Vec<u8>;
 ```
 
 `convert_ast_json_bytes` (the span-only wire) and
@@ -308,6 +313,9 @@ Language-agnostic primitives shared across all implementations:
 - `OutputBuffer` — Pre-allocated output string building with column tracking
 - `config` — `PRINT_WIDTH` / `TAB_WIDTH` / `INDENT` consts, `EmbedContext`, `LayoutMode` (no runtime config)
 - `comment` — Comment type and lookup utilities (see Comment Handling below)
+- `store` — Row stores named by typed ids (`Store`, `Id`, `Run`, `ListBuf`, `TextPool` / `PoolText`) that every language's AST lives in (see [Nested AST](#nested-ast-in-stores-inline-by-value-recursive-edges-by-id))
+- `value_runs` — `value_runs!`, the declaration of a crate's by-value list stores
+- `packed` — `PackedF64`, which keeps number-carrying AST enums 4-aligned
 - `escapes` — Escape sequence handling
 - `source_scan` — Trivia-aware source scanning: the `skip_trivia` cursor + delimiter/keyword/regex finders (used by AST conversion, printers, and the parsers)
 
@@ -330,6 +338,7 @@ What's shared through tsv_lang vs reimplemented per language, and why:
 - Lexer (shared: No, should-be: No) — Different token sets, hot path — mode switching adds branches on every character
 - Parser (shared: No, should-be: No) — Different grammars, precedence, context sensitivity
 - AST types (shared: No, should-be: No) — Different semantics (TypeScript's expression grammar dwarfs CSS's node set)
+- AST storage (shared: Yes, should-be: Yes) — One store / id / run substrate (`tsv_lang::store`), each language its own rows
 - AST conversion (shared: No, should-be: No) — Language-specific JSON quirks (Svelte compatibility, etc.)
 - Escape handling (shared: No, should-be: No) — JS has 7 escape formats, CSS has hex escapes with Svelte quirks
 - Doc builder (shared: Yes, should-be: Yes) — Core formatting engine — the largest tsv_lang module, single renderer everywhere
@@ -347,7 +356,7 @@ What's shared through tsv_lang vs reimplemented per language, and why:
 Patterns that _look_ duplicated but shouldn't be shared:
 
 - **Lexer utilities** (peek/advance/skip_whitespace): Each lexer's hot loop is different. A shared trait would add vtable indirection on every character for no benefit.
-- **Comment collection during parsing**: Each parser manually collects into `Vec<Comment>`. Simple enough that sharing would add abstraction without reducing code.
+- **Comment collection during parsing**: Each parser collects its own — `tsv_ts` on its stores' comment scratch stack (a `Run<Comment>`), `tsv_css` and `tsv_svelte` into a `Vec<Comment>`. Simple enough that sharing would add abstraction without reducing code.
 - **Printer analysis functions** (parenthesis requirements, expression complexity): These encode _layout decisions_ specific to each language. `needs_parens` in tsv_ts is the strongest extraction candidate (relevant to minifiers/transformers too) — but extraction should wait until a second consumer exists.
 
 ## Doc Builder System
@@ -871,7 +880,9 @@ Native tsv runs on the system allocator — no `#[global_allocator]`, no alterna
 
 **Lexing — spans, not strings.** Tokens store `u32` byte offsets (`start`, `end`) into the source, never slices or copies — `Token` is a small POD (16 B; tsv_svelte's 12 B) that a byte cursor over the source emits. The exception is deliberate: a string literal's decoded value is materialized only when it actually contains escape sequences, decoded into a **reused scratch buffer held out-of-band on the lexer** (`Lexer::decode_scratch`, borrowed via `decoded_str` and copied out at receipt — into the stores' text pool in `tsv_ts` and `tsv_css`) so no per-literal `String` allocates and the per-token `Token` stays pointer-free. Comments are spans too — the token carries a `content_start` and the `Comment` node a `content_span`, recovered from source on demand and never copied. On the parser's hot path (`advance`, plus the CSS and Svelte lookaheads) the lexers write the token in place into the parser's slot (`next_token_into`) rather than returning a by-value `Result<Token, Error>` through a stack slot the parser would reload and re-scatter; other TS and CSS callers take it by value (`next_token`); the Svelte lexer has no by-value form.
 
-**Internal AST — in stores, span-identity names, no raw text.** TypeScript's expressions, statements, types and rare wide payloads are rows of per-document stores named by typed ids; a child list is a `Run` over a store (of ids, or of the elements themselves for a list built by value); TypeScript's decoded strings and comments live in the same stores, so its whole tree is there; every CSS list is a value run over a store of its element type and every CSS string pool text, in a stylesheet's stores; every Svelte template list is a value run in a document's own stores, and the one string it keeps as text of its own is pool text there; in all three, small children are kept inline by value (see [Nested AST](#nested-ast-in-stores-inline-by-value-recursive-edges-by-id) for the layout rationale). Identifier names are span-identity — an `IdentName` records the raw name-token length and the name is re-sliced from source; only the rare `\u`-escaped (or oversized) name carries its decoded form, as pool text. Svelte element/attribute names are span-identity too (`source[name_span]`, `.trim()` for the padded-`{ shorthand }` edge), so there is no shared symbol table anywhere. Raw source text is never duplicated into the AST — printers re-slice via `span.extract(source)`; the few deliberate stored-raw caches are cataloged in [Source-Based Printing](#source-based-printing). What remains as owned data is genuinely decoded: string-literal values (only when escaped) and the like, copied once into the text pool.
+**Internal AST — in stores, span-identity names, no raw text.** TypeScript's expressions, statements, types and rare wide payloads are rows of per-document stores named by typed ids; a child list is a `Run` over a store (of ids, or of the elements themselves for a list built by value); TypeScript's decoded strings and comments live in the same stores, so its whole tree is there; every CSS list but the stylesheet's top-level comments (a `Vec<Comment>`, as Svelte's `Root.comments` is) is a value run over a store of its element type and every CSS string pool text, in a stylesheet's stores; every Svelte template list is a value run in a document's own stores, and the one string it keeps as text of its own is pool text there; in all three, small children are kept inline by value (see [Nested AST](#nested-ast-in-stores-inline-by-value-recursive-edges-by-id) for the layout rationale). Identifier names are span-identity — an `IdentName` records the raw name-token length and the name is re-sliced from source; only the rare `\u`-escaped (or oversized) name carries its decoded form, as pool text. Svelte element/attribute names are span-identity too (`source[name_span]`, `.trim()` for the padded-`{ shorthand }` edge), so there is no shared symbol table anywhere. Raw source text is never duplicated into the AST — printers re-slice via `span.extract(source)`; the few deliberate stored-raw caches are cataloged in [Source-Based Printing](#source-based-printing). What remains as owned data is genuinely decoded: string-literal values (only when escaped) and the like, copied once into the text pool.
+
+**Residency — parked capacity is kept, never trimmed.** A parked store set (a language crate's per-thread slot, or the one a `Formatter` owns) keeps the capacity its largest document grew: a reset rewinds every store, scratch stack and text pool in place and trims nothing, which is what lets a warm loop parse without allocating. The memory is released by dropping the `Formatter`, by retiring the thread a binding parked its stores on, or, for a WASM instance, by `reinstantiate()` — per binding in [tsv_ffi §Architecture Position](../crates/tsv_ffi/CLAUDE.md#architecture-position), [tsv_napi §Threading & host residency](../crates/tsv_napi/CLAUDE.md#threading--host-residency), and [tsv_wasm §Memory Residency](../crates/tsv_wasm/CLAUDE.md#memory-residency).
 
 **Svelte template nodes — contiguous storage.** Fragment children are a `Run<FragmentNode>` of enum values rather than boxed nodes, keeping siblings contiguous in their store for the printer's traversal loops.
 
@@ -975,9 +986,10 @@ Decisions made during development with rationale preserved for future reference.
 
 tsv's TypeScript tree lives in per-document stores named by typed ids (below), its decoded
 strings and comments included, so a TypeScript parse takes no arena. The CSS tree's lists
-and strings live in a stylesheet's `CssStores` (below), so a CSS parse takes no arena
-either, and the Svelte template's lists and strings live in the own half of a document's
-`SvelteStores` (below), so a Svelte parse takes none and no Svelte node is in an arena.
+and strings live in a stylesheet's `CssStores` (below; all but its top-level comments, a
+`Vec<Comment>` on the stylesheet), so a CSS parse takes no arena either, and the Svelte
+template's lists and strings live in the own half of a document's `SvelteStores` (below),
+so a Svelte parse takes none and no Svelte node is in an arena.
 
 **`Expression`, `Statement` and `TSType` nodes and the rare payloads are rows of `AstStores`**
 (`ast/stores.rs`), one per document, kept beside the tree in a `Parsed` and shared across a Svelte component's
@@ -1044,17 +1056,16 @@ A TypeScript parse returns the tree with the stores it wrote (`parse(source)` �
 that hold every list and string of the CSS tree), and a Svelte parse too, its tree bundled
 with its `SvelteStores` (its own half, a TypeScript half and a CSS half; `ParsedRoot`, or
 `*_into` a caller's).
-Each language crate parks its stores per thread, boxed, between documents (`with_stores`, which
-`tsv_arena`'s macros run every binding export under, and `WarmStores` for a slot the caller
-owns, as each `Formatter` does); a Svelte document's language halves are the boxes `tsv_ts`'s
-and `tsv_css`'s slots hand over, and its own half the box `tsv_svelte`'s slot hands over, so a
-thread parks one TypeScript store set and one CSS store set whatever mix of languages it
-parses. `format`/`convert` consume either
-into an owned `String`/JSON, so nothing borrowed escapes the call (no self-referential
-ownership — `unsafe_code = "forbid"`). Identifier and
-element/attribute names are **span-identity** — recovered from `source[span]` at each
-consumer, with the rare escaped name carried as pool text — so no name-table lifetime lands
-on the AST or the parser.
+Each language crate parks its stores per thread, boxed, between documents (`with_stores`,
+which every parsing binding export runs under — through `tsv_arena`'s macros, the strip
+exports directly — and `WarmStores` for a slot the caller owns, as each `Formatter` does); a
+Svelte document's language halves are the boxes `tsv_ts`'s and `tsv_css`'s slots hand over,
+and its own half the box `tsv_svelte`'s slot hands over, so a thread parks one TypeScript
+store set and one CSS store set whatever mix of languages it parses. `format`/`convert`
+consume either into an owned `String`/JSON, so nothing borrowed escapes the call (no
+self-referential ownership — `unsafe_code = "forbid"`). Identifier and element/attribute
+names are **span-identity** — recovered from `source[span]` at each consumer, with the rare
+escaped name carried as pool text — so no name-table lifetime lands on the AST or the parser.
 
 **Inline-by-value layout, size-minimized only at the variants that set an enum's
 width.** A node holds its children inline by value where they were owned inline
@@ -1065,13 +1076,13 @@ and the extra pointer-chases that size-minimization adds on hot traversal paths 
 more than the cache-density they buy. (The contiguous allocation itself is the win; the
 node *layout* favors traversal locality over byte size.)
 
-**The deliberate exceptions are two density rules, because an enum's width is the
-ELEMENT width of everything that holds one.** An `Expression` slot is paid on every element of every `&[Expression]`; a
-`Statement` slot on every row of the statement store and every
-`?`-propagation copy out of the parser. So a variant wide enough to set its enum's
-size on its own taxes the whole tree, while the hop to a stored payload is paid only
-where that variant is actually spelled. Where such a variant is also **rare**, it holds
-its payload by id, a row of a store of that payload's own type:
+**The deliberate exceptions are two density rules, because an enum's width is the ELEMENT
+width of everything that holds one.** An `Expression` slot is paid on every row of the
+expression store (a parameter list's run among them); a `Statement` slot on every row of
+the statement store and every `?`-propagation copy out of the parser. So a variant wide
+enough to set its enum's size on its own taxes the whole tree, while the hop to a stored
+payload is paid only where that variant is actually spelled. Where such a variant is also
+**rare**, it holds its payload by id, a row of a store of that payload's own type:
 
 - `Expression` is **44 B** — `ClassExpression`, `FunctionExpression`,
   `ArrowFunctionExpression`, `MetaProperty` and `TaggedTemplateExpression` are stored.
@@ -1134,7 +1145,7 @@ whose own width was two such slots take it:
   value would cost the node: `ExpressionStatement` holds its id alone, `IfStatement`
   its test's id beside its branches' statement ids, `SwitchStatement` an id and its case
   slice, `SwitchCase` (which keeps its own span) **20**,
-  and `ReturnStatement` / `ThrowStatement` an `Option<ExprId>` (their spans now on
+  and `ReturnStatement` / `ThrowStatement` an `Option<ExprId>` (their spans on
   `Statement`'s header). `CatchClause` is the one that does *not*: its `param`
   is built by the parser as an owned value rather than through the spine, so an
   id there would add a row instead of removing a copy — and `CatchClause` is reached
@@ -1143,18 +1154,19 @@ whose own width was two such slots take it:
   (`{#if}`'s test, `{#each}`'s iterable, context and key, `{#await}`'s expression and its
   `{:then}` / `{:catch}` bindings, `{#key}`, `{#snippet}`'s name), the `{@html}` /
   `{@render}` / `{@const}` / `{@attach}` tags, every directive's expression and a spread
-  attribute hold `ExprId` (`Option<ExprId>` where it may be absent). So `ExpressionTag` — the
-  element of every attribute value — is **12 B**, `AttributeNode` **72** and `FragmentNode`
-  **104**, set by `SnippetBlock`. The binding *patterns* among them (`{#each}`'s context,
-  the `{:then}` / `{:catch}` bindings, `{@const}`'s id) are built by the TypeScript side as
-  stored rows — converted from an expression, with an annotation appended as a superseding
-  row — and every identifier the Svelte parser synthesizes (the `bind:value` / `class:name`
-  shorthand, the `{name}` attribute) is pushed the same way. These fields set the width of
-  `FragmentNode` and `AttributeNode`, which are slice elements and are built by value at
-  every level of the recursive parse (the block and tag parsers return
-  `Result<FragmentNode>`, and `parse_children` wraps each parsed element in one), where
-  `CatchClause`'s width reaches nothing past its `Option<CatchId>`. `{#snippet}`'s parameters
-  are a value run, and `{@debug}`'s identifiers an id list.
+  attribute hold `ExprId` (`Option<ExprId>` where it may be absent). So `ExpressionTag` —
+  the element of every attribute value — is **12 B**, `AttributeNode` **56** and
+  `FragmentNode` **84** (52 and 80 on wasm32), the latter set by `SnippetBlock`. The binding
+  *patterns*
+  among them (`{#each}`'s context, the `{:then}` / `{:catch}` bindings, `{@const}`'s id) are
+  built by the TypeScript side as stored rows — converted from an expression, with an
+  annotation appended as a superseding row — and every identifier the Svelte parser
+  synthesizes (the `bind:value` / `class:name` shorthand, the `{name}` attribute) is pushed
+  the same way. These fields set the width of `FragmentNode` and `AttributeNode`, which are
+  run elements and are built by value at every level of the recursive parse (the block and
+  tag parsers return `Result<FragmentNode>`, and `parse_children` wraps each parsed element
+  in one), where `CatchClause`'s width reaches nothing past its `Option<CatchId>`.
+  `{#snippet}`'s parameters are a value run, and `{@debug}`'s identifiers an id list.
 - the expression LISTS whose elements come off the ladder take it per element: call and
   `new` arguments, sequence and template-literal expressions are `Run<ExprId>`, and
   array-literal and array-pattern elements `Run<Option<ExprId>>` (a hole stays `None`; the
@@ -1229,9 +1241,9 @@ stores eliminate per-node `malloc`/`free` and keep locality (rows are pushed in 
 order, which approximates traversal order). The `DocArena` (the doc-builder IR) is the
 index-arena precedent for the build-once/render-once doc tree.
 
-**Still open (separate axis):** re-run the **flat/indexed structure** comparison
-on the mature codebase — an independent question from allocation strategy (the
-early prototype conflated the two).
+**Still open (separate axis):** a struct-of-arrays layout (one column per field, as Zig's
+`MultiArrayList`) over the same ids — a separate question from the row stores, which keep
+each node's fields together.
 
 ### Red-Green Trees (Deferred)
 
@@ -1317,7 +1329,7 @@ The closest Rust projects embody the alternative shapes, which makes the trade-o
 
 Issues that need architectural decisions before building future tools.
 
-- **Scope/symbol resolution** — The shipped ASTs are syntax-only; meaningful linting requires name resolution. The experimental `tsv_check` binder (`crates/tsv_check`, consumed only by `tsv_debug`) is the candidate answer, but nothing shipped links it. *(When: before linter.)*
+- **Scope/symbol resolution** — The shipped ASTs are syntax-only; meaningful linting requires name resolution. The experimental `tsv_check` binder (`crates/tsv_check`, currently outside the workspace build — [CLAUDE.md §Project Structure](../CLAUDE.md#project-structure)) is the candidate answer, but nothing shipped links it. *(When: before linter.)*
 - **Error recovery** — Fail-fast parsers block LSP/linter (need partial ASTs from broken code); also required for full CSS-spec compliance — CSS Syntax 3 §5.5 recovery (drop the bad rule, keep parsing), see conformance_svelte.md §CSS Parser Scope & Error Model. *(When: for full CSS-spec compliance (CSS) / before LSP/linter.)*
 - **Source maps** — A shipped compiler must map output positions to input; the experimental `tsv_svelte_compile` emits none. How do spans survive transforms? *(When: before the compiler ships.)*
 - **Cancellation** — LSP operations must be cancellable mid-parse. Current parser has no cancellation points. *(When: before LSP.)*

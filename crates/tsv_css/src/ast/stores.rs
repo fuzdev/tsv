@@ -86,7 +86,9 @@ const _: () = {
 /// One stylesheet's list stores, the scratch stacks that build their lists, and its text pool.
 ///
 /// A fresh one allocates nothing: a store's buffer is allocated by its first write, a scratch
-/// stack's by its first push, and the pool's by its first string.
+/// stack's by its first push, and the pool's by its first string. There is no `for_source`:
+/// every store here is first written by a flush, which sizes its own first allocation
+/// (`tsv_lang::store`'s `FIRST_ALLOC_BYTES`).
 pub struct CssStores {
     pub(crate) runs: RunStores,
     pub(crate) text: TextPool<CssText>,

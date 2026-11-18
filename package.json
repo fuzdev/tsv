@@ -115,7 +115,7 @@
 		"release:assets": "node scripts/roots/release_assets.ts",
 		"roundtrip:audit:prettier": "node scripts/roots/roundtrip_audit_prettier.ts",
 		"discovery:audit": "npm run build:check && node scripts/roots/discovery_audit.ts",
-		"test:audits": "cargo test -p tsv_lang --features _internal_audits --quiet",
+		"test:audits": "cargo test -p tsv_lang -p tsv_ts -p tsv_css -p tsv_svelte --features tsv_lang/_internal_audits --quiet",
 		"test:node": "node node_modules/.bin/tsc -p tsconfig.vitest.json && node node_modules/.bin/vitest run",
 		"test:node:canonical": "node node_modules/.bin/tsc -p tsconfig.canonical.json && node node_modules/.bin/vitest run --config vitest.canonical.config.ts",
 		"test:depth": "cargo test --profile corpus -p tsv_tests --features tsv_debug/_internal_audits --test depth_limit --quiet",

@@ -2,7 +2,7 @@
 //! [tsv](https://github.com/fuzdev/tsv).
 //!
 //! [`format()`] formats one stylesheet in one call; a [`Formatter`] formats many on one
-//! thread, keeping its arenas warm between calls. The formatter is non-configurable:
+//! thread, keeping its allocations warm between calls. The formatter is non-configurable:
 //! Prettier's style with a print width of 100, tabs and single quotes. Formatting output
 //! is not frozen — it changes between releases as formatting bugs are fixed.
 //!

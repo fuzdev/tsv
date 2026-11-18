@@ -105,14 +105,6 @@ fn linearize_chain<'a>(expr: &'a Expression, input: LinearizeInput<'a, '_>) -> C
 // `SmallVec::truncate` has to re-derive the inline-vs-spilled triple before it can store a
 // length, and this runs 40,239 times a pass. The debug assert is free in release and fires
 // on every chain the test suite builds.
-//
-// ⚠️ Those two numbers replace a **+0.08…+0.32%** first reading, and the correction is
-// worth more than the datum: at the time, the format board carried a ~0.4% per-exec
-// lottery from `DocArena`'s static-node cache (see `tsv_lang::doc::arena`'s
-// `STATIC_CACHE_SLOTS`), so this edit's real 0.02% sat two decades under the noise and
-// the binary's collision draw was read as its cost. The doctrine that came out of it —
-// make the hazard unreachable *where that is free*, not everywhere — survives the
-// correction; the magnitude behind it did not.
 
 /// Linearize starting from a CallExpression (avoids cloning to wrap in Expression)
 ///

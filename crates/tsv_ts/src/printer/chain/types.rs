@@ -160,6 +160,14 @@ pub(crate) enum ChainNode<'a> {
     NonNull { gap: NonNullGap },
 }
 
+// Pinned because `ChainNodeVec` inlines eight of them, and that buffer sits on the
+// expression recursion cycle (`analysis.rs`'s entry points), so a variant that widened the
+// node would silently widen every level's buffer, with output byte-identical and no test able to see it.
+// 64-bit only (the count is pointer-width-relative); the store-check build widens the
+// handles a node carries, so it skips the pin.
+#[cfg(all(test, target_pointer_width = "64"))]
+const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<ChainNode<'static>>() == 48);
+
 /// Which rule the operand→`!` region of a [`ChainNode::NonNull`] takes, keyed on
 /// what sits to its left.
 ///

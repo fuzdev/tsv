@@ -274,8 +274,8 @@ function not_requested_section(id: SectionId, reason: string): Section {
 	return { id, status: 'not_requested', reason, legs: [] };
 }
 
-/** The store-rows section: with an indexed AST, rows minted, live and orphaned, capacity and
- * growth copies per store, read from the store accessor's own counters. */
+/** The store-rows section, left open: rows minted, live and orphaned, capacity and growth
+ * copies per store, once a leg reads the stores' own counters. */
 function store_rows_section(): Section {
 	return {
 		id: 'store_rows',

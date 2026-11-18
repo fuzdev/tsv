@@ -134,7 +134,8 @@ impl<'a> AstView<'a> {
         self.stores.text.get(text)
     }
 
-    /// The comments of `list`: a program's. A miss ends in the store's shared cold path.
+    /// The comments of `list`: a program's, or an embedded parse's. A miss ends in the
+    /// store's shared cold path.
     #[inline]
     pub fn comments(self, list: Run<Comment>) -> &'a [Comment] {
         self.stores.comments.slice(list)

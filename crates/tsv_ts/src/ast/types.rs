@@ -611,10 +611,9 @@ pub struct TSIndexSignature {
 pub struct TSFunctionType {
     pub type_parameters: Option<TSTypeParameterDeclaration>,
     pub params: Run<Expression>,
-    // Inline by value rather than behind a reference: `TSTypeAnnotation` is a span and the id
-    // of its type's row, held inline everywhere else (`Option<TSTypeAnnotation>`), so a
-    // reference here would put a pointer-chase ahead of the store read on the format read
-    // path.
+    // Inline by value rather than a row of its own: `TSTypeAnnotation` is a span and the id
+    // of its type's row, held inline everywhere else (`Option<TSTypeAnnotation>`), so an id
+    // here would put a second store hop ahead of the type's row on the format read path.
     pub return_type: TSTypeAnnotation,
     pub span: Span,
 }

@@ -275,13 +275,14 @@ shipped stack).
 ## Memory Residency
 
 **An instance keeps what its largest input grew, by design.** Every call parses into the stores
-`tsv_arena`'s macros park between calls and formats into the parked doc arena, and each keeps its
-capacity across its reset (the type strip's edit list too) — the reuse that makes a per-file loop
-cheap — with no trim or shrink export: that loop is the one a trim would be paid from. A
-WebAssembly memory only grows besides, so what the allocator frees stays the instance's, reused
-by later calls but never handed back to the host. The release valve is `reinstantiate()` (above):
-the old instance's memory goes with it, so a host that has formatted an outsized input on a
-long-lived instance can swap in a fresh one after it, as it would after a trap.
+each language crate parks per thread between calls and formats into the parked doc arena, and
+each keeps its capacity across its reset (the type strip's edit list too) — the reuse that makes
+a per-file loop cheap — with no trim or shrink export: that loop is the one a trim would be paid
+from. A WebAssembly memory only grows besides, so what the allocator frees stays the
+instance's, reused by later calls but never handed back to the host. The release valve is
+`reinstantiate()` (above): the old instance's memory goes with it, so a host that has
+formatted an outsized input on a long-lived instance can swap in a fresh one after it, as it
+would after a trap.
 
 ## JSON-String Transport
 
