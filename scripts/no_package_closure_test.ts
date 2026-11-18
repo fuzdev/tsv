@@ -12,7 +12,9 @@
  * (`tsconfig.bench_core.json`'s files) import only `node:*` modules and relative files, a
  * type-only import's file included, so `tsc`, which finds a package by walking up to any
  * `node_modules`, can't let one through. And each bench root that loads no package beyond the
- * root install's is one `typecheck:scripts`' gated program names. Read from the source text through
+ * root install's is one `typecheck:scripts`' gated program names. And the gro-hosted roots
+ * `HOST_MODULE_ROOTS` lists load no `node:*` module but the named exception for signal numbers,
+ * so each runs wherever gro's host modules do. Read from the source text through
  * `scripts/import_closure.ts`, since `tsc` resolves a package from any `node_modules` above.
  */
 
@@ -252,6 +254,34 @@ for (const library of [
 			closure.files.filter((path) => AMBIENT_AUTHORITY.test(reader(CHECKOUT)(path))).join('\n'),
 			''
 		);
+	});
+}
+
+/** The gro-hosted roots whose closures reach the system through gro's host modules alone, each
+ * with a module its closure must reach. */
+const HOST_MODULE_ROOTS: Array<[root: string, reaches: string]> = [
+	['scripts/roots/check_ast_types.ts', 'scripts/roots/checkout.ts'],
+	['scripts/roots/check_loc.ts', 'scripts/check_loc.ts'],
+	['scripts/roots/deps_audit.ts', 'scripts/deps_audit.ts'],
+	['scripts/roots/docsrs_audit.ts', 'scripts/docsrs_audit.ts'],
+	['scripts/roots/package_audit.ts', 'scripts/package_audit.ts'],
+	['scripts/roots/patch_npm_package.ts', 'scripts/patch_npm_package.ts'],
+	['scripts/roots/regen_sidecar_lock.ts', 'scripts/regen_sidecar_lock.ts'],
+	['scripts/roots/roundtrip_audit_prettier.ts', 'scripts/roundtrip_audit_prettier.ts'],
+	['scripts/roots/run_if_stale.ts', 'scripts/run_if_stale.ts']
+];
+
+// the named exception is `scripts/exit_code.ts`'s `node:os` (docs/tasks.md); path text is
+// `scripts/posix_path.ts`'s, never `node:path`'s
+for (const [root, reaches] of HOST_MODULE_ROOTS) {
+	test(`${root}'s closure loads no node:* module but the signal numbers`, () => {
+		const closure = loads_of(root);
+		strictEqual(closure.files.includes(reaches), true);
+		const loaded = closure.builtins
+			.filter((found) => !found.type_only)
+			.filter((found) => !(found.specifier === 'node:os' && found.from === 'scripts/exit_code.ts'))
+			.map((found) => `${found.from}:${found.line}: ${found.specifier}`);
+		strictEqual(loaded.join('\n'), '');
 	});
 }
 

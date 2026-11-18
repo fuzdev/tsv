@@ -86,13 +86,12 @@
  * `scripts/roots/docsrs_audit.ts`).
  */
 
-import { dirname, join, normalize } from 'node:path';
-
 import type { FsDir, FsReadDir } from '@fuzdev/gro/fs.ts';
 import { fs_search } from '@fuzdev/gro/fs_search.ts';
 import type { SpawnProgram } from '@fuzdev/gro/spawn.ts';
 
 import { docs_rs_crates } from './docsrs_crates.ts';
+import { join_path } from './posix_path.ts';
 
 const log = (...args: unknown[]) => console.error(...args);
 
@@ -133,7 +132,7 @@ function render_dir(crate_name: string): string {
 	if (!/^[A-Za-z0-9_-]+$/.test(crate_name)) {
 		throw Error(`refusing an unexpected crate name: ${JSON.stringify(crate_name)}`);
 	}
-	return join('doc', crate_name.replaceAll('-', '_'));
+	return `doc/${crate_name.replaceAll('-', '_')}`;
 }
 
 /** One rendered page's ids, read once per run. */
@@ -172,13 +171,13 @@ async function check_rendered(
 	const doc_root = 'doc';
 	const crate_dir = render_dir(crate_name);
 	const dead: DeadRenders = { anchors: [], pages: [], inert: [] };
-	if (!(await docsrs.exists(join(crate_dir, 'index.html')))) return null;
+	if (!(await docsrs.exists(`${crate_dir}/index.html`))) return null;
 	const pages = (await fs_search(docsrs, { path: crate_dir, sort: false }))
 		.map((f) => f.path)
 		.filter((f) => f.endsWith('.html'))
 		.sort();
 	for (const rel of pages) {
-		const page = join(crate_dir, rel);
+		const page = join_path(crate_dir, rel);
 		const html = await docsrs.read_text(page);
 		for (const m of html.matchAll(/\[<code>([^<]*)<\/code>\]/g)) {
 			dead.inert.push(`${crate_name}/${rel}: [${m[1]}]`);
@@ -190,7 +189,7 @@ async function check_rendered(
 			const hash = href.indexOf('#');
 			const path = hash === -1 ? href : href.slice(0, hash);
 			const fragment = hash === -1 ? '' : href.slice(hash + 1);
-			const target = path === '' ? page : normalize(join(dirname(page), path));
+			const target = path === '' ? page : join_path(page, '..', path);
 			const inside = target.slice(doc_root.length + 1).split('/')[0];
 			if (!target.startsWith(doc_root + '/') || !graded.has(inside)) continue;
 			const ids = await ids_of(docsrs, page_ids, target);

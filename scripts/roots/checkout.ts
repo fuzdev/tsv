@@ -6,16 +6,17 @@
  * @module
  */
 
-import { join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
-
 import { fs, type FsDir, type FsReadDir } from '@fuzdev/gro/fs.ts';
 import { is_fs_error } from '@fuzdev/gro/fs_error.ts';
 import { exit } from '@fuzdev/gro/exit.ts';
 import { spawn, type SpawnProgram, type SpawnProgramOptions } from '@fuzdev/gro/spawn.ts';
 
+import { resolve_path } from '../posix_path.ts';
+
 /** The checkout's absolute path, two directories above this module. */
-export const CHECKOUT_PATH = fileURLToPath(new URL('../../', import.meta.url)).replace(/\/$/, '');
+export const CHECKOUT_PATH = decodeURIComponent(
+	new URL('../../', import.meta.url).pathname
+).replace(/\/$/, '');
 
 /** Opens the checkout. */
 export const open_checkout = (): Promise<FsDir> => fs.open_dir(CHECKOUT_PATH);
@@ -26,7 +27,7 @@ export const open_checkout = (): Promise<FsDir> => fs.open_dir(CHECKOUT_PATH);
  * is) is followed, where a handle beneath the checkout refuses an absolute symlink.
  */
 export const open_target = async (checkout: FsDir): Promise<FsDir> => {
-	const path = join(checkout.path, 'target');
+	const path = `${checkout.path}/target`;
 	try {
 		return await fs.open_dir(path);
 	} catch (error) {
@@ -66,7 +67,7 @@ export const open_checkout_program = async (checkout: FsReadDir): Promise<Checko
 	const linked = new Map<string, FsReadDir>();
 	for (const name of LINKABLE_DIRS) {
 		try {
-			linked.set(name, (await fs.open_dir(join(checkout.path, name))).readonly());
+			linked.set(name, (await fs.open_dir(`${checkout.path}/${name}`)).readonly());
 		} catch (error) {
 			if (!is_fs_error(error, 'not_found') && !is_fs_error(error, 'not_a_directory')) throw error;
 		}
@@ -113,7 +114,7 @@ export const exit_unless_checkout_cwd = (checkout: FsReadDir): void => {
  */
 export const open_sibling = async (path: string): Promise<FsReadDir | null> => {
 	try {
-		return (await fs.open_dir(resolve(CHECKOUT_PATH, path))).readonly();
+		return (await fs.open_dir(resolve_path(CHECKOUT_PATH, path))).readonly();
 	} catch {
 		return null;
 	}

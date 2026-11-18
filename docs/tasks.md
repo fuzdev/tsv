@@ -39,6 +39,9 @@ A gro-hosted script imports a `node:*` module only as a named exception, with it
 the script's section. One is shared by several and stated here: `scripts/exit_code.ts` reads
 `node:os` for the platform's signal numbers, to report a child a signal `N` ended as `128 + N`.
 That is platform data, carrying no authority, and no host module exposes it.
+`scripts/posix_path.ts` handles a script's path text without `node:path`, reading a path as
+`node:path`'s POSIX functions do, and `scripts/no_package_closure_test.ts` holds the roots it
+lists to the rule.
 
 ## `build:stamped`
 

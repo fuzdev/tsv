@@ -99,6 +99,7 @@
 		"scripts/pgo/bench_test.ts",
 		"scripts/pgo/depth_stack_test.ts",
 		"scripts/pgo/profile_test.ts",
+		"scripts/posix_path_test.ts",
 		"scripts/publish_crates_test.ts",
 		"scripts/publish_crates_wetrun_test.ts",
 		"scripts/publish_napi_test.ts",

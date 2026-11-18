@@ -57,12 +57,11 @@
  * (`PackageAuditDeps`, built by `scripts/roots/package_audit.ts`).
  */
 
-import { dirname, isAbsolute, join, relative, sep } from 'node:path';
-
 import type { FsReadDir } from '@fuzdev/gro/fs.ts';
 import type { SpawnProgram } from '@fuzdev/gro/spawn.ts';
 
 import { docs_rs_crates } from './docsrs_crates.ts';
+import { join_path, resolve_path } from './posix_path.ts';
 import {
 	binstall_findings,
 	type BinstallMetadata,
@@ -130,13 +129,15 @@ function toolchain_minor(checkout: FsReadDir): string {
 }
 
 /**
- * The directory of `manifest_path` (cargo's absolute path) relative to the checkout, or `null`
- * when it is not beneath it.
+ * The directory of `manifest_path` (cargo's absolute path) relative to the checkout's absolute
+ * `checkout_path`, or `null` when it is not beneath it. Both are read lexically.
  */
 export function to_crate_dir(checkout_path: string, manifest_path: string): string | null {
-	const rel = relative(checkout_path, dirname(manifest_path));
-	if (isAbsolute(rel) || rel === '..' || rel.startsWith(`..${sep}`)) return null;
-	return rel === '' ? '.' : rel.split(sep).join('/');
+	const root = resolve_path('/', checkout_path);
+	const dir = resolve_path(root, `${manifest_path}/..`);
+	if (dir === root) return '.';
+	const prefix = root.endsWith('/') ? root : `${root}/`;
+	return dir.startsWith(prefix) ? dir.slice(prefix.length) : null;
 }
 
 /** Whether two byte arrays hold the same bytes. */
@@ -170,13 +171,13 @@ async function grade_listing(
 	for (const required of ['README.md', 'LICENSE', 'src/lib.rs']) {
 		if (!files.has(required)) findings.push(`tarball lacks ${required}`);
 	}
-	const notice_on_disk = await checkout.exists(join(dir, 'NOTICE'));
+	const notice_on_disk = await checkout.exists(join_path(dir, 'NOTICE'));
 	if (REQUIRED_NOTICE.includes(name) && !notice_on_disk) {
 		findings.push('crate holds no NOTICE, which its shipped data requires');
 	}
 	if (notice_on_disk && !files.has('NOTICE')) findings.push('tarball lacks the NOTICE');
 	for (const file of MUST_NOT_SHIP[name] ?? []) {
-		if (!(await checkout.exists(join(dir, file)))) {
+		if (!(await checkout.exists(join_path(dir, file)))) {
 			findings.push(`${file} is absent from the crate directory, so its exclusion grades nothing`);
 		}
 		if (files.has(file)) findings.push(`tarball ships ${file}, which stays in the repository`);
@@ -186,13 +187,15 @@ async function grade_listing(
 			findings.push(`tarball ships ${file} (only README.md belongs in it)`);
 		}
 	}
-	if (await checkout.exists(join(dir, 'LICENSE'))) {
-		if (!same_bytes(await checkout.read(join(dir, 'LICENSE')), await checkout.read('LICENSE'))) {
+	if (await checkout.exists(join_path(dir, 'LICENSE'))) {
+		if (
+			!same_bytes(await checkout.read(join_path(dir, 'LICENSE')), await checkout.read('LICENSE'))
+		) {
 			findings.push("LICENSE differs from the root LICENSE's bytes");
 		}
 	}
-	if (await checkout.exists(join(dir, 'README.md'))) {
-		for (const target of relative_links(await checkout.read_text(join(dir, 'README.md')))) {
+	if (await checkout.exists(join_path(dir, 'README.md'))) {
+		for (const target of relative_links(await checkout.read_text(join_path(dir, 'README.md')))) {
 			findings.push(`README.md links relatively (${target}), which crates.io cannot resolve`);
 		}
 	}

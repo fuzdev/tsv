@@ -210,6 +210,7 @@ export async function assert_staged_fresh(checks: readonly StagedCheck[]): Promi
 export const WASM_STAGING_SOURCES = [
 	'scripts/roots/patch_npm_package.ts',
 	'scripts/roots/checkout.ts',
+	'scripts/posix_path.ts',
 	'scripts/patch_npm_package.ts',
 	'scripts/npm_facade.ts',
 	'scripts/npm_metadata.ts',
