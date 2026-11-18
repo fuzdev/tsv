@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 1498,
+	"end": 1736,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -114,26 +114,44 @@
 		},
 		{
 			"type": "Line",
-			"value": " Control: with no comment the shell strips at every width and the nested branch",
+			"value": " A FALSE-position shell inside a TRUE branch still has the outer `:` to flush",
 			"start": 1310,
-			"end": 1391
+			"end": 1389
+		},
+		{
+			"type": "Line",
+			"value": " against, so its trailing line comment stays on the branch too",
+			"start": 1391,
+			"end": 1455
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 1534,
+			"end": 1538
+		},
+		{
+			"type": "Line",
+			"value": " Control: with no comment the shell strips at every width and the nested branch",
+			"start": 1548,
+			"end": 1629
 		},
 		{
 			"type": "Line",
 			"value": " sits exactly one level past its operator",
-			"start": 1393,
-			"end": 1436
+			"start": 1631,
+			"end": 1674
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 1497,
+		"end": 1735,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 1488,
+			"end": 1726,
 			"body": [
 				{
 					"type": "TSTypeAliasDeclaration",
@@ -1171,89 +1189,247 @@
 				},
 				{
 					"type": "TSTypeAliasDeclaration",
-					"start": 1438,
-					"end": 1487,
+					"start": 1457,
+					"end": 1545,
 					"id": {
 						"type": "Identifier",
-						"start": 1443,
-						"end": 1444,
-						"name": "L"
+						"start": 1462,
+						"end": 1463,
+						"name": "M"
 					},
 					"typeAnnotation": {
 						"type": "TSConditionalType",
-						"start": 1447,
-						"end": 1486,
+						"start": 1466,
+						"end": 1544,
 						"checkType": {
 							"type": "TSTypeReference",
-							"start": 1447,
-							"end": 1448,
+							"start": 1466,
+							"end": 1467,
 							"typeName": {
 								"type": "Identifier",
-								"start": 1447,
-								"end": 1448,
+								"start": 1466,
+								"end": 1467,
 								"name": "T"
 							}
 						},
 						"extendsType": {
 							"type": "TSTypeReference",
-							"start": 1457,
-							"end": 1458,
+							"start": 1476,
+							"end": 1477,
 							"typeName": {
 								"type": "Identifier",
-								"start": 1457,
-								"end": 1458,
+								"start": 1476,
+								"end": 1477,
+								"name": "U"
+							}
+						},
+						"trueType": {
+							"type": "TSConditionalType",
+							"start": 1482,
+							"end": 1533,
+							"checkType": {
+								"type": "TSTypeReference",
+								"start": 1482,
+								"end": 1483,
+								"typeName": {
+									"type": "Identifier",
+									"start": 1482,
+									"end": 1483,
+									"name": "V"
+								}
+							},
+							"extendsType": {
+								"type": "TSTypeReference",
+								"start": 1492,
+								"end": 1493,
+								"typeName": {
+									"type": "Identifier",
+									"start": 1492,
+									"end": 1493,
+									"name": "W"
+								}
+							},
+							"trueType": {
+								"type": "TSTypeReference",
+								"start": 1499,
+								"end": 1500,
+								"typeName": {
+									"type": "Identifier",
+									"start": 1499,
+									"end": 1500,
+									"name": "X"
+								}
+							},
+							"falseType": {
+								"type": "TSConditionalType",
+								"start": 1506,
+								"end": 1533,
+								"checkType": {
+									"type": "TSTypeReference",
+									"start": 1506,
+									"end": 1507,
+									"typeName": {
+										"type": "Identifier",
+										"start": 1506,
+										"end": 1507,
+										"name": "Y"
+									}
+								},
+								"extendsType": {
+									"type": "TSTypeReference",
+									"start": 1516,
+									"end": 1517,
+									"typeName": {
+										"type": "Identifier",
+										"start": 1516,
+										"end": 1517,
+										"name": "Z"
+									}
+								},
+								"trueType": {
+									"type": "TSTypeReference",
+									"start": 1524,
+									"end": 1525,
+									"typeName": {
+										"type": "Identifier",
+										"start": 1524,
+										"end": 1525,
+										"name": "P"
+									}
+								},
+								"falseType": {
+									"type": "TSTypeReference",
+									"start": 1532,
+									"end": 1533,
+									"typeName": {
+										"type": "Identifier",
+										"start": 1532,
+										"end": 1533,
+										"name": "Q"
+									}
+								}
+							},
+							"trailingComments": [
+								{
+									"type": "Line",
+									"value": " c",
+									"start": 1534,
+									"end": 1538
+								}
+							]
+						},
+						"falseType": {
+							"type": "TSTypeReference",
+							"start": 1543,
+							"end": 1544,
+							"typeName": {
+								"type": "Identifier",
+								"start": 1543,
+								"end": 1544,
+								"name": "R"
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A FALSE-position shell inside a TRUE branch still has the outer `:` to flush",
+							"start": 1310,
+							"end": 1389
+						},
+						{
+							"type": "Line",
+							"value": " against, so its trailing line comment stays on the branch too",
+							"start": 1391,
+							"end": 1455
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 1676,
+					"end": 1725,
+					"id": {
+						"type": "Identifier",
+						"start": 1681,
+						"end": 1682,
+						"name": "L"
+					},
+					"typeAnnotation": {
+						"type": "TSConditionalType",
+						"start": 1685,
+						"end": 1724,
+						"checkType": {
+							"type": "TSTypeReference",
+							"start": 1685,
+							"end": 1686,
+							"typeName": {
+								"type": "Identifier",
+								"start": 1685,
+								"end": 1686,
+								"name": "T"
+							}
+						},
+						"extendsType": {
+							"type": "TSTypeReference",
+							"start": 1695,
+							"end": 1696,
+							"typeName": {
+								"type": "Identifier",
+								"start": 1695,
+								"end": 1696,
 								"name": "U"
 							}
 						},
 						"trueType": {
 							"type": "TSParenthesizedType",
-							"start": 1461,
-							"end": 1482,
+							"start": 1699,
+							"end": 1720,
 							"typeAnnotation": {
 								"type": "TSConditionalType",
-								"start": 1462,
-								"end": 1481,
+								"start": 1700,
+								"end": 1719,
 								"checkType": {
 									"type": "TSTypeReference",
-									"start": 1462,
-									"end": 1463,
+									"start": 1700,
+									"end": 1701,
 									"typeName": {
 										"type": "Identifier",
-										"start": 1462,
-										"end": 1463,
+										"start": 1700,
+										"end": 1701,
 										"name": "V"
 									}
 								},
 								"extendsType": {
 									"type": "TSTypeReference",
-									"start": 1472,
-									"end": 1473,
+									"start": 1710,
+									"end": 1711,
 									"typeName": {
 										"type": "Identifier",
-										"start": 1472,
-										"end": 1473,
+										"start": 1710,
+										"end": 1711,
 										"name": "W"
 									}
 								},
 								"trueType": {
 									"type": "TSTypeReference",
-									"start": 1476,
-									"end": 1477,
+									"start": 1714,
+									"end": 1715,
 									"typeName": {
 										"type": "Identifier",
-										"start": 1476,
-										"end": 1477,
+										"start": 1714,
+										"end": 1715,
 										"name": "X"
 									}
 								},
 								"falseType": {
 									"type": "TSTypeReference",
-									"start": 1480,
-									"end": 1481,
+									"start": 1718,
+									"end": 1719,
 									"typeName": {
 										"type": "Identifier",
-										"start": 1480,
-										"end": 1481,
+										"start": 1718,
+										"end": 1719,
 										"name": "Y"
 									}
 								}
@@ -1261,12 +1437,12 @@
 						},
 						"falseType": {
 							"type": "TSTypeReference",
-							"start": 1485,
-							"end": 1486,
+							"start": 1723,
+							"end": 1724,
 							"typeName": {
 								"type": "Identifier",
-								"start": 1485,
-								"end": 1486,
+								"start": 1723,
+								"end": 1724,
 								"name": "Z"
 							}
 						}
@@ -1275,14 +1451,14 @@
 						{
 							"type": "Line",
 							"value": " Control: with no comment the shell strips at every width and the nested branch",
-							"start": 1310,
-							"end": 1391
+							"start": 1548,
+							"end": 1629
 						},
 						{
 							"type": "Line",
 							"value": " sits exactly one level past its operator",
-							"start": 1393,
-							"end": 1436
+							"start": 1631,
+							"end": 1674
 						}
 					]
 				}

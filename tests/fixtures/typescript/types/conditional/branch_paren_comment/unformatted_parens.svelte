@@ -21,6 +21,11 @@
 	type K = T extends U ? (V extends W ? X : Y // c
 	) : Z;
 
+	// A FALSE-position shell inside a TRUE branch still has the outer `:` to flush
+	// against, so its trailing line comment stays on the branch too
+	type M = T extends U ? (V extends W ? X : (Y extends Z ? P : Q // c
+	)) : R;
+
 	// Control: with no comment the shell strips at every width and the nested branch
 	// sits exactly one level past its operator
 	type L = T extends U ? (V extends W ? X : Y) : Z;
