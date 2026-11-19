@@ -38,8 +38,13 @@ const fn is_line_terminator(c: char) -> bool {
 /// Copy `source` with every range in `edits` blanked. `edits` is sorted here; a range
 /// overlapping an earlier one is clipped to its uncovered tail (the walk never produces one,
 /// but the copy stays total on it), and a clipped range drops a leading [`Mark`].
+///
+/// The sort need not be stable: two edits at one start are two non-empty ranges that
+/// overlap, which the walk never produces, so no order between equal keys is ever read. An
+/// unstable sort also takes no scratch, where a stable one heap-allocates it past a few
+/// hundred edits.
 pub(super) fn apply(source: &str, edits: &mut [Edit]) -> String {
-    edits.sort_by_key(|edit| edit.start);
+    edits.sort_unstable_by_key(|edit| edit.start);
     let mut out = String::with_capacity(source.len());
     let mut copied = 0usize;
     for edit in edits.iter() {
