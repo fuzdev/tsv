@@ -200,10 +200,10 @@
 		"branch:report": "node scripts/roots/branch_report.ts"
 	},
 	"devDependencies": {
-		"@fuzdev/blake3-wasm": "^0.2.0",
-		"@fuzdev/fuz_schema": "^0.5.7",
-		"@fuzdev/fuz_util": "^0.82.0",
-		"@fuzdev/gro": "^0.237.0",
+		"@fuzdev/blake3-wasm": "^0.2.1",
+		"@fuzdev/fuz_schema": "^0.6.1",
+		"@fuzdev/fuz_util": "^0.83.0",
+		"@fuzdev/gro": "^0.238.0",
 		"@types/node": "^24.10.1",
 		"svelte": "^5.58.0",
 		"typescript": "^6.0.3",
