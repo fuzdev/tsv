@@ -824,7 +824,8 @@ impl<'s, 'b> Walk<'s, 'b> {
                 }
                 true
             }
-            StatementKind::TryStatement(s) => {
+            &StatementKind::TryStatement(s) => {
+                let s = self.view.try_stmt(s);
                 self.block(&s.block);
                 if let Some(handler) = self.view.opt_catch(s.handler) {
                     if let Some(param) = &handler.param {
@@ -854,7 +855,8 @@ impl<'s, 'b> Walk<'s, 'b> {
                 }
                 true
             }
-            StatementKind::LabeledStatement(s) => {
+            &StatementKind::LabeledStatement(s) => {
+                let s = self.view.labeled_stmt(s);
                 self.mark(s.label.span.end);
                 self.nested_statement(self.view.stmt(s.body));
                 true
@@ -912,7 +914,9 @@ impl<'s, 'b> Walk<'s, 'b> {
             StatementKind::ForOfStatement(s) => self.statement_tail(self.view.stmt(s.body)),
             StatementKind::WhileStatement(s) => self.statement_tail(self.view.stmt(s.body)),
             StatementKind::WithStatement(s) => self.statement_tail(self.view.stmt(s.body)),
-            StatementKind::LabeledStatement(s) => self.statement_tail(self.view.stmt(s.body)),
+            &StatementKind::LabeledStatement(s) => {
+                self.statement_tail(self.view.stmt(self.view.labeled_stmt(s).body))
+            }
             StatementKind::TSTypeAliasDeclaration(_)
             | StatementKind::TSInterfaceDeclaration(_)
             | StatementKind::TSDeclareFunction(_)

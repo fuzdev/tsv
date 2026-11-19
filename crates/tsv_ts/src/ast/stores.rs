@@ -4,8 +4,9 @@
 //! Beside the three families, [`PayloadStores`] holds one store per payload too rare to sit
 //! inline in the node that refers to it: the function, class and declaration payloads, the
 //! constructor, import and `infer` types, qualified names, a `for` head, a `for … in` /
-//! `for … of` left side, a catch clause, a binding's extras, a call's type arguments, a
-//! comment-bound pair and an escaped name's text. One macro declares each such store with
+//! `for … of` left side, a `try` statement and its catch clause, a labeled statement, a
+//! binding's extras, a call's type arguments, a comment-bound pair and an escaped name's
+//! text. One macro declares each such store with
 //! the id the tree holds and its view accessor.
 //!
 //! [`RunStores`] holds one store per element type of a list built by value: object
@@ -49,12 +50,13 @@ use super::{
     ClassMember, Comment, CommentBoundPair, Decorator, EscapedName, ExportAllDeclaration,
     ExportDefaultDeclaration, ExportNamedDeclaration, ExportSpecifier, Expression, ForInOfLeft,
     ForInit, FunctionDeclaration, FunctionExpression, Identifier, ImportAttribute,
-    ImportDeclaration, ImportSpecifier, MetaProperty, ObjectPatternProperty, ObjectProperty,
-    Program, Statement, SwitchCase, TSConstructorType, TSDeclareFunction, TSEnumDeclaration,
-    TSEnumMember, TSExportAssignment, TSFunctionType, TSImportEqualsDeclaration, TSImportType,
-    TSInferType, TSInterfaceDeclaration, TSInterfaceHeritage, TSModuleDeclaration, TSQualifiedName,
-    TSType, TSTypeAliasDeclaration, TSTypeAnnotation, TSTypeElement, TSTypeParameter,
-    TSTypeParameterInstantiation, TaggedTemplateExpression, TemplateElement, VariableDeclarator,
+    ImportDeclaration, ImportSpecifier, LabeledStatement, MetaProperty, ObjectPatternProperty,
+    ObjectProperty, Program, Statement, SwitchCase, TSConstructorType, TSDeclareFunction,
+    TSEnumDeclaration, TSEnumMember, TSExportAssignment, TSFunctionType, TSImportEqualsDeclaration,
+    TSImportType, TSInferType, TSInterfaceDeclaration, TSInterfaceHeritage, TSModuleDeclaration,
+    TSQualifiedName, TSType, TSTypeAliasDeclaration, TSTypeAnnotation, TSTypeElement,
+    TSTypeParameter, TSTypeParameterInstantiation, TaggedTemplateExpression, TemplateElement,
+    TryStatement, VariableDeclarator,
 };
 
 impl Row for Expression {
@@ -238,8 +240,12 @@ payload_stores! {
     for_heads: ForInit => ForHeadId, for_head;
     /// The left side of a `for … in` or `for … of`: [`ForInOfLeft`] rows.
     for_lefts: ForInOfLeft => ForLeftId, for_left;
+    /// `try` statements, `try {} catch {}`: [`TryStatement`] rows.
+    try_stmts: TryStatement => TryStmtId, try_stmt;
     /// Catch clauses, `catch (e) {}`: [`CatchClause`] rows.
     catches: CatchClause => CatchId, catch;
+    /// Labeled statements, `l: for (;;) {}`: [`LabeledStatement`] rows.
+    labeled_stmts: LabeledStatement => LabeledStmtId, labeled_stmt;
     /// A binding's type annotation and decorators — a parameter name's, a binding pattern's
     /// or a rest element's: [`BindingExtra`] rows.
     binding_extras: BindingExtra => BindingExtraId, binding_extra;
@@ -900,6 +906,7 @@ for (let j; ; ) {}
 for (x in y) {}
 try {
 } catch {}
+l: ;
 ";
 
     /// Pushes a copy of every payload `parsed` holds into its store in `stores`, and returns
@@ -1000,8 +1007,13 @@ try {
                     push!(for_heads, *view.opt_for_head(x.init).expect("a `for` head"));
                 }
                 StatementKind::ForInStatement(x) => push!(for_lefts, *view.for_left(x.left)),
-                StatementKind::TryStatement(x) => {
+                &StatementKind::TryStatement(x) => {
+                    let x = view.try_stmt(x);
+                    push!(try_stmts, *x);
                     push!(catches, *view.opt_catch(x.handler).expect("a catch clause"));
+                }
+                &StatementKind::LabeledStatement(x) => {
+                    push!(labeled_stmts, *view.labeled_stmt(x));
                 }
                 other => panic!("an unexpected statement: {other:?}"),
             }

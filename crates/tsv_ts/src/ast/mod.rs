@@ -21,15 +21,16 @@
 pub(crate) mod convert;
 pub(crate) mod precedence;
 
-// The tag pin of an enum the rows hold by value (`ExpressionKind`, `TSType`): every payload
-// is at least 4 B narrower than the enum, so the enum has room for a tag beside the widest
-// one and no layout shares a payload's niche with it — a niched tag sits INSIDE the widest
-// payload, which then fills the enum. A variant that widens to fill it fails here, where the
-// enum's own size pin would not: niching keeps that size (a variant padded to fill the enum
-// keeps every size pin and fails these). The match makes the list exhaustive and checks each
-// payload type against its variant (a variant's constructor coerced to a `fn` of the listed
-// fields), so a new variant cannot skip the pin. A variant of several fields is measured as
-// their tuple. Declared ahead of the modules so each enum's pin sits beside the enum.
+// The tag pin of an enum the rows hold by value (`ExpressionKind`, `StatementKind`,
+// `TSType`): every payload is at least 4 B narrower than the enum, so the enum has room for a
+// tag beside the widest one and no layout shares a payload's niche with it — a niched tag
+// sits INSIDE the widest payload, which then fills the enum. A variant that widens to fill it
+// fails here, where the enum's own size pin would not: niching keeps that size (a variant
+// padded to fill the enum keeps every size pin and fails these). The match makes the list
+// exhaustive and checks each payload type against its variant (a variant's constructor
+// coerced to a `fn` of the listed fields), so a new variant cannot skip the pin. A variant of
+// several fields is measured as their tuple. Declared ahead of the modules so each enum's pin
+// sits beside the enum.
 #[cfg(test)]
 macro_rules! pin_explicit_tag {
     ($Enum:ident; $($variant:ident($($field:ty),+)),* $(,)?) => {
@@ -64,9 +65,9 @@ pub use stores::{
     ArrowFnId, AstStores, BindingExtraId, CatchId, ClassDeclId, ClassExprId, CommentPairId,
     CtorTypeId, DeclareFnId, EnumDeclId, EscapedNameId, ExportAllId, ExportAssignId,
     ExportDefaultId, ExportNamedId, ExprId, FnDeclId, FnExprId, FnTypeId, ForHeadId, ForLeftId,
-    ImportDeclId, ImportEqualsId, ImportTypeId, InferTypeId, InterfaceDeclId, MetaPropId,
-    ModuleDeclId, Parsed, QualNameId, StmtId, TaggedTplId, Text, TyId, TypeAliasId, TypeArgsId,
-    WarmStores, park_stores, take_stores, with_stores,
+    ImportDeclId, ImportEqualsId, ImportTypeId, InferTypeId, InterfaceDeclId, LabeledStmtId,
+    MetaPropId, ModuleDeclId, Parsed, QualNameId, StmtId, TaggedTplId, Text, TryStmtId, TyId,
+    TypeAliasId, TypeArgsId, WarmStores, park_stores, take_stores, with_stores,
 };
 pub(crate) use stores::{ScratchMarks, extra_with_decorators, extra_with_type_annotation};
 pub use tsv_lang::packed::PackedF64;
@@ -220,9 +221,10 @@ pub use expressions::{
 // the number literal's `f64` held as a [`PackedF64`]) in `tsv_wasm`, the crate compiled
 // for wasm32, and `Expression`'s and `Statement`'s `Option` must stay niche-packed on both.
 //
-// These size pins do NOT guard `ExpressionKind`'s or `TSType`'s TAG: a variant that widens
-// to fill the enum moves the tag into its niche and leaves every size here as it was. The
-// tag pin beside each enum (`ast/expressions.rs`, `ast/types.rs`) is the one that catches it.
+// These size pins do NOT guard `ExpressionKind`'s, `StatementKind`'s or `TSType`'s TAG: a
+// variant that widens to fill the enum moves the tag into its niche and leaves every size here
+// as it was. The tag pin beside each enum (`ast/expressions.rs`, `ast/statements.rs`,
+// `ast/types.rs`) is the one that catches it.
 #[cfg(all(test, target_pointer_width = "64"))]
 const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<Expression>() == 32);
 #[cfg(all(test, target_pointer_width = "64"))]
@@ -230,9 +232,9 @@ const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<ExpressionKind>(
 #[cfg(test)]
 const _: () = assert!(size_of::<Option<Expression>>() == size_of::<Expression>());
 #[cfg(all(test, target_pointer_width = "64"))]
-const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<Statement>() == 48);
+const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<Statement>() == 32);
 #[cfg(all(test, target_pointer_width = "64"))]
-const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<StatementKind>() == 40);
+const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<StatementKind>() == 24);
 #[cfg(test)]
 const _: () = assert!(size_of::<Option<Statement>>() == size_of::<Statement>());
 #[cfg(all(test, target_pointer_width = "64"))]

@@ -268,8 +268,8 @@ pub(super) fn write_statement(w: &mut JsonWriter, stmt: &ast::Statement, ctx: &C
         ast::StatementKind::SwitchStatement(switch_stmt) => {
             write_switch_statement(w, switch_stmt, stmt.span, ctx);
         }
-        ast::StatementKind::TryStatement(try_stmt) => {
-            write_try_statement(w, try_stmt, stmt.span, ctx);
+        &ast::StatementKind::TryStatement(try_stmt) => {
+            write_try_statement(w, ctx.view.try_stmt(try_stmt), stmt.span, ctx);
         }
         ast::StatementKind::ThrowStatement(throw_stmt) => {
             write_throw_statement(w, *throw_stmt, stmt.span, ctx);
@@ -280,8 +280,8 @@ pub(super) fn write_statement(w: &mut JsonWriter, stmt: &ast::Statement, ctx: &C
         ast::StatementKind::ContinueStatement(continue_stmt) => {
             write_continue_statement(w, continue_stmt, stmt.span, ctx);
         }
-        ast::StatementKind::LabeledStatement(labeled) => {
-            write_labeled_statement(w, labeled, stmt.span, ctx);
+        &ast::StatementKind::LabeledStatement(labeled) => {
+            write_labeled_statement(w, ctx.view.labeled_stmt(labeled), stmt.span, ctx);
         }
         ast::StatementKind::EmptyStatement(_) => {
             write_bare_node(w, "EmptyStatement", stmt.span, ctx);

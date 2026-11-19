@@ -301,7 +301,9 @@ impl<'a> Printer<'a> {
             StatementKind::SwitchStatement(stmt) => {
                 self.build_switch_statement_doc(stmt, statement.span)
             }
-            StatementKind::TryStatement(stmt) => self.build_try_statement_doc(stmt, statement.span),
+            &StatementKind::TryStatement(stmt) => {
+                self.build_try_statement_doc(self.view.try_stmt(stmt), statement.span)
+            }
             StatementKind::ThrowStatement(stmt) => {
                 self.build_throw_statement_doc(*stmt, statement.span, ctx.terminator_gap())
             }
@@ -311,7 +313,9 @@ impl<'a> Printer<'a> {
             StatementKind::ContinueStatement(stmt) => {
                 self.build_continue_statement_doc(stmt, statement.span, ctx.terminator_gap())
             }
-            StatementKind::LabeledStatement(stmt) => self.build_labeled_statement_doc(stmt, ctx),
+            &StatementKind::LabeledStatement(stmt) => {
+                self.build_labeled_statement_doc(self.view.labeled_stmt(stmt), ctx)
+            }
             StatementKind::EmptyStatement(_) => d.text(";"),
             StatementKind::DebuggerStatement(_) => self.build_bare_keyword_terminator_doc(
                 "debugger",

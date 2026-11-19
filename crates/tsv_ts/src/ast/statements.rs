@@ -9,8 +9,9 @@ use tsv_lang::Span;
 use super::{
     CatchId, ClassDeclId, DeclareFnId, EnumDeclId, ExportAllId, ExportAssignId, ExportDefaultId,
     ExportNamedId, ExprId, Expression, FnDeclId, ForHeadId, ForLeftId, Identifier, ImportDeclId,
-    ImportEqualsId, InterfaceDeclId, ModuleDeclId, Run, StmtId, TSNamespaceExportDeclaration,
-    TSTypeAnnotation, TSTypeParameterDeclaration, TypeAliasId,
+    ImportEqualsId, InterfaceDeclId, LabeledStmtId, ModuleDeclId, Run, StmtId,
+    TSNamespaceExportDeclaration, TSTypeAnnotation, TSTypeParameterDeclaration, TryStmtId,
+    TypeAliasId,
 };
 
 /// Statement node: the span every variant shares, beside the variant itself.
@@ -48,15 +49,19 @@ pub enum StatementKind {
     // not because they are rare. Rarity is what makes a row of its own free, and it is
     // not the only reason to store one — the struct is copied into its store instead of
     // into the enum, so the copy volume is unchanged and the cost is one row push, while
-    // all of the file's other statement rows get narrower. Stored, a `Statement` is 48
-    // bytes — the span header over a 40-byte `StatementKind` — which is what the
-    // `size_of` asserts in this module's parent pin. The widest inline variant is
-    // `TryStatement` at 36, ahead of `LabeledStatement` at 28 (its inline `Identifier`
-    // label beside the body's id) and the `break` / `continue` labels at 24, so the
-    // ladder stops here.
+    // all of the file's other statement rows get narrower.
     //
-    // (The loop and `try` heads below hold their own heads by id for the same reason,
-    // one level down; the `Expression`-holding heads below hold theirs by id for a
+    // `TryStatement` (0.49% of statements) and `LabeledStatement` (0.09%) are stored for the
+    // same density reason, one rung further down: inline they are 36 and 24 B, every other
+    // payload is at most 20, so storing BOTH makes a `Statement` 32 bytes — the span header
+    // over a 24-byte `StatementKind`, its tag explicit beside a 20-byte payload — which is
+    // what the `size_of` asserts in this module's parent pin. Storing `TryStatement` alone
+    // would not reach it: `LabeledStatement` would fill the enum and rustc would niche the
+    // tag into its label's bools, a decode on every statement `match`. The tag pin below
+    // this enum holds every payload to that 20-byte budget.
+    //
+    // (The loop heads below hold their own heads by id for the same reason, one level
+    // down; the `Expression`-holding heads below hold theirs by id for a
     // different one — see `ExpressionStatement`.)
     TSTypeAliasDeclaration(TypeAliasId),
     TSInterfaceDeclaration(InterfaceDeclId),
@@ -83,11 +88,49 @@ pub enum StatementKind {
     DoWhileStatement(DoWhileStatement),
     WithStatement(WithStatement),
     SwitchStatement(SwitchStatement),
-    TryStatement(TryStatement),
+    TryStatement(TryStmtId),
     ThrowStatement(ThrowStatement),
     BreakStatement(BreakStatement),
     ContinueStatement(ContinueStatement),
-    LabeledStatement(LabeledStatement),
+    LabeledStatement(LabeledStmtId),
+    EmptyStatement(EmptyStatement),
+    DebuggerStatement(DebuggerStatement),
+}
+
+#[cfg(test)]
+pin_explicit_tag! {
+    StatementKind;
+    ExpressionStatement(ExpressionStatement),
+    VariableDeclaration(VariableDeclaration),
+    TSTypeAliasDeclaration(TypeAliasId),
+    TSInterfaceDeclaration(InterfaceDeclId),
+    TSDeclareFunction(DeclareFnId),
+    TSEnumDeclaration(EnumDeclId),
+    TSModuleDeclaration(ModuleDeclId),
+    ReturnStatement(ReturnStatement),
+    BlockStatement(BlockStatement),
+    FunctionDeclaration(FnDeclId),
+    ClassDeclaration(ClassDeclId),
+    ExportNamedDeclaration(ExportNamedId),
+    ExportDefaultDeclaration(ExportDefaultId),
+    ExportAllDeclaration(ExportAllId),
+    TSExportAssignment(ExportAssignId),
+    TSNamespaceExportDeclaration(TSNamespaceExportDeclaration),
+    ImportDeclaration(ImportDeclId),
+    TSImportEqualsDeclaration(ImportEqualsId),
+    IfStatement(IfStatement),
+    ForStatement(ForStatement),
+    ForInStatement(ForInStatement),
+    ForOfStatement(ForOfStatement),
+    WhileStatement(WhileStatement),
+    DoWhileStatement(DoWhileStatement),
+    WithStatement(WithStatement),
+    SwitchStatement(SwitchStatement),
+    TryStatement(TryStmtId),
+    ThrowStatement(ThrowStatement),
+    BreakStatement(BreakStatement),
+    ContinueStatement(ContinueStatement),
+    LabeledStatement(LabeledStmtId),
     EmptyStatement(EmptyStatement),
     DebuggerStatement(DebuggerStatement),
 }
@@ -252,9 +295,9 @@ pub struct IfStatement {
 /// of the parser — while the hop to a stored head is paid only where the variant is
 /// actually spelled. `for (;;)` is 0.05–0.22% of statements in
 /// real source, and inlining `ForInit` + two `Option<Expression>` here set the whole
-/// enum's size on its own. The same trade is taken by `ForInStatement`,
-/// `ForOfStatement` and `TryStatement`; the frequent declaration variants above keep
-/// their inline layout, where it is the right way round.
+/// enum's size on its own. The same trade is taken by `ForInStatement` and
+/// `ForOfStatement`; the frequent declaration variants above keep their inline layout,
+/// where it is the right way round.
 #[derive(Debug, Clone, Copy)]
 pub struct ForStatement {
     /// Initialization: variable declaration or expression (or None)
@@ -347,11 +390,13 @@ pub struct SwitchCase {
 }
 
 /// Try statement: `try { block } catch (param) { handler } finally { finalizer }`
+///
+/// A row of its own payload store, named by a `TryStmtId` from its `Statement` (see
+/// `StatementKind`).
 #[derive(Debug, Clone, Copy)]
 pub struct TryStatement {
     pub block: BlockStatement,
-    /// An id rather than an inline `CatchClause` for the density reason on
-    /// `ForStatement`.
+    /// The catch clause, a row of a payload store of its own.
     pub handler: Option<CatchId>,
     pub finalizer: Option<BlockStatement>,
 }

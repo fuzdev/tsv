@@ -1012,12 +1012,13 @@ reference to the stores; a store row, once pushed, is never edited or truncated,
 that replaces a node (a cover-grammar conversion, an annotated binding pattern) appends the
 new row and the old one is orphaned. The payloads too rare to sit inline in the node that
 refers to them (`ArrowFunctionExpression`, `FunctionDeclaration`, `TSImportType` and their
-fellows, a `for` head, a catch clause, a binding's extras, a call's type arguments, a
-comment-bound pair, an escaped name's text) are rows too, one store per payload type, each
-named by an id of its own type (`ArrowFnId`, `FnDeclId`, `ImportTypeId`, …). The stores also
-hold the tree's decoded strings, in one text pool a `PoolText<Text>` names, and its
-comments, a run of comment rows per program (`Run<Comment>`), each read through the view
-like a row. The CSS tree takes the same shape for its lists and strings: each of its list
+fellows, a `for` head, a `try` statement and its catch clause, a labeled statement, a
+binding's extras, a call's type arguments, a comment-bound pair, an escaped name's text) are
+rows too, one store per payload type, each named by an id of its own type (`ArrowFnId`,
+`FnDeclId`, `ImportTypeId`, …). The stores also hold the tree's decoded strings, in one
+text pool a `PoolText<Text>` names, and its comments, a run of comment rows per program
+(`Run<Comment>`), each read through the view like a row. The CSS tree takes the same shape
+for its lists and strings: each of its list
 types (a stylesheet's nodes, a block's children, the three selector levels, a `::part()`'s
 name spans, a value list's members, a condition's parts and segments) is a value run over a
 `CssStores` store of its element type, built on that type's scratch stack (every element type
@@ -1133,9 +1134,11 @@ payload is paid only where that variant is actually spelled. Where such a varian
   `FunctionDeclaration`, `TSInterfaceDeclaration`, `TSDeclareFunction`,
   `ExportAllDeclaration`, `TSImportEqualsDeclaration`, `TSEnumDeclaration`,
   `TSModuleDeclaration`, `TSExportAssignment`), and one level down `ForStatement`,
-  `ForOfStatement`, `ForInStatement` and `TryStatement` hold their heads by id. Each of those heads is ≤0.2% of statements on real source and a classic
-  `for (;;)` is 0.05–0.22%. Rarity carries the enum from 544 B down to 96; the second rule below,
-  its one deliberate exception and a narrow `Identifier` take it to **48 B**.
+  `ForOfStatement` and `ForInStatement` hold their heads by id. Each of those heads is ≤0.2%
+  of statements on real source and a classic `for (;;)` is 0.05–0.22%. Rarity carries the
+  enum from 544 B down to 96; the second rule below, its one deliberate exception and a
+  narrow `Identifier` take it to 48, and storing `TryStatement` and `LabeledStatement` whole
+  to **32 B**.
 
 All three widths are pinned by `const` asserts in `ast/mod.rs`, so a variant
 that widens any of these enums fails the test build rather than silently fattening every
@@ -1209,22 +1212,27 @@ They are stored anyway, because a stored head's construction copies the same byt
 its store that it would otherwise have moved into the enum, so the cost is one row push
 and the return is 24 bytes off *every other* statement slot. With the id edges and a
 narrow `Identifier` (its binding extras named by a 4 B id, its decoded name, when it has
-one, by a handle into the text pool) `Statement` is **48 B**; its widest inline variant is
-`TryStatement`, which is where the ladder stops. The trade is settled by measurement, not
-by rarity — the only place in the three enums where rarity is not the argument.
+one, by a handle into the text pool) `Statement` would be 48 B, set by an inline
+`TryStatement` (36 B) ahead of an inline `LabeledStatement` (24). Both are stored (0.49%
+and 0.09% of statements), which leaves every payload at most 20 B and `Statement` at
+**32 B**. The pair is stored together because one alone does not pay: with only
+`TryStatement` stored, the 24 B `LabeledStatement` fills the 24 B enum and rustc niches the
+tag into its label's bools, a decode on every statement `match` (the `ExpressionKind` lesson
+above). The trade is settled by measurement, not by rarity — the only place in the three
+enums where rarity is not the argument.
 
 `Statement` is a header over its variant, as `Expression` is —
-`struct Statement { span, kind: StatementKind }` (`StatementKind` 40 B, set by
-`TryStatement` at 36) — with the same span rule: a variant struct carries no span of
-its own unless some node also holds that type outside a `Statement` (`VariableDeclaration`, `BlockStatement`,
-`FunctionDeclaration`, `TSDeclareFunction`, `ClassDeclaration`,
-`TSInterfaceDeclaration`, `TSModuleDeclaration`); those are wrapped only through the
-`Statement::from_*` constructors, which take the header's span from the node's own. Both
-spans are `pub`; they stay equal because that is the only way the wrapped form is built
-and no span write reaches one of those payloads after it is wrapped. A debug build
-asserts the agreement on every `Statement::span()` read for the two held inline; the five
-held in a store take the header span from the same value their row is pushed from. `Statement`
-is 48 B on wasm32 too.
+`struct Statement { span, kind: StatementKind }` (`StatementKind` 24 B, a 4 B tag beside
+a payload of at most 20, held there by the tag pin beside the enum) — with the same span
+rule: a variant struct carries no span of its own unless some node also holds that type
+outside a `Statement` (`VariableDeclaration`, `BlockStatement`, `FunctionDeclaration`,
+`TSDeclareFunction`, `ClassDeclaration`, `TSInterfaceDeclaration`, `TSModuleDeclaration`);
+those are wrapped only through the `Statement::from_*` constructors, which take the header's
+span from the node's own. Both spans are `pub`; they stay equal because that is the only way
+the wrapped form is built and no span write reaches one of those payloads after it is
+wrapped. A debug build asserts the agreement on every `Statement::span()` read for the two
+held inline; the five held in a store take the header span from the same value their row is
+pushed from. `Statement` is 32 B on wasm32 too.
 
 `parse_expression` / `parse_assignment_expression` are the entry points these fields are
 filled from. The read side does pay one indexed load per `prop.key` / `decl.init`, which is why the trade is settled by

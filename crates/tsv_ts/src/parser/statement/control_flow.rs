@@ -688,13 +688,17 @@ impl<'a> Parser<'a> {
             |f| f.span.end,
         );
 
+        let try_stmt = TryStatement {
+            block,
+            handler,
+            finalizer,
+        };
         Ok(Statement {
             span: Span::new(start as u32, end),
-            kind: StatementKind::TryStatement(TryStatement {
-                block,
-                handler,
-                finalizer,
-            }),
+            kind: StatementKind::TryStatement(push_row(
+                &mut self.stores.payloads.try_stmts,
+                try_stmt,
+            )),
         })
     }
 
@@ -948,7 +952,10 @@ impl<'a> Parser<'a> {
 
         Ok(Statement {
             span: Span::new(start as u32, end),
-            kind: StatementKind::LabeledStatement(LabeledStatement { label, body }),
+            kind: StatementKind::LabeledStatement(push_row(
+                &mut self.stores.payloads.labeled_stmts,
+                LabeledStatement { label, body },
+            )),
         })
     }
 }

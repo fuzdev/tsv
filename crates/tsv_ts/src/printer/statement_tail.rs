@@ -89,12 +89,14 @@ impl<'a> Printer<'a> {
     where
         'a: 's,
     {
-        match &stmt.kind {
-            &ast::StatementKind::ExportNamedDeclaration(decl) => {
+        match stmt.kind {
+            ast::StatementKind::ExportNamedDeclaration(decl) => {
                 let decl = self.view.export_named(decl);
                 self.view.opt_stmt(decl.declaration)
             }
-            ast::StatementKind::LabeledStatement(stmt) => Some(self.view.stmt(stmt.body)),
+            ast::StatementKind::LabeledStatement(stmt) => {
+                Some(self.view.stmt(self.view.labeled_stmt(stmt).body))
+            }
             _ => None,
         }
     }
@@ -146,7 +148,9 @@ impl<'a> Printer<'a> {
             ast::StatementKind::ForOfStatement(s) => return Err(self.view.stmt(s.body)),
             ast::StatementKind::WhileStatement(s) => return Err(self.view.stmt(s.body)),
             ast::StatementKind::WithStatement(s) => return Err(self.view.stmt(s.body)),
-            ast::StatementKind::LabeledStatement(s) => return Err(self.view.stmt(s.body)),
+            &ast::StatementKind::LabeledStatement(s) => {
+                return Err(self.view.stmt(self.view.labeled_stmt(s).body));
+            }
             _ => StatementTerminator::Never,
         })
     }
