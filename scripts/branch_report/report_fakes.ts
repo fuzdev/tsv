@@ -8,6 +8,8 @@
 
 import type { FsDir, FsReadDir } from '@fuzdev/gro/fs.ts';
 import { create_fs_paths } from '@fuzdev/gro/fs_paths.ts';
+import { cwd } from '@fuzdev/gro/cwd.ts';
+import { env } from '@fuzdev/gro/env.ts';
 import { fs } from '@fuzdev/gro/fs.ts';
 import type {
 	SpawnChild,
@@ -119,7 +121,7 @@ export function fake_host(
 ): ReportHost {
 	return {
 		checkout,
-		fs_paths: create_fs_paths(fs),
+		fs_paths: create_fs_paths(fs, { cwd: cwd(), home: env.get('HOME') }),
 		cache: {
 			dir: cache,
 			side_program: (name) => {

@@ -16,6 +16,8 @@ import { fileURLToPath } from 'node:url';
 
 import { fs, type FsDir, type FsReadDir } from '@fuzdev/gro/fs.ts';
 import { create_fs_paths } from '@fuzdev/gro/fs_paths.ts';
+import { cwd } from '@fuzdev/gro/cwd.ts';
+import { env } from '@fuzdev/gro/env.ts';
 import { GIT_LOCAL_PASS_ENV } from '@fuzdev/gro/git.ts';
 import { is_spawn_error } from '@fuzdev/gro/spawn_error.ts';
 import { spawn, type SpawnChild, type SpawnProgram, type SpawnResult } from '@fuzdev/gro/spawn.ts';
@@ -791,7 +793,7 @@ const run_over_fakes = async (
 	vi.spyOn(console, 'error').mockImplementation((line: unknown) => void err.push(String(line)));
 	const deps: PerfAbDeps = {
 		checkout: workspace.readonly(),
-		fs_paths: create_fs_paths(fs),
+		fs_paths: create_fs_paths(fs, { cwd: cwd(), home: env.get('HOME') }),
 		// a run requires `HOME` even when `--cache` names the cache
 		home: '/nonexistent/home',
 		open_cache: async (path) => {
@@ -916,7 +918,7 @@ test('usage errors exit 2 with the usage, --help exits 0, before anything is ope
 	await checkout.write('crates/tsv_debug/examples/perf_ab_strip.rs', 'fn main() {}\n');
 	const refusing: PerfAbDeps = {
 		checkout,
-		fs_paths: create_fs_paths(fs),
+		fs_paths: create_fs_paths(fs, { cwd: cwd(), home: env.get('HOME') }),
 		home: undefined,
 		open_cache: unused('open_cache'),
 		git: refusing_program('git'),

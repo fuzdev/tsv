@@ -16,6 +16,8 @@ import { pathToFileURL } from 'node:url';
 
 import { fs } from '@fuzdev/gro/fs.ts';
 import { create_fs_paths } from '@fuzdev/gro/fs_paths.ts';
+import { cwd } from '@fuzdev/gro/cwd.ts';
+import { env } from '@fuzdev/gro/env.ts';
 import { args } from '@fuzdev/gro/args.ts';
 import { stdout } from '@fuzdev/gro/stdout.ts';
 import { stderr } from '@fuzdev/gro/stderr.ts';
@@ -27,7 +29,7 @@ import {
 	type WasmInstance
 } from '../branch_report/wasm_memory.ts';
 
-const fs_paths = create_fs_paths(fs);
+const fs_paths = create_fs_paths(fs, { cwd: cwd(), home: env.get('HOME') });
 
 /** A file's text as `readFile(path, 'utf8')` gives it: a leading BOM kept, a bad byte U+FFFD. */
 const decoder = new TextDecoder('utf-8', { ignoreBOM: true });

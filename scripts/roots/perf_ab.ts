@@ -29,6 +29,7 @@ import { loadavg } from 'node:os';
 
 import { fs, type FsDir } from '@fuzdev/gro/fs.ts';
 import { create_fs_paths, type FsPaths } from '@fuzdev/gro/fs_paths.ts';
+import { cwd } from '@fuzdev/gro/cwd.ts';
 import { GIT_LOCAL_PASS_ENV } from '@fuzdev/gro/git.ts';
 import { env } from '@fuzdev/gro/env.ts';
 import { format_error_detail } from '@fuzdev/gro/error_detail.ts';
@@ -57,7 +58,7 @@ const open_made_dir = async (fs_paths: FsPaths, path: string): Promise<FsDir> =>
 	return opened.dir.dir(opened.path);
 };
 
-const fs_paths = create_fs_paths(fs);
+const fs_paths = create_fs_paths(fs, { cwd: cwd(), home: env.get('HOME') });
 
 /** Every handle the run takes; a program missing from `PATH` throws here. */
 const create_deps = async (): Promise<PerfAbDeps> => ({

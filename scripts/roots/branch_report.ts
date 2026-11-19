@@ -26,6 +26,7 @@ import { loadavg } from 'node:os';
 
 import { fs, type FsDir, type FsReadDir } from '@fuzdev/gro/fs.ts';
 import { create_fs_paths, type FsPaths } from '@fuzdev/gro/fs_paths.ts';
+import { cwd } from '@fuzdev/gro/cwd.ts';
 import { env } from '@fuzdev/gro/env.ts';
 import { pid } from '@fuzdev/gro/pid.ts';
 import { args } from '@fuzdev/gro/args.ts';
@@ -58,7 +59,7 @@ const open_usr_bin = async (): Promise<FsReadDir | null> => {
 	}
 };
 
-const fs_paths = create_fs_paths(fs);
+const fs_paths = create_fs_paths(fs, { cwd: cwd(), home: env.get('HOME') });
 
 /** Every handle the run takes; `git` or `tar` missing from `PATH` throws here. */
 const create_deps = async (): Promise<BranchReportDeps> => {
