@@ -1562,10 +1562,8 @@ impl<'a> Printer<'a> {
                 // path. `:hover\ ` is a pseudo named `hover `; stranding its backslash
                 // would escape the `,` or `{` that follows and destroy the selector list.
                 //
-                // The span also covers an *unreadable* argument list (`:state(/* c */ "x")`,
-                // whose args the parser skipped to `)` after registering the gap comment) —
-                // those comments ride out inside this verbatim slice. See
-                // `tsv_lang::comment_ledger`.
+                // A comment glued to the sigil (`:/* c */hover`) rides out inside this
+                // verbatim slice. See `tsv_lang::comment_ledger`.
                 #[cfg(feature = "_internal_comment_check")]
                 tsv_lang::comment_ledger::record_verbatim_range(self.source, span.start, span.end);
                 let name = self.pseudo_name_text(span, name_end);
@@ -1604,6 +1602,19 @@ impl<'a> Printer<'a> {
         match args {
             ast::PseudoClassArgs::SelectorList { selectors, span } => {
                 self.wrap_pseudo_args(self.build_paren_selector_list_inner(selectors, *span))
+            }
+            ast::PseudoClassArgs::AnyValue { span } => {
+                // An `<any-value>` with no selector grammar is re-emitted from its text:
+                // the whitespace and quote normalization a comment-bearing declaration
+                // value takes, with no number or hash pass, since this argument's tokens
+                // are all it has (`normalize_any_value_with_comments`). Its comments are
+                // registered for the wire but printed here, inside the normalized text.
+                #[cfg(feature = "_internal_comment_check")]
+                tsv_lang::comment_ledger::record_verbatim_range(self.source, span.start, span.end);
+                let text = value_normalization::normalize_any_value_with_comments(
+                    span.extract(self.source),
+                );
+                self.paren_wrap(d.text_pooled(&text))
             }
             ast::PseudoClassArgs::Nth {
                 value,

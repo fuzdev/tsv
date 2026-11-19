@@ -364,6 +364,18 @@ pub enum PseudoClassArgs {
         ident_spans: Run<Span>, // One span per space-separated part name
         span: Span,
     },
+
+    /// An unknown functional pseudo's argument that is not a selector list — the
+    /// `<any-value>` of Selectors 4's `: <function-token> <any-value> )` (`:foo(1 + 2)`,
+    /// `::foo('x', 1)`). `span` covers the argument content (inside the parentheses), and
+    /// the text is read from it: the printer re-emits it with its whitespace and quotes
+    /// normalized and every other token as written (`ValueReader::AnyValue`), comments
+    /// included, so nothing else is stored. Its comments are registered like any other.
+    ///
+    /// ⚠️ The **wire** has no node for it: parseCss rejects a non-selector argument, and
+    /// tsv keeps Svelte's shape for the accepted one — `args: null` on a pseudo-class, no
+    /// `args` key on a pseudo-element — the node's own span already covering the parens.
+    AnyValue { span: Span },
 }
 
 impl PseudoClassArgs {
@@ -373,6 +385,7 @@ impl PseudoClassArgs {
             PseudoClassArgs::Nth { span, .. } => *span,
             PseudoClassArgs::SelectorList { span, .. } => *span,
             PseudoClassArgs::Part { span, .. } => *span,
+            PseudoClassArgs::AnyValue { span } => *span,
         }
     }
 }

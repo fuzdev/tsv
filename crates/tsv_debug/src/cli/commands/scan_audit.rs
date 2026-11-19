@@ -115,6 +115,11 @@ const ALLOW: &[Allow] = &[
         "comment-marker",
     ),
     (
+        "tsv_css/src/parser/pseudo.rs",
+        "let open = text.find('(')?;",
+        "css-value",
+    ),
+    (
         "tsv_css/src/printer/value_normalization/colors.rs",
         "if let Some(open_paren) = raw.find('(') {",
         "css-value",

@@ -819,6 +819,10 @@ fn write_simple_selector(w: &mut JsonWriter, simple: &ast::SimpleSelector, ctx: 
             // conditionally (`...(args && { args })`), so an argument-less
             // `::before` carries no `args` at all, unlike a pseudo-CLASS (which
             // always emits `args`, `null` when absent).
+            // A kept `<any-value>` has no wire node, so it carries no key either.
+            let args = args
+                .as_ref()
+                .filter(|a| !matches!(a, ast::PseudoClassArgs::AnyValue { .. }));
             if let Some(args) = args {
                 w.raw(",\"args\":");
                 write_pseudo_args(w, args, ctx);
@@ -915,6 +919,10 @@ fn write_named_selector(w: &mut JsonWriter, name: &str, span: Span, ctx: &Ctx<'_
 /// nested `SelectorList`, or a `::part()` ident run projected onto one).
 fn write_pseudo_args(w: &mut JsonWriter, args: &ast::PseudoClassArgs, ctx: &Ctx<'_>) {
     match args {
+        // A kept `<any-value>` has no wire node: parseCss rejects a non-selector argument,
+        // and tsv keeps Svelte's shape for the accepted one — `args: null` on a
+        // pseudo-class (a pseudo-element drops the key, filtered at its call site).
+        ast::PseudoClassArgs::AnyValue { .. } => w.null(),
         ast::PseudoClassArgs::Nth {
             value,
             of_selector,

@@ -24,7 +24,8 @@ use numbers::{canonical_unit, is_known_css_unit, normalize_css_number};
 use tsv_lang::printing::format_string_literal;
 
 /// Which of prettier's two value readers a stretch of raw CSS text goes through — the axis
-/// every rule in [`normalize_value_text`] is keyed on.
+/// every rule in [`normalize_value_text`] is keyed on — plus tsv's own token-preserving
+/// [`ValueReader::AnyValue`], for a text no prettier reader has a grammar for.
 ///
 /// The axis is the READER, not the construct: `parser-postcss.js` hands a **declaration
 /// value** (line 195) and an `@supports` / `isModuleRuleName` **prelude** to the same
@@ -61,6 +62,16 @@ pub(crate) enum ValueReader {
     /// both passes — the number one here and the case fold in
     /// `lowercase_media_feature_names`.
     MediaQuery,
+    /// An unknown functional pseudo's `<any-value>` argument (`PseudoClassArgs::AnyValue`,
+    /// `:foo(1 + 2)`) — **tsv's own reader, not one of prettier's**: the argument has no
+    /// grammar beyond its tokens, so this pass changes no token. Quotes requote (a string
+    /// token's value is unchanged by its delimiter) and an unquoted `url()` keeps its content,
+    /// but no number normalizes (`1.0` → `1` turns a `<number>` into an `<integer>`, and
+    /// `a\ .5` → `a\ 0.5` joins the escape-ended ident to the digit) and no hash folds (a
+    /// `#ABC` there may be an ID). Whitespace and comma spacing are
+    /// [`normalize_css_whitespace`]'s, shared with the declaration path
+    /// ([`normalize_any_value_with_comments`]).
+    AnyValue,
 }
 
 /// Normalize CSS numbers, hex colors, unit case and string quotes within a raw value text —
@@ -366,6 +377,8 @@ pub(crate) fn normalize_value_text(input: &str, path: ValueReader) -> String {
             // serialization, so they are copied verbatim like the `#`-token above.
             let normalizes = preserve_from.is_none()
                 && match path {
+                    // An `<any-value>` keeps every token as written.
+                    ValueReader::AnyValue => false,
                     // `[printCssNumber(node.value), printUnit(node.unit)]` — the value node
                     // carries whatever trailed the number as its unit and no gate reads it,
                     // so the number normalizes and the unit rides through (`1.50abc` →
@@ -507,7 +520,7 @@ fn prelude_unit(unit: &str, path: ValueReader) -> Cow<'_, str> {
         ValueReader::MediaQuery if unit.bytes().any(|b| b.is_ascii_uppercase()) => {
             Cow::Owned(unit.to_ascii_lowercase())
         }
-        ValueReader::MediaQuery => Cow::Borrowed(unit),
+        ValueReader::MediaQuery | ValueReader::AnyValue => Cow::Borrowed(unit),
     }
 }
 
@@ -684,7 +697,9 @@ fn media_word_part_split(run: &str) -> (usize, bool) {
 /// run short of what this module read — see [`media_word_part_split`].
 fn ident_run_split(run: &str, path: ValueReader) -> (usize, bool) {
     match path {
-        ValueReader::Value => (run.len(), run.ends_with(is_css_ident_code_point)),
+        ValueReader::Value | ValueReader::AnyValue => {
+            (run.len(), run.ends_with(is_css_ident_code_point))
+        }
         ValueReader::MediaQuery => media_word_part_split(run),
     }
 }
@@ -1351,6 +1366,14 @@ pub(crate) fn extract_value_with_comments(decl_source: &str, colon_pos: usize) -
 /// included, so a measure and its emit can never pick different spellings.
 pub(crate) fn normalize_value_with_comments(value: &str) -> String {
     normalize_value_text(&normalize_css_whitespace(value), ValueReader::Value)
+}
+
+/// [`normalize_value_with_comments`] for an unknown functional pseudo's `<any-value>`
+/// argument: the same whitespace pass (runs collapsed, paren padding trimmed, one space
+/// after a comma and around a comment), then [`ValueReader::AnyValue`]'s token pass, which
+/// requotes strings and leaves every number, unit and hash as written.
+pub(crate) fn normalize_any_value_with_comments(value: &str) -> String {
+    normalize_value_text(&normalize_css_whitespace(value), ValueReader::AnyValue)
 }
 
 #[cfg(test)]

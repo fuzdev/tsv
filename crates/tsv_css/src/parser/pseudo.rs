@@ -142,7 +142,8 @@ enum PseudoArgKind {
     Part,
     /// The `:nth-child()` family — a `<An+B> [of S]?` argument.
     Nth,
-    /// Any other pseudo — its argument is tried as a selector list, else skipped.
+    /// Any other pseudo — its argument is tried as a selector list, else kept as an
+    /// `<any-value>` (`PseudoClassArgs::AnyValue`).
     Unknown,
 }
 
@@ -202,10 +203,10 @@ fn classify_pseudo_args(pseudo_name: &str, is_pseudo_element: bool) -> PseudoArg
 
 /// Parse a pseudo-class/element argument list `( … )` by its pre-classified
 /// `PseudoArgKind` (from `classify_pseudo_args`), dispatching to the per-family helper.
-/// Returns `(Option<PseudoClassArgs>, end_position_of_closing_paren)`; `None` args are
-/// unknown pseudo-classes whose argument isn't a selector list. Every helper takes
-/// `args_start` — the source position just after `(`, where each family's `span` begins —
-/// and owns its own `)` capture.
+/// Returns `(Option<PseudoClassArgs>, end_position_of_closing_paren)`; every family
+/// returns `Some` (an unknown pseudo's non-selector argument is an `AnyValue`). Every
+/// helper takes `args_start` — the source position just after `(`, where each family's
+/// `span` begins — and owns its own `)` capture.
 ///
 /// The selector-list arms all run with `in_pseudo_args` set (via `selector_list_args` →
 /// `with_pseudo_args`), so a bare `<number>`/`<an+b>` term parses as an `Nth` simple
@@ -463,14 +464,19 @@ fn parse_nth_args(
     ))
 }
 
-/// Unknown pseudo-class/element (`:current()`, `:state()`, `::cue()`, …). Try to
-/// parse the argument as a complex selector list first (the common case, sharing
-/// `:is()`'s printer arm which already interleaves gap comments); if that fails the
-/// argument isn't a selector, so skip to the matching `)` and return `None`.
+/// Unknown pseudo-class/element (`:current()`, `:state()`, `::cue()`, …). Selectors 4
+/// gives a functional pseudo the argument `<any-value>`, so tsv tries the common case
+/// first — a complex selector list that runs exactly to the `)`, sharing `:is()`'s printer
+/// arm, which already interleaves gap comments — and otherwise keeps the argument as an
+/// `AnyValue` (`:foo(1 + 2)`, `:foo(f(1 2))`). A list that parses but stops short of the
+/// `)` (`:foo(f(1 2))` reads `f` and stops at its `(`) is no selector argument either.
 fn parse_unknown_args(
     parser: &mut CssParser<'_>,
     args_start: usize,
 ) -> Result<(Option<PseudoClassArgs>, u32), Error> {
+    // The fallback rewinds every registration the selector attempt made — the leading gap
+    // comment included — since an `AnyValue` prints its comments inside its own text.
+    let comments_len = parser.comments.len();
     // Register leading/trailing gap comments (`:current(/* c */ .a)`); the
     // built `SelectorList` args share `:is()`'s printer arm, which already
     // interleaves them, so this path is parser-only.
@@ -483,31 +489,180 @@ fn parse_unknown_args(
     let scratch_marks = parser.stores.scratch_marks();
     // Try to parse as a selector list (complex selectors, strict parsing)
     match parse_complex_selector_list(parser) {
-        Ok(selector_list) => finish_selector_list_args(parser, args_start, selector_list),
+        Ok(selector_list) => {
+            parser.skip_boundary_whitespace_registering_comments()?;
+            if parser.check(TokenKind::RightParen) {
+                return finish_selector_list_args(parser, args_start, selector_list);
+            }
+        }
         // a depth limit is no verdict on the arguments (see `parse_forgiving_selector_list`)
-        Err(error) if error.kind() == tsv_lang::ErrorKind::TooDeep => Err(error),
-        Err(_) => {
-            #[cfg(feature = "_internal_ast_census")]
-            tsv_lang::ast_census_probe::rewind(ast_census_mark);
-            parser.stores.truncate_scratch(&scratch_marks);
-            // Parsing as selector list failed - skip arguments
-            // This handles pseudo-classes with non-selector arguments
-            let mut depth = 1;
-            while depth > 0 && !parser.check(TokenKind::Eof) {
-                if parser.check(TokenKind::LeftParen) {
-                    depth += 1;
-                } else if parser.check(TokenKind::RightParen) {
-                    depth -= 1;
-                    if depth == 0 {
-                        break;
-                    }
-                }
-                if depth > 0 {
-                    parser.advance()?;
+        Err(error) if error.kind() == tsv_lang::ErrorKind::TooDeep => return Err(error),
+        Err(_) => {}
+    }
+    #[cfg(feature = "_internal_ast_census")]
+    tsv_lang::ast_census_probe::rewind(ast_census_mark);
+    parser.stores.truncate_scratch(&scratch_marks);
+    parser.rewind_to(args_start, comments_len)?;
+    let end = scan_any_value(parser, args_start)?;
+    let close = parser.expect_and_capture(TokenKind::RightParen)?;
+    Ok((
+        Some(PseudoClassArgs::AnyValue {
+            span: Span {
+                start: parser.span_pos(args_start),
+                end,
+            },
+        }),
+        close,
+    ))
+}
+
+/// Step an `<any-value>` (css-syntax-3) from `args_start` to the `)` that closes the
+/// pseudo's argument, leaving the parser on it and returning its host offset. Its comments
+/// are registered — the wire's root `comments` list carries them — while the printer
+/// prints them inside the `AnyValue`'s own text and claims them there.
+///
+/// `<any-value>` is one or more tokens, any but a `<bad-string-token>`, a
+/// `<bad-url-token>`, and an unmatched `)`, `]` or `}` — a top-level `;` or `!` is content.
+/// So a block opened inside it must close with its own bracket (a stack, not a paren
+/// count: `:foo({)` and `:foo(1])` reject), and the lexer's two tokens it does not model as
+/// bad are graded here (`bad_string`, `bad_url`). Whitespace and comments are no tokens,
+/// so `:foo()`, `:foo( )` and `:foo(/* c */)` reject.
+fn scan_any_value(parser: &mut CssParser<'_>, args_start: usize) -> Result<u32, Error> {
+    let mut open: Vec<TokenKind> = Vec::new();
+    let mut has_token = false;
+    loop {
+        let kind = parser.current_kind();
+        match kind {
+            TokenKind::Eof => return Err(parser.error_expected("')'")),
+            TokenKind::RightParen if open.is_empty() => break,
+            TokenKind::LeftParen | TokenKind::LeftBracket | TokenKind::LeftBrace => {
+                open.push(kind);
+            }
+            TokenKind::RightParen | TokenKind::RightBracket | TokenKind::RightBrace => {
+                let opener = match kind {
+                    TokenKind::RightParen => TokenKind::LeftParen,
+                    TokenKind::RightBracket => TokenKind::LeftBracket,
+                    _ => TokenKind::LeftBrace,
+                };
+                if open.pop() != Some(opener) {
+                    return Err(parser.error_msg("Unmatched bracket in a pseudo argument"));
                 }
             }
-            let end = parser.expect_and_capture(TokenKind::RightParen)?;
-            Ok((None, end))
+            TokenKind::String { .. } if bad_string(parser.current_value()) => {
+                return Err(parser.error_msg("Unescaped newline in a string"));
+            }
+            TokenKind::Url => {
+                if let Some(cause) = bad_url(parser.current_value()) {
+                    return Err(parser.error_msg(&format!("Invalid url(): {cause}")));
+                }
+            }
+            TokenKind::Comment => parser.register_current_comment(),
+            _ => {}
+        }
+        if !matches!(kind, TokenKind::Whitespace | TokenKind::Comment) {
+            has_token = true;
+        }
+        parser.advance()?;
+    }
+    if !has_token {
+        return Err(parser.error_msg_at(
+            "Expected a functional pseudo argument",
+            parser.base_offset() + args_start,
+        ));
+    }
+    Ok(parser.span_pos(parser.current_start()))
+}
+
+/// Is this string token a `<bad-string-token>` — one holding an unescaped newline
+/// (css-syntax-3 §4.3.5)? An escaped newline is a line continuation, and content.
+fn bad_string(text: &str) -> bool {
+    let bytes = text.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        match bytes[i] {
+            // an escaped CRLF is one newline, continued as a whole
+            b'\\' if bytes[i + 1..].starts_with(b"\r\n") => i += 3,
+            b'\\' => i += 2,
+            b'\n' | b'\r' | b'\x0C' => return true,
+            _ => i += 1,
+        }
+    }
+    false
+}
+
+/// Is this url token a `<bad-url-token>` (css-syntax-3 §4.3.6), and why? Past the
+/// whitespace at either end of its content, a url holds no whitespace, quote, `(`,
+/// non-printable code point, or `\` that opens no valid escape (one before a newline or
+/// the end).
+fn bad_url(text: &str) -> Option<&'static str> {
+    let open = text.find('(')?;
+    let inner = &text[open + 1..];
+    let content = inner.strip_suffix(')').unwrap_or(inner);
+    let content = content.trim_matches(|c: char| matches!(c, ' ' | '\t' | '\n' | '\r' | '\x0C'));
+    let mut chars = content.chars();
+    while let Some(c) = chars.next() {
+        match c {
+            ' ' | '\t' | '\n' | '\r' | '\x0C' => return Some("whitespace inside the url"),
+            '"' | '\'' | '(' => return Some("a quote or '(' inside the url"),
+            '\0'..='\x08' | '\x0B' | '\x0E'..='\x1F' | '\x7F' => {
+                return Some("a non-printable character inside the url");
+            }
+            '\\' => {
+                if matches!(chars.next(), None | Some('\n' | '\r' | '\x0C')) {
+                    return Some("an invalid escape inside the url");
+                }
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{bad_string, bad_url};
+
+    #[test]
+    fn bad_string_is_an_unescaped_newline() {
+        for good in [
+            "'x'",
+            "\"a b\"",
+            "'a\\\nb'",
+            "'a\\\r\nb'",
+            "'a\\\rb'",
+            "'a\\\x0Cb'",
+        ] {
+            assert!(!bad_string(good), "{good:?}");
+        }
+        for bad in ["'a\nb'", "'a\rb'", "'a\r\nb'", "'a\x0Cb'", "'a\\\r\r\nb'"] {
+            assert!(bad_string(bad), "{bad:?}");
+        }
+    }
+
+    #[test]
+    fn bad_url_names_its_cause() {
+        for good in [
+            "url(x)",
+            "url( x )",
+            "url(\n\tx\n)",
+            "url(a\\ b)",
+            "url(a\\(b)",
+            "url(x",
+        ] {
+            assert_eq!(bad_url(good), None, "{good:?}");
+        }
+        for bad in [
+            "url(x y)",
+            "url(a\tb)",
+            "url(a\"b)",
+            "url(a'b)",
+            "url(a(b)",
+            "url(a\x01b)",
+            "url(a\x7Fb)",
+            "url(a\\\nb)",
+            "url(a\\)",
+        ] {
+            assert!(bad_url(bad).is_some(), "{bad:?}");
         }
     }
 }

@@ -819,11 +819,16 @@ the spec settling is the gate.
 | CSS Conditional Values 1 (`css-conditional-values-1`) | `true` / `false` values, comparison operators in values, boolean logic in values |
 | CSS Forms 1 (`css-forms-1`) | `appearance: base`, `::picker()`, `::field-text`, `::clear-icon` |
 
-An unknown pseudo-class/element argument is not held opaque — `parse_unknown_args` first
-tries the content as a complex selector list and only falls back to a paren-balanced raw
-skip. So `:state(foo)`'s `foo` lands as a `TypeSelector` and `:heading(1)`'s `1` as an
-`Nth`. That is not a divergence: `parseCss` produces the identical shape, and matching it
-is the enforced goal.
+An unknown pseudo-class/element argument is not held opaque when it is a selector list —
+`parse_unknown_args` first tries the content as a complex selector list running exactly to
+the `)`, so `:state(foo)`'s `foo` lands as a `TypeSelector` and `:heading(1)`'s `1` as an
+`Nth`, the shape `parseCss` produces. Any other argument is Selectors 4's `<any-value>`
+(`:foo(1 + 2)`, `::foo(f(1 2))`), kept as a `PseudoClassArgs::AnyValue` and printed with
+its whitespace and quotes normalized and every other token as written; `parseCss` rejects
+it, so that acceptance is a cataloged divergence, while the wire keeps Svelte's
+`args: null`. An empty or comment-only argument, an unmatched `]` / `}` / `{`, a bad url
+and a bad string reject —
+[unknown_non_selector_args](../tests/fixtures/css/selectors/pseudo_class/unknown_non_selector_args_svelte_prettier_divergence/).
 
 ---
 
