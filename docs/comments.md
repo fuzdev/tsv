@@ -501,7 +501,7 @@ route through the shared predicate.
 
 Three slot rules bound the scan, because the gap can hold erased structure:
 
-- **A dropped `EmptyStatement` closes its slot** (`statement_gap_floor`): a comment
+- **A dropped `EmptyStatement` closes its slot** (`StatementGap::floor`): a comment
   before the `;` trails the content before it however the lines fall
   (`a(); /* c */ ; b();`), while one after it leads (`a(); ; /* c */ b();`) — prettier
   binds both the same way, and the orphan arm's scan stops at the split so it neither

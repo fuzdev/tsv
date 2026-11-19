@@ -53,59 +53,66 @@ pub(crate) fn is_effectively_empty_body(view: AstView<'_>, body: &[ast::StmtId])
         .all(|s| matches!(&view.stmt(*s).kind, ast::StatementKind::EmptyStatement(_)))
 }
 
-/// The start of the next statement after `index` that will actually be printed
-/// — the first one that isn't a dropped standalone `EmptyStatement` — falling
-/// back to `body_end` when only dropped statements (or nothing) follow.
+/// The trailing gap of the statement at `slots[index]`, read in ONE walk over the slots
+/// after it: where the next printed statement starts, and the gap's slot floor.
 ///
-/// Used to bound a statement's trailing same-line comment scan. A comment
-/// physically trailing a dropped `;` on the statement's own line (`a();; // c`)
-/// must attach to that statement: the `;` it follows emits nothing, so bounding
-/// the scan at the `;` — rather than the next *printed* statement — would strand
-/// the comment (neither the statement's trailing scan nor the dropped `;`'s
-/// leading-comment collection claims it) and silently drop it.
-pub(crate) fn next_printed_stmt_start(
-    view: AstView<'_>,
-    body: &[ast::StmtId],
-    index: usize,
-    body_end: u32,
-) -> u32 {
-    next_printed_stmt(view, body, index).map_or(body_end, |s| s.span().start)
+/// Both halves come from the same run of dropped standalone `EmptyStatement`s (Prettier's
+/// `printStatementSequence` never prints them) between the statement and the next printed
+/// one, which is why one value carries both. Each statement-list walk's printing arm (program,
+/// block/namespace body, switch consequent) builds it once per statement and hands it to
+/// each question it asks of that gap.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct StatementGap {
+    /// The start of the next statement that will actually be printed, `None` when only
+    /// dropped statements (or nothing) follow.
+    ///
+    /// It bounds the statement's trailing same-line comment scan. A comment physically
+    /// trailing a dropped `;` on the statement's own line (`a();; // c`) must attach to
+    /// that statement: the `;` it follows emits nothing, so bounding the scan at the `;`
+    /// — rather than the next *printed* statement — would strand the comment (neither the
+    /// statement's trailing scan nor the dropped `;`'s leading-comment collection claims
+    /// it) and silently drop it. Callers whose behavior differs when nothing prints read
+    /// the `Option` (the trailing-claim split runs only toward a printed statement — a
+    /// comment hugging the body's `}` still trails).
+    pub(crate) next_start: Option<u32>,
+    /// The slot floor for the trailing gap: past the last dropped `EmptyStatement` between
+    /// the statement and the next printed one, else the statement's own end. A comment
+    /// before a dropped `;` binds inside its own slot and trails the content before it
+    /// (`a(); /* c */ ; b();` — prettier reads it the same way), so the leads-next scan
+    /// ([`Printer::trailing_claim_end`](super::Printer::trailing_claim_end)) must not reach
+    /// back across one.
+    pub(crate) floor: u32,
 }
 
-/// The next statement after `body[index]` that `printStatementSequence` will actually
-/// print — `None` when only dropped `EmptyStatement`s (or nothing) follow. The
-/// `Option` form of [`next_printed_stmt_start`], for the callers whose behavior
-/// differs when nothing prints (the trailing-claim split runs only toward a printed
-/// statement — a comment hugging the body's `}` still trails).
-pub(crate) fn next_printed_stmt<'s>(
-    view: AstView<'s>,
-    body: &'s [ast::StmtId],
-    index: usize,
-) -> Option<&'s ast::Statement> {
-    body[index + 1..]
-        .iter()
-        .map(|s| view.stmt(*s))
-        .find(|s| !matches!(&s.kind, ast::StatementKind::EmptyStatement(_)))
-}
+impl StatementGap {
+    /// The gap after `stmt`, which is `slots[index]`.
+    pub(crate) fn of(
+        view: AstView<'_>,
+        stmt: &ast::Statement,
+        slots: &[ast::StmtId],
+        index: usize,
+    ) -> Self {
+        let mut floor = stmt.span().end;
+        for slot in &slots[index + 1..] {
+            let next = view.stmt(*slot);
+            if !matches!(&next.kind, ast::StatementKind::EmptyStatement(_)) {
+                return Self {
+                    next_start: Some(next.span().start),
+                    floor,
+                };
+            }
+            floor = next.span().end;
+        }
+        Self {
+            next_start: None,
+            floor,
+        }
+    }
 
-/// The slot floor for `stmt`'s trailing gap, where `stmt` is `slots[index]`: past the last
-/// dropped `EmptyStatement` between it and the next printed statement, else the statement's
-/// own end. A comment before a dropped `;` binds inside its own slot and trails the
-/// content before it (`a(); /* c */ ; b();` — prettier reads it the same way), so the
-/// leads-next scan ([`Printer::trailing_claim_end`](super::Printer::trailing_claim_end))
-/// must not reach back across one.
-pub(crate) fn statement_gap_floor(
-    view: AstView<'_>,
-    stmt: &ast::Statement,
-    slots: &[ast::StmtId],
-    index: usize,
-) -> u32 {
-    slots[index + 1..]
-        .iter()
-        .map(|s| view.stmt(*s))
-        .take_while(|s| matches!(&s.kind, ast::StatementKind::EmptyStatement(_)))
-        .last()
-        .map_or_else(|| stmt.span().end, |s| s.span().end)
+    /// [`Self::next_start`], falling back to `list_end` when nothing printed follows.
+    pub(crate) fn next_start_or(self, list_end: u32) -> u32 {
+        self.next_start.unwrap_or(list_end)
+    }
 }
 
 /// Check if an expression is a module path call that should use fluid assignment wrapping

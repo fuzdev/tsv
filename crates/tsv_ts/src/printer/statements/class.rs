@@ -246,7 +246,7 @@ impl<'a> Printer<'a> {
     /// binds it the same way), so the leads-next scan
     /// ([`Printer::trailing_claim_end`]) must not reach back across one. The
     /// statement lists get the same rule from their dropped `EmptyStatement` nodes
-    /// ([`statement_gap_floor`](crate::printer::statement_gap_floor)); a class body
+    /// ([`StatementGap::floor`](crate::printer::StatementGap::floor)); a class body
     /// has no node to key on, so the floor reads the source.
     pub(in crate::printer) fn class_member_gap_floor(
         &self,

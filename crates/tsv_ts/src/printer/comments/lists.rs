@@ -8,8 +8,8 @@
 
 use super::{CommentVec, LeadingGlue, Printer, TrailingLineRef};
 use crate::ast;
+use crate::printer::StatementGap;
 use crate::printer::statements::TerminatorGap;
-use crate::printer::{next_printed_stmt, next_printed_stmt_start, statement_gap_floor};
 use tsv_lang::Span;
 use tsv_lang::comments_in_source_after_comment;
 use tsv_lang::doc::DocBuf;
@@ -474,7 +474,7 @@ impl<'a> Printer<'a> {
     /// the **in-source** axis — an owned comment's bytes glue the chain like any
     /// other's. Erased structure in the gap (a dropped `;`, a member separator) is
     /// invisible to the line test, which is why the CLAIM scan opens at its slot floor
-    /// ([`statement_gap_floor`] and kin): a comment bound inside its own slot is
+    /// ([`StatementGap::floor`] and kin): a comment bound inside its own slot is
     /// claimed as trailing and stays behind the cursor, so this test is never asked
     /// of it.
     ///
@@ -519,7 +519,7 @@ impl<'a> Printer<'a> {
     /// dropped `EmptyStatement` binds inside its own slot and trails
     /// (`a(); /* c */ ; b();` — prettier reads it the same way), so statement-list
     /// callers open the scan past the last dropped `;`
-    /// ([`statement_gap_floor`]); the type-literal
+    /// ([`StatementGap::floor`]); the type-literal
     /// member gap opens it past the member's source separator for the same reason (a
     /// comment before the `;` trails its member however the lines fall).
     ///
@@ -533,7 +533,7 @@ impl<'a> Printer<'a> {
     }
 
     /// [`Self::trailing_claim_end`] for `stmt`'s trailing gap (`stmt` is `slots[index]`): from the
-    /// gap's slot floor ([`statement_gap_floor`]) toward the next printed statement — or
+    /// gap's slot floor ([`StatementGap::floor`]) toward the next printed statement — or
     /// toward `tail_target` when only dropped `;`s (or nothing) follow: the construct
     /// past the list's end that gap comments could still lead (a switch consequent's
     /// next `case` label), `None` where nothing prints there (a body's `}`). With no
@@ -553,30 +553,30 @@ impl<'a> Printer<'a> {
         tail_target: Option<u32>,
     ) -> u32 {
         // Only the orphan arm asks here, and an orphan `;` is never frozen.
-        self.statement_claim_end_with(stmt, slots, index, tail_target, || {
-            self.statement_emitted_end(stmt, false)
-        })
+        self.statement_claim_end_with(
+            stmt,
+            StatementGap::of(self.view, stmt, slots, index),
+            tail_target,
+            || self.statement_emitted_end(stmt, false),
+        )
     }
 
     /// [`Self::statement_claim_end`] for a walk that already HOLDS `stmt`'s
-    /// [`Self::statement_emitted_end`] — `emitted_end` hands it over, asked only when the
-    /// gap's scan opens there. Both statement walks' printing arms compute that end for their
-    /// own cursor first, and re-deriving it (the kind walk, the terminator gap's claim) for
-    /// the same statement a second time is the cost this saves.
+    /// [`Self::statement_emitted_end`] and its [`StatementGap`] — `emitted_end` hands the
+    /// first over, asked only when the gap's scan opens there. Both statement walks'
+    /// printing arms compute both for their own cursor and bounds first, and re-deriving
+    /// them (the kind walk, the terminator gap's claim, the walk over the following slots)
+    /// for the same statement a second time is the cost this saves.
     pub(crate) fn statement_claim_end_with(
         &self,
         stmt: &ast::Statement,
-        slots: &[ast::StmtId],
-        index: usize,
+        gap: StatementGap,
         tail_target: Option<u32>,
         emitted_end: impl FnOnce() -> u32,
     ) -> u32 {
-        match next_printed_stmt(self.view, slots, index)
-            .map(|s| s.span().start)
-            .or(tail_target)
-        {
+        match gap.next_start.or(tail_target) {
             Some(target) => self.trailing_claim_end(
-                self.statement_gap_scan_start(stmt, slots, index, emitted_end),
+                self.statement_gap_scan_start(stmt, gap, emitted_end),
                 target,
             ),
             None => u32::MAX,
@@ -584,7 +584,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Where `stmt`'s trailing gap OPENS for the comment scans — the slot floor
-    /// ([`statement_gap_floor`]) lowered into the statement's own terminator gap.
+    /// ([`StatementGap::floor`]) lowered into the statement's own terminator gap.
     ///
     /// The two directions answer two different obstacles and compose in one order. A
     /// dropped `;` after the statement RAISES the floor, because a comment before it binds
@@ -606,15 +606,13 @@ impl<'a> Printer<'a> {
     fn statement_gap_scan_start(
         &self,
         stmt: &ast::Statement,
-        slots: &[ast::StmtId],
-        index: usize,
+        gap: StatementGap,
         emitted_end: impl FnOnce() -> u32,
     ) -> u32 {
-        let floor = statement_gap_floor(self.view, stmt, slots, index);
-        if floor == stmt.span().end {
+        if gap.floor == stmt.span().end {
             emitted_end()
         } else {
-            floor
+            gap.floor
         }
     }
 
@@ -623,7 +621,7 @@ impl<'a> Printer<'a> {
     /// when the statement is FROZEN.
     ///
     /// Named for the emission rather than for a gap, because it is not a sibling of
-    /// [`statement_gap_floor`] or [`Self::statement_gap_scan_start`] and must not be reached
+    /// [`StatementGap::floor`] or [`Self::statement_gap_scan_start`] and must not be reached
     /// for as one: those two answer where a gap's SCAN opens (and a dropped `;` RAISES them),
     /// while this only ever moves DOWN, into the statement's own terminator gap. It is the
     /// anchor a trailing run and a cursor take.
@@ -690,7 +688,7 @@ impl<'a> Printer<'a> {
     /// handed-over comment stays ahead of it for that leading run to find.
     ///
     /// The caller states the gap's slot FLOOR, a per-family fact rather than a preference
-    /// ([`MemberGap`]) — the same role `statement_gap_floor` plays for a statement list.
+    /// ([`MemberGap`]) — the same role [`StatementGap::floor`] plays for a statement list.
     ///
     /// Pushes into the caller's buffer rather than returning one: the run is empty on
     /// nearly every member, and a returned buffer is minted, moved and `extend`ed away
@@ -742,13 +740,13 @@ impl<'a> Printer<'a> {
         // before it — which that `;`'s orphan run then cannot find, a DROP. Raising is the
         // claim SCAN's rule, not the anchor's.
         let stmt_end = self.statement_emitted_end(stmt, frozen);
-        let bound = next_printed_stmt_start(self.view, slots, index, list_end);
+        let gap = StatementGap::of(self.view, stmt, slots, index);
         self.push_trailing_run(
             parts,
             stmt_end,
-            bound,
-            self.statement_claim_end_with(stmt, slots, index, None, || stmt_end),
-            self.printed_tail(stmt_end, statement_gap_floor(self.view, stmt, slots, index)),
+            gap.next_start_or(list_end),
+            self.statement_claim_end_with(stmt, gap, None, || stmt_end),
+            self.printed_tail(stmt_end, gap.floor),
         )
     }
 
@@ -763,7 +761,7 @@ impl<'a> Printer<'a> {
     /// - a **dropped `EmptyStatement`** (`a();⏎; // c`) — it prints nothing at all, so it
     ///   cannot begin a line either.
     ///
-    /// [`statement_gap_floor`] already reports past the second, and `emitted_end`
+    /// [`StatementGap::floor`] already reports past the second, and `emitted_end`
     /// ([`Self::statement_emitted_end`]) sits below the span end exactly when the statement
     /// handed its terminator gap to this list (prettier's `__contentEnd`,
     /// [`Printer::statement_comment_claim_end`]) — which covers the first. So the whole

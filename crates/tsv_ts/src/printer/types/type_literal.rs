@@ -322,7 +322,7 @@ impl<'a> Printer<'a> {
     /// member however the lines fall (`a: A /* c */; b: B` keeps `/* c */` with `a`),
     /// so the leads-next test must not reach it — the separator is this gap's slot
     /// floor, the same role a dropped `;` plays in a statement list
-    /// ([`statement_gap_floor`](crate::printer::statement_gap_floor)).
+    /// ([`StatementGap::floor`](crate::printer::StatementGap::floor)).
     fn type_member_gap_floor(&self, member_content_end: u32, upper_bound: u32) -> u32 {
         self.type_member_separator_pos(member_content_end, upper_bound)
             .map_or(member_content_end, |pos| pos + 1)

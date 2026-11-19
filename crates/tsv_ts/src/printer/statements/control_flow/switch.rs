@@ -8,8 +8,7 @@ use crate::ast::{self, StatementKind};
 use crate::printer::expressions::blocks::{OrphanSemiCursor, StatementBlankScan};
 use crate::printer::statements::StatementContext;
 use crate::printer::{
-    CommentFilter, CommentSpacing, CommentVec, LeadingGlue, Printer, next_printed_stmt_start,
-    statement_gap_floor,
+    CommentFilter, CommentSpacing, CommentVec, LeadingGlue, Printer, StatementGap,
 };
 use smallvec::smallvec;
 use tsv_lang::Span;
@@ -544,9 +543,9 @@ impl<'a> Printer<'a> {
                 // bound is the printing arm's own `has_next_stmt`, asked of the next PRINTED
                 // statement, so a `;` in the middle of a run of them answers for the whole
                 // run rather than for its immediate neighbour.
-                let trailing_semi_run =
-                    next_printed_stmt_start(self.view, consequent, i, inline_comment_boundary)
-                        == inline_comment_boundary;
+                let trailing_semi_run = StatementGap::of(self.view, stmt, consequent, i)
+                    .next_start
+                    .is_none();
                 let slot = self.orphan_semi_slot(
                     stmt,
                     consequent,
@@ -627,8 +626,10 @@ impl<'a> Printer<'a> {
             // ([`Printer::statement_emitted_end`]).
             let frozen = self.gap_frozen_span(prev_end, stmt.span());
             let stmt_gap_start = self.statement_emitted_end(stmt, frozen.is_some());
-            let next_bound =
-                next_printed_stmt_start(self.view, consequent, i, inline_comment_boundary);
+            // The gap after this statement, walked once for every question below that reads
+            // it: the next printed statement's start and the slot floor.
+            let gap = StatementGap::of(self.view, stmt, consequent, i);
+            let next_bound = gap.next_start_or(inline_comment_boundary);
             // Deferring hands the `;` line's comments to the NEXT statement's leading run,
             // so it needs one to exist. For the last statement of a consequent there is no
             // such run; its `;`-line comments land own-line at CASE-LABEL indent instead —
@@ -638,7 +639,7 @@ impl<'a> Printer<'a> {
             // right at every sibling-case break (label indent), one level out at the LAST
             // case, whose next break is the switch's `}` — the renderer-side holdout
             // `doc/arena_render_suffix.rs` names.
-            let has_next_stmt = next_bound != inline_comment_boundary;
+            let has_next_stmt = gap.next_start.is_some();
             // A `//` closing the terminator gap still closes the statement's LAST LINE
             // whoever emits it, so the landing below is unchanged by the hand-off — only the
             // emitter moved (the gap's run is this list's now, and it trails on the content's
@@ -664,9 +665,7 @@ impl<'a> Printer<'a> {
             // instead (`b1(); /* c */ let d1 = 1;`, `b1(); /* c */ case 2:`), emitted
             // by that statement's leading run / the switch's between-case run.
             let claim_end = if body_has_comments {
-                self.statement_claim_end_with(stmt, consequent, i, next_case_start, || {
-                    stmt_gap_start
-                })
+                self.statement_claim_end_with(stmt, gap, next_case_start, || stmt_gap_start)
             } else {
                 u32::MAX
             };
@@ -674,10 +673,7 @@ impl<'a> Printer<'a> {
             // ([`Printer::printed_tail`]) — neither a `;` the author detached nor a dropped
             // one begins a new output line, so a comment past either trails the statement
             // here exactly as it does in a block body.
-            let printed_tail = self.printed_tail(
-                stmt_gap_start,
-                statement_gap_floor(self.view, stmt, consequent, i),
-            );
+            let printed_tail = self.printed_tail(stmt_gap_start, gap.floor);
             // Where the content-line run ends, and whether it leaves the terminator gap EMPTY
             // behind it — two comment queries the `deferred_tail_landing` arms below are the
             // only readers of, so they are asked only there.
