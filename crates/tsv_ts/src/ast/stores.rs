@@ -3,9 +3,10 @@
 //!
 //! Beside the three families, [`PayloadStores`] holds one store per payload too rare to sit
 //! inline in the node that refers to it: the function, class and declaration payloads, the
-//! constructor, import and `infer` types, qualified names, a `for` head, a `for … in` / `for …
-//! of` left side, a catch clause and a parameter name's extras. One macro declares each such
-//! store with the id the tree holds and its view accessor.
+//! constructor, import and `infer` types, qualified names, a `for` head, a `for … in` /
+//! `for … of` left side, a catch clause, a binding's extras, a call's type arguments, a
+//! comment-bound pair and an escaped name's text. One macro declares each such store with
+//! the id the tree holds and its view accessor.
 //!
 //! [`RunStores`] holds one store per element type of a list built by value: object
 //! properties, template quasis, declarators, cases, import and export specifiers, class and
@@ -39,20 +40,21 @@ use std::cell::Cell;
 use std::fmt;
 use std::ops::Deref;
 
-use tsv_lang::store::{Id, ListBuf, ListMark, MarkGroup, Row, Store, TextPool};
+use tsv_lang::store::{Id, ListBuf, ListMark, MarkGroup, PoolText, Row, Run, Store, TextPool};
 #[cfg(test)]
 use tsv_lang::value_runs::{FieldKind, FieldShape};
 
 use super::{
-    ArrowFunctionExpression, AstView, CatchClause, ClassDeclaration, ClassExpression, ClassMember,
-    Comment, Decorator, ExportAllDeclaration, ExportDefaultDeclaration, ExportNamedDeclaration,
-    ExportSpecifier, Expression, ForInOfLeft, ForInit, FunctionDeclaration, FunctionExpression,
-    Identifier, IdentifierParamExtra, ImportAttribute, ImportDeclaration, ImportSpecifier,
-    MetaProperty, ObjectPatternProperty, ObjectProperty, Program, Statement, SwitchCase,
-    TSConstructorType, TSDeclareFunction, TSEnumDeclaration, TSEnumMember, TSExportAssignment,
-    TSImportEqualsDeclaration, TSImportType, TSInferType, TSInterfaceDeclaration,
-    TSInterfaceHeritage, TSModuleDeclaration, TSQualifiedName, TSType, TSTypeAliasDeclaration,
-    TSTypeElement, TSTypeParameter, TaggedTemplateExpression, TemplateElement, VariableDeclarator,
+    ArrowFunctionExpression, AstView, BindingExtra, CatchClause, ClassDeclaration, ClassExpression,
+    ClassMember, Comment, CommentBoundPair, Decorator, EscapedName, ExportAllDeclaration,
+    ExportDefaultDeclaration, ExportNamedDeclaration, ExportSpecifier, Expression, ForInOfLeft,
+    ForInit, FunctionDeclaration, FunctionExpression, Identifier, ImportAttribute,
+    ImportDeclaration, ImportSpecifier, MetaProperty, ObjectPatternProperty, ObjectProperty,
+    Program, Statement, SwitchCase, TSConstructorType, TSDeclareFunction, TSEnumDeclaration,
+    TSEnumMember, TSExportAssignment, TSImportEqualsDeclaration, TSImportType, TSInferType,
+    TSInterfaceDeclaration, TSInterfaceHeritage, TSModuleDeclaration, TSQualifiedName, TSType,
+    TSTypeAliasDeclaration, TSTypeAnnotation, TSTypeElement, TSTypeParameter,
+    TSTypeParameterInstantiation, TaggedTemplateExpression, TemplateElement, VariableDeclarator,
 };
 
 impl Row for Expression {
@@ -236,8 +238,16 @@ payload_stores! {
     for_lefts: ForInOfLeft => ForLeftId, for_left;
     /// Catch clauses, `catch (e) {}`: [`CatchClause`] rows.
     catches: CatchClause => CatchId, catch;
-    /// A parameter name's type annotation and decorators: [`IdentifierParamExtra`] rows.
-    param_extras: IdentifierParamExtra => ParamExtraId, param_extra;
+    /// A binding's type annotation and decorators — a parameter name's, a binding pattern's
+    /// or a rest element's: [`BindingExtra`] rows.
+    binding_extras: BindingExtra => BindingExtraId, binding_extra;
+    /// A call's or `new`'s type arguments, the `<T>` of `f<T>()`:
+    /// [`TSTypeParameterInstantiation`] rows.
+    type_args: TSTypeParameterInstantiation => TypeArgsId, type_args;
+    /// Comment-bound grouping pairs, `/** @type {T} */ (x)`: [`CommentBoundPair`] rows.
+    comment_pairs: CommentBoundPair => CommentPairId, comment_pair;
+    /// The text of a name its span cannot spell, `\u0061`: [`EscapedName`] rows.
+    escaped_names: EscapedName => EscapedNameId, escaped_name;
 }
 
 tsv_lang::value_runs! {
@@ -296,8 +306,8 @@ const _: () = {
 #[cfg(test)]
 const _: () = {
     use tsv_lang::store::STORE_CHECK;
-    assert!(STORE_CHECK || size_of::<ParamExtraId>() == 4);
-    assert!(STORE_CHECK || size_of::<Option<ParamExtraId>>() == 4);
+    assert!(STORE_CHECK || size_of::<BindingExtraId>() == 4);
+    assert!(STORE_CHECK || size_of::<Option<BindingExtraId>>() == 4);
 };
 
 /// Source bytes per expression row [`AstStores::for_source`] reserves. This and the two rates
@@ -357,13 +367,44 @@ impl AstStores {
         self.payloads.fn_decls.get(id)
     }
 
-    /// A parameter name's extras, borrowed from the stores rather than through a view: for the
-    /// crate's own read of a row it rebuilds while appending to the stores
-    /// ([`crate::__private::attach_pattern_type_annotation`]).
+    /// A row for the escaped name `text` spells: the id an [`IdentName`] carries for a name
+    /// its span cannot spell.
+    ///
+    /// [`IdentName`]: super::IdentName
     #[inline]
-    pub(crate) fn param_extra_row(&self, id: ParamExtraId) -> &IdentifierParamExtra {
-        self.payloads.param_extras.get(id)
+    pub(crate) fn push_escaped_name(&mut self, text: PoolText<Text>) -> EscapedNameId {
+        self.payloads.escaped_names.push(EscapedName { text })
     }
+}
+
+/// A binding's extras re-bound with `decorators`, keeping the type annotation `extra` holds:
+/// a new row, since a row is never edited, the one `extra` names (if any) left behind as an
+/// orphan.
+pub(crate) fn extra_with_decorators(
+    payloads: &mut PayloadStores,
+    extra: Option<BindingExtraId>,
+    decorators: Run<Decorator>,
+) -> BindingExtraId {
+    let type_annotation =
+        extra.and_then(|extra| payloads.binding_extras.get(extra).type_annotation);
+    payloads.binding_extras.push(BindingExtra {
+        type_annotation,
+        decorators: Some(decorators),
+    })
+}
+
+/// A binding's extras re-bound with the type annotation `ta`, keeping the decorators `extra`
+/// holds: a new row, as [`extra_with_decorators`]'s is.
+pub(crate) fn extra_with_type_annotation(
+    payloads: &mut PayloadStores,
+    extra: Option<BindingExtraId>,
+    ta: TSTypeAnnotation,
+) -> BindingExtraId {
+    let decorators = extra.and_then(|extra| payloads.binding_extras.get(extra).decorators);
+    payloads.binding_extras.push(BindingExtra {
+        type_annotation: Some(ta),
+        decorators,
+    })
 }
 
 /// The tops of the scratch stacks, taken together: a speculation's restore point.
@@ -833,6 +874,9 @@ mod tests {
 (class {});
 f`x`;
 import.meta;
+f<T>();
+/** @type {T} */ (x);
+\\u0061;
 type A = new () => X;
 type B = import('m');
 type C = D extends infer E ? 1 : 2;
@@ -882,6 +926,16 @@ try {
                         push!(tagged_tpls, *view.tagged_tpl(x));
                     }
                     &ExpressionKind::MetaProperty(x) => push!(meta_props, *view.meta_prop(x)),
+                    ExpressionKind::CallExpression(x) => {
+                        push!(type_args, *x.type_arguments(view).expect("type arguments"));
+                    }
+                    &ExpressionKind::CommentBoundPair(x) => {
+                        push!(comment_pairs, *view.comment_pair(x));
+                    }
+                    ExpressionKind::Identifier(x) => {
+                        let id = x.escaped_name.expect("an escaped name");
+                        push!(escaped_names, *view.escaped_name(id));
+                    }
                     other => panic!("an unexpected expression: {other:?}"),
                 },
                 &StatementKind::TSTypeAliasDeclaration(x) => {
@@ -917,9 +971,9 @@ try {
                     push!(fn_decls, *x);
                     for param in view.exprs(x.params) {
                         if let ExpressionKind::Identifier(name) = &param.kind
-                            && let Some(extra) = view.opt_param_extra(name.extra)
+                            && let Some(extra) = view.opt_binding_extra(name.extra)
                         {
-                            push!(param_extras, *extra);
+                            push!(binding_extras, *extra);
                         }
                     }
                 }

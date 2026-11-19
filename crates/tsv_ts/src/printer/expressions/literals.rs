@@ -416,7 +416,7 @@ impl<'a> Printer<'a> {
         // Skips the single-element `parts` Vec the slow path heap-allocates and
         // the name-end scan that only the modifier/annotation branches consume.
         // Returns the exact DocId the `parts.len() == 1` tail would.
-        let extra = self.view.opt_param_extra(id.extra);
+        let extra = self.view.opt_binding_extra(id.extra);
         let type_annotation = extra.and_then(|e| e.type_annotation.as_ref());
         let decorators = self
             .view

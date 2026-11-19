@@ -34,9 +34,10 @@ pub(super) fn pattern_header(
 pub(super) fn write_template_literal(
     w: &mut JsonWriter,
     template: &ast::TemplateLiteral,
+    span: Span,
     ctx: &Ctx<'_>,
 ) {
-    node_header(w, "TemplateLiteral", template.span, ctx);
+    node_header(w, "TemplateLiteral", span, ctx);
     w.raw(",\"expressions\":");
     write_expressions(
         w,
@@ -50,7 +51,7 @@ pub(super) fn write_template_literal(
     write_array(w, ctx.view.quasis(template.quasis), |w, q| {
         write_template_element(w, q, ctx);
     });
-    close_node(w, "TemplateLiteral", template.span, ctx);
+    close_node(w, "TemplateLiteral", span, ctx);
 }
 
 /// Emits a `TemplateElement` node: acorn excludes the delimiters from the
@@ -93,7 +94,7 @@ pub(super) fn write_object_pattern(
     span: Span,
     ctx: &Ctx<'_>,
 ) {
-    pattern_header(w, "ObjectPattern", span, obj.type_annotation.as_ref(), ctx);
+    pattern_header(w, "ObjectPattern", span, obj.type_annotation(ctx.view), ctx);
     w.raw(",\"properties\":");
     write_array(w, ctx.view.pat_props(obj.properties), |w, p| match p {
         ast::ObjectPatternProperty::Property(p) => write_property(w, p, ctx),
@@ -102,8 +103,8 @@ pub(super) fn write_object_pattern(
     if obj.optional {
         w.raw(",\"optional\":true");
     }
-    write_type_annotation_field(w, obj.type_annotation.as_ref(), ctx);
-    write_decorators_field(w, ctx.view.opt_decorators(obj.decorators), ctx);
+    write_type_annotation_field(w, obj.type_annotation(ctx.view), ctx);
+    write_decorators_field(w, obj.decorators(ctx.view), ctx);
     close_node(w, "ObjectPattern", span, ctx);
 }
 
@@ -117,7 +118,7 @@ pub(super) fn write_rest_element(w: &mut JsonWriter, rest: &ast::RestElement, ct
     if rest.optional {
         w.raw(",\"optional\":true");
     }
-    write_type_annotation_field(w, rest.type_annotation.as_ref(), ctx);
+    write_type_annotation_field(w, rest.type_annotation(ctx.view), ctx);
     close_node(w, "RestElement", rest.span, ctx);
 }
 

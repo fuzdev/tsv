@@ -1439,7 +1439,7 @@ impl<'a> Parser<'a> {
     fn attribute_key_string(&self, key: &ImportAttributeKey) -> String {
         match key {
             ImportAttributeKey::Identifier(id) => match id.escaped_name {
-                Some(s) => self.stores.view().text(s).to_string(),
+                Some(escaped) => self.stores.view().escaped_text(escaped).to_string(),
                 None => {
                     let start = id.span.start as usize - self.base_offset;
                     self.source[start..start + id.name_len as usize].to_string()

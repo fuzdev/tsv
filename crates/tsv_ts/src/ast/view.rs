@@ -12,8 +12,9 @@ use tsv_lang::store::{PoolText, Run};
 
 use super::stores::{PayloadStores, RunStores};
 use super::{
-    AstStores, CatchClause, CatchId, Comment, Decorator, ExprId, Expression, ForHeadId, ForInit,
-    IdentifierParamExtra, ParamExtraId, Parsed, Program, Statement, StmtId, TSType, Text, TyId,
+    AstStores, BindingExtra, BindingExtraId, CatchClause, CatchId, Comment, Decorator,
+    EscapedNameId, ExprId, Expression, ForHeadId, ForInit, Parsed, Program, Statement, StmtId,
+    TSType, Text, TyId,
 };
 
 /// The read access every consumer of the tree holds: resolves edges and lists.
@@ -109,10 +110,10 @@ impl<'a> AstView<'a> {
         id.map(|id| self.catch(id))
     }
 
-    /// The parameter name's extras `id` names, when they are present.
+    /// The binding extras `id` names, when they are present.
     #[inline]
-    pub fn opt_param_extra(self, id: Option<ParamExtraId>) -> Option<&'a IdentifierParamExtra> {
-        id.map(|id| self.param_extra(id))
+    pub fn opt_binding_extra(self, id: Option<BindingExtraId>) -> Option<&'a BindingExtra> {
+        id.map(|id| self.binding_extra(id))
     }
 
     /// The decorators of `list`, when the holder has a list: absent and empty are distinct.
@@ -132,6 +133,15 @@ impl<'a> AstView<'a> {
     #[inline(never)]
     pub fn text(self, text: PoolText<Text>) -> &'a str {
         self.stores.text.get(text)
+    }
+
+    /// The text of the escaped name `id` names (an [`IdentName`]'s `escaped`): its row's pool
+    /// text. Only the rare escaped arm of a name reader asks it.
+    ///
+    /// [`IdentName`]: super::IdentName
+    #[inline]
+    pub fn escaped_text(self, id: EscapedNameId) -> &'a str {
+        self.text(self.escaped_name(id).text)
     }
 
     /// The comments of `list`: a program's, or an embedded parse's. A miss ends in the

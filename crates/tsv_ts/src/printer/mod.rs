@@ -101,7 +101,6 @@ use tsv_lang::{
         OperandAnchor, PAREN_HOP_NEEDLES, TriviaProfile, has_newline_before_position,
         is_hop_needle, skip_regex_literal, skip_trivia,
     },
-    store::PoolText,
 };
 
 /// Which builder a chain-share entry belongs to — the builder half of the share key's tag,
@@ -3609,9 +3608,9 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         match name.escaped {
-            Some(s) => d.text_pooled(self.view.text(s)),
+            Some(id) => self.escaped_name_doc(id),
             None => {
-                let span = Span::new(name_start, name_start + name.raw_len as u32);
+                let span = Span::new(name_start, name_start + name.raw_len);
                 // Graded BOTH ways on every name in every debug build, because both
                 // directions are load-bearing and neither is visible in the output:
                 // over-claiming is a silent width error, and under-claiming silently
@@ -3633,8 +3632,20 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// [`Self::ident_name_doc`]'s escaped arm: the name's decoded text as a pooled doc.
+    ///
+    /// Cold and out of line for the reason [`Self::with_escaped_name`] is: inline, its two
+    /// reads (the row, then the text) grew [`Self::ident_name_doc`] past the inliner's
+    /// budget, and every name doc paid a call for the rare escaped arm.
+    #[cold]
+    #[inline(never)]
+    fn escaped_name_doc(&self, escaped: ast::EscapedNameId) -> DocId {
+        self.d().text_pooled(self.view.escaped_text(escaped))
+    }
+
     /// [`Self::ident_name_doc`] for an `Identifier` node (the name is the
     /// leading token of the node span).
+    #[inline]
     pub(in crate::printer) fn identifier_name_doc(&self, id: &ast::Identifier) -> DocId {
         self.ident_name_doc(id.ident_name(), id.span.start)
     }
@@ -3664,11 +3675,11 @@ impl<'a> Printer<'a> {
     ///
     /// Cold and out of line, the text read and `f` together, so the read's call sits in
     /// no caller's body. Taken only for a name its span cannot spell: one written with a
-    /// `\u` escape, one longer than the name channel's length field, or a synthesized one.
+    /// `\u` escape, one longer than an `Identifier`'s `u16` name length, or a synthesized one.
     #[cold]
     #[inline(never)]
-    fn with_escaped_name<R>(&self, escaped: PoolText<ast::Text>, f: impl FnOnce(&str) -> R) -> R {
-        f(self.view.text(escaped))
+    fn with_escaped_name<R>(&self, escaped: ast::EscapedNameId, f: impl FnOnce(&str) -> R) -> R {
+        f(self.view.escaped_text(escaped))
     }
 
     /// [`Self::with_ident_name_at`] for an `Identifier` node.

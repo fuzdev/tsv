@@ -4,7 +4,6 @@ use crate::ast::*;
 use crate::lexer::{KeywordKind, TokenKind};
 use crate::parser::expression_assignable::AssignableContext;
 use crate::parser::statement::DecoratorListKind;
-use tsv_lang::store::push_row;
 use tsv_lang::{Error, Span};
 
 use super::{Checkpoint, Parser};
@@ -39,7 +38,7 @@ impl<'a> Parser<'a> {
 
         let mut param = Expression::from_identifier(Identifier {
             escaped_name: name.escaped,
-            name_len: name.raw_len,
+            name_len: name.identifier_len(),
             name_plain_ascii: name.plain_ascii,
             optional,
             extra,
@@ -90,14 +89,10 @@ impl<'a> Parser<'a> {
                 param
             }
             ExpressionKind::Identifier(id) => {
-                // a new row: the extras the annotation rode in stay behind as an orphan
-                let type_annotation = id.type_annotation(self.stores.view()).copied();
-                id.extra = Some(push_row(
-                    &mut self.stores.payloads.param_extras,
-                    IdentifierParamExtra {
-                        type_annotation,
-                        decorators: Some(decorators),
-                    },
+                id.extra = Some(extra_with_decorators(
+                    &mut self.stores.payloads,
+                    id.extra,
+                    decorators,
                 ));
                 param
             }
@@ -106,11 +101,19 @@ impl<'a> Parser<'a> {
                 param
             }
             ExpressionKind::ObjectPattern(op) => {
-                op.decorators = Some(decorators);
+                op.extra = Some(extra_with_decorators(
+                    &mut self.stores.payloads,
+                    op.extra,
+                    decorators,
+                ));
                 param
             }
             ExpressionKind::ArrayPattern(arr) => {
-                arr.decorators = Some(decorators);
+                arr.extra = Some(extra_with_decorators(
+                    &mut self.stores.payloads,
+                    arr.extra,
+                    decorators,
+                ));
                 param
             }
             _ => param,
@@ -204,11 +207,19 @@ impl<'a> Parser<'a> {
             let end = type_annotation.span.end;
             match &mut pattern.kind {
                 ExpressionKind::ArrayPattern(p) => {
-                    p.type_annotation = Some(type_annotation);
+                    p.extra = Some(extra_with_type_annotation(
+                        &mut self.stores.payloads,
+                        p.extra,
+                        type_annotation,
+                    ));
                     pattern.span.end = end;
                 }
                 ExpressionKind::ObjectPattern(p) => {
-                    p.type_annotation = Some(type_annotation);
+                    p.extra = Some(extra_with_type_annotation(
+                        &mut self.stores.payloads,
+                        p.extra,
+                        type_annotation,
+                    ));
                     pattern.span.end = end;
                 }
                 _ => {}
@@ -571,10 +582,11 @@ impl<'a> Parser<'a> {
                     // shape), never to the inner pattern.
                     let (optional, type_annotation, arg_end) =
                         self.parse_rest_param_tail(pattern.span().end)?;
+                    let argument = self.push_expr(pattern);
                     Expression::from_rest_element(RestElement {
-                        argument: self.push_expr(pattern),
+                        argument,
                         optional,
-                        type_annotation,
+                        extra: type_annotation.map(|ta| self.typed_extra(ta)),
                         span: Span::new(rest_start as u32, arg_end),
                     })
                 } else {
@@ -596,10 +608,11 @@ impl<'a> Parser<'a> {
                     ));
                     let (optional, type_annotation, arg_end) =
                         self.parse_rest_param_tail(id_end as u32)?;
+                    let argument = self.push_expr(argument);
                     Expression::from_rest_element(RestElement {
-                        argument: self.push_expr(argument),
+                        argument,
                         optional,
-                        type_annotation,
+                        extra: type_annotation.map(|ta| self.typed_extra(ta)),
                         span: Span::new(rest_start as u32, arg_end),
                     })
                 }

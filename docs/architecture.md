@@ -880,7 +880,7 @@ Native tsv runs on the system allocator — no `#[global_allocator]`, no alterna
 
 **Lexing — spans, not strings.** Tokens store `u32` byte offsets (`start`, `end`) into the source, never slices or copies — `Token` is a small POD (16 B; tsv_svelte's 12 B) that a byte cursor over the source emits. The exception is deliberate: a string literal's decoded value is materialized only when it actually contains escape sequences, decoded into a **reused scratch buffer held out-of-band on the lexer** (`Lexer::decode_scratch`, borrowed via `decoded_str` and copied out at receipt — into the stores' text pool in `tsv_ts` and `tsv_css`) so no per-literal `String` allocates and the per-token `Token` stays pointer-free. Comments are spans too — the token carries a `content_start` and the `Comment` node a `content_span`, recovered from source on demand and never copied. On the parser's hot path (`advance`, plus the CSS and Svelte lookaheads) the lexers write the token in place into the parser's slot (`next_token_into`) rather than returning a by-value `Result<Token, Error>` through a stack slot the parser would reload and re-scatter; other TS and CSS callers take it by value (`next_token`); the Svelte lexer has no by-value form.
 
-**Internal AST — in stores, span-identity names, no raw text.** TypeScript's expressions, statements, types and rare wide payloads are rows of per-document stores named by typed ids; a child list is a `Run` over a store (of ids, or of the elements themselves for a list built by value); TypeScript's decoded strings and comments live in the same stores, so its whole tree is there; every CSS list but the stylesheet's top-level comments (a `Vec<Comment>`, as Svelte's `Root.comments` is) is a value run over a store of its element type and every CSS string pool text, in a stylesheet's stores; every Svelte template list is a value run in a document's own stores, and the one string it keeps as text of its own is pool text there; in all three, small children are kept inline by value (see [Nested AST](#nested-ast-in-stores-inline-by-value-recursive-edges-by-id) for the layout rationale). Identifier names are span-identity — an `IdentName` records the raw name-token length and the name is re-sliced from source; only the rare `\u`-escaped (or oversized) name carries its decoded form, as pool text. Svelte element/attribute names are span-identity too (`source[name_span]`, `.trim()` for the padded-`{ shorthand }` edge), so there is no shared symbol table anywhere. Raw source text is never duplicated into the AST — printers re-slice via `span.extract(source)`; the few deliberate stored-raw caches are cataloged in [Source-Based Printing](#source-based-printing). What remains as owned data is genuinely decoded: string-literal values (only when escaped) and the like, copied once into the text pool.
+**Internal AST — in stores, span-identity names, no raw text.** TypeScript's expressions, statements, types and rare wide payloads are rows of per-document stores named by typed ids; a child list is a `Run` over a store (of ids, or of the elements themselves for a list built by value); TypeScript's decoded strings and comments live in the same stores, so its whole tree is there; every CSS list but the stylesheet's top-level comments (a `Vec<Comment>`, as Svelte's `Root.comments` is) is a value run over a store of its element type and every CSS string pool text, in a stylesheet's stores; every Svelte template list is a value run in a document's own stores, and the one string it keeps as text of its own is pool text there; in all three, small children are kept inline by value (see [Nested AST](#nested-ast-in-stores-inline-by-value-recursive-edges-by-id) for the layout rationale). Identifier names are span-identity — an `IdentName` records the raw name-token length and the name is re-sliced from source; only the rare `\u`-escaped (or oversized) name carries its decoded form, as pool text behind an escaped-name row. Svelte element/attribute names are span-identity too (`source[name_span]`, `.trim()` for the padded-`{ shorthand }` edge), so there is no shared symbol table anywhere. Raw source text is never duplicated into the AST — printers re-slice via `span.extract(source)`; the few deliberate stored-raw caches are cataloged in [Source-Based Printing](#source-based-printing). What remains as owned data is genuinely decoded: string-literal values (only when escaped) and the like, copied once into the text pool.
 
 **Residency — parked capacity is kept, never trimmed.** A parked store set (a language crate's per-thread slot, or the one a `Formatter` owns) keeps the capacity its largest document grew: a reset rewinds every store, scratch stack and text pool in place and trims nothing, which is what lets a warm loop parse without allocating. The memory is released by dropping the `Formatter`, by retiring the thread a binding parked its stores on, or, for a WASM instance, by `reinstantiate()` — per binding in [tsv_ffi §Architecture Position](../crates/tsv_ffi/CLAUDE.md#architecture-position), [tsv_napi §Threading & host residency](../crates/tsv_napi/CLAUDE.md#threading--host-residency), and [tsv_wasm §Memory Residency](../crates/tsv_wasm/CLAUDE.md#memory-residency).
 
@@ -1012,10 +1012,11 @@ reference to the stores; a store row, once pushed, is never edited or truncated,
 that replaces a node (a cover-grammar conversion, an annotated binding pattern) appends the
 new row and the old one is orphaned. The payloads too rare to sit inline in the node that
 refers to them (`ArrowFunctionExpression`, `FunctionDeclaration`, `TSImportType` and their
-fellows, a `for` head, a catch clause, a parameter name's extras) are rows too, one store per
-payload type, each named by an id of its own type (`ArrowFnId`, `FnDeclId`, `ImportTypeId`,
-…). The stores also hold the tree's decoded strings, in one text pool a `PoolText<Text>` names, and
-its comments, a run of comment rows per program (`Run<Comment>`), each read through the view
+fellows, a `for` head, a catch clause, a binding's extras, a call's type arguments, a
+comment-bound pair, an escaped name's text) are rows too, one store per payload type, each
+named by an id of its own type (`ArrowFnId`, `FnDeclId`, `ImportTypeId`, …). The stores also
+hold the tree's decoded strings, in one text pool a `PoolText<Text>` names, and its
+comments, a run of comment rows per program (`Run<Comment>`), each read through the view
 like a row. The CSS tree takes the same shape for its lists and strings: each of its list
 types (a stylesheet's nodes, a block's children, the three selector levels, a `::part()`'s
 name spans, a value list's members, a condition's parts and segments) is a value run over a
@@ -1084,23 +1085,38 @@ enough to set its enum's size on its own taxes the whole tree, while the hop to 
 payload is paid only where that variant is actually spelled. Where such a variant is also
 **rare**, it holds its payload by id, a row of a store of that payload's own type:
 
-- `Expression` is **44 B** — `ClassExpression`, `FunctionExpression`,
+- `Expression` is **32 B** — `ClassExpression`, `FunctionExpression`,
   `ArrowFunctionExpression`, `MetaProperty` and `TaggedTemplateExpression` are stored.
   Together they are ~3% of expressions in real source (the two widest, ~0.02%). The
-  next-widest variants are `ArrayPattern`, `ObjectPattern` and `CallExpression`, at one
-  width, and `CallExpression` is 14–21% of expressions, which is where the ladder stops.
-  `Expression` is a header over its variant —
-  `struct Expression { span, kind: ExpressionKind }` (`ExpressionKind` 36 B) — so reading
+  variants next in width are common — `CallExpression` is 14–21% of expressions — so the
+  rule moves down a level there: what is stored is their **rare field**, behind a 4 B id
+  only the node that has one pays a hop for. A call's and a `new`'s type arguments are a
+  row of their own store (`TypeArgsId`; rare on calls, a minority of `new`s), an object or
+  array pattern's or a rest element's annotation and decorators a row of the same store an
+  `Identifier`'s binding extras use (`BindingExtraId`; a minority of patterns, a tiny share
+  of expressions), an identifier's escaped name a row holding its pool text
+  (`EscapedNameId`; only a `\u`-escaped, oversized or synthesized name has one), and the
+  comment-bound pair, rare as a whole, is stored whole (`CommentPairId`). A template
+  literal keeps no span of its own (its quasi's sits on the tagged template that holds
+  one). That leaves `Identifier`, 20 B, the widest variant, so `ExpressionKind` is 24 with
+  an explicit one-byte tag. The tag is pinned explicit on purpose: at the width of its
+  widest variant, rustc niches the tag into that variant's `bool`, and every `match` on
+  the kind decodes it from there, several instructions where an explicit tag takes one
+  load — at an unchanged size, so the size pin cannot see it. A test-build pin beside the
+  enum asserts every payload at least 4 B narrower than the enum, over an exhaustive list
+  of its variants, so a variant that grows to fill it fails the build. `Expression` is a
+  header over its variant —
+  `struct Expression { span, kind: ExpressionKind }` (`ExpressionKind` 24 B) — so reading
   an expression's span is a field load rather than a dispatch over the variants. A
   variant struct carries no span of its own unless some node also holds that type
-  outside an `Expression` (`Identifier`, `Literal`, `TemplateLiteral`, `RestElement`,
+  outside an `Expression` (`Identifier`, `Literal`, `RestElement`,
   `SpreadElement`, `UnaryExpression`, `FunctionExpression`); those are wrapped only
   through the `Expression::from_*` constructors, which take the header's span from the
   node's own. Both spans are `pub` and nothing asserts they agree; they stay equal because
   that is the only way the wrapped form is built and no span is written after construction
   but the pattern wrapper's (an optional or annotated parameter's `?` / `: T` extension in
   the parameter parser), which lands on array and object patterns, carrying no second span.
-  It is 44 B on wasm32 too.
+  It is 32 B on wasm32 too.
 - `TSType` is **52 B** — `TSImportType`, `TSConstructorType` and `TSInferType` are
   stored. No field holds a `TSType` by value: the type parser's deep precedence ladder
   pushes each type to the type store at its builder's tail and returns the row's id
@@ -1139,7 +1155,7 @@ whose own width was two such slots take it:
 
 - `Property` (an object literal's `key: value`, and a destructuring pattern's, which
   reuses the same struct) is **20 B**, not 160 — so `ObjectProperty` is 20 and
-  `ObjectPatternProperty` 28 (its `RestElement` arm sets that one).
+  `ObjectPatternProperty` 24 (a tag beside its two 20 B arms).
 - `VariableDeclarator` is **20 B**, not 160.
 - every `Expression`-holding `Statement` head takes it too, an `ExprId` costing 4 B where the
   value would cost the node: `ExpressionStatement` holds its id alone, `IfStatement`
@@ -1171,7 +1187,7 @@ whose own width was two such slots take it:
   `new` arguments, sequence and template-literal expressions are `Run<ExprId>`, and
   array-literal and array-pattern elements `Run<Option<ExprId>>` (a hole stays `None`; the
   `Option` is niche-packed) — a 4 B element where a by-value one is the whole `Expression`
-  (44 B on both targets). A spread element, built fresh rather than returned by
+  (32 B on both targets). A spread element, built fresh rather than returned by
   the ladder, is pushed once to join them. The parameter lists are value runs (`Run<Expression>`),
   which are rows of the expression store: their elements are built by the parser as
   values (a binding pattern, or an expression converted to one), so an id list would add

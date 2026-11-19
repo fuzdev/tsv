@@ -615,7 +615,7 @@ impl<'a> SvelteParser<'a> {
             if settled || !slice.bytes().any(escapes) {
                 return IdentName {
                     escaped: None,
-                    raw_len: name.len() as u16,
+                    raw_len: name.len() as u32,
                     // Synthesized here rather than lexed, so the property is asked of
                     // the slice directly — in the printer's own class, since the name
                     // seam asserts this field against exactly that. The Svelte printer
@@ -632,7 +632,10 @@ impl<'a> SvelteParser<'a> {
             }
         }
         IdentName {
-            escaped: Some(tsv_ts::__private::push_text(self.stores_mut(), name)),
+            escaped: Some(tsv_ts::__private::push_escaped_name(
+                self.stores_mut(),
+                name,
+            )),
             raw_len: 0,
             plain_ascii: false,
         }

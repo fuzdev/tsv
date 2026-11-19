@@ -917,7 +917,7 @@ impl<'a> Printer<'a> {
         loop {
             let head = match &value.kind {
                 Kind::CallExpression(call) => {
-                    found = call.type_arguments.as_ref().or(found);
+                    found = call.type_arguments(view).or(found);
                     value = view.expr(call.callee);
                     chain_head = true;
                     continue;
@@ -932,7 +932,7 @@ impl<'a> Printer<'a> {
                     chain_head = false;
                     continue;
                 }
-                Kind::NewExpression(new) => new.type_arguments.as_ref(),
+                Kind::NewExpression(new) => new.type_arguments(view),
                 _ if chain_head => None,
                 Kind::AwaitExpression(await_expr) => {
                     value = view.expr(await_expr.argument);

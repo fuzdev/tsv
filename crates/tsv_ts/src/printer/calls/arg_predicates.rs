@@ -90,7 +90,7 @@ fn is_hopefully_short_arg(view: AstView<'_>, expr: &Expression) -> bool {
         // purpose: `is_simple_call_argument` has no paren case, so a cast nested inside
         // another argument stays opaque, matching prettier.
         ExpressionKind::CommentBoundPair(cast) => {
-            is_hopefully_short_arg(view, view.expr(cast.inner))
+            is_hopefully_short_arg(view, view.expr(view.comment_pair(*cast).inner))
         }
 
         // Prettier: `isBinaryCastExpression(node) || node.type === "TypeCastExpression"` —

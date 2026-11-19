@@ -8,10 +8,10 @@ use tsv_lang::store::PoolText;
 use tsv_lang::{Comment, Span};
 
 use super::{
-    ArrayPattern, ArrowFnId, AssignmentPattern, BlockStatement, ClassExprId, ExprId, FnExprId,
-    Identifier, Literal, MetaPropId, ObjectPattern, PrivateIdentifier, RestElement, Run,
+    ArrayPattern, ArrowFnId, AssignmentPattern, BlockStatement, ClassExprId, CommentPairId, ExprId,
+    FnExprId, Identifier, Literal, MetaPropId, ObjectPattern, PrivateIdentifier, RestElement, Run,
     TSParameterProperty, TSTypeAnnotation, TSTypeParameterDeclaration,
-    TSTypeParameterInstantiation, TaggedTplId, TyId,
+    TSTypeParameterInstantiation, TaggedTplId, TyId, TypeArgsId,
 };
 
 /// Expression node: the span every variant shares, beside the variant itself.
@@ -26,6 +26,12 @@ pub struct Expression {
 }
 
 /// The variant half of an [`Expression`].
+///
+/// Its tag is explicit — a byte of its own beside every payload — and pinned so (the
+/// payload pin below this enum). rustc hides the tag in a niche of the widest variant (an
+/// `Identifier`'s `bool`) whenever that variant fills the enum: the size stays put while
+/// every `match` on the kind decodes the tag from that byte, several instructions where an
+/// explicit tag takes one load.
 #[derive(Debug, Clone, Copy)]
 pub enum ExpressionKind {
     Literal(Literal),
@@ -48,10 +54,13 @@ pub enum ExpressionKind {
     // 3.0–3.8%. Inline, the widest of them would set the width of every `Expression`,
     // and that width is paid on every `Expression` SLOT in the tree — both of a
     // `Property`'s, both of a `VariableDeclarator`'s, and every row of a value run —
-    // not just on the rare node that needs it. The next-widest inline variants are
-    // `ArrayPattern`, `ObjectPattern` and `CallExpression`, at one width, and
-    // `CallExpression` is 14–21% of expressions, so the ladder stops here: storing it
-    // would tax the common path.
+    // not just on the rare node that needs it. Below them the widths are held by moving
+    // a common variant's RARE field behind an id rather than the variant itself: a call's
+    // or `new`'s type arguments (`TypeArgsId`), a binding pattern's annotation and
+    // decorators (`BindingExtraId`, as `Identifier`'s), an identifier's escaped name
+    // (`EscapedNameId`), and a comment-bound pair whole (`CommentPairId`), so only the node
+    // that has one pays the hop. The escaped name's move is the one that leaves the enum
+    // room for an explicit tag beside `Identifier`: see the tag pin below this enum.
     //
     // The store hop this adds is on the rare read, and the parser's recursion is
     // unaffected either way — it threads expressions by id (every `parse_*` on its
@@ -91,11 +100,80 @@ pub enum ExpressionKind {
     // A grouping pair bound to the comment before its `(` — the JSDoc type cast
     // `/** @type {T} */ (inner)`, or a glued block whose pair opens with a line comment
     // (`/* c */ (⏎// d⏎inner)`). Internal-only, never serialized
-    CommentBoundPair(CommentBoundPair),
+    CommentBoundPair(CommentPairId),
     // Preserved grouping parens: `(expr)` — only produced under the parser's
     // `preserve_parens` mode (snippet parameters), serialized to match acorn's
     // `preserveParens` output.
     ParenthesizedExpression(ParenthesizedExpression),
+}
+
+// The tag pin: every payload is at least 4 B narrower than the enum, so the enum has room
+// for a tag beside the widest one and no layout shares a payload's niche with it — a niched
+// tag sits INSIDE the widest payload, which then fills the enum. A variant that widens to
+// fill it fails here, where `size_of::<ExpressionKind>()`'s own pin would not: niching
+// keeps that size (a variant padded to fill the enum keeps every size pin and fails these).
+// The match makes the list exhaustive and checks each payload type against its
+// variant, so a new variant cannot skip the pin.
+#[cfg(test)]
+macro_rules! pin_explicit_tag {
+    ($($variant:ident: $payload:ty),* $(,)?) => {
+        #[expect(dead_code, reason = "never called: the match is the exhaustiveness check")]
+        fn every_variant_is_pinned(kind: &ExpressionKind) {
+            match kind {
+                $(ExpressionKind::$variant(payload) => {
+                    let _: &$payload = payload;
+                })*
+            }
+        }
+        $(
+            const _: () = assert!(
+                tsv_lang::store::STORE_CHECK
+                    || size_of::<$payload>() + 4 <= size_of::<ExpressionKind>()
+            );
+        )*
+    };
+}
+#[cfg(test)]
+pin_explicit_tag! {
+    Literal: Literal,
+    Identifier: Identifier,
+    PrivateIdentifier: PrivateIdentifier,
+    ObjectExpression: ObjectExpression,
+    ArrayExpression: ArrayExpression,
+    UnaryExpression: UnaryExpression,
+    UpdateExpression: UpdateExpression,
+    BinaryExpression: BinaryExpression,
+    CallExpression: CallExpression,
+    NewExpression: NewExpression,
+    MemberExpression: MemberExpression,
+    ConditionalExpression: ConditionalExpression,
+    ArrowFunctionExpression: ArrowFnId,
+    FunctionExpression: FnExprId,
+    ClassExpression: ClassExprId,
+    SpreadElement: SpreadElement,
+    TemplateLiteral: TemplateLiteral,
+    TaggedTemplateExpression: TaggedTplId,
+    AwaitExpression: AwaitExpression,
+    YieldExpression: YieldExpression,
+    SequenceExpression: SequenceExpression,
+    RegexLiteral: RegexLiteral,
+    ThisExpression: ThisExpression,
+    Super: Super,
+    AssignmentExpression: AssignmentExpression,
+    ObjectPattern: ObjectPattern,
+    ArrayPattern: ArrayPattern,
+    AssignmentPattern: AssignmentPattern,
+    RestElement: RestElement,
+    TSTypeAssertion: TSTypeAssertion,
+    TSAsExpression: TSAsExpression,
+    TSSatisfiesExpression: TSSatisfiesExpression,
+    TSInstantiationExpression: TSInstantiationExpression,
+    TSNonNullExpression: TSNonNullExpression,
+    TSParameterProperty: TSParameterProperty,
+    ImportExpression: ImportExpression,
+    MetaProperty: MetaPropId,
+    CommentBoundPair: CommentPairId,
+    ParenthesizedExpression: ParenthesizedExpression,
 }
 
 impl Expression {
@@ -106,10 +184,10 @@ impl Expression {
 
     /// Wrap an [`Identifier`], taking the wrapper's span from the node's own.
     ///
-    /// The seven variant types some node also holds OUTSIDE an `Expression` keep a span
+    /// The six variant types some node also holds OUTSIDE an `Expression` keep a span
     /// of their own, so their wrapped form carries it twice. Nothing asserts the two agree
     /// (both are `pub`); they start equal because the wrapped form is built only through
-    /// these constructors, and no later span write reaches one of these seven — the
+    /// these constructors, and no later span write reaches one of these six — the
     /// parameter parser's `?` / `: T` extension writes the wrapper span of an array or
     /// object pattern, which has no second span to leave behind.
     #[inline]
@@ -129,11 +207,12 @@ impl Expression {
         }
     }
 
-    /// Wrap a [`TemplateLiteral`] (see [`Expression::from_identifier`]).
+    /// Wrap a [`TemplateLiteral`], `span` being the template's own, which the node does not
+    /// keep (see [`TemplateLiteral`]).
     #[inline]
-    pub fn from_template_literal(template: TemplateLiteral) -> Self {
+    pub fn from_template_literal(span: Span, template: TemplateLiteral) -> Self {
         Self {
-            span: template.span,
+            span,
             kind: ExpressionKind::TemplateLiteral(template),
         }
     }
@@ -229,7 +308,9 @@ impl Expression {
             }
             // A JSDoc `/** @type {T} */ (expr)` cast is a type assertion too —
             // peel it to its inner target like the others.
-            ExpressionKind::CommentBoundPair(e) => view.expr(e.inner).skip_type_assertions(view),
+            &ExpressionKind::CommentBoundPair(e) => view
+                .expr(view.comment_pair(e).inner)
+                .skip_type_assertions(view),
             _ => self,
         }
     }
@@ -242,8 +323,8 @@ impl Expression {
     /// unwrapped inner's.
     pub fn unwrap_comment_bound_pairs<'a>(&'a self, view: AstView<'a>) -> &'a Expression {
         let mut e = self;
-        while let ExpressionKind::CommentBoundPair(cast) = &e.kind {
-            e = view.expr(cast.inner);
+        while let ExpressionKind::CommentBoundPair(cast) = e.kind {
+            e = view.expr(view.comment_pair(cast).inner);
         }
         e
     }
@@ -799,21 +880,47 @@ impl BinaryExpression {
 #[derive(Debug, Clone, Copy)]
 pub struct CallExpression {
     pub callee: ExprId,
-    pub type_arguments: Option<TSTypeParameterInstantiation>,
+    /// The `<T>` of `fn<T>()`, a row of the type-argument store: rare on calls, so the
+    /// common call pays a 4 B id for it rather than the instantiation's own width, which
+    /// would set `Expression`'s. Read through [`Self::type_arguments`].
+    pub type_args: Option<TypeArgsId>,
     pub arguments: Run<ExprId>,
     pub optional: bool, // true for `foo?.()` (optional chaining)
+}
+
+impl CallExpression {
+    /// The type arguments (`fn<T>()`), if any, read through `view`.
+    #[inline]
+    pub fn type_arguments<'a>(
+        &self,
+        view: AstView<'a>,
+    ) -> Option<&'a TSTypeParameterInstantiation> {
+        self.type_args.map(|id| view.type_args(id))
+    }
 }
 
 /// New expression: `new Date()`, `new Map()`
 ///
 /// Constructor call with the `new` keyword. The callee is typically an
 /// identifier or member expression, and arguments are optional.
-/// Type arguments like `new Map<K, V>()` are stored in `type_arguments`.
+/// Type arguments like `new Map<K, V>()` are a row of the type-argument store, as a
+/// [`CallExpression`]'s are, read through [`Self::type_arguments`].
 #[derive(Debug, Clone, Copy)]
 pub struct NewExpression {
     pub callee: ExprId,
-    pub type_arguments: Option<TSTypeParameterInstantiation>,
+    pub type_args: Option<TypeArgsId>,
     pub arguments: Run<ExprId>,
+}
+
+impl NewExpression {
+    /// The type arguments (`new Map<K, V>()`), if any, read through `view`.
+    #[inline]
+    pub fn type_arguments<'a>(
+        &self,
+        view: AstView<'a>,
+    ) -> Option<&'a TSTypeParameterInstantiation> {
+        self.type_args.map(|id| view.type_args(id))
+    }
 }
 
 /// Dynamic import expression: `import('module')` or `import('module', options)`,
@@ -975,9 +1082,10 @@ impl PropertyKind {
 ///
 /// Both slots are ids rather than inline `Expression`s, which takes an object literal's
 /// element (`ObjectProperty`) to 20 B and an object pattern's (`ObjectPatternProperty`) to
-/// 28 (inline, a `Property` would carry two 44 B `Expression`s). It costs no row: the parser's expression spine already returns the id
-/// of the node it pushed, so an inline slot would be a copy *out of* the store rather than
-/// the place the node lives — see the density note in `ast/mod.rs`.
+/// 24 (inline, a `Property` would carry two 32 B `Expression`s). It costs no row: the
+/// parser's expression spine already returns the id of the node it pushed, so an inline
+/// slot would be a copy *out of* the store rather than the place the node lives — see the
+/// density note in `ast/mod.rs`.
 #[derive(Debug, Clone, Copy)]
 pub struct Property {
     pub key: ExprId,
@@ -998,11 +1106,14 @@ pub struct Property {
 /// For a template like `a ${b} c ${d} e`:
 /// - quasis: ["a ", " c ", " e"]
 /// - expressions: [b, d]
+///
+/// Carries no span: an untagged template's is its `Expression`'s, and a tagged template's
+/// quasi is the one place it stands outside an `Expression`, where
+/// [`TaggedTemplateExpression::quasi_span`] holds it.
 #[derive(Debug, Clone, Copy)]
 pub struct TemplateLiteral {
     pub quasis: Run<TemplateElement>,
     pub expressions: Run<ExprId>,
-    pub span: Span,
 }
 
 /// The decoded ("cooked") value of a template element.
@@ -1098,6 +1209,8 @@ pub struct TaggedTemplateExpression {
     pub tag: ExprId,
     pub type_arguments: Option<TSTypeParameterInstantiation>,
     pub quasi: TemplateLiteral,
+    /// The quasi's span, from its opening backtick through its closing one.
+    pub quasi_span: Span,
 }
 
 /// Await expression: `await promise`

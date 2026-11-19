@@ -302,11 +302,11 @@ impl<'a> Printer<'a> {
             // The shared gate declines a decorated parameter before any hug; this arm has
             // no decorator emitter, so the ordinary builder takes one if it ever arrives.
             debug_assert!(
-                obj.decorators.is_none(),
+                obj.decorators(self.view).is_none(),
                 "a decorated parameter must not reach the group-less hug arm"
             );
             return obj
-                .decorators
+                .decorators(self.view)
                 .is_none()
                 .then(|| self.build_hugged_object_pattern_doc(obj, param.span));
         }

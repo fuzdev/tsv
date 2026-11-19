@@ -113,7 +113,7 @@ pub(super) fn write_new_expression(
     node_header(w, "NewExpression", span, ctx);
     w.raw(",\"callee\":");
     write_expression(w, ctx.view.expr(new_expr.callee), ctx);
-    write_type_arguments_field(w, new_expr.type_arguments.as_ref(), ctx);
+    write_type_arguments_field(w, new_expr.type_arguments(ctx.view), ctx);
     w.raw(",\"arguments\":");
     write_expressions(
         w,
@@ -136,7 +136,7 @@ pub(super) fn call_callee_flags(
 ) -> ExprFlags {
     ExprFlags {
         chain: callee_chain,
-        force_optional: call.optional && call.type_arguments.is_some(),
+        force_optional: call.optional && call.type_args.is_some(),
         strip_optional,
     }
 }
@@ -166,7 +166,7 @@ pub(super) fn write_call_expression_tail(
             .map(|e| ctx.view.expr(*e)),
         ctx,
     );
-    write_type_arguments_field(w, call.type_arguments.as_ref(), ctx);
+    write_type_arguments_field(w, call.type_arguments(ctx.view), ctx);
     if strip_optional {
         // Omitted along an unparenthesized decorator's call/member spine.
     } else if force_optional {
@@ -181,7 +181,7 @@ pub(super) fn write_call_expression_tail(
         // majority of calls carry no type arguments and would pay that walk to
         // discard the answer. `KnownFree` is the caller having already resolved
         // that spine to optional-free.
-        if call.type_arguments.is_none()
+        if call.type_args.is_none()
             || call.optional
             || (callee_chain != ChainState::KnownFree
                 && span.start >= ctx.view.expr(call.callee).span().start

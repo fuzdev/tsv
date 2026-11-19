@@ -565,10 +565,8 @@ fn param_is_flat(view: AstView<'_>, param: &ast::Expression) -> bool {
                 && annotation_is_flat(view, id.type_annotation(view))
         }
         ast::ExpressionKind::ObjectPattern(pattern) => {
-            view.opt_decorators(pattern.decorators)
-                .unwrap_or_default()
-                .is_empty()
-                && annotation_is_flat(view, pattern.type_annotation.as_ref())
+            pattern.decorators(view).unwrap_or_default().is_empty()
+                && annotation_is_flat(view, pattern.type_annotation(view))
                 && view
                     .pat_props(pattern.properties)
                     .iter()
@@ -580,22 +578,20 @@ fn param_is_flat(view: AstView<'_>, param: &ast::Expression) -> bool {
                                 && is_bare_identifier(view, view.expr(property.value))
                         }
                         ast::ObjectPatternProperty::RestElement(rest) => {
-                            rest.type_annotation.is_none()
+                            rest.type_annotation(view).is_none()
                                 && is_bare_identifier(view, view.expr(rest.argument))
                         }
                     })
         }
         ast::ExpressionKind::ArrayPattern(pattern) => {
-            view.opt_decorators(pattern.decorators)
-                .unwrap_or_default()
-                .is_empty()
-                && annotation_is_flat(view, pattern.type_annotation.as_ref())
+            pattern.decorators(view).unwrap_or_default().is_empty()
+                && annotation_is_flat(view, pattern.type_annotation(view))
                 && view.expr_opt_list(pattern.elements).iter().all(|element| {
                     element
                         .as_ref()
                         .is_none_or(|element| match &view.expr(*element).kind {
                             ast::ExpressionKind::RestElement(rest) => {
-                                rest.type_annotation.is_none()
+                                rest.type_annotation(view).is_none()
                                     && is_bare_identifier(view, view.expr(rest.argument))
                             }
                             _ => is_bare_identifier(view, view.expr(*element)),
@@ -604,7 +600,7 @@ fn param_is_flat(view: AstView<'_>, param: &ast::Expression) -> bool {
         }
         ast::ExpressionKind::RestElement(rest) => {
             is_bare_identifier(view, view.expr(rest.argument))
-                && annotation_is_flat(view, rest.type_annotation.as_ref())
+                && annotation_is_flat(view, rest.type_annotation(view))
         }
         ast::ExpressionKind::AssignmentPattern(default) => {
             view.opt_decorators(default.decorators)
@@ -724,8 +720,8 @@ fn sole_param_object_type<'a>(
     };
     let annotation = match &param.kind {
         ast::ExpressionKind::Identifier(id) => id.type_annotation(printer.view),
-        ast::ExpressionKind::ObjectPattern(pattern) => pattern.type_annotation.as_ref(),
-        ast::ExpressionKind::ArrayPattern(pattern) => pattern.type_annotation.as_ref(),
+        ast::ExpressionKind::ObjectPattern(pattern) => pattern.type_annotation(printer.view),
+        ast::ExpressionKind::ArrayPattern(pattern) => pattern.type_annotation(printer.view),
         _ => None,
     }?;
     let ast::TSType::TypeLiteral(literal) =

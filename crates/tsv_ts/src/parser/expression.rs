@@ -85,7 +85,7 @@ const BP_UNARY: u8 = 29;
 // ⚠️ The frame is what the id buys as much as the return. LLVM gives each sret call
 // site its own stack slot and does not merge them across match arms, and a frame is sized
 // once for its widest arm — so a dispatcher with N arms that each call a `parse_*` returning
-// a bare `Expression` (44 B) reserves N × 44 B at **every** recursion level, whichever arm
+// a bare `Expression` (32 B) reserves N × 32 B at **every** recursion level, whichever arm
 // it takes. `Parser::parse_prefix_expression` and `Parser::parse_primary_expression` are
 // those dispatchers, and both sit on the paren / call / member / object-literal cycle, so
 // their slots set the stack every nesting level costs, which the depth limits' margin is
@@ -1176,11 +1176,12 @@ impl<'a> Parser<'a> {
             // `startNodeAtNode(expr)`), not at any stripped wrapping paren.
             let start = self.expr(expr).span().start;
             let span = Span::new(start, paren_end as u32);
+            let type_args = type_arguments.map(|t| self.push_type_args(t));
             expr = self.push_expr(Expression {
                 span,
                 kind: ExpressionKind::CallExpression(CallExpression {
                     callee: expr,
-                    type_arguments,
+                    type_args,
                     arguments,
                     optional: false,
                 }),
@@ -1593,7 +1594,7 @@ impl<'a> Parser<'a> {
                     span,
                     kind: ExpressionKind::CallExpression(CallExpression {
                         callee: left,
-                        type_arguments: None,
+                        type_args: None,
                         arguments,
                         optional: true,
                     }),
@@ -1610,11 +1611,12 @@ impl<'a> Parser<'a> {
                 let (arguments, paren_end) = self.parse_call_arguments()?;
 
                 let span = Span::new(start, paren_end as u32);
+                let type_args = Some(self.push_type_args(type_args));
                 left = self.push_expr(Expression {
                     span,
                     kind: ExpressionKind::CallExpression(CallExpression {
                         callee: left,
-                        type_arguments: Some(type_args),
+                        type_args,
                         arguments,
                         optional: true,
                     }),
@@ -1743,11 +1745,12 @@ impl<'a> Parser<'a> {
                     // A `foo<T>(...)` generic call lifts the callee's `<T>` into
                     // the call's `typeArguments` (see `flatten_instantiation`).
                     let (callee, type_arguments) = self.flatten_instantiation(left, start);
+                    let type_args = type_arguments.map(|t| self.push_type_args(t));
                     left = self.push_expr(Expression {
                         span,
                         kind: ExpressionKind::CallExpression(CallExpression {
                             callee,
-                            type_arguments,
+                            type_args,
                             arguments,
                             optional: false,
                         }),
@@ -2092,8 +2095,8 @@ impl<'a> Parser<'a> {
             TokenKind::NoSubstitutionTemplate | TokenKind::TemplateHead => {
                 // Untagged template literal (a primary expression): invalid escapes
                 // are a syntax error (only tagged templates tolerate them).
-                let template = self.parse_template_literal(false)?;
-                Ok(self.push_ret(Expression::from_template_literal(template)))
+                let (template, span) = self.parse_template_literal(false)?;
+                Ok(self.push_ret(Expression::from_template_literal(span, template)))
             }
             TokenKind::Slash | TokenKind::SlashEquals => {
                 // In expression context, `/` or `/=` starts a regex literal, not division
@@ -2327,13 +2330,17 @@ impl<'a> Parser<'a> {
             let ledger = self.comments_mut();
             ledger[idx].owned_by_node = true;
             let comment = ledger[idx];
-            self.push_expr(Expression {
-                span: paren_span,
-                kind: ExpressionKind::CommentBoundPair(CommentBoundPair {
+            let pair = push_row(
+                &mut self.stores.payloads.comment_pairs,
+                CommentBoundPair {
                     inner: parsed,
                     comment,
                     kind,
-                }),
+                },
+            );
+            self.push_expr(Expression {
+                span: paren_span,
+                kind: ExpressionKind::CommentBoundPair(pair),
             })
         } else {
             parsed
@@ -3498,11 +3505,12 @@ impl<'a> Parser<'a> {
             self.count_operand_pairs(Some((callee, ParenContext::NewCallee)), None)?;
         }
 
+        let type_args = type_arguments.map(|t| self.push_type_args(t));
         Ok(self.push_ret(Expression {
             span: Span::new(start as u32, end),
             kind: ExpressionKind::NewExpression(NewExpression {
                 callee,
-                type_arguments,
+                type_args,
                 arguments,
             }),
         }))
@@ -3572,7 +3580,7 @@ impl<'a> Parser<'a> {
     /// Build a `TaggedTemplateExpression` from an already-parsed tag, its optional
     /// `<T>` type arguments, and the parsed quasi. Shared by `attach_new_callee_tag`
     /// (the `new`-callee sites) and the ordinary postfix tagged-template arm so the
-    /// node's span math — `tag_start..quasi.span.end` — lives in one place. `tag` is
+    /// node's span math — `tag_start..quasi_span.end` — lives in one place. `tag` is
     /// the resolved tag expression and `tag_start` its paren-inclusive start (where
     /// the tag's parse began); the postfix arm flattens a `tag<T>`
     /// `TSInstantiationExpression` off the tag first (via `flatten_instantiation`),
@@ -3582,15 +3590,16 @@ impl<'a> Parser<'a> {
         tag: ExprId,
         tag_start: u32,
         type_arguments: Option<TSTypeParameterInstantiation>,
-        quasi: TemplateLiteral,
+        (quasi, quasi_span): (TemplateLiteral, Span),
     ) -> ExprRet {
-        let end = quasi.span.end;
+        let end = quasi_span.end;
         let tagged = push_row(
             &mut self.stores.payloads.tagged_tpls,
             TaggedTemplateExpression {
                 tag,
                 type_arguments,
                 quasi,
+                quasi_span,
             },
         );
         self.push_ret(Expression {

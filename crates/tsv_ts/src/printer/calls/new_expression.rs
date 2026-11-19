@@ -70,10 +70,7 @@ impl<'a> Printer<'a> {
         // does a run the callee's doc would OPEN with on a line of its own, pair or no pair —
         // the `await`→operand rule (`Printer::build_await_doc`).
         let claim = self.left_spine_run_claim(new_expr_span, keyword_end, callee, || {
-            let new_list = new_expr
-                .type_arguments
-                .as_ref()
-                .map(|_| SecondTypeArgs::Expression);
+            let new_list = new_expr.type_args.map(|_| SecondTypeArgs::Expression);
             super::CalleeParens::of(self, callee, ParenContext::NewCallee, new_list).is_some()
                 || self.left_spine_shell_has_own_line_comment(callee)
         });
@@ -162,10 +159,7 @@ impl<'a> Printer<'a> {
         // through three of them — bare (`new a.b.C()`), parenthesized where the callee
         // holds a call (`new (fn(k).a.B)()`), and frozen, where the mark is simply inert.
         self.mark_new_callee_member_lookups(self.view.expr(new_expr.callee));
-        let new_list = new_expr
-            .type_arguments
-            .as_ref()
-            .map(|_| SecondTypeArgs::Expression);
+        let new_list = new_expr.type_args.map(|_| SecondTypeArgs::Expression);
         // The callee→arguments gap opens at the callee's printed end when the printer emits
         // the callee's required pair ([`Printer::required_pair_gap_start`]), so a comment written
         // last in a stripped shell down the callee's right edge prints ahead of the comments
@@ -221,14 +215,13 @@ impl<'a> Printer<'a> {
             self,
             callee,
             callee_gap_start,
-            new_expr.type_arguments.as_ref(),
+            new_expr.type_arguments(self.view),
         );
 
         // Position just before `(` (after the callee and any type arguments); in
         // the empty-args case it doubles as the dangling-comment boundary.
         let paren_open = new_expr
-            .type_arguments
-            .as_ref()
+            .type_arguments(self.view)
             .map_or(callee_gap_start, |ta| ta.span.end);
 
         // Empty args: just `new Foo()` or `new Foo<K, V>()`, preserving dangling comments

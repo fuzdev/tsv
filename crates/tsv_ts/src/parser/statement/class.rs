@@ -1483,7 +1483,7 @@ impl<'a> Parser<'a> {
         let extra = param_type.map(|ta| self.typed_extra(ta));
         let parameter = Identifier {
             escaped_name: param_name.escaped,
-            name_len: param_name.raw_len,
+            name_len: param_name.identifier_len(),
             name_plain_ascii: param_name.plain_ascii,
             optional: false,
             extra,

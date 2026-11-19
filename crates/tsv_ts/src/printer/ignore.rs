@@ -815,7 +815,7 @@ impl<'a> Printer<'a> {
                     && matches!(
                         &operand.kind,
                         ast::ExpressionKind::NewExpression(new_expr)
-                            if new_expr.type_arguments.is_some()
+                            if new_expr.type_args.is_some()
                     )
             }
             _ => false,
@@ -840,7 +840,7 @@ impl<'a> Printer<'a> {
         let ast::ExpressionKind::NewExpression(new_expr) = &expr.kind else {
             return false;
         };
-        let head_end = new_expr.type_arguments.as_ref().map_or_else(
+        let head_end = new_expr.type_arguments(self.view).map_or_else(
             || self.view.expr(new_expr.callee).span().end,
             |args| args.span.end,
         );

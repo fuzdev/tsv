@@ -101,8 +101,8 @@ fn leading_comment_bound_pair_walk<'x>(
     let start = expr.span().start;
     let mut node = expr;
     loop {
-        if let ExpressionKind::CommentBoundPair(cast) = &node.kind {
-            return Some((cast, node.span));
+        if let ExpressionKind::CommentBoundPair(cast) = node.kind {
+            return Some((view.comment_pair(cast), node.span));
         }
         let child = left_spine_child(view, node)?;
         if child.span().start != start {
@@ -170,7 +170,8 @@ impl<'a> Printer<'a> {
         }
         let mut node = value;
         loop {
-            if let ExpressionKind::CommentBoundPair(pair) = &node.kind {
+            if let ExpressionKind::CommentBoundPair(pair) = node.kind {
+                let pair = self.view.comment_pair(pair);
                 if pair.kind == ast::CommentBoundPairKind::Cast && pair.comment.span == comment {
                     return true;
                 }

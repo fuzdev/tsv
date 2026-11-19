@@ -6,7 +6,7 @@
 use crate::ast::AstView;
 use tsv_lang::Span;
 
-use super::{Decorator, ExprId, Property, Run, TSTypeAnnotation};
+use super::{BindingExtraId, Decorator, ExprId, Property, Run, TSTypeAnnotation};
 
 /// Object pattern for destructuring: `{a, b}`, `{a: x, b: y}`, `{...rest}`
 ///
@@ -23,13 +23,38 @@ use super::{Decorator, ExprId, Property, Run, TSTypeAnnotation};
 pub struct ObjectPattern {
     pub properties: Run<ObjectPatternProperty>,
     /// Optional destructuring-pattern parameter (`{a}?`). Only ever set in a
-    /// parameter position; the `?` extends the expression's span and precedes `type_annotation`.
+    /// parameter position; the `?` extends the expression's span and precedes the type
+    /// annotation.
     pub optional: bool,
-    pub type_annotation: Option<TSTypeAnnotation>,
-    /// Parameter decorators (`@dec { a }: T`). Only set in a parameter position;
-    /// emitted last in the wire, matching acorn (which attaches a parameter's
-    /// decorators to its top-level binding node).
-    pub decorators: Option<Run<Decorator>>,
+    /// The type annotation (`{ a }: T`) and parameter decorators (`@dec { a }: T`), set
+    /// only in a binding position, as a [`BindingExtra`] row — the store [`Identifier`]'s
+    /// binding extras use. A minority of patterns carry one and a tiny share of expressions
+    /// are patterns, while inline the pair would set the width of every `Expression`, so
+    /// the unannotated pattern pays a 4 B id for them. Read through
+    /// [`Self::type_annotation`] and [`Self::decorators`]; the decorators are emitted last
+    /// in the wire, matching acorn (which attaches a parameter's decorators to its
+    /// top-level binding node).
+    ///
+    /// [`Identifier`]: super::Identifier
+    /// [`BindingExtra`]: super::BindingExtra
+    pub extra: Option<BindingExtraId>,
+}
+
+impl ObjectPattern {
+    /// The type annotation, if any, its extras read through `view`.
+    #[inline]
+    pub fn type_annotation<'a>(&self, view: AstView<'a>) -> Option<&'a TSTypeAnnotation> {
+        view.opt_binding_extra(self.extra)
+            .and_then(|e| e.type_annotation.as_ref())
+    }
+
+    /// The parameter decorators, if any, their extras read through `view`.
+    #[inline]
+    pub fn decorators<'a>(&self, view: AstView<'a>) -> Option<&'a [Decorator]> {
+        view.opt_binding_extra(self.extra)
+            .and_then(|e| e.decorators)
+            .map(|list| view.decorators(list))
+    }
 }
 
 /// Object pattern property - either a regular property or a rest element
@@ -95,12 +120,30 @@ pub struct ArrayPattern {
     /// Elements are Option to support holes like `[a, , b]`
     pub elements: Run<Option<ExprId>>,
     /// Optional destructuring-pattern parameter (`[a]?`). Only ever set in a
-    /// parameter position; the `?` extends the expression's span and precedes `type_annotation`.
+    /// parameter position; the `?` extends the expression's span and precedes the type
+    /// annotation.
     pub optional: bool,
-    pub type_annotation: Option<TSTypeAnnotation>,
-    /// Parameter decorators (`@dec [a]: T`). Only set in a parameter position;
-    /// emitted last in the wire, matching acorn.
-    pub decorators: Option<Run<Decorator>>,
+    /// The type annotation (`[a]: T`) and parameter decorators (`@dec [a]: T`), behind
+    /// one id as [`ObjectPattern::extra`]'s are. Read through [`Self::type_annotation`]
+    /// and [`Self::decorators`].
+    pub extra: Option<BindingExtraId>,
+}
+
+impl ArrayPattern {
+    /// The type annotation, if any, its extras read through `view`.
+    #[inline]
+    pub fn type_annotation<'a>(&self, view: AstView<'a>) -> Option<&'a TSTypeAnnotation> {
+        view.opt_binding_extra(self.extra)
+            .and_then(|e| e.type_annotation.as_ref())
+    }
+
+    /// The parameter decorators, if any, their extras read through `view`.
+    #[inline]
+    pub fn decorators<'a>(&self, view: AstView<'a>) -> Option<&'a [Decorator]> {
+        view.opt_binding_extra(self.extra)
+            .and_then(|e| e.decorators)
+            .map(|list| view.decorators(list))
+    }
 }
 
 /// Assignment pattern for default values in destructuring: `a = 1`
@@ -139,13 +182,22 @@ pub struct RestElement {
     /// rest element (never on `argument`). Never set for a destructuring rest
     /// (`[...a]` / `{...a}`), which takes no `?`.
     pub optional: bool,
-    // Inline by value, a span and a type id — see `TSFunctionType.return_type`; held the
-    // same way (`Option<TSTypeAnnotation>`) everywhere else.
-    pub type_annotation: Option<TSTypeAnnotation>,
+    /// The type annotation (`...a: T[]`), behind one id as [`ObjectPattern::extra`]'s is:
+    /// a minority of rests carry one, and inline it would set the width of every
+    /// `Expression` (a rest takes no decorators, so the row's are always `None`).
+    /// Read through [`Self::type_annotation`].
+    pub extra: Option<BindingExtraId>,
     pub span: Span,
 }
 
 impl RestElement {
+    /// The type annotation, if any, its extras read through `view`.
+    #[inline]
+    pub fn type_annotation<'a>(&self, view: AstView<'a>) -> Option<&'a TSTypeAnnotation> {
+        view.opt_binding_extra(self.extra)
+            .and_then(|e| e.type_annotation.as_ref())
+    }
+
     /// The source the grouping parens the parser stripped from the argument leave behind
     /// — `[argument end, span end)`, the region between the argument and the shell's last
     /// `)` (`[...(a /* c */)] = x`). A destructuring-assignment rest is the only one that
@@ -156,7 +208,7 @@ impl RestElement {
     /// extends its span there, and its gaps are the tail emitter's, never an interior.
     pub fn paren_interior(&self, view: AstView<'_>) -> Span {
         let arg_end = view.expr(self.argument).span().end;
-        if self.optional || self.type_annotation.is_some() {
+        if self.optional || self.type_annotation(view).is_some() {
             Span::new(arg_end, arg_end)
         } else {
             Span::new(arg_end, self.span.end)

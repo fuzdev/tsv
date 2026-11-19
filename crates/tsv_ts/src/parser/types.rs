@@ -1212,10 +1212,11 @@ impl<'a> Parser<'a> {
             };
             let (optional, type_annotation, arg_end) =
                 self.parse_rest_param_tail(argument.span().end)?;
+            let argument = self.push_expr(argument);
             return Ok(Expression::from_rest_element(RestElement {
-                argument: self.push_expr(argument),
+                argument,
                 optional,
-                type_annotation,
+                extra: type_annotation.map(|ta| self.typed_extra(ta)),
                 span: Span::new(start as u32, arg_end),
             }));
         }
@@ -1253,7 +1254,7 @@ impl<'a> Parser<'a> {
 
         Ok(Expression::from_identifier(Identifier {
             escaped_name: name.escaped,
-            name_len: name.raw_len,
+            name_len: name.identifier_len(),
             name_plain_ascii: name.plain_ascii,
             optional,
             extra,

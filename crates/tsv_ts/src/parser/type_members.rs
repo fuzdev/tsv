@@ -29,8 +29,8 @@ impl<'a> Parser<'a> {
         let param_type_end = self.ty(param_type).span().end;
 
         let extra = push_row(
-            &mut self.stores.payloads.param_extras,
-            IdentifierParamExtra {
+            &mut self.stores.payloads.binding_extras,
+            BindingExtra {
                 type_annotation: Some(TSTypeAnnotation {
                     type_annotation: param_type,
                     span: Span::new(param_colon_start as u32, param_type_end),
@@ -40,7 +40,7 @@ impl<'a> Parser<'a> {
         );
         let param = Identifier {
             escaped_name: param_name.escaped,
-            name_len: param_name.raw_len,
+            name_len: param_name.identifier_len(),
             name_plain_ascii: param_name.plain_ascii,
             optional: false,
             extra: Some(extra),

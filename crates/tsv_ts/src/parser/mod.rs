@@ -1022,20 +1022,31 @@ impl<'a> Parser<'a> {
         self.stores.comment_scratch.frame_mut(self.comment_mark)
     }
 
-    /// Push the binding `extra` for a typed identifier carrying `ta`: a type
-    /// annotation and no decorators. Callers thread the optionality
-    /// (`type_annotation.map(|ta| self.typed_extra(ta))`); decorators, when
-    /// present, are folded in separately by the parameter-list caller
-    /// (`attach_param_decorators`).
+    /// Push a fresh binding `extra` carrying `ta`: a type annotation and no decorators, for
+    /// a binding built with its annotation in hand — a typed identifier or a typed rest
+    /// element. Callers thread the optionality
+    /// (`type_annotation.map(|ta| self.typed_extra(ta))`). A binding whose extras may
+    /// already hold something re-binds them through [`extra_with_type_annotation`] or
+    /// [`extra_with_decorators`] instead — the parameter-list caller's decorators
+    /// (`attach_param_decorators`), a binding pattern's later `: T`.
     #[inline]
-    fn typed_extra(&mut self, ta: TSTypeAnnotation) -> ParamExtraId {
+    pub(super) fn typed_extra(&mut self, ta: TSTypeAnnotation) -> BindingExtraId {
         push_row(
-            &mut self.stores.payloads.param_extras,
-            IdentifierParamExtra {
+            &mut self.stores.payloads.binding_extras,
+            BindingExtra {
                 type_annotation: Some(ta),
                 decorators: None,
             },
         )
+    }
+
+    /// Push a call's or `new`'s type arguments to the type-argument store.
+    #[inline]
+    pub(super) fn push_type_args(
+        &mut self,
+        type_arguments: TSTypeParameterInstantiation,
+    ) -> TypeArgsId {
+        push_row(&mut self.stores.payloads.type_args, type_arguments)
     }
 
     /// Create a parser of `source` at `base_offset` against `goal`, not yet
@@ -2102,12 +2113,12 @@ impl<'a> Parser<'a> {
     /// The current identifier token's name channel — the canonical identifier
     /// name constructor. Span-identity (`escaped: None`, name = the raw token
     /// bytes) unless the token carries a decoded unicode escape
-    /// (`\u0066oo` → `foo`) or is too long for `raw_len` — only those rare
-    /// cases carry the pool-text escape hatch.
+    /// (`\u0066oo` → `foo`) or is longer than an `Identifier`'s `u16` name length — only those rare
+    /// cases carry an escaped-name row.
     pub(super) fn current_ident_name(&mut self) -> IdentName {
         if let Some(decoded) = self.current_decoded {
             IdentName {
-                escaped: Some(decoded),
+                escaped: Some(self.escaped_name_row(decoded)),
                 raw_len: 0,
                 plain_ascii: false,
             }
@@ -2137,15 +2148,15 @@ impl<'a> Parser<'a> {
         }
         IdentName {
             escaped: None,
-            raw_len: len as u16,
+            raw_len: len,
             plain_ascii: self.current_name_plain_ascii(),
         }
     }
 
     /// The current token's raw text, copied into the text pool — the escape hatch
     /// [`Parser::current_raw_ident_name`] carries for an absurdly long name
-    /// (> 64 KiB), which `raw_len` can't hold (essentially unreachable — no
-    /// real identifier is this long).
+    /// (> 64 KiB), which an `Identifier`'s `u16` `name_len` can't hold (essentially
+    /// unreachable — no real identifier is this long).
     ///
     /// It hands back the handle alone, which returns in a register, rather than
     /// the whole `IdentName`, which would return through a stack slot each
@@ -2153,9 +2164,19 @@ impl<'a> Parser<'a> {
     /// recurse.
     #[cold]
     #[inline(never)]
-    fn oversized_raw_name(&mut self) -> PoolText<Text> {
+    fn oversized_raw_name(&mut self) -> EscapedNameId {
         let raw = self.current_value();
-        self.stores.text.push(raw)
+        let text = self.stores.text.push(raw);
+        self.stores.push_escaped_name(text)
+    }
+
+    /// The escaped-name row for a decoded name already in the pool — the id
+    /// [`Parser::current_ident_name`] carries for a `\u`-escaped name. Cold and out of line
+    /// for the reason [`Parser::oversized_raw_name`] is.
+    #[cold]
+    #[inline(never)]
+    fn escaped_name_row(&mut self, decoded: PoolText<Text>) -> EscapedNameId {
+        self.stores.push_escaped_name(decoded)
     }
 
     /// Name channel for the current token, which the caller has already verified
@@ -2185,7 +2206,7 @@ impl<'a> Parser<'a> {
         expected: &str,
     ) -> bool {
         match pid.name.escaped {
-            Some(s) => self.stores.view().text(s) == expected,
+            Some(id) => self.stores.view().escaped_text(id) == expected,
             None => {
                 let start = span.start as usize + 1 - self.base_offset;
                 let raw = start..start + pid.name.raw_len as usize;

@@ -166,14 +166,16 @@ impl CalleeGap {
     /// window ([`Printer::args_frozen_span`]). Separate from [`Self::start`] so a caller
     /// can't accidentally open the window at the callee and swallow the type arguments'
     /// own comments.
-    pub(super) fn paren_open(&self, call: &ast::CallExpression) -> u32 {
+    pub(super) fn paren_open(&self, view: AstView<'_>, call: &ast::CallExpression) -> u32 {
         // On a split gap the argument side opens AT the `(` — the pre-paren half is the
         // callee side's ([`Self::paren_split`]), and opening before it would hand these
         // windows a comment the head has already emitted. Opening *at* the paren rather than
         // past it is deliberate: everything downstream still finds the `(` where it expects
         // it, so the after-`(` comments keep the delimiter-line rule unchanged.
-        self.paren_split
-            .map_or_else(|| args_side_start(call, self.start), |(_, paren)| paren)
+        self.paren_split.map_or_else(
+            || args_side_start(view, call, self.start),
+            |(_, paren)| paren,
+        )
     }
 }
 
@@ -201,7 +203,7 @@ pub(super) fn callee_gap(
     {
         let start = callee.span().end;
         // [`paren_split_for`]'s own gate, over the gap it would be asked about.
-        let gap_start = args_side_start(call, start);
+        let gap_start = args_side_start(printer.view, call, start);
         if printer
             .view
             .expr_list(call.arguments)
@@ -267,7 +269,11 @@ fn callee_gap_wide(printer: &Printer<'_>, call: &ast::CallExpression, span: Span
     };
     let start = Printer::gap_start_after_owned_pair(callee_end, trailing_gap);
     let optional = call_optional(printer, call, span, start);
-    let paren_open = args_side_start(call, optional.arg_side_start().unwrap_or(start));
+    let paren_open = args_side_start(
+        printer.view,
+        call,
+        optional.arg_side_start().unwrap_or(start),
+    );
     CalleeGap {
         paren_split: call_paren_split(printer, call, paren_open),
         owned_pair,
@@ -289,9 +295,12 @@ fn callee_gap_wide(printer: &Printer<'_>, call: &ast::CallExpression, span: Span
 /// derive [`CalleeGap::paren_split`] — which cannot be read off the struct that is still being
 /// built — and [`CalleeGap::paren_open`] is this plus that split. Written out twice, the two
 /// disagreed the moment either grew a clause, which is the failure that struct's doc names.
-fn args_side_start(call: &ast::CallExpression, start_after_optional: u32) -> u32 {
-    call.type_arguments
-        .as_ref()
+fn args_side_start(
+    view: AstView<'_>,
+    call: &ast::CallExpression,
+    start_after_optional: u32,
+) -> u32 {
+    call.type_arguments(view)
         .map_or(start_after_optional, |ta| ta.span.end)
 }
 
@@ -449,13 +458,13 @@ fn call_optional(
     if !call.optional {
         return CallOptional::Absent;
     }
-    if call.arguments.is_empty() && call.type_arguments.is_none() {
+    if call.arguments.is_empty() && call.type_args.is_none() {
         return CallOptional::Fused;
     }
     // The gap holds only whitespace, comments and the `?.` itself, so the first `?` outside
     // a comment is that token. Bounded by whatever follows it, never by the call's end: a
     // `?` inside an argument (`fn?.(a ? b : c)`) is past the bound and can't be reached.
-    let end = call.type_arguments.as_ref().map_or_else(
+    let end = call.type_arguments(printer.view).map_or_else(
         || {
             printer
                 .view
@@ -513,7 +522,7 @@ pub(super) fn call_paren_open(
     call: &ast::CallExpression,
     span: Span,
 ) -> u32 {
-    callee_gap(printer, call, span).paren_open(call)
+    callee_gap(printer, call, span).paren_open(printer.view, call)
 }
 
 /// Whether a chain expression holds a call: its spine — member objects, `!` operands, and
@@ -1033,7 +1042,7 @@ impl<'a> Printer<'a> {
             let call_has_comments = self.has_comments_on_page_between(paren_open, span.end);
             // The route rebuilds the call from its callee and arguments alone, so a call with
             // type arguments or a `?.` takes the general path, which prints them.
-            if call.type_arguments.is_none()
+            if call.type_args.is_none()
                 && !call.optional
                 && call.arguments.len() >= 2
                 && self.view.expr_list(call

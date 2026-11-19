@@ -829,7 +829,7 @@ impl<'a> Printer<'a> {
         } else {
             binding_end
         };
-        if let Some(ta) = &rest.type_annotation {
+        if let Some(ta) = rest.type_annotation(self.view) {
             parts.push(self.build_binding_type_annotation_doc(after_modifier, ta, wrap));
         }
     }

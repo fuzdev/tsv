@@ -1465,7 +1465,7 @@ fn build_type_arg_hug_state<'a>(
             .enumerate()
             .find_map(|(i, node)| match node {
                 ChainNode::Call { call, span, .. } => {
-                    Some((i, *call, *span, call.type_arguments.as_ref()?))
+                    Some((i, *call, *span, call.type_arguments(printer.view)?))
                 }
                 _ => None,
             })?;

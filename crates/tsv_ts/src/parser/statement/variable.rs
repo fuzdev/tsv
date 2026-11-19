@@ -243,7 +243,7 @@ impl<'a> Parser<'a> {
         Ok((
             Expression::from_identifier(Identifier {
                 escaped_name: name.escaped,
-                name_len: name.raw_len,
+                name_len: name.identifier_len(),
                 name_plain_ascii: name.plain_ascii,
                 optional: false,
                 extra,

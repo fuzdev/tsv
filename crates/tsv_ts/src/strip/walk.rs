@@ -1246,14 +1246,14 @@ impl<'s, 'b> Walk<'s, 'b> {
     fn link_tail(&mut self, link: &Expression) {
         match &link.kind {
             ExpressionKind::CallExpression(call) => {
-                self.type_arguments(call.type_arguments.as_ref());
+                self.type_arguments(call.type_arguments(self.view));
                 for argument in self.view.expr_list(call.arguments) {
                     let argument = self.view.expr(*argument);
                     self.expr(argument);
                 }
             }
             ExpressionKind::NewExpression(new) => {
-                self.type_arguments(new.type_arguments.as_ref());
+                self.type_arguments(new.type_arguments(self.view));
                 for argument in self.view.expr_list(new.arguments) {
                     self.expr(self.view.expr(*argument));
                 }
@@ -1328,14 +1328,14 @@ impl<'s, 'b> Walk<'s, 'b> {
             ExpressionKind::BinaryExpression(binary) => self.binary_chain(binary),
             ExpressionKind::CallExpression(call) => {
                 self.link_operand(self.view.expr(call.callee));
-                self.type_arguments(call.type_arguments.as_ref());
+                self.type_arguments(call.type_arguments(self.view));
                 for argument in self.view.expr_list(call.arguments) {
                     self.expr(self.view.expr(*argument));
                 }
             }
             ExpressionKind::NewExpression(new) => {
                 self.link_operand(self.view.expr(new.callee));
-                self.type_arguments(new.type_arguments.as_ref());
+                self.type_arguments(new.type_arguments(self.view));
                 for argument in self.view.expr_list(new.arguments) {
                     self.expr(self.view.expr(*argument));
                 }
@@ -1395,21 +1395,21 @@ impl<'s, 'b> Walk<'s, 'b> {
                 self.expr(self.view.expr(assignment.right));
             }
             ExpressionKind::ObjectPattern(pattern) => {
-                self.decorators(self.view.opt_decorators(pattern.decorators));
+                self.decorators(pattern.decorators(self.view));
                 for property in self.view.pat_props(pattern.properties) {
                     match property {
                         ObjectPatternProperty::Property(property) => self.property(property),
                         ObjectPatternProperty::RestElement(rest) => self.rest_element(rest),
                     }
                 }
-                self.pattern_tail(e.span, pattern.optional, pattern.type_annotation.as_ref());
+                self.pattern_tail(e.span, pattern.optional, pattern.type_annotation(self.view));
             }
             ExpressionKind::ArrayPattern(pattern) => {
-                self.decorators(self.view.opt_decorators(pattern.decorators));
+                self.decorators(pattern.decorators(self.view));
                 for element in self.view.expr_opt_list(pattern.elements).iter().flatten() {
                     self.expr(self.view.expr(*element));
                 }
-                self.pattern_tail(e.span, pattern.optional, pattern.type_annotation.as_ref());
+                self.pattern_tail(e.span, pattern.optional, pattern.type_annotation(self.view));
             }
             ExpressionKind::AssignmentPattern(pattern) => {
                 self.decorators(self.view.opt_decorators(pattern.decorators));
@@ -1451,7 +1451,9 @@ impl<'s, 'b> Walk<'s, 'b> {
                 self.expr(self.view.expr(property.parameter));
             }
             ExpressionKind::ImportExpression(import) => self.import_expression(import, e.span),
-            ExpressionKind::CommentBoundPair(cast) => self.expr(self.view.expr(cast.inner)),
+            ExpressionKind::CommentBoundPair(cast) => {
+                self.expr(self.view.expr(self.view.comment_pair(*cast).inner));
+            }
             ExpressionKind::ParenthesizedExpression(parens) => {
                 self.expr(parens.unreachable_contents(self.view));
             }
@@ -1490,7 +1492,7 @@ impl<'s, 'b> Walk<'s, 'b> {
 
     fn rest_element(&mut self, rest: &RestElement) {
         self.expr(self.view.expr(rest.argument));
-        self.pattern_tail(rest.span, rest.optional, rest.type_annotation.as_ref());
+        self.pattern_tail(rest.span, rest.optional, rest.type_annotation(self.view));
     }
 
     /// A destructuring pattern's optional `?` (the last `?` ahead of its annotation, past

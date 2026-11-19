@@ -28,9 +28,9 @@ const _: () = assert!(size_of::<DocNode>() == 16);
 // The hot AST types: a 4 B pointer, `Expression`'s and `Statement`'s payloads 4 B aligned,
 // and the `Option` of those two niche-packed. See the native pins in `tsv_ts`'s
 // `ast/mod.rs`.
-const _: () = assert!(size_of::<Expression>() == 44);
+const _: () = assert!(size_of::<Expression>() == 32);
 const _: () = assert!(size_of::<Option<Expression>>() == size_of::<Expression>());
-const _: () = assert!(size_of::<ExpressionKind>() == 36);
+const _: () = assert!(size_of::<ExpressionKind>() == 24);
 const _: () = assert!(size_of::<Statement>() == 48);
 const _: () = assert!(size_of::<Option<Statement>>() == size_of::<Statement>());
 const _: () = assert!(size_of::<StatementKind>() == 40);
@@ -47,7 +47,7 @@ const _: () = assert!(
 // The list elements and their shared `Property` payload, as the same native pins hold them.
 const _: () = assert!(size_of::<Property>() == 20);
 const _: () = assert!(size_of::<ObjectProperty>() == 20);
-const _: () = assert!(size_of::<ObjectPatternProperty>() == 28);
+const _: () = assert!(size_of::<ObjectPatternProperty>() == 24);
 const _: () = assert!(size_of::<VariableDeclarator>() == 20);
 const _: () = assert!(size_of::<SwitchCase>() == 20);
 // The ladders' return currency: an id word plus the pointer-sized `Error` is two words. See

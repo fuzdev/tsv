@@ -31,14 +31,15 @@ mod stores;
 mod types;
 mod view;
 
-pub(crate) use stores::ScratchMarks;
 pub use stores::{
-    ArrowFnId, AstStores, CatchId, ClassDeclId, ClassExprId, CtorTypeId, DeclareFnId, EnumDeclId,
-    ExportAllId, ExportAssignId, ExportDefaultId, ExportNamedId, ExprId, FnDeclId, FnExprId,
-    ForHeadId, ForLeftId, ImportDeclId, ImportEqualsId, ImportTypeId, InferTypeId, InterfaceDeclId,
-    MetaPropId, ModuleDeclId, ParamExtraId, Parsed, QualNameId, StmtId, TaggedTplId, Text, TyId,
-    TypeAliasId, WarmStores, park_stores, take_stores, with_stores,
+    ArrowFnId, AstStores, BindingExtraId, CatchId, ClassDeclId, ClassExprId, CommentPairId,
+    CtorTypeId, DeclareFnId, EnumDeclId, EscapedNameId, ExportAllId, ExportAssignId,
+    ExportDefaultId, ExportNamedId, ExprId, FnDeclId, FnExprId, ForHeadId, ForLeftId, ImportDeclId,
+    ImportEqualsId, ImportTypeId, InferTypeId, InterfaceDeclId, MetaPropId, ModuleDeclId, Parsed,
+    QualNameId, StmtId, TaggedTplId, Text, TyId, TypeAliasId, TypeArgsId, WarmStores, park_stores,
+    take_stores, with_stores,
 };
+pub(crate) use stores::{ScratchMarks, extra_with_decorators, extra_with_type_annotation};
 pub use tsv_lang::packed::PackedF64;
 use tsv_lang::store::PoolText;
 pub use tsv_lang::store::Run;
@@ -132,7 +133,14 @@ pub use expressions::{
 // the widest two are ~0.02%), `TSType`'s three widest (`TSImportType`,
 // `TSConstructorType`, `TSInferType`, so the inline variants set its pinned width below),
 // `Statement`'s DECLARATION heads and its four loop / `try` heads one level down
-// (`ast/statements.rs`). Two of those declaration heads — `ImportDeclaration` and
+// (`ast/statements.rs`). Below `Expression`'s stored five, the variants that would set its
+// width are common, so their RARE fields go behind an id instead: a call's and `new`'s
+// type arguments (`TypeArgsId`), a binding pattern's or rest element's annotation and
+// decorators (`BindingExtraId`, the store `Identifier`'s binding extras use), an
+// identifier's escaped name (`EscapedNameId`), and the rare comment-bound pair whole
+// (`CommentPairId`); a template keeps no span of its own. That leaves `Identifier` (20 B)
+// the widest variant, so `ExpressionKind` is 24 with an explicit tag (pinned beside the
+// enum) and `Expression` 32. Two of those declaration heads — `ImportDeclaration` and
 // `ExportNamedDeclaration` — are stored despite NOT being rare (6.8–11.7% and 2.4–4.0%
 // of statements): they are simply the last two rungs of the ladder, and a stored head's
 // construction copies the same bytes into its store that it would have moved into the
@@ -148,8 +156,8 @@ pub use expressions::{
 // expression spine already returns a pushed row's id, so an inline slot would be a COPY
 // OUT of the store rather than a place the node lives. Naming the slots by id removes
 // that copy instead of adding a row, and takes the element every object-literal and
-// declarator list moves to 20 B (inline, it would carry two 44 B `Expression`s;
-// `ObjectPatternProperty` 28, its `RestElement` arm setting it). `CatchClause` keeps its
+// declarator list moves to 20 B (inline, it would carry two 32 B `Expression`s;
+// `ObjectPatternProperty` 24, a tag beside its two 20 B arms). `CatchClause` keeps its
 // inline `param` deliberately: it is built by the parser as an owned value rather than
 // through the spine, so an id there would ADD a row, and `CatchClause` is reached only
 // through an `Option<CatchId>` so its width sets nothing. The expression LISTS whose
@@ -181,10 +189,14 @@ pub use expressions::{
 // pinned on wasm32 (a 4 B pointer; `Expression`'s and `Statement`'s payloads 4 B aligned,
 // the number literal's `f64` held as a [`PackedF64`]) in `tsv_wasm`, the crate compiled
 // for wasm32, and `Expression`'s and `Statement`'s `Option` must stay niche-packed on both.
+//
+// These size pins do NOT guard `ExpressionKind`'s TAG: a variant that widens to fill the
+// enum moves the tag into its niche and leaves every size here as it was. The payload pin
+// beside the enum (`ast/expressions.rs`) is the one that catches it.
 #[cfg(all(test, target_pointer_width = "64"))]
-const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<Expression>() == 44);
+const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<Expression>() == 32);
 #[cfg(all(test, target_pointer_width = "64"))]
-const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<ExpressionKind>() == 36);
+const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<ExpressionKind>() == 24);
 #[cfg(test)]
 const _: () = assert!(size_of::<Option<Expression>>() == size_of::<Expression>());
 #[cfg(all(test, target_pointer_width = "64"))]
@@ -198,7 +210,7 @@ const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<Property>() == 2
 #[cfg(all(test, target_pointer_width = "64"))]
 const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<ObjectProperty>() == 20);
 #[cfg(all(test, target_pointer_width = "64"))]
-const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<ObjectPatternProperty>() == 28);
+const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<ObjectPatternProperty>() == 24);
 #[cfg(all(test, target_pointer_width = "64"))]
 const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<VariableDeclarator>() == 20);
 #[cfg(all(test, target_pointer_width = "64"))]
@@ -335,22 +347,30 @@ impl Literal {
 ///
 /// `escaped` is `Some` only when the name text differs from the leading
 /// `raw_len` bytes at the node's span start — a `\u` unicode escape
-/// (`\u0066oo` → `foo`), or a name too long for `raw_len` (> `u16::MAX`
-/// bytes) — or when those bytes need a JSON escape, which only a name the grammar
-/// does not vouch for can hold (a Svelte directive name like `a\b`; see below).
-/// It then carries the name as a `PoolText<Text>`, read through [`AstView::text`] at every
-/// consumer — no interner round-trip: for an escape, the decoded name (the parser's
-/// `current_decoded`, already in the pool); for an oversized name, its raw text
-/// copied into the pool; for a Svelte-synthesized name, its text copied into the pool
-/// verbatim. Otherwise (`None`, >99.99% of
-/// identifiers) the name is the raw source slice
-/// `span.start .. span.start + raw_len` — nothing stored at all.
+/// (`\u0066oo` → `foo`), or a name longer than `u16::MAX` bytes — or when those bytes
+/// need a JSON escape, which only a name the grammar does not vouch for can hold (a
+/// Svelte directive name like `a\b`; see below).
+/// It then names an [`EscapedName`] row, whose pool text is read through
+/// [`AstView::escaped_text`] at every consumer — no interner round-trip: for an escape, the
+/// decoded name (the parser's `current_decoded`, already in the pool); for an oversized
+/// name, its raw text copied into the pool; for a Svelte-synthesized name, its text copied
+/// into the pool verbatim. The row is the 4 B id's indirection to the 8 B pool handle: it
+/// keeps [`Identifier`], an inline `Expression` variant, narrow enough that
+/// `ExpressionKind` keeps an explicit tag (see the tag pin in this module). Otherwise
+/// (`None`, >99.99% of identifiers) the name is the raw source slice `span.start ..
+/// span.start + raw_len` — nothing stored at all.
 ///
 /// `raw_len` is the raw name-*token* byte length, fixed at token time: the
 /// owning node's span may later extend past the name (`?`, `!`, `: Type` —
 /// acorn parity), so the name is the leading `raw_len` bytes, never the whole
 /// span. When `escaped` is `Some`, `raw_len` is 0 and unused — read the
 /// pool text instead.
+///
+/// `raw_len` is a `u32` but never exceeds `u16::MAX`: an [`Identifier`] keeps it flattened as
+/// a `u16`, which is what holds it at 20 B, so a longer name takes the escape hatch instead
+/// (the parser's oversized-name path). The field is wider than that bound on purpose: it
+/// keeps `IdentName` at 12 B, a shape the parser's name-channel helpers stay inline and
+/// register-packed in, where an 8 B one outlined them.
 ///
 /// ⚠️ **`escaped: None` is also a claim about the bytes**: the raw slice holds no
 /// `"`, no `\` and no control byte, so the wire writer emits it without a JSON
@@ -362,8 +382,8 @@ impl Literal {
 /// to `escaped: Some`; debug builds assert the claim at the write.
 #[derive(Debug, Clone, Copy)]
 pub struct IdentName {
-    pub escaped: Option<PoolText<Text>>,
-    pub raw_len: u16,
+    pub escaped: Option<EscapedNameId>,
+    pub raw_len: u32,
     /// Whether the raw name is **plain one-column ASCII** — no byte at or above
     /// `0x80`. Answered by the lexer, which walked those bytes anyway and records the
     /// rare tokens that are NOT plain (`Lexer::nonplain_ident_starts`); the parser asks
@@ -395,9 +415,17 @@ impl IdentName {
         debug_assert!(u16::try_from(span.end - span.start).is_ok());
         Self {
             escaped: None,
-            raw_len: (span.end - span.start) as u16,
+            raw_len: span.end - span.start,
             plain_ascii: true,
         }
+    }
+
+    /// `raw_len` as the `u16` an [`Identifier`] stores — lossless, since a name longer than
+    /// `u16::MAX` bytes is never span-identity (see [`IdentName`]).
+    #[inline]
+    pub fn identifier_len(self) -> u16 {
+        debug_assert!(u16::try_from(self.raw_len).is_ok());
+        self.raw_len as u16
     }
 
     /// Resolve the name: an escaped name's text, read through `view`, else the
@@ -407,25 +435,32 @@ impl IdentName {
     #[inline]
     pub fn resolve<'s>(self, span_start: u32, source: &'s str, view: AstView<'s>) -> &'s str {
         match self.escaped {
-            Some(s) => view.text(s),
+            Some(id) => view.escaped_text(id),
             None => &source[span_start as usize..span_start as usize + self.raw_len as usize],
         }
     }
 }
 
+/// An escaped name's text: the row an [`IdentName`]'s `escaped` id names, holding the
+/// pool handle the 8 B of which would otherwise sit in every [`Identifier`]. Read through
+/// [`AstView::escaped_text`].
+#[derive(Debug, Clone, Copy)]
+pub struct EscapedName {
+    pub text: PoolText<Text>,
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct Identifier {
-    /// The [`IdentName`] channel's escape hatch: the decoded name as pool text,
-    /// `Some` only for `\u`-escaped or `raw_len`-oversized
-    /// names, and for a Svelte-synthesized name holding a JSON-escaped byte (see
-    /// [`IdentName`]). Stored flattened (beside `name_len`) rather than as a nested
-    /// [`IdentName`] — the nested struct's tail padding would grow `Identifier`,
-    /// and it is an *inline* `Expression` variant. (The handle is the widest field
-    /// here; `Expression` is set by wider variants, so it does not move
-    /// `sizeof(Expression)`, but it sets `Identifier`'s own width, which every node
-    /// holding one inline pays, a type name or a statement label among them.) Read via
-    /// [`Self::ident_name`].
-    pub escaped_name: Option<PoolText<Text>>,
+    /// The [`IdentName`] channel's escape hatch: the decoded name as an [`EscapedName`] row,
+    /// `Some` only for `\u`-escaped names, names longer than `u16::MAX` bytes, and for a
+    /// Svelte-synthesized name holding a JSON-escaped byte (see [`IdentName`]). Stored
+    /// flattened (beside `name_len`) rather than as a nested [`IdentName`] — the nested
+    /// struct's tail padding would grow `Identifier`, and it is an *inline* `Expression`
+    /// variant. A 4 B id rather than the 8 B pool
+    /// handle itself: `Identifier` is the widest inline variant, so its width is
+    /// `ExpressionKind`'s, and at 20 B it leaves the enum room for an explicit tag
+    /// (the tag pin beside `ExpressionKind`, `ast/expressions.rs`). Read via [`Self::ident_name`].
+    pub escaped_name: Option<EscapedNameId>,
     /// The [`IdentName`] channel's `raw_len`: the raw name-token byte length
     /// (the node span may extend past the name — `?` / `!` / `: Type`).
     pub name_len: u16,
@@ -449,17 +484,18 @@ pub struct Identifier {
     /// the wire's `write_expression_inner`, the type strip's `Walk::expr`) test just those two
     /// (the wire's also its `force_optional` context flag), and `build_identifier_doc_inner`'s
     /// fast path tests `optional` plus each accessor — a new `Identifier` field must join all
-    /// four, a new `IdentifierParamExtra` field the last.
-    pub extra: Option<ParamExtraId>,
+    /// four, a new `BindingExtra` field the last.
+    pub extra: Option<BindingExtraId>,
     pub span: Span,
 }
 
-/// Binding-only extension of [`Identifier`] — the type annotation and parameter
-/// decorators a binding identifier carries. A row of its own store, named by
-/// `Identifier.extra` only at the few binding sites that set it; absent (`None`, folded
-/// into the id's niche) for every reference.
+/// The binding-only extras — the type annotation and parameter decorators a binding
+/// carries. A row of its own store, named by the `extra` of an [`Identifier`], an
+/// [`ObjectPattern`], an [`ArrayPattern`] or a [`RestElement`] (whose row never holds
+/// decorators) at the binding sites that set them; absent (`None`, folded into the id's
+/// niche) for every reference and every unannotated pattern.
 #[derive(Debug, Clone, Copy)]
-pub struct IdentifierParamExtra {
+pub struct BindingExtra {
     pub type_annotation: Option<TSTypeAnnotation>,
     pub decorators: Option<Run<Decorator>>,
 }
@@ -469,7 +505,7 @@ impl Identifier {
     /// read through `view`.
     #[inline]
     pub fn type_annotation<'a>(&self, view: AstView<'a>) -> Option<&'a TSTypeAnnotation> {
-        view.opt_param_extra(self.extra)
+        view.opt_binding_extra(self.extra)
             .and_then(|e| e.type_annotation.as_ref())
     }
 
@@ -477,7 +513,7 @@ impl Identifier {
     /// `view`.
     #[inline]
     pub fn decorators<'a>(&self, view: AstView<'a>) -> Option<&'a [Decorator]> {
-        view.opt_param_extra(self.extra)
+        view.opt_binding_extra(self.extra)
             .and_then(|e| e.decorators)
             .map(|list| view.decorators(list))
     }
@@ -487,7 +523,7 @@ impl Identifier {
     pub fn ident_name(&self) -> IdentName {
         IdentName {
             escaped: self.escaped_name,
-            raw_len: self.name_len,
+            raw_len: u32::from(self.name_len),
             plain_ascii: self.name_plain_ascii,
         }
     }
@@ -512,12 +548,12 @@ impl Identifier {
     ///
     /// Use this for identifiers in expression context (not parameters). For a
     /// binding that carries `?` / a type annotation / decorators, construct
-    /// directly with `extra` naming a pushed [`IdentifierParamExtra`] row.
+    /// directly with `extra` naming a pushed [`BindingExtra`] row.
     #[inline]
     pub fn simple(name: IdentName, span: Span) -> Self {
         Self {
             escaped_name: name.escaped,
-            name_len: name.raw_len,
+            name_len: name.identifier_len(),
             name_plain_ascii: name.plain_ascii,
             optional: false,
             extra: None,
@@ -545,7 +581,7 @@ impl PrivateIdentifier {
     /// end stays correct even if the parser ever tolerated separation after the `#`).
     #[inline]
     pub fn name_span(&self, span: Span) -> Span {
-        Span::new(span.end - self.name.raw_len as u32, span.end)
+        Span::new(span.end - self.name.raw_len, span.end)
     }
 
     /// Resolve the name (without `#`): the raw source slice, or an escaped name's
@@ -553,7 +589,7 @@ impl PrivateIdentifier {
     #[inline]
     pub fn name<'s>(&self, span: Span, source: &'s str, view: AstView<'s>) -> &'s str {
         self.name
-            .resolve(span.end - self.name.raw_len as u32, source, view)
+            .resolve(span.end - self.name.raw_len, source, view)
     }
 }
 

@@ -462,7 +462,7 @@ pub(crate) fn board() -> Vec<TypeRow> {
             ts::Decorator,
             ts::IdentName,
             ts::Identifier,
-            ts::IdentifierParamExtra,
+            ts::BindingExtra,
             ts::Literal,
             ts::LiteralValue,
             ts::PrivateIdentifier,

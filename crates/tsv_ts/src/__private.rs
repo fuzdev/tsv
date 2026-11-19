@@ -4,12 +4,11 @@
 
 use super::*;
 use crate::ast::{
-    AstStores, AstView, ExprId, Expression, ExpressionKind, FunctionDeclaration, Parsed, ParsedRef,
-    Program, Run, Statement, StatementKind, TSTypeAnnotation, TSTypeParameterDeclaration, Text,
-    VariableDeclaration,
+    AstStores, AstView, EscapedNameId, ExprId, Expression, ExpressionKind, FunctionDeclaration,
+    Parsed, ParsedRef, Program, Run, Statement, StatementKind, TSTypeAnnotation,
+    TSTypeParameterDeclaration, VariableDeclaration, extra_with_type_annotation,
 };
 use tsv_lang::Span;
-use tsv_lang::store::PoolText;
 
 pub use crate::ast::{WarmStores, park_stores, take_stores, with_stores};
 pub use crate::imports::{collect_imports, parse_imports_into};
@@ -17,7 +16,6 @@ pub use crate::imports::{collect_imports, parse_imports_into};
 pub use crate::imports::{write_imports_json, write_imports_json_string};
 pub use crate::parser::TopLevelAs;
 pub use crate::strip::strip_into;
-use tsv_lang::store::push_row;
 
 /// The per-document environment shared by every formatting entry point: the
 /// source the AST's spans index into, the comment buffer, the view its tree resolves
@@ -420,11 +418,12 @@ pub fn push_expression(stores: &mut AstStores, expr: Expression) -> ExprId {
     stores.exprs.push(expr)
 }
 
-/// Push `text` into `stores`' text pool and mint its handle — for a host-built name, such as
-/// a directive name a span of the source cannot spell.
-#[inline]
-pub fn push_text(stores: &mut AstStores, text: &str) -> PoolText<Text> {
-    stores.text.push(text)
+/// A name's text copied into `stores`, as the escaped-name row an `IdentName` carries — for a
+/// host-built name a span of the source cannot spell, such as a directive name holding a byte
+/// the wire must escape.
+pub fn push_escaped_name(stores: &mut AstStores, name: &str) -> EscapedNameId {
+    let text = stores.text.push(name);
+    stores.push_escaped_name(text)
 }
 
 /// The `FunctionDeclaration` `program`'s first statement is, borrowed from `stores` — for a
@@ -510,19 +509,7 @@ pub fn attach_pattern_type_annotation(
     // edited), built from the bare one's fields.
     let kind = match &node.kind {
         ExpressionKind::Identifier(id) => {
-            // Re-bind the identifier's binding extra with the parsed type annotation
-            // (preserving any decorators already present). The bare binding's extras stay
-            // behind as an orphan row.
-            let decorators = id
-                .extra
-                .and_then(|extra| stores.param_extra_row(extra).decorators);
-            let extra = push_row(
-                &mut stores.payloads.param_extras,
-                ast::IdentifierParamExtra {
-                    type_annotation: Some(ta),
-                    decorators,
-                },
-            );
+            let extra = extra_with_type_annotation(&mut stores.payloads, id.extra, ta);
             ExpressionKind::Identifier(ast::Identifier {
                 escaped_name: id.escaped_name,
                 name_len: id.name_len,
@@ -533,19 +520,21 @@ pub fn attach_pattern_type_annotation(
             })
         }
         ExpressionKind::ObjectPattern(pattern) => {
+            let extra = extra_with_type_annotation(&mut stores.payloads, pattern.extra, ta);
             ExpressionKind::ObjectPattern(ast::ObjectPattern {
                 properties: pattern.properties,
                 optional: pattern.optional,
-                type_annotation: Some(ta),
-                decorators: pattern.decorators,
+                extra: Some(extra),
             })
         }
-        ExpressionKind::ArrayPattern(pattern) => ExpressionKind::ArrayPattern(ast::ArrayPattern {
-            elements: pattern.elements,
-            optional: pattern.optional,
-            type_annotation: Some(ta),
-            decorators: pattern.decorators,
-        }),
+        ExpressionKind::ArrayPattern(pattern) => {
+            let extra = extra_with_type_annotation(&mut stores.payloads, pattern.extra, ta);
+            ExpressionKind::ArrayPattern(ast::ArrayPattern {
+                elements: pattern.elements,
+                optional: pattern.optional,
+                extra: Some(extra),
+            })
+        }
         // The Svelte block grammar admits an identifier or a destructuring
         // pattern, so nothing else is reachable — and no other `Expression`
         // variant has an annotation slot to hold it. Reject rather than drop.
@@ -570,10 +559,10 @@ pub fn attach_pattern_type_annotation(
 /// The read counterpart of [`attach_pattern_type_annotation`] — the annotation a binding
 /// pattern carries, or `None`.
 ///
-/// One definition of "where does this binding's annotation live", because the three kinds
-/// hold it in three different places (an `Identifier` behind its `extra`, the two
-/// destructuring patterns in a field of their own). Callers wanting the binding's **end**
-/// take [`pattern_binding_end`] rather than reading `span.end` themselves.
+/// One definition of "which binding kinds carry an annotation": an `Identifier`, an
+/// `ObjectPattern` and an `ArrayPattern` each hold it in their binding extras, each behind
+/// its own variant's accessor, and no other root has one. Callers wanting the binding's
+/// **end** take [`pattern_binding_end`] rather than reading `span.end` themselves.
 ///
 /// Its **span** also marks the boundary between the two acorn parses Svelte's
 /// `read_pattern` runs — the pattern, then `read_type_annotation` for the `: T` — so the
@@ -586,8 +575,8 @@ pub fn pattern_type_annotation<'a>(
 ) -> Option<&'a TSTypeAnnotation> {
     match &pattern.kind {
         ExpressionKind::Identifier(id) => id.type_annotation(view),
-        ExpressionKind::ObjectPattern(obj) => obj.type_annotation.as_ref(),
-        ExpressionKind::ArrayPattern(arr) => arr.type_annotation.as_ref(),
+        ExpressionKind::ObjectPattern(obj) => obj.type_annotation(view),
+        ExpressionKind::ArrayPattern(arr) => arr.type_annotation(view),
         _ => None,
     }
 }

@@ -780,7 +780,7 @@ impl<'a> Printer<'a> {
                     })
                     .collect();
                 let braces = self.build_object_braces(expr.span.start, expr.span.end, &entries);
-                self.append_pattern_type_annotation(braces, obj.type_annotation.as_ref())
+                self.append_pattern_type_annotation(braces, obj.type_annotation(self.view))
             }
             ExpressionKind::ObjectExpression(obj) => {
                 let entries: SmallVec<[(u32, u32, DocId); 8]> = self
@@ -804,7 +804,7 @@ impl<'a> Printer<'a> {
                     expr.span.start,
                     expr.span.end,
                 );
-                self.append_pattern_type_annotation(brackets, arr.type_annotation.as_ref())
+                self.append_pattern_type_annotation(brackets, arr.type_annotation(self.view))
             }
             ExpressionKind::ArrayExpression(arr) => self.build_array_brackets(
                 self.view.expr_opt_list(arr.elements),

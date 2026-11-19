@@ -743,7 +743,7 @@ pub(super) fn write_name_field(
     ctx: &Ctx<'_>,
 ) {
     match name.escaped {
-        Some(s) => write_escaped_name_field(w, ctx.view.text(s)),
+        Some(id) => write_escaped_name_field(w, ctx.view.escaped_text(id)),
         None => {
             let start = name_start as usize;
             let end = start + name.raw_len as usize;

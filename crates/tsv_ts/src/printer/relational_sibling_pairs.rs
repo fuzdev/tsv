@@ -82,7 +82,7 @@ fn any_expression_child<'e>(
                 })
         }
         ExpressionKind::ObjectPattern(object) => {
-            decorators_any(view, view.opt_decorators(object.decorators), &mut visit)
+            decorators_any(view, object.decorators(view), &mut visit)
                 || view
                     .pat_props(object.properties)
                     .iter()
@@ -102,7 +102,7 @@ fn any_expression_child<'e>(
             .flatten()
             .any(|child| visit(view.expr(*child), Element { list_end: None })),
         ExpressionKind::ArrayPattern(array) => {
-            decorators_any(view, view.opt_decorators(array.decorators), &mut visit)
+            decorators_any(view, array.decorators(view), &mut visit)
                 || view
                     .expr_opt_list(array.elements)
                     .iter()
@@ -199,7 +199,9 @@ fn any_expression_child<'e>(
                     .options
                     .is_some_and(|options| visit(view.expr(options), Element { list_end }))
         }
-        ExpressionKind::CommentBoundPair(cast) => visit(view.expr(cast.inner), Other),
+        ExpressionKind::CommentBoundPair(cast) => {
+            visit(view.expr(view.comment_pair(*cast).inner), Other)
+        }
         ExpressionKind::ParenthesizedExpression(paren) => visit(view.expr(paren.expression), Other),
         ExpressionKind::Literal(_)
         | ExpressionKind::Identifier(_)

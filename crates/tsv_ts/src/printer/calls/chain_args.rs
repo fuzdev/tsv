@@ -78,7 +78,7 @@ pub(super) fn chain_call_head_doc(
         parts.extend(optional_doc);
         return Some(d.concat(&parts));
     }
-    let type_args = call.type_arguments.as_ref();
+    let type_args = call.type_arguments(printer.view);
     if optional_doc.is_none() && type_args.is_none() {
         return None;
     }
@@ -348,7 +348,7 @@ fn build_call_args_doc_for_chain_impl(
     // hand-rolled copy had no `?.` step at all, which is how the callee-side comment reached
     // the argument-leading scan and printed inside the parens.
     let gap = super::callee_gap(printer, call, span);
-    let paren_open = gap.paren_open(call);
+    let paren_open = gap.paren_open(printer.view, call);
 
     // Check for any comments in arguments (leading, inter-argument, or trailing)
     // Note: presence of comments doesn't necessarily mean expansion - only line comments

@@ -213,7 +213,7 @@ impl<'a> Parser<'a> {
     pub(super) fn parse_template_literal(
         &mut self,
         tagged: bool,
-    ) -> Result<TemplateLiteral, Error> {
+    ) -> Result<(TemplateLiteral, Span), Error> {
         let (start, _) = self.current_pos();
         let quasi_mark = self.stores.runs.quasi_scratch.mark();
 
@@ -228,15 +228,15 @@ impl<'a> Parser<'a> {
 
                 self.stores.runs.quasi_scratch.push(element);
 
-                Ok(TemplateLiteral {
+                let template = TemplateLiteral {
                     quasis: flush_run(
                         &mut self.stores.runs.quasi_scratch,
                         &mut self.stores.runs.quasis,
                         quasi_mark,
                     ),
                     expressions: Run::EMPTY,
-                    span: Span::new(start as u32, elem_end as u32),
-                })
+                };
+                Ok((template, Span::new(start as u32, elem_end as u32)))
             }
             TokenKind::TemplateHead => {
                 // Template with interpolation: `hello ${name}...`
@@ -326,15 +326,15 @@ impl<'a> Parser<'a> {
                     .last()
                     .map_or(start as u32, |q| q.span.end);
 
-                Ok(TemplateLiteral {
+                let template = TemplateLiteral {
                     quasis: flush_run(
                         &mut self.stores.runs.quasi_scratch,
                         &mut self.stores.runs.quasis,
                         quasi_mark,
                     ),
                     expressions: self.flush_expr_list(mark),
-                    span: Span::new(start as u32, end),
-                })
+                };
+                Ok((template, Span::new(start as u32, end)))
             }
             _ => Err(self.error_expected_found_at("template literal", start)),
         }

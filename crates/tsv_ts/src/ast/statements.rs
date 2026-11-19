@@ -489,7 +489,7 @@ pub struct VariableDeclaration {
 ///
 /// Both slots are ids rather than inline `Expression`s, for the density reason on
 /// [`super::Property`] — 20 B on every element of every `declarations` run (inline, it
-/// would carry two 44 B `Expression`s), and no row added, because the parser's
+/// would carry two 32 B `Expression`s), and no row added, because the parser's
 /// expression spine already hands back the id.
 #[derive(Debug, Clone, Copy)]
 pub struct VariableDeclarator {

@@ -844,14 +844,14 @@ fn param_holds_brace_type(view: AstView<'_>, param: &ast::Expression) -> bool {
             annotation_holds_brace_type(view, id.type_annotation(view))
         }
         ExpressionKind::ObjectPattern(p) => {
-            annotation_holds_brace_type(view, p.type_annotation.as_ref())
+            annotation_holds_brace_type(view, p.type_annotation(view))
         }
         ExpressionKind::ArrayPattern(p) => {
-            annotation_holds_brace_type(view, p.type_annotation.as_ref())
+            annotation_holds_brace_type(view, p.type_annotation(view))
         }
         ExpressionKind::RestElement(r) => {
             param_holds_brace_type(view, view.expr(r.argument))
-                || annotation_holds_brace_type(view, r.type_annotation.as_ref())
+                || annotation_holds_brace_type(view, r.type_annotation(view))
         }
         ExpressionKind::AssignmentPattern(p) => param_holds_brace_type(view, view.expr(p.left)),
         _ => false,

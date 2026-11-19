@@ -141,9 +141,7 @@ fn build_call_head(printer: &Printer<'_>, call: &ast::CallExpression, span: Span
         printer,
         callee_expr,
         ParenContext::callee_of(call),
-        call.type_arguments
-            .as_ref()
-            .map(|_| SecondTypeArgs::Expression),
+        call.type_args.map(|_| SecondTypeArgs::Expression),
     );
     // The pair's facts and every window that opens past its `)`, off ONE derivation
     // ([`super::CalleeGap`]).
@@ -279,7 +277,7 @@ fn build_call_head(printer: &Printer<'_>, call: &ast::CallExpression, span: Span
         printer,
         callee,
         callee_gap_start,
-        call.type_arguments.as_ref(),
+        call.type_arguments(printer.view),
     );
 
     CallHead {
@@ -333,13 +331,12 @@ fn build_call_args_doc(
     // Empty args: just `fn()` or `fn<T>()`, preserving dangling comments
     if call.arguments.is_empty() {
         let after_type_args = call
-            .type_arguments
-            .as_ref()
+            .type_arguments(printer.view)
             .map_or(callee_gap_start, |ta| ta.span.end);
         return build_empty_args_doc(printer, callee, after_type_args, span.end, fuse_optional);
     }
 
-    let paren_open = gap.paren_open(call);
+    let paren_open = gap.paren_open(printer.view, call);
 
     // A `Boolean()` coercion's argument is a `shouldNotIndent` position (`key === "arguments"
     // && isBooleanTypeCoercion(parent)`, `shouldNotIndent` in `print/binaryish.js`): its binary chain takes no

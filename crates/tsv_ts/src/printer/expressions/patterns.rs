@@ -568,9 +568,9 @@ impl<'a> Printer<'a> {
 
     /// The object pattern's [`PatternTail`] — [`Self::pattern_body_end`] in its brace
     /// spelling, paired with the tail it bounds.
-    fn object_pattern_tail<'t>(&self, obj: &'t ast::ObjectPattern, span: Span) -> PatternTail<'t> {
+    fn object_pattern_tail(&self, obj: &ast::ObjectPattern, span: Span) -> PatternTail<'a> {
         let optional = obj.optional;
-        let type_annotation = obj.type_annotation.as_ref();
+        let type_annotation = obj.type_annotation(self.view);
         let last_content_end = self
             .view
             .pat_props(obj.properties)
@@ -592,9 +592,9 @@ impl<'a> Printer<'a> {
 
     /// The array pattern's [`PatternTail`]. A trailing hole carries no span, so the scan
     /// starts at the last REAL element — the commas past it are structure.
-    fn array_pattern_tail<'t>(&self, arr: &'t ast::ArrayPattern, span: Span) -> PatternTail<'t> {
+    fn array_pattern_tail(&self, arr: &ast::ArrayPattern, span: Span) -> PatternTail<'a> {
         let optional = arr.optional;
-        let type_annotation = arr.type_annotation.as_ref();
+        let type_annotation = arr.type_annotation(self.view);
         let last_content_end = self
             .view
             .expr_opt_list(arr.elements)

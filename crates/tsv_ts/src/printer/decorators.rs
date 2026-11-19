@@ -624,8 +624,8 @@ impl<'a> Printer<'a> {
 fn param_decorators<'a>(view: AstView<'a>, expr: &ast::Expression) -> Option<&'a [ast::Decorator]> {
     let decorators = match &expr.kind {
         ast::ExpressionKind::Identifier(id) => id.decorators(view),
-        ast::ExpressionKind::ObjectPattern(obj) => view.opt_decorators(obj.decorators),
-        ast::ExpressionKind::ArrayPattern(arr) => view.opt_decorators(arr.decorators),
+        ast::ExpressionKind::ObjectPattern(obj) => obj.decorators(view),
+        ast::ExpressionKind::ArrayPattern(arr) => arr.decorators(view),
         ast::ExpressionKind::AssignmentPattern(ap) => view.opt_decorators(ap.decorators),
         ast::ExpressionKind::TSParameterProperty(pp) => {
             param_decorators(view, view.expr(pp.parameter))

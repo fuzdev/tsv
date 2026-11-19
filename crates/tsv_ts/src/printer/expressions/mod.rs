@@ -421,7 +421,9 @@ impl<'a> Printer<'a> {
                 }
             }
             ExpressionKind::SpreadElement(spread) => self.build_spread_doc(spread),
-            ExpressionKind::TemplateLiteral(template) => self.build_template_literal_doc(template),
+            ExpressionKind::TemplateLiteral(template) => {
+                self.build_template_literal_doc(template, expr.span)
+            }
             &ExpressionKind::TaggedTemplateExpression(tagged) => {
                 self.build_tagged_template_doc(self.view.tagged_tpl(tagged), expr.span)
             }
@@ -445,12 +447,12 @@ impl<'a> Printer<'a> {
                 self.build_assignment_doc(assign, expr.span)
             }
             ExpressionKind::ObjectPattern(obj) => self.with_param_decorators(
-                self.view.opt_decorators(obj.decorators),
+                obj.decorators(self.view),
                 self.build_object_pattern_doc(obj, expr.span),
                 expr.span.start,
             ),
             ExpressionKind::ArrayPattern(arr) => self.with_param_decorators(
-                self.view.opt_decorators(arr.decorators),
+                arr.decorators(self.view),
                 self.build_array_pattern_doc(arr, expr.span),
                 expr.span.start,
             ),
@@ -491,8 +493,8 @@ impl<'a> Printer<'a> {
             ExpressionKind::TSParameterProperty(param_prop) => {
                 self.build_ts_parameter_property_doc(*param_prop, expr.span)
             }
-            ExpressionKind::CommentBoundPair(cast) => {
-                self.build_comment_bound_pair_doc(cast, expr.span)
+            &ExpressionKind::CommentBoundPair(cast) => {
+                self.build_comment_bound_pair_doc(self.view.comment_pair(cast), expr.span)
             }
             // Unreachable by construction: the one parse that builds this node — a
             // `{#snippet}` head's `preserve_parens` parse — feeds the Svelte wire writer
@@ -778,7 +780,7 @@ impl<'a> Printer<'a> {
     pub(super) fn build_function_parameter_doc(&self, expr: &Expression) -> DocId {
         match &expr.kind {
             ExpressionKind::ObjectPattern(obj) => self.with_param_decorators(
-                self.view.opt_decorators(obj.decorators),
+                obj.decorators(self.view),
                 self.build_object_pattern_doc_with_context(
                     obj,
                     expr.span,

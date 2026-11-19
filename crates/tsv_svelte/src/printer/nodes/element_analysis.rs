@@ -110,8 +110,8 @@ impl<'a> Printer<'a> {
             // Assignment expressions have break points
             ExpressionKind::AssignmentExpression(_) => true,
             // Wrapping expressions: check inner
-            ExpressionKind::CommentBoundPair(cast) => {
-                Self::expression_has_break_points(view, view.expr(cast.inner))
+            &ExpressionKind::CommentBoundPair(cast) => {
+                Self::expression_has_break_points(view, view.expr(view.comment_pair(cast).inner))
             }
             ExpressionKind::ParenthesizedExpression(paren) => {
                 Self::expression_has_break_points(view, view.expr(paren.expression))

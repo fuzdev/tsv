@@ -454,7 +454,7 @@ fn unwrap_expression<'a>(view: AstView<'a>, mut expr: &'a Expression) -> &'a Exp
 /// the `is_poorly_breakable_chain` debug_assert sound.
 fn is_call_with_complex_type_arguments(call: &ast::CallExpression, printer: &Printer<'_>) -> bool {
     use ast::TSType;
-    let Some(type_args) = &call.type_arguments else {
+    let Some(type_args) = call.type_arguments(printer.view) else {
         return false;
     };
     if type_args.params.len() > 1 {
@@ -557,7 +557,7 @@ impl Printer<'_> {
                 _ => return None,
             }
         };
-        let type_args = call.type_arguments.as_ref()?;
+        let type_args = call.type_arguments(self.view)?;
         let &[arg] = self.view.ty_list(type_args.params) else {
             return None;
         };
@@ -1706,8 +1706,7 @@ impl<'a> Printer<'a> {
                     // the `(` is located only when a line comment lies in it. A call always has
                     // its `(` there.
                     let args_gap_start = call
-                        .type_arguments
-                        .as_ref()
+                        .type_arguments(self.view)
                         .map_or_else(|| self.view.expr(call.callee).span().end, |ta| ta.span.end);
                     let args_gap_end = self
                         .view

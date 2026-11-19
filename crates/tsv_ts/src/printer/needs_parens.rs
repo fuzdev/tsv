@@ -288,7 +288,7 @@ impl ParenContext {
     /// The [`ParenContext::Callee`] context of `call`'s callee.
     pub(crate) fn callee_of(call: &CallExpression) -> Self {
         Self::Callee {
-            list_joins_call: !call.optional && call.type_arguments.is_none(),
+            list_joins_call: !call.optional && call.type_args.is_none(),
         }
     }
 }
@@ -1493,9 +1493,7 @@ impl RegionHop {
             ExpressionKind::MemberExpression(member) if member.computed && !member.optional => {
                 Self::Index
             }
-            ExpressionKind::CallExpression(call)
-                if call.type_arguments.is_some() && !call.optional =>
-            {
+            ExpressionKind::CallExpression(call) if call.type_args.is_some() && !call.optional => {
                 Self::List
             }
             &ExpressionKind::TaggedTemplateExpression(tagged)

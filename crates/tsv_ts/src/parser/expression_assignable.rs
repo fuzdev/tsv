@@ -307,8 +307,7 @@ impl<'a> Parser<'a> {
                     kind: ExpressionKind::ObjectPattern(ObjectPattern {
                         properties,
                         optional: false,
-                        type_annotation: None,
-                        decorators: None,
+                        extra: None,
                     }),
                 }))
             }
@@ -373,8 +372,7 @@ impl<'a> Parser<'a> {
                     kind: ExpressionKind::ArrayPattern(ArrayPattern {
                         elements: self.flush_opt_expr_list(mark),
                         optional: false,
-                        type_annotation: None,
-                        decorators: None,
+                        extra: None,
                     }),
                 }))
             }
@@ -716,7 +714,7 @@ impl<'a> Parser<'a> {
         Ok(RestElement {
             argument,
             optional: false,
-            type_annotation: None,
+            extra: None,
             span: spread_span,
         })
     }

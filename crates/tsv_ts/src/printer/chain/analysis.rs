@@ -500,7 +500,7 @@ fn fix_callee_base_parens(nodes: &mut [ChainNode<'_>], input: LinearizeInput<'_,
         // for-init `in` rule never changes the verdict here — pass `false`. An
         // instantiation callee ahead of the call's own type arguments keeps the pair the
         // bare-callee path keeps ([`instantiation_keeps_pair_before_type_args`]).
-        let second_list = call.type_arguments.is_some()
+        let second_list = call.type_args.is_some()
             && instantiation_keeps_pair_before_type_args(
                 view,
                 source,
@@ -1043,7 +1043,7 @@ pub(crate) fn transparent_instantiation_callee<'a>(
 ) -> Option<&'a ast::TSInstantiationExpression> {
     match &view.expr(call.callee).kind {
         ExpressionKind::TSInstantiationExpression(inst)
-            if call.optional && call.type_arguments.is_none() =>
+            if call.optional && call.type_args.is_none() =>
         {
             Some(inst)
         }
@@ -1871,7 +1871,7 @@ mod tests {
     fn make_identifier(stores: &mut ast::AstStores, name: &str) -> Expression {
         let len = name.len() as u32;
         let ident_name = IdentName {
-            escaped: Some(crate::__private::push_text(stores, name)),
+            escaped: Some(crate::__private::push_escaped_name(stores, name)),
             raw_len: 0,
             plain_ascii: false,
         };
@@ -1886,7 +1886,7 @@ mod tests {
         object_end: u32,
     ) -> Expression {
         let prop_name = IdentName {
-            escaped: Some(crate::__private::push_text(stores, property_name)),
+            escaped: Some(crate::__private::push_escaped_name(stores, property_name)),
             raw_len: 0,
             plain_ascii: false,
         };
@@ -1918,7 +1918,7 @@ mod tests {
             kind: ExpressionKind::CallExpression(CallExpression {
                 callee,
                 arguments: ast::Run::EMPTY,
-                type_arguments: None,
+                type_args: None,
                 optional: false,
             }),
             span: Span::new(0, callee_end + "()".len() as u32),
@@ -2075,7 +2075,7 @@ mod tests {
         property_start: u32,
     ) -> ChainNode<'a> {
         let ident_name = IdentName {
-            escaped: Some(crate::__private::push_text(stores, name)),
+            escaped: Some(crate::__private::push_escaped_name(stores, name)),
             raw_len: 0,
             plain_ascii: false,
         };

@@ -255,13 +255,18 @@ fn write_expression_full_dispatch(
                 write_comment_bound_pair_paren_frame(
                     w,
                     expr.span,
-                    ctx.view.expr(cast.inner),
+                    ctx.view.expr(ctx.view.comment_pair(*cast).inner),
                     ctx,
                     flags,
                     attach,
                 );
             } else {
-                write_expression_inner(w, ctx.view.expr(cast.inner), ctx, flags);
+                write_expression_inner(
+                    w,
+                    ctx.view.expr(ctx.view.comment_pair(*cast).inner),
+                    ctx,
+                    flags,
+                );
             }
         }
         // Preserved grouping parens (snippet parameters): emit the wrapper with
@@ -284,7 +289,7 @@ fn write_expression_full_dispatch(
             node_header(w, "PrivateIdentifier", expr.span, ctx);
             // The name excludes the leading `#` (the public shape): the
             // trailing `raw_len` bytes of the span.
-            write_name_field(w, pid.name, expr.span.end - pid.name.raw_len as u32, ctx);
+            write_name_field(w, pid.name, expr.span.end - pid.name.raw_len, ctx);
             close_node(w, "PrivateIdentifier", expr.span, ctx);
         }
         ast::ExpressionKind::ObjectExpression(obj) => {
@@ -353,7 +358,7 @@ fn write_expression_full_dispatch(
             write_conditional_expression(w, cond, expr.span, ctx);
         }
         ast::ExpressionKind::TemplateLiteral(template) => {
-            write_template_literal(w, template, ctx);
+            write_template_literal(w, template, expr.span, ctx);
         }
         &ast::ExpressionKind::TaggedTemplateExpression(tagged) => {
             let tagged = ctx.view.tagged_tpl(tagged);
@@ -361,7 +366,7 @@ fn write_expression_full_dispatch(
             w.raw(",\"tag\":");
             write_expression(w, ctx.view.expr(tagged.tag), ctx);
             w.raw(",\"quasi\":");
-            write_template_literal(w, &tagged.quasi, ctx);
+            write_template_literal(w, &tagged.quasi, tagged.quasi_span, ctx);
             write_type_arguments_field(w, tagged.type_arguments.as_ref(), ctx);
             close_node(w, "TaggedTemplateExpression", expr.span, ctx);
         }
@@ -425,7 +430,7 @@ fn write_expression_full_dispatch(
                 w,
                 "ArrayPattern",
                 expr.span,
-                arr.type_annotation.as_ref(),
+                arr.type_annotation(ctx.view),
                 ctx,
             );
             w.raw(",\"elements\":");
@@ -433,12 +438,8 @@ fn write_expression_full_dispatch(
             if arr.optional {
                 w.raw(",\"optional\":true");
             }
-            write_type_annotation_field(w, arr.type_annotation.as_ref(), ctx);
-            super::declarations::write_decorators_field(
-                w,
-                ctx.view.opt_decorators(arr.decorators),
-                ctx,
-            );
+            write_type_annotation_field(w, arr.type_annotation(ctx.view), ctx);
+            super::declarations::write_decorators_field(w, arr.decorators(ctx.view), ctx);
             close_node(w, "ArrayPattern", expr.span, ctx);
         }
         ast::ExpressionKind::AssignmentPattern(pattern) => {
@@ -542,8 +543,12 @@ fn write_expression_full_dispatch(
                     .kind
                 {
                     ast::ExpressionKind::Identifier(id) => id.type_annotation(ctx.view).is_some(),
-                    ast::ExpressionKind::ArrayPattern(arr) => arr.type_annotation.is_some(),
-                    ast::ExpressionKind::ObjectPattern(obj) => obj.type_annotation.is_some(),
+                    ast::ExpressionKind::ArrayPattern(arr) => {
+                        arr.type_annotation(ctx.view).is_some()
+                    }
+                    ast::ExpressionKind::ObjectPattern(obj) => {
+                        obj.type_annotation(ctx.view).is_some()
+                    }
                     _ => false,
                 };
                 (!has_type_ann).then_some(ap)

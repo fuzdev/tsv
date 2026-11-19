@@ -32,6 +32,7 @@ impl<'a> Printer<'a> {
     pub(super) fn build_template_literal_doc(
         &self,
         template: &crate::ast::TemplateLiteral,
+        span: Span,
     ) -> DocId {
         let d = self.d();
         let mut parts = d.pooled_docbuf();
@@ -50,8 +51,7 @@ impl<'a> Printer<'a> {
         // comment is OWNED — printed by the value's own doc — so the emit axis skips it
         // while it still occupies the interpolation. On-page ⊇ to-emit, so widening the gate
         // can only run the collects where they would have been empty, never skip a comment.
-        let template_has_comments =
-            self.has_comments_on_page_between(template.span.start, template.span.end);
+        let template_has_comments = self.has_comments_on_page_between(span.start, span.end);
 
         let mut previous_quasi_indent_size: usize = 0;
 
@@ -618,7 +618,7 @@ impl<'a> Printer<'a> {
             .type_arguments
             .as_ref()
             .map_or(tag_gap_start, |ta| ta.span.end);
-        let comment_end = tagged.quasi.span.start;
+        let comment_end = tagged.quasi_span.start;
         let gap_comments: CommentVec<'_> = self
             .comments_to_emit_between(comment_start, comment_end)
             .collect();
@@ -659,7 +659,7 @@ impl<'a> Printer<'a> {
             }
         }
 
-        parts.push(self.build_template_literal_doc(&tagged.quasi));
+        parts.push(self.build_template_literal_doc(&tagged.quasi, tagged.quasi_span));
         d.concat(&parts)
     }
 }
