@@ -112,6 +112,8 @@ npm run doctor           # one-pass setup check (runtimes, pins + checkout align
 npm run typecheck        # cargo check
 npm run typecheck:features # each binding crate under each single feature + the language crates without `locations` —
 #                          the per-package builds `cargo check --workspace` and clippy's `--all-features` both miss; in `check`
+npm run typecheck:wasm32 # `tsv_wasm` for wasm32 under each published package's features — the one leg off the host target;
+#                          in `check`
 npm run typecheck:scripts # tsc over scripts/'s Node roots, the PGO pipeline, the package suites, the sidecar; in `check`
 npm run typecheck:bench-core # tsc over the package-free bench modules nothing else in `check` typechecks; in `check`
 npm run typecheck:js     # tsc + deno check over the bench harness + scripts/; NOT in `check` (bench node_modules)

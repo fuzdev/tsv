@@ -763,7 +763,7 @@ those pin the few widths a change must not move, and this makes the rest
 *visible*, so a type that grows shows up as a row that moved. An exact width is
 rustc's layout rather than a guarantee, so those guards compile in the test build
 only (`cargo test` fails on a moved pin, a consumer's build never does), and the
-wasm32 widths are pinned in `tsv_wasm`, compiled for wasm32 by `build:packages`;
+wasm32 widths are pinned in `tsv_wasm`, compiled for wasm32 by `typecheck:wasm32`;
 only the niche guards a `#[repr(transparent)]` guarantees (`Error` and its
 `Result<()>`, `Option<GroupId>`) and `PackedF64`'s `repr(C, packed(4))` size and
 alignment stay in every build. The `<=` bounds (`ShareEntry`, `PeeledTail`), upper

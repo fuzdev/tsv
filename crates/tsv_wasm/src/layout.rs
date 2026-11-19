@@ -3,8 +3,9 @@
 //! Each language crate pins its 64-bit widths under `cfg(test)`, where a toolchain that
 //! lays a type out differently fails `cargo test` rather than a consumer's build. A
 //! test build never targets wasm32, so the 32-bit widths are pinned here instead: this
-//! crate is not published, and `npm run build:packages` compiles it for wasm32, so a
-//! change that widens one of these fails the package build.
+//! crate is not published, and `npm run typecheck:wasm32` (in `check`) compiles it for
+//! wasm32, so a change that widens one of these fails the gate, and the package build
+//! after it.
 
 use tsv_css::ast::{ColorChannel, CssValue, SimpleSelector};
 use tsv_lang::doc::DocContext;
