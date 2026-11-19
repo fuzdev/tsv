@@ -36,7 +36,7 @@ use tsv_lang::source_scan::find_char_skipping_comments;
 /// the authored form alone — the stripped output then took the other layout (F1).
 fn is_generic_type(view: AstView<'_>, ts_type: &TSType) -> bool {
     match unwrap_parenthesized(view, ts_type) {
-        TSType::Function(f) => f.type_parameters.is_some(),
+        &TSType::Function(_, f) => view.fn_type(f).type_parameters.is_some(),
         TSType::TypeReference(r) => r.type_arguments.is_some(),
         _ => false,
     }
@@ -64,7 +64,7 @@ fn type_has_internal_breaking(printer: &Printer<'_>, ts_type: &TSType) -> bool {
         TSType::TypeLiteral(_)
         | TSType::Mapped(_)
         | TSType::Tuple(_)
-        | TSType::Function(_)
+        | TSType::Function(..)
         | TSType::Constructor(..)
         // `import(...)` hugs the `=` like a call — its specifier path doesn't
         // break, and any comments expand the parens internally.

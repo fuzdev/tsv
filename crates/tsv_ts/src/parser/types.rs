@@ -1041,12 +1041,17 @@ impl<'a> Parser<'a> {
         let return_type = self.nested(2, |p| p.parse_return_type_inner(arrow_start))?;
         let end = return_type.span.end;
 
-        Ok(self.push_ty_ret(TSType::Function(TSFunctionType {
-            type_parameters: None,
-            params,
-            return_type,
-            span: Span::new(start as u32, end),
-        })))
+        let span = Span::new(start as u32, end);
+        let function = push_row(
+            &mut self.stores.payloads.fn_types,
+            TSFunctionType {
+                type_parameters: None,
+                params,
+                return_type,
+                span,
+            },
+        );
+        Ok(self.push_ty_ret(TSType::Function(span, function)))
     }
 
     /// Parse generic function type: `<T>() => U`, `<T, U extends V>(x: T) => U`
@@ -1078,12 +1083,17 @@ impl<'a> Parser<'a> {
         let return_type = self.nested(2, |p| p.parse_return_type_inner(arrow_start))?;
         let end = return_type.span.end;
 
-        Ok(self.push_ty_ret(TSType::Function(TSFunctionType {
-            type_parameters: Some(type_parameters),
-            params,
-            return_type,
-            span: Span::new(start as u32, end),
-        })))
+        let span = Span::new(start as u32, end);
+        let function = push_row(
+            &mut self.stores.payloads.fn_types,
+            TSFunctionType {
+                type_parameters: Some(type_parameters),
+                params,
+                return_type,
+                span,
+            },
+        );
+        Ok(self.push_ty_ret(TSType::Function(span, function)))
     }
 
     /// Parse constructor type: `new () => T`, `new <T>() => T`, `abstract new () => T`
@@ -2086,7 +2096,7 @@ fn type_takes_pair(view: AstView<'_>, ty: &TSType, position: TypePairPosition) -
         ty,
         TSType::Union(_)
             | TSType::Intersection(_)
-            | TSType::Function(_)
+            | TSType::Function(..)
             | TSType::Constructor(..)
             | TSType::Conditional(_)
     );

@@ -52,7 +52,7 @@ pub(in crate::printer) enum AnnotationParens {
 /// shell: `(x: T): ((y: T) => T) =>` needs the pair just as the shell-less spelling does,
 /// and the shell is redundant *as a type* — only this position requires it.
 fn arrow_return_needs_parens(printer: &Printer<'_>, ty: &TSType) -> bool {
-    matches!(unwrap_parenthesized(printer.view, ty), TSType::Function(_))
+    matches!(unwrap_parenthesized(printer.view, ty), TSType::Function(..))
 }
 
 /// Never — the annotation `:` gap's ordinary answer to "does this frozen child need a

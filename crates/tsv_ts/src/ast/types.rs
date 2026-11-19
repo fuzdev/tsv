@@ -7,8 +7,8 @@ use crate::lexer::KeywordKind;
 use tsv_lang::Span;
 
 use super::{
-    CtorTypeId, Decorator, ExprId, Expression, IdentName, Identifier, ImportTypeId, InferTypeId,
-    Literal, MethodKind, QualNameId, Run, TemplateElement, TyId, UnaryExpression,
+    CtorTypeId, Decorator, ExprId, Expression, FnTypeId, IdentName, Identifier, ImportTypeId,
+    InferTypeId, Literal, MethodKind, QualNameId, Run, TemplateElement, TyId, UnaryExpression,
 };
 
 /// TypeScript type annotation node (e.g., `: number` in `const a: number = 5`)
@@ -27,18 +27,23 @@ pub struct TSTypeAnnotation {
 /// primitive keyword types are implemented. Complex types (unions, intersections,
 /// generics, etc.) will be added incrementally.
 ///
-/// Three variants are stored rather than inline — `Import`, `Constructor` and `Infer`,
-/// each a row of its own payload store named by id — for the density reason `Statement`
-/// and `Expression` take: each is wide enough to set the enum's size on its own and rare
-/// enough that the extra row is free, while the width is paid by every row of the type
-/// store. Each carries its span inline beside the id, so [`TSType::span`] reads every
+/// Four variants are stored rather than inline — `Function`, `Constructor`, `Import` and
+/// `Infer`, each a row of its own payload store named by id — for the density reason
+/// `Statement` and `Expression` take: each is wide enough to set the enum's size on its own
+/// and rare enough that the extra row is free, while the width is paid by every row of the
+/// type store. Each carries its span inline beside the id, so [`TSType::span`] reads every
 /// variant without leaving the row.
+///
+/// Its tag is explicit — 4 B of its own beside every payload — and pinned so (the tag pin
+/// below this enum). Inline, `TSFunctionType` filled the enum and rustc hid the tag in its
+/// first word, so every `match` on a type decoded the tag from there, several instructions
+/// where an explicit tag takes one load; storing it is what freed the room.
 /// A type-store row is the only place a `TSType` lives: no AST field holds one by value — every
 /// holder, lists included (union / intersection members, tuple elements, type arguments,
 /// template-literal types, as `Run<TyId>`), names by its [`TyId`] the row the type parser's
 /// precedence ladder already pushed, since each level returns one (see `Parser::parse_type`).
-/// The widest inline variants are `TSTypeReference` / `TSTypeQuery` / `TSMappedType` /
-/// `TSFunctionType`, and `TSTypeReference` is the common case, so the ladder stops there.
+/// The widest inline variants are `TSTypeReference` / `TSTypeQuery` / `TSMappedType`, and
+/// `TSTypeReference` is the common case, so the ladder stops there.
 #[derive(Debug, Clone, Copy)]
 pub enum TSType {
     /// Primitive type keywords (number, string, boolean, etc.)
@@ -56,7 +61,7 @@ pub enum TSType {
     /// Object/type literal: `{ prop: T }`
     TypeLiteral(TSTypeLiteral),
     /// Function types: `(x: T) => U`
-    Function(TSFunctionType),
+    Function(Span, FnTypeId),
     /// Constructor types: `new () => T` or `abstract new <T>() => T`
     Constructor(Span, CtorTypeId),
     /// Tuple types: `[T, U]`
@@ -89,6 +94,34 @@ pub enum TSType {
     ThisType(TSThisType),
 }
 
+#[cfg(test)]
+pin_explicit_tag! {
+    TSType;
+    Keyword(TSKeywordType),
+    Literal(TSLiteralType),
+    Array(TSArrayType),
+    Union(TSUnionType),
+    Intersection(TSIntersectionType),
+    TypeReference(TSTypeReference),
+    TypeLiteral(TSTypeLiteral),
+    Function(Span, FnTypeId),
+    Constructor(Span, CtorTypeId),
+    Tuple(TSTupleType),
+    Parenthesized(TSParenthesizedType),
+    TypePredicate(TSTypePredicate),
+    Conditional(TSConditionalType),
+    Mapped(TSMappedType),
+    TypeOperator(TSTypeOperator),
+    Import(Span, ImportTypeId),
+    TypeQuery(TSTypeQuery),
+    IndexedAccess(TSIndexedAccessType),
+    Rest(TSRestType),
+    Optional(TSOptionalType),
+    NamedTupleMember(TSNamedTupleMember),
+    Infer(Span, InferTypeId),
+    ThisType(TSThisType),
+}
+
 impl TSType {
     #[inline]
     pub fn span(&self) -> Span {
@@ -100,7 +133,7 @@ impl TSType {
             TSType::Intersection(i) => i.span,
             TSType::TypeReference(r) => r.span,
             TSType::TypeLiteral(t) => t.span,
-            TSType::Function(f) => f.span,
+            TSType::Function(span, _) => *span,
             TSType::Constructor(span, _) => *span,
             TSType::Tuple(t) => t.span,
             TSType::Parenthesized(p) => p.span,

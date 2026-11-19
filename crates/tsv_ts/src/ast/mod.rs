@@ -21,6 +21,35 @@
 pub(crate) mod convert;
 pub(crate) mod precedence;
 
+// The tag pin of an enum the rows hold by value (`ExpressionKind`, `TSType`): every payload
+// is at least 4 B narrower than the enum, so the enum has room for a tag beside the widest
+// one and no layout shares a payload's niche with it — a niched tag sits INSIDE the widest
+// payload, which then fills the enum. A variant that widens to fill it fails here, where the
+// enum's own size pin would not: niching keeps that size (a variant padded to fill the enum
+// keeps every size pin and fails these). The match makes the list exhaustive and checks each
+// payload type against its variant (a variant's constructor coerced to a `fn` of the listed
+// fields), so a new variant cannot skip the pin. A variant of several fields is measured as
+// their tuple. Declared ahead of the modules so each enum's pin sits beside the enum.
+#[cfg(test)]
+macro_rules! pin_explicit_tag {
+    ($Enum:ident; $($variant:ident($($field:ty),+)),* $(,)?) => {
+        #[expect(dead_code, reason = "never called: the match is the exhaustiveness check")]
+        fn every_variant_is_pinned(kind: &$Enum) {
+            match kind {
+                $($Enum::$variant(..) => {
+                    let _: fn($($field),+) -> $Enum = $Enum::$variant;
+                })*
+            }
+        }
+        $(
+            const _: () = assert!(
+                tsv_lang::store::STORE_CHECK
+                    || size_of::<($($field,)+)>() + 4 <= size_of::<$Enum>()
+            );
+        )*
+    };
+}
+
 mod classes;
 mod declarations;
 mod expressions;
@@ -34,10 +63,10 @@ mod view;
 pub use stores::{
     ArrowFnId, AstStores, BindingExtraId, CatchId, ClassDeclId, ClassExprId, CommentPairId,
     CtorTypeId, DeclareFnId, EnumDeclId, EscapedNameId, ExportAllId, ExportAssignId,
-    ExportDefaultId, ExportNamedId, ExprId, FnDeclId, FnExprId, ForHeadId, ForLeftId, ImportDeclId,
-    ImportEqualsId, ImportTypeId, InferTypeId, InterfaceDeclId, MetaPropId, ModuleDeclId, Parsed,
-    QualNameId, StmtId, TaggedTplId, Text, TyId, TypeAliasId, TypeArgsId, WarmStores, park_stores,
-    take_stores, with_stores,
+    ExportDefaultId, ExportNamedId, ExprId, FnDeclId, FnExprId, FnTypeId, ForHeadId, ForLeftId,
+    ImportDeclId, ImportEqualsId, ImportTypeId, InferTypeId, InterfaceDeclId, MetaPropId,
+    ModuleDeclId, Parsed, QualNameId, StmtId, TaggedTplId, Text, TyId, TypeAliasId, TypeArgsId,
+    WarmStores, park_stores, take_stores, with_stores,
 };
 pub(crate) use stores::{ScratchMarks, extra_with_decorators, extra_with_type_annotation};
 pub use tsv_lang::packed::PackedF64;
@@ -130,8 +159,9 @@ pub use expressions::{
 // free, hold their payload by id into a store per payload type: `Expression`'s five
 // widest (`ClassExpression` / `FunctionExpression` / `ArrowFunctionExpression` /
 // `MetaProperty` / `TaggedTemplateExpression`, together ~3% of expressions, of which
-// the widest two are ~0.02%), `TSType`'s three widest (`TSImportType`,
-// `TSConstructorType`, `TSInferType`, so the inline variants set its pinned width below),
+// the widest two are ~0.02%), `TSType`'s four widest (`TSFunctionType`, `TSImportType`,
+// `TSConstructorType`, `TSInferType`, so the inline variants set its pinned width below and
+// leave it room for an explicit tag, pinned beside the enum),
 // `Statement`'s DECLARATION heads and its four loop / `try` heads one level down
 // (`ast/statements.rs`). Below `Expression`'s stored five, the variants that would set its
 // width are common, so their RARE fields go behind an id instead: a call's and `new`'s
@@ -190,9 +220,9 @@ pub use expressions::{
 // the number literal's `f64` held as a [`PackedF64`]) in `tsv_wasm`, the crate compiled
 // for wasm32, and `Expression`'s and `Statement`'s `Option` must stay niche-packed on both.
 //
-// These size pins do NOT guard `ExpressionKind`'s TAG: a variant that widens to fill the
-// enum moves the tag into its niche and leaves every size here as it was. The payload pin
-// beside the enum (`ast/expressions.rs`) is the one that catches it.
+// These size pins do NOT guard `ExpressionKind`'s or `TSType`'s TAG: a variant that widens
+// to fill the enum moves the tag into its niche and leaves every size here as it was. The
+// tag pin beside each enum (`ast/expressions.rs`, `ast/types.rs`) is the one that catches it.
 #[cfg(all(test, target_pointer_width = "64"))]
 const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<Expression>() == 32);
 #[cfg(all(test, target_pointer_width = "64"))]
@@ -216,7 +246,7 @@ const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<VariableDeclarat
 #[cfg(all(test, target_pointer_width = "64"))]
 const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<SwitchCase>() == 20);
 #[cfg(all(test, target_pointer_width = "64"))]
-const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<TSType>() == 52);
+const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<TSType>() == 48);
 // The type-edge holders every type annotation, type-argument list and type-parameter list
 // rides inline in: their `Option`s fold into the id's niche and the run's, so an absent
 // annotation or list costs no width in any of the nodes that hold one.
@@ -356,8 +386,9 @@ impl Literal {
 /// name, its raw text copied into the pool; for a Svelte-synthesized name, its text copied
 /// into the pool verbatim. The row is the 4 B id's indirection to the 8 B pool handle: it
 /// keeps [`Identifier`], an inline `Expression` variant, narrow enough that
-/// `ExpressionKind` keeps an explicit tag (see the tag pin in this module). Otherwise
-/// (`None`, >99.99% of identifiers) the name is the raw source slice `span.start ..
+/// `ExpressionKind` keeps an explicit tag (see the tag pin beside `ExpressionKind`,
+/// `ast/expressions.rs`). Otherwise (`None`, >99.99% of identifiers) the name is the
+/// raw source slice `span.start ..
 /// span.start + raw_len` — nothing stored at all.
 ///
 /// `raw_len` is the raw name-*token* byte length, fixed at token time: the

@@ -46,7 +46,7 @@ impl<'a> Printer<'a> {
                 },
             };
         }
-        matches!(ty, TSType::Function(f) if f.type_parameters.is_some())
+        matches!(ty, &TSType::Function(_, f) if self.view.fn_type(f).type_parameters.is_some())
             && !self.has_comments_on_page_between(open_end, ty.span().start)
     }
 

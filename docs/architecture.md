@@ -1117,9 +1117,12 @@ payload is paid only where that variant is actually spelled. Where such a varian
   but the pattern wrapper's (an optional or annotated parameter's `?` / `: T` extension in
   the parameter parser), which lands on array and object patterns, carrying no second span.
   It is 32 B on wasm32 too.
-- `TSType` is **52 B** — `TSImportType`, `TSConstructorType` and `TSInferType` are
-  stored. No field holds a `TSType` by value: the type parser's deep precedence ladder
-  pushes each type to the type store at its builder's tail and returns the row's id
+- `TSType` is **48 B** — `TSFunctionType`, `TSConstructorType`, `TSImportType` and
+  `TSInferType` are stored, which leaves the inline variants (the widest 44 B) room for an
+  explicit 4 B tag, pinned as `ExpressionKind`'s is: inline, `TSFunctionType` filled the
+  enum and rustc niched the tag into its first word. No field holds a `TSType` by value:
+  the type parser's deep precedence ladder pushes each type to the type store at its
+  builder's tail and returns the row's id
   (`Parser::parse_type`) — the second rule below, applied to a return instead of a
   field — and every holder keeps that id, the lists included (union and intersection
   members, tuple elements, type arguments and template-literal types are `Run<TyId>`, a

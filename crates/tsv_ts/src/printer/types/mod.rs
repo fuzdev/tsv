@@ -678,7 +678,7 @@ impl<'a> Printer<'a> {
                 }
             }
             TSType::TypeLiteral(t) => self.build_type_literal_doc(t),
-            TSType::Function(f) => self.build_function_type_doc(f),
+            &TSType::Function(_, f) => self.build_function_type_doc(self.view.fn_type(f)),
             &TSType::Constructor(_, c) => self.build_constructor_type_doc(self.view.ctor_type(c)),
             TSType::Tuple(t) => self.build_tuple_type_doc(t),
             // Parenthesized types: unwrap, preserving any comments inside the parens.

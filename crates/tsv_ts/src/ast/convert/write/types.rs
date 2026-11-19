@@ -76,7 +76,8 @@ pub(super) fn write_type(w: &mut JsonWriter, ts_type: &ast::TSType, ctx: &Ctx<'_
             });
             close_node(w, "TSTypeLiteral", t.span, ctx);
         }
-        ast::TSType::Function(f) => {
+        &ast::TSType::Function(_, f) => {
+            let f = ctx.view.fn_type(f);
             node_header(w, "TSFunctionType", f.span, ctx);
             write_type_parameters_field(w, f.type_parameters.as_ref(), ctx);
             w.raw(",\"parameters\":");

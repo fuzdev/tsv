@@ -51,9 +51,9 @@ use super::{
     ForInit, FunctionDeclaration, FunctionExpression, Identifier, ImportAttribute,
     ImportDeclaration, ImportSpecifier, MetaProperty, ObjectPatternProperty, ObjectProperty,
     Program, Statement, SwitchCase, TSConstructorType, TSDeclareFunction, TSEnumDeclaration,
-    TSEnumMember, TSExportAssignment, TSImportEqualsDeclaration, TSImportType, TSInferType,
-    TSInterfaceDeclaration, TSInterfaceHeritage, TSModuleDeclaration, TSQualifiedName, TSType,
-    TSTypeAliasDeclaration, TSTypeAnnotation, TSTypeElement, TSTypeParameter,
+    TSEnumMember, TSExportAssignment, TSFunctionType, TSImportEqualsDeclaration, TSImportType,
+    TSInferType, TSInterfaceDeclaration, TSInterfaceHeritage, TSModuleDeclaration, TSQualifiedName,
+    TSType, TSTypeAliasDeclaration, TSTypeAnnotation, TSTypeElement, TSTypeParameter,
     TSTypeParameterInstantiation, TaggedTemplateExpression, TemplateElement, VariableDeclarator,
 };
 
@@ -224,6 +224,8 @@ payload_stores! {
     import_decls: ImportDeclaration => ImportDeclId, import_decl;
     /// Import-equals declarations, `import a = require('m')`: [`TSImportEqualsDeclaration`] rows.
     import_equals: TSImportEqualsDeclaration => ImportEqualsId, import_equals;
+    /// Function types, `(x: T) => U`: [`TSFunctionType`] rows.
+    fn_types: TSFunctionType => FnTypeId, fn_type;
     /// Constructor types, `new () => T`: [`TSConstructorType`] rows.
     ctor_types: TSConstructorType => CtorTypeId, ctor_type;
     /// Import types, `import('m')`: [`TSImportType`] rows.
@@ -878,6 +880,7 @@ f<T>();
 /** @type {T} */ (x);
 \\u0061;
 type A = new () => X;
+type Z = () => X;
 type B = import('m');
 type C = D extends infer E ? 1 : 2;
 type F = G.H;
@@ -912,7 +915,7 @@ try {
             };
         }
         let view = parsed.view();
-        // the four type payloads ride four aliases, of which one is pushed
+        // the five type payloads ride five aliases, of which one is pushed
         let mut aliased = false;
         for &id in view.stmt_list(parsed.program.body) {
             match &view.stmt(id).kind {
@@ -945,6 +948,7 @@ try {
                         aliased = true;
                     }
                     match view.ty(x.type_annotation) {
+                        &TSType::Function(_, t) => push!(fn_types, *view.fn_type(t)),
                         &TSType::Constructor(_, t) => push!(ctor_types, *view.ctor_type(t)),
                         &TSType::Import(_, t) => push!(import_types, *view.import_type(t)),
                         TSType::Conditional(c) => match view.ty(c.extends_type) {

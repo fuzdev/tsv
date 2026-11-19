@@ -34,7 +34,7 @@ const _: () = assert!(size_of::<ExpressionKind>() == 24);
 const _: () = assert!(size_of::<Statement>() == 48);
 const _: () = assert!(size_of::<Option<Statement>>() == size_of::<Statement>());
 const _: () = assert!(size_of::<StatementKind>() == 40);
-const _: () = assert!(size_of::<TSType>() == 52);
+const _: () = assert!(size_of::<TSType>() == 48);
 // The type-edge holders' `Option`s, folded into the id's niche and the run's. See the native
 // pins in `tsv_ts`'s `ast/mod.rs`.
 const _: () = assert!(size_of::<Option<TSTypeAnnotation>>() == size_of::<TSTypeAnnotation>());

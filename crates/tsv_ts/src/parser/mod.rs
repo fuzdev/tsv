@@ -1748,7 +1748,7 @@ impl<'a> Parser<'a> {
     ) -> Result<(), Error> {
         let view = self.stores.view();
         let returns_a_function =
-            return_type.is_some_and(|r| matches!(view.ty(r.type_annotation), TSType::Function(_)));
+            return_type.is_some_and(|r| matches!(view.ty(r.type_annotation), TSType::Function(..)));
         if returns_a_function {
             self.printer_pair()
         } else {

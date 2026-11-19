@@ -27,8 +27,8 @@ pub struct Expression {
 
 /// The variant half of an [`Expression`].
 ///
-/// Its tag is explicit — a byte of its own beside every payload — and pinned so (the
-/// payload pin below this enum). rustc hides the tag in a niche of the widest variant (an
+/// Its tag is explicit — 4 B of its own beside every payload — and pinned so (the
+/// tag pin below this enum). rustc hides the tag in a niche of the widest variant (an
 /// `Identifier`'s `bool`) whenever that variant fills the enum: the size stays put while
 /// every `match` on the kind decodes the tag from that byte, several instructions where an
 /// explicit tag takes one load.
@@ -107,73 +107,48 @@ pub enum ExpressionKind {
     ParenthesizedExpression(ParenthesizedExpression),
 }
 
-// The tag pin: every payload is at least 4 B narrower than the enum, so the enum has room
-// for a tag beside the widest one and no layout shares a payload's niche with it — a niched
-// tag sits INSIDE the widest payload, which then fills the enum. A variant that widens to
-// fill it fails here, where `size_of::<ExpressionKind>()`'s own pin would not: niching
-// keeps that size (a variant padded to fill the enum keeps every size pin and fails these).
-// The match makes the list exhaustive and checks each payload type against its
-// variant, so a new variant cannot skip the pin.
-#[cfg(test)]
-macro_rules! pin_explicit_tag {
-    ($($variant:ident: $payload:ty),* $(,)?) => {
-        #[expect(dead_code, reason = "never called: the match is the exhaustiveness check")]
-        fn every_variant_is_pinned(kind: &ExpressionKind) {
-            match kind {
-                $(ExpressionKind::$variant(payload) => {
-                    let _: &$payload = payload;
-                })*
-            }
-        }
-        $(
-            const _: () = assert!(
-                tsv_lang::store::STORE_CHECK
-                    || size_of::<$payload>() + 4 <= size_of::<ExpressionKind>()
-            );
-        )*
-    };
-}
 #[cfg(test)]
 pin_explicit_tag! {
-    Literal: Literal,
-    Identifier: Identifier,
-    PrivateIdentifier: PrivateIdentifier,
-    ObjectExpression: ObjectExpression,
-    ArrayExpression: ArrayExpression,
-    UnaryExpression: UnaryExpression,
-    UpdateExpression: UpdateExpression,
-    BinaryExpression: BinaryExpression,
-    CallExpression: CallExpression,
-    NewExpression: NewExpression,
-    MemberExpression: MemberExpression,
-    ConditionalExpression: ConditionalExpression,
-    ArrowFunctionExpression: ArrowFnId,
-    FunctionExpression: FnExprId,
-    ClassExpression: ClassExprId,
-    SpreadElement: SpreadElement,
-    TemplateLiteral: TemplateLiteral,
-    TaggedTemplateExpression: TaggedTplId,
-    AwaitExpression: AwaitExpression,
-    YieldExpression: YieldExpression,
-    SequenceExpression: SequenceExpression,
-    RegexLiteral: RegexLiteral,
-    ThisExpression: ThisExpression,
-    Super: Super,
-    AssignmentExpression: AssignmentExpression,
-    ObjectPattern: ObjectPattern,
-    ArrayPattern: ArrayPattern,
-    AssignmentPattern: AssignmentPattern,
-    RestElement: RestElement,
-    TSTypeAssertion: TSTypeAssertion,
-    TSAsExpression: TSAsExpression,
-    TSSatisfiesExpression: TSSatisfiesExpression,
-    TSInstantiationExpression: TSInstantiationExpression,
-    TSNonNullExpression: TSNonNullExpression,
-    TSParameterProperty: TSParameterProperty,
-    ImportExpression: ImportExpression,
-    MetaProperty: MetaPropId,
-    CommentBoundPair: CommentPairId,
-    ParenthesizedExpression: ParenthesizedExpression,
+    ExpressionKind;
+    Literal(Literal),
+    Identifier(Identifier),
+    PrivateIdentifier(PrivateIdentifier),
+    ObjectExpression(ObjectExpression),
+    ArrayExpression(ArrayExpression),
+    UnaryExpression(UnaryExpression),
+    UpdateExpression(UpdateExpression),
+    BinaryExpression(BinaryExpression),
+    CallExpression(CallExpression),
+    NewExpression(NewExpression),
+    MemberExpression(MemberExpression),
+    ConditionalExpression(ConditionalExpression),
+    ArrowFunctionExpression(ArrowFnId),
+    FunctionExpression(FnExprId),
+    ClassExpression(ClassExprId),
+    SpreadElement(SpreadElement),
+    TemplateLiteral(TemplateLiteral),
+    TaggedTemplateExpression(TaggedTplId),
+    AwaitExpression(AwaitExpression),
+    YieldExpression(YieldExpression),
+    SequenceExpression(SequenceExpression),
+    RegexLiteral(RegexLiteral),
+    ThisExpression(ThisExpression),
+    Super(Super),
+    AssignmentExpression(AssignmentExpression),
+    ObjectPattern(ObjectPattern),
+    ArrayPattern(ArrayPattern),
+    AssignmentPattern(AssignmentPattern),
+    RestElement(RestElement),
+    TSTypeAssertion(TSTypeAssertion),
+    TSAsExpression(TSAsExpression),
+    TSSatisfiesExpression(TSSatisfiesExpression),
+    TSInstantiationExpression(TSInstantiationExpression),
+    TSNonNullExpression(TSNonNullExpression),
+    TSParameterProperty(TSParameterProperty),
+    ImportExpression(ImportExpression),
+    MetaProperty(MetaPropId),
+    CommentBoundPair(CommentPairId),
+    ParenthesizedExpression(ParenthesizedExpression),
 }
 
 impl Expression {
