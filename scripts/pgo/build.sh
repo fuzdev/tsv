@@ -26,7 +26,9 @@
 #               rustc command line for the gate to read the flag back from. The
 #               dir is DELETED first: cargo fingerprints the RUSTFLAGS text, not
 #               the profile's bytes, so a kept dir would serve the last profile's
-#               codegen under this one's name.
+#               codegen under this one's name. Each phase sets cargo's build dir
+#               to its target dir, so a configured `build.build-dir` can't keep
+#               the intermediates out of reach of that deletion.
 #
 # `-inline-enable-cost-benefit-analysis=false` turns off LLVM's profile-driven
 # cost-benefit inliner, which otherwise inlines hot call sites past every
@@ -114,6 +116,8 @@ world_args() {
 case $phase in
 instrument)
 	export CARGO_TARGET_DIR="$dir/target-instrument"
+	# intermediates too: a configured `build.build-dir` would keep them outside the dir
+	export CARGO_BUILD_BUILD_DIR="$CARGO_TARGET_DIR"
 	gen="-Cprofile-generate=$dir/build-profraw -Cllvm-args=-pgo-instrument-entry"
 	rustc -vV >"$dir/logs/rustc-instrument.txt"
 	for world in $worlds; do
@@ -130,6 +134,8 @@ use)
 	done
 	rm -rf "$dir/target-use"
 	export CARGO_TARGET_DIR="$dir/target-use"
+	# the deletion reaches the intermediates only when they live in the dir too
+	export CARGO_BUILD_BUILD_DIR="$CARGO_TARGET_DIR"
 	for world in $worlds; do
 		# shellcheck disable=SC2046 # world_args splits into cargo's arguments on purpose
 		run "use-$world" "$(use_flags "$world")" build -v --locked $(world_args "$world")

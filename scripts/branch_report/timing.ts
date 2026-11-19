@@ -565,7 +565,12 @@ export async function leg_build_wall(
 				for (const i of round_order(round)) {
 					const side = sides[i]!;
 					await side.dir_handle.remove('target_wall', { recursive: true, missing_ok: true });
-					const env = { CARGO_TARGET_DIR: `${side.dir}/target_wall` };
+					// the build dir too, so removing `target_wall` makes the next build cold
+					// whatever `build.build-dir` a cargo config sets
+					const env = {
+						CARGO_TARGET_DIR: `${side.dir}/target_wall`,
+						CARGO_BUILD_BUILD_DIR: `${side.dir}/target_wall`
+					};
 					const c0 = performance.now();
 					await run_build(host, side, artifact.argv, log, { env });
 					clean[i].push(performance.now() - c0);
