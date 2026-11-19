@@ -29,7 +29,8 @@ import { spawn } from '@fuzdev/gro/spawn.ts';
 
 import { run_engine_parity } from '../engine_parity.ts';
 import { node_host_triple } from '../napi_host.ts';
-import { open_checkout, open_checkout_program } from './checkout.ts';
+import { open_checkout } from './checkout.ts';
+import { open_checkout_program } from './checkout_program.ts';
 
 const checkout = await open_checkout();
 const checkout_program = await open_checkout_program(checkout);

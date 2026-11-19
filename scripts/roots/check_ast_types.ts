@@ -10,7 +10,8 @@
 import { set_exit_code } from '@fuzdev/gro/exit.ts';
 
 import { AST_TYPES_TSV_BIN, run_check_ast_types } from '../check_ast_types.ts';
-import { open_checkout, open_checkout_program } from './checkout.ts';
+import { open_checkout } from './checkout.ts';
+import { open_checkout_program } from './checkout_program.ts';
 
 const checkout = await open_checkout();
 const checkout_program = await open_checkout_program(checkout);

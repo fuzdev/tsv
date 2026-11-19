@@ -17,7 +17,8 @@ import { fs, type FsDir, type FsReadDir } from '@fuzdev/gro/fs.ts';
 import { env } from '@fuzdev/gro/env.ts';
 import { exit } from '@fuzdev/gro/exit.ts';
 
-import { CHECKOUT_PATH, type CheckoutProgram } from '../../../scripts/roots/checkout.ts';
+import { CHECKOUT_PATH } from '../../../scripts/roots/checkout.ts';
+import type { CheckoutProgram } from '../../../scripts/roots/checkout_program.ts';
 import type { InitCompareImplementations } from '../lib/compare_cli.ts';
 import { init_compare_implementations } from '../lib/compare_engines.ts';
 import type { PinsFile } from '../lib/corpus_pins.ts';

@@ -14,7 +14,9 @@
  * `node_modules`, can't let one through. And each bench root that loads no package beyond the
  * root install's is one `typecheck:scripts`' gated program names. And the gro-hosted roots
  * `HOST_MODULE_ROOTS` lists load no `node:*` module but the named exception for signal numbers,
- * so each runs wherever gro's host modules do. Read from the source text through
+ * so each runs wherever gro's host modules do. And the gro-hosted roots `NO_SPAWN_ROOTS` lists,
+ * which read the checkout but run no program beneath it, load no `spawn`, so each runs without a
+ * spawn grant. Read from the source text through
  * `scripts/import_closure.ts`, since `tsc` resolves a package from any `node_modules` above.
  */
 
@@ -280,6 +282,26 @@ for (const [root, reaches] of HOST_MODULE_ROOTS) {
 		const loaded = closure.builtins
 			.filter((found) => !found.type_only)
 			.filter((found) => !(found.specifier === 'node:os' && found.from === 'scripts/exit_code.ts'))
+			.map((found) => `${found.from}:${found.line}: ${found.specifier}`);
+		strictEqual(loaded.join('\n'), '');
+	});
+}
+
+/** The gro-hosted roots that read the checkout but make no program beneath it, each with a
+ * module its closure must reach: none loads gro's `spawn`, so each runs without a spawn grant. */
+const NO_SPAWN_ROOTS: Array<[root: string, reaches: string]> = [
+	['benches/js/roots/compose_reports.ts', 'scripts/roots/checkout.ts'],
+	['benches/js/roots/divergence_audit.ts', 'scripts/roots/checkout.ts'],
+	['scripts/roots/validate_artifacts.ts', 'scripts/roots/checkout.ts']
+];
+
+for (const [root, reaches] of NO_SPAWN_ROOTS) {
+	test(`${root}'s closure loads no spawn`, () => {
+		const closure = loads_of(root);
+		strictEqual(closure.files.includes(reaches), true);
+		const loaded = closure.packages
+			.filter((found) => !found.type_only)
+			.filter((found) => /^@fuzdev\/gro\/spawn(?:_error)?\.ts$/.test(found.specifier))
 			.map((found) => `${found.from}:${found.line}: ${found.specifier}`);
 		strictEqual(loaded.join('\n'), '');
 	});

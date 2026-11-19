@@ -17,11 +17,8 @@
 import { stdout } from '@fuzdev/gro/stdout.ts';
 import { args } from '@fuzdev/gro/args.ts';
 
-import {
-	exit_unless_checkout_cwd,
-	open_checkout,
-	open_checkout_program
-} from '../../../scripts/roots/checkout.ts';
+import { exit_unless_checkout_cwd, open_checkout } from '../../../scripts/roots/checkout.ts';
+import { open_checkout_program } from '../../../scripts/roots/checkout_program.ts';
 import { corpus_compare_parse_main } from '../corpus_compare_parse.ts';
 import {
 	exit_with,

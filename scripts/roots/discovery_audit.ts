@@ -14,7 +14,8 @@ import { spawn } from '@fuzdev/gro/spawn.ts';
 
 import { CORPORA_ROOT } from '../../benches/js/lib/corpora.ts';
 import { DISCOVERY_TSV_BIN, run_discovery_audit } from '../discovery_audit.ts';
-import { open_checkout, open_checkout_program, sibling_reads } from './checkout.ts';
+import { open_checkout, sibling_reads } from './checkout.ts';
+import { open_checkout_program } from './checkout_program.ts';
 
 const checkout = await open_checkout();
 const checkout_program = await open_checkout_program(checkout);

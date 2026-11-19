@@ -10,7 +10,8 @@ import { args } from '@fuzdev/gro/args.ts';
 import { set_exit_code } from '@fuzdev/gro/exit.ts';
 
 import { CHECK_LOC_TSV_DEBUG, run_check_loc } from '../check_loc.ts';
-import { open_checkout, open_checkout_program } from './checkout.ts';
+import { open_checkout } from './checkout.ts';
+import { open_checkout_program } from './checkout_program.ts';
 
 const checkout = await open_checkout();
 const checkout_program = await open_checkout_program(checkout);

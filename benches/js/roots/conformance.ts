@@ -22,11 +22,8 @@ import { args } from '@fuzdev/gro/args.ts';
 import { spawn } from '@fuzdev/gro/spawn.ts';
 
 import { CARGO_PASS_ENV } from '../../../scripts/cargo_env.ts';
-import {
-	exit_unless_checkout_cwd,
-	open_checkout,
-	open_checkout_program
-} from '../../../scripts/roots/checkout.ts';
+import { exit_unless_checkout_cwd, open_checkout } from '../../../scripts/roots/checkout.ts';
+import { open_checkout_program } from '../../../scripts/roots/checkout_program.ts';
 import { run_conformance } from '../conformance.ts';
 import {
 	exit_with,

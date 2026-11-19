@@ -14,11 +14,8 @@
 
 import { set_exit_code } from '@fuzdev/gro/exit.ts';
 
-import {
-	exit_unless_checkout_cwd,
-	open_checkout,
-	open_checkout_program
-} from '../../../scripts/roots/checkout.ts';
+import { exit_unless_checkout_cwd, open_checkout } from '../../../scripts/roots/checkout.ts';
+import { open_checkout_program } from '../../../scripts/roots/checkout_program.ts';
 import { run_imports_corpus } from '../imports_corpus.ts';
 import { TSV_DEBUG_CORPUS, TSV_DEBUG_PASS_ENV } from '../lib/tsv_debug_server.ts';
 
