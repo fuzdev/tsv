@@ -149,8 +149,41 @@ impl<'a> Printer<'a> {
     /// other identifier (the target is None or a different span).
     // Out of line so the dispatch front stays frameless: inlined, this arm's registers
     // are saved on entry to the front, ahead of its kind test, by every kind.
+    //
+    // Its own hot path calls nothing that needs a frame: a plain-ASCII variable reference
+    // that no statement-level paren targets is one source-span node, and every other
+    // identifier leaves by a tail call to `build_identifier_expression_doc_rest`. Kept whole,
+    // the rest's calls (the full identifier builder, the escaped name, the measured span,
+    // the paren wrap) made every identifier save registers for them. The hot path is the
+    // rest's answer for the same identifier: `ident_name_doc`'s plain arm (through
+    // `identifier_name_doc`) over the same name span, and `maybe_wrap_expr_stmt_paren`'s
+    // no-wrap arm, whose test is this one.
     #[inline(never)]
     fn build_identifier_expression_doc(&self, id: &crate::ast::Identifier) -> DocId {
+        let name = id.ident_name();
+        if id.extra.is_none()
+            && !id.optional
+            && name.escaped.is_none()
+            && name.plain_ascii
+            && self.expr_stmt_paren_target.get() != Some(id.span)
+        {
+            // `ident_name_doc`'s grade of the flag, for the names this path takes from it;
+            // every other span-identity name reaches that function and its own two-sided assert.
+            debug_assert!(
+                !id.name_span()
+                    .extract(self.source)
+                    .bytes()
+                    .any(tsv_lang::printing::is_width_relevant),
+                "`IdentName::plain_ascii` disagrees with the name's own bytes"
+            );
+            return self.d().source_span_plain(id.name_span());
+        }
+        self.build_identifier_expression_doc_rest(id)
+    }
+
+    /// [`Self::build_identifier_expression_doc`] past its plain-name path; total on its own.
+    #[inline(never)]
+    fn build_identifier_expression_doc_rest(&self, id: &crate::ast::Identifier) -> DocId {
         // A variable reference — no `?`, no binding extra — is its name alone, the
         // answer `build_identifier_doc`'s own fast path gives, taken here without paying
         // that function's frame.

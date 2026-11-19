@@ -2934,7 +2934,8 @@ impl DocArena {
     /// Allocate a node and return its DocId.
     #[inline]
     fn alloc(&self, node: DocNode) -> DocId {
-        // the one allocation site, so the fanout budget bounds every printer's doc
+        // the allocation site every builder but `source_span_plain` (which counts its own
+        // node) goes through, so the fanout budget bounds every printer's doc
         crate::fanout_probe::node();
         let mut nodes = self.nodes.borrow_mut();
         let id = DocId(nodes.len() as u32);
@@ -3283,9 +3284,35 @@ impl DocArena {
     /// observable — invisible to a byte-identity sweep on any corpus whose names are
     /// ASCII, which is every corpus. The seam that calls this asserts the property in
     /// debug builds; keep that assert wherever a new caller appears.
+    ///
+    /// The push is spelled here rather than through [`Self::alloc`] so a push onto a full
+    /// node list can leave by a tail call to [`Self::source_span_plain_growing`]: the common
+    /// push is then a store with no call behind it, and a caller whose own path calls nothing
+    /// else (the TypeScript identifier leaf) saves no register for one. It counts its node
+    /// itself, once, on either path, as `alloc` would.
     pub fn source_span_plain(&self, span: Span) -> DocId {
         let w = clamp_text_width((span.end - span.start) as usize);
-        self.alloc(DocNode::Text(DocText::SourceSpan(span, w)))
+        crate::fanout_probe::node();
+        let mut nodes = self.nodes.borrow_mut();
+        let len = nodes.len();
+        if len == nodes.capacity() {
+            drop(nodes);
+            return self.source_span_plain_growing(span, w);
+        }
+        nodes.push(DocNode::Text(DocText::SourceSpan(span, w)));
+        DocId(len as u32)
+    }
+
+    /// [`Self::source_span_plain`] onto a full node list: the growth and the push. The node
+    /// was already counted by the caller, so this pushes directly rather than through
+    /// [`Self::alloc`], which would count it a second time.
+    #[cold]
+    #[inline(never)]
+    fn source_span_plain_growing(&self, span: Span, w: u16) -> DocId {
+        let mut nodes = self.nodes.borrow_mut();
+        let id = DocId(nodes.len() as u32);
+        nodes.push(DocNode::Text(DocText::SourceSpan(span, w)));
+        id
     }
 
     /// [`Self::source_span`] for a **format-ignored verbatim slice** of a

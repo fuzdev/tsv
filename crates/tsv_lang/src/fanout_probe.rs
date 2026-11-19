@@ -240,9 +240,9 @@ mod imp {
         }
     }
 
-    /// The armed half of [`node`], out of line: [`node`] sits in the doc arena's `alloc`,
-    /// which every builder inlines, so the builders' frames carry the flag's load and the
-    /// call alone.
+    /// The armed half of [`node`], out of line: [`node`] sits in the doc arena's `alloc` and
+    /// `source_span_plain`, which every builder inlines, so the builders' frames carry the
+    /// flag's load and the call alone.
     #[cold]
     #[inline(never)]
     fn node_armed() {
