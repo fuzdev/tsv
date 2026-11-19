@@ -44,7 +44,7 @@ pub(in crate::printer) use arg_wrapping::{
 };
 pub(in crate::printer) use import_expr::{ImportOptionsArg, build_import_args_comment_layout};
 
-use super::chain::{self, ChainCall, call_callee_paren_leading_start};
+use super::chain::{self, ChainCall, call_callee_paren_leading_start_of};
 use super::{ArrowChainContext, ParenContext, Printer, SecondTypeArgs, is_curried_arrow_chain};
 use crate::ast;
 use crate::ast::AstView;
@@ -199,7 +199,7 @@ pub(super) fn callee_gap(
     // ([`callee_printed_gap_start`]), which the derivation answers.
     if !call.optional
         && !super::right_spine_may_end_in_shells(callee)
-        && call_callee_paren_leading_start(printer.view, call, span).is_none()
+        && call_callee_paren_leading_start_of(printer.view, call, callee, span).is_none()
     {
         let start = callee.span().end;
         // [`paren_split_for`]'s own gate, over the gap it would be asked about.
@@ -256,14 +256,15 @@ pub(super) fn callee_printed_gap_start(printer: &Printer<'_>, call: &ast::CallEx
 /// for the calls its inline tests cannot answer.
 #[inline(never)]
 fn callee_gap_wide(printer: &Printer<'_>, call: &ast::CallExpression, span: Span) -> CalleeGap {
-    let owned_pair = call_callee_paren_leading_start(printer.view, call, span).is_some();
+    let callee = printer.view.expr(call.callee);
+    let owned_pair = call_callee_paren_leading_start_of(printer.view, call, callee, span).is_some();
     let callee_end = if owned_pair {
-        printer.view.expr(call.callee).span().end
+        callee.span().end
     } else {
         callee_printed_gap_start(printer, call)
     };
     let trailing_gap = if owned_pair {
-        printer.owned_pair_printed_trailing_gap(printer.view.expr(call.callee), true)
+        printer.owned_pair_printed_trailing_gap(callee, true)
     } else {
         printer.owned_pair_trailing_gap(callee_end, false)
     };

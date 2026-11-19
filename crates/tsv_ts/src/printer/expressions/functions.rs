@@ -1005,9 +1005,7 @@ fn function_signature_refuses_hug(
     }
     if func.params.is_empty()
         || !(arg_count > 1
-            || printer
-                .view
-                .exprs(func.params)
+            || params
                 .iter()
                 .all(|param| is_untyped_identifier_param(printer.view, param)))
     {

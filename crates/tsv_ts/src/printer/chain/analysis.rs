@@ -413,21 +413,19 @@ fn mark_own_call_layout(nodes: &mut [ChainNode<'_>], printer: &Printer<'_>) -> b
         long_curried |=
             next_call_args.is_some_and(|outer| outer > 0 && call.arguments.len() > outer);
         next_call_args = Some(call.arguments.len());
+        let callee = printer.view.expr(call.callee);
         if entered {
             // `rec` swallows a memberish-or-call callee and stops at anything else, printing
             // that one with `print()` — a fresh `printCallExpression` context for everything
             // below it.
-            let swallowed = is_memberish(printer.view.expr(call.callee))
-                || matches!(
-                    printer.view.expr(call.callee).kind,
-                    ExpressionKind::CallExpression(_)
-                );
+            let swallowed =
+                is_memberish(callee) || matches!(callee.kind, ExpressionKind::CallExpression(_));
             facts.own_call_layout = !swallowed;
             entered = swallowed;
         } else {
             facts.own_call_layout = true;
-            entered = is_memberish(printer.view.expr(call.callee))
-                && !template_preempts_chain_redirect(printer, call, *span);
+            entered =
+                is_memberish(callee) && !template_preempts_chain_redirect(printer, call, *span);
         }
     }
     long_curried
@@ -572,12 +570,14 @@ pub(crate) fn chain_paren_leading_gap(
 ) -> Option<(u32, u32)> {
     match &expr.kind {
         ExpressionKind::MemberExpression(member) => {
-            member_object_paren_leading_start(view, member, expr.span)
-                .map(|start| (start, view.expr(member.object).span().start))
+            let object = view.expr(member.object);
+            member_object_paren_leading_start(view, member, object, expr.span)
+                .map(|start| (start, object.span().start))
         }
         ExpressionKind::CallExpression(call) => {
-            call_callee_paren_leading_start(view, call, expr.span)
-                .map(|start| (start, view.expr(call.callee).span().start))
+            let callee = view.expr(call.callee);
+            call_callee_paren_leading_start_of(view, call, callee, expr.span)
+                .map(|start| (start, callee.span().start))
         }
         ExpressionKind::TSNonNullExpression(non_null) => {
             non_null_operand_paren_leading_start(view, *non_null, expr.span, comments)
@@ -589,27 +589,61 @@ pub(crate) fn chain_paren_leading_gap(
 
 /// A member's object keeps the pair — and with it the leading run — when the object
 /// is a parenthesized optional chain this access seals (`( // c⏎a?.b).ddd`).
-pub(crate) fn member_object_paren_leading_start(
-    view: AstView<'_>,
+///
+/// `object` is `member.object` as the caller resolved it — every caller holds it for its own
+/// reads.
+pub(crate) fn member_object_paren_leading_start<'a>(
+    view: AstView<'a>,
     member: &ast::MemberExpression,
+    object: &'a Expression,
     span: Span,
 ) -> Option<u32> {
-    child_stops_optional_chain(view, span.start, member.optional, view.expr(member.object))
-        .then_some(span.start)
+    debug_assert!(
+        std::ptr::eq(object, view.expr(member.object)),
+        "`object` is the member's own object row"
+    );
+    child_stops_optional_chain(view, span.start, member.optional, object).then_some(span.start)
 }
 
 /// A callee keeps the pair two ways: the sealed optional chain (`( // c⏎a?.b)()`),
 /// and the IIFE — a function or arrow, the one callee kind prettier prints the run
 /// inside the parens for ([`paren_pair_keeps_leading_run`]).
-pub(crate) fn call_callee_paren_leading_start(
+fn call_callee_paren_leading_start(
     view: AstView<'_>,
     call: &ast::CallExpression,
     span: Span,
 ) -> Option<u32> {
-    let callee = view.expr(call.callee);
-    (child_stops_optional_chain(view, span.start, call.optional, callee)
-        || (span.start < callee.span().start && paren_pair_keeps_leading_run(callee)))
-    .then_some(span.start)
+    call_callee_paren_leading_start_of(view, call, view.expr(call.callee), span)
+}
+
+/// [`call_callee_paren_leading_start`] over the callee the caller already holds.
+///
+/// `callee` is `call.callee` as the caller resolved it — every caller holds it for its own
+/// reads.
+pub(crate) fn call_callee_paren_leading_start_of<'a>(
+    view: AstView<'a>,
+    call: &ast::CallExpression,
+    callee: &'a Expression,
+    span: Span,
+) -> Option<u32> {
+    debug_assert!(
+        std::ptr::eq(callee, view.expr(call.callee)),
+        "`callee` is the call's own callee row"
+    );
+    if child_stops_optional_chain(view, span.start, call.optional, callee) {
+        Some(span.start)
+    } else {
+        iife_callee_paren_leading_start(callee, span)
+    }
+}
+
+/// The IIFE half of [`call_callee_paren_leading_start_of`]: the whole answer once the
+/// callee is known not to stop an optional chain, which [`call_callee_step`] has tested
+/// before it descends.
+#[expect(clippy::inline_always)] // one comparison and a kind test at each of its two sites
+#[inline(always)]
+fn iife_callee_paren_leading_start(callee: &Expression, span: Span) -> Option<u32> {
+    (span.start < callee.span().start && paren_pair_keeps_leading_run(callee)).then_some(span.start)
 }
 
 /// The tagged-template analog of [`call_callee_paren_leading_start`]: a tag's REQUIRED
@@ -682,9 +716,9 @@ enum PendingLink<'a> {
     Call {
         call: &'a ast::CallExpression,
         span: Span,
-        /// Whether the walk descended into the callee — `false` where the callee stopped it as
-        /// a base of its own ([`call_callee_step`]).
-        descended: bool,
+        /// What the return half reads where the walk descended into the callee — `None`
+        /// where the callee stopped it as a base of its own ([`call_callee_step`]).
+        descended: Option<CalleeFinish>,
     },
     /// A member: push its lookup node ([`linearize_member_node`]).
     Member {
@@ -702,6 +736,9 @@ enum PendingLink<'a> {
 /// The links [`linearize_spine_loop`] holds: a chain's rest past [`CHAIN_FRAMES`] links, the
 /// first eight of it without spilling to the heap.
 type PendingLinks<'a> = SmallVec<[PendingLink<'a>; 8]>;
+
+// The held link stays a reference, a span and a verdict, never a row.
+const _: () = assert!(size_of::<PendingLink<'static>>() == 2 * size_of::<usize>() + 8);
 
 /// The link frames [`linearize_spine`] recurses through before it walks the rest of a chain
 /// in [`linearize_spine_loop`]: the common chain is a few links long and its recursion is
@@ -744,9 +781,9 @@ fn linearize_link<'a>(
     };
     match &expr.kind {
         ExpressionKind::CallExpression(call) => {
-            if let Some(callee) = call_callee_step(call, expr.span, input, nodes) {
-                linearize_link(callee, input, nodes, paren_gaps, frames);
-                finish_call_callee(view, call, expr.span, nodes);
+            if let Some(descent) = call_callee_step(call, expr.span, input, nodes) {
+                linearize_link(descent.expr, input, nodes, paren_gaps, frames);
+                finish_call_callee(descent.finish, expr.span, nodes);
             }
             nodes.push(ChainNode::call(call, expr.span));
         }
@@ -793,14 +830,14 @@ fn linearize_spine_loop<'a>(
     loop {
         match &current.kind {
             ExpressionKind::CallExpression(call) => {
-                let callee = call_callee_step(call, current.span, input, nodes);
+                let descent = call_callee_step(call, current.span, input, nodes);
                 pending.push(PendingLink::Call {
                     call,
                     span: current.span,
-                    descended: callee.is_some(),
+                    descended: descent.map(|descent| descent.finish),
                 });
-                match callee {
-                    Some(callee) => current = callee,
+                match descent {
+                    Some(descent) => current = descent.expr,
                     None => break,
                 }
             }
@@ -848,8 +885,8 @@ fn linearize_spine_loop<'a>(
                 span,
                 descended,
             } => {
-                if descended {
-                    finish_call_callee(view, call, span, nodes);
+                if let Some(finish) = descended {
+                    finish_call_callee(finish, span, nodes);
                 }
                 nodes.push(ChainNode::call(call, span));
             }
@@ -1006,7 +1043,7 @@ fn member_object_step<'a>(
 ) -> Option<&'a Expression> {
     let view = input.view();
     let object: &Expression = view.expr(member.object);
-    if let Some(start) = member_object_paren_leading_start(view, member, span) {
+    if let Some(start) = member_object_paren_leading_start(view, member, object, span) {
         push_sealed_chain_base(object, start, nodes);
         None
     } else if input
@@ -1041,14 +1078,35 @@ pub(crate) fn transparent_instantiation_callee<'a>(
     view: AstView<'a>,
     call: &'a ast::CallExpression,
 ) -> Option<&'a ast::TSInstantiationExpression> {
-    match &view.expr(call.callee).kind {
-        ExpressionKind::TSInstantiationExpression(inst)
-            if call.optional && call.type_args.is_none() =>
-        {
+    // The call's own fields first: a plain call — nearly every call — answers without
+    // resolving its callee.
+    if !transparent_instantiation_call(call) {
+        return None;
+    }
+    transparent_instantiation_callee_of(call, view.expr(call.callee))
+}
+
+/// [`transparent_instantiation_callee`] over the callee the caller already holds.
+///
+/// `callee` is `call.callee` as the caller resolved it — every caller holds it for its own
+/// reads. The instantiation returned is a field of that row, so a caller keying a memo on
+/// it (its type arguments) must pass the store's row, never a copy.
+fn transparent_instantiation_callee_of<'a>(
+    call: &ast::CallExpression,
+    callee: &'a Expression,
+) -> Option<&'a ast::TSInstantiationExpression> {
+    match &callee.kind {
+        ExpressionKind::TSInstantiationExpression(inst) if transparent_instantiation_call(call) => {
             Some(inst)
         }
         _ => None,
     }
+}
+
+/// The call-side half of [`transparent_instantiation_callee`]: an optional call with no
+/// type-argument list of its own.
+fn transparent_instantiation_call(call: &ast::CallExpression) -> bool {
+    call.optional && call.type_args.is_none()
 }
 
 /// The sealed optional chain a transparent instantiation callee instantiates
@@ -1075,10 +1133,24 @@ pub(crate) fn transparent_callee_sealed_chain<'a>(
     view: AstView<'a>,
     call: &'a ast::CallExpression,
 ) -> Option<(&'a Expression, u32)> {
-    let inst = transparent_instantiation_callee(view, call)?;
-    let open = view.expr(call.callee).span().start;
-    child_stops_optional_chain(view, open, false, view.expr(inst.expression))
-        .then_some((view.expr(inst.expression), open))
+    if !transparent_instantiation_call(call) {
+        return None;
+    }
+    let callee = view.expr(call.callee);
+    let inst = transparent_instantiation_callee_of(call, callee)?;
+    transparent_callee_sealed_chain_of(view, callee, inst)
+}
+
+/// [`transparent_callee_sealed_chain`] over the callee and its transparent instantiation
+/// ([`transparent_instantiation_callee_of`]) the caller already holds.
+fn transparent_callee_sealed_chain_of<'a>(
+    view: AstView<'a>,
+    callee: &Expression,
+    inst: &ast::TSInstantiationExpression,
+) -> Option<(&'a Expression, u32)> {
+    let open = callee.span().start;
+    let chain = view.expr(inst.expression);
+    child_stops_optional_chain(view, open, false, chain).then_some((chain, open))
 }
 
 /// Linearize a CallExpression's callee.
@@ -1094,11 +1166,27 @@ fn linearize_call_callee<'a>(
     nodes: &mut ChainNodeVec<'a>,
     paren_gaps: &mut Vec<ParenGap>,
 ) {
-    let view = input.view();
-    if let Some(callee) = call_callee_step(call, span, input, nodes) {
-        linearize_spine(callee, input, nodes, paren_gaps);
-        finish_call_callee(view, call, span, nodes);
+    if let Some(descent) = call_callee_step(call, span, input, nodes) {
+        linearize_spine(descent.expr, input, nodes, paren_gaps);
+        finish_call_callee(descent.finish, span, nodes);
     }
+}
+
+/// Where [`call_callee_step`] hands the walk on: the expression to walk, and what its return
+/// half reads once that expression is linearized.
+#[derive(Clone, Copy)]
+struct CalleeDescent<'a> {
+    expr: &'a Expression,
+    finish: CalleeFinish,
+}
+
+/// What [`finish_call_callee`] reads, decided by [`call_callee_step`] while it holds the
+/// callee: a verdict, never a row, so a held link stays small ([`PendingLink::Call`]).
+#[derive(Clone, Copy)]
+struct CalleeFinish {
+    /// Whether the callee keeps its pair and the leading run inside it
+    /// ([`call_callee_paren_leading_start`]) — whose `(` is the call's own start.
+    paren_owned: bool,
 }
 
 /// The descent half of [`linearize_call_callee`]: push the callee where it stops the walk
@@ -1110,14 +1198,17 @@ fn call_callee_step<'a>(
     span: Span,
     input: LinearizeInput<'a, '_>,
     nodes: &mut ChainNodeVec<'a>,
-) -> Option<&'a Expression> {
+) -> Option<CalleeDescent<'a>> {
     let view = input.view();
     let callee = view.expr(call.callee);
     if child_stops_optional_chain(view, span.start, call.optional, callee) {
         push_sealed_chain_base(callee, span.start, nodes);
         return None;
     }
-    if let Some((chain, open)) = transparent_callee_sealed_chain(view, call) {
+    let inst = transparent_instantiation_callee_of(call, callee);
+    if let Some((chain, open)) =
+        inst.and_then(|inst| transparent_callee_sealed_chain_of(view, callee, inst))
+    {
         push_sealed_chain_base(chain, open, nodes);
         return None;
     }
@@ -1129,36 +1220,41 @@ fn call_callee_step<'a>(
         nodes.push(ChainNode::base(callee, true));
         return None;
     }
+    // The callee stops no optional chain here, so its pair's verdict is the IIFE half alone.
+    let paren_leading_start = iife_callee_paren_leading_start(callee, span);
+    debug_assert_eq!(
+        paren_leading_start,
+        call_callee_paren_leading_start_of(view, call, callee, span),
+        "the step's verdict is the predicate's"
+    );
     // A transparent instantiation callee ([`transparent_instantiation_callee`]) emits
     // nothing itself: the Call node prints its type arguments, so the walk goes on into the
     // instantiated expression.
-    Some(view.expr(
-        transparent_instantiation_callee(view, call).map_or(call.callee, |inst| inst.expression),
-    ))
+    Some(CalleeDescent {
+        expr: inst.map_or(callee, |inst| view.expr(inst.expression)),
+        finish: CalleeFinish {
+            paren_owned: paren_leading_start.is_some(),
+        },
+    })
 }
 
 /// The return half of [`linearize_call_callee`], once the callee the walk descended into
 /// is linearized.
 #[expect(clippy::inline_always)] // a half of both walks: each keeps its own copy
 #[inline(always)]
-fn finish_call_callee(
-    view: AstView<'_>,
-    call: &ast::CallExpression,
-    span: Span,
-    nodes: &mut ChainNodeVec<'_>,
-) {
+fn finish_call_callee(finish: CalleeFinish, span: Span, nodes: &mut ChainNodeVec<'_>) {
     // An IIFE callee reached through the chain (`( // c⏎() => {})().p`) owns its own
     // leading gap, exactly as the bare-callee path does: the pair is required and
     // prettier keeps the run inside it. A function or arrow is never itself a chain,
     // so the walk pushed exactly one node for it and that node is the
     // base this call's `(` belongs to.
-    if let Some(start) = call_callee_paren_leading_start(view, call, span)
+    if finish.paren_owned
         && let Some(ChainNode::Base {
             paren_leading_start,
             ..
         }) = nodes.last_mut()
     {
-        *paren_leading_start = Some(start);
+        *paren_leading_start = Some(span.start);
     }
 }
 
@@ -1231,7 +1327,7 @@ fn linearize_member_node<'a>(
     let operand_end = object.span().end;
     let object_end = Printer::gap_start_after_owned_pair(
         operand_end,
-        member_object_paren_leading_start(view, member, member_span)
+        member_object_paren_leading_start(view, member, object, member_span)
             .and_then(|_| paren_shell_close_after(source, operand_end))
             .map(|close| (operand_end, close)),
     );

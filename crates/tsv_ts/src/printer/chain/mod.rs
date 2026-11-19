@@ -54,7 +54,7 @@ pub(super) use analysis::{
     linearize_chain_from_non_null_into,
 };
 pub(crate) use analysis::{
-    call_callee_paren_leading_start, chain_mid_chain_paren_gaps, child_stops_optional_chain,
+    call_callee_paren_leading_start_of, chain_mid_chain_paren_gaps, child_stops_optional_chain,
     tag_paren_leading_start, transparent_callee_sealed_chain, transparent_instantiation_callee,
 };
 pub(super) use builder::call_prints_as_member_chain;
