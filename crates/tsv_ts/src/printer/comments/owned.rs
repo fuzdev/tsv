@@ -684,7 +684,24 @@ impl<'a> Printer<'a> {
     /// doc in parens, present or future. Nothing else prints an owned comment but its
     /// prefix half ([`Self::owned_leading_comment_prefix`]), which the commented non-null
     /// run lays out for each level it builds in place of `build_expression_doc`.
+    ///
+    /// Split at the head: the document-level flag, which is
+    /// [`Self::owned_leading_comment_prefix`]'s own first answer, is tested inline at every
+    /// caller, so an expression in a document with no owned comment — nearly every one — pays
+    /// a compare and no call; the rest is [`Self::prepend_owned_leading_comment_in_document`].
+    /// With the flag clear the prefix answers `None`, so returning `doc` here is that path's
+    /// answer, not a new one.
+    #[inline]
     pub(crate) fn prepend_owned_leading_comment(&self, expr: &Expression, doc: DocId) -> DocId {
+        if !self.has_owned_comments {
+            return doc;
+        }
+        self.prepend_owned_leading_comment_in_document(expr, doc)
+    }
+
+    /// [`Self::prepend_owned_leading_comment`] in a document that holds an owned comment.
+    #[inline(never)]
+    fn prepend_owned_leading_comment_in_document(&self, expr: &Expression, doc: DocId) -> DocId {
         match self.owned_leading_comment_prefix(expr) {
             Some([comment, separator]) => self.d().concat(&[comment, separator, doc]),
             None => doc,
