@@ -379,16 +379,19 @@ impl<F> IdRet<F> {
         }
     }
 
-    /// The id this carries. `wrap` is the only source of the word, so the fallible arm is
-    /// never taken.
+    /// The id this carries. `wrap` is the only source of the word, and it zero-extends a
+    /// nonzero `u32`: the high half is zero, so the truncation keeps the whole index, and the
+    /// low half is nonzero, so the `None` arm is never taken. Testing the low half for zero
+    /// is a shorter sequence than the range test `NonZeroU32::try_from` makes of the whole
+    /// word, and a word that does not fit a `u32` is no state `wrap` can produce.
     #[inline]
     pub fn id(self) -> Id<F> {
-        match NonZeroU32::try_from(self.word) {
-            Ok(index) => Id {
+        match NonZeroU32::new(self.word.get() as u32) {
+            Some(index) => Id {
                 index,
                 family: PhantomData,
             },
-            Err(_) => store_miss(),
+            None => store_miss(),
         }
     }
 }
