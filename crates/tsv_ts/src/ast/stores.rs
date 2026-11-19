@@ -163,6 +163,12 @@ macro_rules! payload_stores {
                 $(self.$field.reset();)*
             }
 
+            /// The bytes every store's allocation holds.
+            #[inline]
+            pub(crate) fn capacity_bytes(&self) -> usize {
+                0 $(+ self.$field.capacity_bytes())*
+            }
+
             /// Every store's shape, for the tests that read what a reset leaves.
             #[cfg(test)]
             fn shapes(&self, out: &mut Vec<FieldShape>) {
@@ -595,9 +601,11 @@ impl AstStores {
     /// Nothing is ever trimmed. The capacity a holder's largest document grew stays parked
     /// for as long as the holder keeps the stores — what lets a warm loop parse without
     /// allocating — and dropping the stores is what releases it: a `Formatter` dropped, a
-    /// binding's thread retired, a WASM instance replaced. The type strip's edit list is not
-    /// among these stores but keeps the same rule: `__private::strip_into` parks it per
-    /// thread, cleared, until the thread exits.
+    /// binding's thread retired, a WASM instance replaced. The free functions are the one
+    /// holder that bounds it: they park stores back only while their capacity is at most
+    /// `tsv_lang::store::ONE_SHOT_PARK_CAP_BYTES`, and drop them otherwise. The type strip's
+    /// edit list is not among these stores but keeps the same rule: `__private::strip_into`
+    /// parks it per thread, cleared, until the thread exits.
     #[inline]
     pub fn reset(&mut self) {
         // destructured whole, so a field added to the stores without a reset here is a build
@@ -638,6 +646,49 @@ impl AstStores {
         text.reset();
         comments.reset();
         comment_scratch.reset();
+    }
+
+    /// The bytes every store's, scratch stack's and the pool's allocation holds: what parking
+    /// these stores retains, and what a free function's park reads against
+    /// `tsv_lang::store::ONE_SHOT_PARK_CAP_BYTES`. Destructured whole, as [`AstStores::reset`]
+    /// is, so no field is missed.
+    pub(crate) fn capacity_bytes(&self) -> usize {
+        let Self {
+            exprs,
+            expr_lists,
+            expr_opt_lists,
+            expr_scratch,
+            expr_list_scratch,
+            expr_opt_scratch,
+            stmts,
+            stmt_lists,
+            stmt_list_scratch,
+            tys,
+            ty_lists,
+            ty_list_scratch,
+            payloads,
+            runs,
+            text,
+            comments,
+            comment_scratch,
+        } = self;
+        exprs.capacity_bytes()
+            + expr_lists.capacity_bytes()
+            + expr_opt_lists.capacity_bytes()
+            + expr_scratch.capacity_bytes()
+            + expr_list_scratch.capacity_bytes()
+            + expr_opt_scratch.capacity_bytes()
+            + stmts.capacity_bytes()
+            + stmt_lists.capacity_bytes()
+            + stmt_list_scratch.capacity_bytes()
+            + tys.capacity_bytes()
+            + ty_lists.capacity_bytes()
+            + ty_list_scratch.capacity_bytes()
+            + payloads.capacity_bytes()
+            + runs.capacity_bytes()
+            + text.capacity_bytes()
+            + comments.capacity_bytes()
+            + comment_scratch.capacity_bytes()
     }
 
     /// Every store's, scratch stack's and the pool's shape, for the tests that read what a
@@ -724,6 +775,21 @@ thread_local! {
     static PARKED: Cell<Option<Box<AstStores>>> = const { Cell::new(None) };
 }
 
+/// The parked stores, leaving the slot empty; `None` when the slot is empty or, for a call from
+/// a thread-local destructor, already gone.
+#[inline]
+fn take_parked() -> Option<Box<AstStores>> {
+    PARKED.try_with(Cell::take).ok().flatten()
+}
+
+/// Puts `stores` in the slot, dropping whatever it holds; drops `stores` instead when the slot
+/// is gone (a call from a thread-local destructor).
+#[inline]
+fn put_parked(stores: Box<AstStores>) {
+    // a slot already destroyed drops the closure, and `stores` with it
+    let _ = PARKED.try_with(|cell| cell.set(Some(stores)));
+}
+
 /// Takes this thread's parked stores out of their slot, or fresh ones when there are none.
 /// The slot is empty until [`park_stores`] hands them back, so a second take meanwhile, and a
 /// thread that never parks them (a panic unwinding past the holder), get fresh stores.
@@ -732,7 +798,7 @@ thread_local! {
 /// it owns the box for as long as it likes, and the thread still parks one store set.
 #[must_use]
 pub fn take_stores() -> Box<AstStores> {
-    PARKED.with(Cell::take).unwrap_or_default()
+    take_parked().unwrap_or_default()
 }
 
 /// Parks `stores` in this thread's slot after an [`AstStores::reset`], keeping slot 0 and
@@ -740,11 +806,13 @@ pub fn take_stores() -> Box<AstStores> {
 /// already in the slot are dropped.
 pub fn park_stores(mut stores: Box<AstStores>) {
     stores.reset();
-    PARKED.with(|cell| cell.set(Some(stores)));
+    put_parked(stores);
 }
 
 /// Run `f` over this thread's parked stores, or over fresh ones when there are none:
 /// `tsv_arena`'s take-and-park protocol, here because that crate cannot name these types.
+/// Parks whatever `f` grew, uncapped — the bindings' protocol; the free functions park
+/// through [`park_stores_capped`].
 ///
 /// The stores are out of the slot while `f` runs ([`take_stores`]), so a nested call takes
 /// fresh ones and a panic out of `f` leaves the slot empty, as a new thread finds it. Parked
@@ -755,6 +823,46 @@ pub fn with_stores<R>(f: impl FnOnce(&mut AstStores) -> R) -> R {
     let result = f(&mut stores);
     park_stores(stores);
     result
+}
+
+/// This thread's parked stores, or fresh ones sized for a document of `source_len` bytes
+/// ([`AstStores::for_source`]) when the slot is empty — the take half of a free function's
+/// call, and of a Svelte one's TypeScript half.
+#[must_use]
+pub fn take_stores_sized(source_len: usize) -> Box<AstStores> {
+    take_parked().unwrap_or_else(|| Box::new(AstStores::for_source(source_len)))
+}
+
+/// Parks `stores` as [`park_stores`] does when their capacity is at most
+/// [`tsv_lang::store::ONE_SHOT_PARK_CAP_BYTES`], and drops them otherwise — the park half of
+/// a free function's call. A drop leaves the slot as the call found it after its take: empty,
+/// unless a nested call parked its own stores meanwhile.
+pub fn park_stores_capped(stores: Box<AstStores>) {
+    if stores.capacity_bytes() <= tsv_lang::store::ONE_SHOT_PARK_CAP_BYTES {
+        park_stores(stores);
+    }
+}
+
+/// A free function's stores: this thread's parked ones, or fresh ones sized for `source_len`
+/// ([`take_stores_sized`]), parked back capped once `f` returns ([`park_stores_capped`]). A
+/// nested call finds the slot empty and takes fresh ones; a panic out of `f` leaves the slot
+/// empty; a call from a thread-local destructor, once the slot is gone, runs on fresh ones and
+/// parks nothing.
+pub(crate) fn with_one_shot_stores<R>(source_len: usize, f: impl FnOnce(&mut AstStores) -> R) -> R {
+    let mut stores = take_stores_sized(source_len);
+    let result = f(&mut stores);
+    park_stores_capped(stores);
+    result
+}
+
+/// The capacity of the stores parked in this thread's slot, or `None` when it is empty — the
+/// retention the free functions' tests read. The stores stay parked.
+#[must_use]
+pub fn parked_stores_capacity() -> Option<usize> {
+    let stores = take_parked()?;
+    let bytes = stores.capacity_bytes();
+    put_parked(stores);
+    Some(bytes)
 }
 
 /// Stores a caller keeps warm across calls in a slot it owns, rewound between them: the
@@ -1685,5 +1793,160 @@ type U = V | W;
             });
             assert_eq!(with_a_row(outer), 2, "the outer stores are untouched");
         });
+    }
+}
+
+/// The free functions' retention contract (`with_one_shot_stores` beneath `format`, `strip`,
+/// `parse_to_json*` and `parse_imports*`): the thread's stores and doc arena, parked back
+/// capped, out of their slots while a call runs.
+#[cfg(test)]
+mod one_shot_tests {
+    use super::*;
+    use crate::Goal;
+    use tsv_lang::doc::arena::parked_doc_arena_capacity;
+    use tsv_lang::store::ONE_SHOT_PARK_CAP_BYTES;
+
+    const SMALL: &str = "let x=1";
+    const SMALL_FORMATTED: &str = "let x = 1;\n";
+
+    /// A document whose stores and doc arena both grow past the cap: forty thousand
+    /// expression statements, each an expression row and a statement row.
+    fn over_cap_source() -> String {
+        "a;\n".repeat(40_000)
+    }
+
+    #[test]
+    fn an_under_cap_call_parks_its_stores_and_doc_arena() {
+        assert_eq!(crate::format(SMALL).unwrap(), SMALL_FORMATTED);
+        let stores = parked_stores_capacity().expect("the stores park");
+        let arena = parked_doc_arena_capacity().expect("the doc arena parks");
+        assert!(stores <= ONE_SHOT_PARK_CAP_BYTES && arena <= ONE_SHOT_PARK_CAP_BYTES);
+        // a second call takes what the first parked, and is correct on it
+        assert_eq!(crate::format("let  y").unwrap(), "let y;\n");
+        assert_eq!(crate::strip("let z: T").unwrap().code, "let z   ");
+    }
+
+    #[test]
+    fn repeated_calls_on_one_document_hold_the_parked_capacity_steady() {
+        // Each call rewinds what it takes, the stores at their park and the doc arena at its
+        // take, so the same document asks the same rows of them every time: once a call has
+        // grown them to its demand, every later one fits in what is parked. A take or a park
+        // that skipped the rewind would append each call's rows behind the last's, growing
+        // the capacity until the cap dropped it.
+        let source = "const value = { a: [1, 2, 3], b: (x: number) => x * 2 };\n".repeat(200);
+        let expected = crate::format(&source).unwrap();
+        assert_eq!(crate::format(&source).unwrap(), expected);
+        let stores = parked_stores_capacity().expect("the stores park");
+        let arena = parked_doc_arena_capacity().expect("the doc arena parks");
+        for call in 0..20 {
+            assert_eq!(crate::format(&source).unwrap(), expected, "call {call}");
+            assert_eq!(
+                parked_stores_capacity(),
+                Some(stores),
+                "the stores' capacity after call {call}"
+            );
+            assert_eq!(
+                parked_doc_arena_capacity(),
+                Some(arena),
+                "the doc arena's capacity after call {call}"
+            );
+        }
+    }
+
+    #[test]
+    fn an_over_cap_document_drops_the_slots_and_the_next_call_is_cold_and_correct() {
+        let _ = crate::format(SMALL).unwrap();
+        assert!(parked_stores_capacity().is_some());
+        let big = over_cap_source();
+        let formatted = crate::format(&big).unwrap();
+        assert_eq!(formatted, big, "the document is its own format");
+        assert_eq!(
+            parked_stores_capacity(),
+            None,
+            "over-cap stores are dropped"
+        );
+        assert_eq!(
+            parked_doc_arena_capacity(),
+            None,
+            "an over-cap doc arena is dropped"
+        );
+        assert_eq!(crate::format(SMALL).unwrap(), SMALL_FORMATTED);
+        assert!(
+            parked_stores_capacity().is_some(),
+            "the cold call parks again"
+        );
+        // the strip and parse paths drop over-cap stores too
+        assert_eq!(crate::strip(&big).unwrap().code, big);
+        assert_eq!(parked_stores_capacity(), None);
+    }
+
+    #[test]
+    fn a_nested_call_takes_fresh_stores_and_leaves_the_outer_ones_alone() {
+        let source = "let a = [1, 2];";
+        let outer_json = with_one_shot_stores(source.len(), |outer| {
+            let program = crate::__private::parse_with_goal_into(source, Goal::Module, outer)
+                .expect("parses");
+            // a free call while the outer stores are taken: the slot is empty, so it runs on
+            // fresh stores and parks those
+            assert_eq!(crate::format("let  b").unwrap(), "let b;\n");
+            assert_eq!(crate::strip("let c: T = 1").unwrap().code, "let c    = 1");
+            crate::__private::convert_ast_json_string(
+                crate::__private::parsed_ref(&program, outer),
+                source,
+            )
+        });
+        assert_eq!(outer_json, crate::parse_to_json(source).unwrap());
+    }
+
+    #[test]
+    fn a_caught_panic_leaves_the_slot_empty_and_the_next_call_works() {
+        let _ = crate::format(SMALL).unwrap();
+        assert!(parked_stores_capacity().is_some());
+        let caught = std::panic::catch_unwind(|| {
+            with_one_shot_stores(SMALL.len(), |stores| {
+                let _ = crate::__private::parse_with_goal_into(SMALL, Goal::Module, stores);
+                panic!("boom");
+            })
+        });
+        assert!(caught.is_err());
+        assert_eq!(
+            parked_stores_capacity(),
+            None,
+            "the panic took the stores with it"
+        );
+        assert_eq!(crate::format(SMALL).unwrap(), SMALL_FORMATTED);
+        assert!(parked_stores_capacity().is_some());
+    }
+
+    #[test]
+    fn a_call_from_a_thread_local_destructor_runs_on_fresh_stores() {
+        type Outputs = (String, String, String);
+        struct CallsOnDrop(std::sync::mpsc::Sender<Outputs>);
+        impl Drop for CallsOnDrop {
+            fn drop(&mut self) {
+                let outputs = (
+                    crate::format(SMALL).unwrap_or_default(),
+                    crate::strip("let s: T").map(|s| s.code).unwrap_or_default(),
+                    crate::parse_to_json("x").unwrap_or_default(),
+                );
+                let _ = self.0.send(outputs);
+            }
+        }
+        thread_local! {
+            static ON_EXIT: Cell<Option<CallsOnDrop>> = const { Cell::new(None) };
+        }
+        let (send, receive) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            // registered ahead of the slots, so std's reverse-order destructors run theirs
+            // first and this one finds them gone
+            ON_EXIT.with(|cell| cell.set(Some(CallsOnDrop(send))));
+            let _ = crate::format(SMALL);
+        })
+        .join()
+        .expect("the thread exits cleanly");
+        let (formatted, stripped, json) = receive.recv().expect("the destructor ran");
+        assert_eq!(formatted, SMALL_FORMATTED);
+        assert_eq!(stripped, "let s   ");
+        assert_eq!(json, crate::parse_to_json("x").unwrap());
     }
 }

@@ -47,6 +47,18 @@
 //! (its npm packages) report it — in the wire's UTF-16 offsets and lines; one line under
 //! `{}`, the `tsv` CLI's frame under `{:#}`.
 //!
+//! ## Memory
+//!
+//! The free functions — [`format()`], `parse_to_json` and `parse_to_json_with` — reuse their
+//! thread's allocations: each call runs on the thread's parked stores, and a format call on
+//! its parked doc arena too, each taken for the call and parked back after it. A slot is
+//! parked back only while its capacity is at most 1 MiB, and dropped otherwise, so a thread
+//! keeps at most about 4 MiB across every tsv language crate it calls (`tsv_ts` and
+//! `tsv_svelte` share these slots) until it exits; a larger stylesheet's allocations are freed
+//! when its call returns, and the next call starts cold. No output depends on it. A
+//! [`Formatter`] keeps its allocations in the value instead, uncapped, for as long as the
+//! caller holds it.
+//!
 //! ## Deep input
 //!
 //! The parser refuses a tree past its depth limits with [`ErrorKind::TooDeep`], so every
@@ -144,15 +156,20 @@ pub const WIRE_COORDINATES: WireCoordinates =
 /// # }
 /// ```
 ///
+/// Runs on this thread's parked stores and doc arena, each kept for the next call while it
+/// holds at most 1 MiB and released when the thread exits ([Memory](crate#memory)).
+///
 /// # Errors
 ///
 /// A parse error.
 pub fn format(source: &str) -> Result<String> {
-    format_in(
-        source,
-        &mut CssStores::new(),
-        tsv_lang::doc::arena::DocArena::for_source,
-    )
+    ast::with_one_shot_stores(|stores| {
+        tsv_lang::doc::arena::with_one_shot_doc_arena(|arena| {
+            format_in(source, stores, move |folded| {
+                tsv_lang::doc::arena::OneShotDocArena::get(arena, folded)
+            })
+        })
+    })
 }
 
 /// The one format path, shared by [`format()`] and [`Formatter`]: fold, parse into
@@ -250,6 +267,9 @@ const _: () = {
 /// # }
 /// ```
 ///
+/// Runs on this thread's parked stores, kept for the next call while they hold at most 1 MiB
+/// and released when the thread exits ([Memory](crate#memory)).
+///
 /// # Errors
 ///
 /// A parse error.
@@ -259,8 +279,6 @@ pub fn parse_to_json(source: &str) -> Result<String> {
 }
 
 /// [`parse_to_json`] under `options`: whether the wire carries `loc`.
-///
-/// Each call parses into fresh stores, dropped once the wire is written.
 ///
 /// ```
 /// # fn main() -> tsv_css::Result<()> {
@@ -272,21 +290,27 @@ pub fn parse_to_json(source: &str) -> Result<String> {
 /// # }
 /// ```
 ///
+/// Runs on this thread's parked stores, kept for the next call while they hold at most 1 MiB
+/// and released when the thread exits ([Memory](crate#memory)).
+///
 /// # Errors
 ///
 /// A parse error.
 #[cfg(feature = "json")]
 pub fn parse_to_json_with(source: &str, options: JsonOptions) -> Result<String> {
-    let ast = __private::parse(source)?;
-    #[cfg(feature = "locations")]
-    if options.locations {
-        return Ok(wire_string(
-            __private::convert_ast_json_bytes_with_locations(&ast, source),
-        ));
-    }
-    #[cfg(not(feature = "locations"))]
-    let _ = options;
-    Ok(__private::convert_ast_json_string(&ast, source))
+    ast::with_one_shot_stores(|stores| {
+        let sheet = __private::parse_into(source, stores)?;
+        let ast = __private::parsed_ref(&sheet, stores);
+        #[cfg(feature = "locations")]
+        if options.locations {
+            return Ok(wire_string(
+                __private::convert_ast_json_bytes_with_locations(ast, source),
+            ));
+        }
+        #[cfg(not(feature = "locations"))]
+        let _ = options;
+        Ok(__private::convert_ast_json_string(ast, source))
+    })
 }
 
 /// The wire's bytes as the `String` they are: the writer emits source slices and ASCII

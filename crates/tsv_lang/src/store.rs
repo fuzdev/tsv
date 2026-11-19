@@ -504,6 +504,17 @@ impl<T: Row> Default for Store<T> {
     }
 }
 
+/// The most bytes a free function parks back in one of its thread's slots: the language
+/// crates' one-shot calls (`tsv_ts::format`, `strip`, `parse_to_json`, …) run on the thread's
+/// parked stores and doc arena, and at the call's end park each back only when its capacity
+/// is at most this, dropping it otherwise. A thread that calls them retains at most this much
+/// per slot — the TypeScript, CSS and Svelte-template stores and the doc arena, about 4 MiB in
+/// all — until it exits; a document whose stores grow past it pays a cold call next time. The
+/// bindings' warm paths (`with_stores`, `doc::arena::with_doc_arena`) park uncapped over the
+/// same slots, and a `Formatter` keeps its own.
+#[doc(hidden)]
+pub const ONE_SHOT_PARK_CAP_BYTES: usize = 1 << 20;
+
 impl<T: Row> Store<T> {
     /// An empty store. Allocates nothing until its first write.
     pub fn new() -> Self {
@@ -591,6 +602,13 @@ impl<T: Row> Store<T> {
     #[doc(hidden)]
     pub fn capacity(&self) -> usize {
         self.rows.capacity()
+    }
+
+    /// The bytes the store's allocation holds: what parking it retains.
+    #[doc(hidden)]
+    #[inline]
+    pub fn capacity_bytes(&self) -> usize {
+        self.rows.capacity() * size_of::<T>()
     }
 
     /// The refused arm of a push's mint, taken after the row is appended so the row itself
@@ -848,6 +866,13 @@ impl<T> ListBuf<T> {
     #[doc(hidden)]
     pub fn capacity(&self) -> usize {
         self.items.capacity()
+    }
+
+    /// The bytes the stack's allocation holds: what parking it retains.
+    #[doc(hidden)]
+    #[inline]
+    pub fn capacity_bytes(&self) -> usize {
+        self.items.capacity() * size_of::<T>()
     }
 }
 
@@ -1208,6 +1233,13 @@ impl<F> TextPool<F> {
     /// The bytes the pool's allocation holds, for a test of what a reset keeps.
     #[doc(hidden)]
     pub fn capacity(&self) -> usize {
+        self.text.capacity()
+    }
+
+    /// The bytes the pool's allocation holds: what parking it retains.
+    #[doc(hidden)]
+    #[inline]
+    pub fn capacity_bytes(&self) -> usize {
         self.text.capacity()
     }
 

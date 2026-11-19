@@ -99,6 +99,12 @@ impl SvelteOwn {
         }
     }
 
+    /// The bytes every store's, scratch stack's and the pool's allocation holds.
+    pub(crate) fn capacity_bytes(&self) -> usize {
+        let Self { runs, text } = self;
+        runs.capacity_bytes() + text.capacity_bytes()
+    }
+
     /// Rewinds the stores in place between documents. Every store once written keeps its
     /// slot 0, so the next document's first write to it mints straight behind it; every
     /// store, scratch stack and the pool keep their capacity. Every run and pool text minted
@@ -108,7 +114,9 @@ impl SvelteOwn {
     /// for as long as the holder keeps the stores — what lets a warm loop parse without
     /// allocating — and dropping the stores is what releases it: a `Formatter` dropped, a
     /// binding's thread retired, a WASM instance replaced. The TypeScript and CSS halves keep
-    /// the same rule.
+    /// the same rule. The free functions are the one holder that bounds it: they park stores
+    /// back only while their capacity is at most `tsv_lang::store::ONE_SHOT_PARK_CAP_BYTES`,
+    /// and drop them otherwise.
     #[inline]
     pub(crate) fn reset(&mut self) {
         // destructured whole, so a field added to the stores without a reset here is a build
@@ -173,7 +181,7 @@ thread_local! {
 /// hands over, and the template's own half, a box this crate's slot hands over.
 ///
 /// Fresh ones allocate the three boxes and nothing beside them: each store's buffer is
-/// allocated by its first write ([`SvelteStores::for_source`] also reserves the TypeScript
+/// allocated by its first write (a free function also reserves the TypeScript
 /// half's busiest stores).
 #[derive(Debug, Default)]
 pub struct SvelteStores {
@@ -192,20 +200,6 @@ impl SvelteStores {
         Self::default()
     }
 
-    /// Empty stores for one document of `source_len` bytes, the TypeScript half's busiest
-    /// stores reserved for that length (`tsv_ts::ast::AstStores::for_source`): the stores of a
-    /// one-shot call. The document's length bounds the bytes of its scripts and template
-    /// expressions, so it sizes the half from above. The CSS half and the template's own
-    /// stores are each first written by a flush, which sizes that first allocation itself.
-    #[must_use]
-    pub(crate) fn for_source(source_len: usize) -> Self {
-        Self {
-            ts: Box::new(AstStores::for_source(source_len)),
-            css: Box::default(),
-            own: Box::default(),
-        }
-    }
-
     /// Rewinds the three halves in place between documents, each keeping its capacity. Every
     /// id, run and pool text minted so far is invalid from here on.
     #[inline]
@@ -218,6 +212,22 @@ impl SvelteStores {
     }
 }
 
+/// The parked own half, leaving the slot empty; `None` when the slot is empty or, for a call
+/// from a thread-local destructor, already gone.
+#[inline]
+fn take_parked() -> Option<Box<SvelteOwn>> {
+    PARKED.try_with(Cell::take).ok().flatten()
+}
+
+/// Puts `own` in the slot after a [`SvelteOwn::reset`], dropping whatever the slot holds;
+/// drops `own` instead when the slot is gone (a call from a thread-local destructor).
+#[inline]
+fn park_own(mut own: Box<SvelteOwn>) {
+    own.reset();
+    // a slot already destroyed drops the closure, and `own` with it
+    let _ = PARKED.try_with(|cell| cell.set(Some(own)));
+}
+
 /// Takes this thread's parked stores out of the three slots — `tsv_ts`'s, `tsv_css`'s and this
 /// crate's, in that order — or a fresh half where a slot holds none. The slots are empty until
 /// [`park_stores`] hands the halves back, so a second take meanwhile, and a thread that never
@@ -227,22 +237,23 @@ pub fn take_stores() -> SvelteStores {
     SvelteStores {
         ts: tsv_ts::__private::take_stores(),
         css: tsv_css::__private::take_stores(),
-        own: PARKED.with(Cell::take).unwrap_or_default(),
+        own: take_parked().unwrap_or_default(),
     }
 }
 
 /// Parks each half in its own slot, rewound in place and keeping its capacity, so every id,
 /// run and pool text minted from them is invalid from here on.
 pub fn park_stores(stores: SvelteStores) {
-    let SvelteStores { ts, css, mut own } = stores;
+    let SvelteStores { ts, css, own } = stores;
     tsv_ts::__private::park_stores(ts);
     tsv_css::__private::park_stores(css);
-    own.reset();
-    PARKED.with(|cell| cell.set(Some(own)));
+    park_own(own);
 }
 
 /// Run `f` over this thread's parked stores, or over fresh ones where a slot holds none:
 /// `tsv_arena`'s take-and-park protocol over the slots `tsv_ts`, `tsv_css` and this crate own.
+/// Parks whatever `f` grew, uncapped — the bindings' protocol; the free functions park each
+/// half capped ([`with_one_shot_stores`]).
 ///
 /// The three halves are out of their slots while `f` runs ([`take_stores`]), so a nested call
 /// takes fresh ones and a panic out of `f` leaves the slots empty, as a new thread finds them.
@@ -253,6 +264,45 @@ pub fn with_stores<R>(f: impl FnOnce(&mut SvelteStores) -> R) -> R {
     let result = f(&mut stores);
     park_stores(stores);
     result
+}
+
+/// A free function's stores: each half this thread's parked one, or a fresh one — the
+/// TypeScript half sized for a document of `source_len` bytes
+/// (`tsv_ts::__private::take_stores_sized`), which bounds the bytes of its scripts and template
+/// expressions from above; the CSS half and the template's own are each first written by a
+/// flush, which sizes that first allocation itself. Once `f` returns each half parks back in
+/// its own slot when its capacity is at most `tsv_lang::store::ONE_SHOT_PARK_CAP_BYTES`, and
+/// is dropped otherwise. A nested call finds the slots empty and takes fresh halves; a panic
+/// out of `f` leaves them empty; a call from a thread-local destructor, once a slot is gone,
+/// runs on a fresh half and parks nothing there.
+pub(crate) fn with_one_shot_stores<R>(
+    source_len: usize,
+    f: impl FnOnce(&mut SvelteStores) -> R,
+) -> R {
+    let mut stores = SvelteStores {
+        ts: tsv_ts::__private::take_stores_sized(source_len),
+        css: tsv_css::__private::take_stores(),
+        own: take_parked().unwrap_or_default(),
+    };
+    let result = f(&mut stores);
+    let SvelteStores { ts, css, own } = stores;
+    tsv_ts::__private::park_stores_capped(ts);
+    tsv_css::__private::park_stores_capped(css);
+    if own.capacity_bytes() <= tsv_lang::store::ONE_SHOT_PARK_CAP_BYTES {
+        park_own(own);
+    }
+    result
+}
+
+/// The capacity of the own half parked in this crate's slot, or `None` when it is empty — the
+/// retention the free functions' tests read (`tsv_ts::__private::parked_stores_capacity` and
+/// `tsv_css`'s read the other two halves). The half stays parked.
+#[must_use]
+pub fn parked_own_capacity() -> Option<usize> {
+    let own = take_parked()?;
+    let bytes = own.capacity_bytes();
+    let _ = PARKED.try_with(|cell| cell.set(Some(own)));
+    Some(bytes)
 }
 
 /// Stores a caller keeps warm across calls in a slot it owns, rewound between them: the
@@ -944,5 +994,195 @@ mod tests {
             });
             assert_eq!(reused, fresh, "{source:?}");
         }
+    }
+}
+
+/// The free functions' retention contract across the three languages on one thread: every
+/// slot each language's free functions take — `tsv_ts`'s and `tsv_css`'s stores, this crate's
+/// own half and `tsv_lang`'s doc arena — handed between them call after call.
+#[cfg(test)]
+mod one_shot_tests {
+    use tsv_lang::doc::arena::parked_doc_arena_capacity;
+    use tsv_lang::store::ONE_SHOT_PARK_CAP_BYTES;
+
+    /// One free-function call, its output (or error) as text.
+    type Call = fn(&str) -> String;
+
+    fn ts_format(source: &str) -> String {
+        format!("{:?}", tsv_ts::format(source))
+    }
+    fn ts_json(source: &str) -> String {
+        format!("{:?}", tsv_ts::parse_to_json(source))
+    }
+    fn ts_strip(source: &str) -> String {
+        format!("{:?}", tsv_ts::strip(source).map(|s| s.code))
+    }
+    fn ts_strip_with_imports(source: &str) -> String {
+        format!(
+            "{:?}",
+            tsv_ts::strip_with_imports(source).map(|(s, i)| (s.code, i))
+        )
+    }
+    fn ts_imports(source: &str) -> String {
+        format!("{:?}", tsv_ts::parse_imports(source))
+    }
+    fn css_format(source: &str) -> String {
+        format!("{:?}", tsv_css::format(source))
+    }
+    fn css_json(source: &str) -> String {
+        format!("{:?}", tsv_css::parse_to_json(source))
+    }
+    fn svelte_format(source: &str) -> String {
+        format!("{:?}", crate::format(source))
+    }
+    fn svelte_json(source: &str) -> String {
+        format!("{:?}", crate::parse_to_json(source))
+    }
+    fn svelte_imports(source: &str) -> String {
+        format!("{:?}", crate::parse_imports(source))
+    }
+
+    /// `call` over `source` on a thread of its own, whose slots are empty: the fresh-store
+    /// output.
+    fn fresh(call: Call, source: &str) -> String {
+        let source = source.to_owned();
+        std::thread::spawn(move || call(&source))
+            .join()
+            .expect("the fresh call returns")
+    }
+
+    #[test]
+    fn interleaved_languages_on_one_thread_match_fresh_stores() {
+        let big_ts = "a;\n".repeat(40_000);
+        let big_svelte = format!("<script>\n{big_ts}</script>\n");
+        let big_css = "a {\n\tb: c;\n}\n".repeat(40_000);
+        let script = "<script lang=\"ts\">import a from './a'; let x: number = [1,2]</script>";
+        let calls: Vec<(Call, String)> = vec![
+            (ts_format, "const   x=[1,2]".into()),
+            (
+                svelte_format,
+                format!("{script}\n<p>{{ x }}</p>\n<style>p {{ color:red }}</style>"),
+            ),
+            (css_format, "a{color:red}".into()),
+            (ts_strip, "let y: T = 1".into()),
+            (ts_format, "let  z".into()),
+            (
+                svelte_json,
+                format!("{script}<p>{{x}}</p><style>p{{top:0}}</style>"),
+            ),
+            (ts_json, "let a = b;".into()),
+            (css_json, "a{}".into()),
+            (
+                svelte_imports,
+                format!("{script}<script module>import('./m')</script>"),
+            ),
+            (ts_imports, "import t from 't'; import('./u');".into()),
+            (
+                ts_strip_with_imports,
+                "import type {T} from 't'; let v: T;".into(),
+            ),
+            // over the cap mid-sequence: each drops the slots it grew past the cap
+            (svelte_format, big_svelte.clone()),
+            (ts_format, "const   x=[1,2]".into()),
+            (css_format, big_css),
+            (svelte_format, "<p  class=\"a\">y</p>".into()),
+            (ts_strip, big_ts),
+            (css_format, "b{top:0}".into()),
+            (svelte_json, big_svelte),
+            (ts_format, "let  w".into()),
+            // errors leave the slots usable
+            (ts_format, "const =".into()),
+            (svelte_format, "<p>{</p>".into()),
+            (css_format, "a{".into()),
+            (ts_format, "const   x=[1,2]".into()),
+        ];
+        for (index, (call, source)) in calls.iter().enumerate() {
+            assert_eq!(call(source), fresh(*call, source), "call {index}");
+        }
+        for capacity in [
+            tsv_ts::__private::parked_stores_capacity(),
+            tsv_css::__private::parked_stores_capacity(),
+            crate::__private::parked_own_capacity(),
+            parked_doc_arena_capacity(),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            assert!(
+                capacity <= ONE_SHOT_PARK_CAP_BYTES,
+                "a slot holds {capacity} bytes"
+            );
+        }
+    }
+
+    #[test]
+    fn an_over_cap_document_drops_every_half_it_grew_past_the_cap() {
+        let script = "a;\n".repeat(40_000);
+        let big = format!("<script>\n{script}</script>\n");
+        assert_eq!(crate::format("<p>x</p>").unwrap(), "<p>x</p>\n");
+        assert!(tsv_ts::__private::parked_stores_capacity().is_some());
+        assert!(crate::__private::parked_own_capacity().is_some());
+        assert!(parked_doc_arena_capacity().is_some());
+        let formatted = crate::format(&big).unwrap();
+        assert_eq!(
+            formatted,
+            format!("<script>\n{}</script>\n", "\ta;\n".repeat(40_000))
+        );
+        assert_eq!(
+            tsv_ts::__private::parked_stores_capacity(),
+            None,
+            "the TS half drops"
+        );
+        assert_eq!(parked_doc_arena_capacity(), None, "the doc arena drops");
+        // the halves that stayed small park back
+        assert!(crate::__private::parked_own_capacity().is_some());
+        assert!(tsv_css::__private::parked_stores_capacity().is_some());
+        assert_eq!(crate::format("<p>{ x }</p>").unwrap(), "<p>{x}</p>\n");
+        assert!(tsv_ts::__private::parked_stores_capacity().is_some());
+    }
+
+    #[test]
+    fn an_over_cap_style_drops_the_css_half() {
+        assert_eq!(crate::format("<p>x</p>").unwrap(), "<p>x</p>\n");
+        assert!(tsv_css::__private::parked_stores_capacity().is_some());
+        let big = format!(
+            "<p>x</p>\n<style>\n{}</style>\n",
+            "a { b: c; }\n".repeat(60_000)
+        );
+        let formatted = crate::format(&big).unwrap();
+        assert_eq!(crate::format(&formatted).unwrap(), formatted);
+        assert_eq!(
+            tsv_css::__private::parked_stores_capacity(),
+            None,
+            "an over-cap CSS half is dropped"
+        );
+        // the halves that stayed small park back
+        assert!(crate::__private::parked_own_capacity().is_some());
+        assert!(tsv_ts::__private::parked_stores_capacity().is_some());
+        assert_eq!(
+            crate::format("<style>a { b:c }</style>").unwrap(),
+            "<style>\n\ta {\n\t\tb: c;\n\t}\n</style>\n"
+        );
+        assert!(
+            tsv_css::__private::parked_stores_capacity().is_some(),
+            "the cold call parks again"
+        );
+    }
+
+    #[test]
+    fn an_over_cap_template_drops_the_own_half() {
+        let big = "<p class=\"a\">{x}</p>\n".repeat(60_000);
+        assert_eq!(crate::format(&big).unwrap(), big);
+        assert_eq!(
+            crate::__private::parked_own_capacity(),
+            None,
+            "an over-cap own half is dropped"
+        );
+        assert!(tsv_css::__private::parked_stores_capacity().is_some());
+        assert_eq!(crate::format("<p>{ x }</p>").unwrap(), "<p>{x}</p>\n");
+        assert!(
+            crate::__private::parked_own_capacity().is_some(),
+            "the cold call parks again"
+        );
     }
 }

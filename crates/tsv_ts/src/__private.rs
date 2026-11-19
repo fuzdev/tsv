@@ -10,7 +10,10 @@ use crate::ast::{
 };
 use tsv_lang::Span;
 
-pub use crate::ast::{WarmStores, park_stores, take_stores, with_stores};
+pub use crate::ast::{
+    WarmStores, park_stores, park_stores_capped, parked_stores_capacity, take_stores,
+    take_stores_sized, with_stores,
+};
 pub use crate::imports::{collect_imports, parse_imports_into};
 #[cfg(feature = "json")]
 pub use crate::imports::{write_imports_json, write_imports_json_string};

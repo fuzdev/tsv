@@ -1,24 +1,16 @@
 # tsv_arena
 
-> The substrate tsv's three bindings share: the per-thread reusable doc arena for the format hot loop, and the goal axis their exports are generated over.
+> The substrate tsv's three bindings share: the goal axis their exports are generated over, and the format path that prints into `tsv_lang`'s per-thread doc arena.
 
 ## Why this crate exists
 
-The bindings (`tsv_ffi`, `tsv_napi`, `tsv_wasm`) are invoked once per file in tight loops (formatters, editor save hooks, benchmarks). A fresh doc arena allocated and freed per call churns the allocator's heap high-water on *every* call — measurable through a host FFI / N-API / WASM layer even when the engine work is unchanged. `tsv_arena` keeps **one doc arena per thread** and `reset()`s it between calls (rewind it, retain its capacity), so a warm thread does no per-call malloc/free. No parse takes an arena from here: every language parses into stores its own crate parks per thread.
+The bindings (`tsv_ffi`, `tsv_napi`, `tsv_wasm`) are invoked once per file in tight loops (formatters, editor save hooks, benchmarks). Each binding's export bodies are generated from this crate's macros, so the three agree by construction on which languages have a goal axis, how a format folds and parses, and how a parse error is mapped. *Which languages have a goal axis at all* is one fact, and three copies of it agree only until one is edited; the crate's scope is the bindings' shared substrate, and its name dates from when it owned the per-thread doc arena.
 
-It's a crate rather than inline copies the bindings would hand-sync: the helper is tiny but encodes a subtle soundness contract (nothing borrowed may outlive the next call's `reset()`); a single home keeps that contract from drifting.
-
-**The same argument is why the goal macros are here too.** Each binding spells the parse goal in its host's idiom — a `u32` code, a trailing optional string — but *which languages have a goal axis at all* is one fact, and three copies of it agree only until one is edited. So the crate's scope is the bindings' shared substrate, not arenas specifically; the name predates the second half.
-
-**Not in `tsv_lang`:** a thread-local hot-loop reuse policy is a binding concern, not a language primitive — putting it there would invert the layering.
+**The doc arena lives in `tsv_lang`** (`tsv_lang::doc::arena::with_doc_arena`, in `doc/arena_slot.rs`): one slot per thread, shared by the bindings' format path (`parse_format!`, uncapped) and the language crates' public free `format` functions (`with_one_shot_doc_arena`, capped at `tsv_lang::store::ONE_SHOT_PARK_CAP_BYTES`), so a thread that runs both holds one arena, not two. It moved down from here so both callers could reach one slot: this crate depends on no language crate, and the language crates cannot depend on it. Its rationale (a fresh arena per call churns the allocator's heap high-water on every call, measurable through a host layer), its take/park protocol and its soundness contract (nothing borrowed may outlive the next call's `reset()`) are on that module. No parse takes an arena: every language parses into stores its own crate parks per thread.
 
 ## API
 
-- `with_doc_arena(f)` — runs `f` with a per-thread `DocArena` (the format-time doc IR). Behind the **`format`** feature, which pulls `tsv_lang` for the type.
-
-It `reset()`s the arena at the *start* of each call; `f` must return an owned value (a formatted `String`) so nothing borrowed escapes. Full rationale + soundness in the `src/lib.rs` module docs.
-
-Plus the goal-axis macros and the export bodies built on them, `#[macro_export]`ed; `parse_ast!`, `parse_ast_for_format!`, `goal_allowed!`, `parse_convert!`, `parse_internal!` and `parse_imports_json!` are feature-independent (the first three generate no code of their own; the three bodies need no doc arena), `parse_format!` needs the `format` feature:
+The goal-axis macros and the export bodies built on them, `#[macro_export]`ed; `parse_ast!`, `parse_ast_for_format!`, `goal_allowed!`, `parse_convert!`, `parse_internal!` and `parse_imports_json!` are feature-independent (the first three generate no code of their own; the three bodies need no doc arena), `parse_format!` needs the `format` feature:
 
 - `parse_ast!($goalness, $lang, $source, $goal, $stores)` — the per-language parse call: every language has stores, the `*_into` entry point's `$stores`, and parses into them alone. `goal` (TypeScript) threads the decoded goal; `nogoal` (Svelte, CSS) drops it. `$lang` resolves in the *caller's* scope, so this crate depends on no language crate.
 - `with_lang_stores!($lang, |stores| body)` (hidden) — runs `body` under `$lang::__private::with_stores` (the language crate's own take-and-park of its stores, since this crate can name no language type; Svelte's takes a TypeScript half and a CSS half from those crates' slots, and its own half from its own).
@@ -27,7 +19,7 @@ Plus the goal-axis macros and the export bodies built on them, `#[macro_export]`
 - `parse_convert!($goalness, $lang, $convert, $source, $goal, $map_err)` — a binding's whole parse export body: parse through `parse_ast!` into the per-thread stores and convert with the language's `__private::$convert` writer (`convert_ast_json_bytes` for the C FFI, `convert_ast_json_string` for the two JS bindings), a parse error through `$map_err`. Its `$goal` is the binding's decoded `Option`, an unset one read as `Goal::default()` (`Module`): a parse runs no fallback. No fold either — the parse wire's offsets are a contract over the caller's own bytes.
 - `parse_internal!($goalness, $lang, $source, $goal, $map_err)` — the benchmark-only `parse_internal_*` body: `parse_convert!` without the convert, `Result<(), _>`, the AST held live by `black_box` inside the stores closure (the one scope where it exists — outside it the parse is dead code the optimizer may delete).
 - `parse_imports_json!($goalness, $lang, $source, $goal, $map_err)` — the two JS bindings' whole imports export body (`tsv_ffi` has no imports family): collect the records through the language's `__private::parse_imports_into` into the per-thread stores and write them with `tsv_ts::__private::write_imports_json_string` in the language's `WIRE_COORDINATES`, a parse error through `$map_err`. Its `$goal` is the decoded `Option`, read as a strip reads it — `goal` hands it on, so unset is the module-then-script fallback; `nogoal` (Svelte) drops it. No fold: the records' offsets index the caller's own bytes.
-- `parse_format!($goalness, $lang, $source, $goal, $map_err)` — a binding's whole format export body, behind the **`format`** feature: fold the source's carriage returns, parse the folded document through `parse_ast_for_format!` into the per-thread stores, and print it into the per-thread doc arena, with a parse error mapped back onto the caller's own source (`FoldedSource::parse_with`) and then through `$map_err`, the binding's own error type.
+- `parse_format!($goalness, $lang, $source, $goal, $map_err)` — a binding's whole format export body, behind the **`format`** feature: fold the source's carriage returns, parse the folded document through `parse_ast_for_format!` into the per-thread stores, and print it into the per-thread doc arena (`tsv_lang::doc::arena::with_doc_arena`, reached as `$crate::__tsv_lang::…`), with a parse error mapped back onto the caller's own source (`FoldedSource::parse_with`) and then through `$map_err`, the binding's own error type.
 - `goal_allowed!($goalness)` — `true` / `false`, read by each binding's own goal decoder (`ffi_source_type`, `napi_source_type`, `wasm_source_type`).
 
 Plus one type and two functions:
@@ -40,18 +32,18 @@ The load-bearing property is that **one `$goalness` tag drives every macro**: a 
 
 ## Abort safety: take and park
 
-`with_doc_arena` **takes** its arena out of the thread-local for the call and **parks** it back after — it never holds a `RefCell` borrow guard across `f`. This is the load-bearing decision in the crate; the argument (a WASM trap runs no `Drop` but leaves the instance callable, so a held guard bricks every later call) is in the `src/lib.rs` module docs, along with the two consequences — a panicking call loses its thread's warm arena, and re-entrancy gets a fresh fallback rather than a panic.
+The doc arena's slot **takes** its arena out of the thread-local for the call and **parks** it back after — it never holds a `RefCell` borrow guard across `f`. The argument (a WASM trap runs no `Drop` but leaves the instance callable, so a held guard bricks every later call) and its two consequences — a panicking call loses its thread's warm arena, and re-entrancy gets a fresh fallback rather than a panic — are in `tsv_lang`'s `doc/arena_slot.rs` module docs, with the tests that pin them.
 
-What the module docs don't carry, because it is evidence rather than rationale:
+What the module docs don't carry, because it is evidence rather than rationale (measured while the slot lived in this crate; the protocol moved unchanged):
 
 - **Measured end-to-end on the built `format` bundle** with a temporary panicking export: with a held guard, a trap made every subsequent `format_typescript` throw; with take/park, calls after the trap return correct output.
 - The change is **byte-identical and faster** on the WASM format path (measure with `benches/js/diagnostics/wasm_format_probe.ts`). Two effects are inseparable by construction: dropping the borrow guard, and the `const { Cell::new(None) }` thread-local init that only becomes possible once the parked state is `None` (a non-`const` initializer necessarily uses std's lazy thread-local storage — a state check per access; the `const` one is eager, on wasm a plain static).
 
 ## Features
 
-- `format` (default) — adds `with_doc_arena`, `parse_format!` + the optional `tsv_lang` dep, re-exported `#[doc(hidden)]` as `__tsv_lang` so `parse_format!`'s expansion reaches `tsv_lang::printing::normalize_carriage_returns` as `$crate::__tsv_lang::…` — a macro path resolves in the *caller's* crate, and this keeps the bindings free of a `tsv_lang` edge of their own.
+- `format` (default) — adds `parse_format!` + the optional `tsv_lang` dep, re-exported `#[doc(hidden)]` as `__tsv_lang` so `parse_format!`'s expansion reaches `tsv_lang::printing::normalize_carriage_returns` and `tsv_lang::doc::arena::with_doc_arena` as `$crate::__tsv_lang::…` — a macro path resolves in the *caller's* crate, so a binding needs no `tsv_lang` edge for the expansion.
 
-The **workspace dependency entry is `default-features = false`**, so a binding gets neither the doc arena nor `tsv_lang` by default and re-enables `format` from its own `format` feature — that's what keeps the parse-only binding build from pulling `tsv_lang`. A standalone `cargo test -p tsv_arena` uses the crate's own `default = ["format"]`, so the doc arena is exercised.
+The **workspace dependency entry is `default-features = false`**, so a binding gets neither `parse_format!` nor this crate's `tsv_lang` edge by default and re-enables `format` from its own `format` feature. A standalone `cargo test -p tsv_arena` uses the crate's own `default = ["format"]`.
 
 ## Consumers
 

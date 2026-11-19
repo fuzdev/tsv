@@ -86,7 +86,7 @@ tsv/
 ├── tsv_check    # experimental TypeScript binder/checker, may never ship (uses tsv_ts + tsv_lang; currently outside the workspace build)
 ├── tsv_cli      # Production CLI binary (pure Rust)
 ├── tsv_debug    # Dev utilities (uses a Node sidecar for JS tools)
-├── tsv_arena    # Shared binding substrate: the per-thread reusable doc arena + the goal axis
+├── tsv_arena    # Shared binding substrate: the format path over tsv_lang's per-thread doc arena + the goal axis
 ├── tsv_ffi      # C FFI bindings
 ├── tsv_napi     # N-API bindings (Node/Bun native path)
 └── tsv_wasm     # WebAssembly bindings
@@ -128,9 +128,9 @@ closed-scope/open-convention stance below.
 
    tsv_cli, tsv_wasm, and tsv_napi also consume tsv_discover (→ tsv_ignore).
    tsv_ffi, tsv_napi, and tsv_wasm also consume tsv_arena — the shared
-   binding substrate: the per-thread reusable doc arena (→ tsv_lang
-   under `format`) plus the goal-axis macros and the parse/format
-   export bodies built on them.
+   binding substrate: the goal-axis macros and the parse/format
+   export bodies built on them, the format body printing into
+   tsv_lang's per-thread doc arena (→ tsv_lang under `format`).
 ```
 
 ### Design Rationale
@@ -882,7 +882,7 @@ Native tsv runs on the system allocator — no `#[global_allocator]`, no alterna
 
 **Internal AST — in stores, span-identity names, no raw text.** TypeScript's expressions, statements, types and rare wide payloads are rows of per-document stores named by typed ids; a child list is a `Run` over a store (of ids, or of the elements themselves for a list built by value); TypeScript's decoded strings and comments live in the same stores, so its whole tree is there; every CSS list but the stylesheet's top-level comments (a `Vec<Comment>`, as Svelte's `Root.comments` is) is a value run over a store of its element type and every CSS string pool text, in a stylesheet's stores; every Svelte template list is a value run in a document's own stores, and the one string it keeps as text of its own is pool text there; in all three, small children are kept inline by value (see [Nested AST](#nested-ast-in-stores-inline-by-value-recursive-edges-by-id) for the layout rationale). Identifier names are span-identity — an `IdentName` records the raw name-token length and the name is re-sliced from source; only the rare `\u`-escaped (or oversized) name carries its decoded form, as pool text behind an escaped-name row. Svelte element/attribute names are span-identity too (`source[name_span]`, `.trim()` for the padded-`{ shorthand }` edge), so there is no shared symbol table anywhere. Raw source text is never duplicated into the AST — printers re-slice via `span.extract(source)`; the few deliberate stored-raw caches are cataloged in [Source-Based Printing](#source-based-printing). What remains as owned data is genuinely decoded: string-literal values (only when escaped) and the like, copied once into the text pool.
 
-**Residency — parked capacity is kept, never trimmed.** A parked store set (a language crate's per-thread slot, or the one a `Formatter` owns) keeps the capacity its largest document grew: a reset rewinds every store, scratch stack and text pool in place and trims nothing, which is what lets a warm loop parse without allocating. The memory is released by dropping the `Formatter`, by retiring the thread a binding parked its stores on, or, for a WASM instance, by `reinstantiate()` — per binding in [tsv_ffi §Architecture Position](../crates/tsv_ffi/CLAUDE.md#architecture-position), [tsv_napi §Threading & host residency](../crates/tsv_napi/CLAUDE.md#threading--host-residency), and [tsv_wasm §Memory Residency](../crates/tsv_wasm/CLAUDE.md#memory-residency).
+**Residency — parked capacity is kept, never trimmed, and capped only for the free functions.** A parked store set (a language crate's per-thread slot, or the one a `Formatter` owns) keeps the capacity its largest document grew: a reset rewinds every store, scratch stack and text pool in place and trims nothing, which is what lets a warm loop parse without allocating. The memory is released by dropping the `Formatter`, by retiring the thread a binding parked its stores on, or, for a WASM instance, by `reinstantiate()`. The public free functions share the bindings' per-thread slots (the stores, and `tsv_lang`'s doc-arena slot, `doc::arena::with_one_shot_doc_arena`) under one bound: each slot is parked back only while its capacity is at most `tsv_lang::store::ONE_SHOT_PARK_CAP_BYTES` (1 MiB) and dropped otherwise, so a library caller's thread retains at most about 4 MiB (the TypeScript, CSS and Svelte-template stores and the doc arena), released at thread exit; a caller that wants the capacity under its own ownership holds a `Formatter`. The bindings' own park stays uncapped — per binding in [tsv_ffi §Architecture Position](../crates/tsv_ffi/CLAUDE.md#architecture-position), [tsv_napi §Threading & host residency](../crates/tsv_napi/CLAUDE.md#threading--host-residency), and [tsv_wasm §Memory Residency](../crates/tsv_wasm/CLAUDE.md#memory-residency).
 
 **Svelte template nodes — contiguous storage.** Fragment children are a `Run<FragmentNode>` of enum values rather than boxed nodes, keeping siblings contiguous in their store for the printer's traversal loops.
 
@@ -890,7 +890,7 @@ Native tsv runs on the system allocator — no `#[global_allocator]`, no alterna
 
 The hottest statics (the punctuation that is three quarters of a run's `text()` calls) and the stateless singleton nodes — `empty()`, the four `Line` kinds, `LineSuffixBoundary`, `BreakParent`, `FlushBreak`, the flow-probe sentinel — form a **prelude** seeded at fixed ids ahead of every document (by the constructors and `reset()`), so a literal `text(",")` or a `line()` folds to a constant with no lookup. A delimiter or operator a builder *receives* is therefore passed as a `DocId` built at the caller: a `&'static str` parameter reaches `text()` as a runtime value and pays the prelude's switch at every call. A `Line` node carries no mode or indent (the enclosing render command supplies both per visit) — the layout analog of "statics are position-free" — so every `line()` in a document is one node. Every other static goes through the static cache, mapping a `&'static str`'s address to its precomputed visual width and the current document's node for it.
 
-The single-shot `format()` path pre-sizes one arena from source length (~2 nodes per source byte, text pool at source/8; `DocArena::with_source_size_hint`) and drops it after rendering. Multi-file drivers (each language crate's public `Formatter`, which the CLI's dir-walk workers hold, and the FFI/NAPI/WASM bindings) instead reuse one arena across calls via `DocArena::reset()` — the doc-IR analogue of the parse stores' reuse — clearing the node/child/text-pool/memo stores while retaining capacity (the static cache's width halves deliberately survive, keyed on `'static` string addresses; its interned node halves are invalidated in O(1) by the reset's generation bump). The printers borrow `&DocArena` so the caller owns the reusable one (`__private::format_ast_in` is the borrowed-arena entry point).
+The single-shot `format()` path takes the thread's parked arena (`tsv_lang::doc::arena::with_one_shot_doc_arena`), or pre-sizes a fresh one from source length when the slot is empty (~2 nodes per source byte, text pool at source/8; `DocArena::with_source_size_hint`), and parks it back only while its capacity is at most 1 MiB (residency, above). Multi-file drivers (each language crate's public `Formatter`, which the CLI's dir-walk workers hold, and the FFI/NAPI/WASM bindings, which share the free functions' one per-thread slot, `doc::arena::with_doc_arena`) reuse one arena across calls uncapped via `DocArena::reset()` — the doc-IR analogue of the parse stores' reuse — clearing the node/child/text-pool/memo stores while retaining capacity (the static cache's width halves deliberately survive, keyed on `'static` string addresses; its interned node halves are invalidated in O(1) by the reset's generation bump). The printers borrow `&DocArena` so the caller owns the reusable one (`__private::format_ast_in` is the borrowed-arena entry point).
 
 The builders' transient parts-lists are pooled the same way: wide-list builders (statement / object / array / parameter / specifier lists) draw a `DocBuf` from a recursion-safe arena free-list (`pooled_docbuf()`) instead of a fresh `SmallVec` per call, collapsing a document's many list-assembly spills into a handful of long-lived reused buffers (byte-identical; allocation only). Parts produced one at a time go through `DocArena::concat_iter`, which pulls three before opening any buffer — most assemblies hold one or two parts, and a one-part concat is its part — so the common case builds no buffer (byte-identical too: parts are pulled in the order a `collect` would build them).
 
@@ -1063,7 +1063,11 @@ which every parsing binding export runs under — through `tsv_arena`'s macros, 
 exports directly — and `WarmStores` for a slot the caller owns, as each `Formatter` does); a
 Svelte document's language halves are the boxes `tsv_ts`'s and `tsv_css`'s slots hand over,
 and its own half the box `tsv_svelte`'s slot hands over, so a thread parks one TypeScript
-store set and one CSS store set whatever mix of languages it parses. `format`/`convert`
+store set and one CSS store set whatever mix of languages it parses. The public free
+functions (`format`, `strip*`, `parse_to_json*`, `parse_imports*`) take the same slots, and a
+format call `tsv_lang`'s one doc-arena slot beside them, but park each back only while its
+capacity is at most `tsv_lang::store::ONE_SHOT_PARK_CAP_BYTES` (1 MiB), dropping it otherwise
+(residency, below). `format`/`convert`
 consume either into an owned `String`/JSON, so nothing borrowed escapes the call (no
 self-referential ownership — `unsafe_code = "forbid"`). Identifier and element/attribute
 names are **span-identity** — recovered from `source[span]` at each consumer, with the rare

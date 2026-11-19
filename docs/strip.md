@@ -11,8 +11,9 @@ and Node's `module.stripTypeScriptTypes` share. The implementation is `tsv_ts::s
 ## Surfaces
 
 - **Rust**: `tsv_ts::strip(source) -> Result<Stripped, StripError>`, the unset goal, and
-  `tsv_ts::strip_with_goal(source, goal: Goal)`, exact; each parses into fresh stores of
-  its own. (The bindings' warm per-thread stores reach the same strip through the hidden
+  `tsv_ts::strip_with_goal(source, goal: Goal)`, exact; each parses into the thread's parked
+  stores, parked back after the call while they hold at most 1 MiB (the crate docs'
+  §Memory). (The bindings' warm per-thread stores reach the same strip through the hidden
   `__private::strip_into(source, Option<Goal>, &mut stores)`.) `Stripped.code` is an owned
   `String`, the source as is when nothing is type-only. `StripError::Parse` carries the
   `Error`; `StripError::Unsupported { construct, error }` the refused construct

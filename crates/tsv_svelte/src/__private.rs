@@ -7,7 +7,7 @@ use super::*;
 use crate::ast::{ParsedRootRef, SvelteStores};
 /// A document's stores, their per-thread parking through the slots `tsv_ts` and `tsv_css`
 /// own, and the slot a caller owns.
-pub use crate::ast::{WarmStores, park_stores, take_stores, with_stores};
+pub use crate::ast::{WarmStores, park_stores, parked_own_capacity, take_stores, with_stores};
 /// The Svelte-shaped HTML answers `tsv_svelte_compile` and `tsv_debug` read — the crate's own
 /// `html` module, where each item's doc says where it departs from the spec.
 pub use crate::html::{is_mathml_element, is_svg_element, preserves_whitespace};

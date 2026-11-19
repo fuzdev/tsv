@@ -60,7 +60,8 @@ use crate::store::{ListBuf, Row, Store, TextPool};
 ///   no reader reaches the store through the view.
 ///
 /// The stores struct gets `new` (allocating nothing), `reset` (every store and scratch stack
-/// rewound in place, capacity kept), `marks` and `truncate` (the scratch stacks' tops, taken
+/// rewound in place, capacity kept), `capacity_bytes` (the bytes every store's and scratch
+/// stack's allocation holds — what parking the stores retains), `marks` and `truncate` (the scratch stacks' tops, taken
 /// into a caller's `MarkGroup` and rewound to), `clear_scratch`, and, in a build with debug
 /// assertions, `scratch_is_empty`. A test build of the caller also gets `shapes`, every
 /// field's [`FieldShape`] in declaration order, and `FIELDS`, the store fields' names. The
@@ -121,6 +122,13 @@ macro_rules! value_runs {
                         $scratch: $crate::store::ListBuf::new(),
                     )*
                 }
+            }
+
+            /// The bytes every store's and scratch stack's allocation holds: what parking the
+            /// stores retains.
+            #[inline]
+            $vis fn capacity_bytes(&self) -> usize {
+                0 $(+ self.$field.capacity_bytes() + self.$scratch.capacity_bytes())*
             }
 
             /// Rewinds the stores and scratch stacks in place, keeping each written store's
@@ -672,5 +680,18 @@ mod tests {
         assert_eq!(format!("{run:?}"), "Run(1, 2)");
         assert_eq!(stores.view().leaves(run), [Leaf(1), Leaf(2)]);
         assert_eq!(stores.shapes()[1].capacity, filled[1].capacity);
+    }
+
+    /// `capacity_bytes` reads every field's allocation: nothing for new stores, what a fill
+    /// grew after it, and the same across a reset, which keeps capacity.
+    #[test]
+    fn capacity_bytes_reads_what_a_reset_keeps() {
+        let mut stores = ToyStores::new();
+        assert_eq!(stores.lists.capacity_bytes(), 0);
+        fill(&mut stores);
+        let filled = stores.lists.capacity_bytes();
+        assert!(filled > 0);
+        stores.lists.reset();
+        assert_eq!(stores.lists.capacity_bytes(), filled);
     }
 }

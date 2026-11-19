@@ -1,6 +1,7 @@
 //! The one-shot driver behind `npm run perf:ab -- --one-shot` (`scripts/perf_ab.ts`): one
 //! language of a corpus timed through the public free functions a library caller reaches, each
-//! a whole call over fresh stores, printed as one JSON line in the shape of the warm driver for
+//! a whole call — on the thread's capped parked stores and doc arena where the measured tree's
+//! free functions park them, over fresh ones on an older tree — printed as one JSON line in the shape of the warm driver for
 //! that language (`perf_ab.rs`, `perf_ab_strip.rs`).
 //!
 //! **Why an example of its own.** The warm drivers measure the warm path, and the task grades

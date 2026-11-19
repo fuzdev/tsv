@@ -14,11 +14,14 @@ crate-type = ["cdylib"]
 tsv_svelte = { workspace = true }
 tsv_ts = { workspace = true }
 tsv_css = { workspace = true }
-# The per-thread reusable doc arena and the goal-axis macros, shared with tsv_ffi. The
-# workspace entry is default-features = false, so a parse-only build
-# doesn't pull tsv_lang (the doc-arena helper's dep); the `format` feature below
-# re-enables it.
+# The goal-axis macros and the format path over the per-thread doc arena, shared with
+# tsv_ffi. The workspace entry is default-features = false; the `format` feature below
+# re-enables the format path.
 tsv_arena = { workspace = true }
+# Named only by the panic probe, which panics inside the per-thread doc arena
+# (`tsv_lang::doc::arena::with_doc_arena`). No features — every build already links it
+# through the language crates.
+tsv_lang = { workspace = true }
 # The discovery matcher behind the `IgnoreStack` class and its verdict methods,
 # the same pair `tsv_wasm` exposes — format-only, since discovery exists to feed
 # the formatter.
@@ -43,8 +46,7 @@ serde_json.workspace = true
 # neither). The default build, every shipped feature, is what the Node bench loads and
 # what ships.
 default = ["format", "parse", "strip", "imports"]
-# Pulls the reusable doc arena (`tsv_arena::with_doc_arena`, which pulls
-# tsv_lang), plus the `IgnoreStack` discovery matcher and its verdict methods.
+# Pulls the format path over the per-thread doc arena (`tsv_arena/format`), plus the `IgnoreStack` discovery matcher and its verdict methods.
 format = ["_internal_exports", "tsv_arena/format", "dep:tsv_ignore", "dep:tsv_discover"]
 parse = ["_internal_exports", "tsv_ts/json", "tsv_css/json", "tsv_svelte/json"]
 # The `strip_typescript` export — the type strip, `tsv_ts::strip` (the same export

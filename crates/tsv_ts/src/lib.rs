@@ -109,6 +109,20 @@
 //! from their typo. A module attempt the depth limit refused ([`ErrorKind::TooDeep`]) takes
 //! no retry: the limit is no verdict on the grammar.
 //!
+//! ## Memory
+//!
+//! The free functions — [`format()`], [`format_with_goal`], [`strip()`], [`strip_with_goal`],
+//! [`strip_with_imports`], [`strip_with_imports_with_goal`], [`parse_imports`],
+//! [`parse_imports_with_goal`], `parse_to_json` and `parse_to_json_with` — reuse their
+//! thread's allocations: each call runs on the thread's parked AST stores, and a format call
+//! on its parked doc arena too, each taken for the call and parked back after it. A slot is
+//! parked back only while its capacity is at most 1 MiB, and dropped otherwise, so a thread
+//! keeps at most about 4 MiB across every tsv language crate it calls (`tsv_css` and
+//! `tsv_svelte` share these slots) until it exits; a larger document's allocations are freed
+//! when its call returns, and the next call starts cold. No output depends on it. A
+//! [`Formatter`] keeps its allocations in the value instead, uncapped, for as long as the
+//! caller holds it.
+//!
 //! ## Deep input
 //!
 //! The parsers refuse a tree past their depth limits with [`ErrorKind::TooDeep`], so every
@@ -168,7 +182,7 @@ mod strip;
 
 use __private::{PrinterInputs, format_folded_in, parse_folded_into};
 use ast::{AstStores, AstView, ParsedRef, Program};
-use tsv_lang::doc::arena::{DocArena, DocId};
+use tsv_lang::doc::arena::{DocArena, DocId, OneShotDocArena, with_one_shot_doc_arena};
 use tsv_lang::is_format_ignore_directive;
 use tsv_lang::printing::{FoldedSource, LineBreaks, LineTable};
 use tsv_lang::{CommentFreeWindow, EmbedContext};
@@ -266,6 +280,9 @@ fn with_doc_printer<'a, R>(
 /// # }
 /// ```
 ///
+/// Runs on this thread's parked stores and doc arena, each kept for the next call while it
+/// holds at most 1 MiB and released when the thread exits ([Memory](crate#memory)).
+///
 /// # Errors
 ///
 /// A parse error under both goals (the one [Goals](crate#goals) picks).
@@ -291,6 +308,9 @@ pub fn format(source: &str) -> Result<String> {
 /// # }
 /// ```
 ///
+/// Runs on this thread's parked stores and doc arena, each kept for the next call while it
+/// holds at most 1 MiB and released when the thread exits ([Memory](crate#memory)).
+///
 /// # Errors
 ///
 /// A parse error at `goal`.
@@ -299,12 +319,13 @@ pub fn format_with_goal(source: &str, goal: Goal) -> Result<String> {
 }
 
 fn format_with_optional_goal(source: &str, goal: Option<Goal>) -> Result<String> {
-    format_in(
-        source,
-        goal,
-        &mut AstStores::for_source(source.len()),
-        DocArena::for_source,
-    )
+    ast::with_one_shot_stores(source.len(), |stores| {
+        with_one_shot_doc_arena(|arena| {
+            format_in(source, goal, stores, move |folded| {
+                OneShotDocArena::get(arena, folded)
+            })
+        })
+    })
 }
 
 /// The one format path, shared by the one-shot functions and [`Formatter`]: fold, parse into
@@ -475,6 +496,9 @@ const _: () = {
 /// # }
 /// ```
 ///
+/// Runs on this thread's parked stores, kept for the next call while they hold at most 1 MiB
+/// and released when the thread exits ([Memory](crate#memory)).
+///
 /// # Errors
 ///
 /// A parse error at the module goal.
@@ -486,8 +510,6 @@ pub fn parse_to_json(source: &str) -> Result<String> {
 /// [`parse_to_json`] under `options`: the goal it parses at (exact, no retry) and whether
 /// the wire carries `loc`.
 ///
-/// Each call parses into fresh stores, dropped once the wire is written.
-///
 /// ```
 /// # fn main() -> tsv_ts::Result<()> {
 /// use tsv_ts::{Goal, JsonOptions, parse_to_json_with};
@@ -498,19 +520,25 @@ pub fn parse_to_json(source: &str) -> Result<String> {
 /// # }
 /// ```
 ///
+/// Runs on this thread's parked stores, kept for the next call while they hold at most 1 MiB
+/// and released when the thread exits ([Memory](crate#memory)).
+///
 /// # Errors
 ///
 /// A parse error at the options' goal.
 #[cfg(feature = "json")]
 pub fn parse_to_json_with(source: &str, options: JsonOptions) -> Result<String> {
-    let program = __private::parse_with_goal(source, options.goal)?;
-    #[cfg(feature = "locations")]
-    if options.locations {
-        return Ok(wire_string(
-            __private::convert_ast_json_bytes_with_locations(&program, source),
-        ));
-    }
-    Ok(__private::convert_ast_json_string(&program, source))
+    ast::with_one_shot_stores(source.len(), |stores| {
+        let program = __private::parse_with_goal_into(source, options.goal, stores)?;
+        let parsed = __private::parsed_ref(&program, stores);
+        #[cfg(feature = "locations")]
+        if options.locations {
+            return Ok(wire_string(
+                __private::convert_ast_json_bytes_with_locations(parsed, source),
+            ));
+        }
+        Ok(__private::convert_ast_json_string(parsed, source))
+    })
 }
 
 /// The wire's bytes as the `String` they are: the writer emits source slices and ASCII

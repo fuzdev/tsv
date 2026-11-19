@@ -856,7 +856,7 @@ pub fn panic_probe() -> napi::Result<()> {
         tsv_ts::__private::with_stores(|_stores| -> napi::Result<()> {
             #[cfg(feature = "format")]
             {
-                tsv_arena::with_doc_arena(|_arena| panic!("tsv_napi panic probe"))
+                tsv_lang::doc::arena::with_doc_arena(|_arena| panic!("tsv_napi panic probe"))
             }
             #[cfg(not(feature = "format"))]
             {
@@ -1369,15 +1369,25 @@ mod tests {
         // thread's slots and park rewound: TypeScript's, CSS's, and for a Svelte document
         // one of each. A run of documents through the assembled exports, the three
         // languages interleaved on one thread and a failed parse among them, must answer
-        // each call as the public one-shot function does over fresh stores.
+        // each call as the public free function does — which takes the same slots (the
+        // stores, and the doc arena on a format) and parks them back capped, so the two
+        // protocols hand the slots to each other call by call. Both are graded against the
+        // free function run on a thread of its own, whose slots start empty, so the oracle
+        // answers from fresh stores whatever the slots this thread shares hold.
         type OneShot = fn(&str) -> tsv_ts::Result<String>;
+        fn on_fresh_thread(f: OneShot, source: &str) -> Result<String, Failure> {
+            let source = source.to_owned();
+            std::thread::spawn(move || f(&source).map_err(|e| Failure::parse(&e)))
+                .join()
+                .expect("the oracle thread panicked")
+        }
         struct Engine<'a> {
             label: &'a str,
             sources: &'a [&'a str],
             format: StringFn,
-            fresh_format: OneShot,
+            free_format: OneShot,
             parse_json: StringFn,
-            fresh_parse: OneShot,
+            free_parse: OneShot,
         }
         let large_css = "a { color: red; }\n".repeat(500);
         let large_svelte = format!(
@@ -1406,25 +1416,25 @@ mod tests {
                 label: "css",
                 sources: &css,
                 format: css_engine::format,
-                fresh_format: tsv_css::format,
+                free_format: tsv_css::format,
                 parse_json: css_engine::parse_json,
-                fresh_parse: tsv_css::parse_to_json,
+                free_parse: tsv_css::parse_to_json,
             },
             Engine {
                 label: "svelte",
                 sources: &svelte,
                 format: svelte_engine::format,
-                fresh_format: tsv_svelte::format,
+                free_format: tsv_svelte::format,
                 parse_json: svelte_engine::parse_json,
-                fresh_parse: tsv_svelte::parse_to_json,
+                free_parse: tsv_svelte::parse_to_json,
             },
             Engine {
                 label: "typescript",
                 sources: &typescript,
                 format: typescript_engine::format,
-                fresh_format: tsv_ts::format,
+                free_format: tsv_ts::format,
                 parse_json: typescript_engine::parse_json,
-                fresh_parse: tsv_ts::parse_to_json,
+                free_parse: tsv_ts::parse_to_json,
             },
         ];
         // twice over, so the second pass runs every document on stores the first warmed
@@ -1435,15 +1445,27 @@ mod tests {
                         continue;
                     };
                     let label = engine.label;
+                    let expected_format = on_fresh_thread(engine.free_format, source);
                     assert_eq!(
                         at_default(engine.format, source),
-                        (engine.fresh_format)(source).map_err(|e| Failure::parse(&e)),
+                        expected_format,
                         "{label} format, pass {pass}: {source:?}"
                     );
                     assert_eq!(
+                        (engine.free_format)(source).map_err(|e| Failure::parse(&e)),
+                        expected_format,
+                        "{label} free format, pass {pass}: {source:?}"
+                    );
+                    let expected_parse = on_fresh_thread(engine.free_parse, source);
+                    assert_eq!(
                         at_default(engine.parse_json, source),
-                        (engine.fresh_parse)(source).map_err(|e| Failure::parse(&e)),
+                        expected_parse,
                         "{label} parse, pass {pass}: {source:?}"
+                    );
+                    assert_eq!(
+                        (engine.free_parse)(source).map_err(|e| Failure::parse(&e)),
+                        expected_parse,
+                        "{label} free parse, pass {pass}: {source:?}"
                     );
                 }
             }

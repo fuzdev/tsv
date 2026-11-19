@@ -31,7 +31,7 @@ wasm-opt = [
 default = ["format", "parse", "strip", "imports"]
 # `format_*` exports + the `IgnoreStack` discovery matcher and its
 # `tsv_discover` verdict methods (@fuzdev/tsv-format-wasm when alone).
-# `tsv_arena/format` adds the reusable doc arena (`with_doc_arena`).
+# `tsv_arena/format` adds the format path over the per-thread doc arena.
 format = [
     "_internal_exports",
     "dep:tsv_ignore",
@@ -67,9 +67,9 @@ tsv_css.workspace = true
 # Named only by the wasm32 layout pins (`src/layout.rs`): the doc arena's types live
 # here. No features — every build already links it through the language crates.
 tsv_lang.workspace = true
-# The per-thread reusable doc arena and the goal-axis macros (shared with the native
-# bindings). The workspace entry is default-features = false; the
-# `format` feature adds `tsv_arena/format` for the reusable doc arena. WASM is
+# The goal-axis macros and the format path over the per-thread doc arena (shared with the
+# native bindings). The workspace entry is default-features = false; the
+# `format` feature adds `tsv_arena/format` for the format path. WASM is
 # single-threaded, so the thread-local reuse is sound and removes the per-call
 # arena allocation.
 tsv_arena = { workspace = true }

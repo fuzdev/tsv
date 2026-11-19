@@ -31,7 +31,11 @@ use std::borrow::Cow;
 use tsv_lang::store::PoolText;
 
 pub(crate) use stores::SvelteOwn;
-pub use stores::{SvelteStores, SvelteText, WarmStores, park_stores, take_stores, with_stores};
+pub(crate) use stores::with_one_shot_stores;
+pub use stores::{
+    SvelteStores, SvelteText, WarmStores, park_stores, parked_own_capacity, take_stores,
+    with_stores,
+};
 use tsv_css::ast::{CssParsedRef, CssStyleSheet, CssView};
 pub use tsv_lang::{Comment, Span};
 use tsv_ts::ast::{

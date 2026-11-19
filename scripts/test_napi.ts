@@ -195,7 +195,7 @@ describe('tsv_napi addon (real N-API JS boundary)', () => {
 	//      corrupts state shared across contexts, and nothing else in the suite
 	//      loads the addon twice.
 	//   2. **The per-thread state.** Every export runs over thread-local stores and
-	//      `with_doc_arena` (crate `tsv_arena`), reused across calls. Single-threaded
+	//      the doc arena (`tsv_lang::doc::arena::with_doc_arena`), reused across calls. Single-threaded
 	//      tests cannot distinguish "per thread" from "one global", so a change that
 	//      made the stores or the doc arena shared would pass everything else and
 	//      corrupt output only under concurrency — the failure mode a consumer hits

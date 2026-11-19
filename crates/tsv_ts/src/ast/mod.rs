@@ -67,9 +67,12 @@ pub use stores::{
     ExportDefaultId, ExportNamedId, ExprId, FnDeclId, FnExprId, FnTypeId, ForHeadId, ForLeftId,
     ImportDeclId, ImportEqualsId, ImportTypeId, InferTypeId, InterfaceDeclId, LabeledStmtId,
     MetaPropId, ModuleDeclId, Parsed, QualNameId, StmtId, TaggedTplId, Text, TryStmtId, TyId,
-    TypeAliasId, TypeArgsId, WarmStores, park_stores, take_stores, with_stores,
+    TypeAliasId, TypeArgsId, WarmStores, park_stores, park_stores_capped, parked_stores_capacity,
+    take_stores, take_stores_sized, with_stores,
 };
-pub(crate) use stores::{ScratchMarks, extra_with_decorators, extra_with_type_annotation};
+pub(crate) use stores::{
+    ScratchMarks, extra_with_decorators, extra_with_type_annotation, with_one_shot_stores,
+};
 pub use tsv_lang::packed::PackedF64;
 use tsv_lang::store::PoolText;
 pub use tsv_lang::store::Run;

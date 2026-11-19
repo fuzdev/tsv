@@ -121,7 +121,8 @@
  * ## One-shot rows
  *
  * `--one-shot` also times the public free functions a library caller reaches, each a whole call
- * over fresh stores with its output dropped inside the timer: `tsv_<lang>::parse_to_json` and
+ * with its output dropped inside the timer — on the thread's parked stores and doc arena, parked
+ * back capped, on a tree whose free functions park them, and over fresh ones on an older tree: `tsv_<lang>::parse_to_json` and
  * `tsv_<lang>::format`, and `tsv_ts::parse_imports` and `tsv_ts::strip` (their `_with_goal`
  * forms where the extension names the goal), through a third driver,
  * `crates/tsv_debug/examples/perf_ab_one_shot.rs`, built only with the flag: linked into a warm
@@ -329,7 +330,7 @@ const DEFAULT_ITERATIONS = 10;
 
 /** What the one-shot rows are, printed above their table and kept in the JSON beside them. */
 const ONE_SHOT_NOTE =
-	'the public free functions over fresh stores per call (parse_to_json + format; parse_imports + ' +
+	'the public free functions, one whole call each (parse_to_json + format; parse_imports + ' +
 	'strip), INFORMATIONAL: verdicts in parentheses, never graded. TypeScript parse_to_json parses ' +
 	'a module only, so a script-goal file counts as an error on both sides';
 
@@ -421,7 +422,7 @@ const USAGE = `usage: npm run perf:ab -- <base-ref> [<cand-ref>] [--rounds N] [-
                   extends the run by pairs up to ${MAX_ROUNDS})
   --iterations N  iterations per file per run (default ${DEFAULT_ITERATIONS})
   --corpus DIR    corpus directory (default ${CORPORA_COLLECTIONS})
-  --one-shot      also time the public one-shot functions (fresh stores per call): informational
+  --one-shot      also time the public one-shot functions (a whole call each): informational
                   rows in a table of their own, never graded
   --json          print the result as JSON instead of the table`;
 

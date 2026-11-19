@@ -12,8 +12,10 @@ pub(crate) mod convert;
 mod stores;
 mod view;
 
+pub(crate) use stores::with_one_shot_stores;
 pub use stores::{
-    CssStores, CssText, ParsedCss, WarmStores, park_stores, take_stores, with_stores,
+    CssStores, CssText, ParsedCss, WarmStores, park_stores, park_stores_capped,
+    parked_stores_capacity, take_stores, with_stores,
 };
 pub use tsv_lang::Comment;
 use tsv_lang::Span;

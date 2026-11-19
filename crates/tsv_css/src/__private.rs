@@ -6,7 +6,9 @@ use super::*;
 use crate::ast::{CssParsedRef, CssStores, CssStyleSheet, ParsedCss};
 /// The stores' per-thread parking and the slot a caller owns (`tsv_arena`'s macros, the
 /// Svelte host and the `Formatter`s reach them here).
-pub use crate::ast::{WarmStores, park_stores, take_stores, with_stores};
+pub use crate::ast::{
+    WarmStores, park_stores, park_stores_capped, parked_stores_capacity, take_stores, with_stores,
+};
 
 /// [`parse`] over a document the format path folded
 /// (`tsv_lang::printing::normalize_carriage_returns`) — the parse every CSS format entry

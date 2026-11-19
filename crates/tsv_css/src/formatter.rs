@@ -8,11 +8,12 @@ use tsv_lang::doc::arena::DocArena;
 /// Formats many CSS sources on one thread, reusing its allocations from one source to the
 /// next.
 ///
-/// [`format()`](crate::format) allocates a fresh doc arena and stores for every call and
-/// drops them before returning. A `Formatter` owns both and rewinds them instead, keeping
-/// the capacity they have grown, so after the first few sources the work allocates almost
-/// nothing new — the shape of a driver that formats a directory, or an editor that formats
-/// on every save. The output is exactly [`format()`](crate::format)'s for the same source.
+/// [`format()`](crate::format) borrows the thread's parked doc arena and stores, keeping each
+/// for the next call only while it holds at most 1 MiB ([Memory](crate#memory)). A
+/// `Formatter` owns both and rewinds them instead, keeping all the capacity they have grown,
+/// so after the first few sources the work allocates almost nothing new — the shape of a
+/// driver that formats a directory, or an editor that formats on every save. The output is
+/// exactly [`format()`](crate::format)'s for the same source.
 ///
 /// **The doc arena rewinds at the start of every call**, so nothing one call leaves behind
 /// reaches the next — including a call that never returned because it panicked and the

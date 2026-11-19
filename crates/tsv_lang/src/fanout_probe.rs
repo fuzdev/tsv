@@ -127,7 +127,11 @@ mod imp {
     #[cold]
     #[inline(never)]
     fn armed(f: impl FnOnce(&mut State) -> bool) {
-        let over = STATE.with(|state| state.borrow_mut().as_mut().is_some_and(f));
+        // a thread whose state is already destroyed — a format run from a thread-local
+        // destructor, which the free functions support — is not armed
+        let over = STATE
+            .try_with(|state| state.borrow_mut().as_mut().is_some_and(f))
+            .unwrap_or(false);
         if over {
             // the stop IS a panic: the audit catches it and reads the payload, the one way to
             // leave a format midway without a return path through every printer

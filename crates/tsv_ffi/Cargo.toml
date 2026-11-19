@@ -14,10 +14,9 @@ crate-type = ["cdylib"]
 tsv_svelte = { workspace = true }
 tsv_ts = { workspace = true }
 tsv_css = { workspace = true }
-# The per-thread reusable doc arena and the goal-axis macros, shared with tsv_napi. The
-# workspace entry is default-features = false, so the parse-only build
-# doesn't pull tsv_lang (the doc-arena helper's dep); the `format` feature below
-# re-enables it.
+# The goal-axis macros and the format path over the per-thread doc arena, shared with
+# tsv_napi. The workspace entry is default-features = false; the `format` feature below
+# re-enables the format path.
 tsv_arena = { workspace = true }
 serde_json.workspace = true
 
@@ -27,7 +26,7 @@ serde_json.workspace = true
 # `--no-default-features --features format` (deno task build:ffi:format), the
 # native mirror of @fuzdev/tsv-format-wasm — it drops the wire-JSON layer.
 default = ["format", "parse"]
-# tsv_format_<lang> exports. Pulls the reusable `DocArena` (tsv_arena/format → tsv_lang).
+# tsv_format_<lang> exports. Pulls the format path over the per-thread `DocArena` (tsv_arena/format).
 format = ["tsv_arena/format"]
 # tsv_parse_<lang> + tsv_parse_internal_<lang> exports plus the wire-JSON
 # layer they emit through (each language crate's `json` feature).

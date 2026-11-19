@@ -30,6 +30,10 @@ use crate::comment_ledger::{DocumentKey, comment_check_enabled, document_key};
 
 use super::DocBuf;
 use super::chain_share::ChainShareStore;
+
+pub use super::arena_slot::{
+    OneShotDocArena, parked_doc_arena_capacity, with_doc_arena, with_one_shot_doc_arena,
+};
 #[cfg(feature = "_internal_swallow_check")]
 use super::swallow::swallow_check_enabled;
 use super::types::{
@@ -2834,6 +2838,47 @@ impl DocArena {
     /// Equivalent to `with_source_size_hint(source.len())`.
     pub fn for_source(source: &str) -> Self {
         Self::with_source_size_hint(source.len())
+    }
+
+    /// The heap bytes the arena's buffers hold — what parking it retains, and what a free
+    /// format function's park reads against `store::ONE_SHOT_PARK_CAP_BYTES`
+    /// (`doc::arena::with_one_shot_doc_arena`). Every buffer a [`Self::reset`] keeps is
+    /// counted, the static cache's fixed box and the pooled doc buffers' spills included; a
+    /// `SmallVec` still inline counts nothing, and the chain-share table's hashed tier counts
+    /// its buckets, a floor on its allocation. `&mut`, so no borrow flag is read.
+    pub(crate) fn capacity_bytes(&mut self) -> usize {
+        fn bytes<T>(buf: &Vec<T>) -> usize {
+            buf.capacity() * size_of::<T>()
+        }
+        let docbufs = self.docbuf_pool.get_mut();
+        let docbuf_spills: usize = docbufs
+            .iter()
+            .filter(|buf| buf.spilled())
+            .map(|buf| buf.capacity() * size_of::<DocId>())
+            .sum();
+        let line_suffix = self.line_suffix_scratch.get_mut();
+        let line_suffix_spill = if line_suffix.spilled() {
+            line_suffix.capacity() * size_of::<ArenaCommand>()
+        } else {
+            0
+        };
+        bytes(self.nodes.get_mut())
+            + bytes(self.children.get_mut())
+            + self.text_pool.get_mut().capacity()
+            + self.pool_scratch.get_mut().capacity()
+            + self.render_scratch.get_mut().capacity()
+            + bytes(self.top_render_stack.get_mut())
+            + bytes(self.sub_render_stack.get_mut())
+            + line_suffix_spill
+            + bytes(self.line_spans_scratch.get_mut())
+            + bytes(self.line_breaks_scratch.get_mut())
+            + bytes(docbufs)
+            + docbuf_spills
+            + self.chain_share_store.get_mut().capacity_bytes()
+            + bytes(self.layout_cache.get_mut())
+            + bytes(self.atomized.get_mut())
+            + bytes(self.keyed_group_modes.get_mut())
+            + size_of_val(&*self.static_cache)
     }
 
     /// Reset the arena for reuse on the next document, retaining capacity.

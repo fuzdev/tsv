@@ -139,6 +139,13 @@ impl ChainShareStore {
         self.hashed.clear();
     }
 
+    /// The bytes both tiers' allocations hold — the hashed tier's counted at one entry and
+    /// one control byte per bucket it can hold, a floor on its table.
+    pub(crate) fn capacity_bytes(&self) -> usize {
+        self.linear.capacity() * size_of::<ShareEntry>()
+            + self.hashed.capacity() * (size_of::<(ShareKey, SharedBuild)>() + 1)
+    }
+
     /// Whether the current scope has reached the hashed tier.
     #[cfg(test)]
     fn is_hashed(&self) -> bool {

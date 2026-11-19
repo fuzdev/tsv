@@ -333,6 +333,9 @@ impl ImportPhase {
 /// # }
 /// ```
 ///
+/// Runs on this thread's parked stores, kept for the next call while they hold at most 1 MiB
+/// and released when the thread exits ([Memory](crate#memory)).
+///
 /// # Errors
 ///
 /// A parse error, when `source` does not parse at either goal (the error reported is the
@@ -351,6 +354,9 @@ pub fn parse_imports(source: &str) -> Result<Imports, Error> {
 /// assert!(parse_imports_with_goal("import a from 'a';", Goal::Module).is_ok());
 /// ```
 ///
+/// Runs on this thread's parked stores, kept for the next call while they hold at most 1 MiB
+/// and released when the thread exits ([Memory](crate#memory)).
+///
 /// # Errors
 ///
 /// A parse error, when `source` does not parse at `goal`.
@@ -358,14 +364,13 @@ pub fn parse_imports_with_goal(source: &str, goal: Goal) -> Result<Imports, Erro
     parse_imports_one_shot(source, Some(goal))
 }
 
-/// The one-shot entry points: fresh stores sized for `source`
-/// ([`crate::ast::AstStores::for_source`]), dropped on return — the [`Imports`] are owned.
+/// The one-shot entry points: this thread's parked stores, or fresh ones sized for `source`
+/// ([`crate::ast::AstStores::for_source`]), parked back capped on return
+/// (`crate::ast::with_one_shot_stores`) — the [`Imports`] are owned.
 fn parse_imports_one_shot(source: &str, goal: Option<Goal>) -> Result<Imports, Error> {
-    parse_imports_into(
-        source,
-        goal,
-        &mut crate::ast::AstStores::for_source(source.len()),
-    )
+    crate::ast::with_one_shot_stores(source.len(), |stores| {
+        parse_imports_into(source, goal, stores)
+    })
 }
 
 /// The import records parsed into a caller's `stores` — the hidden primitive beneath

@@ -980,7 +980,9 @@ names the value in the workspace's `check-cfg` list.
 So a side with the warm parse is measured on the warm path alone: stores reused across files in a
 slot the caller owns, as the CLI's `Formatter` runs them (the bindings run the same take and park
 over a per-thread slot instead). `--one-shot` also times the public free functions a library
-caller reaches, which build fresh stores on every call — each language's `parse_to_json` and
+caller reaches — on a tree whose free functions run on the thread's parked stores and doc arena
+(parked back while each holds at most 1 MiB), on those; on an older tree, over fresh stores every
+call — each language's `parse_to_json` and
 `format`, and the strip's `parse_imports` and `strip` (their `_with_goal` forms where the extension
 names the goal) — each a whole call with its output dropped inside the timer, in the same rounds as
 the warm runs. They run through a third driver, `crates/tsv_debug/examples/perf_ab_one_shot.rs`,

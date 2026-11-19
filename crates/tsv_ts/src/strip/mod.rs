@@ -106,6 +106,9 @@ use blank::Edit;
 /// );
 /// ```
 ///
+/// Runs on this thread's parked stores, kept for the next call while they hold at most 1 MiB
+/// and released when the thread exits ([Memory](crate#memory)).
+///
 /// # Errors
 ///
 /// [`StripError::Parse`] when `source` does not parse at either goal (the error reported
@@ -129,6 +132,9 @@ pub fn strip(source: &str) -> Result<Stripped, StripError> {
 /// );
 /// ```
 ///
+/// Runs on this thread's parked stores, kept for the next call while they hold at most 1 MiB
+/// and released when the thread exits ([Memory](crate#memory)).
+///
 /// # Errors
 ///
 /// [`StripError::Parse`] when `source` does not parse at `goal`; [`StripError::Unsupported`]
@@ -137,13 +143,16 @@ pub fn strip_with_goal(source: &str, goal: crate::Goal) -> Result<Stripped, Stri
     strip_one_shot(source, Some(goal))
 }
 
-/// The one-shot strips: fresh stores sized for `source` ([`crate::ast::AstStores::for_source`]),
-/// dropped on return — the [`Stripped`] output is owned.
+/// The one-shot strips: this thread's parked stores, or fresh ones sized for `source`
+/// ([`crate::ast::AstStores::for_source`]), parked back capped on return
+/// (`crate::ast::with_one_shot_stores`) — the [`Stripped`] output is owned. The walk's edit
+/// list is a fresh one, which leaves [`strip_into`]'s parked list alone.
 fn strip_one_shot(source: &str, goal: Option<crate::Goal>) -> Result<Stripped, StripError> {
-    let mut stores = crate::ast::AstStores::for_source(source.len());
-    let program = crate::__private::parse_with_goal_or_fallback_into(source, goal, &mut stores)
-        .map_err(StripError::Parse)?;
-    strip_program(source, &program, stores.view(), Vec::new()).1
+    crate::ast::with_one_shot_stores(source.len(), |stores| {
+        let program = crate::__private::parse_with_goal_or_fallback_into(source, goal, stores)
+            .map_err(StripError::Parse)?;
+        strip_program(source, &program, stores.view(), Vec::new()).1
+    })
 }
 
 /// [`strip`] and [`parse_imports`](crate::parse_imports()) in one parse and one walk: the
@@ -180,6 +189,9 @@ fn strip_one_shot(source: &str, goal: Option<crate::Goal>) -> Result<Stripped, S
 /// # }
 /// ```
 ///
+/// Runs on this thread's parked stores, kept for the next call while they hold at most 1 MiB
+/// and released when the thread exits ([Memory](crate#memory)).
+///
 /// # Errors
 ///
 /// As [`strip`].
@@ -204,6 +216,9 @@ pub fn strip_with_imports(source: &str) -> Result<(Stripped, Imports), StripErro
 /// assert_eq!(imports.records.len(), 1);
 /// ```
 ///
+/// Runs on this thread's parked stores, kept for the next call while they hold at most 1 MiB
+/// and released when the thread exits ([Memory](crate#memory)).
+///
 /// # Errors
 ///
 /// As [`strip_with_goal`].
@@ -214,18 +229,21 @@ pub fn strip_with_imports_with_goal(
     strip_with_imports_one_shot(source, Some(goal))
 }
 
-/// [`strip_with_imports`] and [`strip_with_imports_with_goal`] over fresh stores, dropped on
-/// return — the output is owned. The parse is [`strip_into`]'s.
+/// [`strip_with_imports`] and [`strip_with_imports_with_goal`] over this thread's parked stores,
+/// parked back capped on return, as [`strip_one_shot`]'s — the output is owned. The parse is
+/// [`strip_into`]'s.
 fn strip_with_imports_one_shot(
     source: &str,
     goal: Option<crate::Goal>,
 ) -> Result<(Stripped, Imports), StripError> {
-    let program =
-        crate::__private::parse_with_goal_or_fallback(source, goal).map_err(StripError::Parse)?;
-    let mut walk = walk::Walk::new(source, walk::Mode::StripWithImports, program.view());
-    walk.program(&program);
-    let (mut edits, imports) = walk.finish_with_imports()?;
-    Ok((stripped(source, &mut edits), imports))
+    crate::ast::with_one_shot_stores(source.len(), |stores| {
+        let program = crate::__private::parse_with_goal_or_fallback_into(source, goal, stores)
+            .map_err(StripError::Parse)?;
+        let mut walk = walk::Walk::new(source, walk::Mode::StripWithImports, stores.view());
+        walk.program(&program);
+        let (mut edits, imports) = walk.finish_with_imports()?;
+        Ok((stripped(source, &mut edits), imports))
+    })
 }
 
 /// The strip into a caller's `stores` — the hidden warm twin of [`strip`] and

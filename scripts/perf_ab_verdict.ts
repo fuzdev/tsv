@@ -88,8 +88,8 @@ export const LANG_PHASES: Readonly<Record<Lang, readonly [Phase, Phase]>> = {
 };
 
 /** Each language's two one-shot rows (`--one-shot`): the public free functions a library caller
- * reaches, each a whole call over fresh stores — `parse_to_json` then `format` through the format
- * driver, `parse_imports` then `strip` through the strip driver. */
+ * reaches, one whole call each — `parse_to_json` then `format` through the format driver,
+ * `parse_imports` then `strip` through the strip driver. */
 export const ONE_SHOT_PHASES: Readonly<Record<Lang, readonly [Phase, Phase]>> = {
 	ts: ['json', 'format'],
 	svelte: ['json', 'format'],

@@ -8,17 +8,16 @@ repository.workspace = true
 publish = false
 
 [dependencies]
-# Only the `format` feature needs tsv_lang — `with_doc_arena`'s `DocArena` type and
-# `parse_format!`'s line-terminator fold (reached through the hidden `__tsv_lang`
-# re-export, so the bindings' code needs no tsv_lang edge for it; tsv_wasm keeps one for
-# its wasm32 layout pins) — so the dep is optional and pulled by `format`: a parse-only
-# binding gets neither.
+# Only the `format` feature needs tsv_lang — `parse_format!`'s line-terminator fold and
+# the thread's doc-arena slot (`tsv_lang::doc::arena::with_doc_arena`), both reached
+# through the hidden `__tsv_lang` re-export, so the bindings' code needs no tsv_lang edge
+# for them (tsv_wasm keeps one for its wasm32 layout pins) — so the dep is optional and
+# pulled by `format`: a parse-only binding gets neither.
 tsv_lang = { workspace = true, optional = true }
 
 [features]
-# `format` adds the reusable doc arena (`with_doc_arena`) and `parse_format!`, both
-# over tsv_lang. Default-on so a standalone `cargo test -p tsv_arena` exercises
-# them; the binding crates set `default-features = false` and re-enable `format`
+# `format` adds `parse_format!`, over tsv_lang's per-thread doc arena. Default-on so a
+# standalone `cargo test -p tsv_arena` exercises it; the binding crates set `default-features = false` and re-enable `format`
 # from their own `format` feature.
 default = ["format"]
 format = ["dep:tsv_lang"]

@@ -27,6 +27,7 @@ mod arena_render;
 mod arena_render_fill;
 mod arena_render_flat;
 mod arena_render_suffix;
+mod arena_slot;
 mod chain_share;
 mod render_config;
 #[cfg(feature = "_internal_swallow_check")]

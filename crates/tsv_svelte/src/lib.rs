@@ -55,6 +55,19 @@
 //! (its npm packages) report it — in the wire's UTF-16 offsets and lines; one line under
 //! `{}`, the `tsv` CLI's frame under `{:#}`.
 //!
+//! ## Memory
+//!
+//! The free functions — [`format()`], [`parse_imports`], `parse_to_json` and
+//! `parse_to_json_with` — reuse their thread's allocations: each call runs on the thread's
+//! parked stores (a component's TypeScript and CSS halves are `tsv_ts`'s and `tsv_css`'s
+//! slots, its template's half this crate's), and a format call on its parked doc arena too,
+//! each taken for the call and parked back after it. A slot is parked back only while its
+//! capacity is at most 1 MiB, and dropped otherwise, so a thread keeps at most about 4 MiB
+//! across every tsv language crate it calls until it exits; a larger component's allocations
+//! are freed when its call returns, and the next call starts cold. No output depends on it. A
+//! [`Formatter`] keeps its allocations in the value instead, uncapped, for as long as the
+//! caller holds it.
+//!
 //! ## Deep input
 //!
 //! The parser refuses a tree past its depth limits with [`ErrorKind::TooDeep`], so every
@@ -195,16 +208,21 @@ fn refuse_lone_cr_in_tag_line_comment(source: &str) -> Result<()> {
 /// # }
 /// ```
 ///
+/// Runs on this thread's parked stores and doc arena, each kept for the next call while it
+/// holds at most 1 MiB and released when the thread exits ([Memory](crate#memory)).
+///
 /// # Errors
 ///
 /// A parse error, or a refusal of a lone `\r` inside an in-tag `//` comment, where the
 /// fold would end the comment early.
 pub fn format(source: &str) -> Result<String> {
-    format_in(
-        source,
-        &mut SvelteStores::for_source(source.len()),
-        tsv_lang::doc::arena::DocArena::for_source,
-    )
+    ast::with_one_shot_stores(source.len(), |stores| {
+        tsv_lang::doc::arena::with_one_shot_doc_arena(|arena| {
+            format_in(source, stores, move |folded| {
+                tsv_lang::doc::arena::OneShotDocArena::get(arena, folded)
+            })
+        })
+    })
 }
 
 /// The one format path, shared by [`format()`] and [`Formatter`]: fold, parse into `stores`,
@@ -303,6 +321,9 @@ const _: () = {
 /// # }
 /// ```
 ///
+/// Runs on this thread's parked stores, kept for the next call while they hold at most 1 MiB
+/// and released when the thread exits ([Memory](crate#memory)).
+///
 /// # Errors
 ///
 /// A parse error.
@@ -312,8 +333,6 @@ pub fn parse_to_json(source: &str) -> Result<String> {
 }
 
 /// [`parse_to_json`] under `options`: whether the wire carries `loc`.
-///
-/// Each call parses into fresh stores, dropped once the wire is written.
 ///
 /// ```
 /// # fn main() -> tsv_svelte::Result<()> {
@@ -325,26 +344,31 @@ pub fn parse_to_json(source: &str) -> Result<String> {
 /// # }
 /// ```
 ///
+/// Runs on this thread's parked stores, kept for the next call while they hold at most 1 MiB
+/// and released when the thread exits ([Memory](crate#memory)).
+///
 /// # Errors
 ///
 /// A parse error.
 #[cfg(feature = "json")]
 pub fn parse_to_json_with(source: &str, options: JsonOptions) -> Result<String> {
-    // fresh stores sized for the document, as every one-shot call's; `__private::parse` keeps
-    // growing its own from empty, since the printer re-parses a whole document through it
-    // inside a format call, the bindings' warm ones included
-    let mut stores = SvelteStores::for_source(source.len());
-    let root = __private::parse_into(source, &mut stores)?;
-    let ast = ParsedRoot { root, stores };
-    #[cfg(feature = "locations")]
-    if options.locations {
-        return Ok(wire_string(
-            __private::convert_ast_json_bytes_with_locations(&ast, source),
-        ));
-    }
-    #[cfg(not(feature = "locations"))]
-    let _ = options;
-    Ok(__private::convert_ast_json_string(&ast, source))
+    // the thread's parked stores, the TypeScript half sized for the document when its slot is
+    // empty, as every free function's; `__private::parse` keeps growing fresh ones from empty,
+    // since the printer re-parses a whole document through it inside a format call, the
+    // bindings' warm ones included
+    ast::with_one_shot_stores(source.len(), |stores| {
+        let root = __private::parse_into(source, stores)?;
+        let ast = __private::parsed_ref(&root, stores);
+        #[cfg(feature = "locations")]
+        if options.locations {
+            return Ok(wire_string(
+                __private::convert_ast_json_bytes_with_locations(ast, source),
+            ));
+        }
+        #[cfg(not(feature = "locations"))]
+        let _ = options;
+        Ok(__private::convert_ast_json_string(ast, source))
+    })
 }
 
 /// Collect the import records of a Svelte component: its instance `<script>` and its
@@ -377,11 +401,16 @@ pub fn parse_to_json_with(source: &str, options: JsonOptions) -> Result<String> 
 /// # }
 /// ```
 ///
+/// Runs on this thread's parked stores, kept for the next call while they hold at most 1 MiB
+/// and released when the thread exits ([Memory](crate#memory)).
+///
 /// # Errors
 ///
 /// A parse error.
 pub fn parse_imports(source: &str) -> Result<Imports> {
-    __private::parse_imports_into(source, &mut SvelteStores::for_source(source.len()))
+    ast::with_one_shot_stores(source.len(), |stores| {
+        __private::parse_imports_into(source, stores)
+    })
 }
 
 /// The wire's bytes as the `String` they are: the writer emits source slices and ASCII

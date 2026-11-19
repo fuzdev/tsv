@@ -74,9 +74,9 @@ impl ProfileCommand {
 
         // One `DocArena` reused across every file and iteration with `reset()`
         // between them — the doc arena's lifecycle in `tsv_cli format`'s worker
-        // loop and the bindings' `tsv_arena` thread-local, so the format phase is
-        // product-shaped (arena growth amortizes across the corpus instead of
-        // recurring per call). Every parse is one-shot: fresh stores per call.
+        // loop and the bindings' per-thread slot (`tsv_lang::doc::arena::with_doc_arena`),
+        // so the format phase is product-shaped (arena growth amortizes across the corpus
+        // instead of recurring per call). Every parse is one-shot: fresh stores per call.
         let mut doc_arena = tsv_lang::doc::arena::DocArena::new();
 
         for path in &files {
