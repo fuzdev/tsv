@@ -5,7 +5,6 @@ use crate::ast::*;
 use crate::lexer::escapes::{LegacyEscape, find_legacy_escape};
 use crate::lexer::{KeywordKind, Lexer, LexerCheckpoint, Token, TokenKind, is_es_line_terminator};
 use crate::printer::ParenContext;
-use std::collections::BTreeSet;
 use std::ops::ControlFlow;
 use tsv_lang::store::{IdRet, ListMark, PoolText, push_row};
 use tsv_lang::{DepthBudget, DepthLimit, Error, Span, SpineCount};
@@ -713,7 +712,7 @@ pub(crate) struct Parser<'a> {
     /// and tsc's comparison reading parses (`Parser::type_arguments_follower_settled`).
     /// That entry says the same thing — the `<` is the operator in this context — and is
     /// a fact about the same tokens.
-    abandoned_type_argument_lists: BTreeSet<(u32, u8)>,
+    abandoned_type_argument_lists: Vec<(u32, u8)>,
     /// The `<` tokens whose type-argument list was read whole, followed by a token only
     /// tsc refuses, and KEPT because tsc's comparison reading does not parse
     /// (`Parser::type_arguments_follower_settled`), each with the context it was read in
@@ -722,7 +721,7 @@ pub(crate) struct Parser<'a> {
     /// same reason: the comparison reading is a parse of everything after the `<`, which
     /// holds any list nested there, so unremembered each answer would be asked once per
     /// reading of every list around it.
-    type_argument_lists_kept: BTreeSet<(u32, u8)>,
+    type_argument_lists_kept: Vec<(u32, u8)>,
     /// Whether a whole type-argument list followed by a token only tsc refuses is put to
     /// tsc's comparison reading at all (`Parser::parse_type_arguments_or_rewind`). Off only
     /// in the re-parse [`parse_retrying_acorn_followers`] runs where tsc rejects the text,
@@ -1109,8 +1108,8 @@ impl<'a> Parser<'a> {
             arrow_return_type_barred_at: None, // Not inside a conditional consequent
             lt_regions: LtRegions::default(),  // No `<` region open
             lt_regions_statement_base: LtRegions::default(), // The top level inherits none
-            abandoned_type_argument_lists: BTreeSet::new(), // No list tried yet
-            type_argument_lists_kept: BTreeSet::new(), // Nor kept past a follower
+            abandoned_type_argument_lists: Vec::new(), // No list tried yet
+            type_argument_lists_kept: Vec::new(), // Nor kept past a follower
             tsc_followers: true,               // tsc's reading, until a failure retries
             gave_up_list_to_tsc_follower: false, // Nothing given up yet
             kept_list_past_tsc_follower: false, // Nor kept
@@ -2694,7 +2693,8 @@ impl<'a> Parser<'a> {
         !self.abandoned_type_argument_lists.is_empty()
             && self
                 .abandoned_type_argument_lists
-                .contains(&(lt, self.type_arguments_context_key()))
+                .binary_search(&(lt, self.type_arguments_context_key()))
+                .is_ok()
     }
 
     /// The context a type-argument list is read in, as one key: every flag that the
@@ -2734,7 +2734,8 @@ impl<'a> Parser<'a> {
         !self.type_argument_lists_kept.is_empty()
             && self
                 .type_argument_lists_kept
-                .contains(&(lt, self.type_arguments_context_key()))
+                .binary_search(&(lt, self.type_arguments_context_key()))
+                .is_ok()
     }
 
     /// Record the verdict on the type-argument list at `lt` that a follower only tsc
@@ -2745,9 +2746,9 @@ impl<'a> Parser<'a> {
     pub(super) fn settle_type_arguments_follower(&mut self, lt: u32, abandoned: bool) {
         let key = (lt, self.type_arguments_context_key());
         if abandoned {
-            self.abandoned_type_argument_lists.insert(key);
+            insert_sorted(&mut self.abandoned_type_argument_lists, key);
         } else {
-            self.type_argument_lists_kept.insert(key);
+            insert_sorted(&mut self.type_argument_lists_kept, key);
         }
     }
 
@@ -2758,8 +2759,8 @@ impl<'a> Parser<'a> {
     /// list tries that `<` again, which a remembered answer does not.
     pub(super) fn abandon_type_arguments(&mut self, lt: u32, error: Error) {
         // the rewind has run: every context flag is back to what the list was tried in
-        self.abandoned_type_argument_lists
-            .insert((lt, self.type_arguments_context_key()));
+        let key = (lt, self.type_arguments_context_key());
+        insert_sorted(&mut self.abandoned_type_argument_lists, key);
         // (a positionless error orders below every position, so it never displaces one)
         let reaches_further = match &self.abandoned_type_arguments_error {
             Some(kept) => error.position() > kept.position(),
@@ -4410,4 +4411,21 @@ pub(crate) fn parse_typescript_preserve_parens(
         },
         |_, _| Ok(()),
     )
+}
+
+/// Insert `key` into the sorted, duplicate-free `set` — the parser's two type-argument verdict
+/// sets, a `BTreeSet` stand-in whose empty drop is inline: a parser is built per Svelte island,
+/// and nearly every one drops both sets empty.
+///
+/// Mostly an append: verdicts are recorded as the parse moves forward, so a key lands past
+/// every other. The exception is a key whose verdict waits on a reading of the tokens after
+/// its `<` — tsc's comparison reading, or a speculation rewound and re-read in another
+/// context — which records the lists inside that reading first, so the key is inserted in
+/// front of theirs. A key is moved once per such reading around it. A region re-read in
+/// another context would move a key once per key it records ahead of it, which is quadratic
+/// in the region's lists, but no reading found so far records keys that way.
+fn insert_sorted(set: &mut Vec<(u32, u8)>, key: (u32, u8)) {
+    if let Err(at) = set.binary_search(&key) {
+        set.insert(at, key);
+    }
 }
