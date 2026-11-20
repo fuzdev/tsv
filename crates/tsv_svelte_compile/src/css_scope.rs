@@ -40,12 +40,13 @@ use std::collections::HashSet;
 
 use tsv_css::ast::{
     AttributeMatcher, Combinator, ComplexSelector, CssAtrule, CssBlockChild, CssDeclaration,
-    CssNode, CssRule, PseudoClassArgs, RelativeSelector, SimpleSelector, attribute_value_text,
+    CssNode, CssRule, CssView, PseudoClassArgs, RelativeSelector, SimpleSelector,
+    attribute_value_text,
 };
 use tsv_lang::Span;
-use tsv_svelte::ast::{AttributeNode, AttributeValue, Element, SpecialElement, Style};
+use tsv_svelte::ast::{AttributeNode, AttributeValue, Element, SpecialElement, Style, SvelteView};
 use tsv_ts::ast::{
-    BinaryOperator, Expression, ExpressionKind, Literal, LiteralValue, ObjectProperty,
+    AstView, BinaryOperator, Expression, ExpressionKind, Literal, LiteralValue, ObjectProperty,
 };
 
 use crate::analyze::stringify_js_number;
@@ -236,14 +237,14 @@ impl CssScoping {
     }
 
     /// Whether `element` (a regular element) gained the hash class.
-    pub(crate) fn element_scoped(&self, element: &Element<'_>) -> bool {
+    pub(crate) fn element_scoped(&self, element: &Element) -> bool {
         self.span_scoped(element.span)
     }
 
     /// Whether `special` (a `<svelte:element>`) gained the hash class. The oracle
     /// scopes it whenever a type/universal selector reaches it (its type match is
     /// unconditional), synthesizing `class="svelte-…"` in its attributes closure.
-    pub(crate) fn special_element_scoped(&self, special: &SpecialElement<'_>) -> bool {
+    pub(crate) fn special_element_scoped(&self, special: &SpecialElement) -> bool {
         self.span_scoped(special.span)
     }
 
@@ -273,7 +274,8 @@ impl CssScoping {
 /// (built by the caller). In collect mode there is no census, so [`analyze_style`]
 /// only surfaces the parse-time refusals.
 pub(crate) fn analyze_style(
-    style: &Style<'_>,
+    style: &Style,
+    sv: SvelteView<'_>,
     source: &str,
     mut sink: Option<&mut Vec<Refusal>>,
 ) -> Result<ScopeInfo, CompileError> {
@@ -287,15 +289,26 @@ pub(crate) fn analyze_style(
     // keyframes prelude in phase 2 before the phase-3 value rewrite). The walk descends
     // everywhere — including into a keyframes block, where a nested keyframes still
     // collects (`css-analyze.js` calls `context.next()` unconditionally).
-    let keyframes = collect_keyframes(style.css_stylesheet.nodes, source);
+    let css = sv.css();
+    let nodes = css.nodes(style.css_stylesheet.nodes);
+    let keyframes = collect_keyframes(css, nodes, source);
     let content_end = style.content_span.end;
-    for node in style.css_stylesheet.nodes {
+    for node in nodes {
         match node {
             CssNode::Rule(rule) => {
-                analyze_rule(rule, source, &keyframes, content_end, &mut sink, &mut info)?;
+                analyze_rule(
+                    css,
+                    rule,
+                    source,
+                    &keyframes,
+                    content_end,
+                    &mut sink,
+                    &mut info,
+                )?;
             }
             CssNode::Atrule(atrule) => {
                 analyze_atrule(
+                    css,
                     atrule,
                     source,
                     &keyframes,
@@ -332,37 +345,53 @@ pub(crate) fn analyze_style(
 /// sits inside a rule — and a rule containing a nested at-rule refuses [`Refusal::CssNestedRule`]
 /// in [`analyze_rule`] before any name edit is emitted, so a name collected here is discarded
 /// on that over-refusal and never reaches output.
-fn collect_keyframes(nodes: &[CssNode<'_>], source: &str) -> Vec<String> {
+fn collect_keyframes(css: CssView<'_>, nodes: &[CssNode], source: &str) -> Vec<String> {
     let mut names = Vec::new();
     for node in nodes {
         match node {
             CssNode::Rule(rule) => {
-                collect_keyframes_children(rule.declarations, source, &mut names);
+                collect_keyframes_children(
+                    css,
+                    css.block_children(rule.declarations),
+                    source,
+                    &mut names,
+                );
             }
-            CssNode::Atrule(atrule) => collect_keyframes_atrule(atrule, source, &mut names),
+            CssNode::Atrule(atrule) => collect_keyframes_atrule(css, atrule, source, &mut names),
         }
     }
     names
 }
 
 fn collect_keyframes_children(
-    children: &[CssBlockChild<'_>],
+    css: CssView<'_>,
+    children: &[CssBlockChild],
     source: &str,
     names: &mut Vec<String>,
 ) {
     for child in children {
         match child {
             CssBlockChild::Rule(rule) => {
-                collect_keyframes_children(rule.declarations, source, names);
+                collect_keyframes_children(
+                    css,
+                    css.block_children(rule.declarations),
+                    source,
+                    names,
+                );
             }
-            CssBlockChild::Atrule(atrule) => collect_keyframes_atrule(atrule, source, names),
+            CssBlockChild::Atrule(atrule) => collect_keyframes_atrule(css, atrule, source, names),
             CssBlockChild::Declaration(_) | CssBlockChild::Comment(_) => {}
         }
     }
 }
 
-fn collect_keyframes_atrule(atrule: &CssAtrule<'_>, source: &str, names: &mut Vec<String>) {
-    if is_keyframes_atrule(atrule.name) {
+fn collect_keyframes_atrule(
+    css: CssView<'_>,
+    atrule: &CssAtrule,
+    source: &str,
+    names: &mut Vec<String>,
+) {
+    if is_keyframes_atrule(css.text(atrule.name)) {
         let prelude = atrule.public_prelude(source);
         if !prelude.starts_with("-global-") {
             names.push(prelude.into_owned());
@@ -371,7 +400,7 @@ fn collect_keyframes_atrule(atrule: &CssAtrule<'_>, source: &str, names: &mut Ve
     if let Some(block) = &atrule.block {
         // Descend regardless — the analysis walk enters even a keyframes block, so a nested
         // keyframes collects (it is never PREFIXED, since the transform returns early).
-        collect_keyframes_children(block.children, source, names);
+        collect_keyframes_children(css, css.block_children(block.children), source, names);
     }
 }
 
@@ -381,14 +410,16 @@ fn collect_keyframes_atrule(atrule: &CssAtrule<'_>, source: &str, names: &mut Ve
 /// like a top-level one. Preserves the sink's collect-vs-bail semantics via
 /// [`refuse`] (`None` bails at the first refusal; `Some` pushes and continues).
 fn analyze_rule(
-    rule: &CssRule<'_>,
+    css: CssView<'_>,
+    rule: &CssRule,
     source: &str,
     keyframes: &[String],
     content_end: u32,
     sink: &mut Option<&mut Vec<Refusal>>,
     info: &mut ScopeInfo,
 ) -> Result<(), CompileError> {
-    for child in rule.declarations {
+    let declarations = css.block_children(rule.declarations);
+    for child in declarations {
         if matches!(child, CssBlockChild::Rule(_) | CssBlockChild::Atrule(_)) {
             refuse(sink, Refusal::CssNestedRule)?;
             break;
@@ -396,8 +427,7 @@ fn analyze_rule(
     }
     // An empty rule (no declarations) is comment-wrapped `/* (empty) … */` by the
     // oracle in non-dev mode; tsv declines to reproduce the wrap and refuses.
-    if !rule
-        .declarations
+    if !declarations
         .iter()
         .any(|child| matches!(child, CssBlockChild::Declaration(_)))
     {
@@ -407,7 +437,7 @@ fn analyze_rule(
     // The oracle's `Declaration` visitor runs on every declaration the transform reaches
     // (`css/index.js:100`) — including inside a plain rule — rewriting `animation` /
     // `animation-name` values that reference a collected keyframes name.
-    for child in rule.declarations {
+    for child in declarations {
         if let CssBlockChild::Declaration(decl) = child {
             scan_animation_declaration(
                 decl,
@@ -418,8 +448,8 @@ fn analyze_rule(
             );
         }
     }
-    for complex in rule.selector.selectors {
-        match build_selector(complex, source, false) {
+    for complex in css.complex_selectors(rule.selector.selectors) {
+        match build_selector(css, complex, source, false) {
             Ok(selector) => info.selectors.push(selector),
             Err(reason) => refuse(sink, reason)?,
         }
@@ -448,7 +478,8 @@ fn analyze_rule(
 /// at-rule PRELUDE is never touched — `@scope (.a) to (.b) { .a {} }` scopes only the
 /// inner `.a`.
 fn analyze_atrule(
-    atrule: &CssAtrule<'_>,
+    css: CssView<'_>,
+    atrule: &CssAtrule,
     source: &str,
     keyframes: &[String],
     content_end: u32,
@@ -461,23 +492,23 @@ fn analyze_atrule(
     // name-prefix path runs regardless of block presence (`@keyframes foo;`, `block: None`).
     // The oracle's separate PRUNE walk still descends the block: collect its step selectors
     // (they scope elements without ever splicing the block).
-    if is_keyframes_atrule(atrule.name) {
+    if is_keyframes_atrule(css.text(atrule.name)) {
         info.keyframes_edits
-            .push(keyframes_name_edit(atrule, source));
-        analyze_keyframes_steps(atrule, source, sink, info)?;
+            .push(keyframes_name_edit(css, atrule, source));
+        analyze_keyframes_steps(css, atrule, source, sink, info)?;
         return Ok(());
     }
     // A statement at-rule (`block: None`) scopes nothing.
     let Some(block) = &atrule.block else {
         return Ok(());
     };
-    for child in block.children {
+    for child in css.block_children(block.children) {
         match child {
             CssBlockChild::Rule(rule) => {
-                analyze_rule(rule, source, keyframes, content_end, sink, info)?;
+                analyze_rule(css, rule, source, keyframes, content_end, sink, info)?;
             }
             CssBlockChild::Atrule(nested) => {
-                analyze_atrule(nested, source, keyframes, content_end, sink, info)?;
+                analyze_atrule(css, nested, source, keyframes, content_end, sink, info)?;
             }
             // A descriptor declaration (`@font-face`/`@page`) scopes no selector but is
             // still `animation`-scanned; a comment scopes nothing (emitted verbatim).
@@ -514,7 +545,8 @@ fn analyze_atrule(
 /// [`Refusal::CssNestedRule`] (safe over-refusal — the oracle's step preludes are simple
 /// compounds). Declaration/comment children of the block or of a step are ignored.
 fn analyze_keyframes_steps(
-    atrule: &CssAtrule<'_>,
+    css: CssView<'_>,
+    atrule: &CssAtrule,
     source: &str,
     sink: &mut Option<&mut Vec<Refusal>>,
     info: &mut ScopeInfo,
@@ -522,11 +554,11 @@ fn analyze_keyframes_steps(
     let Some(block) = &atrule.block else {
         return Ok(());
     };
-    for child in block.children {
+    for child in css.block_children(block.children) {
         match child {
             CssBlockChild::Rule(step) => {
                 // A nested rule/at-rule INSIDE a step rule refuses (corpus-absent).
-                for grandchild in step.declarations {
+                for grandchild in css.block_children(step.declarations) {
                     if matches!(
                         grandchild,
                         CssBlockChild::Rule(_) | CssBlockChild::Atrule(_)
@@ -535,8 +567,8 @@ fn analyze_keyframes_steps(
                         break;
                     }
                 }
-                for complex in step.selector.selectors {
-                    match build_selector(complex, source, true) {
+                for complex in css.complex_selectors(step.selector.selectors) {
+                    match build_selector(css, complex, source, true) {
                         Ok(selector) => info.step_selectors.push(selector),
                         Err(reason) => refuse(sink, reason)?,
                     }
@@ -567,8 +599,8 @@ fn analyze_keyframes_steps(
 /// which tsv never reaches: the enclosing rule holds a nested at-rule and refuses
 /// [`Refusal::CssNestedRule`] in [`analyze_rule`] before this edit is emitted (a safe
 /// over-refusal masking the dropped conjunct; the oracle instead compiles it un-prefixed).
-fn keyframes_name_edit(atrule: &CssAtrule<'_>, source: &str) -> Edit {
-    let mut start = atrule.span.start + 1 + atrule.name.len() as u32;
+fn keyframes_name_edit(css: CssView<'_>, atrule: &CssAtrule, source: &str) -> Edit {
+    let mut start = atrule.span.start + 1 + css.text(atrule.name).len() as u32;
     let bytes = source.as_bytes();
     while (start as usize) < bytes.len() && bytes[start as usize] == b' ' {
         start += 1;
@@ -596,7 +628,7 @@ fn keyframes_name_edit(atrule: &CssAtrule<'_>, source: &str) -> Edit {
 /// here: the only non-ASCII→ASCII single-char lower map is U+212A→`k`, and neither target
 /// string contains `k`; `İ` lowers to two code units and can never equal them.
 fn scan_animation_declaration(
-    decl: &CssDeclaration<'_>,
+    decl: &CssDeclaration,
     source: &str,
     keyframes: &[String],
     content_end: u32,
@@ -676,9 +708,11 @@ fn remove_css_prefix(name: &str) -> &str {
 /// emission reads. Runs the oracle's backward matcher per (ComplexSelector, census
 /// element); a dynamic-attribute or non-ASCII case-fold match, or a
 /// snippet-crossing combinator, refuses.
-pub(crate) fn match_scope(
+pub(crate) fn match_scope<'a>(
     info: ScopeInfo,
-    census: &ElementCensus<'_>,
+    census: &ElementCensus<'a>,
+    sv: SvelteView<'a>,
+    view: AstView<'_>,
     source: &str,
 ) -> Result<CssScoping, CompileError> {
     let mut scoped_elements: HashSet<(u32, u32)> = HashSet::new();
@@ -691,6 +725,8 @@ pub(crate) fn match_scope(
         if !selector.fully_global {
             for census_element in &census.elements {
                 if apply_selector(
+                    sv,
+                    view,
                     selector,
                     census_element.node,
                     &census_element.path,
@@ -724,6 +760,8 @@ pub(crate) fn match_scope(
         let mut scratch = vec![false; selector.relatives.len()];
         for census_element in &census.elements {
             apply_selector(
+                sv,
+                view,
                 selector,
                 census_element.node,
                 &census_element.path,
@@ -752,21 +790,23 @@ pub(crate) fn match_scope(
 /// simple selector is then skipped within its compound (the oracle's `css-prune.js:509`
 /// `continue`). Ordinary selectors pass `false`, so a top-level `50% {}` keeps refusing.
 fn build_selector(
-    complex: &ComplexSelector<'_>,
+    css: CssView<'_>,
+    complex: &ComplexSelector,
     source: &str,
     keyframe_step: bool,
 ) -> Result<ScopedSelector, Refusal> {
-    if complex.children.is_empty() {
+    let children = css.relative_selectors(complex.children);
+    if children.is_empty() {
         return Err(Refusal::CssUnsupportedSelector);
     }
     // A leading combinator on the first relative is invalid (the oracle errors it).
-    if complex.children[0].combinator.is_some() {
+    if children[0].combinator.is_some() {
         return Err(Refusal::CssCombinatorSelector);
     }
 
-    let mut relatives = Vec::with_capacity(complex.children.len());
-    for relative in complex.children {
-        relatives.push(classify_relative(relative, source, keyframe_step)?);
+    let mut relatives = Vec::with_capacity(children.len());
+    for relative in children {
+        relatives.push(classify_relative(css, relative, source, keyframe_step)?);
     }
 
     // `truncate` (css-prune.js:209-232): drop trailing global relatives from the
@@ -790,7 +830,8 @@ fn build_selector(
 /// is threaded to [`parse_plain_compound`] (skip `Percentage`/`Nth` within a keyframes
 /// step compound).
 fn classify_relative(
-    relative: &RelativeSelector<'_>,
+    css: CssView<'_>,
+    relative: &RelativeSelector,
     source: &str,
     keyframe_step: bool,
 ) -> Result<ScopedRelative, Refusal> {
@@ -798,7 +839,7 @@ fn classify_relative(
     if combinator == Some(Combinator::Column) {
         return Err(Refusal::CssCombinatorSelector);
     }
-    let simples = relative.selectors;
+    let simples = css.simple_selectors(relative.selectors);
     // An empty compound (consecutive combinators, `> > .a`) has no anchor.
     if simples.is_empty() {
         return Err(Refusal::CssCombinatorSelector);
@@ -813,7 +854,7 @@ fn classify_relative(
         } = &simples[0]
         && is_global_name(source, *span, *name_end)
     {
-        let inner = parse_global_args(args, source, keyframe_step)?;
+        let inner = parse_global_args(css, args, source, keyframe_step)?;
         return Ok(ScopedRelative {
             kind: RelKind::PureGlobal,
             predicates: inner,
@@ -855,7 +896,7 @@ fn classify_relative(
         return Err(Refusal::CssUnsupportedSelector);
     }
 
-    let (predicates, anchor) = parse_plain_compound(simples, source, keyframe_step)?;
+    let (predicates, anchor) = parse_plain_compound(css, simples, source, keyframe_step)?;
     Ok(ScopedRelative {
         kind: RelKind::Normal,
         predicates,
@@ -873,7 +914,8 @@ fn classify_relative(
 /// skipped selector contributes no predicate, so a compound of only these has an empty
 /// predicate list and matches ANY element (the oracle's fallthrough `return true`).
 fn parse_plain_compound(
-    simples: &[SimpleSelector<'_>],
+    css: CssView<'_>,
+    simples: &[SimpleSelector],
     source: &str,
     keyframe_step: bool,
 ) -> Result<(Vec<Predicate>, Splice), Refusal> {
@@ -921,8 +963,9 @@ fn parse_plain_compound(
                 refuse_if_escaped(name)?;
                 refuse_if_non_ascii(name)?;
                 let name_lower = name.to_ascii_lowercase();
-                let case_insensitive = flags_has(*flags, 'i')
-                    || (!flags_has(*flags, 's')
+                let flags = flags.map(|flags| css.text(flags));
+                let case_insensitive = flags_has(flags, 'i')
+                    || (!flags_has(flags, 's')
                         && HTML_CASE_INSENSITIVE_ATTRIBUTES.contains(&name_lower.as_str()));
                 let value = match value_span {
                     Some(s) => {
@@ -972,17 +1015,18 @@ fn parse_plain_compound(
 /// `keyframe_step` is threaded to [`parse_plain_compound`] for consistency (a `:global`
 /// inside a keyframes step is corpus-absent, but the machinery stays one mechanism).
 fn parse_global_args(
-    args: &PseudoClassArgs<'_>,
+    css: CssView<'_>,
+    args: &PseudoClassArgs,
     source: &str,
     keyframe_step: bool,
 ) -> Result<Vec<Predicate>, Refusal> {
     let PseudoClassArgs::SelectorList { selectors, .. } = args else {
         return Err(Refusal::CssUnsupportedSelector);
     };
-    let [complex] = selectors.selectors else {
+    let [complex] = css.complex_selectors(selectors.selectors) else {
         return Err(Refusal::CssUnsupportedSelector);
     };
-    let [relative] = complex.children else {
+    let [relative] = css.relative_selectors(complex.children) else {
         return Err(Refusal::CssUnsupportedSelector);
     };
     if relative.combinator.is_some() {
@@ -990,7 +1034,12 @@ fn parse_global_args(
     }
     // Reuse the plain-compound parser; the inner anchor is unused (the whole
     // `:global(...)` is stripped, not hash-spliced).
-    let (predicates, _anchor) = parse_plain_compound(relative.selectors, source, keyframe_step)?;
+    let (predicates, _anchor) = parse_plain_compound(
+        css,
+        css.simple_selectors(relative.selectors),
+        source,
+        keyframe_step,
+    )?;
     Ok(predicates)
 }
 
@@ -1038,7 +1087,7 @@ fn bare_global_strip(
 }
 
 /// Whether `simple` is a `:global` pseudo-class (any form).
-fn is_global_pseudo(simple: &SimpleSelector<'_>, source: &str) -> bool {
+fn is_global_pseudo(simple: &SimpleSelector, source: &str) -> bool {
     matches!(
         simple,
         SimpleSelector::PseudoClass { name_end, span, .. }
@@ -1048,7 +1097,7 @@ fn is_global_pseudo(simple: &SimpleSelector<'_>, source: &str) -> bool {
 
 /// Validate a simple selector that trails a bare `:global` in the same compound
 /// (`:global.x` → `.x` is fine; `:global:has(...)` is not).
-fn validate_bare_global_tail(simple: &SimpleSelector<'_>, source: &str) -> Result<(), Refusal> {
+fn validate_bare_global_tail(simple: &SimpleSelector, source: &str) -> Result<(), Refusal> {
     match simple {
         SimpleSelector::Universal {
             namespace_span: None,
@@ -1095,7 +1144,7 @@ fn validate_bare_global_tail(simple: &SimpleSelector<'_>, source: &str) -> Resul
 /// The splice anchor for a compound: after the LAST non-pseudo simple selector (the
 /// oracle's backward walk skipping trailing pseudo). A bare `*` **replaces** its
 /// span; every other anchor **appends**. `None` when pseudo-only (no anchor).
-fn compute_splice(simples: &[SimpleSelector<'_>]) -> Option<Splice> {
+fn compute_splice(simples: &[SimpleSelector]) -> Option<Splice> {
     for simple in simples.iter().rev() {
         match simple {
             SimpleSelector::PseudoClass { .. } | SimpleSelector::PseudoElement { .. } => continue,
@@ -1212,8 +1261,13 @@ fn refuse(sink: &mut Option<&mut Vec<Refusal>>, reason: Refusal) -> Result<(), C
 /// Whether `element` satisfies the whole chain `sel.relatives[from..to]`, matched
 /// BACKWARD from the rightmost relative (`css-prune.js:243-279`). Marks a matched
 /// relative scoped (unless global) and inserts every touched element's span.
-#[expect(clippy::too_many_arguments)]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "the oracle's matcher state plus the two views it reads through"
+)]
 fn apply_selector<'a>(
+    sv: SvelteView<'a>,
+    view: AstView<'_>,
     sel: &ScopedSelector,
     element: CensusNode<'a>,
     path: &[PathFrame<'a>],
@@ -1229,9 +1283,9 @@ fn apply_selector<'a>(
     }
     let idx = to - 1;
     let relative = &sel.relatives[idx];
-    let matched = relative_might_apply(relative, element, source)?
+    let matched = relative_might_apply(sv, view, relative, element, source)?
         && apply_combinator(
-            sel, relative, path, from, idx, census, source, scoped, rel_scoped,
+            sv, view, sel, relative, path, from, idx, census, source, scoped, rel_scoped,
         )?;
     if matched {
         if !relative.global {
@@ -1245,8 +1299,13 @@ fn apply_selector<'a>(
 
 /// Resolve the combinator to the left of `relative` (`css-prune.js:291-359`,
 /// BACKWARD only). A snippet-crossing walk refuses.
-#[expect(clippy::too_many_arguments)]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "the oracle's matcher state plus the two views it reads through"
+)]
 fn apply_combinator<'a>(
+    sv: SvelteView<'a>,
+    view: AstView<'_>,
     sel: &ScopedSelector,
     relative: &ScopedRelative,
     path: &[PathFrame<'a>],
@@ -1268,6 +1327,8 @@ fn apply_combinator<'a>(
             let mut parent_matched = false;
             for ancestor in &ancestors {
                 if apply_selector(
+                    sv,
+                    view,
                     sel,
                     ancestor.node,
                     &path[..ancestor.path_len],
@@ -1286,11 +1347,13 @@ fn apply_combinator<'a>(
         }
         Combinator::NextSibling | Combinator::SubsequentSibling => {
             let adjacent = combinator == Combinator::NextSibling;
-            let siblings = get_possible_element_siblings(census, path, adjacent, source)
+            let siblings = get_possible_element_siblings(sv, census, path, adjacent, source)
                 .map_err(|()| unsupported(Refusal::CssCombinatorSelector))?;
             let mut sibling_matched = false;
             for sibling in &siblings {
                 if apply_selector(
+                    sv,
+                    view,
                     sel,
                     sibling.node,
                     sibling.path.unwrap_or(&[]),
@@ -1320,9 +1383,11 @@ fn every_is_global(sel: &ScopedSelector, from: usize, to: usize) -> bool {
 
 /// The leaf test — `relative_selector_might_apply_to_node` restricted to this
 /// slice's compounds (`css-prune.js:436-675`).
-fn relative_might_apply(
+fn relative_might_apply<'a>(
+    sv: SvelteView<'a>,
+    view: AstView<'_>,
     relative: &ScopedRelative,
-    element: CensusNode<'_>,
+    element: CensusNode<'a>,
     source: &str,
 ) -> Result<bool, CompileError> {
     match relative.kind {
@@ -1332,7 +1397,7 @@ fn relative_might_apply(
         RelKind::Normal | RelKind::PureGlobal => {
             let element_name = element.name_span().extract(source);
             for predicate in &relative.predicates {
-                if !predicate_matches(predicate, element, element_name, source)? {
+                if !predicate_matches(sv, view, predicate, element, element_name, source)? {
                     return Ok(false);
                 }
             }
@@ -1343,9 +1408,11 @@ fn relative_might_apply(
 
 // ── Leaf predicate matching (the oracle's attribute_matches, unchanged) ────────
 
-fn predicate_matches(
+fn predicate_matches<'a>(
+    sv: SvelteView<'a>,
+    view: AstView<'_>,
     predicate: &Predicate,
-    element: CensusNode<'_>,
+    element: CensusNode<'a>,
     element_name: &str,
     source: &str,
 ) -> Result<bool, CompileError> {
@@ -1365,6 +1432,8 @@ fn predicate_matches(
             Ok(element_name.eq_ignore_ascii_case(name))
         }
         Predicate::Class(name) => attribute_matches(
+            sv,
+            view,
             element,
             "class",
             Some(name),
@@ -1374,6 +1443,8 @@ fn predicate_matches(
             source,
         ),
         Predicate::Id(name) => attribute_matches(
+            sv,
+            view,
             element,
             "id",
             Some(name),
@@ -1392,6 +1463,8 @@ fn predicate_matches(
                 return Ok(true);
             }
             attribute_matches(
+                sv,
+                view,
                 element,
                 name,
                 value.as_deref(),
@@ -1419,8 +1492,14 @@ fn is_attribute_whitelisted(element_name: &str, attr_name: &str) -> bool {
 /// `UNKNOWN` chunk (a plain identifier / member / call / template / …) assume-matches
 /// (`Ok(true)`); an un-stringifiable literal inside an otherwise-enumerable set
 /// refuses (`CssDynamicAttributeMatch`) rather than drop a value and under-match.
-fn attribute_matches(
-    element: CensusNode<'_>,
+#[expect(
+    clippy::too_many_arguments,
+    reason = "the oracle's `attribute_matches` parameters plus the two views it reads through"
+)]
+fn attribute_matches<'a>(
+    sv: SvelteView<'a>,
+    view: AstView<'_>,
+    element: CensusNode<'a>,
     name: &str,
     expected_value: Option<&str>,
     operator: Option<AttributeMatcher>,
@@ -1429,7 +1508,7 @@ fn attribute_matches(
     source: &str,
 ) -> Result<bool, CompileError> {
     let name_lower = name.to_ascii_lowercase();
-    for node in element.attributes() {
+    for node in element.attributes(sv) {
         match node {
             AttributeNode::SpreadAttribute(_) => return Ok(true),
             AttributeNode::BindDirective(bind) if bind.name_span.extract(source) == name => {
@@ -1453,7 +1532,7 @@ fn attribute_matches(
                 if !attr_name.eq_ignore_ascii_case(&name_lower) {
                     continue;
                 }
-                let Some(values) = attr.value else {
+                let Some(values) = sv.opt_attribute_values(attr.value) else {
                     return Ok(operator.is_none());
                 };
                 let Some(expected) = expected_value else {
@@ -1474,6 +1553,7 @@ fn attribute_matches(
                 // `true`; NO match falls through to the next attribute (the oracle has
                 // no `return false` here — unlike the text path above).
                 if attribute_chunks_match(
+                    view,
                     values,
                     &name_lower,
                     expected,
@@ -1498,7 +1578,8 @@ fn attribute_matches(
 /// computes every combination and none match (the oracle then falls through to the
 /// next attribute). An un-stringifiable literal in an enumerable set refuses.
 fn attribute_chunks_match(
-    chunks: &[AttributeValue<'_>],
+    view: AstView<'_>,
+    chunks: &[AttributeValue],
     name_lower: &str,
     expected: &str,
     operator: Option<AttributeMatcher>,
@@ -1510,7 +1591,7 @@ fn attribute_chunks_match(
     let mut prev_values: Vec<String> = Vec::new();
 
     for chunk in chunks {
-        let Some(current) = get_possible_values(chunk, is_class, source)? else {
+        let Some(current) = get_possible_values(view, chunk, is_class, source)? else {
             // impossible to find out all combinations
             return Ok(true);
         };
@@ -1602,7 +1683,8 @@ fn ends_with_js_whitespace(s: &str) -> bool {
 /// `null` (the set contained `UNKNOWN` → assume match). An un-stringifiable literal
 /// refuses.
 fn get_possible_values(
-    chunk: &AttributeValue<'_>,
+    view: AstView<'_>,
+    chunk: &AttributeValue,
     is_class: bool,
     source: &str,
 ) -> Result<Option<Vec<String>>, CompileError> {
@@ -1610,7 +1692,14 @@ fn get_possible_values(
         AttributeValue::Text(text) => Ok(Some(vec![text.data(source).into_owned()])),
         AttributeValue::ExpressionTag(tag) => {
             let mut set = GatherSet::default();
-            gather_possible_values(tag.expression, is_class, &mut set, false, source)?;
+            gather_possible_values(
+                view,
+                view.expr(tag.expression),
+                is_class,
+                &mut set,
+                false,
+                source,
+            )?;
             if set.unknown {
                 return Ok(None);
             }
@@ -1680,17 +1769,17 @@ struct GatherSet {
 /// paren-free — a `{#snippet}` head's `preserveParens` parse is kept for the wire alone,
 /// `Root::snippet_wire_parameters` — so no paren node reaches here.) A pure
 /// reference-follow, no allocation.
-fn strip_ts_wrappers<'a, 'arena>(mut node: &'a Expression<'arena>) -> &'a Expression<'arena> {
+fn strip_ts_wrappers<'a>(view: AstView<'a>, mut node: &'a Expression) -> &'a Expression {
     loop {
-        node = match &node.kind {
+        node = view.expr(match &node.kind {
             ExpressionKind::TSAsExpression(n) => n.expression,
             ExpressionKind::TSSatisfiesExpression(n) => n.expression,
             ExpressionKind::TSNonNullExpression(n) => n.expression,
             ExpressionKind::TSInstantiationExpression(n) => n.expression,
             ExpressionKind::TSTypeAssertion(n) => n.expression,
-            ExpressionKind::CommentBoundPair(cast) => cast.inner,
+            ExpressionKind::CommentBoundPair(cast) => view.comment_pair(*cast).inner,
             _ => return node,
-        };
+        });
     }
 }
 
@@ -1698,7 +1787,8 @@ fn strip_ts_wrappers<'a, 'arena>(mut node: &'a Expression<'arena>) -> &'a Expres
 /// value the expression can take to `set`, or marks it `UNKNOWN`. An un-stringifiable
 /// literal (BigInt / regex / non-integer number / escaped object key) refuses.
 fn gather_possible_values(
-    node: &Expression<'_>,
+    view: AstView<'_>,
+    node: &Expression,
     is_class: bool,
     set: &mut GatherSet,
     is_nested: bool,
@@ -1714,10 +1804,11 @@ fn gather_possible_values(
     // expression first (else a `TSAsExpression` falls to `else → UNKNOWN` and
     // over-matches). Stripping at entry also covers wrappers nested in the
     // conditional/logical/array/object sub-expressions this fn recurses into.
-    let node = strip_ts_wrappers(node);
+    let node = strip_ts_wrappers(view, node);
     match &node.kind {
         ExpressionKind::Literal(lit) => {
-            set.values.insert(literal_possible_value(lit, source)?);
+            set.values
+                .insert(literal_possible_value(view, lit, source)?);
         }
         // The oracle treats a regex as an enumerable `Literal` (`String(/x/)` =
         // `"/x/"`); tsv models it as a distinct node and cannot reproduce its
@@ -1727,8 +1818,22 @@ fn gather_possible_values(
             return Err(unsupported(Refusal::CssDynamicAttributeMatch));
         }
         ExpressionKind::ConditionalExpression(cond) => {
-            gather_possible_values(cond.consequent, is_class, set, is_nested, source)?;
-            gather_possible_values(cond.alternate, is_class, set, is_nested, source)?;
+            gather_possible_values(
+                view,
+                view.expr(cond.consequent),
+                is_class,
+                set,
+                is_nested,
+                source,
+            )?;
+            gather_possible_values(
+                view,
+                view.expr(cond.alternate),
+                is_class,
+                set,
+                is_nested,
+                source,
+            )?;
         }
         // Svelte's parser routes `&&` / `||` / `??` through `BinaryExpression`; the
         // oracle's `LogicalExpression` arm is exactly `operator.is_logical()`.
@@ -1736,7 +1841,14 @@ fn gather_possible_values(
             if bin.operator == BinaryOperator::AmpersandAmpersand {
                 // `&&` is special: the left value is only included when it is falsy.
                 let mut left = GatherSet::default();
-                gather_possible_values(bin.left, is_class, &mut left, is_nested, source)?;
+                gather_possible_values(
+                    view,
+                    view.expr(bin.left),
+                    is_class,
+                    &mut left,
+                    is_nested,
+                    source,
+                )?;
                 if left.unknown {
                     // Add the non-nullish falsy values, unless this is a `class`
                     // attribute processed by clsx inside an array/object.
@@ -1753,26 +1865,47 @@ fn gather_possible_values(
                         }
                     }
                 }
-                gather_possible_values(bin.right, is_class, set, is_nested, source)?;
+                gather_possible_values(
+                    view,
+                    view.expr(bin.right),
+                    is_class,
+                    set,
+                    is_nested,
+                    source,
+                )?;
             } else {
-                gather_possible_values(bin.left, is_class, set, is_nested, source)?;
-                gather_possible_values(bin.right, is_class, set, is_nested, source)?;
+                gather_possible_values(
+                    view,
+                    view.expr(bin.left),
+                    is_class,
+                    set,
+                    is_nested,
+                    source,
+                )?;
+                gather_possible_values(
+                    view,
+                    view.expr(bin.right),
+                    is_class,
+                    set,
+                    is_nested,
+                    source,
+                )?;
             }
         }
         ExpressionKind::ArrayExpression(arr) if is_class => {
             // `.flatten()` skips a hole (the oracle's `if (entry)`); a spread element
             // is a non-Literal node → the recursion marks it UNKNOWN via the else arm.
-            for entry in arr.elements.iter().flatten() {
-                gather_possible_values(entry, is_class, set, true, source)?;
+            for &entry in view.expr_opt_list(arr.elements).iter().flatten() {
+                gather_possible_values(view, view.expr(entry), is_class, set, true, source)?;
             }
         }
         ExpressionKind::ObjectExpression(obj) if is_class => {
-            for property in obj.properties {
+            for property in view.obj_props(obj.properties) {
                 if set.unknown {
                     break;
                 }
                 match property {
-                    ObjectProperty::Property(p) if !p.computed => match &p.key.kind {
+                    ObjectProperty::Property(p) if !p.computed => match &view.expr(p.key).kind {
                         ExpressionKind::Identifier(id) => match plain_identifier_str(id, source) {
                             Some(name) => {
                                 set.values.insert(PossibleValue::Str(name.to_string()));
@@ -1782,7 +1915,8 @@ fn gather_possible_values(
                             None => return Err(unsupported(Refusal::CssDynamicAttributeMatch)),
                         },
                         ExpressionKind::Literal(lit) => {
-                            set.values.insert(literal_possible_value(lit, source)?);
+                            set.values
+                                .insert(literal_possible_value(view, lit, source)?);
                         }
                         _ => set.unknown = true,
                     },
@@ -1798,14 +1932,17 @@ fn gather_possible_values(
 /// `String(node.value)` for a `Literal` — the value the oracle adds to the set. A
 /// BigInt (radix/source-format risk) and a non-integer / out-of-safe-range number
 /// refuse, mirroring `analyze`'s integer-only stringification discipline.
-fn literal_possible_value(lit: &Literal<'_>, source: &str) -> Result<PossibleValue, CompileError> {
+fn literal_possible_value(
+    view: AstView<'_>,
+    lit: &Literal,
+    source: &str,
+) -> Result<PossibleValue, CompileError> {
     let value = match &lit.value {
-        LiteralValue::String(s) => s.resolve(lit.span, source).to_string(),
+        LiteralValue::String(s) => s.resolve(lit.span, source, view).to_string(),
         LiteralValue::Boolean(b) => if *b { "true" } else { "false" }.to_string(),
         LiteralValue::Null => "null".to_string(),
-        LiteralValue::Number(n) => {
-            stringify_js_number(*n).ok_or_else(|| unsupported(Refusal::CssDynamicAttributeMatch))?
-        }
+        LiteralValue::Number(n) => stringify_js_number(n.get())
+            .ok_or_else(|| unsupported(Refusal::CssDynamicAttributeMatch))?,
         LiteralValue::BigInt => return Err(unsupported(Refusal::CssDynamicAttributeMatch)),
     };
     Ok(PossibleValue::Str(value))
@@ -1858,7 +1995,7 @@ struct Edit {
 /// after each scoped compound's anchor, global wrappers stripped, and specificity
 /// modifiers (`.svelte-tsvhash` first, `:where(.svelte-tsvhash)` after) applied
 /// per `ComplexSelector`.
-pub(crate) fn splice_scoped_css(style: &Style<'_>, source: &str, scope: &CssScoping) -> String {
+pub(crate) fn splice_scoped_css(style: &Style, source: &str, scope: &CssScoping) -> String {
     let mut edits: Vec<Edit> = Vec::new();
     for (selector, rel_scoped) in scope.info.selectors.iter().zip(&scope.relative_scoped) {
         // Specificity bump is per `ComplexSelector`, left-to-right: the first scoped

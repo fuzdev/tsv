@@ -25,9 +25,9 @@
 
 use tsv_svelte::ast::{
     Attribute, AttributeNode, AttributeValue, Fragment, FragmentNode, SpecialElement,
-    SpecialElementKind, StyleDirectiveValue,
+    SpecialElementKind, StyleDirectiveValue, SvelteView,
 };
-use tsv_ts::ast::Expression;
+use tsv_ts::ast::{ExprId, Expression};
 
 use crate::analyze::NameSet;
 use crate::attr_refs::{TemplateItem, each_child_fragment, each_template_item};
@@ -62,27 +62,30 @@ use crate::{CompileError, Refusal};
 /// - the **no-op drop family** (`class:`/`style:`/`use:`/`transition:`/`in:`/`out:`/
 ///   `animate:`/`{@attach}`): oracle-accepted, so guard-and-drop each expression
 ///   (SSR runs no client lifecycle, but a stray rune / top-level `await` refuses).
-pub(crate) fn guard_inert_special_element<'arena>(
-    env: &mut EmitEnv<'arena>,
-    se: &'arena SpecialElement<'arena>,
-    kind: &SpecialElementKind<'arena>,
+pub(crate) fn guard_inert_special_element(
+    env: &mut EmitEnv<'_>,
+    se: &SpecialElement,
+    kind: &SpecialElementKind,
     tag: &'static str,
 ) -> Result<(), CompileError> {
-    if !se.fragment.nodes.is_empty() {
+    let sv = env.sv;
+    if !sv.nodes(se.fragment.nodes).is_empty() {
         return Err(unsupported(Refusal::SpecialElementChildren {
             name: tag.to_string(),
         }));
     }
     // Exhaustive over `AttributeNode` so a new variant fails compilation here
     // rather than silently being dropped (or refused).
-    for attr in se.attributes {
+    for attr in sv.attributes(se.attributes) {
         match attr {
             AttributeNode::Attribute(a) => {
-                if is_event_attribute(a, env.source) {
+                if is_event_attribute(sv, a, env.source) {
                     // A modern event handler drops from SSR output, but its
                     // expression is still guarded (a misplaced rune / top-level
                     // `await` is an oracle analysis-phase error).
-                    if let Some([AttributeValue::ExpressionTag(t)]) = a.value {
+                    if let Some([AttributeValue::ExpressionTag(t)]) =
+                        sv.opt_attribute_values(a.value)
+                    {
                         guard_dropped(env, t.expression)?;
                     }
                 } else {
@@ -145,7 +148,7 @@ pub(crate) fn guard_inert_special_element<'arena>(
             AttributeNode::StyleDirective(d) => match &d.value {
                 StyleDirectiveValue::ExpressionTag(t) => guard_dropped(env, t.expression)?,
                 StyleDirectiveValue::Parts(parts) => {
-                    for v in *parts {
+                    for v in sv.attribute_values(*parts) {
                         if let AttributeValue::ExpressionTag(t) = v {
                             guard_dropped(env, t.expression)?;
                         }
@@ -162,9 +165,12 @@ pub(crate) fn guard_inert_special_element<'arena>(
 /// value is a single expression (`{expr}`) and whose RAW authored name starts with
 /// `on`. tsv always wraps an attribute value in an array, so the oracle's
 /// `is_expression_attribute` is exactly the single-`ExpressionTag` case here.
-fn is_event_attribute(attr: &Attribute<'_>, source: &str) -> bool {
+fn is_event_attribute(sv: SvelteView<'_>, attr: &Attribute, source: &str) -> bool {
     attr.name_span.extract(source).starts_with("on")
-        && matches!(attr.value, Some([AttributeValue::ExpressionTag(_)]))
+        && matches!(
+            sv.opt_attribute_values(attr.value),
+            Some([AttributeValue::ExpressionTag(_)])
+        )
 }
 
 /// Whether the `bind:<name>` NAME is valid on an SSR-inert special element — a
@@ -175,7 +181,7 @@ fn is_event_attribute(attr: &Attribute<'_>, source: &str) -> bool {
 /// `clientWidth`/`offsetWidth`/…) as a safe "not yet", never an over-acceptance.
 /// The bind's TARGET (its lvalue/reassignability) is validated separately by
 /// `attribute::validate_inert_bind_target`, which the caller runs next.
-fn inert_bind_is_valid(kind: &SpecialElementKind<'_>, name: &str) -> bool {
+fn inert_bind_is_valid(kind: &SpecialElementKind, name: &str) -> bool {
     if name == "this" || name == "focused" {
         return true;
     }
@@ -218,10 +224,13 @@ fn inert_bind_is_valid(kind: &SpecialElementKind<'_>, name: &str) -> bool {
 /// validity rule: the oracle happily accepts a derived read it never emits.
 /// Enforcing it in a dropped region would refuse `{#key d}` and
 /// `{:catch e}<p>{d}</p>`, which the oracle compiles.
-pub(crate) fn guard_dropped<'arena>(
-    env: &EmitEnv<'arena>,
-    expr: &'arena Expression<'arena>,
-) -> Result<(), CompileError> {
+pub(crate) fn guard_dropped(env: &EmitEnv<'_>, expr: ExprId) -> Result<(), CompileError> {
+    guard_dropped_row(env, env.b.view().expr(expr))
+}
+
+/// [`guard_dropped`] over a row held by value rather than named by id: a
+/// `{#snippet}` parameter, which no id names.
+fn guard_dropped_row(env: &EmitEnv<'_>, expr: &Expression) -> Result<(), CompileError> {
     let mut updated = NameSet::default();
     let mut nested = NameSet::default();
     // The component-wide reassignment/shadow collection is `needs_context`'s job
@@ -234,7 +243,7 @@ pub(crate) fn guard_dropped<'arena>(
     // `store_invalid_scoped_subscription`), so we pass the full shadow set.
     let mut ctx = WalkCtx::new(env.source, &mut updated, &mut nested, &no_derived)
         .allow_store_reads(&env.store_names, Some(&env.store_shadowed));
-    walk_expression_guarded(expr, &mut ctx)
+    walk_expression_guarded(env.b.view(), expr, &mut ctx)
 }
 
 /// The guard for a binding **pattern** the SSR output EMITS verbatim — the
@@ -255,14 +264,12 @@ pub(crate) fn guard_dropped<'arena>(
 ///   `let { v = d }` — a bare `d`. tsv *could* match by borrowing verbatim, but
 ///   keeps the rule ON as a **deferred safe over-refusal** (patterns are not
 ///   rewritten this slice; refusing is never a MISMATCH).
-pub(crate) fn guard_pattern<'arena>(
-    env: &EmitEnv<'arena>,
-    pattern: &'arena Expression<'arena>,
-) -> Result<(), CompileError> {
+pub(crate) fn guard_pattern(env: &EmitEnv<'_>, pattern: ExprId) -> Result<(), CompileError> {
     let mut updated = NameSet::default();
     let mut nested = NameSet::default();
     let mut ctx = WalkCtx::new(env.source, &mut updated, &mut nested, &env.derived_names);
-    walk_expression_guarded(pattern, &mut ctx)
+    let view = env.b.view();
+    walk_expression_guarded(view, view.expr(pattern), &mut ctx)
 }
 
 /// Guard a whole fragment the SSR output drops (the `{:catch}` branch) — the
@@ -282,13 +289,17 @@ pub(crate) fn guard_pattern<'arena>(
 /// the emitter does not visit, so without this walk a presence-read node reaches
 /// no guard at all. The test `dropped_fragment_refuses_presence_read_nodes` pins
 /// it, together with the set that must keep compiling beside it.
-pub(crate) fn guard_dropped_fragment<'arena>(
-    env: &EmitEnv<'arena>,
-    fragment: &'arena Fragment<'arena>,
+pub(crate) fn guard_dropped_fragment(
+    env: &EmitEnv<'_>,
+    fragment: &Fragment,
 ) -> Result<(), CompileError> {
-    guard_dropped_presence(fragment)?;
-    each_template_item(fragment, &mut |item| match item {
+    let sv = env.sv;
+    guard_dropped_presence(sv, fragment)?;
+    each_template_item(sv, env.b.view(), fragment, &mut |item| match item {
         TemplateItem::Expression(expr) => guard_dropped(env, expr),
+        // A snippet parameter's default is a dropped expression like any other
+        // (`{:catch}{#snippet s(x = $state(0))}…` refuses on the rune).
+        TemplateItem::Parameter(param) => guard_dropped_row(env, &param),
         // A `<T>` clause holds no value reference. TypeScript in a document with
         // no `lang="ts"` is refused up front by `refuse_template_typescript`.
         TemplateItem::SnippetTypeParameters => Ok(()),
@@ -311,15 +322,15 @@ pub(crate) fn guard_dropped_fragment<'arena>(
 ///
 /// Recursion rides [`each_child_fragment`], the shared structural seam, so a new
 /// child fragment on an existing node kind cannot hide a node from this walk.
-fn guard_dropped_presence(fragment: &Fragment<'_>) -> Result<(), CompileError> {
-    for node in fragment.nodes {
-        if let Some(reason) = dropped_presence_refusal(node) {
+fn guard_dropped_presence(sv: SvelteView<'_>, fragment: &Fragment) -> Result<(), CompileError> {
+    for node in sv.nodes(fragment.nodes) {
+        if let Some(reason) = dropped_presence_refusal(sv, node) {
             return Err(unsupported(reason));
         }
         let mut result = Ok(());
         each_child_fragment(node, &mut |child| {
             if result.is_ok() {
-                result = guard_dropped_presence(child);
+                result = guard_dropped_presence(sv, child);
             }
         });
         result?;
@@ -397,7 +408,7 @@ fn guard_dropped_presence(fragment: &Fragment<'_>) -> Result<(), CompileError> {
 /// Keeping `<svelte:boundary>` out of the refused set is deliberate and not
 /// merely a parity accounting choice: it is a first-class Svelte 5 feature and the
 /// next implementation target, so refusing it here would obstruct that work.
-fn dropped_presence_refusal(node: &FragmentNode<'_>) -> Option<Refusal> {
+fn dropped_presence_refusal(sv: SvelteView<'_>, node: &FragmentNode) -> Option<Refusal> {
     match node {
         FragmentNode::SpecialElement(special) => match &special.kind {
             SpecialElementKind::SlotElement => Some(Refusal::TemplateNode {
@@ -413,13 +424,15 @@ fn dropped_presence_refusal(node: &FragmentNode<'_>) -> Option<Refusal> {
             | SpecialElementKind::SvelteWindow
             | SpecialElementKind::SvelteBody
             | SpecialElementKind::SvelteDocument => {
-                dropped_presence_attribute_refusal(special.attributes)
+                dropped_presence_attribute_refusal(sv.attributes(special.attributes))
             }
         },
         // An element (regular or component) is itself inert, but its ATTRIBUTES are
         // not: a directive hangs off the attribute list rather than off the node
         // kind, so the presence walk has to reach into it.
-        FragmentNode::Element(element) => dropped_presence_attribute_refusal(element.attributes),
+        FragmentNode::Element(element) => {
+            dropped_presence_attribute_refusal(sv.attributes(element.attributes))
+        }
         // Every remaining node kind is inert in a dropped region: what the oracle
         // reads out of one is its *expressions* (references, runes, TypeScript),
         // which the sibling expression walks already cover. Listed rather than
@@ -468,7 +481,7 @@ fn dropped_presence_refusal(node: &FragmentNode<'_>) -> Option<Refusal> {
 /// out: the oracle's bind validations are all *local* to the binding (its target,
 /// its element), so a dropped one cannot invalidate an emitted sibling — and the
 /// expression walk beside this one already guards what it references.
-fn dropped_presence_attribute_refusal(attributes: &[AttributeNode<'_>]) -> Option<Refusal> {
+fn dropped_presence_attribute_refusal(attributes: &[AttributeNode]) -> Option<Refusal> {
     attributes.iter().find_map(|attribute| match attribute {
         AttributeNode::OnDirective(_) => Some(Refusal::RunesOnlyFence { directive: "on:" }),
         AttributeNode::LetDirective(_) => Some(Refusal::RunesOnlyFence { directive: "let:" }),

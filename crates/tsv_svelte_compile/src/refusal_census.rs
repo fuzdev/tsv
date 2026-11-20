@@ -76,9 +76,10 @@
 use std::borrow::Cow;
 use std::collections::HashSet;
 
-use tsv_svelte::ast::{Fragment, FragmentNode, Root};
-use tsv_ts::ast::Statement;
-use tsv_ts::ast::StatementKind;
+use tsv_lang::store::Run;
+use tsv_svelte::ast::{Fragment, FragmentNode, Root, SvelteView};
+use tsv_ts::__private::push_list;
+use tsv_ts::ast::{AstStores, AstView, StatementKind, StmtId};
 
 use crate::analyze::{Bindings, NameSet};
 use crate::attr_refs::each_child_fragment;
@@ -125,9 +126,12 @@ pub fn refusal_census(
         found.push(Refusal::DevMode);
     }
 
-    let arena = bumpalo::Bump::new();
-    let root = tsv_svelte::__private::parse(source, &arena)?;
-    collect(&root, source, &arena, &mut found);
+    let tsv_svelte::ast::ParsedRoot { root, mut stores } = tsv_svelte::__private::parse(source)?;
+    // The TypeScript half is held apart from the template view, as `compile` holds it:
+    // the reused erasure and script rewrite push rows into it while the template is read.
+    tsv_svelte::__private::with_ts_stores(&mut stores, |sv, ts| {
+        collect(&root, sv, ts, source, &mut found);
+    });
 
     Ok(dedup_by_bucket(found))
 }
@@ -245,10 +249,11 @@ pub fn refusal_census_buckets() -> Vec<Cow<'static, str>> {
 /// Ordering mirrors [`compile_server`](crate::transform_server) closely enough to
 /// reuse its guards on the same inputs — but every step catches its `Err` and
 /// keeps going, so one file yields its whole detectable blocker set.
-fn collect<'arena>(
-    root: &Root<'arena>,
+fn collect(
+    root: &Root,
+    sv: SvelteView<'_>,
+    ts: &mut AstStores,
     source: &str,
-    arena: &'arena bumpalo::Bump,
     found: &mut Vec<Refusal>,
 ) {
     // Structural top-level guards. These are field-presence facts, not rules with
@@ -260,14 +265,22 @@ fn collect<'arena>(
     // the same shared predicate `validate_module_exports` uses. The guard-based
     // module refusals (runes / store reads / top-level `await`) are disclaimed —
     // the corpus is module-rune-free, so they never fire in practice.
-    if let Some(module) = root.module
-        && module.content.body.iter().any(|stmt| match &stmt.kind {
-            StatementKind::ExportDefaultDeclaration(_) => true,
-            StatementKind::ExportNamedDeclaration(export) => {
-                crate::validate::export_named_has_default_specifier(export, source)
-            }
-            _ => false,
-        })
+    let view = ts.view();
+    if let Some(module) = &root.module
+        && view
+            .stmt_list(module.content.body)
+            .iter()
+            .any(|&stmt| match view.stmt(stmt).kind {
+                StatementKind::ExportDefaultDeclaration(_) => true,
+                StatementKind::ExportNamedDeclaration(export) => {
+                    crate::validate::export_named_has_default_specifier(
+                        view,
+                        view.export_named(export),
+                        source,
+                    )
+                }
+                _ => false,
+            })
     {
         found.push(Refusal::ModuleDefaultExport);
     }
@@ -277,7 +290,7 @@ fn collect<'arena>(
 
     // Document `lang="ts"` gate (reused verbatim). On refusal, treat the document
     // as non-TS for the rest of the pass (conservative).
-    let ts_document = match document_ts_flag(root, source) {
+    let ts_document = match document_ts_flag(root, sv, source) {
         Ok(flag) => flag,
         Err(err) => {
             push_unsupported(found, err);
@@ -288,27 +301,30 @@ fn collect<'arena>(
     // TypeScript erasure. Per-statement so every refuse-don't-erase site is
     // collected (a whole-body run bails on the first), and so the best-effort
     // erased body skips only the offending statement. `erase_statements` is
-    // reused unmodified — the census never rebuilds its output.
+    // reused unmodified — the census never rebuilds its output, and a refused
+    // statement's pushed rows and open frames are abandoned in the census's own
+    // stores (no frame is held across the call).
     //
     // Best-effort: an erase-FAILED statement is dropped from the body fed to the
     // downstream analyses (`analyze_script`/`analyze_component`/the script loop).
     // So on a file ALREADY carrying an erase refusal, a co-blocker those analyses
     // would have found in the dropped statement can shift — diagnostic-acceptable,
     // and such a file is already exposed by its erase refusal.
-    let mut erased = bumpalo::collections::Vec::new_in(arena);
+    let mut erased: Vec<StmtId> = Vec::new();
     let mut any_typescript = false;
-    if let Some(script) = root.instance {
-        for stmt in script.content.body {
-            match erase::erase_statements(arena, source, std::slice::from_ref(stmt)) {
+    if let Some(script) = &root.instance {
+        let body = script.content.body;
+        for i in 0..body.len() {
+            match erase::erase_statements(ts, source, body.sub_run(i..i + 1)) {
                 Ok(er) => {
                     any_typescript |= er.typescript;
-                    erased.extend_from_slice(er.body);
+                    erased.extend_from_slice(ts.view().stmt_list(er.body));
                 }
                 Err(err) => push_unsupported(found, err),
             }
         }
     }
-    let erased_body: &'arena [Statement<'arena>] = erased.into_bump_slice();
+    let erased_body: Run<StmtId> = push_list(ts, &erased);
     // The document-wide no-`lang="ts"` gate: the script half (any erased TS syntax
     // in a non-TS document) and the template half (reused verbatim, bails on the
     // first — one `TypeScriptWithoutLangTs` bucket per file regardless).
@@ -316,22 +332,24 @@ fn collect<'arena>(
         if any_typescript {
             found.push(Refusal::TypeScriptWithoutLangTs);
         }
-        if let Err(err) = refuse_template_typescript(root, source, arena) {
+        if let Err(err) = refuse_template_typescript(root, sv, ts, source) {
             push_unsupported(found, err);
         }
     }
 
     // CSS scoping — the one parameterized guard: the sink collects all four
     // selector/rule refusals instead of bailing on the first.
-    if let Some(style) = root.css {
+    if let Some(style) = &root.css {
         let mut css = Vec::new();
-        let _ = analyze_style(style, source, Some(&mut css));
+        let _ = analyze_style(style, sv, source, Some(&mut css));
         found.append(&mut css);
     }
 
     // Comment carry-through (reused verbatim). `has_comments` feeds the script
     // rewrite exactly as `compile_server` computes it.
-    let has_comments = match collect_script_comments(root, source, erased_body) {
+    // Nothing below pushes until the script rewrite builds its scratch builder.
+    let view = ts.view();
+    let has_comments = match collect_script_comments(root, sv, view, source, erased_body) {
         Ok(comments) => !comments.is_empty(),
         Err(err) => {
             push_unsupported(found, err);
@@ -342,7 +360,7 @@ fn collect<'arena>(
     // Binding table + derived names (reused verbatim; best-effort on refusal).
     let mut bindings = Bindings::empty();
     let mut derived_names = NameSet::default();
-    if let Err(err) = analyze_script(erased_body, source, &mut bindings, &mut derived_names) {
+    if let Err(err) = analyze_script(view, erased_body, source, &mut bindings, &mut derived_names) {
         push_unsupported(found, err);
     }
     // A module↔instance top-level binding-name collision (a real MISMATCH — see
@@ -356,10 +374,11 @@ fn collect<'arena>(
     // has no erased module body to read — it erases the instance script only. A
     // type-only declaration surviving here can at most over-report one co-blocker
     // in a diagnostic count; it can never reach output.
-    if let Some(module) = root.module {
+    if let Some(module) = &root.module {
         let mut module_bindings = Bindings::empty();
         let mut discard = NameSet::default();
         if analyze_script(
+            view,
             module.content.body,
             source,
             &mut module_bindings,
@@ -389,28 +408,44 @@ fn collect<'arena>(
     // The module body is not erased in the census (a diagnostic imprecision: a
     // module-triggered `needs_context` refusal isn't independently detected), so
     // `analyze_component` receives an empty module body here.
-    let constants = collect_constant_names(erased_body, &[], source);
-    let uses_slots =
-        match analyze_component(root, source, erased_body, &[], &store_names, &constants) {
-            Ok(ctx) => ctx.uses_slots,
-            Err(err) => {
-                push_unsupported(found, err);
-                false
-            }
-        };
+    let constants = collect_constant_names(view, erased_body, Run::EMPTY, source);
+    let uses_slots = match analyze_component(
+        root,
+        sv,
+        view,
+        source,
+        erased_body,
+        Run::EMPTY,
+        &store_names,
+        &constants,
+    ) {
+        Ok(ctx) => ctx.uses_slots,
+        Err(err) => {
+            push_unsupported(found, err);
+            false
+        }
+    };
 
     // Snippet hoist analysis (reused verbatim). Its two inputs mirror
     // `compile_server`: the instance binding names and the subset that are imports.
-    let import_names = import_local_names(erased_body, source);
+    let import_names = import_local_names(view, erased_body, source);
     let instance_binding_names: NameSet = bindings.names().map(str::to_string).collect();
-    if let Err(err) = analyze_snippets(root, source, &instance_binding_names, &import_names) {
+    if let Err(err) = analyze_snippets(
+        root,
+        sv,
+        view,
+        source,
+        &instance_binding_names,
+        &import_names,
+    ) {
         push_unsupported(found, err);
     }
 
     // Instance-script phase: exports, invalid imports, and the per-statement rune
     // rewrite/guard (reused verbatim), collected across statements. A scratch
-    // builder absorbs the rewrite's appendix minting; its output is discarded.
-    let mut b = Builder::new(arena, source);
+    // builder absorbs the rewrite's pushed rows and appendix minting; its output is
+    // discarded.
+    let mut b = Builder::new(ts, source);
     let mut updated = NameSet::default();
     let mut nested_declared = NameSet::default();
     let mut uses_props = false;
@@ -419,9 +454,11 @@ fn collect<'arena>(
     let mut bindable = Vec::new();
     let mut props_id = None;
     let mut generated_names = crate::destructure::GeneratedNames::new(&store_names);
-    for stmt in erased_body {
+    for i in 0..erased_body.len() {
+        let stmt = b.view().stmt_list(erased_body)[i];
+        let kind = b.view().stmt(stmt).kind;
         if matches!(
-            &stmt.kind,
+            kind,
             StatementKind::ExportNamedDeclaration(_)
                 | StatementKind::ExportDefaultDeclaration(_)
                 | StatementKind::ExportAllDeclaration(_)
@@ -431,8 +468,9 @@ fn collect<'arena>(
             found.push(Refusal::InstanceScriptExport);
             continue;
         }
-        if let StatementKind::ImportDeclaration(import) = &stmt.kind {
-            if let Err(err) = refuse_runes_invalid_import(import, source) {
+        if let StatementKind::ImportDeclaration(import) = kind {
+            let view = b.view();
+            if let Err(err) = refuse_runes_invalid_import(view, view.import_decl(import), source) {
                 push_unsupported(found, err);
             }
             continue;
@@ -464,19 +502,20 @@ fn collect<'arena>(
     // (`fragment_node_kind`), so the `TemplateNode` bucket matches
     // `fragment::clean_and_split`'s `other =>` arm exactly. A supported bare
     // `<svelte:head>` is excluded, as it is there.
-    collect_template_nodes(&root.fragment, found);
+    collect_template_nodes(sv, &root.fragment, found);
 }
 
 /// The import local names of an erased instance body — the subset of instance
 /// bindings that do not disqualify snippet hoisting. Mirrors `compile_server`.
-fn import_local_names(body: &[Statement<'_>], source: &str) -> NameSet {
+fn import_local_names(view: AstView<'_>, body: Run<StmtId>, source: &str) -> NameSet {
     use tsv_ts::ast::ImportSpecifier;
-    body.iter()
-        .filter_map(|stmt| match &stmt.kind {
-            StatementKind::ImportDeclaration(import) => Some(import),
+    view.stmt_list(body)
+        .iter()
+        .filter_map(|&stmt| match view.stmt(stmt).kind {
+            StatementKind::ImportDeclaration(import) => Some(view.import_decl(import)),
             _ => None,
         })
-        .flat_map(|import| import.specifiers)
+        .flat_map(|import| view.import_specs(import.specifiers))
         .filter_map(|spec| {
             let local = match spec {
                 ImportSpecifier::Default(s) => &s.local,
@@ -528,8 +567,8 @@ fn import_local_names(body: &[Statement<'_>], source: &str) -> NameSet {
 /// deliberate FENCE, a fenced-population count taken from this census would be a
 /// FLOOR; the corpus runner's `fenced` instead reads each file's real first
 /// refusal. See `compile_corpus_compare`'s TARGET SET section.)
-fn collect_template_nodes(fragment: &Fragment<'_>, found: &mut Vec<Refusal>) {
-    for node in fragment.nodes {
+fn collect_template_nodes(sv: SvelteView<'_>, fragment: &Fragment, found: &mut Vec<Refusal>) {
+    for node in sv.nodes(fragment.nodes) {
         // A special element's refused-or-handled verdict AND its per-variant bucket
         // key both come from the shared `special_element_refusal_kind` mapping, so
         // this detection can never drift from the emitter's actual refusal set.
@@ -543,7 +582,7 @@ fn collect_template_nodes(fragment: &Fragment<'_>, found: &mut Vec<Refusal>) {
         if let Some(kind) = refused_kind {
             found.push(Refusal::TemplateNode { kind });
         }
-        each_child_fragment(node, &mut |child| collect_template_nodes(child, found));
+        each_child_fragment(node, &mut |child| collect_template_nodes(sv, child, found));
     }
 }
 

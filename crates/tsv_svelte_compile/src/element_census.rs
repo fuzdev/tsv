@@ -58,7 +58,7 @@ use std::collections::HashMap;
 use tsv_lang::Span;
 use tsv_svelte::ast::{
     AttributeNode, EachBlock, Element, ElementKind, Fragment, FragmentNode, Root, SpecialElement,
-    SpecialElementKind,
+    SpecialElementKind, SvelteView,
 };
 
 /// One scoping candidate plus the ancestor chain that gives it upward navigability
@@ -78,9 +78,9 @@ pub(crate) struct CensusElement<'a> {
 #[derive(Clone, Copy)]
 pub(crate) enum CensusNode<'a> {
     /// A regular HTML element. A type selector matches it by tag name.
-    Regular(&'a Element<'a>),
+    Regular(&'a Element),
     /// A `<svelte:element>` (dynamic tag).
-    Dynamic(&'a SpecialElement<'a>),
+    Dynamic(&'a SpecialElement),
 }
 
 impl<'a> CensusNode<'a> {
@@ -95,11 +95,11 @@ impl<'a> CensusNode<'a> {
 
     /// The element's attributes — the id/class/attribute selectors route through
     /// `attribute_matches`, which iterates this list.
-    pub(crate) fn attributes(self) -> &'a [AttributeNode<'a>] {
-        match self {
+    pub(crate) fn attributes(self, sv: SvelteView<'a>) -> &'a [AttributeNode] {
+        sv.attributes(match self {
             CensusNode::Regular(e) => e.attributes,
             CensusNode::Dynamic(s) => s.attributes,
-        }
+        })
     }
 
     /// The tag-name span: a regular element's real tag (for a type-selector compare),
@@ -128,10 +128,10 @@ impl<'a> CensusNode<'a> {
 /// reads the index directly instead of an `indexOf`.
 #[derive(Clone, Copy)]
 pub(crate) struct PathFrame<'a> {
-    /// The sibling node list at this level (the arena slice, not a borrow of the
-    /// owning `Fragment` — the root fragment is stored by value on a local `Root`,
-    /// so only its `'a` `nodes` slice can flow into the census).
-    nodes: &'a [FragmentNode<'a>],
+    /// The sibling node list at this level, read through the template view (whose
+    /// slices outlive the `Fragment` that names them — the root fragment is stored
+    /// by value on the `Root`).
+    nodes: &'a [FragmentNode],
     index: usize,
     owner: Owner<'a>,
 }
@@ -172,7 +172,7 @@ enum Owner<'a> {
     /// `is_body` distinguishes the each **body** (the each-self-adjacency wrap-around
     /// applies) from the fallback.
     Each {
-        block: &'a EachBlock<'a>,
+        block: &'a EachBlock,
         is_body: bool,
     },
     Await,
@@ -202,10 +202,16 @@ impl<'a> ElementCensus<'a> {
 }
 
 /// Build the census by one top-down walk over the component fragment.
-pub(crate) fn build_census<'a>(root: &Root<'a>) -> ElementCensus<'a> {
+pub(crate) fn build_census<'a>(root: &Root, sv: SvelteView<'a>) -> ElementCensus<'a> {
     let mut elements = Vec::new();
     let mut path = Vec::new();
-    walk_fragment(root.fragment.nodes, Owner::Root, &mut path, &mut elements);
+    walk_fragment(
+        sv,
+        sv.nodes(root.fragment.nodes),
+        Owner::Root,
+        &mut path,
+        &mut elements,
+    );
     let by_span = elements
         .iter()
         .enumerate()
@@ -218,7 +224,8 @@ pub(crate) fn build_census<'a>(root: &Root<'a>) -> ElementCensus<'a> {
 /// SSR-reachable sub-fragment. `owner` owns `fragment`; `path` is the frame stack
 /// for `fragment`'s owner (its ancestors), extended in place per child.
 fn walk_fragment<'a>(
-    nodes: &'a [FragmentNode<'a>],
+    sv: SvelteView<'a>,
+    nodes: &'a [FragmentNode],
     owner: Owner<'a>,
     path: &mut Vec<PathFrame<'a>>,
     elements: &mut Vec<CensusElement<'a>>,
@@ -233,29 +240,48 @@ fn walk_fragment<'a>(
             FragmentNode::Element(element) => {
                 path.push(frame);
                 if element.kind == ElementKind::Component {
-                    walk_fragment(element.fragment.nodes, Owner::Component, path, elements);
+                    walk_fragment(
+                        sv,
+                        sv.nodes(element.fragment.nodes),
+                        Owner::Component,
+                        path,
+                        elements,
+                    );
                 } else {
                     let node = CensusNode::Regular(element);
                     elements.push(CensusElement {
                         node,
                         path: path.clone(),
                     });
-                    walk_fragment(element.fragment.nodes, Owner::Element(node), path, elements);
+                    walk_fragment(
+                        sv,
+                        sv.nodes(element.fragment.nodes),
+                        Owner::Element(node),
+                        path,
+                        elements,
+                    );
                 }
                 path.pop();
             }
             FragmentNode::IfBlock(block) => {
                 path.push(frame);
-                walk_fragment(block.consequent.nodes, Owner::If, path, elements);
+                walk_fragment(
+                    sv,
+                    sv.nodes(block.consequent.nodes),
+                    Owner::If,
+                    path,
+                    elements,
+                );
                 if let Some(alternate) = &block.alternate {
-                    walk_fragment(alternate.nodes, Owner::If, path, elements);
+                    walk_fragment(sv, sv.nodes(alternate.nodes), Owner::If, path, elements);
                 }
                 path.pop();
             }
             FragmentNode::EachBlock(block) => {
                 path.push(frame);
                 walk_fragment(
-                    block.body.nodes,
+                    sv,
+                    sv.nodes(block.body.nodes),
                     Owner::Each {
                         block,
                         is_body: true,
@@ -265,7 +291,8 @@ fn walk_fragment<'a>(
                 );
                 if let Some(fallback) = &block.fallback {
                     walk_fragment(
-                        fallback.nodes,
+                        sv,
+                        sv.nodes(fallback.nodes),
                         Owner::Each {
                             block,
                             is_body: false,
@@ -293,24 +320,36 @@ fn walk_fragment<'a>(
                 // is a span lookup at emission, so an element the census marks but
                 // emission never reaches contributes nothing to the output.
                 if let Some(pending) = &block.pending {
-                    walk_fragment(pending.nodes, Owner::Await, path, elements);
+                    walk_fragment(sv, sv.nodes(pending.nodes), Owner::Await, path, elements);
                 }
                 if let Some(then) = &block.then {
-                    walk_fragment(then.nodes, Owner::Await, path, elements);
+                    walk_fragment(sv, sv.nodes(then.nodes), Owner::Await, path, elements);
                 }
                 if let Some(catch) = &block.catch {
-                    walk_fragment(catch.nodes, Owner::Await, path, elements);
+                    walk_fragment(sv, sv.nodes(catch.nodes), Owner::Await, path, elements);
                 }
                 path.pop();
             }
             FragmentNode::KeyBlock(block) => {
                 path.push(frame);
-                walk_fragment(block.fragment.nodes, Owner::Key, path, elements);
+                walk_fragment(
+                    sv,
+                    sv.nodes(block.fragment.nodes),
+                    Owner::Key,
+                    path,
+                    elements,
+                );
                 path.pop();
             }
             FragmentNode::SnippetBlock(block) => {
                 path.push(frame);
-                walk_fragment(block.body.nodes, Owner::Snippet, path, elements);
+                walk_fragment(
+                    sv,
+                    sv.nodes(block.body.nodes),
+                    Owner::Snippet,
+                    path,
+                    elements,
+                );
                 path.pop();
             }
             // ⚠️ Exhaustive on purpose, no catch-all — this match decides DESCENT,
@@ -336,7 +375,13 @@ fn walk_fragment<'a>(
                         node,
                         path: path.clone(),
                     });
-                    walk_fragment(special.fragment.nodes, Owner::Element(node), path, elements);
+                    walk_fragment(
+                        sv,
+                        sv.nodes(special.fragment.nodes),
+                        Owner::Element(node),
+                        path,
+                        elements,
+                    );
                     path.pop();
                 }
                 // A `<svelte:boundary>` is descended UNCONDITIONALLY — including the
@@ -348,12 +393,24 @@ fn walk_fragment<'a>(
                 // emission, so a marked-but-unemitted element contributes nothing.
                 SpecialElementKind::SvelteBoundary => {
                     path.push(frame);
-                    walk_fragment(special.fragment.nodes, Owner::Boundary, path, elements);
+                    walk_fragment(
+                        sv,
+                        sv.nodes(special.fragment.nodes),
+                        Owner::Boundary,
+                        path,
+                        elements,
+                    );
                     path.pop();
                 }
                 SpecialElementKind::SvelteHead => {
                     path.push(frame);
-                    walk_fragment(special.fragment.nodes, Owner::Head, path, elements);
+                    walk_fragment(
+                        sv,
+                        sv.nodes(special.fragment.nodes),
+                        Owner::Head,
+                        path,
+                        elements,
+                    );
                     path.pop();
                 }
                 // Not descended, each for its own reason. The legacy slot system
@@ -386,7 +443,7 @@ fn walk_fragment<'a>(
     }
 }
 
-fn is_svelte_element(special: &SpecialElement<'_>) -> bool {
+fn is_svelte_element(special: &SpecialElement) -> bool {
     matches!(special.kind, SpecialElementKind::SvelteElement { .. })
 }
 
@@ -461,6 +518,7 @@ pub(crate) struct SiblingRef<'a, 'c> {
 /// `{#each}` self-adjacency wrap-around. Returns `Err(())` on a `{#snippet}`
 /// crossing.
 pub(crate) fn get_possible_element_siblings<'a, 'c>(
+    sv: SvelteView<'a>,
     census: &'c ElementCensus<'a>,
     path: &[PathFrame<'a>],
     adjacent_only: bool,
@@ -474,7 +532,7 @@ pub(crate) fn get_possible_element_siblings<'a, 'c>(
         let mut j = frame.index;
         while j > 0 {
             j -= 1;
-            if scan_sibling(&nodes[j], adjacent_only, source, &mut result)? {
+            if scan_sibling(sv, &nodes[j], adjacent_only, source, &mut result)? {
                 return Ok(finish(census, result));
             }
         }
@@ -487,7 +545,7 @@ pub(crate) fn get_possible_element_siblings<'a, 'c>(
                     // sibling of `<a />` (the wrap-around). Add the each body's own
                     // possible last children.
                     let mut wrap = Vec::new();
-                    possible_nested_siblings_each(block, adjacent_only, source, &mut wrap)?;
+                    possible_nested_siblings_each(sv, block, adjacent_only, source, &mut wrap)?;
                     add_all(&mut result, &wrap);
                 }
             }
@@ -516,7 +574,8 @@ fn finish<'a, 'c>(
 /// Classify one scanned sibling node, adding possible elements to `result`.
 /// Returns `Ok(true)` to stop the whole walk (an `adjacent_only` definite hit).
 fn scan_sibling<'a>(
-    sib: &'a FragmentNode<'a>,
+    sv: SvelteView<'a>,
+    sib: &'a FragmentNode,
     adjacent_only: bool,
     source: &str,
     result: &mut Vec<(CensusNode<'a>, Existence)>,
@@ -524,7 +583,7 @@ fn scan_sibling<'a>(
     match sib {
         FragmentNode::Element(element) if element.kind != ElementKind::Component => {
             // A slotted element (`slot="…"`) is placed elsewhere, not a flow sibling.
-            if !has_slot_attribute(element, source) {
+            if !has_slot_attribute(sv, element, source) {
                 add_one(result, CensusNode::Regular(element), Existence::Definitely);
                 if adjacent_only {
                     return Ok(true);
@@ -543,7 +602,7 @@ fn scan_sibling<'a>(
         | FragmentNode::AwaitBlock(_)
         | FragmentNode::KeyBlock(_) => {
             let mut nested = Vec::new();
-            possible_nested_siblings(sib, adjacent_only, source, &mut nested)?;
+            possible_nested_siblings(sv, sib, adjacent_only, source, &mut nested)?;
             let has_definite = nested.iter().any(|&(_, e)| e == Existence::Definitely);
             add_all(result, &nested);
             if adjacent_only && has_definite {
@@ -562,22 +621,25 @@ fn scan_sibling<'a>(
 /// The possible last children of a block reached as a sibling (the oracle's
 /// `get_possible_nested_siblings` for `IfBlock`/`EachBlock`/`AwaitBlock`/`KeyBlock`).
 fn possible_nested_siblings<'a>(
-    node: &'a FragmentNode<'a>,
+    sv: SvelteView<'a>,
+    node: &'a FragmentNode,
     adjacent_only: bool,
     source: &str,
     out: &mut Vec<(CensusNode<'a>, Existence)>,
 ) -> Result<(), ()> {
     match node {
         FragmentNode::IfBlock(block) => nested_over_fragments(
+            sv,
             &[Some(&block.consequent), block.alternate.as_ref()],
             adjacent_only,
             source,
             out,
         ),
         FragmentNode::EachBlock(block) => {
-            possible_nested_siblings_each(block, adjacent_only, source, out)
+            possible_nested_siblings_each(sv, block, adjacent_only, source, out)
         }
         FragmentNode::AwaitBlock(block) => nested_over_fragments(
+            sv,
             &[
                 block.pending.as_ref(),
                 block.then.as_ref(),
@@ -588,19 +650,21 @@ fn possible_nested_siblings<'a>(
             out,
         ),
         FragmentNode::KeyBlock(block) => {
-            nested_over_fragments(&[Some(&block.fragment)], adjacent_only, source, out)
+            nested_over_fragments(sv, &[Some(&block.fragment)], adjacent_only, source, out)
         }
         _ => Ok(()),
     }
 }
 
 fn possible_nested_siblings_each<'a>(
-    block: &'a EachBlock<'a>,
+    sv: SvelteView<'a>,
+    block: &'a EachBlock,
     adjacent_only: bool,
     source: &str,
     out: &mut Vec<(CensusNode<'a>, Existence)>,
 ) -> Result<(), ()> {
     nested_over_fragments(
+        sv,
         &[Some(&block.body), block.fallback.as_ref()],
         adjacent_only,
         source,
@@ -612,7 +676,8 @@ fn possible_nested_siblings_each<'a>(
 /// then demote every result to `Probably` unless every present branch yielded a
 /// definite element (the oracle's `exhaustive` flag).
 fn nested_over_fragments<'a>(
-    fragments: &[Option<&'a Fragment<'a>>],
+    sv: SvelteView<'a>,
+    fragments: &[Option<&'a Fragment>],
     adjacent_only: bool,
     source: &str,
     out: &mut Vec<(CensusNode<'a>, Existence)>,
@@ -624,7 +689,13 @@ fn nested_over_fragments<'a>(
             None => exhaustive = false,
             Some(fragment) => {
                 let mut map = Vec::new();
-                loop_child(fragment.nodes, adjacent_only, source, &mut map)?;
+                loop_child(
+                    sv,
+                    sv.nodes(fragment.nodes),
+                    adjacent_only,
+                    source,
+                    &mut map,
+                )?;
                 exhaustive &= map.iter().any(|&(_, e)| e == Existence::Definitely);
                 add_all(&mut result, &map);
             }
@@ -642,7 +713,8 @@ fn nested_over_fragments<'a>(
 /// The oracle's `loop_child`: walk a fragment's children from the end (BACKWARD),
 /// collecting possible last elements, descending nested blocks.
 fn loop_child<'a>(
-    children: &'a [FragmentNode<'a>],
+    sv: SvelteView<'a>,
+    children: &'a [FragmentNode],
     adjacent_only: bool,
     source: &str,
     result: &mut Vec<(CensusNode<'a>, Existence)>,
@@ -667,7 +739,7 @@ fn loop_child<'a>(
             | FragmentNode::AwaitBlock(_)
             | FragmentNode::KeyBlock(_) => {
                 let mut nested = Vec::new();
-                possible_nested_siblings(child, adjacent_only, source, &mut nested)?;
+                possible_nested_siblings(sv, child, adjacent_only, source, &mut nested)?;
                 let has_definite = nested.iter().any(|&(_, e)| e == Existence::Definitely);
                 add_all(result, &nested);
                 if adjacent_only && has_definite {
@@ -715,8 +787,8 @@ fn add_all<'a>(
 /// (`server/visitors/shared/component.js:50`). The oracle is itself split, so each
 /// predicate faithfully mirrors its own site; deduplicating the three into one
 /// would silently break CSS-prune parity.
-fn has_slot_attribute(element: &Element<'_>, source: &str) -> bool {
-    element.attributes.iter().any(|attr| {
+fn has_slot_attribute(sv: SvelteView<'_>, element: &Element, source: &str) -> bool {
+    sv.attributes(element.attributes).iter().any(|attr| {
         matches!(attr, AttributeNode::Attribute(a) if a.name_span.extract(source).eq_ignore_ascii_case("slot"))
     })
 }

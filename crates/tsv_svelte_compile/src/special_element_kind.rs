@@ -72,7 +72,7 @@ macro_rules! special_element_kind_table {
         /// compilation here, forcing a conscious emitted-or-refused choice in one
         /// place.
         pub(crate) fn special_element_refusal_kind(
-            kind: &SpecialElementKind<'_>,
+            kind: &SpecialElementKind,
         ) -> Option<&'static str> {
             match kind {
                 $( $handled => None, )+

@@ -59,6 +59,11 @@
 //!   (`let id = b.view().expr_list(run)[i];`) or copies the ids out first
 //!   (`.to_vec()`), and a lazy rebuild follows the frame rules of `tsv_ts::__private`'s
 //!   write surface (`open` / `extend_from_run` / `flush`, last in first out).
+//! - **An `Err` may leave frames open.** A writer that fails mid-rebuild abandons its
+//!   frames; they sit below every later frame and are never flushed. A caller that
+//!   catches an `Err` from a pushing call and goes on (the census's per-statement
+//!   loops, parity's fallback) holds no frame of its own across that call and never
+//!   flushes a mark taken before it.
 //! - **A reader takes the view first** (`AstView`) and a row by reference
 //!   (`view.expr(id)`), returning owned data or ids, never a reference it keeps.
 //! - **Template and CSS nodes** are read through the template view (`SvelteView`,

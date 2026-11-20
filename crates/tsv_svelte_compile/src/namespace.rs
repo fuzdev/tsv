@@ -102,7 +102,7 @@ pub(crate) fn element_is_mathml(name: &str) -> bool {
 /// once per level of block nesting, and the membership `match`es behind the two predicates would
 /// spill into that frame.
 #[inline(never)]
-fn element_flags(env: &EmitEnv<'_>, el: &Element<'_>, inherited: Namespace) -> (bool, bool) {
+fn element_flags(env: &EmitEnv<'_>, el: &Element, inherited: Namespace) -> (bool, bool) {
     let name = el.name(env.source);
     (element_is_svg(name, inherited), element_is_mathml(name))
 }
@@ -139,7 +139,7 @@ pub(crate) fn infer_namespace(
     env: &EmitEnv<'_>,
     inherited: Namespace,
     parent: FragmentParent,
-    nodes: &[FragmentNode<'_>],
+    nodes: &[FragmentNode],
 ) -> Namespace {
     match parent {
         FragmentParent::DynamicElement => inherited,
@@ -185,7 +185,7 @@ enum NsAccum {
 /// RegularElement ancestor (blocks don't count).
 fn check_nodes_for_namespace(
     env: &EmitEnv<'_>,
-    nodes: &[FragmentNode<'_>],
+    nodes: &[FragmentNode],
     acc: &mut NsAccum,
     inherited: Namespace,
 ) -> bool {
@@ -200,7 +200,7 @@ fn check_nodes_for_namespace(
 /// One node of the deep walk. See [`check_nodes_for_namespace`]. `true` = stop.
 fn check_node(
     env: &EmitEnv<'_>,
-    node: &FragmentNode<'_>,
+    node: &FragmentNode,
     acc: &mut NsAccum,
     inherited: Namespace,
 ) -> bool {
@@ -239,14 +239,14 @@ fn check_node(
         }
         FragmentNode::IfBlock(b) => check_if_block(env, b, acc, inherited),
         FragmentNode::EachBlock(b) => {
-            check_nodes_for_namespace(env, b.body.nodes, acc, inherited)
-                || b.fallback
-                    .as_ref()
-                    .is_some_and(|f| check_nodes_for_namespace(env, f.nodes, acc, inherited))
+            check_nodes_for_namespace(env, env.sv.nodes(b.body.nodes), acc, inherited)
+                || b.fallback.as_ref().is_some_and(|f| {
+                    check_nodes_for_namespace(env, env.sv.nodes(f.nodes), acc, inherited)
+                })
         }
         FragmentNode::AwaitBlock(b) => check_await_block(env, b, acc, inherited),
         FragmentNode::KeyBlock(b) => {
-            check_nodes_for_namespace(env, b.fragment.nodes, acc, inherited)
+            check_nodes_for_namespace(env, env.sv.nodes(b.fragment.nodes), acc, inherited)
         }
         // ExpressionTag / HtmlTag / ConstTag / Comment / RenderTag / SnippetBlock /
         // DebugTag / DeclarationTag: not descended (no elements to find).
@@ -256,17 +256,12 @@ fn check_node(
 
 /// The `{#if}` else-if chain is `alternate` fragments nesting further `IfBlock`s,
 /// so descending consequent + alternate recursively covers every branch.
-fn check_if_block(
-    env: &EmitEnv<'_>,
-    b: &IfBlock<'_>,
-    acc: &mut NsAccum,
-    inherited: Namespace,
-) -> bool {
-    if check_nodes_for_namespace(env, b.consequent.nodes, acc, inherited) {
+fn check_if_block(env: &EmitEnv<'_>, b: &IfBlock, acc: &mut NsAccum, inherited: Namespace) -> bool {
+    if check_nodes_for_namespace(env, env.sv.nodes(b.consequent.nodes), acc, inherited) {
         return true;
     }
     if let Some(alt) = &b.alternate
-        && check_nodes_for_namespace(env, alt.nodes, acc, inherited)
+        && check_nodes_for_namespace(env, env.sv.nodes(alt.nodes), acc, inherited)
     {
         return true;
     }
@@ -277,12 +272,12 @@ fn check_if_block(
 /// zimmerframe walk visits all three, even though SSR later drops `{:catch}`.
 fn check_await_block(
     env: &EmitEnv<'_>,
-    b: &AwaitBlock<'_>,
+    b: &AwaitBlock,
     acc: &mut NsAccum,
     inherited: Namespace,
 ) -> bool {
     for f in [&b.pending, &b.then, &b.catch].into_iter().flatten() {
-        if check_nodes_for_namespace(env, f.nodes, acc, inherited) {
+        if check_nodes_for_namespace(env, env.sv.nodes(f.nodes), acc, inherited) {
             return true;
         }
     }
@@ -295,7 +290,7 @@ fn check_await_block(
 /// the inherited namespace.
 fn shallow_child_namespace(
     env: &EmitEnv<'_>,
-    nodes: &[FragmentNode<'_>],
+    nodes: &[FragmentNode],
     inherited: Namespace,
 ) -> Namespace {
     let mut new_ns: Option<Namespace> = None;

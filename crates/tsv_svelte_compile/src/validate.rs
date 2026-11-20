@@ -52,13 +52,14 @@ use crate::script_decls::{
 use crate::snippet::SnippetAnalysis;
 use crate::text_class::js_trim;
 use crate::transform_server::unsupported;
+use tsv_lang::store::Run;
 use tsv_svelte::ast::{
     Attribute, AttributeNode, AttributeValue, EachBlock, ElementKind, Fragment, FragmentNode, Root,
-    SpecialElementKind,
+    SpecialElementKind, SvelteView,
 };
 use tsv_ts::ast::{
-    ExportNamedDeclaration, Expression, ExpressionKind, LiteralValue, ModuleExportName, Statement,
-    StatementKind,
+    AstView, ExportNamedDeclaration, ExprId, Expression, ExpressionKind, LiteralValue,
+    ModuleExportName, StatementKind, StmtId,
 };
 
 /// The oracle's `each_key_without_as` (`EachBlock.js:26-34`): an `{#each}` with a
@@ -72,16 +73,20 @@ use tsv_ts::ast::{
 /// over-refusal** (the direction is opposite to the module-default check's — here
 /// a missed decode over-refuses rather than under-refuses), so no name decode is
 /// threaded through this walk.
-fn refuse_each_key_without_as(each: &EachBlock<'_>, source: &str) -> Result<(), CompileError> {
+fn refuse_each_key_without_as(
+    view: AstView<'_>,
+    each: &EachBlock,
+    source: &str,
+) -> Result<(), CompileError> {
     let Some(key) = &each.key else {
         return Ok(());
     };
     if each.context.is_some() {
         return Ok(());
     }
-    let keyed = match &key.expression.kind {
+    let keyed = match &view.expr(key.expression).kind {
         ExpressionKind::Identifier(id) => match (each.index, plain_identifier_name(id, source)) {
-            (Some(index), Some(name)) => index != name,
+            (Some(index), Some(name)) => index.extract(source) != name,
             // No index, or an escaped key name this port can't compare — keyed.
             _ => true,
         },
@@ -96,8 +101,15 @@ fn refuse_each_key_without_as(each: &EachBlock<'_>, source: &str) -> Result<(), 
 /// Run every emission-independent validation rule over the whole document.
 ///
 /// Errors with the first refusal found, in document order.
-pub(crate) fn validate_document(root: &Root<'_>, source: &str) -> Result<(), CompileError> {
+pub(crate) fn validate_document(
+    root: &Root,
+    sv: SvelteView<'_>,
+    view: AstView<'_>,
+    source: &str,
+) -> Result<(), CompileError> {
     let mut validator = Validator {
+        sv,
+        view,
         source,
         path: Vec::new(),
         slot_path: Vec::new(),
@@ -164,52 +176,57 @@ enum SlotAncestor {
 }
 
 struct Validator<'s> {
+    sv: SvelteView<'s>,
+    view: AstView<'s>,
     source: &'s str,
     path: Vec<PathEntry<'s>>,
     slot_path: Vec<SlotAncestor>,
 }
 
 impl<'s> Validator<'s> {
-    fn walk_fragment(&mut self, fragment: &Fragment<'_>) -> Result<(), CompileError> {
-        refuse_duplicate_snippet_names(fragment, self.source)?;
-        for node in fragment.nodes {
+    fn walk_fragment(&mut self, fragment: &Fragment) -> Result<(), CompileError> {
+        refuse_duplicate_snippet_names(self.sv, self.view, fragment, self.source)?;
+        for node in self.sv.nodes(fragment.nodes) {
             self.walk_node(node)?;
         }
         Ok(())
     }
 
-    fn walk_node(&mut self, node: &FragmentNode<'_>) -> Result<(), CompileError> {
+    fn walk_node(&mut self, node: &FragmentNode) -> Result<(), CompileError> {
+        let sv = self.sv;
         match node {
             FragmentNode::Element(element) => {
+                let attributes = sv.attributes(element.attributes);
                 let name = element.name_span.extract(self.source);
                 // No `svelte_meta_invalid_tag` check here: the oracle raises it at PARSE
                 // (`phases/1-parse/state/element.js:142`) and so does tsv's parser, which
                 // rejects a `svelte:`-prefixed name that is not a known meta tag. A regular
                 // element can no longer carry the prefix, so there is nothing left to refuse.
-                refuse_duplicate_attributes(element.attributes, self.source)?;
+                refuse_duplicate_attributes(attributes, self.source)?;
                 match element.kind {
                     ElementKind::Html => {
-                        self.validate_element(element.attributes)?;
+                        self.validate_element(attributes)?;
                         self.refuse_invalid_element_placement(name)?;
                     }
-                    ElementKind::Component => self.validate_component(element.attributes)?,
+                    ElementKind::Component => self.validate_component(attributes)?,
                 }
             }
             FragmentNode::SpecialElement(special) => {
+                let attributes = sv.attributes(special.attributes);
                 match special.kind {
                     SpecialElementKind::SvelteElement { .. } => {
-                        self.validate_element(special.attributes)?;
+                        self.validate_element(attributes)?;
                     }
                     // `visit_component`'s other two callers. `<svelte:component>`
                     // and `<svelte:self>` are deliberate fences, so this arm is
                     // unreachable today — written out rather than folded into the
                     // catch-all so it stays correct if either is ever un-fenced.
                     SpecialElementKind::SvelteComponent { .. } | SpecialElementKind::SvelteSelf => {
-                        self.validate_component(special.attributes)?;
+                        self.validate_component(attributes)?;
                     }
                     _ => {}
                 }
-                refuse_duplicate_attributes(special.attributes, self.source)?;
+                refuse_duplicate_attributes(attributes, self.source)?;
             }
             // The oracle's `Text` visitor checks only whitespace-BEARING text, and
             // only when its parent is a `Fragment`. That second guard is automatic
@@ -226,7 +243,9 @@ impl<'s> Validator<'s> {
             // An `{expression}` is checked with no whitespace test — the oracle
             // cannot know what it renders to, so it assumes text.
             FragmentNode::ExpressionTag(_) => self.refuse_invalid_text_placement()?,
-            FragmentNode::EachBlock(each) => refuse_each_key_without_as(each, self.source)?,
+            FragmentNode::EachBlock(each) => {
+                refuse_each_key_without_as(self.view, each, self.source)?;
+            }
             _ => {}
         }
 
@@ -234,7 +253,7 @@ impl<'s> Validator<'s> {
         // from the parent side because the oracle's `path.at(-2)` — the parent of
         // the snippet's containing `Fragment` — is exactly "the node whose own
         // fragment holds this snippet". See [`refuse_component_snippet_rules`].
-        refuse_component_snippet_rules(node, self.source)?;
+        refuse_component_snippet_rules(sv, self.view, node, self.source)?;
 
         let entry = match node {
             FragmentNode::Element(element) => match element.kind {
@@ -276,7 +295,7 @@ impl<'s> Validator<'s> {
         //   - AFTER this node's own checks ran, so the stack holds ancestors ONLY.
         //     That is the oracle's shape: a custom element carrying `slot` is not
         //     its own owner. Moving this above the match silently accepts that case.
-        self.slot_path.push(slot_ancestor(node, self.source));
+        self.slot_path.push(slot_ancestor(sv, node, self.source));
 
         let mut result = Ok(());
         each_child_fragment(node, &mut |child| {
@@ -309,7 +328,7 @@ impl<'s> Validator<'s> {
     /// from both) and the unquoted-sequence rule (`validate_attribute` is called
     /// from both callers — [`refuse_unquoted_attribute_sequence`]). See
     /// [`Self::validate_component`] for the half that does not correspond.
-    fn validate_element(&self, attributes: &[AttributeNode<'_>]) -> Result<(), CompileError> {
+    fn validate_element(&self, attributes: &[AttributeNode]) -> Result<(), CompileError> {
         for attribute in attributes {
             let AttributeNode::Attribute(a) = attribute else {
                 continue;
@@ -321,12 +340,12 @@ impl<'s> Validator<'s> {
             // sequence, never the name — the oracle aborts on the first attribute's
             // first error, so a whole-list pre-pass for any single rule would
             // reorder multi-error elements.
-            refuse_unquoted_attribute_sequence(a, self.source)?;
-            if let Some(expression) = expression_attribute_value(a) {
-                refuse_unparenthesized_sequence(expression, self.source)?;
+            refuse_unquoted_attribute_sequence(self.sv, a, self.source)?;
+            if let Some(expression) = expression_attribute_value(self.sv, a) {
+                refuse_unparenthesized_sequence(self.view.expr(expression), self.source)?;
             }
             refuse_invalid_attribute_name(a, self.source)?;
-            refuse_invalid_event_handler(a, self.source)?;
+            refuse_invalid_event_handler(self.sv, a, self.source)?;
             // Case-**sensitive** (`== "slot"`), mirroring this analyze-phase element
             // rule's oracle site. ⚠️ NOT the census's case-INSENSITIVE test — see
             // `element_census.rs::has_slot_attribute`, whose oracle (`css-prune.js`)
@@ -350,7 +369,7 @@ impl<'s> Validator<'s> {
     /// to an `{@attach}` expression (`:115`), which the element half does not — so
     /// `<span {@attach a, b} />` compiles and `<Foo {@attach a, b} />` does not.
     /// Both directions live-probed; collapsing the two sites breaks one of them.
-    fn validate_component(&self, attributes: &[AttributeNode<'_>]) -> Result<(), CompileError> {
+    fn validate_component(&self, attributes: &[AttributeNode]) -> Result<(), CompileError> {
         for attribute in attributes {
             match attribute {
                 AttributeNode::Attribute(a) => {
@@ -358,13 +377,16 @@ impl<'s> Validator<'s> {
                     // unquoted-sequence rule — the ONE rule this path shares
                     // with `validate_element` besides the sequence scan) runs
                     // before the sequence check (`shared/component.js:93-100`).
-                    refuse_unquoted_attribute_sequence(a, self.source)?;
-                    if let Some(expression) = expression_attribute_value(a) {
-                        refuse_unparenthesized_sequence(expression, self.source)?;
+                    refuse_unquoted_attribute_sequence(self.sv, a, self.source)?;
+                    if let Some(expression) = expression_attribute_value(self.sv, a) {
+                        refuse_unparenthesized_sequence(self.view.expr(expression), self.source)?;
                     }
                 }
                 AttributeNode::AttachTag(attach) => {
-                    refuse_unparenthesized_sequence(attach.expression, self.source)?;
+                    refuse_unparenthesized_sequence(
+                        self.view.expr(attach.expression),
+                        self.source,
+                    )?;
                 }
                 _ => {}
             }
@@ -520,15 +542,17 @@ impl<'s> Validator<'s> {
 /// A snippet whose name this port cannot read (an escaped identifier) is skipped;
 /// `SnippetEscapedName` refuses such a component downstream anyway.
 fn refuse_duplicate_snippet_names(
-    fragment: &Fragment<'_>,
+    sv: SvelteView<'_>,
+    view: AstView<'_>,
+    fragment: &Fragment,
     source: &str,
 ) -> Result<(), CompileError> {
     let mut seen: Vec<&str> = Vec::new();
-    for node in fragment.nodes {
+    for node in sv.nodes(fragment.nodes) {
         let FragmentNode::SnippetBlock(snippet) = node else {
             continue;
         };
-        let Some(name) = crate::snippet::snippet_name(snippet, source) else {
+        let Some(name) = crate::snippet::snippet_name(view, snippet, source) else {
             continue;
         };
         if seen.contains(&name) {
@@ -560,7 +584,9 @@ fn refuse_duplicate_snippet_names(
 /// ([`validate_top_level_snippets`]): that one requires `is_top_level`, i.e. no
 /// `path.at(-2)` at all.
 fn refuse_component_snippet_rules(
-    node: &FragmentNode<'_>,
+    sv: SvelteView<'_>,
+    view: AstView<'_>,
+    node: &FragmentNode,
     source: &str,
 ) -> Result<(), CompileError> {
     // `Component` proper, and the two special elements the conflict rule adds.
@@ -579,11 +605,13 @@ fn refuse_component_snippet_rules(
         _ => return Ok(()),
     };
 
-    for child in fragment.nodes {
+    let attributes = sv.attributes(attributes);
+    let nodes = sv.nodes(fragment.nodes);
+    for child in nodes {
         let FragmentNode::SnippetBlock(snippet) = child else {
             continue;
         };
-        let Some(name) = crate::snippet::snippet_name(snippet, source) else {
+        let Some(name) = crate::snippet::snippet_name(view, snippet, source) else {
             continue;
         };
 
@@ -609,7 +637,7 @@ fn refuse_component_snippet_rules(
         }
         // ⚠️ The oracle scans ALL of the parent's fragment nodes, not just the
         // ones preceding the snippet.
-        if fragment.nodes.iter().any(|sibling| match sibling {
+        if nodes.iter().any(|sibling| match sibling {
             FragmentNode::SnippetBlock(_) | FragmentNode::Comment(_) => false,
             FragmentNode::Text(text) => !js_trim(&text.data(source)).is_empty(),
             _ => true,
@@ -643,16 +671,18 @@ fn refuse_component_snippet_rules(
 /// Runs after the binding table rather than inside [`validate_document`]'s walk
 /// because `analysis.instance.scope.declarations` is its input.
 pub(crate) fn validate_top_level_snippets(
-    root: &Root<'_>,
+    root: &Root,
+    sv: SvelteView<'_>,
+    view: AstView<'_>,
     source: &str,
     instance_binding_names: &NameSet,
     import_names: &NameSet,
 ) -> Result<(), CompileError> {
-    for node in root.fragment.nodes {
+    for node in sv.nodes(root.fragment.nodes) {
         let FragmentNode::SnippetBlock(snippet) = node else {
             continue;
         };
-        let Some(name) = crate::snippet::snippet_name(snippet, source) else {
+        let Some(name) = crate::snippet::snippet_name(view, snippet, source) else {
             continue;
         };
         if instance_binding_names.contains(name) && !import_names.contains(name) {
@@ -684,7 +714,8 @@ pub(crate) fn validate_top_level_snippets(
 /// this port cannot read (an escaped identifier) — the module scope would be
 /// under-populated and the check would refuse a valid export.
 pub(crate) fn validate_module_exports(
-    module_body: &[Statement<'_>],
+    view: AstView<'_>,
+    module_body: Run<StmtId>,
     source: &str,
     snippets: &SnippetAnalysis,
 ) -> Result<(), CompileError> {
@@ -693,26 +724,27 @@ pub(crate) fn validate_module_exports(
     // early-return below and regardless of `export.source` — because the oracle
     // gates neither on the module scope being readable nor on a re-export's
     // `node.source`, unlike the snippet-export check that follows.
-    for stmt in module_body {
-        if let StatementKind::ExportNamedDeclaration(export) = &stmt.kind
-            && export_named_has_default_specifier(export, source)
+    for &stmt in view.stmt_list(module_body) {
+        if let StatementKind::ExportNamedDeclaration(export) = view.stmt(stmt).kind
+            && export_named_has_default_specifier(view, view.export_named(export), source)
         {
             return Err(unsupported(Refusal::ModuleDefaultExport));
         }
     }
 
-    let Some(module_declared) = collect_module_declared(module_body, source) else {
+    let Some(module_declared) = collect_module_declared(view, module_body, source) else {
         return Ok(());
     };
 
-    for stmt in module_body {
-        let StatementKind::ExportNamedDeclaration(export) = &stmt.kind else {
+    for &stmt in view.stmt_list(module_body) {
+        let StatementKind::ExportNamedDeclaration(export) = view.stmt(stmt).kind else {
             continue;
         };
+        let export = view.export_named(export);
         if export.source.is_some() {
             continue;
         }
-        for specifier in export.specifiers {
+        for specifier in view.export_specs(export.specifiers) {
             // The oracle's `specifier.local.type !== 'Identifier'` skip — a string
             // local is only reachable in a re-export, which already `continue`d.
             let ModuleExportName::Identifier(local) = &specifier.local else {
@@ -740,13 +772,13 @@ pub(crate) fn validate_module_exports(
 /// its `ExportNamedDeclaration` visitor. Shared by [`validate_module_exports`] (the
 /// compile path) and the sole-blocker census, so the rule lives once.
 pub(crate) fn export_named_has_default_specifier(
-    export: &ExportNamedDeclaration<'_>,
+    view: AstView<'_>,
+    export: &ExportNamedDeclaration,
     source: &str,
 ) -> bool {
-    export
-        .specifiers
+    view.export_specs(export.specifiers)
         .iter()
-        .any(|specifier| module_export_name_is_default(&specifier.exported, source))
+        .any(|specifier| module_export_name_is_default(view, &specifier.exported, source))
 }
 
 /// The oracle's `specifier.exported.type === 'Identifier' ? .name === 'default'
@@ -756,11 +788,11 @@ pub(crate) fn export_named_has_default_specifier(
 /// escaped alias `default` is caught) and the string via
 /// [`StringCooked::resolve`](tsv_ts::ast::StringCooked::resolve) — so
 /// the comparison matches the oracle's post-decode `.name`/`.value` on every form.
-fn module_export_name_is_default(name: &ModuleExportName<'_>, source: &str) -> bool {
+fn module_export_name_is_default(view: AstView<'_>, name: &ModuleExportName, source: &str) -> bool {
     match name {
-        ModuleExportName::Identifier(id) => id.name(source) == "default",
+        ModuleExportName::Identifier(id) => id.name(source, view) == "default",
         ModuleExportName::Literal(lit) => match &lit.value {
-            LiteralValue::String(cooked) => cooked.resolve(lit.span, source) == "default",
+            LiteralValue::String(cooked) => cooked.resolve(lit.span, source, view) == "default",
             _ => false,
         },
     }
@@ -772,15 +804,21 @@ fn module_export_name_is_default(name: &ModuleExportName<'_>, source: &str) -> b
 /// Rides [`each_script_declaration`], the crate's single answer to "what does this
 /// script declare", with `WithHoistedVars` because a `var` in a nested block is
 /// function-scoped and so reaches module scope exactly like a top-level one.
-fn collect_module_declared(module_body: &[Statement<'_>], source: &str) -> Option<NameSet> {
+fn collect_module_declared(
+    view: AstView<'_>,
+    module_body: Run<StmtId>,
+    source: &str,
+) -> Option<NameSet> {
     let mut declared = NameSet::default();
     let mut opaque = false;
     let result: Result<(), CompileError> =
-        each_script_declaration(module_body, VarScope::WithHoistedVars, &mut |decl| {
+        each_script_declaration(view, module_body, VarScope::WithHoistedVars, &mut |decl| {
             match decl {
                 ScriptDeclaration::Declarator { declarator, .. } => {
                     let mut names = Vec::new();
-                    if pattern_binding_names(declarator.id, source, &mut names).is_err() {
+                    if pattern_binding_names(view, view.expr(declarator.id), source, &mut names)
+                        .is_err()
+                    {
                         opaque = true;
                     } else {
                         declared.extend(names);
@@ -789,7 +827,7 @@ fn collect_module_declared(module_body: &[Statement<'_>], source: &str) -> Optio
                 ScriptDeclaration::Function(id)
                 | ScriptDeclaration::Class(id)
                 | ScriptDeclaration::Import { local: id, .. } => {
-                    match plain_identifier_name(id, source) {
+                    match plain_identifier_name(&id, source) {
                         Some(name) => {
                             declared.insert(name);
                         }
@@ -844,13 +882,13 @@ fn is_not_html_whitespace(c: char) -> bool {
 /// `SpecialElementKind` and `FragmentNode` carry many variants that are all
 /// genuinely transparent, and listing them would drift on every new one for no
 /// behavioral gain.
-fn slot_ancestor(node: &FragmentNode<'_>, source: &str) -> SlotAncestor {
+fn slot_ancestor(sv: SvelteView<'_>, node: &FragmentNode, source: &str) -> SlotAncestor {
     match node {
         FragmentNode::Element(element) => match element.kind {
             ElementKind::Component => SlotAncestor::ComponentLike,
             ElementKind::Html => {
                 let name = element.name_span.extract(source);
-                if is_custom_element(name, element.attributes, source) {
+                if is_custom_element(name, sv.attributes(element.attributes), source) {
                     SlotAncestor::NonComponentOwner
                 } else {
                     SlotAncestor::Transparent
@@ -871,7 +909,7 @@ fn slot_ancestor(node: &FragmentNode<'_>, source: &str) -> SlotAncestor {
 
 /// The oracle's `is_custom_element_node` (`phases/nodes.js:40-46`): a regular
 /// element whose tag contains a `-`, **or** which carries an `is` attribute.
-fn is_custom_element(name: &str, attributes: &[AttributeNode<'_>], source: &str) -> bool {
+fn is_custom_element(name: &str, attributes: &[AttributeNode], source: &str) -> bool {
     name.contains('-') || has_plain_attribute(attributes, source, "is")
 }
 
@@ -880,7 +918,7 @@ fn is_custom_element(name: &str, attributes: &[AttributeNode<'_>], source: &str)
 /// Both callers key on the oracle's own `attribute.type === 'Attribute' &&
 /// attribute.name === …` test, so a directive (`bind:slot`), a spread, and an
 /// `{@attach}` all correctly miss.
-fn has_plain_attribute(attributes: &[AttributeNode<'_>], source: &str, name: &str) -> bool {
+fn has_plain_attribute(attributes: &[AttributeNode], source: &str, name: &str) -> bool {
     attributes.iter().any(
         |attribute| matches!(attribute, AttributeNode::Attribute(a) if a.name_span.extract(source) == name),
     )
@@ -905,10 +943,7 @@ fn has_plain_attribute(attributes: &[AttributeNode<'_>], source: &str, name: &st
 /// `{@attach}` carry their own grammar (`bind:`, `class:`, `on:` — every one of
 /// which contains a `:` that this class does not even list) and the oracle's loop
 /// guards on `attribute.type === 'Attribute'` before testing.
-fn refuse_invalid_attribute_name(
-    attribute: &Attribute<'_>,
-    source: &str,
-) -> Result<(), CompileError> {
+fn refuse_invalid_attribute_name(attribute: &Attribute, source: &str) -> Result<(), CompileError> {
     let name = attribute.name_span.extract(source);
     if has_illegal_attribute_character(name) {
         return Err(unsupported(Refusal::AttributeInvalidName {
@@ -937,10 +972,11 @@ fn refuse_invalid_attribute_name(
 /// name/event-handler rules, which are element-only. Its warning half
 /// (`w.attribute_quoted`) gates nothing and is not ported.
 fn refuse_unquoted_attribute_sequence(
-    attribute: &Attribute<'_>,
+    sv: SvelteView<'_>,
+    attribute: &Attribute,
     source: &str,
 ) -> Result<(), CompileError> {
-    let Some(chunks) = attribute.value else {
+    let Some(chunks) = sv.opt_attribute_values(attribute.value) else {
         return Ok(());
     };
     let Some(last) = chunks.last() else {
@@ -970,8 +1006,8 @@ fn refuse_unquoted_attribute_sequence(
 /// a multi-chunk value (`onclick="{a}{b}"`). Every one of them is a rejected event
 /// handler, which is why the event-handler rule keys on this returning `None`
 /// rather than testing for a text value.
-fn expression_attribute_value<'a>(attribute: &'a Attribute<'a>) -> Option<&'a Expression<'a>> {
-    match attribute.value {
+fn expression_attribute_value(sv: SvelteView<'_>, attribute: &Attribute) -> Option<ExprId> {
+    match sv.opt_attribute_values(attribute.value) {
         Some([AttributeValue::ExpressionTag(tag)]) => Some(tag.expression),
         _ => None,
     }
@@ -984,11 +1020,15 @@ fn expression_attribute_value<'a>(attribute: &'a Attribute<'a>) -> Option<&'a Ex
 /// bare attribute `on` is LEGAL and `onx` is not (both live-probed). Writing it as
 /// `starts_with("on")` alone silently refuses a valid `<button on>`.
 fn refuse_invalid_event_handler(
-    attribute: &Attribute<'_>,
+    sv: SvelteView<'_>,
+    attribute: &Attribute,
     source: &str,
 ) -> Result<(), CompileError> {
     let name = attribute.name_span.extract(source);
-    if name.starts_with("on") && name.len() > 2 && expression_attribute_value(attribute).is_none() {
+    if name.starts_with("on")
+        && name.len() > 2
+        && expression_attribute_value(sv, attribute).is_none()
+    {
         return Err(unsupported(Refusal::AttributeInvalidEventHandler {
             name: name.to_string(),
         }));
@@ -1013,7 +1053,7 @@ fn refuse_invalid_event_handler(
 /// sequence starts at the `(` of its first element, so the scan correctly steps
 /// PAST that paren to the `{` and rejects.
 fn refuse_unparenthesized_sequence(
-    expression: &Expression<'_>,
+    expression: &Expression,
     source: &str,
 ) -> Result<(), CompileError> {
     let ExpressionKind::SequenceExpression(_) = &expression.kind else {
@@ -1067,7 +1107,7 @@ fn has_illegal_attribute_character(name: &str) -> bool {
 /// - the name `this` is never *recorded* (though a second one still collides with a
 ///   recorded key), which is what makes `<svelte:element bind:this this={…}>` legal.
 fn refuse_duplicate_attributes(
-    attributes: &[AttributeNode<'_>],
+    attributes: &[AttributeNode],
     source: &str,
 ) -> Result<(), CompileError> {
     // Elements carry a handful of attributes, so a linear scan beats a set.
