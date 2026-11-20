@@ -1630,13 +1630,13 @@ pub struct SpreadAttribute {
 /// `Copy`: every variant is a leaf of ids, spans and runs, so a list of attributes is copied
 /// into its store as a block.
 ///
-/// On 64-bit targets the tag is explicit (`repr(u32)`), a plain value at the front that a
-/// `match` reads with no decode, for the reason [`FragmentNode`]'s is: left to the compiler,
-/// the layout puts the tag in a niche of the directives' fields, and every `match` on an
-/// attribute decodes it first. The explicit tag widens the node by its four bytes. wasm32
-/// keeps the compiler's layout.
+/// The tag is explicit (`repr(u32)`), a plain value at the front that a `match` reads with
+/// no decode, for the reason [`FragmentNode`]'s is: left to the compiler, the layout puts the
+/// tag in a niche of the directives' fields, and every `match` on an attribute decodes it
+/// first. The explicit tag widens the node by its four bytes. Unlike [`FragmentNode`]'s, it
+/// is explicit on wasm32 too: there the decode it saves also shrinks the packages' code.
 #[derive(Debug, Clone, Copy)]
-#[cfg_attr(target_pointer_width = "64", repr(u32))]
+#[repr(u32)]
 pub enum AttributeNode {
     Attribute(Attribute),
     SpreadAttribute(SpreadAttribute),

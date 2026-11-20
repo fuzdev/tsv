@@ -65,7 +65,7 @@ const _: () = assert!(size_of::<CssBlockChild>() == 112);
 // The Svelte nodes. See the native pins in `tsv_svelte`'s `ast/mod.rs`.
 const _: () = assert!(size_of::<Element>() == 40);
 const _: () = assert!(size_of::<FragmentNode>() == 80);
-const _: () = assert!(size_of::<AttributeNode>() == 52);
+const _: () = assert!(size_of::<AttributeNode>() == 56);
 const _: () = assert!(size_of::<ExpressionTag>() == 12);
 
 enum Family {}
