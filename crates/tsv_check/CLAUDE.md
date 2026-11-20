@@ -141,8 +141,7 @@
   `binder/keyed.rs` owns every way to make a key: a `NodeAddr` (private
   field) comes only from `addr_of<T: Keyed>`, sealed to the row and payload
   types the walk keys, so an id slot, a `&&Row` or a raw integer cannot
-  become one — plus one named constructor for the deliberate MetaProperty
-  id-slot key. At run time, in debug builds, the store-range guard
+  become one. At run time, in debug builds, the store-range guard
   (`debug_assert_stored_key`) asserts that every keyed or looked-up address
   lies in a store row (the `Program` root, held beside the stores, excepted),
   which catches a stack copy.

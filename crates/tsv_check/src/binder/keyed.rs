@@ -2,18 +2,16 @@
 //!
 //! A key is a [`NodeAddr`]: the address of an AST row the walk ids, read in place
 //! through the parse's stores (or of the `Program` root held beside them). Its field
-//! is private to this module, so the only ways to make one are [`addr_of`], bounded by
-//! the sealed [`Keyed`] trait, and the one named constructor for the deliberate
-//! MetaProperty id-slot key ([`NodeAddr::baseline_meta_property_slot`]). No raw
-//! integer becomes a key, and nothing outside this module can implement [`Keyed`]:
-//! its seal lives here, so the `keyed_rows!` list below is the whole impl set. The
-//! runtime half of the keying rule, the store-range guard
+//! is private to this module, so the only way to make one is [`addr_of`], bounded by
+//! the sealed [`Keyed`] trait. No raw integer becomes a key, and nothing outside this
+//! module can implement [`Keyed`]: its seal lives here, so the `keyed_rows!` list below
+//! is the whole impl set. The runtime half of the keying rule, the store-range guard
 //! ([`debug_assert_stored_key`]), also lives here, the one reader of the raw address.
 
 use std::fmt;
 
 use tsv_ts::__private::holds_address;
-use tsv_ts::ast::{AstView, MetaPropId};
+use tsv_ts::ast::AstView;
 
 use super::NodeKind;
 
@@ -22,24 +20,6 @@ use super::NodeKind;
 /// stores (and `Program` root) of the parse it was taken from.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub(crate) struct NodeAddr(usize);
-
-impl NodeAddr {
-    /// The address of a `MetaPropId` slot inside its `Expression` row — NOT the
-    /// `meta_prop` row the lowering keys, so a lookup on it misses. The flow walk's
-    /// `MetaProperty` arm keys this on purpose: it reproduces the baseline's
-    /// MetaProperty walk miss (the strict resolver panics on it), which identity with
-    /// that baseline requires. The store-range guard still passes (the slot lies in a
-    /// store row); only [`Keyed`] would refuse the id, which is why this is its own
-    /// constructor rather than an `addr_of` call.
-    ///
-    /// TODO: key `addr_of(view.meta_prop(*m))` (the lowering's key, and
-    /// `expression_addr_kind`'s) once reproducing the baseline's walk miss is no longer
-    /// required, and delete this constructor.
-    #[inline]
-    pub(crate) fn baseline_meta_property_slot(slot: &MetaPropId) -> Self {
-        NodeAddr(std::ptr::from_ref(slot).addr())
-    }
-}
 
 /// Hex, as the miss and collision messages print an address.
 impl fmt::LowerHex for NodeAddr {

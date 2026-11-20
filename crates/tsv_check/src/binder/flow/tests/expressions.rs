@@ -423,3 +423,44 @@ fn async_iife_stays_isolated() {
     );
     assert!(!product.graph.flags(h_flow).contains(FlowFlags::CALL));
 }
+
+#[test]
+fn meta_properties_resolve_and_flow_continues_past_them() {
+    // `import.meta` at module top level and `new.target` in a function: the flow
+    // walk resolves each MetaProperty through the strict resolver (the key the
+    // lowering ids it under), and the graph after them is still built — a narrowing
+    // condition and a dead statement after each.
+    let src = "const u = import.meta.url; if (u) { a; } \
+               function f() { const t = new.target; if (t) { b; } return; c; }";
+    let (product, bound) = build_with_bound(src);
+
+    let metas = nodes_of_kind(&bound, NodeKind::MetaProperty);
+    assert_eq!(metas.len(), 2);
+    for m in metas {
+        assert!(
+            product.flow_of_node[m.index()].is_some(),
+            "MetaProperty stamped"
+        );
+    }
+
+    // The then-branch leaves read their branch's TrueCondition.
+    for leaf in ["a", "b"] {
+        let flow = flow_of_node(&product, ident(&bound, src, leaf));
+        assert!(
+            product
+                .graph
+                .flags(flow)
+                .contains(FlowFlags::TRUE_CONDITION)
+        );
+    }
+
+    // `c;` after the `return` is dead: flow nil + the Unreachable bit.
+    let c_stmt = *nodes_of_kind(&bound, NodeKind::ExpressionStatement)
+        .last()
+        .expect("c statement");
+    assert_eq!(product.flow_of_node[c_stmt.index()], None);
+    assert_ne!(
+        product.node_flags[c_stmt.index()] & crate::binder::NODE_FLAGS_UNREACHABLE,
+        0
+    );
+}

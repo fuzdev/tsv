@@ -7,7 +7,7 @@
 use super::super::*;
 use super::FlowBuilder;
 use super::predicates::*;
-use crate::binder::{NodeAddr, NodeKind, addr_of, expression_addr_kind};
+use crate::binder::{NodeKind, addr_of, expression_addr_kind};
 use tsv_ts::ast::{
     ArrayPattern, ArrowFunctionBody, ArrowFunctionExpression, AssignmentExpression,
     AssignmentOperator, AssignmentPattern, BinaryExpression, BinaryOperator, CallExpression,
@@ -354,13 +354,7 @@ impl<'a> FlowBuilder<'a> {
                 // Non-leaf write (nil'd in dead code). tsv models `import`/`new`
                 // and `meta`/`target` as identifiers; they are keyword-ish, not
                 // references, so only the MetaProperty node is stamped.
-                // Keys the `MetaPropId` slot, not the `meta_prop` row the lowering
-                // keyed, so `require` misses and panics — reproducing the baseline's
-                // MetaProperty walk miss (see the constructor's TODO).
-                let id = self.require(
-                    NodeAddr::baseline_meta_property_slot(m),
-                    NodeKind::MetaProperty,
-                );
+                let id = self.require(addr_of(view.meta_prop(*m)), NodeKind::MetaProperty);
                 self.set_flow_nonleaf(id);
             }
             E::MemberExpression(m) => self.bind_member_expression_flow(expr, m),
