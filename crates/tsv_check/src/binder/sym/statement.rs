@@ -10,28 +10,34 @@ use super::{ContainerKind, DeclInput, DeclMods, NodeKind, Scope, SymbolBinder};
 use crate::ids::NodeId;
 use tsv_lang::Span;
 use tsv_ts::ast::{
-    ExportDefaultValue, ExportSpecifier, Expression, ExpressionKind, ForInOfLeft, ForInit,
-    Identifier, ImportSpecifier, ModuleExportName, ObjectPatternProperty, Statement, StatementKind,
-    TSModuleDeclarationBody, TSModuleName,
+    AstView, ClassDeclaration, ExportDefaultDeclaration, ExportDefaultValue,
+    ExportNamedDeclaration, ExportSpecifier, Expression, ExpressionKind, ForInOfLeft, ForInit,
+    ForStatement, Identifier, ImportSpecifier, ModuleExportName, ObjectPatternProperty, Run,
+    Statement, StatementKind, SwitchStatement, TSEnumDeclaration, TSExportAssignment,
+    TSImportEqualsDeclaration, TSModuleDeclaration, TSModuleDeclarationBody, TSModuleName,
+    TSTypeAliasDeclaration, TryStatement, VariableDeclaration, VariableDeclarationKind,
 };
 
 impl<'a> SymbolBinder<'a> {
     /// Sub-step A: declare a hoisted function's symbol only (no body descent),
     /// unwrapping any `export`/`export default` wrapper for its modifiers.
-    pub(super) fn declare_hoisted_function(&mut self, stmt: &Statement<'a>) {
+    pub(super) fn declare_hoisted_function(&mut self, stmt: &'a Statement) {
+        let view = self.view;
         match &stmt.kind {
             StatementKind::FunctionDeclaration(f) => {
+                let f = view.fn_decl(*f);
                 if let Some(id) = &f.id {
                     self.bind_function_name(id, f.span, DeclMods::default());
                 }
             }
             StatementKind::TSDeclareFunction(f) => {
+                let f = view.declare_fn(*f);
                 self.bind_function_name(&f.id, f.span, DeclMods::default());
             }
             StatementKind::ExportNamedDeclaration(e) => {
-                if let Some(inner) = e.declaration {
+                if let Some(inner) = view.export_named(*e).declaration {
                     self.declare_hoisted_function_inner(
-                        inner,
+                        view.stmt(inner),
                         DeclMods {
                             exported: true,
                             default: false,
@@ -44,7 +50,7 @@ impl<'a> SymbolBinder<'a> {
                     exported: true,
                     default: true,
                 };
-                match &e.declaration {
+                match &view.export_default(*e).declaration {
                     ExportDefaultValue::FunctionDeclaration(f) => {
                         self.bind_default_function(f.id.as_ref(), stmt.span, mods);
                     }
@@ -58,14 +64,19 @@ impl<'a> SymbolBinder<'a> {
         }
     }
 
-    fn declare_hoisted_function_inner(&mut self, inner: &Statement<'a>, mods: DeclMods) {
+    fn declare_hoisted_function_inner(&mut self, inner: &'a Statement, mods: DeclMods) {
+        let view = self.view;
         match &inner.kind {
             StatementKind::FunctionDeclaration(f) => {
+                let f = view.fn_decl(*f);
                 if let Some(id) = &f.id {
                     self.bind_function_name(id, f.span, mods);
                 }
             }
-            StatementKind::TSDeclareFunction(f) => self.bind_function_name(&f.id, f.span, mods),
+            StatementKind::TSDeclareFunction(f) => {
+                let f = view.declare_fn(*f);
+                self.bind_function_name(&f.id, f.span, mods);
+            }
             _ => {}
         }
     }
@@ -74,21 +85,30 @@ impl<'a> SymbolBinder<'a> {
 
     pub(super) fn visit_statement(
         &mut self,
-        stmt: &Statement<'a>,
+        stmt: &'a Statement,
         mods: DeclMods,
         skip_symbol: bool,
     ) {
+        let view = self.view;
         match &stmt.kind {
             StatementKind::VariableDeclaration(decl) => {
                 let (includes, excludes, block_scoped) = var_flags(decl.kind);
-                for d in decl.declarations {
-                    self.bind_binding(d.id, includes, excludes, block_scoped, mods, decl.span);
-                    if let Some(init) = &d.init {
-                        self.visit_expression(init);
+                for d in view.declarators(decl.declarations) {
+                    self.bind_binding(
+                        view.expr(d.id),
+                        includes,
+                        excludes,
+                        block_scoped,
+                        mods,
+                        decl.span,
+                    );
+                    if let Some(init) = d.init {
+                        self.visit_expr(init);
                     }
                 }
             }
-            StatementKind::FunctionDeclaration(f) => {
+            &StatementKind::FunctionDeclaration(f) => {
+                let f = view.fn_decl(f);
                 if !skip_symbol && let Some(id) = &f.id {
                     self.bind_function_name(id, f.span, mods);
                 }
@@ -97,7 +117,8 @@ impl<'a> SymbolBinder<'a> {
                     b.bind_statement_list(f.body.body, true);
                 });
             }
-            StatementKind::TSDeclareFunction(f) => {
+            &StatementKind::TSDeclareFunction(f) => {
+                let f = view.declare_fn(f);
                 if !skip_symbol {
                     self.bind_function_name(&f.id, f.span, mods);
                 }
@@ -105,8 +126,11 @@ impl<'a> SymbolBinder<'a> {
                     b.bind_params(f.params);
                 });
             }
-            StatementKind::ClassDeclaration(c) => self.bind_class_statement(c, mods, skip_symbol),
-            StatementKind::TSInterfaceDeclaration(i) => {
+            &StatementKind::ClassDeclaration(c) => {
+                self.bind_class_statement(view.class_decl(c), mods, skip_symbol);
+            }
+            &StatementKind::TSInterfaceDeclaration(i) => {
+                let i = view.interface_decl(i);
                 let d = self.decl_from_ident(&i.id, i.span, mods);
                 let sym = self.declare_block_scoped(
                     d,
@@ -115,76 +139,79 @@ impl<'a> SymbolBinder<'a> {
                 );
                 self.bind_interface_body(&i.body, sym, i.type_parameters.as_ref());
             }
-            StatementKind::TSEnumDeclaration(e) => self.bind_enum_statement(e, stmt.span, mods),
-            StatementKind::TSModuleDeclaration(m) => self.bind_module(m, mods),
-            StatementKind::TSTypeAliasDeclaration(t) => {
-                self.bind_type_alias_statement(t, stmt.span, mods);
+            &StatementKind::TSEnumDeclaration(e) => {
+                self.bind_enum_statement(view.enum_decl(e), stmt.span, mods);
             }
-            StatementKind::ImportDeclaration(imp) => {
-                for spec in imp.specifiers {
+            &StatementKind::TSModuleDeclaration(m) => self.bind_module(view.module_decl(m), mods),
+            &StatementKind::TSTypeAliasDeclaration(t) => {
+                self.bind_type_alias_statement(view.type_alias(t), stmt.span, mods);
+            }
+            &StatementKind::ImportDeclaration(imp) => {
+                for spec in view.import_specs(view.import_decl(imp).specifiers) {
                     self.bind_import_specifier(spec);
                 }
             }
-            StatementKind::TSImportEqualsDeclaration(ie) => {
-                self.bind_import_equals_statement(ie, stmt.span);
+            &StatementKind::TSImportEqualsDeclaration(ie) => {
+                self.bind_import_equals_statement(view.import_equals(ie), stmt.span);
             }
-            StatementKind::ExportNamedDeclaration(e) => {
-                self.bind_export_named_statement(e, skip_symbol);
+            &StatementKind::ExportNamedDeclaration(e) => {
+                self.bind_export_named_statement(view.export_named(e), skip_symbol);
             }
-            StatementKind::ExportDefaultDeclaration(e) => {
-                self.bind_export_default(e, stmt.span, skip_symbol);
+            &StatementKind::ExportDefaultDeclaration(e) => {
+                self.bind_export_default(view.export_default(e), stmt.span, skip_symbol);
             }
             // Control flow: descend for nested bindings + block scopes.
             StatementKind::BlockStatement(b) => {
                 self.with_block_scope(|bd| bd.bind_statement_list(b.body, true));
             }
             StatementKind::IfStatement(s) => {
-                self.visit_expression(s.test);
-                self.visit_statement(s.consequent, DeclMods::default(), false);
-                if let Some(alt) = s.alternate {
+                self.visit_expr(s.test);
+                self.visit_statement(view.stmt(s.consequent), DeclMods::default(), false);
+                if let Some(alt) = view.opt_stmt(s.alternate) {
                     self.visit_statement(alt, DeclMods::default(), false);
                 }
             }
             StatementKind::ForStatement(s) => self.bind_for_statement(s),
             StatementKind::ForInStatement(s) => self.with_block_scope(|bd| {
-                bd.bind_for_left(s.left);
-                bd.visit_expression(s.right);
-                bd.visit_statement(s.body, DeclMods::default(), false);
+                bd.bind_for_left(view.for_left(s.left));
+                bd.visit_expr(s.right);
+                bd.visit_statement(view.stmt(s.body), DeclMods::default(), false);
             }),
             StatementKind::ForOfStatement(s) => self.with_block_scope(|bd| {
-                bd.bind_for_left(s.left);
-                bd.visit_expression(s.right);
-                bd.visit_statement(s.body, DeclMods::default(), false);
+                bd.bind_for_left(view.for_left(s.left));
+                bd.visit_expr(s.right);
+                bd.visit_statement(view.stmt(s.body), DeclMods::default(), false);
             }),
             StatementKind::WhileStatement(s) => {
-                self.visit_expression(s.test);
-                self.visit_statement(s.body, DeclMods::default(), false);
+                self.visit_expr(s.test);
+                self.visit_statement(view.stmt(s.body), DeclMods::default(), false);
             }
             StatementKind::DoWhileStatement(s) => {
-                self.visit_statement(s.body, DeclMods::default(), false);
-                self.visit_expression(s.test);
+                self.visit_statement(view.stmt(s.body), DeclMods::default(), false);
+                self.visit_expr(s.test);
             }
             // No `with` object scope: tsc refuses `with` in a TypeScript file outright
             // (TS2410), so there is no object environment to push and the two children
             // bind in the enclosing scope.
             StatementKind::WithStatement(s) => {
-                self.visit_expression(s.object);
-                self.visit_statement(s.body, DeclMods::default(), false);
+                self.visit_expr(s.object);
+                self.visit_statement(view.stmt(s.body), DeclMods::default(), false);
             }
             StatementKind::SwitchStatement(s) => self.bind_switch_statement(s),
-            StatementKind::TryStatement(s) => self.bind_try_statement(s),
-            StatementKind::LabeledStatement(s) => {
-                self.visit_statement(s.body, DeclMods::default(), false);
+            &StatementKind::TryStatement(s) => self.bind_try_statement(view.try_stmt(s)),
+            &StatementKind::LabeledStatement(s) => {
+                let body = view.labeled_stmt(s).body;
+                self.visit_statement(view.stmt(body), DeclMods::default(), false);
             }
             StatementKind::ReturnStatement(s) => {
-                if let Some(a) = &s.argument {
-                    self.visit_expression(a);
+                if let Some(a) = s.argument {
+                    self.visit_expr(a);
                 }
             }
-            StatementKind::ThrowStatement(s) => self.visit_expression(s.argument),
-            StatementKind::ExpressionStatement(s) => self.visit_expression(s.expression),
-            StatementKind::TSExportAssignment(ea) => {
-                self.bind_export_assignment_statement(ea, stmt.span);
+            StatementKind::ThrowStatement(s) => self.visit_expr(s.argument),
+            StatementKind::ExpressionStatement(s) => self.visit_expr(s.expression),
+            &StatementKind::TSExportAssignment(ea) => {
+                self.bind_export_assignment_statement(view.export_assign(ea), stmt.span);
             }
             StatementKind::ExportAllDeclaration(_)
             | StatementKind::TSNamespaceExportDeclaration(_)
@@ -196,12 +223,7 @@ impl<'a> SymbolBinder<'a> {
     }
 
     #[inline]
-    fn bind_class_statement(
-        &mut self,
-        c: &tsv_ts::ast::ClassDeclaration<'a>,
-        mods: DeclMods,
-        skip_symbol: bool,
-    ) {
+    fn bind_class_statement(&mut self, c: &'a ClassDeclaration, mods: DeclMods, skip_symbol: bool) {
         let sym = if skip_symbol {
             None
         } else {
@@ -214,12 +236,7 @@ impl<'a> SymbolBinder<'a> {
     }
 
     #[inline]
-    fn bind_enum_statement(
-        &mut self,
-        e: &tsv_ts::ast::TSEnumDeclaration<'a>,
-        span: Span,
-        mods: DeclMods,
-    ) {
+    fn bind_enum_statement(&mut self, e: &'a TSEnumDeclaration, span: Span, mods: DeclMods) {
         let (inc, exc) = if e.r#const {
             (SymbolFlags::CONST_ENUM, SymbolFlags::CONST_ENUM_EXCLUDES)
         } else {
@@ -236,7 +253,7 @@ impl<'a> SymbolBinder<'a> {
     #[inline]
     fn bind_type_alias_statement(
         &mut self,
-        t: &tsv_ts::ast::TSTypeAliasDeclaration<'a>,
+        t: &'a TSTypeAliasDeclaration,
         span: Span,
         mods: DeclMods,
     ) {
@@ -254,11 +271,7 @@ impl<'a> SymbolBinder<'a> {
     }
 
     #[inline]
-    fn bind_import_equals_statement(
-        &mut self,
-        ie: &tsv_ts::ast::TSImportEqualsDeclaration<'a>,
-        span: Span,
-    ) {
+    fn bind_import_equals_statement(&mut self, ie: &'a TSImportEqualsDeclaration, span: Span) {
         let d = self.decl_from_ident(
             &ie.id,
             span,
@@ -274,14 +287,10 @@ impl<'a> SymbolBinder<'a> {
     }
 
     #[inline]
-    fn bind_export_named_statement(
-        &mut self,
-        e: &tsv_ts::ast::ExportNamedDeclaration<'a>,
-        skip_symbol: bool,
-    ) {
+    fn bind_export_named_statement(&mut self, e: &'a ExportNamedDeclaration, skip_symbol: bool) {
         if let Some(inner) = e.declaration {
             self.visit_statement(
-                inner,
+                self.view.stmt(inner),
                 DeclMods {
                     exported: true,
                     default: false,
@@ -289,38 +298,39 @@ impl<'a> SymbolBinder<'a> {
                 skip_symbol,
             );
         } else {
-            for spec in e.specifiers {
+            for spec in self.view.export_specs(e.specifiers) {
                 self.bind_export_specifier(spec);
             }
         }
     }
 
     #[inline]
-    fn bind_for_statement(&mut self, s: &tsv_ts::ast::ForStatement<'a>) {
+    fn bind_for_statement(&mut self, s: &'a ForStatement) {
+        let view = self.view;
         self.with_block_scope(|bd| {
-            if let Some(init) = &s.init {
-                match init {
-                    ForInit::VariableDeclaration(decl) => bd.bind_var_declaration(decl),
-                    ForInit::Expression(e) => bd.visit_expression(e),
-                }
+            match view.opt_for_head(s.init) {
+                Some(ForInit::VariableDeclaration(decl)) => bd.bind_var_declaration(decl),
+                Some(&ForInit::Expression(e)) => bd.visit_expr(e),
+                None => {}
             }
-            if let Some(t) = &s.test {
-                bd.visit_expression(t);
+            if let Some(t) = s.test {
+                bd.visit_expr(t);
             }
-            if let Some(u) = &s.update {
-                bd.visit_expression(u);
+            if let Some(u) = s.update {
+                bd.visit_expr(u);
             }
-            bd.visit_statement(s.body, DeclMods::default(), false);
+            bd.visit_statement(view.stmt(s.body), DeclMods::default(), false);
         });
     }
 
     #[inline]
-    fn bind_switch_statement(&mut self, s: &tsv_ts::ast::SwitchStatement<'a>) {
-        self.visit_expression(s.discriminant);
+    fn bind_switch_statement(&mut self, s: &'a SwitchStatement) {
+        let view = self.view;
+        self.visit_expr(s.discriminant);
         self.with_block_scope(|bd| {
-            for case in s.cases {
-                if let Some(t) = &case.test {
-                    bd.visit_expression(t);
+            for case in view.cases(s.cases) {
+                if let Some(t) = case.test {
+                    bd.visit_expr(t);
                 }
                 bd.bind_statement_list(case.consequent, false);
             }
@@ -328,9 +338,9 @@ impl<'a> SymbolBinder<'a> {
     }
 
     #[inline]
-    fn bind_try_statement(&mut self, s: &tsv_ts::ast::TryStatement<'a>) {
+    fn bind_try_statement(&mut self, s: &'a TryStatement) {
         self.with_block_scope(|bd| bd.bind_statement_list(s.block.body, true));
-        if let Some(h) = &s.handler {
+        if let Some(h) = self.view.opt_catch(s.handler) {
             // The catch clause is a block scope holding the (block-scoped)
             // parameter; its body is a *separate* nested block scope, so a
             // `const e` shadowing `catch(e)` is a check-time TS2492, not a
@@ -356,11 +366,8 @@ impl<'a> SymbolBinder<'a> {
     }
 
     #[inline]
-    fn bind_export_assignment_statement(
-        &mut self,
-        ea: &tsv_ts::ast::TSExportAssignment<'a>,
-        span: Span,
-    ) {
+    fn bind_export_assignment_statement(&mut self, ea: &'a TSExportAssignment, span: Span) {
+        let expression = self.view.expr(ea.expression);
         // `export = x` — tsgo `bindExportAssignment` with `IsExportEquals`:
         // declared into `exports` under the `"export="` name with ALL
         // excludes (self-merge-only), so a second `export =` conflicts.
@@ -368,7 +375,7 @@ impl<'a> SymbolBinder<'a> {
             let name = self.atoms.export_equals();
             // The name node is the expression when it is a bare identifier
             // (tsgo `getNonAssignedNameOfDeclaration`), else the whole node.
-            let error_span = match &ea.expression.kind {
+            let error_span = match &expression.kind {
                 ExpressionKind::Identifier(id) => id.name_span(),
                 _ => span,
             };
@@ -384,27 +391,28 @@ impl<'a> SymbolBinder<'a> {
             let table = self.exports_of(sym);
             self.declare_symbol(table, Some(sym), d, SymbolFlags::PROPERTY, SymbolFlags::ALL);
         }
-        self.visit_expression(&ea.expression);
+        self.visit_expression(expression);
     }
 
-    fn bind_var_declaration(&mut self, decl: &tsv_ts::ast::VariableDeclaration<'a>) {
+    fn bind_var_declaration(&mut self, decl: &'a VariableDeclaration) {
+        let view = self.view;
         let (includes, excludes, block_scoped) = var_flags(decl.kind);
-        for d in decl.declarations {
+        for d in view.declarators(decl.declarations) {
             self.bind_binding(
-                d.id,
+                view.expr(d.id),
                 includes,
                 excludes,
                 block_scoped,
                 DeclMods::default(),
                 decl.span,
             );
-            if let Some(init) = &d.init {
-                self.visit_expression(init);
+            if let Some(init) = d.init {
+                self.visit_expr(init);
             }
         }
     }
 
-    fn bind_for_left(&mut self, left: &ForInOfLeft<'a>) {
+    fn bind_for_left(&mut self, left: &'a ForInOfLeft) {
         match left {
             ForInOfLeft::VariableDeclaration(decl) => self.bind_var_declaration(decl),
             ForInOfLeft::Pattern(_) => {}
@@ -415,16 +423,18 @@ impl<'a> SymbolBinder<'a> {
 
     fn bind_export_default(
         &mut self,
-        e: &tsv_ts::ast::ExportDefaultDeclaration<'a>,
+        e: &'a ExportDefaultDeclaration,
         span: Span,
         skip_symbol: bool,
     ) {
+        let view = self.view;
         let mods = DeclMods {
             exported: true,
             default: true,
         };
         match &e.declaration {
-            ExportDefaultValue::Expression(expr) => {
+            &ExportDefaultValue::Expression(expr) => {
+                let expr = view.expr(expr);
                 // tsgo `bindExportAssignment` (non-`export =`): excludes = ALL. An
                 // entity-name expression (`export default foo`) is an **alias**
                 // (`ExpressionIsAlias`) whose diagnostic points at the name; any
@@ -508,10 +518,10 @@ impl<'a> SymbolBinder<'a> {
         }
     }
 
-    fn default_decl(&mut self, id: Option<&Identifier<'a>>, node_span: Span) -> DeclInput {
+    fn default_decl(&mut self, id: Option<&'a Identifier>, node_span: Span) -> DeclInput {
         let display = match id {
             Some(i) => {
-                let name = i.name(self.source);
+                let name = i.name(self.source, self.view);
                 self.atoms.intern(name)
             }
             None => self.atoms.default_export(),
@@ -529,7 +539,7 @@ impl<'a> SymbolBinder<'a> {
 
     fn bind_default_function(
         &mut self,
-        id: Option<&Identifier<'a>>,
+        id: Option<&'a Identifier>,
         node_span: Span,
         _mods: DeclMods,
     ) {
@@ -548,26 +558,26 @@ impl<'a> SymbolBinder<'a> {
 
     // --- function names --------------------------------------------------------
 
-    fn bind_function_name(&mut self, id: &Identifier<'a>, node_span: Span, mods: DeclMods) {
+    fn bind_function_name(&mut self, id: &'a Identifier, node_span: Span, mods: DeclMods) {
         let d = self.decl_from_ident(id, node_span, mods);
         self.declare_block_scoped(d, SymbolFlags::FUNCTION, SymbolFlags::FUNCTION_EXCLUDES);
     }
 
     // --- params + bindings ---------------------------------------------------
 
-    pub(super) fn bind_params(&mut self, params: &[Expression<'a>]) {
-        for param in params {
+    pub(super) fn bind_params(&mut self, params: Run<Expression>) {
+        for param in self.view.exprs(params) {
             self.bind_param(param);
         }
     }
 
-    pub(super) fn bind_param(&mut self, param: &Expression<'a>) {
+    pub(super) fn bind_param(&mut self, param: &'a Expression) {
         match &param.kind {
             ExpressionKind::TSParameterProperty(pp) => {
                 // The inner parameter binds as a parameter; a property-parameter
                 // also declares a class member (handled where the constructor's
                 // owning class scope is live — the constructor scope's parent).
-                self.bind_param(pp.parameter);
+                self.bind_param(self.view.expr(pp.parameter));
             }
             _ => self.bind_binding(
                 param,
@@ -584,13 +594,14 @@ impl<'a> SymbolBinder<'a> {
     /// object/array patterns recurse; assignment patterns and rest unwrap.
     fn bind_binding(
         &mut self,
-        target: &Expression<'a>,
+        target: &'a Expression,
         includes: SymbolFlags,
         excludes: SymbolFlags,
         block_scoped: bool,
         mods: DeclMods,
         node_span: Span,
     ) {
+        let view = self.view;
         match &target.kind {
             ExpressionKind::Identifier(id) => {
                 let d = self.decl_from_ident(id, node_span, mods);
@@ -604,16 +615,16 @@ impl<'a> SymbolBinder<'a> {
                 // members bind (its method-signature params conflict, its duplicate
                 // members silent-merge). Narrow by design — an incomplete traversal
                 // only leaves family instances missing, never fabricates a conflict.
-                if let Some(ann) = id.type_annotation() {
+                if let Some(ann) = id.type_annotation(view) {
                     self.bind_type_annotation(ann);
                 }
             }
             ExpressionKind::ObjectPattern(p) => {
-                for prop in p.properties {
+                for prop in view.pat_props(p.properties) {
                     match prop {
                         ObjectPatternProperty::Property(pr) => {
                             self.bind_binding(
-                                pr.value,
+                                view.expr(pr.value),
                                 includes,
                                 excludes,
                                 block_scoped,
@@ -623,7 +634,7 @@ impl<'a> SymbolBinder<'a> {
                         }
                         ObjectPatternProperty::RestElement(r) => {
                             self.bind_binding(
-                                r.argument,
+                                view.expr(r.argument),
                                 includes,
                                 excludes,
                                 block_scoped,
@@ -635,16 +646,19 @@ impl<'a> SymbolBinder<'a> {
                 }
             }
             ExpressionKind::ArrayPattern(p) => {
-                for el in p.elements.iter().flatten() {
+                for &el in view.expr_opt_list(p.elements).iter().flatten() {
+                    let el = view.expr(el);
                     self.bind_binding(el, includes, excludes, block_scoped, mods, el_span(el));
                 }
             }
             ExpressionKind::AssignmentPattern(a) => {
-                self.bind_binding(a.left, includes, excludes, block_scoped, mods, node_span);
-                self.visit_expression(a.right);
+                let left = view.expr(a.left);
+                self.bind_binding(left, includes, excludes, block_scoped, mods, node_span);
+                self.visit_expr(a.right);
             }
             ExpressionKind::RestElement(r) => {
-                self.bind_binding(r.argument, includes, excludes, block_scoped, mods, r.span);
+                let argument = view.expr(r.argument);
+                self.bind_binding(argument, includes, excludes, block_scoped, mods, r.span);
             }
             _ => {}
         }
@@ -652,7 +666,7 @@ impl<'a> SymbolBinder<'a> {
 
     pub(super) fn decl_from_ident(
         &mut self,
-        id: &Identifier<'a>,
+        id: &'a Identifier,
         _node_span: Span,
         mods: DeclMods,
     ) -> DeclInput {
@@ -670,7 +684,7 @@ impl<'a> SymbolBinder<'a> {
 
     // --- modules ---------------------------------------------------------------
 
-    fn bind_module(&mut self, m: &tsv_ts::ast::TSModuleDeclaration<'a>, mods: DeclMods) {
+    fn bind_module(&mut self, m: &'a TSModuleDeclaration, mods: DeclMods) {
         // The module's own symbol (name = identifier, or `"name"` for ambient).
         let (name, display, span) = match &m.id {
             TSModuleName::Identifier(id) => {
@@ -695,7 +709,7 @@ impl<'a> SymbolBinder<'a> {
         // Instantiation state (tsgo `GetModuleInstanceState`): a namespace of only
         // types binds as the inert `NamespaceModule`, so it never conflicts with a
         // `var`/`let`/`type` of the same name; one with value content is `ValueModule`.
-        let (inc, exc) = if module_instantiated(m) {
+        let (inc, exc) = if module_instantiated(self.view, m) {
             (
                 SymbolFlags::VALUE_MODULE,
                 SymbolFlags::VALUE_MODULE_EXCLUDES,
@@ -740,7 +754,7 @@ impl<'a> SymbolBinder<'a> {
             Some(TSModuleDeclarationBody::TSModuleBlock(block)) => {
                 self.bind_statement_list(block.body, true);
             }
-            Some(TSModuleDeclarationBody::TSModuleDeclaration(nested)) => {
+            &Some(TSModuleDeclarationBody::TSModuleDeclaration(nested)) => {
                 // A dotted-namespace continuation: `namespace X.Y.Z {}` parses to a
                 // nested `TSModuleDeclaration` chain, and this body variant is
                 // constructed only by that dot path. tsgo's parser synthesizes an
@@ -753,7 +767,7 @@ impl<'a> SymbolBinder<'a> {
                 //
                 // tsgo: internal/parser/parser.go parseModuleOrNamespaceDeclaration
                 self.bind_module(
-                    nested,
+                    self.view.module_decl(nested),
                     DeclMods {
                         exported: true,
                         default: false,
@@ -768,7 +782,7 @@ impl<'a> SymbolBinder<'a> {
 
     // --- imports / exports (aliases) -----------------------------------------
 
-    fn bind_import_specifier(&mut self, spec: &ImportSpecifier<'a>) {
+    fn bind_import_specifier(&mut self, spec: &'a ImportSpecifier) {
         let id = match spec {
             ImportSpecifier::Default(d) => &d.local,
             ImportSpecifier::Named(n) => &n.local,
@@ -778,11 +792,11 @@ impl<'a> SymbolBinder<'a> {
         self.declare_alias(d, false);
     }
 
-    fn bind_export_specifier(&mut self, spec: &ExportSpecifier<'a>) {
+    fn bind_export_specifier(&mut self, spec: &'a ExportSpecifier) {
         // An export specifier's *exported* name is the table key in `exports`.
         let (name, span) = self.module_export_name_atom(&spec.exported);
         let is_default = matches!(&spec.exported, ModuleExportName::Identifier(id)
-            if id.name(self.source) == "default");
+            if id.name(self.source, self.view) == "default");
         let d = DeclInput {
             name,
             display: name,
@@ -799,8 +813,8 @@ impl<'a> SymbolBinder<'a> {
 /// A [`SymbolFlags`] triple for a variable declaration kind: `(includes,
 /// excludes, block_scoped)`. `block_scoped` selects `bindBlockScopedDeclaration`
 /// (block-scope routing) over `declareSymbolAndAddToSymbolTable` (container).
-fn var_flags(kind: tsv_ts::ast::VariableDeclarationKind) -> (SymbolFlags, SymbolFlags, bool) {
-    use tsv_ts::ast::VariableDeclarationKind as K;
+fn var_flags(kind: VariableDeclarationKind) -> (SymbolFlags, SymbolFlags, bool) {
+    use VariableDeclarationKind as K;
     match kind {
         // `var` is function-scoped (routes through the container).
         K::Var => (
@@ -818,7 +832,7 @@ fn var_flags(kind: tsv_ts::ast::VariableDeclarationKind) -> (SymbolFlags, Symbol
 }
 
 /// The span a bare parameter expression points a diagnostic at.
-fn param_span(param: &Expression<'_>) -> Span {
+fn param_span(param: &Expression) -> Span {
     match &param.kind {
         ExpressionKind::Identifier(id) => id.name_span(),
         _ => param.span(),
@@ -826,7 +840,7 @@ fn param_span(param: &Expression<'_>) -> Span {
 }
 
 /// The span an array-pattern element points a diagnostic at.
-fn el_span(el: &Expression<'_>) -> Span {
+fn el_span(el: &Expression) -> Span {
     match &el.kind {
         ExpressionKind::Identifier(id) => id.name_span(),
         _ => el.span(),
@@ -840,28 +854,33 @@ fn el_span(el: &Expression<'_>) -> Span {
 /// specifier-only named exports (approximated as non-instantiated). Any value
 /// content — a var/function/class/enum, an `export =`/`export default`, an
 /// expression — makes it instantiated.
-fn module_instantiated(m: &tsv_ts::ast::TSModuleDeclaration<'_>) -> bool {
+fn module_instantiated(view: AstView<'_>, m: &TSModuleDeclaration) -> bool {
     match &m.body {
         None => true,
-        Some(TSModuleDeclarationBody::TSModuleDeclaration(nested)) => module_instantiated(nested),
-        Some(TSModuleDeclarationBody::TSModuleBlock(block)) => {
-            !block.body.iter().all(statement_is_non_instantiated)
+        &Some(TSModuleDeclarationBody::TSModuleDeclaration(nested)) => {
+            module_instantiated(view, view.module_decl(nested))
         }
+        Some(TSModuleDeclarationBody::TSModuleBlock(block)) => !view
+            .stmt_list(block.body)
+            .iter()
+            .all(|&stmt| statement_is_non_instantiated(view, view.stmt(stmt))),
     }
 }
 
 /// Whether a module-body statement contributes no value (tsgo
 /// `getModuleInstanceStateWorker`).
-fn statement_is_non_instantiated(stmt: &Statement<'_>) -> bool {
+fn statement_is_non_instantiated(view: AstView<'_>, stmt: &Statement) -> bool {
     match &stmt.kind {
         StatementKind::TSInterfaceDeclaration(_) | StatementKind::TSTypeAliasDeclaration(_) => true,
         StatementKind::ImportDeclaration(_) => true,
-        StatementKind::TSImportEqualsDeclaration(ie) => !ie.is_export,
-        StatementKind::TSModuleDeclaration(nested) => !module_instantiated(nested),
+        &StatementKind::TSImportEqualsDeclaration(ie) => !view.import_equals(ie).is_export,
+        &StatementKind::TSModuleDeclaration(nested) => {
+            !module_instantiated(view, view.module_decl(nested))
+        }
         // `export interface`/`export type` wrap a non-instantiated declaration;
         // specifier-only named exports are approximated non-instantiated.
-        StatementKind::ExportNamedDeclaration(e) => match e.declaration {
-            Some(inner) => statement_is_non_instantiated(inner),
+        &StatementKind::ExportNamedDeclaration(e) => match view.export_named(e).declaration {
+            Some(inner) => statement_is_non_instantiated(view, view.stmt(inner)),
             None => true,
         },
         _ => false,

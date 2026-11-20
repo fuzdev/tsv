@@ -10,9 +10,9 @@ use super::super::symbols::{SymbolFlags, SymbolId};
 use super::{ContainerKind, DeclInput, DeclMods, Scope, SymbolBinder};
 use crate::ids::NodeId;
 use tsv_ts::ast::{
-    ClassBody, ClassMember, Expression, ExpressionKind, MethodKind, Statement, TSEnumMemberId,
-    TSInterfaceBody, TSType, TSTypeAnnotation, TSTypeElement, TSTypeLiteral,
-    TSTypeParameterDeclaration,
+    AstView, ClassBody, ClassMember, Expression, ExpressionKind, FunctionExpression, MethodKind,
+    PropertyModifier, Run, StmtId, TSEnumMember, TSEnumMemberId, TSInterfaceBody, TSType,
+    TSTypeAnnotation, TSTypeElement, TSTypeLiteral, TSTypeParameterDeclaration,
 };
 
 impl<'a> SymbolBinder<'a> {
@@ -21,9 +21,9 @@ impl<'a> SymbolBinder<'a> {
     // tsgo: internal/binder/binder.go bindClassLikeDeclaration (the static-`prototype` clash, :971)
     pub(super) fn bind_class_body(
         &mut self,
-        body: &ClassBody<'a>,
+        body: &'a ClassBody,
         class_symbol: Option<SymbolId>,
-        type_params: Option<&TSTypeParameterDeclaration<'a>>,
+        type_params: Option<&'a TSTypeParameterDeclaration>,
     ) {
         let Some(class_symbol) = class_symbol else {
             // Anonymous / skipped class: still descend member values for nested
@@ -56,14 +56,15 @@ impl<'a> SymbolBinder<'a> {
         self.container = scope;
         self.block_scope = scope;
         self.bind_type_params(type_params);
-        for member in body.body {
+        for member in self.view.class_members(body.body) {
             self.bind_class_member(member, class_symbol);
         }
         self.container = saved.0;
         self.block_scope = saved.1;
     }
 
-    fn bind_class_member(&mut self, member: &ClassMember<'a>, class_symbol: SymbolId) {
+    fn bind_class_member(&mut self, member: &'a ClassMember, class_symbol: SymbolId) {
+        let view = self.view;
         match member {
             ClassMember::MethodDefinition(m) => {
                 let is_static = m.is_static;
@@ -103,7 +104,7 @@ impl<'a> SymbolBinder<'a> {
                         b.bind_statement_list(method_body(&m.value), true);
                     });
                 } else if let Some(key) =
-                    self.resolve_member_key(&m.key, m.computed, Some(class_symbol))
+                    self.resolve_member_key(view.expr(m.key), m.computed, Some(class_symbol))
                 {
                     let d = DeclInput {
                         name: key.key,
@@ -132,7 +133,7 @@ impl<'a> SymbolBinder<'a> {
                 let (inc, exc) = if p.accessor {
                     (SymbolFlags::ACCESSOR, SymbolFlags::ACCESSOR_EXCLUDES)
                 } else {
-                    let opt = if p.modifier == tsv_ts::ast::PropertyModifier::Optional {
+                    let opt = if p.modifier == PropertyModifier::Optional {
                         SymbolFlags::OPTIONAL
                     } else {
                         SymbolFlags::NONE
@@ -142,7 +143,9 @@ impl<'a> SymbolBinder<'a> {
                         SymbolFlags::PROPERTY_EXCLUDES,
                     )
                 };
-                if let Some(key) = self.resolve_member_key(&p.key, p.computed, Some(class_symbol)) {
+                if let Some(key) =
+                    self.resolve_member_key(view.expr(p.key), p.computed, Some(class_symbol))
+                {
                     let d = DeclInput {
                         name: key.key,
                         display: key.display,
@@ -154,8 +157,8 @@ impl<'a> SymbolBinder<'a> {
                     };
                     self.declare_class_member(d, inc, exc, p.is_static);
                 }
-                if let Some(v) = &p.value {
-                    self.visit_expression(v);
+                if let Some(v) = p.value {
+                    self.visit_expr(v);
                 }
             }
             ClassMember::StaticBlock(s) => {
@@ -165,14 +168,16 @@ impl<'a> SymbolBinder<'a> {
         }
     }
 
-    fn bind_constructor_params(&mut self, params: &[Expression<'a>], class_symbol: SymbolId) {
-        for param in params {
+    fn bind_constructor_params(&mut self, params: Run<Expression>, class_symbol: SymbolId) {
+        let view = self.view;
+        for param in view.exprs(params) {
             match &param.kind {
                 ExpressionKind::TSParameterProperty(pp) => {
+                    let parameter = view.expr(pp.parameter);
                     // Bind as a parameter (in the constructor scope)...
-                    self.bind_param(pp.parameter);
+                    self.bind_param(parameter);
                     // ...and as a class instance member (tsgo bindParameter).
-                    if let ExpressionKind::Identifier(id) = &ident_of_param(pp.parameter).kind {
+                    if let ExpressionKind::Identifier(id) = &ident_of_param(view, parameter).kind {
                         let opt = if id.optional {
                             SymbolFlags::OPTIONAL
                         } else {
@@ -194,8 +199,8 @@ impl<'a> SymbolBinder<'a> {
         }
     }
 
-    fn descend_class_values(&mut self, body: &ClassBody<'a>) {
-        for member in body.body {
+    fn descend_class_values(&mut self, body: &'a ClassBody) {
+        for member in self.view.class_members(body.body) {
             match member {
                 ClassMember::MethodDefinition(m) => {
                     self.with_function_scope(m.value.type_parameters.as_ref(), |b| {
@@ -204,8 +209,8 @@ impl<'a> SymbolBinder<'a> {
                     });
                 }
                 ClassMember::PropertyDefinition(p) => {
-                    if let Some(v) = &p.value {
-                        self.visit_expression(v);
+                    if let Some(v) = p.value {
+                        self.visit_expr(v);
                     }
                 }
                 ClassMember::StaticBlock(s) => {
@@ -220,9 +225,9 @@ impl<'a> SymbolBinder<'a> {
 
     pub(super) fn bind_interface_body(
         &mut self,
-        body: &TSInterfaceBody<'a>,
+        body: &'a TSInterfaceBody,
         interface_symbol: SymbolId,
-        type_params: Option<&TSTypeParameterDeclaration<'a>>,
+        type_params: Option<&'a TSTypeParameterDeclaration>,
     ) {
         let saved = (self.container, self.block_scope);
         let scope = Scope {
@@ -235,7 +240,7 @@ impl<'a> SymbolBinder<'a> {
         self.container = scope;
         self.block_scope = scope;
         self.bind_type_params(type_params);
-        for member in body.body {
+        for member in self.view.type_members(body.body) {
             self.bind_type_element(member);
         }
         self.container = saved.0;
@@ -244,8 +249,8 @@ impl<'a> SymbolBinder<'a> {
 
     pub(super) fn bind_interface_body_symbol_less(
         &self,
-        _body: &TSInterfaceBody<'a>,
-        _type_params: Option<&TSTypeParameterDeclaration<'a>>,
+        _body: &'a TSInterfaceBody,
+        _type_params: Option<&'a TSTypeParameterDeclaration>,
     ) {
         // `export default interface` with no container symbol: nothing to bind.
     }
@@ -253,8 +258,8 @@ impl<'a> SymbolBinder<'a> {
     // --- type annotations ----------------------------------------------------
 
     /// Descend a binding's type annotation.
-    pub(super) fn bind_type_annotation(&mut self, ann: &TSTypeAnnotation<'a>) {
-        self.bind_type(ann.type_annotation);
+    pub(super) fn bind_type_annotation(&mut self, ann: &'a TSTypeAnnotation) {
+        self.bind_type(self.view.ty(ann.type_annotation));
     }
 
     /// Bind the only type shape whose members reach the family cascade — a type
@@ -268,7 +273,7 @@ impl<'a> SymbolBinder<'a> {
     // (miss-only; extra=0 holds; unexercised by the corpus). The coherent fix is one
     // general bind-side type descent mirroring the check pass's `CheckWalk::visit_type`,
     // wired into those sites together — not patched per-position.
-    fn bind_type(&mut self, ty: &TSType<'a>) {
+    fn bind_type(&mut self, ty: &'a TSType) {
         if let TSType::TypeLiteral(tl) = ty {
             self.bind_type_literal_body(tl);
         }
@@ -281,7 +286,7 @@ impl<'a> SymbolBinder<'a> {
     ///
     /// tsgo: internal/binder/binder.go bindAnonymousDeclaration
     ///       (SymbolFlagsTypeLiteral, InternalSymbolNameType)
-    fn bind_type_literal_body(&mut self, tl: &TSTypeLiteral<'a>) {
+    fn bind_type_literal_body(&mut self, tl: &'a TSTypeLiteral) {
         let name = self.atoms.intern("__type");
         let sym = self.new_symbol(SymbolFlags::TYPE_LITERAL, name);
         let saved = (self.container, self.block_scope);
@@ -294,18 +299,19 @@ impl<'a> SymbolBinder<'a> {
         };
         self.container = scope;
         self.block_scope = scope;
-        for member in tl.members {
+        for member in self.view.type_members(tl.members) {
             self.bind_type_element(member);
         }
         self.container = saved.0;
         self.block_scope = saved.1;
     }
 
-    fn bind_type_element(&mut self, element: &TSTypeElement<'a>) {
+    fn bind_type_element(&mut self, element: &'a TSTypeElement) {
+        let view = self.view;
         match element {
             TSTypeElement::PropertySignature(p) => {
                 self.declare_type_member(
-                    &p.key,
+                    view.expr(p.key),
                     p.computed,
                     SymbolFlags::PROPERTY,
                     SymbolFlags::PROPERTY_EXCLUDES,
@@ -321,7 +327,7 @@ impl<'a> SymbolBinder<'a> {
             }
             TSTypeElement::MethodSignature(m) => {
                 self.declare_type_member(
-                    &m.key,
+                    view.expr(m.key),
                     m.computed,
                     SymbolFlags::METHOD,
                     SymbolFlags::METHOD_EXCLUDES,
@@ -365,7 +371,7 @@ impl<'a> SymbolBinder<'a> {
     /// keyed by its name into the current member container.
     fn declare_type_member(
         &mut self,
-        key_expr: &Expression<'a>,
+        key_expr: &'a Expression,
         computed: bool,
         inc: SymbolFlags,
         exc: SymbolFlags,
@@ -384,11 +390,7 @@ impl<'a> SymbolBinder<'a> {
         }
     }
 
-    pub(super) fn bind_enum_members(
-        &mut self,
-        members: &[tsv_ts::ast::TSEnumMember<'a>],
-        enum_symbol: SymbolId,
-    ) {
+    pub(super) fn bind_enum_members(&mut self, members: Run<TSEnumMember>, enum_symbol: SymbolId) {
         let saved = (self.container, self.block_scope);
         let scope = Scope {
             kind: ContainerKind::Enum,
@@ -399,7 +401,7 @@ impl<'a> SymbolBinder<'a> {
         };
         self.container = scope;
         self.block_scope = scope;
-        for member in members {
+        for member in self.view.enum_members(members) {
             let (key, span) = match &member.id {
                 TSEnumMemberId::Identifier(id) => (self.ident_atom(id), id.name_span()),
                 TSEnumMemberId::String(lit) => (self.string_atom(lit), lit.span),
@@ -418,8 +420,8 @@ impl<'a> SymbolBinder<'a> {
                 SymbolFlags::ENUM_MEMBER,
                 SymbolFlags::ENUM_MEMBER_EXCLUDES,
             );
-            if let Some(init) = &member.initializer {
-                self.visit_expression(init);
+            if let Some(init) = member.initializer {
+                self.visit_expr(init);
             }
         }
         self.container = saved.0;
@@ -428,12 +430,9 @@ impl<'a> SymbolBinder<'a> {
 
     // --- type parameters -----------------------------------------------------
 
-    pub(super) fn bind_type_params(
-        &mut self,
-        type_params: Option<&TSTypeParameterDeclaration<'a>>,
-    ) {
+    pub(super) fn bind_type_params(&mut self, type_params: Option<&'a TSTypeParameterDeclaration>) {
         if let Some(tp) = type_params {
-            for p in tp.params {
+            for p in self.view.type_params(tp.params) {
                 let d = self.decl_from_ident(&p.name, p.span, DeclMods::default());
                 self.declare_in_container(
                     d,
@@ -446,7 +445,7 @@ impl<'a> SymbolBinder<'a> {
 
     pub(super) fn bind_type_params_in_new_locals(
         &mut self,
-        type_params: Option<&TSTypeParameterDeclaration<'a>>,
+        type_params: Option<&'a TSTypeParameterDeclaration>,
     ) {
         if type_params.is_none() {
             return;
@@ -456,17 +455,14 @@ impl<'a> SymbolBinder<'a> {
 }
 
 /// The binding identifier of a parameter, unwrapping a default (`AssignmentPattern`).
-fn ident_of_param<'b, 'a>(param: &'b Expression<'a>) -> &'b Expression<'a> {
-    match param {
-        Expression {
-            kind: ExpressionKind::AssignmentPattern(a),
-            ..
-        } => a.left,
-        other => other,
+fn ident_of_param<'a>(view: AstView<'a>, param: &'a Expression) -> &'a Expression {
+    match &param.kind {
+        ExpressionKind::AssignmentPattern(a) => view.expr(a.left),
+        _ => param,
     }
 }
 
 /// A method's body statements (a `FunctionExpression`'s block body).
-fn method_body<'a>(f: &tsv_ts::ast::FunctionExpression<'a>) -> &'a [Statement<'a>] {
+fn method_body(f: &FunctionExpression) -> Run<StmtId> {
     f.body.body
 }

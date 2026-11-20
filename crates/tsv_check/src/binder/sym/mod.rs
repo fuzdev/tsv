@@ -66,15 +66,14 @@ mod statement;
 
 use super::atoms::{Atom, Atoms};
 use super::symbols::{Symbol, SymbolFlags, SymbolId, TableId};
-use super::{FileFacts, NodeKind, addr_of};
+use super::{FileFacts, Keyed, NodeAddr, NodeKind, addr_of, debug_assert_stored_key};
 use crate::diag::Diagnostic;
 use crate::ids::{FileId, NodeId};
 use crate::merge::{FileMerge, MergeDecl, MergeSymbol, ModuleAug};
 use tsv_lang::{FxHashMap, Span};
-use tsv_ts::ast::Program;
 use tsv_ts::ast::{
-    ExportDefaultValue, Expression, ExpressionKind, Identifier, Literal, LiteralValue,
-    ModuleExportName, Statement, StatementKind, TSTypeParameterDeclaration,
+    AstView, ExportDefaultValue, Expression, ExpressionKind, Identifier, Literal, LiteralValue,
+    ModuleExportName, Program, Run, Statement, StatementKind, StmtId, TSTypeParameterDeclaration,
 };
 
 /// The container kinds that route member declarations (a subset of tsgo's node
@@ -139,7 +138,10 @@ struct DeclMods {
 /// The symbol bind for one file.
 pub(super) struct SymbolBinder<'a> {
     source: &'a str,
-    address_map: &'a FxHashMap<(usize, NodeKind), NodeId>,
+    /// The view over the parse's stores: every row the bind reads is borrowed in place
+    /// through it.
+    view: AstView<'a>,
+    address_map: &'a FxHashMap<(NodeAddr, NodeKind), NodeId>,
     file: FileId,
     is_external: bool,
 
@@ -163,13 +165,15 @@ impl<'a> SymbolBinder<'a> {
     /// Build a binder for one file, seeding the source-file scope.
     pub(super) fn new(
         source: &'a str,
-        address_map: &'a FxHashMap<(usize, NodeKind), NodeId>,
+        view: AstView<'a>,
+        address_map: &'a FxHashMap<(NodeAddr, NodeKind), NodeId>,
         file: FileId,
         facts: FileFacts,
     ) -> SymbolBinder<'a> {
         let is_external_module = matches!(facts.module_ness, super::ModuleNess::Module);
         let mut binder = SymbolBinder {
             source,
+            view,
             address_map,
             file,
             is_external: is_external_module,
@@ -215,23 +219,27 @@ impl<'a> SymbolBinder<'a> {
     }
 
     /// Bind the program body, then return.
-    pub(super) fn bind_program(&mut self, program: &Program<'a>) {
+    pub(super) fn bind_program(&mut self, program: &'a Program) {
         self.bind_statement_list(program.body, true);
     }
 
     // --- statement lists (functions-first) -----------------------------------
 
     // tsgo: internal/binder/binder.go bindEachStatementFunctionsFirst (functions-first)
-    fn bind_statement_list(&mut self, stmts: &[Statement<'a>], functions_first: bool) {
+    fn bind_statement_list(&mut self, stmts: Run<StmtId>, functions_first: bool) {
+        let view = self.view;
+        let stmts = view.stmt_list(stmts);
         if functions_first {
-            for stmt in stmts {
-                if is_function_statement(stmt) {
+            for &stmt in stmts {
+                let stmt = view.stmt(stmt);
+                if is_function_statement(view, stmt) {
                     self.declare_hoisted_function(stmt);
                 }
             }
         }
-        for stmt in stmts {
-            let skip = functions_first && is_function_statement(stmt);
+        for &stmt in stmts {
+            let stmt = view.stmt(stmt);
+            let skip = functions_first && is_function_statement(view, stmt);
             self.visit_statement(stmt, DeclMods::default(), skip);
         }
     }
@@ -240,7 +248,7 @@ impl<'a> SymbolBinder<'a> {
 
     fn with_function_scope(
         &mut self,
-        type_params: Option<&TSTypeParameterDeclaration<'a>>,
+        type_params: Option<&'a TSTypeParameterDeclaration>,
         f: impl FnOnce(&mut Self),
     ) {
         let saved = (self.container, self.block_scope);
@@ -389,26 +397,34 @@ impl<'a> SymbolBinder<'a> {
 
     /// The [`NodeId`] of `node` (of kind `kind`), or [`NodeId::FIRST`] on a miss.
     /// Lenient by design — the result feeds `Decl.node`, which is dead in the
-    /// single-file pipeline (statement-level inner structs the SoA walk keys on
-    /// the enclosing `&Statement` address fall back to the root id here).
-    fn node_id_of<T>(&self, node: &T, kind: NodeKind) -> NodeId {
+    /// single-file pipeline. Three lookups miss and fall back to the root id: a
+    /// statement-position `TSModuleDeclaration` (every one but a dotted `A.B`
+    /// continuation segment), a `TSExportAssignment`, and an
+    /// `ExportDefaultDeclaration`'s expression arm — each a statement payload in its
+    /// own store row, while the SoA walk keyed the `Statement` row holding its id.
+    /// `node` is still a row read in place, which the store-range guard asserts
+    /// before the lookup.
+    #[track_caller]
+    fn node_id_of<T: Keyed>(&self, node: &'a T, kind: NodeKind) -> NodeId {
+        let address = addr_of(node);
+        debug_assert_stored_key(self.view, address, kind);
         self.address_map
-            .get(&(addr_of(node), kind))
+            .get(&(address, kind))
             .copied()
             .unwrap_or(NodeId::FIRST)
     }
 
     // --- name resolution -----------------------------------------------------
 
-    fn ident_atom(&mut self, id: &Identifier<'_>) -> Atom {
-        let name = id.name(self.source);
+    fn ident_atom(&mut self, id: &Identifier) -> Atom {
+        let name = id.name(self.source, self.view);
         self.atoms.intern(name)
     }
 
-    fn string_atom(&mut self, lit: &Literal<'_>) -> Atom {
+    fn string_atom(&mut self, lit: &Literal) -> Atom {
         match &lit.value {
             LiteralValue::String(cooked) => {
-                let s = cooked.resolve(lit.span, self.source);
+                let s = cooked.resolve(lit.span, self.source, self.view);
                 self.atoms.intern(s)
             }
             // Non-string literals (numbers etc.) key on their source text.
@@ -419,7 +435,7 @@ impl<'a> SymbolBinder<'a> {
         }
     }
 
-    fn module_export_name_atom(&mut self, name: &ModuleExportName<'_>) -> (Atom, Span) {
+    fn module_export_name_atom(&mut self, name: &ModuleExportName) -> (Atom, Span) {
         match name {
             ModuleExportName::Identifier(id) => (self.ident_atom(id), id.name_span()),
             ModuleExportName::Literal(lit) => (self.string_atom(lit), lit.span),
@@ -430,7 +446,7 @@ impl<'a> SymbolBinder<'a> {
 
     fn resolve_member_key(
         &mut self,
-        key: &Expression<'a>,
+        key: &'a Expression,
         computed: bool,
         class_symbol: Option<SymbolId>,
     ) -> Option<KeyInfo> {
@@ -478,7 +494,7 @@ impl<'a> SymbolBinder<'a> {
                 })
             }
             ExpressionKind::PrivateIdentifier(pid) => {
-                let raw = pid.name(key.span, self.source);
+                let raw = pid.name(key.span, self.source, self.view);
                 // The display carries the leading `#`, matching the `#name` span and
                 // the check-side form (`duplicate_members.rs`'s `member_key`) — a
                 // duplicate reported by BOTH the bind cascade and the check pass shares
@@ -525,17 +541,19 @@ struct KeyInfo {
 
 /// Whether a statement is a function declaration (possibly `export`-wrapped) —
 /// the set tsgo's `bindEachStatementFunctionsFirst` binds first.
-fn is_function_statement(stmt: &Statement<'_>) -> bool {
+fn is_function_statement(view: AstView<'_>, stmt: &Statement) -> bool {
     match &stmt.kind {
         StatementKind::FunctionDeclaration(_) | StatementKind::TSDeclareFunction(_) => true,
-        StatementKind::ExportNamedDeclaration(e) => e.declaration.is_some_and(|inner| {
-            matches!(
-                &inner.kind,
-                StatementKind::FunctionDeclaration(_) | StatementKind::TSDeclareFunction(_)
-            )
-        }),
-        StatementKind::ExportDefaultDeclaration(e) => matches!(
-            e.declaration,
+        &StatementKind::ExportNamedDeclaration(e) => {
+            view.export_named(e).declaration.is_some_and(|inner| {
+                matches!(
+                    &view.stmt(inner).kind,
+                    StatementKind::FunctionDeclaration(_) | StatementKind::TSDeclareFunction(_)
+                )
+            })
+        }
+        &StatementKind::ExportDefaultDeclaration(e) => matches!(
+            view.export_default(e).declaration,
             ExportDefaultValue::FunctionDeclaration(_) | ExportDefaultValue::TSDeclareFunction(_)
         ),
         _ => false,
