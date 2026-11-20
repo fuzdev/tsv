@@ -40,17 +40,19 @@
 //       (2294-2428), IsPotentiallyExecutableNode (4210).
 
 use crate::binder::flow::FlowProduct;
-use crate::binder::{BoundFile, NODE_FLAGS_UNREACHABLE, NodeKind, addr_of, statement_kind};
+use crate::binder::{
+    BoundFile, NODE_FLAGS_UNREACHABLE, NodeKind, addr_of, debug_assert_stored_key, statement_kind,
+};
 use crate::diag::Diagnostic;
 use crate::ids::{FileId, NodeId};
 use crate::options::{CheckOptions, Tristate};
 use smallvec::SmallVec;
 use tsv_lang::{Comment, Span};
-use tsv_ts::ast::Program;
 use tsv_ts::ast::{
-    ArrowFunctionBody, ClassMember, Decorator, ExportDefaultValue, Expression, ExpressionKind,
-    ForInOfLeft, ForInit, ObjectPatternProperty, ObjectProperty, Statement, StatementKind,
-    TSModuleDeclaration, TSModuleDeclarationBody,
+    ArrowFunctionBody, AstView, ClassBody, ClassMember, Decorator, ExportDefaultValue, ExprId,
+    Expression, ExpressionKind, ForInOfLeft, ForInit, ObjectPatternProperty, ObjectProperty,
+    ParsedRef, Run, Statement, StatementKind, StmtId, TSModuleDeclaration, TSModuleDeclarationBody,
+    VariableDeclaration,
 };
 
 /// A namespace body's instantiation classification — tsgo's
@@ -102,7 +104,7 @@ struct CandidateRun {
     members: SmallVec<[RunMember; 4]>,
 }
 
-/// The owned, arena-free per-unit unreachable/unused-label candidate table, built
+/// The owned, AST-free per-unit unreachable/unused-label candidate table, built
 /// at bind time and consumed by [`UnreachableCandidates::emit`] per variant.
 /// C15-relocatable by construction (spans are `Copy`; nothing borrows the AST).
 #[derive(Clone, Debug, Default)]
@@ -244,22 +246,26 @@ fn is_instantiated_module(state: ModuleInstanceState, preserve: bool) -> bool {
 }
 
 /// Build the per-unit candidate table from a parsed file's AST + the flow product
-/// (the `Unreachable`-bit source). Called once per parsed unit in `bind_program`.
+/// (the `Unreachable`-bit source). Called once per parsed unit in `bind_program`,
+/// with the same `parsed` the `bound` file was bound from — the candidate lookups
+/// resolve its `Statement` rows' addresses.
 #[must_use]
 pub(crate) fn build_candidates(
-    program: &Program<'_>,
+    parsed: ParsedRef<'_>,
     source: &str,
     bound: &BoundFile,
     flow: &FlowProduct,
 ) -> UnreachableCandidates {
+    let ParsedRef { program, view } = parsed;
     let mut walk = CandidateWalk {
+        view,
         bound,
         flow,
         runs: Vec::new(),
     };
-    walk.visit_list(program.body);
+    walk.visit_run(program.body);
     let unused_labels = collect_unused_labels(bound, flow);
-    let suppressed_ranges = compute_suppressed_ranges(source, program.comments);
+    let suppressed_ranges = compute_suppressed_ranges(source, view.comments(program.comments));
     UnreachableCandidates {
         runs: walk.runs,
         unused_labels,
@@ -376,37 +382,43 @@ fn collect_unused_labels(bound: &BoundFile, flow: &FlowProduct) -> Vec<Span> {
     out
 }
 
-/// The candidate-collection walk over the value structure of one file.
+/// The candidate-collection walk over the value structure of one file, and the view
+/// it reads the tree through.
 struct CandidateWalk<'a> {
+    view: AstView<'a>,
     bound: &'a BoundFile,
     flow: &'a FlowProduct,
     runs: Vec<CandidateRun>,
 }
 
-impl CandidateWalk<'_> {
+impl<'a> CandidateWalk<'a> {
     /// The `NodeId` of a statement if it carries the `Unreachable` bit (a
     /// candidate). Only potentially-executable statements ever get the bit
     /// (`bindChildren`'s dead path gates on `IsPotentiallyExecutableNode`), so a
     /// bit-bearing statement *is* a candidate. A safe (non-panicking) address
     /// lookup — a miss (never expected) simply treats the statement as
-    /// non-candidate.
-    fn candidate_id(&self, stmt: &Statement<'_>) -> Option<NodeId> {
-        let id = self
-            .bound
-            .address_map
-            .get(&(addr_of(stmt), statement_kind(stmt)))
-            .copied()?;
+    /// non-candidate. `stmt` is a `Statement` row read in place through the view —
+    /// the row the SoA walk keyed — which the store-range guard asserts, since a
+    /// copy here would silently drop the candidate.
+    #[track_caller]
+    fn candidate_id(&self, stmt: &'a Statement) -> Option<NodeId> {
+        let address = addr_of(stmt);
+        let kind = statement_kind(stmt);
+        debug_assert_stored_key(self.view, address, kind);
+        let id = self.bound.address_map.get(&(address, kind)).copied()?;
         (self.flow.node_flags[id.index()] & NODE_FLAGS_UNREACHABLE != 0).then_some(id)
     }
 
     /// Process a statement list: group maximal runs of consecutive candidates
     /// (recorded, not descended — the suppression), and descend every
     /// non-candidate statement to find dead code in its nested lists / bodies.
-    fn visit_list(&mut self, stmts: &[Statement<'_>]) {
+    fn visit_list(&mut self, stmts: &[StmtId]) {
+        let view = self.view;
         let mut i = 0;
         while i < stmts.len() {
-            let Some(id) = self.candidate_id(&stmts[i]) else {
-                self.descend(&stmts[i]);
+            let stmt = view.stmt(stmts[i]);
+            let Some(id) = self.candidate_id(stmt) else {
+                self.descend(stmt);
                 i += 1;
                 continue;
             };
@@ -415,16 +427,17 @@ impl CandidateWalk<'_> {
             let mut members: SmallVec<[RunMember; 4]> = SmallVec::new();
             members.push(RunMember {
                 span: self.bound.spans[id.index()],
-                kind: classify(&stmts[i]),
+                kind: classify(view, stmt),
             });
             i += 1;
             while i < stmts.len() {
-                let Some(id) = self.candidate_id(&stmts[i]) else {
+                let stmt = view.stmt(stmts[i]);
+                let Some(id) = self.candidate_id(stmt) else {
                     break;
                 };
                 members.push(RunMember {
                     span: self.bound.spans[id.index()],
-                    kind: classify(&stmts[i]),
+                    kind: classify(view, stmt),
                 });
                 i += 1;
             }
@@ -432,121 +445,124 @@ impl CandidateWalk<'_> {
         }
     }
 
+    /// Process a statement-list run (a body, a block, a case's consequent).
+    fn visit_run(&mut self, stmts: Run<StmtId>) {
+        self.visit_list(self.view.stmt_list(stmts));
+    }
+
+    /// Process a single nested statement position (an `if` arm, a loop or label
+    /// body) as a one-statement list.
+    fn visit_one(&mut self, stmt: StmtId) {
+        self.visit_list(std::slice::from_ref(&stmt));
+    }
+
     /// Descend a **non-candidate** statement's nested statement positions and value
     /// expressions (an embedded arrow/function/class body can hide dead code).
-    fn descend(&mut self, stmt: &Statement<'_>) {
+    fn descend(&mut self, stmt: &'a Statement) {
         use StatementKind as S;
+        let view = self.view;
         match &stmt.kind {
             S::ExpressionStatement(s) => self.visit_expr(s.expression),
-            S::VariableDeclaration(d) => {
-                for decl in d.declarations {
-                    self.visit_expr(decl.id);
-                    if let Some(init) = &decl.init {
-                        self.visit_expr(init);
-                    }
-                }
-            }
-            S::FunctionDeclaration(f) => {
+            S::VariableDeclaration(d) => self.visit_declarators(d),
+            &S::FunctionDeclaration(f) => {
+                let f = view.fn_decl(f);
                 self.visit_params(f.params);
-                self.visit_list(f.body.body);
+                self.visit_run(f.body.body);
             }
-            S::ClassDeclaration(c) => {
-                self.visit_class(c.body.body, c.super_class, c.decorators);
+            &S::ClassDeclaration(c) => {
+                let c = view.class_decl(c);
+                self.visit_class(&c.body, c.super_class, c.decorators);
             }
-            S::TSEnumDeclaration(e) => {
-                for m in e.members {
-                    if let Some(init) = &m.initializer {
+            &S::TSEnumDeclaration(e) => {
+                for m in view.enum_members(view.enum_decl(e).members) {
+                    if let Some(init) = m.initializer {
                         self.visit_expr(init);
                     }
                 }
             }
-            S::TSModuleDeclaration(m) => self.visit_module(m),
+            &S::TSModuleDeclaration(m) => self.visit_module(view.module_decl(m)),
             S::ReturnStatement(s) => {
-                if let Some(a) = &s.argument {
+                if let Some(a) = s.argument {
                     self.visit_expr(a);
                 }
             }
             S::ThrowStatement(s) => self.visit_expr(s.argument),
-            S::BlockStatement(b) => self.visit_list(b.body),
+            S::BlockStatement(b) => self.visit_run(b.body),
             S::IfStatement(s) => {
                 self.visit_expr(s.test);
-                self.visit_list(std::slice::from_ref(s.consequent));
+                self.visit_one(s.consequent);
                 if let Some(alt) = s.alternate {
-                    self.visit_list(std::slice::from_ref(alt));
+                    self.visit_one(alt);
                 }
             }
             S::ForStatement(s) => {
-                match &s.init {
-                    Some(ForInit::VariableDeclaration(d)) => {
-                        for decl in d.declarations {
-                            self.visit_expr(decl.id);
-                            if let Some(init) = &decl.init {
-                                self.visit_expr(init);
-                            }
-                        }
-                    }
-                    Some(ForInit::Expression(e)) => self.visit_expr(e),
+                match view.opt_for_head(s.init) {
+                    Some(ForInit::VariableDeclaration(d)) => self.visit_declarators(d),
+                    Some(&ForInit::Expression(e)) => self.visit_expr(e),
                     None => {}
                 }
-                if let Some(t) = &s.test {
+                if let Some(t) = s.test {
                     self.visit_expr(t);
                 }
-                if let Some(u) = &s.update {
+                if let Some(u) = s.update {
                     self.visit_expr(u);
                 }
-                self.visit_list(std::slice::from_ref(s.body));
+                self.visit_one(s.body);
             }
             S::ForInStatement(s) => {
-                self.visit_for_left(s.left);
+                self.visit_for_left(view.for_left(s.left));
                 self.visit_expr(s.right);
-                self.visit_list(std::slice::from_ref(s.body));
+                self.visit_one(s.body);
             }
             S::ForOfStatement(s) => {
-                self.visit_for_left(s.left);
+                self.visit_for_left(view.for_left(s.left));
                 self.visit_expr(s.right);
-                self.visit_list(std::slice::from_ref(s.body));
+                self.visit_one(s.body);
             }
             S::WhileStatement(s) => {
                 self.visit_expr(s.test);
-                self.visit_list(std::slice::from_ref(s.body));
+                self.visit_one(s.body);
             }
             S::DoWhileStatement(s) => {
-                self.visit_list(std::slice::from_ref(s.body));
+                self.visit_one(s.body);
                 self.visit_expr(s.test);
             }
             S::WithStatement(s) => {
                 self.visit_expr(s.object);
-                self.visit_list(std::slice::from_ref(s.body));
+                self.visit_one(s.body);
             }
             S::SwitchStatement(s) => {
                 self.visit_expr(s.discriminant);
-                for case in s.cases {
-                    if let Some(t) = &case.test {
+                for case in view.cases(s.cases) {
+                    if let Some(t) = case.test {
                         self.visit_expr(t);
                     }
-                    self.visit_list(case.consequent);
+                    self.visit_run(case.consequent);
                 }
             }
-            S::TryStatement(s) => {
-                self.visit_list(s.block.body);
-                if let Some(h) = &s.handler {
+            &S::TryStatement(s) => {
+                let s = view.try_stmt(s);
+                self.visit_run(s.block.body);
+                if let Some(h) = view.opt_catch(s.handler) {
                     if let Some(p) = &h.param {
-                        self.visit_expr(p);
+                        self.visit_expression(p);
                     }
-                    self.visit_list(h.body.body);
+                    self.visit_run(h.body.body);
                 }
                 if let Some(f) = &s.finalizer {
-                    self.visit_list(f.body);
+                    self.visit_run(f.body);
                 }
             }
-            S::LabeledStatement(s) => self.visit_list(std::slice::from_ref(s.body)),
-            S::ExportNamedDeclaration(e) => {
-                if let Some(inner) = e.declaration {
-                    self.visit_list(std::slice::from_ref(inner));
+            &S::LabeledStatement(s) => self.visit_one(view.labeled_stmt(s).body),
+            &S::ExportNamedDeclaration(e) => {
+                if let Some(inner) = view.export_named(e).declaration {
+                    self.visit_one(inner);
                 }
             }
-            S::ExportDefaultDeclaration(e) => self.visit_export_default(&e.declaration),
-            S::TSExportAssignment(ea) => self.visit_expr(&ea.expression),
+            &S::ExportDefaultDeclaration(e) => {
+                self.visit_export_default(&view.export_default(e).declaration);
+            }
+            &S::TSExportAssignment(ea) => self.visit_expr(view.export_assign(ea).expression),
             // No value body to descend for dead code.
             S::TSDeclareFunction(_)
             | S::TSInterfaceDeclaration(_)
@@ -562,134 +578,161 @@ impl CandidateWalk<'_> {
         }
     }
 
-    fn visit_for_left(&mut self, left: &ForInOfLeft<'_>) {
-        match left {
-            ForInOfLeft::VariableDeclaration(d) => {
-                for decl in d.declarations {
-                    self.visit_expr(decl.id);
-                    if let Some(init) = &decl.init {
-                        self.visit_expr(init);
-                    }
-                }
+    fn visit_declarators(&mut self, decl: &'a VariableDeclaration) {
+        for d in self.view.declarators(decl.declarations) {
+            self.visit_expr(d.id);
+            if let Some(init) = d.init {
+                self.visit_expr(init);
             }
-            ForInOfLeft::Pattern(e) => self.visit_expr(e),
         }
     }
 
-    fn visit_export_default(&mut self, v: &ExportDefaultValue<'_>) {
+    fn visit_for_left(&mut self, left: &'a ForInOfLeft) {
+        match left {
+            ForInOfLeft::VariableDeclaration(d) => self.visit_declarators(d),
+            &ForInOfLeft::Pattern(e) => self.visit_expr(e),
+        }
+    }
+
+    fn visit_export_default(&mut self, v: &'a ExportDefaultValue) {
         use ExportDefaultValue as V;
         match v {
-            V::Expression(e) => self.visit_expr(e),
+            &V::Expression(e) => self.visit_expr(e),
             V::FunctionDeclaration(f) => {
                 self.visit_params(f.params);
-                self.visit_list(f.body.body);
+                self.visit_run(f.body.body);
             }
-            V::ClassDeclaration(c) => self.visit_class(c.body.body, c.super_class, c.decorators),
+            V::ClassDeclaration(c) => self.visit_class(&c.body, c.super_class, c.decorators),
             V::TSDeclareFunction(_) | V::TSInterfaceDeclaration(_) => {}
         }
     }
 
     fn visit_class(
         &mut self,
-        members: &[ClassMember<'_>],
-        super_class: Option<&Expression<'_>>,
-        decorators: Option<&[Decorator<'_>]>,
+        body: &'a ClassBody,
+        super_class: Option<ExprId>,
+        decorators: Option<Run<Decorator>>,
     ) {
+        let view = self.view;
         self.visit_decorators(decorators);
         if let Some(sc) = super_class {
             self.visit_expr(sc);
         }
-        for member in members {
+        for member in view.class_members(body.body) {
             match member {
                 ClassMember::MethodDefinition(m) => {
                     self.visit_decorators(m.decorators);
                     self.visit_params(m.value.params);
-                    self.visit_list(m.value.body.body);
+                    self.visit_run(m.value.body.body);
                 }
                 ClassMember::PropertyDefinition(p) => {
                     self.visit_decorators(p.decorators);
-                    if let Some(v) = &p.value {
+                    if let Some(v) = p.value {
                         self.visit_expr(v);
                     }
                 }
-                ClassMember::StaticBlock(s) => self.visit_list(s.body),
+                ClassMember::StaticBlock(s) => self.visit_run(s.body),
                 ClassMember::IndexSignature(_) => {}
             }
         }
     }
 
-    fn visit_module(&mut self, m: &TSModuleDeclaration<'_>) {
+    fn visit_module(&mut self, m: &'a TSModuleDeclaration) {
         match &m.body {
-            Some(TSModuleDeclarationBody::TSModuleBlock(block)) => self.visit_list(block.body),
-            Some(TSModuleDeclarationBody::TSModuleDeclaration(nested)) => self.visit_module(nested),
+            Some(TSModuleDeclarationBody::TSModuleBlock(block)) => self.visit_run(block.body),
+            &Some(TSModuleDeclarationBody::TSModuleDeclaration(nested)) => {
+                self.visit_module(self.view.module_decl(nested));
+            }
             None => {}
         }
     }
 
-    fn visit_decorators(&mut self, decorators: Option<&[Decorator<'_>]>) {
-        if let Some(decs) = decorators {
+    fn visit_decorators(&mut self, decorators: Option<Run<Decorator>>) {
+        if let Some(decs) = self.view.opt_decorators(decorators) {
             for d in decs {
-                self.visit_expr(&d.expression);
+                self.visit_expr(d.expression);
             }
         }
     }
 
-    fn visit_params(&mut self, params: &[Expression<'_>]) {
-        for p in params {
+    fn visit_params(&mut self, params: Run<Expression>) {
+        for p in self.view.exprs(params) {
             self.visit_param(p);
         }
     }
 
-    fn visit_param(&mut self, param: &Expression<'_>) {
+    fn visit_param_id(&mut self, id: ExprId) {
+        self.visit_param(self.view.expr(id));
+    }
+
+    fn visit_param(&mut self, param: &'a Expression) {
         use ExpressionKind as E;
+        let view = self.view;
         match &param.kind {
             E::AssignmentPattern(a) => {
-                self.visit_param(a.left);
+                self.visit_param_id(a.left);
                 self.visit_expr(a.right);
             }
             E::ObjectPattern(op) => {
-                for prop in op.properties {
+                for prop in view.pat_props(op.properties) {
                     match prop {
-                        ObjectPatternProperty::Property(pr) => self.visit_param(pr.value),
-                        ObjectPatternProperty::RestElement(r) => self.visit_param(r.argument),
+                        ObjectPatternProperty::Property(pr) => self.visit_param_id(pr.value),
+                        ObjectPatternProperty::RestElement(r) => self.visit_param_id(r.argument),
                     }
                 }
             }
             E::ArrayPattern(ap) => {
-                for el in ap.elements.iter().flatten() {
-                    self.visit_param(el);
+                for &el in view.expr_opt_list(ap.elements).iter().flatten() {
+                    self.visit_param_id(el);
                 }
             }
-            E::RestElement(r) => self.visit_param(r.argument),
-            E::TSParameterProperty(pp) => self.visit_param(pp.parameter),
+            E::RestElement(r) => self.visit_param_id(r.argument),
+            E::TSParameterProperty(pp) => self.visit_param_id(pp.parameter),
             _ => {}
+        }
+    }
+
+    /// Visit the expression `id` names, read in place from its store.
+    fn visit_expr(&mut self, id: ExprId) {
+        self.visit_expression(self.view.expr(id));
+    }
+
+    fn visit_expr_list(&mut self, list: Run<ExprId>) {
+        for &e in self.view.expr_list(list) {
+            self.visit_expr(e);
         }
     }
 
     /// Descend a value expression, looking for embedded function/arrow/class
     /// bodies (which hold their own statement lists / dead code).
-    fn visit_expr(&mut self, expr: &Expression<'_>) {
+    fn visit_expression(&mut self, expr: &'a Expression) {
         use ExpressionKind as E;
+        let view = self.view;
         match &expr.kind {
-            E::FunctionExpression(f) => {
+            &E::FunctionExpression(f) => {
+                let f = view.fn_expr(f);
                 self.visit_params(f.params);
-                self.visit_list(f.body.body);
+                self.visit_run(f.body.body);
             }
-            E::ArrowFunctionExpression(a) => {
+            &E::ArrowFunctionExpression(a) => {
+                let a = view.arrow_fn(a);
                 self.visit_params(a.params);
                 match &a.body {
-                    ArrowFunctionBody::Expression(e) => self.visit_expr(e),
-                    ArrowFunctionBody::BlockStatement(b) => self.visit_list(b.body),
+                    &ArrowFunctionBody::Expression(e) => self.visit_expr(e),
+                    ArrowFunctionBody::BlockStatement(b) => self.visit_run(b.body),
                 }
             }
-            E::ClassExpression(c) => self.visit_class(c.body.body, c.super_class, c.decorators),
+            &E::ClassExpression(c) => {
+                let c = view.class_expr(c);
+                self.visit_class(&c.body, c.super_class, c.decorators);
+            }
             E::TSAsExpression(t) => self.visit_expr(t.expression),
             E::TSSatisfiesExpression(t) => self.visit_expr(t.expression),
             E::TSTypeAssertion(t) => self.visit_expr(t.expression),
             E::TSInstantiationExpression(t) => self.visit_expr(t.expression),
             E::TSNonNullExpression(t) => self.visit_expr(t.expression),
             E::ParenthesizedExpression(p) => self.visit_expr(p.expression),
-            E::CommentBoundPair(c) => self.visit_expr(c.inner),
+            &E::CommentBoundPair(c) => self.visit_expr(view.comment_pair(c).inner),
             E::UnaryExpression(u) => self.visit_expr(u.argument),
             E::UpdateExpression(u) => self.visit_expr(u.argument),
             E::AwaitExpression(a) => self.visit_expr(a.argument),
@@ -711,22 +754,14 @@ impl CandidateWalk<'_> {
                 self.visit_expr(c.consequent);
                 self.visit_expr(c.alternate);
             }
-            E::SequenceExpression(s) => {
-                for e in s.expressions {
-                    self.visit_expr(e);
-                }
-            }
+            E::SequenceExpression(s) => self.visit_expr_list(s.expressions),
             E::CallExpression(c) => {
                 self.visit_expr(c.callee);
-                for a in c.arguments {
-                    self.visit_expr(a);
-                }
+                self.visit_expr_list(c.arguments);
             }
             E::NewExpression(n) => {
                 self.visit_expr(n.callee);
-                for a in n.arguments {
-                    self.visit_expr(a);
-                }
+                self.visit_expr_list(n.arguments);
             }
             E::MemberExpression(m) => {
                 self.visit_expr(m.object);
@@ -734,12 +769,12 @@ impl CandidateWalk<'_> {
             }
             E::SpreadElement(s) => self.visit_expr(s.argument),
             E::ArrayExpression(a) => {
-                for e in a.elements.iter().flatten() {
+                for &e in view.expr_opt_list(a.elements).iter().flatten() {
                     self.visit_expr(e);
                 }
             }
             E::ObjectExpression(o) => {
-                for prop in o.properties {
+                for prop in view.obj_props(o.properties) {
                     match prop {
                         ObjectProperty::Property(pr) => {
                             self.visit_expr(pr.key);
@@ -749,16 +784,11 @@ impl CandidateWalk<'_> {
                     }
                 }
             }
-            E::TemplateLiteral(t) => {
-                for e in t.expressions {
-                    self.visit_expr(e);
-                }
-            }
-            E::TaggedTemplateExpression(t) => {
+            E::TemplateLiteral(t) => self.visit_expr_list(t.expressions),
+            &E::TaggedTemplateExpression(t) => {
+                let t = view.tagged_tpl(t);
                 self.visit_expr(t.tag);
-                for e in t.quasi.expressions {
-                    self.visit_expr(e);
-                }
+                self.visit_expr_list(t.quasi.expressions);
             }
             E::ImportExpression(i) => {
                 self.visit_expr(i.source);
@@ -771,7 +801,7 @@ impl CandidateWalk<'_> {
                 self.visit_expr(a.right);
             }
             E::ObjectPattern(op) => {
-                for prop in op.properties {
+                for prop in view.pat_props(op.properties) {
                     match prop {
                         ObjectPatternProperty::Property(pr) => {
                             self.visit_expr(pr.key);
@@ -782,7 +812,7 @@ impl CandidateWalk<'_> {
                 }
             }
             E::ArrayPattern(ap) => {
-                for el in ap.elements.iter().flatten() {
+                for &el in view.expr_opt_list(ap.elements).iter().flatten() {
                     self.visit_expr(el);
                 }
             }
@@ -795,13 +825,13 @@ impl CandidateWalk<'_> {
 }
 
 /// Classify a candidate statement for the option filter.
-fn classify(stmt: &Statement<'_>) -> CandidateKind {
+fn classify(view: AstView<'_>, stmt: &Statement) -> CandidateKind {
     match &stmt.kind {
         StatementKind::TSEnumDeclaration(e) => CandidateKind::Enum {
-            is_const: e.r#const,
+            is_const: view.enum_decl(*e).r#const,
         },
         StatementKind::TSModuleDeclaration(m) => CandidateKind::Module {
-            state: module_instance_state(m),
+            state: module_instance_state(view, view.module_decl(*m)),
         },
         _ => CandidateKind::Plain,
     }
@@ -809,21 +839,25 @@ fn classify(stmt: &Statement<'_>) -> CandidateKind {
 
 /// `GetModuleInstanceState` (tsgo utilities.go:2302) — a namespace with no body
 /// (`declare module 'x';`) is instantiated; otherwise fold its block.
-fn module_instance_state(m: &TSModuleDeclaration<'_>) -> ModuleInstanceState {
+fn module_instance_state(view: AstView<'_>, m: &TSModuleDeclaration) -> ModuleInstanceState {
     match &m.body {
         None => ModuleInstanceState::Instantiated,
-        Some(TSModuleDeclarationBody::TSModuleBlock(block)) => block_instance_state(block.body),
-        Some(TSModuleDeclarationBody::TSModuleDeclaration(nested)) => module_instance_state(nested),
+        Some(TSModuleDeclarationBody::TSModuleBlock(block)) => {
+            block_instance_state(view, view.stmt_list(block.body))
+        }
+        &Some(TSModuleDeclarationBody::TSModuleDeclaration(nested)) => {
+            module_instance_state(view, view.module_decl(nested))
+        }
     }
 }
 
 /// The `ModuleBlock` fold of `getModuleInstanceStateWorker` (tsgo utilities.go:2363):
 /// non-instantiated unless a member is const-enum-only (→ const-enum-only) or
 /// instantiated (→ instantiated, short-circuit).
-fn block_instance_state(stmts: &[Statement<'_>]) -> ModuleInstanceState {
+fn block_instance_state(view: AstView<'_>, stmts: &[StmtId]) -> ModuleInstanceState {
     let mut state = ModuleInstanceState::NonInstantiated;
-    for stmt in stmts {
-        match statement_instance_state(stmt) {
+    for &stmt in stmts {
+        match statement_instance_state(view, view.stmt(stmt)) {
             ModuleInstanceState::NonInstantiated => {}
             ModuleInstanceState::ConstEnumOnly => state = ModuleInstanceState::ConstEnumOnly,
             ModuleInstanceState::Instantiated => return ModuleInstanceState::Instantiated,
@@ -833,14 +867,14 @@ fn block_instance_state(stmts: &[Statement<'_>]) -> ModuleInstanceState {
 }
 
 /// The per-statement classification of `getModuleInstanceStateWorker`'s switch.
-fn statement_instance_state(stmt: &Statement<'_>) -> ModuleInstanceState {
+fn statement_instance_state(view: AstView<'_>, stmt: &Statement) -> ModuleInstanceState {
     use StatementKind as S;
     match &stmt.kind {
         S::TSInterfaceDeclaration(_) | S::TSTypeAliasDeclaration(_) => {
             ModuleInstanceState::NonInstantiated
         }
-        S::TSEnumDeclaration(e) => {
-            if e.r#const {
+        &S::TSEnumDeclaration(e) => {
+            if view.enum_decl(e).r#const {
                 ModuleInstanceState::ConstEnumOnly
             } else {
                 ModuleInstanceState::Instantiated
@@ -853,11 +887,11 @@ fn statement_instance_state(stmt: &Statement<'_>) -> ModuleInstanceState {
         S::ImportDeclaration(_) | S::TSImportEqualsDeclaration(_) => {
             ModuleInstanceState::NonInstantiated
         }
-        S::TSModuleDeclaration(nested) => module_instance_state(nested),
-        S::ExportNamedDeclaration(e) => match e.declaration {
+        &S::TSModuleDeclaration(nested) => module_instance_state(view, view.module_decl(nested)),
+        &S::ExportNamedDeclaration(e) => match view.export_named(e).declaration {
             // `export interface` / `export const enum` / `export const` — classify
             // the wrapped declaration.
-            Some(inner) => statement_instance_state(inner),
+            Some(inner) => statement_instance_state(view, view.stmt(inner)),
             // Bare `export { … }` alias targets: a faithful resolution
             // (`getModuleInstanceStateForAliasTarget`) walks the enclosing scope per
             // name — a type-only re-export folds to NonInstantiated. tsv does not
@@ -877,17 +911,20 @@ mod tests {
     use super::*;
     use crate::binder::{bind_file, flow::build_flow};
     use crate::ids::FileId;
-    use bumpalo::Bump;
+    use tsv_ts::ast::Parsed;
 
-    /// Emit both sinks under `options` and return them owned (the arena drops here
+    fn parse(source: &str) -> Parsed {
+        tsv_ts::__private::parse(source).expect("parse")
+    }
+
+    /// Emit both sinks under `options` and return them owned (the parse drops here
     /// — the candidate table and diagnostics borrow nothing from it).
     #[expect(clippy::trivially_copy_pass_by_ref)]
     fn emit_both(source: &str, opts: &CheckOptions) -> (Vec<Diagnostic>, Vec<Diagnostic>) {
-        let arena = Bump::new();
-        let program = tsv_ts::__private::parse(source, &arena).expect("parse");
-        let bound = bind_file(&program, source, FileId::ROOT);
-        let flow = build_flow(&program, source, &bound);
-        let cands = build_candidates(&program, source, &bound, &flow);
+        let parsed = parse(source);
+        let bound = bind_file((&parsed).into(), source, FileId::ROOT);
+        let flow = build_flow((&parsed).into(), source, &bound);
+        let cands = build_candidates((&parsed).into(), source, &bound, &flow);
         let mut diags = Vec::new();
         let mut sugg = Vec::new();
         cands.emit(FileId::ROOT, opts, &mut diags, &mut sugg);
@@ -1056,12 +1093,13 @@ mod tests {
     fn module_instance_state_classification() {
         // Interface/type only → non-instantiated; const enum only → const-enum-only;
         // a value → instantiated.
-        let arena = Bump::new();
-        let parse = |s: &str| tsv_ts::__private::parse(s, &arena).expect("parse");
         let state_of = |src: &str| -> ModuleInstanceState {
-            let program = parse(src);
-            match &program.body[0].kind {
-                StatementKind::TSModuleDeclaration(m) => module_instance_state(m),
+            let parsed = parse(src);
+            let view = parsed.view();
+            match &view.stmt(view.stmt_list(parsed.program.body)[0]).kind {
+                &StatementKind::TSModuleDeclaration(m) => {
+                    module_instance_state(view, view.module_decl(m))
+                }
                 _ => panic!("expected a module"),
             }
         };

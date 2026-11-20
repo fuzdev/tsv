@@ -35,12 +35,14 @@ use crate::ids::FileId;
 use crate::span_scan::{bracket_end, bracket_start};
 use tsv_lang::{FxHashMap, Span};
 use tsv_ts::ast::{
-    ClassMember, Expression, ExpressionKind, Literal, LiteralValue, MethodKind, TSTypeElement,
-    TSTypeParameterDeclaration,
+    AstView, ClassMember, Expression, ExpressionKind, Literal, LiteralValue, MethodKind,
+    TSTypeElement, TSTypeParameterDeclaration,
 };
 
-/// The per-body derivation context (source for names, file for spans).
+/// The per-body derivation context (the view the members are read through, source
+/// for names, file for spans).
 pub(super) struct MemberCtx<'a> {
+    pub view: AstView<'a>,
     pub source: &'a str,
     pub file: FileId,
 }
@@ -82,7 +84,7 @@ enum State {
 /// TS2300 diagnostics to `out`.
 pub(super) fn check_class_members(
     ctx: &MemberCtx<'_>,
-    members: &[ClassMember<'_>],
+    members: &[ClassMember],
     out: &mut Vec<Diagnostic>,
 ) {
     let entries = class_entries(ctx, members);
@@ -93,7 +95,7 @@ pub(super) fn check_class_members(
 /// property/accessor signatures, appending TS2300 diagnostics to `out`.
 pub(super) fn check_type_elements(
     ctx: &MemberCtx<'_>,
-    members: &[TSTypeElement<'_>],
+    members: &[TSTypeElement],
     out: &mut Vec<Diagnostic>,
 ) {
     let entries = type_element_entries(ctx, members);
@@ -102,15 +104,16 @@ pub(super) fn check_type_elements(
 
 /// Build the entry list for a class body (constructor param-properties expanded in
 /// place; methods kept for the batch but unclassified).
-fn class_entries(ctx: &MemberCtx<'_>, members: &[ClassMember<'_>]) -> Vec<Entry> {
+fn class_entries(ctx: &MemberCtx<'_>, members: &[ClassMember]) -> Vec<Entry> {
     let mut entries = Vec::new();
     for member in members {
         match member {
             ClassMember::MethodDefinition(m) => match m.kind {
                 MethodKind::Constructor => {
-                    for param in m.value.params {
+                    for param in ctx.view.exprs(m.value.params) {
                         if let ExpressionKind::TSParameterProperty(pp) = &param.kind
-                            && let Some((key, span)) = param_property_key(ctx, pp.parameter)
+                            && let Some((key, span)) =
+                                param_property_key(ctx, ctx.view.expr(pp.parameter))
                         {
                             entries.push(Entry {
                                 display: key.clone(),
@@ -124,7 +127,9 @@ fn class_entries(ctx: &MemberCtx<'_>, members: &[ClassMember<'_>]) -> Vec<Entry>
                     }
                 }
                 MethodKind::Method => {
-                    if let Some((key, display, span)) = member_key(ctx, &m.key, m.computed) {
+                    if let Some((key, display, span)) =
+                        member_key(ctx, ctx.view.expr(m.key), m.computed)
+                    {
                         entries.push(Entry {
                             key,
                             display,
@@ -136,7 +141,9 @@ fn class_entries(ctx: &MemberCtx<'_>, members: &[ClassMember<'_>]) -> Vec<Entry>
                     }
                 }
                 MethodKind::Get | MethodKind::Set => {
-                    if let Some((key, display, span)) = member_key(ctx, &m.key, m.computed) {
+                    if let Some((key, display, span)) =
+                        member_key(ctx, ctx.view.expr(m.key), m.computed)
+                    {
                         entries.push(Entry {
                             key,
                             display,
@@ -149,7 +156,9 @@ fn class_entries(ctx: &MemberCtx<'_>, members: &[ClassMember<'_>]) -> Vec<Entry>
                 }
             },
             ClassMember::PropertyDefinition(p) => {
-                if let Some((key, display, span)) = member_key(ctx, &p.key, p.computed) {
+                if let Some((key, display, span)) =
+                    member_key(ctx, ctx.view.expr(p.key), p.computed)
+                {
                     let classify = if p.accessor {
                         MemberKind::Accessor
                     } else {
@@ -173,12 +182,14 @@ fn class_entries(ctx: &MemberCtx<'_>, members: &[ClassMember<'_>]) -> Vec<Entry>
 
 /// Build the entry list for an interface / type-literal body. Every member is
 /// instance (no static); call/construct/index signatures carry no name.
-fn type_element_entries(ctx: &MemberCtx<'_>, members: &[TSTypeElement<'_>]) -> Vec<Entry> {
+fn type_element_entries(ctx: &MemberCtx<'_>, members: &[TSTypeElement]) -> Vec<Entry> {
     let mut entries = Vec::new();
     for member in members {
         match member {
             TSTypeElement::PropertySignature(p) => {
-                if let Some((key, display, span)) = member_key(ctx, &p.key, p.computed) {
+                if let Some((key, display, span)) =
+                    member_key(ctx, ctx.view.expr(p.key), p.computed)
+                {
                     entries.push(Entry {
                         key,
                         display,
@@ -190,7 +201,9 @@ fn type_element_entries(ctx: &MemberCtx<'_>, members: &[TSTypeElement<'_>]) -> V
                 }
             }
             TSTypeElement::MethodSignature(m) => {
-                if let Some((key, display, span)) = member_key(ctx, &m.key, m.computed) {
+                if let Some((key, display, span)) =
+                    member_key(ctx, ctx.view.expr(m.key), m.computed)
+                {
                     let classify = match m.kind {
                         MethodKind::Get | MethodKind::Set => Some(MemberKind::Accessor),
                         // A plain method signature is unclassified but still batched.
@@ -304,13 +317,14 @@ fn make_2300(file: FileId, span: Span, display: &str) -> Diagnostic {
 //       merges same-name type params silently (no bind diagnostic)
 pub(super) fn check_type_parameters(
     ctx: &MemberCtx<'_>,
-    decl: &TSTypeParameterDeclaration<'_>,
+    decl: &TSTypeParameterDeclaration,
     out: &mut Vec<Diagnostic>,
 ) {
-    for (i, param) in decl.params.iter().enumerate() {
-        let name = param.name.name(ctx.source);
-        for prior in &decl.params[..i] {
-            if prior.name.name(ctx.source) == name {
+    let params = ctx.view.type_params(decl.params);
+    for (i, param) in params.iter().enumerate() {
+        let name = param.name.name(ctx.source, ctx.view);
+        for prior in &params[..i] {
+            if prior.name.name(ctx.source, ctx.view) == name {
                 out.push(make_2300(ctx.file, param.name.name_span(), name));
             }
         }
@@ -327,7 +341,7 @@ pub(super) fn check_type_parameters(
 /// computed key (`'["a"]'`, not `'a'`).
 fn member_key(
     ctx: &MemberCtx<'_>,
-    key: &Expression<'_>,
+    key: &Expression,
     computed: bool,
 ) -> Option<(String, String, Span)> {
     if computed {
@@ -350,14 +364,14 @@ fn member_key(
     }
     match &key.kind {
         ExpressionKind::Identifier(id) => {
-            let name = id.name(ctx.source).to_string();
+            let name = id.name(ctx.source, ctx.view).to_string();
             Some((name.clone(), name, id.name_span()))
         }
         ExpressionKind::Literal(lit) => literal_key(ctx, lit).map(|k| (k.clone(), k, lit.span)),
         ExpressionKind::PrivateIdentifier(pid) => {
             // A `#name` — key it with the `#` so it never collides with the public
             // `name`; the diagnostic covers the whole `#name` node.
-            let name = pid.name(key.span, ctx.source);
+            let name = pid.name(key.span, ctx.source, ctx.view);
             let keyed = format!("#{name}");
             Some((keyed.clone(), keyed, key.span))
         }
@@ -368,34 +382,39 @@ fn member_key(
 /// The key of a constructor parameter property: the parameter identifier's name
 /// (unwrapping a default `= …`). `None` when the name is a binding pattern (tsgo's
 /// `!ast.IsBindingPattern(param.Name())` guard) — those contribute no member.
-fn param_property_key(ctx: &MemberCtx<'_>, parameter: &Expression<'_>) -> Option<(String, Span)> {
-    let inner = match parameter {
-        Expression {
-            kind: ExpressionKind::AssignmentPattern(a),
-            ..
-        } => a.left,
-        other => other,
+fn param_property_key(ctx: &MemberCtx<'_>, parameter: &Expression) -> Option<(String, Span)> {
+    let inner = match &parameter.kind {
+        ExpressionKind::AssignmentPattern(a) => ctx.view.expr(a.left),
+        _ => parameter,
     };
     match &inner.kind {
-        ExpressionKind::Identifier(id) => Some((id.name(ctx.source).to_string(), id.name_span())),
+        ExpressionKind::Identifier(id) => {
+            Some((id.name(ctx.source, ctx.view).to_string(), id.name_span()))
+        }
         _ => None,
     }
 }
 
 /// The canonical key string of a literal property name: a string's decoded value,
-/// a decimal number's ECMA-262 `Number::toString` form (so `0`, `0.0`, `0e0` all key
-/// `0` and collide with the string `'0'`), a bigint's verbatim source (conservative —
-/// never over-collides). A non-decimal numeric literal (`0x0`, `0o7`, `1_0`) the
-/// parser currently decodes to `NaN` falls back to its verbatim source too, so those
-/// forms stay distinct rather than all keying `"NaN"`.
-fn literal_key(ctx: &MemberCtx<'_>, lit: &Literal<'_>) -> Option<String> {
+/// a number's ECMA-262 `Number::toString` form (so `0`, `0.0`, `0e0` all key `0` and
+/// collide with the string `'0'`), a bigint's verbatim source (conservative — never
+/// over-collides). Non-decimal and separated numeric literals (`0x1`, `0o7`, `1_0`)
+/// are decoded by the parser, so they key their value too (`0x1` keys `"1"`, `1_0`
+/// keys `"10"`). A `NaN` value falls back to its verbatim source — a defensive arm no
+/// literal is known to reach — so distinct forms could never all key `"NaN"`.
+fn literal_key(ctx: &MemberCtx<'_>, lit: &Literal) -> Option<String> {
     match &lit.value {
-        LiteralValue::String(cooked) => Some(cooked.resolve(lit.span, ctx.source).to_string()),
-        // A non-decimal numeric literal decodes to NaN upstream; key it on its
-        // verbatim source (like the bigint arm) so distinct forms stay distinct —
-        // `ecma_number_to_string(NaN)` would collapse them all to `"NaN"` and collide.
-        LiteralValue::Number(n) if n.is_nan() => Some(lit.span.extract(ctx.source).to_string()),
-        LiteralValue::Number(n) => Some(ecma_number_to_string(*n)),
+        LiteralValue::String(cooked) => {
+            Some(cooked.resolve(lit.span, ctx.source, ctx.view).to_string())
+        }
+        // Defensive: the parser decodes every numeric literal form, so no literal is
+        // known to carry NaN. Were one to, key it on its verbatim source (like the
+        // bigint arm) — `ecma_number_to_string(NaN)` would collapse every such form to
+        // `"NaN"` and collide.
+        LiteralValue::Number(n) if n.get().is_nan() => {
+            Some(lit.span.extract(ctx.source).to_string())
+        }
+        LiteralValue::Number(n) => Some(ecma_number_to_string(n.get())),
         LiteralValue::BigInt => Some(lit.span.extract(ctx.source).to_string()),
         LiteralValue::Boolean(_) | LiteralValue::Null => None,
     }
@@ -489,8 +508,8 @@ mod tests {
         assert_eq!(ecma_number_to_string(0.0), "0");
         assert_eq!(ecma_number_to_string(-0.0), "0");
         // `0` and `0.0` and `0e0` all parse to the same f64 → same key (they collide).
-        // (A non-decimal `0x0` decodes to NaN upstream and is keyed on verbatim
-        // source instead — see `literal_key` — so it does NOT reach this helper.)
+        // (A non-decimal `0x0` is decoded by the parser to the same 0, so it keys
+        // `"0"` through this helper too.)
         assert_eq!(ecma_number_to_string(1.0), "1");
         assert_eq!(ecma_number_to_string(100.0), "100");
         assert_eq!(ecma_number_to_string(255.0), "255");
