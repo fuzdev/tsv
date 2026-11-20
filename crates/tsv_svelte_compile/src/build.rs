@@ -73,8 +73,11 @@
 //!   TypeScript read goes through the builder's view (`b.view()`) instead.
 
 use tsv_lang::Span;
-use tsv_lang::store::{Id, Run};
-use tsv_ts::__private::{MintList, MintRow, push, push_escaped_name, push_list, push_text};
+use tsv_lang::store::{Id, ListMark, Run};
+use tsv_ts::__private::{
+    MintList, MintRow, extend_from_run, flush, open, push, push_escaped_name, push_item, push_list,
+    push_text,
+};
 use tsv_ts::ast::{
     ArrayExpression, ArrowFunctionBody, ArrowFunctionExpression, AssignmentExpression,
     AssignmentOperator, AstStores, AstView, BinaryExpression, BinaryOperator, BlockStatement,
@@ -86,6 +89,83 @@ use tsv_ts::ast::{
     UpdateExpression, UpdateOperator, VariableDeclaration, VariableDeclarationKind,
     VariableDeclarator,
 };
+
+use crate::CompileError;
+
+/// One element's outcome in a rebuilt list.
+pub(crate) enum Item<T> {
+    /// Unchanged — the element is the input's.
+    Keep,
+    /// Rebuilt — the element is this one.
+    Replace(T),
+    /// Gone — the list loses the element.
+    Drop,
+}
+
+impl<T> From<Option<T>> for Item<T> {
+    #[inline]
+    fn from(item: Option<T>) -> Self {
+        item.map_or(Item::Keep, Item::Replace)
+    }
+}
+
+/// A rewriter writing into the host stores: what [`rebuild_run`] reaches them by.
+pub(crate) trait HasStores {
+    /// The stores the rewriter reads the input from and pushes its rebuild into.
+    fn stores(&mut self) -> &mut AstStores;
+}
+
+/// Rebuild `run` through a per-element rewrite, sharing the input when no element
+/// changed (`None`). The lazy-prefix rebuild of the write surface: until the first
+/// change nothing is written; the first changed (or dropped) element opens a frame
+/// and copies the unchanged prefix in one block, and every later element is pushed
+/// as it comes. The first changed element's `each` runs before the frame opens;
+/// every later `each` runs with the frame open beneath it, and any frame it opens is
+/// flushed before it returns `Ok`, so the frames nest last in, first out. An `Err`
+/// abandons the open frame and whatever `each` left above it (the node contract's
+/// "an `Err` may leave frames open").
+///
+/// `read` is the view accessor of `T`'s family; each element is read by index and
+/// copied out, so no view is held across `each`.
+pub(crate) fn rebuild_run<C: HasStores, T: MintList>(
+    ctx: &mut C,
+    run: Run<T>,
+    read: for<'v> fn(AstView<'v>, Run<T>) -> &'v [T],
+    mut each: impl FnMut(&mut C, T) -> Result<Item<T>, CompileError>,
+) -> Result<Option<Run<T>>, CompileError> {
+    let mut mark: Option<ListMark<T>> = None;
+    for i in 0..run.len() {
+        let item = read(ctx.stores().view(), run)[i];
+        let out = each(ctx, item)?;
+        let stores = ctx.stores();
+        match out {
+            Item::Keep => {
+                if mark.is_some() {
+                    push_item(stores, item);
+                }
+            }
+            Item::Replace(new) => {
+                if mark.is_none() {
+                    mark = Some(open_with_prefix(stores, run, i));
+                }
+                push_item(stores, new);
+            }
+            Item::Drop => {
+                if mark.is_none() {
+                    mark = Some(open_with_prefix(stores, run, i));
+                }
+            }
+        }
+    }
+    Ok(mark.map(|mark| flush(ctx.stores(), mark)))
+}
+
+/// Open a frame for a rebuild of `run` and copy its unchanged prefix `0..index`.
+fn open_with_prefix<T: MintList>(stores: &mut AstStores, run: Run<T>, index: usize) -> ListMark<T> {
+    let mark = open::<T>(stores);
+    extend_from_run(stores, run, 0..index);
+    mark
+}
 
 /// The appendix-buffer bookkeeping plus the stores every node constructor pushes
 /// into. Owns the growing buffer; the stores are the host document's TypeScript half

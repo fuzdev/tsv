@@ -9,10 +9,14 @@
 //! `analyze_component`).
 //!
 //! **Structural sharing.** Every entry point returns `Option<T>`: `None` means
-//! *unchanged*, so the caller reuses the borrow and nothing is allocated. A
-//! subtree with no TypeScript beneath it is never rebuilt. Clones are shallow —
-//! children are `&'arena T` / `&'arena [T]`, so a rebuilt node copies pointers,
-//! never a subtree.
+//! *unchanged*, so the caller keeps the input id or run and nothing is pushed. A
+//! `Some` is not always a push: a wrapper that unwraps (`x as T`, `/** … */ (x)`)
+//! over an unchanged inner expression yields that inner expression's host id. A
+//! subtree with no TypeScript beneath it is never rebuilt. A rebuild is shallow —
+//! children are ids and runs into the host stores, so a rebuilt node copies its
+//! row with the changed edges swapped and pushes it, never a subtree. A rebuilt
+//! list is the lazy-prefix rebuild (`build`'s [`rebuild_run`]): the first changed element
+//! opens a frame and copies the unchanged prefix in one block.
 //!
 //! **Exhaustive by construction.** The `Statement` and `Expression` matches have
 //! no catch-all arm. A new AST variant fails compilation here instead of
@@ -42,22 +46,25 @@
 //!   drop deliberately does **not** reach backward: a JSDoc above an erased
 //!   `interface` survives onto the next statement, exactly where the oracle puts it.
 
-use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::Span;
 use tsv_lang::source_scan::{TriviaProfile, skip_trivia, skip_trivia_run};
 use tsv_lang::store::Run;
+use tsv_ts::__private::{push, push_list};
 use tsv_ts::ast::{
-    ArrayPattern, ArrowFunctionBody, ArrowFunctionExpression, AssignmentPattern, BlockStatement,
-    CatchClause, ClassBody, ClassDeclaration, ClassExpression, ClassMember, EmptyStatement,
-    ExportDefaultValue, ExportKind, ExprId, Expression, ExpressionKind, ForInOfLeft, ForInit,
-    FunctionDeclaration, FunctionExpression, Identifier, ImportKind, ImportSpecifier,
-    MethodDefinition, MethodKind, ObjectPattern, ObjectPatternProperty, ObjectProperty, Property,
-    PropertyDefinition, PropertyKind, PropertyModifier, RestElement, Statement, StatementKind,
-    StaticBlock, StmtId, SwitchCase, TSModuleDeclarationBody, TemplateLiteral, VariableDeclaration,
-    VariableDeclarator,
+    ArrayPattern, ArrowFunctionBody, ArrowFunctionExpression, AssignmentPattern, AstStores,
+    AstView, BindingExtraId, BlockStatement, CatchClause, ClassBody, ClassDeclaration,
+    ClassExpression, ClassMember, Decorator, EmptyStatement, ExportDefaultDeclaration,
+    ExportDefaultValue, ExportKind, ExportNamedDeclaration, ExprId, Expression, ExpressionKind,
+    ForInOfLeft, ForInit, FunctionDeclaration, FunctionExpression, Identifier, ImportDeclaration,
+    ImportKind, ImportSpecifier, LabeledStatement, MethodDefinition, MethodKind, ObjectPattern,
+    ObjectPatternProperty, ObjectProperty, Property, PropertyDefinition, PropertyKind,
+    PropertyModifier, RestElement, Statement, StatementKind, StaticBlock, StmtId, SwitchCase,
+    TSInterfaceHeritage, TSModuleDeclarationBody, TSParameterProperty, TaggedTemplateExpression,
+    TemplateLiteral, TryStatement, VariableDeclaration, VariableDeclarator,
 };
 
 use crate::CompileError;
+use crate::build::{HasStores, Item, rebuild_run};
 use crate::refusal::Refusal;
 use crate::text_class::{is_js_whitespace, js_char_at};
 
@@ -79,14 +86,15 @@ pub(crate) struct Erased {
     pub(crate) typescript: bool,
 }
 
-/// Erase every TypeScript-only construct from a statement list.
-pub(crate) fn erase_statements<'arena>(
-    arena: &'arena bumpalo::Bump,
+/// Erase every TypeScript-only construct from a statement list, pushing the rows
+/// of every rebuild into `stores` beside the parse's.
+pub(crate) fn erase_statements(
+    stores: &mut AstStores,
     source: &str,
-    stmts: &'arena [Statement<'arena>],
-) -> Result<Erased<'arena>, CompileError> {
-    let mut eraser = Eraser::new(arena, source);
-    let erased = eraser.statements(stmts)?;
+    body: Run<StmtId>,
+) -> Result<Erased, CompileError> {
+    let mut eraser = Eraser::new(stores, source);
+    let erased = eraser.statements(body)?;
     debug_assert!(
         !eraser.typescript || !eraser.regions.is_empty(),
         "every TypeScript erasure must record its region (the refusal window depends on it)"
@@ -94,15 +102,16 @@ pub(crate) fn erase_statements<'arena>(
     Ok(Erased {
         changed: erased.is_some(),
         typescript: eraser.typescript,
-        body: erased.unwrap_or(stmts),
+        body: erased.unwrap_or(body),
         regions: eraser.regions,
     })
 }
 
 /// The product of erasing a single expression.
 pub(crate) struct ErasedExpr {
-    /// The type-free expression, pushed — `None` means *unchanged*, so the caller
-    /// keeps the input id.
+    /// The type-free expression's id — a pushed rebuild, or the host id of an
+    /// unwrapped wrapper's unchanged inner expression; `None` means *unchanged*, so
+    /// the caller keeps the input id.
     pub(crate) expr: Option<ExprId>,
     /// Every erased source region, already extended to its comment-refusal
     /// window (see [`Eraser::drop_region`]). In walk order.
@@ -116,18 +125,48 @@ pub(crate) struct ErasedExpr {
 
 /// Erase every TypeScript-only construct from a single expression — the
 /// per-expression entry point for the Svelte template's borrow points (`{expr}`
-/// tags, attribute values, block tests, `{@const}`/`{#each}`/`{#snippet}`
-/// patterns), where the erasure applies at the borrow and the Svelte AST itself
-/// is never rebuilt.
-pub(crate) fn erase_expression<'arena>(
-    arena: &'arena bumpalo::Bump,
+/// tags, attribute values, block tests, `{@const}`/`{#each}` patterns), where the
+/// erasure applies at the borrow and the Svelte AST itself is never rebuilt.
+pub(crate) fn erase_expression(
+    stores: &mut AstStores,
     source: &str,
-    expr: &Expression<'arena>,
-) -> Result<ErasedExpr<'arena>, CompileError> {
-    let mut eraser = Eraser::new(arena, source);
-    let expr = eraser.expr(expr)?;
+    expr: ExprId,
+) -> Result<ErasedExpr, CompileError> {
+    let mut eraser = Eraser::new(stores, source);
+    let expr = eraser.expr_ref(expr)?;
     Ok(ErasedExpr {
         expr,
+        regions: eraser.regions,
+        typescript: eraser.typescript,
+    })
+}
+
+/// The product of erasing a single parameter, a row no id names (a `{#snippet}`
+/// parameter, held by value in its list).
+pub(crate) struct ErasedParam {
+    /// The type-free parameter — `None` means *unchanged*, so the caller keeps the
+    /// input row.
+    pub(crate) param: Option<Expression>,
+    /// Every erased source region, already extended to its comment-refusal
+    /// window (see [`Eraser::drop_region`]). In walk order.
+    pub(crate) regions: Vec<Span>,
+    /// Whether TypeScript-only *syntax* was erased, as [`ErasedExpr::typescript`].
+    pub(crate) typescript: bool,
+}
+
+/// Erase every TypeScript-only construct from one parameter, by value — the
+/// expression inventory over the row itself. Not a parameter LIST's erasure: no
+/// `this` pseudo-parameter is dropped and no parameter property is read as a
+/// constructor's (a `{#snippet}` head is neither).
+pub(crate) fn erase_parameter(
+    stores: &mut AstStores,
+    source: &str,
+    param: Expression,
+) -> Result<ErasedParam, CompileError> {
+    let mut eraser = Eraser::new(stores, source);
+    let param = eraser.expr_row(&param)?;
+    Ok(ErasedParam {
+        param,
         regions: eraser.regions,
         typescript: eraser.typescript,
     })
@@ -204,7 +243,8 @@ fn unsupported<T>(reason: Refusal) -> Result<T, CompileError> {
     Err(CompileError::Unsupported(reason))
 }
 
-/// The end of a binding's erased TypeScript tail (`?` / `: T`).
+/// The end of a binding's erased TypeScript tail (`?` / `: T`), given the span of
+/// its annotation when it has one.
 ///
 /// The node's own span is usually tail-anchored over the annotation — but not
 /// always: a Svelte **block pattern** (`{#each x as y: T}`, `{@const a: T = v}`)
@@ -212,47 +252,34 @@ fn unsupported<T>(reason: Refusal) -> Result<T, CompileError> {
 /// and hangs the annotation off it as a sibling. Taking the max covers both
 /// span models, so the erased region is never empty (an empty one would record
 /// no refusal window at all).
-fn tail_end(span: Span, type_annotation: Option<&tsv_ts::ast::TSTypeAnnotation<'_>>) -> u32 {
+fn tail_end(span: Span, type_annotation: Option<Span>) -> u32 {
     span.end
-        .max(type_annotation.map_or(0, |annotation| annotation.span.end))
+        .max(type_annotation.map_or(0, |annotation| annotation.end))
 }
 
-/// The rebuilt-list accumulator, materialized lazily: until the first change is
-/// seen the output stays `None` and the caller keeps the original borrow; on the
-/// first change the untouched prefix (`items[..index]`) is copied in once.
-fn rebuilt_list<'out, 'arena, T: Clone>(
-    out: &'out mut Option<BumpVec<'arena, T>>,
-    arena: &'arena bumpalo::Bump,
-    items: &[T],
-    index: usize,
-) -> &'out mut BumpVec<'arena, T> {
-    out.get_or_insert_with(|| {
-        let mut vec = BumpVec::with_capacity_in(items.len(), arena);
-        vec.extend_from_slice(&items[..index]);
-        vec
-    })
+/// Decorators are a `typescript_invalid_feature` hard error in the oracle
+/// (`@dec` on a class, member, or parameter) — and without `lang="ts"` they
+/// are a plain-JS parse error. Never erased, never emitted.
+fn refuse_decorators(decorators: Option<Run<Decorator>>) -> Result<(), CompileError> {
+    if decorators.is_some_and(|list| !list.is_empty()) {
+        return unsupported(Refusal::Decorator);
+    }
+    Ok(())
 }
 
-/// A statement's erasure outcome.
-enum StmtOut<'arena> {
-    /// No TypeScript below — reuse the borrow.
-    Keep,
-    /// Rebuilt without its TypeScript.
-    Replace(Statement<'arena>),
-    /// TypeScript-only — the statement disappears.
-    Drop,
-}
-
-/// A class member's erasure outcome (same shape as [`StmtOut`]).
-enum MemberOut<'arena> {
-    Keep,
-    Replace(ClassMember<'arena>),
-    Drop,
+/// An expression's erasure, when it changed: a rebuilt row (not yet pushed) or an
+/// existing node by id — what an unwrapped wrapper (`x as T`, `/** … */ (x)`)
+/// yields when its inner expression is itself unchanged, so the host's node is
+/// passed on by id rather than copied out and re-pushed.
+#[derive(Clone, Copy)]
+enum Edge {
+    Row(Expression),
+    Id(ExprId),
 }
 
 /// The erasable parts of a class header, shared by `ClassDeclaration` and
 /// `ClassExpression` (which differ only in whether `declare` exists).
-struct ClassHead<'a, 'arena> {
+struct ClassHead {
     span: Span,
     r#abstract: bool,
     /// End of the class name, when it has one — the backward bound for a
@@ -262,20 +289,22 @@ struct ClassHead<'a, 'arena> {
     /// End of the `extends` expression, when there is one.
     super_class_end: Option<u32>,
     super_type_parameters: Option<Span>,
-    implements: &'a [tsv_ts::ast::TSInterfaceHeritage<'arena>],
+    implements: Run<TSInterfaceHeritage>,
 }
 
 /// What a class erasure produces, once resolved against the original — the
 /// `ClassHead` sibling for the parts a class form must rebuild with. Reached only
 /// when something WAS erased, so both fields are final values, not
 /// `None`-means-unchanged options.
-struct ClassParts<'arena> {
-    super_class: Option<&'arena Expression<'arena>>,
-    body: ClassBody<'arena>,
+struct ClassParts {
+    super_class: Option<ExprId>,
+    body: ClassBody,
 }
 
-struct Eraser<'arena, 'src> {
-    arena: &'arena bumpalo::Bump,
+struct Eraser<'s, 'src> {
+    /// The host stores: the input is read through their view, every rebuilt row
+    /// pushed beside the parse's.
+    stores: &'s mut AstStores,
     source: &'src str,
     /// Erased regions, already extended to their comment-refusal windows.
     regions: Vec<Span>,
@@ -288,32 +317,17 @@ struct Eraser<'arena, 'src> {
     constructor_params: bool,
 }
 
-/// Rebuild a slice through a per-item eraser method, sharing the original when
-/// no item changed. The prefix of unchanged items is copied only once a change
-/// is seen (shallow clones — pointers, never subtrees).
-macro_rules! map_slice {
-    ($self:ident, $items:expr, $method:ident) => {{
-        let items = $items;
-        let arena = $self.arena;
-        let mut out: Option<BumpVec<'arena, _>> = None;
-        for (i, item) in items.iter().enumerate() {
-            match $self.$method(item)? {
-                None => {
-                    if let Some(vec) = out.as_mut() {
-                        vec.push(item.clone());
-                    }
-                }
-                Some(new) => rebuilt_list(&mut out, arena, items, i).push(new),
-            }
-        }
-        out.map(BumpVec::into_bump_slice)
-    }};
+impl HasStores for Eraser<'_, '_> {
+    #[inline]
+    fn stores(&mut self) -> &mut AstStores {
+        self.stores
+    }
 }
 
-impl<'arena, 'src> Eraser<'arena, 'src> {
-    fn new(arena: &'arena bumpalo::Bump, source: &'src str) -> Self {
+impl<'s, 'src> Eraser<'s, 'src> {
+    fn new(stores: &'s mut AstStores, source: &'src str) -> Self {
         Self {
-            arena,
+            stores,
             source,
             regions: Vec::new(),
             typescript: false,
@@ -322,7 +336,11 @@ impl<'arena, 'src> Eraser<'arena, 'src> {
     }
 }
 
-impl<'arena> Eraser<'arena, '_> {
+impl Eraser<'_, '_> {
+    fn view(&self) -> AstView<'_> {
+        self.stores.view()
+    }
+
     /// Record an erased TypeScript region, extending it forward to the next
     /// surviving token — the comment-refusal window. Use for a region that
     /// **starts at** its preceding surviving token (a whole statement, an
@@ -353,45 +371,119 @@ impl<'arena> Eraser<'arena, '_> {
         }
     }
 
+    /// The decorators a binding's extra row carries, refused as
+    /// [`refuse_decorators`] refuses a decorator list.
+    fn refuse_extra_decorators(&self, extra: Option<BindingExtraId>) -> Result<(), CompileError> {
+        refuse_decorators(
+            self.view()
+                .opt_binding_extra(extra)
+                .and_then(|extra| extra.decorators),
+        )
+    }
+
+    // ── Edges ──────────────────────────────────────────────────────────────
+
+    /// The id an erased expression is reached by: a rebuilt row pushed, an
+    /// existing node's id as it is.
+    fn push_edge(&mut self, edge: Edge) -> ExprId {
+        match edge {
+            Edge::Row(row) => push(self.stores, row),
+            Edge::Id(id) => id,
+        }
+    }
+
+    /// The row an erased expression is held by in a value position (a parameter
+    /// list, a catch parameter): a rebuilt row as it is, an existing node's row
+    /// copied out.
+    fn edge_row(&self, edge: Edge) -> Expression {
+        match edge {
+            Edge::Row(row) => row,
+            Edge::Id(id) => *self.view().expr(id),
+        }
+    }
+
+    /// The expression `id` names, erased and pushed — `None` when unchanged.
+    fn expr_ref(&mut self, id: ExprId) -> Result<Option<ExprId>, CompileError> {
+        let row = *self.view().expr(id);
+        Ok(self.expr(&row)?.map(|edge| self.push_edge(edge)))
+    }
+
+    /// An expression held by value, erased — `None` when unchanged.
+    fn expr_row(&mut self, row: &Expression) -> Result<Option<Expression>, CompileError> {
+        Ok(self.expr(row)?.map(|edge| self.edge_row(edge)))
+    }
+
+    /// What `id` erases to, as an edge — `id` itself when unchanged: the inner
+    /// expression of an unwrapped wrapper.
+    fn inner(&mut self, id: ExprId) -> Result<Edge, CompileError> {
+        let row = *self.view().expr(id);
+        Ok(self.expr(&row)?.unwrap_or(Edge::Id(id)))
+    }
+
+    /// An id list (call / `new` arguments, sequence and template expressions),
+    /// rebuilt when an element changed.
+    fn id_run(&mut self, run: Run<ExprId>) -> Result<Option<Run<ExprId>>, CompileError> {
+        rebuild_run(
+            self,
+            run,
+            |view, run| view.expr_list(run),
+            |eraser, id| Ok(eraser.expr_ref(id)?.into()),
+        )
+    }
+
+    /// An id list with holes (array and array-pattern elements), rebuilt when an
+    /// element changed.
+    fn opt_id_run(
+        &mut self,
+        run: Run<Option<ExprId>>,
+    ) -> Result<Option<Run<Option<ExprId>>>, CompileError> {
+        rebuild_run(
+            self,
+            run,
+            |view, run| view.expr_opt_list(run),
+            |eraser, element| {
+                Ok(match element {
+                    Some(id) => eraser.expr_ref(id)?.map(Some).into(),
+                    None => Item::Keep,
+                })
+            },
+        )
+    }
+
     // ── Statements ─────────────────────────────────────────────────────────
 
-    fn statements(
-        &mut self,
-        stmts: &'arena [Statement<'arena>],
-    ) -> Result<Option<&'arena [Statement<'arena>]>, CompileError> {
-        let arena = self.arena;
-        let mut out: Option<BumpVec<'arena, Statement<'arena>>> = None;
-        for (i, stmt) in stmts.iter().enumerate() {
-            match self.statement(stmt)? {
-                StmtOut::Keep => {
-                    if let Some(vec) = out.as_mut() {
-                        vec.push(stmt.clone());
-                    }
-                }
-                StmtOut::Replace(new) => rebuilt_list(&mut out, arena, stmts, i).push(new),
-                StmtOut::Drop => {
-                    rebuilt_list(&mut out, arena, stmts, i);
-                }
-            }
-        }
-        Ok(out.map(BumpVec::into_bump_slice))
+    fn statements(&mut self, run: Run<StmtId>) -> Result<Option<Run<StmtId>>, CompileError> {
+        rebuild_run(
+            self,
+            run,
+            |view, run| view.stmt_list(run),
+            |eraser, id| {
+                let stmt = *eraser.view().stmt(id);
+                Ok(match eraser.statement(&stmt)? {
+                    Item::Keep => Item::Keep,
+                    Item::Replace(new) => Item::Replace(push(eraser.stores, new)),
+                    Item::Drop => Item::Drop,
+                })
+            },
+        )
     }
 
     /// A statement in a single-statement position (an `if` branch, a loop body).
     /// A dropped statement becomes `;` — no such position can legally hold a
     /// TypeScript-only declaration, so this is unreachable in valid input, but
     /// it keeps the transformation total.
-    fn statement_ref(
-        &mut self,
-        stmt: &'arena Statement<'arena>,
-    ) -> Result<Option<&'arena Statement<'arena>>, CompileError> {
-        Ok(match self.statement(stmt)? {
-            StmtOut::Keep => None,
-            StmtOut::Replace(new) => Some(self.arena.alloc(new)),
-            StmtOut::Drop => Some(self.arena.alloc(Statement {
-                span: stmt.span,
-                kind: StatementKind::EmptyStatement(EmptyStatement),
-            })),
+    fn statement_ref(&mut self, id: StmtId) -> Result<Option<StmtId>, CompileError> {
+        let stmt = *self.view().stmt(id);
+        Ok(match self.statement(&stmt)? {
+            Item::Keep => None,
+            Item::Replace(new) => Some(push(self.stores, new)),
+            Item::Drop => Some(push(
+                self.stores,
+                Statement {
+                    span: stmt.span,
+                    kind: StatementKind::EmptyStatement(EmptyStatement),
+                },
+            )),
         })
     }
 
@@ -411,23 +503,25 @@ impl<'arena> Eraser<'arena, '_> {
     ///   oracle; the last three the oracle *mis-compiles* (no visitor case, so
     ///   they survive into the component function as invalid JS) — tsv refuses
     ///   rather than reproduce that.
-    fn statement(&mut self, stmt: &Statement<'arena>) -> Result<StmtOut<'arena>, CompileError> {
+    fn statement(&mut self, stmt: &Statement) -> Result<Item<Statement>, CompileError> {
         // The header span: the drop-set payloads below carry none of their own, and
         // a rebuilt statement keeps the original's.
         let span = stmt.span;
-        Ok(match &stmt.kind {
+        Ok(match stmt.kind {
             // ── TypeScript-only statements: dropped whole ──────────────────
             StatementKind::TSTypeAliasDeclaration(_) => {
                 self.drop_region(span);
-                StmtOut::Drop
+                Item::Drop
             }
             StatementKind::TSInterfaceDeclaration(decl) => {
-                self.drop_region(decl.span);
-                StmtOut::Drop
+                let decl_span = self.view().interface_decl(decl).span;
+                self.drop_region(decl_span);
+                Item::Drop
             }
             StatementKind::TSDeclareFunction(decl) => {
-                self.drop_region(decl.span);
-                StmtOut::Drop
+                let decl_span = self.view().declare_fn(decl).span;
+                self.drop_region(decl_span);
+                Item::Drop
             }
 
             // ── Refuse-don't-erase: runtime semantics, or an oracle bug ────
@@ -447,8 +541,9 @@ impl<'arena> Eraser<'arena, '_> {
             // the oracle rejects (`namespaces with non-type nodes`) — with no
             // `declare` carve-out either way.
             StatementKind::TSModuleDeclaration(decl) => {
+                let decl = *self.view().module_decl(decl);
                 let mark = self.regions.len();
-                let type_only = self.module_body_is_type_only(decl.body.as_ref())?;
+                let type_only = self.module_body_is_type_only(decl.body)?;
                 // The whole declaration's span subsumes whatever its body
                 // recorded, so the inner regions collapse into this one.
                 self.regions.truncate(mark);
@@ -456,7 +551,7 @@ impl<'arena> Eraser<'arena, '_> {
                     return unsupported(Refusal::TsNamespaceWithValue);
                 }
                 self.drop_region(decl.span);
-                StmtOut::Drop
+                Item::Drop
             }
 
             // ── Ordinary statements ────────────────────────────────────────
@@ -464,63 +559,70 @@ impl<'arena> Eraser<'arena, '_> {
                 // `declare const x: T;` is ambient — dropped whole.
                 if decl.declare {
                     self.drop_region(decl.span);
-                    return Ok(StmtOut::Drop);
+                    return Ok(Item::Drop);
                 }
-                match self.variable_declaration(decl)? {
-                    None => StmtOut::Keep,
-                    Some(new) => StmtOut::Replace(Statement::from_variable_declaration(new)),
+                match self.variable_declaration(&decl)? {
+                    None => Item::Keep,
+                    Some(new) => Item::Replace(Statement::from_variable_declaration(new)),
                 }
             }
             StatementKind::ExpressionStatement(stmt) => match self.expr_ref(stmt.expression)? {
-                None => StmtOut::Keep,
-                Some(expression) => StmtOut::Replace(Statement {
+                None => Item::Keep,
+                Some(expression) => Item::Replace(Statement {
                     span,
                     kind: StatementKind::ExpressionStatement(tsv_ts::ast::ExpressionStatement {
                         expression,
-                        ..stmt.clone()
+                        ..stmt
                     }),
                 }),
             },
             StatementKind::ReturnStatement(stmt) => match stmt.argument {
                 Some(argument) => match self.expr_ref(argument)? {
-                    None => StmtOut::Keep,
-                    Some(argument) => StmtOut::Replace(Statement {
+                    None => Item::Keep,
+                    Some(argument) => Item::Replace(Statement {
                         span,
                         kind: StatementKind::ReturnStatement(tsv_ts::ast::ReturnStatement {
                             argument: Some(argument),
                         }),
                     }),
                 },
-                None => StmtOut::Keep,
+                None => Item::Keep,
             },
-            StatementKind::BlockStatement(block) => match self.block(block)? {
-                None => StmtOut::Keep,
-                Some(new) => StmtOut::Replace(Statement::from_block_statement(new)),
+            StatementKind::BlockStatement(block) => match self.block(&block)? {
+                None => Item::Keep,
+                Some(new) => Item::Replace(Statement::from_block_statement(new)),
             },
-            StatementKind::FunctionDeclaration(decl) => match self.function_declaration(decl)? {
-                None => StmtOut::Keep,
-                Some(new) => {
-                    StmtOut::Replace(Statement::from_function_declaration(self.arena.alloc(new)))
-                }
-            },
-            StatementKind::ClassDeclaration(decl) => {
-                // `declare class C {}` is ambient — dropped whole.
-                if decl.declare {
-                    self.drop_region(decl.span);
-                    return Ok(StmtOut::Drop);
-                }
-                match self.class_declaration(decl)? {
-                    None => StmtOut::Keep,
+            StatementKind::FunctionDeclaration(decl) => {
+                let func = *self.view().fn_decl(decl);
+                match self.function_declaration(&func)? {
+                    None => Item::Keep,
                     Some(new) => {
-                        StmtOut::Replace(Statement::from_class_declaration(self.arena.alloc(new)))
+                        let id = push(self.stores, new);
+                        Item::Replace(Statement::from_function_declaration(new.span, id))
+                    }
+                }
+            }
+            StatementKind::ClassDeclaration(decl) => {
+                let class = *self.view().class_decl(decl);
+                // `declare class C {}` is ambient — dropped whole.
+                if class.declare {
+                    self.drop_region(class.span);
+                    return Ok(Item::Drop);
+                }
+                match self.class_declaration(&class)? {
+                    None => Item::Keep,
+                    Some(new) => {
+                        let id = push(self.stores, new);
+                        Item::Replace(Statement::from_class_declaration(new.span, id))
                     }
                 }
             }
             StatementKind::ImportDeclaration(decl) => {
+                let decl = *self.view().import_decl(decl);
                 // `import type { X } from 'm'` — the whole declaration.
                 if decl.import_kind == ImportKind::Type {
                     self.drop_region(span);
-                    return Ok(StmtOut::Drop);
+                    return Ok(Item::Drop);
                 }
                 // A per-specifier `type` marker (`import { type X, Y }`). A list
                 // that filters to EMPTY drops the whole statement — the oracle's
@@ -529,113 +631,114 @@ impl<'arena> Eraser<'arena, '_> {
                 // bare side-effect import). A declaration that carried no
                 // specifiers at all (`import 'm'`, `import {} from 'm'`) is
                 // untouched.
-                if decl.specifiers.is_empty()
-                    || !decl.specifiers.iter().any(|spec| {
+                let specifiers = self.view().import_specs(decl.specifiers).to_vec();
+                if specifiers.is_empty()
+                    || !specifiers.iter().any(|spec| {
                         matches!(spec, ImportSpecifier::Named(named)
                             if named.import_kind == ImportKind::Type)
                     })
                 {
-                    return Ok(StmtOut::Keep);
+                    return Ok(Item::Keep);
                 }
                 let mark = self.regions.len();
-                let mut kept: BumpVec<'arena, ImportSpecifier<'arena>> =
-                    BumpVec::with_capacity_in(decl.specifiers.len(), self.arena);
-                for spec in decl.specifiers {
+                let mut kept: Vec<ImportSpecifier> = Vec::with_capacity(specifiers.len());
+                for spec in specifiers {
                     match spec {
                         ImportSpecifier::Named(named) if named.import_kind == ImportKind::Type => {
                             self.drop_region(named.span);
                         }
-                        _ => kept.push(spec.clone()),
+                        _ => kept.push(spec),
                     }
                 }
                 if kept.is_empty() {
                     // Subsumed by the whole-declaration region.
                     self.regions.truncate(mark);
                     self.drop_region(span);
-                    return Ok(StmtOut::Drop);
+                    return Ok(Item::Drop);
                 }
-                StmtOut::Replace(Statement {
+                let specifiers = push_list(self.stores, &kept);
+                let new = push(self.stores, ImportDeclaration { specifiers, ..decl });
+                Item::Replace(Statement {
                     span,
-                    kind: StatementKind::ImportDeclaration(self.arena.alloc(
-                        tsv_ts::ast::ImportDeclaration {
-                            specifiers: kept.into_bump_slice(),
-                            ..(*decl).clone()
-                        },
-                    )),
+                    kind: StatementKind::ImportDeclaration(new),
                 })
             }
             StatementKind::ExportNamedDeclaration(decl) => {
+                let decl = *self.view().export_named(decl);
                 // `export type { X }` / `export type * …` — the whole statement.
                 if decl.export_kind == ExportKind::Type {
                     self.drop_region(span);
-                    return Ok(StmtOut::Drop);
+                    return Ok(Item::Drop);
                 }
                 // `export interface X {}` / `export type X = …` / `export
                 // declare const x` — the exported declaration erases away, so
                 // the export goes with it.
                 if let Some(declaration) = decl.declaration {
                     let mark = self.regions.len();
-                    return Ok(match self.statement(declaration)? {
-                        StmtOut::Keep => StmtOut::Keep,
-                        StmtOut::Drop => {
+                    let inner = *self.view().stmt(declaration);
+                    return Ok(match self.statement(&inner)? {
+                        Item::Keep => Item::Keep,
+                        Item::Drop => {
                             self.regions.truncate(mark);
                             self.drop_region(span);
-                            StmtOut::Drop
+                            Item::Drop
                         }
-                        StmtOut::Replace(new) => StmtOut::Replace(Statement {
-                            span,
-                            kind: StatementKind::ExportNamedDeclaration(self.arena.alloc(
-                                tsv_ts::ast::ExportNamedDeclaration {
-                                    declaration: Some(self.arena.alloc(new)),
-                                    ..(*decl).clone()
+                        Item::Replace(new) => {
+                            let declaration = push(self.stores, new);
+                            let new = push(
+                                self.stores,
+                                ExportNamedDeclaration {
+                                    declaration: Some(declaration),
+                                    ..decl
                                 },
-                            )),
-                        }),
+                            );
+                            Item::Replace(Statement {
+                                span,
+                                kind: StatementKind::ExportNamedDeclaration(new),
+                            })
+                        }
                     });
                 }
                 // `export { type A, b }` — the inline type marker.
-                if !decl
-                    .specifiers
+                let specifiers = self.view().export_specs(decl.specifiers).to_vec();
+                if !specifiers
                     .iter()
                     .any(|spec| spec.export_kind == ExportKind::Type)
                 {
-                    return Ok(StmtOut::Keep);
+                    return Ok(Item::Keep);
                 }
                 let mark = self.regions.len();
-                let mut kept: BumpVec<'arena, tsv_ts::ast::ExportSpecifier<'arena>> =
-                    BumpVec::with_capacity_in(decl.specifiers.len(), self.arena);
-                for spec in decl.specifiers {
+                let mut kept = Vec::with_capacity(specifiers.len());
+                for spec in specifiers {
                     if spec.export_kind == ExportKind::Type {
                         self.drop_region(spec.span);
                     } else {
-                        kept.push(spec.clone());
+                        kept.push(spec);
                     }
                 }
                 if kept.is_empty() {
                     self.regions.truncate(mark);
                     self.drop_region(span);
-                    return Ok(StmtOut::Drop);
+                    return Ok(Item::Drop);
                 }
-                StmtOut::Replace(Statement {
+                let specifiers = push_list(self.stores, &kept);
+                let new = push(self.stores, ExportNamedDeclaration { specifiers, ..decl });
+                Item::Replace(Statement {
                     span,
-                    kind: StatementKind::ExportNamedDeclaration(self.arena.alloc(
-                        tsv_ts::ast::ExportNamedDeclaration {
-                            specifiers: kept.into_bump_slice(),
-                            ..(*decl).clone()
-                        },
-                    )),
+                    kind: StatementKind::ExportNamedDeclaration(new),
                 })
             }
             StatementKind::ExportDefaultDeclaration(decl) => {
-                let declaration = match &decl.declaration {
+                let decl = *self.view().export_default(decl);
+                let declaration = match decl.declaration {
                     ExportDefaultValue::Expression(expr) => {
-                        self.expr(expr)?.map(ExportDefaultValue::Expression)
+                        self.expr_ref(expr)?.map(ExportDefaultValue::Expression)
                     }
                     ExportDefaultValue::FunctionDeclaration(func) => self
-                        .function_declaration(func)?
+                        .function_declaration(&func)?
                         .map(ExportDefaultValue::FunctionDeclaration),
                     ExportDefaultValue::ClassDeclaration(class) => self
-                        .class_declaration(class)?
+                        .class_declaration(&class)?
                         .map(ExportDefaultValue::ClassDeclaration),
                     // `export default function f(): T;` / `export default
                     // interface F {}` — the oracle keeps both (its visitor
@@ -647,22 +750,22 @@ impl<'arena> Eraser<'arena, '_> {
                     | ExportDefaultValue::TSInterfaceDeclaration(_) => None,
                 };
                 match declaration {
-                    None => StmtOut::Keep,
-                    Some(declaration) => StmtOut::Replace(Statement {
-                        span,
-                        kind: StatementKind::ExportDefaultDeclaration(
-                            self.arena
-                                .alloc(tsv_ts::ast::ExportDefaultDeclaration { declaration }),
-                        ),
-                    }),
+                    None => Item::Keep,
+                    Some(declaration) => {
+                        let new = push(self.stores, ExportDefaultDeclaration { declaration });
+                        Item::Replace(Statement {
+                            span,
+                            kind: StatementKind::ExportDefaultDeclaration(new),
+                        })
+                    }
                 }
             }
             StatementKind::ExportAllDeclaration(decl) => {
-                if decl.export_kind == ExportKind::Type {
+                if self.view().export_all(decl).export_kind == ExportKind::Type {
                     self.drop_region(span);
-                    return Ok(StmtOut::Drop);
+                    return Ok(Item::Drop);
                 }
-                StmtOut::Keep
+                Item::Keep
             }
 
             // ── Control flow ───────────────────────────────────────────────
@@ -674,9 +777,9 @@ impl<'arena> Eraser<'arena, '_> {
                     None => None,
                 };
                 if test.is_none() && consequent.is_none() && alternate.is_none() {
-                    return Ok(StmtOut::Keep);
+                    return Ok(Item::Keep);
                 }
-                StmtOut::Replace(Statement {
+                Item::Replace(Statement {
                     span,
                     kind: StatementKind::IfStatement(tsv_ts::ast::IfStatement {
                         test: test.unwrap_or(stmt.test),
@@ -686,83 +789,66 @@ impl<'arena> Eraser<'arena, '_> {
                 })
             }
             StatementKind::ForStatement(stmt) => {
-                let init = match &stmt.init {
-                    Some(init) => self.for_init(init)?.map(Some),
+                let init = match stmt.init {
+                    Some(init) => {
+                        let head = *self.view().for_head(init);
+                        self.for_init(&head)?
+                            .map(|head| Some(push(self.stores, head)))
+                    }
                     None => None,
                 };
-                let test = match &stmt.test {
-                    Some(test) => self.expr(test)?.map(Some),
+                let test = match stmt.test {
+                    Some(test) => self.expr_ref(test)?.map(Some),
                     None => None,
                 };
-                let update = match &stmt.update {
-                    Some(update) => self.expr(update)?.map(Some),
+                let update = match stmt.update {
+                    Some(update) => self.expr_ref(update)?.map(Some),
                     None => None,
                 };
                 let body = self.statement_ref(stmt.body)?;
                 if init.is_none() && test.is_none() && update.is_none() && body.is_none() {
-                    return Ok(StmtOut::Keep);
+                    return Ok(Item::Keep);
                 }
-                StmtOut::Replace(Statement {
+                Item::Replace(Statement {
                     span,
                     kind: StatementKind::ForStatement(tsv_ts::ast::ForStatement {
-                        init: match init {
-                            Some(v) => v.map(|x| &*self.arena.alloc(x)),
-                            None => stmt.init,
-                        },
-                        test: match test {
-                            Some(v) => v.map(|x| &*self.arena.alloc(x)),
-                            None => stmt.test,
-                        },
-                        update: match update {
-                            Some(v) => v.map(|x| &*self.arena.alloc(x)),
-                            None => stmt.update,
-                        },
+                        init: init.unwrap_or(stmt.init),
+                        test: test.unwrap_or(stmt.test),
+                        update: update.unwrap_or(stmt.update),
                         body: body.unwrap_or(stmt.body),
                     }),
                 })
             }
             StatementKind::ForInStatement(stmt) => {
-                let left = self.for_in_of_left(stmt.left)?;
-                let right = self.expr(stmt.right)?;
+                let left = self.for_left(stmt.left)?;
+                let right = self.expr_ref(stmt.right)?;
                 let body = self.statement_ref(stmt.body)?;
                 if left.is_none() && right.is_none() && body.is_none() {
-                    return Ok(StmtOut::Keep);
+                    return Ok(Item::Keep);
                 }
-                StmtOut::Replace(Statement {
+                Item::Replace(Statement {
                     span,
                     kind: StatementKind::ForInStatement(tsv_ts::ast::ForInStatement {
-                        left: match left {
-                            Some(x) => self.arena.alloc(x),
-                            None => stmt.left,
-                        },
-                        right: match right {
-                            Some(x) => self.arena.alloc(x),
-                            None => stmt.right,
-                        },
+                        left: left.unwrap_or(stmt.left),
+                        right: right.unwrap_or(stmt.right),
                         body: body.unwrap_or(stmt.body),
                     }),
                 })
             }
             StatementKind::ForOfStatement(stmt) => {
-                let left = self.for_in_of_left(stmt.left)?;
-                let right = self.expr(stmt.right)?;
+                let left = self.for_left(stmt.left)?;
+                let right = self.expr_ref(stmt.right)?;
                 let body = self.statement_ref(stmt.body)?;
                 if left.is_none() && right.is_none() && body.is_none() {
-                    return Ok(StmtOut::Keep);
+                    return Ok(Item::Keep);
                 }
-                StmtOut::Replace(Statement {
+                Item::Replace(Statement {
                     span,
                     kind: StatementKind::ForOfStatement(tsv_ts::ast::ForOfStatement {
-                        left: match left {
-                            Some(x) => self.arena.alloc(x),
-                            None => stmt.left,
-                        },
-                        right: match right {
-                            Some(x) => self.arena.alloc(x),
-                            None => stmt.right,
-                        },
+                        left: left.unwrap_or(stmt.left),
+                        right: right.unwrap_or(stmt.right),
                         body: body.unwrap_or(stmt.body),
-                        ..stmt.clone()
+                        ..stmt
                     }),
                 })
             }
@@ -770,9 +856,9 @@ impl<'arena> Eraser<'arena, '_> {
                 let test = self.expr_ref(stmt.test)?;
                 let body = self.statement_ref(stmt.body)?;
                 if test.is_none() && body.is_none() {
-                    return Ok(StmtOut::Keep);
+                    return Ok(Item::Keep);
                 }
-                StmtOut::Replace(Statement {
+                Item::Replace(Statement {
                     span,
                     kind: StatementKind::WhileStatement(tsv_ts::ast::WhileStatement {
                         test: test.unwrap_or(stmt.test),
@@ -787,9 +873,9 @@ impl<'arena> Eraser<'arena, '_> {
                 let object = self.expr_ref(stmt.object)?;
                 let body = self.statement_ref(stmt.body)?;
                 if object.is_none() && body.is_none() {
-                    return Ok(StmtOut::Keep);
+                    return Ok(Item::Keep);
                 }
-                StmtOut::Replace(Statement {
+                Item::Replace(Statement {
                     span,
                     kind: StatementKind::WithStatement(tsv_ts::ast::WithStatement {
                         object: object.unwrap_or(stmt.object),
@@ -801,9 +887,9 @@ impl<'arena> Eraser<'arena, '_> {
                 let body = self.statement_ref(stmt.body)?;
                 let test = self.expr_ref(stmt.test)?;
                 if test.is_none() && body.is_none() {
-                    return Ok(StmtOut::Keep);
+                    return Ok(Item::Keep);
                 }
-                StmtOut::Replace(Statement {
+                Item::Replace(Statement {
                     span,
                     kind: StatementKind::DoWhileStatement(tsv_ts::ast::DoWhileStatement {
                         body: body.unwrap_or(stmt.body),
@@ -813,11 +899,16 @@ impl<'arena> Eraser<'arena, '_> {
             }
             StatementKind::SwitchStatement(stmt) => {
                 let discriminant = self.expr_ref(stmt.discriminant)?;
-                let cases = map_slice!(self, stmt.cases, switch_case);
+                let cases = rebuild_run(
+                    self,
+                    stmt.cases,
+                    |view, run| view.cases(run),
+                    |eraser, case| Ok(eraser.switch_case(&case)?.into()),
+                )?;
                 if discriminant.is_none() && cases.is_none() {
-                    return Ok(StmtOut::Keep);
+                    return Ok(Item::Keep);
                 }
-                StmtOut::Replace(Statement {
+                Item::Replace(Statement {
                     span,
                     kind: StatementKind::SwitchStatement(tsv_ts::ast::SwitchStatement {
                         discriminant: discriminant.unwrap_or(stmt.discriminant),
@@ -825,54 +916,66 @@ impl<'arena> Eraser<'arena, '_> {
                     }),
                 })
             }
-            StatementKind::TryStatement(stmt) => {
+            StatementKind::TryStatement(id) => {
+                // The payload is a row by id: a rebuild pushes a new row and points
+                // the statement at it, leaving the host's row as it was.
+                let stmt = *self.view().try_stmt(id);
                 let block = self.block(&stmt.block)?;
-                let handler = match &stmt.handler {
-                    Some(handler) => self.catch_clause(handler)?.map(Some),
+                let handler = match stmt.handler {
+                    Some(handler) => {
+                        let clause = *self.view().catch(handler);
+                        self.catch_clause(&clause)?
+                            .map(|clause| Some(push(self.stores, clause)))
+                    }
                     None => None,
                 };
-                let finalizer = match &stmt.finalizer {
-                    Some(finalizer) => self.block(finalizer)?.map(Some),
+                let finalizer = match stmt.finalizer {
+                    Some(finalizer) => self.block(&finalizer)?.map(Some),
                     None => None,
                 };
                 if block.is_none() && handler.is_none() && finalizer.is_none() {
-                    return Ok(StmtOut::Keep);
+                    return Ok(Item::Keep);
                 }
-                StmtOut::Replace(Statement {
+                let new = push(
+                    self.stores,
+                    TryStatement {
+                        block: block.unwrap_or(stmt.block),
+                        handler: handler.unwrap_or(stmt.handler),
+                        finalizer: finalizer.unwrap_or(stmt.finalizer),
+                    },
+                );
+                Item::Replace(Statement {
                     span,
-                    kind: StatementKind::TryStatement(tsv_ts::ast::TryStatement {
-                        block: block.unwrap_or_else(|| stmt.block.clone()),
-                        handler: match handler {
-                            Some(v) => v.map(|x| &*self.arena.alloc(x)),
-                            None => stmt.handler,
-                        },
-                        finalizer: finalizer.unwrap_or_else(|| stmt.finalizer.clone()),
-                    }),
+                    kind: StatementKind::TryStatement(new),
                 })
             }
             StatementKind::ThrowStatement(stmt) => match self.expr_ref(stmt.argument)? {
-                None => StmtOut::Keep,
-                Some(argument) => StmtOut::Replace(Statement {
+                None => Item::Keep,
+                Some(argument) => Item::Replace(Statement {
                     span,
                     kind: StatementKind::ThrowStatement(tsv_ts::ast::ThrowStatement { argument }),
                 }),
             },
-            StatementKind::LabeledStatement(stmt) => match self.statement_ref(stmt.body)? {
-                None => StmtOut::Keep,
-                Some(body) => StmtOut::Replace(Statement {
-                    span,
-                    kind: StatementKind::LabeledStatement(tsv_ts::ast::LabeledStatement {
-                        body,
-                        ..stmt.clone()
-                    }),
-                }),
-            },
+            StatementKind::LabeledStatement(id) => {
+                // A row by id, rebuilt into a new row as the `try` payload is.
+                let stmt = *self.view().labeled_stmt(id);
+                match self.statement_ref(stmt.body)? {
+                    None => Item::Keep,
+                    Some(body) => {
+                        let new = push(self.stores, LabeledStatement { body, ..stmt });
+                        Item::Replace(Statement {
+                            span,
+                            kind: StatementKind::LabeledStatement(new),
+                        })
+                    }
+                }
+            }
 
             // ── No TypeScript-bearing children ─────────────────────────────
             StatementKind::BreakStatement(_)
             | StatementKind::ContinueStatement(_)
             | StatementKind::EmptyStatement(_)
-            | StatementKind::DebuggerStatement(_) => StmtOut::Keep,
+            | StatementKind::DebuggerStatement(_) => Item::Keep,
         })
     }
 
@@ -881,7 +984,7 @@ impl<'arena> Eraser<'arena, '_> {
     /// (a value namespace lowers to an IIFE, which no erasure can express).
     fn module_body_is_type_only(
         &mut self,
-        body: Option<&TSModuleDeclarationBody<'arena>>,
+        body: Option<TSModuleDeclarationBody>,
     ) -> Result<bool, CompileError> {
         Ok(match body {
             // `declare module 'name';` — a shorthand ambient module, no body.
@@ -905,34 +1008,32 @@ impl<'arena> Eraser<'arena, '_> {
         })
     }
 
-    fn for_init(
-        &mut self,
-        init: &ForInit<'arena>,
-    ) -> Result<Option<ForInit<'arena>>, CompileError> {
+    fn for_init(&mut self, init: &ForInit) -> Result<Option<ForInit>, CompileError> {
         Ok(match init {
             ForInit::VariableDeclaration(decl) => self
                 .variable_declaration(decl)?
                 .map(ForInit::VariableDeclaration),
-            ForInit::Expression(expr) => self.expr(expr)?.map(ForInit::Expression),
+            &ForInit::Expression(expr) => self.expr_ref(expr)?.map(ForInit::Expression),
         })
     }
 
-    fn for_in_of_left(
+    /// The left side of a `for … in` / `for … of`, a row by id: a rebuild pushes a
+    /// new row.
+    fn for_left(
         &mut self,
-        left: &ForInOfLeft<'arena>,
-    ) -> Result<Option<ForInOfLeft<'arena>>, CompileError> {
-        Ok(match left {
+        left: tsv_ts::ast::ForLeftId,
+    ) -> Result<Option<tsv_ts::ast::ForLeftId>, CompileError> {
+        let row = *self.view().for_left(left);
+        let new = match row {
             ForInOfLeft::VariableDeclaration(decl) => self
-                .variable_declaration(decl)?
+                .variable_declaration(&decl)?
                 .map(ForInOfLeft::VariableDeclaration),
-            ForInOfLeft::Pattern(pattern) => self.expr(pattern)?.map(ForInOfLeft::Pattern),
-        })
+            ForInOfLeft::Pattern(pattern) => self.expr_ref(pattern)?.map(ForInOfLeft::Pattern),
+        };
+        Ok(new.map(|new| push(self.stores, new)))
     }
 
-    fn switch_case(
-        &mut self,
-        case: &SwitchCase<'arena>,
-    ) -> Result<Option<SwitchCase<'arena>>, CompileError> {
+    fn switch_case(&mut self, case: &SwitchCase) -> Result<Option<SwitchCase>, CompileError> {
         let test = match case.test {
             Some(test) => self.expr_ref(test)?.map(Some),
             None => None,
@@ -948,12 +1049,9 @@ impl<'arena> Eraser<'arena, '_> {
         }))
     }
 
-    fn catch_clause(
-        &mut self,
-        clause: &CatchClause<'arena>,
-    ) -> Result<Option<CatchClause<'arena>>, CompileError> {
+    fn catch_clause(&mut self, clause: &CatchClause) -> Result<Option<CatchClause>, CompileError> {
         let param = match &clause.param {
-            Some(param) => self.expr(param)?.map(Some),
+            Some(param) => self.expr_row(param)?.map(Some),
             None => None,
         };
         let body = self.block(&clause.body)?;
@@ -961,16 +1059,13 @@ impl<'arena> Eraser<'arena, '_> {
             return Ok(None);
         }
         Ok(Some(CatchClause {
-            param: param.unwrap_or_else(|| clause.param.clone()),
-            body: body.unwrap_or_else(|| clause.body.clone()),
+            param: param.unwrap_or(clause.param),
+            body: body.unwrap_or(clause.body),
             span: clause.span,
         }))
     }
 
-    fn block(
-        &mut self,
-        block: &BlockStatement<'arena>,
-    ) -> Result<Option<BlockStatement<'arena>>, CompileError> {
+    fn block(&mut self, block: &BlockStatement) -> Result<Option<BlockStatement>, CompileError> {
         Ok(self.statements(block.body)?.map(|body| BlockStatement {
             body,
             span: block.span,
@@ -985,32 +1080,37 @@ impl<'arena> Eraser<'arena, '_> {
     /// "`changed == false` proves no TypeScript" invariant).
     fn variable_declaration(
         &mut self,
-        decl: &VariableDeclaration<'arena>,
-    ) -> Result<Option<VariableDeclaration<'arena>>, CompileError> {
+        decl: &VariableDeclaration,
+    ) -> Result<Option<VariableDeclaration>, CompileError> {
         if decl.declare {
             self.drop_region(Span::new(
                 decl.span.start,
                 decl.span.start + "declare".len() as u32,
             ));
         }
-        let declarations = map_slice!(self, decl.declarations, variable_declarator);
+        let declarations = rebuild_run(
+            self,
+            decl.declarations,
+            |view, run| view.declarators(run),
+            |eraser, d| Ok(eraser.variable_declarator(&d)?.into()),
+        )?;
         if !decl.declare && declarations.is_none() {
             return Ok(None);
         }
         Ok(Some(VariableDeclaration {
             declarations: declarations.unwrap_or(decl.declarations),
             declare: false,
-            ..decl.clone()
+            ..*decl
         }))
     }
 
     fn variable_declarator(
         &mut self,
-        declarator: &VariableDeclarator<'arena>,
-    ) -> Result<Option<VariableDeclarator<'arena>>, CompileError> {
-        let id = self.expr(declarator.id)?;
-        let init = match &declarator.init {
-            Some(init) => self.expr(init)?.map(Some),
+        declarator: &VariableDeclarator,
+    ) -> Result<Option<VariableDeclarator>, CompileError> {
+        let id = self.expr_ref(declarator.id)?;
+        let init = match declarator.init {
+            Some(init) => self.expr_ref(init)?.map(Some),
             None => None,
         };
         // `let x!: T` — the definite-assignment `!` lives on the declarator but
@@ -1019,7 +1119,7 @@ impl<'arena> Eraser<'arena, '_> {
         // nothing, so record the `!` here.
         if declarator.definite
             && id.is_none()
-            && let ExpressionKind::Identifier(ident) = &declarator.id.kind
+            && let ExpressionKind::Identifier(ident) = self.view().expr(declarator.id).kind
         {
             self.drop_region(Span::new(ident.name_span().end, ident.span.end));
         }
@@ -1027,10 +1127,8 @@ impl<'arena> Eraser<'arena, '_> {
             return Ok(None);
         }
         Ok(Some(VariableDeclarator {
-            id: id.map_or(declarator.id, |id| &*self.arena.alloc(id)),
-            init: init.map_or(declarator.init, |init| {
-                init.map(|init| &*self.arena.alloc(init))
-            }),
+            id: id.unwrap_or(declarator.id),
+            init: init.unwrap_or(declarator.init),
             definite: false,
             span: declarator.span,
         }))
@@ -1048,11 +1146,11 @@ impl<'arena> Eraser<'arena, '_> {
     /// oracle's rejected shape (see [`Self::parameter_property`]).
     fn params(
         &mut self,
-        params: &'arena [Expression<'arena>],
+        params: Run<Expression>,
         anchor: u32,
         drop_this: bool,
         constructor: bool,
-    ) -> Result<Option<&'arena [Expression<'arena>]>, CompileError> {
+    ) -> Result<Option<Run<Expression>>, CompileError> {
         // Save/restore: a default-value arrow inside a constructor parameter list
         // erases its own (non-constructor) params without clearing the flag for
         // the sibling parameters that follow.
@@ -1064,31 +1162,40 @@ impl<'arena> Eraser<'arena, '_> {
 
     fn params_inner(
         &mut self,
-        params: &'arena [Expression<'arena>],
+        params: Run<Expression>,
         anchor: u32,
         drop_this: bool,
-    ) -> Result<Option<&'arena [Expression<'arena>]>, CompileError> {
-        let drop_first = drop_this && params.first().is_some_and(|p| self.is_this_param(p));
-        if !drop_first {
-            return Ok(map_slice!(self, params, expr));
-        }
+    ) -> Result<Option<Run<Expression>>, CompileError> {
+        let view = self.view();
+        let list = view.exprs(params);
+        let first = list.first().copied();
+        let second_start = list.get(1).map(|next| next.span.start);
+        let Some(this) = first.filter(|first| drop_this && self.is_this_param(first)) else {
+            return self.param_run(params);
+        };
         // The dropped `this` takes its trailing comma with it, and the window
-        // reaches back over the `(` so a comment before it can't leak.
-        let this = params[0].span();
-        let region_end = params.get(1).map_or(this.end, |next| next.span().start);
+        // reaches back over the `(` so a comment before it can't leak. The kept
+        // rest is a sub-run of the input, shared when nothing in it changed.
+        let this = this.span;
+        let region_end = second_start.unwrap_or(this.end);
         self.drop_region_from(anchor, Span::new(this.start, region_end));
-        let rest = &params[1..];
-        let erased = map_slice!(self, rest, expr);
-        Ok(Some(erased.unwrap_or_else(|| {
-            let mut kept = BumpVec::with_capacity_in(rest.len(), self.arena);
-            kept.extend_from_slice(rest);
-            kept.into_bump_slice()
-        })))
+        let rest = params.sub_run(1..params.len());
+        Ok(Some(self.param_run(rest)?.unwrap_or(rest)))
+    }
+
+    /// A parameter list (held by value), rebuilt when a parameter changed.
+    fn param_run(&mut self, run: Run<Expression>) -> Result<Option<Run<Expression>>, CompileError> {
+        rebuild_run(
+            self,
+            run,
+            |view, run| view.exprs(run),
+            |eraser, param| Ok(eraser.expr_row(&param)?.into()),
+        )
     }
 
     /// The TypeScript `this` pseudo-parameter: a bare `this` identifier binding
     /// (acorn's `isThisParam`, mirrored by `tsv_ts`'s parser).
-    fn is_this_param(&self, param: &Expression<'arena>) -> bool {
+    fn is_this_param(&self, param: &Expression) -> bool {
         let ExpressionKind::Identifier(id) = &param.kind else {
             return false;
         };
@@ -1097,8 +1204,8 @@ impl<'arena> Eraser<'arena, '_> {
 
     fn function_declaration(
         &mut self,
-        func: &FunctionDeclaration<'arena>,
-    ) -> Result<Option<FunctionDeclaration<'arena>>, CompileError> {
+        func: &FunctionDeclaration,
+    ) -> Result<Option<FunctionDeclaration>, CompileError> {
         if let Some(type_parameters) = &func.type_parameters {
             self.drop_region_from(func.span.start, type_parameters.span);
         }
@@ -1118,16 +1225,16 @@ impl<'arena> Eraser<'arena, '_> {
             type_parameters: None,
             return_type: None,
             params: params.unwrap_or(func.params),
-            body: body.unwrap_or_else(|| func.body.clone()),
-            ..func.clone()
+            body: body.unwrap_or(func.body),
+            ..*func
         }))
     }
 
     fn function_expression(
         &mut self,
-        func: &FunctionExpression<'arena>,
+        func: &FunctionExpression,
         constructor: bool,
-    ) -> Result<Option<FunctionExpression<'arena>>, CompileError> {
+    ) -> Result<Option<FunctionExpression>, CompileError> {
         if let Some(type_parameters) = &func.type_parameters {
             self.drop_region_from(func.span.start, type_parameters.span);
         }
@@ -1147,16 +1254,16 @@ impl<'arena> Eraser<'arena, '_> {
             type_parameters: None,
             return_type: None,
             params: params.unwrap_or(func.params),
-            body: body.unwrap_or_else(|| func.body.clone()),
-            ..func.clone()
+            body: body.unwrap_or(func.body),
+            ..*func
         }))
     }
 
     fn arrow(
         &mut self,
-        arrow: &ArrowFunctionExpression<'arena>,
+        arrow: &ArrowFunctionExpression,
         span: Span,
-    ) -> Result<Option<ArrowFunctionExpression<'arena>>, CompileError> {
+    ) -> Result<Option<ArrowFunctionExpression>, CompileError> {
         let params_start = arrow.params_start.unwrap_or(span.start);
         if let Some(type_parameters) = &arrow.type_parameters {
             self.drop_region_from(span.start, type_parameters.span);
@@ -1167,12 +1274,12 @@ impl<'arena> Eraser<'arena, '_> {
         // An arrow keeps a leading `this` binding — it is an ordinary parameter
         // name there, and the oracle's `remove_this_param` never visits arrows.
         let params = self.params(arrow.params, params_start, false, false)?;
-        let body = match &arrow.body {
+        let body = match arrow.body {
             ArrowFunctionBody::Expression(expr) => {
                 self.expr_ref(expr)?.map(ArrowFunctionBody::Expression)
             }
             ArrowFunctionBody::BlockStatement(block) => {
-                self.block(block)?.map(ArrowFunctionBody::BlockStatement)
+                self.block(&block)?.map(ArrowFunctionBody::BlockStatement)
             }
         };
         if arrow.type_parameters.is_none()
@@ -1186,8 +1293,8 @@ impl<'arena> Eraser<'arena, '_> {
             type_parameters: None,
             return_type: None,
             params: params.unwrap_or(arrow.params),
-            body: body.unwrap_or_else(|| arrow.body.clone()),
-            ..arrow.clone()
+            body: body.unwrap_or(arrow.body),
+            ..*arrow
         }))
     }
 
@@ -1205,12 +1312,12 @@ impl<'arena> Eraser<'arena, '_> {
     /// literal, is the half worth sharing.
     fn class_parts(
         &mut self,
-        head: &ClassHead<'_, 'arena>,
-        decorators: Option<&'arena [tsv_ts::ast::Decorator<'arena>]>,
-        super_class: Option<&'arena Expression<'arena>>,
-        body: &ClassBody<'arena>,
-    ) -> Result<Option<ClassParts<'arena>>, CompileError> {
-        self.refuse_decorators(decorators)?;
+        head: &ClassHead,
+        decorators: Option<Run<Decorator>>,
+        super_class: Option<ExprId>,
+        body: &ClassBody,
+    ) -> Result<Option<ClassParts>, CompileError> {
+        refuse_decorators(decorators)?;
         let erased_head = self.class_head(head);
         let new_super_class = match super_class {
             Some(expr) => self.expr_ref(expr)?.map(Some),
@@ -1222,20 +1329,21 @@ impl<'arena> Eraser<'arena, '_> {
         }
         Ok(Some(ClassParts {
             super_class: new_super_class.unwrap_or(super_class),
-            body: new_body.unwrap_or_else(|| body.clone()),
+            body: new_body.unwrap_or(*body),
         }))
     }
 
     fn class_declaration(
         &mut self,
-        class: &ClassDeclaration<'arena>,
-    ) -> Result<Option<ClassDeclaration<'arena>>, CompileError> {
+        class: &ClassDeclaration,
+    ) -> Result<Option<ClassDeclaration>, CompileError> {
+        let view = self.view();
         let head = ClassHead {
             span: class.span,
             r#abstract: class.r#abstract,
             id_end: class.id.as_ref().map(|id| id.span.end),
             type_parameters: class.type_parameters.as_ref().map(|tp| tp.span),
-            super_class_end: class.super_class.map(|s| s.span().end),
+            super_class_end: class.super_class.map(|s| view.expr(s).span.end),
             super_type_parameters: class.super_type_parameters.as_ref().map(|tp| tp.span),
             implements: class.implements,
         };
@@ -1246,26 +1354,27 @@ impl<'arena> Eraser<'arena, '_> {
         };
         Ok(Some(ClassDeclaration {
             r#abstract: false,
-            implements: &[],
+            implements: Run::EMPTY,
             type_parameters: None,
             super_type_parameters: None,
             super_class: parts.super_class,
             body: parts.body,
-            ..class.clone()
+            ..*class
         }))
     }
 
     fn class_expression(
         &mut self,
-        class: &ClassExpression<'arena>,
+        class: &ClassExpression,
         class_span: Span,
-    ) -> Result<Option<ClassExpression<'arena>>, CompileError> {
+    ) -> Result<Option<ClassExpression>, CompileError> {
+        let view = self.view();
         let head = ClassHead {
             span: class_span,
             r#abstract: class.r#abstract,
             id_end: class.id.as_ref().map(|id| id.span.end),
             type_parameters: class.type_parameters.as_ref().map(|tp| tp.span),
-            super_class_end: class.super_class.map(|s| s.span().end),
+            super_class_end: class.super_class.map(|s| view.expr(s).span.end),
             super_type_parameters: class.super_type_parameters.as_ref().map(|tp| tp.span),
             implements: class.implements,
         };
@@ -1276,19 +1385,19 @@ impl<'arena> Eraser<'arena, '_> {
         };
         Ok(Some(ClassExpression {
             r#abstract: false,
-            implements: &[],
+            implements: Run::EMPTY,
             type_parameters: None,
             super_type_parameters: None,
             super_class: parts.super_class,
             body: parts.body,
-            ..class.clone()
+            ..*class
         }))
     }
 
     /// Record the erased regions of a class header (`abstract`, `<T>`,
     /// `extends Base<T>`'s type arguments, `implements …`). Returns whether
     /// anything was erased.
-    fn class_head(&mut self, class: &ClassHead<'_, 'arena>) -> bool {
+    fn class_head(&mut self, class: &ClassHead) -> bool {
         // `abstract` has no span of its own; it LEADS the declaration, so its
         // window must not reach backward — a JSDoc above the class survives onto
         // the emitted class, exactly as the oracle places it.
@@ -1304,7 +1413,12 @@ impl<'arena> Eraser<'arena, '_> {
         if let Some(span) = class.super_type_parameters {
             self.drop_region_from(class.span.start, span);
         }
-        if let Some(last) = class.implements.last() {
+        let last_implements = self
+            .view()
+            .heritages(class.implements)
+            .last()
+            .map(|last| last.span.end);
+        if let Some(last_end) = last_implements {
             // The `implements` KEYWORD carries no span, so the clause's window
             // runs from the end of the last SURVIVING header token — the
             // superclass if there is one, else the class name. Starting it at the
@@ -1316,7 +1430,7 @@ impl<'arena> Eraser<'arena, '_> {
                 .super_class_end
                 .or(class.id_end)
                 .unwrap_or(class.span.start);
-            self.drop_region(Span::new(header_end, last.span.end));
+            self.drop_region(Span::new(header_end, last_end));
         }
         class.r#abstract
             || class.type_parameters.is_some()
@@ -1324,50 +1438,34 @@ impl<'arena> Eraser<'arena, '_> {
             || !class.implements.is_empty()
     }
 
-    fn class_body(
-        &mut self,
-        body: &ClassBody<'arena>,
-    ) -> Result<Option<ClassBody<'arena>>, CompileError> {
-        let arena = self.arena;
-        let members = body.body;
-        let mut out: Option<BumpVec<'arena, ClassMember<'arena>>> = None;
-        for (i, member) in members.iter().enumerate() {
-            match self.class_member(member)? {
-                MemberOut::Keep => {
-                    if let Some(vec) = out.as_mut() {
-                        vec.push(member.clone());
-                    }
-                }
-                MemberOut::Replace(new) => rebuilt_list(&mut out, arena, members, i).push(new),
-                MemberOut::Drop => {
-                    rebuilt_list(&mut out, arena, members, i);
-                }
-            }
-        }
-        Ok(out.map(|members| ClassBody {
-            body: members.into_bump_slice(),
+    fn class_body(&mut self, body: &ClassBody) -> Result<Option<ClassBody>, CompileError> {
+        let members = rebuild_run(
+            self,
+            body.body,
+            |view, run| view.class_members(run),
+            |eraser, member| eraser.class_member(&member),
+        )?;
+        Ok(members.map(|members| ClassBody {
+            body: members,
             span: body.span,
         }))
     }
 
-    fn class_member(
-        &mut self,
-        member: &ClassMember<'arena>,
-    ) -> Result<MemberOut<'arena>, CompileError> {
+    fn class_member(&mut self, member: &ClassMember) -> Result<Item<ClassMember>, CompileError> {
         Ok(match member {
             // `[key: string]: T` — a pure type construct, but the oracle's strip
             // pass has no case for it and its transform then *crashes*. Refuse
             // rather than guess at output the oracle cannot produce. A decorated one
             // hits the oracle's decorator error first, so it refuses as a decorator.
             ClassMember::IndexSignature(sig) => {
-                self.refuse_decorators(sig.decorators)?;
+                refuse_decorators(sig.decorators)?;
                 return unsupported(Refusal::TsIndexSignature);
             }
             ClassMember::StaticBlock(block) => {
-                self.refuse_decorators(block.decorators)?;
+                refuse_decorators(block.decorators)?;
                 match self.statements(block.body)? {
-                    None => MemberOut::Keep,
-                    Some(body) => MemberOut::Replace(ClassMember::StaticBlock(StaticBlock {
+                    None => Item::Keep,
+                    Some(body) => Item::Replace(ClassMember::StaticBlock(StaticBlock {
                         decorators: block.decorators,
                         body,
                         span: block.span,
@@ -1381,20 +1479,20 @@ impl<'arena> Eraser<'arena, '_> {
 
     fn method_definition(
         &mut self,
-        method: &MethodDefinition<'arena>,
-    ) -> Result<MemberOut<'arena>, CompileError> {
-        self.refuse_decorators(method.decorators)?;
+        method: &MethodDefinition,
+    ) -> Result<Item<ClassMember>, CompileError> {
+        refuse_decorators(method.decorators)?;
         // An `abstract` member declares no runtime behavior — the oracle drops it.
         if method.r#abstract {
             self.drop_region(method.span);
-            return Ok(MemberOut::Drop);
+            return Ok(Item::Drop);
         }
         // A bodiless, non-abstract method is an overload signature (or an
         // ambient member outside a `declare` class). The oracle has no case for
         // it: the signature survives its strip pass and then collides with the
         // implementation (`duplicate_class_field`), or prints as invalid JS.
         // `is_bodyless` mirrors the wire writer's `TSDeclareMethod` predicate.
-        let func = &method.value;
+        let func = method.value;
         if func.body.body.is_empty() && func.body.span.start == func.body.span.end {
             return unsupported(Refusal::TsOverloadSignature);
         }
@@ -1403,43 +1501,44 @@ impl<'arena> Eraser<'arena, '_> {
             || method.optional
             || func.type_parameters.is_some();
         if erased_head {
+            let key_span = self.view().expr(method.key).span;
             if method.accessibility.is_some() || method.r#override {
-                self.drop_region(Span::new(method.span.start, method.key.span().start));
+                self.drop_region(Span::new(method.span.start, key_span.start));
             }
             // The `?` marker and the `<T>` clause both sit between the key and
             // the parameter list's `(`.
             if method.optional || func.type_parameters.is_some() {
-                self.drop_region(Span::new(method.key.span().end, func.params_start));
+                self.drop_region(Span::new(key_span.end, func.params_start));
             }
         }
-        let key = self.expr(&method.key)?;
-        let value = self.function_expression(func, method.kind == MethodKind::Constructor)?;
+        let key = self.expr_ref(method.key)?;
+        let value = self.function_expression(&func, method.kind == MethodKind::Constructor)?;
         if !erased_head && key.is_none() && value.is_none() {
-            return Ok(MemberOut::Keep);
+            return Ok(Item::Keep);
         }
-        Ok(MemberOut::Replace(ClassMember::MethodDefinition(
+        Ok(Item::Replace(ClassMember::MethodDefinition(
             MethodDefinition {
-                key: key.unwrap_or_else(|| method.key.clone()),
-                value: value.unwrap_or_else(|| func.clone()),
+                key: key.unwrap_or(method.key),
+                value: value.unwrap_or(func),
                 accessibility: None,
                 r#override: false,
                 r#abstract: false,
                 optional: false,
-                ..method.clone()
+                ..*method
             },
         )))
     }
 
     fn property_definition(
         &mut self,
-        prop: &PropertyDefinition<'arena>,
-    ) -> Result<MemberOut<'arena>, CompileError> {
-        self.refuse_decorators(prop.decorators)?;
+        prop: &PropertyDefinition,
+    ) -> Result<Item<ClassMember>, CompileError> {
+        refuse_decorators(prop.decorators)?;
         // `declare x: T` — an ambient field, dropped by the oracle's `ClassBody`
         // visitor.
         if prop.declare {
             self.drop_region(prop.span);
-            return Ok(MemberOut::Drop);
+            return Ok(Item::Drop);
         }
         // `abstract x: T` and `accessor x = 1` have no strip case in the oracle:
         // the first survives its walk and prints as `abstract x;` (invalid JS),
@@ -1450,9 +1549,10 @@ impl<'arena> Eraser<'arena, '_> {
         if prop.accessor {
             return unsupported(Refusal::TsAccessorField);
         }
+        let key_span = self.view().expr(prop.key).span;
         let erased_modifiers = prop.accessibility.is_some() || prop.readonly || prop.r#override;
         if erased_modifiers {
-            self.drop_region(Span::new(prop.span.start, prop.key.span().start));
+            self.drop_region(Span::new(prop.span.start, key_span.start));
         }
         // `?`/`!` and `: T` form one contiguous tail between the key and the
         // initializer (or the member's end).
@@ -1460,54 +1560,33 @@ impl<'arena> Eraser<'arena, '_> {
         if erased_tail {
             let tail_end = prop
                 .value
-                .as_ref()
-                .map_or(prop.span.end, |value| value.span().start);
-            self.drop_region(Span::new(prop.key.span().end, tail_end));
+                .map_or(prop.span.end, |value| self.view().expr(value).span.start);
+            self.drop_region(Span::new(key_span.end, tail_end));
         }
-        let key = self.expr(&prop.key)?;
-        let value = match &prop.value {
-            Some(value) => self.expr(value)?.map(Some),
+        let key = self.expr_ref(prop.key)?;
+        let value = match prop.value {
+            Some(value) => self.expr_ref(value)?.map(Some),
             None => None,
         };
         if !erased_modifiers && !erased_tail && key.is_none() && value.is_none() {
-            return Ok(MemberOut::Keep);
+            return Ok(Item::Keep);
         }
-        Ok(MemberOut::Replace(ClassMember::PropertyDefinition(
+        Ok(Item::Replace(ClassMember::PropertyDefinition(
             PropertyDefinition {
-                key: key.unwrap_or_else(|| prop.key.clone()),
-                value: value.unwrap_or_else(|| prop.value.clone()),
+                key: key.unwrap_or(prop.key),
+                value: value.unwrap_or(prop.value),
                 type_annotation: None,
                 accessibility: None,
                 readonly: false,
                 r#override: false,
                 r#abstract: false,
                 modifier: PropertyModifier::None,
-                ..prop.clone()
+                ..*prop
             },
         )))
     }
 
-    /// Decorators are a `typescript_invalid_feature` hard error in the oracle
-    /// (`@dec` on a class, member, or parameter) — and without `lang="ts"` they
-    /// are a plain-JS parse error. Never erased, never emitted.
-    fn refuse_decorators(
-        &self,
-        decorators: Option<&'arena [tsv_ts::ast::Decorator<'arena>]>,
-    ) -> Result<(), CompileError> {
-        if decorators.is_some_and(|list| !list.is_empty()) {
-            return unsupported(Refusal::Decorator);
-        }
-        Ok(())
-    }
-
     // ── Expressions ────────────────────────────────────────────────────────
-
-    fn expr_ref(
-        &mut self,
-        expr: &'arena Expression<'arena>,
-    ) -> Result<Option<&'arena Expression<'arena>>, CompileError> {
-        Ok(self.expr(expr)?.map(|new| &*self.arena.alloc(new)))
-    }
 
     /// The expression inventory. Exhaustive on purpose — no catch-all arm.
     ///
@@ -1517,248 +1596,286 @@ impl<'arena> Eraser<'arena, '_> {
     /// AST has no such node (it parses without `preserveParens`), so
     /// `/** @type {T} */ (1)` is simply `1` with a leading comment there; keeping
     /// tsv's wrapper would print the parens the oracle drops *and* block the
-    /// static fold. Patterns and binding identifiers **field-drop** their
-    /// annotations and `?`/`!` markers.
+    /// static fold. An unwrapped inner expression that is itself unchanged is
+    /// yielded by id ([`Edge::Id`]). Patterns and binding identifiers
+    /// **field-drop** their annotations and `?`/`!` markers.
     ///
     /// Parens are not a hazard: every tree the compiler reads is paren-free — a
     /// `{#snippet}` head included, whose `preserveParens` parse is kept for the wire
     /// alone (`Root::snippet_wire_parameters`) — and the printer re-derives them from
     /// precedence, exactly as the oracle's printer does — so `(x as T).y` erases to
     /// `x.y` and `(a + b as T) * c` keeps the parens it needs.
-    #[expect(clippy::too_many_lines)]
-    fn expr(
-        &mut self,
-        expr: &Expression<'arena>,
-    ) -> Result<Option<Expression<'arena>>, CompileError> {
-        Ok(match &expr.kind {
+    #[expect(
+        clippy::too_many_lines,
+        reason = "one arm per variant — the exhaustive inventory is the safety argument"
+    )]
+    fn expr(&mut self, expr: &Expression) -> Result<Option<Edge>, CompileError> {
+        let span = expr.span;
+        Ok(match expr.kind {
             // ── The five TypeScript wrappers: unwrap to inner ──────────────
             ExpressionKind::TSAsExpression(node) => {
-                self.drop_region(Span::new(node.expression.span().end, expr.span.end));
-                Some(
-                    self.expr(node.expression)?
-                        .unwrap_or_else(|| node.expression.clone()),
-                )
+                let inner_end = self.view().expr(node.expression).span.end;
+                self.drop_region(Span::new(inner_end, span.end));
+                Some(self.inner(node.expression)?)
             }
             ExpressionKind::TSSatisfiesExpression(node) => {
-                self.drop_region(Span::new(node.expression.span().end, expr.span.end));
-                Some(
-                    self.expr(node.expression)?
-                        .unwrap_or_else(|| node.expression.clone()),
-                )
+                let inner_end = self.view().expr(node.expression).span.end;
+                self.drop_region(Span::new(inner_end, span.end));
+                Some(self.inner(node.expression)?)
             }
             ExpressionKind::TSNonNullExpression(node) => {
-                self.drop_region(Span::new(node.expression.span().end, expr.span.end));
-                Some(
-                    self.expr(node.expression)?
-                        .unwrap_or_else(|| node.expression.clone()),
-                )
+                let inner_end = self.view().expr(node.expression).span.end;
+                self.drop_region(Span::new(inner_end, span.end));
+                Some(self.inner(node.expression)?)
             }
             ExpressionKind::TSInstantiationExpression(node) => {
-                self.drop_region(Span::new(node.expression.span().end, expr.span.end));
-                Some(
-                    self.expr(node.expression)?
-                        .unwrap_or_else(|| node.expression.clone()),
-                )
+                let inner_end = self.view().expr(node.expression).span.end;
+                self.drop_region(Span::new(inner_end, span.end));
+                Some(self.inner(node.expression)?)
             }
             ExpressionKind::TSTypeAssertion(node) => {
-                self.drop_region(Span::new(expr.span.start, node.expression.span().start));
-                Some(
-                    self.expr(node.expression)?
-                        .unwrap_or_else(|| node.expression.clone()),
-                )
+                let inner_start = self.view().expr(node.expression).span.start;
+                self.drop_region(Span::new(span.start, inner_start));
+                Some(self.inner(node.expression)?)
             }
 
-            ExpressionKind::TSParameterProperty(node) => {
-                Some(self.parameter_property(node, expr.span)?)
-            }
+            ExpressionKind::TSParameterProperty(node) => Some(self.parameter_property(node, span)?),
 
             // ── Binding identifiers ────────────────────────────────────────
-            ExpressionKind::Identifier(id) => self.identifier(id)?.map(Expression::from_identifier),
+            ExpressionKind::Identifier(id) => self
+                .identifier(&id)?
+                .map(|id| Edge::Row(Expression::from_identifier(id))),
 
             // ── Patterns ───────────────────────────────────────────────────
             ExpressionKind::ObjectPattern(pattern) => {
-                self.refuse_decorators(pattern.decorators)?;
-                self.pattern_tail(
-                    expr.span,
-                    pattern.optional,
-                    pattern.type_annotation.as_ref(),
-                );
-                let properties = map_slice!(self, pattern.properties, object_pattern_property);
-                let erased = pattern.optional || pattern.type_annotation.is_some();
+                self.refuse_extra_decorators(pattern.extra)?;
+                let annotation = pattern.type_annotation(self.view()).map(|a| a.span);
+                self.pattern_tail(span, pattern.optional, annotation);
+                let properties = rebuild_run(
+                    self,
+                    pattern.properties,
+                    |view, run| view.pat_props(run),
+                    |eraser, p| Ok(eraser.object_pattern_property(&p)?.into()),
+                )?;
+                let erased = pattern.optional || annotation.is_some();
                 if !erased && properties.is_none() {
                     None
                 } else {
-                    Some(Expression {
-                        span: expr.span,
+                    // Decorators were refused above, so the extra row held only the
+                    // erased annotation: clearing it drops nothing that prints.
+                    Some(Edge::Row(Expression {
+                        span,
                         kind: ExpressionKind::ObjectPattern(ObjectPattern {
                             properties: properties.unwrap_or(pattern.properties),
                             optional: false,
-                            type_annotation: None,
-                            ..pattern.clone()
+                            extra: None,
                         }),
-                    })
+                    }))
                 }
             }
             ExpressionKind::ArrayPattern(pattern) => {
-                self.refuse_decorators(pattern.decorators)?;
-                self.pattern_tail(
-                    expr.span,
-                    pattern.optional,
-                    pattern.type_annotation.as_ref(),
-                );
-                let elements = map_slice!(self, pattern.elements, opt_expr);
-                let erased = pattern.optional || pattern.type_annotation.is_some();
+                self.refuse_extra_decorators(pattern.extra)?;
+                let annotation = pattern.type_annotation(self.view()).map(|a| a.span);
+                self.pattern_tail(span, pattern.optional, annotation);
+                let elements = self.opt_id_run(pattern.elements)?;
+                let erased = pattern.optional || annotation.is_some();
                 if !erased && elements.is_none() {
                     None
                 } else {
-                    Some(Expression {
-                        span: expr.span,
+                    // Decorators refused above, as for the object pattern.
+                    Some(Edge::Row(Expression {
+                        span,
                         kind: ExpressionKind::ArrayPattern(ArrayPattern {
                             elements: elements.unwrap_or(pattern.elements),
                             optional: false,
-                            type_annotation: None,
-                            ..pattern.clone()
+                            extra: None,
                         }),
-                    })
+                    }))
                 }
             }
             ExpressionKind::AssignmentPattern(pattern) => {
-                self.refuse_decorators(pattern.decorators)?;
+                refuse_decorators(pattern.decorators)?;
                 let left = self.expr_ref(pattern.left)?;
                 let right = self.expr_ref(pattern.right)?;
                 if left.is_none() && right.is_none() {
                     None
                 } else {
-                    Some(Expression {
-                        span: expr.span,
+                    Some(Edge::Row(Expression {
+                        span,
                         kind: ExpressionKind::AssignmentPattern(AssignmentPattern {
                             left: left.unwrap_or(pattern.left),
                             right: right.unwrap_or(pattern.right),
-                            ..pattern.clone()
+                            ..pattern
                         }),
-                    })
+                    }))
                 }
             }
-            ExpressionKind::RestElement(rest) => {
-                self.rest_element(rest)?.map(Expression::from_rest_element)
-            }
+            ExpressionKind::RestElement(rest) => self
+                .rest_element(&rest)?
+                .map(|rest| Edge::Row(Expression::from_rest_element(rest))),
 
             // ── Calls carry type arguments ─────────────────────────────────
             ExpressionKind::CallExpression(call) => {
-                if let Some(type_arguments) = &call.type_arguments {
+                if let Some(type_args) = call.type_args {
                     // `f /* c */ <T>(x)` — the `<T>` list is detached from the
                     // callee, so the window reaches back to it.
-                    self.drop_region_from(call.callee.span().start, type_arguments.span);
+                    let view = self.view();
+                    let (anchor, region) = (
+                        view.expr(call.callee).span.start,
+                        view.type_args(type_args).span,
+                    );
+                    self.drop_region_from(anchor, region);
                 }
                 let callee = self.expr_ref(call.callee)?;
-                let arguments = map_slice!(self, call.arguments, expr_element);
-                if call.type_arguments.is_none() && callee.is_none() && arguments.is_none() {
+                let arguments = self.id_run(call.arguments)?;
+                if call.type_args.is_none() && callee.is_none() && arguments.is_none() {
                     None
                 } else {
-                    Some(Expression {
-                        span: expr.span,
+                    Some(Edge::Row(Expression {
+                        span,
                         kind: ExpressionKind::CallExpression(tsv_ts::ast::CallExpression {
                             callee: callee.unwrap_or(call.callee),
-                            type_arguments: None,
+                            type_args: None,
                             arguments: arguments.unwrap_or(call.arguments),
-                            ..call.clone()
+                            ..call
                         }),
-                    })
+                    }))
                 }
             }
             ExpressionKind::NewExpression(new) => {
-                if let Some(type_arguments) = &new.type_arguments {
-                    self.drop_region_from(new.callee.span().start, type_arguments.span);
+                if let Some(type_args) = new.type_args {
+                    let view = self.view();
+                    let (anchor, region) = (
+                        view.expr(new.callee).span.start,
+                        view.type_args(type_args).span,
+                    );
+                    self.drop_region_from(anchor, region);
                 }
                 let callee = self.expr_ref(new.callee)?;
-                let arguments = map_slice!(self, new.arguments, expr_element);
-                if new.type_arguments.is_none() && callee.is_none() && arguments.is_none() {
+                let arguments = self.id_run(new.arguments)?;
+                if new.type_args.is_none() && callee.is_none() && arguments.is_none() {
                     None
                 } else {
-                    Some(Expression {
-                        span: expr.span,
+                    Some(Edge::Row(Expression {
+                        span,
                         kind: ExpressionKind::NewExpression(tsv_ts::ast::NewExpression {
                             callee: callee.unwrap_or(new.callee),
-                            type_arguments: None,
+                            type_args: None,
                             arguments: arguments.unwrap_or(new.arguments),
                         }),
-                    })
+                    }))
                 }
             }
-            ExpressionKind::TaggedTemplateExpression(tagged) => {
+            ExpressionKind::TaggedTemplateExpression(id) => {
+                let tagged = *self.view().tagged_tpl(id);
                 if let Some(type_arguments) = &tagged.type_arguments {
-                    self.drop_region_from(tagged.tag.span().start, type_arguments.span);
+                    let anchor = self.view().expr(tagged.tag).span.start;
+                    self.drop_region_from(anchor, type_arguments.span);
                 }
                 let tag = self.expr_ref(tagged.tag)?;
                 let quasi = self.template_literal(&tagged.quasi)?;
                 if tagged.type_arguments.is_none() && tag.is_none() && quasi.is_none() {
                     None
                 } else {
-                    Some(Expression {
-                        span: expr.span,
-                        kind: ExpressionKind::TaggedTemplateExpression(self.arena.alloc(
-                            tsv_ts::ast::TaggedTemplateExpression {
-                                tag: tag.unwrap_or(tagged.tag),
-                                type_arguments: None,
-                                quasi: quasi.unwrap_or_else(|| tagged.quasi.clone()),
-                            },
-                        )),
-                    })
+                    let new = push(
+                        self.stores,
+                        TaggedTemplateExpression {
+                            tag: tag.unwrap_or(tagged.tag),
+                            type_arguments: None,
+                            quasi: quasi.unwrap_or(tagged.quasi),
+                            ..tagged
+                        },
+                    );
+                    Some(Edge::Row(Expression {
+                        span,
+                        kind: ExpressionKind::TaggedTemplateExpression(new),
+                    }))
                 }
             }
 
             // ── Functions and classes ──────────────────────────────────────
-            ExpressionKind::ArrowFunctionExpression(arrow) => {
-                self.arrow(arrow, expr.span)?.map(|a| Expression {
-                    span: expr.span,
-                    kind: ExpressionKind::ArrowFunctionExpression(self.arena.alloc(a)),
-                })
+            ExpressionKind::ArrowFunctionExpression(id) => {
+                let arrow = *self.view().arrow_fn(id);
+                match self.arrow(&arrow, span)? {
+                    None => None,
+                    Some(new) => {
+                        let new = push(self.stores, new);
+                        Some(Edge::Row(Expression {
+                            span,
+                            kind: ExpressionKind::ArrowFunctionExpression(new),
+                        }))
+                    }
+                }
             }
-            ExpressionKind::FunctionExpression(func) => self
-                .function_expression(func, false)?
-                .map(|f| Expression::from_function_expression(self.arena.alloc(f))),
-            ExpressionKind::ClassExpression(class) => {
-                self.class_expression(class, expr.span)?
-                    .map(|c| Expression {
-                        span: expr.span,
-                        kind: ExpressionKind::ClassExpression(self.arena.alloc(c)),
-                    })
+            ExpressionKind::FunctionExpression(id) => {
+                let func = *self.view().fn_expr(id);
+                match self.function_expression(&func, false)? {
+                    None => None,
+                    Some(new) => {
+                        let id = push(self.stores, new);
+                        Some(Edge::Row(Expression::from_function_expression(
+                            new.span, id,
+                        )))
+                    }
+                }
+            }
+            ExpressionKind::ClassExpression(id) => {
+                let class = *self.view().class_expr(id);
+                match self.class_expression(&class, span)? {
+                    None => None,
+                    Some(new) => {
+                        let new = push(self.stores, new);
+                        Some(Edge::Row(Expression {
+                            span,
+                            kind: ExpressionKind::ClassExpression(new),
+                        }))
+                    }
+                }
             }
 
             // ── Plain recursion ────────────────────────────────────────────
-            ExpressionKind::ObjectExpression(obj) => {
-                map_slice!(self, obj.properties, object_property).map(|properties| Expression {
-                    span: expr.span,
+            ExpressionKind::ObjectExpression(obj) => rebuild_run(
+                self,
+                obj.properties,
+                |view, run| view.obj_props(run),
+                |eraser, p| Ok(eraser.object_property(&p)?.into()),
+            )?
+            .map(|properties| {
+                Edge::Row(Expression {
+                    span,
                     kind: ExpressionKind::ObjectExpression(tsv_ts::ast::ObjectExpression {
                         properties,
-                        ..obj.clone()
+                        ..obj
                     }),
                 })
-            }
+            }),
             ExpressionKind::ArrayExpression(arr) => {
-                map_slice!(self, arr.elements, opt_expr_element).map(|elements| Expression {
-                    span: expr.span,
-                    kind: ExpressionKind::ArrayExpression(tsv_ts::ast::ArrayExpression {
-                        elements,
-                        ..arr.clone()
-                    }),
+                self.opt_id_run(arr.elements)?.map(|elements| {
+                    Edge::Row(Expression {
+                        span,
+                        kind: ExpressionKind::ArrayExpression(tsv_ts::ast::ArrayExpression {
+                            elements,
+                            ..arr
+                        }),
+                    })
                 })
             }
             ExpressionKind::UnaryExpression(unary) => {
                 self.expr_ref(unary.argument)?.map(|argument| {
-                    Expression::from_unary_expression(tsv_ts::ast::UnaryExpression {
-                        argument,
-                        ..unary.clone()
-                    })
+                    Edge::Row(Expression::from_unary_expression(
+                        tsv_ts::ast::UnaryExpression { argument, ..unary },
+                    ))
                 })
             }
             ExpressionKind::UpdateExpression(update) => {
-                self.expr_ref(update.argument)?.map(|argument| Expression {
-                    span: expr.span,
-                    kind: ExpressionKind::UpdateExpression(tsv_ts::ast::UpdateExpression {
-                        argument,
-                        ..update.clone()
-                    }),
+                self.expr_ref(update.argument)?.map(|argument| {
+                    Edge::Row(Expression {
+                        span,
+                        kind: ExpressionKind::UpdateExpression(tsv_ts::ast::UpdateExpression {
+                            argument,
+                            ..update
+                        }),
+                    })
                 })
             }
             ExpressionKind::BinaryExpression(binary) => {
@@ -1767,8 +1884,8 @@ impl<'arena> Eraser<'arena, '_> {
                 if left.is_none() && right.is_none() {
                     None
                 } else {
-                    Some(Expression {
-                        span: expr.span,
+                    Some(Edge::Row(Expression {
+                        span,
                         kind: ExpressionKind::BinaryExpression(tsv_ts::ast::BinaryExpression {
                             left: left.unwrap_or(binary.left),
                             right: right.unwrap_or(binary.right),
@@ -1776,9 +1893,9 @@ impl<'arena> Eraser<'arena, '_> {
                             // the SOURCE bytes this rewrite invalidates, and inheriting is the
                             // SAFE direction — a stale `true` costs a redundant paren pair, a
                             // stale `false` an output nothing reparses.
-                            ..binary.clone()
+                            ..binary
                         }),
-                    })
+                    }))
                 }
             }
             ExpressionKind::MemberExpression(member) => {
@@ -1787,14 +1904,14 @@ impl<'arena> Eraser<'arena, '_> {
                 if object.is_none() && property.is_none() {
                     None
                 } else {
-                    Some(Expression {
-                        span: expr.span,
+                    Some(Edge::Row(Expression {
+                        span,
                         kind: ExpressionKind::MemberExpression(tsv_ts::ast::MemberExpression {
                             object: object.unwrap_or(member.object),
                             property: property.unwrap_or(member.property),
-                            ..member.clone()
+                            ..member
                         }),
-                    })
+                    }))
                 }
             }
             ExpressionKind::ConditionalExpression(cond) => {
@@ -1804,8 +1921,8 @@ impl<'arena> Eraser<'arena, '_> {
                 if test.is_none() && consequent.is_none() && alternate.is_none() {
                     None
                 } else {
-                    Some(Expression {
-                        span: expr.span,
+                    Some(Edge::Row(Expression {
+                        span,
                         kind: ExpressionKind::ConditionalExpression(
                             tsv_ts::ast::ConditionalExpression {
                                 test: test.unwrap_or(cond.test),
@@ -1813,44 +1930,52 @@ impl<'arena> Eraser<'arena, '_> {
                                 alternate: alternate.unwrap_or(cond.alternate),
                             },
                         ),
-                    })
+                    }))
                 }
             }
             ExpressionKind::SpreadElement(spread) => {
                 self.expr_ref(spread.argument)?.map(|argument| {
-                    Expression::from_spread_element(tsv_ts::ast::SpreadElement {
-                        argument,
-                        span: spread.span,
-                    })
+                    Edge::Row(Expression::from_spread_element(
+                        tsv_ts::ast::SpreadElement {
+                            argument,
+                            span: spread.span,
+                        },
+                    ))
                 })
             }
             ExpressionKind::TemplateLiteral(template) => self
-                .template_literal(template)?
-                .map(Expression::from_template_literal),
+                .template_literal(&template)?
+                .map(|template| Edge::Row(Expression::from_template_literal(span, template))),
             ExpressionKind::AwaitExpression(node) => {
-                self.expr_ref(node.argument)?.map(|argument| Expression {
-                    span: expr.span,
-                    kind: ExpressionKind::AwaitExpression(tsv_ts::ast::AwaitExpression {
-                        argument,
-                    }),
+                self.expr_ref(node.argument)?.map(|argument| {
+                    Edge::Row(Expression {
+                        span,
+                        kind: ExpressionKind::AwaitExpression(tsv_ts::ast::AwaitExpression {
+                            argument,
+                        }),
+                    })
                 })
             }
             ExpressionKind::YieldExpression(node) => match node.argument {
-                Some(argument) => self.expr_ref(argument)?.map(|argument| Expression {
-                    span: expr.span,
-                    kind: ExpressionKind::YieldExpression(tsv_ts::ast::YieldExpression {
-                        argument: Some(argument),
-                        ..node.clone()
-                    }),
+                Some(argument) => self.expr_ref(argument)?.map(|argument| {
+                    Edge::Row(Expression {
+                        span,
+                        kind: ExpressionKind::YieldExpression(tsv_ts::ast::YieldExpression {
+                            argument: Some(argument),
+                            ..node
+                        }),
+                    })
                 }),
                 None => None,
             },
             ExpressionKind::SequenceExpression(seq) => {
-                map_slice!(self, seq.expressions, expr_element).map(|expressions| Expression {
-                    span: expr.span,
-                    kind: ExpressionKind::SequenceExpression(tsv_ts::ast::SequenceExpression {
-                        expressions,
-                    }),
+                self.id_run(seq.expressions)?.map(|expressions| {
+                    Edge::Row(Expression {
+                        span,
+                        kind: ExpressionKind::SequenceExpression(tsv_ts::ast::SequenceExpression {
+                            expressions,
+                        }),
+                    })
                 })
             }
             ExpressionKind::AssignmentExpression(assign) => {
@@ -1859,16 +1984,16 @@ impl<'arena> Eraser<'arena, '_> {
                 if left.is_none() && right.is_none() {
                     None
                 } else {
-                    Some(Expression {
-                        span: expr.span,
+                    Some(Edge::Row(Expression {
+                        span,
                         kind: ExpressionKind::AssignmentExpression(
                             tsv_ts::ast::AssignmentExpression {
                                 left: left.unwrap_or(assign.left),
                                 right: right.unwrap_or(assign.right),
-                                ..assign.clone()
+                                ..assign
                             },
                         ),
-                    })
+                    }))
                 }
             }
             ExpressionKind::ImportExpression(import) => {
@@ -1880,14 +2005,14 @@ impl<'arena> Eraser<'arena, '_> {
                 if source.is_none() && options.is_none() {
                     None
                 } else {
-                    Some(Expression {
-                        span: expr.span,
+                    Some(Edge::Row(Expression {
+                        span,
                         kind: ExpressionKind::ImportExpression(tsv_ts::ast::ImportExpression {
                             source: source.unwrap_or(import.source),
                             options: options.unwrap_or(import.options),
-                            ..import.clone()
+                            ..import
                         }),
-                    })
+                    }))
                 }
             }
             // `/** @type {T} */ (expr)` — an internal-only wrapper recording the
@@ -1903,10 +2028,12 @@ impl<'arena> Eraser<'arena, '_> {
             // compile path releases it back to the positional machinery — see
             // `transform_server::collect_script_comments`.
             ExpressionKind::CommentBoundPair(cast) => {
-                Some(self.expr(cast.inner)?.unwrap_or_else(|| cast.inner.clone()))
+                let inner = self.view().comment_pair(cast).inner;
+                Some(self.inner(inner)?)
             }
             ExpressionKind::ParenthesizedExpression(paren) => {
-                self.expr(paren.unreachable_contents())?
+                let contents = *paren.unreachable_contents(self.view());
+                self.expr(&contents)?
             }
 
             // ── Leaves ─────────────────────────────────────────────────────
@@ -1927,26 +2054,24 @@ impl<'arena> Eraser<'arena, '_> {
     /// would read as the `=`). Comments in the window refuse instead.
     ///
     /// The trigger is the AST, never the span: a *synthetic* identifier carries
-    /// its name out-of-band (`raw_len: 0`) and may steal the span of the node it
+    /// its name out-of-band (`name_len: 0`) and may steal the span of the node it
     /// replaces, so "span extends past the name" is not a TypeScript signal.
-    fn identifier(
-        &mut self,
-        id: &Identifier<'arena>,
-    ) -> Result<Option<Identifier<'arena>>, CompileError> {
-        self.refuse_decorators(id.decorators())?;
+    ///
+    /// Decorators are refused first, so the cleared extra row held only the
+    /// annotation.
+    fn identifier(&mut self, id: &Identifier) -> Result<Option<Identifier>, CompileError> {
+        self.refuse_extra_decorators(id.extra)?;
         // A plain *reference* never populates `extra` — the overwhelmingly
         // common case exits here on one `Option::is_none()` and a bool.
-        if !id.optional && id.type_annotation().is_none() {
+        let annotation = id.type_annotation(self.view()).map(|a| a.span);
+        if !id.optional && annotation.is_none() {
             return Ok(None);
         }
-        self.drop_region(Span::new(
-            id.name_span().end,
-            tail_end(id.span, id.type_annotation()),
-        ));
+        self.drop_region(Span::new(id.name_span().end, tail_end(id.span, annotation)));
         Ok(Some(Identifier {
             optional: false,
             extra: None,
-            ..id.clone()
+            ..*id
         }))
     }
 
@@ -1954,12 +2079,7 @@ impl<'arena> Eraser<'arena, '_> {
     /// the annotation both trail the pattern's closing bracket. The window reaches
     /// back over any trivia to that bracket, so a comment between them
     /// (`{a} /* c */ : T`) can't leak.
-    fn pattern_tail(
-        &mut self,
-        span: Span,
-        optional: bool,
-        type_annotation: Option<&tsv_ts::ast::TSTypeAnnotation<'arena>>,
-    ) {
+    fn pattern_tail(&mut self, span: Span, optional: bool, type_annotation: Option<Span>) {
         if !optional && type_annotation.is_none() {
             return;
         }
@@ -1967,7 +2087,7 @@ impl<'arena> Eraser<'arena, '_> {
         // The `?` sits before the annotation; without one it is the tail's last byte.
         let start = type_annotation.map_or_else(
             || end.saturating_sub(1).max(span.start),
-            |annotation| annotation.span.start,
+            |annotation| annotation.start,
         );
         self.drop_region_from(span.start, Span::new(start, end));
     }
@@ -1984,82 +2104,38 @@ impl<'arena> Eraser<'arena, '_> {
     /// `constructor(x)`.
     fn parameter_property(
         &mut self,
-        node: &tsv_ts::ast::TSParameterProperty<'arena>,
+        node: TSParameterProperty,
         span: Span,
-    ) -> Result<Expression<'arena>, CompileError> {
+    ) -> Result<Edge, CompileError> {
         if self.constructor_params && (node.readonly || node.accessibility.is_some()) {
             return unsupported(Refusal::TsParameterProperty);
         }
-        self.drop_region(Span::new(span.start, node.parameter.span().start));
-        Ok(self
-            .expr(node.parameter)?
-            .unwrap_or_else(|| node.parameter.clone()))
+        let parameter_start = self.view().expr(node.parameter).span.start;
+        self.drop_region(Span::new(span.start, parameter_start));
+        self.inner(node.parameter)
     }
 
-    fn rest_element(
-        &mut self,
-        rest: &RestElement<'arena>,
-    ) -> Result<Option<RestElement<'arena>>, CompileError> {
-        self.pattern_tail(rest.span, rest.optional, rest.type_annotation.as_ref());
+    /// A rest element's erasure. Its extra row carries only an annotation (a rest
+    /// element takes no decorator), so a rebuild clears it.
+    fn rest_element(&mut self, rest: &RestElement) -> Result<Option<RestElement>, CompileError> {
+        let annotation = rest.type_annotation(self.view()).map(|a| a.span);
+        self.pattern_tail(rest.span, rest.optional, annotation);
         let argument = self.expr_ref(rest.argument)?;
-        if !rest.optional && rest.type_annotation.is_none() && argument.is_none() {
+        if !rest.optional && annotation.is_none() && argument.is_none() {
             return Ok(None);
         }
         Ok(Some(RestElement {
             argument: argument.unwrap_or(rest.argument),
             optional: false,
-            type_annotation: None,
+            extra: None,
             span: rest.span,
         }))
     }
 
-    /// An element of a reference slice (call / `new` arguments, sequence and template
-    /// expressions) — the `map_slice!` contract with `T = &Expression`: a rebuilt
-    /// element is arena-allocated so the rebuilt slice holds references too.
-    fn expr_element(
-        &mut self,
-        expr: &'arena Expression<'arena>,
-    ) -> Result<Option<&'arena Expression<'arena>>, CompileError> {
-        Ok(self.expr(expr)?.map(|new| &*self.arena.alloc(new)))
-    }
-
-    /// An array-literal element slot (`Option<&Expression>`, `None` a hole) — the
-    /// reference twin of `opt_expr`, whose array-pattern slots hold the element by
-    /// value; a rebuilt element is arena-allocated. `&Option<&_>` is the `map_slice!`
-    /// contract's `&T` in.
-    #[expect(
-        clippy::option_option,
-        clippy::trivially_copy_pass_by_ref,
-        clippy::ref_option_ref
-    )]
-    fn opt_expr_element(
-        &mut self,
-        element: &Option<&'arena Expression<'arena>>,
-    ) -> Result<Option<Option<&'arena Expression<'arena>>>, CompileError> {
-        Ok(match element {
-            Some(expr) => self.expr_element(expr)?.map(Some),
-            None => None,
-        })
-    }
-
-    /// An array/array-pattern element slot — `None` is a hole (`[a, , b]`). The
-    /// nesting is the `map_slice!` contract (`&T` in, `Option<T>` out, with
-    /// `T = Option<Expression>`), not a modelling choice.
-    #[expect(clippy::option_option, clippy::ref_option)]
-    fn opt_expr(
-        &mut self,
-        element: &Option<Expression<'arena>>,
-    ) -> Result<Option<Option<Expression<'arena>>>, CompileError> {
-        Ok(match element {
-            Some(expr) => self.expr(expr)?.map(Some),
-            None => None,
-        })
-    }
-
     fn object_property(
         &mut self,
-        property: &ObjectProperty<'arena>,
-    ) -> Result<Option<ObjectProperty<'arena>>, CompileError> {
+        property: &ObjectProperty,
+    ) -> Result<Option<ObjectProperty>, CompileError> {
         Ok(match property {
             ObjectProperty::Property(prop) => self.property(prop)?.map(ObjectProperty::Property),
             ObjectProperty::SpreadElement(spread) => {
@@ -2075,8 +2151,8 @@ impl<'arena> Eraser<'arena, '_> {
 
     fn object_pattern_property(
         &mut self,
-        property: &ObjectPatternProperty<'arena>,
-    ) -> Result<Option<ObjectPatternProperty<'arena>>, CompileError> {
+        property: &ObjectPatternProperty,
+    ) -> Result<Option<ObjectPatternProperty>, CompileError> {
         Ok(match property {
             ObjectPatternProperty::Property(prop) => {
                 self.property(prop)?.map(ObjectPatternProperty::Property)
@@ -2087,22 +2163,19 @@ impl<'arena> Eraser<'arena, '_> {
         })
     }
 
-    fn property(
-        &mut self,
-        prop: &Property<'arena>,
-    ) -> Result<Option<Property<'arena>>, CompileError> {
-        let erased_key = self.expr(prop.key)?;
-        let erased_value = self.expr(prop.value)?;
+    fn property(&mut self, prop: &Property) -> Result<Option<Property>, CompileError> {
+        let erased_key = self.expr_ref(prop.key)?;
+        let erased_value = self.expr_ref(prop.value)?;
         let changed = erased_key.is_some() || erased_value.is_some();
-        let key = erased_key.map_or(prop.key, |key| &*self.arena.alloc(key));
-        let value = erased_value.map_or(prop.value, |value| &*self.arena.alloc(value));
+        let key = erased_key.unwrap_or(prop.key);
+        let value = erased_value.unwrap_or(prop.value);
         if let Some(shorthand) = self.same_name_shorthand(prop, key, value) {
             return Ok(Some(shorthand));
         }
-        Ok(changed.then(|| Property {
+        Ok(changed.then_some(Property {
             key,
             value,
-            ..prop.clone()
+            ..*prop
         }))
     }
 
@@ -2118,27 +2191,25 @@ impl<'arena> Eraser<'arena, '_> {
     /// region, since the shorthand leaves no window for a comment there.
     fn same_name_shorthand(
         &mut self,
-        prop: &Property<'arena>,
-        key: &'arena Expression<'arena>,
-        value: &'arena Expression<'arena>,
-    ) -> Option<Property<'arena>> {
+        prop: &Property,
+        key: ExprId,
+        value: ExprId,
+    ) -> Option<Property> {
         if prop.shorthand || prop.computed || prop.method || prop.kind != PropertyKind::Init {
             return None;
         }
-        let ExpressionKind::Identifier(key_id) = &key.kind else {
+        let view = self.view();
+        let ExpressionKind::Identifier(key_id) = view.expr(key).kind else {
             return None;
         };
-        let base = match value {
-            Expression {
-                kind: ExpressionKind::AssignmentPattern(assign),
-                ..
-            } => assign.left,
-            other => other,
+        let base = match view.expr(value).kind {
+            ExpressionKind::AssignmentPattern(assign) => assign.left,
+            _ => value,
         };
-        let ExpressionKind::Identifier(base_id) = &base.kind else {
+        let ExpressionKind::Identifier(base_id) = view.expr(base).kind else {
             return None;
         };
-        if key_id.name(self.source) != base_id.name(self.source) {
+        if key_id.name(self.source, view) != base_id.name(self.source, view) {
             return None;
         }
         self.push_window(key_id.span.end, base_id.span.start);
@@ -2146,21 +2217,19 @@ impl<'arena> Eraser<'arena, '_> {
             key: base,
             value,
             shorthand: true,
-            ..prop.clone()
+            ..*prop
         })
     }
 
     fn template_literal(
         &mut self,
-        template: &TemplateLiteral<'arena>,
-    ) -> Result<Option<TemplateLiteral<'arena>>, CompileError> {
-        Ok(
-            map_slice!(self, template.expressions, expr_element).map(|expressions| {
-                TemplateLiteral {
-                    expressions,
-                    ..template.clone()
-                }
-            }),
-        )
+        template: &TemplateLiteral,
+    ) -> Result<Option<TemplateLiteral>, CompileError> {
+        Ok(self
+            .id_run(template.expressions)?
+            .map(|expressions| TemplateLiteral {
+                expressions,
+                ..*template
+            }))
     }
 }

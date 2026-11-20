@@ -42,8 +42,9 @@
 //! the code comparison erases every `CommentBoundPair` on both sides and they compare as
 //! comment position.
 
-use bumpalo::Bump;
+use tsv_lang::store::Run;
 use tsv_ts::Goal;
+use tsv_ts::ast::Parsed;
 
 /// The outcome of comparing two canonical JS strings.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -74,11 +75,9 @@ pub fn compare_canonical(ours: &str, oracle: &str) -> Parity {
     }
     // Both strings are already canonical, so they parse; a parse failure here is a
     // genuine divergence (a corrupt reprint), not a comment-position difference.
-    let ours_arena = Bump::new();
-    let oracle_arena = Bump::new();
-    let (Ok(mut ours_program), Ok(mut oracle_program)) = (
-        tsv_ts::__private::parse_with_goal(ours, Goal::Module, &ours_arena),
-        tsv_ts::__private::parse_with_goal(oracle, Goal::Module, &oracle_arena),
+    let (Ok(mut ours_parsed), Ok(mut oracle_parsed)) = (
+        tsv_ts::__private::parse_with_goal(ours, Goal::Module),
+        tsv_ts::__private::parse_with_goal(oracle, Goal::Module),
     ) else {
         return Parity::Divergent;
     };
@@ -86,14 +85,8 @@ pub fn compare_canonical(ours: &str, oracle: &str) -> Parity {
     // A bundler annotation's placement is semantic (tree-shaking / bundling), so it
     // is NOT position-neutral. If either side carries one, only byte-exactness (which
     // already failed) counts — fall back to the strict bar.
-    let has_annotation = ours_program
-        .comments
-        .iter()
-        .any(|c| is_bundler_annotation(c.content(ours)))
-        || oracle_program
-            .comments
-            .iter()
-            .any(|c| is_bundler_annotation(c.content(oracle)));
+    let has_annotation = comment_contents(&ours_parsed, ours).any(is_bundler_annotation)
+        || comment_contents(&oracle_parsed, oracle).any(is_bundler_annotation);
     if has_annotation {
         return Parity::Divergent;
     }
@@ -101,17 +94,7 @@ pub fn compare_canonical(ours: &str, oracle: &str) -> Parity {
     // The comment SEQUENCE (output order, exact content) must match — a dropped,
     // doubled, reordered, or content-changed comment is a real difference, not
     // position. (Comparing sequences, not a multiset, so a reorder is caught.)
-    let ours_comments: Vec<&str> = ours_program
-        .comments
-        .iter()
-        .map(|c| c.content(ours))
-        .collect();
-    let oracle_comments: Vec<&str> = oracle_program
-        .comments
-        .iter()
-        .map(|c| c.content(oracle))
-        .collect();
-    if ours_comments != oracle_comments {
+    if !comment_contents(&ours_parsed, ours).eq(comment_contents(&oracle_parsed, oracle)) {
         return Parity::Divergent;
     }
 
@@ -119,12 +102,8 @@ pub fn compare_canonical(ours: &str, oracle: &str) -> Parity {
     // A comment-forced line break vanishes with its comment, so two same-code programs
     // reprint identically here regardless of where their comments sat. A JSDoc cast's
     // parens go with it (see the module docs): the erase pass unwraps every `CommentBoundPair`.
-    ours_program.comments = &[];
-    oracle_program.comments = &[];
-    ours_program.body = without_comment_bound_pairs(&ours_arena, ours, ours_program.body);
-    oracle_program.body = without_comment_bound_pairs(&oracle_arena, oracle, oracle_program.body);
-    let ours_code = tsv_ts::__private::format_canonical(&ours_program, ours);
-    let oracle_code = tsv_ts::__private::format_canonical(&oracle_program, oracle);
+    let ours_code = code_without_comments(&mut ours_parsed, ours);
+    let oracle_code = code_without_comments(&mut oracle_parsed, oracle);
     if ours_code == oracle_code {
         Parity::CommentPosition
     } else {
@@ -132,16 +111,29 @@ pub fn compare_canonical(ours: &str, oracle: &str) -> Parity {
     }
 }
 
-/// `body` with every `CommentBoundPair` unwrapped to its inner expression, through the
-/// compiler's erase pass. Canonical JS carries no TypeScript for it to erase, so a
-/// refusal cannot come from a cast; should one come from anything else, the body is
-/// compared as it stands.
-fn without_comment_bound_pairs<'arena>(
-    arena: &'arena Bump,
-    source: &str,
-    body: &'arena [tsv_ts::ast::Statement<'arena>],
-) -> &'arena [tsv_ts::ast::Statement<'arena>] {
-    crate::erase::erase_statements(arena, source, body).map_or(body, |erased| erased.body)
+/// The text of every comment in `parsed`, in source order.
+fn comment_contents<'a>(parsed: &'a Parsed, source: &'a str) -> impl Iterator<Item = &'a str> {
+    parsed
+        .stores
+        .view()
+        .comments(parsed.program.comments)
+        .iter()
+        .map(move |c| c.content(source))
+}
+
+/// `parsed` reprinted canonically with its comments cleared and every
+/// `CommentBoundPair` unwrapped to its inner expression, through the compiler's
+/// erase pass. Canonical JS carries no TypeScript for it to erase, so a refusal
+/// cannot come from a cast; should one come from anything else, the body is
+/// compared as it stands. The erase pass pushes its rebuild into the parse's own
+/// stores; nothing here holds a frame across the call, so a failed erase leaves
+/// only its own abandoned frames behind.
+fn code_without_comments(parsed: &mut Parsed, source: &str) -> String {
+    let body = parsed.program.body;
+    parsed.program.body = crate::erase::erase_statements(&mut parsed.stores, source, body)
+        .map_or(body, |erased| erased.body);
+    parsed.program.comments = Run::EMPTY;
+    tsv_ts::__private::format_canonical(&*parsed, source)
 }
 
 /// A bundler annotation whose placement is semantic (moving it changes
