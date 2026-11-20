@@ -21,10 +21,11 @@
 //! ~all real TS), and on failure a `Goal::Script` retry (top-level `await` as an
 //! identifier, no `import`/`export`). Both goals failing is a parse rejection.
 //!
-//! The caller owns the parse arena (`&'a Bump`) — the tsv_ts caller-owns-arena
-//! contract scaled to a unit set. The returned [`CheckResult`] is fully owned
-//! (diagnostics carry owned strings and `Copy` spans; nothing borrows the
-//! arena), so the caller may reset and reuse the arena the moment this returns.
+//! Each unit parses into stores of its own (a one-shot `tsv_ts::ast::Parsed`),
+//! which live through that unit's bind, flow, unreachable-candidate and member-check
+//! walks, every one reading the tree through those stores, and are dropped before
+//! the next unit parses; the returned [`CheckResult`] is fully owned (diagnostics
+//! carry owned strings and `Copy` spans; nothing borrows a parse).
 //
 // tsgo: internal/testutil/harnessutil.go CompileFilesEx (:634-645) — the
 //       baseline-oracle parity path (unconditional syntactic+semantic concat);
@@ -40,10 +41,9 @@ use crate::diag::{Diagnostic, sort_and_deduplicate};
 use crate::ids::FileId;
 use crate::merge::{FileMerge, LibBase, LibFile, merge_program};
 use crate::options::CheckOptions;
-use bumpalo::Bump;
 use tsv_ts::__private::parse_with_goal_or_fallback;
 use tsv_ts::Goal;
-use tsv_ts::ast::Program;
+use tsv_ts::ast::{Parsed, ParsedRef};
 
 /// One source unit to check — a file name (its diagnostic path) and its source.
 pub struct SourceUnit<'a> {
@@ -121,9 +121,10 @@ impl ParsedFacts {
     }
 }
 
-/// A parsed + bound program — variant-independent and fully owned
-/// (arena-independent), so the caller may drop the parse arena the moment this
-/// returns and merge it against any number of lib bases ([`check_bound`]). This is
+/// A parsed + bound program — variant-independent and fully owned (it borrows
+/// no parse; each unit's stores live through its bind, flow, unreachable
+/// candidates and member check, then drop — [`check_bound`] runs without them), so
+/// it can be merged against any number of lib bases ([`check_bound`]). This is
 /// the split that keeps parse+bind out of the per-variant loop: parse+bind once,
 /// merge per resolved lib set.
 pub struct BoundProgram {
@@ -186,40 +187,44 @@ impl BoundProgram {
 /// [`BoundProgram`]. The merge is deferred to [`check_bound`] (it depends on the
 /// resolved lib set), so this is variant-independent.
 #[must_use]
-pub fn bind_program<'a>(units: &[SourceUnit<'a>], arena: &'a Bump) -> BoundProgram {
+pub fn bind_program(units: &[SourceUnit<'_>]) -> BoundProgram {
     let mut bound_units: Vec<BoundUnit> = Vec::with_capacity(units.len());
     let mut parse_rejected = false;
     let mut total_nodes = 0u64;
 
     for (i, unit) in units.iter().enumerate() {
         let file = FileId(i as u32);
-        match parse_unit(unit.source, arena) {
-            Ok(program) => {
-                let module_ness = module_ness(&program);
-                let bound = bind_file(&program, unit.source, file);
+        match parse_unit(unit.source) {
+            Ok(parsed) => {
+                // Every walk below reads this one `parsed` in place — the address
+                // map's keys are its rows' addresses (and its `Program`'s), so the
+                // flow and candidate walks must resolve against the same one.
+                let parsed_ref = ParsedRef::from(&parsed);
+                let module_ness = module_ness(parsed_ref);
+                let bound = bind_file(parsed_ref, unit.source, file);
                 total_nodes += u64::from(bound.node_count);
                 // The third walk: the flow graph, built from the parsed program
                 // and F0's node identity. Borrows `&bound`, so it runs before the
                 // bind product's fields move out below. Carried dark in the unit.
-                let flow = build_flow(&program, unit.source, &bound);
+                let flow = build_flow(parsed_ref, unit.source, &bound);
                 // F3: the unreachable-code / unused-label candidate table, built
                 // once here (the flag bit, run grouping, and const-enum/module
                 // classification are all syntactic). Filtered per variant in
                 // `check_bound`, keeping `BoundProgram` variant-independent.
-                let candidates = build_candidates(&program, unit.source, &bound, &flow);
+                let candidates = build_candidates(parsed_ref, unit.source, &bound, &flow);
                 // Per file: bind diagnostics then check diagnostics — the
                 // getBindAndCheckDiagnostics concat. The check pass is a standalone
                 // syntactic walk over the program (it needs no `BoundFile`); its
                 // output folds in here, and the program-wide sort/dedup collapses any
                 // diagnostic the bind and check both emit.
-                let check_diags = crate::check::check_file_members(&program, unit.source, file);
+                let check_diags = crate::check::check_file_members(parsed_ref, unit.source, file);
                 let mut bind_diagnostics = bound.diagnostics;
                 bind_diagnostics.extend(check_diags);
                 bound_units.push(BoundUnit {
                     file,
                     name: unit.name.to_string(),
                     parse: ParseReport::Parsed(ParsedFacts {
-                        goal: program.goal,
+                        goal: parsed.program.goal,
                         module_ness,
                         node_count: bound.node_count,
                     }),
@@ -315,23 +320,18 @@ pub fn check_bound(
 /// Check a program with no lib base — parse every unit via the goal rule, bind,
 /// merge, and return canonically sorted diagnostics.
 #[must_use]
-pub fn check_program<'a>(
-    units: &[SourceUnit<'a>],
-    arena: &'a Bump,
-    options: &CheckOptions,
-) -> CheckResult {
-    check_bound(&bind_program(units, arena), None, options)
+pub fn check_program(units: &[SourceUnit<'_>], options: &CheckOptions) -> CheckResult {
+    check_bound(&bind_program(units), None, options)
 }
 
 /// Check a program against an optional lib base (the lib-aware entry point).
 #[must_use]
-pub fn check_program_with_lib<'a>(
-    units: &[SourceUnit<'a>],
+pub fn check_program_with_lib(
+    units: &[SourceUnit<'_>],
     lib: Option<&LibBase>,
-    arena: &'a Bump,
     options: &CheckOptions,
 ) -> CheckResult {
-    check_bound(&bind_program(units, arena), lib, options)
+    check_bound(&bind_program(units), lib, options)
 }
 
 /// Parse + bind one lib `.d.ts` file, returning its owned global-eligible product
@@ -343,9 +343,8 @@ pub fn check_program_with_lib<'a>(
 /// Returns the parse error message when the lib file does not parse under either
 /// goal (expected never for the bundled libs; the caller counts it as a carve-out).
 pub fn bind_lib(name: &str, source: &str) -> Result<LibFile, String> {
-    let arena = Bump::new();
-    let program = parse_unit(source, &arena)?;
-    let bound = bind_file(&program, source, FileId::ROOT);
+    let parsed = parse_unit(source)?;
+    let bound = bind_file((&parsed).into(), source, FileId::ROOT);
     // A lib contributes its globals through the merge either as an ambient script
     // (globals in `source_locals`) or, when the lib file is itself a module — e.g.
     // `lib.es2025.iterator.d.ts`, which carries a top-level `export {}` and so binds
@@ -368,8 +367,9 @@ pub fn bind_lib(name: &str, source: &str) -> Result<LibFile, String> {
 /// module-then-script fallback every format surface runs, so which error a double
 /// failure reports is stated once, there. The program records the goal it parsed
 /// under (`Program::goal`), which is also how a caller learns the `Script` retry won.
-fn parse_unit<'a>(source: &'a str, arena: &'a Bump) -> Result<Program<'a>, String> {
-    parse_with_goal_or_fallback(source, None, arena).map_err(|e| format!("{e:#}"))
+/// A one-shot parse: the tree comes back with fresh stores of its own.
+fn parse_unit(source: &str) -> Result<Parsed, String> {
+    parse_with_goal_or_fallback(source, None).map_err(|e| format!("{e:#}"))
 }
 
 #[cfg(test)]
@@ -377,10 +377,8 @@ mod tests {
     use super::*;
 
     fn check(source: &str) -> CheckResult {
-        let arena = Bump::new();
         check_program(
             &[SourceUnit::new("test.ts", source)],
-            &arena,
             &CheckOptions::default(),
         )
     }
@@ -432,13 +430,11 @@ mod tests {
     fn sibling_rejection_does_not_suppress_a_parsed_unit() {
         // The CompileFilesEx parity: a rejected sibling does NOT short-circuit the
         // program — the unit that parsed still contributes its bind diagnostics.
-        let arena = Bump::new();
         let result = check_program(
             &[
                 SourceUnit::new("a.ts", "let x; let x;"),
                 SourceUnit::new("b.ts", "const = ;"),
             ],
-            &arena,
             &CheckOptions::default(),
         );
         assert!(result.parse_rejected);

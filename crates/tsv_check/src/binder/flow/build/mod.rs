@@ -18,23 +18,24 @@ mod predicates;
 mod statements;
 
 use super::*;
-use crate::binder::{BoundFile, NodeKind, addr_of};
+use crate::binder::{BoundFile, NodeAddr, NodeKind, addr_of, debug_assert_stored_key};
 use predicates::{is_false_keyword, is_true_keyword};
 use smallvec::SmallVec;
-use tsv_ts::ast::Program;
-use tsv_ts::ast::{Expression, Statement, StatementKind};
+use tsv_ts::ast::{AstView, Expression, ParsedRef, Program, Run, StatementKind, StmtId};
 
 #[cfg(test)]
 pub(super) use predicates::is_narrowable_reference;
 
-/// Build the flow product for one parsed file, from its `Program` and the F0
-/// [`BoundFile`] (the node-identity source). Invoked from `bind_program`'s
+/// Build the flow product for one parsed file, from its tree and the F0
+/// [`BoundFile`] (the node-identity source). `parsed` must be the one `bound` was
+/// bound from (the same `Program` place and stores — `bind_file`'s contract), since
+/// every node resolves through `bound`'s address map. Invoked from `bind_program`'s
 /// per-unit loop for parsed non-lib units (lib files skip flow construction —
 /// no consumer reads lib flow and ambient files have no executable code).
 #[must_use]
-pub fn build_flow<'a>(program: &Program<'_>, source: &'a str, bound: &'a BoundFile) -> FlowProduct {
-    let mut b = FlowBuilder::new(bound, source);
-    b.run(program);
+pub fn build_flow<'a>(parsed: ParsedRef<'a>, source: &'a str, bound: &'a BoundFile) -> FlowProduct {
+    let mut b = FlowBuilder::new(parsed.view, bound, source);
+    b.run(parsed.program);
     b.finish()
 }
 
@@ -81,6 +82,8 @@ struct ActiveLabelEntry {
 
 /// The flow-graph construction walk.
 pub(super) struct FlowBuilder<'a> {
+    /// Reads the tree the walk descends.
+    pub(super) view: AstView<'a>,
     bound: &'a BoundFile,
     /// The host document — the label-name lookup extracts `spans[id]` slices.
     source: &'a str,
@@ -154,9 +157,10 @@ pub(super) struct FlowBuilder<'a> {
 }
 
 impl<'a> FlowBuilder<'a> {
-    pub(super) fn new(bound: &'a BoundFile, source: &'a str) -> FlowBuilder<'a> {
+    pub(super) fn new(view: AstView<'a>, bound: &'a BoundFile, source: &'a str) -> FlowBuilder<'a> {
         let n = bound.node_count as usize;
         let mut b = FlowBuilder {
+            view,
             bound,
             source,
             flags: Vec::new(),
@@ -373,7 +377,7 @@ impl<'a> FlowBuilder<'a> {
         &mut self,
         flags: FlowFlags,
         antecedent: FlowNodeId,
-        expression: Option<(&Expression<'_>, NodeId)>,
+        expression: Option<(&Expression, NodeId)>,
         is_narrowing: bool,
         is_optional_chain_root: bool,
         parent_is_nullish: bool,
@@ -455,8 +459,13 @@ impl<'a> FlowBuilder<'a> {
 
     // --- helpers ----------------------------------------------------------
 
+    /// Strict resolution of a node the SoA walk keyed — its address a row of the
+    /// stores, which the store-range guard asserts. The `Program` root is the one node
+    /// resolved without this (`run`), being held beside the stores.
     #[inline]
-    fn require(&self, address: usize, kind: NodeKind) -> NodeId {
+    #[track_caller]
+    fn require(&self, address: NodeAddr, kind: NodeKind) -> NodeId {
+        debug_assert_stored_key(self.view, address, kind);
         self.bound.require_node_id(address, kind)
     }
 
@@ -567,10 +576,13 @@ impl<'a> FlowBuilder<'a> {
 
     // --- entry (SourceFile container) -------------------------------------
 
-    fn run(&mut self, program: &Program<'_>) {
+    fn run(&mut self, program: &Program) {
         // The SourceFile is a control-flow container: fresh Start (id 2), no
-        // return target (not an IIFE/constructor), no Start subject.
-        let root = self.require(addr_of(program), NodeKind::Program);
+        // return target (not an IIFE/constructor), no Start subject. The root is
+        // held beside the stores, so it resolves past the store-range guard.
+        let root = self
+            .bound
+            .require_node_id(addr_of(program), NodeKind::Program);
         let start = self.new_flow_node(FlowFlags::START);
         self.current_flow = start;
         self.current_return_target = None;
@@ -587,13 +599,17 @@ impl<'a> FlowBuilder<'a> {
 
     // --- statement lists (functions-first, binder.go:1766) ----------------
 
-    fn visit_statement_list(&mut self, stmts: &[Statement<'_>]) {
-        for stmt in stmts {
+    fn visit_statement_list(&mut self, stmts: Run<StmtId>) {
+        let view = self.view;
+        let stmts = view.stmt_list(stmts);
+        for &stmt in stmts {
+            let stmt = view.stmt(stmt);
             if matches!(&stmt.kind, StatementKind::FunctionDeclaration(_)) {
                 self.visit_statement(stmt);
             }
         }
-        for stmt in stmts {
+        for &stmt in stmts {
+            let stmt = view.stmt(stmt);
             if !matches!(&stmt.kind, StatementKind::FunctionDeclaration(_)) {
                 self.visit_statement(stmt);
             }

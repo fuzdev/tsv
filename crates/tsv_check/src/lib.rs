@@ -13,7 +13,7 @@
 //! ## Pipeline
 //!
 //! ```text
-//! source units (+ arena)
+//! source units
 //!   -> parse (goal rule: Module first, Script retry)       [program]
 //!   -> lower+bind: SoA node-identity walk + symbol bind     [binder/mod,sym]
 //!   -> flow: per-file control-flow graph (third walk)       [binder/flow]
@@ -24,9 +24,9 @@
 //!   -> owned diagnostics (+ a separate suggestion sink)
 //! ```
 //!
-//! [`check_program`] is the single entry point. The caller owns the parse arena
-//! (`&bumpalo::Bump`, the tsv_ts caller-owns-arena contract) and the returned
-//! [`CheckResult`] borrows nothing from it.
+//! [`check_program`] is the single entry point. Each unit parses into stores of its
+//! own, which live through its bind, flow, unreachable candidates and member check;
+//! the returned [`CheckResult`] borrows nothing.
 //!
 //! ## Modules
 //!

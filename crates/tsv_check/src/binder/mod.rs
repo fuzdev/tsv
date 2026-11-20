@@ -12,11 +12,12 @@
 //!   Pre-order — each parent precedes its contiguous subtree, so the
 //!   `subtree_end` interval test (`is X a descendant of Y`) stays valid. Sibling
 //!   order follows the traversal, not always source order (an annotated binding
-//!   descends its `: T` before the binding), which the interval test does not rely on. The one deliberate carve-out is the pure list-wrapper nodes
-//!   (`ClassBody` / `TSInterfaceBody` / a function/try/catch/finally/static body
-//!   `BlockStatement` / the `Program.body` slice / the transparent
-//!   `TSTypeAnnotation` `: T` wrapper): their members/inner stay flat children of
-//!   the owning node, matching today's shape (documented at the sites).
+//!   descends its `: T` before the binding), which the interval test does not rely
+//!   on. The one deliberate carve-out is the pure list-wrapper nodes (`ClassBody` /
+//!   `TSInterfaceBody` / a function/try/catch/finally/static body `BlockStatement` /
+//!   the `Program.body` slice / the transparent `TSTypeAnnotation` `: T` wrapper):
+//!   their members/inner stay flat children of the owning node, matching today's
+//!   shape (documented at the sites).
 //! - **the symbol bind** ([`sym::SymbolBinder`]) — a container-threaded walk that
 //!   ports tsgo's binder: `declareSymbolEx` conflict cascade (TS2300/2451/2567/
 //!   2528), the module-member routing, class/enum/interface member tables, and
@@ -27,21 +28,26 @@
 //! The two are separate passes rather than one fused walk because functions-first
 //! symbol binding reorders symbol *creation* within a statement list, which would
 //! break the SoA walk's strict pre-order id intervals. The symbol bind resolves a
-//! declaration's [`NodeId`] through the SoA walk's address map. Statement-level
-//! inner structs it keys on (`TSExportAssignment`, `ExportDefaultDeclaration`,
-//! `TSModuleDeclaration`) resolve against the enclosing `&Statement` address, so
-//! those `node_id_of` lookups fall back to the root id — the id is not consumed by
-//! the family cascade, which keys on name spans, so the fallback is inert. The
-//! **strict** resolver flow consumers use is [`BoundFile::require_node_id`], which
-//! hard-fails on a miss (a flow graph must never silently drop an attachment).
+//! declaration's [`NodeId`] through the SoA walk's address map. The statement payloads
+//! it keys on (`TSExportAssignment`, `ExportDefaultDeclaration`, a statement-position
+//! `TSModuleDeclaration` — every one but a dotted `A.B` continuation segment) are
+//! their own store rows, while the SoA walk keyed the enclosing `Statement` ROW, so
+//! those `node_id_of` lookups fall back to the root id — the id is not consumed by the
+//! family cascade, which keys on name spans, so the fallback is inert. The **strict**
+//! resolver flow consumers use is [`BoundFile::require_node_id`], which hard-fails on
+//! a miss (a flow graph must never silently drop an attachment).
 //!
-//! **Borrow-only discipline (load-bearing).** Every visitor takes `&'arena`
-//! references and NEVER clones an AST node. The address map keys on
-//! `std::ptr::from_ref(node) as usize` (a safe reference-to-integer cast — the
-//! crate keeps `unsafe_code = "forbid"`), and arena addresses are stable for the
-//! program's lifetime. Every tsv AST type derives `Clone`, so one accidental
-//! `.clone()` in a visitor would mint a differently-addressed copy and silently
-//! break the map. Nothing type-level enforces this — the discipline is the contract.
+//! **Keyed in place (load-bearing).** The address map keys on a row's address, a
+//! [`NodeAddr`] (`addr_of`, a safe reference-to-integer cast — the crate keeps
+//! `unsafe_code = "forbid"`; the `keyed` module owns every way to make one): a row of
+//! the parse's stores, or a field inside one, reached through the [`AstView`] and
+//! borrowed for the walk. Store addresses are stable while the parse lives. Every AST
+//! row is `Copy`, so a `let s = *view.x(id)` or a by-value iteration of a value run
+//! puts a copy on the stack, and keying it (or a field of it) keys a slot another node
+//! reuses. The visitors take `&'a` rows, which a stack copy cannot satisfy, and every
+//! keyed address is checked against the stores in debug builds
+//! ([`debug_assert_stored_key`]) — the `Program` root, held beside the stores, is the
+//! one key excepted.
 //!
 //! **No behavior change (F0 invariant).** The SoA columns feed only the symbol
 //! bind (which reads the address map) and this module's tests; the graded
@@ -56,16 +62,22 @@
 
 mod atoms;
 pub(crate) mod flow;
+mod keyed;
 mod lower;
 mod sym;
 pub(crate) mod symbols;
+
+pub(crate) use keyed::NodeAddr;
+pub(crate) use keyed::{Keyed, addr_of, debug_assert_stored_key};
 
 use crate::diag::Diagnostic;
 use crate::ids::{FileId, NodeId};
 use crate::merge::FileMerge;
 use tsv_lang::{FxHashMap, Span};
-use tsv_ts::ast::Program;
-use tsv_ts::ast::{Expression, ExpressionKind, Statement, StatementKind, TSModuleReference};
+use tsv_ts::ast::{
+    AstView, ExprId, Expression, ExpressionKind, ParsedRef, Program, Run, Statement, StatementKind,
+    StmtId, TSModuleReference,
+};
 
 /// The pre-order node kinds the SoA walk assigns — one variant per tsv_ts AST enum
 /// variant the walk ids (the program root, then statements, expressions, types, and
@@ -77,7 +89,7 @@ use tsv_ts::ast::{Expression, ExpressionKind, Statement, StatementKind, TSModule
 /// type-element index-signature forms; `FunctionExpression` a value function and a
 /// method's `value`. The set is not graded or serialized, so its ordering is free.
 ///
-/// `Hash` is derived so a `(usize, NodeKind)` pair can key the address map — the
+/// `Hash` is derived so a `(NodeAddr, NodeKind)` pair can key the address map — the
 /// compound key that disambiguates the one offset-0 collision pair
 /// (`MethodDefinition` / its inline `value: FunctionExpression`).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -262,17 +274,16 @@ pub struct BoundFile {
     /// The last id in each node's pre-order subtree (self for a leaf) — makes
     /// descendant tests an O(1) id-range check.
     pub subtree_end: Vec<NodeId>,
-    /// Node `(arena address, kind)` -> id (the random-access escape hatch). The
-    /// kind is part of the key so the one offset-0 collision pair
-    /// (`MethodDefinition` and its inline `value: FunctionExpression`) stays
-    /// distinctly resolvable (see [`BoundFile::require_node_id`]).
+    /// Node `(address, kind)` -> id (the random-access escape hatch), the address
+    /// a row of the parse's stores (the `Program` root's excepted). The kind is part
+    /// of the key so the one offset-0 collision pair (`MethodDefinition` and its
+    /// inline `value: FunctionExpression`) stays distinctly resolvable (see
+    /// [`BoundFile::require_node_id`]).
     ///
-    /// These keys assume a node's address is stable, which is why the borrow-only
-    /// discipline exists. `tests/clone_discipline.rs` guards the clone half of it, but
-    /// it cannot see the other half: a `Copy` AST type (`TSKeywordType`) is
-    /// re-addressed by a plain `*deref` copy, with no clone syntax to flag. Keep those
-    /// borrowed too.
-    pub address_map: FxHashMap<(usize, NodeKind), NodeId>,
+    /// These keys assume a node is read in place: every AST row is `Copy`, so a plain
+    /// `*deref` copy re-addresses it with no clone syntax to flag. The store-range
+    /// guard ([`debug_assert_stored_key`]) catches a copy keyed in a debug build.
+    pub(crate) address_map: FxHashMap<(NodeAddr, NodeKind), NodeId>,
     /// Bind diagnostics — the duplicate/conflict family, in emission order (the
     /// caller sorts + dedups across the whole program).
     pub diagnostics: Vec<Diagnostic>,
@@ -298,22 +309,23 @@ impl BoundFile {
     /// silent `NodeId::FIRST` fallback would splice the graph onto the wrong node.
     /// So this hard-fails rather than returning a sentinel.
     ///
-    /// `address` is `std::ptr::from_ref(node) as usize` for the same arena node
-    /// reference the walk keyed on, and `kind` is the [`NodeKind`] the walk
+    /// `address` is `addr_of(node)` for the same node the walk keyed on — read in
+    /// place through the same stores — and `kind` is the [`NodeKind`] the walk
     /// assigned it.
     ///
     /// **The offset-0 collision, resolved by compound keying.** Pointer-identity
     /// alone cannot distinguish a node from an offset-0 inline struct-typed child
-    /// at the same address. The AST has exactly one such pair: `MethodDefinition`
-    /// and its inline `value: FunctionExpression` (value at struct offset 0). The
-    /// kind component of the key disambiguates them — no same-kind collisions
-    /// exist (verified via `-Zprint-type-sizes`), so `(address, kind)` is a total
-    /// key. `require_node_id(addr_of(&method), NodeKind::MethodDefinition)` and
+    /// at the same address — `MethodDefinition` and its inline
+    /// `value: FunctionExpression`. The kind component of the key disambiguates
+    /// such a pair, and the insert-time same-kind assert (in `SoaWalk::insert`) is
+    /// what guards a shared address, so `(address, kind)` is a total key.
+    /// `require_node_id(addr_of(method), NodeKind::MethodDefinition)` and
     /// `require_node_id(addr_of(&method.value), NodeKind::FunctionExpression)`
     /// resolve to their respective distinct ids (pinned by
     /// `method_and_value_resolve_distinctly` below).
     #[must_use]
-    pub fn require_node_id(&self, address: usize, kind: NodeKind) -> NodeId {
+    #[track_caller]
+    pub(crate) fn require_node_id(&self, address: NodeAddr, kind: NodeKind) -> NodeId {
         match self.address_map.get(&(address, kind)) {
             Some(&id) => id,
             None => node_id_miss(address, kind),
@@ -328,8 +340,9 @@ impl BoundFile {
 /// that must abort, not a recoverable data error.
 #[cold]
 #[inline(never)]
+#[track_caller]
 #[expect(clippy::panic)]
-fn node_id_miss(address: usize, kind: NodeKind) -> ! {
+fn node_id_miss(address: NodeAddr, kind: NodeKind) -> ! {
     panic!(
         "require_node_id: ({address:#x}, {kind:?}) not covered by the SoA walk — a flow \
          consumer reached a node the lowering pass did not id (would corrupt the flow graph)"
@@ -348,20 +361,25 @@ fn node_id_miss(address: usize, kind: NodeKind) -> ! {
 /// The module indicators are all structural — no name resolution (and so no
 /// `source`) is needed here.
 #[must_use]
-pub fn module_ness(program: &Program<'_>) -> ModuleNess {
-    for stmt in program.body {
-        if is_external_module_indicator(stmt) {
+pub fn module_ness(parsed: ParsedRef<'_>) -> ModuleNess {
+    let view = parsed.view;
+    let body = view.stmt_list(parsed.program.body);
+    for &stmt in body {
+        if is_external_module_indicator(view, view.stmt(stmt)) {
             return ModuleNess::Module;
         }
     }
-    if program.body.iter().any(stmt_contains_import_meta) {
+    if body
+        .iter()
+        .any(|&stmt| stmt_contains_import_meta(view, view.stmt(stmt)))
+    {
         return ModuleNess::Module;
     }
     ModuleNess::Script
 }
 
 /// tsgo's `isAnExternalModuleIndicatorNode` over one top-level statement.
-fn is_external_module_indicator(stmt: &Statement<'_>) -> bool {
+fn is_external_module_indicator(view: AstView<'_>, stmt: &Statement) -> bool {
     match &stmt.kind {
         // `import ...` / `export ... from` / `export {}` / `export *`.
         StatementKind::ImportDeclaration(_)
@@ -373,8 +391,8 @@ fn is_external_module_indicator(stmt: &Statement<'_>) -> bool {
         | StatementKind::ExportDefaultDeclaration(_) => true,
         // `import x = require('y')` counts only with an external-module reference;
         // `import x = A.B` (an entity name) does not.
-        StatementKind::TSImportEqualsDeclaration(decl) => matches!(
-            decl.module_reference,
+        &StatementKind::TSImportEqualsDeclaration(decl) => matches!(
+            view.import_equals(decl).module_reference,
             TSModuleReference::ExternalModuleReference(_)
         ),
         _ => false,
@@ -385,58 +403,44 @@ fn is_external_module_indicator(stmt: &Statement<'_>) -> bool {
 /// `getImportMetaIfNecessary`). A bounded structural walk over the statement and
 /// its nested expressions/blocks — `import.meta` is inert for the bind cascade,
 /// so this only refines the recorded [`ModuleNess`] fact.
-fn stmt_contains_import_meta(stmt: &Statement<'_>) -> bool {
+fn stmt_contains_import_meta(view: AstView<'_>, stmt: &Statement) -> bool {
     use StatementKind as S;
+    let expr = |id: ExprId| expr_contains_import_meta(view, view.expr(id));
+    let opt_expr = |id: Option<ExprId>| id.is_some_and(expr);
+    let stmt_at = |id: StmtId| stmt_contains_import_meta(view, view.stmt(id));
+    let list = |run: Run<StmtId>| view.stmt_list(run).iter().copied().any(stmt_at);
     match &stmt.kind {
-        S::ExpressionStatement(s) => expr_contains_import_meta(s.expression),
-        S::VariableDeclaration(d) => d
-            .declarations
+        S::ExpressionStatement(s) => expr(s.expression),
+        S::VariableDeclaration(d) => view
+            .declarators(d.declarations)
             .iter()
-            .any(|decl| decl.init.is_some_and(expr_contains_import_meta)),
-        S::ReturnStatement(s) => s.argument.is_some_and(expr_contains_import_meta),
-        S::ThrowStatement(s) => expr_contains_import_meta(s.argument),
-        S::BlockStatement(b) => b.body.iter().any(stmt_contains_import_meta),
+            .any(|decl| opt_expr(decl.init)),
+        S::ReturnStatement(s) => opt_expr(s.argument),
+        S::ThrowStatement(s) => expr(s.argument),
+        S::BlockStatement(b) => list(b.body),
         S::IfStatement(s) => {
-            expr_contains_import_meta(s.test)
-                || stmt_contains_import_meta(s.consequent)
-                || s.alternate.is_some_and(stmt_contains_import_meta)
+            expr(s.test) || stmt_at(s.consequent) || s.alternate.is_some_and(stmt_at)
         }
-        S::ForStatement(s) => {
-            s.test.is_some_and(|e| expr_contains_import_meta(e))
-                || stmt_contains_import_meta(s.body)
-        }
-        S::ForInStatement(s) => {
-            expr_contains_import_meta(s.right) || stmt_contains_import_meta(s.body)
-        }
-        S::ForOfStatement(s) => {
-            expr_contains_import_meta(s.right) || stmt_contains_import_meta(s.body)
-        }
-        S::WhileStatement(s) => {
-            expr_contains_import_meta(s.test) || stmt_contains_import_meta(s.body)
-        }
-        S::DoWhileStatement(s) => {
-            expr_contains_import_meta(s.test) || stmt_contains_import_meta(s.body)
-        }
-        S::WithStatement(s) => {
-            expr_contains_import_meta(s.object) || stmt_contains_import_meta(s.body)
-        }
+        S::ForStatement(s) => opt_expr(s.test) || stmt_at(s.body),
+        S::ForInStatement(s) => expr(s.right) || stmt_at(s.body),
+        S::ForOfStatement(s) => expr(s.right) || stmt_at(s.body),
+        S::WhileStatement(s) => expr(s.test) || stmt_at(s.body),
+        S::DoWhileStatement(s) => expr(s.test) || stmt_at(s.body),
+        S::WithStatement(s) => expr(s.object) || stmt_at(s.body),
         S::SwitchStatement(s) => {
-            expr_contains_import_meta(s.discriminant)
-                || s.cases.iter().any(|c| {
-                    c.test.is_some_and(expr_contains_import_meta)
-                        || c.consequent.iter().any(stmt_contains_import_meta)
-                })
+            expr(s.discriminant)
+                || view
+                    .cases(s.cases)
+                    .iter()
+                    .any(|c| opt_expr(c.test) || list(c.consequent))
         }
-        S::TryStatement(s) => {
-            s.block.body.iter().any(stmt_contains_import_meta)
-                || s.handler
-                    .as_ref()
-                    .is_some_and(|h| h.body.body.iter().any(stmt_contains_import_meta))
-                || s.finalizer
-                    .as_ref()
-                    .is_some_and(|f| f.body.iter().any(stmt_contains_import_meta))
+        &S::TryStatement(t) => {
+            let t = view.try_stmt(t);
+            list(t.block.body)
+                || view.opt_catch(t.handler).is_some_and(|h| list(h.body.body))
+                || t.finalizer.as_ref().is_some_and(|f| list(f.body))
         }
-        S::LabeledStatement(s) => stmt_contains_import_meta(s.body),
+        &S::LabeledStatement(s) => stmt_at(view.labeled_stmt(s).body),
         _ => false,
     }
 }
@@ -444,80 +448,65 @@ fn stmt_contains_import_meta(stmt: &Statement<'_>) -> bool {
 /// Whether an expression subtree contains an `import.meta` meta-property. Covers
 /// the common expression positions; deliberately not exhaustive over every type
 /// node (types never carry `import.meta`).
-fn expr_contains_import_meta(expr: &Expression<'_>) -> bool {
+fn expr_contains_import_meta(view: AstView<'_>, expr: &Expression) -> bool {
     use ExpressionKind as E;
+    let at = |id: ExprId| expr_contains_import_meta(view, view.expr(id));
+    let list = |run: Run<ExprId>| view.expr_list(run).iter().copied().any(at);
     match &expr.kind {
         // `import.meta` vs `new.target`: the only two meta-properties, told apart
         // by the meta keyword's name length (`import` = 6, `new` = 3).
-        E::MetaProperty(m) => m.meta.name_len == 6,
-        E::ParenthesizedExpression(p) => expr_contains_import_meta(p.expression),
-        E::UnaryExpression(u) => expr_contains_import_meta(u.argument),
-        E::UpdateExpression(u) => expr_contains_import_meta(u.argument),
-        E::AwaitExpression(a) => expr_contains_import_meta(a.argument),
-        E::YieldExpression(y) => y.argument.is_some_and(expr_contains_import_meta),
-        E::BinaryExpression(b) => {
-            expr_contains_import_meta(b.left) || expr_contains_import_meta(b.right)
-        }
-        E::AssignmentExpression(a) => {
-            expr_contains_import_meta(a.left) || expr_contains_import_meta(a.right)
-        }
-        E::ConditionalExpression(c) => {
-            expr_contains_import_meta(c.test)
-                || expr_contains_import_meta(c.consequent)
-                || expr_contains_import_meta(c.alternate)
-        }
-        E::SequenceExpression(s) => s.expressions.iter().copied().any(expr_contains_import_meta),
-        E::CallExpression(c) => {
-            expr_contains_import_meta(c.callee)
-                || c.arguments.iter().copied().any(expr_contains_import_meta)
-        }
-        E::NewExpression(n) => {
-            expr_contains_import_meta(n.callee)
-                || n.arguments.iter().copied().any(expr_contains_import_meta)
-        }
-        E::MemberExpression(m) => {
-            expr_contains_import_meta(m.object) || expr_contains_import_meta(m.property)
-        }
-        E::TSNonNullExpression(t) => expr_contains_import_meta(t.expression),
-        E::TSAsExpression(t) => expr_contains_import_meta(t.expression),
-        E::TSSatisfiesExpression(t) => expr_contains_import_meta(t.expression),
-        E::ArrayExpression(a) => a
-            .elements
+        &E::MetaProperty(m) => view.meta_prop(m).meta.name_len == 6,
+        E::ParenthesizedExpression(p) => at(p.expression),
+        E::UnaryExpression(u) => at(u.argument),
+        E::UpdateExpression(u) => at(u.argument),
+        E::AwaitExpression(a) => at(a.argument),
+        E::YieldExpression(y) => y.argument.is_some_and(at),
+        E::BinaryExpression(b) => at(b.left) || at(b.right),
+        E::AssignmentExpression(a) => at(a.left) || at(a.right),
+        E::ConditionalExpression(c) => at(c.test) || at(c.consequent) || at(c.alternate),
+        E::SequenceExpression(s) => list(s.expressions),
+        E::CallExpression(c) => at(c.callee) || list(c.arguments),
+        E::NewExpression(n) => at(n.callee) || list(n.arguments),
+        E::MemberExpression(m) => at(m.object) || at(m.property),
+        E::TSNonNullExpression(t) => at(t.expression),
+        E::TSAsExpression(t) => at(t.expression),
+        E::TSSatisfiesExpression(t) => at(t.expression),
+        E::ArrayExpression(a) => view
+            .expr_opt_list(a.elements)
             .iter()
             .flatten()
             .copied()
-            .any(expr_contains_import_meta),
+            .any(at),
         _ => false,
     }
 }
 
 /// Bind one file: run the SoA walk and the symbol bind, returning the [`BoundFile`].
 ///
-/// `source` is the host document the AST spans index into (the binder resolves
-/// declared names by slicing it, matching the parser's span-identity names).
+/// `parsed` is the tree and the view over its stores; every key the walk records is
+/// the address of a row in those stores (or of the `Program` root beside them), so the
+/// flow walk ([`flow::build_flow`]) must be handed the same `parsed` — the same
+/// `Program` place and the same stores — for its lookups to hit. `source` is the host
+/// document the AST spans index into (the binder resolves declared names by slicing
+/// it, matching the parser's span-identity names).
 #[must_use]
-pub fn bind_file<'arena>(
-    program: &'arena Program<'arena>,
-    source: &str,
-    file: FileId,
-) -> BoundFile {
+pub fn bind_file(parsed: ParsedRef<'_>, source: &str, file: FileId) -> BoundFile {
+    let ParsedRef { program, view } = parsed;
     // Pass 1: the SoA node-identity walk (source pre-order).
-    let mut walk = SoaWalk::default();
-    let root = walk.add(NodeKind::Program, program.span, None, addr_of(program));
+    let mut walk = SoaWalk::new(view);
+    let root = walk.add_root(program);
     // The `Program.body` slice is a pure list-wrapper: its statements stay flat
     // children of the root (no separate node), matching today's shape.
-    for stmt in program.body {
-        walk.visit_statement(stmt, root);
-    }
+    walk.visit_statements(program.body, root);
     walk.close(root);
 
     let facts = FileFacts {
-        module_ness: module_ness(program),
+        module_ness: module_ness(parsed),
     };
 
     // Pass 2: the symbol bind (functions-first, container-threaded).
     let (diagnostics, merge) = {
-        let mut binder = sym::SymbolBinder::new(source, &walk.address_map, file, facts);
+        let mut binder = sym::SymbolBinder::new(source, view, &walk.address_map, file, facts);
         binder.bind_program(program);
         binder.finish()
     };
@@ -536,31 +525,50 @@ pub fn bind_file<'arena>(
     }
 }
 
-/// The address key of an arena node: a reference-to-integer cast (safe — no
-/// dereference, so `unsafe_code = "forbid"` holds). Stable for the arena's life.
-#[inline]
-pub(crate) fn addr_of<T>(node: &T) -> usize {
-    std::ptr::from_ref(node) as usize
-}
-
-/// The mutable SoA columns being filled by pass 1.
-#[derive(Default)]
-struct SoaWalk {
+/// The mutable SoA columns being filled by pass 1, and the view the walk reads the
+/// tree through.
+struct SoaWalk<'a> {
+    view: AstView<'a>,
     parents: Vec<Option<NodeId>>,
     kinds: Vec<NodeKind>,
     spans: Vec<Span>,
     subtree_end: Vec<NodeId>,
-    address_map: FxHashMap<(usize, NodeKind), NodeId>,
+    address_map: FxHashMap<(NodeAddr, NodeKind), NodeId>,
 }
 
-impl SoaWalk {
-    /// Assign the next pre-order id to a node, recording its columns and address.
-    fn add(
+impl<'a> SoaWalk<'a> {
+    fn new(view: AstView<'a>) -> Self {
+        SoaWalk {
+            view,
+            parents: Vec::new(),
+            kinds: Vec::new(),
+            spans: Vec::new(),
+            subtree_end: Vec::new(),
+            address_map: FxHashMap::default(),
+        }
+    }
+
+    /// Assign the root id to the `Program`: the one node keyed outside the stores (the
+    /// tree's root is held beside them), so the one key the store-range guard excepts.
+    fn add_root(&mut self, program: &Program) -> NodeId {
+        self.insert(NodeKind::Program, program.span, None, addr_of(program))
+    }
+
+    /// Assign the next pre-order id to a node under `parent`, recording its columns and
+    /// its address — a row of the stores, which the store-range guard asserts.
+    #[track_caller]
+    fn add(&mut self, kind: NodeKind, span: Span, parent: NodeId, address: NodeAddr) -> NodeId {
+        debug_assert_stored_key(self.view, address, kind);
+        self.insert(kind, span, Some(parent), address)
+    }
+
+    #[track_caller]
+    fn insert(
         &mut self,
         kind: NodeKind,
         span: Span,
         parent: Option<NodeId>,
-        address: usize,
+        address: NodeAddr,
     ) -> NodeId {
         let id = NodeId::from_index(self.kinds.len());
         self.parents.push(parent);
@@ -570,9 +578,9 @@ impl SoaWalk {
         // The insert must run in ALL profiles — the flow walk's strict
         // `require_node_id` reads this map at runtime. Each node is added exactly
         // once by the pre-order walk, so a prior entry for this `(address, kind)`
-        // key is a genuine same-kind offset-0 collision (the "no same-kind
-        // collisions exist" claim in `require_node_id`, made a corpus-checked
-        // invariant — `tsc_conformance run` is a debug build). Only that
+        // key is a genuine same-kind offset-0 collision — the assert the total-key
+        // paragraph of `require_node_id` rests on, made a corpus-checked invariant
+        // (`tsc_conformance run` is a debug build). Only that
         // collision *assertion* compiles out of release; the insert side effect
         // is hoisted out of the assert condition so it always happens.
         let prev = self.address_map.insert((address, kind), id);
@@ -591,16 +599,18 @@ impl SoaWalk {
     }
 
     /// Add a leaf node (no children): one `add` immediately followed by `close`.
-    fn leaf(&mut self, kind: NodeKind, span: Span, address: usize, parent: NodeId) {
-        let id = self.add(kind, span, Some(parent), address);
+    #[track_caller]
+    fn leaf(&mut self, kind: NodeKind, span: Span, address: NodeAddr, parent: NodeId) {
+        let id = self.add(kind, span, parent, address);
         self.close(id);
     }
 }
 
 /// The [`NodeKind`] for a statement variant. Shared with the flow walk and the
 /// unreachable-code shim, which resolve statements through the compound-keyed
-/// address map (`require_node_id` / a lenient `address_map` lookup).
-pub(crate) fn statement_kind(stmt: &Statement<'_>) -> NodeKind {
+/// address map (`require_node_id` / a lenient `address_map` lookup) — a statement is
+/// keyed on its own `Statement` row, whichever variant it is.
+pub(crate) fn statement_kind(stmt: &Statement) -> NodeKind {
     match &stmt.kind {
         StatementKind::ExpressionStatement(_) => NodeKind::ExpressionStatement,
         StatementKind::VariableDeclaration(_) => NodeKind::VariableDeclaration,
@@ -638,9 +648,11 @@ pub(crate) fn statement_kind(stmt: &Statement<'_>) -> NodeKind {
     }
 }
 
-/// The `(arena address, NodeKind)` compound key for an expression variant — the
-/// key `SoaWalk::visit_expression` registers it under in the address map.
-/// Shared with the flow walk's `expr_id`, so the two mappings cannot drift: a
+/// The `(address, NodeKind)` compound key for an expression — the key
+/// `SoaWalk::visit_expression` registers it under in the address map. `e` must be a
+/// row read in place through `view` (a store row, or an `Expression` held inside one),
+/// never a stack copy: an inline variant's key is the address of its payload inside
+/// `e`. Shared with the flow walk's `expr_id`, so the two mappings cannot drift: a
 /// `debug_assert` at the end of `visit_expression` pins the agreement on every
 /// lowered expression (corpus-exercised — the conformance gate runs debug
 /// builds), and the flow walk's strict resolver hard-fails on any residual
@@ -648,17 +660,15 @@ pub(crate) fn statement_kind(stmt: &Statement<'_>) -> NodeKind {
 /// walk treats the cast wrapper as transparent (matching tsgo, where the
 /// reparsed cast is not a flow subject), and the SoA walk lowers both the
 /// wrapper and the inner, so the inner's key is always present.
-pub(crate) fn expression_addr_kind(e: &Expression<'_>) -> (usize, NodeKind) {
+pub(crate) fn expression_addr_kind(view: AstView<'_>, e: &Expression) -> (NodeAddr, NodeKind) {
     use ExpressionKind as E;
-    // ⚠️ The five arena-boxed variants deref (`addr_of(*x)`), the rest do not. Their
-    // binder is a `&&Node`, so a bare `addr_of(x)` infers `T = &Node` and keys on the
-    // address of the ENUM's pointer slot instead of the node's — a different key from
-    // the one `visit_expression` registers, which reaches its visitor by deref
-    // coercion and so sees the node. The boxed spelling is also the more stable key:
-    // it survives a copy of the enum, where an inline payload's address does not.
-    // The lockstep `debug_assert` in `lower::expression` is what catches drift here.
+    // The stored variants key their payload's own row in its store (`view.arrow_fn(x)`
+    // and siblings), the row `visit_expression` hands its visitor; every other variant
+    // keys its payload where it sits, inside `e`.
     match &e.kind {
-        E::CommentBoundPair(c) => expression_addr_kind(c.inner),
+        &E::CommentBoundPair(c) => {
+            expression_addr_kind(view, view.expr(view.comment_pair(c).inner))
+        }
         E::Literal(x) => (addr_of(x), NodeKind::Literal),
         E::Identifier(x) => (addr_of(x), NodeKind::Identifier),
         E::PrivateIdentifier(x) => (addr_of(x), NodeKind::PrivateIdentifier),
@@ -671,12 +681,17 @@ pub(crate) fn expression_addr_kind(e: &Expression<'_>) -> (usize, NodeKind) {
         E::NewExpression(x) => (addr_of(x), NodeKind::NewExpression),
         E::MemberExpression(x) => (addr_of(x), NodeKind::MemberExpression),
         E::ConditionalExpression(x) => (addr_of(x), NodeKind::ConditionalExpression),
-        E::ArrowFunctionExpression(x) => (addr_of(*x), NodeKind::ArrowFunctionExpression),
-        E::FunctionExpression(x) => (addr_of(*x), NodeKind::FunctionExpression),
-        E::ClassExpression(x) => (addr_of(*x), NodeKind::ClassExpression),
+        &E::ArrowFunctionExpression(x) => {
+            (addr_of(view.arrow_fn(x)), NodeKind::ArrowFunctionExpression)
+        }
+        &E::FunctionExpression(x) => (addr_of(view.fn_expr(x)), NodeKind::FunctionExpression),
+        &E::ClassExpression(x) => (addr_of(view.class_expr(x)), NodeKind::ClassExpression),
         E::SpreadElement(x) => (addr_of(x), NodeKind::SpreadElement),
         E::TemplateLiteral(x) => (addr_of(x), NodeKind::TemplateLiteral),
-        E::TaggedTemplateExpression(x) => (addr_of(*x), NodeKind::TaggedTemplateExpression),
+        &E::TaggedTemplateExpression(x) => (
+            addr_of(view.tagged_tpl(x)),
+            NodeKind::TaggedTemplateExpression,
+        ),
         E::AwaitExpression(x) => (addr_of(x), NodeKind::AwaitExpression),
         E::YieldExpression(x) => (addr_of(x), NodeKind::YieldExpression),
         E::SequenceExpression(x) => (addr_of(x), NodeKind::SequenceExpression),
@@ -695,7 +710,7 @@ pub(crate) fn expression_addr_kind(e: &Expression<'_>) -> (usize, NodeKind) {
         E::TSNonNullExpression(x) => (addr_of(x), NodeKind::TSNonNullExpression),
         E::TSParameterProperty(x) => (addr_of(x), NodeKind::TSParameterProperty),
         E::ImportExpression(x) => (addr_of(x), NodeKind::ImportExpression),
-        E::MetaProperty(x) => (addr_of(*x), NodeKind::MetaProperty),
+        &E::MetaProperty(x) => (addr_of(view.meta_prop(x)), NodeKind::MetaProperty),
         E::ParenthesizedExpression(x) => (addr_of(x), NodeKind::ParenthesizedExpression),
     }
 }
@@ -703,12 +718,20 @@ pub(crate) fn expression_addr_kind(e: &Expression<'_>) -> (usize, NodeKind) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bumpalo::Bump;
+    use tsv_ts::ast::{ClassMember, Parsed};
+
+    fn parse(source: &str) -> Parsed {
+        tsv_ts::__private::parse(source).expect("parse")
+    }
 
     fn bind(source: &str) -> BoundFile {
-        let arena = Bump::new();
-        let program = tsv_ts::__private::parse(source, &arena).expect("parse");
-        bind_file(&program, source, FileId::ROOT)
+        bind_file((&parse(source)).into(), source, FileId::ROOT)
+    }
+
+    /// The `index`th top-level statement of `parsed`, read in place.
+    fn top_statement(parsed: &Parsed, index: usize) -> &Statement {
+        let view = parsed.view();
+        view.stmt(view.stmt_list(parsed.program.body)[index])
     }
 
     #[test]
@@ -745,11 +768,10 @@ mod tests {
 
     #[test]
     fn address_map_resolves_a_statement() {
-        let arena = Bump::new();
-        let program = tsv_ts::__private::parse("let a = 1; let b = 2;", &arena).expect("parse");
-        let bound = bind_file(&program, "let a = 1; let b = 2;", FileId::ROOT);
-        let second = &program.body[1];
-        let addr = std::ptr::from_ref(second) as usize;
+        let src = "let a = 1; let b = 2;";
+        let parsed = parse(src);
+        let bound = bind_file((&parsed).into(), src, FileId::ROOT);
+        let addr = addr_of(top_statement(&parsed, 1));
         let id = bound
             .address_map
             .get(&(addr, NodeKind::VariableDeclaration))
@@ -784,10 +806,10 @@ mod tests {
 
     #[test]
     fn require_node_id_resolves_a_known_node() {
-        let arena = Bump::new();
-        let program = tsv_ts::__private::parse("let a = 1;", &arena).expect("parse");
-        let bound = bind_file(&program, "let a = 1;", FileId::ROOT);
-        let addr = std::ptr::from_ref(&program.body[0]) as usize;
+        let src = "let a = 1;";
+        let parsed = parse(src);
+        let bound = bind_file((&parsed).into(), src, FileId::ROOT);
+        let addr = addr_of(top_statement(&parsed, 0));
         let id = bound.require_node_id(addr, NodeKind::VariableDeclaration);
         assert_eq!(bound.kinds[id.index()], NodeKind::VariableDeclaration);
     }
@@ -795,10 +817,17 @@ mod tests {
     #[test]
     #[should_panic(expected = "not covered by the SoA walk")]
     fn require_node_id_hard_fails_on_a_miss() {
-        // Address 0 is never a real arena node — the strict resolver must abort
-        // rather than return a corrupting `NodeId::FIRST` sentinel.
-        let bound = bind("const x = 1;");
-        let _ = bound.require_node_id(0, NodeKind::Program);
+        // A row of another live parse was never keyed by this walk — the strict
+        // resolver must abort rather than return a corrupting `NodeId::FIRST`
+        // sentinel. Both parses stay alive, so their rows cannot share an address.
+        let src = "const x = 1;";
+        let parsed = parse(src);
+        let bound = bind_file((&parsed).into(), src, FileId::ROOT);
+        let other = parse("const y = 2;");
+        let _ = bound.require_node_id(
+            addr_of(top_statement(&other, 0)),
+            NodeKind::VariableDeclaration,
+        );
     }
 
     #[test]
@@ -808,20 +837,20 @@ mod tests {
         // address (value at struct offset 0), yet each resolves to its own id
         // through the `(address, NodeKind)` key. Both look-ups hit the same
         // address; only the kind tells them apart.
-        use tsv_ts::ast::ClassMember;
-        let arena = Bump::new();
         let src = "class C { m() {} }";
-        let program = tsv_ts::__private::parse(src, &arena).expect("parse");
-        let bound = bind_file(&program, src, FileId::ROOT);
-        let StatementKind::ClassDeclaration(class) = &program.body[0].kind else {
+        let parsed = parse(src);
+        let view = parsed.view();
+        let bound = bind_file((&parsed).into(), src, FileId::ROOT);
+        let &StatementKind::ClassDeclaration(class) = &top_statement(&parsed, 0).kind else {
             panic!("expected a class declaration");
         };
-        let ClassMember::MethodDefinition(method) = &class.body.body[0] else {
+        let class = view.class_decl(class);
+        let ClassMember::MethodDefinition(method) = &view.class_members(class.body.body)[0] else {
             panic!("expected a method definition");
         };
         // The two share one address (the collision the compound key resolves).
-        let method_addr = std::ptr::from_ref(method) as usize;
-        let value_addr = std::ptr::from_ref(&method.value) as usize;
+        let method_addr = addr_of(method);
+        let value_addr = addr_of(&method.value);
         assert_eq!(method_addr, value_addr);
         // The method resolves to its own id …
         let method_id = bound.require_node_id(method_addr, NodeKind::MethodDefinition);
@@ -839,9 +868,7 @@ mod tests {
         // parameter. `class C<T> {}` mints Program, ClassDeclaration, Identifier(C),
         // TSTypeParameterDeclaration, TSTypeParameter, Identifier(T) = 6 nodes, and
         // `require_node_id` resolves the type-parameter node.
-        let arena = Bump::new();
-        let program = tsv_ts::__private::parse("class C<T> {}", &arena).expect("parse");
-        let bound = bind_file(&program, "class C<T> {}", FileId::ROOT);
+        let bound = bind("class C<T> {}");
         assert_eq!(bound.node_count, 6);
         let tp = bound
             .kinds
@@ -865,14 +892,25 @@ mod tests {
         );
     }
 
+    #[test]
+    #[cfg(debug_assertions)]
+    #[should_panic(expected = "a copied row was keyed")]
+    fn stored_key_guard_refuses_a_stack_copy() {
+        // A row read in place passes the store-range guard; a `Copy` of the same row on
+        // the stack does not, and keying it is the bug the guard names.
+        let parsed = parse("let a = 1;");
+        let row = top_statement(&parsed, 0);
+        debug_assert_stored_key(parsed.view(), addr_of(row), NodeKind::VariableDeclaration);
+        let copy = *row;
+        debug_assert_stored_key(parsed.view(), addr_of(&copy), NodeKind::VariableDeclaration);
+    }
+
     /// The sorted family diagnostic codes a source produces — via the full
     /// program pipeline, so the canonical sort + dedup applies (a conflict emits
     /// one diagnostic per position after collapsing the repeated prior-decl ones).
     fn diag_codes(source: &str) -> Vec<u32> {
-        let arena = Bump::new();
         let result = crate::program::check_program(
             &[crate::program::SourceUnit::new("t.ts", source)],
-            &arena,
             &crate::options::CheckOptions::default(),
         );
         result.diagnostics.iter().map(|d| d.code).collect()
