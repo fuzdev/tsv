@@ -1802,7 +1802,7 @@ fn format_root<'a>(
     {
         tsv_lang::comment_ledger::register_parsed(source, &comments);
         let mut html_comment_spans = Vec::new();
-        collect_html_comment_spans(parsed.view, &root.fragment, &mut html_comment_spans);
+        collect_html_comment_spans(parsed.view, root.fragment, &mut html_comment_spans);
         tsv_lang::comment_ledger::register_parsed_spans(source, html_comment_spans);
     }
 
@@ -1936,37 +1936,37 @@ fn format_lifted_runs(
 /// `{#await}` / `{#key}` / `{#snippet}` block bodies). The print-once comment ledger reads
 /// only the span, so no `HtmlComment` need be manufactured into a `Comment`.
 #[cfg(feature = "_internal_comment_check")]
-fn collect_html_comment_spans(view: SvelteView<'_>, fragment: &ast::Fragment, out: &mut Vec<Span>) {
+fn collect_html_comment_spans(view: SvelteView<'_>, fragment: ast::Fragment, out: &mut Vec<Span>) {
     for node in view.nodes(fragment.nodes) {
         match node {
             FragmentNode::Comment(comment) => out.push(comment.span),
-            FragmentNode::Element(el) => collect_html_comment_spans(view, &el.fragment, out),
-            FragmentNode::SpecialElement(el) => collect_html_comment_spans(view, &el.fragment, out),
+            FragmentNode::Element(el) => collect_html_comment_spans(view, el.fragment, out),
+            FragmentNode::SpecialElement(el) => collect_html_comment_spans(view, el.fragment, out),
             FragmentNode::IfBlock(block) => {
-                collect_html_comment_spans(view, &block.consequent, out);
-                if let Some(alternate) = &block.alternate {
+                collect_html_comment_spans(view, block.consequent, out);
+                if let Some(alternate) = block.alternate {
                     collect_html_comment_spans(view, alternate, out);
                 }
             }
             FragmentNode::EachBlock(block) => {
-                collect_html_comment_spans(view, &block.body, out);
-                if let Some(fallback) = &block.fallback {
+                collect_html_comment_spans(view, block.body, out);
+                if let Some(fallback) = block.fallback {
                     collect_html_comment_spans(view, fallback, out);
                 }
             }
             FragmentNode::AwaitBlock(block) => {
-                if let Some(pending) = &block.pending {
+                if let Some(pending) = block.pending {
                     collect_html_comment_spans(view, pending, out);
                 }
-                if let Some(then) = &block.then {
+                if let Some(then) = block.then {
                     collect_html_comment_spans(view, then, out);
                 }
-                if let Some(catch) = &block.catch {
+                if let Some(catch) = block.catch {
                     collect_html_comment_spans(view, catch, out);
                 }
             }
-            FragmentNode::KeyBlock(block) => collect_html_comment_spans(view, &block.fragment, out),
-            FragmentNode::SnippetBlock(block) => collect_html_comment_spans(view, &block.body, out),
+            FragmentNode::KeyBlock(block) => collect_html_comment_spans(view, block.fragment, out),
+            FragmentNode::SnippetBlock(block) => collect_html_comment_spans(view, block.body, out),
             _ => {}
         }
     }
