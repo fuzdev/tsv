@@ -25,11 +25,13 @@ mod frozen_body;
 mod fused_spans_tests;
 mod helpers;
 mod lifted_runs;
+mod node_slice;
 mod nodes;
 mod script_style;
 mod text;
 
 use crate::ast::{self, FragmentNode, SvelteView};
+use node_slice::{NodeSliceAddr, NodeSliceKey};
 use nodes::AttrGaps;
 use smallvec::SmallVec;
 use std::cell::{Cell, OnceCell, RefCell};
@@ -195,13 +197,13 @@ struct IgnoreRanges {
     markers: Vec<Option<RangeMarker>>,
     /// Each range as its (start marker, end marker) fragment indices, in source order.
     pairs: SmallVec<[(usize, usize); 2]>,
-    /// The address of the fragment's first node — which fragment this pairs, so a read against
+    /// The address of the fragment's nodes — which fragment this pairs, so a read against
     /// another fails a debug assertion rather than answering for the wrong nodes.
-    nodes_addr: usize,
+    nodes_addr: NodeSliceAddr,
 }
 
 impl IgnoreRanges {
-    fn new(nodes: &[FragmentNode], source: &str) -> Self {
+    fn new(view: SvelteView<'_>, nodes: &[FragmentNode], source: &str) -> Self {
         let markers: Vec<Option<RangeMarker>> = nodes
             .iter()
             .map(|n| match n {
@@ -224,7 +226,7 @@ impl IgnoreRanges {
         Self {
             markers,
             pairs,
-            nodes_addr: nodes.as_ptr() as usize,
+            nodes_addr: NodeSliceAddr::of(view, nodes),
         }
     }
 
@@ -293,7 +295,7 @@ enum RangeMarker {
 /// The one spelling of the marker test — the range pairing ([`IgnoreRanges`], which the freeze
 /// scan, the comment-classification barrier and the lifted-run rewrite all read) and the
 /// region-end trail's exclusion ask it here, so they cannot drift on which comments count as
-/// markers. A free function (not a method) because [`IgnoreRanges::new`] needs `source` alone.
+/// markers. A free function (not a method) because [`IgnoreRanges::new`] holds no printer.
 fn range_marker(comment: &ast::HtmlComment, source: &str) -> Option<RangeMarker> {
     let content = comment.content(source);
     if is_format_ignore_range_start(content) {
@@ -531,9 +533,9 @@ pub(crate) struct Printer<'a> {
     /// address in the store, so a reader hands over a slice of the store — one an accessor
     /// returned, or a sub-slice of it — never one over a copied node, whose stack slot another
     /// node can reuse.
-    fragment_edges: RefCell<std::collections::BTreeMap<usize, nodes::IndexedFragment>>,
+    fragment_edges: RefCell<std::collections::BTreeMap<NodeSliceAddr, nodes::IndexedFragment>>,
     /// Each node slice's glue flags (`nodes::FragmentGlue`), computed on first ask.
-    fragment_glue_cache: RefCell<FxHashMap<(usize, usize), std::rc::Rc<nodes::FragmentGlue>>>,
+    fragment_glue_cache: RefCell<FxHashMap<NodeSliceKey, std::rc::Rc<nodes::FragmentGlue>>>,
     /// The root fragment's `format-ignore` range pairing ([`Self::ignore_ranges`]), on first ask.
     ignore_ranges: OnceCell<IgnoreRanges>,
 }
@@ -2064,13 +2066,17 @@ impl<'a> Printer<'a> {
 
     /// The root fragment's [`IgnoreRanges`], paired on first ask and kept for the document —
     /// every reader asks of the one root this printer formats.
-    fn ignore_ranges(&self, root_fragment: &ast::Fragment) -> &IgnoreRanges {
-        let ranges = self
-            .ignore_ranges
-            .get_or_init(|| IgnoreRanges::new(self.svelte.nodes(root_fragment.nodes), self.source));
+    fn ignore_ranges(&self, root_fragment: ast::Fragment) -> &IgnoreRanges {
+        let ranges = self.ignore_ranges.get_or_init(|| {
+            IgnoreRanges::new(
+                self.svelte,
+                self.svelte.nodes(root_fragment.nodes),
+                self.source,
+            )
+        });
         debug_assert_eq!(
             ranges.nodes_addr,
-            self.svelte.nodes(root_fragment.nodes).as_ptr() as usize,
+            NodeSliceAddr::of(self.svelte, self.svelte.nodes(root_fragment.nodes)),
             "the ignore ranges pair one root fragment per printer"
         );
         ranges
@@ -2177,7 +2183,7 @@ impl<'a> Printer<'a> {
             (bytes[end..start].iter().all(|&b| ast::is_collapsible_ws(b))
                 && is_region_end_marker(comment.content(self.source))
                 && range_marker(comment, self.source).is_none()
-                && !self.ignore_ranges(&root.fragment).contains(idx))
+                && !self.ignore_ranges(root.fragment).contains(idx))
             .then_some(idx)
         })
     }
@@ -2293,7 +2299,7 @@ impl<'a> Printer<'a> {
         let scan = CommentScan::new(
             self.svelte,
             root.fragment,
-            self.ignore_ranges(&root.fragment),
+            self.ignore_ranges(root.fragment),
         );
 
         for (i, node) in self.svelte.nodes(root.fragment.nodes).iter().enumerate() {
@@ -2395,7 +2401,7 @@ impl<'a> Printer<'a> {
                 FragmentNode::Text(t) if t.is_collapsible_ws_only => {}
                 FragmentNode::Comment(_) if sections.0.iter().any(|s| s.trail == Some(i)) => {}
                 FragmentNode::Comment(_) if !travels[i] => {
-                    let ranges = self.ignore_ranges(&root.fragment);
+                    let ranges = self.ignore_ranges(root.fragment);
                     if ranges.markers[i].is_some() || ranges.contains(i) {
                         break;
                     }
@@ -2644,7 +2650,7 @@ impl<'a> Printer<'a> {
         // The ranges are paired over the whole fragment; the slice drops only whitespace text and
         // section comments, and a range marker is never a section comment (it pins itself to the
         // template), so every marker is in the slice and the pairing is the slice's own.
-        let ranges = self.ignore_ranges(&fragment);
+        let ranges = self.ignore_ranges(fragment);
         debug_assert!(
             skip_indices.iter().all(|&k| ranges.markers[k].is_none()),
             "a range marker never travels with a section"

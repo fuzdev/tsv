@@ -51,6 +51,16 @@ impl<'a> SvelteView<'a> {
         &self.stores.own.runs
     }
 
+    /// Whether `address` lies inside the fragment-node store's rows: the store-range guard a
+    /// reader keying a node slice by address asserts (the printer's fragment memos). A slice an
+    /// accessor returned, or a sub-slice of it, always lies there; a slice over a copied node
+    /// never does. Read-only, and present in every build, so a `debug_assert!` over it
+    /// type-checks in release.
+    #[inline]
+    pub(crate) fn holds_node_address(self, address: usize) -> bool {
+        self.runs().nodes.holds_address(address)
+    }
+
     /// The elements of `list`, when it is present: an attribute's value parts.
     #[inline]
     pub fn opt_attribute_values(

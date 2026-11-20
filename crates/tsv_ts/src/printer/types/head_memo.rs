@@ -31,6 +31,7 @@ use smallvec::SmallVec;
 
 use super::{EdgeRun, HeadRegion, HeadStep, Printer};
 use crate::ast::TSType;
+use crate::printer::keyed::NodeAddr;
 
 /// The visits an outermost descent takes before it memoizes: the descent real code makes
 /// is a handful of links, and one that outlives this many memoizes the rest of the call,
@@ -72,10 +73,10 @@ pub(super) mod test_memo_after {
     }
 }
 
-/// One memoized answer's key: the node (by its address in its store — two nodes never share
-/// one, and a span can be shared by a node and its sole member), the axis, and the claim the
-/// answer was read under.
-type HeadKey = (usize, EdgeRun, Option<(u32, u32)>);
+/// One memoized answer's key: the node (by its address in its store, [`NodeAddr`] — two nodes
+/// never share one, and a span can be shared by a node and its sole member), the axis, and the
+/// claim the answer was read under.
+type HeadKey = (NodeAddr, EdgeRun, Option<(u32, u32)>);
 
 /// One descent's answer, as the memo stores it.
 #[derive(Clone, Copy)]
@@ -182,7 +183,7 @@ impl Printer<'_> {
         let found = loop {
             // The claim is read at every level, as the recursion read it at every call.
             let key = (
-                std::ptr::from_ref(ty) as usize,
+                NodeAddr::of(self.view, ty),
                 run,
                 self.claimed_shell_leading_run
                     .get()

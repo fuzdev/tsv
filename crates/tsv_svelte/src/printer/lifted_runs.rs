@@ -372,7 +372,7 @@ impl Printer<'_> {
         // range's own verbatim slice makes ([`range_cuts`]).
         let nodes = self.svelte.nodes(root.fragment.nodes);
         let ranges: SmallVec<[Span; 2]> = self
-            .ignore_ranges(&root.fragment)
+            .ignore_ranges(root.fragment)
             .pairs
             .iter()
             .map(|&(start, end)| Span::new(nodes[start].span().start, nodes[end].span().end))

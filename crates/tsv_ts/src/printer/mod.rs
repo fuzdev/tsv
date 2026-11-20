@@ -37,6 +37,7 @@ mod comments;
 mod decorators;
 mod expressions;
 mod ignore;
+mod keyed;
 mod layout;
 mod needs_parens;
 mod pre_body;
@@ -1705,10 +1706,11 @@ impl<'a> Printer<'a> {
     /// [`Self::chain_share_key`] for an AST node of any kind, `span` being the source its doc
     /// prints — the range an [assumed break](Self::assumed_break) is checked against.
     ///
-    /// The key is the node's address in its store: pass a reference into the store — one an
-    /// accessor returned, or a field of it — never a copy, whose stack slot another node can
-    /// reuse.
-    pub(crate) fn chain_share_key_of<T>(
+    /// The key is the node's address in its store ([`keyed::NodeAddr`]): pass a reference into
+    /// the store — one an accessor returned, or a field of it — never a copy, whose stack slot
+    /// another node can reuse. `T: Keyed` refuses a reference or an id at compile time; a debug
+    /// build asserts the address lies in a store row once a window is open.
+    pub(crate) fn chain_share_key_of<T: keyed::Keyed>(
         &self,
         node: &T,
         span: Span,
@@ -1729,7 +1731,7 @@ impl<'a> Printer<'a> {
         if self.expand_last_arg_flat_params.get() {
             tag |= ShareTag::FLAT_PARAMS_BIT;
         }
-        Some((std::ptr::from_ref(node) as usize, tag))
+        Some((keyed::NodeAddr::of(self.view, node).share_bits(), tag))
     }
 
     /// Look up `key` in the chain share store, or build and record it.

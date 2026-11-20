@@ -15,6 +15,7 @@
 use super::helpers::is_control_flow_block;
 use crate::ast::{ElementKind, FragmentNode, Root};
 use crate::printer::Printer;
+use crate::printer::node_slice::{NodeSliceAddr, NodeSliceKey};
 use std::rc::Rc;
 
 /// Whether a line break at each content edge of a fragment disappears — the edge of a line box,
@@ -246,17 +247,16 @@ impl<'a> Printer<'a> {
     /// store — one an accessor returned, or a sub-slice of it — never one over a copied node,
     /// whose stack slot another node can reuse.
     fn fragment_glue(&self, nodes: &[FragmentNode]) -> Rc<FragmentGlue> {
-        let addr = nodes.as_ptr() as usize;
-        let key = (addr, nodes.len());
+        let key = NodeSliceKey::of(self.svelte, nodes);
+        let addr = key.addr();
         if let Some(glue) = self.fragment_glue_cache.borrow().get(&key) {
             return Rc::clone(glue);
         }
-        let size = size_of::<FragmentNode>();
         let index = self.fragment_edges.borrow();
         let fragment = index
             .range(..=addr)
             .next_back()
-            .map(|(&start, &entry)| ((addr - start) / size, entry))
+            .map(|(&start, &entry)| (addr.nodes_past(start), entry))
             .filter(|&(offset, entry)| offset + nodes.len() <= entry.len);
         debug_assert!(
             nodes.is_empty() || index.is_empty() || fragment.is_some(),
@@ -399,7 +399,7 @@ impl<'a> Printer<'a> {
             .take_while(|n| n.is_whitespace_only_text())
             .count();
         self.fragment_edges.borrow_mut().insert(
-            nodes.as_ptr() as usize,
+            NodeSliceAddr::of(self.svelte, nodes),
             IndexedFragment {
                 len: nodes.len(),
                 ws_ends: (ws_lead, ws_trail),
