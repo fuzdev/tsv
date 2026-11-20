@@ -50,12 +50,13 @@
 use std::collections::HashMap;
 
 use bumpalo::collections::Vec as BumpVec;
+use tsv_lang::store::Run;
 use tsv_lang::{Comment, Span};
-use tsv_svelte::ast::{Element, Root, SpecialElement};
+use tsv_svelte::ast::{Element, Root, SpecialElement, SvelteView};
 use tsv_ts::ast::{
-    BlockStatement, ExportDefaultDeclaration, ExportDefaultValue, Expression, ExpressionKind,
-    ExpressionStatement, FunctionDeclaration, ObjectExpression, ObjectProperty, Statement,
-    StatementKind, VariableDeclaration, VariableDeclarationKind,
+    AstStores, BlockStatement, ExportDefaultDeclaration, ExportDefaultValue, ExprId, Expression,
+    ExpressionKind, ExpressionStatement, FunctionDeclaration, ObjectExpression, ObjectProperty,
+    Statement, StatementKind, StmtId, VariableDeclaration, VariableDeclarationKind,
 };
 
 use crate::analyze::{Bindings, NameSet, RuneInit, Scope, ScopeEntry, classify_rune_init};
@@ -85,10 +86,18 @@ const COMPONENT_NAME: &str = "Input";
 
 /// Everything the emitters share: the builder, the script analysis products,
 /// and the CSS scoping state.
-pub(crate) struct EmitEnv<'arena, 's> {
-    pub(crate) b: Builder<'arena>,
-    pub(crate) source: &'s str,
-    pub(crate) bindings: Bindings<'arena>,
+///
+/// `'a` is the compile: the builder writes the document's TypeScript half (and reads
+/// it, `b.view()`), and `sv` reads the template and CSS halves — held apart by
+/// `tsv_svelte::__private::with_ts_stores`, so a template read never holds the
+/// TypeScript half and `sv.ts()` is never the way to it (it reads an empty
+/// stand-in for the call). The host source outlives the call, so it shares `'a`.
+pub(crate) struct EmitEnv<'a> {
+    pub(crate) b: Builder<'a>,
+    /// The template and CSS halves of the document's stores.
+    pub(crate) sv: SvelteView<'a>,
+    pub(crate) source: &'a str,
+    pub(crate) bindings: Bindings,
     pub(crate) derived_names: NameSet,
     /// Top-level `$state`/`$state.raw` binding names. Stored as `Normal` in the
     /// binding table (a plain server variable after rewrite), but the oracle's
@@ -123,7 +132,7 @@ pub(crate) struct EmitEnv<'arena, 's> {
     pub(crate) scope: Option<CssScoping>,
     /// Active block-scope overlays (each items/indexes, `{:then}` values,
     /// `{@const}` bindings), innermost last.
-    pub(crate) overlays: Vec<HashMap<String, ScopeEntry<'arena>>>,
+    pub(crate) overlays: Vec<HashMap<String, ScopeEntry>>,
     /// Inside an `{#each}` body — a nested each refuses. Not because the oracle's
     /// unique-name allocation order is unreachable (it is modelled; see
     /// [`Refusal::NestedEach`]) but because the rest of the nested emission path
@@ -151,7 +160,7 @@ pub(crate) struct EmitEnv<'arena, 's> {
     /// emitted between the imports and the exported component function (source
     /// order — a top-level snippet is visited in order as the root fragment is
     /// walked).
-    pub(crate) hoisted_snippets: Vec<Statement<'arena>>,
+    pub(crate) hoisted_snippets: Vec<StmtId>,
     /// Comment-refusal windows of the regions erased from **template** borrow
     /// points (the script's are an [`Analysis`] product, collected before
     /// emission). Deliberately **not** an [`Analysis`] product: it is accumulated
@@ -161,9 +170,10 @@ pub(crate) struct EmitEnv<'arena, 's> {
     erased_windows: Vec<Span>,
 }
 
-impl<'arena> EmitEnv<'arena, '_> {
-    pub(crate) fn value_scope(&self) -> Scope<'_, 'arena> {
+impl EmitEnv<'_> {
+    pub(crate) fn value_scope(&self) -> Scope<'_> {
         Scope {
+            view: self.b.view(),
             bindings: &self.bindings,
             overlays: &self.overlays,
         }
@@ -187,24 +197,17 @@ impl<'arena> EmitEnv<'arena, '_> {
     /// A missed borrow point cannot ship TypeScript silently: the finished
     /// program is re-erased ([`self_check_no_typescript`]) and any survivor is a
     /// loud [`CompileError::TypeErasureLeak`].
-    pub(crate) fn erase(
-        &mut self,
-        expr: &'arena Expression<'arena>,
-    ) -> Result<&'arena Expression<'arena>, CompileError> {
-        let arena = self.b.arena;
-        let erased = erase::erase_expression(arena, self.source, expr)?;
+    pub(crate) fn erase(&mut self, expr: ExprId) -> Result<ExprId, CompileError> {
+        let erased = erase::erase_expression(self.b.stores, self.source, expr)?;
         self.erased_windows.extend(erased.regions);
-        Ok(match erased.expr {
-            Some(new) => arena.alloc(new),
-            None => expr,
-        })
+        Ok(erased.expr.unwrap_or(expr))
     }
 
     /// Push a block-scope overlay; refuses names that shadow a derived binding
     /// (the guard's derived-read refusal is name-based and can't see scopes).
     pub(crate) fn push_overlay(
         &mut self,
-        entries: HashMap<String, ScopeEntry<'arena>>,
+        entries: HashMap<String, ScopeEntry>,
     ) -> Result<(), CompileError> {
         for name in entries.keys() {
             if self.derived_names.contains(name) {
@@ -225,7 +228,7 @@ impl<'arena> EmitEnv<'arena, '_> {
     /// give it the `svelte-tsvhash` class? A pure lookup — the matching (including
     /// which selectors are used) already ran in [`analyze`]. Returns `false` when
     /// the component has no `<style>`.
-    pub(crate) fn element_scope(&self, element: &Element<'arena>) -> bool {
+    pub(crate) fn element_scope(&self, element: &Element) -> bool {
         self.scope
             .as_ref()
             .is_some_and(|scope| scope.element_scoped(element))
@@ -235,7 +238,7 @@ impl<'arena> EmitEnv<'arena, '_> {
     /// lookup as [`element_scope`](Self::element_scope), keyed on the special
     /// element's span. A type or universal selector matches a `<svelte:element>`
     /// unconditionally, so a styled component scopes every one it reaches.
-    pub(crate) fn special_element_scope(&self, special: &SpecialElement<'arena>) -> bool {
+    pub(crate) fn special_element_scope(&self, special: &SpecialElement) -> bool {
         self.scope
             .as_ref()
             .is_some_and(|scope| scope.special_element_scoped(special))
@@ -287,7 +290,7 @@ impl<'arena> EmitEnv<'arena, '_> {
 /// Two products are deliberately *not finished* here because their finalization
 /// depends on the loop's output — see the [`Analysis::bindings`] and
 /// [`Analysis::component`] field notes.
-pub(crate) struct Analysis<'arena> {
+pub(crate) struct Analysis {
     /// The top-level script binding table (the evaluator's input).
     ///
     /// ⚠ **Not frozen when `analyze` returns.** It is populated by
@@ -297,7 +300,7 @@ pub(crate) struct Analysis<'arena> {
     /// from [`Self::component`], neither of which exists until the loop runs.
     /// [`compile_server`] finalizes it in place, the same mutation sequence as
     /// before this factoring.
-    pub(crate) bindings: Bindings<'arena>,
+    pub(crate) bindings: Bindings,
     /// Derived-binding names (read rewriting / refusal).
     pub(crate) derived_names: NameSet,
     /// Top-level `$state`/`$state.raw` binding names — a component named after
@@ -330,14 +333,14 @@ pub(crate) struct Analysis<'arena> {
     /// The type-erased instance-script statement list — the rewrite loop
     /// iterates it. (NOTHING may read `root.instance.content.body`: the un-erased
     /// tree still carries TypeScript.)
-    pub(crate) instance_body: &'arena [Statement<'arena>],
+    pub(crate) instance_body: Run<StmtId>,
     /// The type-erased module-script statement list (imports + declarations +
     /// non-default exports, source order), emitted **verbatim** as a module-scope
     /// program between the hoisted snippets and the component function — carrying
     /// only the `module_comments` the oracle keeps (see that field). Empty when
     /// there is no module script. (NOTHING may read `root.module.content.body`: the
     /// un-erased tree still carries TypeScript.)
-    pub(crate) module_body: &'arena [Statement<'arena>],
+    pub(crate) module_body: Run<StmtId>,
     /// Carried instance-script comments (threaded into the export program).
     pub(crate) script_comments: Vec<Comment>,
     /// Carried module-script comments — the "open half": the ones the oracle keeps
@@ -373,22 +376,25 @@ pub(crate) struct Analysis<'arena> {
 /// - the two deferred-finalization products as-is: [`Analysis::bindings`]
 ///   pre-patch and [`Analysis::component`] unresolved (see their field notes).
 ///
-/// `analyze` performs **no minting**, so it needs no [`Builder`]: the setup block
-/// mints nothing until the loop, so the `$` runtime import stays the first
-/// appendix lexeme whether it is minted before or after this call, and the
-/// appendix byte stream is identical either way.
-fn analyze<'arena>(
-    root: &Root<'arena>,
+/// `analyze` performs **no appendix minting**, so it needs no [`Builder`]: the setup
+/// block mints nothing into the buffer until the loop, so the `$` runtime import
+/// stays the first appendix lexeme whether it is minted before or after this call,
+/// and the appendix byte stream is identical either way. It does push rows into
+/// `ts` — type erasure rebuilds what it changes there — so it takes the stores the
+/// builder later borrows.
+fn analyze(
+    root: &Root,
+    sv: SvelteView<'_>,
+    ts: &mut AstStores,
     source: &str,
-    arena: &'arena bumpalo::Bump,
-) -> Result<Analysis<'arena>, CompileError> {
+) -> Result<Analysis, CompileError> {
     if root.options.is_some() {
         return Err(unsupported(Refusal::SvelteOptions));
     }
     // The emission-independent validation rules (the oracle's parse-time and
     // whole-component checks) — one walk over the whole document, dropped regions
     // included, before any emission decision is made. See `validate.rs`.
-    crate::validate::validate_document(root, source)?;
+    crate::validate::validate_document(root, sv, ts.view(), source)?;
     // TypeScript erasure — the oracle's phase-1 `remove_typescript_nodes`, run
     // BEFORE every analysis pass (`analyze_script`, `analyze_snippets`,
     // `needs_context`) and before the codegen loop. `instance_body` is the
@@ -396,15 +402,15 @@ fn analyze<'arena>(
     // `root.instance.content.body` (the un-erased tree still carries TS). The
     // document `ts` flag is decided from the first lang-bearing script in source
     // order — the module can set it (`document_ts_flag`).
-    let ts_document = document_ts_flag(root, source)?;
+    let ts_document = document_ts_flag(root, sv, source)?;
     // The oracle's parse-time `<script>` attribute-value rules (one source-order
     // loop, first-error-wins): a `context` attribute that isn't `context="module"`
     // (`script_invalid_context`) and a valued `module` attribute
     // (`script_invalid_attribute_value`).
-    crate::script_ts_gate::refuse_invalid_script_attributes(root, source)?;
-    let (instance_body, erased_windows) = match root.instance {
+    crate::script_ts_gate::refuse_invalid_script_attributes(root, sv, source)?;
+    let (instance_body, erased_windows) = match &root.instance {
         Some(script) => {
-            let erased = erase::erase_statements(arena, source, script.content.body)?;
+            let erased = erase::erase_statements(ts, source, script.content.body)?;
             // The oracle gates the TypeScript *grammar* on the document-wide
             // `ts` flag: without it, a `: T` / `as T` / `x!` is a plain-JS parse
             // error. tsv's parser is TS-permissive and would silently accept —
@@ -416,21 +422,24 @@ fn analyze<'arena>(
             }
             (erased.body, erased.regions)
         }
-        None => (&[][..], Vec::new()),
+        None => (Run::EMPTY, Vec::new()),
     };
     // The module `<script>` half: erase + validate (plain modules only — runes,
     // store reads, top-level await, and `export default` refuse). Its type-free
     // body emits verbatim at module scope. Runs before every analysis so the
     // module bindings feed the same passes the instance bindings do.
     let (module_body, module_erased_windows) =
-        analyze_module_script(root, source, arena, ts_document)?;
+        analyze_module_script(root, sv, ts, source, ts_document)?;
     // The template half of the same document-wide gate. The borrow points
     // (`EmitEnv::erase`) already erase every template expression that reaches
     // output, so this sweep exists for the ones that DON'T — see
     // `refuse_template_typescript`. It runs only without the flag.
     if !ts_document {
-        refuse_template_typescript(root, source, arena)?;
+        refuse_template_typescript(root, sv, ts, source)?;
     }
+    // Everything below reads the TypeScript half; nothing pushes into it again
+    // until the script-rewrite loop.
+    let view = ts.view();
 
     // CSS scoping (no minting): parse the selector chains, then match them against
     // the element census upfront. The census (`element_census`) gives the ancestor/
@@ -438,11 +447,11 @@ fn analyze<'arena>(
     // which elements gain the hash class, which selectors are used, which compounds
     // splice a hash — is computed here rather than accumulated during emission. A
     // dynamic-attribute / non-ASCII / snippet-crossing match refuses here.
-    let scope = match root.css {
+    let scope = match &root.css {
         Some(style) => {
-            let info = analyze_style(style, source, None)?;
-            let census = build_census(root);
-            Some(match_scope(info, &census, source)?)
+            let info = analyze_style(style, sv, source, None)?;
+            let census = build_census(root, sv);
+            Some(match_scope(info, &census, sv, view, source)?)
         }
         None => None,
     };
@@ -451,29 +460,41 @@ fn analyze<'arena>(
     // (their spans are host-absolute, so the detached-comment machinery works
     // against the buffer). Classes whose placement can't be made to converge
     // refuse — see `collect_script_comments`.
-    let script_comments = collect_script_comments(root, source, instance_body)?;
+    let script_comments = collect_script_comments(root, sv, view, source, instance_body)?;
     let has_comments = !script_comments.is_empty();
     // A `<script module>` comment the oracle KEEPS — one recovered by esrap's
     // comment-index re-seek over a preceding block-bearing statement (the "open
     // half"); the rest drop. Bidirectionally exact against the pinned oracle. Runs
     // AFTER `collect_script_comments`, which refuses the module-after-instance
     // ordering first, so this only ever computes the module-first keep set.
-    let module_comments =
-        collect_module_script_comments(root, source, module_body, &module_erased_windows)?;
+    let module_comments = collect_module_script_comments(
+        root,
+        sv,
+        view,
+        source,
+        module_body,
+        &module_erased_windows,
+    )?;
 
     // A rune keyword whose stem is also a binding in scope at the instance script
     // (`import { state } from './store'` + `$state`) is READ AS A STORE by the
     // oracle, not as the rune — refuse before the binding table (which would
     // classify it as the rune) is built. `instance.scope.get` chains to the module
     // scope, so both bodies are searched. See `refuse_rune_store_collision`.
-    refuse_rune_store_collision(instance_body, module_body, source)?;
+    refuse_rune_store_collision(view, instance_body, module_body, source)?;
 
     // Script analysis pass: the top-level binding table (evaluator input) and
     // the derived-name set (read rewriting / refusal). The instance script fills
     // the table first.
     let mut bindings = Bindings::empty();
     let mut derived_names = NameSet::default();
-    analyze_script(instance_body, source, &mut bindings, &mut derived_names)?;
+    analyze_script(
+        view,
+        instance_body,
+        source,
+        &mut bindings,
+        &mut derived_names,
+    )?;
 
     // The snippet-hoist BLOCKER set is INSTANCE bindings only. A module binding
     // is module-scope (accessible from a hoisted, module-scope snippet, like an
@@ -488,14 +509,15 @@ fn analyze<'arena>(
     // `Scope.declare` forwarding an `import` to the parent scope
     // (`phases/scope.js:679-681`), so they share one set rather than each keeping
     // its own.
-    let import_names: NameSet = instance_body
+    let import_names: NameSet = view
+        .stmt_list(instance_body)
         .iter()
-        .chain(module_body.iter())
-        .filter_map(|stmt| match &stmt.kind {
-            StatementKind::ImportDeclaration(import) => Some(import),
+        .chain(view.stmt_list(module_body))
+        .filter_map(|&stmt| match view.stmt(stmt).kind {
+            StatementKind::ImportDeclaration(import) => Some(view.import_decl(import)),
             _ => None,
         })
-        .flat_map(|import| import.specifiers)
+        .flat_map(|import| view.import_specs(import.specifiers))
         .filter_map(|spec| {
             use tsv_ts::ast::ImportSpecifier;
             let local = match spec {
@@ -520,6 +542,8 @@ fn analyze<'arena>(
     // so a future reorder is loud rather than a silent corpus re-bucketing.
     crate::validate::validate_top_level_snippets(
         root,
+        sv,
+        view,
         source,
         &instance_binding_names,
         &import_names,
@@ -537,6 +561,7 @@ fn analyze<'arena>(
         let mut module_bindings = Bindings::empty();
         let mut module_derived = NameSet::default();
         analyze_script(
+            view,
             module_body,
             source,
             &mut module_bindings,
@@ -561,19 +586,26 @@ fn analyze<'arena>(
     // Module bindings join the shared table: they feed the evaluator (a module
     // `const K = 5` folds `{K}`), the store-base set (a template `$c` on a module
     // store), and `needs_context` (a module import member/call).
-    analyze_script(module_body, source, &mut bindings, &mut derived_names)?;
+    analyze_script(view, module_body, source, &mut bindings, &mut derived_names)?;
 
     // Snippet hoist analysis: which top-level `{#snippet}`s go to module scope.
     // Import locals don't disqualify hoisting — instance AND module imports — so
     // the blocker set the analysis subtracts is the instance-binding table minus
     // every import local (`import_names`, frozen above).
-    let snippets = analyze_snippets(root, source, &instance_binding_names, &import_names)?;
+    let snippets = analyze_snippets(
+        root,
+        sv,
+        view,
+        source,
+        &instance_binding_names,
+        &import_names,
+    )?;
 
     // `snippet_invalid_export` / `export_undefined` for the module script's
     // `export { … }` specifiers (`2-analyze/index.js:823-836`). It reads the
     // hoist decision (a hoistable snippet's binding lands in module scope), so it
     // runs after `analyze_snippets`.
-    crate::validate::validate_module_exports(module_body, source, &snippets)?;
+    crate::validate::validate_module_exports(view, module_body, source, &snippets)?;
 
     // Every top-level binding name — instance AND module — is a candidate store
     // base: a `$name` reference is a store auto-subscription iff `name` is a
@@ -583,7 +615,7 @@ fn analyze<'arena>(
     // `compile_server` for the script guard / store rewrite / template walk).
     let store_names: NameSet = bindings.names().map(str::to_string).collect();
 
-    let unassignable_names = collect_constant_names(instance_body, module_body, source);
+    let unassignable_names = collect_constant_names(view, instance_body, module_body, source);
 
     // The whole-component analysis, over instance + module + template. Computed
     // here because the script rewrite needs its `uses_slots` (the `$props()` rest
@@ -594,6 +626,8 @@ fn analyze<'arena>(
     // inputs that trip both.
     let component = analyze_component(
         root,
+        sv,
+        view,
         source,
         instance_body,
         module_body,
@@ -614,16 +648,17 @@ fn analyze<'arena>(
     // the module-rune refusal must widen this scan to `module_body` too, or the
     // component emits a static call where the oracle guards it — a MISMATCH.
     let mut state_names = NameSet::default();
-    for stmt in instance_body {
-        if let StatementKind::VariableDeclaration(decl) = &stmt.kind {
-            for declarator in decl.declarations {
+    for &stmt in view.stmt_list(instance_body) {
+        if let StatementKind::VariableDeclaration(decl) = view.stmt(stmt).kind {
+            for declarator in view.declarators(decl.declarations) {
                 if matches!(
-                    declarator
-                        .init
-                        .as_ref()
-                        .and_then(|init| classify_rune_init(init, source)),
+                    declarator.init.and_then(|init| classify_rune_init(
+                        view,
+                        view.expr(init),
+                        source
+                    )),
                     Some(RuneInit::State(_))
-                ) && let Some(name) = identifier_binding_name(declarator.id, source)
+                ) && let Some(name) = identifier_binding_name(view.expr(declarator.id), source)
                 {
                     state_names.insert(name);
                 }
@@ -645,15 +680,22 @@ fn analyze<'arena>(
         script_comments,
         module_comments,
         erased_windows,
-        each_index_names: blocks::assign_each_index_names(&root.fragment),
+        each_index_names: blocks::assign_each_index_names(sv, &root.fragment),
     })
 }
 
 /// Compile a parsed component to server output.
-pub(crate) fn compile_server<'arena>(
-    root: &Root<'arena>,
+///
+/// `sv` reads the document's template and CSS halves and `ts` is its TypeScript half,
+/// held apart by `tsv_svelte::__private::with_ts_stores` for the whole compile: the
+/// analysis and the emission both read the parsed TypeScript through `ts` and push
+/// the rows they build beside it, so a host id and a pushed one name rows of the one
+/// store and the printed program reads them through one view.
+pub(crate) fn compile_server(
+    root: &Root,
+    sv: SvelteView<'_>,
+    ts: &mut AstStores,
     source: &str,
-    arena: &'arena bumpalo::Bump,
 ) -> Result<CompileOutput, CompileError> {
     // Analysis first (setup block minus the rewrite loop and `EmitEnv`). See
     // `analyze`: `bindings` comes back pre-patch and `component` unresolved.
@@ -672,7 +714,7 @@ pub(crate) fn compile_server<'arena>(
         module_comments,
         erased_windows,
         each_index_names,
-    } = analyze(root, source, arena)?;
+    } = analyze(root, sv, ts, source)?;
 
     // Every top-level binding name is a candidate store base: `$name` is a store
     // auto-subscription iff `name` is a binding (an unbound `$name` is the
@@ -683,9 +725,9 @@ pub(crate) fn compile_server<'arena>(
     let store_names: NameSet = bindings.names().map(str::to_string).collect();
 
     // 1. `import * as $ from 'svelte/internal/server';` — the first appendix
-    // lexeme. `analyze` mints nothing, so this heads the appendix exactly as it
+    // lexeme. `analyze` mints nothing into the appendix, so this heads it exactly as it
     // did before the setup block was factored out.
-    let mut b = Builder::new(arena, source);
+    let mut b = Builder::new(ts, source);
     let import = b.import_namespace("$", "svelte/internal/server");
 
     // 4. Script rewrite pass: rune rewrites, guard walks, mutation/shadow
@@ -917,6 +959,7 @@ pub(crate) fn compile_server<'arena>(
 
     let mut env = EmitEnv {
         b,
+        sv,
         source,
         bindings,
         derived_names,
@@ -1284,17 +1327,11 @@ pub(crate) fn unsupported(reason: Refusal) -> CompileError {
 /// registration, appended as the component body's last statement. The object
 /// lists the bindable props in source order (shorthand `{ value }` when the prop
 /// key equals the local name, `{ value: v }` when renamed).
-fn build_bind_props_stmt<'arena>(
-    b: &mut Builder<'arena>,
-    arena: &'arena bumpalo::Bump,
-    entries: &[BindableEntry],
-) -> Statement<'arena> {
-    let object = build_bindable_object(b, arena, entries);
-    let props_ident = Expression::from_identifier(b.ident("$$props"));
-    let mut args: BumpVec<'arena, Expression<'arena>> = BumpVec::new_in(arena);
-    args.push(props_ident);
-    args.push(object);
-    let call = b.member_call("$", "bind_props", args.into_bump_slice());
+fn build_bind_props_stmt(b: &mut Builder<'_>, entries: &[BindableEntry]) -> Statement {
+    let object = build_bindable_object(b, entries);
+    let object = b.push(object);
+    let props_ident = b.ident_expr("$$props");
+    let call = b.member_call("$", "bind_props", &[props_ident, object]);
     b.expression_statement(call)
 }
 
@@ -1302,41 +1339,34 @@ fn build_bind_props_stmt<'arena>(
 /// node is minted into the appendix (like [`build_sanitize_slots_decl`] and the
 /// spread object builders), so no host comment window can be swept; the printer
 /// reprints it canonically, so the minted spacing/commas here are cosmetic.
-fn build_bindable_object<'arena>(
-    b: &mut Builder<'arena>,
-    arena: &'arena bumpalo::Bump,
-    entries: &[BindableEntry],
-) -> Expression<'arena> {
+fn build_bindable_object(b: &mut Builder<'_>, entries: &[BindableEntry]) -> Expression {
     let obrace = b.mint("{ ").start;
-    let mut properties: BumpVec<'arena, ObjectProperty<'arena>> = BumpVec::new_in(arena);
+    let mut properties: Vec<ObjectProperty> = Vec::with_capacity(entries.len());
     for (i, entry) in entries.iter().enumerate() {
         if i > 0 {
             b.mint(", ");
         }
         let shorthand = entry.key == entry.local;
-        let key = b.ident(&entry.key);
-        let key_span = key.span;
+        let key = b.ident_expr(&entry.key);
+        let key_span = b.view().expr(key).span;
         // Object-shorthand `{ value }` when the key equals the local; otherwise
         // `{ value: v }` with a distinct value identifier.
         let value = if shorthand {
-            Expression::from_identifier(b.ident(&entry.local))
+            b.ident_expr(&entry.local)
         } else {
             b.mint(": ");
-            Expression::from_identifier(b.ident(&entry.local))
+            b.ident_expr(&entry.local)
         };
         properties.push(ObjectProperty::Property(init_property(
-            b.arena,
-            Expression::from_identifier(key),
-            value,
-            shorthand,
-            key_span,
+            key, value, shorthand, key_span,
         )));
     }
     let cbrace = b.mint(" }").end;
+    let properties = b.push_list(&properties);
     Expression {
         span: Span::new(obrace, cbrace),
         kind: ExpressionKind::ObjectExpression(ObjectExpression {
-            properties: properties.into_bump_slice(),
+            properties,
             spread_trailing_comma: false,
         }),
     }
@@ -1351,21 +1381,23 @@ fn build_bindable_object<'arena>(
 /// inside a later function body, which then prints twice. At the block start both
 /// that window and its own internal ones are empty, and the next statement's leading
 /// window is the authored one.
-fn build_props_id_decl<'arena>(b: &Builder<'arena>, name: &str, at: u32) -> Statement<'arena> {
+fn build_props_id_decl(b: &mut Builder<'_>, name: &str, at: u32) -> Statement {
     let span = Span::new(at, at);
-    let id = Expression::from_identifier(b.ident_at(name, span));
+    let id = b.ident_expr_at(name, span);
     let renderer_arg = b.ident_expr_at("$$renderer", span);
-    let init = b.member_call_at("$", "props_id", std::slice::from_ref(renderer_arg), span);
+    let init = b.member_call_at("$", "props_id", &[renderer_arg], span);
+    let init = b.push(init);
     declaration_stmt(b, VariableDeclarationKind::Const, id, init)
 }
 
 /// `const $$slots = $.sanitize_slots($$props);` — the oracle's `uses_slots`
 /// binding, prepended to the component function body, zero-width at `at` like
 /// [`build_props_id_decl`].
-fn build_sanitize_slots_decl<'arena>(b: &Builder<'arena>, at: u32) -> Statement<'arena> {
+fn build_sanitize_slots_decl(b: &mut Builder<'_>, at: u32) -> Statement {
     let span = Span::new(at, at);
-    let slots_id = Expression::from_identifier(b.ident_at("$$slots", span));
+    let slots_id = b.ident_expr_at("$$slots", span);
     let props_arg = b.ident_expr_at("$$props", span);
-    let init = b.member_call_at("$", "sanitize_slots", std::slice::from_ref(props_arg), span);
+    let init = b.member_call_at("$", "sanitize_slots", &[props_arg], span);
+    let init = b.push(init);
     declaration_stmt(b, VariableDeclarationKind::Const, slots_id, init)
 }

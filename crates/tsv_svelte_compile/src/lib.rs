@@ -7,10 +7,11 @@
 //! diff between two canonical forms reflects only a real code difference, never
 //! incidental whitespace.
 //!
-//! [`compile`] generates server (SSR) output by constructing a synthetic
-//! `tsv_ts` AST over the hybrid appendix buffer (`build`) and printing it
-//! through `tsv_ts::__private::format_canonical` — generated JS is canonical-form by
-//! construction, so the parity comparison verifies rather than transforms it.
+//! [`compile`] generates server (SSR) output by constructing a synthetic `tsv_ts`
+//! AST over the hybrid appendix buffer (`build`) — its rows pushed into the parsed
+//! component's own TypeScript stores, beside the rows they borrow — and printing
+//! it through `tsv_ts::__private::format_canonical`. Generated JS is canonical-form
+//! by construction, so the parity comparison verifies rather than transforms it.
 //! The server transform (`transform_server`) covers a deliberately small
 //! language subset today; unhandled shapes surface as
 //! [`CompileError::Unsupported`] rather than guessed output.
@@ -222,9 +223,13 @@ pub fn compile(source: &str, options: &CompileOptions) -> Result<CompileOutput, 
     if options.dev {
         return Err(CompileError::Unsupported(Refusal::DevMode));
     }
-    let arena = bumpalo::Bump::new();
-    let root = tsv_svelte::__private::parse(source, &arena)?;
-    let output = transform_server::compile_server(&root, source, &arena)?;
+    let tsv_svelte::ast::ParsedRoot { root, mut stores } = tsv_svelte::__private::parse(source)?;
+    // The TypeScript half is held apart from the template view for the whole compile:
+    // the analysis (type erasure) and the emission both push rows into it while the
+    // template is read.
+    let output = tsv_svelte::__private::with_ts_stores(&mut stores, |sv, ts| {
+        transform_server::compile_server(&root, sv, ts, source)
+    })?;
     validate_output_js(&output.js)?;
     Ok(output)
 }
@@ -234,8 +239,7 @@ pub fn compile(source: &str, options: &CompileOptions) -> Result<CompileOutput, 
 /// Split from [`compile`] so the corrupt-output path is unit-testable without
 /// weakening the public API (no test-only hooks on `compile` itself).
 fn validate_output_js(js: &str) -> Result<(), CompileError> {
-    let arena = bumpalo::Bump::new();
-    match tsv_ts::__private::parse_with_goal(js, Goal::Module, &arena) {
+    match tsv_ts::__private::parse_with_goal(js, Goal::Module) {
         Ok(_) => Ok(()),
         Err(err) => Err(CompileError::CorruptOutput(err)),
     }
@@ -277,11 +281,9 @@ pub fn canonicalize_js(source: &str) -> Result<String, CanonicalizeError> {
     // so it owes the same LF-only output as every other one. A parse error indexes the
     // folded text, so it is mapped back onto the caller's source before it leaves.
     let folded = tsv_lang::printing::normalize_carriage_returns(source);
-    let arena = bumpalo::Bump::new();
-    let program = tsv_ts::__private::parse_folded(&folded, Some(Goal::Module), &arena)?;
-    let output = tsv_ts::__private::format_canonical(&program, folded.text());
-    let check_arena = bumpalo::Bump::new();
-    if let Err(err) = tsv_ts::__private::parse_with_goal(&output, Goal::Module, &check_arena) {
+    let parsed = tsv_ts::__private::parse_folded(&folded, Some(Goal::Module))?;
+    let output = tsv_ts::__private::format_canonical(&parsed, folded.text());
+    if let Err(err) = tsv_ts::__private::parse_with_goal(&output, Goal::Module) {
         return Err(CanonicalizeError::CorruptOutput(err));
     }
     Ok(output)

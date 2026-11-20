@@ -101,18 +101,18 @@ fn validate_directive_combinations(
 
 /// Whether `attr` is the element's `class` attribute (case-insensitive, matching
 /// the oracle's lowercasing of attribute names on non-foreign elements).
-fn attribute_is_class(env: &EmitEnv<'_, '_>, attr: &Attribute<'_>) -> bool {
+fn attribute_is_class(env: &EmitEnv<'_>, attr: &Attribute<'_>) -> bool {
     attribute_name_eq(env, attr, "class")
 }
 
 /// Whether `attr` is the element's `style` attribute (see [`attribute_is_class`]).
-fn attribute_is_style(env: &EmitEnv<'_, '_>, attr: &Attribute<'_>) -> bool {
+fn attribute_is_style(env: &EmitEnv<'_>, attr: &Attribute<'_>) -> bool {
     attribute_name_eq(env, attr, "style")
 }
 
 /// Case-insensitive attribute-name test (the oracle lowercases attribute names on
 /// non-foreign elements).
-fn attribute_name_eq(env: &EmitEnv<'_, '_>, attr: &Attribute<'_>, name: &str) -> bool {
+fn attribute_name_eq(env: &EmitEnv<'_>, attr: &Attribute<'_>, name: &str) -> bool {
     attr.name(env.source).eq_ignore_ascii_case(name)
 }
 
@@ -165,7 +165,7 @@ impl<'arena> AttrHost<'arena> {
 /// single entry both the regular-element (`<name`-prefixed) and `<svelte:element>`
 /// (attributes-closure) paths route through, so the two never drift.
 fn emit_host_attributes<'arena>(
-    env: &mut EmitEnv<'arena, '_>,
+    env: &mut EmitEnv<'arena>,
     host: AttrHost<'arena>,
     name: &str,
     out: &mut BodyBuilder<'arena>,
@@ -185,7 +185,7 @@ fn emit_host_attributes<'arena>(
 
 /// Emit one element's open tag, children, and close tag into the template.
 pub(crate) fn emit_element<'arena>(
-    env: &mut EmitEnv<'arena, '_>,
+    env: &mut EmitEnv<'arena>,
     element: &'arena Element<'arena>,
     out: &mut BodyBuilder<'arena>,
     parent_ctx: &FragmentCtx<'_>,
@@ -306,7 +306,7 @@ pub(crate) fn emit_element<'arena>(
 /// `<{name}` prefix is already pushed by the caller; the void/children/close
 /// suffix follows it.
 fn emit_plain_attributes<'arena>(
-    env: &mut EmitEnv<'arena, '_>,
+    env: &mut EmitEnv<'arena>,
     host: AttrHost<'arena>,
     name: &str,
     out: &mut BodyBuilder<'arena>,
@@ -469,7 +469,7 @@ fn emit_plain_attributes<'arena>(
 /// Whether `element` is a custom element (Svelte's `is_custom_element_node`): a
 /// hyphenated tag name, or a plain `is` attribute (case-sensitive). A custom
 /// element sets `ELEMENT_PRESERVE_ATTRIBUTE_CASE` in the spread flags.
-fn is_custom_element_node(env: &EmitEnv<'_, '_>, element: &Element<'_>, name: &str) -> bool {
+fn is_custom_element_node(env: &EmitEnv<'_>, element: &Element<'_>, name: &str) -> bool {
     name.contains('-')
         || element.attributes.iter().any(|attr_node| {
             let AttributeNode::Attribute(attr) = attr_node else {
@@ -488,7 +488,7 @@ fn is_custom_element_node(env: &EmitEnv<'_, '_>, element: &Element<'_>, name: &s
 /// namespace the element sits in — the ancestor signal for a `<a>`/`<title>`
 /// element's svg-ness.
 fn spread_element_flags(
-    env: &EmitEnv<'_, '_>,
+    env: &EmitEnv<'_>,
     element: &Element<'_>,
     name: &str,
     inherited: Namespace,
@@ -517,7 +517,7 @@ fn spread_element_flags(
 /// only newline-scan region for the expansion decision) is appendix-only and
 /// collapses when it fits — the same idiom as `build_props_object`.
 fn build_element_spread_object<'arena>(
-    env: &mut EmitEnv<'arena, '_>,
+    env: &mut EmitEnv<'arena>,
     host: AttrHost<'arena>,
     name: &str,
     namespace: Namespace,
@@ -588,7 +588,7 @@ fn build_element_spread_object<'arena>(
 /// one is seen, every earlier absent one becomes an explicit `void 0` (so e.g. an
 /// `<input>`'s flags argument forces `void 0` for the elided css_hash/classes/styles).
 fn elide_call_args<'arena>(
-    env: &mut EmitEnv<'arena, '_>,
+    env: &mut EmitEnv<'arena>,
     slots: [Option<Expression<'arena>>; 5],
 ) -> &'arena [Expression<'arena>] {
     let arena = env.b.arena;
@@ -635,7 +635,7 @@ fn elide_call_args<'arena>(
 /// attribute). A `bind:`/`class:`/`style:` validity gate can also refuse (an invalid
 /// bind target, a bad `style:` modifier).
 fn emit_spread_attributes<'arena>(
-    env: &mut EmitEnv<'arena, '_>,
+    env: &mut EmitEnv<'arena>,
     host: AttrHost<'arena>,
     name: &str,
     out: &mut BodyBuilder<'arena>,
@@ -762,7 +762,7 @@ fn emit_spread_attributes<'arena>(
 /// hash class is synthesized into the attributes closure exactly like a regular
 /// element's (via the shared [`emit_host_attributes`], keyed on the census match).
 pub(crate) fn emit_svelte_element<'arena>(
-    env: &mut EmitEnv<'arena, '_>,
+    env: &mut EmitEnv<'arena>,
     se: &'arena SpecialElement<'arena>,
     tag: &'arena SpecialThis<'arena>,
     out: &mut BodyBuilder<'arena>,
@@ -872,7 +872,7 @@ pub(crate) fn emit_svelte_element<'arena>(
 /// there is no parameter (unlike a component's `children: ($$renderer) => …` prop,
 /// which is passed a fresh renderer).
 fn paramless_renderer_arrow<'arena>(
-    env: &mut EmitEnv<'arena, '_>,
+    env: &mut EmitEnv<'arena>,
     body: &'arena [Statement<'arena>],
 ) -> Expression<'arena> {
     let block_span = env.b.here();

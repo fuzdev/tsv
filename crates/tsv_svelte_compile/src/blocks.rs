@@ -83,7 +83,7 @@ pub(crate) fn assign_each_index_names(fragment: &Fragment<'_>) -> HashMap<(u32, 
 /// Refuse if a generated block name (`each_array`, `$$index`, `$$length`) would
 /// collide with a user binding — the oracle's component-scope name generation
 /// would then pick a different suffix, which this port doesn't replicate.
-fn check_name_free(env: &EmitEnv<'_, '_>, name: &str) -> Result<(), CompileError> {
+fn check_name_free(env: &EmitEnv<'_>, name: &str) -> Result<(), CompileError> {
     if env.bindings.contains(name) || env.snippets.names.contains(name) {
         return Err(unsupported(Refusal::GeneratedNameCollision {
             name: name.to_string(),
@@ -144,7 +144,7 @@ fn svelte_hash(s: &str) -> String {
 /// Attributes on the head element are refused (the oracle carries none in this
 /// subset).
 pub(crate) fn emit_svelte_head<'arena>(
-    env: &mut EmitEnv<'arena, '_>,
+    env: &mut EmitEnv<'arena>,
     head: &'arena SpecialElement<'arena>,
     out: &mut BodyBuilder<'arena>,
 ) -> Result<(), CompileError> {
@@ -225,7 +225,7 @@ const BOUNDARY_VALID_ATTRIBUTES: [&str; 3] = ["onerror", "failed", "pending"];
 /// ([`Refusal::BoundaryAttributeSnippet`]); `onerror` is dropped (SSR runs no
 /// error handler) but still guard-walked, like an event handler.
 pub(crate) fn emit_boundary<'arena>(
-    env: &mut EmitEnv<'arena, '_>,
+    env: &mut EmitEnv<'arena>,
     boundary: &'arena SpecialElement<'arena>,
     out: &mut BodyBuilder<'arena>,
     ctx: &FragmentCtx<'_>,
@@ -347,7 +347,7 @@ pub(crate) fn emit_boundary<'arena>(
 /// The `{ failed }` shorthand object the `$$renderer.boundary` call takes as its
 /// first argument — the value references the `function failed(…)` declaration
 /// emitted just above it.
-fn boundary_props<'arena>(env: &mut EmitEnv<'arena, '_>, name: &str) -> Expression<'arena> {
+fn boundary_props<'arena>(env: &mut EmitEnv<'arena>, name: &str) -> Expression<'arena> {
     let obrace = env.b.mint("{").start;
     let key = env.b.ident(name);
     let key_span = key.span;
@@ -382,7 +382,7 @@ fn boundary_props<'arena>(env: &mut EmitEnv<'arena, '_>, name: &str) -> Expressi
 /// handler) but still guard-walked, exactly like an event-handler attribute — a
 /// stray rune or top-level `await` inside it must still refuse.
 fn guard_boundary_attributes<'arena>(
-    env: &EmitEnv<'arena, '_>,
+    env: &EmitEnv<'arena>,
     boundary: &'arena SpecialElement<'arena>,
 ) -> Result<(), CompileError> {
     for attr_node in boundary.attributes {
@@ -520,7 +520,7 @@ fn block_stmt<'arena>(
 /// Emit `{@const name = init}` into the current fragment: a hoisted `const`
 /// declaration plus an evaluator overlay entry so later reads fold.
 pub(crate) fn emit_const_tag<'arena>(
-    env: &mut EmitEnv<'arena, '_>,
+    env: &mut EmitEnv<'arena>,
     tag: &'arena ConstTag<'arena>,
     out: &mut BodyBuilder<'arena>,
 ) -> Result<(), CompileError> {
@@ -582,7 +582,7 @@ pub(crate) fn emit_const_tag<'arena>(
 /// merge-forward `<!--]-->` closer. A missing `{:else}` synthesizes the
 /// anchor-only terminal branch.
 pub(crate) fn emit_if_block<'arena>(
-    env: &mut EmitEnv<'arena, '_>,
+    env: &mut EmitEnv<'arena>,
     if_block: &'arena IfBlock<'arena>,
     out: &mut BodyBuilder<'arena>,
     ctx: &FragmentCtx<'_>,
@@ -714,7 +714,7 @@ fn animate_host_element<'arena>(
 /// pushes. Nested `{#each}` refuses (the nested emission path is unvalidated —
 /// see [`Refusal::NestedEach`]; the name orders themselves are modelled).
 pub(crate) fn emit_each_block<'arena>(
-    env: &mut EmitEnv<'arena, '_>,
+    env: &mut EmitEnv<'arena>,
     each: &'arena EachBlock<'arena>,
     out: &mut BodyBuilder<'arena>,
     ctx: &FragmentCtx<'_>,
@@ -908,7 +908,7 @@ pub(crate) fn emit_each_block<'arena>(
 /// the **erased** binding pattern.
 #[expect(clippy::too_many_arguments)] // one cohesive each-body emit; splitting would just re-thread the same state
 fn emit_each_body<'arena>(
-    env: &mut EmitEnv<'arena, '_>,
+    env: &mut EmitEnv<'arena>,
     each: &'arena EachBlock<'arena>,
     context: Option<&'arena Expression<'arena>>,
     array_name: &str,
@@ -938,7 +938,7 @@ fn emit_each_body<'arena>(
 /// followed by a merge-forward `<!--]-->` closer. The `{:catch}` branch is
 /// dropped (the oracle omits it from SSR); empty callbacks are `() => {}`.
 pub(crate) fn emit_await_block<'arena>(
-    env: &mut EmitEnv<'arena, '_>,
+    env: &mut EmitEnv<'arena>,
     await_block: &'arena AwaitBlock<'arena>,
     out: &mut BodyBuilder<'arena>,
     ctx: &FragmentCtx<'_>,
@@ -1042,7 +1042,7 @@ pub(crate) fn emit_await_block<'arena>(
 /// and a closing `<!---->`. The key expression is SSR-ignored (guard-walked,
 /// then dropped).
 pub(crate) fn emit_key_block<'arena>(
-    env: &mut EmitEnv<'arena, '_>,
+    env: &mut EmitEnv<'arena>,
     key: &'arena KeyBlock<'arena>,
     out: &mut BodyBuilder<'arena>,
     ctx: &FragmentCtx<'_>,

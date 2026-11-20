@@ -37,7 +37,7 @@ use crate::{CompileError, Refusal};
 /// `{#each}` collection, `{#await}` promise): a derived read (bare or nested)
 /// becomes `d()`, everything else is guarded and passed through borrowed.
 pub(crate) fn wrap_single<'arena>(
-    env: &mut EmitEnv<'arena, '_>,
+    env: &mut EmitEnv<'arena>,
     expr: &'arena Expression<'arena>,
 ) -> Result<Expression<'arena>, CompileError> {
     let wrapped = wrap_value_expr(env, expr)?;
@@ -64,7 +64,7 @@ pub(crate) fn wrap_single<'arena>(
 /// stays on the guarded fast path, byte-identical to before (and does no extra
 /// allocation).
 pub(crate) fn wrap_value_expr<'arena>(
-    env: &mut EmitEnv<'arena, '_>,
+    env: &mut EmitEnv<'arena>,
     expr: &'arena Expression<'arena>,
 ) -> Result<&'arena [Expression<'arena>], CompileError> {
     Ok(std::slice::from_ref(rewrite_template_value(env, expr)?))
@@ -123,7 +123,7 @@ fn bare_store_read(source: &str, store_names: &NameSet, expr: &Expression<'_>) -
 /// returning the borrowed input unchanged when nothing needs rewriting (after
 /// guarding it).
 fn rewrite_template_value<'arena>(
-    env: &mut EmitEnv<'arena, '_>,
+    env: &mut EmitEnv<'arena>,
     expr: &'arena Expression<'arena>,
 ) -> Result<&'arena Expression<'arena>, CompileError> {
     // A bare read of a derived binding becomes `d()`.
@@ -176,7 +176,7 @@ fn rewrite_template_value<'arena>(
 /// mutation refuses via [`Refusal::MutationInTemplateExpr`] (a mutation would
 /// postdate the binding analysis the fold already consulted).
 fn guard_template_value<'arena>(
-    env: &EmitEnv<'arena, '_>,
+    env: &EmitEnv<'arena>,
     expr: &'arena Expression<'arena>,
 ) -> Result<(), CompileError> {
     let mut updated = NameSet::default();
@@ -260,7 +260,7 @@ fn contains_rewrite_target(
 /// through to the guard, which refuses the target it carries — a safe
 /// over-refusal.
 fn rebuild_value<'arena>(
-    env: &mut EmitEnv<'arena, '_>,
+    env: &mut EmitEnv<'arena>,
     expr: &'arena Expression<'arena>,
 ) -> Result<&'arena Expression<'arena>, CompileError> {
     let rebuilt = match &expr.kind {
@@ -386,7 +386,7 @@ fn rebuild_value<'arena>(
 /// Rewrite each expression of a slice (call arguments, sequence, template
 /// expressions), returning a fresh arena slice of references.
 fn rewrite_value_slice<'arena>(
-    env: &mut EmitEnv<'arena, '_>,
+    env: &mut EmitEnv<'arena>,
     exprs: &'arena [&'arena Expression<'arena>],
 ) -> Result<&'arena [&'arena Expression<'arena>], CompileError> {
     let arena = env.b.arena;
@@ -401,7 +401,7 @@ fn rewrite_value_slice<'arena>(
 /// Rewrite each present element of an array-element slice (`[a, , b]` holes stay
 /// `None`), returning a fresh arena slice.
 fn rewrite_opt_slice<'arena>(
-    env: &mut EmitEnv<'arena, '_>,
+    env: &mut EmitEnv<'arena>,
     elements: &'arena [Option<&'arena Expression<'arena>>],
 ) -> Result<&'arena [Option<&'arena Expression<'arena>>], CompileError> {
     let arena = env.b.arena;

@@ -61,7 +61,7 @@ enum ClassBase<'arena> {
 /// empty `''`). Mirrors the oracle's `build_attribute_value` + `needs_clsx`
 /// handling for the `class` attribute.
 fn build_class_base<'arena>(
-    env: &mut EmitEnv<'arena, '_>,
+    env: &mut EmitEnv<'arena>,
     class_attr: Option<&'arena Attribute<'arena>>,
 ) -> Result<ClassBase<'arena>, CompileError> {
     let Some(attr) = class_attr else {
@@ -111,7 +111,7 @@ fn build_class_base<'arena>(
 /// identifier-safe name, matching the oracle's own canonicalized output. Each
 /// value is the directive expression, erased + guarded + derived-rewritten.
 fn build_class_directives_object<'arena>(
-    env: &mut EmitEnv<'arena, '_>,
+    env: &mut EmitEnv<'arena>,
     class_directives: &[&'arena ClassDirective<'arena>],
 ) -> Result<Expression<'arena>, CompileError> {
     let arena = env.b.arena;
@@ -157,7 +157,7 @@ fn build_class_directives_object<'arena>(
 /// (a `class:active={active as T}` is not shorthand — the raw node is a
 /// `TSAsExpression` — and its value is the erased/guarded expression).
 pub(crate) fn build_spread_class_object<'arena>(
-    env: &mut EmitEnv<'arena, '_>,
+    env: &mut EmitEnv<'arena>,
     class_directives: &[&'arena ClassDirective<'arena>],
 ) -> Result<Expression<'arena>, CompileError> {
     let arena = env.b.arena;
@@ -218,7 +218,7 @@ pub(crate) fn build_spread_class_object<'arena>(
 /// [`build_style_property`] for the per-property build (key lowercasing / quoting,
 /// shorthand).
 pub(crate) fn build_spread_style_object<'arena>(
-    env: &mut EmitEnv<'arena, '_>,
+    env: &mut EmitEnv<'arena>,
     style_directives: &[&'arena StyleDirective<'arena>],
 ) -> Result<Expression<'arena>, CompileError> {
     let arena = env.b.arena;
@@ -254,7 +254,7 @@ pub(crate) fn build_spread_style_object<'arena>(
 /// 2nd argument is `void 0` (the directives object is always the 3rd argument, so
 /// the middle argument is never elided).
 pub(crate) fn emit_class_directives<'arena>(
-    env: &mut EmitEnv<'arena, '_>,
+    env: &mut EmitEnv<'arena>,
     class_attr: Option<&'arena Attribute<'arena>>,
     class_directives: &[&'arena ClassDirective<'arena>],
     out: &mut BodyBuilder<'arena>,
@@ -321,7 +321,7 @@ fn validate_style_modifiers(directive: &StyleDirective<'_>) -> Result<(), Compil
 /// MINUS any CSS scoping (style is never scoped): a dynamic `style={expr}` is the
 /// bare expression, not `$.clsx(expr)`.
 fn build_style_base<'arena>(
-    env: &mut EmitEnv<'arena, '_>,
+    env: &mut EmitEnv<'arena>,
     style_attr: Option<&'arena Attribute<'arena>>,
 ) -> Result<Expression<'arena>, CompileError> {
     let Some(attr) = style_attr else {
@@ -366,7 +366,7 @@ fn build_style_base<'arena>(
 /// shorthand `style:color` prints as object-shorthand `{ color }` when the
 /// (lowercased) key coincides with the raw same-name identifier value.
 fn build_style_property<'arena>(
-    env: &mut EmitEnv<'arena, '_>,
+    env: &mut EmitEnv<'arena>,
     directive: &'arena StyleDirective<'arena>,
 ) -> Result<Property<'arena>, CompileError> {
     let raw_name = directive.name_span.extract(env.source).to_string();
@@ -429,7 +429,7 @@ fn build_style_property<'arena>(
 /// array `[ { normal… }, { important… } ]` (the normal object is `{}` when all are
 /// important). Source order is preserved within each group.
 fn build_style_directives_arg<'arena>(
-    env: &mut EmitEnv<'arena, '_>,
+    env: &mut EmitEnv<'arena>,
     style_directives: &[&'arena StyleDirective<'arena>],
 ) -> Result<Expression<'arena>, CompileError> {
     let arena = env.b.arena;
@@ -494,7 +494,7 @@ fn build_style_directives_arg<'arena>(
 /// `''`). Unlike `$.attr_class`, there is no css-hash argument (style is never
 /// scoped) and the directives argument may be an important-partitioned array.
 pub(crate) fn emit_style_directives<'arena>(
-    env: &mut EmitEnv<'arena, '_>,
+    env: &mut EmitEnv<'arena>,
     style_attr: Option<&'arena Attribute<'arena>>,
     style_directives: &[&'arena StyleDirective<'arena>],
     out: &mut BodyBuilder<'arena>,

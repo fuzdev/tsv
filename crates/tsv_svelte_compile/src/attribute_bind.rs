@@ -99,7 +99,7 @@ enum InputType {
 
 /// Classify the `<input>`'s `type` attribute (case-sensitive `type`, mirroring the
 /// oracle's `attr.name === 'type'` — a `TYPE` would not be found).
-fn classify_input_type(env: &EmitEnv<'_, '_>, element: &Element<'_>) -> InputType {
+fn classify_input_type(env: &EmitEnv<'_>, element: &Element<'_>) -> InputType {
     for attr_node in element.attributes {
         let AttributeNode::Attribute(attr) = attr_node else {
             continue;
@@ -180,7 +180,7 @@ fn is_get_set_pair(expr: &Expression<'_>) -> bool {
 /// and applies the rule from its scoped `template_consts` set. So a bind to a
 /// template-scoped const refuses THERE, not here. Keep the two straight when
 /// changing either — a shape this seam accepts is not thereby accepted by tsv.
-fn reassignable_bind_target_root(env: &EmitEnv<'_, '_>, expr: &Expression<'_>) -> Option<String> {
+fn reassignable_bind_target_root(env: &EmitEnv<'_>, expr: &Expression<'_>) -> Option<String> {
     let name = bind_target_root(expr, env.source)?;
     // The rejection applies to a BARE identifier target only. The oracle's
     // `validate_no_const_assignment` recurses through array/object PATTERNS and
@@ -198,7 +198,7 @@ fn reassignable_bind_target_root(env: &EmitEnv<'_, '_>, expr: &Expression<'_>) -
 }
 
 fn emitted_bind_target<'arena>(
-    env: &mut EmitEnv<'arena, '_>,
+    env: &mut EmitEnv<'arena>,
     directive: &'arena BindDirective<'arena>,
     bind_name: &str,
 ) -> Result<Expression<'arena>, CompileError> {
@@ -242,7 +242,7 @@ fn emitted_bind_target<'arena>(
 ///
 /// A failure refuses with the collapsing `Refusal::BindDirective { name }` bucket.
 pub(crate) fn validate_inert_bind_target<'arena>(
-    env: &mut EmitEnv<'arena, '_>,
+    env: &mut EmitEnv<'arena>,
     directive: &'arena BindDirective<'arena>,
 ) -> Result<(), CompileError> {
     let bind_name = directive.name_span.extract(env.source).to_string();
@@ -275,7 +275,7 @@ pub(crate) fn validate_inert_bind_target<'arena>(
 /// Returns `Ok(())` for a valid `bind:this` — the caller emits nothing (inline) or
 /// contributes no object property (spread).
 pub(crate) fn validate_dynamic_bind<'arena>(
-    env: &mut EmitEnv<'arena, '_>,
+    env: &mut EmitEnv<'arena>,
     directive: &'arena BindDirective<'arena>,
 ) -> Result<(), CompileError> {
     let bind_name = directive.name_span.extract(env.source).to_string();
@@ -291,7 +291,7 @@ pub(crate) fn validate_dynamic_bind<'arena>(
 
 /// Build and push `$.attr(name, value[, true])` for a synthesized bind attribute.
 fn push_bind_attr<'arena>(
-    env: &mut EmitEnv<'arena, '_>,
+    env: &mut EmitEnv<'arena>,
     name: &str,
     value: Expression<'arena>,
     boolean: bool,
@@ -311,7 +311,7 @@ fn push_bind_attr<'arena>(
 /// The companion `value` attribute (case-sensitive `value`, the oracle's
 /// `attr.name === 'value'`) a `bind:group` reads for its synthesized `checked`.
 fn find_value_attribute<'arena>(
-    env: &EmitEnv<'_, '_>,
+    env: &EmitEnv<'_>,
     element: &'arena Element<'arena>,
 ) -> Option<&'arena Attribute<'arena>> {
     element.attributes.iter().find_map(|attr_node| {
@@ -328,7 +328,7 @@ fn find_value_attribute<'arena>(
 /// `{expr}` → the erased/wrapped expression; a bare `value` → `true`; a mixed
 /// value → refuse this group for now.
 fn build_companion_value<'arena>(
-    env: &mut EmitEnv<'arena, '_>,
+    env: &mut EmitEnv<'arena>,
     value_attr: &'arena Attribute<'arena>,
 ) -> Result<Expression<'arena>, CompileError> {
     let Some(values) = value_attr.value else {
@@ -399,7 +399,7 @@ enum BindEmission<'arena> {
 /// content-editable trio, `open`, `focused`, an invalid target/type, or a bind
 /// expression that isn't a `$state`-rooted lvalue.
 fn resolve_bind_directive<'arena>(
-    env: &mut EmitEnv<'arena, '_>,
+    env: &mut EmitEnv<'arena>,
     directive: &'arena BindDirective<'arena>,
     element: &'arena Element<'arena>,
     element_name: &str,
@@ -504,7 +504,7 @@ fn resolve_bind_directive<'arena>(
 /// drops it, but the inline path declines rather than reproduce the drop; the spread
 /// path skips it instead).
 pub(crate) fn emit_bind_directive<'arena>(
-    env: &mut EmitEnv<'arena, '_>,
+    env: &mut EmitEnv<'arena>,
     directive: &'arena BindDirective<'arena>,
     element: &'arena Element<'arena>,
     element_name: &str,
@@ -533,7 +533,7 @@ pub(crate) fn emit_bind_directive<'arena>(
 /// - `OmitInSsr` → refuse, exactly as the inline path does (a safe over-refusal;
 ///   well-formed `omit_in_ssr`+spread parity is deferred to a future slice).
 pub(crate) fn build_bind_object_property<'arena>(
-    env: &mut EmitEnv<'arena, '_>,
+    env: &mut EmitEnv<'arena>,
     directive: &'arena BindDirective<'arena>,
     element: &'arena Element<'arena>,
     element_name: &str,

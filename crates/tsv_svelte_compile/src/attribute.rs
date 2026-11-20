@@ -104,7 +104,7 @@ const DOM_BOOLEAN_ATTRIBUTES: &[&str] = &[
 /// on matched classes); dynamic and mixed values emit the oracle's runtime
 /// calls (`$.attr` / `$.attr_class` / `$.attr_style`).
 pub(crate) fn emit_attribute<'arena>(
-    env: &mut EmitEnv<'arena, '_>,
+    env: &mut EmitEnv<'arena>,
     attr: &'arena Attribute<'arena>,
     element_name: &str,
     out: &mut BodyBuilder<'arena>,
@@ -278,7 +278,7 @@ pub(crate) fn collapse_attr_whitespace(decoded: &str) -> String {
 /// `title="{expr}"` — `quoted` carries the distinction, which only the class
 /// `$.clsx` rule reads).
 fn emit_dynamic_attribute<'arena>(
-    env: &mut EmitEnv<'arena, '_>,
+    env: &mut EmitEnv<'arena>,
     name: &str,
     expr: &'arena Expression<'arena>,
     quoted: bool,
@@ -355,7 +355,7 @@ enum MixedAttrValue<'arena> {
 /// template path). Returns [`MixedAttrValue::Folded`] when every part folds — each
 /// caller decides how to escape/emit it — else the assembled template literal.
 fn build_mixed_attr_value<'arena>(
-    env: &mut EmitEnv<'arena, '_>,
+    env: &mut EmitEnv<'arena>,
     trim_whitespace: bool,
     values: &'arena [AttributeValue<'arena>],
 ) -> Result<MixedAttrValue<'arena>, CompileError> {
@@ -436,7 +436,7 @@ fn build_mixed_attr_value<'arena>(
 /// attribute emits as static text or as a `$.stringify` template is exactly what a
 /// drifting second copy of the loop would change.
 pub(crate) fn build_mixed_value_expr<'arena>(
-    env: &mut EmitEnv<'arena, '_>,
+    env: &mut EmitEnv<'arena>,
     trim_whitespace: bool,
     values: &'arena [AttributeValue<'arena>],
 ) -> Result<Expression<'arena>, CompileError> {
@@ -452,7 +452,7 @@ pub(crate) fn build_mixed_value_expr<'arena>(
 /// template literal with `$.stringify(expr)` interpolations (omitted when the
 /// oracle's evaluator proves a defined string), folded where known.
 fn emit_mixed_attribute<'arena>(
-    env: &mut EmitEnv<'arena, '_>,
+    env: &mut EmitEnv<'arena>,
     name: &str,
     values: &'arena [AttributeValue<'arena>],
     out: &mut BodyBuilder<'arena>,
@@ -520,7 +520,7 @@ fn emit_mixed_attribute<'arena>(
 ///   concatenation, **not** HTML-escaped — the runtime escapes the object value)
 ///   or a `$.stringify` template literal.
 fn build_attribute_value_expr<'arena>(
-    env: &mut EmitEnv<'arena, '_>,
+    env: &mut EmitEnv<'arena>,
     name: &str,
     value: Option<&'arena [AttributeValue<'arena>]>,
 ) -> Result<Expression<'arena>, CompileError> {
@@ -571,7 +571,7 @@ fn build_attribute_value_expr<'arena>(
 /// is an identifier and the value is the same-named identifier (`{ hidden }`, the
 /// oracle's `b.prop` collapse).
 pub(crate) fn build_spread_object_property<'arena>(
-    env: &mut EmitEnv<'arena, '_>,
+    env: &mut EmitEnv<'arena>,
     attr: &'arena Attribute<'arena>,
     element_name: &str,
     inherited: Namespace,

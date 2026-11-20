@@ -63,7 +63,7 @@ use crate::{CompileError, Refusal};
 ///   `animate:`/`{@attach}`): oracle-accepted, so guard-and-drop each expression
 ///   (SSR runs no client lifecycle, but a stray rune / top-level `await` refuses).
 pub(crate) fn guard_inert_special_element<'arena>(
-    env: &mut EmitEnv<'arena, '_>,
+    env: &mut EmitEnv<'arena>,
     se: &'arena SpecialElement<'arena>,
     kind: &SpecialElementKind<'arena>,
     tag: &'static str,
@@ -219,7 +219,7 @@ fn inert_bind_is_valid(kind: &SpecialElementKind<'_>, name: &str) -> bool {
 /// Enforcing it in a dropped region would refuse `{#key d}` and
 /// `{:catch e}<p>{d}</p>`, which the oracle compiles.
 pub(crate) fn guard_dropped<'arena>(
-    env: &EmitEnv<'arena, '_>,
+    env: &EmitEnv<'arena>,
     expr: &'arena Expression<'arena>,
 ) -> Result<(), CompileError> {
     let mut updated = NameSet::default();
@@ -256,7 +256,7 @@ pub(crate) fn guard_dropped<'arena>(
 ///   keeps the rule ON as a **deferred safe over-refusal** (patterns are not
 ///   rewritten this slice; refusing is never a MISMATCH).
 pub(crate) fn guard_pattern<'arena>(
-    env: &EmitEnv<'arena, '_>,
+    env: &EmitEnv<'arena>,
     pattern: &'arena Expression<'arena>,
 ) -> Result<(), CompileError> {
     let mut updated = NameSet::default();
@@ -283,7 +283,7 @@ pub(crate) fn guard_pattern<'arena>(
 /// no guard at all. The test `dropped_fragment_refuses_presence_read_nodes` pins
 /// it, together with the set that must keep compiling beside it.
 pub(crate) fn guard_dropped_fragment<'arena>(
-    env: &EmitEnv<'arena, '_>,
+    env: &EmitEnv<'arena>,
     fragment: &'arena Fragment<'arena>,
 ) -> Result<(), CompileError> {
     guard_dropped_presence(fragment)?;

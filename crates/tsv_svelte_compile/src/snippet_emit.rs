@@ -29,7 +29,7 @@ use crate::{CompileError, Refusal};
 /// template first). The snippet body reuses the fragment machinery, with the
 /// parameters masked to UNKNOWN so their reads never fold.
 pub(crate) fn emit_snippet<'arena>(
-    env: &mut EmitEnv<'arena, '_>,
+    env: &mut EmitEnv<'arena>,
     snippet: &'arena SnippetBlock<'arena>,
     out: &mut BodyBuilder<'arena>,
 ) -> Result<(), CompileError> {
@@ -52,7 +52,7 @@ pub(crate) fn emit_snippet<'arena>(
 /// template-hoist path ([`emit_snippet`]) and the component snippet-prop path
 /// (where the function lives in the component's wrapping block).
 pub(crate) fn build_snippet_function<'arena>(
-    env: &mut EmitEnv<'arena, '_>,
+    env: &mut EmitEnv<'arena>,
     snippet: &'arena SnippetBlock<'arena>,
 ) -> Result<(Statement<'arena>, String), CompileError> {
     let arena = env.b.arena;
@@ -172,7 +172,7 @@ pub(crate) fn render_callee_name<'s>(expr: &Expression<'_>, source: &'s str) -> 
 /// `binding?.kind !== 'normal'`): a local snippet is non-dynamic, a snippet prop
 /// is dynamic. A non-standalone (dynamic) callee's fragment keeps the trailing
 /// `<!---->` anchor even when the render is the sole child.
-pub(crate) fn render_callee_dynamic(env: &EmitEnv<'_, '_>, name: &str) -> bool {
+pub(crate) fn render_callee_dynamic(env: &EmitEnv<'_>, name: &str) -> bool {
     !env.snippets.names.contains(name)
 }
 
@@ -182,7 +182,7 @@ pub(crate) fn render_callee_dynamic(env: &EmitEnv<'_, '_>, name: &str) -> bool {
 /// local snippet or a snippet prop; anything else refuses. Arguments ride the
 /// same value machinery as block tests (a bare derived read becomes `d()`).
 pub(crate) fn emit_render_tag<'arena>(
-    env: &mut EmitEnv<'arena, '_>,
+    env: &mut EmitEnv<'arena>,
     tag: &'arena RenderTag<'arena>,
     out: &mut BodyBuilder<'arena>,
     is_standalone: bool,

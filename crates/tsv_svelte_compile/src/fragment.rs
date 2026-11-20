@@ -177,7 +177,7 @@ pub(crate) struct FragmentCtx<'p> {
 /// Walk a fragment: normalize whitespace per the oracle's `clean_nodes` rules,
 /// then append static HTML / interpolations to the template.
 pub(crate) fn emit_fragment<'arena>(
-    env: &mut EmitEnv<'arena, '_>,
+    env: &mut EmitEnv<'arena>,
     fragment: &Fragment<'arena>,
     out: &mut BodyBuilder<'arena>,
     ctx: FragmentCtx<'_>,
@@ -433,7 +433,7 @@ pub(crate) fn emit_fragment<'arena>(
 /// for `{#each}`/`{#await}`), and return the finished statement slice. The
 /// overlay gives any `{@const}` in the body a scope to enter.
 pub(crate) fn emit_child_body<'arena>(
-    env: &mut EmitEnv<'arena, '_>,
+    env: &mut EmitEnv<'arena>,
     fragment: &Fragment<'arena>,
     pre: &[Statement<'arena>],
     mark_text_first: bool,
@@ -521,7 +521,7 @@ fn collect_hoisted_snippets<'arena>(
 /// Emit `{expr}` (escaped) or `{@html expr}` (raw) — the oracle's text-sequence
 /// interpolation with its fold gate.
 fn emit_expression_tag<'arena>(
-    env: &mut EmitEnv<'arena, '_>,
+    env: &mut EmitEnv<'arena>,
     expr: &'arena Expression<'arena>,
     out: &mut BodyBuilder<'arena>,
     escape: bool,
@@ -571,7 +571,7 @@ fn emit_expression_tag<'arena>(
 /// emits exactly like a regular element's text content: a statically-known value
 /// folds, otherwise it emits `$.escape(expr)`.
 fn emit_title_element<'arena>(
-    env: &mut EmitEnv<'arena, '_>,
+    env: &mut EmitEnv<'arena>,
     title: &'arena SpecialElement<'arena>,
     out: &mut BodyBuilder<'arena>,
 ) -> Result<(), CompileError> {

@@ -102,7 +102,7 @@ pub(crate) fn element_is_mathml(name: &str) -> bool {
 /// once per level of block nesting, and the membership `match`es behind the two predicates would
 /// spill into that frame.
 #[inline(never)]
-fn element_flags(env: &EmitEnv<'_, '_>, el: &Element<'_>, inherited: Namespace) -> (bool, bool) {
+fn element_flags(env: &EmitEnv<'_>, el: &Element<'_>, inherited: Namespace) -> (bool, bool) {
     let name = el.name(env.source);
     (element_is_svg(name, inherited), element_is_mathml(name))
 }
@@ -136,7 +136,7 @@ pub(crate) fn determine_namespace_for_children(name: &str, inherited: Namespace)
 /// a root/block/component (an element's children use
 /// [`determine_namespace_for_children`] directly).
 pub(crate) fn infer_namespace(
-    env: &EmitEnv<'_, '_>,
+    env: &EmitEnv<'_>,
     inherited: Namespace,
     parent: FragmentParent,
     nodes: &[FragmentNode<'_>],
@@ -184,7 +184,7 @@ enum NsAccum {
 /// walk because every element found here has that fragment's parent as its nearest
 /// RegularElement ancestor (blocks don't count).
 fn check_nodes_for_namespace(
-    env: &EmitEnv<'_, '_>,
+    env: &EmitEnv<'_>,
     nodes: &[FragmentNode<'_>],
     acc: &mut NsAccum,
     inherited: Namespace,
@@ -199,7 +199,7 @@ fn check_nodes_for_namespace(
 
 /// One node of the deep walk. See [`check_nodes_for_namespace`]. `true` = stop.
 fn check_node(
-    env: &EmitEnv<'_, '_>,
+    env: &EmitEnv<'_>,
     node: &FragmentNode<'_>,
     acc: &mut NsAccum,
     inherited: Namespace,
@@ -257,7 +257,7 @@ fn check_node(
 /// The `{#if}` else-if chain is `alternate` fragments nesting further `IfBlock`s,
 /// so descending consequent + alternate recursively covers every branch.
 fn check_if_block(
-    env: &EmitEnv<'_, '_>,
+    env: &EmitEnv<'_>,
     b: &IfBlock<'_>,
     acc: &mut NsAccum,
     inherited: Namespace,
@@ -276,7 +276,7 @@ fn check_if_block(
 /// Descend every `{#await}` phase fragment (pending/then/catch) — the oracle's
 /// zimmerframe walk visits all three, even though SSR later drops `{:catch}`.
 fn check_await_block(
-    env: &EmitEnv<'_, '_>,
+    env: &EmitEnv<'_>,
     b: &AwaitBlock<'_>,
     acc: &mut NsAccum,
     inherited: Namespace,
@@ -294,7 +294,7 @@ fn check_await_block(
 /// svg → svg, all mathml → mathml, any plain-html or a mix → html; no elements →
 /// the inherited namespace.
 fn shallow_child_namespace(
-    env: &EmitEnv<'_, '_>,
+    env: &EmitEnv<'_>,
     nodes: &[FragmentNode<'_>],
     inherited: Namespace,
 ) -> Namespace {

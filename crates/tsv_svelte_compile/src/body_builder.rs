@@ -10,8 +10,8 @@
 //! See [`crate::transform_server`] for the orchestration that builds the
 //! component's root body.
 
-use bumpalo::collections::Vec as BumpVec;
-use tsv_ts::ast::{Expression, Statement};
+use tsv_lang::store::Run;
+use tsv_ts::ast::{ExprId, Expression, Statement, StmtId};
 
 use crate::build::Builder;
 
@@ -22,18 +22,23 @@ use crate::build::Builder;
 /// pending template into a `$$renderer.push(…)` statement, emit their own
 /// statements, and let closer-anchor text accumulate into the next template —
 /// the oracle's multi-push output shape.
-pub(crate) struct BodyBuilder<'arena> {
-    pub(crate) stmts: BumpVec<'arena, Statement<'arena>>,
+///
+/// The statements are ids: a borrowed host statement goes in as its own id
+/// ([`Self::push_statement_id`], never copied out and pushed again), a built one as
+/// the id of the row [`Self::push_statement`] pushes, and [`Self::finish`] pushes them
+/// as the body's run. The pending interpolations are built rows, pushed at the flush.
+pub(crate) struct BodyBuilder {
+    pub(crate) stmts: Vec<StmtId>,
     texts: Vec<String>,
-    exprs: BumpVec<'arena, Expression<'arena>>,
+    exprs: Vec<Expression>,
 }
 
-impl<'arena> BodyBuilder<'arena> {
-    pub(crate) fn new_in(arena: &'arena bumpalo::Bump) -> Self {
+impl BodyBuilder {
+    pub(crate) fn new() -> Self {
         Self {
-            stmts: BumpVec::new_in(arena),
+            stmts: Vec::new(),
             texts: vec![String::new()],
-            exprs: BumpVec::new_in(arena),
+            exprs: Vec::new(),
         }
     }
 
@@ -62,34 +67,41 @@ impl<'arena> BodyBuilder<'arena> {
         current.push_str(chunk);
     }
 
-    pub(crate) fn push_expr(&mut self, expr: Expression<'arena>) {
+    pub(crate) fn push_expr(&mut self, expr: Expression) {
         self.exprs.push(expr);
         self.texts.push(String::new());
     }
 
     /// Flush the pending template (if any) into a `$$renderer.push(…)`
     /// statement.
-    fn flush(&mut self, b: &mut Builder<'arena>, arena: &'arena bumpalo::Bump) {
+    fn flush(&mut self, b: &mut Builder<'_>) {
         if self.exprs.is_empty() && self.texts.iter().all(String::is_empty) {
             return;
         }
         let texts = std::mem::replace(&mut self.texts, vec![String::new()]);
-        let exprs = std::mem::replace(&mut self.exprs, BumpVec::new_in(arena));
-        let template = b.template_literal(&texts, b.expr_refs(exprs.into_bump_slice()));
-        let template_alloc = arena.alloc(template);
-        let push_call = b.member_call("$$renderer", "push", std::slice::from_ref(template_alloc));
+        let exprs = std::mem::take(&mut self.exprs);
+        let ids: Vec<ExprId> = exprs.iter().map(|&expr| b.push(expr)).collect();
+        let expressions = b.push_list(&ids);
+        let template = b.template_literal(&texts, expressions);
+        let template = b.push(template);
+        let push_call = b.member_call("$$renderer", "push", &[template]);
         // Pushed directly rather than through `push_statement`: this IS the flush.
-        self.stmts.push(b.expression_statement(push_call));
+        let stmt = b.expression_statement(push_call);
+        self.stmts.push(b.push(stmt));
     }
 
-    /// Flush the pending template, then append a statement.
-    pub(crate) fn push_statement(
-        &mut self,
-        b: &mut Builder<'arena>,
-        arena: &'arena bumpalo::Bump,
-        stmt: Statement<'arena>,
-    ) {
-        self.flush(b, arena);
+    /// Flush the pending template, then push a built statement and append it. A
+    /// borrowed host statement goes through [`Self::push_statement_id`]; passing a
+    /// copy of one here pushes a duplicate row.
+    pub(crate) fn push_statement(&mut self, b: &mut Builder<'_>, stmt: Statement) {
+        self.flush(b);
+        self.stmts.push(b.push(stmt));
+    }
+
+    /// Flush the pending template, then append a statement that already has an id —
+    /// a borrowed host statement, or one pushed earlier.
+    pub(crate) fn push_statement_id(&mut self, b: &mut Builder<'_>, stmt: StmtId) {
+        self.flush(b);
         self.stmts.push(stmt);
     }
 
@@ -97,21 +109,16 @@ impl<'arena> BodyBuilder<'arena> {
     /// position — the shape every block/element emitter ends on.
     pub(crate) fn push_expression_statement(
         &mut self,
-        b: &mut Builder<'arena>,
-        arena: &'arena bumpalo::Bump,
-        expression: Expression<'arena>,
+        b: &mut Builder<'_>,
+        expression: Expression,
     ) {
         let stmt = b.expression_statement(expression);
-        self.push_statement(b, arena, stmt);
+        self.push_statement(b, stmt);
     }
 
-    /// Finish: flush and return the statement slice.
-    pub(crate) fn finish(
-        mut self,
-        b: &mut Builder<'arena>,
-        arena: &'arena bumpalo::Bump,
-    ) -> &'arena [Statement<'arena>] {
-        self.flush(b, arena);
-        self.stmts.into_bump_slice()
+    /// Finish: flush and return the statement run.
+    pub(crate) fn finish(mut self, b: &mut Builder<'_>) -> Run<StmtId> {
+        self.flush(b);
+        b.push_list(&self.stmts)
     }
 }

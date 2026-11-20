@@ -54,7 +54,7 @@ use crate::{CompileError, Refusal};
 /// - A top-level `prop`/`$derived`/`$state` binding → dynamic. A plain
 ///   declaration/import (`normal`) or an unresolved global (`binding === null`)
 ///   is **not** dynamic.
-fn component_dynamic(env: &EmitEnv<'_, '_>, name: &str) -> bool {
+fn component_dynamic(env: &EmitEnv<'_>, name: &str) -> bool {
     if name.contains('.') {
         return true;
     }
@@ -78,10 +78,7 @@ fn component_dynamic(env: &EmitEnv<'_, '_>, name: &str) -> bool {
 /// `clean_nodes` `is_standalone`: a non-dynamic `Component` with no
 /// `--custom-property` attribute — `hmr` is always off here). When true its call
 /// reuses the enclosing block's anchor and emits no trailing `<!---->`.
-pub(crate) fn component_is_standalone_eligible(
-    env: &EmitEnv<'_, '_>,
-    element: &Element<'_>,
-) -> bool {
+pub(crate) fn component_is_standalone_eligible(env: &EmitEnv<'_>, element: &Element<'_>) -> bool {
     if element.kind != ElementKind::Component {
         return false;
     }
@@ -128,7 +125,7 @@ impl ChildrenPlan<'_> {
 /// genuine deferred gap). A `{#snippet}` child named `children` keeps the
 /// `children` prop name but a `default` slot key (the oracle's rename).
 fn plan_component_children<'arena>(
-    env: &mut EmitEnv<'arena, '_>,
+    env: &mut EmitEnv<'arena>,
     element: &'arena Element<'arena>,
     name: &str,
 ) -> Result<ChildrenPlan<'arena>, CompileError> {
@@ -218,7 +215,7 @@ fn plan_component_children<'arena>(
 /// case-**insensitive** because CSS pruning lowercases
 /// (`css-prune.js:1015`) — the oracle is split, so the two predicates are
 /// deliberately different, and merging them would break CSS-prune parity.
-fn child_slot_attribute(env: &EmitEnv<'_, '_>, element: &Element<'_>) -> bool {
+fn child_slot_attribute(env: &EmitEnv<'_>, element: &Element<'_>) -> bool {
     component_has_named_attribute(env, element, "slot")
 }
 
@@ -228,7 +225,7 @@ fn child_slot_attribute(env: &EmitEnv<'_, '_>, element: &Element<'_>) -> bool {
 /// The case-sensitivity matches `child_slot_attribute` and the same oracle site
 /// (`server/visitors/shared/component.js:50`); see that function for why it must
 /// NOT be unified with the census's case-insensitive `has_slot_attribute`.
-fn special_element_slot_attribute(env: &EmitEnv<'_, '_>, se: &SpecialElement<'_>) -> bool {
+fn special_element_slot_attribute(env: &EmitEnv<'_>, se: &SpecialElement<'_>) -> bool {
     se.attributes.iter().any(|attr_node| {
         let AttributeNode::Attribute(attr) = attr_node else {
             return false;
@@ -239,7 +236,7 @@ fn special_element_slot_attribute(env: &EmitEnv<'_, '_>, se: &SpecialElement<'_>
 
 /// Whether an element carries a plain attribute with the given (case-sensitive)
 /// name.
-fn component_has_named_attribute(env: &EmitEnv<'_, '_>, element: &Element<'_>, name: &str) -> bool {
+fn component_has_named_attribute(env: &EmitEnv<'_>, element: &Element<'_>, name: &str) -> bool {
     element.attributes.iter().any(|attr_node| {
         let AttributeNode::Attribute(attr) = attr_node else {
             return false;
@@ -255,7 +252,7 @@ fn component_has_named_attribute(env: &EmitEnv<'_, '_>, element: &Element<'_>, n
 /// slots, `--custom-property` attributes, and directives are refused — see the
 /// individual refusal sites.
 pub(crate) fn emit_component<'arena>(
-    env: &mut EmitEnv<'arena, '_>,
+    env: &mut EmitEnv<'arena>,
     element: &'arena Element<'arena>,
     out: &mut BodyBuilder<'arena>,
     name: &str,
@@ -329,7 +326,7 @@ enum PropGroup<'a, 'arena> {
 /// `$.spread_props([ … ])` interleaving objects and spread expressions in source
 /// order. Refuses `--custom-property` attributes, `bind:`, and other directives.
 fn build_component_props<'arena>(
-    env: &mut EmitEnv<'arena, '_>,
+    env: &mut EmitEnv<'arena>,
     element: &'arena Element<'arena>,
     name: &str,
     plan: &ChildrenPlan<'arena>,
@@ -434,7 +431,7 @@ fn build_component_props<'arena>(
 /// the (appendix) key spans (the object printer reads its own span region for the
 /// expansion decision — all appendix, no newlines, so it collapses when it fits).
 fn build_props_object<'arena>(
-    env: &mut EmitEnv<'arena, '_>,
+    env: &mut EmitEnv<'arena>,
     attrs: &[&'arena Attribute<'arena>],
     synthetic: Option<&ChildrenPlan<'arena>>,
 ) -> Result<Expression<'arena>, CompileError> {
@@ -477,7 +474,7 @@ fn build_props_object<'arena>(
 
 /// A `{ name }` shorthand prop for a named-snippet child — the value references
 /// the `function name(…)` declaration in the component's wrapping block.
-fn build_snippet_prop<'arena>(env: &mut EmitEnv<'arena, '_>, name: &str) -> Property<'arena> {
+fn build_snippet_prop<'arena>(env: &mut EmitEnv<'arena>, name: &str) -> Property<'arena> {
     let key = env.b.ident(name);
     let key_span = key.span;
     let value = env.b.ident(name);
@@ -495,7 +492,7 @@ fn build_snippet_prop<'arena>(env: &mut EmitEnv<'arena, '_>, name: &str) -> Prop
 /// machinery (text-first eligible, per the oracle's `is_text_first` Component
 /// parent). The key is minted first so the (key-only) property span stays forward.
 fn build_children_prop<'arena>(
-    env: &mut EmitEnv<'arena, '_>,
+    env: &mut EmitEnv<'arena>,
     fragment: &Fragment<'arena>,
 ) -> Result<Property<'arena>, CompileError> {
     let arena = env.b.arena;
@@ -535,10 +532,7 @@ fn build_children_prop<'arena>(
 /// one `true` entry per named-snippet slot plus `default` for default children
 /// (slot names are always valid identifiers). Named-slot arrow values would live
 /// here too, but named slots are refused.
-fn build_slots_prop<'arena>(
-    env: &mut EmitEnv<'arena, '_>,
-    slot_keys: &[String],
-) -> Property<'arena> {
+fn build_slots_prop<'arena>(env: &mut EmitEnv<'arena>, slot_keys: &[String]) -> Property<'arena> {
     let arena = env.b.arena;
     let key = env.b.ident("$$slots");
     let key_span = key.span;
@@ -580,7 +574,7 @@ fn build_slots_prop<'arena>(
 /// before the value, so the (key-only) property span stays forward and in the
 /// appendix; the value prints from its own span.
 fn build_component_property<'arena>(
-    env: &mut EmitEnv<'arena, '_>,
+    env: &mut EmitEnv<'arena>,
     attr: &'arena Attribute<'arena>,
 ) -> Result<Property<'arena>, CompileError> {
     let name = attr.name(env.source).to_string();
@@ -609,7 +603,7 @@ fn build_component_property<'arena>(
 /// - a mixed text+expression value → a template literal (or a folded string
 ///   literal when every part is statically known).
 fn build_prop_value<'arena>(
-    env: &mut EmitEnv<'arena, '_>,
+    env: &mut EmitEnv<'arena>,
     attr: &'arena Attribute<'arena>,
 ) -> Result<Expression<'arena>, CompileError> {
     let Some(values) = attr.value else {

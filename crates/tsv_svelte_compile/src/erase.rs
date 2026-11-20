@@ -45,14 +45,15 @@
 use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::Span;
 use tsv_lang::source_scan::{TriviaProfile, skip_trivia, skip_trivia_run};
+use tsv_lang::store::Run;
 use tsv_ts::ast::{
     ArrayPattern, ArrowFunctionBody, ArrowFunctionExpression, AssignmentPattern, BlockStatement,
     CatchClause, ClassBody, ClassDeclaration, ClassExpression, ClassMember, EmptyStatement,
-    ExportDefaultValue, ExportKind, Expression, ExpressionKind, ForInOfLeft, ForInit,
+    ExportDefaultValue, ExportKind, ExprId, Expression, ExpressionKind, ForInOfLeft, ForInit,
     FunctionDeclaration, FunctionExpression, Identifier, ImportKind, ImportSpecifier,
     MethodDefinition, MethodKind, ObjectPattern, ObjectPatternProperty, ObjectProperty, Property,
     PropertyDefinition, PropertyKind, PropertyModifier, RestElement, Statement, StatementKind,
-    StaticBlock, SwitchCase, TSModuleDeclarationBody, TemplateLiteral, VariableDeclaration,
+    StaticBlock, StmtId, SwitchCase, TSModuleDeclarationBody, TemplateLiteral, VariableDeclaration,
     VariableDeclarator,
 };
 
@@ -61,9 +62,9 @@ use crate::refusal::Refusal;
 use crate::text_class::{is_js_whitespace, js_char_at};
 
 /// The product of erasing a statement list.
-pub(crate) struct Erased<'arena> {
-    /// The type-free statements — the input slice itself when nothing changed.
-    pub(crate) body: &'arena [Statement<'arena>],
+pub(crate) struct Erased {
+    /// The type-free statements — the input run itself when nothing changed.
+    pub(crate) body: Run<StmtId>,
     /// Every erased source region, already extended to its comment-refusal
     /// window (see [`Eraser::drop_region`]). In walk order.
     pub(crate) regions: Vec<Span>,
@@ -99,10 +100,10 @@ pub(crate) fn erase_statements<'arena>(
 }
 
 /// The product of erasing a single expression.
-pub(crate) struct ErasedExpr<'arena> {
-    /// The type-free expression — `None` means *unchanged*, so the caller reuses
-    /// the borrow.
-    pub(crate) expr: Option<Expression<'arena>>,
+pub(crate) struct ErasedExpr {
+    /// The type-free expression, pushed — `None` means *unchanged*, so the caller
+    /// keeps the input id.
+    pub(crate) expr: Option<ExprId>,
     /// Every erased source region, already extended to its comment-refusal
     /// window (see [`Eraser::drop_region`]). In walk order.
     pub(crate) regions: Vec<Span>,

@@ -27,7 +27,9 @@
 
 use std::collections::{HashMap, HashSet};
 
-use tsv_ts::ast::{ArrowFunctionBody, BinaryOperator, Expression, ExpressionKind, UnaryOperator};
+use tsv_ts::ast::{
+    ArrowFunctionBody, AstView, BinaryOperator, ExprId, Expression, ExpressionKind, UnaryOperator,
+};
 
 use crate::{CompileError, Refusal};
 
@@ -48,9 +50,9 @@ pub(crate) enum BindingKind {
 
 /// A binding's evaluation-relevant initial value.
 #[derive(Clone, Copy)]
-pub(crate) enum Initial<'arena> {
+pub(crate) enum Initial {
     /// Evaluate through this expression (for rune inits, the rune's argument).
-    Expr(&'arena Expression<'arena>),
+    Expr(ExprId),
     /// A function declaration (the FUNCTION sentinel).
     Function,
     /// An argument-less `$state()` (evaluates to `undefined`).
@@ -59,25 +61,25 @@ pub(crate) enum Initial<'arena> {
     None,
 }
 
-pub(crate) struct Binding<'arena> {
+pub(crate) struct Binding {
     pub kind: BindingKind,
-    pub initial: Initial<'arena>,
+    pub initial: Initial,
     pub updated: bool,
 }
 
 /// The top-level script binding table.
-pub(crate) struct Bindings<'arena> {
-    map: HashMap<String, Binding<'arena>>,
+pub(crate) struct Bindings {
+    map: HashMap<String, Binding>,
 }
 
-impl<'arena> Bindings<'arena> {
+impl Bindings {
     pub(crate) fn empty() -> Self {
         Self {
             map: HashMap::new(),
         }
     }
 
-    pub(crate) fn get(&self, name: &str) -> Option<&Binding<'arena>> {
+    pub(crate) fn get(&self, name: &str) -> Option<&Binding> {
         self.map.get(name)
     }
 
@@ -101,7 +103,7 @@ impl<'arena> Bindings<'arena> {
             .is_some_and(|b| b.kind == BindingKind::Prop)
     }
 
-    pub(crate) fn insert(&mut self, name: String, binding: Binding<'arena>) {
+    pub(crate) fn insert(&mut self, name: String, binding: Binding) {
         self.map.insert(name, binding);
     }
 
@@ -325,31 +327,35 @@ const RUNE_KEYPATHS: &[&str] = &[
 /// matching the oracle's `get_rune` returning null for a bound root, without
 /// modeling the scope.
 pub(crate) fn rune_call_spread(
-    call: &tsv_ts::ast::CallExpression<'_>,
+    view: AstView<'_>,
+    call: &tsv_ts::ast::CallExpression,
     source: &str,
 ) -> Option<String> {
-    let keypath = callee_keypath(call.callee, source)?;
+    let keypath = callee_keypath(view, view.expr(call.callee), source)?;
     if keypath == "$inspect" || !RUNE_KEYPATHS.contains(&keypath.as_str()) {
         return None;
     }
-    call.arguments
+    view.expr_list(call.arguments)
         .iter()
-        .any(|arg| matches!(arg.kind, ExpressionKind::SpreadElement(_)))
+        .any(|&arg| matches!(view.expr(arg).kind, ExpressionKind::SpreadElement(_)))
         .then_some(keypath)
 }
 
 /// Evaluate `expr` against the binding table — the ported `scope.evaluate`.
 pub(crate) fn evaluate(
-    expr: &Expression<'_>,
-    scope: &Scope<'_, '_>,
+    expr: &Expression,
+    scope: &Scope<'_>,
     source: &str,
     depth: usize,
 ) -> EvalResult {
     if depth > 16 {
         return gray("evaluation recursion limit (cyclic bindings?)");
     }
+    let view = scope.view;
+    // Evaluate the child expression `id` one level down.
+    let child = |id: ExprId| evaluate(view.expr(id), scope, source, depth + 1);
     match &expr.kind {
-        ExpressionKind::Literal(lit) => literal_value(lit, source),
+        ExpressionKind::Literal(lit) => literal_value(view, lit, source),
 
         ExpressionKind::Identifier(id) => {
             if id.escaped_name.is_some() {
@@ -371,7 +377,7 @@ pub(crate) fn evaluate(
                         return Ok(Evaluation::single(Entry::Unknown));
                     }
                     match binding.initial {
-                        Initial::Expr(init) => evaluate(init, scope, source, depth + 1),
+                        Initial::Expr(init) => child(init),
                         Initial::Function => Ok(Evaluation::single(Entry::FunctionSentinel)),
                         Initial::Undefined => Ok(Evaluation::known(Value::Undefined)),
                         Initial::None => Ok(Evaluation::single(Entry::Unknown)),
@@ -389,8 +395,8 @@ pub(crate) fn evaluate(
                 LessThan, LessThanEquals, Minus, Percent, Pipe, PipePipe, Plus, QuestionQuestion,
                 RightShift, Slash, Star, StarStar, UnsignedRightShift,
             };
-            let a = evaluate(bin.left, scope, source, depth + 1)?;
-            let b = evaluate(bin.right, scope, source, depth + 1)?;
+            let a = child(bin.left)?;
+            let b = child(bin.right)?;
             match bin.operator {
                 // Logical operators (merged into BinaryExpression in this AST)
                 // follow the oracle's LogicalExpression case.
@@ -462,9 +468,9 @@ pub(crate) fn evaluate(
         }
 
         ExpressionKind::ConditionalExpression(cond) => {
-            let test = evaluate(cond.test, scope, source, depth + 1)?;
-            let consequent = evaluate(cond.consequent, scope, source, depth + 1)?;
-            let alternate = evaluate(cond.alternate, scope, source, depth + 1)?;
+            let test = child(cond.test)?;
+            let consequent = child(cond.consequent)?;
+            let alternate = child(cond.alternate)?;
             if let Some(tv) = test.known_value() {
                 return Ok(if tv.truthy() { consequent } else { alternate });
             }
@@ -474,7 +480,7 @@ pub(crate) fn evaluate(
         }
 
         ExpressionKind::UnaryExpression(unary) => {
-            let argument = evaluate(unary.argument, scope, source, depth + 1)?;
+            let argument = child(unary.argument)?;
             if let Some(v) = argument.known_value() {
                 return Ok(Evaluation::known(unary_op(unary.operator, v)?));
             }
@@ -498,13 +504,13 @@ pub(crate) fn evaluate(
         }
 
         ExpressionKind::CallExpression(call) => {
-            match global_keypath(call.callee, scope, source) {
+            match global_keypath(view.expr(call.callee), scope, source) {
                 Some(keypath) if keypath.starts_with('$') => {
                     // The rune table.
-                    let arg = call.arguments.first();
+                    let arg = view.expr_list(call.arguments).first().copied();
                     match keypath.as_str() {
                         "$state" | "$state.raw" | "$derived" => match arg {
-                            Some(arg) => evaluate(arg, scope, source, depth + 1),
+                            Some(arg) => child(arg),
                             None => Ok(Evaluation::known(Value::Undefined)),
                         },
                         "$props.id" => Ok(Evaluation::single(Entry::StringSentinel)),
@@ -514,18 +520,15 @@ pub(crate) fn evaluate(
                             eval.add(Entry::Value(Value::Bool(true)));
                             Ok(eval)
                         }
-                        "$derived.by" => match arg {
-                            Some(Expression {
-                                kind: ExpressionKind::ArrowFunctionExpression(arrow),
-                                ..
-                            }) => match &arrow.body {
-                                ArrowFunctionBody::Expression(body) => {
-                                    evaluate(body, scope, source, depth + 1)
+                        "$derived.by" => match arg.map(|arg| view.expr(arg).kind) {
+                            Some(ExpressionKind::ArrowFunctionExpression(arrow)) => {
+                                match view.arrow_fn(arrow).body {
+                                    ArrowFunctionBody::Expression(body) => child(body),
+                                    ArrowFunctionBody::BlockStatement(_) => {
+                                        Ok(Evaluation::single(Entry::Unknown))
+                                    }
                                 }
-                                ArrowFunctionBody::BlockStatement(_) => {
-                                    Ok(Evaluation::single(Entry::Unknown))
-                                }
-                            },
+                            }
                             _ => Ok(Evaluation::single(Entry::Unknown)),
                         },
                         _ => Ok(Evaluation::single(Entry::Unknown)),
@@ -542,18 +545,18 @@ pub(crate) fn evaluate(
 
         ExpressionKind::TemplateLiteral(template) => {
             let mut result = String::new();
-            match quasi_cooked(template, 0, source) {
+            match quasi_cooked(view, template, 0, source) {
                 Some(text) => result.push_str(&text),
                 None => return gray("template quasi with invalid escape"),
             }
-            for (i, e) in template.expressions.iter().enumerate() {
-                let evaluated = evaluate(e, scope, source, depth + 1)?;
+            for (i, &e) in view.expr_list(template.expressions).iter().enumerate() {
+                let evaluated = child(e)?;
                 match evaluated.known_value() {
                     Some(value) => {
                         // The oracle concatenates `e.value + cooked` — plain JS
                         // stringification, same bounded rules as the fold.
                         result.push_str(&template_concat_value(value)?);
-                        match quasi_cooked(template, i + 1, source) {
+                        match quasi_cooked(view, template, i + 1, source) {
                             Some(text) => result.push_str(&text),
                             None => return gray("template quasi with invalid escape"),
                         }
@@ -590,16 +593,12 @@ pub(crate) fn evaluate(
         // erasure unwraps all six before this runs, so these arms are defense in
         // depth: falling into the `default: UNKNOWN` arm below would *under-fold*
         // (a parity divergence, not a refusal).
-        ExpressionKind::TSAsExpression(e) => evaluate(e.expression, scope, source, depth + 1),
-        ExpressionKind::TSSatisfiesExpression(e) => {
-            evaluate(e.expression, scope, source, depth + 1)
-        }
-        ExpressionKind::TSNonNullExpression(e) => evaluate(e.expression, scope, source, depth + 1),
-        ExpressionKind::TSTypeAssertion(e) => evaluate(e.expression, scope, source, depth + 1),
-        ExpressionKind::TSInstantiationExpression(e) => {
-            evaluate(e.expression, scope, source, depth + 1)
-        }
-        ExpressionKind::CommentBoundPair(e) => evaluate(e.inner, scope, source, depth + 1),
+        ExpressionKind::TSAsExpression(e) => child(e.expression),
+        ExpressionKind::TSSatisfiesExpression(e) => child(e.expression),
+        ExpressionKind::TSNonNullExpression(e) => child(e.expression),
+        ExpressionKind::TSTypeAssertion(e) => child(e.expression),
+        ExpressionKind::TSInstantiationExpression(e) => child(e.expression),
+        ExpressionKind::CommentBoundPair(pair) => child(view.comment_pair(*pair).inner),
 
         // Everything else is the oracle's `default: UNKNOWN` — portable.
         _ => Ok(Evaluation::single(Entry::Unknown)),
@@ -614,15 +613,16 @@ fn all_numbers(eval: &Evaluation) -> bool {
 
 /// The cooked text of quasi `i` (decoded escapes), `None` for invalid escapes.
 fn quasi_cooked(
-    template: &tsv_ts::ast::TemplateLiteral<'_>,
+    view: AstView<'_>,
+    template: &tsv_ts::ast::TemplateLiteral,
     i: usize,
     source: &str,
 ) -> Option<String> {
     use tsv_ts::ast::TemplateCooked;
-    let quasi = &template.quasis[i];
-    match &quasi.cooked {
+    let quasi = &view.quasis(template.quasis)[i];
+    match quasi.cooked {
         TemplateCooked::Verbatim => Some(quasi.raw_span.extract(source).to_string()),
-        TemplateCooked::Decoded(s) => Some((*s).to_string()),
+        TemplateCooked::Decoded(text) => Some(view.text(text).to_string()),
         TemplateCooked::Invalid => None,
     }
 }
@@ -638,18 +638,18 @@ fn template_concat_value(value: &Value) -> Result<String, Gray> {
 }
 
 /// The literal's value in the ported domain.
-fn literal_value(lit: &tsv_ts::ast::Literal<'_>, source: &str) -> EvalResult {
+fn literal_value(view: AstView<'_>, lit: &tsv_ts::ast::Literal, source: &str) -> EvalResult {
     use tsv_ts::ast::{LiteralValue, StringCooked};
-    match &lit.value {
-        LiteralValue::Number(n) => Ok(Evaluation::known(Value::Num(*n))),
-        LiteralValue::Boolean(b) => Ok(Evaluation::known(Value::Bool(*b))),
+    match lit.value {
+        LiteralValue::Number(n) => Ok(Evaluation::known(Value::Num(n.get()))),
+        LiteralValue::Boolean(b) => Ok(Evaluation::known(Value::Bool(b))),
         LiteralValue::Null => Ok(Evaluation::known(Value::Null)),
         LiteralValue::String(cooked) => {
             let raw = lit.span.extract(source);
             let inner = &raw[1..raw.len() - 1];
             let value = match cooked {
                 StringCooked::Verbatim => inner.to_string(),
-                StringCooked::Decoded(s) => (*s).to_string(),
+                StringCooked::Decoded(text) => view.text(text).to_string(),
             };
             Ok(Evaluation::known(Value::Str(value)))
         }
@@ -661,7 +661,7 @@ fn literal_value(lit: &tsv_ts::ast::Literal<'_>, source: &str) -> EvalResult {
 /// non-computed member accesses rooted at an identifier with **no** local
 /// binding. `None` when the root is a local binding, computed, or not an
 /// identifier.
-fn global_keypath(expr: &Expression<'_>, scope: &Scope<'_, '_>, source: &str) -> Option<String> {
+fn global_keypath(expr: &Expression, scope: &Scope<'_>, source: &str) -> Option<String> {
     match &expr.kind {
         ExpressionKind::Identifier(id) => {
             if id.escaped_name.is_some() {
@@ -683,8 +683,9 @@ fn global_keypath(expr: &Expression<'_>, scope: &Scope<'_, '_>, source: &str) ->
             Some(name.to_string())
         }
         ExpressionKind::MemberExpression(member) if !member.computed => {
-            let object = global_keypath(member.object, scope, source)?;
-            let ExpressionKind::Identifier(prop) = &member.property.kind else {
+            let view = scope.view;
+            let object = global_keypath(view.expr(member.object), scope, source)?;
+            let ExpressionKind::Identifier(prop) = &view.expr(member.property).kind else {
                 return None;
             };
             if prop.escaped_name.is_some() {
@@ -822,11 +823,14 @@ fn to_int32(n: f64) -> i32 {
 /// source slice, and this walk reads only the raw slice. A caller that must not
 /// MISS a binding pairs this with [`pattern_binds_unnameable_identifier`].
 pub(crate) fn pattern_binding_names(
-    pattern: &Expression<'_>,
+    view: AstView<'_>,
+    pattern: &Expression,
     source: &str,
     out: &mut Vec<String>,
 ) -> Result<(), CompileError> {
     use tsv_ts::ast::{ObjectPatternProperty, ObjectProperty};
+    let walk =
+        |id: ExprId, out: &mut Vec<String>| pattern_binding_names(view, view.expr(id), source, out);
     match &pattern.kind {
         ExpressionKind::Identifier(id) => {
             if id.escaped_name.is_none() {
@@ -836,42 +840,32 @@ pub(crate) fn pattern_binding_names(
             Ok(())
         }
         ExpressionKind::ObjectPattern(obj) => {
-            for prop in obj.properties {
+            for prop in view.pat_props(obj.properties) {
                 match prop {
-                    ObjectPatternProperty::Property(p) => {
-                        pattern_binding_names(p.value, source, out)?;
-                    }
-                    ObjectPatternProperty::RestElement(rest) => {
-                        pattern_binding_names(rest.argument, source, out)?;
-                    }
+                    ObjectPatternProperty::Property(p) => walk(p.value, out)?,
+                    ObjectPatternProperty::RestElement(rest) => walk(rest.argument, out)?,
                 }
             }
             Ok(())
         }
         ExpressionKind::ObjectExpression(obj) => {
             // Patterns reuse expression shapes in some positions.
-            for prop in obj.properties {
+            for prop in view.obj_props(obj.properties) {
                 match prop {
-                    ObjectProperty::Property(p) => {
-                        pattern_binding_names(p.value, source, out)?;
-                    }
-                    ObjectProperty::SpreadElement(s) => {
-                        pattern_binding_names(s.argument, source, out)?;
-                    }
+                    ObjectProperty::Property(p) => walk(p.value, out)?,
+                    ObjectProperty::SpreadElement(s) => walk(s.argument, out)?,
                 }
             }
             Ok(())
         }
         ExpressionKind::ArrayPattern(arr) => {
-            for element in arr.elements.iter().flatten() {
-                pattern_binding_names(element, source, out)?;
+            for &element in view.expr_opt_list(arr.elements).iter().flatten() {
+                walk(element, out)?;
             }
             Ok(())
         }
-        ExpressionKind::AssignmentPattern(assign) => {
-            pattern_binding_names(assign.left, source, out)
-        }
-        ExpressionKind::RestElement(rest) => pattern_binding_names(rest.argument, source, out),
+        ExpressionKind::AssignmentPattern(assign) => walk(assign.left, out),
+        ExpressionKind::RestElement(rest) => walk(rest.argument, out),
         _ => Err(CompileError::Unsupported(Refusal::BindingPatternShape {
             kind: expression_kind(pattern),
         })),
@@ -892,34 +886,39 @@ pub(crate) fn pattern_binding_names(
 /// "there may be a hidden binding" rather than silently as "no". That is what
 /// keeps this from drifting out of step with `pattern_binding_names` — the two
 /// can only disagree in the safe direction.
-pub(crate) fn pattern_binds_unnameable_identifier(pattern: &Expression<'_>) -> bool {
+pub(crate) fn pattern_binds_unnameable_identifier(view: AstView<'_>, pattern: &Expression) -> bool {
     use tsv_ts::ast::{ObjectPatternProperty, ObjectProperty};
+    let walk = |id: ExprId| pattern_binds_unnameable_identifier(view, view.expr(id));
     match &pattern.kind {
         ExpressionKind::Identifier(id) => id.escaped_name.is_some(),
-        ExpressionKind::ObjectPattern(obj) => obj.properties.iter().any(|prop| match prop {
-            ObjectPatternProperty::Property(p) => pattern_binds_unnameable_identifier(p.value),
-            ObjectPatternProperty::RestElement(rest) => {
-                pattern_binds_unnameable_identifier(rest.argument)
-            }
-        }),
-        ExpressionKind::ObjectExpression(obj) => obj.properties.iter().any(|prop| match prop {
-            ObjectProperty::Property(p) => pattern_binds_unnameable_identifier(p.value),
-            ObjectProperty::SpreadElement(s) => pattern_binds_unnameable_identifier(s.argument),
-        }),
-        ExpressionKind::ArrayPattern(arr) => arr
-            .elements
+        ExpressionKind::ObjectPattern(obj) => {
+            view.pat_props(obj.properties)
+                .iter()
+                .any(|prop| match prop {
+                    ObjectPatternProperty::Property(p) => walk(p.value),
+                    ObjectPatternProperty::RestElement(rest) => walk(rest.argument),
+                })
+        }
+        ExpressionKind::ObjectExpression(obj) => {
+            view.obj_props(obj.properties)
+                .iter()
+                .any(|prop| match prop {
+                    ObjectProperty::Property(p) => walk(p.value),
+                    ObjectProperty::SpreadElement(s) => walk(s.argument),
+                })
+        }
+        ExpressionKind::ArrayPattern(arr) => view
+            .expr_opt_list(arr.elements)
             .iter()
             .flatten()
-            .any(pattern_binds_unnameable_identifier),
-        ExpressionKind::AssignmentPattern(assign) => {
-            pattern_binds_unnameable_identifier(assign.left)
-        }
-        ExpressionKind::RestElement(rest) => pattern_binds_unnameable_identifier(rest.argument),
+            .any(|&element| walk(element)),
+        ExpressionKind::AssignmentPattern(assign) => walk(assign.left),
+        ExpressionKind::RestElement(rest) => walk(rest.argument),
         _ => true,
     }
 }
 
-pub(crate) fn expression_kind(expr: &Expression<'_>) -> &'static str {
+pub(crate) fn expression_kind(expr: &Expression) -> &'static str {
     // Only used for error messages on unusual pattern shapes.
     match &expr.kind {
         ExpressionKind::MemberExpression(_) => "member expression",
@@ -929,31 +928,32 @@ pub(crate) fn expression_kind(expr: &Expression<'_>) -> &'static str {
 }
 
 /// A sanctioned rune declarator init, classified for rewriting.
-pub(crate) enum RuneInit<'arena> {
+pub(crate) enum RuneInit {
     /// `$props()` (argument-less, direct call).
     Props,
     /// `$props.id()` (argument-less member call) — the declarator is skipped and a
     /// server-hoisted `const <name> = $.props_id($$renderer)` takes its place.
     PropsId,
     /// `$state(arg?)` / `$state.raw(arg?)` — the server drops the wrapper.
-    State(Option<&'arena Expression<'arena>>),
+    State(Option<ExprId>),
     /// `$state.snapshot(x)` (exactly one argument) — the server unwraps it to `x`
     /// in a declarator init, exactly like `$state`/`$derived` unwrap their
     /// argument. Distinct from [`Self::State`] so a snapshot binding never joins
     /// the `state_names` set (it is a plain `const`, not a reactive `$state`).
-    StateSnapshot(&'arena Expression<'arena>),
+    StateSnapshot(ExprId),
     /// `$derived(expr)` — becomes `$.derived(() => expr)`.
-    Derived(&'arena Expression<'arena>),
+    Derived(ExprId),
     /// `$derived.by(fn)` — becomes `$.derived(fn)`.
-    DerivedBy(&'arena Expression<'arena>),
+    DerivedBy(ExprId),
 }
 
 /// Classify a declarator init as a sanctioned rune call. `None` for anything
 /// else (including malformed rune calls — the guard walk refuses those).
-pub(crate) fn classify_rune_init<'arena>(
-    init: &'arena Expression<'arena>,
+pub(crate) fn classify_rune_init(
+    view: AstView<'_>,
+    init: &Expression,
     source: &str,
-) -> Option<RuneInit<'arena>> {
+) -> Option<RuneInit> {
     let ExpressionKind::CallExpression(call) = &init.kind else {
         return None;
     };
@@ -972,13 +972,12 @@ pub(crate) fn classify_rune_init<'arena>(
     // (a safe over-refusal). The template snapshot path (`snapshot_call_arg`)
     // recognizes the optional form separately and correctly emits `$.snapshot(x)`,
     // matching the oracle there.
-    if call.optional
-        || matches!(&call.callee.kind, ExpressionKind::MemberExpression(m) if m.optional)
-    {
+    let callee = view.expr(call.callee);
+    if call.optional || matches!(&callee.kind, ExpressionKind::MemberExpression(m) if m.optional) {
         return None;
     }
-    let keypath = callee_keypath(call.callee, source)?;
-    let arg = call.arguments.first().copied();
+    let keypath = callee_keypath(view, callee, source)?;
+    let arg = view.expr_list(call.arguments).first().copied();
     match keypath.as_str() {
         "$props" if call.arguments.is_empty() => Some(RuneInit::Props),
         "$props.id" if call.arguments.is_empty() => Some(RuneInit::PropsId),
@@ -996,16 +995,13 @@ pub(crate) fn classify_rune_init<'arena>(
 /// Whether `expr` is a direct statement-position effect call
 /// (`$effect(fn)` / `$effect.pre(fn)`) — dropped on the server, forcing the
 /// `$$renderer.component(…)` wrapper.
-pub(crate) fn is_effect_call<'arena>(
-    expr: &'arena Expression<'arena>,
-    source: &str,
-) -> Option<&'arena Expression<'arena>> {
+pub(crate) fn is_effect_call(view: AstView<'_>, expr: &Expression, source: &str) -> Option<ExprId> {
     let ExpressionKind::CallExpression(call) = &expr.kind else {
         return None;
     };
-    let keypath = callee_keypath(call.callee, source)?;
+    let keypath = callee_keypath(view, view.expr(call.callee), source)?;
     if (keypath == "$effect" || keypath == "$effect.pre") && call.arguments.len() == 1 {
-        call.arguments.first().copied()
+        view.expr_list(call.arguments).first().copied()
     } else {
         None
     }
@@ -1029,38 +1025,41 @@ pub(crate) fn is_effect_call<'arena>(
 /// oracle error), or a chain the oracle mis-compiles into invalid JS (`.foo()`,
 /// a second `.with`, a non-call `.with`) — which the rune guard then refuses as
 /// a `$`-rooted call, a safe over-refusal.
-pub(crate) fn is_inspect_call<'arena>(
-    expr: &'arena Expression<'arena>,
+pub(crate) fn is_inspect_call(
+    view: AstView<'_>,
+    expr: &Expression,
     source: &str,
-) -> Option<Vec<&'arena Expression<'arena>>> {
+) -> Option<Vec<ExprId>> {
     let ExpressionKind::CallExpression(call) = &expr.kind else {
         return None;
     };
-    match &call.callee.kind {
+    let callee = view.expr(call.callee);
+    match &callee.kind {
         // Bare `$inspect(args)` — one or more arguments (the oracle rejects
         // `$inspect()` with `rune_invalid_arguments_length`).
-        ExpressionKind::Identifier(_) => (callee_keypath(call.callee, source).as_deref()
+        ExpressionKind::Identifier(_) => (callee_keypath(view, callee, source).as_deref()
             == Some("$inspect")
             && !call.arguments.is_empty())
-        .then(|| call.arguments.to_vec()),
+        .then(|| view.expr_list(call.arguments).to_vec()),
         // `$inspect(args).with(cb)` — exactly one `.with`, carrying exactly one
         // argument, over the `$inspect(...)` call. A second `.with` or any other
         // method leaves the outer call un-rewritten in the oracle → invalid JS;
         // a wrong outer arity (`.with()` / `.with(f, x)`) is a hard oracle error
         // (`rune_invalid_arguments_length`). Both stay refused via the guard.
         ExpressionKind::MemberExpression(member) if !member.computed => {
-            let ExpressionKind::CallExpression(inner) = &member.object.kind else {
+            let ExpressionKind::CallExpression(inner) = &view.expr(member.object).kind else {
                 return None;
             };
-            if callee_keypath(member.property, source).as_deref() != Some("with")
+            if callee_keypath(view, view.expr(member.property), source).as_deref() != Some("with")
                 || call.arguments.len() != 1
-                || callee_keypath(inner.callee, source).as_deref() != Some("$inspect")
+                || callee_keypath(view, view.expr(inner.callee), source).as_deref()
+                    != Some("$inspect")
                 || inner.arguments.is_empty()
             {
                 return None;
             }
-            let mut guarded: Vec<&'arena Expression<'arena>> = inner.arguments.to_vec();
-            guarded.extend(call.arguments.iter().copied());
+            let mut guarded: Vec<ExprId> = view.expr_list(inner.arguments).to_vec();
+            guarded.extend_from_slice(view.expr_list(call.arguments));
             Some(guarded)
         }
         _ => None,
@@ -1069,8 +1068,12 @@ pub(crate) fn is_inspect_call<'arena>(
 
 /// The plain (non-computed) identifier keypath of a callee: `$state`,
 /// `$state.raw` — one identifier or one member level.
-pub(crate) fn callee_keypath(callee: &Expression<'_>, source: &str) -> Option<String> {
-    fn plain_name<'s>(id: &tsv_ts::ast::Identifier<'_>, source: &'s str) -> Option<&'s str> {
+pub(crate) fn callee_keypath(
+    view: AstView<'_>,
+    callee: &Expression,
+    source: &str,
+) -> Option<String> {
+    fn plain_name<'s>(id: &tsv_ts::ast::Identifier, source: &'s str) -> Option<&'s str> {
         if id.escaped_name.is_some() {
             return None;
         }
@@ -1080,10 +1083,10 @@ pub(crate) fn callee_keypath(callee: &Expression<'_>, source: &str) -> Option<St
     match &callee.kind {
         ExpressionKind::Identifier(id) => plain_name(id, source).map(str::to_string),
         ExpressionKind::MemberExpression(member) if !member.computed => {
-            let ExpressionKind::Identifier(obj) = &member.object.kind else {
+            let ExpressionKind::Identifier(obj) = &view.expr(member.object).kind else {
                 return None;
             };
-            let ExpressionKind::Identifier(prop) = &member.property.kind else {
+            let ExpressionKind::Identifier(prop) = &view.expr(member.property).kind else {
                 return None;
             };
             Some(format!(
@@ -1100,7 +1103,7 @@ pub(crate) fn callee_keypath(callee: &Expression<'_>, source: &str) -> Option<St
 pub(crate) type NameSet = HashSet<String>;
 
 /// A block-scope overlay entry (each item/index, `{:then}` value, `{@const}`).
-pub(crate) enum ScopeEntry<'arena> {
+pub(crate) enum ScopeEntry {
     /// Masked to UNKNOWN: the binding exists but is never statically known to
     /// this port (each items/indexes, await values). Behaviorally equivalent to
     /// the oracle's UNKNOWN/NUMBER sentinels for every emission decision this
@@ -1108,24 +1111,27 @@ pub(crate) enum ScopeEntry<'arena> {
     Masked,
     /// A `{@const}` binding — evaluates through its initial like a top-level
     /// binding (the oracle folds statically-known const-tag reads).
-    Const(Binding<'arena>),
+    Const(Binding),
 }
 
 /// The name-resolution context evaluation runs against: the top-level table
-/// plus the active block-scope overlays (innermost last).
-pub(crate) struct Scope<'a, 'arena> {
-    pub bindings: &'a Bindings<'arena>,
-    pub overlays: &'a [HashMap<String, ScopeEntry<'arena>>],
+/// plus the active block-scope overlays (innermost last), and the view of the
+/// TypeScript stores the bindings' initial expressions (and every expression
+/// evaluated against them) read through.
+pub(crate) struct Scope<'a> {
+    pub view: AstView<'a>,
+    pub bindings: &'a Bindings,
+    pub overlays: &'a [HashMap<String, ScopeEntry>],
 }
 
-pub(crate) enum Resolved<'a, 'arena> {
+pub(crate) enum Resolved<'a> {
     Masked,
-    Binding(&'a Binding<'arena>),
+    Binding(&'a Binding),
     None,
 }
 
-impl<'a, 'arena> Scope<'a, 'arena> {
-    pub(crate) fn resolve(&self, name: &str) -> Resolved<'a, 'arena> {
+impl<'a> Scope<'a> {
+    pub(crate) fn resolve(&self, name: &str) -> Resolved<'a> {
         for overlay in self.overlays.iter().rev() {
             match overlay.get(name) {
                 Some(ScopeEntry::Masked) => return Resolved::Masked,
