@@ -21,14 +21,13 @@
 //!
 //! See [`crate::transform_server`] for the orchestration.
 
-use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::Span;
 use tsv_svelte::ast::{
     Attribute, AttributeValue, ClassDirective, StyleDirective, StyleDirectiveValue,
 };
 use tsv_ts::ast::{
-    ArrayExpression, Expression, ExpressionKind, LiteralValue, ObjectExpression, ObjectProperty,
-    Property,
+    ArrayExpression, ExprId, Expression, ExpressionKind, LiteralValue, ObjectExpression,
+    ObjectProperty, Property,
 };
 
 use crate::attribute::{
@@ -48,30 +47,31 @@ use crate::{CompileError, Refusal};
 /// govern CSS-scope handling: a string-literal base folds the hash into its text
 /// and contributes its tokens to selector matching; any other base carries the
 /// hash in the 2nd argument and contributes no static tokens.
-enum ClassBase<'arena> {
+enum ClassBase {
     /// A statically-known string base (`class="foo"`, or the synthetic `''`).
     StringLiteral(String),
     /// A non-string-literal base expression (`$.clsx(w)`, a bare identifier, a
-    /// template literal, `true`).
-    Expr(Expression<'arena>),
+    /// template literal, `true`), pushed.
+    Expr(ExprId),
 }
 
 /// Build the base expression for an element's `$.attr_class(...)` call from its
 /// authored `class` attribute (`None` = no authored class → the oracle's synthetic
 /// empty `''`). Mirrors the oracle's `build_attribute_value` + `needs_clsx`
 /// handling for the `class` attribute.
-fn build_class_base<'arena>(
-    env: &mut EmitEnv<'arena>,
-    class_attr: Option<&'arena Attribute<'arena>>,
-) -> Result<ClassBase<'arena>, CompileError> {
+fn build_class_base(
+    env: &mut EmitEnv<'_>,
+    class_attr: Option<&Attribute>,
+) -> Result<ClassBase, CompileError> {
     let Some(attr) = class_attr else {
         // No authored `class` — the oracle injects a synthetic `class=""`
         // (2-analyze/index.js), so the base is the empty string literal.
         return Ok(ClassBase::StringLiteral(String::new()));
     };
-    let Some(values) = attr.value else {
+    let Some(values) = env.sv.opt_attribute_values(attr.value) else {
         // A bare boolean `class` — the oracle's `build_attribute_value(true)` → `true`.
-        return Ok(ClassBase::Expr(env.b.true_literal()));
+        let flag = env.b.true_literal();
+        return Ok(ClassBase::Expr(env.b.push(flag)));
     };
     match values {
         [AttributeValue::Text(text)] => {
@@ -87,16 +87,15 @@ fn build_class_base<'arena>(
             // path (`emit_dynamic_attribute`).
             let quoted = preceded_by_quote(env.source, tag.span.start);
             let expr = env.erase(tag.expression)?;
-            if matches!(&expr.kind, ExpressionKind::Literal(lit)
-                if matches!(lit.value, LiteralValue::String(_)))
-            {
+            if is_string_literal(env, expr) {
                 return Err(unsupported(Refusal::StringLiteralExprAttribute));
             }
             let wrapped = wrap_value_expr(env, expr)?;
-            let base = if class_needs_clsx(expr, quoted) {
-                env.b.member_call("$", "clsx", wrapped)
+            let base = if class_needs_clsx(env.b.view().expr(expr), quoted) {
+                let clsx = env.b.member_call("$", "clsx", &[wrapped]);
+                env.b.push(clsx)
             } else {
-                wrapped[0].clone()
+                wrapped
             };
             Ok(ClassBase::Expr(base))
         }
@@ -105,42 +104,51 @@ fn build_class_base<'arena>(
     }
 }
 
+/// Whether the expression `expr` names is a string literal — the oracle's
+/// inline-literal attribute path, which neither base builder reproduces.
+fn is_string_literal(env: &EmitEnv<'_>, expr: ExprId) -> bool {
+    matches!(&env.b.view().expr(expr).kind, ExpressionKind::Literal(lit)
+        if matches!(lit.value, LiteralValue::String(_)))
+}
+
+/// A pushed object literal over `properties` at `span` (its minted braces).
+fn object_expr(env: &mut EmitEnv<'_>, properties: &[ObjectProperty], span: Span) -> ExprId {
+    let properties = env.b.push_list(properties);
+    env.b.push(Expression {
+        span,
+        kind: ExpressionKind::ObjectExpression(ObjectExpression {
+            properties,
+            spread_trailing_comma: false,
+        }),
+    })
+}
+
 /// Build the directives object `{ 'name': expr, … }` (source order) for
 /// `$.attr_class`. The key is always a string literal (the oracle's
 /// `b.literal(directive.name)`); `format_canonical` drops the quotes for an
 /// identifier-safe name, matching the oracle's own canonicalized output. Each
 /// value is the directive expression, erased + guarded + derived-rewritten.
-fn build_class_directives_object<'arena>(
-    env: &mut EmitEnv<'arena>,
-    class_directives: &[&'arena ClassDirective<'arena>],
-) -> Result<Expression<'arena>, CompileError> {
-    let arena = env.b.arena;
+fn build_class_directives_object(
+    env: &mut EmitEnv<'_>,
+    class_directives: &[&ClassDirective],
+) -> Result<ExprId, CompileError> {
     let obrace = env.b.mint("{").start;
-    let mut properties: BumpVec<'arena, ObjectProperty<'arena>> = BumpVec::new_in(arena);
+    let mut properties: Vec<ObjectProperty> = Vec::with_capacity(class_directives.len());
     for directive in class_directives {
         let name = directive.name_span.extract(env.source);
         let key = env.b.string_literal_expr(name);
         let key_span = key.span();
+        let key = env.b.push(key);
         // The template borrow point: erase once, then guard + rewrite a bare
         // derived read to `d()`.
         let expr = env.erase(directive.expression)?;
-        let value = wrap_value_expr(env, expr)?[0].clone();
+        let value = wrap_value_expr(env, expr)?;
         properties.push(ObjectProperty::Property(init_property(
-            env.b.arena,
-            key,
-            value,
-            false,
-            key_span,
+            key, value, false, key_span,
         )));
     }
     let cbrace = env.b.mint("}").end;
-    Ok(Expression {
-        span: Span::new(obrace, cbrace),
-        kind: ExpressionKind::ObjectExpression(ObjectExpression {
-            properties: properties.into_bump_slice(),
-            spread_trailing_comma: false,
-        }),
-    })
+    Ok(object_expr(env, &properties, Span::new(obrace, cbrace)))
 }
 
 /// Build the `classes` (3rd) argument of a spread element's `$.attributes(…)` call
@@ -156,27 +164,29 @@ fn build_class_directives_object<'arena>(
 /// oracle's `directive.expression.type === 'Identifier' && … === directive.name`
 /// (a `class:active={active as T}` is not shorthand — the raw node is a
 /// `TSAsExpression` — and its value is the erased/guarded expression).
-pub(crate) fn build_spread_class_object<'arena>(
-    env: &mut EmitEnv<'arena>,
-    class_directives: &[&'arena ClassDirective<'arena>],
-) -> Result<Expression<'arena>, CompileError> {
-    let arena = env.b.arena;
+pub(crate) fn build_spread_class_object(
+    env: &mut EmitEnv<'_>,
+    class_directives: &[&ClassDirective],
+) -> Result<ExprId, CompileError> {
     let obrace = env.b.mint("{").start;
-    let mut properties: BumpVec<'arena, ObjectProperty<'arena>> = BumpVec::new_in(arena);
+    let mut properties: Vec<ObjectProperty> = Vec::with_capacity(class_directives.len());
     for directive in class_directives {
         let name = directive.name_span.extract(env.source).to_string();
         // The oracle's same-named-identifier shorthand fork, read on the RAW node:
         // the value is the bare `b.id(directive.name)` (no transform / derived
         // rewrite), exactly like a `style:` shorthand.
-        let same_named = matches!(&directive.expression.kind, ExpressionKind::Identifier(id)
-            if plain_identifier_name(id, env.source).as_deref() == Some(name.as_str()));
+        let same_named = matches!(
+            &env.b.view().expr(directive.expression).kind,
+            ExpressionKind::Identifier(id)
+                if plain_identifier_name(id, env.source).as_deref() == Some(name.as_str())
+        );
         let (value, is_shorthand_id) = if same_named {
-            (Expression::from_identifier(env.b.ident(&name)), true)
+            (env.b.ident_expr(&name), true)
         } else {
             // The template borrow point: erase once, then guard + rewrite a bare
             // derived read to `d()`.
             let expr = env.erase(directive.expression)?;
-            (wrap_value_expr(env, expr)?[0].clone(), false)
+            (wrap_value_expr(env, expr)?, false)
         };
         let key_is_ident = is_js_identifier(&name);
         let shorthand = is_shorthand_id && key_is_ident;
@@ -189,22 +199,13 @@ pub(crate) fn build_spread_class_object<'arena>(
             let span = key.span();
             (key, span)
         };
+        let key = env.b.push(key);
         properties.push(ObjectProperty::Property(init_property(
-            env.b.arena,
-            key,
-            value,
-            shorthand,
-            key_span,
+            key, value, shorthand, key_span,
         )));
     }
     let cbrace = env.b.mint("}").end;
-    Ok(Expression {
-        span: Span::new(obrace, cbrace),
-        kind: ExpressionKind::ObjectExpression(ObjectExpression {
-            properties: properties.into_bump_slice(),
-            spread_trailing_comma: false,
-        }),
-    })
+    Ok(object_expr(env, &properties, Span::new(obrace, cbrace)))
 }
 
 /// Build the `styles` (4th) argument of a spread element's `$.attributes(…)` call
@@ -217,27 +218,20 @@ pub(crate) fn build_spread_class_object<'arena>(
 /// `|important` is legal, else refuse) but does not partition. Reuses
 /// [`build_style_property`] for the per-property build (key lowercasing / quoting,
 /// shorthand).
-pub(crate) fn build_spread_style_object<'arena>(
-    env: &mut EmitEnv<'arena>,
-    style_directives: &[&'arena StyleDirective<'arena>],
-) -> Result<Expression<'arena>, CompileError> {
-    let arena = env.b.arena;
+pub(crate) fn build_spread_style_object(
+    env: &mut EmitEnv<'_>,
+    style_directives: &[&StyleDirective],
+) -> Result<ExprId, CompileError> {
     let obrace = env.b.mint("{").start;
-    let mut properties: BumpVec<'arena, ObjectProperty<'arena>> = BumpVec::new_in(arena);
+    let mut properties: Vec<ObjectProperty> = Vec::with_capacity(style_directives.len());
     for directive in style_directives {
-        validate_style_modifiers(directive)?;
+        validate_style_modifiers(env, directive)?;
         properties.push(ObjectProperty::Property(build_style_property(
             env, directive,
         )?));
     }
     let cbrace = env.b.mint("}").end;
-    Ok(Expression {
-        span: Span::new(obrace, cbrace),
-        kind: ExpressionKind::ObjectExpression(ObjectExpression {
-            properties: properties.into_bump_slice(),
-            spread_trailing_comma: false,
-        }),
-    })
+    Ok(object_expr(env, &properties, Span::new(obrace, cbrace)))
 }
 
 /// Emit the fused `$.attr_class(base, css_hash, { name: expr, … })` call for a
@@ -253,11 +247,11 @@ pub(crate) fn build_spread_style_object<'arena>(
 /// hash).trim()`) or, for any other base, rides the 2nd argument; otherwise the
 /// 2nd argument is `void 0` (the directives object is always the 3rd argument, so
 /// the middle argument is never elided).
-pub(crate) fn emit_class_directives<'arena>(
-    env: &mut EmitEnv<'arena>,
-    class_attr: Option<&'arena Attribute<'arena>>,
-    class_directives: &[&'arena ClassDirective<'arena>],
-    out: &mut BodyBuilder<'arena>,
+pub(crate) fn emit_class_directives(
+    env: &mut EmitEnv<'_>,
+    class_attr: Option<&Attribute>,
+    class_directives: &[&ClassDirective],
+    out: &mut BodyBuilder,
     element_scoped: bool,
 ) -> Result<(), CompileError> {
     let base = build_class_base(env, class_attr)?;
@@ -280,7 +274,8 @@ pub(crate) fn emit_class_directives<'arena>(
             } else {
                 escaped
             };
-            env.b.string_literal_expr(&text)
+            let literal = env.b.string_literal_expr(&text);
+            env.b.push(literal)
         }
         ClassBase::Expr(e) => e,
     };
@@ -292,14 +287,13 @@ pub(crate) fn emit_class_directives<'arena>(
     } else {
         env.b.void_zero()
     };
+    let css_hash = env.b.push(css_hash);
 
     let directives = build_class_directives_object(env, class_directives)?;
 
-    let mut args: BumpVec<'arena, Expression<'arena>> = BumpVec::new_in(env.b.arena);
-    args.push(base_expr);
-    args.push(css_hash);
-    args.push(directives);
-    let call = env.b.member_call("$", "attr_class", args.into_bump_slice());
+    let call = env
+        .b
+        .member_call("$", "attr_class", &[base_expr, css_hash, directives]);
     out.push_expr(call);
     Ok(())
 }
@@ -308,11 +302,23 @@ pub(crate) fn emit_class_directives<'arena>(
 /// `|important` (or none). Any other modifier, or two or more, is
 /// `style_directive_invalid_modifier` — an oracle *error*, so tsv refuses rather
 /// than compile it.
-fn validate_style_modifiers(directive: &StyleDirective<'_>) -> Result<(), CompileError> {
-    match directive.modifiers {
-        [] | ["important"] => Ok(()),
+fn validate_style_modifiers(
+    env: &EmitEnv<'_>,
+    directive: &StyleDirective,
+) -> Result<(), CompileError> {
+    match env.sv.modifiers(directive.modifiers) {
+        [] => Ok(()),
+        [modifier] if modifier.extract(env.source) == "important" => Ok(()),
         _ => Err(unsupported(Refusal::StyleDirectiveInvalidModifier)),
     }
+}
+
+/// Whether a `style:` directive carries the `|important` modifier.
+fn is_important(env: &EmitEnv<'_>, directive: &StyleDirective) -> bool {
+    env.sv
+        .modifiers(directive.modifiers)
+        .iter()
+        .any(|modifier| modifier.extract(env.source) == "important")
 }
 
 /// Build the base (1st) argument of a `$.attr_style(base, directives)` call from
@@ -320,18 +326,20 @@ fn validate_style_modifiers(directive: &StyleDirective<'_>) -> Result<(), Compil
 /// phase-2 synthetic empty `''`). Mirrors `build_class_base` MINUS `$.clsx` and
 /// MINUS any CSS scoping (style is never scoped): a dynamic `style={expr}` is the
 /// bare expression, not `$.clsx(expr)`.
-fn build_style_base<'arena>(
-    env: &mut EmitEnv<'arena>,
-    style_attr: Option<&'arena Attribute<'arena>>,
-) -> Result<Expression<'arena>, CompileError> {
+fn build_style_base(
+    env: &mut EmitEnv<'_>,
+    style_attr: Option<&Attribute>,
+) -> Result<ExprId, CompileError> {
     let Some(attr) = style_attr else {
         // No authored `style` — the oracle injects a synthetic `style=""`
         // (2-analyze/index.js), so the base is the empty string literal.
-        return Ok(env.b.string_literal_expr(""));
+        let empty = env.b.string_literal_expr("");
+        return Ok(env.b.push(empty));
     };
-    let Some(values) = attr.value else {
+    let Some(values) = env.sv.opt_attribute_values(attr.value) else {
         // A bare boolean `style` — the oracle's `build_attribute_value(true)` → `true`.
-        return Ok(env.b.true_literal());
+        let flag = env.b.true_literal();
+        return Ok(env.b.push(flag));
     };
     match values {
         [AttributeValue::Text(text)] => {
@@ -340,7 +348,8 @@ fn build_style_base<'arena>(
             // (`build_attribute_value`, non-component → `escape_html(data, true)`).
             let decoded = text.data(env.source);
             let collapsed = collapse_attr_whitespace(&decoded);
-            Ok(env.b.string_literal_expr(&escape_html_attr(&collapsed)))
+            let literal = env.b.string_literal_expr(&escape_html_attr(&collapsed));
+            Ok(env.b.push(literal))
         }
         [AttributeValue::ExpressionTag(tag)] => {
             // Dynamic `style={expr}` / `style="{expr}"` — the bare expression (NO
@@ -348,12 +357,10 @@ fn build_style_base<'arena>(
             // oracle's inline-literal path we don't reproduce — refuse, matching the
             // standalone dynamic-attribute path (`emit_dynamic_attribute`).
             let expr = env.erase(tag.expression)?;
-            if matches!(&expr.kind, ExpressionKind::Literal(lit)
-                if matches!(lit.value, LiteralValue::String(_)))
-            {
+            if is_string_literal(env, expr) {
                 return Err(unsupported(Refusal::StringLiteralExprAttribute));
             }
-            Ok(wrap_value_expr(env, expr)?[0].clone())
+            wrap_value_expr(env, expr)
         }
         // A mixed-value `style="a {b}"` base — deferred (rare).
         _ => Err(unsupported(Refusal::StyleDirectiveWithMixedStyle)),
@@ -365,10 +372,10 @@ fn build_style_base<'arena>(
 /// lowercased unless it starts with `--` (custom properties keep case); a
 /// shorthand `style:color` prints as object-shorthand `{ color }` when the
 /// (lowercased) key coincides with the raw same-name identifier value.
-fn build_style_property<'arena>(
-    env: &mut EmitEnv<'arena>,
-    directive: &'arena StyleDirective<'arena>,
-) -> Result<Property<'arena>, CompileError> {
+fn build_style_property(
+    env: &mut EmitEnv<'_>,
+    directive: &StyleDirective,
+) -> Result<Property, CompileError> {
     let raw_name = directive.name_span.extract(env.source).to_string();
     // The oracle lowercases the property name unless it is a `--custom-property`.
     let key_name = if raw_name.starts_with("--") {
@@ -381,24 +388,22 @@ fn build_style_property<'arena>(
     let (value, is_shorthand_id) = match &directive.value {
         StyleDirectiveValue::True => {
             // Shorthand `style:color` → `b.id(directive.name)` (RAW name).
-            (Expression::from_identifier(env.b.ident(&raw_name)), true)
+            (env.b.ident_expr(&raw_name), true)
         }
         StyleDirectiveValue::ExpressionTag(tag) => {
             // The template borrow point: erase once, then guard + rewrite a bare
             // derived read to `d()`. `|important` does NOT wrap the value.
             let expr = env.erase(tag.expression)?;
-            (wrap_value_expr(env, expr)?[0].clone(), false)
+            (wrap_value_expr(env, expr)?, false)
         }
-        StyleDirectiveValue::Parts(parts) => match parts {
+        StyleDirectiveValue::Parts(parts) => match env.sv.attribute_values(*parts) {
             // A static `style:color="red"` → the string literal, collapsed +
             // trimmed + attribute-escaped like the base text value.
             [AttributeValue::Text(text)] => {
                 let decoded = text.data(env.source);
                 let collapsed = collapse_attr_whitespace(&decoded);
-                (
-                    env.b.string_literal_expr(&escape_html_attr(&collapsed)),
-                    false,
-                )
+                let literal = env.b.string_literal_expr(&escape_html_attr(&collapsed));
+                (env.b.push(literal), false)
             }
             // A mixed `style:color="a {b}"` value — deferred (rare).
             _ => return Err(unsupported(Refusal::StyleDirectiveWithMixedValue)),
@@ -420,26 +425,26 @@ fn build_style_property<'arena>(
         let span = key.span();
         (key, span)
     };
+    let key = env.b.push(key);
 
-    Ok(init_property(env.b.arena, key, value, shorthand, key_span))
+    Ok(init_property(key, value, shorthand, key_span))
 }
 
 /// Build the directives (2nd) argument of `$.attr_style`: a plain object
 /// `{ normal… }`, or — when any directive carries `|important` — a 2-element
 /// array `[ { normal… }, { important… } ]` (the normal object is `{}` when all are
 /// important). Source order is preserved within each group.
-fn build_style_directives_arg<'arena>(
-    env: &mut EmitEnv<'arena>,
-    style_directives: &[&'arena StyleDirective<'arena>],
-) -> Result<Expression<'arena>, CompileError> {
-    let arena = env.b.arena;
+fn build_style_directives_arg(
+    env: &mut EmitEnv<'_>,
+    style_directives: &[&StyleDirective],
+) -> Result<ExprId, CompileError> {
     let obrace = env.b.mint("{").start;
-    let mut normal: BumpVec<'arena, ObjectProperty<'arena>> = BumpVec::new_in(arena);
-    let mut important: BumpVec<'arena, ObjectProperty<'arena>> = BumpVec::new_in(arena);
+    let mut normal: Vec<ObjectProperty> = Vec::new();
+    let mut important: Vec<ObjectProperty> = Vec::new();
     for directive in style_directives {
-        validate_style_modifiers(directive)?;
+        validate_style_modifiers(env, directive)?;
         let property = ObjectProperty::Property(build_style_property(env, directive)?);
-        if directive.modifiers.contains(&"important") {
+        if is_important(env, directive) {
             important.push(property);
         } else {
             normal.push(property);
@@ -451,40 +456,24 @@ fn build_style_directives_arg<'arena>(
     // properties render from their own key/value spans, so the normal span
     // enclosing the (source-order-interleaved) important property text is harmless.
     let cbrace = env.b.mint("}").end;
-    let normal_obj = Expression {
-        span: Span::new(obrace, cbrace),
-        kind: ExpressionKind::ObjectExpression(ObjectExpression {
-            properties: normal.into_bump_slice(),
-            spread_trailing_comma: false,
-        }),
-    };
+    let normal_obj = object_expr(env, &normal, Span::new(obrace, cbrace));
     if important.is_empty() {
         return Ok(normal_obj);
     }
     // Any `|important` → the partitioned `[ {normal}, {important} ]` array.
-    let normal_alloc: &'arena Expression<'arena> = arena.alloc(normal_obj);
     let iobrace = env.b.mint("{").start;
     let icbrace = env.b.mint("}").end;
-    let important_obj = Expression {
-        span: Span::new(iobrace, icbrace),
-        kind: ExpressionKind::ObjectExpression(ObjectExpression {
-            properties: important.into_bump_slice(),
-            spread_trailing_comma: false,
-        }),
-    };
-    let important_alloc: &'arena Expression<'arena> = arena.alloc(important_obj);
+    let important_obj = object_expr(env, &important, Span::new(iobrace, icbrace));
     let lbracket = env.b.mint("[").start;
     let rbracket = env.b.mint("]").end;
-    let mut elements: BumpVec<'arena, Option<&'arena Expression<'arena>>> = BumpVec::new_in(arena);
-    elements.push(Some(normal_alloc));
-    elements.push(Some(important_alloc));
-    Ok(Expression {
+    let elements = env.b.push_list(&[Some(normal_obj), Some(important_obj)]);
+    Ok(env.b.push(Expression {
         span: Span::new(lbracket, rbracket),
         kind: ExpressionKind::ArrayExpression(ArrayExpression {
-            elements: elements.into_bump_slice(),
+            elements,
             spread_trailing_comma: false,
         }),
-    })
+    }))
 }
 
 /// Emit the fused `$.attr_style(base, { name: value, … })` call for a regular
@@ -493,19 +482,16 @@ fn build_style_directives_arg<'arena>(
 /// present (its value is the base), else `None` (the oracle's synthetic empty
 /// `''`). Unlike `$.attr_class`, there is no css-hash argument (style is never
 /// scoped) and the directives argument may be an important-partitioned array.
-pub(crate) fn emit_style_directives<'arena>(
-    env: &mut EmitEnv<'arena>,
-    style_attr: Option<&'arena Attribute<'arena>>,
-    style_directives: &[&'arena StyleDirective<'arena>],
-    out: &mut BodyBuilder<'arena>,
+pub(crate) fn emit_style_directives(
+    env: &mut EmitEnv<'_>,
+    style_attr: Option<&Attribute>,
+    style_directives: &[&StyleDirective],
+    out: &mut BodyBuilder,
 ) -> Result<(), CompileError> {
     let base = build_style_base(env, style_attr)?;
     let directives = build_style_directives_arg(env, style_directives)?;
 
-    let mut args: BumpVec<'arena, Expression<'arena>> = BumpVec::new_in(env.b.arena);
-    args.push(base);
-    args.push(directives);
-    let call = env.b.member_call("$", "attr_style", args.into_bump_slice());
+    let call = env.b.member_call("$", "attr_style", &[base, directives]);
     out.push_expr(call);
     Ok(())
 }

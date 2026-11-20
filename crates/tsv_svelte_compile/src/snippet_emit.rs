@@ -8,9 +8,8 @@
 
 use std::collections::HashMap;
 
-use bumpalo::collections::Vec as BumpVec;
 use tsv_svelte::ast::{RenderTag, SnippetBlock};
-use tsv_ts::ast::{CallExpression, Expression, ExpressionKind, Statement};
+use tsv_ts::ast::{AstView, CallExpression, ExprId, Expression, ExpressionKind, Statement};
 
 use crate::analyze::{ScopeEntry, pattern_binding_names};
 use crate::body_builder::BodyBuilder;
@@ -18,7 +17,7 @@ use crate::fragment::emit_child_body;
 use crate::namespace::{ChildNamespace, FragmentParent, Namespace};
 use crate::script_decls::plain_identifier_str;
 use crate::snippet::snippet_name;
-use crate::template_value::wrap_single;
+use crate::template_value::wrap_value_expr;
 use crate::transform_server::{EmitEnv, unsupported};
 use crate::{CompileError, Refusal};
 
@@ -28,20 +27,20 @@ use crate::{CompileError, Refusal};
 /// else goes to the current fragment's init (via `out`, flushing any pending
 /// template first). The snippet body reuses the fragment machinery, with the
 /// parameters masked to UNKNOWN so their reads never fold.
-pub(crate) fn emit_snippet<'arena>(
-    env: &mut EmitEnv<'arena>,
-    snippet: &'arena SnippetBlock<'arena>,
-    out: &mut BodyBuilder<'arena>,
+pub(crate) fn emit_snippet(
+    env: &mut EmitEnv<'_>,
+    snippet: &SnippetBlock,
+    out: &mut BodyBuilder,
 ) -> Result<(), CompileError> {
-    let arena = env.b.arena;
     let (fn_decl, _name) = build_snippet_function(env, snippet)?;
     // Only a hoistable *top-level* snippet's identity is in the hoistable set; a
     // nested or body-local snippet (`is_hoisted` false — its span is never
     // inserted) goes to this block's init.
     if env.snippets.is_hoisted(snippet) {
+        let fn_decl = env.b.push(fn_decl);
         env.hoisted_snippets.push(fn_decl);
     } else {
-        out.push_statement(&mut env.b, arena, fn_decl);
+        out.push_statement(&mut env.b, fn_decl);
     }
     Ok(())
 }
@@ -51,24 +50,25 @@ pub(crate) fn emit_snippet<'arena>(
 /// escaped name; typed and generic signatures COMPILE (they erase). Shared by the
 /// template-hoist path ([`emit_snippet`]) and the component snippet-prop path
 /// (where the function lives in the component's wrapping block).
-pub(crate) fn build_snippet_function<'arena>(
-    env: &mut EmitEnv<'arena>,
-    snippet: &'arena SnippetBlock<'arena>,
-) -> Result<(Statement<'arena>, String), CompileError> {
-    let arena = env.b.arena;
+pub(crate) fn build_snippet_function(
+    env: &mut EmitEnv<'_>,
+    snippet: &SnippetBlock,
+) -> Result<(Statement, String), CompileError> {
     // A **top-level** rest parameter is a `snippet_invalid_rest_parameter` error in
     // the oracle's analysis phase (`2-analyze/visitors/SnippetBlock.js`), which
     // scans `node.parameters` itself and never descends — so a rest element NESTED
     // in a destructuring parameter (`{#snippet s({ ...rest })}`, `s(a, [b, ...t])`)
     // is legal and compiles. Match that exactly: top level only.
-    if snippet
-        .parameters
+    if env
+        .b
+        .view()
+        .exprs(snippet.parameters)
         .iter()
         .any(|param| matches!(param.kind, ExpressionKind::RestElement(_)))
     {
         return Err(unsupported(Refusal::SnippetRestParameter));
     }
-    let Some(name) = snippet_name(snippet, env.source) else {
+    let Some(name) = snippet_name(env.b.view(), snippet, env.source) else {
         // An escaped snippet name isn't reproducible by this port.
         return Err(unsupported(Refusal::SnippetEscapedName));
     };
@@ -83,19 +83,19 @@ pub(crate) fn build_snippet_function<'arena>(
 
     // The parameter list is a template borrow point — the patterns are borrowed
     // verbatim into the emitted function, so `(x: string)` erases to `(x)` here.
-    let mut params: BumpVec<'arena, Expression<'arena>> = BumpVec::new_in(arena);
-    for param in snippet.parameters {
-        params.push(env.erase(param)?.clone());
+    let raw_params = env.b.view().exprs(snippet.parameters).to_vec();
+    let mut params = Vec::with_capacity(raw_params.len());
+    for param in raw_params {
+        params.push(env.erase_parameter(param)?);
     }
-    let params = params.into_bump_slice();
 
     // Mask the parameters to UNKNOWN in the body (a parameter read never folds),
     // and refuse a parameter that shadows a `$derived` binding (the overlay push
     // enforces this).
-    let mut overlay: HashMap<String, ScopeEntry<'arena>> = HashMap::new();
-    for param in params {
+    let mut overlay: HashMap<String, ScopeEntry> = HashMap::new();
+    for param in &params {
         let mut names = Vec::new();
-        pattern_binding_names(param, env.source, &mut names)?;
+        pattern_binding_names(env.b.view(), param, env.source, &mut names)?;
         for name in names {
             overlay.insert(name, ScopeEntry::Masked);
         }
@@ -108,7 +108,7 @@ pub(crate) fn build_snippet_function<'arena>(
     // default is the fallback when the body holds no elements.
     let body = emit_child_body(
         env,
-        &snippet.body,
+        env.sv.nodes(snippet.body.nodes),
         &[],
         true,
         false,
@@ -122,13 +122,13 @@ pub(crate) fn build_snippet_function<'arena>(
 
     // `($$renderer, ...params)` — the synthetic renderer first, then the erased
     // parameter patterns.
-    let mut all_params: BumpVec<'arena, Expression<'arena>> = BumpVec::new_in(arena);
+    let mut all_params = Vec::with_capacity(params.len() + 1);
     all_params.push(Expression::from_identifier(env.b.ident("$$renderer")));
-    all_params.extend_from_slice(params);
+    all_params.extend_from_slice(&params);
     let block_span = env.b.here();
     let fn_decl = env
         .b
-        .function_declaration(&name, all_params.into_bump_slice(), body, block_span);
+        .function_declaration(&name, &all_params, body, block_span);
     Ok((fn_decl, name))
 }
 
@@ -148,9 +148,7 @@ pub(crate) fn build_snippet_function<'arena>(
 /// parser accepts the shape too, but this helper returns `None` for it, so the
 /// emitter refuses — a safe over-refusal, subsumed by the standing
 /// template-expression-comment refusal (a cast is never comment-free).
-pub(crate) fn render_call_expression<'a, 'arena>(
-    expr: &'a Expression<'arena>,
-) -> Option<&'a CallExpression<'arena>> {
+pub(crate) fn render_call_expression(expr: &Expression) -> Option<&CallExpression> {
     match &expr.kind {
         ExpressionKind::CallExpression(call) => Some(call),
         _ => None,
@@ -160,9 +158,13 @@ pub(crate) fn render_call_expression<'a, 'arena>(
 /// The plain callee name of a `{@render}` expression: unwrap the (possibly
 /// optional) call, requiring a plain-identifier callee. `None` for a member
 /// callee, a non-call, or an escaped identifier.
-pub(crate) fn render_callee_name<'s>(expr: &Expression<'_>, source: &'s str) -> Option<&'s str> {
-    let call = render_call_expression(expr)?;
-    match &call.callee.kind {
+pub(crate) fn render_callee_name<'s>(
+    view: AstView<'_>,
+    expr: ExprId,
+    source: &'s str,
+) -> Option<&'s str> {
+    let call = render_call_expression(view.expr(expr))?;
+    match &view.expr(call.callee).kind {
         ExpressionKind::Identifier(id) => plain_identifier_str(id, source),
         _ => None,
     }
@@ -181,20 +183,19 @@ pub(crate) fn render_callee_dynamic(env: &EmitEnv<'_>, name: &str) -> bool {
 /// unless the enclosing fragment is standalone. The callee must resolve to a
 /// local snippet or a snippet prop; anything else refuses. Arguments ride the
 /// same value machinery as block tests (a bare derived read becomes `d()`).
-pub(crate) fn emit_render_tag<'arena>(
-    env: &mut EmitEnv<'arena>,
-    tag: &'arena RenderTag<'arena>,
-    out: &mut BodyBuilder<'arena>,
+pub(crate) fn emit_render_tag(
+    env: &mut EmitEnv<'_>,
+    tag: &RenderTag,
+    out: &mut BodyBuilder,
     is_standalone: bool,
 ) -> Result<(), CompileError> {
-    let arena = env.b.arena;
     // "A `{@render}` holds a call expression" is a **parse-time** rule in the
     // oracle (`render_tag_invalid_expression`, raised while reading the tag) — so
     // it is decided on the RAW node, BEFORE type erasure. The distinction is
     // observable: `{@render (s as T)(x)}` is a call and compiles, while
     // `{@render (s(x) as T)}` and `{@render s(x)!}` are rejected even though
     // erasure would turn both into calls.
-    if render_call_expression(tag.expression).is_none() {
+    if render_call_expression(env.b.view().expr(tag.expression)).is_none() {
         return Err(unsupported(Refusal::RenderTagUnsupportedCallee));
     }
     // The template borrow point: the whole `callee(args)` call is erased once, so
@@ -202,12 +203,12 @@ pub(crate) fn emit_render_tag<'arena>(
     // node (`{@render s<T>(x as U)}` → `s(x)`). Erasing a call yields a call, so
     // the shape settled above survives.
     let expression = env.erase(tag.expression)?;
-    let Some(call) = render_call_expression(expression) else {
+    let Some(&call) = render_call_expression(env.b.view().expr(expression)) else {
         return Err(unsupported(Refusal::RenderTagUnsupportedCallee));
     };
     // The callee must be a plain identifier resolving to a local snippet or a
     // snippet prop.
-    let Some(name) = render_callee_name(expression, env.source) else {
+    let Some(name) = render_callee_name(env.b.view(), expression, env.source) else {
         return Err(unsupported(Refusal::RenderTagUnsupportedCallee));
     };
     let is_snippet = env.snippets.names.contains(name);
@@ -218,15 +219,14 @@ pub(crate) fn emit_render_tag<'arena>(
 
     // `callee($$renderer, ...args)`. Arguments go through the value machinery so
     // a bare derived read becomes `d()` and runes/mutations refuse.
-    let mut args: BumpVec<'arena, Expression<'arena>> = BumpVec::new_in(arena);
-    args.push(Expression::from_identifier(env.b.ident("$$renderer")));
-    for arg in call.arguments {
-        args.push(wrap_single(env, arg)?);
+    let arguments = env.b.view().expr_list(call.arguments).to_vec();
+    let mut args = Vec::with_capacity(arguments.len() + 1);
+    args.push(env.b.ident_expr("$$renderer"));
+    for arg in arguments {
+        args.push(wrap_value_expr(env, arg)?);
     }
-    let render_call = env
-        .b
-        .call_of(call.callee, args.into_bump_slice(), call.optional);
-    out.push_expression_statement(&mut env.b, arena, render_call);
+    let render_call = env.b.call_of(call.callee, &args, call.optional);
+    out.push_expression_statement(&mut env.b, render_call);
     // A dynamic or non-sole render keeps the anchor so its output doesn't glue to
     // the surrounding fragment (the oracle's `empty_comment` push).
     if !is_standalone {

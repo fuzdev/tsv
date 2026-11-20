@@ -8,16 +8,16 @@
 
 use std::collections::HashMap;
 
-use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::Span;
+use tsv_lang::store::Run;
 use tsv_svelte::ast::{
     AttributeNode, AttributeValue, AwaitBlock, ConstTag, EachBlock, Element, Fragment,
-    FragmentNode, IfBlock, KeyBlock, SnippetBlock, SpecialElement,
+    FragmentNode, IfBlock, KeyBlock, SnippetBlock, SpecialElement, SvelteView,
 };
 use tsv_ts::ast::{
-    BinaryOperator, BlockStatement, Expression, ExpressionKind, ForInit, ForStatement, IfStatement,
-    ObjectExpression, ObjectProperty, Statement, StatementKind, UpdateOperator,
-    VariableDeclaration, VariableDeclarationKind, VariableDeclarator,
+    BinaryOperator, BlockStatement, ExprId, Expression, ExpressionKind, ForInit, ForStatement,
+    IfStatement, ObjectExpression, ObjectProperty, Statement, StatementKind, StmtId,
+    UpdateOperator, VariableDeclaration, VariableDeclarationKind, VariableDeclarator,
 };
 
 use crate::analyze::{Binding, BindingKind, Initial, ScopeEntry, pattern_binding_names};
@@ -30,7 +30,7 @@ use crate::namespace::{ChildNamespace, FragmentParent, Namespace};
 use crate::script_decls::plain_identifier_name;
 use crate::snippet::snippet_name;
 use crate::snippet_emit::build_snippet_function;
-use crate::template_value::wrap_single;
+use crate::template_value::wrap_value_expr;
 use crate::transform_server::{EmitEnv, unsupported};
 use crate::{CompileError, Refusal};
 
@@ -58,12 +58,15 @@ use crate::{CompileError, Refusal};
 ///   branch, which consumes a `$$index` while consuming no `each_array`;
 /// - it advances once per `{#each}` regardless of an authored index, since the
 ///   name is minted before the visitor knows whether it will be used.
-pub(crate) fn assign_each_index_names(fragment: &Fragment<'_>) -> HashMap<(u32, u32), String> {
-    fn walk(fragment: &Fragment<'_>, names: &mut HashMap<(u32, u32), String>) {
-        for node in fragment.nodes {
+pub(crate) fn assign_each_index_names(
+    sv: SvelteView<'_>,
+    fragment: &Fragment,
+) -> HashMap<(u32, u32), String> {
+    fn walk(sv: SvelteView<'_>, fragment: &Fragment, names: &mut HashMap<(u32, u32), String>) {
+        for node in sv.nodes(fragment.nodes) {
             // Post-order: descend first, so a nested `{#each}` takes the lower
             // suffix — the oracle's visit-children-then-assign shape.
-            each_child_fragment(node, &mut |child| walk(child, names));
+            each_child_fragment(node, &mut |child| walk(sv, child, names));
             if let FragmentNode::EachBlock(block) = node {
                 let n = names.len();
                 let name = if n == 0 {
@@ -76,7 +79,7 @@ pub(crate) fn assign_each_index_names(fragment: &Fragment<'_>) -> HashMap<(u32, 
         }
     }
     let mut names = HashMap::new();
-    walk(fragment, &mut names);
+    walk(sv, fragment, &mut names);
     names
 }
 
@@ -143,13 +146,13 @@ fn svelte_hash(s: &str) -> String {
 /// unsupported special child refuses through the usual `emit_fragment` path.
 /// Attributes on the head element are refused (the oracle carries none in this
 /// subset).
-pub(crate) fn emit_svelte_head<'arena>(
-    env: &mut EmitEnv<'arena>,
-    head: &'arena SpecialElement<'arena>,
-    out: &mut BodyBuilder<'arena>,
+pub(crate) fn emit_svelte_head(
+    env: &mut EmitEnv<'_>,
+    head: &SpecialElement,
+    out: &mut BodyBuilder,
 ) -> Result<(), CompileError> {
-    let arena = env.b.arena;
-    if !head.attributes.is_empty() {
+    let sv = env.sv;
+    if !sv.attributes(head.attributes).is_empty() {
         return Err(unsupported(Refusal::SvelteHeadAttributes));
     }
     // The head body: a normal fragment (not text-first-marked) in the closure.
@@ -157,7 +160,7 @@ pub(crate) fn emit_svelte_head<'arena>(
     // content is html at the component root.
     let body = emit_child_body(
         env,
-        &head.fragment,
+        sv.nodes(head.fragment.nodes),
         &[],
         false,
         false,
@@ -170,16 +173,17 @@ pub(crate) fn emit_svelte_head<'arena>(
     )?;
     let here = env.b.here();
     let renderer_param = Expression::from_identifier(env.b.ident("$$renderer"));
-    let params = std::slice::from_ref(arena.alloc(renderer_param));
-    let arrow = env.b.arrow_block(params, body, here);
+    let arrow = env.b.arrow_block(&[renderer_param], body, here);
 
     // `$.head('<hash>', $$renderer, arrow)`.
-    let mut args: BumpVec<'arena, Expression<'arena>> = BumpVec::new_in(arena);
-    args.push(env.b.string_literal_expr(&svelte_hash(COMPILE_FILENAME)));
-    args.push(Expression::from_identifier(env.b.ident("$$renderer")));
-    args.push(arrow);
-    let call = env.b.member_call("$", "head", args.into_bump_slice());
-    out.push_expression_statement(&mut env.b, arena, call);
+    let hash = env.b.string_literal_expr(&svelte_hash(COMPILE_FILENAME));
+    let args = [
+        env.b.push(hash),
+        env.b.ident_expr("$$renderer"),
+        env.b.push(arrow),
+    ];
+    let call = env.b.member_call("$", "head", &args);
+    out.push_expression_statement(&mut env.b, call);
     Ok(())
 }
 
@@ -224,13 +228,13 @@ const BOUNDARY_VALID_ATTRIBUTES: [&str; 3] = ["onerror", "failed", "pending"];
 /// The `failed={expr}` / `pending={expr}` **attribute** forms refuse
 /// ([`Refusal::BoundaryAttributeSnippet`]); `onerror` is dropped (SSR runs no
 /// error handler) but still guard-walked, like an event handler.
-pub(crate) fn emit_boundary<'arena>(
-    env: &mut EmitEnv<'arena>,
-    boundary: &'arena SpecialElement<'arena>,
-    out: &mut BodyBuilder<'arena>,
+pub(crate) fn emit_boundary(
+    env: &mut EmitEnv<'_>,
+    boundary: &SpecialElement,
+    out: &mut BodyBuilder,
     ctx: &FragmentCtx<'_>,
 ) -> Result<(), CompileError> {
-    let arena = env.b.arena;
+    let sv = env.sv;
     guard_boundary_attributes(env, boundary)?;
 
     // Split the fragment: EVERY `failed`/`pending` snippet leaves the children
@@ -245,36 +249,36 @@ pub(crate) fn emit_boundary<'arena>(
     // {#snippet a}…</div>` over-accepts identically. Closing it means porting
     // the oracle's whole-component validations; a refusal scoped to this
     // emitter would buy an arbitrary sliver of the hole and misplace the fix.
-    let mut failed_snippet: Option<&'arena SnippetBlock<'arena>> = None;
-    let mut pending_snippet: Option<&'arena SnippetBlock<'arena>> = None;
-    let mut children_nodes: BumpVec<'arena, FragmentNode<'arena>> = BumpVec::new_in(arena);
-    for node in boundary.fragment.nodes {
+    let mut failed_snippet: Option<&SnippetBlock> = None;
+    let mut pending_snippet: Option<&SnippetBlock> = None;
+    let mut children_nodes: Vec<FragmentNode> = Vec::new();
+    for node in sv.nodes(boundary.fragment.nodes) {
         let reserved = match node {
-            FragmentNode::SnippetBlock(snippet) => match snippet_name(snippet, env.source) {
-                Some("failed") => {
-                    failed_snippet.get_or_insert(snippet);
-                    true
+            FragmentNode::SnippetBlock(snippet) => {
+                match snippet_name(env.b.view(), snippet, env.source) {
+                    Some("failed") => {
+                        failed_snippet.get_or_insert(snippet);
+                        true
+                    }
+                    Some("pending") => {
+                        pending_snippet.get_or_insert(snippet);
+                        true
+                    }
+                    _ => false,
                 }
-                Some("pending") => {
-                    pending_snippet.get_or_insert(snippet);
-                    true
-                }
-                _ => false,
-            },
+            }
             _ => false,
         };
         if !reserved {
-            children_nodes.push(node.clone());
+            children_nodes.push(*node);
         }
     }
-    let children_fragment = Fragment {
-        nodes: children_nodes.into_bump_slice(),
-    };
 
-    // (1) children — always, even when `pending` discards the result.
+    // (1) children — always, even when `pending` discards the result. The
+    // filtered nodes are a slice no run names, so they pass as one.
     let children_body = emit_child_body(
         env,
-        &children_fragment,
+        &children_nodes,
         &[],
         true,
         ctx.preserve_whitespace,
@@ -286,7 +290,7 @@ pub(crate) fn emit_boundary<'arena>(
     let (opener, inner_body) = if let Some(pending) = pending_snippet {
         let body = emit_child_body(
             env,
-            &pending.body,
+            sv.nodes(pending.body.nodes),
             &[],
             true,
             ctx.preserve_whitespace,
@@ -302,20 +306,21 @@ pub(crate) fn emit_boundary<'arena>(
     // produces. A fresh `BodyBuilder` gives them the right isolation for free:
     // `push_statement` flushes the pending template first, so each anchor lands in
     // its own `$$renderer.push(…)` rather than merging with a sibling's.
-    let mut inner = BodyBuilder::new_in(arena);
+    let mut inner = BodyBuilder::new();
     inner.push_text(opener);
-    let inner_block = (*block_stmt(&env.b, inner_body)).clone();
-    inner.push_statement(&mut env.b, arena, inner_block);
+    let inner_block = block_stmt(&env.b, inner_body);
+    inner.push_statement(&mut env.b, inner_block);
     inner.push_text(BOUNDARY_CLOSE);
-    let inner_stmts = inner.finish(&mut env.b, arena);
+    let inner_stmts = inner.finish(&mut env.b);
 
     // (3) failed — visited last, so its generated names come after the children's
     // and the pending body's, even though its function declaration prints first.
     let Some(failed) = failed_snippet else {
         // No `failed`: the oracle skips the wrapper entirely and splices the three
         // statements into the enclosing body.
-        for stmt in inner_stmts {
-            out.push_statement(&mut env.b, arena, stmt.clone());
+        for i in 0..inner_stmts.len() {
+            let stmt = env.b.view().stmt_list(inner_stmts)[i];
+            out.push_statement_id(&mut env.b, stmt);
         }
         return Ok(());
     };
@@ -324,41 +329,32 @@ pub(crate) fn emit_boundary<'arena>(
     // `$$renderer.boundary({ failed }, ($$renderer) => { … })`.
     let props = boundary_props(env, &name);
     let renderer_param = Expression::from_identifier(env.b.ident("$$renderer"));
-    let params = std::slice::from_ref(arena.alloc(renderer_param));
     let here = env.b.here();
-    let arrow = env.b.arrow_block(params, inner_stmts, here);
-    let mut args: BumpVec<'arena, Expression<'arena>> = BumpVec::new_in(arena);
-    args.push(props);
-    args.push(arrow);
-    let call = env
-        .b
-        .member_call("$$renderer", "boundary", args.into_bump_slice());
+    let arrow = env.b.arrow_block(&[renderer_param], inner_stmts, here);
+    let args = [env.b.push(props), env.b.push(arrow)];
+    let call = env.b.member_call("$$renderer", "boundary", &args);
     // The oracle visits the snippet with an `init` of the boundary's own and pushes
     // `{ ...init, boundary }` as one block, so the function is scoped to its boundary:
     // two sibling boundaries each declare their own `failed` without colliding.
-    let mut scoped: BumpVec<'arena, Statement<'arena>> = BumpVec::new_in(arena);
-    scoped.push(fn_decl);
-    scoped.push(env.b.expression_statement(call));
-    let scoped_block = (*block_stmt(&env.b, scoped.into_bump_slice())).clone();
-    out.push_statement(&mut env.b, arena, scoped_block);
+    let call_stmt = env.b.expression_statement(call);
+    let scoped = [env.b.push(fn_decl), env.b.push(call_stmt)];
+    let scoped = env.b.push_list(&scoped);
+    let scoped_block = block_stmt(&env.b, scoped);
+    out.push_statement(&mut env.b, scoped_block);
     Ok(())
 }
 
 /// The `{ failed }` shorthand object the `$$renderer.boundary` call takes as its
 /// first argument — the value references the `function failed(…)` declaration
 /// emitted just above it.
-fn boundary_props<'arena>(env: &mut EmitEnv<'arena>, name: &str) -> Expression<'arena> {
+fn boundary_props(env: &mut EmitEnv<'_>, name: &str) -> Expression {
     let obrace = env.b.mint("{").start;
     let key = env.b.ident(name);
     let key_span = key.span;
-    let property = init_property(
-        env.b.arena,
-        Expression::from_identifier(key),
-        Expression::from_identifier(env.b.ident(name)),
-        true,
-        key_span,
-    );
-    let properties = std::slice::from_ref(env.b.arena.alloc(ObjectProperty::Property(property)));
+    let key = env.b.push(Expression::from_identifier(key));
+    let value = env.b.ident_expr(name);
+    let property = init_property(key, value, true, key_span);
+    let properties = env.b.push_list(&[ObjectProperty::Property(property)]);
     let cbrace = env.b.mint("}").end;
     Expression {
         span: Span::new(obrace, cbrace),
@@ -381,11 +377,12 @@ fn boundary_props<'arena>(env: &mut EmitEnv<'arena>, name: &str) -> Expression<'
 /// A valid `onerror={handler}` is DROPPED from the output (SSR never runs the
 /// handler) but still guard-walked, exactly like an event-handler attribute — a
 /// stray rune or top-level `await` inside it must still refuse.
-fn guard_boundary_attributes<'arena>(
-    env: &EmitEnv<'arena>,
-    boundary: &'arena SpecialElement<'arena>,
+fn guard_boundary_attributes(
+    env: &EmitEnv<'_>,
+    boundary: &SpecialElement,
 ) -> Result<(), CompileError> {
-    for attr_node in boundary.attributes {
+    let sv = env.sv;
+    for attr_node in sv.attributes(boundary.attributes) {
         let AttributeNode::Attribute(attr) = attr_node else {
             // A spread or any directive — `svelte_boundary_invalid_attribute`.
             return Err(unsupported(Refusal::BoundaryInvalidAttribute));
@@ -400,7 +397,7 @@ fn guard_boundary_attributes<'arena>(
         // `svelte_boundary_invalid_attribute_value`: the value must be exactly one
         // `ExpressionTag` — a boolean attribute (`value: None`), a static string,
         // and a mixed `a{b}c` value all reject.
-        let Some([AttributeValue::ExpressionTag(tag)]) = attr.value else {
+        let Some([AttributeValue::ExpressionTag(tag)]) = sv.opt_attribute_values(attr.value) else {
             return Err(unsupported(Refusal::BoundaryInvalidAttributeValue { name }));
         };
         if valid != "onerror" {
@@ -414,20 +411,23 @@ fn guard_boundary_attributes<'arena>(
 }
 
 /// A single-declarator `let`/`const` declaration statement.
-pub(crate) fn declaration_stmt<'arena>(
-    b: &Builder<'arena>,
+pub(crate) fn declaration_stmt(
+    b: &mut Builder<'_>,
     kind: VariableDeclarationKind,
-    id: Expression<'arena>,
-    init: Expression<'arena>,
-) -> Statement<'arena> {
-    let span = Span::new(id.span().start, init.span().end);
+    id: ExprId,
+    init: ExprId,
+) -> Statement {
+    let span = Span::new(
+        b.view().expr(id).span().start,
+        b.view().expr(init).span().end,
+    );
     let declarator = VariableDeclarator {
-        id: b.arena.alloc(id),
-        init: Some(b.arena.alloc(init)),
+        id,
+        init: Some(init),
         definite: false,
         span,
     };
-    let decls = std::slice::from_ref(b.arena.alloc(declarator));
+    let decls = b.push_list(&[declarator]);
     Statement::from_variable_declaration(VariableDeclaration {
         kind,
         declarations: decls,
@@ -442,87 +442,68 @@ pub(crate) fn declaration_stmt<'arena>(
 /// `$$renderer.push` of a template literal, the marker joins that template's first
 /// chunk and its own push is dropped. Anything else first (a declaration, a nested
 /// block, an empty branch) keeps the separate marker push.
-fn fold_block_marker<'arena>(
-    b: &mut Builder<'arena>,
-    marker: &str,
-    body: &'arena [Statement<'arena>],
-) -> &'arena [Statement<'arena>] {
-    let Some(StatementKind::ExpressionStatement(first)) = body.get(1).map(|stmt| &stmt.kind) else {
-        return body;
-    };
-    let ExpressionKind::CallExpression(call) = &first.expression.kind else {
-        return body;
-    };
-    let (
-        Expression {
-            kind: ExpressionKind::MemberExpression(member),
-            ..
-        },
-        [
-            Expression {
-                kind: ExpressionKind::TemplateLiteral(template),
-                ..
-            },
-        ],
-    ) = (call.callee, call.arguments)
+fn fold_block_marker(b: &mut Builder<'_>, marker: &str, body: Run<StmtId>) -> Run<StmtId> {
+    let view = b.view();
+    let stmts = view.stmt_list(body);
+    let Some(StatementKind::ExpressionStatement(first)) =
+        stmts.get(1).map(|&id| &view.stmt(id).kind)
     else {
         return body;
     };
-    let (
-        Expression {
-            kind: ExpressionKind::Identifier(object),
-            ..
-        },
-        Expression {
-            kind: ExpressionKind::Identifier(property),
-            ..
-        },
-    ) = (member.object, member.property)
+    let ExpressionKind::CallExpression(call) = &view.expr(first.expression).kind else {
+        return body;
+    };
+    let (ExpressionKind::MemberExpression(member), &[argument]) =
+        (&view.expr(call.callee).kind, view.expr_list(call.arguments))
     else {
+        return body;
+    };
+    let ExpressionKind::TemplateLiteral(template) = view.expr(argument).kind else {
+        return body;
+    };
+    let (ExpressionKind::Identifier(object), ExpressionKind::Identifier(property)) = (
+        &view.expr(member.object).kind,
+        &view.expr(member.property).kind,
+    ) else {
         return body;
     };
     if member.computed
-        || object.name(&b.buffer) != "$$renderer"
-        || property.name(&b.buffer) != "push"
+        || object.name(&b.buffer, view) != "$$renderer"
+        || property.name(&b.buffer, view) != "push"
     {
         return body;
     }
     // Markers hold no character a template literal escapes, so the chunk's raw text
     // takes the marker as-is.
-    let mut texts: Vec<String> = template
-        .quasis
+    let mut texts: Vec<String> = view
+        .quasis(template.quasis)
         .iter()
         .map(|quasi| quasi.raw(&b.buffer).to_string())
         .collect();
+    let rest = stmts[2..].to_vec();
     texts[0].insert_str(0, marker);
     let folded = b.template_literal(&texts, template.expressions);
-    let folded = b.arena.alloc(folded);
-    let push = b.member_call("$$renderer", "push", std::slice::from_ref(folded));
-    let mut stmts: BumpVec<'arena, Statement<'arena>> = BumpVec::new_in(b.arena);
-    stmts.push(b.expression_statement(push));
-    stmts.extend(body[2..].iter().cloned());
-    stmts.into_bump_slice()
+    let folded = b.push(folded);
+    let push = b.member_call("$$renderer", "push", &[folded]);
+    let push = b.expression_statement(push);
+    let mut out = Vec::with_capacity(rest.len() + 1);
+    out.push(b.push(push));
+    out.extend_from_slice(&rest);
+    b.push_list(&out)
 }
 
-/// Wrap a finished statement slice in a `BlockStatement` (`{ … }`).
-fn block_stmt<'arena>(
-    b: &Builder<'arena>,
-    body: &'arena [Statement<'arena>],
-) -> &'arena Statement<'arena> {
+/// Wrap a finished statement run in a `BlockStatement` (`{ … }`).
+fn block_stmt(b: &Builder<'_>, body: Run<StmtId>) -> Statement {
     let span = b.here();
-    b.arena
-        .alloc(Statement::from_block_statement(BlockStatement {
-            body,
-            span,
-        }))
+    Statement::from_block_statement(BlockStatement { body, span })
 }
 
 /// Emit `{@const name = init}` into the current fragment: a hoisted `const`
 /// declaration plus an evaluator overlay entry so later reads fold.
-pub(crate) fn emit_const_tag<'arena>(
-    env: &mut EmitEnv<'arena>,
-    tag: &'arena ConstTag<'arena>,
-    out: &mut BodyBuilder<'arena>,
+pub(crate) fn emit_const_tag(
+    env: &mut EmitEnv<'_>,
+    tag: &ConstTag,
+    out: &mut BodyBuilder,
 ) -> Result<(), CompileError> {
     // Two template borrow points: the binding pattern (`{@const a: T = v}`) and
     // the initializer. The erased init feeds BOTH the emitted declaration and the
@@ -533,7 +514,7 @@ pub(crate) fn emit_const_tag<'arena>(
     // Only a plain-identifier binding is modeled: a destructured `{@const}`
     // whose init folds would have the oracle fold each read, which this port
     // can't reproduce per-binding — refuse rather than risk a silent mismatch.
-    let ExpressionKind::Identifier(ident) = &id.kind else {
+    let ExpressionKind::Identifier(ident) = &env.b.view().expr(id).kind else {
         return Err(unsupported(Refusal::DestructuredConstTag));
     };
     let Some(name) = plain_identifier_name(ident, env.source) else {
@@ -548,16 +529,9 @@ pub(crate) fn emit_const_tag<'arena>(
         return Err(unsupported(Refusal::BlockScopeShadowsDerived { name }));
     }
     // Guard + wrap the init (bare derived → d(), refuse runes/mutations).
-    let wrapped_init = wrap_single(env, init)?;
-    let id_expr = id.clone();
-    let arena = env.b.arena;
-    let stmt = declaration_stmt(
-        &env.b,
-        VariableDeclarationKind::Const,
-        id_expr,
-        wrapped_init,
-    );
-    out.push_statement(&mut env.b, arena, stmt);
+    let wrapped_init = wrap_value_expr(env, init)?;
+    let stmt = declaration_stmt(&mut env.b, VariableDeclarationKind::Const, id, wrapped_init);
+    out.push_statement(&mut env.b, stmt);
 
     // Enter the innermost overlay so `{name}` reads fold through its init.
     let binding = Binding {
@@ -581,25 +555,25 @@ pub(crate) fn emit_const_tag<'arena>(
 /// with per-branch hydration anchors (`<!--[N-->`, terminal `<!--[-1-->`) and a
 /// merge-forward `<!--]-->` closer. A missing `{:else}` synthesizes the
 /// anchor-only terminal branch.
-pub(crate) fn emit_if_block<'arena>(
-    env: &mut EmitEnv<'arena>,
-    if_block: &'arena IfBlock<'arena>,
-    out: &mut BodyBuilder<'arena>,
+pub(crate) fn emit_if_block(
+    env: &mut EmitEnv<'_>,
+    if_block: &IfBlock,
+    out: &mut BodyBuilder,
     ctx: &FragmentCtx<'_>,
 ) -> Result<(), CompileError> {
-    let arena = env.b.arena;
+    let sv = env.sv;
     let preserve = ctx.preserve_whitespace;
 
     // Flatten the else-if chain into (test, consequent) branches + terminal else
     // (an `{:else if}` nests as an alternate fragment of one `IfBlock{elseif}`).
-    let mut branches: Vec<(&'arena Expression<'arena>, &'arena Fragment<'arena>)> = Vec::new();
+    let mut branches: Vec<(ExprId, &Fragment)> = Vec::new();
     let mut current = if_block;
-    let final_else: Option<&'arena Fragment<'arena>>;
+    let final_else: Option<&Fragment>;
     loop {
         branches.push((current.test, &current.consequent));
         match &current.alternate {
             Some(alt) => {
-                if let [FragmentNode::IfBlock(inner)] = alt.nodes
+                if let [FragmentNode::IfBlock(inner)] = sv.nodes(alt.nodes)
                     && inner.elseif
                 {
                     current = inner;
@@ -617,16 +591,17 @@ pub(crate) fn emit_if_block<'arena>(
 
     // Build branch bodies in document order (anchors 0,1,2,…) so nested-block
     // name counters advance in the oracle's order.
-    let mut cons_blocks: Vec<(Expression<'arena>, &'arena Statement<'arena>)> = Vec::new();
+    let mut cons_blocks: Vec<(ExprId, StmtId)> = Vec::new();
     for (i, &(test, frag)) in branches.iter().enumerate() {
         let test = env.erase(test)?;
-        let test_expr = wrap_single(env, test)?;
+        let test_expr = wrap_value_expr(env, test)?;
         let marker = format!("<!--[{i}-->");
         let anchor = env.b.push_string_stmt(&marker);
+        let anchor = env.b.push(anchor);
         let body = emit_child_body(
             env,
-            frag,
-            std::slice::from_ref(&anchor),
+            sv.nodes(frag.nodes),
+            &[anchor],
             false,
             preserve,
             block_child_ns(ctx),
@@ -634,17 +609,18 @@ pub(crate) fn emit_if_block<'arena>(
         )?;
         let body = fold_block_marker(&mut env.b, &marker, body);
         let block = block_stmt(&env.b, body);
-        cons_blocks.push((test_expr, block));
+        cons_blocks.push((test_expr, env.b.push(block)));
     }
 
     // Terminal else (document order: after every consequent).
     let else_anchor = env.b.push_string_stmt("<!--[-1-->");
+    let else_anchor = env.b.push(else_anchor);
     let else_body = match final_else {
         Some(frag) => {
             let body = emit_child_body(
                 env,
-                frag,
-                std::slice::from_ref(&else_anchor),
+                sv.nodes(frag.nodes),
+                &[else_anchor],
                 false,
                 preserve,
                 block_child_ns(ctx),
@@ -652,29 +628,25 @@ pub(crate) fn emit_if_block<'arena>(
             )?;
             fold_block_marker(&mut env.b, "<!--[-1-->", body)
         }
-        None => {
-            let mut v: BumpVec<'arena, Statement<'arena>> = BumpVec::new_in(arena);
-            v.push(else_anchor);
-            v.into_bump_slice()
-        }
+        None => env.b.push_list(&[else_anchor]),
     };
-    let mut alternate: &'arena Statement<'arena> = block_stmt(&env.b, else_body);
+    let mut alternate = block_stmt(&env.b, else_body);
 
     // Assemble the chain inner-to-outer.
-    for (test, cons) in cons_blocks.into_iter().rev() {
+    for (test, consequent) in cons_blocks.into_iter().rev() {
         let here = env.b.here();
         let if_stmt = IfStatement {
-            test: arena.alloc(test),
-            consequent: cons,
-            alternate: Some(alternate),
+            test,
+            consequent,
+            alternate: Some(env.b.push(alternate)),
         };
-        alternate = arena.alloc(Statement {
+        alternate = Statement {
             span: here,
             kind: StatementKind::IfStatement(if_stmt),
-        });
+        };
     }
 
-    out.push_statement(&mut env.b, arena, (*alternate).clone());
+    out.push_statement(&mut env.b, alternate);
     out.push_text("<!--]-->");
     Ok(())
 }
@@ -685,13 +657,11 @@ pub(crate) fn emit_if_block<'arena>(
 /// whose body has at most one child once `Comment`/`ConstTag`/`DeclarationTag`/
 /// whitespace-only `Text` are filtered out, and that child is a regular element.
 /// Returns that element (whose span the emitter matches) or `None`.
-fn animate_host_element<'arena>(
-    each: &'arena EachBlock<'arena>,
-) -> Option<&'arena Element<'arena>> {
+fn animate_host_element<'a>(sv: SvelteView<'a>, each: &EachBlock) -> Option<&'a Element> {
     each.key.as_ref()?;
     let mut count = 0usize;
-    let mut sole_element: Option<&'arena Element<'arena>> = None;
-    for node in each.body.nodes {
+    let mut sole_element: Option<&'a Element> = None;
+    for node in sv.nodes(each.body.nodes) {
         match node {
             FragmentNode::Comment(_)
             | FragmentNode::ConstTag(_)
@@ -713,16 +683,16 @@ fn animate_host_element<'arena>(
 /// `if (each_array.length !== 0) { … } else { … }` whose openers are string
 /// pushes. Nested `{#each}` refuses (the nested emission path is unvalidated —
 /// see [`Refusal::NestedEach`]; the name orders themselves are modelled).
-pub(crate) fn emit_each_block<'arena>(
-    env: &mut EmitEnv<'arena>,
-    each: &'arena EachBlock<'arena>,
-    out: &mut BodyBuilder<'arena>,
+pub(crate) fn emit_each_block(
+    env: &mut EmitEnv<'_>,
+    each: &EachBlock,
+    out: &mut BodyBuilder,
     ctx: &FragmentCtx<'_>,
 ) -> Result<(), CompileError> {
     if env.in_each {
         return Err(unsupported(Refusal::NestedEach));
     }
-    let arena = env.b.arena;
+    let sv = env.sv;
     let preserve = ctx.preserve_whitespace;
 
     // The key `(key)` and the context pattern are guard-walked (a rune could hide
@@ -745,7 +715,7 @@ pub(crate) fn emit_each_block<'arena>(
 
     // Collection (guard + bare-derived rewrite).
     let collection_expr = env.erase(each.expression)?;
-    let collection = wrap_single(env, collection_expr)?;
+    let collection = wrap_value_expr(env, collection_expr)?;
 
     // Unique names. `each_array` is minted HERE, in emission (= transform) order,
     // mirroring the oracle's `state.scope.root.unique('each_array')`. `$$index` is
@@ -755,7 +725,7 @@ pub(crate) fn emit_each_block<'arena>(
     let array_name = env.next_each_array_name();
     let generated_index = env.each_index_name(each.span)?;
     let index_name = match each.index {
-        Some(i) => i.to_string(),
+        Some(i) => i.extract(env.source).to_string(),
         None => generated_index,
     };
     check_name_free(env, &array_name)?;
@@ -766,20 +736,18 @@ pub(crate) fn emit_each_block<'arena>(
     // Mint the `each_array` id BEFORE the call so the declaration span runs
     // forward (id.start < init.end) — the printer's call-head width math
     // subtracts the two and would underflow on an inverted span.
-    let array_id = Expression::from_identifier(env.b.ident(&array_name));
-    let coll_alloc = arena.alloc(collection);
-    let ensure = env
-        .b
-        .member_call("$", "ensure_array_like", std::slice::from_ref(coll_alloc));
-    let const_each = declaration_stmt(&env.b, VariableDeclarationKind::Const, array_id, ensure);
+    let array_id = env.b.ident_expr(&array_name);
+    let ensure = env.b.member_call("$", "ensure_array_like", &[collection]);
+    let ensure = env.b.push(ensure);
+    let const_each = declaration_stmt(&mut env.b, VariableDeclarationKind::Const, array_id, ensure);
 
     // for-loop init: `let IDX = 0, $$length = each_array.length`.
     let index_id = Expression::from_identifier(env.b.ident(&index_name));
     let zero = env.b.number(0.0);
     let index_span = Span::new(index_id.span().start, zero.span().end);
     let index_declarator = VariableDeclarator {
-        id: arena.alloc(index_id),
-        init: Some(arena.alloc(zero)),
+        id: env.b.push(index_id),
+        init: Some(env.b.push(zero)),
         definite: false,
         span: index_span,
     };
@@ -788,18 +756,16 @@ pub(crate) fn emit_each_block<'arena>(
     let length_member = env.b.member_prop(arr_for_length, "length");
     let length_span = Span::new(length_id.span().start, length_member.span().end);
     let length_declarator = VariableDeclarator {
-        id: arena.alloc(length_id),
-        init: Some(arena.alloc(length_member)),
+        id: env.b.push(length_id),
+        init: Some(env.b.push(length_member)),
         definite: false,
         span: length_span,
     };
-    let mut init_decls: BumpVec<'arena, VariableDeclarator<'arena>> = BumpVec::new_in(arena);
-    init_decls.push(index_declarator);
-    init_decls.push(length_declarator);
+    let init_decls = env.b.push_list(&[index_declarator, length_declarator]);
     let init_here = env.b.here();
     let init_decl = VariableDeclaration {
         kind: VariableDeclarationKind::Let,
-        declarations: init_decls.into_bump_slice(),
+        declarations: init_decls,
         declare: false,
         span: init_here,
     };
@@ -808,15 +774,18 @@ pub(crate) fn emit_each_block<'arena>(
     let idx_test = env.b.ident_expr(&index_name);
     let len_test = env.b.ident_expr("$$length");
     let test = env.b.binary(idx_test, BinaryOperator::LessThan, len_test);
+    let test = env.b.push(test);
     let idx_update = env.b.ident_expr(&index_name);
     let update = env.b.update(idx_update, UpdateOperator::Increment);
+    let update = env.b.push(update);
 
     // Body: `let CTX = each_array[IDX]` + the body fragment (text-first marker),
     // with context/index names masked to UNKNOWN in the evaluator.
-    let mut overlay: HashMap<String, ScopeEntry<'arena>> = HashMap::new();
+    let mut overlay: HashMap<String, ScopeEntry> = HashMap::new();
     if let Some(context) = context {
         let mut names = Vec::new();
-        pattern_binding_names(context, env.source, &mut names)?;
+        let view = env.b.view();
+        pattern_binding_names(view, view.expr(context), env.source, &mut names)?;
         for name in names {
             overlay.insert(name, ScopeEntry::Masked);
         }
@@ -826,7 +795,7 @@ pub(crate) fn emit_each_block<'arena>(
     // each) is recognized by span, so `emit_element` can accept exactly it and
     // refuse every other `animate:`. Save/restore around the body like `in_each`.
     let saved_animate_host = env.animate_host_span;
-    env.animate_host_span = animate_host_element(each).map(|el| el.span);
+    env.animate_host_span = animate_host_element(sv, each).map(|el| el.span);
     env.in_each = true;
     let body_result = emit_each_body(
         env,
@@ -843,32 +812,34 @@ pub(crate) fn emit_each_block<'arena>(
     let body_stmts = body_result?;
 
     let for_body = block_stmt(&env.b, body_stmts);
+    let for_body = env.b.push(for_body);
     let for_here = env.b.here();
     let for_loop = Statement {
         span: for_here,
         kind: StatementKind::ForStatement(ForStatement {
-            init: Some(arena.alloc(ForInit::VariableDeclaration(init_decl))),
-            test: Some(arena.alloc(test)),
-            update: Some(arena.alloc(update)),
+            init: Some(env.b.push(ForInit::VariableDeclaration(init_decl))),
+            test: Some(test),
+            update: Some(update),
             body: for_body,
         }),
     };
 
     if let Some(fallback) = &each.fallback {
-        out.push_statement(&mut env.b, arena, const_each);
+        out.push_statement(&mut env.b, const_each);
         // if branch: `{ $$renderer.push('<!--[-->'); for_loop }`.
         let open_anchor = env.b.push_string_stmt("<!--[-->");
-        let mut if_body: BumpVec<'arena, Statement<'arena>> = BumpVec::new_in(arena);
-        if_body.push(open_anchor);
-        if_body.push(for_loop);
-        let if_branch = block_stmt(&env.b, if_body.into_bump_slice());
+        let if_body = [env.b.push(open_anchor), env.b.push(for_loop)];
+        let if_body = env.b.push_list(&if_body);
+        let if_branch = block_stmt(&env.b, if_body);
+        let if_branch = env.b.push(if_branch);
         // else branch: `{ $$renderer.push('<!--[!-->'); …fallback… }`. The
         // fallback's parent is the each block, so it is text-first-eligible.
         let else_anchor = env.b.push_string_stmt("<!--[!-->");
+        let else_anchor = env.b.push(else_anchor);
         let fallback_stmts = emit_child_body(
             env,
-            fallback,
-            std::slice::from_ref(&else_anchor),
+            sv.nodes(fallback.nodes),
+            &[else_anchor],
             true,
             preserve,
             block_child_ns(ctx),
@@ -876,10 +847,13 @@ pub(crate) fn emit_each_block<'arena>(
         )?;
         let fallback_stmts = fold_block_marker(&mut env.b, "<!--[!-->", fallback_stmts);
         let else_branch = block_stmt(&env.b, fallback_stmts);
+        let else_branch = env.b.push(else_branch);
         // condition: `each_array.length !== 0`.
         let arr_cond = env.b.ident_expr(&array_name);
-        let len_cond = arena.alloc(env.b.member_prop(arr_cond, "length"));
-        let zero_cond = arena.alloc(env.b.number(0.0));
+        let len_cond = env.b.member_prop(arr_cond, "length");
+        let len_cond = env.b.push(len_cond);
+        let zero_cond = env.b.number(0.0);
+        let zero_cond = env.b.push(zero_cond);
         let cond = env
             .b
             .binary(len_cond, BinaryOperator::BangEqualsEquals, zero_cond);
@@ -887,17 +861,17 @@ pub(crate) fn emit_each_block<'arena>(
         let if_stmt = Statement {
             span: if_here,
             kind: StatementKind::IfStatement(IfStatement {
-                test: arena.alloc(cond),
+                test: env.b.push(cond),
                 consequent: if_branch,
                 alternate: Some(else_branch),
             }),
         };
-        out.push_statement(&mut env.b, arena, if_stmt);
+        out.push_statement(&mut env.b, if_stmt);
     } else {
         // Opener merges into the preceding template; then const + for loop.
         out.push_text("<!--[-->");
-        out.push_statement(&mut env.b, arena, const_each);
-        out.push_statement(&mut env.b, arena, for_loop);
+        out.push_statement(&mut env.b, const_each);
+        out.push_statement(&mut env.b, for_loop);
     }
     out.push_text("<!--]-->");
     Ok(())
@@ -906,48 +880,47 @@ pub(crate) fn emit_each_block<'arena>(
 /// The `{#each}` body: `let CTX = each_array[IDX]` (when `as` is present) then
 /// the body fragment (which gets the text-first `<!---->` marker). `context` is
 /// the **erased** binding pattern.
-#[expect(clippy::too_many_arguments)] // one cohesive each-body emit; splitting would just re-thread the same state
-fn emit_each_body<'arena>(
-    env: &mut EmitEnv<'arena>,
-    each: &'arena EachBlock<'arena>,
-    context: Option<&'arena Expression<'arena>>,
+#[expect(
+    clippy::too_many_arguments,
+    reason = "one cohesive each-body emit; splitting would just re-thread the same state"
+)]
+fn emit_each_body(
+    env: &mut EmitEnv<'_>,
+    each: &EachBlock,
+    context: Option<ExprId>,
     array_name: &str,
     index_name: &str,
     preserve: bool,
     ns: ChildNamespace,
-    overlay: HashMap<String, ScopeEntry<'arena>>,
-) -> Result<&'arena [Statement<'arena>], CompileError> {
-    let arena = env.b.arena;
-    let mut pre: BumpVec<'arena, Statement<'arena>> = BumpVec::new_in(arena);
+    overlay: HashMap<String, ScopeEntry>,
+) -> Result<Run<StmtId>, CompileError> {
+    let mut pre = Vec::new();
     if let Some(context) = context {
         let arr = env.b.ident_expr(array_name);
         let idx = env.b.ident_expr(index_name);
         let member = env.b.member_computed(arr, idx);
-        let let_stmt = declaration_stmt(
-            &env.b,
-            VariableDeclarationKind::Let,
-            context.clone(),
-            member,
-        );
-        pre.push(let_stmt);
+        let member = env.b.push(member);
+        let let_stmt = declaration_stmt(&mut env.b, VariableDeclarationKind::Let, context, member);
+        pre.push(env.b.push(let_stmt));
     }
-    emit_child_body(env, &each.body, &pre, true, preserve, ns, overlay)
+    let nodes = env.sv.nodes(each.body.nodes);
+    emit_child_body(env, nodes, &pre, true, preserve, ns, overlay)
 }
 
 /// Emit `{#await}`: `$.await($$renderer, expr, () => {pending}, (value?) => {then})`
 /// followed by a merge-forward `<!--]-->` closer. The `{:catch}` branch is
 /// dropped (the oracle omits it from SSR); empty callbacks are `() => {}`.
-pub(crate) fn emit_await_block<'arena>(
-    env: &mut EmitEnv<'arena>,
-    await_block: &'arena AwaitBlock<'arena>,
-    out: &mut BodyBuilder<'arena>,
+pub(crate) fn emit_await_block(
+    env: &mut EmitEnv<'_>,
+    await_block: &AwaitBlock,
+    out: &mut BodyBuilder,
     ctx: &FragmentCtx<'_>,
 ) -> Result<(), CompileError> {
-    let arena = env.b.arena;
+    let sv = env.sv;
     let preserve = ctx.preserve_whitespace;
 
     let promise = env.erase(await_block.expression)?;
-    let expr = wrap_single(env, promise)?;
+    let expr = wrap_value_expr(env, promise)?;
     // The `{:then value}` binding is borrowed into the then-arrow's parameter list
     // — a template borrow point (`{#await p then v: T}`). The `{:catch error}`
     // binding is NOT: the oracle drops the catch branch from SSR entirely, so
@@ -958,45 +931,45 @@ pub(crate) fn emit_await_block<'arena>(
     };
 
     // Pending arrow: `() => { pending }` (empty when there is no pending content).
-    let empty: &'arena [Statement<'arena>] = &[];
     let pending_stmts = match &await_block.pending {
         Some(frag) => emit_child_body(
             env,
-            frag,
+            sv.nodes(frag.nodes),
             &[],
             false,
             preserve,
             block_child_ns(ctx),
             HashMap::new(),
         )?,
-        None => empty,
+        None => Run::EMPTY,
     };
     let pending_here = env.b.here();
-    let no_params: &'arena [Expression<'arena>] = &[];
-    let pending_arrow = env.b.arrow_block(no_params, pending_stmts, pending_here);
+    let pending_arrow = env.b.arrow_block(&[], pending_stmts, pending_here);
 
     // Then arrow: `(value?) => { then }`. The `{:then value}` pattern binds one
-    // param; its names mask to UNKNOWN in the then body.
-    let then_params: &'arena [Expression<'arena>] = match value {
+    // param; its names mask to UNKNOWN in the then body. A parameter list is a
+    // value run, so the erased pattern's row is copied out into it.
+    let then_params: Vec<Expression> = match value {
         Some(value) => {
             guard_pattern(env, value)?;
-            std::slice::from_ref(value)
+            vec![*env.b.view().expr(value)]
         }
-        None => &[],
+        None => Vec::new(),
     };
     let then_stmts = match &await_block.then {
         Some(frag) => {
-            let mut overlay: HashMap<String, ScopeEntry<'arena>> = HashMap::new();
+            let mut overlay: HashMap<String, ScopeEntry> = HashMap::new();
             if let Some(value) = value {
                 let mut names = Vec::new();
-                pattern_binding_names(value, env.source, &mut names)?;
+                let view = env.b.view();
+                pattern_binding_names(view, view.expr(value), env.source, &mut names)?;
                 for name in names {
                     overlay.insert(name, ScopeEntry::Masked);
                 }
             }
             emit_child_body(
                 env,
-                frag,
+                sv.nodes(frag.nodes),
                 &[],
                 false,
                 preserve,
@@ -1004,10 +977,10 @@ pub(crate) fn emit_await_block<'arena>(
                 overlay,
             )?
         }
-        None => empty,
+        None => Run::EMPTY,
     };
     let then_here = env.b.here();
-    let then_arrow = env.b.arrow_block(then_params, then_stmts, then_here);
+    let then_arrow = env.b.arrow_block(&then_params, then_stmts, then_here);
 
     // The `{:catch}` branch is dropped from SSR — the emitter never visits it. It
     // still gets the dropped-fragment guard, which covers both what the branch
@@ -1027,13 +1000,14 @@ pub(crate) fn emit_await_block<'arena>(
     }
 
     // `$.await($$renderer, expr, pending, then)`.
-    let mut args: BumpVec<'arena, Expression<'arena>> = BumpVec::new_in(arena);
-    args.push(Expression::from_identifier(env.b.ident("$$renderer")));
-    args.push(expr);
-    args.push(pending_arrow);
-    args.push(then_arrow);
-    let call = env.b.member_call("$", "await", args.into_bump_slice());
-    out.push_expression_statement(&mut env.b, arena, call);
+    let args = [
+        env.b.ident_expr("$$renderer"),
+        expr,
+        env.b.push(pending_arrow),
+        env.b.push(then_arrow),
+    ];
+    let call = env.b.member_call("$", "await", &args);
+    out.push_expression_statement(&mut env.b, call);
     out.push_text("<!--]-->");
     Ok(())
 }
@@ -1041,19 +1015,18 @@ pub(crate) fn emit_await_block<'arena>(
 /// Emit `{#key}`: a `<!---->` marker, a bare `{ … }` block wrapping the body,
 /// and a closing `<!---->`. The key expression is SSR-ignored (guard-walked,
 /// then dropped).
-pub(crate) fn emit_key_block<'arena>(
-    env: &mut EmitEnv<'arena>,
-    key: &'arena KeyBlock<'arena>,
-    out: &mut BodyBuilder<'arena>,
+pub(crate) fn emit_key_block(
+    env: &mut EmitEnv<'_>,
+    key: &KeyBlock,
+    out: &mut BodyBuilder,
     ctx: &FragmentCtx<'_>,
 ) -> Result<(), CompileError> {
-    let arena = env.b.arena;
     let preserve = ctx.preserve_whitespace;
     guard_dropped(env, key.expression)?;
     out.push_text("<!---->");
     let body = emit_child_body(
         env,
-        &key.fragment,
+        env.sv.nodes(key.fragment.nodes),
         &[],
         false,
         preserve,
@@ -1061,7 +1034,7 @@ pub(crate) fn emit_key_block<'arena>(
         HashMap::new(),
     )?;
     let block = block_stmt(&env.b, body);
-    out.push_statement(&mut env.b, arena, (*block).clone());
+    out.push_statement(&mut env.b, block);
     out.push_text("<!---->");
     Ok(())
 }

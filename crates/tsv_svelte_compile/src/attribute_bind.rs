@@ -19,9 +19,8 @@
 //!
 //! See [`crate::transform_server`] for the orchestration.
 
-use bumpalo::collections::Vec as BumpVec;
 use tsv_svelte::ast::{Attribute, AttributeNode, AttributeValue, BindDirective, Element};
-use tsv_ts::ast::{BinaryOperator, Expression, ExpressionKind, Property};
+use tsv_ts::ast::{AstView, BinaryOperator, ExprId, Expression, ExpressionKind, Property};
 
 use crate::attribute::escape_html_attr;
 use crate::body_builder::BodyBuilder;
@@ -99,8 +98,9 @@ enum InputType {
 
 /// Classify the `<input>`'s `type` attribute (case-sensitive `type`, mirroring the
 /// oracle's `attr.name === 'type'` — a `TYPE` would not be found).
-fn classify_input_type(env: &EmitEnv<'_>, element: &Element<'_>) -> InputType {
-    for attr_node in element.attributes {
+fn classify_input_type(env: &EmitEnv<'_>, element: &Element) -> InputType {
+    let sv = env.sv;
+    for attr_node in sv.attributes(element.attributes) {
         let AttributeNode::Attribute(attr) = attr_node else {
             continue;
         };
@@ -108,7 +108,7 @@ fn classify_input_type(env: &EmitEnv<'_>, element: &Element<'_>) -> InputType {
         if !is_type {
             continue;
         }
-        return match attr.value {
+        return match sv.opt_attribute_values(attr.value) {
             None => InputType::Bare,
             Some([AttributeValue::Text(text)]) => {
                 InputType::Static(text.data(env.source).into_owned())
@@ -130,11 +130,11 @@ fn classify_input_type(env: &EmitEnv<'_>, element: &Element<'_>) -> InputType {
 /// internal AST has no chain wrapper (the flag rides each member), so the refusal
 /// is expressed by refusing any optional link; the recursion propagates it from a
 /// deeper link up.
-fn bind_target_root(expr: &Expression<'_>, source: &str) -> Option<String> {
+fn bind_target_root(view: AstView<'_>, expr: &Expression, source: &str) -> Option<String> {
     match &expr.kind {
         ExpressionKind::Identifier(id) => plain_identifier_name(id, source),
         ExpressionKind::MemberExpression(member) if !member.optional => {
-            bind_target_root(member.object, source)
+            bind_target_root(view, view.expr(member.object), source)
         }
         _ => None,
     }
@@ -145,8 +145,8 @@ fn bind_target_root(expr: &Expression<'_>, source: &str) -> Option<String> {
 /// an Identifier / member chain (`SequenceExpression` + `expressions.length === 2`
 /// in its `BindDirective` analysis). Recognized only so `bind:this` can OMIT it at
 /// parity — the value/checked/group arms still refuse it (no attr value to emit).
-fn is_get_set_pair(expr: &Expression<'_>) -> bool {
-    matches!(&expr.kind, ExpressionKind::SequenceExpression(seq) if seq.expressions.len() == 2)
+fn is_get_set_pair(env: &EmitEnv<'_>, expr: ExprId) -> bool {
+    matches!(&env.b.view().expr(expr).kind, ExpressionKind::SequenceExpression(seq) if seq.expressions.len() == 2)
 }
 
 /// The bind target's root name, but only when that root is something the oracle
@@ -180,8 +180,10 @@ fn is_get_set_pair(expr: &Expression<'_>) -> bool {
 /// and applies the rule from its scoped `template_consts` set. So a bind to a
 /// template-scoped const refuses THERE, not here. Keep the two straight when
 /// changing either — a shape this seam accepts is not thereby accepted by tsv.
-fn reassignable_bind_target_root(env: &EmitEnv<'_>, expr: &Expression<'_>) -> Option<String> {
-    let name = bind_target_root(expr, env.source)?;
+fn reassignable_bind_target_root(env: &EmitEnv<'_>, expr: ExprId) -> Option<String> {
+    let view = env.b.view();
+    let expr = view.expr(expr);
+    let name = bind_target_root(view, expr, env.source)?;
     // The rejection applies to a BARE identifier target only. The oracle's
     // `validate_no_const_assignment` recurses through array/object PATTERNS and
     // tests `argument.type === 'Identifier'`; a `MemberExpression` argument matches
@@ -197,11 +199,11 @@ fn reassignable_bind_target_root(env: &EmitEnv<'_>, expr: &Expression<'_>) -> Op
     Some(name)
 }
 
-fn emitted_bind_target<'arena>(
-    env: &mut EmitEnv<'arena>,
-    directive: &'arena BindDirective<'arena>,
+fn emitted_bind_target(
+    env: &mut EmitEnv<'_>,
+    directive: &BindDirective,
     bind_name: &str,
-) -> Result<Expression<'arena>, CompileError> {
+) -> Result<ExprId, CompileError> {
     // The template borrow point: erase the bind target once, then gate its erased
     // shape (an `x as T` target is `x`, an assignable lvalue).
     let expr = env.erase(directive.expression)?;
@@ -209,7 +211,7 @@ fn emitted_bind_target<'arena>(
         Some(name) if env.state_names.contains(&name) => {}
         _ => return refuse_bind(bind_name),
     }
-    Ok(wrap_value_expr(env, expr)?[0].clone())
+    wrap_value_expr(env, expr)
 }
 
 /// Validate the TARGET of a `bind:` on an SSR-inert special element
@@ -241,16 +243,16 @@ fn emitted_bind_target<'arena>(
 /// [`reassignable_bind_target_root`].
 ///
 /// A failure refuses with the collapsing `Refusal::BindDirective { name }` bucket.
-pub(crate) fn validate_inert_bind_target<'arena>(
-    env: &mut EmitEnv<'arena>,
-    directive: &'arena BindDirective<'arena>,
+pub(crate) fn validate_inert_bind_target(
+    env: &mut EmitEnv<'_>,
+    directive: &BindDirective,
 ) -> Result<(), CompileError> {
     let bind_name = directive.name_span.extract(env.source).to_string();
     // Erase a TypeScript wrapper (`bind:this={x as T}`) first, exactly as the
     // regular fork does before gating the target's shape.
     let expr = env.erase(directive.expression)?;
     if bind_name == "this" {
-        if reassignable_bind_target_root(env, expr).is_some() || is_get_set_pair(expr) {
+        if reassignable_bind_target_root(env, expr).is_some() || is_get_set_pair(env, expr) {
             return Ok(());
         }
         return refuse_bind(&bind_name);
@@ -274,14 +276,14 @@ pub(crate) fn validate_inert_bind_target<'arena>(
 ///
 /// Returns `Ok(())` for a valid `bind:this` — the caller emits nothing (inline) or
 /// contributes no object property (spread).
-pub(crate) fn validate_dynamic_bind<'arena>(
-    env: &mut EmitEnv<'arena>,
-    directive: &'arena BindDirective<'arena>,
+pub(crate) fn validate_dynamic_bind(
+    env: &mut EmitEnv<'_>,
+    directive: &BindDirective,
 ) -> Result<(), CompileError> {
     let bind_name = directive.name_span.extract(env.source).to_string();
     if bind_name == "this" {
         let expr = env.erase(directive.expression)?;
-        if reassignable_bind_target_root(env, expr).is_some() || is_get_set_pair(expr) {
+        if reassignable_bind_target_root(env, expr).is_some() || is_get_set_pair(env, expr) {
             return Ok(());
         }
         return refuse_bind(&bind_name);
@@ -290,36 +292,36 @@ pub(crate) fn validate_dynamic_bind<'arena>(
 }
 
 /// Build and push `$.attr(name, value[, true])` for a synthesized bind attribute.
-fn push_bind_attr<'arena>(
-    env: &mut EmitEnv<'arena>,
+fn push_bind_attr(
+    env: &mut EmitEnv<'_>,
     name: &str,
-    value: Expression<'arena>,
+    value: ExprId,
     boolean: bool,
-    out: &mut BodyBuilder<'arena>,
+    out: &mut BodyBuilder,
 ) -> Result<(), CompileError> {
-    let mut args: BumpVec<'arena, Expression<'arena>> = BumpVec::new_in(env.b.arena);
-    args.push(env.b.string_literal_expr(name));
-    args.push(value);
+    let name_literal = env.b.string_literal_expr(name);
+    let mut args = vec![env.b.push(name_literal), value];
     if boolean {
-        args.push(env.b.true_literal());
+        let flag = env.b.true_literal();
+        args.push(env.b.push(flag));
     }
-    let call = env.b.member_call("$", "attr", args.into_bump_slice());
+    let call = env.b.member_call("$", "attr", &args);
     out.push_expr(call);
     Ok(())
 }
 
 /// The companion `value` attribute (case-sensitive `value`, the oracle's
 /// `attr.name === 'value'`) a `bind:group` reads for its synthesized `checked`.
-fn find_value_attribute<'arena>(
-    env: &EmitEnv<'_>,
-    element: &'arena Element<'arena>,
-) -> Option<&'arena Attribute<'arena>> {
-    element.attributes.iter().find_map(|attr_node| {
-        let AttributeNode::Attribute(attr) = attr_node else {
-            return None;
-        };
-        (attr.name(env.source) == "value").then_some(attr)
-    })
+fn find_value_attribute<'a>(env: &EmitEnv<'a>, element: &Element) -> Option<&'a Attribute> {
+    env.sv
+        .attributes(element.attributes)
+        .iter()
+        .find_map(|attr_node| {
+            let AttributeNode::Attribute(attr) = attr_node else {
+                return None;
+            };
+            (attr.name(env.source) == "value").then_some(attr)
+        })
 }
 
 /// Build the companion `value` attribute's value for a `bind:group` synthesis —
@@ -327,21 +329,23 @@ fn find_value_attribute<'arena>(
 /// component mode): a static text → an attr-escaped string literal; a single
 /// `{expr}` → the erased/wrapped expression; a bare `value` → `true`; a mixed
 /// value → refuse this group for now.
-fn build_companion_value<'arena>(
-    env: &mut EmitEnv<'arena>,
-    value_attr: &'arena Attribute<'arena>,
-) -> Result<Expression<'arena>, CompileError> {
-    let Some(values) = value_attr.value else {
-        return Ok(env.b.true_literal());
+fn build_companion_value(
+    env: &mut EmitEnv<'_>,
+    value_attr: &Attribute,
+) -> Result<ExprId, CompileError> {
+    let Some(values) = env.sv.opt_attribute_values(value_attr.value) else {
+        let flag = env.b.true_literal();
+        return Ok(env.b.push(flag));
     };
     match values {
         [AttributeValue::Text(text)] => {
             let decoded = text.data(env.source);
-            Ok(env.b.string_literal_expr(&escape_html_attr(&decoded)))
+            let literal = env.b.string_literal_expr(&escape_html_attr(&decoded));
+            Ok(env.b.push(literal))
         }
         [AttributeValue::ExpressionTag(tag)] => {
             let expr = env.erase(tag.expression)?;
-            Ok(wrap_value_expr(env, expr)?[0].clone())
+            wrap_value_expr(env, expr)
         }
         _ => refuse_bind("group"),
     }
@@ -350,14 +354,14 @@ fn build_companion_value<'arena>(
 /// The SSR emission a `bind:` **core kind** reduces to, independent of whether the
 /// element carries a `{...spread}` — the fork the inline (`emit_bind_directive`)
 /// and spread (`build_bind_object_property`) callers share so the two never drift.
-enum BindEmission<'arena> {
+enum BindEmission {
     /// The synthesized attribute `name = value` (`bind:value`/`bind:checked`, or
     /// `bind:group`'s synthesized `checked`). `boolean` picks the inline
     /// `$.attr(name, value, true)` boolean form; the spread object drops it (the
     /// object property is just `name: value`).
     Attr {
         name: &'static str,
-        value: Expression<'arena>,
+        value: ExprId,
         boolean: bool,
     },
     /// Emit nothing on BOTH paths: a valid `bind:this`, or a `bind:group` with no
@@ -398,12 +402,12 @@ enum BindEmission<'arena> {
 /// bind on a non-`<input>` target, `value` on `<textarea>`/`<select>`, the
 /// content-editable trio, `open`, `focused`, an invalid target/type, or a bind
 /// expression that isn't a `$state`-rooted lvalue.
-fn resolve_bind_directive<'arena>(
-    env: &mut EmitEnv<'arena>,
-    directive: &'arena BindDirective<'arena>,
-    element: &'arena Element<'arena>,
+fn resolve_bind_directive(
+    env: &mut EmitEnv<'_>,
+    directive: &BindDirective,
+    element: &Element,
     element_name: &str,
-) -> Result<BindEmission<'arena>, CompileError> {
+) -> Result<BindEmission, CompileError> {
     let bind_name = directive.name_span.extract(env.source).to_string();
 
     // `bind:this` (itself an `omit_in_ssr` bind, but with the `{get, set}`/lvalue
@@ -411,7 +415,7 @@ fn resolve_bind_directive<'arena>(
     // `bind:this={x as T}` TS wrapper first.
     if bind_name == "this" {
         let expr = env.erase(directive.expression)?;
-        if reassignable_bind_target_root(env, expr).is_some() || is_get_set_pair(expr) {
+        if reassignable_bind_target_root(env, expr).is_some() || is_get_set_pair(env, expr) {
             return Ok(BindEmission::Omit);
         }
         return refuse_bind(&bind_name);
@@ -474,22 +478,17 @@ fn resolve_bind_directive<'arena>(
                 return Ok(BindEmission::Omit);
             };
             let value = build_companion_value(env, value_attr)?;
-            let arena = env.b.arena;
             let synth = if is_checkbox {
-                let group_alloc = arena.alloc(group);
-                let callee = env.b.member_prop(group_alloc, "includes");
-                let callee_alloc = arena.alloc(callee);
-                let args = std::slice::from_ref(arena.alloc(value));
-                env.b.call_of(callee_alloc, args, false)
+                let callee = env.b.member_prop(group, "includes");
+                let callee = env.b.push(callee);
+                env.b.call_of(callee, &[value], false)
             } else {
-                let group_alloc = arena.alloc(group);
-                let value_alloc = arena.alloc(value);
                 env.b
-                    .binary(group_alloc, BinaryOperator::EqualsEqualsEquals, value_alloc)
+                    .binary(group, BinaryOperator::EqualsEqualsEquals, value)
             };
             Ok(BindEmission::Attr {
                 name: "checked",
-                value: synth,
+                value: env.b.push(synth),
                 boolean: true,
             })
         }
@@ -503,12 +502,12 @@ fn resolve_bind_directive<'arena>(
 /// emits nothing; an `omit_in_ssr` bind refuses (a safe over-refusal — the oracle
 /// drops it, but the inline path declines rather than reproduce the drop; the spread
 /// path skips it instead).
-pub(crate) fn emit_bind_directive<'arena>(
-    env: &mut EmitEnv<'arena>,
-    directive: &'arena BindDirective<'arena>,
-    element: &'arena Element<'arena>,
+pub(crate) fn emit_bind_directive(
+    env: &mut EmitEnv<'_>,
+    directive: &BindDirective,
+    element: &Element,
     element_name: &str,
-    out: &mut BodyBuilder<'arena>,
+    out: &mut BodyBuilder,
 ) -> Result<(), CompileError> {
     match resolve_bind_directive(env, directive, element, element_name)? {
         BindEmission::Attr {
@@ -532,12 +531,12 @@ pub(crate) fn emit_bind_directive<'arena>(
 /// - `Omit` (a valid `bind:this`, a no-companion `bind:group`) → `None`;
 /// - `OmitInSsr` → refuse, exactly as the inline path does (a safe over-refusal;
 ///   well-formed `omit_in_ssr`+spread parity is deferred to a future slice).
-pub(crate) fn build_bind_object_property<'arena>(
-    env: &mut EmitEnv<'arena>,
-    directive: &'arena BindDirective<'arena>,
-    element: &'arena Element<'arena>,
+pub(crate) fn build_bind_object_property(
+    env: &mut EmitEnv<'_>,
+    directive: &BindDirective,
+    element: &Element,
     element_name: &str,
-) -> Result<Option<Property<'arena>>, CompileError> {
+) -> Result<Option<Property>, CompileError> {
     match resolve_bind_directive(env, directive, element, element_name)? {
         BindEmission::Attr {
             name,
@@ -548,15 +547,10 @@ pub(crate) fn build_bind_object_property<'arena>(
             // identifier key; `shorthand` collapses `{ value: value }` → `{ value }`.
             let key = env.b.ident(name);
             let key_span = key.span;
-            let shorthand = matches!(&value.kind, ExpressionKind::Identifier(id)
+            let key = env.b.push(Expression::from_identifier(key));
+            let shorthand = matches!(&env.b.view().expr(value).kind, ExpressionKind::Identifier(id)
                 if plain_identifier_name(id, env.source).as_deref() == Some(name));
-            Ok(Some(init_property(
-                env.b.arena,
-                Expression::from_identifier(key),
-                value,
-                shorthand,
-                key_span,
-            )))
+            Ok(Some(init_property(key, value, shorthand, key_span)))
         }
         // A valid `bind:this` / no-companion `bind:group` drops with no entry.
         BindEmission::Omit => Ok(None),

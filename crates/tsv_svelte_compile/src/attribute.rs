@@ -19,9 +19,8 @@
 //! See [`crate::transform_server`] for the orchestration, and
 //! [`crate::attribute_bind`] for the `bind:` half.
 
-use bumpalo::collections::Vec as BumpVec;
 use tsv_svelte::ast::{Attribute, AttributeValue};
-use tsv_ts::ast::{Expression, ExpressionKind, LiteralValue, Property};
+use tsv_ts::ast::{ExprId, Expression, ExpressionKind, LiteralValue, Property};
 
 use crate::analyze::{evaluate, stringify_value};
 use crate::body_builder::BodyBuilder;
@@ -103,11 +102,11 @@ const DOM_BOOLEAN_ATTRIBUTES: &[&str] = &[
 /// attribute escaping, `class`/`style` whitespace collapse, and the scope hash
 /// on matched classes); dynamic and mixed values emit the oracle's runtime
 /// calls (`$.attr` / `$.attr_class` / `$.attr_style`).
-pub(crate) fn emit_attribute<'arena>(
-    env: &mut EmitEnv<'arena>,
-    attr: &'arena Attribute<'arena>,
+pub(crate) fn emit_attribute(
+    env: &mut EmitEnv<'_>,
+    attr: &Attribute,
     element_name: &str,
-    out: &mut BodyBuilder<'arena>,
+    out: &mut BodyBuilder,
     element_scoped: bool,
     namespace: Namespace,
 ) -> Result<(), CompileError> {
@@ -134,7 +133,7 @@ pub(crate) fn emit_attribute<'arena>(
         }));
     }
 
-    let Some(values) = attr.value else {
+    let Some(values) = env.sv.opt_attribute_values(attr.value) else {
         // Boolean attribute: the oracle emits `name=""`.
         out.push_text(&escape_template_text(&format!(" {emit_name}=\"\"")));
         return Ok(());
@@ -238,7 +237,7 @@ pub(crate) fn preceded_by_quote(source: &str, pos: u32) -> bool {
 /// `LogicalExpression` (`&&`/`||`/`??` DO wrap — oracle-probed), so the
 /// exclusion is arithmetic/comparison binaries only. The terminal arm mirrors
 /// the oracle's own negative-list rule: everything else wraps.
-pub(crate) fn class_needs_clsx(expr: &Expression<'_>, quoted: bool) -> bool {
+pub(crate) fn class_needs_clsx(expr: &Expression, quoted: bool) -> bool {
     if quoted {
         return false;
     }
@@ -277,12 +276,12 @@ pub(crate) fn collapse_attr_whitespace(decoded: &str) -> String {
 /// A single-expression attribute value: `title={expr}` (or quoted,
 /// `title="{expr}"` — `quoted` carries the distinction, which only the class
 /// `$.clsx` rule reads).
-fn emit_dynamic_attribute<'arena>(
-    env: &mut EmitEnv<'arena>,
+fn emit_dynamic_attribute(
+    env: &mut EmitEnv<'_>,
     name: &str,
-    expr: &'arena Expression<'arena>,
+    expr: ExprId,
     quoted: bool,
-    out: &mut BodyBuilder<'arena>,
+    out: &mut BodyBuilder,
 ) -> Result<(), CompileError> {
     // Event handlers (`on*` single-expression attributes) are dropped in
     // `emit_attribute` before dispatch, so they never reach here.
@@ -293,7 +292,7 @@ fn emit_dynamic_attribute<'arena>(
     let expr = env.erase(expr)?;
     // A string-literal expression value takes the oracle's inline-literal path
     // (pre-escaped static emission) — refuse rather than guess its edge rules.
-    if matches!(&expr.kind, ExpressionKind::Literal(lit)
+    if matches!(&env.b.view().expr(expr).kind, ExpressionKind::Literal(lit)
         if matches!(lit.value, LiteralValue::String(_)))
     {
         return Err(unsupported(Refusal::StringLiteralExprAttribute));
@@ -307,30 +306,28 @@ fn emit_dynamic_attribute<'arena>(
             if env.scope.is_some() {
                 return Err(unsupported(Refusal::DynamicClassOnStyled));
             }
-            if class_needs_clsx(expr, quoted) {
-                let clsx = env.b.member_call("$", "clsx", wrapped);
-                let clsx_alloc = env.b.arena.alloc(clsx);
-                env.b
-                    .member_call("$", "attr_class", std::slice::from_ref(clsx_alloc))
+            if class_needs_clsx(env.b.view().expr(expr), quoted) {
+                let clsx = env.b.member_call("$", "clsx", &[wrapped]);
+                let clsx = env.b.push(clsx);
+                env.b.member_call("$", "attr_class", &[clsx])
             } else {
-                env.b
-                    .member_call("$", "attr_class", std::slice::from_ref(&wrapped[0]))
+                env.b.member_call("$", "attr_class", &[wrapped])
             }
         }
         "style" => {
             if env.scope.is_some() {
                 return Err(unsupported(Refusal::DynamicStyleOnStyled));
             }
-            env.b.member_call("$", "attr_style", wrapped)
+            env.b.member_call("$", "attr_style", &[wrapped])
         }
         _ => {
-            let mut args = BumpVec::new_in(env.b.arena);
-            args.push(env.b.string_literal_expr(name));
-            args.push(wrapped[0].clone());
+            let name_literal = env.b.string_literal_expr(name);
+            let mut args = vec![env.b.push(name_literal), wrapped];
             if DOM_BOOLEAN_ATTRIBUTES.contains(&name) {
-                args.push(env.b.true_literal());
+                let flag = env.b.true_literal();
+                args.push(env.b.push(flag));
             }
-            env.b.member_call("$", "attr", args.into_bump_slice())
+            env.b.member_call("$", "attr", &args)
         }
     };
     out.push_expr(call);
@@ -339,13 +336,13 @@ fn emit_dynamic_attribute<'arena>(
 
 /// The value of a mixed text+expression attribute, as the oracle's
 /// `build_attribute_value` produces it in its multi-chunk path.
-enum MixedAttrValue<'arena> {
+enum MixedAttrValue {
     /// Every part folded statically — the raw concatenated value (un-HTML-escaped;
     /// each caller escapes as its own target requires).
     Folded(String),
     /// A template literal `` `t${$.stringify(a)}u` `` (interpolations omitted when
     /// the evaluator proves a defined string).
-    Template(Expression<'arena>),
+    Template(Expression),
 }
 
 /// Build a mixed text+expression attribute value — the fold-or-template logic
@@ -354,16 +351,16 @@ enum MixedAttrValue<'arena> {
 /// collapses `class`/`style` runs (no per-chunk trim, matching the oracle's
 /// template path). Returns [`MixedAttrValue::Folded`] when every part folds — each
 /// caller decides how to escape/emit it — else the assembled template literal.
-fn build_mixed_attr_value<'arena>(
-    env: &mut EmitEnv<'arena>,
+fn build_mixed_attr_value(
+    env: &mut EmitEnv<'_>,
     trim_whitespace: bool,
-    values: &'arena [AttributeValue<'arena>],
-) -> Result<MixedAttrValue<'arena>, CompileError> {
+    values: &[AttributeValue],
+) -> Result<MixedAttrValue, CompileError> {
     let mut texts: Vec<String> = vec![String::new()];
     // The unescaped folded value, in parallel — consumed only when every part
     // folds statically.
     let mut raw = String::new();
-    let mut exprs: BumpVec<'arena, Expression<'arena>> = BumpVec::new_in(env.b.arena);
+    let mut exprs: Vec<ExprId> = Vec::new();
     for value in values {
         match value {
             AttributeValue::Text(text) => {
@@ -378,7 +375,10 @@ fn build_mixed_attr_value<'arena>(
                 raw.push_str(&chunk);
                 // Attribute templates carry no HTML escaping — the runtime
                 // escapes; only template metachars are escaped here.
-                #[expect(clippy::unwrap_used)]
+                #[expect(
+                    clippy::unwrap_used,
+                    reason = "`texts` starts non-empty and only grows"
+                )]
                 texts
                     .last_mut()
                     .unwrap()
@@ -390,7 +390,8 @@ fn build_mixed_attr_value<'arena>(
                 let expr = env.erase(tag.expression)?;
                 // Guard first — never fold an oracle-invalid expression.
                 let wrapped = wrap_value_expr(env, expr)?;
-                let evaluated = evaluate(expr, &env.value_scope(), env.source, 0)
+                let scope = env.value_scope();
+                let evaluated = evaluate(scope.view.expr(expr), &scope, env.source, 0)
                     .map_err(|g| unsupported(Refusal::StaticEvalNotPortable(g.0)))?;
                 if let Some(value) = evaluated.known_value() {
                     // Folds into the quasi — plain `(value ?? '') + ''`, no
@@ -398,7 +399,10 @@ fn build_mixed_attr_value<'arena>(
                     let text = stringify_value(value)
                         .map_err(|g| unsupported(Refusal::StaticFoldNotPortable(g.0)))?;
                     raw.push_str(&text);
-                    #[expect(clippy::unwrap_used)]
+                    #[expect(
+                        clippy::unwrap_used,
+                        reason = "`texts` starts non-empty and only grows"
+                    )]
                     texts
                         .last_mut()
                         .unwrap()
@@ -406,9 +410,10 @@ fn build_mixed_attr_value<'arena>(
                     continue;
                 }
                 let piece = if evaluated.is_defined_string() {
-                    wrapped[0].clone()
+                    wrapped
                 } else {
-                    env.b.member_call("$", "stringify", wrapped)
+                    let stringify = env.b.member_call("$", "stringify", &[wrapped]);
+                    env.b.push(stringify)
                 };
                 exprs.push(piece);
                 texts.push(String::new());
@@ -419,10 +424,10 @@ fn build_mixed_attr_value<'arena>(
     if exprs.is_empty() {
         return Ok(MixedAttrValue::Folded(raw));
     }
-    Ok(MixedAttrValue::Template(env.b.template_literal(
-        &texts,
-        env.b.expr_refs(exprs.into_bump_slice()),
-    )))
+    let expressions = env.b.push_list(&exprs);
+    Ok(MixedAttrValue::Template(
+        env.b.template_literal(&texts, expressions),
+    ))
 }
 
 /// [`build_mixed_attr_value`] as the oracle's bare `build_attribute_value` result:
@@ -434,28 +439,28 @@ fn build_mixed_attr_value<'arena>(
 /// the component prop builder (`component::build_prop_value`) share. Both want the
 /// same bare value, so neither may re-derive the fold decision: whether a mixed
 /// attribute emits as static text or as a `$.stringify` template is exactly what a
-/// drifting second copy of the loop would change.
-pub(crate) fn build_mixed_value_expr<'arena>(
-    env: &mut EmitEnv<'arena>,
+/// drifting second copy of the loop would change. The value is pushed and its id
+/// returned.
+pub(crate) fn build_mixed_value_expr(
+    env: &mut EmitEnv<'_>,
     trim_whitespace: bool,
-    values: &'arena [AttributeValue<'arena>],
-) -> Result<Expression<'arena>, CompileError> {
-    Ok(
-        match build_mixed_attr_value(env, trim_whitespace, values)? {
-            MixedAttrValue::Folded(raw) => env.b.string_literal_expr(&raw),
-            MixedAttrValue::Template(template) => template,
-        },
-    )
+    values: &[AttributeValue],
+) -> Result<ExprId, CompileError> {
+    let value = match build_mixed_attr_value(env, trim_whitespace, values)? {
+        MixedAttrValue::Folded(raw) => env.b.string_literal_expr(&raw),
+        MixedAttrValue::Template(template) => template,
+    };
+    Ok(env.b.push(value))
 }
 
 /// A mixed text+expression attribute value: `title="t {a} u"` — an attribute
 /// template literal with `$.stringify(expr)` interpolations (omitted when the
 /// oracle's evaluator proves a defined string), folded where known.
-fn emit_mixed_attribute<'arena>(
-    env: &mut EmitEnv<'arena>,
+fn emit_mixed_attribute(
+    env: &mut EmitEnv<'_>,
     name: &str,
-    values: &'arena [AttributeValue<'arena>],
-    out: &mut BodyBuilder<'arena>,
+    values: &[AttributeValue],
+    out: &mut BodyBuilder,
 ) -> Result<(), CompileError> {
     // Event attributes (RAW name starting `on`) are refused by the dispatch in
     // `emit_attribute` before this is reached.
@@ -482,22 +487,18 @@ fn emit_mixed_attribute<'arena>(
         }
         MixedAttrValue::Template(template) => template,
     };
-    let template_alloc = env.b.arena.alloc(template);
+    let template = env.b.push(template);
     let call = match name {
-        "class" => env
-            .b
-            .member_call("$", "attr_class", std::slice::from_ref(template_alloc)),
-        "style" => env
-            .b
-            .member_call("$", "attr_style", std::slice::from_ref(template_alloc)),
+        "class" => env.b.member_call("$", "attr_class", &[template]),
+        "style" => env.b.member_call("$", "attr_style", &[template]),
         _ => {
-            let mut args = BumpVec::new_in(env.b.arena);
-            args.push(env.b.string_literal_expr(name));
-            args.push(template_alloc.clone());
+            let name_literal = env.b.string_literal_expr(name);
+            let mut args = vec![env.b.push(name_literal), template];
             if DOM_BOOLEAN_ATTRIBUTES.contains(&name) {
-                args.push(env.b.true_literal());
+                let flag = env.b.true_literal();
+                args.push(env.b.push(flag));
             }
-            env.b.member_call("$", "attr", args.into_bump_slice())
+            env.b.member_call("$", "attr", &args)
         }
     };
     out.push_expr(call);
@@ -519,14 +520,17 @@ fn emit_mixed_attribute<'arena>(
 /// - a mixed text+expression value → a fully-folded string literal (the raw
 ///   concatenation, **not** HTML-escaped — the runtime escapes the object value)
 ///   or a `$.stringify` template literal.
-fn build_attribute_value_expr<'arena>(
-    env: &mut EmitEnv<'arena>,
+///
+/// The value is pushed and its id returned.
+fn build_attribute_value_expr(
+    env: &mut EmitEnv<'_>,
     name: &str,
-    value: Option<&'arena [AttributeValue<'arena>]>,
-) -> Result<Expression<'arena>, CompileError> {
+    value: Option<&[AttributeValue]>,
+) -> Result<ExprId, CompileError> {
     let Some(values) = value else {
         // A boolean attribute: `build_attribute_value(true)` → `true`.
-        return Ok(env.b.true_literal());
+        let flag = env.b.true_literal();
+        return Ok(env.b.push(flag));
     };
     let trim_whitespace = name == "class" || name == "style";
     match values {
@@ -537,22 +541,21 @@ fn build_attribute_value_expr<'arena>(
             } else {
                 decoded.into_owned()
             };
-            Ok(env.b.string_literal_expr(&escape_html_attr(&collapsed)))
+            let literal = env.b.string_literal_expr(&escape_html_attr(&collapsed));
+            Ok(env.b.push(literal))
         }
         [AttributeValue::ExpressionTag(tag)] => {
             // The template borrow point. Both the `class` `$.clsx` gate and the
             // wrap read the ERASED node (an `x as T` value is the assignable `x`).
             let quoted = preceded_by_quote(env.source, tag.span.start);
             let expr = env.erase(tag.expression)?;
-            let wrapped = wrap_value_expr(env, expr)?[0].clone();
+            let wrapped = wrap_value_expr(env, expr)?;
             // A `class` single-expression wraps in `$.clsx` per the oracle's
             // `needs_clsx` rule (its `has_spread` branch pre-wraps the expression);
             // every other name (and a non-clsx class) passes the bare value.
-            if name == "class" && class_needs_clsx(expr, quoted) {
-                let wrapped_alloc = env.b.arena.alloc(wrapped);
-                Ok(env
-                    .b
-                    .member_call("$", "clsx", std::slice::from_ref(wrapped_alloc)))
+            if name == "class" && class_needs_clsx(env.b.view().expr(expr), quoted) {
+                let clsx = env.b.member_call("$", "clsx", &[wrapped]);
+                Ok(env.b.push(clsx))
             } else {
                 Ok(wrapped)
             }
@@ -570,12 +573,13 @@ fn build_attribute_value_expr<'arena>(
 /// identifier-safe, else a quoted string literal; `shorthand` is set when the key
 /// is an identifier and the value is the same-named identifier (`{ hidden }`, the
 /// oracle's `b.prop` collapse).
-pub(crate) fn build_spread_object_property<'arena>(
-    env: &mut EmitEnv<'arena>,
-    attr: &'arena Attribute<'arena>,
+pub(crate) fn build_spread_object_property(
+    env: &mut EmitEnv<'_>,
+    attr: &Attribute,
     element_name: &str,
     inherited: Namespace,
-) -> Result<Option<Property<'arena>>, CompileError> {
+) -> Result<Option<Property>, CompileError> {
+    let values = env.sv.opt_attribute_values(attr.value);
     let raw_name = attr.name(env.source).to_string();
     // `defaultValue`/`defaultChecked` are properties, not attributes — the oracle
     // omits them from the object (case-sensitive raw-name test).
@@ -596,7 +600,7 @@ pub(crate) fn build_spread_object_property<'arena>(
     // value form with name length > 2 is `attribute_invalid_event_handler` (an
     // oracle analysis error) → refuse.
     if raw_name.starts_with("on") {
-        if let Some([AttributeValue::ExpressionTag(tag)]) = attr.value {
+        if let Some([AttributeValue::ExpressionTag(tag)]) = values {
             guard_dropped(env, tag.expression)?;
             return Ok(None);
         }
@@ -606,7 +610,7 @@ pub(crate) fn build_spread_object_property<'arena>(
         // A bare `on` (length 2) with a non-expression value is a normal attribute.
     }
 
-    let value = build_attribute_value_expr(env, &name, attr.value)?;
+    let value = build_attribute_value_expr(env, &name, values)?;
     // The object key is the emitted attribute name — case-preserved on an
     // svg/mathml element (`get_attribute_name`), lowercased otherwise. The value
     // builder above still keys the `class` → `$.clsx` decision on the lowercased
@@ -623,18 +627,13 @@ pub(crate) fn build_spread_object_property<'arena>(
         env.b.string_literal_expr(emit_name)
     };
     let key_span = key.span();
+    let key = env.b.push(key);
     // Object shorthand `{ hidden }`: an identifier key whose value is the plain
     // identifier of the same (emitted) name (`hidden={hidden}`, `viewBox={viewBox}`).
     let shorthand = key_is_ident
-        && matches!(&value.kind, ExpressionKind::Identifier(id)
+        && matches!(&env.b.view().expr(value).kind, ExpressionKind::Identifier(id)
             if plain_identifier_name(id, env.source).as_deref() == Some(emit_name));
-    Ok(Some(init_property(
-        env.b.arena,
-        key,
-        value,
-        shorthand,
-        key_span,
-    )))
+    Ok(Some(init_property(key, value, shorthand, key_span)))
 }
 
 /// Collapse `[ \t\n\r\f]+` runs to one space without trimming (the mixed-value

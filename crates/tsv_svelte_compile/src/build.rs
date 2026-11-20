@@ -64,6 +64,10 @@
 //!   catches an `Err` from a pushing call and goes on (the census's per-statement
 //!   loops, parity's fallback) holds no frame of its own across that call and never
 //!   flushes a mark taken before it.
+//! - **A host id may print at more than one position** (`bind:group`'s companion
+//!   `value`, which the oracle also emits as its own attribute). That is sound: a
+//!   chain-share hit is keyed by address, builder tag and the expand-last flags, so it
+//!   equals a rebuild, and the renderer re-resolves a keyed group at each occurrence.
 //! - **A reader takes the view first** (`AstView`) and a row by reference
 //!   (`view.expr(id)`), returning owned data or ids, never a reference it keeps.
 //! - **Template and CSS nodes** are read through the template view (`SvelteView`,

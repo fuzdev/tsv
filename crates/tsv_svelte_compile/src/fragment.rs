@@ -25,13 +25,13 @@
 
 use std::collections::HashMap;
 
-use bumpalo::collections::Vec as BumpVec;
+use tsv_lang::store::Run;
 use tsv_svelte::ast::{
-    AwaitBlock, ConstTag, EachBlock, Element, ElementKind, ExpressionTag, Fragment, FragmentNode,
-    HtmlTag, IfBlock, KeyBlock, RenderTag, SnippetBlock, SpecialElement, SpecialElementKind,
-    SpecialThis,
+    AwaitBlock, ConstTag, EachBlock, Element, ElementKind, ExpressionTag, FragmentNode, HtmlTag,
+    IfBlock, KeyBlock, RenderTag, SnippetBlock, SpecialElement, SpecialElementKind, SpecialThis,
+    SvelteView,
 };
-use tsv_ts::ast::{Expression, Statement};
+use tsv_ts::ast::{ExprId, Expression, StmtId};
 
 use crate::analyze::{ScopeEntry, evaluate, stringify_value};
 use crate::blocks::{
@@ -99,28 +99,28 @@ fn escape_html_text(s: &str) -> String {
 /// A fragment child after comment-dropping, const-tag hoisting, and text
 /// decoding, mutable for the whitespace normalization pass. Blocks are non-text
 /// nodes for whitespace purposes (`is_expr` is false).
-enum CleanNode<'arena> {
+enum CleanNode<'n> {
     Text(String),
-    Expr(&'arena ExpressionTag<'arena>),
-    Html(&'arena HtmlTag<'arena>),
-    Element(&'arena Element<'arena>),
+    Expr(&'n ExpressionTag),
+    Html(&'n HtmlTag),
+    Element(&'n Element),
     /// A `<svelte:element this={…}>` — emitted as a statement-level
     /// `$.element($$renderer, TAG, attrsFn?, childrenFn?)` call (like a component /
     /// control-flow block, it interrupts the template push stream). A non-text,
     /// non-expr node for whitespace normalization. Carries the `this` tag alongside
     /// the element so emission never re-destructures the (guaranteed) kind.
-    SvelteElement(&'arena SpecialElement<'arena>, &'arena SpecialThis<'arena>),
+    SvelteElement(&'n SpecialElement, &'n SpecialThis),
     /// A `<svelte:boundary>` — emitted as isolated `<!--[-->` / `<!--]-->` anchor
     /// pushes around a bare block statement, optionally wrapped in a
     /// `$$renderer.boundary({ failed }, ($$renderer) => …)` call
     /// ([`crate::blocks::emit_boundary`]). Like a block, it interrupts the template
     /// push stream, so it is a non-text, non-expr node for whitespace purposes.
-    Boundary(&'arena SpecialElement<'arena>),
-    If(&'arena IfBlock<'arena>),
-    Each(&'arena EachBlock<'arena>),
-    Await(&'arena AwaitBlock<'arena>),
-    Key(&'arena KeyBlock<'arena>),
-    Render(&'arena RenderTag<'arena>),
+    Boundary(&'n SpecialElement),
+    If(&'n IfBlock),
+    Each(&'n EachBlock),
+    Await(&'n AwaitBlock),
+    Key(&'n KeyBlock),
+    Render(&'n RenderTag),
 }
 
 impl CleanNode<'_> {
@@ -133,7 +133,10 @@ impl CleanNode<'_> {
 }
 
 /// Per-fragment emission context.
-#[expect(clippy::struct_excessive_bools)] // independent per-fragment flags, not a state machine
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "independent per-fragment flags, not a state machine"
+)]
 pub(crate) struct FragmentCtx<'p> {
     /// Whether a text-first fragment gets the leading `<!---->` anchor. True for
     /// the component root and `{#each}` bodies (the oracle's `is_text_first`:
@@ -174,30 +177,33 @@ pub(crate) struct FragmentCtx<'p> {
     pub(crate) in_svg_text: bool,
 }
 
-/// Walk a fragment: normalize whitespace per the oracle's `clean_nodes` rules,
-/// then append static HTML / interpolations to the template.
-pub(crate) fn emit_fragment<'arena>(
-    env: &mut EmitEnv<'arena>,
-    fragment: &Fragment<'arena>,
-    out: &mut BodyBuilder<'arena>,
+/// Walk a fragment's nodes: normalize whitespace per the oracle's `clean_nodes`
+/// rules, then append static HTML / interpolations to the template.
+///
+/// Takes the node slice rather than a `Fragment`: a `Fragment` is nothing but its
+/// node run, and two callers (the `<svelte:boundary>` children, a component's
+/// default-slot children) walk a filtered subset no run names.
+pub(crate) fn emit_fragment(
+    env: &mut EmitEnv<'_>,
+    nodes: &[FragmentNode],
+    out: &mut BodyBuilder,
     ctx: FragmentCtx<'_>,
 ) -> Result<(), CompileError> {
-    let nodes: &'arena [FragmentNode<'arena>] = fragment.nodes;
     let source = env.source;
 
     // Decode and filter into the working list. Comments are dropped (the oracle
     // compiles with preserveComments off); `{@const}` tags are hoisted out of the
     // whitespace list and emitted first (the oracle's `clean_nodes` hoisting).
-    let mut list: Vec<CleanNode<'arena>> = Vec::with_capacity(nodes.len());
-    let mut const_tags: Vec<&'arena ConstTag<'arena>> = Vec::new();
-    let mut head_nodes: Vec<&'arena SpecialElement<'arena>> = Vec::new();
+    let mut list: Vec<CleanNode<'_>> = Vec::with_capacity(nodes.len());
+    let mut const_tags: Vec<&ConstTag> = Vec::new();
+    let mut head_nodes: Vec<&SpecialElement> = Vec::new();
     // `<title>` elements hoist to the front of their fragment exactly like
     // `<svelte:head>` — the oracle's `clean_nodes` lists `TitleElement` in the
     // hoisted set and its visitor pushes to `state.init` (emitted before all
     // template content), so a `<title>` always precedes its head siblings
     // regardless of source order, and never participates in surrounding
     // whitespace normalization.
-    let mut title_nodes: Vec<&'arena SpecialElement<'arena>> = Vec::new();
+    let mut title_nodes: Vec<&SpecialElement> = Vec::new();
     for node in nodes {
         match node {
             // Every special-element kind is dispatched here. The kinds the transform
@@ -274,7 +280,7 @@ pub(crate) fn emit_fragment<'arena>(
                     | SpecialElementKind::SlotElement
                     | SpecialElementKind::SvelteFragment => {
                         // A silent `{}` here would DROP the node from the output.
-                        #[expect(clippy::unreachable)] // the mapping refused these above
+                        #[expect(clippy::unreachable, reason = "the mapping refused these above")]
                         {
                             unreachable!("refused above via special_element_refusal_kind")
                         }
@@ -320,8 +326,8 @@ pub(crate) fn emit_fragment<'arena>(
     // (Fragment.js:35-44 + RegularElement.js:229-231; see
     // `collect_hoisted_snippets`).
     let hoisted_snippets = if ctx.hoist_snippets {
-        let mut collected: Vec<&'arena SnippetBlock<'arena>> = Vec::new();
-        collect_hoisted_snippets(fragment, &mut collected);
+        let mut collected: Vec<&SnippetBlock> = Vec::new();
+        collect_hoisted_snippets(env.sv, nodes, &mut collected);
         collected
     } else {
         Vec::new()
@@ -386,10 +392,10 @@ pub(crate) fn emit_fragment<'arena>(
             // TypeScript before `clean_nodes` runs, and to it `{@render (s as T)(x)}`
             // is a plain `s(x)`. Reading the raw node would call it dynamic and emit
             // an anchor the oracle elides. `emit_render_tag` erases again for its own
-            // borrow; a second erase of a type-free node allocates nothing.
+            // borrow; a second erase of a type-free node pushes nothing.
             [CleanNode::Render(tag)] => {
                 let expression = env.erase(tag.expression)?;
-                render_callee_name(expression, source)
+                render_callee_name(env.b.view(), expression, source)
                     .is_some_and(|name| !render_callee_dynamic(env, name))
             }
             [CleanNode::Element(element)] => component_is_standalone_eligible(env, element),
@@ -430,29 +436,30 @@ pub(crate) fn emit_fragment<'arena>(
 /// Emit a block body fragment into a fresh child body builder, prepending `pre`
 /// statements (block anchor pushes, an `{#each}` binding) and pushing a
 /// block-scope `overlay` (empty for `{#if}`/`{#key}`, seeded with masked locals
-/// for `{#each}`/`{#await}`), and return the finished statement slice. The
+/// for `{#each}`/`{#await}`), and return the finished statement run. The
 /// overlay gives any `{@const}` in the body a scope to enter.
-pub(crate) fn emit_child_body<'arena>(
-    env: &mut EmitEnv<'arena>,
-    fragment: &Fragment<'arena>,
-    pre: &[Statement<'arena>],
+///
+/// `nodes` is the fragment's node slice — `sv.nodes(fragment.nodes)`, or the
+/// filtered subset a `<svelte:boundary>` / a component's default slot walks — and
+/// `pre` the ids of statements already pushed.
+pub(crate) fn emit_child_body(
+    env: &mut EmitEnv<'_>,
+    nodes: &[FragmentNode],
+    pre: &[StmtId],
     mark_text_first: bool,
     preserve_whitespace: bool,
     ns: ChildNamespace,
-    overlay: HashMap<String, ScopeEntry<'arena>>,
-) -> Result<&'arena [Statement<'arena>], CompileError> {
-    let arena = env.b.arena;
+    overlay: HashMap<String, ScopeEntry>,
+) -> Result<Run<StmtId>, CompileError> {
     // Re-infer this fragment's namespace from its own nodes (Svelte's `Fragment`
     // visitor), falling back to the inherited namespace.
-    let namespace = infer_namespace(env, ns.inherited, ns.parent, fragment.nodes);
+    let namespace = infer_namespace(env, ns.inherited, ns.parent, nodes);
     env.push_overlay(overlay)?;
-    let mut child = BodyBuilder::new_in(arena);
-    for stmt in pre {
-        child.stmts.push(stmt.clone());
-    }
+    let mut child = BodyBuilder::new();
+    child.stmts.extend_from_slice(pre);
     let result = emit_fragment(
         env,
-        fragment,
+        nodes,
         &mut child,
         FragmentCtx {
             mark_text_first,
@@ -467,7 +474,7 @@ pub(crate) fn emit_child_body<'arena>(
     );
     env.pop_overlay();
     result?;
-    Ok(child.finish(&mut env.b, arena))
+    Ok(child.finish(&mut env.b))
 }
 
 /// Collect the snippets that hoist to this block scope: the fragment's own
@@ -497,33 +504,34 @@ pub(crate) fn emit_child_body<'arena>(
 /// refused (`Refusal::TemplateNode`, "declaration tag"), a `{@const}` directly in
 /// a regular element is oracle-rejected (`const_tag_invalid_placement`), and an
 /// async element is `experimental.async`-fenced.
-fn collect_hoisted_snippets<'arena>(
-    fragment: &Fragment<'arena>,
-    out: &mut Vec<&'arena SnippetBlock<'arena>>,
+fn collect_hoisted_snippets<'n>(
+    sv: SvelteView<'n>,
+    nodes: &'n [FragmentNode],
+    out: &mut Vec<&'n SnippetBlock>,
 ) {
     // Phase 1: this fragment's own direct-child snippets, source order.
-    for node in fragment.nodes {
+    for node in nodes {
         if let FragmentNode::SnippetBlock(snippet) = node {
             out.push(snippet);
         }
     }
     // Phase 2: each transparent (non-Component) element subtree, source order,
     // recursed with the same two-phase rule.
-    for node in fragment.nodes {
+    for node in nodes {
         if let FragmentNode::Element(element) = node
             && element.kind != ElementKind::Component
         {
-            collect_hoisted_snippets(&element.fragment, out);
+            collect_hoisted_snippets(sv, sv.nodes(element.fragment.nodes), out);
         }
     }
 }
 
 /// Emit `{expr}` (escaped) or `{@html expr}` (raw) — the oracle's text-sequence
 /// interpolation with its fold gate.
-fn emit_expression_tag<'arena>(
-    env: &mut EmitEnv<'arena>,
-    expr: &'arena Expression<'arena>,
-    out: &mut BodyBuilder<'arena>,
+fn emit_expression_tag(
+    env: &mut EmitEnv<'_>,
+    expr: ExprId,
+    out: &mut BodyBuilder,
     escape: bool,
 ) -> Result<(), CompileError> {
     // The template borrow point: erase TypeScript ONCE, then feed the erased node
@@ -535,7 +543,8 @@ fn emit_expression_tag<'arena>(
     let wrapped = wrap_value_expr(env, expr)?;
 
     // The fold gate: a known evaluation folds into the static text.
-    let evaluated = evaluate(expr, &env.value_scope(), env.source, 0)
+    let scope = env.value_scope();
+    let evaluated = evaluate(scope.view.expr(expr), &scope, env.source, 0)
         .map_err(|g| unsupported(Refusal::StaticEvalNotPortable(g.0)))?;
     if let Some(value) = evaluated.known_value() {
         if !escape {
@@ -550,9 +559,9 @@ fn emit_expression_tag<'arena>(
     }
 
     let call = if escape {
-        env.b.member_call("$", "escape", wrapped)
+        env.b.member_call("$", "escape", &[wrapped])
     } else {
-        env.b.member_call("$", "html", wrapped)
+        env.b.member_call("$", "html", &[wrapped])
     };
     out.push_expr(call);
     Ok(())
@@ -570,23 +579,23 @@ fn emit_expression_tag<'arena>(
 /// tsv's parser is permissive about both, so each refuses here. A `{expr}` child
 /// emits exactly like a regular element's text content: a statically-known value
 /// folds, otherwise it emits `$.escape(expr)`.
-fn emit_title_element<'arena>(
-    env: &mut EmitEnv<'arena>,
-    title: &'arena SpecialElement<'arena>,
-    out: &mut BodyBuilder<'arena>,
+fn emit_title_element(
+    env: &mut EmitEnv<'_>,
+    title: &SpecialElement,
+    out: &mut BodyBuilder,
 ) -> Result<(), CompileError> {
+    let sv = env.sv;
     // Any attribute on <title> is `title_illegal_attribute` in the oracle.
-    if !title.attributes.is_empty() {
+    if !sv.attributes(title.attributes).is_empty() {
         return Err(unsupported(Refusal::TitleAttributes));
     }
-    let arena = env.b.arena;
     let source = env.source;
 
     // Build `<title>` + children + `</title>` into a fresh body. Title children are
     // only text/expression, so this flushes to a single `$$renderer.push(…)`.
-    let mut body = BodyBuilder::new_in(arena);
+    let mut body = BodyBuilder::new();
     body.push_text("<title>");
-    for node in title.fragment.nodes {
+    for node in sv.nodes(title.fragment.nodes) {
         match node {
             FragmentNode::Text(text) => {
                 let decoded = text.data(source);
@@ -600,20 +609,16 @@ fn emit_title_element<'arena>(
         }
     }
     body.push_text("</title>");
-    let body_stmts = body.finish(&mut env.b, arena);
+    let body_stmts = body.finish(&mut env.b);
 
     // Wrap in `$$renderer.title(($$renderer) => { … })` — the closure receives a
     // `$$renderer` parameter (like `$.head`'s closure), not the enclosing one.
     let here = env.b.here();
     let renderer_param = Expression::from_identifier(env.b.ident("$$renderer"));
-    let params = std::slice::from_ref(arena.alloc(renderer_param));
-    let arrow = env.b.arrow_block(params, body_stmts, here);
-    let mut args: BumpVec<'arena, Expression<'arena>> = BumpVec::new_in(arena);
-    args.push(arrow);
-    let call = env
-        .b
-        .member_call("$$renderer", "title", args.into_bump_slice());
-    out.push_expression_statement(&mut env.b, arena, call);
+    let arrow = env.b.arrow_block(&[renderer_param], body_stmts, here);
+    let arrow = env.b.push(arrow);
+    let call = env.b.member_call("$$renderer", "title", &[arrow]);
+    out.push_expression_statement(&mut env.b, call);
     Ok(())
 }
 
@@ -686,7 +691,7 @@ fn normalize_whitespace(
     list.retain(|_| !*keep.next().unwrap_or(&false));
 }
 
-pub(crate) fn fragment_node_kind(node: &FragmentNode<'_>) -> &'static str {
+pub(crate) fn fragment_node_kind(node: &FragmentNode) -> &'static str {
     match node {
         FragmentNode::Element(_) => "element",
         FragmentNode::SpecialElement(_) => "special element",

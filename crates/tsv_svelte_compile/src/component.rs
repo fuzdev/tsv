@@ -18,15 +18,14 @@
 
 use std::collections::HashMap;
 
-use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::Span;
 use tsv_svelte::ast::{
-    Attribute, AttributeNode, AttributeValue, Element, ElementKind, Fragment, FragmentNode,
-    SpecialElement, SpecialElementKind,
+    Attribute, AttributeNode, AttributeValue, Element, ElementKind, FragmentNode, SpecialElement,
+    SpecialElementKind,
 };
 use tsv_ts::ast::{
-    ArrayExpression, BlockStatement, Expression, ExpressionKind, ObjectExpression, ObjectProperty,
-    Property, Statement,
+    ArrayExpression, BlockStatement, ExprId, Expression, ExpressionKind, ObjectExpression,
+    ObjectProperty, Property, Statement,
 };
 
 use crate::analyze::BindingKind;
@@ -78,7 +77,7 @@ fn component_dynamic(env: &EmitEnv<'_>, name: &str) -> bool {
 /// `clean_nodes` `is_standalone`: a non-dynamic `Component` with no
 /// `--custom-property` attribute — `hmr` is always off here). When true its call
 /// reuses the enclosing block's anchor and emits no trailing `<!---->`.
-pub(crate) fn component_is_standalone_eligible(env: &EmitEnv<'_>, element: &Element<'_>) -> bool {
+pub(crate) fn component_is_standalone_eligible(env: &EmitEnv<'_>, element: &Element) -> bool {
     if element.kind != ElementKind::Component {
         return false;
     }
@@ -86,31 +85,35 @@ pub(crate) fn component_is_standalone_eligible(env: &EmitEnv<'_>, element: &Elem
     if component_dynamic(env, &name) {
         return false;
     }
-    !element.attributes.iter().any(|attr_node| {
-        let AttributeNode::Attribute(attr) = attr_node else {
-            return false;
-        };
-        attr.name(env.source).starts_with("--")
-    })
+    !env.sv
+        .attributes(element.attributes)
+        .iter()
+        .any(|attr_node| {
+            let AttributeNode::Attribute(attr) = attr_node else {
+                return false;
+            };
+            attr.name(env.source).starts_with("--")
+        })
 }
 
 /// The component-children analysis product: the synthetic props to append after
 /// the attribute props, plus the snippet-prop function declarations that go into
 /// the component's wrapping block.
-struct ChildrenPlan<'arena> {
+struct ChildrenPlan {
     /// `function name($$renderer, …) { … }` declarations (source order), placed in
     /// the component's wrapping block so the snippet props can reference them.
-    snippet_functions: Vec<Statement<'arena>>,
+    snippet_functions: Vec<Statement>,
     /// Snippet prop names (source order) — each emits a `{ name }` shorthand prop.
     snippet_props: Vec<String>,
     /// `$$slots` entries (slot keys, source order): snippet slots, then `default`.
     slot_keys: Vec<String>,
-    /// The default-slot children fragment (direct `{#snippet}` children filtered
-    /// out) → the implicit `children: ($$renderer) => { … }` arrow, if any.
-    default_children: Option<Fragment<'arena>>,
+    /// The default-slot children (direct `{#snippet}` children filtered out — a
+    /// subset no run names, so the nodes themselves) → the implicit
+    /// `children: ($$renderer) => { … }` arrow, if any.
+    default_children: Option<Vec<FragmentNode>>,
 }
 
-impl ChildrenPlan<'_> {
+impl ChildrenPlan {
     /// Whether the plan contributes any synthetic props (a snippet prop, the
     /// `children` arrow, or `$$slots`) — `slot_keys` is non-empty exactly then.
     fn has_content(&self) -> bool {
@@ -124,17 +127,17 @@ impl ChildrenPlan<'_> {
 /// prop alongside default children (the oracle's `$$slots.default` divergence, a
 /// genuine deferred gap). A `{#snippet}` child named `children` keeps the
 /// `children` prop name but a `default` slot key (the oracle's rename).
-fn plan_component_children<'arena>(
-    env: &mut EmitEnv<'arena>,
-    element: &'arena Element<'arena>,
+fn plan_component_children(
+    env: &mut EmitEnv<'_>,
+    element: &Element,
     name: &str,
-) -> Result<ChildrenPlan<'arena>, CompileError> {
-    let arena = env.b.arena;
+) -> Result<ChildrenPlan, CompileError> {
+    let children = env.sv.nodes(element.fragment.nodes);
     let mut snippet_functions = Vec::new();
     let mut snippet_props = Vec::new();
     let mut slot_keys = Vec::new();
     let mut has_default = false;
-    for node in element.fragment.nodes {
+    for node in children {
         match node {
             FragmentNode::SnippetBlock(snippet) => {
                 let (func, snippet_name) = build_snippet_function(env, snippet)?;
@@ -185,16 +188,13 @@ fn plan_component_children<'arena>(
     let default_children = if has_default {
         // The `children` arrow sees only the default-slot children — direct
         // `{#snippet}` children live in the wrapping block, not the arrow body.
-        let mut nodes: BumpVec<'arena, FragmentNode<'arena>> = BumpVec::new_in(arena);
-        for node in element.fragment.nodes {
-            if !matches!(node, FragmentNode::SnippetBlock(_)) {
-                nodes.push(node.clone());
-            }
-        }
+        let nodes: Vec<FragmentNode> = children
+            .iter()
+            .filter(|node| !matches!(node, FragmentNode::SnippetBlock(_)))
+            .copied()
+            .collect();
         slot_keys.push("default".to_string());
-        Some(Fragment {
-            nodes: nodes.into_bump_slice(),
-        })
+        Some(nodes)
     } else {
         None
     };
@@ -215,7 +215,7 @@ fn plan_component_children<'arena>(
 /// case-**insensitive** because CSS pruning lowercases
 /// (`css-prune.js:1015`) — the oracle is split, so the two predicates are
 /// deliberately different, and merging them would break CSS-prune parity.
-fn child_slot_attribute(env: &EmitEnv<'_>, element: &Element<'_>) -> bool {
+fn child_slot_attribute(env: &EmitEnv<'_>, element: &Element) -> bool {
     component_has_named_attribute(env, element, "slot")
 }
 
@@ -225,8 +225,8 @@ fn child_slot_attribute(env: &EmitEnv<'_>, element: &Element<'_>) -> bool {
 /// The case-sensitivity matches `child_slot_attribute` and the same oracle site
 /// (`server/visitors/shared/component.js:50`); see that function for why it must
 /// NOT be unified with the census's case-insensitive `has_slot_attribute`.
-fn special_element_slot_attribute(env: &EmitEnv<'_>, se: &SpecialElement<'_>) -> bool {
-    se.attributes.iter().any(|attr_node| {
+fn special_element_slot_attribute(env: &EmitEnv<'_>, se: &SpecialElement) -> bool {
+    env.sv.attributes(se.attributes).iter().any(|attr_node| {
         let AttributeNode::Attribute(attr) = attr_node else {
             return false;
         };
@@ -236,13 +236,16 @@ fn special_element_slot_attribute(env: &EmitEnv<'_>, se: &SpecialElement<'_>) ->
 
 /// Whether an element carries a plain attribute with the given (case-sensitive)
 /// name.
-fn component_has_named_attribute(env: &EmitEnv<'_>, element: &Element<'_>, name: &str) -> bool {
-    element.attributes.iter().any(|attr_node| {
-        let AttributeNode::Attribute(attr) = attr_node else {
-            return false;
-        };
-        attr.name(env.source) == name
-    })
+fn component_has_named_attribute(env: &EmitEnv<'_>, element: &Element, name: &str) -> bool {
+    env.sv
+        .attributes(element.attributes)
+        .iter()
+        .any(|attr_node| {
+            let AttributeNode::Attribute(attr) = attr_node else {
+                return false;
+            };
+            attr.name(env.source) == name
+        })
 }
 
 /// Emit `Name($$renderer, props)` for a component invocation (`<Foo … />`),
@@ -251,14 +254,13 @@ fn component_has_named_attribute(env: &EmitEnv<'_>, element: &Element<'_>, name:
 /// the call in a bare `{ function …; Name(…); }` block. Dynamic components, named
 /// slots, `--custom-property` attributes, and directives are refused — see the
 /// individual refusal sites.
-pub(crate) fn emit_component<'arena>(
-    env: &mut EmitEnv<'arena>,
-    element: &'arena Element<'arena>,
-    out: &mut BodyBuilder<'arena>,
+pub(crate) fn emit_component(
+    env: &mut EmitEnv<'_>,
+    element: &Element,
+    out: &mut BodyBuilder,
     name: &str,
     is_standalone: bool,
 ) -> Result<(), CompileError> {
-    let arena = env.b.arena;
     // A dynamic component (member / reactive binding) compiles to the truthiness
     // guard — a later slice.
     if component_dynamic(env, name) {
@@ -280,10 +282,8 @@ pub(crate) fn emit_component<'arena>(
     // `Name($$renderer, props)`. The callee is the component reference (a plain
     // identifier — member components refuse above).
     let callee = env.b.ident_expr(name);
-    let mut args: BumpVec<'arena, Expression<'arena>> = BumpVec::new_in(arena);
-    args.push(Expression::from_identifier(env.b.ident("$$renderer")));
-    args.push(props_expr);
-    let call = env.b.call_of(callee, args.into_bump_slice(), false);
+    let args = [env.b.ident_expr("$$renderer"), env.b.push(props_expr)];
+    let call = env.b.call_of(callee, &args, false);
     let call_stmt = env.b.expression_statement(call);
 
     // Named-snippet children hoist their `function` declarations into a bare block
@@ -292,18 +292,19 @@ pub(crate) fn emit_component<'arena>(
     let stmt = if plan.snippet_functions.is_empty() {
         call_stmt
     } else {
-        let mut block_body: BumpVec<'arena, Statement<'arena>> = BumpVec::new_in(arena);
+        let mut block_body = Vec::with_capacity(plan.snippet_functions.len() + 1);
         for func in plan.snippet_functions {
-            block_body.push(func);
+            block_body.push(env.b.push(func));
         }
-        block_body.push(call_stmt);
+        block_body.push(env.b.push(call_stmt));
         let block_span = env.b.here();
+        let body = env.b.push_list(&block_body);
         Statement::from_block_statement(BlockStatement {
-            body: block_body.into_bump_slice(),
+            body,
             span: block_span,
         })
     };
-    out.push_statement(&mut env.b, arena, stmt);
+    out.push_statement(&mut env.b, stmt);
 
     // A non-standalone component keeps the `<!---->` anchor so its output doesn't
     // fuse with the surrounding fragment.
@@ -316,28 +317,27 @@ pub(crate) fn emit_component<'arena>(
 /// A group of component attributes: consecutive plain attributes accumulate into
 /// one object literal; a `{...spread}` starts a new group (the oracle's
 /// `props_and_spreads` grouping in `shared/component.js`).
-enum PropGroup<'a, 'arena> {
-    Props(Vec<&'a Attribute<'arena>>),
-    Spread(&'a Expression<'arena>),
+enum PropGroup<'a> {
+    Props(Vec<&'a Attribute>),
+    Spread(ExprId),
 }
 
 /// Build the component call's props argument: a plain object `{ … }` when there
 /// are no spreads (or a single leading props group), otherwise
 /// `$.spread_props([ … ])` interleaving objects and spread expressions in source
 /// order. Refuses `--custom-property` attributes, `bind:`, and other directives.
-fn build_component_props<'arena>(
-    env: &mut EmitEnv<'arena>,
-    element: &'arena Element<'arena>,
+fn build_component_props(
+    env: &mut EmitEnv<'_>,
+    element: &Element,
     name: &str,
-    plan: &ChildrenPlan<'arena>,
-) -> Result<Expression<'arena>, CompileError> {
-    let arena = env.b.arena;
+    plan: &ChildrenPlan,
+) -> Result<Expression, CompileError> {
     // The synthetic children props (snippet props, the `children` arrow,
     // `$$slots`) go into the last props group, or a new one after a trailing
     // spread.
     let synthetic = plan.has_content().then_some(plan);
-    let mut groups: Vec<PropGroup<'_, 'arena>> = Vec::new();
-    for attr_node in element.attributes {
+    let mut groups: Vec<PropGroup<'_>> = Vec::new();
+    for attr_node in env.sv.attributes(element.attributes) {
         match attr_node {
             AttributeNode::Attribute(attr) => {
                 let attr_name = attr.name(env.source).to_string();
@@ -376,7 +376,7 @@ fn build_component_props<'arena>(
     let single_object =
         groups.is_empty() || (groups.len() == 1 && matches!(groups[0], PropGroup::Props(_)));
     if single_object {
-        let attrs: &[&Attribute<'arena>] = match groups.first() {
+        let attrs: &[&Attribute] = match groups.first() {
             Some(PropGroup::Props(props)) => props,
             _ => &[],
         };
@@ -387,7 +387,7 @@ fn build_component_props<'arena>(
     // element construction so the array span encloses the minted object spans.
     let last_is_props = matches!(groups.last(), Some(PropGroup::Props(_)));
     let lbracket = env.b.mint("[").start;
-    let mut elements: BumpVec<'arena, Option<&'arena Expression<'arena>>> = BumpVec::new_in(arena);
+    let mut elements: Vec<Option<ExprId>> = Vec::with_capacity(groups.len() + 1);
     let group_count = groups.len();
     for (i, group) in groups.iter().enumerate() {
         let element_expr = match group {
@@ -398,46 +398,45 @@ fn build_component_props<'arena>(
                 } else {
                     None
                 };
-                build_props_object(env, props, syn)?
+                let object = build_props_object(env, props, syn)?;
+                env.b.push(object)
             }
             PropGroup::Spread(expr) => {
                 // The template borrow point (`<Foo {...(o as any)} />`).
-                let expr = env.erase(expr)?;
-                wrap_value_expr(env, expr)?[0].clone()
+                let expr = env.erase(*expr)?;
+                wrap_value_expr(env, expr)?
             }
         };
-        elements.push(Some(arena.alloc(element_expr)));
+        elements.push(Some(element_expr));
     }
     // A trailing spread with synthetic props needs its own props object appended.
     if !last_is_props && let Some(plan) = synthetic {
-        elements.push(Some(arena.alloc(build_props_object(env, &[], Some(plan))?)));
+        let object = build_props_object(env, &[], Some(plan))?;
+        elements.push(Some(env.b.push(object)));
     }
     let rbracket = env.b.mint("]").end;
-    let array = Expression {
+    let elements = env.b.push_list(&elements);
+    let array = env.b.push(Expression {
         span: Span::new(lbracket, rbracket),
         kind: ExpressionKind::ArrayExpression(ArrayExpression {
-            elements: elements.into_bump_slice(),
+            elements,
             spread_trailing_comma: false,
         }),
-    };
-    let array_alloc = arena.alloc(array);
-    Ok(env
-        .b
-        .member_call("$", "spread_props", std::slice::from_ref(array_alloc)))
+    });
+    Ok(env.b.member_call("$", "spread_props", &[array]))
 }
 
 /// Build a plain object literal `{ … }` from a run of component attributes. The
 /// braces are minted around the property construction so the object span encloses
 /// the (appendix) key spans (the object printer reads its own span region for the
 /// expansion decision — all appendix, no newlines, so it collapses when it fits).
-fn build_props_object<'arena>(
-    env: &mut EmitEnv<'arena>,
-    attrs: &[&'arena Attribute<'arena>],
-    synthetic: Option<&ChildrenPlan<'arena>>,
-) -> Result<Expression<'arena>, CompileError> {
-    let arena = env.b.arena;
+fn build_props_object(
+    env: &mut EmitEnv<'_>,
+    attrs: &[&Attribute],
+    synthetic: Option<&ChildrenPlan>,
+) -> Result<Expression, CompileError> {
     let obrace = env.b.mint("{").start;
-    let mut properties: BumpVec<'arena, ObjectProperty<'arena>> = BumpVec::new_in(arena);
+    let mut properties: Vec<ObjectProperty> = Vec::new();
     for attr in attrs {
         properties.push(ObjectProperty::Property(build_component_property(
             env, attr,
@@ -452,10 +451,8 @@ fn build_props_object<'arena>(
                 snippet_name,
             )));
         }
-        if let Some(fragment) = &plan.default_children {
-            properties.push(ObjectProperty::Property(build_children_prop(
-                env, fragment,
-            )?));
+        if let Some(nodes) = &plan.default_children {
+            properties.push(ObjectProperty::Property(build_children_prop(env, nodes)?));
         }
         properties.push(ObjectProperty::Property(build_slots_prop(
             env,
@@ -463,10 +460,11 @@ fn build_props_object<'arena>(
         )));
     }
     let cbrace = env.b.mint("}").end;
+    let properties = env.b.push_list(&properties);
     Ok(Expression {
         span: Span::new(obrace, cbrace),
         kind: ExpressionKind::ObjectExpression(ObjectExpression {
-            properties: properties.into_bump_slice(),
+            properties,
             spread_trailing_comma: false,
         }),
     })
@@ -474,28 +472,22 @@ fn build_props_object<'arena>(
 
 /// A `{ name }` shorthand prop for a named-snippet child — the value references
 /// the `function name(…)` declaration in the component's wrapping block.
-fn build_snippet_prop<'arena>(env: &mut EmitEnv<'arena>, name: &str) -> Property<'arena> {
+fn build_snippet_prop(env: &mut EmitEnv<'_>, name: &str) -> Property {
     let key = env.b.ident(name);
     let key_span = key.span;
-    let value = env.b.ident(name);
-    init_property(
-        env.b.arena,
-        Expression::from_identifier(key),
-        Expression::from_identifier(value),
-        true,
-        key_span,
-    )
+    let key = env.b.push(Expression::from_identifier(key));
+    let value = env.b.ident_expr(name);
+    init_property(key, value, true, key_span)
 }
 
 /// The implicit `children` prop for a component's default-slot children:
 /// `children: ($$renderer) => { …body… }`. The body reuses the fragment
 /// machinery (text-first eligible, per the oracle's `is_text_first` Component
 /// parent). The key is minted first so the (key-only) property span stays forward.
-fn build_children_prop<'arena>(
-    env: &mut EmitEnv<'arena>,
-    fragment: &Fragment<'arena>,
-) -> Result<Property<'arena>, CompileError> {
-    let arena = env.b.arena;
+fn build_children_prop(
+    env: &mut EmitEnv<'_>,
+    nodes: &[FragmentNode],
+) -> Result<Property, CompileError> {
     let key = env.b.ident("children");
     let key_span = key.span;
     // Component children (the default-slot `children` snippet) re-infer their
@@ -504,7 +496,7 @@ fn build_children_prop<'arena>(
     // html document default is the fallback when the slot holds no elements.
     let body = emit_child_body(
         env,
-        fragment,
+        nodes,
         &[],
         true,
         false,
@@ -516,55 +508,46 @@ fn build_children_prop<'arena>(
         HashMap::new(),
     )?;
     let renderer_param = Expression::from_identifier(env.b.ident("$$renderer"));
-    let params = std::slice::from_ref(arena.alloc(renderer_param));
     let block_span = env.b.here();
-    let arrow = env.b.arrow_block(params, body, block_span);
-    Ok(init_property(
-        arena,
-        Expression::from_identifier(key),
-        arrow,
-        false,
-        key_span,
-    ))
+    let arrow = env.b.arrow_block(&[renderer_param], body, block_span);
+    let key = env.b.push(Expression::from_identifier(key));
+    let arrow = env.b.push(arrow);
+    Ok(init_property(key, arrow, false, key_span))
 }
 
 /// The `$$slots: { key1: true, … }` prop that accompanies component children —
 /// one `true` entry per named-snippet slot plus `default` for default children
 /// (slot names are always valid identifiers). Named-slot arrow values would live
 /// here too, but named slots are refused.
-fn build_slots_prop<'arena>(env: &mut EmitEnv<'arena>, slot_keys: &[String]) -> Property<'arena> {
-    let arena = env.b.arena;
+fn build_slots_prop(env: &mut EmitEnv<'_>, slot_keys: &[String]) -> Property {
     let key = env.b.ident("$$slots");
     let key_span = key.span;
     let obrace = env.b.mint("{").start;
-    let mut inner_props: BumpVec<'arena, ObjectProperty<'arena>> = BumpVec::new_in(arena);
+    let mut inner_props: Vec<ObjectProperty> = Vec::with_capacity(slot_keys.len());
     for slot_key in slot_keys {
         let entry_key = env.b.ident(slot_key);
         let entry_key_span = entry_key.span;
+        let entry_key = env.b.push(Expression::from_identifier(entry_key));
         let entry_val = env.b.true_literal();
+        let entry_val = env.b.push(entry_val);
         inner_props.push(ObjectProperty::Property(init_property(
-            arena,
-            Expression::from_identifier(entry_key),
+            entry_key,
             entry_val,
             false,
             entry_key_span,
         )));
     }
     let cbrace = env.b.mint("}").end;
-    let inner = Expression {
+    let properties = env.b.push_list(&inner_props);
+    let inner = env.b.push(Expression {
         span: Span::new(obrace, cbrace),
         kind: ExpressionKind::ObjectExpression(ObjectExpression {
-            properties: inner_props.into_bump_slice(),
+            properties,
             spread_trailing_comma: false,
         }),
-    };
-    init_property(
-        arena,
-        Expression::from_identifier(key),
-        inner,
-        false,
-        key_span,
-    )
+    });
+    let key = env.b.push(Expression::from_identifier(key));
+    init_property(key, inner, false, key_span)
 }
 
 /// Build one `key: value` object property from a component attribute. The key is
@@ -573,10 +556,10 @@ fn build_slots_prop<'arena>(env: &mut EmitEnv<'arena>, slot_keys: &[String]) -> 
 /// identifier of the same name (`{ n: n }` prints as `{ n }`). The key is minted
 /// before the value, so the (key-only) property span stays forward and in the
 /// appendix; the value prints from its own span.
-fn build_component_property<'arena>(
-    env: &mut EmitEnv<'arena>,
-    attr: &'arena Attribute<'arena>,
-) -> Result<Property<'arena>, CompileError> {
+fn build_component_property(
+    env: &mut EmitEnv<'_>,
+    attr: &Attribute,
+) -> Result<Property, CompileError> {
     let name = attr.name(env.source).to_string();
     let key_is_ident = is_js_identifier(&name);
     let key = if key_is_ident {
@@ -585,11 +568,12 @@ fn build_component_property<'arena>(
         env.b.string_literal_expr(&name)
     };
     let key_span = key.span();
+    let key = env.b.push(key);
     let value = build_prop_value(env, attr)?;
     let shorthand = key_is_ident
-        && matches!(&value.kind, ExpressionKind::Identifier(id)
+        && matches!(&env.b.view().expr(value).kind, ExpressionKind::Identifier(id)
             if plain_identifier_name(id, env.source).as_deref() == Some(name.as_str()));
-    Ok(init_property(env.b.arena, key, value, shorthand, key_span))
+    Ok(init_property(key, value, shorthand, key_span))
 }
 
 /// Build a component attribute's prop value:
@@ -602,24 +586,24 @@ fn build_component_property<'arena>(
 ///   with **no fold** (the single-chunk component path doesn't evaluate);
 /// - a mixed text+expression value → a template literal (or a folded string
 ///   literal when every part is statically known).
-fn build_prop_value<'arena>(
-    env: &mut EmitEnv<'arena>,
-    attr: &'arena Attribute<'arena>,
-) -> Result<Expression<'arena>, CompileError> {
-    let Some(values) = attr.value else {
-        return Ok(env.b.true_literal());
+///
+/// The value is pushed and its id returned.
+fn build_prop_value(env: &mut EmitEnv<'_>, attr: &Attribute) -> Result<ExprId, CompileError> {
+    let Some(values) = env.sv.opt_attribute_values(attr.value) else {
+        let flag = env.b.true_literal();
+        return Ok(env.b.push(flag));
     };
     match values {
         [AttributeValue::Text(text)] => {
             let decoded = text.data(env.source);
-            Ok(env.b.string_literal_expr(&decoded))
+            let literal = env.b.string_literal_expr(&decoded);
+            Ok(env.b.push(literal))
         }
         [AttributeValue::ExpressionTag(tag)] => {
             // The template borrow point. The erased node also decides the caller's
             // `{ n }` shorthand test — `<Foo n={n as T} />` is `{ n }` to the oracle.
             let expr = env.erase(tag.expression)?;
-            let wrapped = wrap_value_expr(env, expr)?;
-            Ok(wrapped[0].clone())
+            wrap_value_expr(env, expr)
         }
         // A mixed text+expression value. Unlike the element mixed-attribute path
         // there is no whitespace trim (hence `false`), no HTML escaping, and no

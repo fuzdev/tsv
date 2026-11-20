@@ -203,6 +203,18 @@ impl EmitEnv<'_> {
         Ok(erased.expr.unwrap_or(expr))
     }
 
+    /// [`Self::erase`] for a `{#snippet}` parameter, a row no id names (a
+    /// parameter list is a value run): the erased pattern by value, its erased
+    /// regions joining the same comment-refusal windows.
+    pub(crate) fn erase_parameter(
+        &mut self,
+        param: Expression,
+    ) -> Result<Expression, CompileError> {
+        let erased = erase::erase_parameter(self.b.stores, self.source, param)?;
+        self.erased_windows.extend(erased.regions);
+        Ok(erased.param.unwrap_or(param))
+    }
+
     /// Push a block-scope overlay; refuses names that shadow a derived binding
     /// (the guard's derived-read refusal is name-based and can't see scopes).
     pub(crate) fn push_overlay(
