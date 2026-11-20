@@ -12,7 +12,8 @@
 //! Both over-refuse on purpose; the direction matters, because a missed binding
 //! is a MISMATCH while an extra refusal is merely a gap.
 
-use tsv_ts::ast::{LiteralValue, Statement};
+use tsv_lang::store::Run;
+use tsv_ts::ast::{AstView, Identifier, LiteralValue, StmtId};
 
 use crate::analyze::{
     RUNE_BASES, RuneInit, classify_rune_init, pattern_binding_names,
@@ -127,13 +128,14 @@ enum StemInit {
 /// string, or as a **member/property NAME** (`obj.$state`, `{ $state: 1 }`),
 /// which is not a rune reference at all. Every one is a clean refusal rather
 /// than a wrong compile, which is why the scan is deliberately unbounded.
-pub(crate) fn refuse_rune_store_collision<'arena>(
-    instance_body: &'arena [Statement<'arena>],
-    module_body: &'arena [Statement<'arena>],
+pub(crate) fn refuse_rune_store_collision(
+    view: AstView<'_>,
+    instance_body: Run<StmtId>,
+    module_body: Run<StmtId>,
     source: &str,
 ) -> Result<(), CompileError> {
-    let static_block = script_contains_static_block(instance_body, source)
-        || script_contains_static_block(module_body, source);
+    let static_block = script_contains_static_block(view, instance_body, source)
+        || script_contains_static_block(view, module_body, source);
     for stem in RUNE_BASES {
         let name = format!("${stem}");
         if !source_references_identifier(source, &name) {
@@ -147,8 +149,8 @@ pub(crate) fn refuse_rune_store_collision<'arena>(
         }
         // `instance.scope.get(stem)`: the instance scope's own declarations, then
         // its parent's — the module scope.
-        let Some(init) = stem_declaration(instance_body, stem, source)
-            .or_else(|| stem_declaration(module_body, stem, source))
+        let Some(init) = stem_declaration(view, instance_body, stem, source)
+            .or_else(|| stem_declaration(view, module_body, stem, source))
         else {
             continue;
         };
@@ -199,11 +201,12 @@ pub(crate) fn refuse_rune_store_collision<'arena>(
 /// out to be a division, a `U+0085` (`<NEL>`, Unicode whitespace but NOT JS
 /// whitespace, so the scan sees a boundary the JS lexer would reject anyway) —
 /// and over-reporting only costs an extra refusal.
-fn script_contains_static_block(stmts: &[Statement<'_>], source: &str) -> bool {
-    let (Some(first), Some(last)) = (stmts.first(), stmts.last()) else {
+fn script_contains_static_block(view: AstView<'_>, stmts: Run<StmtId>, source: &str) -> bool {
+    let stmts = view.stmt_list(stmts);
+    let (Some(&first), Some(&last)) = (stmts.first(), stmts.last()) else {
         return false;
     };
-    let range = first.span().start as usize..last.span().end as usize;
+    let range = view.stmt(first).span().start as usize..view.stmt(last).span().end as usize;
     let Some(text) = source.get(range) else {
         // An unexpected span shape is not a reason to go blind.
         return true;
@@ -244,13 +247,14 @@ fn script_contains_static_block(stmts: &[Statement<'_>], source: &str) -> bool {
 /// enumeration — so a `var` hoisted out of a nested block or for-head is seen and
 /// a new `Statement` variant fails compilation rather than silently escaping the
 /// guard.
-fn stem_declaration<'arena>(
-    stmts: &'arena [Statement<'arena>],
+fn stem_declaration(
+    view: AstView<'_>,
+    stmts: Run<StmtId>,
     stem: &str,
     source: &str,
 ) -> Option<StemInit> {
     let mut found = None;
-    let walk = each_script_declaration::<()>(stmts, VarScope::WithHoistedVars, &mut |decl| {
+    let walk = each_script_declaration::<()>(view, stmts, VarScope::WithHoistedVars, &mut |decl| {
         match decl {
             ScriptDeclaration::Declarator {
                 declarator,
@@ -263,8 +267,9 @@ fn stem_declaration<'arena>(
                 // so it counts as declaring the stem (a safe over-refusal). Same
                 // for an escaped binding identifier, which
                 // `pattern_binding_names` skips outright.
-                let unnameable = pattern_binding_names(declarator.id, source, &mut names).is_err()
-                    || pattern_binds_unnameable_identifier(declarator.id);
+                let pattern = view.expr(declarator.id);
+                let unnameable = pattern_binding_names(view, pattern, source, &mut names).is_err()
+                    || pattern_binds_unnameable_identifier(view, pattern);
                 if !unnameable && !names.iter().any(|n| n == stem) {
                     return Ok(());
                 }
@@ -273,25 +278,29 @@ fn stem_declaration<'arena>(
                 // so the oracle's `get_rune(binding.initial)` sees `null` and the
                 // rune EXEMPTION does not apply however the declarator's own init
                 // reads.
-                found = Some(match declarator.init.as_ref() {
-                    Some(init) if !initial_dropped => match classify_rune_init(init, source) {
-                        Some(RuneInit::Props) => StemInit::PropsRune,
-                        Some(_) => StemInit::OtherRune,
-                        None => StemInit::Plain,
-                    },
+                found = Some(match declarator.init {
+                    Some(init) if !initial_dropped => {
+                        match classify_rune_init(view, view.expr(init), source) {
+                            Some(RuneInit::Props) => StemInit::PropsRune,
+                            Some(_) => StemInit::OtherRune,
+                            None => StemInit::Plain,
+                        }
+                    }
                     _ => StemInit::Plain,
                 });
             }
             ScriptDeclaration::Function(id) | ScriptDeclaration::Class(id) => {
-                if identifier_name(id, source) == stem {
+                if identifier_name(view, &id, source) == stem {
                     found = Some(StemInit::Plain);
                 }
             }
             ScriptDeclaration::Import { local, declaration } => {
-                if identifier_name(local, source) == stem {
+                if identifier_name(view, &local, source) == stem {
+                    let declaration = view.import_decl(declaration);
                     let from_store = matches!(
                         &declaration.source.value,
-                        LiteralValue::String(s) if s.resolve(declaration.source.span, source) == "svelte/store"
+                        LiteralValue::String(s)
+                            if s.resolve(declaration.source.span, source, view) == "svelte/store"
                     );
                     found = Some(if from_store {
                         StemInit::SvelteStoreImport
@@ -313,8 +322,8 @@ fn stem_declaration<'arena>(
 /// Unlike [`crate::script_decls::plain_identifier_name`] this never returns
 /// `None`: a binding whose name this check cannot read is a binding it would
 /// MISS, and a missed binding is an under-refusal.
-fn identifier_name(id: &tsv_ts::ast::Identifier<'_>, source: &str) -> String {
-    id.name(source).to_string()
+fn identifier_name(view: AstView<'_>, id: &Identifier, source: &str) -> String {
+    id.name(source, view).to_string()
 }
 
 /// Whether `name` (a `$`-prefixed rune keyword) occurs in `source` as a whole

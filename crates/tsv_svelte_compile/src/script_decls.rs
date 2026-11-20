@@ -12,8 +12,10 @@
 //! Target-independent: this is a fact about the script's scope, not about what
 //! any transform emits.
 
+use tsv_lang::store::Run;
 use tsv_ts::ast::{
-    Expression, ExpressionKind, ImportDeclaration, ImportSpecifier, Statement, StatementKind,
+    AstView, Expression, ExpressionKind, Identifier, ImportDeclId, ImportSpecifier, StatementKind,
+    StmtId, VariableDeclarator,
 };
 
 /// Which of a script's `var` declarations [`each_script_declaration`] reports.
@@ -29,11 +31,13 @@ pub(crate) enum VarScope {
     WithHoistedVars,
 }
 
-/// One binding a script's statements introduce at SCRIPT scope.
-pub(crate) enum ScriptDeclaration<'arena> {
+/// One binding a script's statements introduce at SCRIPT scope. Its rows are copied
+/// out of the view (each is `Copy`), and the import it came from is named by id.
+#[derive(Clone, Copy)]
+pub(crate) enum ScriptDeclaration {
     /// A `var`/`let`/`const`/`using` declarator.
     Declarator {
-        declarator: &'arena tsv_ts::ast::VariableDeclarator<'arena>,
+        declarator: VariableDeclarator,
         /// Whether this declarator reached script scope by hoisting **through a
         /// POROUS scope** — a block, a for-head/body, a switch, a try/catch. The
         /// oracle re-declares such a `var` on the parent scope and passes NO
@@ -45,16 +49,16 @@ pub(crate) enum ScriptDeclaration<'arena> {
         initial_dropped: bool,
     },
     /// A `function name(…) {}` declaration's name.
-    Function(&'arena tsv_ts::ast::Identifier<'arena>),
+    Function(Identifier),
     /// A `class Name {}` declaration's name.
-    Class(&'arena tsv_ts::ast::Identifier<'arena>),
+    Class(Identifier),
     /// One `import` specifier's local name, with the declaration it came from —
     /// the oracle's `Binding.initial` for an import binding is the whole
     /// `ImportDeclaration`, and its `source` is what the `svelte/store` carve-out
     /// tests.
     Import {
-        local: &'arena tsv_ts::ast::Identifier<'arena>,
-        declaration: &'arena ImportDeclaration<'arena>,
+        local: Identifier,
+        declaration: ImportDeclId,
     },
 }
 
@@ -65,13 +69,14 @@ pub(crate) enum ScriptDeclaration<'arena> {
 /// than being silently skipped, which is exactly how a hand-copied enumeration
 /// with a `_ => {}` tail goes stale and starts missing bindings (an
 /// under-refusal, i.e. a MISMATCH, for the collision walk below).
-pub(crate) fn each_script_declaration<'arena, E>(
-    stmts: &'arena [Statement<'arena>],
+pub(crate) fn each_script_declaration<E>(
+    view: AstView<'_>,
+    stmts: Run<StmtId>,
     var_scope: VarScope,
-    f: &mut impl FnMut(ScriptDeclaration<'arena>) -> Result<(), E>,
+    f: &mut impl FnMut(ScriptDeclaration) -> Result<(), E>,
 ) -> Result<(), E> {
-    for stmt in stmts {
-        script_declarations_of(stmt, var_scope, true, false, f)?;
+    for &stmt in view.stmt_list(stmts) {
+        script_declarations_of(view, stmt, var_scope, true, false, f)?;
     }
     Ok(())
 }
@@ -116,12 +121,13 @@ pub(crate) fn each_script_declaration<'arena, E>(
 /// handles the whole family with a lexical fence instead
 /// ([`crate::script_collision`]'s `script_contains_static_block`), so this walk
 /// deliberately stops at a class body and no consumer depends on it descending.
-fn script_declarations_of<'arena, E>(
-    stmt: &'arena Statement<'arena>,
+fn script_declarations_of<E>(
+    view: AstView<'_>,
+    stmt: StmtId,
     var_scope: VarScope,
     top: bool,
     porous: bool,
-    f: &mut dyn FnMut(ScriptDeclaration<'arena>) -> Result<(), E>,
+    f: &mut dyn FnMut(ScriptDeclaration) -> Result<(), E>,
 ) -> Result<(), E> {
     use tsv_ts::ast::{ForInOfLeft, ForInit, VariableDeclarationKind};
 
@@ -131,7 +137,7 @@ fn script_declarations_of<'arena, E>(
     macro_rules! nested {
         ($s:expr) => {
             if descend {
-                script_declarations_of($s, var_scope, false, porous, f)?;
+                script_declarations_of(view, $s, var_scope, false, porous, f)?;
             }
         };
     }
@@ -139,7 +145,7 @@ fn script_declarations_of<'arena, E>(
     macro_rules! nested_porous {
         ($s:expr) => {
             if descend {
-                script_declarations_of($s, var_scope, false, true, f)?;
+                script_declarations_of(view, $s, var_scope, false, true, f)?;
             }
         };
     }
@@ -148,7 +154,7 @@ fn script_declarations_of<'arena, E>(
             // A for-head is never the script's own statement list, so only `var` —
             // and the for statement's own scope is porous, so the initializer goes.
             if descend && $decl.kind == VariableDeclarationKind::Var {
-                for declarator in $decl.declarations {
+                for &declarator in view.declarators($decl.declarations) {
                     f(ScriptDeclaration::Declarator {
                         declarator,
                         initial_dropped: true,
@@ -158,10 +164,10 @@ fn script_declarations_of<'arena, E>(
         };
     }
 
-    match &stmt.kind {
+    match view.stmt(stmt).kind {
         StatementKind::VariableDeclaration(decl) => {
             if top || (descend && decl.kind == VariableDeclarationKind::Var) {
-                for declarator in decl.declarations {
+                for &declarator in view.declarators(decl.declarations) {
                     f(ScriptDeclaration::Declarator {
                         declarator,
                         initial_dropped: porous,
@@ -170,13 +176,13 @@ fn script_declarations_of<'arena, E>(
             }
         }
         StatementKind::FunctionDeclaration(fun) => {
-            if top && let Some(id) = fun.id.as_ref() {
+            if top && let Some(id) = view.fn_decl(fun).id {
                 f(ScriptDeclaration::Function(id))?;
             }
             // A function BODY is a new function scope — no `var` escapes it.
         }
         StatementKind::ClassDeclaration(class) => {
-            if top && let Some(id) = class.id.as_ref() {
+            if top && let Some(id) = view.class_decl(class).id {
                 f(ScriptDeclaration::Class(id))?;
             }
             // A class body is deliberately OPAQUE here — see the ⚠️ note on this
@@ -184,11 +190,11 @@ fn script_declarations_of<'arena, E>(
             // in the oracle; `script_contains_static_block` is what covers it.
         }
         StatementKind::ImportDeclaration(import) => {
-            for spec in import.specifiers {
+            for spec in view.import_specs(view.import_decl(import).specifiers) {
                 let local = match spec {
-                    ImportSpecifier::Default(s) => &s.local,
-                    ImportSpecifier::Named(s) => &s.local,
-                    ImportSpecifier::Namespace(s) => &s.local,
+                    ImportSpecifier::Default(s) => s.local,
+                    ImportSpecifier::Named(s) => s.local,
+                    ImportSpecifier::Namespace(s) => s.local,
                 };
                 f(ScriptDeclaration::Import {
                     local,
@@ -202,8 +208,8 @@ fn script_declarations_of<'arena, E>(
         // the SAME level. (`export { a }` / `export … from` carry no
         // `declaration` and bind no new name.)
         StatementKind::ExportNamedDeclaration(export) => {
-            if let Some(decl) = export.declaration {
-                script_declarations_of(decl, var_scope, top, porous, f)?;
+            if let Some(decl) = view.export_named(export).declaration {
+                script_declarations_of(view, decl, var_scope, top, porous, f)?;
             }
         }
         // `export default function name() {}` binds `name`, but an instance-script
@@ -214,7 +220,7 @@ fn script_declarations_of<'arena, E>(
         // Statement bodies that are NOT a new function scope: a `var` declared
         // inside one is function-scoped and lands in THIS script's scope.
         StatementKind::BlockStatement(block) => {
-            for s in block.body {
+            for &s in view.stmt_list(block.body) {
                 nested_porous!(s);
             }
         }
@@ -225,19 +231,19 @@ fn script_declarations_of<'arena, E>(
             }
         }
         StatementKind::ForStatement(stmt) => {
-            if let Some(ForInit::VariableDeclaration(decl)) = stmt.init.as_ref() {
+            if let Some(ForInit::VariableDeclaration(decl)) = view.opt_for_head(stmt.init) {
                 head_declaration!(decl);
             }
             nested_porous!(stmt.body);
         }
         StatementKind::ForInStatement(stmt) => {
-            if let ForInOfLeft::VariableDeclaration(decl) = &stmt.left {
+            if let ForInOfLeft::VariableDeclaration(decl) = view.for_left(stmt.left) {
                 head_declaration!(decl);
             }
             nested_porous!(stmt.body);
         }
         StatementKind::ForOfStatement(stmt) => {
-            if let ForInOfLeft::VariableDeclaration(decl) = &stmt.left {
+            if let ForInOfLeft::VariableDeclaration(decl) = view.for_left(stmt.left) {
                 head_declaration!(decl);
             }
             nested_porous!(stmt.body);
@@ -247,25 +253,26 @@ fn script_declarations_of<'arena, E>(
         // Unreachable in practice: a Svelte `<script>` is Module code, so it is strict
         // and the parser refuses `with` there.
         StatementKind::WithStatement(stmt) => nested!(stmt.body),
-        StatementKind::LabeledStatement(stmt) => nested!(stmt.body),
+        StatementKind::LabeledStatement(stmt) => nested!(view.labeled_stmt(stmt).body),
         StatementKind::SwitchStatement(stmt) => {
-            for case in stmt.cases {
-                for s in case.consequent {
+            for case in view.cases(stmt.cases) {
+                for &s in view.stmt_list(case.consequent) {
                     nested_porous!(s);
                 }
             }
         }
         StatementKind::TryStatement(stmt) => {
-            for s in stmt.block.body {
+            let stmt = view.try_stmt(stmt);
+            for &s in view.stmt_list(stmt.block.body) {
                 nested_porous!(s);
             }
-            if let Some(handler) = stmt.handler.as_ref() {
-                for s in handler.body.body {
+            if let Some(handler) = view.opt_catch(stmt.handler) {
+                for &s in view.stmt_list(handler.body.body) {
                     nested_porous!(s);
                 }
             }
-            if let Some(finalizer) = stmt.finalizer.as_ref() {
-                for s in finalizer.body {
+            if let Some(finalizer) = stmt.finalizer {
+                for &s in view.stmt_list(finalizer.body) {
                     nested_porous!(s);
                 }
             }
@@ -304,10 +311,7 @@ fn script_declarations_of<'arena, E>(
 /// walks each borrow (`rune_guard`, `snippet`, `needs_context`, `snippet_emit`);
 /// [`plain_identifier_name`] is its owned-`String` form. Centralized because the
 /// escaped-identifier handling here is a recurring bug class — one place to audit.
-pub(crate) fn plain_identifier_str<'s>(
-    id: &tsv_ts::ast::Identifier<'_>,
-    source: &'s str,
-) -> Option<&'s str> {
+pub(crate) fn plain_identifier_str<'s>(id: &Identifier, source: &'s str) -> Option<&'s str> {
     if id.escaped_name.is_some() {
         return None;
     }
@@ -315,14 +319,11 @@ pub(crate) fn plain_identifier_str<'s>(
     Some(&source[start..start + id.name_len as usize])
 }
 
-pub(crate) fn plain_identifier_name(
-    id: &tsv_ts::ast::Identifier<'_>,
-    source: &str,
-) -> Option<String> {
+pub(crate) fn plain_identifier_name(id: &Identifier, source: &str) -> Option<String> {
     plain_identifier_str(id, source).map(str::to_string)
 }
 
-pub(crate) fn identifier_binding_name(id: &Expression<'_>, source: &str) -> Option<String> {
+pub(crate) fn identifier_binding_name(id: &Expression, source: &str) -> Option<String> {
     let ExpressionKind::Identifier(ident) = &id.kind else {
         return None;
     };

@@ -1,4 +1,4 @@
-//! Rune refusal walk over borrowed script statements — plus the collection
+//! Rune refusal walk over the script statements — plus the collection
 //! passes that ride the same traversal.
 //!
 //! The server transform rewrites a fixed set of rune shapes elsewhere (the
@@ -36,10 +36,12 @@
 
 use std::collections::HashSet;
 
+use tsv_lang::store::Run;
 use tsv_ts::ast::{
-    ArrowFunctionBody, ClassBody, ClassMember, ExportDefaultValue, Expression, ExpressionKind,
-    ForInOfLeft, ForInit, FunctionExpression, ImportSpecifier, ObjectPatternProperty,
-    ObjectProperty, Statement, StatementKind,
+    ArrowFunctionBody, AstView, ClassBody, ClassMember, ExportDefaultValue, ExprId, Expression,
+    ExpressionKind, ForInOfLeft, ForInit, ForLeftId, FunctionExpression, Identifier,
+    ImportSpecifier, ObjectPatternProperty, ObjectProperty, Statement, StatementKind, StmtId,
+    VariableDeclaration,
 };
 
 use crate::analyze::{NameSet, expression_kind, pattern_binding_names};
@@ -48,6 +50,10 @@ use crate::{CompileError, Refusal};
 
 /// The walk's shared state: the source names resolve against, the collection
 /// sinks, and the refusal set.
+///
+/// It holds no view: every walk takes the TypeScript view as its own first
+/// argument, so a caller that pushes rows between walks keeps one context across
+/// them.
 pub(crate) struct WalkCtx<'a> {
     pub source: &'a str,
     /// Assignment/update target root names (fed back as `updated` bindings).
@@ -126,23 +132,25 @@ impl<'a> WalkCtx<'a> {
     }
 }
 
-/// Walk one borrowed statement: refuse stray runes and derived reads, collect
+/// Walk one statement: refuse stray runes and derived reads, collect
 /// mutations and nested declarations. `depth` is the statement nesting depth
 /// (0 = a top-level script statement, whose declarations are the top bindings).
 pub(crate) fn walk_statement_guarded(
-    stmt: &Statement<'_>,
+    view: AstView<'_>,
+    stmt: &Statement,
     ctx: &mut WalkCtx<'_>,
     depth: usize,
 ) -> Result<(), CompileError> {
-    walk_statement(stmt, ctx, depth)
+    walk_statement(view, stmt, ctx, depth)
 }
 
 /// Walk one expression (template expressions, rewritten declarator pieces).
 pub(crate) fn walk_expression_guarded(
-    expr: &Expression<'_>,
+    view: AstView<'_>,
+    expr: &Expression,
     ctx: &mut WalkCtx<'_>,
 ) -> Result<(), CompileError> {
-    walk_expression(expr, ctx)
+    walk_expression(view, expr, ctx)
 }
 
 /// Walk one class member with the normal refusing rules — a method body, a
@@ -153,39 +161,43 @@ pub(crate) fn walk_expression_guarded(
 /// reach-matched by construction, so no member can be exempted without a matching
 /// unwrap (which would emit an undefined `$state` reference — a MISMATCH).
 pub(crate) fn walk_class_member_guarded(
-    member: &ClassMember<'_>,
+    view: AstView<'_>,
+    member: &ClassMember,
     ctx: &mut WalkCtx<'_>,
 ) -> Result<(), CompileError> {
-    walk_class_member(member, ctx)
+    walk_class_member(view, member, ctx)
 }
 
 /// The `$`-prefixed name of a plain identifier, or `None`. Parsed identifiers
-/// are span-identity (`escaped: None`); an interned (escaped) name is synthetic
-/// (`$$renderer`, `$$props`, …) and never refused.
-fn dollar_identifier_name<'s>(
-    id: &tsv_ts::ast::Identifier<'_>,
-    source: &'s str,
-) -> Option<&'s str> {
+/// are span-identity (`escaped_name: None`); a pooled name is a user escape or a
+/// synthetic name (`$$renderer`, `$$props`, …) and is never refused here.
+fn dollar_identifier_name<'s>(id: &Identifier, source: &'s str) -> Option<&'s str> {
     let name = identifier_name(id, source)?;
     name.starts_with('$').then_some(name)
 }
 
-fn identifier_name<'s>(id: &tsv_ts::ast::Identifier<'_>, source: &'s str) -> Option<&'s str> {
+fn identifier_name<'s>(id: &Identifier, source: &'s str) -> Option<&'s str> {
     plain_identifier_str(id, source)
 }
 
 /// The `$`-prefixed root-identifier name of a callee, peeled through member
 /// accesses (`$state.raw`), non-null assertions, instantiations, and preserved
 /// parens — `None` when the root is not a plain `$`-identifier.
-fn dollar_callee_root<'s>(callee: &Expression<'_>, source: &'s str) -> Option<&'s str> {
+fn dollar_callee_root<'s>(
+    view: AstView<'_>,
+    callee: &Expression,
+    source: &'s str,
+) -> Option<&'s str> {
     match &callee.kind {
         ExpressionKind::Identifier(id) => dollar_identifier_name(id, source),
-        ExpressionKind::MemberExpression(member) => dollar_callee_root(member.object, source),
+        ExpressionKind::MemberExpression(member) => {
+            dollar_callee_root(view, view.expr(member.object), source)
+        }
         ExpressionKind::TSNonNullExpression(non_null) => {
-            dollar_callee_root(non_null.expression, source)
+            dollar_callee_root(view, view.expr(non_null.expression), source)
         }
         ExpressionKind::TSInstantiationExpression(inst) => {
-            dollar_callee_root(inst.expression, source)
+            dollar_callee_root(view, view.expr(inst.expression), source)
         }
         _ => None,
     }
@@ -233,14 +245,21 @@ fn store_read_exemption(ctx: &WalkCtx<'_>, name: &str) -> Option<Result<(), Comp
 /// Shared by the guard walk and the whole-component reassignment collection in
 /// `needs_context` (which must see mutations inside dropped event handlers so a
 /// reassigned binding is never statically folded).
-pub(crate) fn assign_target_roots(target: &Expression<'_>, source: &str, out: &mut NameSet) {
+pub(crate) fn assign_target_roots(
+    view: AstView<'_>,
+    target: &Expression,
+    source: &str,
+    out: &mut NameSet,
+) {
     match &target.kind {
         ExpressionKind::Identifier(id) => {
             if let Some(name) = identifier_name(id, source) {
                 out.insert(name.to_string());
             }
         }
-        ExpressionKind::MemberExpression(m) => assign_target_roots(m.object, source, out),
+        ExpressionKind::MemberExpression(m) => {
+            assign_target_roots(view, view.expr(m.object), source, out);
+        }
         // All four TypeScript assignment-target wrappers the parser accepts
         // (`expression_assignable.rs`). LOAD-BEARING, not defense in depth: the
         // script's statements are erased before this walk, but the TEMPLATE's are
@@ -249,29 +268,41 @@ pub(crate) fn assign_target_roots(target: &Expression<'_>, source: &str, out: &m
         // reassignment collection walks the raw fragment. A missing arm silently
         // loses a reassignment root (`(x as any).y = 1` in a handler) and then
         // statically folds a mutated binding.
-        ExpressionKind::TSNonNullExpression(t) => assign_target_roots(t.expression, source, out),
-        ExpressionKind::TSAsExpression(t) => assign_target_roots(t.expression, source, out),
-        ExpressionKind::TSSatisfiesExpression(t) => assign_target_roots(t.expression, source, out),
-        ExpressionKind::TSTypeAssertion(t) => assign_target_roots(t.expression, source, out),
+        ExpressionKind::TSNonNullExpression(t) => {
+            assign_target_roots(view, view.expr(t.expression), source, out);
+        }
+        ExpressionKind::TSAsExpression(t) => {
+            assign_target_roots(view, view.expr(t.expression), source, out);
+        }
+        ExpressionKind::TSSatisfiesExpression(t) => {
+            assign_target_roots(view, view.expr(t.expression), source, out);
+        }
+        ExpressionKind::TSTypeAssertion(t) => {
+            assign_target_roots(view, view.expr(t.expression), source, out);
+        }
         ExpressionKind::ObjectPattern(obj) => {
-            for prop in obj.properties {
+            for prop in view.pat_props(obj.properties) {
                 match prop {
                     ObjectPatternProperty::Property(p) => {
-                        assign_target_roots(p.value, source, out);
+                        assign_target_roots(view, view.expr(p.value), source, out);
                     }
                     ObjectPatternProperty::RestElement(rest) => {
-                        assign_target_roots(rest.argument, source, out);
+                        assign_target_roots(view, view.expr(rest.argument), source, out);
                     }
                 }
             }
         }
         ExpressionKind::ArrayPattern(arr) => {
-            for element in arr.elements.iter().flatten() {
-                assign_target_roots(element, source, out);
+            for &element in view.expr_opt_list(arr.elements).iter().flatten() {
+                assign_target_roots(view, view.expr(element), source, out);
             }
         }
-        ExpressionKind::AssignmentPattern(a) => assign_target_roots(a.left, source, out),
-        ExpressionKind::RestElement(r) => assign_target_roots(r.argument, source, out),
+        ExpressionKind::AssignmentPattern(a) => {
+            assign_target_roots(view, view.expr(a.left), source, out);
+        }
+        ExpressionKind::RestElement(r) => {
+            assign_target_roots(view, view.expr(r.argument), source, out);
+        }
         _ => {}
     }
 }
@@ -292,7 +323,8 @@ pub(crate) fn assign_target_roots(target: &Expression<'_>, source: &str, out: &m
 /// Keyed on `derived_names`, so in a dropped region (an empty set) it never fires
 /// — a dropped-handler derived write compiles, unchanged.
 fn refuse_derived_write_target(
-    target: &Expression<'_>,
+    view: AstView<'_>,
+    target: &Expression,
     ctx: &WalkCtx<'_>,
 ) -> Result<(), CompileError> {
     match &target.kind {
@@ -312,18 +344,18 @@ fn refuse_derived_write_target(
         // Destructuring-pattern targets: every slot is itself an assignment target,
         // so recurse into each binding-leaf position.
         ExpressionKind::ArrayPattern(pattern) => {
-            for element in pattern.elements.iter().flatten() {
-                refuse_derived_write_target(element, ctx)?;
+            for &element in view.expr_opt_list(pattern.elements).iter().flatten() {
+                refuse_derived_write_target(view, view.expr(element), ctx)?;
             }
         }
         ExpressionKind::ObjectPattern(pattern) => {
-            for prop in pattern.properties {
+            for prop in view.pat_props(pattern.properties) {
                 match prop {
                     ObjectPatternProperty::Property(p) => {
-                        refuse_derived_write_target(p.value, ctx)?;
+                        refuse_derived_write_target(view, view.expr(p.value), ctx)?;
                     }
                     ObjectPatternProperty::RestElement(rest) => {
-                        refuse_derived_write_target(rest.argument, ctx)?;
+                        refuse_derived_write_target(view, view.expr(rest.argument), ctx)?;
                     }
                 }
             }
@@ -331,10 +363,10 @@ fn refuse_derived_write_target(
         // A default (`[d = 1] = …`): `left` is the binding, `right` the default
         // (a read the read rewrite / guard handles). Only the binding refuses.
         ExpressionKind::AssignmentPattern(pattern) => {
-            refuse_derived_write_target(pattern.left, ctx)?;
+            refuse_derived_write_target(view, view.expr(pattern.left), ctx)?;
         }
         ExpressionKind::RestElement(rest) => {
-            refuse_derived_write_target(rest.argument, ctx)?;
+            refuse_derived_write_target(view, view.expr(rest.argument), ctx)?;
         }
         _ => {}
     }
@@ -343,9 +375,9 @@ fn refuse_derived_write_target(
 
 /// Record the names a declaration pattern declares into `nested_declared`
 /// (best-effort — unusual pattern shapes just record nothing extra).
-fn collect_nested_declared(pattern: &Expression<'_>, ctx: &mut WalkCtx<'_>) {
+fn collect_nested_declared(view: AstView<'_>, pattern: &Expression, ctx: &mut WalkCtx<'_>) {
     let mut names = Vec::new();
-    if pattern_binding_names(pattern, ctx.source, &mut names).is_ok() {
+    if pattern_binding_names(view, pattern, ctx.source, &mut names).is_ok() {
         for name in names {
             ctx.nested_declared.insert(name);
         }
@@ -433,7 +465,8 @@ fn collect_nested_declared(pattern: &Expression<'_>, ctx: &mut WalkCtx<'_>) {
 /// binding rule, so tsv keeps that site span-identity (its own `dollar_identifier_name`
 /// check at the `ClassExpression` arm); see `docs/conformance_svelte_compiler.md`.
 pub(crate) fn refuse_dollar_binding_pattern(
-    pattern: &Expression<'_>,
+    view: AstView<'_>,
+    pattern: &Expression,
     source: &str,
 ) -> Result<(), CompileError> {
     // One walk: `collect_decoded_binding_names` both enforces the shape gate
@@ -442,7 +475,7 @@ pub(crate) fn refuse_dollar_binding_pattern(
     // decoding an escaped leaf `pattern_binding_names` would skip. The `$`-prefix
     // test then reads those decoded names.
     let mut names = Vec::new();
-    collect_decoded_binding_names(pattern, source, &mut names)?;
+    collect_decoded_binding_names(view, pattern, source, &mut names)?;
     for name in names {
         if name.starts_with('$') {
             return Err(CompileError::Unsupported(Refusal::DollarPrefixedBinding {
@@ -464,48 +497,49 @@ pub(crate) fn refuse_dollar_binding_pattern(
 /// ObjectPattern/ObjectExpression property-values + rest, ArrayPattern elements +
 /// rest, an AssignmentPattern's `left`, a RestElement's argument.
 fn collect_decoded_binding_names(
-    pattern: &Expression<'_>,
+    view: AstView<'_>,
+    pattern: &Expression,
     source: &str,
     out: &mut Vec<String>,
 ) -> Result<(), CompileError> {
     match &pattern.kind {
         ExpressionKind::Identifier(id) => {
-            out.push(id.name(source).to_string());
+            out.push(id.name(source, view).to_string());
         }
         ExpressionKind::ObjectPattern(obj) => {
-            for prop in obj.properties {
+            for prop in view.pat_props(obj.properties) {
                 match prop {
                     ObjectPatternProperty::Property(p) => {
-                        collect_decoded_binding_names(p.value, source, out)?;
+                        collect_decoded_binding_names(view, view.expr(p.value), source, out)?;
                     }
                     ObjectPatternProperty::RestElement(rest) => {
-                        collect_decoded_binding_names(rest.argument, source, out)?;
+                        collect_decoded_binding_names(view, view.expr(rest.argument), source, out)?;
                     }
                 }
             }
         }
         ExpressionKind::ObjectExpression(obj) => {
-            for prop in obj.properties {
+            for prop in view.obj_props(obj.properties) {
                 match prop {
                     ObjectProperty::Property(p) => {
-                        collect_decoded_binding_names(p.value, source, out)?;
+                        collect_decoded_binding_names(view, view.expr(p.value), source, out)?;
                     }
                     ObjectProperty::SpreadElement(s) => {
-                        collect_decoded_binding_names(s.argument, source, out)?;
+                        collect_decoded_binding_names(view, view.expr(s.argument), source, out)?;
                     }
                 }
             }
         }
         ExpressionKind::ArrayPattern(arr) => {
-            for element in arr.elements.iter().flatten() {
-                collect_decoded_binding_names(element, source, out)?;
+            for &element in view.expr_opt_list(arr.elements).iter().flatten() {
+                collect_decoded_binding_names(view, view.expr(element), source, out)?;
             }
         }
         ExpressionKind::AssignmentPattern(assign) => {
-            collect_decoded_binding_names(assign.left, source, out)?;
+            collect_decoded_binding_names(view, view.expr(assign.left), source, out)?;
         }
         ExpressionKind::RestElement(rest) => {
-            collect_decoded_binding_names(rest.argument, source, out)?;
+            collect_decoded_binding_names(view, view.expr(rest.argument), source, out)?;
         }
         _ => {
             return Err(CompileError::Unsupported(Refusal::BindingPatternShape {
@@ -526,13 +560,14 @@ fn collect_decoded_binding_names(
 /// (`script_bindings::refuse_runes_invalid_import`, the oracle's own import
 /// visitor's analog). A new interception point must call this too.
 pub(crate) fn refuse_dollar_binding_name(
-    id: &tsv_ts::ast::Identifier<'_>,
+    view: AstView<'_>,
+    id: &Identifier,
     source: &str,
 ) -> Result<(), CompileError> {
-    // Decode via `Identifier::name` — the raw slice for a plain id, the decoded
-    // `&'arena str` for an escaped one — so an escaped `$f` refuses exactly as the
-    // oracle rejects the decoded `$f`.
-    let name = id.name(source);
+    // Decode via `Identifier::name` — the raw slice for a plain id, the escaped
+    // name's pool text for an escaped one — so an escaped `$f` refuses exactly as
+    // the oracle rejects the decoded `$f`.
+    let name = id.name(source, view);
     if name.starts_with('$') {
         return Err(CompileError::Unsupported(Refusal::DollarPrefixedBinding {
             name: name.to_string(),
@@ -565,7 +600,8 @@ pub(crate) fn refuse_dollar_binding_name(
 /// here, and `script_bindings::refuse_runes_invalid_import`, for the imports the
 /// transform hoists out of the statement stream before the guard walk runs.
 pub(crate) fn refuse_dollar_import_locals(
-    specifiers: &[ImportSpecifier<'_>],
+    view: AstView<'_>,
+    specifiers: &[ImportSpecifier],
     source: &str,
 ) -> Result<(), CompileError> {
     for specifier in specifiers {
@@ -574,44 +610,63 @@ pub(crate) fn refuse_dollar_import_locals(
             ImportSpecifier::Named(n) => &n.local,
             ImportSpecifier::Namespace(n) => &n.local,
         };
-        refuse_dollar_binding_name(local, source)?;
+        refuse_dollar_binding_name(view, local, source)?;
     }
     Ok(())
 }
 
-fn enter_function(params: &[Expression<'_>], ctx: &mut WalkCtx<'_>) -> Result<(), CompileError> {
+/// Enter a function: one level deeper, its parameters (a run of rows held by
+/// value) declared in the nested scope and walked.
+fn enter_function(
+    view: AstView<'_>,
+    params: Run<Expression>,
+    ctx: &mut WalkCtx<'_>,
+) -> Result<(), CompileError> {
     ctx.fn_depth += 1;
-    for param in params {
-        collect_nested_declared(param, ctx);
-        walk_expression(param, ctx)?;
+    for param in view.exprs(params) {
+        collect_nested_declared(view, param, ctx);
+        walk_expression(view, param, ctx)?;
     }
     Ok(())
 }
 
 fn walk_statements(
-    stmts: &[Statement<'_>],
+    view: AstView<'_>,
+    stmts: Run<StmtId>,
     ctx: &mut WalkCtx<'_>,
     depth: usize,
 ) -> Result<(), CompileError> {
-    for stmt in stmts {
-        walk_statement(stmt, ctx, depth)?;
+    for &stmt in view.stmt_list(stmts) {
+        walk_stmt(view, stmt, ctx, depth)?;
     }
     Ok(())
 }
 
+/// [`walk_statement`] over the statement `stmt` names.
+fn walk_stmt(
+    view: AstView<'_>,
+    stmt: StmtId,
+    ctx: &mut WalkCtx<'_>,
+    depth: usize,
+) -> Result<(), CompileError> {
+    walk_statement(view, view.stmt(stmt), ctx, depth)
+}
+
 fn walk_statement(
-    stmt: &Statement<'_>,
+    view: AstView<'_>,
+    stmt: &Statement,
     ctx: &mut WalkCtx<'_>,
     depth: usize,
 ) -> Result<(), CompileError> {
     match &stmt.kind {
-        StatementKind::ExpressionStatement(s) => walk_expression(s.expression, ctx),
-        StatementKind::VariableDeclaration(s) => walk_variable_declaration(s, ctx, depth),
-        StatementKind::ReturnStatement(s) => walk_opt(s.argument, ctx),
-        StatementKind::BlockStatement(s) => walk_statements(s.body, ctx, depth + 1),
+        StatementKind::ExpressionStatement(s) => walk(view, s.expression, ctx),
+        StatementKind::VariableDeclaration(s) => walk_variable_declaration(view, s, ctx, depth),
+        StatementKind::ReturnStatement(s) => walk_opt(view, s.argument, ctx),
+        StatementKind::BlockStatement(s) => walk_statements(view, s.body, ctx, depth + 1),
         StatementKind::FunctionDeclaration(s) => {
+            let s = view.fn_decl(*s);
             if let Some(id) = &s.id {
-                refuse_dollar_binding_name(id, ctx.source)?;
+                refuse_dollar_binding_name(view, id, ctx.source)?;
             }
             if (depth > 0 || ctx.fn_depth > 0)
                 && let Some(id) = &s.id
@@ -619,123 +674,129 @@ fn walk_statement(
             {
                 ctx.nested_declared.insert(name.to_string());
             }
-            enter_function(s.params, ctx)?;
-            let result = walk_statements(s.body.body, ctx, depth + 1);
+            enter_function(view, s.params, ctx)?;
+            let result = walk_statements(view, s.body.body, ctx, depth + 1);
             ctx.fn_depth -= 1;
             result
         }
         // Nothing else here is walkable — the source is a literal and the
         // imported name is a name-only position.
-        StatementKind::ImportDeclaration(s) => {
-            refuse_dollar_import_locals(s.specifiers, ctx.source)
-        }
+        StatementKind::ImportDeclaration(s) => refuse_dollar_import_locals(
+            view,
+            view.import_specs(view.import_decl(*s).specifiers),
+            ctx.source,
+        ),
         StatementKind::ClassDeclaration(s) => {
+            let s = view.class_decl(*s);
             if let Some(id) = &s.id {
-                refuse_dollar_binding_name(id, ctx.source)?;
+                refuse_dollar_binding_name(view, id, ctx.source)?;
             }
-            walk_class_body(&s.body, ctx)
+            walk_class_body(view, &s.body, ctx)
         }
-        StatementKind::ExportNamedDeclaration(s) => match &s.declaration {
-            Some(decl) => walk_statement(decl, ctx, depth),
+        StatementKind::ExportNamedDeclaration(s) => match view.export_named(*s).declaration {
+            Some(decl) => walk_stmt(view, decl, ctx, depth),
             None => Ok(()),
         },
-        StatementKind::ExportDefaultDeclaration(s) => match &s.declaration {
-            ExportDefaultValue::Expression(e) => walk_expression(e, ctx),
+        StatementKind::ExportDefaultDeclaration(s) => match &view.export_default(*s).declaration {
+            ExportDefaultValue::Expression(e) => walk(view, *e, ctx),
             ExportDefaultValue::FunctionDeclaration(f) => {
                 if let Some(id) = &f.id {
-                    refuse_dollar_binding_name(id, ctx.source)?;
+                    refuse_dollar_binding_name(view, id, ctx.source)?;
                 }
-                enter_function(f.params, ctx)?;
-                let result = walk_statements(f.body.body, ctx, depth + 1);
+                enter_function(view, f.params, ctx)?;
+                let result = walk_statements(view, f.body.body, ctx, depth + 1);
                 ctx.fn_depth -= 1;
                 result
             }
             ExportDefaultValue::ClassDeclaration(c) => {
                 if let Some(id) = &c.id {
-                    refuse_dollar_binding_name(id, ctx.source)?;
+                    refuse_dollar_binding_name(view, id, ctx.source)?;
                 }
-                walk_class_body(&c.body, ctx)
+                walk_class_body(view, &c.body, ctx)
             }
             ExportDefaultValue::TSDeclareFunction(_)
             | ExportDefaultValue::TSInterfaceDeclaration(_) => Ok(()),
         },
         StatementKind::IfStatement(s) => {
-            walk_expression(s.test, ctx)?;
-            walk_statement(s.consequent, ctx, depth + 1)?;
+            walk(view, s.test, ctx)?;
+            walk_stmt(view, s.consequent, ctx, depth + 1)?;
             match s.alternate {
-                Some(alt) => walk_statement(alt, ctx, depth + 1),
+                Some(alt) => walk_stmt(view, alt, ctx, depth + 1),
                 None => Ok(()),
             }
         }
         StatementKind::ForStatement(s) => {
-            match &s.init {
+            match view.opt_for_head(s.init) {
                 Some(ForInit::VariableDeclaration(decl)) => {
                     // For-scope declarations are block-scoped — always shadow
                     // candidates regardless of depth.
-                    for declarator in decl.declarations {
-                        collect_nested_declared(declarator.id, ctx);
+                    for declarator in view.declarators(decl.declarations) {
+                        collect_nested_declared(view, view.expr(declarator.id), ctx);
                     }
-                    walk_variable_declaration(decl, ctx, depth + 1)?;
+                    walk_variable_declaration(view, decl, ctx, depth + 1)?;
                 }
-                Some(ForInit::Expression(e)) => walk_expression(e, ctx)?,
+                Some(ForInit::Expression(e)) => walk(view, *e, ctx)?,
                 None => {}
             }
-            walk_opt(s.test, ctx)?;
-            walk_opt(s.update, ctx)?;
-            walk_statement(s.body, ctx, depth + 1)
+            walk_opt(view, s.test, ctx)?;
+            walk_opt(view, s.update, ctx)?;
+            walk_stmt(view, s.body, ctx, depth + 1)
         }
         StatementKind::ForInStatement(s) => {
-            walk_for_left(s.left, ctx, depth)?;
-            walk_expression(s.right, ctx)?;
-            walk_statement(s.body, ctx, depth + 1)
+            walk_for_left(view, s.left, ctx, depth)?;
+            walk(view, s.right, ctx)?;
+            walk_stmt(view, s.body, ctx, depth + 1)
         }
         StatementKind::ForOfStatement(s) => {
-            walk_for_left(s.left, ctx, depth)?;
-            walk_expression(s.right, ctx)?;
-            walk_statement(s.body, ctx, depth + 1)
+            walk_for_left(view, s.left, ctx, depth)?;
+            walk(view, s.right, ctx)?;
+            walk_stmt(view, s.body, ctx, depth + 1)
         }
         StatementKind::WhileStatement(s) => {
-            walk_expression(s.test, ctx)?;
-            walk_statement(s.body, ctx, depth + 1)
+            walk(view, s.test, ctx)?;
+            walk_stmt(view, s.body, ctx, depth + 1)
         }
         StatementKind::DoWhileStatement(s) => {
-            walk_statement(s.body, ctx, depth + 1)?;
-            walk_expression(s.test, ctx)
+            walk_stmt(view, s.body, ctx, depth + 1)?;
+            walk(view, s.test, ctx)
         }
         // Unreachable in practice: a Svelte `<script>` is Module code, so it is strict
         // and the parser refuses `with` there.
         StatementKind::WithStatement(s) => {
-            walk_expression(s.object, ctx)?;
-            walk_statement(s.body, ctx, depth + 1)
+            walk(view, s.object, ctx)?;
+            walk_stmt(view, s.body, ctx, depth + 1)
         }
         StatementKind::SwitchStatement(s) => {
-            walk_expression(s.discriminant, ctx)?;
-            for case in s.cases {
-                walk_opt(case.test, ctx)?;
-                walk_statements(case.consequent, ctx, depth + 1)?;
+            walk(view, s.discriminant, ctx)?;
+            for case in view.cases(s.cases) {
+                walk_opt(view, case.test, ctx)?;
+                walk_statements(view, case.consequent, ctx, depth + 1)?;
             }
             Ok(())
         }
         StatementKind::TryStatement(s) => {
-            walk_statements(s.block.body, ctx, depth + 1)?;
-            if let Some(handler) = &s.handler {
+            let s = view.try_stmt(*s);
+            walk_statements(view, s.block.body, ctx, depth + 1)?;
+            if let Some(handler) = view.opt_catch(s.handler) {
                 if let Some(param) = &handler.param {
-                    collect_nested_declared(param, ctx);
+                    collect_nested_declared(view, param, ctx);
                     // A catch parameter IS a binding (`declaration_kind: 'let'`
                     // in a porous scope), so the `$$slots` reference carve-out
                     // must not reach it.
-                    refuse_dollar_binding_pattern(param, ctx.source)?;
-                    walk_expression(param, ctx)?;
+                    refuse_dollar_binding_pattern(view, param, ctx.source)?;
+                    walk_expression(view, param, ctx)?;
                 }
-                walk_statements(handler.body.body, ctx, depth + 1)?;
+                walk_statements(view, handler.body.body, ctx, depth + 1)?;
             }
             if let Some(finalizer) = &s.finalizer {
-                walk_statements(finalizer.body, ctx, depth + 1)?;
+                walk_statements(view, finalizer.body, ctx, depth + 1)?;
             }
             Ok(())
         }
-        StatementKind::ThrowStatement(s) => walk_expression(s.argument, ctx),
-        StatementKind::LabeledStatement(s) => walk_statement(s.body, ctx, depth + 1),
+        StatementKind::ThrowStatement(s) => walk(view, s.argument, ctx),
+        StatementKind::LabeledStatement(s) => {
+            walk_stmt(view, view.labeled_stmt(*s).body, ctx, depth + 1)
+        }
         // No expression-bearing children.
         StatementKind::BreakStatement(_)
         | StatementKind::ContinueStatement(_)
@@ -755,105 +816,130 @@ fn walk_statement(
         StatementKind::TSModuleDeclaration(_) => {
             Err(CompileError::Unsupported(Refusal::TsNamespaceWithValue))
         }
-        StatementKind::TSExportAssignment(s) => walk_expression(&s.expression, ctx),
+        StatementKind::TSExportAssignment(s) => walk(view, view.export_assign(*s).expression, ctx),
     }
 }
 
 fn walk_variable_declaration(
-    decl: &tsv_ts::ast::VariableDeclaration<'_>,
+    view: AstView<'_>,
+    decl: &VariableDeclaration,
     ctx: &mut WalkCtx<'_>,
     depth: usize,
 ) -> Result<(), CompileError> {
-    for declarator in decl.declarations {
+    for declarator in view.declarators(decl.declarations) {
         if depth > 0 || ctx.fn_depth > 0 {
-            collect_nested_declared(declarator.id, ctx);
+            collect_nested_declared(view, view.expr(declarator.id), ctx);
         }
-        refuse_dollar_binding_pattern(declarator.id, ctx.source)?;
-        walk_expression(declarator.id, ctx)?;
-        walk_opt(declarator.init, ctx)?;
+        refuse_dollar_binding_pattern(view, view.expr(declarator.id), ctx.source)?;
+        walk(view, declarator.id, ctx)?;
+        walk_opt(view, declarator.init, ctx)?;
     }
     Ok(())
 }
 
 fn walk_for_left(
-    left: &ForInOfLeft<'_>,
+    view: AstView<'_>,
+    left: ForLeftId,
     ctx: &mut WalkCtx<'_>,
     depth: usize,
 ) -> Result<(), CompileError> {
-    match left {
+    match view.for_left(left) {
         ForInOfLeft::VariableDeclaration(decl) => {
-            for declarator in decl.declarations {
-                collect_nested_declared(declarator.id, ctx);
+            for declarator in view.declarators(decl.declarations) {
+                collect_nested_declared(view, view.expr(declarator.id), ctx);
             }
-            walk_variable_declaration(decl, ctx, depth + 1)
+            walk_variable_declaration(view, decl, ctx, depth + 1)
         }
         ForInOfLeft::Pattern(pattern) => {
-            assign_target_roots(pattern, ctx.source, ctx.updated);
+            let pattern = *pattern;
+            assign_target_roots(view, view.expr(pattern), ctx.source, ctx.updated);
             // A `$derived` binding-leaf loop target (`for ([d] of …)`) is a derived
             // write the oracle lowers to an unimplemented shape — refuse. (A bare
             // `for (d of …)` target refuses here too; the oracle itself emits
             // invalid JS there, so a clean refusal only improves on it. A member
             // target `for (d.x of …)` reads the derived and compiles.)
-            refuse_derived_write_target(pattern, ctx)?;
-            walk_expression(pattern, ctx)
+            refuse_derived_write_target(view, view.expr(pattern), ctx)?;
+            walk(view, pattern, ctx)
         }
     }
 }
 
-fn walk_opt(expr: Option<&Expression<'_>>, ctx: &mut WalkCtx<'_>) -> Result<(), CompileError> {
+/// [`walk_expression`] over the expression `id` names.
+fn walk(view: AstView<'_>, id: ExprId, ctx: &mut WalkCtx<'_>) -> Result<(), CompileError> {
+    walk_expression(view, view.expr(id), ctx)
+}
+
+fn walk_opt(
+    view: AstView<'_>,
+    expr: Option<ExprId>,
+    ctx: &mut WalkCtx<'_>,
+) -> Result<(), CompileError> {
     match expr {
-        Some(e) => walk_expression(e, ctx),
+        Some(e) => walk(view, e, ctx),
         None => Ok(()),
     }
 }
 
-fn walk_expressions(exprs: &[&Expression<'_>], ctx: &mut WalkCtx<'_>) -> Result<(), CompileError> {
-    for expr in exprs {
-        walk_expression(expr, ctx)?;
+fn walk_expressions(
+    view: AstView<'_>,
+    exprs: Run<ExprId>,
+    ctx: &mut WalkCtx<'_>,
+) -> Result<(), CompileError> {
+    for &expr in view.expr_list(exprs) {
+        walk(view, expr, ctx)?;
     }
     Ok(())
 }
 
 fn walk_function_expression(
-    f: &FunctionExpression<'_>,
+    view: AstView<'_>,
+    f: &FunctionExpression,
     ctx: &mut WalkCtx<'_>,
 ) -> Result<(), CompileError> {
     if let Some(id) = &f.id {
-        refuse_dollar_binding_name(id, ctx.source)?;
+        refuse_dollar_binding_name(view, id, ctx.source)?;
         if let Some(name) = identifier_name(id, ctx.source) {
             ctx.nested_declared.insert(name.to_string());
         }
     }
-    enter_function(f.params, ctx)?;
-    let result = walk_statements(f.body.body, ctx, 1);
+    enter_function(view, f.params, ctx)?;
+    let result = walk_statements(view, f.body.body, ctx, 1);
     ctx.fn_depth -= 1;
     result
 }
 
-fn walk_class_body(body: &ClassBody<'_>, ctx: &mut WalkCtx<'_>) -> Result<(), CompileError> {
-    for member in body.body {
-        walk_class_member(member, ctx)?;
+fn walk_class_body(
+    view: AstView<'_>,
+    body: &ClassBody,
+    ctx: &mut WalkCtx<'_>,
+) -> Result<(), CompileError> {
+    for member in view.class_members(body.body) {
+        walk_class_member(view, member, ctx)?;
     }
     Ok(())
 }
 
-fn walk_class_member(member: &ClassMember<'_>, ctx: &mut WalkCtx<'_>) -> Result<(), CompileError> {
+fn walk_class_member(
+    view: AstView<'_>,
+    member: &ClassMember,
+    ctx: &mut WalkCtx<'_>,
+) -> Result<(), CompileError> {
     match member {
         ClassMember::MethodDefinition(m) => {
             if m.computed {
-                walk_expression(&m.key, ctx)?;
+                walk(view, m.key, ctx)?;
             }
-            walk_function_expression(&m.value, ctx)?;
+            walk_function_expression(view, &m.value, ctx)?;
         }
         ClassMember::PropertyDefinition(p) => {
             if p.computed {
-                walk_expression(&p.key, ctx)?;
+                walk(view, p.key, ctx)?;
             }
-            walk_opt(p.value.as_ref(), ctx)?;
+            walk_opt(view, p.value, ctx)?;
         }
         ClassMember::StaticBlock(b) => {
             ctx.fn_depth += 1;
-            let result = walk_statements(b.body, ctx, 1);
+            let result = walk_statements(view, b.body, ctx, 1);
             ctx.fn_depth -= 1;
             result?;
         }
@@ -862,7 +948,11 @@ fn walk_class_member(member: &ClassMember<'_>, ctx: &mut WalkCtx<'_>) -> Result<
     Ok(())
 }
 
-fn walk_expression(expr: &Expression<'_>, ctx: &mut WalkCtx<'_>) -> Result<(), CompileError> {
+fn walk_expression(
+    view: AstView<'_>,
+    expr: &Expression,
+    ctx: &mut WalkCtx<'_>,
+) -> Result<(), CompileError> {
     match &expr.kind {
         // The rune guard: any call/new whose callee roots in a `$`-identifier. A
         // store-base callee root (`$fn()`, `$obj.m()`, `new $C()`) is a store read
@@ -873,26 +963,26 @@ fn walk_expression(expr: &Expression<'_>, ctx: &mut WalkCtx<'_>) -> Result<(), C
         // never store bases), as does a shadowed base
         // (`store_invalid_scoped_subscription`).
         ExpressionKind::CallExpression(call) => {
-            if let Some(name) = dollar_callee_root(call.callee, ctx.source) {
+            if let Some(name) = dollar_callee_root(view, view.expr(call.callee), ctx.source) {
                 match store_read_exemption(ctx, name) {
                     Some(Ok(())) => {}
                     Some(Err(err)) => return Err(err),
                     None => return Err(rune_error(name)),
                 }
             }
-            walk_expression(call.callee, ctx)?;
-            walk_expressions(call.arguments, ctx)
+            walk(view, call.callee, ctx)?;
+            walk_expressions(view, call.arguments, ctx)
         }
         ExpressionKind::NewExpression(new_expr) => {
-            if let Some(name) = dollar_callee_root(new_expr.callee, ctx.source) {
+            if let Some(name) = dollar_callee_root(view, view.expr(new_expr.callee), ctx.source) {
                 match store_read_exemption(ctx, name) {
                     Some(Ok(())) => {}
                     Some(Err(err)) => return Err(err),
                     None => return Err(rune_error(name)),
                 }
             }
-            walk_expression(new_expr.callee, ctx)?;
-            walk_expressions(new_expr.arguments, ctx)
+            walk(view, new_expr.callee, ctx)?;
+            walk_expressions(view, new_expr.arguments, ctx)
         }
 
         // A bare `$`-prefixed identifier reference (`let x = $state;`, a
@@ -972,12 +1062,13 @@ fn walk_expression(expr: &Expression<'_>, ctx: &mut WalkCtx<'_>) -> Result<(), C
             // value-walk can't rewrite an escaped read (classification not ported,
             // like needs_context/snippet), so refuse rather than emit a bare `d` —
             // a MISMATCH. A plain escaped local (not a derived name) stays legal.
-            if let Some(name) = id.escaped_name
-                && ctx.derived_names.contains(name)
-            {
-                return Err(CompileError::Unsupported(Refusal::DerivedBindingRead {
-                    name: name.to_string(),
-                }));
+            if let Some(escaped) = id.escaped_name {
+                let name = view.escaped_text(escaped);
+                if ctx.derived_names.contains(name) {
+                    return Err(CompileError::Unsupported(Refusal::DerivedBindingRead {
+                        name: name.to_string(),
+                    }));
+                }
             }
             Ok(())
         }
@@ -991,57 +1082,60 @@ fn walk_expression(expr: &Expression<'_>, ctx: &mut WalkCtx<'_>) -> Result<(), C
         | ExpressionKind::MetaProperty(_) => Ok(()),
 
         ExpressionKind::ObjectExpression(obj) => {
-            for prop in obj.properties {
+            for prop in view.obj_props(obj.properties) {
                 match prop {
                     ObjectProperty::Property(p) => {
                         if p.computed {
-                            walk_expression(p.key, ctx)?;
+                            walk(view, p.key, ctx)?;
                         }
-                        walk_expression(p.value, ctx)?;
+                        walk(view, p.value, ctx)?;
                     }
-                    ObjectProperty::SpreadElement(s) => walk_expression(s.argument, ctx)?,
+                    ObjectProperty::SpreadElement(s) => walk(view, s.argument, ctx)?,
                 }
             }
             Ok(())
         }
         ExpressionKind::ArrayExpression(arr) => {
-            for element in arr.elements {
-                walk_opt(*element, ctx)?;
+            for &element in view.expr_opt_list(arr.elements) {
+                walk_opt(view, element, ctx)?;
             }
             Ok(())
         }
-        ExpressionKind::UnaryExpression(u) => walk_expression(u.argument, ctx),
+        ExpressionKind::UnaryExpression(u) => walk(view, u.argument, ctx),
         ExpressionKind::UpdateExpression(u) => {
-            assign_target_roots(u.argument, ctx.source, ctx.updated);
-            refuse_derived_write_target(u.argument, ctx)?;
-            walk_expression(u.argument, ctx)
+            assign_target_roots(view, view.expr(u.argument), ctx.source, ctx.updated);
+            refuse_derived_write_target(view, view.expr(u.argument), ctx)?;
+            walk(view, u.argument, ctx)
         }
         ExpressionKind::BinaryExpression(b) => {
-            walk_expression(b.left, ctx)?;
-            walk_expression(b.right, ctx)
+            walk(view, b.left, ctx)?;
+            walk(view, b.right, ctx)
         }
         ExpressionKind::MemberExpression(m) => {
-            walk_expression(m.object, ctx)?;
+            walk(view, m.object, ctx)?;
             if m.computed {
-                walk_expression(m.property, ctx)?;
+                walk(view, m.property, ctx)?;
             }
             Ok(())
         }
         ExpressionKind::ConditionalExpression(c) => {
-            walk_expression(c.test, ctx)?;
-            walk_expression(c.consequent, ctx)?;
-            walk_expression(c.alternate, ctx)
+            walk(view, c.test, ctx)?;
+            walk(view, c.consequent, ctx)?;
+            walk(view, c.alternate, ctx)
         }
         ExpressionKind::ArrowFunctionExpression(a) => {
-            enter_function(a.params, ctx)?;
+            let a = view.arrow_fn(*a);
+            enter_function(view, a.params, ctx)?;
             let result = match &a.body {
-                ArrowFunctionBody::Expression(e) => walk_expression(e, ctx),
-                ArrowFunctionBody::BlockStatement(b) => walk_statements(b.body, ctx, 1),
+                ArrowFunctionBody::Expression(e) => walk(view, *e, ctx),
+                ArrowFunctionBody::BlockStatement(b) => walk_statements(view, b.body, ctx, 1),
             };
             ctx.fn_depth -= 1;
             result
         }
-        ExpressionKind::FunctionExpression(f) => walk_function_expression(f, ctx),
+        ExpressionKind::FunctionExpression(f) => {
+            walk_function_expression(view, view.fn_expr(*f), ctx)
+        }
         // A class EXPRESSION id is the one `$`-prefixed binding name the oracle
         // ACCEPTS (it declares no binding for it, so `dollar_prefix_invalid`
         // never fires) — this refusal is a deliberate over-refusal, not the
@@ -1059,6 +1153,7 @@ fn walk_expression(expr: &Expression<'_>, ctx: &mut WalkCtx<'_>) -> Result<(), C
         // over-refusal, and is not one of the escaped over-acceptances the
         // `Identifier::name` decode closes. See `docs/conformance_svelte_compiler.md`.
         ExpressionKind::ClassExpression(c) => {
+            let c = view.class_expr(*c);
             if let Some(id) = &c.id
                 && let Some(name) = dollar_identifier_name(id, ctx.source)
             {
@@ -1066,13 +1161,14 @@ fn walk_expression(expr: &Expression<'_>, ctx: &mut WalkCtx<'_>) -> Result<(), C
                     name: name.to_string(),
                 }));
             }
-            walk_class_body(&c.body, ctx)
+            walk_class_body(view, &c.body, ctx)
         }
-        ExpressionKind::SpreadElement(s) => walk_expression(s.argument, ctx),
-        ExpressionKind::TemplateLiteral(t) => walk_expressions(t.expressions, ctx),
+        ExpressionKind::SpreadElement(s) => walk(view, s.argument, ctx),
+        ExpressionKind::TemplateLiteral(t) => walk_expressions(view, t.expressions, ctx),
         ExpressionKind::TaggedTemplateExpression(t) => {
-            walk_expression(t.tag, ctx)?;
-            walk_expressions(t.quasi.expressions, ctx)
+            let t = view.tagged_tpl(*t);
+            walk(view, t.tag, ctx)?;
+            walk_expressions(view, t.quasi.expressions, ctx)
         }
         // Top-level/template `await` forces the oracle's async-component
         // shapes (blockers, thunked pushes) — not implemented, refuse. Inside
@@ -1081,62 +1177,62 @@ fn walk_expression(expr: &Expression<'_>, ctx: &mut WalkCtx<'_>) -> Result<(), C
             if ctx.fn_depth == 0 {
                 return Err(CompileError::Unsupported(Refusal::TopLevelAwait));
             }
-            walk_expression(a.argument, ctx)
+            walk(view, a.argument, ctx)
         }
         ExpressionKind::YieldExpression(y) => match y.argument {
-            Some(argument) => walk_expression(argument, ctx),
+            Some(argument) => walk(view, argument, ctx),
             None => Ok(()),
         },
-        ExpressionKind::SequenceExpression(s) => walk_expressions(s.expressions, ctx),
+        ExpressionKind::SequenceExpression(s) => walk_expressions(view, s.expressions, ctx),
         ExpressionKind::AssignmentExpression(a) => {
-            assign_target_roots(a.left, ctx.source, ctx.updated);
-            refuse_derived_write_target(a.left, ctx)?;
-            walk_expression(a.left, ctx)?;
-            walk_expression(a.right, ctx)
+            assign_target_roots(view, view.expr(a.left), ctx.source, ctx.updated);
+            refuse_derived_write_target(view, view.expr(a.left), ctx)?;
+            walk(view, a.left, ctx)?;
+            walk(view, a.right, ctx)
         }
         ExpressionKind::ObjectPattern(p) => {
-            for prop in p.properties {
+            for prop in view.pat_props(p.properties) {
                 match prop {
                     ObjectPatternProperty::Property(prop) => {
                         if prop.computed {
-                            walk_expression(prop.key, ctx)?;
+                            walk(view, prop.key, ctx)?;
                         }
-                        walk_expression(prop.value, ctx)?;
+                        walk(view, prop.value, ctx)?;
                     }
                     ObjectPatternProperty::RestElement(rest) => {
-                        walk_expression(rest.argument, ctx)?;
+                        walk(view, rest.argument, ctx)?;
                     }
                 }
             }
             Ok(())
         }
         ExpressionKind::ArrayPattern(p) => {
-            for element in p.elements {
-                walk_opt(element.as_ref(), ctx)?;
+            for &element in view.expr_opt_list(p.elements) {
+                walk_opt(view, element, ctx)?;
             }
             Ok(())
         }
         ExpressionKind::AssignmentPattern(p) => {
-            walk_expression(p.left, ctx)?;
-            walk_expression(p.right, ctx)
+            walk(view, p.left, ctx)?;
+            walk(view, p.right, ctx)
         }
-        ExpressionKind::RestElement(r) => walk_expression(r.argument, ctx),
-        ExpressionKind::TSTypeAssertion(t) => walk_expression(t.expression, ctx),
-        ExpressionKind::TSAsExpression(t) => walk_expression(t.expression, ctx),
-        ExpressionKind::TSSatisfiesExpression(t) => walk_expression(t.expression, ctx),
-        ExpressionKind::TSInstantiationExpression(t) => walk_expression(t.expression, ctx),
-        ExpressionKind::TSNonNullExpression(t) => walk_expression(t.expression, ctx),
-        ExpressionKind::TSParameterProperty(t) => walk_expression(t.parameter, ctx),
+        ExpressionKind::RestElement(r) => walk(view, r.argument, ctx),
+        ExpressionKind::TSTypeAssertion(t) => walk(view, t.expression, ctx),
+        ExpressionKind::TSAsExpression(t) => walk(view, t.expression, ctx),
+        ExpressionKind::TSSatisfiesExpression(t) => walk(view, t.expression, ctx),
+        ExpressionKind::TSInstantiationExpression(t) => walk(view, t.expression, ctx),
+        ExpressionKind::TSNonNullExpression(t) => walk(view, t.expression, ctx),
+        ExpressionKind::TSParameterProperty(t) => walk(view, t.parameter, ctx),
         ExpressionKind::ImportExpression(i) => {
-            walk_expression(i.source, ctx)?;
+            walk(view, i.source, ctx)?;
             match i.options {
-                Some(options) => walk_expression(options, ctx),
+                Some(options) => walk(view, options, ctx),
                 None => Ok(()),
             }
         }
-        ExpressionKind::CommentBoundPair(j) => walk_expression(j.inner, ctx),
+        ExpressionKind::CommentBoundPair(j) => walk(view, view.comment_pair(*j).inner, ctx),
         ExpressionKind::ParenthesizedExpression(p) => {
-            walk_expression(p.unreachable_contents(), ctx)
+            walk_expression(view, p.unreachable_contents(view), ctx)
         }
     }
 }

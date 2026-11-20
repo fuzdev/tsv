@@ -10,14 +10,15 @@
 //! See [`crate::transform_server`] for the orchestration that calls this, and
 //! `../../docs/checklist_svelte_compiler.md` for the probed boundaries.
 
-use tsv_svelte::ast::{ElementKind, FragmentNode, Root};
+use tsv_svelte::ast::{ElementKind, FragmentNode, Root, SvelteView};
 use tsv_ts::ast::{
-    ArrowFunctionBody, ClassBody, ClassMember, ExportDefaultValue, Expression, ExpressionKind,
-    ForInOfLeft, ForInit, ObjectPatternProperty, ObjectProperty, Statement, StatementKind,
-    VariableDeclaration,
+    ArrowFunctionBody, AstView, ClassBody, ClassMember, ExportDefaultValue, ExprId, Expression,
+    ExpressionKind, ForInOfLeft, ForInit, ForLeftId, ObjectPatternProperty, ObjectProperty,
+    Statement, StatementKind, StmtId, VariableDeclaration,
 };
 
 use tsv_lang::Span;
+use tsv_lang::store::Run;
 
 use crate::analyze::{is_effect_call, is_inspect_call};
 use crate::transform_server::unsupported;
@@ -44,9 +45,11 @@ use crate::{CompileError, Refusal};
 /// this runs before [`collect_module_script_comments`], that refusal is the reason
 /// the latter only ever sees the module-first ordering.
 pub(crate) fn collect_script_comments(
-    root: &Root<'_>,
+    root: &Root,
+    sv: SvelteView<'_>,
+    view: AstView<'_>,
     source: &str,
-    instance_body: &[Statement<'_>],
+    instance_body: Run<StmtId>,
 ) -> Result<Vec<tsv_lang::Comment>, CompileError> {
     if root.comments.is_empty() {
         return Ok(Vec::new());
@@ -55,10 +58,10 @@ pub(crate) fn collect_script_comments(
     // here: this loop only refuses the module-AFTER-instance ordering (below) and
     // otherwise SKIPS them. A comment the oracle keeps (recovered by a preceding
     // block) carries there; the rest drop.
-    let module_content = root.module.map(|module| module.content.span);
+    let module_content = root.module.as_ref().map(|module| module.content.span);
     let in_module =
         |comment: &tsv_lang::Comment| module_content.is_some_and(|m| m.contains(comment.span));
-    let Some(script) = root.instance else {
+    let Some(script) = &root.instance else {
         // No instance script to carry into: any comment that is not a (dropped)
         // module comment is a template comment we don't thread — refuse.
         for comment in &root.comments {
@@ -89,24 +92,33 @@ pub(crate) fn collect_script_comments(
     //
     // The one shape that does NOT converge is a template emitting a nested block —
     // see [`template_emits_nested_block`].
-    let survives = |stmt: &Statement<'_>| match &stmt.kind {
+    let survives = |stmt: &Statement| match &stmt.kind {
         StatementKind::ImportDeclaration(_) => false,
         StatementKind::ExpressionStatement(expr_stmt) => {
-            is_effect_call(expr_stmt.expression, source).is_none()
-                && is_inspect_call(expr_stmt.expression, source).is_none()
+            let expression = view.expr(expr_stmt.expression);
+            is_effect_call(view, expression, source).is_none()
+                && is_inspect_call(view, expression, source).is_none()
         }
         _ => true,
     };
+    let instance_body = view.stmt_list(instance_body);
     let last_stmt_end = instance_body
         .iter()
+        .map(|&stmt| view.stmt(stmt))
         .filter(|stmt| survives(stmt))
         .map(|stmt| stmt.span().end)
         .max()
         .unwrap_or(content.start);
-    let nested_block = template_emits_nested_block(root.fragment.nodes);
+    let nested_block = template_emits_nested_block(sv, sv.nodes(root.fragment.nodes));
     // Walk only what the emitted body keeps: a hoisted import or a dropped effect
     // opens no block and flushes nothing in the oracle's output.
-    let census = BlockCensus::of(instance_body.iter().filter(|stmt| survives(stmt)));
+    let census = BlockCensus::of(
+        view,
+        instance_body
+            .iter()
+            .copied()
+            .filter(|&stmt| survives(view.stmt(stmt))),
+    );
     // A leading comment glued to the `<script>` line (no newline before it) shares
     // its source line with the function's synthetic opening brace, so the printer
     // trails it after the `{` instead of onto its own line — refuse the class
@@ -114,7 +126,7 @@ pub(crate) fn collect_script_comments(
     // the covered fixtures are unaffected).
     let first_stmt_start = instance_body
         .first()
-        .map_or(content.end, |stmt| stmt.span().start);
+        .map_or(content.end, |&stmt| view.stmt(stmt).span().start);
     let mut comments = Vec::with_capacity(root.comments.len());
     for comment in &root.comments {
         // A module-script comment drops — but ONLY when the module script comes
@@ -170,7 +182,7 @@ pub(crate) fn collect_script_comments(
         comment.owned_by_node = false;
         comments.push(comment);
     }
-    for node in root.fragment.nodes {
+    for node in sv.nodes(root.fragment.nodes) {
         // A whitespace-only text node — e.g. the run between a module `</script>`
         // and the instance `<script>`, or leading/trailing template whitespace —
         // is not real markup, so it doesn't force the refusal. Any genuine
@@ -233,12 +245,13 @@ pub(crate) fn collect_script_comments(
 /// keep condition if that pin moves. Runs AFTER [`collect_script_comments`], which
 /// refuses the module-after-instance ordering, so this only sees module-first.
 pub(crate) fn collect_module_script_comments(
-    root: &Root<'_>,
+    root: &Root,
+    view: AstView<'_>,
     source: &str,
-    module_body: &[Statement<'_>],
+    module_body: Run<StmtId>,
     module_erased_windows: &[Span],
 ) -> Result<Vec<tsv_lang::Comment>, CompileError> {
-    let Some(module) = root.module else {
+    let Some(module) = &root.module else {
         return Ok(Vec::new());
     };
     if root.comments.is_empty() {
@@ -248,14 +261,15 @@ pub(crate) fn collect_module_script_comments(
     // The module-AFTER-instance ordering is refused upstream in
     // `collect_script_comments`, which runs first — so this is a no-op guard, kept
     // so the keep set is never computed for that ordering if the call order changes.
-    if let Some(instance) = root.instance
+    if let Some(instance) = &root.instance
         && instance.content.span.start < module_content.start
     {
         return Ok(Vec::new());
     }
     let has_instance = root.instance.is_some();
     // Condition 1's substrate: the earliest block esrap can re-seek the index on.
-    let census = BlockCensus::of(module_body);
+    let module_body = view.stmt_list(module_body);
+    let census = BlockCensus::of(view, module_body.iter().copied());
     let min_block = census.min_block_start();
     let mut kept = Vec::new();
     for comment in &root.comments {
@@ -268,7 +282,8 @@ pub(crate) fn collect_module_script_comments(
         // Condition 2: a flush target — a non-empty module statement extending past
         // the comment, or an instance script.
         let has_flush = has_instance
-            || module_body.iter().any(|stmt| {
+            || module_body.iter().any(|&stmt| {
+                let stmt = view.stmt(stmt);
                 !matches!(&stmt.kind, StatementKind::EmptyStatement(_))
                     && stmt.span().end > comment.span.end
             });
@@ -394,10 +409,10 @@ struct BlockCensus {
 }
 
 impl BlockCensus {
-    fn of<'s, 'arena: 's>(statements: impl IntoIterator<Item = &'s Statement<'arena>>) -> Self {
+    fn of(view: AstView<'_>, statements: impl IntoIterator<Item = StmtId>) -> Self {
         let mut census = Self::default();
         for stmt in statements {
-            census_stmt(stmt, &mut census);
+            census_stmt(view, stmt, &mut census);
         }
         census
     }
@@ -409,124 +424,127 @@ impl BlockCensus {
     }
 }
 
-fn census_stmts(statements: &[Statement<'_>], census: &mut BlockCensus) {
-    for stmt in statements {
-        census_stmt(stmt, census);
+fn census_stmts(view: AstView<'_>, statements: Run<StmtId>, census: &mut BlockCensus) {
+    for &stmt in view.stmt_list(statements) {
+        census_stmt(view, stmt, census);
     }
 }
 
-fn census_stmt(stmt: &Statement<'_>, census: &mut BlockCensus) {
+fn census_stmt(view: AstView<'_>, stmt: StmtId, census: &mut BlockCensus) {
+    let stmt = view.stmt(stmt);
     census.item_ends.push(stmt.span().end);
     match &stmt.kind {
         StatementKind::BlockStatement(block) => {
             census.blocks.push(block.span);
-            census_stmts(block.body, census);
+            census_stmts(view, block.body, census);
         }
         StatementKind::FunctionDeclaration(f) => {
-            for param in f.params {
-                census_expr(param, census);
-            }
+            let f = view.fn_decl(*f);
+            census_params(view, f.params, census);
             census.blocks.push(f.body.span);
-            census_stmts(f.body.body, census);
+            census_stmts(view, f.body.body, census);
         }
-        StatementKind::ClassDeclaration(c) => census_class_body(&c.body, census),
-        StatementKind::ExpressionStatement(s) => census_expr(s.expression, census),
-        StatementKind::VariableDeclaration(d) => census_var_decl(d, census),
+        StatementKind::ClassDeclaration(c) => {
+            census_class_body(view, &view.class_decl(*c).body, census);
+        }
+        StatementKind::ExpressionStatement(s) => census_expr(view, s.expression, census),
+        StatementKind::VariableDeclaration(d) => census_var_decl(view, d, census),
         StatementKind::ReturnStatement(s) => {
-            if let Some(arg) = s.argument.as_ref() {
-                census_expr(arg, census);
+            if let Some(arg) = s.argument {
+                census_expr(view, arg, census);
             }
         }
-        StatementKind::ThrowStatement(s) => census_expr(s.argument, census),
+        StatementKind::ThrowStatement(s) => census_expr(view, s.argument, census),
         StatementKind::IfStatement(s) => {
-            census_expr(s.test, census);
-            census_stmt(s.consequent, census);
+            census_expr(view, s.test, census);
+            census_stmt(view, s.consequent, census);
             if let Some(alt) = s.alternate {
-                census_stmt(alt, census);
+                census_stmt(view, alt, census);
             }
         }
         StatementKind::ForStatement(s) => {
-            match &s.init {
-                Some(ForInit::VariableDeclaration(d)) => census_var_decl(d, census),
-                Some(ForInit::Expression(e)) => census_expr(e, census),
+            match view.opt_for_head(s.init) {
+                Some(ForInit::VariableDeclaration(d)) => census_var_decl(view, d, census),
+                Some(ForInit::Expression(e)) => census_expr(view, *e, census),
                 None => {}
             }
-            if let Some(test) = s.test.as_ref() {
-                census_expr(test, census);
+            if let Some(test) = s.test {
+                census_expr(view, test, census);
             }
-            if let Some(update) = s.update.as_ref() {
-                census_expr(update, census);
+            if let Some(update) = s.update {
+                census_expr(view, update, census);
             }
-            census_stmt(s.body, census);
+            census_stmt(view, s.body, census);
         }
         StatementKind::ForInStatement(s) => {
-            census_for_left(s.left, census);
-            census_expr(s.right, census);
-            census_stmt(s.body, census);
+            census_for_left(view, s.left, census);
+            census_expr(view, s.right, census);
+            census_stmt(view, s.body, census);
         }
         StatementKind::ForOfStatement(s) => {
-            census_for_left(s.left, census);
-            census_expr(s.right, census);
-            census_stmt(s.body, census);
+            census_for_left(view, s.left, census);
+            census_expr(view, s.right, census);
+            census_stmt(view, s.body, census);
         }
         StatementKind::WhileStatement(s) => {
-            census_expr(s.test, census);
-            census_stmt(s.body, census);
+            census_expr(view, s.test, census);
+            census_stmt(view, s.body, census);
         }
         StatementKind::DoWhileStatement(s) => {
-            census_stmt(s.body, census);
-            census_expr(s.test, census);
+            census_stmt(view, s.body, census);
+            census_expr(view, s.test, census);
         }
         // Unreachable in practice: a Svelte `<script>` is Module code, so it is strict
         // and the parser refuses `with` there.
         StatementKind::WithStatement(s) => {
-            census_expr(s.object, census);
-            census_stmt(s.body, census);
+            census_expr(view, s.object, census);
+            census_stmt(view, s.body, census);
         }
         StatementKind::SwitchStatement(s) => {
-            census_expr(s.discriminant, census);
-            for case in s.cases {
-                if let Some(test) = case.test.as_ref() {
-                    census_expr(test, census);
+            census_expr(view, s.discriminant, census);
+            for case in view.cases(s.cases) {
+                if let Some(test) = case.test {
+                    census_expr(view, test, census);
                 }
-                census_stmts(case.consequent, census);
+                census_stmts(view, case.consequent, census);
             }
         }
         StatementKind::TryStatement(s) => {
+            let s = view.try_stmt(*s);
             census.blocks.push(s.block.span);
-            census_stmts(s.block.body, census);
-            if let Some(handler) = &s.handler {
+            census_stmts(view, s.block.body, census);
+            if let Some(handler) = view.opt_catch(s.handler) {
                 if let Some(param) = &handler.param {
-                    census_expr(param, census);
+                    census_expr_row(view, param, census);
                 }
                 census.blocks.push(handler.body.span);
-                census_stmts(handler.body.body, census);
+                census_stmts(view, handler.body.body, census);
             }
             if let Some(finalizer) = &s.finalizer {
                 census.blocks.push(finalizer.span);
-                census_stmts(finalizer.body, census);
+                census_stmts(view, finalizer.body, census);
             }
         }
-        StatementKind::LabeledStatement(s) => census_stmt(s.body, census),
+        StatementKind::LabeledStatement(s) => census_stmt(view, view.labeled_stmt(*s).body, census),
         StatementKind::ExportNamedDeclaration(s) => {
-            if let Some(decl) = &s.declaration {
-                census_stmt(decl, census);
+            if let Some(decl) = view.export_named(*s).declaration {
+                census_stmt(view, decl, census);
             }
         }
-        StatementKind::ExportDefaultDeclaration(s) => match &s.declaration {
-            ExportDefaultValue::Expression(e) => census_expr(e, census),
+        StatementKind::ExportDefaultDeclaration(s) => match &view.export_default(*s).declaration {
+            ExportDefaultValue::Expression(e) => census_expr(view, *e, census),
             ExportDefaultValue::FunctionDeclaration(f) => {
-                for param in f.params {
-                    census_expr(param, census);
-                }
+                census_params(view, f.params, census);
                 census.blocks.push(f.body.span);
-                census_stmts(f.body.body, census);
+                census_stmts(view, f.body.body, census);
             }
-            ExportDefaultValue::ClassDeclaration(c) => census_class_body(&c.body, census),
+            ExportDefaultValue::ClassDeclaration(c) => census_class_body(view, &c.body, census),
             ExportDefaultValue::TSDeclareFunction(_)
             | ExportDefaultValue::TSInterfaceDeclaration(_) => {}
         },
-        StatementKind::TSExportAssignment(s) => census_expr(&s.expression, census),
+        StatementKind::TSExportAssignment(s) => {
+            census_expr(view, view.export_assign(*s).expression, census);
+        }
         // No block-bearing children (or a TypeScript-only statement dropped before
         // this runs).
         StatementKind::BreakStatement(_)
@@ -545,186 +563,199 @@ fn census_stmt(stmt: &Statement<'_>, census: &mut BlockCensus) {
     }
 }
 
-fn census_var_decl(decl: &VariableDeclaration<'_>, census: &mut BlockCensus) {
-    for declarator in decl.declarations {
-        census_expr(declarator.id, census);
-        if let Some(init) = declarator.init.as_ref() {
-            census_expr(init, census);
+fn census_var_decl(view: AstView<'_>, decl: &VariableDeclaration, census: &mut BlockCensus) {
+    for declarator in view.declarators(decl.declarations) {
+        census_expr(view, declarator.id, census);
+        if let Some(init) = declarator.init {
+            census_expr(view, init, census);
         }
     }
 }
 
-fn census_for_left(left: &ForInOfLeft<'_>, census: &mut BlockCensus) {
-    match left {
-        ForInOfLeft::VariableDeclaration(d) => census_var_decl(d, census),
-        ForInOfLeft::Pattern(p) => census_expr(p, census),
+fn census_for_left(view: AstView<'_>, left: ForLeftId, census: &mut BlockCensus) {
+    match view.for_left(left) {
+        ForInOfLeft::VariableDeclaration(d) => census_var_decl(view, d, census),
+        ForInOfLeft::Pattern(p) => census_expr(view, *p, census),
     }
 }
 
-fn census_class_body(body: &ClassBody<'_>, census: &mut BlockCensus) {
+/// A function's parameters: a run of rows held by value.
+fn census_params(view: AstView<'_>, params: Run<Expression>, census: &mut BlockCensus) {
+    for param in view.exprs(params) {
+        census_expr_row(view, param, census);
+    }
+}
+
+fn census_class_body(view: AstView<'_>, body: &ClassBody, census: &mut BlockCensus) {
     census.blocks.push(body.span);
-    for member in body.body {
+    for member in view.class_members(body.body) {
         census.item_ends.push(member.span().end);
         match member {
             ClassMember::MethodDefinition(m) => {
                 if m.computed {
-                    census_expr(&m.key, census);
+                    census_expr(view, m.key, census);
                 }
-                for param in m.value.params {
-                    census_expr(param, census);
-                }
+                census_params(view, m.value.params, census);
                 census.blocks.push(m.value.body.span);
-                census_stmts(m.value.body.body, census);
+                census_stmts(view, m.value.body.body, census);
             }
             ClassMember::PropertyDefinition(p) => {
                 if p.computed {
-                    census_expr(&p.key, census);
+                    census_expr(view, p.key, census);
                 }
-                if let Some(value) = p.value.as_ref() {
+                if let Some(value) = p.value {
                     // esrap's `PropertyDefinition` flushes after the VALUE with no
                     // upper bound, and the value can end a line above the member.
-                    census.item_ends.push(value.span().end);
-                    census_expr(value, census);
+                    census.item_ends.push(view.expr(value).span().end);
+                    census_expr(view, value, census);
                 }
             }
             ClassMember::StaticBlock(b) => {
                 census.blocks.push(b.span);
-                census_stmts(b.body, census);
+                census_stmts(view, b.body, census);
             }
             ClassMember::IndexSignature(_) => {}
         }
     }
 }
 
-fn census_exprs(exprs: &[&Expression<'_>], census: &mut BlockCensus) {
-    for expr in exprs {
-        census_expr(expr, census);
+fn census_exprs(view: AstView<'_>, exprs: Run<ExprId>, census: &mut BlockCensus) {
+    for &expr in view.expr_list(exprs) {
+        census_expr(view, expr, census);
     }
 }
 
-fn census_expr(expr: &Expression<'_>, census: &mut BlockCensus) {
+/// [`census_expr_row`] over the expression `id` names.
+fn census_expr(view: AstView<'_>, id: ExprId, census: &mut BlockCensus) {
+    census_expr_row(view, view.expr(id), census);
+}
+
+fn census_expr_row(view: AstView<'_>, expr: &Expression, census: &mut BlockCensus) {
     match &expr.kind {
         ExpressionKind::ArrowFunctionExpression(a) => {
-            for param in a.params {
-                census_expr(param, census);
-            }
+            let a = view.arrow_fn(*a);
+            census_params(view, a.params, census);
             match &a.body {
-                ArrowFunctionBody::Expression(e) => census_expr(e, census),
+                ArrowFunctionBody::Expression(e) => census_expr(view, *e, census),
                 ArrowFunctionBody::BlockStatement(b) => {
                     census.blocks.push(b.span);
-                    census_stmts(b.body, census);
+                    census_stmts(view, b.body, census);
                 }
             }
         }
         ExpressionKind::FunctionExpression(f) => {
-            for param in f.params {
-                census_expr(param, census);
-            }
+            let f = view.fn_expr(*f);
+            census_params(view, f.params, census);
             census.blocks.push(f.body.span);
-            census_stmts(f.body.body, census);
+            census_stmts(view, f.body.body, census);
         }
-        ExpressionKind::ClassExpression(c) => census_class_body(&c.body, census),
+        ExpressionKind::ClassExpression(c) => {
+            census_class_body(view, &view.class_expr(*c).body, census);
+        }
         ExpressionKind::NewExpression(e) => {
-            census_expr(e.callee, census);
-            census_exprs(e.arguments, census);
+            census_expr(view, e.callee, census);
+            census_exprs(view, e.arguments, census);
         }
         ExpressionKind::CallExpression(e) => {
-            census_expr(e.callee, census);
-            census_exprs(e.arguments, census);
+            census_expr(view, e.callee, census);
+            census_exprs(view, e.arguments, census);
         }
         ExpressionKind::MemberExpression(e) => {
-            census_expr(e.object, census);
+            census_expr(view, e.object, census);
             if e.computed {
-                census_expr(e.property, census);
+                census_expr(view, e.property, census);
             }
         }
         ExpressionKind::ObjectExpression(obj) => {
-            for prop in obj.properties {
+            for prop in view.obj_props(obj.properties) {
                 match prop {
                     ObjectProperty::Property(p) => {
                         if p.computed {
-                            census_expr(p.key, census);
+                            census_expr(view, p.key, census);
                         }
-                        census_expr(p.value, census);
+                        census_expr(view, p.value, census);
                     }
-                    ObjectProperty::SpreadElement(s) => census_expr(s.argument, census),
+                    ObjectProperty::SpreadElement(s) => census_expr(view, s.argument, census),
                 }
             }
         }
         ExpressionKind::ArrayExpression(arr) => {
-            for element in arr.elements {
-                if let Some(e) = element.as_ref() {
-                    census_expr(e, census);
-                }
+            for &e in view.expr_opt_list(arr.elements).iter().flatten() {
+                census_expr(view, e, census);
             }
         }
-        ExpressionKind::UnaryExpression(u) => census_expr(u.argument, census),
-        ExpressionKind::UpdateExpression(u) => census_expr(u.argument, census),
+        ExpressionKind::UnaryExpression(u) => census_expr(view, u.argument, census),
+        ExpressionKind::UpdateExpression(u) => census_expr(view, u.argument, census),
         ExpressionKind::BinaryExpression(b) => {
-            census_expr(b.left, census);
-            census_expr(b.right, census);
+            census_expr(view, b.left, census);
+            census_expr(view, b.right, census);
         }
         ExpressionKind::ConditionalExpression(c) => {
-            census_expr(c.test, census);
-            census_expr(c.consequent, census);
-            census_expr(c.alternate, census);
+            census_expr(view, c.test, census);
+            census_expr(view, c.consequent, census);
+            census_expr(view, c.alternate, census);
         }
-        ExpressionKind::SpreadElement(s) => census_expr(s.argument, census),
-        ExpressionKind::TemplateLiteral(t) => census_exprs(t.expressions, census),
+        ExpressionKind::SpreadElement(s) => census_expr(view, s.argument, census),
+        ExpressionKind::TemplateLiteral(t) => census_exprs(view, t.expressions, census),
         ExpressionKind::TaggedTemplateExpression(t) => {
-            census_expr(t.tag, census);
-            census_exprs(t.quasi.expressions, census);
+            let t = view.tagged_tpl(*t);
+            census_expr(view, t.tag, census);
+            census_exprs(view, t.quasi.expressions, census);
         }
-        ExpressionKind::AwaitExpression(a) => census_expr(a.argument, census),
+        ExpressionKind::AwaitExpression(a) => census_expr(view, a.argument, census),
         ExpressionKind::YieldExpression(y) => {
             if let Some(arg) = y.argument {
-                census_expr(arg, census);
+                census_expr(view, arg, census);
             }
         }
-        ExpressionKind::SequenceExpression(s) => census_exprs(s.expressions, census),
+        ExpressionKind::SequenceExpression(s) => census_exprs(view, s.expressions, census),
         ExpressionKind::AssignmentExpression(a) => {
-            census_expr(a.left, census);
-            census_expr(a.right, census);
+            census_expr(view, a.left, census);
+            census_expr(view, a.right, census);
         }
         ExpressionKind::ObjectPattern(p) => {
-            for prop in p.properties {
+            for prop in view.pat_props(p.properties) {
                 match prop {
                     ObjectPatternProperty::Property(prop) => {
                         if prop.computed {
-                            census_expr(prop.key, census);
+                            census_expr(view, prop.key, census);
                         }
-                        census_expr(prop.value, census);
+                        census_expr(view, prop.value, census);
                     }
-                    ObjectPatternProperty::RestElement(rest) => census_expr(rest.argument, census),
+                    ObjectPatternProperty::RestElement(rest) => {
+                        census_expr(view, rest.argument, census);
+                    }
                 }
             }
         }
         ExpressionKind::ArrayPattern(p) => {
-            for element in p.elements {
-                if let Some(e) = element.as_ref() {
-                    census_expr(e, census);
-                }
+            for &e in view.expr_opt_list(p.elements).iter().flatten() {
+                census_expr(view, e, census);
             }
         }
         ExpressionKind::AssignmentPattern(p) => {
-            census_expr(p.left, census);
-            census_expr(p.right, census);
+            census_expr(view, p.left, census);
+            census_expr(view, p.right, census);
         }
-        ExpressionKind::RestElement(r) => census_expr(r.argument, census),
-        ExpressionKind::TSTypeAssertion(t) => census_expr(t.expression, census),
-        ExpressionKind::TSAsExpression(t) => census_expr(t.expression, census),
-        ExpressionKind::TSSatisfiesExpression(t) => census_expr(t.expression, census),
-        ExpressionKind::TSInstantiationExpression(t) => census_expr(t.expression, census),
-        ExpressionKind::TSNonNullExpression(t) => census_expr(t.expression, census),
-        ExpressionKind::TSParameterProperty(t) => census_expr(t.parameter, census),
+        ExpressionKind::RestElement(r) => census_expr(view, r.argument, census),
+        ExpressionKind::TSTypeAssertion(t) => census_expr(view, t.expression, census),
+        ExpressionKind::TSAsExpression(t) => census_expr(view, t.expression, census),
+        ExpressionKind::TSSatisfiesExpression(t) => census_expr(view, t.expression, census),
+        ExpressionKind::TSInstantiationExpression(t) => census_expr(view, t.expression, census),
+        ExpressionKind::TSNonNullExpression(t) => census_expr(view, t.expression, census),
+        ExpressionKind::TSParameterProperty(t) => census_expr(view, t.parameter, census),
         ExpressionKind::ImportExpression(i) => {
-            census_expr(i.source, census);
+            census_expr(view, i.source, census);
             if let Some(options) = i.options {
-                census_expr(options, census);
+                census_expr(view, options, census);
             }
         }
-        ExpressionKind::CommentBoundPair(j) => census_expr(j.inner, census),
-        ExpressionKind::ParenthesizedExpression(p) => census_expr(p.unreachable_contents(), census),
+        ExpressionKind::CommentBoundPair(j) => {
+            census_expr(view, view.comment_pair(*j).inner, census);
+        }
+        ExpressionKind::ParenthesizedExpression(p) => {
+            census_expr_row(view, p.unreachable_contents(view), census);
+        }
         // Leaves — no children, no blocks.
         ExpressionKind::Literal(_)
         | ExpressionKind::Identifier(_)
@@ -780,7 +811,7 @@ fn census_expr(expr: &Expression<'_>, census: &mut BlockCensus) {
 ///
 /// Exhaustively matched so a new [`FragmentNode`] variant fails compilation here
 /// rather than silently defaulting to "no block".
-fn template_emits_nested_block(nodes: &[FragmentNode<'_>]) -> bool {
+fn template_emits_nested_block(sv: SvelteView<'_>, nodes: &[FragmentNode]) -> bool {
     nodes.iter().any(|node| match node {
         // Leaves and the tags that emit a bare call — no block.
         FragmentNode::Text(_)
@@ -805,11 +836,11 @@ fn template_emits_nested_block(nodes: &[FragmentNode<'_>]) -> bool {
             // snippet prop — a block. Childless (or whitespace-only), it is a bare
             // `Foo($$renderer, {…})` call.
             ElementKind::Component => {
-                element.fragment.nodes.iter().any(|child| {
+                sv.nodes(element.fragment.nodes).iter().any(|child| {
                     !matches!(child, FragmentNode::Text(text) if text.is_collapsible_ws_only)
                 })
             }
-            ElementKind::Html => template_emits_nested_block(element.fragment.nodes),
+            ElementKind::Html => template_emits_nested_block(sv, sv.nodes(element.fragment.nodes)),
         },
     })
 }

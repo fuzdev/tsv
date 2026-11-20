@@ -22,15 +22,16 @@
 
 use std::collections::{HashMap, HashSet};
 
+use tsv_lang::store::Run;
 use tsv_svelte::ast::{
     AttributeNode, AwaitBlock, ConstTag, DebugTag, DeclarationTag, EachBlock, Element, Fragment,
     FragmentNode, HtmlTag, IfBlock, KeyBlock, RenderTag, Root, SnippetBlock, SpecialElement,
-    SpecialElementKind,
+    SpecialElementKind, SvelteView,
 };
 use tsv_ts::ast::{
-    ArrowFunctionBody, ClassBody, ClassMember, Expression, ExpressionKind, ForInOfLeft, ForInit,
-    FunctionExpression, Identifier, ObjectPatternProperty, ObjectProperty, Statement,
-    StatementKind, VariableDeclaration,
+    ArrowFunctionBody, AstView, ClassBody, ClassMember, ExprId, Expression, ExpressionKind,
+    ForInOfLeft, ForInit, ForLeftId, FunctionExpression, Identifier, ObjectPatternProperty,
+    ObjectProperty, StatementKind, StmtId, VariableDeclaration,
 };
 
 use crate::analyze::{NameSet, pattern_binding_names};
@@ -65,7 +66,7 @@ impl SnippetAnalysis {
     /// `SnippetBlock::span.start`, so a body-local snippet and a nested snippet
     /// (neither of which is ever inserted) both return `false` — a nested snippet
     /// sharing a top-level snippet's name is never mistaken for it.
-    pub(crate) fn is_hoisted(&self, snippet: &SnippetBlock<'_>) -> bool {
+    pub(crate) fn is_hoisted(&self, snippet: &SnippetBlock) -> bool {
         self.hoistable.contains(&snippet.span.start)
     }
 
@@ -79,15 +80,19 @@ impl SnippetAnalysis {
 }
 
 /// The plain (non-escaped) name of a snippet's `expression` identifier.
-pub(crate) fn snippet_name<'s>(snippet: &SnippetBlock<'_>, source: &'s str) -> Option<&'s str> {
-    match &snippet.expression.kind {
+pub(crate) fn snippet_name<'s>(
+    view: AstView<'_>,
+    snippet: &SnippetBlock,
+    source: &'s str,
+) -> Option<&'s str> {
+    match &view.expr(snippet.expression).kind {
         ExpressionKind::Identifier(id) => plain_name(id, source),
         _ => None,
     }
 }
 
 /// The plain (non-escaped) name of an identifier, `None` for an escaped one.
-fn plain_name<'s>(id: &Identifier<'_>, source: &'s str) -> Option<&'s str> {
+fn plain_name<'s>(id: &Identifier, source: &'s str) -> Option<&'s str> {
     plain_identifier_str(id, source)
 }
 
@@ -99,18 +104,19 @@ fn plain_name<'s>(id: &Identifier<'_>, source: &'s str) -> Option<&'s str> {
 /// **not** disqualify hoisting). A snippet whose free-vs-shadowed classification
 /// is ambiguous, or a duplicate top-level snippet name, returns `Err`.
 pub(crate) fn analyze_snippets(
-    root: &Root<'_>,
+    root: &Root,
+    sv: SvelteView<'_>,
+    view: AstView<'_>,
     source: &str,
     instance_bindings: &NameSet,
     import_names: &NameSet,
 ) -> Result<SnippetAnalysis, CompileError> {
     let mut names = NameSet::default();
-    let mut name_collector = Collector::new(source);
+    let mut name_collector = Collector::new(sv, view, source);
     name_collector.collect_names(&root.fragment, &mut names);
 
-    let top_level: Vec<&SnippetBlock<'_>> = root
-        .fragment
-        .nodes
+    let top_level: Vec<&SnippetBlock> = sv
+        .nodes(root.fragment.nodes)
         .iter()
         .filter_map(|node| match node {
             FragmentNode::SnippetBlock(s) => Some(s),
@@ -123,7 +129,7 @@ pub(crate) fn analyze_snippets(
     // oracle's per-fragment scope rule rather than a root-only slice — so two `function` declarations can never be emitted here.
     let top_level_names: NameSet = top_level
         .iter()
-        .filter_map(|s| snippet_name(s, source).map(str::to_string))
+        .filter_map(|s| snippet_name(view, s, source).map(str::to_string))
         .collect();
 
     // Per snippet: is it *directly* non-hoistable (a free ref to an instance
@@ -131,11 +137,11 @@ pub(crate) fn analyze_snippets(
     let mut direct_ok: HashMap<String, bool> = HashMap::new();
     let mut deps: HashMap<String, Vec<String>> = HashMap::new();
     for snippet in &top_level {
-        let Some(name) = snippet_name(snippet, source) else {
+        let Some(name) = snippet_name(view, snippet, source) else {
             continue;
         };
 
-        let mut c = Collector::new(source);
+        let mut c = Collector::new(sv, view, source);
         c.collect_snippet_scope(snippet);
         if c.opaque {
             return Err(unsupported(Refusal::SnippetHoistAmbiguous {
@@ -220,7 +226,7 @@ pub(crate) fn analyze_snippets(
     let mut hoistable_spans: HashSet<u32> = HashSet::new();
     let mut hoisted_names = NameSet::default();
     for snippet in &top_level {
-        if let Some(name) = snippet_name(snippet, source)
+        if let Some(name) = snippet_name(view, snippet, source)
             && hoistable.get(name).copied() == Some(true)
         {
             hoistable_spans.insert(snippet.span.start);
@@ -248,6 +254,8 @@ fn unsupported(reason: Refusal) -> CompileError {
 /// by any identifier the port can't name (an escaped identifier), which makes
 /// the hoist decision undecidable.
 struct Collector<'s> {
+    sv: SvelteView<'s>,
+    view: AstView<'s>,
     source: &'s str,
     refs: NameSet,
     locals: NameSet,
@@ -262,8 +270,10 @@ struct Collector<'s> {
 }
 
 impl<'s> Collector<'s> {
-    fn new(source: &'s str) -> Self {
+    fn new(sv: SvelteView<'s>, view: AstView<'s>, source: &'s str) -> Self {
         Self {
+            sv,
+            view,
             source,
             refs: NameSet::default(),
             locals: NameSet::default(),
@@ -275,15 +285,15 @@ impl<'s> Collector<'s> {
 
     /// Collect the snippet's parameter names (into `params`+`locals`) and its
     /// body references and locals.
-    fn collect_snippet_scope(&mut self, snippet: &SnippetBlock<'_>) {
-        for param in snippet.parameters {
+    fn collect_snippet_scope(&mut self, snippet: &SnippetBlock) {
+        for param in self.view.exprs(snippet.parameters) {
             self.bind_pattern_into_params(param);
             self.param_defaults(param);
         }
         self.fragment(&snippet.body);
     }
 
-    fn ident_ref(&mut self, id: &Identifier<'_>) {
+    fn ident_ref(&mut self, id: &Identifier) {
         match plain_name(id, self.source) {
             Some(name) => {
                 self.refs.insert(name.to_string());
@@ -292,7 +302,7 @@ impl<'s> Collector<'s> {
         }
     }
 
-    fn ident_local(&mut self, id: &Identifier<'_>) {
+    fn ident_local(&mut self, id: &Identifier) {
         match plain_name(id, self.source) {
             Some(name) => {
                 self.locals.insert(name.to_string());
@@ -302,9 +312,9 @@ impl<'s> Collector<'s> {
     }
 
     /// Bind a parameter pattern into `params` and `locals`.
-    fn bind_pattern_into_params(&mut self, pattern: &Expression<'_>) {
+    fn bind_pattern_into_params(&mut self, pattern: &Expression) {
         let mut names = Vec::new();
-        if pattern_binding_names(pattern, self.source, &mut names).is_err() {
+        if pattern_binding_names(self.view, pattern, self.source, &mut names).is_err() {
             self.opaque = true;
             return;
         }
@@ -316,9 +326,9 @@ impl<'s> Collector<'s> {
 
     /// Bind a pattern's names into `locals` (nested declarations, each items,
     /// `{@const}`/`{:then}` bindings, catch params).
-    fn bind_pattern(&mut self, pattern: &Expression<'_>) {
+    fn bind_pattern(&mut self, pattern: &Expression) {
         let mut names = Vec::new();
-        if pattern_binding_names(pattern, self.source, &mut names).is_err() {
+        if pattern_binding_names(self.view, pattern, self.source, &mut names).is_err() {
             self.opaque = true;
             return;
         }
@@ -329,19 +339,20 @@ impl<'s> Collector<'s> {
 
     /// Walk a parameter pattern for its reference-bearing default expressions
     /// (`{a = expr}`).
-    fn param_defaults(&mut self, pattern: &Expression<'_>) {
+    fn param_defaults(&mut self, pattern: &Expression) {
+        let view = self.view;
         match &pattern.kind {
             ExpressionKind::AssignmentPattern(p) => self.expr(p.right),
             ExpressionKind::ObjectPattern(p) => {
-                for prop in p.properties {
+                for prop in view.pat_props(p.properties) {
                     if let ObjectPatternProperty::Property(prop) = prop {
-                        self.param_defaults(prop.value);
+                        self.param_defaults(view.expr(prop.value));
                     }
                 }
             }
             ExpressionKind::ArrayPattern(p) => {
-                for element in p.elements.iter().flatten() {
-                    self.param_defaults(element);
+                for &element in view.expr_opt_list(p.elements).iter().flatten() {
+                    self.param_defaults(view.expr(element));
                 }
             }
             _ => {}
@@ -350,13 +361,13 @@ impl<'s> Collector<'s> {
 
     // ── Snippet-name collection (a separate, lighter pass) ──────────────────
 
-    fn collect_names(&mut self, fragment: &Fragment<'_>, out: &mut NameSet) {
-        for node in fragment.nodes {
+    fn collect_names(&mut self, fragment: &Fragment, out: &mut NameSet) {
+        for node in self.sv.nodes(fragment.nodes) {
             // Only a snippet contributes a name; the recursion into every child
             // fragment rides the shared seam, so a new template shape can't drop
             // out of this pass silently (the former `_ => {}` arm).
             if let FragmentNode::SnippetBlock(s) = node
-                && let Some(name) = snippet_name(s, self.source)
+                && let Some(name) = snippet_name(self.view, s, self.source)
             {
                 out.insert(name.to_string());
             }
@@ -366,13 +377,13 @@ impl<'s> Collector<'s> {
 
     // ── Fragment walk ───────────────────────────────────────────────────────
 
-    fn fragment(&mut self, fragment: &Fragment<'_>) {
-        for node in fragment.nodes {
+    fn fragment(&mut self, fragment: &Fragment) {
+        for node in self.sv.nodes(fragment.nodes) {
             self.fragment_node(node);
         }
     }
 
-    fn fragment_node(&mut self, node: &FragmentNode<'_>) {
+    fn fragment_node(&mut self, node: &FragmentNode) {
         match node {
             FragmentNode::Text(_) | FragmentNode::Comment(_) => {}
             FragmentNode::Element(e) => self.element(e),
@@ -391,7 +402,7 @@ impl<'s> Collector<'s> {
         }
     }
 
-    fn element(&mut self, element: &Element<'_>) {
+    fn element(&mut self, element: &Element) {
         // The shared traversal (`attr_refs`) defines which attribute expressions
         // are reference-bearing — including component `{...spread}` expressions and
         // the no-op drop family (`use:`/`transition:`/`animate:`/`{@attach}`) on a
@@ -403,19 +414,20 @@ impl<'s> Collector<'s> {
         // fragment, so the emission refusals that let the default traversal skip
         // element spreads / the refused legacy directives never fire — there every
         // attribute reference must be counted, `style:` shorthand names included.
+        let sv = self.sv;
         if self.in_dropped_catch {
-            self.dropped_attribute_refs(element.attributes);
+            self.dropped_attribute_refs(sv.attributes(element.attributes));
         } else {
-            each_attribute_expression(element, &mut |expr| self.expr(expr));
+            each_attribute_expression(sv, element, &mut |expr| self.expr(expr));
             let source = self.source;
-            each_emitted_directive_name(element, source, &mut |name| {
+            each_emitted_directive_name(sv, element, source, &mut |name| {
                 self.directive_name_ref(name);
             });
         }
         self.fragment(&element.fragment);
     }
 
-    fn special_element(&mut self, se: &SpecialElement<'_>) {
+    fn special_element(&mut self, se: &SpecialElement) {
         // A `<svelte:element>` COMPILES: its `this={…}` expression, attribute
         // expressions and directive names all emit, so its free references are
         // collected here on the emitted path (a `this={local}` / `class:x={local}`
@@ -440,7 +452,7 @@ impl<'s> Collector<'s> {
             if let Some(expr) = special_element_reference_expression(se) {
                 self.expr(expr);
             }
-            self.dropped_attribute_refs(se.attributes);
+            self.dropped_attribute_refs(self.sv.attributes(se.attributes));
         }
         self.fragment(&se.fragment);
     }
@@ -448,8 +460,10 @@ impl<'s> Collector<'s> {
     /// Count every reference in an attribute list on the dropped-`{:catch}` path:
     /// each reference-bearing attribute expression, plus each value-binding
     /// directive name.
-    fn dropped_attribute_refs(&mut self, attributes: &[AttributeNode<'_>]) {
-        each_reference_bearing_attribute_expression(attributes, &mut |expr| self.expr(expr));
+    fn dropped_attribute_refs(&mut self, attributes: &[AttributeNode]) {
+        each_reference_bearing_attribute_expression(self.sv, attributes, &mut |expr| {
+            self.expr(expr);
+        });
         let source = self.source;
         each_reference_bearing_directive_name(attributes, source, &mut |name| {
             self.directive_name_ref(name);
@@ -466,11 +480,11 @@ impl<'s> Collector<'s> {
         }
     }
 
-    fn html_tag(&mut self, tag: &HtmlTag<'_>) {
+    fn html_tag(&mut self, tag: &HtmlTag) {
         self.expr(tag.expression);
     }
 
-    fn if_block(&mut self, block: &IfBlock<'_>) {
+    fn if_block(&mut self, block: &IfBlock) {
         self.expr(block.test);
         self.fragment(&block.consequent);
         if let Some(alt) = &block.alternate {
@@ -478,16 +492,16 @@ impl<'s> Collector<'s> {
         }
     }
 
-    fn each_block(&mut self, block: &EachBlock<'_>) {
+    fn each_block(&mut self, block: &EachBlock) {
         self.expr(block.expression);
         if let Some(key) = &block.key {
             self.expr(key.expression);
         }
         if let Some(context) = block.context {
-            self.bind_pattern(context);
+            self.bind_pattern(self.view.expr(context));
         }
         if let Some(index) = block.index {
-            self.locals.insert(index.to_string());
+            self.locals.insert(index.extract(self.source).to_string());
         }
         self.fragment(&block.body);
         if let Some(fallback) = &block.fallback {
@@ -495,13 +509,13 @@ impl<'s> Collector<'s> {
         }
     }
 
-    fn await_block(&mut self, block: &AwaitBlock<'_>) {
+    fn await_block(&mut self, block: &AwaitBlock) {
         self.expr(block.expression);
         if let Some(value) = block.value {
-            self.bind_pattern(value);
+            self.bind_pattern(self.view.expr(value));
         }
         if let Some(error) = block.error {
-            self.bind_pattern(error);
+            self.bind_pattern(self.view.expr(error));
         }
         // Pending/then are emitted (so their skipped attribute positions refuse at
         // emission); the `{:catch}` branch is dropped, so it is walked with the
@@ -517,61 +531,75 @@ impl<'s> Collector<'s> {
         }
     }
 
-    fn key_block(&mut self, block: &KeyBlock<'_>) {
+    fn key_block(&mut self, block: &KeyBlock) {
         self.expr(block.expression);
         self.fragment(&block.fragment);
     }
 
-    fn const_tag(&mut self, tag: &ConstTag<'_>) {
-        self.bind_pattern(tag.id);
+    fn const_tag(&mut self, tag: &ConstTag) {
+        self.bind_pattern(self.view.expr(tag.id));
         self.expr(tag.init);
     }
 
-    fn render_tag(&mut self, tag: &RenderTag<'_>) {
+    fn render_tag(&mut self, tag: &RenderTag) {
         self.expr(tag.expression);
     }
 
-    fn nested_snippet(&mut self, snippet: &SnippetBlock<'_>) {
+    fn nested_snippet(&mut self, snippet: &SnippetBlock) {
         // The nested snippet's name and parameters are locals of the enclosing
         // snippet's subtree; its body references count toward the enclosing scope.
-        if let Some(name) = snippet_name(snippet, self.source) {
+        if let Some(name) = snippet_name(self.view, snippet, self.source) {
             self.locals.insert(name.to_string());
         }
-        for param in snippet.parameters {
+        for param in self.view.exprs(snippet.parameters) {
             self.bind_pattern(param);
             self.param_defaults(param);
         }
         self.fragment(&snippet.body);
     }
 
-    fn declaration_tag(&mut self, tag: &DeclarationTag<'_>) {
+    fn declaration_tag(&mut self, tag: &DeclarationTag) {
         self.var_decl(&tag.declaration);
     }
 
-    fn debug_tag(&mut self, tag: &DebugTag<'_>) {
-        for id in tag.identifiers {
-            self.expr(id);
-        }
+    fn debug_tag(&mut self, tag: &DebugTag) {
+        self.exprs(tag.identifiers);
     }
 
-    fn var_decl(&mut self, decl: &VariableDeclaration<'_>) {
-        for declarator in decl.declarations {
-            self.bind_pattern(declarator.id);
-            if let Some(init) = &declarator.init {
+    fn var_decl(&mut self, decl: &VariableDeclaration) {
+        let view = self.view;
+        for declarator in view.declarators(decl.declarations) {
+            self.bind_pattern(view.expr(declarator.id));
+            if let Some(init) = declarator.init {
                 self.expr(init);
             }
         }
     }
 
+    /// A function's parameters, a run of rows held by value: each binds into the
+    /// function's scope, and its defaults are references.
+    fn params(&mut self, params: Run<Expression>) {
+        for param in self.view.exprs(params) {
+            self.bind_pattern(param);
+            self.param_defaults(param);
+        }
+    }
+
     // ── Expression walk ──────────────────────────────────────────────────────
 
-    fn exprs(&mut self, exprs: &[&Expression<'_>]) {
-        for expr in exprs {
+    fn exprs(&mut self, exprs: Run<ExprId>) {
+        for &expr in self.view.expr_list(exprs) {
             self.expr(expr);
         }
     }
 
-    fn expr(&mut self, expr: &Expression<'_>) {
+    /// [`Self::expr_row`] over the expression `id` names.
+    fn expr(&mut self, id: ExprId) {
+        self.expr_row(self.view.expr(id));
+    }
+
+    fn expr_row(&mut self, expr: &Expression) {
+        let view = self.view;
         match &expr.kind {
             ExpressionKind::Identifier(id) => self.ident_ref(id),
             ExpressionKind::MemberExpression(m) => {
@@ -589,19 +617,17 @@ impl<'s> Collector<'s> {
                 self.exprs(n.arguments);
             }
             ExpressionKind::ArrowFunctionExpression(a) => {
-                for param in a.params {
-                    self.bind_pattern(param);
-                    self.param_defaults(param);
-                }
+                let a = view.arrow_fn(*a);
+                self.params(a.params);
                 match &a.body {
-                    ArrowFunctionBody::Expression(e) => self.expr(e),
+                    ArrowFunctionBody::Expression(e) => self.expr(*e),
                     ArrowFunctionBody::BlockStatement(b) => self.stmts(b.body),
                 }
             }
-            ExpressionKind::FunctionExpression(f) => self.function_expr(f),
-            ExpressionKind::ClassExpression(c) => self.class_body(&c.body),
+            ExpressionKind::FunctionExpression(f) => self.function_expr(view.fn_expr(*f)),
+            ExpressionKind::ClassExpression(c) => self.class_body(&view.class_expr(*c).body),
             ExpressionKind::ObjectExpression(obj) => {
-                for prop in obj.properties {
+                for prop in view.obj_props(obj.properties) {
                     match prop {
                         ObjectProperty::Property(p) => {
                             if p.computed {
@@ -614,7 +640,7 @@ impl<'s> Collector<'s> {
                 }
             }
             ExpressionKind::ArrayExpression(arr) => {
-                for element in arr.elements.iter().flatten() {
+                for &element in view.expr_opt_list(arr.elements).iter().flatten() {
                     self.expr(element);
                 }
             }
@@ -632,12 +658,13 @@ impl<'s> Collector<'s> {
             ExpressionKind::SpreadElement(s) => self.expr(s.argument),
             ExpressionKind::TemplateLiteral(t) => self.exprs(t.expressions),
             ExpressionKind::TaggedTemplateExpression(t) => {
+                let t = view.tagged_tpl(*t);
                 self.expr(t.tag);
                 self.exprs(t.quasi.expressions);
             }
             ExpressionKind::AwaitExpression(a) => self.expr(a.argument),
             ExpressionKind::YieldExpression(y) => {
-                if let Some(arg) = &y.argument {
+                if let Some(arg) = y.argument {
                     self.expr(arg);
                 }
             }
@@ -647,7 +674,7 @@ impl<'s> Collector<'s> {
                 self.expr(a.right);
             }
             ExpressionKind::ObjectPattern(p) => {
-                for prop in p.properties {
+                for prop in view.pat_props(p.properties) {
                     match prop {
                         ObjectPatternProperty::Property(prop) => {
                             if prop.computed {
@@ -660,7 +687,7 @@ impl<'s> Collector<'s> {
                 }
             }
             ExpressionKind::ArrayPattern(p) => {
-                for element in p.elements.iter().flatten() {
+                for &element in view.expr_opt_list(p.elements).iter().flatten() {
                     self.expr(element);
                 }
             }
@@ -677,12 +704,14 @@ impl<'s> Collector<'s> {
             ExpressionKind::TSParameterProperty(t) => self.expr(t.parameter),
             ExpressionKind::ImportExpression(i) => {
                 self.expr(i.source);
-                if let Some(options) = &i.options {
+                if let Some(options) = i.options {
                     self.expr(options);
                 }
             }
-            ExpressionKind::CommentBoundPair(j) => self.expr(j.inner),
-            ExpressionKind::ParenthesizedExpression(p) => self.expr(p.unreachable_contents()),
+            ExpressionKind::CommentBoundPair(j) => self.expr(view.comment_pair(*j).inner),
+            ExpressionKind::ParenthesizedExpression(p) => {
+                self.expr_row(p.unreachable_contents(view));
+            }
             ExpressionKind::Literal(_)
             | ExpressionKind::PrivateIdentifier(_)
             | ExpressionKind::RegexLiteral(_)
@@ -692,31 +721,28 @@ impl<'s> Collector<'s> {
         }
     }
 
-    fn function_expr(&mut self, f: &FunctionExpression<'_>) {
+    fn function_expr(&mut self, f: &FunctionExpression) {
         if let Some(id) = &f.id {
             self.ident_local(id);
         }
-        for param in f.params {
-            self.bind_pattern(param);
-            self.param_defaults(param);
-        }
+        self.params(f.params);
         self.stmts(f.body.body);
     }
 
-    fn class_body(&mut self, body: &ClassBody<'_>) {
-        for member in body.body {
+    fn class_body(&mut self, body: &ClassBody) {
+        for member in self.view.class_members(body.body) {
             match member {
                 ClassMember::MethodDefinition(m) => {
                     if m.computed {
-                        self.expr(&m.key);
+                        self.expr(m.key);
                     }
                     self.function_expr(&m.value);
                 }
                 ClassMember::PropertyDefinition(p) => {
                     if p.computed {
-                        self.expr(&p.key);
+                        self.expr(p.key);
                     }
-                    if let Some(value) = &p.value {
+                    if let Some(value) = p.value {
                         self.expr(value);
                     }
                 }
@@ -728,26 +754,26 @@ impl<'s> Collector<'s> {
 
     // ── Statement walk ───────────────────────────────────────────────────────
 
-    fn stmts(&mut self, stmts: &[Statement<'_>]) {
-        for stmt in stmts {
+    fn stmts(&mut self, stmts: Run<StmtId>) {
+        for &stmt in self.view.stmt_list(stmts) {
             self.stmt(stmt);
         }
     }
 
-    fn stmt(&mut self, stmt: &Statement<'_>) {
-        match &stmt.kind {
+    fn stmt(&mut self, stmt: StmtId) {
+        let view = self.view;
+        match &view.stmt(stmt).kind {
             StatementKind::VariableDeclaration(d) => self.var_decl(d),
             StatementKind::FunctionDeclaration(f) => {
+                let f = view.fn_decl(*f);
                 if let Some(id) = &f.id {
                     self.ident_local(id);
                 }
-                for param in f.params {
-                    self.bind_pattern(param);
-                    self.param_defaults(param);
-                }
+                self.params(f.params);
                 self.stmts(f.body.body);
             }
             StatementKind::ClassDeclaration(c) => {
+                let c = view.class_decl(*c);
                 if let Some(id) = &c.id {
                     self.ident_local(id);
                 }
@@ -755,7 +781,7 @@ impl<'s> Collector<'s> {
             }
             StatementKind::ExpressionStatement(s) => self.expr(s.expression),
             StatementKind::ReturnStatement(s) => {
-                if let Some(arg) = &s.argument {
+                if let Some(arg) = s.argument {
                     self.expr(arg);
                 }
             }
@@ -768,15 +794,15 @@ impl<'s> Collector<'s> {
                 }
             }
             StatementKind::ForStatement(s) => {
-                match &s.init {
+                match view.opt_for_head(s.init) {
                     Some(ForInit::VariableDeclaration(d)) => self.var_decl(d),
-                    Some(ForInit::Expression(e)) => self.expr(e),
+                    Some(ForInit::Expression(e)) => self.expr(*e),
                     None => {}
                 }
-                if let Some(test) = &s.test {
+                if let Some(test) = s.test {
                     self.expr(test);
                 }
-                if let Some(update) = &s.update {
+                if let Some(update) = s.update {
                     self.expr(update);
                 }
                 self.stmt(s.body);
@@ -807,16 +833,17 @@ impl<'s> Collector<'s> {
             }
             StatementKind::SwitchStatement(s) => {
                 self.expr(s.discriminant);
-                for case in s.cases {
-                    if let Some(test) = &case.test {
+                for case in view.cases(s.cases) {
+                    if let Some(test) = case.test {
                         self.expr(test);
                     }
                     self.stmts(case.consequent);
                 }
             }
             StatementKind::TryStatement(s) => {
+                let s = view.try_stmt(*s);
                 self.stmts(s.block.body);
-                if let Some(handler) = &s.handler {
+                if let Some(handler) = view.opt_catch(s.handler) {
                     if let Some(param) = &handler.param {
                         self.bind_pattern(param);
                     }
@@ -827,7 +854,7 @@ impl<'s> Collector<'s> {
                 }
             }
             StatementKind::ThrowStatement(s) => self.expr(s.argument),
-            StatementKind::LabeledStatement(s) => self.stmt(s.body),
+            StatementKind::LabeledStatement(s) => self.stmt(view.labeled_stmt(*s).body),
             // No reference-bearing children, or refused before emission.
             StatementKind::BreakStatement(_)
             | StatementKind::ContinueStatement(_)
@@ -848,10 +875,10 @@ impl<'s> Collector<'s> {
         }
     }
 
-    fn for_left(&mut self, left: &ForInOfLeft<'_>) {
-        match left {
+    fn for_left(&mut self, left: ForLeftId) {
+        match self.view.for_left(left) {
             ForInOfLeft::VariableDeclaration(decl) => self.var_decl(decl),
-            ForInOfLeft::Pattern(pattern) => self.expr(pattern),
+            ForInOfLeft::Pattern(pattern) => self.expr(*pattern),
         }
     }
 }

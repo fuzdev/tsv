@@ -8,8 +8,9 @@
 //! sequence, and [`crate::erase`] for the erasure these gate.
 
 use tsv_lang::Span;
-use tsv_svelte::ast::{AttributeNode, AttributeValue, Root};
-use tsv_ts::ast::Statement;
+use tsv_lang::store::Run;
+use tsv_svelte::ast::{AttributeNode, AttributeValue, Root, SvelteView};
+use tsv_ts::ast::{AstStores, StmtId};
 
 use crate::attr_refs::{TemplateItem, each_template_item};
 use crate::transform_server::unsupported;
@@ -29,13 +30,16 @@ use crate::{CompileError, Refusal, erase};
 /// pipeline untouched, and prints verbatim. The eraser's `None`-means-unchanged
 /// contract makes "no change" a *proof* of no TypeScript — and it is the same
 /// inventory that did the erasing, so there is nothing to drift.
-pub(crate) fn self_check_no_typescript<'arena>(
-    arena: &'arena bumpalo::Bump,
+///
+/// The re-erasure pushes the rows of any rebuild beside the program's; nothing reads
+/// them, since a rebuild is the leak this refuses.
+pub(crate) fn self_check_no_typescript(
+    stores: &mut AstStores,
     buffer: &str,
-    programs: &[&'arena [Statement<'arena>]],
+    programs: &[Run<StmtId>],
 ) -> Result<(), CompileError> {
-    for body in programs {
-        let checked = erase::erase_statements(arena, buffer, body)?;
+    for &body in programs {
+        let checked = erase::erase_statements(stores, buffer, body)?;
         if checked.changed {
             let leak = checked
                 .regions
@@ -64,14 +68,18 @@ pub(crate) fn self_check_no_typescript<'arena>(
 /// `lang` on it does not refuse. `generics` on *either* script is refused
 /// outright (an open type-parameter *binding*, not annotation erasure), as is a
 /// deciding `lang` other than `ts`/`js`/empty.
-pub(crate) fn document_ts_flag(root: &Root<'_>, source: &str) -> Result<bool, CompileError> {
+pub(crate) fn document_ts_flag(
+    root: &Root,
+    sv: SvelteView<'_>,
+    source: &str,
+) -> Result<bool, CompileError> {
     // Both scripts in source order — the first lang-bearing one decides.
-    let mut scripts = [root.module, root.instance];
+    let mut scripts = [root.module.as_ref(), root.instance.as_ref()];
     scripts.sort_by_key(|s| s.map_or(u32::MAX, |script| script.span.start));
     let mut ts = false;
     let mut decided = false;
     for script in scripts.into_iter().flatten() {
-        for attr_node in script.attributes {
+        for attr_node in sv.attributes(script.attributes) {
             let AttributeNode::Attribute(attr) = attr_node else {
                 continue;
             };
@@ -84,7 +92,7 @@ pub(crate) fn document_ts_flag(root: &Root<'_>, source: &str) -> Result<bool, Co
                     if decided {
                         continue;
                     }
-                    match attr.value {
+                    match sv.opt_attribute_values(attr.value) {
                         // A bare `lang` (no value) never matches the oracle's
                         // regex — plain JS, like no attribute at all, and it does
                         // NOT count as the deciding script.
@@ -158,11 +166,15 @@ pub(crate) fn document_ts_flag(root: &Root<'_>, source: &str) -> Result<bool, Co
 /// `context`. Reserved names are disjoint from `module`/`context`, so at most one
 /// rule fires per attribute.
 pub(crate) fn refuse_invalid_script_attributes(
-    root: &Root<'_>,
+    root: &Root,
+    sv: SvelteView<'_>,
     source: &str,
 ) -> Result<(), CompileError> {
-    for script in [root.module, root.instance].into_iter().flatten() {
-        for attr_node in script.attributes {
+    for script in [root.module.as_ref(), root.instance.as_ref()]
+        .into_iter()
+        .flatten()
+    {
+        for attr_node in sv.attributes(script.attributes) {
             let AttributeNode::Attribute(attr) = attr_node else {
                 continue;
             };
@@ -179,7 +191,7 @@ pub(crate) fn refuse_invalid_script_attributes(
                     // (`value` is `None`), an expression, a multi-chunk value, or any
                     // other text fails.
                     let valid = matches!(
-                        attr.value,
+                        sv.opt_attribute_values(attr.value),
                         Some([AttributeValue::Text(text)]) if text.data(source) == "module"
                     );
                     if !valid {
@@ -232,21 +244,31 @@ pub(crate) fn refuse_invalid_script_attributes(
 /// `{#await p then { a }: { a: number }}` through in a document with no `lang="ts"`,
 /// where the oracle parse-errors. A dropped node is an invisible node. The same
 /// precondition backs the erase self-check, for the same reason.
-pub(crate) fn refuse_template_typescript<'arena>(
-    root: &Root<'arena>,
+///
+/// The items are collected before any is erased, since the erasure pushes the rows
+/// of a rebuild into the stores the walk reads. A snippet parameter, a row no id
+/// names, is erased by value. Nothing reads a rebuild: only the `typescript` flag
+/// is asked.
+pub(crate) fn refuse_template_typescript(
+    root: &Root,
+    sv: SvelteView<'_>,
+    ts: &mut AstStores,
     source: &str,
-    arena: &'arena bumpalo::Bump,
 ) -> Result<(), CompileError> {
-    each_template_item(&root.fragment, &mut |item| {
+    let mut items = Vec::new();
+    each_template_item(sv, ts.view(), &root.fragment, &mut |item| {
+        items.push(item);
+        Ok(())
+    })?;
+    for item in items {
         let typescript = match item {
-            TemplateItem::Expression(expr) => {
-                erase::erase_expression(arena, source, expr)?.typescript
-            }
+            TemplateItem::Expression(expr) => erase::erase_expression(ts, source, expr)?.typescript,
+            TemplateItem::Parameter(param) => erase::erase_parameter(ts, source, param)?.typescript,
             TemplateItem::SnippetTypeParameters => true,
         };
         if typescript {
             return Err(unsupported(Refusal::TypeScriptWithoutLangTs));
         }
-        Ok(())
-    })
+    }
+    Ok(())
 }

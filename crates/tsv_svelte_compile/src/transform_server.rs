@@ -429,7 +429,7 @@ fn analyze(
     // body emits verbatim at module scope. Runs before every analysis so the
     // module bindings feed the same passes the instance bindings do.
     let (module_body, module_erased_windows) =
-        analyze_module_script(root, sv, ts, source, ts_document)?;
+        analyze_module_script(root, ts, source, ts_document)?;
     // The template half of the same document-wide gate. The borrow points
     // (`EmitEnv::erase`) already erase every template expression that reaches
     // output, so this sweep exists for the ones that DON'T — see
@@ -467,14 +467,8 @@ fn analyze(
     // half"); the rest drop. Bidirectionally exact against the pinned oracle. Runs
     // AFTER `collect_script_comments`, which refuses the module-after-instance
     // ordering first, so this only ever computes the module-first keep set.
-    let module_comments = collect_module_script_comments(
-        root,
-        sv,
-        view,
-        source,
-        module_body,
-        &module_erased_windows,
-    )?;
+    let module_comments =
+        collect_module_script_comments(root, view, source, module_body, &module_erased_windows)?;
 
     // A rune keyword whose stem is also a binding in scope at the instance script
     // (`import { state } from './store'` + `$state`) is READ AS A STORE by the

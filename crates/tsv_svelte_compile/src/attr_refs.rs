@@ -47,16 +47,20 @@
 
 use tsv_svelte::ast::{
     AttributeNode, AttributeValue, Element, ElementKind, Fragment, FragmentNode, SpecialElement,
-    SpecialElementKind, SpecialThis, StyleDirectiveValue,
+    SpecialElementKind, SpecialThis, StyleDirectiveValue, SvelteView,
 };
-use tsv_ts::ast::Expression;
+use tsv_ts::ast::{AstView, ExprId, Expression};
 
 use crate::CompileError;
 
 /// One TypeScript- or rune-bearing item of a template fragment.
-pub(crate) enum TemplateItem<'a, 'arena> {
-    /// A borrowed expression — the overwhelming majority.
-    Expression(&'a Expression<'arena>),
+#[derive(Clone, Copy)]
+pub(crate) enum TemplateItem {
+    /// An expression the template names by id — the overwhelming majority.
+    Expression(ExprId),
+    /// One `{#snippet}` parameter. The parameters are a run of rows held by value, so
+    /// no id names one: the row itself is the item.
+    Parameter(Expression),
     /// A `{#snippet}`'s `<T>` clause. TypeScript with no `Expression` to yield,
     /// so it gets its own item rather than being missed.
     SnippetTypeParameters,
@@ -86,39 +90,47 @@ pub(crate) enum TemplateItem<'a, 'arena> {
 ///
 /// The `FragmentNode` match is exhaustive on purpose — a new template shape fails
 /// compilation here instead of slipping silently past both gates.
-pub(crate) fn each_template_item<'a, 'arena>(
-    fragment: &'a Fragment<'arena>,
-    f: &mut impl FnMut(TemplateItem<'a, 'arena>) -> Result<(), CompileError>,
+///
+/// `sv` reads the template, `view` the TypeScript it embeds (a declaration tag's
+/// declarators, a snippet's parameters). Every item is owned, so a consumer that
+/// pushes rows may collect the items first and walk them after.
+pub(crate) fn each_template_item(
+    sv: SvelteView<'_>,
+    view: AstView<'_>,
+    fragment: &Fragment,
+    f: &mut impl FnMut(TemplateItem) -> Result<(), CompileError>,
 ) -> Result<(), CompileError> {
-    for node in fragment.nodes {
-        each_node_item(node, f)?;
+    for node in sv.nodes(fragment.nodes) {
+        each_node_item(sv, view, node, f)?;
     }
     Ok(())
 }
 
-fn each_node_item<'a, 'arena>(
-    node: &'a FragmentNode<'arena>,
-    f: &mut impl FnMut(TemplateItem<'a, 'arena>) -> Result<(), CompileError>,
+fn each_node_item(
+    sv: SvelteView<'_>,
+    view: AstView<'_>,
+    node: &FragmentNode,
+    f: &mut impl FnMut(TemplateItem) -> Result<(), CompileError>,
 ) -> Result<(), CompileError> {
-    let mut expr = |e: &'a Expression<'arena>| f(TemplateItem::Expression(e));
+    let mut expr = |e: ExprId| f(TemplateItem::Expression(e));
     match node {
         FragmentNode::Text(_) | FragmentNode::Comment(_) => {}
         FragmentNode::Element(element) => {
-            each_attribute_item(element.attributes, f)?;
-            each_template_item(&element.fragment, f)?;
+            each_attribute_item(sv, sv.attributes(element.attributes), f)?;
+            each_template_item(sv, view, &element.fragment, f)?;
         }
         FragmentNode::SpecialElement(special) => {
             if let Some(this) = special_element_reference_expression(special) {
                 expr(this)?;
             }
-            each_attribute_item(special.attributes, f)?;
-            each_template_item(&special.fragment, f)?;
+            each_attribute_item(sv, sv.attributes(special.attributes), f)?;
+            each_template_item(sv, view, &special.fragment, f)?;
         }
         FragmentNode::ExpressionTag(tag) => expr(tag.expression)?,
         FragmentNode::HtmlTag(tag) => expr(tag.expression)?,
         FragmentNode::RenderTag(tag) => expr(tag.expression)?,
         FragmentNode::DebugTag(tag) => {
-            for identifier in tag.identifiers {
+            for &identifier in view.expr_list(tag.identifiers) {
                 expr(identifier)?;
             }
         }
@@ -127,49 +139,49 @@ fn each_node_item<'a, 'arena>(
             expr(tag.init)?;
         }
         FragmentNode::DeclarationTag(tag) => {
-            for declarator in tag.declaration.declarations {
+            for declarator in view.declarators(tag.declaration.declarations) {
                 expr(declarator.id)?;
-                if let Some(init) = &declarator.init {
+                if let Some(init) = declarator.init {
                     expr(init)?;
                 }
             }
         }
         FragmentNode::IfBlock(block) => {
             expr(block.test)?;
-            each_template_item(&block.consequent, f)?;
+            each_template_item(sv, view, &block.consequent, f)?;
             if let Some(alternate) = &block.alternate {
-                each_template_item(alternate, f)?;
+                each_template_item(sv, view, alternate, f)?;
             }
         }
         FragmentNode::EachBlock(block) => {
             expr(block.expression)?;
             for e in block
                 .context
-                .iter()
-                .chain(block.key.iter().map(|k| &k.expression))
+                .into_iter()
+                .chain(block.key.map(|k| k.expression))
             {
                 expr(e)?;
             }
-            each_template_item(&block.body, f)?;
+            each_template_item(sv, view, &block.body, f)?;
             if let Some(fallback) = &block.fallback {
-                each_template_item(fallback, f)?;
+                each_template_item(sv, view, fallback, f)?;
             }
         }
         FragmentNode::AwaitBlock(block) => {
             expr(block.expression)?;
-            for e in block.value.iter().chain(block.error.iter()) {
+            for e in block.value.into_iter().chain(block.error) {
                 expr(e)?;
             }
             for child in [&block.pending, &block.then, &block.catch]
                 .into_iter()
                 .flatten()
             {
-                each_template_item(child, f)?;
+                each_template_item(sv, view, child, f)?;
             }
         }
         FragmentNode::KeyBlock(block) => {
             expr(block.expression)?;
-            each_template_item(&block.fragment, f)?;
+            each_template_item(sv, view, &block.fragment, f)?;
         }
         FragmentNode::SnippetBlock(snippet) => {
             // `type_params_raw` is the raw-text fallback for a `<T>` clause whose
@@ -177,21 +189,22 @@ fn each_node_item<'a, 'arena>(
             if snippet.type_parameters.is_some() || snippet.type_params_raw.is_some() {
                 f(TemplateItem::SnippetTypeParameters)?;
             }
-            for param in snippet.parameters {
-                f(TemplateItem::Expression(param))?;
+            for &param in view.exprs(snippet.parameters) {
+                f(TemplateItem::Parameter(param))?;
             }
-            each_template_item(&snippet.body, f)?;
+            each_template_item(sv, view, &snippet.body, f)?;
         }
     }
     Ok(())
 }
 
-fn each_attribute_item<'a, 'arena>(
-    attributes: &'a [AttributeNode<'arena>],
-    f: &mut impl FnMut(TemplateItem<'a, 'arena>) -> Result<(), CompileError>,
+fn each_attribute_item(
+    sv: SvelteView<'_>,
+    attributes: &[AttributeNode],
+    f: &mut impl FnMut(TemplateItem) -> Result<(), CompileError>,
 ) -> Result<(), CompileError> {
-    let mut found: Vec<&'a Expression<'arena>> = Vec::new();
-    each_reference_bearing_attribute_expression(attributes, &mut |e| found.push(e));
+    let mut found: Vec<ExprId> = Vec::new();
+    each_reference_bearing_attribute_expression(sv, attributes, &mut |e| found.push(e));
     for e in found {
         f(TemplateItem::Expression(e))?;
     }
@@ -224,10 +237,7 @@ fn each_attribute_item<'a, 'arena>(
 ///
 /// ⚠️ Riding this seam is the default; the three above state their reason in code.
 /// See [the walk inventory](crate#the-walks-and-their-oracle-phases).
-pub(crate) fn each_child_fragment<'a, 'arena>(
-    node: &'a FragmentNode<'arena>,
-    f: &mut impl FnMut(&'a Fragment<'arena>),
-) {
+pub(crate) fn each_child_fragment<'a>(node: &'a FragmentNode, f: &mut impl FnMut(&'a Fragment)) {
     match node {
         FragmentNode::Text(_)
         | FragmentNode::Comment(_)
@@ -299,15 +309,16 @@ pub(crate) fn each_child_fragment<'a, 'arena>(
 /// rather than an `Expression`, so an expression traversal cannot reach it — it is
 /// surfaced separately by [`each_emitted_directive_name`] (needed by the
 /// snippet-hoist analysis; a bare name never fires `needs_context`).
-pub(crate) fn each_attribute_expression<'a, 'arena>(
-    element: &'a Element<'arena>,
-    f: &mut impl FnMut(&'a Expression<'arena>),
+pub(crate) fn each_attribute_expression(
+    sv: SvelteView<'_>,
+    element: &Element,
+    f: &mut impl FnMut(ExprId),
 ) {
     let is_html = element.kind == ElementKind::Html;
-    for attr_node in element.attributes {
+    for attr_node in sv.attributes(element.attributes) {
         match attr_node {
             AttributeNode::Attribute(attr) => {
-                if let Some(values) = attr.value {
+                if let Some(values) = sv.opt_attribute_values(attr.value) {
                     for value in values {
                         if let AttributeValue::ExpressionTag(tag) = value {
                             f(tag.expression);
@@ -339,7 +350,7 @@ pub(crate) fn each_attribute_expression<'a, 'arena>(
             AttributeNode::StyleDirective(d) if is_html => match &d.value {
                 StyleDirectiveValue::ExpressionTag(tag) => f(tag.expression),
                 StyleDirectiveValue::Parts(parts) => {
-                    for value in *parts {
+                    for value in sv.attribute_values(*parts) {
                         if let AttributeValue::ExpressionTag(tag) = value {
                             f(tag.expression);
                         }
@@ -402,14 +413,15 @@ pub(crate) fn each_attribute_expression<'a, 'arena>(
 /// [`each_reference_bearing_directive_name`], the same set. A bare name never fires
 /// `needs_context`, so only the snippet-hoist analysis consumes this.
 pub(crate) fn each_emitted_directive_name<'s>(
-    element: &Element<'_>,
+    sv: SvelteView<'_>,
+    element: &Element,
     source: &'s str,
     f: &mut impl FnMut(&'s str),
 ) {
     if element.kind != ElementKind::Html {
         return;
     }
-    for attr_node in element.attributes {
+    for attr_node in sv.attributes(element.attributes) {
         let name_span = match attr_node {
             AttributeNode::UseDirective(d) => d.name_span,
             AttributeNode::TransitionDirective(d) => d.name_span,
@@ -447,14 +459,15 @@ pub(crate) fn each_emitted_directive_name<'s>(
 ///
 /// Takes `&[AttributeNode]` (not `&Element`) so it also serves a special element's
 /// attributes on the dropped path.
-pub(crate) fn each_reference_bearing_attribute_expression<'a, 'arena>(
-    attributes: &'a [AttributeNode<'arena>],
-    f: &mut impl FnMut(&'a Expression<'arena>),
+pub(crate) fn each_reference_bearing_attribute_expression(
+    sv: SvelteView<'_>,
+    attributes: &[AttributeNode],
+    f: &mut impl FnMut(ExprId),
 ) {
     for attr_node in attributes {
         match attr_node {
             AttributeNode::Attribute(attr) => {
-                if let Some(values) = attr.value {
+                if let Some(values) = sv.opt_attribute_values(attr.value) {
                     for value in values {
                         if let AttributeValue::ExpressionTag(tag) = value {
                             f(tag.expression);
@@ -474,7 +487,7 @@ pub(crate) fn each_reference_bearing_attribute_expression<'a, 'arena>(
             AttributeNode::StyleDirective(d) => match &d.value {
                 StyleDirectiveValue::ExpressionTag(tag) => f(tag.expression),
                 StyleDirectiveValue::Parts(parts) => {
-                    for value in *parts {
+                    for value in sv.attribute_values(*parts) {
                         if let AttributeValue::ExpressionTag(tag) = value {
                             f(tag.expression);
                         }
@@ -526,7 +539,7 @@ pub(crate) fn each_reference_bearing_attribute_expression<'a, 'arena>(
 /// `$.attr_style`'s `{ color }` shorthand, so its name is counted on both paths);
 /// only `use:`/`transition:`/`animate:` refuse on a component there.
 pub(crate) fn each_reference_bearing_directive_name<'s>(
-    attributes: &[AttributeNode<'_>],
+    attributes: &[AttributeNode],
     source: &'s str,
     f: &mut impl FnMut(&'s str),
 ) {
@@ -549,9 +562,7 @@ pub(crate) fn each_reference_bearing_directive_name<'s>(
 /// other special-element kinds carry no such expression (their references live in
 /// attributes / children). Used only on the dropped-`{:catch}` path — every
 /// special element is refused at emission elsewhere.
-pub(crate) fn special_element_reference_expression<'a, 'arena>(
-    se: &'a SpecialElement<'arena>,
-) -> Option<&'a Expression<'arena>> {
+pub(crate) fn special_element_reference_expression(se: &SpecialElement) -> Option<ExprId> {
     match &se.kind {
         SpecialElementKind::SvelteElement {
             tag: SpecialThis::Braced(tag),

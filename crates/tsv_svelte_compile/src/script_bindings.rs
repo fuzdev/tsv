@@ -11,9 +11,11 @@
 //! exhaustive statement enumeration — so a new AST variant fails compilation
 //! rather than silently escaping the table.
 
+use tsv_lang::store::Run;
+use tsv_svelte::ast::Root;
 use tsv_ts::ast::{
-    Expression, ExpressionKind, ImportDeclaration, ImportSpecifier, LiteralValue, ModuleExportName,
-    Statement, StatementKind, VariableDeclarator,
+    AstStores, AstView, Expression, ExpressionKind, ImportDeclaration, ImportSpecifier,
+    LiteralValue, ModuleExportName, StatementKind, StmtId, VariableDeclarator,
 };
 
 use crate::analyze::{
@@ -50,16 +52,19 @@ use crate::{CompileError, Refusal, erase};
 /// module-body reassignment/needs_context effects flow through the shared
 /// whole-component analysis ([`crate::needs_context::analyze_component`]) and the
 /// binding table ([`analyze_script`]), not through any module-only rewrite.
-pub(crate) fn analyze_module_script<'arena>(
-    root: &tsv_svelte::ast::Root<'arena>,
+///
+/// The erasure pushes the rows of what it rebuilds into `ts`; the walks after it
+/// read the erased body through `ts`'s view.
+pub(crate) fn analyze_module_script(
+    root: &Root,
+    ts: &mut AstStores,
     source: &str,
-    arena: &'arena bumpalo::Bump,
     ts_document: bool,
-) -> Result<(&'arena [Statement<'arena>], Vec<tsv_lang::Span>), CompileError> {
-    let Some(script) = root.module else {
-        return Ok((&[], Vec::new()));
+) -> Result<(Run<StmtId>, Vec<tsv_lang::Span>), CompileError> {
+    let Some(script) = &root.module else {
+        return Ok((Run::EMPTY, Vec::new()));
     };
-    let erased = erase::erase_statements(arena, source, script.content.body)?;
+    let erased = erase::erase_statements(ts, source, script.content.body)?;
     // The same document-wide TypeScript gate the instance body pays: without the
     // flag, a `: T` / `as T` / `x!` in the module is a plain-JS parse error in the
     // oracle, so a permissive accept here would be an over-acceptance.
@@ -79,15 +84,17 @@ pub(crate) fn analyze_module_script<'arena>(
     let mut updated = NameSet::default();
     let mut nested = NameSet::default();
     let derived = NameSet::default();
-    for stmt in body {
-        if matches!(&stmt.kind, StatementKind::ExportDefaultDeclaration(_)) {
+    let view = ts.view();
+    for &stmt in view.stmt_list(body) {
+        let stmt = view.stmt(stmt);
+        if matches!(stmt.kind, StatementKind::ExportDefaultDeclaration(_)) {
             return Err(unsupported(Refusal::ModuleDefaultExport));
         }
-        if let StatementKind::ImportDeclaration(import) = &stmt.kind {
-            refuse_runes_invalid_import(import, source)?;
+        if let StatementKind::ImportDeclaration(import) = stmt.kind {
+            refuse_runes_invalid_import(view, view.import_decl(import), source)?;
         }
         let mut ctx = WalkCtx::new(source, &mut updated, &mut nested, &derived);
-        walk_statement_guarded(stmt, &mut ctx, 0)?;
+        walk_statement_guarded(view, stmt, &mut ctx, 0)?;
     }
     Ok((body, regions))
 }
@@ -103,23 +110,25 @@ pub(crate) fn analyze_module_script<'arena>(
 /// conservatively — that check reads the raw span, so it can't compare the oracle's
 /// DECODED name and over-refuses instead.
 pub(crate) fn refuse_runes_invalid_import(
-    import: &ImportDeclaration<'_>,
+    view: AstView<'_>,
+    import: &ImportDeclaration,
     source: &str,
 ) -> Result<(), CompileError> {
     // Checked here rather than in the guard walk because the transform hoists
     // imports out of the statement stream before `walk_statement` runs. The rule
     // — including the type-only-import caveat — lives at
     // `refuse_dollar_import_locals`.
-    refuse_dollar_import_locals(import.specifiers, source)?;
+    let specifiers = view.import_specs(import.specifiers);
+    refuse_dollar_import_locals(view, specifiers, source)?;
     let LiteralValue::String(cooked) = &import.source.value else {
         return Ok(());
     };
-    let specifier = cooked.resolve(import.source.span, source);
+    let specifier = cooked.resolve(import.source.span, source, view);
     if specifier.starts_with("svelte/internal") {
         return Err(unsupported(Refusal::SvelteInternalImport));
     }
     if specifier == "svelte" {
-        for spec in import.specifiers {
+        for spec in specifiers {
             let ImportSpecifier::Named(named) = spec else {
                 continue;
             };
@@ -144,10 +153,11 @@ pub(crate) fn refuse_runes_invalid_import(
 
 /// Analysis pass: populate the top-level binding table and the derived-name
 /// set from the script's top-level declarations.
-pub(crate) fn analyze_script<'arena>(
-    stmts: &'arena [Statement<'arena>],
+pub(crate) fn analyze_script(
+    view: AstView<'_>,
+    stmts: Run<StmtId>,
     source: &str,
-    bindings: &mut Bindings<'arena>,
+    bindings: &mut Bindings,
     derived_names: &mut NameSet,
 ) -> Result<(), CompileError> {
     // The oracle's duplicate-`$props()` flag is per-SCRIPT state — its analyze phase
@@ -155,29 +165,44 @@ pub(crate) fn analyze_script<'arena>(
     // alike (`phases/2-analyze/index.js:313,725,793`) — so the flag is scoped to one
     // `analyze_script` call and the export recursion inside it, not to the component.
     let mut seen_props = false;
-    analyze_script_in(stmts, source, bindings, derived_names, &mut seen_props)
+    analyze_script_in(
+        view,
+        stmts,
+        source,
+        bindings,
+        derived_names,
+        &mut seen_props,
+    )
 }
 
-fn analyze_script_in<'arena>(
-    stmts: &'arena [Statement<'arena>],
+fn analyze_script_in(
+    view: AstView<'_>,
+    stmts: Run<StmtId>,
     source: &str,
-    bindings: &mut Bindings<'arena>,
+    bindings: &mut Bindings,
     derived_names: &mut NameSet,
     seen_props: &mut bool,
 ) -> Result<(), CompileError> {
-    each_script_declaration(stmts, VarScope::TopLevelOnly, &mut |decl| {
+    each_script_declaration(view, stmts, VarScope::TopLevelOnly, &mut |decl| {
         let (id, initial) = match decl {
             // `VarScope::TopLevelOnly` never reports a hoisted declarator, so
             // `initial_dropped` is always false here.
             ScriptDeclaration::Declarator { declarator, .. } => {
-                return analyze_declarator(declarator, source, bindings, derived_names, seen_props);
+                return analyze_declarator(
+                    view,
+                    &declarator,
+                    source,
+                    bindings,
+                    derived_names,
+                    seen_props,
+                );
             }
             ScriptDeclaration::Function(id) => (id, Initial::Function),
             ScriptDeclaration::Class(id) | ScriptDeclaration::Import { local: id, .. } => {
                 (id, Initial::None)
             }
         };
-        if let Some(name) = plain_identifier_name(id, source) {
+        if let Some(name) = plain_identifier_name(&id, source) {
             bindings.insert(
                 name,
                 Binding {
@@ -217,21 +242,23 @@ fn analyze_script_in<'arena>(
 /// fold initial (and, for a derived leaf, makes its read a call), and a missed
 /// leaf would MISMATCH, so a pattern binding one refuses (`unnameable`) — a safe
 /// over-refusal on a shape absent from the gating Svelte corpus.
-fn register_destructured_leaves<'arena>(
-    id: &Expression<'arena>,
+#[expect(clippy::too_many_arguments)] // the binding table's two sinks plus the rune's kind, initial and refusal; the view is the eighth
+fn register_destructured_leaves(
+    view: AstView<'_>,
+    id: &Expression,
     source: &str,
-    bindings: &mut Bindings<'arena>,
+    bindings: &mut Bindings,
     derived_names: &mut NameSet,
     kind: BindingKind,
-    initial: Initial<'arena>,
+    initial: Initial,
     unnameable: Refusal,
 ) -> Result<(), CompileError> {
-    if crate::analyze::pattern_binds_unnameable_identifier(id) {
+    if crate::analyze::pattern_binds_unnameable_identifier(view, id) {
         return Err(unsupported(unnameable));
     }
     let is_derived = kind == BindingKind::Derived;
     let mut names = Vec::new();
-    pattern_binding_names(id, source, &mut names)?;
+    pattern_binding_names(view, id, source, &mut names)?;
     for name in names {
         if is_derived {
             derived_names.insert(name.clone());
@@ -259,16 +286,19 @@ fn register_destructured_leaves<'arena>(
 /// skipped it would emit a bare `d` where the oracle emits `d()`. Keying that off
 /// `kind` here (as [`register_destructured_leaves`] already does) is what keeps the
 /// two arms from drifting apart per rune.
-fn register_rune_binding<'arena>(
-    declarator: &'arena VariableDeclarator<'arena>,
+#[expect(clippy::too_many_arguments)] // the binding table's two sinks plus the rune's kind, initial and refusal; the view is the eighth
+fn register_rune_binding(
+    view: AstView<'_>,
+    declarator: &VariableDeclarator,
     source: &str,
-    bindings: &mut Bindings<'arena>,
+    bindings: &mut Bindings,
     derived_names: &mut NameSet,
     kind: BindingKind,
-    initial: Initial<'arena>,
+    initial: Initial,
     unnameable: Refusal,
 ) -> Result<(), CompileError> {
-    match identifier_binding_name(declarator.id, source) {
+    let id = view.expr(declarator.id);
+    match identifier_binding_name(id, source) {
         Some(name) => {
             if kind == BindingKind::Derived {
                 derived_names.insert(name.clone());
@@ -283,7 +313,8 @@ fn register_rune_binding<'arena>(
             );
         }
         None => register_destructured_leaves(
-            declarator.id,
+            view,
+            id,
             source,
             bindings,
             derived_names,
@@ -296,17 +327,18 @@ fn register_rune_binding<'arena>(
 }
 
 /// Classify one top-level declarator into the binding table.
-fn analyze_declarator<'arena>(
-    declarator: &'arena VariableDeclarator<'arena>,
+fn analyze_declarator(
+    view: AstView<'_>,
+    declarator: &VariableDeclarator,
     source: &str,
-    bindings: &mut Bindings<'arena>,
+    bindings: &mut Bindings,
     derived_names: &mut NameSet,
     seen_props: &mut bool,
 ) -> Result<(), CompileError> {
     let rune = declarator
         .init
-        .as_ref()
-        .and_then(|init| classify_rune_init(init, source));
+        .and_then(|init| classify_rune_init(view, view.expr(init), source));
+    let id = view.expr(declarator.id);
 
     match rune {
         Some(RuneInit::Props) => {
@@ -322,7 +354,7 @@ fn analyze_declarator<'arena>(
             }
             *seen_props = true;
             let mut names = Vec::new();
-            pattern_binding_names(declarator.id, source, &mut names)?;
+            pattern_binding_names(view, id, source, &mut names)?;
             for name in names {
                 bindings.insert(
                     name,
@@ -341,7 +373,7 @@ fn analyze_declarator<'arena>(
             // evaluates through the `$props.id()` call — the evaluator maps that
             // keypath to a STRING sentinel, so a `{id}` read never folds (matching
             // the oracle's `$.escape(id)`).
-            let name = identifier_binding_name(declarator.id, source)
+            let name = identifier_binding_name(id, source)
                 .ok_or_else(|| unsupported(Refusal::PropsIdBindingPattern))?;
             bindings.insert(
                 name,
@@ -361,6 +393,7 @@ fn analyze_declarator<'arena>(
             // every leaf takes this same initial.
             let initial = arg.map_or(Initial::Undefined, Initial::Expr);
             register_rune_binding(
+                view,
                 declarator,
                 source,
                 bindings,
@@ -383,6 +416,7 @@ fn analyze_declarator<'arena>(
             // inherits that `Initial::None` (a snapshot leaf never folds), so a
             // destructured target lowers exactly like `$state` MINUS the fold.
             register_rune_binding(
+                view,
                 declarator,
                 source,
                 bindings,
@@ -402,6 +436,7 @@ fn analyze_declarator<'arena>(
             // `$.derived(() => path)`; the initial only governs the fold.
             let initial = Initial::Expr(expr);
             register_rune_binding(
+                view,
                 declarator,
                 source,
                 bindings,
@@ -416,14 +451,15 @@ fn analyze_declarator<'arena>(
             // arrow's body (a block-bodied arrow is UNKNOWN). A destructured leaf
             // folds through that same body.
             use tsv_ts::ast::ArrowFunctionBody;
-            let initial = match &f.kind {
-                ExpressionKind::ArrowFunctionExpression(arrow) => match &arrow.body {
+            let initial = match view.expr(f).kind {
+                ExpressionKind::ArrowFunctionExpression(arrow) => match view.arrow_fn(arrow).body {
                     ArrowFunctionBody::Expression(body) => Initial::Expr(body),
                     ArrowFunctionBody::BlockStatement(_) => Initial::None,
                 },
                 _ => Initial::None,
             };
             register_rune_binding(
+                view,
                 declarator,
                 source,
                 bindings,
@@ -437,7 +473,7 @@ fn analyze_declarator<'arena>(
             // Plain declarator: an Identifier id gets its init as the
             // evaluation initial; destructured ids are Opaque (the oracle's
             // per-binding initial for those isn't modeled).
-            if let Some(name) = identifier_binding_name(declarator.id, source) {
+            if let Some(name) = identifier_binding_name(id, source) {
                 bindings.insert(
                     name,
                     Binding {
@@ -448,7 +484,7 @@ fn analyze_declarator<'arena>(
                 );
             } else {
                 let mut names = Vec::new();
-                pattern_binding_names(declarator.id, source, &mut names)?;
+                pattern_binding_names(view, id, source, &mut names)?;
                 for name in names {
                     bindings.insert(
                         name,

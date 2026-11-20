@@ -35,14 +35,17 @@
 //! `FragmentNode` variant fails compilation here instead of silently slipping
 //! past the analysis.
 
+use tsv_lang::store::Run;
 use tsv_svelte::ast::{
     AttributeNode, AwaitBlock, ConstTag, EachBlock, Element, Fragment, FragmentNode, HtmlTag,
     IfBlock, KeyBlock, RenderTag, Root, SnippetBlock, SpecialElement, SpecialElementKind,
+    SvelteView,
 };
 use tsv_ts::ast::{
-    ArrowFunctionBody, ClassBody, ClassMember, ExportDefaultValue, Expression, ExpressionKind,
-    ForInOfLeft, ForInit, FunctionExpression, ObjectPatternProperty, ObjectProperty, Statement,
-    StatementKind, VariableDeclaration, VariableDeclarationKind,
+    ArrowFunctionBody, AstView, ClassBody, ClassMember, ExportDefaultValue, ExprId, Expression,
+    ExpressionKind, ForInOfLeft, ForInit, ForLeftId, FunctionExpression, Identifier,
+    ObjectPatternProperty, ObjectProperty, StatementKind, StmtId, VariableDeclaration,
+    VariableDeclarationKind,
 };
 
 use crate::analyze::{NameSet, RuneInit, classify_rune_init, pattern_binding_names};
@@ -58,6 +61,10 @@ use crate::{CompileError, Refusal};
 /// The accumulating analysis state.
 #[expect(clippy::struct_excessive_bools)] // independent monotonic accumulator flags, not a state machine
 struct Nc<'a> {
+    /// The template's view.
+    sv: SvelteView<'a>,
+    /// The TypeScript view: both scripts and every template expression.
+    view: AstView<'a>,
     source: &'a str,
     /// Prop + import names — the roots whose member/call access is unsafe.
     context_roots: &'a NameSet,
@@ -229,25 +236,30 @@ pub(crate) struct ComponentContext {
 /// walk must never see. The oracle's phase-2 analysis spans the module body too: a
 /// module import member/call, or a module-body `new`, fires the wrapper, and a
 /// module `let` reassigned anywhere stays dynamic.
+#[expect(clippy::too_many_arguments)] // the two views beside the document, both bodies and the two name sets
 pub(crate) fn analyze_component(
-    root: &Root<'_>,
+    root: &Root,
+    sv: SvelteView<'_>,
+    view: AstView<'_>,
     source: &str,
-    instance_body: &[Statement<'_>],
-    module_body: &[Statement<'_>],
+    instance_body: Run<StmtId>,
+    module_body: Run<StmtId>,
     store_names: &NameSet,
     constants: &NameSet,
 ) -> Result<ComponentContext, CompileError> {
     let mut context_roots = NameSet::default();
-    collect_context_roots(instance_body, source, &mut context_roots);
-    collect_context_roots(module_body, source, &mut context_roots);
+    collect_context_roots(view, instance_body, source, &mut context_roots);
+    collect_context_roots(view, module_body, source, &mut context_roots);
 
     // The rest_prop roots are collected from the INSTANCE body only: a module
     // `$props()` refuses upstream (`analyze_module_script`), so no rest_prop
     // binding ever originates in the module script.
     let mut rest_prop_names = NameSet::default();
-    collect_rest_prop_names(instance_body, source, &mut rest_prop_names);
+    collect_rest_prop_names(view, instance_body, source, &mut rest_prop_names);
 
     let mut nc = Nc {
+        sv,
+        view,
         source,
         context_roots: &context_roots,
         rest_prop_names: &rest_prop_names,
@@ -276,11 +288,11 @@ pub(crate) fn analyze_component(
     // belt-and-braces — but they are what makes "a shadow cannot outlive its
     // phase" hold by construction rather than by auditing every walk arm (the
     // one direction that would turn a safe over-refusal into an over-acceptance).
-    for stmt in instance_body {
+    for &stmt in view.stmt_list(instance_body) {
         walk_stmt(stmt, &mut nc, false);
     }
     js_scope_restore(&mut nc, 0);
-    for stmt in module_body {
+    for &stmt in view.stmt_list(module_body) {
         walk_stmt(stmt, &mut nc, false);
     }
     js_scope_restore(&mut nc, 0);
@@ -314,18 +326,23 @@ fn unsupported(reason: Refusal) -> CompileError {
 
 /// The plain (non-escaped) name of an identifier, `None` for a unicode-escaped
 /// or synthetic identifier.
-fn plain_name<'s>(id: &tsv_ts::ast::Identifier<'_>, source: &'s str) -> Option<&'s str> {
+fn plain_name<'s>(id: &Identifier, source: &'s str) -> Option<&'s str> {
     plain_identifier_str(id, source)
 }
 
 /// Collect the top-level prop (incl. rest-prop) and import names into
 /// `context_roots` — the roots whose member/call access sets `needs_context`.
-fn collect_context_roots(instance_body: &[Statement<'_>], source: &str, out: &mut NameSet) {
-    for stmt in instance_body {
-        match &stmt.kind {
+fn collect_context_roots(
+    view: AstView<'_>,
+    instance_body: Run<StmtId>,
+    source: &str,
+    out: &mut NameSet,
+) {
+    for &stmt in view.stmt_list(instance_body) {
+        match &view.stmt(stmt).kind {
             StatementKind::ImportDeclaration(import) => {
                 use tsv_ts::ast::ImportSpecifier;
-                for spec in import.specifiers {
+                for spec in view.import_specs(view.import_decl(*import).specifiers) {
                     let local = match spec {
                         ImportSpecifier::Default(s) => &s.local,
                         ImportSpecifier::Named(s) => &s.local,
@@ -337,18 +354,22 @@ fn collect_context_roots(instance_body: &[Statement<'_>], source: &str, out: &mu
                 }
             }
             StatementKind::VariableDeclaration(decl) => {
-                for declarator in decl.declarations {
+                for declarator in view.declarators(decl.declarations) {
                     let is_props = declarator
                         .init
-                        .as_ref()
-                        .and_then(|init| classify_rune_init(init, source))
+                        .and_then(|init| classify_rune_init(view, view.expr(init), source))
                         .is_some_and(|r| matches!(r, RuneInit::Props));
                     if is_props {
                         let mut names = Vec::new();
                         // Best-effort: a malformed props pattern is refused later
                         // by the binding analysis; here we simply record what we
                         // can resolve.
-                        let _ = pattern_binding_names(declarator.id, source, &mut names);
+                        let _ = pattern_binding_names(
+                            view,
+                            view.expr(declarator.id),
+                            source,
+                            &mut names,
+                        );
                         for name in names {
                             out.insert(name);
                         }
@@ -380,30 +401,34 @@ fn collect_context_roots(instance_body: &[Statement<'_>], source: &str, out: &mu
 /// `$$…` half). The declare-site `$$`-key check
 /// (`script_props::rewrite_props_pattern`) now DECODES, so it is no longer paired
 /// with this one.
-fn collect_rest_prop_names(instance_body: &[Statement<'_>], source: &str, out: &mut NameSet) {
-    for stmt in instance_body {
-        let StatementKind::VariableDeclaration(decl) = &stmt.kind else {
+fn collect_rest_prop_names(
+    view: AstView<'_>,
+    instance_body: Run<StmtId>,
+    source: &str,
+    out: &mut NameSet,
+) {
+    for &stmt in view.stmt_list(instance_body) {
+        let StatementKind::VariableDeclaration(decl) = &view.stmt(stmt).kind else {
             continue;
         };
-        for declarator in decl.declarations {
+        for declarator in view.declarators(decl.declarations) {
             let is_props = declarator
                 .init
-                .as_ref()
-                .and_then(|init| classify_rune_init(init, source))
+                .and_then(|init| classify_rune_init(view, view.expr(init), source))
                 .is_some_and(|r| matches!(r, RuneInit::Props));
             if !is_props {
                 continue;
             }
-            match &declarator.id.kind {
+            match &view.expr(declarator.id).kind {
                 ExpressionKind::Identifier(id) => {
                     if let Some(name) = plain_name(id, source) {
                         out.insert(name.to_string());
                     }
                 }
                 ExpressionKind::ObjectPattern(obj) => {
-                    for prop in obj.properties {
+                    for prop in view.pat_props(obj.properties) {
                         if let ObjectPatternProperty::RestElement(rest) = prop
-                            && let ExpressionKind::Identifier(id) = &rest.argument.kind
+                            && let ExpressionKind::Identifier(id) = &view.expr(rest.argument).kind
                             && let Some(name) = plain_name(id, source)
                         {
                             out.insert(name.to_string());
@@ -435,30 +460,37 @@ fn collect_rest_prop_names(instance_body: &[Statement<'_>], source: &str, out: &
 /// absent, so writing to one still compiles. A residual over-acceptance, tracked
 /// in `../../docs/checklist_svelte_compiler.md`.
 pub(crate) fn collect_constant_names(
-    instance_body: &[Statement<'_>],
-    module_body: &[Statement<'_>],
+    view: AstView<'_>,
+    instance_body: Run<StmtId>,
+    module_body: Run<StmtId>,
     source: &str,
 ) -> NameSet {
-    use tsv_ts::ast::{ImportSpecifier, VariableDeclarationKind};
+    use tsv_ts::ast::ImportSpecifier;
 
     let mut out = NameSet::default();
-    for stmt in instance_body.iter().chain(module_body.iter()) {
-        match &stmt.kind {
+    for &stmt in view
+        .stmt_list(instance_body)
+        .iter()
+        .chain(view.stmt_list(module_body))
+    {
+        match &view.stmt(stmt).kind {
             StatementKind::VariableDeclaration(decl)
                 if decl.kind == VariableDeclarationKind::Const =>
             {
-                for declarator in decl.declarations {
+                for declarator in view.declarators(decl.declarations) {
                     // Best-effort: a pattern this cannot enumerate is one
                     // `analyze_declarator` refuses anyway, so nothing reaches a
                     // write gate unnamed.
                     let mut names = Vec::new();
-                    if pattern_binding_names(declarator.id, source, &mut names).is_ok() {
+                    if pattern_binding_names(view, view.expr(declarator.id), source, &mut names)
+                        .is_ok()
+                    {
                         out.extend(names);
                     }
                 }
             }
             StatementKind::ImportDeclaration(import) => {
-                for spec in import.specifiers {
+                for spec in view.import_specs(view.import_decl(*import).specifiers) {
                     let local = match spec {
                         ImportSpecifier::Default(s) => &s.local,
                         ImportSpecifier::Named(s) => &s.local,
@@ -572,7 +604,7 @@ pub(crate) fn collect_constant_names(
 /// Sets `nc.refuse` rather than returning: like every other refusal this walk
 /// raises, it is resolved late so the script-loop refusals keep winning for an
 /// input that trips both.
-fn refuse_invalid_assign_target(target: &Expression<'_>, nc: &mut Nc<'_>, top: bool) {
+fn refuse_invalid_assign_target(target: &Expression, nc: &mut Nc<'_>, top: bool) {
     match &target.kind {
         ExpressionKind::Identifier(id) => {
             let Some(name) = plain_name(id, nc.source) else {
@@ -617,25 +649,29 @@ fn refuse_invalid_assign_target(target: &Expression<'_>, nc: &mut Nc<'_>, top: b
             }
         }
         ExpressionKind::ArrayPattern(pattern) => {
-            for element in pattern.elements.iter().flatten() {
-                refuse_invalid_assign_target(element, nc, false);
+            for &element in nc.view.expr_opt_list(pattern.elements).iter().flatten() {
+                refuse_invalid_assign_target(nc.view.expr(element), nc, false);
             }
         }
         ExpressionKind::ObjectPattern(pattern) => {
-            for prop in pattern.properties {
+            for prop in nc.view.pat_props(pattern.properties) {
                 if let ObjectPatternProperty::Property(p) = prop {
-                    refuse_invalid_assign_target(p.value, nc, false);
+                    refuse_invalid_assign_target(nc.view.expr(p.value), nc, false);
                 }
             }
         }
         ExpressionKind::TSNonNullExpression(t) => {
-            refuse_invalid_assign_target(t.expression, nc, top);
+            refuse_invalid_assign_target(nc.view.expr(t.expression), nc, top);
         }
-        ExpressionKind::TSAsExpression(t) => refuse_invalid_assign_target(t.expression, nc, top),
+        ExpressionKind::TSAsExpression(t) => {
+            refuse_invalid_assign_target(nc.view.expr(t.expression), nc, top);
+        }
         ExpressionKind::TSSatisfiesExpression(t) => {
-            refuse_invalid_assign_target(t.expression, nc, top);
+            refuse_invalid_assign_target(nc.view.expr(t.expression), nc, top);
         }
-        ExpressionKind::TSTypeAssertion(t) => refuse_invalid_assign_target(t.expression, nc, top),
+        ExpressionKind::TSTypeAssertion(t) => {
+            refuse_invalid_assign_target(nc.view.expr(t.expression), nc, top);
+        }
         // A `MemberExpression` target (and everything else) matches no oracle
         // branch — it writes THROUGH the binding, never rebinds it.
         _ => {}
@@ -667,10 +703,10 @@ fn exit_block_scope(set: &mut NameSet, added: Vec<String>) {
 /// in a single helper: the no-leak property rests on every enter having a visible
 /// exit on the same straight-line path, and folding the pair behind a function
 /// would move that audit off the page.
-fn template_const_names(pattern: Option<&Expression<'_>>, source: &str) -> Vec<String> {
+fn template_const_names(view: AstView<'_>, pattern: Option<ExprId>, source: &str) -> Vec<String> {
     let mut names = Vec::new();
     if let Some(pattern) = pattern {
-        let _ = pattern_binding_names(pattern, source, &mut names);
+        let _ = pattern_binding_names(view, view.expr(pattern), source, &mut names);
     }
     names
 }
@@ -723,10 +759,10 @@ fn js_binding<'b>(nc: &'b Nc<'_>, name: &str) -> Option<&'b JsBinding> {
 /// there and untested by probe. That parse gap is itself a standing tsv
 /// over-acceptance, owed to the frontend — see
 /// `../../docs/checklist_svelte_compiler.md` §Owed to main.
-fn declare_js_pattern(pattern: &Expression<'_>, nc: &mut Nc<'_>, is_const: bool) {
+fn declare_js_pattern(pattern: &Expression, nc: &mut Nc<'_>, is_const: bool) {
     declare_pattern(pattern, nc);
     let mut names = Vec::new();
-    if pattern_binding_names(pattern, nc.source, &mut names).is_ok() {
+    if pattern_binding_names(nc.view, pattern, nc.source, &mut names).is_ok() {
         for name in names {
             declare_js_local(name, is_const, nc);
         }
@@ -735,7 +771,7 @@ fn declare_js_pattern(pattern: &Expression<'_>, nc: &mut Nc<'_>, is_const: bool)
 
 /// [`declare_ident`] plus the JS-scope record. A function or class NAME is never a
 /// `const` binding.
-fn declare_js_ident(id: &tsv_ts::ast::Identifier<'_>, nc: &mut Nc<'_>) {
+fn declare_js_ident(id: &Identifier, nc: &mut Nc<'_>) {
     declare_ident(id, nc);
     if let Some(name) = plain_name(id, nc.source) {
         let name = name.to_string();
@@ -762,23 +798,24 @@ fn declare_js_ident(id: &tsv_ts::ast::Identifier<'_>, nc: &mut Nc<'_>) {
 /// A `const` recorded here is recorded a second time when [`walk_var_decl`]
 /// reaches its declarator. The duplicate entry is benign — same name, same kind,
 /// and the backward scan finds either — so the two paths are left independent.
-fn hoist_block_consts(stmts: &[Statement<'_>], nc: &mut Nc<'_>) {
-    for stmt in stmts {
-        if let StatementKind::VariableDeclaration(decl) = &stmt.kind
+fn hoist_block_consts(stmts: Run<StmtId>, nc: &mut Nc<'_>) {
+    let view = nc.view;
+    for &stmt in view.stmt_list(stmts) {
+        if let StatementKind::VariableDeclaration(decl) = &view.stmt(stmt).kind
             && decl.kind == VariableDeclarationKind::Const
         {
-            for declarator in decl.declarations {
-                declare_js_pattern(declarator.id, nc, true);
+            for declarator in view.declarators(decl.declarations) {
+                declare_js_pattern(view.expr(declarator.id), nc, true);
             }
         }
     }
 }
 
 /// Walk a nested statement list as its own JS block scope.
-fn walk_block(stmts: &[Statement<'_>], nc: &mut Nc<'_>) {
+fn walk_block(stmts: Run<StmtId>, nc: &mut Nc<'_>) {
     let mark = js_scope_mark(nc);
     hoist_block_consts(stmts, nc);
-    for stmt in stmts {
+    for &stmt in nc.view.stmt_list(stmts) {
         walk_stmt(stmt, nc, true);
     }
     js_scope_restore(nc, mark);
@@ -788,9 +825,9 @@ fn walk_block(stmts: &[Statement<'_>], nc: &mut Nc<'_>) {
 /// pattern shape `pattern_binding_names` can't collect just records nothing, so
 /// the set stays a superset of the true nested bindings). Inside a function-like
 /// subtree the names also join `fn_declared` (see the field docs).
-fn declare_pattern(pattern: &Expression<'_>, nc: &mut Nc<'_>) {
+fn declare_pattern(pattern: &Expression, nc: &mut Nc<'_>) {
     let mut names = Vec::new();
-    if pattern_binding_names(pattern, nc.source, &mut names).is_ok() {
+    if pattern_binding_names(nc.view, pattern, nc.source, &mut names).is_ok() {
         for name in names {
             if nc.fn_depth > 0 {
                 nc.fn_declared.insert(name.clone());
@@ -802,7 +839,7 @@ fn declare_pattern(pattern: &Expression<'_>, nc: &mut Nc<'_>) {
 
 /// Add a single identifier's name to `shadowed` (and `fn_declared` inside a
 /// function-like subtree).
-fn declare_ident(id: &tsv_ts::ast::Identifier<'_>, nc: &mut Nc<'_>) {
+fn declare_ident(id: &Identifier, nc: &mut Nc<'_>) {
     if let Some(name) = plain_name(id, nc.source) {
         if nc.fn_depth > 0 {
             nc.fn_declared.insert(name.to_string());
@@ -825,19 +862,20 @@ fn declare_ident(id: &tsv_ts::ast::Identifier<'_>, nc: &mut Nc<'_>) {
 /// `$$renderer.component(…)` the oracle never emits. A silent MISMATCH, not a
 /// refusal. `CommentBoundPair` is the sixth transparent wrapper (valid JS, and
 /// the oracle has no such node at all).
-fn root_of<'e>(expr: &'e Expression<'e>) -> &'e Expression<'e> {
+fn root_of<'e>(view: AstView<'e>, expr: &'e Expression) -> &'e Expression {
     let mut node = expr;
     loop {
-        match &node.kind {
-            ExpressionKind::MemberExpression(m) => node = m.object,
-            ExpressionKind::TSAsExpression(t) => node = t.expression,
-            ExpressionKind::TSSatisfiesExpression(t) => node = t.expression,
-            ExpressionKind::TSNonNullExpression(t) => node = t.expression,
-            ExpressionKind::TSTypeAssertion(t) => node = t.expression,
-            ExpressionKind::TSInstantiationExpression(t) => node = t.expression,
-            ExpressionKind::CommentBoundPair(j) => node = j.inner,
+        let next = match &node.kind {
+            ExpressionKind::MemberExpression(m) => m.object,
+            ExpressionKind::TSAsExpression(t) => t.expression,
+            ExpressionKind::TSSatisfiesExpression(t) => t.expression,
+            ExpressionKind::TSNonNullExpression(t) => t.expression,
+            ExpressionKind::TSTypeAssertion(t) => t.expression,
+            ExpressionKind::TSInstantiationExpression(t) => t.expression,
+            ExpressionKind::CommentBoundPair(j) => view.comment_pair(*j).inner,
             _ => return node,
-        }
+        };
+        node = view.expr(next);
     }
 }
 
@@ -845,8 +883,8 @@ fn root_of<'e>(expr: &'e Expression<'e>) -> &'e Expression<'e> {
 /// non-identifier root is unsafe (→ `needs`); a plain-identifier root that is a
 /// context-root is recorded (resolved against `shadowed` at the end); an escaped
 /// root can't be classified (→ refuse).
-fn check_root(access: &Expression<'_>, nc: &mut Nc<'_>) {
-    match &root_of(access).kind {
+fn check_root(access: &Expression, nc: &mut Nc<'_>) {
+    match &root_of(nc.view, access).kind {
         ExpressionKind::Identifier(id) => match plain_name(id, nc.source) {
             Some(name) => {
                 // A `$name` store read roots at its base binding `name` (the
@@ -870,25 +908,40 @@ fn check_root(access: &Expression<'_>, nc: &mut Nc<'_>) {
     }
 }
 
-fn walk_exprs(exprs: &[&Expression<'_>], nc: &mut Nc<'_>) {
-    for expr in exprs {
-        walk_expr(expr, nc);
+fn walk_exprs(exprs: Run<ExprId>, nc: &mut Nc<'_>) {
+    for &expr in nc.view.expr_list(exprs) {
+        walk_id(expr, nc);
     }
 }
 
-fn walk_opt(expr: Option<&Expression<'_>>, nc: &mut Nc<'_>) {
+fn walk_opt(expr: Option<ExprId>, nc: &mut Nc<'_>) {
     if let Some(expr) = expr {
-        walk_expr(expr, nc);
+        walk_id(expr, nc);
+    }
+}
+
+/// [`walk_expr`] over the expression `id` names.
+fn walk_id(id: ExprId, nc: &mut Nc<'_>) {
+    walk_expr(nc.view.expr(id), nc);
+}
+
+/// Declare each of a function's parameters (a run of rows held by value) in its
+/// scope, then walk it, one at a time.
+fn walk_params(params: Run<Expression>, nc: &mut Nc<'_>) {
+    for param in nc.view.exprs(params) {
+        declare_js_pattern(param, nc, false);
+        walk_expr(param, nc);
     }
 }
 
 /// Walk an expression: detect `new`/unsafe-member/unsafe-call triggers, and
 /// collect any nested function/arrow/class bindings into `shadowed`.
-fn walk_expr(expr: &Expression<'_>, nc: &mut Nc<'_>) {
+fn walk_expr(expr: &Expression, nc: &mut Nc<'_>) {
+    let view = nc.view;
     match &expr.kind {
         ExpressionKind::NewExpression(new_expr) => {
             nc.needs = true;
-            walk_expr(new_expr.callee, nc);
+            walk_id(new_expr.callee, nc);
             walk_exprs(new_expr.arguments, nc);
         }
         ExpressionKind::CallExpression(call) => {
@@ -898,12 +951,12 @@ fn walk_expr(expr: &Expression<'_>, nc: &mut Nc<'_>) {
             // rune but `$inspect`; fires wherever the call sits (this walk covers
             // the instance/module scripts and the template, pre-rewrite).
             if nc.refuse.is_none()
-                && let Some(rune) = crate::analyze::rune_call_spread(call, nc.source)
+                && let Some(rune) = crate::analyze::rune_call_spread(view, call, nc.source)
             {
                 nc.refuse = Some(Refusal::RuneInvalidSpread { rune });
             }
-            check_root(call.callee, nc);
-            walk_expr(call.callee, nc);
+            check_root(view.expr(call.callee), nc);
+            walk_id(call.callee, nc);
             walk_exprs(call.arguments, nc);
         }
         ExpressionKind::MemberExpression(member) => {
@@ -937,39 +990,37 @@ fn walk_expr(expr: &Expression<'_>, nc: &mut Nc<'_>) {
             // plain-name set, so an escaped rest-prop ROOT binding is a separate,
             // narrower residual left by `collect_rest_prop_names`.
             if nc.refuse.is_none()
-                && let ExpressionKind::Identifier(obj) = &member.object.kind
+                && let ExpressionKind::Identifier(obj) = &view.expr(member.object).kind
                 && let Some(obj_name) = plain_name(obj, nc.source)
                 && nc.rest_prop_names.contains(obj_name)
-                && let ExpressionKind::Identifier(prop) = &member.property.kind
-                && prop.name(nc.source).starts_with("$$")
+                && let ExpressionKind::Identifier(prop) = &view.expr(member.property).kind
+                && prop.name(nc.source, view).starts_with("$$")
             {
                 nc.refuse = Some(Refusal::PropsIllegalName);
             }
             check_root(expr, nc);
-            walk_expr(member.object, nc);
+            walk_id(member.object, nc);
             if member.computed {
-                walk_expr(member.property, nc);
+                walk_id(member.property, nc);
             }
         }
 
         // Nested function scopes: their params/bindings shadow the component
         // scope, so record them and walk the body (always nested).
         ExpressionKind::ArrowFunctionExpression(a) => {
+            let a = view.arrow_fn(*a);
             nc.fn_depth += 1;
             let mark = js_scope_mark(nc);
-            for param in a.params {
-                declare_js_pattern(param, nc, false);
-                walk_expr(param, nc);
-            }
+            walk_params(a.params, nc);
             match &a.body {
-                ArrowFunctionBody::Expression(e) => walk_expr(e, nc),
+                ArrowFunctionBody::Expression(e) => walk_id(*e, nc),
                 ArrowFunctionBody::BlockStatement(b) => walk_block(b.body, nc),
             }
             js_scope_restore(nc, mark);
             nc.fn_depth -= 1;
         }
-        ExpressionKind::FunctionExpression(f) => walk_function_expression(f, nc),
-        ExpressionKind::ClassExpression(c) => walk_class_body(&c.body, nc),
+        ExpressionKind::FunctionExpression(f) => walk_function_expression(view.fn_expr(*f), nc),
+        ExpressionKind::ClassExpression(c) => walk_class_body(&view.class_expr(*c).body, nc),
 
         // A bare identifier reference: detect `$$slots` (the oracle's
         // `uses_slots`) and a `$name` store access (the store-subscription gate),
@@ -986,7 +1037,9 @@ fn walk_expr(expr: &Expression<'_>, nc: &mut Nc<'_>) {
             // escaped `arguments` reference outside a non-arrow function refuses
             // too — the oracle reads the DECODED `node.name`. Resolved late,
             // first-wins; the cheap gates short-circuit before the decode.
-            if nc.nonarrow_fn_depth == 0 && nc.refuse.is_none() && id.name(nc.source) == "arguments"
+            if nc.nonarrow_fn_depth == 0
+                && nc.refuse.is_none()
+                && id.name(nc.source, view) == "arguments"
             {
                 nc.refuse = Some(Refusal::InvalidArgumentsUsage);
             }
@@ -994,12 +1047,12 @@ fn walk_expr(expr: &Expression<'_>, nc: &mut Nc<'_>) {
             // key on the DECODED identifier name — the oracle reads `node.name`,
             // so an escaped `$$slots` or a `$name` store reference counts exactly
             // as its plain spelling. The plain fast path stays a span slice; only
-            // an escaped identifier reads its decoded `&'arena str`.
+            // an escaped identifier reads its escaped name's pool text.
             let decoded;
             let name = if let Some(name) = plain_name(id, nc.source) {
                 name
             } else {
-                decoded = id.name(nc.source).to_string();
+                decoded = id.name(nc.source, view).to_string();
                 &decoded
             };
             if name == "$$slots" {
@@ -1019,92 +1072,103 @@ fn walk_expr(expr: &Expression<'_>, nc: &mut Nc<'_>) {
         | ExpressionKind::MetaProperty(_) => {}
 
         ExpressionKind::ObjectExpression(obj) => {
-            for prop in obj.properties {
+            for prop in view.obj_props(obj.properties) {
                 match prop {
                     ObjectProperty::Property(p) => {
                         if p.computed {
-                            walk_expr(p.key, nc);
+                            walk_id(p.key, nc);
                         }
-                        walk_expr(p.value, nc);
+                        walk_id(p.value, nc);
                     }
-                    ObjectProperty::SpreadElement(s) => walk_expr(s.argument, nc),
+                    ObjectProperty::SpreadElement(s) => walk_id(s.argument, nc),
                 }
             }
         }
         ExpressionKind::ArrayExpression(arr) => {
-            for element in arr.elements {
-                walk_opt(*element, nc);
+            for &element in view.expr_opt_list(arr.elements) {
+                walk_opt(element, nc);
             }
         }
-        ExpressionKind::UnaryExpression(u) => walk_expr(u.argument, nc),
+        ExpressionKind::UnaryExpression(u) => walk_id(u.argument, nc),
         ExpressionKind::UpdateExpression(u) => {
-            crate::rune_guard::assign_target_roots(u.argument, nc.source, &mut nc.reassigned);
-            refuse_invalid_assign_target(u.argument, nc, true);
-            walk_expr(u.argument, nc);
+            crate::rune_guard::assign_target_roots(
+                nc.view,
+                nc.view.expr(u.argument),
+                nc.source,
+                &mut nc.reassigned,
+            );
+            refuse_invalid_assign_target(nc.view.expr(u.argument), nc, true);
+            walk_id(u.argument, nc);
         }
         ExpressionKind::BinaryExpression(b) => {
-            walk_expr(b.left, nc);
-            walk_expr(b.right, nc);
+            walk_id(b.left, nc);
+            walk_id(b.right, nc);
         }
         ExpressionKind::ConditionalExpression(c) => {
-            walk_expr(c.test, nc);
-            walk_expr(c.consequent, nc);
-            walk_expr(c.alternate, nc);
+            walk_id(c.test, nc);
+            walk_id(c.consequent, nc);
+            walk_id(c.alternate, nc);
         }
-        ExpressionKind::SpreadElement(s) => walk_expr(s.argument, nc),
+        ExpressionKind::SpreadElement(s) => walk_id(s.argument, nc),
         ExpressionKind::TemplateLiteral(t) => walk_exprs(t.expressions, nc),
         ExpressionKind::TaggedTemplateExpression(t) => {
-            walk_expr(t.tag, nc);
+            let t = view.tagged_tpl(*t);
+            walk_id(t.tag, nc);
             walk_exprs(t.quasi.expressions, nc);
         }
-        ExpressionKind::AwaitExpression(a) => walk_expr(a.argument, nc),
+        ExpressionKind::AwaitExpression(a) => walk_id(a.argument, nc),
         ExpressionKind::YieldExpression(y) => walk_opt(y.argument, nc),
         ExpressionKind::SequenceExpression(s) => walk_exprs(s.expressions, nc),
         ExpressionKind::AssignmentExpression(a) => {
-            crate::rune_guard::assign_target_roots(a.left, nc.source, &mut nc.reassigned);
-            refuse_invalid_assign_target(a.left, nc, true);
-            walk_expr(a.left, nc);
-            walk_expr(a.right, nc);
+            crate::rune_guard::assign_target_roots(
+                nc.view,
+                nc.view.expr(a.left),
+                nc.source,
+                &mut nc.reassigned,
+            );
+            refuse_invalid_assign_target(nc.view.expr(a.left), nc, true);
+            walk_id(a.left, nc);
+            walk_id(a.right, nc);
         }
         ExpressionKind::ObjectPattern(p) => {
-            for prop in p.properties {
+            for prop in view.pat_props(p.properties) {
                 match prop {
                     ObjectPatternProperty::Property(prop) => {
                         if prop.computed {
-                            walk_expr(prop.key, nc);
+                            walk_id(prop.key, nc);
                         }
-                        walk_expr(prop.value, nc);
+                        walk_id(prop.value, nc);
                     }
-                    ObjectPatternProperty::RestElement(rest) => walk_expr(rest.argument, nc),
+                    ObjectPatternProperty::RestElement(rest) => walk_id(rest.argument, nc),
                 }
             }
         }
         ExpressionKind::ArrayPattern(p) => {
-            for element in p.elements {
-                walk_opt(element.as_ref(), nc);
+            for &element in view.expr_opt_list(p.elements) {
+                walk_opt(element, nc);
             }
         }
         ExpressionKind::AssignmentPattern(p) => {
-            walk_expr(p.left, nc);
-            walk_expr(p.right, nc);
+            walk_id(p.left, nc);
+            walk_id(p.right, nc);
         }
-        ExpressionKind::RestElement(r) => walk_expr(r.argument, nc),
-        ExpressionKind::TSTypeAssertion(t) => walk_expr(t.expression, nc),
-        ExpressionKind::TSAsExpression(t) => walk_expr(t.expression, nc),
-        ExpressionKind::TSSatisfiesExpression(t) => walk_expr(t.expression, nc),
-        ExpressionKind::TSInstantiationExpression(t) => walk_expr(t.expression, nc),
-        ExpressionKind::TSNonNullExpression(t) => walk_expr(t.expression, nc),
-        ExpressionKind::TSParameterProperty(t) => walk_expr(t.parameter, nc),
+        ExpressionKind::RestElement(r) => walk_id(r.argument, nc),
+        ExpressionKind::TSTypeAssertion(t) => walk_id(t.expression, nc),
+        ExpressionKind::TSAsExpression(t) => walk_id(t.expression, nc),
+        ExpressionKind::TSSatisfiesExpression(t) => walk_id(t.expression, nc),
+        ExpressionKind::TSInstantiationExpression(t) => walk_id(t.expression, nc),
+        ExpressionKind::TSNonNullExpression(t) => walk_id(t.expression, nc),
+        ExpressionKind::TSParameterProperty(t) => walk_id(t.parameter, nc),
         ExpressionKind::ImportExpression(i) => {
-            walk_expr(i.source, nc);
+            walk_id(i.source, nc);
             walk_opt(i.options, nc);
         }
-        ExpressionKind::CommentBoundPair(j) => walk_expr(j.inner, nc),
-        ExpressionKind::ParenthesizedExpression(p) => walk_expr(p.unreachable_contents(), nc),
+        ExpressionKind::CommentBoundPair(j) => walk_id(view.comment_pair(*j).inner, nc),
+        ExpressionKind::ParenthesizedExpression(p) => walk_expr(p.unreachable_contents(view), nc),
     }
 }
 
-fn walk_function_expression(f: &FunctionExpression<'_>, nc: &mut Nc<'_>) {
+fn walk_function_expression(f: &FunctionExpression, nc: &mut Nc<'_>) {
     nc.fn_depth += 1;
     // A `FunctionExpression` suppresses `invalid_arguments_usage` — before the
     // params, so a parameter default (`function(g = arguments)`) counts as inside.
@@ -1114,30 +1178,27 @@ fn walk_function_expression(f: &FunctionExpression<'_>, nc: &mut Nc<'_>) {
     if let Some(id) = &f.id {
         declare_js_ident(id, nc);
     }
-    for param in f.params {
-        declare_js_pattern(param, nc, false);
-        walk_expr(param, nc);
-    }
+    walk_params(f.params, nc);
     walk_block(f.body.body, nc);
     js_scope_restore(nc, mark);
     nc.nonarrow_fn_depth -= 1;
     nc.fn_depth -= 1;
 }
 
-fn walk_class_body(body: &ClassBody<'_>, nc: &mut Nc<'_>) {
-    for member in body.body {
+fn walk_class_body(body: &ClassBody, nc: &mut Nc<'_>) {
+    for member in nc.view.class_members(body.body) {
         match member {
             ClassMember::MethodDefinition(m) => {
                 if m.computed {
-                    walk_expr(&m.key, nc);
+                    walk_id(m.key, nc);
                 }
                 walk_function_expression(&m.value, nc);
             }
             ClassMember::PropertyDefinition(p) => {
                 if p.computed {
-                    walk_expr(&p.key, nc);
+                    walk_id(p.key, nc);
                 }
-                walk_opt(p.value.as_ref(), nc);
+                walk_opt(p.value, nc);
             }
             ClassMember::StaticBlock(b) => {
                 nc.fn_depth += 1;
@@ -1151,31 +1212,33 @@ fn walk_class_body(body: &ClassBody<'_>, nc: &mut Nc<'_>) {
 
 /// Walk a variable declaration: at nested depth its pattern names shadow the
 /// component scope; the init/default expressions are always trigger-checked.
-fn walk_var_decl(decl: &VariableDeclaration<'_>, nc: &mut Nc<'_>, shadow: bool) {
+fn walk_var_decl(decl: &VariableDeclaration, nc: &mut Nc<'_>, shadow: bool) {
     let is_const = decl.kind == VariableDeclarationKind::Const;
-    for declarator in decl.declarations {
+    for declarator in nc.view.declarators(decl.declarations) {
         if shadow {
-            declare_js_pattern(declarator.id, nc, is_const);
+            declare_js_pattern(nc.view.expr(declarator.id), nc, is_const);
         }
-        walk_expr(declarator.id, nc);
+        walk_id(declarator.id, nc);
         walk_opt(declarator.init, nc);
     }
 }
 
-fn walk_for_left(left: &ForInOfLeft<'_>, nc: &mut Nc<'_>) {
-    match left {
+fn walk_for_left(left: ForLeftId, nc: &mut Nc<'_>) {
+    match nc.view.for_left(left) {
         ForInOfLeft::VariableDeclaration(decl) => walk_var_decl(decl, nc, true),
-        ForInOfLeft::Pattern(pattern) => walk_expr(pattern, nc),
+        ForInOfLeft::Pattern(pattern) => walk_id(*pattern, nc),
     }
 }
 
 /// Walk a statement. `shadow` is false only for the component's top-level
 /// instance statements — where a declaration's own name is a component binding,
 /// not a shadow; everywhere else (nested scopes, template) it is true.
-fn walk_stmt(stmt: &Statement<'_>, nc: &mut Nc<'_>, shadow: bool) {
-    match &stmt.kind {
+fn walk_stmt(stmt: StmtId, nc: &mut Nc<'_>, shadow: bool) {
+    let view = nc.view;
+    match &view.stmt(stmt).kind {
         StatementKind::VariableDeclaration(d) => walk_var_decl(d, nc, shadow),
         StatementKind::FunctionDeclaration(f) => {
+            let f = view.fn_decl(*f);
             // The declaration's own name binds in the ENCLOSING scope, so it is
             // recorded before the mark; the parameters and body are its own.
             if shadow && let Some(id) = &f.id {
@@ -1186,26 +1249,24 @@ fn walk_stmt(stmt: &Statement<'_>, nc: &mut Nc<'_>, shadow: bool) {
             // the params, so a parameter default counts as inside the function.
             nc.nonarrow_fn_depth += 1;
             let mark = js_scope_mark(nc);
-            for param in f.params {
-                declare_js_pattern(param, nc, false);
-                walk_expr(param, nc);
-            }
+            walk_params(f.params, nc);
             walk_block(f.body.body, nc);
             js_scope_restore(nc, mark);
             nc.nonarrow_fn_depth -= 1;
             nc.fn_depth -= 1;
         }
         StatementKind::ClassDeclaration(c) => {
+            let c = view.class_decl(*c);
             if shadow && let Some(id) = &c.id {
                 declare_js_ident(id, nc);
             }
             walk_class_body(&c.body, nc);
         }
-        StatementKind::ExpressionStatement(s) => walk_expr(s.expression, nc),
+        StatementKind::ExpressionStatement(s) => walk_id(s.expression, nc),
         StatementKind::ReturnStatement(s) => walk_opt(s.argument, nc),
         StatementKind::BlockStatement(s) => walk_block(s.body, nc),
         StatementKind::IfStatement(s) => {
-            walk_expr(s.test, nc);
+            walk_id(s.test, nc);
             walk_stmt(s.consequent, nc, true);
             if let Some(alt) = s.alternate {
                 walk_stmt(alt, nc, true);
@@ -1215,9 +1276,9 @@ fn walk_stmt(stmt: &Statement<'_>, nc: &mut Nc<'_>, shadow: bool) {
         // wraps both.
         StatementKind::ForStatement(s) => {
             let mark = js_scope_mark(nc);
-            match &s.init {
+            match view.opt_for_head(s.init) {
                 Some(ForInit::VariableDeclaration(d)) => walk_var_decl(d, nc, true),
-                Some(ForInit::Expression(e)) => walk_expr(e, nc),
+                Some(ForInit::Expression(e)) => walk_id(*e, nc),
                 None => {}
             }
             walk_opt(s.test, nc);
@@ -1228,33 +1289,33 @@ fn walk_stmt(stmt: &Statement<'_>, nc: &mut Nc<'_>, shadow: bool) {
         StatementKind::ForInStatement(s) => {
             let mark = js_scope_mark(nc);
             walk_for_left(s.left, nc);
-            walk_expr(s.right, nc);
+            walk_id(s.right, nc);
             walk_stmt(s.body, nc, true);
             js_scope_restore(nc, mark);
         }
         StatementKind::ForOfStatement(s) => {
             let mark = js_scope_mark(nc);
             walk_for_left(s.left, nc);
-            walk_expr(s.right, nc);
+            walk_id(s.right, nc);
             walk_stmt(s.body, nc, true);
             js_scope_restore(nc, mark);
         }
         StatementKind::WhileStatement(s) => {
-            walk_expr(s.test, nc);
+            walk_id(s.test, nc);
             walk_stmt(s.body, nc, true);
         }
         StatementKind::DoWhileStatement(s) => {
             walk_stmt(s.body, nc, true);
-            walk_expr(s.test, nc);
+            walk_id(s.test, nc);
         }
         // Unreachable in practice: a Svelte `<script>` is Module code, so it is strict
         // and the parser refuses `with` there.
         StatementKind::WithStatement(s) => {
-            walk_expr(s.object, nc);
+            walk_id(s.object, nc);
             walk_stmt(s.body, nc, true);
         }
         StatementKind::SwitchStatement(s) => {
-            walk_expr(s.discriminant, nc);
+            walk_id(s.discriminant, nc);
             // The oracle gives a `switch` ONE block scope shared by ALL its cases
             // (`phases/scope.js`: `SwitchStatement: create_block_scope`), so a
             // `const` in one case is in scope for a write in another and refuses.
@@ -1264,20 +1325,21 @@ fn walk_stmt(stmt: &Statement<'_>, nc: &mut Nc<'_>, shadow: bool) {
             // first, so both orderings (const-then-write and write-then-const) see
             // the binding.
             let mark = js_scope_mark(nc);
-            for case in s.cases {
+            for case in view.cases(s.cases) {
                 hoist_block_consts(case.consequent, nc);
             }
-            for case in s.cases {
+            for case in view.cases(s.cases) {
                 walk_opt(case.test, nc);
-                for stmt in case.consequent {
+                for &stmt in view.stmt_list(case.consequent) {
                     walk_stmt(stmt, nc, true);
                 }
             }
             js_scope_restore(nc, mark);
         }
         StatementKind::TryStatement(s) => {
+            let s = view.try_stmt(*s);
             walk_block(s.block.body, nc);
-            if let Some(handler) = &s.handler {
+            if let Some(handler) = view.opt_catch(s.handler) {
                 let mark = js_scope_mark(nc);
                 if let Some(param) = &handler.param {
                     declare_js_pattern(param, nc, false);
@@ -1290,24 +1352,21 @@ fn walk_stmt(stmt: &Statement<'_>, nc: &mut Nc<'_>, shadow: bool) {
                 walk_block(finalizer.body, nc);
             }
         }
-        StatementKind::ThrowStatement(s) => walk_expr(s.argument, nc),
-        StatementKind::LabeledStatement(s) => walk_stmt(s.body, nc, true),
+        StatementKind::ThrowStatement(s) => walk_id(s.argument, nc),
+        StatementKind::LabeledStatement(s) => walk_stmt(view.labeled_stmt(*s).body, nc, true),
         StatementKind::ExportNamedDeclaration(s) => {
-            if let Some(decl) = &s.declaration {
+            if let Some(decl) = view.export_named(*s).declaration {
                 walk_stmt(decl, nc, shadow);
             }
         }
-        StatementKind::ExportDefaultDeclaration(s) => match &s.declaration {
-            ExportDefaultValue::Expression(e) => walk_expr(e, nc),
+        StatementKind::ExportDefaultDeclaration(s) => match &view.export_default(*s).declaration {
+            ExportDefaultValue::Expression(e) => walk_id(*e, nc),
             ExportDefaultValue::FunctionDeclaration(f) => {
                 nc.fn_depth += 1;
                 // Suppresses `invalid_arguments_usage` — before the params.
                 nc.nonarrow_fn_depth += 1;
                 let mark = js_scope_mark(nc);
-                for param in f.params {
-                    declare_js_pattern(param, nc, false);
-                    walk_expr(param, nc);
-                }
+                walk_params(f.params, nc);
                 walk_block(f.body.body, nc);
                 js_scope_restore(nc, mark);
                 nc.nonarrow_fn_depth -= 1;
@@ -1317,7 +1376,7 @@ fn walk_stmt(stmt: &Statement<'_>, nc: &mut Nc<'_>, shadow: bool) {
             ExportDefaultValue::TSDeclareFunction(_)
             | ExportDefaultValue::TSInterfaceDeclaration(_) => {}
         },
-        StatementKind::TSExportAssignment(s) => walk_expr(&s.expression, nc),
+        StatementKind::TSExportAssignment(s) => walk_id(view.export_assign(*s).expression, nc),
         // No trigger-bearing children, or refused elsewhere (TS enum/module are
         // refused by type erasure before this analysis runs; the rune guard
         // refuses them too as its own defense in depth).
@@ -1340,29 +1399,30 @@ fn walk_stmt(stmt: &Statement<'_>, nc: &mut Nc<'_>, shadow: bool) {
 /// Walk a template fragment: trigger-check every rendered expression and record
 /// the block-local bindings (each item/index, `{:then}`/`{:catch}` values,
 /// `{@const}` names) that shadow the component scope.
-fn walk_fragment(fragment: &Fragment<'_>, nc: &mut Nc<'_>) {
+fn walk_fragment(fragment: &Fragment, nc: &mut Nc<'_>) {
+    let (sv, view) = (nc.sv, nc.view);
     // The `{@const}` names of this fragment enter scope BEFORE any of its nodes is
     // walked, mirroring the oracle's scope PRE-PASS (`create_scopes` completes
     // before any reference is validated), so a write textually earlier than the
     // `{@const}` still resolves to it.
     let mut names = Vec::new();
-    for node in fragment.nodes {
+    for node in sv.nodes(fragment.nodes) {
         if let FragmentNode::ConstTag(tag) = node {
-            let _ = pattern_binding_names(tag.id, nc.source, &mut names);
+            let _ = pattern_binding_names(view, view.expr(tag.id), nc.source, &mut names);
         }
     }
     let added = enter_block_scope(&mut nc.template_consts, names);
-    for node in fragment.nodes {
+    for node in sv.nodes(fragment.nodes) {
         walk_fragment_node(node, nc);
     }
     exit_block_scope(&mut nc.template_consts, added);
 }
 
-fn walk_fragment_node(node: &FragmentNode<'_>, nc: &mut Nc<'_>) {
+fn walk_fragment_node(node: &FragmentNode, nc: &mut Nc<'_>) {
     match node {
         FragmentNode::Text(_) | FragmentNode::Comment(_) => {}
         FragmentNode::Element(element) => walk_element(element, nc),
-        FragmentNode::ExpressionTag(tag) => walk_expr(tag.expression, nc),
+        FragmentNode::ExpressionTag(tag) => walk_id(tag.expression, nc),
         FragmentNode::HtmlTag(tag) => walk_html_tag(tag, nc),
         FragmentNode::IfBlock(block) => walk_if_block(block, nc),
         FragmentNode::EachBlock(block) => walk_each_block(block, nc),
@@ -1426,23 +1486,31 @@ fn walk_fragment_node(node: &FragmentNode<'_>, nc: &mut Nc<'_>) {
 /// `<svelte:element>` (whose `this={…}` / attributes / children emit) — and, for
 /// every kind, through a dropped `{:catch}` (refused at emission there, so
 /// reachable only this way).
-fn walk_special_element(se: &SpecialElement<'_>, nc: &mut Nc<'_>) {
+fn walk_special_element(se: &SpecialElement, nc: &mut Nc<'_>) {
+    let sv = nc.sv;
     if let Some(expr) = special_element_reference_expression(se) {
-        walk_expr(expr, nc);
+        walk_id(expr, nc);
     }
     // A `bind:` is two-way — it MUTATES its target, so the target's root binding
     // is reassigned component-wide (the oracle marks it at analysis time). Without
     // this a `<svelte:window bind:scrollY={y}>` would let a later `{y}` read fold to
     // its initial value where the oracle keeps it dynamic — mirrors `walk_element`.
-    for attr_node in se.attributes {
+    for attr_node in sv.attributes(se.attributes) {
         if let AttributeNode::BindDirective(d) = attr_node {
-            crate::rune_guard::assign_target_roots(d.expression, nc.source, &mut nc.reassigned);
+            crate::rune_guard::assign_target_roots(
+                nc.view,
+                nc.view.expr(d.expression),
+                nc.source,
+                &mut nc.reassigned,
+            );
             // A `bind:` reaches the SAME oracle validator as an assignment
             // (`BindDirective.js:181`), so its target obeys the same three rules.
-            refuse_invalid_assign_target(d.expression, nc, true);
+            refuse_invalid_assign_target(nc.view.expr(d.expression), nc, true);
         }
     }
-    each_reference_bearing_attribute_expression(se.attributes, &mut |expr| walk_expr(expr, nc));
+    each_reference_bearing_attribute_expression(sv, sv.attributes(se.attributes), &mut |expr| {
+        walk_id(expr, nc);
+    });
     walk_fragment(&se.fragment, nc);
 }
 
@@ -1450,16 +1518,17 @@ fn walk_special_element(se: &SpecialElement<'_>, nc: &mut Nc<'_>) {
 /// shadow the component scope, and any `new`/unsafe member/call in its body
 /// still triggers the wrapper (a prop-rooted access inside a snippet fires
 /// `needs_context`, and a `new` in a *hoistable* snippet body fires it too).
-fn walk_snippet_block(snippet: &SnippetBlock<'_>, nc: &mut Nc<'_>) {
+fn walk_snippet_block(snippet: &SnippetBlock, nc: &mut Nc<'_>) {
     nc.fn_depth += 1;
     // Parameters are `kind: 'snippet'` in the oracle (`phases/scope.js:1342`), so
     // writing to one inside the body is `snippet_parameter_assignment` — and,
     // unlike the each rule, it is NOT gated on runes mode.
     let mut names = Vec::new();
-    for param in snippet.parameters {
+    let view = nc.view;
+    for param in view.exprs(snippet.parameters) {
         declare_pattern(param, nc);
         walk_expr(param, nc);
-        let _ = pattern_binding_names(param, nc.source, &mut names);
+        let _ = pattern_binding_names(view, param, nc.source, &mut names);
     }
     let added = enter_block_scope(&mut nc.snippet_params, names);
     walk_fragment(&snippet.body, nc);
@@ -1471,23 +1540,24 @@ fn walk_snippet_block(snippet: &SnippetBlock<'_>, nc: &mut Nc<'_>) {
 /// callee with expression metadata (not as a `CallExpression`), so a plain
 /// snippet/prop callee never triggers `needs_context`; a member callee is
 /// refused at emission time. Arguments are ordinary template expressions.
-fn walk_render_tag(tag: &RenderTag<'_>, nc: &mut Nc<'_>) {
+fn walk_render_tag(tag: &RenderTag, nc: &mut Nc<'_>) {
     // Inside a dropped `{:catch}` the "member callee refused at emission"
     // assumption doesn't hold — the callee is never emitted — so the whole render
     // expression is trigger-checked (a member-rooted callee over a prop must fire
     // the wrapper, matching the oracle).
     if nc.in_dropped_catch {
-        walk_expr(tag.expression, nc);
+        walk_id(tag.expression, nc);
         return;
     }
     // The same (possibly-parenthesized) call unwrap the emitter uses. A non-call
     // render refuses at emission, so here it simply yields no arguments to check.
-    if let Some(call) = render_call_expression(tag.expression) {
+    if let Some(call) = render_call_expression(nc.view.expr(tag.expression)) {
         walk_exprs(call.arguments, nc);
     }
 }
 
-fn walk_element(element: &Element<'_>, nc: &mut Nc<'_>) {
+fn walk_element(element: &Element, nc: &mut Nc<'_>) {
+    let sv = nc.sv;
     // A `bind:` directive is a two-way binding — it MUTATES its target, so the
     // target's root binding is reassigned component-wide (the oracle marks the
     // binding mutated at analysis time, before it decides what to emit). Without
@@ -1497,12 +1567,17 @@ fn walk_element(element: &Element<'_>, nc: &mut Nc<'_>) {
     // makes the whole component refuse, so the mark is harmless there — and rides
     // `assign_target_roots`, which unwraps the raw template's TypeScript
     // assignment-target wrappers.
-    for attr_node in element.attributes {
+    for attr_node in sv.attributes(element.attributes) {
         if let AttributeNode::BindDirective(d) = attr_node {
-            crate::rune_guard::assign_target_roots(d.expression, nc.source, &mut nc.reassigned);
+            crate::rune_guard::assign_target_roots(
+                nc.view,
+                nc.view.expr(d.expression),
+                nc.source,
+                &mut nc.reassigned,
+            );
             // A `bind:` reaches the SAME oracle validator as an assignment
             // (`BindDirective.js:181`), so its target obeys the same three rules.
-            refuse_invalid_assign_target(d.expression, nc, true);
+            refuse_invalid_assign_target(nc.view.expr(d.expression), nc, true);
         }
     }
     // The shared traversal (`attr_refs`) defines which attribute expressions are
@@ -1523,31 +1598,33 @@ fn walk_element(element: &Element<'_>, nc: &mut Nc<'_>) {
     // `new`/prop-rooted access in any skipped position must still trigger the
     // wrapper, so every attribute reference is walked.
     if nc.in_dropped_catch {
-        each_reference_bearing_attribute_expression(element.attributes, &mut |expr| {
-            walk_expr(expr, nc);
-        });
+        each_reference_bearing_attribute_expression(
+            sv,
+            sv.attributes(element.attributes),
+            &mut |expr| walk_id(expr, nc),
+        );
     } else {
-        each_attribute_expression(element, &mut |expr| walk_expr(expr, nc));
+        each_attribute_expression(sv, element, &mut |expr| walk_id(expr, nc));
     }
     walk_fragment(&element.fragment, nc);
 }
 
-fn walk_html_tag(tag: &HtmlTag<'_>, nc: &mut Nc<'_>) {
-    walk_expr(tag.expression, nc);
+fn walk_html_tag(tag: &HtmlTag, nc: &mut Nc<'_>) {
+    walk_id(tag.expression, nc);
 }
 
-fn walk_if_block(block: &IfBlock<'_>, nc: &mut Nc<'_>) {
-    walk_expr(block.test, nc);
+fn walk_if_block(block: &IfBlock, nc: &mut Nc<'_>) {
+    walk_id(block.test, nc);
     walk_fragment(&block.consequent, nc);
     if let Some(alt) = &block.alternate {
         walk_fragment(alt, nc);
     }
 }
 
-fn walk_each_block(block: &EachBlock<'_>, nc: &mut Nc<'_>) {
-    walk_expr(block.expression, nc);
+fn walk_each_block(block: &EachBlock, nc: &mut Nc<'_>) {
+    walk_id(block.expression, nc);
     if let Some(key) = &block.key {
-        walk_expr(key.expression, nc);
+        walk_id(key.expression, nc);
     }
     // The context binding is `kind: 'each'` in the oracle (`phases/scope.js:1244`),
     // so writing to it inside the block is `each_item_invalid_assignment`. Scoped
@@ -1558,15 +1635,17 @@ fn walk_each_block(block: &EachBlock<'_>, nc: &mut Nc<'_>) {
     // the residual this slice leaves open (see the checklist).
     let mut each_added = Vec::new();
     if let Some(context) = block.context {
+        let context = nc.view.expr(context);
         declare_pattern(context, nc);
         walk_expr(context, nc);
         let mut names = Vec::new();
-        if pattern_binding_names(context, nc.source, &mut names).is_ok() {
+        if pattern_binding_names(nc.view, context, nc.source, &mut names).is_ok() {
             each_added = enter_block_scope(&mut nc.each_items, names);
         }
     }
     let mut index_added = Vec::new();
     if let Some(index) = block.index {
+        let index = index.extract(nc.source);
         nc.shadowed.insert(index.to_string());
         // `('template' | 'static', 'const')` at `phases/scope.js:1273` — so unlike
         // the ITEM beside it (`('each', 'const')`, excluded from the const rule),
@@ -1582,15 +1661,15 @@ fn walk_each_block(block: &EachBlock<'_>, nc: &mut Nc<'_>) {
     exit_block_scope(&mut nc.each_items, each_added);
 }
 
-fn walk_await_block(block: &AwaitBlock<'_>, nc: &mut Nc<'_>) {
-    walk_expr(block.expression, nc);
+fn walk_await_block(block: &AwaitBlock, nc: &mut Nc<'_>) {
+    walk_id(block.expression, nc);
     if let Some(value) = block.value {
-        declare_pattern(value, nc);
-        walk_expr(value, nc);
+        declare_pattern(nc.view.expr(value), nc);
+        walk_id(value, nc);
     }
     if let Some(error) = block.error {
-        declare_pattern(error, nc);
-        walk_expr(error, nc);
+        declare_pattern(nc.view.expr(error), nc);
+        walk_id(error, nc);
     }
     // Pending/then are emitted (their skipped attribute positions refuse at
     // emission); the `{:catch}` branch is dropped, so it is walked with the
@@ -1602,13 +1681,13 @@ fn walk_await_block(block: &AwaitBlock<'_>, nc: &mut Nc<'_>) {
     // into their OWN branch fragment's scope (`phases/scope.js:1310`/`:1324`), so
     // a write to one is `constant_assignment`, scoped to that branch alone.
     if let Some(then) = &block.then {
-        let names = template_const_names(block.value, nc.source);
+        let names = template_const_names(nc.view, block.value, nc.source);
         let added = enter_block_scope(&mut nc.template_consts, names);
         walk_fragment(then, nc);
         exit_block_scope(&mut nc.template_consts, added);
     }
     if let Some(catch) = &block.catch {
-        let names = template_const_names(block.error, nc.source);
+        let names = template_const_names(nc.view, block.error, nc.source);
         let added = enter_block_scope(&mut nc.template_consts, names);
         let prev = nc.in_dropped_catch;
         nc.in_dropped_catch = true;
@@ -1618,13 +1697,13 @@ fn walk_await_block(block: &AwaitBlock<'_>, nc: &mut Nc<'_>) {
     }
 }
 
-fn walk_key_block(block: &KeyBlock<'_>, nc: &mut Nc<'_>) {
-    walk_expr(block.expression, nc);
+fn walk_key_block(block: &KeyBlock, nc: &mut Nc<'_>) {
+    walk_id(block.expression, nc);
     walk_fragment(&block.fragment, nc);
 }
 
-fn walk_const_tag(tag: &ConstTag<'_>, nc: &mut Nc<'_>) {
-    declare_pattern(tag.id, nc);
-    walk_expr(tag.id, nc);
-    walk_expr(tag.init, nc);
+fn walk_const_tag(tag: &ConstTag, nc: &mut Nc<'_>) {
+    declare_pattern(nc.view.expr(tag.id), nc);
+    walk_id(tag.id, nc);
+    walk_id(tag.init, nc);
 }
