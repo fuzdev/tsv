@@ -456,6 +456,33 @@ impl<F> Run<F> {
         self.len == 0
     }
 
+    /// The rows `range` names inside this run, as a run of the same store: a kept part of a
+    /// list (its tail past a first element, a rebuilt list's unchanged prefix) is a sub-run,
+    /// never a copy. The check build carries the run's stamp over, so the sub-run reads only
+    /// where the run does. An empty `range` is [`Run::EMPTY`]; a `range` reversed or past the
+    /// run's end ends in the shared cold path.
+    #[inline]
+    #[must_use]
+    pub fn sub_run(self, range: std::ops::Range<usize>) -> Self {
+        if range.start > range.end || range.end > self.len() {
+            store_miss();
+        }
+        if range.start == range.end {
+            return Self::EMPTY;
+        }
+        // inside the run, so the new start is at most the run's end, which fits a `u32`
+        let Some(start) = self.start.checked_add(range.start as u32) else {
+            store_miss();
+        };
+        Self {
+            start,
+            len: (range.end - range.start) as u32,
+            #[cfg(feature = "_internal_store_check")]
+            stamp: self.stamp,
+            family: PhantomData,
+        }
+    }
+
     /// The run's slot range. A run's end fits a `u32`, per [`mint_range`], so the addition
     /// cannot overflow a wasm32 `usize`.
     #[inline]
@@ -612,6 +639,18 @@ impl<T: Row> Store<T> {
     #[inline]
     pub fn capacity_bytes(&self) -> usize {
         self.rows.capacity() * size_of::<T>()
+    }
+
+    /// Whether `address` lies inside the rows this store holds, the capacity past them
+    /// excluded: the store-range guard's read, which a reader keying nodes by address asserts
+    /// on each address it keys. A reference a read of this store returned (a row, or a field
+    /// inside one) always lies inside; a copy of a row on the stack never does. Read-only, and
+    /// stable only while the store does not grow.
+    #[doc(hidden)]
+    #[inline]
+    pub fn holds_address(&self, address: usize) -> bool {
+        let rows = self.rows.as_ptr_range();
+        rows.start.addr() <= address && address < rows.end.addr()
     }
 
     /// The refused arm of a push's mint, taken after the row is appended so the row itself
@@ -841,6 +880,18 @@ impl<T> ListBuf<T> {
         self.items.push(item);
         #[cfg(feature = "_internal_ast_census")]
         crate::ast_census_probe::list_delta::<T>(1);
+    }
+
+    /// Appends `items` to the frame in progress, in order, as one block: what a run of
+    /// [`ListBuf::push`] calls appends, counted by the census as those pushes are.
+    #[inline]
+    pub fn extend_from_slice(&mut self, items: &[T])
+    where
+        T: Copy,
+    {
+        self.items.extend_from_slice(items);
+        #[cfg(feature = "_internal_ast_census")]
+        crate::ast_census_probe::list_delta::<T>(items.len() as isize);
     }
 
     /// Empties the stack between parses, keeping capacity and never trimming it.
@@ -2563,6 +2614,92 @@ mod tests {
         let run = scratch.flush_copy(mark, &mut nodes);
         nodes.reset();
         nodes.slice(run);
+    }
+
+    /// `extend_from_slice` appends to the frame in progress: inside a nested frame it lands
+    /// above the outer frame's elements, flushes with the inner frame alone, and leaves the
+    /// outer frame's prefix in place for its own flush.
+    #[test]
+    fn extend_from_slice_appends_to_the_open_frame() {
+        let mut nodes = store();
+        let mut scratch = ListBuf::new();
+        let outer = scratch.mark();
+        scratch.push(Node("a"));
+        let inner = scratch.mark();
+        scratch.extend_from_slice(&[Node("b"), Node("c")]);
+        scratch.extend_from_slice(&[]);
+        scratch.push(Node("d"));
+        assert_eq!(scratch.len_since(inner), 3);
+        let inner_run = scratch.flush_copy(inner, &mut nodes);
+        scratch.extend_from_slice(&[Node("e")]);
+        let outer_run = scratch.flush_copy(outer, &mut nodes);
+        assert!(scratch.is_empty());
+        assert_eq!(texts(&nodes, inner_run), ["b", "c", "d"]);
+        assert_eq!(texts(&nodes, outer_run), ["a", "e"]);
+    }
+
+    fn run_of(nodes: &mut Store<Node<'static>>, words: &[&'static str]) -> Run<Alpha> {
+        let mut scratch = ListBuf::new();
+        let mark = scratch.mark();
+        for &word in words {
+            scratch.push(Node(word));
+        }
+        scratch.flush_copy(mark, nodes)
+    }
+
+    /// A sub-run reads the rows its range names in the run, in place: the whole run, a tail,
+    /// a middle, and an empty range anywhere, which is the empty run.
+    #[test]
+    fn a_sub_run_reads_its_range_of_the_run() {
+        let mut nodes = store();
+        let _before = run_of(&mut nodes, &["x", "y"]);
+        let run = run_of(&mut nodes, &["a", "b", "c", "d"]);
+        assert_eq!(run.sub_run(0..4), run);
+        assert_eq!(texts(&nodes, run.sub_run(1..4)), ["b", "c", "d"]);
+        assert_eq!(texts(&nodes, run.sub_run(1..3)), ["b", "c"]);
+        assert_eq!(texts(&nodes, run.sub_run(3..4)), ["d"]);
+        for at in 0..=4 {
+            assert_eq!(run.sub_run(at..at), Run::EMPTY);
+        }
+        assert_eq!(Run::<Alpha>::EMPTY.sub_run(0..0), Run::EMPTY);
+        let tail = run.sub_run(1..4);
+        assert_eq!(texts(&nodes, tail.sub_run(1..3)), ["c", "d"]);
+    }
+
+    #[test]
+    #[should_panic(expected = "store miss")]
+    fn a_sub_run_past_the_run_reaches_the_shared_miss() {
+        let mut nodes = store();
+        let run = run_of(&mut nodes, &["a", "b"]);
+        let _ = run.sub_run(1..3);
+    }
+
+    #[test]
+    #[should_panic(expected = "store miss")]
+    fn a_reversed_sub_run_reaches_the_shared_miss() {
+        let mut nodes = store();
+        let run = run_of(&mut nodes, &["a", "b"]);
+        #[expect(clippy::reversed_empty_ranges, reason = "the refusal under test")]
+        let _ = run.sub_run(2..1);
+    }
+
+    /// `holds_address` is true for a row read in place and false for a copy of it, for the
+    /// address one past the last row, and for any address before the store is written.
+    #[test]
+    fn holds_address_answers_for_rows_read_in_place() {
+        let mut nodes = store();
+        let probe = Node("a");
+        assert!(!nodes.holds_address((&raw const probe).addr()));
+        let first = nodes.push(Node("a"));
+        let last = nodes.push(Node("b"));
+        let row = nodes.get(first);
+        assert!(nodes.holds_address((&raw const *row).addr()));
+        let row = nodes.get(last);
+        let end = (&raw const *row).addr() + size_of::<Node<'static>>();
+        assert!(nodes.holds_address(end - 1));
+        assert!(!nodes.holds_address(end));
+        let copy = *nodes.get(last);
+        assert!(!nodes.holds_address((&raw const copy).addr()));
     }
 
     #[cfg(feature = "_internal_store_check")]

@@ -133,6 +133,16 @@ macro_rules! payload_stores {
                 type Family = Self;
             }
 
+            impl super::mint::sealed::RowStore for $Row {
+                #[inline]
+                fn store(
+                    stores: &mut AstStores,
+                    _: super::mint::sealed::Seal,
+                ) -> &mut Store<Self> {
+                    &mut stores.payloads.$field
+                }
+            }
+
             #[doc = concat!(
                 "A handle to one [`", stringify!($Row), "`] row, read through [`AstView::",
                 stringify!($acc), "`]."
@@ -167,6 +177,13 @@ macro_rules! payload_stores {
             #[inline]
             pub(crate) fn capacity_bytes(&self) -> usize {
                 0 $(+ self.$field.capacity_bytes())*
+            }
+
+            /// Whether `address` lies inside the rows of one of the stores, as
+            /// [`AstStores::holds_address`] asks.
+            #[inline]
+            pub(crate) fn holds_address(&self, address: usize) -> bool {
+                false $(|| self.$field.holds_address(address))*
             }
 
             /// Every store's shape, for the tests that read what a reset leaves.
@@ -271,7 +288,8 @@ tsv_lang::value_runs! {
     /// The tops of the value-run scratch stacks, taken together: their part of a
     /// [`ScratchMarks`].
     pub(crate) struct RunMarks;
-    pub view AstView::runs;
+    pub view AstView::runs,
+        mint AstStores.runs => super::mint::sealed::ListStore, super::mint::sealed::Seal;
 
     /// Object literal members, `{ a: 1, ...b }`: [`ObjectProperty`] rows.
     obj_props, obj_prop_scratch: ObjectProperty => obj_props;
@@ -689,6 +707,44 @@ impl AstStores {
             + text.capacity_bytes()
             + comments.capacity_bytes()
             + comment_scratch.capacity_bytes()
+    }
+
+    /// Whether `address` lies inside the rows of one of the stores, their scratch stacks and
+    /// the text pool excluded: the store-range guard's read (`Store::holds_address`), which a
+    /// reader keying nodes by address asserts on each address it keys. A node reached through
+    /// the view, or a field inside one, lies in a store; a copy of a row on the stack never
+    /// does. Destructured whole, as [`AstStores::reset`] is, so a store added without a line
+    /// here is a build error rather than a store the guard cannot see.
+    pub(crate) fn holds_address(&self, address: usize) -> bool {
+        let Self {
+            exprs,
+            expr_lists,
+            expr_opt_lists,
+            expr_scratch: _,
+            expr_list_scratch: _,
+            expr_opt_scratch: _,
+            stmts,
+            stmt_lists,
+            stmt_list_scratch: _,
+            tys,
+            ty_lists,
+            ty_list_scratch: _,
+            payloads,
+            runs,
+            text: _,
+            comments,
+            comment_scratch: _,
+        } = self;
+        exprs.holds_address(address)
+            || expr_lists.holds_address(address)
+            || expr_opt_lists.holds_address(address)
+            || stmts.holds_address(address)
+            || stmt_lists.holds_address(address)
+            || tys.holds_address(address)
+            || ty_lists.holds_address(address)
+            || payloads.holds_address(address)
+            || runs.holds_address(address)
+            || comments.holds_address(address)
     }
 
     /// Every store's, scratch stack's and the pool's shape, for the tests that read what a

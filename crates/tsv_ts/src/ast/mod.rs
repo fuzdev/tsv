@@ -54,6 +54,7 @@ macro_rules! pin_explicit_tag {
 mod classes;
 mod declarations;
 mod expressions;
+pub(crate) mod mint;
 mod modules;
 mod patterns;
 mod statements;

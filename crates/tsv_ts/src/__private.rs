@@ -10,6 +10,11 @@ use crate::ast::{
 };
 use tsv_lang::Span;
 
+/// The write surface: rows pushed, lists built and strings pooled by a host that builds
+/// TypeScript of its own around a parsed tree (see the module's contracts).
+pub use crate::ast::mint::{
+    MintList, MintRow, extend_from_run, flush, open, push, push_item, push_list, push_text,
+};
 pub use crate::ast::{
     WarmStores, park_stores, park_stores_capped, parked_stores_capacity, take_stores,
     take_stores_sized, with_stores,
@@ -412,15 +417,6 @@ pub fn parse_pattern_with_comments(
     )
 }
 
-/// Push `expr` into `stores` and mint its id — for a host-built expression, such as a
-/// shorthand directive's synthesized identifier.
-#[inline]
-pub fn push_expression(stores: &mut AstStores, expr: Expression) -> ExprId {
-    #[cfg(feature = "_internal_ast_census")]
-    tsv_lang::ast_census_probe::mint::<Expression>(1);
-    stores.exprs.push(expr)
-}
-
 /// A name's text copied into `stores`, as the escaped-name row an `IdentName` carries — for a
 /// host-built name a span of the source cannot spell, such as a directive name holding a byte
 /// the wire must escape.
@@ -446,19 +442,16 @@ pub fn first_function_declaration<'s>(
     }
 }
 
-/// Copy `ids` into `stores`' id-list store as one run — for a list the host gathered itself
-/// (`{@debug}`'s identifiers).
-pub fn push_expression_list(stores: &mut AstStores, ids: &[ExprId]) -> Run<ExprId> {
-    let mark = stores.expr_list_scratch.mark();
-    for &id in ids {
-        stores.expr_list_scratch.push(id);
-    }
-    let run = stores
-        .expr_list_scratch
-        .flush_copy(mark, &mut stores.expr_lists);
-    #[cfg(feature = "_internal_ast_census")]
-    tsv_lang::ast_census_probe::mint::<ExprId>(run.len());
-    run
+/// Whether `address` lies inside the rows of one of the stores `view` reads: the store-range
+/// guard a reader keying nodes by address (the experimental typechecker's address map) asserts
+/// on every address it keys. A node reached through the view, or a field inside one, always
+/// lies in a store; a copy of a `Copy` row on the stack never does, and keying one would key
+/// a slot another node can reuse. The tree's root, a `Program` held beside the stores, is no
+/// store's row, so a caller excepts it. Read-only, and present in every build, so a
+/// `debug_assert!` over it type-checks in release.
+#[inline]
+pub fn holds_address(view: AstView<'_>, address: usize) -> bool {
+    view.stores().holds_address(address)
 }
 
 /// Attach a `: T` annotation to a **Svelte block-position** binding pattern

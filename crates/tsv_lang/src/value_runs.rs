@@ -44,7 +44,16 @@ use crate::store::{ListBuf, Row, Store, TextPool};
 ///   returns the stores struct for the view's lifetime (`AstView::runs`, here
 ///   `fn runs(self) -> &'a RunStores`). The view is a type of the calling crate, named bare
 ///   (the accessors are an inherent `impl` of it), `Copy`, with one lifetime parameter and no
-///   other.
+///   other;
+/// - optionally, after the view, a `mint` clause,
+///   `, mint AstStores.runs => sealed::ListStore, sealed::Seal`: the caller's stores type that
+///   holds the generated struct and the field holding it, then a trait of the caller's and the
+///   type of its seal argument. Per entry the macro writes
+///   `impl ListStore for Row` with the trait's one method, `split(stores: &mut AstStores, _:
+///   Seal) -> (&mut Store<Row>, &mut ListBuf<Row>)`, the entry's store and scratch stack
+///   borrowed apart — so a write surface the caller seals behind that trait reaches every
+///   entry, one added later included, without a line of its own. A caller with no such
+///   surface leaves the clause out.
 ///
 /// Each entry names a store field, its scratch stack's field and the element type; its doc
 /// comment documents the store field. An element type has one entry: a second store of the
@@ -62,8 +71,9 @@ use crate::store::{ListBuf, Row, Store, TextPool};
 /// The stores struct gets `new` (allocating nothing), `reset` (every store and scratch stack
 /// rewound in place, capacity kept), `capacity_bytes` (the bytes every store's and scratch
 /// stack's allocation holds — what parking the stores retains), `marks` and `truncate` (the scratch stacks' tops, taken
-/// into a caller's `MarkGroup` and rewound to), `clear_scratch`, and, in a build with debug
-/// assertions, `scratch_is_empty`. A test build of the caller also gets `shapes`, every
+/// into a caller's `MarkGroup` and rewound to), `clear_scratch`, `holds_address` (whether an
+/// address lies in the rows of one of the stores, the store-range guard's read), and, in a
+/// build with debug assertions, `scratch_is_empty`. A test build of the caller also gets `shapes`, every
 /// field's [`FieldShape`] in declaration order, and `FIELDS`, the store fields' names. The
 /// macro places no bound on an element type beyond [`Row`]: which flush a list takes
 /// (`ListBuf::flush_copy` or `flush_copy_short`) is the choice of the code that builds it.
@@ -87,7 +97,8 @@ macro_rules! value_runs {
         $vis:vis struct $Stores:ident;
         $(#[$marks_meta:meta])*
         $marks_vis:vis struct $Marks:ident;
-        $acc_vis:vis view $View:ident :: $reach:ident;
+        $acc_vis:vis view $View:ident :: $reach:ident
+            $(, mint $Outer:ident . $outer_field:ident => $Mint:path, $Seal:ty)?;
         $(
             $(#[$m:meta])*
             $field:ident, $scratch:ident : $Row:ty $(as $stated:ident)? $(=> $acc:ident)?;
@@ -96,6 +107,11 @@ macro_rules! value_runs {
         $(
             $crate::__value_runs_family!($Row $(, $stated)?);
         )*
+
+        $crate::__value_runs_mint! {
+            $($Outer . $outer_field => $Mint, $Seal)?;
+            $($field, $scratch : $Row;)*
+        }
 
         $(#[$stores_meta])*
         $vis struct $Stores {
@@ -175,6 +191,14 @@ macro_rules! value_runs {
                 $(self.$scratch.reset();)*
             }
 
+            /// Whether `address` lies inside the rows of one of the stores, their scratch
+            /// stacks excluded: the store-range guard's read
+            /// ([`Store::holds_address`](crate::store::Store::holds_address)).
+            #[inline]
+            $vis fn holds_address(&self, address: usize) -> bool {
+                false $(|| self.$field.holds_address(address))*
+            }
+
             /// Whether every scratch stack is empty.
             #[cfg(debug_assertions)]
             $vis fn scratch_is_empty(&self) -> bool {
@@ -201,6 +225,31 @@ macro_rules! value_runs {
                 }
             )?)*
         }
+    };
+}
+
+/// [`value_runs!`](crate::value_runs!)'s `mint` clause: per entry, an impl of the caller's
+/// sealed list trait handing out the entry's store and scratch stack apart, reached through
+/// the field of the caller's stores that holds the generated struct. Nothing without the clause.
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __value_runs_mint {
+    (; $($field:ident, $scratch:ident : $Row:ty;)*) => {};
+    (
+        $Outer:ident . $outer_field:ident => $Mint:path, $Seal:ty;
+        $($field:ident, $scratch:ident : $Row:ty;)*
+    ) => {
+        $(
+            impl $Mint for $Row {
+                #[inline]
+                fn split(
+                    stores: &mut $Outer,
+                    _: $Seal,
+                ) -> (&mut $crate::store::Store<$Row>, &mut $crate::store::ListBuf<$Row>) {
+                    (&mut stores.$outer_field.$field, &mut stores.$outer_field.$scratch)
+                }
+            }
+        )*
     };
 }
 
@@ -290,7 +339,7 @@ impl FieldShape {
 mod tests {
     use super::{FieldKind, FieldShape};
     use crate::Span;
-    use crate::store::{MarkGroup, PoolText, Run, TextPool};
+    use crate::store::{ListBuf, MarkGroup, PoolText, Row, Run, Store, TextPool};
 
     /// The family of the toy pool.
     enum Words {}
@@ -337,7 +386,7 @@ mod tests {
         struct ToyLists;
         /// The tops of the toy scratch stacks.
         struct ToyMarks;
-        view ToyView::lists;
+        view ToyView::lists, mint ToyStores.lists => ToySplit, ToySeal;
 
         /// `Copy` rows, read through the view.
         leaves, leaf_scratch: Leaf => leaves;
@@ -349,6 +398,24 @@ mod tests {
         spans, span_scratch: Span as Row => spans;
         /// Rows that are handles of the pool, a generic type whose family is stated beside it.
         names, name_scratch: PoolText<Words> as Row => names;
+    }
+
+    /// The seal argument of [`ToySplit`], standing in for a language crate's unconstructible
+    /// one.
+    struct ToySeal;
+
+    /// The toy's list trait, which the `mint` clause implements for every entry.
+    trait ToySplit: Sized {
+        fn split(stores: &mut ToyStores, seal: ToySeal) -> (&mut Store<Self>, &mut ListBuf<Self>);
+    }
+
+    /// `items` as one run of `T`'s store, through the store and scratch stack the `mint` clause
+    /// hands out.
+    fn push_list<T: ToySplit + Row + Copy>(stores: &mut ToyStores, items: &[T]) -> Run<T::Family> {
+        let (store, scratch) = T::split(stores, ToySeal);
+        let mark = scratch.mark();
+        scratch.extend_from_slice(items);
+        scratch.flush_copy(mark, store)
     }
 
     impl ToyStores {
@@ -693,5 +760,38 @@ mod tests {
         assert!(filled > 0);
         stores.lists.reset();
         assert_eq!(stores.lists.capacity_bytes(), filled);
+    }
+
+    /// The `mint` clause hands out each entry's own store and scratch stack: a list built
+    /// through it reads back through the entry's accessor, and leaves the scratch empty.
+    #[test]
+    fn the_mint_clause_splits_each_entry_to_its_own_store() {
+        let mut stores = ToyStores::new();
+        let leaves = push_list(&mut stores, &[Leaf(7), Leaf(8)]);
+        let spans = push_list(&mut stores, &[span(3)]);
+        let tokens = push_list(&mut stores, &[Token(9), Token(10)]);
+        let view = stores.view();
+        assert_eq!(view.leaves(leaves), [Leaf(7), Leaf(8)]);
+        assert_eq!(view.spans(spans), [span(3)]);
+        assert_eq!(stores.lists.tokens.slice(tokens), [Token(9), Token(10)]);
+        assert!(stores.lists.scratch_is_empty());
+    }
+
+    /// `holds_address` answers for the rows of every store: an element read in place lies in
+    /// one, a copy of it on the stack does not, and nothing does before a store is written.
+    #[test]
+    fn holds_address_reads_every_store_and_no_copy() {
+        let mut stores = ToyStores::new();
+        let probe = Leaf(1);
+        assert!(!stores.lists.holds_address((&raw const probe).addr()));
+        let leaves = push_list(&mut stores, &[Leaf(1), Leaf(2)]);
+        let tokens = push_list(&mut stores, &[Token(3)]);
+        let view = stores.view();
+        let leaf = &view.leaves(leaves)[1];
+        assert!(stores.lists.holds_address((&raw const *leaf).addr()));
+        let token = &stores.lists.tokens.slice(tokens)[0];
+        assert!(stores.lists.holds_address((&raw const *token).addr()));
+        let copy = *leaf;
+        assert!(!stores.lists.holds_address((&raw const copy).addr()));
     }
 }

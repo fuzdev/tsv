@@ -380,7 +380,7 @@ impl<'a> SvelteParser<'a> {
             };
             identifiers = match sequence {
                 Some(elements) => elements,
-                None => tsv_ts::__private::push_expression_list(self.stores_mut(), &[expr]),
+                None => tsv_ts::__private::push_list(self.stores_mut(), &[expr]),
             };
         }
 

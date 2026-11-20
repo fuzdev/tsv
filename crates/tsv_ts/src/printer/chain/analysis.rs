@@ -1988,8 +1988,8 @@ mod tests {
         };
         let property_start = object_end + 1; // after the dot
         let span_end = property_start + property_name.len() as u32;
-        let object = crate::__private::push_expression(stores, object);
-        let property = crate::__private::push_expression(
+        let object = crate::__private::push(stores, object);
+        let property = crate::__private::push(
             stores,
             Expression::from_identifier(Identifier::simple(
                 prop_name,
@@ -2009,7 +2009,7 @@ mod tests {
 
     /// Helper to create a call expression: callee()
     fn make_call(stores: &mut ast::AstStores, callee: Expression, callee_end: u32) -> Expression {
-        let callee = crate::__private::push_expression(stores, callee);
+        let callee = crate::__private::push(stores, callee);
         Expression {
             kind: ExpressionKind::CallExpression(CallExpression {
                 callee,

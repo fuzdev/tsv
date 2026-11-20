@@ -4,13 +4,14 @@
 
 use super::*;
 
-use crate::ast::{ParsedRootRef, SvelteStores};
+use crate::ast::{ParsedRootRef, SvelteStores, SvelteView};
 /// A document's stores, their per-thread parking through the slots `tsv_ts` and `tsv_css`
 /// own, and the slot a caller owns.
 pub use crate::ast::{WarmStores, park_stores, parked_own_capacity, take_stores, with_stores};
 /// The Svelte-shaped HTML answers `tsv_svelte_compile` and `tsv_debug` read — the crate's own
 /// `html` module, where each item's doc says where it departs from the spec.
 pub use crate::html::{is_mathml_element, is_svg_element, preserves_whitespace};
+use tsv_ts::ast::AstStores;
 
 /// Parse a document the format path folded (`tsv_lang::printing::normalize_carriage_returns`)
 /// — the parse every Svelte format entry point runs: the CLI, the bindings' `parse_format!`
@@ -51,6 +52,40 @@ pub fn parsed_ref<'a>(root: &'a Root, stores: &'a SvelteStores) -> ParsedRootRef
     ParsedRootRef {
         root,
         view: stores.view(),
+    }
+}
+
+/// Run `f` over the document's template view and its TypeScript half, held apart, so a host
+/// can read the template (the own and CSS halves) while it writes TypeScript rows of its own
+/// (`tsv_ts::__private`'s write surface) and keep the template's references across its
+/// pushes. The TypeScript half is moved out of `stores` for the call and moved back after it
+/// on every exit — a value `f` returns, an `Err` it carries, a panic it unwinds with (resumed
+/// once the half is back).
+///
+/// For the call, an empty `AstStores` stands in for the half the view would read, so a read
+/// of the TypeScript half through the view inside `f` (`view.ts().expr(id)` of a template
+/// expression's id) misses loudly, in the stores' shared cold path, and never reads a wrong
+/// row: read the TypeScript rows through the `&mut AstStores` `f` is handed
+/// (`stores.view()`). The ids `f` mints there are the document's, read through `stores`'
+/// view once the call returns, and like every id of the document they die with its stores.
+///
+/// Unlike `tsv_ts`'s parked-stores entry points, where a panic leaves the slot empty, a panic
+/// here still puts the half back — with whatever frames `f` left open, so the next parse into
+/// these stores asserts in a debug build until they are reset (parking resets them). `f` may
+/// also replace the half whole (`*ts = AstStores::new()`), which drops every TypeScript id the
+/// document's parse minted.
+pub fn with_ts_stores<R>(
+    stores: &mut SvelteStores,
+    f: impl FnOnce(SvelteView<'_>, &mut AstStores) -> R,
+) -> R {
+    let mut ts = std::mem::replace(&mut stores.ts, Box::new(AstStores::new()));
+    // the closure borrows the view and the half apart, so neither borrow outlives the call
+    let result =
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| f(stores.view(), &mut ts)));
+    stores.ts = ts;
+    match result {
+        Ok(value) => value,
+        Err(payload) => std::panic::resume_unwind(payload),
     }
 }
 
@@ -240,4 +275,89 @@ pub fn convert_ast_json_bytes_with_locations<'a>(
 pub fn convert_ast_json_string<'a>(parsed: impl Into<ParsedRootRef<'a>>, source: &str) -> String {
     String::from_utf8(convert_ast_json_bytes(parsed, source))
         .expect("writer emits valid UTF-8 (source slices + ASCII fragments)")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ast::{ExpressionTag, FragmentNode};
+
+    /// The document's top-level expression tag: `{x}` of `{x}`.
+    fn first_tag(parsed: &ParsedRoot) -> ExpressionTag {
+        let nodes = parsed.view().nodes(parsed.root.fragment.nodes);
+        match nodes.first() {
+            Some(FragmentNode::ExpressionTag(tag)) => *tag,
+            _ => panic!("the document opens with an expression tag"),
+        }
+    }
+
+    /// The address of the TypeScript half's box: the half `with_ts_stores` must put back.
+    fn half_address(stores: &SvelteStores) -> usize {
+        (&raw const *stores.ts).addr()
+    }
+
+    /// An `Ok` exit puts the half back, and a row minted inside reads through the document's
+    /// view afterwards, beside the parse's own.
+    #[test]
+    fn with_ts_stores_puts_the_half_back_after_ok() {
+        let mut parsed = parse("{alpha}").expect("parses");
+        let tag = first_tag(&parsed);
+        let before = half_address(&parsed.stores);
+        let minted = with_ts_stores(&mut parsed.stores, |view, ts| {
+            // the template half reads through the view while the TypeScript half is written
+            assert_eq!(view.nodes(parsed.root.fragment.nodes).len(), 1);
+            let row = *ts.view().expr(tag.expression);
+            tsv_ts::__private::push(ts, row)
+        });
+        assert_eq!(half_address(&parsed.stores), before);
+        let ts = parsed.stores.view().ts();
+        assert_eq!(ts.expr(minted).span, ts.expr(tag.expression).span);
+        assert!(minted != tag.expression);
+    }
+
+    /// An `Err` the closure returns puts the half back too, with the rows minted before it.
+    #[test]
+    fn with_ts_stores_puts_the_half_back_after_err() {
+        let mut parsed = parse("{alpha}").expect("parses");
+        let tag = first_tag(&parsed);
+        let before = half_address(&parsed.stores);
+        let mut minted = None;
+        let result: std::result::Result<(), &str> = with_ts_stores(&mut parsed.stores, |_, ts| {
+            let row = *ts.view().expr(tag.expression);
+            minted = Some(tsv_ts::__private::push(ts, row));
+            Err("stopped")?;
+            Ok(())
+        });
+        assert_eq!(result, Err("stopped"));
+        assert_eq!(half_address(&parsed.stores), before);
+        let minted = minted.expect("minted before the error");
+        let ts = parsed.stores.view().ts();
+        assert_eq!(ts.expr(minted).span, ts.expr(tag.expression).span);
+    }
+
+    /// A panic inside the closure unwinds through, and the half is back once it is caught.
+    #[test]
+    fn with_ts_stores_puts_the_half_back_after_a_panic() {
+        let mut parsed = parse("{alpha}").expect("parses");
+        let tag = first_tag(&parsed);
+        let before = half_address(&parsed.stores);
+        let unwound = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            with_ts_stores(&mut parsed.stores, |_, _| panic!("boom"));
+        }));
+        assert!(unwound.is_err());
+        assert_eq!(half_address(&parsed.stores), before);
+        let _ = parsed.stores.view().ts().expr(tag.expression);
+    }
+
+    /// A read of the TypeScript half through the view inside the closure misses loudly: the
+    /// stand-in holds no row.
+    #[test]
+    #[should_panic(expected = "store ")]
+    fn a_read_of_the_half_through_the_view_inside_misses() {
+        let mut parsed = parse("{alpha}").expect("parses");
+        let tag = first_tag(&parsed);
+        with_ts_stores(&mut parsed.stores, |view, _| {
+            let _ = view.ts().expr(tag.expression);
+        });
+    }
 }

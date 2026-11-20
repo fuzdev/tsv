@@ -234,7 +234,7 @@ impl<'a> SvelteParser<'a> {
     /// Push an expression the parser built itself (a shorthand's synthesized identifier).
     #[inline]
     pub(crate) fn push_ts_expr(&mut self, expr: Expression) -> ExprId {
-        tsv_ts::__private::push_expression(self.stores_mut(), expr)
+        tsv_ts::__private::push(self.stores_mut(), expr)
     }
 
     /// The document's stores, for an operation outside an island parse.

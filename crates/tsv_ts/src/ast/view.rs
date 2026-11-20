@@ -162,6 +162,13 @@ impl<'a> AstView<'a> {
     pub(super) fn runs(self) -> &'a RunStores {
         &self.stores.runs
     }
+
+    /// The stores the view reads, for the crate's own readers of what no accessor answers
+    /// (the store-range guard, `crate::__private::holds_address`).
+    #[inline]
+    pub(crate) fn stores(self) -> &'a AstStores {
+        self.stores
+    }
 }
 
 impl AstStores {
