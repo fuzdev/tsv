@@ -1016,7 +1016,12 @@ pub struct CssAtruleBlock {
 }
 
 /// At-rule block child - can be rule, declaration, or nested at-rule
+///
+/// The tag is explicit: left to the compiler it folds into a niche of a variant's payload, and
+/// every match on a child — the printer walks each block's run of them — then decodes the
+/// variant from that payload instead of reading one word.
 #[derive(Debug, Clone, Copy)]
+#[repr(u32)]
 pub enum CssBlockChild {
     Rule(CssRule),
     Declaration(CssDeclaration),
@@ -1045,6 +1050,10 @@ const _: () = assert!(size_of::<ColorChannel>() == 12);
 const _: () = assert!(size_of::<Color>() == 52);
 #[cfg(all(test, target_pointer_width = "64"))]
 const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<CssValue>() == 64);
+// `CssBlockChild`'s explicit tag widens its row past its widest payload; a niche-tagged child
+// would fit in less, and the pin is what catches the tag being dropped.
+#[cfg(all(test, target_pointer_width = "64"))]
+const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<CssBlockChild>() == 112);
 
 // An optional list-bearing node folds its absence into its run's niche: an absent `of S`, an
 // absent block, an absent connector run cost nothing beside a present one.

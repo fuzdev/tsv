@@ -7,7 +7,7 @@
 //! wasm32, so a change that widens one of these fails the gate, and the package build
 //! after it.
 
-use tsv_css::ast::{ColorChannel, CssValue, SimpleSelector};
+use tsv_css::ast::{ColorChannel, CssBlockChild, CssValue, SimpleSelector};
 use tsv_lang::doc::DocContext;
 use tsv_lang::doc::arena::DocNode;
 use tsv_lang::store::{Id, IdRet, ListBuf, ListMark, PoolText, Run, Store, StoreView, TextPool};
@@ -60,6 +60,8 @@ const _: () = assert!(size_of::<Result<IdRet<TSType>, Error>>() == 2 * size_of::
 const _: () = assert!(size_of::<ColorChannel>() == 12);
 const _: () = assert!(size_of::<CssValue>() == 64);
 const _: () = assert!(size_of::<SimpleSelector>() == 60);
+// `CssBlockChild`'s explicit tag. See the native pin in `tsv_css`'s `ast/mod.rs`.
+const _: () = assert!(size_of::<CssBlockChild>() == 112);
 // The Svelte nodes. See the native pins in `tsv_svelte`'s `ast/mod.rs`.
 const _: () = assert!(size_of::<Element>() == 40);
 const _: () = assert!(size_of::<FragmentNode>() == 80);
