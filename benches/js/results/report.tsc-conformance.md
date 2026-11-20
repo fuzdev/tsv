@@ -6,13 +6,13 @@ Oracle: tsgo committed `.errors.txt` baselines (bind + merge + flow family). Det
 
 - in-scope tests: 9389
 - in-scope variants: 9888
-- expect-clean graded / clean pass: 4436 / 4436
-- baselined + parsed: 4464
-- family graded / family-positive: 4085 / 140
+- expect-clean graded / clean pass: 4475 / 4475
+- baselined + parsed: 4504
+- family graded / family-positive: 4134 / 143
 
 ## Family (dup 2300 / 2451 / 2567 / 2528 + merge 2397 / 2649 / 2664 / 2671; flow 7027 / 7028)
 
-- match: 573 (dup 539, flow 34)
+- match: 581 (dup 547, flow 34)
 - missing: 37 (dup 11, flow 26)
   - by cause: merge-path 0, lib-conflict 0, late-bound 11, cfa 26, other 0
 - extra (GATE=0): 0
@@ -22,7 +22,7 @@ Oracle: tsgo committed `.errors.txt` baselines (bind + merge + flow family). Det
 
 | code | match | missing |
 | --- | --- | --- |
-| TS2300 | 415 | 11 |
+| TS2300 | 423 | 11 |
 | TS2397 | 4 | 0 |
 | TS2451 | 56 | 0 |
 | TS2528 | 35 | 0 |
@@ -37,13 +37,13 @@ Oracle: tsgo committed `.errors.txt` baselines (bind + merge + flow family). Det
 
 ## Carve-outs
 
-- recovery-AST rule (a): 379 (family-positive 11)
+- recovery-AST rule (a): 370 (family-positive 11)
 - moduleDetection variants (inert for family): 1
 
 ## Parse-divergence census
 
-- parse-rejected: 988 (no baseline 44, TS1xxx-only 456, other 488)
-- script-goal retries: 25
+- parse-rejected: 909 (no baseline 5, TS1xxx-only 443, other 461)
+- script-goal retries: 59
 - crash-excluded (tracked): 0
 
 ## Lib base
