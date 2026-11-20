@@ -64,7 +64,6 @@ pub mod strip_fixtures_validate;
 pub mod swallow_audit;
 pub mod test262;
 pub mod ts_fixture_audit;
-#[cfg(tsv_unported)]
 pub mod tsc_conformance;
 pub mod type_sizes;
 pub mod variant_audit;

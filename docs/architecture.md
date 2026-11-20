@@ -83,7 +83,7 @@ tsv/
 ├── tsv_css      # CSS parser/formatter (standalone)
 ├── tsv_svelte   # Svelte parser/formatter (uses tsv_ts + tsv_css)
 ├── tsv_svelte_compile # experimental Svelte→JS compiler + JS canonicalizer (uses tsv_svelte + tsv_ts + tsv_css; consumed only by tsv_debug and the integration tests)
-├── tsv_check    # experimental TypeScript binder/checker, may never ship (uses tsv_ts + tsv_lang; currently outside the workspace build)
+├── tsv_check    # experimental TypeScript binder/checker, may never ship (uses tsv_ts + tsv_lang; consumed only by tsv_debug)
 ├── tsv_cli      # Production CLI binary (pure Rust)
 ├── tsv_debug    # Dev utilities (uses a Node sidecar for JS tools)
 ├── tsv_arena    # Shared binding substrate: the format path over tsv_lang's per-thread doc arena + the goal axis
@@ -120,8 +120,8 @@ closed-scope/open-convention stance below.
 (production) (dev, Node)   (C FFI)    (N-API, Node/Bun)  (browser/Node/Deno)
                 ↑
             tsv_check  (experimental TypeScript binder/checker, may never ship —
-                        depends on tsv_lang + tsv_ts; currently outside the workspace build,
-                        and no shipped format/parse artifact links it)
+                        depends on tsv_lang + tsv_ts; consumed ONLY by tsv_debug,
+                        so no shipped format/parse artifact links it)
             tsv_svelte_compile  (experimental Svelte→JS compiler + JS canonicalizer —
                         depends on tsv_lang + tsv_ts + tsv_css + tsv_svelte;
                         consumed ONLY by tsv_debug and the integration tests, so no shipped artifact links it)
@@ -1360,7 +1360,7 @@ The closest Rust projects embody the alternative shapes, which makes the trade-o
 
 Issues that need architectural decisions before building future tools.
 
-- **Scope/symbol resolution** — The shipped ASTs are syntax-only; meaningful linting requires name resolution. The experimental `tsv_check` binder (`crates/tsv_check`, currently outside the workspace build — [CLAUDE.md §Project Structure](../CLAUDE.md#project-structure)) is the candidate answer, but nothing shipped links it. *(When: before linter.)*
+- **Scope/symbol resolution** — The shipped ASTs are syntax-only; meaningful linting requires name resolution. The experimental `tsv_check` binder (`crates/tsv_check`, consumed only by `tsv_debug`) is the candidate answer, but nothing shipped links it. *(When: before linter.)*
 - **Error recovery** — Fail-fast parsers block LSP/linter (need partial ASTs from broken code); also required for full CSS-spec compliance — CSS Syntax 3 §5.5 recovery (drop the bad rule, keep parsing), see conformance_svelte.md §CSS Parser Scope & Error Model. *(When: for full CSS-spec compliance (CSS) / before LSP/linter.)*
 - **Source maps** — A shipped compiler must map output positions to input; the experimental `tsv_svelte_compile` emits none. How do spans survive transforms? *(When: before the compiler ships.)*
 - **Cancellation** — LSP operations must be cancellable mid-parse. Current parser has no cancellation points. *(When: before LSP.)*

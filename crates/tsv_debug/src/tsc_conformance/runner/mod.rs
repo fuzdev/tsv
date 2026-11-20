@@ -62,7 +62,6 @@ use crate::tsc_conformance::options_meta::{
     SKIPPED_TESTS, is_config_file_name, variant_is_unsupported,
 };
 use crate::tsc_conformance::variants::{Variant, config_name, expand};
-use bumpalo::Bump;
 use std::collections::{BTreeMap, HashMap};
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::Path;
@@ -292,12 +291,11 @@ pub fn check_one(
     let baseline = ondisk.get(&(test.suite, baseline_name.clone())).copied();
 
     // Parse + bind every unit, then merge against the selected variant's lib base.
-    let arena = Bump::new();
     let source_units: Vec<SourceUnit<'_>> = units
         .iter()
         .map(|u| SourceUnit::new(&u.name, &u.content))
         .collect();
-    let bound = bind_program(&source_units, &arena);
+    let bound = bind_program(&source_units);
     let mut resolver = LibResolver::new(checkout);
     let base = resolver.base_for(&variant.config);
     let lib_files = base.as_ref().map_or(&[][..], |b| b.lib_files.as_slice());
@@ -401,19 +399,16 @@ pub fn dump_flow_dot(checkout: &Path, name: &str) -> Result<String, String> {
         .first()
         .ok_or_else(|| "test has no units".to_string())?;
 
-    let arena = Bump::new();
-    // The goal rule (Module first, Script retry) — the same rule bind_program
-    // uses, inlined here because --dump-flow keeps the BoundFile for rendering.
-    let program =
-        match tsv_ts::__private::parse_with_goal(&unit.content, tsv_ts::Goal::Module, &arena) {
-            Ok(p) => p,
-            Err(module_err) => {
-                tsv_ts::__private::parse_with_goal(&unit.content, tsv_ts::Goal::Script, &arena)
-                    .map_err(|_| format!("parse error: {module_err:#}"))?
-            }
-        };
-    let bound = bind_file(&program, &unit.content, FileId::ROOT);
-    let flow = build_flow(&program, &unit.content, &bound);
+    // The goal rule (Module first, Script retry), inlined here because --dump-flow
+    // keeps the BoundFile for rendering. The one `parsed` feeds both walks: the flow
+    // walk resolves nodes by the addresses the bind keyed in it.
+    let parsed = match tsv_ts::__private::parse_with_goal(&unit.content, tsv_ts::Goal::Module) {
+        Ok(p) => p,
+        Err(module_err) => tsv_ts::__private::parse_with_goal(&unit.content, tsv_ts::Goal::Script)
+            .map_err(|_| format!("parse error: {module_err:#}"))?,
+    };
+    let bound = bind_file((&parsed).into(), &unit.content, FileId::ROOT);
+    let flow = build_flow((&parsed).into(), &unit.content, &bound);
     Ok(render_flow_dot(&flow, &bound.spans, &unit.content))
 }
 

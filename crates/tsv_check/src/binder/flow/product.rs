@@ -14,7 +14,7 @@ pub struct FlowStats {
     pub dead_labels: u32,
 }
 
-/// The owned, arena-free, file-local flow product carried **dark** in a
+/// The owned, file-local flow product (it borrows no parse) carried **dark** in a
 /// `BoundUnit` (nothing consumes it until F3; F1a builds it and `--dump-flow`
 /// renders it). C15-relocatable by construction.
 pub struct FlowProduct {

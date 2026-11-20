@@ -46,11 +46,6 @@ impl ProfileCommand {
             eprintln!("Error: --bind and --strip each replace the format column; pass one");
             return Err(CliError::Failed);
         }
-        #[cfg(not(tsv_unported))]
-        if self.bind {
-            eprintln!("Error: --bind needs tsv_check, which is outside the workspace build");
-            return Err(CliError::Failed);
-        }
         let mode = if self.bind {
             Mode::Bind
         } else if self.strip {
@@ -330,22 +325,16 @@ fn profile_file(
     let mut parse_times = Vec::with_capacity(iterations);
     let mut format_times = Vec::with_capacity(iterations);
     let mut render_times = Vec::with_capacity(iterations);
-    #[cfg_attr(not(tsv_unported), expect(unused_mut))]
     let mut bind_stats = None;
 
     for _ in 0..iterations {
         // Clears what a failed iteration left behind.
         let _ = tsv_lang::phase_timing::take_render_time();
         let (parse_dur, format_dur) = match mode {
-            #[cfg(tsv_unported)]
             Mode::Bind => {
                 let (parse_dur, format_dur, stats) = profile_bind_once(&source)?;
                 bind_stats = Some(stats); // deterministic — any iteration's copy
                 (parse_dur, format_dur)
-            }
-            #[cfg(not(tsv_unported))]
-            Mode::Bind => {
-                return Err("--bind needs tsv_check, which is outside the workspace build".into());
             }
             Mode::Strip => profile_strip_once(&source)?,
             Mode::Format => profile_once(&source, parser_type, doc_arena)?,
@@ -380,17 +369,16 @@ fn profile_file(
 /// Run one parse + lower+bind iteration for TypeScript, returning
 /// `(parse_duration, bind_duration, flow_counters)`. The bind phase runs the
 /// `tsv_check` binder (SoA walk + symbol bind) over the parsed program.
-#[cfg(tsv_unported)]
 fn profile_bind_once(source: &str) -> Result<(Duration, Duration, BindStats), String> {
     let t0 = Instant::now();
-    let ast = tsv_ts::__private::parse(source).map_err(|e| format!("parse error: {e:#}"))?;
+    let parsed = tsv_ts::__private::parse(source).map_err(|e| format!("parse error: {e:#}"))?;
     let parse_dur = t0.elapsed();
 
     let t1 = Instant::now();
     // Parse -> lower+bind (F0) -> flow graph (F1). The flow walk is the third
     // pass, so it belongs in the bind column the checker's perf anchor tracks.
-    let bound = tsv_check::bind_file(&ast, source, tsv_check::FileId::ROOT);
-    let flow = tsv_check::build_flow(&ast, source, &bound);
+    let bound = tsv_check::bind_file((&parsed).into(), source, tsv_check::FileId::ROOT);
+    let flow = tsv_check::build_flow((&parsed).into(), source, &bound);
     let bind_dur = t1.elapsed();
 
     let stats = BindStats {

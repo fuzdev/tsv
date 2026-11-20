@@ -2,8 +2,6 @@
 
 > An **experimental** from-scratch TypeScript binder + checker (`tsv_check`) and the pure-Rust harness that grades it against tsgo's committed error baselines. Everything here is in development and **may never ship** — nothing in tsv's published artifacts depends on it, and none of its gates run at release cadence.
 
-**Not run at present:** `tsv_check` is outside the workspace build ([CLAUDE.md §Project Structure](../CLAUDE.md#project-structure)), so `tsc_conformance`, `profile --bind`, the `conformance:tsc-*` tasks and the `cargo tree -i tsv_check` below do not work.
-
 ## Status
 
 `tsv_check` is a research crate: a
@@ -35,7 +33,7 @@ error baselines over the tsc test corpus, read from a pinned `../typescript-go`
 checkout (oracle pin `168e7015`, baselines under
 `testdata/baselines/reference/submodule`). Observable behavior — which diagnostics
 exist, their codes, spans, and order — is ported from tsgo; representation (dense u32
-ids, SoA side columns, arena borrowing) is tsv's own.
+ids, SoA side columns, rows read in place from the parse's stores) is tsv's own.
 
 ## Gating status
 

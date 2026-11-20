@@ -20,7 +20,7 @@
   diagnostics exist, their codes/spans/order, budget limits, circularity
   outcomes) is ported from tsgo — the reference checkout is a pinned
   `../typescript-go` — while representation (dense u32 ids, SoA side
-  columns, arena borrowing) is tsv's own.
+  columns, rows read in place from the parse's stores) is tsv's own.
 - **Reference anchors.** Semantic-core functions carry a
   `// tsgo: <file.go> <function>` comment tying them to their counterpart
   in the pinned checkout. A deliberate structural departure is documented
@@ -127,20 +127,27 @@
     walk uses the lenient lookup (a miss just means "not a candidate"). The
     flow product rides `BoundUnit`,
     consumed by `check/unreachable.rs` (TS7027/7028) and, later, the CFA type
-    engine. The address map keys on `(address, NodeKind)`, so the one offset-0
+    engine. The address map keys on `(NodeAddr, NodeKind)`, so the one offset-0
     collision pair — a `MethodDefinition` and its inline
     `value: FunctionExpression` (same address) — stays distinctly resolvable
     (pinned by `method_and_value_resolve_distinctly`); the kind disambiguates,
     and no same-kind collisions exist.
 
-  **Borrow-only discipline**: visitors take `&'arena` references and never
-  clone AST nodes — the AST derives `Clone`, and one accidental `.clone()`
-  silently mints differently-addressed copies that break the address map.
-  Nothing type-level prevents it, so `tests/clone_discipline.rs` does: it fails
-  on any clone-shaped call in `src/` outside its reviewed non-AST allow-list
-  (and on any allow-list entry gone stale).
+  **Keyed in place (the store-world rule)**: every walk reads rows in place
+  from the parse's stores through the `AstView` and keys or resolves a node
+  by the row's address. Every AST row is `Copy`, so a `*deref` copy on the
+  stack re-addresses a node with no clone syntax to flag, and keying it keys
+  a slot the next copy reuses. Two guards hold the rule. At compile time,
+  `binder/keyed.rs` owns every way to make a key: a `NodeAddr` (private
+  field) comes only from `addr_of<T: Keyed>`, sealed to the row and payload
+  types the walk keys, so an id slot, a `&&Row` or a raw integer cannot
+  become one — plus one named constructor for the deliberate MetaProperty
+  id-slot key. At run time, in debug builds, the store-range guard
+  (`debug_assert_stored_key`) asserts that every keyed or looked-up address
+  lies in a store row (the `Program` root, held beside the stores, excepted),
+  which catches a stack copy.
 - `check/` — the post-bind **syntactic** check pass (`check_file_members`), a
-  standalone `CheckWalk` over `&Program` that never consults the binder's
+  standalone `CheckWalk` over the parse (`ParsedRef`) that never consults the binder's
   symbol tables (walking the shared interface member table would break
   declaration-merging). It descends every syntactic position a type literal or
   type-parameter list can hide — class / interface / type-literal bodies, every
@@ -206,9 +213,8 @@
 ## Public API
 
 ```rust
-let arena = bumpalo::Bump::new();
 let units = [SourceUnit::new("a.ts", source)];
-let result: CheckResult = check_program(&units, &arena, &CheckOptions::default());
+let result: CheckResult = check_program(&units, &CheckOptions::default());
 // result.diagnostics — canonically sorted + deduplicated (error category)
 // result.suggestions — suggestion-category diagnostics (default-option TS7027/8),
 //                      a SEPARATE sink the parity/expect-clean grading never reads
@@ -216,7 +222,7 @@ let result: CheckResult = check_program(&units, &arena, &CheckOptions::default()
 // result.parse_rejected — some unit parse-rejected (reported; suppresses nothing)
 ```
 
-The caller owns the arena (the same contract as `tsv_ts::__private::parse`); the
+Each unit parses into stores of its own, dropped once its bind-time walks finish; the
 result is fully owned — nothing borrows out. For lib-aware checking:
 `bind_program` (parse+bind+flow once, variant-independent, fully owned) →
 `check_bound(&bound, Some(&lib_base), &options)`; `bind_lib` produces a cacheable

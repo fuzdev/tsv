@@ -11,7 +11,6 @@ use commands::gap_audit::GapAuditCommand;
 use commands::ignore_audit::IgnoreAuditCommand;
 #[cfg(feature = "_internal_swallow_check")]
 use commands::swallow_audit::SwallowAuditCommand;
-#[cfg(tsv_unported)]
 use commands::tsc_conformance::TscConformanceCommand;
 use commands::width_audit::WidthAuditCommand;
 use commands::{
@@ -170,7 +169,6 @@ pub enum Subcommand {
     #[cfg(feature = "_internal_swallow_check")]
     SwallowAudit(SwallowAuditCommand),
     Test262(Test262Command),
-    #[cfg(tsv_unported)]
     TscConformance(TscConformanceCommand),
     TsFixtureAudit(TsFixtureAuditCommand),
     TypeSizes(TypeSizesCommand),
@@ -249,7 +247,6 @@ impl TopLevel {
             #[cfg(feature = "_internal_swallow_check")]
             Subcommand::SwallowAudit(c) => c.run(),
             Subcommand::Test262(c) => c.run(),
-            #[cfg(tsv_unported)]
             Subcommand::TscConformance(c) => c.run(),
             Subcommand::TsFixtureAudit(c) => c.run(),
             Subcommand::TypeSizes(c) => c.run(),

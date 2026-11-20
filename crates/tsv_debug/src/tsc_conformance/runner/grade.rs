@@ -239,7 +239,6 @@ fn probe_crash_exclusion(test: &CorpusTest) -> bool {
         return true;
     };
     let units = split_units(&content, &test.basename);
-    let arena = Bump::new();
     let source_units: Vec<SourceUnit<'_>> = units
         .iter()
         .map(|u| SourceUnit::new(&u.name, &u.content))
@@ -248,7 +247,7 @@ fn probe_crash_exclusion(test: &CorpusTest) -> bool {
     // panic; the message would otherwise leak to stderr and read as a failure).
     let _hook = SuppressedPanicHook::install();
     catch_unwind(AssertUnwindSafe(|| {
-        let _ = check_program(&source_units, &arena, &CheckOptions::default());
+        let _ = check_program(&source_units, &CheckOptions::default());
     }))
     .is_err()
 }
@@ -285,11 +284,10 @@ fn grade_test(
     options: &RunOptions,
     report: &mut SkeletonReport,
 ) {
-    // Parse + bind on a fresh arena, contained against panics (the tsv parser is the
-    // panic source; the merge over owned data that follows is deterministic).
-    let arena = Bump::new();
+    // Parse + bind, contained against panics (the tsv parser is the panic source; the
+    // merge over owned data that follows is deterministic).
     let bound = match catch_unwind(AssertUnwindSafe(|| {
-        bind_program(&[SourceUnit::new(&unit.name, &unit.content)], &arena)
+        bind_program(&[SourceUnit::new(&unit.name, &unit.content)])
     })) {
         Ok(bound) => bound,
         Err(payload) => {

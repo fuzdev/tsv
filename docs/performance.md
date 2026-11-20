@@ -114,16 +114,15 @@ The tools, in order of use:
 ### 1. `tsv_debug profile` — phase timing
 
 Measures parse vs format timing across files. Pure Rust, no external dependencies.
-The `--bind` form (not run while `tsv_check` is outside the workspace build —
-[CLAUDE.md §Project Structure](../CLAUDE.md#project-structure)) instead measures
-parse vs lower+bind timing through the `tsv_check` crate (the experimental
-typechecker, which may never ship — see [typechecker.md](typechecker.md);
-TypeScript files only) and reports peak RSS (`VmHWM` from `/proc/self/status`) —
-the binder's standing perf-anchor form; add `--flow-stats` for its deterministic
-flow-construction counters. The `--strip` form times `tsv_ts::strip` over what a
-module loader strips (`.ts` / `.mts` / `.cts`, no declaration file): the strip
-parses inside, so its second column is the strip's time less the parse's — the
-walk and the blanking copy — and `total` is the whole strip.
+The `--bind` form instead measures parse vs lower+bind timing through the
+`tsv_check` crate (the experimental typechecker, which may never ship — see
+[typechecker.md](typechecker.md); TypeScript files only) and reports peak RSS
+(`VmHWM` from `/proc/self/status`) — the binder's standing perf-anchor form;
+add `--flow-stats` for its deterministic flow-construction counters. The
+`--strip` form times `tsv_ts::strip` over what a module loader strips (`.ts` /
+`.mts` / `.cts`, no declaration file): the strip parses inside, so its second
+column is the strip's time less the parse's — the walk and the blanking copy —
+and `total` is the whole strip.
 
 ```bash
 # Profile a directory

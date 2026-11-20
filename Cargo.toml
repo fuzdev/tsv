@@ -10,6 +10,7 @@ members = [
     "crates/tsv_css",
     "crates/tsv_svelte",
     "crates/tsv_svelte_compile",
+    "crates/tsv_check",
     "crates/tsv_cli",
     "crates/tsv_debug",
     "crates/tsv_wasm",
@@ -51,6 +52,9 @@ tsv_svelte = { path = "crates/tsv_svelte", version = "=0.8.1", default-features 
 # Svelte→JS compiler + JS canonicalizer. Dev-tooling consumer only (tsv_debug);
 # no shipped artifact links it yet.
 tsv_svelte_compile = { path = "crates/tsv_svelte_compile" }
+# Experimental TypeScript binder + checker. Dev-tooling consumer only (tsv_debug's
+# conformance harness); no shipped artifact links it.
+tsv_check = { path = "crates/tsv_check" }
 
 # External dependencies
 argh = "0.1.19"
@@ -66,8 +70,8 @@ napi = "3.16.1"
 napi-derive = "3.5.7"
 napi-build = "2.6.0"
 # Bump arena. No parse takes one (every language's tree lives in its own
-# stores): `tsv_debug` and `tsv_check` (outside the workspace build) are what remain,
-# and both use only `Bump` itself. Safe API only — `unsafe_code = "forbid"`.
+# stores): `tsv_debug` is what remains, and it uses only `Bump` itself. Safe API
+# only — `unsafe_code = "forbid"`.
 bumpalo = "3.20.3"
 # Async runtime + combinators — dev/debug tooling only (tsv_debug, integration tests)
 tokio = { version = "1" }
@@ -107,14 +111,10 @@ unused_lifetimes = "warn"
 elided_lifetimes_in_paths = "warn"
 unused_qualifications = "warn"
 unreachable_pub = "warn"
-# `tsv_unported` is never set: it gates the `tsv_debug` code that needs `tsv_check`, which is
-# outside the workspace build. A custom cfg, not a Cargo feature:
-# an optional path dependency would still join the workspace, and the `--all-features` legs
-# would turn a feature on against a dependency that is not there.
 # `perf_ab_api` selects the entry-point generation `tsv_debug`'s `perf_ab` drivers are built
 # against; `scripts/perf_ab.ts` sets it on the example's own compilation alone (the drivers'
 # module docs).
-unexpected_cfgs = { level = "warn", check-cfg = ["cfg(tsv_unported)", 'cfg(perf_ab_api, values("svelte_bump", "css_bump", "css_no_stores", "strip_bump", "no_warm_stores", "ts_parse_bump", "no_stores"))'] }
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(perf_ab_api, values("svelte_bump", "css_bump", "css_no_stores", "strip_bump", "no_warm_stores", "ts_parse_bump", "no_stores"))'] }
 
 [workspace.lints.rustdoc]
 # A doc link is the only machine-checkable claim a doc comment makes, so an unresolvable

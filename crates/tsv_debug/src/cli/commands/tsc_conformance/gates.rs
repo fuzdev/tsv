@@ -85,7 +85,7 @@ pub(super) fn enforce_run_gates(
     } else {
         eprintln!(
             "\nError: {}. If deliberate (a harness-port change, a tsv parser change, or a \
-             typescript-go pull), re-pin with `deno task conformance:tsc-check:update` — it \
+             typescript-go pull), re-pin with `npm run conformance:tsc-check:update` — it \
              rewrites {PIN_SNAPSHOT_FILE} and never touches the zero-valued invariant consts or \
              the crash-exclusion ledger (docs/typechecker.md §Pins & re-pinning).",
             errs.join("; ")

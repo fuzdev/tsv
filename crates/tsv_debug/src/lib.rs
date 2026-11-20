@@ -15,5 +15,4 @@ pub mod render_normalize;
 pub mod sidecar;
 pub mod strip_fixtures;
 pub mod test262;
-#[cfg(tsv_unported)]
 pub mod tsc_conformance;

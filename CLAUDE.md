@@ -306,7 +306,7 @@ Methodology, results tracking and the `perf` recipe (the `profiling` cargo profi
 
 ```bash
 cargo run --release -p tsv_debug -- profile ../corpora/collections/zzz/src/lib        # parse vs format timing (--iterations, --json, --flow-stats)
-cargo run --release -p tsv_debug -- profile --bind ../corpora/collections/zzz/src     # parse vs lower+bind timing (TS-only) + peak RSS; not run while tsv_check is outside the build
+cargo run --release -p tsv_debug -- profile --bind ../corpora/collections/zzz/src     # parse vs lower+bind timing (TS-only) + peak RSS
 cargo run --release -p tsv_debug -- profile --strip ../corpora/collections            # parse vs the type strip's walk + blank (.ts/.mts/.cts, no .d.ts)
 cargo run --release -p tsv_debug -- json_profile ../corpora/collections/zzz/src/lib   # the one-shot parse vs the span-only wire write (--locations: the loc emitter)
 cargo run --release -p tsv_debug -- compile_profile tests/fixtures_compile            # Svelte compile vs the format wall
@@ -381,8 +381,6 @@ tsv/
 │   └── fixtures_imports/ # Import-record fixtures for `parse_imports` (input.ts / input.svelte + oracle-generated expected.json) — tests/fixtures_imports/README.md
 └── docs/            # Documentation (fixtures, cli, architecture, etc.)
 ```
-
-**Outside the workspace build:** `tsv_check` stays on disk but is currently not a workspace member, so nothing builds or tests it. The `tsv_debug` code that needs it is compiled out behind the never-set `tsv_unported` cfg: `tsc_conformance` exits as an unrecognized argument, `profile --bind` exits with an error, and the `npm run conformance:tsc-*` scripts do not run.
 
 **Crate pattern** (tsv_ts, tsv_css, tsv_svelte): `lib.rs` (public API: `parse_to_json()` / `parse_to_json_with(JsonOptions)`, `format()`, `Formatter` (`format()` over a warm doc arena and stores, for many sources on one thread; the free functions share the thread's parked ones, capped at 1 MiB a slot), and the re-exported `run_with_stack` / `STACK_SIZE`; the AST-taking `__private::parse()` / `__private::convert_ast_json_bytes()` beneath them), `ast/` (internal AST + the wire-JSON writer), `lexer/`, `parser/`, `printer/` (uses the tsv_lang doc builder), and escapes (tsv_ts's `lexer/escapes.rs`, tsv_css's `escapes.rs`; Svelte delegates to TS/CSS). `tsv_ts` and `tsv_css` also export embedding APIs for `tsv_svelte` (`parse_embedded` + embedded-formatting variants); `tsv_ts` additionally exports the `build_*_doc` functions. That plumbing, and each language crate's `parse_folded` / `format_folded_in` (the format path `tsv_arena`'s macros call), lives in a `#[doc(hidden)] pub mod __private` — reachable by the sibling crates, not public API.
 
@@ -516,7 +514,7 @@ cargo run -p tsv_debug test262 [path-pattern]     # ECMAScript conformance (pure
 
 The pure-Rust integrity audits are `tsv_debug` commands too (`conformance_audit`, `compile_conformance_audit`, `variant_audit`, `canonicalize_audit`, each `--json`), run through their `npm run` gates under [Fixtures](#fixtures-rust--node-based); profiling commands are under [Performance Profiling](#performance-profiling).
 
-**Typechecker conformance (`tsc_conformance`) — EXPERIMENTAL, may never ship, and currently outside the workspace build ([Project Structure](#project-structure)), so these tasks do not run.** `tsv_check` is a from-scratch TypeScript binder + checker; no shipped artifact links it, and the parser and formatter are never modified in service of it. `tsv_debug tsc_conformance` grades it against tsgo's committed `.errors.txt` baselines (`../typescript-go`) via **on-demand** tasks — `npm run conformance:tsc-roundtrip`, `npm run conformance:tsc-check` (`:update` re-pins after deliberate drift) — none in `check`, `conformance`, or release gating. ./docs/typechecker.md.
+**Typechecker conformance (`tsc_conformance`) — EXPERIMENTAL, may never ship.** `tsv_check` is a from-scratch TypeScript binder + checker; no shipped artifact links it, and the parser and formatter are never modified in service of it. `tsv_debug tsc_conformance` grades it against tsgo's committed `.errors.txt` baselines (`../typescript-go`) via **on-demand** tasks — `npm run conformance:tsc-roundtrip`, `npm run conformance:tsc-check` (`:update` re-pins after deliberate drift) — none in `check`, `conformance`, or release gating. ./docs/typechecker.md.
 
 ## Architectural Notes
 
@@ -601,7 +599,7 @@ The shipped language/foundation crates' external deps (`tsv_cli` adds only `argh
 - `serde_json` — **never a normal or build dependency of a crate meant for publishing** (every crate with a `[package.metadata.docs.rs]` table; `npm run deps:audit` gates it), because the workspace entry's `preserve_order` / `float_roundtrip` / `arbitrary_precision` features would unify into a consumer's own `serde_json` and change its deserialization. It is the dev-dependency oracle of `tsv_lang`'s writer and `tsv_html`'s entity-table generator, and a normal dependency of the unpublished `tsv_ffi`, `tsv_debug` and the root test package; the one reader, `tsv_debug::json`, enables `unbounded_depth`. `serde` itself is a dev-tooling dep, out of every published library crate's normal graph (`tsv_cli` reaches it through `argh` → `argh_shared`, which carries no `serde_json`)
 - `smallvec` — stack-allocated vectors (printers + `tsv_check`)
 - `unicode-ident` / `unicode-segmentation` / `unicode-width` — XID identifiers, grapheme clustering, display width (CJK, zero-width)
-- `bumpalo` — no parse takes it (every tree — TypeScript, CSS, Svelte — lives in its own stores); what remains is the dev tooling (`tsv_debug`'s census interner and the old-generation arms of its `perf:ab` drivers) and `tsv_check`, outside the workspace build
+- `bumpalo` — no parse takes it (every tree — TypeScript, CSS, Svelte — lives in its own stores); what remains is the dev tooling (`tsv_debug`'s census interner and the old-generation arms of its `perf:ab` drivers)
 - `talc` — WASM global allocator (`tsv_wasm`, wasm32-only target dep): pure-Rust `no_std`, replacing dlmalloc; the `WasmGrowAndExtend` source keeps the warm instance's linear-memory high-water at dlmalloc parity. Pulls `lock_api` + `allocator-api2` (+ `scopeguard`) into the wasm32 graph only
 - `napi` / `napi-derive` / `napi-build` — N-API bindings for `tsv_napi` (tsv-scoped carve-out)
 

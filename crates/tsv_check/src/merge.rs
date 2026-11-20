@@ -71,8 +71,8 @@ fn is_ambient_module_symbol_name(name: &str) -> bool {
 
 /// One bound lib (`.d.ts`) file's global-eligible product — its owned
 /// [`FileMerge`] plus the display name a cross-file conflict points a masked
-/// diagnostic at. Arena-independent (owned strings), so the caller may drop the
-/// parse arena the moment the bind returns and reuse this across every variant.
+/// diagnostic at. Owned (strings, no borrow of the parse), so the caller may drop the
+/// parse the moment the bind returns and reuse this across every variant.
 pub struct LibFile {
     /// The lib file's display name (e.g. `lib.es5.d.ts`).
     pub name: String,
