@@ -97,7 +97,7 @@ pub(crate) enum TemplateItem {
 pub(crate) fn each_template_item(
     sv: SvelteView<'_>,
     view: AstView<'_>,
-    fragment: &Fragment,
+    fragment: Fragment,
     f: &mut impl FnMut(TemplateItem) -> Result<(), CompileError>,
 ) -> Result<(), CompileError> {
     for node in sv.nodes(fragment.nodes) {
@@ -117,14 +117,14 @@ fn each_node_item(
         FragmentNode::Text(_) | FragmentNode::Comment(_) => {}
         FragmentNode::Element(element) => {
             each_attribute_item(sv, sv.attributes(element.attributes), f)?;
-            each_template_item(sv, view, &element.fragment, f)?;
+            each_template_item(sv, view, element.fragment, f)?;
         }
         FragmentNode::SpecialElement(special) => {
             if let Some(this) = special_element_reference_expression(special) {
                 expr(this)?;
             }
             each_attribute_item(sv, sv.attributes(special.attributes), f)?;
-            each_template_item(sv, view, &special.fragment, f)?;
+            each_template_item(sv, view, special.fragment, f)?;
         }
         FragmentNode::ExpressionTag(tag) => expr(tag.expression)?,
         FragmentNode::HtmlTag(tag) => expr(tag.expression)?,
@@ -148,9 +148,9 @@ fn each_node_item(
         }
         FragmentNode::IfBlock(block) => {
             expr(block.test)?;
-            each_template_item(sv, view, &block.consequent, f)?;
+            each_template_item(sv, view, block.consequent, f)?;
             if let Some(alternate) = &block.alternate {
-                each_template_item(sv, view, alternate, f)?;
+                each_template_item(sv, view, *alternate, f)?;
             }
         }
         FragmentNode::EachBlock(block) => {
@@ -162,9 +162,9 @@ fn each_node_item(
             {
                 expr(e)?;
             }
-            each_template_item(sv, view, &block.body, f)?;
+            each_template_item(sv, view, block.body, f)?;
             if let Some(fallback) = &block.fallback {
-                each_template_item(sv, view, fallback, f)?;
+                each_template_item(sv, view, *fallback, f)?;
             }
         }
         FragmentNode::AwaitBlock(block) => {
@@ -176,12 +176,12 @@ fn each_node_item(
                 .into_iter()
                 .flatten()
             {
-                each_template_item(sv, view, child, f)?;
+                each_template_item(sv, view, *child, f)?;
             }
         }
         FragmentNode::KeyBlock(block) => {
             expr(block.expression)?;
-            each_template_item(sv, view, &block.fragment, f)?;
+            each_template_item(sv, view, block.fragment, f)?;
         }
         FragmentNode::SnippetBlock(snippet) => {
             // `type_params_raw` is the raw-text fallback for a `<T>` clause whose
@@ -192,7 +192,7 @@ fn each_node_item(
             for &param in view.exprs(snippet.parameters) {
                 f(TemplateItem::Parameter(param))?;
             }
-            each_template_item(sv, view, &snippet.body, f)?;
+            each_template_item(sv, view, snippet.body, f)?;
         }
     }
     Ok(())

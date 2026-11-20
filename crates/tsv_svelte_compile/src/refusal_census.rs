@@ -502,7 +502,7 @@ fn collect(
     // (`fragment_node_kind`), so the `TemplateNode` bucket matches
     // `fragment::clean_and_split`'s `other =>` arm exactly. A supported bare
     // `<svelte:head>` is excluded, as it is there.
-    collect_template_nodes(sv, &root.fragment, found);
+    collect_template_nodes(sv, root.fragment, found);
 }
 
 /// The import local names of an erased instance body — the subset of instance
@@ -567,7 +567,7 @@ fn import_local_names(view: AstView<'_>, body: Run<StmtId>, source: &str) -> Nam
 /// deliberate FENCE, a fenced-population count taken from this census would be a
 /// FLOOR; the corpus runner's `fenced` instead reads each file's real first
 /// refusal. See `compile_corpus_compare`'s TARGET SET section.)
-fn collect_template_nodes(sv: SvelteView<'_>, fragment: &Fragment, found: &mut Vec<Refusal>) {
+fn collect_template_nodes(sv: SvelteView<'_>, fragment: Fragment, found: &mut Vec<Refusal>) {
     for node in sv.nodes(fragment.nodes) {
         // A special element's refused-or-handled verdict AND its per-variant bucket
         // key both come from the shared `special_element_refusal_kind` mapping, so
@@ -582,7 +582,7 @@ fn collect_template_nodes(sv: SvelteView<'_>, fragment: &Fragment, found: &mut V
         if let Some(kind) = refused_kind {
             found.push(Refusal::TemplateNode { kind });
         }
-        each_child_fragment(node, &mut |child| collect_template_nodes(sv, child, found));
+        each_child_fragment(node, &mut |child| collect_template_nodes(sv, *child, found));
     }
 }
 

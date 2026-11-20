@@ -17,15 +17,15 @@
 //! See [`crate::transform_server`] for the orchestration that calls these in
 //! sequence.
 
-use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::Span;
 use tsv_ts::ast::{
-    ClassBody, ClassDeclaration, ClassMember, Expression, ExpressionKind, PropertyDefinition,
-    Statement, StatementKind, VariableDeclaration, VariableDeclarator,
+    AstView, ClassBody, ClassDeclId, ClassDeclaration, ClassMember, ExprId, Expression,
+    ExpressionKind, PropertyDefinition, Statement, StatementKind, StmtId, VariableDeclaration,
+    VariableDeclarator,
 };
 
 use crate::analyze::{NameSet, RuneInit, classify_rune_init, is_effect_call, is_inspect_call};
-use crate::build::Builder;
+use crate::build::{Builder, Item, rebuild_run};
 use crate::destructure::{GeneratedNames, expand_destructured_derived, expand_destructured_state};
 use crate::rune_guard::{
     WalkCtx, refuse_dollar_binding_name, refuse_dollar_binding_pattern, walk_class_member_guarded,
@@ -72,16 +72,14 @@ fn script_walk_ctx<'a>(
 ///
 /// An optional call (`f?.()`) is a `ChainExpression` in the oracle's AST, never a
 /// bare `CallExpression`, so it never collapses either.
-pub(crate) fn unthunk_callee<'arena>(
-    expr: &Expression<'arena>,
-) -> Option<&'arena Expression<'arena>> {
+pub(crate) fn unthunk_callee(view: AstView<'_>, expr: &Expression) -> Option<ExprId> {
     let ExpressionKind::CallExpression(call) = &expr.kind else {
         return None;
     };
     if !call.arguments.is_empty() || call.optional {
         return None;
     }
-    matches!(call.callee.kind, ExpressionKind::Identifier(_)).then_some(call.callee)
+    matches!(view.expr(call.callee).kind, ExpressionKind::Identifier(_)).then_some(call.callee)
 }
 
 /// Refuse a `$derived(…)` whose WHOLE argument is a bare `$derived` read
@@ -93,7 +91,7 @@ pub(crate) fn unthunk_callee<'arena>(
 /// oracle output IS `$.derived(d())` — reproduced by the rewrite (`.by` runs no
 /// `unthunk`), so it compiles.
 fn refuse_bare_derived_arg(
-    expr: &Expression<'_>,
+    expr: &Expression,
     source: &str,
     derived_names: &NameSet,
 ) -> Result<(), CompileError> {
@@ -121,16 +119,14 @@ fn refuse_bare_derived_arg(
 /// - everything else passes through borrowed after the guard walk (which also
 ///   collects mutations and shadow names for the evaluator).
 ///
-/// Passthrough/rebuild is a *shallow* re-slot: `Statement`/`VariableDeclarator`
-/// hold children inline by value, so placing a borrowed statement into the
-/// synthetic body clones the wrapper only — children remain shared `&'arena`
-/// refs into the parsed AST, and the original wrapper never enters the printed
-/// tree (no duplicate spans in what the printer walks). See `build.rs` for the
-/// address-keyed side-table caveat.
+/// Passthrough is the statement's own id: an unchanged statement is never copied
+/// out and pushed again. A rebuild is a *shallow* re-slot — the new declaration's
+/// declarators keep their children's host ids, and the original statement never
+/// enters the printed tree (no duplicate spans in what the printer walks).
 #[expect(clippy::too_many_arguments)]
-pub(crate) fn rewrite_script_statement<'arena>(
-    b: &mut Builder<'arena>,
-    stmt: &'arena Statement<'arena>,
+pub(crate) fn rewrite_script_statement(
+    b: &mut Builder<'_>,
+    stmt: StmtId,
     source: &str,
     derived_names: &NameSet,
     store_names: &NameSet,
@@ -144,16 +140,17 @@ pub(crate) fn rewrite_script_statement<'arena>(
     bindable: &mut Vec<BindableEntry>,
     props_id: &mut Option<String>,
     names: &mut GeneratedNames<'_>,
-) -> Result<Option<Statement<'arena>>, CompileError> {
+) -> Result<Option<StmtId>, CompileError> {
+    let row = *b.view().stmt(stmt);
     // A top-level `$:` label is a legacy reactive statement — invalid in
     // runes mode (the oracle rejects it with legacy_reactive_statement_invalid),
     // so cloning it through would emit a dead label with no reactivity, a
     // silent mis-compile. Only the top level refuses: the oracle accepts a
     // `$` label inside a function (an ordinary JS label) and clones it
-    // through, as does the fallback below. An escaped label name can't be
+    // through; the fallback below passes it through too. An escaped label name can't be
     // classified from its raw span, so it refuses conservatively.
-    if let StatementKind::LabeledStatement(labeled) = &stmt.kind {
-        let label = &labeled.label;
+    if let StatementKind::LabeledStatement(labeled) = row.kind {
+        let label = &b.view().labeled_stmt(labeled).label;
         let is_dollar = label.escaped_name.is_some() || {
             let start = label.span.start as usize;
             &source[start..start + label.name_len as usize] == "$"
@@ -167,12 +164,13 @@ pub(crate) fn rewrite_script_statement<'arena>(
     // callback is still guard-walked so stray runes inside refuse. A comment inside
     // is NOT a dropped region: the oracle keeps it (its printer writes it in the gap
     // the statement leaves), and so does the positional carry.
-    if let StatementKind::ExpressionStatement(expr_stmt) = &stmt.kind
-        && let Some(callback) = is_effect_call(expr_stmt.expression, source)
+    let view = b.view();
+    if let StatementKind::ExpressionStatement(expr_stmt) = row.kind
+        && let Some(callback) = is_effect_call(view, view.expr(expr_stmt.expression), source)
     {
         *has_effects = true;
         let mut ctx = script_walk_ctx(source, updated, nested_declared, derived_names, store_names);
-        walk_expression_guarded(callback, &mut ctx)?;
+        walk_expression_guarded(view, view.expr(callback), &mut ctx)?;
         return Ok(None);
     }
 
@@ -185,12 +183,12 @@ pub(crate) fn rewrite_script_statement<'arena>(
     // which the oracle rejects) or a derived read refuses; the `$inspect` callee
     // itself is exempt at this recognized position. A comment inside is kept, as
     // for `$effect`.
-    if let StatementKind::ExpressionStatement(expr_stmt) = &stmt.kind
-        && let Some(guarded) = is_inspect_call(expr_stmt.expression, source)
+    if let StatementKind::ExpressionStatement(expr_stmt) = row.kind
+        && let Some(guarded) = is_inspect_call(view, view.expr(expr_stmt.expression), source)
     {
         let mut ctx = script_walk_ctx(source, updated, nested_declared, derived_names, store_names);
         for expr in guarded {
-            walk_expression_guarded(expr, &mut ctx)?;
+            walk_expression_guarded(view, view.expr(expr), &mut ctx)?;
         }
         return Ok(None);
     }
@@ -201,9 +199,10 @@ pub(crate) fn rewrite_script_statement<'arena>(
     // nested class — takes the normal refusing guard walk, so the guard-exempt set
     // equals the unwrap set: reach-matched by construction (see
     // `rewrite_class_state_fields`).
-    if let StatementKind::ClassDeclaration(class) = &stmt.kind {
+    if let StatementKind::ClassDeclaration(class) = row.kind {
         return rewrite_class_state_fields(
             b,
+            stmt,
             class,
             source,
             derived_names,
@@ -215,25 +214,26 @@ pub(crate) fn rewrite_script_statement<'arena>(
         .map(Some);
     }
 
-    let StatementKind::VariableDeclaration(decl) = &stmt.kind else {
+    let StatementKind::VariableDeclaration(decl) = row.kind else {
         let mut ctx = script_walk_ctx(source, updated, nested_declared, derived_names, store_names);
-        walk_statement_guarded(stmt, &mut ctx, 0)?;
-        return Ok(Some(stmt.clone()));
+        walk_statement_guarded(view, &row, &mut ctx, 0)?;
+        return Ok(Some(stmt));
     };
 
-    let has_rune_init = decl.declarations.iter().any(|d| {
+    let has_rune_init = view.declarators(decl.declarations).iter().any(|d| {
         d.init
-            .as_ref()
-            .is_some_and(|i| classify_rune_init(i, source).is_some())
+            .is_some_and(|i| classify_rune_init(view, view.expr(i), source).is_some())
     });
     if !has_rune_init {
         let mut ctx = script_walk_ctx(source, updated, nested_declared, derived_names, store_names);
-        walk_statement_guarded(stmt, &mut ctx, 0)?;
-        return Ok(Some(stmt.clone()));
+        walk_statement_guarded(view, &row, &mut ctx, 0)?;
+        return Ok(Some(stmt));
     }
 
-    let mut declarations: BumpVec<'arena, VariableDeclarator<'arena>> = BumpVec::new_in(b.arena);
-    for declarator in decl.declarations {
+    // The declarators, copied out: the rewrites below push as they walk them.
+    let source_declarators = view.declarators(decl.declarations).to_vec();
+    let mut declarations: Vec<VariableDeclarator> = Vec::with_capacity(source_declarators.len());
+    for declarator in source_declarators {
         let mut ctx = script_walk_ctx(source, updated, nested_declared, derived_names, store_names);
         // The `$`-prefixed BINDING rule, at the one point every declarator on
         // this path passes — before the rune dispatch below, mirroring the
@@ -245,11 +245,11 @@ pub(crate) fn rewrite_script_statement<'arena>(
         // not walked at all, and the two that are walked go through
         // `walk_expression_guarded`, which sees a pattern as an expression and
         // takes the store-read exemption this `WalkCtx` enables.
-        refuse_dollar_binding_pattern(declarator.id, source)?;
+        let view = b.view();
+        refuse_dollar_binding_pattern(view, view.expr(declarator.id), source)?;
         let rune = declarator
             .init
-            .as_ref()
-            .and_then(|init| classify_rune_init(init, source));
+            .and_then(|init| classify_rune_init(view, view.expr(init), source));
 
         // `$props.id()` — skip the declarator entirely: the transform hoists
         // `const <name> = $.props_id($$renderer)` to the top of the component body
@@ -261,7 +261,7 @@ pub(crate) fn rewrite_script_statement<'arena>(
             if props_id.is_some() {
                 return Err(unsupported(Refusal::DuplicatePropsId));
             }
-            let name = identifier_binding_name(declarator.id, source)
+            let name = identifier_binding_name(view.expr(declarator.id), source)
                 .ok_or_else(|| unsupported(Refusal::PropsIdBindingPattern))?;
             *props_id = Some(name);
             dropped_regions.push(declarator.span);
@@ -272,7 +272,7 @@ pub(crate) fn rewrite_script_statement<'arena>(
         // (`destructure::expand_destructured_derived`), unlike an identifier
         // target's single rewrite.
         if matches!(rune, Some(RuneInit::Derived(_) | RuneInit::DerivedBy(_)))
-            && identifier_binding_name(declarator.id, source).is_none()
+            && identifier_binding_name(view.expr(declarator.id), source).is_none()
         {
             // A destructured `$derived` in a MULTI-declarator source (`let x = 1,
             // {a, b} = $derived(o)`) expands 1→N, but the oracle keeps only THAT
@@ -318,7 +318,7 @@ pub(crate) fn rewrite_script_statement<'arena>(
         // identically to `$state` (the wrapper dropped); the two diverge only in the
         // leaf `initial` the binding table already assigned (snapshot never folds).
         if matches!(rune, Some(RuneInit::State(_) | RuneInit::StateSnapshot(_)))
-            && identifier_binding_name(declarator.id, source).is_none()
+            && identifier_binding_name(view.expr(declarator.id), source).is_none()
         {
             // A multi-declarator source (`let x = 1, {a, b} = $state(o)`) expands
             // 1→N, but the oracle keeps only THAT declarator's leaves joined while
@@ -366,27 +366,31 @@ pub(crate) fn rewrite_script_statement<'arena>(
         // a `$bindable` left in any UNrecognized position survives the rewrite and
         // still refuses.
         if rune.is_none() {
-            walk_expression_guarded(declarator.id, &mut ctx)?;
+            walk_expression_guarded(view, view.expr(declarator.id), &mut ctx)?;
         }
         // The regions of a rewritten rune call a carried comment cannot survive —
         // recorded so a comment inside refuses. Not the call syntax the rewrite drops:
         // the oracle keeps every comment there (esrap writes it by position, beside
         // the kept argument), and so does the positional carry.
         // A rune is recognized from the init, so with one `init_span` is the call's span.
-        let init_span = declarator.init.map_or(declarator.span, Expression::span);
+        let init_span = declarator
+            .init
+            .map_or(declarator.span, |init| view.expr(init).span);
         if let Some(rune) = &rune {
-            match rune {
+            match *rune {
                 // `$state(v)` / `$state.snapshot(x)` unwrap to the bare argument, and
                 // `$derived.by(f)` / `$derived(e)` become a `$.derived(…)` call that steals
                 // the init's span around `f` or a body-anchored thunk of `e`
-                // (`Builder::thunk_on_body`) — the borrowed argument keeps its host span,
-                // so a comment before, inside or after it carries once. Except past a
+                // (`Builder::thunk_on_body`) — the host argument keeps its span, so a
+                // comment before, inside or after it carries once. Except past a
                 // trailing comma, which the carry drops.
                 RuneInit::State(Some(arg))
                 | RuneInit::StateSnapshot(arg)
                 | RuneInit::Derived(arg)
                 | RuneInit::DerivedBy(arg) => {
-                    if let Some(region) = trailing_comma_region(source, arg.span(), init_span) {
+                    if let Some(region) =
+                        trailing_comma_region(source, view.expr(arg).span, init_span)
+                    {
                         dropped_regions.push(region);
                     }
                 }
@@ -402,7 +406,7 @@ pub(crate) fn rewrite_script_statement<'arena>(
             }
         }
 
-        let mut new_id = declarator.id.clone();
+        let mut new_id = declarator.id;
         // `RuneInit::PropsId` is skipped via `continue` above, so the arm below is
         // genuinely dead — it documents that invariant rather than a live branch.
         #[expect(clippy::unreachable)]
@@ -421,30 +425,33 @@ pub(crate) fn rewrite_script_statement<'arena>(
                 // while a `$bindable` in any unrecognized position (nested, wrong
                 // arity, non-identifier key/local) survived the rewrite and
                 // refuses here.
-                walk_expression_guarded(&new_id, &mut ctx)?;
+                let view = b.view();
+                walk_expression_guarded(view, view.expr(new_id), &mut ctx)?;
                 // Span-steal: the synthetic `$$props` takes the replaced
                 // `$props()` call's host span, so the declarator's `=`-gap
                 // comment windows stay exactly the authored ones.
-                let props_ident = b.ident_at("$$props", init_span);
-                Some(&*b.arena.alloc(Expression::from_identifier(props_ident)))
+                Some(b.ident_expr_at("$$props", init_span))
             }
             // Handled above by `continue` — the declarator is skipped, never
             // rebuilt, so this arm is unreachable. Kept for match exhaustiveness.
             Some(RuneInit::PropsId) => unreachable!("$props.id() is skipped above"),
             Some(RuneInit::State(arg)) => match arg {
                 Some(arg) => {
-                    walk_expression_guarded(arg, &mut ctx)?;
-                    Some(&*b.arena.alloc(arg.clone()))
+                    walk_expression_guarded(view, view.expr(arg), &mut ctx)?;
+                    Some(arg)
                 }
                 // A zero-width `void 0` at the call's end: the declarator's `=`
                 // window then holds the authored gap and the empty call, and no
                 // later comment (`Builder::void_zero_at`).
-                None => Some(&*b.arena.alloc(b.void_zero_at(init_span.end))),
+                None => {
+                    let void_zero = b.void_zero_at(init_span.end);
+                    Some(b.push(void_zero))
+                }
             },
             // `$state.snapshot(x)` unwraps to `x` (like `$state`), guarding `x`.
             Some(RuneInit::StateSnapshot(arg)) => {
-                walk_expression_guarded(arg, &mut ctx)?;
-                Some(&*b.arena.alloc(arg.clone()))
+                walk_expression_guarded(view, view.expr(arg), &mut ctx)?;
+                Some(arg)
             }
             Some(RuneInit::Derived(expr)) => {
                 // `$derived(d)` whose WHOLE body is a bare `$derived` read: the
@@ -454,8 +461,8 @@ pub(crate) fn rewrite_script_statement<'arena>(
                 // reproduce that collapse (its store-rewrite pass would turn the
                 // argument into `d()`, giving `$.derived(() => d())`), so refuse —
                 // a safe over-refusal (the read refused before this slice too).
-                refuse_bare_derived_arg(expr, source, derived_names)?;
-                walk_expression_guarded(expr, &mut ctx)?;
+                refuse_bare_derived_arg(view.expr(expr), source, derived_names)?;
+                walk_expression_guarded(view, view.expr(expr), &mut ctx)?;
                 // The oracle wraps the value with `b.thunk`, which is
                 // `unthunk(arrow([], value))` — and `unthunk` COLLAPSES the arrow
                 // when its body is a plain call whose callee is a bare identifier
@@ -471,16 +478,15 @@ pub(crate) fn rewrite_script_statement<'arena>(
                 // `$derived(...)` init's host span so a carried script comment's
                 // declarator/call windows stay empty (`Builder::member_call_at`), the
                 // call-structure analog of the `$$props` span-steal above.
-                let argument = match unthunk_callee(expr) {
+                let argument = match unthunk_callee(view, view.expr(expr)) {
                     Some(callee) => callee,
-                    None => &*b.arena.alloc(b.thunk_on_body(expr)),
+                    None => {
+                        let thunk = b.thunk_on_body(expr);
+                        b.push(thunk)
+                    }
                 };
-                Some(&*b.arena.alloc(b.member_call_at(
-                    "$",
-                    "derived",
-                    std::slice::from_ref(argument),
-                    init_span,
-                )))
+                let call = b.member_call_at("$", "derived", &[argument], init_span);
+                Some(b.push(call))
             }
             Some(RuneInit::DerivedBy(f)) => {
                 // `$derived.by(d)` passes `d` straight through as the compute
@@ -489,23 +495,19 @@ pub(crate) fn rewrite_script_statement<'arena>(
                 // `$.derived(d())`, exactly the oracle's output — so no refusal is
                 // needed (unlike the `$derived(d)` arm, whose `() => d()` the oracle
                 // collapses to `$.derived(d)`, a form the rewrite can't reproduce).
-                walk_expression_guarded(f, &mut ctx)?;
-                Some(&*b.arena.alloc(b.member_call_at(
-                    "$",
-                    "derived",
-                    std::slice::from_ref(f),
-                    init_span,
-                )))
+                walk_expression_guarded(view, view.expr(f), &mut ctx)?;
+                let call = b.member_call_at("$", "derived", &[f], init_span);
+                Some(b.push(call))
             }
             None => {
                 if let Some(init) = declarator.init {
-                    walk_expression_guarded(init, &mut ctx)?;
+                    walk_expression_guarded(view, view.expr(init), &mut ctx)?;
                 }
                 declarator.init
             }
         };
         declarations.push(VariableDeclarator {
-            id: b.arena.alloc(new_id),
+            id: new_id,
             init: new_init,
             definite: declarator.definite,
             span: declarator.span,
@@ -516,14 +518,14 @@ pub(crate) fn rewrite_script_statement<'arena>(
     if declarations.is_empty() {
         return Ok(None);
     }
-    Ok(Some(Statement::from_variable_declaration(
-        VariableDeclaration {
-            kind: decl.kind,
-            declarations: declarations.into_bump_slice(),
-            declare: decl.declare,
-            span: decl.span,
-        },
-    )))
+    let declarations = b.push_list(&declarations);
+    let rebuilt = Statement::from_variable_declaration(VariableDeclaration {
+        kind: decl.kind,
+        declarations,
+        declare: decl.declare,
+        span: decl.span,
+    });
+    Ok(Some(b.push(rebuilt)))
 }
 
 /// The gap after a rune call's kept argument when the call carries a trailing comma
@@ -555,122 +557,122 @@ fn trailing_comma_region(source: &str, arg_span: Span, init_span: Span) -> Optio
 /// Oracle shape: `field = $state(v)` → `field = v`; a no-arg `field = $state()` →
 /// a BARE field `field;` (the value dropped, NOT `void 0` — the divergence from the
 /// top-level no-arg declarator, which mints `void 0`); a `static`/computed field is
-/// oracle-rejected placement and refuses here. Non-rune members clone through in
+/// oracle-rejected placement and refuses here. Non-rune members pass through in
 /// source order (the class member order is preserved). A comment in the dropped call
 /// syntax carries like the top-level declarator's; only a trailing-comma gap is
 /// recorded in `dropped_regions`, so a comment there refuses.
 ///
-/// The member list is rebuilt **lazily** (the `erase.rs::class_body`
-/// structural-sharing idiom): `out` stays `None` — allocating nothing — until the
-/// first `$state` field is unwrapped, at which point the untouched prefix is
-/// backfilled once; a rune-free top-level class (the common case) returns
-/// `class.clone()` having allocated no member `Vec`. The per-member side effects —
-/// the guard walk, the refusal checks, the `dropped_regions` pushes — run for every
-/// member regardless of whether `out` ever materializes.
+/// The member list is rebuilt **lazily** ([`rebuild_run`], the
+/// `erase.rs::class_body` structural-sharing idiom): nothing is written until the
+/// first `$state` field is unwrapped, at which point the untouched prefix is copied
+/// once; a rune-free top-level class (the common case) returns the statement's own
+/// id having pushed nothing. The per-member side effects — the guard walk, the
+/// refusal checks, the `dropped_regions` pushes — run for every member regardless
+/// of whether the rebuild ever opens.
 #[expect(clippy::too_many_arguments)]
-fn rewrite_class_state_fields<'arena>(
-    b: &Builder<'arena>,
-    class: &'arena ClassDeclaration<'arena>,
+fn rewrite_class_state_fields(
+    b: &mut Builder<'_>,
+    stmt: StmtId,
+    class: ClassDeclId,
     source: &str,
     derived_names: &NameSet,
     store_names: &NameSet,
     updated: &mut NameSet,
     nested_declared: &mut NameSet,
     dropped_regions: &mut Vec<Span>,
-) -> Result<Statement<'arena>, CompileError> {
-    let arena = b.arena;
+) -> Result<StmtId, CompileError> {
+    let class_row = *b.view().class_decl(class);
     // This path intercepts the statement before the guard walk's
     // `ClassDeclaration` arm, so it owns the class id's binding check.
-    if let Some(id) = &class.id {
-        refuse_dollar_binding_name(id, source)?;
+    if let Some(id) = &class_row.id {
+        refuse_dollar_binding_name(b.view(), id, source)?;
     }
     // Same exemptions as the surrounding script guard: a `$name` store read / a
     // `$derived` read inside a method body is rewritten later, not refused here.
     let mut ctx = script_walk_ctx(source, updated, nested_declared, derived_names, store_names);
 
-    let members = class.body.body;
-    let mut out: Option<BumpVec<'arena, ClassMember<'arena>>> = None;
-    for (i, member) in members.iter().enumerate() {
-        // The per-member step produces `Some(replacement)` for an unwrapped
-        // `$state` field and `None` for an unchanged member — AFTER running the
-        // member's side effects. The lazy `out` then decides allocation only.
-        let replacement = if let ClassMember::PropertyDefinition(p) = member
-            // The one exempt shape — a DIRECT top-level `$state`/`$state.raw`
-            // field. `!is_static && !computed` keeps static/computed rune fields
-            // (which the oracle rejects as `state_invalid_placement`) on the
-            // refusing path.
-            && !p.is_static
-            && !p.computed
-            && let Some(value) = &p.value
-            && let Some(RuneInit::State(arg)) = classify_rune_init(value, source)
-        {
-            let init_span = value.span();
-            let new_value = match arg {
-                // `field = $state(v)` → `field = v`: guard-walk the borrowed
-                // argument, drop the call syntax around it.
-                Some(arg) => {
-                    // A LONE reactive-binding argument (`$state($count)` /
-                    // `$state(d)`) refuses: the oracle keeps such a lone store /
-                    // `$derived` read BARE in the unwrapped field, but tsv's store
-                    // rewrite descends into class bodies and would rewrite the kept
-                    // argument to `$.store_get(…)` / `d()` — a MISMATCH. A compound
-                    // (`$state($count + 1)`) or a plain-variable argument is fine —
-                    // the inner read there IS rewritten at parity.
-                    if is_lone_reactive_binding(arg, source, derived_names, store_names) {
-                        return Err(unsupported(Refusal::ClassFieldStateReactiveArg));
+    let members = rebuild_run(
+        b,
+        class_row.body.body,
+        |view, run| view.class_members(run),
+        |b, member| {
+            let view = b.view();
+            // The per-member step produces `Replace` for an unwrapped `$state` field
+            // and `Keep` for an unchanged member — AFTER running the member's side
+            // effects. The lazy rebuild then decides what is written only.
+            if let ClassMember::PropertyDefinition(p) = member
+                // The one exempt shape — a DIRECT top-level `$state`/`$state.raw`
+                // field. `!is_static && !computed` keeps static/computed rune fields
+                // (which the oracle rejects as `state_invalid_placement`) on the
+                // refusing path.
+                && !p.is_static
+                && !p.computed
+                && let Some(value) = p.value
+                && let Some(RuneInit::State(arg)) =
+                    classify_rune_init(view, view.expr(value), source)
+            {
+                let init_span = view.expr(value).span;
+                let new_value = match arg {
+                    // `field = $state(v)` → `field = v`: guard-walk the host
+                    // argument, drop the call syntax around it.
+                    Some(arg) => {
+                        // A LONE reactive-binding argument (`$state($count)` /
+                        // `$state(d)`) refuses: the oracle keeps such a lone store /
+                        // `$derived` read BARE in the unwrapped field, but tsv's store
+                        // rewrite descends into class bodies and would rewrite the kept
+                        // argument to `$.store_get(…)` / `d()` — a MISMATCH. A compound
+                        // (`$state($count + 1)`) or a plain-variable argument is fine —
+                        // the inner read there IS rewritten at parity.
+                        if is_lone_reactive_binding(
+                            view,
+                            view.expr(arg),
+                            source,
+                            derived_names,
+                            store_names,
+                        ) {
+                            return Err(unsupported(Refusal::ClassFieldStateReactiveArg));
+                        }
+                        walk_expression_guarded(view, view.expr(arg), &mut ctx)?;
+                        if let Some(region) =
+                            trailing_comma_region(source, view.expr(arg).span, init_span)
+                        {
+                            dropped_regions.push(region);
+                        }
+                        Some(arg)
                     }
-                    walk_expression_guarded(arg, &mut ctx)?;
-                    if let Some(region) = trailing_comma_region(source, arg.span(), init_span) {
-                        dropped_regions.push(region);
-                    }
-                    Some(arg.clone())
-                }
-                // `field = $state()` → a bare field `field;` (value dropped, no
-                // `void 0`). Nothing is minted, so a comment inside the empty call
-                // carries (the oracle trails it after the field).
-                None => None,
-            };
-            Some(ClassMember::PropertyDefinition(PropertyDefinition {
-                value: new_value,
-                ..p.clone()
-            }))
-        } else {
-            // Every other member — the normal refusing guard walk.
-            walk_class_member_guarded(member, &mut ctx)?;
-            None
-        };
-
-        match replacement {
-            // Unchanged — only clone into `out` once it has been materialized.
-            None => {
-                if let Some(vec) = out.as_mut() {
-                    vec.push(member.clone());
-                }
+                    // `field = $state()` → a bare field `field;` (value dropped, no
+                    // `void 0`). Nothing is minted, so a comment inside the empty call
+                    // carries (the oracle trails it after the field).
+                    None => None,
+                };
+                Ok(Item::Replace(ClassMember::PropertyDefinition(
+                    PropertyDefinition {
+                        value: new_value,
+                        ..p
+                    },
+                )))
+            } else {
+                // Every other member — the normal refusing guard walk.
+                walk_class_member_guarded(view, &member, &mut ctx)?;
+                Ok(Item::Keep)
             }
-            // Changed — materialize `out` (backfilling the untouched prefix
-            // `members[..i]` on the first change) and push the replacement.
-            Some(new) => out
-                .get_or_insert_with(|| {
-                    let mut vec = BumpVec::with_capacity_in(members.len(), arena);
-                    vec.extend_from_slice(&members[..i]);
-                    vec
-                })
-                .push(new),
-        }
-    }
+        },
+    )?;
 
-    match out {
-        // No `$state` field — allocated nothing; the class node passes through.
-        None => Ok(Statement::from_class_declaration(class)),
-        Some(members) => Ok(Statement::from_class_declaration(arena.alloc(
-            ClassDeclaration {
+    match members {
+        // No `$state` field — nothing pushed; the class statement passes through.
+        None => Ok(stmt),
+        Some(members) => {
+            let rebuilt = b.push(ClassDeclaration {
                 body: ClassBody {
-                    body: members.into_bump_slice(),
-                    span: class.body.span,
+                    body: members,
+                    span: class_row.body.span,
                 },
-                ..class.clone()
-            },
-        ))),
+                ..class_row
+            });
+            let rebuilt = Statement::from_class_declaration(class_row.span, rebuilt);
+            Ok(b.push(rebuilt))
+        }
     }
 }
 
@@ -691,7 +693,8 @@ fn rewrite_class_state_fields<'arena>(
 /// (`$state($count + 1)` → `$.store_get(…) + 1`) or a plain-variable argument stays
 /// compiling.
 fn is_lone_reactive_binding(
-    arg: &Expression<'_>,
+    view: AstView<'_>,
+    arg: &Expression,
     source: &str,
     derived_names: &NameSet,
     store_names: &NameSet,
@@ -702,7 +705,7 @@ fn is_lone_reactive_binding(
     if id.escaped_name.is_some() {
         // Escaped: the store rewrite decodes it, the derived rewrite does not — so
         // decode and test the STORE branch alone.
-        let name = id.name(source);
+        let name = id.name(source, view);
         return crate::analyze::store_read_base(name)
             .is_some_and(|base| store_names.contains(base));
     }

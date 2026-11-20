@@ -53,9 +53,11 @@ impl BodyBuilder {
     /// `'{'` string literal into the text right after a `$`. The oracle escapes it
     /// (it assembles the whole string before escaping); tsv joins the seam here.
     pub(crate) fn push_text(&mut self, chunk: &str) {
-        // Every element of `texts` exists by construction (starts with one entry;
-        // `push_expr` appends the follower).
-        #[expect(clippy::unwrap_used)]
+        #[expect(
+            clippy::unwrap_used,
+            reason = "`texts` is never empty: it starts with one entry, the flush resets it to \
+                      one, and `push_expr` only appends"
+        )]
         let current = self.texts.last_mut().unwrap();
         if current.ends_with('$') && chunk.starts_with('{') {
             // The trailing `$` is raw (any preceding backslash was already

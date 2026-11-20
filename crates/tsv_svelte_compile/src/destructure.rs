@@ -66,9 +66,9 @@
 
 use std::collections::HashMap;
 
-use bumpalo::collections::Vec as BumpVec;
 use tsv_ts::ast::{
-    Expression, ExpressionKind, ObjectPatternProperty, Property, VariableDeclarator,
+    AstView, ExprId, Expression, ExpressionKind, ObjectPatternProperty, Property,
+    VariableDeclarator,
 };
 
 use crate::CompileError;
@@ -161,12 +161,12 @@ impl Lowering {
 /// and that the script carries no comments. `ctx` is the script-body guard context
 /// (store/derived reads exempt) reused to walk the pattern defaults and the rune
 /// argument for stray runes.
-pub(crate) fn expand_destructured_derived<'arena>(
-    b: &mut Builder<'arena>,
+pub(crate) fn expand_destructured_derived(
+    b: &mut Builder<'_>,
     ctx: &mut WalkCtx<'_>,
-    declarations: &mut BumpVec<'arena, VariableDeclarator<'arena>>,
-    declarator: &'arena VariableDeclarator<'arena>,
-    rune: RuneInit<'arena>,
+    declarations: &mut Vec<VariableDeclarator>,
+    declarator: VariableDeclarator,
+    rune: RuneInit,
     source: &str,
     names: &mut GeneratedNames<'_>,
 ) -> Result<(), CompileError> {
@@ -174,7 +174,8 @@ pub(crate) fn expand_destructured_derived<'arena>(
     // rune (`{a = $state(0)}`) or a top-level `await`. The binding leaves are
     // exempt (derived reads allowed; `$`-prefixed leaves already refused by
     // `refuse_dollar_binding_pattern` before this arm).
-    walk_expression_guarded(declarator.id, ctx)?;
+    let view = b.view();
+    walk_expression_guarded(view, view.expr(declarator.id), ctx)?;
 
     let (value, is_derived, refusal) = match rune {
         RuneInit::Derived(expr) => (expr, true, Refusal::DestructuringDerived),
@@ -184,12 +185,12 @@ pub(crate) fn expand_destructured_derived<'arena>(
     };
     // Guard the rune argument (a bare derived read is exempt — the store rewrite
     // lowers it to `base()` inside each projection).
-    walk_expression_guarded(value, ctx)?;
+    walk_expression_guarded(view, view.expr(value), ctx)?;
 
-    // rhs: a bare-identifier `$derived(o)` projects directly from the borrowed
-    // `o`; every other shape mints `$$d` and projects from `$$d()`.
-    let mint_d = !(is_derived && matches!(value.kind, ExpressionKind::Identifier(_)));
-    let rhs: &'arena Expression<'arena> = if mint_d {
+    // rhs: a bare-identifier `$derived(o)` projects directly from the host `o`;
+    // every other shape mints `$$d` and projects from `$$d()`.
+    let mint_d = !(is_derived && matches!(view.expr(value).kind, ExpressionKind::Identifier(_)));
+    let rhs = if mint_d {
         let d_name = names.generate("$$d");
         // Mint the id BEFORE the init so the declarator span runs forward
         // (`id.start < init.end`) — the invariant `build_sanitize_slots_decl`
@@ -198,23 +199,29 @@ pub(crate) fn expand_destructured_derived<'arena>(
         let span = d_id.span();
         // `$.derived(<init>)`: `$derived` thunks the value (reusing the identifier
         // path's unthunk collapse); `$derived.by` passes the compute fn directly.
-        let argument: &'arena Expression<'arena> = if is_derived {
-            match unthunk_callee(value) {
+        let argument = if is_derived {
+            match unthunk_callee(b.view(), b.view().expr(value)) {
                 Some(callee) => callee,
-                None => &*b.arena.alloc(b.thunk_on_body(value)),
+                None => {
+                    let thunk = b.thunk_on_body(value);
+                    b.push(thunk)
+                }
             }
         } else {
             value
         };
         let init = derived_wrap(b, argument);
+        let id = b.push(d_id);
+        let init = b.push(init);
         declarations.push(VariableDeclarator {
-            id: b.arena.alloc(d_id),
-            init: Some(b.arena.alloc(init)),
+            id,
+            init: Some(init),
             definite: false,
             span,
         });
         let callee = b.ident_expr(&d_name);
-        b.arena.alloc(b.call_of(callee, &[], false))
+        let call = b.call_of(callee, &[], false);
+        b.push(call)
     } else {
         value
     };
@@ -245,12 +252,12 @@ pub(crate) fn expand_destructured_derived<'arena>(
 /// and that the script carries no comments. `ctx` is the script-body guard context
 /// (store/derived reads exempt) reused to walk the pattern defaults and the rune
 /// argument for stray runes.
-pub(crate) fn expand_destructured_state<'arena>(
-    b: &mut Builder<'arena>,
+pub(crate) fn expand_destructured_state(
+    b: &mut Builder<'_>,
     ctx: &mut WalkCtx<'_>,
-    declarations: &mut BumpVec<'arena, VariableDeclarator<'arena>>,
-    declarator: &'arena VariableDeclarator<'arena>,
-    rune: RuneInit<'arena>,
+    declarations: &mut Vec<VariableDeclarator>,
+    declarator: VariableDeclarator,
+    rune: RuneInit,
     source: &str,
     names: &mut GeneratedNames<'_>,
 ) -> Result<(), CompileError> {
@@ -258,21 +265,25 @@ pub(crate) fn expand_destructured_state<'arena>(
     // rune (`{a = $state(0)}`) or a top-level `await`. The binding leaves are
     // exempt (`$`-prefixed leaves already refused by `refuse_dollar_binding_pattern`
     // before this arm).
-    walk_expression_guarded(declarator.id, ctx)?;
+    let view = b.view();
+    walk_expression_guarded(view, view.expr(declarator.id), ctx)?;
 
     // `value` is the argument the `tmp` holds — `void 0` when argless. The rune's
     // argument is guard-walked (a bare store/derived read is exempt — the store
     // rewrite lowers it inside `let tmp = value` afterward). `$state.snapshot`'s
     // wrapper is dropped, so its argument becomes `value` just like `$state`.
-    let (value, refusal): (Expression<'arena>, Refusal) = match rune {
+    let (value, refusal) = match rune {
         RuneInit::State(Some(arg)) => {
-            walk_expression_guarded(arg, ctx)?;
-            (arg.clone(), Refusal::DestructuringState)
+            walk_expression_guarded(view, view.expr(arg), ctx)?;
+            (arg, Refusal::DestructuringState)
         }
-        RuneInit::State(None) => (b.void_zero(), Refusal::DestructuringState),
+        RuneInit::State(None) => {
+            let void_zero = b.void_zero();
+            (b.push(void_zero), Refusal::DestructuringState)
+        }
         RuneInit::StateSnapshot(arg) => {
-            walk_expression_guarded(arg, ctx)?;
-            (arg.clone(), Refusal::DestructuringStateSnapshot)
+            walk_expression_guarded(view, view.expr(arg), ctx)?;
+            (arg, Refusal::DestructuringStateSnapshot)
         }
         // Only the three state arms reach here (the caller matched them).
         _ => return Err(unsupported(Refusal::DestructuringState)),
@@ -282,23 +293,24 @@ pub(crate) fn expand_destructured_state<'arena>(
     // oracle's order: `scope.generate('tmp')` runs before `extract_paths`, whose
     // `$$array` names the Extractor mints inline during the walk).
     let tmp_name = names.generate("tmp");
-    // `tmp`'s init is the borrowed host `value` (not a mint), so — unlike the
-    // minted `$$d` / `$$array` inits — this declarator does NOT run forward: the
-    // id is a fresh appendix span (high) while `value` keeps its lower host span,
-    // so `id.start > init.end`. Safe anyway, because the printer's underflow-prone
+    // `tmp`'s init is the host `value` (not a mint), so — unlike the minted
+    // `$$d` / `$$array` inits — this declarator does NOT run forward: the id is a
+    // fresh appendix span (high) while `value` keeps its lower host span, so
+    // `id.start > init.end`. Safe anyway, because the printer's underflow-prone
     // `callee.end - decl.span.start` (`variable.rs`) reads the reused host
     // STATEMENT span (`rewrite_script_statement`'s `span: decl.span`), never this
     // appendix id span.
     let tmp_id = Expression::from_identifier(b.ident(&tmp_name));
     let tmp_span = tmp_id.span();
+    let id = b.push(tmp_id);
     declarations.push(VariableDeclarator {
-        id: b.arena.alloc(tmp_id),
-        init: Some(b.arena.alloc(value)),
+        id,
+        init: Some(value),
         definite: false,
         span: tmp_span,
     });
     // Every leaf projects from a fresh `tmp` read (a plain `const`, so no `()`).
-    let rhs: &'arena Expression<'arena> = b.ident_expr(&tmp_name);
+    let rhs = b.ident_expr(&tmp_name);
 
     Extractor::new(b, source, refusal, Lowering::State).extract_onto(
         declarator.id,
@@ -310,30 +322,27 @@ pub(crate) fn expand_destructured_state<'arena>(
 
 /// `$.derived(<argument>)` — the intermediate/insert wrapper (comment-free, so a
 /// plain appendix mint is safe; byte-identical to the span-stealing form).
-fn derived_wrap<'arena>(
-    b: &mut Builder<'arena>,
-    argument: &'arena Expression<'arena>,
-) -> Expression<'arena> {
-    b.member_call("$", "derived", std::slice::from_ref(argument))
+fn derived_wrap(b: &mut Builder<'_>, argument: ExprId) -> Expression {
+    b.member_call("$", "derived", &[argument])
 }
 
 /// The port of the oracle's `_extract_paths`: it walks the binding pattern in
 /// parallel with the access expression `rhs`, collecting `inserts` (array
 /// `$.to_array` intermediates) and `paths` (leaf `const name = $.derived(() =>
 /// access)` declarators), each already wrapped as its own declarator.
-struct Extractor<'b, 'arena> {
-    b: &'b mut Builder<'arena>,
+struct Extractor<'b, 'a> {
+    b: &'b mut Builder<'a>,
     source: &'b str,
     /// The refusal for an unrecognized shape (per rune family).
     refusal: Refusal,
     /// Which rune family — the only fork (leaf/array-intermediate wrapping).
     mode: Lowering,
-    inserts: Vec<VariableDeclarator<'arena>>,
-    paths: Vec<VariableDeclarator<'arena>>,
+    inserts: Vec<VariableDeclarator>,
+    paths: Vec<VariableDeclarator>,
 }
 
-impl<'b, 'arena> Extractor<'b, 'arena> {
-    fn new(b: &'b mut Builder<'arena>, source: &'b str, refusal: Refusal, mode: Lowering) -> Self {
+impl<'b, 'a> Extractor<'b, 'a> {
+    fn new(b: &'b mut Builder<'a>, source: &'b str, refusal: Refusal, mode: Lowering) -> Self {
         Self {
             b,
             source,
@@ -353,26 +362,29 @@ impl<'b, 'arena> Extractor<'b, 'arena> {
     /// cosmetic difference.
     fn extract_onto(
         mut self,
-        param: &Expression<'arena>,
-        expr: &'arena Expression<'arena>,
+        param: ExprId,
+        expr: ExprId,
         names: &mut GeneratedNames<'_>,
-        declarations: &mut BumpVec<'arena, VariableDeclarator<'arena>>,
+        declarations: &mut Vec<VariableDeclarator>,
     ) -> Result<(), CompileError> {
         self.extract(param, expr, names)?;
         declarations.extend(self.inserts);
         declarations.extend(self.paths);
         Ok(())
     }
-}
 
-impl<'arena> Extractor<'_, 'arena> {
+    fn view(&self) -> AstView<'_> {
+        self.b.view()
+    }
+
     fn extract(
         &mut self,
-        param: &Expression<'arena>,
-        expr: &'arena Expression<'arena>,
+        param: ExprId,
+        expr: ExprId,
         names: &mut GeneratedNames<'_>,
     ) -> Result<(), CompileError> {
-        match &param.kind {
+        let kind = self.view().expr(param).kind;
+        match kind {
             // Leaf: `const <param> = $.derived(() => expr)`. A declaration pattern
             // never binds a member expression, so an Identifier is the only leaf.
             ExpressionKind::Identifier(_) => {
@@ -380,12 +392,14 @@ impl<'arena> Extractor<'_, 'arena> {
                 Ok(())
             }
             ExpressionKind::ObjectPattern(obj) => {
-                for prop in obj.properties {
+                // The properties, copied out: each projection pushes.
+                let properties = self.view().pat_props(obj.properties).to_vec();
+                for prop in &properties {
                     match prop {
                         ObjectPatternProperty::RestElement(rest) => {
                             // `$.exclude_from_object(expr, [<sibling key literals>])`.
-                            let keys = self.rest_keys(obj.properties)?;
-                            let rest_expr = self.exclude_from_object(expr, keys);
+                            let keys = self.rest_keys(&properties)?;
+                            let rest_expr = self.exclude_from_object(expr, &keys);
                             self.extract(rest.argument, rest_expr, names)?;
                         }
                         ObjectPatternProperty::Property(p) => {
@@ -401,14 +415,13 @@ impl<'arena> Extractor<'_, 'arena> {
                 // len]))`. State: `const $$array = $.to_array(expr[, len])` (a plain
                 // `const`, no `$.derived` wrap). The length is omitted when the last
                 // element is a rest.
+                let elements = self.view().expr_opt_list(arr.elements).to_vec();
                 let has_rest = matches!(
-                    arr.elements.last(),
-                    Some(Some(Expression {
-                        kind: ExpressionKind::RestElement(_),
-                        ..
-                    }))
+                    elements.last(),
+                    Some(Some(last))
+                        if matches!(self.view().expr(*last).kind, ExpressionKind::RestElement(_))
                 );
-                let len = (!has_rest).then_some(arr.elements.len());
+                let len = (!has_rest).then_some(elements.len());
                 let name = names.generate(self.mode.array_base());
                 // Mint the id BEFORE the `$.to_array` / `$.derived` init so the
                 // declarator span runs forward (see the `$$d` mint's forward-span
@@ -418,23 +431,26 @@ impl<'arena> Extractor<'_, 'arena> {
                 let to_array = self.build_to_array(expr, len);
                 let init = match self.mode {
                     Lowering::Derived => {
-                        let value = &*self.b.arena.alloc(to_array);
+                        let value = self.b.push(to_array);
                         self.derived_of(value)
                     }
                     Lowering::State => to_array,
                 };
+                let id = self.b.push(id);
+                let init = self.b.push(init);
                 self.inserts.push(VariableDeclarator {
-                    id: self.b.arena.alloc(id),
-                    init: Some(self.b.arena.alloc(init)),
+                    id,
+                    init: Some(init),
                     definite: false,
                     span: id_span,
                 });
 
-                for (i, element) in arr.elements.iter().enumerate() {
+                for (i, element) in elements.into_iter().enumerate() {
                     let Some(element) = element else {
                         continue; // a hole (`[a, , b]`) projects nothing
                     };
-                    if let ExpressionKind::RestElement(rest) = &element.kind {
+                    let kind = self.view().expr(element).kind;
+                    if let ExpressionKind::RestElement(rest) = kind {
                         let slice = self.array_rest(&name, i);
                         self.extract(rest.argument, slice, names)?;
                     } else {
@@ -457,63 +473,63 @@ impl<'arena> Extractor<'_, 'arena> {
     }
 
     /// A leaf projection: `$.derived(() => access)` (derived) or the RAW `access`
-    /// (state) as `const <node-clone> = <init>`.
-    fn push_path(&mut self, node: &Expression<'arena>, access: &'arena Expression<'arena>) {
+    /// (state) as `const <node> = <init>`, the leaf binding by its host id.
+    fn push_path(&mut self, node: ExprId, access: ExprId) {
         let init = match self.mode {
-            Lowering::Derived => self.derived_of(access),
-            Lowering::State => access.clone(),
+            Lowering::Derived => {
+                let derived = self.derived_of(access);
+                self.b.push(derived)
+            }
+            Lowering::State => access,
         };
-        let span = node.span();
+        let span = self.view().expr(node).span;
         self.paths.push(VariableDeclarator {
-            id: self.b.arena.alloc(node.clone()),
-            init: Some(self.b.arena.alloc(init)),
+            id: node,
+            init: Some(init),
             definite: false,
             span,
         });
     }
 
     /// `$.derived(() => access)`.
-    fn derived_of(&mut self, access: &'arena Expression<'arena>) -> Expression<'arena> {
-        let arrow = &*self.b.arena.alloc(self.b.thunk_on_body(access));
-        self.b
-            .member_call("$", "derived", std::slice::from_ref(arrow))
+    fn derived_of(&mut self, access: ExprId) -> Expression {
+        let arrow = self.b.thunk_on_body(access);
+        let arrow = self.b.push(arrow);
+        self.b.member_call("$", "derived", &[arrow])
     }
 
     /// `expr.<key>` — an object-pattern property projection. Only a plain,
     /// non-computed identifier key is built; a computed / literal / escaped key
-    /// refuses (a safe over-refusal — the corpus has only identifier keys).
-    fn object_member(
-        &mut self,
-        expr: &'arena Expression<'arena>,
-        prop: &Property<'arena>,
-    ) -> Result<&'arena Expression<'arena>, CompileError> {
+    /// refuses (a safe over-refusal — the corpus has only identifier keys). The
+    /// object `expr` is shared by id between sibling projections (the node
+    /// contract: an id may print at more than one position).
+    fn object_member(&mut self, expr: ExprId, prop: &Property) -> Result<ExprId, CompileError> {
         if prop.computed {
             return Err(unsupported(self.refusal.clone()));
         }
-        let ExpressionKind::Identifier(key) = &prop.key.kind else {
+        let ExpressionKind::Identifier(key) = &self.view().expr(prop.key).kind else {
             return Err(unsupported(self.refusal.clone()));
         };
         let Some(name) = plain_identifier_name(key, self.source) else {
             return Err(unsupported(self.refusal.clone()));
         };
-        // Clone the (reused) object so sibling properties don't alias one node.
-        let object = &*self.b.arena.alloc(expr.clone());
-        Ok(&*self.b.arena.alloc(self.b.member_prop(object, &name)))
+        let member = self.b.member_prop(expr, &name);
+        Ok(self.b.push(member))
     }
 
     /// The `[<key literals>]` for `$.exclude_from_object` — the string names of
     /// every non-rest sibling property's KEY, in source order.
     fn rest_keys(
         &mut self,
-        properties: &'arena [ObjectPatternProperty<'arena>],
-    ) -> Result<&'arena [Option<&'arena Expression<'arena>>], CompileError> {
+        properties: &[ObjectPatternProperty],
+    ) -> Result<Vec<Option<ExprId>>, CompileError> {
         let mut names: Vec<String> = Vec::new();
         for prop in properties {
             if let ObjectPatternProperty::Property(p) = prop {
                 if p.computed {
                     return Err(unsupported(self.refusal.clone()));
                 }
-                let ExpressionKind::Identifier(key) = &p.key.kind else {
+                let ExpressionKind::Identifier(key) = &self.view().expr(p.key).kind else {
                     return Err(unsupported(self.refusal.clone()));
                 };
                 let Some(name) = plain_identifier_name(key, self.source) else {
@@ -522,80 +538,72 @@ impl<'arena> Extractor<'_, 'arena> {
                 names.push(name);
             }
         }
-        let mut elems: BumpVec<'arena, Option<&'arena Expression<'arena>>> =
-            BumpVec::with_capacity_in(names.len(), self.b.arena);
+        let mut elems = Vec::with_capacity(names.len());
         for name in names {
             let key = self.b.string_literal_expr(&name);
-            elems.push(Some(self.b.arena.alloc(key)));
+            elems.push(Some(self.b.push(key)));
         }
-        Ok(elems.into_bump_slice())
+        Ok(elems)
     }
 
     /// `$.exclude_from_object(expr, [<keys>])`.
-    fn exclude_from_object(
-        &mut self,
-        expr: &'arena Expression<'arena>,
-        keys: &'arena [Option<&'arena Expression<'arena>>],
-    ) -> &'arena Expression<'arena> {
+    fn exclude_from_object(&mut self, expr: ExprId, keys: &[Option<ExprId>]) -> ExprId {
         let array = self.b.array_of(keys);
-        let mut args: BumpVec<'arena, Expression<'arena>> = BumpVec::new_in(self.b.arena);
-        args.push(expr.clone());
-        args.push(array);
+        let array = self.b.push(array);
         let call = self
             .b
-            .member_call("$", "exclude_from_object", args.into_bump_slice());
-        &*self.b.arena.alloc(call)
+            .member_call("$", "exclude_from_object", &[expr, array]);
+        self.b.push(call)
     }
 
     /// A small non-negative integer (an array index or length) as a numeric
     /// literal. The value is a destructuring-pattern position, always far below
     /// the f64 integer-exact range, so the cast is lossless in practice.
     #[expect(clippy::cast_precision_loss)]
-    fn small_number(&mut self, n: usize) -> Expression<'arena> {
-        self.b.number(n as f64)
+    fn small_number(&mut self, n: usize) -> ExprId {
+        let number = self.b.number(n as f64);
+        self.b.push(number)
     }
 
     /// `$.to_array(expr[, len])`.
-    fn build_to_array(
-        &mut self,
-        expr: &'arena Expression<'arena>,
-        len: Option<usize>,
-    ) -> Expression<'arena> {
-        let mut args: BumpVec<'arena, Expression<'arena>> = BumpVec::new_in(self.b.arena);
-        args.push(expr.clone());
+    fn build_to_array(&mut self, expr: ExprId, len: Option<usize>) -> Expression {
+        let mut args = vec![expr];
         if let Some(len) = len {
             args.push(self.small_number(len));
         }
-        self.b.member_call("$", "to_array", args.into_bump_slice())
+        self.b.member_call("$", "to_array", &args)
     }
 
     /// The array intermediate read: `$$derived_array()` (derived — read as a call,
     /// since the intermediate is itself a derived binding) or the BARE `$$array`
     /// (state — a plain `const`).
-    fn array_read(&mut self, name: &str) -> &'arena Expression<'arena> {
+    fn array_read(&mut self, name: &str) -> ExprId {
         let ident = self.b.ident_expr(name);
         match self.mode {
-            Lowering::Derived => &*self.b.arena.alloc(self.b.call_of(ident, &[], false)),
+            Lowering::Derived => {
+                let call = self.b.call_of(ident, &[], false);
+                self.b.push(call)
+            }
             Lowering::State => ident,
         }
     }
 
     /// `$$derived_array()[i]` / `$$array[i]`.
-    fn array_index(&mut self, name: &str, i: usize) -> &'arena Expression<'arena> {
+    fn array_index(&mut self, name: &str, i: usize) -> ExprId {
         let base = self.array_read(name);
-        let index = &*self.b.arena.alloc(self.small_number(i));
-        &*self.b.arena.alloc(self.b.member_computed(base, index))
+        let index = self.small_number(i);
+        let member = self.b.member_computed(base, index);
+        self.b.push(member)
     }
 
     /// `$$derived_array().slice(i)` / `$$array.slice(i)`.
-    fn array_rest(&mut self, name: &str, i: usize) -> &'arena Expression<'arena> {
+    fn array_rest(&mut self, name: &str, i: usize) -> ExprId {
         let base = self.array_read(name);
-        let slice = &*self.b.arena.alloc(self.b.member_prop(base, "slice"));
-        let index = &*self.b.arena.alloc(self.small_number(i));
-        &*self
-            .b
-            .arena
-            .alloc(self.b.call_of(slice, std::slice::from_ref(index), false))
+        let slice = self.b.member_prop(base, "slice");
+        let slice = self.b.push(slice);
+        let index = self.small_number(i);
+        let call = self.b.call_of(slice, &[index], false);
+        self.b.push(call)
     }
 
     /// The port of the oracle's `build_fallback` (`utils/ast.js:585`) for the sync
@@ -603,47 +611,46 @@ impl<'arena> Extractor<'_, 'arena> {
     /// `$.fallback(expr, () => default, true)` (with the `b.thunk` unthunk collapse
     /// — `f()` → `f`). An async default is unreachable: the pattern guard walk
     /// refuses the top-level `await` first.
-    fn build_fallback(
-        &mut self,
-        expr: &'arena Expression<'arena>,
-        default: &'arena Expression<'arena>,
-    ) -> &'arena Expression<'arena> {
-        let mut args: BumpVec<'arena, Expression<'arena>> = BumpVec::new_in(self.b.arena);
-        args.push(expr.clone());
-        if is_simple_expression(default) {
-            args.push(default.clone());
+    fn build_fallback(&mut self, expr: ExprId, default: ExprId) -> ExprId {
+        let mut args = vec![expr];
+        if is_simple_expression(self.view(), default) {
+            args.push(default);
         } else {
-            let thunk = match unthunk_callee(default) {
+            let thunk = match unthunk_callee(self.view(), self.view().expr(default)) {
                 Some(callee) => callee,
-                None => &*self.b.arena.alloc(self.b.thunk_on_body(default)),
+                None => {
+                    let thunk = self.b.thunk_on_body(default);
+                    self.b.push(thunk)
+                }
             };
-            args.push(thunk.clone());
-            args.push(self.b.true_literal());
+            args.push(thunk);
+            let true_literal = self.b.true_literal();
+            args.push(self.b.push(true_literal));
         }
-        let call = self.b.member_call("$", "fallback", args.into_bump_slice());
-        &*self.b.arena.alloc(call)
+        let call = self.b.member_call("$", "fallback", &args);
+        self.b.push(call)
     }
 }
 
 /// The oracle's `is_simple_expression` (`utils/ast.js:442`): an identifier /
 /// literal / function / arrow, or a conditional/binary/logical whose operands are
 /// all simple. tsv folds logical into [`ExpressionKind::BinaryExpression`].
-fn is_simple_expression(node: &Expression<'_>) -> bool {
-    match &node.kind {
+fn is_simple_expression(view: AstView<'_>, node: ExprId) -> bool {
+    match view.expr(node).kind {
         ExpressionKind::Literal(_)
         | ExpressionKind::Identifier(_)
         | ExpressionKind::ArrowFunctionExpression(_)
         | ExpressionKind::FunctionExpression(_) => true,
         ExpressionKind::ConditionalExpression(c) => {
-            is_simple_expression(c.test)
-                && is_simple_expression(c.consequent)
-                && is_simple_expression(c.alternate)
+            is_simple_expression(view, c.test)
+                && is_simple_expression(view, c.consequent)
+                && is_simple_expression(view, c.alternate)
         }
         ExpressionKind::BinaryExpression(b) => {
             // TODO: the oracle (`utils/ast.js:461`) also guards `left.type !==
             // 'PrivateIdentifier'` on this arm; omitted as unreachable — a
             // `#x in obj` default is parse-rejected at module scope.
-            is_simple_expression(b.left) && is_simple_expression(b.right)
+            is_simple_expression(view, b.left) && is_simple_expression(view, b.right)
         }
         _ => false,
     }

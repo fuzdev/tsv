@@ -291,7 +291,7 @@ pub(crate) fn guard_pattern(env: &EmitEnv<'_>, pattern: ExprId) -> Result<(), Co
 /// it, together with the set that must keep compiling beside it.
 pub(crate) fn guard_dropped_fragment(
     env: &EmitEnv<'_>,
-    fragment: &Fragment,
+    fragment: Fragment,
 ) -> Result<(), CompileError> {
     let sv = env.sv;
     guard_dropped_presence(sv, fragment)?;
@@ -322,7 +322,7 @@ pub(crate) fn guard_dropped_fragment(
 ///
 /// Recursion rides [`each_child_fragment`], the shared structural seam, so a new
 /// child fragment on an existing node kind cannot hide a node from this walk.
-fn guard_dropped_presence(sv: SvelteView<'_>, fragment: &Fragment) -> Result<(), CompileError> {
+fn guard_dropped_presence(sv: SvelteView<'_>, fragment: Fragment) -> Result<(), CompileError> {
     for node in sv.nodes(fragment.nodes) {
         if let Some(reason) = dropped_presence_refusal(sv, node) {
             return Err(unsupported(reason));
@@ -330,7 +330,7 @@ fn guard_dropped_presence(sv: SvelteView<'_>, fragment: &Fragment) -> Result<(),
         let mut result = Ok(());
         each_child_fragment(node, &mut |child| {
             if result.is_ok() {
-                result = guard_dropped_presence(sv, child);
+                result = guard_dropped_presence(sv, *child);
             }
         });
         result?;

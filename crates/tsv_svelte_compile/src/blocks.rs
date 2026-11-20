@@ -60,13 +60,13 @@ use crate::{CompileError, Refusal};
 ///   name is minted before the visitor knows whether it will be used.
 pub(crate) fn assign_each_index_names(
     sv: SvelteView<'_>,
-    fragment: &Fragment,
+    fragment: Fragment,
 ) -> HashMap<(u32, u32), String> {
-    fn walk(sv: SvelteView<'_>, fragment: &Fragment, names: &mut HashMap<(u32, u32), String>) {
+    fn walk(sv: SvelteView<'_>, fragment: Fragment, names: &mut HashMap<(u32, u32), String>) {
         for node in sv.nodes(fragment.nodes) {
             // Post-order: descend first, so a nested `{#each}` takes the lower
             // suffix — the oracle's visit-children-then-assign shape.
-            each_child_fragment(node, &mut |child| walk(sv, child, names));
+            each_child_fragment(node, &mut |child| walk(sv, *child, names));
             if let FragmentNode::EachBlock(block) = node {
                 let n = names.len();
                 let name = if n == 0 {
@@ -442,6 +442,11 @@ pub(crate) fn declaration_stmt(
 /// `$$renderer.push` of a template literal, the marker joins that template's first
 /// chunk and its own push is dropped. Anything else first (a declaration, a nested
 /// block, an empty branch) keeps the separate marker push.
+///
+/// The folded template is a new row over the source template's own `expressions`
+/// run (the interpolations keep their ids); only the quasis are rebuilt. The source
+/// template, its push, and the marker push leave the printed tree: the returned run
+/// holds the folded push and the rest of `body`, never `body[0]` or `body[1]`.
 fn fold_block_marker(b: &mut Builder<'_>, marker: &str, body: Run<StmtId>) -> Run<StmtId> {
     let view = b.view();
     let stmts = view.stmt_list(body);
@@ -995,7 +1000,7 @@ pub(crate) fn emit_await_block(
     // `{:catch}` is the only dropped FRAGMENT. The other dropped regions — an
     // `{#each}` key, a `{#key}` expression, an event handler's value — are single
     // expressions, so they carry no node kind and route through `guard_dropped`.
-    if let Some(catch) = &await_block.catch {
+    if let Some(catch) = await_block.catch {
         guard_dropped_fragment(env, catch)?;
     }
 

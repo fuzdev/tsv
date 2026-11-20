@@ -119,6 +119,13 @@ pub(crate) trait HasStores {
     fn stores(&mut self) -> &mut AstStores;
 }
 
+impl HasStores for Builder<'_> {
+    #[inline]
+    fn stores(&mut self) -> &mut AstStores {
+        self.stores
+    }
+}
+
 /// Rebuild `run` through a per-element rewrite, sharing the input when no element
 /// changed (`None`). The lazy-prefix rebuild of the write surface: until the first
 /// change nothing is written; the first changed (or dropped) element opens a frame

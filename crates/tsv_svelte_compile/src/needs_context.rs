@@ -296,7 +296,7 @@ pub(crate) fn analyze_component(
         walk_stmt(stmt, &mut nc, false);
     }
     js_scope_restore(&mut nc, 0);
-    walk_fragment(&root.fragment, &mut nc);
+    walk_fragment(root.fragment, &mut nc);
 
     if let Some(reason) = nc.refuse {
         return Err(unsupported(reason));
@@ -1399,7 +1399,7 @@ fn walk_stmt(stmt: StmtId, nc: &mut Nc<'_>, shadow: bool) {
 /// Walk a template fragment: trigger-check every rendered expression and record
 /// the block-local bindings (each item/index, `{:then}`/`{:catch}` values,
 /// `{@const}` names) that shadow the component scope.
-fn walk_fragment(fragment: &Fragment, nc: &mut Nc<'_>) {
+fn walk_fragment(fragment: Fragment, nc: &mut Nc<'_>) {
     let (sv, view) = (nc.sv, nc.view);
     // The `{@const}` names of this fragment enter scope BEFORE any of its nodes is
     // walked, mirroring the oracle's scope PRE-PASS (`create_scopes` completes
@@ -1511,7 +1511,7 @@ fn walk_special_element(se: &SpecialElement, nc: &mut Nc<'_>) {
     each_reference_bearing_attribute_expression(sv, sv.attributes(se.attributes), &mut |expr| {
         walk_id(expr, nc);
     });
-    walk_fragment(&se.fragment, nc);
+    walk_fragment(se.fragment, nc);
 }
 
 /// A `{#snippet}` is a function-like subtree: its parameters + body locals
@@ -1531,7 +1531,7 @@ fn walk_snippet_block(snippet: &SnippetBlock, nc: &mut Nc<'_>) {
         let _ = pattern_binding_names(view, param, nc.source, &mut names);
     }
     let added = enter_block_scope(&mut nc.snippet_params, names);
-    walk_fragment(&snippet.body, nc);
+    walk_fragment(snippet.body, nc);
     exit_block_scope(&mut nc.snippet_params, added);
     nc.fn_depth -= 1;
 }
@@ -1606,7 +1606,7 @@ fn walk_element(element: &Element, nc: &mut Nc<'_>) {
     } else {
         each_attribute_expression(sv, element, &mut |expr| walk_id(expr, nc));
     }
-    walk_fragment(&element.fragment, nc);
+    walk_fragment(element.fragment, nc);
 }
 
 fn walk_html_tag(tag: &HtmlTag, nc: &mut Nc<'_>) {
@@ -1615,9 +1615,9 @@ fn walk_html_tag(tag: &HtmlTag, nc: &mut Nc<'_>) {
 
 fn walk_if_block(block: &IfBlock, nc: &mut Nc<'_>) {
     walk_id(block.test, nc);
-    walk_fragment(&block.consequent, nc);
+    walk_fragment(block.consequent, nc);
     if let Some(alt) = &block.alternate {
-        walk_fragment(alt, nc);
+        walk_fragment(*alt, nc);
     }
 }
 
@@ -1653,9 +1653,9 @@ fn walk_each_block(block: &EachBlock, nc: &mut Nc<'_>) {
         // the each block's child scope, covering body + fallback.
         index_added = enter_block_scope(&mut nc.template_consts, vec![index.to_string()]);
     }
-    walk_fragment(&block.body, nc);
+    walk_fragment(block.body, nc);
     if let Some(fallback) = &block.fallback {
-        walk_fragment(fallback, nc);
+        walk_fragment(*fallback, nc);
     }
     exit_block_scope(&mut nc.template_consts, index_added);
     exit_block_scope(&mut nc.each_items, each_added);
@@ -1675,7 +1675,7 @@ fn walk_await_block(block: &AwaitBlock, nc: &mut Nc<'_>) {
     // emission); the `{:catch}` branch is dropped, so it is walked with the
     // inclusive attribute traversal. The flag is scoped to the catch subtree.
     if let Some(pending) = &block.pending {
-        walk_fragment(pending, nc);
+        walk_fragment(*pending, nc);
     }
     // The `{:then}` value and the `{:catch}` error are each declared `'const'`
     // into their OWN branch fragment's scope (`phases/scope.js:1310`/`:1324`), so
@@ -1683,7 +1683,7 @@ fn walk_await_block(block: &AwaitBlock, nc: &mut Nc<'_>) {
     if let Some(then) = &block.then {
         let names = template_const_names(nc.view, block.value, nc.source);
         let added = enter_block_scope(&mut nc.template_consts, names);
-        walk_fragment(then, nc);
+        walk_fragment(*then, nc);
         exit_block_scope(&mut nc.template_consts, added);
     }
     if let Some(catch) = &block.catch {
@@ -1691,7 +1691,7 @@ fn walk_await_block(block: &AwaitBlock, nc: &mut Nc<'_>) {
         let added = enter_block_scope(&mut nc.template_consts, names);
         let prev = nc.in_dropped_catch;
         nc.in_dropped_catch = true;
-        walk_fragment(catch, nc);
+        walk_fragment(*catch, nc);
         nc.in_dropped_catch = prev;
         exit_block_scope(&mut nc.template_consts, added);
     }
@@ -1699,7 +1699,7 @@ fn walk_await_block(block: &AwaitBlock, nc: &mut Nc<'_>) {
 
 fn walk_key_block(block: &KeyBlock, nc: &mut Nc<'_>) {
     walk_id(block.expression, nc);
-    walk_fragment(&block.fragment, nc);
+    walk_fragment(block.fragment, nc);
 }
 
 fn walk_const_tag(tag: &ConstTag, nc: &mut Nc<'_>) {

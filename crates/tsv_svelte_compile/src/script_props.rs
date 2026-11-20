@@ -5,11 +5,10 @@
 //! `$$props`, the trailing `$.bind_props($$props, { … })`, the sanitize_slots
 //! deconfliction. Called from [`crate::script_rewrite`]'s `$props()` arm.
 
-use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::Span;
 use tsv_ts::ast::{
-    AssignmentPattern, Expression, ExpressionKind, ObjectPattern, ObjectPatternProperty, Property,
-    RestElement,
+    AssignmentPattern, AstView, ExprId, Expression, ExpressionKind, ObjectPattern,
+    ObjectPatternProperty, Property, RestElement,
 };
 
 use crate::build::{Builder, init_property};
@@ -29,11 +28,11 @@ pub(crate) struct BindableEntry {
 }
 
 /// The fallback of a rewritable `$bindable(...)` destructure default.
-enum BindableDefault<'arena> {
+enum BindableDefault {
     /// `$bindable()` — argument-less; the default becomes `void 0`.
     ArgLess,
     /// `$bindable(fallback)` — the default becomes `fallback`.
-    Arg(&'arena Expression<'arena>),
+    Arg(ExprId),
 }
 
 /// Classify a destructure default's right side as a rewritable `$bindable(...)`
@@ -41,22 +40,23 @@ enum BindableDefault<'arena> {
 /// anything else — a non-call, a member callee, or `$bindable(a, b)` (the oracle
 /// rejects that arity, `rune_invalid_arguments_length`) — so the `$bindable` call
 /// survives the rewrite and the guard walk refuses it.
-fn bindable_default<'arena>(
-    right: &'arena Expression<'arena>,
+fn bindable_default(
+    view: AstView<'_>,
+    right: &Expression,
     source: &str,
-) -> Option<BindableDefault<'arena>> {
+) -> Option<BindableDefault> {
     let ExpressionKind::CallExpression(call) = &right.kind else {
         return None;
     };
-    let ExpressionKind::Identifier(callee) = &call.callee.kind else {
+    let ExpressionKind::Identifier(callee) = &view.expr(call.callee).kind else {
         return None;
     };
     if plain_identifier_name(callee, source).as_deref() != Some("$bindable") {
         return None;
     }
-    match call.arguments {
+    match view.expr_list(call.arguments) {
         [] => Some(BindableDefault::ArgLess),
-        [arg] => Some(BindableDefault::Arg(arg)),
+        [arg] => Some(BindableDefault::Arg(*arg)),
         _ => None,
     }
 }
@@ -71,68 +71,60 @@ fn bindable_default<'arena>(
 /// the guard to refuse (a safe over-refusal, even for a non-identifier-keyed prop
 /// the oracle would compile). A computed key or a nested-pattern value never reaches
 /// here — both already refused as [`Refusal::PropsInvalidPattern`].
-fn bindable_property<'arena>(
-    prop: &'arena ObjectPatternProperty<'arena>,
+fn bindable_property(
+    view: AstView<'_>,
+    prop: &ObjectPatternProperty,
     source: &str,
-) -> Option<(
-    BindableEntry,
-    &'arena Property<'arena>,
-    &'arena AssignmentPattern<'arena>,
-    BindableDefault<'arena>,
-)> {
+) -> Option<(BindableEntry, Property, AssignmentPattern, BindableDefault)> {
     let ObjectPatternProperty::Property(p) = prop else {
         return None;
     };
     if p.computed {
         return None;
     }
-    let ExpressionKind::AssignmentPattern(assign) = &p.value.kind else {
+    let ExpressionKind::AssignmentPattern(assign) = view.expr(p.value).kind else {
         return None;
     };
-    let default = bindable_default(assign.right, source)?;
-    let ExpressionKind::Identifier(key_id) = &p.key.kind else {
+    let default = bindable_default(view, view.expr(assign.right), source)?;
+    let ExpressionKind::Identifier(key_id) = &view.expr(p.key).kind else {
         return None;
     };
     let key = plain_identifier_name(key_id, source)?;
-    let ExpressionKind::Identifier(left_id) = &assign.left.kind else {
+    let ExpressionKind::Identifier(left_id) = &view.expr(assign.left).kind else {
         return None;
     };
     let local = plain_identifier_name(left_id, source)?;
-    Some((BindableEntry { key, local }, p, assign, default))
+    Some((BindableEntry { key, local }, *p, assign, default))
 }
 
 /// Rebuild an object-pattern property, replacing its `$bindable(fallback?)`
 /// default with the fallback (`void 0` when argument-less). A shallow re-slot:
-/// the key, the `AssignmentPattern.left`, and every flag stay borrowed; only the
-/// default's `right` changes.
-fn rewrite_bindable_default<'arena>(
-    b: &Builder<'arena>,
-    p: &'arena Property<'arena>,
-    assign: &'arena AssignmentPattern<'arena>,
-    assign_span: Span,
-    default: BindableDefault<'arena>,
-) -> ObjectPatternProperty<'arena> {
-    let new_right: &'arena Expression<'arena> = match default {
+/// the key and the `AssignmentPattern.left` keep their host ids and every flag
+/// is copied; only the default's `right` changes, in a new `AssignmentPattern` row.
+fn rewrite_bindable_default(
+    b: &mut Builder<'_>,
+    p: Property,
+    assign: AssignmentPattern,
+    default: BindableDefault,
+) -> ObjectPatternProperty {
+    let assign_span = b.view().expr(p.value).span;
+    let new_right = match default {
         BindableDefault::Arg(arg) => arg,
-        BindableDefault::ArgLess => b.arena.alloc(b.void_zero_at(assign.right.span().end)),
+        BindableDefault::ArgLess => {
+            let at = b.view().expr(assign.right).span.end;
+            let void_zero = b.void_zero_at(at);
+            b.push(void_zero)
+        }
     };
-    let new_value = Expression {
+    let value = b.push(Expression {
         span: assign_span,
         kind: ExpressionKind::AssignmentPattern(AssignmentPattern {
             left: assign.left,
             right: new_right,
             decorators: assign.decorators,
         }),
-    };
-    ObjectPatternProperty::Property(Property {
-        key: p.key,
-        value: b.arena.alloc(new_value),
-        kind: p.kind,
-        shorthand: p.shorthand,
-        computed: p.computed,
-        method: p.method,
-        span: p.span,
-    })
+    });
+    ObjectPatternProperty::Property(Property { value, ..p })
 }
 
 /// Rewrite a `$props()` binding pattern for the server module: replace each
@@ -151,7 +143,7 @@ fn rewrite_bindable_default<'arena>(
 ///   rewrite.
 ///
 /// Returns `(replacement pattern, bindable entries)`. The replacement is `None`
-/// when nothing changed, so the original borrowed pattern is kept. Refuses a
+/// when nothing changed, so the host pattern `id` is kept. Refuses a
 /// non-identifier/non-object `$props()` pattern (the oracle rejects those —
 /// props_invalid_identifier). Every node either rewrite injects is zero-width at a
 /// host position (the start of the property it precedes, the end of a replaced
@@ -166,15 +158,18 @@ fn rewrite_bindable_default<'arena>(
 /// `VariableDeclaration` visitor — always the `_` suffix, unconditional;
 /// `$$events` never renames, and a user `$$slots_`/`$$events` reference or
 /// declaration is oracle-rejected input, so no second-order collision exists).
-pub(crate) fn rewrite_props_pattern<'arena>(
-    b: &Builder<'arena>,
-    id: &'arena Expression<'arena>,
+pub(crate) fn rewrite_props_pattern(
+    b: &mut Builder<'_>,
+    id: ExprId,
     source: &str,
     uses_slots: bool,
-) -> Result<(Option<Expression<'arena>>, Vec<BindableEntry>), CompileError> {
-    let arena = b.arena;
-    match &id.kind {
+) -> Result<(Option<ExprId>, Vec<BindableEntry>), CompileError> {
+    let pattern = *b.view().expr(id);
+    match pattern.kind {
         ExpressionKind::ObjectPattern(obj) => {
+            let view = b.view();
+            // The properties, copied out: the rewrite below pushes as it walks them.
+            let props = view.pat_props(obj.properties).to_vec();
             // The oracle's per-property validation of a `$props()` destructure
             // (`2-analyze/visitors/VariableDeclarator.js:97-110`): three checks in
             // source order, first-wins (the oracle's `e.*` throws). Runs BEFORE the
@@ -182,7 +177,7 @@ pub(crate) fn rewrite_props_pattern<'arena>(
             // (`{ [x]: a }`, `{ $$slots: a }`, `{ a: { b } }`) still reaches it. A
             // `RestElement` is skipped (the oracle's `property.type !== 'Property'`
             // continue).
-            for prop in obj.properties {
+            for prop in &props {
                 let ObjectPatternProperty::Property(p) = prop else {
                     continue;
                 };
@@ -198,8 +193,8 @@ pub(crate) fn rewrite_props_pattern<'arena>(
                 //    `{ $$foo = 1 }` — is refused upstream as `DollarPrefixedBinding`
                 //    (`script_rewrite.rs`, the oracle's `dollar_prefix_invalid`, which fires
                 //    first), so only `{ $$key: value }` reaches here.
-                if let ExpressionKind::Identifier(key_id) = &p.key.kind
-                    && key_id.name(source).starts_with("$$")
+                if let ExpressionKind::Identifier(key_id) = &view.expr(p.key).kind
+                    && key_id.name(source, view).starts_with("$$")
                 {
                     return Err(unsupported(Refusal::PropsIllegalName));
                 }
@@ -208,87 +203,72 @@ pub(crate) fn rewrite_props_pattern<'arena>(
                 //    `{ a: [b] }`, `{ a: { b } = {} }`) — `props_invalid_pattern`. A
                 //    `$bindable()` default's value is still checked here, so a nested
                 //    `{ a: { b } = $bindable() }` refuses BEFORE the guard sees `$bindable`.
-                let value = match &p.value {
-                    Expression {
-                        kind: ExpressionKind::AssignmentPattern(assign),
-                        ..
-                    } => assign.left,
-                    other => other,
+                let value = match view.expr(p.value).kind {
+                    ExpressionKind::AssignmentPattern(assign) => view.expr(assign.left),
+                    _ => view.expr(p.value),
                 };
                 if !matches!(value.kind, ExpressionKind::Identifier(_)) {
                     return Err(unsupported(Refusal::PropsInvalidPattern));
                 }
             }
-            let has_rest = obj
-                .properties
+            let has_rest = props
                 .iter()
                 .any(|p| matches!(p, ObjectPatternProperty::RestElement(_)));
-            let has_bindable = obj
-                .properties
+            let has_bindable = props
                 .iter()
-                .any(|p| bindable_property(p, source).is_some());
+                .any(|p| bindable_property(view, p, source).is_some());
             if !has_rest && !has_bindable {
                 return Ok((None, Vec::new()));
             }
             let mut entries = Vec::new();
-            let mut properties: BumpVec<'arena, ObjectPatternProperty<'arena>> =
-                BumpVec::new_in(arena);
-            for prop in obj.properties {
+            let mut properties: Vec<ObjectPatternProperty> = Vec::with_capacity(props.len() + 2);
+            for prop in props {
                 if matches!(prop, ObjectPatternProperty::RestElement(_)) {
                     let at = prop.span().start;
                     properties.push(slots_pattern_prop(b, uses_slots, at));
                     properties.push(shorthand_pattern_prop(b, "$$events", at));
-                    properties.push(prop.clone());
-                } else if let Some((entry, p, assign, default)) = bindable_property(prop, source) {
+                    properties.push(prop);
+                } else if let Some((entry, p, assign, default)) =
+                    bindable_property(b.view(), &prop, source)
+                {
                     entries.push(entry);
-                    properties.push(rewrite_bindable_default(
-                        b,
-                        p,
-                        assign,
-                        p.value.span,
-                        default,
-                    ));
+                    properties.push(rewrite_bindable_default(b, p, assign, default));
                 } else {
-                    properties.push(prop.clone());
+                    properties.push(prop);
                 }
             }
-            Ok((
-                Some(Expression {
-                    span: id.span,
-                    kind: ExpressionKind::ObjectPattern(ObjectPattern {
-                        properties: properties.into_bump_slice(),
-                        optional: obj.optional,
-                        type_annotation: obj.type_annotation.clone(),
-                        decorators: obj.decorators,
-                    }),
+            let properties = b.push_list(&properties);
+            let rewritten = b.push(Expression {
+                span: pattern.span,
+                kind: ExpressionKind::ObjectPattern(ObjectPattern {
+                    properties,
+                    optional: obj.optional,
+                    extra: obj.extra,
                 }),
-                entries,
-            ))
+            });
+            Ok((Some(rewritten), entries))
         }
         ExpressionKind::Identifier(_) => {
-            let mut properties: BumpVec<'arena, ObjectPatternProperty<'arena>> =
-                BumpVec::new_in(arena);
-            let at = id.span().start;
-            properties.push(slots_pattern_prop(b, uses_slots, at));
-            properties.push(shorthand_pattern_prop(b, "$$events", at));
-            properties.push(ObjectPatternProperty::RestElement(RestElement {
-                argument: arena.alloc(id.clone()),
+            let at = pattern.span.start;
+            let slots = slots_pattern_prop(b, uses_slots, at);
+            let events = shorthand_pattern_prop(b, "$$events", at);
+            // The host identifier becomes the rest element's argument, by its own id.
+            let rest = ObjectPatternProperty::RestElement(RestElement {
+                argument: id,
                 optional: false,
-                type_annotation: None,
-                span: id.span(),
-            }));
-            Ok((
-                Some(Expression {
-                    span: id.span(),
-                    kind: ExpressionKind::ObjectPattern(ObjectPattern {
-                        properties: properties.into_bump_slice(),
-                        optional: false,
-                        type_annotation: None,
-                        decorators: None,
-                    }),
+                extra: None,
+                span: pattern.span,
+            });
+            let properties = b.push_list(&[slots, events, rest]);
+            let rewritten = b.push(Expression {
+                span: pattern.span,
+                kind: ExpressionKind::ObjectPattern(ObjectPattern {
+                    properties,
+                    optional: false,
+                    extra: None,
                 }),
-                Vec::new(),
-            ))
+            });
+            Ok((Some(rewritten), Vec::new()))
         }
         _ => Err(unsupported(Refusal::PropsBindingPattern)),
     }
@@ -298,22 +278,14 @@ pub(crate) fn rewrite_props_pattern<'arena>(
 /// renamed `{ $$slots: $$slots_ }` when the sanitize_slots const owns the name
 /// (see [`rewrite_props_pattern`]). Zero-width at `at`, like
 /// [`shorthand_pattern_prop`].
-fn slots_pattern_prop<'arena>(
-    b: &Builder<'arena>,
-    uses_slots: bool,
-    at: u32,
-) -> ObjectPatternProperty<'arena> {
+fn slots_pattern_prop(b: &mut Builder<'_>, uses_slots: bool, at: u32) -> ObjectPatternProperty {
     if !uses_slots {
         return shorthand_pattern_prop(b, "$$slots", at);
     }
     let span = Span::new(at, at);
-    ObjectPatternProperty::Property(init_property(
-        b.arena,
-        Expression::from_identifier(b.ident_at("$$slots", span)),
-        Expression::from_identifier(b.ident_at("$$slots_", span)),
-        false,
-        span,
-    ))
+    let key = b.ident_expr_at("$$slots", span);
+    let value = b.ident_expr_at("$$slots_", span);
+    ObjectPatternProperty::Property(init_property(key, value, false, span))
 }
 
 /// A shorthand `{ name }` pattern property over a synthetic identifier, zero-width
@@ -321,18 +293,10 @@ fn slots_pattern_prop<'arena>(
 /// appendix span there would open the previous property's trailing window from its
 /// host end into the appendix, sweeping every later carried comment into the
 /// pattern; at `at`, the windows around it are the authored gaps.
-fn shorthand_pattern_prop<'arena>(
-    b: &Builder<'arena>,
-    name: &str,
-    at: u32,
-) -> ObjectPatternProperty<'arena> {
+fn shorthand_pattern_prop(b: &mut Builder<'_>, name: &str, at: u32) -> ObjectPatternProperty {
     let span = Span::new(at, at);
     let ident = b.ident_at(name, span);
-    ObjectPatternProperty::Property(init_property(
-        b.arena,
-        Expression::from_identifier(ident.clone()),
-        Expression::from_identifier(ident),
-        true,
-        span,
-    ))
+    let key = b.push(Expression::from_identifier(ident));
+    let value = b.push(Expression::from_identifier(ident));
+    ObjectPatternProperty::Property(init_property(key, value, true, span))
 }

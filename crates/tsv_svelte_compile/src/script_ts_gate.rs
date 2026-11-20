@@ -256,7 +256,7 @@ pub(crate) fn refuse_template_typescript(
     source: &str,
 ) -> Result<(), CompileError> {
     let mut items = Vec::new();
-    each_template_item(sv, ts.view(), &root.fragment, &mut |item| {
+    each_template_item(sv, ts.view(), root.fragment, &mut |item| {
         items.push(item);
         Ok(())
     })?;

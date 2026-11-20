@@ -113,7 +113,7 @@ pub(crate) fn analyze_snippets(
 ) -> Result<SnippetAnalysis, CompileError> {
     let mut names = NameSet::default();
     let mut name_collector = Collector::new(sv, view, source);
-    name_collector.collect_names(&root.fragment, &mut names);
+    name_collector.collect_names(root.fragment, &mut names);
 
     let top_level: Vec<&SnippetBlock> = sv
         .nodes(root.fragment.nodes)
@@ -290,7 +290,7 @@ impl<'s> Collector<'s> {
             self.bind_pattern_into_params(param);
             self.param_defaults(param);
         }
-        self.fragment(&snippet.body);
+        self.fragment(snippet.body);
     }
 
     fn ident_ref(&mut self, id: &Identifier) {
@@ -361,7 +361,7 @@ impl<'s> Collector<'s> {
 
     // ── Snippet-name collection (a separate, lighter pass) ──────────────────
 
-    fn collect_names(&mut self, fragment: &Fragment, out: &mut NameSet) {
+    fn collect_names(&mut self, fragment: Fragment, out: &mut NameSet) {
         for node in self.sv.nodes(fragment.nodes) {
             // Only a snippet contributes a name; the recursion into every child
             // fragment rides the shared seam, so a new template shape can't drop
@@ -371,13 +371,13 @@ impl<'s> Collector<'s> {
             {
                 out.insert(name.to_string());
             }
-            each_child_fragment(node, &mut |child| self.collect_names(child, out));
+            each_child_fragment(node, &mut |child| self.collect_names(*child, out));
         }
     }
 
     // ── Fragment walk ───────────────────────────────────────────────────────
 
-    fn fragment(&mut self, fragment: &Fragment) {
+    fn fragment(&mut self, fragment: Fragment) {
         for node in self.sv.nodes(fragment.nodes) {
             self.fragment_node(node);
         }
@@ -424,7 +424,7 @@ impl<'s> Collector<'s> {
                 self.directive_name_ref(name);
             });
         }
-        self.fragment(&element.fragment);
+        self.fragment(element.fragment);
     }
 
     fn special_element(&mut self, se: &SpecialElement) {
@@ -454,7 +454,7 @@ impl<'s> Collector<'s> {
             }
             self.dropped_attribute_refs(self.sv.attributes(se.attributes));
         }
-        self.fragment(&se.fragment);
+        self.fragment(se.fragment);
     }
 
     /// Count every reference in an attribute list on the dropped-`{:catch}` path:
@@ -486,9 +486,9 @@ impl<'s> Collector<'s> {
 
     fn if_block(&mut self, block: &IfBlock) {
         self.expr(block.test);
-        self.fragment(&block.consequent);
+        self.fragment(block.consequent);
         if let Some(alt) = &block.alternate {
-            self.fragment(alt);
+            self.fragment(*alt);
         }
     }
 
@@ -503,9 +503,9 @@ impl<'s> Collector<'s> {
         if let Some(index) = block.index {
             self.locals.insert(index.extract(self.source).to_string());
         }
-        self.fragment(&block.body);
+        self.fragment(block.body);
         if let Some(fallback) = &block.fallback {
-            self.fragment(fallback);
+            self.fragment(*fallback);
         }
     }
 
@@ -521,19 +521,19 @@ impl<'s> Collector<'s> {
         // emission); the `{:catch}` branch is dropped, so it is walked with the
         // inclusive attribute traversal. The flag is scoped to the catch subtree.
         for frag in [&block.pending, &block.then].into_iter().flatten() {
-            self.fragment(frag);
+            self.fragment(*frag);
         }
         if let Some(catch) = &block.catch {
             let prev = self.in_dropped_catch;
             self.in_dropped_catch = true;
-            self.fragment(catch);
+            self.fragment(*catch);
             self.in_dropped_catch = prev;
         }
     }
 
     fn key_block(&mut self, block: &KeyBlock) {
         self.expr(block.expression);
-        self.fragment(&block.fragment);
+        self.fragment(block.fragment);
     }
 
     fn const_tag(&mut self, tag: &ConstTag) {
@@ -555,7 +555,7 @@ impl<'s> Collector<'s> {
             self.bind_pattern(param);
             self.param_defaults(param);
         }
-        self.fragment(&snippet.body);
+        self.fragment(snippet.body);
     }
 
     fn declaration_tag(&mut self, tag: &DeclarationTag) {

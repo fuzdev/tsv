@@ -114,7 +114,7 @@ pub(crate) fn validate_document(
         path: Vec::new(),
         slot_path: Vec::new(),
     };
-    validator.walk_fragment(&root.fragment)
+    validator.walk_fragment(root.fragment)
 }
 
 /// One entry of the oracle's `context.path`, reduced to the three things the
@@ -184,7 +184,7 @@ struct Validator<'s> {
 }
 
 impl<'s> Validator<'s> {
-    fn walk_fragment(&mut self, fragment: &Fragment) -> Result<(), CompileError> {
+    fn walk_fragment(&mut self, fragment: Fragment) -> Result<(), CompileError> {
         refuse_duplicate_snippet_names(self.sv, self.view, fragment, self.source)?;
         for node in self.sv.nodes(fragment.nodes) {
             self.walk_node(node)?;
@@ -300,7 +300,7 @@ impl<'s> Validator<'s> {
         let mut result = Ok(());
         each_child_fragment(node, &mut |child| {
             if result.is_ok() {
-                result = self.walk_fragment(child);
+                result = self.walk_fragment(*child);
             }
         });
 
@@ -544,7 +544,7 @@ impl<'s> Validator<'s> {
 fn refuse_duplicate_snippet_names(
     sv: SvelteView<'_>,
     view: AstView<'_>,
-    fragment: &Fragment,
+    fragment: Fragment,
     source: &str,
 ) -> Result<(), CompileError> {
     let mut seen: Vec<&str> = Vec::new();

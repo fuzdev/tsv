@@ -146,7 +146,11 @@ fn bind_target_root(view: AstView<'_>, expr: &Expression, source: &str) -> Optio
 /// in its `BindDirective` analysis). Recognized only so `bind:this` can OMIT it at
 /// parity — the value/checked/group arms still refuse it (no attr value to emit).
 fn is_get_set_pair(env: &EmitEnv<'_>, expr: ExprId) -> bool {
-    matches!(&env.b.view().expr(expr).kind, ExpressionKind::SequenceExpression(seq) if seq.expressions.len() == 2)
+    let view = env.b.view();
+    matches!(
+        &view.expr(expr).kind,
+        ExpressionKind::SequenceExpression(seq) if seq.expressions.len() == 2
+    )
 }
 
 /// The bind target's root name, but only when that root is something the oracle

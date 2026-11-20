@@ -49,14 +49,14 @@
 
 use std::collections::HashMap;
 
-use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::store::Run;
 use tsv_lang::{Comment, Span};
 use tsv_svelte::ast::{Element, Root, SpecialElement, SvelteView};
 use tsv_ts::ast::{
     AstStores, BlockStatement, ExportDefaultDeclaration, ExportDefaultValue, ExprId, Expression,
     ExpressionKind, ExpressionStatement, FunctionDeclaration, ObjectExpression, ObjectProperty,
-    Statement, StatementKind, StmtId, VariableDeclaration, VariableDeclarationKind,
+    ParsedRef, Program, Statement, StatementKind, StmtId, VariableDeclaration,
+    VariableDeclarationKind,
 };
 
 use crate::analyze::{Bindings, NameSet, RuneInit, Scope, ScopeEntry, classify_rune_init};
@@ -686,7 +686,7 @@ fn analyze(
         script_comments,
         module_comments,
         erased_windows,
-        each_index_names: blocks::assign_each_index_names(sv, &root.fragment),
+        each_index_names: blocks::assign_each_index_names(sv, root.fragment),
     })
 }
 
@@ -740,10 +740,10 @@ pub(crate) fn compile_server(
     // collection, effect detection. Rewrites drop source regions (rune call
     // wrappers, whole effect statements) — a comment inside a dropped region
     // has nowhere to go, so it refuses.
-    let mut body: BumpVec<'arena, Statement<'arena>> = BumpVec::new_in(arena);
+    let mut body: Vec<StmtId> = Vec::new();
     // Instance-script `import` statements hoist to module scope (an `import`
     // inside the component function is invalid JS); the rest stay in the body.
-    let mut user_imports: BumpVec<'arena, Statement<'arena>> = BumpVec::new_in(arena);
+    let mut user_imports: Vec<StmtId> = Vec::new();
     let mut uses_props = false;
     let mut has_effects = false;
     let mut updated = NameSet::default();
@@ -769,7 +769,10 @@ pub(crate) fn compile_server(
     // must NOT win over the script-loop refusals below, so it is `?`-unwrapped
     // only after the loop (see `Analysis::component`).
     let uses_slots = component.as_ref().is_ok_and(|c| c.uses_slots);
-    for stmt in instance_body {
+    for i in 0..instance_body.len() {
+        // Read by index: the rewrite pushes as the loop walks the run.
+        let stmt = b.view().stmt_list(instance_body)[i];
+        let kind = b.view().stmt(stmt).kind;
         // Instance-script exports refuse — every form. The oracle compiles
         // `export const`/`function`/`{a}` into a trailing
         // `$.bind_props($$props, { … })` (not implemented), rejects
@@ -777,7 +780,7 @@ pub(crate) fn compile_server(
         // `export * from`; passing any of them through verbatim would nest
         // an `export` inside the component function (invalid JS).
         if matches!(
-            &stmt.kind,
+            kind,
             StatementKind::ExportNamedDeclaration(_)
                 | StatementKind::ExportDefaultDeclaration(_)
                 | StatementKind::ExportAllDeclaration(_)
@@ -786,9 +789,10 @@ pub(crate) fn compile_server(
         ) {
             return Err(unsupported(Refusal::InstanceScriptExport));
         }
-        if let StatementKind::ImportDeclaration(import) = &stmt.kind {
-            refuse_runes_invalid_import(import, source)?;
-            user_imports.push(stmt.clone());
+        if let StatementKind::ImportDeclaration(import) = kind {
+            let view = b.view();
+            refuse_runes_invalid_import(view, view.import_decl(import), source)?;
+            user_imports.push(stmt);
             continue;
         }
         let rewritten = rewrite_script_statement(
@@ -816,7 +820,7 @@ pub(crate) fn compile_server(
         // let/const/var, no-init, dependent, destructured, and mixed
         // rune+plain declarators; the per-declarator rune rewrites above
         // compose with the split). Declarations in nested scopes (function
-        // bodies, blocks, for-heads) stay joined — borrowed passthrough
+        // bodies, blocks, for-heads) stay joined — the host statement
         // already matches that. Comments refuse: the oracle re-anchors a
         // comment *inside* the split (`let // c` then the declarator on the
         // next line), a placement this transform can't reproduce.
@@ -829,23 +833,27 @@ pub(crate) fn compile_server(
         // per-source-declarator grouping the flat accumulator has lost, so it
         // refuses upstream (in `rewrite_script_statement`).
         let source_multi = matches!(
-            &stmt.kind,
+            kind,
             StatementKind::VariableDeclaration(src) if src.declarations.len() > 1
         );
-        match &rewritten.kind {
+        match b.view().stmt(rewritten).kind {
             StatementKind::VariableDeclaration(decl)
                 if source_multi && decl.declarations.len() > 1 =>
             {
                 if has_comments {
                     return Err(unsupported(Refusal::CommentsAlongsideMultiDeclarator));
                 }
-                for declarator in decl.declarations {
-                    body.push(Statement::from_variable_declaration(VariableDeclaration {
+                // Each split declaration is a one-element sub-run of the joined
+                // one's declarators: the declarator rows are shared, not copied.
+                for j in 0..decl.declarations.len() {
+                    let declarator_span = b.view().declarators(decl.declarations)[j].span;
+                    let split = b.push(Statement::from_variable_declaration(VariableDeclaration {
                         kind: decl.kind,
-                        declarations: std::slice::from_ref(declarator),
+                        declarations: decl.declarations.sub_run(j..j + 1),
                         declare: decl.declare,
-                        span: declarator.span,
+                        span: declarator_span,
                     }));
+                    body.push(split);
                 }
             }
             _ => body.push(rewritten),
@@ -952,16 +960,16 @@ pub(crate) fn compile_server(
     // write, or a read whose base is shadowed, refuses. The `var $$store_subs`
     // injection is analysis-driven (`component.uses_stores`) and independent of
     // this rewrite — it fires for a store referenced only in a dropped handler too.
-    let body_slice = body.into_bump_slice();
+    let body = b.push_list(&body);
     let body = store_rewrite::rewrite_store_accesses(
         &mut b,
         source,
         &store_names,
         &store_shadowed,
         &derived_names,
-        body_slice,
+        body,
     )?
-    .unwrap_or(body_slice);
+    .unwrap_or(body);
 
     let mut env = EmitEnv {
         b,
@@ -996,7 +1004,7 @@ pub(crate) fn compile_server(
     let fn_id = env.b.ident_at(COMPONENT_NAME, Span::new(0, 0));
     env.b.mint("(");
     let params_start = 0;
-    let mut params: BumpVec<'arena, Expression<'arena>> = BumpVec::new_in(arena);
+    let mut params: Vec<Expression> = Vec::with_capacity(2);
     let renderer = env.b.ident_at("$$renderer", Span::new(0, 0));
     params.push(Expression::from_identifier(renderer));
     if uses_props {
@@ -1007,26 +1015,22 @@ pub(crate) fn compile_server(
     let lbrace = env.b.mint(") {").end - 1;
     let block_start = root
         .instance
+        .as_ref()
         .map_or(lbrace, |script| script.content.span.start);
 
     // 6. Emit the template into the body: statements interleaved with
     // `$$renderer.push(…)` template flushes (blocks split the pushes).
-    let mut out = BodyBuilder::new_in(arena);
-    for stmt in body {
-        out.stmts.push(stmt.clone());
-    }
+    let mut out = BodyBuilder::new();
+    out.stmts.extend_from_slice(env.b.view().stmt_list(body));
     // The root fragment re-infers its namespace from its own nodes (Svelte's
     // `Fragment` visitor with the `Root` parent — in the deep-walk special list),
     // starting from the html document default.
-    let root_namespace = infer_namespace(
-        &env,
-        Namespace::Html,
-        FragmentParent::Special,
-        root.fragment.nodes,
-    );
+    let root_nodes = sv.nodes(root.fragment.nodes);
+    let root_namespace =
+        infer_namespace(&env, Namespace::Html, FragmentParent::Special, root_nodes);
     emit_fragment(
         &mut env,
-        &root.fragment,
+        root_nodes,
         &mut out,
         FragmentCtx {
             mark_text_first: true,
@@ -1044,17 +1048,17 @@ pub(crate) fn compile_server(
     // `$.bind_props` (the oracle's order).
     if env.uses_stores {
         let stmt = env.b.unsubscribe_stores_stmt();
-        out.push_statement(&mut env.b, arena, stmt);
+        out.push_statement(&mut env.b, stmt);
     }
     // `$.bind_props($$props, { … })` is the component body's LAST statement (after
     // every template flush, inside the `needs_context` wrapper forced above),
     // listing the bindable props in source order — shorthand when the prop key and
     // the local name match, `key: local` when renamed.
     if !bindable.is_empty() {
-        let stmt = build_bind_props_stmt(&mut env.b, arena, &bindable);
-        out.push_statement(&mut env.b, arena, stmt);
+        let stmt = build_bind_props_stmt(&mut env.b, &bindable);
+        out.push_statement(&mut env.b, stmt);
     }
-    let body = out.finish(&mut env.b, arena);
+    let body = out.finish(&mut env.b);
 
     // `var $$store_subs;` is prepended when any store read compiled — BEFORE the
     // `$props.id()` hoist prepend below, so the final order is
@@ -1063,10 +1067,7 @@ pub(crate) fn compile_server(
     // wrapper when there is one, at the component-body top.
     let body = if env.uses_stores {
         let decl = env.b.store_subs_var_at(block_start);
-        let mut with_subs: BumpVec<'arena, Statement<'arena>> = BumpVec::new_in(arena);
-        with_subs.push(decl);
-        with_subs.extend_from_slice(body);
-        with_subs.into_bump_slice()
+        prepend_statement(&mut env.b, decl, body)
     } else {
         body
     };
@@ -1079,11 +1080,8 @@ pub(crate) fn compile_server(
     // prepended OUTSIDE the wrapper below). It references `$$renderer` (always in
     // scope), never `$$props`, so it forces no parameter.
     let body = if let Some(name) = &props_id {
-        let decl = build_props_id_decl(&env.b, name, block_start);
-        let mut with_id: BumpVec<'arena, Statement<'arena>> = BumpVec::new_in(arena);
-        with_id.push(decl);
-        with_id.extend_from_slice(body);
-        with_id.into_bump_slice()
+        let decl = build_props_id_decl(&mut env.b, name, block_start);
+        prepend_statement(&mut env.b, decl, body)
     } else {
         body
     };
@@ -1119,16 +1117,14 @@ pub(crate) fn compile_server(
     let body = if needs_context {
         let inner_span = Span::new(block_start, env.b.buffer.len() as u32);
         let wrapper_renderer = env.b.ident("$$renderer");
-        let mut wrapper_params: BumpVec<'arena, Expression<'arena>> = BumpVec::new_in(arena);
-        wrapper_params.push(Expression::from_identifier(wrapper_renderer));
-        let arrow = env
-            .b
-            .arrow_block(wrapper_params.into_bump_slice(), body, inner_span);
-        let arrow_alloc = env.b.arena.alloc(arrow);
-        let call = env
-            .b
-            .member_call("$$renderer", "component", std::slice::from_ref(arrow_alloc));
-        let mut outer: BumpVec<'arena, Statement<'arena>> = BumpVec::new_in(arena);
+        let arrow = env.b.arrow_block(
+            &[Expression::from_identifier(wrapper_renderer)],
+            body,
+            inner_span,
+        );
+        let arrow = env.b.push(arrow);
+        let call = env.b.member_call("$$renderer", "component", &[arrow]);
+        let expression = env.b.push(call);
         // A FICTIONAL span, low start + appendix end — not the call's own span.
         //
         // The wrapper is the function body's only statement, so the printer's
@@ -1148,14 +1144,15 @@ pub(crate) fn compile_server(
         // through `Builder::expression_statement`: that helper takes the span
         // from the expression, which is exactly the span this site must NOT
         // have.
-        outer.push(Statement {
-            span: Span::new(0, env.b.buffer.len() as u32),
+        let end = env.b.buffer.len() as u32;
+        let wrapper = env.b.push(Statement {
+            span: Span::new(0, end),
             kind: StatementKind::ExpressionStatement(ExpressionStatement {
-                expression: env.b.arena.alloc(call),
+                expression,
                 is_directive: false,
             }),
         });
-        outer.into_bump_slice()
+        env.b.push_list(&[wrapper])
     } else {
         body
     };
@@ -1165,11 +1162,8 @@ pub(crate) fn compile_server(
     // `:300`). Prepend it here so it sits outside any `$$renderer.component`
     // wrapper, matching the oracle's placement.
     let body = if component.uses_slots {
-        let slots_decl = build_sanitize_slots_decl(&env.b, block_start);
-        let mut with_slots: BumpVec<'arena, Statement<'arena>> = BumpVec::new_in(arena);
-        with_slots.push(slots_decl);
-        with_slots.extend_from_slice(body);
-        with_slots.into_bump_slice()
+        let slots_decl = build_sanitize_slots_decl(&mut env.b, block_start);
+        prepend_statement(&mut env.b, slots_decl, body)
     } else {
         body
     };
@@ -1182,10 +1176,11 @@ pub(crate) fn compile_server(
     // Concatenation equals the single-program print: canonical mode joins
     // top-level statements with exactly one hardline and no blank lines.
     let rbrace_end = env.b.mint("}").end;
+    let params = env.b.push_list(&params);
     let function = FunctionDeclaration {
         id: Some(fn_id),
         type_parameters: None,
-        params: params.into_bump_slice(),
+        params,
         return_type: None,
         body: BlockStatement {
             body,
@@ -1196,44 +1191,44 @@ pub(crate) fn compile_server(
         params_start,
         span: Span::new(0, rbrace_end),
     };
-    let export = Statement {
+    let export_default = env.b.push(ExportDefaultDeclaration {
+        declaration: ExportDefaultValue::FunctionDeclaration(function),
+    });
+    let export = env.b.push(Statement {
         span: Span::new(0, rbrace_end),
-        kind: StatementKind::ExportDefaultDeclaration(arena.alloc(ExportDefaultDeclaration {
-            declaration: ExportDefaultValue::FunctionDeclaration(function),
-        })),
-    };
+        kind: StatementKind::ExportDefaultDeclaration(export_default),
+    });
+    // Every program spans the whole buffer, the appendix included.
+    let program_span = Span::new(0, env.b.buffer.len() as u32);
 
     // The module scaffold: the `$` runtime import, then the user's hoisted
     // instance-script imports in source order. All are comment-free, so no
     // low-anchor→appendix window can sweep a host comment (the reason the import
     // and export programs stay separate).
-    let mut import_body: BumpVec<'arena, Statement<'arena>> = BumpVec::new_in(arena);
+    let import = env.b.push(import);
+    let mut import_body = Vec::with_capacity(1 + user_imports.len());
     import_body.push(import);
-    for user_import in user_imports {
-        import_body.push(user_import);
-    }
-    let import_program = tsv_ts::ast::Program {
-        body: import_body.into_bump_slice(),
-        comments: &[],
-        span: Span::new(0, env.b.buffer.len() as u32),
+    import_body.extend(user_imports);
+    let import_program = Program {
+        body: env.b.push_list(&import_body),
+        comments: Run::EMPTY,
+        span: program_span,
         goal: tsv_ts::Goal::Module,
     };
 
     // Hoistable top-level snippets print as their own comment-free program,
     // between the imports and the exported component function (the oracle's
     // module-scope placement). Empty when nothing hoists.
-    let hoisted_program = (!env.hoisted_snippets.is_empty()).then(|| {
-        let mut hoisted_body: BumpVec<'arena, Statement<'arena>> = BumpVec::new_in(arena);
-        for snippet in env.hoisted_snippets.drain(..) {
-            hoisted_body.push(snippet);
-        }
-        tsv_ts::ast::Program {
-            body: hoisted_body.into_bump_slice(),
-            comments: &[],
-            span: Span::new(0, env.b.buffer.len() as u32),
+    let hoisted_program = if env.hoisted_snippets.is_empty() {
+        None
+    } else {
+        Some(Program {
+            body: env.b.push_list(&env.hoisted_snippets),
+            comments: Run::EMPTY,
+            span: program_span,
             goal: tsv_ts::Goal::Module,
-        }
-    });
+        })
+    };
 
     // The module `<script>` body prints as its own module-scope program (imports +
     // declarations + non-default exports, source order), between the hoisted
@@ -1249,20 +1244,18 @@ pub(crate) fn compile_server(
     let module_program = if module_body.is_empty() {
         None
     } else {
-        Some(tsv_ts::ast::Program {
+        Some(Program {
             body: module_body,
-            comments: arena.alloc_slice_copy(&module_comments),
-            span: Span::new(0, env.b.buffer.len() as u32),
+            comments: comment_run(&mut env.b, &module_comments),
+            span: program_span,
             goal: tsv_ts::Goal::Module,
         })
     };
 
-    let mut export_body: BumpVec<'arena, Statement<'arena>> = BumpVec::new_in(arena);
-    export_body.push(export);
-    let export_program = tsv_ts::ast::Program {
-        body: export_body.into_bump_slice(),
-        comments: arena.alloc_slice_copy(&script_comments),
-        span: Span::new(0, env.b.buffer.len() as u32),
+    let export_program = Program {
+        body: env.b.push_list(&[export]),
+        comments: comment_run(&mut env.b, &script_comments),
+        span: program_span,
         goal: tsv_ts::Goal::Module,
     };
 
@@ -1276,44 +1269,40 @@ pub(crate) fn compile_server(
     // TypeScript-only node. One walk, and the inventory it checks against is the
     // same one that did the erasing — nothing to drift.
     self_check_no_typescript(
-        arena,
+        env.b.stores,
         &env.b.buffer,
         &[
             import_program.body,
-            hoisted_program.as_ref().map_or(&[][..], |p| p.body),
-            module_program.as_ref().map_or(&[][..], |p| p.body),
+            hoisted_program.as_ref().map_or(Run::EMPTY, |p| p.body),
+            module_program.as_ref().map_or(Run::EMPTY, |p| p.body),
             export_program.body,
         ],
     )?;
 
-    // One caller-owned doc arena shared across the three canonical reprints. The
-    // import / hoisted-snippet / export programs are three disjoint sub-ASTs of
-    // the same `env.b.buffer` source, so no `reset()` is needed between them, and
-    // the arena is a working buffer that never holds content — byte-identical to
-    // three fresh-arena `format_canonical` calls. `env.b.buffer` is not mutated
-    // between the calls, so one immutable borrow spans all three.
+    // One caller-owned doc arena shared across the canonical reprints. The import /
+    // hoisted-snippet / module / export programs are disjoint sub-trees of the same
+    // stores over the same `env.b.buffer` source, so no `reset()` is needed between
+    // them, and the arena is a working buffer that never holds content —
+    // byte-identical to fresh-arena `format_canonical` calls. Nothing is pushed or
+    // minted between the calls, so one view and one buffer borrow span them all.
     let doc_arena = tsv_lang::doc::arena::DocArena::for_source(&env.b.buffer);
-    let mut js = tsv_ts::__private::format_canonical_in(&import_program, &env.b.buffer, &doc_arena);
-    if let Some(hoisted_program) = &hoisted_program {
-        js.push_str(&tsv_ts::__private::format_canonical_in(
-            hoisted_program,
+    let view = env.b.view();
+    let print = |program: &Program| {
+        tsv_ts::__private::format_canonical_in(
+            ParsedRef { program, view },
             &env.b.buffer,
             &doc_arena,
-        ));
+        )
+    };
+    let mut js = print(&import_program);
+    if let Some(hoisted_program) = &hoisted_program {
+        js.push_str(&print(hoisted_program));
     }
     if let Some(module_program) = &module_program {
-        js.push_str(&tsv_ts::__private::format_canonical_in(
-            module_program,
-            &env.b.buffer,
-            &doc_arena,
-        ));
+        js.push_str(&print(module_program));
     }
-    js.push_str(&tsv_ts::__private::format_canonical_in(
-        &export_program,
-        &env.b.buffer,
-        &doc_arena,
-    ));
-    let css = match (root.css, &env.scope) {
+    js.push_str(&print(&export_program));
+    let css = match (&root.css, &env.scope) {
         (Some(style), Some(scope)) => Some(splice_scoped_css(style, source, scope)),
         _ => None,
     };
@@ -1323,6 +1312,25 @@ pub(crate) fn compile_server(
         css,
         warnings: Vec::new(),
     })
+}
+
+/// `stmt` pushed and prepended to `body`, as a new run (the input run is left as
+/// it was).
+fn prepend_statement(b: &mut Builder<'_>, stmt: Statement, body: Run<StmtId>) -> Run<StmtId> {
+    let stmt = b.push(stmt);
+    let mut stmts = Vec::with_capacity(body.len() + 1);
+    stmts.push(stmt);
+    stmts.extend_from_slice(b.view().stmt_list(body));
+    b.push_list(&stmts)
+}
+
+/// A program's comments as a run of the stores (`Run::EMPTY` when there are none).
+fn comment_run(b: &mut Builder<'_>, comments: &[Comment]) -> Run<Comment> {
+    if comments.is_empty() {
+        Run::EMPTY
+    } else {
+        b.push_list(comments)
+    }
 }
 
 pub(crate) fn unsupported(reason: Refusal) -> CompileError {
