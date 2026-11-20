@@ -4,7 +4,7 @@
 
 Unlike `tsv_cli` (pure Rust, production binary), `tsv_debug` validates and debugs `tsv` against external sources of truth: Prettier (formatting), Svelte's compiler (parsing), acorn-typescript (TS AST shape). The binary `tsv_debug` powers `npm run fixtures:*`, the `npm run *:audit` gates, `npm run audit:corpus`, `npm run idempotency:sweep`, and friends. For the command catalog see [../../CLAUDE.md §Debug Tooling](../../CLAUDE.md#debug-tooling); the audit gates are cataloged in [../../docs/audits.md](../../docs/audits.md), the profiling tools in [../../docs/performance.md](../../docs/performance.md), the Svelte-compiler harnesses in [../../docs/compile_tooling.md](../../docs/compile_tooling.md).
 
-`tsv_svelte_compile` and `tsv_check` are currently outside the workspace build, so the modules below that need them or serve only code that does (`compile_fixtures.rs`, `tsc_conformance/`, the `compile_*`, `canonicalize_audit` and `erase_comment_census` commands) are compiled out behind the never-set `tsv_unported` cfg ([../../CLAUDE.md §Project Structure](../../CLAUDE.md#project-structure)).
+`tsv_check` is currently outside the workspace build, so the code below that needs it (`tsc_conformance/`, the `tsc_conformance` command, `profile --bind`) is compiled out behind the never-set `tsv_unported` cfg ([../../CLAUDE.md §Project Structure](../../CLAUDE.md#project-structure)).
 
 ## Architecture Position
 

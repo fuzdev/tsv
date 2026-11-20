@@ -3,7 +3,6 @@
 // the integration tests in `tests/` and documented by `cargo doc`.
 pub mod audit;
 pub mod cli;
-#[cfg(tsv_unported)]
 pub mod compile_fixtures;
 pub mod depth_shapes;
 pub mod diff;

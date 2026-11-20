@@ -714,9 +714,6 @@ cargo run -p tsv_debug buffer_sizes <paths> --json
 
 ### 9. `tsv_debug compile_profile` — Svelte compile against the format wall
 
-Not run while `tsv_svelte_compile` is outside the workspace build
-([CLAUDE.md §Project Structure](../CLAUDE.md#project-structure)).
-
 Times the Svelte compiler (`tsv_svelte_compile::compile`) per file and reports it
 as a **ratio** against parsing plus formatting the same file. The ratio is the
 point: it says how many times the format wall a compile costs, which is the cheap
@@ -725,8 +722,8 @@ frame is ~2–3× for an all-linear pipeline.
 
 The two rows deliberately keep different shapes, so the number means what it says:
 `compile` is the whole **cold per-call** cost (the compiler has no warm arena-reuse
-entry point, so that *is* its production shape), while `parse + format` reuses warm
-state across iterations (the `tsv_cli` shape). **Compare ratios only against ratios
+entry point, so that *is* its production shape), while `parse + format` reuses a warm
+`DocArena` across iterations (the `profile` command's shape). **Compare ratios only against ratios
 from this same command** — never against a raw timing from `profile`.
 
 Refusals and parse failures are counted, not timed. Any compile self-check failure

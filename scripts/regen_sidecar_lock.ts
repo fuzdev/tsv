@@ -15,9 +15,8 @@
  *      needs, and any OTHER package that moved with it is the oracle shifting under you;
  *   2. update `LOCKED_TRANSITIVE` in `scripts/check_canonical_pins.ts` if a pinned
  *      transitive version changed;
- *   3. re-run `npm run pins:audit`. `npm run compile:fixtures:validate`
- *      (oracle freshness) does not run while `tsv_svelte_compile` is outside
- *      the workspace build.
+ *   3. re-run `npm run compile:fixtures:validate` (oracle freshness) and
+ *      `npm run pins:audit`.
  *
  * Re-resolving a locked transitive (taking a newer `esrap` under svelte's range) is the lock's
  * deletion before this runs, its own deliberate oracle move.
@@ -133,8 +132,8 @@ export async function run_regen_sidecar_lock(
 		return 1;
 	}
 	console.log(
-		`wrote ${SIDECAR_LOCK_PATH} — diff it, then re-run \`npm run pins:audit\` and reinstall the sidecar ` +
-			`(\`${SIDECAR_INSTALL_COMMAND}\`; \`compile:fixtures:validate\` does not run while tsv_svelte_compile is outside the workspace build)`
+		`wrote ${SIDECAR_LOCK_PATH} — diff it, reinstall the sidecar (\`${SIDECAR_INSTALL_COMMAND}\`), ` +
+			'then re-run `npm run pins:audit` and `npm run compile:fixtures:validate`'
 	);
 	return 0;
 }

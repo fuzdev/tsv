@@ -615,6 +615,7 @@ dependencies = [
  "tsv_ignore",
  "tsv_lang",
  "tsv_svelte",
+ "tsv_svelte_compile",
  "tsv_ts",
 ]
 
@@ -689,6 +690,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "tsv_svelte_compile"
+version = "0.8.1"
+dependencies = [
+ "thiserror",
+ "tsv_css",
+ "tsv_lang",
+ "tsv_svelte",
+ "tsv_ts",
+ "unicode-ident",
+]
+
+[[package]]
 name = "tsv_tests"
 version = "0.8.1"
 dependencies = [
@@ -701,6 +714,7 @@ dependencies = [
  "tsv_discover",
  "tsv_lang",
  "tsv_svelte",
+ "tsv_svelte_compile",
  "tsv_ts",
 ]
 

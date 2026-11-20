@@ -9,6 +9,7 @@ members = [
     "crates/tsv_ts",
     "crates/tsv_css",
     "crates/tsv_svelte",
+    "crates/tsv_svelte_compile",
     "crates/tsv_cli",
     "crates/tsv_debug",
     "crates/tsv_wasm",
@@ -47,6 +48,9 @@ tsv_discover = { path = "crates/tsv_discover", version = "=0.8.1" }
 tsv_ts = { path = "crates/tsv_ts", version = "=0.8.1", default-features = false }
 tsv_css = { path = "crates/tsv_css", version = "=0.8.1", default-features = false }
 tsv_svelte = { path = "crates/tsv_svelte", version = "=0.8.1", default-features = false }
+# Svelte→JS compiler + JS canonicalizer. Dev-tooling consumer only (tsv_debug);
+# no shipped artifact links it yet.
+tsv_svelte_compile = { path = "crates/tsv_svelte_compile" }
 
 # External dependencies
 argh = "0.1.19"
@@ -62,9 +66,9 @@ napi = "3.16.1"
 napi-derive = "3.5.7"
 napi-build = "2.6.0"
 # Bump arena. No parse takes one (every language's tree lives in its own
-# stores): `tsv_debug` and the crates outside the workspace build are what remain.
-# Safe API only — `unsafe_code = "forbid"`.
-bumpalo = { version = "3.20.3", features = ["collections"] }
+# stores): `tsv_debug` and `tsv_check` (outside the workspace build) are what remain,
+# and both use only `Bump` itself. Safe API only — `unsafe_code = "forbid"`.
+bumpalo = "3.20.3"
 # Async runtime + combinators — dev/debug tooling only (tsv_debug, integration tests)
 tokio = { version = "1" }
 futures-util = "0.3"
@@ -103,8 +107,8 @@ unused_lifetimes = "warn"
 elided_lifetimes_in_paths = "warn"
 unused_qualifications = "warn"
 unreachable_pub = "warn"
-# `tsv_unported` is never set: it gates the `tsv_debug` code that needs `tsv_svelte_compile` or
-# `tsv_check`, the two crates outside the workspace build. A custom cfg, not a Cargo feature:
+# `tsv_unported` is never set: it gates the `tsv_debug` code that needs `tsv_check`, which is
+# outside the workspace build. A custom cfg, not a Cargo feature:
 # an optional path dependency would still join the workspace, and the `--all-features` legs
 # would turn a feature on against a dependency that is not there.
 # `perf_ab_api` selects the entry-point generation `tsv_debug`'s `perf_ab` drivers are built
@@ -231,6 +235,7 @@ tsv_cli = { path = "crates/tsv_cli" }
 # `FORMATTABLE_EXTENSIONS` — argh renders help from string literals, so the const cannot
 # reach it and the two spellings need a gate.
 tsv_discover.workspace = true
+tsv_svelte_compile.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
 futures-util.workspace = true
 

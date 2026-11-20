@@ -96,7 +96,7 @@ use crate::sidecar::{self, SidecarError, SvelteGenerate};
 ///
 /// Deterministic for a given `--seed` + corpus, and corpus-add-stable: each seed
 /// file's mutants come from its own path-keyed stream. Sidecar-dependent, so it is
-/// NOT part of `deno task check` — run it on demand (`deno task compile:fuzz`).
+/// NOT part of `npm run check` — run it on demand (`npm run compile:fuzz`).
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "compile_fuzz")]
 pub struct CompileFuzzCommand {

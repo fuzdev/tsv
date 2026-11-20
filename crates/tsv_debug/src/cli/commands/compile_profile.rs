@@ -15,18 +15,18 @@ use tsv_svelte_compile::{CompileError, CompileOptions, compile};
 /// counted, not timed), measures three medians over N iterations:
 ///
 /// - **compile** — `tsv_svelte_compile::compile`, the whole cold shape: every
-///   call pays its own internal arenas (AST bump, per-program `DocArena`s, the
-///   validation-reparse bump). There is no warm entry point, so this IS the
-///   production shape today.
-/// - **parse** / **format** — `tsv_svelte::__private::parse` + `format_ast_in` on the same
-///   file with run-shared reset arenas, the product shape `tsv_cli format`
-///   pays (mirroring the `profile` command).
+///   call pays its own internal allocations (the parse's stores, per-program `DocArena`s,
+///   the validation reparse). There is no warm entry point, so this IS the production
+///   shape today.
+/// - **parse** / **format** — `tsv_svelte::__private::parse_folded` + `format_folded_in` on
+///   the same file with a run-shared reset `DocArena` and a one-shot parse, as the
+///   `profile` command times it.
 ///
 /// The headline is the **ratio** column: compile ÷ (parse + format) — the
 /// compile-multiple over the format wall. The design frame expects ~2–3×
 /// (all-linear pipeline); a drifting multiple is the cheap tripwire for
 /// super-linear or rebuilt work. The two rows deliberately keep their own
-/// production shapes (cold compile vs warm format), so compare ratios only
+/// shapes (cold compile vs a reused `DocArena` format), so compare ratios only
 /// against ratios measured by this same command.
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "compile_profile")]
@@ -55,17 +55,16 @@ impl CompileProfileCommand {
         let mut parse_failed = 0usize;
         let mut corrupt = 0usize;
 
-        // The parse/format reference rows reuse one AST `Bump` and one
-        // `DocArena` across the run with `reset()` between iterations — the
-        // `tsv_cli format` worker lifecycle, same as the `profile` command.
+        // The parse/format reference rows reuse one `DocArena` across the run with
+        // `reset()` between iterations — the `tsv_cli format` worker lifecycle, same as
+        // the `profile` command; every parse is one-shot (fresh stores per call).
         // The compile row gets no such treatment on purpose: `compile()` has
         // no caller-owned-arena variant, so its cold per-call allocations are
         // part of what this command measures.
-        let mut arena = bumpalo::Bump::new();
         let mut doc_arena = tsv_lang::doc::arena::DocArena::new();
 
         for path in &files {
-            match profile_compile_file(path, self.iterations, &mut arena, &mut doc_arena) {
+            match profile_compile_file(path, self.iterations, &mut doc_arena) {
                 Ok(Outcome::Timed(result)) => results.push(result),
                 Ok(Outcome::Refused) => refused += 1,
                 Ok(Outcome::ParseFailed) => parse_failed += 1,
@@ -75,7 +74,6 @@ impl CompileProfileCommand {
                 }
                 Err(err) => {
                     eprintln!("Error profiling {}: {err}", path.display());
-                    arena.reset();
                     doc_arena.reset();
                 }
             }
@@ -160,7 +158,6 @@ impl FileResult {
 fn profile_compile_file(
     path: &Path,
     iterations: usize,
-    arena: &mut bumpalo::Bump,
     doc_arena: &mut tsv_lang::doc::arena::DocArena,
 ) -> Result<Outcome, String> {
     let source = std::fs::read_to_string(path).map_err(|e| format!("read error: {e}"))?;
@@ -191,7 +188,7 @@ fn profile_compile_file(
         // the parse column, then the folded text's parse and format
         let t1 = Instant::now();
         let folded = tsv_lang::printing::normalize_carriage_returns(&source);
-        let ast = tsv_svelte::__private::parse_folded(&folded, arena)
+        let ast = tsv_svelte::__private::parse_folded(&folded)
             .map_err(|e| format!("parse error: {e:#}"))?;
         parse_times.push(t1.elapsed());
 
@@ -201,7 +198,6 @@ fn profile_compile_file(
 
         // Reference-row arena teardown outside the timed regions, mirroring
         // the `profile` command.
-        arena.reset();
         doc_arena.reset();
     }
 
@@ -320,7 +316,7 @@ fn print_table(results: &[FileResult], iterations: usize, skips: &Skips) {
         total.files, skips.refused, skips.parse_failed, skips.corrupt
     );
     eprintln!(
-        "compile = cold per-call shape; parse/format = warm reset-reuse arenas (tsv_cli shape); ratio = compile / (parse + format)"
+        "compile = cold per-call shape; parse/format = one-shot parse, reset-reuse DocArena (the `profile` command's shape); ratio = compile / (parse + format)"
     );
 }
 

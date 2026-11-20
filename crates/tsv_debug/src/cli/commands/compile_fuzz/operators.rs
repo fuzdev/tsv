@@ -129,15 +129,14 @@ impl Donor {
     /// Returns `None` when tsv's parser rejects the component — the same gate the
     /// seed list uses, so a donor is always a real, parseable component.
     pub(super) fn from_source(source: &str) -> Option<Self> {
-        let arena = bumpalo::Bump::new();
-        let root = tsv_svelte::__private::parse(source, &arena).ok()?;
+        let root = tsv_svelte::__private::parse(source).ok()?;
         // The three top-level regions to cut out of the template. `<svelte:options>`
         // stays in: it is a template-level construct and carries no bindings.
         let mut cuts: Vec<(usize, usize)> = Vec::new();
         for span in [
-            root.instance.map(|s| s.span),
-            root.module.map(|s| s.span),
-            root.css.map(|s| s.span),
+            root.instance.as_ref().map(|s| s.span),
+            root.module.as_ref().map(|s| s.span),
+            root.css.as_ref().map(|s| s.span),
         ]
         .into_iter()
         .flatten()
@@ -157,10 +156,12 @@ impl Donor {
 
         let script = root
             .instance
+            .as_ref()
             .map(|s| s.content.span.extract(source).to_string())
             .unwrap_or_default();
         let is_ts = root
             .instance
+            .as_ref()
             .is_some_and(|s| super::anchors::script_is_ts(s.span, source));
         let declared = super::anchors::declared_names(&script);
         Some(Self {

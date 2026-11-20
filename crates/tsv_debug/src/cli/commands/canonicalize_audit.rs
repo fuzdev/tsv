@@ -29,8 +29,8 @@ use super::profile::{is_ts_family, resolve_seed_files_named};
 ///   table precisely to prevent this; this bucket is what proves the routing is
 ///   still intact at corpus scale.
 ///
-/// Pure Rust, no sidecar. Exits 1 on any failure. The `canonicalize:audit` deno
-/// task gates this over `tests/fixtures` in `deno task check`; point it at real
+/// Pure Rust, no sidecar. Exits 1 on any failure. The `canonicalize:audit`
+/// task gates this over `tests/fixtures` and `tests/fixtures_compile` in `npm run check`; point it at real
 /// corpora on demand (`canonicalize_audit ../corpora/collections/zzz/src ../corpora/collections/gro/src`).
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "canonicalize_audit")]
@@ -157,7 +157,7 @@ impl CanonicalizeAuditCommand {
         // The floor UNDER the non-empty resolution: every file resolving and every
         // file being input-rejected reads identically here — "0 clean", no failures,
         // exit 0 — so a parser that started rejecting the whole corpus would pass.
-        // This audit is the `deno task check` leg invoked with explicit paths, so
+        // This audit is the `npm run check` leg invoked with explicit paths, so
         // there is no `default_paths` pin above it to catch that.
         check_graded_nonzero(
             report.files - report.input_rejected - report.read_error,
@@ -216,11 +216,11 @@ fn comment_loss(input: &str, output: &str) -> Option<String> {
 ///
 /// `None` if the source doesn't parse as a strict module.
 fn comment_texts(source: &str) -> Option<Vec<String>> {
-    let arena = bumpalo::Bump::new();
-    let program = tsv_ts::__private::parse(source, &arena).ok()?;
+    let program = tsv_ts::__private::parse(source).ok()?;
     Some(
         program
-            .comments
+            .view()
+            .comments(program.comments)
             .iter()
             .map(|c| {
                 let text = &source[c.span.start as usize..c.span.end as usize];

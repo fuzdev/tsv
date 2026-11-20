@@ -82,7 +82,7 @@ tsv/
 ├── tsv_ts       # TypeScript parser/formatter (standalone)
 ├── tsv_css      # CSS parser/formatter (standalone)
 ├── tsv_svelte   # Svelte parser/formatter (uses tsv_ts + tsv_css)
-├── tsv_svelte_compile # experimental Svelte→JS compiler + JS canonicalizer (uses tsv_svelte + tsv_ts + tsv_css; currently outside the workspace build)
+├── tsv_svelte_compile # experimental Svelte→JS compiler + JS canonicalizer (uses tsv_svelte + tsv_ts + tsv_css; consumed only by tsv_debug and the integration tests)
 ├── tsv_check    # experimental TypeScript binder/checker, may never ship (uses tsv_ts + tsv_lang; currently outside the workspace build)
 ├── tsv_cli      # Production CLI binary (pure Rust)
 ├── tsv_debug    # Dev utilities (uses a Node sidecar for JS tools)
@@ -124,7 +124,7 @@ closed-scope/open-convention stance below.
                         and no shipped format/parse artifact links it)
             tsv_svelte_compile  (experimental Svelte→JS compiler + JS canonicalizer —
                         depends on tsv_lang + tsv_ts + tsv_css + tsv_svelte;
-                        currently outside the workspace build, and no shipped artifact links it)
+                        consumed ONLY by tsv_debug and the integration tests, so no shipped artifact links it)
 
    tsv_cli, tsv_wasm, and tsv_napi also consume tsv_discover (→ tsv_ignore).
    tsv_ffi, tsv_napi, and tsv_wasm also consume tsv_arena — the shared

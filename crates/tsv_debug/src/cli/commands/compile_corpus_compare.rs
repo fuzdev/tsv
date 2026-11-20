@@ -42,7 +42,7 @@ mod ratchet;
 ///
 /// Exit codes: 0 = clean (mismatch = 0, over-acceptance = 0, error = 0), 1 = a
 /// FAILURE (a mismatch or an over-acceptance — either is a compiler bug), 2 = a
-/// harness error. Sidecar-dependent — kept out of `deno task check`; point it at
+/// harness error. Sidecar-dependent — kept out of `npm run check`; point it at
 /// real repos and the Svelte test suites on demand.
 ///
 /// `--json` carries the full per-file path list for every refusal, oracle-reject,

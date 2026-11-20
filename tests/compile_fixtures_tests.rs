@@ -16,7 +16,6 @@
 //! Oracle freshness (does the canonical Svelte compiler still produce these
 //! expectations?) is sidecar-dependent and lives in the
 //! `compile_fixtures_validate` command instead.
-#![cfg(tsv_unported)]
 
 use std::path::Path;
 use tsv_debug::compile_fixtures::{
@@ -45,8 +44,7 @@ fn test_all_compile_fixtures() {
         // input.svelte must parse (the compiler front end accepts it).
         let input = match std::fs::read_to_string(fixture.input_path()) {
             Ok(input) => {
-                let arena = bumpalo::Bump::new();
-                if let Err(e) = tsv_svelte::__private::parse(&input, &arena) {
+                if let Err(e) = tsv_svelte::__private::parse(&input) {
                     failures.push(format!("{name}: input.svelte fails to parse: {e}"));
                 }
                 Some(input)

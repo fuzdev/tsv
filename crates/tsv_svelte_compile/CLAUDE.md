@@ -212,9 +212,11 @@ project-wide conventions.
   a tree→tree pre-pass over the instance script's `Program` producing a type-free
   statement list, run BEFORE every analysis pass and before codegen (the oracle's
   phase-1 placement). Structural sharing via an `Option<T>` return — `None` means
-  *unchanged*, so a subtree with no TypeScript beneath it is never rebuilt and
-  nothing is allocated; a rebuilt node shallow-clones (children are `&'arena T`,
-  so pointers move, never subtrees). The `Statement` and `Expression` matches are
+  *unchanged*, so the caller keeps the input id or run, a subtree with no TypeScript
+  beneath it is never rebuilt, and nothing is pushed; a rebuilt node copies its row
+  with the changed edges swapped and pushes it as a new row (children are ids and
+  runs into the host stores, so ids move, never subtrees), and a rebuilt list is
+  `build.rs`'s lazy-prefix `rebuild_run`. The `Statement` and `Expression` matches are
   **exhaustive, no catch-all** — a new AST variant fails compilation here rather
   than silently passing TypeScript through, and `TSType`'s variants are never
   visited (they hang off the dropped `Option` fields). That exhaustiveness plus
@@ -238,19 +240,25 @@ project-wide conventions.
   drop deliberately does **not** reach backward: a JSDoc above an erased `interface`
   survives onto the next statement, exactly where the oracle puts it.
   `erase_expression` is the per-expression entry point the **template's borrow
-  points** use (`transform_server`'s `EmitEnv::erase`): every TypeScript-bearing
-  markup position is a `tsv_ts` `Expression` reached through a small set of
-  borrows, so erasure applies at the borrow and **the Svelte AST is never
+  points** use (`transform_server`'s `EmitEnv::erase`, id in, id out): every
+  TypeScript-bearing markup position is a `tsv_ts` expression id reached through a
+  small set of such points, so erasure applies there and **the Svelte AST is never
   rebuilt**. The erased node is what every consumer of that borrow reads — the
   emitted argument, the static-fold gate beside it (a raw `x as T` would fold to
   UNKNOWN where the oracle folds `x`: a silent under-fold, not a refusal), and
   the shape predicates that switch on a node's variant.
 - `build.rs` — synthetic-AST constructors over the **hybrid appendix buffer**:
   the print buffer is the host `.svelte` source plus an appendix of minted
-  lexemes. Borrowed user subtrees keep their real host spans; minted
+  lexemes. Every synthetic row is pushed into the host document's TypeScript
+  stores (`tsv_ts::__private`'s write surface) beside the parse's own rows, and
+  its module doc's **node contract** binds every writer: a node passes by id (a
+  fresh row by value), never as a reference into the view held across a push, and never as a host
+  row copied out only to be passed on unchanged; a loop that pushes while walking a run reads by index;
+  an `Err` may leave frames open. Borrowed user subtrees keep their real host spans; minted
   literal/template-quasi text lives in the appendix at the spans the nodes
   claim; synthetic identifiers ride the `IdentName` escape-hatch channel
-  (`IdentName { escaped: Some(arena.alloc_str(name)), raw_len: 0 }`, source-free — `ident_at`
+  (`IdentName { escaped: Some(push_escaped_name(stores, name)), raw_len: 0 }`, the name in
+  the document's text pool, source-free — `ident_at`
   places one at a caller-chosen span, either fictional-low so header comment
   windows stay empty, or *stolen* from the node it replaces so authored gaps
   survive). Codegen owns zero precedence knowledge — the printer's
@@ -1000,7 +1008,7 @@ independent. They are listed here in dependency order, walk first.
   (Stated as an invariant, not a consumer list: every new emitter module inherits
   the dependency.)
 - `template_value.rs` — the **template-value substitution walk**
-  (`wrap_value_expr` / `wrap_single` over the `rewrite_template_value` core), the
+  (`wrap_value_expr` over the `rewrite_template_value` core), the
   single home every template value position routes through. It rewrites every read
   of a
   `$derived` binding — bare (`{d}`) or nested at any depth (`{d + 1}`, `{obj[d]}`,

@@ -27,7 +27,7 @@ use std::path::Path;
 ///    direction gates).
 ///
 /// Pure Rust, no sidecar. Exits non-zero on any finding. Gated in
-/// `deno task check`.
+/// `npm run check`.
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "compile_conformance_audit")]
 pub struct CompileConformanceAuditCommand {

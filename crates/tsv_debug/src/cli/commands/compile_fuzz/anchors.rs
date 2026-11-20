@@ -70,7 +70,8 @@
 //!   `.`, or `#` inside `<style>`. A source scan over the CSS content span.
 
 use tsv_svelte::ast::{
-    AttributeNode, AttributeValue, Fragment, FragmentNode, Root, ScriptContext, SpecialElementKind,
+    AttributeNode, AttributeValue, Fragment, FragmentNode, ParsedRoot, ScriptContext,
+    SpecialElementKind, SvelteView,
 };
 
 /// A script's splice slot: where a statement can be inserted, and whether the
@@ -143,30 +144,30 @@ impl Anchors {
     /// Parse `source` and collect its anchors, or `None` when tsv's parser rejects
     /// it (an unparseable seed is simply not usable as one).
     pub(super) fn collect(source: &str) -> Option<Self> {
-        let arena = bumpalo::Bump::new();
-        let root = tsv_svelte::__private::parse(source, &arena).ok()?;
+        let root = tsv_svelte::__private::parse(source).ok()?;
+        let sv = root.view();
         let mut anchors = Self::default();
-        anchors.walk_fragment(&root.fragment, source, false);
+        anchors.walk_fragment(sv, root.fragment, source, false);
         anchors.instance = script_slot(&root, source, ScriptContext::Default);
         anchors.module = script_slot(&root, source, ScriptContext::Module);
-        if let Some(script) = root.instance {
+        if let Some(script) = &root.instance {
             anchors.declared = declared_names(script.content.span.extract(source));
         }
-        if let Some(script) = root.module {
+        if let Some(script) = &root.module {
             let text = script.content.span.extract(source);
             anchors.module_declared = declared_names(text);
             anchors.module_exported = exported_names(text);
         }
-        for script in [root.instance, root.module].into_iter().flatten() {
+        for script in [&root.instance, &root.module].into_iter().flatten() {
             push_whitespace_runs(&mut anchors.script_ws, source, script.content.span);
         }
-        if let Some(style) = root.css {
+        if let Some(style) = &root.css {
             push_css_ident_ends(&mut anchors.css_ident_ends, source, style.content_span);
         }
         // `<svelte:options>` hangs off the root rather than the fragment, so the
         // node walk never reaches it.
-        if let Some(options) = root.options {
-            anchors.push_attr_value_edges(options.attributes, source);
+        if let Some(options) = &root.options {
+            anchors.push_attr_value_edges(sv, options.attributes, source);
         }
         for names in [
             &mut anchors.template_reads,
@@ -182,8 +183,14 @@ impl Anchors {
 
     /// Walk one fragment, recording its gaps and recursing. `dropped` marks that
     /// this fragment sits inside a region the server target never emits.
-    fn walk_fragment(&mut self, fragment: &Fragment<'_>, source: &str, dropped: bool) {
-        for node in fragment.nodes {
+    fn walk_fragment(
+        &mut self,
+        sv: SvelteView<'_>,
+        fragment: Fragment,
+        source: &str,
+        dropped: bool,
+    ) {
+        for node in sv.nodes(fragment.nodes) {
             // Whitespace-only text is not a useful splice neighbor (and splicing
             // before it produces the same document as splicing after the previous
             // sibling), so gaps anchor on real nodes only.
@@ -195,88 +202,95 @@ impl Anchors {
             if dropped {
                 self.dropped_gaps.push(start);
             }
-            self.walk_node(node, source, dropped);
+            self.walk_node(sv, node, source, dropped);
         }
     }
 
-    fn walk_node(&mut self, node: &FragmentNode<'_>, source: &str, dropped: bool) {
+    fn walk_node(&mut self, sv: SvelteView<'_>, node: &FragmentNode, source: &str, dropped: bool) {
+        let ts = sv.ts();
         match node {
             FragmentNode::Element(element) => {
                 self.wrappable.push((element.span.start, element.span.end));
                 self.attr_slots.push(element.name_span.end);
-                self.push_attr_value_edges(element.attributes, source);
+                self.push_attr_value_edges(sv, element.attributes, source);
                 // TODO: attribute VALUES are not scanned for reads, so a name used only
                 // in `<Foo {...r} />` or `attr={x}` is missing from `template_reads`.
                 // That list is the donor graft's collision guard, so the gap lets a
                 // rare graft re-declare such a name — measured at 1 ungradeable mutant
                 // per ~14.5k, the residual after the destructuring/export guards. The
                 // fix is walking `element.attributes`' nested value structure.
-                self.walk_fragment(&element.fragment, source, dropped);
+                self.walk_fragment(sv, element.fragment, source, dropped);
             }
             FragmentNode::SpecialElement(element) => {
                 // A `<svelte:boundary>`'s `pending` / `failed` snippet children are
                 // dropped on the server; its default content is not. The snippet
                 // blocks below carry that through, so only mark the boundary itself.
                 let boundary = matches!(element.kind, SpecialElementKind::SvelteBoundary);
-                self.push_attr_value_edges(element.attributes, source);
-                self.walk_fragment(&element.fragment, source, dropped || boundary);
+                self.push_attr_value_edges(sv, element.attributes, source);
+                self.walk_fragment(sv, element.fragment, source, dropped || boundary);
             }
             FragmentNode::ExpressionTag(tag) => {
                 self.expr_interiors.push(tag.span.start + 1);
-                self.push_reads(tag.expression.span().extract(source));
+                self.push_reads(ts.expr(tag.expression).span().extract(source));
             }
             FragmentNode::IfBlock(block) => {
                 self.wrappable.push((block.span.start, block.span.end));
-                self.push_reads(block.test.span().extract(source));
-                self.walk_fragment(&block.consequent, source, dropped);
+                self.push_reads(ts.expr(block.test).span().extract(source));
+                self.walk_fragment(sv, block.consequent, source, dropped);
                 if let Some(alternate) = &block.alternate {
-                    self.walk_fragment(alternate, source, dropped);
+                    self.walk_fragment(sv, *alternate, source, dropped);
                 }
             }
             FragmentNode::EachBlock(block) => {
                 self.wrappable.push((block.span.start, block.span.end));
-                self.push_reads(block.expression.span().extract(source));
+                self.push_reads(ts.expr(block.expression).span().extract(source));
                 if let Some(context) = block.context
-                    && let Some(gap) = first_gap(&block.body)
-                    && let Some(name) = plain_identifier(context.span().extract(source))
+                    && let Some(gap) = first_gap(sv, block.body)
+                    && let Some(name) = plain_identifier(ts.expr(context).span().extract(source))
                 {
                     self.block_bindings.push(BlockBinding {
                         name,
                         body_gap: gap,
                     });
                 }
-                self.walk_fragment(&block.body, source, dropped);
+                self.walk_fragment(sv, block.body, source, dropped);
                 if let Some(fallback) = &block.fallback {
-                    self.walk_fragment(fallback, source, dropped);
+                    self.walk_fragment(sv, *fallback, source, dropped);
                 }
             }
             FragmentNode::AwaitBlock(block) => {
                 self.wrappable.push((block.span.start, block.span.end));
-                self.push_reads(block.expression.span().extract(source));
+                self.push_reads(ts.expr(block.expression).span().extract(source));
                 if let Some(pending) = &block.pending {
-                    self.walk_fragment(pending, source, dropped);
+                    self.walk_fragment(sv, *pending, source, dropped);
                 }
                 if let Some(then) = &block.then {
-                    self.walk_fragment(then, source, dropped);
+                    self.walk_fragment(sv, *then, source, dropped);
                 }
                 // The `{:catch}` body is the canonical server-dropped region.
                 if let Some(catch) = &block.catch {
-                    self.walk_fragment(catch, source, true);
+                    self.walk_fragment(sv, *catch, source, true);
                 }
             }
             FragmentNode::KeyBlock(block) => {
                 self.wrappable.push((block.span.start, block.span.end));
-                self.push_reads(block.expression.span().extract(source));
-                self.walk_fragment(&block.fragment, source, dropped);
+                self.push_reads(ts.expr(block.expression).span().extract(source));
+                self.walk_fragment(sv, block.fragment, source, dropped);
             }
             FragmentNode::SnippetBlock(block) => {
-                if let Some(name) = plain_identifier(block.expression.span().extract(source)) {
+                if let Some(name) =
+                    plain_identifier(ts.expr(block.expression).span().extract(source))
+                {
                     self.snippets.push((name, dropped));
                 }
-                self.walk_fragment(&block.body, source, dropped);
+                self.walk_fragment(sv, block.body, source, dropped);
             }
-            FragmentNode::HtmlTag(tag) => self.push_reads(tag.expression.span().extract(source)),
-            FragmentNode::RenderTag(tag) => self.push_reads(tag.expression.span().extract(source)),
+            FragmentNode::HtmlTag(tag) => {
+                self.push_reads(ts.expr(tag.expression).span().extract(source));
+            }
+            FragmentNode::RenderTag(tag) => {
+                self.push_reads(ts.expr(tag.expression).span().extract(source));
+            }
             FragmentNode::ConstTag(_)
             | FragmentNode::DeclarationTag(_)
             | FragmentNode::DebugTag(_)
@@ -291,12 +305,17 @@ impl Anchors {
     /// construction: an unquoted value's extent is decided by the parser's
     /// whitespace notion, which is the very thing under test, so injecting there
     /// would be reasoning in a circle.
-    fn push_attr_value_edges(&mut self, attributes: &[AttributeNode<'_>], source: &str) {
-        for attribute in attributes {
+    fn push_attr_value_edges(
+        &mut self,
+        sv: SvelteView<'_>,
+        attributes: tsv_lang::store::Run<AttributeNode>,
+        source: &str,
+    ) {
+        for attribute in sv.attributes(attributes) {
             let AttributeNode::Attribute(attribute) = attribute else {
                 continue;
             };
-            let Some(values) = attribute.value else {
+            let Some(values) = sv.opt_attribute_values(attribute.value) else {
                 continue;
             };
             for value in values {
@@ -420,19 +439,26 @@ fn push_css_ident_ends(out: &mut Vec<u32>, source: &str, span: tsv_lang::Span) {
 
 /// The first splice offset inside `fragment`, or `None` when it is empty (an empty
 /// body has no anchor — nothing in this module invents one).
-fn first_gap(fragment: &Fragment<'_>) -> Option<u32> {
-    fragment.nodes.first().map(|node| node.span().start)
+fn first_gap(sv: SvelteView<'_>, fragment: Fragment) -> Option<u32> {
+    sv.nodes(fragment.nodes)
+        .first()
+        .map(|node| node.span().start)
 }
 
 /// Build a script's slot: the insertion offset, the `lang="ts"` flag, and the
 /// statement-boundary gaps inside it.
-fn script_slot(root: &Root<'_>, source: &str, context: ScriptContext) -> Option<ScriptSlot> {
+fn script_slot(root: &ParsedRoot, source: &str, context: ScriptContext) -> Option<ScriptSlot> {
     let script = match context {
-        ScriptContext::Default => root.instance?,
-        ScriptContext::Module => root.module?,
+        ScriptContext::Default => root.instance.as_ref()?,
+        ScriptContext::Module => root.module.as_ref()?,
     };
     let program = &script.content;
-    let stmt_gaps: Vec<u32> = program.body.iter().map(|s| s.span().start).collect();
+    let ts = root.view().ts();
+    let stmt_gaps: Vec<u32> = ts
+        .stmt_list(program.body)
+        .iter()
+        .map(|&s| ts.stmt(s).span().start)
+        .collect();
     Some(ScriptSlot {
         // The program span starts just past the opening tag's `>`, so it is always
         // a valid statement position — including for an empty script.
