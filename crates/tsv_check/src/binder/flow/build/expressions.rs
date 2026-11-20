@@ -7,20 +7,25 @@
 use super::super::*;
 use super::FlowBuilder;
 use super::predicates::*;
-use crate::binder::{NodeKind, addr_of, expression_addr_kind};
+use crate::binder::{NodeAddr, NodeKind, addr_of, expression_addr_kind};
 use tsv_ts::ast::{
-    ArrowFunctionBody, AssignmentOperator, BinaryExpression, BinaryOperator, ClassExpression,
-    ConditionalExpression, Decorator, Expression, ExpressionKind, FunctionExpression, Identifier,
-    ObjectPatternProperty, ObjectProperty, Property, UnaryOperator,
+    ArrayPattern, ArrowFunctionBody, ArrowFunctionExpression, AssignmentExpression,
+    AssignmentOperator, AssignmentPattern, BinaryExpression, BinaryOperator, CallExpression,
+    ClassExpression, ConditionalExpression, Decorator, ExprId, Expression, ExpressionKind,
+    FunctionExpression, Identifier, ImportExpression, MemberExpression, NewExpression,
+    ObjectPattern, ObjectPatternProperty, ObjectProperty, Property, SequenceExpression,
+    TaggedTemplateExpression, UnaryExpression, UnaryOperator,
 };
 
 impl<'a> FlowBuilder<'a> {
     /// `maybeBindExpressionFlowIfCall` (binder.go:2143): a top-level dotted-name
     /// (non-`super`) call is a potential assertion → `createFlowCall`.
-    pub(super) fn maybe_bind_expression_flow_if_call(&mut self, expr: &Expression<'_>) {
+    pub(super) fn maybe_bind_expression_flow_if_call(&mut self, expr: &'a Expression) {
+        let view = self.view;
         if let ExpressionKind::CallExpression(c) = &expr.kind
-            && !matches!(c.callee.kind, ExpressionKind::Super(_))
-            && is_dotted_name(c.callee)
+            && let callee = view.expr(c.callee)
+            && !matches!(callee.kind, ExpressionKind::Super(_))
+            && is_dotted_name(view, callee)
         {
             let call_id = self.require(addr_of(c), NodeKind::CallExpression);
             self.current_flow = self.create_flow_call(self.current_flow, call_id);
@@ -34,7 +39,7 @@ impl<'a> FlowBuilder<'a> {
     /// nil-node no-op (`for (;;)`).
     fn do_with_conditional_branches(
         &mut self,
-        value: Option<&Expression<'_>>,
+        value: Option<&'a Expression>,
         true_target: FlowNodeId,
         false_target: FlowNodeId,
     ) {
@@ -58,7 +63,7 @@ impl<'a> FlowBuilder<'a> {
     /// atomic — their dedicated short-circuit machinery is F2).
     pub(super) fn bind_condition(
         &mut self,
-        node: Option<&Expression<'_>>,
+        node: Option<&'a Expression>,
         true_target: FlowNodeId,
         false_target: FlowNodeId,
         parent_is_nullish: bool,
@@ -66,7 +71,7 @@ impl<'a> FlowBuilder<'a> {
         self.do_with_conditional_branches(node, true_target, false_target);
         if node.is_none_or(|e| !is_logical_condition(e)) {
             let with_id = node.map(|e| (e, self.expr_id(e)));
-            let is_narrowing = node.is_some_and(is_narrowing_expression);
+            let is_narrowing = node.is_some_and(|e| is_narrowing_expression(self.view, e));
             let tc = self.create_flow_condition(
                 FlowFlags::TRUE_CONDITION,
                 self.current_flow,
@@ -97,12 +102,12 @@ impl<'a> FlowBuilder<'a> {
     /// compound-assignment (`&&=`/`||=`/`??=`), else `None`.
     fn bind_binary_expression_flow(
         &mut self,
-        node: &Expression<'_>,
-        left: &Expression<'_>,
-        right: &Expression<'_>,
+        node: &'a Expression,
+        left: &'a Expression,
+        right: &'a Expression,
         is_and: bool,
         is_nullish: bool,
-        assign_target: Option<&Expression<'_>>,
+        assign_target: Option<&'a Expression>,
     ) {
         if self.current_true_target.is_none() {
             let post = self.create_branch_label();
@@ -149,12 +154,12 @@ impl<'a> FlowBuilder<'a> {
     #[expect(clippy::too_many_arguments)] // faithful port of the tsgo signature
     fn bind_logical_like_expression(
         &mut self,
-        node: &Expression<'_>,
-        left: &Expression<'_>,
-        right: &Expression<'_>,
+        node: &'a Expression,
+        left: &'a Expression,
+        right: &'a Expression,
         is_and: bool,
         is_nullish: bool,
-        assign_target: Option<&Expression<'_>>,
+        assign_target: Option<&'a Expression>,
         true_target: FlowNodeId,
         false_target: FlowNodeId,
     ) {
@@ -187,7 +192,7 @@ impl<'a> FlowBuilder<'a> {
             self.current_false_target = saved_false;
             self.bind_assignment_target_flow(target);
             let node_id = self.expr_id(node);
-            let is_narrowing = is_narrowing_expression(node);
+            let is_narrowing = is_narrowing_expression(self.view, node);
             let tc = self.create_flow_condition(
                 FlowFlags::TRUE_CONDITION,
                 self.current_flow,
@@ -214,19 +219,20 @@ impl<'a> FlowBuilder<'a> {
     /// `bindConditionalExpressionFlow` (binder.go:2289) — a `?:` as a value: the
     /// condition splits to true/false labels feeding the two arms, which merge at
     /// a `hasFlowEffects`-gated post label.
-    fn bind_conditional_expression_flow(&mut self, c: &ConditionalExpression<'_>) {
+    fn bind_conditional_expression_flow(&mut self, c: &'a ConditionalExpression) {
+        let view = self.view;
         let true_label = self.create_branch_label();
         let false_label = self.create_branch_label();
         let post = self.create_branch_label();
         let saved_flow = self.current_flow;
         let saved_effects = self.has_flow_effects;
         self.has_flow_effects = false;
-        self.bind_condition(Some(c.test), true_label, false_label, false);
+        self.bind_condition(Some(view.expr(c.test)), true_label, false_label, false);
         self.current_flow = self.finish_flow_label(true_label);
-        self.visit_expression(c.consequent);
+        self.visit_expr(c.consequent);
         self.add_antecedent(post, self.current_flow);
         self.current_flow = self.finish_flow_label(false_label);
-        self.visit_expression(c.alternate);
+        self.visit_expr(c.alternate);
         self.add_antecedent(post, self.current_flow);
         self.current_flow = if self.has_flow_effects {
             self.finish_flow_label(post)
@@ -242,8 +248,8 @@ impl<'a> FlowBuilder<'a> {
     /// per-element machinery) is F2, alongside parameter-default forks — a
     /// destructuring target is not a narrowable reference, so it mints no mutation
     /// here, and its sub-references were already visited.
-    pub(super) fn bind_assignment_target_flow(&mut self, target: &Expression<'_>) {
-        if is_narrowable_reference(target) {
+    pub(super) fn bind_assignment_target_flow(&mut self, target: &'a Expression) {
+        if is_narrowable_reference(self.view, target) {
             let id = self.expr_id(target);
             self.current_flow =
                 self.create_flow_mutation(FlowFlags::ASSIGNMENT, self.current_flow, id);
@@ -254,9 +260,11 @@ impl<'a> FlowBuilder<'a> {
     /// `(address, kind)` in the address map, via the shared
     /// [`expression_addr_kind`] mapping (the same one `visit_expression`'s
     /// lockstep guard pins in `binder/mod.rs`). Condition / mutation subjects are
-    /// always value expressions F0 lowered, so this never misses.
-    fn expr_id(&self, e: &Expression<'_>) -> NodeId {
-        let (addr, kind) = expression_addr_kind(e);
+    /// always value expressions F0 lowered, so this never misses. `e` is read in
+    /// place from the stores, so its stored payloads resolve to their own rows.
+    #[track_caller]
+    fn expr_id(&self, e: &'a Expression) -> NodeId {
+        let (addr, kind) = expression_addr_kind(self.view, e);
         self.require(addr, kind)
     }
 
@@ -270,7 +278,7 @@ impl<'a> FlowBuilder<'a> {
     /// constructors / static blocks, never a plain IIFE.
     fn visit_function_expression(
         &mut self,
-        f: &FunctionExpression<'_>,
+        f: &'a FunctionExpression,
         node_id: NodeId,
         is_iife: bool,
     ) {
@@ -284,23 +292,18 @@ impl<'a> FlowBuilder<'a> {
         self.exit_container(saved, is_iife, true, true, node_id, false);
     }
 
-    fn visit_arrow(
-        &mut self,
-        a: &tsv_ts::ast::ArrowFunctionExpression<'_>,
-        node_id: NodeId,
-        is_iife: bool,
-    ) {
+    fn visit_arrow(&mut self, a: &'a ArrowFunctionExpression, node_id: NodeId, is_iife: bool) {
         self.set_flow_leaf(node_id); // binder.go:915 (arrows dispatch here too)
         let saved = self.enter_container(Some(node_id), is_iife, is_iife);
         self.bind_params(a.params);
         match &a.body {
-            ArrowFunctionBody::Expression(e) => self.visit_expression(e),
+            &ArrowFunctionBody::Expression(e) => self.visit_expr(e),
             ArrowFunctionBody::BlockStatement(block) => self.visit_statement_list(block.body),
         }
         self.exit_container(saved, is_iife, true, true, node_id, false);
     }
 
-    fn visit_class_expr(&mut self, c: &ClassExpression<'_>) {
+    fn visit_class_expr(&mut self, c: &'a ClassExpression) {
         self.visit_class_common(
             c.id.as_ref(),
             c.decorators,
@@ -312,8 +315,14 @@ impl<'a> FlowBuilder<'a> {
 
     // --- expressions ------------------------------------------------------
 
-    pub(super) fn visit_expression(&mut self, expr: &Expression<'_>) {
+    /// Visit the expression `id` names, read in place from its store.
+    pub(super) fn visit_expr(&mut self, id: ExprId) {
+        self.visit_expression(self.view.expr(id));
+    }
+
+    pub(super) fn visit_expression(&mut self, expr: &'a Expression) {
         use ExpressionKind as E;
+        let view = self.view;
         // A **value** sub-position resets the condition targets, so a logical
         // expression nested inside one (`if (f(x && y))`, `if (c ? x && y : z)`,
         // `if (g([x && y]))`) is classified top-level — a value with its own
@@ -345,56 +354,66 @@ impl<'a> FlowBuilder<'a> {
                 // Non-leaf write (nil'd in dead code). tsv models `import`/`new`
                 // and `meta`/`target` as identifiers; they are keyword-ish, not
                 // references, so only the MetaProperty node is stamped.
-                let id = self.require(addr_of(m), NodeKind::MetaProperty);
+                // Keys the `MetaPropId` slot, not the `meta_prop` row the lowering
+                // keyed, so `require` misses and panics — reproducing the baseline's
+                // MetaProperty walk miss (see the constructor's TODO).
+                let id = self.require(
+                    NodeAddr::baseline_meta_property_slot(m),
+                    NodeKind::MetaProperty,
+                );
                 self.set_flow_nonleaf(id);
             }
             E::MemberExpression(m) => self.bind_member_expression_flow(expr, m),
             E::Literal(_) | E::PrivateIdentifier(_) | E::RegexLiteral(_) => {}
             E::ObjectExpression(o) => {
-                for prop in o.properties {
+                for prop in view.obj_props(o.properties) {
                     self.visit_object_property(prop);
                 }
             }
             E::ArrayExpression(a) => {
-                for el in a.elements.iter().flatten() {
-                    self.visit_expression(el);
+                for &el in view.expr_opt_list(a.elements).iter().flatten() {
+                    self.visit_expr(el);
                 }
             }
             E::UnaryExpression(u) if u.operator == UnaryOperator::Bang => {
                 self.bind_prefix_unary_expression_flow(u);
             }
-            E::UnaryExpression(u) => self.visit_expression(u.argument),
-            E::UpdateExpression(u) => self.visit_expression(u.argument),
+            E::UnaryExpression(u) => self.visit_expr(u.argument),
+            E::UpdateExpression(u) => self.visit_expr(u.argument),
             E::BinaryExpression(b) if b.operator.is_logical() => {
                 self.bind_logical_binary_expression_flow(expr, b);
             }
             E::BinaryExpression(b) => {
-                self.visit_expression(b.left);
-                self.visit_expression(b.right);
+                self.visit_expr(b.left);
+                self.visit_expr(b.right);
             }
             E::CallExpression(c) => self.bind_call_expression_flow(c),
             E::NewExpression(n) => self.visit_new_expression(n),
             E::ConditionalExpression(c) => self.bind_conditional_expression_flow(c),
-            E::ArrowFunctionExpression(a) => {
-                let id = self.require(addr_of(*a), NodeKind::ArrowFunctionExpression);
+            &E::ArrowFunctionExpression(a) => {
+                let a = view.arrow_fn(a);
+                let id = self.require(addr_of(a), NodeKind::ArrowFunctionExpression);
                 self.visit_arrow(a, id, false);
             }
-            E::FunctionExpression(f) => {
-                let id = self.require(addr_of(*f), NodeKind::FunctionExpression);
+            &E::FunctionExpression(f) => {
+                let f = view.fn_expr(f);
+                let id = self.require(addr_of(f), NodeKind::FunctionExpression);
                 self.visit_function_expression(f, id, false);
             }
-            E::ClassExpression(c) => self.visit_class_expr(c),
-            E::SpreadElement(s) => self.visit_expression(s.argument),
+            &E::ClassExpression(c) => self.visit_class_expr(view.class_expr(c)),
+            E::SpreadElement(s) => self.visit_expr(s.argument),
             E::TemplateLiteral(t) => {
-                for e in t.expressions {
-                    self.visit_expression(e);
+                for &e in view.expr_list(t.expressions) {
+                    self.visit_expr(e);
                 }
             }
-            E::TaggedTemplateExpression(t) => self.visit_tagged_template_expression(t),
-            E::AwaitExpression(a) => self.visit_expression(a.argument),
+            &E::TaggedTemplateExpression(t) => {
+                self.visit_tagged_template_expression(view.tagged_tpl(t));
+            }
+            E::AwaitExpression(a) => self.visit_expr(a.argument),
             E::YieldExpression(y) => {
                 if let Some(a) = y.argument {
-                    self.visit_expression(a);
+                    self.visit_expr(a);
                 }
             }
             E::SequenceExpression(s) => self.bind_sequence_expression_flow(s),
@@ -405,16 +424,16 @@ impl<'a> FlowBuilder<'a> {
             E::ObjectPattern(op) => self.visit_object_pattern(op),
             E::ArrayPattern(ap) => self.visit_array_pattern(ap),
             E::AssignmentPattern(a) => self.visit_assignment_pattern(a),
-            E::RestElement(r) => self.visit_expression(r.argument),
-            E::TSTypeAssertion(t) => self.visit_expression(t.expression),
-            E::TSAsExpression(t) => self.visit_expression(t.expression),
-            E::TSSatisfiesExpression(t) => self.visit_expression(t.expression),
-            E::TSInstantiationExpression(t) => self.visit_expression(t.expression),
-            E::TSNonNullExpression(t) => self.visit_expression(t.expression),
-            E::TSParameterProperty(pp) => self.visit_expression(pp.parameter),
+            E::RestElement(r) => self.visit_expr(r.argument),
+            E::TSTypeAssertion(t) => self.visit_expr(t.expression),
+            E::TSAsExpression(t) => self.visit_expr(t.expression),
+            E::TSSatisfiesExpression(t) => self.visit_expr(t.expression),
+            E::TSInstantiationExpression(t) => self.visit_expr(t.expression),
+            E::TSNonNullExpression(t) => self.visit_expr(t.expression),
+            E::TSParameterProperty(pp) => self.visit_expr(pp.parameter),
             E::ImportExpression(i) => self.visit_import_expression(i),
-            E::CommentBoundPair(c) => self.visit_expression(c.inner),
-            E::ParenthesizedExpression(p) => self.visit_expression(p.expression),
+            &E::CommentBoundPair(c) => self.visit_expr(view.comment_pair(c).inner),
+            E::ParenthesizedExpression(p) => self.visit_expr(p.expression),
         }
         if let Some((t, f)) = restore {
             self.current_true_target = t;
@@ -423,23 +442,19 @@ impl<'a> FlowBuilder<'a> {
     }
 
     #[inline]
-    fn bind_member_expression_flow(
-        &mut self,
-        expr: &Expression<'_>,
-        m: &tsv_ts::ast::MemberExpression<'_>,
-    ) {
+    fn bind_member_expression_flow(&mut self, expr: &'a Expression, m: &'a MemberExpression) {
         // The access flow write (binder.go:618): non-leaf, reachable-
         // only, gated on `isNarrowableReference`.
-        if is_narrowable_reference(expr) {
+        if is_narrowable_reference(self.view, expr) {
             let id = self.require(addr_of(m), NodeKind::MemberExpression);
             self.set_flow_nonleaf(id);
         }
-        self.visit_expression(m.object);
-        self.visit_expression(m.property);
+        self.visit_expr(m.object);
+        self.visit_expr(m.property);
     }
 
     #[inline]
-    fn bind_prefix_unary_expression_flow(&mut self, u: &tsv_ts::ast::UnaryExpression<'_>) {
+    fn bind_prefix_unary_expression_flow(&mut self, u: &'a UnaryExpression) {
         // `bindPrefixUnaryExpressionFlow` (binder.go:2174): swap the
         // condition targets around the operand so `!x` narrows inversely.
         // The pre/post swaps are symmetric — any sub-binder restores the
@@ -449,7 +464,7 @@ impl<'a> FlowBuilder<'a> {
             &mut self.current_true_target,
             &mut self.current_false_target,
         );
-        self.visit_expression(u.argument);
+        self.visit_expr(u.argument);
         std::mem::swap(
             &mut self.current_true_target,
             &mut self.current_false_target,
@@ -459,70 +474,84 @@ impl<'a> FlowBuilder<'a> {
     #[inline]
     fn bind_logical_binary_expression_flow(
         &mut self,
-        expr: &Expression<'_>,
-        b: &BinaryExpression<'_>,
+        expr: &'a Expression,
+        b: &'a BinaryExpression,
     ) {
         // `bindBinaryExpressionFlow` logical branch (binder.go:2219).
+        let view = self.view;
         let is_and = b.operator == BinaryOperator::AmpersandAmpersand;
         let is_nullish = b.operator == BinaryOperator::QuestionQuestion;
-        self.bind_binary_expression_flow(expr, b.left, b.right, is_and, is_nullish, None);
+        self.bind_binary_expression_flow(
+            expr,
+            view.expr(b.left),
+            view.expr(b.right),
+            is_and,
+            is_nullish,
+            None,
+        );
     }
 
     #[inline]
-    fn bind_call_expression_flow(&mut self, c: &tsv_ts::ast::CallExpression<'_>) {
+    fn bind_call_expression_flow(&mut self, c: &'a CallExpression) {
         use ExpressionKind as E;
+        let view = self.view;
         // IIFE detection (`GetImmediatelyInvokedFunctionExpression`,
         // utilities.go:1834; `bindCallExpressionFlow`, binder.go:2419):
         // a non-async (non-generator) function/arrow callee — through any
         // grouping parens — is inlined into the containing flow. Its
         // arguments bind FIRST so the callee's flow write captures the
         // post-argument flow.
-        let mut unwrapped = c.callee;
+        let mut unwrapped = view.expr(c.callee);
         while let E::ParenthesizedExpression(p) = &unwrapped.kind {
-            unwrapped = p.expression;
+            unwrapped = view.expr(p.expression);
         }
         match &unwrapped.kind {
-            E::ArrowFunctionExpression(a) if !a.r#async => {
-                for arg in c.arguments {
-                    self.visit_expression(arg);
+            E::ArrowFunctionExpression(a) if !view.arrow_fn(*a).r#async => {
+                for &arg in view.expr_list(c.arguments) {
+                    self.visit_expr(arg);
                 }
-                let id = self.require(addr_of(*a), NodeKind::ArrowFunctionExpression);
+                let a = view.arrow_fn(*a);
+                let id = self.require(addr_of(a), NodeKind::ArrowFunctionExpression);
                 self.visit_arrow(a, id, true);
             }
-            E::FunctionExpression(f) if !f.r#async && !f.generator => {
-                for arg in c.arguments {
-                    self.visit_expression(arg);
+            E::FunctionExpression(f)
+                if !view.fn_expr(*f).r#async && !view.fn_expr(*f).generator =>
+            {
+                for &arg in view.expr_list(c.arguments) {
+                    self.visit_expr(arg);
                 }
-                let id = self.require(addr_of(*f), NodeKind::FunctionExpression);
+                let f = view.fn_expr(*f);
+                let id = self.require(addr_of(f), NodeKind::FunctionExpression);
                 self.visit_function_expression(f, id, true);
             }
             _ => {
-                self.visit_expression(c.callee);
-                for arg in c.arguments {
-                    self.visit_expression(arg);
+                self.visit_expr(c.callee);
+                for &arg in view.expr_list(c.arguments) {
+                    self.visit_expr(arg);
                 }
             }
         }
     }
 
     #[inline]
-    fn visit_new_expression(&mut self, n: &tsv_ts::ast::NewExpression<'_>) {
-        self.visit_expression(n.callee);
-        for a in n.arguments {
-            self.visit_expression(a);
+    fn visit_new_expression(&mut self, n: &'a NewExpression) {
+        self.visit_expr(n.callee);
+        for &a in self.view.expr_list(n.arguments) {
+            self.visit_expr(a);
         }
     }
 
     #[inline]
-    fn visit_tagged_template_expression(&mut self, t: &tsv_ts::ast::TaggedTemplateExpression<'_>) {
-        self.visit_expression(t.tag);
-        for e in t.quasi.expressions {
-            self.visit_expression(e);
+    fn visit_tagged_template_expression(&mut self, t: &'a TaggedTemplateExpression) {
+        self.visit_expr(t.tag);
+        for &e in self.view.expr_list(t.quasi.expressions) {
+            self.visit_expr(e);
         }
     }
 
     #[inline]
-    fn bind_sequence_expression_flow(&mut self, s: &tsv_ts::ast::SequenceExpression<'_>) {
+    fn bind_sequence_expression_flow(&mut self, s: &'a SequenceExpression) {
+        let view = self.view;
         // `bindBinaryExpressionFlow` comma branch: each operand's value
         // is discarded (statement-like), so a top-level dotted-name call
         // is a potential assertion — apply maybe-call per operand
@@ -532,7 +561,8 @@ impl<'a> FlowBuilder<'a> {
         // it once per leaf operand (intermediate comma nodes are no-op
         // non-calls), so the effect matches.
         // tsgo: binder.go bindBinaryExpressionFlow (comma branch)
-        for e in s.expressions {
+        for &e in view.expr_list(s.expressions) {
+            let e = view.expr(e);
             self.visit_expression(e);
             self.maybe_bind_expression_flow_if_call(e);
         }
@@ -541,90 +571,100 @@ impl<'a> FlowBuilder<'a> {
     #[inline]
     fn bind_logical_assignment_expression_flow(
         &mut self,
-        expr: &Expression<'_>,
-        a: &tsv_ts::ast::AssignmentExpression<'_>,
+        expr: &'a Expression,
+        a: &'a AssignmentExpression,
     ) {
         // `bindBinaryExpressionFlow` logical compound-assignment branch.
+        let view = self.view;
         let is_and = a.operator == AssignmentOperator::LogicalAndAssign;
         let is_nullish = a.operator == AssignmentOperator::NullishAssign;
-        self.bind_binary_expression_flow(expr, a.left, a.right, is_and, is_nullish, Some(a.left));
+        let left = view.expr(a.left);
+        self.bind_binary_expression_flow(
+            expr,
+            left,
+            view.expr(a.right),
+            is_and,
+            is_nullish,
+            Some(left),
+        );
     }
 
     #[inline]
-    fn bind_assignment_expression_flow(&mut self, a: &tsv_ts::ast::AssignmentExpression<'_>) {
+    fn bind_assignment_expression_flow(&mut self, a: &'a AssignmentExpression) {
         // `bindBinaryExpressionFlow` assignment branch (binder.go:2249) —
         // bind operands, then the target's `Assignment` mutation.
-        self.visit_expression(a.left);
-        self.visit_expression(a.right);
-        self.bind_assignment_target_flow(a.left);
+        let left = self.view.expr(a.left);
+        self.visit_expression(left);
+        self.visit_expr(a.right);
+        self.bind_assignment_target_flow(left);
     }
 
     #[inline]
-    fn visit_object_pattern(&mut self, op: &tsv_ts::ast::ObjectPattern<'_>) {
-        self.visit_decorators(op.decorators);
-        for prop in op.properties {
+    fn visit_object_pattern(&mut self, op: &'a ObjectPattern) {
+        let view = self.view;
+        self.visit_decorators(op.decorators(view));
+        for prop in view.pat_props(op.properties) {
             self.visit_object_pattern_property(prop);
         }
     }
 
     #[inline]
-    fn visit_array_pattern(&mut self, ap: &tsv_ts::ast::ArrayPattern<'_>) {
-        self.visit_decorators(ap.decorators);
-        for el in ap.elements.iter().flatten() {
-            self.visit_expression(el);
+    fn visit_array_pattern(&mut self, ap: &'a ArrayPattern) {
+        let view = self.view;
+        self.visit_decorators(ap.decorators(view));
+        for &el in view.expr_opt_list(ap.elements).iter().flatten() {
+            self.visit_expr(el);
         }
     }
 
     #[inline]
-    fn visit_assignment_pattern(&mut self, a: &tsv_ts::ast::AssignmentPattern<'_>) {
-        self.visit_decorators(a.decorators);
-        self.visit_expression(a.left);
-        self.visit_expression(a.right);
+    fn visit_assignment_pattern(&mut self, a: &'a AssignmentPattern) {
+        self.visit_decorators(self.view.opt_decorators(a.decorators));
+        self.visit_expr(a.left);
+        self.visit_expr(a.right);
     }
 
     #[inline]
-    fn visit_import_expression(&mut self, i: &tsv_ts::ast::ImportExpression<'_>) {
-        self.visit_expression(i.source);
+    fn visit_import_expression(&mut self, i: &'a ImportExpression) {
+        self.visit_expr(i.source);
         if let Some(o) = i.options {
-            self.visit_expression(o);
+            self.visit_expr(o);
         }
     }
 
-    pub(super) fn visit_identifier(&mut self, ident: &Identifier<'_>) {
+    pub(super) fn visit_identifier(&mut self, ident: &'a Identifier) {
         // Identifier flow write (binder.go:602): a leaf — unconditional, so a
         // dead identifier keeps `Some(unreachable)`. Its decorators (parameter
         // decorators) are value expressions; its type annotation is a type
         // position (skipped).
         let id = self.require(addr_of(ident), NodeKind::Identifier);
         self.set_flow_leaf(id);
-        self.visit_decorators(ident.decorators());
+        self.visit_decorators(ident.decorators(self.view));
     }
 
-    pub(super) fn visit_decorators(&mut self, decorators: Option<&[Decorator<'_>]>) {
+    /// Visit a decorator list, `None` or a run the view resolved in place.
+    pub(super) fn visit_decorators(&mut self, decorators: Option<&'a [Decorator]>) {
         if let Some(decs) = decorators {
             for d in decs {
-                self.visit_expression(&d.expression);
+                self.visit_expr(d.expression);
             }
         }
     }
 
-    fn visit_object_property(&mut self, prop: &ObjectProperty<'_>) {
+    fn visit_object_property(&mut self, prop: &'a ObjectProperty) {
         match prop {
             ObjectProperty::Property(pr) => self.visit_object_expr_property(pr),
-            ObjectProperty::SpreadElement(s) => self.visit_expression(s.argument),
+            ObjectProperty::SpreadElement(s) => self.visit_expr(s.argument),
         }
     }
 
-    fn visit_object_expr_property(&mut self, pr: &Property<'_>) {
+    fn visit_object_expr_property(&mut self, pr: &'a Property) {
+        let view = self.view;
         let is_method_or_accessor = pr.method || pr.kind != tsv_ts::ast::PropertyKind::Init;
-        if let (
-            true,
-            Expression {
-                kind: ExpressionKind::FunctionExpression(f),
-                ..
-            },
-        ) = (is_method_or_accessor, &pr.value)
+        if is_method_or_accessor
+            && let &ExpressionKind::FunctionExpression(f) = &view.expr(pr.value).kind
         {
+            let f = view.fn_expr(f);
             // An object-literal method/accessor is a control-flow container
             // anchored on its value FunctionExpression — the body-bearing node
             // (unlike `MethodDefinition`, a `Property` does NOT share its value's
@@ -635,8 +675,8 @@ impl<'a> FlowBuilder<'a> {
             // body Start's subject (binder.go:1534) — the P3 narrowing hint
             // (`IsObjectLiteralOrClassExpressionMethodOrAccessor`,
             // utilities.go:566; the class-expression half lives in `visit_method`).
-            self.visit_expression(pr.key);
-            let anchor = self.require(addr_of(*f), NodeKind::FunctionExpression);
+            self.visit_expr(pr.key);
+            let anchor = self.require(addr_of(f), NodeKind::FunctionExpression);
             let prop_id = self.require(addr_of(pr), NodeKind::Property);
             self.set_flow_leaf(prop_id);
             let saved = self.enter_container(Some(prop_id), false, false);
@@ -644,18 +684,18 @@ impl<'a> FlowBuilder<'a> {
             self.visit_statement_list(f.body.body);
             self.exit_container(saved, false, true, true, anchor, false);
         } else {
-            self.visit_expression(pr.key);
-            self.visit_expression(pr.value);
+            self.visit_expr(pr.key);
+            self.visit_expr(pr.value);
         }
     }
 
-    fn visit_object_pattern_property(&mut self, prop: &ObjectPatternProperty<'_>) {
+    fn visit_object_pattern_property(&mut self, prop: &'a ObjectPatternProperty) {
         match prop {
             ObjectPatternProperty::Property(pr) => {
-                self.visit_expression(pr.key);
-                self.visit_expression(pr.value);
+                self.visit_expr(pr.key);
+                self.visit_expr(pr.value);
             }
-            ObjectPatternProperty::RestElement(r) => self.visit_expression(r.argument),
+            ObjectPatternProperty::RestElement(r) => self.visit_expr(r.argument),
         }
     }
 }

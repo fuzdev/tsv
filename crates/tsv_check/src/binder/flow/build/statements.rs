@@ -11,22 +11,24 @@ use crate::binder::{NodeKind, addr_of, statement_kind};
 use smallvec::SmallVec;
 use tsv_ts::ast::{
     BreakStatement, ClassDeclaration, ClassMember, ContinueStatement, Decorator, DoWhileStatement,
-    Expression, ExpressionKind, ForInOfLeft, ForInit, ForStatement, FunctionDeclaration,
-    Identifier, IfStatement, LabeledStatement, MethodDefinition, MethodKind, ObjectPatternProperty,
-    Statement, StatementKind, SwitchCase, SwitchStatement, TSModuleDeclarationBody, TryStatement,
+    ExportDefaultDeclaration, ExprId, Expression, ExpressionKind, ForInOfLeft, ForInit,
+    ForStatement, FunctionDeclaration, Identifier, IfStatement, LabeledStatement, MethodDefinition,
+    MethodKind, ObjectPatternProperty, Run, Statement, StatementKind, SwitchCase, SwitchStatement,
+    TSModuleDeclaration, TSModuleDeclarationBody, TryStatement, VariableDeclaration,
     VariableDeclarator, WhileStatement,
 };
 
 impl<'a> FlowBuilder<'a> {
     // --- statements -------------------------------------------------------
 
-    pub(super) fn visit_statement(&mut self, stmt: &Statement<'_>) {
+    pub(super) fn visit_statement(&mut self, stmt: &'a Statement) {
+        let view = self.view;
         let id = self.require(addr_of(stmt), statement_kind(stmt));
         if self.current_unreachable() {
             // bindChildren dead path (binder.go:1651): the non-leaf statement's
             // flow attachment is nil (already `None`); mark potentially-
             // executable nodes; then descend generically (no flow shaping).
-            if is_potentially_executable(stmt) {
+            if is_potentially_executable(view, stmt) {
                 self.node_flags[id.index()] |= crate::binder::NODE_FLAGS_UNREACHABLE;
             }
             self.descend_children_generic(stmt);
@@ -39,18 +41,19 @@ impl<'a> FlowBuilder<'a> {
         }
         match &stmt.kind {
             StatementKind::ExpressionStatement(s) => {
-                self.visit_expression(s.expression);
-                self.maybe_bind_expression_flow_if_call(s.expression);
+                let expression = view.expr(s.expression);
+                self.visit_expression(expression);
+                self.maybe_bind_expression_flow_if_call(expression);
             }
             StatementKind::VariableDeclaration(d) => {
-                for decl in d.declarations {
+                for decl in view.declarators(d.declarations) {
                     self.bind_variable_declaration_flow(decl);
                 }
             }
             StatementKind::ReturnStatement(s) => {
                 // `bindReturnStatement` (binder.go:1939).
-                if let Some(a) = &s.argument {
-                    self.visit_expression(a);
+                if let Some(a) = s.argument {
+                    self.visit_expr(a);
                 }
                 if let Some(rt) = self.current_return_target {
                     self.add_antecedent(rt, self.current_flow);
@@ -61,7 +64,7 @@ impl<'a> FlowBuilder<'a> {
             }
             StatementKind::ThrowStatement(s) => {
                 // `bindThrowStatement` (binder.go:1949).
-                self.visit_expression(s.argument);
+                self.visit_expr(s.argument);
                 self.current_flow = self.unreachable_flow;
                 self.has_flow_effects = true;
             }
@@ -71,16 +74,28 @@ impl<'a> FlowBuilder<'a> {
             StatementKind::DoWhileStatement(s) => self.bind_do_statement(id, s),
             StatementKind::ForStatement(s) => self.bind_for_statement(id, s),
             StatementKind::ForInStatement(s) => {
-                self.bind_for_in_or_of(id, s.left, s.right, s.body);
+                self.bind_for_in_or_of(
+                    id,
+                    view.for_left(s.left),
+                    view.expr(s.right),
+                    view.stmt(s.body),
+                );
             }
             StatementKind::ForOfStatement(s) => {
-                self.bind_for_in_or_of(id, s.left, s.right, s.body);
+                self.bind_for_in_or_of(
+                    id,
+                    view.for_left(s.left),
+                    view.expr(s.right),
+                    view.stmt(s.body),
+                );
             }
             StatementKind::BreakStatement(s) => self.bind_break_statement(s),
             StatementKind::ContinueStatement(s) => self.bind_continue_statement(s),
             StatementKind::SwitchStatement(s) => self.bind_switch_statement(id, s),
-            StatementKind::TryStatement(s) => self.bind_try_statement(s),
-            StatementKind::LabeledStatement(s) => self.bind_labeled_statement(s),
+            &StatementKind::TryStatement(s) => self.bind_try_statement(view.try_stmt(s)),
+            &StatementKind::LabeledStatement(s) => {
+                self.bind_labeled_statement(view.labeled_stmt(s));
+            }
             // Everything else (declarations, blocks, exports, modules, and `with` —
             // which shapes no flow: tsc's binder has no `bindWithStatement`, so the
             // statement falls to `bindEachChild` there) threads flow linearly through
@@ -99,93 +114,81 @@ impl<'a> FlowBuilder<'a> {
     /// are therefore reached **only in dead code**; the reachable topology lives
     /// in `visit_statement`. Containers nested here still open their own `Start`
     /// regions, so a function body stays reachable even in dead code.
-    fn descend_children_generic(&mut self, stmt: &Statement<'_>) {
+    fn descend_children_generic(&mut self, stmt: &'a Statement) {
+        let view = self.view;
         match &stmt.kind {
-            StatementKind::ExpressionStatement(s) => self.visit_expression(s.expression),
-            StatementKind::VariableDeclaration(d) => {
-                for decl in d.declarations {
-                    self.visit_expression(decl.id);
-                    if let Some(init) = &decl.init {
-                        self.visit_expression(init);
-                    }
-                }
-            }
-            StatementKind::FunctionDeclaration(f) => {
+            StatementKind::ExpressionStatement(s) => self.visit_expr(s.expression),
+            StatementKind::VariableDeclaration(d) => self.visit_declarators_linear(d),
+            &StatementKind::FunctionDeclaration(f) => {
                 let id = self.require(addr_of(stmt), statement_kind(stmt));
-                self.visit_function_declaration(f, id);
+                self.visit_function_declaration(view.fn_decl(f), id);
             }
-            StatementKind::ClassDeclaration(c) => self.visit_class_decl(c),
+            &StatementKind::ClassDeclaration(c) => self.visit_class_decl(view.class_decl(c)),
             StatementKind::ReturnStatement(s) => {
-                if let Some(a) = &s.argument {
-                    self.visit_expression(a);
+                if let Some(a) = s.argument {
+                    self.visit_expr(a);
                 }
             }
-            StatementKind::ThrowStatement(s) => self.visit_expression(s.argument),
+            StatementKind::ThrowStatement(s) => self.visit_expr(s.argument),
             StatementKind::BlockStatement(b) => self.visit_statement_list(b.body),
             // --- dead-path linear descent for the branching kinds (their real
             //     topology lives in `visit_statement`; reached only when dead) ---
             StatementKind::IfStatement(s) => {
-                self.visit_expression(s.test);
-                self.visit_statement(s.consequent);
-                if let Some(alt) = s.alternate {
+                self.visit_expr(s.test);
+                self.visit_statement(view.stmt(s.consequent));
+                if let Some(alt) = view.opt_stmt(s.alternate) {
                     self.visit_statement(alt);
                 }
             }
             StatementKind::ForStatement(s) => {
-                match &s.init {
-                    Some(ForInit::VariableDeclaration(d)) => {
-                        for decl in d.declarations {
-                            self.visit_expression(decl.id);
-                            if let Some(init) = &decl.init {
-                                self.visit_expression(init);
-                            }
-                        }
-                    }
-                    Some(ForInit::Expression(e)) => self.visit_expression(e),
+                match view.opt_for_head(s.init) {
+                    Some(ForInit::VariableDeclaration(d)) => self.visit_declarators_linear(d),
+                    Some(&ForInit::Expression(e)) => self.visit_expr(e),
                     None => {}
                 }
-                if let Some(t) = &s.test {
-                    self.visit_expression(t);
+                if let Some(t) = s.test {
+                    self.visit_expr(t);
                 }
-                if let Some(u) = &s.update {
-                    self.visit_expression(u);
+                if let Some(u) = s.update {
+                    self.visit_expr(u);
                 }
-                self.visit_statement(s.body);
+                self.visit_statement(view.stmt(s.body));
             }
             StatementKind::ForInStatement(s) => {
-                self.visit_for_left(s.left);
-                self.visit_expression(s.right);
-                self.visit_statement(s.body);
+                self.visit_for_left(view.for_left(s.left));
+                self.visit_expr(s.right);
+                self.visit_statement(view.stmt(s.body));
             }
             StatementKind::ForOfStatement(s) => {
-                self.visit_for_left(s.left);
-                self.visit_expression(s.right);
-                self.visit_statement(s.body);
+                self.visit_for_left(view.for_left(s.left));
+                self.visit_expr(s.right);
+                self.visit_statement(view.stmt(s.body));
             }
             StatementKind::WhileStatement(s) => {
-                self.visit_expression(s.test);
-                self.visit_statement(s.body);
+                self.visit_expr(s.test);
+                self.visit_statement(view.stmt(s.body));
             }
             StatementKind::DoWhileStatement(s) => {
-                self.visit_statement(s.body);
-                self.visit_expression(s.test);
+                self.visit_statement(view.stmt(s.body));
+                self.visit_expr(s.test);
             }
             StatementKind::WithStatement(s) => {
-                self.visit_expression(s.object);
-                self.visit_statement(s.body);
+                self.visit_expr(s.object);
+                self.visit_statement(view.stmt(s.body));
             }
             StatementKind::SwitchStatement(s) => {
-                self.visit_expression(s.discriminant);
-                for case in s.cases {
-                    if let Some(t) = &case.test {
-                        self.visit_expression(t);
+                self.visit_expr(s.discriminant);
+                for case in view.cases(s.cases) {
+                    if let Some(t) = case.test {
+                        self.visit_expr(t);
                     }
                     self.visit_statement_list(case.consequent);
                 }
             }
-            StatementKind::TryStatement(s) => {
+            &StatementKind::TryStatement(s) => {
+                let s = view.try_stmt(s);
                 self.visit_statement_list(s.block.body);
-                if let Some(handler) = &s.handler {
+                if let Some(handler) = view.opt_catch(s.handler) {
                     if let Some(param) = &handler.param {
                         self.visit_expression(param);
                     }
@@ -195,11 +198,12 @@ impl<'a> FlowBuilder<'a> {
                     self.visit_statement_list(finalizer.body);
                 }
             }
-            StatementKind::LabeledStatement(s) => {
+            &StatementKind::LabeledStatement(s) => {
                 // Dead-path fallback; the reachable topology lives in
                 // `bind_labeled_statement`.
+                let s = view.labeled_stmt(s);
                 self.visit_identifier(&s.label);
-                self.visit_statement(s.body);
+                self.visit_statement(view.stmt(s.body));
             }
             StatementKind::BreakStatement(s) => {
                 if let Some(label) = &s.label {
@@ -211,15 +215,19 @@ impl<'a> FlowBuilder<'a> {
                     self.visit_identifier(label);
                 }
             }
-            StatementKind::ExportNamedDeclaration(e) => {
-                if let Some(inner) = e.declaration {
-                    self.visit_statement(inner);
+            &StatementKind::ExportNamedDeclaration(e) => {
+                if let Some(inner) = view.export_named(e).declaration {
+                    self.visit_statement(view.stmt(inner));
                 }
                 // export specifiers / source are non-value (skipped).
             }
-            StatementKind::ExportDefaultDeclaration(e) => self.visit_export_default(e),
-            StatementKind::TSExportAssignment(ea) => self.visit_expression(&ea.expression),
-            StatementKind::TSModuleDeclaration(m) => self.visit_module(m),
+            &StatementKind::ExportDefaultDeclaration(e) => {
+                self.visit_export_default(view.export_default(e));
+            }
+            &StatementKind::TSExportAssignment(ea) => {
+                self.visit_expr(view.export_assign(ea).expression);
+            }
+            &StatementKind::TSModuleDeclaration(m) => self.visit_module(view.module_decl(m)),
             // No value content (types / imports / enum bodies / empty): skipped,
             // per the "types are not descended" scope note. See module docs.
             StatementKind::TSTypeAliasDeclaration(_)
@@ -235,18 +243,22 @@ impl<'a> FlowBuilder<'a> {
         }
     }
 
-    fn visit_for_left(&mut self, left: &ForInOfLeft<'_>) {
+    fn visit_for_left(&mut self, left: &'a ForInOfLeft) {
         use ForInOfLeft as L;
         match left {
-            L::VariableDeclaration(d) => {
-                for decl in d.declarations {
-                    self.visit_expression(decl.id);
-                    if let Some(init) = &decl.init {
-                        self.visit_expression(init);
-                    }
-                }
+            L::VariableDeclaration(d) => self.visit_declarators_linear(d),
+            &L::Pattern(e) => self.visit_expr(e),
+        }
+    }
+
+    /// A declaration list's names and initializers, threaded linearly (the
+    /// dead-path descent: no `Assignment` mutation, no initializer fork).
+    fn visit_declarators_linear(&mut self, d: &'a VariableDeclaration) {
+        for decl in self.view.declarators(d.declarations) {
+            self.visit_expr(decl.id);
+            if let Some(init) = decl.init {
+                self.visit_expr(init);
             }
-            L::Pattern(e) => self.visit_expression(e),
         }
     }
 
@@ -259,10 +271,10 @@ impl<'a> FlowBuilder<'a> {
     /// forks per `bindInitializer`. A destructuring pattern emits one
     /// `Assignment` per declarator (tsv has no binding-element node — see the
     /// module scope note).
-    fn bind_variable_declaration_flow(&mut self, decl: &VariableDeclarator<'_>) {
-        self.bind_binding_target(decl.id);
-        if let Some(init) = &decl.init {
-            self.visit_expression(init);
+    fn bind_variable_declaration_flow(&mut self, decl: &'a VariableDeclarator) {
+        self.bind_binding_target(self.view.expr(decl.id));
+        if let Some(init) = decl.init {
+            self.visit_expr(init);
         }
         if decl.init.is_some() {
             let decl_id = self.require(addr_of(decl), NodeKind::VariableDeclarator);
@@ -275,16 +287,17 @@ impl<'a> FlowBuilder<'a> {
 
     /// `bindIfStatement` (binder.go:1924) — then/else branch labels merge at
     /// `postIf`; each branch binds against the condition-split flow.
-    fn bind_if_statement(&mut self, s: &IfStatement<'_>) {
+    fn bind_if_statement(&mut self, s: &'a IfStatement) {
+        let view = self.view;
         let then_label = self.create_branch_label();
         let else_label = self.create_branch_label();
         let post_if = self.create_branch_label();
-        self.bind_condition(Some(s.test), then_label, else_label, false);
+        self.bind_condition(Some(view.expr(s.test)), then_label, else_label, false);
         self.current_flow = self.finish_flow_label(then_label);
-        self.visit_statement(s.consequent);
+        self.visit_statement(view.stmt(s.consequent));
         self.add_antecedent(post_if, self.current_flow);
         self.current_flow = self.finish_flow_label(else_label);
-        if let Some(alt) = s.alternate {
+        if let Some(alt) = view.opt_stmt(s.alternate) {
             self.visit_statement(alt);
         }
         self.add_antecedent(post_if, self.current_flow);
@@ -294,16 +307,17 @@ impl<'a> FlowBuilder<'a> {
     /// `bindWhileStatement` (binder.go:1857) — the entry edge is added to the
     /// loop label **before** it becomes `current_flow`; the back edge **after**
     /// the body.
-    fn bind_while_statement(&mut self, stmt_id: NodeId, s: &WhileStatement<'_>) {
+    fn bind_while_statement(&mut self, stmt_id: NodeId, s: &'a WhileStatement) {
+        let view = self.view;
         let loop_label = self.create_loop_label();
         let pre_while = self.set_continue_target(stmt_id, loop_label);
         let pre_body = self.create_branch_label();
         let post_while = self.create_branch_label();
         self.add_antecedent(pre_while, self.current_flow); // entry edge (first)
         self.current_flow = pre_while;
-        self.bind_condition(Some(s.test), pre_body, post_while, false);
+        self.bind_condition(Some(view.expr(s.test)), pre_body, post_while, false);
         self.current_flow = self.finish_flow_label(pre_body);
-        self.bind_iterative_statement(s.body, post_while, pre_while);
+        self.bind_iterative_statement(view.stmt(s.body), post_while, pre_while);
         self.add_antecedent(pre_while, self.current_flow); // back edge (after)
         self.current_flow = self.finish_flow_label(post_while);
     }
@@ -311,48 +325,50 @@ impl<'a> FlowBuilder<'a> {
     /// `bindDoStatement` (binder.go:1871) — the body runs from the loop label
     /// first; the continue target is a **pre-condition** branch label (not the
     /// loop label), and the condition loops back to the loop label.
-    fn bind_do_statement(&mut self, stmt_id: NodeId, s: &DoWhileStatement<'_>) {
+    fn bind_do_statement(&mut self, stmt_id: NodeId, s: &'a DoWhileStatement) {
+        let view = self.view;
         let pre_do = self.create_loop_label();
         let condition_label = self.create_branch_label();
         let pre_condition = self.set_continue_target(stmt_id, condition_label);
         let post_do = self.create_branch_label();
         self.add_antecedent(pre_do, self.current_flow);
         self.current_flow = pre_do;
-        self.bind_iterative_statement(s.body, post_do, pre_condition);
+        self.bind_iterative_statement(view.stmt(s.body), post_do, pre_condition);
         self.add_antecedent(pre_condition, self.current_flow);
         self.current_flow = self.finish_flow_label(pre_condition);
-        self.bind_condition(Some(s.test), pre_do, post_do, false);
+        self.bind_condition(Some(view.expr(s.test)), pre_do, post_do, false);
         self.current_flow = self.finish_flow_label(post_do);
     }
 
     /// `bindForStatement` (binder.go:1885) — init → loop label → condition →
     /// body (continue = the increment label) → incrementor → back edge.
-    fn bind_for_statement(&mut self, stmt_id: NodeId, s: &ForStatement<'_>) {
+    fn bind_for_statement(&mut self, stmt_id: NodeId, s: &'a ForStatement) {
+        let view = self.view;
         let loop_label = self.create_loop_label();
         let pre_loop = self.set_continue_target(stmt_id, loop_label);
         let pre_body = self.create_branch_label();
         let pre_increment = self.create_branch_label();
         let post_loop = self.create_branch_label();
-        match &s.init {
+        match view.opt_for_head(s.init) {
             Some(ForInit::VariableDeclaration(d)) => {
-                for decl in d.declarations {
+                for decl in view.declarators(d.declarations) {
                     self.bind_variable_declaration_flow(decl);
                 }
             }
-            Some(ForInit::Expression(e)) => self.visit_expression(e),
+            Some(&ForInit::Expression(e)) => self.visit_expr(e),
             None => {}
         }
         self.add_antecedent(pre_loop, self.current_flow);
         self.current_flow = pre_loop;
         // A nil condition is a true passthrough / false-unreachable, handled by
         // `create_flow_condition`'s nil-expression arm.
-        self.bind_condition(s.test, pre_body, post_loop, false);
+        self.bind_condition(view.opt_expr(s.test), pre_body, post_loop, false);
         self.current_flow = self.finish_flow_label(pre_body);
-        self.bind_iterative_statement(s.body, post_loop, pre_increment);
+        self.bind_iterative_statement(view.stmt(s.body), post_loop, pre_increment);
         self.add_antecedent(pre_increment, self.current_flow);
         self.current_flow = self.finish_flow_label(pre_increment);
-        if let Some(u) = &s.update {
-            self.visit_expression(u);
+        if let Some(u) = s.update {
+            self.visit_expr(u);
         }
         self.add_antecedent(pre_loop, self.current_flow); // back edge
         self.current_flow = self.finish_flow_label(post_loop);
@@ -365,10 +381,11 @@ impl<'a> FlowBuilder<'a> {
     fn bind_for_in_or_of(
         &mut self,
         stmt_id: NodeId,
-        left: &ForInOfLeft<'_>,
-        right: &Expression<'_>,
-        body: &Statement<'_>,
+        left: &'a ForInOfLeft,
+        right: &'a Expression,
+        body: &'a Statement,
     ) {
+        let view = self.view;
         let loop_label = self.create_loop_label();
         let pre_loop = self.set_continue_target(stmt_id, loop_label);
         let post_loop = self.create_branch_label();
@@ -382,10 +399,10 @@ impl<'a> FlowBuilder<'a> {
         // initializer); a pattern initializer runs `bindAssignmentTargetFlow`.
         match left {
             ForInOfLeft::VariableDeclaration(d) => {
-                for decl in d.declarations {
-                    self.bind_binding_target(decl.id);
-                    if let Some(init) = &decl.init {
-                        self.visit_expression(init);
+                for decl in view.declarators(d.declarations) {
+                    self.bind_binding_target(view.expr(decl.id));
+                    if let Some(init) = decl.init {
+                        self.visit_expr(init);
                     }
                     let decl_id = self.require(addr_of(decl), NodeKind::VariableDeclarator);
                     self.current_flow = self.create_flow_mutation(
@@ -395,7 +412,8 @@ impl<'a> FlowBuilder<'a> {
                     );
                 }
             }
-            ForInOfLeft::Pattern(p) => {
+            &ForInOfLeft::Pattern(p) => {
+                let p = view.expr(p);
                 self.visit_expression(p);
                 self.bind_assignment_target_flow(p);
             }
@@ -428,7 +446,7 @@ impl<'a> FlowBuilder<'a> {
     /// break/continue targets installed, restored on exit.
     fn bind_iterative_statement(
         &mut self,
-        body: &Statement<'_>,
+        body: &'a Statement,
         break_target: FlowNodeId,
         continue_target: FlowNodeId,
     ) {
@@ -445,7 +463,7 @@ impl<'a> FlowBuilder<'a> {
     /// `L`'s **break** target (`findActiveLabel`, marking it referenced); an
     /// unlabeled `break` uses `current_break_target`. An unresolved label is a
     /// no-op (deferred diagnostic).
-    fn bind_break_statement(&mut self, s: &BreakStatement<'_>) {
+    fn bind_break_statement(&mut self, s: &'a BreakStatement) {
         match &s.label {
             None => {
                 let target = self.current_break_target;
@@ -466,7 +484,7 @@ impl<'a> FlowBuilder<'a> {
     /// `bindContinueStatement` (binder.go:1959) — a labeled `continue L` resolves
     /// to `L`'s **continue** target; an unlabeled `continue` uses
     /// `current_continue_target`. A missing/`None` target is a no-op.
-    fn bind_continue_statement(&mut self, s: &ContinueStatement<'_>) {
+    fn bind_continue_statement(&mut self, s: &'a ContinueStatement) {
         match &s.label {
             None => {
                 let target = self.current_continue_target;
@@ -503,16 +521,16 @@ impl<'a> FlowBuilder<'a> {
     /// label alongside the case-block exit. `preSwitchCaseFlow` is captured
     /// **after** the discriminant is bound (the flow every clause forks from) and
     /// saved/restored here, as in tsgo (it is not in the container save set).
-    fn bind_switch_statement(&mut self, switch_id: NodeId, s: &SwitchStatement<'_>) {
+    fn bind_switch_statement(&mut self, switch_id: NodeId, s: &'a SwitchStatement) {
         let post_switch = self.create_branch_label();
-        self.visit_expression(s.discriminant);
+        self.visit_expr(s.discriminant);
         let save_break = self.current_break_target;
         let save_pre_switch = self.pre_switch_case_flow;
         self.current_break_target = Some(post_switch);
         self.pre_switch_case_flow = Some(self.current_flow);
         self.bind_case_block(switch_id, s);
         self.add_antecedent(post_switch, self.current_flow);
-        let has_default = s.cases.iter().any(|c| c.test.is_none());
+        let has_default = self.view.cases(s.cases).iter().any(|c| c.test.is_none());
         if !has_default {
             // The "no clause matched" fall-off: reachable from the switch head
             // regardless of narrowing (an empty `(0, 0)` range is the sentinel).
@@ -532,10 +550,13 @@ impl<'a> FlowBuilder<'a> {
     /// reached only after a prior `break`/`return` stays reachable (the F2a
     /// reachability fix). An empty-clause run (`case a: case b:` with no
     /// statements) re-points to the head only when nothing live falls into it.
-    fn bind_case_block(&mut self, switch_id: NodeId, s: &SwitchStatement<'_>) {
-        let clauses = s.cases;
+    fn bind_case_block(&mut self, switch_id: NodeId, s: &'a SwitchStatement) {
+        let view = self.view;
+        // The clauses, read in place: each clause's address is its row in the store.
+        let clauses = view.cases(s.cases);
+        let discriminant = view.expr(s.discriminant);
         let is_narrowing_switch =
-            is_true_keyword(s.discriminant) || is_narrowing_expression(s.discriminant);
+            is_true_keyword(discriminant) || is_narrowing_expression(view, discriminant);
         let last = clauses.len().wrapping_sub(1);
         let mut fallthrough_flow = self.unreachable_flow;
         let mut i = 0;
@@ -573,11 +594,11 @@ impl<'a> FlowBuilder<'a> {
     /// `bindCaseOrDefaultClause` (binder.go:2126) — the clause's test expression
     /// binds under the switch head (`preSwitchCaseFlow`, saved/restored), its
     /// statements under the current (post-`preCase`) flow.
-    fn bind_case_or_default_clause(&mut self, case: &SwitchCase<'_>) {
-        if let Some(test) = &case.test {
+    fn bind_case_or_default_clause(&mut self, case: &'a SwitchCase) {
+        if let Some(test) = case.test {
             let saved = self.current_flow;
             self.current_flow = self.pre_switch_case_flow.unwrap_or(self.unreachable_flow);
-            self.visit_expression(test);
+            self.visit_expr(test);
             self.current_flow = saved;
         }
         self.visit_statement_list(case.consequent);
@@ -602,7 +623,7 @@ impl<'a> FlowBuilder<'a> {
     /// (`combineFlowLists`), it becomes `current_flow`, and up to three
     /// `ReduceLabel`s route the finally's completion back through the return /
     /// outer-exception / normal-exit subsets (binder.go:2052-2067).
-    fn bind_try_statement(&mut self, s: &TryStatement<'_>) {
+    fn bind_try_statement(&mut self, s: &'a TryStatement) {
         let save_return_target = self.current_return_target;
         let save_exception_target = self.current_exception_target;
         let normal_exit = self.create_branch_label();
@@ -616,7 +637,7 @@ impl<'a> FlowBuilder<'a> {
         self.current_exception_target = Some(exception_label);
         self.visit_statement_list(s.block.body);
         self.add_antecedent(normal_exit, self.current_flow);
-        if let Some(handler) = &s.handler {
+        if let Some(handler) = self.view.opt_catch(s.handler) {
             // The catch is the target of exceptions from the try block; its own
             // exceptions flow to a fresh label (catch = a second try).
             self.current_flow = self.finish_flow_label(exception_label);
@@ -691,7 +712,7 @@ impl<'a> FlowBuilder<'a> {
     /// then pop; an **unreferenced** label gets the `Unreachable` stamp on its
     /// identifier (the TS7028 signal, binder.go:2167). The post label merges the
     /// body's exit.
-    fn bind_labeled_statement(&mut self, s: &LabeledStatement<'_>) {
+    fn bind_labeled_statement(&mut self, s: &'a LabeledStatement) {
         let post = self.create_branch_label();
         let label_id = self.require(addr_of(&s.label), NodeKind::Identifier);
         self.active_label_list.push(ActiveLabelEntry {
@@ -701,7 +722,7 @@ impl<'a> FlowBuilder<'a> {
             label_node_id: label_id,
         });
         self.visit_identifier(&s.label);
-        self.visit_statement(s.body);
+        self.visit_statement(self.view.stmt(s.body));
         // Balanced with the push above (pop is always `Some`). An unreferenced
         // label's identifier gets the `Unreachable` stamp (the TS7028 signal).
         if let Some(entry) = self.active_label_list.pop()
@@ -722,22 +743,22 @@ impl<'a> FlowBuilder<'a> {
     }
 
     /// The source text of a label identifier (the break/continue label name).
-    fn label_text(&self, ident: &Identifier<'_>) -> &'a str {
+    fn label_text(&self, ident: &'a Identifier) -> &'a str {
         let id = self.require(addr_of(ident), NodeKind::Identifier);
         self.bound.spans[id.index()].extract(self.source)
     }
 
     // --- containers -------------------------------------------------------
 
-    fn visit_function_declaration(&mut self, f: &FunctionDeclaration<'_>, anchor: NodeId) {
+    fn visit_function_declaration(&mut self, f: &'a FunctionDeclaration, anchor: NodeId) {
         let saved = self.enter_container(None, false, false);
         self.bind_params(f.params);
         self.visit_statement_list(f.body.body);
         self.exit_container(saved, false, true, true, anchor, false);
     }
 
-    pub(super) fn bind_params(&mut self, params: &[Expression<'_>]) {
-        for param in params {
+    pub(super) fn bind_params(&mut self, params: Run<Expression>) {
+        for param in self.view.exprs(params) {
             self.bind_binding_target(param);
         }
     }
@@ -748,7 +769,7 @@ impl<'a> FlowBuilder<'a> {
     /// no side effects when its initializer isn't evaluated — GH#49759). The
     /// entry/exit pointer-equality guard is exact: a literal default (`= 1`)
     /// leaves `current_flow` untouched and mints no label.
-    fn bind_initializer(&mut self, initializer: &Expression<'_>) {
+    fn bind_initializer(&mut self, initializer: &'a Expression) {
         let entry = self.current_flow;
         self.visit_expression(initializer);
         if entry == self.unreachable_flow || entry == self.current_flow {
@@ -767,42 +788,43 @@ impl<'a> FlowBuilder<'a> {
     /// flow). Distinct from the value traversal (`visit_expression`) so the
     /// assignment-target destructuring recursion — a separate deferred item —
     /// stays untouched; for a non-defaulted target the two are equivalent.
-    fn bind_binding_target(&mut self, node: &Expression<'_>) {
+    fn bind_binding_target(&mut self, node: &'a Expression) {
         use ExpressionKind as E;
+        let view = self.view;
         match &node.kind {
             E::AssignmentPattern(a) => {
-                self.visit_decorators(a.decorators);
-                self.bind_initializer(a.right);
-                self.bind_binding_target(a.left);
+                self.visit_decorators(view.opt_decorators(a.decorators));
+                self.bind_initializer(view.expr(a.right));
+                self.bind_binding_target(view.expr(a.left));
             }
             E::ObjectPattern(op) => {
-                self.visit_decorators(op.decorators);
-                for prop in op.properties {
+                self.visit_decorators(op.decorators(view));
+                for prop in view.pat_props(op.properties) {
                     match prop {
                         ObjectPatternProperty::Property(pr) => {
-                            self.visit_expression(pr.key);
-                            self.bind_binding_target(pr.value);
+                            self.visit_expr(pr.key);
+                            self.bind_binding_target(view.expr(pr.value));
                         }
                         ObjectPatternProperty::RestElement(r) => {
-                            self.bind_binding_target(r.argument);
+                            self.bind_binding_target(view.expr(r.argument));
                         }
                     }
                 }
             }
             E::ArrayPattern(ap) => {
-                self.visit_decorators(ap.decorators);
-                for el in ap.elements.iter().flatten() {
-                    self.bind_binding_target(el);
+                self.visit_decorators(ap.decorators(view));
+                for &el in view.expr_opt_list(ap.elements).iter().flatten() {
+                    self.bind_binding_target(view.expr(el));
                 }
             }
-            E::RestElement(r) => self.bind_binding_target(r.argument),
-            E::TSParameterProperty(pp) => self.bind_binding_target(pp.parameter),
+            E::RestElement(r) => self.bind_binding_target(view.expr(r.argument)),
+            E::TSParameterProperty(pp) => self.bind_binding_target(view.expr(pp.parameter)),
             // A plain identifier / other leaf binding: the ordinary traversal.
             _ => self.visit_expression(node),
         }
     }
 
-    fn visit_class_decl(&mut self, c: &ClassDeclaration<'_>) {
+    fn visit_class_decl(&mut self, c: &'a ClassDeclaration) {
         self.visit_class_common(
             c.id.as_ref(),
             c.decorators,
@@ -821,37 +843,38 @@ impl<'a> FlowBuilder<'a> {
     /// down to `visit_method` — tsv expressions carry no parent pointer.
     pub(super) fn visit_class_common(
         &mut self,
-        name: Option<&Identifier<'_>>,
-        decorators: Option<&[Decorator<'_>]>,
-        super_class: Option<&Expression<'_>>,
-        members: &[ClassMember<'_>],
+        name: Option<&'a Identifier>,
+        decorators: Option<Run<Decorator>>,
+        super_class: Option<ExprId>,
+        members: Run<ClassMember>,
         is_class_expression: bool,
     ) {
+        let view = self.view;
         if let Some(name) = name {
             self.visit_identifier(name);
         }
-        self.visit_decorators(decorators);
+        self.visit_decorators(view.opt_decorators(decorators));
         if let Some(sc) = super_class {
-            self.visit_expression(sc);
+            self.visit_expr(sc);
         }
-        for member in members {
+        for member in view.class_members(members) {
             self.visit_class_member(member, is_class_expression);
         }
     }
 
-    fn visit_class_member(&mut self, member: &ClassMember<'_>, is_class_expression: bool) {
+    fn visit_class_member(&mut self, member: &'a ClassMember, is_class_expression: bool) {
         match member {
             ClassMember::MethodDefinition(m) => self.visit_method(m, is_class_expression),
             ClassMember::PropertyDefinition(p) => {
-                self.visit_decorators(p.decorators);
-                self.visit_expression(&p.key);
+                self.visit_decorators(self.view.opt_decorators(p.decorators));
+                self.visit_expr(p.key);
                 // property type annotation is a type position (skip).
-                if let Some(value) = &p.value {
+                if let Some(value) = p.value {
                     // A property-with-initializer is a control-flow container
                     // (binder.go:2584): fresh Start around the initializer.
                     let p_id = self.require(addr_of(p), NodeKind::PropertyDefinition);
                     let saved = self.enter_container(None, false, false);
-                    self.visit_expression(value);
+                    self.visit_expr(value);
                     self.exit_container(saved, false, false, false, p_id, false);
                 }
             }
@@ -868,10 +891,10 @@ impl<'a> FlowBuilder<'a> {
         }
     }
 
-    fn visit_method(&mut self, m: &MethodDefinition<'_>, is_class_expression: bool) {
-        self.visit_decorators(m.decorators);
+    fn visit_method(&mut self, m: &'a MethodDefinition, is_class_expression: bool) {
+        self.visit_decorators(self.view.opt_decorators(m.decorators));
         let is_ctor = m.kind == MethodKind::Constructor;
-        self.visit_expression(&m.key);
+        self.visit_expr(m.key);
         // The method body lives in `value` (a FunctionExpression); the method is
         // a control-flow container anchored on that FunctionExpression — the
         // body-bearing node (tsv wraps a method body in a FunctionExpression,
@@ -900,7 +923,7 @@ impl<'a> FlowBuilder<'a> {
         self.exit_container(saved, false, true, true, anchor, is_ctor);
     }
 
-    fn visit_module(&mut self, m: &tsv_ts::ast::TSModuleDeclaration<'_>) {
+    fn visit_module(&mut self, m: &'a TSModuleDeclaration) {
         use tsv_ts::ast::TSModuleName;
         if let TSModuleName::Identifier(name) = &m.id {
             self.visit_identifier(name);
@@ -914,17 +937,17 @@ impl<'a> FlowBuilder<'a> {
                 self.visit_statement_list(block.body);
                 self.exit_container(saved, false, false, false, block_id, false);
             }
-            Some(TSModuleDeclarationBody::TSModuleDeclaration(nested)) => {
-                self.visit_module(nested);
+            &Some(TSModuleDeclarationBody::TSModuleDeclaration(nested)) => {
+                self.visit_module(self.view.module_decl(nested));
             }
             None => {}
         }
     }
 
-    fn visit_export_default(&mut self, e: &tsv_ts::ast::ExportDefaultDeclaration<'_>) {
+    fn visit_export_default(&mut self, e: &'a ExportDefaultDeclaration) {
         use tsv_ts::ast::ExportDefaultValue as V;
         match &e.declaration {
-            V::Expression(expr) => self.visit_expression(expr),
+            &V::Expression(expr) => self.visit_expr(expr),
             V::FunctionDeclaration(f) => {
                 let id = self.require(addr_of(f), NodeKind::FunctionDeclaration);
                 self.visit_function_declaration(f, id);

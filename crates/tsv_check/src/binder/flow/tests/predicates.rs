@@ -3,37 +3,39 @@
 
 use super::super::build::{FlowBuilder, is_narrowable_reference};
 use super::super::*;
+use super::parse;
 use crate::binder::{NodeKind, addr_of, bind_file};
 use crate::ids::FileId;
-use bumpalo::Bump;
 use tsv_ts::ast::{Expression, ExpressionKind, StatementKind};
 
 #[test]
 fn create_flow_condition_ports_verbatim() {
     let src = "true; false; y;";
-    let arena = Bump::new();
-    let program = tsv_ts::__private::parse(src, &arena).expect("parse");
-    let bound = bind_file(&program, src, FileId::ROOT);
+    let parsed = parse(src);
+    let view = parsed.view();
+    let bound = bind_file((&parsed).into(), src, FileId::ROOT);
 
-    // Extract the top-level expressions + their node ids.
-    let expr_at = |i: usize| -> (&Expression<'_>, NodeId) {
-        let StatementKind::ExpressionStatement(s) = &program.body[i].kind else {
+    // Extract the top-level expressions + their node ids, read in place.
+    let expr_at = |i: usize| -> (&Expression, NodeId) {
+        let stmt = view.stmt(view.stmt_list(parsed.program.body)[i]);
+        let StatementKind::ExpressionStatement(s) = &stmt.kind else {
             panic!("expression statement");
         };
-        let id = match &s.expression.kind {
+        let expression = view.expr(s.expression);
+        let id = match &expression.kind {
             ExpressionKind::Literal(l) => bound.require_node_id(addr_of(l), NodeKind::Literal),
             ExpressionKind::Identifier(idn) => {
                 bound.require_node_id(addr_of(idn), NodeKind::Identifier)
             }
             _ => panic!("unexpected expression"),
         };
-        (s.expression, id)
+        (expression, id)
     };
     let true_lit = expr_at(0);
     let false_lit = expr_at(1);
     let y = expr_at(2);
 
-    let mut b = FlowBuilder::new(&bound, src);
+    let mut b = FlowBuilder::new(view, &bound, src);
     let ante = b.new_flow_node(FlowFlags::START);
 
     // nil-expr True → passthrough; nil-expr False → unreachable.
@@ -95,13 +97,13 @@ fn create_flow_condition_ports_verbatim() {
 #[test]
 fn is_narrowable_reference_matches_tsgo_shape() {
     // Sanity for the live access-gate helper.
-    let arena = Bump::new();
     let src = "a.b; a[0]; a?.b;";
-    let program = tsv_ts::__private::parse(src, &arena).expect("parse");
-    for stmt in program.body {
-        if let StatementKind::ExpressionStatement(s) = &stmt.kind {
+    let parsed = parse(src);
+    let view = parsed.view();
+    for &stmt in view.stmt_list(parsed.program.body) {
+        if let StatementKind::ExpressionStatement(s) = &view.stmt(stmt).kind {
             assert!(
-                is_narrowable_reference(s.expression),
+                is_narrowable_reference(view, view.expr(s.expression)),
                 "member/element access should be narrowable"
             );
         }
