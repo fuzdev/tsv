@@ -862,13 +862,8 @@ impl<T> Default for ListBuf<T> {
 impl<T> ListBuf<T> {
     /// An empty scratch stack.
     pub fn new() -> Self {
-        Self::with_capacity(0)
-    }
-
-    /// An empty scratch stack pre-sized for `items` elements.
-    pub fn with_capacity(items: usize) -> Self {
         Self {
-            items: Vec::with_capacity(items),
+            items: Vec::new(),
             #[cfg(feature = "_internal_store_check")]
             live: stamp::LiveMarks::default(),
         }
@@ -1171,13 +1166,8 @@ impl<F> Default for TextPool<F> {
 impl<F> TextPool<F> {
     /// An empty pool. Allocates nothing until its first non-empty write.
     pub fn new() -> Self {
-        Self::with_capacity(0)
-    }
-
-    /// An empty pool pre-sized for `bytes` bytes, the sentinel byte among them. Writes nothing.
-    pub fn with_capacity(bytes: usize) -> Self {
         Self {
-            text: String::with_capacity(bytes),
+            text: String::new(),
             #[cfg(feature = "_internal_store_check")]
             stamp: stamp::Stamp::fresh(),
             family: PhantomData,
@@ -1206,46 +1196,26 @@ impl<F> TextPool<F> {
     /// The writer appends and nothing else, so `write` can reach no byte already in the pool. If
     /// `write` panics, what it wrote stays behind it as bytes no handle names, and the pool stays
     /// usable.
-    #[inline]
-    pub fn push_with(&mut self, write: impl FnOnce(&mut PoolWriter<'_>)) -> PoolText<F> {
-        match self.try_push_with(|writer| -> Result<(), std::convert::Infallible> {
-            write(writer);
-            Ok(())
-        }) {
-            Ok(text) => text,
-            Err(never) => match never {},
-        }
-    }
-
-    /// [`TextPool::push_with`] for a fallible `write`: its error is returned, and what it wrote
-    /// before failing is taken back out of the pool.
     ///
     /// The sentinel of a pool never written is written before `write` runs, so a pool is never
-    /// left holding text without it; a failed or empty write leaves it as a reset pool is.
+    /// left holding text without it; an empty write leaves it as a reset pool is.
     #[inline]
-    pub fn try_push_with<E>(
-        &mut self,
-        write: impl FnOnce(&mut PoolWriter<'_>) -> Result<(), E>,
-    ) -> Result<PoolText<F>, E> {
+    pub fn push_with(&mut self, write: impl FnOnce(&mut PoolWriter<'_>)) -> PoolText<F> {
         if self.text.is_empty() {
             self.write_sentinel();
         }
         let base = self.text.len();
-        let written = write(&mut PoolWriter {
+        write(&mut PoolWriter {
             text: &mut self.text,
         });
-        if let Err(error) = written {
-            self.text.truncate(base);
-            return Err(error);
-        }
         let count = self.text.len() - base;
         if count == 0 {
-            return Ok(PoolText::EMPTY);
+            return PoolText::EMPTY;
         }
         let Some((start, len)) = mint_range(base, count) else {
             store_overflow();
         };
-        Ok(self.handle(start, len))
+        self.handle(start, len)
     }
 
     /// The string `text` names. A handle from this pool always lands on the character
@@ -1902,7 +1872,7 @@ mod tests {
     #[test]
     fn reset_keeps_slot_zero_and_capacity() {
         let mut nodes = store();
-        let mut scratch = ListBuf::with_capacity(8);
+        let mut scratch = ListBuf::new();
         let mark = scratch.mark();
         for _ in 0..8 {
             scratch.push(Node("x"));
@@ -2405,9 +2375,6 @@ mod tests {
         assert_eq!(fresh.get(PoolText::EMPTY), "");
         let defaulted: TextPool<Words> = TextPool::default();
         assert_eq!(defaulted.text.capacity(), 0);
-        let sized: TextPool<Words> = TextPool::with_capacity(16);
-        assert!(sized.text.is_empty(), "a sized pool writes no sentinel");
-        assert!(sized.text.capacity() >= 16);
     }
 
     #[test]
@@ -2440,7 +2407,7 @@ mod tests {
 
     #[test]
     fn pool_text_preserves_multibyte_strings_at_their_boundaries() {
-        let mut pool = TextPool::<Words>::with_capacity(32);
+        let mut pool = fresh_pool();
         let accented = pool.push("é");
         let ascii = pool.push("abc");
         let cjk = pool.push("日本語");
@@ -2471,7 +2438,7 @@ mod tests {
 
     #[test]
     fn pool_reset_keeps_capacity_and_the_sentinel() {
-        let mut pool = TextPool::<Words>::with_capacity(16);
+        let mut pool = fresh_pool();
         pool.push("some text");
         let capacity = pool.text.capacity();
         pool.reset();
@@ -2549,32 +2516,6 @@ mod tests {
         let built = pool.push_with(|writer| writer.push_str("new"));
         assert_eq!((built.start.get(), pool.get(built)), (1, "new"));
         assert_eq!(pool.text, "\0new");
-    }
-
-    #[test]
-    fn a_failed_write_is_taken_back() {
-        let mut pool = fresh_pool();
-        let kept = pool.push("kept");
-        let failed = pool.try_push_with(|writer| {
-            writer.push_str("partial");
-            Err("refused")
-        });
-        assert_eq!(failed, Err("refused"));
-        assert_eq!(pool.text, "\0kept");
-        let next = pool.try_push_with(|writer| -> Result<(), ()> {
-            writer.push('n');
-            Ok(())
-        });
-        let next = next.expect("an ok write");
-        assert_eq!((next.start.get(), pool.get(next)), (5, "n"));
-        assert_eq!(pool.get(kept), "kept");
-
-        let mut fresh = fresh_pool();
-        assert_eq!(fresh.try_push_with(|_| Err(())), Err(()));
-        assert_eq!(
-            fresh.text, "\0",
-            "a failed write on a fresh pool leaves a reset pool"
-        );
     }
 
     #[test]

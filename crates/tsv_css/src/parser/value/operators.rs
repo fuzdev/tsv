@@ -408,14 +408,13 @@ fn tokenize_run(run: &str, colon_is_operator: bool, head_welds: bool) -> Option<
         i,
         previous,
         colon_is_operator,
-        head_welds,
         first: Some(first),
     })
 }
 
 /// The members of a run that splits, in order, each read as it is pulled — no buffer
 /// holds them. The tokenizer's whole state is the position, what stands to the left of it
-/// and the two flags, and a member is read off `run` alone, so the caller can parse each
+/// and `colon_is_operator`, and a member is read off `run` alone, so the caller can parse each
 /// operand (a function's arguments splitting runs of their own included) before the next
 /// member is read: a nested run is read by a `RunMembers` of its own, over its own text.
 ///
@@ -428,7 +427,6 @@ pub(crate) struct RunMembers<'r> {
     /// What stands to the left of `i` (see [`Preceding`]).
     previous: Preceding,
     colon_is_operator: bool,
-    head_welds: bool,
     /// The member the verdict read, until it is pulled.
     first: Option<ValueToken>,
 }
@@ -456,7 +454,9 @@ impl Iterator for RunMembers<'_> {
             &mut self.i,
             &mut self.previous,
             self.colon_is_operator,
-            self.head_welds,
+            // `head_welds` is read only at `Preceding::Head`, which the verdict's first member
+            // has already left behind.
+            false,
         ))
     }
 }

@@ -333,7 +333,7 @@ macro_rules! parse_imports_json {
     ($goalness:ident, $lang:ident, $source:expr, $goal:expr, $map_err:expr) => {{
         let source = $source;
         let goal = $goal;
-        $lang::__private::with_stores(|stores| {
+        $crate::with_lang_stores!($lang, |stores| {
             $crate::parse_imports_json!(@collect $goalness, $lang, source, goal, stores)
                 .map(|imports| {
                     tsv_ts::__private::write_imports_json_string(

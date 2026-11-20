@@ -36,6 +36,7 @@ use super::types::{ChainGroup, ChainNode};
 use crate::ast::AstView;
 use crate::ast::{Expression, ExpressionKind, MemberExpression};
 use crate::printer::Printer;
+use crate::printer::needs_parens::strip_non_null_wrappers;
 use std::cell::Cell;
 use tsv_lang::Span;
 use tsv_lang::doc::arena::DocId;
@@ -139,7 +140,7 @@ pub(crate) fn build_lookup_after_operand_doc(
             && !spine_has_optional_link(printer.view, member, span))
         || (marked(&printer.inline_member_call_tail)
             && matches!(
-                strip_non_null(printer.view, printer.view.expr(member.object)).kind,
+                strip_non_null_wrappers(printer.view, printer.view.expr(member.object)).kind,
                 ExpressionKind::CallExpression(_)
             ));
     let d = printer.arena();
@@ -149,14 +150,6 @@ pub(crate) fn build_lookup_after_operand_doc(
         member_lookup_group(d, lookup)
     };
     d.concat(&[object_doc, lookup])
-}
-
-/// `expr` with every `!` peeled off.
-fn strip_non_null<'e>(view: AstView<'e>, mut expr: &'e Expression) -> &'e Expression {
-    while let ExpressionKind::TSNonNullExpression(non_null) = &expr.kind {
-        expr = view.expr(non_null.expression);
-    }
-    expr
 }
 
 /// Whether any link of the chain `member` (spanning `span`) ends — a member or a call,

@@ -29,17 +29,12 @@
 //!   cover-grammar literal or list converted to its pattern), passed through (a flattened
 //!   instantiation's node), or a wrapper the parse discards (the `function` shell around a
 //!   `{#snippet}` head's parameters).
-//! - `moved_inline`: rows stranded by a by-value move into a parent's own slot: the node is
-//!   alive inside its parent, the store row is not (a class field's initializer, a
-//!   computed class or interface key, an enum initializer, `export default` / `export =`,
-//!   a decorator, a `for` head, an array pattern's unchanged element). Not waste; a by-value
-//!   slot that became a store edge would make this a row.
 //! - `built_inline`: nodes built by value in a parent's slot and never placed at all (a
-//!   non-computed class or interface key, a catch parameter). No row, counted beside
-//!   `moved_inline` so a by-value slot's demand is visible.
-//! - `live`: `minted - abandoned - dup_dead - superseded - moved_inline`: the rows the
+//!   non-computed class or interface key, a catch parameter). No row, counted so a by-value
+//!   slot's demand is visible.
+//! - `live`: `minted - abandoned - dup_dead - superseded`: the rows the
 //!   finished tree reaches through a reference edge or a list. A node held by value in a
-//!   parent is not in it; `moved_inline` and `built_inline` count those. A JSDoc cast's
+//!   parent is not in it; `built_inline` counts those. A JSDoc cast's
 //!   `CommentBoundPair` wrapper is live with no wire object of its own, so `Expression` reads
 //!   above the wire's count. Derived, so the survivor side is the `wire` column, below.
 //! - `dup_kept`: minted rows that copy another row with both reachable (a shorthand
@@ -202,7 +197,6 @@ mod census {
         pub(super) duplicate_dead: u64,
         pub(super) superseded: u64,
         pub(super) duplicate_kept: u64,
-        pub(super) moved_inline: u64,
         pub(super) built_inline: u64,
         scratch_peak_max: u64,
         scratch_peak_sum: u64,
@@ -211,7 +205,7 @@ mod census {
     impl Sums {
         /// Everything the row's claims remove from `minted`.
         fn claimed(self) -> u64 {
-            self.abandoned + self.duplicate_dead + self.superseded + self.moved_inline
+            self.abandoned + self.duplicate_dead + self.superseded
         }
 
         /// `minted` less every claim. Claims are checked against `minted` per file
@@ -232,7 +226,6 @@ mod census {
             self.duplicate_dead += row.duplicate_dead;
             self.superseded += row.superseded;
             self.duplicate_kept += row.duplicate_kept;
-            self.moved_inline += row.moved_inline;
             self.built_inline += row.built_inline;
             self.scratch_peak_max = self.scratch_peak_max.max(row.scratch_peak);
             self.scratch_peak_sum += row.scratch_peak;
@@ -245,7 +238,6 @@ mod census {
             self.duplicate_dead += other.duplicate_dead;
             self.superseded += other.superseded;
             self.duplicate_kept += other.duplicate_kept;
-            self.moved_inline += other.moved_inline;
             self.built_inline += other.built_inline;
             self.scratch_peak_max = self.scratch_peak_max.max(other.scratch_peak_max);
             self.scratch_peak_sum += other.scratch_peak_sum;
@@ -453,7 +445,7 @@ mod census {
             .unwrap_or(0)
             .max("store".len());
         println!(
-            "{:<10}  {:<label_w$}  {:>5}  {:>10}  {:>8}  {:>10}  {:>9}  {:>9}  {:>9}  {:>9}  \
+            "{:<10}  {:<label_w$}  {:>5}  {:>10}  {:>8}  {:>10}  {:>9}  {:>9}  {:>9}  \
              {:>9}  {:>9}  {:>8}  {:>8}  {:>10}  {:>9}",
             "crate",
             "store",
@@ -464,7 +456,6 @@ mod census {
             "abandoned",
             "dup_dead",
             "supersede",
-            "moved_in",
             "built_in",
             "dup_kept",
             "peak_max",
@@ -478,7 +469,7 @@ mod census {
             let delta = wire.map(|&wire| sums.live().cast_signed() - wire.cast_signed());
             println!(
                 "{:<10}  {:<label_w$}  {:>5}  {:>10}  {:>8.4}  {:>10}  {:>9}  {:>9}  {:>9}  \
-                 {:>9}  {:>9}  {:>9}  {:>8}  {:>8.3}  {:>10}  {:>9}",
+                 {:>9}  {:>9}  {:>8}  {:>8.3}  {:>10}  {:>9}",
                 key.krate,
                 key.label,
                 sums.width,
@@ -488,7 +479,6 @@ mod census {
                 sums.abandoned,
                 sums.duplicate_dead,
                 sums.superseded,
-                sums.moved_inline,
                 sums.built_inline,
                 sums.duplicate_kept,
                 sums.scratch_peak_max,
@@ -539,7 +529,6 @@ mod census {
                     "duplicate_dead": sums.duplicate_dead,
                     "superseded": sums.superseded,
                     "duplicate_kept": sums.duplicate_kept,
-                    "moved_inline": sums.moved_inline,
                     "built_inline": sums.built_inline,
                     "scratch_peak_max": sums.scratch_peak_max,
                     "scratch_peak_per_byte": per_byte(sums.scratch_peak_sum, bytes),
@@ -599,7 +588,6 @@ mod tests {
             "a, the array, x, the pattern's row, the assignment"
         );
         assert_eq!(expr.duplicate_dead, 0);
-        assert_eq!(expr.moved_inline, 0);
         assert_eq!(expr.superseded, 1, "the array");
         assert_eq!(expr.live(), 4, "a, x, the pattern's row, the assignment");
         let ids = row(&census, "tsv_ts", "Option<Id<Expression>> (ids)");
@@ -739,7 +727,6 @@ mod tests {
         let census = census_of("class A { x = 1 }", ParserType::TypeScript);
         let expr = row(&census, "tsv_ts", "Expression");
         assert_eq!(expr.minted, 2, "the key `x` and the initializer `1`");
-        assert_eq!(expr.moved_inline, 0);
         assert_eq!(expr.built_inline, 0);
         assert_eq!(expr.live(), 2);
         assert_eq!(expr.duplicate_dead, 0);
@@ -751,7 +738,6 @@ mod tests {
     fn a_computed_object_key_keeps_its_row() {
         let census = census_of("({ [k]: 1 });", ParserType::TypeScript);
         let expr = row(&census, "tsv_ts", "Expression");
-        assert_eq!(expr.moved_inline, 0);
         assert_eq!(expr.duplicate_dead, 0);
     }
 

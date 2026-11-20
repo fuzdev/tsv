@@ -42,11 +42,6 @@ pub enum Dead {
     /// Duplicated, and both copies stay reachable (a shorthand property's key and value). Not
     /// waste: the parse's own tree holds both. Counted so a store row count reads honestly.
     DuplicateKept,
-    /// Cloned out of its store into a parent that holds it by value: the store row is
-    /// stranded, but the node is alive inside its parent (a class field's initializer, an
-    /// enum initializer, an `export default` value). Not waste: a by-value slot that became a
-    /// store edge would make this a row.
-    MovedInline,
 }
 
 /// One element type's counters over an armed run.
@@ -64,8 +59,6 @@ pub struct Row {
     pub superseded: u64,
     /// Rows duplicated with both copies reachable ([`Dead::DuplicateKept`]).
     pub duplicate_kept: u64,
-    /// Rows stranded by a by-value move into a parent's own slot ([`Dead::MovedInline`]).
-    pub moved_inline: u64,
     /// Nodes built by value in a parent's slot, never placed in a store ([`built_inline`]):
     /// no row here, counted so the slot is visible as demand.
     pub built_inline: u64,
@@ -83,8 +76,6 @@ pub struct Tally {
 enum LogKind {
     Mint,
     Dead(Dead),
-    /// An earlier [`Dead`] claim of this class taken back ([`reclassify`]).
-    UndoDead(Dead),
     BuiltInline,
 }
 
@@ -151,17 +142,7 @@ pub fn disarm() -> Tally {
         let rows = u64::from(entry.rows);
         match entry.kind {
             LogKind::Mint => row.minted += rows,
-            LogKind::Dead(class) => {
-                let field = dead_field(row, class);
-                *field = field.wrapping_add(rows);
-            }
-            // wraps below zero only until the claim it takes back, which is logged later than
-            // the undo at a site that reclassifies before the clone it names; the log is
-            // applied whole, so the sum is exact
-            LogKind::UndoDead(class) => {
-                let field = dead_field(row, class);
-                *field = field.wrapping_sub(rows);
-            }
+            LogKind::Dead(class) => *dead_field(row, class) += rows,
             LogKind::BuiltInline => row.built_inline += rows,
         }
     }
@@ -175,7 +156,6 @@ fn dead_field(row: &mut Row, class: Dead) -> &mut u64 {
         Dead::DuplicateRoot => &mut row.duplicate_dead,
         Dead::Superseded => &mut row.superseded,
         Dead::DuplicateKept => &mut row.duplicate_kept,
-        Dead::MovedInline => &mut row.moved_inline,
     }
 }
 
@@ -212,26 +192,6 @@ pub fn built_inline<T>(rows: usize) {
             index,
             rows: rows as u32,
             kind: LogKind::BuiltInline,
-        });
-    });
-}
-
-/// Move a [`dead`] claim from class `from` to class `to`, for a caller that knows better
-/// than the clone site what became of the value (a by-value boundary whose result is
-/// allocated again rather than held by value).
-pub fn reclassify<T>(from: Dead, to: Dead, rows: usize) {
-    with_state(|state| {
-        let index = state.index_of::<T>() as u32;
-        let rows = rows as u32;
-        state.log.push(LogEntry {
-            index,
-            rows,
-            kind: LogKind::UndoDead(from),
-        });
-        state.log.push(LogEntry {
-            index,
-            rows,
-            kind: LogKind::Dead(to),
         });
     });
 }
