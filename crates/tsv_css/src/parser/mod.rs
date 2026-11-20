@@ -132,7 +132,13 @@ impl<'a> CssParser<'a> {
 
     /// The current token's source text, pushed into the stores' text pool: for a node that
     /// keeps the token's verbatim spelling as text of its own.
-    #[inline]
+    ///
+    /// `inline(always)`: LLVM declines plain `#[inline]` here, and the out-of-line copy is a
+    /// call on every verbatim-text token, its body two loads, a slice whose boundary checks
+    /// are cold edges, and the pool push. Forced in, each caller absorbs the call and its
+    /// argument setup.
+    #[expect(clippy::inline_always)]
+    #[inline(always)]
     pub(crate) fn push_current_value(&mut self) -> PoolText<CssText> {
         let source = self.source;
         self.stores
