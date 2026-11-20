@@ -1009,7 +1009,12 @@ impl<T: Row> ListBuf<T> {
 
     /// The copying flush, with or without the one-row arm. Each caller passes `one_row_arm`
     /// as a literal, so the arm exists only in the form that names it.
-    #[inline]
+    ///
+    /// `inline(always)`: LLVM keeps the plain `#[inline]` form out of line, one copy per row
+    /// type, so every flush pays a call around a body whose common case is a count test, one
+    /// row's move and a truncate. Forced in, that work joins the caller's code.
+    #[expect(clippy::inline_always)]
+    #[inline(always)]
     fn flush_copy_frame(
         &mut self,
         mark: ListMark<T::Family>,
