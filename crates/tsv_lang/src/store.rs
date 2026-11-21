@@ -50,6 +50,9 @@ use std::num::NonZeroU32;
 #[cfg(all(target_pointer_width = "64", not(feature = "_internal_store_check")))]
 use std::num::NonZeroU64;
 
+#[doc(hidden)]
+pub mod park;
+
 /// Whether this build carries the `_internal_store_check` stamps, for a crate that pins a handle's
 /// width without a feature of its own: `assert!(STORE_CHECK || size_of::<X>() == N)`.
 pub const STORE_CHECK: bool = cfg!(feature = "_internal_store_check");

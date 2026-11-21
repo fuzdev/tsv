@@ -30,6 +30,7 @@ use std::fmt;
 use tsv_css::ast::CssStores;
 use tsv_lang::Span;
 use tsv_lang::store::TextPool;
+use tsv_lang::store::park::{self, Parkable};
 #[cfg(test)]
 use tsv_lang::value_runs::FieldShape;
 use tsv_ts::ast::AstStores;
@@ -170,6 +171,20 @@ impl fmt::Debug for SvelteOwn {
     }
 }
 
+impl Parkable for SvelteOwn {
+    #[expect(clippy::inline_always, reason = "forwards to the inherent method")]
+    #[inline(always)]
+    fn reset(&mut self) {
+        Self::reset(self);
+    }
+
+    #[expect(clippy::inline_always, reason = "forwards to the inherent method")]
+    #[inline(always)]
+    fn capacity_bytes(&self) -> usize {
+        Self::capacity_bytes(self)
+    }
+}
+
 thread_local! {
     /// This thread's parked own half. Boxed, so a take and a park each move a pointer, and a
     /// holder that keeps it in a [`SvelteStores`] between the two keeps the allocation this
@@ -212,22 +227,6 @@ impl SvelteStores {
     }
 }
 
-/// The parked own half, leaving the slot empty; `None` when the slot is empty or, for a call
-/// from a thread-local destructor, already gone.
-#[inline]
-fn take_parked() -> Option<Box<SvelteOwn>> {
-    PARKED.try_with(Cell::take).ok().flatten()
-}
-
-/// Puts `own` in the slot after a [`SvelteOwn::reset`], dropping whatever the slot holds;
-/// drops `own` instead when the slot is gone (a call from a thread-local destructor).
-#[inline]
-fn park_own(mut own: Box<SvelteOwn>) {
-    own.reset();
-    // a slot already destroyed drops the closure, and `own` with it
-    let _ = PARKED.try_with(|cell| cell.set(Some(own)));
-}
-
 /// Takes this thread's parked stores out of the three slots — `tsv_ts`'s, `tsv_css`'s and this
 /// crate's, in that order — or a fresh half where a slot holds none. The slots are empty until
 /// [`park_stores`] hands the halves back, so a second take meanwhile, and a thread that never
@@ -237,7 +236,7 @@ pub fn take_stores() -> SvelteStores {
     SvelteStores {
         ts: tsv_ts::__private::take_stores(),
         css: tsv_css::__private::take_stores(),
-        own: take_parked().unwrap_or_default(),
+        own: park::take(&PARKED),
     }
 }
 
@@ -247,7 +246,7 @@ pub fn park_stores(stores: SvelteStores) {
     let SvelteStores { ts, css, own } = stores;
     tsv_ts::__private::park_stores(ts);
     tsv_css::__private::park_stores(css);
-    park_own(own);
+    park::park(&PARKED, own);
 }
 
 /// Run `f` over this thread's parked stores, or over fresh ones where a slot holds none:
@@ -282,15 +281,13 @@ pub(crate) fn with_one_shot_stores<R>(
     let mut stores = SvelteStores {
         ts: tsv_ts::__private::take_stores_sized(source_len),
         css: tsv_css::__private::take_stores(),
-        own: take_parked().unwrap_or_default(),
+        own: park::take(&PARKED),
     };
     let result = f(&mut stores);
     let SvelteStores { ts, css, own } = stores;
     tsv_ts::__private::park_stores_capped(ts);
     tsv_css::__private::park_stores_capped(css);
-    if own.capacity_bytes() <= tsv_lang::store::ONE_SHOT_PARK_CAP_BYTES {
-        park_own(own);
-    }
+    park::park_capped(&PARKED, own);
     result
 }
 
@@ -299,10 +296,7 @@ pub(crate) fn with_one_shot_stores<R>(
 /// `tsv_css`'s read the other two halves). The half stays parked.
 #[must_use]
 pub fn parked_own_capacity() -> Option<usize> {
-    let own = take_parked()?;
-    let bytes = own.capacity_bytes();
-    let _ = PARKED.try_with(|cell| cell.set(Some(own)));
-    Some(bytes)
+    park::parked_capacity(&PARKED)
 }
 
 /// Stores a caller keeps warm across calls in a slot it owns, rewound between them: the

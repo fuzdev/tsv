@@ -1063,7 +1063,9 @@ which every parsing binding export runs under — through `tsv_arena`'s macros, 
 exports directly — and `WarmStores` for a slot the caller owns, as each `Formatter` does); a
 Svelte document's language halves are the boxes `tsv_ts`'s and `tsv_css`'s slots hand over,
 and its own half the box `tsv_svelte`'s slot hands over, so a thread parks one TypeScript
-store set and one CSS store set whatever mix of languages it parses. The public free
+store set and one CSS store set whatever mix of languages it parses. Each crate declares its
+own slot (a `thread_local!` cannot be generic); the protocol over it — take, park, the capped
+park, the owned `Warm` slot — is generic, stated once in `tsv_lang::store::park`. The public free
 functions (`format`, `strip*`, `parse_to_json*`, `parse_imports*`) take the same slots, and a
 format call `tsv_lang`'s one doc-arena slot beside them, but park each back only while its
 capacity is at most `tsv_lang::store::ONE_SHOT_PARK_CAP_BYTES` (1 MiB), dropping it otherwise

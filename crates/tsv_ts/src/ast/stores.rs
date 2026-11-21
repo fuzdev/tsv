@@ -41,6 +41,7 @@ use std::cell::Cell;
 use std::fmt;
 use std::ops::Deref;
 
+use tsv_lang::store::park::{self, Parkable, Warm};
 use tsv_lang::store::{Id, ListBuf, ListMark, MarkGroup, PoolText, Row, Run, Store, TextPool};
 #[cfg(test)]
 use tsv_lang::value_runs::{FieldKind, FieldShape};
@@ -825,44 +826,41 @@ impl Deref for Parsed {
     }
 }
 
+impl Parkable for AstStores {
+    #[expect(clippy::inline_always, reason = "forwards to the inherent method")]
+    #[inline(always)]
+    fn reset(&mut self) {
+        Self::reset(self);
+    }
+
+    #[expect(clippy::inline_always, reason = "forwards to the inherent method")]
+    #[inline(always)]
+    fn capacity_bytes(&self) -> usize {
+        Self::capacity_bytes(self)
+    }
+}
+
 thread_local! {
-    /// This thread's parked stores. Boxed, so a take and a park each move a pointer where the
-    /// stores inline would be copied whole both ways.
+    /// This thread's parked stores, in the box `tsv_lang::store::park` hands over.
     static PARKED: Cell<Option<Box<AstStores>>> = const { Cell::new(None) };
 }
 
-/// The parked stores, leaving the slot empty; `None` when the slot is empty or, for a call from
-/// a thread-local destructor, already gone.
-#[inline]
-fn take_parked() -> Option<Box<AstStores>> {
-    PARKED.try_with(Cell::take).ok().flatten()
-}
-
-/// Puts `stores` in the slot, dropping whatever it holds; drops `stores` instead when the slot
-/// is gone (a call from a thread-local destructor).
-#[inline]
-fn put_parked(stores: Box<AstStores>) {
-    // a slot already destroyed drops the closure, and `stores` with it
-    let _ = PARKED.try_with(|cell| cell.set(Some(stores)));
-}
-
-/// Takes this thread's parked stores out of their slot, or fresh ones when there are none.
-/// The slot is empty until [`park_stores`] hands them back, so a second take meanwhile, and a
-/// thread that never parks them (a panic unwinding past the holder), get fresh stores.
+/// Takes this thread's parked stores out of their slot, or fresh ones when there are none
+/// (`tsv_lang::store::park::take`, whose protocol this crate's slot keeps). The slot is empty
+/// until [`park_stores`] hands them back.
 ///
 /// The half of [`with_stores`] a holder that keeps the stores in a struct of its own calls:
 /// it owns the box for as long as it likes, and the thread still parks one store set.
 #[must_use]
 pub fn take_stores() -> Box<AstStores> {
-    take_parked().unwrap_or_default()
+    park::take(&PARKED)
 }
 
 /// Parks `stores` in this thread's slot after an [`AstStores::reset`], keeping slot 0 and
 /// capacity, so every id, run and pool text minted from them is invalid from here on. Stores
 /// already in the slot are dropped.
-pub fn park_stores(mut stores: Box<AstStores>) {
-    stores.reset();
-    put_parked(stores);
+pub fn park_stores(stores: Box<AstStores>) {
+    park::park(&PARKED, stores);
 }
 
 /// Run `f` over this thread's parked stores, or over fresh ones when there are none:
@@ -886,17 +884,16 @@ pub fn with_stores<R>(f: impl FnOnce(&mut AstStores) -> R) -> R {
 /// call, and of a Svelte one's TypeScript half.
 #[must_use]
 pub fn take_stores_sized(source_len: usize) -> Box<AstStores> {
-    take_parked().unwrap_or_else(|| Box::new(AstStores::for_source(source_len)))
+    park::take_or(&PARKED, || Box::new(AstStores::for_source(source_len)))
 }
 
 /// Parks `stores` as [`park_stores`] does when their capacity is at most
-/// [`tsv_lang::store::ONE_SHOT_PARK_CAP_BYTES`], and drops them otherwise — the park half of
-/// a free function's call. A drop leaves the slot as the call found it after its take: empty,
-/// unless a nested call parked its own stores meanwhile.
+/// [`tsv_lang::store::ONE_SHOT_PARK_CAP_BYTES`], and drops them otherwise
+/// (`tsv_lang::store::park::park_capped`) — the park half of a free function's call. A drop
+/// leaves the slot as the call found it after its take: empty, unless a nested call parked its
+/// own stores meanwhile.
 pub fn park_stores_capped(stores: Box<AstStores>) {
-    if stores.capacity_bytes() <= tsv_lang::store::ONE_SHOT_PARK_CAP_BYTES {
-        park_stores(stores);
-    }
+    park::park_capped(&PARKED, stores);
 }
 
 /// A free function's stores: this thread's parked ones, or fresh ones sized for `source_len`
@@ -915,49 +912,15 @@ pub(crate) fn with_one_shot_stores<R>(source_len: usize, f: impl FnOnce(&mut Ast
 /// retention the free functions' tests read. The stores stay parked.
 #[must_use]
 pub fn parked_stores_capacity() -> Option<usize> {
-    let stores = take_parked()?;
-    let bytes = stores.capacity_bytes();
-    put_parked(stores);
-    Some(bytes)
+    park::parked_capacity(&PARKED)
 }
 
-/// Stores a caller keeps warm across calls in a slot it owns, rewound between them: the
-/// take-and-park protocol of [`with_stores`] over the caller's slot instead of the thread's, as
-/// the `Formatter` keeps its stores. The slot holds a box, so a take and a park each move a
-/// pointer.
-///
-/// A holder names no store type, so its code reads the same whatever the stores hold.
-#[derive(Debug, Default)]
-pub struct WarmStores {
-    parked: Option<Box<AstStores>>,
-}
-
-impl WarmStores {
-    /// Takes the parked stores out of the slot, or fresh ones when there are none. The slot is
-    /// empty until [`WarmStores::park`] hands them back.
-    #[must_use]
-    pub fn take(&mut self) -> Box<AstStores> {
-        self.parked.take().unwrap_or_default()
-    }
-
-    /// Parks `stores` in the slot after an [`AstStores::reset`], keeping slot 0 and capacity,
-    /// so every id, run and pool text minted from them is invalid from here on.
-    pub fn park(&mut self, mut stores: Box<AstStores>) {
-        stores.reset();
-        self.parked = Some(stores);
-    }
-
-    /// Run `f` over the parked stores, or over fresh ones when there are none, and park them
-    /// after an [`AstStores::reset`], keeping slot 0 and capacity, so every id, run and pool
-    /// text `f` minted is invalid once it returns. A panic out of `f` leaves the slot empty,
-    /// and the next call starts from fresh stores.
-    pub fn with<R>(&mut self, f: impl FnOnce(&mut AstStores) -> R) -> R {
-        let mut stores = self.take();
-        let result = f(&mut stores);
-        self.park(stores);
-        result
-    }
-}
+/// Stores a caller keeps warm across calls in a slot it owns, rewound between them
+/// (`tsv_lang::store::park::Warm`): the take-and-park protocol of [`with_stores`] over the
+/// caller's slot instead of the thread's, as the `Formatter` keeps its stores. A park rewinds
+/// them by [`AstStores::reset`], keeping slot 0 and capacity, so every id, run and pool text
+/// minted from them is invalid from there on.
+pub type WarmStores = Warm<AstStores>;
 
 #[cfg(test)]
 mod tests {
