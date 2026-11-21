@@ -126,7 +126,9 @@ impl<'a> SvelteParser<'a> {
     /// Unlike `parse_expression_tag`, this does **not** touch the lexer — the caller
     /// owns the cursor (the raw-byte attribute-value sequence readers reposition once
     /// when the whole value is done). The matching `}` is found by a raw scan that
-    /// skips nested braces, string literals, line/block comments, and regex literals.
+    /// skips nested braces, string literals, line/block comments, and regex literals —
+    /// after a bare name path glued to its `}` is tried first
+    /// (`tsv_ts::__private::parse_bare_name_closed`).
     pub(crate) fn parse_expression_tag_at(
         &mut self,
         brace_pos: usize,
@@ -138,6 +140,26 @@ impl<'a> SvelteParser<'a> {
         );
         let start = brace_pos;
         let expr_start = brace_pos + 1; // after the '{'
+
+        // The common island, a name path glued to its `}` (`{count}`, `{user.name}`, `{f()}`),
+        // is pushed without finding the brace first: the byte after the path is the close.
+        let nesting = self.island_nesting();
+        if let Some((expression, close)) = tsv_ts::__private::parse_bare_name_closed(
+            self.source,
+            expr_start,
+            b'}',
+            tsv_ts::__private::BareIsland::Any,
+            nesting,
+            self.stores_mut(),
+        ) {
+            return Ok(ExpressionTag {
+                expression,
+                span: Span {
+                    start: start as u32,
+                    end: (close + 1) as u32,
+                },
+            });
+        }
 
         // Find the matching closing `}` — the one robust brace matcher.
         let Some(expr_end) = scan_to_matching_brace(self.source.as_bytes(), expr_start) else {
@@ -219,7 +241,13 @@ pub(crate) fn scan_to_matching_paren(bytes: &[u8], scan_start: usize) -> Option<
 /// Started past the keyword, the head's first `/` stands where an expression begins,
 /// which is what it is to the parser that reads the head.
 pub(crate) fn scan_head_to_matching_brace(bytes: &[u8], scan_start: usize) -> Option<usize> {
-    scan_to_matching_brace(bytes, head_keyword_end(bytes, scan_start))
+    let from = head_keyword_end(bytes, scan_start);
+    // A head that is its keyword alone (`{/if}`, `{:else}`) closes right there — the
+    // scan's own first answer, taken without entering it.
+    if bytes.get(from) == Some(&b'}') {
+        return Some(from);
+    }
+    scan_to_matching_brace(bytes, from)
 }
 
 /// Where a block or tag head's keyword ends: past leading ASCII whitespace and the

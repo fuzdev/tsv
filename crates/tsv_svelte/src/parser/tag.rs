@@ -435,6 +435,33 @@ impl<'a> SvelteParser<'a> {
     /// parsers. The stored expression keeps the wrapper — the printer reproduces
     /// the authored cast from it.
     fn parse_render_tag(&mut self, start: usize) -> Result<FragmentNode, Error> {
+        // The common head, `render ` and a name path called with no arguments glued to the
+        // `}` (`{@render children()}`, `{@render a.b?.()}`), is a call — the refusal below
+        // passes it — and is pushed without a scan or a parse. Any other head pushes nothing
+        // here and takes the full read.
+        let head_start = self.current_end();
+        let expr_start = head_start + "render ".len();
+        if self.source.as_bytes().get(head_start..expr_start) == Some(b"render ") {
+            let nesting = self.island_nesting();
+            if let Some((expression, close)) = tsv_ts::__private::parse_bare_name_closed(
+                self.source,
+                expr_start,
+                b'}',
+                tsv_ts::__private::BareIsland::Call,
+                nesting,
+                self.stores_mut(),
+            ) {
+                let end = close + 1;
+                self.advance_to_position(end)?;
+                return Ok(FragmentNode::RenderTag(RenderTag {
+                    expression,
+                    span: Span {
+                        start: start as u32,
+                        end: end as u32,
+                    },
+                }));
+            }
+        }
         // The refusal runs inside the expression's parse, so tsc's comparison reading of
         // `{@render f<T, U><V>(x)}` — a sequence — is re-read as acorn-typescript's call
         // (`parse_ts_expression_checked`).

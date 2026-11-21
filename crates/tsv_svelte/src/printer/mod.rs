@@ -647,6 +647,39 @@ pub(in crate::printer) fn plain_path_span(view: AstView<'_>, expr: &Expression) 
     (path == expr.span).then_some(path)
 }
 
+/// The span of an expression that is a **plain call** — a zero-argument call on a plain
+/// reference ([`plain_reference_span`]), `f()` or `f?.()`, spelled with no byte between the
+/// name and its empty list — when the expression's own span is exactly that.
+///
+/// It prints as its own source bytes, as a plain path does ([`plain_path_span`]): a name's
+/// doc, then an argument list with nothing in it to break. The callee is a bare name only,
+/// kept conservative — a path callee makes the call a member chain, which `tsv_ts` lays out
+/// through its own chain rules — and type arguments decline it. A caller that prints the span owes the same proof a plain path's
+/// does, that the call owns no block comment glued ahead of it.
+pub(in crate::printer) fn plain_call_span(
+    view: AstView<'_>,
+    source: &str,
+    expr: &Expression,
+) -> Option<Span> {
+    let ExpressionKind::CallExpression(call) = &expr.kind else {
+        return None;
+    };
+    if call.type_args.is_some() || !call.arguments.is_empty() {
+        return None;
+    }
+    let ExpressionKind::Identifier(callee) = &view.expr(call.callee).kind else {
+        return None;
+    };
+    let callee = plain_reference_span(callee)?;
+    let list: &[u8] = if call.optional { b"?.()" } else { b"()" };
+    (callee.start == expr.span.start
+        && source
+            .as_bytes()
+            .get(callee.end as usize..expr.span.end as usize)
+            == Some(list))
+    .then_some(expr.span)
+}
+
 impl<'a> Printer<'a> {
     /// A printer over `source`, classifying its lines here (standalone layout) — the
     /// tests' constructor; the format entry points hand [`Self::with_line_breaks`] a
@@ -975,6 +1008,13 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn fused_plain_path(&self, expr: &Expression) -> Option<Span> {
         plain_path_span(self.view, expr)
             .filter(|path| !self.owns_leading_comment_at(path.start) && fuses_source_spans())
+    }
+
+    /// The span of `expr` when it is a plain call ([`plain_call_span`]) that owns no comment
+    /// and may print as its own bytes ([`fuses_source_spans`]).
+    pub(in crate::printer) fn fused_plain_call(&self, expr: &Expression) -> Option<Span> {
+        plain_call_span(self.view, self.source, expr)
+            .filter(|call| !self.owns_leading_comment_at(call.start) && fuses_source_spans())
     }
 
     /// One text over `span`, for a construct a gate proved prints as its own source bytes

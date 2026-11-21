@@ -103,6 +103,7 @@ const SEEDS: &[&str] = &[
     "<div on:click={ h } bind:this={ el.x } {...rest} {@attach a.b} class:c={ c }>{@const d = e.f}</div>",
     "<table><tr><td>t</td><td> </td><td></td></tr></table><select><option>o</option></select>",
     "<div {a} {bb} cc={cc} dd=\"{dd}\" {class}><Foo {x} {y.z} {\u{e9}} /></div>",
+    "{@render f()}{@render g?.()}{@render a.b()}{@render h(x)}{@html k()}{@html m?.()}<p>{n()}{o.p?.()}</p>",
 ];
 
 /// Each seed with each insert at each byte position.
@@ -152,6 +153,9 @@ fn a_line_walked_across_the_print_width_formats_identically_without_fused_spans(
                 ),
                 format!(
                     "{{#if {pad}aaaaaaaaaaaaaaaaaaaa.bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb}}<i title=\"{value}\">{{cccccccccccccccccccc}}</i>{{/if}}"
+                ),
+                format!(
+                    "<p>{pad} {value} {{@render aaaaaaaaaaaaaaaaaaaa()}} {{@html bbbbbbbbbbbbbbbbbbbb?.()}} {{cccccccccccccccccccc()}}</p>"
                 ),
             ] {
                 assert_fused_matches_general(&source, &format_args!("{source:?}"));

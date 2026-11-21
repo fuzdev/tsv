@@ -362,22 +362,25 @@ pub fn parse_expression_with_comments(
 }
 
 /// A host's expression island that is exactly one plain name or a `.`-chain of them (`{x}`,
-/// `{user.name}`), pushed onto `stores` as the rows [`parse_expression_with_comments`] would
-/// build for it — or `None`, and nothing pushed, for every other island, which takes that
-/// parse.
+/// `{user.name}`), optionally called with no arguments (`{f()}`, `{a.b?.()}`), pushed onto
+/// `stores` as the rows [`parse_expression_with_comments`] would build for it — or `None`,
+/// and nothing pushed, for every other island, which takes that parse.
 ///
 /// Most expression islands in a Svelte template are a name or a short member path
 /// (`{count}`, `value={form.email}`), and each would otherwise construct and drop a whole
 /// [`parser::Parser`] to read a few tokens. Every `.`-separated segment must be ASCII
 /// identifier bytes (`[A-Za-z0-9_$]`), not led by a digit, and not a keyword in the lexer's
 /// own table ([`crate::lexer::keyword_at`]), and there are at most
-/// [`BARE_NAME_MAX_SEGMENTS`] of them: a keyword (`this.x`, `a.class`), a non-ASCII or escaped
-/// name, whitespace, a comment, `?.` or any other token all take the parse, so its reading of
-/// every such island — a refusal (`let`), a literal (`true`), an `await` — stays the one
-/// answer. The rows are pushed in the parse's order: the head, then each property and the
-/// member over it. The bounds keep the island far inside every limit the parse counts (a
-/// member link adds a wire level and a spine link), so an island near the nesting limit takes
-/// the parse, which owns every depth answer. It collects no comment, since it holds none.
+/// [`BARE_NAME_MAX_SEGMENTS`] of them. The one tail the path may carry is an empty argument
+/// list, `()` or `?.()`, ending the island. A keyword (`this.x`, `a.class`), a non-ASCII or
+/// escaped name, whitespace, a comment, a `?.` outside that tail, or any other token all take
+/// the parse, so its reading of every such island — a refusal (`let`), a literal (`true`), an
+/// `await` — stays the one answer. The island is at most `u16::MAX` bytes, which bounds every
+/// name in it to what an identifier row's `u16` length holds. The rows are pushed in the parse's order: the head, then each property and
+/// the member over it, then the call. The bounds keep the island far inside every limit the
+/// parse counts (a member link adds a wire level and a spine link, the call its own and an
+/// optional call's chain wrap), so an island near the nesting limit takes the parse, which
+/// owns every depth answer. It collects no comment, since it holds none.
 ///
 /// Debug builds parse every island this answers into scratch stores as well and assert the
 /// parse built the same tree.
@@ -388,16 +391,94 @@ pub fn parse_bare_name_expression(
     stores: &mut AstStores,
 ) -> Option<ExprId> {
     let bytes = source.as_bytes();
-    if bytes.len() > usize::from(u16::MAX)
-        || host_nesting + 8 + BARE_NAME_MAX_SEGMENTS >= tsv_lang::NESTING_LIMIT
-    {
+    if bytes.len() > usize::from(u16::MAX) || !bare_name_fits_nesting(host_nesting) {
         return None;
     }
-    // Segment by segment on the lexer's own name scan, stopping at the first byte no name
-    // path holds: an island that is not one (`{() => f(x)}`) is refused there, never scanned
-    // to its end.
+    let path_end = bare_name_path_end(bytes, 0)?;
+    let call = if path_end == bytes.len() {
+        None
+    } else {
+        match empty_call_tail(&bytes[path_end..]) {
+            Some((optional, len)) if path_end + len == bytes.len() => Some(optional),
+            _ => return None,
+        }
+    };
+    let expr = push_bare_island(bytes, base_offset, path_end, call, stores);
+    #[cfg(debug_assertions)]
+    assert_parse_builds_tree(source, base_offset, host_nesting, stores.view(), expr);
+    Some(expr)
+}
+
+/// Which islands [`parse_bare_name_closed`] answers.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum BareIsland {
+    /// A name path, called with no arguments or not.
+    Any,
+    /// Only a name path called with no arguments — a host that refuses every other shape
+    /// (`{@render}`) pushes nothing for one.
+    Call,
+}
+
+/// [`parse_bare_name_expression`] for an island whose extent is not yet known: the island
+/// starting at `start` in `source` (the whole document), answered only when the byte right
+/// after it is `close` — so a host can skip finding its delimiter for the common island
+/// (`{count}`). Returns the pushed root and the offset of that `close` byte; `None`, with
+/// nothing pushed, for every other island, `shape` included.
+pub fn parse_bare_name_closed(
+    source: &str,
+    start: usize,
+    close: u8,
+    shape: BareIsland,
+    host_nesting: u32,
+    stores: &mut AstStores,
+) -> Option<(ExprId, usize)> {
+    let bytes = source.as_bytes();
+    if !bare_name_fits_nesting(host_nesting) {
+        return None;
+    }
+    let path_end = bare_name_path_end(bytes, start)?;
+    let rest = &bytes[path_end..];
+    let (call, end) = if shape == BareIsland::Any && rest.first() == Some(&close) {
+        (None, path_end)
+    } else {
+        let (optional, len) = empty_call_tail(rest)?;
+        (Some(optional), path_end + len)
+    };
+    if bytes.get(end) != Some(&close) || end - start > usize::from(u16::MAX) {
+        return None;
+    }
+    let island = &bytes[start..end];
+    let expr = push_bare_island(island, start, path_end - start, call, stores);
+    #[cfg(debug_assertions)]
+    assert_parse_builds_tree(
+        &source[start..end],
+        start,
+        host_nesting,
+        stores.view(),
+        expr,
+    );
+    Some((expr, end))
+}
+
+/// The most `.`-separated segments a bare island's path holds; a longer path takes the
+/// parse.
+const BARE_NAME_MAX_SEGMENTS: u32 = 8;
+
+/// Whether an island at `host_nesting` is far enough inside the nesting limit for a bare
+/// island's rows ([`parse_bare_name_expression`]).
+#[inline]
+fn bare_name_fits_nesting(host_nesting: u32) -> bool {
+    host_nesting + 10 + BARE_NAME_MAX_SEGMENTS < tsv_lang::NESTING_LIMIT
+}
+
+/// Where the name path at `start` ends — the first byte past its last segment, which is no
+/// `.` that a further segment follows — or `None` when no path starts there or a segment
+/// fails the bare island's rule ([`parse_bare_name_expression`]). Stops at the first byte
+/// no path holds, so an island that is not one (`{() => f(x)}`) is refused there, never
+/// scanned to its end.
+#[inline]
+fn bare_name_path_end(bytes: &[u8], mut start: usize) -> Option<usize> {
     let mut segments = 0;
-    let mut start = 0;
     loop {
         if !bytes
             .get(start)
@@ -411,22 +492,55 @@ pub fn parse_bare_name_expression(
         }
         segments += 1;
         match bytes.get(end) {
-            None => break,
             Some(b'.') if segments < BARE_NAME_MAX_SEGMENTS => start = end + 1,
-            Some(_) => return None,
+            _ => return Some(end),
         }
     }
-    let expr = push_bare_name(bytes, base_offset, stores);
-    #[cfg(debug_assertions)]
-    assert_parse_builds_tree(source, base_offset, host_nesting, stores.view(), expr);
-    Some(expr)
 }
 
-/// The most `.`-separated segments [`parse_bare_name_expression`] answers; a longer path
-/// takes the parse.
-const BARE_NAME_MAX_SEGMENTS: u32 = 8;
+/// The empty argument list leading `tail` — `()`, or `?.()` (whether it is optional), with
+/// its length — or `None`.
+#[inline]
+fn empty_call_tail(tail: &[u8]) -> Option<(bool, usize)> {
+    if tail.starts_with(b"()") {
+        Some((false, 2))
+    } else if tail.starts_with(b"?.()") {
+        Some((true, 4))
+    } else {
+        None
+    }
+}
 
-/// Push the rows of the name path `bytes` (checked by [`parse_bare_name_expression`]),
+/// Push the rows of a bare island `bytes` sitting at `base_offset` — its name path, the
+/// first `path_len` bytes, then the empty call (`Some(optional)`) the rest spells — and
+/// return the outermost.
+fn push_bare_island(
+    bytes: &[u8],
+    base_offset: usize,
+    path_len: usize,
+    call: Option<bool>,
+    stores: &mut AstStores,
+) -> ExprId {
+    let path = push_bare_name(&bytes[..path_len], base_offset, stores);
+    let Some(optional) = call else {
+        return path;
+    };
+    let start = base_offset as u32;
+    push(
+        stores,
+        Expression {
+            span: Span::new(start, start + bytes.len() as u32),
+            kind: ExpressionKind::CallExpression(ast::CallExpression {
+                callee: path,
+                type_args: None,
+                arguments: Run::EMPTY,
+                optional,
+            }),
+        },
+    )
+}
+
+/// Push the rows of the name path `bytes` (checked by [`bare_name_path_end`]),
 /// sitting at `base_offset`, and return the outermost.
 fn push_bare_name(bytes: &[u8], base_offset: usize, stores: &mut AstStores) -> ExprId {
     let start = base_offset as u32;
@@ -463,8 +577,9 @@ fn push_bare_name(bytes: &[u8], base_offset: usize, stores: &mut AstStores) -> E
     expr
 }
 
-/// [`parse_bare_name_expression`]'s debug differential: the parse of `source` builds the
-/// tree rooted at `expr` in `view`.
+/// The bare islands' debug differential ([`parse_bare_name_expression`],
+/// [`parse_bare_name_closed`]): the parse of `source` builds the tree rooted at `expr` in
+/// `view`.
 #[cfg(debug_assertions)]
 #[expect(clippy::expect_used)]
 fn assert_parse_builds_tree(
@@ -485,6 +600,14 @@ fn assert_parse_builds_tree(
                 member.optional,
                 tree(view, member.object),
                 tree(view, member.property)
+            ),
+            ExpressionKind::CallExpression(call) => format!(
+                "Call({:?}, {:?}, {:?}, {}, {})",
+                row.span,
+                call.optional,
+                call.type_args.is_some(),
+                call.arguments.len(),
+                tree(view, call.callee)
             ),
             _ => format!("{row:?}"),
         }

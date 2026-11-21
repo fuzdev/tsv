@@ -899,6 +899,13 @@ impl<'a> Printer<'a> {
     ) -> HeadExpr {
         let frozen = self.honored_directive_in_gap(span_start, expr.span().start);
 
+        // A plain zero-argument call (`{@render children()}`) prints as its own bytes, with
+        // no clarity paren to add around a call.
+        if !frozen && let Some(call) = self.fused_plain_call(expr) {
+            let value_doc = self.plain_source_span_doc(call);
+            return self.assemble_head_expr(value_doc, span_start, expr, span_end, frozen);
+        }
+
         // The shared braced-head embed ([`Printer::head_embed`], which carries the reasoning).
         //
         // Built directly in the shared arena — the surrounding doc tree (closing `}`, etc.)
