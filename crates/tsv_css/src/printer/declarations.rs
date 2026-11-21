@@ -108,8 +108,13 @@ pub(super) fn list_has_closing_comma(source: &str, values: &[CssValue], list_end
     let Some(last) = values.last() else {
         return false;
     };
+    // The last element nearly always reaches the list's end: no tail, no comma.
+    let last_end = last.span().end_usize();
+    if last_end >= list_end {
+        return false;
+    }
     source
-        .get(last.span().end_usize()..list_end)
+        .get(last_end..list_end)
         .is_some_and(|tail| crate::escapes::trim_end_preserving_escape(tail).ends_with(','))
 }
 
@@ -415,6 +420,9 @@ impl<'a> Printer<'a> {
     /// and cannot drift (the doc-first shape the at-rule prelude and the function /
     /// multiline-continuation paths already use). Replaces the former measure-then-emit
     /// pair (a discarded flat-join measured to decide, then a *different* fill emitted).
+    /// The flat form is tried first on the fill alone (`try_write_value_list_flat`), the
+    /// same fit question the declaration doc's own flat try asks, so that doc is built
+    /// only for a list that breaks.
     ///
     /// The two list kinds wrap differently, so each builds its own shape:
     /// - **comma** breaks *after* the colon — flat `prop: a, b`, broken
@@ -444,11 +452,19 @@ impl<'a> Printer<'a> {
             CssValue::CommaSeparated { values, span } => {
                 let fill =
                     self.build_comma_fill_doc(self.view.values(*values), span.end_usize(), ctx);
+                if self.try_write_value_list_flat(fill) {
+                    self.write_declaration_end(decl);
+                    return;
+                }
                 self.build_broken_head_value_decl_doc(fill, &[])
             }
             CssValue::List { values, .. } => {
                 let parts = self.build_space_fill_parts(self.view.values(*values), ctx);
                 let fill = self.d().fill(&parts);
+                if self.try_write_value_list_flat(fill) {
+                    self.write_declaration_end(decl);
+                    return;
+                }
                 if Self::is_grid_row_property(self.view.text(decl.property)) {
                     self.build_broken_head_value_decl_doc(fill, &[])
                 } else {
@@ -462,11 +478,29 @@ impl<'a> Printer<'a> {
             _ => {
                 let value_doc = self.build_css_value_doc(&decl.value);
                 let d = self.d();
-                d.concat(&[d.text(": "), value_doc])
+                let doc = d.concat(&[d.text(": "), value_doc]);
+                self.write_arena_doc(doc);
+                self.write_declaration_end(decl);
+                return;
             }
         };
-        self.write_arena_doc(doc);
+        // The list's flat form was refused above, and the declaration doc's own flat try
+        // would refuse it too, so the doc renders directly.
+        self.render_arena_doc(doc);
         self.write_declaration_end(decl);
+    }
+
+    /// A list value's flat form — `: ` and the fill, the `;` reserved — written without the
+    /// declaration doc around the fill: `true` when it fit and was appended, `false` (buffer
+    /// untouched) when the list breaks and its declaration doc renders it.
+    fn try_write_value_list_flat(&mut self, fill: DocId) -> bool {
+        let mark = self.buffer.len();
+        self.write(": ");
+        if self.try_write_arena_doc_flat(fill, 1) {
+            return true;
+        }
+        self.buffer.as_append_target().truncate(mark);
+        false
     }
 
     /// Format a CSS declaration (property: value;)
@@ -532,7 +566,7 @@ impl<'a> Printer<'a> {
         }
 
         // Dispatch to appropriate handler based on value type and formatting needs
-        if let Some((run, content_start)) = self.progid_opaque_value(decl) {
+        if let Some((run, content_start)) = self.progid_opaque_value(decl, decl_source) {
             self.print_decl_progid_opaque(decl, run, content_start);
         } else if let Some(plan) = self.grid_multirow_plan(decl) {
             self.print_decl_grid_multirow(decl, plan);
@@ -583,13 +617,18 @@ impl<'a> Printer<'a> {
     /// The comment-free check is a byte compare on the value's first bytes; only a
     /// declaration that both carries a block comment (`has_block_comment`, O(1)) and opens
     /// its value with one pays the run lex.
-    fn progid_opaque_value(&self, decl: &ast::CssDeclaration) -> Option<(Option<Span>, u32)> {
+    fn progid_opaque_value(
+        &self,
+        decl: &ast::CssDeclaration,
+        decl_source: &str,
+    ) -> Option<(Option<Span>, u32)> {
         fn starts_with_progid(text: &str) -> bool {
-            text.as_bytes()
-                .get(..7)
-                .is_some_and(|head| head.eq_ignore_ascii_case(b"progid:"))
+            matches!(text.as_bytes().first(), Some(b'p' | b'P'))
+                && text
+                    .as_bytes()
+                    .get(..7)
+                    .is_some_and(|head| head.eq_ignore_ascii_case(b"progid:"))
         }
-        let decl_source = decl.span.extract(self.source);
         let value = &decl_source[decl.colon_pos() + 1..];
         let trimmed = crate::escapes::trim_start_css(value);
         let value_start = decl.colon_offset + 1 + (value.len() - trimmed.len()) as u32;
