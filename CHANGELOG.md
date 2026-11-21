@@ -11,8 +11,16 @@ Each `## Unreleased` section must be non-empty and carry a
 `## Unreleased` (reset to `bump: patch`) for the next cycle.
 
 ## Unreleased
-<!-- bump: patch -->
+<!-- bump: minor -->
 
+- **breaking** fix: an unknown functional pseudo-class keeps an argument that is not a
+  selector list (`a:foo(1 + 2)` formatted to `a:foo`); an empty argument (`a:foo()`), an
+  unmatched bracket, or a bad url or string inside one is now a parse error
+
+- perf: parsing and formatting are faster
+- feat: an internal panic in `@fuzdev/tsv`'s addon throws an `Error` whose message is
+  `panic: ` and the panic's message
+- chore: the npm packages no longer list Deno as a supported runtime
 - chore: the internal TypeScript, CSS and Svelte ASTs live in per-document stores named by
   typed ids, with decoded text in a pool, instead of bump-arena references; formatted output
   and the parse wire are unchanged, the hidden Rust `ast` / `__private` items change shape
