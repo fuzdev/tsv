@@ -361,6 +361,72 @@ pub fn parse_expression_with_comments(
     )
 }
 
+/// A host's expression island that is exactly one plain identifier, pushed onto `stores` as
+/// the row [`parse_expression_with_comments`] would build for it — or `None`, and nothing
+/// pushed, for every other island, which takes that parse.
+///
+/// Most expression islands in a Svelte template are one name (`{count}`, `value={x}`), and
+/// each would otherwise construct and drop a whole [`parser::Parser`] to read one token. The
+/// island qualifies when every byte is an ASCII identifier byte (`[A-Za-z0-9_$]`, not led by
+/// a digit) and the lexer's own keyword table ([`crate::lexer::keyword_at`]) names no
+/// keyword: a keyword, a non-ASCII or escaped name, whitespace or a comment all take the
+/// parse, so its reading of every such word — a refusal (`let`), a literal (`true`), an
+/// `await` — stays the one answer. A leaf identifier charges no nesting level, so the depth
+/// guard is belt-and-braces: an island near the limit takes the parse, which owns every depth
+/// answer. It collects no comment, since it holds none.
+///
+/// Debug builds parse every island this answers into scratch stores as well and assert the
+/// parse built the same row.
+pub fn parse_bare_identifier_expression(
+    source: &str,
+    base_offset: usize,
+    host_nesting: u32,
+    stores: &mut AstStores,
+) -> Option<ExprId> {
+    let bytes = source.as_bytes();
+    let (&first, rest) = bytes.split_first()?;
+    if !(first.is_ascii_alphabetic() || first == b'_' || first == b'$')
+        || !rest
+            .iter()
+            .all(|&b| b.is_ascii_alphanumeric() || b == b'_' || b == b'$')
+        || bytes.len() > usize::from(u16::MAX)
+        || lexer::keyword_at(bytes, 0, bytes.len()).is_some()
+        || host_nesting + 8 >= tsv_lang::NESTING_LIMIT
+    {
+        return None;
+    }
+    let span = Span::new(base_offset as u32, (base_offset + bytes.len()) as u32);
+    let row = Expression::from_identifier(ast::Identifier::simple(
+        ast::IdentName::from_span(span),
+        span,
+    ));
+    #[cfg(debug_assertions)]
+    assert_parse_builds_row(source, base_offset, host_nesting, &row);
+    Some(push(stores, row))
+}
+
+/// [`parse_bare_identifier_expression`]'s debug differential: the parse of `source` builds
+/// `row`.
+#[cfg(debug_assertions)]
+#[expect(clippy::expect_used)]
+fn assert_parse_builds_row(source: &str, base_offset: usize, host_nesting: u32, row: &Expression) {
+    let mut scratch = AstStores::default();
+    let (parsed, _) = parse_expression_with_comments(
+        source,
+        base_offset,
+        host_nesting,
+        &mut scratch,
+        "end of input",
+        |_, _| Ok(()),
+    )
+    .expect("a bare identifier island parses");
+    assert_eq!(
+        format!("{:?}", scratch.view().expr(parsed)),
+        format!("{row:?}"),
+        "the bare-identifier island built a row the parse does not: {source:?}"
+    );
+}
+
 /// Parse a binding pattern — an expression converted to a pattern — and return it with
 /// the comments it collected.
 ///

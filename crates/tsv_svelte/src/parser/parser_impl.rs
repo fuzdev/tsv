@@ -731,6 +731,17 @@ impl<'a> SvelteParser<'a> {
         base_offset: usize,
         end: &str,
     ) -> Result<ExprId, Error> {
+        // The common island, one plain name, is pushed without a parse. Only the unchecked
+        // entry takes it: a host check judges the parsed expression, which this skips.
+        let nesting = self.island_nesting();
+        if let Some(expr) = tsv_ts::__private::parse_bare_identifier_expression(
+            source,
+            base_offset,
+            nesting,
+            self.stores_mut(),
+        ) {
+            return Ok(expr);
+        }
         self.parse_ts_expression_checked(source, base_offset, end, |_, _, _| Ok(()))
     }
 

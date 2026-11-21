@@ -442,9 +442,11 @@ impl IdentName {
     ///
     /// ⚠️ **`plain_ascii` is `true`, and that is a CONTRACT on the caller**: this
     /// constructor is handed a span, not the bytes under it, so the span must cover a
-    /// reserved or contextual keyword — ASCII by the grammar. Every caller today is one
-    /// of the two meta-properties (`new.target`, `import.meta`). A caller whose span is
-    /// an arbitrary name must build the channel from the token instead
+    /// reserved or contextual keyword — ASCII by the grammar — or bytes the caller has
+    /// checked are ASCII identifier bytes. The callers are the two meta-properties
+    /// (`new.target`, `import.meta`) and `__private::parse_bare_identifier_expression`,
+    /// which checks its island's bytes first. Any other caller whose span is an arbitrary
+    /// name must build the channel from the token instead
     /// (`Parser::current_raw_ident_name`); the printer's name seam asserts the property
     /// in debug builds, so a violation fails the suite rather than shifting a width.
     #[inline]
