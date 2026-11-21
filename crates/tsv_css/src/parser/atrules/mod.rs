@@ -458,8 +458,7 @@ fn parse_atrule_block(
         // keeps the non-relative selector grammar so keyframe stops (`0%`, `from`) and
         // top-level complex selectors parse unchanged.
         if expect_rules {
-            let child = parse_block_child(parser, false, name)?;
-            parser.stores.runs.block_child_scratch.push(child);
+            parse_block_child(parser, false, name)?;
             parser.skip_boundary_whitespace()?;
             continue;
         }
@@ -468,8 +467,7 @@ fn parse_atrule_block(
         // `@font-face`, unknown at-rules, `@scope`): declaration-vs-rule disambiguation
         // via `is_nested_rule_start`. `true` allows a leading combinator (a `> .child {}`
         // relative selector in a `@scope` body).
-        let child = parse_block_child(parser, true, name)?;
-        parser.stores.runs.block_child_scratch.push(child);
+        parse_block_child(parser, true, name)?;
         parser.skip_boundary_whitespace()?;
     }
 
@@ -496,21 +494,21 @@ fn parse_atrule_block(
 /// Syntax 3 §"consume a block's contents"). `allow_relative_selectors` picks the
 /// selector grammar for the rule case: `false` = non-relative (top-level rule-list
 /// blocks — conditional groups, keyframes), `true` = relative (nested-declarations
-/// contexts — unknown at-rules, `@scope` — where a leading combinator is valid).
+/// contexts — unknown at-rules, `@scope` — where a leading combinator is valid). The child
+/// pushes itself onto `block_child_scratch`.
 fn parse_block_child(
     parser: &mut CssParser<'_>,
     allow_relative_selectors: bool,
     name: PoolText<CssText>,
-) -> Result<CssBlockChild, Error> {
+) -> Result<(), Error> {
     if super::declarations::is_nested_rule_start(parser)? {
-        Ok(CssBlockChild::Rule(super::declarations::parse_rule(
+        super::declarations::parse_rule(
             parser,
             allow_relative_selectors,
-        )?))
+            super::declarations::RuleSink::Child,
+        )
     } else if parser.check(TokenKind::Identifier) {
-        Ok(CssBlockChild::Declaration(
-            super::declarations::parse_declaration(parser)?,
-        ))
+        super::declarations::parse_declaration(parser)
     } else {
         Err(unexpected_block_token(parser, name))
     }

@@ -1049,8 +1049,7 @@ impl<'a> CssParser<'a> {
             }
 
             // Parse rules (selector { declarations })
-            let node = declarations::parse_rule(self, false)?;
-            self.stores.runs.node_scratch.push(CssNode::Rule(node));
+            declarations::parse_rule(self, false, declarations::RuleSink::Node)?;
 
             self.skip_html_comment_markers()?;
         }

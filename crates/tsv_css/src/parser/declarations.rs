@@ -58,17 +58,31 @@ pub(crate) fn is_nested_rule_start(parser: &CssParser<'_>) -> Result<bool, Error
     }
 }
 
-/// Parse a CSS rule: `selector { property: value; }`
+/// The scratch list a parsed rule is pushed onto: [`parse_rule`] pushes its own row, so the
+/// rule is built in place rather than returned by value and copied into the list.
+#[derive(Clone, Copy)]
+pub(crate) enum RuleSink {
+    /// The stylesheet's top-level `node_scratch`.
+    Node,
+    /// A block's `block_child_scratch`.
+    Child,
+}
+
+/// Parse a CSS rule: `selector { property: value; }`, and push it onto `sink`'s list.
 ///
 /// When `nested` is true, the selector list allows leading combinators (CSS Nesting relative selectors).
 /// For example: `> .child {}`, `+ .sibling {}`, `~ .general {}`
-pub(crate) fn parse_rule(parser: &mut CssParser<'_>, nested: bool) -> Result<CssRule, Error> {
+pub(crate) fn parse_rule(
+    parser: &mut CssParser<'_>,
+    nested: bool,
+    sink: RuleSink,
+) -> Result<(), Error> {
     // two wire levels: the `Rule` and its `Block` (the depth limit's count)
-    parser.nested(2, |p| parse_rule_body(p, nested))
+    parser.nested(2, |p| parse_rule_body(p, nested, sink))
 }
 
 /// [`parse_rule`] inside its depth levels.
-fn parse_rule_body(parser: &mut CssParser<'_>, nested: bool) -> Result<CssRule, Error> {
+fn parse_rule_body(parser: &mut CssParser<'_>, nested: bool, sink: RuleSink) -> Result<(), Error> {
     // Ahead of the capture: this offset becomes the rule's AND its prelude's `start`, both
     // of which sit past a boundary whitespace run in `parseCss` (see
     // `skip_boundary_whitespace`). Two of the three callers reach here having already
@@ -143,24 +157,14 @@ fn parse_rule_body(parser: &mut CssParser<'_>, nested: bool) -> Result<CssRule, 
         // Check if we're looking at a nested rule (CSS Nesting Module)
         if is_nested_rule_start(parser)? {
             // Parse nested rule recursively (nested rules allow leading combinators)
-            let nested_rule = parse_rule(parser, true)?;
-            parser
-                .stores
-                .runs
-                .block_child_scratch
-                .push(CssBlockChild::Rule(nested_rule));
+            parse_rule(parser, true, RuleSink::Child)?;
             parser.skip_whitespace()?;
             continue;
         }
 
         // Otherwise, parse as declaration
         if parser.check(TokenKind::Identifier) {
-            let decl = parse_declaration(parser)?;
-            parser
-                .stores
-                .runs
-                .block_child_scratch
-                .push(CssBlockChild::Declaration(decl));
+            parse_declaration(parser)?;
         } else {
             // Skip unexpected tokens
             parser.advance()?;
@@ -180,7 +184,7 @@ fn parse_rule_body(parser: &mut CssParser<'_>, nested: bool) -> Result<CssRule, 
         &mut parser.stores.runs.block_children,
         mark,
     );
-    Ok(CssRule {
+    let rule = CssRule {
         selector,
         block_span: Span {
             start: block_start,
@@ -191,7 +195,16 @@ fn parse_rule_body(parser: &mut CssParser<'_>, nested: bool) -> Result<CssRule, 
             start,
             end: block_end,
         },
-    })
+    };
+    match sink {
+        RuleSink::Node => parser.stores.runs.node_scratch.push(CssNode::Rule(rule)),
+        RuleSink::Child => parser
+            .stores
+            .runs
+            .block_child_scratch
+            .push(CssBlockChild::Rule(rule)),
+    }
+    Ok(())
 }
 
 /// The declaration head as a token walk: from the property identifier across the
@@ -288,8 +301,9 @@ fn assert_token_head_agrees(
     );
 }
 
-/// Parse a CSS declaration: `property: value;`
-pub(crate) fn parse_declaration(parser: &mut CssParser<'_>) -> Result<CssDeclaration, Error> {
+/// Parse a CSS declaration: `property: value;`, and push it onto the block's
+/// `block_child_scratch` — built in place rather than returned by value and copied there.
+pub(crate) fn parse_declaration(parser: &mut CssParser<'_>) -> Result<(), Error> {
     let start = parser.base_offset() + parser.current_start();
 
     // Parse property
@@ -465,14 +479,19 @@ pub(crate) fn parse_declaration(parser: &mut CssParser<'_>) -> Result<CssDeclara
 
     // Span covers the entire declaration (property + value, not including semicolon)
     // The source value will be extracted on-demand during conversion using this span
-    Ok(CssDeclaration {
-        property,
-        value,
-        important_end,
-        span: decl_span,
-        colon_offset,
-        has_block_comment,
-    })
+    parser
+        .stores
+        .runs
+        .block_child_scratch
+        .push(CssBlockChild::Declaration(CssDeclaration {
+            property,
+            value,
+            important_end,
+            span: decl_span,
+            colon_offset,
+            has_block_comment,
+        }));
+    Ok(())
 }
 
 #[cfg(test)]
