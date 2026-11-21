@@ -57,13 +57,13 @@ use analysis::{
     template_literal_has_newlines,
 };
 pub(crate) use calls::{call_may_print_whole, spine_first_call_within};
-pub(crate) use comments::leading_regex_start;
 use comments::{
     ClassMemberModifiers, CommentFilter, CommentSpacing, CommentVec, ContinuationValue,
     HeritageKeyword, LeadingGlue, MemberBlankScan, MemberBody, MemberFloor, MemberFreeze,
     MemberGap, MemberSeam, RunLeadingBlank, ShellLeadingRun, ShellPair, StandaloneGlue,
     next_significant_byte, paren_shell_close_after,
 };
+pub(crate) use comments::{leading_regex_start, left_spine_has_no_shell};
 use decorators::class_expr_has_decorators;
 pub(crate) use decorators::decorator_takes_pair;
 pub use expressions::assignment::should_inline_logical_expression;

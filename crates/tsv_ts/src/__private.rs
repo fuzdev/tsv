@@ -909,6 +909,11 @@ pub fn expression_printed_start(
     expression: &Expression,
     inputs: &PrinterInputs<'_>,
 ) -> u32 {
+    // The walk's own first answer, asked before a printer is built: a spine whose first byte
+    // is not a `(` has no shell, and the expression prints from its own start.
+    if printer::left_spine_has_no_shell(inputs.source, expression) {
+        return expression.span().start;
+    }
     with_doc_printer(arena, inputs, EmbedContext::default(), |printer| {
         printer.left_spine_printed_start(expression)
     })

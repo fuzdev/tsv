@@ -49,7 +49,9 @@ pub(crate) use paren::{
     AsiOperandShell, LeftSpineClaim, ParenLeadingValue, next_significant_byte,
     paren_pair_keeps_leading_run, paren_shell_close_after,
 };
-pub(crate) use paren::{LeftSpineStep, leading_regex_start, left_spine_shell_is_comment_free};
+pub(crate) use paren::{
+    LeftSpineStep, leading_regex_start, left_spine_has_no_shell, left_spine_shell_is_comment_free,
+};
 pub(in crate::printer) use paren::{leading_decorated_class, printed_left_spine_step};
 
 // Re-export for submodules to use `super::X` instead of `super::super::X`.

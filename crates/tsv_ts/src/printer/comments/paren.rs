@@ -435,7 +435,7 @@ pub(crate) fn left_spine_shell_is_comment_free(source: &str, start: u32) -> bool
 /// printed. Exact — a span opens on a token — so the structural left-spine walks skip
 /// themselves on it ([`Printer::left_spine_printed_start`],
 /// [`Printer::build_value_with_left_spine_owned_comment`]).
-pub(super) fn left_spine_has_no_shell(source: &str, expr: &ast::Expression) -> bool {
+pub(crate) fn left_spine_has_no_shell(source: &str, expr: &ast::Expression) -> bool {
     source.as_bytes().get(expr.span().start as usize) != Some(&b'(')
 }
 
