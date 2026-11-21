@@ -147,6 +147,14 @@ impl IndexMut<HoistedSection> for HoistedComments {
 }
 
 impl HoistedComments {
+    /// Whether no section carries a comment — true for every document whose root fragment
+    /// holds no comment, among others.
+    fn is_empty(&self) -> bool {
+        self.0
+            .iter()
+            .all(|section| section.leading.is_empty() && section.trail.is_none())
+    }
+
     /// Which of the root fragment's `len` nodes travel with a hoisted section — a leading run
     /// or a region-end trail — indexed like the nodes.
     fn travelling(&self, len: usize) -> Vec<bool> {
@@ -2054,6 +2062,10 @@ impl<'a> Printer<'a> {
     /// Every section's freeze verdict ([`Self::section_is_frozen`]) — `<svelte:options>`
     /// takes none, since it always prints normalized.
     fn frozen_sections(&self, root: &ast::Root) -> FrozenSections {
+        // Only a root fragment comment freezes a section: with none, none is frozen.
+        if !self.root_has_comment(root) {
+            return [false; 4];
+        }
         let hoisted: SmallVec<[Span; 4]> = root_sections(root)
             .into_iter()
             .filter_map(|(span, _)| span)
@@ -2062,6 +2074,15 @@ impl<'a> Printer<'a> {
             section != HoistedSection::Options
                 && span.is_some_and(|span| self.section_is_frozen(root.fragment, span, &hoisted))
         })
+    }
+
+    /// Whether the root fragment holds a comment node — the one thing that can travel with a
+    /// hoisted section ([`Self::hoisted_comments`]) or freeze one ([`Self::frozen_sections`]).
+    fn root_has_comment(&self, root: &ast::Root) -> bool {
+        self.svelte
+            .nodes(root.fragment.nodes)
+            .iter()
+            .any(|n| matches!(n, FragmentNode::Comment(_)))
     }
 
     /// The root fragment's [`IgnoreRanges`], paired on first ask and kept for the document —
@@ -2294,6 +2315,10 @@ impl<'a> Printer<'a> {
     /// [`Self::region_end_trails`]); each candidate names one section and each section at most
     /// one candidate, so a confirmed trail is written exactly once.
     fn hoisted_comments(&self, root: &ast::Root) -> HoistedComments {
+        // Only a root fragment comment travels: with none, no section carries one.
+        if !self.root_has_comment(root) {
+            return HoistedComments::default();
+        }
         let trails = self.region_end_trails(root);
         let mut sections = HoistedComments::default();
         let scan = CommentScan::new(

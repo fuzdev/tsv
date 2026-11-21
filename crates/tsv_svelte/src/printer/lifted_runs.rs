@@ -512,8 +512,12 @@ impl Printer<'_> {
         sections: &HoistedComments,
     ) -> SmallVec<[LiftedRun; 4]> {
         let nodes = self.svelte.nodes(root.fragment.nodes);
-        let travels = sections.travelling(nodes.len());
-        let is_content = |i: usize, n: &FragmentNode| !(n.is_whitespace_only_text() || travels[i]);
+        // With no comment travelling (the common case) a node is content unless it is
+        // whitespace, and the travel table is never built.
+        let travels = (!sections.is_empty()).then(|| sections.travelling(nodes.len()));
+        let is_content = |i: usize, n: &FragmentNode| {
+            !(n.is_whitespace_only_text() || travels.as_ref().is_some_and(|t| t[i]))
+        };
         let content = nodes
             .iter()
             .enumerate()
