@@ -101,8 +101,10 @@ enum FastScan {
     Comma(Run<CssValue>),
     /// No comma but a top-level whitespace run — a whitespace list.
     Whitespace,
-    /// Neither a comma nor top-level whitespace — a single leaf value.
-    Leaf,
+    /// Neither a comma nor top-level whitespace — a single leaf value; whether its first
+    /// group closes on its last byte (`false` for a quote-led text, and for one holding a
+    /// comment, which ends the scan as `Comment` first).
+    Leaf(bool),
     /// A `/* */` comment was found; take the comment-aware two-pass fallback.
     Comment,
 }
@@ -316,7 +318,8 @@ impl<'a> ValueParser<'a> {
     /// advance would save that walk only by handing the split back to the two-pass path the
     /// fused one replaced, so the class is derived for all three and spent on two.
     ///
-    /// The other callers classify an element they have already split:
+    /// The value parser's own splits classify an element they have already split, and
+    /// call [`Self::parse_scanned`] to state its group close as well:
     /// [`Self::split_top_level`], whose whitespace elements are separator-free by
     /// construction, and [`Self::push_comma_segment`], which records its segment's class
     /// during the fused pass. [`Self::unclassified_path_builds_leaf`] is the claim a
@@ -329,12 +332,13 @@ impl<'a> ValueParser<'a> {
         self.parse_scanned(stores, class, false)
     }
 
-    /// [`Self::parse_classified`] for the declaration scan, which states one more thing
-    /// about a value it classed a leaf: `group_closes_text`, that the text's first
-    /// parenthesized group closes on its last byte (`ValueFacts::group_closes_value`).
-    /// It rides to the function leaf's paren scan, which it answers
-    /// (`plain_function_parts`); `false` is "not known" and is what every other caller
-    /// passes. Read only beside a leaf class — the claim is about the whole text.
+    /// [`Self::parse_classified`] for a caller that states one more thing about a text it
+    /// classed a leaf: `group_closes_text`, that the text's head construct closes on its
+    /// last byte — the declaration scan (`ValueFacts::group_closes_value`: the opening
+    /// string of a quote-led value, else its first parenthesized group), and the comma and
+    /// whitespace splits (the first group of an element that is not quote-led). It answers
+    /// the leaf's own close scan in advance (`parse_single_value`); `false` is "not known".
+    /// Read only beside a leaf class — the claim is about the whole text.
     ///
     /// The leaf class is most calls, so it is answered here, inline at each caller, and
     /// everything else goes to [`Self::parse_scanned_rest`] out of line, so a leaf never
@@ -401,7 +405,7 @@ impl<'a> ValueParser<'a> {
                     };
                 }
                 FastScan::Whitespace => return self.parse_space_separated(stores),
-                FastScan::Leaf => return self.build_leaf(text, stores),
+                FastScan::Leaf(closes) => return self.build_scanned_leaf(text, closes, stores),
                 // A `/* */` comment was found — defer to the comment-aware path.
                 FastScan::Comment => {}
             }
@@ -435,7 +439,7 @@ impl<'a> ValueParser<'a> {
     /// withholds the class on any comment). The debug-assertion oracle for every caller.
     fn unclassified_path_builds_leaf(&self, text: &str) -> bool {
         match self.oracle_scan(text) {
-            FastScan::Leaf => true,
+            FastScan::Leaf(_) => true,
             FastScan::Comment => {
                 crate::escapes::trim_css(text).len() == text.len()
                     && classify_separators(text) == ValueSeparator::None
@@ -483,6 +487,8 @@ impl<'a> ValueParser<'a> {
         // element when it falls before the element's trimmed end, trailing otherwise.
         let mut lead_end = 0usize;
         let mut seg_ws = usize::MAX;
+        // The segment's first group close (`)` taking the depth from one to zero).
+        let mut seg_close = usize::MAX;
 
         let mut i = 0;
         while i < bytes.len() {
@@ -557,13 +563,19 @@ impl<'a> ValueParser<'a> {
                     continue;
                 }
                 b'(' => in_parens += 1,
-                b')' => in_parens = in_parens.saturating_sub(1),
+                b')' => {
+                    if in_parens == 1 && seg_close == usize::MAX {
+                        seg_close = i;
+                    }
+                    in_parens = in_parens.saturating_sub(1);
+                }
                 b',' if top => {
                     let mark = *frame.get_or_insert_with(|| stores.runs.value_scratch.mark());
-                    self.push_comma_segment(mark, text, seg_start, i, seg_ws, stores);
+                    self.push_comma_segment(mark, text, seg_start, i, seg_ws, seg_close, stores);
                     seg_start = i + 1;
                     lead_end = i + 1;
                     seg_ws = usize::MAX;
+                    seg_close = usize::MAX;
                 }
                 _ if top && b.is_ascii_whitespace() => {
                     ws_seen = true;
@@ -583,7 +595,15 @@ impl<'a> ValueParser<'a> {
             // Final segment runs to EOF (`ve_raw == text.len()`). Every comma-terminated
             // segment pushed an element (an empty one the sentinel), so the frame is
             // non-empty here and the leaf guard cannot arm.
-            self.push_comma_segment(mark, text, seg_start, bytes.len(), seg_ws, stores);
+            self.push_comma_segment(
+                mark,
+                text,
+                seg_start,
+                bytes.len(),
+                seg_ws,
+                seg_close,
+                stores,
+            );
             FastScan::Comma(flush_run(
                 &mut stores.runs.value_scratch,
                 &mut stores.runs.values,
@@ -592,7 +612,9 @@ impl<'a> ValueParser<'a> {
         } else if ws_seen {
             FastScan::Whitespace
         } else {
-            FastScan::Leaf
+            FastScan::Leaf(
+                seg_close.wrapping_add(1) == bytes.len() && !matches!(bytes[0], b'"' | b'\''),
+            )
         }
     }
 
@@ -605,7 +627,13 @@ impl<'a> ValueParser<'a> {
     /// its leading run (`usize::MAX` for none), which classifies the element: the segment
     /// holds no comment (`fast_scan` returns at the first comment, before the segment
     /// holding it is pushed) and no top-level comma, so a top-level whitespace byte inside
-    /// the element makes it a whitespace list and none makes it a single leaf.
+    /// the element makes it a whitespace list and none makes it a single leaf. `seg_close`
+    /// is the segment's first group close — the `)` taking the paren depth from one to
+    /// zero, `usize::MAX` for none — which tells a leaf element whether its first group
+    /// closes on its last byte.
+    // `seg_ws` and `seg_close` are scalars the fused scan keeps in registers; a struct
+    // bundling them would be built and passed through memory on every comma.
+    #[expect(clippy::too_many_arguments)]
     fn push_comma_segment(
         &self,
         mark: ListMark<CssValue>,
@@ -613,6 +641,7 @@ impl<'a> ValueParser<'a> {
         seg_start: usize,
         seg_end: usize,
         seg_ws: usize,
+        seg_close: usize,
         stores: &mut CssStores,
     ) {
         let seg = &text[seg_start..seg_end];
@@ -661,7 +690,9 @@ impl<'a> ValueParser<'a> {
             } else {
                 ValueSeparator::None
             };
-            sub.parse_classified(stores, Some(class))
+            let group_closes = seg_close.wrapping_add(1) == value_end
+                && !matches!(text.as_bytes()[value_start], b'"' | b'\'');
+            sub.parse_scanned(stores, Some(class), group_closes)
         };
         stores.runs.value_scratch.push(node);
     }
@@ -730,7 +761,7 @@ impl<'a> ValueParser<'a> {
         // A whitespace element holds no top-level separator by construction: the walk
         // below cuts it at every top-level whitespace run and comment boundary, and a
         // whitespace list holds no top-level comma. So it is parsed with that class
-        // named, and `parse_classified` skips re-deriving it with `fast_scan` — a second
+        // named, and `parse_scanned` skips re-deriving it with `fast_scan` — a second
         // walk of the element's bytes that could only answer `Leaf` (or bail on a
         // parenthesized comment toward the same leaf).
         let element_class = comment_is_element.then_some(ValueSeparator::None);
@@ -785,8 +816,11 @@ impl<'a> ValueParser<'a> {
                 let parsed = if first && value_end_raw == text.len() {
                     sub_parser.parse_single(stores)
                 } else {
+                    let group_closes = !cursor.saw_comment
+                        && cursor.group_close.wrapping_add(1) == value_end
+                        && !matches!(bytes[value_start], b'"' | b'\'');
                     // Recursive, but same source!
-                    sub_parser.parse_classified(stores, element_class)
+                    sub_parser.parse_scanned(stores, element_class, group_closes)
                 };
                 // An operator run is FLATTENED into the list around it, because the
                 // separator rule reads across the element boundary: `1.5 /2.5` is a
@@ -1601,7 +1635,7 @@ mod tests {
 
     #[test]
     fn whitespace_element_with_a_parenthesized_comment_is_one_leaf() {
-        // A whitespace list's element reaches `parse_classified` already classified
+        // A whitespace list's element reaches `parse_scanned` already classified
         // separator-free, while `fast_scan` bails on this element's comment though it
         // sits inside the parens — the case `unclassified_path_builds_leaf` grades (its
         // `debug_assert` runs here). The element stays one member, its comment inside it.

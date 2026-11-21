@@ -93,15 +93,18 @@ pub(super) struct ValueFacts {
     /// Whether the value holds no tokens at all besides whitespace, comments, and a
     /// trailing `!important`.
     pub(super) is_empty: bool,
-    /// Whether the value's first parenthesized group — the first `(` to raise the paren
-    /// depth from zero — closes on the value's last byte (`value_end - 1`).
+    /// Whether the value's head construct closes on its last byte (`value_end - 1`): for a
+    /// value that opens with a quote, the string it opens; otherwise the first
+    /// parenthesized group — the first `(` to raise the paren depth from zero.
     ///
     /// Not one of the declaration node's facts: it is the value parser's, which asks the
-    /// same question of a function leaf (`name(args)` is a function only when the name's
-    /// `(` closes at the very end) by scanning the group a second time. Both walks here
-    /// cross the group anyway and keep the paren depth, so they note where it first
-    /// returns to zero. See `crate::parser::value::plain_function_parts` for where it is
-    /// spent and what holds it to the scan it replaces.
+    /// same questions of a leaf by scanning a second time — a function leaf (`name(args)` is
+    /// a function only when the name's `(` closes at the very end) and a string leaf (one
+    /// string spanning the run). Both walks here cross the head anyway, so they note where
+    /// it ends. The two readings cannot meet: the value parser spends the fact only on a
+    /// leaf, as the closed string when the run is quote-led and in
+    /// `crate::parser::value::plain_function_parts` when it starts with a plain name, and
+    /// no run is both. See `crate::parser::value::parse_single_value` for where it is spent.
     pub(super) group_closes_value: bool,
 }
 
@@ -135,6 +138,20 @@ const SKIP: [bool; 256] = {
     t
 };
 
+/// [`SKIP`] inside a paren group: a separator there moves none of the scan's state (the
+/// class reads only paren-depth-0 separators), so it is skipped with the inert content.
+const SKIP_NESTED: [bool; 256] = {
+    let mut t = SKIP;
+    let mut i = 0;
+    while i < 128 {
+        if is_value_separator(i as u8) {
+            t[i] = true;
+        }
+        i += 1;
+    }
+    t
+};
+
 /// How many bytes [`skip_run_end`] tests behind one bound check.
 const SKIP_CHUNK: usize = 8;
 
@@ -146,14 +163,21 @@ const SKIP_CHUNK: usize = 8;
 /// across the chunk.
 #[inline]
 fn skip_run_end(bytes: &[u8], from: usize) -> usize {
+    skip_run_end_in(bytes, from, &SKIP)
+}
+
+/// [`skip_run_end`] over a table the caller names: the byte scan switches to its nested
+/// table between a group's `(` and its `)`, where a separator is interior text.
+#[inline]
+fn skip_run_end_in(bytes: &[u8], from: usize, table: &[bool; 256]) -> usize {
     let mut i = from;
     while let Some(chunk) = bytes.get(i..i + SKIP_CHUNK) {
-        if let Some(k) = chunk.iter().position(|&b| !SKIP[b as usize]) {
+        if let Some(k) = chunk.iter().position(|&b| !table[b as usize]) {
             return i + k;
         }
         i += SKIP_CHUNK;
     }
-    while i < bytes.len() && SKIP[bytes[i] as usize] {
+    while i < bytes.len() && table[bytes[i] as usize] {
         i += 1;
     }
     i
@@ -639,13 +663,16 @@ fn scan_value_core<const WANT_VERDICT: bool>(
     // The `)` that first brings the paren depth back to zero — the close of the value's
     // first parenthesized group. `usize::MAX` is "none yet".
     let mut first_group_close = usize::MAX;
+    // One past the closing quote of a string that opens the value (`usize::MAX`: none).
+    let mut lead_string_end = usize::MAX;
 
+    let mut table: &[bool; 256] = &SKIP;
     let (terminator, terminator_kind) = loop {
         // Most of these runs are empty — the loop comes back here after every inspected
         // byte, and inspected bytes come in clusters (`), `, `(--`) — so the first byte is
         // tested alone, ahead of the chunked walk's bound check.
-        if i < len && SKIP[bytes[i] as usize] {
-            i = skip_run_end(bytes, i + 1);
+        if i < len && table[bytes[i] as usize] {
+            i = skip_run_end_in(bytes, i + 1, table);
         }
         if i >= len {
             break (len, TerminatorKind::Eof);
@@ -713,6 +740,9 @@ fn scan_value_core<const WANT_VERDICT: bool>(
                     first_group_close = first_group_close.min(i);
                 }
                 paren = paren.saturating_sub(1);
+                if paren == 0 {
+                    table = &SKIP;
+                }
                 i += 1;
             }
             // A `url(…)` is ONE opaque token (css-syntax §4.3.6), so its parens are content,
@@ -728,12 +758,19 @@ fn scan_value_core<const WANT_VERDICT: bool>(
                 }
                 ParenOpen::Nesting => {
                     paren += 1;
+                    table = &SKIP_NESTED;
                     i += 1;
                 }
                 ParenOpen::UnterminatedUrl => return None,
             },
             // A string the lexer would reject (unterminated / trailing `\`) declines.
-            b'"' | b'\'' => i = string_end(bytes, i).ok()?,
+            b'"' | b'\'' => {
+                let open = i;
+                i = string_end(bytes, i).ok()?;
+                if open == value_start {
+                    lead_string_end = i;
+                }
+            }
             b'/' if is_comment_start(bytes, i) => {
                 has_comment = true;
                 i = comment_end_checked(bytes, i)?;
@@ -805,7 +842,11 @@ fn scan_value_core<const WANT_VERDICT: bool>(
             has_comment,
             is_empty,
             // `first_group_close` is `usize::MAX` for no group, which no `value_end` reaches.
-            group_closes_value: first_group_close.wrapping_add(1) == value_end,
+            group_closes_value: if matches!(bytes.get(value_start), Some(b'"' | b'\'')) {
+                lead_string_end == value_end
+            } else {
+                first_group_close.wrapping_add(1) == value_end
+            },
         },
         class,
     ))
@@ -921,6 +962,9 @@ fn scan_value_tokens(
     let mut bracket: u32 = 0;
     // The `)` token that first brings the paren depth back to zero (`usize::MAX`: none).
     let mut first_group_close = usize::MAX;
+    // One past the closing quote of a string that opens the value (`usize::MAX`: none).
+    let mut lead_string_end = usize::MAX;
+    let mut lead_string_start: Option<usize> = None;
 
     // The terminator token's own start — where the parser re-seats its lexer. At EOF the
     // token is zero-width at end-of-source, so the same field serves both exits.
@@ -954,6 +998,10 @@ fn scan_value_tokens(
         }
 
         let (start, end) = (token.start as usize, token.end as usize);
+        if part_count == 0 && !has_comment && matches!(token.kind, TokenKind::String { .. }) {
+            lead_string_start = Some(start);
+            lead_string_end = end;
+        }
         let (is_bang, is_important) = match token.kind {
             // An identifier can't be `!`; it can be `important` (case-insensitive), and an
             // escaped spelling counts — hence the decoded value.
@@ -1017,7 +1065,11 @@ fn scan_value_tokens(
         important_end,
         has_comment,
         is_empty,
-        group_closes_value: first_group_close.wrapping_add(1) == value_end,
+        group_closes_value: if lead_string_start == Some(value_start) {
+            lead_string_end == value_end
+        } else {
+            first_group_close.wrapping_add(1) == value_end
+        },
     })
 }
 
@@ -1114,6 +1166,8 @@ mod tests {
         let mut last_bang: Option<usize> = None;
         let mut verdict_is_decl = false;
         let mut first_group_close = usize::MAX;
+        // One past the closing quote of a string that opens the value (`usize::MAX`: none).
+        let mut lead_string_end = usize::MAX;
 
         let (terminator, terminator_kind) = loop {
             if i < len && SKIP[bytes[i] as usize] {
@@ -1183,7 +1237,13 @@ mod tests {
                     }
                     ParenOpen::UnterminatedUrl => return None,
                 },
-                b'"' | b'\'' => i = string_end(bytes, i).ok()?,
+                b'"' | b'\'' => {
+                    let open = i;
+                    i = string_end(bytes, i).ok()?;
+                    if open == value_start {
+                        lead_string_end = i;
+                    }
+                }
                 b'/' if is_comment_start(bytes, i) => {
                     has_comment = true;
                     i = comment_end_checked(bytes, i)?;
@@ -1239,7 +1299,11 @@ mod tests {
                 important_end,
                 has_comment,
                 is_empty,
-                group_closes_value: first_group_close.wrapping_add(1) == value_end,
+                group_closes_value: if matches!(bytes.get(value_start), Some(b'"' | b'\'')) {
+                    lead_string_end == value_end
+                } else {
+                    first_group_close.wrapping_add(1) == value_end
+                },
             },
             class,
         ))
@@ -1337,6 +1401,7 @@ mod tests {
     fn group_close_agrees_with_the_function_paren_scan() {
         use crate::parser::value::plain_function_paren;
         use crate::parser::value::scan::matching_close_paren;
+        use crate::parser::value::strings::quoted_string_spans_all;
 
         const ALPHABET: [&str; 21] = [
             "(",
@@ -1370,6 +1435,11 @@ mod tests {
                 let text = &source[HEAD.len()..facts.value_end];
                 if let Some(open) = plain_function_paren(text.as_bytes()) {
                     let closes = matching_close_paren(text, open) == Some(text.len() - 1);
+                    assert_eq!(facts.group_closes_value, closes, "for {source:?}");
+                    spent += u32::from(closes);
+                } else if matches!(text.as_bytes().first(), Some(b'"' | b'\'')) {
+                    // A quote-led value: the fact is the opening string's close.
+                    let closes = quoted_string_spans_all(text.as_bytes());
                     assert_eq!(facts.group_closes_value, closes, "for {source:?}");
                     spent += u32::from(closes);
                 }

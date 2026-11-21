@@ -45,6 +45,13 @@ pub(crate) struct ValueCursor<'a> {
 
     /// Which quote character opened the current string
     quote_char: char,
+
+    /// The last `consume_until`'s first group close: the `)` that brought the paren depth
+    /// from one back to zero (`usize::MAX`: none).
+    pub(crate) group_close: usize,
+    /// Whether a comment stood in the last `consume_until`'s range — a `group_close` beside
+    /// one is not spent, since a comment's bytes are not the leaf scan's model.
+    pub(crate) saw_comment: bool,
 }
 
 impl<'a> ValueCursor<'a> {
@@ -67,6 +74,8 @@ impl<'a> ValueCursor<'a> {
             paren_depth: 0,
             in_quote: false,
             quote_char: '\0',
+            group_close: usize::MAX,
+            saw_comment: false,
         }
     }
 
@@ -106,16 +115,19 @@ impl<'a> ValueCursor<'a> {
     ///
     /// Returns the start and end positions of the consumed text.
     /// Respects nesting — a delimiter inside parentheses, quotes, an escape, or a
-    /// block comment is ignored.
+    /// block comment is ignored. Records the range's first group close and whether it
+    /// held a comment ([`Self::group_close`], [`Self::saw_comment`]).
     ///
     /// # Arguments
     /// * `is_delimiter` - Predicate to check if character is a delimiter
     /// * `skip` - The caller's [`value_skip_table!`](super::scan::value_skip_table) for
     ///   `is_delimiter`. It has to be the caller's, because `is_delimiter` is opaque
     ///   here — so the table and the predicate it mirrors are declared side by side at
-    ///   the call site, and the `debug_assert` below re-derives every skip from the
-    ///   predicate itself. A table that disagrees fails the test suite (which runs in
-    ///   debug) rather than silently changing a split.
+    ///   the call site, and the `debug_assert` below re-derives every top-level skip from
+    ///   the predicate itself. A table that disagrees fails the test suite (which runs in
+    ///   debug) rather than silently changing a split. Inside parens or a string the walk
+    ///   skips with its own nested table instead, which stops only at the bytes the
+    ///   nesting reads (`\`, `(`, `)`, the quotes, `/`) and no delimiter test runs there.
     /// * `stop_at_comment` - End the range at a **top-level** comment start as well as at
     ///   `is_delimiter`. Set for the space-separated split, where a comment is its own
     ///   element (see `split_top_level`'s `comment_is_element`), and clear for the comma
@@ -144,6 +156,14 @@ impl<'a> ValueCursor<'a> {
         let start = self.pos;
         let bytes = self.source.as_bytes();
         let mut i = self.pos;
+        self.group_close = usize::MAX;
+        self.saw_comment = false;
+        const NESTED: [bool; 256] = crate::parser::value::scan::value_skip_table!(|b| false);
+        let mut table: &[bool; 256] = if self.paren_depth == 0 && !self.in_quote {
+            skip
+        } else {
+            &NESTED
+        };
 
         // Walk bytes instead of `char_indices` to skip the per-char UTF-8 decode
         // on the ASCII-dominant common case. Every delimiter and every nesting
@@ -160,9 +180,10 @@ impl<'a> ValueCursor<'a> {
             // escape, not a nesting or quote trigger. One L1 load retires them
             // before the decode, the escape probe, the predicate call, and
             // `update_state`'s match chain.
-            if skip[b as usize] {
+            if table[b as usize] {
                 debug_assert!(
-                    b < 0x80 && !is_value_structural(b) && !is_delimiter(b as char),
+                    !std::ptr::eq(table, skip)
+                        || b < 0x80 && !is_value_structural(b) && !is_delimiter(b as char),
                     "consume_until skip table disagrees with its delimiter predicate at {b:#04x}"
                 );
                 i += 1;
@@ -205,6 +226,7 @@ impl<'a> ValueCursor<'a> {
                 if stop_at_comment && self.paren_depth == 0 && i > start {
                     return (start, i);
                 }
+                self.saw_comment = true;
                 i = comment_end(bytes, i);
                 continue;
             }
@@ -214,8 +236,20 @@ impl<'a> ValueCursor<'a> {
                 return (start, i);
             }
 
+            if ch == ')'
+                && !self.in_quote
+                && self.paren_depth == 1
+                && self.group_close == usize::MAX
+            {
+                self.group_close = i;
+            }
             // Update state for next iteration
             self.update_state(ch);
+            table = if self.paren_depth == 0 && !self.in_quote {
+                skip
+            } else {
+                &NESTED
+            };
             i += width;
         }
 

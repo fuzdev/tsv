@@ -43,9 +43,10 @@ use strings::parse_string_literal;
 ///   already derived it (`crate::parser::decl_scan`), which lets `ValueParser` skip its own
 ///   classifying pass over the very same bytes. `None` means "not known", never "no
 ///   separator" — that is `Some(ValueSeparator::None)`.
-/// * `group_closes_value` - whether that scan saw the value's first parenthesized group
-///   close on the value's last byte, which is the function leaf's own paren scan
-///   answered in advance (see [`plain_function_parts`]). `false` means "not known".
+/// * `group_closes_value` - whether that scan saw the value's head construct (its opening
+///   string when quote-led, else its first parenthesized group) close on the value's last
+///   byte, which answers a leaf's own close scan in advance (see [`parse_single_value`]).
+///   `false` means "not known".
 /// * `colon_is_operator` - whether a top-level `:` in this value is a value operator,
 ///   which it is in a **custom property's** value and nowhere else at the top level (see
 ///   `operators::split_value_run`). The caller knows it from the property name.
@@ -259,8 +260,10 @@ fn locate_value(value_str: &str) -> Option<(&str, usize)> {
 /// check confirmed it is trimmed) and the two-pass fallback passes
 /// `self.text().trim()` — so no `str::trim` is repeated here.
 ///
-/// `group_closes_run` is the declaration scan's word that the run's first parenthesized
-/// group closes on its last byte ([`plain_function_parts`]); `false` is "not known".
+/// `group_closes_run` is a scan's word that the run's head construct closes on its last
+/// byte — the opening string when the run is quote-led (only the declaration scan says it
+/// then), the first parenthesized group otherwise ([`plain_function_parts`]); `false` is
+/// "not known".
 #[inline]
 pub(crate) fn parse_single_value(
     s: &str,
@@ -270,6 +273,16 @@ pub(crate) fn parse_single_value(
     group_closes_run: bool,
     stores: &mut CssStores,
 ) -> CssValue {
+    // A run the declaration scan saw as ONE string closing on its last byte
+    // (`group_closes_run` on a quote-led run): a single operand, so neither the splitter
+    // nor the literal's own close scan has anything left to ask.
+    if group_closes_run && matches!(s.as_bytes().first(), Some(b'"' | b'\'')) {
+        debug_assert!(
+            operators::split_value_run(s, colon_is_operator, head_welds).is_none(),
+            "a closed string run splits: {s:?}"
+        );
+        return strings::closed_string_literal(s, span, stores);
+    }
     // A whole-run function under a PLAIN name (`var(--a)`, `rgba(0, 0, 0, 0.5)`,
     // `-webkit-gradient(…)`) is one closed token to the splitter by construction: the name
     // holds no byte that ends a word, and the run ends at the group's own `)`. So it is read
@@ -296,6 +309,17 @@ pub(crate) fn parse_single_value(
         return parse_operator_run(members, span, stores);
     }
 
+    // A digit-led token not ending in `)` is a dimension: no string, function or colour
+    // opens on a digit, and a digit opens a number (`starts_number`).
+    if let [b'0'..=b'9', .., last] | [last @ b'0'..=b'9'] = s.as_bytes()
+        && *last != b')'
+    {
+        debug_assert!(
+            parse_color(s).is_none() && crate::number::starts_number(s),
+            "a digit-led leaf is not a dimension: {s:?}"
+        );
+        return CssValue::Dimension { span };
+    }
     parse_leaf_value(s, span, stores)
 }
 
@@ -438,20 +462,24 @@ pub(in crate::parser) fn plain_function_paren(bytes: &[u8]) -> Option<usize> {
 /// whole of `s[..paren_pos]` and already a valid one (plain ASCII word content, no
 /// whitespace, no escape), so only the paren scan is left to ask.
 ///
-/// And for a declaration's whole value the boundary scan has already asked it.
-/// `group_closes_run` is `ValueFacts::group_closes_value` — the value's first group closes
-/// on its last byte — handed over only with a stated leaf class, so the run is the text
-/// that scan walked, holding no comment, no escape outside a string and no url-token.
-/// `plain_function_paren` puts nothing but name bytes ahead of `paren_pos`, so the `(`
-/// there is the first one the scan nested on, and its close is the run's last byte without
+/// And a scan that already crossed the run has usually asked it. `group_closes_run` says
+/// the run's first group closes on its last byte, from one of four scans: the
+/// declaration's boundary scan (`ValueFacts::group_closes_value`, handed over only with a
+/// stated leaf class, so the run is the text that scan walked, holding no comment, no
+/// escape outside a string and no url-token), and the value parser's own comma split
+/// (`fast_scan` and its segments) and whitespace split (`ValueCursor::consume_until`),
+/// each of which reports a close only for a run it saw no comment in and that is not
+/// quote-led, and steps an escape whole as this scan does. `plain_function_paren` puts
+/// nothing but name bytes ahead of `paren_pos`, so the `(` there is the first one the
+/// reporting scan nested on, and its close is the run's last byte without
 /// [`scan::matching_close_paren`] walking the group again. `false` claims nothing, and the
 /// scan runs as it would for any other leaf.
 ///
-/// The two scans' models differ in ways the stated class rules out — the boundary scan
-/// steps a comment and a url-token whole and declines on an escape, where this one reads
-/// a `/*` as content and steps an escape — and agree on what is left: parens nest, a
-/// string is opaque, `[]` and `{}` move no paren depth. The claim is held to the scan it
-/// replaces in every debug build.
+/// The scans' models differ only in ways those conditions rule out — the boundary scan
+/// steps a comment and a url-token whole and declines on an escape, where this one reads a
+/// `/*` as content — and agree on what is left: parens nest, a string is opaque, `[]` and
+/// `{}` move no paren depth. The claim is held to the scan it replaces in every debug
+/// build.
 fn plain_function_parts(s: &str, paren_pos: usize, group_closes_run: bool) -> Option<(&str, &str)> {
     let close = if group_closes_run {
         debug_assert_eq!(

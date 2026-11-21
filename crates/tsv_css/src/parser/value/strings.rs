@@ -29,30 +29,45 @@ pub(crate) fn parse_string_literal(
         && (quote == b'"' || quote == b'\'')
         && quoted_string_spans_all(bytes)
     {
-        // Extract content without quotes
-        let raw_content = &s[1..s.len() - 1];
-
-        // Decode CSS escape sequences. No-escape strings stay `Verbatim` (zero alloc —
-        // the printer recovers the text from `span`); only escaped strings own pool
-        // text. The quote char is recovered from `source[span.start]`, not stored.
-        let content = match escapes::decode_escape_sequences_in(raw_content, &mut stores.text) {
-            None => StringCooked::Verbatim,
-            Some(decoded) => StringCooked::Decoded(decoded),
-        };
-        debug_assert!(
-            match (&content, escapes::decode_escape_sequences(raw_content)) {
-                (StringCooked::Verbatim, Cow::Borrowed(_)) => true,
-                (StringCooked::Decoded(decoded), Cow::Owned(reference)) => {
-                    stores.text.get(*decoded) == reference
-                }
-                _ => false,
-            },
-            "the pool decoder left the reference decoder on {raw_content:?}"
-        );
-
-        return Some(CssValue::String { content, span });
+        return Some(closed_string_literal(s, span, stores));
     }
     None
+}
+
+/// [`parse_string_literal`] for a run the caller vouches is one closed string (a quote,
+/// then the string, closed by its matching quote on the run's last byte and nowhere
+/// earlier — [`quoted_string_spans_all`], which every debug build asserts).
+///
+/// Out of line: the declaration scan's closed-string arm reaches it from inside
+/// `parse_single_value`, which inlines into the value parser's recursion, and the
+/// decode's locals would otherwise land in that recursive frame.
+#[inline(never)]
+pub(crate) fn closed_string_literal(s: &str, span: Span, stores: &mut CssStores) -> CssValue {
+    debug_assert!(
+        quoted_string_spans_all(s.as_bytes()),
+        "not one closed string: {s:?}"
+    );
+    // Extract content without quotes
+    let raw_content = &s[1..s.len() - 1];
+
+    // Decode CSS escape sequences. No-escape strings stay `Verbatim` (zero alloc — the
+    // printer recovers the text from `span`); only escaped strings own pool text. The
+    // quote char is recovered from `source[span.start]`, not stored.
+    let content = match escapes::decode_escape_sequences_in(raw_content, &mut stores.text) {
+        None => StringCooked::Verbatim,
+        Some(decoded) => StringCooked::Decoded(decoded),
+    };
+    debug_assert!(
+        match (&content, escapes::decode_escape_sequences(raw_content)) {
+            (StringCooked::Verbatim, Cow::Borrowed(_)) => true,
+            (StringCooked::Decoded(decoded), Cow::Owned(reference)) => {
+                stores.text.get(*decoded) == reference
+            }
+            _ => false,
+        },
+        "the pool decoder left the reference decoder on {raw_content:?}"
+    );
+    CssValue::String { content, span }
 }
 
 /// Whether the quoted string that opens at byte 0 of `bytes` spans **all** of `bytes`
@@ -78,7 +93,7 @@ pub(crate) fn parse_string_literal(
 /// false-match a delimiter and no per-char decode is owed. Two spellings of one
 /// grammar also cost twice — this walk was a per-byte match arm chain over the same
 /// bytes `string_end` scans a word at a time.
-fn quoted_string_spans_all(bytes: &[u8]) -> bool {
+pub(crate) fn quoted_string_spans_all(bytes: &[u8]) -> bool {
     matches!(crate::lexer::string_end(bytes, 0), Ok(end) if end == bytes.len())
 }
 
