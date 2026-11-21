@@ -120,6 +120,24 @@ const fn is_trim_boundary_ws(b: u8) -> bool {
     matches!(b, b'\t' | b'\n' | 0x0B | 0x0C | b'\r' | b' ')
 }
 
+/// Is `text` already trimmed, read from its boundary bytes alone? Both ends ASCII and
+/// not whitespace ([`is_trim_boundary_ws`]) ⇒ the ASCII trim is a no-op. `false` for an
+/// empty text, an ASCII-whitespace end (rare: `text` is trimmed in practice) and a
+/// non-ASCII end byte — which may be a non-ASCII space (NBSP, em space), CSS value
+/// content the trimming path keeps.
+#[inline]
+fn has_trimmed_ascii_boundaries(text: &str) -> bool {
+    let bytes = text.as_bytes();
+    matches!(
+        (bytes.first(), bytes.last()),
+        (Some(&first), Some(&last))
+            if first < 0x80
+                && last < 0x80
+                && !is_trim_boundary_ws(first)
+                && !is_trim_boundary_ws(last)
+    )
+}
+
 impl<'a> ValueParser<'a> {
     /// Create parser from value string and its span in full CSS
     ///
@@ -317,6 +335,11 @@ impl<'a> ValueParser<'a> {
     /// It rides to the function leaf's paren scan, which it answers
     /// (`plain_function_parts`); `false` is "not known" and is what every other caller
     /// passes. Read only beside a leaf class — the claim is about the whole text.
+    ///
+    /// The leaf class is most calls, so it is answered here, inline at each caller, and
+    /// everything else goes to [`Self::parse_scanned_rest`] out of line, so a leaf never
+    /// pays that body's prologue or class switch.
+    #[inline]
     pub(crate) fn parse_scanned(
         &self,
         stores: &mut CssStores,
@@ -324,34 +347,42 @@ impl<'a> ValueParser<'a> {
         group_closes_text: bool,
     ) -> CssValue {
         let text = self.text();
-        let bytes = text.as_bytes();
+        // The caller's answer, where it has one. `debug_assert` grades it against the
+        // pass it replaces — the strongest oracle available, since it is the very path
+        // whose answer is being skipped, and every CSS fixture re-proves it. It does not
+        // recurse, so the check costs a debug build a walk or two of `text`.
+        if class == Some(ValueSeparator::None) && has_trimmed_ascii_boundaries(text) {
+            debug_assert!(
+                self.unclassified_path_builds_leaf(text),
+                "caller called {text:?} separator-free, the unclassified path disagreed"
+            );
+            return self.build_scanned_leaf(text, group_closes_text, stores);
+        }
+        self.parse_scanned_rest(stores, class)
+    }
 
-        // Fast path: confirm `text` is already trimmed straight from its boundary
-        // bytes (ASCII and non-whitespace ends ⇒ the ASCII trim is a no-op) and skip
-        // the redundant trim the two-pass path runs. An ASCII-whitespace boundary
-        // (`text` is trimmed in practice, so this is rare) or a non-ASCII boundary
-        // byte falls through to the trimming path below: an ASCII-whitespace end is
-        // trimmed there (same value), while a non-ASCII space (NBSP, em space) is
-        // kept — it is CSS value content, not whitespace.
-        if let (Some(&first), Some(&last)) = (bytes.first(), bytes.last())
-            && first < 0x80
-            && last < 0x80
-            && !is_trim_boundary_ws(first)
-            && !is_trim_boundary_ws(last)
-        {
-            // The caller's answer, where it has one. `debug_assert` grades it against the
-            // pass it replaces — the strongest oracle available, since it is the very
-            // path whose answer is being skipped, and every CSS fixture re-proves it.
-            // Neither arm recurses, so the check costs a debug build a walk or two of
-            // `text`.
+    /// [`Self::parse_scanned`] past its leaf arm: the whitespace and comma classes, the
+    /// unclassified call, and any text whose boundary bytes do not prove it trimmed.
+    #[inline(never)]
+    fn parse_scanned_rest(
+        &self,
+        stores: &mut CssStores,
+        class: Option<ValueSeparator>,
+    ) -> CssValue {
+        let text = self.text();
+        // A leaf class reaches this function only when `parse_scanned`'s boundary test
+        // failed, so it fails the same test below and takes the trimming path.
+        debug_assert!(
+            class != Some(ValueSeparator::None) || !has_trimmed_ascii_boundaries(text),
+            "a trimmed leaf is answered by `parse_scanned`"
+        );
+
+        // Fast path: a text whose boundary bytes prove it already trimmed skips the
+        // redundant trim the two-pass path runs. An ASCII-whitespace end is trimmed by
+        // the path below (same value); a non-ASCII end byte may be a non-ASCII space,
+        // which that path keeps — it is CSS value content, not whitespace.
+        if has_trimmed_ascii_boundaries(text) {
             match class {
-                Some(ValueSeparator::None) => {
-                    debug_assert!(
-                        self.unclassified_path_builds_leaf(text),
-                        "caller called {text:?} separator-free, the unclassified path disagreed"
-                    );
-                    return self.build_scanned_leaf(text, group_closes_text, stores);
-                }
                 Some(ValueSeparator::Whitespace) => {
                     debug_assert!(
                         matches!(self.oracle_scan(text), FastScan::Whitespace),
@@ -359,7 +390,7 @@ impl<'a> ValueParser<'a> {
                     );
                     return self.parse_space_separated(stores);
                 }
-                Some(ValueSeparator::Comma) | None => {}
+                Some(ValueSeparator::None | ValueSeparator::Comma) | None => {}
             }
 
             match self.fast_scan(text, stores) {
@@ -848,6 +879,48 @@ impl<'a> ValueParser<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// `parse_scanned` answers a trimmed leaf inline and hands every other text to
+    /// `parse_scanned_rest`; whatever class a caller states, the value must be the one the
+    /// unclassified parse builds. Texts the boundary test declines (a non-ASCII end, a
+    /// comment) are the hand-off cases the corpus reaches only through the declaration and
+    /// list paths. A text the unclassified path would not build as one leaf is skipped: no
+    /// caller states the leaf class for it (the debug assertion holds callers to that).
+    #[test]
+    fn a_stated_class_parses_as_the_unclassified_path_does() {
+        let leaf_texts = [
+            "u",
+            "f(a)",
+            "u\u{a0}",
+            "\u{a0}u",
+            " u",
+            "u\t",
+            "a/* c */b",
+            "f(a /* c */ b)",
+        ];
+        let list_texts = ["a b", "a b\u{a0}", "\u{a0}a b"];
+        let cases = leaf_texts
+            .iter()
+            .map(|&t| (t, ValueSeparator::None))
+            .chain(list_texts.iter().map(|&t| (t, ValueSeparator::Whitespace)));
+        for (text, class) in cases {
+            let span = Span::new(0, text.len() as u32);
+            let mut stated = CssStores::new();
+            let mut plain = CssStores::new();
+            let parser = ValueParser::new(text, span);
+            if class == ValueSeparator::None && !parser.unclassified_path_builds_leaf(text) {
+                continue;
+            }
+            let a = parser.parse_classified(&mut stated, Some(class));
+            let b = ValueParser::new(text, span).parse(&mut plain);
+            assert_eq!(format!("{a:?}"), format!("{b:?}"), "{text:?} as {class:?}");
+            assert_eq!(
+                stated.runs.values.len(),
+                plain.runs.values.len(),
+                "{text:?} as {class:?}: stores"
+            );
+        }
+    }
 
     /// The **fused-pass invariant**: the three top-level trackers — `fast_scan`,
     /// `ValueCursor::consume_until`, and `classify_separators` — must agree on what is
