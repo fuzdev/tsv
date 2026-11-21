@@ -11,8 +11,8 @@ mod token;
 
 // Re-export public API
 pub(crate) use core::{
-    ES_LINE_TERMINATOR_LEADS, is_es_line_terminator, is_es_line_terminator_at, is_es_whitespace,
-    unicode_escape_len_at,
+    ES_LINE_TERMINATOR_LEADS, ascii_id_run_end, is_ascii_id_start, is_es_line_terminator,
+    is_es_line_terminator_at, is_es_whitespace, unicode_escape_len_at,
 };
 pub(crate) use core::{Lexer, LexerCheckpoint};
 pub(crate) use token::keyword_at;

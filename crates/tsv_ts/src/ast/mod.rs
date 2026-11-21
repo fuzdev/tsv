@@ -444,7 +444,7 @@ impl IdentName {
     /// constructor is handed a span, not the bytes under it, so the span must cover a
     /// reserved or contextual keyword — ASCII by the grammar — or bytes the caller has
     /// checked are ASCII identifier bytes. The callers are the two meta-properties
-    /// (`new.target`, `import.meta`) and `__private::parse_bare_identifier_expression`,
+    /// (`new.target`, `import.meta`) and `__private::parse_bare_name_expression`,
     /// which checks its island's bytes first. Any other caller whose span is an arbitrary
     /// name must build the channel from the token instead
     /// (`Parser::current_raw_ident_name`); the printer's name seam asserts the property

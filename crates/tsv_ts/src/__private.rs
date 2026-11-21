@@ -361,55 +361,134 @@ pub fn parse_expression_with_comments(
     )
 }
 
-/// A host's expression island that is exactly one plain identifier, pushed onto `stores` as
-/// the row [`parse_expression_with_comments`] would build for it — or `None`, and nothing
-/// pushed, for every other island, which takes that parse.
+/// A host's expression island that is exactly one plain name or a `.`-chain of them (`{x}`,
+/// `{user.name}`), pushed onto `stores` as the rows [`parse_expression_with_comments`] would
+/// build for it — or `None`, and nothing pushed, for every other island, which takes that
+/// parse.
 ///
-/// Most expression islands in a Svelte template are one name (`{count}`, `value={x}`), and
-/// each would otherwise construct and drop a whole [`parser::Parser`] to read one token. The
-/// island qualifies when every byte is an ASCII identifier byte (`[A-Za-z0-9_$]`, not led by
-/// a digit) and the lexer's own keyword table ([`crate::lexer::keyword_at`]) names no
-/// keyword: a keyword, a non-ASCII or escaped name, whitespace or a comment all take the
-/// parse, so its reading of every such word — a refusal (`let`), a literal (`true`), an
-/// `await` — stays the one answer. A leaf identifier charges no nesting level, so the depth
-/// guard is belt-and-braces: an island near the limit takes the parse, which owns every depth
-/// answer. It collects no comment, since it holds none.
+/// Most expression islands in a Svelte template are a name or a short member path
+/// (`{count}`, `value={form.email}`), and each would otherwise construct and drop a whole
+/// [`parser::Parser`] to read a few tokens. Every `.`-separated segment must be ASCII
+/// identifier bytes (`[A-Za-z0-9_$]`), not led by a digit, and not a keyword in the lexer's
+/// own table ([`crate::lexer::keyword_at`]), and there are at most
+/// [`BARE_NAME_MAX_SEGMENTS`] of them: a keyword (`this.x`, `a.class`), a non-ASCII or escaped
+/// name, whitespace, a comment, `?.` or any other token all take the parse, so its reading of
+/// every such island — a refusal (`let`), a literal (`true`), an `await` — stays the one
+/// answer. The rows are pushed in the parse's order: the head, then each property and the
+/// member over it. The bounds keep the island far inside every limit the parse counts (a
+/// member link adds a wire level and a spine link), so an island near the nesting limit takes
+/// the parse, which owns every depth answer. It collects no comment, since it holds none.
 ///
 /// Debug builds parse every island this answers into scratch stores as well and assert the
-/// parse built the same row.
-pub fn parse_bare_identifier_expression(
+/// parse built the same tree.
+pub fn parse_bare_name_expression(
     source: &str,
     base_offset: usize,
     host_nesting: u32,
     stores: &mut AstStores,
 ) -> Option<ExprId> {
     let bytes = source.as_bytes();
-    let (&first, rest) = bytes.split_first()?;
-    if !(first.is_ascii_alphabetic() || first == b'_' || first == b'$')
-        || !rest
-            .iter()
-            .all(|&b| b.is_ascii_alphanumeric() || b == b'_' || b == b'$')
-        || bytes.len() > usize::from(u16::MAX)
-        || lexer::keyword_at(bytes, 0, bytes.len()).is_some()
-        || host_nesting + 8 >= tsv_lang::NESTING_LIMIT
+    if bytes.len() > usize::from(u16::MAX)
+        || host_nesting + 8 + BARE_NAME_MAX_SEGMENTS >= tsv_lang::NESTING_LIMIT
     {
         return None;
     }
-    let span = Span::new(base_offset as u32, (base_offset + bytes.len()) as u32);
-    let row = Expression::from_identifier(ast::Identifier::simple(
-        ast::IdentName::from_span(span),
-        span,
-    ));
+    // Segment by segment on the lexer's own name scan, stopping at the first byte no name
+    // path holds: an island that is not one (`{() => f(x)}`) is refused there, never scanned
+    // to its end.
+    let mut segments = 0;
+    let mut start = 0;
+    loop {
+        if !bytes
+            .get(start)
+            .is_some_and(|&b| lexer::is_ascii_id_start(b))
+        {
+            return None;
+        }
+        let end = lexer::ascii_id_run_end(bytes, start);
+        if lexer::keyword_at(bytes, start, end - start).is_some() {
+            return None;
+        }
+        segments += 1;
+        match bytes.get(end) {
+            None => break,
+            Some(b'.') if segments < BARE_NAME_MAX_SEGMENTS => start = end + 1,
+            Some(_) => return None,
+        }
+    }
+    let expr = push_bare_name(bytes, base_offset, stores);
     #[cfg(debug_assertions)]
-    assert_parse_builds_row(source, base_offset, host_nesting, &row);
-    Some(push(stores, row))
+    assert_parse_builds_tree(source, base_offset, host_nesting, stores.view(), expr);
+    Some(expr)
 }
 
-/// [`parse_bare_identifier_expression`]'s debug differential: the parse of `source` builds
-/// `row`.
+/// The most `.`-separated segments [`parse_bare_name_expression`] answers; a longer path
+/// takes the parse.
+const BARE_NAME_MAX_SEGMENTS: u32 = 8;
+
+/// Push the rows of the name path `bytes` (checked by [`parse_bare_name_expression`]),
+/// sitting at `base_offset`, and return the outermost.
+fn push_bare_name(bytes: &[u8], base_offset: usize, stores: &mut AstStores) -> ExprId {
+    let start = base_offset as u32;
+    let push_name = |stores: &mut AstStores, from: u32, len: usize| {
+        let span = Span::new(from, from + len as u32);
+        let name = push(
+            stores,
+            Expression::from_identifier(ast::Identifier::simple(
+                ast::IdentName::from_span(span),
+                span,
+            )),
+        );
+        (name, span.end)
+    };
+    let mut segments = bytes.split(|&b| b == b'.');
+    let head_len = segments.next().map_or(0, <[u8]>::len);
+    let (mut expr, mut end) = push_name(stores, start, head_len);
+    for segment in segments {
+        let (property, property_end) = push_name(stores, end + 1, segment.len());
+        expr = push(
+            stores,
+            Expression {
+                span: Span::new(start, property_end),
+                kind: ExpressionKind::MemberExpression(ast::MemberExpression {
+                    object: expr,
+                    property,
+                    computed: false,
+                    optional: false,
+                }),
+            },
+        );
+        end = property_end;
+    }
+    expr
+}
+
+/// [`parse_bare_name_expression`]'s debug differential: the parse of `source` builds the
+/// tree rooted at `expr` in `view`.
 #[cfg(debug_assertions)]
 #[expect(clippy::expect_used)]
-fn assert_parse_builds_row(source: &str, base_offset: usize, host_nesting: u32, row: &Expression) {
+fn assert_parse_builds_tree(
+    source: &str,
+    base_offset: usize,
+    host_nesting: u32,
+    view: AstView<'_>,
+    expr: ExprId,
+) {
+    /// The row of `id` with its children resolved, so trees in two stores compare.
+    fn tree(view: AstView<'_>, id: ExprId) -> String {
+        let row = view.expr(id);
+        match row.kind {
+            ExpressionKind::MemberExpression(member) => format!(
+                "Member({:?}, {:?}, {:?}, {}, {})",
+                row.span,
+                member.computed,
+                member.optional,
+                tree(view, member.object),
+                tree(view, member.property)
+            ),
+            _ => format!("{row:?}"),
+        }
+    }
     let mut scratch = AstStores::default();
     let (parsed, _) = parse_expression_with_comments(
         source,
@@ -419,11 +498,11 @@ fn assert_parse_builds_row(source: &str, base_offset: usize, host_nesting: u32, 
         "end of input",
         |_, _| Ok(()),
     )
-    .expect("a bare identifier island parses");
+    .expect("a bare name island parses");
     assert_eq!(
-        format!("{:?}", scratch.view().expr(parsed)),
-        format!("{row:?}"),
-        "the bare-identifier island built a row the parse does not: {source:?}"
+        tree(scratch.view(), parsed),
+        tree(view, expr),
+        "the bare-name island built a tree the parse does not: {source:?}"
     );
 }
 

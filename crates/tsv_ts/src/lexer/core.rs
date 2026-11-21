@@ -54,7 +54,7 @@ const ID_CONTINUE_LUT: [bool; 256] = {
 /// ASCII subset of `ID_Start` (`a-z A-Z _ $`) — the byte-cursor fast path before
 /// falling back to the full Unicode `is_id_start` on a decoded char.
 #[inline]
-const fn is_ascii_id_start(b: u8) -> bool {
+pub(crate) const fn is_ascii_id_start(b: u8) -> bool {
     ID_START_LUT[b as usize]
 }
 
@@ -73,7 +73,7 @@ const fn is_ascii_id_continue(b: u8) -> bool {
 /// byte is still the table's to classify; only the bound check is shared across the chunk.
 /// Eight rather than four because most names end inside the first chunk.
 #[inline]
-fn ascii_id_run_end(bytes: &[u8], start: usize) -> usize {
+pub(crate) fn ascii_id_run_end(bytes: &[u8], start: usize) -> usize {
     const CHUNK: usize = 8;
     let mut end = start + 1;
     while let Some(chunk) = bytes.get(end..end + CHUNK) {
