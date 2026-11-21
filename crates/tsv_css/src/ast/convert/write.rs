@@ -49,8 +49,9 @@
 //!
 //! - The emitters that carry ~37% of the corpus's nodes — the rule
 //!   (`write_rule`), the relative selector (`write_relative_selector`), and the
-//!   named selectors (`write_named_selector`, and the namespaced arm of
-//!   `write_type_selector`, which writes the same tail itself) — close through
+//!   named selectors (`write_named_selector`, the class / id / type / pseudo names
+//!   `write_selector_name` writes before the same tail, and the namespaced arm of
+//!   `write_type_selector`, which writes that tail itself) — close through
 //!   [`JsonWriter::start_end_tail`]: the lead, the key, both integers and the
 //!   closing byte stored into one fixed-width window of the buffer, inline at the
 //!   site.
@@ -274,12 +275,29 @@ fn write_string(w: &mut JsonWriter, s: &str) {
     w.string_led_words(&[], s.as_bytes());
 }
 
+/// A selector name written from source: `span` less `prefix_len` bytes of sigil, with
+/// [`raw_selector_name`]'s escape scan and [`write_string`]'s JSON-escape scan asked as
+/// one. A name with no `\`, `"`, control or non-ASCII byte is written straight.
+#[inline(never)]
+fn write_selector_name(w: &mut JsonWriter, source: &str, span: Span, prefix_len: usize) {
+    let (start, end) = (span.start as usize + prefix_len, span.end as usize);
+    let bytes = source.as_bytes();
+    if start <= end
+        && end <= bytes.len()
+        && tsv_lang::swar::next_byte_below_or_of(bytes, start, end, 0x20, [b'\\', b'"']) == end
+    {
+        w.string_escape_free_led(b"", &bytes[start..end]);
+        return;
+    }
+    write_string(w, &raw_selector_name(source, span, prefix_len));
+}
+
 /// [`write_string`] behind its field's key `lead` (`,"property":`), written as part of the
 /// string's own window append rather than as an append of its own — one out-of-line copy per
 /// key, for the two fields every declaration carries.
 #[inline(never)]
-fn write_keyed_string<const K: usize>(w: &mut JsonWriter, lead: &[u8; K], s: &str) {
-    w.string_led_words(lead, s.as_bytes());
+fn write_keyed_string<const K: usize>(w: &mut JsonWriter, lead: &[u8; K], s: &[u8]) {
+    w.string_led_words(lead, s);
 }
 
 /// The standalone `StyleSheetFile` root: `type`, `start` (0), `end` (source
@@ -485,13 +503,6 @@ fn write_block(
     ctx: &Ctx<'_>,
     comments: &mut Vec<WireComment>,
 ) {
-    comments.extend(children.iter().filter_map(|c| match c {
-        ast::CssBlockChild::Comment(c) => Some(WireComment {
-            span: c.span,
-            position: None,
-        }),
-        _ => None,
-    }));
     ctx.head(
         w,
         b"{\"type\":\"Block\",\"start\":",
@@ -499,14 +510,21 @@ fn write_block(
         block_span.end,
         b",\"children\":[",
     );
-    write_array_open(
-        w,
-        b"",
-        children
-            .iter()
-            .filter(|c| !matches!(c, ast::CssBlockChild::Comment(_))),
-        |w, c| write_block_child(w, c, ctx, comments),
-    );
+    let mut first = true;
+    for child in children {
+        if let ast::CssBlockChild::Comment(c) = child {
+            comments.push(WireComment {
+                span: c.span,
+                position: None,
+            });
+            continue;
+        }
+        if !first {
+            w.raw(",");
+        }
+        first = false;
+        write_block_child(w, child, ctx, comments);
+    }
     w.raw("]}");
 }
 
@@ -586,6 +604,42 @@ fn write_declaration(
     ctx: &Ctx<'_>,
     comments: &mut Vec<WireComment>,
 ) {
+    // A comment-free declaration whose trims stop on plain ASCII bytes is written straight
+    // from the source bytes: its `property` and `value` are the slices `split_declaration`
+    // and the wire trims (`trim_wire_end`, `trim_wire_start`, the class `trim_wire` names)
+    // produce, asked on bytes. A trim that stops where the class may go on — `<VT>` or a
+    // non-ASCII byte (`tsv_lang::stop_byte_may_be_js_whitespace`) — takes the `str` path.
+    if !decl.has_block_comment {
+        let bytes = ctx.source.as_bytes();
+        let content_end = decl
+            .important_end
+            .map_or(decl.span.end, |e| e.max(decl.span.end));
+        let end = crate::comments::scan_to_terminator(ctx.source, content_end as usize);
+        let colon = decl.colon_offset as usize;
+        if let (Some(property), Some(value)) = (
+            bytes.get(decl.span.start as usize..colon),
+            bytes.get(colon + 1..end),
+        ) {
+            let property = property.trim_ascii_end();
+            let value = value.trim_ascii();
+            if !(tsv_lang::stop_byte_may_be_js_whitespace(property.last())
+                || tsv_lang::stop_byte_may_be_js_whitespace(value.first())
+                || tsv_lang::stop_byte_may_be_js_whitespace(value.last()))
+            {
+                ctx.head(
+                    w,
+                    b"{\"type\":\"Declaration\",\"start\":",
+                    decl.span.start,
+                    end as u32,
+                    b"",
+                );
+                write_keyed_string(w, b",\"property\":", property);
+                write_keyed_string(w, b",\"value\":", value);
+                w.raw("}");
+                return;
+            }
+        }
+    }
     let split = split_declaration(decl, ctx.source);
     let value: Cow<'_, str> = if decl.has_block_comment {
         strip_css_comments_collecting(split.value, split.value_start, comments)
@@ -602,8 +656,12 @@ fn write_declaration(
         split.end,
         b"",
     );
-    write_keyed_string(w, b",\"property\":", trim_wire_end(split.property));
-    write_keyed_string(w, b",\"value\":", &value);
+    write_keyed_string(
+        w,
+        b",\"property\":",
+        trim_wire_end(split.property).as_bytes(),
+    );
+    write_keyed_string(w, b",\"value\":", value.as_bytes());
     w.raw("}");
 }
 
@@ -706,7 +764,12 @@ fn write_simple_selector(w: &mut JsonWriter, simple: &ast::SimpleSelector, ctx: 
             span,
         } => {
             let name = match namespace_span {
-                None => raw_selector_name(ctx.source, *span, 0),
+                None => {
+                    w.raw("{\"type\":\"TypeSelector\",\"name\":");
+                    write_selector_name(w, ctx.source, *span, 0);
+                    ctx.tail(w, b",", span.start, span.end, b"}");
+                    return;
+                }
                 // Step forward from the prefix token rather than scanning for a `|`: the
                 // separator is the next non-trivia byte after the prefix, and the element
                 // name the next one after that. Both junctures may hold a comment
@@ -729,14 +792,14 @@ fn write_simple_selector(w: &mut JsonWriter, simple: &ast::SimpleSelector, ctx: 
         ast::SimpleSelector::Class { span } => {
             // Past the `.` AND any comment glued to it (`./* c */cls`) — never a bare `1`.
             let name_start = crate::comments::class_name_start(ctx.source.as_bytes(), span.start);
-            let name = raw_selector_name(ctx.source, *span, (name_start - span.start) as usize);
             w.raw("{\"type\":\"ClassSelector\",\"name\":");
-            write_named_selector(w, &name, *span, ctx);
+            write_selector_name(w, ctx.source, *span, (name_start - span.start) as usize);
+            ctx.tail(w, b",", span.start, span.end, b"}");
         }
         ast::SimpleSelector::Id { span } => {
-            let name = raw_selector_name(ctx.source, *span, 1);
             w.raw("{\"type\":\"IdSelector\",\"name\":");
-            write_named_selector(w, &name, *span, ctx);
+            write_selector_name(w, ctx.source, *span, 1);
+            ctx.tail(w, b",", span.start, span.end, b"}");
         }
         ast::SimpleSelector::Nesting { span } => {
             w.raw("{\"type\":\"NestingSelector\",\"name\":");
@@ -788,9 +851,8 @@ fn write_simple_selector(w: &mut JsonWriter, simple: &ast::SimpleSelector, ctx: 
                 start: crate::comments::pseudo_name_start(ctx.source.as_bytes(), span.start),
                 end: *name_end,
             };
-            let name = raw_selector_name(ctx.source, name_span, 0);
             w.raw("{\"type\":\"PseudoClassSelector\",\"name\":");
-            write_string(w, &name);
+            write_selector_name(w, ctx.source, name_span, 0);
             w.raw(",\"args\":");
             write_or_null(w, args.as_ref(), |w, a| write_pseudo_args(w, a, ctx));
             w.span_start_end_field(ctx.positions, span.start, span.end);
@@ -804,16 +866,12 @@ fn write_simple_selector(w: &mut JsonWriter, simple: &ast::SimpleSelector, ctx: 
             let name_end = *name_end;
             // Past BOTH colons and any comment glued to either (`:/* c */:before`) —
             // never a bare `2`.
-            let name = raw_selector_name(
-                ctx.source,
-                Span {
-                    start: crate::comments::pseudo_name_start(ctx.source.as_bytes(), span.start),
-                    end: name_end,
-                },
-                0,
-            );
+            let name_span = Span {
+                start: crate::comments::pseudo_name_start(ctx.source.as_bytes(), span.start),
+                end: name_end,
+            };
             w.raw("{\"type\":\"PseudoElementSelector\",\"name\":");
-            write_string(w, &name);
+            write_selector_name(w, ctx.source, name_span, 0);
             w.span_start_end_field(ctx.positions, span.start, span.end);
             // `args` is emitted only when present — Svelte spreads the key in
             // conditionally (`...(args && { args })`), so an argument-less
@@ -901,8 +959,9 @@ fn write_type_selector(
     ctx.tail(w, b",", span.start, span.end, b"}");
 }
 
-/// The shared `{type, name, start, end}` shape (Class/Id/Nesting, and a `TypeSelector`
-/// with no namespace), from the name on: the caller has written the node's head,
+/// The shared `{type, name, start, end}` shape for a name already in hand — the nesting
+/// `&` and a universal `*` with no namespace — from the name on (a name read from source
+/// is [`write_selector_name`]'s, followed by the same tail): the caller has written the node's head,
 /// `{"type":"…","name":`, as one literal of its own — a constant-width store at each
 /// site, where a node type handed down here would be three appends, the middle one a
 /// runtime-length copy.
@@ -1001,7 +1060,8 @@ fn write_part_args(w: &mut JsonWriter, ident_spans: &[Span], ctx: &Ctx<'_>) {
                 ctx,
                 |w, ctx| {
                     w.raw("{\"type\":\"TypeSelector\",\"name\":");
-                    write_named_selector(w, &raw_selector_name(ctx.source, *span, 0), *span, ctx);
+                    write_selector_name(w, ctx.source, *span, 0);
+                    ctx.tail(w, b",", span.start, span.end, b"}");
                 },
             );
         });

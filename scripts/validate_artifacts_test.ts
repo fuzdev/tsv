@@ -209,8 +209,8 @@ test("a subset's distance below `all` outside its band fails", async () => {
 	deepStrictEqual(
 		narrow.out.filter((line) => line.includes('(npm) =')),
 		[
-			'  FAIL: all - format (npm) = 301.0 KB — expected ≥301.0 KB (feature gate broken?)',
-			'  PASS: all - parse (npm) = 1.95 MB'
+			'  FAIL: all - format (npm) = 327.0 KB — expected ≥327.0 KB (feature gate broken?)',
+			'  PASS: all - parse (npm) = 1.97 MB'
 		]
 	);
 	const wide = await run(

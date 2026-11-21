@@ -134,9 +134,9 @@ export const BOUNDS = {
 // both deltas: `all − format` is the parse wire, the type strip and the import records
 // together, the import records its smallest part.
 //
-// At the current center: `all − format` 327,255 B; `all − parse` 1,974,258 B.
+// At the current centers: `all − format` 355,334 B; `all − parse` 1,974,258 B.
 export const DELTAS = {
-	format: { min: 301_000, max: 353_000 }, // all − format
+	format: { min: 327_000, max: 384_000 }, // all − format
 	parse: { min: 1_816_000, max: 2_132_000 } // all − parse
 };
 

@@ -188,8 +188,11 @@ pub fn trim_js_whitespace(s: &str) -> &str {
 
 /// Whether the byte a `trim_ascii*` stopped on may still belong to [`is_js_whitespace`]: `<VT>`,
 /// or any byte of a non-ASCII char (a lead byte at a head, a continuation byte at a tail).
+/// A byte-level fast path that trims with `trim_ascii*` asks this of each stop byte, and
+/// falls back to the `str` trims when it answers `true`.
 #[inline]
-const fn stop_byte_may_be_js_whitespace(b: Option<&u8>) -> bool {
+#[must_use]
+pub const fn stop_byte_may_be_js_whitespace(b: Option<&u8>) -> bool {
     matches!(b, Some(&b) if b == 0x0b || b >= 0x80)
 }
 

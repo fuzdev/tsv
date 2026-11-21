@@ -144,5 +144,6 @@ pub use span::Span;
 pub use stack::{STACK_SIZE, run_with_stack};
 #[doc(hidden)]
 pub use whitespace::{
-    is_js_whitespace, trim_end_js_whitespace, trim_js_whitespace, trim_start_js_whitespace,
+    is_js_whitespace, stop_byte_may_be_js_whitespace, trim_end_js_whitespace, trim_js_whitespace,
+    trim_start_js_whitespace,
 };
