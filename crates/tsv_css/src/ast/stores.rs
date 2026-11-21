@@ -344,7 +344,10 @@ mod tests {
     use super::*;
     use crate::ast::{CssAtrule, CssBlockChild, CssNode, PreludeValue, PseudoClassArgs};
     use tsv_lang::store::PoolText;
-    use tsv_lang::value_runs::FieldKind;
+    use tsv_lang::value_runs::{
+        FieldKind, assert_every_field_written, assert_rejected_under_the_store_check,
+        assert_rewound,
+    };
 
     /// A stylesheet whose parse writes every store: a top-level at-rule over a rule (the
     /// nodes and the block children), its `@supports` condition with a `selector()` argument
@@ -445,43 +448,6 @@ mod tests {
         stores.text.push("a pooled string")
     }
 
-    /// Asserts `filled` wrote every field, so a field nothing fills cannot pass a rewind test
-    /// by standing empty: a store past slot 0, a scratch stack holding an element, the pool
-    /// past its sentinel — every store the value-run macro declares among them.
-    fn assert_every_field_written(filled: &[FieldShape]) {
-        let unwritten: Vec<_> = filled
-            .iter()
-            .filter(|shape| match shape.kind {
-                FieldKind::Store | FieldKind::Pool => shape.len <= 1,
-                FieldKind::Scratch => shape.len == 0,
-            })
-            .map(|shape| shape.name)
-            .collect();
-        assert!(
-            unwritten.is_empty(),
-            "the fill leaves these unwritten: {unwritten:?}"
-        );
-        for field in RunStores::FIELDS {
-            assert!(
-                filled.iter().any(|shape| shape.name == *field),
-                "{field} has no shape"
-            );
-        }
-    }
-
-    fn assert_rewound(filled: &[FieldShape], rewound: &[FieldShape]) {
-        assert_eq!(filled.len(), rewound.len());
-        for (before, after) in filled.iter().zip(rewound) {
-            assert_eq!(before.name, after.name);
-            assert_eq!(after.len, before.rewound_len(), "{}", before.name);
-            assert_eq!(
-                after.capacity, before.capacity,
-                "{} keeps its capacity",
-                before.name
-            );
-        }
-    }
-
     /// The scratch stacks' names and heights.
     fn scratch_heights(stores: &CssStores) -> Vec<(&'static str, usize)> {
         stores
@@ -521,7 +487,7 @@ mod tests {
         let text = fill_every_field(&mut stores);
         assert_eq!(stores.view().text(text), "a pooled string");
         let filled = stores.shapes();
-        assert_every_field_written(&filled);
+        assert_every_field_written(&filled, RunStores::FIELDS);
         stores.reset();
         assert_rewound(&filled, &stores.shapes());
         // the next stylesheet's first string lands where the last one's did
@@ -538,7 +504,7 @@ mod tests {
         let mut stores = CssStores::new();
         fill_every_field(&mut stores);
         let filled = stores.shapes();
-        assert_every_field_written(&filled);
+        assert_every_field_written(&filled, RunStores::FIELDS);
         #[cfg(debug_assertions)]
         assert!(!stores.scratch_is_empty());
         stores.clear_scratch();
@@ -650,7 +616,7 @@ mod tests {
             fill_every_field(stores);
             stores.shapes()
         });
-        assert_every_field_written(&filled);
+        assert_every_field_written(&filled, RunStores::FIELDS);
         let rewound = warm.with(|stores| stores.shapes());
         assert_rewound(&filled, &rewound);
     }
@@ -661,7 +627,7 @@ mod tests {
             fill_every_field(stores);
             stores.shapes()
         });
-        assert_every_field_written(&filled);
+        assert_every_field_written(&filled, RunStores::FIELDS);
         let rewound = with_stores(|stores| stores.shapes());
         assert_rewound(&filled, &rewound);
     }
@@ -716,23 +682,6 @@ mod tests {
             at,
             "the stores come back through the slot"
         );
-    }
-
-    /// Whether `read` is refused as the store-check build refuses a handle from another
-    /// generation; an unstamped build reads it in bounds instead.
-    fn assert_rejected_under_the_store_check(read: impl FnOnce()) {
-        let read = std::panic::catch_unwind(std::panic::AssertUnwindSafe(read));
-        if tsv_lang::store::STORE_CHECK {
-            let message = read.expect_err("a retained handle is rejected");
-            let message = message
-                .downcast_ref::<String>()
-                .map(String::as_str)
-                .or_else(|| message.downcast_ref::<&str>().copied())
-                .expect("a panic message");
-            assert!(message.contains("store stamp mismatch"), "{message}");
-        } else {
-            assert!(read.is_ok(), "unstamped, a retained handle reads in bounds");
-        }
     }
 
     /// A pool text kept past the park reads the next stylesheet's text in bounds; the

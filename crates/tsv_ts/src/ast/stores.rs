@@ -969,6 +969,9 @@ mod tests {
         TSTypeElement, ThisExpression,
     };
     use tsv_lang::store::flush_run;
+    use tsv_lang::value_runs::{
+        assert_every_field_written, assert_rejected_under_the_store_check, assert_rewound,
+    };
 
     const SPAN: Span = Span { start: 0, end: 0 };
 
@@ -1413,46 +1416,12 @@ type U = V | W;
         stores.ty_list_scratch.push(ty);
     }
 
-    /// Asserts `filled` wrote every field, so a field nothing fills cannot pass a rewind test
-    /// by standing empty: a store past slot 0, a scratch stack holding an element, the pool
-    /// past its sentinel.
-    fn assert_every_field_written(filled: &[FieldShape]) {
-        let unwritten: Vec<_> = filled
-            .iter()
-            .filter(|shape| match shape.kind {
-                FieldKind::Store | FieldKind::Pool => shape.len <= 1,
-                FieldKind::Scratch => shape.len == 0,
-            })
-            .map(|shape| shape.name)
-            .collect();
-        assert!(
-            unwritten.is_empty(),
-            "the fill leaves these unwritten: {unwritten:?}"
-        );
-    }
-
-    /// Asserts `rewound` is `filled` after a reset: every field back at its rewound length,
-    /// slot 0 and the sentinel kept, and no capacity shrunk or grown.
-    fn assert_rewound(filled: &[FieldShape], rewound: &[FieldShape]) {
-        let expected: Vec<FieldShape> = filled
-            .iter()
-            .map(|&shape| FieldShape {
-                len: shape.rewound_len(),
-                ..shape
-            })
-            .collect();
-        assert_eq!(
-            rewound, expected,
-            "every field rewinds and keeps its capacity"
-        );
-    }
-
     #[test]
     fn a_reset_rewinds_every_field() {
         let mut stores = AstStores::new();
         fill_every_field(&mut stores);
         let filled = stores.shapes();
-        assert_every_field_written(&filled);
+        assert_every_field_written(&filled, RunStores::FIELDS);
         stores.reset();
         assert_rewound(&filled, &stores.shapes());
     }
@@ -1483,7 +1452,7 @@ type U = V | W;
         let mut stores = AstStores::new();
         fill_every_field(&mut stores);
         let filled = stores.shapes();
-        assert_every_field_written(&filled);
+        assert_every_field_written(&filled, RunStores::FIELDS);
         #[cfg(debug_assertions)]
         assert!(!stores.scratch_is_empty());
         stores.clear_scratch();
@@ -1603,7 +1572,7 @@ type U = V | W;
         let mut stores = AstStores::new();
         fill_every_field(&mut stores);
         let filled = stores.shapes();
-        assert_every_field_written(&filled);
+        assert_every_field_written(&filled, RunStores::FIELDS);
         stores.reset();
         let rewound = stores.shapes();
         assert_rewound(&filled, &rewound);
@@ -1664,7 +1633,7 @@ type U = V | W;
             fill_every_field(stores);
             stores.shapes()
         });
-        assert_every_field_written(&filled);
+        assert_every_field_written(&filled, RunStores::FIELDS);
         let rewound = warm.with(|stores| stores.shapes());
         assert_rewound(&filled, &rewound);
     }
@@ -1675,7 +1644,7 @@ type U = V | W;
             fill_every_field(stores);
             stores.shapes()
         });
-        assert_every_field_written(&filled);
+        assert_every_field_written(&filled, RunStores::FIELDS);
         let rewound = with_stores(|stores: &mut AstStores| stores.shapes());
         assert_rewound(&filled, &rewound);
     }
@@ -1736,23 +1705,6 @@ type U = V | W;
             at,
             "the stores come back through the slot"
         );
-    }
-
-    /// Whether `read` is refused as the store-check build refuses a handle from another
-    /// generation; an unstamped build reads it in bounds instead.
-    fn assert_rejected_under_the_store_check(read: impl FnOnce()) {
-        let read = std::panic::catch_unwind(std::panic::AssertUnwindSafe(read));
-        if tsv_lang::store::STORE_CHECK {
-            let message = read.expect_err("a retained handle is rejected");
-            let message = message
-                .downcast_ref::<String>()
-                .map(String::as_str)
-                .or_else(|| message.downcast_ref::<&str>().copied())
-                .expect("a panic message");
-            assert!(message.contains("store stamp mismatch"), "{message}");
-        } else {
-            assert!(read.is_ok(), "unstamped, a retained handle reads in bounds");
-        }
     }
 
     /// An id or a pool text kept past the park reads the next document's rows or text in

@@ -345,7 +345,7 @@ impl WarmStores {
 mod tests {
     use super::*;
     use crate::ast::{Attribute, FragmentNode, SvelteView};
-    use tsv_lang::value_runs::FieldKind;
+    use tsv_lang::value_runs::{FieldKind, assert_every_field_written, assert_rewound};
 
     /// Where each half lives: a take that hands back the allocations a park left reads the
     /// same three addresses.
@@ -712,27 +712,6 @@ mod tests {
         runs.wire_param_scratch.push(wire);
     }
 
-    fn assert_every_own_field_written(filled: &[FieldShape]) {
-        let unwritten: Vec<_> = filled
-            .iter()
-            .filter(|shape| match shape.kind {
-                FieldKind::Store | FieldKind::Pool => shape.len <= 1,
-                FieldKind::Scratch => shape.len == 0,
-            })
-            .map(|shape| shape.name)
-            .collect();
-        assert!(
-            unwritten.is_empty(),
-            "the fill leaves these unwritten: {unwritten:?}"
-        );
-        for field in SvelteRuns::FIELDS {
-            assert!(
-                filled.iter().any(|shape| shape.name == *field),
-                "{field} has no shape"
-            );
-        }
-    }
-
     fn assert_own_scratch_empty(stores: &SvelteStores) {
         let open: Vec<_> = stores
             .own
@@ -764,37 +743,22 @@ mod tests {
         let mut stores = SvelteStores::new();
         fill_own(&mut stores);
         let filled = stores.own.shapes();
-        assert_every_own_field_written(&filled);
+        assert_every_field_written(&filled, SvelteRuns::FIELDS);
         stores.reset();
-        let rewound = stores.own.shapes();
-        for (before, after) in filled.iter().zip(&rewound) {
-            assert_eq!(before.name, after.name);
-            assert_eq!(after.len, before.rewound_len(), "{}", before.name);
-            assert_eq!(
-                after.capacity, before.capacity,
-                "{} keeps its capacity",
-                before.name
-            );
-        }
+        assert_rewound(&filled, &stores.own.shapes());
         let mut warm = WarmStores::default();
         let parked = warm.with(|stores| {
             fill_own(stores);
             stores.own.shapes()
         });
         let taken = warm.with(|stores| stores.own.shapes());
-        for (before, after) in parked.iter().zip(&taken) {
-            assert_eq!(after.len, before.rewound_len(), "{}", before.name);
-            assert_eq!(after.capacity, before.capacity, "{}", before.name);
-        }
+        assert_rewound(&parked, &taken);
         let parked = with_stores(|stores| {
             fill_own(stores);
             stores.own.shapes()
         });
         let taken = with_stores(|stores| stores.own.shapes());
-        for (before, after) in parked.iter().zip(&taken) {
-            assert_eq!(after.len, before.rewound_len(), "{}", before.name);
-            assert_eq!(after.capacity, before.capacity, "{}", before.name);
-        }
+        assert_rewound(&parked, &taken);
     }
 
     /// `clear_scratch` empties every scratch stack of the own half and touches nothing else.
@@ -803,7 +767,7 @@ mod tests {
         let mut stores = SvelteStores::new();
         fill_own(&mut stores);
         let filled = stores.own.shapes();
-        assert_every_own_field_written(&filled);
+        assert_every_field_written(&filled, SvelteRuns::FIELDS);
         stores.own.clear_scratch();
         assert_own_scratch_empty(&stores);
         let expected: Vec<FieldShape> = filled

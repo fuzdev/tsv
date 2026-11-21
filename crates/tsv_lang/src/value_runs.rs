@@ -1,5 +1,6 @@
 //! [`value_runs!`](crate::value_runs!), the declaration of a language crate's value-run stores,
-//! and [`FieldShape`], what a test reads of one store, scratch stack or pool.
+//! and [`FieldShape`], what a test reads of one store, scratch stack or pool, with the
+//! assertions the language crates' stores tests make over it.
 //!
 //! A value run is a list whose elements are built whole and stand nowhere else: a
 //! [`Run`](crate::store::Run) over a [`Store`] of the element type, built on that type's
@@ -335,9 +336,89 @@ impl FieldShape {
     }
 }
 
+/// Asserts `filled` wrote every field, so a field nothing fills cannot pass a rewind test by
+/// standing empty: a store past slot 0, a scratch stack holding an element, the pool past its
+/// sentinel — and that every name in `fields` (a [`value_runs!`](crate::value_runs!) struct's
+/// `FIELDS`) has a shape among them.
+///
+/// A helper of the language crates' stores tests, here so each crate's reads the same.
+/// `#[inline]`, so only a test build that calls it codegens it: no shipped build lays out its
+/// code, or the formatting instances it reaches.
+#[doc(hidden)]
+#[inline]
+pub fn assert_every_field_written(filled: &[FieldShape], fields: &[&str]) {
+    let unwritten: Vec<_> = filled
+        .iter()
+        .filter(|shape| match shape.kind {
+            FieldKind::Store | FieldKind::Pool => shape.len <= 1,
+            FieldKind::Scratch => shape.len == 0,
+        })
+        .map(|shape| shape.name)
+        .collect();
+    assert!(
+        unwritten.is_empty(),
+        "the fill leaves these unwritten: {unwritten:?}"
+    );
+    for field in fields {
+        assert!(
+            filled.iter().any(|shape| shape.name == *field),
+            "{field} has no shape"
+        );
+    }
+}
+
+/// Asserts `rewound` is `filled` after a reset, field by field: every field back at its
+/// rewound length ([`FieldShape::rewound_len`]), slot 0 and the sentinel kept, and no capacity
+/// shrunk or grown.
+///
+/// A helper of the language crates' stores tests, here so each crate's reads the same.
+/// `#[inline]`, so only a test build that calls it codegens it: no shipped build lays out its
+/// code, or the formatting instances it reaches.
+#[doc(hidden)]
+#[inline]
+pub fn assert_rewound(filled: &[FieldShape], rewound: &[FieldShape]) {
+    assert_eq!(filled.len(), rewound.len(), "the same fields");
+    for (&before, &after) in filled.iter().zip(rewound) {
+        assert_eq!(
+            after,
+            FieldShape {
+                len: before.rewound_len(),
+                ..before
+            },
+            "{} rewinds and keeps its capacity",
+            before.name
+        );
+    }
+}
+
+/// Asserts `read` is refused as the store-check build refuses a handle from another
+/// generation (a panic naming the stamp mismatch), and that an unstamped build reads it in
+/// bounds instead.
+///
+/// A helper of the language crates' stores tests, here so each crate's reads the same.
+#[doc(hidden)]
+#[expect(
+    clippy::expect_used,
+    reason = "a test helper: a failed expectation is the assertion"
+)]
+pub fn assert_rejected_under_the_store_check(read: impl FnOnce()) {
+    let read = std::panic::catch_unwind(std::panic::AssertUnwindSafe(read));
+    if crate::store::STORE_CHECK {
+        let message = read.expect_err("a retained handle is rejected");
+        let message = message
+            .downcast_ref::<String>()
+            .map(String::as_str)
+            .or_else(|| message.downcast_ref::<&str>().copied())
+            .expect("a panic message");
+        assert!(message.contains("store stamp mismatch"), "{message}");
+    } else {
+        assert!(read.is_ok(), "unstamped, a retained handle reads in bounds");
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{FieldKind, FieldShape};
+    use super::{FieldKind, FieldShape, assert_every_field_written, assert_rewound};
     use crate::Span;
     use crate::store::{ListBuf, MarkGroup, PoolText, Row, Run, Store, TextPool};
 
@@ -496,18 +577,6 @@ mod tests {
         stores.lists.branch_scratch.push(row);
         stores.lists.token_scratch.push(Token(0));
         stores.lists.span_scratch.push(span(0));
-    }
-
-    fn assert_every_field_written(filled: &[FieldShape]) {
-        let unwritten: Vec<_> = filled
-            .iter()
-            .filter(|shape| match shape.kind {
-                FieldKind::Store | FieldKind::Pool => shape.len <= 1,
-                FieldKind::Scratch => shape.len == 0,
-            })
-            .map(|shape| shape.name)
-            .collect();
-        assert!(unwritten.is_empty(), "left unwritten: {unwritten:?}");
     }
 
     #[test]
@@ -682,7 +751,7 @@ mod tests {
         let mut stores = ToyStores::new();
         fill(&mut stores);
         let filled = stores.shapes();
-        assert_every_field_written(&filled);
+        assert_every_field_written(&filled, ToyLists::FIELDS);
         #[cfg(debug_assertions)]
         assert!(!stores.lists.scratch_is_empty());
         stores.lists.clear_scratch();
@@ -726,17 +795,10 @@ mod tests {
         let mut stores = ToyStores::new();
         fill(&mut stores);
         let filled = stores.shapes();
-        assert_every_field_written(&filled);
+        assert_every_field_written(&filled, ToyLists::FIELDS);
         stores.lists.reset();
         stores.text.reset();
-        let expected: Vec<FieldShape> = filled
-            .iter()
-            .map(|&shape| FieldShape {
-                len: shape.rewound_len(),
-                ..shape
-            })
-            .collect();
-        assert_eq!(stores.shapes(), expected);
+        assert_rewound(&filled, &stores.shapes());
 
         // slot 0 survives, so the next list mints straight behind it
         let lists = &mut stores.lists;
