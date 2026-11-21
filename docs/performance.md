@@ -124,6 +124,13 @@ add `--flow-stats` for its deterministic flow-construction counters. The
 column is the strip's time less the parse's — the walk and the blanking copy —
 and `total` is the whole strip.
 
+Each parse takes fresh stores by default, so a document pays its stores' first
+allocation and growth. `--warm` (format mode) instead parses into stores kept warm
+across files and iterations — each language's `WarmStores`, taken and parked outside
+the timed regions — the stores' lifecycle in `tsv format`'s `Formatter`, the public
+free functions and every binding. A board of what ships takes `--warm`; a row the
+default form shows in allocation or store growth may be one the product never pays.
+
 ```bash
 # Profile a directory
 cargo run --release -p tsv_debug -- profile ../corpora/collections/zzz/src/lib
@@ -198,7 +205,8 @@ cargo run --release -p tsv_debug -- json_profile ../corpora/collections/zzz/src/
 
 # JSON output with per-file data (e.g. to split costs by multibyte flag)
 cargo run --release -p tsv_debug -- json_profile ../corpora/collections/zzz/src/lib --json
-# Also: --iterations <n> (default: 5), --locations (the loc emitter)
+# Also: --iterations <n> (default: 5), --locations (the loc emitter),
+# --warm (stores kept warm across files and iterations, as every binding keeps them)
 ```
 
 Output shows, per language: file/byte/wire-byte/multibyte counts and the

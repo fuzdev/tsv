@@ -1,9 +1,9 @@
-//! Profile the parse→JSON emission path, one-shot (fresh stores per parse).
+//! Profile the parse→JSON emission path.
 //!
 //! Every binding's `parse_<lang>` (`tsv_ffi`'s `tsv_parse_<lang>` among them) runs
 //! `parse` + `convert_ast_json_bytes` — the span-only wire — over stores it keeps warm
 //! per thread; this command times those two phases per file across a corpus, each parse
-//! over fresh stores. `--locations` times the Rust `loc` emitter instead
+//! over fresh stores, or with `--warm` over stores kept warm across files and iterations. `--locations` times the Rust `loc` emitter instead
 //! (`convert_ast_json_bytes_with_locations`, what `tsv parse --locations` writes). Either
 //! writer walks the internal AST once and emits the final char-space wire JSON directly, so
 //! there are no sub-steps to decompose: just `parse` and `write`.
@@ -18,7 +18,9 @@ use std::time::{Duration, Instant};
 use tsv_cli::cli::input::ParserType;
 use tsv_lang::Wire;
 
-use super::profile::{format_duration, format_size, lang_token, median_us, resolve_profile_files};
+use super::profile::{
+    WarmStores, format_duration, format_size, lang_token, median_us, resolve_profile_files,
+};
 use crate::cli::CliError;
 
 /// Bench-corpus exclusions, mirrored from `benches/js/lib/corpus.ts`:
@@ -46,6 +48,11 @@ pub struct JsonProfileCommand {
     #[argh(switch)]
     locations: bool,
 
+    /// parse into stores kept warm across files and iterations, as every binding does;
+    /// by default each parse takes fresh stores
+    #[argh(switch)]
+    warm: bool,
+
     /// file paths, directories, or glob patterns
     #[argh(positional)]
     paths: Vec<String>,
@@ -63,9 +70,10 @@ impl JsonProfileCommand {
 
         let mut results = Vec::new();
         let mut parse_errors = 0usize;
+        let mut warm = self.warm.then(WarmStores::default);
 
         for path in &files {
-            match profile_file(path, self.iterations, wire) {
+            match profile_file(path, self.iterations, wire, warm.as_mut()) {
                 Ok(result) => results.push(result),
                 Err(_) => parse_errors += 1,
             }
@@ -122,7 +130,12 @@ struct IterMeta {
     wire_bytes: usize,
 }
 
-fn profile_file(path: &Path, iterations: usize, wire: Wire) -> Result<FileResult, String> {
+fn profile_file(
+    path: &Path,
+    iterations: usize,
+    wire: Wire,
+    mut warm: Option<&mut WarmStores>,
+) -> Result<FileResult, String> {
     let source = std::fs::read_to_string(path).map_err(|e| format!("read error: {e}"))?;
     let parser_type = ParserType::from_extension(&path.to_string_lossy());
 
@@ -130,7 +143,14 @@ fn profile_file(path: &Path, iterations: usize, wire: Wire) -> Result<FileResult
     let mut meta: Option<IterMeta> = None;
 
     for _ in 0..iterations {
-        profile_once(&source, parser_type, wire, &mut steps, &mut meta)?;
+        profile_once(
+            &source,
+            parser_type,
+            wire,
+            warm.as_deref_mut(),
+            &mut steps,
+            &mut meta,
+        )?;
     }
 
     let meta = meta.ok_or("no iterations ran")?;
@@ -151,58 +171,95 @@ fn profile_file(path: &Path, iterations: usize, wire: Wire) -> Result<FileResult
 
 /// One iteration of the parse path: `parse`, then the span-only writer
 /// (`convert_ast_json_bytes`) for [`Wire::Span`], the `loc` emitter
-/// (`convert_ast_json_bytes_with_locations`) for [`Wire::Loc`].
+/// (`convert_ast_json_bytes_with_locations`) for [`Wire::Loc`]. With `warm` the parse goes
+/// into its language's warm stores (`parse_into`), whose take and park sit outside both timed
+/// regions; without it, into fresh stores.
 fn profile_once(
     source: &str,
     parser_type: ParserType,
     wire: Wire,
+    warm: Option<&mut WarmStores>,
     steps: &mut StepDurations,
     meta: &mut Option<IterMeta>,
 ) -> Result<(), String> {
-    let bytes = match parser_type {
-        ParserType::TypeScript => {
-            let t = Instant::now();
-            let ast =
-                tsv_ts::__private::parse(source).map_err(|e| format!("parse error: {e:#}"))?;
-            steps.parse.push(t.elapsed());
-            let t = Instant::now();
-            let bytes = match wire {
-                Wire::Span => tsv_ts::__private::convert_ast_json_bytes(&ast, source),
-                Wire::Loc => tsv_ts::__private::convert_ast_json_bytes_with_locations(&ast, source),
-            };
-            steps.write.push(t.elapsed());
-            bytes
-        }
-        ParserType::Svelte => {
-            let t = Instant::now();
-            let ast =
-                tsv_svelte::__private::parse(source).map_err(|e| format!("parse error: {e:#}"))?;
-            steps.parse.push(t.elapsed());
-            let t = Instant::now();
-            let bytes = match wire {
-                Wire::Span => tsv_svelte::__private::convert_ast_json_bytes(&ast, source),
+    let bytes = match (parser_type, warm) {
+        (ParserType::TypeScript, None) => time_phases(
+            steps,
+            &mut (),
+            |()| tsv_ts::__private::parse(source),
+            |ast, ()| match wire {
+                Wire::Span => tsv_ts::__private::convert_ast_json_bytes(ast, source),
+                Wire::Loc => tsv_ts::__private::convert_ast_json_bytes_with_locations(ast, source),
+            },
+        )?,
+        (ParserType::TypeScript, Some(warm)) => warm.ts.with(|stores| {
+            time_phases(
+                steps,
+                stores,
+                |stores| tsv_ts::__private::parse_into(source, stores),
+                |program, stores| {
+                    let parsed = tsv_ts::__private::parsed_ref(program, stores);
+                    match wire {
+                        Wire::Span => tsv_ts::__private::convert_ast_json_bytes(parsed, source),
+                        Wire::Loc => {
+                            tsv_ts::__private::convert_ast_json_bytes_with_locations(parsed, source)
+                        }
+                    }
+                },
+            )
+        })?,
+        (ParserType::Svelte, None) => time_phases(
+            steps,
+            &mut (),
+            |()| tsv_svelte::__private::parse(source),
+            |ast, ()| match wire {
+                Wire::Span => tsv_svelte::__private::convert_ast_json_bytes(ast, source),
                 Wire::Loc => {
-                    tsv_svelte::__private::convert_ast_json_bytes_with_locations(&ast, source)
+                    tsv_svelte::__private::convert_ast_json_bytes_with_locations(ast, source)
                 }
-            };
-            steps.write.push(t.elapsed());
-            bytes
-        }
-        ParserType::Css => {
-            let t = Instant::now();
-            let ast =
-                tsv_css::__private::parse(source).map_err(|e| format!("parse error: {e:#}"))?;
-            steps.parse.push(t.elapsed());
-            let t = Instant::now();
-            let bytes = match wire {
-                Wire::Span => tsv_css::__private::convert_ast_json_bytes(&ast, source),
-                Wire::Loc => {
-                    tsv_css::__private::convert_ast_json_bytes_with_locations(&ast, source)
-                }
-            };
-            steps.write.push(t.elapsed());
-            bytes
-        }
+            },
+        )?,
+        (ParserType::Svelte, Some(warm)) => warm.svelte.with(|stores| {
+            time_phases(
+                steps,
+                stores,
+                |stores| tsv_svelte::__private::parse_into(source, stores),
+                |root, stores| {
+                    let parsed = tsv_svelte::__private::parsed_ref(root, stores);
+                    match wire {
+                        Wire::Span => tsv_svelte::__private::convert_ast_json_bytes(parsed, source),
+                        Wire::Loc => tsv_svelte::__private::convert_ast_json_bytes_with_locations(
+                            parsed, source,
+                        ),
+                    }
+                },
+            )
+        })?,
+        (ParserType::Css, None) => time_phases(
+            steps,
+            &mut (),
+            |()| tsv_css::__private::parse(source),
+            |ast, ()| match wire {
+                Wire::Span => tsv_css::__private::convert_ast_json_bytes(ast, source),
+                Wire::Loc => tsv_css::__private::convert_ast_json_bytes_with_locations(ast, source),
+            },
+        )?,
+        (ParserType::Css, Some(warm)) => warm.css.with(|stores| {
+            time_phases(
+                steps,
+                stores,
+                |stores| tsv_css::__private::parse_into(source, stores),
+                |stylesheet, stores| {
+                    let parsed = tsv_css::__private::parsed_ref(stylesheet, stores);
+                    match wire {
+                        Wire::Span => tsv_css::__private::convert_ast_json_bytes(parsed, source),
+                        Wire::Loc => tsv_css::__private::convert_ast_json_bytes_with_locations(
+                            parsed, source,
+                        ),
+                    }
+                },
+            )
+        })?,
     };
 
     if meta.is_none() {
@@ -214,6 +271,24 @@ fn profile_once(
         });
     }
     Ok(())
+}
+
+/// The timed phases every language shares, warm or not: `parse`, then `write`, each pushed to
+/// its column. `state` is what both closures read — a language's warm stores, or nothing —
+/// handed to each in turn so neither holds it across the other.
+fn time_phases<S, P>(
+    steps: &mut StepDurations,
+    state: &mut S,
+    parse: impl FnOnce(&mut S) -> tsv_lang::Result<P>,
+    write: impl FnOnce(&P, &S) -> Vec<u8>,
+) -> Result<Vec<u8>, String> {
+    let t = Instant::now();
+    let ast = parse(state).map_err(|e| format!("parse error: {e:#}"))?;
+    steps.parse.push(t.elapsed());
+    let t = Instant::now();
+    let bytes = write(&ast, state);
+    steps.write.push(t.elapsed());
+    Ok(bytes)
 }
 
 /// Sums of per-file medians for one language.

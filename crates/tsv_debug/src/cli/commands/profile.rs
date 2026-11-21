@@ -35,6 +35,12 @@ pub struct ProfileCommand {
     #[argh(switch)]
     flow_stats: bool,
 
+    /// parse into stores kept warm across files and iterations, as `tsv format`'s
+    /// `Formatter`, the public free functions and every binding do; by default each parse
+    /// takes fresh stores. Format mode only
+    #[argh(switch)]
+    warm: bool,
+
     /// file paths, directories, or glob patterns
     #[argh(positional)]
     paths: Vec<String>,
@@ -44,6 +50,10 @@ impl ProfileCommand {
     pub(crate) fn run(self) -> Result<(), CliError> {
         if self.bind && self.strip {
             eprintln!("Error: --bind and --strip each replace the format column; pass one");
+            return Err(CliError::Failed);
+        }
+        if self.warm && (self.bind || self.strip) {
+            eprintln!("Error: --warm times the format path; it takes no --bind or --strip");
             return Err(CliError::Failed);
         }
         let mode = if self.bind {
@@ -71,11 +81,13 @@ impl ProfileCommand {
         // between them — the doc arena's lifecycle in `tsv_cli format`'s worker
         // loop and the bindings' per-thread slot (`tsv_lang::doc::arena::with_doc_arena`),
         // so the format phase is product-shaped (arena growth amortizes across the corpus
-        // instead of recurring per call). Every parse is one-shot: fresh stores per call.
+        // instead of recurring per call). Every parse takes fresh stores unless `--warm`
+        // keeps them across files and iterations too.
         let mut doc_arena = tsv_lang::doc::arena::DocArena::new();
+        let mut warm = self.warm.then(WarmStores::default);
 
         for path in &files {
-            match profile_file(path, self.iterations, mode, &mut doc_arena) {
+            match profile_file(path, self.iterations, mode, &mut doc_arena, warm.as_mut()) {
                 Ok(result) => results.push(result),
                 Err(err) => {
                     eprintln!("Error profiling {}: {err}", path.display());
@@ -318,6 +330,7 @@ fn profile_file(
     iterations: usize,
     mode: Mode,
     doc_arena: &mut tsv_lang::doc::arena::DocArena,
+    mut warm: Option<&mut WarmStores>,
 ) -> Result<FileResult, String> {
     let source = std::fs::read_to_string(path).map_err(|e| format!("read error: {e}"))?;
     let parser_type = ParserType::from_extension(&path.to_string_lossy());
@@ -337,7 +350,7 @@ fn profile_file(
                 (parse_dur, format_dur)
             }
             Mode::Strip => profile_strip_once(&source)?,
-            Mode::Format => profile_once(&source, parser_type, doc_arena)?,
+            Mode::Format => profile_once(&source, parser_type, doc_arena, warm.as_deref_mut())?,
         };
         parse_times.push(parse_dur);
         format_times.push(format_dur);
@@ -423,6 +436,16 @@ fn profile_strip_once(source: &str) -> Result<(Duration, Duration), String> {
     Ok((parse_dur, strip_dur.saturating_sub(parse_dur)))
 }
 
+/// Stores kept warm across files and iterations (`--warm`): a handle per language, each its
+/// own crate's `WarmStores`, taken before the timed regions and parked after them, as the
+/// CLI's `Formatter` keeps its stores in a slot it owns. A run warms the languages it meets.
+#[derive(Default)]
+pub(crate) struct WarmStores {
+    pub(crate) ts: tsv_ts::__private::WarmStores,
+    pub(crate) svelte: tsv_svelte::__private::WarmStores,
+    pub(crate) css: tsv_css::__private::WarmStores,
+}
+
 /// Run one parse + format iteration, return (parse_duration, format_duration).
 ///
 /// The shipped format path, phase for phase (each language crate's `format` and
@@ -431,6 +454,8 @@ fn profile_strip_once(source: &str) -> Result<(Duration, Duration), String> {
 /// named: the module grammar, retried as a script), and format it with `format_folded_in`.
 /// The fold is timed in the parse column — it runs ahead of the parse, and its pass takes
 /// the document's line verdict the format then reads instead of walking the source again.
+/// With `warm` the parse goes into its language's warm stores (`parse_folded_into`), whose
+/// take and park sit outside both timed regions; without it, into fresh stores.
 ///
 /// The doc arena is caller-owned and reset between iterations (see `profile_file`);
 /// setup/teardown stays outside both timed regions.
@@ -442,36 +467,80 @@ fn profile_once(
     source: &str,
     parser_type: ParserType,
     doc_arena: &tsv_lang::doc::arena::DocArena,
+    warm: Option<&mut WarmStores>,
 ) -> Result<(Duration, Duration), String> {
-    let parse_error = |e: tsv_lang::Error| format!("parse error: {e:#}");
+    match (parser_type, warm) {
+        (ParserType::TypeScript, None) => time_phases(
+            source,
+            &mut (),
+            |folded, ()| tsv_ts::__private::parse_folded(folded, None),
+            |ast, folded, ()| tsv_ts::__private::format_folded_in(ast, folded, doc_arena),
+        ),
+        (ParserType::TypeScript, Some(warm)) => warm.ts.with(|stores| {
+            time_phases(
+                source,
+                stores,
+                |folded, stores| tsv_ts::__private::parse_folded_into(folded, None, stores),
+                |program, folded, stores| {
+                    let parsed = tsv_ts::__private::parsed_ref(program, stores);
+                    tsv_ts::__private::format_folded_in(parsed, folded, doc_arena)
+                },
+            )
+        }),
+        (ParserType::Svelte, None) => time_phases(
+            source,
+            &mut (),
+            |folded, ()| tsv_svelte::__private::parse_folded(folded),
+            |ast, folded, ()| tsv_svelte::__private::format_folded_in(ast, folded, doc_arena),
+        ),
+        (ParserType::Svelte, Some(warm)) => warm.svelte.with(|stores| {
+            time_phases(
+                source,
+                stores,
+                tsv_svelte::__private::parse_folded_into,
+                |root, folded, stores| {
+                    let parsed = tsv_svelte::__private::parsed_ref(root, stores);
+                    tsv_svelte::__private::format_folded_in(parsed, folded, doc_arena)
+                },
+            )
+        }),
+        (ParserType::Css, None) => time_phases(
+            source,
+            &mut (),
+            |folded, ()| tsv_css::__private::parse_folded(folded),
+            |ast, folded, ()| tsv_css::__private::format_folded_in(ast, folded, doc_arena),
+        ),
+        (ParserType::Css, Some(warm)) => warm.css.with(|stores| {
+            time_phases(
+                source,
+                stores,
+                tsv_css::__private::parse_folded_into,
+                |stylesheet, folded, stores| {
+                    let parsed = tsv_css::__private::parsed_ref(stylesheet, stores);
+                    tsv_css::__private::format_folded_in(parsed, folded, doc_arena)
+                },
+            )
+        }),
+    }
+}
+
+/// The timed phases every language shares, warm or not: the fold and `parse` timed as the
+/// parse, then `format` as the format. `state` is what both closures read — a language's warm
+/// stores, or nothing — handed to each in turn so neither holds it across the other.
+fn time_phases<S, P>(
+    source: &str,
+    state: &mut S,
+    parse: impl FnOnce(&tsv_lang::printing::FoldedSource<'_>, &mut S) -> tsv_lang::Result<P>,
+    format: impl FnOnce(&P, &tsv_lang::printing::FoldedSource<'_>, &S) -> String,
+) -> Result<(Duration, Duration), String> {
     let t0 = Instant::now();
     let folded = tsv_lang::printing::normalize_carriage_returns(source);
-    match parser_type {
-        ParserType::TypeScript => {
-            let ast = tsv_ts::__private::parse_folded(&folded, None).map_err(parse_error)?;
-            let parse_dur = t0.elapsed();
+    let ast = parse(&folded, state).map_err(|e| format!("parse error: {e:#}"))?;
+    let parse_dur = t0.elapsed();
 
-            let t1 = Instant::now();
-            let _ = tsv_ts::__private::format_folded_in(&ast, &folded, doc_arena);
-            Ok((parse_dur, t1.elapsed()))
-        }
-        ParserType::Svelte => {
-            let ast = tsv_svelte::__private::parse_folded(&folded).map_err(parse_error)?;
-            let parse_dur = t0.elapsed();
-
-            let t1 = Instant::now();
-            let _ = tsv_svelte::__private::format_folded_in(&ast, &folded, doc_arena);
-            Ok((parse_dur, t1.elapsed()))
-        }
-        ParserType::Css => {
-            let ast = tsv_css::__private::parse_folded(&folded).map_err(parse_error)?;
-            let parse_dur = t0.elapsed();
-
-            let t1 = Instant::now();
-            let _ = tsv_css::__private::format_folded_in(&ast, &folded, doc_arena);
-            Ok((parse_dur, t1.elapsed()))
-        }
-    }
+    let t1 = Instant::now();
+    let _ = format(&ast, &folded, state);
+    Ok((parse_dur, t1.elapsed()))
 }
 
 pub(crate) fn median_us(durations: &[Duration]) -> f64 {
