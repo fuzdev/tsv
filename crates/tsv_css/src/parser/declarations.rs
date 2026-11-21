@@ -318,9 +318,20 @@ pub(crate) fn parse_declaration(parser: &mut CssParser<'_>) -> Result<(), Error>
     {
         let (name, end) =
             extend_wildcard_name(parser, parser.current_identifier(), parser.current_end())?;
-        (parser.stores.text.push(&name), end)
+        (PropertyName::Pooled(parser.stores.text.push(&name)), end)
     } else {
-        (parser.current_identifier_in_pool(), parser.current_end())
+        let property = match parser.current_decoded {
+            Some(decoded) => PropertyName::Pooled(decoded),
+            None => {
+                // `Verbatim` reads the name at the declaration's span start: the property
+                // token must open the span, which a reordering above would break
+                debug_assert_eq!(parser.base_offset() + parser.current_start(), start);
+                PropertyName::Verbatim {
+                    len: (parser.current_end() - parser.current_start()) as u32,
+                }
+            }
+        };
+        (property, parser.current_end())
     };
 
     // Locate the value and scan it to its terminator (`;` / `}` at depth zero, or EOF),
@@ -541,7 +552,11 @@ mod tests {
                 .unwrap_or_else(|error| panic!("{source:?}: {error:?}"));
             match children {
                 [CssBlockChild::Declaration(declaration)] => {
-                    assert_eq!(view.text(declaration.property), property, "{source:?}");
+                    assert_eq!(
+                        declaration.property_text(view, &source),
+                        property,
+                        "{source:?}"
+                    );
                 }
                 _ => panic!("{source:?}: expected one declaration"),
             }

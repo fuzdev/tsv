@@ -427,14 +427,13 @@ impl AttributeMatcher {
 #[derive(Debug, Clone, Copy)]
 pub struct CssDeclaration {
     /// Property name, **escape-decoded** (spec-canonical `<ident-token>` value, e.g. `\63 olor`
-    /// → `color`; CSS Syntax §4.3.11). This is NOT a verbatim slice of `span`, so it is kept as
-    /// pool text rather than recovered from a span (a span would silently un-decode it).
-    /// Used internally for the `--`-prefix check, keyword matches (`grid*`), and inline-width
-    /// math. The printer's *output* and the public AST both emit the **raw** property text from
+    /// → `color`; CSS Syntax §4.3.11), read through [`CssDeclaration::property_text`]. Used
+    /// internally for the `--`-prefix check, keyword matches (`grid*`), and inline-width math.
+    /// The printer's *output* and the public AST both emit the **raw** property text from
     /// source instead (`extract_property_name` / convert), preserving escapes — a documented
     /// Svelte quirk. So decoded(internal) / raw(output+public) is intentional (the
     /// spec-vs-Svelte escape-encoding split).
-    pub property: PoolText<CssText>,
+    pub property: PropertyName,
     pub value: CssValue, // Semantic representation (normalized)
     /// End position including !important (span.end excludes it for the formatter).
     /// `None` means no !important. Use `is_important()` for the bool check.
@@ -455,7 +454,39 @@ pub struct CssDeclaration {
     pub has_block_comment: bool,
 }
 
+/// A [`CssDeclaration`]'s escape-decoded property name.
+///
+/// A name with nothing to decode is the source's own bytes at the start of the declaration,
+/// so it is kept as its length and read from there — no copy is made. An escaped name (its
+/// decoded text differs from its source bytes) or a wildcard custom property (`--a-*`, which
+/// spans past one token) is pool text.
+#[derive(Debug, Clone, Copy)]
+pub enum PropertyName {
+    /// The `len` source bytes at the declaration's `span.start`.
+    Verbatim { len: u32 },
+    /// Text of its own, in the stores' pool.
+    Pooled(PoolText<CssText>),
+}
+
 impl CssDeclaration {
+    /// The escape-decoded property name ([`Self::property`]).
+    ///
+    /// # Panics
+    ///
+    /// When `source` is not the whole document the declaration's `span` indexes — the host
+    /// document for a sheet embedded in one (a Svelte `<style>`), not the sheet's own text —
+    /// a verbatim name's slice can fall out of bounds or off a char boundary.
+    #[inline]
+    pub fn property_text<'a>(&self, view: CssView<'a>, source: &'a str) -> &'a str {
+        match self.property {
+            PropertyName::Verbatim { len } => {
+                let start = self.span.start as usize;
+                &source[start..start + len as usize]
+            }
+            PropertyName::Pooled(text) => view.text(text),
+        }
+    }
+
     pub fn is_important(&self) -> bool {
         self.important_end.is_some()
     }
@@ -1054,6 +1085,8 @@ const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<CssValue>() == 6
 // would fit in less, and the pin is what catches the tag being dropped.
 #[cfg(all(test, target_pointer_width = "64"))]
 const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<CssBlockChild>() == 112);
+// `Verbatim`'s length rides beside `Pooled`'s non-zero start, which tags the two.
+const _: () = assert!(tsv_lang::store::STORE_CHECK || size_of::<PropertyName>() == 8);
 
 // An optional list-bearing node folds its absence into its run's niche: an absent `of S`, an
 // absent block, an absent connector run cost nothing beside a present one.

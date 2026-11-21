@@ -296,7 +296,7 @@ impl<'a> Printer<'a> {
         // Custom properties skip structure-based multiline (one-per-line for List values).
         // They take the self-deciding width path via `print_decl_value_list` instead.
         // See fixture: declaration_long_multiline (continuation indent for space-separated items)
-        if self.view.text(decl.property).starts_with("--") {
+        if decl.property_text(self.view, self.source).starts_with("--") {
             return None;
         }
 
@@ -465,7 +465,7 @@ impl<'a> Printer<'a> {
                     self.write_declaration_end(decl);
                     return;
                 }
-                if Self::is_grid_row_property(self.view.text(decl.property)) {
+                if Self::is_grid_row_property(decl.property_text(self.view, self.source)) {
                     self.build_broken_head_value_decl_doc(fill, &[])
                 } else {
                     self.build_space_value_decl_doc(fill)
@@ -509,7 +509,8 @@ impl<'a> Printer<'a> {
         // and cleared at the end rather than threaded through the value builders. Saved
         // and restored like `in_keyframes`, so a nested context cannot leak it.
         let was_scope = self.value_scope;
-        self.value_scope.font_shorthand = property_is_font_shorthand(self.view.text(decl.property));
+        self.value_scope.font_shorthand =
+            property_is_font_shorthand(decl.property_text(self.view, self.source));
         // The whole-value `{…}` block keeps its own braces spaced as authored
         // (`ValueScope::whole_value_block`); read off the value's text, since the block's
         // braces are ordinary members once parsed.
@@ -780,7 +781,7 @@ impl<'a> Printer<'a> {
         // comment's byte inflation is excluded by `visual_width`; the ` !important` tail is
         // counted via `declaration_tail` (the same pieces the emit writes) so an important
         // value wraps rather than overrunning the print width. `: ` is 2 cols, `;` is 1.
-        let inline_len = visual_width(self.view.text(decl.property), TAB_WIDTH)
+        let inline_len = visual_width(decl.property_text(self.view, self.source), TAB_WIDTH)
             + 2
             + visual_width(&func_normalized, TAB_WIDTH)
             + visual_width(&self.declaration_tail(decl), TAB_WIDTH)
@@ -836,7 +837,7 @@ impl<'a> Printer<'a> {
             self.write_arena_doc(doc);
         } else {
             let mut parts = value_normalization::split_by_space_preserving_parens(&normalized);
-            let doc = if Self::is_grid_row_property(self.view.text(decl.property)) {
+            let doc = if Self::is_grid_row_property(decl.property_text(self.view, self.source)) {
                 // The leading run is the colon's, as on the comma shape; an all-comment
                 // value is not peeled, so its comments stay the rows they are.
                 let leading_run = peel_leading_comment_run(&mut parts);
@@ -986,7 +987,7 @@ impl<'a> Printer<'a> {
     where
         'a: 'v,
     {
-        if !Self::is_grid_row_property(self.view.text(decl.property)) {
+        if !Self::is_grid_row_property(decl.property_text(self.view, self.source)) {
             return None;
         }
         let CssValue::List { values, .. } = &decl.value else {
