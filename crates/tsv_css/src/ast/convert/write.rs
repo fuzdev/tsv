@@ -84,6 +84,19 @@
 //! fewer instructions than the staged form. **Grade any change to this on `cycles`/wall as well as
 //! instructions** — the two channels have ranked this file's scopes in opposite orders.
 //!
+//! # Shared span words
+//!
+//! A selector list of one complex selector — nearly every rule prelude — has that selector's span,
+//! and a complex selector of one relative selector has that one's: three bursts, one `start`/`end`.
+//! `write_selector_list_inner` turns the pair into digit words once ([`JsonWriter::span_words`]) and
+//! hands them down, so the complex selector's head and the relative selector's tail write them
+//! through [`JsonWriter::start_end_head_words`] / [`JsonWriter::start_end_tail_words`] without
+//! generating the digits again. Each hand-off is guarded by a span comparison at the parent — the
+//! words' reuse contract ([`SpanWords`]) — and restated against the node's own span in debug builds.
+//! The chain pays only while the three emitters are one function: `write_complex_selector` and
+//! `write_relative_selector` are `inline(always)` and the complex selector's loop over its
+//! relative selectors is open-coded (each says why).
+//!
 //! The windows are the span-only wire's shape. On the wire that carries `loc`, which sits
 //! between `end` and the closing constant, [`Ctx::head`] / [`Ctx::tail`] write the same burst
 //! piecewise with the `loc` field in place.
@@ -94,7 +107,9 @@ use super::{
 };
 use crate::ast;
 use std::borrow::Cow;
-use tsv_lang::{JsonWriter, Span, Wire, WirePositions, WireTables, write_array, write_or_null};
+use tsv_lang::{
+    JsonWriter, Span, SpanWords, Wire, WirePositions, WireTables, write_array, write_or_null,
+};
 
 /// Declares one `parseCss()` metadata payload twice from a single literal: bare
 /// (`$bare`), and as the constant burst that closes its node (`$closing` — `$lead`,
@@ -683,37 +698,85 @@ fn write_selector_list_inner(
     ctx: &Ctx<'_>,
     filter_invalid: bool,
 ) {
-    ctx.head(
-        w,
-        b"{\"type\":\"SelectorList\",\"start\":",
-        sl.span.start,
-        sl.span.end,
-        b",\"children\":[",
-    );
+    // The list's digit words, made once (module doc, §Shared span words): a list of one
+    // complex selector — nearly every list — shares that selector's span, so the
+    // selector's head (and, through it, its one relative selector's tail) writes the
+    // same words again. The `loc` wire writes its positions piecewise and takes none.
+    let selectors = ctx.view.complex_selectors(sl.selectors);
+    let words = if ctx.positions.has_locations() {
+        None
+    } else {
+        JsonWriter::span_words(ctx.pos(sl.span.start), ctx.pos(sl.span.end))
+    };
+    let lead = b"{\"type\":\"SelectorList\",\"start\":";
+    match words {
+        Some(words) => w.start_end_head_words(lead, words, b",\"children\":["),
+        None => ctx.head(w, lead, sl.span.start, sl.span.end, b",\"children\":["),
+    }
+    let shared = match selectors {
+        [c] if c.span == sl.span => words,
+        _ => None,
+    };
     write_array_open(
         w,
         b"",
-        ctx.view
-            .complex_selectors(sl.selectors)
+        selectors
             .iter()
             .filter(|c| !filter_invalid || !selector_contains_invalid(c, ctx.view)),
-        |w, c| write_complex_selector(w, c, ctx),
+        |w, c| write_complex_selector(w, c, ctx, shared),
     );
     w.raw("]}");
 }
 
-/// Emits a `ComplexSelector` node.
-fn write_complex_selector(w: &mut JsonWriter, c: &ast::ComplexSelector, ctx: &Ctx<'_>) {
-    ctx.head(
-        w,
-        b"{\"type\":\"ComplexSelector\",\"start\":",
-        c.span.start,
-        c.span.end,
-        b",\"children\":[",
-    );
-    write_array_open(w, b"", ctx.view.relative_selectors(c.children), |w, r| {
-        write_relative_selector(w, r, ctx);
-    });
+/// Emits a `ComplexSelector` node. `shared` is its list's [`SpanWords`] when the
+/// list proved the two spans equal (a one-selector list), else `None`.
+///
+/// `inline(always)`, as is [`write_relative_selector`]: the words ride registers
+/// from the list's head to the relative selector's tail only while all three bodies
+/// are one function. Measured outlined (with the words still threaded), the list → complex
+/// call costs more than the shared words save.
+#[expect(clippy::inline_always)]
+#[inline(always)]
+fn write_complex_selector(
+    w: &mut JsonWriter,
+    c: &ast::ComplexSelector,
+    ctx: &Ctx<'_>,
+    shared: Option<SpanWords>,
+) {
+    #[cfg(debug_assertions)]
+    if let Some(words) = shared {
+        assert_eq!(
+            Some(words),
+            JsonWriter::span_words(ctx.pos(c.span.start), ctx.pos(c.span.end)),
+            "shared span words reused for a complex selector of another span"
+        );
+    }
+    let words = match shared {
+        Some(words) => Some(words),
+        None if ctx.positions.has_locations() => None,
+        None => JsonWriter::span_words(ctx.pos(c.span.start), ctx.pos(c.span.end)),
+    };
+    let lead = b"{\"type\":\"ComplexSelector\",\"start\":";
+    match words {
+        Some(words) => w.start_end_head_words(lead, words, b",\"children\":["),
+        None => ctx.head(w, lead, c.span.start, c.span.end, b",\"children\":["),
+    }
+    let children = ctx.view.relative_selectors(c.children);
+    let shared = match children {
+        [r] if r.span == c.span => words,
+        _ => None,
+    };
+    // Open-coded, not `write_array_open`: through its closure, LLVM outlined the
+    // relative selector's body (and the words with it) out of this function — measured
+    // a loss — where the loop keeps it inline.
+    let mut first = true;
+    for r in children {
+        if !first {
+            w.raw(",");
+        }
+        first = false;
+        write_relative_selector(w, r, ctx, shared);
+    }
     if ctx.has_metadata {
         w.raw(COMPLEX_META_CLOSE);
     } else {
@@ -726,8 +789,25 @@ fn write_complex_selector(w: &mut JsonWriter, c: &ast::ComplexSelector, ctx: &Ct
 ///
 /// The trailing `start`/`end` burst is one in-place window, led by the `]` that
 /// closes `selectors` and stopping before `metadata` for `write_rule`'s reason (module
-/// doc, §The `start`/`end` bursts).
-fn write_relative_selector(w: &mut JsonWriter, r: &ast::RelativeSelector, ctx: &Ctx<'_>) {
+/// doc, §The `start`/`end` bursts) — written from `shared`, its complex selector's
+/// [`SpanWords`], when the complex proved the two spans equal (its one relative
+/// selector), and `inline(always)` for [`write_complex_selector`]'s reason.
+#[expect(clippy::inline_always)]
+#[inline(always)]
+fn write_relative_selector(
+    w: &mut JsonWriter,
+    r: &ast::RelativeSelector,
+    ctx: &Ctx<'_>,
+    shared: Option<SpanWords>,
+) {
+    #[cfg(debug_assertions)]
+    if let Some(words) = shared {
+        assert_eq!(
+            Some(words),
+            JsonWriter::span_words(ctx.pos(r.span.start), ctx.pos(r.span.end)),
+            "shared span words reused for a relative selector of another span"
+        );
+    }
     // The combinator-less head — the first compound of every selector — is one literal
     // through the `selectors` array's `[`.
     match (&r.combinator, &r.combinator_span) {
@@ -741,7 +821,10 @@ fn write_relative_selector(w: &mut JsonWriter, r: &ast::RelativeSelector, ctx: &
     write_array_open(w, b"", ctx.view.simple_selectors(r.selectors), |w, s| {
         write_simple_selector(w, s, ctx);
     });
-    ctx.tail(w, b"],", r.span.start, r.span.end, b"");
+    match shared {
+        Some(words) => w.start_end_tail_words(b"],", words, b""),
+        None => ctx.tail(w, b"],", r.span.start, r.span.end, b""),
+    }
     if ctx.has_metadata {
         w.raw(RELATIVE_META_CLOSE);
     } else {

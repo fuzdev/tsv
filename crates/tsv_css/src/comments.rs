@@ -132,6 +132,13 @@ pub(crate) fn skip_trivia_forward(bytes: &[u8], from: usize, to: usize) -> usize
 /// Each step is ANCHORED at a known position rather than searching, which is what keeps
 /// it escape-proof: an escape can only begin where the name does, and `comment_run_end`
 /// answers `None` on a `\` (`.\/*x*/y` is an ident, not a comment).
+///
+/// `inline(always)` is a placement pin, not a property of this body: the wire writer's
+/// pseudo-selector arms and the printer both call it, and growing the writer's selector
+/// chain (its shared span words) flipped LLVM's inlining decision here, a measured loss
+/// on the format path with no change of its own.
+#[expect(clippy::inline_always)]
+#[inline(always)]
 pub(crate) fn pseudo_name_start(bytes: &[u8], span_start: u32) -> u32 {
     let mut i = span_start as usize + 1; // past the first `:`
     i = comment_run_end(bytes, i).unwrap_or(i);

@@ -148,6 +148,27 @@ const HEAD_CLOSE_MAX: usize = 16;
 /// widest close.
 const HEAD_WINDOW: usize = HEAD_LEAD_MAX + START_END_WINDOW + HEAD_CLOSE_MAX;
 
+/// A span's `start` and `end` already turned into [`digit_word`] registers, for the
+/// nodes of a chain that share one span — computed once by
+/// [`JsonWriter::span_words`] and written as often as the chain needs through
+/// [`JsonWriter::start_end_head_words`] / [`JsonWriter::start_end_tail_words`].
+///
+/// ⚠️ Nothing here knows which span the words came from: reusing them for a node is
+/// correct only when that node's emitted `start`/`end` EQUAL the ones the words
+/// were made from, and that equality is the **caller's** proof (its spans compared,
+/// on a wire whose offset translation maps equal bytes to equal values). A caller
+/// restates the check in a `#[cfg(debug_assertions)]` block against
+/// [`JsonWriter::span_words`] over the node's own span — never a `debug_assert!`
+/// inside an always-inlined hot body, which can move release codegen.
+///
+/// Holds only values a word carries (each at most [`WORD_DIGITS`] digits), so its
+/// windows need no wide arm.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SpanWords {
+    start: (u64, usize),
+    end: (u64, usize),
+}
+
 /// Decimal digit count of a `u32` (`0` is one digit) — the [`decimal_width`]
 /// sibling for the `u32` path.
 ///
@@ -2006,7 +2027,7 @@ impl JsonWriter {
     /// `inline(always)`, [`StageRun`]'s trade: the body lands at each site with its
     /// constants folded and the buffer's fields in registers, for two inlined
     /// `digit_word` copies of `.text` a site.
-    #[expect(clippy::inline_always, clippy::expect_used)]
+    #[expect(clippy::inline_always)]
     #[inline(always)]
     pub fn start_end_tail<const L: usize, const C: usize>(
         &mut self,
@@ -2027,22 +2048,13 @@ impl JsonWriter {
             self.start_end_tail_slow(lead, start, end, close);
             return;
         }
-        self.buf.extend_from_slice(&[0; TAIL_WINDOW]);
-        let window = self
-            .buf
-            .last_chunk_mut::<TAIL_WINDOW>()
-            .expect("the window was just appended");
-        window[..L].copy_from_slice(lead);
-        let at = L + START_KEY.len();
-        window[L..at].copy_from_slice(START_KEY.as_bytes());
-        let used = fill_start_end(
-            &mut window[at..],
+        self.tail_window(
+            len,
+            lead,
             (start_word, start_digits),
             (end_word, end_digits),
+            close,
         );
-        let close_at = at + used;
-        window[close_at..close_at + C].copy_from_slice(close);
-        self.buf.truncate(len + close_at + C);
     }
 
     /// A node's opening burst — `lead` (a literal ending in `"start":`), N `,"end":` M,
@@ -2058,7 +2070,7 @@ impl JsonWriter {
     /// it replaces spilled them around `start_end`'s call. Out of line it is that call
     /// again with more arguments. The price is two inlined [`digit_word`] copies of
     /// `.text` a site.
-    #[expect(clippy::inline_always, clippy::expect_used)]
+    #[expect(clippy::inline_always)]
     #[inline(always)]
     pub fn start_end_head<const L: usize, const C: usize>(
         &mut self,
@@ -2079,20 +2091,140 @@ impl JsonWriter {
             self.start_end_head_slow(lead, start, end, close);
             return;
         }
+        self.head_window(
+            len,
+            lead,
+            (start_word, start_digits),
+            (end_word, end_digits),
+            close,
+        );
+    }
+
+    /// A span's two [`digit_word`] registers, made once for the nodes that share the
+    /// span and handed to [`JsonWriter::start_end_head_words`] /
+    /// [`JsonWriter::start_end_tail_words`] — or `None` when either value is past
+    /// `99_999_999`, the windows' wide case, which the caller writes through
+    /// [`JsonWriter::start_end_head`] / [`JsonWriter::start_end_tail`] instead.
+    ///
+    /// `start` and `end` are the EMITTED values (after any offset translation).
+    /// [`SpanWords`] carries the reuse contract. `inline(always)` for
+    /// [`JsonWriter::start_end_head`]'s reason: out of line, the two words come back
+    /// through memory.
+    #[expect(clippy::inline_always)]
+    #[inline(always)]
+    #[must_use]
+    pub fn span_words(start: u32, end: u32) -> Option<SpanWords> {
+        let start = digit_word(start);
+        let end = digit_word(end);
+        if start.1 > WORD_DIGITS || end.1 > WORD_DIGITS {
+            return None;
+        }
+        Some(SpanWords { start, end })
+    }
+
+    /// [`JsonWriter::start_end_head`] over words already made by
+    /// [`JsonWriter::span_words`]: byte-identical to `start_end_head(lead, start, end,
+    /// close)` for the `start`/`end` the words were made from, with no digit
+    /// generation at the site. Reusing one [`SpanWords`] for a second node is sound
+    /// only under [`SpanWords`]'s contract.
+    ///
+    /// The words fit the window by construction, so the only cold arm is a buffer
+    /// too full for it, which grows the buffer and comes back to the same window.
+    #[expect(clippy::inline_always)]
+    #[inline(always)]
+    pub fn start_end_head_words<const L: usize, const C: usize>(
+        &mut self,
+        lead: &[u8; L],
+        words: SpanWords,
+        close: &[u8; C],
+    ) {
+        const { assert!(L <= HEAD_LEAD_MAX && C <= HEAD_CLOSE_MAX) };
+        let len = self.buf.len();
+        if self.buf.capacity() - len < HEAD_WINDOW {
+            self.reserve_window(HEAD_WINDOW);
+        }
+        self.head_window(len, lead, words.start, words.end, close);
+    }
+
+    /// [`JsonWriter::start_end_tail`] over words already made by
+    /// [`JsonWriter::span_words`] — [`JsonWriter::start_end_head_words`]' twin at a
+    /// node's other end, under the same [`SpanWords`] contract.
+    #[expect(clippy::inline_always)]
+    #[inline(always)]
+    pub fn start_end_tail_words<const L: usize, const C: usize>(
+        &mut self,
+        lead: &[u8; L],
+        words: SpanWords,
+        close: &[u8; C],
+    ) {
+        const { assert!(L <= TAIL_LEAD_MAX && C <= TAIL_CLOSE_MAX) };
+        let len = self.buf.len();
+        if self.buf.capacity() - len < TAIL_WINDOW {
+            self.reserve_window(TAIL_WINDOW);
+        }
+        self.tail_window(len, lead, words.start, words.end, close);
+    }
+
+    /// The opening window [`JsonWriter::start_end_head`] and its words twin share:
+    /// `lead`, the pair, `close`, appended at `len` (the buffer's length, with room
+    /// for [`HEAD_WINDOW`] already made) and trimmed. Each word is at most
+    /// [`WORD_DIGITS`] digits.
+    #[expect(clippy::inline_always, clippy::expect_used)]
+    #[inline(always)]
+    fn head_window<const L: usize, const C: usize>(
+        &mut self,
+        len: usize,
+        lead: &[u8; L],
+        start: (u64, usize),
+        end: (u64, usize),
+        close: &[u8; C],
+    ) {
         self.buf.extend_from_slice(&[0; HEAD_WINDOW]);
         let window = self
             .buf
             .last_chunk_mut::<HEAD_WINDOW>()
             .expect("the window was just appended");
         window[..L].copy_from_slice(lead);
-        let used = fill_start_end(
-            &mut window[L..],
-            (start_word, start_digits),
-            (end_word, end_digits),
-        );
+        let used = fill_start_end(&mut window[L..], start, end);
         let close_at = L + used;
         window[close_at..close_at + C].copy_from_slice(close);
         self.buf.truncate(len + close_at + C);
+    }
+
+    /// The closing window [`JsonWriter::start_end_tail`] and its words twin share —
+    /// [`JsonWriter::head_window`]'s shape with `"start":` after `lead`.
+    #[expect(clippy::inline_always, clippy::expect_used)]
+    #[inline(always)]
+    fn tail_window<const L: usize, const C: usize>(
+        &mut self,
+        len: usize,
+        lead: &[u8; L],
+        start: (u64, usize),
+        end: (u64, usize),
+        close: &[u8; C],
+    ) {
+        self.buf.extend_from_slice(&[0; TAIL_WINDOW]);
+        let window = self
+            .buf
+            .last_chunk_mut::<TAIL_WINDOW>()
+            .expect("the window was just appended");
+        window[..L].copy_from_slice(lead);
+        let at = L + START_KEY.len();
+        window[L..at].copy_from_slice(START_KEY.as_bytes());
+        let used = fill_start_end(&mut window[at..], start, end);
+        let close_at = at + used;
+        window[close_at..close_at + C].copy_from_slice(close);
+        self.buf.truncate(len + close_at + C);
+    }
+
+    /// The words windows' one cold arm: a buffer too full for a `window`-byte
+    /// append grows here, out of line, and the caller then writes its window as on
+    /// the common path. Unlike [`JsonWriter::start_end_head_slow`] it does no write
+    /// of its own — the words have no wide case to send off the window.
+    #[cold]
+    #[inline(never)]
+    fn reserve_window(&mut self, window: usize) {
+        self.buf.reserve(window);
     }
 
     /// [`JsonWriter::start_end_head`] off its window, for
@@ -3305,6 +3437,88 @@ mod tests {
                             "[,\"start\":{start},\"end\":{end},\"start\":{end},\"end\":{start}"
                         ),
                         "`,` … ({start}, {end}), capacity {cap}"
+                    );
+                }
+            }
+        }
+    }
+
+    /// [`JsonWriter::span_words`] and its two windows against `format!` over every
+    /// width pair at each power-of-ten edge: the words are `None` exactly when a value
+    /// is past `99_999_999` (the 8→9-digit hand-off), and otherwise ONE [`SpanWords`]
+    /// written three times — two heads and a tail, the selector chain's reuse — is
+    /// byte-identical to `start_end_head` / `start_end_tail` over the same values, at
+    /// the widest lead and close each window is sized for, into a buffer with room and
+    /// into one with none (the grow arm).
+    #[test]
+    fn start_end_words_match_format() {
+        fn emit<const HL: usize, const HC: usize, const TL: usize, const TC: usize>(
+            cap: usize,
+            words: SpanWords,
+            head: (&[u8; HL], &[u8; HC]),
+            tail: (&[u8; TL], &[u8; TC]),
+        ) -> String {
+            let mut w = JsonWriter::with_capacity(cap);
+            w.raw("[");
+            w.start_end_head_words(head.0, words, head.1);
+            w.start_end_head_words(head.0, words, head.1);
+            w.start_end_tail_words(tail.0, words, tail.1);
+            String::from_utf8(w.into_bytes()).expect("digits are ASCII")
+        }
+        let mut edges = vec![0, 1, u32::MAX, u32::MAX - 1];
+        let mut pow = 10u32;
+        loop {
+            edges.extend([pow - 1, pow, pow + 1]);
+            match pow.checked_mul(10) {
+                Some(next) => pow = next,
+                None => break,
+            }
+        }
+        let wide_head = (&[b'x'; HEAD_LEAD_MAX], &[b'y'; HEAD_CLOSE_MAX]);
+        let wide_tail = (&[b'p'; TAIL_LEAD_MAX], &[b'q'; TAIL_CLOSE_MAX]);
+        for &start in &edges {
+            for &end in &edges {
+                let words = JsonWriter::span_words(start, end);
+                let wide = start > 99_999_999 || end > 99_999_999;
+                assert_eq!(words.is_none(), wide, "span_words({start}, {end})");
+                let Some(words) = words else { continue };
+                for cap in [0, 256] {
+                    let head = format!(
+                        "{{\"type\":\"ComplexSelector\",\"start\":{start},\"end\":{end},\"children\":["
+                    );
+                    assert_eq!(
+                        emit(
+                            cap,
+                            words,
+                            (
+                                b"{\"type\":\"ComplexSelector\",\"start\":",
+                                b",\"children\":["
+                            ),
+                            (b"],", b""),
+                        ),
+                        format!("[{head}{head}],\"start\":{start},\"end\":{end}"),
+                        "selector chain ({start}, {end}), capacity {cap}"
+                    );
+                    let (lead, close) = ("x".repeat(HEAD_LEAD_MAX), "y".repeat(HEAD_CLOSE_MAX));
+                    let head = format!("{lead}{start},\"end\":{end}{close}");
+                    let (lead, close) = ("p".repeat(TAIL_LEAD_MAX), "q".repeat(TAIL_CLOSE_MAX));
+                    let expected =
+                        format!("[{head}{head}{lead}\"start\":{start},\"end\":{end}{close}");
+                    assert_eq!(
+                        emit(cap, words, wide_head, wide_tail),
+                        expected,
+                        "widest ({start}, {end}), capacity {cap}"
+                    );
+                    // The words windows are the value windows' twins, byte for byte.
+                    let mut w = JsonWriter::with_capacity(cap);
+                    w.raw("[");
+                    w.start_end_head(wide_head.0, start, end, wide_head.1);
+                    w.start_end_head(wide_head.0, start, end, wide_head.1);
+                    w.start_end_tail(wide_tail.0, start, end, wide_tail.1);
+                    assert_eq!(
+                        String::from_utf8(w.into_bytes()).expect("digits are ASCII"),
+                        expected,
+                        "value windows ({start}, {end}), capacity {cap}"
                     );
                 }
             }
