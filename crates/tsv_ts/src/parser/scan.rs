@@ -255,6 +255,157 @@ impl Drop for SkippedTemplate<'_> {
     }
 }
 
+/// Whether the raw byte scans read the `/` at `slash` the way the parser did — as a regular
+/// expression's opening when `regex`, else as a division — judged by the last byte of the token
+/// before it, which ends at `prev_end` (the start of the input when it is `0`), and by the gap
+/// between the two.
+///
+/// The scans (`tsv_lang::source_scan::OperandAnchor`, under this crate's grammar or acorn's
+/// island reading) decide from the bytes before the `/`, and the parser from the grammar; this
+/// names the tokens after which the two provably agree, and answers `false` after every other.
+/// Over-reports by design — `false` only sends an island to the bounded path
+/// (`crate::__private::parse_expression_to_brace`):
+///
+/// - A **regex** is read alike after an operator punctuator (`=`, `(`, `,`, `[`, `{`, `;`,
+///   `:`, `?`, `&`, `|`, `*`, `%`, `<`, `^`, `~`, `/`, a prefix `!` whose run follows the
+///   input's start, a space, tab, line feed, carriage return or form feed, or one of those
+///   punctuators but `/` (a comment's `*/`), a single `+` / `-`) and an arrow's `=>`. Not
+///   after a header's `)` (`if (c) /re/`), a block's `}`, a `>` closing a list the parser
+///   abandoned, a word (`of /re/`, `return /re/`), a `++`, or a `!` glued to a word or a
+///   comment (`for (x of!/re/)`: the scans step over a glued run as a postfix non-null and
+///   read `of` as a name).
+/// - A **division** is read alike after an operand's end — a name that is no reserved word
+///   (the scans' `word_before_regex` list), a numeric literal, `)`, `]`, a string or template
+///   literal, a postfix `++` / `--`. Not after a `}` (the island scan reads it as acorn does, a
+///   lookahead as the grammar does), a `!` (`a ! / 2`), a `>`, a reserved word used as a name
+///   (`await / 2`), or a non-ASCII character.
+///
+/// Either holds only when the gap is trivia the scans read as the lexer does
+/// ([`gap_reads_alike`]): the scans' backward walk to the token before the `/` steps over ASCII
+/// whitespace and comments alone, so it takes a vertical tab or a non-ASCII whitespace character
+/// the lexer skips (`aa\u{FEFF}/ bb`) for a significant byte — no operand's end, so a regex.
+pub(super) fn scans_read_slash_alike(
+    bytes: &[u8],
+    prev_end: usize,
+    slash: usize,
+    regex: bool,
+) -> bool {
+    if !gap_reads_alike(bytes, prev_end, slash) {
+        return false;
+    }
+    let Some(&last) = prev_end.checked_sub(1).and_then(|at| bytes.get(at)) else {
+        return regex;
+    };
+    let doubled = prev_end >= 2 && bytes[prev_end - 2] == last;
+    if regex {
+        return match last {
+            b'=' | b'(' | b',' | b'[' | b'{' | b';' | b':' | b'?' | b'&' | b'|' | b'*' | b'%'
+            | b'<' | b'^' | b'~' | b'/' => true,
+            b'!' => {
+                let mut run = prev_end - 1;
+                while run > 0 && bytes[run - 1] == b'!' {
+                    run -= 1;
+                }
+                run == 0
+                    || matches!(
+                        bytes[run - 1],
+                        b' ' | b'\t'
+                            | b'\n'
+                            | b'\r'
+                            | b'\x0C'
+                            | b'='
+                            | b'('
+                            | b','
+                            | b'['
+                            | b'{'
+                            | b';'
+                            | b':'
+                            | b'?'
+                            | b'&'
+                            | b'|'
+                            | b'*'
+                            | b'%'
+                            | b'<'
+                            | b'^'
+                            | b'~'
+                    )
+            }
+            b'+' | b'-' => !doubled,
+            b'>' => prev_end >= 2 && bytes[prev_end - 2] == b'=',
+            _ => false,
+        };
+    }
+    match last {
+        b')' | b']' | b'\'' | b'"' | b'`' => true,
+        b'+' | b'-' => doubled,
+        b if b.is_ascii_alphanumeric() || b == b'_' || b == b'$' => {
+            let mut start = prev_end - 1;
+            while start > 0
+                && (bytes[start - 1].is_ascii_alphanumeric()
+                    || matches!(bytes[start - 1], b'_' | b'$'))
+            {
+                start -= 1;
+            }
+            // A non-ASCII character before the ASCII tail is one longer name; leave it to the
+            // bounded path rather than read it here.
+            (start == 0 || bytes[start - 1] < 0x80)
+                && !matches!(
+                    &bytes[start..prev_end],
+                    b"return"
+                        | b"typeof"
+                        | b"instanceof"
+                        | b"in"
+                        | b"void"
+                        | b"delete"
+                        | b"case"
+                        | b"do"
+                        | b"else"
+                        | b"throw"
+                        | b"new"
+                        | b"extends"
+                        | b"yield"
+                        | b"await"
+                )
+        }
+        _ => false,
+    }
+}
+
+/// Whether `bytes[from..to]` — trivia to the lexer, between two tokens — holds only what the
+/// scans' backward walk to the token before a `/` steps over too: the ASCII whitespace it skips
+/// (`u8::is_ascii_whitespace`, which leaves out the vertical tab) and comments, which the scans
+/// skip whole ([`skip_trivia`]), whatever they hold.
+#[inline]
+fn gap_reads_alike(bytes: &[u8], from: usize, to: usize) -> bool {
+    let Some(gap) = bytes.get(from..to) else {
+        return false;
+    };
+    // The common gap: a space, or nothing.
+    gap.iter().all(u8::is_ascii_whitespace) || gap_with_comments_reads_alike(bytes, from, to)
+}
+
+/// The cold tail of [`gap_reads_alike`], for a gap holding anything but ASCII whitespace.
+#[cold]
+#[inline(never)]
+fn gap_with_comments_reads_alike(bytes: &[u8], from: usize, to: usize) -> bool {
+    let mut i = from;
+    while i < to {
+        if bytes[i].is_ascii_whitespace() {
+            i += 1;
+        } else if bytes[i] == b'/' {
+            // Only a comment opens with a `/` in trivia; `skip_trivia` ends a line comment at
+            // the line terminators the lexer does.
+            match skip_trivia(bytes, i, to, TriviaProfile::JS) {
+                Some(past) => i = past,
+                None => return false,
+            }
+        } else {
+            return false;
+        }
+    }
+    true
+}
+
 /// Skip whitespace and comments, returning new position
 #[inline]
 pub(super) fn skip_whitespace_and_comments(bytes: &[u8], mut pos: usize) -> usize {

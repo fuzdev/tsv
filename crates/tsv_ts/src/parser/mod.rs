@@ -3,9 +3,7 @@
 use crate::Goal;
 use crate::ast::*;
 use crate::lexer::escapes::{LegacyEscape, find_legacy_escape};
-use crate::lexer::{
-    KeywordKind, LexedFacts, Lexer, LexerCheckpoint, Token, TokenKind, is_es_line_terminator,
-};
+use crate::lexer::{KeywordKind, Lexer, LexerCheckpoint, Token, TokenKind, is_es_line_terminator};
 use crate::printer::ParenContext;
 use std::ops::ControlFlow;
 use tsv_lang::store::{IdRet, ListMark, PoolText, push_row};
@@ -512,8 +510,9 @@ pub(super) struct Checkpoint {
 }
 
 /// [`Parser::parse_expression_to_brace`]'s answer: the island's root, the offset of the `}` it
-/// stops at, what its tokens held, and its comments.
-pub(crate) type BraceIsland = (ExprId, usize, LexedFacts, Run<Comment>);
+/// stops at, whether a `/` it read stands where the raw scans may read it the other way
+/// ([`Parser::slash_unlike_scans`]), and its comments.
+pub(crate) type BraceIsland = (ExprId, usize, bool, Run<Comment>);
 
 #[expect(clippy::struct_excessive_bools)]
 pub(crate) struct Parser<'a> {
@@ -659,6 +658,12 @@ pub(crate) struct Parser<'a> {
     /// there is walked by re-entering the expression printer
     /// ([`Parser::binary_link_units`]). Set (save/restore) by [`Parser::with_no_in`].
     in_for_header: bool,
+    /// Whether a `/` or `/=` token the parse read — a division, or a regular expression's
+    /// opening — follows a token after which the raw byte scans may read it the other way
+    /// (`scan::scans_read_slash_alike`). Sticky and not part of a checkpoint: a rewound
+    /// speculation leaves it set, which only over-reports. Read once, by an island parse that
+    /// found its own close ([`Parser::parse_expression_to_brace`]).
+    slash_unlike_scans: bool,
     /// The innermost open position whose bare assignment prints without the pair the
     /// printer gives an assignment elsewhere ([`Parser::pair_free_root`], save/restore):
     /// where it starts, and how its expression ends.
@@ -1151,6 +1156,7 @@ impl<'a> Parser<'a> {
             peek_had_line_terminator: false, // No peek cached yet
             allow_in: true,                  // Allow `in` binary operator by default
             in_for_header: false,
+            slash_unlike_scans: false,
             pair_free_root: None,
             no_in_depth: 0,                    // Only read while `allow_in` is false
             arrow_return_type_barred_at: None, // Not inside a conditional consequent
@@ -4174,10 +4180,26 @@ impl<'a> Parser<'a> {
         Ok((expr, comments))
     }
 
+    /// Record the current `/` or `/=` token, read as a regular expression's opening (`regex`)
+    /// or as a division, while `prev_end` is the end of the token before it
+    /// ([`Parser::slash_unlike_scans`]).
+    #[inline]
+    pub(super) fn note_slash(&mut self, regex: bool) {
+        if !scan::scans_read_slash_alike(
+            self.source.as_bytes(),
+            self.prev_end,
+            self.current.start as usize,
+            regex,
+        ) {
+            self.slash_unlike_scans = true;
+        }
+    }
+
     /// Parse a single expression from a source that runs on past it — a host's island whose
     /// end the host has not found — and accept it only where it stops at a `}` the expression
     /// leaves as the current token: returns the expression, that `}`'s offset in the host
-    /// document, what the tokens read held (`LexedFacts`), and the comments collected.
+    /// document, whether a `/` it read stands where the raw scans may read it the other way
+    /// ([`Parser::slash_unlike_scans`]), and the comments collected.
     ///
     /// Accepting means three things at once, each refused otherwise (an error the caller
     /// discards for its own scan and slice parse): the current token is `BraceClose`, no
@@ -4194,7 +4216,7 @@ impl<'a> Parser<'a> {
             return Err(self.error_expected_found("'}'"));
         }
         let close = self.current.start as usize + self.base_offset;
-        Ok((expr, close, self.lexer.lexed(), self.take_comments()))
+        Ok((expr, close, self.slash_unlike_scans, self.take_comments()))
     }
 
     /// Hand the collected comments to the caller as a `Run<Comment>`, flushing the ledger

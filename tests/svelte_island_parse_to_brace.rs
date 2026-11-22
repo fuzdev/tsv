@@ -8,10 +8,16 @@
 //! the tag's extent, the comment extents before its `}`, the formatted output, and an error's
 //! message and position.
 //!
-//! - **A `/` token** is refused, so the scan decides where the island ends: a division
-//!   (`{a / b}`, `{x /= 2}`), a regex holding a `}` (`a={/re}/.test(x)}`), the one the scan
-//!   and the parse read apart, `{function () {} / 2}` (a division to the parse, a regex to
-//!   acorn's island running through the tag's `}` — Svelte's unclosed tag).
+//! - **A `/` the scans and the parse may read apart** is refused, so the scan decides where
+//!   the island ends: a division after a `}` — `{function () {} / 2}` is a division to the
+//!   parse and a regex to acorn's island scan, running through the tag's `}` (Svelte's
+//!   unclosed tag) — a regex after a word or a `)`, and a `/` after whitespace the scans take
+//!   for code (a vertical tab, a non-ASCII space: `{aa\u{FEFF}/ bb}` divides to the parse and
+//!   opens a regex to the scans).
+//! - **Every other `/`** — a division after a name, a number, a `)` or `]`
+//!   (`{a / b}`, `{x /= 2}`), a regex after an operator or at the island's start
+//!   (`a={/re}/.test(x)}`) — is read alike by the parse, its lookaheads and the island scan,
+//!   and the parse's answer stands; it ends where the scan would have ended it.
 //! - **A `/` only inside a string, template or comment** is no token, and the parse's answer
 //!   stands.
 //! - **A comment before the `}`** ends where it ends in the slice: the parse stops with the `}`
@@ -60,7 +66,7 @@ fn wire_holds(cases: &[(&str, &str)]) {
 }
 
 #[test]
-fn a_slash_token_island_ends_where_the_scan_ends_it() {
+fn a_slash_read_alike_ends_where_the_scan_ends_it() {
     wire_holds(&[
         (
             "<p>{a / b}</p>",
@@ -78,6 +84,22 @@ fn a_slash_token_island_ends_where_the_scan_ends_it() {
             "<p>{a / b}</p><p>/</p>",
             r#""type":"ExpressionTag","start":3,"end":10"#,
         ),
+        (
+            "<p>{(a + b) / c[0] / 2}</p><p>/) => 1/</p>",
+            r#""type":"ExpressionTag","start":3,"end":23"#,
+        ),
+        (
+            "<p>{x.replace(/}/g, '') / 'a'.length}</p>",
+            r#""type":"ExpressionTag","start":3,"end":37"#,
+        ),
+        (
+            "<p>{(a = b / 2) => a}</p><p>/) => 1/</p>",
+            r#""type":"ExpressionTag","start":3,"end":21"#,
+        ),
+        (
+            "<p>{`${a}/${b}` / 2}</p>",
+            r#""type":"ExpressionTag","start":3,"end":20"#,
+        ),
     ]);
     assert_eq!(formatted("<p>{a / b}</p>"), "<p>{a / b}</p>\n");
     assert_eq!(
@@ -91,6 +113,12 @@ fn a_slash_the_scan_reads_as_a_regex_falls_back() {
     let unclosed = ("Unclosed expression tag".to_owned(), "1:4".to_owned());
     assert_eq!(error("<p>{function () {} / 2}</p>"), unclosed);
     assert_eq!(error("<p>{class {} / 2}</p>"), unclosed);
+    // A division after an object literal is acorn's too, so the scan ends the island at the
+    // same `}` the parse does.
+    wire_holds(&[(
+        "<p>{{} / 2}</p><p>/</p>",
+        r#""type":"ExpressionTag","start":3,"end":11"#,
+    )]);
 }
 
 #[test]
@@ -270,5 +298,121 @@ fn a_template_inside_a_type_argument_answer_reads_the_same_whatever_follows() {
                 r#""type":"ExpressionTag","start":30,"end":69"#,
             ),
         ]);
+    }
+}
+
+/// Whether the island at byte 1 of `source` (past its `{`) is answered by its own parse.
+fn closed_by_parse(source: &str) -> bool {
+    tsv_ts::__private::parse_expression_to_brace(source, 1, 0, &mut tsv_ts::ast::AstStores::new())
+        .is_some()
+}
+
+#[test]
+fn the_parse_answers_a_slash_read_alike_and_refuses_the_rest() {
+    for source in [
+        "{a / b}",
+        "{x /= 2}",
+        "{(a + b) / 2}",
+        "{a[0] / 'b'.length}",
+        "{a++ / 2}",
+        "{/re/.test(x)}",
+        "{a && /re/.test(x)}",
+        "{!/re/.test(x)}",
+        "{(a) => /re/.test(a)}",
+        "{`${a}/${b}`}",
+        "{f<A, `${'`'}`>(c)}",
+    ] {
+        assert!(closed_by_parse(source), "{source:?}");
+    }
+    for source in [
+        "{{} / 2}",
+        "{function () {} / 2}",
+        "{a! / 2}",
+        "{a.await / 2}",
+        "{() => { if (c) /re/.test(s) }}",
+        "{() => { for (x of /re/g.exec(s)); }}",
+        "{() => { return /re/ }}",
+    ] {
+        assert!(!closed_by_parse(source), "{source:?}");
+    }
+}
+
+/// Every whitespace character JS reads as trivia that the scans' anchor walk does not
+/// (`is_ascii_whitespace`): the vertical tab and each non-ASCII `WhiteSpace` /
+/// `LineTerminator`. The walk reads one as a significant byte, which is no operand's end, so
+/// a `/` after it opens a regex to the scans.
+const GAP_WHITESPACE: &[char] = &[
+    '\u{000B}', '\u{00A0}', '\u{FEFF}', '\u{1680}', '\u{2000}', '\u{2001}', '\u{2002}', '\u{2003}',
+    '\u{2004}', '\u{2005}', '\u{2006}', '\u{2007}', '\u{2008}', '\u{2009}', '\u{200A}', '\u{2028}',
+    '\u{2029}', '\u{202F}', '\u{205F}', '\u{3000}',
+];
+
+#[test]
+fn a_slash_after_whitespace_the_scans_read_as_code_is_refused() {
+    // `G` is the gap character, between the token before the `/` and the `/`, beside
+    // comments of each kind.
+    let divisions = [
+        "{aaG/ bb}",
+        "{aa G / bb}",
+        "{aa /* c */G/ bb}",
+        "{aaG/* c */ / bb}",
+        "{aa // c\nG/ bb}",
+        "{aa++G/ 2}",
+        "{a--G/ 2}",
+        "{(a)G/ 2}",
+        "{a[0]G/ 2}",
+        "{'s'G/ 2}",
+        "{1G/ 2}",
+        "{xG/= 2}",
+    ];
+    let regexes = [
+        "{a &&G/re/.test(x)}",
+        "{a && /* c */G/re/.test(x)}",
+        "{!G/re/.test(x)}",
+        "{aG!/re/.test(x)}",
+        "{a +G/re/.test(x)}",
+        "{a +G+/re/.test(x)}",
+        "{(a) =>G/re/.test(a)}",
+        "{f(G/re/)}",
+        "{G/re/.test(x)}",
+    ];
+    for &gap in GAP_WHITESPACE {
+        for template in divisions.iter().chain(&regexes) {
+            let island = template.replace('G', &gap.to_string());
+            // A debug build asserts that an island its parse answers ends where the brace
+            // scan ends it; the document's own verdict is not the question here.
+            let _ = tsv_svelte::__private::parse(&format!("<p>{island}</p><p>/</p>"));
+        }
+        for template in divisions {
+            let island = template.replace('G', &gap.to_string());
+            assert!(!closed_by_parse(&island), "{island:?}");
+        }
+    }
+    // ASCII whitespace and comments in the gap are read alike.
+    for island in [
+        "{aa \t\r\n\x0C/ bb}",
+        "{aa /* c\u{FEFF} */ / bb}",
+        "{aa // c\u{FEFF}\n/ bb}",
+        "{aa // c\u{2028}/ bb}",
+        "{a && /* c */ /re/.test(x)}",
+    ] {
+        assert!(closed_by_parse(island), "{island:?}");
+    }
+}
+
+#[test]
+fn a_regex_after_a_bang_glued_to_a_word_is_refused() {
+    // The scans step over a `!` run glued to a word as a postfix non-null and read the `/`
+    // after `of` as a division; the parse reads `of`, a prefix `!`, then a regex. The host
+    // text after the island holds the quote or brace a misread scan would run on to.
+    for island in [
+        "{(() => { for (const x of!/'/.exec(s)) ; })()}",
+        "{(() => { for (const x of /* c */!/'/.exec(s)) ; })()}",
+        "{(() => { for (const x of!!/}/.exec(s)) ; })()}",
+    ] {
+        // A debug build asserts that an island its parse answers ends where the brace scan
+        // ends it.
+        let _ = tsv_svelte::__private::parse(&format!("<p>{island}</p><p>'/}}</p>"));
+        assert!(!closed_by_parse(island), "{island:?}");
     }
 }

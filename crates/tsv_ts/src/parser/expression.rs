@@ -1277,6 +1277,9 @@ impl<'a> Parser<'a> {
         // error, read before the operator is consumed while `prev_token_end` still
         // closes the left side.
         self.check_bare_assignment_left(left, expr_start)?;
+        if operator == AssignmentOperator::DivideAssign {
+            self.note_slash(false);
+        }
         // the deepest nesting the frame has reached by the end of the target, the target's
         // own among it, which the assignment's level sits above
         let target_peak = self.depth.peak();
@@ -1465,6 +1468,10 @@ impl<'a> Parser<'a> {
             BinaryOperator::GreaterThan => 1,
             BinaryOperator::RightShift => 2,
             BinaryOperator::UnsignedRightShift => 3,
+            BinaryOperator::Slash => {
+                self.note_slash(false);
+                0
+            }
             _ => 0,
         };
         let may_close_type_arguments =
@@ -2117,6 +2124,8 @@ impl<'a> Parser<'a> {
                     "regex relex with populated peek cache"
                 );
                 let lexer_start = self.current.start as usize;
+                // `prev_end` is still the end of the token before the `/`.
+                self.note_slash(true);
                 let (regex_token, pattern_end) = self.lexer.read_regex_literal(lexer_start)?;
                 let lexer_end = regex_token.end as usize;
 

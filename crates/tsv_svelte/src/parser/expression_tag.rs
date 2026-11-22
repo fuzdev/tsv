@@ -128,8 +128,9 @@ impl<'a> SvelteParser<'a> {
     /// when the whole value is done). Three readings find the matching `}`, in turn: a bare
     /// name path glued to its `}` (`tsv_ts::__private::parse_bare_name_closed`); then the
     /// island's own parse, run over the rest of the document and stopping at the `}` it
-    /// leaves current (`tsv_ts::__private::parse_expression_to_brace`, which refuses every
-    /// island holding a `/` token, where the scans' regex rule and the parse can part); and
+    /// leaves current (`tsv_ts::__private::parse_expression_to_brace`, which refuses an
+    /// island holding a `/` the scans' regex rule and the parse may read apart, such as a
+    /// division after a `}`); and
     /// last, for every island those refuse, [`scan_to_matching_brace`] (nested braces,
     /// strings, comments, regex and template literals skipped) and a parse of the slice it
     /// bounds, which reports every error.
@@ -166,7 +167,8 @@ impl<'a> SvelteParser<'a> {
         }
 
         // Every other island is parsed to the `}` it stops at, which the brace scan then need
-        // not find — unless the parse refuses it (an island holding a `/` token among them).
+        // not find — unless the parse refuses it (an island holding a `/` the scan may read
+        // apart from the parse among them).
         if let Some(island) = self.with_island_stores(|this, stores| {
             tsv_ts::__private::parse_expression_to_brace(
                 this.source,
