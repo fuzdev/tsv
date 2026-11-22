@@ -366,8 +366,9 @@ pub(crate) fn closes_type_arguments(bytes: &[u8], gt: usize, lower_bound: usize)
         let b = bytes[i];
         if b == b'<'
             && !headers.after_header_close
-            // Past an operand: a `/` here would divide.
-            && !anchor.starts_regex(bytes, i, lower_bound, grammar)
+            // Past an operand: a `/` here would divide. The grammar's `}` reading is
+            // `BYTES_ONLY`'s, which always answers, so `None` never comes back.
+            && anchor.starts_regex(bytes, i, lower_bound, grammar) == Some(false)
             && !follows_postfix_update(bytes, i, lower_bound)
             && matching_angle_close(bytes, i + 1, TypeArgScan::Parse) == Some(gt)
         {
@@ -448,7 +449,10 @@ fn skip_walked_regex(
     lower_bound: usize,
     grammar: OperandGrammar,
 ) -> Option<usize> {
-    if !(headers.after_for_of || anchor.starts_regex(bytes, i, lower_bound, grammar)) {
+    // Both walks' grammars read a `}` as `BYTES_ONLY` does, which always answers, so no
+    // `None` comes back to take a side on.
+    if !(headers.after_for_of || anchor.starts_regex(bytes, i, lower_bound, grammar) == Some(true))
+    {
         return None;
     }
     skip_regex_literal(bytes, i, bytes.len()).filter(|&past| past <= bound)

@@ -11,8 +11,7 @@
 //! - **A `/` token** is refused, so the scan decides where the island ends: a division
 //!   (`{a / b}`, `{x /= 2}`), a regex holding a `}` (`a={/re}/.test(x)}`), the one the scan
 //!   and the parse read apart, `{function () {} / 2}` (a division to the parse, a regex to
-//!   acorn's island running through the tag's `}` — Svelte's unclosed tag), and a division
-//!   after a braced operand, which a lookahead would read as a regex running past the `}`.
+//!   acorn's island running through the tag's `}` — Svelte's unclosed tag).
 //! - **A `/` only inside a string, template or comment** is no token, and the parse's answer
 //!   stands.
 //! - **A comment before the `}`** ends where it ends in the slice: the parse stops with the `}`
@@ -212,24 +211,27 @@ fn a_backtick_inside_an_interpolation_takes_the_bounded_parse() {
 }
 
 /// A division after a braced operand inside an arrow head's parens: the lookahead that finds
-/// the head's `)` reads a `/` after a `}` as a regex's opening, and such a "regex" may run
-/// over the island's `}` to a `/` in the document, past a `)` and `=>` there. Every island
-/// holding a `/` token takes the bounded parse, so the document after the `}` cannot decide
-/// the reading: each is rejected as the bounded parse rejects it, whatever follows. (The
-/// rejection is that lookahead's own misread of the division, pinned as it stands.)
+/// the head's `)` reads the `/` after the `}` as the division it is, so no "regex" runs over the
+/// island's `}` to a `/` in the document, past a `)` and `=>` there — each island parses, and
+/// ends where it does, whatever follows it.
 #[test]
-fn a_division_after_a_braced_operand_reads_as_the_bounded_parse_does() {
-    let cases = [
-        ("<p>{(a = {} / 2) => a}</p>", "1:18"),
-        ("<p>{(a = {} / 2) => a}</p>)=>1/", "1:18"),
-        ("{(x = {} / 2) => a}/) => q", "1:15"),
-        ("<div a={(a = function () {} / 2) => a}></div>)=>1/", "1:34"),
-    ];
-    for (source, header) in cases {
-        assert_eq!(
-            error(source),
-            ("Expected '}', found '=>'".to_owned(), header.to_owned()),
-            "{source:?}"
-        );
-    }
+fn a_division_after_a_braced_operand_reads_the_same_whatever_follows() {
+    wire_holds(&[
+        (
+            "<p>{(a = {} / 2) => a}</p>",
+            r#""type":"ExpressionTag","start":3,"end":22"#,
+        ),
+        (
+            "<p>{(a = {} / 2) => a}</p>)=>1/",
+            r#""type":"ExpressionTag","start":3,"end":22"#,
+        ),
+        (
+            "{(x = {} / 2) => a}/) => q",
+            r#""type":"ExpressionTag","start":0,"end":19"#,
+        ),
+        (
+            "<div a={(a = function () {} / 2) => a}></div>)=>1/",
+            r#""type":"ExpressionTag","start":7,"end":38"#,
+        ),
+    ]);
 }

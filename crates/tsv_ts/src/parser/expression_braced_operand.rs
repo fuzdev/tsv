@@ -104,9 +104,23 @@ pub(crate) fn closes_braced_operand(
     lower_bound: usize,
     start: ScanStart,
     resume: &mut BracedOperandWalk,
-) -> bool {
+) -> Option<bool> {
+    // acorn's tokenizer always answers: a `}` the walk does not meet ends no operand.
+    Some(reach_brace::<TokenContexts>(bytes, rbrace, lower_bound, start, resume) == Some(true))
+}
+
+/// Walk the region from `lower_bound` on through the `}` at `rbrace` as `R` reads it —
+/// resuming the scan's walk where one is kept — and say whether the brace ends an operand:
+/// `None` when the walk does not meet it as a token of its own, or `R` cannot tell.
+fn reach_brace<R: Reading>(
+    bytes: &[u8],
+    rbrace: usize,
+    lower_bound: usize,
+    start: ScanStart,
+    resume: &mut BracedOperandWalk,
+) -> Option<bool> {
     let mut walk = resume
-        .take::<Walk>()
+        .take::<Walk<R>>()
         .filter(|walk| walk.resumes(rbrace, lower_bound, start))
         .unwrap_or_else(|| Box::new(Walk::new(lower_bound, start)));
     let closed = walk.reach(bytes, rbrace);
@@ -115,23 +129,49 @@ pub(crate) fn closes_braced_operand(
         // and is not kept for that scan to resume.
         resume.put(walk);
     }
-    closed.is_some_and(Closed::ends_operand)
+    closed?.ends_operand()
 }
 
 /// The walk's reading of every `/` that no `}` settles: this crate's answers for a `>` and
 /// a `)`, and the bytes' for a `}` — which the walk never asks, a `/` after a `}` being its
-/// own to answer ([`Region::divides_after_brace`]).
-const WALK_GRAMMAR: OperandGrammar = crate::__private::OPERAND_GRAMMAR;
+/// own to answer ([`Region::closed_before`]).
+const WALK_GRAMMAR: OperandGrammar = OperandGrammar {
+    closes_type_arguments: crate::parser::closes_type_arguments,
+    closes_statement_header: crate::parser::closes_statement_header,
+    ..OperandGrammar::BYTES_ONLY
+};
 
 /// [`WALK_GRAMMAR`] with every `}` ending an operand: the probe that tells whether the
-/// operand before a `/` ends on a `}` ([`Region::divides_after_brace`]).
+/// operand before a `/` ends on a `}` ([`Region::closed_before`]).
 const BRACE_ENDS_OPERAND: OperandGrammar = OperandGrammar {
-    closes_braced_operand: |_, _, _, _, _| true,
+    closes_braced_operand: |_, _, _, _, _| Some(true),
     ..WALK_GRAMMAR
 };
 
+/// How a [`Walk`] reads its tokens: the state that settles what each `}` closed — acorn's
+/// tokenizer's ([`TokenContexts`]) or this crate's grammar's ([`GrammarContexts`]).
+trait Reading: Sized + 'static {
+    fn new(start: ScanStart) -> Self;
+    /// A line terminator lies between the last token and the next.
+    fn line_break(&mut self);
+    /// Read a punctuator or a literal.
+    fn token(&mut self, token: Token);
+    /// Read a word: a keyword or a name.
+    fn word(&mut self, word: &[u8]);
+    /// Whether the innermost open context is a template literal's `${…}`.
+    fn in_interpolation(&self) -> bool;
+    /// A template literal's `${` was read.
+    fn open_interpolation(&mut self);
+    /// The innermost interpolation's own `}` was read.
+    fn close_interpolation(&mut self);
+    /// Whether the last token read is a `}`.
+    fn after_brace(&self) -> bool;
+    /// What the last `}` closed, while only `!`s follow it.
+    fn closed(&mut self) -> Option<&mut Closed>;
+}
+
 /// A forward walk of one scanned region, token by token, kept between a scan's asks.
-struct Walk {
+struct Walk<R> {
     lower_bound: usize,
     start: ScanStart,
     /// The next byte to read. Everything before it has been tokenized.
@@ -140,10 +180,10 @@ struct Walk {
     region: Region,
     /// The regions around `region`, outermost first.
     outer: Vec<Region>,
-    contexts: TokenContexts,
+    contexts: R,
 }
 
-impl Walk {
+impl<R: Reading> Walk<R> {
     fn new(lower_bound: usize, start: ScanStart) -> Self {
         Self {
             lower_bound,
@@ -151,7 +191,7 @@ impl Walk {
             at: lower_bound,
             region: Region::new(lower_bound),
             outer: Vec::new(),
-            contexts: TokenContexts::new(start),
+            contexts: R::new(start),
         }
     }
 
@@ -168,7 +208,9 @@ impl Walk {
             let i = self.at;
             let past_whitespace = skip_whitespace(bytes, i);
             if past_whitespace > i {
-                self.contexts.newline |= holds_line_terminator(&bytes[i..past_whitespace]);
+                if holds_line_terminator(&bytes[i..past_whitespace]) {
+                    self.contexts.line_break();
+                }
                 self.at = past_whitespace;
                 continue;
             }
@@ -191,8 +233,9 @@ impl Walk {
                     // A comment: transparent, except that a line comment's terminator — or
                     // one inside a block comment — is a line break between the tokens
                     // around it.
-                    self.contexts.newline |=
-                        bytes[i + 1] == b'/' || holds_line_terminator(&bytes[i..past]);
+                    if bytes[i + 1] == b'/' || holds_line_terminator(&bytes[i..past]) {
+                        self.contexts.line_break();
+                    }
                 } else {
                     self.contexts.token(Token::Operand);
                 }
@@ -200,20 +243,18 @@ impl Walk {
                 continue;
             }
             if b == b'/' {
-                let regex = self
-                    .region
-                    .divides_after_brace(bytes, i, &self.contexts)
-                    .map_or_else(
-                        || {
-                            self.region.anchor.starts_regex(
-                                bytes,
-                                i,
-                                self.region.lower_bound,
-                                WALK_GRAMMAR,
-                            )
-                        },
-                        |divides| !divides,
-                    );
+                let regex = match self.region.closed_before(bytes, i, &mut self.contexts) {
+                    // A brace the reading cannot place leaves the walk unable to read on.
+                    Some(closed) => !closed.ends_operand()?,
+                    None => {
+                        self.region.anchor.starts_regex(
+                            bytes,
+                            i,
+                            self.region.lower_bound,
+                            WALK_GRAMMAR,
+                        ) == Some(true)
+                    }
+                };
                 if regex && let Some(past) = skip_regex_literal(bytes, i, bytes.len()) {
                     self.region.anchor.skipped_operand(past);
                     self.contexts.token(Token::Operand);
@@ -237,12 +278,12 @@ impl Walk {
                 self.contexts.token(Token::Operand);
                 continue;
             }
-            if b == b'}' && self.contexts.top() == Context::Interpolation {
+            if b == b'}' && self.contexts.in_interpolation() {
                 // The interpolation's own `}`: template text follows, in the region around
                 // it. One the walk began inside is the scan's own closer, which it never
                 // asks about.
                 self.region = self.outer.pop()?;
-                self.contexts.stack.pop();
+                self.contexts.close_interpolation();
                 self.at = self.template_text(bytes, i + 1, rbrace)?;
                 continue;
             }
@@ -250,8 +291,11 @@ impl Walk {
             self.contexts.token(token);
             self.at = i + len;
             if token == Token::BraceR {
-                let closed = self.contexts.closed.as_mut()?;
+                let closed = self.contexts.closed()?;
                 closed.bang = non_null_follows(bytes, i + 1);
+                if closed.unless_line_break {
+                    closed.line_break = line_break_follows(bytes, i + 1);
+                }
                 if i == rbrace {
                     return Some(*closed);
                 }
@@ -302,9 +346,9 @@ impl Region {
         }
     }
 
-    /// Whether the `/` at `slash` divides because the operand before it ends on the `}`
-    /// last closed — `None` when it ends on anything else, and the scanners' own rule
-    /// decides. This is the answer the scan was given when it asked about that brace.
+    /// What the `}` last closed, when the operand before the `/` at `slash` ends on it —
+    /// `None` when it ends on anything else, and the scanners' own rule decides. The brace's
+    /// answer is the one the scan was given when it asked about that brace.
     ///
     /// With no token since the brace, the operand ends on it: only whitespace and comments
     /// lie between, which the scan reads past too. A `!` run since is the anchor's to
@@ -313,21 +357,26 @@ impl Region {
     /// every one, and the two disagree exactly when it landed on a `}` — the one last
     /// closed, since any token after that brace other than a `!` would be what the anchor
     /// landed on instead.
-    fn divides_after_brace(
+    ///
+    /// The record's [`Closed::ends_operand`] may be `None`: a brace the reading cannot place.
+    fn closed_before(
         &self,
         bytes: &[u8],
         slash: usize,
-        contexts: &TokenContexts,
-    ) -> Option<bool> {
-        let closed = contexts.closed?;
-        let ends_on_brace = contexts.prev == Token::BraceR
+        contexts: &mut impl Reading,
+    ) -> Option<Closed> {
+        let after_brace = contexts.after_brace();
+        let closed = *contexts.closed()?;
+        let ends_on_brace = after_brace
             || (self
                 .anchor
                 .starts_regex(bytes, slash, self.lower_bound, WALK_GRAMMAR)
-                && !self
+                == Some(true)
+                && self
                     .anchor
-                    .starts_regex(bytes, slash, self.lower_bound, BRACE_ENDS_OPERAND));
-        ends_on_brace.then(|| closed.ends_operand())
+                    .starts_regex(bytes, slash, self.lower_bound, BRACE_ENDS_OPERAND)
+                    == Some(false));
+        ends_on_brace.then_some(closed)
     }
 }
 
@@ -351,6 +400,33 @@ fn non_null_follows(bytes: &[u8], after: usize) -> bool {
             return false;
         }
         i = past;
+    }
+}
+
+/// Whether a line terminator stands between the `}` just before `after` and the token after
+/// it, past whitespace, comments and any `!` run ([`Closed::line_break`]).
+fn line_break_follows(bytes: &[u8], after: usize) -> bool {
+    let mut i = after;
+    loop {
+        let past_whitespace = skip_whitespace(bytes, i);
+        if holds_line_terminator(&bytes[i..past_whitespace]) {
+            return true;
+        }
+        match bytes.get(past_whitespace) {
+            Some(b'!') => i = past_whitespace + 1,
+            Some(b'/') if matches!(bytes.get(past_whitespace + 1), Some(b'/' | b'*')) => {
+                let Some(past) =
+                    skip_trivia(bytes, past_whitespace, bytes.len(), TriviaProfile::JS)
+                else {
+                    return false;
+                };
+                if holds_line_terminator(&bytes[past_whitespace..past]) {
+                    return true;
+                }
+                i = past;
+            }
+            _ => return false,
+        }
     }
 }
 
@@ -385,6 +461,7 @@ fn punctuator_at(bytes: &[u8], i: usize) -> (Token, usize) {
         b'?' => (Token::Question, 1),
         b'=' if next == Some(b'>') => (Token::Arrow, 2),
         b'+' | b'-' if next == Some(bytes[i]) => (Token::Operand, 2),
+        b'>' => (Token::Gt, 1),
         _ => (Token::Operator, 1),
     }
 }
@@ -404,6 +481,10 @@ enum Token {
     /// `+`, `...`, `[`, `typeof`, `new`, `return`, …) — and the `${` a
     /// [`ScanStart::Interpolation`] region opens after.
     Operator,
+    /// A `>` byte: an [`Self::Operator`] to acorn, told apart because it closes a type
+    /// argument or parameter list too, which the grammar's reading of a `{` after it asks
+    /// ([`GrammarContexts`]).
+    Gt,
     /// A `!`: an [`Self::Operator`] to acorn, told apart because a run of them glued to a
     /// `}` is TypeScript's postfix non-null, which leaves the `/` after it the brace's
     /// question ([`Closed`]).
@@ -428,6 +509,7 @@ impl Token {
         matches!(
             self,
             Token::Operator
+                | Token::Gt
                 | Token::Bang
                 | Token::ParenL
                 | Token::BraceL
@@ -494,15 +576,24 @@ struct Frame {
 /// What the last `}` closed, for the `/` after it — kept while only `!`s follow the brace.
 #[derive(Clone, Copy, Debug)]
 struct Closed {
-    /// Whether the brace ends an operand: an object literal's, or the body of a function or
-    /// class acorn's tokenizer reads as an expression — and not at statement level.
-    operand: bool,
-    /// Whether it does when a postfix `!` run follows: any function or class body as well,
-    /// which acorn-typescript's non-null reads as an operand whatever the tokenizer took
-    /// the keyword for.
-    operand_before_bang: bool,
+    /// Whether the brace ends an operand: to acorn's tokenizer an object literal's, or the
+    /// body of a function or class it reads as an expression — and not at statement level.
+    /// `None` where the reading cannot tell ([`GrammarContexts`]).
+    operand: Option<bool>,
+    /// Whether it does when a postfix `!` run follows: to acorn any function or class body
+    /// as well, which acorn-typescript's non-null reads as an operand whatever the
+    /// tokenizer took the keyword for.
+    operand_before_bang: Option<bool>,
     /// Whether a postfix `!` run glued to the brace follows it ([`non_null_follows`]).
     bang: bool,
+    /// Whether the answer stands only while no line terminator follows the brace: the
+    /// grammar's object or type literal at statement level, whose `/` past a line break
+    /// divides after an object and opens a regex after a type alias's literal — two the
+    /// walk does not tell apart ([`GrammarContexts`]).
+    unless_line_break: bool,
+    /// Whether a line terminator follows the brace before the next token, past any `!` run
+    /// ([`line_break_follows`]), read only for [`Self::unless_line_break`].
+    line_break: bool,
 }
 
 impl Closed {
@@ -515,13 +606,21 @@ impl Closed {
             )
         });
         Self {
-            operand,
-            operand_before_bang: operand || frame.is_some_and(|frame| frame.context.is_function()),
+            operand: Some(operand),
+            operand_before_bang: Some(
+                operand || frame.is_some_and(|frame| frame.context.is_function()),
+            ),
             bang: false,
+            unless_line_break: false,
+            line_break: false,
         }
     }
 
-    fn ends_operand(self) -> bool {
+    /// Whether the brace ends an operand — `None` where the reading cannot tell.
+    fn ends_operand(self) -> Option<bool> {
+        if self.unless_line_break && self.line_break {
+            return None;
+        }
         if self.bang {
             self.operand_before_bang
         } else {
@@ -793,10 +892,533 @@ impl TokenContexts {
     }
 }
 
+impl Reading for TokenContexts {
+    fn new(start: ScanStart) -> Self {
+        TokenContexts::new(start)
+    }
+
+    fn line_break(&mut self) {
+        self.newline = true;
+    }
+
+    fn token(&mut self, token: Token) {
+        TokenContexts::token(self, token);
+    }
+
+    fn word(&mut self, word: &[u8]) {
+        TokenContexts::word(self, word);
+    }
+
+    fn in_interpolation(&self) -> bool {
+        self.top() == Context::Interpolation
+    }
+
+    fn open_interpolation(&mut self) {
+        TokenContexts::open_interpolation(self);
+    }
+
+    fn close_interpolation(&mut self) {
+        self.stack.pop();
+    }
+
+    fn after_brace(&self) -> bool {
+        self.prev == Token::BraceR
+    }
+
+    fn closed(&mut self) -> Option<&mut Closed> {
+        self.closed.as_mut()
+    }
+}
+
+/// Whether the `}` at `rbrace` closes a braced operand as this crate's PARSER reads it — an
+/// object or type literal, or a function or class expression's body — so a `/` after it
+/// divides; `Some(false)` where the `/` opens a regex (a block, an arrow's or a declaration's
+/// body), and `None` where the walk cannot tell. `tsv_lang`'s `ClosesBracedOperand` for the
+/// raw scans whose only reader is that parser: the lookaheads that find an arrow head's or a
+/// function type's `)` ([`crate::__private::OPERAND_GRAMMAR`]) and the template literal
+/// skips inside them.
+///
+/// Those scans read from a `(` or an interpolation's `${`, so their region is an
+/// expression, where the brace a `/` may follow is always an operand's — except inside a
+/// nested body, where statements begin. The walk keeps the grammar's frames
+/// ([`GrammarContexts`]) and answers from the brace's opener and the token before it: the
+/// same token walk the acorn reading takes ([`Walk`]), with the grammar's answers where
+/// acorn's tokenizer has heuristics (a `function` or `class` keyword is an expression's
+/// wherever an expression is expected, an `async function` included; a type literal after
+/// `as` or `satisfies` ends an operand).
+///
+/// **`None` is the answer wherever the reading is not certain**, and the scan that asked
+/// then answers as it does at the end of its input: either reading of a misplaced `/` can
+/// carry the scan past its region — a regex skip over the region's close, or a division
+/// reading a regex body's brackets as code — so a guess would make the answer depend on
+/// what follows the region. The uncertain braces are ones valid code almost never divides
+/// after: a brace whose opener the walk cannot place (after a type parameter list's `>` at
+/// statement level, after a keyword that may be a name, a property named `class`), and an
+/// object or type literal at statement level followed by a line break, where the `/`
+/// divides after `x = {}` and opens a regex after `type T = {}` — and everything nested in
+/// a brace the walk could not place.
+// TODO: the uncertain shapes are over-rejected in an arrow head's parameter list (a default
+// holding a nested body that writes one): `(a = () => { type T = {}⏎/re/.test(s) }) => a`.
+// Recording a `type` alias's `=` would settle the one real-looking member.
+pub(crate) fn closes_braced_operand_in_grammar(
+    bytes: &[u8],
+    rbrace: usize,
+    lower_bound: usize,
+    start: ScanStart,
+    resume: &mut BracedOperandWalk,
+) -> Option<bool> {
+    reach_brace::<GrammarContexts>(bytes, rbrace, lower_bound, start, resume)
+}
+
+/// How a `{` directly inside a [`GrammarFrame`] reads.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Scope {
+    /// Expressions and types only: the region's base, a `(…)`, a `${…}`, an object or type
+    /// literal, a class body — a `{` there is a literal's where an expression may begin.
+    Expressions,
+    /// A statement list: a block, or a function's, arrow's or method's body — a `{` there
+    /// is a block's where a statement may begin.
+    Statements,
+}
+
+/// What opened a [`GrammarFrame`], which says what closes it.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Opener {
+    /// The region's own start — nothing in the walk closes it.
+    Base,
+    Paren,
+    Interpolation,
+    Brace,
+}
+
+/// One open frame of [`GrammarContexts`].
+#[derive(Clone, Copy, Debug)]
+struct GrammarFrame {
+    opener: Opener,
+    scope: Scope,
+    /// What the frame's `}` answers ([`Closed::operand`]): `None` where the walk could not
+    /// place the brace, or any brace around it.
+    ends_operand: Option<bool>,
+    /// An object or type literal directly in a statement list ([`Closed::unless_line_break`]).
+    statement_literal: bool,
+    /// How many conditional `?`s are open in the frame, so a `:` can be told for a
+    /// conditional's.
+    conditionals: u32,
+}
+
+/// The token before the current one, as [`GrammarContexts`] tells tokens apart.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Prev {
+    /// An expression may begin after it: an operator, `(`, `,`, `[`, `?`, a prefix `!`, an
+    /// operator keyword (`typeof`, `new`, `in`, `await`, …), a declaration's `let`.
+    Operator,
+    /// `void`: an operator keyword in an expression, a type in a function's return type.
+    Void,
+    /// `return` / `yield`: an expression may begin after it on the same line, and none after
+    /// a line break (ASI).
+    Restricted,
+    /// A contextual keyword a type or an expression follows — `as`, `satisfies`, `of`,
+    /// `is`, `keyof`, `infer`, `extends` — and which may be a name too.
+    Contextual,
+    /// An operand: a name, a literal, `]`, a postfix `++` / `--`.
+    Operand,
+    /// A keyword a block follows: `else`, `do`, `try`, `finally`, a class's `static`.
+    BlockKeyword,
+    /// A keyword the walk does not place (`default`).
+    Unplaced,
+    /// The word `async`, with what a `function` keyword in its place would have read as.
+    Async(Option<bool>),
+    Function,
+    Class,
+    ParenR,
+    BraceL,
+    BraceR,
+    Semi,
+    /// A `:` that closed a conditional opened in the same frame.
+    ConditionalColon,
+    /// Any other `:` — a label's, a `case`'s, a type annotation's, a property's.
+    Colon,
+    Arrow,
+    Gt,
+    Dot,
+}
+
+/// A `function` or `class` keyword whose body the walk has not reached yet.
+#[derive(Clone, Copy, Debug)]
+struct Head {
+    /// The frame depth the keyword was read at; its body's `{` opens at the same depth.
+    depth: usize,
+    /// What the body's `}` answers: an expression's ends an operand, a declaration's does
+    /// not, and `None` when the keyword stood where neither is certain.
+    ends_operand: Option<bool>,
+    class: bool,
+}
+
+/// The part of this crate's grammar a braced operand's `}` turns on, over a walk: the
+/// frames ([`GrammarFrame`]), the `function` and `class` heads not yet at their bodies, and
+/// the token before the current one.
+///
+/// A `{` reads by the frame it opens in and the token before it ([`Self::brace`]): in an
+/// expression it is an object or type literal wherever an expression or a type may begin,
+/// an arrow's body after `=>` and a method's after `)` or its return type; in a statement
+/// list it is a block wherever a statement may begin — after `{`, `;`, `}`, a header's `)`, a label's `:`, an
+/// operand (a line break before it ends the statement, or it opens a TypeScript
+/// declaration's body: `enum E {`) — and a literal where an expression may begin. A
+/// `function` or `class` keyword is an expression's where an expression may begin and a
+/// declaration's where a statement may, and its body is the first `{` at its depth after a
+/// token a type or a heritage clause can end on (`)`, a name, `}`, `>`, `void`); every `{`
+/// before that is a return type's or a heritage's literal.
+struct GrammarContexts {
+    stack: Vec<GrammarFrame>,
+    heads: Vec<Head>,
+    prev: Prev,
+    /// Whether a line terminator sits between `prev` and the current token.
+    newline: bool,
+    /// What the last `}` closed ([`Closed`]).
+    closed: Option<Closed>,
+    /// Whether a closer met no frame it closes: the walk has left the region it read, and
+    /// answers no brace past it.
+    lost: bool,
+}
+
+impl GrammarContexts {
+    fn top(&self) -> GrammarFrame {
+        // The base frame is never popped: a close that would pop it loses the walk instead.
+        self.stack.last().copied().unwrap_or(GrammarFrame {
+            opener: Opener::Base,
+            scope: Scope::Expressions,
+            ends_operand: None,
+            statement_literal: false,
+            conditionals: 0,
+        })
+    }
+
+    /// Push a frame opened by `opener`, poisoned when the frame around it is: what a brace
+    /// the walk could not place holds is not placed either.
+    fn push(&mut self, opener: Opener, scope: Scope, ends_operand: Option<bool>) {
+        let poisoned = self
+            .stack
+            .last()
+            .is_some_and(|top| top.opener == Opener::Brace && top.ends_operand.is_none());
+        let statement_literal = opener == Opener::Brace
+            && scope == Scope::Expressions
+            && ends_operand == Some(true)
+            && self.top().scope == Scope::Statements;
+        self.stack.push(GrammarFrame {
+            opener,
+            scope,
+            ends_operand: if poisoned { None } else { ends_operand },
+            statement_literal,
+            conditionals: 0,
+        });
+    }
+
+    /// Pop the innermost frame when `opener` opened it, dropping the heads read inside it.
+    /// `None` when another frame is innermost: the closer is not the walk's to read, and the
+    /// walk is lost.
+    fn pop(&mut self, opener: Opener) -> Option<GrammarFrame> {
+        let top = *self.stack.last()?;
+        if top.opener != opener {
+            self.lost = true;
+            return None;
+        }
+        self.stack.pop();
+        let depth = self.stack.len();
+        self.heads.retain(|head| head.depth <= depth);
+        Some(top)
+    }
+
+    /// Whether an expression may begin after `prev`.
+    fn expression_expected(&self) -> bool {
+        match self.prev {
+            Prev::Operator | Prev::Void | Prev::Gt | Prev::Arrow | Prev::ConditionalColon => true,
+            Prev::Restricted | Prev::Contextual => !self.newline,
+            Prev::Colon => self.top().scope == Scope::Expressions,
+            _ => false,
+        }
+    }
+
+    /// Whether a statement may begin after `prev`, in a statement list.
+    fn statement_expected(&self) -> bool {
+        self.top().scope == Scope::Statements
+            && match self.prev {
+                Prev::BraceL
+                | Prev::Semi
+                | Prev::BraceR
+                | Prev::ParenR
+                | Prev::BlockKeyword
+                | Prev::Colon => true,
+                Prev::Operand | Prev::Restricted => self.newline,
+                _ => false,
+            }
+    }
+
+    /// What a `function` or `class` keyword read now begins: an expression (its body's `}`
+    /// ends an operand), a declaration (it does not), or `None` where neither is certain.
+    fn head_ends_operand(&self) -> Option<bool> {
+        if self.statement_expected() {
+            Some(false)
+        } else if self.expression_expected() {
+            Some(true)
+        } else {
+            None
+        }
+    }
+
+    /// Read a `{`: the body of the head pending at this depth, or a brace read by the
+    /// frame it opens in and the token before it.
+    fn brace(&mut self) {
+        let depth = self.stack.len();
+        if let Some(head) = self
+            .heads
+            .last()
+            .copied()
+            .filter(|head| head.depth == depth)
+        {
+            // A body follows a token a return type or a heritage clause ends on; any other
+            // `{` there opens a type or a heritage's literal.
+            let body = matches!(
+                self.prev,
+                Prev::ParenR | Prev::Operand | Prev::BraceR | Prev::Gt | Prev::Void | Prev::Class
+            );
+            if body {
+                self.heads.pop();
+                let scope = if head.class {
+                    Scope::Expressions
+                } else {
+                    Scope::Statements
+                };
+                self.push(Opener::Brace, scope, head.ends_operand);
+            } else {
+                self.push(Opener::Brace, Scope::Expressions, Some(true));
+            }
+            return;
+        }
+        let block = Some(false);
+        let literal = Some(true);
+        let (scope, ends_operand) = match self.top().scope {
+            Scope::Expressions => match self.prev {
+                // An arrow's body, a method's or accessor's, a class's static block.
+                Prev::Arrow | Prev::ParenR | Prev::BlockKeyword => (Scope::Statements, block),
+                _ if self.expression_expected() => (Scope::Expressions, literal),
+                // A contextual keyword a type follows across a line break.
+                Prev::Contextual => (Scope::Expressions, literal),
+                // A method's or accessor's body after its return type (`m(): T {`,
+                // `m(): { a: 1 } {`): no expression or type puts a `{` right after an
+                // operand or a `}` in an expression's frame, and a function's or class's
+                // head is read apart ([`Head`]).
+                // TODO: a return type ending in `>` or `void` (`m(): Promise<T> {`,
+                // `m(): void {`) is read above as a literal's start, where `a > {}` and
+                // `void {}` begin one; a body read so is uncertain at its first nested brace.
+                Prev::Operand | Prev::BraceR => (Scope::Statements, block),
+                _ => (Scope::Statements, None),
+            },
+            Scope::Statements => match self.prev {
+                Prev::Arrow => (Scope::Statements, block),
+                _ if self.statement_expected() => (Scope::Statements, block),
+                // A TypeScript declaration's body (`enum E {`, `namespace N {`).
+                Prev::Operand => (Scope::Statements, block),
+                // `>` closes `interface I<T>`'s parameters or a comparison's operator, and
+                // a line break after a contextual keyword leaves it a name or an operator.
+                Prev::Gt => (Scope::Statements, None),
+                _ if self.expression_expected() => (Scope::Expressions, literal),
+                _ => (Scope::Statements, None),
+            },
+        };
+        self.push(Opener::Brace, scope, ends_operand);
+    }
+
+    /// Read a `function` or `class` keyword.
+    fn head(&mut self, class: bool) {
+        let ends_operand = match self.prev {
+            // `async function`: read where the `async` stood.
+            Prev::Async(ends_operand) if !class && !self.newline => ends_operand,
+            _ => self.head_ends_operand(),
+        };
+        self.heads.push(Head {
+            depth: self.stack.len(),
+            ends_operand,
+            class,
+        });
+        self.set(if class { Prev::Class } else { Prev::Function });
+    }
+
+    /// Make `prev` the token just read.
+    fn set(&mut self, prev: Prev) {
+        self.prev = prev;
+        self.newline = false;
+    }
+}
+
+impl Reading for GrammarContexts {
+    fn new(start: ScanStart) -> Self {
+        let mut contexts = Self {
+            stack: Vec::new(),
+            heads: Vec::new(),
+            prev: Prev::Operator,
+            newline: false,
+            closed: None,
+            lost: false,
+        };
+        contexts.push(Opener::Base, Scope::Expressions, None);
+        if start == ScanStart::Interpolation {
+            contexts.open_interpolation();
+        }
+        contexts
+    }
+
+    fn line_break(&mut self) {
+        self.newline = true;
+    }
+
+    fn token(&mut self, token: Token) {
+        let closed = self.closed.take();
+        let prev = self.prev;
+        match token {
+            Token::ParenL => {
+                // A `(` right after `class` names a method `class`, not a class.
+                if prev == Prev::Class {
+                    self.heads.pop();
+                }
+                self.push(Opener::Paren, Scope::Expressions, None);
+                self.set(Prev::Operator);
+            }
+            Token::ParenR => {
+                let _ = self.pop(Opener::Paren);
+                self.set(Prev::ParenR);
+            }
+            Token::BraceL => {
+                self.brace();
+                self.set(Prev::BraceL);
+            }
+            Token::BraceR => {
+                let popped = self.pop(Opener::Brace);
+                let ends_operand = popped.and_then(|frame| frame.ends_operand);
+                self.closed = Some(Closed {
+                    operand: ends_operand,
+                    // A postfix `!` changes no answer of the grammar's: it follows an
+                    // operand, and a block or declaration ends a statement, after which a
+                    // `!` is prefix.
+                    operand_before_bang: ends_operand,
+                    bang: false,
+                    unless_line_break: popped.is_some_and(|frame| frame.statement_literal),
+                    line_break: false,
+                });
+                self.set(Prev::BraceR);
+            }
+            Token::Semi => {
+                let depth = self.stack.len();
+                // A head with no body: an overload's or an ambient declaration's.
+                self.heads.retain(|head| head.depth != depth);
+                self.set(Prev::Semi);
+            }
+            Token::Colon => {
+                // A `:` right after the keyword names a property `function` or `class`.
+                if matches!(prev, Prev::Function | Prev::Class) {
+                    self.heads.pop();
+                }
+                let conditional = self.stack.last_mut().is_some_and(|frame| {
+                    let open = frame.conditionals > 0;
+                    if open {
+                        frame.conditionals -= 1;
+                    }
+                    open
+                });
+                self.set(if conditional {
+                    Prev::ConditionalColon
+                } else {
+                    Prev::Colon
+                });
+            }
+            Token::Question => {
+                if let Some(frame) = self.stack.last_mut() {
+                    frame.conditionals += 1;
+                }
+                self.set(Prev::Operator);
+            }
+            Token::Bang => {
+                self.closed = closed;
+                self.set(Prev::Operator);
+            }
+            Token::Arrow => self.set(Prev::Arrow),
+            Token::Gt => self.set(Prev::Gt),
+            Token::Dot => self.set(Prev::Dot),
+            Token::Operand | Token::Name => self.set(Prev::Operand),
+            Token::Function => self.head(false),
+            Token::Class => self.head(true),
+            Token::Extends => self.set(Prev::Contextual),
+            Token::Start | Token::Operator => self.set(Prev::Operator),
+        }
+    }
+
+    fn word(&mut self, word: &[u8]) {
+        if self.prev == Prev::Dot || word.first() == Some(&b'#') {
+            self.set(Prev::Operand);
+            return;
+        }
+        let prev = match word {
+            b"function" => return self.head(false),
+            b"class" => return self.head(true),
+            b"async" => Prev::Async(self.head_ends_operand()),
+            b"void" => Prev::Void,
+            b"return" | b"yield" => Prev::Restricted,
+            b"as" | b"satisfies" | b"of" | b"is" | b"keyof" | b"infer" | b"extends" => {
+                Prev::Contextual
+            }
+            b"else" | b"do" | b"try" | b"finally" | b"static" => Prev::BlockKeyword,
+            b"default" => Prev::Unplaced,
+            b"typeof" | b"new" | b"in" | b"instanceof" | b"delete" | b"await" | b"case"
+            | b"throw" | b"let" | b"const" | b"var" => Prev::Operator,
+            _ => Prev::Operand,
+        };
+        self.set(prev);
+    }
+
+    fn in_interpolation(&self) -> bool {
+        self.stack
+            .last()
+            .is_some_and(|frame| frame.opener == Opener::Interpolation)
+    }
+
+    fn open_interpolation(&mut self) {
+        self.push(Opener::Interpolation, Scope::Expressions, None);
+        self.closed = None;
+        self.set(Prev::Operator);
+    }
+
+    fn close_interpolation(&mut self) {
+        let _ = self.pop(Opener::Interpolation);
+        self.closed = None;
+        self.set(Prev::Operand);
+    }
+
+    fn after_brace(&self) -> bool {
+        self.prev == Prev::BraceR
+    }
+
+    fn closed(&mut self) -> Option<&mut Closed> {
+        if self.lost {
+            return None;
+        }
+        self.closed.as_mut()
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::closes_braced_operand;
     use tsv_lang::source_scan::{BracedOperandWalk, ScanStart};
+
+    /// The acorn reading's answer, which is always given.
+    fn closes_braced_operand(
+        bytes: &[u8],
+        rbrace: usize,
+        lower_bound: usize,
+        start: ScanStart,
+        walk: &mut BracedOperandWalk,
+    ) -> bool {
+        super::closes_braced_operand(bytes, rbrace, lower_bound, start, walk)
+            .expect("acorn's tokenizer always answers")
+    }
 
     /// One ask, with no walk to resume.
     fn closes(src: &[u8], rbrace: usize, lower_bound: usize, start: ScanStart) -> bool {
@@ -1335,5 +1957,77 @@ mod tests {
             ));
         }
         assert_eq!(divided, pairs);
+    }
+
+    /// The grammar reading's answer for the first `}` a `/` follows, the walk starting at
+    /// byte 0 of a region that begins as an expression.
+    fn grammar_divides(src: &str) -> Option<bool> {
+        let rbrace = braces_before_a_slash(src)
+            .next()
+            .expect("a `}` before a `/` to ask about");
+        super::closes_braced_operand_in_grammar(
+            src.as_bytes(),
+            rbrace,
+            0,
+            ScanStart::Expression,
+            &mut BracedOperandWalk::default(),
+        )
+    }
+
+    #[test]
+    fn the_grammar_reads_a_brace_by_its_opener() {
+        // An operand's brace: a literal where an expression or a type may begin, and a
+        // function or class expression's body — wherever acorn's tokenizer takes it.
+        for src in [
+            "({} / 2)",
+            "(a = { b: 1 } / 2)",
+            "(function () {} / 2)",
+            "(c ? x : function () {} / 2)",
+            "(async function () {} / 2)",
+            "(class extends B {} / 2)",
+            "(function (): { a: 1 } {} / 2)",
+            "(x as {} / 2)",
+            "(x satisfies { a: 1 } / 2)",
+            "(() => { x = {} / 2 })",
+            "(() => { return {} / 2 })",
+            "(() => { x = function () {} / 2 })",
+            "(class { m(): number { x = {} / 2 } })",
+            "`${{} / 2}`",
+        ] {
+            assert_eq!(grammar_divides(src), Some(true), "{src:?}");
+        }
+        // A statement's brace: a block, an arrow's body, a declaration's body.
+        for src in [
+            "(() => { if (c) {} /re/ })",
+            "(() => { {} /re/ })",
+            "(() => { a\n{} /re/ })",
+            "(() => { l: {} /re/ })",
+            "(() => { function f() {} /re/ })",
+            "(() => { function f(): {} {} /re/ })",
+            "(() => { class A {} /re/ })",
+            "(() => { enum E {} /re/ })",
+            "(() => { return\n{} /re/ })",
+            "(() => { x => {}\n/re/ })",
+            // A method's body after its return type.
+            "(class { m(): number { if (c) {} /re/ } })",
+            "(class { m(): number { {} /re/ } })",
+            "({ m(): number { {} /re/ } })",
+            "(class { m(): { a: 1 } { {} /re/ } })",
+            "(class { get a(): A[] { {} /re/ } })",
+            "(class { m(x): x is A { {} /re/ } })",
+            "(class extends B { m(): number { {} /re/ } })",
+        ] {
+            assert_eq!(grammar_divides(src), Some(false), "{src:?}");
+        }
+        // A brace the walk cannot place, and an object or type literal at statement level
+        // before a line break.
+        for src in [
+            "(() => { interface I<T> {} /re/ })",
+            "(() => { type T = {}\n/re/ })",
+            "(() => { x = {}\n/ 2 })",
+            "(() => { default {} /re/ })",
+        ] {
+            assert_eq!(grammar_divides(src), None, "{src:?}");
+        }
     }
 }

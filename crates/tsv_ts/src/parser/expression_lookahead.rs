@@ -250,14 +250,17 @@ pub(super) fn matching_paren_close(bytes: &[u8], start: usize) -> Option<usize> 
         }
         // Regex literals are the one trivia kind the cursor leaves significant
         // (it needs previous-token context). Skip a real regex so a `)`/`(`
-        // inside its pattern isn't counted — e.g. a param default `(a = /\)/)`.
-        if bytes[pos] == b'/'
-            && anchor.starts_regex(bytes, pos, start, crate::__private::OPERAND_GRAMMAR)
-            && let Some(past) = skip_regex_literal(bytes, pos, end)
-        {
-            pos = past;
-            anchor.skipped_operand(pos);
-            continue;
+        // inside its pattern isn't counted — e.g. a param default `(a = /\)/)`. A `/`
+        // the grammar cannot read (after a `}` it cannot place) ends the scan, as the end
+        // of the input does, so no answer depends on what follows the group.
+        if bytes[pos] == b'/' {
+            let regex =
+                anchor.starts_regex(bytes, pos, start, crate::__private::OPERAND_GRAMMAR)?;
+            if regex && let Some(past) = skip_regex_literal(bytes, pos, end) {
+                pos = past;
+                anchor.skipped_operand(pos);
+                continue;
+            }
         }
         match bytes[pos] {
             b'(' => depth += 1,

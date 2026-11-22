@@ -1,0 +1,949 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 803,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Text",
+				"start": 781,
+				"end": 783,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "ExpressionTag",
+				"start": 783,
+				"end": 802,
+				"expression": {
+					"type": "ArrowFunctionExpression",
+					"start": 784,
+					"end": 801,
+					"id": null,
+					"expression": true,
+					"generator": false,
+					"async": false,
+					"params": [
+						{
+							"type": "AssignmentPattern",
+							"start": 785,
+							"end": 795,
+							"left": {
+								"type": "Identifier",
+								"start": 785,
+								"end": 786,
+								"name": "x"
+							},
+							"right": {
+								"type": "BinaryExpression",
+								"start": 789,
+								"end": 795,
+								"left": {
+									"type": "ObjectExpression",
+									"start": 789,
+									"end": 791,
+									"properties": []
+								},
+								"operator": "/",
+								"right": {
+									"type": "Literal",
+									"start": 794,
+									"end": 795,
+									"value": 2,
+									"raw": "2"
+								}
+							}
+						}
+					],
+					"body": {
+						"type": "Identifier",
+						"start": 800,
+						"end": 801,
+						"name": "x"
+					}
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Arrow parameter defaults dividing an operand that ends in `}` — the scan for the `)`",
+			"start": 20,
+			"end": 107
+		},
+		{
+			"type": "Line",
+			"value": " that closes the parameter list reads the `/` as the division it is, not as a regex",
+			"start": 109,
+			"end": 194
+		},
+		{
+			"type": "Line",
+			"value": " opener that runs on to a later `/` on the same line.",
+			"start": 196,
+			"end": 251
+		},
+		{
+			"type": "Line",
+			"value": " After an object literal",
+			"start": 254,
+			"end": 280
+		},
+		{
+			"type": "Line",
+			"value": " An async head",
+			"start": 357,
+			"end": 373
+		},
+		{
+			"type": "Line",
+			"value": " Arrow arguments",
+			"start": 416,
+			"end": 434
+		},
+		{
+			"type": "Line",
+			"value": " A conditional's consequent arrow with a return type",
+			"start": 498,
+			"end": 552
+		},
+		{
+			"type": "Line",
+			"value": " A slash later on the line, in a comment",
+			"start": 603,
+			"end": 645
+		},
+		{
+			"type": "Line",
+			"value": " a/b",
+			"start": 676,
+			"end": 682
+		},
+		{
+			"type": "Line",
+			"value": " The division inside a template interpolation",
+			"start": 685,
+			"end": 732
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 781,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 772,
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 282,
+					"end": 314,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 288,
+							"end": 313,
+							"id": {
+								"type": "Identifier",
+								"start": 288,
+								"end": 289,
+								"name": "a"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 292,
+								"end": 313,
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "AssignmentPattern",
+										"start": 293,
+										"end": 303,
+										"left": {
+											"type": "Identifier",
+											"start": 293,
+											"end": 294,
+											"name": "x"
+										},
+										"right": {
+											"type": "BinaryExpression",
+											"start": 297,
+											"end": 303,
+											"left": {
+												"type": "ObjectExpression",
+												"start": 297,
+												"end": 299,
+												"properties": []
+											},
+											"operator": "/",
+											"right": {
+												"type": "Literal",
+												"start": 302,
+												"end": 303,
+												"value": 2,
+												"raw": "2"
+											}
+										}
+									}
+								],
+								"body": {
+									"type": "BinaryExpression",
+									"start": 308,
+									"end": 313,
+									"left": {
+										"type": "Identifier",
+										"start": 308,
+										"end": 309,
+										"name": "x"
+									},
+									"operator": "/",
+									"right": {
+										"type": "Literal",
+										"start": 312,
+										"end": 313,
+										"value": 2,
+										"raw": "2"
+									}
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Arrow parameter defaults dividing an operand that ends in `}` — the scan for the `)`",
+							"start": 20,
+							"end": 107
+						},
+						{
+							"type": "Line",
+							"value": " that closes the parameter list reads the `/` as the division it is, not as a regex",
+							"start": 109,
+							"end": 194
+						},
+						{
+							"type": "Line",
+							"value": " opener that runs on to a later `/` on the same line.",
+							"start": 196,
+							"end": 251
+						},
+						{
+							"type": "Line",
+							"value": " After an object literal",
+							"start": 254,
+							"end": 280
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 316,
+					"end": 354,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 322,
+							"end": 353,
+							"id": {
+								"type": "Identifier",
+								"start": 322,
+								"end": 323,
+								"name": "b"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 326,
+								"end": 353,
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "AssignmentPattern",
+										"start": 327,
+										"end": 343,
+										"left": {
+											"type": "Identifier",
+											"start": 327,
+											"end": 328,
+											"name": "x"
+										},
+										"right": {
+											"type": "BinaryExpression",
+											"start": 331,
+											"end": 343,
+											"left": {
+												"type": "ObjectExpression",
+												"start": 331,
+												"end": 339,
+												"properties": [
+													{
+														"type": "Property",
+														"start": 333,
+														"end": 337,
+														"method": false,
+														"shorthand": false,
+														"computed": false,
+														"key": {
+															"type": "Identifier",
+															"start": 333,
+															"end": 334,
+															"name": "y"
+														},
+														"value": {
+															"type": "Literal",
+															"start": 336,
+															"end": 337,
+															"value": 1,
+															"raw": "1"
+														},
+														"kind": "init"
+													}
+												]
+											},
+											"operator": "/",
+											"right": {
+												"type": "Literal",
+												"start": 342,
+												"end": 343,
+												"value": 2,
+												"raw": "2"
+											}
+										}
+									}
+								],
+								"body": {
+									"type": "BinaryExpression",
+									"start": 348,
+									"end": 353,
+									"left": {
+										"type": "Identifier",
+										"start": 348,
+										"end": 349,
+										"name": "x"
+									},
+									"operator": "/",
+									"right": {
+										"type": "Literal",
+										"start": 352,
+										"end": 353,
+										"value": 2,
+										"raw": "2"
+									}
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 375,
+					"end": 413,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 381,
+							"end": 412,
+							"id": {
+								"type": "Identifier",
+								"start": 381,
+								"end": 382,
+								"name": "c"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 385,
+								"end": 412,
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": true,
+								"params": [
+									{
+										"type": "AssignmentPattern",
+										"start": 392,
+										"end": 402,
+										"left": {
+											"type": "Identifier",
+											"start": 392,
+											"end": 393,
+											"name": "x"
+										},
+										"right": {
+											"type": "BinaryExpression",
+											"start": 396,
+											"end": 402,
+											"left": {
+												"type": "ObjectExpression",
+												"start": 396,
+												"end": 398,
+												"properties": []
+											},
+											"operator": "/",
+											"right": {
+												"type": "Literal",
+												"start": 401,
+												"end": 402,
+												"value": 2,
+												"raw": "2"
+											}
+										}
+									}
+								],
+								"body": {
+									"type": "BinaryExpression",
+									"start": 407,
+									"end": 412,
+									"left": {
+										"type": "Identifier",
+										"start": 407,
+										"end": 408,
+										"name": "x"
+									},
+									"operator": "/",
+									"right": {
+										"type": "Literal",
+										"start": 411,
+										"end": 412,
+										"value": 2,
+										"raw": "2"
+									}
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An async head",
+							"start": 357,
+							"end": 373
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 436,
+					"end": 464,
+					"expression": {
+						"type": "CallExpression",
+						"start": 436,
+						"end": 463,
+						"callee": {
+							"type": "Identifier",
+							"start": 436,
+							"end": 438,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 439,
+								"end": 462,
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "AssignmentPattern",
+										"start": 440,
+										"end": 456,
+										"left": {
+											"type": "Identifier",
+											"start": 440,
+											"end": 441,
+											"name": "x"
+										},
+										"right": {
+											"type": "BinaryExpression",
+											"start": 444,
+											"end": 456,
+											"left": {
+												"type": "ObjectExpression",
+												"start": 444,
+												"end": 446,
+												"properties": []
+											},
+											"operator": "/",
+											"right": {
+												"type": "BinaryExpression",
+												"start": 450,
+												"end": 455,
+												"left": {
+													"type": "Literal",
+													"start": 450,
+													"end": 451,
+													"value": 2,
+													"raw": "2"
+												},
+												"operator": "/",
+												"right": {
+													"type": "Literal",
+													"start": 454,
+													"end": 455,
+													"value": 1,
+													"raw": "1"
+												}
+											}
+										}
+									}
+								],
+								"body": {
+									"type": "Identifier",
+									"start": 461,
+									"end": 462,
+									"name": "x"
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Arrow arguments",
+							"start": 416,
+							"end": 434
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 466,
+					"end": 495,
+					"expression": {
+						"type": "CallExpression",
+						"start": 466,
+						"end": 494,
+						"callee": {
+							"type": "Identifier",
+							"start": 466,
+							"end": 468,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 469,
+								"end": 486,
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "AssignmentPattern",
+										"start": 470,
+										"end": 480,
+										"left": {
+											"type": "Identifier",
+											"start": 470,
+											"end": 471,
+											"name": "x"
+										},
+										"right": {
+											"type": "BinaryExpression",
+											"start": 474,
+											"end": 480,
+											"left": {
+												"type": "ObjectExpression",
+												"start": 474,
+												"end": 476,
+												"properties": []
+											},
+											"operator": "/",
+											"right": {
+												"type": "Literal",
+												"start": 479,
+												"end": 480,
+												"value": 2,
+												"raw": "2"
+											}
+										}
+									}
+								],
+								"body": {
+									"type": "Identifier",
+									"start": 485,
+									"end": 486,
+									"name": "x"
+								}
+							},
+							{
+								"type": "BinaryExpression",
+								"start": 488,
+								"end": 493,
+								"left": {
+									"type": "Identifier",
+									"start": 488,
+									"end": 489,
+									"name": "y"
+								},
+								"operator": "/",
+								"right": {
+									"type": "Literal",
+									"start": 492,
+									"end": 493,
+									"value": 2,
+									"raw": "2"
+								}
+							}
+						],
+						"optional": false
+					}
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 554,
+					"end": 600,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 560,
+							"end": 599,
+							"id": {
+								"type": "Identifier",
+								"start": 560,
+								"end": 561,
+								"name": "d"
+							},
+							"init": {
+								"type": "ConditionalExpression",
+								"start": 564,
+								"end": 599,
+								"test": {
+									"type": "Identifier",
+									"start": 564,
+									"end": 568,
+									"name": "cond"
+								},
+								"consequent": {
+									"type": "ArrowFunctionExpression",
+									"start": 571,
+									"end": 595,
+									"returnType": {
+										"type": "TSTypeAnnotation",
+										"start": 583,
+										"end": 586,
+										"typeAnnotation": {
+											"type": "TSTypeReference",
+											"start": 585,
+											"end": 586,
+											"typeName": {
+												"type": "Identifier",
+												"start": 585,
+												"end": 586,
+												"name": "T"
+											}
+										}
+									},
+									"id": null,
+									"expression": true,
+									"generator": false,
+									"async": false,
+									"params": [
+										{
+											"type": "AssignmentPattern",
+											"start": 572,
+											"end": 582,
+											"left": {
+												"type": "Identifier",
+												"start": 572,
+												"end": 573,
+												"name": "x"
+											},
+											"right": {
+												"type": "BinaryExpression",
+												"start": 576,
+												"end": 582,
+												"left": {
+													"type": "ObjectExpression",
+													"start": 576,
+													"end": 578,
+													"properties": []
+												},
+												"operator": "/",
+												"right": {
+													"type": "Literal",
+													"start": 581,
+													"end": 582,
+													"value": 2,
+													"raw": "2"
+												}
+											}
+										}
+									],
+									"body": {
+										"type": "BinaryExpression",
+										"start": 590,
+										"end": 595,
+										"left": {
+											"type": "Identifier",
+											"start": 590,
+											"end": 591,
+											"name": "x"
+										},
+										"operator": "/",
+										"right": {
+											"type": "Literal",
+											"start": 594,
+											"end": 595,
+											"value": 2,
+											"raw": "2"
+										}
+									}
+								},
+								"alternate": {
+									"type": "Identifier",
+									"start": 598,
+									"end": 599,
+									"name": "y"
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A conditional's consequent arrow with a return type",
+							"start": 498,
+							"end": 552
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 647,
+					"end": 675,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 653,
+							"end": 674,
+							"id": {
+								"type": "Identifier",
+								"start": 653,
+								"end": 654,
+								"name": "e"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 657,
+								"end": 674,
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "AssignmentPattern",
+										"start": 658,
+										"end": 668,
+										"left": {
+											"type": "Identifier",
+											"start": 658,
+											"end": 659,
+											"name": "x"
+										},
+										"right": {
+											"type": "BinaryExpression",
+											"start": 662,
+											"end": 668,
+											"left": {
+												"type": "ObjectExpression",
+												"start": 662,
+												"end": 664,
+												"properties": []
+											},
+											"operator": "/",
+											"right": {
+												"type": "Literal",
+												"start": 667,
+												"end": 668,
+												"value": 2,
+												"raw": "2"
+											}
+										}
+									}
+								],
+								"body": {
+									"type": "Identifier",
+									"start": 673,
+									"end": 674,
+									"name": "x"
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A slash later on the line, in a comment",
+							"start": 603,
+							"end": 645
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Line",
+							"value": " a/b",
+							"start": 676,
+							"end": 682
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 734,
+					"end": 771,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 740,
+							"end": 770,
+							"id": {
+								"type": "Identifier",
+								"start": 740,
+								"end": 741,
+								"name": "f"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 744,
+								"end": 770,
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "AssignmentPattern",
+										"start": 745,
+										"end": 760,
+										"left": {
+											"type": "Identifier",
+											"start": 745,
+											"end": 746,
+											"name": "x"
+										},
+										"right": {
+											"type": "TemplateLiteral",
+											"start": 749,
+											"end": 760,
+											"expressions": [
+												{
+													"type": "BinaryExpression",
+													"start": 752,
+													"end": 758,
+													"left": {
+														"type": "ObjectExpression",
+														"start": 752,
+														"end": 754,
+														"properties": []
+													},
+													"operator": "/",
+													"right": {
+														"type": "Literal",
+														"start": 757,
+														"end": 758,
+														"value": 2,
+														"raw": "2"
+													}
+												}
+											],
+											"quasis": [
+												{
+													"type": "TemplateElement",
+													"start": 750,
+													"end": 750,
+													"value": {
+														"raw": "",
+														"cooked": ""
+													},
+													"tail": false
+												},
+												{
+													"type": "TemplateElement",
+													"start": 759,
+													"end": 759,
+													"value": {
+														"raw": "",
+														"cooked": ""
+													},
+													"tail": true
+												}
+											]
+										}
+									}
+								],
+								"body": {
+									"type": "BinaryExpression",
+									"start": 765,
+									"end": 770,
+									"left": {
+										"type": "Identifier",
+										"start": 765,
+										"end": 766,
+										"name": "x"
+									},
+									"operator": "/",
+									"right": {
+										"type": "Literal",
+										"start": 769,
+										"end": 770,
+										"value": 2,
+										"raw": "2"
+									}
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The division inside a template interpolation",
+							"start": 685,
+							"end": 732
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

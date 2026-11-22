@@ -34,7 +34,9 @@ mod type_members; // Type-literal / interface-body member grammar (property/meth
 mod types; // TypeScript type-syntax parsing (annotations, type expressions, type parameters)
 
 pub(crate) use expression::is_jsdoc_type_cast_comment;
-pub(crate) use expression_braced_operand::closes_braced_operand;
+pub(crate) use expression_braced_operand::{
+    closes_braced_operand, closes_braced_operand_in_grammar,
+};
 pub(crate) use expression_type_args::{closes_statement_header, closes_type_arguments};
 
 /// Who owns a top-level `as` in a partial expression parse — TypeScript, or the host

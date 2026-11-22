@@ -1716,22 +1716,22 @@ pub fn leading_regex_start(view: AstView<'_>, expression: &Expression) -> Option
 }
 
 /// The TypeScript grammar's answers to the operand ends a raw byte scan cannot read
-/// ([`closes_type_arguments`], [`closes_statement_header`]).
+/// ([`closes_type_arguments`], [`closes_statement_header`], and the grammar's reading of a
+/// `}`).
 ///
 /// The raw scans that find where an expression ENDS before this crate's parser reads it
-/// (the arrow-head lookahead and the printer's paren scan) take it, so each reads a `/` the
-/// way that parser will. It leaves a `}` to the bytes — after every one a `/` opens a regex
-/// — since the reader that tells an object literal's `}` from a block's is acorn's
-/// tokenizer, and these scans have no acorn parse behind them
-/// ([`ACORN_ISLAND_GRAMMAR`]).
-// TODO: after a `}` these scans read a regex where the grammar divides, so an arrow head
-// whose default divides a braced operand ahead of a `)` is rejected:
-// `f((a = {} / (2 / 1)) => a);`.
+/// (the arrow-head lookahead, the function-type lookahead and the printer's paren scan)
+/// take it, so each reads a `/` the way that parser will. A `}` is read by a walk of the
+/// scan's region that keeps the grammar's frames (`{} / 2` divides, `if (c) {}⏎/re/` opens
+/// a regex), and a `}` the walk cannot place stops the scan as the end of its input would,
+/// so no answer depends on what follows the region. A Svelte island's scan reads the `}`
+/// as acorn does instead ([`ACORN_ISLAND_GRAMMAR`]), since acorn settles where it ends.
 pub const OPERAND_GRAMMAR: tsv_lang::source_scan::OperandGrammar =
     tsv_lang::source_scan::OperandGrammar {
         closes_type_arguments,
         closes_statement_header,
-        ..tsv_lang::source_scan::OperandGrammar::BYTES_ONLY
+        closes_braced_operand: parser::closes_braced_operand_in_grammar,
+        start: tsv_lang::source_scan::ScanStart::Expression,
     };
 
 /// [`OPERAND_GRAMMAR`] plus acorn's reading of a `}` — the grammar for a scan that finds

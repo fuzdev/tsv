@@ -3304,13 +3304,14 @@ impl<'a> Printer<'a> {
                 // scan is looking for and running its range on to some unrelated
                 // paren. The scan reaches the literal's OPENING `/` first, whose
                 // next byte is never `/` or `*`, so `skip_trivia` can't claim it.
+                // A `/` the grammar cannot read ends the scan, as the end of its range does.
                 b'/' => {
                     if anchor.starts_regex(
                         source,
                         i,
                         start as usize,
                         crate::__private::OPERAND_GRAMMAR,
-                    ) && let Some(past) = skip_regex_literal(source, i, end)
+                    )? && let Some(past) = skip_regex_literal(source, i, end)
                     {
                         i = past;
                         anchor.skipped_operand(i);
