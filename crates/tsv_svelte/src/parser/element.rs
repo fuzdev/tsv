@@ -417,7 +417,7 @@ impl<'a> SvelteParser<'a> {
         // (`source[name_span]`), so nothing to intern here. The name's classification is
         // computed once, here, for the element to store; the body also reads the element kind
         // and the void test from it.
-        let facts = TagFacts::compute(tag_name);
+        let facts = TagFacts::of_name(self.source, tag_name);
 
         self.parse_regular_element_body(start, tag_name, facts, name_span)
     }

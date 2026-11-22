@@ -27,6 +27,7 @@ mod view;
 // text. No Svelte type carries a lifetime.
 
 use std::borrow::Cow;
+use std::cell::RefCell;
 
 use tsv_lang::store::PoolText;
 
@@ -1225,6 +1226,61 @@ fn name_shape(name: &str) -> NameShape {
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(crate) struct TagFacts(u16);
 
+/// [`TagFacts::of_name`]'s memo: [`TagFactsMemo::SLOTS`] direct-mapped slots of a name key and
+/// its facts. An empty slot's key is all zero, which no name's key is (its length byte is never
+/// zero).
+struct TagFactsMemo {
+    keys: [[u64; 2]; TagFactsMemo::SLOTS],
+    facts: [TagFacts; TagFactsMemo::SLOTS],
+}
+
+impl TagFactsMemo {
+    /// A power of two: [`TagFactsMemo::slot`] takes the hash's top bits.
+    const SLOTS: usize = 64;
+    const EMPTY: Self = Self {
+        keys: [[0; 2]; Self::SLOTS],
+        facts: [TagFacts(0); Self::SLOTS],
+    };
+
+    /// The key of `name`, a slice of `source`: its bytes as two little-endian words, masked to
+    /// the name, the length in the high word's top byte, read from the 16-byte window of
+    /// `source` at the name's address; `None` for an empty name, one longer than 15 bytes, one
+    /// whose window runs past the source, or one outside `source`'s bytes.
+    fn key(source: &[u8], name: &[u8]) -> Option<[u64; 2]> {
+        let name_len = name.len();
+        if name_len == 0 || name_len > 15 {
+            return None;
+        }
+        // The name's offset in `source`, from its address: in range only for a slice of
+        // `source`, so the window read below is the name's own bytes and the ones after it.
+        let name_start = name.as_ptr().addr().checked_sub(source.as_ptr().addr())?;
+        let window: &[u8; 16] = source
+            .get(name_start..name_start.checked_add(16)?)?
+            .try_into()
+            .ok()?;
+        let (lo, hi) = window.split_at(8);
+        let lo = u64::from_le_bytes(lo.try_into().ok()?);
+        let hi = u64::from_le_bytes(hi.try_into().ok()?);
+        let mask = |bytes: usize| {
+            if bytes >= 8 {
+                u64::MAX
+            } else {
+                (1u64 << (8 * bytes)) - 1
+            }
+        };
+        let lo = lo & mask(name_len);
+        let hi = hi & mask(name_len.saturating_sub(8));
+        Some([lo, hi | ((name_len as u64) << 56)])
+    }
+
+    /// The slot `key` maps to: the top bits of a multiplicative hash of both words.
+    fn slot(key: [u64; 2]) -> usize {
+        const { assert!(TagFactsMemo::SLOTS.is_power_of_two()) };
+        let hash = (key[0] ^ key[1].rotate_left(29)).wrapping_mul(0x9E37_79B9_7F4A_7C15);
+        (hash >> (64 - Self::SLOTS.trailing_zeros())) as usize
+    }
+}
+
 impl TagFacts {
     /// `crate::html::is_block_element` (block-level for formatting).
     const BLOCK: u16 = 1 << 0;
@@ -1256,6 +1312,39 @@ impl TagFacts {
     /// break). Deliberately narrower than [`VOID`](Self::VOID): the other void elements render
     /// inline, so a `<img>`/`<input>`/`<wbr>` flows where a `<br>` owns its line.
     const LINE_BREAK: u16 = 1 << 11;
+
+    /// [`TagFacts::compute`] for `tag_name`, a slice of `source`, answered from a per-thread memo
+    /// when the name was seen before.
+    ///
+    /// A document's elements repeat a few names (`div`, `span`, `Button`), and the facts are a
+    /// pure function of the name — `compute` must read nothing else, or the memo would answer
+    /// one context's facts in another — so the memo is per thread rather than per document:
+    /// nothing to reset, and nothing added to the stores a parse takes and parks. It is
+    /// direct-mapped, one name a slot, keyed on the name's exact bytes — a name of at most 15
+    /// bytes read as two words from the 16-byte window of `source` that starts at it, masked
+    /// to the name, with its length in the top byte — so a hit is two loads and a compare, and
+    /// a key never matches a different name. The window is located by the name's own address,
+    /// so a key is always built from the name it stores facts for: a `tag_name` outside
+    /// `source`'s bytes, a longer name, or one whose window would run past the source's end,
+    /// is computed.
+    pub(crate) fn of_name(source: &str, tag_name: &str) -> Self {
+        thread_local! {
+            static MEMO: RefCell<TagFactsMemo> = const { RefCell::new(TagFactsMemo::EMPTY) };
+        }
+        let Some(key) = TagFactsMemo::key(source.as_bytes(), tag_name.as_bytes()) else {
+            return Self::compute(tag_name);
+        };
+        MEMO.with_borrow_mut(|memo| {
+            let slot = TagFactsMemo::slot(key);
+            if memo.keys[slot] == key {
+                return memo.facts[slot];
+            }
+            let facts = Self::compute(tag_name);
+            memo.keys[slot] = key;
+            memo.facts[slot] = facts;
+            facts
+        })
+    }
 
     /// Derive the facts from the tag name. The single source: [`Element::facts`] stores exactly
     /// this, and the equivalence test grades every accessor against the predicates named here.
@@ -2502,6 +2591,64 @@ mod tests {
             assert!(!is_svelte_void(not_void), "{not_void:?}");
         }
         assert!(!crate::html::is_void_element("!doctype"));
+    }
+
+    /// The memo answers what `compute` does — on a miss and on a hit, for names that share a
+    /// slot (more names than slots, so slots are evicted and refilled), near-miss names whose
+    /// facts differ, the 15/16-byte key boundary, and a name too near the source's end for
+    /// its window.
+    #[test]
+    fn tag_facts_of_a_name_are_its_computed_facts() {
+        use super::TagFacts;
+        let mut names: Vec<String> = [
+            "div",
+            "Div",
+            "span",
+            "svg",
+            "pre",
+            "table",
+            "br",
+            "!doctype",
+            "a:b",
+            "x.y",
+            "Δcomp",
+            "abcdefghijklmno",
+            "abcdefghijklmnop",
+            "abcdefgh",
+            "abcdefg",
+            // one byte off a name whose facts differ: a key that dropped a byte would collide
+            "dix",
+            "prf",
+            "tablf",
+            "bq",
+        ]
+        .iter()
+        .map(|&name| name.to_owned())
+        .collect();
+        names.extend((0..300).map(|i| format!("e{i}")));
+        let mut source = String::new();
+        let mut spans = Vec::new();
+        for name in &names {
+            source.push('<');
+            spans.push((source.len(), source.len() + name.len()));
+            source.push_str(name);
+            source.push('>');
+        }
+        for _ in 0..2 {
+            for (name, &(start, end)) in names.iter().zip(&spans) {
+                assert_eq!(
+                    TagFacts::of_name(&source, &source[start..end]),
+                    TagFacts::compute(name),
+                    "{name:?}"
+                );
+            }
+        }
+        // the window runs past the end, or the name lies outside the source: computed
+        assert_eq!(
+            TagFacts::of_name("<div", &"<div"[1..]),
+            TagFacts::compute("div")
+        );
+        assert_eq!(TagFacts::of_name(&source, "div"), TagFacts::compute("div"));
     }
 
     /// Grade every packed [`TagFacts`](super::TagFacts) accessor against the pure predicate it
