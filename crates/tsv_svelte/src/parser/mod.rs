@@ -384,31 +384,21 @@ fn find_tag_close(
 ) -> Option<usize> {
     let bytes = source.as_bytes();
     // Every caller anchors `from` just past a `>`, so it is a char boundary; the hop below
-    // then only ever lands on `<`, which is ASCII. Stated as an assert because the `?` on
-    // the re-slice would turn a mid-character `from` into a silent "no close tag" instead
-    // of a panic.
+    // then only ever lands on `<`, which is ASCII, and the whitespace skip decodes only past
+    // an ASCII `</tag`. The byte scan itself would not notice a mid-character `from`, so
+    // the precondition is asserted rather than left to it.
     debug_assert!(source.is_char_boundary(from));
     let mut i = from;
-    // Hop to each `<` rather than testing every byte. A single-`char` pattern reaches
-    // `memchr` — through `CharSearcher`, so it is an out-of-line `next_match` call plus
-    // that searcher's own setup around it, not a bare `memchr` — and the run between
-    // two `<`s in a raw-text body is long (a real component averages one per ~1.2-1.5 KB
-    // of `<script>`/`<style>` body), so the per-byte test this loop used to run was
-    // paying its whole cost on bytes that cannot begin a close tag. `i` only ever sits on `from` (a tag boundary) or on a `<`, both
-    // ASCII, so the re-slice is always on a char boundary; an `i` past the end answers
-    // `None`, which is this scan's own "no close tag" result.
-    //
-    // ⚠️ It trades a per-BYTE cost for a per-`<` one, so it has a density axis: measured
-    // `instructions:u` **−2.45%** on a 1,695-file Svelte corpus and **−1.40%** on a
-    // synthetic body carrying a `<` every 42 bytes, but **+0.91%** at one every 15.
-    // Break-even is near one `<` per ~25 bytes, and the densest body in that whole real
-    // corpus is 28.8 — so the tax needs a script an order of magnitude more
-    // angle-bracket-dense than anything real. Re-entering `find` per candidate (rather
-    // than holding one `match_indices` searcher across them) is what buys the mainline
-    // case: the searcher form is ~0.14 points worse there and ~0.1-0.3 better on the
-    // dense shapes, and the mainline is where every measured document sits.
-    while let Some(rel) = source.get(i..)?.find('<') {
-        i += rel;
+    // Hop to each `<` rather than testing every byte ([`next_lt`]): the run between two
+    // `<`s in a raw-text body is long (a real component's `<script>`/`<style>` body holds
+    // few), and every byte between them cannot begin a close tag. `i` only ever sits on
+    // `from` (a tag boundary) or on a `<`, both ASCII; an `i` at or past the end answers
+    // `None`, this scan's own "no close tag" result.
+    loop {
+        i = next_lt(bytes, i);
+        if i >= bytes.len() {
+            return None;
+        }
         if bytes.get(i + 1) == Some(&b'/')
             && bytes.get(i + 2..).is_some_and(|rest| rest.starts_with(tag))
         {
@@ -424,7 +414,39 @@ fn find_tag_close(
         }
         i += 1;
     }
-    None
+}
+
+/// The bytes [`next_lt`] tests a step: four 16-byte vectors. The width is part of the
+/// lowering, not a tuning knob — at 32, wasm32 compares as vectors but reduces the "any `<`?"
+/// lane by lane, where 16 and 64 reduce with one `v128.any_true`; 64 also halves the
+/// native step count against 16.
+const LT_CHUNK: usize = 64;
+
+/// The first `<` at or after `from` in `bytes`, or `from.max(bytes.len())` when there is
+/// none.
+///
+/// Each step folds [`LT_CHUNK`] byte compares into one "any `<`?" answer — plain code that
+/// LLVM lowers to vector compares and a single reduction on x86-64 (SSE2) and on wasm32
+/// (simd128, which the workspace enables); aarch64 is expected to lower it to NEON alike,
+/// unverified — and only the chunk that holds a `<` is walked byte by byte. A body dense in `<`s pays that walk on most chunks, so the scan
+/// is shaped for the raw-text bodies it reads, where they are sparse.
+#[inline]
+fn next_lt(bytes: &[u8], from: usize) -> usize {
+    let mut i = from;
+    while let Some(chunk) = bytes.get(i..).and_then(<[u8]>::first_chunk::<LT_CHUNK>) {
+        let mut any = false;
+        for &b in chunk {
+            any |= b == b'<';
+        }
+        if any {
+            break;
+        }
+        i += LT_CHUNK;
+    }
+    while i < bytes.len() && bytes[i] != b'<' {
+        i += 1;
+    }
+    i
 }
 
 /// Find the first `target` byte in `bytes[start..end]` that sits at bracket depth 0
