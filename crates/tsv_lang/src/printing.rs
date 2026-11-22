@@ -1088,9 +1088,9 @@ impl LineTable<'_> {
 //
 
 /// [`line_terminators_are_lf_only`]'s loose lane test — `\r` or any non-ASCII byte, and
-/// [`classify_line_terminators`]'s, which walks the same loop — is a superset of the exact
-/// candidate class `{ \r, 0xE2 }` their word re-asks and tails answer,
-/// proved here rather than trusted (a uniform word cannot borrow across lanes unless it is
+/// [`classify_line_terminators`]'s, which asks the same needle of a whole chunk and then of each
+/// word — is a superset of the exact candidate class `{ \r, 0xE2 }` their word re-asks and tails
+/// answer, proved here rather than trusted (a uniform word cannot borrow across lanes unless it is
 /// itself a match, so `hits != 0` is exactly the byte test).
 const _: () = {
     let mut b = 0u16;
@@ -1105,14 +1105,14 @@ const _: () = {
     }
 };
 
-/// Whether every line terminator in `bytes` is a `\n` — a `\r\n` included (the byte the
-/// table records for it is the `\n`); a bare `\r` or a U+2028 / U+2029 anywhere, a string
-/// literal or a comment body included, says no. The document-level fact the scan forms of
-/// the three line questions are gated on, and the one thing a document pays for up front
-/// now that its table is built on demand ([`LineBreaks`]) — on the entry points that fold
-/// `<CR>` ahead of the parse, the fold's own pass takes it instead
-/// ([`classify_line_terminators`], the same loop with a different cold re-ask), so this
-/// runs only for a caller that never folds (`format_ast_in` reached directly).
+/// Whether every line terminator in `bytes` is a `\n` — a `\r\n` included (the byte the table
+/// records for it is the `\n`); a bare `\r` or a U+2028 / U+2029 anywhere, a string literal or a
+/// comment body included, says no. The document-level fact the scan forms of the three line
+/// questions are gated on, and the one thing a document pays for up front now that its table is
+/// built on demand ([`LineBreaks`]) — on the entry points that fold `<CR>` ahead of the parse, the
+/// fold's own pass takes it instead ([`classify_line_terminators`], the same needle behind a
+/// chunk-wide first stage, with a different cold re-ask), so this runs only for a caller that never
+/// folds (`format_ast_in` reached directly).
 ///
 /// One pass with ONE loose needle: `\r` or any non-ASCII byte, three operations a word
 /// ([`crate::swar::zero_or_high_lanes`]), and nearly every word of real source fires
@@ -1210,22 +1210,22 @@ struct Terminators {
 }
 
 /// The `<CR>` fold's pass ([`normalize_carriage_returns`]): [`line_terminators_are_lf_only`]'s
-/// loose loop — the same one needle, `\r` or any non-ASCII byte, two words a step, a
-/// fired word re-asked out of line — recording the two facts the fold and the folded
-/// document's verdict need, so the fold's up-front `find('\r')` (std's memchr, nine
-/// instructions a word — a whole-source pass on every format entry point that folds, over
-/// a corpus in which no file holds a `\r`) is gone and the verdict pass does not run a
-/// second time behind it; the fold's per-line search from the first `\r` on is unchanged. Unlike the verdict pass it has
-/// no early answer to return: it runs to the end, or until both facts are known.
+/// loose loop — the same one needle, `\r` or any non-ASCII byte, a fired word re-asked out
+/// of line — behind a first stage that asks it of [`CLASSIFY_CHUNK`] bytes at once
+/// ([`classify_chunk`]), recording the two facts the fold and the folded document's verdict
+/// need, so the fold needs no up-front `find('\r')` (a whole-source pass on every format
+/// entry point that folds, over a corpus in which no file holds a `\r`) and the verdict pass
+/// does not run a second time behind it; the fold's per-line search from the first `\r` on is
+/// unchanged. Unlike the verdict pass it has no early answer to return: it runs to the end,
+/// or until both facts are known.
 ///
 /// The verdict is stated over the FOLDED text, which is why a `\r` is not asked whether
 /// it ends in a `\n` here: after the fold every `\r` and `\r\n` IS a `\n`, and a U+2028 /
 /// U+2029 — which the fold does not touch — is the only terminator that can remain
 /// otherwise.
 ///
-/// Outlined on purpose, like the verdict pass: inlined into the CLI's format function the
-/// loop carried that function's register pressure — 19 instructions per sixteen bytes
-/// against 17 here — and read 0.07 points less of a CLI run (measured on two corpora).
+/// Outlined on purpose, like the verdict pass, so its loops do not take on the register
+/// pressure of the CLI's format function they would otherwise be inlined into.
 #[inline(never)]
 fn classify_line_terminators(bytes: &[u8]) -> Terminators {
     let mut found = Terminators {
@@ -1233,8 +1233,25 @@ fn classify_line_terminators(bytes: &[u8]) -> Terminators {
         holds_separator: false,
     };
     let mut i = 0;
-    // The loop is `line_terminators_are_lf_only`'s, spelled the same way for the same
-    // reasons (two words a step; the sixteen bytes claimed once).
+    // The first stage folds the needle over a whole chunk into one "any?" answer; a chunk
+    // that fires is re-asked a word at a time out of line, then the scan resumes at the
+    // next chunk.
+    while let Some(chunk) = bytes
+        .get(i..)
+        .and_then(<[u8]>::first_chunk::<CLASSIFY_CHUNK>)
+    {
+        let mut any = false;
+        for &b in chunk {
+            any |= b == b'\r' || b >= 0x80;
+        }
+        if any && classify_chunk(bytes, i, chunk, &mut found) {
+            return found;
+        }
+        i += CLASSIFY_CHUNK;
+    }
+    // The fewer-than-`CLASSIFY_CHUNK` bytes left: `line_terminators_are_lf_only`'s loop,
+    // spelled the same way for the same reasons (two words a step; the sixteen bytes
+    // claimed once).
     while let Some(chunk) = bytes[i..].first_chunk::<16>() {
         let (words, _) = chunk.as_chunks::<8>();
         let (a, b) = (u64::from_le_bytes(words[0]), u64::from_le_bytes(words[1]));
@@ -1260,6 +1277,42 @@ fn classify_line_terminators(bytes: &[u8]) -> Terminators {
         }
     }
     found
+}
+
+/// The bytes [`classify_line_terminators`]'s first stage tests a step: four 16-byte
+/// vectors. As with the Svelte raw-text close scan's `<` search, the width is part of the
+/// lowering rather than a tuning knob — at 32, wasm32 compares as vectors but reduces the
+/// "any?" lane by lane, where 16 and 64 reduce with one `v128.any_true` — and 64 takes four
+/// times the bytes of the two-word loop behind it a step.
+const CLASSIFY_CHUNK: usize = 64;
+
+/// [`classify_line_terminators`]'s re-ask of a chunk its first stage fired on: each of the
+/// chunk's eight words asked the word loop's own loose test, each that fires handed to
+/// [`classify_word`]. Returns whether both facts are now known, so the pass can stop.
+///
+/// The first stage's fold is `b == b'\r' || b >= 0x80` per byte — byte-exact, with no cross-lane
+/// borrow, so a chunk fires exactly when one of its words would; plain code that LLVM lowers to
+/// vector compares and a single reduction (SSE2 on x86-64, simd128 on wasm32; aarch64 is expected
+/// to lower it to NEON alike, unverified). The `>= 0x80` half is not slack: it is how the needle
+/// reaches U+2028 / U+2029, whose UTF-8 encodings lead with `0xE2`, and it takes every other
+/// non-ASCII byte with it, which the exact re-ask dismisses. Out of line (natively; wasm-opt may
+/// inline it) so the first stage's loop holds nothing else; not `#[cold]`, as [`classify_word`] is,
+/// because a chunk is eight words, so any non-ASCII text fires one.
+#[inline(never)]
+fn classify_chunk(
+    bytes: &[u8],
+    at: usize,
+    chunk: &[u8; CLASSIFY_CHUNK],
+    found: &mut Terminators,
+) -> bool {
+    let (words, _) = chunk.as_chunks::<8>();
+    for (k, word) in words.iter().enumerate() {
+        let w = u64::from_le_bytes(*word);
+        if zero_or_high_lanes(w ^ splat(b'\r')) != 0 && classify_word(bytes, at + 8 * k, w, found) {
+            return true;
+        }
+    }
+    false
 }
 
 /// [`classify_line_terminators`]'s exact question over the one word at `at` the loose
@@ -3369,6 +3422,155 @@ mod tests {
         let folded = normalize_carriage_returns("\r\u{2028}x\ry\r\nz");
         assert_eq!(folded.text(), "\n\u{2028}x\ny\nz");
         assert!(!folded.lf_only());
+    }
+
+    /// What [`classify_line_terminators`] must answer for `doc`, by plain string search: the
+    /// first `\r`, and whether a U+2028 / U+2029 is anywhere.
+    fn classify_reference(doc: &str) -> (Option<usize>, bool) {
+        (doc.find('\r'), doc.contains(['\u{2028}', '\u{2029}']))
+    }
+
+    /// [`classify_line_terminators`] and the fold built on it, against [`classify_reference`]
+    /// and a `replace`-based fold.
+    fn assert_classifies(doc: &str) {
+        let Terminators {
+            first_cr,
+            holds_separator,
+        } = classify_line_terminators(doc.as_bytes());
+        let (want_cr, want_separator) = classify_reference(doc);
+        assert_eq!(first_cr, want_cr, "first `\\r` {doc:?}");
+        // The pass stops early only once both facts are known, so the second is exact too.
+        assert_eq!(holds_separator, want_separator, "separator {doc:?}");
+        let folded = normalize_carriage_returns(doc);
+        let want = doc.replace("\r\n", "\n").replace('\r', "\n");
+        assert_eq!(folded.text(), want, "fold {doc:?}");
+        assert_eq!(folded.lf_only(), !want_separator, "verdict {doc:?}");
+        assert_eq!(
+            matches!(folded.into_text(), Cow::Borrowed(_)),
+            want_cr.is_none(),
+            "borrowed {doc:?}"
+        );
+    }
+
+    /// A terminator at each position around the first stage's chunk boundaries — the last
+    /// byte of a chunk, the first of the next, a multi-byte one straddling the seam — in
+    /// documents that end exactly on a boundary and just past one, so the chunk loop, the
+    /// two-word loop behind it, the lone word and the byte tail each meet every shape.
+    #[test]
+    fn classify_line_terminators_at_the_chunk_boundaries() {
+        let shapes = ["\r", "\r\n", "\u{2028}", "\u{2029}"];
+        let positions = [
+            0usize, 1, 7, 8, 15, 16, 61, 62, 63, 64, 65, 120, 126, 127, 128, 129,
+        ];
+        for len in [63usize, 64, 65, 72, 79, 80, 127, 128, 129, 136, 143, 200] {
+            for shape in shapes {
+                for &at in &positions {
+                    if at + shape.len() > len {
+                        continue;
+                    }
+                    let mut doc = "x".repeat(at);
+                    doc.push_str(shape);
+                    doc.push_str(&"x".repeat(len - doc.len()));
+                    assert_classifies(&doc);
+                    // A `\r` ahead of it, in an earlier chunk or the same one: the first
+                    // `\r` stays the first, and a separator after it is still found.
+                    if at >= 1 {
+                        let mut ahead = doc.clone();
+                        ahead.replace_range(0..1, "\r");
+                        assert_classifies(&ahead);
+                    }
+                    // Non-ASCII text that is not a terminator ahead of it in the same
+                    // chunk fires the chunk on its own; the re-ask must still find this.
+                    if at >= 2 {
+                        let mut ahead = doc.clone();
+                        ahead.replace_range(0..2, "\u{e9}");
+                        assert_classifies(&ahead);
+                    }
+                }
+            }
+        }
+        // Exactly one and two chunks, with nothing past the chunk loop at all.
+        for len in [64usize, 128] {
+            assert_classifies(&"x".repeat(len));
+            for at in [0, len / 2, len - 1] {
+                let mut doc = "x".repeat(len);
+                doc.replace_range(at..=at, "\r");
+                assert_classifies(&doc);
+            }
+        }
+    }
+
+    /// An all-ASCII document runs every chunk to the end with nothing firing, and a `\r` in
+    /// its last byte is still found.
+    #[test]
+    fn classify_line_terminators_over_a_long_ascii_document() {
+        let line = "const value = compute(alpha, beta);\n";
+        let mut doc = String::new();
+        while doc.len() + line.len() <= 4096 {
+            doc.push_str(line);
+        }
+        doc.push_str(&"x".repeat(4096 - doc.len()));
+        assert_eq!(doc.len(), 4096);
+        assert_classifies(&doc);
+        for at in [4032, 4095] {
+            let mut cr = doc.clone();
+            cr.replace_range(at..=at, "\r");
+            assert_classifies(&cr);
+        }
+    }
+
+    /// Non-ASCII characters that are not terminators fire the first stage's fold — `é` (a
+    /// two-byte character), U+2713 and U+2000 (`0xE2`-led, the second sharing U+2028's
+    /// `e2 80` prefix) — and the exact re-ask dismisses them, at every offset in a chunk.
+    #[test]
+    fn classify_line_terminators_dismisses_non_ascii_non_separators() {
+        for other in ["\u{e9}", "\u{2713}", "\u{2000}"] {
+            for at in 0..=130usize {
+                let mut doc = "x".repeat(at);
+                doc.push_str(other);
+                doc.push_str(&"x".repeat(200 - doc.len()));
+                assert_classifies(&doc);
+                // The same chunk also holding a `\r`, a CRLF or a separator after it.
+                for tail in ["\r", "\r\n", "\u{2028}", "\u{2029}"] {
+                    let mut both = doc.clone();
+                    both.insert_str(at + other.len() + 1, tail);
+                    assert_classifies(&both);
+                }
+            }
+        }
+    }
+
+    /// [`classify_line_terminators`] differentially over random documents: mostly plain
+    /// bytes with a rare terminator or non-ASCII character, long enough to cross several
+    /// chunks. Deterministic (a fixed xorshift seed), sized to stay quick in a debug build.
+    #[test]
+    fn classify_line_terminators_matches_the_reference_on_random_documents() {
+        let pieces = [
+            "x", "\r", "\n", "\r\n", "\u{e9}", "\u{2028}", "\u{2029}", "\u{2713}", "\u{2000}",
+            "abcdefgh",
+        ];
+        let mut state: u64 = 0x9e37_79b9_7f4a_7c15;
+        let mut next = || {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            state
+        };
+        let mut doc = String::new();
+        for _ in 0..20_000 {
+            let len = (next() % 300) as usize;
+            doc.clear();
+            while doc.len() < len {
+                let r = next();
+                let k = if r % 23 == 0 {
+                    (r >> 8) as usize % pieces.len()
+                } else {
+                    0
+                };
+                doc.push_str(pieces[k]);
+            }
+            assert_classifies(&doc);
+        }
     }
 
     /// U+2028 / U+2029 are terminators to ECMAScript and ordinary characters to HTML and CSS
