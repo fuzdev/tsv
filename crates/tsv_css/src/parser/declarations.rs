@@ -440,37 +440,22 @@ pub(crate) fn parse_declaration(parser: &mut CssParser<'_>) -> Result<(), Error>
         end: facts.value_end as u32,
     };
 
-    // Custom properties (--*) with unusual values (e.g., leading comma) preserve raw value
-    // Normal custom property values are still parsed for proper formatting. Only a custom
-    // property reads its raw text here, so only it pays the extract; a leading-comma test
-    // needs the leading trim alone.
-    let value = if is_custom_property
-        && source_relative_span
-            .extract(parser.source())
-            .trim_start()
-            .starts_with(',')
-    {
-        // Leading comma is unusual syntax - preserve as raw identifier
-        // (text recovered verbatim from `span` at print time)
-        CssValue::Identifier { span: value_span }
-    } else {
-        super::value::parse_value_from_source(
-            parser.source(),
-            source_relative_span,
-            base,
-            value_class,
-            facts.group_closes_value,
-            // A top-level `:` is a value operator in a custom property's value and
-            // nowhere else: css-syntax-3 admits whatever the text holds there, and
-            // prettier's parser throws on a plain property's (`a { b: c:d }`), so there
-            // is no oracle for splitting one. This is where the `--` is known.
-            is_custom_property,
-            // the value parser's own recursion, a level a function, counted as it parses
-            parser.nesting_room(),
-            parser.stores,
-        )
-        .map_err(|open| parser.too_deep(open as usize))?
-    };
+    let value = super::value::parse_value_from_source(
+        parser.source(),
+        source_relative_span,
+        base,
+        value_class,
+        facts.group_closes_value,
+        // A custom property's value has rules of its own (a top-level `:` is a value
+        // operator, a leading `,` keeps the value raw), and this is where the `--` is known.
+        // Prettier's parser throws on a plain property's `:` (`a { b: c:d }`), so there is no
+        // oracle for splitting one; css-syntax-3 admits whatever the text holds there.
+        is_custom_property,
+        // the value parser's own recursion, a level a function, counted as it parses
+        parser.nesting_room(),
+        parser.stores,
+    )
+    .map_err(|open| parser.too_deep(open as usize))?;
 
     // Optionally consume semicolon (but don't include it in the declaration span)
     if parser.check(TokenKind::Semicolon) {

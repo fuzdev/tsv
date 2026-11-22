@@ -47,9 +47,12 @@ use strings::parse_string_literal;
 ///   string when quote-led, else its first parenthesized group) close on the value's last
 ///   byte, which answers a leaf's own close scan in advance (see [`parse_single_value`]).
 ///   `false` means "not known".
-/// * `colon_is_operator` - whether a top-level `:` in this value is a value operator,
-///   which it is in a **custom property's** value and nowhere else at the top level (see
-///   `operators::split_value_run`). The caller knows it from the property name.
+/// * `is_custom_property` - whether this is a **custom property's** value, which the caller
+///   knows from the property name. Two rules hold there and nowhere else: a top-level `:` is
+///   a value operator (see `operators::split_value_run`), and a value led — past any
+///   whitespace, Unicode's as `str::trim_start` reads it — by a `,` is kept raw, one
+///   identifier over the whole span it was handed (its text recovered verbatim at print
+///   time).
 /// * `room` - the function levels the parse may enter (the depth limit's count, one level
 ///   a function or parenthesized group — [`FunctionLevels`]).
 /// * `stores` - the stylesheet's stores, carried through the value parser's
@@ -66,12 +69,22 @@ pub(super) fn parse_value_from_source(
     base_offset: u32,
     class: Option<ValueSeparator>,
     group_closes_value: bool,
-    colon_is_operator: bool,
+    is_custom_property: bool,
     room: u32,
     stores: &mut CssStores,
 ) -> Result<CssValue, u32> {
     let value_str = source_relative_span.extract(source);
     let absolute_start = base_offset + source_relative_span.start;
+
+    // A custom property's leading-comma value is unusual syntax, kept raw.
+    if is_custom_property && value_str.trim_start().starts_with(',') {
+        return Ok(CssValue::Identifier {
+            span: Span {
+                start: absolute_start,
+                end: base_offset + source_relative_span.end,
+            },
+        });
+    }
 
     // An all-whitespace (or empty) value keeps the span it was handed.
     let Some((trimmed, leading)) = locate_value(value_str) else {
@@ -105,7 +118,7 @@ pub(super) fn parse_value_from_source(
 
     // ValueParser re-parses the same source text, so nested value spans stay
     // accurate through its same-source recursion.
-    let parser = if colon_is_operator {
+    let parser = if is_custom_property {
         parser::ValueParser::new_custom_property(trimmed, absolute_span)
     } else {
         parser::ValueParser::new(trimmed, absolute_span)
@@ -1106,7 +1119,7 @@ mod operator_run_tests {
 
     /// `source` parsed whole as a custom property's value (a `:` is an operator) or a plain
     /// one, into `stores`, and its operator runs ([`split_runs`]).
-    fn runs_in(source: &str, colon_is_operator: bool, stores: &mut CssStores) -> Vec<Vec<String>> {
+    fn runs_in(source: &str, is_custom_property: bool, stores: &mut CssStores) -> Vec<Vec<String>> {
         let span = Span {
             start: 0,
             end: source.len() as u32,
@@ -1117,7 +1130,7 @@ mod operator_run_tests {
             0,
             None,
             false,
-            colon_is_operator,
+            is_custom_property,
             u32::MAX,
             stores,
         )
@@ -1168,8 +1181,8 @@ mod operator_run_tests {
     #[test]
     fn nested_operator_runs_read_back_their_own_members() {
         let mut stores = CssStores::new();
-        for &(source, colon_is_operator, expected) in CASES {
-            let runs = runs_in(source, colon_is_operator, &mut stores);
+        for &(source, is_custom_property, expected) in CASES {
+            let runs = runs_in(source, is_custom_property, &mut stores);
             let expected: Vec<Vec<String>> = expected
                 .iter()
                 .map(|run| run.iter().map(|&m| m.to_owned()).collect())

@@ -1,7 +1,7 @@
 use super::parser::ValueParser;
 use crate::ast::{CssStores, CssValue};
 use tsv_lang::Span;
-use tsv_lang::store::{Run, flush_run};
+use tsv_lang::store::{Run, push_run_of_one};
 
 /// Parse function arguments as comma-separated values
 ///
@@ -49,14 +49,6 @@ pub(crate) fn parse_function_arguments(
     match value {
         // Already a run of the stores — return it directly (zero copy)
         CssValue::CommaSeparated { values, .. } => values,
-        single => {
-            let mark = stores.runs.value_scratch.mark();
-            stores.runs.value_scratch.push(single);
-            flush_run(
-                &mut stores.runs.value_scratch,
-                &mut stores.runs.values,
-                mark,
-            )
-        }
+        single => push_run_of_one(&mut stores.runs.values, single),
     }
 }

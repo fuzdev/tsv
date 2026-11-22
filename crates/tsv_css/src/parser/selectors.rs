@@ -1,7 +1,7 @@
 use super::CssParser;
 use crate::ast::*;
 use crate::lexer::TokenKind;
-use tsv_lang::store::{Run, flush_run};
+use tsv_lang::store::{Run, flush_run, push_run_of_one};
 use tsv_lang::{Error, Span};
 
 /// Register comment(s) sitting between a complex selector and its `,` separator
@@ -54,24 +54,23 @@ fn parse_selector_list_with(
     // pseudo-class argument nothing has stepped it yet, so this skip is load-bearing.
     parser.skip_boundary_whitespace()?;
     let start = parser.span_pos(parser.current_start());
-    let mark = parser.stores.runs.complex_selector_scratch.mark();
 
     // Parse the first selector; a selector list always has at least one.
     let first = parse_item(parser)?;
     let mut end = first.span.end;
+    if !selector_list_continues(parser)? {
+        // A list of one — most of them — is stored as a run of one, with no scratch frame.
+        let selectors = push_run_of_one(&mut parser.stores.runs.complex_selectors, first);
+        return Ok(SelectorList {
+            selectors,
+            span: Span { start, end },
+        });
+    }
+    let mark = parser.stores.runs.complex_selector_scratch.mark();
     parser.stores.runs.complex_selector_scratch.push(first);
 
     // Parse each additional selector after its comma.
     loop {
-        // Selector-list boundaries (`read_selector_list`'s `allow_comment_or_whitespace`):
-        // legacy `<!-- ... -->` markers are allowed after a complete selector (before
-        // `{`/`,`) and after a comma — but NOT between compounds, so `h1 <!-- --> p`
-        // still rejects (parse_combinator already stops at `<`, leaving the marker here).
-        parser.skip_html_comment_markers()?;
-        skip_comments_before_comma(parser)?;
-        if !parser.check(TokenKind::Comma) {
-            break;
-        }
         parser.advance()?; // consume comma
         // `read_selector_list`'s post-`,` `allow_comment_or_whitespace`; boundary-aware so a
         // run behind a registered comment is stepped too (the `skip_html_comment_markers`
@@ -81,6 +80,9 @@ fn parse_selector_list_with(
         let sel = parse_item(parser)?;
         end = sel.span.end;
         parser.stores.runs.complex_selector_scratch.push(sel);
+        if !selector_list_continues(parser)? {
+            break;
+        }
     }
 
     let selectors = flush_run(
@@ -92,6 +94,19 @@ fn parse_selector_list_with(
         selectors,
         span: Span { start, end },
     })
+}
+
+/// Step the selector-list boundary after a complete selector and answer whether a `,` — and
+/// so another selector — follows.
+///
+/// The boundary is `read_selector_list`'s `allow_comment_or_whitespace`: legacy `<!-- ... -->`
+/// markers are allowed after a complete selector (before `{`/`,`) and after a comma — but NOT
+/// between compounds, so `h1 <!-- --> p` still rejects (`parse_combinator` already stops at
+/// `<`, leaving the marker here).
+fn selector_list_continues(parser: &mut CssParser<'_>) -> Result<bool, Error> {
+    parser.skip_html_comment_markers()?;
+    skip_comments_before_comma(parser)?;
+    Ok(parser.check(TokenKind::Comma))
 }
 
 /// Parse a complex selector list: `div, span > a, .class#id`
@@ -402,23 +417,40 @@ pub(crate) fn parse_complex_selector(parser: &mut CssParser<'_>) -> Result<Compl
         let (combinator, combinator_span) = pending.unzip();
         let child = parse_relative_selector(parser, combinator, combinator_span)?;
         end = child.span.end;
-        parser.stores.runs.relative_selector_scratch.push(child);
 
         // Continue with the next combinator, or stop. The loop ends at `{`/`,`/`)`/EOF or
         // when no further combinator follows; a gap comment is registered inside
         // `parse_combinator` (`div /* c */ p`) and is never itself a terminator — a trailing
         // comment before a stop token is left unconsumed for the caller's pre-brace /
         // pseudo-arg handling.
-        if parser.check(TokenKind::LeftBrace)
+        let next = if parser.check(TokenKind::LeftBrace)
             || parser.check(TokenKind::Comma)
             || parser.check(TokenKind::RightParen)
             || parser.check(TokenKind::Eof)
         {
-            break;
-        }
-        let Some(cs) = parse_combinator(parser)? else {
-            break; // No more combinators, we're done
+            None
+        } else {
+            parse_combinator(parser)?
         };
+        let Some(cs) = next else {
+            if parser.stores.runs.relative_selector_scratch.len_since(mark) == 0 {
+                // A one-compound selector — most of them — is stored as a run of one, its
+                // frame closed still empty.
+                parser
+                    .stores
+                    .runs
+                    .relative_selector_scratch
+                    .close_empty(mark);
+                let children = push_run_of_one(&mut parser.stores.runs.relative_selectors, child);
+                return Ok(ComplexSelector {
+                    children,
+                    span: Span { start, end },
+                });
+            }
+            parser.stores.runs.relative_selector_scratch.push(child);
+            break;
+        };
+        parser.stores.runs.relative_selector_scratch.push(child);
         pending = Some(cs);
     }
 
@@ -669,61 +701,30 @@ fn parse_relative_selector(
         || parser.base_offset() + parser.current_start(),
         |s| s.start_usize(),
     );
-    let mark = parser.stores.runs.simple_selector_scratch.mark();
-
-    // Parse one or more simple selectors
-    loop {
+    // Parse one or more simple selectors. A compound of one — most of them — is stored as a
+    // run of one, with no scratch frame; the frame opens at a second selector. One call site
+    // for `parse_simple_selector`, on the selector recursion's path (a pseudo-class argument
+    // re-enters it), keeps it inlined into this frame.
+    let mut frame = None;
+    let selectors = loop {
         let simple = parse_simple_selector(parser)?;
+        let more = compound_continues(parser)?;
+        if frame.is_none() && !more {
+            break push_run_of_one(&mut parser.stores.runs.simple_selectors, simple);
+        }
+        let mark = *frame.get_or_insert_with(|| parser.stores.runs.simple_selector_scratch.mark());
         parser.stores.runs.simple_selector_scratch.push(simple);
-
-        // A glued comment run (`.a/* c */.b`, `.a/* c *//* d */.b`) between two simple
-        // selectors is inter-token trivia that keeps them in one compound — with no
-        // surrounding whitespace it is NOT a descendant. Register the whole run and
-        // continue only when a simple-selector start follows it glued; a whitespace
-        // anywhere in the run (`.a/* c */ .b`) ends the compound and the combinator loop
-        // reads it as a descendant.
-        if matches!(parser.current_kind(), TokenKind::Comment) {
-            if compound_continues_across_comments(parser)? {
-                while matches!(parser.current_kind(), TokenKind::Comment) {
-                    parser.register_current_comment();
-                    parser.advance()?;
-                }
-                continue;
-            }
-            break;
+        if !more {
+            break flush_run(
+                &mut parser.stores.runs.simple_selector_scratch,
+                &mut parser.stores.runs.simple_selectors,
+                mark,
+            );
         }
-
-        // A boundary whitespace run at the head of the next token IS whitespace to
-        // `parseCss` — `read_selector` runs `allow_comment_or_whitespace` after every simple
-        // selector — so it ends the compound however the lexer read it. The break is only
-        // half the rule and was long held back for the other half: on its own it makes the
-        // caller expect a `{` where the selector continues, turning `&<NBSP>b` and `*<NBSP>b`
-        // into parse errors. `parse_combinator` supplies the other half — it steps the same
-        // run and reports the descendant combinator that replaces the break — so the two
-        // must stay together. The run reaches here after every simple selector that is not
-        // itself an identifier (`&`, `*`, a `)`, a `]`, a `%`); an identifier's own trailing
-        // run was swallowed by `read_identifier` on both sides and never gets this far.
-        if parser.boundary_run_len() > 0 {
-            break;
-        }
-
-        // Check if another simple selector follows (no whitespace, no combinator)
-        if !is_simple_selector_chain(parser) {
-            break;
-        }
-    }
+    };
 
     let end = parser.span_pos(parser.current_start());
 
-    if parser.stores.runs.simple_selector_scratch.len_since(mark) == 0 {
-        return Err(parser.error_expected_at("selector", start));
-    }
-
-    let selectors = flush_run(
-        &mut parser.stores.runs.simple_selector_scratch,
-        &mut parser.stores.runs.simple_selectors,
-        mark,
-    );
     Ok(RelativeSelector {
         combinator,
         combinator_span,
@@ -733,6 +734,44 @@ fn parse_relative_selector(
             end,
         },
     })
+}
+
+/// Answer, after a simple selector, whether the compound goes on with another one glued to
+/// it — registering a glued comment run it continues across.
+fn compound_continues(parser: &mut CssParser<'_>) -> Result<bool, Error> {
+    // A glued comment run (`.a/* c */.b`, `.a/* c *//* d */.b`) between two simple
+    // selectors is inter-token trivia that keeps them in one compound — with no
+    // surrounding whitespace it is NOT a descendant. Register the whole run and
+    // continue only when a simple-selector start follows it glued; a whitespace
+    // anywhere in the run (`.a/* c */ .b`) ends the compound and the combinator loop
+    // reads it as a descendant.
+    if matches!(parser.current_kind(), TokenKind::Comment) {
+        if compound_continues_across_comments(parser)? {
+            while matches!(parser.current_kind(), TokenKind::Comment) {
+                parser.register_current_comment();
+                parser.advance()?;
+            }
+            return Ok(true);
+        }
+        return Ok(false);
+    }
+
+    // A boundary whitespace run at the head of the next token IS whitespace to
+    // `parseCss` — `read_selector` runs `allow_comment_or_whitespace` after every simple
+    // selector — so it ends the compound however the lexer read it. Ending the compound here is
+    // only half the rule and was long held back for the other half: on its own it makes the
+    // caller expect a `{` where the selector continues, turning `&<NBSP>b` and `*<NBSP>b`
+    // into parse errors. `parse_combinator` supplies the other half — it steps the same
+    // run and reports the descendant combinator that replaces the break — so the two
+    // must stay together. The run reaches here after every simple selector that is not
+    // itself an identifier (`&`, `*`, a `)`, a `]`, a `%`); an identifier's own trailing
+    // run was swallowed by `read_identifier` on both sides and never gets this far.
+    if parser.boundary_run_len() > 0 {
+        return Ok(false);
+    }
+
+    // Check if another simple selector follows (no whitespace, no combinator)
+    Ok(is_simple_selector_chain(parser))
 }
 
 /// Check if another simple selector follows in the chain (e.g., `div.class#id`, `&__a`, `div&`)

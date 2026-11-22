@@ -216,6 +216,15 @@ mod stamp {
             stale_mark();
         }
 
+        /// A close of an empty frame: [`LiveMarks::pop_through`], refused for a frame that
+        /// still holds rows.
+        pub(super) fn close_empty(&self, seq: u64, frame_len: usize) {
+            if frame_len != 0 {
+                nonempty_close();
+            }
+            self.pop_through(seq);
+        }
+
         /// A read of an open frame: requires the mark and pops nothing.
         pub(super) fn require(&self, seq: u64) {
             let live = self.stack.take();
@@ -250,6 +259,16 @@ mod stamp {
     )]
     fn stale_mark() -> ! {
         panic!("stale list mark: its frame was already flushed, rewound past or reset");
+    }
+
+    #[cold]
+    #[inline(never)]
+    #[expect(
+        clippy::panic,
+        reason = "the audit build's whole job is to fail loudly here"
+    )]
+    fn nonempty_close() -> ! {
+        panic!("closed a list frame that still holds rows: flush it instead");
     }
 
     #[cold]
@@ -584,6 +603,30 @@ impl<T: Row> Store<T> {
         }
     }
 
+    /// Appends `row` as a run of one — the run a one-row frame's flush mints, a store's first
+    /// write primed as a flush primes it, with no frame opened on a scratch list. Shaped as
+    /// [`Store::push`] is (append, then mint, the row stored straight into its slot): a mint
+    /// that needs the row by reference first would spill it to the stack on every call.
+    #[inline]
+    pub fn push_as_run(&mut self, row: T) -> Run<T::Family>
+    where
+        T: Copy,
+    {
+        let index = mint_index(self.rows.len());
+        self.rows.push(row);
+        let start = match index {
+            Some(index) => index,
+            None => self.prime_run_after_first_push(),
+        };
+        Run {
+            start,
+            len: 1,
+            #[cfg(feature = "_internal_store_check")]
+            stamp: self.stamp,
+            family: PhantomData,
+        }
+    }
+
     /// The row `id` names. A miss ends in the shared cold path.
     #[inline]
     pub fn get(&self, id: Id<T::Family>) -> &T {
@@ -672,6 +715,27 @@ impl<T: Row> Store<T> {
             [only] => *only,
             _ => store_overflow(),
         };
+        self.rows.push(first);
+        NonZeroU32::MIN
+    }
+
+    /// [`Store::prime_after_first_push`] for [`Store::push_as_run`]: the store's first
+    /// allocation sized as [`Store::prime_range`] sizes a flush's, to [`FIRST_ALLOC_BYTES`] of
+    /// rows (or the row and its slot 0, if more), so a list stored as a run of one primes the
+    /// store as the same list flushed would.
+    #[cold]
+    #[inline(never)]
+    fn prime_run_after_first_push(&mut self) -> NonZeroU32
+    where
+        T: Copy,
+    {
+        let first = match self.rows.as_slice() {
+            [only] => *only,
+            _ => store_overflow(),
+        };
+        // exact: `push` already allocated the minimum capacity, and an amortized reserve from
+        // there doubles it, past what a flush's reserve on the empty store asks for
+        self.rows.reserve_exact(first_alloc_rows::<T>().max(2) - 1);
         self.rows.push(first);
         NonZeroU32::MIN
     }
@@ -1015,6 +1079,17 @@ impl<T: Row> ListBuf<T> {
         #[cfg(feature = "_internal_ast_census")]
         crate::ast_census_probe::list_delta::<T>(-1);
         self.items.pop()
+    }
+
+    /// Closes the frame `mark` opened while nothing is in it — a list its builder stored
+    /// another way ([`push_run_of_one`]) — as a flush of the empty frame would, but with no
+    /// work in a release build. The check build requires the frame empty and pops the mark.
+    #[inline]
+    pub fn close_empty(&mut self, mark: ListMark<T::Family>) {
+        #[cfg(feature = "_internal_store_check")]
+        self.live.close_empty(mark.seq, self.len_since(mark));
+        #[cfg(not(feature = "_internal_store_check"))]
+        let _ = mark;
     }
 
     /// Rewinds the stack to `mark`, discarding every element above it. `mark` stays usable, so
@@ -1377,6 +1452,16 @@ pub fn flush_run<T: Row + Copy>(
     run
 }
 
+/// Push `row` into its store as a run of one ([`Store::push_as_run`]): a list a caller has
+/// seen end after its first element, minted without the scratch frame [`flush_run`] would
+/// copy it out of. A free function over the store's field path, as [`push_row`] is.
+#[inline]
+pub fn push_run_of_one<T: Row + Copy>(store: &mut Store<T>, row: T) -> Run<T::Family> {
+    #[cfg(feature = "_internal_ast_census")]
+    crate::ast_census_probe::mint::<T>(1);
+    store.push_as_run(row)
+}
+
 /// [`push_row`] for a row that keeps a span of its own, read by `span_of`: returns that span,
 /// read before the push, beside the id, for the header of the node that wraps the id. A debug
 /// build re-reads the stored row, which checks only that storing the row kept its span.
@@ -1721,6 +1806,62 @@ mod tests {
         assert_eq!(run.len(), 1);
         assert_eq!(texts(&nodes, run), ["only"]);
         assert_eq!(scratch.len_since(mark), 0);
+    }
+
+    #[test]
+    fn an_empty_frame_closes_and_the_frame_around_it_flushes() {
+        let mut nodes = store();
+        let mut scratch = ListBuf::new();
+        let outer = scratch.mark();
+        scratch.push(Node("a"));
+        let inner = scratch.mark();
+        scratch.close_empty(inner);
+        scratch.push(Node("b"));
+        let run = scratch.flush_copy(outer, &mut nodes);
+        assert_eq!(texts(&nodes, run), ["a", "b"]);
+    }
+
+    /// A row wide enough that [`FIRST_ALLOC_BYTES`] holds fewer rows than twice a `Vec`'s
+    /// minimum capacity: the band where an amortized reserve after a push sizes past a flush.
+    #[derive(Clone, Copy)]
+    struct WideRow([u8; 160]);
+
+    impl Row for WideRow {
+        type Family = WideRow;
+    }
+
+    #[test]
+    fn a_wide_run_pushed_as_one_primes_as_a_one_row_flush_does() {
+        let mut pushed = Store::new();
+        let mut flushed = Store::new();
+        let mut scratch = ListBuf::new();
+        let run = pushed.push_as_run(WideRow([7; 160]));
+        assert_eq!(pushed.slice(run)[0].0, [7; 160]);
+        let mark = scratch.mark();
+        scratch.push(WideRow([1; 160]));
+        let one_row = scratch.flush_copy_short(mark, &mut flushed);
+        assert_eq!((run.start, run.len), (one_row.start, one_row.len));
+        assert_eq!(pushed.rows.capacity(), flushed.rows.capacity());
+    }
+
+    #[test]
+    fn a_run_pushed_as_one_is_the_run_a_one_row_flush_mints() {
+        // A store's first write, then a later one.
+        let mut pushed = store();
+        let mut flushed = store();
+        let mut scratch = ListBuf::new();
+        for text in ["first", "later"] {
+            let run = pushed.push_as_run(Node(text));
+            let mark = scratch.mark();
+            scratch.push(Node(text));
+            // Runs of two stores compare by position: the check build refuses `==` across
+            // instances.
+            let one_row = scratch.flush_copy_short(mark, &mut flushed);
+            assert_eq!((run.start, run.len), (one_row.start, one_row.len));
+            assert_eq!(texts(&pushed, run), [text]);
+        }
+        assert_eq!(pushed.rows.len(), flushed.rows.len());
+        assert_eq!(pushed.rows.capacity(), flushed.rows.capacity());
     }
 
     #[test]
@@ -2649,6 +2790,25 @@ mod tests {
     #[cfg(feature = "_internal_store_check")]
     mod stamped {
         use super::*;
+
+        #[test]
+        #[should_panic(expected = "closed a list frame that still holds rows")]
+        fn closing_a_frame_that_holds_rows_is_refused() {
+            let mut scratch = ListBuf::new();
+            let mark = scratch.mark();
+            scratch.push(Node("a"));
+            scratch.close_empty(mark);
+        }
+
+        #[test]
+        #[should_panic(expected = "stale list mark")]
+        fn a_closed_mark_is_stale() {
+            let mut nodes = store();
+            let mut scratch = ListBuf::new();
+            let mark = scratch.mark();
+            scratch.close_empty(mark);
+            scratch.flush_copy(mark, &mut nodes);
+        }
 
         fn two_row_store() -> (Store<Node<'static>>, Id<Alpha>) {
             let mut nodes = store();
