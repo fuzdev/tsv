@@ -224,7 +224,7 @@ impl<'a> Parser<'a> {
                 arrow_token,
             },
         );
-        Ok(self.push_ret(Expression {
+        Ok(self.push_head_ret(Expression {
             span: Span::new(start as u32, end),
             kind: ExpressionKind::ArrowFunctionExpression(arrow),
         }))
@@ -316,7 +316,7 @@ impl<'a> Parser<'a> {
                 arrow_token,
             },
         );
-        Ok(self.push_ret(Expression {
+        Ok(self.push_head_ret(Expression {
             span: Span::new(start as u32, end),
             kind: ExpressionKind::ArrowFunctionExpression(arrow),
         }))
@@ -366,7 +366,7 @@ impl<'a> Parser<'a> {
                 arrow_token,
             },
         );
-        Ok(self.push_ret(Expression {
+        Ok(self.push_head_ret(Expression {
             span: Span::new(start as u32, end),
             kind: ExpressionKind::ArrowFunctionExpression(arrow),
         }))
@@ -434,7 +434,7 @@ impl<'a> Parser<'a> {
                 arrow_token,
             },
         );
-        Ok(self.push_ret(Expression {
+        Ok(self.push_head_ret(Expression {
             span: Span::new(start as u32, end),
             kind: ExpressionKind::ArrowFunctionExpression(arrow),
         }))

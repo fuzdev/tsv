@@ -143,7 +143,7 @@ pub(in crate::parser) fn debug_assert_encloses(
 /// `yield` is only a `YieldExpression` in `[+Yield]`; outside a generator it is a
 /// (deferred) reserved-word identifier that prettier accepts as an operand, so the guard
 /// must not fire there — hence the `in_yield` gate. See the parser's `in_yield` field.
-fn is_bare_assignment_head(expr: &Expression, start: usize, in_yield: bool) -> bool {
+pub(super) fn is_bare_assignment_head(expr: &Expression, start: usize, in_yield: bool) -> bool {
     let is_head = matches!(expr.kind, ExpressionKind::ArrowFunctionExpression(_))
         || (in_yield && matches!(expr.kind, ExpressionKind::YieldExpression(_)));
     is_head && start == expr.span().start as usize
@@ -618,7 +618,7 @@ impl<'a> Parser<'a> {
         // concise arrow body (`() => x || a`) or the yield argument
         // (`yield a || b`, `yield +c`) — so this fires only for a truly complete
         // head with no argument/body to absorb it.
-        let leading_bare_head = is_bare_assignment_head(self.expr(left), expr_start, self.in_yield);
+        let leading_bare_head = self.is_bare_head(left, expr_start, self.in_yield);
 
         // The same head is no OPERAND either. Above the assignment tier this parse is a
         // unary operator's argument or a binary operator's right side — a
@@ -1000,7 +1000,7 @@ impl<'a> Parser<'a> {
         // *starts* an expression is instead absorbed earlier as the yield argument
         // (`yield [x]` is `yield` of an array; `yield (e)` its parenthesized arg),
         // so only the no-argument bare head reaches here.
-        if is_bare_assignment_head(self.expr(parsed), head_start, self.in_yield) {
+        if self.is_bare_head(parsed, head_start, self.in_yield) {
             return Ok(ExprRet::wrap(parsed));
         }
 
@@ -1907,7 +1907,7 @@ impl<'a> Parser<'a> {
                 // (`extends (a => b) {}`) is fine — there the arrow's own span starts
                 // past the `(`, so it differs from where the atom's parse began
                 // (`is_bare_assignment_head`, the one spelling of that test).
-                if is_bare_assignment_head(self.expr(parsed), start, false) {
+                if self.is_bare_head(parsed, start, false) {
                     return Err(self.error_msg(
                         "Arrow functions cannot be used as a class heritage expression",
                     ));
@@ -2469,14 +2469,27 @@ impl<'a> Parser<'a> {
     /// a node genuinely starts at the token, never when the head was a grouping `(` the
     /// parser discards (`/* c */ (a + b)` — there the comment leads a paren, no node
     /// begins at it, and it stays an ordinary positional comment).
-    #[inline]
+    ///
+    /// Asked at every expression head, so only the document-level gate is inlined there:
+    /// until a glued block comment has been drained (`Parser::glued_block_seen`) no head
+    /// can have one, and the scan stays out of line.
+    #[expect(clippy::inline_always)]
+    #[inline(always)]
     pub(in crate::parser) fn bind_leading_comment(&mut self, head_start: usize, expr: ExprId) {
-        if self.expr(expr).span().start as usize != head_start {
-            return;
+        if self.glued_block_seen {
+            self.bind_glued_leading_comment(head_start, expr);
         }
+    }
+
+    /// [`Self::bind_leading_comment`] past its gate.
+    #[inline(never)]
+    fn bind_glued_leading_comment(&mut self, head_start: usize, expr: ExprId) {
         let Some(idx) = self.glued_block_comment_index(head_start) else {
             return;
         };
+        if self.expr(expr).span().start as usize != head_start {
+            return;
+        }
         self.comments_mut()[idx].owned_by_node = true;
     }
 
@@ -3125,7 +3138,7 @@ impl<'a> Parser<'a> {
             (None, yield_end as u32)
         };
 
-        Ok(self.push_ret(Expression {
+        Ok(self.push_head_ret(Expression {
             span: Span::new(start as u32, end),
             kind: ExpressionKind::YieldExpression(YieldExpression { argument, delegate }),
         }))
@@ -3236,7 +3249,7 @@ impl<'a> Parser<'a> {
 
         // A bare arrow is an `AssignmentExpression`, never the `MemberExpression` a `new`
         // callee is: `new () => a` is a syntax error where `new (() => a)` constructs.
-        if is_bare_assignment_head(self.expr(callee_parsed), callee_start as usize, false) {
+        if self.is_bare_head(callee_parsed, callee_start as usize, false) {
             return Err(Error::invalid_syntax(
                 "An arrow function cannot be a `new` callee without parentheses".to_string(),
                 callee_start as usize,

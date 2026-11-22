@@ -496,6 +496,7 @@ pub(super) struct Checkpoint {
     spine: SpineCount,
     lt_regions: LtRegions,
     abandoned_type_arguments_error: Option<Error>,
+    bare_head_hint: Option<ExprId>,
     /// The scratch stacks' tops, the comment ledger's among them, truncated to on every
     /// rewind. The stores are not: an abandoned row stays orphaned, and the ids already
     /// handed out stay valid.
@@ -862,6 +863,18 @@ pub(crate) struct Parser<'a> {
     /// `parse_type`, which nothing can precede (every intermediate
     /// union/intersection/array/operand loop breaks on `?`).
     pending_conditional_extends: Option<TyId>,
+    /// The id of the last arrow function or `yield` expression pushed on the parse that
+    /// stands — the only kinds `is_bare_assignment_head` can answer `true` for. A bare head
+    /// is asked about before any later arrow or `yield` push can stand (children are pushed
+    /// before their parent, and a rewind restores the hint, so an abandoned speculation's
+    /// arrow never displaces one the parse kept), so an id that differs is answered `false`
+    /// without reading its row ([`Parser::is_bare_head`]).
+    bare_head_hint: Option<ExprId>,
+    /// Whether a block comment with no line terminator after it has been drained — the only
+    /// comment `glued_block_comment_index` can find — or any block comment a peek drains,
+    /// conservatively (the token after it is not lexed yet). Monotone (a rewind leaves it
+    /// set), so a `false` proves no glued block comment precedes any token read so far.
+    glued_block_seen: bool,
 }
 
 impl<'a> Parser<'a> {
@@ -878,6 +891,31 @@ impl<'a> Parser<'a> {
     #[inline]
     pub(in crate::parser) fn push_ret(&mut self, expr: Expression) -> ExprRet {
         ExprRet::wrap(self.push_expr(expr))
+    }
+
+    /// [`Parser::push_ret`] for an arrow function or `yield` expression: records the id as
+    /// the bare-head hint.
+    #[inline]
+    pub(in crate::parser) fn push_head_ret(&mut self, expr: Expression) -> ExprRet {
+        let id = self.push_expr(expr);
+        self.bare_head_hint = Some(id);
+        ExprRet::wrap(id)
+    }
+
+    /// `is_bare_assignment_head` over `id`, answered `false` without a row read unless
+    /// `id` is the last arrow / `yield` pushed ([`Parser::bare_head_hint`]). Debug builds
+    /// read the row every time and check the answer agrees.
+    #[inline]
+    pub(in crate::parser) fn is_bare_head(&self, id: ExprId, start: usize, in_yield: bool) -> bool {
+        let head = self.bare_head_hint == Some(id)
+            && expression::is_bare_assignment_head(self.expr(id), start, in_yield);
+        #[cfg(debug_assertions)]
+        assert_eq!(
+            head,
+            expression::is_bare_assignment_head(self.expr(id), start, in_yield),
+            "the bare-head hint missed an arrow or yield head"
+        );
+        head
     }
 
     /// Flush the id list opened at `mark` (`ListBuf::flush_copy`).
@@ -1131,6 +1169,8 @@ impl<'a> Parser<'a> {
             fn_type_disallowed: false, // Top level is a full-type position
             conditional_type_disallowed: false, // Top level allows conditional types
             pending_conditional_extends: None,
+            bare_head_hint: None,
+            glued_block_seen: false,
         }
     }
 
@@ -1225,12 +1265,15 @@ impl<'a> Parser<'a> {
             if has_line_terminator {
                 self.had_line_terminator = true;
             }
+            let is_block = *is_block;
             self.stores.comment_scratch.push(comment);
             let token = self.lexer.next_token()?;
             self.update_current(token);
             // Also check line terminator in whitespace after comment
             if self.lexer.had_line_terminator() {
                 self.had_line_terminator = true;
+            } else if is_block {
+                self.glued_block_seen = true;
             }
         }
 
@@ -2630,6 +2673,7 @@ impl<'a> Parser<'a> {
             spine: self.spine,
             lt_regions: self.lt_regions,
             abandoned_type_arguments_error: self.abandoned_type_arguments_error.clone(),
+            bare_head_hint: self.bare_head_hint,
             scratch_marks: self.stores.scratch_marks(),
             #[cfg(feature = "_internal_ast_census")]
             ast_census_mark: tsv_lang::ast_census_probe::mark(),
@@ -2659,6 +2703,7 @@ impl<'a> Parser<'a> {
             spine,
             lt_regions,
             abandoned_type_arguments_error,
+            bare_head_hint,
             scratch_marks,
             #[cfg(feature = "_internal_ast_census")]
             ast_census_mark,
@@ -2679,6 +2724,7 @@ impl<'a> Parser<'a> {
         self.spine = spine;
         self.lt_regions = lt_regions;
         self.abandoned_type_arguments_error = abandoned_type_arguments_error;
+        self.bare_head_hint = bare_head_hint;
         self.stores.truncate_scratch(&scratch_marks);
         // Whatever the abandoned parse's type grammar was handing to itself is not
         // for the re-parse to receive (`checkpoint` asserts it was empty).
@@ -3166,6 +3212,11 @@ impl<'a> Parser<'a> {
                             );
                             if has_line_terminator {
                                 self.peek_had_line_terminator = true;
+                            }
+                            // Set for every block comment here: the token after it is not
+                            // lexed yet, so whether a line terminator follows is unknown.
+                            if *is_block {
+                                self.glued_block_seen = true;
                             }
                             self.stores.comment_scratch.push(comment);
                             continue;
