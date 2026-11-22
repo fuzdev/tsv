@@ -3,7 +3,9 @@
 use crate::Goal;
 use crate::ast::*;
 use crate::lexer::escapes::{LegacyEscape, find_legacy_escape};
-use crate::lexer::{KeywordKind, Lexer, LexerCheckpoint, Token, TokenKind, is_es_line_terminator};
+use crate::lexer::{
+    KeywordKind, LexedFacts, Lexer, LexerCheckpoint, Token, TokenKind, is_es_line_terminator,
+};
 use crate::printer::ParenContext;
 use std::ops::ControlFlow;
 use tsv_lang::store::{IdRet, ListMark, PoolText, push_row};
@@ -504,6 +506,10 @@ pub(super) struct Checkpoint {
     #[cfg(feature = "_internal_ast_census")]
     ast_census_mark: u32,
 }
+
+/// [`Parser::parse_expression_to_brace`]'s answer: the island's root, the offset of the `}` it
+/// stops at, what its tokens held, and its comments.
+pub(crate) type BraceIsland = (ExprId, usize, LexedFacts, Run<Comment>);
 
 #[expect(clippy::struct_excessive_bools)]
 pub(crate) struct Parser<'a> {
@@ -4162,6 +4168,29 @@ impl<'a> Parser<'a> {
         self.expect_end_of_input(end)?;
         let comments = self.take_comments();
         Ok((expr, comments))
+    }
+
+    /// Parse a single expression from a source that runs on past it — a host's island whose
+    /// end the host has not found — and accept it only where it stops at a `}` the expression
+    /// leaves as the current token: returns the expression, that `}`'s offset in the host
+    /// document, what the tokens read held (`LexedFacts`), and the comments collected.
+    ///
+    /// Accepting means three things at once, each refused otherwise (an error the caller
+    /// discards for its own scan and slice parse): the current token is `BraceClose`, no
+    /// token past it was read (the peek cache is empty), and no lexer error is held — so the
+    /// comments taken are exactly those before the `}`, and nothing after it was consumed.
+    pub(crate) fn parse_expression_to_brace(&mut self) -> Result<BraceIsland, Error> {
+        let expr = self.parse_expression()?.id();
+        if self.current.kind != TokenKind::BraceClose
+            // defensive: no expression path is known to leave a peek behind its last token,
+            // and one would mean a token past the `}` was read
+            || self.peek.is_some()
+            || self.lexer_error.is_some()
+        {
+            return Err(self.error_expected_found("'}'"));
+        }
+        let close = self.current.start as usize + self.base_offset;
+        Ok((expr, close, self.lexer.lexed(), self.take_comments()))
     }
 
     /// Hand the collected comments to the caller as a `Run<Comment>`, flushing the ledger

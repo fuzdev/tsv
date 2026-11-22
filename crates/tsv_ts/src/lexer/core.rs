@@ -194,6 +194,22 @@ enum TemplateStop {
     Eof,
 }
 
+/// Facts about the tokens a lexer has produced since it was made, read once, at the end of an
+/// island parse that found its own close (`Parser::parse_expression_to_brace`). Each is sticky
+/// and deliberately not part of a checkpoint: a rewound speculation leaves it set, which only
+/// over-reports. Two one-byte fields, which the [`Lexer`] holds in its tail padding.
+#[derive(Clone, Copy, Default, Debug)]
+pub(crate) struct LexedFacts {
+    /// A `/` or `/=` punctuator was produced — the division arms of the punctuator dispatch,
+    /// and the only way a regular expression literal starts too: the lexer never reads one
+    /// itself, the parser re-reads a `/` or `/=` token as one ([`Lexer::read_regex_literal`]).
+    pub(crate) saw_slash: bool,
+    /// A template literal opening an interpolation was read (a `TemplateHead`): only such an
+    /// island can hold a backtick inside an interpolation, which the parser's byte
+    /// lookaheads, skipping a template from one backtick to the next, pair wrongly.
+    pub(crate) saw_interpolation: bool,
+}
+
 /// A [`Lexer`] cursor position with the state that travels with it, taken by
 /// [`Lexer::checkpoint`] and restored by [`Lexer::rewind`]. Opaque: only the lexer
 /// reads it, and only to put itself back.
@@ -240,6 +256,9 @@ pub(crate) struct Lexer<'a> {
     /// stale contents are inert.
     decode_scratch: String,
     has_decoded: bool,
+    /// What the tokens read so far held, for an island parse that found its own close
+    /// ([`LexedFacts`]).
+    lexed: LexedFacts,
     /// The start offsets of the last two identifier-or-keyword tokens whose raw bytes
     /// were NOT plain one-column ASCII — a byte at or above `0x80` somewhere in the
     /// token — most recent first, `u32::MAX` (no token starts there) while unset.
@@ -414,6 +433,7 @@ impl<'a> Lexer<'a> {
             had_line_terminator: false,
             decode_scratch: String::new(),
             has_decoded: false,
+            lexed: LexedFacts::default(),
             nonplain_ident_starts: [u32::MAX; 2],
             base_offset,
         }
@@ -590,6 +610,12 @@ impl<'a> Lexer<'a> {
     fn advance_ascii(&mut self) {
         debug_assert!(self.bytes[self.position].is_ascii());
         self.position += 1;
+    }
+
+    /// What the tokens read so far held — see [`LexedFacts`].
+    #[inline]
+    pub(crate) fn lexed(&self) -> LexedFacts {
+        self.lexed
     }
 
     /// Create a token with the current position as end
@@ -1426,12 +1452,14 @@ impl<'a> Lexer<'a> {
                     Some(b'/' | b'*') => return self.next_token_dispatch(bytes, start, b'/', dst),
                     Some(b'=') => {
                         // Division assignment operator /=
+                        self.lexed.saw_slash = true;
                         self.advance_ascii();
                         self.advance_ascii();
                         self.make_token(TokenKind::SlashEquals, start)
                     }
                     _ => {
                         // Division operator /
+                        self.lexed.saw_slash = true;
                         self.advance_ascii();
                         self.make_token(TokenKind::Slash, start)
                     }
@@ -1841,6 +1869,7 @@ impl<'a> Lexer<'a> {
             }
             TemplateStop::Interpolation => {
                 self.template_depth += 1;
+                self.lexed.saw_interpolation = true;
                 if self.source[start..].starts_with('`') {
                     TokenKind::TemplateHead
                 } else {

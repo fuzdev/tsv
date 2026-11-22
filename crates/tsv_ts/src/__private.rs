@@ -361,6 +361,237 @@ pub fn parse_expression_with_comments(
     )
 }
 
+/// An expression island [`parse_expression_to_brace`] found the end of.
+#[derive(Clone, Copy, Debug)]
+pub struct ClosedIsland {
+    /// The island's root.
+    pub expr: ExprId,
+    /// The offset in the host document of the `}` the island stops at.
+    pub close: usize,
+    /// The comments the island collected, all of them before `close`.
+    pub comments: Run<ast::Comment>,
+}
+
+/// Parse the expression island starting at `start` in `source` — the whole host document,
+/// not a slice ending at the island's close — and find that close by the parse itself: the
+/// island is answered only where the expression stops with the current token a `}`, no
+/// token past it read and no lexer error held. `None` for every other island, with nothing
+/// reachable pushed and no comment handed over; the host then finds the close its own way
+/// and parses the bounded slice, and that path owns every error (so `Expected '}'`, the
+/// unclosed-tag error and their positions are unchanged).
+///
+/// **Every forward byte scan the parse runs may now read past the island's `}`**, into the
+/// rest of the document, where a bounded slice ended, and the island's reading must not
+/// depend on what it finds there. The contract those scans keep, and the one a new scan
+/// must keep: past an unbalanced `}` a scan answers as it does at the end of its input, or
+/// else whatever it then finds lies beyond the island, so the bracket it was matching is
+/// unclosed inside it, and the reading that answer selects fails before the parse can stop
+/// at the `}` — rewound by a speculation, or failing the parse, which falls back. The scans
+/// that stop at an unbalanced `}` (`matching_angle_close`, `matching_delimiter_close`, the
+/// return-type scan behind an arrow head) answer as at the end; the ones that do not
+/// (`matching_paren_close`, `scan_angle_brackets`) can only select a reading that needs a
+/// closer the island does not hold. A one-byte follower test reads `}` where the slice read
+/// nothing, and each answers both alike.
+///
+/// ⚠️ That holds only while a scan sees the island's brackets where its tokens are, and two
+/// kinds of byte break it, so an island holding either is not answered:
+///
+/// - **A `/` token** (`LexedFacts::saw_slash`). A scan that skips regular expression
+///   literals decides regex or division from the bytes before the `/`, and after a `}` it
+///   reads a `/` as a regex's opening — so in `{(a = {} / 2) => a}` the division after the
+///   object literal is skipped as a regex that runs over the island's `}` to the next `/` in
+///   the document, and the `)` and `=>` beyond it make the head an arrow's where the slice
+///   reading rejects it. A host's own brace scan, under the acorn operand rules, also parts
+///   from the parse at a `/` (`{function () {} / 2}`: acorn's island ends inside a regex).
+///   Every regular expression literal starts as such a token, so the islands answered hold
+///   none.
+/// - **A backtick inside an interpolation** (`backtick_in_interpolation`, asked of an island
+///   whose lexer read a template opening one, `LexedFacts::saw_interpolation`). Those scans
+///   skip a template literal from one backtick to the next (`TriviaProfile::JS`), so
+///   `` `${"`"}` `` pairs the wrong two and leaves a quote opening a string that runs over the
+///   `}` into the document; a type-argument list whose `>` the scan reaches there
+///   (`` {f<A, `${"`"}`>(c)} ``, a call before a `"` and a `>` in the document, a comparison
+///   before none) or an arrow whose `)` and `=>` it reaches is the island's real reading,
+///   which parses.
+///
+/// So an island this answers holds no `/` token and no such backtick, and it ends where the
+/// host's brace scan ends it. Debug builds parse every island this answers as the bounded
+/// slice too and assert the same tree and comments.
+// The method-path form clippy suggests fails the higher-ranked lifetime check on
+// `with_embedding_parser`'s `f` bound, as at `parse_embedded`.
+#[expect(clippy::redundant_closure_for_method_calls)]
+#[inline(never)]
+pub fn parse_expression_to_brace(
+    source: &str,
+    start: usize,
+    host_nesting: u32,
+    stores: &mut AstStores,
+) -> Option<ClosedIsland> {
+    let (expr, close, lexed, comments) = with_embedding_parser(
+        &source[start..],
+        start,
+        host_nesting,
+        stores,
+        |parser| parser.parse_expression_to_brace(),
+        |_, _| Ok(()),
+    )
+    .ok()?;
+    if lexed.saw_slash
+        || (lexed.saw_interpolation && backtick_in_interpolation(&source.as_bytes()[start..close]))
+    {
+        return None;
+    }
+    #[cfg(all(debug_assertions, feature = "json"))]
+    assert_slice_parse_builds_island(
+        source,
+        start,
+        close,
+        host_nesting,
+        stores.view(),
+        expr,
+        comments,
+    );
+    Some(ClosedIsland {
+        expr,
+        close,
+        comments,
+    })
+}
+
+/// Whether a backtick stands inside a template literal's interpolation in `island` — a
+/// nested template, or a string or comment spelling one — for an island its lexer read whole
+/// with no `/` token ([`parse_expression_to_brace`]), so every `/` here outside a string or a
+/// template's text opens a comment, as the lexer read it. Over-reports rather than misses: any
+/// backtick in an interpolation answers, whatever it stands in.
+#[inline(never)]
+fn backtick_in_interpolation(island: &[u8]) -> bool {
+    use tsv_lang::swar::next_byte_of;
+    let len = island.len();
+    let mut i = 0;
+    // `None` in code outside any template, `Some(depth)` inside an interpolation at that
+    // brace depth; template text is walked by its own loop below
+    let mut interpolation: Option<u32> = None;
+    loop {
+        i = next_byte_of(island, i.min(len), [b'`', b'\'', b'"', b'/', b'{', b'}']);
+        if i >= len {
+            return false;
+        }
+        match (island[i], interpolation) {
+            (b'`', Some(_)) => return true,
+            (quote @ (b'\'' | b'"'), _) => {
+                let mut j = i + 1;
+                loop {
+                    j = next_byte_of(island, j.min(len), [quote, b'\\', b'`']);
+                    match island.get(j) {
+                        Some(b'\\') => j += 2,
+                        Some(b'`') if interpolation.is_some() => return true,
+                        Some(b'`') => j += 1,
+                        _ => break,
+                    }
+                }
+                i = j + 1;
+            }
+            (b'/', _) => {
+                // a `/` neither comment opener follows stands alone, one byte
+                let end = match island.get(i + 1) {
+                    Some(b'*') => island[i + 2..]
+                        .windows(2)
+                        .position(|w| w == b"*/")
+                        .map_or(len, |at| i + 2 + at + 2),
+                    Some(b'/') => next_byte_of(island, i, [b'\n', b'\r']).min(len),
+                    _ => i + 1,
+                };
+                if interpolation.is_some() && island[i..end].contains(&b'`') {
+                    return true;
+                }
+                i = end;
+            }
+            (b'{', Some(depth)) => {
+                interpolation = Some(depth + 1);
+                i += 1;
+            }
+            (b'}', Some(0)) | (b'`', None) => {
+                // template text, to its end or its next interpolation
+                interpolation = None;
+                i += 1;
+                loop {
+                    i = next_byte_of(island, i.min(len), [b'\\', b'`', b'$']);
+                    match island.get(i) {
+                        Some(b'\\') => i += 2,
+                        Some(b'$') if island.get(i + 1) == Some(&b'{') => {
+                            interpolation = Some(0);
+                            i += 2;
+                            break;
+                        }
+                        Some(b'$') => i += 1,
+                        _ => {
+                            i += 1;
+                            break;
+                        }
+                    }
+                }
+            }
+            (b'}', Some(depth)) => {
+                interpolation = Some(depth - 1);
+                i += 1;
+            }
+            _ => i += 1,
+        }
+    }
+}
+
+/// [`parse_expression_to_brace`]'s debug differential: the bounded slice `source[start..close]`,
+/// parsed as a host parses it when it has found the close itself, builds the same tree (read
+/// as its wire JSON) and collects the same comments as the island did in `view`.
+#[cfg(all(debug_assertions, feature = "json"))]
+#[expect(clippy::expect_used)]
+fn assert_slice_parse_builds_island(
+    source: &str,
+    start: usize,
+    close: usize,
+    host_nesting: u32,
+    view: AstView<'_>,
+    expr: ExprId,
+    comments: Run<ast::Comment>,
+) {
+    let wire = |view: AstView<'_>, expr: ExprId| {
+        let tables = tsv_lang::WireTables::new(source, WIRE_COORDINATES, tsv_lang::Wire::Span);
+        let mut w = tsv_lang::JsonWriter::with_capacity(256);
+        let env = EmbedWriter {
+            source,
+            positions: tables.positions(),
+            view,
+            comments: CommentMode::Off,
+            vanilla_acorn: false,
+            annotation_comments: CommentMode::Off,
+        };
+        write_expression_embedded(&mut w, view.expr(expr), env);
+        String::from_utf8(w.into_bytes()).expect("the wire is UTF-8")
+    };
+    let mut scratch = AstStores::default();
+    let (parsed, parsed_comments) = parse_expression_with_comments(
+        &source[start..close],
+        start,
+        host_nesting,
+        &mut scratch,
+        "'}'",
+        |_, _| Ok(()),
+    )
+    .expect("an island parsed to its `}` parses as the slice ending there");
+    assert_eq!(
+        wire(scratch.view(), parsed),
+        wire(view, expr),
+        "the island parsed to its `}}` built a tree the slice parse does not: {:?}",
+        &source[start..close]
+    );
+    assert_eq!(
+        format!("{:?}", scratch.view().comments(parsed_comments)),
+        format!("{:?}", view.comments(comments)),
+        "the island parsed to its `}}` collected comments the slice parse does not: {:?}",
+        &source[start..close]
+    );
+}
+
 /// A host's expression island that is exactly one plain name or a `.`-chain of them (`{x}`,
 /// `{user.name}`), optionally called with no arguments (`{f()}`, `{a.b?.()}`), pushed onto
 /// `stores` as the rows [`parse_expression_with_comments`] would build for it — or `None`,
@@ -1781,4 +2012,40 @@ pub fn parse_preserve_parens(source: &str) -> Result<Parsed> {
 /// them) or an ordinary glued/annotation comment (its next token is what it binds).
 pub fn is_jsdoc_type_cast_comment(content: &str) -> bool {
     parser::is_jsdoc_type_cast_comment(content)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::backtick_in_interpolation;
+
+    #[test]
+    fn a_backtick_counts_only_inside_an_interpolation() {
+        for island in [
+            "`${a}`",
+            "`${a}` + `${b}`",
+            "`a\\`${b}`",
+            "'`' + `${a}`",
+            "/* ` */ `${a}`",
+            "`${{ a: 1 }.a}`",
+            "`${a}` // `",
+            "`${a / b}` / 2",
+            "`${a /= b}`",
+            "'a\\",
+            "`a\\",
+            "`${'a\\",
+        ] {
+            assert!(!backtick_in_interpolation(island.as_bytes()), "{island}");
+        }
+        for island in [
+            "`${`a`}`",
+            "`${\"`\"}`",
+            "`${'`'}`",
+            "`${a /* ` */}`",
+            "`${a // `\n}`",
+            "`${{ a: `b` }.a}`",
+            "`${a}${`b`}`",
+        ] {
+            assert!(backtick_in_interpolation(island.as_bytes()), "{island}");
+        }
+    }
 }

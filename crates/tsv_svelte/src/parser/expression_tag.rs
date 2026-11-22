@@ -125,10 +125,14 @@ impl<'a> SvelteParser<'a> {
     ///
     /// Unlike `parse_expression_tag`, this does **not** touch the lexer — the caller
     /// owns the cursor (the raw-byte attribute-value sequence readers reposition once
-    /// when the whole value is done). The matching `}` is found by a raw scan that
-    /// skips nested braces, string literals, line/block comments, and regex literals —
-    /// after a bare name path glued to its `}` is tried first
-    /// (`tsv_ts::__private::parse_bare_name_closed`).
+    /// when the whole value is done). Three readings find the matching `}`, in turn: a bare
+    /// name path glued to its `}` (`tsv_ts::__private::parse_bare_name_closed`); then the
+    /// island's own parse, run over the rest of the document and stopping at the `}` it
+    /// leaves current (`tsv_ts::__private::parse_expression_to_brace`, which refuses every
+    /// island holding a `/` token, where the scans' regex rule and the parse can part); and
+    /// last, for every island those refuse, [`scan_to_matching_brace`] (nested braces,
+    /// strings, comments, regex and template literals skipped) and a parse of the slice it
+    /// bounds, which reports every error.
     pub(crate) fn parse_expression_tag_at(
         &mut self,
         brace_pos: usize,
@@ -161,7 +165,37 @@ impl<'a> SvelteParser<'a> {
             });
         }
 
-        // Find the matching closing `}` — the one robust brace matcher.
+        // Every other island is parsed to the `}` it stops at, which the brace scan then need
+        // not find — unless the parse refuses it (an island holding a `/` token among them).
+        if let Some(island) = self.with_island_stores(|this, stores| {
+            tsv_ts::__private::parse_expression_to_brace(
+                this.source,
+                expr_start,
+                this.island_nesting(),
+                stores,
+            )
+        }) {
+            #[cfg(debug_assertions)]
+            {
+                assert_eq!(
+                    scan_to_matching_brace(self.source.as_bytes(), expr_start),
+                    Some(island.close),
+                    "an island parsed to its `}}` ends where the brace scan does not: {:?}",
+                    &self.source[expr_start..island.close]
+                );
+            }
+            self.merge_island_comments(island.comments);
+            return Ok(ExpressionTag {
+                expression: island.expr,
+                span: Span {
+                    start: start as u32,
+                    end: (island.close + 1) as u32,
+                },
+            });
+        }
+
+        // The island's parse refused it: find the matching closing `}` — the one robust
+        // brace matcher — and parse the slice, which owns every error.
         let Some(expr_end) = scan_to_matching_brace(self.source.as_bytes(), expr_start) else {
             return Err(self.error_unclosed_at("expression tag", start));
         };
