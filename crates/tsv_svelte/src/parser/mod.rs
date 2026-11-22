@@ -42,7 +42,11 @@ pub(crate) fn parse_svelte(source: &str, stores: &mut SvelteStores) -> Result<Ro
         stores.own.scratch_is_empty(),
         "a parse began over an open list frame"
     );
-    let outcome = SvelteParser::new(source, stores).and_then(|mut parser| parser.parse_root());
+    // One memo of the TypeScript grammar's answers for the document's own scans and every
+    // island parse in it.
+    let outcome = tsv_ts::__private::remembering_grammar_answers(source, || {
+        SvelteParser::new(source, stores).and_then(|mut parser| parser.parse_root())
+    });
     if outcome.is_err() {
         stores.own.clear_scratch();
     } else {

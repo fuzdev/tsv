@@ -1111,6 +1111,55 @@ fn a_css_value_past_the_limit_is_refused_at_the_paren_that_passes_it() {
     }
 }
 
+/// Nested template literals far past the limit, where a byte lookahead skips them ahead of the
+/// parse — an arrow head's `)`, a type-argument list's `>`, a Svelte tag's `}` — are refused
+/// without exhausting the stack: the skip and its interpolations' scans recurse into each
+/// other, and stop at `tsv_lang::NESTING_LIMIT` templates as at the end of their input.
+#[test]
+fn templates_nested_far_past_the_limit_in_a_lookahead_are_refused() {
+    let n = 200_000;
+    let nested = |leaf: &str| format!("{}{leaf}{}", rep("`${", n), rep("}`", n));
+    for (name, lang, source) in [
+        (
+            "arrow default",
+            Lang::Ts,
+            format!("(a = {}) => a;\n", nested("x")),
+        ),
+        (
+            "type argument",
+            Lang::Ts,
+            format!("f<A, {}>(c);\n", nested("B")),
+        ),
+        (
+            "type argument division",
+            Lang::Ts,
+            format!("(a = {}) => a;\n", {
+                // each level asks whether its `>` closes a list, over the levels inside it
+                let mut s = String::from("A");
+                for _ in 0..n / 10 {
+                    s = format!("`${{f<{s}>/2}}`");
+                }
+                s
+            }),
+        ),
+        (
+            "svelte tag",
+            Lang::Svelte,
+            format!("<p>{{{}}}</p>\n", nested("x")),
+        ),
+        (
+            "svelte arrow default",
+            Lang::Svelte,
+            format!("<p>{{(a = {}) => a}}</p>\n", nested("x")),
+        ),
+    ] {
+        let parsed = on_thread(format!("far {name}"), gate_stack(), move || {
+            parse(lang, &source)
+        });
+        assert!(parsed.is_err(), "{name}: accepted");
+    }
+}
+
 /// A module the depth limit refuses is not retried as a script: the script grammar reads
 /// every construct the module one accepts as the same tree but `await`, so a retry could
 /// only succeed by reading the source differently (`await <T>a` as `await < T > a`) — a

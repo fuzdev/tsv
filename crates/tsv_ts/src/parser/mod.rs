@@ -27,6 +27,7 @@ mod expression_literals; // Object and array literal parsing
 mod expression_lookahead; // Arrow function and type argument disambiguation
 mod expression_template; // Template literal parsing (`\`...${expr}...\``)
 mod expression_type_args; // Type-argument byte-scan lookahead (`<Type, ...>` vs `<`)
+pub(crate) mod grammar_memo; // The memo of the grammar answers the raw scans ask, one per parse or print
 mod parameters; // Function/method parameter and destructuring-pattern parsing
 mod scan; // Low-level byte scanning utilities
 mod statement; // Statement parsing (refactored into submodules)
@@ -38,6 +39,7 @@ pub(crate) use expression_braced_operand::{
     closes_braced_operand, closes_braced_operand_in_grammar,
 };
 pub(crate) use expression_type_args::{closes_statement_header, closes_type_arguments};
+pub(crate) use scan::skip_trivia_in_grammar;
 
 /// Who owns a top-level `as` in a partial expression parse — TypeScript, or the host
 /// grammar the expression is embedded in.
@@ -4377,6 +4379,8 @@ pub(crate) fn parse_retrying_acorn_followers<T>(
         stores.scratch_is_empty(),
         "a parse began over an open list frame"
     );
+    // One memo of the grammar's answers for both readings and every lookahead in them.
+    let _answers = grammar_memo::Root::enter(source.as_bytes());
     #[cfg(feature = "_internal_ast_census")]
     let ast_census_mark = tsv_lang::ast_census_probe::mark();
     let mut parser = Parser::new(source, base_offset, goal, stores);

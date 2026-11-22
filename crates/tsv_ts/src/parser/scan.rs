@@ -4,7 +4,11 @@
 // parsing (arrow function detection) and type parsing (index signature detection).
 
 use std::borrow::Cow;
+use std::cell::Cell;
 
+use tsv_lang::source_scan::{TriviaProfile, skip_template_literal, skip_trivia};
+
+use super::grammar_memo;
 use crate::lexer::{
     is_es_line_terminator, is_es_line_terminator_at, is_es_whitespace, unicode_escape_len_at,
 };
@@ -150,6 +154,105 @@ pub(super) fn skip_block_comment(bytes: &[u8], mut pos: usize) -> usize {
         pos += 1;
     }
     pos
+}
+
+/// If `bytes[i]` begins a comment, a string or a template literal, the position just past
+/// it; otherwise `None` — `tsv_lang`'s `skip_trivia` under `TriviaProfile::JS`, except that a
+/// template literal is skipped whole, its interpolations scanned as the expressions they
+/// are ([`skip_template_in_grammar`]).
+///
+/// The one trivia skip for this crate's raw lookaheads. `skip_trivia` steps from a
+/// template's backtick to the next one, which pairs the wrong two when an interpolation
+/// holds a backtick of its own (`` `${'`'}` ``, `` `${`a`}` ``) and leaves a quote that runs
+/// on past the scan's region — so a lookahead's answer would depend on what follows the
+/// expression it reads.
+///
+/// An unterminated literal or comment returns `end`, as `skip_trivia` does — and so does a
+/// template whose interpolation holds a `/` the grammar cannot read, or one nested past the
+/// scans' bound, which stops the scan as the end of its input would. Callers must ensure
+/// `i < end <= bytes.len()`.
+#[inline]
+pub(crate) fn skip_trivia_in_grammar(bytes: &[u8], i: usize, end: usize) -> Option<usize> {
+    // The hot test `skip_trivia` leads with: almost every byte opens no trivia. Each path
+    // counts the one scan step `skip_trivia` would.
+    let b = bytes[i];
+    if b != b'"' && b != b'\'' && b != b'`' && b != b'/' {
+        tsv_lang::fanout_probe::scan(1);
+        return None;
+    }
+    skip_trivia_in_grammar_cold(bytes, i, end, b)
+}
+
+/// The cold tail of [`skip_trivia_in_grammar`], for a byte that may open trivia.
+#[cold]
+#[inline(never)]
+fn skip_trivia_in_grammar_cold(bytes: &[u8], i: usize, end: usize, b: u8) -> Option<usize> {
+    if b == b'`' {
+        return Some(skip_template_in_grammar(bytes, i, end));
+    }
+    skip_trivia(bytes, i, end, TriviaProfile::JS)
+}
+
+/// Skip the template literal whose backtick is at `i`, its interpolations scanned under this
+/// crate's grammar (`crate::__private::OPERAND_GRAMMAR`), the grammar's answers remembered
+/// (`grammar_memo`).
+///
+/// That grammar's answers (`closes_type_arguments`, `closes_statement_header`) walk their
+/// region again, skipping its templates here, whose interpolations ask them again a level
+/// deeper: in a nest of `` `${(a = …) => f<T>/2}` `` each level's answer asks every level
+/// inside it. The skips stacked through those answers are templates nested in one another,
+/// and `skip_template_literal`'s own count restarts at each, so every skip here counts
+/// toward `tsv_lang::NESTING_LIMIT` too, and past it returns `end`, as the scan does past
+/// its own count — the parser refuses that nesting anyway.
+#[cold]
+#[inline(never)]
+pub(super) fn skip_template_in_grammar(bytes: &[u8], i: usize, end: usize) -> usize {
+    tsv_lang::fanout_probe::scan(1);
+    let Some(_template) = SkippedTemplate::enter(bytes) else {
+        return end;
+    };
+    skip_template_literal(bytes, i, end, crate::__private::OPERAND_GRAMMAR)
+}
+
+thread_local! {
+    /// How many [`skip_template_in_grammar`] skips are open on this thread.
+    static OPEN_TEMPLATES: Cell<u32> = const { Cell::new(0) };
+}
+
+/// One open [`skip_template_in_grammar`], until dropped: one of the templates counted toward
+/// the limit, and a root of the grammar answers' memo over the bytes it skips in (joining the
+/// one open, `grammar_memo::Root`).
+struct SkippedTemplate<'s> {
+    _answers: grammar_memo::Root<'s>,
+}
+
+impl<'s> SkippedTemplate<'s> {
+    /// `None` once `tsv_lang::NESTING_LIMIT` skips are open: the template is nested past
+    /// the limit.
+    #[inline]
+    fn enter(bytes: &'s [u8]) -> Option<Self> {
+        let counted = OPEN_TEMPLATES
+            .try_with(|open| {
+                let templates = open.get();
+                let under = templates < tsv_lang::NESTING_LIMIT;
+                if under {
+                    open.set(templates + 1);
+                }
+                under
+            })
+            // A thread whose locals are being torn down counts nothing.
+            .unwrap_or(true);
+        counted.then(|| Self {
+            _answers: grammar_memo::Root::enter(bytes),
+        })
+    }
+}
+
+impl Drop for SkippedTemplate<'_> {
+    #[inline]
+    fn drop(&mut self) {
+        let _ = OPEN_TEMPLATES.try_with(|open| open.set(open.get() - 1));
+    }
 }
 
 /// Skip whitespace and comments, returning new position

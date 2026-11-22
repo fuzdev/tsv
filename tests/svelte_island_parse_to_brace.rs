@@ -185,29 +185,27 @@ fn a_lookahead_past_the_close_changes_nothing() {
     );
 }
 
-/// A backtick inside a template's interpolation pairs the wrong two backticks for the parser's
-/// byte lookaheads, which skip a template from one backtick to the next, and the quote it
-/// leaves opens a string that runs over the island's `}` into the document — so what a
-/// lookahead finds there would depend on the document. Such an island takes the bounded
-/// parse, and reads as it does there whatever follows it. (The bounded reading itself is the
-/// lookahead's misread — `f<A, `${"`"}`>(c)` is a call to tsc — which this pins as it stands.)
+/// A backtick inside a template's interpolation: the parser's byte lookaheads skip a template
+/// literal whole, its interpolations included, so no quote is left to open a string that runs
+/// over the island's `}` into the document — the type-argument list is a call's, and the arrow
+/// head an arrow's, whatever follows the tag.
 #[test]
-fn a_backtick_inside_an_interpolation_takes_the_bounded_parse() {
+fn a_backtick_inside_an_interpolation_reads_the_same_whatever_follows() {
     for source in [
         "<p>{f<A, `${\"`\"}`>(c)}</p>",
         "<p>{f<A, `${\"`\"}`>(c)}\"></p>",
     ] {
         let json = wire(source);
-        let needle = r#""type":"ExpressionTag","start":3,"end":22,"expression":{"type":"SequenceExpression","start":4,"end":21"#;
+        let needle = r#""type":"ExpressionTag","start":3,"end":22,"expression":{"type":"CallExpression","start":4,"end":21"#;
         assert!(
             json.contains(needle),
             "{source:?}: no {needle:?} in\n{json}"
         );
     }
-    assert_eq!(
-        error("<p>{(x = `${\"`\"}`) => x}\") =></p>"),
-        ("Expected '}', found '=>'".to_owned(), "1:20".to_owned())
-    );
+    wire_holds(&[(
+        "<p>{(x = `${\"`\"}`) => x}\") =></p>",
+        r#""type":"ExpressionTag","start":3,"end":24"#,
+    )]);
 }
 
 /// A division after a braced operand inside an arrow head's parens: the lookahead that finds
@@ -234,4 +232,43 @@ fn a_division_after_a_braced_operand_reads_the_same_whatever_follows() {
             r#""type":"ExpressionTag","start":7,"end":38"#,
         ),
     ]);
+}
+
+/// A template inside one of the grammar's answers — the `>` before a `/` — is read under the
+/// grammar too, its object literal's `}` and type-argument list's `>` dividing as they do
+/// outside it, so the island parses, and ends where it does, whatever follows the tag.
+#[test]
+fn a_template_inside_a_type_argument_answer_reads_the_same_whatever_follows() {
+    for tail in ["", "<p>/) => 1/</p>"] {
+        wire_holds(&[
+            (
+                &format!("<script lang=\"ts\"></script><p>{{`${{{{}} / 2}}` + f<T>/2}}</p>{tail}"),
+                r#""type":"ExpressionTag","start":30,"end":52"#,
+            ),
+            (
+                &format!("<script lang=\"ts\"></script><p>{{`${{g<T>/2}}` + f<T>/2}}</p>{tail}"),
+                r#""type":"ExpressionTag","start":30,"end":52"#,
+            ),
+            (
+                &format!(
+                    "<script lang=\"ts\"></script><p>{{(a = `${{{{}} / 2}}`, b = f<T>/2) => a}}</p>{tail}"
+                ),
+                r#""type":"ExpressionTag","start":30,"end":66"#,
+            ),
+            // The answer's own walk reads a `}` as the grammar does: the object literal's `/`
+            // divides, so the quoted `/` after it opens no regex running over the list's `>`.
+            (
+                &format!(
+                    "<script lang=\"ts\"></script><p>{{`${{{{}} / 2 + '/' + f<T>/2}}`}}</p>{tail}"
+                ),
+                r#""type":"ExpressionTag","start":30,"end":58"#,
+            ),
+            (
+                &format!(
+                    "<script lang=\"ts\"></script><p>{{(a = `${{{{}} / 2 + '/' + f<T>/2}}`) => a}}</p>{tail}"
+                ),
+                r#""type":"ExpressionTag","start":30,"end":69"#,
+            ),
+        ]);
+    }
 }

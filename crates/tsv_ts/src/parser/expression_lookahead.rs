@@ -11,12 +11,10 @@
 use super::expression_type_args::TypeArgScan;
 use super::scan::{
     identifier_starts_at, is_word_at, skip_identifier, skip_numeric_literal,
-    skip_whitespace_and_comments,
+    skip_trivia_in_grammar, skip_whitespace_and_comments,
 };
 use crate::lexer::{KeywordKind, is_es_line_terminator_at, keyword_at};
-use tsv_lang::source_scan::{
-    OperandAnchor, PAREN_HOP_NEEDLES, TriviaProfile, is_hop_needle, skip_regex_literal, skip_trivia,
-};
+use tsv_lang::source_scan::{OperandAnchor, PAREN_HOP_NEEDLES, is_hop_needle, skip_regex_literal};
 
 /// `<` at `pos` is `<=` comparison operator, not an angle bracket open
 #[inline]
@@ -243,7 +241,7 @@ pub(super) fn matching_paren_close(bytes: &[u8], start: usize) -> Option<usize> 
         // Strings, templates, and comments are opaque — a `(`/`)` inside one is
         // not a real delimiter. The shared cursor skips all three in one place
         // (including backtick templates, which this scan historically missed).
-        if let Some(past) = skip_trivia(bytes, pos, end, TriviaProfile::JS) {
+        if let Some(past) = skip_trivia_in_grammar(bytes, pos, end) {
             anchor.skipped_trivia(bytes, pos, past, start, crate::__private::OPERAND_GRAMMAR);
             pos = past;
             continue;
@@ -333,7 +331,7 @@ fn scan_for_arrow(bytes: &[u8], colon: usize) -> bool {
 
         // Strings and templates are opaque (comments were consumed above) and,
         // as literal types, are atoms.
-        if let Some(past) = skip_trivia(bytes, pos, end, TriviaProfile::JS) {
+        if let Some(past) = skip_trivia_in_grammar(bytes, pos, end) {
             position = TypePos::Atom;
             pos = past;
             continue;
@@ -657,7 +655,7 @@ pub(super) fn scan_angle_brackets(bytes: &[u8], pos: usize) -> usize {
         // all three); an angle inside one isn't significant. No regex skip is
         // needed (unlike `matching_paren_close`): this scans type-argument
         // syntax `<…>`, where a `/…/` regex literal can't appear.
-        if let Some(past) = skip_trivia(bytes, pos, end, TriviaProfile::JS) {
+        if let Some(past) = skip_trivia_in_grammar(bytes, pos, end) {
             pos = past;
             continue;
         }
@@ -924,7 +922,7 @@ pub(super) fn matching_angle_close(
         // all three); a `<`/`>`/`;` inside one isn't significant. No regex skip is
         // needed (unlike `matching_paren_close`): this verifies a type-argument
         // sequence `<…>`, where a `/…/` regex literal can't appear.
-        if let Some(past) = skip_trivia(bytes, pos, end, TriviaProfile::JS) {
+        if let Some(past) = skip_trivia_in_grammar(bytes, pos, end) {
             pos = past;
             continue;
         }
@@ -1002,7 +1000,7 @@ pub(super) fn matching_delimiter_close(bytes: &[u8], open: usize) -> Option<usiz
     let mut pos = open;
 
     while pos < end {
-        if let Some(past) = skip_trivia(bytes, pos, end, TriviaProfile::JS) {
+        if let Some(past) = skip_trivia_in_grammar(bytes, pos, end) {
             pos = past;
             continue;
         }

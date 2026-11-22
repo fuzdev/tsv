@@ -1,0 +1,1174 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 647,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Type arguments holding a template literal type whose interpolation holds a backtick",
+			"start": 20,
+			"end": 106
+		},
+		{
+			"type": "Line",
+			"value": " or a quote — the scan for the closing `>` steps over the whole template, its",
+			"start": 108,
+			"end": 187
+		},
+		{
+			"type": "Line",
+			"value": " interpolations included, so the inner backtick does not end it.",
+			"start": 189,
+			"end": 255
+		},
+		{
+			"type": "Line",
+			"value": " A later quote that used to pair with the inner one, closing the list for the wrong",
+			"start": 478,
+			"end": 563
+		},
+		{
+			"type": "Line",
+			"value": " reason",
+			"start": 565,
+			"end": 574
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 646,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 637,
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 258,
+					"end": 277,
+					"expression": {
+						"type": "CallExpression",
+						"start": 258,
+						"end": 276,
+						"callee": {
+							"type": "Identifier",
+							"start": 258,
+							"end": 260,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 274,
+								"end": 275,
+								"name": "c"
+							}
+						],
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 260,
+							"end": 273,
+							"params": [
+								{
+									"type": "TSTypeReference",
+									"start": 261,
+									"end": 262,
+									"typeName": {
+										"type": "Identifier",
+										"start": 261,
+										"end": 262,
+										"name": "A"
+									}
+								},
+								{
+									"type": "TSLiteralType",
+									"start": 264,
+									"end": 272,
+									"literal": {
+										"type": "TemplateLiteral",
+										"start": 264,
+										"end": 272,
+										"expressions": [
+											{
+												"type": "TSLiteralType",
+												"start": 267,
+												"end": 270,
+												"literal": {
+													"type": "Literal",
+													"start": 267,
+													"end": 270,
+													"value": "`",
+													"raw": "'`'"
+												}
+											}
+										],
+										"quasis": [
+											{
+												"type": "TemplateElement",
+												"start": 265,
+												"end": 265,
+												"value": {
+													"raw": "",
+													"cooked": ""
+												},
+												"tail": false
+											},
+											{
+												"type": "TemplateElement",
+												"start": 271,
+												"end": 271,
+												"value": {
+													"raw": "",
+													"cooked": ""
+												},
+												"tail": true
+											}
+										]
+									}
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Type arguments holding a template literal type whose interpolation holds a backtick",
+							"start": 20,
+							"end": 106
+						},
+						{
+							"type": "Line",
+							"value": " or a quote — the scan for the closing `>` steps over the whole template, its",
+							"start": 108,
+							"end": 187
+						},
+						{
+							"type": "Line",
+							"value": " interpolations included, so the inner backtick does not end it.",
+							"start": 189,
+							"end": 255
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 279,
+					"end": 302,
+					"expression": {
+						"type": "NewExpression",
+						"start": 279,
+						"end": 301,
+						"callee": {
+							"type": "Identifier",
+							"start": 283,
+							"end": 285,
+							"name": "Fn"
+						},
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 285,
+							"end": 298,
+							"params": [
+								{
+									"type": "TSTypeReference",
+									"start": 286,
+									"end": 287,
+									"typeName": {
+										"type": "Identifier",
+										"start": 286,
+										"end": 287,
+										"name": "A"
+									}
+								},
+								{
+									"type": "TSLiteralType",
+									"start": 289,
+									"end": 297,
+									"literal": {
+										"type": "TemplateLiteral",
+										"start": 289,
+										"end": 297,
+										"expressions": [
+											{
+												"type": "TSLiteralType",
+												"start": 292,
+												"end": 295,
+												"literal": {
+													"type": "Literal",
+													"start": 292,
+													"end": 295,
+													"value": "`",
+													"raw": "'`'"
+												}
+											}
+										],
+										"quasis": [
+											{
+												"type": "TemplateElement",
+												"start": 290,
+												"end": 290,
+												"value": {
+													"raw": "",
+													"cooked": ""
+												},
+												"tail": false
+											},
+											{
+												"type": "TemplateElement",
+												"start": 296,
+												"end": 296,
+												"value": {
+													"raw": "",
+													"cooked": ""
+												},
+												"tail": true
+											}
+										]
+									}
+								}
+							]
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 299,
+								"end": 300,
+								"name": "c"
+							}
+						]
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 304,
+					"end": 326,
+					"expression": {
+						"type": "CallExpression",
+						"start": 304,
+						"end": 325,
+						"callee": {
+							"type": "Identifier",
+							"start": 304,
+							"end": 306,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 323,
+								"end": 324,
+								"name": "c"
+							}
+						],
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 306,
+							"end": 322,
+							"params": [
+								{
+									"type": "TSTypeReference",
+									"start": 307,
+									"end": 308,
+									"typeName": {
+										"type": "Identifier",
+										"start": 307,
+										"end": 308,
+										"name": "A"
+									}
+								},
+								{
+									"type": "TSTypeReference",
+									"start": 310,
+									"end": 321,
+									"typeName": {
+										"type": "Identifier",
+										"start": 310,
+										"end": 311,
+										"name": "B"
+									},
+									"typeArguments": {
+										"type": "TSTypeParameterInstantiation",
+										"start": 311,
+										"end": 321,
+										"params": [
+											{
+												"type": "TSLiteralType",
+												"start": 312,
+												"end": 320,
+												"literal": {
+													"type": "TemplateLiteral",
+													"start": 312,
+													"end": 320,
+													"expressions": [
+														{
+															"type": "TSLiteralType",
+															"start": 315,
+															"end": 318,
+															"literal": {
+																"type": "Literal",
+																"start": 315,
+																"end": 318,
+																"value": "`",
+																"raw": "'`'"
+															}
+														}
+													],
+													"quasis": [
+														{
+															"type": "TemplateElement",
+															"start": 313,
+															"end": 313,
+															"value": {
+																"raw": "",
+																"cooked": ""
+															},
+															"tail": false
+														},
+														{
+															"type": "TemplateElement",
+															"start": 319,
+															"end": 319,
+															"value": {
+																"raw": "",
+																"cooked": ""
+															},
+															"tail": true
+														}
+													]
+												}
+											}
+										]
+									}
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 328,
+					"end": 351,
+					"expression": {
+						"type": "CallExpression",
+						"start": 328,
+						"end": 350,
+						"callee": {
+							"type": "Identifier",
+							"start": 328,
+							"end": 330,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 348,
+								"end": 349,
+								"name": "c"
+							}
+						],
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 330,
+							"end": 347,
+							"params": [
+								{
+									"type": "TSTypeLiteral",
+									"start": 331,
+									"end": 346,
+									"members": [
+										{
+											"type": "TSPropertySignature",
+											"start": 333,
+											"end": 344,
+											"computed": false,
+											"key": {
+												"type": "Identifier",
+												"start": 333,
+												"end": 334,
+												"name": "a"
+											},
+											"typeAnnotation": {
+												"type": "TSTypeAnnotation",
+												"start": 334,
+												"end": 344,
+												"typeAnnotation": {
+													"type": "TSLiteralType",
+													"start": 336,
+													"end": 344,
+													"literal": {
+														"type": "TemplateLiteral",
+														"start": 336,
+														"end": 344,
+														"expressions": [
+															{
+																"type": "TSLiteralType",
+																"start": 339,
+																"end": 342,
+																"literal": {
+																	"type": "Literal",
+																	"start": 339,
+																	"end": 342,
+																	"value": "`",
+																	"raw": "'`'"
+																}
+															}
+														],
+														"quasis": [
+															{
+																"type": "TemplateElement",
+																"start": 337,
+																"end": 337,
+																"value": {
+																	"raw": "",
+																	"cooked": ""
+																},
+																"tail": false
+															},
+															{
+																"type": "TemplateElement",
+																"start": 343,
+																"end": 343,
+																"value": {
+																	"raw": "",
+																	"cooked": ""
+																},
+																"tail": true
+															}
+														]
+													}
+												}
+											}
+										}
+									]
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 353,
+					"end": 371,
+					"expression": {
+						"type": "CallExpression",
+						"start": 353,
+						"end": 370,
+						"callee": {
+							"type": "Identifier",
+							"start": 353,
+							"end": 355,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 368,
+								"end": 369,
+								"name": "c"
+							}
+						],
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 355,
+							"end": 367,
+							"params": [
+								{
+									"type": "TSTupleType",
+									"start": 356,
+									"end": 366,
+									"elementTypes": [
+										{
+											"type": "TSLiteralType",
+											"start": 357,
+											"end": 365,
+											"literal": {
+												"type": "TemplateLiteral",
+												"start": 357,
+												"end": 365,
+												"expressions": [
+													{
+														"type": "TSLiteralType",
+														"start": 360,
+														"end": 363,
+														"literal": {
+															"type": "Literal",
+															"start": 360,
+															"end": 363,
+															"value": "`",
+															"raw": "'`'"
+														}
+													}
+												],
+												"quasis": [
+													{
+														"type": "TemplateElement",
+														"start": 358,
+														"end": 358,
+														"value": {
+															"raw": "",
+															"cooked": ""
+														},
+														"tail": false
+													},
+													{
+														"type": "TemplateElement",
+														"start": 364,
+														"end": 364,
+														"value": {
+															"raw": "",
+															"cooked": ""
+														},
+														"tail": true
+													}
+												]
+											}
+										}
+									]
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 373,
+					"end": 402,
+					"expression": {
+						"type": "CallExpression",
+						"start": 373,
+						"end": 401,
+						"callee": {
+							"type": "Identifier",
+							"start": 373,
+							"end": 375,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 399,
+								"end": 400,
+								"name": "c"
+							}
+						],
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 375,
+							"end": 398,
+							"params": [
+								{
+									"type": "TSFunctionType",
+									"start": 376,
+									"end": 397,
+									"parameters": [
+										{
+											"type": "Identifier",
+											"start": 377,
+											"end": 388,
+											"name": "a",
+											"typeAnnotation": {
+												"type": "TSTypeAnnotation",
+												"start": 378,
+												"end": 388,
+												"typeAnnotation": {
+													"type": "TSLiteralType",
+													"start": 380,
+													"end": 388,
+													"literal": {
+														"type": "TemplateLiteral",
+														"start": 380,
+														"end": 388,
+														"expressions": [
+															{
+																"type": "TSLiteralType",
+																"start": 383,
+																"end": 386,
+																"literal": {
+																	"type": "Literal",
+																	"start": 383,
+																	"end": 386,
+																	"value": "`",
+																	"raw": "'`'"
+																}
+															}
+														],
+														"quasis": [
+															{
+																"type": "TemplateElement",
+																"start": 381,
+																"end": 381,
+																"value": {
+																	"raw": "",
+																	"cooked": ""
+																},
+																"tail": false
+															},
+															{
+																"type": "TemplateElement",
+																"start": 387,
+																"end": 387,
+																"value": {
+																	"raw": "",
+																	"cooked": ""
+																},
+																"tail": true
+															}
+														]
+													}
+												}
+											}
+										}
+									],
+									"typeAnnotation": {
+										"type": "TSTypeAnnotation",
+										"start": 390,
+										"end": 397,
+										"typeAnnotation": {
+											"type": "TSVoidKeyword",
+											"start": 393,
+											"end": 397
+										}
+									}
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 404,
+					"end": 423,
+					"expression": {
+						"type": "TaggedTemplateExpression",
+						"start": 404,
+						"end": 422,
+						"tag": {
+							"type": "Identifier",
+							"start": 404,
+							"end": 406,
+							"name": "fn"
+						},
+						"quasi": {
+							"type": "TemplateLiteral",
+							"start": 419,
+							"end": 422,
+							"expressions": [],
+							"quasis": [
+								{
+									"type": "TemplateElement",
+									"start": 420,
+									"end": 421,
+									"value": {
+										"raw": "t",
+										"cooked": "t"
+									},
+									"tail": true
+								}
+							]
+						},
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 406,
+							"end": 419,
+							"params": [
+								{
+									"type": "TSTypeReference",
+									"start": 407,
+									"end": 408,
+									"typeName": {
+										"type": "Identifier",
+										"start": 407,
+										"end": 408,
+										"name": "A"
+									}
+								},
+								{
+									"type": "TSLiteralType",
+									"start": 410,
+									"end": 418,
+									"literal": {
+										"type": "TemplateLiteral",
+										"start": 410,
+										"end": 418,
+										"expressions": [
+											{
+												"type": "TSLiteralType",
+												"start": 413,
+												"end": 416,
+												"literal": {
+													"type": "Literal",
+													"start": 413,
+													"end": 416,
+													"value": "`",
+													"raw": "'`'"
+												}
+											}
+										],
+										"quasis": [
+											{
+												"type": "TemplateElement",
+												"start": 411,
+												"end": 411,
+												"value": {
+													"raw": "",
+													"cooked": ""
+												},
+												"tail": false
+											},
+											{
+												"type": "TemplateElement",
+												"start": 417,
+												"end": 417,
+												"value": {
+													"raw": "",
+													"cooked": ""
+												},
+												"tail": true
+											}
+										]
+									}
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 425,
+					"end": 447,
+					"expression": {
+						"type": "CallExpression",
+						"start": 425,
+						"end": 446,
+						"callee": {
+							"type": "Identifier",
+							"start": 425,
+							"end": 427,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 444,
+								"end": 445,
+								"name": "c"
+							}
+						],
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 427,
+							"end": 443,
+							"params": [
+								{
+									"type": "TSTypeReference",
+									"start": 428,
+									"end": 429,
+									"typeName": {
+										"type": "Identifier",
+										"start": 428,
+										"end": 429,
+										"name": "A"
+									}
+								},
+								{
+									"type": "TSLiteralType",
+									"start": 431,
+									"end": 442,
+									"literal": {
+										"type": "TemplateLiteral",
+										"start": 431,
+										"end": 442,
+										"expressions": [
+											{
+												"type": "TSLiteralType",
+												"start": 434,
+												"end": 440,
+												"literal": {
+													"type": "TemplateLiteral",
+													"start": 434,
+													"end": 440,
+													"expressions": [],
+													"quasis": [
+														{
+															"type": "TemplateElement",
+															"start": 435,
+															"end": 439,
+															"value": {
+																"raw": "it's",
+																"cooked": "it's"
+															},
+															"tail": true
+														}
+													]
+												}
+											}
+										],
+										"quasis": [
+											{
+												"type": "TemplateElement",
+												"start": 432,
+												"end": 432,
+												"value": {
+													"raw": "",
+													"cooked": ""
+												},
+												"tail": false
+											},
+											{
+												"type": "TemplateElement",
+												"start": 441,
+												"end": 441,
+												"value": {
+													"raw": "",
+													"cooked": ""
+												},
+												"tail": true
+											}
+										]
+									}
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 449,
+					"end": 475,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 455,
+							"end": 474,
+							"id": {
+								"type": "Identifier",
+								"start": 455,
+								"end": 456,
+								"name": "x"
+							},
+							"init": {
+								"type": "TSInstantiationExpression",
+								"start": 459,
+								"end": 474,
+								"expression": {
+									"type": "Identifier",
+									"start": 459,
+									"end": 461,
+									"name": "fn"
+								},
+								"typeArguments": {
+									"type": "TSTypeParameterInstantiation",
+									"start": 461,
+									"end": 474,
+									"params": [
+										{
+											"type": "TSTypeReference",
+											"start": 462,
+											"end": 463,
+											"typeName": {
+												"type": "Identifier",
+												"start": 462,
+												"end": 463,
+												"name": "A"
+											}
+										},
+										{
+											"type": "TSLiteralType",
+											"start": 465,
+											"end": 473,
+											"literal": {
+												"type": "TemplateLiteral",
+												"start": 465,
+												"end": 473,
+												"expressions": [
+													{
+														"type": "TSLiteralType",
+														"start": 468,
+														"end": 471,
+														"literal": {
+															"type": "Literal",
+															"start": 468,
+															"end": 471,
+															"value": "`",
+															"raw": "'`'"
+														}
+													}
+												],
+												"quasis": [
+													{
+														"type": "TemplateElement",
+														"start": 466,
+														"end": 466,
+														"value": {
+															"raw": "",
+															"cooked": ""
+														},
+														"tail": false
+													},
+													{
+														"type": "TemplateElement",
+														"start": 472,
+														"end": 472,
+														"value": {
+															"raw": "",
+															"cooked": ""
+														},
+														"tail": true
+													}
+												]
+											}
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 576,
+					"end": 595,
+					"expression": {
+						"type": "CallExpression",
+						"start": 576,
+						"end": 594,
+						"callee": {
+							"type": "Identifier",
+							"start": 576,
+							"end": 578,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 592,
+								"end": 593,
+								"name": "c"
+							}
+						],
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 578,
+							"end": 591,
+							"params": [
+								{
+									"type": "TSTypeReference",
+									"start": 579,
+									"end": 580,
+									"typeName": {
+										"type": "Identifier",
+										"start": 579,
+										"end": 580,
+										"name": "A"
+									}
+								},
+								{
+									"type": "TSLiteralType",
+									"start": 582,
+									"end": 590,
+									"literal": {
+										"type": "TemplateLiteral",
+										"start": 582,
+										"end": 590,
+										"expressions": [
+											{
+												"type": "TSLiteralType",
+												"start": 585,
+												"end": 588,
+												"literal": {
+													"type": "Literal",
+													"start": 585,
+													"end": 588,
+													"value": "`",
+													"raw": "'`'"
+												}
+											}
+										],
+										"quasis": [
+											{
+												"type": "TemplateElement",
+												"start": 583,
+												"end": 583,
+												"value": {
+													"raw": "",
+													"cooked": ""
+												},
+												"tail": false
+											},
+											{
+												"type": "TemplateElement",
+												"start": 589,
+												"end": 589,
+												"value": {
+													"raw": "",
+													"cooked": ""
+												},
+												"tail": true
+											}
+										]
+									}
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A later quote that used to pair with the inner one, closing the list for the wrong",
+							"start": 478,
+							"end": 563
+						},
+						{
+							"type": "Line",
+							"value": " reason",
+							"start": 565,
+							"end": 574
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 597,
+					"end": 614,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 603,
+							"end": 613,
+							"id": {
+								"type": "Identifier",
+								"start": 603,
+								"end": 604,
+								"name": "y"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 607,
+								"end": 613,
+								"value": ">(1)",
+								"raw": "'>(1)'"
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 617,
+					"end": 636,
+					"expression": {
+						"type": "CallExpression",
+						"start": 617,
+						"end": 635,
+						"callee": {
+							"type": "Identifier",
+							"start": 617,
+							"end": 619,
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 633,
+								"end": 634,
+								"name": "c"
+							}
+						],
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 619,
+							"end": 632,
+							"params": [
+								{
+									"type": "TSTypeReference",
+									"start": 620,
+									"end": 621,
+									"typeName": {
+										"type": "Identifier",
+										"start": 620,
+										"end": 621,
+										"name": "A"
+									}
+								},
+								{
+									"type": "TSLiteralType",
+									"start": 623,
+									"end": 631,
+									"literal": {
+										"type": "TemplateLiteral",
+										"start": 623,
+										"end": 631,
+										"expressions": [
+											{
+												"type": "TSLiteralType",
+												"start": 626,
+												"end": 629,
+												"literal": {
+													"type": "Literal",
+													"start": 626,
+													"end": 629,
+													"value": "`",
+													"raw": "'`'"
+												}
+											}
+										],
+										"quasis": [
+											{
+												"type": "TemplateElement",
+												"start": 624,
+												"end": 624,
+												"value": {
+													"raw": "",
+													"cooked": ""
+												},
+												"tail": false
+											},
+											{
+												"type": "TemplateElement",
+												"start": 630,
+												"end": 630,
+												"value": {
+													"raw": "",
+													"cooked": ""
+												},
+												"tail": true
+											}
+										]
+									}
+								}
+							]
+						}
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

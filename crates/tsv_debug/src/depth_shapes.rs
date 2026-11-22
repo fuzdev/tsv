@@ -960,6 +960,24 @@ fn construct_shapes() -> Vec<Shape> {
             ";\n",
         ),
         ts_nesting("ts_template", "x = ", "`${", "1", "}`", ";\n"),
+        // nested templates where a lookahead skips them ahead of the parse: an arrow head's
+        // `)`, a type-argument list's `>` (whose skip and interpolation scans recurse)
+        ts_nesting(
+            "ts_template_arrow_default",
+            "x = (a = ",
+            "`${",
+            "1",
+            "}`",
+            ") => a;\n",
+        ),
+        ts_nesting(
+            "ts_template_type_argument",
+            "f<A, ",
+            "`${",
+            "B",
+            "}`",
+            ">(c);\n",
+        ),
         ts_nesting("ts_pattern_array", "const ", "[", "a", "]", " = x;\n"),
         ts_nesting("ts_pattern_object", "const ", "{a: ", "a", "}", " = x;\n"),
         // TypeScript: statements
@@ -1413,6 +1431,23 @@ fn construct_shapes() -> Vec<Shape> {
         ),
         svelte("svelte_each", "", "{#each a as b}", "x", "{/each}", "\n"),
         svelte("svelte_expression", "<p>{", "[", "1", "]", "}</p>\n"),
+        // nested templates the tag's brace scan skips, and an arrow head's lookahead inside
+        svelte(
+            "svelte_expression_template",
+            "<p>{",
+            "`${",
+            "1",
+            "}`",
+            "}</p>\n",
+        ),
+        svelte(
+            "svelte_expression_template_arrow_default",
+            "<p>{(a = ",
+            "`${",
+            "1",
+            "}`",
+            ") => a}</p>\n",
+        ),
         // a `{@const}` holds its binding and init two wire levels below the tag
         svelte(
             "svelte_const_init",

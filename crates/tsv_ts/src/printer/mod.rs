@@ -3277,7 +3277,7 @@ impl<'a> Printer<'a> {
                     break;
                 }
             }
-            if let Some(past) = skip_trivia(source, i, end, TriviaProfile::JS) {
+            if let Some(past) = crate::parser::skip_trivia_in_grammar(source, i, end) {
                 anchor.skipped_trivia(
                     source,
                     i,

@@ -105,36 +105,59 @@ pub(crate) fn closes_braced_operand(
     start: ScanStart,
     resume: &mut BracedOperandWalk,
 ) -> Option<bool> {
-    // acorn's tokenizer always answers: a `}` the walk does not meet ends no operand.
-    Some(reach_brace::<TokenContexts>(bytes, rbrace, lower_bound, start, resume) == Some(true))
+    match reach_brace::<TokenContexts>(bytes, rbrace, lower_bound, start, resume) {
+        // acorn's tokenizer always answers: a `}` the walk does not meet ends no operand.
+        Reached::Brace(ends_operand) => Some(ends_operand == Some(true)),
+        Reached::Missed => Some(false),
+        // This crate's answer to a `/` on the way could not be given.
+        Reached::Stuck => None,
+    }
+}
+
+/// What a walk to a `}` found ([`reach_brace`]).
+enum Reached {
+    /// The brace, as a token of its own, and whether it ends an operand — `None` when the
+    /// reading cannot tell ([`Closed::ends_operand`]).
+    Brace(Option<bool>),
+    /// No such token: the walk stepped over the brace inside a literal or a comment, or met
+    /// a `/` after a brace the reading could not place.
+    Missed,
+    /// A `/` on the way that this crate's answers could not read
+    /// ([`WALK_GRAMMAR`]'s type-argument and statement-header questions).
+    Stuck,
 }
 
 /// Walk the region from `lower_bound` on through the `}` at `rbrace` as `R` reads it —
-/// resuming the scan's walk where one is kept — and say whether the brace ends an operand:
-/// `None` when the walk does not meet it as a token of its own, or `R` cannot tell.
+/// resuming the scan's walk where one is kept — and say what it found.
 fn reach_brace<R: Reading>(
     bytes: &[u8],
     rbrace: usize,
     lower_bound: usize,
     start: ScanStart,
     resume: &mut BracedOperandWalk,
-) -> Option<bool> {
+) -> Reached {
     let mut walk = resume
         .take::<Walk<R>>()
         .filter(|walk| walk.resumes(rbrace, lower_bound, start))
         .unwrap_or_else(|| Box::new(Walk::new(lower_bound, start)));
     let closed = walk.reach(bytes, rbrace);
+    let stuck = walk.stuck;
     if closed.is_some() {
         // A walk that missed `rbrace` read the region differently from the scan asking it,
         // and is not kept for that scan to resume.
         resume.put(walk);
     }
-    closed?.ends_operand()
+    match closed {
+        Some(closed) => Reached::Brace(closed.ends_operand()),
+        None if stuck => Reached::Stuck,
+        None => Reached::Missed,
+    }
 }
 
 /// The walk's reading of every `/` that no `}` settles: this crate's answers for a `>` and
 /// a `)`, and the bytes' for a `}` — which the walk never asks, a `/` after a `}` being its
-/// own to answer ([`Region::closed_before`]).
+/// own to answer ([`Region::closed_before`]). Each region asks it as the region begins
+/// ([`Region::grammar`]), which those answers' own walks read their braces by.
 const WALK_GRAMMAR: OperandGrammar = OperandGrammar {
     closes_type_arguments: crate::parser::closes_type_arguments,
     closes_statement_header: crate::parser::closes_statement_header,
@@ -181,6 +204,8 @@ struct Walk<R> {
     /// The regions around `region`, outermost first.
     outer: Vec<Region>,
     contexts: R,
+    /// Whether the walk stopped at a `/` this crate's answers could not read ([`Reached::Stuck`]).
+    stuck: bool,
 }
 
 impl<R: Reading> Walk<R> {
@@ -189,9 +214,10 @@ impl<R: Reading> Walk<R> {
             lower_bound,
             start,
             at: lower_bound,
-            region: Region::new(lower_bound),
+            region: Region::new(lower_bound, start),
             outer: Vec::new(),
             contexts: R::new(start),
+            stuck: false,
         }
     }
 
@@ -227,7 +253,7 @@ impl<R: Reading> Walk<R> {
                     i,
                     past,
                     self.region.lower_bound,
-                    WALK_GRAMMAR,
+                    self.region.grammar(WALK_GRAMMAR),
                 );
                 if b == b'/' {
                     // A comment: transparent, except that a line comment's terminator — or
@@ -247,12 +273,14 @@ impl<R: Reading> Walk<R> {
                     // A brace the reading cannot place leaves the walk unable to read on.
                     Some(closed) => !closed.ends_operand()?,
                     None => {
-                        self.region.anchor.starts_regex(
+                        let regex = self.region.anchor.starts_regex(
                             bytes,
                             i,
                             self.region.lower_bound,
-                            WALK_GRAMMAR,
-                        ) == Some(true)
+                            self.region.grammar(WALK_GRAMMAR),
+                        );
+                        self.stuck = regex.is_none();
+                        regex?
                     }
                 };
                 if regex && let Some(past) = skip_regex_literal(bytes, i, bytes.len()) {
@@ -320,8 +348,10 @@ impl<R: Reading> Walk<R> {
                 }
                 b'$' if bytes.get(i + 1) == Some(&b'{') => {
                     self.contexts.open_interpolation();
-                    self.outer
-                        .push(std::mem::replace(&mut self.region, Region::new(i + 2)));
+                    self.outer.push(std::mem::replace(
+                        &mut self.region,
+                        Region::new(i + 2, ScanStart::Interpolation),
+                    ));
                     return Some(i + 2);
                 }
                 _ => i += 1,
@@ -336,14 +366,22 @@ impl<R: Reading> Walk<R> {
 struct Region {
     anchor: OperandAnchor,
     lower_bound: usize,
+    /// How the region begins: as the walk's does, or as an interpolation.
+    start: ScanStart,
 }
 
 impl Region {
-    fn new(lower_bound: usize) -> Self {
+    fn new(lower_bound: usize, start: ScanStart) -> Self {
         Self {
             anchor: OperandAnchor::new(lower_bound),
             lower_bound,
+            start,
         }
+    }
+
+    /// `grammar` for a region that begins as this one does.
+    fn grammar(&self, grammar: OperandGrammar) -> OperandGrammar {
+        grammar.starting(self.start)
     }
 
     /// What the `}` last closed, when the operand before the `/` at `slash` ends on it —
@@ -368,14 +406,18 @@ impl Region {
         let after_brace = contexts.after_brace();
         let closed = *contexts.closed()?;
         let ends_on_brace = after_brace
-            || (self
-                .anchor
-                .starts_regex(bytes, slash, self.lower_bound, WALK_GRAMMAR)
-                == Some(true)
-                && self
-                    .anchor
-                    .starts_regex(bytes, slash, self.lower_bound, BRACE_ENDS_OPERAND)
-                    == Some(false));
+            || (self.anchor.starts_regex(
+                bytes,
+                slash,
+                self.lower_bound,
+                self.grammar(WALK_GRAMMAR),
+            ) == Some(true)
+                && self.anchor.starts_regex(
+                    bytes,
+                    slash,
+                    self.lower_bound,
+                    self.grammar(BRACE_ENDS_OPERAND),
+                ) == Some(false));
         ends_on_brace.then_some(closed)
     }
 }
@@ -957,8 +999,17 @@ impl Reading for TokenContexts {
 /// object or type literal at statement level followed by a line break, where the `/`
 /// divides after `x = {}` and opens a regex after `type T = {}` — and everything nested in
 /// a brace the walk could not place.
+// TODO: this walk is not remembered, and the type-argument and statement-header answers walk
+// a region through it again (`expression_type_args::walk_grammar`): a template nest asking
+// them at every level (`` `${f<@>/2 + {} / 2}` ``) still costs a cubic in its depth, which
+// only inputs tsc rejects reach. Remembering it would need its resumable state in the key;
+// the forward scan recording each operand-position `<` (`grammar_memo`)
+// would retire it.
 // TODO: the uncertain shapes are over-rejected in an arrow head's parameter list (a default
 // holding a nested body that writes one): `(a = () => { type T = {}⏎/re/.test(s) }) => a`.
+// A Svelte island refuses them too once a `> /` or `)! /` follows in the island
+// (`{g(() => { type T = {}⏎/re/.test(s); return f<T> / 2 })}`, which Svelte accepts): the
+// type-argument and statement-header walks read their braces by this grammar.
 // Recording a `type` alias's `=` would settle the one real-looking member.
 pub(crate) fn closes_braced_operand_in_grammar(
     bytes: &[u8],
@@ -967,7 +1018,10 @@ pub(crate) fn closes_braced_operand_in_grammar(
     start: ScanStart,
     resume: &mut BracedOperandWalk,
 ) -> Option<bool> {
-    reach_brace::<GrammarContexts>(bytes, rbrace, lower_bound, start, resume)
+    match reach_brace::<GrammarContexts>(bytes, rbrace, lower_bound, start, resume) {
+        Reached::Brace(ends_operand) => ends_operand,
+        Reached::Missed | Reached::Stuck => None,
+    }
 }
 
 /// How a `{` directly inside a [`GrammarFrame`] reads.
