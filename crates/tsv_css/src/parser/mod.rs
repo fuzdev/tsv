@@ -1004,7 +1004,7 @@ impl<'a> CssParser<'a> {
     }
 
     /// The levels of nesting left before the limit — what a declaration value's parse may
-    /// enter (`value::parse_value_from_source`).
+    /// enter (`value::parse_value_from_source_into`).
     #[inline]
     pub(crate) fn nesting_room(&self) -> u32 {
         NESTING_LIMIT - self.depth.nesting()

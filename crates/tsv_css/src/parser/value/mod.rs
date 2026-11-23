@@ -57,13 +57,28 @@ use strings::parse_string_literal;
 ///   a function or parenthesized group — [`FunctionLevels`]).
 /// * `stores` - the stylesheet's stores, carried through the value parser's
 ///   recursion.
+/// * `out` - where the parsed value is written; untouched on an error.
+///
+/// The value is written through `out` rather than returned, and the function is inlined into
+/// its one caller, for that caller's sake — not to save a copy, since the value
+/// `parse_scanned` returns is still copied into `out`. Returned, that copy reloaded the
+/// value's span with one load straddling two of the value parser's 4-byte stores — a
+/// store-to-load-forwarding stall, once per declaration; written to `out`, LLVM lowers the
+/// same copy with loads that each meet one store. It is a lowering choice and so fragile:
+/// before reshaping either side, read the `ls_bad_status2.stli_other:u` counter over a CSS
+/// parse, before and after.
 ///
 /// # Errors
 ///
 /// The host offset of the `(` whose function would enter past `room`, the parse
 /// abandoned there.
 #[expect(clippy::too_many_arguments)]
-pub(super) fn parse_value_from_source(
+#[expect(
+    clippy::inline_always,
+    reason = "the out-param's codegen is read in its one caller, `parse_declaration`"
+)]
+#[inline(always)]
+pub(super) fn parse_value_from_source_into(
     source: &str,
     source_relative_span: Span,
     base_offset: u32,
@@ -72,28 +87,31 @@ pub(super) fn parse_value_from_source(
     is_custom_property: bool,
     room: u32,
     stores: &mut CssStores,
-) -> Result<CssValue, u32> {
+    out: &mut CssValue,
+) -> Result<(), u32> {
     let value_str = source_relative_span.extract(source);
     let absolute_start = base_offset + source_relative_span.start;
 
     // A custom property's leading-comma value is unusual syntax, kept raw.
     if is_custom_property && value_str.trim_start().starts_with(',') {
-        return Ok(CssValue::Identifier {
+        *out = CssValue::Identifier {
             span: Span {
                 start: absolute_start,
                 end: base_offset + source_relative_span.end,
             },
-        });
+        };
+        return Ok(());
     }
 
     // An all-whitespace (or empty) value keeps the span it was handed.
     let Some((trimmed, leading)) = locate_value(value_str) else {
-        return Ok(CssValue::Identifier {
+        *out = CssValue::Identifier {
             span: Span {
                 start: absolute_start,
                 end: base_offset + source_relative_span.end,
             },
-        });
+        };
+        return Ok(());
     };
 
     // The value's own span: where it starts, plus how long it is. The end needs
@@ -128,11 +146,13 @@ pub(super) fn parse_value_from_source(
     // parse runs unbounded, as it does outside any value's parse (`FunctionLevels::within`
     // never nests — no value parse reaches the declaration parser).
     if trimmed.len() <= room as usize {
-        return Ok(parser.parse_scanned(stores, class, group_closes_text));
+        *out = parser.parse_scanned(stores, class, group_closes_text);
+        return Ok(());
     }
-    FunctionLevels::within(room, || {
+    *out = FunctionLevels::within(room, || {
         parser.parse_scanned(stores, class, group_closes_text)
-    })
+    })?;
+    Ok(())
 }
 
 /// The function levels a value's parse may still enter, and the `(` where it ran out — the
@@ -262,7 +282,7 @@ fn locate_value(value_str: &str) -> Option<(&str, usize)> {
 }
 
 // Old parsing functions removed - replaced by ValueParser with same-source recursion
-// - parse_value_string() → use parse_value_from_source() instead
+// - parse_value_string() → use parse_value_from_source_into() instead
 // - parse_value_or_list() → handled internally by ValueParser
 // See: parser::ValueParser for the new implementation
 
@@ -951,12 +971,16 @@ mod function_name_tests {
 
 #[cfg(test)]
 mod value_span_tests {
-    use super::parse_value_from_source;
+    use super::parse_value_from_source_into;
+    use crate::ast::CssValue;
     use tsv_lang::Span;
 
-    /// The span `parse_value_from_source` gives the value it parsed.
+    /// The span `parse_value_from_source_into` gives the value it parsed.
     fn value_span(source: &str, start: u32, end: u32) -> Span {
-        parse_value_from_source(
+        let mut value = CssValue::Identifier {
+            span: Span::new(0, 0),
+        };
+        parse_value_from_source_into(
             source,
             Span { start, end },
             0,
@@ -965,9 +989,10 @@ mod value_span_tests {
             false,
             256,
             &mut crate::ast::CssStores::new(),
+            &mut value,
         )
-        .expect("within the room")
-        .span()
+        .expect("within the room");
+        value.span()
     }
 
     /// The already-trimmed fast path must agree with the trimming path on where
@@ -1075,7 +1100,7 @@ mod function_levels_tests {
 
 #[cfg(test)]
 mod operator_run_tests {
-    use super::parse_value_from_source;
+    use super::parse_value_from_source_into;
     use crate::ast::{CssStores, CssValue};
     use tsv_lang::Span;
 
@@ -1124,7 +1149,10 @@ mod operator_run_tests {
             start: 0,
             end: source.len() as u32,
         };
-        let value = parse_value_from_source(
+        let mut value = CssValue::Identifier {
+            span: Span::new(0, 0),
+        };
+        parse_value_from_source_into(
             source,
             span,
             0,
@@ -1133,6 +1161,7 @@ mod operator_run_tests {
             is_custom_property,
             u32::MAX,
             stores,
+            &mut value,
         )
         .expect("within the room");
         let mut out = Vec::new();

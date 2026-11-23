@@ -818,7 +818,7 @@ fn scan_value_core<const WANT_VERDICT: bool>(
     let is_empty = crate::comments::skip_trivia_forward(bytes, value_start, span_end) >= span_end;
 
     // The class the value parser would have derived for itself, over `[value_start,
-    // value_end)` — the text `parse_value_from_source` hands its `ValueParser`. A separator
+    // value_end)` — the text `parse_value_from_source_into` hands its `ValueParser`. A separator
     // at or past `value_end` sits in the trailing whitespace or the `!important` and is not
     // the value's own (`color: red !important` is a leaf, not a whitespace list). A comment
     // is unstated because `fast_scan` refuses a commented value outright and defers to the

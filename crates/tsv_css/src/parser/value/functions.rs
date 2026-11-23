@@ -32,7 +32,7 @@ pub(crate) fn parse_function_arguments(
         return Run::EMPTY;
     }
 
-    // Calculate adjusted span for trimmed args (same logic as parse_value_from_source)
+    // Calculate adjusted span for trimmed args (same logic as parse_value_from_source_into)
     let trim_end_offset = args_str.len() - trim_start_offset - trimmed.len();
     let adjusted_span = Span {
         start: parent_span.start + trim_start_offset as u32,

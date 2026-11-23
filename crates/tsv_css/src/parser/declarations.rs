@@ -338,7 +338,7 @@ pub(crate) fn parse_declaration(parser: &mut CssParser<'_>) -> Result<(), Error>
     // collecting the few facts the declaration node needs: where its span ends, whether it
     // holds a comment, whether it is empty, and where a trailing `!important` sits. The scan
     // walks bytes rather than tokens — a value's text is re-parsed from source below
-    // (`parse_value_from_source`) anyway, so tokenizing it here only to find a `;` was
+    // (`parse_value_from_source_into`) anyway, so tokenizing it here only to find a `;` was
     // paying the lexer twice for the same bytes. See `decl_scan`.
     //
     // For a non-custom declaration the rule/declaration disambiguation already walked this
@@ -429,7 +429,7 @@ pub(crate) fn parse_declaration(parser: &mut CssParser<'_>) -> Result<(), Error>
     };
 
     // Parse the value directly from source for accurate span tracking
-    // Use parse_value_from_source instead of parse_value_string to avoid
+    // Use parse_value_from_source_into instead of parse_value_string to avoid
     // span drift from whitespace differences between source and reconstructed tokens
     //
     // The scan's offsets are already source-relative; the span above is the
@@ -440,7 +440,12 @@ pub(crate) fn parse_declaration(parser: &mut CssParser<'_>) -> Result<(), Error>
         end: facts.value_end as u32,
     };
 
-    let value = super::value::parse_value_from_source(
+    // Written in place rather than returned: `parse_value_from_source_into` names the
+    // store-forwarding stall a returned value cost here.
+    let mut value = CssValue::Identifier {
+        span: Span::new(0, 0),
+    };
+    super::value::parse_value_from_source_into(
         parser.source(),
         source_relative_span,
         base,
@@ -454,6 +459,7 @@ pub(crate) fn parse_declaration(parser: &mut CssParser<'_>) -> Result<(), Error>
         // the value parser's own recursion, a level a function, counted as it parses
         parser.nesting_room(),
         parser.stores,
+        &mut value,
     )
     .map_err(|open| parser.too_deep(open as usize))?;
 
