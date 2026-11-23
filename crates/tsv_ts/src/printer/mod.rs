@@ -3255,6 +3255,8 @@ impl<'a> Printer<'a> {
         // maintained per byte; `OperandAnchor` owns the rule, including which kinds
         // of skipped trivia end an operand.
         let mut anchor = OperandAnchor::new(start as usize);
+        // The grammar's walk of this range, advanced by each ask.
+        let mut walk = tsv_lang::source_scan::ScanWalk::default();
 
         while i < end {
             // Only `PAREN_HOP_NEEDLES` can move this scan; every other byte
@@ -3278,12 +3280,16 @@ impl<'a> Printer<'a> {
                 }
             }
             if let Some(past) = crate::parser::skip_trivia_in_grammar(source, i, end) {
+                if source[i] == b'`' && past < end {
+                    walk.skipped_template(i, past);
+                }
                 anchor.skipped_trivia(
                     source,
                     i,
                     past,
                     start as usize,
                     crate::__private::OPERAND_GRAMMAR,
+                    &mut walk,
                 );
                 i = past;
                 continue;
@@ -3311,6 +3317,7 @@ impl<'a> Printer<'a> {
                         i,
                         start as usize,
                         crate::__private::OPERAND_GRAMMAR,
+                        &mut walk,
                     )? && let Some(past) = skip_regex_literal(source, i, end)
                     {
                         i = past;

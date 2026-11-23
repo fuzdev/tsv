@@ -1,10 +1,18 @@
-//! The braced-operand resolver: whether a `}` ends an operand, read as acorn reads it —
-//! `tsv_lang`'s `ClosesBracedOperand` for a Svelte island's extent
-//! (`crate::__private::ACORN_ISLAND_GRAMMAR`).
+//! The grammar's answers to the raw scans — whether a `}` ends an operand (read as acorn
+//! reads it for a Svelte island's extent, `crate::__private::ACORN_ISLAND_GRAMMAR`, or as
+//! this crate's parser does), whether a `>` closes a type-argument list, and whether a `)`
+//! closes a statement header — all given by one forward walk of the region a scan reads
+//! ([`Walk`]), kept in the scan's `ScanWalk` and advanced by each ask.
 
-use super::scan::{identifier_starts_at, skip_identifier, skip_numeric_literal, skip_whitespace};
+use super::expression_lookahead::{is_arrow_close, is_greater_equal_op, is_less_equal_op};
+use super::expression_type_args::{TypeArgScan, type_arg_head_commits};
+use super::scan::{
+    TemplateHints, identifier_starts_at, skip_identifier, skip_numeric_literal, skip_whitespace,
+    skip_whitespace_and_comments,
+};
+use tsv_lang::FxHashMap;
 use tsv_lang::source_scan::{
-    BracedOperandWalk, OperandAnchor, OperandGrammar, ScanStart, TriviaProfile, skip_regex_literal,
+    OperandAnchor, OperandGrammar, ScanStart, ScanWalk, TriviaProfile, skip_regex_literal,
     skip_trivia,
 };
 
@@ -72,14 +80,10 @@ use tsv_lang::source_scan::{
 ///
 /// Asked only for a `/` after a `}`, which real code almost never writes, so the walk's cost
 /// is paid there alone.
-// TODO: the walk reads each `>` + `/` and each `)!` + `/` it passes through
-// `closes_type_arguments` / `closes_statement_header`, each a walk from the region's start,
-// so a region that interleaves thousands of `f<T> /` or `(a)! /` pairs with a `} /` pays
-// that quadratically — those resolvers' own worst case, met a second time. A template
-// literal's interpolation is a region of its own to the scan and is tokenized again in
-// line by each region around it, so nesting costs its depth. A parse entry that reads an
-// expression from the island's start and stops where it ends would retire this walk, the
-// type-argument one and the statement-header one together.
+// TODO: a template literal's interpolation is a region of its own to the scan, and is
+// tokenized again in line by each region around it, so nesting costs its depth. A parse
+// entry that reads an expression from the island's start and stops where it ends would
+// retire this walk.
 // TODO: tracked differences from Svelte.
 // - Rejected where Svelte accepts, when the misread regex closes on its line: a braced
 //   operand at statement level inside a nested body (`{() => { x = {} / 2 }}`,
@@ -103,9 +107,11 @@ pub(crate) fn closes_braced_operand(
     rbrace: usize,
     lower_bound: usize,
     start: ScanStart,
-    resume: &mut BracedOperandWalk,
+    resume: &mut ScanWalk,
 ) -> Option<bool> {
-    match reach_brace::<TokenContexts>(bytes, rbrace, lower_bound, start, resume) {
+    match with_walk::<TokenContexts, _>(resume, lower_bound, start, |walk, scan| {
+        walk.brace(bytes, rbrace, scan)
+    }) {
         // acorn's tokenizer always answers: a `}` the walk does not meet ends no operand.
         Reached::Brace(ends_operand) => Some(ends_operand == Some(true)),
         Reached::Missed => Some(false),
@@ -114,67 +120,229 @@ pub(crate) fn closes_braced_operand(
     }
 }
 
-/// What a walk to a `}` found ([`reach_brace`]).
+/// What a walk found at a `}` ([`Walk::brace`]).
+#[derive(Clone, Copy)]
 enum Reached {
     /// The brace, as a token of its own, and whether it ends an operand — `None` when the
     /// reading cannot tell ([`Closed::ends_operand`]).
     Brace(Option<bool>),
-    /// No such token: the walk stepped over the brace inside a literal or a comment, or met
-    /// a `/` after a brace the reading could not place.
+    /// No such token: the walk stepped over the brace inside a literal or a comment, met
+    /// a `/` after a brace the reading could not place, or left the region it read.
     Missed,
-    /// A `/` on the way that this crate's answers could not read
-    /// ([`WALK_GRAMMAR`]'s type-argument and statement-header questions).
+    /// A `/` on the way that the walk's own answers could not read.
     Stuck,
 }
 
-/// Walk the region from `lower_bound` on through the `}` at `rbrace` as `R` reads it —
-/// resuming the scan's walk where one is kept — and say what it found.
-fn reach_brace<R: Reading>(
-    bytes: &[u8],
-    rbrace: usize,
+/// The walks a scan's `ScanWalk` keeps: this crate's grammar's, which answers every
+/// question of [`crate::__private::OPERAND_GRAMMAR`], and acorn's, which answers the `}`
+/// question of [`crate::__private::ACORN_ISLAND_GRAMMAR`]. Each is begun at the first ask
+/// that needs it.
+#[derive(Default)]
+struct ScanWalkers {
+    grammar: Option<Box<Walk<GrammarContexts>>>,
+    acorn: Option<Box<Walk<TokenContexts>>>,
+}
+
+/// Run `ask` on the `R` walk `slot` keeps for the region beginning at `lower_bound` as
+/// `start` says — begun now when there is none, or the one kept is of another region.
+fn with_walk<R: Reading, T>(
+    slot: &mut ScanWalk,
     lower_bound: usize,
     start: ScanStart,
-    resume: &mut BracedOperandWalk,
-) -> Reached {
-    let mut walk = resume
-        .take::<Walk<R>>()
-        .filter(|walk| walk.resumes(rbrace, lower_bound, start))
-        .unwrap_or_else(|| Box::new(Walk::new(lower_bound, start)));
-    let closed = walk.reach(bytes, rbrace);
-    let stuck = walk.stuck;
-    if closed.is_some() {
-        // A walk that missed `rbrace` read the region differently from the scan asking it,
-        // and is not kept for that scan to resume.
-        resume.put(walk);
+    ask: impl FnOnce(&mut Walk<R>, &ScanWalk) -> T,
+) -> T {
+    let mut walkers = slot.take::<ScanWalkers>().unwrap_or_default();
+    let kept = R::kept(&mut walkers);
+    let walk = match kept {
+        Some(walk) if walk.lower_bound == lower_bound && walk.start == start => walk,
+        _ => kept.insert(Box::new(Walk::new(lower_bound, start))),
+    };
+    let answer = ask(walk, slot);
+    slot.put(walkers);
+    answer
+}
+
+/// Whether the `>` at `gt` closes a type-argument list this crate's parser would read —
+/// `tsv_lang`'s `ClosesTypeArguments` for the TypeScript grammar, so a raw byte scan that
+/// meets `f<T> / 2` reads the division the parser will, instead of opening a regex at `/ 2`
+/// and running past the expression's end.
+///
+/// It asks the parser's own LOOKAHEAD question from the other end. The parser tries a list
+/// at a `<` that follows an operand (the subscript loop, `new C<T>`, a type reference) where
+/// `type_arg_head_commits` admits one under `TypeArgScan::Parse`, so the scan's walk of its
+/// region ([`Walk`]) records each `<` it reads and the `>` that closes it — matched as the
+/// delimiters of a list are, a `(`, `[` or `{` holding its own — and answers for the one
+/// whose `>` is `gt`. A `<` whose operand position the walk's own reading of the tokens
+/// before it says is no operand's end opens no list; nor does one after a postfix `++` /
+/// `--` — the update is no subscript base, so the parser reads a comparison there — or after
+/// a statement header's `)` (`if (c) <T>x`), where the parser begins a statement.
+///
+/// Every `/` the walk passes is read by its own earlier answers — a `>` it closed a list
+/// at divides, a header's `)` before a glued `!` begins a statement — so an answer reads
+/// nothing past `gt` but the list's follower and the extent of a literal begun before it
+/// (which the asking scan reads the same way), and nothing outside the scan's region: the
+/// record is the scan's own reading.
+///
+/// `None` when the walk could not read up to `gt`: a `/` after a `}` or a `)!` it could not
+/// place.
+// TODO: this answers for the lookahead alone, and the parser goes on to TRY the tail
+// of a list that has a separator (`Parser::parse_type_arguments_or_rewind`). Behind a tail
+// it abandons the two disagree: `fn(a < b, c + d >⏎/x/.test(e))` is a comparison with a
+// regex to the parser, and a list closed ahead of a division to this scan (the line break
+// is what makes the lookahead commit there). A raw scan that meets a delimiter inside
+// that regex then ends early — a Svelte tag cut at the `}` of `>⏎/}/` — which the parse
+// of the cut slice reports. A scan cannot run the type grammar; recording the `<` the
+// parser abandoned, where the same scan runs after a parse, would let it agree.
+pub(crate) fn closes_type_arguments(
+    bytes: &[u8],
+    gt: usize,
+    lower_bound: usize,
+    start: ScanStart,
+    walk: &mut ScanWalk,
+) -> Option<bool> {
+    with_walk::<GrammarContexts, _>(walk, lower_bound, start, |walk, scan| {
+        walk.type_arguments(bytes, gt, scan)
+    })
+}
+
+/// Whether the `)` at `rparen` closes a statement header this crate's parser would read —
+/// `if (c)`, `while (c)`, `for (…)`, `for await (…)`, `with (o)` — so a statement begins
+/// after it. `tsv_lang`'s `ClosesStatementHeader` for the TypeScript grammar: a scan that
+/// meets a `!` glued to a `)` asks it, and reads `if (c)!/re/` as the prefix `!` and regex
+/// the parser will, where `f()! / 2` is a postfix non-null divided.
+///
+/// Read off the same walk as [`closes_type_arguments`] ([`StatementHeaders`]), from
+/// `lower_bound` to the `)`; `None` as there.
+pub(crate) fn closes_statement_header(
+    bytes: &[u8],
+    rparen: usize,
+    lower_bound: usize,
+    start: ScanStart,
+    walk: &mut ScanWalk,
+) -> Option<bool> {
+    with_walk::<GrammarContexts, _>(walk, lower_bound, start, |walk, scan| {
+        walk.statement_header(bytes, rparen, scan)
+    })
+}
+
+/// The answers a [`Walk`] has recorded about the `>`s and `)`s it read — the ones its own
+/// reading of each `/` after them goes by ([`OWN_GRAMMAR`]), and the scan's asks.
+#[derive(Default)]
+struct OwnAnswers {
+    /// Each `<`…`>` pair whose `<` may open a list, in the order of their `>`s.
+    pairs: Vec<Pair>,
+    /// Each `)` that closed a statement header, in source order.
+    header_closes: Vec<usize>,
+}
+
+/// A `<` and the `>` the walk matched it to, with whether the pair is a type-argument list.
+struct Pair {
+    lt: usize,
+    gt: usize,
+    grade: Grade,
+}
+
+/// What a [`Pair`] is known to be.
+#[derive(Clone, Copy)]
+enum Grade {
+    /// Not graded yet: its `<` follows an operand, and its head is still to be read.
+    Pending,
+    /// A list (`Some(true)`), no list, or `None` where the walk could not tell whether its
+    /// `<` follows an operand.
+    Known(Option<bool>),
+}
+
+impl OwnAnswers {
+    /// The pair whose `>` is at `gt`.
+    fn pair(&mut self, gt: usize) -> Option<&mut Pair> {
+        let at = self.pairs.binary_search_by_key(&gt, |pair| pair.gt).ok()?;
+        self.pairs.get_mut(at)
     }
-    match closed {
-        Some(closed) => Reached::Brace(closed.ends_operand()),
-        None if stuck => Reached::Stuck,
-        None => Reached::Missed,
+
+    /// Whether the `>` at `gt` closes a list, grading its pair now if it is pending — with
+    /// the walk's `templates` lent to the head's skips ([`TemplateHints`]) when it has them.
+    fn closes_type_arguments(
+        &mut self,
+        bytes: &[u8],
+        gt: usize,
+        templates: Option<&mut FxHashMap<usize, usize>>,
+    ) -> Option<bool> {
+        let pair = self.pair(gt)?;
+        Some(pair.graded(bytes, templates)).flatten()
     }
 }
 
-/// The walk's reading of every `/` that no `}` settles: this crate's answers for a `>` and
-/// a `)`, and the bytes' for a `}` — which the walk never asks, a `/` after a `}` being its
-/// own to answer ([`Region::closed_before`]). Each region asks it as the region begins
-/// ([`Region::grammar`]), which those answers' own walks read their braces by.
-const WALK_GRAMMAR: OperandGrammar = OperandGrammar {
-    closes_type_arguments: crate::parser::closes_type_arguments,
-    closes_statement_header: crate::parser::closes_statement_header,
+impl Pair {
+    fn graded(
+        &mut self,
+        bytes: &[u8],
+        templates: Option<&mut FxHashMap<usize, usize>>,
+    ) -> Option<bool> {
+        if let Grade::Known(known) = self.grade {
+            return known;
+        }
+        let head = skip_whitespace_and_comments(bytes, self.lt + 1);
+        let commits = head < bytes.len() && {
+            let _hints = templates.map(|templates| TemplateHints::lend(bytes, templates));
+            type_arg_head_commits(bytes, head, TypeArgScan::Parse)
+        };
+        self.grade = Grade::Known(Some(commits));
+        Some(commits)
+    }
+}
+
+/// The grammar a [`Walk`] reads its own `/`s by: its recorded answers for a `>` and a `)`,
+/// and no `}` — a `/` after a `}` being the walk's own to answer ([`Region::closed_before`]).
+const OWN_GRAMMAR: OperandGrammar = OperandGrammar {
+    closes_type_arguments: own_type_arguments,
+    closes_statement_header: own_statement_header,
     ..OperandGrammar::BYTES_ONLY
 };
 
-/// [`WALK_GRAMMAR`] with every `}` ending an operand: the probe that tells whether the
+/// [`OWN_GRAMMAR`] with every `}` ending an operand: the probe that tells whether the
 /// operand before a `/` ends on a `}` ([`Region::closed_before`]).
 const BRACE_ENDS_OPERAND: OperandGrammar = OperandGrammar {
     closes_braced_operand: |_, _, _, _, _| Some(true),
-    ..WALK_GRAMMAR
+    ..OWN_GRAMMAR
 };
+
+/// [`OWN_GRAMMAR`]'s `>` answer: the walk's record, which it graded before asking
+/// ([`Walk::grade_last_gt`]).
+fn own_type_arguments(
+    bytes: &[u8],
+    gt: usize,
+    _lower_bound: usize,
+    _start: ScanStart,
+    walk: &mut ScanWalk,
+) -> Option<bool> {
+    let mut answers = walk.take::<OwnAnswers>()?;
+    let closes = answers
+        .pair(gt)
+        .map_or(Some(false), |pair| pair.graded(bytes, None));
+    walk.put(answers);
+    closes
+}
+
+/// [`OWN_GRAMMAR`]'s `)` answer: the walk's record.
+fn own_statement_header(
+    _bytes: &[u8],
+    rparen: usize,
+    _lower_bound: usize,
+    _start: ScanStart,
+    walk: &mut ScanWalk,
+) -> Option<bool> {
+    let answers = walk.take::<OwnAnswers>()?;
+    let closes = answers.header_closes.binary_search(&rparen).is_ok();
+    walk.put(answers);
+    Some(closes)
+}
 
 /// How a [`Walk`] reads its tokens: the state that settles what each `}` closed — acorn's
 /// tokenizer's ([`TokenContexts`]) or this crate's grammar's ([`GrammarContexts`]).
 trait Reading: Sized + 'static {
     fn new(start: ScanStart) -> Self;
+    /// The walk of this reading a scan keeps ([`ScanWalkers`]).
+    fn kept(walkers: &mut ScanWalkers) -> &mut Option<Box<Walk<Self>>>;
     /// A line terminator lies between the last token and the next.
     fn line_break(&mut self);
     /// Read a punctuator or a literal.
@@ -193,7 +361,20 @@ trait Reading: Sized + 'static {
     fn closed(&mut self) -> Option<&mut Closed>;
 }
 
-/// A forward walk of one scanned region, token by token, kept between a scan's asks.
+/// Why a [`Walk`] stopped reading.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Halt {
+    /// A `/` whose operand the walk's own answers could not place ([`Reached::Stuck`]).
+    Stuck,
+    /// A `/` after a brace the reading could not place.
+    Unplaced,
+    /// The end of the input, or the close of the interpolation the region is.
+    End,
+}
+
+/// A forward walk of one scanned region, token by token, kept in the scan's `ScanWalk` and
+/// advanced by each of its asks: it records what each `}`, `>` and `)` it reads closed, so
+/// an ask answers from the record, and reads each `/` by its own earlier answers.
 struct Walk<R> {
     lower_bound: usize,
     start: ScanStart,
@@ -204,8 +385,18 @@ struct Walk<R> {
     /// The regions around `region`, outermost first.
     outer: Vec<Region>,
     contexts: R,
-    /// Whether the walk stopped at a `/` this crate's answers could not read ([`Reached::Stuck`]).
-    stuck: bool,
+    /// Why the walk stopped, and where — `None` while it reads on.
+    halt: Option<(Halt, usize)>,
+    /// Each `}` the walk read as a token of its own, in source order, and what it found
+    /// there: [`Reached::Missed`] where it had lost the region by then
+    /// ([`GrammarContexts::lost`]).
+    braces: Vec<(usize, Reached)>,
+    /// The walk's own answers, in the form its anchors ask them through ([`OWN_GRAMMAR`]).
+    answers: Option<Box<OwnAnswers>>,
+    /// Each template literal the walk read whole, by its backtick: where it ends.
+    templates: FxHashMap<usize, usize>,
+    /// The backticks of the template literals the walk is inside, innermost last.
+    open_templates: Vec<usize>,
 }
 
 impl<R: Reading> Walk<R> {
@@ -217,134 +408,330 @@ impl<R: Reading> Walk<R> {
             region: Region::new(lower_bound, start),
             outer: Vec::new(),
             contexts: R::new(start),
-            stuck: false,
+            halt: None,
+            braces: Vec::new(),
+            answers: Some(Box::default()),
+            templates: FxHashMap::default(),
+            open_templates: Vec::new(),
         }
     }
 
-    /// Whether this walk, begun for an earlier ask, is the walk an ask about `rbrace` would
-    /// begin: the same region, and not yet past the brace.
-    fn resumes(&self, rbrace: usize, lower_bound: usize, start: ScanStart) -> bool {
-        self.lower_bound == lower_bound && self.start == start && self.at <= rbrace
+    /// Read on through every token that begins at or before `target`, stepping over each
+    /// template literal the `scan` asking skipped where the scan's skip ended.
+    fn advance(&mut self, bytes: &[u8], target: usize, scan: &ScanWalk) {
+        while self.halt.is_none() && self.at <= target {
+            let at = self.at;
+            if let Err(halt) = self.step(bytes, scan) {
+                self.halt = Some((halt, at));
+            }
+        }
     }
 
-    /// Walk on through the `}` at `rbrace`, and say what it closed — `None` when the walk
-    /// does not meet it as a token of its own.
-    fn reach(&mut self, bytes: &[u8], rbrace: usize) -> Option<Closed> {
-        while self.at <= rbrace {
-            let i = self.at;
-            let past_whitespace = skip_whitespace(bytes, i);
-            if past_whitespace > i {
-                if holds_line_terminator(&bytes[i..past_whitespace]) {
-                    self.contexts.line_break();
-                }
-                self.at = past_whitespace;
-                continue;
+    /// Why the walk stopped before reading the token at `at`, if it did.
+    fn halted_before(&self, at: usize) -> Option<Halt> {
+        self.halt
+            .filter(|&(_, from)| from <= at)
+            .map(|(halt, _)| halt)
+    }
+
+    /// What the `}` at `rbrace` closed.
+    fn brace(&mut self, bytes: &[u8], rbrace: usize, scan: &ScanWalk) -> Reached {
+        self.advance(bytes, rbrace, scan);
+        match self.braces.binary_search_by_key(&rbrace, |&(at, _)| at) {
+            Ok(at) => self.braces[at].1,
+            Err(_) if self.halted_before(rbrace) == Some(Halt::Stuck) => Reached::Stuck,
+            Err(_) => Reached::Missed,
+        }
+    }
+
+    /// Whether the `>` at `gt` closes a type-argument list ([`closes_type_arguments`]).
+    fn type_arguments(&mut self, bytes: &[u8], gt: usize, scan: &ScanWalk) -> Option<bool> {
+        self.advance(bytes, gt, scan);
+        let templates = &mut self.templates;
+        if let Some(answers) = self.answers.as_mut()
+            && answers.pair(gt).is_some()
+        {
+            return answers.closes_type_arguments(bytes, gt, Some(templates));
+        }
+        self.unread_before(gt)
+    }
+
+    /// Whether the `)` at `rparen` closes a statement header ([`closes_statement_header`]).
+    fn statement_header(&mut self, bytes: &[u8], rparen: usize, scan: &ScanWalk) -> Option<bool> {
+        self.advance(bytes, rparen, scan);
+        if self
+            .answers
+            .as_ref()
+            .is_some_and(|answers| answers.header_closes.binary_search(&rparen).is_ok())
+        {
+            return Some(true);
+        }
+        self.unread_before(rparen)
+    }
+
+    /// The answer for a delimiter at `at` the walk recorded nothing about: `None` when it
+    /// stopped before it at a `/` it could not read, and otherwise no.
+    fn unread_before(&self, at: usize) -> Option<bool> {
+        match self.halted_before(at) {
+            Some(Halt::Stuck | Halt::Unplaced) => None,
+            _ => Some(false),
+        }
+    }
+
+    /// Grade the pair of the `>` the region's last token was, if any — before an anchor
+    /// that may land on it asks the walk's own grammar about it ([`own_type_arguments`]).
+    fn grade_last_gt(&mut self, bytes: &[u8]) {
+        if let Some(gt) = self.region.last_gt
+            && let Some(answers) = self.answers.as_mut()
+            && let Some(pair) = answers.pair(gt)
+        {
+            pair.graded(bytes, Some(&mut self.templates));
+        }
+    }
+
+    /// Run `f` on the region's anchor with the walk's own answers in the `ScanWalk` it
+    /// asks through ([`OWN_GRAMMAR`]).
+    fn with_own<T>(&mut self, f: impl FnOnce(&mut Region, &mut R, &mut ScanWalk) -> T) -> T {
+        let mut own = ScanWalk::default();
+        own.put(self.answers.take().unwrap_or_default());
+        let out = f(&mut self.region, &mut self.contexts, &mut own);
+        self.answers = own.take::<OwnAnswers>();
+        out
+    }
+
+    /// Whether the `/` (or `<`) at `i` stands where an operand has not just ended, by the
+    /// walk's own reading of the tokens before it — `Err` where it cannot tell.
+    fn reads_regex(&mut self, bytes: &[u8], i: usize) -> Result<bool, Halt> {
+        self.grade_last_gt(bytes);
+        self.with_own(|region, contexts, own| {
+            match region.closed_before(bytes, i, contexts, own) {
+                // A brace the reading cannot place leaves the walk unable to read on.
+                Some(closed) => closed
+                    .ends_operand()
+                    .map(|ends| !ends)
+                    .ok_or(Halt::Unplaced),
+                None => region
+                    .anchor
+                    .starts_regex(
+                        bytes,
+                        i,
+                        region.lower_bound,
+                        region.grammar(OWN_GRAMMAR),
+                        own,
+                    )
+                    .ok_or(Halt::Stuck),
             }
-            let b = *bytes.get(i)?;
-            if b == b'`' {
-                // Template text holds no token; the walk resumes at an interpolation or
-                // past the closing backtick.
-                self.at = self.template_text(bytes, i + 1, rbrace)?;
-                continue;
+        })
+    }
+
+    /// Read the token at `at`, and move `at` past it.
+    fn step(&mut self, bytes: &[u8], scan: &ScanWalk) -> Result<(), Halt> {
+        let i = self.at;
+        let past_whitespace = skip_whitespace(bytes, i);
+        if past_whitespace > i {
+            if holds_line_terminator(&bytes[i..past_whitespace]) {
+                self.contexts.line_break();
             }
-            if let Some(past) = skip_trivia(bytes, i, bytes.len(), TriviaProfile::JS) {
-                self.region.anchor.skipped_trivia(
+            self.at = past_whitespace;
+            return Ok(());
+        }
+        let b = *bytes.get(i).ok_or(Halt::End)?;
+        if b == b'`' {
+            self.region.last_gt = None;
+            if let Some(past) = scan.template_end(i) {
+                // A template the scan skipped whole: an operand, which the walk steps over
+                // as the scan did.
+                self.templates.insert(i, past);
+                self.region.anchor.skipped_operand(past);
+                self.region.headers.skipped_operand();
+                self.contexts.token(Token::Operand);
+                self.at = past;
+                return Ok(());
+            }
+            // Template text holds no token; the walk resumes at an interpolation or past
+            // the closing backtick.
+            self.open_templates.push(i);
+            self.at = self.template_text(bytes, i + 1)?;
+            return Ok(());
+        }
+        if let Some(past) = skip_trivia(bytes, i, bytes.len(), TriviaProfile::JS) {
+            if b == b'/' {
+                self.grade_last_gt(bytes);
+            }
+            self.with_own(|region, _, own| {
+                region.anchor.skipped_trivia(
                     bytes,
                     i,
                     past,
-                    self.region.lower_bound,
-                    self.region.grammar(WALK_GRAMMAR),
+                    region.lower_bound,
+                    region.grammar(OWN_GRAMMAR),
+                    own,
                 );
-                if b == b'/' {
-                    // A comment: transparent, except that a line comment's terminator — or
-                    // one inside a block comment — is a line break between the tokens
-                    // around it.
-                    if bytes[i + 1] == b'/' || holds_line_terminator(&bytes[i..past]) {
-                        self.contexts.line_break();
-                    }
-                } else {
-                    self.contexts.token(Token::Operand);
-                }
-                self.at = past;
-                continue;
-            }
+            });
             if b == b'/' {
-                let regex = match self.region.closed_before(bytes, i, &mut self.contexts) {
-                    // A brace the reading cannot place leaves the walk unable to read on.
-                    Some(closed) => !closed.ends_operand()?,
-                    None => {
-                        let regex = self.region.anchor.starts_regex(
-                            bytes,
-                            i,
-                            self.region.lower_bound,
-                            self.region.grammar(WALK_GRAMMAR),
-                        );
-                        self.stuck = regex.is_none();
-                        regex?
-                    }
-                };
-                if regex && let Some(past) = skip_regex_literal(bytes, i, bytes.len()) {
-                    self.region.anchor.skipped_operand(past);
-                    self.contexts.token(Token::Operand);
-                    self.at = past;
-                    continue;
+                // A comment: transparent, except that a line comment's terminator — or
+                // one inside a block comment — is a line break between the tokens
+                // around it.
+                if bytes[i + 1] == b'/' || holds_line_terminator(&bytes[i..past]) {
+                    self.contexts.line_break();
                 }
-                self.contexts.token(Token::Operator);
-                self.at = i + 1;
-                continue;
-            }
-            if identifier_starts_at(bytes, i) || b == b'#' {
-                let word_start = if b == b'#' { i + 1 } else { i };
-                let word_end = skip_identifier(bytes, word_start).max(i + 1);
-                self.contexts.word(&bytes[i..word_end]);
-                self.at = word_end;
-                continue;
-            }
-            if b.is_ascii_digit() || (b == b'.' && bytes.get(i + 1).is_some_and(u8::is_ascii_digit))
-            {
-                self.at = skip_numeric_literal(bytes, i).max(i + 1);
+            } else {
+                self.region.last_gt = None;
                 self.contexts.token(Token::Operand);
-                continue;
             }
-            if b == b'}' && self.contexts.in_interpolation() {
-                // The interpolation's own `}`: template text follows, in the region around
-                // it. One the walk began inside is the scan's own closer, which it never
-                // asks about.
-                self.region = self.outer.pop()?;
-                self.contexts.close_interpolation();
-                self.at = self.template_text(bytes, i + 1, rbrace)?;
-                continue;
+            self.at = past;
+            return Ok(());
+        }
+        if b == b'/' {
+            let regex = self.region.headers.after_for_of || self.reads_regex(bytes, i)?;
+            self.region.last_gt = None;
+            if regex && let Some(past) = skip_regex_literal(bytes, i, bytes.len()) {
+                self.region.anchor.skipped_operand(past);
+                self.region.headers.skipped_operand();
+                self.contexts.token(Token::Operand);
+                self.at = past;
+                return Ok(());
             }
-            let (token, len) = punctuator_at(bytes, i);
-            self.contexts.token(token);
-            self.at = i + len;
-            if token == Token::BraceR {
-                let closed = self.contexts.closed()?;
+            self.region.headers.step(bytes, i, i + 1);
+            self.contexts.token(Token::Operator);
+            self.at = i + 1;
+            return Ok(());
+        }
+        if identifier_starts_at(bytes, i) || b == b'#' {
+            let word_start = if b == b'#' { i + 1 } else { i };
+            let word_end = skip_identifier(bytes, word_start).max(i + 1);
+            self.read_headers(bytes, i, word_end);
+            self.region.last_gt = None;
+            self.contexts.word(&bytes[i..word_end]);
+            self.at = word_end;
+            return Ok(());
+        }
+        if b.is_ascii_digit() || (b == b'.' && bytes.get(i + 1).is_some_and(u8::is_ascii_digit)) {
+            let end = skip_numeric_literal(bytes, i).max(i + 1);
+            self.read_headers(bytes, i, end);
+            self.region.last_gt = None;
+            self.at = end;
+            self.contexts.token(Token::Operand);
+            return Ok(());
+        }
+        if b == b'}' && self.contexts.in_interpolation() {
+            // The interpolation's own `}`: template text follows, in the region around
+            // it. One the walk began inside is the scan's own closer, which it never
+            // asks about.
+            self.region = self.outer.pop().ok_or(Halt::End)?;
+            self.contexts.close_interpolation();
+            self.at = self.template_text(bytes, i + 1)?;
+            return Ok(());
+        }
+        let (token, len) = punctuator_at(bytes, i);
+        for at in i..i + len {
+            self.read_angle(bytes, at);
+        }
+        self.read_headers(bytes, i, i + len);
+        self.region.last_gt = match token {
+            Token::Gt => Some(i),
+            Token::Bang => self.region.last_gt,
+            _ => None,
+        };
+        self.contexts.token(token);
+        self.at = i + len;
+        if token == Token::BraceR {
+            let read = self.contexts.closed().map_or(Reached::Missed, |closed| {
                 closed.bang = non_null_follows(bytes, i + 1);
                 if closed.unless_line_break {
                     closed.line_break = line_break_follows(bytes, i + 1);
                 }
-                if i == rbrace {
-                    return Some(*closed);
+                Reached::Brace(closed.ends_operand())
+            });
+            self.braces.push((i, read));
+        }
+        Ok(())
+    }
+
+    /// Step the region's [`StatementHeaders`] over the significant bytes `from..end` of one
+    /// token, recording each `)` that closes a header.
+    fn read_headers(&mut self, bytes: &[u8], from: usize, end: usize) {
+        let mut at = from;
+        while at < end {
+            let next = self.region.headers.step(bytes, at, end).max(at + 1);
+            if bytes[at] == b')'
+                && self.region.headers.after_header_close
+                && let Some(answers) = self.answers.as_mut()
+            {
+                answers.header_closes.push(at);
+            }
+            at = next;
+        }
+    }
+
+    /// Keep the record of `<`…`>` pairs over the punctuator byte at `at` — the delimiters a
+    /// list is matched by, as `expression_lookahead::matching_angle_close` matches them:
+    /// a `<` opens one level deeper and a `>` closes the innermost open `<` in the same
+    /// `(…)`, `[…]` or `{…}`, whose closer, or a `;`, ends the `<`s still open in it.
+    fn read_angle(&mut self, bytes: &[u8], at: usize) {
+        match bytes[at] {
+            b'<' if !is_less_equal_op(bytes, at) => {
+                let role = if self.region.headers.after_header_close
+                    || follows_postfix_update(bytes, at, self.region.lower_bound)
+                {
+                    LtRole::NoList
+                } else {
+                    match self.reads_regex(bytes, at) {
+                        Ok(true) => LtRole::NoList,
+                        Ok(false) => LtRole::AfterOperand,
+                        Err(_) => LtRole::Unknown,
+                    }
+                };
+                self.region.open_angle(OpenLt { pos: at, role });
+            }
+            b'>' if !is_arrow_close(bytes, at) && !is_greater_equal_op(bytes, at) => {
+                let Some(lt) = self.region.close_angle() else {
+                    return;
+                };
+                let grade = match lt.role {
+                    LtRole::NoList => return,
+                    LtRole::Unknown => Grade::Known(None),
+                    LtRole::AfterOperand => Grade::Pending,
+                };
+                if let Some(answers) = self.answers.as_mut() {
+                    answers.pairs.push(Pair {
+                        lt: lt.pos,
+                        gt: at,
+                        grade,
+                    });
                 }
             }
+            b'(' | b'[' | b'{' => self.region.angles.push(Vec::new()),
+            b')' | b']' | b'}' => {
+                if self.region.angles.len() > 1 {
+                    self.region.angles.pop();
+                } else if let Some(level) = self.region.angles.last_mut() {
+                    level.clear();
+                }
+            }
+            b';' => {
+                if let Some(level) = self.region.angles.last_mut() {
+                    level.clear();
+                }
+            }
+            _ => {}
         }
-        // The walk stepped over `rbrace` inside a literal or a comment.
-        None
     }
 
     /// Read the template text beginning at `i` and return where tokens resume: inside an
-    /// interpolation, which becomes the walk's region, or past the closing backtick. `None`
-    /// when the text runs to `limit` — the position the walk is asked about, which is then
-    /// text and no token.
-    fn template_text(&mut self, bytes: &[u8], mut i: usize, limit: usize) -> Option<usize> {
-        while i < limit {
+    /// interpolation, which becomes the walk's region, or past the closing backtick.
+    fn template_text(&mut self, bytes: &[u8], mut i: usize) -> Result<usize, Halt> {
+        while i < bytes.len() {
             match bytes[i] {
                 b'\\' => i += 2,
                 b'`' => {
+                    if let Some(open) = self.open_templates.pop() {
+                        self.templates.insert(open, i + 1);
+                    }
                     self.region.anchor.skipped_operand(i + 1);
+                    self.region.headers.skipped_operand();
                     self.contexts.token(Token::Operand);
-                    return Some(i + 1);
+                    return Ok(i + 1);
                 }
                 b'$' if bytes.get(i + 1) == Some(&b'{') => {
                     self.contexts.open_interpolation();
@@ -352,13 +739,31 @@ impl<R: Reading> Walk<R> {
                         &mut self.region,
                         Region::new(i + 2, ScanStart::Interpolation),
                     ));
-                    return Some(i + 2);
+                    return Ok(i + 2);
                 }
                 _ => i += 1,
             }
         }
-        None
+        Err(Halt::End)
     }
+}
+
+/// What a `<` the walk read may open ([`OpenLt`]).
+#[derive(Clone, Copy)]
+enum LtRole {
+    /// No list: it follows no operand, a postfix update or a statement header's `)`.
+    NoList,
+    /// A list, if its head commits: it follows an operand.
+    AfterOperand,
+    /// Whether it follows an operand, the walk cannot tell.
+    Unknown,
+}
+
+/// A `<` the walk read whose `>` it has not met yet.
+#[derive(Clone, Copy)]
+struct OpenLt {
+    pos: usize,
+    role: LtRole,
 }
 
 /// One region the scan reads with an anchor of its own: the walk's whole range, or a
@@ -368,6 +773,14 @@ struct Region {
     lower_bound: usize,
     /// How the region begins: as the walk's does, or as an interpolation.
     start: ScanStart,
+    /// Which open `(` are statement headers' ([`StatementHeaders`]).
+    headers: StatementHeaders,
+    /// The `<`s still open, by the `(…)`, `[…]` or `{…}` they were read in, innermost
+    /// last; the first level is the region's own.
+    angles: Vec<Vec<OpenLt>>,
+    /// The `>` the last token was — or the one before a `!` run since — which an anchor
+    /// landing there asks about.
+    last_gt: Option<usize>,
 }
 
 impl Region {
@@ -376,12 +789,25 @@ impl Region {
             anchor: OperandAnchor::new(lower_bound),
             lower_bound,
             start,
+            headers: StatementHeaders::default(),
+            angles: vec![Vec::new()],
+            last_gt: None,
         }
     }
 
     /// `grammar` for a region that begins as this one does.
     fn grammar(&self, grammar: OperandGrammar) -> OperandGrammar {
         grammar.starting(self.start)
+    }
+
+    fn open_angle(&mut self, lt: OpenLt) {
+        if let Some(level) = self.angles.last_mut() {
+            level.push(lt);
+        }
+    }
+
+    fn close_angle(&mut self) -> Option<OpenLt> {
+        self.angles.last_mut()?.pop()
     }
 
     /// What the `}` last closed, when the operand before the `/` at `slash` ends on it —
@@ -402,6 +828,7 @@ impl Region {
         bytes: &[u8],
         slash: usize,
         contexts: &mut impl Reading,
+        own: &mut ScanWalk,
     ) -> Option<Closed> {
         let after_brace = contexts.after_brace();
         let closed = *contexts.closed()?;
@@ -410,16 +837,122 @@ impl Region {
                 bytes,
                 slash,
                 self.lower_bound,
-                self.grammar(WALK_GRAMMAR),
+                self.grammar(OWN_GRAMMAR),
+                own,
             ) == Some(true)
                 && self.anchor.starts_regex(
                     bytes,
                     slash,
                     self.lower_bound,
                     self.grammar(BRACE_ENDS_OPERAND),
+                    own,
                 ) == Some(false));
         ends_on_brace.then_some(closed)
     }
+}
+
+/// Which open `(` are statement headers' — `if (`, `while (`, `for (`, `for await (`,
+/// `with (` — read forward, token by token, by the raw scans that must tell a header's `)`
+/// from any other: a header's `)` ends no operand, since a statement begins after it
+/// (`if (c) <T>x`, `if (c)!/re/`), where after any other `)` (`f()<T>`, `f()!`) an operand
+/// has just ended.
+///
+/// Read forward, so a comment between a keyword and its `(` (`if /* c */ (`) is stepped
+/// over like any other trivia by the walk that feeds it.
+#[derive(Default)]
+struct StatementHeaders {
+    /// Whether each open `(` is a header's, innermost last.
+    open: Vec<bool>,
+    /// Whether the last significant token closed a header's `(`.
+    after_header_close: bool,
+    /// The header keyword the last significant token was, so a `(` right after it opens
+    /// a header.
+    keyword: HeaderKeyword,
+    /// Whether the last significant byte was a `.`, which makes the next word a member
+    /// name (`a.if (`), never a keyword.
+    after_dot: bool,
+    /// Whether the last significant token was the `of` of a `for` header (`for (x of`),
+    /// after which an expression begins — so a `/` there opens a regex.
+    after_for_of: bool,
+}
+
+impl StatementHeaders {
+    /// A literal the walk stepped over whole, which ends an operand like any word.
+    fn skipped_operand(&mut self) {
+        self.after_header_close = false;
+        self.keyword = HeaderKeyword::None;
+        self.after_dot = false;
+        self.after_for_of = false;
+    }
+
+    /// Read the significant, non-whitespace token at `i` — a whole word, or one byte —
+    /// and return where the next one may begin. `end` bounds a word.
+    fn step(&mut self, bytes: &[u8], i: usize, end: usize) -> usize {
+        if identifier_starts_at(bytes, i) {
+            let word_end = skip_identifier(bytes, i).min(end);
+            if word_end > i {
+                let word = &bytes[i..word_end];
+                self.after_for_of =
+                    !self.after_dot && word == b"of" && self.open.last() == Some(&true);
+                self.keyword = if self.after_dot {
+                    HeaderKeyword::None
+                } else {
+                    HeaderKeyword::of(word, self.keyword)
+                };
+                self.after_dot = false;
+                self.after_header_close = false;
+                return word_end;
+            }
+        }
+        let b = bytes[i];
+        self.after_for_of = false;
+        match b {
+            b'(' => {
+                self.open.push(self.keyword != HeaderKeyword::None);
+                self.after_header_close = false;
+            }
+            b')' => self.after_header_close = self.open.pop().unwrap_or(false),
+            _ => self.after_header_close = false,
+        }
+        self.keyword = HeaderKeyword::None;
+        self.after_dot = b == b'.';
+        i + 1
+    }
+}
+
+/// Whether a word opens a statement header when a `(` follows it — the keyword half of
+/// [`StatementHeaders`].
+#[derive(Clone, Copy, PartialEq, Eq, Default)]
+enum HeaderKeyword {
+    /// No header keyword: a `(` after it is a call's or a group's.
+    #[default]
+    None,
+    /// `if`, `while`, `with`, or `for await`.
+    Header,
+    /// `for`, a header keyword itself and the one an `await` may follow.
+    For,
+}
+
+impl HeaderKeyword {
+    /// The keyword `word` is, `previous` being the one before it (`for await`).
+    fn of(word: &[u8], previous: Self) -> Self {
+        match word {
+            b"if" | b"while" | b"with" => Self::Header,
+            b"for" => Self::For,
+            b"await" if previous == Self::For => Self::Header,
+            _ => Self::None,
+        }
+    }
+}
+
+/// Whether the significant byte before `pos` closes a postfix `++` / `--`, looking back
+/// over whitespace only — a comment in that gap reads as no update, the operand answer.
+fn follows_postfix_update(bytes: &[u8], pos: usize, lower_bound: usize) -> bool {
+    let mut j = pos;
+    while j > lower_bound && bytes[j - 1].is_ascii_whitespace() {
+        j -= 1;
+    }
+    j >= lower_bound + 2 && matches!(&bytes[j - 2..j], b"++" | b"--")
 }
 
 /// Whether a postfix `!` run glued to the `}` just before `after` follows it — the run the
@@ -939,6 +1472,10 @@ impl Reading for TokenContexts {
         TokenContexts::new(start)
     }
 
+    fn kept(walkers: &mut ScanWalkers) -> &mut Option<Box<Walk<Self>>> {
+        &mut walkers.acorn
+    }
+
     fn line_break(&mut self) {
         self.newline = true;
     }
@@ -999,26 +1536,23 @@ impl Reading for TokenContexts {
 /// object or type literal at statement level followed by a line break, where the `/`
 /// divides after `x = {}` and opens a regex after `type T = {}` — and everything nested in
 /// a brace the walk could not place.
-// TODO: this walk is not remembered, and the type-argument and statement-header answers walk
-// a region through it again (`expression_type_args::walk_grammar`): a template nest asking
-// them at every level (`` `${f<@>/2 + {} / 2}` ``) still costs a cubic in its depth, which
-// only inputs tsc rejects reach. Remembering it would need its resumable state in the key;
-// the forward scan recording each operand-position `<` (`grammar_memo`)
-// would retire it.
 // TODO: the uncertain shapes are over-rejected in an arrow head's parameter list (a default
 // holding a nested body that writes one): `(a = () => { type T = {}⏎/re/.test(s) }) => a`.
 // A Svelte island refuses them too once a `> /` or `)! /` follows in the island
 // (`{g(() => { type T = {}⏎/re/.test(s); return f<T> / 2 })}`, which Svelte accepts): the
-// type-argument and statement-header walks read their braces by this grammar.
+// type-argument and statement-header answers come from the walk that reads its braces by
+// this grammar.
 // Recording a `type` alias's `=` would settle the one real-looking member.
 pub(crate) fn closes_braced_operand_in_grammar(
     bytes: &[u8],
     rbrace: usize,
     lower_bound: usize,
     start: ScanStart,
-    resume: &mut BracedOperandWalk,
+    resume: &mut ScanWalk,
 ) -> Option<bool> {
-    match reach_brace::<GrammarContexts>(bytes, rbrace, lower_bound, start, resume) {
+    match with_walk::<GrammarContexts, _>(resume, lower_bound, start, |walk, scan| {
+        walk.brace(bytes, rbrace, scan)
+    }) {
         Reached::Brace(ends_operand) => ends_operand,
         Reached::Missed | Reached::Stuck => None,
     }
@@ -1305,6 +1839,10 @@ impl GrammarContexts {
 }
 
 impl Reading for GrammarContexts {
+    fn kept(walkers: &mut ScanWalkers) -> &mut Option<Box<Walk<Self>>> {
+        &mut walkers.grammar
+    }
+
     fn new(start: ScanStart) -> Self {
         let mut contexts = Self {
             stack: Vec::new(),
@@ -1460,7 +1998,7 @@ impl Reading for GrammarContexts {
 
 #[cfg(test)]
 mod tests {
-    use tsv_lang::source_scan::{BracedOperandWalk, ScanStart};
+    use tsv_lang::source_scan::{ScanStart, ScanWalk};
 
     /// The acorn reading's answer, which is always given.
     fn closes_braced_operand(
@@ -1468,7 +2006,7 @@ mod tests {
         rbrace: usize,
         lower_bound: usize,
         start: ScanStart,
-        walk: &mut BracedOperandWalk,
+        walk: &mut ScanWalk,
     ) -> bool {
         super::closes_braced_operand(bytes, rbrace, lower_bound, start, walk)
             .expect("acorn's tokenizer always answers")
@@ -1476,13 +2014,7 @@ mod tests {
 
     /// One ask, with no walk to resume.
     fn closes(src: &[u8], rbrace: usize, lower_bound: usize, start: ScanStart) -> bool {
-        closes_braced_operand(
-            src,
-            rbrace,
-            lower_bound,
-            start,
-            &mut BracedOperandWalk::default(),
-        )
+        closes_braced_operand(src, rbrace, lower_bound, start, &mut ScanWalk::default())
     }
 
     /// The `}`s a `/` follows, past whitespace alone — the ones a scan asks about.
@@ -1944,7 +2476,7 @@ mod tests {
             "f<T> / {} / 1 + {} / f<T> / 2",
         ] {
             for start in [ScanStart::Expression, ScanStart::Interpolation] {
-                let mut walk = BracedOperandWalk::default();
+                let mut walk = ScanWalk::default();
                 // Twice over: the second pass begins with a walk left past its first brace,
                 // which is not one to resume.
                 for rbrace in braces_before_a_slash(src).chain(braces_before_a_slash(src)) {
@@ -1958,7 +2490,7 @@ mod tests {
         // Nor is a walk begun for another region: from its `function`, this one reads a
         // regex after the body, which swallows the object literal.
         let src = b"x + function () {} / {} / 2";
-        let mut walk = BracedOperandWalk::default();
+        let mut walk = ScanWalk::default();
         assert!(closes_braced_operand(
             src,
             17,
@@ -1976,7 +2508,7 @@ mod tests {
         // Nor one begun as another kind of region: inside an interpolation the body ends an
         // operand, and as a whole expression the same bytes open on a statement's keyword.
         let src = b"function () {} / 2 + {} / 3";
-        let mut walk = BracedOperandWalk::default();
+        let mut walk = ScanWalk::default();
         assert!(closes_braced_operand(
             src,
             13,
@@ -1999,7 +2531,7 @@ mod tests {
         // once. Walked from its start at each ask, this many pairs would not finish.
         let pairs = 200_000;
         let src = format!("[{}]", vec!["{} / 1"; pairs].join(", "));
-        let mut walk = BracedOperandWalk::default();
+        let mut walk = ScanWalk::default();
         let mut divided = 0;
         for rbrace in braces_before_a_slash(&src) {
             divided += usize::from(closes_braced_operand(
@@ -2024,7 +2556,7 @@ mod tests {
             rbrace,
             0,
             ScanStart::Expression,
-            &mut BracedOperandWalk::default(),
+            &mut ScanWalk::default(),
         )
     }
 

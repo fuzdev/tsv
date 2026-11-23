@@ -112,12 +112,13 @@ fn within<T: Send + 'static>(
         .unwrap_or_else(|_| panic!("{name}: not parsed within {seconds}s"))
 }
 
-/// Each of the grammar's answers walks its region again, skipping the templates there, whose
-/// interpolations ask the answers again a level deeper — exponential in the nesting unless
-/// each answer is remembered — and the parser starts a lookahead at every level's arrow head
-/// or list, each scanning the levels inside it: a memo kept for one scan alone works every
-/// answer out again per scan around it, a power of the depth past any deadline here. Kept
-/// for the whole parse, these nests cost a low polynomial in their depth, well within it.
+/// The grammar's answers skip the templates in their region, whose interpolations ask the
+/// answers again a level deeper, and the parser starts a lookahead at every level's arrow
+/// head or list, each scanning the levels inside it — exponential in the nesting if an
+/// answer read the levels inside it again. Each answer is read off the one walk its scan
+/// keeps, which steps over a template the scan skipped where the scan's skip ended, and a
+/// type-argument head's template skips take the walk's own ends: these nests cost at most a
+/// low polynomial in their depth, well within the deadline.
 ///
 /// The deepest nests are past the parser's depth limit, which refuses them only once its
 /// descent reaches the limit — after the lookahead at the outermost arrow head has scanned

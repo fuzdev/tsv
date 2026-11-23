@@ -14,17 +14,19 @@ use super::scan::{
     skip_trivia_in_grammar, skip_whitespace_and_comments,
 };
 use crate::lexer::{KeywordKind, is_es_line_terminator_at, keyword_at};
-use tsv_lang::source_scan::{OperandAnchor, PAREN_HOP_NEEDLES, is_hop_needle, skip_regex_literal};
+use tsv_lang::source_scan::{
+    OperandAnchor, PAREN_HOP_NEEDLES, ScanWalk, is_hop_needle, skip_regex_literal,
+};
 
 /// `<` at `pos` is `<=` comparison operator, not an angle bracket open
 #[inline]
-fn is_less_equal_op(bytes: &[u8], pos: usize) -> bool {
+pub(super) fn is_less_equal_op(bytes: &[u8], pos: usize) -> bool {
     pos + 1 < bytes.len() && bytes[pos + 1] == b'='
 }
 
 /// `>` at `pos` is preceded by `=`, making it part of `=>` arrow operator
 #[inline]
-fn is_arrow_close(bytes: &[u8], pos: usize) -> bool {
+pub(super) fn is_arrow_close(bytes: &[u8], pos: usize) -> bool {
     pos > 0 && bytes[pos - 1] == b'='
 }
 
@@ -34,7 +36,7 @@ fn is_arrow_close(bytes: &[u8], pos: usize) -> bool {
 /// is `>=>`, a close glued to an arrow (`<T>(x): A<B>=> x`), which keeps its `>` as the
 /// close the type parser needs.
 #[inline]
-fn is_greater_equal_op(bytes: &[u8], pos: usize) -> bool {
+pub(super) fn is_greater_equal_op(bytes: &[u8], pos: usize) -> bool {
     pos + 1 < bytes.len()
         && bytes[pos + 1] == b'='
         && !(pos + 2 < bytes.len() && bytes[pos + 2] == b'>')
@@ -214,6 +216,8 @@ pub(super) fn matching_paren_close(bytes: &[u8], start: usize) -> Option<usize> 
     // The regex-vs-division anchor, rebuilt where a `/` asks for it rather than
     // maintained per byte; `OperandAnchor` owns the rule.
     let mut anchor = OperandAnchor::new(start);
+    // The grammar's walk of this group, advanced by each ask.
+    let mut walk = ScanWalk::default();
     while pos < end {
         // Only `PAREN_HOP_NEEDLES` can move this scan; every other byte reaches
         // the `_ => {}` arm below and was stepped over one at a time, so the walk
@@ -242,7 +246,17 @@ pub(super) fn matching_paren_close(bytes: &[u8], start: usize) -> Option<usize> 
         // not a real delimiter. The shared cursor skips all three in one place
         // (including backtick templates, which this scan historically missed).
         if let Some(past) = skip_trivia_in_grammar(bytes, pos, end) {
-            anchor.skipped_trivia(bytes, pos, past, start, crate::__private::OPERAND_GRAMMAR);
+            if bytes[pos] == b'`' && past < end {
+                walk.skipped_template(pos, past);
+            }
+            anchor.skipped_trivia(
+                bytes,
+                pos,
+                past,
+                start,
+                crate::__private::OPERAND_GRAMMAR,
+                &mut walk,
+            );
             pos = past;
             continue;
         }
@@ -252,8 +266,13 @@ pub(super) fn matching_paren_close(bytes: &[u8], start: usize) -> Option<usize> 
         // the grammar cannot read (after a `}` it cannot place) ends the scan, as the end
         // of the input does, so no answer depends on what follows the group.
         if bytes[pos] == b'/' {
-            let regex =
-                anchor.starts_regex(bytes, pos, start, crate::__private::OPERAND_GRAMMAR)?;
+            let regex = anchor.starts_regex(
+                bytes,
+                pos,
+                start,
+                crate::__private::OPERAND_GRAMMAR,
+                &mut walk,
+            )?;
             if regex && let Some(past) = skip_regex_literal(bytes, pos, end) {
                 pos = past;
                 anchor.skipped_operand(pos);

@@ -18,7 +18,7 @@
 //! acorn parses (`tsv_ts::__private::ACORN_ISLAND_GRAMMAR`, a Svelte island's extent) — where each
 //! of these braces, directly inside a body, answers as a block's too.
 
-use tsv_lang::source_scan::{BracedOperandWalk, OperandGrammar, ScanStart};
+use tsv_lang::source_scan::{OperandGrammar, ScanStart, ScanWalk};
 
 fn format(source: &str) -> String {
     let program = tsv_ts::__private::parse(source).expect("parse failed");
@@ -143,7 +143,7 @@ fn the_crates_own_scans_read_a_brace_as_its_reader_does() {
             1,
             0,
             ScanStart::Expression,
-            &mut BracedOperandWalk::default(),
+            &mut ScanWalk::default(),
         )
     };
     assert_eq!(closes(tsv_ts::__private::OPERAND_GRAMMAR), Some(true));

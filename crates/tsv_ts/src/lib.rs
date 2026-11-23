@@ -254,8 +254,7 @@ fn with_doc_printer<'a, R>(
     build: impl FnOnce(&printer::Printer<'a>) -> R,
 ) -> R {
     let printer = make_doc_printer(arena, inputs, embed);
-    // The printer's paren scans ask the grammar too; one memo for the whole build.
-    let out = parser::grammar_memo::remembering(inputs.source.as_bytes(), || build(&printer));
+    let out = build(&printer);
     if let Some(window) = inputs.comment_free_window {
         window.take_from(&printer.comment_free_gap);
     }
@@ -403,8 +402,7 @@ fn format_program_in(
     if canonical {
         printer.set_canonical();
     }
-    // The printer's paren scans ask the grammar too; one memo for the whole print.
-    parser::grammar_memo::remembering(source.as_bytes(), || printer.print_program(parsed.program));
+    printer.print_program(parsed.program);
     let output = printer.into_string();
     arena.park_line_breaks_scratch(line_breaks.into_scratch());
     output
@@ -603,40 +601,7 @@ fn with_program_printer<R>(
     let inputs = PrinterInputs::for_document(source, &comments, view, line_table);
     let mut printer = make_doc_printer(arena, &inputs, embed);
     printer.program_start = program.span.start;
-    // The printer's paren scans ask the grammar too; one memo for the whole build.
-    parser::grammar_memo::remembering(source.as_bytes(), || build(&printer))
-}
-
-/// Whether the `>` at `gt` in `bytes` closes a type-argument list this crate's parser
-/// reads — `f<T> / 2`, where the `/` divides, against `a > /re/`, where it opens a regex.
-/// The TypeScript grammar's `tsv_lang::source_scan::ClosesTypeArguments`
-/// (`OPERAND_GRAMMAR`). `lower_bound` is the scan's own start, which bounds the walk, and
-/// `start` how the region begins; `None` when a brace on the way leaves the grammar unable
-/// to tell.
-#[must_use]
-pub(crate) fn closes_type_arguments(
-    bytes: &[u8],
-    gt: usize,
-    lower_bound: usize,
-    start: tsv_lang::source_scan::ScanStart,
-) -> Option<bool> {
-    parser::closes_type_arguments(bytes, gt, lower_bound, start)
-}
-
-/// Whether the `)` at `rparen` in `bytes` closes a statement header this crate's parser
-/// reads — `if (c)!/re/`, where the glued `!` is a prefix not and the `/` opens a regex,
-/// against `f()! / 2`, a postfix non-null divided. The TypeScript grammar's
-/// `tsv_lang::source_scan::ClosesStatementHeader` (`OPERAND_GRAMMAR`). `lower_bound` is
-/// the scan's own start, where its forward walk begins, and `start` how the region begins;
-/// `None` as for [`closes_type_arguments`].
-#[must_use]
-pub(crate) fn closes_statement_header(
-    bytes: &[u8],
-    rparen: usize,
-    lower_bound: usize,
-    start: tsv_lang::source_scan::ScanStart,
-) -> Option<bool> {
-    parser::closes_statement_header(bytes, rparen, lower_bound, start)
+    build(&printer)
 }
 
 /// Printer buffer-population sampling for `tsv_debug buffer_sizes`. Behind the

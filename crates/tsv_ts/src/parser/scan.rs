@@ -4,14 +4,14 @@
 // parsing (arrow function detection) and type parsing (index signature detection).
 
 use std::borrow::Cow;
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 
 use tsv_lang::source_scan::{TriviaProfile, skip_template_literal, skip_trivia};
 
-use super::grammar_memo;
 use crate::lexer::{
     is_es_line_terminator, is_es_line_terminator_at, is_es_whitespace, unicode_escape_len_at,
 };
+use tsv_lang::FxHashMap;
 
 /// 256-entry lookup table for the lookahead whitespace class. `In` is its ASCII half —
 /// `<SP>`, `<TAB>`, `<VT>`, `<FF>` from `WhiteSpace` plus `<LF>`, `<CR>` from
@@ -194,21 +194,26 @@ fn skip_trivia_in_grammar_cold(bytes: &[u8], i: usize, end: usize, b: u8) -> Opt
 }
 
 /// Skip the template literal whose backtick is at `i`, its interpolations scanned under this
-/// crate's grammar (`crate::__private::OPERAND_GRAMMAR`), the grammar's answers remembered
-/// (`grammar_memo`).
+/// crate's grammar (`crate::__private::OPERAND_GRAMMAR`) — or, where the scan asking the
+/// grammar a question has already read the template whole, where that read ended
+/// ([`TemplateHints`]).
 ///
-/// That grammar's answers (`closes_type_arguments`, `closes_statement_header`) walk their
-/// region again, skipping its templates here, whose interpolations ask them again a level
-/// deeper: in a nest of `` `${(a = …) => f<T>/2}` `` each level's answer asks every level
-/// inside it. The skips stacked through those answers are templates nested in one another,
-/// and `skip_template_literal`'s own count restarts at each, so every skip here counts
-/// toward `tsv_lang::NESTING_LIMIT` too, and past it returns `end`, as the scan does past
-/// its own count — the parser refuses that nesting anyway.
+/// The grammar's type-argument answer grades a list's head, and a head that holds a
+/// template skips it here: in a nest of `` `${f<…>/2}` `` each level's answer would skip
+/// every level inside it once more, and the skip asks the answers again a level deeper —
+/// exponential in the nesting. The walk answering the question has read the template
+/// already, and lends where it ended. The skips stacked through those answers are templates
+/// nested in one another, and `skip_template_literal`'s own count restarts at each, so every
+/// skip here counts toward `tsv_lang::NESTING_LIMIT` too, and past it returns `end`, as the
+/// scan does past its own count — the parser refuses that nesting anyway.
 #[cold]
 #[inline(never)]
 pub(super) fn skip_template_in_grammar(bytes: &[u8], i: usize, end: usize) -> usize {
     tsv_lang::fanout_probe::scan(1);
-    let Some(_template) = SkippedTemplate::enter(bytes) else {
+    if let Some(past) = TemplateHints::end_of(bytes, i, end) {
+        return past;
+    }
+    let Some(_template) = SkippedTemplate::enter() else {
         return end;
     };
     skip_template_literal(bytes, i, end, crate::__private::OPERAND_GRAMMAR)
@@ -217,20 +222,20 @@ pub(super) fn skip_template_in_grammar(bytes: &[u8], i: usize, end: usize) -> us
 thread_local! {
     /// How many [`skip_template_in_grammar`] skips are open on this thread.
     static OPEN_TEMPLATES: Cell<u32> = const { Cell::new(0) };
+    /// The template ends lent by the walk answering the grammar's question in progress
+    /// ([`TemplateHints::lend`]).
+    static TEMPLATE_HINTS: RefCell<Lent> = RefCell::new(Lent::default());
 }
 
 /// One open [`skip_template_in_grammar`], until dropped: one of the templates counted toward
-/// the limit, and a root of the grammar answers' memo over the bytes it skips in (joining the
-/// one open, `grammar_memo::Root`).
-struct SkippedTemplate<'s> {
-    _answers: grammar_memo::Root<'s>,
-}
+/// the limit.
+struct SkippedTemplate;
 
-impl<'s> SkippedTemplate<'s> {
+impl SkippedTemplate {
     /// `None` once `tsv_lang::NESTING_LIMIT` skips are open: the template is nested past
     /// the limit.
     #[inline]
-    fn enter(bytes: &'s [u8]) -> Option<Self> {
+    fn enter() -> Option<Self> {
         let counted = OPEN_TEMPLATES
             .try_with(|open| {
                 let templates = open.get();
@@ -242,16 +247,79 @@ impl<'s> SkippedTemplate<'s> {
             })
             // A thread whose locals are being torn down counts nothing.
             .unwrap_or(true);
-        counted.then(|| Self {
-            _answers: grammar_memo::Root::enter(bytes),
-        })
+        counted.then_some(Self)
     }
 }
 
-impl Drop for SkippedTemplate<'_> {
+impl Drop for SkippedTemplate {
     #[inline]
     fn drop(&mut self) {
         let _ = OPEN_TEMPLATES.try_with(|open| open.set(open.get() - 1));
+    }
+}
+
+/// The template ends one walk has lent, and the bytes they are about (by address and
+/// length — the walk's bytes, which stay put while it is lending).
+#[derive(Default)]
+struct Lent {
+    bytes: (usize, usize),
+    ends: FxHashMap<usize, usize>,
+}
+
+/// The template literals a grammar walk read whole, lent — for the duration of one grade of
+/// a type-argument head — to the template skips the grade makes
+/// ([`skip_template_in_grammar`]), so a template the walk has read is not read again.
+///
+/// A lend names the bytes it is about, and a skip of other bytes, or of a template the walk
+/// did not read, or one whose end lies past the skip's bound, reads the template itself.
+/// Nested lends — a grade inside a skip inside a grade — set the outer one aside and put it
+/// back when they end, unwinding included. A lent end skips the open-template count a read
+/// would take, so it differs from a read only past the nesting limit, where the parser refuses
+/// the document anyway. A scan records only a template it read to its close (`past < end`), as
+/// `tsv_lang`'s own scan does, so no truncated skip is lent.
+pub(super) struct TemplateHints<'w> {
+    ends: &'w mut FxHashMap<usize, usize>,
+    outer: Lent,
+}
+
+impl<'w> TemplateHints<'w> {
+    /// Lend `ends` — where each template the walk read over `bytes` ends, by its backtick —
+    /// until the returned guard drops.
+    pub(super) fn lend(bytes: &[u8], ends: &'w mut FxHashMap<usize, usize>) -> Self {
+        let lent = Lent {
+            bytes: (bytes.as_ptr() as usize, bytes.len()),
+            ends: std::mem::take(ends),
+        };
+        let outer = TEMPLATE_HINTS
+            .try_with(|hints| std::mem::replace(&mut *hints.borrow_mut(), lent))
+            .unwrap_or_default();
+        Self { ends, outer }
+    }
+
+    /// Where the template whose backtick is at `i` in `bytes` ends, when the walk lending
+    /// has read it and it ends by `end`.
+    fn end_of(bytes: &[u8], i: usize, end: usize) -> Option<usize> {
+        TEMPLATE_HINTS
+            .try_with(|hints| {
+                let hints = hints.try_borrow().ok()?;
+                if hints.bytes != (bytes.as_ptr() as usize, bytes.len()) {
+                    return None;
+                }
+                hints.ends.get(&i).copied().filter(|&past| past <= end)
+            })
+            .ok()
+            .flatten()
+    }
+}
+
+impl Drop for TemplateHints<'_> {
+    fn drop(&mut self) {
+        let outer = std::mem::take(&mut self.outer);
+        if let Ok(lent) =
+            TEMPLATE_HINTS.try_with(|hints| std::mem::replace(&mut *hints.borrow_mut(), outer))
+        {
+            *self.ends = lent.ends;
+        }
     }
 }
 

@@ -1631,8 +1631,9 @@ pub fn leading_regex_start(view: AstView<'_>, expression: &Expression) -> Option
 }
 
 /// The TypeScript grammar's answers to the operand ends a raw byte scan cannot read
-/// ([`closes_type_arguments`], [`closes_statement_header`], and the grammar's reading of a
-/// `}`).
+/// (whether a `>` closes a type-argument list, whether a `)` closes a statement header, and
+/// the grammar's reading of a `}`), each read off one forward walk of the scan's region that
+/// the scan keeps in its `ScanWalk`.
 ///
 /// The raw scans that find where an expression ENDS before this crate's parser reads it
 /// (the arrow-head lookahead, the function-type lookahead and the printer's paren scan)
@@ -1643,8 +1644,8 @@ pub fn leading_regex_start(view: AstView<'_>, expression: &Expression) -> Option
 /// as acorn does instead ([`ACORN_ISLAND_GRAMMAR`]), since acorn settles where it ends.
 pub const OPERAND_GRAMMAR: tsv_lang::source_scan::OperandGrammar =
     tsv_lang::source_scan::OperandGrammar {
-        closes_type_arguments,
-        closes_statement_header,
+        closes_type_arguments: parser::closes_type_arguments,
+        closes_statement_header: parser::closes_statement_header,
         closes_braced_operand: parser::closes_braced_operand_in_grammar,
         start: tsv_lang::source_scan::ScanStart::Expression,
     };
@@ -1667,21 +1668,6 @@ pub const ACORN_ISLAND_GRAMMAR: tsv_lang::source_scan::OperandGrammar =
         start: tsv_lang::source_scan::ScanStart::Expression,
         ..OPERAND_GRAMMAR
     };
-
-/// Run `parse` — a host's parse of `source`, whose scans read islands under
-/// [`ACORN_ISLAND_GRAMMAR`] or [`OPERAND_GRAMMAR`] and whose islands this crate parses — with
-/// the grammar's type-argument and statement-header answers about `source` remembered until
-/// it returns. This crate's own parses remember them already; a host opens the one memo for
-/// its whole document here, so its scans and every island parse inside it share it.
-///
-/// Each answer walks its region again, so a document nesting template literals that hold
-/// them would otherwise ask the questions inside a nest once per scan around them. The memo
-/// keys an answer by the address of the bytes asked about, which is sound because it holds
-/// answers about `source` alone: a scan or parse of other bytes inside `parse` keeps a memo
-/// of its own.
-pub fn remembering_grammar_answers<R>(source: &str, parse: impl FnOnce() -> R) -> R {
-    parser::grammar_memo::remembering(source.as_bytes(), parse)
-}
 
 // The ECMAScript identifier grammar, for embedders that read an identifier out of
 // their OWN syntax rather than through this crate's lexer: a `{#snippet}` name and

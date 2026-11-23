@@ -8,7 +8,6 @@ use super::expression_lookahead::{
     paren_starts_function_type, paren_starts_modified_parameter_list,
     scan_for_closing_angle_bracket, starts_expression_after_type_args,
 };
-use super::grammar_memo;
 use super::scan::{
     identifier_starts_at, is_word_at, skip_identifier, skip_numeric_literal,
     skip_template_in_grammar, skip_trivia_in_grammar, skip_whitespace,
@@ -16,10 +15,7 @@ use super::scan::{
 };
 use smallvec::SmallVec;
 use tsv_lang::NESTING_LIMIT;
-use tsv_lang::source_scan::{
-    BracedOperandWalk, OperandAnchor, OperandGrammar, ScanStart, TriviaProfile, skip_regex_literal,
-    skip_trivia,
-};
+use tsv_lang::source_scan::{TriviaProfile, skip_trivia};
 
 /// Which reading of the type-argument lookahead a caller wants — the one parameter the two
 /// readings are threaded through, so the walk stays a single body and they cannot drift.
@@ -306,356 +302,6 @@ impl<'a> Parser<'a> {
     }
 }
 
-/// Whether the `>` at `gt` closes a type-argument list this crate's parser would read —
-/// `tsv_lang`'s `ClosesTypeArguments` for the TypeScript grammar, so a raw byte scan
-/// that meets `f<T> / 2` reads the division the parser will, instead of opening a regex
-/// at `/ 2` and running past the expression's end.
-///
-/// It asks the parser's own LOOKAHEAD question from the other end. The parser tries a
-/// list at a `<` that follows an operand (the subscript loop, `new C<T>`, a type
-/// reference) where [`type_arg_head_commits`] admits one under [`TypeArgScan::Parse`], so
-/// this walks
-/// `lower_bound..gt` for such a `<` — its position read by the same operand rule the
-/// scanners use ([`OperandAnchor`]), comments and strings stepped over — and answers for
-/// the one whose [`matching_angle_close`] is `gt`. At most one `<` can close there: a
-/// second opener between them raises the angle depth past `gt`, and one inside a
-/// bracket or paren stops at its own unbalanced closer.
-///
-/// A `<` after a postfix `++` / `--` opens no list — the update is no subscript base, so
-/// the parser reads a comparison there — and is passed over; so is one after a statement
-/// header's `)` (`if (c) <T>x`), where the parser begins a statement, not a subscript.
-///
-/// Asked only for a `/` right after a `>`, which real code almost never writes, so the
-/// walk's cost is paid there alone.
-// TODO: this answers for the lookahead alone, and the parser goes on to TRY the tail
-// of a list that has a separator (`Parser::parse_type_arguments_or_rewind`). Behind a tail
-// it abandons the two disagree: `fn(a < b, c + d >⏎/x/.test(e))` is a comparison with a
-// regex to the parser, and a list closed ahead of a division to this scan (the line break
-// is what makes the lookahead commit there). A raw scan that meets a delimiter inside
-// that regex then ends early — a Svelte tag cut at the `}` of `>⏎/}/` — which the parse
-// of the cut slice reports. A scan cannot run the type grammar; recording the `<` the
-// parser abandoned, where the same scan runs after a parse, would let it agree.
-// TODO: the walk is O(gt - lower_bound) per ask, so a region holding many `> /` pairs
-// (`a > /x/ > /x/ > …`) pays it quadratically. Nothing real has the shape; a scan that
-// recorded each operand-position `<` as it passed would make it linear.
-pub(crate) fn closes_type_arguments(
-    bytes: &[u8],
-    gt: usize,
-    lower_bound: usize,
-    start: ScanStart,
-) -> Option<bool> {
-    grammar_memo::answer(
-        grammar_memo::Question::TypeArguments,
-        bytes,
-        gt,
-        lower_bound,
-        start,
-        || walk_closes_type_arguments(bytes, gt, lower_bound, start),
-    )
-}
-
-/// [`closes_type_arguments`]'s walk, which its memo stands in for. `None` when a `/` or a
-/// `<` on the way follows a `}` the grammar cannot place ([`walk_grammar`]).
-fn walk_closes_type_arguments(
-    bytes: &[u8],
-    gt: usize,
-    lower_bound: usize,
-    start: ScanStart,
-) -> Option<bool> {
-    // The inner ask needs no type-argument resolver — a `>` right before a `<` ends no
-    // list the parser would subscript again — but it does read a `!` glued to a header's
-    // `)` as the prefix not it is (`if (c)!<T>x`), whose `<` opens an assertion.
-    let grammar = OperandGrammar {
-        closes_type_arguments: |_, _, _, _| Some(false),
-        closes_statement_header,
-        ..walk_grammar(start)
-    };
-    let mut anchor = OperandAnchor::new(lower_bound);
-    let mut braced = BracedOperandWalk::default();
-    let mut headers = StatementHeaders::default();
-    let mut i = lower_bound;
-    while i < gt {
-        if let Some(past) = skip_trivia_in_grammar(bytes, i, gt) {
-            anchor.skipped_trivia(bytes, i, past, lower_bound, grammar);
-            i = past;
-            continue;
-        }
-        if bytes[i] == b'/'
-            && walk_reads_regex(
-                bytes,
-                i,
-                (&anchor, &mut braced),
-                &headers,
-                lower_bound,
-                grammar,
-            )?
-            && let Some(past) = skip_walked_regex(bytes, i, gt)
-        {
-            anchor.skipped_operand(past);
-            headers.skipped_operand();
-            i = past;
-            continue;
-        }
-        let b = bytes[i];
-        if b == b'<'
-            && !headers.after_header_close
-            && !follows_postfix_update(bytes, i, lower_bound)
-        {
-            // Past an operand, where a `/` would divide — `None` when the grammar cannot
-            // tell, which matters only for the `<` whose list closes at `gt`.
-            let past_operand = anchor
-                .starts_regex_resuming(bytes, i, lower_bound, grammar, &mut braced)
-                .map(|regex| !regex);
-            if past_operand != Some(false)
-                && matching_angle_close(bytes, i + 1, TypeArgScan::Parse) == Some(gt)
-            {
-                past_operand?;
-                let head = skip_whitespace_and_comments(bytes, i + 1);
-                return Some(
-                    head < bytes.len() && type_arg_head_commits(bytes, head, TypeArgScan::Parse),
-                );
-            }
-        }
-        i = if b.is_ascii_whitespace() {
-            i + 1
-        } else {
-            headers.step(bytes, i, gt)
-        };
-    }
-    Some(false)
-}
-
-/// The grammar the two walks below read their own `/`s by: the bytes' answers, except that a
-/// `}` is placed as this crate's grammar places it (`closes_braced_operand_in_grammar`), from
-/// the walk's `lower_bound`, in a region that begins as `start` says — the reading the scan
-/// asking the walk gives its own `}`s. A walk that took every `}` for a block's would read
-/// `{} / 2 + '/'` as a regex and step over whatever lies past it. A `}` the grammar cannot
-/// place leaves the walk unable to read on, and its answer `None`.
-const fn walk_grammar(start: ScanStart) -> OperandGrammar {
-    OperandGrammar {
-        closes_braced_operand: crate::parser::closes_braced_operand_in_grammar,
-        ..OperandGrammar::BYTES_ONLY
-    }
-    .starting(start)
-}
-
-/// Whether the `)` at `rparen` closes a statement header this crate's parser would read —
-/// `if (c)`, `while (c)`, `for (…)`, `for await (…)`, `with (o)` — so a statement begins
-/// after it. `tsv_lang`'s `ClosesStatementHeader` for the TypeScript grammar: a scan that
-/// meets a `!` glued to a `)` asks it, and reads `if (c)!/re/` as the prefix `!` and regex
-/// the parser will, where `f()! / 2` is a postfix non-null divided.
-///
-/// The same forward walk [`closes_type_arguments`] takes ([`StatementHeaders`]), from
-/// `lower_bound` to the `)`. Asked only of a `)` a glued `!` run follows, which real code
-/// almost never writes before a `/`, so the walk's cost is paid there alone.
-pub(crate) fn closes_statement_header(
-    bytes: &[u8],
-    rparen: usize,
-    lower_bound: usize,
-    start: ScanStart,
-) -> Option<bool> {
-    grammar_memo::answer(
-        grammar_memo::Question::StatementHeader,
-        bytes,
-        rparen,
-        lower_bound,
-        start,
-        || walk_closes_statement_header(bytes, rparen, lower_bound, start),
-    )
-}
-
-/// [`closes_statement_header`]'s walk, which its memo stands in for. `None` as for
-/// [`walk_closes_type_arguments`].
-fn walk_closes_statement_header(
-    bytes: &[u8],
-    rparen: usize,
-    lower_bound: usize,
-    start: ScanStart,
-) -> Option<bool> {
-    // The walk's own anchor, only to step over a regex literal (`if (/\)/.test(s))!`), so it
-    // asks no header question itself: no recursion into this walk.
-    let grammar = walk_grammar(start);
-    let mut anchor = OperandAnchor::new(lower_bound);
-    let mut braced = BracedOperandWalk::default();
-    let mut headers = StatementHeaders::default();
-    let mut i = lower_bound;
-    while i < rparen {
-        if let Some(past) = skip_trivia_in_grammar(bytes, i, rparen) {
-            anchor.skipped_trivia(bytes, i, past, lower_bound, grammar);
-            i = past;
-            continue;
-        }
-        if bytes[i] == b'/'
-            && walk_reads_regex(
-                bytes,
-                i,
-                (&anchor, &mut braced),
-                &headers,
-                lower_bound,
-                grammar,
-            )?
-            && let Some(past) = skip_walked_regex(bytes, i, rparen)
-        {
-            anchor.skipped_operand(past);
-            headers.skipped_operand();
-            i = past;
-            continue;
-        }
-        i = if bytes[i].is_ascii_whitespace() {
-            i + 1
-        } else {
-            headers.step(bytes, i, rparen)
-        };
-    }
-    // Only a walk that landed on the `)` itself read what it closes.
-    Some(
-        i == rparen && {
-            headers.step(bytes, rparen, rparen + 1);
-            headers.after_header_close
-        },
-    )
-}
-
-/// Whether a walk reads the `/` at `i` as a regex literal's opening, for it to step over the
-/// literal whole ([`skip_walked_regex`]) — `None` when its anchor cannot tell
-/// ([`walk_grammar`]), which leaves the walk unable to read on.
-///
-/// Only a regex the walk's `anchor` reads there — or one right after a `for` header's `of`
-/// (`for (x of /\)/g.exec(s))`), a contextual keyword the anchor's word list cannot hold,
-/// since an `of` elsewhere may be a name divided. The anchor asks no type-argument question
-/// (a resolver must not recurse into itself), so after a list's `>` it can take a division
-/// for a regex's opener, which [`skip_walked_regex`]'s bound answers for.
-#[cold]
-#[inline(never)]
-fn walk_reads_regex(
-    bytes: &[u8],
-    i: usize,
-    (anchor, braced): (&OperandAnchor, &mut BracedOperandWalk),
-    headers: &StatementHeaders,
-    lower_bound: usize,
-    grammar: OperandGrammar,
-) -> Option<bool> {
-    Some(
-        headers.after_for_of
-            || anchor.starts_regex_resuming(bytes, i, lower_bound, grammar, braced)?,
-    )
-}
-
-/// Where a regex literal opening at the `/` at `i` ends, for a resolver's forward walk to step
-/// over it whole — so a paren or angle in its body (`if (/\)/.test(s))`) is not tracked as
-/// code — once [`walk_reads_regex`] reads one there.
-///
-/// Only one closed on its line, and ending at or before the walk's `bound`: after a list's `>`
-/// the walk can take a division for a regex's opener, and a span reaching past the `>` or `)`
-/// being asked about would hide the very token the walk is looking for.
-fn skip_walked_regex(bytes: &[u8], i: usize, bound: usize) -> Option<usize> {
-    skip_regex_literal(bytes, i, bytes.len()).filter(|&past| past <= bound)
-}
-
-/// Which open `(` are statement headers' — `if (`, `while (`, `for (`, `for await (`,
-/// `with (` — read forward, token by token, by the raw scans that must tell a header's `)`
-/// from any other: a header's `)` ends no operand, since a statement begins after it
-/// (`if (c) <T>x`, `if (c)!/re/`), where after any other `)` (`f()<T>`, `f()!`) an operand
-/// has just ended.
-///
-/// Read forward, so a comment between a keyword and its `(` (`if /* c */ (`) is stepped
-/// over like any other trivia by the walk that feeds it.
-#[derive(Default)]
-struct StatementHeaders {
-    /// Whether each open `(` is a header's, innermost last.
-    open: Vec<bool>,
-    /// Whether the last significant token closed a header's `(`.
-    after_header_close: bool,
-    /// The header keyword the last significant token was, so a `(` right after it opens
-    /// a header.
-    keyword: HeaderKeyword,
-    /// Whether the last significant byte was a `.`, which makes the next word a member
-    /// name (`a.if (`), never a keyword.
-    after_dot: bool,
-    /// Whether the last significant token was the `of` of a `for` header (`for (x of`),
-    /// after which an expression begins — so a `/` there opens a regex.
-    after_for_of: bool,
-}
-
-impl StatementHeaders {
-    /// A literal the walk stepped over whole, which ends an operand like any word.
-    fn skipped_operand(&mut self) {
-        self.after_header_close = false;
-        self.keyword = HeaderKeyword::None;
-        self.after_dot = false;
-        self.after_for_of = false;
-    }
-
-    /// Read the significant, non-whitespace token at `i` — a whole word, or one byte —
-    /// and return where the next one may begin. `end` bounds a word.
-    fn step(&mut self, bytes: &[u8], i: usize, end: usize) -> usize {
-        if identifier_starts_at(bytes, i) {
-            let word_end = skip_identifier(bytes, i).min(end);
-            if word_end > i {
-                let word = &bytes[i..word_end];
-                self.after_for_of =
-                    !self.after_dot && word == b"of" && self.open.last() == Some(&true);
-                self.keyword = if self.after_dot {
-                    HeaderKeyword::None
-                } else {
-                    HeaderKeyword::of(word, self.keyword)
-                };
-                self.after_dot = false;
-                self.after_header_close = false;
-                return word_end;
-            }
-        }
-        let b = bytes[i];
-        self.after_for_of = false;
-        match b {
-            b'(' => {
-                self.open.push(self.keyword != HeaderKeyword::None);
-                self.after_header_close = false;
-            }
-            b')' => self.after_header_close = self.open.pop().unwrap_or(false),
-            _ => self.after_header_close = false,
-        }
-        self.keyword = HeaderKeyword::None;
-        self.after_dot = b == b'.';
-        i + 1
-    }
-}
-
-/// Whether a word opens a statement header when a `(` follows it — the keyword half of
-/// [`StatementHeaders`].
-#[derive(Clone, Copy, PartialEq, Eq, Default)]
-enum HeaderKeyword {
-    /// No header keyword: a `(` after it is a call's or a group's.
-    #[default]
-    None,
-    /// `if`, `while`, `with`, or `for await`.
-    Header,
-    /// `for`, a header keyword itself and the one an `await` may follow.
-    For,
-}
-
-impl HeaderKeyword {
-    /// The keyword `word` is, `previous` being the one before it (`for await`).
-    fn of(word: &[u8], previous: Self) -> Self {
-        match word {
-            b"if" | b"while" | b"with" => Self::Header,
-            b"for" => Self::For,
-            b"await" if previous == Self::For => Self::Header,
-            _ => Self::None,
-        }
-    }
-}
-
-/// Whether the significant byte before `pos` closes a postfix `++` / `--`, looking back
-/// over whitespace only — a comment in that gap reads as no update, the operand answer.
-fn follows_postfix_update(bytes: &[u8], pos: usize, lower_bound: usize) -> bool {
-    let mut j = pos;
-    while j > lower_bound && bytes[j - 1].is_ascii_whitespace() {
-        j -= 1;
-    }
-    j >= lower_bound + 2 && matches!(&bytes[j - 2..j], b"++" | b"--")
-}
-
 /// Whether the type-argument HEAD at `pos` — the first significant byte past a `<` —
 /// opens a type-argument list: the whole grade, in one walk.
 ///
@@ -713,7 +359,7 @@ fn follows_postfix_update(bytes: &[u8], pos: usize, lower_bound: usize) -> bool 
 /// ([`skip_relex_operand_suffixes`]). And inside an index that reading goes no further
 /// than the body's first operand — the first token that could continue a type takes the
 /// rest of the index as it stands, for the reasons [`Region::Nested`] states.
-fn type_arg_head_commits(bytes: &[u8], pos: usize, scan: TypeArgScan) -> bool {
+pub(super) fn type_arg_head_commits(bytes: &[u8], pos: usize, scan: TypeArgScan) -> bool {
     type_arg_head_walk(bytes, pos, scan, &mut false)
 }
 
@@ -3755,14 +3401,20 @@ fn negative_literal_end(bytes: &[u8], after: usize, scan: TypeArgScan) -> usize 
 
 #[cfg(test)]
 mod tests {
-    use super::{closes_statement_header, closes_type_arguments};
-    use tsv_lang::source_scan::ScanStart;
+    use crate::parser::{closes_statement_header, closes_type_arguments};
+    use tsv_lang::source_scan::{ScanStart, ScanWalk};
 
     /// Whether the LAST `)` in `src` closes a statement header, walking from byte 0.
     fn closes_header(src: &str) -> bool {
         let rparen = src.rfind(')').expect("a `)` to ask about");
-        closes_statement_header(src.as_bytes(), rparen, 0, ScanStart::Expression)
-            .expect("the grammar places every brace these hold")
+        closes_statement_header(
+            src.as_bytes(),
+            rparen,
+            0,
+            ScanStart::Expression,
+            &mut ScanWalk::default(),
+        )
+        .expect("the grammar places every brace these hold")
     }
 
     #[test]
@@ -3808,8 +3460,14 @@ mod tests {
     /// Whether the LAST `>` in `src` closes a type-argument list, scanning from byte 0.
     fn closes(src: &str) -> bool {
         let gt = src.rfind('>').expect("a `>` to ask about");
-        closes_type_arguments(src.as_bytes(), gt, 0, ScanStart::Expression)
-            .expect("the grammar places every brace these hold")
+        closes_type_arguments(
+            src.as_bytes(),
+            gt,
+            0,
+            ScanStart::Expression,
+            &mut ScanWalk::default(),
+        )
+        .expect("the grammar places every brace these hold")
     }
 
     #[test]

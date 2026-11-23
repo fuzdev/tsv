@@ -674,7 +674,8 @@ impl OperandAnchor {
     /// lazy answer must be resolved here, while the run it belongs to is still
     /// reachable — by the same `lower_bound` and `grammar` the scan's
     /// [`Self::starts_regex`] asks with (a `!` glued to a `)` before the comment may be a
-    /// statement header's, [`OperandGrammar::closes_statement_header`]).
+    /// statement header's, [`OperandGrammar::closes_statement_header`]), and the scan's
+    /// `walk` ([`ScanWalk`]).
     ///
     /// ⚠️ **The two assignments below are ordered**: resolving the comment case reads
     /// `segment_start`, so moving the floor first would resolve it against the wrong
@@ -688,11 +689,13 @@ impl OperandAnchor {
         past: usize,
         lower_bound: usize,
         grammar: OperandGrammar,
+        walk: &mut ScanWalk,
     ) {
         self.at_boundary = if trivia_ends_operand(bytes, i) {
             past
         } else {
-            self.at(bytes, i, lower_bound, grammar).unwrap_or(UNREAD)
+            self.at(bytes, i, lower_bound, grammar, walk)
+                .unwrap_or(UNREAD)
         };
         self.segment_start = past;
     }
@@ -724,13 +727,14 @@ impl OperandAnchor {
         pos: usize,
         lower_bound: usize,
         grammar: OperandGrammar,
+        walk: &mut ScanWalk,
     ) -> Option<usize> {
         let mut j = pos;
         while j > self.segment_start && bytes[j - 1].is_ascii_whitespace() {
             j -= 1;
         }
         if j > self.segment_start && bytes[j - 1] == b'!' {
-            j = self.postfix_non_null_start(bytes, j, lower_bound, grammar)?;
+            j = self.postfix_non_null_start(bytes, j, lower_bound, grammar, walk)?;
         }
         if j > self.segment_start {
             Some(j)
@@ -776,6 +780,7 @@ impl OperandAnchor {
         run_end: usize,
         lower_bound: usize,
         grammar: OperandGrammar,
+        walk: &mut ScanWalk,
     ) -> Option<usize> {
         let mut k = run_end - 1;
         while k > self.segment_start && bytes[k - 1] == b'!' {
@@ -811,6 +816,7 @@ impl OperandAnchor {
                 operand_end - 1,
                 lower_bound,
                 grammar.start,
+                walk,
             )?
         {
             return Some(run_end);
@@ -831,7 +837,8 @@ impl OperandAnchor {
     /// Whether the `/` at `pos` starts a regex literal — [`is_regex_start_after`]
     /// over the anchor this rebuilds, so a caller never handles the two separately.
     /// `lower_bound` (the scan's start) bounds every walk, and `grammar` answers the
-    /// operand ends the bytes cannot ([`OperandGrammar`]).
+    /// operand ends the bytes cannot ([`OperandGrammar`]), keeping what it learns in the
+    /// scan's `walk` ([`ScanWalk`]) — one per region, handed to every ask the scan makes.
     ///
     /// `None` when the grammar cannot tell ([`ClosesBracedOperand`], and the other two
     /// questions [`OperandGrammar`] answers): the scan then
@@ -845,31 +852,9 @@ impl OperandAnchor {
         pos: usize,
         lower_bound: usize,
         grammar: OperandGrammar,
+        walk: &mut ScanWalk,
     ) -> Option<bool> {
-        self.starts_regex_resuming(
-            bytes,
-            pos,
-            lower_bound,
-            grammar,
-            &mut BracedOperandWalk::default(),
-        )
-    }
-
-    /// [`Self::starts_regex`] for a scan that asks about more than one `/` of a region:
-    /// `walk` is the scan's own, handed to the grammar's braced-operand resolver at each
-    /// ask so its walk of the region resumes instead of starting over
-    /// ([`BracedOperandWalk`]).
-    #[inline]
-    #[must_use]
-    pub fn starts_regex_resuming(
-        &self,
-        bytes: &[u8],
-        pos: usize,
-        lower_bound: usize,
-        grammar: OperandGrammar,
-        walk: &mut BracedOperandWalk,
-    ) -> Option<bool> {
-        let anchor = self.at(bytes, pos, lower_bound, grammar)?;
+        let anchor = self.at(bytes, pos, lower_bound, grammar, walk)?;
         // A skipped literal ends an operand, whatever its last byte reads as.
         if self.literal_end == Some(anchor) {
             return Some(false);
@@ -917,7 +902,7 @@ impl OperandGrammar {
     pub const BYTES_ONLY: Self = Self {
         closes_type_arguments: never,
         closes_statement_header: never,
-        closes_braced_operand: never_braced,
+        closes_braced_operand: never,
         start: ScanStart::Interpolation,
     };
 
@@ -929,48 +914,74 @@ impl OperandGrammar {
 }
 
 /// The resolver that answers no to everything ([`OperandGrammar::BYTES_ONLY`]).
-fn never(_bytes: &[u8], _at: usize, _lower_bound: usize, _start: ScanStart) -> Option<bool> {
-    Some(false)
-}
-
-/// [`never()`] for the braced-operand question ([`OperandGrammar::BYTES_ONLY`]).
-fn never_braced(
+fn never(
     _bytes: &[u8],
     _at: usize,
     _lower_bound: usize,
     _start: ScanStart,
-    _walk: &mut BracedOperandWalk,
+    _walk: &mut ScanWalk,
 ) -> Option<bool> {
     Some(false)
 }
 
-/// What a [`ClosesBracedOperand`] resolver keeps between the asks of one scan: where its
-/// forward walk of the region stopped, so the next `}` the scan asks about resumes the walk
-/// instead of repeating it — which is what keeps a region holding many `} /` pairs linear.
+/// What the grammar's resolvers keep between the asks of one scan: the forward walk of the
+/// region the scan reads, which each ask advances to the position it is about and answers
+/// from what the walk has recorded — so a region is walked once however many `>`, `)` and
+/// `}` questions the scan asks of it, and no ask walks the region again from its start.
 ///
-/// The scan owns one per region, created empty, and only carries it: its contents are the
-/// resolver's ([`Self::take`] / [`Self::put`]). A scan that asks once needs none
-/// ([`OperandAnchor::starts_regex`]).
+/// The scan owns one per region, created empty, hands it to every ask
+/// ([`OperandAnchor::starts_regex`], [`OperandAnchor::skipped_trivia`]) and only carries
+/// it: its contents are the resolvers' ([`Self::take`] / [`Self::put`]). A nested region —
+/// a template literal's interpolation — is scanned with a walk of its own.
+///
+/// The scan also notes each template literal it skipped whole ([`Self::skipped_template`]),
+/// so the walk, reaching one, steps over it as the scan did rather than reading the levels
+/// inside it again ([`Self::template_end`]).
 #[derive(Default)]
-pub struct BracedOperandWalk(Option<Box<dyn std::any::Any>>);
+pub struct ScanWalk {
+    state: Option<Box<dyn std::any::Any>>,
+    /// Each template the scan skipped, by its backtick, with where it ended — in source
+    /// order, since a scan reads forward.
+    templates: Vec<(usize, usize)>,
+}
 
-impl BracedOperandWalk {
-    /// Take out what the resolver left, when it is a `T`.
+impl ScanWalk {
+    /// Take out what the resolvers left, when it is a `T`.
     #[must_use]
     pub fn take<T: std::any::Any>(&mut self) -> Option<Box<T>> {
-        self.0.take()?.downcast().ok()
+        self.state.take()?.downcast().ok()
     }
 
     /// Leave `state` for the scan's next ask.
     pub fn put<T: std::any::Any>(&mut self, state: Box<T>) {
-        self.0 = Some(state);
+        self.state = Some(state);
+    }
+
+    /// Note that the scan skipped the template literal whose backtick is at `start`, to
+    /// `end`, just past its closing backtick.
+    pub fn skipped_template(&mut self, start: usize, end: usize) {
+        if self.templates.last().is_none_or(|&(last, _)| last < start) {
+            self.templates.push((start, end));
+        }
+    }
+
+    /// Where the template literal whose backtick is at `start` ended, when the scan skipped
+    /// it ([`Self::skipped_template`]).
+    #[must_use]
+    pub fn template_end(&self, start: usize) -> Option<usize> {
+        let at = self
+            .templates
+            .binary_search_by_key(&start, |&(open, _)| open)
+            .ok()?;
+        Some(self.templates[at].1)
     }
 }
 
-impl std::fmt::Debug for BracedOperandWalk {
+impl std::fmt::Debug for ScanWalk {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("BracedOperandWalk")
-            .field(&self.0.is_some())
+        f.debug_struct("ScanWalk")
+            .field("state", &self.state.is_some())
+            .field("templates", &self.templates.len())
             .finish()
     }
 }
@@ -978,7 +989,7 @@ impl std::fmt::Debug for BracedOperandWalk {
 /// How a scanned region begins — the one fact about its surroundings a scan that starts
 /// mid-document cannot read from the bytes it is handed, and which the
 /// [`ClosesBracedOperand`] question turns on.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ScanStart {
     /// The region is a whole expression with nothing before it, read as a parse of its
     /// own: its first token is the first token of that parse.
@@ -1000,8 +1011,13 @@ pub enum ScanStart {
 /// bounds any backward reach, and how the region begins ([`ScanStart`]), which a forward walk
 /// from that bound reads its braces by. `None` when the grammar cannot tell, which the scan
 /// gives up on as it does at the end of its input ([`ClosesBracedOperand`]).
-pub(crate) type ClosesTypeArguments =
-    fn(bytes: &[u8], gt: usize, lower_bound: usize, start: ScanStart) -> Option<bool>;
+pub(crate) type ClosesTypeArguments = fn(
+    bytes: &[u8],
+    gt: usize,
+    lower_bound: usize,
+    start: ScanStart,
+    walk: &mut ScanWalk,
+) -> Option<bool>;
 
 /// Whether the `)` at `rparen` closes a **statement header** — `if (c)`, `while (c)`,
 /// `for (…)`, `with (o)` — after which a statement begins, so a `!` glued to it is a
@@ -1012,8 +1028,13 @@ pub(crate) type ClosesTypeArguments =
 /// of a plain `) /` pair. Its arguments are the scanned bytes, the `)`'s offset, the
 /// scan's lower bound, where a forward walk to the `)` may begin, and how the region begins
 /// ([`ScanStart`]). `None` when the grammar cannot tell, as for [`ClosesTypeArguments`].
-pub(crate) type ClosesStatementHeader =
-    fn(bytes: &[u8], rparen: usize, lower_bound: usize, start: ScanStart) -> Option<bool>;
+pub(crate) type ClosesStatementHeader = fn(
+    bytes: &[u8],
+    rparen: usize,
+    lower_bound: usize,
+    start: ScanStart,
+    walk: &mut ScanWalk,
+) -> Option<bool>;
 
 /// Whether the `}` at `rbrace` closes a **braced operand** — an object literal (`{} / 2`),
 /// or a function or class expression's body (`x + function () {} / 2`) — so that the `/`
@@ -1028,7 +1049,7 @@ pub(crate) type ClosesStatementHeader =
 ///
 /// Its arguments are the scanned bytes, the `}`'s offset, the scan's lower bound (where a
 /// forward walk to the `}` begins), how the region begins ([`ScanStart`]) and the scan's
-/// place for the resolver's walk ([`BracedOperandWalk`]). A scan asks in source order, so
+/// place for the resolvers' walk ([`ScanWalk`]). A scan asks in source order, so
 /// each ask's `}` lies past the last one's.
 ///
 /// `None` when the reader the resolver models leaves the `}` undecided where the
@@ -1041,7 +1062,7 @@ pub(crate) type ClosesBracedOperand = fn(
     rbrace: usize,
     lower_bound: usize,
     start: ScanStart,
-    walk: &mut BracedOperandWalk,
+    walk: &mut ScanWalk,
 ) -> Option<bool>;
 
 /// Whether a `/` starts a regex literal (rather than a division operator), given
@@ -1095,7 +1116,7 @@ fn is_regex_start_after(
     operand_end: usize,
     lower_bound: usize,
     grammar: OperandGrammar,
-    walk: &mut BracedOperandWalk,
+    walk: &mut ScanWalk,
 ) -> Option<bool> {
     // Nothing significant before it (start of the scanned region) → regex.
     if operand_end <= lower_bound {
@@ -1128,7 +1149,7 @@ fn is_regex_start_after(
                 true
             } else {
                 // `None` when the grammar cannot tell, which the scan gives up on.
-                return (grammar.closes_type_arguments)(bytes, j, lower_bound, grammar.start)
+                return (grammar.closes_type_arguments)(bytes, j, lower_bound, grammar.start, walk)
                     .map(|closes| !closes);
             }
         }
@@ -1423,8 +1444,8 @@ fn scan_to_matching_close<const OPEN: u8, const CLOSE: u8>(
     // The anchor `is_regex_start_after` reads, rebuilt where a `/` asks for it. A
     // template literal ends an operand, as does a skipped regex.
     let mut anchor = OperandAnchor::new(scan_start);
-    // The braced-operand resolver's walk of this region, resumed at each `}` + `/`.
-    let mut braced_walk = BracedOperandWalk::default();
+    // The resolvers' walk of this region, advanced by each ask.
+    let mut walk = ScanWalk::default();
     while i < end {
         // Only the hop needles can move this scan; every other byte reaches the
         // `_ => {}` arm below and is stepped over one at a time, so the walk hops
@@ -1453,19 +1474,22 @@ fn scan_to_matching_close<const OPEN: u8, const CLOSE: u8>(
             break;
         }
         if bytes[i] == b'`' {
+            let open = i;
             i = skip_template_literal_in(bytes, i, end, grammar, templates);
+            if i < end {
+                walk.skipped_template(open, i);
+            }
             anchor.skipped_operand(i);
             continue;
         }
         if let Some(past) = skip_trivia(bytes, i, end, TriviaProfile::JS) {
-            anchor.skipped_trivia(bytes, i, past, scan_start, grammar);
+            anchor.skipped_trivia(bytes, i, past, scan_start, grammar, &mut walk);
             i = past;
             continue;
         }
         if bytes[i] == b'/' && i + 1 < end {
             // A `/` the grammar cannot read stops the scan, as the end of its input would.
-            let regex =
-                anchor.starts_regex_resuming(bytes, i, scan_start, grammar, &mut braced_walk)?;
+            let regex = anchor.starts_regex(bytes, i, scan_start, grammar, &mut walk)?;
             if regex && let Some(past) = skip_regex_literal(bytes, i, end) {
                 i = past;
                 anchor.skipped_operand(i);
@@ -1833,7 +1857,7 @@ mod tests {
             operand_end,
             lower_bound,
             grammar,
-            &mut BracedOperandWalk::default(),
+            &mut ScanWalk::default(),
         )
         .expect("the tests' grammars always answer")
     }
@@ -1937,20 +1961,39 @@ mod tests {
             while i < end {
                 if let Some(past) = skip_trivia(bytes, i, end, TriviaProfile::JS) {
                     assert_eq!(
-                        anchor.at(bytes, i, 0, OperandGrammar::BYTES_ONLY),
+                        anchor.at(
+                            bytes,
+                            i,
+                            0,
+                            OperandGrammar::BYTES_ONLY,
+                            &mut ScanWalk::default()
+                        ),
                         Some(eager),
                         "{src:?}: anchor disagrees before trivia at {i}"
                     );
                     if trivia_ends_operand(bytes, i) {
                         eager = past;
                     }
-                    anchor.skipped_trivia(bytes, i, past, 0, OperandGrammar::BYTES_ONLY);
+                    anchor.skipped_trivia(
+                        bytes,
+                        i,
+                        past,
+                        0,
+                        OperandGrammar::BYTES_ONLY,
+                        &mut ScanWalk::default(),
+                    );
                     i = past;
                     continue;
                 }
                 if bytes[i] == b'/' {
                     assert_eq!(
-                        anchor.at(bytes, i, 0, OperandGrammar::BYTES_ONLY),
+                        anchor.at(
+                            bytes,
+                            i,
+                            0,
+                            OperandGrammar::BYTES_ONLY,
+                            &mut ScanWalk::default()
+                        ),
                         Some(eager),
                         "{src:?}: anchor disagrees at the `/` at {i}"
                     );
@@ -2347,15 +2390,34 @@ mod tests {
         let end = src.len();
         let mut anchor = OperandAnchor::new(0);
         assert_eq!(
-            anchor.starts_regex(src, 4, 0, OperandGrammar::BYTES_ONLY),
+            anchor.starts_regex(
+                src,
+                4,
+                0,
+                OperandGrammar::BYTES_ONLY,
+                &mut ScanWalk::default()
+            ),
             Some(true)
         );
         let past = skip_regex_literal(src, 4, end).unwrap();
         assert_eq!(past, 7);
         anchor.skipped_operand(past);
-        anchor.skipped_trivia(src, 8, 15, 0, OperandGrammar::BYTES_ONLY);
+        anchor.skipped_trivia(
+            src,
+            8,
+            15,
+            0,
+            OperandGrammar::BYTES_ONLY,
+            &mut ScanWalk::default(),
+        );
         assert_eq!(
-            anchor.starts_regex(src, 16, 0, OperandGrammar::BYTES_ONLY),
+            anchor.starts_regex(
+                src,
+                16,
+                0,
+                OperandGrammar::BYTES_ONLY,
+                &mut ScanWalk::default()
+            ),
             Some(false)
         );
     }
@@ -2403,8 +2465,21 @@ mod tests {
             let open = 2;
             let close = skip_trivia(bytes, open, bytes.len(), TriviaProfile::JS).unwrap();
             let mut anchor = OperandAnchor::new(0);
-            anchor.skipped_trivia(bytes, open, close, 0, OperandGrammar::BYTES_ONLY);
-            anchor.starts_regex(bytes, bytes.len() - 1, 0, OperandGrammar::BYTES_ONLY) == Some(true)
+            anchor.skipped_trivia(
+                bytes,
+                open,
+                close,
+                0,
+                OperandGrammar::BYTES_ONLY,
+                &mut ScanWalk::default(),
+            );
+            anchor.starts_regex(
+                bytes,
+                bytes.len() - 1,
+                0,
+                OperandGrammar::BYTES_ONLY,
+                &mut ScanWalk::default(),
+            ) == Some(true)
         };
         // A comment that spans lines is a line break: the run begins a statement.
         assert!(regex("a /* c\n*/!/"));
@@ -2418,14 +2493,20 @@ mod tests {
     fn a_bang_glued_to_a_statement_headers_paren_asks_the_grammar() {
         // A toy grammar whose only header is `if (c)`.
         let header: ClosesStatementHeader =
-            |bytes, rparen, lower_bound, _| Some(bytes[lower_bound..rparen].ends_with(b"if (c"));
+            |bytes, rparen, lower_bound, _, _| Some(bytes[lower_bound..rparen].ends_with(b"if (c"));
         let grammar = OperandGrammar {
             closes_statement_header: header,
             ..OperandGrammar::BYTES_ONLY
         };
         let regex = |src: &str, grammar: OperandGrammar| {
             let bytes = src.as_bytes();
-            OperandAnchor::new(0).starts_regex(bytes, bytes.len() - 1, 0, grammar) == Some(true)
+            OperandAnchor::new(0).starts_regex(
+                bytes,
+                bytes.len() - 1,
+                0,
+                grammar,
+                &mut ScanWalk::default(),
+            ) == Some(true)
         };
         // After a header's `)`, a glued run is a prefix `!` and the `/` opens a regex.
         assert!(regex("if (c)!/", grammar));
@@ -2440,12 +2521,18 @@ mod tests {
     #[test]
     fn a_header_the_grammar_cannot_tell_leaves_the_slash_unread() {
         let grammar = OperandGrammar {
-            closes_statement_header: |_, _, _, _| None,
+            closes_statement_header: |_, _, _, _, _| None,
             ..OperandGrammar::BYTES_ONLY
         };
         let ask = |src: &str| {
             let bytes = src.as_bytes();
-            OperandAnchor::new(0).starts_regex(bytes, bytes.len() - 1, 0, grammar)
+            OperandAnchor::new(0).starts_regex(
+                bytes,
+                bytes.len() - 1,
+                0,
+                grammar,
+                &mut ScanWalk::default(),
+            )
         };
         // The glued `)` is asked about, and its `None` comes back for the `/`.
         assert_eq!(ask("if (c)!/"), None);
@@ -2456,17 +2543,23 @@ mod tests {
         // until a literal moves the boundary past it.
         let src = b"(c)! /* x */ / 2 + 'a' / 2";
         let mut anchor = OperandAnchor::new(0);
-        anchor.skipped_trivia(src, 5, 12, 0, grammar);
-        assert_eq!(anchor.starts_regex(src, 13, 0, grammar), None);
-        anchor.skipped_trivia(src, 19, 22, 0, grammar);
-        assert_eq!(anchor.starts_regex(src, 23, 0, grammar), Some(false));
+        anchor.skipped_trivia(src, 5, 12, 0, grammar, &mut ScanWalk::default());
+        assert_eq!(
+            anchor.starts_regex(src, 13, 0, grammar, &mut ScanWalk::default()),
+            None
+        );
+        anchor.skipped_trivia(src, 19, 22, 0, grammar, &mut ScanWalk::default());
+        assert_eq!(
+            anchor.starts_regex(src, 23, 0, grammar, &mut ScanWalk::default()),
+            Some(false)
+        );
     }
 
     #[test]
     fn is_regex_start_after_a_gt_asks_the_resolver() {
         let bytes = b"f<T> /";
         let closes = OperandGrammar {
-            closes_type_arguments: |_, gt, _, _| Some(gt == 3),
+            closes_type_arguments: |_, gt, _, _, _| Some(gt == 3),
             ..OperandGrammar::BYTES_ONLY
         };
         // Without a type-argument grammar every `>` is an operator.
@@ -2475,17 +2568,17 @@ mod tests {
         // An arrow's `=>` opens an expression whatever the resolver says.
         let arrow = b"s => /";
         let always = OperandGrammar {
-            closes_type_arguments: |_, _, _, _| Some(true),
+            closes_type_arguments: |_, _, _, _, _| Some(true),
             ..OperandGrammar::BYTES_ONLY
         };
         assert!(regex_after(arrow, 4, 0, always));
         // A grammar that cannot tell hands its `None` back.
         let unknown = OperandGrammar {
-            closes_type_arguments: |_, _, _, _| None,
+            closes_type_arguments: |_, _, _, _, _| None,
             ..OperandGrammar::BYTES_ONLY
         };
         assert_eq!(
-            is_regex_start_after(bytes, 4, 0, unknown, &mut BracedOperandWalk::default()),
+            is_regex_start_after(bytes, 4, 0, unknown, &mut ScanWalk::default()),
             None
         );
     }
