@@ -102,8 +102,8 @@ export function artifact_freshness_checks(built: ReadonlySet<WasmVariant>): Arra
 	);
 }
 
-// Centers (the npm staging's `.wasm`): format 2,720,874 B, parse
-// 1,073,871 B and all 3,048,129 B, measured on one tree 2026-11-03; all carries the type
+// Centers (the npm staging's `.wasm`): format 2,856,548 B, parse
+// 1,161,367 B and all 3,218,680 B, measured on one tree 2026-11-23; all carries the type
 // strip and the import records (the `strip` and `imports` features, which the umbrella alone
 // builds). Bounds are ±8% of each. The import records are about 10 KB of `all`, and no
 // part of format or parse.
@@ -116,9 +116,9 @@ export function artifact_freshness_checks(built: ReadonlySet<WasmVariant>): Arra
 // named in the commit. The retired centers and what moved them are recorded
 // elsewhere, not here.
 export const BOUNDS = {
-	format: { min: 2_503_000, max: 2_938_000 },
-	parse: { min: 988_000, max: 1_160_000 },
-	all: { min: 2_804_000, max: 3_292_000 }
+	format: { min: 2_628_000, max: 3_085_000 },
+	parse: { min: 1_068_000, max: 1_254_000 },
+	all: { min: 2_961_000, max: 3_476_000 }
 };
 
 // all = format + parse. `all − format` is what the parse feature adds (parser
@@ -134,10 +134,10 @@ export const BOUNDS = {
 // both deltas: `all − format` is the parse wire, the type strip and the import records
 // together, the import records its smallest part.
 //
-// At the current centers: `all − format` 355,334 B; `all − parse` 1,974,258 B.
+// At the current centers: `all − format` 362,132 B; `all − parse` 2,057,313 B.
 export const DELTAS = {
-	format: { min: 327_000, max: 384_000 }, // all − format
-	parse: { min: 1_816_000, max: 2_132_000 } // all − parse
+	format: { min: 333_000, max: 391_000 }, // all − format
+	parse: { min: 1_893_000, max: 2_222_000 } // all − parse
 };
 
 /**

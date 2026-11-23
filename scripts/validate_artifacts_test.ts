@@ -41,9 +41,9 @@ const deno_bundle = (variant: WasmVariant): string =>
 /** Each variant's bundle size: its band's center, so `all` minus a subset sits inside its delta
  * band too (the centers the bounds were cut from differ by the measured deltas). */
 const CENTER: Record<WasmVariant, number> = {
-	format: 2_720_874,
-	parse: 1_073_871,
-	all: 3_048_129
+	format: 2_856_548,
+	parse: 1_161_367,
+	all: 3_218_680
 };
 
 /**
@@ -144,11 +144,11 @@ const touch = (root: FsDir, path: string, ms = T_LATER): Promise<void> =>
 /** What a fresh, fully built checkout prints, each line. */
 const FULL_OUT = [
 	'=== WASM binary sizes ===',
-	'  PASS: format/npm: 2.72 MB (2720874 B)',
-	'  PASS: parse/npm: 1.07 MB (1073871 B)',
-	'  PASS: all/npm: 3.05 MB (3048129 B)',
-	'  PASS: all - format (npm) = 327.3 KB',
-	'  PASS: all - parse (npm) = 1.97 MB',
+	'  PASS: format/npm: 2.86 MB (2856548 B)',
+	'  PASS: parse/npm: 1.16 MB (1161367 B)',
+	'  PASS: all/npm: 3.22 MB (3218680 B)',
+	'  PASS: all - format (npm) = 362.1 KB',
+	'  PASS: all - parse (npm) = 2.06 MB',
 	'\n=== Third-party notice ===',
 	'  PASS: format/npm — package.json files declares NOTICE',
 	'  PASS: format/npm — NOTICE is crates/tsv_html/NOTICE verbatim',
@@ -173,13 +173,13 @@ test('a bundle outside its band fails, naming the size and the bound', async () 
 	strictEqual(small.code, 1);
 	strictEqual(
 		small.out.find((line) => line.includes('parse/npm:')),
-		'  FAIL: parse/npm: 988.0 KB (987999 B) < min 988.0 KB — suspiciously small'
+		'  FAIL: parse/npm: 1.07 MB (1067999 B) < min 1.07 MB — suspiciously small'
 	);
 	const big = await run(sized(root.readonly(), { [npm_bundle('format')]: BOUNDS.format.max + 1 }));
 	strictEqual(big.code, 1);
 	strictEqual(
 		big.out.find((line) => line.includes('format/npm:')),
-		'  FAIL: format/npm: 2.94 MB (2938001 B) > max 2.94 MB — size regression'
+		'  FAIL: format/npm: 3.09 MB (3085001 B) > max 3.08 MB — size regression'
 	);
 	// the bounds are inclusive (the deltas this moves are the next test's)
 	const edges = await run(
@@ -191,9 +191,9 @@ test('a bundle outside its band fails, naming the size and the bound', async () 
 	deepStrictEqual(
 		edges.out.filter((line) => / B\)$/.test(line)),
 		[
-			'  PASS: format/npm: 2.94 MB (2938000 B)',
-			'  PASS: parse/npm: 988.0 KB (988000 B)',
-			'  PASS: all/npm: 3.05 MB (3048129 B)'
+			'  PASS: format/npm: 3.08 MB (3085000 B)',
+			'  PASS: parse/npm: 1.07 MB (1068000 B)',
+			'  PASS: all/npm: 3.22 MB (3218680 B)'
 		]
 	);
 });
@@ -209,8 +209,8 @@ test("a subset's distance below `all` outside its band fails", async () => {
 	deepStrictEqual(
 		narrow.out.filter((line) => line.includes('(npm) =')),
 		[
-			'  FAIL: all - format (npm) = 327.0 KB — expected ≥327.0 KB (feature gate broken?)',
-			'  PASS: all - parse (npm) = 1.97 MB'
+			'  FAIL: all - format (npm) = 333.0 KB — expected ≥333.0 KB (feature gate broken?)',
+			'  PASS: all - parse (npm) = 2.03 MB'
 		]
 	);
 	const wide = await run(
@@ -218,7 +218,7 @@ test("a subset's distance below `all` outside its band fails", async () => {
 	);
 	strictEqual(
 		wide.out.find((line) => line.includes('all - parse (npm)')),
-		'  FAIL: all - parse (npm) = 2.13 MB — expected ≤2.13 MB (unexpected bloat)'
+		'  FAIL: all - parse (npm) = 2.22 MB — expected ≤2.22 MB (unexpected bloat)'
 	);
 	strictEqual(wide.code, 1);
 });
