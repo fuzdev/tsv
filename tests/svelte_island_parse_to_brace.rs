@@ -1,9 +1,11 @@
 // helper fns here aren't `#[test]`, so clippy.toml's allow-expect-in-tests doesn't reach them
 #![expect(clippy::expect_used)]
 
-//! An expression tag's island is parsed over the rest of the document and ends at the `}` its
-//! parse stops at (`tsv_ts::__private::parse_expression_to_brace`), and every island that
-//! reading refuses takes the brace scan and the bounded slice parse instead. Each shape below
+//! An expression tag's island — and the expression of an `{#if}`, `{:else if}`, `{#key}`,
+//! `{@html}`, `{@render}` or `{@attach}` head, or of a spread — is parsed over the rest of the
+//! document and ends at the `}` its parse stops at
+//! (`tsv_ts::__private::parse_expression_to_brace`), and every island that reading refuses
+//! takes the brace scan and the bounded slice parse instead. Each shape below
 //! sits on one side of that line, and each must read exactly as the bounded parse reads it:
 //! the tag's extent, the comment extents before its `}`, the formatted output, and an error's
 //! message and position.
@@ -414,5 +416,93 @@ fn a_regex_after_a_bang_glued_to_a_word_is_refused() {
         // ends it.
         let _ = tsv_svelte::__private::parse(&format!("<p>{island}</p><p>'/}}</p>"));
         assert!(!closed_by_parse(island), "{island:?}");
+    }
+}
+
+/// Every head that takes the same route — `{#if}`, `{:else if}`, `{#key}`, `{@html}`,
+/// `{@render}`, `{@attach}` and a spread — with `%` standing for its expression.
+const HEADS: &[&str] = &[
+    "{#if %}text{/if}",
+    "{#if cond}text1{:else if %}text2{/if}",
+    "{#key %}text{/key}",
+    "<p>{@html %}</p>",
+    "{@render fn(%)}",
+    "<div {@attach %}></div>",
+    "<div {...%}></div>",
+];
+
+/// Host text after a head that a misread `/` would run on into: a regex closing on its `/`,
+/// a quote or a backtick a misread string would open, a `}` a misread scan would stop at.
+const HOSTILE_TAILS: &[&str] = &["", "<p>/}</p>", "<p>'/}</p>", "<p>`/}</p>"];
+
+/// `head` with `expression` in its `%`, then `tail`: the source and the expression's offset.
+fn head_with(head: &str, expression: &str, tail: &str) -> (String, usize) {
+    let at = head.find('%').expect("a `%` placeholder");
+    (
+        format!("{}{expression}{}{tail}", &head[..at], &head[at + 1..]),
+        at,
+    )
+}
+
+/// A head's expression holding a `/` after a braced operand's `}` — a division to the parse
+/// and to acorn's island scan alike — and a `/` after a block's `}` inside a nested body — a
+/// regex to both: each ends where it does, whatever host text follows the head. The function
+/// expression's division is the parse-only half of the fixture
+/// `svelte/expressions/head_slash_after_brace`, whose formatted side is a cataloged
+/// divergence (`svelte/expressions/division_after_function_parens_prettier_divergence`).
+#[test]
+fn a_head_slash_after_a_brace_reads_the_same_whatever_follows() {
+    for &head in HEADS {
+        for &tail in HOSTILE_TAILS {
+            for (expression, kind) in [
+                ("x + {} / 2", "BinaryExpression"),
+                ("{ a: 1 } / 2", "BinaryExpression"),
+                ("x + function () {} / 2", "BinaryExpression"),
+                ("x + class {} / 2", "BinaryExpression"),
+                ("fn(() => { if (a) {} /}/.test(b); })", "CallExpression"),
+                ("fn(() => { a; {} /'/.test(b); })", "CallExpression"),
+                ("a / b", "BinaryExpression"),
+            ] {
+                let (source, at) = head_with(head, expression, tail);
+                let needle = format!(
+                    r#""type":"{kind}","start":{at},"end":{}"#,
+                    at + expression.len()
+                );
+                let json = wire(&source);
+                assert!(
+                    json.contains(&needle),
+                    "{source:?}: no {needle:?} in\n{json}"
+                );
+            }
+        }
+    }
+}
+
+/// A head whose expression OPENS on a function or class expression: acorn reads the keyword
+/// as a statement's, so the `/` after its body opens a regex running through the head's `}`,
+/// and Svelte rejects each head.
+#[test]
+fn a_head_led_by_a_function_reads_its_slash_as_a_regex() {
+    // `{@render}`'s expression is a call's argument here, which no statement begins.
+    for &head in HEADS.iter().filter(|head| !head.starts_with("{@render")) {
+        for &tail in HOSTILE_TAILS {
+            for expression in ["function () {} / 2", "class {} / 2"] {
+                let (source, _) = head_with(head, expression, tail);
+                assert!(tsv_svelte::__private::parse(&source).is_err(), "{source:?}");
+            }
+        }
+    }
+}
+
+#[test]
+fn a_keyword_separator_outside_the_head_scans_run_takes_the_fallback() {
+    // A vertical tab, a no-break space or a byte-order mark between `else` and `if` is not in
+    // the head scan's whitespace run, so the head takes the bounded path, and the debug build's
+    // assert that the parsed island ends where that scan does is never asked.
+    for separator in ["\u{b}", "\u{a0}", "\u{feff}"] {
+        for expression in ["/}/.test(s)", "x / 2", "{} / 2"] {
+            let source = format!("{{#if c}}{{:else{separator}if {expression}}}x{{/if}}");
+            let _ = tsv_svelte::__private::parse(&source);
+        }
     }
 }

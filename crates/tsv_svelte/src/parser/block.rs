@@ -9,7 +9,7 @@ use crate::whitespace::is_svelte_ws;
 use tsv_lang::source_scan::{TriviaProfile, skip_trivia_run};
 use tsv_lang::store::{PoolText, Run};
 use tsv_lang::{Error, Span};
-use tsv_ts::__private::{TopLevelAs, first_function_declaration};
+use tsv_ts::__private::{BareIsland, TopLevelAs, first_function_declaration};
 use tsv_ts::ast::ExprId;
 use tsv_ts::ast::{AstStores, Expression, ExpressionKind};
 
@@ -339,29 +339,47 @@ impl<'a> SvelteParser<'a> {
         // Get the content start position (after {# or {:)
         let tag_content_start = self.current_end();
 
-        // Scan to find closing } and extract content
-        let (expr_content, content_start) = self.scan_block_tag_content(tag_content_start)?;
-
-        // Extract the expression (skip "if " or "else if " prefix, handling
-        // variable whitespace). Svelte requires whitespace after the `if`
-        // keyword, so `{#if(x)}` / `{:else if(x)}` are rejected.
-        let expr_str = if is_elseif {
-            // {:else if expr} - skip "else", whitespace, "if", whitespace
-            let after_else = self
-                .strip_dispatched_keyword(expr_content, "else", tag_content_start)?
-                .trim_start_matches(is_svelte_ws);
-            self.strip_block_keyword(after_else, "if", tag_content_start)?
-                .trim_start_matches(is_svelte_ws)
+        // The test parsed to the `}` it stops at, or — for every head that reading refuses —
+        // scanned to its `}` and parsed as the bounded slice, which owns every error.
+        let keywords: &[&[u8]] = if is_elseif {
+            &[b"else", b"if"]
         } else {
-            // {#if expr} - skip "if", whitespace
-            self.strip_block_keyword(expr_content, "if", tag_content_start)?
-                .trim_start_matches(is_svelte_ws)
+            &[b"if"]
         };
+        let fast = self.parse_keyword_head_to_brace(
+            tag_content_start,
+            keywords,
+            BareIsland::Any,
+            |_, _, _| true,
+        )?;
+        let (test, content_start) = if let Some(parsed) = fast {
+            parsed
+        } else {
+            let (expr_content, content_start) = self.scan_block_tag_content(tag_content_start)?;
 
-        // Parse the test expression (with comments)
-        let expr_offset = tag_content_start + subslice_offset(expr_content, expr_str);
+            // Extract the expression (skip "if " or "else if " prefix, handling
+            // variable whitespace). Svelte requires whitespace after the `if`
+            // keyword, so `{#if(x)}` / `{:else if(x)}` are rejected.
+            let expr_str = if is_elseif {
+                // {:else if expr} - skip "else", whitespace, "if", whitespace
+                let after_else = self
+                    .strip_dispatched_keyword(expr_content, "else", tag_content_start)?
+                    .trim_start_matches(is_svelte_ws);
+                self.strip_block_keyword(after_else, "if", tag_content_start)?
+                    .trim_start_matches(is_svelte_ws)
+            } else {
+                // {#if expr} - skip "if", whitespace
+                self.strip_block_keyword(expr_content, "if", tag_content_start)?
+                    .trim_start_matches(is_svelte_ws)
+            };
 
-        let test = self.parse_ts_expression(expr_str, expr_offset, "'}'")?;
+            // Parse the test expression (with comments)
+            let expr_offset = tag_content_start + subslice_offset(expr_content, expr_str);
+            (
+                self.parse_ts_expression(expr_str, expr_offset, "'}'")?,
+                content_start,
+            )
+        };
 
         // Opening tag span is from start to content_start (includes the closing })
         let opening_tag_span = Span {
@@ -1364,18 +1382,32 @@ impl<'a> SvelteParser<'a> {
         // Get the content start position (after {#)
         let tag_content_start = self.current_end();
 
-        // Scan to find closing } and extract content
-        let (tag_content, content_start) = self.scan_block_tag_content(tag_content_start)?;
+        // The expression parsed to the `}` it stops at, or scanned to its `}` and parsed as
+        // the bounded slice (`parse_if_block_inner`).
+        let fast = self.parse_keyword_head_to_brace(
+            tag_content_start,
+            &[b"key"],
+            BareIsland::Any,
+            |_, _, _| true,
+        )?;
+        let (expression, content_start) = if let Some(parsed) = fast {
+            parsed
+        } else {
+            let (tag_content, content_start) = self.scan_block_tag_content(tag_content_start)?;
 
-        // Parse: "key expression" — Svelte requires whitespace after the keyword. Leading
-        // whitespace only — the trailing run may be a line comment's own text
-        // (`SvelteParser::parse_ts_expression`).
-        let expr_str = self
-            .strip_block_keyword(tag_content, "key", tag_content_start)?
-            .trim_start_matches(is_svelte_ws);
+            // Parse: "key expression" — Svelte requires whitespace after the keyword. Leading
+            // whitespace only — the trailing run may be a line comment's own text
+            // (`SvelteParser::parse_ts_expression`).
+            let expr_str = self
+                .strip_block_keyword(tag_content, "key", tag_content_start)?
+                .trim_start_matches(is_svelte_ws);
 
-        let expr_offset = tag_content_start + subslice_offset(tag_content, expr_str);
-        let expression = self.parse_ts_expression(expr_str, expr_offset, "'}'")?;
+            let expr_offset = tag_content_start + subslice_offset(tag_content, expr_str);
+            (
+                self.parse_ts_expression(expr_str, expr_offset, "'}'")?,
+                content_start,
+            )
+        };
 
         // Opening tag span is from start to content_start (includes the closing })
         let opening_tag_span = Span {

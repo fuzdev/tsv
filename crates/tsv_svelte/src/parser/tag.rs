@@ -8,6 +8,7 @@ use crate::whitespace::is_svelte_ws;
 use tsv_lang::source_scan::TriviaProfile;
 use tsv_lang::store::Run;
 use tsv_lang::{Error, Span};
+use tsv_ts::__private::BareIsland;
 use tsv_ts::ast::ExprId;
 use tsv_ts::ast::{AstView, Expression, ExpressionKind};
 
@@ -43,14 +44,33 @@ impl<'a> SvelteParser<'a> {
     /// (`strip_block_keyword`), parse the remaining content as one TS expression
     /// (which collects comments and enforces end-of-input), and span the whole
     /// `{@…}`. The caller wraps the `(expression, span)` in its node type, and hands its
-    /// refusal of the expression in as `host_check` (`parse_ts_expression_checked`).
+    /// refusal of the expression in as `host_check` (`parse_ts_expression_checked`), with
+    /// `shape` the bare path's answer to it.
+    ///
+    /// The expression is parsed to the `}` it stops at first
+    /// (`SvelteParser::parse_keyword_head_to_brace`); a head that reading refuses, the
+    /// host's refusal included, is scanned to its `}` and parsed as the bounded slice, with
+    /// the refusal run inside that parse.
     fn parse_keyword_expression_tag(
         &mut self,
         start: usize,
         keyword: &str,
+        shape: BareIsland,
         host_check: impl Fn(&Self, AstView<'_>, ExprId) -> Result<(), Error>,
     ) -> Result<(ExprId, Span), Error> {
         let tag_content_start = self.current_end();
+        if let Some((expression, end)) = self.parse_keyword_head_to_brace(
+            tag_content_start,
+            &[keyword.as_bytes()],
+            shape,
+            |this, view, expression| host_check(this, view, expression).is_ok(),
+        )? {
+            let span = Span {
+                start: start as u32,
+                end: end as u32,
+            };
+            return Ok((expression, span));
+        }
         let (tag_content, after_close) = self.scan_block_tag_content(tag_content_start)?;
 
         // Svelte requires whitespace after the keyword. Leading whitespace only — the
@@ -74,7 +94,7 @@ impl<'a> SvelteParser<'a> {
     /// Parse an html tag: {@html expression}
     fn parse_html_tag(&mut self, start: usize) -> Result<FragmentNode, Error> {
         let (expression, span) =
-            self.parse_keyword_expression_tag(start, "html", |_, _, _| Ok(()))?;
+            self.parse_keyword_expression_tag(start, "html", BareIsland::Any, |_, _, _| Ok(()))?;
         Ok(FragmentNode::HtmlTag(HtmlTag { expression, span }))
     }
 
@@ -435,38 +455,17 @@ impl<'a> SvelteParser<'a> {
     /// parsers. The stored expression keeps the wrapper — the printer reproduces
     /// the authored cast from it.
     fn parse_render_tag(&mut self, start: usize) -> Result<FragmentNode, Error> {
-        // The common head, `render ` and a name path called with no arguments glued to the
-        // `}` (`{@render children()}`, `{@render a.b?.()}`), is a call — the refusal below
-        // passes it — and is pushed without a scan or a parse. Any other head pushes nothing
-        // here and takes the full read.
-        let head_start = self.current_end();
-        let expr_start = head_start + "render ".len();
-        if self.source.as_bytes().get(head_start..expr_start) == Some(b"render ") {
-            let nesting = self.island_nesting();
-            if let Some((expression, close)) = tsv_ts::__private::parse_bare_name_closed(
-                self.source,
-                expr_start,
-                b'}',
-                tsv_ts::__private::BareIsland::Call,
-                nesting,
-                self.stores_mut(),
-            ) {
-                let end = close + 1;
-                self.advance_to_position(end)?;
-                return Ok(FragmentNode::RenderTag(RenderTag {
-                    expression,
-                    span: Span {
-                        start: start as u32,
-                        end: end as u32,
-                    },
-                }));
-            }
-        }
         // The refusal runs inside the expression's parse, so tsc's comparison reading of
         // `{@render f<T, U><V>(x)}` — a sequence — is re-read as acorn-typescript's call
         // (`parse_ts_expression_checked`).
-        let (expression, span) =
-            self.parse_keyword_expression_tag(start, "render", |this, view, expression| {
+        let (expression, span) = self.parse_keyword_expression_tag(
+            start,
+            "render",
+            // The common head, a name path called with no arguments glued to the `}`
+            // (`{@render children()}`, `{@render a.b?.()}`), is a call — the refusal
+            // below passes it — and is pushed without a parse.
+            BareIsland::Call,
+            |this, view, expression| {
                 let expression = view.expr(expression);
                 if matches!(
                     expression.unwrap_comment_bound_pairs(view).kind,
@@ -479,7 +478,8 @@ impl<'a> SvelteParser<'a> {
                         expression.span().start as usize,
                     ))
                 }
-            })?;
+            },
+        )?;
 
         Ok(FragmentNode::RenderTag(RenderTag { expression, span }))
     }

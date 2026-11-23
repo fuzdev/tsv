@@ -3,6 +3,8 @@
 use crate::ast::*;
 use crate::lexer::{BlockOrTagMarker, TokenKind};
 use tsv_lang::{Error, Span};
+use tsv_ts::__private::BareIsland;
+use tsv_ts::ast::{AstView, ExprId};
 
 use super::parser_impl::SvelteParser;
 
@@ -153,7 +155,7 @@ impl<'a> SvelteParser<'a> {
             self.source,
             expr_start,
             b'}',
-            tsv_ts::__private::BareIsland::Any,
+            BareIsland::Any,
             nesting,
             self.stores_mut(),
         ) {
@@ -220,6 +222,124 @@ impl<'a> SvelteParser<'a> {
             },
         })
     }
+
+    /// The expression of a head that opens on a keyword — `{#if …}`, `{:else if …}`,
+    /// `{#key …}`, `{@html …}`, `{@render …}`, `{@attach …}` — parsed to the `}` it stops at,
+    /// as [`Self::parse_head_to_brace`] reads it, with the lexer advanced past that `}`.
+    /// `head_start` is the first byte after the `{#` / `{:` / `{@` marker, where `keywords`
+    /// must stand in turn, each followed by a run of ASCII whitespace.
+    ///
+    /// `Ok(None)`, nothing merged and the lexer untouched, for every head that reading
+    /// refuses and for every head spelled otherwise — a keyword with no whitespace after it,
+    /// or a non-ASCII character after the run, which may be more JS `\s` the host's keyword
+    /// strip would trim. The caller then scans to the head's `}` and parses the slice, which
+    /// owns every error.
+    pub(crate) fn parse_keyword_head_to_brace(
+        &mut self,
+        head_start: usize,
+        keywords: &[&[u8]],
+        shape: BareIsland,
+        accept: impl Fn(&Self, AstView<'_>, ExprId) -> bool,
+    ) -> Result<Option<(ExprId, usize)>, Error> {
+        let Some(expr_start) = head_expression_start(self.source.as_bytes(), head_start, keywords)
+        else {
+            return Ok(None);
+        };
+        let parsed = self.parse_head_to_brace(expr_start, shape, accept)?;
+        // The head ends where the bounded path's scan, which starts past the keyword, ends it.
+        #[cfg(debug_assertions)]
+        if let Some((_, end)) = parsed {
+            assert_eq!(
+                scan_head_to_matching_brace(self.source.as_bytes(), head_start),
+                Some(end - 1),
+                "a head parsed to its `}}` ends where the head scan does not: {:?}",
+                &self.source[head_start..end]
+            );
+        }
+        Ok(parsed)
+    }
+
+    /// A head's expression starting at `expr_start` — past a keyword's whitespace or a
+    /// spread's `...` — parsed to the `}` it stops at, as an expression tag's island is
+    /// ([`Self::parse_expression_tag_at`]): a bare name path glued to its `}` first, then
+    /// the island's own parse over the rest of the document. Returns the expression and the
+    /// offset just past its `}`, with the lexer advanced there.
+    ///
+    /// `Ok(None)`, nothing merged and the lexer untouched, for every island both readings
+    /// refuse, which the caller then scans to its `}` and parses as the bounded slice, the
+    /// path that owns every error. `accept` is the host's refusal of the parsed island
+    /// (`{@render}` takes only a call): an island it refuses falls back the same way, so the
+    /// bounded parse can run the refusal inside the island's parse
+    /// ([`Self::parse_ts_expression_checked`]). `shape` is the bare path's own answer to it,
+    /// since a bare island is pushed without asking.
+    pub(crate) fn parse_head_to_brace(
+        &mut self,
+        expr_start: usize,
+        shape: BareIsland,
+        accept: impl Fn(&Self, AstView<'_>, ExprId) -> bool,
+    ) -> Result<Option<(ExprId, usize)>, Error> {
+        let nesting = self.island_nesting();
+        if let Some((expression, close)) = tsv_ts::__private::parse_bare_name_closed(
+            self.source,
+            expr_start,
+            b'}',
+            shape,
+            nesting,
+            self.stores_mut(),
+        ) {
+            let end = close + 1;
+            self.advance_to_position(end)?;
+            return Ok(Some((expression, end)));
+        }
+        let Some(island) = self.with_island_stores(|this, stores| {
+            tsv_ts::__private::parse_expression_to_brace(
+                this.source,
+                expr_start,
+                this.island_nesting(),
+                stores,
+            )
+        }) else {
+            return Ok(None);
+        };
+        #[cfg(debug_assertions)]
+        {
+            assert_eq!(
+                scan_to_matching_brace(self.source.as_bytes(), expr_start),
+                Some(island.close),
+                "a head parsed to its `}}` ends where the brace scan does not: {:?}",
+                &self.source[expr_start..island.close]
+            );
+        }
+        if !accept(self, self.ts_view(), island.expr) {
+            return Ok(None);
+        }
+        self.merge_island_comments(island.comments);
+        let end = island.close + 1;
+        self.advance_to_position(end)?;
+        Ok(Some((island.expr, end)))
+    }
+}
+
+/// Where a head's expression starts: past each of `keywords` in turn at `at`, each followed
+/// by a run of ASCII whitespace ([`SvelteParser::parse_keyword_head_to_brace`]). `None` when
+/// a keyword is missing, no whitespace follows one, or a non-ASCII byte follows the run.
+fn head_expression_start(bytes: &[u8], mut at: usize, keywords: &[&[u8]]) -> Option<usize> {
+    for keyword in keywords {
+        if !bytes.get(at..)?.starts_with(keyword) {
+            return None;
+        }
+        at += keyword.len();
+        let run_start = at;
+        // The head scan's own run (`head_keyword_end`), so the scan the debug assert checks
+        // against starts where this reading does: a vertical tab takes the fallback.
+        while bytes.get(at).is_some_and(u8::is_ascii_whitespace) {
+            at += 1;
+        }
+        if at == run_start || bytes.get(at).is_some_and(|&b| !b.is_ascii()) {
+            return None;
+        }
+    }
+    Some(at)
 }
 
 /// Find the `}` that closes the construct opened by a `{` just before

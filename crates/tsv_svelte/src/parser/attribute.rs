@@ -7,6 +7,7 @@ use crate::whitespace::{
 };
 use tsv_lang::store::{ListBuf, ListMark, Run, flush_run};
 use tsv_lang::{Error, Span};
+use tsv_ts::__private::BareIsland;
 use tsv_ts::ast::ExprId;
 use tsv_ts::ast::{Expression, IdentName, Identifier};
 
@@ -755,6 +756,24 @@ impl<'a> SvelteParser<'a> {
         let marker_pos = brace_interior_start(self.source, start);
         let content_start = marker_pos + 1; // past the `@`
 
+        // The expression parsed to the `}` it stops at. Every head that reading refuses —
+        // a wrong keyword (`<div {@html x}>`) among them — takes the scan and the bounded
+        // parse below, which own every error.
+        if let Some((expression, end)) = self.parse_keyword_head_to_brace(
+            content_start,
+            &[b"attach"],
+            BareIsland::Any,
+            |_, _, _| true,
+        )? {
+            return Ok(AttachTag {
+                expression,
+                span: Span {
+                    start: start as u32,
+                    end: end as u32,
+                },
+            });
+        }
+
         // Find the matching closing `}` (skips strings/comments/regex), scanning past the
         // `attach` keyword, which is no operand.
         let Some(content_end) = scan_head_to_matching_brace(self.source.as_bytes(), content_start)
@@ -834,6 +853,21 @@ impl<'a> SvelteParser<'a> {
         } else {
             content_start
         };
+        // The expression after the `...` parsed to the `}` it stops at. A spread with no
+        // `...`, and every island that reading refuses, takes the scan and the bounded parse
+        // below, which own every error.
+        if scan_start != content_start
+            && let Some((expression, end)) =
+                self.parse_head_to_brace(scan_start, BareIsland::Any, |_, _, _| true)?
+        {
+            return Ok(SpreadAttribute {
+                expression,
+                span: Span {
+                    start: start as u32,
+                    end: end as u32,
+                },
+            });
+        }
         let Some(content_end) = scan_to_matching_brace(self.source.as_bytes(), scan_start) else {
             return Err(self.error_unclosed_at("spread attribute", start));
         };
