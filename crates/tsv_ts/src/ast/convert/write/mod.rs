@@ -1069,6 +1069,112 @@ pub(super) fn write_identifier_plain(w: &mut JsonWriter, id: &ast::Identifier, c
     run.flush();
 }
 
+/// A node header on the span-only wire (`{"type":"X","start":N,"end":M`), staged
+/// into the caller's open run — the bytes [`header_run`] writes there, for a caller
+/// that stages several nodes into one run. The caller made room
+/// ([`SPAN_HEADER_MAX`]).
+///
+/// Only for a caller already known to run with no comment attach and on the
+/// span-only wire: the node's open reports to no attach, and the header carries
+/// no `loc`. Stated once in the assert rather than tested again per header.
+#[expect(clippy::inline_always)]
+#[inline(always)]
+pub(super) fn stage_span_header(
+    run: &mut StageRun<'_>,
+    node_type: &'static str,
+    span: Span,
+    ctx: &Ctx<'_>,
+) {
+    debug_assert!(
+        matches!(ctx.comments, CommentMode::Off) && ctx.positions.lines().is_none(),
+        "a staged header reports to no comment attach and carries no `loc`"
+    );
+    run.raw("{\"type\":\"");
+    run.short(node_type);
+    run.raw("\",\"start\":");
+    run.u32(ctx.pos(span.start));
+    run.raw(",\"end\":");
+    run.u32(ctx.pos(span.end));
+}
+
+/// The widest [`stage_span_header`] plus the child key a caller stages behind it:
+/// `{"type":"`, the longest node type, `","start":`, an integer, `,"end":`, an
+/// integer, and the longest child key (`,"expression":`). Each integer is counted
+/// at `u64`'s width ([`STAGED_INTEGER_MAX`]), so the bound holds without an
+/// argument about which offsets are reachable.
+pub(super) const SPAN_HEADER_MAX: usize = "{\"type\":\"".len()
+    + LONGEST_NODE_TYPE
+    + "\",\"start\":".len()
+    + STAGED_INTEGER_MAX
+    + ",\"end\":".len()
+    + STAGED_INTEGER_MAX
+    + ",\"expression\":".len();
+
+/// The longest node `type` the writer emits.
+const LONGEST_NODE_TYPE: usize = "TSConstructSignatureDeclaration".len();
+
+/// The widest integer a staged-width bound counts: `u64::MAX`'s digits, wider
+/// than any `u32` offset, so no bound depends on which values are reachable.
+const STAGED_INTEGER_MAX: usize = u64::MAX.ilog10() as usize + 1;
+
+/// The name bytes of an `Identifier` that [`stage_identifier_plain`] may stage
+/// whole, or `None` — the identifiers whose expression emission is
+/// [`write_identifier_plain`]'s run arm.
+///
+/// That is an identifier with no binding extra and no `?` (the expression
+/// dispatch's plain arm), and a name its run arm stages: unescaped, so its
+/// source bytes are the name and hold nothing JSON escapes, and within
+/// [`StageRun::SHORT_MAX`]. For a caller already known to run with no comment
+/// attach, the run arm's third condition.
+#[expect(clippy::inline_always)]
+#[inline(always)]
+pub(super) fn plain_identifier_stage_name<'s>(
+    id: &ast::Identifier,
+    ctx: &Ctx<'s>,
+) -> Option<&'s [u8]> {
+    let name = id.ident_name();
+    let name_len = name.raw_len as usize;
+    if id.extra.is_some() || id.optional || name.escaped.is_some() || name_len > StageRun::SHORT_MAX
+    {
+        return None;
+    }
+    let start = id.span.start as usize;
+    Some(&ctx.source.as_bytes()[start..start + name_len])
+}
+
+/// Stage a plain `Identifier` on the span-only wire, whose name
+/// [`plain_identifier_stage_name`] returned, into the caller's open run —
+/// [`write_identifier_plain`]'s run bytes. The caller made room
+/// ([`PLAIN_IDENTIFIER_MAX`]).
+#[expect(clippy::inline_always)]
+#[inline(always)]
+pub(super) fn stage_identifier_plain(
+    run: &mut StageRun<'_>,
+    span: Span,
+    name: &[u8],
+    ctx: &Ctx<'_>,
+) {
+    run.raw("{\"type\":\"Identifier\",\"start\":");
+    run.u32(ctx.pos(span.start));
+    run.raw(",\"end\":");
+    run.u32(ctx.pos(span.end));
+    run.raw(",\"name\":\"");
+    run.short_bytes(name);
+    run.raw("\"}");
+}
+
+/// The widest [`stage_identifier_plain`]: `{"type":"Identifier","start":`, an
+/// integer, `,"end":`, an integer, `,"name":"`, a name of up to
+/// [`StageRun::SHORT_MAX`] bytes and `"}`, each integer at `u64`'s width
+/// ([`STAGED_INTEGER_MAX`]).
+pub(super) const PLAIN_IDENTIFIER_MAX: usize = "{\"type\":\"Identifier\",\"start\":".len()
+    + STAGED_INTEGER_MAX
+    + ",\"end\":".len()
+    + STAGED_INTEGER_MAX
+    + ",\"name\":\"".len()
+    + StageRun::SHORT_MAX
+    + "\"}".len();
+
 /// An `Identifier` carrying only the binding's `optional` flag (function and
 /// method ids, entity-name-as-expression nodes) — no type annotation or
 /// decorators.

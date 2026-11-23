@@ -12,14 +12,15 @@ use super::patterns::{
 };
 use super::types::{write_type, write_type_parameter_instantiation};
 use super::{
-    CommentAttach, CommentMode, Ctx, JsonWriter, close_node, node_header, write_array,
-    write_bare_node, write_identifier_parts, write_identifier_plain, write_literal,
+    CommentAttach, CommentMode, Ctx, JsonWriter, PLAIN_IDENTIFIER_MAX, SPAN_HEADER_MAX, close_node,
+    node_header, plain_identifier_stage_name, stage_identifier_plain, stage_span_header,
+    write_array, write_bare_node, write_identifier_parts, write_identifier_plain, write_literal,
     write_name_field, write_type_annotation_field, write_type_arguments_field,
 };
 use crate::ast;
 use crate::ast::AstView;
 use smallvec::SmallVec;
-use tsv_lang::Span;
+use tsv_lang::{Span, StageRun};
 
 /// What a call/member/non-null node has inherited from its parent about the
 /// optional chain it sits on.
@@ -603,117 +604,257 @@ enum ChainTail<'e> {
 /// comment-attach node events, of the recursion down the spine. Each link reads the flags
 /// its parent hands it exactly as the recursion did (`needs_chain_wrap`, `child_chain`,
 /// `flags_after_wrap`).
-#[inline(never)]
+///
+/// Two forms write the same bytes. With no comment attach and on the span-only wire —
+/// every ordinary parse — [`write_chain_staged`] stages the spine into shared runs; any
+/// other emission takes [`write_chain_general`], one append per fragment. Debug builds
+/// write each staged chain the general way as well and assert the bytes equal
+/// ([`debug_assert_staged_chain_is_general`]).
+#[inline]
 fn write_chain(w: &mut JsonWriter, expr: &ast::Expression, ctx: &Ctx<'_>, flags: ExprFlags) {
+    if matches!(ctx.comments, CommentMode::Off) && ctx.positions.lines().is_none() {
+        #[cfg(debug_assertions)]
+        if GENERAL_CHAIN_REFERENCE.get() {
+            write_chain_general(w, expr, ctx, flags);
+            return;
+        }
+        #[cfg(debug_assertions)]
+        let from = w.as_bytes().len();
+        write_chain_staged(w, expr, ctx, flags);
+        #[cfg(debug_assertions)]
+        debug_assert_staged_chain_is_general(&w.as_bytes()[from..], expr, ctx, flags);
+    } else {
+        write_chain_general(w, expr, ctx, flags);
+    }
+}
+
+#[cfg(debug_assertions)]
+thread_local! {
+    /// Set while [`debug_assert_staged_chain_is_general`] writes its reference: every
+    /// chain then takes [`write_chain_general`], so the reference holds no staged bytes,
+    /// and the chains nested in it are not checked again — each was checked where the
+    /// staged write reached it, and a check per enclosing chain would make the cost
+    /// exponential in the nesting.
+    static GENERAL_CHAIN_REFERENCE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// Debug-only: `staged` — the bytes [`write_chain_staged`] just wrote for `expr` — must
+/// be the bytes [`write_chain_general`] writes for it — the form every comment-attach and
+/// `loc` emission takes — so the two forms are tied on every chain a debug build stages.
+/// Release builds compile out the reference write and the compare.
+#[cfg(debug_assertions)]
+fn debug_assert_staged_chain_is_general(
+    staged: &[u8],
+    expr: &ast::Expression,
+    ctx: &Ctx<'_>,
+    flags: ExprFlags,
+) {
+    /// Clears the flag on the way out, a panic in the reference write included — a
+    /// caller that catches it (the fuzzer) would otherwise run every later chain
+    /// unchecked.
+    struct Reset;
+    impl Drop for Reset {
+        fn drop(&mut self) {
+            GENERAL_CHAIN_REFERENCE.set(false);
+        }
+    }
+    let mut general = JsonWriter::with_capacity(staged.len());
+    {
+        GENERAL_CHAIN_REFERENCE.set(true);
+        let _reset = Reset;
+        write_chain_general(&mut general, expr, ctx, flags);
+    }
+    debug_assert!(
+        staged == general.as_bytes(),
+        "the staged chain must be the general path's bytes\n  staged: {}\n general: {}",
+        String::from_utf8_lossy(staged),
+        String::from_utf8_lossy(general.as_bytes()),
+    );
+}
+
+/// [`write_chain`] with no comment attach, on the span-only wire, where a node's open and
+/// close report to nothing and its header carries no `loc`: the bytes of several nodes
+/// then run together with nothing between them, so they are staged into one run rather
+/// than appended a fragment at a time.
+///
+/// Down the spine, every link's `ChainExpression` wrap, header and child key go into one
+/// run held open across the links ([`stage_span_header`]). A base that is a plain
+/// identifier is staged into it too ([`stage_identifier_plain`]); any other base flushes
+/// the run and goes through the dispatch. Back up, the innermost tails the run can hold
+/// whole ([`stage_chain_tail`]) are staged; the first that cannot flushes the run, and it
+/// and every tail above it take [`write_chain_tails`]. The run spills to the output
+/// buffer whenever the next step might not fit (`StageRun::spill_unless_room`), so a
+/// spine of any length stages.
+///
+/// The general form's bytes, step for step: [`stage_span_header`] is `node_header`'s
+/// span-only run, [`stage_identifier_plain`] `write_identifier_plain`'s, and each staged
+/// tail the literal the general tail writes for the same flags.
+///
+/// The tails are read in place, by index, never iterated by value: `into_iter` moves the
+/// `SmallVec`, inline buffer and all, into the iterator.
+#[inline(never)]
+fn write_chain_staged(w: &mut JsonWriter, expr: &ast::Expression, ctx: &Ctx<'_>, flags: ExprFlags) {
+    let mut tails: SmallVec<[(ChainTail<'_>, Span, bool); 8]> = SmallVec::new();
+    let (mut expr, mut flags) = (expr, flags);
+    let mut run = w.stage_run();
+    loop {
+        let Some(link) = chain_link(ctx.view, expr, flags) else {
+            if let ast::ExpressionKind::Identifier(id) = &expr.kind
+                && !flags.force_optional
+                && let Some(name) = plain_identifier_stage_name(id, ctx)
+            {
+                run.spill_unless_room::<PLAIN_IDENTIFIER_MAX>();
+                stage_identifier_plain(&mut run, id.span, name, ctx);
+            } else {
+                run.flush();
+                write_expression_inner(w, expr, ctx, flags);
+                run = w.stage_run();
+            }
+            break;
+        };
+        run.spill_unless_room::<{ 2 * SPAN_HEADER_MAX }>();
+        if link.needs_chain {
+            stage_span_header(&mut run, "ChainExpression", expr.span, ctx);
+            run.raw(",\"expression\":");
+        }
+        stage_span_header(&mut run, link.node_type, expr.span, ctx);
+        run.short(link.child_key);
+        tails.push((link.tail, expr.span, link.needs_chain));
+        expr = ctx.view.expr(link.child);
+        flags = link.child_flags;
+    }
+    let mut unstaged = tails.len();
+    while let Some(entry) = unstaged.checked_sub(1).map(|i| &tails[i]) {
+        if !stage_chain_tail(&mut run, entry, ctx) {
+            break;
+        }
+        unstaged -= 1;
+    }
+    run.flush();
+    write_chain_tails(w, &tails[..unstaged], ctx);
+}
+
+/// Stage one link's tail and its `ChainExpression` close into the open run, for the tails
+/// whose every byte is known here: a non-computed member whose property is a plain
+/// identifier ([`plain_identifier_stage_name`]), a call with no arguments and no type
+/// arguments, and a non-null close. Returns `false`, having staged nothing, for any other
+/// tail.
+///
+/// Each arm is [`write_member_expression_tail`] / [`write_call_expression_tail`] /
+/// `close_node` with those fields fixed: the property is the plain identifier the
+/// dispatch writes for it, a call's argument list is `[]` and its type-arguments field
+/// absent — which makes its `optional` field unconditional — and every close is the bare
+/// `}`.
+#[expect(clippy::inline_always)]
+#[inline(always)]
+fn stage_chain_tail(
+    run: &mut StageRun<'_>,
+    &(ref tail, _, needs_chain): &(ChainTail<'_>, Span, bool),
+    ctx: &Ctx<'_>,
+) -> bool {
+    match *tail {
+        ChainTail::Member {
+            member,
+            force,
+            strip,
+        } => {
+            if member.computed {
+                return false;
+            }
+            let ast::ExpressionKind::Identifier(id) = &ctx.view.expr(member.property).kind else {
+                return false;
+            };
+            let Some(name) = plain_identifier_stage_name(id, ctx) else {
+                return false;
+            };
+            run.spill_unless_room::<MEMBER_TAIL_MAX>();
+            run.raw(",\"property\":");
+            stage_identifier_plain(run, id.span, name, ctx);
+            if strip {
+                run.raw(",\"computed\":false}");
+            } else if force || member.optional {
+                run.raw(",\"computed\":false,\"optional\":true}");
+            } else {
+                run.raw(",\"computed\":false,\"optional\":false}");
+            }
+        }
+        ChainTail::Call {
+            call, force, strip, ..
+        } => {
+            if call.type_args.is_some() || !ctx.view.expr_list(call.arguments).is_empty() {
+                return false;
+            }
+            run.spill_unless_room::<CALL_TAIL_MAX>();
+            if strip {
+                run.raw(",\"arguments\":[]}");
+            } else if force || call.optional {
+                run.raw(",\"arguments\":[],\"optional\":true}");
+            } else {
+                run.raw(",\"arguments\":[],\"optional\":false}");
+            }
+        }
+        ChainTail::NonNull => {
+            run.spill_unless_room::<NON_NULL_TAIL_MAX>();
+            run.raw("}");
+        }
+    }
+    if needs_chain {
+        run.raw("}");
+    }
+    true
+}
+
+/// The widest staged member tail: `,"property":`, a plain identifier, the widest
+/// `computed`/`optional` literal with the node's `}`, and a `ChainExpression`'s `}`.
+const MEMBER_TAIL_MAX: usize = ",\"property\":".len()
+    + PLAIN_IDENTIFIER_MAX
+    + ",\"computed\":false,\"optional\":false}".len()
+    + 1;
+
+/// The widest staged call tail: the widest `arguments`/`optional` literal with the
+/// node's `}`, and a `ChainExpression`'s `}`.
+const CALL_TAIL_MAX: usize = ",\"arguments\":[],\"optional\":false}".len() + 1;
+
+/// The staged non-null tail: the node's `}` and a `ChainExpression`'s.
+const NON_NULL_TAIL_MAX: usize = 2;
+
+/// [`write_chain`]'s form for a comment-attach or `loc` emission, one append per
+/// fragment — the reference [`write_chain_staged`] is asserted against in debug builds.
+#[inline(never)]
+fn write_chain_general(
+    w: &mut JsonWriter,
+    expr: &ast::Expression,
+    ctx: &Ctx<'_>,
+    flags: ExprFlags,
+) {
     let mut tails: SmallVec<[(ChainTail<'_>, Span, bool); 8]> = SmallVec::new();
     let (mut expr, mut flags) = (expr, flags);
     loop {
-        let (child, child_flags, tail) = match &expr.kind {
-            ast::ExpressionKind::CallExpression(call) => {
-                let needs_chain = needs_chain_wrap(ctx.view, expr, flags);
-                let callee_chain = child_chain(
-                    expr.span.start,
-                    ctx.view.expr(call.callee).span().start,
-                    needs_chain,
-                    flags,
-                );
-                let (force, strip) = flags_after_wrap(flags, needs_chain);
-                open_chain_link(
-                    w,
-                    needs_chain,
-                    "CallExpression",
-                    ",\"callee\":",
-                    expr.span,
-                    ctx,
-                );
-                (
-                    call.callee,
-                    call_callee_flags(call, callee_chain, strip),
-                    (
-                        ChainTail::Call {
-                            call,
-                            callee_chain,
-                            force,
-                            strip,
-                        },
-                        needs_chain,
-                    ),
-                )
-            }
-            ast::ExpressionKind::MemberExpression(member) => {
-                let needs_chain = needs_chain_wrap(ctx.view, expr, flags);
-                let object_chain = child_chain(
-                    expr.span.start,
-                    ctx.view.expr(member.object).span().start,
-                    needs_chain,
-                    flags,
-                );
-                let (force, strip) = flags_after_wrap(flags, needs_chain);
-                open_chain_link(
-                    w,
-                    needs_chain,
-                    "MemberExpression",
-                    ",\"object\":",
-                    expr.span,
-                    ctx,
-                );
-                (
-                    member.object,
-                    ExprFlags {
-                        chain: object_chain,
-                        force_optional: false,
-                        strip_optional: strip,
-                    },
-                    (
-                        ChainTail::Member {
-                            member,
-                            force,
-                            strip,
-                        },
-                        needs_chain,
-                    ),
-                )
-            }
-            ast::ExpressionKind::TSNonNullExpression(non_null) => {
-                let needs_chain = needs_chain_wrap(ctx.view, expr, flags);
-                // A parenthesized inner chain seals at the parens, so the paren-aware
-                // child check applies like it does for calls/members.
-                let inner_chain = child_chain(
-                    expr.span.start,
-                    ctx.view.expr(non_null.expression).span().start,
-                    needs_chain,
-                    flags,
-                );
-                open_chain_link(
-                    w,
-                    needs_chain,
-                    "TSNonNullExpression",
-                    ",\"expression\":",
-                    expr.span,
-                    ctx,
-                );
-                (
-                    non_null.expression,
-                    // force/strip die here: TSNonNullExpression is not a call/member
-                    // spine node.
-                    ExprFlags {
-                        chain: inner_chain,
-                        ..ExprFlags::default()
-                    },
-                    (ChainTail::NonNull, needs_chain),
-                )
-            }
-            _ => {
-                write_expression_inner(w, expr, ctx, flags);
-                break;
-            }
+        let Some(link) = chain_link(ctx.view, expr, flags) else {
+            write_expression_inner(w, expr, ctx, flags);
+            break;
         };
-        tails.push((tail.0, expr.span, tail.1));
-        expr = ctx.view.expr(child);
-        flags = child_flags;
+        open_chain_link(
+            w,
+            link.needs_chain,
+            link.node_type,
+            link.child_key,
+            expr.span,
+            ctx,
+        );
+        tails.push((link.tail, expr.span, link.needs_chain));
+        expr = ctx.view.expr(link.child);
+        flags = link.child_flags;
     }
-    for (tail, span, needs_chain) in tails.into_iter().rev() {
-        match tail {
+    write_chain_tails(w, &tails, ctx);
+}
+
+/// Each link's tail and closes, innermost first (`tails` is outermost first).
+#[expect(clippy::inline_always)]
+#[inline(always)]
+fn write_chain_tails(w: &mut JsonWriter, tails: &[(ChainTail<'_>, Span, bool)], ctx: &Ctx<'_>) {
+    for &(ref tail, span, needs_chain) in tails.iter().rev() {
+        match *tail {
             ChainTail::Call {
                 call,
                 callee_chain,
@@ -731,6 +872,108 @@ fn write_chain(w: &mut JsonWriter, expr: &ast::Expression, ctx: &Ctx<'_>, flags:
             close_node(w, "ChainExpression", span, ctx);
         }
     }
+}
+
+/// One link of a chain spine as [`write_chain`]'s walk reads it — both forms' shared
+/// reading: whether it opens a `ChainExpression` wrap, its header's type, the key and id of
+/// the child the walk continues into with the flags it hands that child, and the tail it
+/// writes on the way back up.
+struct ChainLink<'e> {
+    needs_chain: bool,
+    node_type: &'static str,
+    child_key: &'static str,
+    child: ast::ExprId,
+    child_flags: ExprFlags,
+    tail: ChainTail<'e>,
+}
+
+/// Read `expr` as a link of the chain spine, given the flags its parent hands it — or
+/// `None` for the spine's base, any kind but a call, member or non-null. Each link reads
+/// those flags exactly as the recursion did (`needs_chain_wrap`, `child_chain`,
+/// `flags_after_wrap`).
+#[expect(clippy::inline_always)]
+#[inline(always)]
+fn chain_link<'e>(
+    view: AstView<'_>,
+    expr: &'e ast::Expression,
+    flags: ExprFlags,
+) -> Option<ChainLink<'e>> {
+    Some(match &expr.kind {
+        ast::ExpressionKind::CallExpression(call) => {
+            let needs_chain = needs_chain_wrap(view, expr, flags);
+            let callee_chain = child_chain(
+                expr.span.start,
+                view.expr(call.callee).span().start,
+                needs_chain,
+                flags,
+            );
+            let (force, strip) = flags_after_wrap(flags, needs_chain);
+            ChainLink {
+                needs_chain,
+                node_type: "CallExpression",
+                child_key: ",\"callee\":",
+                child: call.callee,
+                child_flags: call_callee_flags(call, callee_chain, strip),
+                tail: ChainTail::Call {
+                    call,
+                    callee_chain,
+                    force,
+                    strip,
+                },
+            }
+        }
+        ast::ExpressionKind::MemberExpression(member) => {
+            let needs_chain = needs_chain_wrap(view, expr, flags);
+            let object_chain = child_chain(
+                expr.span.start,
+                view.expr(member.object).span().start,
+                needs_chain,
+                flags,
+            );
+            let (force, strip) = flags_after_wrap(flags, needs_chain);
+            ChainLink {
+                needs_chain,
+                node_type: "MemberExpression",
+                child_key: ",\"object\":",
+                child: member.object,
+                child_flags: ExprFlags {
+                    chain: object_chain,
+                    force_optional: false,
+                    strip_optional: strip,
+                },
+                tail: ChainTail::Member {
+                    member,
+                    force,
+                    strip,
+                },
+            }
+        }
+        ast::ExpressionKind::TSNonNullExpression(non_null) => {
+            let needs_chain = needs_chain_wrap(view, expr, flags);
+            // A parenthesized inner chain seals at the parens, so the paren-aware
+            // child check applies like it does for calls/members.
+            let inner_chain = child_chain(
+                expr.span.start,
+                view.expr(non_null.expression).span().start,
+                needs_chain,
+                flags,
+            );
+            ChainLink {
+                needs_chain,
+                node_type: "TSNonNullExpression",
+                child_key: ",\"expression\":",
+                child: non_null.expression,
+                // force/strip die here: TSNonNullExpression is not a call/member
+                // spine node.
+                child_flags: ExprFlags {
+                    chain: inner_chain,
+                    ..ExprFlags::default()
+                },
+                tail: ChainTail::NonNull,
+            }
+        }
+        _ => return None,
+    })
 }
 
 /// Open one link of [`write_chain`]: its `ChainExpression` wrap where `needs_chain`, then

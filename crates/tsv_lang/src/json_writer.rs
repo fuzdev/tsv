@@ -886,7 +886,8 @@ fn whitespace_control_count(bytes: &[u8]) -> usize {
 /// through [`StageRun::raw`] / [`StageRun::short`] / [`StageRun::short_bytes`] /
 /// [`StageRun::u32`] / [`StageRun::usize`] (and its [`StageRun::usize_kept`] /
 /// [`StageRun::repeat`] pair), and closed by [`StageRun::flush`], which is the run's
-/// one write to the output buffer. [`JsonWriter::stage_run`] says what a run
+/// one write to the output buffer (a run that [`StageRun::spill_unless_room`]
+/// spills writes more, one per spill). [`JsonWriter::stage_run`] says what a run
 /// buys and what it costs.
 ///
 /// The length is a field of this value rather than of the writer, and that is
@@ -1189,8 +1190,33 @@ impl StageRun<'_> {
         self.raw("}}");
     }
 
-    /// Append the run to the output buffer — the single write the whole shape
-    /// exists to reach.
+    /// Make room for `NEED` more bytes: when less than that is left in the
+    /// scratch, append the run so far to the output buffer and keep the run
+    /// open, empty.
+    ///
+    /// For a caller that stages **several nodes' bytes into one run**, where the
+    /// run's width has no bound of its own — each node's fragments are bounded,
+    /// their count is not. The caller states the widest next step as `NEED` and
+    /// stages up to that many bytes before asking again. The output is the bytes
+    /// a single flush would have written, whether or not a spill happens; a
+    /// spill costs one more append to the output buffer.
+    #[inline(always)]
+    pub fn spill_unless_room<const NEED: usize>(&mut self) {
+        const {
+            assert!(
+                NEED <= STAGE_CAP,
+                "a step wider than the scratch never fits"
+            );
+        }
+        if self.len > STAGE_CAP - NEED {
+            self.buf.extend_from_slice(&self.stage[..self.len]);
+            self.len = 0;
+        }
+    }
+
+    /// Append the run to the output buffer — the write the whole shape exists
+    /// to reach, and the only one unless [`StageRun::spill_unless_room`] spilled
+    /// the run's front ahead of it.
     #[inline(always)]
     pub fn flush(self) {
         self.buf.extend_from_slice(&self.stage[..self.len]);
@@ -1210,7 +1236,9 @@ impl JsonWriter {
 
     /// Open a **staged run** — a fixed-shape burst of fragments assembled in
     /// the writer's scratch and appended to the output buffer as one write by
-    /// [`StageRun::flush`]. The run starts empty.
+    /// [`StageRun::flush`] (or, for a run that stages several nodes and so has
+    /// no fixed width, one write per [`StageRun::spill_unless_room`] spill and
+    /// the flush). The run starts empty.
     ///
     /// This exists because of what a node header costs when written directly.
     /// The header is 16 appends per AST node (10 static fragments and 6
@@ -1227,14 +1255,14 @@ impl JsonWriter {
     /// the writer — see there), and the integer emission inlines into the one
     /// staging site instead of reaching an out-of-line emitter per integer.
     ///
-    /// The cost it trades for is a single runtime-length `extend_from_slice`
-    /// per run — a `memmove` call over ~90 bytes, whose loads read bytes the
-    /// staging just stored narrowly (the store-forwarding hazard that made a
-    /// *20-byte* fixed blit inside `u32` a ~22%-of-run stall). At header scale
-    /// that trade pays and was measured to: the copy is a loop over enough
-    /// bytes to amortize both the dispatch and the drain, while the
-    /// bookkeeping it removes is 16 checks and 6 reloads. **Grade any change
-    /// to this shape on `cycles:u`, not instructions** — the hazard is
+    /// The cost it trades for is a single runtime-length `extend_from_slice` per
+    /// run (per spill, too, for a run that spills) — a `memmove` call over ~90
+    /// bytes, whose loads read bytes the staging just stored narrowly (the
+    /// store-forwarding hazard that made a *20-byte* fixed blit inside `u32` a
+    /// ~22%-of-run stall). At header scale that trade pays and was measured to: the
+    /// copy is a loop over enough bytes to amortize both the dispatch and the
+    /// drain, while the bookkeeping it removes is 16 checks and 6 reloads. **Grade
+    /// any change to this shape on `cycles:u`, not instructions** — the hazard is
     /// invisible to an instruction count.
     ///
     /// Runs do not nest and cannot interleave with a direct append: a run
@@ -1247,8 +1275,10 @@ impl JsonWriter {
     /// out-of-line [`JsonWriter::u32`] instead, which cost it ~1.6% of the
     /// wire path. Today `tsv_ts`'s `node_header_impl`,
     /// `write_identifier_parts_with_character` and `write_identifier_plain` (a
-    /// whole childless node as one run), and `tsv_svelte`'s `name_loc`
-    /// field + `Attribute`/element/`Text` headers stage. A
+    /// whole childless node as one run), `tsv_ts`'s `write_chain_staged` (a
+    /// whole chain spine's headers, plain-identifier base and plainest tails,
+    /// spilling as it goes), and `tsv_svelte`'s `name_loc` field +
+    /// `Attribute`/element/`Text` headers stage. A
     /// `start`/`end` pair outside a run is [`JsonWriter::start_end`]'s one call,
     /// not two `u32`s — or, for a burst short enough to be written whole into
     /// one window of the output buffer, [`JsonWriter::start_end_tail`], which is
@@ -3946,6 +3976,32 @@ mod tests {
             "widest staged header is {} bytes, STAGE_CAP is {STAGE_CAP}",
             w.as_bytes().len()
         );
+    }
+
+    /// A run that spills keeps its bytes and their order: what reaches the output
+    /// buffer is what one flush of an unbounded run would have written, across
+    /// many spills.
+    #[test]
+    fn spill_unless_room_keeps_the_runs_bytes() {
+        let mut w = JsonWriter::with_capacity(0);
+        let mut expected = String::new();
+        let mut run = w.stage_run();
+        for i in 0..200u32 {
+            run.spill_unless_room::<{ 2 + MAX_U32_DIGITS }>();
+            run.raw(",[");
+            run.u32(i * 40_503);
+            expected.push_str(",[");
+            expected.push_str(&(i * 40_503).to_string());
+        }
+        run.spill_unless_room::<STAGE_CAP>();
+        run.raw("]");
+        expected.push(']');
+        run.flush();
+        assert!(
+            expected.len() > 2 * STAGE_CAP,
+            "the run must spill more than once"
+        );
+        assert_eq!(String::from_utf8(w.into_bytes()).expect("ASCII"), expected);
     }
 
     /// The other staged shape with a runtime-length fragment: a whole plain
