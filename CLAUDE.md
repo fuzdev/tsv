@@ -114,6 +114,8 @@ npm run typecheck:features # each binding crate under each single feature + the 
 #                          the per-package builds `cargo check --workspace` and clippy's `--all-features` both miss; in `check`
 npm run typecheck:wasm32 # `tsv_wasm` for wasm32 under each published package's features — the one leg off the host target;
 #                          in `check`
+npm run typecheck:release # every workspace target, tests included, under the default and all features, with debug assertions OFF
+#                          + warnings denied; in `check`
 npm run typecheck:scripts # tsc over scripts/'s Node roots, the PGO pipeline, the package suites, the sidecar; in `check`
 npm run typecheck:bench-core # tsc over the package-free bench modules nothing else in `check` typechecks; in `check`
 npm run typecheck:js     # tsc + deno check over the bench harness + scripts/; NOT in `check` (bench node_modules)
