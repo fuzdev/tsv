@@ -169,6 +169,62 @@ pub struct SpanWords {
     end: (u64, usize),
 }
 
+impl SpanWords {
+    /// The `start` word alone, for a node whose span opens where this one does.
+    #[expect(clippy::inline_always)]
+    #[inline(always)]
+    #[must_use]
+    pub const fn start_half(self) -> SpanHalf {
+        SpanHalf(self.start)
+    }
+
+    /// The `end` word alone, for a node whose span closes where this one does.
+    #[expect(clippy::inline_always)]
+    #[inline(always)]
+    #[must_use]
+    pub const fn end_half(self) -> SpanHalf {
+        SpanHalf(self.end)
+    }
+
+    /// The words of a node that opens where `start`'s node opens and closes where
+    /// `end`'s closes — `None` when either half is [`SpanHalf::NONE`].
+    ///
+    /// The two nodes' shared ends are the caller's proof, under [`SpanWords`]' contract:
+    /// nothing here knows which span either half came from.
+    #[expect(clippy::inline_always)]
+    #[inline(always)]
+    #[must_use]
+    pub const fn join(start: SpanHalf, end: SpanHalf) -> Option<SpanWords> {
+        if start.is_none() || end.is_none() {
+            return None;
+        }
+        Some(SpanWords {
+            start: start.0,
+            end: end.0,
+        })
+    }
+}
+
+/// One end of a [`SpanWords`] — a position's [`digit_word`] register — handed from the
+/// node that made it to an enclosing node sharing that end, or [`SpanHalf::NONE`] when
+/// the node made no words (the `loc` wire, a value past [`WORD_DIGITS`] digits).
+///
+/// The absent value is a word of zero digits, a width [`digit_word`] never returns,
+/// rather than an `Option`: the half travels back as a function's return value, and the
+/// two-word form comes back in registers where an `Option` around it, with no niche to
+/// fill, would not.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SpanHalf((u64, usize));
+
+impl SpanHalf {
+    /// No word: [`SpanWords::join`] answers `None` for it.
+    pub const NONE: SpanHalf = SpanHalf((0, 0));
+
+    const fn is_none(self) -> bool {
+        self.0.1 == 0
+    }
+}
+
 /// Decimal digit count of a `u32` (`0` is one digit) — the [`decimal_width`]
 /// sibling for the `u32` path.
 ///
@@ -3521,6 +3577,32 @@ mod tests {
                         "value windows ({start}, {end}), capacity {cap}"
                     );
                 }
+            }
+        }
+    }
+
+    #[test]
+    fn span_halves_join_to_span_words() {
+        // A joined pair is the words `span_words` makes of the two ends it took, at every
+        // digit-width edge on either side; a missing half joins to nothing.
+        let mut edges = vec![0, 1, 99_999_999, 100_000_000, u32::MAX];
+        let mut pow = 10u32;
+        while pow < 100_000_000 {
+            edges.extend([pow - 1, pow, pow + 1]);
+            pow *= 10;
+        }
+        for &a in &edges {
+            for &b in &edges {
+                let start =
+                    JsonWriter::span_words(a, a).map_or(SpanHalf::NONE, SpanWords::start_half);
+                let end = JsonWriter::span_words(b, b).map_or(SpanHalf::NONE, SpanWords::end_half);
+                assert_eq!(
+                    SpanWords::join(start, end),
+                    JsonWriter::span_words(a, b),
+                    "join({a}, {b})"
+                );
+                assert_eq!(SpanWords::join(SpanHalf::NONE, end), None);
+                assert_eq!(SpanWords::join(start, SpanHalf::NONE), None);
             }
         }
     }

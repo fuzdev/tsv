@@ -97,6 +97,16 @@
 //! `write_relative_selector` are `inline(always)` and the complex selector's loop over its
 //! relative selectors is open-coded (each says why).
 //!
+//! The chain reaches one node further down and one further up. Down: a compound of one class or
+//! one unprefixed type selector (`.a`, `div` — most compounds) usually spans its relative
+//! selector, so `write_relative_selector` writes that node itself, ahead of the general loop, and
+//! closes it on the same words. Up: a rule opens where its prelude opens and closes where its
+//! block closes, so the list hands back its `start` word and the block its `end` word
+//! ([`SpanHalf`], one register pair each) and `write_rule` joins them ([`SpanWords::join`]) for
+//! its own tail. Both are guarded by span comparisons like the rest of the chain. Handing the
+//! words down to every simple selector's arm instead measured worse on instructions, and widened
+//! `write_selector_list_inner`'s frame, which the pseudo-class argument recursion repeats.
+//!
 //! The windows are the span-only wire's shape. On the wire that carries `loc`, which sits
 //! between `end` and the closing constant, [`Ctx::head`] / [`Ctx::tail`] write the same burst
 //! piecewise with the `loc` field in place.
@@ -108,7 +118,8 @@ use super::{
 use crate::ast;
 use std::borrow::Cow;
 use tsv_lang::{
-    JsonWriter, Span, SpanWords, Wire, WirePositions, WireTables, write_array, write_or_null,
+    JsonWriter, Span, SpanHalf, SpanWords, Wire, WirePositions, WireTables, write_array,
+    write_or_null,
 };
 
 /// Declares one `parseCss()` metadata payload twice from a single literal: bare
@@ -417,7 +428,10 @@ fn write_node(
 ///
 /// The trailing `start`/`end` burst is one in-place window (module doc, §The
 /// `start`/`end` bursts); the closing constant — `metadata` and the `}`, or the `}`
-/// alone — is an append of its own, since which one it is varies by document.
+/// alone — is an append of its own, since which one it is varies by document. A rule
+/// opens where its prelude does and closes where its block does, so the window is
+/// written from the two halves' words when both made them (module doc, §Shared span
+/// words).
 fn write_rule(
     w: &mut JsonWriter,
     rule: &ast::CssRule,
@@ -425,16 +439,29 @@ fn write_rule(
     comments: &mut Vec<WireComment>,
 ) {
     w.raw("{\"type\":\"Rule\",\"prelude\":");
-    write_selector_list(w, &rule.selector, ctx);
+    let prelude_start = write_selector_list(w, &rule.selector, ctx);
     w.raw(",\"block\":");
-    write_block(
+    let block_end = write_block(
         w,
         rule.block_span,
         ctx.view.block_children(rule.declarations),
         ctx,
         comments,
     );
-    ctx.tail(w, b",", rule.span.start, rule.span.end, b"");
+    let shared =
+        if rule.span.start == rule.selector.span.start && rule.span.end == rule.block_span.end {
+            SpanWords::join(prelude_start, block_end)
+        } else {
+            None
+        };
+    match shared {
+        Some(words) => {
+            #[cfg(debug_assertions)]
+            assert_words_of(words, rule.span, ctx, "rule");
+            w.start_end_tail_words(b",", words, b"");
+        }
+        None => ctx.tail(w, b",", rule.span.start, rule.span.end, b""),
+    }
     if ctx.has_metadata {
         w.raw(RULE_META_CLOSE);
     } else {
@@ -464,7 +491,8 @@ fn write_atrule(
     collect_prelude_comments(atrule, ctx.source, comments);
     w.raw(",\"block\":");
     write_or_null(w, atrule.block.as_ref(), |w, b| {
-        write_block(
+        // An at-rule's positions lead, so nothing it writes after the block shares its end.
+        let _ = write_block(
             w,
             b.span,
             ctx.view.block_children(b.children),
@@ -511,20 +539,32 @@ fn collect_prelude_comments(
 
 /// Emits a `Block` node. A `Comment` child produces no output — it is collected
 /// for the stylesheet's `comments` array and filtered out of `children`.
+///
+/// Returns the `end` half of the words its head was written from, for the rule that
+/// closes where the block does ([`SpanHalf::NONE`] when the head made none).
 fn write_block(
     w: &mut JsonWriter,
     block_span: Span,
     children: &[ast::CssBlockChild],
     ctx: &Ctx<'_>,
     comments: &mut Vec<WireComment>,
-) {
-    ctx.head(
-        w,
-        b"{\"type\":\"Block\",\"start\":",
-        block_span.start,
-        block_span.end,
-        b",\"children\":[",
-    );
+) -> SpanHalf {
+    let words = if ctx.positions.has_locations() {
+        None
+    } else {
+        JsonWriter::span_words(ctx.pos(block_span.start), ctx.pos(block_span.end))
+    };
+    let lead = b"{\"type\":\"Block\",\"start\":";
+    match words {
+        Some(words) => w.start_end_head_words(lead, words, b",\"children\":["),
+        None => ctx.head(
+            w,
+            lead,
+            block_span.start,
+            block_span.end,
+            b",\"children\":[",
+        ),
+    }
     let mut first = true;
     for child in children {
         if let ast::CssBlockChild::Comment(c) = child {
@@ -541,6 +581,7 @@ fn write_block(
         write_block_child(w, child, ctx, comments);
     }
     w.raw("]}");
+    words.map_or(SpanHalf::NONE, SpanWords::end_half)
 }
 
 fn write_block_child(
@@ -681,23 +722,25 @@ fn write_declaration(
 }
 
 /// Emits a `SelectorList` node (rule preludes — parsed non-forgivingly, no
-/// `Invalid`).
-fn write_selector_list(w: &mut JsonWriter, sl: &ast::SelectorList, ctx: &Ctx<'_>) {
-    write_selector_list_inner(w, sl, ctx, false);
+/// `Invalid`), returning the `start` half of its words for the rule that opens where
+/// the list does.
+fn write_selector_list(w: &mut JsonWriter, sl: &ast::SelectorList, ctx: &Ctx<'_>) -> SpanHalf {
+    write_selector_list_inner(w, sl, ctx, false)
 }
 
 /// Emits a `SelectorList` node for pseudo-class args — drops complex selectors
 /// containing a forgiving-parse `Invalid`.
 fn write_selector_list_filtered(w: &mut JsonWriter, sl: &ast::SelectorList, ctx: &Ctx<'_>) {
-    write_selector_list_inner(w, sl, ctx, true);
+    let _ = write_selector_list_inner(w, sl, ctx, true);
 }
 
+/// Returns the `start` half of the list's words ([`SpanHalf::NONE`] when it made none).
 fn write_selector_list_inner(
     w: &mut JsonWriter,
     sl: &ast::SelectorList,
     ctx: &Ctx<'_>,
     filter_invalid: bool,
-) {
+) -> SpanHalf {
     // The list's digit words, made once (module doc, §Shared span words): a list of one
     // complex selector — nearly every list — shares that selector's span, so the
     // selector's head (and, through it, its one relative selector's tail) writes the
@@ -726,6 +769,7 @@ fn write_selector_list_inner(
         |w, c| write_complex_selector(w, c, ctx, shared),
     );
     w.raw("]}");
+    words.map_or(SpanHalf::NONE, SpanWords::start_half)
 }
 
 /// Emits a `ComplexSelector` node. `shared` is its list's [`SpanWords`] when the
@@ -745,11 +789,7 @@ fn write_complex_selector(
 ) {
     #[cfg(debug_assertions)]
     if let Some(words) = shared {
-        assert_eq!(
-            Some(words),
-            JsonWriter::span_words(ctx.pos(c.span.start), ctx.pos(c.span.end)),
-            "shared span words reused for a complex selector of another span"
-        );
+        assert_words_of(words, c.span, ctx, "complex selector");
     }
     let words = match shared {
         Some(words) => Some(words),
@@ -802,11 +842,7 @@ fn write_relative_selector(
 ) {
     #[cfg(debug_assertions)]
     if let Some(words) = shared {
-        assert_eq!(
-            Some(words),
-            JsonWriter::span_words(ctx.pos(r.span.start), ctx.pos(r.span.end)),
-            "shared span words reused for a relative selector of another span"
-        );
+        assert_words_of(words, r.span, ctx, "relative selector");
     }
     // The combinator-less head — the first compound of every selector — is one literal
     // through the `selectors` array's `[`.
@@ -818,9 +854,34 @@ fn write_relative_selector(
         }
         _ => w.raw("{\"type\":\"RelativeSelector\",\"combinator\":null,\"selectors\":["),
     }
-    write_array_open(w, b"", ctx.view.simple_selectors(r.selectors), |w, s| {
-        write_simple_selector(w, s, ctx);
-    });
+    // A compound of one class or one unprefixed type selector — `.a`, `div`, the
+    // commonest compounds — that spans the whole relative selector closes on the same
+    // words, so it is written here, ahead of the general loop.
+    match (shared, ctx.view.simple_selectors(r.selectors)) {
+        (Some(words), [ast::SimpleSelector::Class { span }]) if *span == r.span => {
+            #[cfg(debug_assertions)]
+            assert_words_of(words, *span, ctx, "class selector");
+            write_class_selector_head(w, *span, ctx);
+            w.start_end_tail_words(b",", words, b"}");
+        }
+        (
+            Some(words),
+            [
+                ast::SimpleSelector::Type {
+                    namespace_span: None,
+                    span,
+                },
+            ],
+        ) if *span == r.span => {
+            #[cfg(debug_assertions)]
+            assert_words_of(words, *span, ctx, "type selector");
+            write_type_selector_head(w, *span, ctx);
+            w.start_end_tail_words(b",", words, b"}");
+        }
+        (_, simples) => write_array_open(w, b"", simples, |w, s| {
+            write_simple_selector(w, s, ctx);
+        }),
+    }
     match shared {
         Some(words) => w.start_end_tail_words(b"],", words, b""),
         None => ctx.tail(w, b"],", r.span.start, r.span.end, b""),
@@ -832,6 +893,40 @@ fn write_relative_selector(
     }
 }
 
+/// Restates the [`SpanWords`] reuse contract at a reuse site, in debug builds: the shared
+/// `words` are the ones the node's own span makes.
+#[cfg(debug_assertions)]
+fn assert_words_of(words: SpanWords, span: Span, ctx: &Ctx<'_>, node: &str) {
+    assert_eq!(
+        Some(words),
+        JsonWriter::span_words(ctx.pos(span.start), ctx.pos(span.end)),
+        "shared span words reused for a {node} of another span"
+    );
+}
+
+/// A `ClassSelector` through its `name` — the name read from source past the `.` AND any
+/// comment glued to it (`./* c */cls`), never a bare `1`. The caller writes the tail.
+///
+/// `inline(always)`, as is [`write_type_selector_head`]: each has two callers, the general
+/// simple-selector arm and `write_relative_selector`'s lone-compound arm, and the class
+/// head came out of line between them — a call on the commonest selector of all.
+#[expect(clippy::inline_always)]
+#[inline(always)]
+fn write_class_selector_head(w: &mut JsonWriter, span: Span, ctx: &Ctx<'_>) {
+    let name_start = crate::comments::class_name_start(ctx.source.as_bytes(), span.start);
+    w.raw("{\"type\":\"ClassSelector\",\"name\":");
+    write_selector_name(w, ctx.source, span, (name_start - span.start) as usize);
+}
+
+/// An unprefixed `TypeSelector` through its `name`, read from source. The caller writes
+/// the tail.
+#[expect(clippy::inline_always)]
+#[inline(always)]
+fn write_type_selector_head(w: &mut JsonWriter, span: Span, ctx: &Ctx<'_>) {
+    w.raw("{\"type\":\"TypeSelector\",\"name\":");
+    write_selector_name(w, ctx.source, span, 0);
+}
+
 fn write_combinator(w: &mut JsonWriter, name: &'static str, span: Span, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"Combinator\",\"name\":");
     w.token(name); // ` ` / `>` / `+` / `~` / `||` — escape-free
@@ -840,6 +935,13 @@ fn write_combinator(w: &mut JsonWriter, name: &'static str, span: Span, ctx: &Ct
 }
 
 /// Emit a simple selector (type/universal/class/id/nesting/attribute/pseudo/percentage).
+///
+/// `inline(never)` is a placement pin. Its one caller is the general loop of
+/// `write_relative_selector`, which sits inside `write_selector_list_inner` with the
+/// lone-compound arm ahead of it; out of line, this body's frame is paid only by a
+/// compound that reaches it, and the list's own frame, which the pseudo-class argument
+/// recursion repeats, stays narrow. Inline, the list function is twice the size.
+#[inline(never)]
 fn write_simple_selector(w: &mut JsonWriter, simple: &ast::SimpleSelector, ctx: &Ctx<'_>) {
     match simple {
         ast::SimpleSelector::Type {
@@ -848,8 +950,7 @@ fn write_simple_selector(w: &mut JsonWriter, simple: &ast::SimpleSelector, ctx: 
         } => {
             let name = match namespace_span {
                 None => {
-                    w.raw("{\"type\":\"TypeSelector\",\"name\":");
-                    write_selector_name(w, ctx.source, *span, 0);
+                    write_type_selector_head(w, *span, ctx);
                     ctx.tail(w, b",", span.start, span.end, b"}");
                     return;
                 }
@@ -873,10 +974,7 @@ fn write_simple_selector(w: &mut JsonWriter, simple: &ast::SimpleSelector, ctx: 
             write_type_selector(w, "*", *namespace_span, *span, ctx);
         }
         ast::SimpleSelector::Class { span } => {
-            // Past the `.` AND any comment glued to it (`./* c */cls`) — never a bare `1`.
-            let name_start = crate::comments::class_name_start(ctx.source.as_bytes(), span.start);
-            w.raw("{\"type\":\"ClassSelector\",\"name\":");
-            write_selector_name(w, ctx.source, *span, (name_start - span.start) as usize);
+            write_class_selector_head(w, *span, ctx);
             ctx.tail(w, b",", span.start, span.end, b"}");
         }
         ast::SimpleSelector::Id { span } => {

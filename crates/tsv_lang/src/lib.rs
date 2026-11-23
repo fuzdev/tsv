@@ -127,7 +127,7 @@ pub use error::{Error, ErrorKind, ErrorReport, Result};
 pub use hash::{FxHashMap, FxHashSet, FxHasher};
 #[cfg(feature = "_json")]
 #[doc(hidden)]
-pub use json_writer::{JsonWriter, SpanWords, StageRun, write_array, write_or_null};
+pub use json_writer::{JsonWriter, SpanHalf, SpanWords, StageRun, write_array, write_or_null};
 pub use location::WirePoint;
 #[doc(hidden)]
 pub use location::{
