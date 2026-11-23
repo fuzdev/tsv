@@ -1188,6 +1188,7 @@ mod operator_run_tests {
                 .map(|run| run.iter().map(|&m| m.to_owned()).collect())
                 .collect();
             assert_eq!(runs, expected, "{source:?}");
+            #[cfg(debug_assertions)]
             assert!(stores.scratch_is_empty(), "{source:?}");
         }
     }

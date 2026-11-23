@@ -6989,7 +6989,7 @@ mod inline_sibling_line_group_tests {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, debug_assertions))]
 mod welded_marker_burial_tests {
     //! [`super::DocArena::welded_entry`] reads only the top node, so ANY builder that wraps a
     //! marked doc can bury the marker: the walk then stops one entry short, and the run stands
@@ -7011,7 +7011,6 @@ mod welded_marker_burial_tests {
 
     /// The burial tripwire must FIRE on the historical bug shape — a marker wrapped in a bare
     /// `group([marked, line])` with its flags NOT re-hoisted.
-    #[cfg(debug_assertions)]
     #[test]
     #[should_panic(expected = "buried welded-run marker")]
     fn burial_tripwire_fires_on_a_bare_wrapping_join() {
@@ -7025,7 +7024,6 @@ mod welded_marker_burial_tests {
     /// `NotGlued`, but the descent must also not fire through it), a marker sitting behind a
     /// `Fill`'s items (a glued boundary in some deeper fill — the descent stops at the `Fill`),
     /// and plain markerless content.
-    #[cfg(debug_assertions)]
     #[test]
     fn burial_tripwire_quiet_on_legitimate_nesting() {
         let a = DocArena::new();

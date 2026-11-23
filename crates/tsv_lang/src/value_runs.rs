@@ -836,6 +836,7 @@ mod tests {
         assert_eq!(view.leaves(leaves), [Leaf(7), Leaf(8)]);
         assert_eq!(view.spans(spans), [span(3)]);
         assert_eq!(stores.lists.tokens.slice(tokens), [Token(9), Token(10)]);
+        #[cfg(debug_assertions)]
         assert!(stores.lists.scratch_is_empty());
     }
 
