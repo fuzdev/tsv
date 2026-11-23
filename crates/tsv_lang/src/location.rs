@@ -206,11 +206,22 @@ impl ByteToCharMap {
     /// Build a byte-to-UTF-16-code-unit offset map from source text
     ///
     /// For ASCII-only sources, returns an empty map (fast path).
+    ///
+    /// One scan answers both questions: the search for the first multibyte
+    /// character is the ASCII test, and the table is built from where it stopped,
+    /// so the ASCII prefix ahead of that character is read once.
     pub(crate) fn new(source: &str, bom: LeadingBom) -> Self {
-        if source.is_ascii() {
+        let ascii_prefix = next_non_ascii_chunked(source.as_bytes(), 0);
+        if ascii_prefix == source.len() {
             return Self::identity();
         }
-        build_map(source, &mut LineScan::map_only(), ScanRule::None, bom)
+        build_map(
+            source,
+            ascii_prefix,
+            &mut LineScan::map_only(),
+            ScanRule::None,
+            bom,
+        )
     }
 
     /// The identity map: every byte offset translates to itself — what `new`
@@ -350,11 +361,24 @@ struct Outgrown {
     delta: u32,
 }
 
-/// Index of the first non-ASCII byte at or after `from`, or `bytes.len()`.
+/// Index of the first non-ASCII byte at or after `from`, or `bytes.len()`: the
+/// search `build_deltas` asks for the end of each run between two multibyte
+/// characters.
 ///
-/// Word-at-a-time: the multibyte characters this splits the source on are
-/// sparse, so the scan between them is the bulk of construction.
-#[inline]
+/// Word-at-a-time for a run's first 64 bytes, then a chunk stage
+/// ([`next_non_ascii_chunked`]). Both halves of the trade are measured: in
+/// non-ASCII-dense text (CJK prose, strings, comments) a run is mostly shorter
+/// than a word, so the first word answers and a chunk stage would load eight to
+/// find a byte that one holds; in real code a run between two sparse characters
+/// is mostly long, and there a chunk tests 64 bytes with one branch. A run that
+/// ends within its first 64 bytes pays one compare a word over the word loop
+/// alone; one that ends in the next 64 pays a chunk it does not use, so runs of
+/// about 64 to 128 bytes are the shape this form loses on.
+///
+/// `inline(always)` is pinned: outlined, the build loop pays a call for every
+/// run, about ten instructions per character on dense text.
+#[expect(clippy::inline_always)]
+#[inline(always)]
 fn next_non_ascii(bytes: &[u8], from: usize) -> usize {
     let mut i = from;
     while let Some(chunk) = bytes[i..].first_chunk::<8>() {
@@ -365,11 +389,44 @@ fn next_non_ascii(bytes: &[u8], from: usize) -> usize {
             return i + (hits.trailing_zeros() / 8) as usize;
         }
         i += 8;
+        if i - from == 64 {
+            return next_non_ascii_chunked(bytes, i);
+        }
     }
     while i < bytes.len() && bytes[i] < 0x80 {
         i += 1;
     }
     i
+}
+
+/// [`next_non_ascii`] for a run already known or expected to be long: the
+/// search `ByteToCharMap::new` asks once, from byte 0, for where an ASCII prefix
+/// ends (the whole source, in most documents), and the continuation of a build
+/// run past its first 64 bytes.
+///
+/// Each 64-byte chunk ORs its eight words into one and asks the high bits once —
+/// the "any?" question needs no per-word position. A chunk that fires leaves the
+/// stage at its own start, where the word loop finds the byte within the chunk;
+/// so does a tail too short for a chunk. Either way the word loop ends inside
+/// its first 64 bytes, so it never hands back here.
+///
+/// Out of line, so the build loop's inlined word loop stays small; the call is
+/// paid once per long run.
+#[inline(never)]
+fn next_non_ascii_chunked(bytes: &[u8], from: usize) -> usize {
+    let mut i = from;
+    while let Some(chunk) = bytes[i..].first_chunk::<64>() {
+        let (words, _) = chunk.as_chunks::<8>();
+        let mut any = 0u64;
+        for word in words {
+            any |= u64::from_le_bytes(*word);
+        }
+        if high_bit_lanes(any) != 0 {
+            break;
+        }
+        i += 64;
+    }
+    next_non_ascii(bytes, i)
 }
 
 /// Fill the `byte − utf16` delta table (and, per `line_rule`, the line starts),
@@ -485,22 +542,38 @@ fn utf8_len(lead: u8) -> usize {
 /// its width: its three bytes resolve to position 0 and it leaves a running delta of 3
 /// (`byte − utf16` with the unit it would have counted for gone), so every later byte
 /// reads one unit lower. It holds no line terminator, so the line scan can start behind it.
+///
+/// `ascii_prefix` is the length of a leading run the caller has already proved ASCII
+/// (`ByteToCharMap::new`'s search for the first multibyte character): it shares delta 0,
+/// so it is one fill and the scan starts behind it. Only the map-only rule takes one — a
+/// line rule must scan that prefix for its terminators — and a nonzero prefix means byte
+/// 0 is ASCII, so there is no BOM behind it.
 fn build_map(
     source: &str,
+    ascii_prefix: usize,
     lines: &mut LineScan,
     line_rule: ScanRule,
     bom: LeadingBom,
 ) -> ByteToCharMap {
+    debug_assert!(
+        ascii_prefix == 0 || line_rule == ScanRule::None,
+        "a line rule must scan the whole source"
+    );
+    debug_assert!(source.as_bytes()[..ascii_prefix].is_ascii());
     let mut narrow: Vec<u8> = Vec::with_capacity(source.len() + 1);
     let bom_len = match bom {
         LeadingBom::Elided => leading_bom_len(source),
         LeadingBom::Counted => 0,
     };
-    if bom_len > 0 {
+    let (from, delta) = if bom_len > 0 {
+        // An elided BOM's three bytes resolve to position 0: a running delta of its
+        // length. Byte 0 is not ASCII, so no proved prefix precedes it.
         narrow.extend_from_slice(&[0, 1, 2]);
-    }
-    // An elided BOM's three bytes resolve to position 0: a running delta of its length.
-    let (from, delta) = (bom_len, bom_len as u32);
+        (bom_len, bom_len as u32)
+    } else {
+        narrow.resize(ascii_prefix, 0);
+        (ascii_prefix, 0)
+    };
     let Err(outgrown) = build_deltas::<u8>(source, &mut narrow, lines, from, delta, line_rule)
     else {
         return ByteToCharMap {
@@ -943,7 +1016,7 @@ impl LocationTracker {
         }
 
         let mut lines = LineScan::lines(source.len());
-        let map = build_map(source, &mut lines, ScanRule::Ecmascript, bom);
+        let map = build_map(source, 0, &mut lines, ScanRule::Ecmascript, bom);
         (Self::with_line_starts(lines.starts), map)
     }
 
@@ -966,7 +1039,7 @@ impl LocationTracker {
             ascii_lf_line_starts_into(source.as_bytes(), 0, &mut lines);
             ByteToCharMap::identity()
         } else {
-            build_map(source, &mut lines, ScanRule::Lf, bom)
+            build_map(source, 0, &mut lines, ScanRule::Lf, bom)
         };
         (Self::with_line_starts(lines.starts), map)
     }
@@ -1495,7 +1568,8 @@ mod tests {
     #[test]
     fn test_elided_leading_bom_shifts_every_later_position_by_one() {
         let bom = '\u{feff}';
-        for tail in ["<div>x</div>", "a\né\n中", &"é".repeat(300)] {
+        let long_ascii = format!("{}é", "x".repeat(100));
+        for tail in ["<div>x</div>", "a\né\n中", &"é".repeat(300), &long_ascii] {
             let source = format!("{bom}{tail}");
             let counted = ByteToCharMap::new(&source, LeadingBom::Counted);
             let (lf_tracker, lf_map) = LocationTracker::new_with_map(&source, LeadingBom::Elided);
@@ -1607,10 +1681,134 @@ mod tests {
         }
     }
 
+    /// `ByteToCharMap::new` builds from the first multibyte character its search finds,
+    /// so the search's chunk and word boundaries are where a prefix fill could run one
+    /// entry short or long: the character at each boundary offset, in each UTF-8 width,
+    /// straddling a word and a chunk boundary, and as the source's last character, with
+    /// a second character behind it for the build to continue to.
+    #[test]
+    fn test_map_built_from_the_first_multibyte_character_at_the_scan_boundaries() {
+        // ASCII filler carrying both terminators, so the fused constructors' line
+        // halves are graded across the same boundaries.
+        fn filler(len: usize) -> String {
+            b"ab\ncd\r\nef gh"
+                .iter()
+                .cycle()
+                .take(len)
+                .map(|&b| char::from(b))
+                .collect()
+        }
+
+        // All ASCII: the identity map, with no table, at and around each stride.
+        for len in [0usize, 1, 7, 8, 9, 63, 64, 65, 127, 128, 129] {
+            let source = filler(len);
+            assert!(!ByteToCharMap::new(&source, LeadingBom::Counted).has_multibyte());
+            assert_map_matches_reference(&source, "all ASCII");
+        }
+
+        let mut positions: Vec<usize> = (0..=10).collect();
+        positions.extend(56..=72);
+        positions.extend(126..=130);
+        // U+FEFF too: at byte 0 it is a BOM, which the Counted reading the reference
+        // grades keeps as an ordinary character.
+        for ch in ['é', '中', '\u{2028}', '\u{feff}', '😀'] {
+            let width = ch.len_utf8();
+            for &at in &positions {
+                for trailing in [0usize, 1, 9, 70] {
+                    let mut source = filler(at);
+                    source.push(ch);
+                    source.push_str(&filler(trailing));
+                    assert_eq!(next_non_ascii(source.as_bytes(), 0), at, "{ch:?} at {at}");
+                    assert_map_matches_reference(&source, "first multibyte");
+                    // A second character behind the first, the build's next run.
+                    source.push('é');
+                    assert_map_matches_reference(&source, "first multibyte, then one");
+                }
+            }
+            // As the last character, its final byte at `len - 1`.
+            for len in [width, 8, 9, 63, 64, 65, 66, 128, 129] {
+                let mut source = filler(len - width);
+                source.push(ch);
+                assert_map_matches_reference(&source, "last character");
+            }
+        }
+    }
+
+    /// `next_non_ascii` and `next_non_ascii_chunked` against a byte loop, from every
+    /// start, over random bytes at several high-byte densities — the chunk stage's
+    /// break and the word loop's resume at every alignment, and a high byte at the
+    /// slice's last index.
+    #[test]
+    fn test_next_non_ascii_matches_a_byte_loop() {
+        let mut state = 0x9E37_79B9_7F4A_7C15u64;
+        for len in [0usize, 1, 7, 8, 9, 63, 64, 65, 127, 128, 129, 300] {
+            for density in [0u32, 3, 50, 400] {
+                for _ in 0..8 {
+                    let mut bytes: Vec<u8> = (0..len)
+                        .map(|_| {
+                            state = state
+                                .wrapping_mul(6_364_136_223_846_793_005)
+                                .wrapping_add(1);
+                            let r = (state >> 33) as u32;
+                            if density > 0 && r.is_multiple_of(density) {
+                                0x80 | r as u8
+                            } else {
+                                (r % 0x80) as u8
+                            }
+                        })
+                        .collect();
+                    for pass in 0..2 {
+                        if pass == 1 {
+                            // Everything ASCII but the last byte.
+                            if len == 0 {
+                                break;
+                            }
+                            for b in &mut bytes {
+                                *b &= 0x7f;
+                            }
+                            bytes[len - 1] = 0xff;
+                        }
+                        for from in 0..=len {
+                            let want = (from..len).find(|&i| bytes[i] >= 0x80).unwrap_or(len);
+                            let at = format!("len {len} from {from} density {density} pass {pass}");
+                            assert_eq!(next_non_ascii(&bytes, from), want, "words first: {at}");
+                            assert_eq!(next_non_ascii_chunked(&bytes, from), want, "chunked: {at}");
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Every run length either side of `next_non_ascii`'s hand-off to the chunk stage
+    /// (eight words, 64 bytes) and of the chunk stage's own stride, from every start
+    /// alignment within a word: a high byte that ends the run, and a run that ends
+    /// the slice, each with and without a tail behind it.
+    #[test]
+    fn test_next_non_ascii_across_the_chunk_hand_off() {
+        for start in 0..8usize {
+            for run in 0..=200usize {
+                for tail in [0usize, 1, 7, 8, 63, 64, 65] {
+                    let mut bytes = vec![b'a'; start + run];
+                    let ends_at_high = tail > 0;
+                    if ends_at_high {
+                        bytes.push(0xc3);
+                        bytes.extend(std::iter::repeat_n(b'b', tail - 1));
+                    }
+                    let want = start + run;
+                    let at = format!("start {start} run {run} tail {tail}");
+                    assert_eq!(next_non_ascii(&bytes, start), want, "words first: {at}");
+                    assert_eq!(next_non_ascii_chunked(&bytes, start), want, "chunked: {at}");
+                }
+            }
+        }
+    }
+
     #[test]
     fn test_next_non_ascii_finds_the_first_high_byte() {
-        // Every alignment within and past the word-at-a-time stride.
-        for prefix in 0..24usize {
+        // Every alignment within and past the word-at-a-time stride and the
+        // 64-byte chunk stage ahead of it.
+        for prefix in 0..200usize {
             let mut source = "a".repeat(prefix);
             source.push('é');
             source.push_str("bcd");
