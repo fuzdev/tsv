@@ -7,7 +7,8 @@ use crate::ast::{CssStores, CssValue};
 use crate::parser::value::cursor::ValueCursor;
 use crate::parser::value::lists::{ValueSeparator, classify_separators};
 use crate::parser::value::scan::{
-    comment_run_end, is_comment_start, is_value_separator, quoted_run_end, value_skip_table,
+    comment_run_end, is_comment_start, is_value_separator, quoted_run_end, table_run_end,
+    value_skip_table,
 };
 use crate::whitespace::is_css_whitespace;
 use tsv_lang::Span;
@@ -492,7 +493,7 @@ impl<'a> ValueParser<'a> {
 
         let mut i = 0;
         while i < bytes.len() {
-            let b = bytes[i];
+            let mut b = bytes[i];
 
             // Most of a value's bytes are inert content, which no arm below can act
             // on (see `FAST_SCAN_SKIP`). One L1 load retires them ahead of the whole
@@ -510,9 +511,14 @@ impl<'a> ValueParser<'a> {
             // and a value averages under four words, so every value's last word is a tail.
             // Half the BYTES do sit in runs of 13+ (mean 25), which bounds what any tuning
             // could recover here at a few tenths of a percent.
+            //
+            // What does pay is the table walked in chunks (`table_run_end`): one bound check
+            // per chunk rather than per byte, with no word kernel. The byte that ends the run
+            // is no skip byte, so it goes straight to the arms below, never re-tested.
             if FAST_SCAN_SKIP[b as usize] {
-                i += 1;
-                continue;
+                i = table_run_end(bytes, i + 1, &FAST_SCAN_SKIP);
+                let Some(&stop) = bytes.get(i) else { break };
+                b = stop;
             }
 
             // A block comment outside quotes: *this loop's* inline split is comment-blind

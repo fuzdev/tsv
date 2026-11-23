@@ -4,7 +4,9 @@
 // args) while respecting parenthesis and quote nesting, tracking byte position
 // during parsing.
 
-use crate::parser::value::scan::{comment_end, is_comment_start, is_value_structural};
+use crate::parser::value::scan::{
+    comment_end, is_comment_start, is_value_structural, table_run_end,
+};
 use crate::whitespace::is_css_whitespace;
 
 /// Position-tracking cursor for parsing CSS values
@@ -179,14 +181,20 @@ impl<'a> ValueCursor<'a> {
             // Most of a value's bytes are inert content — not a delimiter, not an
             // escape, not a nesting or quote trigger. One L1 load retires them
             // before the decode, the escape probe, the predicate call, and
-            // `update_state`'s match chain.
+            // `update_state`'s match chain — a whole run of them at a time
+            // (`table_run_end`). The byte that ends the run goes back through the loop head
+            // for its bound check and load; its table test there always misses.
             if table[b as usize] {
+                let end = table_run_end(bytes, i + 1, table);
                 debug_assert!(
                     !std::ptr::eq(table, skip)
-                        || b < 0x80 && !is_value_structural(b) && !is_delimiter(b as char),
-                    "consume_until skip table disagrees with its delimiter predicate at {b:#04x}"
+                        || bytes[i..end].iter().all(|&b| {
+                            b < 0x80 && !is_value_structural(b) && !is_delimiter(b as char)
+                        }),
+                    "consume_until skip table disagrees with its delimiter predicate in {:?}",
+                    &bytes[i..end]
                 );
-                i += 1;
+                i = end;
                 continue;
             }
 

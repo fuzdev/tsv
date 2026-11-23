@@ -250,6 +250,42 @@ macro_rules! value_skip_table {
 
 pub(crate) use value_skip_table;
 
+/// How many bytes [`table_run_end`] tests behind one bound check.
+///
+/// Sixteen is chosen for these runs' shape, not in general: a value is short, and a run that
+/// starts within a chunk of the value's end walks byte by byte, so a wider chunk hands more
+/// runs to that tail, while a narrower one pays the bound check and the loop's back edge more
+/// often across the long runs that hold much of a value's bytes. A second, narrower stage after the
+/// chunked one, and `chunks_exact`'s remainder bookkeeping, each cost more than they saved.
+/// The declaration boundary scan's own walk (`decl_scan::skip_run_end_in`) keeps its width,
+/// chosen on its own runs.
+const TABLE_RUN_CHUNK: usize = 16;
+
+/// The end of the run of `table` bytes from `from` — `from` itself when none is one — for
+/// the value scanners whose skip test is a [`value_skip_table!`] lookup.
+///
+/// [`TABLE_RUN_CHUNK`] bytes at a time while that many are in bounds, each tested against
+/// the table in turn with no bound check of its own, then byte by byte. Every byte is still
+/// the table's to classify; only the bound check is shared across the chunk.
+#[expect(
+    clippy::inline_always,
+    reason = "each caller's skip test must fold into its own loop, with a constant table where it has one"
+)]
+#[inline(always)]
+pub(crate) fn table_run_end(bytes: &[u8], from: usize, table: &[bool; 256]) -> usize {
+    let mut i = from;
+    while let Some(chunk) = bytes.get(i..i + TABLE_RUN_CHUNK) {
+        if let Some(k) = chunk.iter().position(|&b| !table[b as usize]) {
+            return i + k;
+        }
+        i += TABLE_RUN_CHUNK;
+    }
+    while i < bytes.len() && table[bytes[i] as usize] {
+        i += 1;
+    }
+    i
+}
+
 #[cfg(test)]
 mod matching_close_paren_tests {
     use super::matching_close_paren;
