@@ -9,9 +9,10 @@
 //! re-indent of either's bytes.
 //!
 //! **Byte-identity**: the wire JSON is a faithful emission of the acorn quirk
-//! catalog — each node's field order, `skip_serializing_if` behavior, `null`s
-//! for non-skipped `Option`s, and scalar formatting match acorn-typescript's
-//! JSON exactly (the shape each fixture's `expected.json` records).
+//! catalog — key presence, `skip_serializing_if` behavior, `null`s for
+//! non-skipped `Option`s, and scalar formatting match acorn-typescript's JSON
+//! (the shape each fixture's `expected.json` records); key order is tsv's own,
+//! one per node type (docs/conformance_svelte.md §Key Order).
 //!
 //! Dynamic strings are escaped by `JsonWriter::string`, byte-identical to
 //! `serde_json`'s string serialization; only non-integral `f64` goes to
@@ -97,7 +98,7 @@ pub fn write_variable_declaration_embedded(
     env: EmbedWriter<'_>,
 ) {
     let ctx = Ctx::from_embed(env);
-    write_variable_declaration(w, var_decl, &ctx, false);
+    write_variable_declaration(w, var_decl, &ctx);
 }
 
 /// Emit an embedded expression whose top-level `Identifier` carries an injected
@@ -291,8 +292,8 @@ pub(super) struct Ctx<'a> {
     /// vanilla-only wire quirks: `options` rather than `arguments` for an
     /// `ImportExpression`'s second argument (vanilla acorn always emits the
     /// field, `null` when absent; acorn-typescript emits a skip-if-empty
-    /// `arguments` array instead), and `value`-before-`kind` on get/set
-    /// `Property` nodes (acorn-typescript's get/set path assigns `kind` first).
+    /// `arguments` array instead), `importKind`/`exportKind` omitted where
+    /// `"value"`, and `attributes` always emitted on import/export declarations.
     /// `false` for standalone TS and every `lang="ts"` component.
     ///
     /// The fact is **component-global** (Svelte's single `this.ts`), so it is
@@ -541,7 +542,7 @@ fn debug_assert_overhanging_node_is_island_root(
     }
 }
 
-/// Shared body of `node_header` and the name-first identifier emission;
+/// Shared body of `node_header` and the `character`-bearing identifier emission;
 /// `CHARACTER` (the fused `inject_loc_character`, injected into
 /// `loc.start`/`loc.end` for the top-level `Identifier` of a simple block
 /// pattern / shorthand) is a compile-time constant, so each wrapper
@@ -582,8 +583,7 @@ fn header_run<const CHARACTER: bool>(
 }
 
 /// The `,"start":…,"end":…,"loc":{…}` position fields (final char space) —
-/// the tail of `header_run`, also emitted after a leading `name` for the
-/// Svelte-constructed identifiers whose fields precede the positions.
+/// the tail of `header_run`.
 ///
 /// Emits into the caller's **staged run**, which the caller opens and flushes
 /// around it — the whole header reaches the output buffer as one append (see
@@ -951,9 +951,9 @@ pub(super) fn write_identifier_parts(
 
 /// `write_identifier_parts` with `character` injected into the node's `loc`
 /// (the fused `inject_loc_character`) — the top-level `Identifier` of a simple
-/// Svelte block pattern / shorthand. Svelte's parser constructs these
-/// identifiers itself, with `name` ahead of the positions
-/// (`{type, name, start, end, loc}`), unlike acorn-parsed identifiers.
+/// Svelte block pattern / shorthand. Svelte's parser constructs these identifiers
+/// itself, with `name` ahead of the positions; tsv's wire gives them the one
+/// `Identifier` order, acorn's.
 pub(super) fn write_identifier_parts_with_character(
     w: &mut JsonWriter,
     span: Span,
@@ -972,15 +972,8 @@ pub(super) fn write_identifier_parts_with_character(
         type_annotation.map_or(span.end, |ta| ta.span.end),
         ctx,
     );
-    attach_open("Identifier", span, ctx);
-    w.raw("{\"type\":\"Identifier\"");
-    write_name_field(w, name, span.start, ctx);
-    // `name` is escape-sensitive and precedes the positions, so it can't join
-    // the staged run — the run opens after it and covers the positions alone.
-    let mut run = w.stage_run();
-    position_fields::<true>(&mut run, span, ctx);
-    run.flush();
-    write_identifier_tail(w, span, optional, type_annotation, decorators, ctx);
+    node_header_impl::<true>(w, "Identifier", span, ctx);
+    write_identifier_fields(w, span, name, optional, type_annotation, decorators, ctx);
 }
 
 /// The `Identifier` fields after the node header: `name`, then the tail.

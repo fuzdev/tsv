@@ -144,7 +144,7 @@ impl LocWiresCommand {
 
 /// What the fixture tree claims about a document's parse (module doc).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Claim {
+pub(crate) enum Claim {
     /// tsv must parse it; a failure fails the run.
     Required,
     /// Only prettier's side claims anything; a tsv rejection is streamed and counted.
@@ -152,7 +152,7 @@ enum Claim {
 }
 
 /// Every graded document in `fixture`'s directory, by filename, with its claim.
-fn documents(fixture: &Fixture) -> Vec<(String, Claim)> {
+pub(crate) fn documents(fixture: &Fixture) -> Vec<(String, Claim)> {
     let files = FixtureFiles::scan(fixture);
     let mut documents = vec![(fixture.input_file.clone(), Claim::Required)];
     for list in [

@@ -38,7 +38,7 @@ pub(super) fn write_for_statement(
     w.raw(",\"init\":");
     match ctx.view.opt_for_head(for_stmt.init) {
         Some(ast::ForInit::VariableDeclaration(decl)) => {
-            write_variable_declaration(w, decl, ctx, false);
+            write_variable_declaration(w, decl, ctx);
         }
         Some(ast::ForInit::Expression(expr)) => write_expression(w, ctx.view.expr(*expr), ctx),
         None => w.null(),
@@ -60,7 +60,7 @@ pub(super) fn write_for_statement(
 fn write_for_in_of_left(w: &mut JsonWriter, left: &ast::ForInOfLeft, ctx: &Ctx<'_>) {
     match left {
         ast::ForInOfLeft::VariableDeclaration(decl) => {
-            write_variable_declaration(w, decl, ctx, false);
+            write_variable_declaration(w, decl, ctx);
         }
         ast::ForInOfLeft::Pattern(expr) => write_expression(w, ctx.view.expr(*expr), ctx),
     }

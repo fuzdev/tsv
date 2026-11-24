@@ -1018,6 +1018,68 @@ export const DOCUMENTED_MATCHERS: DocumentedMatcher[] = [
 		}
 	},
 	{
+		// tsv's wire gives `ArrowFunctionExpression` one key order, its common route's
+		// (`returnType` first, `typeParameters` last), where acorn-typescript's generic async
+		// route (`async <T>(…) => …`) writes `typeParameters`, `params`, `returnType` first.
+		// Svelte's comment walk visits keys in order, so on that route the head's comments
+		// land on other nodes of the arrow — with no parameter, on the body. Admitted only as
+		// that: a comment array (or a field of one of its comments) owned by the type
+		// parameters, a parameter, the return type or the body of a canonical async arrow
+		// whose type parameters start after the arrow does — and only
+		// when every comment it names lies between the arrow's start and its body's. What
+		// this cannot see — the matcher reads canonical's tree, not tsv's — is a head comment
+		// tsv drops: the missing attachment reads like a moved one.
+		name: 'generic_async_arrow_comment_order',
+		conformance_section:
+			"Comment Attachment Differences — An `async <T>(…)` arrow's head comments attach in the arrow's one key order",
+		matches: (entry, _canonical_parent, ctx) => {
+			const at = /^(.*)\.(leadingComments|trailingComments)(?:\[\d+\](?:\.(\w+))?)?$/.exec(
+				entry.path
+			);
+			if (!at) return false;
+			const owner = at[1]!;
+			const segments = owner.split('.');
+			for (let i = segments.length - 1; i >= 1; i--) {
+				const arrow = get_at_path(ctx.canonical_root, segments.slice(0, i).join('.')) as {
+					type?: unknown;
+					async?: unknown;
+					start?: unknown;
+					typeParameters?: { start?: unknown } | null;
+					body?: { start?: unknown } | null;
+				} | null;
+				if (arrow?.type !== 'ArrowFunctionExpression') continue;
+				if (!/^(typeParameters|params\[\d+\]|returnType|body)$/.test(segments[i]!)) return false;
+				const start = arrow.start;
+				const body_start = arrow.body?.start;
+				if (
+					arrow.async !== true ||
+					typeof start !== 'number' ||
+					typeof body_start !== 'number' ||
+					typeof arrow.typeParameters?.start !== 'number' ||
+					arrow.typeParameters.start <= start
+				) {
+					return false;
+				}
+				const in_head = (offset: unknown): boolean =>
+					typeof offset === 'number' && start <= offset && offset <= body_start;
+				const in_head_comments = (value: unknown): boolean =>
+					Array.isArray(value) &&
+					(value as (CommentLike | null)[]).every((c) => in_head(c?.start) && in_head(c?.end));
+				if (entry.kind === 'missing_ours') return in_head_comments(entry.canonical);
+				if (entry.kind === 'missing_canonical') return in_head_comments(entry.ours);
+				const array = get_at_path(ctx.canonical_root, `${owner}.${at[2]}`);
+				if (!in_head_comments(array)) return false;
+				if (entry.kind === 'length_mismatch') return true;
+				const field = at[3];
+				return (
+					entry.kind === 'value_mismatch' &&
+					(field === 'start' || field === 'end' ? in_head(entry.ours) : true)
+				);
+			}
+			return false;
+		}
+	},
+	{
 		// acorn-typescript ends a typed RestElement at the binding, excluding the
 		// type annotation (`(...args: Array<any>)` → end after `args`) — inconsistent
 		// with its own Identifier params, and with babel/TS-ESLint, which include

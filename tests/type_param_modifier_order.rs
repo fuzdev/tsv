@@ -8,23 +8,18 @@
 //! rule — "only on a class, interface or type alias" — already is). Prettier formats
 //! every ordering.
 //!
-//! Two opposite claims meet on that fact, and this file is where they can both be
-//! stated:
+//! Both of tsv's outputs are order-blind:
 //!
-//! - the **wire** preserves the SOURCE order, because acorn-typescript's
-//!   `tsParseModifiers` stamps each flag as it consumes the keyword — `<in const T>`
-//!   emits `in` before `const`, `<const in T>` the reverse;
-//! - the **printer** emits the CANONICAL `const in out` however the source spells it,
+//! - the **wire** writes the modifier keys in one order, `const`, `in`, `out` — tsv's
+//!   wire takes one key order per node type, where acorn-typescript's `tsParseModifiers`
+//!   stamps each flag as it consumes the keyword, so its key order follows the source
+//!   (key order is not graded against the oracle; keys, values and presence are);
+//! - the **printer** emits the canonical `const in out` however the source spells it,
 //!   exactly as prettier does.
 //!
-//! Together they mean the source order is observable only until the first format.
-//! That is precisely why a fixture cannot hold this: an `input.*` must be a
-//! formatting fixed point, and every non-canonical ordering is rewritten by both
-//! formatters — so the reversed spelling can only ride as an `unformatted_*` variant,
-//! which the validator never runs the canonical parser over. The accepts and the
-//! normalization are pinned by
-//! `typescript/typescript_specific/generics/type_param_modifier_order`; the key
-//! ORDER, which has no fixture form at all, is pinned here.
+//! The accepts and the normalization are pinned by
+//! `typescript/typescript_specific/generics/type_param_modifier_order`; the one wire for
+//! every spelling is pinned here.
 //!
 //! ⚠️ One spelling has no fixture form at ALL, not even a variant: the **reversed
 //! variance pair** `<out in T>`, which acorn-typescript *rejects* in every declaration
@@ -37,9 +32,13 @@
 
 use serde_json::Value;
 
-fn parse_json(source: &str) -> Value {
+fn wire(source: &str) -> Vec<u8> {
     let program = tsv_ts::__private::parse(source).expect("parse failed");
-    tsv_debug::json::wire_value(&tsv_ts::__private::convert_ast_json_bytes(&program, source))
+    tsv_ts::__private::convert_ast_json_bytes(&program, source)
+}
+
+fn parse_json(source: &str) -> Value {
+    tsv_debug::json::wire_value(&wire(source))
 }
 
 fn format(source: &str) -> String {
@@ -61,25 +60,38 @@ fn modifier_keys(source: &str) -> Vec<String> {
         .collect()
 }
 
-/// The wire stamps modifiers in the order the author wrote them — acorn's
-/// `tsParseModifiers` sets each flag as it consumes its keyword, so the key order is
-/// a fact about the SOURCE, not a fixed field order.
+/// The wire writes the modifiers present in one order, `const`, `in`, `out`, whatever
+/// order the author wrote them in.
 #[test]
-fn wire_keys_follow_source_order() {
+fn wire_keys_take_one_order() {
     for (source, expected) in [
         ("class C<const in T> {}", vec!["const", "in"]),
-        ("class C<in const T> {}", vec!["in", "const"]),
+        ("class C<in const T> {}", vec!["const", "in"]),
         ("class C<const out T> {}", vec!["const", "out"]),
-        ("class C<out const T> {}", vec!["out", "const"]),
+        ("class C<out const T> {}", vec!["const", "out"]),
         ("class C<in out T> {}", vec!["in", "out"]),
         // The one spelling acorn rejects outright — tsv defers TS1029, so the wire
         // shape below is tsv's alone (see the module doc).
-        ("class C<out in T> {}", vec!["out", "in"]),
+        ("class C<out in T> {}", vec!["in", "out"]),
         ("class C<const T> {}", vec!["const"]),
         ("class C<in T> {}", vec!["in"]),
         ("class C<out T> {}", vec!["out"]),
     ] {
         assert_eq!(modifier_keys(source), expected, "wire keys of {source:?}");
+    }
+}
+
+/// Spellings that differ only in modifier order give byte-identical wires: the parameter's
+/// span covers the modifiers either way, and no field records which came first.
+#[test]
+fn reordered_spellings_write_the_same_bytes() {
+    for (a, b) in [
+        ("class C<const in T> {}", "class C<in const T> {}"),
+        ("class C<const out T> {}", "class C<out const T> {}"),
+        ("class C<in out T> {}", "class C<out in T> {}"),
+        ("class C<const in out T> {}", "class C<out in const T> {}"),
+    ] {
+        assert_eq!(wire(a), wire(b), "{a:?} and {b:?}");
     }
 }
 

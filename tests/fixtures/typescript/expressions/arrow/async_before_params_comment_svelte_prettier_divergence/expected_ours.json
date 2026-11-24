@@ -1,0 +1,371 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 539,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A comment between `async` and the parameters can only be a single-line block",
+			"start": 20,
+			"end": 99
+		},
+		{
+			"type": "Line",
+			"value": " comment — every other kind carries a line terminator, which the",
+			"start": 101,
+			"end": 167
+		},
+		{
+			"type": "Line",
+			"value": " `async [no LineTerminator here] ArrowFormalParameters` rule rejects (the",
+			"start": 169,
+			"end": 244
+		},
+		{
+			"type": "Line",
+			"value": " `async_line_break` fixture covers those rejections).",
+			"start": 246,
+			"end": 301
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 319,
+			"end": 326
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 354,
+			"end": 361
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 389,
+			"end": 396
+		},
+		{
+			"type": "Line",
+			"value": " a run stays in order, in the gap the author wrote it in",
+			"start": 425,
+			"end": 483
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 501,
+			"end": 509
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 510,
+			"end": 518
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 538,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 529,
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 303,
+					"end": 336,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 309,
+							"end": 335,
+							"id": {
+								"type": "Identifier",
+								"start": 309,
+								"end": 310,
+								"name": "a"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 313,
+								"end": 335,
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": true,
+								"params": [],
+								"body": {
+									"type": "BlockStatement",
+									"start": 333,
+									"end": 335,
+									"body": [],
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 319,
+											"end": 326
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A comment between `async` and the parameters can only be a single-line block",
+							"start": 20,
+							"end": 99
+						},
+						{
+							"type": "Line",
+							"value": " comment — every other kind carries a line terminator, which the",
+							"start": 101,
+							"end": 167
+						},
+						{
+							"type": "Line",
+							"value": " `async [no LineTerminator here] ArrowFormalParameters` rule rejects (the",
+							"start": 169,
+							"end": 244
+						},
+						{
+							"type": "Line",
+							"value": " `async_line_break` fixture covers those rejections).",
+							"start": 246,
+							"end": 301
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 338,
+					"end": 371,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 344,
+							"end": 370,
+							"id": {
+								"type": "Identifier",
+								"start": 344,
+								"end": 345,
+								"name": "b"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 348,
+								"end": 370,
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": true,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 363,
+										"end": 364,
+										"name": "x",
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " c ",
+												"start": 354,
+												"end": 361
+											}
+										]
+									}
+								],
+								"body": {
+									"type": "Identifier",
+									"start": 369,
+									"end": 370,
+									"name": "x"
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 373,
+					"end": 422,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 379,
+							"end": 421,
+							"id": {
+								"type": "Identifier",
+								"start": 379,
+								"end": 380,
+								"name": "c"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 383,
+								"end": 421,
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": true,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 411,
+										"end": 415,
+										"name": "x",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 412,
+											"end": 415,
+											"typeAnnotation": {
+												"type": "TSTypeReference",
+												"start": 414,
+												"end": 415,
+												"typeName": {
+													"type": "Identifier",
+													"start": 414,
+													"end": 415,
+													"name": "T"
+												}
+											}
+										},
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " c ",
+												"start": 389,
+												"end": 396
+											}
+										]
+									}
+								],
+								"body": {
+									"type": "Identifier",
+									"start": 420,
+									"end": 421,
+									"name": "x"
+								},
+								"typeParameters": {
+									"type": "TSTypeParameterDeclaration",
+									"start": 397,
+									"end": 410,
+									"params": [
+										{
+											"type": "TSTypeParameter",
+											"start": 398,
+											"end": 409,
+											"name": "T",
+											"constraint": {
+												"type": "TSTypeReference",
+												"start": 408,
+												"end": 409,
+												"typeName": {
+													"type": "Identifier",
+													"start": 408,
+													"end": 409,
+													"name": "A"
+												}
+											}
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 485,
+					"end": 528,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 491,
+							"end": 527,
+							"id": {
+								"type": "Identifier",
+								"start": 491,
+								"end": 492,
+								"name": "d"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 495,
+								"end": 527,
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": true,
+								"params": [],
+								"body": {
+									"type": "BlockStatement",
+									"start": 525,
+									"end": 527,
+									"body": [],
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c1 ",
+											"start": 501,
+											"end": 509
+										},
+										{
+											"type": "Block",
+											"value": " c2 ",
+											"start": 510,
+											"end": 518
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a run stays in order, in the gap the author wrote it in",
+							"start": 425,
+							"end": 483
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"type": "Text",
+						"start": 14,
+						"end": 16,
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

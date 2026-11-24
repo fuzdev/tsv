@@ -605,34 +605,70 @@ test('reconstruct_locations: depth costs no JS stack', () => {
 	deepStrictEqual(innermost.loc, { start: { line: 1, column: 0 }, end: { line: 1, column: 1 } });
 });
 
-test('reconstruct_locations: an in-tag comment is told by the key order its collector wrote', () => {
-	// Svelte's template reader writes `{type, start, end, value}` (an in-tag comment, which
-	// gets `character`); acorn's `onComment` wrapper `{type, value, start, end}` (the plain
-	// shape) — whatever the tree around them says
-	const source = '<div /* a */ title={/* b */ x}></div>';
+test('reconstruct_locations: an in-tag comment is told by where it sits in the tree', () => {
+	// Svelte's template reader collects a comment written between an element's attributes
+	// (it gets `character`); acorn collects the rest (the plain shape) — one inside an
+	// attribute value, or inside a `<svelte:element>`'s `this={…}`, whose `tag` span
+	// excludes the braces. All three are written in the one comment key order.
+	const source =
+		'<div /* a */ title={/* b */ x}></div><svelte:element this={/* c */ y}></svelte:element>';
 	const at = (needle: string) => source.indexOf(needle);
-	const template_reader: Record<string, unknown> = {
+	const comment = (text: string): Record<string, unknown> => ({
 		type: 'Block',
-		start: at('/* a'),
-		end: at('/* a') + 7,
-		value: ' a '
+		value: ` ${text} `,
+		start: at(`/* ${text}`),
+		end: at(`/* ${text}`) + 7
+	});
+	const [a, b, c] = [comment('a'), comment('b'), comment('c')];
+	const div_end = at('<svelte:element');
+	const div = {
+		type: 'RegularElement',
+		start: 0,
+		end: div_end,
+		name: 'div',
+		attributes: [
+			{
+				type: 'Attribute',
+				start: at('title'),
+				end: at(' x}') + 3,
+				name: 'title',
+				value: {
+					type: 'ExpressionTag',
+					start: at('{/* b'),
+					end: at(' x}') + 3,
+					expression: { type: 'Identifier', start: at(' x}') + 1, end: at(' x}') + 2, name: 'x' }
+				}
+			}
+		],
+		fragment: { type: 'Fragment', nodes: [] }
 	};
-	const acorn: Record<string, unknown> = {
-		type: 'Block',
-		value: ' b ',
-		start: at('/* b'),
-		end: at('/* b') + 7
+	const element = {
+		type: 'SvelteElement',
+		start: div_end,
+		end: source.length,
+		name: 'svelte:element',
+		tag: { type: 'Identifier', start: at(' y}') + 1, end: at(' y}') + 2, name: 'y' },
+		attributes: [],
+		fragment: { type: 'Fragment', nodes: [] }
 	};
-	const root = { type: 'Root', start: 0, end: source.length, comments: [acorn, template_reader] };
+	const root = {
+		type: 'Root',
+		start: 0,
+		end: source.length,
+		fragment: { type: 'Fragment', nodes: [div, element] },
+		comments: [a, b, c]
+	};
 	reconstruct_locations(root, source);
-	deepStrictEqual(template_reader.loc, {
+	deepStrictEqual(a.loc, {
 		start: { line: 1, column: 5, character: 5 },
 		end: { line: 1, column: 12, character: 12 }
 	});
-	deepStrictEqual(acorn.loc, {
-		start: { line: 1, column: at('/* b') },
-		end: { line: 1, column: at('/* b') + 7 }
-	});
+	for (const plain of [b, c]) {
+		deepStrictEqual(plain.loc, {
+			start: { line: 1, column: plain.start },
+			end: { line: 1, column: plain.end }
+		});
+	}
 });
 
 test('parse: the source type is forwarded, unset when not named', () => {

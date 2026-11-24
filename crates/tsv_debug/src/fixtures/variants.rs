@@ -37,7 +37,7 @@ pub fn unformatted_ours_suffix<'a>(filename: &'a str, input_ext: &str) -> Option
 /// (`prettier_variant_bom.svelte` → `expected_prettier_variant_bom.json`).
 ///
 /// The pin makes the non-divergence parse claim (P4) about THAT variant: the canonical
-/// parser's AST of the variant, which tsv's parse must reproduce byte-strict. It exists
+/// parser's AST of the variant, which tsv's parse must reproduce (key order aside). It exists
 /// for a parse fact only a non-fixed-point authoring can carry — a leading BOM with nothing
 /// load-bearing behind it, which the format side strips, or a newline inside a region the
 /// canonical parser overwrites (Svelte's `_ as ` annotation window), which tsv's formatter

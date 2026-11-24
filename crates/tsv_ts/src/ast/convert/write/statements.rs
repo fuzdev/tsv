@@ -92,7 +92,7 @@ pub(super) fn write_statement(w: &mut JsonWriter, stmt: &ast::Statement, ctx: &C
             close_node(w, "ExpressionStatement", stmt.span, ctx);
         }
         ast::StatementKind::VariableDeclaration(var_decl) => {
-            write_variable_declaration(w, var_decl, ctx, false);
+            write_variable_declaration(w, var_decl, ctx);
         }
         &ast::StatementKind::TSTypeAliasDeclaration(type_alias) => {
             let type_alias = ctx.view.type_alias(type_alias);
@@ -115,11 +115,10 @@ pub(super) fn write_statement(w: &mut JsonWriter, stmt: &ast::Statement, ctx: &C
         }
         &ast::StatementKind::ClassDeclaration(class_decl) => {
             let class_decl = ctx.view.class_decl(class_decl);
-            write_class_declaration(w, class_decl, ctx, false);
+            write_class_declaration(w, class_decl, ctx);
         }
         &ast::StatementKind::ExportNamedDeclaration(export_decl) => {
             let export_decl = ctx.view.export_named(export_decl);
-            let is_type_export = matches!(export_decl.export_kind, ast::ExportKind::Type);
             let start = export_start(
                 ctx.source,
                 stmt.span.start,
@@ -134,7 +133,7 @@ pub(super) fn write_statement(w: &mut JsonWriter, stmt: &ast::Statement, ctx: &C
             write_export_kind_field(w, export_decl.export_kind, ctx);
             w.raw(",\"declaration\":");
             write_or_null(w, ctx.view.opt_stmt(export_decl.declaration), |w, d| {
-                write_exported_declaration(w, d, ctx, is_type_export);
+                write_statement(w, d, ctx);
             });
             w.raw(",\"specifiers\":");
             write_array(w, ctx.view.export_specs(export_decl.specifiers), |w, s| {
@@ -291,11 +290,11 @@ pub(super) fn write_statement(w: &mut JsonWriter, stmt: &ast::Statement, ctx: &C
         }
         &ast::StatementKind::TSInterfaceDeclaration(iface) => {
             let iface = ctx.view.interface_decl(iface);
-            write_interface_declaration(w, iface, ctx, false);
+            write_interface_declaration(w, iface, ctx);
         }
         &ast::StatementKind::TSDeclareFunction(func) => {
             let func = ctx.view.declare_fn(func);
-            write_declare_function(w, func, ctx, false);
+            write_declare_function(w, func, ctx);
         }
         &ast::StatementKind::TSEnumDeclaration(enum_decl) => {
             let enum_decl = ctx.view.enum_decl(enum_decl);
@@ -362,59 +361,18 @@ pub(super) fn write_block_statement(
     close_node(w, "BlockStatement", block.span, ctx);
 }
 
-/// Emit an `export`ed declaration. Same dispatch as `write_statement`, but the
-/// `declare`-carrying declarations get `exported = true`: acorn-typescript's
-/// `parseExportDeclaration` stamps `declare` on the *finished* node (post-hoc),
-/// unlike the statement-level `tsTryParseDeclare` prefix assignment — so
-/// `export declare` serializes `declare` last.
-///
-/// A decorated class needs the sharper question, because a decorator between
-/// `export` and `declare` sends the class back down the *statement* route: it
-/// takes `is_type_export`, the enclosing node's `exportKind`, which acorn sets in
-/// the very `if (isDeclare)` block that does the post-hoc stamp. For the other
-/// three, `declare` can only have come from the export route, so the bit is `true`
-/// by construction (and inert where there is no `declare` to place).
-fn write_exported_declaration(
-    w: &mut JsonWriter,
-    stmt: &ast::Statement,
-    ctx: &Ctx<'_>,
-    is_type_export: bool,
-) {
-    match &stmt.kind {
-        ast::StatementKind::VariableDeclaration(var_decl) => {
-            write_variable_declaration(w, var_decl, ctx, true);
-        }
-        &ast::StatementKind::ClassDeclaration(class_decl) => {
-            let class_decl = ctx.view.class_decl(class_decl);
-            write_class_declaration(w, class_decl, ctx, is_type_export);
-        }
-        &ast::StatementKind::TSInterfaceDeclaration(iface) => {
-            let iface = ctx.view.interface_decl(iface);
-            write_interface_declaration(w, iface, ctx, true);
-        }
-        &ast::StatementKind::TSDeclareFunction(func) => {
-            let func = ctx.view.declare_fn(func);
-            write_declare_function(w, func, ctx, true);
-        }
-        _ => write_statement(w, stmt, ctx),
-    }
-}
-
 /// Emits a `VariableDeclaration` node (each declarator a `VariableDeclarator`).
-/// Field order: `declare?` (statement position), `declarations` (each: `id`,
-/// `definite` only when true, `init` nullable), `kind`, `declare?` (export
-/// position) — acorn-typescript's statement-level `declare` is stamped before
-/// the declaration parses (`tsTryParseDeclare`), while `export declare` stamps
-/// the finished node (`parseExportDeclaration`), so the field's position
-/// depends on `exported`.
+/// Field order: `declare?`, `declarations` (each: `id`, `definite` only when true, `init`
+/// nullable), `kind` — acorn-typescript's statement route (`tsTryParseDeclare` stamps
+/// `declare` before the declaration parses). `export declare` stamps the finished node
+/// instead (`parseExportDeclaration`); tsv's wire keeps the one order.
 pub(super) fn write_variable_declaration(
     w: &mut JsonWriter,
     var_decl: &ast::VariableDeclaration,
     ctx: &Ctx<'_>,
-    exported: bool,
 ) {
     node_header(w, "VariableDeclaration", var_decl.span, ctx);
-    if var_decl.declare && !exported {
+    if var_decl.declare {
         w.raw(",\"declare\":true");
     }
     w.raw(",\"declarations\":");
@@ -439,9 +397,6 @@ pub(super) fn write_variable_declaration(
         ast::VariableDeclarationKind::Var => w.raw(",\"kind\":\"var\""),
         ast::VariableDeclarationKind::Using => w.raw(",\"kind\":\"using\""),
         ast::VariableDeclarationKind::AwaitUsing => w.raw(",\"kind\":\"await using\""),
-    }
-    if var_decl.declare && exported {
-        w.raw(",\"declare\":true");
     }
     close_node(w, "VariableDeclaration", var_decl.span, ctx);
 }

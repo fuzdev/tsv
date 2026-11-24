@@ -42,13 +42,13 @@ pub(crate) fn parse_input(
 pub(crate) struct InputAstPaths {
     /// The compact span-only wire `convert_ast_json_bytes` emitted
     /// (fixtures pin spans; the `loc` gates grade `loc`, not this). Read back into
-    /// a `Value` only on a byte mismatch, to classify it as field-order-only vs
-    /// semantic ([`Self::wire_value`]) — so the happy path deserializes nothing,
-    /// like the CLI.
+    /// a key-order-insensitive `Value` only on a byte mismatch against an oracle file
+    /// ([`Self::wire_value`]) — so the happy path deserializes nothing, like the CLI.
     pub wire: Vec<u8>,
     /// The same wire tab-indented + trailing newline — the exact bytes
-    /// `expected*.json` files store (what `fixtures_update_parsed` writes); the
-    /// byte-strict comparison the parser phases gate on.
+    /// `expected*.json` files store (what `fixtures_update_parsed` writes); P2 compares
+    /// `expected_ours.json` against it byte-strict, and P2b/P4 try it before the `Value`
+    /// comparison.
     pub ast_json_tabs: String,
 }
 

@@ -79,8 +79,6 @@ pub enum ValidationError {
     ParserExpectedSvelteOutdated,
     #[error("our parser output differs from expected.json")]
     ParserOursDiffersFromExpected,
-    #[error("our parser output matches expected.json semantically but field order differs")]
-    ParserOursFieldOrderDiffers,
     #[error("Parser error: {0}")]
     ParserError(String),
     #[error("Parser error (svelte_divergence): {0}")]
@@ -165,8 +163,6 @@ pub enum ValidationError {
     ParserVariantPinOutdated(String),
     #[error("our parser output for {variant} differs from {pin}")]
     ParserVariantOursDiffers { variant: String, pin: String },
-    #[error("our parser output for {variant} matches {pin} semantically but field order differs")]
-    ParserVariantOursFieldOrderDiffers { variant: String, pin: String },
     #[error("{variant}: {message}")]
     ParserVariantError { variant: String, message: String },
 
@@ -382,9 +378,6 @@ impl ValidationError {
         match self {
             Self::StructureValidationFailed(_) => "See error message for details",
             Self::ParserOursDiffersFromExpected => "Fix the parser to match expected.json",
-            Self::ParserOursFieldOrderDiffers => {
-                "Match the canonical field order at the writer site, or catalog as a _svelte_divergence (expected_ours.json + expected_svelte.json)"
-            }
             Self::ParserExpectedJsonOutdated
             | Self::ParserExpectedOursOutdated
             | Self::ParserExpectedSvelteOutdated => {
@@ -400,9 +393,6 @@ impl ValidationError {
             Self::ParserVariantPinOutdated(_) => "Run: deno task fixtures:update:parsed <pattern>",
             Self::ParserVariantOursDiffers { .. } => {
                 "Fix the parser to match the pin (the canonical parser's AST of that variant)"
-            }
-            Self::ParserVariantOursFieldOrderDiffers { .. } => {
-                "Match the canonical field order at the writer site"
             }
             Self::ParserVariantError { .. } => {
                 "Verify the pinned variant is valid syntax for BOTH parsers; if valid, fix the parser"
@@ -658,7 +648,6 @@ impl ValidationError {
             Self::StructureValidationFailed(_) => "Structure",
 
             Self::ParserOursDiffersFromExpected
-            | Self::ParserOursFieldOrderDiffers
             | Self::ParserExpectedJsonOutdated
             | Self::ParserExpectedOursOutdated
             | Self::ParserExpectedSvelteOutdated
@@ -671,7 +660,6 @@ impl ValidationError {
             | Self::TsvRejectsCanonicalRejects(_)
             | Self::ParserVariantPinOutdated(_)
             | Self::ParserVariantOursDiffers { .. }
-            | Self::ParserVariantOursFieldOrderDiffers { .. }
             | Self::ParserVariantError { .. } => "Parser",
 
             Self::FormatterInputNotIdempotent(_)

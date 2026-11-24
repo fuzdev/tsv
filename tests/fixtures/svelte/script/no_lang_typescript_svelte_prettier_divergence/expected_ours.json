@@ -20,9 +20,9 @@
 				"end": 133,
 				"expression": {
 					"type": "Identifier",
-					"name": "fn",
 					"start": 105,
-					"end": 107
+					"end": 107,
+					"name": "fn"
 				},
 				"typeParams": "T",
 				"parameters": [
@@ -139,9 +139,9 @@
 				},
 				"context": {
 					"type": "Identifier",
-					"name": "item",
 					"start": 148,
 					"end": 152,
+					"name": "item",
 					"typeAnnotation": {
 						"type": "TSTypeAnnotation",
 						"start": 152,
@@ -201,9 +201,9 @@
 				},
 				"value": {
 					"type": "Identifier",
-					"name": "v",
 					"start": 230,
-					"end": 231
+					"end": 231,
+					"name": "v"
 				},
 				"error": null,
 				"pending": null,

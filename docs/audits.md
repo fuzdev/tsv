@@ -53,6 +53,7 @@ The Svelte compiler's *sidecar-dependent* harnesses — the corpus comparison, t
 | [Corpus bundle](#the-corpus-bundle-auditcorpus) | `audit:corpus` | the content-loss / robustness bundle over real code | publish Step 3c |
 | [Lexer diff](#differential-lexer-harness-lex_diff) | — | token-stream drift after a lexer change | dev tool |
 | [Variant direction](#variant-whitespace-direction-audit-variantsaudit) | `variants:audit` | a `_compact` variant that ADDS whitespace, or a `_spaces` variant that REMOVES it — the pair's two directions collapsing into one | `npm run check` |
+| [Key order](#key-order-audit-orderaudit) | `order:audit` | a wire node type emitted in more than one key order, tsv's child-bearing keys out of the canonical parser's relative order, or a duplicate key in any object | `npm run check` |
 | [Conformance audit](#conformance-audit-conformanceaudit) | `conformance:audit` | doc/fixture catalog + link integrity | `npm run check` |
 | [Compiler conformance](#compiler-conformance-audit-conformanceauditcompiler) | `conformance:audit:compiler` | compile-fixture divergence catalog + checklist ↔ `Refusal` drift | `npm run check` |
 | [Canonicalizer](#canonicalizer-audit-canonicalizeaudit) | `canonicalize:audit` | `canonicalize_js` non-idempotence / corrupt output / comment loss | `npm run check` |
@@ -2518,6 +2519,75 @@ rather than compacting it, and takes a fixture's own explanatory prose down with
 When adding a `_compact` variant, glue its comments **horizontally** and leave their
 lines; a glued form that stops normalizing is the signal to leave that gap, not a
 reason to pad the rest.
+
+## Key-Order Audit (`order:audit`)
+
+```bash
+cargo run -p tsv_debug key_order_audit            # audit (exit 1 on any finding, or on nothing graded)
+cargo run -p tsv_debug key_order_audit --orders   # also print each type's derived total key order
+# Also: a positional fixture root (default tests/fixtures)
+```
+
+The wire's key order is tsv's own ([conformance_svelte.md §Key Order](./conformance_svelte.md#key-order)):
+the fixture gate compares tsv's wire with each canonical `expected*.json` as a key-order-insensitive
+value (P2b, P4 — [fixture_overview.md §All Validation Rules](./fixture_overview.md#all-validation-rules)),
+so once the bytes stop pinning order nothing else would notice a writer that reorders a node's keys.
+This audit states what the order still promises. Pure Rust — no sidecar, no formatter run; gated in
+`npm run check` via the `order:audit` task.
+
+**What it proves**, over tsv's own span-only wire for every parseable source document in each
+fixture directory (inputs and variants, prettier-side forms included — `loc_wires`' document
+set, each at the fixture's goal):
+
+- **One key order per type.** Every key sequence observed for a type embeds in one total order
+  (a topological sort of the "a before b" edges each sequence contributes); a cycle is the
+  report, `CONFLICT`, with the sequences that form it and a document for each. Keys absent from
+  one object are no conflict — the order is over the keys present.
+- **Child-bearing order is the canonical parser's.** A key is child-bearing for a type when it
+  holds a positioned object (numeric `start` and `end`) or an array holding one, and
+  `leadingComments` / `trailingComments` always are, by name — a `<script>` `Program`'s
+  preceding-HTML entry is a positionless `{type, value}`, so content alone would miss its
+  list (the oracle writes it after `trailingComments`). The audit
+  reads the oracle's own sequences from the committed oracle files (`expected.json`,
+  `expected_svelte.json`, each `expected_<stem>.json` pin; the `{"error": …}` marker
+  skipped), cuts both sides to the type's child-bearing keys, and requires the two sides'
+  edges together to still sort — `CHILD-ORDER` when they don't. This is the order Svelte's
+  `add_comments` and its compiler's visitors walk.
+- **The oracle agrees with itself.** An oracle type whose child-bearing keys take more than one
+  order on their own fails the run (`ORACLE`) rather than being exempted silently; an
+  exemption has to be named deliberately.
+- **No duplicate key** in any object on either side (`DUPLICATE`), which a `Value` read — the
+  fixture gate's — would collapse to its last occurrence.
+
+**Keying.** An object with a string `type` keys by it; CSS nodes key apart as `css:<type>`
+(CSS's `Block` and the JS comment `Block` share a name and nothing else); a `type`-less object
+keys by where it sits, `~<parent>.<field>`, so its order is held too.
+
+**Exempt by design.**
+
+- **Scalar order** is free across types — the audit asks only that each type use one order, never
+  which one.
+- **TypeScript-only children** — the keys Svelte's `remove_typescript_nodes` deletes before any
+  visitor walks (`TYPESCRIPT_ONLY_KEYS` in `key_order_audit.rs`) — are left out of the
+  child-bearing comparison: their position is tsv's to choose. Comment attachment still walks
+  them, so moving one can move an attachment — the `async <T>(…)` arrow's, a cataloged
+  divergence. The list is hand-mirrored from Svelte's source; re-read it on an oracle bump.
+
+⚠️ **Blind spots.**
+
+- **Only fixture shapes.** A type, or a key sequence, no fixture document produces is never
+  seen, and a child-bearing pair is compared against the oracle only where an oracle file holds
+  the type with both keys present. A route that writes a type in a second order on a construct no fixture holds
+  passes — the corpus tools compare as values, key order unseen.
+- **Child-bearing is read off the value.** A key that is `null` or an empty array in every
+  observed instance is never child-bearing for its type, so its order relative to the children
+  goes unchecked.
+- **The span-only wire only.** The `loc` wire is not walked; its one addition, `loc` right after
+  `end`, is placed by construction and graded as a value by `check:loc`.
+- **A document tsv rejects** is skipped and counted (the fixture gate and `check:loc` own that
+  verdict), and a `tsv_rejects.txt` fixture is read for its oracle file alone.
+
+**Vacuity.** A run that grades no document or reads no oracle file refuses to pass.
 
 ## Conformance Audit (`conformance:audit`)
 

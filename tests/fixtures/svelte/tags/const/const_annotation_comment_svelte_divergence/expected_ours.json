@@ -54,15 +54,18 @@
 							"end": 337,
 							"declaration": {
 								"type": "VariableDeclaration",
-								"kind": "const",
+								"start": 309,
+								"end": 336,
 								"declarations": [
 									{
 										"type": "VariableDeclarator",
+										"start": 315,
+										"end": 336,
 										"id": {
 											"type": "Identifier",
-											"name": "a1",
 											"start": 315,
 											"end": 317,
+											"name": "a1",
 											"typeAnnotation": {
 												"type": "TSTypeAnnotation",
 												"start": 317,
@@ -93,13 +96,10 @@
 											"start": 332,
 											"end": 336,
 											"name": "expr"
-										},
-										"start": 315,
-										"end": 336
+										}
 									}
 								],
-								"start": 309,
-								"end": 336
+								"kind": "const"
 							}
 						},
 						{
@@ -128,10 +128,13 @@
 							"end": 421,
 							"declaration": {
 								"type": "VariableDeclaration",
-								"kind": "const",
+								"start": 389,
+								"end": 420,
 								"declarations": [
 									{
 										"type": "VariableDeclarator",
+										"start": 395,
+										"end": 420,
 										"id": {
 											"type": "ObjectPattern",
 											"start": 395,
@@ -189,13 +192,10 @@
 											"start": 416,
 											"end": 420,
 											"name": "expr"
-										},
-										"start": 395,
-										"end": 420
+										}
 									}
 								],
-								"start": 389,
-								"end": 420
+								"kind": "const"
 							}
 						},
 						{
@@ -224,15 +224,18 @@
 							"end": 523,
 							"declaration": {
 								"type": "VariableDeclaration",
-								"kind": "const",
+								"start": 495,
+								"end": 522,
 								"declarations": [
 									{
 										"type": "VariableDeclarator",
+										"start": 501,
+										"end": 522,
 										"id": {
 											"type": "Identifier",
-											"name": "a3",
 											"start": 501,
 											"end": 503,
+											"name": "a3",
 											"typeAnnotation": {
 												"type": "TSTypeAnnotation",
 												"start": 503,
@@ -263,13 +266,10 @@
 													"end": 517
 												}
 											]
-										},
-										"start": 501,
-										"end": 522
+										}
 									}
 								],
-								"start": 495,
-								"end": 522
+								"kind": "const"
 							}
 						},
 						{
@@ -298,15 +298,18 @@
 							"end": 605,
 							"declaration": {
 								"type": "VariableDeclaration",
-								"kind": "const",
+								"start": 580,
+								"end": 604,
 								"declarations": [
 									{
 										"type": "VariableDeclarator",
+										"start": 586,
+										"end": 604,
 										"id": {
 											"type": "Identifier",
-											"name": "a4",
 											"start": 586,
-											"end": 588
+											"end": 588,
+											"name": "a4"
 										},
 										"init": {
 											"type": "Identifier",
@@ -321,13 +324,10 @@
 													"end": 599
 												}
 											]
-										},
-										"start": 586,
-										"end": 604
+										}
 									}
 								],
-								"start": 580,
-								"end": 604
+								"kind": "const"
 							}
 						},
 						{
@@ -356,15 +356,18 @@
 							"end": 890,
 							"declaration": {
 								"type": "VariableDeclaration",
-								"kind": "const",
+								"start": 858,
+								"end": 889,
 								"declarations": [
 									{
 										"type": "VariableDeclarator",
+										"start": 864,
+										"end": 889,
 										"id": {
 											"type": "Identifier",
-											"name": "a6",
 											"start": 864,
 											"end": 866,
+											"name": "a6",
 											"typeAnnotation": {
 												"type": "TSTypeAnnotation",
 												"start": 866,
@@ -413,13 +416,10 @@
 											"start": 885,
 											"end": 889,
 											"name": "expr"
-										},
-										"start": 864,
-										"end": 889
+										}
 									}
 								],
-								"start": 858,
-								"end": 889
+								"kind": "const"
 							}
 						},
 						{
@@ -623,9 +623,9 @@
 				"name": "lang",
 				"value": [
 					{
+						"type": "Text",
 						"start": 14,
 						"end": 16,
-						"type": "Text",
 						"raw": "ts",
 						"data": "ts"
 					}

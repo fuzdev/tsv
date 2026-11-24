@@ -16,18 +16,17 @@
 //! ([`CommentAttach::mark_last_body_element`], which says why it is a MARK rather than a
 //! span read).
 //!
-//! ⭐ **Child visit order is acorn's by construction.** zimmerframe visits a node's
-//! object-valued properties in property-insertion order, and the writer's field order
-//! already *is* that order (`write_arrow_function_expression`,
-//! `write_function_expression`, `write_new_expression`, `write_call_expression_tail` and the
-//! `SwitchCase` / `LabeledStatement` / `MethodDefinition` writers each carry the note).
-//! An emit-driven walk cannot disagree with the field order it is itself emitting, so
-//! the whole class of "the walk and the wire order a node's children differently" bugs
-//! is unrepresentable. The class is real, not hypothetical: a walk that reproduces that
-//! order by hand has to get the generic-async arrow right, whose wire order is
-//! `[typeParameters, params…, returnType, body]` —
-//! `tests/fixtures/typescript/expressions/arrow/async_generic/params_comment_return_type`
-//! pins where each of its gaps attaches.
+//! ⭐ **Child visit order is the wire's field order, by construction.** zimmerframe visits
+//! a node's object-valued properties in property-insertion order, and the attach walks
+//! the writer's field order — tsv's one order per node type, which keeps acorn's relative
+//! order of child-bearing keys (`write_new_expression`, `write_call_expression_tail` and
+//! the `SwitchCase` / `LabeledStatement` / `MethodDefinition` writers each carry the
+//! note). An emit-driven walk cannot disagree with the field order it is itself emitting,
+//! so the whole class of "the walk and the wire order a node's children differently" bugs
+//! is unrepresentable. Where acorn's own order varies by route and the wire's does not —
+//! the generic async arrow, which acorn writes `[typeParameters, params…, returnType,
+//! body]` — the attach follows the wire, a cataloged divergence pinned by
+//! `tests/fixtures/typescript/expressions/arrow/async_generic/params_comment_return_type_svelte_divergence`.
 //!
 //! Two further hazards are unrepresentable for the same reason. A per-node map keyed by
 //! `(start, end, type)` can hold an entry no node ever closes with (a silently dropped
@@ -113,8 +112,7 @@ pub struct IslandComments<'a> {
     pub root_fallback: bool,
     /// The preceding-HTML comment Svelte reports as the `<script>` `Program`'s first
     /// `leadingComments` entry — a positionless `{type: "Line", value}` it builds itself,
-    /// prepended after the fact so a `Program` whose first attach touch was *trailing*
-    /// still serializes `trailingComments` first.
+    /// prepended after the walk, so the `Program` writes it after its `trailingComments`.
     pub html_leading: Option<&'a str>,
     /// The canonical reader parsed this island with acorn's `preserveParens: true` and
     /// then dropped every `ParenthesizedExpression` (Svelte's `parse_expression_at` +
@@ -460,7 +458,7 @@ impl<'a> CommentAttach<'a> {
         } else {
             None
         };
-        self.emit(w, leading, trailing, html, positions);
+        self.emit(w, node_type, leading, trailing, html, positions);
         st.attached.truncate(frame.lead_start as usize);
         if st.virtual_roots != 0 {
             self.close_root_parens(st);
@@ -789,14 +787,15 @@ impl<'a> CommentAttach<'a> {
     /// Emit `,"leadingComments":[…]` / `,"trailingComments":[…]` for the node that just
     /// closed (fused, final char space).
     ///
-    /// Order mirrors acorn's appended object keys: whichever list the attach touched
-    /// **first** serializes first. Leading is assigned at node entry and trailing after
-    /// the children, so leading normally wins — except where a node's only attach-time
-    /// touch was trailing and its leading run arrives afterwards, which is exactly the
-    /// `<script>` `Program` with a preceding HTML comment.
+    /// The two lists keep the canonical order, one per node type, as every child-bearing key
+    /// does: leading, then trailing, on every node acorn's walk attaches to (it assigns
+    /// `leadingComments` at node entry and `trailingComments` after the children), and
+    /// trailing, then leading, on a `<script>` `Program`, whose only `leadingComments` is
+    /// the preceding HTML comment Svelte prepends after the walk.
     fn emit(
         &self,
         w: &mut JsonWriter,
+        node_type: &'static str,
         leading: &[u32],
         trailing: &[u32],
         html: Option<&str>,
@@ -805,7 +804,7 @@ impl<'a> CommentAttach<'a> {
         if leading.is_empty() && trailing.is_empty() && html.is_none() {
             return;
         }
-        if leading.is_empty() && !trailing.is_empty() {
+        if node_type == "Program" {
             self.emit_trailing(w, trailing, positions);
             self.emit_leading(w, leading, html, positions);
         } else {

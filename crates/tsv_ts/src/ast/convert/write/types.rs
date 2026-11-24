@@ -120,11 +120,11 @@ pub(super) fn write_type(w: &mut JsonWriter, ts_type: &ast::TSType, ctx: &Ctx<'_
             } else {
                 write_identifier_plain(w, &p.parameter_name, ctx);
             }
-            // acorn-typescript's annotation-less forms (`asserts foo` /
-            // `asserts this`) assign `asserts` before the null annotation;
-            // the `is T` forms assign the annotation first and stamp
-            // `asserts` last. The annotation node is synthesized around the
-            // type's own span (there is no `:` in `x is T`).
+            // Field order `parameterName`, `typeAnnotation`, `asserts` — the `is T` forms'
+            // (acorn-typescript's annotation-less `asserts foo` / `asserts this` assign
+            // `asserts` before the null annotation; tsv's wire keeps the one order). The
+            // annotation node is synthesized around the type's own span (there is no `:`
+            // in `x is T`).
             match p.type_annotation {
                 Some(t) => {
                     w.raw(",\"typeAnnotation\":");
@@ -132,15 +132,11 @@ pub(super) fn write_type(w: &mut JsonWriter, ts_type: &ast::TSType, ctx: &Ctx<'_
                     w.raw(",\"typeAnnotation\":");
                     write_type(w, ctx.view.ty(t), ctx);
                     close_node(w, "TSTypeAnnotation", ctx.view.ty(t).span(), ctx);
-                    w.raw(",\"asserts\":");
-                    w.bool(p.asserts);
                 }
-                None => {
-                    w.raw(",\"asserts\":");
-                    w.bool(p.asserts);
-                    w.raw(",\"typeAnnotation\":null");
-                }
+                None => w.raw(",\"typeAnnotation\":null"),
             }
+            w.raw(",\"asserts\":");
+            w.bool(p.asserts);
             close_node(w, "TSTypePredicate", p.span, ctx);
         }
         ast::TSType::Conditional(c) => {
@@ -485,12 +481,11 @@ fn write_type_element(w: &mut JsonWriter, elem: &ast::TSTypeElement, ctx: &Ctx<'
             close_node(w, "TSPropertySignature", p.span, ctx);
         }
         ast::TSTypeElement::MethodSignature(m) => {
-            // Field order: `readonly` (only when true), `computed`, `key`, then
-            // per kind — a get/set signature's `kind` is assigned between the
-            // two `parsePropertyName` calls (right after the key); a plain
-            // method's `kind` lands on the finished signature (last). Then
-            // `optional` (only when true), `typeParameters?`, `parameters`,
-            // `typeAnnotation?` (the return type's wire name).
+            // Field order: `readonly` (only when true), `computed`, `key`, `optional`
+            // (only when true), `typeParameters?`, `parameters`, `typeAnnotation?` (the
+            // return type's wire name), `kind` — a plain method's order, whose `kind`
+            // lands on the finished signature. (acorn-typescript assigns a get/set
+            // signature's `kind` right after the key; tsv's wire keeps the one order.)
             //
             // `readonly` has no acorn counterpart — acorn-typescript rejects the
             // modifier on a method signature — so it is placed as on
@@ -503,14 +498,6 @@ fn write_type_element(w: &mut JsonWriter, elem: &ast::TSTypeElement, ctx: &Ctx<'
             w.bool(m.computed);
             w.raw(",\"key\":");
             write_expression(w, ctx.view.expr(m.key), ctx);
-            let getset = matches!(m.kind, ast::MethodKind::Get | ast::MethodKind::Set);
-            if getset {
-                w.raw(",\"kind\":");
-                w.token(match m.kind {
-                    ast::MethodKind::Get => "get",
-                    _ => "set",
-                });
-            }
             if m.optional {
                 w.raw(",\"optional\":true");
             }
@@ -518,9 +505,11 @@ fn write_type_element(w: &mut JsonWriter, elem: &ast::TSTypeElement, ctx: &Ctx<'
             w.raw(",\"parameters\":");
             write_expressions(w, ctx.view.exprs(m.params), ctx);
             write_type_annotation_field(w, m.return_type.as_ref(), ctx);
-            if !getset {
-                w.raw(",\"kind\":\"method\"");
-            }
+            w.raw(match m.kind {
+                ast::MethodKind::Get => ",\"kind\":\"get\"",
+                ast::MethodKind::Set => ",\"kind\":\"set\"",
+                _ => ",\"kind\":\"method\"",
+            });
             close_node(w, "TSMethodSignature", m.span, ctx);
         }
         ast::TSTypeElement::CallSignature(c) => {
@@ -612,19 +601,17 @@ pub(super) fn write_index_signature(
 
 /// Emits a `TSInterfaceDeclaration` node (its `extends` clauses as
 /// `TSExpressionWithTypeArguments`, its body a `TSInterfaceBody`). Field order:
-/// `declare?` (statement position), `id`, `typeParameters?`, `extends` (only
-/// when non-empty), `body`, `declare?` (export position) — acorn-typescript's
-/// statement-level `declare interface` passes `declare` into the interface
-/// parse (assigned before `id`), while `export declare` stamps the finished
-/// node, so the field's position depends on `exported`.
+/// `declare?`, `id`, `typeParameters?`, `extends` (only when non-empty), `body` —
+/// acorn-typescript's statement route (`declare interface` passes `declare` into the
+/// interface parse, before `id`). `export declare` stamps the finished node instead;
+/// tsv's wire keeps the one order.
 pub(super) fn write_interface_declaration(
     w: &mut JsonWriter,
     iface: &ast::TSInterfaceDeclaration,
     ctx: &Ctx<'_>,
-    exported: bool,
 ) {
     node_header(w, "TSInterfaceDeclaration", iface.span, ctx);
-    if iface.declare && !exported {
+    if iface.declare {
         w.raw(",\"declare\":true");
     }
     w.raw(",\"id\":");
@@ -652,26 +639,21 @@ pub(super) fn write_interface_declaration(
         write_type_element(w, m, ctx);
     });
     close_node(w, "TSInterfaceBody", iface.body.span, ctx);
-    if iface.declare && exported {
-        w.raw(",\"declare\":true");
-    }
     close_node(w, "TSInterfaceDeclaration", iface.span, ctx);
 }
 
-/// Emits a `TSDeclareFunction` node. Field order: `declare?` (statement
-/// position), `id`, `expression` (always false), `generator`, `async`,
-/// `typeParameters?`, `params`, `returnType?`, `declare?` (export position) —
-/// acorn-typescript's statement-level `declare function` stamps `declare`
-/// before the function parses (`tsTryParseDeclare`), while `export declare`
-/// stamps the finished node, so the field's position depends on `exported`.
+/// Emits a `TSDeclareFunction` node. Field order: `declare?`, `id`, `expression` (always
+/// false), `generator`, `async`, `typeParameters?`, `params`, `returnType?` —
+/// acorn-typescript's statement route (`tsTryParseDeclare` stamps `declare` before the
+/// function parses). `export declare` stamps the finished node instead; tsv's wire keeps
+/// the one order.
 pub(super) fn write_declare_function(
     w: &mut JsonWriter,
     func: &ast::TSDeclareFunction,
     ctx: &Ctx<'_>,
-    exported: bool,
 ) {
     node_header(w, "TSDeclareFunction", func.span, ctx);
-    if func.declare && !exported {
+    if func.declare {
         w.raw(",\"declare\":true");
     }
     w.raw(",\"id\":");
@@ -681,9 +663,6 @@ pub(super) fn write_declare_function(
     w.raw(",\"params\":");
     write_expressions(w, ctx.view.exprs(func.params), ctx);
     super::write_return_type_field(w, func.return_type.as_ref(), ctx);
-    if func.declare && exported {
-        w.raw(",\"declare\":true");
-    }
     close_node(w, "TSDeclareFunction", func.span, ctx);
 }
 

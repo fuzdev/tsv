@@ -46,6 +46,7 @@ pub mod imports;
 pub mod imports_fixtures_update;
 pub mod imports_fixtures_validate;
 pub mod json_profile;
+pub mod key_order_audit;
 pub mod lex_diff;
 pub mod line_width;
 pub mod loc_wires;

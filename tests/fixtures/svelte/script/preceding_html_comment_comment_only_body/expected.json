@@ -1,0 +1,62 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 43,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 14,
+				"data": " hello "
+			},
+			{
+				"type": "Text",
+				"start": 14,
+				"end": 15,
+				"raw": "\n",
+				"data": "\n"
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " only",
+			"start": 25,
+			"end": 32
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 15,
+		"end": 42,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 23,
+			"end": 33,
+			"body": [],
+			"sourceType": "module",
+			"trailingComments": [
+				{
+					"type": "Line",
+					"value": " only",
+					"start": 25,
+					"end": 32
+				}
+			],
+			"leadingComments": [
+				{
+					"type": "Line",
+					"value": " hello "
+				}
+			]
+		},
+		"attributes": []
+	}
+}

@@ -1,0 +1,4 @@
+<!-- hello -->
+<script>
+	// only
+</script>

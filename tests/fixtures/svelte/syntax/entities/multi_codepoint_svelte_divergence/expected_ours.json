@@ -111,9 +111,9 @@
 						"name": "data-attr",
 						"value": [
 							{
+								"type": "Text",
 								"start": 316,
 								"end": 321,
-								"type": "Text",
 								"raw": "&bne;",
 								"data": "=⃥"
 							}
@@ -184,9 +184,9 @@
 						"name": "data-attr",
 						"value": [
 							{
+								"type": "Text",
 								"start": 468,
 								"end": 476,
-								"type": "Text",
 								"raw": "&equals;",
 								"data": "="
 							}

@@ -338,7 +338,7 @@ fn write_expression_full_dispatch(
             write_arrow_function_expression(w, ctx.view.arrow_fn(arrow), expr.span, ctx);
         }
         &ast::ExpressionKind::FunctionExpression(func) => {
-            write_function_expression(w, ctx.view.fn_expr(func), ctx, false);
+            write_function_expression(w, ctx.view.fn_expr(func), ctx);
         }
         &ast::ExpressionKind::ClassExpression(class_expr) => {
             write_class_expression(w, ctx.view.class_expr(class_expr), expr.span, ctx);

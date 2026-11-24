@@ -3,4 +3,7 @@
 	const b = async <T extends A>(x = /* c2 */ 1): T => x;
 	const c = async /* c3 */ <T extends A>(x): T => x;
 	const d = async <T extends A>(x): /* c4 */ T => x;
+	const e = async </* c5 */ T extends A>() => x;
+	const f = async <T extends A /* c6 */>(x) => x;
+	const g = async </* c7 */ T extends A>() => {};
 </script>

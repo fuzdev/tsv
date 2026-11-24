@@ -39,6 +39,13 @@
 	export const enum G {
 		'a' = 1
 	}
+	export declare enum J {
+		'a' = 1,
+		"b"
+	}
+	export declare const enum K {
+		'a' = 1
+	}
 	namespace N {
 		export enum H {
 			'a' = 1

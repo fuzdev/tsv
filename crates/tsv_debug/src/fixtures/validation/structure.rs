@@ -32,7 +32,8 @@ pub(super) const STRUCTURE_RULE_COUNT: usize = 24;
 /// S14: `expected_ours.json` MUST be in svelte divergence dirs
 /// S15: `expected_svelte.json` MUST be in svelte divergence dirs
 /// S16: Svelte divergence dirs CANNOT have `expected.json`
-/// S17: `expected_ours.json` and `expected_svelte.json` must differ (identical content is no divergence)
+/// S17: `expected_ours.json` and `expected_svelte.json` must differ as values (key order is
+///      tsv's own, so two ASTs that differ only in it are no divergence)
 /// S18: `prettier_nonconvergent.txt` requires a prettier divergence dir and CANNOT
 ///      coexist with prettier-claim files (`output_prettier.*`, `unformatted_*`,
 ///      `unformatted_prettier_*`, `prettier_variant_*`, `variant_*`, `divergent_variant_*`,
@@ -189,18 +190,26 @@ pub(super) fn validate_fixture_structure(
             );
         }
 
-        // S17: expected_ours.json and expected_svelte.json must have different content
-        // (if they're identical, there's no divergence and the pattern is pointless)
+        // S17: expected_ours.json and expected_svelte.json must differ as values — key order
+        // is tsv's own, so a pair equal but for it is no divergence and the pattern is pointless
         let expected_ours_content = read_file(&expected_ours_path)?;
         let expected_svelte_content = read_file(&expected_svelte_path)?;
-        if expected_ours_content == expected_svelte_content {
+        let same = expected_ours_content == expected_svelte_content
+            || matches!(
+                (
+                    crate::json::from_str::<serde_json::Value>(&expected_ours_content),
+                    crate::json::from_str::<serde_json::Value>(&expected_svelte_content),
+                ),
+                (Ok(ours), Ok(svelte)) if ours == svelte
+            );
+        if same {
             return Err(
-                "expected_ours.json and expected_svelte.json are identical.\n\
+                "expected_ours.json and expected_svelte.json are the same AST (key order aside).\n\
                 The divergence pattern is only for when our parser differs from the canonical parser's.\n\
                 If the ASTs match, use the standard expected.json pattern instead:\n\
                 1. Remove _svelte_divergence suffix from directory name\n\
                 2. Delete expected_ours.json and expected_svelte.json\n\
-                3. Run: deno task fixtures:update:parsed"
+                3. Run: npm run fixtures:update:parsed -- <pattern>"
                     .to_string(),
             );
         }

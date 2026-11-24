@@ -253,9 +253,9 @@
 				},
 				"context": {
 					"type": "Identifier",
-					"name": "c",
 					"start": 314,
-					"end": 315
+					"end": 315,
+					"name": "c"
 				},
 				"index": "i",
 				"key": {
@@ -333,9 +333,9 @@
 				},
 				"context": {
 					"type": "Identifier",
-					"name": "d",
 					"start": 449,
-					"end": 450
+					"end": 450,
+					"name": "d"
 				},
 				"key": {
 					"type": "Identifier",
@@ -507,9 +507,9 @@
 				"name": "lang",
 				"value": [
 					{
+						"type": "Text",
 						"start": 14,
 						"end": 16,
-						"type": "Text",
 						"raw": "ts",
 						"data": "ts"
 					}

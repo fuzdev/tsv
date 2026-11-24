@@ -203,6 +203,7 @@
 						"type": "TSDeclareFunction",
 						"start": 185,
 						"end": 234,
+						"declare": true,
 						"id": {
 							"type": "Identifier",
 							"start": 208,
@@ -240,8 +241,7 @@
 									]
 								}
 							}
-						},
-						"declare": true
+						}
 					},
 					"specifiers": [],
 					"source": null
@@ -257,9 +257,9 @@
 				"name": "lang",
 				"value": [
 					{
+						"type": "Text",
 						"start": 14,
 						"end": 16,
-						"type": "Text",
 						"raw": "ts",
 						"data": "ts"
 					}

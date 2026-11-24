@@ -210,9 +210,9 @@
 				},
 				"context": {
 					"type": "Identifier",
-					"name": "item",
 					"start": 302,
-					"end": 306
+					"end": 306,
+					"name": "item"
 				},
 				"index": "i",
 				"key": {
@@ -277,9 +277,9 @@
 				},
 				"context": {
 					"type": "Identifier",
-					"name": "item",
 					"start": 367,
-					"end": 371
+					"end": 371,
+					"name": "item"
 				},
 				"index": "i",
 				"key": {

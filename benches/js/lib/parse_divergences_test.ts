@@ -64,6 +64,82 @@ test('lone_surrogate_value: U+FFFD for a lone surrogate, and only that', () => {
 	strictEqual(claims('lone_surrogate_value', entry('a', 'b'), {}), false);
 });
 
+test("generic_async_arrow_comment_order: a head comment moved by the arrow's one key order", () => {
+	// `const a = async <T>(x /* c */): T => x;` — canonical trails `c` on `x`, tsv leads the
+	// return type with it
+	const c = { type: 'Block', value: ' c ', start: 22, end: 29 };
+	const arrow = (async: boolean, type_parameters_start: number) => ({
+		instance: {
+			content: {
+				body: [
+					{
+						declarations: [
+							{
+								init: {
+									type: 'ArrowFunctionExpression',
+									start: 10,
+									end: 39,
+									async,
+									typeParameters: {
+										type: 'TSTypeParameterDeclaration',
+										start: type_parameters_start
+									},
+									params: [{ type: 'Identifier', start: 20, end: 21, trailingComments: [c] }],
+									returnType: { type: 'TSTypeAnnotation', start: 30, end: 33 },
+									body: { type: 'Identifier', start: 37, end: 38 }
+								}
+							}
+						]
+					}
+				]
+			}
+		}
+	});
+	const init = 'instance.content.body[0].declarations[0].init';
+	const moved_off: Entry = {
+		kind: 'missing_ours',
+		path: `${init}.params[0].trailingComments`,
+		ours: undefined,
+		canonical: [c]
+	};
+	const moved_on = (ours: unknown, at = 'returnType'): Entry => ({
+		kind: 'missing_canonical',
+		path: `${init}.${at}.leadingComments`,
+		ours,
+		canonical: undefined
+	});
+	const order = (e: Entry, tree: unknown = arrow(true, 16)) =>
+		claims('generic_async_arrow_comment_order', e, tree, 'svelte');
+	strictEqual(order(moved_off), true);
+	strictEqual(order(moved_on([c])), true);
+	// not the generic async route: a plain async arrow, or `<T>async (…)`'s graft
+	strictEqual(order(moved_off, arrow(false, 16)), false);
+	strictEqual(order(moved_off, arrow(true, 10)), false);
+	// a comment outside the head (in the body) is no head comment
+	const later = { type: 'Block', value: ' d ', start: 38, end: 45 };
+	strictEqual(order(moved_on([later])), false);
+	// with no parameter the head comment moves to the body: a body's array is admitted for a
+	// comment in the head, never for one inside the body
+	strictEqual(order(moved_on([c], 'body')), true);
+	const in_body = { type: 'Block', value: ' e ', start: 37, end: 38 };
+	strictEqual(order(moved_on([in_body], 'body')), false);
+	// a comment array on the arrow itself is not a head node's
+	strictEqual(
+		claims(
+			'generic_async_arrow_comment_order',
+			{
+				kind: 'missing_canonical',
+				path: `${init}.leadingComments`,
+				ours: [c],
+				canonical: undefined
+			},
+			arrow(true, 16),
+			'svelte'
+		),
+		false
+	);
+});
+
 test('svelte_empty_container_comment_drain: a comment walked as a node in an empty container', () => {
 	// `if (a) {} else if (b) { // r⏎} else { // s⏎}` — `// r` leads the empty else block,
 	// and canonical nests `// s` in it; tsv trails `// s` on the `if`

@@ -1518,16 +1518,11 @@ export interface TSTypeParameter extends AcornCommentAttachment {
 	start: number;
 	end: number;
 	loc?: SourceLocation;
-	/**
-	 * Omitted from JSON when false. The three modifier keys are emitted in the order
-	 * the SOURCE spells them, so `<in const T>` and `<const in T>` differ by key order
-	 * alone (both parse; the ordering rule is a tsc grammar-checker error, and both
-	 * formatters normalize the printed form to `const in out`).
-	 */
+	/** Omitted from JSON when false. */
 	const?: boolean;
-	/** Omitted from JSON when false. See `const` for the key-order rule. */
+	/** Omitted from JSON when false. */
 	in?: boolean;
-	/** Omitted from JSON when false. See `const` for the key-order rule. */
+	/** Omitted from JSON when false. */
 	out?: boolean;
 	name: string;
 	constraint?: TSType;
@@ -2146,15 +2141,16 @@ export interface ClassDirective {
 
 /**
  * The identifier Svelte builds for a SHORTHAND `bind:` / `class:` directive, where the
- * directive name IS the expression. Distinct from acorn's `Identifier` in its field order
- * (positions first) and in carrying no `loc` in Svelte's own wire (nothing parsed it), which
- * is why the directive positions are a union rather than plain `Expression`.
+ * directive name IS the expression. Distinct from acorn's `Identifier` in its field set (no
+ * `optional`, `typeAnnotation` or `decorators`, and no comment attachment) and in carrying
+ * no `loc` in Svelte's own wire (nothing parsed it), which is why the directive positions are
+ * a union rather than plain `Expression`.
  */
 export interface SvelteShorthandIdentifier {
+	type: 'Identifier';
 	start: number;
 	end: number;
 	loc?: SourceLocation;
-	type: 'Identifier';
 	name: string;
 }
 

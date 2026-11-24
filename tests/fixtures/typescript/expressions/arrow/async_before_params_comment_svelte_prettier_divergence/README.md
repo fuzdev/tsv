@@ -1,4 +1,4 @@
-# async_before_params_comment_prettier_divergence
+# async_before_params_comment_svelte_prettier_divergence
 
 A comment between an async arrow's `async` keyword and its parameters is kept in
 the gap the author wrote it in. Prettier relocates it, and where it lands depends
@@ -25,3 +25,17 @@ Not preserving drops the comment: the gap has no other emitter.
 
 See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment Position Philosophy and
 [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.
+
+## Svelte divergence (parser)
+
+The generic case `async /* c */ <T extends A>(x: T) => x` is also a parse divergence.
+tsv's wire gives `ArrowFunctionExpression` one key order — acorn-typescript's common
+route's, with `typeParameters` last — where acorn-typescript's generic async route
+(`tsTryParseGenericAsyncArrowFunction`) writes `typeParameters` first. Svelte's comment
+walk visits keys in order, so canonical gives `c` to the type parameter declaration's
+`leadingComments` and tsv gives it to the first parameter `x`'s. The comment is kept,
+on the same arrow head, and in the root `comments` array of both parsers; the other
+three cases attach the same in both. See
+[conformance_svelte.md](../../../../../../docs/conformance_svelte.md) §Comment Attachment
+Differences, and `../async_generic/params_comment_return_type_svelte_divergence/` for
+the route with a return type.

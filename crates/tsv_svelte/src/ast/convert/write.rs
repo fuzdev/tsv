@@ -83,8 +83,7 @@
 //! **A run is earned by frequency.** Those headers are among the most frequent
 //! bursts the writer emits, and each staged emitter is *inlined at its site* — so
 //! a rare burst buys nothing and still costs `@fuzdev/tsv-parse-wasm` bytes.
-//! `ExpressionTag`, `write_text`'s raw-content arm, `write_sequence_text` and
-//! the directive heads are deliberately left unstaged: their `start`/`end`
+//! `ExpressionTag` and the directive heads are deliberately left unstaged: their `start`/`end`
 //! pairs are one out-of-line call each (`JsonWriter::start_end`, or its
 //! `start_end_field` / `start_end_object` forms, which also write the
 //! `,"start":` / `{"start":` key — reached through `JsonWriter::span_start_end`
@@ -418,19 +417,21 @@ fn write_root(w: &mut JsonWriter, root: &ast::Root, ctx: &Ctx<'_>) {
     w.raw("}");
 }
 
-/// A root-level comment, emitted fused in final char space. Svelte's two
-/// comment collectors build different literals: one acorn collected (a `<script>`
-/// or template-expression comment, through its `onComment` wrapper) is
-/// `{type, value, start, end, loc}`; an in-tag one its template reader collected,
-/// `{type, start, end, value, loc}` with `character` in its `loc` — the
-/// `from_template_reader` axis keys both differences. tsv writes `loc` immediately
-/// after `end` in both, from the document's one line table.
+/// A root-level comment, emitted fused in final char space: `{type, value, start, end,
+/// loc}`, the literal acorn's `onComment` wrapper builds (a `<script>` or
+/// template-expression comment). Svelte's template reader builds an in-tag comment
+/// `{type, start, end, value, loc}`; tsv's wire keeps the one order, and the
+/// `from_template_reader` axis keys the one difference left — `character` in such a
+/// comment's `loc`. tsv writes `loc` immediately after `end`, from the document's one
+/// line table.
 fn write_root_comment(w: &mut JsonWriter, comment: &Comment, ctx: &Ctx<'_>) {
     let span = comment.span;
     w.raw("{\"type\":\"");
     w.raw(if comment.is_block { "Block" } else { "Line" });
+    w.raw("\",\"value\":");
+    w.string(&comment.wire_value(ctx.source));
     if comment.from_template_reader {
-        w.raw("\",\"start\":");
+        w.raw(",\"start\":");
         w.start_end(ctx.pos(span.start), ctx.pos(span.end));
         if let Some(lines) = ctx.positions.lines() {
             // `character` in each point, the shape Svelte's own `locate-character`
@@ -438,11 +439,7 @@ fn write_root_comment(w: &mut JsonWriter, comment: &Comment, ctx: &Ctx<'_>) {
             let (start, end) = lines.span_positions(span.start, span.end);
             w.loc_field::<true>(start, end);
         }
-        w.raw(",\"value\":");
-        w.string(&comment.wire_value(ctx.source));
     } else {
-        w.raw("\",\"value\":");
-        w.string(&comment.wire_value(ctx.source));
         w.span_start_end_field(ctx.positions, span.start, span.end);
     }
     w.raw("}");
@@ -641,18 +638,7 @@ fn write_element(w: &mut JsonWriter, elem: &ast::Element, ctx: &Ctx<'_>) {
         w.raw("],\"fragment\":{\"type\":\"Fragment\",\"nodes\":[");
     }
     let nodes = ctx.svelte.nodes(elem.fragment.nodes);
-    // A `<textarea>`'s content is read with the attribute-value sequence
-    // machinery in the canonical parser, whose `Text` literal leads with the
-    // positions (`{start, end, type, raw, data}`). Asked only of an element with
-    // children: an empty one writes the same bytes under either name.
-    if !nodes.is_empty() && elem.name(ctx.source) == "textarea" {
-        write_items(w, nodes, |w, n| match n {
-            ast::FragmentNode::Text(text) => write_sequence_text(w, text, ctx),
-            _ => write_fragment_node(w, n, ctx),
-        });
-    } else {
-        write_items(w, nodes, |w, n| write_fragment_node(w, n, ctx));
-    }
+    write_items(w, nodes, |w, n| write_fragment_node(w, n, ctx));
     // The node array, the fragment, the element.
     w.raw("]}}");
 }
@@ -729,12 +715,15 @@ fn write_special_tag(w: &mut JsonWriter, this: &ast::SpecialThis, ctx: &Ctx<'_>)
         ast::SpecialThis::Plain(text) => {
             let content = text.data(ctx.source);
             let span = text.span;
-            w.raw("{\"type\":\"Literal\",\"value\":");
+            // Svelte builds this `Literal` `{type, value, raw, start, end}`; tsv's wire
+            // gives it acorn's one `Literal` order.
+            w.raw("{\"type\":\"Literal\",\"start\":");
+            w.span_start_end(ctx.positions, span.start, span.end);
+            w.raw(",\"value\":");
             w.string(&content);
             w.raw(",\"raw\":");
             // Svelte reports the raw as a single-quoted string regardless of source.
             w.string(&format!("'{content}'"));
-            w.span_start_end_field(ctx.positions, span.start, span.end);
             w.raw("}");
         }
         ast::SpecialThis::Braced(tag) => {
@@ -768,24 +757,11 @@ fn write_shorthand_expression_tag(w: &mut JsonWriter, tag: &ast::ExpressionTag, 
     w.raw("}");
 }
 
-/// Emits a `Text` node (fragment context: `type, start, end, raw, data`).
-/// Raw-content element text (`TextDecoding::Raw` — a nested `<script>`/
-/// `<style>`) comes from a different canonical construction site whose
-/// literal leads with the positions and puts `data` first:
-/// `{start, end, type, data, raw}`. Only the fragment arm stages its header —
-/// the raw arm is one text node per nested `<script>`/`<style>`, far too rare
-/// to earn a staged run's inlined emitters (module doc, Staged runs).
+/// Emits a `Text` node: `type, start, end, raw, data`, the order Svelte builds a
+/// fragment's text in. (Its attribute-value sequence builds `{start, end, type, raw,
+/// data}` and a raw-content element's text — a nested `<script>`/`<style>` —
+/// `{start, end, type, data, raw}`; tsv's wire keeps the one order.)
 fn write_text(w: &mut JsonWriter, text: &ast::Text, ctx: &Ctx<'_>) {
-    if matches!(text.decoding, ast::TextDecoding::Raw) {
-        w.span_start_end_object(ctx.positions, text.span.start, text.span.end);
-        // `data`, then `raw`: a `Raw` decoding is no decode at all, so the two
-        // are always the same bytes and the pair escapes them once.
-        debug_assert_eq!(text.data(ctx.source), text.raw(ctx.source));
-        w.raw(",\"type\":\"Text\",\"data\":");
-        w.string_pair(text.raw(ctx.source), ",\"raw\":");
-        w.raw("}");
-        return;
-    }
     // Staged burst; ends at the dynamic `raw` (module doc, Staged runs).
     let mut run = w.stage_run();
     run.raw("{\"type\":\"Text\",\"start\":");
@@ -841,9 +817,8 @@ fn write_whitespace_raw_then_data(w: &mut JsonWriter, text: &ast::Text, ctx: &Ct
 #[inline(never)]
 fn write_content_raw_then_data(w: &mut JsonWriter, text: &ast::Text, ctx: &Ctx<'_>) {
     let raw = text.raw(ctx.source);
-    // Asked inline rather than through `data()`: this is every raw-first `Text` with
-    // content the writer emits (all but a raw-content element's, which `write_text`
-    // writes itself).
+    // Asked inline rather than through `data()`: this is every `Text` with content the
+    // writer emits.
     if text.data_is_raw(raw) {
         w.string_pair(raw, ",\"data\":");
     } else {
@@ -851,16 +826,6 @@ fn write_content_raw_then_data(w: &mut JsonWriter, text: &ast::Text, ctx: &Ctx<'
         w.raw(",\"data\":");
         w.string(&text.data(ctx.source));
     }
-}
-
-/// A `Text` as Svelte's attribute-value sequence literal, `{start, end, type, raw, data}`
-/// — an attribute value's text part, and a `<textarea>`'s content, which Svelte reads as
-/// the same sequence.
-fn write_sequence_text(w: &mut JsonWriter, text: &ast::Text, ctx: &Ctx<'_>) {
-    w.span_start_end_object(ctx.positions, text.span.start, text.span.end);
-    w.raw(",\"type\":\"Text\",\"raw\":");
-    write_raw_then_data(w, text, ctx);
-    w.raw("}");
 }
 
 /// Emits a `Comment` node (HTML `<!-- … -->`).
@@ -876,18 +841,16 @@ fn write_html_comment(w: &mut JsonWriter, comment: &ast::HtmlComment, ctx: &Ctx<
 // Blocks
 //
 
-/// Emits an `IfBlock` node. Svelte constructs a root `{#if}` as
-/// `{type, elseif, start, end, …}` but an `{:else if}` block as
-/// `{start, end, type, elseif, …}` — two construction sites with different
-/// literal orders, keyed exactly by `elseif`.
+/// Emits an `IfBlock` node: `{type, elseif, start, end, …}`, the order Svelte builds a
+/// root `{#if}` in. (It builds an `{:else if}` block `{start, end, type, elseif, …}`;
+/// tsv's wire keeps the one order.)
 fn write_if_block(w: &mut JsonWriter, block: &ast::IfBlock, ctx: &Ctx<'_>) {
-    if block.elseif {
-        w.span_start_end_object(ctx.positions, block.span.start, block.span.end);
-        w.raw(",\"type\":\"IfBlock\",\"elseif\":true");
-    } else {
-        w.raw("{\"type\":\"IfBlock\",\"elseif\":false,\"start\":");
-        w.span_start_end(ctx.positions, block.span.start, block.span.end);
-    }
+    w.raw_pick(
+        block.elseif,
+        b"{\"type\":\"IfBlock\",\"elseif\":true,\"start\":",
+        b"{\"type\":\"IfBlock\",\"elseif\":false,\"start\":",
+    );
+    w.span_start_end(ctx.positions, block.span.start, block.span.end);
     let range_end = fragment_first_start(ctx.svelte, block.consequent).unwrap_or(block.span.end);
     w.raw(",\"test\":");
     write_generic_island(
@@ -1335,9 +1298,17 @@ fn write_const_declaration(
     init_mode: CommentMode<'_>,
     ctx: &Ctx<'_>,
 ) {
-    w.raw(
-        "{\"type\":\"VariableDeclaration\",\"kind\":\"const\",\"declarations\":[{\"type\":\"VariableDeclarator\",\"id\":",
+    // Svelte builds the pair `{type, kind, declarations, start, end}` /
+    // `{type, id, init, start, end}`; tsv's wire gives each acorn's one order.
+    w.raw("{\"type\":\"VariableDeclaration\",\"start\":");
+    w.span_start_end(ctx.positions, tag.span.start + 2, decl_end);
+    w.raw(",\"declarations\":[{\"type\":\"VariableDeclarator\",\"start\":");
+    w.span_start_end(
+        ctx.positions,
+        ctx.view.expr(tag.id).span().start,
+        declarator_end,
     );
+    w.raw(",\"id\":");
     write_pattern_embedded(
         w,
         ctx.view.expr(tag.id),
@@ -1345,14 +1316,7 @@ fn write_const_declaration(
     );
     w.raw(",\"init\":");
     write_expression_embedded(w, ctx.view.expr(tag.init), ctx.embed(init_mode));
-    w.span_start_end_field(
-        ctx.positions,
-        ctx.view.expr(tag.id).span().start,
-        declarator_end,
-    );
-    w.raw("}],\"start\":");
-    w.span_start_end(ctx.positions, tag.span.start + 2, decl_end);
-    w.raw("}");
+    w.raw("}],\"kind\":\"const\"}");
 }
 
 /// Emits a `DeclarationTag` node (`{const …}` / `{let …}`).
@@ -1464,7 +1428,7 @@ fn write_attribute_value_field(w: &mut JsonWriter, values: &[ast::AttributeValue
 /// One attribute-value part (array element or bare-object body).
 fn write_attribute_value(w: &mut JsonWriter, value: &ast::AttributeValue, ctx: &Ctx<'_>) {
     match value {
-        ast::AttributeValue::Text(text) => write_sequence_text(w, text, ctx),
+        ast::AttributeValue::Text(text) => write_text(w, text, ctx),
         ast::AttributeValue::ExpressionTag(tag) => write_expression_tag(w, tag, ctx),
     }
 }
@@ -1572,8 +1536,8 @@ fn write_transition_directive(w: &mut JsonWriter, d: &ast::TransitionDirective, 
 /// `bind:`/`class:` share an expression: the explicit form (`bind:x={e}`) is a
 /// generic island keyed on the directive span (a real expression parse, so
 /// template comments can attach); the shorthand form (`bind:x`)
-/// is a synthetic `Identifier` with Svelte field order (`start, end, type,
-/// name`) that never carries a comment, emitted fused.
+/// is a synthetic `Identifier` (Svelte builds it `{start, end, type, name}`; tsv's wire
+/// gives it acorn's one `Identifier` order) that never carries a comment, emitted fused.
 fn write_directive_value_expression(
     w: &mut JsonWriter,
     expr: &tsv_ts::ast::Expression,
@@ -1589,8 +1553,9 @@ fn write_directive_value_expression(
         let tsv_ts::ast::ExpressionKind::Identifier(id) = &expr.kind else {
             unreachable!("shorthand directive expression is always an Identifier");
         };
-        w.span_start_end_object(ctx.positions, id.span.start, id.span.end);
-        w.raw(",\"type\":\"Identifier\",\"name\":");
+        w.raw("{\"type\":\"Identifier\",\"start\":");
+        w.span_start_end(ctx.positions, id.span.start, id.span.end);
+        w.raw(",\"name\":");
         w.string(id.name(ctx.source, ctx.view));
         w.raw("}");
     }
@@ -2161,17 +2126,17 @@ mod tests {
             r#"{"css":null,"js":[],"start":0,"end":111,"type":"Root","fragment":{"type":"Fragment","#,
             r#""nodes":[{"type":"RegularElement","start":0,"end":111,"name":"div","#,
             r#""attributes":[{"type":"Attribute","start":5,"end":6,"name":"a","value":true},"#,
-            r#"{"type":"Attribute","start":7,"end":12,"name":"b","value":[{"start":10,"end":11,"#,
-            r#""type":"Text","raw":"c","data":"c"}]},"#,
+            r#"{"type":"Attribute","start":7,"end":12,"name":"b","value":[{"type":"Text","start":10,"#,
+            r#""end":11,"raw":"c","data":"c"}]},"#,
             r#"{"type":"Attribute","start":13,"end":20,"name":"d","value":[{"type":"ExpressionTag","#,
             r#""start":16,"end":19,"expression":{"type":"Identifier","start":17,"end":18,"#,
             r#""name":"e"}}]},"#,
             r#"{"type":"Attribute","start":21,"end":26,"name":"f","value":{"type":"ExpressionTag","#,
             r#""start":23,"end":26,"expression":{"type":"Identifier","start":24,"end":25,"name":"g"}}},"#,
             r#"{"type":"Attribute","start":27,"end":30,"name":"h","value":{"type":"ExpressionTag","#,
-            r#""start":28,"end":29,"expression":{"type":"Identifier","name":"h","start":28,"end":29}}},"#,
-            r#"{"type":"Attribute","start":31,"end":39,"name":"i","value":[{"start":34,"end":35,"#,
-            r#""type":"Text","raw":"j","data":"j"},"#,
+            r#""start":28,"end":29,"expression":{"type":"Identifier","start":28,"end":29,"name":"h"}}},"#,
+            r#"{"type":"Attribute","start":31,"end":39,"name":"i","value":[{"type":"Text","start":34,"#,
+            r#""end":35,"raw":"j","data":"j"},"#,
             r#"{"type":"ExpressionTag","start":35,"end":38,"expression":{"type":"Identifier","#,
             r#""start":36,"end":37,"name":"k"}}]}],"fragment":{"type":"Fragment","#,
             r#""nodes":[{"type":"Text","start":40,"end":41,"raw":"t","data":"t"},"#,
@@ -2179,7 +2144,7 @@ mod tests {
             r#""start":42,"end":43,"name":"x"}},"#,
             r#"{"type":"Comment","start":44,"end":52,"data":"c"},"#,
             r#"{"type":"RegularElement","start":52,"end":77,"name":"textarea","attributes":[],"#,
-            r#""fragment":{"type":"Fragment","nodes":[{"start":62,"end":63,"type":"Text","raw":"y","#,
+            r#""fragment":{"type":"Fragment","nodes":[{"type":"Text","start":62,"end":63,"raw":"y","#,
             r#""data":"y"},"#,
             r#"{"type":"ExpressionTag","start":63,"end":66,"expression":{"type":"Identifier","#,
             r#""start":64,"end":65,"name":"z"}}]}},"#,

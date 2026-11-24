@@ -23,7 +23,7 @@ A single AST cannot optimize for both manipulation and serialization.
 
 ### Public wire JSON (serialization boundary only)
 
-- Exact JSON field ordering (matching the canonical parser)
+- The canonical parser's keys and values, in a key order of tsv's own — one per node type, child-bearing keys in the canonical relative order ([conformance_svelte.md §Key Order](./conformance_svelte.md#key-order))
 - Plain JSON numbers (byte spans emitted as char / UTF-16 offsets)
 - Source-faithful strings (raw slices reconstructed at the boundary)
 - Emitted directly by the writer (`ast/convert/`), never an intermediate typed tree
@@ -210,8 +210,9 @@ that island-scoped attach, run **online** off the writer's own node opens and cl
 its trailing ones after its children — exactly the two moments the writer already has —
 and the wire emits both lists at the close, so there is no second pass, no recorded
 tree, and no per-node map. `leadingComments` / `trailingComments` serialize in place,
-and the walk's child-visit order is acorn's *by construction*, since it IS the emitted
-field order. `<script>` content, block patterns, `{@const}`/`{const}`/`{let}`
+and the walk's child-visit order is the emitted key order *by construction* — acorn's for
+every child-bearing key but the TypeScript-only ones, whose position tsv's own key order
+chooses ([conformance_svelte.md §Key Order](./conformance_svelte.md#key-order)). `<script>` content, block patterns, `{@const}`/`{const}`/`{let}`
 declarations, and `<svelte:options>` fuse the same way; embedded `<style>` children fuse
 via `tsv_css`'s `write_css_children`.
 

@@ -69,9 +69,9 @@
 				},
 				"context": {
 					"type": "Identifier",
-					"name": "e",
 					"start": 80,
 					"end": 81,
+					"name": "e",
 					"typeAnnotation": {
 						"type": "TSTypeAnnotation",
 						"start": 81,
@@ -212,9 +212,9 @@
 				"name": "lang",
 				"value": [
 					{
+						"type": "Text",
 						"start": 14,
 						"end": 16,
-						"type": "Text",
 						"raw": "ts",
 						"data": "ts"
 					}

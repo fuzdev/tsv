@@ -35,15 +35,12 @@ pub(in crate::fixtures::validation) fn validate_parser_ours(
     }
 }
 
-/// Validate our parser output matches expected.json (non-divergence fixtures only)
+/// P2b: our parser output matches expected.json (non-divergence fixtures only)
 ///
 /// For non-divergence fixtures, expected.json should match both the canonical parser
-/// AND our parser. Byte-strict: compares the tabbed serialization against the file
-/// content exactly like P1/P2/P3, so wire *field-order* divergences fail too
-/// (`preserve_order` keeps real key order on both sides, and both sides are
-/// `to_json_with_tabs` output, so number/escape formatting is already normalized).
-/// A mismatch that is semantically equal as `serde_json::Value` (key-order-insensitive)
-/// is reported as a field-order divergence to make triage self-identifying.
+/// AND our parser — in keys, values and presence, not in key order: the wire's key order
+/// is tsv's own (one order per node type, held by `order:audit`), so a byte mismatch that
+/// is equal as a key-order-insensitive `serde_json::Value` passes ([`compare_wire`]).
 pub(in crate::fixtures::validation) fn validate_parser_ours_matches_expected(
     result: &mut FixtureValidation,
     fixture: &Fixture,
@@ -69,8 +66,7 @@ pub(in crate::fixtures::validation) fn validate_parser_ours_matches_expected(
     };
 
     match compare_wire(paths, &expected_str) {
-        WireMatch::Exact => result.add_success(ValidationSuccess::ParserOursMatchesExpected),
-        WireMatch::FieldOrderOnly => result.add_error(ValidationError::ParserOursFieldOrderDiffers),
+        WireMatch::Same => result.add_success(ValidationSuccess::ParserOursMatchesExpected),
         WireMatch::Differs => result.add_error(ValidationError::ParserOursDiffersFromExpected),
         WireMatch::Unreadable(e) => result.add_error(ValidationError::ParserError(format!(
             "Failed to parse expected.json: {e}"
@@ -79,12 +75,11 @@ pub(in crate::fixtures::validation) fn validate_parser_ours_matches_expected(
 }
 
 /// How the writer's wire stands against an `expected*.json` the canonical parser produced —
-/// the triage P2b and P4 share, so a field-order divergence reads the same at both.
+/// the comparison P2b and P4 share. Key order is not graded: the canonical parser's order is
+/// its own and tsv's is tsv's, so the two are equal when their `Value`s are.
 enum WireMatch {
-    /// The tabbed serialization is byte-identical to the file.
-    Exact,
-    /// Semantically equal as a key-order-insensitive `Value`; only the field order differs.
-    FieldOrderOnly,
+    /// Byte-identical, or equal as a key-order-insensitive `Value`.
+    Same,
     /// A real AST difference.
     Differs,
     /// The expected file is not readable JSON; carries the reader's message.
@@ -93,10 +88,10 @@ enum WireMatch {
 
 fn compare_wire(paths: &InputAstPaths, expected: &str) -> WireMatch {
     if paths.ast_json_tabs == expected {
-        return WireMatch::Exact;
+        return WireMatch::Same;
     }
     match crate::json::from_str::<serde_json::Value>(expected) {
-        Ok(expected_json) if paths.wire_value() == expected_json => WireMatch::FieldOrderOnly,
+        Ok(expected_json) if paths.wire_value() == expected_json => WireMatch::Same,
         Ok(_) => WireMatch::Differs,
         Err(e) => WireMatch::Unreadable(e.to_string()),
     }
@@ -245,13 +240,12 @@ pub(in crate::fixtures::validation) fn read_variant_pins(
 }
 
 /// P4 (tsv side): our parse of a pinned variant reproduces its `expected_<stem>.json`
-/// byte-strict — the P2b claim, made about the variant instead of the input.
+/// in everything but key order — the P2b claim, made about the variant instead of the input.
 ///
 /// The pin exists for a parse fact no `input.*` can carry: a leading BOM with nothing
 /// load-bearing behind it, which the format side strips, or a newline inside a region the
 /// canonical parser overwrites (Svelte's `_ as ` annotation window), which tsv's formatter
-/// always removes — so such an input is never its own fixed point (F1). Pure Rust, like P2b;
-/// a semantically-equal mismatch is reported as the field-order kind, like P2b's.
+/// always removes — so such an input is never its own fixed point (F1). Pure Rust, like P2b.
 pub(in crate::fixtures::validation) fn validate_variant_parse_pins_ours(
     result: &mut FixtureValidation,
     fixture: &Fixture,
@@ -272,13 +266,7 @@ pub(in crate::fixtures::validation) fn validate_variant_parse_pins_ours(
         };
         let paths = input_ast_paths(&parsed, &pin.variant);
         match compare_wire(&paths, &pin.expected) {
-            WireMatch::Exact => matched += 1,
-            WireMatch::FieldOrderOnly => {
-                result.add_error(ValidationError::ParserVariantOursFieldOrderDiffers {
-                    variant: pin.variant_name.clone(),
-                    pin: pin.pin_name.clone(),
-                });
-            }
+            WireMatch::Same => matched += 1,
             WireMatch::Differs => {
                 result.add_error(ValidationError::ParserVariantOursDiffers {
                     variant: pin.variant_name.clone(),

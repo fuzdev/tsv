@@ -1266,7 +1266,10 @@ checkout's id in `GATE_CHECKOUT_IDS`, in one change. `bench:pins:suites` needs n
 **Fixture churn is only one of three ways an oracle bump lands, and the third is
 ungated.** Read each upstream commit's source diff *and* the regression fixture it
 ships, then run those constructs through tsv, the new oracle, and real tsc —
-comparing wire **key order**, not just accept/reject:
+comparing the wire **trees** — keys, values, where each comment attaches — not just
+accept/reject (key order is tsv's own, so an oracle that reorders a node's keys moves no
+fixture; one that reorders its child-bearing keys fails `order:audit` (where a fixture holds the type with both keys) once `fixtures:update`
+has regenerated the oracle files it reads):
 
 - an upstream **bug fix** retires a tsv correction — divergence fixtures collapse,
   and `fixtures:update` shows you exactly which;

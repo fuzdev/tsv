@@ -122,12 +122,10 @@ pub(super) fn write_rest_element(w: &mut JsonWriter, rest: &ast::RestElement, ct
     close_node(w, "RestElement", rest.span, ctx);
 }
 
-/// Emits a `Property` node. Field order: `method`, `shorthand`, `computed`,
-/// `key`, then `value`/`kind` — acorn assigns `value` before `kind` in every
-/// shape except two acorn-typescript paths that assign `kind` first: get/set
-/// (`parseGetterSetter`) and generic object methods (`m<T>() {}`, the
-/// `parsePropertyValue` override). Vanilla acorn (`ctx.vanilla_acorn`) assigns
-/// `value` first everywhere.
+/// Emits a `Property` node. Field order: `method`, `shorthand`, `computed`, `key`,
+/// `value`, `kind` — acorn's order. (Two acorn-typescript paths assign `kind` before
+/// `value` — get/set, `parseGetterSetter`, and generic object methods, the
+/// `parsePropertyValue` override; tsv's wire keeps the one order.)
 pub(super) fn write_property(w: &mut JsonWriter, prop: &ast::Property, ctx: &Ctx<'_>) {
     node_header(w, "Property", prop.span, ctx);
     // `method` and `computed` are nearly always `false`, so the common shape is
@@ -152,34 +150,23 @@ pub(super) fn write_property(w: &mut JsonWriter, prop: &ast::Property, ctx: &Ctx
         );
     }
     write_expression(w, ctx.view.expr(prop.key), ctx);
-    let getset = !matches!(prop.kind, ast::PropertyKind::Init);
-    let generic_method = prop.method
-        && matches!(&ctx.view.expr(prop.value).kind, &ast::ExpressionKind::FunctionExpression(f)
-            if ctx.view.fn_expr(f).type_parameters.is_some());
-    if (getset || generic_method) && !ctx.vanilla_acorn {
-        w.raw(",\"kind\":\"");
-        w.raw(prop.kind.as_str());
-        w.raw("\",\"value\":");
-        write_property_value(w, prop, ctx);
-    } else {
-        w.raw(",\"value\":");
-        write_property_value(w, prop, ctx);
-        // Nearly every property is `init`, so that kind appends the whole
-        // field as one literal rather than a runtime-length copy of `as_str()`.
-        match prop.kind {
-            ast::PropertyKind::Init => w.raw(",\"kind\":\"init\""),
-            kind => {
-                w.raw(",\"kind\":\"");
-                w.raw(kind.as_str());
-                w.raw("\"");
-            }
+    w.raw(",\"value\":");
+    write_property_value(w, prop, ctx);
+    // Nearly every property is `init`, so that kind appends the whole
+    // field as one literal rather than a runtime-length copy of `as_str()`.
+    match prop.kind {
+        ast::PropertyKind::Init => w.raw(",\"kind\":\"init\""),
+        kind => {
+            w.raw(",\"kind\":\"");
+            w.raw(kind.as_str());
+            w.raw("\"");
         }
     }
     close_node(w, "Property", prop.span, ctx);
 }
 
-/// A method/get/set value goes through acorn's `parseMethod`, whose
-/// `typeParameters` are grafted post-hoc (serialize after `body`).
+/// A method/get/set value goes through acorn's `parseMethod`; its `FunctionExpression`
+/// takes the one field order every `FunctionExpression` does.
 ///
 /// A shorthand default an object LITERAL holds (`({ a = 1 } += x)`, the
 /// `CoverInitializedName` on a compound operator's left, which stays a literal) is an
@@ -196,7 +183,7 @@ fn write_property_value(w: &mut JsonWriter, prop: &ast::Property, ctx: &Ctx<'_>)
             },
             true,
         ) => {
-            write_function_expression(w, ctx.view.fn_expr(f), ctx, true);
+            write_function_expression(w, ctx.view.fn_expr(f), ctx);
         }
         (
             ast::Expression {

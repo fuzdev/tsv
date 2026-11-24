@@ -96,9 +96,9 @@
 				"name": "lang",
 				"value": [
 					{
+						"type": "Text",
 						"start": 14,
 						"end": 16,
-						"type": "Text",
 						"raw": "ts",
 						"data": "ts"
 					}
@@ -190,9 +190,9 @@
 				"name": "lang",
 				"value": [
 					{
+						"type": "Text",
 						"start": 101,
 						"end": 103,
-						"type": "Text",
 						"raw": "ts",
 						"data": "ts"
 					}

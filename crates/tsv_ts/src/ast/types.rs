@@ -459,22 +459,25 @@ impl TSTypeParameterModifier {
             TSTypeParameterModifier::Out => "out",
         }
     }
+
+    /// This modifier's bit in [`TSTypeParameterModifiers`].
+    const fn bit(self) -> u8 {
+        match self {
+            TSTypeParameterModifier::Const => 1,
+            TSTypeParameterModifier::In => 2,
+            TSTypeParameterModifier::Out => 4,
+        }
+    }
 }
 
-/// The modifiers a type parameter carries, **in source order**.
+/// The modifiers a type parameter carries, as a set.
 ///
-/// ⚠️ The order is observable OUTPUT, not bookkeeping, and the two readers ask
-/// opposite questions of it. acorn-typescript stamps each flag as it consumes the
-/// keyword, so `<in const T>` emits `in` before `const` on the wire while
-/// `<const in T>` emits it after — the WRITER must walk [`Self::iter`]. The PRINTER
-/// is the reverse: it emits the canonical `const in out` however the source spells
-/// it (as prettier does), so it asks [`Self::contains`] three times and never sees
-/// the order. Storing a set plus a separate order field would give those two
-/// answers room to disagree; one ordered value cannot.
+/// The order the source spells them in is not kept: the wire writes them in one order
+/// (`const`, `in`, `out`) and the printer prints them in it, as prettier does.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct TSTypeParameterModifiers {
-    /// At most one of each of the three keywords, so three slots always suffice.
-    order: [Option<TSTypeParameterModifier>; 3],
+    /// One bit per [`TSTypeParameterModifier`] (`TSTypeParameterModifier::bit`).
+    bits: u8,
 }
 
 impl TSTypeParameterModifiers {
@@ -484,28 +487,13 @@ impl TSTypeParameterModifiers {
         if self.contains(modifier) {
             return false;
         }
-        for slot in &mut self.order {
-            if slot.is_none() {
-                *slot = Some(modifier);
-                return true;
-            }
-        }
-        // Unreachable: there are three distinct modifiers and three slots, and the
-        // duplicate check above already returned, so at most two slots are filled.
-        // Reporting "already present" is the harmless reading if it ever were reached:
-        // the caller rejects on a `false`, which is what a fourth modifier keyword
-        // would deserve anyway.
-        false
+        self.bits |= modifier.bit();
+        true
     }
 
-    /// Whether `modifier` is present, order-blind — the printer's question.
+    /// Whether `modifier` is present.
     pub fn contains(self, modifier: TSTypeParameterModifier) -> bool {
-        self.order.iter().flatten().any(|&m| m == modifier)
-    }
-
-    /// The modifiers in the order the author wrote them — the wire's question.
-    pub fn iter(self) -> impl Iterator<Item = TSTypeParameterModifier> {
-        self.order.into_iter().flatten()
+        self.bits & modifier.bit() != 0
     }
 }
 
@@ -516,7 +504,7 @@ pub struct TSTypeParameter {
     pub name: Identifier,
     pub constraint: Option<TyId>,
     pub default: Option<TyId>,
-    /// `const` / `in` / `out`, in source order — see [`TSTypeParameterModifiers`].
+    /// `const` / `in` / `out`, as a set — see [`TSTypeParameterModifiers`].
     pub modifiers: TSTypeParameterModifiers,
     pub span: Span,
 }

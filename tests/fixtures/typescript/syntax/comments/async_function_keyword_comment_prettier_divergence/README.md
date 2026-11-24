@@ -14,7 +14,7 @@ makes this the modifier→keyword rule rather than an `async` special case.
 The same rule the modifier→keyword sibling
 `../declaration_keyword_name_prettier_divergence/` states for `abstract /* b */
 class B {}`, and the same one the `async`→parameters gap of an async arrow states
-(`../../../expressions/arrow/async_before_params_comment_prettier_divergence/`).
+(`../../../expressions/arrow/async_before_params_comment_svelte_prettier_divergence/`).
 Prettier's two destinations here are keyed on whether a name follows, so its
 placement is no oracle.
 

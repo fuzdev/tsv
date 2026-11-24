@@ -68,8 +68,8 @@
  * - `character` in `loc`: a shorthand attribute's expansion (`{x}`), a snippet name, a
  *   simple-identifier block pattern (`{#each … as x}`, `{:then x}`, `{:catch x}`,
  *   `{@const x = …}`), and an **in-tag** comment — one written between an element's
- *   attributes, which Svelte's template reader collects rather than acorn — told apart by
- *   the key order each collector writes (see `stamp_in_tag_comment_locs`).
+ *   attributes, which Svelte's template reader collects rather than acorn — found by where
+ *   it sits in the tree (see `stamp_in_tag_comment_locs`).
  *
  * **A leading byte-order mark is read the way each wire reads it.** Svelte's `parse` and
  * `parseCss` strip a U+FEFF at index 0 before parsing, so the Svelte and CSS wires index
@@ -378,22 +378,157 @@ function stamp_character_locs(node, starts, source) {
  *
  * Svelte's template reader collects the comments written *between* an element's
  * attributes (`<div /* c *\/ class="x">`) and stamps `character` into their `loc`;
- * every other comment is collected by acorn and gets the plain shape. The wire itself
- * records which collector built each one, in its key order — the template reader's
- * literal is `{type, start, end, value}`, acorn's `onComment` wrapper's
- * `{type, value, start, end}` — so that order is read here, not re-derived from the
- * tree. It holds for any tree a parse returned (`JSON.parse` and `structuredClone` keep
- * key order); a tree rebuilt with its comments' keys reordered loses the stamp.
- * @param {any[]} comments
+ * every other comment is collected by acorn and gets the plain shape. Both land in the
+ * root `comments` array and the wire writes both in one key order, so which collector
+ * built a comment is read off the tree: an in-tag comment lies in an element's opening
+ * tag (or `<svelte:options>`'s), outside every positioned value the element holds — its
+ * attributes, a `<svelte:element>`'s `tag`, a `<svelte:component>`'s `expression`
+ * (`in_tag_head`). Those last two exclude their braces, so an acorn comment inside
+ * `this={/* c *\/ x}` sits in the same gap; its nearest neighbours past whitespace and
+ * other comments tell it apart, a `{` or `(` before it or a `}` or `)` after it, which
+ * no tag head puts next to an in-tag comment (`delimited_by_expression`). A template
+ * comment costs one descent of the template, a `<script>` comment nothing.
+ * @param {any} root
  * @param {number[]} starts
- * @mutates comments
+ * @param {string} source - the string the wire's offsets index
+ * @mutates root
  */
-function stamp_in_tag_comment_locs(comments, starts) {
-	for (const c of comments) {
+function stamp_in_tag_comment_locs(root, starts, source) {
+	/** @type {{by_end: Map<number, number>, by_start: Map<number, number>} | null} */
+	let neighbours = null;
+	for (const c of root.comments) {
 		if (typeof c?.start !== 'number' || typeof c.end !== 'number') continue;
-		if (Object.keys(c)[1] !== 'start') continue;
+		if (contains(root.instance?.content, c) || contains(root.module?.content, c)) continue;
+		if (!in_tag_head(root, c)) continue;
+		neighbours ??= comment_neighbours(root.comments);
+		if (delimited_by_expression(source, c, neighbours)) continue;
 		c.loc = { start: name_loc_at(c.start, starts), end: name_loc_at(c.end, starts) };
 	}
+}
+
+/**
+ * Whether the positioned object `node` spans `c`.
+ * @param {any} node
+ * @param {{start: number, end: number}} c
+ */
+function contains(node, c) {
+	return (
+		node !== null &&
+		typeof node === 'object' &&
+		typeof node.start === 'number' &&
+		node.start <= c.start &&
+		c.end <= node.end
+	);
+}
+
+/**
+ * Whether `c` lies in an opening tag's gaps: descend the template to the element whose
+ * head holds it, `<svelte:options>` first (it sits outside the fragment).
+ * @param {any} root
+ * @param {{start: number, end: number}} c
+ */
+function in_tag_head(root, c) {
+	if (contains(root.options, c)) return head_holds(root.options, c) === true;
+	/** @type {any[]} */
+	let fragments = [root.fragment];
+	descend: for (;;) {
+		for (const fragment of fragments) {
+			const node = node_spanning(fragment?.nodes, c);
+			if (node === null) continue;
+			if (Array.isArray(node.attributes)) {
+				const held = head_holds(node, c);
+				if (held !== null) return held;
+			}
+			fragments = [];
+			for (const key in node) {
+				if (node[key]?.type === 'Fragment') fragments.push(node[key]);
+			}
+			continue descend;
+		}
+		return false;
+	}
+}
+
+/**
+ * The node of a fragment's `nodes` (sorted, disjoint) that spans `c`, or `null`.
+ * @param {any[] | undefined} nodes
+ * @param {{start: number, end: number}} c
+ */
+function node_spanning(nodes, c) {
+	if (!Array.isArray(nodes)) return null;
+	let lo = 0;
+	let hi = nodes.length - 1;
+	while (lo <= hi) {
+		const mid = (lo + hi) >> 1;
+		const node = nodes[mid];
+		if (node.end < c.start) lo = mid + 1;
+		else if (node.start > c.start) hi = mid - 1;
+		else return contains(node, c) ? node : null;
+	}
+	return null;
+}
+
+/**
+ * For an element spanning `c`: `true` when `c` is in its head outside every positioned
+ * value, `false` when a value holds it, `null` when it lies past the head (look deeper).
+ * @param {any} node
+ * @param {{start: number, end: number}} c
+ * @returns {boolean | null}
+ */
+function head_holds(node, c) {
+	const head_end = node.fragment?.nodes?.[0]?.start ?? node.end;
+	if (c.end > head_end) return null;
+	for (const key in node) {
+		if (key === 'fragment' || key === 'loc' || key === 'name_loc') continue;
+		const value = node[key];
+		if (Array.isArray(value)) {
+			for (const item of value) if (contains(item, c)) return false;
+		} else if (contains(value, c)) {
+			return false;
+		}
+	}
+	return true;
+}
+
+/**
+ * Every comment's `start` by its `end`, and `end` by `start` — how
+ * `delimited_by_expression` steps over a run of comments.
+ * @param {any[]} comments
+ */
+function comment_neighbours(comments) {
+	const by_end = new Map();
+	const by_start = new Map();
+	for (const c of comments) {
+		by_end.set(c.end, c.start);
+		by_start.set(c.start, c.end);
+	}
+	return { by_end, by_start };
+}
+
+/**
+ * Whether `c`'s nearest neighbours, past whitespace and other comments, are an
+ * expression's delimiters: a `{` or `(` before it, or a `}` or `)` after it.
+ * @param {string} source
+ * @param {{start: number, end: number}} c
+ * @param {{by_end: Map<number, number>, by_start: Map<number, number>}} neighbours
+ */
+function delimited_by_expression(source, c, { by_end, by_start }) {
+	let before = c.start;
+	for (;;) {
+		while (before > 0 && /\s/.test(source[before - 1])) before--;
+		const start = by_end.get(before);
+		if (start === undefined) break;
+		before = start;
+	}
+	if (source[before - 1] === '{' || source[before - 1] === '(') return true;
+	let after = c.end;
+	for (;;) {
+		while (after < source.length && /\s/.test(source[after])) after++;
+		const end = by_start.get(after);
+		if (end === undefined) break;
+		after = end;
+	}
+	return source[after] === '}' || source[after] === ')';
 }
 
 /**
@@ -461,7 +596,7 @@ function walk_add_loc(root, ctx) {
  */
 function reconstruct_in(ast, starts, source, is_svelte) {
 	walk_add_loc(ast, { starts, source, is_svelte });
-	if (is_svelte && Array.isArray(ast?.comments)) stamp_in_tag_comment_locs(ast.comments, starts);
+	if (is_svelte && Array.isArray(ast?.comments)) stamp_in_tag_comment_locs(ast, starts, source);
 	return ast;
 }
 

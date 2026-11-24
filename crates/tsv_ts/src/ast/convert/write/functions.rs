@@ -10,20 +10,15 @@ use super::{
 use crate::ast;
 use tsv_lang::Span;
 
-/// Emits an `ArrowFunctionExpression` node.
-///
-/// acorn-typescript's arrow paths assign fields in different orders, so the
-/// wire order is shape-dependent:
-///
-/// - `async <T>(…)` (`tsTryParseGenericAsyncArrowFunction`): `typeParameters`,
-///   `params`, `returnType?`, then the `parseArrowExpression` tail (`id`,
-///   `expression`, `generator`, `async`, `body`). Detected as an async arrow
-///   whose type parameters start after the arrow itself (`async` keyword
-///   first); a `<T>async (…)` graft starts at the `<`.
-/// - everything else (`parseParenArrowList` / `parseSubscriptAsyncArrow`):
-///   `returnType?` first (stamped on the fresh node), then `id`, `expression`,
-///   `generator`, `async`, `params`, `body`, with `typeParameters?` last (the
-///   `<T>(…) => …` reading grafts them onto the finished arrow).
+/// Emits an `ArrowFunctionExpression` node. Field order, on every route: `returnType?`,
+/// `id`, `expression`, `generator`, `async`, `params`, `body`, `typeParameters?` —
+/// acorn-typescript's common routes' (`parseParenArrowList` / `parseSubscriptAsyncArrow`
+/// stamp `returnType` on the fresh node; the `<T>(…) => …` reading grafts `typeParameters`
+/// onto the finished arrow). Its generic async route (`async <T>(…)`,
+/// `tsTryParseGenericAsyncArrowFunction`) writes `typeParameters`, `params`, `returnType`
+/// first; tsv's wire keeps the one order, so the comment attach (which walks in field
+/// order) places that route's head comments as the common route would — a cataloged
+/// divergence (`docs/conformance_svelte.md` §Comment Attachment Differences).
 pub(super) fn write_arrow_function_expression(
     w: &mut JsonWriter,
     arrow: &ast::ArrowFunctionExpression,
@@ -31,35 +26,17 @@ pub(super) fn write_arrow_function_expression(
     ctx: &Ctx<'_>,
 ) {
     node_header(w, "ArrowFunctionExpression", span, ctx);
-    let generic_async = arrow.r#async
-        && arrow
-            .type_parameters
-            .as_ref()
-            .is_some_and(|tp| tp.span.start > span.start);
-    if generic_async {
-        write_type_parameters_field(w, arrow.type_parameters.as_ref(), ctx);
-        w.raw(",\"params\":");
-        write_expressions(w, ctx.view.exprs(arrow.params), ctx);
-        write_return_type_field(w, arrow.return_type.as_ref(), ctx);
-        w.raw_pick(
-            arrow.body.is_expression(),
-            b",\"id\":null,\"expression\":true,\"generator\":false,\"async\":true,\"body\":",
-            b",\"id\":null,\"expression\":false,\"generator\":false,\"async\":true,\"body\":",
-        );
-        write_arrow_body(w, &arrow.body, ctx);
-    } else {
-        write_return_type_field(w, arrow.return_type.as_ref(), ctx);
-        w.raw_pick(
-            arrow.body.is_expression(),
-            b",\"id\":null,\"expression\":true,\"generator\":false,\"async\":",
-            b",\"id\":null,\"expression\":false,\"generator\":false,\"async\":",
-        );
-        w.raw_pick(arrow.r#async, b"true,\"params\":", b"false,\"params\":");
-        write_expressions(w, ctx.view.exprs(arrow.params), ctx);
-        w.raw(",\"body\":");
-        write_arrow_body(w, &arrow.body, ctx);
-        write_type_parameters_field(w, arrow.type_parameters.as_ref(), ctx);
-    }
+    write_return_type_field(w, arrow.return_type.as_ref(), ctx);
+    w.raw_pick(
+        arrow.body.is_expression(),
+        b",\"id\":null,\"expression\":true,\"generator\":false,\"async\":",
+        b",\"id\":null,\"expression\":false,\"generator\":false,\"async\":",
+    );
+    w.raw_pick(arrow.r#async, b"true,\"params\":", b"false,\"params\":");
+    write_expressions(w, ctx.view.exprs(arrow.params), ctx);
+    w.raw(",\"body\":");
+    write_arrow_body(w, &arrow.body, ctx);
+    write_type_parameters_field(w, arrow.type_parameters.as_ref(), ctx);
     close_node(w, "ArrowFunctionExpression", span, ctx);
 }
 
@@ -70,16 +47,16 @@ fn write_arrow_body(w: &mut JsonWriter, body: &ast::ArrowFunctionBody, ctx: &Ctx
     }
 }
 
-/// Emits a `FunctionExpression` node. Field order:
-/// `id` (nullable), `expression`, `generator`, `async`, `typeParameters?`,
-/// `params`, `returnType?`, `body` — except an object-literal method value
-/// (`type_params_last`), where acorn-typescript grafts `typeParameters` onto
-/// the finished `parseMethod` node, so it serializes after `body`.
+/// Emits a `FunctionExpression` node. Field order, on every route: `id` (nullable),
+/// `expression`, `generator`, `async`, `typeParameters?`, `params`, `returnType?`,
+/// `body`. (acorn-typescript grafts a method value's `typeParameters` onto the finished
+/// `parseMethod` node, after `body`; tsv's wire keeps the one order, and no comment
+/// attachment moves with it — a method value starts at its `(`, so the walk has already
+/// given every comment in its type parameters to an enclosing node.)
 pub(super) fn write_function_expression(
     w: &mut JsonWriter,
     func: &ast::FunctionExpression,
     ctx: &Ctx<'_>,
-    type_params_last: bool,
 ) {
     node_header(w, "FunctionExpression", func.span, ctx);
     w.raw(",\"id\":");
@@ -87,17 +64,12 @@ pub(super) fn write_function_expression(
         write_identifier_with_optional(w, id, ctx);
     });
     write_function_flags_fields(w, func.generator, func.r#async);
-    if !type_params_last {
-        write_type_parameters_field(w, func.type_parameters.as_ref(), ctx);
-    }
+    write_type_parameters_field(w, func.type_parameters.as_ref(), ctx);
     w.raw(",\"params\":");
     write_expressions(w, ctx.view.exprs(func.params), ctx);
     write_return_type_field(w, func.return_type.as_ref(), ctx);
     w.raw(",\"body\":");
     write_block_statement(w, &func.body, ctx);
-    if type_params_last {
-        write_type_parameters_field(w, func.type_parameters.as_ref(), ctx);
-    }
     close_node(w, "FunctionExpression", func.span, ctx);
 }
 

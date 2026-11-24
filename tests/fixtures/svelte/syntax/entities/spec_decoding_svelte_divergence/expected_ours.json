@@ -85,9 +85,9 @@
 						"name": "data-attr",
 						"value": [
 							{
+								"type": "Text",
 								"start": 347,
 								"end": 360,
-								"type": "Text",
 								"raw": "&AMP_ &COPY_1",
 								"data": "&_ ©_1"
 							}
@@ -184,9 +184,9 @@
 						"name": "data-attr",
 						"value": [
 							{
+								"type": "Text",
 								"start": 531,
 								"end": 543,
-								"type": "Text",
 								"raw": "&AMP- &AMP=1",
 								"data": "&- &AMP=1"
 							}
