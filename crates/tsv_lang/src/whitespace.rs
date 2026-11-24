@@ -5,7 +5,7 @@
 //!
 //! | the site mirrors | class | asked by |
 //! | --- | --- | --- |
-//! | anything spelled in JS — Svelte's parser, `parseCss`, prettier's `.trim()` | [`is_js_whitespace`] | `tsv_svelte`'s `is_svelte_ws`; `tsv_css`'s wire trims and escape terminators; this crate's directive + comment readers; `tsv_ts`'s comment renderer |
+//! | anything spelled in JS — Svelte's parser, acorn's tokenizer, `parseCss`, prettier's `.trim()` | [`is_js_whitespace`] | `tsv_svelte`'s `is_svelte_ws` and its block-head scans; `tsv_css`'s wire trims and escape terminators; this crate's directive + comment readers and `source_scan`'s look-back from a `/` to the operand before it; `tsv_ts`'s comment renderer |
 //! | css-syntax-3 tokenization (§4.2 **plus** §3.3, see there) | `tsv_css`'s `is_css_whitespace` (ASCII-only, five) | CSS value separation, value-text collapsing |
 //! | "may a formatter respell this without changing what RENDERS" | `tsv_svelte`'s `is_collapsible_ws` (`[ \t\n\r]`) | the Svelte printer's text/fill |
 //!
@@ -64,7 +64,11 @@
 //!   comment's `trimEnd`);
 //! - `tsv_css`'s wire trims mirror `read_value`'s `value.trim()`, and its hex-escape
 //!   terminator mirrors `read_identifier`'s `(\r\n|\s)?` — a JS regex, which the comment
-//!   there had equated with `char::is_whitespace`.
+//!   there had equated with `char::is_whitespace`;
+//! - `source_scan`'s `OperandAnchor` stepped back from a `/` over `u8::is_ascii_whitespace`
+//!   alone, so a `<VT>` or a no-break space between an operand and its `/` read as an operator
+//!   and the division as a regex (`{a<NBSP>/ 2}`, which acorn divides) — the walk now steps the
+//!   full class by whole characters (`js_space_width_before`).
 
 /// Whether `c` is whitespace to a **JS regular expression's `\s`**.
 ///
