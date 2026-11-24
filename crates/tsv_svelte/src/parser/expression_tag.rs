@@ -227,13 +227,11 @@ impl<'a> SvelteParser<'a> {
     /// `{#key …}`, `{@html …}`, `{@render …}`, `{@attach …}` — parsed to the `}` it stops at,
     /// as [`Self::parse_head_to_brace`] reads it, with the lexer advanced past that `}`.
     /// `head_start` is the first byte after the `{#` / `{:` / `{@` marker, where `keywords`
-    /// must stand in turn, each followed by a run of ASCII whitespace.
+    /// must stand in turn, each followed by a run of Svelte whitespace (JS `\s`).
     ///
     /// `Ok(None)`, nothing merged and the lexer untouched, for every head that reading
-    /// refuses and for every head spelled otherwise — a keyword with no whitespace after it,
-    /// or a non-ASCII character after the run, which may be more JS `\s` the host's keyword
-    /// strip would trim. The caller then scans to the head's `}` and parses the slice, which
-    /// owns every error.
+    /// refuses and for every head spelled otherwise — a keyword with no whitespace after it.
+    /// The caller then scans to the head's `}` and parses the slice, which owns every error.
     pub(crate) fn parse_keyword_head_to_brace(
         &mut self,
         head_start: usize,
@@ -321,8 +319,9 @@ impl<'a> SvelteParser<'a> {
 }
 
 /// Where a head's expression starts: past each of `keywords` in turn at `at`, each followed
-/// by a run of ASCII whitespace ([`SvelteParser::parse_keyword_head_to_brace`]). `None` when
-/// a keyword is missing, no whitespace follows one, or a non-ASCII byte follows the run.
+/// by a run of whitespace ([`SvelteParser::parse_keyword_head_to_brace`]) — the head scan's
+/// own run ([`skip_head_ws`]), so the scan the debug assert checks against starts where this
+/// reading does. `None` when a keyword is missing or no whitespace follows one.
 fn head_expression_start(bytes: &[u8], mut at: usize, keywords: &[&[u8]]) -> Option<usize> {
     for keyword in keywords {
         if !bytes.get(at..)?.starts_with(keyword) {
@@ -330,12 +329,8 @@ fn head_expression_start(bytes: &[u8], mut at: usize, keywords: &[&[u8]]) -> Opt
         }
         at += keyword.len();
         let run_start = at;
-        // The head scan's own run (`head_keyword_end`), so the scan the debug assert checks
-        // against starts where this reading does: a vertical tab takes the fallback.
-        while bytes.get(at).is_some_and(u8::is_ascii_whitespace) {
-            at += 1;
-        }
-        if at == run_start || bytes.get(at).is_some_and(|&b| !b.is_ascii()) {
+        at = skip_head_ws(bytes, at);
+        if at == run_start {
             return None;
         }
     }
@@ -397,7 +392,25 @@ pub(crate) fn scan_to_matching_paren(bytes: &[u8], scan_start: usize) -> Option<
 /// Started past the keyword, the head's first `/` stands where an expression begins,
 /// which is what it is to the parser that reads the head.
 pub(crate) fn scan_head_to_matching_brace(bytes: &[u8], scan_start: usize) -> Option<usize> {
-    let from = head_keyword_end(bytes, scan_start);
+    let Some(from) = head_keyword_end(bytes, scan_start, ascii_head_ws_end) else {
+        return scan_wide_head_to_matching_brace(bytes, scan_start);
+    };
+    scan_from_keyword_end(bytes, from)
+}
+
+/// [`scan_head_to_matching_brace`] for a head whose whitespace holds a non-ASCII character
+/// before its keyword ends — read again from the start, every run in the full class.
+/// Out of line and called last, so the common head's scan saves nothing for it.
+#[cold]
+#[inline(never)]
+fn scan_wide_head_to_matching_brace(bytes: &[u8], scan_start: usize) -> Option<usize> {
+    let from = head_keyword_end(bytes, scan_start, |bytes, i| Some(skip_head_ws(bytes, i)))?;
+    scan_from_keyword_end(bytes, from)
+}
+
+/// The head scan past its keyword, from `from` ([`head_keyword_end`]).
+#[inline]
+fn scan_from_keyword_end(bytes: &[u8], from: usize) -> Option<usize> {
     // A head that is its keyword alone (`{/if}`, `{:else}`) closes right there — the
     // scan's own first answer, taken without entering it.
     if bytes.get(from) == Some(&b'}') {
@@ -406,32 +419,90 @@ pub(crate) fn scan_head_to_matching_brace(bytes: &[u8], scan_start: usize) -> Op
     scan_to_matching_brace(bytes, from)
 }
 
-/// Where a block or tag head's keyword ends: past leading ASCII whitespace and the
-/// keyword's letters, and past a following `if` when the keyword is `else`
-/// (`{:else if …}`). A head with no keyword ends where it began.
-fn head_keyword_end(bytes: &[u8], start: usize) -> usize {
-    let skip_ws = |mut i: usize| {
-        while bytes.get(i).is_some_and(u8::is_ascii_whitespace) {
-            i += 1;
+/// Svelte's whitespace ASCII members — TAB, LF, VT, FF, CR and SPACE, the bytes `is_whitespace`
+/// (`1-parse/utils/whitespace.js`) takes below U+0080 — one bit per byte value, so a head's
+/// whitespace run asks each ASCII byte one question.
+const ASCII_SVELTE_WS: u64 = 0b11_1110_0000_0000 | (1 << b' ');
+
+/// The end of the whitespace run at `i` when an ASCII byte (or the end) ends it, or `None`
+/// when a non-ASCII byte does, which may be whitespace too — the caller then reads the head
+/// again with [`skip_head_ws`].
+#[inline]
+fn ascii_head_ws_end(bytes: &[u8], mut i: usize) -> Option<usize> {
+    loop {
+        match bytes.get(i) {
+            Some(&b) if b <= b' ' && (ASCII_SVELTE_WS >> b) & 1 != 0 => i += 1,
+            Some(&b) if !b.is_ascii() => return None,
+            _ => return Some(i),
         }
-        i
-    };
+    }
+}
+
+/// The end of the whitespace run at `i`: [`is_svelte_ws`](crate::whitespace::is_svelte_ws),
+/// Svelte's `allow_whitespace` — the class every head reading past a keyword must share, or a
+/// separator the canonical parser steps over (`{:else<VT>if …}`, a no-break space, a U+FEFF)
+/// ends the run early and the keyword after it is scanned as an operand. A non-ASCII byte
+/// hands the rest of the run to [`skip_wide_head_ws`].
+#[inline]
+fn skip_head_ws(bytes: &[u8], i: usize) -> usize {
+    match ascii_head_ws_end(bytes, i) {
+        Some(end) => end,
+        None => skip_wide_head_ws(bytes, i),
+    }
+}
+
+/// [`skip_head_ws`] over a run holding a non-ASCII character, decoding each one.
+/// `bytes` is a document's text and `i` a character boundary.
+#[cold]
+#[inline(never)]
+fn skip_wide_head_ws(bytes: &[u8], mut i: usize) -> usize {
+    while let Some(&b) = bytes.get(i) {
+        let width = match b {
+            _ if b <= b' ' && (ASCII_SVELTE_WS >> b) & 1 != 0 => 1,
+            0xC0..=0xDF => 2,
+            0xE0..=0xEF => 3,
+            0xF0..=0xF7 => 4,
+            _ => break,
+        };
+        let is_ws = width == 1
+            || core::str::from_utf8(&bytes[i..bytes.len().min(i + width)])
+                .ok()
+                .and_then(|c| c.chars().next())
+                .is_some_and(crate::whitespace::is_svelte_ws);
+        if !is_ws {
+            break;
+        }
+        i += width;
+    }
+    i
+}
+
+/// Where a block or tag head's keyword ends: past leading whitespace and the keyword's
+/// letters, and past a following `if` when the keyword is `else` (`{:else if …}`). A head
+/// with no keyword ends where it began. Each whitespace run is `skip`'s — [`skip_head_ws`]'s
+/// reading, or `None` where [`ascii_head_ws_end`] leaves a run to it.
+#[inline]
+fn head_keyword_end(
+    bytes: &[u8],
+    start: usize,
+    skip: impl Fn(&[u8], usize) -> Option<usize>,
+) -> Option<usize> {
     let skip_word = |mut i: usize| {
         while bytes.get(i).is_some_and(u8::is_ascii_alphabetic) {
             i += 1;
         }
         i
     };
-    let word_start = skip_ws(start);
+    let word_start = skip(bytes, start)?;
     let word_end = skip_word(word_start);
     if &bytes[word_start..word_end] == b"else" {
-        let if_start = skip_ws(word_end);
+        let if_start = skip(bytes, word_end)?;
         let if_end = skip_word(if_start);
         if &bytes[if_start..if_end] == b"if" {
-            return if_end;
+            return Some(if_end);
         }
     }
-    word_end
+    Some(word_end)
 }
 
 #[cfg(test)]
@@ -510,5 +581,19 @@ mod tests {
     fn an_island_of_many_braced_operands_is_scanned_once() {
         let elements = vec!["{} / 1"; 100_000].join(", ");
         assert!(parses(&format!("<div>{{[{elements}]}}</div>")));
+    }
+
+    /// The head run's byte mask and cold arm are Svelte's whitespace class, at every code point.
+    #[test]
+    fn the_head_run_is_svelte_whitespace() {
+        for c in (0..=0x10_FFFF).filter_map(char::from_u32) {
+            let source = format!("{c}x");
+            let expected = if crate::whitespace::is_svelte_ws(c) {
+                c.len_utf8()
+            } else {
+                0
+            };
+            assert_eq!(super::skip_head_ws(source.as_bytes(), 0), expected, "{c:?}");
+        }
     }
 }

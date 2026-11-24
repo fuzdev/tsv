@@ -1,0 +1,165 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 406,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 340,
+				"data": "\n\tSvelte takes any JS `\\s` character between `else` and `if`, so a vertical tab, a\n\tno-break space or a U+FEFF separates them (see the unformatted_* variants), and the\n\thead's expression still opens after the `if`: a `/` there starts a regex. U+0085 NEL\n\tis not in JS `\\s` and does not separate them (see input_invalid_nel_else_if).\n"
+			},
+			{
+				"type": "Text",
+				"start": 340,
+				"end": 341,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "IfBlock",
+				"elseif": false,
+				"start": 341,
+				"end": 405,
+				"test": {
+					"type": "Identifier",
+					"start": 346,
+					"end": 347,
+					"name": "a"
+				},
+				"consequent": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 348,
+							"end": 350,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 350,
+							"end": 362,
+							"name": "p",
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 353,
+										"end": 358,
+										"raw": "text1",
+										"data": "text1"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 362,
+							"end": 363,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				},
+				"alternate": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"start": 363,
+							"end": 405,
+							"type": "IfBlock",
+							"elseif": true,
+							"test": {
+								"type": "CallExpression",
+								"start": 373,
+								"end": 384,
+								"callee": {
+									"type": "MemberExpression",
+									"start": 373,
+									"end": 381,
+									"object": {
+										"type": "Literal",
+										"start": 373,
+										"end": 376,
+										"value": {},
+										"raw": "/}/",
+										"regex": {
+											"pattern": "}",
+											"flags": ""
+										}
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 377,
+										"end": 381,
+										"name": "test"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 382,
+										"end": 383,
+										"name": "b"
+									}
+								],
+								"optional": false
+							},
+							"consequent": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 385,
+										"end": 387,
+										"raw": "\n\t",
+										"data": "\n\t"
+									},
+									{
+										"type": "RegularElement",
+										"start": 387,
+										"end": 399,
+										"name": "p",
+										"attributes": [],
+										"fragment": {
+											"type": "Fragment",
+											"nodes": [
+												{
+													"type": "Text",
+													"start": 390,
+													"end": 395,
+													"raw": "text2",
+													"data": "text2"
+												}
+											]
+										}
+									},
+									{
+										"type": "Text",
+										"start": 399,
+										"end": 400,
+										"raw": "\n",
+										"data": "\n"
+									}
+								]
+							},
+							"alternate": null
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

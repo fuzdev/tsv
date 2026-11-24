@@ -494,15 +494,18 @@ fn a_head_led_by_a_function_reads_its_slash_as_a_regex() {
     }
 }
 
+/// A vertical tab, a no-break space or a byte-order mark between `else` and `if` is Svelte
+/// whitespace (JS `\s`), so the head reads as it does with a space there — the same tree, each
+/// separator one UTF-16 unit on the wire, and the same output — and a `/` after the `if` opens
+/// an expression.
 #[test]
-fn a_keyword_separator_outside_the_head_scans_run_takes_the_fallback() {
-    // A vertical tab, a no-break space or a byte-order mark between `else` and `if` is not in
-    // the head scan's whitespace run, so the head takes the bounded path, and the debug build's
-    // assert that the parsed island ends where that scan does is never asked.
+fn a_keyword_separator_in_svelte_whitespace_reads_as_a_space() {
     for separator in ["\u{b}", "\u{a0}", "\u{feff}"] {
         for expression in ["/}/.test(s)", "x / 2", "{} / 2"] {
             let source = format!("{{#if c}}{{:else{separator}if {expression}}}x{{/if}}");
-            let _ = tsv_svelte::__private::parse(&source);
+            let spaced = format!("{{#if c}}{{:else if {expression}}}x{{/if}}");
+            assert_eq!(wire(&source), wire(&spaced), "{source:?}");
+            assert_eq!(formatted(&source), formatted(&spaced), "{source:?}");
         }
     }
 }
