@@ -620,8 +620,8 @@ fn trivia_ends_operand(bytes: &[u8], i: usize) -> bool {
 /// instead of maintained per byte.
 ///
 /// A depth-tracking scan needs the anchor only where it meets a `/`, which is a rare
-/// byte — but stated as a running variable it charges every *significant* byte an
-/// `is_ascii_whitespace` test and a select to keep current. This carries the two
+/// byte — but stated as a running variable it charges every *significant* byte a
+/// whitespace test and a select to keep current. This carries the two
 /// facts the anchor can be rebuilt from instead: its value as of the last boundary
 /// the scan crossed, and where the run of significant bytes since that boundary
 /// began. Both move only at a boundary, so the per-byte cost is nothing at all.
@@ -730,8 +730,12 @@ impl OperandAnchor {
         walk: &mut ScanWalk,
     ) -> Option<usize> {
         let mut j = pos;
-        while j > self.segment_start && bytes[j - 1].is_ascii_whitespace() {
-            j -= 1;
+        while j > self.segment_start {
+            let width = js_space_width_before(bytes, j, self.segment_start);
+            if width == 0 {
+                break;
+            }
+            j -= width;
         }
         if j > self.segment_start && bytes[j - 1] == b'!' {
             j = self.postfix_non_null_start(bytes, j, lower_bound, grammar, walk)?;
@@ -790,10 +794,10 @@ impl OperandAnchor {
         // it — the last byte of whatever the scan stepped over, which is a line break exactly
         // when that was a line comment or a block comment holding one.
         let glued = if k > self.segment_start {
-            !bytes[k - 1].is_ascii_whitespace()
+            js_space_width_before(bytes, k, self.segment_start) == 0
         } else {
             k == 0
-                || !(bytes[k - 1].is_ascii_whitespace()
+                || !(js_space_width_before(bytes, k, lower_bound) != 0
                     || line_terminator_ends_at(bytes, k)
                     || self.multi_line_comment_ends_at(bytes, k, lower_bound))
         };
@@ -1259,9 +1263,11 @@ fn word_before_regex(bytes: &[u8], word_end: usize, lower_bound: usize) -> bool 
             j = open;
             continue;
         }
-        if !bytes[j].is_ascii_whitespace() {
+        let width = js_space_width_before(bytes, j + 1, lower_bound);
+        if width == 0 {
             return bytes[j] != b'.';
         }
+        j = j + 1 - width;
     }
     true
 }
@@ -1355,6 +1361,43 @@ pub fn skip_regex_literal(bytes: &[u8], start: usize, end: usize) -> Option<usiz
         }
     }
     Some(end)
+}
+
+/// The ASCII members of ECMAScript's `WhiteSpace` and `LineTerminator` — TAB, LF, VT, FF, CR
+/// and SPACE, JS `\s` below U+0080 — one bit per byte value. Not `u8::is_ascii_whitespace`,
+/// which leaves out VT.
+const ASCII_JS_SPACE: u64 = 0b11_1110_0000_0000 | (1 << b' ');
+
+/// The width in bytes of the ECMAScript `WhiteSpace` or `LineTerminator` character (JS `\s`,
+/// [`is_js_whitespace`](crate::whitespace::is_js_whitespace)) ending just before `end`, or 0
+/// when the character there is none, its lead byte sought no lower than `floor` (a character
+/// that would start below it reads as none) — so a backward walk over
+/// the space between an operand and the token after it steps a vertical tab, a no-break space
+/// or a U+FEFF as it steps a space, as the tokenizer that reads the source does.
+#[inline]
+fn js_space_width_before(bytes: &[u8], end: usize, floor: usize) -> usize {
+    let b = bytes[end - 1];
+    if b.is_ascii() {
+        usize::from(b <= b' ' && (ASCII_JS_SPACE >> b) & 1 != 0)
+    } else {
+        wide_js_space_width_before(bytes, end, floor)
+    }
+}
+
+/// [`js_space_width_before`] for a character ending in a non-ASCII byte: every non-ASCII
+/// member is two or three bytes, so the walk steps back to a lead byte at most two bytes up.
+#[cold]
+#[inline(never)]
+fn wide_js_space_width_before(bytes: &[u8], end: usize, floor: usize) -> usize {
+    let mut lead = end - 1;
+    while lead > floor && end - lead < 3 && bytes[lead] & 0xC0 == 0x80 {
+        lead -= 1;
+    }
+    std::str::from_utf8(&bytes[lead..end])
+        .ok()
+        .and_then(|s| s.chars().next())
+        .filter(|&c| c.len_utf8() == end - lead && crate::whitespace::is_js_whitespace(c))
+        .map_or(0, char::len_utf8)
 }
 
 /// Whether an ECMAScript `LineTerminator` ENDS just before `end` — the backward twin of
@@ -1885,7 +1928,7 @@ mod tests {
             // anchor advances past every significant byte that is not whitespace or
             // a GLUED `!` run's `!`, and those leave it alone. `OperandAnchor` rebuilds
             // the same value lazily, so this loop is its independent oracle.
-            if !bytes[i].is_ascii_whitespace() && !is_glued_bang(bytes, i, lower_bound) {
+            if !in_js_space(bytes, i) && !is_glued_bang(bytes, i, lower_bound) {
                 operand_end = i + 1;
             }
             i += 1;
@@ -1909,9 +1952,27 @@ mod tests {
             && block_comment_start_before(bytes, k - 1, lower_bound)
                 .is_some_and(|open| bytes[open..k].contains(&b'\n'));
         k == lower_bound
-            || !(bytes[k - 1].is_ascii_whitespace()
+            || !(in_js_space(bytes, k - 1)
                 || line_terminator_ends_at(bytes, k)
                 || multi_line_comment)
+    }
+
+    /// Whether the byte at `i` belongs to a JS `\s` character — decoded forward from the
+    /// character's lead byte, independently of the backward step production takes.
+    fn in_js_space(bytes: &[u8], i: usize) -> bool {
+        let mut lead = i;
+        while lead > 0 && bytes[lead] & 0xC0 == 0x80 {
+            lead -= 1;
+        }
+        let tail = &bytes[lead..bytes.len().min(lead + 4)];
+        let valid = match std::str::from_utf8(tail) {
+            Ok(s) => s,
+            Err(e) => std::str::from_utf8(&tail[..e.valid_up_to()]).unwrap_or_default(),
+        };
+        valid
+            .chars()
+            .next()
+            .is_some_and(crate::whitespace::is_js_whitespace)
     }
 
     /// The lazy anchor must agree with the eager rule at every `/` in a source —
@@ -1951,6 +2012,17 @@ mod tests {
             "('s'! / b)",
             "(/a/ / b)",
             "(x + /a/ /* c */ / b)",
+            "(a\u{b}/ b)",
+            "(a\u{a0}/ b)",
+            "(a\u{feff}\u{3000}/ b)",
+            "(a\u{2028}/ b)",
+            "(a\u{85}/ b)",
+            "(a\u{200b}/ b)",
+            "(a\u{a0}!/re/)",
+            "(a\u{b}! / b)",
+            "(é\u{a0}/ b)",
+            "(typeof\u{a0}/re/)",
+            "(a.\u{a0}in / b)",
         ];
         for src in sources {
             let bytes = src.as_bytes();
@@ -2006,7 +2078,7 @@ mod tests {
                         continue;
                     }
                 }
-                if !bytes[i].is_ascii_whitespace() && !is_glued_bang(bytes, i, 0) {
+                if !in_js_space(bytes, i) && !is_glued_bang(bytes, i, 0) {
                     eager = i + 1;
                 }
                 i += 1;
@@ -2283,6 +2355,41 @@ mod tests {
         assert!(!regex_at("a./* c */in /", 12, 0));
         // ...while a comment before a genuine operator keyword leaves it one.
         assert!(regex_at("/* c */ typeof /", 15, 0));
+    }
+
+    #[test]
+    fn a_brace_scan_steps_every_js_space_between_an_operand_and_its_slash() {
+        let close = |src: &str| {
+            scan_to_matching_brace(src.as_bytes(), 1, src.len(), OperandGrammar::BYTES_ONLY)
+        };
+        // Every JS `\s` character — a vertical tab, the non-ASCII spaces, the line separators —
+        // sits between the operand and the `/` as a space does, so the `/` divides and the
+        // scan closes at the island's own `}`.
+        for sep in [
+            '\u{b}', '\u{a0}', '\u{1680}', '\u{2000}', '\u{2028}', '\u{3000}', '\u{feff}',
+        ] {
+            for src in [
+                format!("{{a{sep}/ 2}}"),
+                format!("{{é{sep}/ 2}}"),
+                format!("{{a{sep}{sep}/ 2}}"),
+                format!("{{a /* c */{sep}/ 2}}"),
+            ] {
+                assert_eq!(close(&src), Some(src.len() - 1), "{src:?}");
+            }
+            // A reserved word stays an operator across it, and a member name an operand.
+            let src = format!("{{typeof{sep}/}}/}}");
+            assert_eq!(close(&src), Some(src.len() - 1), "{src:?}");
+            let src = format!("{{a.{sep}in / 2}}");
+            assert_eq!(close(&src), Some(src.len() - 1), "{src:?}");
+            // A `!` it separates from the operand is a prefix not, as after a space.
+            let src = format!("{{a{sep}!/}}/}}");
+            assert_eq!(close(&src), Some(src.len() - 1), "{src:?}");
+        }
+        // NEL and the zero-width space are no JS `\s`, so the operand ends on them and the
+        // `/` reads as a regex that never closes — acorn rejects both inputs too.
+        for sep in ['\u{85}', '\u{200b}'] {
+            assert_eq!(close(&format!("{{a{sep}/ 2}}")), None, "{sep:?}");
+        }
     }
 
     #[test]

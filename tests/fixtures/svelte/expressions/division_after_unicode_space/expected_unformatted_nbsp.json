@@ -1,0 +1,274 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 416,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 298,
+				"data": "\n\tSvelte takes any JS `\\s` character between an operand and the `/` after it, so after a\n\tvertical tab, a no-break space or a U+FEFF (see the unformatted_* variants) the `/`\n\tstill divides, in every host the brace scan serves. U+0085 NEL is not in JS `\\s` (see\n\tinput_invalid_nel_division).\n"
+			},
+			{
+				"type": "Text",
+				"start": 298,
+				"end": 299,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 299,
+				"end": 313,
+				"name": "p",
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 302,
+							"end": 309,
+							"expression": {
+								"type": "BinaryExpression",
+								"start": 303,
+								"end": 308,
+								"left": {
+									"type": "Identifier",
+									"start": 303,
+									"end": 304,
+									"name": "a"
+								},
+								"operator": "/",
+								"right": {
+									"type": "Literal",
+									"start": 307,
+									"end": 308,
+									"value": 2,
+									"raw": "2"
+								}
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 313,
+				"end": 314,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 314,
+				"end": 335,
+				"name": "div",
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 319,
+						"end": 328,
+						"name": "x",
+						"value": {
+							"type": "ExpressionTag",
+							"start": 321,
+							"end": 328,
+							"expression": {
+								"type": "BinaryExpression",
+								"start": 322,
+								"end": 327,
+								"left": {
+									"type": "Identifier",
+									"start": 322,
+									"end": 323,
+									"name": "a"
+								},
+								"operator": "/",
+								"right": {
+									"type": "Literal",
+									"start": 326,
+									"end": 327,
+									"value": 2,
+									"raw": "2"
+								}
+							}
+						}
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 335,
+				"end": 336,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 336,
+				"end": 363,
+				"name": "div",
+				"attributes": [
+					{
+						"type": "AttachTag",
+						"start": 341,
+						"end": 356,
+						"expression": {
+							"type": "BinaryExpression",
+							"start": 350,
+							"end": 355,
+							"left": {
+								"type": "Identifier",
+								"start": 350,
+								"end": 351,
+								"name": "a"
+							},
+							"operator": "/",
+							"right": {
+								"type": "Literal",
+								"start": 354,
+								"end": 355,
+								"value": 2,
+								"raw": "2"
+							}
+						}
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 363,
+				"end": 364,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "HtmlTag",
+				"start": 364,
+				"end": 377,
+				"expression": {
+					"type": "BinaryExpression",
+					"start": 371,
+					"end": 376,
+					"left": {
+						"type": "Identifier",
+						"start": 371,
+						"end": 372,
+						"name": "a"
+					},
+					"operator": "/",
+					"right": {
+						"type": "Literal",
+						"start": 375,
+						"end": 376,
+						"value": 2,
+						"raw": "2"
+					}
+				}
+			},
+			{
+				"type": "Text",
+				"start": 377,
+				"end": 378,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "IfBlock",
+				"elseif": false,
+				"start": 378,
+				"end": 395,
+				"test": {
+					"type": "BinaryExpression",
+					"start": 383,
+					"end": 388,
+					"left": {
+						"type": "Identifier",
+						"start": 383,
+						"end": 384,
+						"name": "a"
+					},
+					"operator": "/",
+					"right": {
+						"type": "Literal",
+						"start": 387,
+						"end": 388,
+						"value": 2,
+						"raw": "2"
+					}
+				},
+				"consequent": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 389,
+							"end": 390,
+							"raw": "x",
+							"data": "x"
+						}
+					]
+				},
+				"alternate": null
+			},
+			{
+				"type": "Text",
+				"start": 395,
+				"end": 396,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "KeyBlock",
+				"start": 396,
+				"end": 415,
+				"expression": {
+					"type": "BinaryExpression",
+					"start": 402,
+					"end": 407,
+					"left": {
+						"type": "Identifier",
+						"start": 402,
+						"end": 403,
+						"name": "a"
+					},
+					"operator": "/",
+					"right": {
+						"type": "Literal",
+						"start": 406,
+						"end": 407,
+						"value": 2,
+						"raw": "2"
+					}
+				},
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 408,
+							"end": 409,
+							"raw": "x",
+							"data": "x"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

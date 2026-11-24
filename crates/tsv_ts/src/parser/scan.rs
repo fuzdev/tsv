@@ -349,9 +349,9 @@ impl Drop for TemplateHints<'_> {
 ///   (`await / 2`), or a non-ASCII character.
 ///
 /// Either holds only when the gap is trivia the scans read as the lexer does
-/// ([`gap_reads_alike`]): the scans' backward walk to the token before the `/` steps over ASCII
-/// whitespace and comments alone, so it takes a vertical tab or a non-ASCII whitespace character
-/// the lexer skips (`aa\u{FEFF}/ bb`) for a significant byte — no operand's end, so a regex.
+/// ([`gap_reads_alike`]) — checked narrower than the scans' backward walk, which steps every JS
+/// `\s` character and comments: a gap holding a vertical tab or a non-ASCII whitespace character
+/// (`aa\u{FEFF}/ bb`) only takes the bounded path.
 pub(super) fn scans_read_slash_alike(
     bytes: &[u8],
     prev_end: usize,
@@ -439,10 +439,11 @@ pub(super) fn scans_read_slash_alike(
     }
 }
 
-/// Whether `bytes[from..to]` — trivia to the lexer, between two tokens — holds only what the
-/// scans' backward walk to the token before a `/` steps over too: the ASCII whitespace it skips
-/// (`u8::is_ascii_whitespace`, which leaves out the vertical tab) and comments, which the scans
-/// skip whole ([`skip_trivia`]), whatever they hold.
+/// Whether `bytes[from..to]` — trivia to the lexer, between two tokens — holds only ASCII
+/// whitespace (`u8::is_ascii_whitespace`, which leaves out the vertical tab) and comments, which
+/// the scans skip whole ([`skip_trivia`]), whatever they hold: a subset of what the scans' backward
+/// walk to the token before a `/` steps over (every JS `\s` character), kept narrow for the hot
+/// path.
 #[inline]
 fn gap_reads_alike(bytes: &[u8], from: usize, to: usize) -> bool {
     let Some(gap) = bytes.get(from..to) else {
