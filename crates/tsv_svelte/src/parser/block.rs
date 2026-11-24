@@ -786,8 +786,15 @@ impl<'a> SvelteParser<'a> {
         // and only falls to acorn when that reads nothing — and then only on a `{`/`[`
         // (`expected_pattern` otherwise). So the identifier arm goes through the same
         // reader (reserved-word rule included) and the bracket arm keeps the deferral.
-        let end = match trimmed.as_bytes().first() {
-            Some(&open @ (b'{' | b'[')) => self.matching_bracket_end(trimmed, open, adjusted)?,
+        //
+        // A plain name is pushed as its `Identifier` row without a sub-parse when it keeps the
+        // bare islands' rule (`tsv_ts::__private::parse_bare_pattern_name`); every other name
+        // and every destructure takes `parse_ts_pattern`, which yields ObjectPattern /
+        // ArrayPattern (not the Object/Array *Expression* the plain expression parser would).
+        let (end, bare) = match trimmed.as_bytes().first() {
+            Some(&open @ (b'{' | b'[')) => {
+                (self.matching_bracket_end(trimmed, open, adjusted)?, None)
+            }
             _ => {
                 let Some(name) = self.read_identifier(trimmed, adjusted)? else {
                     return Err(Self::error_expected_at(
@@ -795,12 +802,20 @@ impl<'a> SvelteParser<'a> {
                         adjusted,
                     ));
                 };
-                name.len()
+                let nesting = self.island_nesting();
+                let bare = tsv_ts::__private::parse_bare_pattern_name(
+                    name,
+                    adjusted,
+                    nesting,
+                    self.stores_mut(),
+                );
+                (name.len(), bare)
             }
         };
-        // `parse_ts_pattern` yields ObjectPattern/ArrayPattern (not the Object/Array
-        // *Expression* the plain expression parser would).
-        let expr = self.parse_ts_pattern(&trimmed[..end], adjusted)?;
+        let expr = match bare {
+            Some(expr) => expr,
+            None => self.parse_ts_pattern(&trimmed[..end], adjusted)?,
+        };
 
         let after_pattern = trimmed[end..].trim_start_matches(is_svelte_ws);
         if !after_pattern.starts_with(':') {

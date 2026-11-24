@@ -181,6 +181,16 @@ fn is_reserved_word(name: &str) -> bool {
     )
 }
 
+/// The end of the `ID_Continue` run in `s` from the character boundary `from` — the Unicode
+/// reading of [`SvelteParser::read_identifier`], off its ASCII path.
+#[cold]
+#[inline(never)]
+fn id_continue_run_end(s: &str, from: usize) -> usize {
+    s[from..]
+        .find(|c: char| !is_id_continue(c))
+        .map_or(s.len(), |end| from + end)
+}
+
 impl<'a> SvelteParser<'a> {
     pub(crate) fn new(source: &'a str, stores: &'a mut SvelteStores) -> Result<Self, Error> {
         let mut lexer = Lexer::new(source);
@@ -665,7 +675,9 @@ impl<'a> SvelteParser<'a> {
     /// `char::is_alphabetic` / `is_alphanumeric` is NOT this class and misses in **both**
     /// directions: U+2118 is `ID_Start` but not alphabetic, and U+00B2 is alphanumeric but
     /// not `ID_Continue`. This function is their only reader in the crate, which is what
-    /// keeps that answer in one place.
+    /// keeps that answer in one place. Its ASCII path reads the two classes' ASCII members as
+    /// bytes, exact by construction (a debug assert holds it to the Unicode reading), and hands
+    /// the rest of the name to that reading at its first non-ASCII byte.
     ///
     /// The single reader for all six positions canonical reads this way, each of which had
     /// an inline copy and had drifted: the snippet's ran `is_id_continue` from the FIRST
@@ -679,11 +691,37 @@ impl<'a> SvelteParser<'a> {
         s: &'a str,
         offset: usize,
     ) -> Result<Option<&'a str>, Error> {
-        let Some(first) = s.chars().next().filter(|c| is_id_start(*c)) else {
-            return Ok(None);
+        // The ASCII members of both classes are `[A-Za-z_$]` and `[A-Za-z0-9_$]`, read as bytes;
+        // the Unicode reading takes over from the first non-ASCII byte.
+        let is_ascii_continue = |b: u8| b.is_ascii_alphanumeric() || b == b'_' || b == b'$';
+        let bytes = s.as_bytes();
+        let end = match bytes.first() {
+            Some(&b) if b.is_ascii_alphabetic() || b == b'_' || b == b'$' => {
+                let mut end = 1;
+                while bytes.get(end).is_some_and(|&b| is_ascii_continue(b)) {
+                    end += 1;
+                }
+                if bytes.get(end).is_some_and(|b| !b.is_ascii()) {
+                    id_continue_run_end(s, end)
+                } else {
+                    end
+                }
+            }
+            Some(b) if b.is_ascii() => return Ok(None),
+            None => return Ok(None),
+            Some(_) => {
+                let Some(first) = s.chars().next().filter(|c| is_id_start(*c)) else {
+                    return Ok(None);
+                };
+                debug_assert!(is_id_continue(first), "ID_Start is a subset of ID_Continue");
+                id_continue_run_end(s, first.len_utf8())
+            }
         };
-        debug_assert!(is_id_continue(first), "ID_Start is a subset of ID_Continue");
-        let end = s.find(|c: char| !is_id_continue(c)).unwrap_or(s.len());
+        debug_assert_eq!(
+            end,
+            s.find(|c: char| !is_id_continue(c)).unwrap_or(s.len()),
+            "the byte reading of the identifier at {offset} ends where the Unicode one does"
+        );
         let name = &s[..end];
         if is_reserved_word(name) {
             return Err(self.error_msg_at(&format!("Unexpected reserved word '{name}'"), offset));

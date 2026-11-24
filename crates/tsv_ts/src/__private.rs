@@ -606,6 +606,43 @@ pub fn parse_bare_name_closed(
     Some((expr, end))
 }
 
+/// A Svelte block pattern that is one plain name, `name` sitting at `base_offset` — the
+/// `item` of `{#each xs as item}`, a `{:then value}`, a `{@const x = …}` — pushed onto `stores`
+/// as the `Identifier` row [`parse_pattern_with_comments`] builds for it, or `None`, and
+/// nothing pushed, for every other pattern, which takes that parse.
+///
+/// The host has already read `name` as the whole binding (an identifier, its extent bounded),
+/// so what is left is the bare islands' own rule ([`parse_bare_name_expression`]): ASCII
+/// identifier bytes not led by a digit, not a keyword in the lexer's table, at most `u16::MAX`
+/// bytes, at a nesting far inside the limit. A name that fails it — non-ASCII, or a word in
+/// the lexer's table (`async`, `as`, `undefined`, `number`, …) — is refused at the first byte
+/// that fails, and takes the parse, which owns every answer for it. A contextual word outside
+/// that table (`of`, `type`, `get`) is a plain name to the parse too, and is pushed here.
+///
+/// Debug builds parse every name this answers into scratch stores as well and assert the parse
+/// built the same tree and collected no comment.
+#[inline]
+pub fn parse_bare_pattern_name(
+    name: &str,
+    base_offset: usize,
+    host_nesting: u32,
+    stores: &mut AstStores,
+) -> Option<ExprId> {
+    let bytes = name.as_bytes();
+    if !bare_name_fits_nesting(host_nesting)
+        || bytes.len() > usize::from(u16::MAX)
+        || !bytes.first().is_some_and(|&b| lexer::is_ascii_id_start(b))
+        || lexer::ascii_id_run_end(bytes, 0) != bytes.len()
+        || lexer::keyword_at(bytes, 0, bytes.len()).is_some()
+    {
+        return None;
+    }
+    let expr = push_bare_name(bytes, base_offset, stores);
+    #[cfg(debug_assertions)]
+    assert_pattern_parse_builds_tree(name, base_offset, host_nesting, stores.view(), expr);
+    Some(expr)
+}
+
 /// The most `.`-separated segments a bare island's path holds; a longer path takes the
 /// parse.
 const BARE_NAME_MAX_SEGMENTS: u32 = 8;
@@ -688,6 +725,7 @@ fn push_bare_island(
 
 /// Push the rows of the name path `bytes` (checked by [`bare_name_path_end`]),
 /// sitting at `base_offset`, and return the outermost.
+#[inline]
 fn push_bare_name(bytes: &[u8], base_offset: usize, stores: &mut AstStores) -> ExprId {
     let start = base_offset as u32;
     let push_name = |stores: &mut AstStores, from: u32, len: usize| {
@@ -723,6 +761,32 @@ fn push_bare_name(bytes: &[u8], base_offset: usize, stores: &mut AstStores) -> E
     expr
 }
 
+/// The row of `id` in `view` with its children resolved, so the bare islands' trees in two
+/// stores compare ([`assert_parse_builds_tree`], [`assert_pattern_parse_builds_tree`]).
+#[cfg(debug_assertions)]
+fn bare_tree(view: AstView<'_>, id: ExprId) -> String {
+    let row = view.expr(id);
+    match row.kind {
+        ExpressionKind::MemberExpression(member) => format!(
+            "Member({:?}, {:?}, {:?}, {}, {})",
+            row.span,
+            member.computed,
+            member.optional,
+            bare_tree(view, member.object),
+            bare_tree(view, member.property)
+        ),
+        ExpressionKind::CallExpression(call) => format!(
+            "Call({:?}, {:?}, {:?}, {}, {})",
+            row.span,
+            call.optional,
+            call.type_args.is_some(),
+            call.arguments.len(),
+            bare_tree(view, call.callee)
+        ),
+        _ => format!("{row:?}"),
+    }
+}
+
 /// The bare islands' debug differential ([`parse_bare_name_expression`],
 /// [`parse_bare_name_closed`]): the parse of `source` builds the tree rooted at `expr` in
 /// `view`.
@@ -735,29 +799,6 @@ fn assert_parse_builds_tree(
     view: AstView<'_>,
     expr: ExprId,
 ) {
-    /// The row of `id` with its children resolved, so trees in two stores compare.
-    fn tree(view: AstView<'_>, id: ExprId) -> String {
-        let row = view.expr(id);
-        match row.kind {
-            ExpressionKind::MemberExpression(member) => format!(
-                "Member({:?}, {:?}, {:?}, {}, {})",
-                row.span,
-                member.computed,
-                member.optional,
-                tree(view, member.object),
-                tree(view, member.property)
-            ),
-            ExpressionKind::CallExpression(call) => format!(
-                "Call({:?}, {:?}, {:?}, {}, {})",
-                row.span,
-                call.optional,
-                call.type_args.is_some(),
-                call.arguments.len(),
-                tree(view, call.callee)
-            ),
-            _ => format!("{row:?}"),
-        }
-    }
     let mut scratch = AstStores::default();
     let (parsed, _) = parse_expression_with_comments(
         source,
@@ -769,9 +810,35 @@ fn assert_parse_builds_tree(
     )
     .expect("a bare name island parses");
     assert_eq!(
-        tree(scratch.view(), parsed),
-        tree(view, expr),
+        bare_tree(scratch.view(), parsed),
+        bare_tree(view, expr),
         "the bare-name island built a tree the parse does not: {source:?}"
+    );
+}
+
+/// [`parse_bare_pattern_name`]'s debug differential: the pattern parse of `name` builds the
+/// tree rooted at `expr` in `view`, and collects no comment.
+#[cfg(debug_assertions)]
+#[expect(clippy::expect_used)]
+fn assert_pattern_parse_builds_tree(
+    name: &str,
+    base_offset: usize,
+    host_nesting: u32,
+    view: AstView<'_>,
+    expr: ExprId,
+) {
+    let mut scratch = AstStores::default();
+    let (parsed, comments) =
+        parse_pattern_with_comments(name, base_offset, host_nesting, &mut scratch)
+            .expect("a bare pattern name parses");
+    assert!(
+        comments.is_empty(),
+        "a bare pattern name holds no comment: {name:?}"
+    );
+    assert_eq!(
+        bare_tree(scratch.view(), parsed),
+        bare_tree(view, expr),
+        "the bare pattern name built a tree the pattern parse does not: {name:?}"
     );
 }
 
