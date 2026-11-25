@@ -9,8 +9,9 @@
 //!   walks recurse through, so a construct it leaves uncounted — a level the wire puts on
 //!   the path each repetition and the count does not see — fails here, whether or not its
 //!   walks happen to fit the stack ([`check_wire`]);
-//! - the deepest accepted input runs **parse, both wire writers (span-only and `loc`),
-//!   format, the imports walk (TypeScript and Svelte) and the type strip (TypeScript)** on
+//! - the deepest accepted input runs **parse, both wire writers (span-only and `loc`), the
+//!   span-only wire's tape transcode and its print back, format, the imports walk (TypeScript
+//!   and Svelte) and the type strip (TypeScript)** on
 //!   a thread nine tenths of the contract's size ([`GATE_STACK`]), which it must survive: a
 //!   stack overflow aborts this test binary, which fails the gate;
 //! - in an optimized build, a **spine shape** — a flat chain, thousands of links under a
@@ -558,7 +559,8 @@ fn run_walks_on(name: String, stack: usize, lang: Lang, source: String) {
         match lang {
             Lang::Ts => {
                 let program = tsv_ts::__private::parse(&source).expect("parses");
-                assert!(!tsv_ts::__private::convert_ast_json_bytes(&program, &source).is_empty());
+                let span = tsv_ts::__private::convert_ast_json_bytes(&program, &source);
+                assert_tape(&name, "typescript", &span, &source);
                 assert!(
                     !tsv_ts::__private::convert_ast_json_bytes_with_locations(&program, &source)
                         .is_empty()
@@ -599,7 +601,8 @@ fn run_walks_on(name: String, stack: usize, lang: Lang, source: String) {
             }
             Lang::Css => {
                 let sheet = tsv_css::__private::parse(&source).expect("parses");
-                assert!(!tsv_css::__private::convert_ast_json_bytes(&sheet, &source).is_empty());
+                let span = tsv_css::__private::convert_ast_json_bytes(&sheet, &source);
+                assert_tape(&name, "css", &span, &source);
                 assert!(
                     !tsv_css::__private::convert_ast_json_bytes_with_locations(&sheet, &source)
                         .is_empty()
@@ -609,7 +612,8 @@ fn run_walks_on(name: String, stack: usize, lang: Lang, source: String) {
             }
             Lang::Svelte => {
                 let root = tsv_svelte::__private::parse(&source).expect("parses");
-                assert!(!tsv_svelte::__private::convert_ast_json_bytes(&root, &source).is_empty());
+                let span = tsv_svelte::__private::convert_ast_json_bytes(&root, &source);
+                assert_tape(&name, "svelte", &span, &source);
                 assert!(
                     !tsv_svelte::__private::convert_ast_json_bytes_with_locations(&root, &source)
                         .is_empty()
@@ -624,6 +628,25 @@ fn run_walks_on(name: String, stack: usize, lang: Lang, source: String) {
             }
         }
     });
+}
+
+/// The span-only wire transcodes to a tape (`docs/tape_format.md`) and prints back to itself,
+/// on the walks' thread: the transcoder and the printer keep their frames on the heap, so the
+/// deepest wire costs them no stack.
+fn assert_tape(name: &str, language: &str, span: &[u8], source: &str) {
+    assert!(!span.is_empty());
+    let source = tsv_debug::tape::wire_source(language, source);
+    let mut transcoder = tsv_arena::tape::Transcoder::new();
+    let tape = transcoder
+        .transcode(span, source)
+        .unwrap_or_else(|e| panic!("{name}: the transcoder refused the wire: {e}"));
+    let back = tsv_debug::tape::tape_to_json(tape, source)
+        .unwrap_or_else(|e| panic!("{name}: the tape does not print: {e}"));
+    assert_eq!(
+        tsv_debug::tape::bytes_difference(&back, span),
+        None,
+        "{name}: the tape prints back to another wire"
+    );
 }
 
 /// The format of an accepted input must parse again and be its own format (F1): every pair

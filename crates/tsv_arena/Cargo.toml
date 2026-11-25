@@ -21,6 +21,10 @@ tsv_lang = { workspace = true, optional = true }
 # from their own `format` feature.
 default = ["format"]
 format = ["dep:tsv_lang"]
+# `tape` adds the tape module: the binary parse wire's schema tables and the JSON → tape
+# transcoder (docs/tape_format.md). It pulls nothing in, so a binding enables it from its
+# `parse` feature without reaching the format-only build.
+tape = []
 
 [lints]
 workspace = true

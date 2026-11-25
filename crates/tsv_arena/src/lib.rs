@@ -21,6 +21,14 @@
 //!
 //! No parse takes an arena: every language parses into stores of its own, which each
 //! language crate parks per thread itself (`tsv_ts::__private::with_stores`).
+//!
+//! # The tape
+//!
+//! Behind the `tape` feature, the `tape` module holds the binary parse wire's schema tables and
+//! its producer, the JSON → tape `tape::Transcoder` (`docs/tape_format.md`).
+
+#[cfg(feature = "tape")]
+pub mod tape;
 
 /// `tsv_lang`, re-exported for [`parse_format!`]'s expansion alone: a macro's paths
 /// resolve in the *caller's* crate, so without this every binding would need its own

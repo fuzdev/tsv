@@ -63,6 +63,7 @@ pub mod strip;
 pub mod strip_fixtures_validate;
 #[cfg(feature = "_internal_swallow_check")]
 pub mod swallow_audit;
+pub mod tape;
 pub mod test262;
 pub mod ts_fixture_audit;
 pub mod tsc_conformance;

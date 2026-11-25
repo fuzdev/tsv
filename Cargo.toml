@@ -230,6 +230,8 @@ serde_json.workspace = true
 
 [dev-dependencies]
 tsv_debug = { path = "crates/tsv_debug" }
+# `tests/tape_roundtrip.rs` and `tests/depth_limit.rs` drive the tape transcoder directly.
+tsv_arena = { workspace = true, features = ["tape"] }
 tsv_cli = { path = "crates/tsv_cli" }
 # `tests/cli_tests/` grades `tsv format --help`'s extension list against
 # `FORMATTABLE_EXTENSIONS` — argh renders help from string literals, so the const cannot

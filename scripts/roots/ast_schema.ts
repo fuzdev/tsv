@@ -1,7 +1,7 @@
 /**
  * `check:ast-schema`' and `ast-schema:update`'s root (`scripts/ast_schema.ts`). Its reach: the
- * checkout's `crates/tsv_wasm/types/`, read always and written under `--update`; it runs no
- * program.
+ * checkout's `crates/tsv_wasm/types/`, `crates/tsv_wasm/npm/` and `crates/tsv_arena/src/tape/`,
+ * read always and written under `--update`; it runs no program.
  *
  * @module
  */
@@ -20,7 +20,11 @@ if (unknown.length > 0) {
 	const checkout = await open_checkout();
 	set_exit_code(
 		await run_ast_schema(
-			{ types: checkout.dir('crates/tsv_wasm/types') },
+			{
+				types: checkout.dir('crates/tsv_wasm/types'),
+				npm: checkout.dir('crates/tsv_wasm/npm'),
+				tape: checkout.dir('crates/tsv_arena/src/tape')
+			},
 			args.includes('--update')
 		)
 	);

@@ -42,8 +42,8 @@ use commands::{
     render_audit::RenderAuditCommand, render_compare::RenderCompareCommand,
     roundtrip_audit::RoundtripAuditCommand, scan_audit::ScanAuditCommand,
     schema_audit::SchemaAuditCommand, strip::StripCommand,
-    strip_fixtures_validate::StripFixturesValidateCommand, test262::Test262Command,
-    ts_fixture_audit::TsFixtureAuditCommand, type_sizes::TypeSizesCommand,
+    strip_fixtures_validate::StripFixturesValidateCommand, tape::TapeCommand,
+    test262::Test262Command, ts_fixture_audit::TsFixtureAuditCommand, type_sizes::TypeSizesCommand,
     variant_audit::VariantAuditCommand,
 };
 
@@ -165,6 +165,7 @@ pub enum Subcommand {
     SchemaAudit(SchemaAuditCommand),
     Strip(StripCommand),
     StripFixturesValidate(StripFixturesValidateCommand),
+    Tape(TapeCommand),
     // Requires the `_internal_swallow_check` feature so default builds keep the
     // render-time swallow instrumentation compiled out (production-shaped
     // profiles); the `swallow:audit` deno task passes it.
@@ -247,6 +248,7 @@ impl TopLevel {
             Subcommand::ImportsFixturesValidate(c) => c.run(),
             Subcommand::Strip(c) => c.run(),
             Subcommand::StripFixturesValidate(c) => c.run(),
+            Subcommand::Tape(c) => c.run(),
             #[cfg(feature = "_internal_swallow_check")]
             Subcommand::SwallowAudit(c) => c.run(),
             Subcommand::Test262(c) => c.run(),

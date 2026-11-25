@@ -1,0 +1,755 @@
+/**
+ * The tape's generated code, from the tape schema (`tape_schema.ts`): the JS decoder the npm
+ * facade ships (`crates/tsv_wasm/npm/tape_decode.js`) and the Rust tables the transcoder and
+ * `tsv_debug`'s printer read (`crates/tsv_arena/src/tape/shapes.rs`).
+ *
+ * Both are output: `npm run ast-schema:update` regenerates them with the `.d.ts`, and
+ * `npm run check:ast-schema` holds each byte-for-byte to the committed file. The decoder is laid
+ * out the way `tsv format` lays it out, so `format:audit` holds it to the formatter's fixed
+ * point like every other JS file; the Rust file is `#[rustfmt::skip]` where its module is
+ * declared, its tables one entry per line.
+ *
+ * The decoder's shape: one small function per fast shape, building the record as one object
+ * literal in wire key order, dispatched through a table by the record's header word — never one
+ * large `switch`; and one iterative interpreter over generated descriptors (`slow`) for every
+ * other record, which also re-decodes a whole tape when the recursive fast path overflows the
+ * stack (`docs/tape_format.md` §Decoding).
+ *
+ * @module
+ */
+
+import {
+	Enc,
+	ENC_NAMES,
+	TAPE_FORMAT_VERSION,
+	TAPE_HEADER_WORDS,
+	TAPE_MAGIC,
+	TAPE_MAX_ENTRIES,
+	pre_type_max,
+	TAPE_SHAPES_PATH,
+	type TapeSchema
+} from './tape_schema.ts';
+
+/** The AST schema table's path (`ast_schema.ts`'s `AST_SCHEMA_PATH`, which imports this module). */
+const AST_SCHEMA_PATH = 'crates/tsv_wasm/types/tsv_ast_schema.json';
+
+/** The decoder's path, from the checkout root. */
+export const TAPE_DECODER_PATH = 'crates/tsv_wasm/npm/tape_decode.js';
+
+/** The transcoder tables' path, from the checkout root. */
+export const TAPE_RUST_TABLES_PATH = 'crates/tsv_arena/src/tape/shapes.rs';
+
+const hex = (n: number): string => `0x${n.toString(16).padStart(8, '0')}`;
+
+/** A JS string literal, single-quoted (`tsv format`'s preference). */
+const js_string = (text: string): string => {
+	const json = JSON.stringify(text);
+	const body = json.slice(1, -1).replace(/\\"/g, '"').replace(/'/g, "\\'");
+	return `'${body}'`;
+};
+
+/** A JS property name: bare when it is an identifier, else quoted. */
+const js_key = (key: string): string =>
+	/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(key) ? key : js_string(key);
+
+/** The keyword vocabularies, each distinct list once, and each list's index by its JSON. */
+function keyword_tables(schema: TapeSchema): { lists: string[][]; index: Map<string, number> } {
+	const lists: string[][] = [];
+	const index = new Map<string, number>();
+	for (const entry of schema.entries) {
+		for (const field of entry.fields) {
+			if (field.values === undefined) continue;
+			const key = JSON.stringify(field.values);
+			if (!index.has(key)) {
+				index.set(key, lists.length);
+				lists.push([...field.values]);
+			}
+		}
+	}
+	return { lists, index };
+}
+
+/**
+ * An array literal: one line when it fits, else broken as `tsv format` breaks it — numbers
+ * filled onto as few lines as the width allows, anything else one item per line.
+ */
+function js_array(prefix: string, items: string[], suffix: string, indent = ''): string[] {
+	const width = (line: string): number => line.length + (line.match(/\t/g)?.length ?? 0);
+	const one = `${indent}${prefix}[${items.join(', ')}]${suffix}`;
+	if (width(one) <= 100) return [one];
+	const inner = `${indent}\t`;
+	const lines: string[] = [];
+	if (items.every((item) => /^-?\d+$/.test(item))) {
+		let line = '';
+		items.forEach((item, i) => {
+			const piece = i < items.length - 1 ? `${item},` : item;
+			const next = line === '' ? piece : `${line} ${piece}`;
+			if (line !== '' && width(`${inner}${next}`) > 100) {
+				lines.push(`${inner}${line}`);
+				line = piece;
+			} else line = next;
+		});
+		lines.push(`${inner}${line}`);
+	} else {
+		items.forEach((item, i) => lines.push(`${inner}${item}${i < items.length - 1 ? ',' : ''}`));
+	}
+	return [`${indent}${prefix}[`, ...lines, `${indent}]${suffix}`];
+}
+
+/** One descriptor table: an array per entry, one line each when it fits. */
+function entry_table(name: string, doc: string, rows: string[][]): string[] {
+	const out = [`/** ${doc} */`, `const ${name} = [`];
+	rows.forEach((row, n) => out.push(...js_array('', row, n < rows.length - 1 ? ',' : '', '\t')));
+	out.push('];');
+	return out;
+}
+
+/**
+ * One descriptor table as a `JSON.parse` of a string literal: a JS engine scans a string far
+ * faster than it parses the same data as an array literal, and the table is read once at load.
+ */
+function json_table(name: string, doc: string, value: unknown): string[] {
+	return [
+		`/** ${doc} */`,
+		`const ${name} = JSON.parse(`,
+		`\t${js_string(JSON.stringify(value))}`,
+		');'
+	];
+}
+
+/** The generated JS decoder's text. */
+export function generate_tape_decoder(schema: TapeSchema): string {
+	const { lists, index } = keyword_tables(schema);
+	const keyword_of = (values: ReadonlyArray<string>): number => index.get(JSON.stringify(values))!;
+	const out: string[] = [
+		`// GENERATED by ` + '`npm run ast-schema:update`' + ` from ${AST_SCHEMA_PATH} and`,
+		`// ${TAPE_SHAPES_PATH} — edit those, never this file.`,
+		...HEAD.split('\n'),
+		`export const TAPE_FORMAT_VERSION = ${TAPE_FORMAT_VERSION};`,
+		'',
+		'/** The hash of the schema and shape list this decoder was generated from. */',
+		`export const SHAPES_HASH = ${hex(schema.hash)};`,
+		'',
+		`const MAGIC = ${hex(TAPE_MAGIC)};`,
+		`const HEADER_WORDS = ${TAPE_HEADER_WORDS};`,
+		`const HEADER_BYTES = ${TAPE_HEADER_WORDS * 4};`,
+		'const NULL_REF = -0x80000000;',
+		`const MAX_ENTRIES = ${TAPE_MAX_ENTRIES};`,
+		...STATE.split('\n'),
+		...json_table('KW', "The keyword vocabularies, indexed by a keyword field's word.", lists)
+	];
+	lists.forEach((_, k) => out.push(`const K${k} = KW[${k}];`));
+	out.push(
+		...json_table(
+			'ENTRY_TYPE',
+			'Per tape entry: its `type` (`null` when it has none).',
+			schema.entries.map((e) => e.type)
+		),
+		...json_table(
+			'ENTRY_KEYS',
+			'Per tape entry: its keys, in wire order.',
+			schema.entries.map((e) => e.fields.map((f) => f.key))
+		),
+		...json_table(
+			'ENTRY_ENCODINGS',
+			`Per tape entry: each field's encoding (${ENC_NAMES.map((name, code) => `${code} ${name}`).join(', ')}).`,
+			schema.entries.map((e) => e.fields.map((f) => f.enc))
+		),
+		...json_table(
+			'ENTRY_BITS',
+			"Per tape entry: each field's mask bit, -1 when every record carries it.",
+			schema.entries.map((e) => e.fields.map((f) => f.bit))
+		),
+		...json_table(
+			'ENTRY_KEYWORDS',
+			"Per tape entry: each keyword field's vocabulary in KW, -1 for any other field.",
+			schema.entries.map((e) =>
+				e.fields.map((f) => (f.values === undefined ? -1 : keyword_of(f.values)))
+			)
+		),
+		...json_table('SHAPE_ENTRY', 'Per fast shape id: its entry.', [
+			0,
+			...schema.shapes.map((s) => s.entry)
+		]),
+		...json_table('SHAPE_MASK', 'Per fast shape id: its mask.', [
+			0,
+			...schema.shapes.map((s) => s.mask)
+		]),
+		...STATIC.split('\n')
+	);
+	for (const shape of schema.shapes) {
+		const entry = schema.entries[shape.entry]!;
+		const present = entry.fields.filter((f) => f.bit === -1 || (shape.mask & (1 << f.bit)) !== 0);
+		const own = present.some((f) => f.enc === Enc.own);
+		const props = present.map((f) => {
+			let ex: string;
+			switch (f.enc) {
+				case Enc.type:
+					ex = js_string(entry.type!);
+					break;
+				case Enc.offset:
+					ex = own && (f.key === 'start' || f.key === 'end') ? `(${f.key[0]} = u[p++])` : 'u[p++]';
+					break;
+				case Enc.boolean:
+					ex = 'u[p++] !== 0';
+					break;
+				case Enc.number:
+					ex = 'N()';
+					break;
+				case Enc.null:
+					ex = 'null';
+					break;
+				case Enc.own:
+					ex = 'src.slice(s, e)';
+					break;
+				case Enc.keyword:
+					ex = `K${keyword_of(f.values!)}[u[p++]]`;
+					break;
+				case Enc.ref:
+					ex = 'S()';
+					break;
+				case Enc.ref_nullable:
+					ex = 'SN()';
+					break;
+				case Enc.strings:
+					ex = 'L()';
+					break;
+				case Enc.record:
+					ex = 'R()';
+					break;
+				case Enc.list:
+					ex = 'A()';
+					break;
+				default:
+					ex = 'V()';
+			}
+			return `${js_key(f.key)}: ${ex}`;
+		});
+		out.push('', `/** ${entry.name}, mask ${shape.mask} */`, `function s${shape.id}() {`);
+		if (own) out.push('\tlet s, e;');
+		out.push('\treturn {');
+		props.forEach((prop, n) => out.push(`\t\t${prop}${n < props.length - 1 ? ',' : ''}`));
+		out.push('\t};', '}');
+	}
+	out.push(
+		'',
+		'/** The fast shapes, by header word. */',
+		...js_array('const SHAPES = ', ['null', ...schema.shapes.map((s) => `s${s.id}`)], ';')
+	);
+	return `${out.join('\n')}\n`;
+}
+
+/** The decoder's module doc. */
+const HEAD = `
+/**
+ * The tape decoder: the binary parse wire (\`docs/tape_format.md\`) to the same tree
+ * \`JSON.parse\` makes of the wire's JSON, key order included.
+ *
+ * One small function per fast shape builds its record as one object literal; every other
+ * record — an entry-generic one, a self-describing one — goes through \`slow\`, an iterative
+ * interpreter over the descriptor tables below. The fast path recurses, one call per nested
+ * record, and a tree deep enough to overflow the stack throws a \`RangeError\` out of it: the
+ * decoder then decodes the same tape again from its start with \`slow\`, which recurses
+ * nowhere. Every module-level variable is set from the tape before either pass reads it, so
+ * nothing an abandoned fast pass left behind reaches the second one.
+ *
+ * Generated, with the descriptor tables and one function per fast shape, by
+ * \`scripts/tape_gen.ts\`, where the hand-written part below lives.
+ *
+ * @module
+ */
+
+/** The tape format's version, which the header's second word must carry. */`;
+
+/** The decoder's module state. */
+const STATE = `
+const utf8 = new TextDecoder();
+const F64 = new Float64Array(1);
+const F64_WORDS = new Uint32Array(F64.buffer);
+const NO_WORDS = new Uint32Array(0);
+const NO_INTS = new Int32Array(0);
+/** The tape's words are little-endian; the typed-array views read the host's order. */
+const LITTLE_ENDIAN = new Uint8Array(new Uint32Array([1]).buffer)[0] === 1;
+
+/** The tape body as unsigned words. */
+let u = NO_WORDS;
+/** The same words, signed (string refs and headers). */
+let i = NO_INTS;
+/** The read position, in words from the body start. */
+let p = 0;
+/** The source the tape was written against. */
+let src = '';
+/** The tape's string pool, decoded once. */
+let pool = '';
+`;
+
+/** The decoder's hand-written part: the entry points, the readers and the slow path. */
+const STATIC = `
+/**
+ * Decodes a tape against \`source\`, the exact string the parse read.
+ * @param {Uint8Array} bytes - the tape
+ * @param {string} source
+ * @returns {unknown} the tree \`JSON.parse\` makes of the same wire's JSON
+ * @throws {Error} when the header names another format, schema or shape list, or the tape is
+ * malformed
+ */
+export function decode_tape(bytes, source) {
+	const end = open(bytes, source);
+	try {
+		let tree;
+		try {
+			tree = R();
+		} catch (error) {
+			if (!(error instanceof RangeError)) throw error;
+			p = 0;
+			tree = slow();
+		}
+		if (p !== end) throw new Error(\`tape: \${end - p} words left after the root record\`);
+		return tree;
+	} finally {
+		close();
+	}
+}
+
+/**
+ * Decodes a tape with the iterative interpreter alone — what \`decode_tape\` falls back to on a
+ * stack overflow, exposed so a gate can run every tape through it.
+ * @param {Uint8Array} bytes - the tape
+ * @param {string} source
+ * @returns {unknown}
+ */
+export function decode_tape_iterative(bytes, source) {
+	const end = open(bytes, source);
+	try {
+		const tree = slow();
+		if (p !== end) throw new Error(\`tape: \${end - p} words left after the root record\`);
+		return tree;
+	} finally {
+		close();
+	}
+}
+
+/**
+ * Reads the header and points the module state at the body and the pool.
+ * @param {Uint8Array} bytes
+ * @param {string} source
+ * @returns {number} the body's length in words
+ */
+function open(bytes, source) {
+	if (!LITTLE_ENDIAN) throw new Error('tape: this decoder reads a little-endian host only');
+	if (bytes.byteOffset % 4 !== 0) bytes = bytes.slice();
+	if (bytes.byteLength < HEADER_BYTES) throw new Error('tape: shorter than its header');
+	const header = new Uint32Array(bytes.buffer, bytes.byteOffset, HEADER_WORDS);
+	if (header[0] !== MAGIC) throw new Error('tape: not a tape (bad magic)');
+	if (header[1] !== TAPE_FORMAT_VERSION) {
+		throw new Error(\`tape: format version \${header[1]}, this decoder reads \${TAPE_FORMAT_VERSION}\`);
+	}
+	if (header[2] !== SHAPES_HASH) {
+		throw new Error('tape: written against another schema or shape list (SHAPES_HASH differs)');
+	}
+	const words = header[3];
+	const pool_bytes = header[4];
+	const pool_start = HEADER_BYTES + words * 4;
+	if (bytes.byteLength !== pool_start + pool_bytes) {
+		throw new Error('tape: its length disagrees with its header');
+	}
+	u = new Uint32Array(bytes.buffer, bytes.byteOffset + HEADER_BYTES, words);
+	i = new Int32Array(bytes.buffer, bytes.byteOffset + HEADER_BYTES, words);
+	pool = pool_bytes === 0 ? '' : utf8.decode(bytes.subarray(pool_start, pool_start + pool_bytes));
+	if (pool.length !== header[6]) throw new Error('tape: its pool disagrees with its header');
+	if (source.length !== header[7]) {
+		throw new Error(
+			'tape: written against another source (its UTF-16 length is not the one in its header)'
+		);
+	}
+	src = source;
+	p = 0;
+	return words;
+}
+
+/** Drops the module's hold on the last tape and source. */
+function close() {
+	u = NO_WORDS;
+	i = NO_INTS;
+	src = '';
+	pool = '';
+}
+
+/** A string ref. */
+function S() {
+	const a = i[p];
+	const b = i[p + 1];
+	p += 2;
+	return a >= 0 ? src.slice(a, b) : pool.slice(-1 - a, b);
+}
+
+/** A string ref or the null ref. */
+function SN() {
+	const a = i[p];
+	const b = i[p + 1];
+	p += 2;
+	if (a >= 0) return src.slice(a, b);
+	return a === NULL_REF ? null : pool.slice(-1 - a, b);
+}
+
+/** An inline \`f64\`. */
+function N() {
+	F64_WORDS[0] = u[p];
+	F64_WORDS[1] = u[p + 1];
+	p += 2;
+	return F64[0];
+}
+
+/** A count, then that many string refs. */
+function L() {
+	const n = u[p++];
+	const a = new Array(n);
+	for (let k = 0; k < n; k++) a[k] = S();
+	return a;
+}
+
+/** A count, then that many records. */
+function A() {
+	const n = u[p++];
+	const a = new Array(n);
+	for (let k = 0; k < n; k++) a[k] = R();
+	return a;
+}
+
+/** A record: a fast shape by its function, \`null\`, or any other through \`slow\`. */
+function R() {
+	const h = i[p];
+	if (h > 0) {
+		const shape = SHAPES[h];
+		if (shape === undefined) throw new Error(\`tape: no fast shape \${h}\`);
+		p++;
+		return shape();
+	}
+	if (h === 0) {
+		p++;
+		return null;
+	}
+	return slow();
+}
+
+/** A tagged value. */
+function V() {
+	switch (u[p++]) {
+		case 0:
+			return null;
+		case 1:
+			return false;
+		case 2:
+			return true;
+		case 3:
+			return N();
+		case 4:
+			return S();
+		case 5: {
+			const n = u[p++];
+			const a = new Array(n);
+			for (let k = 0; k < n; k++) a[k] = V();
+			return a;
+		}
+		case 6:
+			return R();
+	}
+	throw new Error(\`tape: bad value tag at word \${p - 1}\`);
+}
+
+/** Sets an own key, \`__proto__\` too (a self-describing record may hold one). */
+function put(o, key, v) {
+	if (key === '__proto__') {
+		Object.defineProperty(o, key, {
+			value: v,
+			writable: true,
+			enumerable: true,
+			configurable: true
+		});
+	} else o[key] = v;
+}
+
+/**
+ * Decodes the record at \`p\` and everything inside it with an explicit stack — no recursion, so
+ * no depth limit but memory. A frame is a typed record (\`t: 0\`, filled field by field from its
+ * entry's descriptors), a self-describing one (\`t: 1\`), or an array (\`t: 2\`: of records when
+ * \`r\`, else of tagged values). A container is put into its parent when it is made, so every key
+ * lands in wire order.
+ * @returns {unknown}
+ */
+function slow() {
+	const stack = [];
+	let root = null;
+	let want_record = true;
+	for (;;) {
+		let v;
+		let frame = null;
+		if (want_record) {
+			const h = i[p++];
+			if (h === 0) v = null;
+			else if (h === -1) {
+				v = {};
+				frame = { t: 1, o: v, n: u[p++], k: 0, key: '', e: 0, m: 0, f: 0, a: null, r: false };
+			} else {
+				let e;
+				let m;
+				if (h > 0) {
+					e = SHAPE_ENTRY[h];
+					m = SHAPE_MASK[h];
+					if (e === undefined) throw new Error(\`tape: no fast shape \${h}\`);
+				} else {
+					const x = -h - 2;
+					e = x % MAX_ENTRIES;
+					m = (x - e) / MAX_ENTRIES;
+					if (e >= ENTRY_KEYS.length) throw new Error(\`tape: no entry \${e}\`);
+				}
+				v = {};
+				frame = { t: 0, o: v, n: 0, k: 0, key: '', e, m, f: 0, a: null, r: false };
+			}
+		} else {
+			switch (u[p++]) {
+				case 0:
+					v = null;
+					break;
+				case 1:
+					v = false;
+					break;
+				case 2:
+					v = true;
+					break;
+				case 3:
+					v = N();
+					break;
+				case 4:
+					v = S();
+					break;
+				case 5: {
+					const n = u[p++];
+					v = new Array(n);
+					frame = { t: 2, o: null, n, k: 0, key: '', e: 0, m: 0, f: 0, a: v, r: false };
+					break;
+				}
+				case 6:
+					want_record = true;
+					continue;
+				default:
+					throw new Error(\`tape: bad value tag at word \${p - 1}\`);
+			}
+		}
+		if (stack.length === 0) root = v;
+		else {
+			const top = stack[stack.length - 1];
+			if (top.t === 2) top.a[top.k++] = v;
+			else if (top.t === 1) {
+				put(top.o, top.key, v);
+				top.k++;
+			} else top.o[ENTRY_KEYS[top.e][top.f++]] = v;
+		}
+		if (frame !== null) stack.push(frame);
+		// find the next nested read, closing every container that is full
+		for (;;) {
+			if (stack.length === 0) return root;
+			const top = stack[stack.length - 1];
+			if (top.t === 2) {
+				if (top.k < top.n) {
+					want_record = top.r;
+					break;
+				}
+				stack.pop();
+				continue;
+			}
+			if (top.t === 1) {
+				if (top.k < top.n) {
+					top.key = S();
+					want_record = false;
+					break;
+				}
+				stack.pop();
+				continue;
+			}
+			const next = fill(top, stack);
+			if (next === 0) {
+				want_record = true;
+				break;
+			}
+			if (next === 1) {
+				want_record = false;
+				break;
+			}
+			if (next === 3) stack.pop();
+		}
+	}
+}
+
+/**
+ * Reads a typed record's fields from \`frame.f\` on, until one needs a nested read.
+ * @returns {number} \`0\` a record next, \`1\` a tagged value next, \`2\` a list frame pushed,
+ * \`3\` the record is complete
+ */
+function fill(frame, stack) {
+	const e = frame.e;
+	const m = frame.m;
+	const o = frame.o;
+	const keys = ENTRY_KEYS[e];
+	const encodings = ENTRY_ENCODINGS[e];
+	const bits = ENTRY_BITS[e];
+	for (let f = frame.f; f < keys.length; f++) {
+		const bit = bits[f];
+		if (bit >= 0 && (m & (1 << bit)) === 0) continue;
+		const key = keys[f];
+		switch (encodings[f]) {
+			case 0:
+				o[key] = ENTRY_TYPE[e];
+				break;
+			case 1:
+				o[key] = u[p++];
+				break;
+			case 2:
+				o[key] = u[p++] !== 0;
+				break;
+			case 3:
+				o[key] = N();
+				break;
+			case 4:
+				o[key] = null;
+				break;
+			case 5:
+				o[key] = src.slice(o.start, o.end);
+				break;
+			case 6:
+				o[key] = KW[ENTRY_KEYWORDS[e][f]][u[p++]];
+				break;
+			case 7:
+				o[key] = S();
+				break;
+			case 8:
+				o[key] = SN();
+				break;
+			case 9:
+				o[key] = L();
+				break;
+			case 10:
+				frame.f = f;
+				return 0;
+			case 11: {
+				const n = u[p++];
+				const a = new Array(n);
+				o[key] = a;
+				frame.f = f + 1;
+				stack.push({ t: 2, o: null, n, k: 0, key: '', e: 0, m: 0, f: 0, a, r: true });
+				return 2;
+			}
+			default:
+				frame.f = f;
+				return 1;
+		}
+	}
+	return 3;
+}`;
+
+/** The Rust name of an encoding. */
+const rust_enc = (code: number): string =>
+	ENC_NAMES[code]!.split('_')
+		.map((part) => part[0]!.toUpperCase() + part.slice(1))
+		.join('');
+
+/** A Rust string literal. */
+const rust_string = (text: string): string => JSON.stringify(text);
+
+const by_text = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
+
+/** The generated Rust tables' text. */
+export function generate_tape_rust(schema: TapeSchema): string {
+	const { lists, index } = keyword_tables(schema);
+	const out: string[] = [
+		'//! GENERATED by `npm run ast-schema:update` from',
+		`//! ` +
+			'`' +
+			`${AST_SCHEMA_PATH}` +
+			'` and `' +
+			`${TAPE_SHAPES_PATH}` +
+			'`' +
+			` — edit those,`,
+		'//! never this file; `npm run check:ast-schema` holds the two together.',
+		'//!',
+		"//! The tape schema the transcoder writes against and `tsv_debug`'s printer reads: the tape",
+		'//! entries with their fields in wire order, the keyword vocabularies, the fast shapes, and',
+		"//! the two byte-keyed lookups the transcoder resolves an object's entry with.",
+		'',
+		'use super::{Enc, Entry, Field, NO_AUX, NO_BIT};',
+		'',
+		"/// The tape format's version, the header's second word.",
+		`pub const TAPE_FORMAT_VERSION: u32 = ${TAPE_FORMAT_VERSION};`,
+		'',
+		'/// The most keys a typed entry carries ahead of its `type`: what the transcoder holds',
+		'/// while it reads them, before the `type` names a candidate.',
+		`pub const PRE_TYPE_MAX: usize = ${pre_type_max(schema.entries)};`,
+		'',
+		'/// The hash of the schema and shape list these tables were generated from.',
+		`pub const SHAPES_HASH: u32 = ${hex(schema.hash)};`,
+		'',
+		'/// The keyword vocabularies a `keyword` field names by its `aux`.',
+		`pub static KEYWORDS: [&[&str]; ${lists.length}] = [`
+	];
+	for (const list of lists) out.push(`    &[${list.map(rust_string).join(', ')}],`);
+	out.push(
+		'];',
+		'',
+		'/// The tape entries, by id.',
+		`pub static ENTRIES: [Entry; ${schema.entries.length}] = [`
+	);
+	for (const e of schema.entries) {
+		out.push(
+			'    Entry {',
+			`        name: ${rust_string(e.name)},`,
+			`        ty: ${e.type === null ? 'None' : `Some(${rust_string(e.type)})`},`,
+			'        fields: &['
+		);
+		for (const f of e.fields) {
+			const bit = f.bit === -1 ? 'NO_BIT' : String(f.bit);
+			const aux =
+				f.values !== undefined
+					? String(index.get(JSON.stringify(f.values)))
+					: f.entry !== undefined
+						? String(f.entry)
+						: 'NO_AUX';
+			out.push(
+				`            Field { key: ${rust_string(f.key)}, enc: Enc::${rust_enc(f.enc)}, bit: ${bit}, aux: ${aux} },`
+			);
+		}
+		out.push('        ],', '    },');
+	}
+	out.push(
+		'];',
+		'',
+		"/// The fast shapes as `(entry, mask)`, sorted; a shape's id is its index plus one.",
+		`pub static SHAPES: [(u16, u32); ${schema.shapes.length}] = [`
+	);
+	for (const s of schema.shapes) out.push(`    (${s.entry}, ${s.mask}),`);
+	out.push(
+		'];',
+		'',
+		'/// The candidate entries of a `type` value, in table order.',
+		'#[must_use]',
+		"pub fn entries_of_type(ty: &[u8]) -> &'static [u16] {",
+		'    match ty {'
+	);
+	for (const [type, ids] of [...schema.by_type].sort((a, b) => by_text(a[0], b[0]))) {
+		out.push(`        b${rust_string(type)} => &[${ids.join(', ')}],`);
+	}
+	out.push(
+		'        _ => &[],',
+		'    }',
+		'}',
+		'',
+		'/// The encoding of a key some typed entry carries ahead of its `type`.',
+		'#[must_use]',
+		'pub fn pre_type_encoding(key: &[u8]) -> Option<Enc> {',
+		'    match key {'
+	);
+	for (const [key, enc] of [...schema.pre_type].sort((a, b) => by_text(a[0], b[0]))) {
+		out.push(`        b${rust_string(key)} => Some(Enc::${rust_enc(enc)}),`);
+	}
+	out.push('        _ => None,', '    }', '}');
+	return `${out.join('\n')}\n`;
+}

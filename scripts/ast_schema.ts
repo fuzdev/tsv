@@ -26,13 +26,25 @@
  * wire's own duplicate check is the Rust validator's (`tsv_debug schema_audit`), which reads
  * the wire key by key.
  *
- * Its reach: the checkout's `crates/tsv_wasm/types/`, read always and written under
- * `--update` (`AstSchemaDeps`, built by `scripts/roots/ast_schema.ts`).
+ * The tape's generated code rides the same check: the table and the tape's committed shape list
+ * (`tsv_tape_shapes.json`, beside the table) generate the JS tape decoder and the Rust
+ * transcoder's tables (`tape_gen.ts`), so a table edit regenerates every reader of the wire.
+ *
+ * Its reach: the checkout's `crates/tsv_wasm/types/`, `crates/tsv_wasm/npm/` and
+ * `crates/tsv_arena/src/tape/`, read always and written under `--update` (`AstSchemaDeps`,
+ * built by `scripts/roots/ast_schema.ts`).
  */
 
 import type { FsDir } from '@fuzdev/gro/fs.ts';
 
 import { AST_TYPES_PATH, generate_ast_types } from './ast_types_gen.ts';
+import {
+	generate_tape_decoder,
+	generate_tape_rust,
+	TAPE_DECODER_PATH,
+	TAPE_RUST_TABLES_PATH
+} from './tape_gen.ts';
+import { build_tape_schema, parse_tape_shapes, TAPE_SHAPES_PATH } from './tape_schema.ts';
 
 /** The table's path, from the checkout root. */
 export const AST_SCHEMA_PATH = 'crates/tsv_wasm/types/tsv_ast_schema.json';
@@ -489,18 +501,26 @@ export function layout_ast_schema(schema: AstSchema): string {
 
 /** What `run_ast_schema` reaches. */
 export interface AstSchemaDeps {
-	/** The checkout's `crates/tsv_wasm/types/`, holding the table and the `.d.ts`. */
+	/** The checkout's `crates/tsv_wasm/types/`: the table, the `.d.ts` and the tape's shape list. */
 	types: FsDir;
+	/** The checkout's `crates/tsv_wasm/npm/`, holding the generated tape decoder. */
+	npm: FsDir;
+	/** The checkout's `crates/tsv_arena/src/tape/`, holding the generated transcoder tables. */
+	tape: FsDir;
 }
 
 const TABLE_FILE = 'tsv_ast_schema.json';
 const TYPES_FILE = 'tsv_ast.d.ts';
+const SHAPES_FILE = 'tsv_tape_shapes.json';
+const DECODER_FILE = 'tape_decode.js';
+const RUST_TABLES_FILE = 'shapes.rs';
 
 /**
- * Checks the table reads, sits in canonical layout, and generates the committed `.d.ts` — or
- * with `update`, rewrites the two files that drifted.
- * @returns the exit code: `1` when the table does not read or generate, or either file drifted
- * without `update`, else `0`
+ * Checks the table reads, sits in canonical layout, and generates the committed `.d.ts`, and
+ * that the table with the tape's committed shape list generates the committed tape decoder and
+ * transcoder tables (`tape_gen.ts`) — or with `update`, rewrites every file that drifted.
+ * @returns the exit code: `1` when the table or shape list does not read or generate, or a
+ * file drifted without `update`, else `0`
  */
 export async function run_ast_schema(deps: AstSchemaDeps, update: boolean): Promise<number> {
 	const text = await deps.types.read_text(TABLE_FILE);
@@ -516,16 +536,25 @@ export async function run_ast_schema(deps: AstSchemaDeps, update: boolean): Prom
 		for (const error of types.errors) console.error(`  ${error}`);
 		return 1;
 	}
-	const outputs: Array<[file: string, path: string, wanted: string]> = [
-		[TABLE_FILE, AST_SCHEMA_PATH, layout_ast_schema(schema)],
-		[TYPES_FILE, AST_TYPES_PATH, types]
+	const shapes = parse_tape_shapes(await deps.types.read_text(SHAPES_FILE));
+	const tape = 'errors' in shapes ? shapes : build_tape_schema(schema, shapes);
+	if ('errors' in tape) {
+		console.error(`${TAPE_SHAPES_PATH} and ${AST_SCHEMA_PATH} do not make a tape schema:`);
+		for (const error of tape.errors) console.error(`  ${error}`);
+		return 1;
+	}
+	const outputs: Array<[dir: FsDir, file: string, path: string, wanted: string]> = [
+		[deps.types, TABLE_FILE, AST_SCHEMA_PATH, layout_ast_schema(schema)],
+		[deps.types, TYPES_FILE, AST_TYPES_PATH, types],
+		[deps.npm, DECODER_FILE, TAPE_DECODER_PATH, generate_tape_decoder(tape)],
+		[deps.tape, RUST_TABLES_FILE, TAPE_RUST_TABLES_PATH, generate_tape_rust(tape)]
 	];
 	let drifted = 0;
-	for (const [file, path, wanted] of outputs) {
-		const committed = await deps.types.read_text_if_exists(file);
+	for (const [dir, file, path, wanted] of outputs) {
+		const committed = await dir.read_text_if_exists(file);
 		if (committed === wanted) continue;
 		if (update) {
-			await deps.types.write(file, wanted);
+			await dir.write(file, wanted);
 			console.log(`${path}: rewritten`);
 		} else {
 			console.error(`${path} is not what the table generates — run \`npm run ast-schema:update\`.`);
@@ -533,6 +562,8 @@ export async function run_ast_schema(deps: AstSchemaDeps, update: boolean): Prom
 		}
 	}
 	if (drifted > 0) return 1;
-	console.log(`${AST_SCHEMA_PATH}: in canonical layout; ${AST_TYPES_PATH}: generated`);
+	console.log(
+		`${AST_SCHEMA_PATH}: in canonical layout; ${AST_TYPES_PATH}, ${TAPE_DECODER_PATH} and ${TAPE_RUST_TABLES_PATH}: generated`
+	);
 	return 0;
 }
