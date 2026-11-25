@@ -150,6 +150,14 @@ await assert_staged_fresh([
 // Graded by the one list every reader of that staging shares
 // (`wasm_package_checks`), because a feature or an export moves with any of them.
 const wasm_package_index = `${wasm_package_dir('all')}/index.js`;
+/** The wasm umbrella's `./parse` entry under Node, beside its root. */
+const wasm_package_parse = `${wasm_package_dir('all')}/parse.js`;
+/** The wasm umbrella's two Node entries, the root and `./parse`, as one table — the loader's
+ * `api` counterpart. */
+const import_wasm_entries = async (): Promise<Record<string, any>> => ({
+	...(await import(pathToFileURL(wasm_package_index).href)),
+	...(await import(pathToFileURL(wasm_package_parse).href))
+});
 let wasm_parity_staleness: StagedStaleness | undefined;
 for (const check of wasm_package_checks('all')) {
 	wasm_parity_staleness = await staged_staleness(check);
@@ -240,8 +248,13 @@ after(() => {
 });
 
 const loader_path = join(staged, 'node_modules', '@fuzdev', 'tsv', 'index.js');
-// ESM import of the ESM loader — the ordinary consumer path.
-const api = await import(pathToFileURL(loader_path).href);
+const loader_parse_path = join(staged, 'node_modules', '@fuzdev', 'tsv', 'parse.js');
+// ESM import of the ESM loader — the ordinary consumer path: the root, and the `./parse`
+// entry (the parse family), which share one addon.
+const root_api = await import(pathToFileURL(loader_path).href);
+const parse_api = await import(pathToFileURL(loader_parse_path).href);
+/** Both entries' exports as one table, for the rows that read a family by its name. */
+const api: Record<string, any> = { ...root_api, ...parse_api };
 /**
  * The libc detection, loaded here rather than in its own suite far below.
  * Two reasons, and the second is a trap:
@@ -289,10 +302,47 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 	// a missing `reinstantiate` as "a trapped engine cannot be recovered" — an
 	// accidental export here would silently flip those branches.
 	it('exports none of the four WASM lifecycle exports', () => {
-		assert.strictEqual(api.wasm_module, undefined);
-		assert.strictEqual(api.reinstantiate, undefined);
-		assert.strictEqual(api.init, undefined);
-		assert.strictEqual(api.init_sync, undefined);
+		for (const entry of [root_api, parse_api]) {
+			assert.strictEqual(entry.wasm_module, undefined);
+			assert.strictEqual(entry.reinstantiate, undefined);
+			assert.strictEqual(entry.init, undefined);
+			assert.strictEqual(entry.init_sync, undefined);
+		}
+	});
+
+	// The split: the root formats, strips, collects import records and matches ignore files;
+	// the parse family, the AST helpers and the tape decoder are the `./parse` entry's alone.
+	it('the root carries no parse family; ./parse carries nothing else', () => {
+		assert.deepEqual(Object.keys(root_api).sort(), [
+			'IgnoreStack',
+			'format_css',
+			'format_svelte',
+			'format_typescript',
+			'parse_imports_svelte',
+			'parse_imports_typescript',
+			'strip_typescript'
+		]);
+		assert.deepEqual(Object.keys(parse_api).sort(), [
+			'create_locator',
+			'parse_css',
+			'parse_css_json',
+			'parse_svelte',
+			'parse_svelte_json',
+			'parse_typescript',
+			'parse_typescript_json',
+			'reconstruct_locations'
+		]);
+		// what the root imports (its module doc names the parse entry, so its code is read)
+		const root_imports = [
+			...readFileSync(loader_path, 'utf8').matchAll(/^(?:import|export) .* from '([^']+)';$/gm)
+		].map((m) => m[1]);
+		assert.deepEqual(root_imports.sort(), [
+			'./addon.js',
+			'./api.js',
+			'./api_imports.js',
+			'./api_strip.js'
+		]);
+		assert.match(readFileSync(loader_parse_path, 'utf8'), /from '\.\/tape_engine\.js'/);
 	});
 
 	// The class carries the same kind of delta one level down: a GC-managed
@@ -322,21 +372,28 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 		'differs from @fuzdev/tsv-wasm by exactly the WASM lifecycle',
 		{ skip: wasm_parity_skip },
 		async () => {
+			// entry by entry: the root, then `./parse`
 			const wasm = await import(pathToFileURL(wasm_package_index).href);
-			assert.deepEqual(
-				Object.keys(wasm)
-					.filter((name) => !(name in api))
-					.sort(),
-				['init', 'init_sync', 'reinstantiate', 'wasm_module'],
-				'the wasm package has an export this loader is missing'
-			);
-			assert.deepEqual(
-				Object.keys(api)
-					.filter((name) => !(name in wasm))
-					.sort(),
-				[],
-				'this loader has an export the wasm package is missing'
-			);
+			const wasm_parse = await import(pathToFileURL(wasm_package_parse).href);
+			for (const [label, wasm_entry, native_entry, lifecycle] of [
+				['the root', wasm, root_api, ['init', 'init_sync', 'reinstantiate', 'wasm_module']],
+				['./parse', wasm_parse, parse_api, []]
+			] as const) {
+				assert.deepEqual(
+					Object.keys(wasm_entry)
+						.filter((name) => !(name in native_entry))
+						.sort(),
+					lifecycle,
+					`the wasm package's ${label} has an export this loader's is missing`
+				);
+				assert.deepEqual(
+					Object.keys(native_entry)
+						.filter((name) => !(name in wasm_entry))
+						.sort(),
+					[],
+					`this loader's ${label} has an export the wasm package's is missing`
+				);
+			}
 			// And one level down, over the shared class. `Reflect.ownKeys`, not
 			// `getOwnPropertyNames`: half the stated delta is `[Symbol.dispose]`,
 			// which the glue assigns as an own SYMBOL-keyed property after the
@@ -383,10 +440,51 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 		'returns the same parse failures as @fuzdev/tsv-wasm',
 		{ skip: wasm_parity_skip },
 		async () => {
-			const wasm = await import(pathToFileURL(wasm_package_index).href);
+			const wasm = await import_wasm_entries();
 			assert.deepEqual(parse_failures(api), parse_failures(wasm));
 		}
 	);
+
+	// The tape route under `parse_<lang>`: the raw export hands the words over as a typed array
+	// copied into a buffer V8 owns (4-aligned by type), its exact bytes the header's length, and
+	// the facade's decode is the JSON route's tree.
+	it('the raw tape export returns aligned words the facade decodes to the JSON tree', () => {
+		const addon = createRequire(loader_path)(`@fuzdev/tsv-${platform_triple()}`);
+		for (const [language, source] of [
+			['typescript', '\ufeffconst é = `x${1}😀`;'],
+			['svelte', '\ufeff<div title="é">{a}😀</div><style>a { color: red }</style>'],
+			['css', '\ufeffa::before { content: "é" }']
+		] as const) {
+			const words = addon[`parse_tape_${language}`](source);
+			assert.ok(words instanceof Uint32Array, language);
+			assert.equal(words.byteOffset % 4, 0, language);
+			assert.equal(words[0], 0x54565354, `${language}: the magic`);
+			assert.ok(32 + words[3]! * 4 + words[4]! <= words.byteLength, language);
+			assert.deepEqual(
+				ok_ast(api[`parse_${language}`](source)),
+				JSON.parse(ok_json(api[`parse_${language}_json`](source))),
+				language
+			);
+		}
+		// a failure is the JSON export's own object, not a tape
+		assert.deepEqual(
+			addon.parse_tape_typescript('const = ;'),
+			addon.parse_typescript_json('const = ;')
+		);
+	});
+
+	// The tape is a buffer V8 owns, which its GC reclaims like any other, not an external one
+	// whose napi finalizer waits for the event loop to turn: a synchronous loop over many files
+	// would otherwise hold every tape it made until it yields. Node's `arrayBuffers` counts only
+	// the buffers V8 allocated.
+	it('the raw tape export hands over a buffer V8 owns', () => {
+		const addon = createRequire(loader_path)(`@fuzdev/tsv-${platform_triple()}`);
+		const source = 'const x = { a: [1, 2, 3], b: "str" };\n'.repeat(200);
+		const before = process.memoryUsage().arrayBuffers;
+		const words = addon.parse_tape_typescript(source);
+		assert.ok(words instanceof Uint32Array);
+		assert.ok(process.memoryUsage().arrayBuffers - before >= words.byteLength);
+	});
 
 	it('parses to span-only objects, and _json siblings return the string', () => {
 		const ast = ok_ast(api.parse_typescript('const x = 1;'));
@@ -493,7 +591,8 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 	});
 
 	// export names and the lone-surrogate refusal, shared with the wasm entries' suite
-	register_facade_surface_suite('@fuzdev/tsv loader', api, { facade_exports: 12 });
+	register_facade_surface_suite('@fuzdev/tsv loader (root)', root_api, { facade_exports: 6 });
+	register_facade_surface_suite('@fuzdev/tsv loader (./parse)', parse_api, { facade_exports: 6 });
 
 	it('the loader ships the shared facade verbatim', () => {
 		for (const { published, source } of facade_files(ALL_FAMILIES)) {
@@ -509,10 +608,13 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 	// generated from the facade's declarations (`facade_type_names`) — so it is held to
 	// that same derived set: every option and error type the facade declares, by name, from
 	// the file that declares it.
-	it("index.d.ts re-exports exactly the facade's declared types", () => {
-		const index_dts = readFileSync(join(NAPI_LOADER_DIR, 'index.d.ts'), 'utf8');
-		const reexported = (from: string): Array<string> =>
-			[...index_dts.matchAll(/^export type \{([^}]*)\} from '([^']+)';/gm)]
+	it("index.d.ts and parse.d.ts re-export exactly the facade's declared types", () => {
+		const reexported = (entry: string, from: string): Array<string> =>
+			[
+				...readFileSync(join(NAPI_LOADER_DIR, entry), 'utf8').matchAll(
+					/^export type \{([^}]*)\} from '([^']+)';/gm
+				)
+			]
 				.filter((m) => m[2] === from)
 				.flatMap((m) => m[1]!.split(',').map((name) => name.trim()))
 				.filter((name) => name !== '')
@@ -521,12 +623,23 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 			facade_type_names(
 				file,
 				readFileSync(new URL(`../${FACADE_SOURCE_DIR}/${file}`, import.meta.url), 'utf8')
-			);
-		assert.deepEqual(reexported('./facade_format.js'), declared('facade_format.d.ts').sort());
-		assert.deepEqual(reexported('./facade_parse.js'), declared('facade_parse.d.ts').sort());
-		assert.deepEqual(reexported('./facade_strip.js'), declared('facade_strip.d.ts').sort());
-		assert.deepEqual(reexported('./facade_imports.js'), declared('facade_imports.d.ts').sort());
-		assert.deepEqual(reexported('./facade_error.js'), declared('facade_error.d.ts').sort());
+			).sort();
+		// the root: format, strip, imports and the error types — no parse type
+		assert.deepEqual(
+			reexported('index.d.ts', './facade_format.js'),
+			declared('facade_format.d.ts')
+		);
+		assert.deepEqual(reexported('index.d.ts', './facade_parse.js'), []);
+		assert.deepEqual(reexported('index.d.ts', './facade_strip.js'), declared('facade_strip.d.ts'));
+		assert.deepEqual(
+			reexported('index.d.ts', './facade_imports.js'),
+			declared('facade_imports.d.ts')
+		);
+		assert.deepEqual(reexported('index.d.ts', './facade_error.js'), declared('facade_error.d.ts'));
+		// `./parse`: the parse types and the error types its results carry
+		assert.deepEqual(reexported('parse.d.ts', './facade_parse.js'), declared('facade_parse.d.ts'));
+		assert.deepEqual(reexported('parse.d.ts', './facade_error.js'), declared('facade_error.d.ts'));
+		assert.deepEqual(reexported('parse.d.ts', './facade_format.js'), []);
 	});
 
 	// The discovery matcher rides the package as a class. The `undefined`
@@ -604,14 +717,33 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 				`const tsv = await import('@fuzdev/tsv');
 const unexported = await import('@fuzdev/tsv/cli.js').then(() => 'resolved', (error) => error.code);
 const locations = Object.keys(await import('@fuzdev/tsv/locations')).sort();
-process.stdout.write(JSON.stringify({out: tsv.format_typescript('const   x=1').code, unexported, locations}));`
+const parse = await import('@fuzdev/tsv/parse');
+const internals = {};
+for (const file of ['addon.js', 'tape_engine.js', 'tape_decode.js', 'api_parse.js']) {
+	internals[file] = await import('@fuzdev/tsv/' + file).then(() => 'resolved', (error) => error.code);
+}
+process.stdout.write(JSON.stringify({
+	out: tsv.format_typescript('const   x=1').code,
+	parsed: parse.parse_typescript('const x = 1;').ast.type,
+	unexported,
+	internals,
+	locations
+}));`
 			],
 			{ cwd: staged, encoding: 'utf-8' }
 		);
 		assert.equal(probe.status, 0, probe.stderr);
+		const unexported = 'ERR_PACKAGE_PATH_NOT_EXPORTED';
 		assert.deepEqual(JSON.parse(probe.stdout), {
 			out: 'const x = 1;\n',
-			unexported: 'ERR_PACKAGE_PATH_NOT_EXPORTED',
+			parsed: 'Program',
+			unexported,
+			internals: {
+				'addon.js': unexported,
+				'tape_engine.js': unexported,
+				'tape_decode.js': unexported,
+				'api_parse.js': unexported
+			},
 			locations: ['create_locator', 'reconstruct_locations']
 		});
 	});
@@ -676,14 +808,14 @@ process.stdout.write(JSON.stringify({
 			assert.ok(mode & 0o111, 'the CLI binary must be executable');
 		}
 		// The loader's SUPPORTED list and its optionalDependencies must agree —
-		// the build script and index.js each carry the list, and this is the
+		// the build script and addon.js each carry the list, and this is the
 		// gate that keeps them in sync.
-		const source = readFileSync(loader_path, 'utf8');
+		const source = readFileSync(join(dirname(loader_path), 'addon.js'), 'utf8');
 		const supported = [...source.matchAll(/^\t'([a-z0-9]+-[a-z0-9-]+)'/gm)].map((m) => m[1]);
 		assert.deepEqual(
 			supported.map((t) => `@fuzdev/tsv-${t}`).sort(),
 			Object.keys(loader_pkg.optionalDependencies).sort(),
-			'npm/index.js SUPPORTED must match the generated optionalDependencies'
+			'npm/addon.js SUPPORTED must match the generated optionalDependencies'
 		);
 		// Every `files` entry the loader package declares actually shipped.
 		for (const file of loader_pkg.files) {

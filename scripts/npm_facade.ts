@@ -8,8 +8,9 @@
  *
  * The shared part — the options reader with the format family (`api.js`) and the parse-failure type
  * every family's results carry — rides every package; the format declarations ride the
- * format-capable ones; the parse half — the parse family, the `locations.js` helper it runs and the
- * AST types its declarations name — rides the parse-capable ones (the format-only package loads
+ * format-capable ones; the parse half — the parse family, the tape decoder its `parse_<lang>`
+ * reads, the `locations.js` helper it runs and the AST types its declarations name — rides the
+ * parse-capable ones (the format-only package loads
  * none of it); and the strip half — the type strip and its declarations — and the imports half —
  * the import records and theirs — ride the two packages that carry them (`@fuzdev/tsv-wasm`,
  * `@fuzdev/tsv`). The declarations are named apart from the `.js` files they sit beside
@@ -50,10 +51,13 @@ const FACADE_SHARED_FILES: ReadonlyArray<FacadeFile> = [
 /** The format family's declarations — for the format-capable packages alone. */
 const FACADE_FORMAT_FILES: ReadonlyArray<FacadeFile> = [from_source_dir('facade_format.d.ts')];
 
-/** The facade's parse half — with the generated AST types `facade_parse.d.ts` and
- * `locations.d.ts` import. */
+/** The facade's parse half — with its tape route (`tape_engine.js` over the generated decoder,
+ * `tape_decode.js`, which the entries' `parse_<lang>` decodes through) and the generated AST
+ * types `facade_parse.d.ts` and `locations.d.ts` import. */
 const FACADE_PARSE_FILES: ReadonlyArray<FacadeFile> = [
 	from_source_dir('api_parse.js'),
+	from_source_dir('tape_engine.js'),
+	from_source_dir('tape_decode.js'),
 	from_source_dir('facade_parse.d.ts'),
 	from_source_dir('locations.js'),
 	from_source_dir('locations.d.ts'),

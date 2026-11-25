@@ -68,9 +68,12 @@ Outside the macro, the `format` feature also exports **`IgnoreStack`** — a `#[
 Staged by `npm run build:napi:packages` (`scripts/build_napi_packages.ts`)
 into `crates/tsv_napi/pkg/` (gitignored):
 
-- **`pkg/napi/` — `@fuzdev/tsv`**, the loader: `npm/index.js` +
-  `npm/index.d.ts` + `npm/platform.js` (triple detection, shared by `index.js`
-  and `bin.js`) + `npm/bin.js` (the `tsv` bin — a dispatcher, see below) +
+- **`pkg/napi/` — `@fuzdev/tsv`**, the loader: two entries — the root `npm/index.js` +
+  `npm/index.d.ts` (format, strip, imports, `IgnoreStack`) and the `./parse` entry
+  `npm/parse.js` + `npm/parse.d.ts` (the parse family, over the tape route) — over
+  `npm/addon.js` (the triple resolve, the platform `require` and its load error, imported by
+  both entries so the addon loads once), `npm/platform.js` (triple detection, shared by
+  `addon.js` and `bin.js`) + `npm/bin.js` (the `tsv` bin — a dispatcher, see below) +
   `npm/README.md` + the facade with its parse, strip and imports halves (`api.js` / `api_parse.js` /
   `api_strip.js` / `api_imports.js`, `locations.js`, the declarations — `facade_format.d.ts` /
   `facade_parse.d.ts` / `facade_strip.d.ts` / `facade_imports.d.ts`,
@@ -122,11 +125,14 @@ export names, same `(source, options?)` bags, same error strings: the loader
 publishes through the wasm packages' own facade (`api.js` / `api_parse.js` / `api_strip.js` /
 `api_imports.js`, staged
 in from `crates/tsv_wasm/npm/`), so there is one options reader for both, and
-`scripts/test_napi_npm.ts` asserts the strings. `parse_<lang>` returns `{ok: true, ast}`, the
-JSON-parsed span-only object (`{locations: true}` adds `loc`, reconstructed in JS), and
-`parse_<lang>_json` returns `{ok: true, json}`, the wire string; a failure is
-`{ok: false, error}`. The loader's `index.js` imports the three facade files, which sit beside it
-only once staged. The deliberately
+`scripts/test_napi_npm.ts` asserts the strings. `parse_<lang>` (from `@fuzdev/tsv/parse`) returns `{ok: true, ast}`, the span-only object
+decoded from the addon's `parse_tape_<lang>` (`tape_engine.js`, the tape route
+[../tsv_wasm/CLAUDE.md](../tsv_wasm/CLAUDE.md) §The npm Facade describes — the words copied
+into a buffer the JS engine owns) — the tree `JSON.parse` makes of the wire —
+(`{locations: true}` adds `loc`, reconstructed in JS), and `parse_<lang>_json` returns
+`{ok: true, json}`, the wire string; a failure is `{ok: false, error}`. The root `index.js`
+imports the format, strip and imports facade files and `parse.js` the parse half, each of
+which sits beside it only once staged; the root loads no parse code and no decoder. The deliberately
 absent exports are the four WASM lifecycle ones — `init()`/`init_sync()`
 (nothing to initialize), `wasm_module` (no compiled module), and
 `reinstantiate()` (no instance to poison; a native overflow is a process-fatal
@@ -139,14 +145,16 @@ too), and the class's keys via `Reflect.ownKeys` — a
 name-only walk would miss `[Symbol.dispose]`, which is half of what the
 sentence above claims. It runs whenever the wasm package is staged AND fresh,
 and SKIPS otherwise: `npm run test:napi:npm` does not build that package, and
-an export set captured before the delta moved reads as clean. Neither package
-exports the bench-only `parse_internal_*` family
-(`scripts/patch_npm_package.ts` filters it out of the wasm wrappers too).
+an export set captured before the delta moved reads as clean. The diff is entry by entry
+— the roots, then the two `./parse` entries, which must match exactly. Neither package
+exports the engine-only `parse_internal_*` / `parse_tape_*` families
+(`scripts/patch_npm_package.ts` filters both out of the wasm wrappers too —
+`ENGINE_ONLY_PREFIXES`).
 
 The locations helpers (`reconstruct_locations` / `create_locator`)
 ship here too: `tsv_wasm/npm/locations.js` is pure JS over the span-only wire —
 the facade's `{locations: true}` runs it — so the staging script copies that same
-file in and the loader's `index.js` re-exports it whole (`export *`), so the names are
+file in and the loader's `parse.js` re-exports it whole (`export *`), so the names are
 never listed a second time. It is also the loader's `./locations` subpath, as in the wasm
 packages that parse: pure JS importing nothing, so it loads no addon —
 `scripts/test_napi_npm.ts` imports it from the staging that has no platform package, where
@@ -193,12 +201,15 @@ the parse-failure table under Bun):
 - **Loader resolution by BARE SPECIFIER** — the ESM walk of the `exports` map from a cwd
   inside the staging and the CommonJS `require.resolve` walk of the same map, plus the
   encapsulation (a file the map does not name stays unreachable).
-- **The surface** — the options surface with exact error strings; the hand-written
-  `index.d.ts` re-exporting exactly the option and error types the facade's declarations
-  declare (`facade_type_names`); the export-set diff against `@fuzdev/tsv-wasm` when that
-  package is staged and fresh; the unsupported-platform error.
+- **The surface** — the options surface with exact error strings; the root and `./parse`
+  each carrying exactly its family; the hand-written `index.d.ts` / `parse.d.ts`
+  re-exporting exactly the option and error types the facade's declarations declare
+  (`facade_type_names`), the parse types from `parse.d.ts` alone; the raw
+  `parse_tape_<lang>` handing over aligned words the facade decodes to the JSON tree; the
+  export-set diff against `@fuzdev/tsv-wasm`, entry by entry, when that package is staged
+  and fresh; the unsupported-platform error.
 - **package.json coherence** — pins, selection fields, `files` on both packages, the
-  executable bit on the CLI binary, loader-`SUPPORTED` vs optionalDependencies.
+  executable bit on the CLI binary, `addon.js`'s `SUPPORTED` vs optionalDependencies.
 - **The `tsv` bin** — `bin.js` really dispatches to the binary (argh's help output, a
   discriminator the JS mirror never prints); it forwards exit codes, stdout/stderr and
   stdin; `--version` through the bin matches the staged package version (a binary↔package
@@ -214,7 +225,7 @@ the parse-failure table under Bun):
 
 The loader's declarations are graded by `npm run typecheck:packages -- napi` (also part of
 a bare `typecheck:packages` run while the loader is staged): the staged package installed
-into a temp consumer, its root, `./locations` and README examples compiled on `es2022`
+into a temp consumer, its root, `./parse`, `./locations` and README examples compiled on `es2022`
 alone — no DOM lib, which pins that it declares none — under `nodenext` and `bundler`
 resolution. `scripts/publish.ts` Step 6 runs it: staging the loader is a file copy
 (`scripts/roots/build_napi_packages.ts --loader-only`, no cargo build), so the WASM release stages it at
@@ -438,7 +449,7 @@ Three properties a Node/Bun host inherits from this crate, none of them visible 
 ## Files
 
 - `src/lib.rs` — All bindings: the `lang_bindings!` macro (its engine halves the shared `tsv_arena` macros — `parse_convert!` / `parse_internal!` for the parse exports, `parse_format!` carrying the format path's unset source type — with `napi_source_type` decoding the optional `sourceType` string per `tsv_arena::Family`), the three `lang_bindings!` invocations, the `strip`-gated `strip_typescript` export (its engine half `strip_typescript_engine`), the `imports`-gated `parse_imports_typescript` / `parse_imports_svelte` exports (their engine halves beside them, each `tsv_arena`'s `parse_imports_json!`), the `format`-gated `IgnoreStack` class, `catch_panic` and `engine_export` (every export's body runs through one of them), the `panic_probe` exports, and a `#[cfg(test)]` module. The panic probe panics inside `tsv_ts::__private::with_stores`; the strip runs over the per-thread stores (`tsv_ts::__private::with_stores`), and the format export reaches the doc arena through the macros. What every export family shares (the source-type decoder, `Failure`'s parse arm, the failure object) is gated on the private `_internal_exports` feature, which each family enables, rather than on an `any` over the families
-- `npm/` — the `@fuzdev/tsv` loader package source (`index.js` + `index.d.ts` — hand-written: the loader plus the wasm packages' own facade over the addon, so the surface is theirs minus the WASM lifecycle (§The npm packages states the exact delta, and the suite diffs it as a set), and bound by the same `.js`-extension rule on relative specifiers ([../tsv_wasm/CLAUDE.md](../tsv_wasm/CLAUDE.md) §Line/Column Reconstruction Helper), asserted by `scripts/test_napi_npm.ts` — + `platform.js` (triple detection) + `bin.js` (the `tsv` bin dispatcher) + `README.md`); staged with generated package.jsons by `scripts/build_napi_packages.ts`, which also copies in the shared facade (`api.js` / `api_parse.js` / `api_strip.js` / `api_imports.js` and the `facade_*.d.ts` declarations), the `locations.js` helper and the `cli.js` fallback (see §The npm packages)
+- `npm/` — the `@fuzdev/tsv` loader package source (`index.js` + `index.d.ts`, the root, and `parse.js` + `parse.d.ts`, the `./parse` entry, over `addon.js` — hand-written: the loader plus the wasm packages' own facade over the addon, so the surface is theirs minus the WASM lifecycle (§The npm packages states the exact delta, and the suite diffs it as a set), and bound by the same `.js`-extension rule on relative specifiers ([../tsv_wasm/CLAUDE.md](../tsv_wasm/CLAUDE.md) §Line/Column Reconstruction Helper), asserted by `scripts/test_napi_npm.ts` — + `platform.js` (triple detection) + `bin.js` (the `tsv` bin dispatcher) + `README.md`); staged with generated package.jsons by `scripts/build_napi_packages.ts`, which also copies in the shared facade (`api.js` / `api_parse.js` / `api_strip.js` / `api_imports.js` and the `facade_*.d.ts` declarations), the tape route (`tape_engine.js` + the generated `tape_decode.js`), the `locations.js` helper and the `cli.js` fallback (see §The npm packages)
 - `build.rs` — `napi_build::setup()` (linker config for the addon)
 - `Cargo.toml` — `crate-type = ["cdylib"]`; `unsafe_code = "deny"`, not `allow` — `#[napi]`'s generated items carry their own `#[allow(unsafe_code)]` (an inner `allow` overrides `deny`), so the macro output compiles while any hand-written `unsafe` stays a compile error; deps `napi` + `napi-derive` (3.x) + `tsv_arena`, plus the `format`-optional `tsv_ignore` + `tsv_discover` behind `IgnoreStack`, build-dep `napi-build` (2.x). `format` → `tsv_arena/format` + those two (no direct `tsv_lang` edge: `parse_format!`'s line-terminator fold reaches it through `tsv_arena`)
 

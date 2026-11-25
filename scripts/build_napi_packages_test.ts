@@ -117,6 +117,9 @@ describe('the loader package', () => {
 		const expected: Array<[string, string]> = [
 			['crates/tsv_napi/npm/index.js', 'index.js'],
 			['crates/tsv_napi/npm/index.d.ts', 'index.d.ts'],
+			['crates/tsv_napi/npm/parse.js', 'parse.js'],
+			['crates/tsv_napi/npm/parse.d.ts', 'parse.d.ts'],
+			['crates/tsv_napi/npm/addon.js', 'addon.js'],
 			['crates/tsv_napi/npm/platform.js', 'platform.js'],
 			['crates/tsv_napi/npm/bin.js', 'bin.js'],
 			['crates/tsv_napi/npm/README.md', 'README.md'],

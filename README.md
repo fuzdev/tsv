@@ -120,15 +120,17 @@ const result = format_svelte('<script>\nconst   x=1\n</script>');
 if (result.ok) console.log(result.code); // else result.error: {kind, message, frame, start, end, loc}
 ```
 
+The parser is its own entry, `./parse`, so a process that only formats never loads it:
+
 ```typescript
-import {parse_svelte, type Root} from '@fuzdev/tsv';
+import {parse_svelte, type Root} from '@fuzdev/tsv/parse';
 const result = parse_svelte('<script>const x = 1;</script>');
 if (result.ok) {
 	const ast: Root = result.ast;
 }
 ```
 
-`@fuzdev/tsv` and `@fuzdev/tsv-wasm` are drop-in swaps.
+`@fuzdev/tsv` and `@fuzdev/tsv-wasm` are drop-in swaps, entry for entry.
 The native package is prebuilt
 for Linux (x64 gnu and musl, arm64 gnu), macOS (arm64 and x64), and Windows x64.
 As with other wasm packages, browsers must call `await init()`.
@@ -198,7 +200,7 @@ shape the npm packages type in
 (the `locations` cargo feature); the default `json` feature can be turned off for a build
 without `parse_to_json*`.
 
-| npm (`@fuzdev/tsv`, `@fuzdev/tsv-wasm`)                | Rust                                                                       |
+| npm (`@fuzdev/tsv`, `@fuzdev/tsv-wasm`; `parse_*` from `./parse`) | Rust                                                            |
 | ------------------------------------------------------ | -------------------------------------------------------------------------- |
 | `format_typescript(src)`                               | `tsv_ts::format(src)`                                                      |
 | `format_typescript(src, {sourceType: 'script'})`       | `tsv_ts::format_with_goal(src, Goal::Script)`                              |

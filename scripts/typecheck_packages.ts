@@ -8,13 +8,15 @@
  * What it grades, per package — the three wasm packages and the native `@fuzdev/tsv`
  * loader:
  *
- * - every exported subpath — the root, `./worker` (wasm), `./locations` (parse-capable) —
+ * - every exported subpath — the root, `./worker` (wasm), `./parse` and `./locations`
+ *   (parse-capable; the parse-only package's root graded as a parser too) —
  *   through lean consumer modules that call the surface with typed returns, forwarded
  *   option bags, the format / parse result narrowing (`TsvParseError`, the format's
  *   `FormatRefusedError`), the `IgnoreStack` verdict union and the type strip's and the
  *   import records' result narrowing (in the two packages that carry them), plus
- *   `// @ts-expect-error` negatives for what must NOT compile (an unused one is itself an
- *   error, so the negatives are pinned too);
+ *   `// @ts-expect-error` negatives for what must NOT compile — the parse family, the AST types
+ *   and the helper absent from a root that formats, the formatter from `./parse` (an unused
+ *   one is itself an error, so the negatives are pinned too);
  * - every ```ts / ```typescript block of the README the package ships, each as its own
  *   module, and every ```js / ```javascript block under `checkJs`;
  * - under a strict matrix (`strict`, `exactOptionalPropertyTypes`,
@@ -32,8 +34,8 @@
  * The two defect classes it pins: a declaration needing a lib the consumer did not ask for
  * (TS2550 — `IgnoreStack`'s `[Symbol.dispose]` without the `esnext.disposable` reference
  * `patch_npm_package.ts` prepends), and a name lost to star-export ambiguation between
- * `tsv_ast.d.ts` and `locations.d.ts` (TS2308) — pinned from both sides: the root
- * re-exports `Position` / `SourceLocation`, and `./locations` must not.
+ * `tsv_ast.d.ts` and `locations.d.ts` (TS2308) — pinned from both sides: `./parse` re-exports
+ * `Position` / `SourceLocation`, and `./locations` must not.
  *
  * A README block that only compiles under Node — it imports `node:` builtins or the
  * Node-only `wasm_module` — carries a `<!-- typecheck: node -->` line immediately above
@@ -249,8 +251,9 @@ const warning: string | undefined = stack.shadow_warning('src');
 void [returns, formatted, script, css, verdict, warning];
 `;
 
-/** The parse family and the locator, over the package root. */
-const parse_module = (pkg: PackageSpec): string => `
+/** The parse family and the locator, over the entry `specifier` names: every parse-capable
+ * package's `./parse`, and the parse-only package's root too. */
+const parse_module = (specifier: string): string => `
 import {
 	create_locator,
 	parse_css,
@@ -260,7 +263,7 @@ import {
 	parse_typescript,
 	parse_typescript_json,
 	reconstruct_locations
-} from '${pkg.name}';
+} from '${specifier}';
 import type {
 	ParseJsonOptions,
 	ParseJsonResult,
@@ -274,7 +277,7 @@ import type {
 	TsvParseError,
 	TypeScriptParseJsonOptions,
 	TypeScriptParseOptions
-} from '${pkg.name}';
+} from '${specifier}';
 
 ${EXACT}
 
@@ -458,7 +461,7 @@ void [returns, svelte_returns, specifiers, kinds, type_only, phase];
 const locations_module = (pkg: PackageSpec): string => `
 import {create_locator, reconstruct_locations} from '${pkg.name}/locations';
 import type {LocationLanguage, Locator, LocatorOptions} from '${pkg.name}/locations';
-// @ts-expect-error Position is tsv_ast.d.ts's; exported here too, the root's star exports clash (TS2308)
+// @ts-expect-error Position is tsv_ast.d.ts's; exported here too, ./parse's star exports clash (TS2308)
 import type {Position} from '${pkg.name}/locations';
 // @ts-expect-error the subpath is the helper alone, no engine
 import {parse_css} from '${pkg.name}/locations';
@@ -549,6 +552,19 @@ const absent_module = (pkg: PackageSpec): string => {
 			'// @ts-expect-error nor their types',
 			`import type {ImportsResult} from '${pkg.name}';`,
 			'void parse_imports_typescript;'
+		);
+	}
+	if (pkg.parse && pkg.format) {
+		lines.push(
+			"// @ts-expect-error the parse family is the ./parse entry's, not the root's",
+			`import {parse_css} from '${pkg.name}';`,
+			'// @ts-expect-error and so are the AST types',
+			`import type {Program} from '${pkg.name}';`,
+			'// @ts-expect-error and the reconstruction helper',
+			`import {create_locator} from '${pkg.name}';`,
+			'// @ts-expect-error the ./parse entry carries no formatter',
+			`import {format_css} from '${pkg.name}/parse';`,
+			'void [parse_css, create_locator, format_css];'
 		);
 	}
 	if (pkg.engine === 'napi') {
@@ -651,7 +667,9 @@ function consumer_files(pkg: PackageSpec, readme: string): Array<ConsumerFile> {
 	};
 	if (pkg.format) add('format', format_module(pkg));
 	if (pkg.parse) {
-		add('parse', parse_module(pkg));
+		add('parse', parse_module(`${pkg.name}/parse`));
+		// the parse-only package keeps the family at its root as well
+		if (!pkg.format) add('parse_root', parse_module(pkg.name));
 		add('locations', locations_module(pkg), { dom: false });
 	}
 	if (pkg.strip) add('strip', strip_module(pkg));

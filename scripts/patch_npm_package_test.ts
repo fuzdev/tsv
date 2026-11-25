@@ -820,3 +820,51 @@ test('with no gzip the package is written and the summary fails', async () => {
 		'@fuzdev/tsv-format-wasm'
 	);
 });
+
+/** The glue of a parse-only build: no class, and per language the three raw parse exports the
+ * split reads (the object parse, the wire string, the tape) beside the engine-only bench one. */
+const GLUE_PARSE =
+	GLUE.replace(/^export class IgnoreStack[\s\S]*?^}\n/m, '')
+		.replace(/^export function format_\w+\(.*\n/gm, '')
+		.replace(/^const IgnoreStackFinalization[\s\S]*?\);\n/m, '') +
+	['css', 'svelte', 'typescript']
+		.flatMap((l) => [
+			`export function parse_${l}(source, source_type) {}`,
+			`export function parse_${l}_json(source, source_type) {}`,
+			`export function parse_tape_${l}(source, source_type) {}`
+		])
+		.join('\n') +
+	'\n';
+
+test('parse: the ./parse entry decodes the tape, and the root re-exports it whole', async () => {
+	await using root = (await make_staging('parse', GLUE_PARSE)).root;
+	const pkg = root.dir('parse/npm');
+	const { deps, err } = await make_deps(root);
+	strictEqual(await run_patch_npm_package(deps, ['parse']), 0);
+	deepStrictEqual(err, []);
+	const parse_js = await pkg.read_text('parse.js');
+	ok(parse_js.includes("import './node_init.js';"), parse_js);
+	ok(parse_js.includes('parse: create_tape_parse({'), parse_js);
+	ok(parse_js.includes('typescript: _parse_tape_typescript })'), parse_js);
+	ok(parse_js.includes('typescript: _parse_typescript_json }\n'), parse_js);
+	ok(!/\b_parse_typescript\b/.test(parse_js), 'the raw object parse is not the facade engine');
+	const parse_browser_js = await pkg.read_text('parse_browser.js');
+	ok(parse_browser_js.includes("import { _guarded } from './lazy.js';"), parse_browser_js);
+	ok(parse_browser_js.includes('_guarded(_parse_tape_typescript)'), parse_browser_js);
+	ok((await pkg.read_text('index.js')).endsWith("export * from './parse.js';\n"));
+	ok((await pkg.read_text('browser.js')).endsWith("export * from './parse_browser.js';\n"));
+	ok((await pkg.read_text('node_init.js')).includes('initSync({ module: wasm_module });'));
+	ok((await pkg.read_text('lazy.js')).includes('export const _guarded ='));
+	const manifest = JSON.parse(await pkg.read_text('package.json'));
+	deepStrictEqual(manifest.exports['./parse'], {
+		node: { types: './parse.d.ts', default: './parse.js' },
+		default: { types: './parse.d.ts', default: './parse_browser.js' }
+	});
+	deepStrictEqual(manifest.sideEffects, ['./index.js', './node_init.js']);
+	for (const file of ['parse.js', 'parse_browser.js', 'parse.d.ts', 'node_init.js', 'lazy.js']) {
+		ok(manifest.files.includes(file), file);
+	}
+	for (const name of ['parse_tape_', 'parse_internal_']) {
+		ok(!(await pkg.read_text('parse.d.ts')).includes(name), name);
+	}
+});

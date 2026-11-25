@@ -109,6 +109,9 @@ const napi_cases = (): Array<Case> => {
 			inputs: [
 				'crates/tsv_napi/npm/index.js',
 				'crates/tsv_napi/npm/index.d.ts',
+				'crates/tsv_napi/npm/parse.js',
+				'crates/tsv_napi/npm/parse.d.ts',
+				'crates/tsv_napi/npm/addon.js',
 				'crates/tsv_napi/npm/platform.js',
 				'crates/tsv_napi/npm/bin.js',
 				...facade_sources(ALL_FAMILIES),

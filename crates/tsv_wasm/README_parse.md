@@ -39,7 +39,19 @@ if (program.ok && stylesheet.ok) {
 
 Three parsers, each returning the AST its canonical parser returns: `parse_svelte` Svelte's modern `parse` AST, `parse_typescript` ESTree as acorn + acorn-typescript emit it, and `parse_css` Svelte's `parseCss` AST. Each takes a source `string` and an optional options object, and returns a result: `{ok: true, ast}`, or `{ok: false, error}` for a source that doesn't parse ([below](#errors-and-depth-limits)). The AST is **span-only** by default: `start`/`end` offsets on every node, no per-node `loc` (line/column) and no Svelte `name_loc` — pass `{locations: true}` for those.
 
-AST types are bundled in `tsv_ast.d.ts` and re-exported from the package — `import type` any node directly.
+AST types are bundled in `tsv_ast.d.ts` and re-exported from the package — `import type` any node directly. The parsers read a compact binary form of the wire straight out of WASM memory and decode it to objects in JS — the same tree `JSON.parse` makes of the `_json` string, key order included.
+
+The parse family is also the `@fuzdev/tsv-parse-wasm/parse` entry — the same functions and types, under the subpath `@fuzdev/tsv-wasm` and `@fuzdev/tsv` publish their parsers at, so switching packages changes only the package name:
+
+```typescript
+import {parse_svelte} from '@fuzdev/tsv-parse-wasm/parse';
+import type {Root} from '@fuzdev/tsv-parse-wasm/parse';
+
+const parsed = parse_svelte('<p>x</p>');
+if (parsed.ok) {
+	const root: Root = parsed.ast;
+}
+```
 
 To parse across threads, compile once and share: the main entry exports `wasm_module`, the compiled `WebAssembly.Module`, and the `@fuzdev/tsv-parse-wasm/worker` subpath is the same API without import-time initialization, so a worker calls `init_sync({module: wasm_module})` on the module handed to it (`workerData` or `postMessage`) instead of compiling again. `wasm_module` is exported by the Node/Bun entry alone; in a browser Worker call `await init()`, or `postMessage` a `WebAssembly.Module` you compiled yourself.
 

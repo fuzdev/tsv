@@ -20,6 +20,7 @@
 
 import { createHash } from 'node:crypto';
 import { readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import process from 'node:process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
@@ -83,7 +84,14 @@ const main = async (): Promise<void> => {
 	}
 
 	// deno-lint-ignore no-explicit-any
-	const tsv: any = await import(pathToFileURL(values.loader).href);
+	// the loader's root and its `./parse` entry beside it (the parse family), one addon between them
+	// TODO: train the tape route (`parse_<lang>`, the `./parse` entry's default) as an op of its
+	// own, with its `HOT_FUNCTIONS` floor and byte-identity — the shipped addon's profile does
+	// not yet see the transcoder
+	const tsv: any = {
+		...(await import(pathToFileURL(values.loader).href)),
+		...(await import(pathToFileURL(join(dirname(values.loader), 'parse.js')).href))
+	};
 	const decoder = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
 	const sha256 = (text: string): string => createHash('sha256').update(text).digest('hex');
 

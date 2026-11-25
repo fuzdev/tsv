@@ -27,12 +27,13 @@ import { reconstruct_locations } from './locations.js';
  *
  * `engine.parse_json` (`(source, source_type?) => string | failure`) is required;
  * `engine.parse` (`(source, source_type?) => {ok: true, ast} | failure`) is optional — an
- * engine that parses its wire itself (the WASM bindings run `JSON.parse` engine-side, and
- * build the whole result there) supplies it, and otherwise the facade `JSON.parse`s the
- * string. A `JSON.parse` failure there is an engine bug, never the caller's source: it
- * throws a plain `Error` (the WASM engine's own text for the same failure, the
- * `SyntaxError` as its `cause`), never a result. A failure is the `{ok: false, error}` the
- * engine returned (`read_failure`).
+ * engine that builds the tree itself supplies it: every published entry passes the tape
+ * route (`tape_engine.js`'s `create_tape_parse` over the raw `parse_tape_<lang>`, decoding
+ * the binary wire), and the WASM module's raw `parse_<lang>` (`JSON.parse` run engine-side)
+ * fits the same slot. Without it the facade `JSON.parse`s the string; a failure there is an
+ * engine bug, never the caller's source: it throws a plain `Error` (the WASM engine's own
+ * text for the same failure, the `SyntaxError` as its `cause`), never a result. A failure is
+ * the `{ok: false, error}` the engine returned (`read_failure`).
  *
  * @param {{
  * 	parse_json: Record<string, (source: string, source_type?: string) => unknown>,

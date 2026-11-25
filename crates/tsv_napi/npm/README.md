@@ -4,7 +4,7 @@
 
 Rust-based formatter + parser + type stripper + import lister as a prebuilt native addon for Node.js and Bun. A near-Prettier formatter that tracks **Prettier** + **prettier-plugin-svelte** closely (documented divergences), and a parser whose AST is compatible with Svelte's parser + acorn + acorn-typescript (and `parseCss`).
 
-The API mirrors [`@fuzdev/tsv-wasm`](https://www.npmjs.com/package/@fuzdev/tsv-wasm) export for export — same names, same options, same errors — minus only what a WASM engine needs and this one doesn't (`init`, `init_sync`, `wasm_module`, `reinstantiate`, the `./worker` subpath, and the WASM `IgnoreStack`'s `free()` / `[Symbol.dispose]()`, which a GC-managed native class doesn't need), so the two are drop-in swaps: this package is the fast native path; the WASM one runs everywhere (browsers included) and is the fallback for platforms without a prebuilt binding.
+The API mirrors [`@fuzdev/tsv-wasm`](https://www.npmjs.com/package/@fuzdev/tsv-wasm) entry for entry (the root and `./parse`) and export for export — same names, same options, same errors — minus only what a WASM engine needs and this one doesn't (`init`, `init_sync`, `wasm_module`, `reinstantiate`, the `./worker` subpath, and the WASM `IgnoreStack`'s `free()` / `[Symbol.dispose]()`, which a GC-managed native class doesn't need), so the two are drop-in swaps: this package is the fast native path; the WASM one runs everywhere (browsers included) and is the fallback for platforms without a prebuilt binding.
 
 Docs and benchmarks: [tsv.fuz.dev](https://tsv.fuz.dev/). Source and conformance notes: [github.com/fuzdev/tsv](https://github.com/fuzdev/tsv).
 
@@ -53,10 +53,11 @@ Files format in parallel; `--jobs N` overrides the worker count. (If the platfor
 
 ## Usage
 
-The package is ESM, and there is no initialization step (a CommonJS host loads it with `await import('@fuzdev/tsv')`):
+The package is ESM, and there is no initialization step (a CommonJS host loads it with `await import('@fuzdev/tsv')`). It has two entries: the root (`@fuzdev/tsv`) formats, strips types, lists imports and matches ignore files; the parser is `@fuzdev/tsv/parse`, so a process that never parses never loads it.
 
 ```javascript
-import {format_svelte, format_typescript, parse_typescript} from '@fuzdev/tsv';
+import {format_svelte} from '@fuzdev/tsv';
+import {parse_typescript} from '@fuzdev/tsv/parse';
 
 const formatted = format_svelte('<script>\nconst   x=1\n</script>'); // {ok: true, code}
 const parsed = parse_typescript('const x = 1;'); // {ok: true, ast}: acorn-typescript-shaped, span-only
@@ -75,9 +76,9 @@ A set value is exact. With none named and both grammars rejecting the source, th
 
 ### Parsing
 
-`parse_svelte` / `parse_typescript` / `parse_css` return `{ok: true, ast}` with the language's public JSON AST as an object — span-only by default, `start`/`end` offsets on every node and no per-node `loc`; the `parse_*_json` siblings return that wire as a JSON string, `{ok: true, json}`, for consumers that forward it without paying `JSON.parse`. A source that doesn't parse returns `{ok: false, error}` ([Errors](#errors)). The object parsers take an optional `{locations?, sourceType?}` bag, the `_json` ones `{sourceType?}`, and `sourceType` is TypeScript-only. TypeScript types for the AST are bundled in `tsv_ast.d.ts` and re-exported from the package (`import type {...} from '@fuzdev/tsv'`).
+`parse_svelte` / `parse_typescript` / `parse_css`, from `@fuzdev/tsv/parse`, return `{ok: true, ast}` with the language's public JSON AST as an object — span-only by default, `start`/`end` offsets on every node and no per-node `loc`; the `parse_*_json` siblings return that wire as a JSON string, `{ok: true, json}`, for consumers that forward it without paying `JSON.parse`. A source that doesn't parse returns `{ok: false, error}` ([Errors](#errors)). The object parsers take an optional `{locations?, sourceType?}` bag, the `_json` ones `{sourceType?}`, and `sourceType` is TypeScript-only. TypeScript types for the AST are bundled in `tsv_ast.d.ts` and re-exported from the parse entry (`import type {...} from '@fuzdev/tsv/parse'`), with the parse option and result types. Under the hood the object parsers read a compact binary form of the wire that the native addon hands over in one buffer and JS decodes straight to objects — the same tree `JSON.parse` makes of the `_json` string, key order included.
 
-`locations: true` adds `loc` (and Svelte's `name_loc`), computed in JS after the parse by `reconstruct_locations`. It is exported too, with `create_locator(source, {language})` for sparse lookups (`language` required), whose `position_at(offset)` / `loc_of(node)` throw a `RangeError` for an offset or span the source doesn't hold (a `TypeError` for an offset that isn't a number, or a node whose `start`/`end` getter throws); the whole-tree forms (`reconstruct_locations`, the locator's `reconstruct(ast)`) check nothing per node, and take an acyclic tree — the parse's own, or a clone of it. Both are also the `@fuzdev/tsv/locations` entry point, pure JS that loads no native addon.
+`locations: true` adds `loc` (and Svelte's `name_loc`), computed in JS after the parse by `reconstruct_locations`. It is exported from the parse entry too, with `create_locator(source, {language})` for sparse lookups (`language` required), whose `position_at(offset)` / `loc_of(node)` throw a `RangeError` for an offset or span the source doesn't hold (a `TypeError` for an offset that isn't a number, or a node whose `start`/`end` getter throws); the whole-tree forms (`reconstruct_locations`, the locator's `reconstruct(ast)`) check nothing per node, and take an acyclic tree — the parse's own, or a clone of it. Both are also the `@fuzdev/tsv/locations` entry point, pure JS that loads no native addon.
 
 ### Stripping types
 
@@ -151,7 +152,7 @@ if (!result.ok) {
 
 What still throws is what no result can report: an argument error (a `TypeError`, above), a source over the 4 GiB size cap, and the engine failures below.
 
-A Rust panic — always a tsv bug, please report it — is also thrown rather than aborting the process, as an `Error` whose message is `panic: ` and the panic's message; stack overflow is the one crash that could still abort, as a bare `SIGSEGV`, and tsv's depth limits keep it out of reach: a source nested or chained past them is refused as an ordinary parse error (`{ok: false, error}`) — counting the parens the formatter would add, so the output of any source it accepts parses again — and every input under them fits a 2 MiB thread — graded with every shape the limits count at its deepest accepted depth (the limits and the stack contract are in the repo's [docs/cli.md](https://github.com/fuzdev/tsv/blob/main/docs/cli.md#recursion-depth)). A main thread (the process stack limit, commonly 8 MiB) and a `worker_threads` worker (Node's 4 MiB default) both hold it; only a worker you start with `resourceLimits.stackSizeMb` below 2 is under the contract. The bundled `tsv` CLI sizes its own stack. Reconstructing `loc` — `{locations: true}`, or `reconstruct_locations` — runs in JS without recursion, so it reaches as deep as the parse does.
+A Rust panic — always a tsv bug, please report it — is also thrown rather than aborting the process, as an `Error` whose message is `panic: ` and the panic's message; stack overflow is the one crash that could still abort, as a bare `SIGSEGV`, and tsv's depth limits keep it out of reach: a source nested or chained past them is refused as an ordinary parse error (`{ok: false, error}`) — counting the parens the formatter would add, so the output of any source it accepts parses again — and every input under them fits a 2 MiB thread — graded with every shape the limits count at its deepest accepted depth (the limits and the stack contract are in the repo's [docs/cli.md](https://github.com/fuzdev/tsv/blob/main/docs/cli.md#recursion-depth)). A main thread (the process stack limit, commonly 8 MiB) and a `worker_threads` worker (Node's 4 MiB default) both hold it; only a worker you start with `resourceLimits.stackSizeMb` below 2 is under the contract. The bundled `tsv` CLI sizes its own stack. Reconstructing `loc` — `{locations: true}`, or `reconstruct_locations` — runs in JS without recursion, and the object parsers' decode falls back to a pass that recurses nowhere when a tree outgrows the JS stack, so both reach as deep as the parse does.
 
 ## Status
 

@@ -44,11 +44,16 @@
  * `parse_imports_svelte` for `.svelte`, deep-equal on both engines — the records, or the
  * parse error.
  *
+ * **The parse wire** rides it too, over `tests/fixtures` and the snapshot, from each package's
+ * `./parse` entry: `parse_<lang>` by extension (`.svelte`, `.css`, the strip's engine extensions
+ * for TypeScript) deep-equal on both engines, and on each engine deep-equal to `JSON.parse` of
+ * its own `parse_<lang>_json` — the tape route against the JSON route, key order included (the
+ * comparison is of the two trees' serializations).
+ *
  * Blind spots. It compares the two CLI **drivers** as well as the two engines, so a driver-only
  * difference reads as a failure here (that is a real finding, just a differently-located one;
  * `scripts/test_napi_npm.ts` is where the driver contract is pinned flag by flag). It sees only
- * inputs the corpus holds, and only the format, strip and imports paths — `parse` wire equality is
- * not graded here. And it cannot see a divergence both engines share with each other but not with
+ * inputs the corpus holds. And it cannot see a divergence both engines share with each other but not with
  * prettier, which is the conformance gates' job.
  *
  * NOT in `npm run check`: it needs two built packages, and `check` builds
@@ -268,15 +273,29 @@ async function collect(
  * The list pairs each file with the export that reads it. */
 const ENGINE_PARITY_SCRIPT = `
 import { readFileSync } from 'node:fs';
-import * as native from '@fuzdev/tsv';
-const wasm = await import(process.argv[2]);
-const files = JSON.parse(readFileSync(process.argv[3], 'utf8'));
+import * as native_root from '@fuzdev/tsv';
+import * as native_parse from '@fuzdev/tsv/parse';
+const native = { ...native_root, ...native_parse };
+const wasm = { ...(await import(process.argv[2])), ...(await import(process.argv[3])) };
+const files = JSON.parse(readFileSync(process.argv[4], 'utf8'));
 const differing = [];
+/** A parse export's result with the JSON wire read back as the tree it names. */
+const read_back = (result) => (result.ok ? { ok: true, ast: JSON.parse(result.json) } : result);
 for (const [file, name] of files) {
 	const source = readFileSync(file, 'utf8');
 	const a = JSON.stringify(native[name](source));
 	const b = JSON.stringify(wasm[name](source));
 	if (a !== b) differing.push(file);
+	else if (/^parse_(svelte|typescript|css)$/.test(name)) {
+		// the tape route against the JSON route, on each engine: the decoded tree is the one
+		// JSON.parse makes of the same wire, key order included
+		for (const engine of [native, wasm]) {
+			if (JSON.stringify(read_back(engine[name + '_json'](source))) !== a) {
+				differing.push(file);
+				break;
+			}
+		}
+	}
 }
 process.stdout.write(JSON.stringify({ files: files.length, differing }));
 `;
@@ -543,10 +562,12 @@ export async function run_engine_parity(
 			'files.json',
 			JSON.stringify(files.map((file) => [file, export_for(file)]))
 		);
-		const wasm_index = pathToFileURL(join(checkout.path, wasm_package_dir('all'), 'index.js')).href;
+		const wasm_entry = (file: string): string =>
+			pathToFileURL(join(checkout.path, wasm_package_dir('all'), file)).href;
 		const result = await run(node, consumer, [
 			join(consumer.path, 'engine_parity.mjs'),
-			wasm_index,
+			wasm_entry('index.js'),
+			wasm_entry('parse.js'),
 			join(consumer.path, 'files.json')
 		]);
 		if (result.status !== 0) {
@@ -581,6 +602,18 @@ export async function run_engine_parity(
 				: 'parse_imports_typescript'
 		);
 
+	/** The parse leg over the engines alone: each file's `parse_<lang>` (the tape route) equal
+	 * on both engines, and on each to `JSON.parse` of its own `parse_<lang>_json`. */
+	const grade_parse_engines = (root: string): Promise<RootReport> =>
+		grade_engines(root, 'parse_*', [...STRIP_ENGINE_EXTENSIONS, '.svelte', '.css'], (file) => {
+			const extension = extname(file).toLowerCase();
+			return extension === '.svelte'
+				? 'parse_svelte'
+				: extension === '.css'
+					? 'parse_css'
+					: 'parse_typescript';
+		});
+
 	const roots = args.length
 		? args
 		: ['tests/fixtures', 'tests/fixtures_compile', '../corpora/collections'];
@@ -597,6 +630,9 @@ export async function run_engine_parity(
 		? args
 		: ['tests/fixtures_imports', '../corpora/collections'];
 	for (const root of imports_engine_roots) reports.push(await grade_imports_engines(root));
+	// the parse wire: the fixture tree and the snapshot, in process
+	const parse_engine_roots = args.length ? args : ['tests/fixtures', '../corpora/collections'];
+	for (const root of parse_engine_roots) reports.push(await grade_parse_engines(root));
 
 	if (json) {
 		print(JSON.stringify({ native: native.label, reports }, null, 2));

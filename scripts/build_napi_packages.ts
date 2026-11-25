@@ -1,10 +1,11 @@
 /**
  * Stage the publishable N-API npm packages into `crates/tsv_napi/pkg/`:
  *
- * - `pkg/napi/` — the `@fuzdev/tsv` loader, ESM like the wasm packages (index.js + index.d.ts +
- *   platform.js (triple detection) + the shared facade with its parse, strip and imports
+ * - `pkg/napi/` — the `@fuzdev/tsv` loader, ESM like the wasm packages (the root entry
+ *   index.js + index.d.ts, the `./parse` entry parse.js + parse.d.ts, the addon.js both
+ *   import, platform.js (triple detection) + the shared facade with its parse, strip and imports
  *   halves — `api.js` / `api_parse.js` / `api_strip.js` / `api_imports.js`, the `locations.js`
- *   helper, the declarations (`facade_format.d.ts`, `facade_parse.d.ts`,
+ *   helper, the tape route (`tape_engine.js` + the generated `tape_decode.js`), the declarations (`facade_format.d.ts`, `facade_parse.d.ts`,
  *   `facade_strip.d.ts`, `facade_imports.d.ts`, `facade_error.d.ts`, `locations.d.ts`,
  *   `tsv_ast.d.ts`), the table
  *   `scripts/npm_facade.ts` names — + the shared `cli.js` + the `bin.js` dispatcher wired
@@ -54,7 +55,22 @@ import { cargo_workspace_version } from './release/version.ts';
 import { format_size } from './size.ts';
 import { stage_file, type StageFileDeps } from './stage_file.ts';
 
-/** The platform packages the loader pins — keep in sync with `npm/index.js`'s
+/**
+ * The loader's own modules and declarations, staged from `crates/tsv_napi/npm/` under their
+ * names: the root entry (`index.js`), the `./parse` entry (`parse.js`), the internal
+ * `addon.js` both import, and `platform.js`, the triple detection `addon.js` and `bin.js`
+ * share.
+ */
+export const NAPI_LOADER_FILES: ReadonlyArray<string> = [
+	'index.js',
+	'index.d.ts',
+	'parse.js',
+	'parse.d.ts',
+	'addon.js',
+	'platform.js'
+];
+
+/** The platform packages the loader pins — keep in sync with `npm/addon.js`'s
  * `SUPPORTED` (`scripts/test_napi_npm.ts` gates the agreement, via the
  * generated optionalDependencies). */
 export const SUPPORTED_TRIPLES = [
@@ -162,15 +178,14 @@ export async function run_build_napi_packages(
 	const loader_dir = 'crates/tsv_napi/pkg/napi';
 	await fs.make_dir(at(loader_dir));
 	for (const [from, to] of [
-		['crates/tsv_napi/npm/index.js', 'index.js'],
-		['crates/tsv_napi/npm/index.d.ts', 'index.d.ts'],
-		['crates/tsv_napi/npm/platform.js', 'platform.js'],
+		...NAPI_LOADER_FILES.map((file) => [`crates/tsv_napi/npm/${file}`, file]),
 		// the `tsv` bin — a dispatcher that execs the platform package's native
 		// CLI binary, falling back to cli.js (see crates/tsv_napi/npm/bin.js)
 		['crates/tsv_napi/npm/bin.js', 'bin.js'],
 		['crates/tsv_napi/npm/README.md', 'README.md'],
 		// the shared facade every tsv package exports through — one options reader and
-		// one set of error texts with the wasm packages; `index.js` imports every half
+		// one set of error texts with the wasm packages; `index.js` imports the format, strip
+		// and imports halves, `parse.js` the parse half (with the tape decoder)
 		...facade_files(ALL_FAMILIES).map(({ source, published }) => [source, published]),
 		// the JS CLI — imports its engine from `./index.js`, so the same source
 		// binds to the native loader here and to the wasm engine in
@@ -192,7 +207,7 @@ export async function run_build_napi_packages(
 			'and an import-records parser (N-API)',
 		// ESM, matching the wasm packages — one module system across tsv's npm
 		// surface, so shared sources load unchanged in either. The platform `.node`
-		// is still `require`d, via `createRequire` (see npm/index.js).
+		// is still `require`d, via `createRequire` (see npm/addon.js).
 		type: 'module',
 		main: 'index.js',
 		types: 'index.d.ts',
@@ -201,6 +216,12 @@ export async function run_build_napi_packages(
 			'.': {
 				types: './index.d.ts',
 				default: './index.js'
+			},
+			// the parse family — its own entry, whose static graph holds the tape decoder, so
+			// a process that never parses never loads it (`@fuzdev/tsv-wasm/parse`'s twin)
+			'./parse': {
+				types: './parse.d.ts',
+				default: './parse.js'
 			},
 			// the reconstruction helper alone — pure JS that imports nothing, so it loads no
 			// addon (the wasm packages that parse export the same subpath)
@@ -211,9 +232,7 @@ export async function run_build_napi_packages(
 		// write the normalized form so the publish log stays quiet.
 		bin: { tsv: 'bin.js' },
 		files: [
-			'index.js',
-			'index.d.ts',
-			'platform.js',
+			...NAPI_LOADER_FILES,
 			'bin.js',
 			...facade_files(ALL_FAMILIES).map((file) => file.published),
 			'cli.js',
@@ -237,8 +256,8 @@ export async function run_build_napi_packages(
 			'native'
 		],
 		...NPM_SHARED_METADATA,
-		// The loader's top-level platform require IS the side effect.
-		sideEffects: ['./index.js'],
+		// The addon's top-level platform require IS the side effect, reached from either entry.
+		sideEffects: ['./index.js', './addon.js', './parse.js'],
 		optionalDependencies: Object.fromEntries(
 			SUPPORTED_TRIPLES.map((t) => [`@fuzdev/tsv-${t}`, version])
 		)

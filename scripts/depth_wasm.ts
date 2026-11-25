@@ -85,8 +85,13 @@ interface Failure {
 /** A child: grade the shapes of one shard in this process, printing failures as JSON lines. */
 async function run_child(args: Map<string, string>): Promise<void> {
 	const pkg_dir = resolve(ROOT, process.env.PKG_DIR ?? 'crates/tsv_wasm/pkg/all/npm');
+	// the root (format, the strip, the import records, `reinstantiate`) and the `./parse` entry
+	// (the parse family): one module instance between them
 	// deno-lint-ignore no-explicit-any
-	const tsv: any = await import(pathToFileURL(join(pkg_dir, 'index.js')).href);
+	const tsv: any = {
+		...(await import(pathToFileURL(join(pkg_dir, 'index.js')).href)),
+		...(await import(pathToFileURL(join(pkg_dir, 'parse.js')).href))
+	};
 	const [shard, shards] = args.get('shard')!.split('/').map(Number) as [number, number];
 	const pass = args.get('pass')!;
 	const filter = args.get('filter') ?? '';

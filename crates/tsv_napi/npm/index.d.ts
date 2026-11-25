@@ -1,42 +1,25 @@
 /**
- * Hand-written types for `@fuzdev/tsv` — `@fuzdev/tsv-wasm`'s surface (the same facade
- * declarations, re-exported from the staged `facade_format.d.ts` / `facade_parse.d.ts` /
- * `facade_strip.d.ts` / `facade_imports.d.ts` / `facade_error.d.ts`, and the same `tsv_ast`
- * re-export), so the two packages type-check interchangeably except for what a WASM engine needs
- * and this one doesn't: `init()` and `init_sync()` (nothing here needs initializing), `wasm_module`
- * (no compiled module to hand a worker), `reinstantiate()` (no instance to poison), and
- * `IgnoreStack`'s `free()` / `[Symbol.dispose]` (a GC-managed native object has no handle to
- * release). That list is the whole delta — `scripts/test_napi_npm.ts` diffs the two packages'
- * export names rather than trusting it. The `locations.js` helper's functions and types are
- * re-exported whole, from the copy `scripts/build_napi_packages.ts` stages beside this file.
+ * Hand-written types for `@fuzdev/tsv` — `@fuzdev/tsv-wasm`'s root surface (the same facade
+ * declarations, re-exported from the staged `facade_format.d.ts` / `facade_strip.d.ts` /
+ * `facade_imports.d.ts` / `facade_error.d.ts`), so the two packages type-check interchangeably
+ * except for what a WASM engine needs and this one doesn't: `init()` and `init_sync()` (nothing
+ * here needs initializing), `wasm_module` (no compiled module to hand a worker),
+ * `reinstantiate()` (no instance to poison), and `IgnoreStack`'s `free()` / `[Symbol.dispose]`
+ * (a GC-managed native object has no handle to release). That list is the whole delta —
+ * `scripts/test_napi_npm.ts` diffs the two packages' export names rather than trusting it. The
+ * parse family, the AST types and the `locations.js` helper are the `./parse` entry's
+ * (`parse.d.ts`), not this root's.
  *
  * Relative specifiers carry the **`.js`** extension, here and in every
  * `import(...)` below: under `moduleResolution: node16`/`nodenext` a relative
  * specifier inside a declaration file must have the runtime extension or the
- * consumer gets TS2834, and TypeScript resolves `./tsv_ast.js` to
- * `./tsv_ast.d.ts`. Same rule the wasm packages' generated declarations follow.
+ * consumer gets TS2834, and TypeScript resolves `./facade_format.js` to
+ * `./facade_format.d.ts`. Same rule the wasm packages' generated declarations follow.
  */
-export type * from './tsv_ast.js';
-// `export *`, not `export type *` — the helper's functions AND its types flow through,
-// matching the wasm packages' index.d.ts.
-export * from './locations.js';
 
-// The parse/format surface is the shared facade's, declared once beside it
-// (`facade_format.d.ts` / `facade_parse.d.ts`, staged in from `crates/tsv_wasm/npm/`, and
-// named apart from the `api.js` / `api_parse.js` modules beside them, which do not export
-// these). Re-exported by NAME, so the `tsv_ast` star export above can never ambiguate one
-// away (TS2308).
-export type {
-	ParseOptions,
-	TypeScriptParseOptions,
-	ParseJsonOptions,
-	TypeScriptParseJsonOptions,
-	ParseSuccess,
-	ParseJsonSuccess,
-	ParseFailure,
-	ParseResult,
-	ParseJsonResult
-} from './facade_parse.js';
+// The format surface is the shared facade's, declared once beside it (`facade_format.d.ts`,
+// staged in from `crates/tsv_wasm/npm/`, and named apart from the `api.js` module beside it,
+// which does not export these). Re-exported by NAME.
 export type {
 	FormatOptions,
 	TypeScriptFormatOptions,
@@ -67,14 +50,6 @@ export type {
 	ImportsResult
 } from './facade_imports.js';
 export type { TsvError, TsvParseError } from './facade_error.js';
-export {
-	parse_svelte,
-	parse_svelte_json,
-	parse_typescript,
-	parse_typescript_json,
-	parse_css,
-	parse_css_json
-} from './facade_parse.js';
 export { format_svelte, format_typescript, format_css } from './facade_format.js';
 export { strip_typescript } from './facade_strip.js';
 export { parse_imports_typescript, parse_imports_svelte } from './facade_imports.js';

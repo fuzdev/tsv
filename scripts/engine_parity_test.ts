@@ -208,7 +208,8 @@ test('agreeing engines: every leg graded, each program handed its arguments wher
 		'  ✓ corpus (tsv strip): 2 files, byte-identical',
 		'  ✓ corpus (strip_typescript): 2 files, byte-identical',
 		'  ✓ corpus (parse_imports_*): 2 files, byte-identical',
-		'✓ the two engines agree on every byte across 10 files'
+		'  ✓ corpus (parse_*): 3 files, byte-identical',
+		'✓ the two engines agree on every byte across 13 files'
 	]);
 	deepStrictEqual(native_programs, [NATIVE]);
 	const wasm_cli = join(checkout.path, WASM_CLI);
@@ -220,6 +221,7 @@ test('agreeing engines: every leg graded, each program handed its arguments wher
 		{ args: ['strip', 'corpus/sub/c.TS'], cwd: '<checkout>' }
 	]);
 	const index_url = pathToFileURL(join(checkout.path, 'crates/tsv_wasm/pkg/all/npm/index.js')).href;
+	const parse_url = pathToFileURL(join(checkout.path, 'crates/tsv_wasm/pkg/all/npm/parse.js')).href;
 	// the temp roots by the order they were made: the empty scope, the two trees, then one
 	// consumer per in-process leg
 	const temp = (n: number, file: string): string => join(temp_roots[n]!, file);
@@ -230,12 +232,16 @@ test('agreeing engines: every leg graded, each program handed its arguments wher
 		{ args: [wasm_cli, 'strip', 'corpus/a.ts'], cwd: '<checkout>' },
 		{ args: [wasm_cli, 'strip', 'corpus/sub/c.TS'], cwd: '<checkout>' },
 		{
-			args: [temp(2, 'engine_parity.mjs'), index_url, temp(2, 'files.json')],
+			args: [temp(2, 'engine_parity.mjs'), index_url, parse_url, temp(2, 'files.json')],
 			cwd: '<temp 2>'
 		},
 		{
-			args: [temp(3, 'engine_parity.mjs'), index_url, temp(3, 'files.json')],
+			args: [temp(3, 'engine_parity.mjs'), index_url, parse_url, temp(3, 'files.json')],
 			cwd: '<temp 3>'
+		},
+		{
+			args: [temp(4, 'engine_parity.mjs'), index_url, parse_url, temp(4, 'files.json')],
+			cwd: '<temp 4>'
 		}
 	]);
 	// the consumer project: the script, the list (absolute paths, each with its export), and
@@ -251,11 +257,17 @@ test('agreeing engines: every leg graded, each program handed its arguments wher
 			[
 				[absolute('a.ts'), 'parse_imports_typescript'],
 				[absolute('sub/c.TS'), 'parse_imports_typescript']
+			],
+			[
+				[absolute('a.ts'), 'parse_typescript'],
+				[absolute('sub/b.css'), 'parse_css'],
+				[absolute('sub/c.TS'), 'parse_typescript']
 			]
 		]
 	);
 	for (const { files } of consumers) {
-		ok(files['engine_parity.mjs']!.includes("import * as native from '@fuzdev/tsv';"));
+		ok(files['engine_parity.mjs']!.includes("import * as native_root from '@fuzdev/tsv';"));
+		ok(files['engine_parity.mjs']!.includes("import * as native_parse from '@fuzdev/tsv/parse';"));
 		strictEqual(files['node_modules/@fuzdev/tsv/index.js'], 'crates/tsv_napi/pkg/napi/index.js');
 		strictEqual(files['node_modules/@fuzdev/tsv/cli.js'], 'crates/tsv_napi/pkg/napi/cli.js');
 		strictEqual(
@@ -427,6 +439,8 @@ test('the in-process half reports what its child found, and a child that failed'
 		`      strip_typescript differs: ${join(checkout.path, 'corpus/sub/c.TS')}`,
 		'      compared 1 of 2 files',
 		'  ✗ corpus (parse_imports_*): 2 files',
+		'      the comparison child failed (exit 3): boom',
+		'  ✗ corpus (parse_*): 3 files',
 		'      the comparison child failed (exit 3): boom'
 	]);
 });
@@ -448,6 +462,12 @@ test('a svelte file reads through the svelte export; the strip half takes no sve
 				'corpus/a.ts parse_imports_typescript',
 				'corpus/c.svelte parse_imports_svelte',
 				'corpus/sub/c.TS parse_imports_typescript'
+			],
+			[
+				'corpus/a.ts parse_typescript',
+				'corpus/c.svelte parse_svelte',
+				'corpus/sub/b.css parse_css',
+				'corpus/sub/c.TS parse_typescript'
 			]
 		]
 	);
@@ -461,7 +481,8 @@ test('an absent root is skipped, and nothing gradable fails', async () => {
 		'  ⚠ nowhere — skipped (not present)',
 		'  ⚠ nowhere — skipped (not present)',
 		'  ⚠ nowhere (strip_typescript) — skipped (not present)',
-		'  ⚠ nowhere (parse_imports_*) — skipped (not present)'
+		'  ⚠ nowhere (parse_imports_*) — skipped (not present)',
+		'  ⚠ nowhere (parse_*) — skipped (not present)'
 	]);
 	deepStrictEqual(err, ['✗ no corpus root was gradable — nothing was compared']);
 });
@@ -478,7 +499,9 @@ test('the default roots, when none is named', async () => {
 		'  ⚠ tests/fixtures — skipped (not present)',
 		'  ⚠ ../corpora/collections (strip_typescript) — skipped (not present)',
 		'  ⚠ tests/fixtures_imports (parse_imports_*) — skipped (not present)',
-		'  ⚠ ../corpora/collections (parse_imports_*) — skipped (not present)'
+		'  ⚠ ../corpora/collections (parse_imports_*) — skipped (not present)',
+		'  ⚠ tests/fixtures (parse_*) — skipped (not present)',
+		'  ⚠ ../corpora/collections (parse_*) — skipped (not present)'
 	]);
 });
 
@@ -494,14 +517,20 @@ test('--json prints the native label and every report, the runs included', async
 	strictEqual(report.native, `staged platform package (${TRIPLE})`);
 	deepStrictEqual(
 		report.reports.map((r) => r.root),
-		['corpus', 'corpus (tsv strip)', 'corpus (strip_typescript)', 'corpus (parse_imports_*)']
+		[
+			'corpus',
+			'corpus (tsv strip)',
+			'corpus (strip_typescript)',
+			'corpus (parse_imports_*)',
+			'corpus (parse_*)'
+		]
 	);
 	deepStrictEqual(report.reports[0]!.native, {
 		status: 0,
 		stdout: '',
 		stderr: 'checked 3 files\n'
 	});
-	strictEqual(out[1], '✓ the two engines agree on every byte across 10 files');
+	strictEqual(out[1], '✓ the two engines agree on every byte across 13 files');
 });
 
 test('no node, or one that fails its version probe, is refused before anything runs', async () => {

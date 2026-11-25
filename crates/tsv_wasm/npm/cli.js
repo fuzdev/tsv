@@ -127,19 +127,29 @@ const FORMATTERS = {
 	css: engine.format_css
 };
 
-const PARSERS = {
-	svelte: engine.parse_svelte_json,
-	typescript: engine.parse_typescript_json,
-	css: engine.parse_css_json
-};
-
-/** The object parsers, for `parse --locations`: `{locations: true}` reconstructs `loc`
- * over the span-only tree (the facade's sugar), which is then stringified. */
-const OBJECT_PARSERS = {
-	svelte: engine.parse_svelte,
-	typescript: engine.parse_typescript,
-	css: engine.parse_css
-};
+/**
+ * The parse family, loaded by the `parse` command alone: it lives on the package's
+ * `./parse` entry (`parse.js`, a file both packages ship), whose static graph holds the
+ * tape decoder, so a `format` or `strip` run never loads parse code. `PARSERS` are the
+ * wire-string parsers; `OBJECT_PARSERS`, for `parse --locations`, the object parsers,
+ * whose `{locations: true}` reconstructs `loc` over the span-only tree (the facade's
+ * sugar), which is then stringified.
+ */
+async function load_parsers() {
+	const parse = await import('./parse.js');
+	return {
+		PARSERS: {
+			svelte: parse.parse_svelte_json,
+			typescript: parse.parse_typescript_json,
+			css: parse.parse_css_json
+		},
+		OBJECT_PARSERS: {
+			svelte: parse.parse_svelte,
+			typescript: parse.parse_typescript,
+			css: parse.parse_css
+		}
+	};
+}
 
 /**
  * How many in-scope files it takes before worker threads are worth their
@@ -191,7 +201,7 @@ const MAX_WORKERS_PER_LOGICAL_CPU = 4;
 const WORKER_STACK_SIZE_MB = 32;
 
 /** Valid `--parser` values (shared by `format` and `parse` — `FORMATTERS` and
- * `PARSERS` are keyed by the same names). */
+ * `load_parsers`' tables are keyed by the same names). */
 const PARSER_NAMES = new Set(['svelte', 'typescript', 'css']);
 
 /** The extensions `tsv strip` takes — the native `tsv_discover::STRIPPABLE_EXTENSIONS`,
@@ -444,7 +454,7 @@ async function main() {
 			await run_format(subcommand);
 			break;
 		case 'parse':
-			run_parse(subcommand);
+			run_parse(subcommand, await load_parsers());
 			break;
 		case 'strip':
 			run_strip(subcommand);
@@ -1487,7 +1497,7 @@ function run_format_worker() {
 	}
 }
 
-function run_parse({ values, positionals }) {
+function run_parse({ values, positionals }, { PARSERS, OBJECT_PARSERS }) {
 	const flag_parser = values.parser;
 	// --source-type is validated upfront (exit 2) like the native CLI; it only
 	// affects the TypeScript parser (svelte is always a module, css has no goal).

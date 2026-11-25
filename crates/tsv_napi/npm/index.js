@@ -2,18 +2,26 @@
  * `@fuzdev/tsv` — native N-API bindings for tsv (Node.js / Bun).
  *
  * A thin loader over the per-platform prebuilt addons (`@fuzdev/tsv-<triple>`, installed as
- * optionalDependencies — the package manager selects by their `os`/`cpu`/`libc` fields; this file
- * only resolves the matching name). The formatter, parser, type-strip and import-records API is
- * `@fuzdev/tsv-wasm`'s — the same hand-written facade (`api.js` / `api_parse.js` / `api_strip.js` /
- * `api_imports.js`, staged in from the wasm crate), so the same names, `(source, options?)` bags,
- * and error strings — and the two are drop-in swaps: this one is the fast native path, that one the
- * universal fallback (browsers + unsupported platforms). What is absent here is only what a WASM
- * engine needs and this one doesn't: `init()` and `init_sync()` (nothing to initialize),
- * `wasm_module` (no compiled module to hand a worker), `reinstantiate()` (no instance to poison — a
- * native stack overflow is a process-fatal SIGSEGV, not a recoverable trap), and, one level down,
- * `IgnoreStack`'s `free()` and its `[Symbol.dispose]` alias, which a GC-managed native object has
- * no handle to need. That list is the whole delta — `scripts/test_napi_npm.ts` compares the two
- * export sets rather than trusting this sentence.
+ * optionalDependencies — the package manager selects by their `os`/`cpu`/`libc` fields;
+ * `addon.js` only resolves the matching name). The formatter, parser, type-strip and
+ * import-records API is `@fuzdev/tsv-wasm`'s — the same hand-written facade (`api.js` /
+ * `api_parse.js` / `api_strip.js` / `api_imports.js`, staged in from the wasm crate), so the same
+ * names, `(source, options?)` bags, and error strings — and the two are drop-in swaps: this one is
+ * the fast native path, that one the universal fallback (browsers + unsupported platforms).
+ *
+ * Two entries, as in `@fuzdev/tsv-wasm`: this root carries format, the type strip, the import
+ * records and `IgnoreStack`; the parse family — `parse_<lang>`, `parse_<lang>_json`, the
+ * `locations.js` helpers and the AST types — is the `./parse` entry's (`parse.js`), whose
+ * static graph holds the tape decoder, so a process that never parses never loads either.
+ * Both import the addon from `addon.js`, so it loads once.
+ *
+ * What is absent here is only what a WASM engine needs and this one doesn't: `init()` and
+ * `init_sync()` (nothing to initialize), `wasm_module` (no compiled module to hand a worker),
+ * `reinstantiate()` (no instance to poison — a native stack overflow is a process-fatal SIGSEGV,
+ * not a recoverable trap), and, one level down, `IgnoreStack`'s `free()` and its
+ * `[Symbol.dispose]` alias, which a GC-managed native object has no handle to need. That list is
+ * the whole delta — `scripts/test_napi_npm.ts` compares the two export sets, entry by entry,
+ * rather than trusting this sentence.
  *
  * `npm/cli.js` reads that absence three ways: as the signal to load this
  * loader in its workers rather than the wasm `./worker` entry, as the signal
@@ -32,72 +40,24 @@
  * panic in every export); stack overflow is the one crash that still aborts the host.
  */
 
-import { createRequire } from 'node:module';
-
 // The shared facade — staged beside this file by `scripts/build_napi_packages.ts` from
-// `crates/tsv_wasm/npm/`, so these four resolve in the package, not in the source tree.
+// `crates/tsv_wasm/npm/`, so these resolve in the package, not in the source tree.
+import { addon } from './addon.js';
 import { create_format_api } from './api.js';
 import { create_imports_api } from './api_imports.js';
-import { create_parse_api } from './api_parse.js';
 import { create_strip_api } from './api_strip.js';
-import { platform_triple } from './platform.js';
 
-const require = createRequire(import.meta.url);
-
-/** The platform packages that exist — what the load error reports. Keep in
- * sync with `scripts/build_napi_packages.ts`'s `SUPPORTED_TRIPLES`
- * (`scripts/test_napi_npm.ts` gates the agreement via the generated
- * optionalDependencies). */
-const SUPPORTED = [
-	'linux-x64-gnu',
-	'linux-arm64-gnu',
-	'linux-x64-musl',
-	'darwin-arm64',
-	'darwin-x64',
-	'win32-x64'
-];
-
-const triple = platform_triple();
-let addon;
-try {
-	addon = require(`@fuzdev/tsv-${triple}`);
-} catch (cause) {
-	// Two different failures share this catch: a platform with no prebuilt
-	// package, and a supported platform whose package did not install (a
-	// lockfile resolved on another OS, `--omit=optional`, npm's optional-dep
-	// bugs). Only the second has a remedy short of switching engines, so name it.
-	const remedy = SUPPORTED.includes(triple)
-		? `This platform is prebuilt, so the package should have installed with @fuzdev/tsv — ` +
-			`run \`npm i @fuzdev/tsv-${triple}\`, or delete node_modules and the lockfile and ` +
-			`reinstall (a lockfile from another platform, or --omit=optional, drops it); ` +
-			`@fuzdev/tsv-wasm (universal WASM, same API) needs no native package. `
-		: `Prebuilt platforms: ${SUPPORTED.join(', ')}. ` +
-			`On an unsupported platform use @fuzdev/tsv-wasm (universal WASM, same API). `;
-	throw new Error(
-		`@fuzdev/tsv: failed to load the native binding for ${triple} ` +
-			`(@fuzdev/tsv-${triple}). ${remedy}Cause: ${cause?.message ?? cause}`,
-		{ cause }
-	);
-}
-
-// The published surface: the shared facade (`api.js` + `api_parse.js` + `api_strip.js` +
-// `api_imports.js`, staged from `crates/tsv_wasm/npm/` — one options reader, one set of error
-// texts, the `{locations: true}` sugar) over the addon's flat exports. The addon emits the
-// span-only wire as a JSON string; the facade `JSON.parse`s it.
-const engine_languages = ['svelte', 'typescript', 'css'];
+// The published surface: the shared facade (`api.js` + `api_strip.js` + `api_imports.js`,
+// staged from `crates/tsv_wasm/npm/` — one options reader, one set of error texts) over the
+// addon's flat exports. The parse family is the `./parse` entry's (`parse.js`), so a
+// process that never parses never loads it or the tape decoder.
 const from_addon = (name) =>
 	Object.fromEntries(
-		engine_languages.map((language) => [language, addon[name.replace('<lang>', language)]])
+		['svelte', 'typescript', 'css'].map((language) => [
+			language,
+			addon[name.replace('<lang>', language)]
+		])
 	);
-
-export const {
-	parse_svelte,
-	parse_svelte_json,
-	parse_typescript,
-	parse_typescript_json,
-	parse_css,
-	parse_css_json
-} = create_parse_api({ parse_json: from_addon('parse_<lang>_json') });
 
 export const { format_svelte, format_typescript, format_css } = create_format_api(
 	from_addon('format_<lang>')
@@ -117,7 +77,3 @@ export const { parse_imports_typescript, parse_imports_svelte } = create_imports
 // as `@fuzdev/tsv-wasm`'s, including `undefined` (not `null`) from the three
 // maybe-a-warning methods, so `cli.js` drives either package's copy unchanged.
 export const IgnoreStack = addon.IgnoreStack;
-
-// The reconstruction helpers — pure JS over the span-only wire, no addon — staged
-// beside this file from `crates/tsv_wasm/npm/`, the wasm packages' copy verbatim.
-export * from './locations.js';

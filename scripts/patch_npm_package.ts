@@ -2,7 +2,8 @@
  * Patches a wasm-pack `--target web` build into the published npm package shape.
  *
  * Creates:
- * - index.js — Node.js/Bun entry: auto-init via readFileSync + initSync (zero config)
+ * - index.js — Node.js/Bun entry: auto-init via readFileSync + initSync (zero config) — in the
+ *   parse-capable variants through `node_init.js`, which the `./parse` entry imports too
  * - browser.js — Browser/default entry: async `init()` with not-initialized
  *   guards — one around each engine function the facade calls, and a guarded
  *   SUBCLASS per class export, since a constructor cannot take a per-call guard
@@ -11,6 +12,13 @@
  *   consumer reaches for (the same module instance, so the same singleton)
  * - index.d.ts / browser.d.ts — type declarations, one per entry (the Node
  *   entry has one export the lazy entries don't: `wasm_module`)
+ * - in the parse-capable variants, the `./parse` subpath — the parse family, its
+ *   `parse_<lang>` decoding the engine's tape (`tape_engine.js`): `parse.js` (Node and Bun,
+ *   initialized at import by `node_init.js`), `parse_browser.js` (the rest, behind the
+ *   not-initialized guard of `lazy.js`, which holds the flag, `init` and `init_sync`
+ *   `browser.js` re-exports), and `parse.d.ts`. The umbrella's root carries no parse code;
+ *   the parse-only root re-exports the `./parse` entry whole. The format-only variant keeps
+ *   its one-file entries.
  *
  * Also patches the generated glue itself (`tsv_wasm.js`): appends the
  * `reinstantiate` trap-recovery hook — only the glue can reach its module-level
@@ -47,10 +55,10 @@
  * format family; `facade_error.d.ts`, the `TsvError` shape and the `TsvParseError` every
  * family's results carry); the format-capable variants (`format`, `all`) the format
  * declarations (`facade_format.d.ts`); the parse-capable ones (`parse`, `all`) its
- * parse half — `api_parse.js` + `facade_parse.d.ts`, the AST types they name (`tsv_ast.d.ts`),
- * and the pure-JS reconstruction helper (`locations.js` + `.d.ts`), whose functions it
- * re-exports from index.js/browser.js and both `.d.ts` and exposes as the `./locations`
- * subpath. The file table, that subpath's entry and the type names are
+ * parse half — `api_parse.js` + `facade_parse.d.ts`, the tape route (`tape_engine.js` + the
+ * generated `tape_decode.js`), the AST types they name (`tsv_ast.d.ts`), and the pure-JS
+ * reconstruction helper (`locations.js` + `.d.ts`), whose functions it re-exports from the
+ * `./parse` entries and `parse.d.ts` and exposes as the `./locations` subpath. The file table, that subpath's entry and the type names are
  * `scripts/npm_facade.ts`'s, shared with the napi staging. The format-only package loads
  * neither `api_parse.js` nor the helper.
  *
@@ -125,6 +133,15 @@ const browser_dts = 'browser.d.ts';
 const api_file = 'api.js';
 const format_dts = 'facade_format.d.ts';
 const api_parse_file = 'api_parse.js';
+// the parse family's tape route (`tape_engine.js`, over the generated `tape_decode.js`)
+const tape_engine_file = 'tape_engine.js';
+// the parse-capable variants' `./parse` entry (`parse.js` for Node and Bun, `parse_browser.js`
+// elsewhere, one `parse.d.ts`) and the internal modules each condition's two entries share
+const parse_file = 'parse.js';
+const parse_browser_file = 'parse_browser.js';
+const parse_dts_file = 'parse.d.ts';
+const node_init_file = 'node_init.js';
+const lazy_file = 'lazy.js';
 const parse_dts = 'facade_parse.d.ts';
 // the strip and imports halves, in the `all` variant alone
 const api_strip_file = 'api_strip.js';
@@ -196,13 +213,12 @@ export async function run_patch_npm_package(
 	const stage_deps = stage_file_between(deps.checkout, pkg);
 
 	// The pure-JS line/column reconstruction helper (`npm/locations.js` + hand-written
-	// `locations.d.ts`), which `api_parse.js` runs for `{locations: true}` and every
-	// parse-capable entry also re-exports. Rides the parse-capable packages only — the
-	// format-only package has no use for it. Needs no WASM init (pure computation over
-	// an already-parsed AST). A whole-module re-export (no init guard), shared by
-	// index.js + browser.js and both `.d.ts` (where `export *` carries the helper's
-	// functions AND its types), so a new helper export reaches every entry, and
-	// `@fuzdev/tsv`'s, with no list to keep.
+	// `locations.d.ts`), which `api_parse.js` runs for `{locations: true}` and the `./parse`
+	// entries also re-export. Rides the parse-capable packages only — the format-only package
+	// has no use for it. Needs no WASM init (pure computation over an already-parsed AST). A
+	// whole-module re-export (no init guard), shared by parse.js + parse_browser.js and
+	// parse.d.ts (where `export *` carries the helper's functions AND its types), so a new
+	// helper export reaches every entry, and `@fuzdev/tsv`'s, with no list to keep.
 	const locations_reexport = has_parse_exports ? `export * from './locations.js';\n` : '';
 
 	// 1. Extract the public function exports from the generated JS.
@@ -561,12 +577,17 @@ export function reinstantiate() {
 		fns.map((name) => pattern.exec(name)?.[1]).filter((l): l is string => l !== undefined);
 	const format_languages = languages_of(/^format_(\w+)$/);
 	const parse_languages = languages_of(/^parse_(\w+)_json$/);
+	// the raw tape exports the `./parse` entries decode through — engine-only, so read off the
+	// generated JS apart from the published names
+	const tape_fns = [...generated_js.matchAll(/^export function (parse_tape_\w+)/gm)].map(
+		(m) => m[1]!
+	);
 	for (const language of parse_languages) {
-		if (!fns.includes(`parse_${language}`)) {
-			print_error(
-				`FAIL: generated ${main_js} has \`parse_${language}_json\` but no \`parse_${language}\``
-			);
-			return 1;
+		for (const raw of [`parse_${language}`, `parse_tape_${language}`]) {
+			if (!fns.includes(raw) && !tape_fns.includes(raw)) {
+				print_error(`FAIL: generated ${main_js} has \`parse_${language}_json\` but no \`${raw}\``);
+				return 1;
+			}
 		}
 	}
 	/** The names the facade publishes per family — the raw names, which it keeps. */
@@ -632,7 +653,6 @@ export function reinstantiate() {
 	// format functions, though its `api_parse.js` still imports `api.js`'s shared helpers
 	const facade_imports =
 		(format_fns.length ? `import { create_format_api } from './${api_file}';\n` : '') +
-		(has_parse_exports ? `import { create_parse_api } from './${api_parse_file}';\n` : '') +
 		(strip_fns.length ? `import { create_strip_api } from './${api_strip_file}';\n` : '') +
 		(imports_fns.length ? `import { create_imports_api } from './${api_imports_file}';\n` : '');
 	const facade_exports = (wrap: (raw: string) => string): string =>
@@ -640,11 +660,6 @@ export function reinstantiate() {
 			? `export const { ${format_fns.join(', ')} } = create_format_api({\n` +
 				format_languages.map((l) => `\t${l}: ${wrap(`_format_${l}`)}`).join(',\n') +
 				`\n});\n`
-			: '') +
-		(parse_fns.length
-			? `export const { ${parse_fns.join(', ')} } = create_parse_api({\n` +
-				`\tparse: ${engine_table(parse_languages, (l) => wrap(`_parse_${l}`))},\n` +
-				`\tparse_json: ${engine_table(parse_languages, (l) => wrap(`_parse_${l}_json`))}\n});\n`
 			: '') +
 		(strip_fns.length
 			? `export const { ${strip_fns.join(', ')} } = create_strip_api(` +
@@ -654,6 +669,83 @@ export function reinstantiate() {
 			? `export const { ${imports_fns.join(', ')} } = create_imports_api(` +
 				`${engine_table(imports_languages, (l) => wrap(`_parse_imports_${l}`))});\n`
 			: '');
+
+	// 2'. The parse-capable variants split the parse family onto its own `./parse` entry,
+	// whose static graph holds the tape decoder (`tape_engine.js` → `tape_decode.js`), so a
+	// root import that never parses never loads it. The root keeps format, the strip, the
+	// import records and the classes (`@fuzdev/tsv-wasm`), or re-exports the `./parse` entry
+	// whole (`@fuzdev/tsv-parse-wasm`, whose purpose is to parse — `./parse` is then an alias
+	// a consumer can swap package names under). Two internal modules carry what the entries
+	// of one condition share, so a process importing both initializes one instance:
+	// `node_init.js` compiles and initializes at import (the root and `parse.js` import it),
+	// and `lazy.js` holds the browser entries' ready flag, `init` and `init_sync` (the root and
+	// `parse_browser.js` import it). The format-only variant keeps the one-file entries below,
+	// unchanged.
+	const root_fns = fns.filter((name) => !parse_fns.includes(name));
+	const parse_reexport = variant === 'parse' ? `export * from './parse.js';\n` : '';
+	const parse_browser_reexport = variant === 'parse' ? `export * from './parse_browser.js';\n` : '';
+	const parse_raw = [
+		...parse_languages.map((l) => `parse_tape_${l}`),
+		...parse_languages.map((l) => `parse_${l}_json`)
+	];
+	const parse_facade = (wrap: (raw: string) => string): string =>
+		`export const { ${parse_fns.join(', ')} } = create_parse_api({\n` +
+		`\tparse: create_tape_parse(${engine_table(parse_languages, (l) => wrap(`_parse_tape_${l}`))}),\n` +
+		`\tparse_json: ${engine_table(parse_languages, (l) => wrap(`_parse_${l}_json`))}\n});\n`;
+	const parse_imports =
+		`import {\n${parse_raw.map((f) => `\t${f} as _${f},`).join('\n')}\n} from './${main_js}';\n` +
+		`import { create_parse_api } from './${api_parse_file}';\n` +
+		`import { create_tape_parse } from './${tape_engine_file}';\n`;
+	const split_index_js = `import {
+	reinstantiate${[...root_fns.map((f) => `,\n\t${f} as _${f}`), ...classes.map((c) => `,\n\t${c}`)].join('')}
+} from './${main_js}';
+${facade_imports}
+// the compiled module and the lifecycle pair, initialized at import by \`${node_init_file}\` — the
+// module the \`./parse\` entry imports too, so the two share one instance
+export { init, init_sync, wasm_module } from './${node_init_file}';
+${
+	root_fns.length
+		? `\n// the published functions: the shared facade over the raw flat exports\n${facade_exports((raw) => raw)}`
+		: ''
+}
+export { reinstantiate${classes.map((c) => `, ${c}`).join('')} };
+${parse_reexport}`;
+	const node_init_js = `import { readFileSync } from 'node:fs';
+import { default as _init, initSync } from './${main_js}';
+
+/** The compiled WASM module backing this package's exports. Pass it to a worker
+ * (\`workerData\`/\`postMessage\`) and initialize there via \`${pkg_name}/worker\`'s
+ * \`init_sync({module})\` — no worker recompiles, and compiled code is shared. */
+export const wasm_module = new WebAssembly.Module(
+	readFileSync(new URL('./${wasm_file}', import.meta.url))
+);
+initSync({ module: wasm_module });
+
+// The lifecycle pair the lazy entries export too — already initialized above, so both
+// are no-ops here. Declared rather than re-exported under an alias, so each carries its
+// export name (the glue's own are \`__wbg_init\` and \`initSync\`).
+/** Initialize the WASM module — done at import on this entry, so a no-op. */
+export async function init(...args) {
+	await _init(...args);
+}
+/** Synchronously initialize the WASM module — done at import on this entry, so a no-op. */
+export function init_sync(...args) {
+	initSync(...args);
+}
+`;
+	const parse_js = `// The \`${pkg_name}/parse\` entry under Node and Bun: the parse family, \`parse_<lang>\` decoding
+// the engine's tape. Importing it compiles and initializes the module (\`${node_init_file}\`,
+// the instance the root entry shares).
+import './${node_init_file}';
+${parse_imports}
+${parse_facade((raw) => raw)}${locations_reexport}`;
+	const parse_browser_js = `// The \`${pkg_name}/parse\` entry everywhere but Node and Bun: the parse family behind the
+// not-initialized guard the root's \`init()\` lifts (\`${lazy_file}\`, the flag both share).
+${parse_imports}import { _guarded } from './${lazy_file}';
+
+${parse_facade((raw) => `_guarded(${raw})`)}${locations_reexport}`;
+	/** The modules the split adds beside the two root entries. */
+	const split_modules: Array<[string, string]> = [];
 
 	// 2. Create index.js — Node.js/Bun entry: auto-init via readFileSync + initSync.
 	// WASM is initialized synchronously at import time, so no init guard needed.
@@ -697,18 +789,18 @@ ${facade_exports((raw) => raw)}
 export { reinstantiate, wasm_module${classes.map((c) => `, ${c}`).join('')} };
 ${locations_reexport}`;
 
-	await pkg.write('index.js', index_js);
+	await pkg.write('index.js', has_parse_exports ? split_index_js : index_js);
 	print(`Created ${pkg_root}/index.js`);
 
-	/** The `init` doc's lines, shared by browser.js and both `.d.ts`: what it is required for
-	 * (an engine call), and what needs no init — the facade's argument checks always, and the
-	 * pure-JS reconstruction helper where the variant ships it. */
+	/** The `init` doc's lines, shared by the lazy init and both `.d.ts`: what it is required for
+	 * (an engine call, the `./parse` entry's too), and what needs no init — the facade's argument
+	 * checks always, and the pure-JS reconstruction helper where the variant ships it. */
 	const init_doc_lines = has_parse_exports
 		? [
-				'Initialize the WASM module. Required in browsers before any engine call; the pure-JS',
-				'reconstruction helper (`create_locator`, `reconstruct_locations`) and the option and',
-				'source checks need none. No-op if already initialized; overlapping calls share one',
-				'initialization.'
+				'Initialize the WASM module. Required in browsers before any engine call, the `./parse`',
+				"entry's included (it shares this initialization); the pure-JS reconstruction helper and",
+				'the option and source checks need none. No-op if already initialized; overlapping calls',
+				'share one initialization.'
 			]
 		: [
 				'Initialize the WASM module. Required in browsers before any engine call; the option',
@@ -798,8 +890,101 @@ ${classes
 	)}${classes.length ? '\n\n' : ''}// the published functions: the shared facade over the guarded raw exports
 ${facade_exports((raw) => `_guarded(${raw})`)}`;
 
-	await pkg.write('browser.js', browser_js);
+	// The split variants' browser pair: the ready flag, `init` and `init_sync` in `lazy.js`, which
+	// `browser.js` re-exports and `parse_browser.js` guards with — one flag, so one `init()` serves
+	// both entries.
+	const lazy_js = `import { default as _init, initSync } from './${main_js}';
+
+let _ready = false;
+/** The in-flight async init, shared by every overlapping \`init()\` so they compile and
+ * instantiate once; cleared on failure so a later call can retry. */
+let _init_p;
+
+/** Throws until the module is initialized. */
+export function _check() {
+	if (!_ready) throw new Error('${pkg_name}: WASM not initialized. Call \\\`await init()\\\` first.');
+}
+
+/** One engine function behind the not-initialized guard. The facade validates the
+ * options bag before it calls in here, so a bad bag reports itself even before
+ * \`init()\`; a well-formed call before it gets this guard's message. */
+export const _guarded =
+	(f) =>
+	(...args) => {
+		_check();
+		return f(...args);
+	};
+
+${init_doc}
+export async function init(...args) {
+	if (_ready) return;
+	await (_init_p ??= _init(...args).then(
+		() => {
+			_ready = true;
+		},
+		(error) => {
+			_init_p = undefined;
+			// an init_sync() that landed while this one was pending already initialized
+			if (_ready) return;
+			throw error;
+		}
+	));
+}
+
+/** Synchronously initialize the WASM module. Works in Workers (not Chrome main thread for >4KB WASM). */
+export function init_sync(...args) {
+	if (_ready) return;
+	initSync(...args);
+	_ready = true;
+}
+`;
+	const split_root_imports = [...root_fns, ...classes].map((f) => `\t${f} as _${f},`).join('\n');
+	const split_browser_js = `${
+		split_root_imports ? `import {\n${split_root_imports}\n} from './${main_js}';\n` : ''
+	}${facade_imports}${
+		classes.length || root_fns.length
+			? `import { ${[...(classes.length ? ['_check'] : []), ...(root_fns.length ? ['_guarded'] : [])].join(', ')} } from './${lazy_file}';\n`
+			: ''
+	}
+// the trap-recovery hook re-exports as-is — it guards itself (throws until initialized)
+export { reinstantiate } from './${main_js}';
+// the lifecycle pair, whose ready flag the \`./parse\` entry's guard reads too
+export { init, init_sync } from './${lazy_file}';
+
+${classes
+	.map(
+		(c) =>
+			`export class ${c} extends _${c} {
+	constructor(...args) {
+		_check();
+		super(...args);
+	}
+}`
+	)
+	.join('\n\n')}${classes.length ? '\n\n' : ''}${
+		root_fns.length
+			? `// the published functions: the shared facade over the guarded raw exports\n${facade_exports((raw) => `_guarded(${raw})`)}`
+			: ''
+	}${parse_browser_reexport}`;
+	split_modules.push(
+		[node_init_file, node_init_js],
+		[lazy_file, lazy_js],
+		[parse_file, parse_js],
+		[parse_browser_file, parse_browser_js]
+	);
+
+	await pkg.write('browser.js', has_parse_exports ? split_browser_js : browser_js);
 	print(`Created ${pkg_root}/browser.js`);
+
+	// 3a. The parse-capable variants' other modules: the `./parse` entry's two conditions
+	// (`parse.js` for Node and Bun, `parse_browser.js` for the rest), and the internal init
+	// modules each pair of entries shares.
+	if (has_parse_exports) {
+		for (const [file, text] of split_modules) {
+			await pkg.write(file, text);
+			print(`Created ${pkg_root}/${file}`);
+		}
+	}
 
 	// 3b. Create worker.js — the `./worker` subpath, a re-export of browser.js.
 	// `export *` keeps it the SAME module instance, so `init_sync` here initializes
@@ -837,18 +1022,23 @@ export * from './browser.js';
 		print(`Patched ${pkg_root}/${dts_file}: esnext.disposable lib reference`);
 	}
 
-	const ast_reexport = has_parse_exports ? `export type * from './tsv_ast.js';\n` : '';
 	const named_reexport = (names: Array<string>, from: string, type_only: boolean): string =>
 		names.length
 			? `export ${type_only ? 'type ' : ''}{ ${names.join(', ')} } from './${from}';\n`
 			: '';
+	// the `./parse` entry's declarations: the parse family, its AST, option and result types,
+	// the reconstruction helper, and the error types a failed result carries — on that entry
+	// alone (the `@fuzdev/tsv-parse-wasm` root re-exports it whole)
+	const parse_entry_dts = `export type * from './tsv_ast.js';\n${locations_reexport}${named_reexport(api_parse_types, dts_specifier(parse_dts), true)}${named_reexport(error_types, dts_specifier('facade_error.d.ts'), true)}${named_reexport(parse_fns, dts_specifier(parse_dts), false)}`;
+	// `@fuzdev/tsv-parse-wasm`'s root carries the `./parse` entry whole, types included
+	const parse_entry_reexport = variant === 'parse' ? `export * from './${parse_file}';\n` : '';
 	// Everything all three entries share. `wasm_module` is deliberately NOT here:
 	// only `index.js` compiles at import and exports it, so declaring it for the
 	// browser and `./worker` entries would name an export that does not exist —
 	// under a bundler that is a build error TypeScript said was fine, which is a
 	// worse failure than a nullable type. Hence one `.d.ts` per entry, and the
 	// per-condition `types` in `exports` that lets each be reached.
-	const shared_dts = `${ast_reexport}${locations_reexport}${named_reexport(api_parse_types, dts_specifier(parse_dts), true)}${named_reexport(api_types, dts_specifier(format_dts), true)}${named_reexport(api_strip_types, dts_specifier(strip_dts), true)}${named_reexport(api_imports_types, dts_specifier(imports_dts), true)}${named_reexport(error_types, dts_specifier('facade_error.d.ts'), true)}${named_reexport(parse_fns, dts_specifier(parse_dts), false)}${named_reexport(format_fns, dts_specifier(format_dts), false)}${named_reexport(strip_fns, dts_specifier(strip_dts), false)}${named_reexport(imports_fns, dts_specifier(imports_dts), false)}${
+	const shared_dts = `${parse_entry_reexport}${named_reexport(api_types, dts_specifier(format_dts), true)}${named_reexport(api_strip_types, dts_specifier(strip_dts), true)}${named_reexport(api_imports_types, dts_specifier(imports_dts), true)}${named_reexport(error_types, dts_specifier('facade_error.d.ts'), true)}${named_reexport(format_fns, dts_specifier(format_dts), false)}${named_reexport(strip_fns, dts_specifier(strip_dts), false)}${named_reexport(imports_fns, dts_specifier(imports_dts), false)}${
 		classes.length ? `export { ${classes.join(', ')} } from '${dts_module}';\n` : ''
 	}${init_doc}
 export declare function init(module_or_path?: {
@@ -894,6 +1084,13 @@ export declare const wasm_module: WebAssembly.Module;
 	// it), so one declaration file serves both.
 	await pkg.write(browser_dts, shared_dts);
 	print(`Created ${pkg_root}/${browser_dts}`);
+
+	if (has_parse_exports) {
+		// one declaration file for both of the `./parse` entry's conditions: neither exports
+		// anything the other lacks
+		await pkg.write(parse_dts_file, parse_entry_dts);
+		print(`Created ${pkg_root}/${parse_dts_file}`);
+	}
 
 	// 5. Copy the variant README, the repo LICENSE and the third-party NOTICE into the package
 	// root.
@@ -965,6 +1162,16 @@ export declare const wasm_module: WebAssembly.Module;
 			types: `./${browser_dts}`,
 			default: `./${worker_file}`
 		},
+		// the parse family, on its own entry so a root import never loads the tape decoder:
+		// the Node and Bun condition initializes at import, the rest takes the root's `init()`
+		...(has_parse_exports
+			? {
+					'./parse': {
+						node: { types: `./${parse_dts_file}`, default: `./${parse_file}` },
+						default: { types: `./${parse_dts_file}`, default: `./${parse_browser_file}` }
+					}
+				}
+			: {}),
 		// the reconstruction helper alone (a consumer holding a tree — from disk, another
 		// process, a `_json` export — reaches it without loading the engine); parse-capable
 		// variants only, like the helper itself
@@ -983,6 +1190,9 @@ export declare const wasm_module: WebAssembly.Module;
 		'browser.js',
 		browser_dts,
 		worker_file,
+		...(has_parse_exports
+			? [parse_file, parse_browser_file, parse_dts_file, node_init_file, lazy_file]
+			: []),
 		main_js,
 		dts_file,
 		wasm_file,
@@ -1011,7 +1221,8 @@ export declare const wasm_module: WebAssembly.Module;
 	// side-effect-free — but its top-level readFileSync + initSync IS the side
 	// effect. Without this, a tree-shaking bundler on the `node` condition may
 	// bypass the re-export facade and skip initialization entirely.
-	manifest.sideEffects = ['./index.js'];
+	// The split variants initialize in `node_init.js`, which both Node entries import.
+	manifest.sideEffects = has_parse_exports ? ['./index.js', `./${node_init_file}`] : ['./index.js'];
 
 	// wasm-pack's web-target fields point at the raw glue; `exports` supersedes them,
 	// so replace them with the Node facade for pre-`exports` resolvers (an old

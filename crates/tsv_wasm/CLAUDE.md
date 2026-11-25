@@ -25,9 +25,9 @@ the format family) and `npm/api_parse.js` (the parse family), staged verbatim in
 package by `scripts/patch_npm_package.ts` — and into the native `@fuzdev/tsv` by
 `scripts/build_napi_packages.ts`, so the two package sets share **one** options reader and
 one set of error texts by construction rather than by a parity test. Each package entry
-(`index.js`, `browser.js`, the napi loader) is a thin adapter: it hands
-`create_format_api` / `create_parse_api` its engine's functions and re-exports the result
-by name.
+(`index.js`, `browser.js`, `parse.js`, `parse_browser.js`, the napi loader's `index.js` and
+`parse.js`) is a thin adapter: it hands `create_format_api` / `create_parse_api` its engine's
+functions and re-exports the result by name.
 
 Every export takes `(source, options?)` with an acorn-style bag:
 `parse_<lang>(source, {locations?, sourceType?})`, `parse_<lang>_json(source,
@@ -112,7 +112,8 @@ source-type refusals, a source over the 4 GiB cap (a plain `Error`), a caught pa
 trap (`RuntimeError`) or stack exhaustion (`RangeError`). A format parses the CR-folded text
 through the language's `parse_folded` (`FoldedSource::parse_with`), which maps the error back
 onto the caller's source, so it reports the span a parse of that source would. Where the facade
-`JSON.parse`s an engine's wire itself (the native engine), a failure there is thrown as
+`JSON.parse`s an engine's wire itself (an engine table with no `parse` — the bench's hand-built
+ones; every published entry takes the tape route), a failure there is thrown as
 `Error('internal error: AST serialized to invalid JSON', {cause})` — the WASM engine's own text
 for that case — never returned as a parse failure.
 
@@ -172,11 +173,40 @@ conversion. `JsValue` is wasm-bindgen's own, so the format-only build still link
 `js-sys`. The raw `parse_<lang>` returns `{ok: true, ast}`, the object `js_sys::JSON::parse` made
 of the wire, so the bench's fairness probe reads the raw module directly.
 
+**The parse family is its own entry, `./parse`, and `parse_<lang>` takes the tape route.**
+In `@fuzdev/tsv-wasm` and the native `@fuzdev/tsv` the root carries format, the strip, the
+import records and `IgnoreStack`; `parse_<lang>`, `parse_<lang>_json`, the `locations.js`
+helpers and the AST, option and result types are the `./parse` entry's alone (no root
+re-export), since its static graph holds the tape decoder (`npm/tape_decode.js`, generated,
+[../../docs/tape_format.md](../../docs/tape_format.md)) — so a process that never parses never
+loads it, and no `require()` defers it. `parse_<lang>` is `create_parse_api`'s `engine.parse`
+built by `npm/tape_engine.js` (`create_tape_parse`) over the raw `parse_tape_<lang>`: on a
+`Uint32Array` it decodes the tape — its exact bytes the header's length, against the text the
+wire indexes (a Svelte or CSS source less its leading BOM) — into `{ok: true, ast}`, the tree
+`JSON.parse` makes of the `_json` wire, and passes any other value through for `read_failure`;
+a tape that does not decode throws `Error('internal error: the engine returned a tape that
+does not decode', {cause})`. `{locations: true}` is unchanged (`reconstruct_locations` over the
+decoded object); `parse_<lang>_json` keeps the JSON route. `create_parse_api` itself is
+unchanged: an engine table with no `parse` (the bench's hand-built tables) still `JSON.parse`s
+the string.
+
+The generated wasm entries (`scripts/patch_npm_package.ts`) for the parse-capable variants:
+`./parse` is `parse.js` under the `node` condition (it imports `node_init.js`, the
+compile-and-`initSync`-at-import module the root's `index.js` re-exports `wasm_module` / `init` /
+`init_sync` from, so both entries share one instance) and `parse_browser.js` elsewhere (its
+engine calls behind `lazy.js`'s guard — the ready flag, `init` and `init_sync` the root's
+`browser.js` re-exports, so one `init()` serves both); one `parse.d.ts` types both.
+`@fuzdev/tsv-parse-wasm`'s root re-exports its `./parse` entry whole (`export *`), so its root
+API is as before and `./parse` is an alias a consumer can swap package names under.
+`./worker` stays `browser.js`: in the umbrella it carries no parser, and a Node worker that
+imports `./parse` initializes from that entry (a second compile) rather than the handed module.
+
 **The format-only package loads no parse code.** `api.js` imports nothing;
 `api_parse.js` imports `api.js`'s reader and `locations.js`. `@fuzdev/tsv-format-wasm`
-ships `api.js` alone — neither `api_parse.js` nor `locations.js` is in its `files`, and its
-entries import neither (`scripts/test_npm.ts` asserts both). The parse-only package ships
-`api.js` too (`api_parse.js` imports its reader) but not the format declarations.
+ships `api.js` alone — neither `api_parse.js` nor `locations.js` (nor the tape route) is in
+its `files`, and its entries — the one-file layout, untouched by the split — import neither
+(`scripts/test_npm.ts` asserts both). The parse-only package ships `api.js` too
+(`api_parse.js` imports its reader) but not the format declarations.
 
 **Every published function is named for its export.** `create_format_api` /
 `create_parse_api` define each function under a computed key (`Object.assign(api,
@@ -193,11 +223,12 @@ the parse failure `TsvParseError` that extends it (its own file, so every packag
 whichever family's declarations it carries, each of which imports it); `FormatRefusedError` and
 `StripUnsupportedError` extend it too, adding only their `kind` (+ `construct`) and what their
 `end` covers. `TsvError` and `TsvParseError` are re-exported by name from every entry and
-from the napi `index.d.ts`. The published declarations are the facade's hand-written
+from the napi `index.d.ts` and `parse.d.ts`. The published declarations are the facade's hand-written
 `npm/facade_format.d.ts` (format and its `FormatResult` / `FormatRefusedError`; in the
 format-capable packages), `npm/facade_parse.d.ts` (parse, `ParseResult<T>` / `ParseJsonResult`),
 `npm/facade_strip.d.ts` and `npm/facade_imports.d.ts`, re-exported **by name** from
-each entry's `index.d.ts` / `browser.d.ts` (the napi `index.d.ts` the same way):
+each entry's `index.d.ts` / `browser.d.ts` — the parse half from `parse.d.ts`, the `./parse`
+entry's (the napi `index.d.ts` / `parse.d.ts` the same way):
 `parse_svelte(...): ParseResult<Root>`, `parse_typescript(...): ParseResult<Program>`,
 `parse_css(...): ParseResult<StyleSheetFile>`, `format_<lang>(...): FormatResult`. Each result
 narrows on `ok`, its error on `kind`.
@@ -479,8 +510,9 @@ tolerances (see [docs/conformance_svelte.md](../../docs/conformance_svelte.md)).
 It ships in `@fuzdev/tsv-parse-wasm`, `@fuzdev/tsv-wasm` and the native `@fuzdev/tsv` loader
 (`build_napi_packages.ts` stages it there) — every package but the format-only one.
 `patch_npm_package.ts` copies it + the hand-written `npm/locations.d.ts` into the
-package root and re-exports the functions from index.js/browser.js/index.d.ts (directly,
-with no init guard — it never touches WASM). Its agreement with the Rust writer is gated at
+package root and re-exports the functions from the `./parse` entries' parse.js /
+parse_browser.js / parse.d.ts (directly, with no init guard — it never touches WASM; the
+parse-only root re-exports that entry whole). Its agreement with the Rust writer is gated at
 two cadences: `npm run check:loc` (`scripts/check_loc.ts`) deep-equals the two over every
 fixture document in `npm run check`, and `corpus:compare:parse`'s loc arm requires it of
 every corpus file before grading tsv's `loc` against the canonical parser's. The package
@@ -496,7 +528,7 @@ cross-grade stays green. The outside reference is the canonical parsers' own `lo
 graded by `corpus:compare:parse` — exactly against acorn for TypeScript, against Svelte
 through its cataloged tolerance rows.
 
-**`.d.ts` export-name constraint.** `index.d.ts` re-exports both `tsv_ast.d.ts`
+**`.d.ts` export-name constraint.** `parse.d.ts` re-exports both `tsv_ast.d.ts`
 (`export type *`) and `locations.d.ts` (`export *`), so a name exported by BOTH is
 ambiguated away (TS2308) — silently dropping that name from the package. `tsv_ast`
 owns `Position` / `SourceLocation` / `NameLocation` / `NamePosition` (+ every AST
@@ -527,7 +559,7 @@ its option and error types are re-exported **by name** from `facade_format.d.ts`
 `facade_parse.d.ts` / `facade_strip.d.ts` / `facade_imports.d.ts` / `facade_error.d.ts`, an
 explicit form star-export ambiguation can't drop. The type names are read off those files (`scripts/npm_facade.ts`'s `facade_type_names`), so a type
 the facade declares reaches every wasm entry with no list to keep; the napi loader's
-hand-written `index.d.ts` is held to the same derived set by `scripts/test_napi_npm.ts`.
+hand-written `index.d.ts` and `parse.d.ts` are held to the same derived set by `scripts/test_napi_npm.ts`.
 
 A declaration can also need a **lib** the consumer did not ask for. wasm-bindgen declares
 each class's `[Symbol.dispose]()`, which only the `esnext.disposable` lib types, so a
@@ -826,8 +858,9 @@ exceed.
 - `types/tsv_ast_schema.json` — the AST schema table: every wire node type and named variant, its fields in wire order (§TS Type Maintenance)
 - `types/tsv_ast.d.ts` — TS types GENERATED from the table (`npm run ast-schema:update`), bundled into the parse-capable packages
 - `types/tsv_tape_shapes.json` — the tape's fast-shape list, GENERATED from the fixture wire (`npm run tape-shapes:update`)
-- `npm/tape_decode.js` — the tape decoder, GENERATED from the table and the shape list (`npm run ast-schema:update`; docs/tape_format.md); no package stages it yet
-- `npm/cli.js` — The `tsv` bin shipped in `@fuzdev/tsv-wasm` — mirrors `tsv_cli`'s contract (flags, exit codes, traversal); argv parsed by a transcription of argh's grammar, zero deps.
+- `npm/tape_decode.js` — the tape decoder, GENERATED from the table and the shape list (`npm run ast-schema:update`; docs/tape_format.md); staged into every parse-capable package beside `npm/tape_engine.js`
+- `npm/tape_engine.js` — the tape route's adapter (`create_tape_parse`): an engine's raw `parse_tape_<lang>` exports decoded into `create_parse_api`'s `engine.parse` table (§The npm Facade); part of `scripts/npm_facade.ts`'s parse half
+- `npm/cli.js` — The `tsv` bin shipped in `@fuzdev/tsv-wasm` — mirrors `tsv_cli`'s contract (flags, exit codes, traversal); argv parsed by a transcription of argh's grammar, zero deps. Its `parse` command alone loads the parse family, by `await import('./parse.js')` (`load_parsers`), a file both packages ship, so a `format` or `strip` run loads no parse code.
   - **Pool.** Path mode fans onto `node:worker_threads` behind `--jobs`, spawning **itself** as the worker (`isMainThread` splits the two roles) and claiming work off one `Atomics` cursor. `WORKER_FILE_THRESHOLD` gates the **default** only — a JS pool costs tens of milliseconds to bring up against the native pool's ~50 µs thread spawn. Only on the WASM engine does a width of 1 stay on the main thread: over N-API it is a pool of one worker (`resolve_route`), since a native stack overflow on the main thread is a `SIGSEGV` no catch survives and only a pool worker carries the reserved stack. An explicit `--jobs N` bypasses the threshold at any file count and is held to the native CLI's `4 × logical` ceiling (`clamp_worker_count`, restated by hand, over the same logical count — the affinity mask capped by the cgroup CPU quota, which `cgroup_cpu_quota` transcribes from Rust std because Node's and Bun's `availableParallelism()` leave it out), giving the threshold something to be calibrated against.
   - **Per-engine defaults.** The threshold and `default_jobs` are keyed off the same `wasm_module` export that decides how a worker binds: the crossover and the knee are properties of the engine, not the driver (see [../../docs/cli.md](../../docs/cli.md) §Binary Structure). On WASM the pool peaks at *half* the physical cores, because V8's multithreaded wasm tier-up has claimed the rest before the first worker exists; over the N-API addon, with no compiler thread to compete with, at the core count.
   - **Overflow.** A WASM trap is contained to its file on both roles (`format_one` calls `reinstantiate` on a `WebAssembly.RuntimeError` or a native-stack `RangeError`, see [§Panic Reporting](#panic-reporting)); the `RangeError` arm is feature-detected — the native engine exports no hook and its overflow is process-fatal. Every pool worker reserves the native CLI's `STACK_SIZE` (`WORKER_STACK_SIZE_MB`, gated against `tsv_lang`'s `stack.rs` by `scripts/test_npm.ts`), and the sequential route re-runs a file whose main-thread format hit that `RangeError` in a one-worker pool (`retry_overflowed_files`), so a deep file's verdict does not depend on which route the file count picked — on Node, whose workers honor the reservation (Bun and Deno ignore it; see [../../docs/cli.md §Recursion Depth](../../docs/cli.md#recursion-depth)).
@@ -837,7 +870,7 @@ exceed.
 - `npm/api.js` + `npm/facade_format.d.ts`, `npm/api_parse.js` + `npm/facade_parse.d.ts`, `npm/facade_error.d.ts` (the `TsvError` base shape and the `TsvParseError` every family's result carries) — The hand-written facade every package publishes through: the options reader, the failure readers and the format family, and the parse family with the `{locations: true}` sugar (see [The npm Facade](#the-npm-facade-options--typed-returns), which also says why the declarations are named apart from their modules). Staged verbatim by `patch_npm_package.ts` (`api_parse.js` + `facade_parse.d.ts` into the parse-capable packages only, `facade_format.d.ts` into the format-capable ones) and by `scripts/build_napi_packages.ts` into the native `@fuzdev/tsv` — one source for both package sets. `scripts/npm_facade.ts` owns what both staging scripts share: the facade file table (with `locations.*` and `types/tsv_ast.d.ts` in the parse half), the `./locations` exports entry, and the re-exported type names
 - `npm/api_strip.js` + `npm/facade_strip.d.ts` — The facade's strip half (`create_strip_api`, the result object; [The npm Facade](#the-npm-facade-options--typed-returns)), staged into `@fuzdev/tsv-wasm` and the native `@fuzdev/tsv` alone, as `scripts/npm_facade.ts`'s strip family
 - `npm/api_imports.js` + `npm/facade_imports.d.ts` — The facade's imports half (`create_imports_api`), staged into the same two packages, as `scripts/npm_facade.ts`'s imports family
-- `npm/locations.js` + `npm/locations.d.ts` — Pure-JS line/column reconstruction for the span-only wire; ships in the parse-capable packages, run by `api_parse.js` for `{locations: true}`, re-exported from index.js/browser.js by `patch_npm_package.ts`, and exported alone as the `./locations` subpath. Also copied into the native `@fuzdev/tsv` by `scripts/build_napi_packages.ts` — this file is the single source for both, which is what the napi loader being ESM bought (see [Line/Column Reconstruction Helper](#linecolumn-reconstruction-helper-npmlocationsjs))
+- `npm/locations.js` + `npm/locations.d.ts` — Pure-JS line/column reconstruction for the span-only wire; ships in the parse-capable packages, run by `api_parse.js` for `{locations: true}`, re-exported from the `./parse` entries (`parse.js` / `parse_browser.js`, and `parse.d.ts`) by `patch_npm_package.ts`, and exported alone as the `./locations` subpath. Also copied into the native `@fuzdev/tsv` by `scripts/build_napi_packages.ts` — this file is the single source for both, which is what the napi loader being ESM bought (see [Line/Column Reconstruction Helper](#linecolumn-reconstruction-helper-npmlocationsjs))
 - `README_format.md` — Shipped as `README.md` in `@fuzdev/tsv-format-wasm` (copied by `patch_npm_package.ts`)
 - `README_parse.md` — Shipped as `README.md` in `@fuzdev/tsv-parse-wasm` (copied by `patch_npm_package.ts`)
 - `README_all.md` — Shipped as `README.md` in `@fuzdev/tsv-wasm` (copied by `patch_npm_package.ts`). Each README's TypeScript and JavaScript blocks (```ts / ```typescript / ```js / ```javascript, the JavaScript under `checkJs`) compile against its package in `npm run typecheck:packages`, so every one must be a standalone module with its own imports; a block that only compiles under Node carries `<!-- typecheck: node -->` on the line above its fence

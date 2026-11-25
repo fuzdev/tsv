@@ -67,11 +67,17 @@ const ENTRIES: Array<[entry: string, reaches: string]> = [
 const COMPUTED_IMPORTS: Record<string, { count: number; why: string }> = {
 	'scripts/test_bun.ts': { count: 1, why: 'each staged package, by its file URL, under Bun' },
 	'scripts/test_napi_npm.ts': {
-		count: 8,
-		why: 'the staged `@fuzdev/tsv` loader, its platform module, and the staged wasm package, by their file URLs'
+		count: 11,
+		why: 'the staged `@fuzdev/tsv` loader (its root and `./parse` entries), its platform module, and the staged wasm package (its root and `./parse` entries), by their file URLs'
 	},
-	'scripts/pgo/addon_ops.ts': { count: 1, why: 'the staged `@fuzdev/tsv` loader, by its path' },
-	'scripts/pgo/addon_depth.ts': { count: 1, why: 'the staged `@fuzdev/tsv` loader, by its path' },
+	'scripts/pgo/addon_ops.ts': {
+		count: 2,
+		why: 'the staged `@fuzdev/tsv` loader, its root and `./parse` entries, by their paths'
+	},
+	'scripts/pgo/addon_depth.ts': {
+		count: 2,
+		why: 'the staged `@fuzdev/tsv` loader, its root and `./parse` entries, by their paths'
+	},
 	'benches/js/lib/wasm.ts': {
 		count: 1,
 		why: "the runtime's wasm-pack glue the bench build wrote, by its path under `crates/tsv_wasm/pkg/`"

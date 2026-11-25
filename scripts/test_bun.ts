@@ -7,7 +7,12 @@
  * N-API paths: its keys, their order, its span and `loc` are graded here and nowhere else
  * under Bun. The type strip's API table (`scripts/strip_suite.ts`) rides along over the two
  * packages that carry the strip, since its refusal is built the same way, and so does the
- * import-records table (`scripts/imports_suite.ts`), whose failures are the same object.
+ * import-records table (`scripts/imports_suite.ts`), whose failures are the same object. Every
+ * package that parses also runs the tape route (`register_tape_route_suite`): `parse_<lang>`
+ * decodes a tape handed over as a typed array — over the native addon a copy napi-rs makes into
+ * a buffer JavaScriptCore allocates, a path only a Bun run exercises — into the tree
+ * `JSON.parse` makes of the JSON wire. Where a root formats, its parse family is imported from
+ * the `./parse` entry beside it.
  *
  * Narrow by design. The package suites themselves run under `bun test` nearly whole, but
  * their CLI and resolution rows assert Node's own behavior; this registers the shared
@@ -35,7 +40,8 @@
  * Prerequisite: the named stagings — npm run build:npm:<variant>, build:napi:packages
  */
 
-import { after } from 'node:test';
+import { after, describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -64,6 +70,33 @@ const STRIP_PACKAGES: ReadonlySet<Package> = new Set(['all', 'napi']);
 
 /** The packages that carry the import records: the same two. */
 const IMPORTS_PACKAGES: ReadonlySet<Package> = new Set(['all', 'napi']);
+
+/** The packages whose root formats, so their parse family is the `./parse` entry's. */
+const PARSE_SUBPATH_PACKAGES: ReadonlySet<Package> = new Set(['all', 'napi']);
+
+/**
+ * The tape route under Bun: `parse_<lang>` decodes the engine's tape — over the native addon a
+ * typed array napi-rs copies into a buffer the engine owns, over WASM a view of the instance's
+ * memory — into the tree `JSON.parse` makes of `parse_<lang>_json`'s wire, key order included.
+ */
+function register_tape_route_suite(label: string, api: Record<string, any>): void {
+	describe(`tape route: ${label}`, () => {
+		it('parse_<lang> is the JSON wire, read back', () => {
+			for (const [language, source] of [
+				['typescript', '\ufeffconst é = `x${1}😀`; /* c */ let a = [1, 2.5, -0];'],
+				['svelte', '\ufeff<div title="é" {...a}>{b}😀</div><style>a { color: red }</style>'],
+				['css', '\ufeff@media (min-width: 1px) { a::before { content: "é" } }']
+			] as const) {
+				for (let i = 0; i < 3; i++) {
+					const tape = api[`parse_${language}`](source);
+					const json = api[`parse_${language}_json`](source);
+					assert.equal(tape.ok, true, language);
+					assert.equal(JSON.stringify(tape.ast), JSON.stringify(JSON.parse(json.json)), language);
+				}
+			}
+		});
+	});
+}
 
 /** The launcher flag that turns a missing `bun` from a warn-skip into a failure. */
 const REQUIRE_FLAG = '--require-bun';
@@ -161,13 +194,20 @@ async function register(packages: Array<string>): Promise<void> {
 			name = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')).name;
 			symlinkSync(dir, join(consumer, 'node_modules', name), 'junction');
 		}
-		// the bare specifier, resolved from inside the consumer as its own import would be
+		// the bare specifiers, resolved from inside the consumer as its own import would be: the
+		// root, and the `./parse` entry where the root formats (the parse-only root carries the
+		// family itself)
 		const entry = join(consumer, `${p}.mjs`);
-		writeFileSync(entry, `export * from ${JSON.stringify(name)};\n`);
+		writeFileSync(
+			entry,
+			`export * from ${JSON.stringify(name)};\n` +
+				(PARSE_SUBPATH_PACKAGES.has(p) ? `export * from ${JSON.stringify(`${name}/parse`)};\n` : '')
+		);
 		apis.push([name, await import(pathToFileURL(entry).href), p]);
 	}
 	for (const [name, api, p] of apis) {
 		register_parse_failure_suite(`${name} under Bun`, api);
+		if (p !== 'format') register_tape_route_suite(`${name} under Bun`, api);
 		// the strip's refusal is an engine-built object too, returned through the same path
 		if (STRIP_PACKAGES.has(p)) register_strip_api_suite(`${name} under Bun`, api);
 		if (IMPORTS_PACKAGES.has(p)) register_imports_api_suite(`${name} under Bun`, api);

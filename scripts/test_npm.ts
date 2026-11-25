@@ -106,6 +106,14 @@ const PKG_NAMES = {
 await assert_staged_fresh(wasm_package_checks(variant, pkg_dir));
 
 const node_entry = await import(`../${pkg_dir}/index.js`);
+/**
+ * The parse family's entry under Node: the `./parse` subpath's `parse.js`, which shares the
+ * root's instance (`node_init.js`). The format-only package has none, and its rows that read
+ * a parser skip there; `parse_entry` is then the root, which holds no parser either.
+ */
+const parse_entry = has_parse ? await import(`../${pkg_dir}/parse.js`) : node_entry;
+/** Every export of the package's Node entries, the root's and `./parse`'s, as one table. */
+const node_entries = { ...node_entry, ...parse_entry };
 
 /**
  * Repo root — `PKG_DIR` is repo-relative, and this file lives in `scripts/`.
@@ -266,8 +274,12 @@ describe(`package metadata: ${pkg_dir}`, () => {
 		);
 	});
 
-	it('index.js is marked side-effectful (auto-init survives tree-shaking)', () => {
-		assert.deepEqual(pkg.sideEffects, ['./index.js']);
+	it('the auto-init is marked side-effectful (it survives tree-shaking)', () => {
+		// the parse-capable variants initialize in `node_init.js`, which both Node entries import
+		assert.deepEqual(
+			pkg.sideEffects,
+			has_parse ? ['./index.js', './node_init.js'] : ['./index.js']
+		);
 	});
 
 	// The facade's parts: the shared one (`api.js` — the options reader + the format family —
@@ -369,6 +381,43 @@ describe(`package metadata: ${pkg_dir}`, () => {
 			default: './worker.js'
 		});
 		assert.ok(pkg.files.includes('worker.js'));
+	});
+
+	// The parse family is its own entry, whose static graph holds the tape decoder: the Node
+	// condition initializes at import (`node_init.js`, shared with the root), the rest takes the
+	// root's `init()` (`lazy.js`'s flag). One declaration file serves both.
+	it('exports the ./parse subpath where parsing ships', () => {
+		assert.deepEqual(
+			pkg.exports['./parse'],
+			has_parse
+				? {
+						node: { types: './parse.d.ts', default: './parse.js' },
+						default: { types: './parse.d.ts', default: './parse_browser.js' }
+					}
+				: undefined
+		);
+		for (const file of ['parse.js', 'parse_browser.js', 'parse.d.ts', 'node_init.js', 'lazy.js']) {
+			assert.equal(pkg.files.includes(file), has_parse, file);
+		}
+	});
+
+	// What the split buys: a root that formats loads no parse code — no parse facade, no
+	// decoder, no reconstruction helper — at either condition. The parse-only root IS a parser,
+	// so it re-exports the `./parse` entry whole.
+	it('a root that formats loads no parse code', { skip: !has_parse }, () => {
+		for (const f of ['index.js', 'browser.js', 'index.d.ts', 'browser.d.ts']) {
+			const text = readFileSync(new URL(`../${pkg_dir}/${f}`, import.meta.url), 'utf8');
+			if (has_format) {
+				assert.doesNotMatch(text, /api_parse|tape_|locations|tsv_ast|parse\.js|parse_browser/, f);
+			} else {
+				assert.match(text, /export \* from '\.\/parse(_browser)?\.js';/, f);
+			}
+		}
+		// the decoder is reached through the parse entries alone
+		for (const f of ['parse.js', 'parse_browser.js']) {
+			const text = readFileSync(new URL(`../${pkg_dir}/${f}`, import.meta.url), 'utf8');
+			assert.match(text, /from '\.\/tape_engine\.js'/, f);
+		}
 	});
 
 	it('exports the ./locations subpath where the helper ships', () => {
@@ -615,13 +664,22 @@ console.log(JSON.stringify({ kinds, poisoned, recovered, again: healthy().ok }))
 		assert.equal(node_entry.format_typescript, undefined);
 	});
 
-	it('parse_* absent from the format-only build', { skip: has_parse }, () => {
+	// the format-only build has no parser at all; the umbrella's is the `./parse` entry's alone
+	it('parse_* absent from a root that formats', { skip: !has_format }, () => {
 		assert.equal(node_entry.parse_typescript, undefined);
+		assert.equal(node_entry.parse_typescript_json, undefined);
 	});
 
-	it('reconstruct_locations absent from the format-only build', { skip: has_parse }, () => {
+	it('reconstruct_locations absent from a root that formats', { skip: !has_format }, () => {
 		assert.equal(node_entry.reconstruct_locations, undefined);
 		assert.equal(node_entry.create_locator, undefined);
+	});
+
+	// the parse-only root IS the `./parse` entry, re-exported whole: the same functions
+	it('the parse-only root re-exports the ./parse entry', { skip: has_format }, () => {
+		for (const [name, value] of Object.entries(parse_entry)) {
+			assert.equal(node_entry[name], value, name);
+		}
 	});
 
 	it('IgnoreStack absent from the parse-only build', { skip: has_format }, () => {
@@ -673,9 +731,9 @@ console.log(JSON.stringify({ kinds, poisoned, recovered, again: healthy().ok }))
 				['svelte', '<div>x</div>', 'Root'],
 				['css', 'a { color: red }', 'StyleSheetFile']
 			]) {
-				const ast = ok_ast(node_entry[`parse_${language}`](source));
+				const ast = ok_ast(parse_entry[`parse_${language}`](source));
 				assert.equal(ast.type, root);
-				const json = ok_json(node_entry[`parse_${language}_json`](source));
+				const json = ok_json(parse_entry[`parse_${language}_json`](source));
 				assert.equal(typeof json, 'string');
 				assert.deepEqual(JSON.parse(json), ast);
 			}
@@ -683,39 +741,44 @@ console.log(JSON.stringify({ kinds, poisoned, recovered, again: healthy().ok }))
 	);
 
 	it('parse: the span-only wire by default, `loc` on request', { skip: !has_parse }, () => {
-		const span_only = ok_ast(node_entry.parse_typescript('const x = 1;'));
-		const located = ok_ast(node_entry.parse_typescript('const x = 1;', { locations: true }));
+		const span_only = ok_ast(parse_entry.parse_typescript('const x = 1;'));
+		const located = ok_ast(parse_entry.parse_typescript('const x = 1;', { locations: true }));
 		assert.equal('loc' in span_only, false);
 		assert.equal(typeof span_only.start, 'number');
 		assert.deepEqual(located.loc, { start: { line: 1, column: 0 }, end: { line: 1, column: 12 } });
 		// `{locations: false}` is the default spelled out
 		assert.deepEqual(
-			ok_ast(node_entry.parse_typescript('const x = 1;', { locations: false })),
+			ok_ast(parse_entry.parse_typescript('const x = 1;', { locations: false })),
 			span_only
 		);
 		// svelte's name_loc is a location field too
 		const sv = '<div class="a">x</div>';
-		assert.doesNotMatch(JSON.stringify(ok_ast(node_entry.parse_svelte(sv))), /"name_loc"|"loc"/);
+		assert.doesNotMatch(JSON.stringify(ok_ast(parse_entry.parse_svelte(sv))), /"name_loc"|"loc"/);
 		assert.match(
-			JSON.stringify(ok_ast(node_entry.parse_svelte(sv, { locations: true }))),
+			JSON.stringify(ok_ast(parse_entry.parse_svelte(sv, { locations: true }))),
 			/"name_loc"/
 		);
 		// css carries none by default, and `loc` on every node on request
-		assert.doesNotMatch(JSON.stringify(ok_ast(node_entry.parse_css('a { color: red }'))), /"loc"/);
+		assert.doesNotMatch(JSON.stringify(ok_ast(parse_entry.parse_css('a { color: red }'))), /"loc"/);
 		assert.ok(
-			ok_ast(node_entry.parse_css('a { color: red }', { locations: true })).children[0].loc
+			ok_ast(parse_entry.parse_css('a { color: red }', { locations: true })).children[0].loc
 		);
 	});
 
 	it('parse options: sourceType switches the TypeScript parse goal', { skip: !has_parse }, () => {
-		const program = ok_ast(node_entry.parse_typescript('var await = 1;', { sourceType: 'script' }));
+		const program = ok_ast(
+			parse_entry.parse_typescript('var await = 1;', { sourceType: 'script' })
+		);
 		assert.equal(program.sourceType, 'script');
 		// module goal (default and explicit) reserves `await`
-		assert.equal(node_entry.parse_typescript('var await = 1;').ok, false);
-		assert.equal(node_entry.parse_typescript('var await = 1;', { sourceType: 'module' }).ok, false);
+		assert.equal(parse_entry.parse_typescript('var await = 1;').ok, false);
+		assert.equal(
+			parse_entry.parse_typescript('var await = 1;', { sourceType: 'module' }).ok,
+			false
+		);
 		// sourceType composes with locations (it drives the parser, locations the view)
 		const composed = ok_ast(
-			node_entry.parse_typescript('var await = 1;', {
+			parse_entry.parse_typescript('var await = 1;', {
 				sourceType: 'script',
 				locations: true
 			})
@@ -725,36 +788,36 @@ console.log(JSON.stringify({ kinds, poisoned, recovered, again: healthy().ok }))
 		// the `_json` export takes the source type too
 		assert.equal(
 			JSON.parse(
-				ok_json(node_entry.parse_typescript_json('var await = 1;', { sourceType: 'script' }))
+				ok_json(parse_entry.parse_typescript_json('var await = 1;', { sourceType: 'script' }))
 			).sourceType,
 			'script'
 		);
 	});
 
 	it('parse options: the entries route through the shared facade', { skip: !has_parse }, () => {
-		assert.throws(() => node_entry.parse_typescript('x;', { locatons: true }), {
+		assert.throws(() => parse_entry.parse_typescript('x;', { locatons: true }), {
 			name: 'TypeError',
 			message: "unknown parse option 'locatons' (expected 'locations' or 'sourceType')"
 		});
 		// the `_json` exports return the wire string itself, so they refuse `locations`,
 		// pointing at the object parser
-		assert.throws(() => node_entry.parse_css_json('a{}', { locations: false }), {
+		assert.throws(() => parse_entry.parse_css_json('a{}', { locations: false }), {
 			name: 'TypeError',
 			message:
 				"parse option 'locations' is not supported by parse_css_json — the JSON string is " +
 				'the span-only wire; use parse_css(source, {locations: true})'
 		});
-		assert.throws(() => node_entry.parse_svelte('<div>x</div>', { sourceType: 'module' }), {
+		assert.throws(() => parse_entry.parse_svelte('<div>x</div>', { sourceType: 'module' }), {
 			name: 'TypeError',
 			message: "parse option 'sourceType' is only supported for TypeScript"
 		});
 		// the forwarding idiom over the real engine (`npm/cli.js` hands one bag to whichever
 		// parser)
-		assert.ok(ok_ast(node_entry.parse_svelte('<div>x</div>', { sourceType: undefined })));
-		assert.equal(ok_ast(node_entry.parse_typescript('x;', null)).type, 'Program');
+		assert.ok(ok_ast(parse_entry.parse_svelte('<div>x</div>', { sourceType: undefined })));
+		assert.equal(ok_ast(parse_entry.parse_typescript('x;', null)).type, 'Program');
 		// a non-string source is the facade's refusal, not the glue's (which would read
 		// `42` as the empty document off Node)
-		assert.throws(() => node_entry.parse_typescript(42), {
+		assert.throws(() => parse_entry.parse_typescript(42), {
 			name: 'TypeError',
 			message: 'parse source must be a string (got number)'
 		});
@@ -763,12 +826,12 @@ console.log(JSON.stringify({ kinds, poisoned, recovered, again: healthy().ok }))
 
 // The parse-failure contract (`scripts/parse_failure_suite.ts`) over the auto-init entry;
 // the lazy entry runs the same table once initialized (the browser entry's block below).
-register_parse_failure_suite(`index.js: ${pkg_dir}`, node_entry);
+register_parse_failure_suite(`index.js + parse.js: ${pkg_dir}`, node_entries);
 
 // The type strip (`scripts/strip_suite.ts`) is the umbrella's alone: the subset packages
 // build without the `strip` cargo feature, so they neither link the strip nor export it.
 const has_strip = variant === 'all';
-if (has_strip) register_strip_api_suite(`index.js: ${pkg_dir}`, node_entry);
+if (has_strip) register_strip_api_suite(`index.js + parse.js: ${pkg_dir}`, node_entries);
 
 describe(`strip scope: ${pkg_dir}`, () => {
 	it(`strip_typescript is ${has_strip ? 'exported' : 'absent'}`, () => {
@@ -779,7 +842,7 @@ describe(`strip scope: ${pkg_dir}`, () => {
 // The import records (`scripts/imports_suite.ts`) are the umbrella's alone too: the subsets
 // build without the `imports` cargo feature.
 const has_imports = variant === 'all';
-if (has_imports) register_imports_api_suite(`index.js: ${pkg_dir}`, node_entry);
+if (has_imports) register_imports_api_suite(`index.js + parse.js: ${pkg_dir}`, node_entries);
 
 describe(`imports scope: ${pkg_dir}`, () => {
 	it(`parse_imports_* is ${has_imports ? 'exported' : 'absent'}`, () => {
@@ -865,10 +928,10 @@ describe(`raw engine parse failure (tsv_wasm.js): ${pkg_dir}`, () => {
 describe(`locations helper (index.js): ${pkg_dir}`, { skip: !has_parse }, () => {
 	it('`{locations: true}` is the reconstruction of the default parse', () => {
 		const ts = 'const x = 1;\nconst y = 2;\n';
-		const located = ok_ast(node_entry.parse_typescript(ts, { locations: true }));
+		const located = ok_ast(parse_entry.parse_typescript(ts, { locations: true }));
 		assert.deepEqual(
 			located,
-			node_entry.reconstruct_locations(ok_ast(node_entry.parse_typescript(ts)), ts)
+			parse_entry.reconstruct_locations(ok_ast(parse_entry.parse_typescript(ts)), ts)
 		);
 		// acorn's `loc`: 1-based line, 0-based UTF-16 column, on every node
 		assert.deepEqual(located.body[1].loc, {
@@ -884,8 +947,8 @@ describe(`locations helper (index.js): ${pkg_dir}`, { skip: !has_parse }, () => 
 	it('a named subtree reconstructs as it sits in the located parse', () => {
 		const sv = '<p>x</p>';
 		// named, the subtree reconstructs under Svelte's rule, `name_loc` included
-		const fragment = node_entry.reconstruct_locations(
-			ok_ast(node_entry.parse_svelte(sv)).fragment,
+		const fragment = parse_entry.reconstruct_locations(
+			ok_ast(parse_entry.parse_svelte(sv)).fragment,
 			sv,
 			{
 				language: 'svelte'
@@ -893,15 +956,15 @@ describe(`locations helper (index.js): ${pkg_dir}`, { skip: !has_parse }, () => 
 		);
 		assert.deepEqual(
 			fragment.nodes[0].name_loc,
-			ok_ast(node_entry.parse_svelte(sv, { locations: true })).fragment.nodes[0].name_loc
+			ok_ast(parse_entry.parse_svelte(sv, { locations: true })).fragment.nodes[0].name_loc
 		);
 	});
 
 	it("a locator's lookups agree with the located parse", () => {
 		const ts = 'const x = 1;\nconst y = 2;\n';
-		const located = ok_ast(node_entry.parse_typescript(ts, { locations: true }));
-		const spans = ok_ast(node_entry.parse_typescript(ts));
-		const locator = node_entry.create_locator(ts, { language: 'typescript' });
+		const located = ok_ast(parse_entry.parse_typescript(ts, { locations: true }));
+		const spans = ok_ast(parse_entry.parse_typescript(ts));
+		const locator = parse_entry.create_locator(ts, { language: 'typescript' });
 		assert.deepEqual(locator.loc_of(spans.body[0]), located.body[0].loc);
 		assert.deepEqual(locator.loc_of(spans.body[1]), located.body[1].loc);
 		// one offset at a time, in the same coordinates
@@ -910,10 +973,10 @@ describe(`locations helper (index.js): ${pkg_dir}`, { skip: !has_parse }, () => 
 
 	it('CSS: `loc` on every node on request, LF-only', () => {
 		const css = 'a {\r\n\tcolor: red;\r}\n';
-		const located = ok_ast(node_entry.parse_css(css, { locations: true }));
+		const located = ok_ast(parse_entry.parse_css(css, { locations: true }));
 		assert.deepEqual(
 			located,
-			node_entry.reconstruct_locations(ok_ast(node_entry.parse_css(css)), css)
+			parse_entry.reconstruct_locations(ok_ast(parse_entry.parse_css(css)), css)
 		);
 		// a lone CR opens no line in a CSS document (it is a column), and the CRLF's LF ends
 		// line 1: the rule closes on line 2 after `\tcolor: red;\r}`
@@ -932,16 +995,16 @@ describe(`locations helper (index.js): ${pkg_dir}`, { skip: !has_parse }, () => 
 			'<svelte:options /* o */ runes />\n<div /* c */ class="a">\n\t{#each xs as { a, b: [c] }, i (a)}{a}{/each}\n</div>\n<style>\n/* s */\np { color: red; }\n</style>\n'
 		];
 		for (const sv of sources) {
-			const located = ok_ast(node_entry.parse_svelte(sv, { locations: true }));
+			const located = ok_ast(parse_entry.parse_svelte(sv, { locations: true }));
 			assert.deepEqual(
 				located,
-				node_entry.reconstruct_locations(ok_ast(node_entry.parse_svelte(sv)), sv, {
+				parse_entry.reconstruct_locations(ok_ast(parse_entry.parse_svelte(sv)), sv, {
 					language: 'svelte'
 				}),
 				JSON.stringify(sv.slice(0, 60))
 			);
 		}
-		const located = ok_ast(node_entry.parse_svelte(sources[0], { locations: true }));
+		const located = ok_ast(parse_entry.parse_svelte(sources[0], { locations: true }));
 		const div = located.fragment.nodes.find((n: any) => n.type === 'RegularElement');
 		const name_at = sources[0].indexOf('<div') + 1;
 		assert.deepEqual(div.name_loc, {
@@ -956,13 +1019,13 @@ describe(`locations helper (index.js): ${pkg_dir}`, { skip: !has_parse }, () => 
 		// starts at 0 and its `name_loc` is column 1; the helper indexes the same
 		// BOM-less string, or every line-1 column and name span would read one off.
 		const sv = '\ufeff<div class="a">x</div>\n<span>y</span>';
-		const sv_located = ok_ast(node_entry.parse_svelte(sv, { locations: true }));
+		const sv_located = ok_ast(parse_entry.parse_svelte(sv, { locations: true }));
 		assert.equal(sv_located.fragment.nodes[0].start, 0);
 		assert.equal(sv_located.fragment.nodes[0].name_loc.start.column, 1);
 		assert.equal(sv_located.fragment.nodes[0].loc.start.column, 0);
 		// acorn counts the BOM as whitespace: the first statement sits at offset 1, column 1
 		const ts_located = ok_ast(
-			node_entry.parse_typescript('\ufeffconst x = 1;', { locations: true })
+			parse_entry.parse_typescript('\ufeffconst x = 1;', { locations: true })
 		);
 		assert.equal(ts_located.body[0].start, 1);
 		assert.equal(ts_located.body[0].loc.start.column, 1);
@@ -972,10 +1035,10 @@ describe(`locations helper (index.js): ${pkg_dir}`, { skip: !has_parse }, () => 
 	// Svelte document `\n` alone — in its `<script>`, template expressions and `<style>` too.
 	it('a lone CR / U+2028 / U+2029 follows its document rule in both languages', () => {
 		const script = 'let a = 1;\rlet b = 2;\u2028let c = 3;\u2029let d = 4;\r\nlet e = 5;';
-		const ts_located = ok_ast(node_entry.parse_typescript(script, { locations: true }));
+		const ts_located = ok_ast(parse_entry.parse_typescript(script, { locations: true }));
 		assert.equal(ts_located.body[4].loc.start.line, 5, 'TypeScript counts every terminator');
 		const sv = `<script>\n${script}\n</script>\n<p>{x\r+\u2028y}</p>\n`;
-		const sv_located = ok_ast(node_entry.parse_svelte(sv, { locations: true }));
+		const sv_located = ok_ast(parse_entry.parse_svelte(sv, { locations: true }));
 		// the script's lone CR / LS / PS open no line; its CRLF is one LF
 		assert.equal(sv_located.instance.content.body[3].loc.start.line, 2, 'Svelte counts LF alone');
 		assert.equal(sv_located.instance.content.body[4].loc.start.line, 3);
@@ -1006,10 +1069,10 @@ describe(`locations helper (index.js): ${pkg_dir}`, { skip: !has_parse }, () => 
 
 		const parse = (language: string, source: string, options: object): any =>
 			language === 'svelte'
-				? ok_ast(node_entry.parse_svelte(source, options))
+				? ok_ast(parse_entry.parse_svelte(source, options))
 				: language === 'css'
-					? ok_ast(node_entry.parse_css(source, options))
-					: ok_ast(node_entry.parse_typescript(source, options));
+					? ok_ast(parse_entry.parse_css(source, options))
+					: ok_ast(parse_entry.parse_typescript(source, options));
 		// every object with numeric `start`/`end`, in walk order
 		const spanned = (node: any, out: Array<any> = []): Array<any> => {
 			if (Array.isArray(node)) {
@@ -1055,10 +1118,10 @@ describe(`locations helper (index.js): ${pkg_dir}`, { skip: !has_parse }, () => 
 				findings.push(`${rel}: the default parse is not the located one minus loc/name_loc`);
 			}
 			// the per-node entry point, asked before `reconstruct` mutates the same tree
-			const locator = node_entry.create_locator(source, { language });
+			const locator = parse_entry.create_locator(source, { language });
 			const nodes = spanned(span_only);
 			const answers = nodes.map((n) => locator.loc_of(n));
-			const recon = node_entry.reconstruct_locations(span_only, source, { language });
+			const recon = parse_entry.reconstruct_locations(span_only, source, { language });
 			if (!isDeepStrictEqual(recon, located)) {
 				findings.push(`${rel}: {locations: true} differs from reconstruct_locations`);
 			}
@@ -1091,9 +1154,16 @@ describe(`locations helper (index.js): ${pkg_dir}`, { skip: !has_parse }, () => 
 // - Post-init_sync: format functions work, init is idempotent
 describe(`browser entry (browser.js): ${pkg_dir}`, () => {
 	let browser: any;
+	/** The `./parse` entry's lazy condition (`parse_browser.js`), whose guard reads the root's
+	 * ready flag (`lazy.js`); the root itself in the format-only package, which has none. */
+	let browser_parse: any;
+	/** Both lazy entries' exports as one table. */
+	let browser_all: any;
 
-	it('import browser.js', async () => {
+	it('import browser.js and parse_browser.js', async () => {
 		browser = await import(`../${pkg_dir}/browser.js`);
+		browser_parse = has_parse ? await import(`../${pkg_dir}/parse_browser.js`) : browser;
+		browser_all = { ...browser, ...browser_parse };
 	});
 
 	// the lazy entry builds its own facade over the guarded engine functions, and writes
@@ -1101,10 +1171,21 @@ describe(`browser entry (browser.js): ${pkg_dir}`, () => {
 	// the node entry's — and its lone-surrogate refusal BEFORE init, which the facade
 	// answers ahead of the guard
 	register_facade_surface_suite(`browser.js (lazy entry, before init): ${pkg_dir}`, () => browser);
+	if (has_parse && has_format) {
+		register_facade_surface_suite(
+			`parse_browser.js (lazy ./parse entry, before init): ${pkg_dir}`,
+			() => browser_parse
+		);
+	}
 
 	it('exports throw before init', () => {
 		const guarded = has_format ? 'format_typescript' : 'parse_typescript';
 		assert.throws(() => browser[guarded]('const x = 1'), /WASM not initialized/);
+		// the `./parse` entry's guard reads the same flag
+		if (has_parse) {
+			assert.throws(() => browser_parse.parse_typescript('const x = 1'), /WASM not initialized/);
+			assert.throws(() => browser_parse.parse_css_json('a {}'), /WASM not initialized/);
+		}
 	});
 
 	// The facade reads the options bag before it calls into the engine, so a bad bag
@@ -1132,7 +1213,7 @@ describe(`browser entry (browser.js): ${pkg_dir}`, () => {
 		// init_sync below, proving the helper carries no init guard (it never
 		// touches WASM). This is why browser.js re-exports it directly.
 		const ast = { type: 'Program', start: 0, end: 5, body: [] };
-		const out = browser.reconstruct_locations(ast, 'x = 1');
+		const out = browser_parse.reconstruct_locations(ast, 'x = 1');
 		assert.deepEqual(out.loc, {
 			start: { line: 1, column: 0 },
 			end: { line: 1, column: 5 }
@@ -1146,10 +1227,19 @@ describe(`browser entry (browser.js): ${pkg_dir}`, () => {
 
 	// the parse-failure table over the lazy entry, now initialized — the same facade over
 	// the same guarded engine functions, reached through the other entry's wiring
-	register_parse_failure_suite(`browser.js (lazy entry): ${pkg_dir}`, () => browser);
+	register_parse_failure_suite(
+		`browser.js + parse_browser.js (lazy entries): ${pkg_dir}`,
+		() => browser_all
+	);
 	if (variant === 'all') {
-		register_strip_api_suite(`browser.js (lazy entry): ${pkg_dir}`, () => browser);
-		register_imports_api_suite(`browser.js (lazy entry): ${pkg_dir}`, () => browser);
+		register_strip_api_suite(
+			`browser.js + parse_browser.js (lazy entries): ${pkg_dir}`,
+			() => browser_all
+		);
+		register_imports_api_suite(
+			`browser.js + parse_browser.js (lazy entries): ${pkg_dir}`,
+			() => browser_all
+		);
 	}
 
 	it('format functions work after init', { skip: !has_format }, () => {
@@ -1158,15 +1248,20 @@ describe(`browser entry (browser.js): ${pkg_dir}`, () => {
 		assert.equal(ok_code(browser.format_svelte('<div   >x</div   >')), '<div>x</div>\n');
 	});
 
+	// one `init_sync` through the root serves the `./parse` entry: the flag is `lazy.js`'s, shared
 	it('parse works after init', { skip: !has_parse }, () => {
-		assert.equal(ok_ast(browser.parse_typescript('const x = 1;')).type, 'Program');
+		assert.equal(ok_ast(browser_parse.parse_typescript('const x = 1;')).type, 'Program');
+		assert.deepEqual(
+			ok_ast(browser_parse.parse_svelte('<p>{a}</p>')),
+			JSON.parse(ok_json(browser_parse.parse_svelte_json('<p>{a}</p>')))
+		);
 	});
 
 	// Regression: the guard wrappers once hardcoded a single `(source)` param,
 	// silently dropping every later argument in the browser entry only.
 	it('the init guard forwards extra args (parse options)', { skip: !has_parse }, () => {
 		const program = ok_ast(
-			browser.parse_typescript('var await = 1;', {
+			browser_parse.parse_typescript('var await = 1;', {
 				sourceType: 'script',
 				locations: true
 			})
@@ -1200,7 +1295,7 @@ describe(`browser entry (browser.js): ${pkg_dir}`, () => {
 		if (has_format) {
 			assert.equal(ok_code(browser.format_typescript('const   x=1')), 'const x = 1;\n');
 		} else {
-			assert.equal(ok_ast(browser.parse_typescript('const x = 1;')).type, 'Program');
+			assert.equal(ok_ast(browser_parse.parse_typescript('const x = 1;')).type, 'Program');
 		}
 	});
 });
@@ -1485,6 +1580,21 @@ report.locations = await import(${JSON.stringify(`${pkg_name}/locations`)}).then
 	(mod) => Object.keys(mod).sort(),
 	(error) => error.code
 );
+report.parse = await import(${JSON.stringify(`${pkg_name}/parse`)}).then(
+	(mod) => ({
+		names: Object.keys(mod).sort(),
+		// the subpath shares the root's instance: no init of its own, and a parse works
+		works: mod.parse_typescript('const x = 1;').ast.type
+	}),
+	(error) => error.code
+);
+report.internals = {};
+for (const file of ['node_init.js', 'lazy.js', 'parse_browser.js', 'tape_engine.js', 'tape_decode.js']) {
+	report.internals[file] = await import(${JSON.stringify(`${pkg_name}/`)} + file).then(
+		() => 'resolved',
+		(error) => error.code
+	);
+}
 report.worker = await new Promise((resolve, reject) => {
 	const worker = new Worker(${JSON.stringify(worker_source)}, {
 		eval: true,
@@ -1541,6 +1651,41 @@ console.log(JSON.stringify(report));
 			report?.locations,
 			has_parse ? ['create_locator', 'reconstruct_locations'] : 'ERR_PACKAGE_PATH_NOT_EXPORTED'
 		);
+	});
+
+	// The parse family by its subpath: exactly the family and the helper, initialized by the
+	// import (the Node condition), and the same names in every package that parses.
+	it('the ./parse subpath exposes exactly the parse family, initialized', () => {
+		assert.deepEqual(
+			report?.parse,
+			has_parse
+				? {
+						names: [
+							'create_locator',
+							'parse_css',
+							'parse_css_json',
+							'parse_svelte',
+							'parse_svelte_json',
+							'parse_typescript',
+							'parse_typescript_json',
+							'reconstruct_locations'
+						],
+						works: 'Program'
+					}
+				: 'ERR_PACKAGE_PATH_NOT_EXPORTED'
+		);
+	});
+
+	// the split's internal modules are files, never subpaths
+	it('the init and decoder modules are not importable', () => {
+		const code = 'ERR_PACKAGE_PATH_NOT_EXPORTED';
+		assert.deepEqual(report?.internals, {
+			'node_init.js': code,
+			'lazy.js': code,
+			'parse_browser.js': code,
+			'tape_engine.js': code,
+			'tape_decode.js': code
+		});
 	});
 
 	it('the ./locations subpath works with no engine installed', { skip: !has_parse }, () => {
@@ -2103,7 +2248,7 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 		assert.equal(bare.status, 0, bare.stderr);
 		assert.doesNotMatch(bare.stdout, /"loc"/);
 		// the default output is the engine's wire string, verbatim
-		assert.equal(bare.stdout, `${ok_json(node_entry.parse_typescript_json('const x = 1;'))}\n`);
+		assert.equal(bare.stdout, `${ok_json(parse_entry.parse_typescript_json('const x = 1;'))}\n`);
 		// --locations is the facade's `{locations: true}`, stringified
 		const composed = run_cli([
 			'parse',
@@ -2119,14 +2264,14 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 		assert.deepEqual(
 			JSON.parse(composed.stdout),
 			ok_ast(
-				node_entry.parse_typescript('var await = 1;', { sourceType: 'script', locations: true })
+				parse_entry.parse_typescript('var await = 1;', { sourceType: 'script', locations: true })
 			)
 		);
 		assert.match(composed.stdout, /"sourceType":"script"/);
 		// svelte carries name_loc on request; css loc
 		for (const [parser, source, parse] of [
-			['svelte', '<div class="a">x</div>', node_entry.parse_svelte],
-			['css', 'a{color:red}', node_entry.parse_css]
+			['svelte', '<div class="a">x</div>', parse_entry.parse_svelte],
+			['css', 'a{color:red}', parse_entry.parse_css]
 		] as const) {
 			const span = run_cli(['parse', '--content', source, '--parser', parser]);
 			assert.equal(span.status, 0, span.stderr);
@@ -2149,7 +2294,7 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 		assert.match(pretty.stdout, /\n\t"type": "Program"/);
 		assert.deepEqual(
 			JSON.parse(pretty.stdout),
-			ok_ast(node_entry.parse_typescript('const x = 1;', { locations: true }))
+			ok_ast(parse_entry.parse_typescript('const x = 1;', { locations: true }))
 		);
 	});
 

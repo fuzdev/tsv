@@ -66,7 +66,7 @@ import {
 } from 'node:fs';
 import { Buffer } from 'node:buffer';
 import { availableParallelism } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import process from 'node:process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
@@ -154,7 +154,11 @@ interface WorkerInput {
 
 /** A worker: grade one shard's shapes on this thread, noting each one before it runs. */
 async function run_worker(input: WorkerInput): Promise<void> {
-	const tsv = await import(pathToFileURL(input.loader).href);
+	// the loader's root and its `./parse` entry beside it (the parse family), one addon between them
+	const tsv = {
+		...(await import(pathToFileURL(input.loader).href)),
+		...(await import(pathToFileURL(join(dirname(input.loader), 'parse.js')).href))
+	};
 	const shapes = read_shapes(input.shapes).filter(
 		(shape, i) => i % input.shards === input.shard && shape.name.includes(input.filter)
 	);

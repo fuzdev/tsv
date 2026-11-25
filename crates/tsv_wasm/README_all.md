@@ -49,9 +49,12 @@ Large trees format across worker threads — `--jobs N` sets the count, and the 
 
 In Node.js and Bun, WASM is initialized synchronously at import time — zero config. In browsers and bundlers, call `await init()` once first (Vite, Webpack, and Rollup resolve the WASM asset automatically; `init_sync({ module })` is also exported for Workers and custom loading).
 
+The package has two entries over one WASM instance: the root (`@fuzdev/tsv-wasm`) formats, strips types, lists imports and matches ignore files, and exports the WASM lifecycle; the parser is `@fuzdev/tsv-wasm/parse`, so code that never parses never loads it. One `init()` from the root serves both.
+
 ```typescript
-import {format_svelte, parse_svelte} from '@fuzdev/tsv-wasm';
-import type {Root} from '@fuzdev/tsv-wasm';
+import {format_svelte} from '@fuzdev/tsv-wasm';
+import {parse_svelte} from '@fuzdev/tsv-wasm/parse';
+import type {Root} from '@fuzdev/tsv-wasm/parse';
 
 const formatted = format_svelte('<script>\nconst   x=1\n</script>');
 if (formatted.ok) console.log(formatted.code);
@@ -62,7 +65,7 @@ const root: Root = parsed.ast;
 
 ### Formatting and parsing
 
-Three formatters (`format_svelte`, `format_typescript`, `format_css`) take a source `string` and return `{ok: true, code}` with the formatted `string`. Three parsers return `{ok: true, ast}` with the AST their canonical parser returns — `parse_svelte` Svelte's modern `parse` AST, `parse_typescript` ESTree as acorn + acorn-typescript emit it, `parse_css` Svelte's `parseCss` AST — span-only by default, `start`/`end` offsets on every node and no per-node `loc`; the `parse_*_json` variants return that AST as a compact JSON string instead, `{ok: true, json}` (faster when writing to disk or the wire). For a source they cannot handle, all return `{ok: false, error}` ([below](#errors-and-depth-limits)), as the strip does. AST types are bundled in `tsv_ast.d.ts` and re-exported from the package — `import type` any node directly.
+Three formatters (`format_svelte`, `format_typescript`, `format_css`) take a source `string` and return `{ok: true, code}` with the formatted `string`. Three parsers, from `@fuzdev/tsv-wasm/parse`, return `{ok: true, ast}` with the AST their canonical parser returns — `parse_svelte` Svelte's modern `parse` AST, `parse_typescript` ESTree as acorn + acorn-typescript emit it, `parse_css` Svelte's `parseCss` AST — span-only by default, `start`/`end` offsets on every node and no per-node `loc`; the `parse_*_json` variants return that AST as a compact JSON string instead, `{ok: true, json}` (faster when writing to disk or the wire). For a source they cannot handle, all return `{ok: false, error}` ([below](#errors-and-depth-limits)), as the strip does. AST types are bundled in `tsv_ast.d.ts` and re-exported from the parse entry — `import type` any node from `@fuzdev/tsv-wasm/parse`. The object parsers read a compact binary form of the wire straight out of WASM memory and decode it to objects in JS — the same tree `JSON.parse` makes of the `_json` string, key order included.
 
 ### Options
 
@@ -80,10 +83,10 @@ A supported key set to `undefined` reads as its default — `sourceType: undefin
 
 ### Reconstructing line/column
 
-`{locations: true}` runs `reconstruct_locations`, a pure-JS helper the package also exports for a tree you already hold:
+`{locations: true}` runs `reconstruct_locations`, a pure-JS helper the parse entry also exports for a tree you already hold:
 
 ```typescript
-import {parse_typescript, reconstruct_locations} from '@fuzdev/tsv-wasm';
+import {parse_typescript, reconstruct_locations} from '@fuzdev/tsv-wasm/parse';
 
 const src = 'const x = 1;\n';
 const located = parse_typescript(src, {locations: true});
@@ -104,7 +107,7 @@ It adds `loc` to every object with `start`/`end` and `name_loc` to Svelte elemen
 For sparse lookups, `create_locator(source, {language})` builds the line table once for `position_at(offset)`, `loc_of(node)` (`null` for a node without numeric `start`/`end`) and `reconstruct(ast)`. Its `language` (`'typescript'`, `'svelte'`, or `'css'`) is required.
 
 ```typescript
-import {create_locator, parse_typescript} from '@fuzdev/tsv-wasm';
+import {create_locator, parse_typescript} from '@fuzdev/tsv-wasm/parse';
 
 const src = 'let a;\nlet b;';
 const locator = create_locator(src, {language: 'typescript'});
@@ -118,7 +121,7 @@ locator.position_at(7); // {line: 2, column: 0}
 
 A locator's single lookups throw a `RangeError` for an offset or span the text doesn't hold (a `TypeError` for an offset that isn't a number, or a node whose `start`/`end` getter throws); the whole-tree forms check nothing per node. A missing or unknown `language`, an uninferable root, or a non-string source throws a `TypeError`. So does an options argument that isn't an object, or a key other than `language` — a typo like `{langauge: 'css'}` throws rather than falling back to inference.
 
-`reconstruct_locations` and `create_locator` are also the `@fuzdev/tsv-wasm/locations` entry point, pure JS that loads no WASM; the `SourceLocation` and `Position` types they return come from the package root.
+`reconstruct_locations` and `create_locator` are also the `@fuzdev/tsv-wasm/locations` entry point, pure JS that loads no WASM; the `SourceLocation` and `Position` types they return come from `@fuzdev/tsv-wasm/parse`.
 
 ### Errors and depth limits
 
@@ -151,7 +154,7 @@ Deeply nested input has a ceiling, and tsv draws it before the engine's stacks d
 
 ### Worker pools
 
-To run tsv across threads, compile once and share: the main entry exports `wasm_module`, the compiled `WebAssembly.Module` behind its exports, and the `@fuzdev/tsv-wasm/worker` subpath is the same API without the import-time initialization — so a worker calls `init_sync({module: wasm_module})` on the module handed to it (`workerData` or `postMessage`) instead of reading and compiling the WASM again. Compiled code is shared across isolates, so no worker pays for a second compile. The `tsv` bin above uses exactly this. `wasm_module` is the Node/Bun entry's alone — that entry is the one that compiles at import — so in a browser Worker call `await init()` instead, or `postMessage` a `WebAssembly.Module` you compiled yourself. [`@fuzdev/tsv-format-wasm`](https://www.npmjs.com/package/@fuzdev/tsv-format-wasm) shows the two-line pattern.
+To run tsv across threads, compile once and share: the main entry exports `wasm_module`, the compiled `WebAssembly.Module` behind its exports, and the `@fuzdev/tsv-wasm/worker` subpath is the root's API without the import-time initialization — so a worker calls `init_sync({module: wasm_module})` on the module handed to it (`workerData` or `postMessage`) instead of reading and compiling the WASM again. Compiled code is shared across isolates, so no worker pays for a second compile. The `tsv` bin above uses exactly this. `wasm_module` is the Node/Bun entry's alone — that entry is the one that compiles at import — so in a browser Worker call `await init()` instead, or `postMessage` a `WebAssembly.Module` you compiled yourself. [`@fuzdev/tsv-format-wasm`](https://www.npmjs.com/package/@fuzdev/tsv-format-wasm) shows the two-line pattern. `./worker` carries the root's API and no parser; a worker that parses imports `@fuzdev/tsv-wasm/parse` as well, which shares that `init_sync` in a browser but under Node and Bun initializes from the package's own `.wasm` (a second compile) rather than the handed module.
 
 ### Stripping types
 
