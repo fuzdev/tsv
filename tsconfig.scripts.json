@@ -36,6 +36,8 @@
 		"benches/js/roots/harvest_ts_repo.ts",
 		"benches/js/roots/idempotency_sweep.ts",
 		"benches/js/roots/svelte_styles_harvest.ts",
-		"benches/js/roots/wpt_css_harvest.ts"
+		"benches/js/roots/wpt_css_harvest.ts",
+		"benches/js/roots/tape_corpus.ts",
+		"benches/js/roots/tape_bench.ts"
 	]
 }
