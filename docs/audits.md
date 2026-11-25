@@ -39,6 +39,8 @@ The Svelte compiler's *sidecar-dependent* harnesses — the corpus comparison, t
 | [Wire-type drift](#wire-type-drift-check-checkast-types) | `check:ast-types` | the shipped `tsv_ast.d.ts`, generated from the AST schema table, not typing what the wire-JSON writers emit or the canonical parser's committed wire — plus a wire type the table has no entry for | `npm run check` |
 | [Package declarations](#package-declaration-check-typecheckpackages) | `typecheck:packages` | a staged package's published `.d.ts` failing a consumer's strict compile — a lib the consumer did not ask for (TS2550), a name star-export ambiguation drops (TS2308), a type a package must not export, a README example that does not compile | `scripts/publish.ts` Step 6 (all four packages); on demand (needs `npm run bench:install`, so NOT in `npm run check`) |
 | [Loc cross-grade](#loc-cross-grade-checkloc) | `check:loc` | tsv's loc wire and the shipped `locations.js` reconstruction of its span-only wire disagreeing on any fixture input — the two implementations of the one `loc` definition drifting apart | `npm run check` |
+| [Tape gate](#tape-gate-checktape) | `check:tape` | the offline JS tape encoder and the Rust transcoder writing different bytes for one fixture wire, or the shipped tape decoder — its fast path, or its iterative interpreter alone — reading back a tree that is not `JSON.parse`'s of the wire, key order included | `npm run check` |
+| [Tape corpus](#tape-corpus-leg-tapecorpus) | `tape:corpus` | the same, over real code | `npm run conformance` (release) |
 | [Pin agreement](#canonical-pin-agreement-audit-pinsaudit) | `pins:audit` | the five canonical-oracle pin sites disagreeing — including the lockfile, which alone pins the oracle's own transitive deps | `npm run check` |
 | [Checkout alignment](#checkout-alignment-audit-pinsauditcheckouts) | `pins:audit:checkouts` | a present `../svelte` / `../acorn-typescript` clone that is not the pinned version, or whose version file can't be read; checkout drift (warn — HEAD, or the `../corpora` snapshot's `collections/` tree id) | `npm run conformance` (preflight) |
 | [Authoring independence](#authoring-independence-audit-authoringaudit) | `authoring:audit` | two render-equivalent authorings settling on two fixed points; non-idempotency | `npm run check`; `audit:corpus` (real code) |
@@ -1471,6 +1473,56 @@ all, each by a declaration: `input_invalid_*` (it must fail both parsers) and a
 - **The fixture tree's inputs are format fixed points**, so no input holds a raw `<CR>`; the
   lone-`<CR>` rule is graded by the injection variants of `wire:audit:terminators` (whose
   comparator runs the same check) and by the package tests in `scripts/test_npm.ts`.
+
+## Tape Gate (`check:tape`)
+
+```bash
+npm run check:tape          # builds target/corpus/tsv_debug, then scripts/check_tape.ts over tests/fixtures
+npm run tape-shapes:update  # rewrite the fast-shape list from the fixture wire, then regenerate
+```
+
+**What it proves.** That the tape ([tape_format.md](./tape_format.md)) carries every fixture
+document's span-only wire exactly, and that its two producers agree. Per document — each
+parseable input and format variant, the documents `check:loc` grades — the offline encoder
+(`scripts/tape_encode.ts`) writes the wire's tree to a tape byte-equal to the Rust
+transcoder's (`tsv_arena::tape::Transcoder`); the shipped decoder
+(`crates/tsv_wasm/npm/tape_decode.js`) reads it back to a tree deep-equal to `JSON.parse`'s,
+key order and `-0` included; so does its iterative interpreter alone, the path a stack
+overflow falls back to; and so does the decoder over the same wire written with every typed
+record entry-generic, so every entry's descriptors are read by the interpreter that serves the
+masks no fast shape covers. It also refuses a committed decoder generated from another table or
+shape list.
+
+**How.** One `tsv_debug tape` process (`cli/commands/tape.rs`) streams each document's source,
+wire and transcoded tape as NDJSON, split on LF alone. It reports the records whose presence
+mask is off the fast-shape list; that is no failure (the entry-generic record carries any mask),
+and `tape-shapes:update` folds them in. Beside it in `check`, `tests/tape_roundtrip.rs` prints
+every transcoded tape back to its wire byte for byte (`tsv_debug::tape::tape_to_json`), and
+`tests/depth_limit.rs` transcodes and prints every depth-limit shape on the contract's stack.
+
+**Blind spots.**
+
+- **The fixtures, not real code**: `tape:corpus` grades the same over the snapshot.
+- **The producers agree on the writers' JSON only.** The offline encoder reads `JSON.parse`'s
+  tree, which has lost a number's spelling, a duplicate key and the text order of an
+  integer-like key; a wire with any of them still decodes right, but the two tapes may differ.
+- **No binding ships a tape yet**, so the boundary a tape crosses (a WASM view, an N-API buffer)
+  is graded by none of this.
+
+## Tape Corpus Leg (`tape:corpus`)
+
+```bash
+npm run tape:corpus         # builds the corpus tsv_debug; :run skips the build
+```
+
+`check:tape`'s grades over every file of the `gates` view's snapshot tiers in the three
+languages (`benches/js/tape_corpus.ts`), tsv's side one `tsv_debug tape --stdin` process: a
+panic, a transcoder refusal, a byte difference between the producers, a decoded tree that is not
+`JSON.parse`'s, an empty corpus, or a run that graded no file fails it, and so does any parse
+error but one: a TypeScript file tsv rejects at the module goal yet parses at the script goal (a
+sloppy script) has no wire at the parse's goal and is counted, not graded (its verdict is
+`corpus:compare:parse`'s). No pinned count: it grades a property of every file it reaches. A
+`npm run conformance` leg.
 
 ## Package-Declaration Check (`typecheck:packages`)
 
