@@ -16,6 +16,13 @@ Each `## Unreleased` section must be non-empty and carry a
 - **breaking** fix: an unknown functional pseudo-class keeps an argument that is not a
   selector list (`a:foo(1 + 2)` formatted to `a:foo`); an empty argument (`a:foo()`), an
   unmatched bracket, or a bad url or string inside one is now a parse error
+- **breaking** feat: the parse wire's key order is tsv's own, one order per node type; keys,
+  values and key presence still match Svelte's parser, except that comments in an
+  `async <T>(…) =>` head attach as that one order places them
+- **breaking** chore: the published AST types (`tsv_ast.d.ts`) are generated from a schema
+  and narrowed to what the wire emits: `AttributeText` is gone (`AttributeValue` is
+  `Text | ExpressionTag`), `RootComment` drops `'CSSComment'`, `TSDeclareMethod.id` is
+  `null`, and `TSMethodSignature.kind` and `Attribute.value` are required
 
 - perf: parsing and formatting are faster
 - feat: an internal panic in `@fuzdev/tsv`'s addon throws an `Error` whose message is
