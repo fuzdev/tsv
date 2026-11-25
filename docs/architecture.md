@@ -40,8 +40,10 @@ Each language crate separates these cleanly:
 
 - `ast` — the internal AST, optimized for manipulation (`ast/mod.rs`, plus submodules)
 - `ast/convert` (file or directory) — Emits the public wire JSON directly from
-  the internal AST, in one walk (the writer), matching the canonical parser's JSON exactly
-  on the span-only wire (the `loc` wire is a superset — §`loc` lines)
+  the internal AST, in one walk (the writer), matching the canonical parser's JSON on the
+  span-only wire in every key, value and key presence, in tsv's own key order
+  ([conformance_svelte.md §Key Order](./conformance_svelte.md#key-order)); the `loc` wire is a
+  superset — §`loc` lines
 
 TypeScript splits its AST types across `ast/`'s submodules (`expressions.rs`, `statements.rs`, `types.rs`, …) and its writer across `convert/write/`, due to complexity. CSS and Svelte define their AST types in `ast/mod.rs` itself, beside a `convert/` directory.
 

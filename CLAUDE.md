@@ -559,7 +559,7 @@ HTML knowledge lives in two places, split by whose answer it is. `tsv_html` (pub
 Drop-in replacement for the canonical parsers' **public JSON AST** (acorn / acorn-typescript / Svelte / `parseCss`), NOT their internal implementation.
 
 - **Internal AST**: clean, semantic representation (decoded strings, normalized values) — what every tool (formatter, linter, …) builds on.
-- **Wire JSON**: the parse product. The per-language writers (`ast/convert/write*`) emit it **directly from the internal AST in a single walk**, applying each acorn/`parseCss`/Svelte quirk at emission time — never materializing a typed public-AST Rust layer. The wire shape *is* the contract, documented by the hand-maintained `crates/tsv_wasm/types/tsv_ast.d.ts`. No shipped crate reads the wire back (the CLI's `--pretty` re-indents the bytes); `tsv_debug::json` (the fixture gate, the audits) is the one reader, unbounded in depth.
+- **Wire JSON**: the parse product. The per-language writers (`ast/convert/write*`) emit it **directly from the internal AST in a single walk**, applying each acorn/`parseCss`/Svelte quirk at emission time — never materializing a typed public-AST Rust layer. The wire shape *is* the contract, stated by the AST schema table `crates/tsv_wasm/types/tsv_ast_schema.json` and the `tsv_ast.d.ts` generated from it ([Publishing](#publishing)). No shipped crate reads the wire back (the CLI's `--pretty` re-indents the bytes); `tsv_debug::json` (the fixture gate, the audits) is the one reader, unbounded in depth.
 
 Worked example + full design: ./docs/architecture.md §Two-AST Design.
 

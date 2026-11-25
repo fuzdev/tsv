@@ -108,7 +108,8 @@
 //!
 //! **Byte-identity**: the wire JSON is a faithful emission of the Svelte
 //! parser's JSON (its acorn `<script>` shape plus `parseCss` `<style>` shape) —
-//! the shape the canonical Svelte parser's `expected.json` records.
+//! the shape the canonical Svelte parser's `expected.json` records; key order is
+//! tsv's own, one per node type (docs/conformance_svelte.md §Key Order).
 
 use std::borrow::Cow;
 

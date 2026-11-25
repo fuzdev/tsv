@@ -77,7 +77,7 @@ bumpalo = "3.20.3"
 tokio = { version = "1" }
 futures-util = "0.3"
 serde = { version = "1", features = ["derive"] }
-# preserve_order: keep object key order (wire field-order conformance).
+# preserve_order: keep object key order (exact re-serialization; the byte-strict canonical-side compares).
 # float_roundtrip: exact shortest f64 parsing.
 # arbitrary_precision: `serde_json::Value` stores number tokens verbatim
 # instead of collapsing them to f64, so the fixture pipeline (expected.json
