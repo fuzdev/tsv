@@ -34,7 +34,8 @@
  * its errors, and the `{locations: true}` sugar. The function list is extracted
  * from the generated `tsv_wasm.js` (every `export function format_*` / `parse_*`),
  * so adding a language to `lang_bindings!` flows through the entries with no
- * changes here. `parse_internal_*` exports are bench-only and excluded. Its TYPES
+ * changes here. The engine-only exports (`ENGINE_ONLY_PREFIXES`: the bench's
+ * `parse_internal_*`, the tape's `parse_tape_*`) are excluded. Its TYPES
  * do not flow through — the published declarations are the facade's hand-written
  * `facade_format.d.ts` / `facade_parse.d.ts`, so a new language also needs a declaration added
  * there. This script fails the build when one is missing (the declaration check
@@ -130,6 +131,13 @@ const api_strip_file = 'api_strip.js';
 const strip_dts = 'facade_strip.d.ts';
 const api_imports_file = 'api_imports.js';
 const imports_dts = 'facade_imports.d.ts';
+/**
+ * The raw exports no published entry names: `parse_internal_*` (bench-only — it parses and
+ * hands JS nothing) and `parse_tape_*` (the binary parse wire, engine plumbing the facade's
+ * `parse_<lang>` decodes). Both still ship in the raw glue; neither is a facade name.
+ */
+export const ENGINE_ONLY_PREFIXES: ReadonlyArray<string> = ['parse_internal_', 'parse_tape_'];
+
 /** A facade declaration file as an import specifier (`.js`, as `dts_module` explains). */
 const dts_specifier = (file: string): string => file.replace(/\.d\.ts$/, '.js');
 
@@ -202,7 +210,11 @@ export async function run_patch_npm_package(
 	const generated_js = await pkg.read_text(main_js);
 	const fns = [...generated_js.matchAll(/^export function (\w+)/gm)]
 		.map((m) => m[1])
-		.filter((name) => /^(format|parse|strip)_/.test(name) && !name.startsWith('parse_internal_'))
+		.filter(
+			(name) =>
+				/^(format|parse|strip)_/.test(name) &&
+				!ENGINE_ONLY_PREFIXES.some((prefix) => name.startsWith(prefix))
+		)
 		.sort();
 
 	const expected_formats = ['format_css', 'format_svelte', 'format_typescript'];

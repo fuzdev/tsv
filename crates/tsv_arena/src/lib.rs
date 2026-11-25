@@ -5,8 +5,8 @@
 //! hand-sync them, and each encodes a contract too subtle to keep three copies of honest (see
 //! the crate's CLAUDE.md §Why this crate exists). The goal macros ([`parse_ast!`],
 //! [`parse_ast_for_format!`], [`goal_allowed!`]), the export bodies built on them
-//! ([`parse_convert!`], [`parse_internal!`], [`parse_imports_json!`], and the format path's
-//! `parse_format!`), the export [`Family`] and the string-axis decoder
+//! ([`parse_convert!`], [`parse_internal!`], [`parse_imports_json!`], the format path's
+//! `parse_format!` and the tape's `parse_tape!`), the export [`Family`] and the string-axis decoder
 //! ([`decode_source_type`]) are below, with [`format_panic`], the one text both native
 //! bindings report a caught panic with.
 //!
@@ -25,7 +25,8 @@
 //! # The tape
 //!
 //! Behind the `tape` feature, the `tape` module holds the binary parse wire's schema tables and
-//! its producer, the JSON → tape `tape::Transcoder` (`docs/tape_format.md`).
+//! its producer, the JSON → tape `tape::Transcoder` (`docs/tape_format.md`), with the thread's
+//! parked transcoder (`tape::with_transcoder`) the bindings' `parse_tape!` export body runs on.
 
 #[cfg(feature = "tape")]
 pub mod tape;
@@ -248,6 +249,47 @@ macro_rules! parse_internal {
                 $crate::parse_ast!($goalness, $lang, source, goal, stores).map_err($map_err)?;
             ::std::hint::black_box(&ast);
             Ok(())
+        })
+    }};
+}
+
+/// A binding's whole **tape** export body: [`parse_convert!`]'s span-only wire
+/// (`convert_ast_json_bytes`), transcoded on this thread's parked transcoder
+/// ([`tape::with_transcoder`]) into `$out` as the tape's words
+/// ([`tape::Transcoder::transcode_words`]) — the binary parse wire (`docs/tape_format.md`) a
+/// JS host decodes to the tree `JSON.parse` makes of the same wire. The transcoder reads the
+/// text the wire's offsets index, `$lang::WIRE_COORDINATES.wire_text(source)`: a Svelte or CSS
+/// document less the leading byte-order mark its wire elides.
+///
+/// A parse error goes through `$map_err` as in [`parse_convert!`] (the goal read as it reads
+/// it); a transcode error, through `$map_tape_err` — a wire the writers emit never fails one
+/// but on size (a source too long for a string ref's signed offset). Expands to
+/// `Result<usize, _>`, the tape's length in bytes; `$out` is a `&mut Vec<u32>` the binding
+/// owns (a fresh one it gives away whole, or a parked one it lends the host a view of).
+/// Behind the `tape` feature.
+///
+/// ```ignore
+/// parse_tape!(goal, tsv_ts, source, goal, &mut words, |e| Failure::parse(&e), |e| internal(e))
+/// ```
+#[cfg(feature = "tape")]
+#[macro_export]
+macro_rules! parse_tape {
+    ($goalness:ident, $lang:ident, $source:expr, $goal:expr, $out:expr, $map_err:expr, $map_tape_err:expr) => {{
+        let source: &str = $source;
+        let out: &mut ::std::vec::Vec<u32> = $out;
+        $crate::parse_convert!(
+            $goalness,
+            $lang,
+            convert_ast_json_bytes,
+            source,
+            $goal,
+            $map_err
+        )
+        .and_then(|json| {
+            $crate::tape::with_transcoder(|transcoder| {
+                transcoder.transcode_words(&json, $lang::WIRE_COORDINATES.wire_text(source), out)
+            })
+            .map_err($map_tape_err)
         })
     }};
 }

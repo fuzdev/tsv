@@ -1442,9 +1442,36 @@ fn ascii_ecmascript_line_starts_into(bytes: &[u8], base: usize, lines: &mut Line
     }
 }
 
+// Below every other item on purpose: a shipped build's panic locations carry their line
+// numbers, so an item added above code another build links would move that build's bytes.
+impl WireCoordinates {
+    /// The text this wire's offsets index: `source` itself where a leading byte-order mark is
+    /// counted, and `source` less it where the mark is elided — what a reader resolving the
+    /// wire's offsets against the source (the binary tape's producer) must slice.
+    #[must_use]
+    pub fn wire_text(self, source: &str) -> &str {
+        match self.bom {
+            LeadingBom::Elided => &source[leading_bom_len(source)..],
+            LeadingBom::Counted => source,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The wire's text drops exactly the one leading BOM an eliding wire does not count.
+    #[test]
+    fn wire_text_follows_the_bom_reading() {
+        let elided = WireCoordinates::new(LineRule::Lf, LeadingBom::Elided);
+        let counted = WireCoordinates::new(LineRule::Ecmascript, LeadingBom::Counted);
+        assert_eq!(elided.wire_text("\u{FEFF}a"), "a");
+        assert_eq!(elided.wire_text("\u{FEFF}\u{FEFF}a"), "\u{FEFF}a");
+        assert_eq!(elided.wire_text("a\u{FEFF}"), "a\u{FEFF}");
+        assert_eq!(elided.wire_text(""), "");
+        assert_eq!(counted.wire_text("\u{FEFF}a"), "\u{FEFF}a");
+    }
 
     /// The dense absolute-`u32` table the delta representation replaced, kept
     /// as this module's arithmetic oracle.

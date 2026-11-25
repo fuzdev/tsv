@@ -444,6 +444,59 @@ impl Transcoder {
     /// [`TapeError`] for a text that is not compact JSON, a string holding a lone surrogate, or a
     /// source or tape past the format's sizes.
     pub fn transcode(&mut self, json: &[u8], source: &str) -> Result<&[u8], TapeError> {
+        self.run(json, source)?;
+        self.finish()
+    }
+
+    /// [`Transcoder::transcode`], the tape written into `out` as words — the form a binding
+    /// hands a host, since a `u32` buffer is 4-aligned by its type and a JS host views the tape
+    /// in place (a `Uint32Array`, then the exact bytes over the same memory). Each word's bytes
+    /// in memory are the tape's bytes in order, on any host: the header and body words are
+    /// stored little-endian and the pool packed into the words after them, its last word
+    /// zero-padded. Returns the tape's length in bytes, the pool's last byte included and the
+    /// padding not.
+    ///
+    /// `out` is cleared first and grown to the tape's exact word count (`reserve_exact`), so a
+    /// fresh `Vec` comes back with no spare capacity — one a binding gives away whole — and a
+    /// reused one keeps the capacity it has.
+    ///
+    /// # Errors
+    ///
+    /// As [`Transcoder::transcode`].
+    pub fn transcode_words(
+        &mut self,
+        json: &[u8],
+        source: &str,
+        out: &mut Vec<u32>,
+    ) -> Result<usize, TapeError> {
+        self.run(json, source)?;
+        let header = self.header()?;
+        out.clear();
+        out.reserve_exact(HEADER_WORDS + self.tape.len() + self.pool.len().div_ceil(4));
+        out.extend(
+            header
+                .iter()
+                .chain(self.tape.iter())
+                .map(|word| word.to_le()),
+        );
+        let mut chunks = self.pool.chunks_exact(4);
+        out.extend(
+            chunks
+                .by_ref()
+                .map(|c| u32::from_ne_bytes([c[0], c[1], c[2], c[3]])),
+        );
+        let rest = chunks.remainder();
+        if !rest.is_empty() {
+            let mut last = [0u8; 4];
+            last[..rest.len()].copy_from_slice(rest);
+            out.push(u32::from_ne_bytes(last));
+        }
+        Ok(HEADER_WORDS * 4 + self.tape.len() * 4 + self.pool.len())
+    }
+
+    /// Reads the JSON text into `tape` and `pool`: everything a transcode does but lay out its
+    /// output.
+    fn run(&mut self, json: &[u8], source: &str) -> Result<(), TapeError> {
         self.start(source)?;
         let mut p = self.open_record(json, 0, NO_ENTRY, Some((0, self.units)))?;
         while let Some(top) = self.frames.last() {
@@ -461,7 +514,7 @@ impl Transcoder {
         if p != json.len() {
             return Err(TapeError::Malformed { at: p });
         }
-        self.finish()
+        Ok(())
     }
 
     fn start(&mut self, source: &str) -> Result<(), TapeError> {
@@ -496,9 +549,10 @@ impl Transcoder {
         Ok(())
     }
 
-    fn finish(&mut self) -> Result<&[u8], TapeError> {
+    /// The tape's header words (`docs/tape_format.md` §The tape).
+    fn header(&self) -> Result<[u32; HEADER_WORDS], TapeError> {
         let (words, pool_bytes) = sizes(self.tape.len(), self.pool.len(), self.pool_units)?;
-        let header: [u32; HEADER_WORDS] = [
+        Ok([
             MAGIC,
             TAPE_FORMAT_VERSION,
             SHAPES_HASH,
@@ -507,7 +561,11 @@ impl Transcoder {
             0,
             self.pool_units,
             self.units,
-        ];
+        ])
+    }
+
+    fn finish(&mut self) -> Result<&[u8], TapeError> {
+        let header = self.header()?;
         self.out.clear();
         self.out
             .reserve(HEADER_WORDS * 4 + self.tape.len() * 4 + self.pool.len());
@@ -1144,6 +1202,38 @@ mod tests {
             .map(|c| u32::from_le_bytes([c[0], c[1], c[2], c[3]]))
             .collect();
         assert_eq!(&body[..2], &[HEADER_ESCAPE, 5]);
+    }
+
+    /// The word form is the byte form, word by word in memory, padded to a whole word.
+    #[test]
+    fn the_word_tape_is_the_byte_tape() {
+        let mut t = Transcoder::new();
+        let mut out = vec![7; 3];
+        for (json, source) in [
+            (r#"{"a":1}"#, ""),
+            (r#"{"a":"xyz"}"#, ""),
+            (r#"{"a":"wxyz"}"#, ""),
+            (r#"{"a":"é"}"#, "a😀b"),
+            (r#"{"type":"Identifier","start":0,"end":1,"name":"a"}"#, "a"),
+        ] {
+            let bytes = t.transcode(json.as_bytes(), source).unwrap().to_vec();
+            let len = t
+                .transcode_words(json.as_bytes(), source, &mut out)
+                .unwrap();
+            assert_eq!(len, bytes.len(), "{json}");
+            assert_eq!(out.len(), bytes.len().div_ceil(4), "{json}");
+            let laid: Vec<u8> = out.iter().flat_map(|w| w.to_ne_bytes()).collect();
+            assert_eq!(&laid[..len], &bytes[..], "{json}");
+            assert!(
+                laid[len..].iter().all(|&b| b == 0),
+                "{json}: the padding is zero"
+            );
+        }
+        // a fresh buffer comes back holding the tape alone
+        let mut fresh = Vec::new();
+        t.transcode_words(br#"{"a":"xyz"}"#, "", &mut fresh)
+            .unwrap();
+        assert_eq!(fresh.capacity(), fresh.len());
     }
 
     #[test]

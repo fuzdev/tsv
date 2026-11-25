@@ -20,6 +20,35 @@ mod transcode;
 
 pub use transcode::{TapeError, Transcoder};
 
+use std::cell::Cell;
+
+thread_local! {
+    /// This thread's parked transcoder, between [`with_transcoder`] calls.
+    static TRANSCODER: Cell<Option<Box<Transcoder>>> = const { Cell::new(None) };
+}
+
+/// Runs `f` with this thread's transcoder, whose buffers keep their capacity from call to call
+/// — the bindings' tape exports run once per file in a loop, as their parse exports do over
+/// the stores.
+///
+/// Take and park, never a held borrow: the transcoder leaves the slot for the call and goes
+/// back after, so a WASM trap inside `f` (which runs no `Drop`) leaves the slot empty — the
+/// next call starts a fresh transcoder — rather than locked, and a call nested inside `f` or
+/// one after a caught panic gets a fresh one too. Parked uncapped, as the bindings park their
+/// stores and doc arena: a thread keeps what its largest input grew. A call from a
+/// thread-local destructor, once the slot is gone, runs on a fresh transcoder and parks
+/// nothing.
+pub fn with_transcoder<R>(f: impl FnOnce(&mut Transcoder) -> R) -> R {
+    let mut transcoder = TRANSCODER
+        .try_with(Cell::take)
+        .ok()
+        .flatten()
+        .unwrap_or_default();
+    let result = f(&mut transcoder);
+    let _ = TRANSCODER.try_with(|slot| slot.set(Some(transcoder)));
+    result
+}
+
 /// How a field is laid down on the tape (`docs/tape_format.md` §Field encodings). The
 /// discriminants are the codes the generated JS decoder's tables carry.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

@@ -45,6 +45,7 @@ export function format_css(source, source_type) {}
 export function format_svelte(source, source_type) {}
 export function format_typescript(source, source_type) {}
 export function parse_internal_bench(source) {}
+export function parse_tape_bench(source) {}
 const IgnoreStackFinalization = (typeof FinalizationRegistry === 'undefined')
     ? { register: () => {}, unregister: () => {} }
     : new FinalizationRegistry(ptr => wasm.__wbg_ignorestack_free(ptr, 1));
@@ -274,6 +275,7 @@ export function format_css(source, source_type) {}
 export function format_svelte(source, source_type) {}
 export function format_typescript(source, source_type) {}
 export function parse_internal_bench(source) {}
+export function parse_tape_bench(source) {}
 const IgnoreStackFinalization = (typeof FinalizationRegistry === 'undefined')
     ? { register: () => {}, unregister: () => {} }
     : new FinalizationRegistry(({ ptr, gen }) => {

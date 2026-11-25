@@ -17,19 +17,20 @@ Build/usage commands live in [../../CLAUDE.md §JS Bindings](../../CLAUDE.md#js-
 Mirrors `tsv_wasm`'s split so the bench can size scope-matched native artifacts:
 
 - `format` (default) — `tsv_format_<lang>` exports
-- `parse` (default) — `tsv_parse_<lang>` + `tsv_parse_internal_<lang>` exports, and the `json` layer on each language crate
+- `parse` (default) — `tsv_parse_<lang>` + `tsv_parse_internal_<lang>` + `tsv_parse_tape_<lang>` exports (and `tsv_free_tape`), the `json` layer on each language crate, and `tsv_arena/tape` (the transcoder)
 
 The default (both features) is the full `libtsv_ffi` any FFI host links; the bench's perf rows load its profile-guided build (`npm run build:bench:pgo`, trained as itself through the bench's FFI wrapper). The size table also reports two subset builds, plain, each in its own target dir so they don't clobber the full lib: `--no-default-features --features format` (the native mirror of `@fuzdev/tsv-format-wasm`, no wire-JSON layer, scope-matched to oxfmt) and `--no-default-features --features parse` (the mirror of `@fuzdev/tsv-parse-wasm`, printers dropped, scope-matched to oxc-parser). See `npm run build:ffi:format` / `build:ffi:parse` — built only by `build:bench`, which the gate never runs, so `npm run typecheck:features` (in `check`) `cargo check`s each half on its own.
 
 ## Public API
 
-The `lang_bindings!` macro generates three `extern "C"` functions per language (svelte, typescript, css) — the full default build; the `format`/`parse` features gate which are emitted (see [Features](#features) above):
+The `lang_bindings!` macro generates four `extern "C"` functions per language (svelte, typescript, css) — the full default build; the `format`/`parse` features gate which are emitted (see [Features](#features) above):
 
 - `tsv_parse_<lang>` — the span-only JSON AST (`start`/`end` offsets, no per-node `loc`; Svelte also no `name_loc`) — the one parse wire every binding emits. See [../tsv_ts/CLAUDE.md](../tsv_ts/CLAUDE.md) §Public API. The `loc`-bearing wire has no C-ABI export; the corpus tools ask `tsv_debug loc_wires --stdin` for it.
 - `tsv_parse_internal_<lang>` — Empty payload (`*out_len == 0` with `TSV_STATUS_OK`; benchmark-only; AST is built but not converted/serialized — `std::hint::black_box` prevents elision)
+- `tsv_parse_tape_<lang>` — the tape, the binary parse wire ([../../docs/tape_format.md](../../docs/tape_format.md)): `tsv_parse_<lang>`'s wire laid down as words (`tsv_arena`'s `parse_tape!`), `*out_len` its length in bytes. The one export whose payload is not a byte allocation — see the free rule below
 - `tsv_format_<lang>` — Formatted source
 
-Plus `tsv_free(ptr, len)` for deallocation.
+Plus `tsv_free(ptr, len)` for deallocation, and `tsv_free_tape(ptr, len)` for a `tsv_parse_tape_*` payload.
 
 ### The uniform signature
 
@@ -65,29 +66,32 @@ are top-level `import`/`export` declarations, `import.meta` and a top-level `for
 `tsv_napi` and `tsv_wasm` spell the axis as a trailing optional `sourceType` string.
 Each binding has its own `lang_bindings!`, but all three build their bodies from the
 **same** [`tsv_arena`](../tsv_arena/) macros (`parse_convert!` / `parse_internal!` /
-`parse_format!`, over one `goal_allowed!` tag), so which languages have a goal axis is
+`parse_format!` / `parse_tape!`, over one `goal_allowed!` tag), so which languages have a goal axis is
 one fact in one place and coverage is identical by construction.
 
 ## Memory & Safety Contract
 
-- **Allocation**: tsv allocates returned buffers as `Box<[u8]>` and leaks them via `Box::into_raw`. Length is written to `*out_len`.
-- **Free**: Caller MUST call `tsv_free(ptr, *out_len)` exactly once per returned pointer. `tsv_free` no-ops on null or zero length.
+- **Allocation**: tsv allocates returned buffers as `Box<[u8]>` (the tape family's as `Box<[u32]>`, below) and leaks them via `Box::into_raw`. Length is written to `*out_len`.
+- **Free**: Caller MUST call `tsv_free(ptr, *out_len)` exactly once per returned pointer (`tsv_free_tape` for a `tsv_parse_tape_*` one, below). `tsv_free` no-ops on null or zero length.
+- **The tape family's word ABI**: a `tsv_parse_tape_*` payload — the tape, or on an error status the same `{"error": …}` JSON — is a `Box<[u32]>` (`words_to_ptr`): 4-aligned by its type, so a host can view the tape's words in place, its last word zero-padded past `*out_len` bytes. It keeps the uniform signature (the `*mut u8` is the words' address) and is freed by `tsv_free_tape(ptr, *out_len)`, which rebuilds the `ceil(len / 4)`-word box — never by `tsv_free`, whose byte box would be the wrong layout. One free function per family whatever the status, so a caller never picks the free by the verdict.
 - **Source buffer**: `source_ptr` must be readable for `source_len` bytes, and the buffer must not be mutated until the call returns. The bytes need not be valid UTF-8: invalid UTF-8 is reported through `TSV_STATUS_ERROR` (`{"error": "Invalid UTF-8: ..."}`), not a crash. A null `source_ptr` with `source_len == 0` is accepted as the empty source (FFI hosts commonly pass (null, 0) for an empty buffer); null with a non-zero length is an error.
 - **Out-params**: `out_len` must point to a properly aligned `size_t` and `out_status` to a properly aligned `uint32_t`, each valid for writes, and neither may overlap the source buffer (both are written while it is still being read).
-- **Errors: the status word, never the payload.** `*out_status` receives `TSV_STATUS_OK` (0) or `TSV_STATUS_ERROR` (1), written exactly once per call alongside `*out_len` — one site writes both (`bytes_to_ptr`), so they cannot disagree about which call they describe. That word is the whole verdict. A failed call's payload IS a `{"error": "..."}` JSON object with a valid pointer the caller still must free, but a caller must not sniff for it: formatted output is arbitrary source text, so no prefix test is sound in general. `tsv_parse_internal_*` is the sharpest case — its success payload is empty, carrying no shape to read a verdict off at all.
+- **Errors: the status word, never the payload.** `*out_status` receives `TSV_STATUS_OK` (0) or `TSV_STATUS_ERROR` (1), written exactly once per call alongside `*out_len` — one site per payload form writes both (`bytes_to_ptr`, and `words_to_ptr` for the tape family), so they cannot disagree about which call they describe. That word is the whole verdict. A failed call's payload IS a `{"error": "..."}` JSON object with a valid pointer the caller still must free, but a caller must not sniff for it: formatted output is arbitrary source text, so no prefix test is sound in general. `tsv_parse_internal_*` is the sharpest case — its success payload is empty, carrying no shape to read a verdict off at all.
 - **Panic safety**: Every entry point wraps the work in `std::panic::catch_unwind`. Built with `panic = "unwind"`, a panic is caught and reported as `TSV_STATUS_ERROR` with a `{"error": "panic: ..."}` payload (`tsv_arena::format_panic`, the text the N-API addon throws too); under `panic = "abort"` profiles it still aborts.
 
 ## Files
 
-- `src/lib.rs` — All bindings: the `lang_bindings!` macro (its bodies the shared `tsv_arena` macros — `parse_convert!` / `parse_internal!` for the parse exports, `parse_format!` carrying the format path's `Option<Goal>` — with `ffi_source_type` decoding the `u32` code per `tsv_arena::Family`), the three `lang_bindings!` invocations, the `TSV_STATUS_*` constants, source-extraction helpers, `tsv_free`, and a `#[cfg(test)]` module. The panic test panics inside `tsv_ts::__private::with_stores`; the format export reaches the doc arena through the macros
-- `Cargo.toml` — `crate-type = ["cdylib"]`; `unsafe_code = "deny"`, not the workspace's `forbid` — each item that needs `unsafe` (every `unsafe fn`, and in edition 2024 every `#[unsafe(no_mangle)]` export) lifts it with its own `#[expect(unsafe_code, reason = "…")]` (inside `lang_bindings!` for the generated exports), so the unsafe surface is that enumerated list and any other site is a compile error; `clippy::undocumented_unsafe_blocks = "warn"`, so every `unsafe` block carries a `// SAFETY:` comment saying why it upholds the function's `# Safety` contract; deps include `tsv_arena` (`format` → `tsv_arena/format`)
+- `src/lib.rs` — All bindings: the `lang_bindings!` macro (its bodies the shared `tsv_arena` macros — `parse_convert!` / `parse_internal!` / `parse_tape!` for the parse exports, `parse_format!` carrying the format path's `Option<Goal>` — with `ffi_source_type` decoding the `u32` code per `tsv_arena::Family`), the three `lang_bindings!` invocations, the `TSV_STATUS_*` constants, source-extraction helpers, `tsv_free` and `tsv_free_tape`, and a `#[cfg(test)]` module. The panic test panics inside `tsv_ts::__private::with_stores`; the format export reaches the doc arena through the macros
+- `Cargo.toml` — `crate-type = ["cdylib"]`; `unsafe_code = "deny"`, not the workspace's `forbid` — each item that needs `unsafe` (every `unsafe fn`, and in edition 2024 every `#[unsafe(no_mangle)]` export) lifts it with its own `#[expect(unsafe_code, reason = "…")]` (inside `lang_bindings!` for the generated exports), so the unsafe surface is that enumerated list and any other site is a compile error; `clippy::undocumented_unsafe_blocks = "warn"`, so every `unsafe` block carries a `// SAFETY:` comment saying why it upholds the function's `# Safety` contract; deps include `tsv_arena` (`format` → `tsv_arena/format`, `parse` → `tsv_arena/tape`)
 
 The in-crate test module drives every entry point in-process (real
 alloc → write `out_len`/`out_status` → `tsv_free` round-trip): the happy
 path per language, the error status on invalid syntax, the goal axis and its three
 refusals (an unknown code; a script goal on a goalless language; the unspecified
 code on a parse export) beside the fallback that code answers, the invalid-UTF-8 path,
-empty input, and `tsv_free` null/zero no-ops. Its `call_raw` helper pins the one
+empty input, `tsv_free` null/zero no-ops, and the tape family against the JSON
+wire (its errors in the same word payload, freed by `tsv_free_tape`). Its
+`call_raw` helper pins the one
 direction of status↔payload agreement that is a contract — an error status must
 carry an `{"error": …}` payload — and deliberately leaves the converse unasserted,
 since asserting a success payload *isn't* an error object would rebuild the content

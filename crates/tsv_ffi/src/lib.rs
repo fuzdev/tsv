@@ -31,7 +31,9 @@
 //!
 //! All functions that return `*mut u8` allocate memory that the caller must free
 //! by calling `tsv_free(ptr, len)` with the returned pointer and length — on the
-//! error path too.
+//! error path too. The one exception is the tape family (`tsv_parse_tape_<lang>`), whose
+//! payloads are word allocations (4-aligned, so a host can view the tape's words in place)
+//! freed by `tsv_free_tape(ptr, len)` instead, on the error path too.
 //!
 //! # Safety
 //!
@@ -63,7 +65,7 @@ use tsv_arena::parse_format;
 #[cfg(any(feature = "parse", feature = "format"))]
 use tsv_arena::{Family, goal_allowed};
 #[cfg(feature = "parse")]
-use tsv_arena::{parse_convert, parse_internal};
+use tsv_arena::{parse_convert, parse_internal, parse_tape};
 
 /// `*out_status` for a call that produced its payload: the returned bytes are the
 /// wire JSON, the formatted source, or (for `tsv_parse_internal_*`) empty.
@@ -78,8 +80,17 @@ pub const TSV_STATUS_OK: u32 = 0;
 /// a channel that carries arbitrary formatted source.
 pub const TSV_STATUS_ERROR: u32 = 1;
 
+/// How an export family renders an error payload: [`error_result`] for the byte payloads,
+/// `tape_error_result` (the `parse` feature) for the tape exports' word payloads — so a
+/// payload is always freed by its own family's free function, whatever the status.
+///
+/// # Safety
+/// The renderers' own contract ([`bytes_to_ptr`]'s): both out-params aligned, valid for
+/// writes, and not overlapping a buffer the caller still borrows.
+type ErrorRenderer = unsafe fn(&str, *mut usize, *mut u32) -> *mut u8;
+
 /// Decode the caller's source buffer and render a payload from it: either `f`'s,
-/// or an error payload when the buffer can't be decoded.
+/// or an error payload (rendered by `error_result`) when the buffer can't be decoded.
 ///
 /// The `&str` is handed *into* `f` rather than returned, which is what bounds
 /// its lifetime to this call. Returning it would need a lifetime appearing only
@@ -111,6 +122,7 @@ unsafe fn with_extracted_source(
     source_len: usize,
     out_len: *mut usize,
     out_status: *mut u32,
+    error_result: ErrorRenderer,
     f: impl FnOnce(&str) -> *mut u8,
 ) -> *mut u8 {
     // An empty source needs no read at all — and short-circuiting matters for
@@ -180,7 +192,78 @@ where
     };
     // SAFETY: `with_extracted_source`'s contract (the source buffer and both
     // out-params) is this function's own, forwarded verbatim.
-    unsafe { with_extracted_source(source_ptr, source_len, out_len, out_status, render) }
+    unsafe {
+        with_extracted_source(
+            source_ptr,
+            source_len,
+            out_len,
+            out_status,
+            error_result,
+            render,
+        )
+    }
+}
+
+/// [`with_source_string`] for the tape exports: `f` writes the tape's words into a fresh
+/// buffer and returns its length in bytes, and every payload — the tape, or an error's
+/// `{"error": "…"}` JSON — is a word allocation ([`words_to_ptr`]), 4-aligned by its type so
+/// a host can view the tape's words in place, and freed by [`tsv_free_tape`].
+///
+/// # Safety
+/// Same contract as [`with_extracted_source`]: the source buffer readable for
+/// `source_len` bytes and unmutated for the call, both out-params properly aligned,
+/// valid for writes, and not overlapping it.
+#[cfg(feature = "parse")]
+#[expect(
+    unsafe_code,
+    reason = "forwards the caller's raw source buffer and out-params"
+)]
+unsafe fn with_source_tape<F>(
+    source_ptr: *const u8,
+    source_len: usize,
+    out_len: *mut usize,
+    out_status: *mut u32,
+    f: F,
+) -> *mut u8
+where
+    F: FnOnce(&str, &mut Vec<u32>) -> Result<usize, String> + panic::UnwindSafe,
+{
+    let render = |source: &str| {
+        let written = panic::catch_unwind(|| {
+            let mut words = Vec::new();
+            f(source, &mut words).map(|len| (words, len))
+        });
+        match written {
+            // SAFETY: `words_to_ptr` needs `out_len` / `out_status` aligned and valid for
+            // writes, which is this function's own contract, and `len` is the tape's byte
+            // length within `words` (`transcode_words`' return). The captured raw
+            // out-params are still valid: `with_extracted_source` invokes this closure at
+            // most once, synchronously, before returning.
+            Ok(Ok((words, len))) => unsafe {
+                words_to_ptr(words, len, TSV_STATUS_OK, out_len, out_status)
+            },
+            // SAFETY: as above — the out-params are this function's contract, still
+            // valid during the synchronous call.
+            Ok(Err(e)) => unsafe { tape_error_result(&e, out_len, out_status) },
+            // SAFETY: as above — the out-params are this function's contract, still
+            // valid during the synchronous call.
+            Err(payload) => unsafe {
+                tape_error_result(&format_panic(&*payload), out_len, out_status)
+            },
+        }
+    };
+    // SAFETY: `with_extracted_source`'s contract (the source buffer and both
+    // out-params) is this function's own, forwarded verbatim.
+    unsafe {
+        with_extracted_source(
+            source_ptr,
+            source_len,
+            out_len,
+            out_status,
+            tape_error_result,
+            render,
+        )
+    }
 }
 
 /// Convert an output payload (JSON bytes or a formatted `String` — anything
@@ -226,6 +309,73 @@ unsafe fn error_result(message: &str, out_len: *mut usize, out_status: *mut u32)
     let json = serde_json::to_string(&error).unwrap();
     // SAFETY: this function's contract is `bytes_to_ptr`'s, forwarded verbatim.
     unsafe { bytes_to_ptr(json, TSV_STATUS_ERROR, out_len, out_status) }
+}
+
+/// A word payload as the tape exports return it: `words` leaked as a `Box<[u32]>` (its
+/// length is its capacity — `transcode_words` and [`pack_words`] fill a fresh buffer exactly,
+/// so no reallocation happens here) and its address returned as the uniform `*mut u8`,
+/// 4-aligned by the allocation's type; `len`, the payload's length in BYTES (the last word's
+/// padding not counted), written to `out_len` and `status` to `out_status`.
+///
+/// # Safety
+/// - as [`bytes_to_ptr`] for the two out-params
+/// - `len` must lie within `words`' bytes and past its last word's start, so
+///   `len.div_ceil(4) == words.len()` — what [`tsv_free_tape`] rebuilds the allocation from
+#[cfg(feature = "parse")]
+#[expect(unsafe_code, reason = "writes the caller's raw out-params")]
+unsafe fn words_to_ptr(
+    words: Vec<u32>,
+    len: usize,
+    status: u32,
+    out_len: *mut usize,
+    out_status: *mut u32,
+) -> *mut u8 {
+    debug_assert_eq!(len.div_ceil(4), words.len());
+    let words = words.into_boxed_slice();
+    // SAFETY: the caller guarantees `out_len` is properly aligned and valid for
+    // writes of a `usize` and `out_status` of a `u32`, and that neither overlaps the
+    // still-borrowed source buffer (this function's `# Safety` contract).
+    unsafe {
+        *out_len = len;
+        *out_status = status;
+    }
+    Box::into_raw(words).cast::<u8>()
+}
+
+/// `bytes` packed into words, in memory order, the last word zero-padded.
+#[cfg(feature = "parse")]
+fn pack_words(bytes: &[u8]) -> Vec<u32> {
+    let mut words = Vec::with_capacity(bytes.len().div_ceil(4));
+    let mut chunks = bytes.chunks_exact(4);
+    words.extend(
+        chunks
+            .by_ref()
+            .map(|c| u32::from_ne_bytes([c[0], c[1], c[2], c[3]])),
+    );
+    let rest = chunks.remainder();
+    if !rest.is_empty() {
+        let mut last = [0u8; 4];
+        last[..rest.len()].copy_from_slice(rest);
+        words.push(u32::from_ne_bytes(last));
+    }
+    words
+}
+
+/// [`error_result`] for the tape exports: the same `{"error": "…"}` payload, in a word
+/// allocation ([`words_to_ptr`]), so it is freed by [`tsv_free_tape`] like the tape.
+///
+/// # Safety
+/// Same contract as [`bytes_to_ptr`] for the two out-params.
+#[cfg(feature = "parse")]
+#[expect(unsafe_code, reason = "forwards the caller's raw out-params")]
+unsafe fn tape_error_result(message: &str, out_len: *mut usize, out_status: *mut u32) -> *mut u8 {
+    let error = serde_json::json!({ "error": message });
+    #[expect(clippy::unwrap_used)] // JSON serialization of simple object won't fail
+    let json = serde_json::to_string(&error).unwrap();
+    let words = pack_words(json.as_bytes());
+    // SAFETY: this function's contract is `words_to_ptr`'s for the out-params, and the
+    // packed words hold exactly `json.len()` bytes, padded to a whole word.
+    unsafe { words_to_ptr(words, json.len(), TSV_STATUS_ERROR, out_len, out_status) }
 }
 
 /// The C-ABI source-type codes, the one spelling of the `u32` every entry point
@@ -321,6 +471,7 @@ macro_rules! lang_bindings {
         $goalness:ident,
         $parse_fn:ident,
         $parse_internal_fn:ident,
+        $parse_tape_fn:ident,
         $format_fn:ident,
         $lang:ident $(,)?
     ) => {
@@ -398,6 +549,54 @@ macro_rules! lang_bindings {
             }
         }
 
+        /// Parse source code and return its tape — the binary parse wire
+        /// (`docs/tape_format.md`): the span-only wire `tsv_parse_<lang>` returns, laid down
+        /// as words. `*out_len` is the tape's length in bytes, and the payload — the tape,
+        /// or on an error status the `{"error": …}` JSON — is a word allocation, 4-aligned,
+        /// freed by `tsv_free_tape(ptr, *out_len)`, never `tsv_free`.
+        ///
+        /// # Safety
+        /// See the module-level safety contract; free with `tsv_free_tape`.
+        #[cfg(feature = "parse")]
+        #[expect(
+            unsafe_code,
+            reason = "a C ABI export: unmangled, over the caller's raw pointers"
+        )]
+        #[unsafe(no_mangle)]
+        pub unsafe extern "C" fn $parse_tape_fn(
+            source_ptr: *const u8,
+            source_len: usize,
+            source_type: u32,
+            out_len: *mut usize,
+            out_status: *mut u32,
+        ) -> *mut u8 {
+            // SAFETY: `with_source_tape`'s contract (the source buffer and both
+            // out-params) is this export's own, the module-level safety contract,
+            // forwarded verbatim.
+            unsafe {
+                with_source_tape(
+                    source_ptr,
+                    source_len,
+                    out_len,
+                    out_status,
+                    |source, words| {
+                        // parse export: the unspecified code is refused (see the first arm)
+                        let goal =
+                            ffi_source_type(source_type, goal_allowed!($goalness), Family::Parse)?;
+                        parse_tape!(
+                            $goalness,
+                            $lang,
+                            source,
+                            goal,
+                            words,
+                            |e| format!("{e:#}"),
+                            |e| format!("the parse does not fit a tape: {e}")
+                        )
+                    },
+                )
+            }
+        }
+
         /// Format source code. The source type shapes only the parse the formatter runs;
         /// formatting itself is non-configurable.
         ///
@@ -436,6 +635,7 @@ lang_bindings!(
     nogoal,
     tsv_parse_svelte,
     tsv_parse_internal_svelte,
+    tsv_parse_tape_svelte,
     tsv_format_svelte,
     tsv_svelte,
 );
@@ -443,6 +643,7 @@ lang_bindings!(
     goal,
     tsv_parse_typescript,
     tsv_parse_internal_typescript,
+    tsv_parse_tape_typescript,
     tsv_format_typescript,
     tsv_ts,
 );
@@ -450,6 +651,7 @@ lang_bindings!(
     nogoal,
     tsv_parse_css,
     tsv_parse_internal_css,
+    tsv_parse_tape_css,
     tsv_format_css,
     tsv_css,
 );
@@ -476,6 +678,38 @@ pub unsafe extern "C" fn tsv_free(ptr: *mut u8, len: usize) {
         // `Box<[u8]>` of exactly that length, so rebuilding the box is sound.
         unsafe {
             drop(Box::from_raw(std::ptr::slice_from_raw_parts_mut(ptr, len)));
+        }
+    }
+}
+
+/// Free a payload a `tsv_parse_tape_*` export returned — the tape, or its error payload.
+///
+/// # Safety
+/// - `ptr` must be a pointer previously returned by a `tsv_parse_tape_*` function (never one
+///   from another export, whose payload `tsv_free` frees)
+/// - `len` must be the length written to `out_len` by that function
+/// - Must be called exactly once per allocation
+#[cfg(feature = "parse")]
+#[expect(
+    unsafe_code,
+    reason = "a C ABI export: unmangled, reclaiming a buffer from a raw pointer"
+)]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn tsv_free_tape(ptr: *mut u8, len: usize) {
+    if !ptr.is_null() && len > 0 {
+        #[expect(
+            clippy::cast_ptr_alignment,
+            reason = "the pointer came from a `Box<[u32]>` (`words_to_ptr`), so it is 4-aligned"
+        )]
+        let words = ptr.cast::<u32>();
+        // SAFETY: the caller guarantees `ptr` / `len` are a pointer and byte length a tape
+        // export returned, not yet freed: `words_to_ptr` leaked them from a `Box<[u32]>`
+        // of exactly `len.div_ceil(4)` words, so rebuilding the box is sound.
+        unsafe {
+            drop(Box::from_raw(std::ptr::slice_from_raw_parts_mut(
+                words,
+                len.div_ceil(4),
+            )));
         }
     }
 }
@@ -632,6 +866,117 @@ mod tests {
                 "{label}: the parse export emits the span-only wire: {out}"
             );
         }
+    }
+
+    // --- parse_tape: the JSON wire as a tape, in a word allocation ---
+
+    /// [`call_raw`] for a tape export: the payload's bytes, freed by `tsv_free_tape`, with
+    /// the pointer's alignment checked — the word allocation is what lets a host view it.
+    #[expect(unsafe_code, reason = "drives a raw C ABI export and frees its buffer")]
+    fn call_tape_raw(f: FfiFn, bytes: &[u8], goal: u32) -> (u32, Vec<u8>) {
+        let mut out_len: usize = 0;
+        let mut out_status: u32 = u32::MAX;
+        // SAFETY: as in `call_raw` — a live slice, aligned disjoint out-params.
+        let ptr = unsafe {
+            f(
+                bytes.as_ptr(),
+                bytes.len(),
+                goal,
+                &raw mut out_len,
+                &raw mut out_status,
+            )
+        };
+        assert!(!ptr.is_null(), "FFI returned a null pointer");
+        assert_eq!(ptr.align_offset(4), 0, "a tape payload is word-aligned");
+        // SAFETY: the call wrote `out_len` bytes starting at `ptr`.
+        let out = unsafe { slice::from_raw_parts(ptr, out_len) }.to_vec();
+        // SAFETY: `ptr`/`out_len` came from a tape export above; freed exactly once.
+        unsafe { tsv_free_tape(ptr, out_len) };
+        assert!(
+            out_status == TSV_STATUS_OK || out_status == TSV_STATUS_ERROR,
+            "out_status must be written on every call, got {out_status}"
+        );
+        (out_status, out)
+    }
+
+    /// The tape export's payload is the JSON export's wire transcoded against the text its
+    /// offsets index (a Svelte or CSS document less its leading BOM), and its every error
+    /// is the JSON export's own.
+    #[test]
+    fn parse_tape_is_the_json_wire_and_its_errors() {
+        let cases: [(&str, FfiFn, FfiFn, &str, &str); 3] = [
+            (
+                "typescript",
+                tsv_parse_typescript,
+                tsv_parse_tape_typescript,
+                "\u{FEFF}const é = 'x😀';",
+                "const =",
+            ),
+            (
+                "svelte",
+                tsv_parse_svelte,
+                tsv_parse_tape_svelte,
+                "\u{FEFF}<div title=\"é\">x😀</div>",
+                "<div {",
+            ),
+            (
+                "css",
+                tsv_parse_css,
+                tsv_parse_tape_css,
+                "\u{FEFF}a::before { content: 'é' }",
+                "a {",
+            ),
+        ];
+        for (label, json_fn, tape_fn, good, bad) in cases {
+            let json = call(json_fn, good);
+            let wire_text = if label == "typescript" {
+                good
+            } else {
+                good.strip_prefix('\u{FEFF}').unwrap()
+            };
+            let expected = tsv_arena::tape::Transcoder::new()
+                .transcode(json.as_bytes(), wire_text)
+                .unwrap()
+                .to_vec();
+            let (status, tape) = call_tape_raw(tape_fn, good.as_bytes(), MODULE);
+            assert_eq!(status, TSV_STATUS_OK, "{label}");
+            assert_eq!(tape, expected, "{label}: the tape of the JSON wire");
+            for (bytes, goal) in [
+                (bad.as_bytes(), MODULE),
+                (good.as_bytes(), UNSPECIFIED),
+                (good.as_bytes(), UNKNOWN),
+                (&b"\xff"[..], MODULE),
+            ] {
+                let (status, payload) = call_tape_raw(tape_fn, bytes, goal);
+                assert_eq!(status, TSV_STATUS_ERROR, "{label}");
+                assert_eq!(
+                    error_message(std::str::from_utf8(&payload).unwrap()),
+                    Some(call_err_bytes(json_fn, bytes, goal)),
+                    "{label}: the JSON export's error"
+                );
+            }
+        }
+        let (status, _) = call_tape_raw(tsv_parse_tape_typescript, b"var await = 1;", SCRIPT);
+        assert_eq!(
+            status, TSV_STATUS_OK,
+            "the script goal reaches the tape export"
+        );
+        let (status, _) = call_tape_raw(tsv_parse_tape_css, b"a {}", SCRIPT);
+        assert_eq!(
+            status, TSV_STATUS_ERROR,
+            "a goalless language refuses the script code"
+        );
+        // an empty source is a tape too
+        let (status, tape) = call_tape_raw(tsv_parse_tape_typescript, b"", MODULE);
+        assert_eq!(status, TSV_STATUS_OK);
+        assert_eq!(&tape[..4], b"TSVT");
+    }
+
+    /// [`call_err_goal`] over raw bytes.
+    fn call_err_bytes(f: FfiFn, bytes: &[u8], goal: u32) -> String {
+        let (status, out) = call_raw(f, bytes, goal);
+        assert_eq!(status, TSV_STATUS_ERROR, "expected an error, got: {out}");
+        error_message(&out).expect("checked by `call_raw`")
     }
 
     // --- parse_internal: empty payload on success, error status on failure ---

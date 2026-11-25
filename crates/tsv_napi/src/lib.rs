@@ -15,7 +15,12 @@
 //! `{ok: false, error}` object (`Failure::Returned`), no `Error` built and nothing thrown;
 //! an engine failure with no point (an argument refusal, the size cap) still throws
 //! (`napi::Error`). `parse_internal_<lang>` parses without converting (benchmark-only, AST
-//! kept live via `black_box`).
+//! kept live via `black_box`). `parse_tape_<lang>` returns the binary parse wire
+//! (`docs/tape_format.md`), the JSON wire laid down as words in a `Vec<u32>` and copied into a
+//! `Uint32Array` the engine owns (4-aligned by type), which the npm loader's `parse_<lang>`
+//! decodes. A copy, not an external buffer: an external buffer's finalizer runs only once the
+//! event loop turns, so a synchronous loop of parses would hold every tape it made until it
+//! yielded, out of reach of the garbage collector.
 //!
 //! **Panic contract**: every export runs its body through [`catch_panic`], and the
 //! addon builds with the workspace `napi` profile (`release` + `panic =
@@ -45,6 +50,8 @@ use napi_derive::napi;
 // `parse_format!`, `parse_imports_json!`) come from the same crate, so the bindings
 // share ONE definition of which languages have a goal and of what each export does,
 // rather than hand-synced copies.
+#[cfg(feature = "parse")]
+use napi::bindgen_prelude::{Uint32ArraySlice, Unknown};
 #[cfg(feature = "_internal_exports")]
 use tsv_arena::Family;
 #[cfg(any(feature = "parse", feature = "format"))]
@@ -54,7 +61,7 @@ use tsv_arena::parse_format;
 #[cfg(feature = "imports")]
 use tsv_arena::parse_imports_json;
 #[cfg(feature = "parse")]
-use tsv_arena::{parse_convert, parse_internal};
+use tsv_arena::{parse_convert, parse_internal, parse_tape};
 
 // The one parse-error type, shared by every language crate: each re-exports
 // `tsv_lang::Error` (and the `ErrorReport` its `to_report` returns, whose span is two
@@ -255,12 +262,19 @@ fn engine_export<T>(
     })
 }
 
-/// Generate `parse_<lang>_json` / `parse_internal_<lang>` / `format_<lang>` N-API
-/// functions for one language module. The `js_name` literals keep the JS export
-/// names snake_case for parity with `tsv_wasm` (napi-rs would otherwise camelCase
-/// them); `parse_<lang>_json` is the name `tsv_wasm` gives the same string-returning
-/// export (the WASM engine's `parse_<lang>` returns the parsed object, which this
-/// addon leaves to its host's `JSON.parse`).
+/// A transcode the tape export could not finish, thrown as a plain `Error`: a wire the writers
+/// emit never fails one but on size (a source too long for the tape's signed string offsets).
+#[cfg(feature = "parse")]
+fn tape_failure(e: tsv_arena::tape::TapeError) -> Failure {
+    Failure::Plain(format!("the parse does not fit a tape: {e}"))
+}
+
+/// Generate `parse_<lang>_json` / `parse_internal_<lang>` / `parse_tape_<lang>` / `format_<lang>`
+/// N-API functions for one language module. The `js_name` literals keep the JS export names
+/// snake_case for parity with `tsv_wasm` (napi-rs would otherwise camelCase them);
+/// `parse_<lang>_json` is the name `tsv_wasm` gives the same string-returning export (the WASM
+/// engine's `parse_<lang>` returns the parsed object, which this addon leaves to its host's
+/// `JSON.parse`).
 ///
 /// Each export is two halves: the engine work, in a module named for the language
 /// (`$engine`), returning a [`Failure`] — what the in-crate tests drive, since they
@@ -291,6 +305,7 @@ macro_rules! lang_bindings {
         $engine:ident,
         $parse_json_fn:ident, $parse_json_js:literal,
         $parse_internal_fn:ident, $parse_internal_js:literal,
+        $parse_tape_fn:ident, $parse_tape_js:literal,
         $format_fn:ident, $format_js:literal
     ) => {
         /// The engine halves of this language's exports (see `lang_bindings!`).
@@ -324,6 +339,27 @@ macro_rules! lang_bindings {
             ) -> Result<(), Failure> {
                 let goal = napi_source_type(source_type, goal_allowed!($goalness), Family::Parse)?;
                 parse_internal!($goalness, $lang, source, goal, |e| { Failure::parse(&e) })
+            }
+
+            /// The tape (`docs/tape_format.md`): the span-only wire as words, a buffer holding
+            /// exactly the tape (padded to a whole word), which the export copies to its host.
+            #[cfg(feature = "parse")]
+            pub(super) fn parse_tape(
+                source: &str,
+                source_type: Option<String>,
+            ) -> Result<Vec<u32>, Failure> {
+                let goal = napi_source_type(source_type, goal_allowed!($goalness), Family::Parse)?;
+                let mut words = Vec::new();
+                parse_tape!(
+                    $goalness,
+                    $lang,
+                    source,
+                    goal,
+                    &mut words,
+                    |e| Failure::parse(&e),
+                    tape_failure
+                )?;
+                Ok(words)
             }
 
             /// The formatted source.
@@ -363,6 +399,27 @@ macro_rules! lang_bindings {
             engine_export(env, || $engine::parse_internal(&source, source_type))
         }
 
+        /// Parse source code and return its tape — the binary parse wire (`docs/tape_format.md`) —
+        /// as a `Uint32Array` over a buffer the engine owns (a copy, which its garbage collector
+        /// reclaims like any other, never an external buffer whose finalizer waits on the event
+        /// loop), whose exact bytes are the header's length; or the returned `{ok: false, error}`,
+        /// as the JSON export returns it. Engine plumbing: the npm loader's `parse_<lang>` decodes
+        /// it, and no published entry exports it.
+        #[cfg(feature = "parse")]
+        #[napi(js_name = $parse_tape_js, catch_unwind)]
+        pub fn $parse_tape_fn(
+            env: &Env,
+            source: String,
+            source_type: Option<String>,
+        ) -> napi::Result<Either<Unknown<'_>, Object<'_>>> {
+            engine_export(env, || {
+                let words = $engine::parse_tape(&source, source_type)?;
+                Uint32ArraySlice::copy_from(env, &words)
+                    .map(|tape| tape.to_unknown())
+                    .map_err(|e| Failure::Plain(e.to_string()))
+            })
+        }
+
         /// Format source code and return the formatted string. The source type
         /// shapes only the parse the formatter runs; formatting is non-configurable.
         /// Omitted, it means none was named: the module grammar, retried as a script. A
@@ -387,6 +444,8 @@ lang_bindings!(
     "parse_svelte_json",
     parse_internal_svelte,
     "parse_internal_svelte",
+    parse_tape_svelte,
+    "parse_tape_svelte",
     format_svelte,
     "format_svelte"
 );
@@ -398,6 +457,8 @@ lang_bindings!(
     "parse_typescript_json",
     parse_internal_typescript,
     "parse_internal_typescript",
+    parse_tape_typescript,
+    "parse_tape_typescript",
     format_typescript,
     "format_typescript"
 );
@@ -409,6 +470,8 @@ lang_bindings!(
     "parse_css_json",
     parse_internal_css,
     "parse_internal_css",
+    parse_tape_css,
+    "parse_tape_css",
     format_css,
     "format_css"
 );
@@ -1148,6 +1211,83 @@ mod tests {
                 "{label} parse_internal: the same failure as the parse"
             );
         }
+    }
+
+    // --- parse_tape: the JSON route's wire as a tape, and its failures exactly ---
+
+    /// Signature shared by every `parse_tape` engine half.
+    type TapeFn = fn(&str, Option<String>) -> Result<Vec<u32>, Failure>;
+
+    /// The tape export is the JSON export's wire transcoded against the text its offsets
+    /// index (a Svelte or CSS document less its leading BOM), and every failure is the
+    /// JSON export's own: a parse failure, a refused source type.
+    #[test]
+    fn parse_tape_is_the_json_wire_and_its_failures() {
+        let cases: [(&str, StringFn, TapeFn, &str, &str); 3] = [
+            (
+                "typescript",
+                typescript_engine::parse_json,
+                typescript_engine::parse_tape,
+                "\u{FEFF}const é = 'x😀';",
+                "const = ;",
+            ),
+            (
+                "css",
+                css_engine::parse_json,
+                css_engine::parse_tape,
+                "\u{FEFF}a::before { content: 'é' }",
+                "a {",
+            ),
+            (
+                "svelte",
+                svelte_engine::parse_json,
+                svelte_engine::parse_tape,
+                "\u{FEFF}<div title=\"é\">x😀</div>",
+                "<div {",
+            ),
+        ];
+        for (label, json_fn, tape_fn, good, bad) in cases {
+            let json = at_default(json_fn, good).unwrap();
+            let wire_text = if label == "typescript" {
+                good
+            } else {
+                good.strip_prefix('\u{FEFF}').unwrap()
+            };
+            let mut expected = Vec::new();
+            let len = tsv_arena::tape::Transcoder::new()
+                .transcode_words(json.as_bytes(), wire_text, &mut expected)
+                .unwrap();
+            let words = tape_fn(good, None).unwrap_or_else(|e| panic!("{label}: {}", e.message()));
+            assert_eq!(words, expected, "{label}: the tape of the JSON wire");
+            assert_eq!(
+                words.len(),
+                len.div_ceil(4),
+                "{label}: padded to a whole word"
+            );
+            assert_eq!(
+                tape_fn(bad, None).unwrap_err(),
+                at_default(json_fn, bad).unwrap_err(),
+                "{label}: the parse failure is the JSON export's"
+            );
+            if label != "typescript" {
+                assert_eq!(
+                    tape_fn(good, Some("module".to_owned())).unwrap_err(),
+                    at_goal(json_fn, good, "module").unwrap_err(),
+                    "{label}: the source-type refusal is the JSON export's"
+                );
+            }
+        }
+        // the goal axis reads as the JSON export's
+        let src = "var await = 1;\n";
+        assert!(typescript_engine::parse_tape(src, Some("script".to_owned())).is_ok());
+        assert_eq!(
+            typescript_engine::parse_tape(src, None).unwrap_err(),
+            at_default(typescript_engine::parse_json, src).unwrap_err()
+        );
+        assert_eq!(
+            typescript_engine::parse_tape(src, Some("sloppy".to_owned())).unwrap_err(),
+            at_goal(typescript_engine::parse_json, src, "sloppy").unwrap_err()
+        );
     }
 
     /// A point as `(offset, line, column)` — `WirePoint` is `#[non_exhaustive]`, so a test

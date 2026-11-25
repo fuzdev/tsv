@@ -17,8 +17,9 @@ Package shape, version-of-truth rule, and the `npm run release` / `build:npm:*` 
 ## The npm Facade: Options & Typed Returns
 
 The raw exports are **flat** — `parse_<lang>(source, source_type?)`,
-`parse_<lang>_json(source, source_type?)`, `format_<lang>(source, source_type?)`
-(`src/lib.rs`'s `lang_bindings!`), the same shape `tsv_napi`'s addon takes. The published
+`parse_<lang>_json(source, source_type?)`, `parse_tape_<lang>(source, source_type?)`,
+`format_<lang>(source, source_type?)` (`src/lib.rs`'s `lang_bindings!`), the same shape
+`tsv_napi`'s addon takes. The published
 surface is a **hand-written JS facade** over them: `npm/api.js` (the options reader and
 the format family) and `npm/api_parse.js` (the parse family), staged verbatim into every
 package by `scripts/patch_npm_package.ts` — and into the native `@fuzdev/tsv` by
@@ -297,6 +298,26 @@ the JS object graph node-by-node with `serde_wasm_bindgen` is measurably slower.
 `parse_*_json` exports return the JSON string itself (`{ok: true, json}` through the facade) — for
 consumers that forward the wire format (disk, network, another tool) without paying
 `JSON.parse` for an object they don't need.
+
+## The Tape Export (`parse_tape_<lang>`)
+
+The binary parse wire ([../../docs/tape_format.md](../../docs/tape_format.md)): the raw
+`parse_tape_<lang>(source, source_type?)` lays the span-only wire down as words (`tsv_arena`'s
+`parse_tape!`, the body all three bindings share) and returns a `Uint32Array` **view** of this
+instance's linear memory — no copy — or the `{ok: false, error}` every parse export returns.
+The words live in a parked thread-local buffer (`TAPE`, `src/lib.rs`): taken for the call and
+parked back full before the view is built (take and park, so a trap leaves the slot empty, never
+locked), and the view is made last, by the safe `js_sys::Uint32Array::new_with_byte_offset_and_length`
+over `wasm_bindgen::memory()`'s buffer as it stands after every growth the call made — never the
+unsafe `Uint32Array::view`. A `u32` buffer makes the view 4-aligned by type; the tape's exact
+bytes are its header's length, the array padded to a whole word.
+
+**The view is valid until the next call into the instance** — that call takes the slot and
+overwrites it, and any memory growth detaches the view's buffer. A reader decodes it
+synchronously, calling nothing in between, or copies it. The buffer, like the stores and the doc
+arena, is parked uncapped ([Memory Residency](#memory-residency)). Like `parse_internal_*`, the
+export is engine plumbing: `patch_npm_package.ts` names it in `ENGINE_ONLY_PREFIXES`, so no
+published entry re-exports it, though the raw glue carries it.
 
 ## Format Options
 

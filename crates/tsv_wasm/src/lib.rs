@@ -8,8 +8,9 @@
 //! - `--no-default-features --features format` (`@fuzdev/tsv-format-wasm`):
 //!   `format_*` exports only.
 //! - `--no-default-features --features parse` (`@fuzdev/tsv-parse-wasm`):
-//!   `parse_*`, `parse_*_json`, and `parse_internal_*` plus the convert layer
-//!   that serializes ASTs to JS; the printers drop out at link time.
+//!   `parse_*`, `parse_*_json`, `parse_internal_*` and `parse_tape_*` plus the convert layer
+//!   that serializes ASTs to JS and the transcoder that lays the wire down as a tape; the
+//!   printers drop out at link time.
 //!
 //! The AST crosses the JS boundary as a single JSON string — the span-only wire,
 //! the one every binding emits: `parse_*` calls the engine's native `JSON.parse` on
@@ -49,7 +50,7 @@ use tsv_arena::parse_format;
 #[cfg(feature = "imports")]
 use tsv_arena::parse_imports_json;
 #[cfg(feature = "parse")]
-use tsv_arena::{parse_convert, parse_internal};
+use tsv_arena::{parse_convert, parse_internal, parse_tape};
 
 // The one parse-error type, shared by every language crate: each re-exports
 // `tsv_lang::Error` (and the `ErrorReport` its `to_report` returns, whose span is two
@@ -664,7 +665,53 @@ macro_rules! wire_json {
     };
 }
 
-/// Generate `parse_<lang>` / `parse_<lang>_json` / `parse_internal_<lang>` /
+#[cfg(feature = "parse")]
+thread_local! {
+    /// The last tape a `parse_tape_<lang>` export wrote, parked between calls: the export hands
+    /// its host a view of these words in linear memory rather than a copy.
+    static TAPE: std::cell::Cell<Option<Vec<u32>>> = const { std::cell::Cell::new(None) };
+}
+
+/// Run a tape export's body over the parked tape buffer and hand back a view of what it
+/// wrote: a `Uint32Array` over the words in this instance's linear memory, no copy, its
+/// exact bytes the header's length.
+///
+/// Take and park, as the stores and the doc arena are held: the buffer leaves the slot for
+/// the call and goes back, full, before the view is built — so a trap inside `fill` leaves
+/// the slot empty rather than locked (the next call starts a fresh buffer), and the view's
+/// words stay where they are once the export returns. The view is built last, from the
+/// memory's buffer as it stands after every growth the call made, and reads through the
+/// safe typed-array constructor over that buffer, never `Uint32Array::view`.
+///
+/// **The view's lifetime is the host's to keep short.** It reads valid words until the next
+/// call into this instance: that call takes the slot and overwrites it, and any growth of
+/// the memory detaches the view's buffer. The npm facade decodes it synchronously, calling
+/// nothing in between; a host reading the raw export directly must do the same, or copy.
+/// The buffer is parked uncapped — an instance keeps what its largest input grew, like its
+/// stores and doc arena (`reinstantiate()` is the release valve).
+#[cfg(feature = "parse")]
+fn tape_view(
+    fill: impl FnOnce(&mut Vec<u32>) -> Result<usize, Failure>,
+) -> Result<JsValue, Failure> {
+    let mut words = TAPE.take().unwrap_or_default();
+    let filled = fill(&mut words);
+    // a pointer into linear memory is a 32-bit offset on the shipped target
+    let (offset, len) = (words.as_ptr() as usize as u32, words.len() as u32);
+    TAPE.set(Some(words));
+    filled?;
+    let memory = wasm_bindgen::memory().unchecked_into::<js_sys::WebAssembly::Memory>();
+    Ok(js_sys::Uint32Array::new_with_byte_offset_and_length(&memory.buffer(), offset, len).into())
+}
+
+/// A transcode the tape export could not finish, thrown as a plain `Error`: a wire the
+/// writers emit never fails one but on size (a source too long for the tape's signed string
+/// offsets).
+#[cfg(feature = "parse")]
+fn tape_failure(e: tsv_arena::tape::TapeError) -> Failure {
+    Failure::Thrown(err(format!("the parse does not fit a tape: {e}")))
+}
+
+/// Generate `parse_<lang>` / `parse_<lang>_json` / `parse_internal_<lang>` / `parse_tape_<lang>` /
 /// `format_<lang>` WASM functions for one language module. The parse exports
 /// are gated on `parse` (so the format-only build excludes the convert layer)
 /// and `format_*` on `format` (so the parse-only build drops the printers at
@@ -686,6 +733,7 @@ macro_rules! lang_bindings {
         $parse_fn:ident,
         $parse_json_fn:ident,
         $parse_internal_fn:ident,
+        $parse_tape_fn:ident,
         $format_fn:ident,
         $lang:ident $(,)?
     ) => {
@@ -741,6 +789,34 @@ macro_rules! lang_bindings {
             }
         }
 
+        /// Parse source into its tape — the binary parse wire (`docs/tape_format.md`) — as a
+        /// `Uint32Array` VIEW of this instance's memory ([`tape_view`]: valid until the next
+        /// call into the instance), whose exact bytes are the header's length; or the
+        /// `{ok: false, error}` a parse failure is returned as. Engine plumbing: the npm
+        /// facade's `parse_<lang>` decodes it, and no published entry exports it.
+        #[cfg(feature = "parse")]
+        #[wasm_bindgen]
+        pub fn $parse_tape_fn(source: &str, source_type: JsValue) -> Result<JsValue, JsValue> {
+            let goal = wasm_source_type(
+                SourceTypeArg::read(&source_type),
+                goal_allowed!($goalness),
+                Family::Parse,
+            )
+            .map_err(err)?;
+            tape_view(|words| {
+                parse_tape!(
+                    $goalness,
+                    $lang,
+                    source,
+                    goal,
+                    words,
+                    |e: Error| parse_failure(&e),
+                    tape_failure
+                )
+            })
+            .or_else(Failure::into_return)
+        }
+
         /// Format source: the formatted string, or the `{ok: false, error}` a parse failure
         /// or a refusal is returned as. The source type shapes only the parse the formatter
         /// runs; omitted, it means none was named — the module grammar, retried as a script.
@@ -770,6 +846,7 @@ lang_bindings!(
     parse_svelte,
     parse_svelte_json,
     parse_internal_svelte,
+    parse_tape_svelte,
     format_svelte,
     tsv_svelte,
 );
@@ -778,6 +855,7 @@ lang_bindings!(
     parse_typescript,
     parse_typescript_json,
     parse_internal_typescript,
+    parse_tape_typescript,
     format_typescript,
     tsv_ts,
 );
@@ -786,6 +864,7 @@ lang_bindings!(
     parse_css,
     parse_css_json,
     parse_internal_css,
+    parse_tape_css,
     format_css,
     tsv_css,
 );
