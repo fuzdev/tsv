@@ -50,7 +50,7 @@ const FACADE_SHARED_FILES: ReadonlyArray<FacadeFile> = [
 /** The format family's declarations — for the format-capable packages alone. */
 const FACADE_FORMAT_FILES: ReadonlyArray<FacadeFile> = [from_source_dir('facade_format.d.ts')];
 
-/** The facade's parse half — with the hand-maintained AST types `facade_parse.d.ts` and
+/** The facade's parse half — with the generated AST types `facade_parse.d.ts` and
  * `locations.d.ts` import. */
 const FACADE_PARSE_FILES: ReadonlyArray<FacadeFile> = [
 	from_source_dir('api_parse.js'),

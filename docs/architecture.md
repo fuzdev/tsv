@@ -254,8 +254,8 @@ This shape gives both:
 - A `Language` trait with `dyn` dispatch — costs inlining, adds vtables.
 - A central `tsv_ast` crate owning shared public/wire types — inverts
   per-language ownership; every language crate becomes a dependent of
-  the central crate. (The wire shape is the hand-maintained
-  `tsv_ast.d.ts`, not a Rust type layer; a future typed-as-reader crate
+  the central crate. (The wire shape is the AST schema table
+  `tsv_ast_schema.json` and the `tsv_ast.d.ts` generated from it, not a Rust type layer; a future typed-as-reader crate
   would be the same inversion to avoid.)
 - A `tsv_languages` enum in some core crate — forces editing a central
   place to add a language.

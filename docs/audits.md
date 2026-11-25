@@ -36,7 +36,7 @@ The Svelte compiler's *sidecar-dependent* harnesses — the corpus comparison, t
 | [Published deps](#published-graph-dependency-audit-depsaudit) | `deps:audit` | a crate meant for publishing reaching `serde_json` through a normal or build dependency, at any feature set or target — the workspace entry's features would unify into a consumer's own `serde_json` and change how it deserializes | `npm run check` |
 | [Package contents](#package-contents-audit-packageaudit) | `package:audit` | a crate meant for publishing whose crates.io tarball lacks its `README.md`, `LICENSE` (the root's bytes) or a required `NOTICE`, ships any other Markdown (`CLAUDE.md`), links relatively from its README, or states a `rust-version` other than the pinned toolchain's major.minor — plus cargo's publishable set drifting from the shared reader's, and a binary crate's binstall table naming an asset the release workflow does not upload (or missing a shipped target) | `npm run check` |
 | [Crates publish rehearsal](#crates-publish-rehearsal-publishcrates) | `publish:crates` · `publish:crates:package` | a publishable crate that does not build ALONE from its tarball against its siblings' tarballs (what workspace feature unification hides); with the public-API gate, a crate whose public API breaks its published baseline at the level the version change states — a crate with no published baseline is SKIPPED loudly, never passed | CI's `artifacts` job (`publish:crates:package`, every commit); the release workflow's `crates` job (the full dry run: tag, dispatch, weekly) |
-| [Wire-type drift](#wire-type-drift-check-checkast-types) | `check:ast-types` | the shipped `tsv_ast.d.ts` no longer describing what the wire-JSON writers emit — plus a wire type it never declared at all | `npm run check` |
+| [Wire-type drift](#wire-type-drift-check-checkast-types) | `check:ast-types` | the shipped `tsv_ast.d.ts`, generated from the AST schema table, not typing what the wire-JSON writers emit or the canonical parser's committed wire — plus a wire type the table has no entry for | `npm run check` |
 | [Package declarations](#package-declaration-check-typecheckpackages) | `typecheck:packages` | a staged package's published `.d.ts` failing a consumer's strict compile — a lib the consumer did not ask for (TS2550), a name star-export ambiguation drops (TS2308), a type a package must not export, a README example that does not compile | `scripts/publish.ts` Step 6 (all four packages); on demand (needs `npm run bench:install`, so NOT in `npm run check`) |
 | [Loc cross-grade](#loc-cross-grade-checkloc) | `check:loc` | tsv's loc wire and the shipped `locations.js` reconstruction of its span-only wire disagreeing on any fixture input — the two implementations of the one `loc` definition drifting apart | `npm run check` |
 | [Pin agreement](#canonical-pin-agreement-audit-pinsaudit) | `pins:audit` | the five canonical-oracle pin sites disagreeing — including the lockfile, which alone pins the oracle's own transitive deps | `npm run check` |
@@ -53,7 +53,7 @@ The Svelte compiler's *sidecar-dependent* harnesses — the corpus comparison, t
 | [Corpus bundle](#the-corpus-bundle-auditcorpus) | `audit:corpus` | the content-loss / robustness bundle over real code | publish Step 3c |
 | [Lexer diff](#differential-lexer-harness-lex_diff) | — | token-stream drift after a lexer change | dev tool |
 | [Variant direction](#variant-whitespace-direction-audit-variantsaudit) | `variants:audit` | a `_compact` variant that ADDS whitespace, or a `_spaces` variant that REMOVES it — the pair's two directions collapsing into one | `npm run check` |
-| [Key order](#key-order-audit-orderaudit) | `order:audit` | a wire node type emitted in more than one key order, tsv's child-bearing keys out of the canonical parser's relative order, or a duplicate key in any object | `npm run check` |
+| [Schema](#schema-audit-schemaaudit) | `schema:audit` | an object tsv's wire emits that the AST schema table does not describe — an undeclared type, an extra or missing key, a key out of the table's order, a wrong value class — or a table entry, field or flag no fixture exercises, the table's child-bearing order against the canonical parser's, or a duplicate key in any object | `npm run check` |
 | [Conformance audit](#conformance-audit-conformanceaudit) | `conformance:audit` | doc/fixture catalog + link integrity | `npm run check` |
 | [Compiler conformance](#compiler-conformance-audit-conformanceauditcompiler) | `conformance:audit:compiler` | compile-fixture divergence catalog + checklist ↔ `Refusal` drift | `npm run check` |
 | [Canonicalizer](#canonicalizer-audit-canonicalizeaudit) | `canonicalize:audit` | `canonicalize_js` non-idempotence / corrupt output / comment loss | `npm run check` |
@@ -1318,14 +1318,17 @@ the released version and for good, source the release never had.
 npm run check:ast-types     # scripts/check_ast_types.ts
 ```
 
-Three arms (below) over `crates/tsv_wasm/types/tsv_ast.d.ts`; A and C share one generated file
+Three arms (below) over `crates/tsv_wasm/types/tsv_ast.d.ts` and the AST schema table it is generated
+from (`tsv_ast_schema.json` beside it; `npm run check:ast-schema` holds the two together); A and C share one generated file
 and one `tsc -p tsconfig.ast_types.json` (strict, no ambient types: the generated file and the
 `.d.ts` it imports). ~17 s a run (nearly all arm C), changed or not: `tsc` keeps no cache.
 
 **What it proves.** That `crates/tsv_wasm/types/tsv_ast.d.ts` still describes what the
-converter emits. That `.d.ts` is hand-maintained and it **ships** — `@fuzdev/tsv-parse-wasm`
-bundles it, so it is the wire contract consumers type against, and nothing in the Rust build
-knows it exists. TypeScript's excess-property checking on the generated object literals catches
+converter emits. That `.d.ts` is generated from the table and it **ships** — `@fuzdev/tsv-parse-wasm`
+bundles it, so it is the wire contract consumers type against. [`schema:audit`](#schema-audit-schemaaudit)
+holds the table's keys, order and presence to the writers; what it cannot hold is a member TYPE
+the table spells (a union missing an alternative, a literal too narrow), which only a compiler
+typing real wire against the `.d.ts` sees. TypeScript's excess-property checking on the generated object literals catches
 both directions of drift: a field the converter emits that the `.d.ts` lacks ("may only specify
 known properties"), and a field the `.d.ts` requires that the converter does not emit
 ("Property 'X' is missing"). Renames and value-type changes fall out the same way.
@@ -1336,12 +1339,12 @@ known properties"), and a field the `.d.ts` requires that the converter does not
   types `loc` / `name_loc`, since the fixture wire is span-only. Grades the LIVE writer, so it
   is the arm that fails the moment a `write_*` changes.
 - **B — wire-type coverage.** Every `type` discriminant present in the committed fixture wire
-  must be declared, or listed in the script's `OPAQUE_WIRE_TYPES` — the CSS node vocabulary,
-  which `StyleSheet.children` types as `unknown[]` by design, plus one non-node: `Boolean`, a
-  DATA key inside the evaluated `<svelte:options customElement>` props config that the
-  text-level scan cannot tell from a discriminator. A set difference over
-  text — no type-checking, and the widest reach of the three. A stale opaque entry also fails,
-  so the list cannot quietly outlive its reason.
+  must name a table entry: one the `.d.ts` declares, or one the table marks `opaque` — the CSS
+  node vocabulary, which `StyleSheet.children` types as `unknown[]` by design — or a spelling a
+  `data` field's `discriminators` name: `Boolean`, a DATA key inside the evaluated
+  `<svelte:options customElement>` props config, no node at all. Read where the walk meets each
+  object, CSS-keyed as the table keys its CSS entries — no type-checking, and the widest reach of
+  the three. A stale opaque name also fails, so the table cannot quietly outlive its reason.
 - **C — fixture-corpus conformance.** Arm A over inputs nobody curated: a computed minimal cover
   of the corpus's `expected*.json`, typed against the same `.d.ts`. Stronger than arm A in two
   ways, not merely wider — the committed `expected.json` is the CANONICAL parser's output with
@@ -1362,9 +1365,9 @@ wrong twice, both times caught by canarying against a known-real bug rather than
 
 The cost was measured before choosing: ~1 s for positions against ~19 s for slots, on a `check`
 whose total is minutes and whose cost is dominated by build configuration rather than audit
-code. Two things keep the price honest. Slots inside an OPAQUE region (parent or child named in
-`OPAQUE_WIRE_TYPES`) are excluded from the cover target — they type against `unknown`, so
-covering them graded nothing (2893 → 2636 slots, 770 → 698 files, ~20 s). The checker keeps no
+code. Two things keep the price honest. Slots inside an OPAQUE region (parent or child among the table's
+opaque names, CSS-keyed, so a JS `Block` comment's slots stay in) are excluded from the cover
+target — they type against `unknown`, so covering them graded nothing. The checker keeps no
 cache, so each run pays the full price, the cover's size being what bounds it. Reverting is a one-line change in
 `wire_field_slots`; the trade it buys is precisely the class of bug this gate exists for. Same
 lesson one level up from the one that motivated arm B, and then again one level up from that.
@@ -1394,17 +1397,15 @@ C keeps reporting truthfully about the `.d.ts`. Oracle freshness is
 - **It asks only whether the two sides AGREE on a shape arm A reaches** — never whether that
   shape is the one acorn / `parseCss` / Svelte actually produce. Arm C narrows this a long way
   by grading the committed oracle wire, but the parse conformance gates remain the authority.
-- **Arm B is a NAME check over raw text** — two failure shapes follow, both live in the corpus
-  and both absorbed deliberately: a discriminant declared for an unrelated reason counts
-  (`AttachedComment`'s `'Line' | 'Block'` covers the CSS `Block` node's name for free — which
-  is why `Block` is listed opaque anyway), and a DATA key spelled `"type"` reads as a
-  discriminant (`Boolean`, the `customElement` config entry above). Arm C is what walks the
-  typed paths; a reachability-scoped name check would remove the first shape and is a candidate
-  follow-up.
+- **Arm B is a NAME check** — CSS-keyed, so the JS comment `Block` no longer covers the CSS
+  `Block` node's name, but blind to position: a DATA key spelled `"type"` reads as a
+  discriminant (`Boolean`, the `customElement` config entry above), which is why the table
+  names it on the field holding it. Arm C is what walks the typed paths, and `schema:audit` is
+  what resolves every object to an entry by position.
 
-The per-field checklist in
+The table and its checklist in
 [crates/tsv_wasm/CLAUDE.md §TS Type Maintenance](../crates/tsv_wasm/CLAUDE.md#ts-type-maintenance)
-is what carries a writer change; this gate is the backstop.
+are what carry a writer change; this gate and `schema:audit` are the backstops.
 
 ## Loc Cross-Grade (`check:loc`)
 
@@ -2520,70 +2521,110 @@ When adding a `_compact` variant, glue its comments **horizontally** and leave t
 lines; a glued form that stops normalizing is the signal to leave that gap, not a
 reason to pad the rest.
 
-## Key-Order Audit (`order:audit`)
+## Schema Audit (`schema:audit`)
 
 ```bash
-cargo run -p tsv_debug key_order_audit            # audit (exit 1 on any finding, or on nothing graded)
-cargo run -p tsv_debug key_order_audit --orders   # also print each type's derived total key order
-# Also: a positional fixture root (default tests/fixtures)
+cargo run -p tsv_debug schema_audit     # audit (exit 1 on any finding, or on nothing graded)
+# Also: --table <path> (default crates/tsv_wasm/types/tsv_ast_schema.json), a positional fixture root
 ```
 
-The wire's key order is tsv's own ([conformance_svelte.md §Key Order](./conformance_svelte.md#key-order)):
-the fixture gate compares tsv's wire with each canonical `expected*.json` as a key-order-insensitive
-value (P2b, P4 — [fixture_overview.md §All Validation Rules](./fixture_overview.md#all-validation-rules)),
-so once the bytes stop pinning order nothing else would notice a writer that reorders a node's keys.
-This audit states what the order still promises. Pure Rust — no sidecar, no formatter run; gated in
-`npm run check` via the `order:audit` task.
+The AST schema table, `crates/tsv_wasm/types/tsv_ast_schema.json`, is the one description of the
+wire JSON: an entry per wire node type, per named variant of one, and per `type`-less object, each
+listing its fields in wire order — what each holds, when it is present, its string class — and
+the generated `tsv_ast.d.ts` is one reading of it
+([crates/tsv_wasm/CLAUDE.md §TS Type Maintenance](../crates/tsv_wasm/CLAUDE.md#ts-type-maintenance)).
+This audit holds tsv's writers to the table, and the table to the canonical parser where key order
+is the parser's to choose. The wire's key order is tsv's own
+([conformance_svelte.md §Key Order](./conformance_svelte.md#key-order)): the fixture gate compares
+as values (P2b, P4 — [fixture_overview.md §All Validation Rules](./fixture_overview.md#all-validation-rules)),
+so the table is what still pins the order. Pure Rust — no sidecar, no formatter run; gated in
+`npm run check` via the `schema:audit` task.
 
-**What it proves**, over tsv's own span-only wire for every parseable source document in each
-fixture directory (inputs and variants, prettier-side forms included — `loc_wires`' document
-set, each at the fixture's goal):
+**What it proves**, over BOTH of tsv's wires — the span-only one and the `loc`-bearing one — for
+every parseable source document in each fixture directory (inputs and variants, prettier-side
+forms included — `loc_wires`' document set, each at the fixture's goal):
 
-- **One key order per type.** Every key sequence observed for a type embeds in one total order
-  (a topological sort of the "a before b" edges each sequence contributes); a cycle is the
-  report, `CONFLICT`, with the sequences that form it and a document for each. Keys absent from
-  one object are no conflict — the order is over the keys present.
+- **Every object resolves to an entry.** A typed object by its `type` — a node of the CSS tree
+  (below a `StyleSheet` or `StyleSheetFile`, a Svelte `StyleSheet`'s `attributes` aside) by
+  its CSS entry, since CSS's `Block` and the JS comment `Block` share a name and nothing else —
+  narrowed to the interfaces the parent field's `ts` admits there (the opaque CSS entries carry
+  a `ts` the `.d.ts` never prints, so the CSS tree's slots are checked too) and to the entries
+  whose `positions` name the parent slot, where an entry limits them; a `type`-less object by the
+  parent field's `entry`. None is `UNDECLARED`.
+- **Every object conforms to one of them**: each key a field of the entry (`EXTRA`), in the field
+  order (`ORDER`); each field the entry requires on this wire, in this document's dialect,
+  present and each it rules out absent (`PRESENCE` — the dialect is vanilla acorn's in a Svelte
+  component whose first `lang`-bearing script is not `lang="ts"` by its raw text, the writer's
+  rule); each value one of the field's kinds, `null` only where nullable (`VALUE`), a `loc`
+  carrying `character` only where its field says so; a string true to its class (`STRING`) — an
+  `own` one the node's own span of the source, a `slice` one a range of the source within the
+  nearest positioned object around it, a `keyword` one among its field's `values`. Every
+  candidate that conforms counts as exercised; the findings reported are the base entry's where
+  it conforms, else the narrowest conforming variant's, else the candidate's with the fewest.
+- **The table says nothing the fixtures do not show** (`UNEXERCISED`), as far as an observation
+  can say it: every entry is resolved to at least once and every field present on some object;
+  in each dialect an object of an acorn entry was met in, a field `optional` there is seen
+  absent there, and seen present there too where the table states the dialect apart
+  (`vanilla_acorn`) or the other dialect showed it; every flag — nullable, an item hole,
+  `character`, each kind and each keyword value a field lists — is met by some value; and a
+  `pooled` string is seen at least once that is no range of its enclosing span. The
+  attached-comment lists are exempt: the attachment walk reaches essentially every acorn node, so
+  an entry carries them as a rule, whether or not a fixture puts a comment there.
+- **One key order per type** (`TABLE`): the entries of one `type` — a base and its named
+  variants — embed in one total order. And every name a field's `ts` spells resolves to an
+  alias or an interface the table declares.
 - **Child-bearing order is the canonical parser's.** A key is child-bearing for a type when it
-  holds a positioned object (numeric `start` and `end`) or an array holding one, and
-  `leadingComments` / `trailingComments` always are, by name — a `<script>` `Program`'s
-  preceding-HTML entry is a positionless `{type, value}`, so content alone would miss its
-  list (the oracle writes it after `trailingComments`). The audit
-  reads the oracle's own sequences from the committed oracle files (`expected.json`,
-  `expected_svelte.json`, each `expected_<stem>.json` pin; the `{"error": …}` marker
-  skipped), cuts both sides to the type's child-bearing keys, and requires the two sides'
-  edges together to still sort — `CHILD-ORDER` when they don't. This is the order Svelte's
-  `add_comments` and its compiler's visitors walk.
-- **The oracle agrees with itself.** An oracle type whose child-bearing keys take more than one
-  order on their own fails the run (`ORACLE`) rather than being exempted silently; an
-  exemption has to be named deliberately.
-- **No duplicate key** in any object on either side (`DUPLICATE`), which a `Value` read — the
-  fixture gate's — would collapse to its last occurrence.
+  holds a positioned object (numeric `start` and `end`) or an array holding one, on either
+  side, and `leadingComments` / `trailingComments` always are, by name — a `<script>`
+  `Program`'s preceding-HTML entry is a positionless `{type, value}`, so content alone would
+  miss its list. The audit reads the oracle's own sequences from the committed oracle files
+  (`expected.json`, `expected_svelte.json`, each `expected_<stem>.json` pin; the
+  `{"error": …}` marker skipped), cuts them and the table's order for the type to the
+  child-bearing keys, and requires the edges together to still sort — `CHILD-ORDER` when they
+  don't. This is the order Svelte's `add_comments` and its compiler's visitors walk. An oracle
+  type whose child-bearing keys take more than one order on their own fails the run (`ORACLE`)
+  rather than being exempted silently.
+- **No duplicate key** in any object on either side (`DUPLICATE`), which a `Value` read or a
+  `JSON.parse` would collapse to its last occurrence — why this check lives here; the table's own
+  duplicates are `check:ast-schema`'s.
 
-**Keying.** An object with a string `type` keys by it; CSS nodes key apart as `css:<type>`
-(CSS's `Block` and the JS comment `Block` share a name and nothing else); a `type`-less object
-keys by where it sits, `~<parent>.<field>`, so its order is held too.
+A finding is reported once per distinct message, with the first document that made it and how
+many times it was made.
 
 **Exempt by design.**
 
-- **Scalar order** is free across types — the audit asks only that each type use one order, never
-  which one.
-- **TypeScript-only children** — the keys Svelte's `remove_typescript_nodes` deletes before any
-  visitor walks (`TYPESCRIPT_ONLY_KEYS` in `key_order_audit.rs`) — are left out of the
-  child-bearing comparison: their position is tsv's to choose. Comment attachment still walks
-  them, so moving one can move an attachment — the `async <T>(…)` arrow's, a cataloged
-  divergence. The list is hand-mirrored from Svelte's source; re-read it on an oracle bump.
+- **Scalar order** follows the table but is never compared with the oracle's.
+- **TypeScript-only children** — the fields the table marks `ts_only`, the keys Svelte's
+  `remove_typescript_nodes` deletes before any visitor walks — are left out of the child-bearing
+  comparison: their position is tsv's to choose. Comment attachment still walks them, so moving
+  one can move an attachment — the `async <T>(…)` arrow's, a cataloged divergence. The set is
+  hand-mirrored from Svelte's source; re-read it on an oracle bump.
+- **`cooked` strings are not graded per value**: whether one needed decoding is a per-value fact,
+  so a cooked string may or may not be a slice. A member's `ts` is not graded either — that is
+  `check:ast-types`'.
 
 ⚠️ **Blind spots.**
 
-- **Only fixture shapes.** A type, or a key sequence, no fixture document produces is never
-  seen, and a child-bearing pair is compared against the oracle only where an oracle file holds
-  the type with both keys present. A route that writes a type in a second order on a construct no fixture holds
-  passes — the corpus tools compare as values, key order unseen.
+- **Only fixture shapes.** A type, a key sequence or a dialect no fixture document produces is
+  never seen, and a child-bearing pair is compared against the oracle only where an oracle file
+  holds the type with both keys present; the corpus tools compare as values, key order unseen.
+  A dialect claim no document contradicts is unprovable by observation: a field the table makes
+  `absent` under vanilla acorn and some other presence under acorn-typescript passes on its
+  vanilla side whatever the claim, since vanilla fixtures never show a field a canonical-accepted
+  vanilla component cannot hold — the claims state what holds for every input the canonical
+  parser accepts, which tsv's permissive parser can exceed. The one TypeScript-only field with no
+  vanilla claim, `Identifier.typeAnnotation`, is left open by a tracked over-acceptance fixture
+  (`svelte/script/no_lang_typescript_svelte_prettier_divergence`); once that input is rejected, the
+  audit's never-present rule forces the claim.
 - **Child-bearing is read off the value.** A key that is `null` or an empty array in every
   observed instance is never child-bearing for its type, so its order relative to the children
-  goes unchecked.
-- **The span-only wire only.** The `loc` wire is not walked; its one addition, `loc` right after
-  `end`, is placed by construction and graded as a value by `check:loc`.
+  goes unchecked against the oracle (the table still fixes it).
+- **Variant resolution is by position and shape.** A Svelte-built node whose key set is a subset
+  of its acorn namesake's is told apart only where the parent field admits one and not the other
+  (or the entry's `positions` exclude the slot); elsewhere the object exercises both, and the
+  base entry takes its findings.
+- **A `slice` string is placed only within its enclosing span**, not at a specific range: a
+  string that happens to recur inside that span passes.
 - **A document tsv rejects** is skipped and counted (the fixture gate and `check:loc` own that
   verdict), and a `tsv_rejects.txt` fixture is read for its oracle file alone.
 

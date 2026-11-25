@@ -5,7 +5,7 @@ WebAssembly bindings for `tsv`. Three npm packages from one Rust crate via the `
 
 - `@fuzdev/tsv-format-wasm` — `--no-default-features --features format`, format only
 - `@fuzdev/tsv-parse-wasm` — `--no-default-features --features parse`, parse only (the printers
-  drop out at link time; bundles `tsv_ast.d.ts` for typed returns)
+  drop out at link time; bundles `tsv_ast.d.ts`, generated from `tsv_ast_schema.json`, for typed returns)
 - `@fuzdev/tsv-wasm` — the default build: everything — the type strip (`strip_typescript`,
   the `strip` feature) and the import records (`parse_imports_typescript` /
   `parse_imports_svelte`, the `imports` feature), neither of which a subset enables, included —
@@ -679,48 +679,90 @@ The wasm-bindgen-generated `tsv_wasm.d.ts` declares the class, so no
 
 ## TS Type Maintenance
 
-`types/tsv_ast.d.ts` is **hand-maintained**. Any change to the wire JSON a
-writer emits — a field, its key name, when it's omitted, or a discriminator
-`type` string — in `crates/tsv_*/src/ast/convert/write*` must also update the
-`.d.ts`. Reviewers (human or agent) flag drift at PR time.
+The wire is described once, in the **AST schema table** `types/tsv_ast_schema.json`, and
+`types/tsv_ast.d.ts` is **generated** from it (`scripts/ast_types_gen.ts`): edit the table, never
+the `.d.ts`. `npm run ast-schema:update` rewrites the table in its canonical layout and
+regenerates the `.d.ts`; `npm run check:ast-schema` (in `check`) fails when either file is not
+what that would write. Plain JSON, so every consumer reads it with nothing new — the Node
+generators with `JSON.parse`, `tsv_debug schema_audit` with `serde_json` — named for the `.d.ts`
+it sits beside. The layout is the generator's (`scripts/ast_schema.ts`), never a JSON formatter's.
+
+**What the table says.** `sections` (the `.d.ts`'s `//` headers, in order) hold three kinds of
+item:
+
+- **An entry** per wire node type (`type`), per **named variant** of one (`variant` — a node the
+  same `type` names whose key set or field types differ by where it sits: every Svelte-built
+  namesake below, `RegexLiteral`, the type-position `TemplateLiteralType`, the positionless
+  preceding-HTML comment), and per `type`-less object (`loc`'s `SourceLocation`, a template
+  element's `value`, `<svelte:options>`). `interface` names the `.d.ts` interface it generates:
+  entries sharing one merge into it — the `type` member the union of their discriminators, a
+  member some entry lacks or emits only conditionally optional. `css` marks a node of the CSS
+  tree (below a stylesheet root, keyed apart from a JS namesake); `opaque` an entry the
+  `.d.ts` leaves undeclared (the CSS node vocabulary below `StyleSheet.children: unknown[]`,
+  whose fields still carry a `ts` naming the CSS entries they hold, for the audit alone);
+  `positions` the parent slots (`Type.key`) an entry may stand in where its interface admits
+  more (the preceding-HTML comment, `Program.leadingComments` alone);
+  `mixin` the comment-attachment interface no wire object is graded against; `extends`,
+  `doc` (published, one string per line) and `note` (maintainer rationale, never published).
+- **Its `fields`, in wire order** — the order the writer emits them in, one order per type.
+  Each has a `key`; a `kind` (`type`, `offset`, `loc`, `boolean`, `number`, `string`,
+  `strings`, `child`, `list`, `object`, `comments`, `data` for opaque JSON, `null` for a slot
+  that is always `null`; several where the value varies); `ts`, the member's `.d.ts` type (an
+  `object` or `loc` field's defaults to its `entry`, the `type`-less entry it holds; a comment
+  list's is the mixin's); `presence` (default always; `optional` when emitted only
+  conditionally, `locations` on the `loc`-bearing wire alone, `absent`) and `vanilla_acorn`, the
+  presence in a non-`lang="ts"` component where it differs; `nullable`, `items_nullable` (array
+  holes); `string`, the class of a string's text, each a promise a consumer (a decoder) may rely
+  on — `own` (its node's own span of the source: graded per value), `slice` (a range of the
+  source within the nearest positioned object around it: graded per value), `cooked` (decoded
+  from the source — a slice unless decoding changed it, so no per-value promise), `keyword` (one
+  of the field's `values`, a closed vocabulary: graded per value, and every value must be met),
+  `pooled` (text no span on the wire locates — built by the writer, or read from source the wire
+  gives no position for — so it must be carried: graded only as having been seen once that
+  way); `values`, a `keyword` field's vocabulary; `ts_only` (a key Svelte's
+  `remove_typescript_nodes` deletes, its position tsv's to choose); `character` (a `loc` whose positions may carry `character`); `discriminators` (the
+  `type` spellings a `data` field holds as data, not nodes); `doc` and `note`.
+- **An alias** — a `.d.ts` union (`Expression`, `FragmentNode`), `intersect`-ed with the mixin
+  where every member may carry attached comments.
 
 Maintenance checklist when a writer's emitted shape changes:
 
 1. Update the `write_*` function (the emitted field / key / skip condition).
-2. Locate the matching `interface` / `type` in `types/tsv_ast.d.ts`.
-3. Apply the same change. The JSON key is exactly what the writer emits
-   (e.g. `w.raw(",\"typeParameters\":")` → `typeParameters`).
-4. A field the writer emits only conditionally (`if let Some(..)` / `if flag`)
-   is optional in TS (`T?`); one it never emits is absent from the interface.
-5. If the field carries positions (`start`/`end`/`loc`/`character`), make sure
+2. Find the entry (or entries, a base and its variants) in `types/tsv_ast_schema.json`, and
+   apply the same change: the key is exactly what the writer emits (e.g.
+   `w.raw(",\"typeParameters\":")` → `typeParameters`), in the order it emits it; a key it
+   emits only conditionally takes `presence: optional`, one it never emits is no field.
+3. If the field carries positions (`start`/`end`/`loc`/`character`), make sure
    the writer (`ast/convert/write*`) emits them through the document's
    `WirePositions` (each writer's `Ctx::pos` and node-header helpers and
    `JsonWriter::span_start_end*` for offsets, `span_loc` / `loc_field` for `loc`) — a raw byte offset means
    silently untranslated positions on multibyte sources.
-6. Run `cargo test --workspace` and `npm run check:ast-types`.
+4. Run `npm run ast-schema:update`, then `npm run schema:audit` (the writers against the
+   table, over every fixture document on both wires — [docs/audits.md §Schema Audit](../../docs/audits.md#schema-audit-schemaaudit)),
+   `npm run check:ast-types` and `cargo test --workspace`.
 
-`npm run check:ast-types` (in `npm run check`) runs three arms against `tsv_ast.d.ts`
+`npm run check:ast-types` (in `npm run check`) runs three arms against the generated `tsv_ast.d.ts`
 ([docs/audits.md §Wire-Type Drift Check](../../docs/audits.md#wire-type-drift-check-checkast-types)):
 **(A)** `tsv parse --locations` on curated snippets, each output embedded as a typed literal and
 typechecked by `tsc` — excess-property checking catches drift both ways (missing/added fields,
 discriminator-string mismatches); **(B)** every `type` discriminant the fixture corpus produces
-must be declared here or be deliberately opaque (the CSS node vocabulary plus the
-`customElement` config-data `type:` key); **(C)** a computed minimal cover of every field SLOT
+must name a table entry, declared or deliberately opaque (the CSS node vocabulary plus the
+`customElement` config-data `type:` key, both read from the table); **(C)** a computed minimal cover of every field SLOT
 (`ParentType.key -> ChildType`) in the committed `expected*.json`, typed the same way — graded
 against the CANONICAL parser's output (`loc`/`name_loc` stripped) rather than tsv's own, since
 `expected.json` is what `fixtures_update_parsed` regenerates from Svelte / acorn-typescript /
 `parseCss`.
 
 Extend the `samples` array when a shape wants stating explicitly; arms B
-and C need no maintenance — they follow the fixture tree. A `.d.ts` field
+and C need no maintenance — they follow the fixture tree. A field
 typed `unknown` is invisible to arm C, so typing one concretely (`Script.content`
 is `Program`, not `unknown`) is what puts a region behind the gate.
 
 ⚠️ **A node SVELTE builds is not the acorn node of the same `type`, and the tell — in
 Svelte's own wire — is `loc`.** Where Svelte constructs a node instead of handing the
 text to acorn, the result carries the acorn discriminator but a different field set —
-so it needs its own interface rather than reuse, and a position holding either takes a
-union. The tell is Svelte's alone: tsv's wire gives every positioned object a `loc`,
+so it needs its own variant entry and interface rather than reuse, and a position holding
+either takes a union. The tell is Svelte's alone: tsv's wire gives every positioned object a `loc`,
 these included (each interface types it `loc?`), so on tsv's wire the difference
 is the field set, not the `loc`. The ones in the wire today, each with its own type, and
 the acorn node the last is easily confused with:
@@ -733,27 +775,33 @@ the acorn node the last is easily confused with:
 | `{const}` / `{let}` `declaration` | the ordinary acorn `VariableDeclaration` | parsed, so `loc` throughout — and unlike `{@const}` it may carry MORE THAN ONE declarator |
 
 The inverse mistake is just as easy: typing one of these as its acorn namesake
-compiles until a fixture reaches it. The wire-type gate's fixture-cover arm is what
-holds the distinction.
+compiles until a fixture reaches it. The wire-type gate's fixture-cover arm catches that
+where the canonical wire differs; `schema:audit` resolves each object by the union its
+position admits, but where both namesakes conform it cannot tell which one an object is.
 
 ⚠️ **Comment attachment is a Svelte-only wire fact with a modelling rule.**
 `leadingComments` / `trailingComments` (`AttachedComment[]`) are appended by
 Svelte's acorn pass, never by `parse_typescript` / `parse_css`, and the
-attachment DFS reaches essentially every acorn node. They are therefore
-declared once as `AcornCommentAttachment` and applied two ways, which
+attachment DFS reaches essentially every acorn node. The table lists them on every acorn
+entry (`kind: comments`, after every other field — trailing before leading on `Program`, as
+Svelte appends them), and the `.d.ts` declares them once as `AcornCommentAttachment` (the
+table's `mixin`), applied two ways, which
 between them cover every acorn node: **intersected** into the node unions
 (`Expression`, `Statement`, `TSType`, `TSTypeElement`), and **extended**
 by the acorn interfaces that positions reference directly by name
-(`Identifier`, `Property`, `BlockStatement`, `SwitchCase`, …). A new acorn
-node reachable only by name needs the `extends`; the gate is what says so.
+(`Identifier`, `Property`, `BlockStatement`, `SwitchCase`, …) — the entry's `extends`. A new
+acorn node reachable only by name needs the `extends`; the gate is what says so.
 
-The acorn-typescript vs vanilla-acorn deltas the writer emits (`vanilla_acorn`)
-require dual updates.
+The acorn-typescript vs vanilla-acorn deltas the writer emits (`Ctx::vanilla_acorn`) are each
+field's `vanilla_acorn` presence, and so is a TypeScript-only field's `absent` there: the
+presence a canonical-accepted vanilla component can show, which tsv's permissive parser can
+exceed.
 
 ## Files
 
 - `src/lib.rs` — WASM bindings (`lang_bindings!` macro, its bodies the `parse_convert!` / `parse_internal!` / `parse_format!` macros shared with the two native bindings via [`tsv_arena`](../tsv_arena/), and the two imports exports' `parse_imports_json!` shared with `tsv_napi`, every export flat `(source, source_type?)`, + `wasm_source_type`, the raw module's source-type decoder; what every export family shares is gated on the private `_internal_exports` feature each family enables) + the wasm32-gated talc `#[global_allocator]` and panic hook
-- `types/tsv_ast.d.ts` — Hand-maintained TS types, bundled into the parse-capable packages
+- `types/tsv_ast_schema.json` — the AST schema table: every wire node type and named variant, its fields in wire order (§TS Type Maintenance)
+- `types/tsv_ast.d.ts` — TS types GENERATED from the table (`npm run ast-schema:update`), bundled into the parse-capable packages
 - `npm/cli.js` — The `tsv` bin shipped in `@fuzdev/tsv-wasm` — mirrors `tsv_cli`'s contract (flags, exit codes, traversal); argv parsed by a transcription of argh's grammar, zero deps.
   - **Pool.** Path mode fans onto `node:worker_threads` behind `--jobs`, spawning **itself** as the worker (`isMainThread` splits the two roles) and claiming work off one `Atomics` cursor. `WORKER_FILE_THRESHOLD` gates the **default** only — a JS pool costs tens of milliseconds to bring up against the native pool's ~50 µs thread spawn. Only on the WASM engine does a width of 1 stay on the main thread: over N-API it is a pool of one worker (`resolve_route`), since a native stack overflow on the main thread is a `SIGSEGV` no catch survives and only a pool worker carries the reserved stack. An explicit `--jobs N` bypasses the threshold at any file count and is held to the native CLI's `4 × logical` ceiling (`clamp_worker_count`, restated by hand, over the same logical count — the affinity mask capped by the cgroup CPU quota, which `cgroup_cpu_quota` transcribes from Rust std because Node's and Bun's `availableParallelism()` leave it out), giving the threshold something to be calibrated against.
   - **Per-engine defaults.** The threshold and `default_jobs` are keyed off the same `wasm_module` export that decides how a worker binds: the crossover and the knee are properties of the engine, not the driver (see [../../docs/cli.md](../../docs/cli.md) §Binary Structure). On WASM the pool peaks at *half* the physical cores, because V8's multithreaded wasm tier-up has claimed the rest before the first worker exists; over the N-API addon, with no compiler thread to compete with, at the core count.

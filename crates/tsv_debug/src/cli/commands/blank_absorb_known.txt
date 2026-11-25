@@ -35,7 +35,7 @@
 # fix — or a vanished site; re-pin either way).
 #
 # Format: (NODE_TYPE, LEFT→RIGHT)
-# shapes: 540
+# shapes: 543
 (AnimateDirective, ^→expression)
 (AnimateDirective, expression→$)
 (ArrayExpression, ^→$)
@@ -386,6 +386,7 @@
 (TSArrayType, elementType→$)
 (TSAsExpression, ^→expression)
 (TSAsExpression, expression→typeAnnotation)
+(TSCallSignatureDeclaration, ^→$)
 (TSCallSignatureDeclaration, ^→parameters)
 (TSCallSignatureDeclaration, ^→typeAnnotation)
 (TSCallSignatureDeclaration, parameters→parameters)
@@ -396,9 +397,11 @@
 (TSConditionalType, checkType→extendsType)
 (TSConditionalType, extendsType→trueType)
 (TSConditionalType, trueType→falseType)
+(TSConstructSignatureDeclaration, ^→$)
 (TSConstructSignatureDeclaration, ^→parameters)
 (TSConstructSignatureDeclaration, ^→typeAnnotation)
 (TSConstructSignatureDeclaration, ^→typeParameters)
+(TSConstructSignatureDeclaration, parameters→$)
 (TSConstructSignatureDeclaration, parameters→typeAnnotation)
 (TSConstructSignatureDeclaration, typeAnnotation→$)
 (TSConstructSignatureDeclaration, typeParameters→parameters)

@@ -46,7 +46,6 @@ pub mod imports;
 pub mod imports_fixtures_update;
 pub mod imports_fixtures_validate;
 pub mod json_profile;
-pub mod key_order_audit;
 pub mod lex_diff;
 pub mod line_width;
 pub mod loc_wires;
@@ -59,6 +58,7 @@ pub mod render_audit;
 pub mod render_compare;
 pub mod roundtrip_audit;
 pub mod scan_audit;
+pub mod schema_audit;
 pub mod strip;
 pub mod strip_fixtures_validate;
 #[cfg(feature = "_internal_swallow_check")]

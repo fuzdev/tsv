@@ -1,26 +1,28 @@
 /**
- * Hand-maintained TypeScript declarations for the tsv wire JSON (the public
- * AST each parse export returns).
+ * TypeScript declarations for the tsv wire JSON (the public AST each parse export returns).
  *
- * Mirrors what the wire-JSON writers emit:
+ * GENERATED from `tsv_ast_schema.json` beside it by `npm run ast-schema:update` — edit the
+ * table, never this file; `npm run check:ast-schema` holds the two together. The table is the
+ * one description of what the wire-JSON writers emit:
  *   - crates/tsv_ts/src/ast/convert/write/
  *   - crates/tsv_css/src/ast/convert/write.rs
  *   - crates/tsv_svelte/src/ast/convert/write.rs
  *
- * Bundled inside `@fuzdev/tsv-parse-wasm`, `@fuzdev/tsv-wasm`, and `@fuzdev/tsv`. Any change
- * to the JSON a writer emits must be mirrored here — see
- * `crates/tsv_wasm/CLAUDE.md` for the maintenance checklist.
+ * Bundled inside `@fuzdev/tsv-parse-wasm`, `@fuzdev/tsv-wasm`, and `@fuzdev/tsv`. See
+ * `crates/tsv_wasm/CLAUDE.md` §TS Type Maintenance for what the table says and how a writer
+ * change reaches it.
  *
- * Field names are exactly the keys the writer emits. A field emitted only
- * conditionally (`if let Some(..)` / `if flag`) is optional (`T?`); a field
+ * Field names are exactly the keys the writer emits, listed in the order it emits them. A field
+ * emitted only conditionally (`if let Some(..)` / `if flag`) is optional (`T?`); a field
  * always emitted with a `null` fallback (`write_or_null`) is `T | null`.
  *
  * **Completeness contract**: this file is verified exactly as far as the test corpus
  * reaches — `scripts/check_ast_types.ts` types the curated samples and the committed fixture
- * wire against it (every `type` discriminant, every gradable field slot). A claim narrower
- * than the field's name suggests (a tuple length, a literal union, `never[]`) is a checked
- * statement about that corpus, not a spec guarantee; on a construct no fixture exercises,
- * trust the wire over this file and add the fixture.
+ * wire against it (every `type` discriminant, every gradable field slot), and
+ * `tsv_debug schema_audit` holds every object tsv emits over the fixtures to the table. A claim
+ * narrower than the field's name suggests (a tuple length, a literal union, `never[]`) is a
+ * checked statement about that corpus, not a spec guarantee; on a construct no fixture
+ * exercises, trust the wire over this file and add the fixture.
  */
 
 //
@@ -59,8 +61,10 @@ export interface SourceLocation {
 export interface AttachedComment {
 	type: 'Line' | 'Block';
 	value: string;
-	/** Present on every attachment except the leading run Svelte builds on `Program` itself
-	 * — the corpus's only start/end-less attachment position. */
+	/**
+	 * Present on every attachment except the leading run Svelte builds on `Program` itself
+	 * — the corpus's only start/end-less attachment position.
+	 */
 	start?: number;
 	/** See `start`. */
 	end?: number;
@@ -314,8 +318,8 @@ export interface SwitchCase extends AcornCommentAttachment {
 	start: number;
 	end: number;
 	loc?: SourceLocation;
-	test: Expression | null;
 	consequent: Statement[];
+	test: Expression | null;
 }
 
 export interface TryStatement {
@@ -366,8 +370,8 @@ export interface LabeledStatement {
 	start: number;
 	end: number;
 	loc?: SourceLocation;
-	label: Identifier;
 	body: Statement;
+	label: Identifier;
 }
 
 export interface EmptyStatement {
@@ -389,10 +393,10 @@ export interface VariableDeclaration extends AcornCommentAttachment {
 	start: number;
 	end: number;
 	loc?: SourceLocation;
-	declarations: VariableDeclarator[];
-	kind: string;
 	/** Omitted from JSON when false. */
 	declare?: boolean;
+	declarations: VariableDeclarator[];
+	kind: string;
 }
 
 export interface VariableDeclarator extends AcornCommentAttachment {
@@ -538,8 +542,8 @@ export interface NewExpression {
 	end: number;
 	loc?: SourceLocation;
 	callee: Expression;
-	arguments: Expression[];
 	typeArguments?: TSTypeParameterInstantiation;
+	arguments: Expression[];
 }
 
 /** Dynamic import: `import('mod')` or `import('mod', {with: {type: 'json'}})`. */
@@ -612,6 +616,7 @@ export interface ArrowFunctionExpression {
 	start: number;
 	end: number;
 	loc?: SourceLocation;
+	returnType?: TSTypeAnnotation;
 	/** Always null for arrow functions. */
 	id: null;
 	expression: boolean;
@@ -620,7 +625,6 @@ export interface ArrowFunctionExpression {
 	params: Expression[];
 	body: ArrowFunctionBody;
 	typeParameters?: TSTypeParameterDeclaration;
-	returnType?: TSTypeAnnotation;
 }
 
 export type ArrowFunctionBody = Expression | BlockStatement;
@@ -762,8 +766,8 @@ export interface Property extends AcornCommentAttachment {
 	shorthand: boolean;
 	computed: boolean;
 	key: Expression;
-	kind: string;
 	value: Expression;
+	kind: string;
 }
 
 /** `<Type>expr` angle-bracket type assertion. */
@@ -824,9 +828,9 @@ export interface ClassDeclaration {
 	start: number;
 	end: number;
 	loc?: SourceLocation;
-	decorators?: Decorator[];
 	declare?: boolean;
 	abstract?: boolean;
+	decorators?: Decorator[];
 	id: Identifier | null;
 	typeParameters?: TSTypeParameterDeclaration;
 	superClass: Expression | null;
@@ -876,19 +880,19 @@ export interface MethodDefinition extends AcornCommentAttachment {
 	start: number;
 	end: number;
 	loc?: SourceLocation;
-	decorators?: Decorator[];
-	accessibility?: string;
 	abstract?: boolean;
-	static: boolean;
+	accessibility?: string;
 	/** Omitted from JSON when false. */
 	override?: boolean;
-	/** Optional method (`m?()`); omitted from JSON when false. */
-	optional?: boolean;
+	static: boolean;
 	computed: boolean;
 	key: Expression;
+	/** Optional method (`m?()`); omitted from JSON when false. */
+	optional?: boolean;
 	kind: string;
 	typeParameters?: TSTypeParameterDeclaration;
 	value: MethodValue;
+	decorators?: Decorator[];
 }
 
 export type MethodValue = FunctionExpression | TSDeclareMethod;
@@ -899,7 +903,7 @@ export interface TSDeclareMethod {
 	start: number;
 	end: number;
 	loc?: SourceLocation;
-	id: Identifier | null;
+	id: null;
 	expression: boolean;
 	generator: boolean;
 	async: boolean;
@@ -912,13 +916,12 @@ export interface PropertyDefinition extends AcornCommentAttachment {
 	start: number;
 	end: number;
 	loc?: SourceLocation;
-	decorators?: Decorator[];
+	declare?: boolean;
 	abstract?: boolean;
 	accessor?: boolean;
 	accessibility?: string;
 	readonly?: boolean;
 	override?: boolean;
-	declare?: boolean;
 	static: boolean;
 	computed: boolean;
 	key: Expression;
@@ -926,6 +929,7 @@ export interface PropertyDefinition extends AcornCommentAttachment {
 	definite?: boolean;
 	typeAnnotation?: TSTypeAnnotation;
 	value: Expression | null;
+	decorators?: Decorator[];
 }
 
 export interface FunctionExpression extends AcornCommentAttachment {
@@ -949,8 +953,10 @@ export interface TSExpressionWithTypeArguments extends AcornCommentAttachment {
 	start: number;
 	end: number;
 	loc?: SourceLocation;
-	/** A dotted heritage name (`implements A.B`, `extends A.B`) is a `TSQualifiedName`, so
-	 * this is the entity-name union rather than a general expression. */
+	/**
+	 * A dotted heritage name (`implements A.B`, `extends A.B`) is a `TSQualifiedName`, so
+	 * this is the entity-name union rather than a general expression.
+	 */
 	expression: TSEntityName;
 	typeParameters?: TSTypeParameterInstantiation;
 }
@@ -1030,6 +1036,8 @@ export interface TSInterfaceDeclaration extends AcornCommentAttachment {
 	start: number;
 	end: number;
 	loc?: SourceLocation;
+	/** Omitted from JSON when false. */
+	declare?: boolean;
 	id: Identifier;
 	typeParameters?: TSTypeParameterDeclaration;
 	/**
@@ -1039,8 +1047,6 @@ export interface TSInterfaceDeclaration extends AcornCommentAttachment {
 	 */
 	extends?: TSExpressionWithTypeArguments[];
 	body: TSInterfaceBody;
-	/** Omitted from JSON when false. */
-	declare?: boolean;
 }
 
 /** `declare function foo(): void` or overload signature. */
@@ -1295,12 +1301,14 @@ export interface TSTypeAnnotation {
 	start: number;
 	end: number;
 	loc?: SourceLocation;
-	/** See `AcornCommentAttachment` — a wrapper node, not a union member, so it carries the
-	 * attachment keys itself. */
+	typeAnnotation: TSType;
+	/**
+	 * See `AcornCommentAttachment` — a wrapper node, not a union member, so it carries the
+	 * attachment keys itself.
+	 */
 	leadingComments?: AttachedComment[];
 	/** See `leadingComments`. */
 	trailingComments?: AttachedComment[];
-	typeAnnotation: TSType;
 }
 
 export type TSType = (
@@ -1577,12 +1585,12 @@ export interface TSMethodSignature {
 	key: Expression;
 	/** Omitted from JSON when false. */
 	optional?: boolean;
-	/** `"get"` or `"set"` for accessor signatures; omitted for regular methods. */
-	kind?: string;
 	typeParameters?: TSTypeParameterDeclaration;
 	parameters: Expression[];
 	/** Return type. Serialized as `typeAnnotation` to match acorn-typescript. */
 	typeAnnotation?: TSTypeAnnotation;
+	/** `"get"` or `"set"` for accessor signatures, `"method"` otherwise. */
+	kind: string;
 }
 
 /** `(): T`. */
@@ -1931,8 +1939,8 @@ export interface Root {
 	fragment: Fragment;
 	options: SvelteOptions | null;
 	comments: RootComment[];
-	instance?: Script;
 	module?: Script;
+	instance?: Script;
 }
 
 export interface Fragment {
@@ -1958,12 +1966,11 @@ export type FragmentNode =
 	| RenderTag;
 
 /**
- * A document-level comment on `Root`. Heterogeneous by design: `Line` / `Block` for the
- * JS-side comments Svelte hoists here, `CSSComment` for the ones its CSS parser produced.
- * Unlike `AttachedComment` these always carry positions.
+ * A document-level comment on `Root`: the JS-side comments Svelte hoists here. Unlike
+ * `AttachedComment` these always carry positions.
  */
 export interface RootComment {
-	type: 'Line' | 'Block' | 'CSSComment';
+	type: 'Line' | 'Block';
 	value: string;
 	start: number;
 	end: number;
@@ -2022,14 +2029,14 @@ export interface SpecialElement {
 	name_loc?: NameLocation;
 	attributes: AttributeNode[];
 	fragment: Fragment;
+	/** Component expression for `<svelte:component this={Component}>`. */
+	expression?: Expression;
 	/**
 	 * The `this` binding of `<svelte:element>`: an `Expression` for `this={tag}`, or a
 	 * `SvelteFusedLiteral` for the plain-string `this="div"` — the two forms serialize
 	 * differently, which is why this is not simply `Expression`.
 	 */
 	tag?: Expression | SvelteFusedLiteral;
-	/** Component expression for `<svelte:component this={Component}>`. */
-	expression?: Expression;
 }
 
 /**
@@ -2040,11 +2047,11 @@ export interface SpecialElement {
  */
 export interface SvelteFusedLiteral {
 	type: 'Literal';
-	value: string;
-	raw: string;
 	start: number;
 	end: number;
 	loc?: SourceLocation;
+	value: string;
+	raw: string;
 }
 
 /** `<svelte:options runes={true} />`. */
@@ -2055,9 +2062,9 @@ export interface SvelteOptions {
 	attributes: AttributeNode[];
 	runes?: boolean;
 	immutable?: boolean;
+	css?: string;
 	accessors?: boolean;
 	preserveWhitespace?: boolean;
-	css?: string;
 	namespace?: string;
 	customElement?: unknown;
 }
@@ -2075,7 +2082,7 @@ export interface Attribute {
 	 * `a={x}`; otherwise the attribute-value SEQUENCE — one `AttributeText` for a plain
 	 * quoted value, text and tag parts interleaved for `a="x{y}z"`.
 	 */
-	value?: true | ExpressionTag | AttributeValue[];
+	value: true | ExpressionTag | AttributeValue[];
 }
 
 /** `{@attach ...}` (Svelte 5.29+). */
@@ -2230,24 +2237,13 @@ export type AttributeNode =
 	| AnimateDirective
 	| LetDirective;
 
-export type AttributeValue = AttributeText | ExpressionTag;
+export type AttributeValue = Text | ExpressionTag;
 
 /**
- * Text inside an attribute value.
- *
- * Note: attribute-value `Text` nodes serialize `start`/`end` before `type`,
- * unlike fragment-level `Text` nodes.
+ * Text node in a fragment, or text inside an attribute value. In an attribute value Svelte
+ * decodes `data` by its attribute rule (`decode_character_references(raw, true)`): a named
+ * entity written without its `;` stays literal before a word character or `=`.
  */
-export interface AttributeText {
-	start: number;
-	end: number;
-	loc?: SourceLocation;
-	type: 'Text';
-	raw: string;
-	data: string;
-}
-
-/** Text node in a fragment. */
 export interface Text {
 	type: 'Text';
 	start: number;
@@ -2348,9 +2344,9 @@ export interface SnippetBlock {
 	end: number;
 	loc?: SourceLocation;
 	expression: Expression;
+	typeParams?: string;
 	parameters: Expression[];
 	body: Fragment;
-	typeParams?: string;
 }
 
 /** `{@html expression}`. */
@@ -2384,21 +2380,21 @@ export interface ConstTag {
  */
 export interface SvelteConstDeclaration {
 	type: 'VariableDeclaration';
-	kind: 'const';
-	declarations: [SvelteConstDeclarator];
 	start: number;
 	end: number;
 	loc?: SourceLocation;
+	declarations: [SvelteConstDeclarator];
+	kind: 'const';
 }
 
 /** The single declarator of a `{@const}` — see `SvelteConstDeclaration`. */
 export interface SvelteConstDeclarator {
 	type: 'VariableDeclarator';
-	id: Expression;
-	init: Expression;
 	start: number;
 	end: number;
 	loc?: SourceLocation;
+	id: Expression;
+	init: Expression;
 }
 
 /**

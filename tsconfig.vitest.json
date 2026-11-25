@@ -67,6 +67,8 @@
 		"benches/js/lib/tsv_artifacts_test.ts",
 		"benches/js/lib/tsv_debug_server_test.ts",
 		"benches/js/roots/harvest_deps_test.ts",
+		"scripts/ast_schema_test.ts",
+		"scripts/ast_types_gen_test.ts",
 		"scripts/branch_report/legs_test.ts",
 		"scripts/branch_report/parsers_test.ts",
 		"scripts/branch_report/programs_test.ts",

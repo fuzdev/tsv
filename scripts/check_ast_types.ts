@@ -1,8 +1,12 @@
 /**
  * Drift check for `crates/tsv_wasm/types/tsv_ast.d.ts`.
  *
- * The `.d.ts` is hand-maintained, so nothing but this gate holds it to what the wire-JSON
- * writers actually emit. It asks three questions, and they fail for different reasons:
+ * The `.d.ts` is generated from the AST schema table (`ast_schema.ts`), and `schema_audit`
+ * holds the table to every object tsv's writers emit over the fixtures. This gate is the other
+ * side: it types real wire — tsv's live output and the canonical parser's committed one —
+ * against the generated declarations, so a member type the table spells wrong (a union missing
+ * an alternative, a literal too narrow) fails here. It asks three questions, and they fail for
+ * different reasons:
  *
  * **A — writer conformance.** Invoke `tsv parse` on a curated set of snippets and type each
  * JSON output as a literal. TypeScript's excess-property checking on object literals catches
@@ -12,12 +16,13 @@
  * This arm grades the LIVE writer, so it is the one that fails the moment a `write_*` changes.
  *
  * **B — wire-type coverage.** Every `type` discriminant present anywhere in the committed
- * fixture wire must be declared in the `.d.ts`, or listed in `OPAQUE_WIRE_TYPES` below. This
- * is the cheap arm and the one with the widest reach: it is a set difference over text, no
- * type-checking involved. It exists because arm A can only be as right as its samples are
- * broad — `LogicalExpression` (`a && b`, one of the commonest nodes in JS) was absent from
- * the `.d.ts` entirely while this gate was green, because no curated snippet contained a
- * short-circuit operator.
+ * fixture wire must name an entry of the AST schema table (`crates/tsv_wasm/types/tsv_ast_schema.json`,
+ * which generates the `.d.ts`): one the `.d.ts` declares, or one the table marks `opaque` —
+ * the CSS node vocabulary, and the data a `data` field's `discriminators` name. This is the
+ * cheap arm and the one with the widest reach: a set difference, no type-checking involved. It
+ * exists because arm A can only be as right as its samples are broad — `LogicalExpression`
+ * (`a && b`, one of the commonest nodes in JS) was absent from the `.d.ts` entirely while this
+ * gate was green, because no curated snippet contained a short-circuit operator.
  *
  * **C — fixture-corpus conformance.** Arm A over inputs nobody curated: a computed minimal
  * cover of the fixture tree's `expected*.json` — every discriminant the corpus contains, in
@@ -32,16 +37,15 @@
  * Arms A and C share one generated file and one `tsc` invocation (`tsconfig.ast_types.json`:
  * strict, no ambient types, the file and the `.d.ts` it imports alone).
  *
- * ⚠️ **Arm B is a NAME check, not a reachability check, and its scan is text-level.** Two
- * failure shapes follow, both live in the corpus today and both absorbed deliberately: a name
- * declared for an unrelated reason counts (`AttachedComment`'s `'Line' | 'Block'` covers the
- * CSS `Block` node's name for free — which is why `Block` is ALSO listed opaque below), and a
- * DATA key spelled `"type"` reads as a discriminant (`Boolean`, from the evaluated
- * `<svelte:options customElement>` props config). Arm C is what actually walks the typed
- * paths. The two are complementary in the usual way: B is broad and shallow, C is narrow and
- * deep.
+ * ⚠️ **Arm B is a NAME check, not a reachability check.** It reads a discriminant where the
+ * walk meets it, keyed apart in the CSS tree (`css:Block` is not the JS comment `Block`), but
+ * it does not ask whether a position may hold it: a DATA key spelled `"type"` reads as a
+ * discriminant (`Boolean`, from the evaluated `<svelte:options customElement>` props config),
+ * which is why the table names it on the field that holds it. Arm C is what actually walks the
+ * typed paths. The two are complementary in the usual way: B is broad and shallow, C is narrow
+ * and deep.
  *
- * Its reach: the checkout read-only (the fixtures and the `.d.ts`), `scripts/` read-write (the
+ * Its reach: the checkout read-only (the fixtures, the table and the `.d.ts`), `scripts/` read-write (the
  * generated file, removed when it passes and left for inspection when it fails), and two
  * programs run in the checkout, its `target/corpus/tsv` and `node_modules/.bin/tsc`
  * (`CheckAstTypesDeps`, built by `scripts/roots/check_ast_types.ts`).
@@ -50,9 +54,11 @@
 import type { FsDir, FsReadDir } from '@fuzdev/gro/fs.ts';
 import type { SpawnProgram } from '@fuzdev/gro/spawn.ts';
 
+import { AST_SCHEMA_PATH, type AstSchema, is_alias, parse_ast_schema } from './ast_schema.ts';
+
 /** What `run_check_ast_types` reaches. */
 export interface CheckAstTypesDeps {
-	/** The checkout, read for the fixtures and the `.d.ts`, and the programs' working directory. */
+	/** The checkout, read for the fixtures and the table, and the programs' working directory. */
 	checkout: FsReadDir;
 	/** The checkout's `scripts/`, where the generated file is written. */
 	scripts: FsDir;
@@ -306,7 +312,6 @@ async function parse(deps: CheckAstTypesDeps, sample: Sample): Promise<string> {
 //
 
 const FIXTURES_ROOT = 'tests/fixtures';
-const DTS_PATH = 'crates/tsv_wasm/types/tsv_ast.d.ts';
 
 /**
  * Root interface per fixture input kind. A fixture whose input name is not here FAILS the
@@ -322,46 +327,38 @@ const ROOT_TYPE: Record<string, Sample['type']> = {
 };
 
 /**
- * Wire `type` discriminants the `.d.ts` deliberately does NOT declare. Two kinds, each with
- * its own reason:
- *
- * - **The CSS node vocabulary** (every entry but `Boolean`): `StyleSheet.children` /
- *   `StyleSheetFile.children` / `StyleSheet.attributes` are `unknown[]` by design ("their
- *   precise shape is not currently mirrored in this file"), so the CSS tree below the
- *   stylesheet root has no interfaces to name. `Block` belongs here even though the name
- *   check would pass without it — `'Line' | 'Block'` covers the name by accident (see the
- *   arm-B warning above) — because `wire_field_slots` keys its opaque-region filter on THIS
- *   set, and membership is the statement that the node is opaque on purpose.
- * - **`Boolean` is not a node at all**: it is a DATA key inside Svelte's evaluated
- *   `<svelte:options customElement>` props config (`props: {x: {type: 'Boolean'}}`), which
- *   the text-level discriminant scan cannot tell from a discriminator. It sits under the
- *   `unknown`-typed `SvelteOptions.customElement`, and typing that field would retire the
- *   entry.
- *
- * This is a snapshot of a deliberate boundary, not a bug list: shrinking the CSS side means
- * typing the CSS AST, and a name may only be ADDED here alongside a decision to leave that
- * region opaque. Every discriminant the corpus produces that is not here must be declared.
+ * A discriminant as the walk keys it: a node of the CSS tree (everything below a `StyleSheet` or
+ * `StyleSheetFile` but a Svelte `StyleSheet`'s `attributes`) prefixed `css:`, as the table keys
+ * its CSS entries — the CSS `Block` and the JS comment `Block` share a name and nothing else.
  */
-const OPAQUE_WIRE_TYPES: ReadonlySet<string> = new Set([
-	'Atrule',
-	'AttributeSelector',
-	'Block',
-	'Boolean',
-	'ClassSelector',
-	'Combinator',
-	'ComplexSelector',
-	'Declaration',
-	'IdSelector',
-	'NestingSelector',
-	'Nth',
-	'Percentage',
-	'PseudoClassSelector',
-	'PseudoElementSelector',
-	'RelativeSelector',
-	'Rule',
-	'SelectorList',
-	'TypeSelector'
-]);
+const label_of = (type: string, css: boolean): string => (css ? `css:${type}` : type);
+
+/** Whether `type` opens the CSS tree. */
+const opens_css = (type: unknown): boolean => type === 'StyleSheet' || type === 'StyleSheetFile';
+
+/**
+ * The table's discriminants, split by whether the `.d.ts` declares them. OPAQUE are the ones it
+ * deliberately does not: the entries the table marks `opaque` (the CSS node vocabulary below the
+ * stylesheet roots, which the `.d.ts` types `unknown[]`), and the spellings a `data` field's
+ * `discriminators` name (`Boolean`, a DATA key inside Svelte's evaluated
+ * `<svelte:options customElement>` props config, which the text of a wire cannot tell from a
+ * discriminator). Typing a region is a table edit — the day its entries lose `opaque`, their
+ * slots re-enter arm C's cover and their names leave this set.
+ */
+function table_discriminants(schema: AstSchema): { declared: Set<string>; opaque: Set<string> } {
+	const declared = new Set<string>();
+	const opaque = new Set<string>();
+	for (const section of schema.sections) {
+		for (const item of section.entries) {
+			if (is_alias(item)) continue;
+			if (item.type !== undefined) {
+				(item.opaque ? opaque : declared).add(label_of(item.type, item.css === true));
+			}
+			for (const field of item.fields) for (const d of field.discriminators ?? []) opaque.add(d);
+		}
+	}
+	return { declared, opaque };
+}
 
 /**
  * Floors, in the spirit of the audit gates' vacuity guards: a walk that resolves nothing, or
@@ -376,28 +373,10 @@ interface FixtureWire {
 	path: string;
 	root: Sample['type'];
 	bytes: number;
-	/** The `type` discriminants this wire contains (arm B). */
+	/** The `type` discriminants this wire contains, CSS-keyed (`label_of`; arm B). */
 	types: Set<string>;
 	/** The `ParentType.key->ChildType` slots this wire contains (arm C's cover target). */
 	positions: Set<string>;
-}
-
-/** Every `type: 'A' | 'B'` literal the `.d.ts` declares, union spellings included. */
-function declared_discriminants(dts: string): Set<string> {
-	const out = new Set<string>();
-	const decl = /\btype:\s*\|?\s*((?:'[A-Za-z]+'\s*\|\s*)*'[A-Za-z]+')/g;
-	for (const m of dts.matchAll(decl)) {
-		for (const lit of m[1].matchAll(/'([A-Za-z]+)'/g)) out.add(lit[1]);
-	}
-	return out;
-}
-
-/** The `type` discriminants a wire JSON text contains. Text, not a parse — this runs over the
- * whole corpus and only the selected files are ever parsed. */
-function wire_discriminants(json: string): Set<string> {
-	const out = new Set<string>();
-	for (const m of json.matchAll(/"type"\s*:\s*"([A-Za-z]+)"/g)) out.add(m[1]);
-	return out;
 }
 
 /**
@@ -423,53 +402,66 @@ function wire_discriminants(json: string): Set<string> {
  * `#scalar` / `#empty` / `#obj` stand in where a value has no discriminator of its own, so a
  * scalar-vs-node change at a slot still registers as a distinct slot.
  *
- * Slots inside an OPAQUE region (parent or child named in `OPAQUE_WIRE_TYPES`) are skipped:
- * the typed side is `unknown` there, so covering them spends `tsc` time grading
- * nothing. The filter keys on the live set, so the day a region is typed (its names leave the
- * set) its slots re-enter the cover automatically. Safe in both directions today because
- * every opaque name occurs only inside an `unknown`-typed region — the stale-entry check is
- * what keeps that true.
+ * Slots inside an OPAQUE region (parent or child among `table_discriminants`' opaque ones) are
+ * skipped: the typed side is `unknown` there, so covering them spends `tsc` time grading
+ * nothing. The filter keys on the table, so the day a region is typed (its entries lose
+ * `opaque`) its slots re-enter the cover automatically. Safe in both directions because every
+ * opaque name occurs only inside an `unknown`-typed region — the stale-entry check is what
+ * keeps that true, and the CSS-keyed labels keep a JS `Block` comment's slots in the cover.
+ *
+ * The same walk collects the wire's discriminants (arm B), CSS-keyed like the slots.
  */
-function wire_field_slots(json: unknown): Set<string> {
+function wire_field_slots(
+	json: unknown,
+	opaque: ReadonlySet<string>
+): { slots: Set<string>; types: Set<string> } {
 	const out = new Set<string>();
-	const shape = (v: unknown): string => {
+	const types = new Set<string>();
+	const shape = (v: unknown, css: boolean): string => {
 		if (v === null || typeof v !== 'object') return '#scalar';
 		// An array nested directly in an array also grades '#scalar' — no wire position holds
 		// one today (checked over the corpus), so the conflation is unreachable, not a choice.
 		if (Array.isArray(v)) return '#scalar';
 		const t = (v as Record<string, unknown>).type;
-		return typeof t === 'string' ? t : '#obj';
+		return typeof t === 'string' ? label_of(t, css || opens_css(t)) : '#obj';
 	};
 	const add = (parent: string, k: string, child: string): void => {
-		if (OPAQUE_WIRE_TYPES.has(parent) || OPAQUE_WIRE_TYPES.has(child)) return;
+		if (opaque.has(parent) || opaque.has(child)) return;
 		out.add(`${parent}.${k}->${child}`);
 	};
-	const visit = (n: unknown): void => {
+	const visit = (n: unknown, css: boolean): void => {
 		if (Array.isArray(n)) {
-			for (const e of n) visit(e);
+			for (const e of n) visit(e, css);
 			return;
 		}
 		if (n === null || typeof n !== 'object') return;
 		const obj = n as Record<string, unknown>;
-		const parent = typeof obj.type === 'string' ? obj.type : null;
+		const inside = css || opens_css(obj.type);
+		const parent = typeof obj.type === 'string' ? label_of(obj.type, inside) : null;
+		if (parent !== null) types.add(parent);
 		for (const [k, v] of Object.entries(obj)) {
+			// A Svelte `<style>`'s attributes are template nodes, not CSS.
+			const child_css = inside && !(obj.type === 'StyleSheet' && k === 'attributes');
 			if (parent !== null && k !== 'type') {
 				if (Array.isArray(v)) {
 					if (v.length === 0) add(parent, k, '#empty');
-					for (const e of v) add(parent, k, shape(e));
+					for (const e of v) add(parent, k, shape(e, child_css));
 				} else {
-					add(parent, k, shape(v));
+					add(parent, k, shape(v, child_css));
 				}
 			}
-			visit(v);
+			visit(v, child_css);
 		}
 	};
-	visit(json);
-	return out;
+	visit(json, false);
+	return { slots: out, types };
 }
 
 /** The fixture wires, or `null` after reporting an unknown input kind. */
-async function collect_fixture_wires(checkout: FsReadDir): Promise<FixtureWire[] | null> {
+async function collect_fixture_wires(
+	checkout: FsReadDir,
+	opaque: ReadonlySet<string>
+): Promise<FixtureWire[] | null> {
 	const out: FixtureWire[] = [];
 	let unknown_kind = false;
 	const walk = async (dir: string): Promise<void> => {
@@ -499,13 +491,8 @@ async function collect_fixture_wires(checkout: FsReadDir): Promise<FixtureWire[]
 				const text = await checkout.read_text(path);
 				// A no-oracle marker payload (`{"error": …}`) types nothing.
 				if (!/^\s*\{\s*"error"/.test(text)) {
-					out.push({
-						path,
-						root,
-						bytes: text.length,
-						types: wire_discriminants(text),
-						positions: wire_field_slots(JSON.parse(text))
-					});
+					const { slots, types } = wire_field_slots(JSON.parse(text), opaque);
+					out.push({ path, root, bytes: text.length, types, positions: slots });
 				}
 			}
 		}
@@ -559,11 +546,15 @@ function cover(wires: FixtureWire[], wanted: Set<string>): FixtureWire[] {
  * @returns the exit code: `1` on drift or a refused corpus, else `0`
  */
 export async function run_check_ast_types(deps: CheckAstTypesDeps): Promise<number> {
-	const dts = await deps.checkout.read_text(DTS_PATH);
-	const declared = declared_discriminants(dts);
+	const schema = parse_ast_schema(await deps.checkout.read_text(AST_SCHEMA_PATH));
+	if ('errors' in schema) {
+		console.error(`${AST_SCHEMA_PATH} does not read — run \`npm run check:ast-schema\`.`);
+		return 1;
+	}
+	const { declared, opaque } = table_discriminants(schema);
 
 	console.log(`Scanning ${FIXTURES_ROOT} …`);
-	const wires = await collect_fixture_wires(deps.checkout);
+	const wires = await collect_fixture_wires(deps.checkout, opaque);
 	if (wires === null) return 1;
 	const corpus_types = new Set<string>();
 	for (const w of wires) for (const t of w.types) corpus_types.add(t);
@@ -584,22 +575,22 @@ export async function run_check_ast_types(deps: CheckAstTypesDeps): Promise<numb
 	}
 
 	// Arm B — every discriminant the wire produces is declared, or deliberately opaque.
-	const undeclared = [...corpus_types].filter((t) => !declared.has(t) && !OPAQUE_WIRE_TYPES.has(t));
+	const undeclared = [...corpus_types].filter((t) => !declared.has(t) && !opaque.has(t));
 	undeclared.sort();
-	const stale_opaque = [...OPAQUE_WIRE_TYPES].filter((t) => !corpus_types.has(t));
+	const stale_opaque = [...opaque].filter((t) => !corpus_types.has(t));
 	stale_opaque.sort();
 	if (undeclared.length > 0 || stale_opaque.length > 0) {
 		console.error('');
 		if (undeclared.length > 0) {
 			console.error(`Wire-type coverage gap — ${undeclared.length} discriminant(s) the fixture`);
-			console.error(`corpus produces but ${DTS_PATH} does not declare:`);
+			console.error(`corpus produces but ${AST_SCHEMA_PATH} has no entry for:`);
 			for (const t of undeclared) console.error(`  ${t}`);
 			console.error('');
-			console.error('Declare each one, or — if the node is deliberately opaque — add it to');
-			console.error('OPAQUE_WIRE_TYPES with the reason.');
+			console.error('Add an entry for each one (`opaque` if the region is deliberately untyped),');
+			console.error('then `npm run ast-schema:update`.');
 		}
 		if (stale_opaque.length > 0) {
-			console.error(`Stale OPAQUE_WIRE_TYPES entr(ies) — no longer produced by the corpus:`);
+			console.error(`Stale opaque name(s) in the table — no longer produced by the corpus:`);
 			for (const t of stale_opaque) console.error(`  ${t}`);
 			console.error('Remove them; an opaque entry that fires on nothing hides the next one.');
 		}
@@ -607,8 +598,8 @@ export async function run_check_ast_types(deps: CheckAstTypesDeps): Promise<numb
 	}
 	console.log(
 		`Wire-type coverage: ${corpus_types.size} discriminant(s) across ${wires.length} fixture` +
-			` wire(s) — ${corpus_types.size - OPAQUE_WIRE_TYPES.size} declared,` +
-			` ${OPAQUE_WIRE_TYPES.size} deliberately opaque.`
+			` wire(s) — ${corpus_types.size - opaque.size} declared,` +
+			` ${opaque.size} deliberately opaque.`
 	);
 
 	// Arm C — the minimal cover, typed against the .d.ts alongside the curated samples.
@@ -662,8 +653,10 @@ export async function run_check_ast_types(deps: CheckAstTypesDeps): Promise<numb
 	if (check.kind !== 'exited' || check.code !== 0) {
 		console.error('');
 		console.error(`Drift detected. ${gen_path} left in place for inspection.`);
-		console.error(`Update crates/tsv_wasm/types/tsv_ast.d.ts to match the actual`);
-		console.error(`shape, or fix the convert layer if the .d.ts is correct.`);
+		console.error(`Update ${AST_SCHEMA_PATH} to match the actual shape (then`);
+		console.error(
+			`\`npm run ast-schema:update\`), or fix the convert layer if the table is correct.`
+		);
 		return 1;
 	}
 

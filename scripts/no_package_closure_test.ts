@@ -262,6 +262,7 @@ for (const library of [
 /** The gro-hosted roots whose closures reach the system through gro's host modules alone, each
  * with a module its closure must reach. */
 const HOST_MODULE_ROOTS: Array<[root: string, reaches: string]> = [
+	['scripts/roots/ast_schema.ts', 'scripts/ast_types_gen.ts'],
 	['scripts/roots/check_ast_types.ts', 'scripts/roots/checkout.ts'],
 	['scripts/roots/check_loc.ts', 'scripts/check_loc.ts'],
 	['scripts/roots/deps_audit.ts', 'scripts/deps_audit.ts'],
@@ -292,6 +293,7 @@ for (const [root, reaches] of HOST_MODULE_ROOTS) {
 const NO_SPAWN_ROOTS: Array<[root: string, reaches: string]> = [
 	['benches/js/roots/compose_reports.ts', 'scripts/roots/checkout.ts'],
 	['benches/js/roots/divergence_audit.ts', 'scripts/roots/checkout.ts'],
+	['scripts/roots/ast_schema.ts', 'scripts/ast_schema.ts'],
 	['scripts/roots/validate_artifacts.ts', 'scripts/roots/checkout.ts']
 ];
 

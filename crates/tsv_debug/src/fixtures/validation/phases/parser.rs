@@ -39,7 +39,7 @@ pub(in crate::fixtures::validation) fn validate_parser_ours(
 ///
 /// For non-divergence fixtures, expected.json should match both the canonical parser
 /// AND our parser — in keys, values and presence, not in key order: the wire's key order
-/// is tsv's own (one order per node type, held by `order:audit`), so a byte mismatch that
+/// is tsv's own (one order per node type, the AST schema table's, held by `schema:audit`), so a byte mismatch that
 /// is equal as a key-order-insensitive `serde_json::Value` passes ([`compare_wire`]).
 pub(in crate::fixtures::validation) fn validate_parser_ours_matches_expected(
     result: &mut FixtureValidation,

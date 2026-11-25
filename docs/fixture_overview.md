@@ -385,9 +385,9 @@ with the parser that wrote it, so any byte that moves is a stale file. **P2b and
 side grade tsv's wire against the canonical parser's file and ignore key order** — a byte
 mismatch passes when the two are equal as `Value`s — because the wire's key order is tsv's
 own ([conformance_svelte.md §Key Order](./conformance_svelte.md#key-order)). What that
-leaves ungraded, one order per node type and the canonical relative order of the
-child-bearing keys, `npm run order:audit` holds
-([audits.md §Key-Order Audit](./audits.md#key-order-audit-orderaudit)). The multibyte and
+leaves ungraded, the one order per node type the AST schema table states and the canonical
+relative order of the child-bearing keys, `npm run schema:audit` holds
+([audits.md §Schema Audit](./audits.md#schema-audit-schemaaudit)). The multibyte and
 `<script>`/template-comment fixtures make P2/P2b exercise the writer's fused byte→char offset
 translation and island-scoped comment attach against the canonical oracle. A bug shared by the writer and the fixture's own `expected.json` is
 invisible here — the corpus-scale external oracle for that class is

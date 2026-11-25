@@ -1268,7 +1268,7 @@ ungated.** Read each upstream commit's source diff *and* the regression fixture 
 ships, then run those constructs through tsv, the new oracle, and real tsc —
 comparing the wire **trees** — keys, values, where each comment attaches — not just
 accept/reject (key order is tsv's own, so an oracle that reorders a node's keys moves no
-fixture; one that reorders its child-bearing keys fails `order:audit` (where a fixture holds the type with both keys) once `fixtures:update`
+fixture; one that reorders its child-bearing keys fails `schema:audit` (where a fixture holds the type with both keys) once `fixtures:update`
 has regenerated the oracle files it reads):
 
 - an upstream **bug fix** retires a tsv correction — divergence fixtures collapse,

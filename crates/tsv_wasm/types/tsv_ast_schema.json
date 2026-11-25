@@ -1,0 +1,4953 @@
+{
+	"doc": [
+		"TypeScript declarations for the tsv wire JSON (the public AST each parse export returns).",
+		"",
+		"GENERATED from `tsv_ast_schema.json` beside it by `npm run ast-schema:update` — edit the",
+		"table, never this file; `npm run check:ast-schema` holds the two together. The table is the",
+		"one description of what the wire-JSON writers emit:",
+		"  - crates/tsv_ts/src/ast/convert/write/",
+		"  - crates/tsv_css/src/ast/convert/write.rs",
+		"  - crates/tsv_svelte/src/ast/convert/write.rs",
+		"",
+		"Bundled inside `@fuzdev/tsv-parse-wasm`, `@fuzdev/tsv-wasm`, and `@fuzdev/tsv`. See",
+		"`crates/tsv_wasm/CLAUDE.md` §TS Type Maintenance for what the table says and how a writer",
+		"change reaches it.",
+		"",
+		"Field names are exactly the keys the writer emits, listed in the order it emits them. A field",
+		"emitted only conditionally (`if let Some(..)` / `if flag`) is optional (`T?`); a field",
+		"always emitted with a `null` fallback (`write_or_null`) is `T | null`.",
+		"",
+		"**Completeness contract**: this file is verified exactly as far as the test corpus",
+		"reaches — `scripts/check_ast_types.ts` types the curated samples and the committed fixture",
+		"wire against it (every `type` discriminant, every gradable field slot), and",
+		"`tsv_debug schema_audit` holds every object tsv emits over the fixtures to the table. A claim",
+		"narrower than the field's name suggests (a tuple length, a literal union, `never[]`) is a",
+		"checked statement about that corpus, not a spec guarantee; on a construct no fixture",
+		"exercises, trust the wire over this file and add the fixture."
+	],
+	"note": [
+		"The AST schema table: the one description of the wire JSON, which generates tsv_ast.d.ts",
+		"(npm run ast-schema:update) and which tsv_debug schema_audit holds the writers to. Entries",
+		"list their fields in wire order; what each key means is crates/tsv_wasm/CLAUDE.md",
+		"§TS Type Maintenance. `doc` text is published in the .d.ts; `note` text, like this, is not."
+	],
+	"sections": [
+		{
+			"title": "Foundational types (reused across TypeScript, CSS, and Svelte ASTs).",
+			"entries": [
+				{
+					"interface": "Position",
+					"doc": [
+						"Line/column position. `character` is a UTF-16 offset (the same space as `start`/`end`), present only on the nodes Svelte's own reader creates — shorthand-attribute identifiers, snippet names, simple-identifier block patterns, and in-tag comments."
+					],
+					"fields": [
+						{"key": "line", "kind": "number", "ts": "number"},
+						{"key": "column", "kind": "number", "ts": "number"},
+						{
+							"key": "character",
+							"kind": "number",
+							"ts": "number",
+							"presence": "optional",
+							"doc": ["Omitted from JSON when absent."]
+						}
+					]
+				},
+				{
+					"interface": "SourceLocation",
+					"doc": [
+						"Range with start/end positions: every object carrying numeric `start`/`end` gets one as",
+						"`loc` when locations are requested (`{locations: true}`, `tsv parse --locations`) — the",
+						"line (1-based) and column (0-based, UTF-16 code units) of those offsets, ECMAScript line",
+						"terminators for a TypeScript document and LF alone for a Svelte or CSS one. Optional, as",
+						"in estree: the default span-only wire omits it. In a Svelte tree it is a superset of",
+						"Svelte's own wire, which carries `loc` on acorn-parsed nodes only; `parseCss` emits none."
+					],
+					"fields": [
+						{"key": "start", "kind": "object", "entry": "Position"},
+						{"key": "end", "kind": "object", "entry": "Position"}
+					]
+				},
+				{
+					"type": "Line",
+					"interface": "AttachedComment",
+					"doc": [
+						"A comment acorn attached to a node, as an appended object key.",
+						"",
+						"**Svelte only.** `parse_typescript` and `parse_css` never emit these — the attachment",
+						"pass is Svelte's (`phases/1-parse/acorn.js`'s `add_comments`), which tsv mirrors, so",
+						"they appear on the nodes of a component's `<script>` and template-expression islands",
+						"and nowhere else."
+					],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "value", "kind": "string", "ts": "string", "string": "slice"},
+						{
+							"key": "start",
+							"kind": "offset",
+							"ts": "number",
+							"doc": [
+								"Present on every attachment except the leading run Svelte builds on `Program` itself",
+								"— the corpus's only start/end-less attachment position."
+							]
+						},
+						{
+							"key": "end",
+							"kind": "offset",
+							"ts": "number",
+							"doc": ["See `start`."]
+						},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"}
+					]
+				},
+				{
+					"type": "Block",
+					"interface": "AttachedComment",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "value", "kind": "string", "ts": "string", "string": "cooked"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"}
+					]
+				},
+				{
+					"type": "Line",
+					"variant": "HtmlLeadingComment",
+					"interface": "AttachedComment",
+					"positions": ["Program.leadingComments"],
+					"note": [
+						"The HTML comment written just before a `<script>` tag, which Svelte builds itself and prepends to the script `Program`'s `leadingComments`: no positions."
+					],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "value", "kind": "string", "ts": "string", "string": "pooled"}
+					]
+				},
+				{
+					"interface": "AcornCommentAttachment",
+					"mixin": true,
+					"doc": [
+						"The optional comment keys any acorn-produced node may carry in the Svelte wire.",
+						"Intersected into the node unions rather than repeated on ~190 interfaces — the",
+						"attachment DFS can reach essentially every acorn node type, so listing hosts would be a",
+						"list that goes stale rather than a statement of the rule."
+					],
+					"fields": [
+						{
+							"key": "leadingComments",
+							"kind": "comments",
+							"ts": "AttachedComment[]",
+							"presence": "optional"
+						},
+						{
+							"key": "trailingComments",
+							"kind": "comments",
+							"ts": "AttachedComment[]",
+							"presence": "optional"
+						}
+					]
+				},
+				{
+					"type": "Decorator",
+					"interface": "Decorator",
+					"extends": ["AcornCommentAttachment"],
+					"doc": ["Decorator applied to a class or class member: `@expression`."],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "expression", "kind": "child", "ts": "Expression"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "Literal",
+					"interface": "Literal",
+					"extends": ["AcornCommentAttachment"],
+					"doc": [
+						"Literal value: string, number, boolean, null, or BigInt.",
+						"Numeric values with no fractional part serialize as integers."
+					],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{
+							"key": "value",
+							"kind": ["string", "number", "boolean"],
+							"ts": "string | number | boolean | bigint | null",
+							"nullable": true,
+							"string": "cooked"
+						},
+						{"key": "raw", "kind": "string", "ts": "string", "string": "own"},
+						{
+							"key": "bigint",
+							"kind": "string",
+							"ts": "string",
+							"presence": "optional",
+							"string": "cooked",
+							"doc": ["Present only for BigInt literals (e.g., `1n`). Omitted otherwise."]
+						},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "Identifier",
+					"interface": "Identifier",
+					"extends": ["AcornCommentAttachment"],
+					"doc": ["Identifier name (variable, parameter, property name, etc.)."],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{
+							"key": "loc",
+							"kind": "loc",
+							"entry": "SourceLocation",
+							"presence": "locations",
+							"character": true
+						},
+						{"key": "name", "kind": "string", "ts": "string", "string": "cooked"},
+						{
+							"key": "optional",
+							"kind": "boolean",
+							"ts": "boolean",
+							"presence": "optional",
+							"vanilla_acorn": "absent",
+							"doc": ["Optional parameter marker (`x?`). Omitted from JSON when false."]
+						},
+						{
+							"key": "typeAnnotation",
+							"kind": "child",
+							"ts": "TSTypeAnnotation | SvelteBlockTypeAnnotation",
+							"presence": "optional",
+							"ts_only": true,
+							"doc": ["Omitted from JSON when absent."]
+						},
+						{
+							"key": "decorators",
+							"kind": "list",
+							"ts": "Decorator[]",
+							"presence": "optional",
+							"vanilla_acorn": "absent",
+							"doc": ["Decorators on this parameter. Omitted from JSON when empty."]
+						},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "PrivateIdentifier",
+					"interface": "PrivateIdentifier",
+					"doc": ["Private class member identifier: `#name`. Name excludes the `#`."],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "name", "kind": "string", "ts": "string", "string": "cooked"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "Program",
+					"interface": "Program",
+					"extends": ["AcornCommentAttachment"],
+					"doc": [
+						"Acorn `Program` node — root of a TypeScript/JS source file.",
+						"",
+						"When the source is a Svelte `<script>` block (non-`lang=\"ts\"`), some",
+						"import/export fields take vanilla acorn's shape, as Svelte's parser emits",
+						"it (notably `importKind`/`exportKind` may be omitted). The resulting shape is a",
+						"subset of this interface; no extra fields are added."
+					],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "body", "kind": "list", "ts": "Statement[]"},
+						{
+							"key": "sourceType",
+							"kind": "string",
+							"ts": "'script' | 'module'",
+							"string": "keyword",
+							"values": ["script", "module"],
+							"doc": ["The parse goal the program was read at — the writer emits no other value."]
+						},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"}
+					]
+				}
+			]
+		},
+		{
+			"title": "TypeScript AST — statements",
+			"entries": [
+				{
+					"alias": "Statement",
+					"union": [
+						"ExpressionStatement",
+						"VariableDeclaration",
+						"TSTypeAliasDeclaration",
+						"TSInterfaceDeclaration",
+						"TSDeclareFunction",
+						"TSEnumDeclaration",
+						"TSModuleDeclaration",
+						"ReturnStatement",
+						"BlockStatement",
+						"FunctionDeclaration",
+						"ClassDeclaration",
+						"ExportNamedDeclaration",
+						"ExportDefaultDeclaration",
+						"ExportAllDeclaration",
+						"TSExportAssignment",
+						"TSNamespaceExportDeclaration",
+						"ImportDeclaration",
+						"TSImportEqualsDeclaration",
+						"IfStatement",
+						"ForStatement",
+						"ForInStatement",
+						"ForOfStatement",
+						"WhileStatement",
+						"DoWhileStatement",
+						"WithStatement",
+						"SwitchStatement",
+						"TryStatement",
+						"ThrowStatement",
+						"BreakStatement",
+						"ContinueStatement",
+						"LabeledStatement",
+						"EmptyStatement",
+						"DebuggerStatement"
+					],
+					"intersect": "AcornCommentAttachment"
+				},
+				{
+					"type": "ExpressionStatement",
+					"interface": "ExpressionStatement",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "expression", "kind": "child", "ts": "Expression"},
+						{
+							"key": "directive",
+							"kind": "string",
+							"ts": "string",
+							"presence": "optional",
+							"string": "slice",
+							"doc": [
+								"Present only for directive prologue entries: raw string contents without quotes."
+							]
+						},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "BlockStatement",
+					"interface": "BlockStatement",
+					"extends": ["AcornCommentAttachment"],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "body", "kind": "list", "ts": "Statement[]"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"interface": "FunctionDeclaration",
+					"extends": ["AcornCommentAttachment"],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "id", "kind": "child", "ts": "Identifier | null", "nullable": true},
+						{"key": "expression", "kind": "boolean", "ts": "boolean"},
+						{"key": "generator", "kind": "boolean", "ts": "boolean"},
+						{"key": "async", "kind": "boolean", "ts": "boolean"},
+						{
+							"key": "typeParameters",
+							"kind": "child",
+							"ts": "TSTypeParameterDeclaration",
+							"presence": "optional",
+							"vanilla_acorn": "absent",
+							"ts_only": true
+						},
+						{"key": "params", "kind": "list", "ts": "Expression[]"},
+						{
+							"key": "returnType",
+							"kind": "child",
+							"ts": "TSTypeAnnotation",
+							"presence": "optional",
+							"vanilla_acorn": "absent",
+							"ts_only": true
+						},
+						{"key": "body", "kind": "child", "ts": "BlockStatement"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "ReturnStatement",
+					"interface": "ReturnStatement",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "argument", "kind": "child", "ts": "Expression | null", "nullable": true},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "IfStatement",
+					"interface": "IfStatement",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "test", "kind": "child", "ts": "Expression"},
+						{"key": "consequent", "kind": "child", "ts": "Statement"},
+						{"key": "alternate", "kind": "child", "ts": "Statement | null", "nullable": true},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "ForStatement",
+					"interface": "ForStatement",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "init", "kind": "child", "ts": "ForInit | null", "nullable": true},
+						{"key": "test", "kind": "child", "ts": "Expression | null", "nullable": true},
+						{"key": "update", "kind": "child", "ts": "Expression | null", "nullable": true},
+						{"key": "body", "kind": "child", "ts": "Statement"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"alias": "ForInit",
+					"union": ["VariableDeclaration", "Expression"]
+				},
+				{
+					"type": "ForInStatement",
+					"interface": "ForInStatement",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "left", "kind": "child", "ts": "ForInOfLeft"},
+						{"key": "right", "kind": "child", "ts": "Expression"},
+						{"key": "body", "kind": "child", "ts": "Statement"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "ForOfStatement",
+					"interface": "ForOfStatement",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "await", "kind": "boolean", "ts": "boolean"},
+						{"key": "left", "kind": "child", "ts": "ForInOfLeft"},
+						{"key": "right", "kind": "child", "ts": "Expression"},
+						{"key": "body", "kind": "child", "ts": "Statement"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"alias": "ForInOfLeft",
+					"union": ["VariableDeclaration", "Expression"]
+				},
+				{
+					"type": "WhileStatement",
+					"interface": "WhileStatement",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "test", "kind": "child", "ts": "Expression"},
+						{"key": "body", "kind": "child", "ts": "Statement"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "DoWhileStatement",
+					"interface": "DoWhileStatement",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "body", "kind": "child", "ts": "Statement"},
+						{"key": "test", "kind": "child", "ts": "Expression"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "WithStatement",
+					"interface": "WithStatement",
+					"doc": ["Sloppy-mode Script code only — strict code disallows `with` by an early error."],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "object", "kind": "child", "ts": "Expression"},
+						{"key": "body", "kind": "child", "ts": "Statement"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "SwitchStatement",
+					"interface": "SwitchStatement",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "discriminant", "kind": "child", "ts": "Expression"},
+						{"key": "cases", "kind": "list", "ts": "SwitchCase[]"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "SwitchCase",
+					"interface": "SwitchCase",
+					"extends": ["AcornCommentAttachment"],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "consequent", "kind": "list", "ts": "Statement[]"},
+						{"key": "test", "kind": "child", "ts": "Expression | null", "nullable": true},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "TryStatement",
+					"interface": "TryStatement",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "block", "kind": "child", "ts": "BlockStatement"},
+						{"key": "handler", "kind": "child", "ts": "CatchClause | null", "nullable": true},
+						{"key": "finalizer", "kind": "child", "ts": "BlockStatement | null", "nullable": true},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "CatchClause",
+					"interface": "CatchClause",
+					"extends": ["AcornCommentAttachment"],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "param", "kind": "child", "ts": "Expression | null", "nullable": true},
+						{"key": "body", "kind": "child", "ts": "BlockStatement"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "ThrowStatement",
+					"interface": "ThrowStatement",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "argument", "kind": "child", "ts": "Expression"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "BreakStatement",
+					"interface": "BreakStatement",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "label", "kind": "child", "ts": "Identifier | null", "nullable": true},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "ContinueStatement",
+					"interface": "ContinueStatement",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "label", "kind": "child", "ts": "Identifier | null", "nullable": true},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "LabeledStatement",
+					"interface": "LabeledStatement",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "body", "kind": "child", "ts": "Statement"},
+						{"key": "label", "kind": "child", "ts": "Identifier"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "EmptyStatement",
+					"interface": "EmptyStatement",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "DebuggerStatement",
+					"interface": "DebuggerStatement",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"interface": "VariableDeclaration",
+					"extends": ["AcornCommentAttachment"],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{
+							"key": "declare",
+							"kind": "boolean",
+							"ts": "boolean",
+							"presence": "optional",
+							"vanilla_acorn": "absent",
+							"doc": ["Omitted from JSON when false."]
+						},
+						{"key": "declarations", "kind": "list", "ts": "VariableDeclarator[]"},
+						{
+							"key": "kind",
+							"kind": "string",
+							"ts": "string",
+							"string": "keyword",
+							"values": ["var", "let", "const", "using", "await using"]
+						},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "VariableDeclarator",
+					"interface": "VariableDeclarator",
+					"extends": ["AcornCommentAttachment"],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "id", "kind": "child", "ts": "Expression"},
+						{
+							"key": "definite",
+							"kind": "boolean",
+							"ts": "boolean",
+							"presence": "optional",
+							"vanilla_acorn": "absent",
+							"doc": ["Definite assignment assertion (`!`). Omitted from JSON when false."]
+						},
+						{"key": "init", "kind": "child", "ts": "Expression | null", "nullable": true},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				}
+			]
+		},
+		{
+			"title": "TypeScript AST — expressions",
+			"entries": [
+				{
+					"alias": "Expression",
+					"union": [
+						"Literal",
+						"Identifier",
+						"PrivateIdentifier",
+						"ObjectExpression",
+						"ArrayExpression",
+						"UnaryExpression",
+						"UpdateExpression",
+						"BinaryExpression",
+						"LogicalExpression",
+						"CallExpression",
+						"NewExpression",
+						"MemberExpression",
+						"ConditionalExpression",
+						"ArrowFunctionExpression",
+						"FunctionExpression",
+						"ClassExpression",
+						"SpreadElement",
+						"TemplateLiteral",
+						"TaggedTemplateExpression",
+						"AwaitExpression",
+						"YieldExpression",
+						"SequenceExpression",
+						"RegexLiteral",
+						"ThisExpression",
+						"Super",
+						"AssignmentExpression",
+						"ObjectPattern",
+						"ArrayPattern",
+						"AssignmentPattern",
+						"RestElement",
+						"TSTypeAssertion",
+						"TSAsExpression",
+						"TSSatisfiesExpression",
+						"TSInstantiationExpression",
+						"TSNonNullExpression",
+						"ImportExpression",
+						"MetaProperty",
+						"TSParameterProperty",
+						"ParenthesizedExpression",
+						"ChainExpression"
+					],
+					"intersect": "AcornCommentAttachment"
+				},
+				{
+					"type": "ObjectExpression",
+					"interface": "ObjectExpression",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "properties", "kind": "list", "ts": "ObjectProperty[]"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"alias": "ObjectProperty",
+					"union": ["Property", "SpreadElement"]
+				},
+				{
+					"type": "ArrayExpression",
+					"interface": "ArrayExpression",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{
+							"key": "elements",
+							"kind": "list",
+							"ts": "(Expression | null)[]",
+							"items_nullable": true
+						},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "UnaryExpression",
+					"interface": "UnaryExpression",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{
+							"key": "operator",
+							"kind": "string",
+							"ts": "string",
+							"string": "keyword",
+							"values": ["-", "+", "!", "~", "typeof", "void", "delete"]
+						},
+						{"key": "prefix", "kind": "boolean", "ts": "boolean"},
+						{"key": "argument", "kind": "child", "ts": "Expression"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "UpdateExpression",
+					"interface": "UpdateExpression",
+					"doc": ["Update expression: `++x`, `x++`, `--x`, `x--`."],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{
+							"key": "operator",
+							"kind": "string",
+							"ts": "string",
+							"string": "keyword",
+							"values": ["++", "--"]
+						},
+						{"key": "prefix", "kind": "boolean", "ts": "boolean"},
+						{"key": "argument", "kind": "child", "ts": "Expression"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "BinaryExpression",
+					"interface": "BinaryExpression",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "left", "kind": "child", "ts": "Expression"},
+						{
+							"key": "operator",
+							"kind": "string",
+							"ts": "string",
+							"string": "keyword",
+							"values": [
+								"==",
+								"!=",
+								"===",
+								"!==",
+								"<",
+								"<=",
+								">",
+								">=",
+								"<<",
+								">>",
+								">>>",
+								"+",
+								"-",
+								"*",
+								"/",
+								"%",
+								"**",
+								"|",
+								"^",
+								"&",
+								"in",
+								"instanceof"
+							]
+						},
+						{"key": "right", "kind": "child", "ts": "Expression"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "LogicalExpression",
+					"interface": "LogicalExpression",
+					"doc": [
+						"`a && b`, `a || b`, `a ?? b`. Structurally identical to `BinaryExpression` — one",
+						"writer emits both, splitting on the operator alone (`write_expression`'s",
+						"`BinaryExpression` arm) — but ESTree gives the short-circuiting operators their own",
+						"node type, so the discriminator differs and consumers narrowing on `type` need both."
+					],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "left", "kind": "child", "ts": "Expression"},
+						{
+							"key": "operator",
+							"kind": "string",
+							"ts": "string",
+							"string": "keyword",
+							"values": ["||", "&&", "??"]
+						},
+						{"key": "right", "kind": "child", "ts": "Expression"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "CallExpression",
+					"interface": "CallExpression",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "callee", "kind": "child", "ts": "Expression"},
+						{"key": "arguments", "kind": "list", "ts": "Expression[]"},
+						{
+							"key": "typeArguments",
+							"kind": "child",
+							"ts": "TSTypeParameterInstantiation",
+							"presence": "optional",
+							"vanilla_acorn": "absent",
+							"ts_only": true
+						},
+						{
+							"key": "optional",
+							"kind": "boolean",
+							"ts": "boolean",
+							"presence": "optional",
+							"vanilla_acorn": "always",
+							"doc": [
+								"acorn-typescript omits `optional` when `typeArguments` is present or in decorator contexts."
+							]
+						},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "NewExpression",
+					"interface": "NewExpression",
+					"doc": ["`new Foo()`, `new Map<K, V>()`."],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "callee", "kind": "child", "ts": "Expression"},
+						{
+							"key": "typeArguments",
+							"kind": "child",
+							"ts": "TSTypeParameterInstantiation",
+							"presence": "optional",
+							"vanilla_acorn": "absent",
+							"ts_only": true
+						},
+						{"key": "arguments", "kind": "list", "ts": "Expression[]"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "ImportExpression",
+					"interface": "ImportExpression",
+					"doc": ["Dynamic import: `import('mod')` or `import('mod', {with: {type: 'json'}})`."],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "source", "kind": "child", "ts": "Expression"},
+						{
+							"key": "phase",
+							"kind": "string",
+							"ts": "'source' | 'defer'",
+							"presence": "optional",
+							"vanilla_acorn": "absent",
+							"string": "keyword",
+							"values": ["source", "defer"],
+							"doc": [
+								"Import phase (`'source'`/`'defer'`) for `import.source(…)` / `import.defer(…)`; omitted otherwise."
+							]
+						},
+						{
+							"key": "arguments",
+							"kind": "list",
+							"ts": "Expression[]",
+							"presence": "optional",
+							"vanilla_acorn": "absent",
+							"doc": [
+								"The second argument, acorn-typescript's spelling: a single-element array.",
+								"Omitted from JSON when there is no second argument, and absent entirely",
+								"under vanilla acorn, which spells it `options`."
+							]
+						},
+						{
+							"key": "options",
+							"kind": "child",
+							"ts": "Expression | null",
+							"presence": "absent",
+							"vanilla_acorn": "always",
+							"nullable": true,
+							"doc": [
+								"The second argument, vanilla acorn's ESTree spelling (a Svelte",
+								"non-`lang=\"ts\"` component): always present there, `null` when there is no",
+								"second argument. Absent under acorn-typescript, which spells it",
+								"`arguments`."
+							]
+						},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "MetaProperty",
+					"interface": "MetaProperty",
+					"doc": ["`import.meta` or `new.target`."],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "meta", "kind": "child", "ts": "Identifier"},
+						{"key": "property", "kind": "child", "ts": "Identifier"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "MemberExpression",
+					"interface": "MemberExpression",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "object", "kind": "child", "ts": "Expression"},
+						{"key": "property", "kind": "child", "ts": "Expression"},
+						{"key": "computed", "kind": "boolean", "ts": "boolean"},
+						{
+							"key": "optional",
+							"kind": "boolean",
+							"ts": "boolean",
+							"presence": "optional",
+							"vanilla_acorn": "always",
+							"doc": ["acorn omits `optional` in decorator-expression contexts."]
+						},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "ChainExpression",
+					"interface": "ChainExpression",
+					"doc": ["Optional chaining wrapper: `a?.b`, `a?.b()`, `a?.b.c.d()`."],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "expression", "kind": "child", "ts": "Expression"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "ConditionalExpression",
+					"interface": "ConditionalExpression",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "test", "kind": "child", "ts": "Expression"},
+						{"key": "consequent", "kind": "child", "ts": "Expression"},
+						{"key": "alternate", "kind": "child", "ts": "Expression"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "ArrowFunctionExpression",
+					"interface": "ArrowFunctionExpression",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{
+							"key": "returnType",
+							"kind": "child",
+							"ts": "TSTypeAnnotation",
+							"presence": "optional",
+							"vanilla_acorn": "absent",
+							"ts_only": true
+						},
+						{
+							"key": "id",
+							"kind": "null",
+							"ts": "null",
+							"doc": ["Always null for arrow functions."]
+						},
+						{"key": "expression", "kind": "boolean", "ts": "boolean"},
+						{"key": "generator", "kind": "boolean", "ts": "boolean"},
+						{"key": "async", "kind": "boolean", "ts": "boolean"},
+						{"key": "params", "kind": "list", "ts": "Expression[]"},
+						{"key": "body", "kind": "child", "ts": "ArrowFunctionBody"},
+						{
+							"key": "typeParameters",
+							"kind": "child",
+							"ts": "TSTypeParameterDeclaration",
+							"presence": "optional",
+							"vanilla_acorn": "absent",
+							"ts_only": true
+						},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"alias": "ArrowFunctionBody",
+					"union": ["Expression", "BlockStatement"]
+				},
+				{
+					"type": "SpreadElement",
+					"interface": "SpreadElement",
+					"extends": ["AcornCommentAttachment"],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "argument", "kind": "child", "ts": "Expression"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "TemplateLiteral",
+					"interface": "TemplateLiteral",
+					"extends": ["AcornCommentAttachment"],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "expressions", "kind": "list", "ts": "Expression[]"},
+						{"key": "quasis", "kind": "list", "ts": "TemplateElement[]"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "TemplateElement",
+					"interface": "TemplateElement",
+					"extends": ["AcornCommentAttachment"],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "value", "kind": "object", "entry": "TemplateElementValue"},
+						{"key": "tail", "kind": "boolean", "ts": "boolean"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"interface": "TemplateElementValue",
+					"fields": [
+						{"key": "raw", "kind": "string", "ts": "string", "string": "cooked"},
+						{
+							"key": "cooked",
+							"kind": "string",
+							"ts": "string | null",
+							"nullable": true,
+							"string": "cooked",
+							"doc": ["`null` for invalid escape sequences in tagged templates."]
+						}
+					]
+				},
+				{
+					"type": "TaggedTemplateExpression",
+					"interface": "TaggedTemplateExpression",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "tag", "kind": "child", "ts": "Expression"},
+						{"key": "quasi", "kind": "child", "ts": "TemplateLiteral"},
+						{
+							"key": "typeArguments",
+							"kind": "child",
+							"ts": "TSTypeParameterInstantiation",
+							"presence": "optional",
+							"vanilla_acorn": "absent",
+							"ts_only": true
+						},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "AwaitExpression",
+					"interface": "AwaitExpression",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "argument", "kind": "child", "ts": "Expression"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "YieldExpression",
+					"interface": "YieldExpression",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "delegate", "kind": "boolean", "ts": "boolean"},
+						{"key": "argument", "kind": "child", "ts": "Expression | null", "nullable": true},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "SequenceExpression",
+					"interface": "SequenceExpression",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "expressions", "kind": "list", "ts": "Expression[]"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "ParenthesizedExpression",
+					"interface": "ParenthesizedExpression",
+					"doc": [
+						"Parenthesized expression: `(expr)`. Only emitted for `{#snippet}` parameters,",
+						"where Svelte parses with acorn's `preserveParens` and skips `remove_parens`,",
+						"so the parens survive in the AST (e.g. a default `c = (2, 3)`). Every other",
+						"grouping paren is discarded (the public AST is otherwise paren-free). `start`",
+						"and `end` cover the parentheses; `expression` keeps its own paren-free span."
+					],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "expression", "kind": "child", "ts": "Expression"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "Literal",
+					"variant": "RegexLiteral",
+					"interface": "RegexLiteral",
+					"doc": [
+						"Regex literal: `/pat/flags`. Serializes with `type: \"Literal\"` to match acorn."
+					],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{
+							"key": "value",
+							"kind": "data",
+							"ts": "unknown",
+							"doc": ["Always serializes as an empty object (regex can't be represented in JSON)."]
+						},
+						{"key": "raw", "kind": "string", "ts": "string", "string": "own"},
+						{"key": "regex", "kind": "object", "entry": "RegexValue"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"interface": "RegexValue",
+					"fields": [
+						{"key": "pattern", "kind": "string", "ts": "string", "string": "slice"},
+						{"key": "flags", "kind": "string", "ts": "string", "string": "slice"}
+					]
+				},
+				{
+					"type": "ThisExpression",
+					"interface": "ThisExpression",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "Super",
+					"interface": "Super",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "AssignmentExpression",
+					"interface": "AssignmentExpression",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{
+							"key": "operator",
+							"kind": "string",
+							"ts": "string",
+							"string": "keyword",
+							"values": [
+								"=",
+								"+=",
+								"-=",
+								"*=",
+								"/=",
+								"%=",
+								"**=",
+								"<<=",
+								">>=",
+								">>>=",
+								"|=",
+								"^=",
+								"&=",
+								"||=",
+								"&&=",
+								"??="
+							]
+						},
+						{
+							"key": "left",
+							"kind": "child",
+							"ts": "Expression",
+							"doc": [
+								"A TypeScript assertion wrapping the target survives here — `(x as T) = 1` is a",
+								"`TSAsExpression`, not the bare `Identifier`."
+							]
+						},
+						{"key": "right", "kind": "child", "ts": "Expression"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "Property",
+					"interface": "Property",
+					"extends": ["AcornCommentAttachment"],
+					"doc": ["Object property (also used inside object patterns)."],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "method", "kind": "boolean", "ts": "boolean"},
+						{"key": "shorthand", "kind": "boolean", "ts": "boolean"},
+						{"key": "computed", "kind": "boolean", "ts": "boolean"},
+						{"key": "key", "kind": "child", "ts": "Expression"},
+						{"key": "value", "kind": "child", "ts": "Expression"},
+						{
+							"key": "kind",
+							"kind": "string",
+							"ts": "string",
+							"string": "keyword",
+							"values": ["init", "get", "set"]
+						},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "TSTypeAssertion",
+					"interface": "TSTypeAssertion",
+					"doc": ["`<Type>expr` angle-bracket type assertion."],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "typeAnnotation", "kind": "child", "ts": "TSType", "ts_only": true},
+						{"key": "expression", "kind": "child", "ts": "Expression"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "TSAsExpression",
+					"interface": "TSAsExpression",
+					"doc": ["`expr as Type` or `expr as const`."],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "expression", "kind": "child", "ts": "Expression"},
+						{"key": "typeAnnotation", "kind": "child", "ts": "TSType", "ts_only": true},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "TSSatisfiesExpression",
+					"interface": "TSSatisfiesExpression",
+					"doc": ["`expr satisfies Type`."],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "expression", "kind": "child", "ts": "Expression"},
+						{"key": "typeAnnotation", "kind": "child", "ts": "TSType", "ts_only": true},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "TSInstantiationExpression",
+					"interface": "TSInstantiationExpression",
+					"doc": ["Instantiation expression: `f<T>`."],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "expression", "kind": "child", "ts": "Expression"},
+						{
+							"key": "typeArguments",
+							"kind": "child",
+							"ts": "TSTypeParameterInstantiation",
+							"ts_only": true
+						},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "TSNonNullExpression",
+					"interface": "TSNonNullExpression",
+					"doc": ["Non-null assertion: `expr!`."],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "expression", "kind": "child", "ts": "Expression"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				}
+			]
+		},
+		{
+			"title": "TypeScript AST — classes",
+			"entries": [
+				{
+					"type": "ClassDeclaration",
+					"interface": "ClassDeclaration",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{
+							"key": "declare",
+							"kind": "boolean",
+							"ts": "boolean",
+							"presence": "optional",
+							"vanilla_acorn": "absent"
+						},
+						{
+							"key": "abstract",
+							"kind": "boolean",
+							"ts": "boolean",
+							"presence": "optional",
+							"vanilla_acorn": "absent"
+						},
+						{
+							"key": "decorators",
+							"kind": "list",
+							"ts": "Decorator[]",
+							"presence": "optional",
+							"vanilla_acorn": "absent"
+						},
+						{"key": "id", "kind": "child", "ts": "Identifier | null", "nullable": true},
+						{
+							"key": "typeParameters",
+							"kind": "child",
+							"ts": "TSTypeParameterDeclaration",
+							"presence": "optional",
+							"vanilla_acorn": "absent",
+							"ts_only": true
+						},
+						{"key": "superClass", "kind": "child", "ts": "Expression | null", "nullable": true},
+						{
+							"key": "superTypeParameters",
+							"kind": "child",
+							"ts": "TSTypeParameterInstantiation",
+							"presence": "optional",
+							"vanilla_acorn": "absent",
+							"ts_only": true
+						},
+						{
+							"key": "implements",
+							"kind": "list",
+							"ts": "TSExpressionWithTypeArguments[]",
+							"presence": "optional",
+							"vanilla_acorn": "absent",
+							"ts_only": true
+						},
+						{"key": "body", "kind": "child", "ts": "ClassBody"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "ClassExpression",
+					"interface": "ClassExpression",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{
+							"key": "decorators",
+							"kind": "list",
+							"ts": "Decorator[]",
+							"presence": "optional",
+							"vanilla_acorn": "absent"
+						},
+						{
+							"key": "abstract",
+							"kind": "boolean",
+							"ts": "boolean",
+							"presence": "optional",
+							"vanilla_acorn": "absent"
+						},
+						{"key": "id", "kind": "child", "ts": "Identifier | null", "nullable": true},
+						{
+							"key": "typeParameters",
+							"kind": "child",
+							"ts": "TSTypeParameterDeclaration",
+							"presence": "optional",
+							"vanilla_acorn": "absent",
+							"ts_only": true
+						},
+						{"key": "superClass", "kind": "child", "ts": "Expression | null", "nullable": true},
+						{
+							"key": "superTypeParameters",
+							"kind": "child",
+							"ts": "TSTypeParameterInstantiation",
+							"presence": "optional",
+							"vanilla_acorn": "absent",
+							"ts_only": true
+						},
+						{
+							"key": "implements",
+							"kind": "list",
+							"ts": "TSExpressionWithTypeArguments[]",
+							"presence": "optional",
+							"vanilla_acorn": "absent",
+							"ts_only": true
+						},
+						{"key": "body", "kind": "child", "ts": "ClassBody"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "ClassBody",
+					"interface": "ClassBody",
+					"extends": ["AcornCommentAttachment"],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "body", "kind": "list", "ts": "ClassMember[]"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"alias": "ClassMember",
+					"union": ["MethodDefinition", "PropertyDefinition", "StaticBlock", "TSIndexSignature"]
+				},
+				{
+					"type": "StaticBlock",
+					"interface": "StaticBlock",
+					"doc": ["Static initialization block: `static { ... }` (ES2022)."],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "body", "kind": "list", "ts": "Statement[]"},
+						{
+							"key": "decorators",
+							"kind": "list",
+							"ts": "Decorator[]",
+							"presence": "optional",
+							"doc": [
+								"A decorated block's decorators (`@a static {}`), after `body`; omitted when none."
+							]
+						},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "MethodDefinition",
+					"interface": "MethodDefinition",
+					"extends": ["AcornCommentAttachment"],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{
+							"key": "abstract",
+							"kind": "boolean",
+							"ts": "boolean",
+							"presence": "optional",
+							"vanilla_acorn": "absent"
+						},
+						{
+							"key": "accessibility",
+							"kind": "string",
+							"ts": "string",
+							"presence": "optional",
+							"vanilla_acorn": "absent",
+							"string": "keyword",
+							"values": ["public", "private", "protected"]
+						},
+						{
+							"key": "override",
+							"kind": "boolean",
+							"ts": "boolean",
+							"presence": "optional",
+							"vanilla_acorn": "absent",
+							"doc": ["Omitted from JSON when false."]
+						},
+						{"key": "static", "kind": "boolean", "ts": "boolean"},
+						{"key": "computed", "kind": "boolean", "ts": "boolean"},
+						{"key": "key", "kind": "child", "ts": "Expression"},
+						{
+							"key": "optional",
+							"kind": "boolean",
+							"ts": "boolean",
+							"presence": "optional",
+							"vanilla_acorn": "absent",
+							"doc": ["Optional method (`m?()`); omitted from JSON when false."]
+						},
+						{
+							"key": "kind",
+							"kind": "string",
+							"ts": "string",
+							"string": "keyword",
+							"values": ["constructor", "method", "get", "set"]
+						},
+						{
+							"key": "typeParameters",
+							"kind": "child",
+							"ts": "TSTypeParameterDeclaration",
+							"presence": "optional",
+							"vanilla_acorn": "absent",
+							"ts_only": true
+						},
+						{"key": "value", "kind": "child", "ts": "MethodValue"},
+						{
+							"key": "decorators",
+							"kind": "list",
+							"ts": "Decorator[]",
+							"presence": "optional",
+							"vanilla_acorn": "absent"
+						},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"alias": "MethodValue",
+					"union": ["FunctionExpression", "TSDeclareMethod"]
+				},
+				{
+					"type": "TSDeclareMethod",
+					"interface": "TSDeclareMethod",
+					"doc": ["Abstract method or overload signature (no body)."],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{
+							"key": "id",
+							"kind": "null",
+							"ts": "null",
+							"note": [
+								"The writer shares `FunctionExpression`'s `write_or_null`, but a method's function has no name of its own."
+							]
+						},
+						{"key": "expression", "kind": "boolean", "ts": "boolean"},
+						{"key": "generator", "kind": "boolean", "ts": "boolean"},
+						{"key": "async", "kind": "boolean", "ts": "boolean"},
+						{"key": "params", "kind": "list", "ts": "Expression[]"},
+						{
+							"key": "returnType",
+							"kind": "child",
+							"ts": "TSTypeAnnotation",
+							"presence": "optional",
+							"ts_only": true
+						},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "PropertyDefinition",
+					"interface": "PropertyDefinition",
+					"extends": ["AcornCommentAttachment"],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{
+							"key": "declare",
+							"kind": "boolean",
+							"ts": "boolean",
+							"presence": "optional",
+							"vanilla_acorn": "absent"
+						},
+						{
+							"key": "abstract",
+							"kind": "boolean",
+							"ts": "boolean",
+							"presence": "optional",
+							"vanilla_acorn": "absent"
+						},
+						{
+							"key": "accessor",
+							"kind": "boolean",
+							"ts": "boolean",
+							"presence": "optional",
+							"vanilla_acorn": "absent"
+						},
+						{
+							"key": "accessibility",
+							"kind": "string",
+							"ts": "string",
+							"presence": "optional",
+							"vanilla_acorn": "absent",
+							"string": "keyword",
+							"values": ["public", "private", "protected"]
+						},
+						{
+							"key": "readonly",
+							"kind": "boolean",
+							"ts": "boolean",
+							"presence": "optional",
+							"vanilla_acorn": "absent"
+						},
+						{
+							"key": "override",
+							"kind": "boolean",
+							"ts": "boolean",
+							"presence": "optional",
+							"vanilla_acorn": "absent"
+						},
+						{"key": "static", "kind": "boolean", "ts": "boolean"},
+						{"key": "computed", "kind": "boolean", "ts": "boolean"},
+						{"key": "key", "kind": "child", "ts": "Expression"},
+						{
+							"key": "optional",
+							"kind": "boolean",
+							"ts": "boolean",
+							"presence": "optional",
+							"vanilla_acorn": "absent"
+						},
+						{
+							"key": "definite",
+							"kind": "boolean",
+							"ts": "boolean",
+							"presence": "optional",
+							"vanilla_acorn": "absent"
+						},
+						{
+							"key": "typeAnnotation",
+							"kind": "child",
+							"ts": "TSTypeAnnotation",
+							"presence": "optional",
+							"vanilla_acorn": "absent",
+							"ts_only": true
+						},
+						{"key": "value", "kind": "child", "ts": "Expression | null", "nullable": true},
+						{
+							"key": "decorators",
+							"kind": "list",
+							"ts": "Decorator[]",
+							"presence": "optional",
+							"vanilla_acorn": "absent"
+						},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "FunctionExpression",
+					"interface": "FunctionExpression",
+					"extends": ["AcornCommentAttachment"],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "id", "kind": "child", "ts": "Identifier | null", "nullable": true},
+						{"key": "expression", "kind": "boolean", "ts": "boolean"},
+						{"key": "generator", "kind": "boolean", "ts": "boolean"},
+						{"key": "async", "kind": "boolean", "ts": "boolean"},
+						{
+							"key": "typeParameters",
+							"kind": "child",
+							"ts": "TSTypeParameterDeclaration",
+							"presence": "optional",
+							"vanilla_acorn": "absent",
+							"ts_only": true
+						},
+						{"key": "params", "kind": "list", "ts": "Expression[]"},
+						{
+							"key": "returnType",
+							"kind": "child",
+							"ts": "TSTypeAnnotation",
+							"presence": "optional",
+							"vanilla_acorn": "absent",
+							"ts_only": true
+						},
+						{"key": "body", "kind": "child", "ts": "BlockStatement"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "TSExpressionWithTypeArguments",
+					"interface": "TSExpressionWithTypeArguments",
+					"extends": ["AcornCommentAttachment"],
+					"doc": ["`implements Foo<T>` clause member, and `interface A extends Foo<T>` heritage."],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{
+							"key": "expression",
+							"kind": "child",
+							"ts": "TSEntityName",
+							"doc": [
+								"A dotted heritage name (`implements A.B`, `extends A.B`) is a `TSQualifiedName`, so",
+								"this is the entity-name union rather than a general expression."
+							]
+						},
+						{
+							"key": "typeParameters",
+							"kind": "child",
+							"ts": "TSTypeParameterInstantiation",
+							"presence": "optional",
+							"ts_only": true
+						},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "TSParameterProperty",
+					"interface": "TSParameterProperty",
+					"doc": ["TS constructor parameter property: `constructor(public x: number)`."],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{
+							"key": "accessibility",
+							"kind": "string",
+							"ts": "string",
+							"presence": "optional",
+							"string": "keyword",
+							"values": ["public", "private", "protected"]
+						},
+						{
+							"key": "readonly",
+							"kind": "boolean",
+							"ts": "boolean",
+							"presence": "optional",
+							"doc": ["Omitted from JSON when false."]
+						},
+						{
+							"key": "override",
+							"kind": "boolean",
+							"ts": "boolean",
+							"presence": "optional",
+							"doc": ["Omitted from JSON when false."]
+						},
+						{"key": "parameter", "kind": "child", "ts": "Expression"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				}
+			]
+		},
+		{
+			"title": "TypeScript AST — patterns (destructuring)",
+			"entries": [
+				{
+					"type": "ObjectPattern",
+					"interface": "ObjectPattern",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "properties", "kind": "list", "ts": "ObjectPatternProperty[]"},
+						{
+							"key": "optional",
+							"kind": "boolean",
+							"ts": "boolean",
+							"presence": "optional",
+							"vanilla_acorn": "absent"
+						},
+						{
+							"key": "typeAnnotation",
+							"kind": "child",
+							"ts": "TSTypeAnnotation | SvelteBlockTypeAnnotation",
+							"presence": "optional",
+							"vanilla_acorn": "absent",
+							"ts_only": true
+						},
+						{
+							"key": "decorators",
+							"kind": "list",
+							"ts": "Decorator[]",
+							"presence": "optional",
+							"vanilla_acorn": "absent",
+							"doc": ["Parameter decorators (`@dec { a }: T`) — only in a parameter position."]
+						},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"alias": "ObjectPatternProperty",
+					"union": ["Property", "RestElement"]
+				},
+				{
+					"type": "ArrayPattern",
+					"interface": "ArrayPattern",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{
+							"key": "elements",
+							"kind": "list",
+							"ts": "(Expression | null)[]",
+							"items_nullable": true
+						},
+						{
+							"key": "optional",
+							"kind": "boolean",
+							"ts": "boolean",
+							"presence": "optional",
+							"vanilla_acorn": "absent"
+						},
+						{
+							"key": "typeAnnotation",
+							"kind": "child",
+							"ts": "TSTypeAnnotation | SvelteBlockTypeAnnotation",
+							"presence": "optional",
+							"vanilla_acorn": "absent",
+							"ts_only": true
+						},
+						{
+							"key": "decorators",
+							"kind": "list",
+							"ts": "Decorator[]",
+							"presence": "optional",
+							"vanilla_acorn": "absent",
+							"doc": ["Parameter decorators (`@dec [a]: T`) — only in a parameter position."]
+						},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "AssignmentPattern",
+					"interface": "AssignmentPattern",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "left", "kind": "child", "ts": "Expression"},
+						{"key": "right", "kind": "child", "ts": "Expression"},
+						{
+							"key": "decorators",
+							"kind": "list",
+							"ts": "Decorator[]",
+							"presence": "optional",
+							"vanilla_acorn": "absent",
+							"doc": ["Parameter decorators (`@dec a = 1`) — only in a parameter position."]
+						},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "RestElement",
+					"interface": "RestElement",
+					"extends": ["AcornCommentAttachment"],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "argument", "kind": "child", "ts": "Expression"},
+						{
+							"key": "optional",
+							"kind": "boolean",
+							"ts": "boolean",
+							"presence": "optional",
+							"vanilla_acorn": "absent",
+							"doc": [
+								"Optional rest parameter (`...a?`) — only in a parameter position (invalid TS, deferred)."
+							]
+						},
+						{
+							"key": "typeAnnotation",
+							"kind": "child",
+							"ts": "TSTypeAnnotation",
+							"presence": "optional",
+							"vanilla_acorn": "absent",
+							"ts_only": true
+						},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				}
+			]
+		},
+		{
+			"title": "TypeScript AST — declarations",
+			"entries": [
+				{
+					"type": "TSInterfaceDeclaration",
+					"interface": "TSInterfaceDeclaration",
+					"extends": ["AcornCommentAttachment"],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{
+							"key": "declare",
+							"kind": "boolean",
+							"ts": "boolean",
+							"presence": "optional",
+							"doc": ["Omitted from JSON when false."]
+						},
+						{"key": "id", "kind": "child", "ts": "Identifier"},
+						{
+							"key": "typeParameters",
+							"kind": "child",
+							"ts": "TSTypeParameterDeclaration",
+							"presence": "optional",
+							"ts_only": true
+						},
+						{
+							"key": "extends",
+							"kind": "list",
+							"ts": "TSExpressionWithTypeArguments[]",
+							"presence": "optional",
+							"doc": [
+								"Omitted from JSON when empty. The heritage node is the same",
+								"`TSExpressionWithTypeArguments` a class `implements` clause carries — acorn-typescript",
+								"emits one node type for both positions."
+							]
+						},
+						{"key": "body", "kind": "child", "ts": "TSInterfaceBody"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "TSDeclareFunction",
+					"interface": "TSDeclareFunction",
+					"doc": ["`declare function foo(): void` or overload signature."],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{
+							"key": "declare",
+							"kind": "boolean",
+							"ts": "boolean",
+							"presence": "optional",
+							"doc": ["Omitted from JSON when false."]
+						},
+						{"key": "id", "kind": "child", "ts": "Identifier"},
+						{"key": "expression", "kind": "boolean", "ts": "boolean"},
+						{"key": "generator", "kind": "boolean", "ts": "boolean"},
+						{"key": "async", "kind": "boolean", "ts": "boolean"},
+						{
+							"key": "typeParameters",
+							"kind": "child",
+							"ts": "TSTypeParameterDeclaration",
+							"presence": "optional",
+							"ts_only": true
+						},
+						{"key": "params", "kind": "list", "ts": "Expression[]"},
+						{
+							"key": "returnType",
+							"kind": "child",
+							"ts": "TSTypeAnnotation",
+							"presence": "optional",
+							"ts_only": true
+						},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "TSEnumDeclaration",
+					"interface": "TSEnumDeclaration",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{
+							"key": "const",
+							"kind": "boolean",
+							"ts": "boolean",
+							"presence": "optional",
+							"doc": ["Omitted from JSON when false."]
+						},
+						{
+							"key": "declare",
+							"kind": "boolean",
+							"ts": "boolean",
+							"presence": "optional",
+							"doc": ["Omitted from JSON when false."]
+						},
+						{"key": "id", "kind": "child", "ts": "Identifier"},
+						{"key": "members", "kind": "list", "ts": "TSEnumMember[]"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "TSEnumMember",
+					"interface": "TSEnumMember",
+					"extends": ["AcornCommentAttachment"],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "id", "kind": "child", "ts": "TSEnumMemberId"},
+						{"key": "initializer", "kind": "child", "ts": "Expression", "presence": "optional"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"alias": "TSEnumMemberId",
+					"union": ["Identifier", "Literal"]
+				},
+				{
+					"type": "TSModuleDeclaration",
+					"interface": "TSModuleDeclaration",
+					"doc": ["`namespace A { ... }` or `module A { ... }`."],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{
+							"key": "global",
+							"kind": "boolean",
+							"ts": "boolean",
+							"presence": "optional",
+							"doc": ["`declare global {}` flag. Omitted from JSON when false."]
+						},
+						{"key": "id", "kind": "child", "ts": "TSModuleName"},
+						{
+							"key": "body",
+							"kind": "child",
+							"ts": "TSModuleDeclarationBody",
+							"presence": "optional",
+							"doc": ["None for shorthand ambient modules (`declare module 'name';`)."]
+						},
+						{
+							"key": "declare",
+							"kind": "boolean",
+							"ts": "boolean",
+							"presence": "optional",
+							"doc": ["Omitted from JSON when false."]
+						},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"alias": "TSModuleName",
+					"union": ["Identifier", "Literal"]
+				},
+				{
+					"alias": "TSModuleDeclarationBody",
+					"union": ["TSModuleBlock", "TSModuleDeclaration"]
+				},
+				{
+					"type": "TSModuleBlock",
+					"interface": "TSModuleBlock",
+					"extends": ["AcornCommentAttachment"],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "body", "kind": "list", "ts": "Statement[]"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				}
+			]
+		},
+		{
+			"title": "TypeScript AST — imports / exports",
+			"entries": [
+				{
+					"type": "ExportNamedDeclaration",
+					"interface": "ExportNamedDeclaration",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{
+							"key": "exportKind",
+							"kind": "string",
+							"ts": "string",
+							"vanilla_acorn": "absent",
+							"string": "keyword",
+							"values": ["type", "value"],
+							"doc": ["Omitted in Svelte non-`lang=\"ts\"` context when `\"value\"`."]
+						},
+						{"key": "declaration", "kind": "child", "ts": "Statement | null", "nullable": true},
+						{"key": "specifiers", "kind": "list", "ts": "ExportSpecifier[]"},
+						{"key": "source", "kind": "child", "ts": "Literal | null", "nullable": true},
+						{
+							"key": "attributes",
+							"kind": "list",
+							"ts": "ImportAttribute[]",
+							"presence": "optional",
+							"vanilla_acorn": "always",
+							"doc": [
+								"Present in Svelte non-`lang=\"ts\"` context; omitted in TS context when empty."
+							]
+						},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "ExportDefaultDeclaration",
+					"interface": "ExportDefaultDeclaration",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{
+							"key": "exportKind",
+							"kind": "string",
+							"ts": "string",
+							"vanilla_acorn": "absent",
+							"string": "keyword",
+							"values": ["value"],
+							"doc": ["Omitted in Svelte non-`lang=\"ts\"` context."]
+						},
+						{"key": "declaration", "kind": "child", "ts": "ExportDefaultValue"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"alias": "ExportDefaultValue",
+					"union": [
+						"Expression",
+						"FunctionDeclaration",
+						"TSDeclareFunction",
+						"ClassDeclaration",
+						"TSInterfaceDeclaration"
+					]
+				},
+				{
+					"alias": "ModuleExportName",
+					"doc": [
+						"A module export name: a bare `Identifier` or a string `Literal`. Per ecma262",
+						"`ModuleExportName : IdentifierName | StringLiteral` (ES2022 arbitrary module",
+						"namespace names) — e.g. `import { 'str' as b }`, `export { x as 'str' }`,",
+						"`export * as 'str' from`."
+					],
+					"union": ["Identifier", "Literal"]
+				},
+				{
+					"type": "ExportAllDeclaration",
+					"interface": "ExportAllDeclaration",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{
+							"key": "exportKind",
+							"kind": "string",
+							"ts": "string",
+							"vanilla_acorn": "absent",
+							"string": "keyword",
+							"values": ["type", "value"],
+							"doc": ["Omitted in Svelte non-`lang=\"ts\"` context when `\"value\"`."]
+						},
+						{"key": "exported", "kind": "child", "ts": "ModuleExportName | null", "nullable": true},
+						{"key": "source", "kind": "child", "ts": "Literal"},
+						{
+							"key": "attributes",
+							"kind": "list",
+							"ts": "ImportAttribute[]",
+							"presence": "optional",
+							"vanilla_acorn": "always",
+							"doc": [
+								"Present in Svelte non-`lang=\"ts\"` context; omitted in TS context when empty."
+							]
+						},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "TSExportAssignment",
+					"interface": "TSExportAssignment",
+					"doc": ["`export = value;`."],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "expression", "kind": "child", "ts": "Expression"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "TSNamespaceExportDeclaration",
+					"interface": "TSNamespaceExportDeclaration",
+					"doc": ["`export as namespace Foo;` — TypeScript UMD global export."],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "id", "kind": "child", "ts": "Identifier"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "ExportSpecifier",
+					"interface": "ExportSpecifier",
+					"extends": ["AcornCommentAttachment"],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "local", "kind": "child", "ts": "ModuleExportName"},
+						{"key": "exported", "kind": "child", "ts": "ModuleExportName"},
+						{
+							"key": "exportKind",
+							"kind": "string",
+							"ts": "string",
+							"vanilla_acorn": "absent",
+							"string": "keyword",
+							"values": ["type", "value"],
+							"doc": ["Omitted in Svelte non-`lang=\"ts\"` context when `\"value\"`."]
+						},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "ImportDeclaration",
+					"interface": "ImportDeclaration",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{
+							"key": "importKind",
+							"kind": "string",
+							"ts": "string",
+							"vanilla_acorn": "absent",
+							"string": "keyword",
+							"values": ["type", "value"],
+							"doc": ["Omitted in Svelte non-`lang=\"ts\"` context when `\"value\"`."]
+						},
+						{
+							"key": "phase",
+							"kind": "string",
+							"ts": "'source' | 'defer'",
+							"presence": "optional",
+							"vanilla_acorn": "absent",
+							"string": "keyword",
+							"values": ["source", "defer"],
+							"doc": [
+								"Import phase (`'source'`/`'defer'`) for `import source …` / `import defer …`; omitted otherwise."
+							]
+						},
+						{"key": "specifiers", "kind": "list", "ts": "ImportSpecifier[]"},
+						{"key": "source", "kind": "child", "ts": "Literal"},
+						{
+							"key": "attributes",
+							"kind": "list",
+							"ts": "ImportAttribute[]",
+							"presence": "optional",
+							"vanilla_acorn": "always",
+							"doc": [
+								"Present in Svelte non-`lang=\"ts\"` context (even when empty); omitted in TS context when empty."
+							]
+						},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"alias": "ImportSpecifier",
+					"union": ["ImportDefaultSpecifier", "ImportNamedSpecifier", "ImportNamespaceSpecifier"]
+				},
+				{
+					"type": "ImportDefaultSpecifier",
+					"interface": "ImportDefaultSpecifier",
+					"extends": ["AcornCommentAttachment"],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "local", "kind": "child", "ts": "Identifier"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "ImportSpecifier",
+					"interface": "ImportNamedSpecifier",
+					"extends": ["AcornCommentAttachment"],
+					"fields": [
+						{
+							"key": "type",
+							"kind": "type",
+							"doc": ["Acorn names named imports `\"ImportSpecifier\"` (no `Named` prefix)."]
+						},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "imported", "kind": "child", "ts": "ModuleExportName"},
+						{"key": "local", "kind": "child", "ts": "Identifier"},
+						{
+							"key": "importKind",
+							"kind": "string",
+							"ts": "string",
+							"vanilla_acorn": "absent",
+							"string": "keyword",
+							"values": ["type", "value"],
+							"doc": ["Omitted in Svelte non-`lang=\"ts\"` context when `\"value\"`."]
+						},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "ImportNamespaceSpecifier",
+					"interface": "ImportNamespaceSpecifier",
+					"extends": ["AcornCommentAttachment"],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "local", "kind": "child", "ts": "Identifier"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "ImportAttribute",
+					"interface": "ImportAttribute",
+					"extends": ["AcornCommentAttachment"],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{
+							"key": "key",
+							"kind": "child",
+							"ts": "Identifier | Literal",
+							"doc": ["Bare `type` → `Identifier`; quoted `'resolution-mode'` → `Literal`."]
+						},
+						{"key": "value", "kind": "child", "ts": "Literal"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "TSImportEqualsDeclaration",
+					"interface": "TSImportEqualsDeclaration",
+					"doc": ["`import x = require(\"y\")` or `import x = A.B`."],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{
+							"key": "importKind",
+							"kind": "string",
+							"ts": "string",
+							"string": "keyword",
+							"values": ["type", "value"]
+						},
+						{"key": "isExport", "kind": "boolean", "ts": "boolean"},
+						{"key": "id", "kind": "child", "ts": "Identifier"},
+						{"key": "moduleReference", "kind": "child", "ts": "TSModuleReference"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"alias": "TSModuleReference",
+					"union": ["TSExternalModuleReference", "TSEntityName"]
+				},
+				{
+					"type": "TSExternalModuleReference",
+					"interface": "TSExternalModuleReference",
+					"extends": ["AcornCommentAttachment"],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "expression", "kind": "child", "ts": "Literal"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				}
+			]
+		},
+		{
+			"title": "TypeScript AST — types",
+			"entries": [
+				{
+					"type": "TSTypeAnnotation",
+					"variant": "SvelteBlockTypeAnnotation",
+					"interface": "SvelteBlockTypeAnnotation",
+					"doc": [
+						"The type annotation Svelte builds for a BLOCK BINDING (`{#each xs as x: T}`,",
+						"`{:then v: T}`): `read_type_annotation` constructs the wrapper itself — the same",
+						"Svelte-built family as `SvelteShorthandIdentifier` and `SvelteConstDeclaration`, which",
+						"carry no `loc` in Svelte's own wire (tsv's carries one like every positioned object). Its",
+						"`typeAnnotation` is an ordinary acorn type node. Only the three pattern positions can hold",
+						"one."
+					],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "typeAnnotation", "kind": "child", "ts": "TSType", "ts_only": true}
+					]
+				},
+				{
+					"type": "TSTypeAnnotation",
+					"interface": "TSTypeAnnotation",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "typeAnnotation", "kind": "child", "ts": "TSType", "ts_only": true},
+						{
+							"key": "leadingComments",
+							"kind": "comments",
+							"ts": "AttachedComment[]",
+							"presence": "optional",
+							"doc": [
+								"See `AcornCommentAttachment` — a wrapper node, not a union member, so it carries the",
+								"attachment keys itself."
+							]
+						},
+						{
+							"key": "trailingComments",
+							"kind": "comments",
+							"ts": "AttachedComment[]",
+							"presence": "optional",
+							"doc": ["See `leadingComments`."]
+						}
+					]
+				},
+				{
+					"alias": "TSType",
+					"union": [
+						"TSNumberKeyword",
+						"TSStringKeyword",
+						"TSBooleanKeyword",
+						"TSAnyKeyword",
+						"TSVoidKeyword",
+						"TSUndefinedKeyword",
+						"TSNullKeyword",
+						"TSNeverKeyword",
+						"TSUnknownKeyword",
+						"TSObjectKeyword",
+						"TSSymbolKeyword",
+						"TSBigIntKeyword",
+						"TSLiteralType",
+						"TSArrayType",
+						"TSUnionType",
+						"TSIntersectionType",
+						"TSTypeReference",
+						"TSTypeLiteral",
+						"TSFunctionType",
+						"TSConstructorType",
+						"TSTupleType",
+						"TSParenthesizedType",
+						"TSTypePredicate",
+						"TSConditionalType",
+						"TSMappedType",
+						"TSTypeOperator",
+						"TSImportType",
+						"TSTypeQuery",
+						"TSIndexedAccessType",
+						"TSRestType",
+						"TSOptionalType",
+						"TSNamedTupleMember",
+						"TSInferType",
+						"TSThisType"
+					],
+					"intersect": "AcornCommentAttachment"
+				},
+				{
+					"type": "TSArrayType",
+					"interface": "TSArrayType",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "elementType", "kind": "child", "ts": "TSType"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "TSIndexedAccessType",
+					"interface": "TSIndexedAccessType",
+					"doc": ["`T[K]`, `Obj[\"key\"]`."],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "objectType", "kind": "child", "ts": "TSType"},
+						{"key": "indexType", "kind": "child", "ts": "TSType"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "TSNumberKeyword",
+					"interface": "TSNumberKeyword",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "TSStringKeyword",
+					"interface": "TSStringKeyword",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "TSBooleanKeyword",
+					"interface": "TSBooleanKeyword",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "TSAnyKeyword",
+					"interface": "TSAnyKeyword",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "TSVoidKeyword",
+					"interface": "TSVoidKeyword",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "TSUndefinedKeyword",
+					"interface": "TSUndefinedKeyword",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "TSNullKeyword",
+					"interface": "TSNullKeyword",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "TSNeverKeyword",
+					"interface": "TSNeverKeyword",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "TSUnknownKeyword",
+					"interface": "TSUnknownKeyword",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "TSObjectKeyword",
+					"interface": "TSObjectKeyword",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "TSSymbolKeyword",
+					"interface": "TSSymbolKeyword",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "TSBigIntKeyword",
+					"interface": "TSBigIntKeyword",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"interface": "TSTypeAliasDeclaration",
+					"doc": ["`type X = T`."],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "id", "kind": "child", "ts": "Identifier"},
+						{
+							"key": "typeParameters",
+							"kind": "child",
+							"ts": "TSTypeParameterDeclaration",
+							"presence": "optional",
+							"ts_only": true
+						},
+						{"key": "typeAnnotation", "kind": "child", "ts": "TSType", "ts_only": true},
+						{
+							"key": "declare",
+							"kind": "boolean",
+							"ts": "boolean",
+							"presence": "optional",
+							"doc": ["Omitted from JSON when false."]
+						},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "TSLiteralType",
+					"interface": "TSLiteralType",
+					"doc": ["`type X = 'hello'` or `type X = \\`template\\``."],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "literal", "kind": "child", "ts": "TSLiteralTypeLiteral"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"alias": "TSLiteralTypeLiteral",
+					"union": ["TemplateLiteralType", "UnaryExpression", "Literal"]
+				},
+				{
+					"type": "TemplateLiteral",
+					"variant": "TemplateLiteralType",
+					"interface": "TemplateLiteralType",
+					"doc": [
+						"Template literal in type position (same structure as `TemplateLiteral` but expressions are `TSType`)."
+					],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "expressions", "kind": "list", "ts": "TSType[]"},
+						{"key": "quasis", "kind": "list", "ts": "TemplateElement[]"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"alias": "TSEntityName",
+					"doc": ["`Foo` or `Foo.Bar.Baz`."],
+					"union": ["Identifier", "TSQualifiedName"]
+				},
+				{
+					"type": "TSQualifiedName",
+					"interface": "TSQualifiedName",
+					"extends": ["AcornCommentAttachment"],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "left", "kind": "child", "ts": "TSEntityName"},
+						{"key": "right", "kind": "child", "ts": "Identifier"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "TSTypeParameterInstantiation",
+					"interface": "TSTypeParameterInstantiation",
+					"extends": ["AcornCommentAttachment"],
+					"doc": ["`<T, U>` in call/instantiation position."],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "params", "kind": "list", "ts": "TSType[]"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "TSTypeParameterDeclaration",
+					"interface": "TSTypeParameterDeclaration",
+					"extends": ["AcornCommentAttachment"],
+					"doc": ["`<T extends U = V>` in declaration position."],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "params", "kind": "list", "ts": "TSTypeParameter[]"},
+						{
+							"key": "extra",
+							"kind": "object",
+							"entry": "TSTypeParameterExtra",
+							"presence": "optional"
+						},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"interface": "TSTypeParameterExtra",
+					"fields": [
+						{"key": "trailingComma", "kind": "number", "ts": "number"}
+					]
+				},
+				{
+					"type": "TSTypeParameter",
+					"interface": "TSTypeParameter",
+					"extends": ["AcornCommentAttachment"],
+					"doc": ["Single type parameter with optional modifiers (`const`, `in`, `out`)."],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{
+							"key": "const",
+							"kind": "boolean",
+							"ts": "boolean",
+							"presence": "optional",
+							"doc": ["Omitted from JSON when false."]
+						},
+						{
+							"key": "in",
+							"kind": "boolean",
+							"ts": "boolean",
+							"presence": "optional",
+							"doc": ["Omitted from JSON when false."]
+						},
+						{
+							"key": "out",
+							"kind": "boolean",
+							"ts": "boolean",
+							"presence": "optional",
+							"doc": ["Omitted from JSON when false."]
+						},
+						{"key": "name", "kind": "string", "ts": "string", "string": "cooked"},
+						{"key": "constraint", "kind": "child", "ts": "TSType", "presence": "optional"},
+						{"key": "default", "kind": "child", "ts": "TSType", "presence": "optional"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"alias": "TSTypeElement",
+					"union": [
+						"TSPropertySignature",
+						"TSMethodSignature",
+						"TSCallSignatureDeclaration",
+						"TSConstructSignatureDeclaration",
+						"TSIndexSignature"
+					],
+					"intersect": "AcornCommentAttachment"
+				},
+				{
+					"type": "TSInterfaceBody",
+					"interface": "TSInterfaceBody",
+					"extends": ["AcornCommentAttachment"],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "body", "kind": "list", "ts": "TSTypeElement[]"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "TSPropertySignature",
+					"interface": "TSPropertySignature",
+					"doc": ["`prop: T`, `readonly prop?: T`."],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{
+							"key": "readonly",
+							"kind": "boolean",
+							"ts": "boolean",
+							"presence": "optional",
+							"doc": ["Omitted from JSON when false."]
+						},
+						{
+							"key": "computed",
+							"kind": "boolean",
+							"ts": "boolean",
+							"presence": "optional",
+							"doc": ["acorn omits this when `key` is the `new` keyword."]
+						},
+						{"key": "key", "kind": "child", "ts": "Expression"},
+						{
+							"key": "optional",
+							"kind": "boolean",
+							"ts": "boolean",
+							"presence": "optional",
+							"doc": ["Omitted from JSON when false."]
+						},
+						{
+							"key": "typeAnnotation",
+							"kind": "child",
+							"ts": "TSTypeAnnotation",
+							"presence": "optional",
+							"ts_only": true
+						},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "TSMethodSignature",
+					"interface": "TSMethodSignature",
+					"doc": ["`method(): T`, `get prop(): T`, `set prop(v: T)`."],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{
+							"key": "readonly",
+							"kind": "boolean",
+							"ts": "boolean",
+							"presence": "optional",
+							"doc": [
+								"A `readonly` modifier, which tsc's parser accepts on a method signature (its checker",
+								"rejects it, TS1024) and acorn-typescript rejects. Omitted from JSON when false."
+							]
+						},
+						{"key": "computed", "kind": "boolean", "ts": "boolean"},
+						{"key": "key", "kind": "child", "ts": "Expression"},
+						{
+							"key": "optional",
+							"kind": "boolean",
+							"ts": "boolean",
+							"presence": "optional",
+							"doc": ["Omitted from JSON when false."]
+						},
+						{
+							"key": "typeParameters",
+							"kind": "child",
+							"ts": "TSTypeParameterDeclaration",
+							"presence": "optional",
+							"ts_only": true
+						},
+						{"key": "parameters", "kind": "list", "ts": "Expression[]"},
+						{
+							"key": "typeAnnotation",
+							"kind": "child",
+							"ts": "TSTypeAnnotation",
+							"presence": "optional",
+							"ts_only": true,
+							"doc": ["Return type. Serialized as `typeAnnotation` to match acorn-typescript."]
+						},
+						{
+							"key": "kind",
+							"kind": "string",
+							"ts": "string",
+							"string": "keyword",
+							"values": ["method", "get", "set"],
+							"doc": ["`\"get\"` or `\"set\"` for accessor signatures, `\"method\"` otherwise."]
+						},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "TSCallSignatureDeclaration",
+					"interface": "TSCallSignatureDeclaration",
+					"doc": ["`(): T`."],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{
+							"key": "typeParameters",
+							"kind": "child",
+							"ts": "TSTypeParameterDeclaration",
+							"presence": "optional",
+							"ts_only": true
+						},
+						{"key": "parameters", "kind": "list", "ts": "Expression[]"},
+						{
+							"key": "typeAnnotation",
+							"kind": "child",
+							"ts": "TSTypeAnnotation",
+							"presence": "optional",
+							"ts_only": true
+						},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "TSConstructSignatureDeclaration",
+					"interface": "TSConstructSignatureDeclaration",
+					"doc": ["`new (): T`."],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{
+							"key": "typeParameters",
+							"kind": "child",
+							"ts": "TSTypeParameterDeclaration",
+							"presence": "optional",
+							"ts_only": true
+						},
+						{"key": "parameters", "kind": "list", "ts": "Expression[]"},
+						{
+							"key": "typeAnnotation",
+							"kind": "child",
+							"ts": "TSTypeAnnotation",
+							"presence": "optional",
+							"ts_only": true
+						},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "TSIndexSignature",
+					"interface": "TSIndexSignature",
+					"extends": ["AcornCommentAttachment"],
+					"doc": ["`[key: string]: T`."],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{
+							"key": "static",
+							"kind": "boolean",
+							"ts": "boolean",
+							"presence": "optional",
+							"doc": ["Omitted from JSON when false."]
+						},
+						{
+							"key": "readonly",
+							"kind": "boolean",
+							"ts": "boolean",
+							"presence": "optional",
+							"doc": ["Omitted from JSON when false."]
+						},
+						{"key": "parameters", "kind": "list", "ts": "Identifier[]"},
+						{
+							"key": "typeAnnotation",
+							"kind": "child",
+							"ts": "TSTypeAnnotation",
+							"presence": "optional",
+							"ts_only": true,
+							"doc": ["Omitted from JSON for a typeless index signature (`[key: string]`)."]
+						},
+						{
+							"key": "decorators",
+							"kind": "list",
+							"ts": "Decorator[]",
+							"presence": "optional",
+							"doc": [
+								"A decorated class index signature's decorators (`@a [k: string]: T;`); omitted when none."
+							]
+						},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "TSUnionType",
+					"interface": "TSUnionType",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "types", "kind": "list", "ts": "TSType[]"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "TSIntersectionType",
+					"interface": "TSIntersectionType",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "types", "kind": "list", "ts": "TSType[]"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "TSTypeReference",
+					"interface": "TSTypeReference",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "typeName", "kind": "child", "ts": "TSEntityName"},
+						{
+							"key": "typeArguments",
+							"kind": "child",
+							"ts": "TSTypeParameterInstantiation",
+							"presence": "optional",
+							"ts_only": true
+						},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "TSTypeLiteral",
+					"interface": "TSTypeLiteral",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "members", "kind": "list", "ts": "TSTypeElement[]"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "TSFunctionType",
+					"interface": "TSFunctionType",
+					"doc": ["`(x: T) => U`, `<T>(x: T) => U`."],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{
+							"key": "typeParameters",
+							"kind": "child",
+							"ts": "TSTypeParameterDeclaration",
+							"presence": "optional",
+							"ts_only": true
+						},
+						{"key": "parameters", "kind": "list", "ts": "Expression[]"},
+						{"key": "typeAnnotation", "kind": "child", "ts": "TSTypeAnnotation", "ts_only": true},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "TSConstructorType",
+					"interface": "TSConstructorType",
+					"doc": ["`new () => T`, `abstract new <T>() => T`."],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "abstract", "kind": "boolean", "ts": "boolean"},
+						{
+							"key": "typeParameters",
+							"kind": "child",
+							"ts": "TSTypeParameterDeclaration",
+							"presence": "optional",
+							"ts_only": true
+						},
+						{"key": "parameters", "kind": "list", "ts": "Expression[]"},
+						{"key": "typeAnnotation", "kind": "child", "ts": "TSTypeAnnotation", "ts_only": true},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "TSTupleType",
+					"interface": "TSTupleType",
+					"doc": ["`[T, U, V]`."],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "elementTypes", "kind": "list", "ts": "TSType[]"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "TSRestType",
+					"interface": "TSRestType",
+					"doc": ["Rest type in tuples: `...T`."],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "typeAnnotation", "kind": "child", "ts": "TSType", "ts_only": true},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "TSOptionalType",
+					"interface": "TSOptionalType",
+					"doc": ["Optional type in tuples: `T?`."],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "typeAnnotation", "kind": "child", "ts": "TSType", "ts_only": true},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "TSNamedTupleMember",
+					"interface": "TSNamedTupleMember",
+					"doc": [
+						"`label: T` or `label?: T` in tuple types. The label is an `IdentifierName`, so a",
+						"reserved or contextual keyword spells one too (`[function: string]`)."
+					],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "label", "kind": "child", "ts": "Identifier"},
+						{"key": "optional", "kind": "boolean", "ts": "boolean"},
+						{"key": "elementType", "kind": "child", "ts": "TSType"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "TSInferType",
+					"interface": "TSInferType",
+					"doc": ["`infer U` in conditional types."],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "typeParameter", "kind": "child", "ts": "TSTypeParameter"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "TSThisType",
+					"interface": "TSThisType",
+					"extends": ["AcornCommentAttachment"],
+					"doc": ["`this` in type position."],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "TSParenthesizedType",
+					"interface": "TSParenthesizedType",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "typeAnnotation", "kind": "child", "ts": "TSType", "ts_only": true},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "TSTypePredicate",
+					"interface": "TSTypePredicate",
+					"doc": ["`x is T` or `asserts x is T`."],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "parameterName", "kind": "child", "ts": "TSTypePredicateParameterName"},
+						{
+							"key": "typeAnnotation",
+							"kind": "child",
+							"ts": "TSTypeAnnotation | null",
+							"nullable": true,
+							"ts_only": true
+						},
+						{"key": "asserts", "kind": "boolean", "ts": "boolean"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"alias": "TSTypePredicateParameterName",
+					"union": ["Identifier", "TSThisType"]
+				},
+				{
+					"type": "TSConditionalType",
+					"interface": "TSConditionalType",
+					"doc": ["`T extends U ? V : W`."],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "checkType", "kind": "child", "ts": "TSType"},
+						{"key": "extendsType", "kind": "child", "ts": "TSType"},
+						{"key": "trueType", "kind": "child", "ts": "TSType"},
+						{"key": "falseType", "kind": "child", "ts": "TSType"},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "TSMappedType",
+					"interface": "TSMappedType",
+					"doc": ["`{ [K in keyof T]: V }`."],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{
+							"key": "readonly",
+							"kind": ["boolean", "string"],
+							"ts": "TSMappedTypeModifier",
+							"presence": "optional",
+							"string": "keyword",
+							"values": ["+", "-"]
+						},
+						{
+							"key": "typeParameter",
+							"kind": "child",
+							"ts": "TSTypeParameter",
+							"doc": [
+								"The `K in T` binder. Same `TSTypeParameter` a declaration's `<…>` list carries —",
+								"acorn-typescript emits one node type for both positions — with `constraint` holding",
+								"the `in` operand and the modifier keys (`const`/`in`/`out`) and `default` unreachable",
+								"here."
+							]
+						},
+						{
+							"key": "nameType",
+							"kind": "child",
+							"ts": "TSType | null",
+							"nullable": true,
+							"doc": ["Key remapping: `as NewK`."]
+						},
+						{
+							"key": "optional",
+							"kind": ["boolean", "string"],
+							"ts": "TSMappedTypeModifier",
+							"presence": "optional",
+							"string": "keyword",
+							"values": ["+", "-"]
+						},
+						{
+							"key": "typeAnnotation",
+							"kind": "child",
+							"ts": "TSType",
+							"presence": "optional",
+							"ts_only": true,
+							"doc": ["The value type — omitted entirely when absent (`{ [K in T] }`)."]
+						},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"alias": "TSMappedTypeModifier",
+					"doc": ["Mapped-type modifier: `true`, `\"+\"`, or `\"-\"`."],
+					"union": ["true", "'+'", "'-'"]
+				},
+				{
+					"type": "TSTypeOperator",
+					"interface": "TSTypeOperator",
+					"doc": ["`keyof T`, `unique symbol`, `readonly T`."],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{
+							"key": "operator",
+							"kind": "string",
+							"ts": "string",
+							"string": "keyword",
+							"values": ["keyof", "unique", "readonly"]
+						},
+						{"key": "typeAnnotation", "kind": "child", "ts": "TSType", "ts_only": true},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"type": "TSImportType",
+					"interface": "TSImportType",
+					"doc": ["`import('module')`, `import('module', {with: {...}}).Qualifier<T>`."],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "argument", "kind": "child", "ts": "Literal"},
+						{"key": "options", "kind": "child", "ts": "Expression", "presence": "optional"},
+						{"key": "qualifier", "kind": "child", "ts": "TSEntityName", "presence": "optional"},
+						{
+							"key": "typeArguments",
+							"kind": "child",
+							"ts": "TSTypeParameterInstantiation",
+							"presence": "optional",
+							"ts_only": true
+						},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				},
+				{
+					"alias": "TSTypeQueryExprName",
+					"union": ["Identifier", "TSQualifiedName", "TSImportType"]
+				},
+				{
+					"type": "TSTypeQuery",
+					"interface": "TSTypeQuery",
+					"doc": ["`typeof x`, `typeof Foo.bar`, `typeof import(\"module\")`, `typeof Array<T>`."],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "exprName", "kind": "child", "ts": "TSTypeQueryExprName"},
+						{
+							"key": "typeArguments",
+							"kind": "child",
+							"ts": "TSTypeParameterInstantiation",
+							"presence": "optional",
+							"ts_only": true
+						},
+						{"key": "leadingComments", "kind": "comments", "presence": "optional"},
+						{"key": "trailingComments", "kind": "comments", "presence": "optional"}
+					]
+				}
+			]
+		},
+		{
+			"title": "CSS AST",
+			"entries": [
+				{
+					"type": "StyleSheet",
+					"interface": "StyleSheet",
+					"css": true,
+					"doc": [
+						"Parsed CSS — content of a `<style>` tag in a Svelte component.",
+						"",
+						"Children and attributes are emitted as opaque JSON values that follow",
+						"Svelte's `parseCss` output; their precise shape is not currently",
+						"mirrored in this file."
+					],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "attributes", "kind": "list", "ts": "unknown[]"},
+						{"key": "children", "kind": "list", "ts": "unknown[]"},
+						{"key": "comments", "kind": "list", "ts": "CSSComment[]"},
+						{"key": "content", "kind": "object", "entry": "StyleContent"}
+					]
+				},
+				{
+					"type": "StyleSheetFile",
+					"interface": "StyleSheetFile",
+					"css": true,
+					"doc": [
+						"Standalone CSS file parse — what `parse_css` returns when CSS is not",
+						"embedded in a Svelte component. Matches Svelte's `parseCss(...)` output",
+						"shape: `children` and `comments` (no `attributes`/`content`)."
+					],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "children", "kind": "list", "ts": "unknown[]"},
+						{"key": "comments", "kind": "list", "ts": "CSSComment[]"}
+					]
+				},
+				{
+					"type": "CSSComment",
+					"interface": "CSSComment",
+					"css": true,
+					"doc": [
+						"A CSS block comment, in source order on the stylesheet root — CSS comments",
+						"are detached from the nodes around them rather than carried as children.",
+						"",
+						"`value` is the interior text, delimiters excluded."
+					],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "value", "kind": "string", "ts": "string", "string": "slice"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{
+							"key": "position",
+							"kind": "number",
+							"ts": "number",
+							"presence": "optional",
+							"doc": [
+								"Index into the containing declaration `value` or at-rule `prelude`",
+								"string — an ordinary JS string index (UTF-16 code units). Present only",
+								"for a comment lifted out of one, and measured before that string's",
+								"trailing trim, so it can point one past the end."
+							]
+						}
+					]
+				},
+				{
+					"interface": "StyleContent",
+					"css": true,
+					"doc": ["Raw CSS text inside a `<style>` block."],
+					"fields": [
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "styles", "kind": "string", "ts": "string", "string": "own"},
+						{
+							"key": "comment",
+							"kind": "child",
+							"ts": "Comment | null",
+							"nullable": true,
+							"doc": ["A leading block comment ahead of the stylesheet body; `null` when absent."]
+						}
+					]
+				},
+				{
+					"type": "Atrule",
+					"interface": "CSSAtrule",
+					"css": true,
+					"opaque": true,
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset"},
+						{"key": "end", "kind": "offset"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "name", "kind": "string", "string": "cooked"},
+						{"key": "prelude", "kind": "string", "string": "cooked"},
+						{"key": "block", "kind": "child", "ts": "CSSBlock | null", "nullable": true}
+					]
+				},
+				{
+					"type": "AttributeSelector",
+					"interface": "CSSAttributeSelector",
+					"css": true,
+					"opaque": true,
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset"},
+						{"key": "end", "kind": "offset"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "name", "kind": "string", "string": "cooked"},
+						{"key": "matcher", "kind": "string", "nullable": true, "string": "cooked"},
+						{"key": "value", "kind": "string", "nullable": true, "string": "slice"},
+						{"key": "flags", "kind": "string", "nullable": true, "string": "slice"},
+						{"key": "namespace", "kind": "string", "presence": "optional", "string": "cooked"}
+					]
+				},
+				{
+					"type": "Block",
+					"interface": "CSSBlock",
+					"css": true,
+					"opaque": true,
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset"},
+						{"key": "end", "kind": "offset"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "children", "kind": "list", "ts": "(CSSAtrule | CSSDeclaration | CSSRule)[]"}
+					]
+				},
+				{
+					"type": "ClassSelector",
+					"interface": "CSSClassSelector",
+					"css": true,
+					"opaque": true,
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "name", "kind": "string", "string": "cooked"},
+						{"key": "start", "kind": "offset"},
+						{"key": "end", "kind": "offset"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"}
+					]
+				},
+				{
+					"type": "Combinator",
+					"interface": "CSSCombinator",
+					"css": true,
+					"opaque": true,
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{
+							"key": "name",
+							"kind": "string",
+							"string": "keyword",
+							"values": [" ", ">", "+", "~", "||"],
+							"note": [
+								"The oracle writes one space for any whitespace run between compound selectors."
+							]
+						},
+						{"key": "start", "kind": "offset"},
+						{"key": "end", "kind": "offset"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"}
+					]
+				},
+				{
+					"type": "ComplexSelector",
+					"interface": "CSSComplexSelector",
+					"css": true,
+					"opaque": true,
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset"},
+						{"key": "end", "kind": "offset"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "children", "kind": "list", "ts": "CSSRelativeSelector[]"},
+						{
+							"key": "metadata",
+							"kind": "object",
+							"entry": "CSSComplexSelectorMetadata",
+							"presence": "optional"
+						}
+					]
+				},
+				{
+					"type": "Declaration",
+					"interface": "CSSDeclaration",
+					"css": true,
+					"opaque": true,
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset"},
+						{"key": "end", "kind": "offset"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "property", "kind": "string", "string": "slice"},
+						{"key": "value", "kind": "string", "string": "cooked"}
+					]
+				},
+				{
+					"type": "IdSelector",
+					"interface": "CSSIdSelector",
+					"css": true,
+					"opaque": true,
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "name", "kind": "string", "string": "cooked"},
+						{"key": "start", "kind": "offset"},
+						{"key": "end", "kind": "offset"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"}
+					]
+				},
+				{
+					"type": "NestingSelector",
+					"interface": "CSSNestingSelector",
+					"css": true,
+					"opaque": true,
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "name", "kind": "string", "string": "own"},
+						{"key": "start", "kind": "offset"},
+						{"key": "end", "kind": "offset"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"}
+					]
+				},
+				{
+					"type": "Nth",
+					"interface": "CSSNth",
+					"css": true,
+					"opaque": true,
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "value", "kind": "string", "string": "slice"},
+						{"key": "start", "kind": "offset"},
+						{"key": "end", "kind": "offset"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "selector", "kind": "child", "ts": "CSSSelectorList", "presence": "optional"}
+					]
+				},
+				{
+					"type": "Percentage",
+					"interface": "CSSPercentage",
+					"css": true,
+					"opaque": true,
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "value", "kind": "string", "string": "own"},
+						{"key": "start", "kind": "offset"},
+						{"key": "end", "kind": "offset"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"}
+					]
+				},
+				{
+					"type": "PseudoClassSelector",
+					"interface": "CSSPseudoClassSelector",
+					"css": true,
+					"opaque": true,
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "name", "kind": "string", "string": "cooked"},
+						{"key": "args", "kind": "child", "ts": "CSSSelectorList | null", "nullable": true},
+						{"key": "start", "kind": "offset"},
+						{"key": "end", "kind": "offset"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"}
+					]
+				},
+				{
+					"type": "PseudoElementSelector",
+					"interface": "CSSPseudoElementSelector",
+					"css": true,
+					"opaque": true,
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "name", "kind": "string", "string": "cooked"},
+						{"key": "start", "kind": "offset"},
+						{"key": "end", "kind": "offset"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "args", "kind": "child", "ts": "CSSSelectorList", "presence": "optional"}
+					]
+				},
+				{
+					"type": "RelativeSelector",
+					"interface": "CSSRelativeSelector",
+					"css": true,
+					"opaque": true,
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "combinator", "kind": "child", "ts": "CSSCombinator | null", "nullable": true},
+						{
+							"key": "selectors",
+							"kind": "list",
+							"ts": "(CSSAttributeSelector | CSSClassSelector | CSSIdSelector | CSSNestingSelector | CSSNth | CSSPercentage | CSSPseudoClassSelector | CSSPseudoElementSelector | CSSTypeSelector)[]"
+						},
+						{"key": "start", "kind": "offset"},
+						{"key": "end", "kind": "offset"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{
+							"key": "metadata",
+							"kind": "object",
+							"entry": "CSSRelativeSelectorMetadata",
+							"presence": "optional"
+						}
+					]
+				},
+				{
+					"type": "Rule",
+					"interface": "CSSRule",
+					"css": true,
+					"opaque": true,
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "prelude", "kind": "child", "ts": "CSSSelectorList"},
+						{"key": "block", "kind": "child", "ts": "CSSBlock"},
+						{"key": "start", "kind": "offset"},
+						{"key": "end", "kind": "offset"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{
+							"key": "metadata",
+							"kind": "object",
+							"entry": "CSSRuleMetadata",
+							"presence": "optional"
+						}
+					]
+				},
+				{
+					"type": "SelectorList",
+					"interface": "CSSSelectorList",
+					"css": true,
+					"opaque": true,
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset"},
+						{"key": "end", "kind": "offset"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "children", "kind": "list", "ts": "CSSComplexSelector[]"}
+					]
+				},
+				{
+					"type": "TypeSelector",
+					"interface": "CSSTypeSelector",
+					"css": true,
+					"opaque": true,
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "name", "kind": "string", "string": "cooked"},
+						{"key": "namespace", "kind": "string", "presence": "optional", "string": "cooked"},
+						{"key": "start", "kind": "offset"},
+						{"key": "end", "kind": "offset"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"}
+					]
+				},
+				{
+					"interface": "CSSRuleMetadata",
+					"css": true,
+					"opaque": true,
+					"fields": [
+						{"key": "parent_rule", "kind": "null"},
+						{"key": "has_local_selectors", "kind": "boolean"},
+						{"key": "has_global_selectors", "kind": "boolean"},
+						{"key": "is_global_block", "kind": "boolean"}
+					]
+				},
+				{
+					"interface": "CSSComplexSelectorMetadata",
+					"css": true,
+					"opaque": true,
+					"fields": [
+						{"key": "rule", "kind": "null"},
+						{"key": "is_global", "kind": "boolean"},
+						{"key": "used", "kind": "boolean"}
+					]
+				},
+				{
+					"interface": "CSSRelativeSelectorMetadata",
+					"css": true,
+					"opaque": true,
+					"fields": [
+						{"key": "is_global", "kind": "boolean"},
+						{"key": "is_global_like", "kind": "boolean"},
+						{"key": "scoped", "kind": "boolean"}
+					]
+				}
+			]
+		},
+		{
+			"title": "Svelte AST",
+			"entries": [
+				{
+					"interface": "NameLocation",
+					"doc": [
+						"Span of a name (element, attribute, directive), as `{line, column, character}` endpoints;",
+						"`character` is a UTF-16 offset. Present when locations are requested."
+					],
+					"fields": [
+						{"key": "start", "kind": "object", "entry": "NamePosition"},
+						{"key": "end", "kind": "object", "entry": "NamePosition"}
+					]
+				},
+				{
+					"interface": "NamePosition",
+					"fields": [
+						{"key": "line", "kind": "number", "ts": "number"},
+						{"key": "column", "kind": "number", "ts": "number"},
+						{"key": "character", "kind": "number", "ts": "number"}
+					]
+				},
+				{
+					"type": "Root",
+					"interface": "Root",
+					"doc": ["Root node of a `.svelte` file."],
+					"fields": [
+						{"key": "css", "kind": "child", "ts": "StyleSheet | null", "nullable": true},
+						{
+							"key": "js",
+							"kind": "list",
+							"ts": "never[]",
+							"doc": [
+								"Legacy Svelte-4 field. Always `[]` — `never[]` states that as a checked claim rather",
+								"than a comment, so the day something populates it the wire-type gate says so instead of",
+								"quietly widening."
+							]
+						},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "type", "kind": "type"},
+						{"key": "fragment", "kind": "child", "ts": "Fragment"},
+						{
+							"key": "options",
+							"kind": "object",
+							"ts": "SvelteOptions | null",
+							"entry": "SvelteOptions",
+							"nullable": true
+						},
+						{"key": "comments", "kind": "list", "ts": "RootComment[]"},
+						{"key": "module", "kind": "child", "ts": "Script", "presence": "optional"},
+						{"key": "instance", "kind": "child", "ts": "Script", "presence": "optional"}
+					]
+				},
+				{
+					"type": "Fragment",
+					"interface": "Fragment",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "nodes", "kind": "list", "ts": "FragmentNode[]"}
+					]
+				},
+				{
+					"alias": "FragmentNode",
+					"union": [
+						"Element",
+						"SpecialElement",
+						"ExpressionTag",
+						"Text",
+						"Comment",
+						"IfBlock",
+						"EachBlock",
+						"AwaitBlock",
+						"KeyBlock",
+						"SnippetBlock",
+						"HtmlTag",
+						"ConstTag",
+						"DeclarationTag",
+						"DebugTag",
+						"RenderTag"
+					]
+				},
+				{
+					"type": "Line",
+					"variant": "RootComment",
+					"interface": "RootComment",
+					"doc": [
+						"A document-level comment on `Root`: the JS-side comments Svelte hoists here. Unlike",
+						"`AttachedComment` these always carry positions."
+					],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "value", "kind": "string", "ts": "string", "string": "slice"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{
+							"key": "loc",
+							"kind": "loc",
+							"entry": "SourceLocation",
+							"presence": "locations",
+							"character": true
+						}
+					]
+				},
+				{
+					"type": "Block",
+					"variant": "RootComment",
+					"interface": "RootComment",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "value", "kind": "string", "ts": "string", "string": "cooked"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{
+							"key": "loc",
+							"kind": "loc",
+							"entry": "SourceLocation",
+							"presence": "locations",
+							"character": true
+						}
+					]
+				},
+				{
+					"type": "Comment",
+					"interface": "Comment",
+					"doc": ["HTML comment in template: `<!-- content -->`."],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "data", "kind": "string", "ts": "string", "string": "slice"}
+					]
+				},
+				{
+					"type": "Comment",
+					"interface": "Comment",
+					"css": true,
+					"note": [
+						"The same shape as a template HTML comment: the comment written just before a `<style>` tag, held as `StyleContent.comment`."
+					],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "data", "kind": "string", "ts": "string", "string": "slice"}
+					]
+				},
+				{
+					"type": "Component",
+					"interface": "Element",
+					"doc": [
+						"HTML element or component tag (the `type` field distinguishes them at runtime)."
+					],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "name", "kind": "string", "ts": "string", "string": "slice"},
+						{"key": "name_loc", "kind": "loc", "entry": "NameLocation", "presence": "locations"},
+						{"key": "attributes", "kind": "list", "ts": "AttributeNode[]"},
+						{"key": "fragment", "kind": "child", "ts": "Fragment"}
+					]
+				},
+				{
+					"type": "RegularElement",
+					"interface": "Element",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "name", "kind": "string", "ts": "string", "string": "slice"},
+						{"key": "name_loc", "kind": "loc", "entry": "NameLocation", "presence": "locations"},
+						{"key": "attributes", "kind": "list", "ts": "AttributeNode[]"},
+						{"key": "fragment", "kind": "child", "ts": "Fragment"}
+					]
+				},
+				{
+					"type": "SvelteHead",
+					"interface": "SpecialElement",
+					"doc": [
+						"Special Svelte elements: `<svelte:head>`, `<svelte:window>`,",
+						"`<svelte:body>`, `<svelte:document>`, `<svelte:element>`,",
+						"`<svelte:component>`, `<svelte:self>`, `<slot>`, `<svelte:fragment>`,",
+						"`<svelte:boundary>`, and `<title>` inside `<svelte:head>`."
+					],
+					"fields": [
+						{
+							"key": "type",
+							"kind": "type",
+							"doc": [
+								"The closed set `ast::SpecialElementKind::node_type` emits — spelled as a literal",
+								"union rather than `string` so consumers narrow on it, and so the wire-type coverage",
+								"arm of `scripts/check_ast_types.ts` can see these names declared."
+							]
+						},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "name", "kind": "string", "ts": "string", "string": "slice"},
+						{"key": "name_loc", "kind": "loc", "entry": "NameLocation", "presence": "locations"},
+						{"key": "attributes", "kind": "list", "ts": "AttributeNode[]"},
+						{"key": "fragment", "kind": "child", "ts": "Fragment"}
+					]
+				},
+				{
+					"type": "SvelteWindow",
+					"interface": "SpecialElement",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "name", "kind": "string", "ts": "string", "string": "slice"},
+						{"key": "name_loc", "kind": "loc", "entry": "NameLocation", "presence": "locations"},
+						{"key": "attributes", "kind": "list", "ts": "AttributeNode[]"},
+						{"key": "fragment", "kind": "child", "ts": "Fragment"}
+					]
+				},
+				{
+					"type": "SvelteBody",
+					"interface": "SpecialElement",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "name", "kind": "string", "ts": "string", "string": "slice"},
+						{"key": "name_loc", "kind": "loc", "entry": "NameLocation", "presence": "locations"},
+						{"key": "attributes", "kind": "list", "ts": "AttributeNode[]"},
+						{"key": "fragment", "kind": "child", "ts": "Fragment"}
+					]
+				},
+				{
+					"type": "SvelteDocument",
+					"interface": "SpecialElement",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "name", "kind": "string", "ts": "string", "string": "slice"},
+						{"key": "name_loc", "kind": "loc", "entry": "NameLocation", "presence": "locations"},
+						{"key": "attributes", "kind": "list", "ts": "AttributeNode[]"},
+						{"key": "fragment", "kind": "child", "ts": "Fragment"}
+					]
+				},
+				{
+					"type": "SvelteElement",
+					"interface": "SpecialElement",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "name", "kind": "string", "ts": "string", "string": "slice"},
+						{"key": "name_loc", "kind": "loc", "entry": "NameLocation", "presence": "locations"},
+						{"key": "attributes", "kind": "list", "ts": "AttributeNode[]"},
+						{"key": "fragment", "kind": "child", "ts": "Fragment"},
+						{
+							"key": "tag",
+							"kind": "child",
+							"ts": "Expression | SvelteFusedLiteral",
+							"doc": [
+								"The `this` binding of `<svelte:element>`: an `Expression` for `this={tag}`, or a",
+								"`SvelteFusedLiteral` for the plain-string `this=\"div\"` — the two forms serialize",
+								"differently, which is why this is not simply `Expression`."
+							]
+						}
+					]
+				},
+				{
+					"type": "SvelteComponent",
+					"interface": "SpecialElement",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "name", "kind": "string", "ts": "string", "string": "slice"},
+						{"key": "name_loc", "kind": "loc", "entry": "NameLocation", "presence": "locations"},
+						{"key": "attributes", "kind": "list", "ts": "AttributeNode[]"},
+						{"key": "fragment", "kind": "child", "ts": "Fragment"},
+						{
+							"key": "expression",
+							"kind": "child",
+							"ts": "Expression",
+							"doc": ["Component expression for `<svelte:component this={Component}>`."]
+						}
+					]
+				},
+				{
+					"type": "SvelteSelf",
+					"interface": "SpecialElement",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "name", "kind": "string", "ts": "string", "string": "slice"},
+						{"key": "name_loc", "kind": "loc", "entry": "NameLocation", "presence": "locations"},
+						{"key": "attributes", "kind": "list", "ts": "AttributeNode[]"},
+						{"key": "fragment", "kind": "child", "ts": "Fragment"}
+					]
+				},
+				{
+					"type": "SlotElement",
+					"interface": "SpecialElement",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "name", "kind": "string", "ts": "string", "string": "slice"},
+						{"key": "name_loc", "kind": "loc", "entry": "NameLocation", "presence": "locations"},
+						{"key": "attributes", "kind": "list", "ts": "AttributeNode[]"},
+						{"key": "fragment", "kind": "child", "ts": "Fragment"}
+					]
+				},
+				{
+					"type": "SvelteFragment",
+					"interface": "SpecialElement",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "name", "kind": "string", "ts": "string", "string": "slice"},
+						{"key": "name_loc", "kind": "loc", "entry": "NameLocation", "presence": "locations"},
+						{"key": "attributes", "kind": "list", "ts": "AttributeNode[]"},
+						{"key": "fragment", "kind": "child", "ts": "Fragment"}
+					]
+				},
+				{
+					"type": "SvelteBoundary",
+					"interface": "SpecialElement",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "name", "kind": "string", "ts": "string", "string": "slice"},
+						{"key": "name_loc", "kind": "loc", "entry": "NameLocation", "presence": "locations"},
+						{"key": "attributes", "kind": "list", "ts": "AttributeNode[]"},
+						{"key": "fragment", "kind": "child", "ts": "Fragment"}
+					]
+				},
+				{
+					"type": "TitleElement",
+					"interface": "SpecialElement",
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "name", "kind": "string", "ts": "string", "string": "slice"},
+						{"key": "name_loc", "kind": "loc", "entry": "NameLocation", "presence": "locations"},
+						{"key": "attributes", "kind": "list", "ts": "AttributeNode[]"},
+						{"key": "fragment", "kind": "child", "ts": "Fragment"}
+					]
+				},
+				{
+					"type": "Literal",
+					"variant": "SvelteFusedLiteral",
+					"interface": "SvelteFusedLiteral",
+					"doc": [
+						"Svelte's own literal node, distinct from acorn's `Literal`: Svelte's wire gives it no",
+						"`loc` (tsv's does, like every positioned object), and `raw` is Svelte's re-quoted form rather than the author's bytes (`this=\"div\"` emits",
+						"`raw: \"'div'\"`). Emitted where Svelte fuses a plain-string binding into a literal instead",
+						"of parsing it as an expression — today only `<svelte:element this=\"div\">`."
+					],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "value", "kind": "string", "ts": "string", "string": "cooked"},
+						{"key": "raw", "kind": "string", "ts": "string", "string": "pooled"}
+					]
+				},
+				{
+					"interface": "SvelteOptions",
+					"doc": ["`<svelte:options runes={true} />`."],
+					"fields": [
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "attributes", "kind": "list", "ts": "AttributeNode[]"},
+						{"key": "runes", "kind": "boolean", "ts": "boolean", "presence": "optional"},
+						{"key": "immutable", "kind": "boolean", "ts": "boolean", "presence": "optional"},
+						{
+							"key": "css",
+							"kind": "string",
+							"ts": "string",
+							"presence": "optional",
+							"string": "cooked"
+						},
+						{"key": "accessors", "kind": "boolean", "ts": "boolean", "presence": "optional"},
+						{
+							"key": "preserveWhitespace",
+							"kind": "boolean",
+							"ts": "boolean",
+							"presence": "optional"
+						},
+						{
+							"key": "namespace",
+							"kind": "string",
+							"ts": "string",
+							"presence": "optional",
+							"string": "cooked"
+						},
+						{
+							"key": "customElement",
+							"kind": "data",
+							"ts": "unknown",
+							"presence": "optional",
+							"discriminators": ["Boolean"]
+						}
+					]
+				},
+				{
+					"type": "Attribute",
+					"interface": "Attribute",
+					"doc": ["Regular `name=value` element attribute."],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "name", "kind": "string", "ts": "string", "string": "slice"},
+						{"key": "name_loc", "kind": "loc", "entry": "NameLocation", "presence": "locations"},
+						{
+							"key": "value",
+							"kind": ["boolean", "child", "list"],
+							"ts": "true | ExpressionTag | AttributeValue[]",
+							"doc": [
+								"`true` for a valueless attribute (`hidden`); a single `ExpressionTag` for a bare",
+								"`a={x}`; otherwise the attribute-value SEQUENCE — one `AttributeText` for a plain",
+								"quoted value, text and tag parts interleaved for `a=\"x{y}z\"`."
+							]
+						}
+					]
+				},
+				{
+					"type": "AttachTag",
+					"interface": "AttachTag",
+					"doc": ["`{@attach ...}` (Svelte 5.29+)."],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "expression", "kind": "child", "ts": "Expression"}
+					]
+				},
+				{
+					"type": "SpreadAttribute",
+					"interface": "SpreadAttribute",
+					"doc": ["`{...obj}` spread attribute."],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "expression", "kind": "child", "ts": "Expression"}
+					]
+				},
+				{
+					"type": "OnDirective",
+					"interface": "OnDirective",
+					"doc": ["`on:click={handler}`."],
+					"fields": [
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "type", "kind": "type"},
+						{"key": "name", "kind": "string", "ts": "string", "string": "slice"},
+						{"key": "name_loc", "kind": "loc", "entry": "NameLocation", "presence": "locations"},
+						{"key": "expression", "kind": "child", "ts": "Expression | null", "nullable": true},
+						{"key": "modifiers", "kind": "strings", "ts": "string[]"}
+					]
+				},
+				{
+					"type": "BindDirective",
+					"interface": "BindDirective",
+					"doc": ["`bind:value={name}`."],
+					"fields": [
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "type", "kind": "type"},
+						{"key": "name", "kind": "string", "ts": "string", "string": "slice"},
+						{"key": "name_loc", "kind": "loc", "entry": "NameLocation", "presence": "locations"},
+						{
+							"key": "expression",
+							"kind": "child",
+							"ts": "Expression | SvelteShorthandIdentifier",
+							"doc": [
+								"The bound target — an `Identifier` or `MemberExpression`, or the `SequenceExpression`",
+								"of a function binding (`bind:x={get, set}`). The SHORTHAND form (`bind:value`) has no",
+								"expression to parse, so Svelte builds the identifier itself:",
+								"`SvelteShorthandIdentifier`."
+							]
+						},
+						{"key": "modifiers", "kind": "strings", "ts": "string[]"}
+					]
+				},
+				{
+					"type": "ClassDirective",
+					"interface": "ClassDirective",
+					"doc": ["`class:active={cond}`."],
+					"fields": [
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "type", "kind": "type"},
+						{"key": "name", "kind": "string", "ts": "string", "string": "slice"},
+						{"key": "name_loc", "kind": "loc", "entry": "NameLocation", "presence": "locations"},
+						{
+							"key": "expression",
+							"kind": "child",
+							"ts": "Expression | SvelteShorthandIdentifier",
+							"doc": ["The shorthand form (`class:active`) yields a `SvelteShorthandIdentifier`."]
+						},
+						{"key": "modifiers", "kind": "strings", "ts": "string[]"}
+					]
+				},
+				{
+					"type": "Identifier",
+					"variant": "SvelteShorthandIdentifier",
+					"interface": "SvelteShorthandIdentifier",
+					"doc": [
+						"The identifier Svelte builds for a SHORTHAND `bind:` / `class:` directive, where the",
+						"directive name IS the expression. Distinct from acorn's `Identifier` in its field set (no",
+						"`optional`, `typeAnnotation` or `decorators`, and no comment attachment) and in carrying",
+						"no `loc` in Svelte's own wire (nothing parsed it), which is why the directive positions are",
+						"a union rather than plain `Expression`."
+					],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "name", "kind": "string", "ts": "string", "string": "slice"}
+					]
+				},
+				{
+					"type": "StyleDirective",
+					"interface": "StyleDirective",
+					"doc": ["`style:color={value}`."],
+					"fields": [
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "type", "kind": "type"},
+						{"key": "name", "kind": "string", "ts": "string", "string": "slice"},
+						{"key": "name_loc", "kind": "loc", "entry": "NameLocation", "presence": "locations"},
+						{"key": "modifiers", "kind": "strings", "ts": "string[]"},
+						{
+							"key": "value",
+							"kind": ["boolean", "child", "list"],
+							"ts": "true | ExpressionTag | AttributeValue[]",
+							"doc": ["The same attribute-value sequence shape as `Attribute.value`."]
+						}
+					]
+				},
+				{
+					"type": "UseDirective",
+					"interface": "UseDirective",
+					"doc": ["`use:action={params}`."],
+					"fields": [
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "type", "kind": "type"},
+						{"key": "name", "kind": "string", "ts": "string", "string": "slice"},
+						{"key": "name_loc", "kind": "loc", "entry": "NameLocation", "presence": "locations"},
+						{"key": "expression", "kind": "child", "ts": "Expression | null", "nullable": true},
+						{"key": "modifiers", "kind": "strings", "ts": "string[]"}
+					]
+				},
+				{
+					"type": "TransitionDirective",
+					"interface": "TransitionDirective",
+					"doc": ["`transition:fade`, `in:fly`, `out:slide`."],
+					"fields": [
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "type", "kind": "type"},
+						{"key": "name", "kind": "string", "ts": "string", "string": "slice"},
+						{"key": "name_loc", "kind": "loc", "entry": "NameLocation", "presence": "locations"},
+						{"key": "expression", "kind": "child", "ts": "Expression | null", "nullable": true},
+						{"key": "modifiers", "kind": "strings", "ts": "string[]"},
+						{"key": "intro", "kind": "boolean", "ts": "boolean"},
+						{"key": "outro", "kind": "boolean", "ts": "boolean"}
+					]
+				},
+				{
+					"type": "AnimateDirective",
+					"interface": "AnimateDirective",
+					"doc": ["`animate:flip={params}`."],
+					"fields": [
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "type", "kind": "type"},
+						{"key": "name", "kind": "string", "ts": "string", "string": "slice"},
+						{"key": "name_loc", "kind": "loc", "entry": "NameLocation", "presence": "locations"},
+						{"key": "expression", "kind": "child", "ts": "Expression | null", "nullable": true},
+						{"key": "modifiers", "kind": "strings", "ts": "string[]"}
+					]
+				},
+				{
+					"type": "LetDirective",
+					"interface": "LetDirective",
+					"doc": ["`let:item={localItem}` slot prop."],
+					"fields": [
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "type", "kind": "type"},
+						{"key": "name", "kind": "string", "ts": "string", "string": "slice"},
+						{"key": "name_loc", "kind": "loc", "entry": "NameLocation", "presence": "locations"},
+						{"key": "expression", "kind": "child", "ts": "Expression | null", "nullable": true},
+						{"key": "modifiers", "kind": "strings", "ts": "string[]"}
+					]
+				},
+				{
+					"alias": "AttributeNode",
+					"union": [
+						"Attribute",
+						"SpreadAttribute",
+						"AttachTag",
+						"OnDirective",
+						"BindDirective",
+						"ClassDirective",
+						"StyleDirective",
+						"UseDirective",
+						"TransitionDirective",
+						"AnimateDirective",
+						"LetDirective"
+					]
+				},
+				{
+					"alias": "AttributeValue",
+					"union": ["Text", "ExpressionTag"]
+				},
+				{
+					"type": "Text",
+					"interface": "Text",
+					"doc": [
+						"Text node in a fragment, or text inside an attribute value. In an attribute value Svelte",
+						"decodes `data` by its attribute rule (`decode_character_references(raw, true)`): a named",
+						"entity written without its `;` stays literal before a word character or `=`."
+					],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "raw", "kind": "string", "ts": "string", "string": "own"},
+						{"key": "data", "kind": "string", "ts": "string", "string": "cooked"}
+					]
+				},
+				{
+					"type": "ExpressionTag",
+					"interface": "ExpressionTag",
+					"doc": ["`{expression}` in template position."],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "expression", "kind": "child", "ts": "Expression"}
+					]
+				},
+				{
+					"type": "Script",
+					"interface": "Script",
+					"doc": [
+						"Svelte `<script>` block.",
+						"",
+						"`content` is a `Program`, with `leadingComments` / `trailingComments`",
+						"(`AttachedComment`) injected onto its nodes by Svelte's acorn pass — see",
+						"`AcornCommentAttachment`, which is what lets this be typed rather than `unknown`."
+					],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{
+							"key": "context",
+							"kind": "string",
+							"ts": "string",
+							"string": "keyword",
+							"values": ["default", "module"],
+							"doc": ["`\"default\"` or `\"module\"`."]
+						},
+						{"key": "content", "kind": "child", "ts": "Program"},
+						{"key": "attributes", "kind": "list", "ts": "AttributeNode[]"}
+					]
+				},
+				{
+					"type": "IfBlock",
+					"interface": "IfBlock",
+					"doc": ["`{#if test}...{/if}` and `{:else if test}...` chains."],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "elseif", "kind": "boolean", "ts": "boolean"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "test", "kind": "child", "ts": "Expression"},
+						{"key": "consequent", "kind": "child", "ts": "Fragment"},
+						{"key": "alternate", "kind": "child", "ts": "Fragment | null", "nullable": true}
+					]
+				},
+				{
+					"type": "EachBlock",
+					"interface": "EachBlock",
+					"doc": ["`{#each expr as item, i (key)}...{/each}`."],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "expression", "kind": "child", "ts": "Expression"},
+						{"key": "body", "kind": "child", "ts": "Fragment"},
+						{
+							"key": "context",
+							"kind": "child",
+							"ts": "Expression | null",
+							"nullable": true,
+							"doc": [
+								"The `as` binding pattern; `null` when there is no `as` clause. A pattern position is",
+								"typed `Expression` here for the same reason acorn reuses expression nodes for",
+								"patterns — see `FunctionDeclaration.params`."
+							]
+						},
+						{
+							"key": "index",
+							"kind": "string",
+							"ts": "string",
+							"presence": "optional",
+							"string": "slice"
+						},
+						{"key": "key", "kind": "child", "ts": "Expression", "presence": "optional"},
+						{"key": "fallback", "kind": "child", "ts": "Fragment", "presence": "optional"}
+					]
+				},
+				{
+					"type": "AwaitBlock",
+					"interface": "AwaitBlock",
+					"doc": ["`{#await promise}...{:then value}...{:catch error}...{/await}`."],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "expression", "kind": "child", "ts": "Expression"},
+						{
+							"key": "value",
+							"kind": "child",
+							"ts": "Expression | null",
+							"nullable": true,
+							"doc": ["The `{:then x}` binding pattern; `null` when the clause binds nothing."]
+						},
+						{
+							"key": "error",
+							"kind": "child",
+							"ts": "Expression | null",
+							"nullable": true,
+							"doc": ["The `{:catch e}` binding pattern; `null` when the clause binds nothing."]
+						},
+						{"key": "pending", "kind": "child", "ts": "Fragment | null", "nullable": true},
+						{"key": "then", "kind": "child", "ts": "Fragment | null", "nullable": true},
+						{"key": "catch", "kind": "child", "ts": "Fragment | null", "nullable": true}
+					]
+				},
+				{
+					"type": "KeyBlock",
+					"interface": "KeyBlock",
+					"doc": ["`{#key expression}...{/key}`."],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "expression", "kind": "child", "ts": "Expression"},
+						{"key": "fragment", "kind": "child", "ts": "Fragment"}
+					]
+				},
+				{
+					"type": "SnippetBlock",
+					"interface": "SnippetBlock",
+					"doc": ["`{#snippet name(params)}...{/snippet}`."],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "expression", "kind": "child", "ts": "Expression"},
+						{
+							"key": "typeParams",
+							"kind": "string",
+							"ts": "string",
+							"presence": "optional",
+							"string": "slice"
+						},
+						{"key": "parameters", "kind": "list", "ts": "Expression[]"},
+						{"key": "body", "kind": "child", "ts": "Fragment"}
+					]
+				},
+				{
+					"type": "HtmlTag",
+					"interface": "HtmlTag",
+					"doc": ["`{@html expression}`."],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "expression", "kind": "child", "ts": "Expression"}
+					]
+				},
+				{
+					"type": "ConstTag",
+					"interface": "ConstTag",
+					"doc": [
+						"`{@const x = expr}`.",
+						""
+					],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "declaration", "kind": "child", "ts": "SvelteConstDeclaration"}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"variant": "SvelteConstDeclaration",
+					"interface": "SvelteConstDeclaration",
+					"doc": [
+						"The declaration a `{@const}` carries. **Not** the acorn `VariableDeclaration` a `<script>`",
+						"body holds: Svelte builds this wrapper itself, so in Svelte's own wire neither it nor its",
+						"declarator carries `loc` (tsv's do, like every positioned object) — while the `id` inside",
+						"does, from Svelte's own reader (so that `loc` has `character`), and `init` is an ordinary",
+						"acorn expression. Always",
+						"`const`, always exactly one declarator, both enforced by the type."
+					],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "declarations", "kind": "list", "ts": "[SvelteConstDeclarator]"},
+						{
+							"key": "kind",
+							"kind": "string",
+							"ts": "'const'",
+							"string": "keyword",
+							"values": ["const"]
+						}
+					]
+				},
+				{
+					"type": "VariableDeclarator",
+					"variant": "SvelteConstDeclarator",
+					"interface": "SvelteConstDeclarator",
+					"doc": ["The single declarator of a `{@const}` — see `SvelteConstDeclaration`."],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "id", "kind": "child", "ts": "Expression"},
+						{"key": "init", "kind": "child", "ts": "Expression"}
+					]
+				},
+				{
+					"type": "DeclarationTag",
+					"interface": "DeclarationTag",
+					"doc": [
+						"`{const x = expr}` / `{let x = expr}` / `{let x}` — the bare declaration tags",
+						"(no `@`).",
+						"",
+						"`declaration` is an ordinary acorn `VariableDeclaration` — `loc` and all — with `kind`",
+						"`const` or `let`. Unlike `{@const}` it may carry MORE THAN ONE declarator",
+						"(`{let x, y, z}`), and a `let` declarator may have a `null` `init`."
+					],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "declaration", "kind": "child", "ts": "VariableDeclaration"}
+					]
+				},
+				{
+					"type": "DebugTag",
+					"interface": "DebugTag",
+					"doc": ["`{@debug a, b, c}`."],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "identifiers", "kind": "list", "ts": "Expression[]"}
+					]
+				},
+				{
+					"type": "RenderTag",
+					"interface": "RenderTag",
+					"doc": ["`{@render snippet(args)}`."],
+					"fields": [
+						{"key": "type", "kind": "type"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
+						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
+						{"key": "expression", "kind": "child", "ts": "Expression"}
+					]
+				}
+			]
+		}
+	]
+}
