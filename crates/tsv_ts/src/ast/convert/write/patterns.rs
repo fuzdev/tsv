@@ -4,7 +4,7 @@ use super::declarations::write_decorators_field;
 use super::expressions::{write_expression, write_expressions};
 use super::functions::write_function_expression;
 use super::{
-    Ctx, JsonWriter, close_node, node_header, node_header_wide_end, write_array,
+    Ctx, Sink, close_node, node_header, node_header_wide_end, write_array,
     write_type_annotation_field,
 };
 use crate::ast;
@@ -18,7 +18,7 @@ use tsv_lang::Span;
 /// `read_pattern` patches `end` to the annotation's. Shared so the two pattern writers
 /// can't drift.
 pub(super) fn pattern_header(
-    w: &mut JsonWriter,
+    w: &mut Sink<'_>,
     node_type: &'static str,
     span: Span,
     type_annotation: Option<&ast::TSTypeAnnotation>,
@@ -26,19 +26,19 @@ pub(super) fn pattern_header(
 ) {
     match type_annotation {
         Some(ta) => node_header_wide_end(w, node_type, span, ta.span.end, ctx),
-        None => node_header(w, node_type, span, ctx),
+        None => node_header!(w, @dyn node_type, span, ctx),
     }
 }
 
 /// Emits a `TemplateLiteral` node. Field order: `expressions`, `quasis`.
 pub(super) fn write_template_literal(
-    w: &mut JsonWriter,
+    w: &mut Sink<'_>,
     template: &ast::TemplateLiteral,
     span: Span,
     ctx: &Ctx<'_>,
 ) {
-    node_header(w, "TemplateLiteral", span, ctx);
-    w.raw(",\"expressions\":");
+    node_header!(w, "TemplateLiteral", span, ctx);
+    raw!(w, "TemplateLiteral", ",\"expressions\":");
     write_expressions(
         w,
         ctx.view
@@ -47,7 +47,7 @@ pub(super) fn write_template_literal(
             .map(|e| ctx.view.expr(*e)),
         ctx,
     );
-    w.raw(",\"quasis\":");
+    raw!(w, "TemplateLiteral", ",\"quasis\":");
     write_array(w, ctx.view.quasis(template.quasis), |w, q| {
         write_template_element(w, q, ctx);
     });
@@ -58,7 +58,7 @@ pub(super) fn write_template_literal(
 /// span (`+1` past the opening `` ` `` or `}`, `-1`/`-2` before the closing
 /// `` ` `` or `${`). `cooked` is null for invalid escapes in tagged templates.
 pub(super) fn write_template_element(
-    w: &mut JsonWriter,
+    w: &mut Sink<'_>,
     element: &ast::TemplateElement,
     ctx: &Ctx<'_>,
 ) {
@@ -69,39 +69,45 @@ pub(super) fn write_template_element(
         element.span.end - 2
     };
     let adjusted_span = Span::new(adjusted_start, adjusted_end);
-    node_header(w, "TemplateElement", adjusted_span, ctx);
+    node_header!(w, "TemplateElement", adjusted_span, ctx);
     // `trv`, not `raw`: the wire reports the element's VALUE, where ECMAScript
     // has already folded `<CR>` / `<CR><LF>` to `<LF>` (§12.9.6). The source
     // slice is the printer's question.
     let trv = element.trv(ctx.source, ctx.view);
-    w.raw(",\"value\":{\"raw\":");
+    raw!(w, "TemplateElement", ",\"value\":{\"raw\":");
     w.string(trv);
-    w.raw(",\"cooked\":");
+    raw!(w, "~TemplateElementValue", ",\"cooked\":");
     match element.cooked {
         ast::TemplateCooked::Verbatim => w.string(trv),
         ast::TemplateCooked::Decoded(decoded) => w.string(ctx.view.text(decoded)),
         ast::TemplateCooked::Invalid => w.null(),
     }
-    w.raw_pick(element.tail, b"},\"tail\":true", b"},\"tail\":false");
+    pick!(
+        w,
+        "TemplateElement",
+        element.tail,
+        "},\"tail\":true",
+        "},\"tail\":false"
+    );
     close_node(w, "TemplateElement", adjusted_span, ctx);
 }
 
 /// Emits an `ObjectPattern` node. Field order: `properties`, `optional`
 /// (only when true), `typeAnnotation?`, `decorators?` (parameter position).
 pub(super) fn write_object_pattern(
-    w: &mut JsonWriter,
+    w: &mut Sink<'_>,
     obj: &ast::ObjectPattern,
     span: Span,
     ctx: &Ctx<'_>,
 ) {
     pattern_header(w, "ObjectPattern", span, obj.type_annotation(ctx.view), ctx);
-    w.raw(",\"properties\":");
+    raw!(w, ",\"properties\":");
     write_array(w, ctx.view.pat_props(obj.properties), |w, p| match p {
         ast::ObjectPatternProperty::Property(p) => write_property(w, p, ctx),
         ast::ObjectPatternProperty::RestElement(r) => write_rest_element(w, r, ctx),
     });
     if obj.optional {
-        w.raw(",\"optional\":true");
+        raw!(w, ",\"optional\":true");
     }
     write_type_annotation_field(w, obj.type_annotation(ctx.view), ctx);
     write_decorators_field(w, obj.decorators(ctx.view), ctx);
@@ -109,14 +115,14 @@ pub(super) fn write_object_pattern(
 }
 
 /// Emits a `RestElement` node.
-pub(super) fn write_rest_element(w: &mut JsonWriter, rest: &ast::RestElement, ctx: &Ctx<'_>) {
-    node_header(w, "RestElement", rest.span, ctx);
-    w.raw(",\"argument\":");
+pub(super) fn write_rest_element(w: &mut Sink<'_>, rest: &ast::RestElement, ctx: &Ctx<'_>) {
+    node_header!(w, "RestElement", rest.span, ctx);
+    raw!(w, "RestElement", ",\"argument\":");
     write_expression(w, ctx.view.expr(rest.argument), ctx);
     // acorn carries a rest parameter's `?` on the rest element (never on
     // `argument`), between `argument` and `typeAnnotation`, only when present.
     if rest.optional {
-        w.raw(",\"optional\":true");
+        raw!(w, "RestElement", ",\"optional\":true");
     }
     write_type_annotation_field(w, rest.type_annotation(ctx.view), ctx);
     close_node(w, "RestElement", rest.span, ctx);
@@ -126,40 +132,52 @@ pub(super) fn write_rest_element(w: &mut JsonWriter, rest: &ast::RestElement, ct
 /// `value`, `kind` — acorn's order. (Two acorn-typescript paths assign `kind` before
 /// `value` — get/set, `parseGetterSetter`, and generic object methods, the
 /// `parsePropertyValue` override; tsv's wire keeps the one order.)
-pub(super) fn write_property(w: &mut JsonWriter, prop: &ast::Property, ctx: &Ctx<'_>) {
-    node_header(w, "Property", prop.span, ctx);
+pub(super) fn write_property(w: &mut Sink<'_>, prop: &ast::Property, ctx: &Ctx<'_>) {
+    node_header!(w, "Property", prop.span, ctx);
     // `method` and `computed` are nearly always `false`, so the common shape is
     // one literal per `shorthand` value, the four keys folded in.
     if prop.method || prop.computed {
-        w.raw_pick(prop.method, b",\"method\":true", b",\"method\":false");
-        w.raw_pick(
-            prop.shorthand,
-            b",\"shorthand\":true",
-            b",\"shorthand\":false",
+        pick!(
+            w,
+            "Property",
+            prop.method,
+            ",\"method\":true",
+            ",\"method\":false"
         );
-        w.raw_pick(
+        pick!(
+            w,
+            "Property",
+            prop.shorthand,
+            ",\"shorthand\":true",
+            ",\"shorthand\":false"
+        );
+        pick!(
+            w,
+            "Property",
             prop.computed,
-            b",\"computed\":true,\"key\":",
-            b",\"computed\":false,\"key\":",
+            ",\"computed\":true,\"key\":",
+            ",\"computed\":false,\"key\":"
         );
     } else {
-        w.raw_pick(
+        pick!(
+            w,
+            "Property",
             prop.shorthand,
-            b",\"method\":false,\"shorthand\":true,\"computed\":false,\"key\":",
-            b",\"method\":false,\"shorthand\":false,\"computed\":false,\"key\":",
+            ",\"method\":false,\"shorthand\":true,\"computed\":false,\"key\":",
+            ",\"method\":false,\"shorthand\":false,\"computed\":false,\"key\":"
         );
     }
     write_expression(w, ctx.view.expr(prop.key), ctx);
-    w.raw(",\"value\":");
+    raw!(w, "Property", ",\"value\":");
     write_property_value(w, prop, ctx);
     // Nearly every property is `init`, so that kind appends the whole
     // field as one literal rather than a runtime-length copy of `as_str()`.
     match prop.kind {
-        ast::PropertyKind::Init => w.raw(",\"kind\":\"init\""),
+        ast::PropertyKind::Init => raw!(w, "Property", ",\"kind\":\"init\""),
         kind => {
-            w.raw(",\"kind\":\"");
-            w.raw(kind.as_str());
-            w.raw("\"");
+            raw!(w, "Property", ",\"kind\":\"");
+            quoted!(w, kind.as_str());
+            raw!(w, "\"");
         }
     }
     close_node(w, "Property", prop.span, ctx);
@@ -173,7 +191,7 @@ pub(super) fn write_property(w: &mut JsonWriter, prop: &ast::Property, ctx: &Ctx
 /// `AssignmentPattern` on the wire: acorn reads every `{ a = 1 }` through
 /// `parseMaybeDefault`, whatever the literal becomes. The internal literal keeps the
 /// `=` assignment it was parsed as; a pattern property already holds the pattern.
-fn write_property_value(w: &mut JsonWriter, prop: &ast::Property, ctx: &Ctx<'_>) {
+fn write_property_value(w: &mut Sink<'_>, prop: &ast::Property, ctx: &Ctx<'_>) {
     let method_value = prop.method || !matches!(prop.kind, ast::PropertyKind::Init);
     match (ctx.view.expr(prop.value), method_value) {
         (
@@ -193,10 +211,10 @@ fn write_property_value(w: &mut JsonWriter, prop: &ast::Property, ctx: &Ctx<'_>)
             false,
         ) if prop.shorthand => {
             debug_assert_eq!(assign.operator, ast::AssignmentOperator::Assign);
-            node_header(w, "AssignmentPattern", *span, ctx);
-            w.raw(",\"left\":");
+            node_header!(w, "AssignmentPattern", *span, ctx);
+            raw!(w, "AssignmentPattern", ",\"left\":");
             write_expression(w, ctx.view.expr(assign.left), ctx);
-            w.raw(",\"right\":");
+            raw!(w, "AssignmentPattern", ",\"right\":");
             write_expression(w, ctx.view.expr(assign.right), ctx);
             close_node(w, "AssignmentPattern", *span, ctx);
         }
@@ -208,20 +226,20 @@ fn write_property_value(w: &mut JsonWriter, prop: &ast::Property, ctx: &Ctx<'_>)
 /// `TSParameterProperty` quirk needs (`span` is normally `pattern.span`; the
 /// quirk widens it to the whole parameter property).
 pub(super) fn write_assignment_pattern(
-    w: &mut JsonWriter,
+    w: &mut Sink<'_>,
     pattern: &ast::AssignmentPattern,
     ctx: &Ctx<'_>,
     span: Span,
 ) {
-    node_header(w, "AssignmentPattern", span, ctx);
-    w.raw(",\"left\":");
+    node_header!(w, "AssignmentPattern", span, ctx);
+    raw!(w, "AssignmentPattern", ",\"left\":");
     // A default's target keeps its type-assertion wrapper (`{ a: (b as T) = 1 }` →
     // `TSAsExpression`): acorn-typescript's `toAssignable` validates through the
     // assertion but preserves the node — same as the simple `=` left in
     // `write_expression`'s `AssignmentExpression` arm. The internal-only JSDoc cast is
     // still peeled, by `write_expression` itself.
     write_expression(w, ctx.view.expr(pattern.left), ctx);
-    w.raw(",\"right\":");
+    raw!(w, "AssignmentPattern", ",\"right\":");
     write_expression(w, ctx.view.expr(pattern.right), ctx);
     write_decorators_field(w, ctx.view.opt_decorators(pattern.decorators), ctx);
     close_node(w, "AssignmentPattern", span, ctx);

@@ -12,15 +12,14 @@ use super::patterns::{
 };
 use super::types::{write_type, write_type_parameter_instantiation};
 use super::{
-    CommentAttach, CommentMode, Ctx, JsonWriter, PLAIN_IDENTIFIER_MAX, SPAN_HEADER_MAX, close_node,
-    node_header, plain_identifier_stage_name, stage_identifier_plain, stage_span_header,
-    write_array, write_bare_node, write_identifier_parts, write_identifier_plain, write_literal,
+    CommentAttach, CommentMode, Ctx, Sink, close_node, node_header, write_array, write_bare_node,
+    write_chain_any, write_identifier_parts, write_identifier_plain, write_literal,
     write_name_field, write_type_annotation_field, write_type_arguments_field,
 };
 use crate::ast;
 use crate::ast::AstView;
 use smallvec::SmallVec;
-use tsv_lang::{Span, StageRun};
+use tsv_lang::Span;
 
 /// What a call/member/non-null node has inherited from its parent about the
 /// optional chain it sits on.
@@ -29,7 +28,7 @@ use tsv_lang::{Span, StageRun};
 /// they are one value rather than two flags — a node reaches at most one, and
 /// both let it skip the `has_optional_in_chain` walk entirely.
 #[derive(Clone, Copy, Default, PartialEq, Eq)]
-pub(super) enum ChainState {
+pub(in crate::ast::convert) enum ChainState {
     /// Nothing inherited — the node resolves the question for itself. A
     /// parenthesized child seals its own chain and lands here.
     #[default]
@@ -64,21 +63,21 @@ pub(super) enum ChainState {
 /// `@a.b<T>` wraps its member spine in one). `chain` does *not* survive the unwrap: a
 /// cast's parens seal the chain.
 #[derive(Clone, Copy, Default)]
-pub(super) struct ExprFlags {
-    pub(super) chain: ChainState,
-    pub(super) force_optional: bool,
-    pub(super) strip_optional: bool,
+pub(in crate::ast::convert) struct ExprFlags {
+    pub(in crate::ast::convert) chain: ChainState,
+    pub(in crate::ast::convert) force_optional: bool,
+    pub(in crate::ast::convert) strip_optional: bool,
 }
 
 /// Emit an expression's wire JSON in a fresh context (not inside a chain).
-pub(super) fn write_expression(w: &mut JsonWriter, expr: &ast::Expression, ctx: &Ctx<'_>) {
+pub(super) fn write_expression(w: &mut Sink<'_>, expr: &ast::Expression, ctx: &Ctx<'_>) {
     write_expression_inner(w, expr, ctx, ExprFlags::default());
 }
 
 /// Emit a JSON array of expressions (params, arguments, elements without
 /// holes) — the writer's most common list shape.
 pub(super) fn write_expressions<'a>(
-    w: &mut JsonWriter,
+    w: &mut Sink<'_>,
     items: impl IntoIterator<Item = &'a ast::Expression>,
     ctx: &Ctx<'_>,
 ) {
@@ -90,13 +89,13 @@ pub(super) fn write_expressions<'a>(
 /// `ArrayPattern` only: `ArrayExpression` takes `write_body_array_holes`, which is
 /// this plus the last-in-body mark acorn's trailing rule reads.
 fn write_expression_holes<'a>(
-    w: &mut JsonWriter,
+    w: &mut Sink<'_>,
     items: impl IntoIterator<Item = &'a Option<ast::ExprId>>,
     ctx: &Ctx<'_>,
 ) {
     write_array(w, items, |w, e| match e {
         Some(expr) => write_expression(w, ctx.view.expr(*expr), ctx),
-        None => w.null(),
+        None => null_item!(w),
     });
 }
 
@@ -112,8 +111,8 @@ fn write_expression_holes<'a>(
 /// ⚠️ Out of line, and every arm a tail call, for one reason: the dispatch IS the
 /// expression recursion, so this function must add nothing to its frames.
 #[inline(never)]
-pub(super) fn write_expression_inner(
-    w: &mut JsonWriter,
+pub(in crate::ast::convert) fn write_expression_inner(
+    w: &mut Sink<'_>,
     expr: &ast::Expression,
     ctx: &Ctx<'_>,
     flags: ExprFlags,
@@ -145,7 +144,7 @@ pub(super) fn write_expression_inner(
 #[cold]
 #[inline(never)]
 fn write_comment_bound_pair_paren_frame(
-    w: &mut JsonWriter,
+    w: &mut Sink<'_>,
     span: Span,
     inner: &ast::Expression,
     ctx: &Ctx<'_>,
@@ -163,7 +162,7 @@ fn write_comment_bound_pair_paren_frame(
 // to the front, ahead of its kind test, by every kind.
 #[inline(never)]
 fn write_expression_identifier(
-    w: &mut JsonWriter,
+    w: &mut Sink<'_>,
     id: &ast::Identifier,
     force_optional: bool,
     ctx: &Ctx<'_>,
@@ -186,12 +185,7 @@ fn write_expression_identifier(
 /// operand and close innermost first: the bytes, and the order of the comment-attach
 /// node events, of the recursion down the left.
 #[inline(never)]
-fn write_binary_chain(
-    w: &mut JsonWriter,
-    binary: &ast::BinaryExpression,
-    span: Span,
-    ctx: &Ctx<'_>,
-) {
+fn write_binary_chain(w: &mut Sink<'_>, binary: &ast::BinaryExpression, span: Span, ctx: &Ctx<'_>) {
     // LogicalExpression for `&&`/`||`/`??`, BinaryExpression otherwise.
     fn node_type(operator: ast::BinaryOperator) -> &'static str {
         match operator {
@@ -204,8 +198,8 @@ fn write_binary_chain(
     let mut spine: SmallVec<[(&ast::BinaryExpression, Span); 8]> = SmallVec::new();
     let (mut node, mut node_span) = (binary, span);
     loop {
-        node_header(w, node_type(node.operator), node_span, ctx);
-        w.raw(",\"left\":");
+        node_header!(w, @dyn node_type(node.operator), node_span, ctx);
+        raw!(w, ",\"left\":");
         spine.push((node, node_span));
         match &ctx.view.expr(node.left).kind {
             ast::ExpressionKind::BinaryExpression(left) => {
@@ -219,9 +213,9 @@ fn write_binary_chain(
         }
     }
     for &(node, node_span) in spine.iter().rev() {
-        w.raw(",\"operator\":\"");
-        w.raw(node.operator.as_str());
-        w.raw("\",\"right\":");
+        raw!(w, ",\"operator\":\"");
+        quoted!(w, node.operator.as_str());
+        raw!(w, "\",\"right\":");
         write_expression(w, ctx.view.expr(node.right), ctx);
         close_node(w, node_type(node.operator), node_span, ctx);
     }
@@ -233,7 +227,7 @@ fn write_binary_chain(
 // front answers first.
 #[inline(never)]
 fn write_expression_full_dispatch(
-    w: &mut JsonWriter,
+    w: &mut Sink<'_>,
     expr: &ast::Expression,
     ctx: &Ctx<'_>,
     flags: ExprFlags,
@@ -274,8 +268,8 @@ fn write_expression_full_dispatch(
         // its paren-covering span, then the inner expression. Only produced under
         // the parser's `preserve_parens` mode, so it never appears elsewhere.
         ast::ExpressionKind::ParenthesizedExpression(paren) => {
-            node_header(w, "ParenthesizedExpression", expr.span, ctx);
-            w.raw(",\"expression\":");
+            node_header!(w, "ParenthesizedExpression", expr.span, ctx);
+            raw!(w, "ParenthesizedExpression", ",\"expression\":");
             write_expression(w, ctx.view.expr(paren.expression), ctx);
             close_node(w, "ParenthesizedExpression", expr.span, ctx);
         }
@@ -287,46 +281,48 @@ fn write_expression_full_dispatch(
             write_expression_identifier(w, id, flags.force_optional, ctx);
         }
         ast::ExpressionKind::PrivateIdentifier(pid) => {
-            node_header(w, "PrivateIdentifier", expr.span, ctx);
+            node_header!(w, "PrivateIdentifier", expr.span, ctx);
             // The name excludes the leading `#` (the public shape): the
             // trailing `raw_len` bytes of the span.
             write_name_field(w, pid.name, expr.span.end - pid.name.raw_len, ctx);
             close_node(w, "PrivateIdentifier", expr.span, ctx);
         }
         ast::ExpressionKind::ObjectExpression(obj) => {
-            node_header(w, "ObjectExpression", expr.span, ctx);
-            w.raw(",\"properties\":");
+            node_header!(w, "ObjectExpression", expr.span, ctx);
+            raw!(w, "ObjectExpression", ",\"properties\":");
             super::write_body_array(w, ctx.view.obj_props(obj.properties), ctx, |w, p| {
                 write_object_property(w, p, ctx);
             });
             close_node(w, "ObjectExpression", expr.span, ctx);
         }
         ast::ExpressionKind::ArrayExpression(arr) => {
-            node_header(w, "ArrayExpression", expr.span, ctx);
-            w.raw(",\"elements\":");
+            node_header!(w, "ArrayExpression", expr.span, ctx);
+            raw!(w, "ArrayExpression", ",\"elements\":");
             super::write_body_array_holes(w, ctx.view.expr_opt_list(arr.elements), ctx, |w, e| {
                 write_expression(w, ctx.view.expr(*e), ctx);
             });
             close_node(w, "ArrayExpression", expr.span, ctx);
         }
         ast::ExpressionKind::UnaryExpression(unary) => {
-            node_header(w, "UnaryExpression", unary.span, ctx);
-            w.raw(",\"operator\":\"");
-            w.raw(unary.operator.as_str());
+            node_header!(w, "UnaryExpression", unary.span, ctx);
+            raw!(w, "UnaryExpression", ",\"operator\":\"");
+            quoted!(w, unary.operator.as_str());
             // Constant: acorn's `UnaryExpression` is always prefix (postfix
             // `++`/`--` is an `UpdateExpression`).
-            w.raw_fixed(b"\",\"prefix\":true,\"argument\":");
+            fixed!(w, "UnaryExpression", "\",\"prefix\":true,\"argument\":");
             write_expression(w, ctx.view.expr(unary.argument), ctx);
             close_node(w, "UnaryExpression", unary.span, ctx);
         }
         ast::ExpressionKind::UpdateExpression(update) => {
-            node_header(w, "UpdateExpression", expr.span, ctx);
-            w.raw(",\"operator\":\"");
-            w.raw(update.operator.as_str());
-            w.raw_pick(
+            node_header!(w, "UpdateExpression", expr.span, ctx);
+            raw!(w, "UpdateExpression", ",\"operator\":\"");
+            quoted!(w, update.operator.as_str());
+            pick!(
+                w,
+                "UpdateExpression",
                 update.prefix,
-                b"\",\"prefix\":true,\"argument\":",
-                b"\",\"prefix\":false,\"argument\":",
+                "\",\"prefix\":true,\"argument\":",
+                "\",\"prefix\":false,\"argument\":"
             );
             write_expression(w, ctx.view.expr(update.argument), ctx);
             close_node(w, "UpdateExpression", expr.span, ctx);
@@ -344,8 +340,8 @@ fn write_expression_full_dispatch(
             write_class_expression(w, ctx.view.class_expr(class_expr), expr.span, ctx);
         }
         ast::ExpressionKind::SpreadElement(spread) => {
-            node_header(w, "SpreadElement", spread.span, ctx);
-            w.raw(",\"argument\":");
+            node_header!(w, "SpreadElement", spread.span, ctx);
+            raw!(w, "SpreadElement", ",\"argument\":");
             write_expression(w, ctx.view.expr(spread.argument), ctx);
             close_node(w, "SpreadElement", spread.span, ctx);
         }
@@ -363,10 +359,10 @@ fn write_expression_full_dispatch(
         }
         &ast::ExpressionKind::TaggedTemplateExpression(tagged) => {
             let tagged = ctx.view.tagged_tpl(tagged);
-            node_header(w, "TaggedTemplateExpression", expr.span, ctx);
-            w.raw(",\"tag\":");
+            node_header!(w, "TaggedTemplateExpression", expr.span, ctx);
+            raw!(w, "TaggedTemplateExpression", ",\"tag\":");
             write_expression(w, ctx.view.expr(tagged.tag), ctx);
-            w.raw(",\"quasi\":");
+            raw!(w, "TaggedTemplateExpression", ",\"quasi\":");
             write_template_literal(w, &tagged.quasi, tagged.quasi_span, ctx);
             write_type_arguments_field(w, tagged.type_arguments.as_ref(), ctx);
             close_node(w, "TaggedTemplateExpression", expr.span, ctx);
@@ -378,8 +374,8 @@ fn write_expression_full_dispatch(
             write_yield_expression(w, *yield_expr, expr.span, ctx);
         }
         ast::ExpressionKind::SequenceExpression(seq) => {
-            node_header(w, "SequenceExpression", expr.span, ctx);
-            w.raw(",\"expressions\":");
+            node_header!(w, "SequenceExpression", expr.span, ctx);
+            raw!(w, "SequenceExpression", ",\"expressions\":");
             write_expressions(
                 w,
                 ctx.view
@@ -392,15 +388,16 @@ fn write_expression_full_dispatch(
         }
         ast::ExpressionKind::RegexLiteral(regex) => {
             // Regex uses "Literal" type in acorn/Svelte AST; `value` is `{}`.
-            node_header(w, "Literal", expr.span, ctx);
-            w.raw(",\"value\":{},\"raw\":");
+            // the tape's `Literal/RegexLiteral` variant: a `regex` record, no `bigint`
+            node_header!(w, "Literal" @ "Literal/RegexLiteral", expr.span, ctx);
+            raw!(w, "Literal/RegexLiteral", ",\"value\":{},\"raw\":");
             w.string(expr.span.extract(ctx.source));
-            w.raw(",\"regex\":{\"pattern\":");
+            raw!(w, "Literal/RegexLiteral", ",\"regex\":{\"pattern\":");
             w.string(regex.pattern(ctx.source));
-            w.raw(",\"flags\":");
+            raw!(w, "~RegexValue", ",\"flags\":");
             w.string(regex.flags(ctx.source));
             // Close the inner `regex` object, then the `Literal` node.
-            w.raw("}");
+            raw!(w, "}");
             close_node(w, "Literal", expr.span, ctx);
         }
         ast::ExpressionKind::ThisExpression(_) => {
@@ -414,12 +411,12 @@ fn write_expression_full_dispatch(
             // `TSAsExpression`): acorn-typescript's `toAssignable` validates through the
             // assertion but preserves the node. A JSDoc cast is not an assertion node at
             // all in the public AST, and `write_expression` already peels it.
-            node_header(w, "AssignmentExpression", expr.span, ctx);
-            w.raw(",\"operator\":\"");
-            w.raw(assign.operator.as_str());
-            w.raw("\",\"left\":");
+            node_header!(w, "AssignmentExpression", expr.span, ctx);
+            raw!(w, "AssignmentExpression", ",\"operator\":\"");
+            quoted!(w, assign.operator.as_str());
+            raw!(w, "AssignmentExpression", "\",\"left\":");
             write_expression(w, ctx.view.expr(assign.left), ctx);
-            w.raw(",\"right\":");
+            raw!(w, "AssignmentExpression", ",\"right\":");
             write_expression(w, ctx.view.expr(assign.right), ctx);
             close_node(w, "AssignmentExpression", expr.span, ctx);
         }
@@ -434,10 +431,10 @@ fn write_expression_full_dispatch(
                 arr.type_annotation(ctx.view),
                 ctx,
             );
-            w.raw(",\"elements\":");
+            raw!(w, ",\"elements\":");
             write_expression_holes(w, ctx.view.expr_opt_list(arr.elements), ctx);
             if arr.optional {
-                w.raw(",\"optional\":true");
+                raw!(w, ",\"optional\":true");
             }
             write_type_annotation_field(w, arr.type_annotation(ctx.view), ctx);
             super::declarations::write_decorators_field(w, arr.decorators(ctx.view), ctx);
@@ -450,32 +447,32 @@ fn write_expression_full_dispatch(
             write_rest_element(w, rest, ctx);
         }
         ast::ExpressionKind::TSTypeAssertion(type_assert) => {
-            node_header(w, "TSTypeAssertion", expr.span, ctx);
-            w.raw(",\"typeAnnotation\":");
+            node_header!(w, "TSTypeAssertion", expr.span, ctx);
+            raw!(w, "TSTypeAssertion", ",\"typeAnnotation\":");
             write_type(w, ctx.view.ty(type_assert.type_annotation), ctx);
-            w.raw(",\"expression\":");
+            raw!(w, "TSTypeAssertion", ",\"expression\":");
             write_expression(w, ctx.view.expr(type_assert.expression), ctx);
             close_node(w, "TSTypeAssertion", expr.span, ctx);
         }
         ast::ExpressionKind::TSAsExpression(as_expr) => {
-            node_header(w, "TSAsExpression", expr.span, ctx);
-            w.raw(",\"expression\":");
+            node_header!(w, "TSAsExpression", expr.span, ctx);
+            raw!(w, "TSAsExpression", ",\"expression\":");
             write_expression(w, ctx.view.expr(as_expr.expression), ctx);
-            w.raw(",\"typeAnnotation\":");
+            raw!(w, "TSAsExpression", ",\"typeAnnotation\":");
             write_type(w, ctx.view.ty(as_expr.type_annotation), ctx);
             close_node(w, "TSAsExpression", expr.span, ctx);
         }
         ast::ExpressionKind::TSSatisfiesExpression(sat_expr) => {
-            node_header(w, "TSSatisfiesExpression", expr.span, ctx);
-            w.raw(",\"expression\":");
+            node_header!(w, "TSSatisfiesExpression", expr.span, ctx);
+            raw!(w, "TSSatisfiesExpression", ",\"expression\":");
             write_expression(w, ctx.view.expr(sat_expr.expression), ctx);
-            w.raw(",\"typeAnnotation\":");
+            raw!(w, "TSSatisfiesExpression", ",\"typeAnnotation\":");
             write_type(w, ctx.view.ty(sat_expr.type_annotation), ctx);
             close_node(w, "TSSatisfiesExpression", expr.span, ctx);
         }
         ast::ExpressionKind::TSInstantiationExpression(inst_expr) => {
-            node_header(w, "TSInstantiationExpression", expr.span, ctx);
-            w.raw(",\"expression\":");
+            node_header!(w, "TSInstantiationExpression", expr.span, ctx);
+            raw!(w, "TSInstantiationExpression", ",\"expression\":");
             write_expression_inner(
                 w,
                 ctx.view.expr(inst_expr.expression),
@@ -488,16 +485,16 @@ fn write_expression_full_dispatch(
                     strip_optional: flags.strip_optional,
                 },
             );
-            w.raw(",\"typeArguments\":");
+            raw!(w, "TSInstantiationExpression", ",\"typeArguments\":");
             write_type_parameter_instantiation(w, &inst_expr.type_arguments, ctx);
             close_node(w, "TSInstantiationExpression", expr.span, ctx);
         }
         ast::ExpressionKind::ImportExpression(import_expr) => {
-            node_header(w, "ImportExpression", expr.span, ctx);
-            w.raw(",\"source\":");
+            node_header!(w, "ImportExpression", expr.span, ctx);
+            raw!(w, "ImportExpression", ",\"source\":");
             write_expression(w, ctx.view.expr(import_expr.source), ctx);
             if let Some(phase) = import_expr.phase.as_str() {
-                w.raw(",\"phase\":");
+                raw!(w, "ImportExpression", ",\"phase\":");
                 w.token(phase);
             }
             // The two parser variants spell the second argument differently, and
@@ -507,24 +504,24 @@ fn write_expression_full_dispatch(
             // its own dialect instead: a single-element `arguments` array,
             // skip-if-empty, with no `options` field.
             if ctx.vanilla_acorn {
-                w.raw(",\"options\":");
+                raw!(w, "ImportExpression", ",\"options\":");
                 match &import_expr.options {
                     Some(opts) => write_expression(w, ctx.view.expr(*opts), ctx),
-                    None => w.raw("null"),
+                    None => raw!(w, "null"),
                 }
             } else if let Some(opts) = ctx.view.opt_expr(import_expr.options) {
-                w.raw(",\"arguments\":[");
+                raw!(w, "ImportExpression", ",\"arguments\":[");
                 write_expression(w, opts, ctx);
-                w.raw("]");
+                raw!(w, "]");
             }
             close_node(w, "ImportExpression", expr.span, ctx);
         }
         &ast::ExpressionKind::MetaProperty(meta) => {
             let meta = ctx.view.meta_prop(meta);
-            node_header(w, "MetaProperty", expr.span, ctx);
-            w.raw(",\"meta\":");
+            node_header!(w, "MetaProperty", expr.span, ctx);
+            raw!(w, "MetaProperty", ",\"meta\":");
             write_identifier_plain(w, &meta.meta, ctx);
-            w.raw(",\"property\":");
+            raw!(w, "MetaProperty", ",\"property\":");
             write_identifier_plain(w, &meta.property, ctx);
             close_node(w, "MetaProperty", expr.span, ctx);
         }
@@ -556,18 +553,18 @@ fn write_expression_full_dispatch(
             } else {
                 None
             };
-            node_header(w, "TSParameterProperty", expr.span, ctx);
+            node_header!(w, "TSParameterProperty", expr.span, ctx);
             if let Some(acc) = param_prop.accessibility {
-                w.raw(",\"accessibility\":");
+                raw!(w, "TSParameterProperty", ",\"accessibility\":");
                 w.token(acc.as_str());
             }
             if param_prop.readonly {
-                w.raw(",\"readonly\":true");
+                raw!(w, "TSParameterProperty", ",\"readonly\":true");
             }
             if param_prop.r#override {
-                w.raw(",\"override\":true");
+                raw!(w, "TSParameterProperty", ",\"override\":true");
             }
-            w.raw(",\"parameter\":");
+            raw!(w, "TSParameterProperty", ",\"parameter\":");
             if let Some(ap) = override_ap {
                 write_assignment_pattern(w, ap, ctx, expr.span);
             } else {
@@ -580,7 +577,7 @@ fn write_expression_full_dispatch(
 
 /// The deferred half of one link [`write_chain`] walks down: what the node writes after
 /// the child its walk continues into.
-enum ChainTail<'e> {
+pub(in crate::ast::convert) enum ChainTail<'e> {
     Call {
         call: &'e ast::CallExpression,
         callee_chain: ChainState,
@@ -606,223 +603,21 @@ enum ChainTail<'e> {
 /// `flags_after_wrap`).
 ///
 /// Two forms write the same bytes. With no comment attach and on the span-only wire —
-/// every ordinary parse — [`write_chain_staged`] stages the spine into shared runs; any
+/// every ordinary parse — `write_chain_staged` stages the spine into shared runs; any
 /// other emission takes [`write_chain_general`], one append per fragment. Debug builds
 /// write each staged chain the general way as well and assert the bytes equal
-/// ([`debug_assert_staged_chain_is_general`]).
+/// (`debug_assert_staged_chain_is_general`).
 #[inline]
-fn write_chain(w: &mut JsonWriter, expr: &ast::Expression, ctx: &Ctx<'_>, flags: ExprFlags) {
-    if matches!(ctx.comments, CommentMode::Off) && ctx.positions.lines().is_none() {
-        #[cfg(debug_assertions)]
-        if GENERAL_CHAIN_REFERENCE.get() {
-            write_chain_general(w, expr, ctx, flags);
-            return;
-        }
-        #[cfg(debug_assertions)]
-        let from = w.as_bytes().len();
-        write_chain_staged(w, expr, ctx, flags);
-        #[cfg(debug_assertions)]
-        debug_assert_staged_chain_is_general(&w.as_bytes()[from..], expr, ctx, flags);
-    } else {
-        write_chain_general(w, expr, ctx, flags);
-    }
+fn write_chain(w: &mut Sink<'_>, expr: &ast::Expression, ctx: &Ctx<'_>, flags: ExprFlags) {
+    write_chain_any(w, expr, ctx, flags);
 }
-
-#[cfg(debug_assertions)]
-thread_local! {
-    /// Set while [`debug_assert_staged_chain_is_general`] writes its reference: every
-    /// chain then takes [`write_chain_general`], so the reference holds no staged bytes,
-    /// and the chains nested in it are not checked again — each was checked where the
-    /// staged write reached it, and a check per enclosing chain would make the cost
-    /// exponential in the nesting.
-    static GENERAL_CHAIN_REFERENCE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
-}
-
-/// Debug-only: `staged` — the bytes [`write_chain_staged`] just wrote for `expr` — must
-/// be the bytes [`write_chain_general`] writes for it — the form every comment-attach and
-/// `loc` emission takes — so the two forms are tied on every chain a debug build stages.
-/// Release builds compile out the reference write and the compare.
-#[cfg(debug_assertions)]
-fn debug_assert_staged_chain_is_general(
-    staged: &[u8],
-    expr: &ast::Expression,
-    ctx: &Ctx<'_>,
-    flags: ExprFlags,
-) {
-    /// Clears the flag on the way out, a panic in the reference write included — a
-    /// caller that catches it (the fuzzer) would otherwise run every later chain
-    /// unchecked.
-    struct Reset;
-    impl Drop for Reset {
-        fn drop(&mut self) {
-            GENERAL_CHAIN_REFERENCE.set(false);
-        }
-    }
-    let mut general = JsonWriter::with_capacity(staged.len());
-    {
-        GENERAL_CHAIN_REFERENCE.set(true);
-        let _reset = Reset;
-        write_chain_general(&mut general, expr, ctx, flags);
-    }
-    debug_assert!(
-        staged == general.as_bytes(),
-        "the staged chain must be the general path's bytes\n  staged: {}\n general: {}",
-        String::from_utf8_lossy(staged),
-        String::from_utf8_lossy(general.as_bytes()),
-    );
-}
-
-/// [`write_chain`] with no comment attach, on the span-only wire, where a node's open and
-/// close report to nothing and its header carries no `loc`: the bytes of several nodes
-/// then run together with nothing between them, so they are staged into one run rather
-/// than appended a fragment at a time.
-///
-/// Down the spine, every link's `ChainExpression` wrap, header and child key go into one
-/// run held open across the links ([`stage_span_header`]). A base that is a plain
-/// identifier is staged into it too ([`stage_identifier_plain`]); any other base flushes
-/// the run and goes through the dispatch. Back up, the innermost tails the run can hold
-/// whole ([`stage_chain_tail`]) are staged; the first that cannot flushes the run, and it
-/// and every tail above it take [`write_chain_tails`]. The run spills to the output
-/// buffer whenever the next step might not fit (`StageRun::spill_unless_room`), so a
-/// spine of any length stages.
-///
-/// The general form's bytes, step for step: [`stage_span_header`] is `node_header`'s
-/// span-only run, [`stage_identifier_plain`] `write_identifier_plain`'s, and each staged
-/// tail the literal the general tail writes for the same flags.
-///
-/// The tails are read in place, by index, never iterated by value: `into_iter` moves the
-/// `SmallVec`, inline buffer and all, into the iterator.
-#[inline(never)]
-fn write_chain_staged(w: &mut JsonWriter, expr: &ast::Expression, ctx: &Ctx<'_>, flags: ExprFlags) {
-    let mut tails: SmallVec<[(ChainTail<'_>, Span, bool); 8]> = SmallVec::new();
-    let (mut expr, mut flags) = (expr, flags);
-    let mut run = w.stage_run();
-    loop {
-        let Some(link) = chain_link(ctx.view, expr, flags) else {
-            if let ast::ExpressionKind::Identifier(id) = &expr.kind
-                && !flags.force_optional
-                && let Some(name) = plain_identifier_stage_name(id, ctx)
-            {
-                run.spill_unless_room::<PLAIN_IDENTIFIER_MAX>();
-                stage_identifier_plain(&mut run, id.span, name, ctx);
-            } else {
-                run.flush();
-                write_expression_inner(w, expr, ctx, flags);
-                run = w.stage_run();
-            }
-            break;
-        };
-        run.spill_unless_room::<{ 2 * SPAN_HEADER_MAX }>();
-        if link.needs_chain {
-            stage_span_header(&mut run, "ChainExpression", expr.span, ctx);
-            run.raw(",\"expression\":");
-        }
-        stage_span_header(&mut run, link.node_type, expr.span, ctx);
-        run.short(link.child_key);
-        tails.push((link.tail, expr.span, link.needs_chain));
-        expr = ctx.view.expr(link.child);
-        flags = link.child_flags;
-    }
-    let mut unstaged = tails.len();
-    while let Some(entry) = unstaged.checked_sub(1).map(|i| &tails[i]) {
-        if !stage_chain_tail(&mut run, entry, ctx) {
-            break;
-        }
-        unstaged -= 1;
-    }
-    run.flush();
-    write_chain_tails(w, &tails[..unstaged], ctx);
-}
-
-/// Stage one link's tail and its `ChainExpression` close into the open run, for the tails
-/// whose every byte is known here: a non-computed member whose property is a plain
-/// identifier ([`plain_identifier_stage_name`]), a call with no arguments and no type
-/// arguments, and a non-null close. Returns `false`, having staged nothing, for any other
-/// tail.
-///
-/// Each arm is [`write_member_expression_tail`] / [`write_call_expression_tail`] /
-/// `close_node` with those fields fixed: the property is the plain identifier the
-/// dispatch writes for it, a call's argument list is `[]` and its type-arguments field
-/// absent — which makes its `optional` field unconditional — and every close is the bare
-/// `}`.
-#[expect(clippy::inline_always)]
-#[inline(always)]
-fn stage_chain_tail(
-    run: &mut StageRun<'_>,
-    &(ref tail, _, needs_chain): &(ChainTail<'_>, Span, bool),
-    ctx: &Ctx<'_>,
-) -> bool {
-    match *tail {
-        ChainTail::Member {
-            member,
-            force,
-            strip,
-        } => {
-            if member.computed {
-                return false;
-            }
-            let ast::ExpressionKind::Identifier(id) = &ctx.view.expr(member.property).kind else {
-                return false;
-            };
-            let Some(name) = plain_identifier_stage_name(id, ctx) else {
-                return false;
-            };
-            run.spill_unless_room::<MEMBER_TAIL_MAX>();
-            run.raw(",\"property\":");
-            stage_identifier_plain(run, id.span, name, ctx);
-            if strip {
-                run.raw(",\"computed\":false}");
-            } else if force || member.optional {
-                run.raw(",\"computed\":false,\"optional\":true}");
-            } else {
-                run.raw(",\"computed\":false,\"optional\":false}");
-            }
-        }
-        ChainTail::Call {
-            call, force, strip, ..
-        } => {
-            if call.type_args.is_some() || !ctx.view.expr_list(call.arguments).is_empty() {
-                return false;
-            }
-            run.spill_unless_room::<CALL_TAIL_MAX>();
-            if strip {
-                run.raw(",\"arguments\":[]}");
-            } else if force || call.optional {
-                run.raw(",\"arguments\":[],\"optional\":true}");
-            } else {
-                run.raw(",\"arguments\":[],\"optional\":false}");
-            }
-        }
-        ChainTail::NonNull => {
-            run.spill_unless_room::<NON_NULL_TAIL_MAX>();
-            run.raw("}");
-        }
-    }
-    if needs_chain {
-        run.raw("}");
-    }
-    true
-}
-
-/// The widest staged member tail: `,"property":`, a plain identifier, the widest
-/// `computed`/`optional` literal with the node's `}`, and a `ChainExpression`'s `}`.
-const MEMBER_TAIL_MAX: usize = ",\"property\":".len()
-    + PLAIN_IDENTIFIER_MAX
-    + ",\"computed\":false,\"optional\":false}".len()
-    + 1;
-
-/// The widest staged call tail: the widest `arguments`/`optional` literal with the
-/// node's `}`, and a `ChainExpression`'s `}`.
-const CALL_TAIL_MAX: usize = ",\"arguments\":[],\"optional\":false}".len() + 1;
-
-/// The staged non-null tail: the node's `}` and a `ChainExpression`'s.
-const NON_NULL_TAIL_MAX: usize = 2;
 
 /// [`write_chain`]'s form for a comment-attach or `loc` emission, one append per
-/// fragment — the reference [`write_chain_staged`] is asserted against in debug builds.
+/// fragment — the reference `write_chain_staged` is
+/// asserted against in debug builds.
 #[inline(never)]
-fn write_chain_general(
-    w: &mut JsonWriter,
+pub(in crate::ast::convert) fn write_chain_general(
+    w: &mut Sink<'_>,
     expr: &ast::Expression,
     ctx: &Ctx<'_>,
     flags: ExprFlags,
@@ -852,7 +647,11 @@ fn write_chain_general(
 /// Each link's tail and closes, innermost first (`tails` is outermost first).
 #[expect(clippy::inline_always)]
 #[inline(always)]
-fn write_chain_tails(w: &mut JsonWriter, tails: &[(ChainTail<'_>, Span, bool)], ctx: &Ctx<'_>) {
+pub(in crate::ast::convert) fn write_chain_tails(
+    w: &mut Sink<'_>,
+    tails: &[(ChainTail<'_>, Span, bool)],
+    ctx: &Ctx<'_>,
+) {
     for &(ref tail, span, needs_chain) in tails.iter().rev() {
         match *tail {
             ChainTail::Call {
@@ -878,13 +677,13 @@ fn write_chain_tails(w: &mut JsonWriter, tails: &[(ChainTail<'_>, Span, bool)], 
 /// reading: whether it opens a `ChainExpression` wrap, its header's type, the key and id of
 /// the child the walk continues into with the flags it hands that child, and the tail it
 /// writes on the way back up.
-struct ChainLink<'e> {
-    needs_chain: bool,
-    node_type: &'static str,
-    child_key: &'static str,
-    child: ast::ExprId,
-    child_flags: ExprFlags,
-    tail: ChainTail<'e>,
+pub(in crate::ast::convert) struct ChainLink<'e> {
+    pub(in crate::ast::convert) needs_chain: bool,
+    pub(in crate::ast::convert) node_type: &'static str,
+    pub(in crate::ast::convert) child_key: &'static str,
+    pub(in crate::ast::convert) child: ast::ExprId,
+    pub(in crate::ast::convert) child_flags: ExprFlags,
+    pub(in crate::ast::convert) tail: ChainTail<'e>,
 }
 
 /// Read `expr` as a link of the chain spine, given the flags its parent hands it — or
@@ -893,7 +692,7 @@ struct ChainLink<'e> {
 /// `flags_after_wrap`).
 #[expect(clippy::inline_always)]
 #[inline(always)]
-fn chain_link<'e>(
+pub(in crate::ast::convert) fn chain_link<'e>(
     view: AstView<'_>,
     expr: &'e ast::Expression,
     flags: ExprFlags,
@@ -979,7 +778,7 @@ fn chain_link<'e>(
 /// Open one link of [`write_chain`]: its `ChainExpression` wrap where `needs_chain`, then
 /// its own header and the key of the child the walk continues into.
 fn open_chain_link(
-    w: &mut JsonWriter,
+    w: &mut Sink<'_>,
     needs_chain: bool,
     node_type: &'static str,
     child_key: &'static str,
@@ -987,11 +786,11 @@ fn open_chain_link(
     ctx: &Ctx<'_>,
 ) {
     if needs_chain {
-        node_header(w, "ChainExpression", span, ctx);
-        w.raw(",\"expression\":");
+        node_header!(w, "ChainExpression", span, ctx);
+        raw!(w, "ChainExpression", ",\"expression\":");
     }
-    node_header(w, node_type, span, ctx);
-    w.raw(child_key);
+    node_header!(w, @dyn node_type, span, ctx);
+    key_raw!(w, child_key);
 }
 
 /// Whether this call/member/non-null node opens a `ChainExpression` wrap.
@@ -1038,12 +837,12 @@ fn flags_after_wrap(flags: ExprFlags, needs_chain: bool) -> (bool, bool) {
 }
 
 /// Emit an object-literal property (a `Property` or a `SpreadElement`).
-fn write_object_property(w: &mut JsonWriter, prop: &ast::ObjectProperty, ctx: &Ctx<'_>) {
+fn write_object_property(w: &mut Sink<'_>, prop: &ast::ObjectProperty, ctx: &Ctx<'_>) {
     match prop {
         ast::ObjectProperty::Property(p) => write_property(w, p, ctx),
         ast::ObjectProperty::SpreadElement(s) => {
-            node_header(w, "SpreadElement", s.span, ctx);
-            w.raw(",\"argument\":");
+            node_header!(w, "SpreadElement", s.span, ctx);
+            raw!(w, "SpreadElement", ",\"argument\":");
             write_expression(w, ctx.view.expr(s.argument), ctx);
             close_node(w, "SpreadElement", s.span, ctx);
         }

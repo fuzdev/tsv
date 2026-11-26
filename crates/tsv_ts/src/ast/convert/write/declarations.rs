@@ -8,7 +8,7 @@ use super::types::{
     write_entity_name, write_index_signature, write_type, write_type_parameter_instantiation,
 };
 use super::{
-    Ctx, JsonWriter, close_node, node_header, write_array, write_function_flags_fields,
+    Ctx, Sink, close_node, node_header, write_array, write_function_flags_fields,
     write_identifier_plain, write_identifier_with_optional, write_name_field, write_or_null,
     write_return_type_field, write_type_annotation_field, write_type_parameters_field,
 };
@@ -20,10 +20,10 @@ use tsv_lang::Span;
 /// spine omits `optional`; a parenthesized `@(expr)` rides the full expression
 /// parser and keeps it. Parens are stripped from the expression, so the only
 /// signal is the span gap.
-pub(super) fn write_decorator(w: &mut JsonWriter, decorator: &ast::Decorator, ctx: &Ctx<'_>) {
+pub(super) fn write_decorator(w: &mut Sink<'_>, decorator: &ast::Decorator, ctx: &Ctx<'_>) {
     let parenthesized = decorator.span.end > ctx.view.expr(decorator.expression).span().end;
-    node_header(w, "Decorator", decorator.span, ctx);
-    w.raw(",\"expression\":");
+    node_header!(w, "Decorator", decorator.span, ctx);
+    raw!(w, "Decorator", ",\"expression\":");
     write_expression_inner(
         w,
         ctx.view.expr(decorator.expression),
@@ -42,12 +42,12 @@ pub(super) fn write_decorator(w: &mut JsonWriter, decorator: &ast::Decorator, ct
 /// Emit a `decorators` field when the internal node carries decorators
 /// (`Option<Vec>` with skip-if-none: present ⇒ emitted, even empty).
 pub(super) fn write_decorators_field(
-    w: &mut JsonWriter,
+    w: &mut Sink<'_>,
     decorators: Option<&[ast::Decorator]>,
     ctx: &Ctx<'_>,
 ) {
     if let Some(decs) = decorators {
-        w.raw(",\"decorators\":");
+        raw!(w, ",\"decorators\":");
         write_array(w, decs, |w, d| write_decorator(w, d, ctx));
     }
 }
@@ -55,19 +55,19 @@ pub(super) fn write_decorators_field(
 /// Emits a `TSTypeAliasDeclaration` node. Field order: `id`,
 /// `typeParameters?`, `typeAnnotation`, `declare` (only when true).
 pub(super) fn write_type_alias_declaration(
-    w: &mut JsonWriter,
+    w: &mut Sink<'_>,
     type_alias: &ast::TSTypeAliasDeclaration,
     span: Span,
     ctx: &Ctx<'_>,
 ) {
-    node_header(w, "TSTypeAliasDeclaration", span, ctx);
-    w.raw(",\"id\":");
+    node_header!(w, "TSTypeAliasDeclaration", span, ctx);
+    raw!(w, "TSTypeAliasDeclaration", ",\"id\":");
     write_identifier_plain(w, &type_alias.id, ctx);
     write_type_parameters_field(w, type_alias.type_parameters.as_ref(), ctx);
-    w.raw(",\"typeAnnotation\":");
+    raw!(w, "TSTypeAliasDeclaration", ",\"typeAnnotation\":");
     write_type(w, ctx.view.ty(type_alias.type_annotation), ctx);
     if type_alias.declare {
-        w.raw(",\"declare\":true");
+        raw!(w, "TSTypeAliasDeclaration", ",\"declare\":true");
     }
     close_node(w, "TSTypeAliasDeclaration", span, ctx);
 }
@@ -76,21 +76,21 @@ pub(super) fn write_type_alias_declaration(
 /// `expression` (always false), `generator`, `async`, `typeParameters?`,
 /// `params`, `returnType?`, `body`.
 pub(super) fn write_function_declaration(
-    w: &mut JsonWriter,
+    w: &mut Sink<'_>,
     func_decl: &ast::FunctionDeclaration,
     ctx: &Ctx<'_>,
 ) {
-    node_header(w, "FunctionDeclaration", func_decl.span, ctx);
-    w.raw(",\"id\":");
+    node_header!(w, "FunctionDeclaration", func_decl.span, ctx);
+    raw!(w, "FunctionDeclaration", ",\"id\":");
     write_or_null(w, func_decl.id.as_ref(), |w, id| {
         write_identifier_plain(w, id, ctx);
     });
     write_function_flags_fields(w, func_decl.generator, func_decl.r#async);
     write_type_parameters_field(w, func_decl.type_parameters.as_ref(), ctx);
-    w.raw(",\"params\":");
+    raw!(w, "FunctionDeclaration", ",\"params\":");
     write_expressions(w, ctx.view.exprs(func_decl.params), ctx);
     write_return_type_field(w, func_decl.return_type.as_ref(), ctx);
-    w.raw(",\"body\":");
+    raw!(w, "FunctionDeclaration", ",\"body\":");
     write_block_statement(w, &func_decl.body, ctx);
     close_node(w, "FunctionDeclaration", func_decl.span, ctx);
 }
@@ -122,7 +122,7 @@ fn super_class_wrap_span(
 /// Emit the `superClass` (nullable) and `superTypeParameters?` fields, applying
 /// the wrap decision. Shared by class declarations and expressions.
 fn write_super_class_fields(
-    w: &mut JsonWriter,
+    w: &mut Sink<'_>,
     super_class: Option<&ast::Expression>,
     super_type_parameters: Option<&ast::TSTypeParameterInstantiation>,
     type_params_span: Option<Span>,
@@ -135,19 +135,19 @@ fn write_super_class_fields(
         super_type_parameters.map(|tp| tp.span.end),
         ctx.source,
     );
-    w.raw(",\"superClass\":");
+    raw!(w, ",\"superClass\":");
     if let (Some(e), Some(stp), Some(ws)) = (super_class, super_type_parameters, wrap_span) {
         // Wrapped: `superTypeParameters` is consumed into the wrapper.
-        node_header(w, "TSInstantiationExpression", ws, ctx);
-        w.raw(",\"expression\":");
+        node_header!(w, "TSInstantiationExpression", ws, ctx);
+        raw!(w, "TSInstantiationExpression", ",\"expression\":");
         write_expression(w, e, ctx);
-        w.raw(",\"typeArguments\":");
+        raw!(w, "TSInstantiationExpression", ",\"typeArguments\":");
         write_type_parameter_instantiation(w, stp, ctx);
         close_node(w, "TSInstantiationExpression", ws, ctx);
     } else {
         write_or_null(w, super_class, |w, e| write_expression(w, e, ctx));
         if let Some(stp) = super_type_parameters {
-            w.raw(",\"superTypeParameters\":");
+            raw!(w, ",\"superTypeParameters\":");
             write_type_parameter_instantiation(w, stp, ctx);
         }
     }
@@ -160,19 +160,19 @@ fn write_super_class_fields(
 /// (`declare abstract class`, `export declare class`) stamp `declare` on the finished node;
 /// tsv's wire keeps the one order.
 pub(super) fn write_class_declaration(
-    w: &mut JsonWriter,
+    w: &mut Sink<'_>,
     class_decl: &ast::ClassDeclaration,
     ctx: &Ctx<'_>,
 ) {
-    node_header(w, "ClassDeclaration", class_decl.span, ctx);
+    node_header!(w, "ClassDeclaration", class_decl.span, ctx);
     if class_decl.declare {
-        w.raw(",\"declare\":true");
+        raw!(w, "ClassDeclaration", ",\"declare\":true");
     }
     if class_decl.r#abstract {
-        w.raw(",\"abstract\":true");
+        raw!(w, "ClassDeclaration", ",\"abstract\":true");
     }
     write_decorators_field(w, ctx.view.opt_decorators(class_decl.decorators), ctx);
-    w.raw(",\"id\":");
+    raw!(w, "ClassDeclaration", ",\"id\":");
     write_or_null(w, class_decl.id.as_ref(), |w, id| {
         write_identifier_plain(w, id, ctx);
     });
@@ -185,24 +185,24 @@ pub(super) fn write_class_declaration(
         ctx,
     );
     write_implements_field(w, ctx.view.heritages(class_decl.implements), ctx);
-    w.raw(",\"body\":");
+    raw!(w, "ClassDeclaration", ",\"body\":");
     write_class_body(w, &class_decl.body, ctx);
     close_node(w, "ClassDeclaration", class_decl.span, ctx);
 }
 
 /// Emits a `ClassExpression` node (no `declare` field).
 pub(super) fn write_class_expression(
-    w: &mut JsonWriter,
+    w: &mut Sink<'_>,
     class_expr: &ast::ClassExpression,
     span: Span,
     ctx: &Ctx<'_>,
 ) {
-    node_header(w, "ClassExpression", span, ctx);
+    node_header!(w, "ClassExpression", span, ctx);
     write_decorators_field(w, ctx.view.opt_decorators(class_expr.decorators), ctx);
     if class_expr.r#abstract {
-        w.raw(",\"abstract\":true");
+        raw!(w, "ClassExpression", ",\"abstract\":true");
     }
-    w.raw(",\"id\":");
+    raw!(w, "ClassExpression", ",\"id\":");
     write_or_null(w, class_expr.id.as_ref(), |w, id| {
         write_identifier_plain(w, id, ctx);
     });
@@ -215,7 +215,7 @@ pub(super) fn write_class_expression(
         ctx,
     );
     write_implements_field(w, ctx.view.heritages(class_expr.implements), ctx);
-    w.raw(",\"body\":");
+    raw!(w, "ClassExpression", ",\"body\":");
     write_class_body(w, &class_expr.body, ctx);
     close_node(w, "ClassExpression", span, ctx);
 }
@@ -223,23 +223,23 @@ pub(super) fn write_class_expression(
 /// The `implements` field is skip-if-empty — an empty internal list emits no
 /// field.
 fn write_implements_field(
-    w: &mut JsonWriter,
+    w: &mut Sink<'_>,
     implements: &[ast::TSInterfaceHeritage],
     ctx: &Ctx<'_>,
 ) {
     if implements.is_empty() {
         return;
     }
-    w.raw(",\"implements\":");
+    raw!(w, ",\"implements\":");
     write_array(w, implements, |w, h| {
         write_expression_with_type_arguments(w, h, ctx);
     });
 }
 
 /// Emits a `ClassBody` node (dispatching each `ClassMember`).
-fn write_class_body(w: &mut JsonWriter, body: &ast::ClassBody, ctx: &Ctx<'_>) {
-    node_header(w, "ClassBody", body.span, ctx);
-    w.raw(",\"body\":");
+fn write_class_body(w: &mut Sink<'_>, body: &ast::ClassBody, ctx: &Ctx<'_>) {
+    node_header!(w, "ClassBody", body.span, ctx);
+    raw!(w, "ClassBody", ",\"body\":");
     write_array(w, ctx.view.class_members(body.body), |w, m| match m {
         ast::ClassMember::MethodDefinition(method) => {
             write_method_definition(w, method, ctx);
@@ -248,8 +248,8 @@ fn write_class_body(w: &mut JsonWriter, body: &ast::ClassBody, ctx: &Ctx<'_>) {
             write_property_definition(w, prop, ctx);
         }
         ast::ClassMember::StaticBlock(block) => {
-            node_header(w, "StaticBlock", block.span, ctx);
-            w.raw(",\"body\":");
+            node_header!(w, "StaticBlock", block.span, ctx);
+            raw!(w, "StaticBlock", ",\"body\":");
             write_array(w, ctx.view.stmt_list(block.body), |w, s| {
                 write_statement(w, ctx.view.stmt(*s), ctx);
             });
@@ -270,12 +270,12 @@ fn write_class_body(w: &mut JsonWriter, body: &ast::ClassBody, ctx: &Ctx<'_>) {
 /// A class member's modifier fields take one order (the member writers' docs), where
 /// acorn-typescript's `tsParseModifiers` stamps each as it reads its keyword, so its wire
 /// follows the member's source order; `static` is (re-)assigned after that loop, last.
-fn write_accessibility_field(w: &mut JsonWriter, accessibility: Option<ast::Accessibility>) {
+fn write_accessibility_field(w: &mut Sink<'_>, accessibility: Option<ast::Accessibility>) {
     match accessibility {
         None => {}
-        Some(ast::Accessibility::Public) => w.raw(",\"accessibility\":\"public\""),
-        Some(ast::Accessibility::Private) => w.raw(",\"accessibility\":\"private\""),
-        Some(ast::Accessibility::Protected) => w.raw(",\"accessibility\":\"protected\""),
+        Some(ast::Accessibility::Public) => raw!(w, ",\"accessibility\":\"public\""),
+        Some(ast::Accessibility::Private) => raw!(w, ",\"accessibility\":\"private\""),
+        Some(ast::Accessibility::Protected) => raw!(w, ",\"accessibility\":\"protected\""),
     }
 }
 
@@ -284,25 +284,25 @@ fn write_accessibility_field(w: &mut JsonWriter, accessibility: Option<ast::Acce
 /// `typeParameters?` (moved here from the FunctionExpression, acorn
 /// convention), `value`, `decorators?` (attached to the finished member, so
 /// they serialize last).
-fn write_method_definition(w: &mut JsonWriter, method: &ast::MethodDefinition, ctx: &Ctx<'_>) {
-    node_header(w, "MethodDefinition", method.span, ctx);
+fn write_method_definition(w: &mut Sink<'_>, method: &ast::MethodDefinition, ctx: &Ctx<'_>) {
+    node_header!(w, "MethodDefinition", method.span, ctx);
     if method.r#abstract {
-        w.raw(",\"abstract\":true");
+        raw!(w, "MethodDefinition", ",\"abstract\":true");
     }
     write_accessibility_field(w, method.accessibility);
     if method.r#override {
-        w.raw(",\"override\":true");
+        raw!(w, "MethodDefinition", ",\"override\":true");
     }
-    w.raw(",\"static\":");
+    raw!(w, "MethodDefinition", ",\"static\":");
     w.bool(method.is_static);
-    w.raw(",\"computed\":");
+    raw!(w, "MethodDefinition", ",\"computed\":");
     w.bool(method.computed);
-    w.raw(",\"key\":");
+    raw!(w, "MethodDefinition", ",\"key\":");
     write_expression(w, ctx.view.expr(method.key), ctx);
     if method.optional {
-        w.raw(",\"optional\":true");
+        raw!(w, "MethodDefinition", ",\"optional\":true");
     }
-    w.raw(",\"kind\":");
+    raw!(w, "MethodDefinition", ",\"kind\":");
     w.token(method.kind.as_str());
     let func = &method.value;
     write_type_parameters_field(w, func.type_parameters.as_ref(), ctx);
@@ -319,19 +319,19 @@ fn write_method_definition(w: &mut JsonWriter, method: &ast::MethodDefinition, c
     } else {
         ("FunctionExpression", Some(&func.body))
     };
-    w.raw(",\"value\":");
+    raw!(w, "MethodDefinition", ",\"value\":");
     let value_span = Span::new(func.params_start, func.span.end);
-    node_header(w, value_type, value_span, ctx);
-    w.raw(",\"id\":");
+    node_header!(w, @dyn value_type, value_span, ctx);
+    raw!(w, ",\"id\":");
     write_or_null(w, func.id.as_ref(), |w, id| {
         write_identifier_with_optional(w, id, ctx);
     });
     write_function_flags_fields(w, func.generator, func.r#async);
-    w.raw(",\"params\":");
+    raw!(w, ",\"params\":");
     write_expressions(w, ctx.view.exprs(func.params), ctx);
     write_return_type_field(w, func.return_type.as_ref(), ctx);
     if let Some(body) = body {
-        w.raw(",\"body\":");
+        raw!(w, ",\"body\":");
         write_block_statement(w, body, ctx);
     }
     // Close the `value` function node, then the `MethodDefinition`.
@@ -344,38 +344,38 @@ fn write_method_definition(w: &mut JsonWriter, method: &ast::MethodDefinition, c
 /// `accessibility?`, `readonly?`, `override?`, `static`, `computed`,
 /// `key`, `optional?`, `definite?`, `typeAnnotation?`, `value` (nullable),
 /// `decorators?` (attached to the finished member, so they serialize last).
-fn write_property_definition(w: &mut JsonWriter, prop: &ast::PropertyDefinition, ctx: &Ctx<'_>) {
-    node_header(w, "PropertyDefinition", prop.span, ctx);
+fn write_property_definition(w: &mut Sink<'_>, prop: &ast::PropertyDefinition, ctx: &Ctx<'_>) {
+    node_header!(w, "PropertyDefinition", prop.span, ctx);
     if prop.declare {
-        w.raw(",\"declare\":true");
+        raw!(w, "PropertyDefinition", ",\"declare\":true");
     }
     if prop.r#abstract {
-        w.raw(",\"abstract\":true");
+        raw!(w, "PropertyDefinition", ",\"abstract\":true");
     }
     if prop.accessor {
-        w.raw(",\"accessor\":true");
+        raw!(w, "PropertyDefinition", ",\"accessor\":true");
     }
     write_accessibility_field(w, prop.accessibility);
     if prop.readonly {
-        w.raw(",\"readonly\":true");
+        raw!(w, "PropertyDefinition", ",\"readonly\":true");
     }
     if prop.r#override {
-        w.raw(",\"override\":true");
+        raw!(w, "PropertyDefinition", ",\"override\":true");
     }
-    w.raw(",\"static\":");
+    raw!(w, "PropertyDefinition", ",\"static\":");
     w.bool(prop.is_static);
-    w.raw(",\"computed\":");
+    raw!(w, "PropertyDefinition", ",\"computed\":");
     w.bool(prop.computed);
-    w.raw(",\"key\":");
+    raw!(w, "PropertyDefinition", ",\"key\":");
     write_expression(w, ctx.view.expr(prop.key), ctx);
     if matches!(prop.modifier, ast::PropertyModifier::Optional) {
-        w.raw(",\"optional\":true");
+        raw!(w, "PropertyDefinition", ",\"optional\":true");
     }
     if matches!(prop.modifier, ast::PropertyModifier::Definite) {
-        w.raw(",\"definite\":true");
+        raw!(w, "PropertyDefinition", ",\"definite\":true");
     }
     write_type_annotation_field(w, prop.type_annotation.as_ref(), ctx);
-    w.raw(",\"value\":");
+    raw!(w, "PropertyDefinition", ",\"value\":");
     write_or_null(w, prop.value.as_ref(), |w, v| {
         write_expression(w, ctx.view.expr(*v), ctx);
     });
@@ -387,19 +387,23 @@ fn write_property_definition(w: &mut JsonWriter, prop: &ast::PropertyDefinition,
 /// (`{"trailingComma":N}`, emitted like `start`/`end` in the mapper's output
 /// space).
 pub(super) fn write_type_parameter_declaration(
-    w: &mut JsonWriter,
+    w: &mut Sink<'_>,
     params: &ast::TSTypeParameterDeclaration,
     ctx: &Ctx<'_>,
 ) {
-    node_header(w, "TSTypeParameterDeclaration", params.span, ctx);
-    w.raw(",\"params\":");
+    node_header!(w, "TSTypeParameterDeclaration", params.span, ctx);
+    raw!(w, "TSTypeParameterDeclaration", ",\"params\":");
     write_array(w, ctx.view.type_params(params.params), |w, p| {
         write_type_parameter(w, p, ctx);
     });
     if let Some(pos) = params.trailing_comma {
-        w.raw(",\"extra\":{\"trailingComma\":");
+        raw!(
+            w,
+            "TSTypeParameterDeclaration",
+            ",\"extra\":{\"trailingComma\":"
+        );
         w.u32(ctx.pos(pos));
-        w.raw("}");
+        raw!(w, "}");
     }
     close_node(w, "TSTypeParameterDeclaration", params.span, ctx);
 }
@@ -408,31 +412,27 @@ pub(super) fn write_type_parameter_declaration(
 /// `constraint?`, `default?` — the order both formatters print the modifiers in.
 /// (acorn-typescript's `tsParseModifiers` stamps each flag as it consumes the keyword, so
 /// its wire follows the source's spelling; tsv's keeps the one order.)
-pub(super) fn write_type_parameter(
-    w: &mut JsonWriter,
-    param: &ast::TSTypeParameter,
-    ctx: &Ctx<'_>,
-) {
-    node_header(w, "TSTypeParameter", param.span, ctx);
+pub(super) fn write_type_parameter(w: &mut Sink<'_>, param: &ast::TSTypeParameter, ctx: &Ctx<'_>) {
+    node_header!(w, "TSTypeParameter", param.span, ctx);
     if param
         .modifiers
         .contains(ast::TSTypeParameterModifier::Const)
     {
-        w.raw(",\"const\":true");
+        raw!(w, "TSTypeParameter", ",\"const\":true");
     }
     if param.modifiers.contains(ast::TSTypeParameterModifier::In) {
-        w.raw(",\"in\":true");
+        raw!(w, "TSTypeParameter", ",\"in\":true");
     }
     if param.modifiers.contains(ast::TSTypeParameterModifier::Out) {
-        w.raw(",\"out\":true");
+        raw!(w, "TSTypeParameter", ",\"out\":true");
     }
     write_name_field(w, param.name.ident_name(), param.name.span.start, ctx);
     if let Some(c) = ctx.view.opt_ty(param.constraint) {
-        w.raw(",\"constraint\":");
+        raw!(w, "TSTypeParameter", ",\"constraint\":");
         write_type(w, c, ctx);
     }
     if let Some(d) = ctx.view.opt_ty(param.default) {
-        w.raw(",\"default\":");
+        raw!(w, "TSTypeParameter", ",\"default\":");
         write_type(w, d, ctx);
     }
     close_node(w, "TSTypeParameter", param.span, ctx);
@@ -442,15 +442,15 @@ pub(super) fn write_type_parameter(
 /// `expression` is the heritage entity name (an `Identifier` or a
 /// `TSQualifiedName`, matching `extends`), plus `typeParameters?`.
 fn write_expression_with_type_arguments(
-    w: &mut JsonWriter,
+    w: &mut Sink<'_>,
     heritage: &ast::TSInterfaceHeritage,
     ctx: &Ctx<'_>,
 ) {
-    node_header(w, "TSExpressionWithTypeArguments", heritage.span, ctx);
-    w.raw(",\"expression\":");
+    node_header!(w, "TSExpressionWithTypeArguments", heritage.span, ctx);
+    raw!(w, "TSExpressionWithTypeArguments", ",\"expression\":");
     write_entity_name(w, &heritage.expression, ctx);
     if let Some(ta) = &heritage.type_arguments {
-        w.raw(",\"typeParameters\":");
+        raw!(w, "TSExpressionWithTypeArguments", ",\"typeParameters\":");
         write_type_parameter_instantiation(w, ta, ctx);
     }
     close_node(w, "TSExpressionWithTypeArguments", heritage.span, ctx);

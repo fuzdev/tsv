@@ -71,8 +71,69 @@
 
 use std::cell::{Cell, RefCell};
 
-use super::CommentMode;
-use tsv_lang::{Comment, JsonWriter, Span, WirePositions};
+use crate::ast;
+use tsv_lang::{Comment, Span, WirePositions, WireSink};
+
+/// The comment role of an emission (the Svelte comment-attach paths).
+///
+/// `Off` for every ordinary emission — the hot path pays one never-taken
+/// discriminant compare per node open and close. `Attach` is a comment-bearing
+/// island: acorn's leading/trailing attach runs **online**, driven by this
+/// emit's own node opens and closes, and each node emits the comments it was
+/// assigned at its own close (see [`CommentAttach`]).
+#[derive(Clone, Copy)]
+pub enum CommentMode<'a> {
+    Off,
+    Attach(&'a CommentAttach<'a>),
+}
+
+impl CommentMode<'_> {
+    /// Run `f` — the write of one node — inside **silent frames** for the grouping pairs
+    /// around it that the parse kept no span for (`tsv_svelte`'s `{@debug a, (b)}`, its
+    /// pairs read back off the source): each pair opens outermost-first, claims as the pair
+    /// would in acorn's walk and emits nothing, and closes innermost-first once `f` is
+    /// done. `parens` is outermost-first. A no-op wrapper in `Off` mode, which has no walk
+    /// to frame.
+    pub fn with_silent_parens<R>(self, parens: &[Span], f: impl FnOnce() -> R) -> R {
+        let CommentMode::Attach(attach) = self else {
+            return f();
+        };
+        for &pair in parens {
+            attach.paren_open(pair);
+        }
+        let result = f();
+        for &pair in parens.iter().rev() {
+            attach.paren_close(pair);
+        }
+        result
+    }
+}
+
+/// The per-document inputs every embedded writer shares (`write_program_embedded`,
+/// `write_expression_embedded`, `write_pattern_embedded`,
+/// `write_variable_declaration_embedded`,
+/// `write_identifier_expression_with_character`) — the source text, positions,
+/// comment role and parser variant each one funnels into a `Ctx`.
+///
+/// Bundled into one `Copy` value so the call sites stop re-threading the same
+/// arguments. It is an entry-boundary value: each writer destructures it into a
+/// stack `Ctx` (`Ctx::from_embed`) and the per-node walk threads `&Ctx`, so it
+/// is copied once per island rather than once per node.
+#[derive(Clone, Copy)]
+pub struct EmbedWriter<'a> {
+    pub source: &'a str,
+    pub positions: WirePositions<'a>,
+    /// Resolves the tree's ids, runs and pool text.
+    pub view: ast::AstView<'a>,
+    pub comments: CommentMode<'a>,
+    /// The canonical parser for this document — see `Ctx::vanilla_acorn`. It is
+    /// component-global, so an island carries the same variant as the
+    /// component's `<script>` blocks.
+    pub vanilla_acorn: bool,
+    /// The block pattern's trailing `: T` — its comment role, see
+    /// `Ctx::annotation_comments`. `Off` for every other entry.
+    pub annotation_comments: CommentMode<'a>,
+}
 
 /// What one island declares up front: the comments its canonical parse would have
 /// collected, plus the two facts acorn's walk reads about a **root**'s surroundings.
@@ -418,9 +479,9 @@ impl<'a> CommentAttach<'a> {
     /// reshapes the comment-free path it exists to stay out of.
     #[cold]
     #[inline(never)]
-    pub(super) fn close_and_emit(
+    pub(super) fn close_and_emit<S: WireSink>(
         &self,
-        w: &mut JsonWriter,
+        w: &mut S,
         node_type: &'static str,
         span: Span,
         positions: WirePositions<'_>,
@@ -438,9 +499,9 @@ impl<'a> CommentAttach<'a> {
     /// A node closes outside a skipped subtree: decide its trailing comments, then emit
     /// both lists.
     #[cold]
-    fn close_attached(
+    fn close_attached<S: WireSink>(
         &self,
-        w: &mut JsonWriter,
+        w: &mut S,
         node_type: &'static str,
         span: Span,
         positions: WirePositions<'_>,
@@ -792,9 +853,9 @@ impl<'a> CommentAttach<'a> {
     /// `leadingComments` at node entry and `trailingComments` after the children), and
     /// trailing, then leading, on a `<script>` `Program`, whose only `leadingComments` is
     /// the preceding HTML comment Svelte prepends after the walk.
-    fn emit(
+    fn emit<S: WireSink>(
         &self,
-        w: &mut JsonWriter,
+        w: &mut S,
         node_type: &'static str,
         leading: &[u32],
         trailing: &[u32],
@@ -813,9 +874,9 @@ impl<'a> CommentAttach<'a> {
         }
     }
 
-    fn emit_leading(
+    fn emit_leading<S: WireSink>(
         &self,
-        w: &mut JsonWriter,
+        w: &mut S,
         leading: &[u32],
         html: Option<&str>,
         positions: WirePositions<'_>,
@@ -823,43 +884,73 @@ impl<'a> CommentAttach<'a> {
         if leading.is_empty() && html.is_none() {
             return;
         }
+        #[cfg(feature = "_tape")]
+        w.t_key_named("leadingComments");
         w.raw(",\"leadingComments\":[");
+        #[cfg(feature = "_tape")]
+        w.t_list_open();
         if let Some(value) = html {
             // Svelte's own `{type: "Line", value}` — no positions.
+            #[cfg(feature = "_tape")]
+            w.t_open(const { tsv_lang::tape::entry_id("Line/HtmlLeadingComment") });
             w.raw("{\"type\":\"Line\",\"value\":");
             w.string(value);
             w.raw("}");
+            #[cfg(feature = "_tape")]
+            w.t_close();
             if !leading.is_empty() {
                 w.raw(",");
             }
         }
         self.write_run(w, leading, positions);
         w.raw("]");
+        #[cfg(feature = "_tape")]
+        w.t_list_close();
     }
 
-    fn emit_trailing(&self, w: &mut JsonWriter, trailing: &[u32], positions: WirePositions<'_>) {
+    fn emit_trailing<S: WireSink>(
+        &self,
+        w: &mut S,
+        trailing: &[u32],
+        positions: WirePositions<'_>,
+    ) {
         if trailing.is_empty() {
             return;
         }
+        #[cfg(feature = "_tape")]
+        w.t_key_named("trailingComments");
         w.raw(",\"trailingComments\":[");
+        #[cfg(feature = "_tape")]
+        w.t_list_open();
         self.write_run(w, trailing, positions);
         w.raw("]");
+        #[cfg(feature = "_tape")]
+        w.t_list_close();
     }
 
     /// The comma-separated `{type, value, start, end, loc}` objects of one run (`loc`
     /// only on a wire that carries it).
-    fn write_run(&self, w: &mut JsonWriter, run: &[u32], positions: WirePositions<'_>) {
+    fn write_run<S: WireSink>(&self, w: &mut S, run: &[u32], positions: WirePositions<'_>) {
         for (i, &idx) in run.iter().enumerate() {
             if i > 0 {
                 w.raw(",");
             }
             let comment = self.island.queue[idx as usize];
+            // the tape's record: its `value` a ref, then the two offsets — no field has a bit
+            #[cfg(feature = "_tape")]
+            w.t_open(if comment.is_block {
+                const { tsv_lang::tape::entry_id("Block") }
+            } else {
+                const { tsv_lang::tape::entry_id("Line") }
+            });
             w.raw("{\"type\":\"");
             w.raw(if comment.is_block { "Block" } else { "Line" });
             w.raw("\",\"value\":");
             w.string(&comment.wire_value(self.source));
             w.span_start_end_field(positions, comment.span.start, comment.span.end);
             w.raw("}");
+            #[cfg(feature = "_tape")]
+            w.t_close();
         }
     }
 }

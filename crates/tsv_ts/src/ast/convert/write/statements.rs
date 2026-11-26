@@ -18,9 +18,8 @@ use super::types::{
     write_declare_function, write_entity_name, write_enum_declaration, write_interface_declaration,
 };
 use super::{
-    Ctx, JsonWriter, close_node, node_header, write_array, write_bare_node,
-    write_export_kind_field, write_identifier_plain, write_import_kind_field, write_literal,
-    write_or_null,
+    Ctx, Sink, close_node, node_header, write_array, write_bare_node, write_export_kind_field,
+    write_identifier_plain, write_import_kind_field, write_literal, write_or_null,
 };
 use crate::ast;
 use tsv_lang::Span;
@@ -53,29 +52,29 @@ fn export_start(source: &str, span_start: u32, class_is_decorated: bool) -> u32 
 /// attributes (possibly `[]`); no clause emits `[]` under the Svelte schema and
 /// omits the field under acorn.
 fn write_attributes_field(
-    w: &mut JsonWriter,
+    w: &mut Sink<'_>,
     attributes: Option<&[ast::ImportAttribute]>,
     ctx: &Ctx<'_>,
 ) {
     match attributes {
         Some(attrs) => {
-            w.raw(",\"attributes\":");
+            raw!(w, ",\"attributes\":");
             write_array(w, attrs, |w, a| write_import_attribute(w, a, ctx));
         }
         None => {
             if ctx.vanilla_acorn {
-                w.raw(",\"attributes\":[]");
+                raw!(w, ",\"attributes\":[]");
             }
         }
     }
 }
 
 /// Emit a `Statement`, dispatching on its variant.
-pub(super) fn write_statement(w: &mut JsonWriter, stmt: &ast::Statement, ctx: &Ctx<'_>) {
+pub(super) fn write_statement(w: &mut Sink<'_>, stmt: &ast::Statement, ctx: &Ctx<'_>) {
     match &stmt.kind {
         ast::StatementKind::ExpressionStatement(expr_stmt) => {
-            node_header(w, "ExpressionStatement", stmt.span, ctx);
-            w.raw(",\"expression\":");
+            node_header!(w, "ExpressionStatement", stmt.span, ctx);
+            raw!(w, "ExpressionStatement", ",\"expression\":");
             write_expression(w, ctx.view.expr(expr_stmt.expression), ctx);
             if expr_stmt.is_directive {
                 // acorn stores the raw string contents without quotes. A
@@ -86,7 +85,7 @@ pub(super) fn write_statement(w: &mut JsonWriter, stmt: &ast::Statement, ctx: &C
                     .expr(expr_stmt.expression)
                     .span()
                     .extract(ctx.source);
-                w.raw(",\"directive\":");
+                raw!(w, "ExpressionStatement", ",\"directive\":");
                 w.string(&raw[1..raw.len() - 1]);
             }
             close_node(w, "ExpressionStatement", stmt.span, ctx);
@@ -99,8 +98,8 @@ pub(super) fn write_statement(w: &mut JsonWriter, stmt: &ast::Statement, ctx: &C
             write_type_alias_declaration(w, type_alias, stmt.span, ctx);
         }
         ast::StatementKind::ReturnStatement(ret) => {
-            node_header(w, "ReturnStatement", stmt.span, ctx);
-            w.raw(",\"argument\":");
+            node_header!(w, "ReturnStatement", stmt.span, ctx);
+            raw!(w, "ReturnStatement", ",\"argument\":");
             write_or_null(w, ret.argument.as_ref(), |w, e| {
                 write_expression(w, ctx.view.expr(*e), ctx);
             });
@@ -129,17 +128,17 @@ pub(super) fn write_statement(w: &mut JsonWriter, stmt: &ast::Statement, ctx: &C
                     if ctx.view.class_decl(class).decorators.is_some()),
             );
             let export_span = Span::new(start, stmt.span.end);
-            node_header(w, "ExportNamedDeclaration", export_span, ctx);
+            node_header!(w, "ExportNamedDeclaration", export_span, ctx);
             write_export_kind_field(w, export_decl.export_kind, ctx);
-            w.raw(",\"declaration\":");
+            raw!(w, "ExportNamedDeclaration", ",\"declaration\":");
             write_or_null(w, ctx.view.opt_stmt(export_decl.declaration), |w, d| {
                 write_statement(w, d, ctx);
             });
-            w.raw(",\"specifiers\":");
+            raw!(w, "ExportNamedDeclaration", ",\"specifiers\":");
             write_array(w, ctx.view.export_specs(export_decl.specifiers), |w, s| {
                 write_export_specifier(w, s, ctx);
             });
-            w.raw(",\"source\":");
+            raw!(w, "ExportNamedDeclaration", ",\"source\":");
             write_or_null(w, export_decl.source.as_ref(), |w, s| {
                 write_literal(w, s, ctx);
             });
@@ -159,21 +158,21 @@ pub(super) fn write_statement(w: &mut JsonWriter, stmt: &ast::Statement, ctx: &C
                     if class.decorators.is_some()),
             );
             let export_span = Span::new(start, stmt.span.end);
-            node_header(w, "ExportDefaultDeclaration", export_span, ctx);
+            node_header!(w, "ExportDefaultDeclaration", export_span, ctx);
             write_export_kind_field(w, ast::ExportKind::Value, ctx);
-            w.raw(",\"declaration\":");
+            raw!(w, "ExportDefaultDeclaration", ",\"declaration\":");
             write_export_default_value(w, &export_decl.declaration, ctx);
             close_node(w, "ExportDefaultDeclaration", export_span, ctx);
         }
         &ast::StatementKind::ExportAllDeclaration(export_decl) => {
             let export_decl = ctx.view.export_all(export_decl);
-            node_header(w, "ExportAllDeclaration", stmt.span, ctx);
+            node_header!(w, "ExportAllDeclaration", stmt.span, ctx);
             write_export_kind_field(w, export_decl.export_kind, ctx);
-            w.raw(",\"exported\":");
+            raw!(w, "ExportAllDeclaration", ",\"exported\":");
             write_or_null(w, export_decl.exported.as_ref(), |w, name| {
                 write_module_export_name(w, name, ctx);
             });
-            w.raw(",\"source\":");
+            raw!(w, "ExportAllDeclaration", ",\"source\":");
             write_literal(w, &export_decl.source, ctx);
             write_attributes_field(
                 w,
@@ -184,30 +183,30 @@ pub(super) fn write_statement(w: &mut JsonWriter, stmt: &ast::Statement, ctx: &C
         }
         &ast::StatementKind::TSExportAssignment(export_assign) => {
             let export_assign = ctx.view.export_assign(export_assign);
-            node_header(w, "TSExportAssignment", stmt.span, ctx);
-            w.raw(",\"expression\":");
+            node_header!(w, "TSExportAssignment", stmt.span, ctx);
+            raw!(w, "TSExportAssignment", ",\"expression\":");
             write_expression(w, ctx.view.expr(export_assign.expression), ctx);
             close_node(w, "TSExportAssignment", stmt.span, ctx);
         }
         ast::StatementKind::TSNamespaceExportDeclaration(ns_export) => {
-            node_header(w, "TSNamespaceExportDeclaration", stmt.span, ctx);
-            w.raw(",\"id\":");
+            node_header!(w, "TSNamespaceExportDeclaration", stmt.span, ctx);
+            raw!(w, "TSNamespaceExportDeclaration", ",\"id\":");
             write_identifier_plain(w, &ns_export.id, ctx);
             close_node(w, "TSNamespaceExportDeclaration", stmt.span, ctx);
         }
         &ast::StatementKind::ImportDeclaration(import_decl) => {
             let import_decl = ctx.view.import_decl(import_decl);
-            node_header(w, "ImportDeclaration", stmt.span, ctx);
+            node_header!(w, "ImportDeclaration", stmt.span, ctx);
             write_import_kind_field(w, import_decl.import_kind, ctx);
             if let Some(phase) = import_decl.phase.as_str() {
-                w.raw(",\"phase\":");
+                raw!(w, "ImportDeclaration", ",\"phase\":");
                 w.token(phase);
             }
-            w.raw(",\"specifiers\":");
+            raw!(w, "ImportDeclaration", ",\"specifiers\":");
             write_array(w, ctx.view.import_specs(import_decl.specifiers), |w, s| {
                 write_import_specifier(w, s, ctx);
             });
-            w.raw(",\"source\":");
+            raw!(w, "ImportDeclaration", ",\"source\":");
             write_literal(w, &import_decl.source, ctx);
             write_attributes_field(
                 w,
@@ -218,21 +217,21 @@ pub(super) fn write_statement(w: &mut JsonWriter, stmt: &ast::Statement, ctx: &C
         }
         &ast::StatementKind::TSImportEqualsDeclaration(import_eq) => {
             let import_eq = ctx.view.import_equals(import_eq);
-            node_header(w, "TSImportEqualsDeclaration", stmt.span, ctx);
-            w.raw(",\"importKind\":");
+            node_header!(w, "TSImportEqualsDeclaration", stmt.span, ctx);
+            raw!(w, "TSImportEqualsDeclaration", ",\"importKind\":");
             w.token(match import_eq.import_kind {
                 ast::ImportKind::Value => "value",
                 ast::ImportKind::Type => "type",
             });
-            w.raw(",\"isExport\":");
+            raw!(w, "TSImportEqualsDeclaration", ",\"isExport\":");
             w.bool(import_eq.is_export);
-            w.raw(",\"id\":");
+            raw!(w, "TSImportEqualsDeclaration", ",\"id\":");
             write_identifier_plain(w, &import_eq.id, ctx);
-            w.raw(",\"moduleReference\":");
+            raw!(w, "TSImportEqualsDeclaration", ",\"moduleReference\":");
             match &import_eq.module_reference {
                 ast::TSModuleReference::ExternalModuleReference(ext_ref) => {
-                    node_header(w, "TSExternalModuleReference", ext_ref.span, ctx);
-                    w.raw(",\"expression\":");
+                    node_header!(w, "TSExternalModuleReference", ext_ref.span, ctx);
+                    raw!(w, "TSExternalModuleReference", ",\"expression\":");
                     write_literal(w, &ext_ref.expression, ctx);
                     close_node(w, "TSExternalModuleReference", ext_ref.span, ctx);
                 }
@@ -311,25 +310,25 @@ pub(super) fn write_statement(w: &mut JsonWriter, stmt: &ast::Statement, ctx: &C
 /// true), `id`, `body?` (omitted for shorthand ambient modules), `declare`
 /// (only when true).
 pub(super) fn write_module_declaration(
-    w: &mut JsonWriter,
+    w: &mut Sink<'_>,
     decl: &ast::TSModuleDeclaration,
     ctx: &Ctx<'_>,
 ) {
-    node_header(w, "TSModuleDeclaration", decl.span, ctx);
+    node_header!(w, "TSModuleDeclaration", decl.span, ctx);
     if decl.global {
-        w.raw(",\"global\":true");
+        raw!(w, "TSModuleDeclaration", ",\"global\":true");
     }
-    w.raw(",\"id\":");
+    raw!(w, "TSModuleDeclaration", ",\"id\":");
     match &decl.id {
         ast::TSModuleName::Identifier(id) => write_identifier_plain(w, id, ctx),
         ast::TSModuleName::Literal(lit) => write_literal(w, lit, ctx),
     }
     if let Some(body) = &decl.body {
-        w.raw(",\"body\":");
+        raw!(w, "TSModuleDeclaration", ",\"body\":");
         match body {
             ast::TSModuleDeclarationBody::TSModuleBlock(block) => {
-                node_header(w, "TSModuleBlock", block.span, ctx);
-                w.raw(",\"body\":");
+                node_header!(w, "TSModuleBlock", block.span, ctx);
+                raw!(w, "TSModuleBlock", ",\"body\":");
                 write_array(w, ctx.view.stmt_list(block.body), |w, s| {
                     write_statement(w, ctx.view.stmt(*s), ctx);
                 });
@@ -342,19 +341,15 @@ pub(super) fn write_module_declaration(
         }
     }
     if decl.declare {
-        w.raw(",\"declare\":true");
+        raw!(w, ",\"declare\":true");
     }
     close_node(w, "TSModuleDeclaration", decl.span, ctx);
 }
 
 /// Emits a `BlockStatement` node.
-pub(super) fn write_block_statement(
-    w: &mut JsonWriter,
-    block: &ast::BlockStatement,
-    ctx: &Ctx<'_>,
-) {
-    node_header(w, "BlockStatement", block.span, ctx);
-    w.raw(",\"body\":");
+pub(super) fn write_block_statement(w: &mut Sink<'_>, block: &ast::BlockStatement, ctx: &Ctx<'_>) {
+    node_header!(w, "BlockStatement", block.span, ctx);
+    raw!(w, "BlockStatement", ",\"body\":");
     super::write_body_array(w, ctx.view.stmt_list(block.body), ctx, |w, s| {
         write_statement(w, ctx.view.stmt(*s), ctx);
     });
@@ -367,23 +362,23 @@ pub(super) fn write_block_statement(
 /// `declare` before the declaration parses). `export declare` stamps the finished node
 /// instead (`parseExportDeclaration`); tsv's wire keeps the one order.
 pub(super) fn write_variable_declaration(
-    w: &mut JsonWriter,
+    w: &mut Sink<'_>,
     var_decl: &ast::VariableDeclaration,
     ctx: &Ctx<'_>,
 ) {
-    node_header(w, "VariableDeclaration", var_decl.span, ctx);
+    node_header!(w, "VariableDeclaration", var_decl.span, ctx);
     if var_decl.declare {
-        w.raw(",\"declare\":true");
+        raw!(w, "VariableDeclaration", ",\"declare\":true");
     }
-    w.raw(",\"declarations\":");
+    raw!(w, "VariableDeclaration", ",\"declarations\":");
     write_array(w, ctx.view.declarators(var_decl.declarations), |w, d| {
-        node_header(w, "VariableDeclarator", d.span, ctx);
-        w.raw(",\"id\":");
+        node_header!(w, "VariableDeclarator", d.span, ctx);
+        raw!(w, "VariableDeclarator", ",\"id\":");
         write_expression(w, ctx.view.expr(d.id), ctx);
         if d.definite {
-            w.raw(",\"definite\":true");
+            raw!(w, "VariableDeclarator", ",\"definite\":true");
         }
-        w.raw(",\"init\":");
+        raw!(w, "VariableDeclarator", ",\"init\":");
         write_or_null(w, d.init.as_ref(), |w, e| {
             write_expression(w, ctx.view.expr(*e), ctx);
         });
@@ -392,11 +387,11 @@ pub(super) fn write_variable_declaration(
     // One literal per kind, so each appends the whole field at once rather
     // than a runtime-length copy of `as_str()`.
     match var_decl.kind {
-        ast::VariableDeclarationKind::Const => w.raw(",\"kind\":\"const\""),
-        ast::VariableDeclarationKind::Let => w.raw(",\"kind\":\"let\""),
-        ast::VariableDeclarationKind::Var => w.raw(",\"kind\":\"var\""),
-        ast::VariableDeclarationKind::Using => w.raw(",\"kind\":\"using\""),
-        ast::VariableDeclarationKind::AwaitUsing => w.raw(",\"kind\":\"await using\""),
+        ast::VariableDeclarationKind::Const => raw!(w, ",\"kind\":\"const\""),
+        ast::VariableDeclarationKind::Let => raw!(w, ",\"kind\":\"let\""),
+        ast::VariableDeclarationKind::Var => raw!(w, ",\"kind\":\"var\""),
+        ast::VariableDeclarationKind::Using => raw!(w, ",\"kind\":\"using\""),
+        ast::VariableDeclarationKind::AwaitUsing => raw!(w, ",\"kind\":\"await using\""),
     }
     close_node(w, "VariableDeclaration", var_decl.span, ctx);
 }

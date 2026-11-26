@@ -3,7 +3,7 @@
 use super::expressions::{ChainState, ExprFlags, write_expression, write_expressions};
 use super::statements::write_block_statement;
 use super::{
-    Ctx, JsonWriter, close_node, node_header, write_function_flags_fields,
+    Ctx, Sink, close_node, node_header, write_function_flags_fields,
     write_identifier_with_optional, write_or_null, write_return_type_field,
     write_type_arguments_field, write_type_parameters_field,
 };
@@ -20,27 +20,35 @@ use tsv_lang::Span;
 /// order) places that route's head comments as the common route would — a cataloged
 /// divergence (`docs/conformance_svelte.md` §Comment Attachment Differences).
 pub(super) fn write_arrow_function_expression(
-    w: &mut JsonWriter,
+    w: &mut Sink<'_>,
     arrow: &ast::ArrowFunctionExpression,
     span: Span,
     ctx: &Ctx<'_>,
 ) {
-    node_header(w, "ArrowFunctionExpression", span, ctx);
+    node_header!(w, "ArrowFunctionExpression", span, ctx);
     write_return_type_field(w, arrow.return_type.as_ref(), ctx);
-    w.raw_pick(
+    pick!(
+        w,
+        "ArrowFunctionExpression",
         arrow.body.is_expression(),
-        b",\"id\":null,\"expression\":true,\"generator\":false,\"async\":",
-        b",\"id\":null,\"expression\":false,\"generator\":false,\"async\":",
+        ",\"id\":null,\"expression\":true,\"generator\":false,\"async\":",
+        ",\"id\":null,\"expression\":false,\"generator\":false,\"async\":"
     );
-    w.raw_pick(arrow.r#async, b"true,\"params\":", b"false,\"params\":");
+    pick!(
+        w,
+        "ArrowFunctionExpression",
+        arrow.r#async,
+        "true,\"params\":",
+        "false,\"params\":"
+    );
     write_expressions(w, ctx.view.exprs(arrow.params), ctx);
-    w.raw(",\"body\":");
+    raw!(w, "ArrowFunctionExpression", ",\"body\":");
     write_arrow_body(w, &arrow.body, ctx);
     write_type_parameters_field(w, arrow.type_parameters.as_ref(), ctx);
     close_node(w, "ArrowFunctionExpression", span, ctx);
 }
 
-fn write_arrow_body(w: &mut JsonWriter, body: &ast::ArrowFunctionBody, ctx: &Ctx<'_>) {
+fn write_arrow_body(w: &mut Sink<'_>, body: &ast::ArrowFunctionBody, ctx: &Ctx<'_>) {
     match body {
         ast::ArrowFunctionBody::Expression(expr) => write_expression(w, ctx.view.expr(*expr), ctx),
         ast::ArrowFunctionBody::BlockStatement(block) => write_block_statement(w, block, ctx),
@@ -54,21 +62,21 @@ fn write_arrow_body(w: &mut JsonWriter, body: &ast::ArrowFunctionBody, ctx: &Ctx
 /// attachment moves with it — a method value starts at its `(`, so the walk has already
 /// given every comment in its type parameters to an enclosing node.)
 pub(super) fn write_function_expression(
-    w: &mut JsonWriter,
+    w: &mut Sink<'_>,
     func: &ast::FunctionExpression,
     ctx: &Ctx<'_>,
 ) {
-    node_header(w, "FunctionExpression", func.span, ctx);
-    w.raw(",\"id\":");
+    node_header!(w, "FunctionExpression", func.span, ctx);
+    raw!(w, "FunctionExpression", ",\"id\":");
     write_or_null(w, func.id.as_ref(), |w, id| {
         write_identifier_with_optional(w, id, ctx);
     });
     write_function_flags_fields(w, func.generator, func.r#async);
     write_type_parameters_field(w, func.type_parameters.as_ref(), ctx);
-    w.raw(",\"params\":");
+    raw!(w, "FunctionExpression", ",\"params\":");
     write_expressions(w, ctx.view.exprs(func.params), ctx);
     write_return_type_field(w, func.return_type.as_ref(), ctx);
-    w.raw(",\"body\":");
+    raw!(w, "FunctionExpression", ",\"body\":");
     write_block_statement(w, &func.body, ctx);
     close_node(w, "FunctionExpression", func.span, ctx);
 }
@@ -77,16 +85,16 @@ pub(super) fn write_function_expression(
 /// `arguments` — acorn-typescript hoists `typeArguments` off the callee in
 /// `parseNewCallee` before the argument list is parsed.
 pub(super) fn write_new_expression(
-    w: &mut JsonWriter,
+    w: &mut Sink<'_>,
     new_expr: &ast::NewExpression,
     span: Span,
     ctx: &Ctx<'_>,
 ) {
-    node_header(w, "NewExpression", span, ctx);
-    w.raw(",\"callee\":");
+    node_header!(w, "NewExpression", span, ctx);
+    raw!(w, "NewExpression", ",\"callee\":");
     write_expression(w, ctx.view.expr(new_expr.callee), ctx);
     write_type_arguments_field(w, new_expr.type_arguments(ctx.view), ctx);
-    w.raw(",\"arguments\":");
+    raw!(w, "NewExpression", ",\"arguments\":");
     write_expressions(
         w,
         ctx.view
@@ -121,7 +129,7 @@ pub(super) fn call_callee_flags(
 /// (see `ExprFlags`): strip omits `optional` entirely (decorator spine) and
 /// wins over force (`true`), which wins over the computed value.
 pub(super) fn write_call_expression_tail(
-    w: &mut JsonWriter,
+    w: &mut Sink<'_>,
     call: &ast::CallExpression,
     span: Span,
     ctx: &Ctx<'_>,
@@ -129,7 +137,7 @@ pub(super) fn write_call_expression_tail(
     force_optional: bool,
     strip_optional: bool,
 ) {
-    w.raw(",\"arguments\":");
+    raw!(w, ",\"arguments\":");
     write_expressions(
         w,
         ctx.view
@@ -142,7 +150,7 @@ pub(super) fn write_call_expression_tail(
     if strip_optional {
         // Omitted along an unparenthesized decorator's call/member spine.
     } else if force_optional {
-        w.raw(",\"optional\":true");
+        raw!(w, ",\"optional\":true");
     } else {
         // acorn-typescript omits `optional` on a typeArguments call unless the
         // call is part of an optional chain; the chain test is the call's own
@@ -159,7 +167,12 @@ pub(super) fn write_call_expression_tail(
                 && span.start >= ctx.view.expr(call.callee).span().start
                 && ctx.view.expr(call.callee).has_optional_in_chain(ctx.view))
         {
-            w.raw_pick(call.optional, b",\"optional\":true", b",\"optional\":false");
+            pick!(
+                w,
+                call.optional,
+                ",\"optional\":true",
+                ",\"optional\":false"
+            );
         }
     }
     close_node(w, "CallExpression", span, ctx);
@@ -170,36 +183,39 @@ pub(super) fn write_call_expression_tail(
 /// `property`, `computed`, `optional?`. Same strip/force precedence as a call's; the strip
 /// walks member → object (its object's flags are the chain walk's).
 pub(super) fn write_member_expression_tail(
-    w: &mut JsonWriter,
+    w: &mut Sink<'_>,
     member: &ast::MemberExpression,
     span: Span,
     ctx: &Ctx<'_>,
     force_optional: bool,
     strip_optional: bool,
 ) {
-    w.raw(",\"property\":");
+    raw!(w, ",\"property\":");
     write_expression(w, ctx.view.expr(member.property), ctx);
     // One literal per value, `optional` folded in where it is written: both
     // flags are nearly always `false`, so each branch predicts at its site.
     if strip_optional {
         // `optional` is omitted along an unparenthesized decorator's
         // call/member spine.
-        w.raw_pick(
+        pick!(
+            w,
             member.computed,
-            b",\"computed\":true",
-            b",\"computed\":false",
+            ",\"computed\":true",
+            ",\"computed\":false"
         );
     } else if force_optional || member.optional {
-        w.raw_pick(
+        pick!(
+            w,
             member.computed,
-            b",\"computed\":true,\"optional\":true",
-            b",\"computed\":false,\"optional\":true",
+            ",\"computed\":true,\"optional\":true",
+            ",\"computed\":false,\"optional\":true"
         );
     } else {
-        w.raw_pick(
+        pick!(
+            w,
             member.computed,
-            b",\"computed\":true,\"optional\":false",
-            b",\"computed\":false,\"optional\":false",
+            ",\"computed\":true,\"optional\":false",
+            ",\"computed\":false,\"optional\":false"
         );
     }
     close_node(w, "MemberExpression", span, ctx);
@@ -207,30 +223,30 @@ pub(super) fn write_member_expression_tail(
 
 /// Emits a `ConditionalExpression` node.
 pub(super) fn write_conditional_expression(
-    w: &mut JsonWriter,
+    w: &mut Sink<'_>,
     cond: &ast::ConditionalExpression,
     span: Span,
     ctx: &Ctx<'_>,
 ) {
-    node_header(w, "ConditionalExpression", span, ctx);
-    w.raw(",\"test\":");
+    node_header!(w, "ConditionalExpression", span, ctx);
+    raw!(w, "ConditionalExpression", ",\"test\":");
     write_expression(w, ctx.view.expr(cond.test), ctx);
-    w.raw(",\"consequent\":");
+    raw!(w, "ConditionalExpression", ",\"consequent\":");
     write_expression(w, ctx.view.expr(cond.consequent), ctx);
-    w.raw(",\"alternate\":");
+    raw!(w, "ConditionalExpression", ",\"alternate\":");
     write_expression(w, ctx.view.expr(cond.alternate), ctx);
     close_node(w, "ConditionalExpression", span, ctx);
 }
 
 /// Emits an `AwaitExpression` node.
 pub(super) fn write_await_expression(
-    w: &mut JsonWriter,
+    w: &mut Sink<'_>,
     await_expr: ast::AwaitExpression,
     span: Span,
     ctx: &Ctx<'_>,
 ) {
-    node_header(w, "AwaitExpression", span, ctx);
-    w.raw(",\"argument\":");
+    node_header!(w, "AwaitExpression", span, ctx);
+    raw!(w, "AwaitExpression", ",\"argument\":");
     write_expression(w, ctx.view.expr(await_expr.argument), ctx);
     close_node(w, "AwaitExpression", span, ctx);
 }
@@ -238,15 +254,15 @@ pub(super) fn write_await_expression(
 /// Emits a `YieldExpression` node. Field order: `delegate`, `argument`
 /// (nullable).
 pub(super) fn write_yield_expression(
-    w: &mut JsonWriter,
+    w: &mut Sink<'_>,
     yield_expr: ast::YieldExpression,
     span: Span,
     ctx: &Ctx<'_>,
 ) {
-    node_header(w, "YieldExpression", span, ctx);
-    w.raw(",\"delegate\":");
+    node_header!(w, "YieldExpression", span, ctx);
+    raw!(w, "YieldExpression", ",\"delegate\":");
     w.bool(yield_expr.delegate);
-    w.raw(",\"argument\":");
+    raw!(w, "YieldExpression", ",\"argument\":");
     write_or_null(w, yield_expr.argument.as_ref(), |w, e| {
         write_expression(w, ctx.view.expr(*e), ctx);
     });

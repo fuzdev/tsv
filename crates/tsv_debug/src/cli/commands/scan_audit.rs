@@ -199,6 +199,11 @@ impl ScanAuditCommand {
             // letting a banned site inside it pass unseen.
             let text = super::read_doc(file)?;
             let rel = crate_relative(file);
+            // a `tests.rs` / `*_tests.rs` is a test module mounted out of line (`#[cfg(test)]`),
+            // skipped whole as an inline one is
+            if rel.ends_with("tests.rs") {
+                continue;
+            }
             scan_file(&rel, &text, &mut sites);
         }
         sites.sort_by(|a, b| (a.path.as_str(), a.line_no).cmp(&(b.path.as_str(), b.line_no)));
@@ -262,7 +267,8 @@ fn crate_relative(path: &Path) -> String {
     s.strip_prefix("crates/").unwrap_or(&s).replace('\\', "/")
 }
 
-/// Find every `find`/`rfind` call site in `text`, skipping `#[cfg(test)]` modules,
+/// Find every `find`/`rfind` call site in `text`, skipping `#[cfg(test)]` modules (an out-of-line
+/// `tests.rs` is skipped by its caller),
 /// `//`-comment occurrences, and closure-pattern (`.find(|…|)`) calls.
 fn scan_file(rel: &str, text: &str, out: &mut Vec<Site>) {
     // Naive brace-depth tracker to skip inline `#[cfg(test)]` modules. Best-effort:

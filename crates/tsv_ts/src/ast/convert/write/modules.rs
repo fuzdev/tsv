@@ -4,37 +4,33 @@ use super::declarations::{write_class_declaration, write_function_declaration};
 use super::expressions::write_expression;
 use super::types::{write_declare_function, write_interface_declaration};
 use super::{
-    Ctx, JsonWriter, close_node, node_header, write_export_kind_field, write_identifier_plain,
+    Ctx, Sink, close_node, node_header, write_export_kind_field, write_identifier_plain,
     write_import_kind_field, write_literal,
 };
 use crate::ast;
 
 /// Emit an import specifier (`ImportDefaultSpecifier` / `ImportSpecifier` /
 /// `ImportNamespaceSpecifier`).
-pub(super) fn write_import_specifier(
-    w: &mut JsonWriter,
-    spec: &ast::ImportSpecifier,
-    ctx: &Ctx<'_>,
-) {
+pub(super) fn write_import_specifier(w: &mut Sink<'_>, spec: &ast::ImportSpecifier, ctx: &Ctx<'_>) {
     match spec {
         ast::ImportSpecifier::Default(default_spec) => {
-            node_header(w, "ImportDefaultSpecifier", default_spec.span, ctx);
-            w.raw(",\"local\":");
+            node_header!(w, "ImportDefaultSpecifier", default_spec.span, ctx);
+            raw!(w, "ImportDefaultSpecifier", ",\"local\":");
             write_identifier_plain(w, &default_spec.local, ctx);
             close_node(w, "ImportDefaultSpecifier", default_spec.span, ctx);
         }
         ast::ImportSpecifier::Named(named_spec) => {
-            node_header(w, "ImportSpecifier", named_spec.span, ctx);
-            w.raw(",\"imported\":");
+            node_header!(w, "ImportSpecifier", named_spec.span, ctx);
+            raw!(w, "ImportSpecifier", ",\"imported\":");
             write_module_export_name(w, &named_spec.imported, ctx);
-            w.raw(",\"local\":");
+            raw!(w, "ImportSpecifier", ",\"local\":");
             write_identifier_plain(w, &named_spec.local, ctx);
             write_import_kind_field(w, named_spec.import_kind, ctx);
             close_node(w, "ImportSpecifier", named_spec.span, ctx);
         }
         ast::ImportSpecifier::Namespace(ns_spec) => {
-            node_header(w, "ImportNamespaceSpecifier", ns_spec.span, ctx);
-            w.raw(",\"local\":");
+            node_header!(w, "ImportNamespaceSpecifier", ns_spec.span, ctx);
+            raw!(w, "ImportNamespaceSpecifier", ",\"local\":");
             write_identifier_plain(w, &ns_spec.local, ctx);
             close_node(w, "ImportNamespaceSpecifier", ns_spec.span, ctx);
         }
@@ -42,33 +38,25 @@ pub(super) fn write_import_specifier(
 }
 
 /// Emits an `ImportAttribute` node.
-pub(super) fn write_import_attribute(
-    w: &mut JsonWriter,
-    attr: &ast::ImportAttribute,
-    ctx: &Ctx<'_>,
-) {
-    node_header(w, "ImportAttribute", attr.span, ctx);
-    w.raw(",\"key\":");
+pub(super) fn write_import_attribute(w: &mut Sink<'_>, attr: &ast::ImportAttribute, ctx: &Ctx<'_>) {
+    node_header!(w, "ImportAttribute", attr.span, ctx);
+    raw!(w, "ImportAttribute", ",\"key\":");
     match &attr.key {
         ast::ImportAttributeKey::Identifier(id) => write_identifier_plain(w, id, ctx),
         ast::ImportAttributeKey::Literal(lit) => write_literal(w, lit, ctx),
     }
-    w.raw(",\"value\":");
+    raw!(w, "ImportAttribute", ",\"value\":");
     write_literal(w, &attr.value, ctx);
     close_node(w, "ImportAttribute", attr.span, ctx);
 }
 
 /// Emits an `ExportSpecifier` node. Field order: `local`, `exported`,
 /// `exportKind?`.
-pub(super) fn write_export_specifier(
-    w: &mut JsonWriter,
-    spec: &ast::ExportSpecifier,
-    ctx: &Ctx<'_>,
-) {
-    node_header(w, "ExportSpecifier", spec.span, ctx);
-    w.raw(",\"local\":");
+pub(super) fn write_export_specifier(w: &mut Sink<'_>, spec: &ast::ExportSpecifier, ctx: &Ctx<'_>) {
+    node_header!(w, "ExportSpecifier", spec.span, ctx);
+    raw!(w, "ExportSpecifier", ",\"local\":");
     write_module_export_name(w, &spec.local, ctx);
-    w.raw(",\"exported\":");
+    raw!(w, "ExportSpecifier", ",\"exported\":");
     write_module_export_name(w, &spec.exported, ctx);
     write_export_kind_field(w, spec.export_kind, ctx);
     close_node(w, "ExportSpecifier", spec.span, ctx);
@@ -77,7 +65,7 @@ pub(super) fn write_export_specifier(
 /// Emit a module export name: an identifier emits an `Identifier` node, a
 /// string a `Literal` node.
 pub(super) fn write_module_export_name(
-    w: &mut JsonWriter,
+    w: &mut Sink<'_>,
     name: &ast::ModuleExportName,
     ctx: &Ctx<'_>,
 ) {
@@ -90,7 +78,7 @@ pub(super) fn write_module_export_name(
 /// Emit an `export default` value (an expression or a function/class/interface
 /// declaration).
 pub(super) fn write_export_default_value(
-    w: &mut JsonWriter,
+    w: &mut Sink<'_>,
     value: &ast::ExportDefaultValue,
     ctx: &Ctx<'_>,
 ) {

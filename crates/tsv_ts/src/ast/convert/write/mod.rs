@@ -20,6 +20,18 @@
 //! (node types, operators, kinds) are known escape-free and written verbatim;
 //! integers have a unique decimal form and are hand-formatted.
 //!
+//! # One walk, two products
+//!
+//! This body is mounted once per sink: as `convert::write`, the JSON copy, and behind `_tape`
+//! as `convert::write_tape::write`, the tape copy (`docs/tape_format.md` §A direct writer). A
+//! site states its JSON literal once, through a site macro (`write_macros.rs`): the JSON copy
+//! writes it, the tape copy replays the ops a compile-time reader made of it
+//! (`tsv_lang::tape::literal_ops`) — records, presence bits, list brackets, and each value as
+//! the field its key declared lays it down. Each mount defines `tape!` / `json_only!` before
+//! mounting, and provides by name the functions it writes its own way (`write_json.rs`,
+//! `write_tape.rs`): the staged runs, the name window, a literal's fused fields, a number's
+//! spelling. crates/tsv_ts/CLAUDE.md §Distinctives says how to edit a site.
+//!
 //! Three conversion-time mutations of already-converted children become
 //! pre-computed decisions threaded down as flags (see `ExprFlags` in
 //! `expressions`): the `?.<T>()` callee-optional force, the unparenthesized
@@ -28,47 +40,84 @@
 //! `TSInstantiationExpression` wrap is decided before its fields are emitted.
 
 use super::bigint_to_decimal;
+// The functions each mount writes its own way (`write_json.rs`, `write_tape.rs`).
+use super::{
+    header_run, write_chain_any, write_identifier_plain, write_literal_fields_any,
+    write_name_field, write_number_value,
+};
 use crate::ast;
-use tsv_lang::{Span, StageRun, Wire, WirePositions, WireTables};
-// The JSON-scalar substrate is shared across the three language writers (so the
-// Svelte writer can compose embedded TS/CSS emission into one buffer). Only the
-// TS-specific node emitters (`node_header`, field helpers, `Ctx`) live here.
-pub(super) use tsv_lang::{JsonWriter, write_array, write_or_null};
+pub(super) use crate::ast::convert::comments::{CommentAttach, CommentMode, EmbedWriter};
+use tsv_lang::{Span, Wire, WirePositions, WireTables};
 
-mod comments;
+json_only! {
+    /// The JSON copy's sink. The JSON-scalar substrate is shared across the three language
+    /// writers (so the Svelte writer can compose embedded TS/CSS emission into one buffer);
+    /// only the TS-specific node emitters (`node_header`, field helpers, `Ctx`) live here.
+    type Sink<'a> = JsonWriter;
+    pub(super) use tsv_lang::{JsonWriter, write_array, write_or_null};
+}
+tape! {
+    /// The tape copy's sink, and its list helpers (`write_tape.rs`).
+    type Sink<'a> = tsv_lang::tape::TapeWriter<'a>;
+    pub(super) use super::{write_array, write_or_null};
+}
+
 mod control_flow;
 mod declarations;
-mod expressions;
+pub(super) mod expressions;
 mod functions;
 mod modules;
 mod patterns;
 mod statements;
 mod types;
 
-pub use comments::{CommentAttach, IslandComments};
 use declarations::{write_decorator, write_type_parameter_declaration};
 use statements::{write_statement, write_variable_declaration};
 use types::{write_type_annotation, write_type_parameter_instantiation};
 
-/// Convert an internal `Program` straight to its compact wire-JSON bytes on `wire`, in
-/// the coordinates `crate::WIRE_COORDINATES` states.
-///
-/// One AST walk, no intermediate tree, the byte→UTF-16 translation fused in (identity
-/// on ASCII).
-///
-/// Returns `Vec<u8>` rather than `String`: every emitted byte comes from `&str`
-/// slices and ASCII fragments, so the output is valid UTF-8 by construction,
-/// but proving that to a `String` costs an O(output) validation scan, and the
-/// output is several times the source (`tsv_lang::estimated_json_capacity`).
-/// Byte-oriented boundaries (FFI, the CLI's stdout) take the bytes as-is; `&str`
-/// boundaries (`convert_ast_json_string` → WASM/N-API) pay the one validation at
-/// the edge.
-pub(crate) fn write_program_bytes(parsed: ast::ParsedRef<'_>, source: &str, wire: Wire) -> Vec<u8> {
-    let tables = WireTables::new(source, crate::WIRE_COORDINATES, wire);
-    let ctx = Ctx::new(source, tables.positions(), CommentMode::Off, parsed.view);
-    let mut w = JsonWriter::with_capacity(tsv_lang::estimated_json_capacity(source.len(), wire));
-    write_program(&mut w, parsed.program, &ctx);
-    w.into_bytes()
+json_only! {
+    /// Convert an internal `Program` straight to its compact wire-JSON bytes on `wire`, in
+    /// the coordinates `crate::WIRE_COORDINATES` states.
+    ///
+    /// One AST walk, no intermediate tree, the byte→UTF-16 translation fused in (identity
+    /// on ASCII).
+    ///
+    /// Returns `Vec<u8>` rather than `String`: every emitted byte comes from `&str`
+    /// slices and ASCII fragments, so the output is valid UTF-8 by construction,
+    /// but proving that to a `String` costs an O(output) validation scan, and the
+    /// output is several times the source (`tsv_lang::estimated_json_capacity`).
+    /// Byte-oriented boundaries (FFI, the CLI's stdout) take the bytes as-is; `&str`
+    /// boundaries (`convert_ast_json_string` → WASM/N-API) pay the one validation at
+    /// the edge.
+    pub(crate) fn write_program_bytes(
+        parsed: ast::ParsedRef<'_>,
+        source: &str,
+        wire: Wire,
+    ) -> Vec<u8> {
+        let tables = WireTables::new(source, crate::WIRE_COORDINATES, wire);
+        let ctx = Ctx::new(source, tables.positions(), CommentMode::Off, parsed.view);
+        let capacity = tsv_lang::estimated_json_capacity(source.len(), wire);
+        let mut w = JsonWriter::with_capacity(capacity);
+        write_program(&mut w, parsed.program, &ctx);
+        w.into_bytes()
+    }
+}
+
+tape! {
+    /// The span-only wire's TAPE of an internal `Program`, written into `sink` by the same walk
+    /// as `write_program_bytes`, in the coordinates `crate::WIRE_COORDINATES` states (a leading
+    /// byte-order mark counted, as acorn counts it). Finish it with `sink.finish_words()` /
+    /// `sink.finish_bytes()`.
+    pub(crate) fn write_program_tape(
+        parsed: ast::ParsedRef<'_>,
+        source: &str,
+        sink: &mut tsv_lang::tape::TapeSink,
+    ) {
+        let tables = WireTables::new(source, crate::WIRE_COORDINATES, Wire::Span);
+        let ctx = Ctx::new(source, tables.positions(), CommentMode::Off, parsed.view);
+        let mut w = sink.writer(source, ctx.positions, crate::WIRE_COORDINATES.bom);
+        write_program(&mut w, parsed.program, &ctx);
+    }
 }
 
 /// Emit an embedded TS expression's wire JSON into a caller-owned writer, for
@@ -82,7 +131,7 @@ pub(crate) fn write_program_bytes(parsed: ast::ParsedRef<'_>, source: &str, wire
 /// online off this emit's own node opens and closes and each node emits its
 /// assigned comments at its close; `Off` for every ordinary emission.
 #[inline]
-pub fn write_expression_embedded(w: &mut JsonWriter, expr: &ast::Expression, env: EmbedWriter<'_>) {
+pub fn write_expression_embedded(w: &mut Sink<'_>, expr: &ast::Expression, env: EmbedWriter<'_>) {
     let ctx = Ctx::from_embed(env);
     expressions::write_expression(w, expr, &ctx);
 }
@@ -93,7 +142,7 @@ pub fn write_expression_embedded(w: &mut JsonWriter, expr: &ast::Expression, env
 /// `write_expression_embedded`.
 #[inline]
 pub fn write_variable_declaration_embedded(
-    w: &mut JsonWriter,
+    w: &mut Sink<'_>,
     var_decl: &ast::VariableDeclaration,
     env: EmbedWriter<'_>,
 ) {
@@ -110,7 +159,7 @@ pub fn write_variable_declaration_embedded(
 /// leading comment attaches to the `Identifier`.
 #[inline]
 pub fn write_identifier_expression_with_character(
-    w: &mut JsonWriter,
+    w: &mut Sink<'_>,
     expr: &ast::Expression,
     env: EmbedWriter<'_>,
 ) {
@@ -120,7 +169,7 @@ pub fn write_identifier_expression_with_character(
 
 /// The shared body of the shorthand/snippet-name identifier emission.
 fn write_identifier_expression_with_character_in(
-    w: &mut JsonWriter,
+    w: &mut Sink<'_>,
     expr: &ast::Expression,
     ctx: &Ctx<'_>,
 ) {
@@ -153,7 +202,7 @@ fn write_identifier_expression_with_character_in(
 /// subtree, and the annotation attaches under `annotation_comments` instead — see
 /// `Ctx::annotation_comments`.
 #[inline]
-pub fn write_pattern_embedded(w: &mut JsonWriter, expr: &ast::Expression, env: EmbedWriter<'_>) {
+pub fn write_pattern_embedded(w: &mut Sink<'_>, expr: &ast::Expression, env: EmbedWriter<'_>) {
     let mut ctx = Ctx::from_embed(env);
     if let Some(ann) = crate::__private::pattern_type_annotation(ctx.view, expr) {
         ctx.pattern_ann_span = ann.span;
@@ -178,13 +227,13 @@ pub fn write_pattern_embedded(w: &mut JsonWriter, expr: &ast::Expression, env: E
 }
 
 /// Emit the `Program` node.
-fn write_program(w: &mut JsonWriter, program: &ast::Program, ctx: &Ctx<'_>) {
-    node_header(w, "Program", program.span, ctx);
-    w.raw(",\"body\":");
+fn write_program(w: &mut Sink<'_>, program: &ast::Program, ctx: &Ctx<'_>) {
+    node_header!(w, "Program", program.span, ctx);
+    raw!(w, "Program", ",\"body\":");
     write_body_array(w, ctx.view.stmt_list(program.body), ctx, |w, s| {
         write_statement(w, ctx.view.stmt(*s), ctx);
     });
-    w.raw(",\"sourceType\":");
+    raw!(w, "Program", ",\"sourceType\":");
     w.token(program.goal.source_type());
     close_node(w, "Program", program.span, ctx);
 }
@@ -199,70 +248,9 @@ fn write_program(w: &mut JsonWriter, program: &ast::Program, ctx: &Ctx<'_>) {
 /// emitted exactly as a standalone `Program` is, its `loc` included (the content
 /// span's, under the host document's line table). `env.annotation_comments` is
 /// inert here — only a block pattern carries a second parse.
-pub fn write_program_embedded(w: &mut JsonWriter, program: &ast::Program, env: EmbedWriter<'_>) {
+pub fn write_program_embedded(w: &mut Sink<'_>, program: &ast::Program, env: EmbedWriter<'_>) {
     let ctx = Ctx::from_embed(env);
     write_program(w, program, &ctx);
-}
-
-/// The comment role of an emission (the Svelte comment-attach paths).
-///
-/// `Off` for every ordinary emission — the hot path pays one never-taken
-/// discriminant compare per node open and close. `Attach` is a comment-bearing
-/// island: acorn's leading/trailing attach runs **online**, driven by this
-/// emit's own node opens and closes, and each node emits the comments it was
-/// assigned at its own close (see [`CommentAttach`]).
-#[derive(Clone, Copy)]
-pub enum CommentMode<'a> {
-    Off,
-    Attach(&'a CommentAttach<'a>),
-}
-
-impl CommentMode<'_> {
-    /// Run `f` — the write of one node — inside **silent frames** for the grouping pairs
-    /// around it that the parse kept no span for (`tsv_svelte`'s `{@debug a, (b)}`, its
-    /// pairs read back off the source): each pair opens outermost-first, claims as the pair
-    /// would in acorn's walk and emits nothing, and closes innermost-first once `f` is
-    /// done. `parens` is outermost-first. A no-op wrapper in `Off` mode, which has no walk
-    /// to frame.
-    pub fn with_silent_parens<R>(self, parens: &[Span], f: impl FnOnce() -> R) -> R {
-        let CommentMode::Attach(attach) = self else {
-            return f();
-        };
-        for &pair in parens {
-            attach.paren_open(pair);
-        }
-        let result = f();
-        for &pair in parens.iter().rev() {
-            attach.paren_close(pair);
-        }
-        result
-    }
-}
-
-/// The per-document inputs every embedded writer shares (`write_program_embedded`,
-/// `write_expression_embedded`, `write_pattern_embedded`,
-/// `write_variable_declaration_embedded`,
-/// `write_identifier_expression_with_character`) — the source text, positions,
-/// comment role and parser variant each one funnels into a `Ctx`.
-///
-/// Bundled into one `Copy` value so the call sites stop re-threading the same
-/// arguments. It is an entry-boundary value: each writer destructures it into a
-/// stack `Ctx` (`Ctx::from_embed`) and the per-node walk threads `&Ctx`, so it
-/// is copied once per island rather than once per node.
-#[derive(Clone, Copy)]
-pub struct EmbedWriter<'a> {
-    pub source: &'a str,
-    pub positions: WirePositions<'a>,
-    /// Resolves the tree's ids, runs and pool text.
-    pub view: ast::AstView<'a>,
-    pub comments: CommentMode<'a>,
-    /// The canonical parser for this document — see `Ctx::vanilla_acorn`. It is
-    /// component-global, so an island carries the same variant as the
-    /// component's `<script>` blocks.
-    pub vanilla_acorn: bool,
-    /// The block pattern's trailing `: T` — its comment role, see
-    /// `Ctx::annotation_comments`. `Off` for every other entry.
-    pub annotation_comments: CommentMode<'a>,
 }
 
 /// The per-document environment every writer function shares (`source` and the
@@ -320,7 +308,7 @@ impl<'a> Ctx<'a> {
     /// waiting to be inherited by the next caller, which is exactly how the
     /// embedded path shipped `vanilla_acorn: false` to every expression island.
     #[inline]
-    fn new(
+    pub(super) fn new(
         source: &'a str,
         positions: WirePositions<'a>,
         comments: CommentMode<'a>,
@@ -368,23 +356,23 @@ impl<'a> Ctx<'a> {
 /// `CommentMode::Off` (every ordinary emission) makes this exactly
 /// `w.raw("}")` after one never-taken branch.
 #[inline]
-pub(super) fn close_node(w: &mut JsonWriter, node_type: &'static str, span: Span, ctx: &Ctx<'_>) {
+pub(super) fn close_node(w: &mut Sink<'_>, node_type: &'static str, span: Span, ctx: &Ctx<'_>) {
     if let CommentMode::Attach(attach) = ctx.comments {
         attach.close_and_emit(w, node_type, span, ctx.positions);
     }
-    w.raw("}");
+    raw!(w, "}");
 }
 
 /// Emit a node with no fields beyond the universal prefix (`ThisExpression`,
 /// `Super`, keyword types, …).
 #[inline]
 pub(super) fn write_bare_node(
-    w: &mut JsonWriter,
+    w: &mut Sink<'_>,
     node_type: &'static str,
     span: Span,
     ctx: &Ctx<'_>,
 ) {
-    node_header(w, node_type, span, ctx);
+    node_header!(w, @dyn node_type, span, ctx);
     close_node(w, node_type, span, ctx);
 }
 
@@ -428,10 +416,10 @@ pub(super) fn attach_open(node_type: &'static str, span: Span, ctx: &Ctx<'_>) {
 /// [`attach_open`] — not as a win.
 #[inline]
 pub(super) fn write_body_array<'a, T: 'a>(
-    w: &mut JsonWriter,
+    w: &mut Sink<'_>,
     items: &'a [T],
     ctx: &Ctx<'_>,
-    mut emit: impl FnMut(&mut JsonWriter, &'a T),
+    mut emit: impl FnMut(&mut Sink<'_>, &'a T),
 ) {
     let CommentMode::Attach(attach) = ctx.comments else {
         write_array(w, items, |w, item| emit(w, item));
@@ -457,15 +445,15 @@ pub(super) fn write_body_array<'a, T: 'a>(
 /// The mode test is hoisted as in [`write_body_array`], for the same reason.
 #[inline]
 pub(super) fn write_body_array_holes<'a, T: 'a>(
-    w: &mut JsonWriter,
+    w: &mut Sink<'_>,
     items: &'a [Option<T>],
     ctx: &Ctx<'_>,
-    mut emit: impl FnMut(&mut JsonWriter, &'a T),
+    mut emit: impl FnMut(&mut Sink<'_>, &'a T),
 ) {
     let CommentMode::Attach(attach) = ctx.comments else {
         write_array(w, items, |w, item| match item {
             Some(item) => emit(w, item),
-            None => w.null(),
+            None => null_item!(w),
         });
         return;
     };
@@ -477,7 +465,7 @@ pub(super) fn write_body_array_holes<'a, T: 'a>(
             }
             emit(w, item);
         }
-        None => w.null(),
+        None => null_item!(w),
     });
 }
 
@@ -490,7 +478,7 @@ pub(super) fn write_body_array_holes<'a, T: 'a>(
 /// `Position.character`, so it is always omitted. Static fragments are
 /// pre-fused into the fewest buffer writes — this runs once per node.
 #[inline]
-pub(super) fn node_header(w: &mut JsonWriter, node_type: &'static str, span: Span, ctx: &Ctx<'_>) {
+pub(super) fn node_header(w: &mut Sink<'_>, node_type: &'static str, span: Span, ctx: &Ctx<'_>) {
     node_header_impl::<false>(w, node_type, span, ctx);
 }
 
@@ -509,7 +497,7 @@ pub(super) fn node_header(w: &mut JsonWriter, node_type: &'static str, span: Spa
 /// carries an annotation, so the hot per-node path keeps its branch-free
 /// monomorphized header.
 pub(super) fn node_header_wide_end(
-    w: &mut JsonWriter,
+    w: &mut Sink<'_>,
     node_type: &'static str,
     span: Span,
     wire_end: u32,
@@ -518,6 +506,7 @@ pub(super) fn node_header_wide_end(
     let wire_end = wire_end.max(span.end);
     #[cfg(debug_assertions)]
     debug_assert_overhanging_node_is_island_root(node_type, span, wire_end, ctx);
+    tape! { w.t_open_named(node_type); }
     attach_open(node_type, span, ctx);
     header_run::<false>(w, node_type, Span::new(span.start, wire_end), ctx);
 }
@@ -549,7 +538,7 @@ fn debug_assert_overhanging_node_is_island_root(
 /// monomorphizes to its own straight-line emission (no runtime branch on the
 /// per-node hot path).
 fn node_header_impl<const CHARACTER: bool>(
-    w: &mut JsonWriter,
+    w: &mut Sink<'_>,
     node_type: &'static str,
     span: Span,
     ctx: &Ctx<'_>,
@@ -558,70 +547,15 @@ fn node_header_impl<const CHARACTER: bool>(
     header_run::<CHARACTER>(w, node_type, span, ctx);
 }
 
-/// The header's bytes — `{"type":"X"` and the position fields of `span` — as one
-/// staged run: the part of a header that does not report to the comment attach.
-#[expect(clippy::inline_always)]
-#[inline(always)]
-fn header_run<const CHARACTER: bool>(
-    w: &mut JsonWriter,
-    node_type: &'static str,
-    span: Span,
-    ctx: &Ctx<'_>,
-) {
-    debug_assert!(
-        node_type
-            .bytes()
-            .all(|b| b != b'"' && b != b'\\' && b >= 0x20),
-        "node type must be escape-free: {node_type:?}"
-    );
-    let mut run = w.stage_run();
-    run.raw("{\"type\":\"");
-    run.short(node_type);
-    run.raw("\"");
-    position_fields::<CHARACTER>(&mut run, span, ctx);
-    run.flush();
-}
-
-/// The `,"start":…,"end":…,"loc":{…}` position fields (final char space) —
-/// the tail of `header_run`.
-///
-/// Emits into the caller's **staged run**, which the caller opens and flushes
-/// around it — the whole header reaches the output buffer as one append (see
-/// [`JsonWriter::stage_run`] for why).
-///
-/// `inline(always)` because it is handed the run by reference: outlined, the
-/// run's length would live in memory across the call, which is the cost
-/// holding it by value removes (see [`StageRun`]).
-#[expect(clippy::inline_always)]
-#[inline(always)]
-fn position_fields<const CHARACTER: bool>(run: &mut StageRun<'_>, span: Span, ctx: &Ctx<'_>) {
-    let Some(lines) = ctx.positions.lines() else {
-        // The span-only wire: offsets only, no `loc` (and no `character`, which
-        // lives inside `loc`). Only the byte→char `pos` is needed, so the
-        // per-node line/column lookup is skipped entirely.
-        run.raw(",\"start\":");
-        run.u32(ctx.pos(span.start));
-        run.raw(",\"end\":");
-        run.u32(ctx.pos(span.end));
-        return;
-    };
-    let (start, end) = lines.span_positions(span.start, span.end);
-    run.raw(",\"start\":");
-    run.u32(start.0);
-    run.raw(",\"end\":");
-    run.u32(end.0);
-    run.loc_object::<CHARACTER>(",\"loc\":", start, end);
-}
-
 /// Emit `,"typeParameters":<declaration>` when present (skip-if-none field).
 #[inline]
 pub(super) fn write_type_parameters_field(
-    w: &mut JsonWriter,
+    w: &mut Sink<'_>,
     type_parameters: Option<&ast::TSTypeParameterDeclaration>,
     ctx: &Ctx<'_>,
 ) {
     if let Some(tp) = type_parameters {
-        w.raw(",\"typeParameters\":");
+        raw!(w, ",\"typeParameters\":");
         write_type_parameter_declaration(w, tp, ctx);
     }
 }
@@ -629,12 +563,12 @@ pub(super) fn write_type_parameters_field(
 /// Emit `,"typeArguments":<instantiation>` when present (skip-if-none field).
 #[inline]
 pub(super) fn write_type_arguments_field(
-    w: &mut JsonWriter,
+    w: &mut Sink<'_>,
     type_arguments: Option<&ast::TSTypeParameterInstantiation>,
     ctx: &Ctx<'_>,
 ) {
     if let Some(ta) = type_arguments {
-        w.raw(",\"typeArguments\":");
+        raw!(w, ",\"typeArguments\":");
         write_type_parameter_instantiation(w, ta, ctx);
     }
 }
@@ -644,12 +578,12 @@ pub(super) fn write_type_arguments_field(
 /// types).
 #[inline]
 pub(super) fn write_type_annotation_field(
-    w: &mut JsonWriter,
+    w: &mut Sink<'_>,
     type_annotation: Option<&ast::TSTypeAnnotation>,
     ctx: &Ctx<'_>,
 ) {
     if let Some(ta) = type_annotation {
-        w.raw(",\"typeAnnotation\":");
+        raw!(w, ",\"typeAnnotation\":");
         write_type_annotation(w, ta, ctx);
     }
 }
@@ -657,12 +591,12 @@ pub(super) fn write_type_annotation_field(
 /// Emit `,"returnType":<annotation>` when present (skip-if-none field).
 #[inline]
 pub(super) fn write_return_type_field(
-    w: &mut JsonWriter,
+    w: &mut Sink<'_>,
     return_type: Option<&ast::TSTypeAnnotation>,
     ctx: &Ctx<'_>,
 ) {
     if let Some(rt) = return_type {
-        w.raw(",\"returnType\":");
+        raw!(w, ",\"returnType\":");
         write_type_annotation(w, rt, ctx);
     }
 }
@@ -672,11 +606,12 @@ pub(super) fn write_return_type_field(
 /// constant `expression` field, the `generator` field and the `async` key fold
 /// into one literal per `generator` value.
 #[inline]
-pub(super) fn write_function_flags_fields(w: &mut JsonWriter, generator: bool, r#async: bool) {
-    w.raw_pick(
+pub(super) fn write_function_flags_fields(w: &mut Sink<'_>, generator: bool, r#async: bool) {
+    pick!(
+        w,
         generator,
-        b",\"expression\":false,\"generator\":true,\"async\":",
-        b",\"expression\":false,\"generator\":false,\"async\":",
+        ",\"expression\":false,\"generator\":true,\"async\":",
+        ",\"expression\":false,\"generator\":false,\"async\":"
     );
     w.bool(r#async);
 }
@@ -688,14 +623,14 @@ pub(super) fn write_function_flags_fields(w: &mut JsonWriter, generator: bool, r
 /// runtime-chosen token.
 #[inline]
 pub(super) fn write_import_kind_field(
-    w: &mut JsonWriter,
+    w: &mut Sink<'_>,
     import_kind: ast::ImportKind,
     ctx: &Ctx<'_>,
 ) {
     match import_kind {
-        ast::ImportKind::Type => w.raw(",\"importKind\":\"type\""),
+        ast::ImportKind::Type => raw!(w, ",\"importKind\":\"type\""),
         ast::ImportKind::Value if ctx.vanilla_acorn => {}
-        ast::ImportKind::Value => w.raw(",\"importKind\":\"value\""),
+        ast::ImportKind::Value => raw!(w, ",\"importKind\":\"value\""),
     }
 }
 
@@ -703,204 +638,32 @@ pub(super) fn write_import_kind_field(
 /// [`write_import_kind_field`].
 #[inline]
 pub(super) fn write_export_kind_field(
-    w: &mut JsonWriter,
+    w: &mut Sink<'_>,
     export_kind: ast::ExportKind,
     ctx: &Ctx<'_>,
 ) {
     match export_kind {
-        ast::ExportKind::Type => w.raw(",\"exportKind\":\"type\""),
+        ast::ExportKind::Type => raw!(w, ",\"exportKind\":\"type\""),
         ast::ExportKind::Value if ctx.vanilla_acorn => {}
-        ast::ExportKind::Value => w.raw(",\"exportKind\":\"value\""),
+        ast::ExportKind::Value => raw!(w, ",\"exportKind\":\"value\""),
     }
-}
-
-/// Emit an identifier's `,"name":` field — the single name-emission funnel.
-/// Span-identity names are the raw source slice (the leading `raw_len` bytes at
-/// `name_start`); escaped names are the decoded pool text (an escaped
-/// identifier's `\u{78}` source form decodes to `x`). Both arms write the wire
-/// value directly; no allocation.
-///
-/// The span-identity arm skips the escape scan: an `IdentName` with no
-/// `escaped` form promises its source bytes hold nothing JSON escapes (see
-/// [`ast::IdentName`] — a lexed `IdentifierName` by the grammar, any other
-/// slice by its constructor's check), so the key and the quoted name are one
-/// fixed-width append. The decoded arm keeps the scan — it is rare, and it is
-/// also where a constructor parks a name it cannot vouch for.
-///
-/// `inline(never)`, and the pair of choices is measured, not stylistic: this is
-/// the one out-of-line copy of the window write, and because both arms leave by
-/// tail call (the decoded one to [`write_escaped_name_field`], the window's cold
-/// grow and long paths to theirs) it saves no register at all. Left to the
-/// inliner, the body folded into its callers and reshaped THEIR inlining — the
-/// `Identifier` field writer came back out of line, a call and seven register
-/// saves per name — which cost ~0.45% of the parse→JSON path's instructions on
-/// TypeScript against this shape; `inline(always)` there was no better.
-#[inline(never)]
-pub(super) fn write_name_field(
-    w: &mut JsonWriter,
-    name: ast::IdentName,
-    name_start: u32,
-    ctx: &Ctx<'_>,
-) {
-    match name.escaped {
-        Some(id) => write_escaped_name_field(w, ctx.view.escaped_text(id)),
-        None => {
-            let start = name_start as usize;
-            let end = start + name.raw_len as usize;
-            debug_assert!(
-                ctx.source.is_char_boundary(start) && ctx.source.is_char_boundary(end),
-                "a span-identity name covers whole characters"
-            );
-            w.string_escape_free_led(NAME_KEY, &ctx.source.as_bytes()[start..end]);
-        }
-    }
-}
-
-/// The `,"name":` key an identifier's name follows.
-const NAME_KEY: &[u8; 8] = b",\"name\":";
-
-/// [`write_name_field`]'s decoded arm, out of line: it is rare, and inline its
-/// key's append — a call on its grow path — made every name write keep its
-/// values in callee-saved registers.
-#[inline(never)]
-fn write_escaped_name_field(w: &mut JsonWriter, name: &str) {
-    w.raw_fixed(NAME_KEY);
-    w.string(name);
-}
-
-/// Emit a numeric literal value the way acorn's JSON does: non-finite as
-/// `null` (JSON has no Infinity/NaN — an overflow literal like `1e999`),
-/// integral doubles below `1e21` as their expanded shortest-round-trip integer
-/// digits and integral doubles at/above `1e21` in exponential form (JS
-/// `Number::toString` / `JSON.stringify` semantics), everything else as
-/// `JsonWriter::f64` writes it (`zmij`'s shortest round-trip digits, `serde_json`'s
-/// spelling) — which matches JS except the one non-integral decade handled below.
-pub(super) fn write_number_value(w: &mut JsonWriter, n: f64) {
-    if !n.is_finite() {
-        // ±Inf → null, matching JSON.stringify (a parsed literal is never NaN).
-        w.null();
-        return;
-    }
-    if n.fract() == 0.0 {
-        // Below 2^53 every integral f64 is exact, so the shortest round-trip
-        // representation *is* the integer's own digits — write them directly,
-        // no format!/parse round trip.
-        if n.abs() < 9_007_199_254_740_992.0 {
-            w.i64(n as i64);
-            return;
-        }
-        // Above 2^53 the shortest representation can denote the double with
-        // fewer significant digits than the exact integer (JS prints that
-        // expanded form), so go through Display + parse.
-        let shortest = format!("{n}");
-        if let Ok(v) = shortest.parse::<i64>() {
-            w.i64(v);
-            return;
-        }
-        if let Ok(v) = shortest.parse::<u64>() {
-            w.u64(v);
-            return;
-        }
-        // Beyond u64 but below 1e21, JS `Number::toString` still prints the
-        // expanded integer (the spec's `k <= n <= 21` case); `shortest` —
-        // Rust's shortest-round-trip Display — already holds those exact digits.
-        // At/above 1e21 JS switches to exponential, where Rust's Display would
-        // wrongly keep expanding, so that range falls through to `w.f64`.
-        if n.abs() < 1e21 {
-            w.raw(&shortest);
-            return;
-        }
-    } else {
-        // Non-integral. JS `Number::toString` uses fixed notation down to the
-        // spec's `n = -5` (|x| in [1e-6, 1e-5)), whereas `zmij` switches to
-        // scientific one decade earlier — the sole non-integral divergence.
-        // In that single decade the point sits at position -5, so the fixed
-        // form is `0.` + five zeros + the shortest significant digits.
-        let a = n.abs();
-        if (1e-6..1e-5).contains(&a) {
-            // `{a:e}` is the shortest round-trip scientific form (`d[.ddd]e-6`);
-            // its mantissa digits are exactly `s` in the spec.
-            let sci = format!("{a:e}");
-            let mantissa = sci.split('e').next().unwrap_or(&sci);
-            let mut out = String::with_capacity(8 + mantissa.len());
-            if n.is_sign_negative() {
-                out.push('-');
-            }
-            out.push_str("0.00000");
-            out.extend(mantissa.chars().filter(|&c| c != '.'));
-            w.raw(&out);
-            return;
-        }
-    }
-    w.f64(n);
 }
 
 /// Emits a `Literal` node.
 ///
-/// The common literals take [`write_literal_fields_fused`]'s single write; any
-/// it declines takes [`write_literal_fields`].
-pub(super) fn write_literal(w: &mut JsonWriter, lit: &ast::Literal, ctx: &Ctx<'_>) {
-    node_header(w, "Literal", lit.span, ctx);
-    #[cfg(debug_assertions)]
-    let fields_from = w.as_bytes().len();
-    if write_literal_fields_fused(w, lit, ctx) {
-        #[cfg(debug_assertions)]
-        {
-            let mut full = JsonWriter::with_capacity(0);
-            write_literal_fields(&mut full, lit, ctx);
-            debug_assert_eq!(
-                String::from_utf8_lossy(&w.as_bytes()[fields_from..]),
-                String::from_utf8_lossy(full.as_bytes()),
-                "the fused literal fields must be the full path's bytes"
-            );
-        }
-    } else {
-        write_literal_fields(w, lit, ctx);
-    }
+/// Its fields are the mount's `write_literal_fields_any`: on the JSON wire the common
+/// literals in one fused write (`write_json.rs`), any other through
+/// [`write_literal_fields`].
+pub(super) fn write_literal(w: &mut Sink<'_>, lit: &ast::Literal, ctx: &Ctx<'_>) {
+    node_header!(w, "Literal", lit.span, ctx);
+    write_literal_fields_any(w, lit, ctx);
     close_node(w, "Literal", lit.span, ctx);
-}
-
-/// A `Literal`'s `value` and `raw` fields as one write, for the literals whose
-/// two fields are one constant or one source token: a string with no escape to
-/// decode, a plain decimal integer, `true`, `false` and `null`. Returns `false`,
-/// having written nothing, for every other literal — and for a string or number
-/// the writer's own conditions decline ([`JsonWriter::try_string_value_raw`],
-/// [`JsonWriter::try_number_value_raw`]).
-///
-/// A numeric token is tested as text, not by its parsed value: one made only of
-/// decimal digits with no leading zero is the shortest form of the integer it
-/// names, so the value the parser stored prints as those same digits.
-#[inline]
-fn write_literal_fields_fused(w: &mut JsonWriter, lit: &ast::Literal, ctx: &Ctx<'_>) -> bool {
-    match lit.value {
-        ast::LiteralValue::String(ast::StringCooked::Verbatim) => {
-            w.try_string_value_raw(lit.span.extract(ctx.source).as_bytes())
-        }
-        ast::LiteralValue::Number(_) => {
-            w.try_number_value_raw(lit.span.extract(ctx.source).as_bytes())
-        }
-        ast::LiteralValue::Boolean(true) => {
-            w.raw(",\"value\":true,\"raw\":\"true\"");
-            true
-        }
-        ast::LiteralValue::Boolean(false) => {
-            w.raw(",\"value\":false,\"raw\":\"false\"");
-            true
-        }
-        ast::LiteralValue::Null => {
-            w.raw(",\"value\":null,\"raw\":\"null\"");
-            true
-        }
-        ast::LiteralValue::String(ast::StringCooked::Decoded(_)) | ast::LiteralValue::BigInt => {
-            false
-        }
-    }
 }
 
 /// A `Literal`'s `value`, `raw` and (for a BigInt) `bigint` fields, field by
 /// field — every literal's general emission.
-fn write_literal_fields(w: &mut JsonWriter, lit: &ast::Literal, ctx: &Ctx<'_>) {
-    w.raw(",\"value\":");
+pub(super) fn write_literal_fields(w: &mut Sink<'_>, lit: &ast::Literal, ctx: &Ctx<'_>) {
+    raw!(w, ",\"value\":");
     // `bigint` is emitted only for BigInt literals (`skip_serializing_if` on
     // `Option`), and shares the decimal string with `value`.
     let mut bigint: Option<String> = None;
@@ -919,16 +682,20 @@ fn write_literal_fields(w: &mut JsonWriter, lit: &ast::Literal, ctx: &Ctx<'_>) {
     }
     let raw = lit.span.extract(ctx.source);
     if let ast::LiteralValue::String(_) = lit.value {
-        w.raw(",\"raw\":");
+        raw!(w, ",\"raw\":");
         w.string(raw);
     } else {
         // A numeric, BigInt, boolean or `null` token is escape-free by grammar —
         // digits, letters, `.`, `_`, and a sign only inside an exponent — so its
         // raw text takes the name field's unscanned write.
-        w.string_escape_free_led(b",\"raw\":", raw.as_bytes());
+        json_only! { w.string_escape_free_led(b",\"raw\":", raw.as_bytes()); }
+        tape! {
+            raw!(w, ",\"raw\":");
+            w.string(raw);
+        }
     }
     if let Some(decimal) = bigint {
-        w.raw(",\"bigint\":");
+        raw!(w, ",\"bigint\":");
         w.string(&decimal);
     }
 }
@@ -937,7 +704,7 @@ fn write_literal_fields(w: &mut JsonWriter, lit: &ast::Literal, ctx: &Ctx<'_>) {
 /// then `optional` (only when true), `typeAnnotation` (only when present),
 /// `decorators` (only when non-empty).
 pub(super) fn write_identifier_parts(
-    w: &mut JsonWriter,
+    w: &mut Sink<'_>,
     span: Span,
     name: ast::IdentName,
     optional: bool,
@@ -945,7 +712,7 @@ pub(super) fn write_identifier_parts(
     decorators: Option<&[ast::Decorator]>,
     ctx: &Ctx<'_>,
 ) {
-    node_header(w, "Identifier", span, ctx);
+    node_header!(w, "Identifier", span, ctx);
     write_identifier_fields(w, span, name, optional, type_annotation, decorators, ctx);
 }
 
@@ -955,7 +722,7 @@ pub(super) fn write_identifier_parts(
 /// itself, with `name` ahead of the positions; tsv's wire gives them the one
 /// `Identifier` order, acorn's.
 pub(super) fn write_identifier_parts_with_character(
-    w: &mut JsonWriter,
+    w: &mut Sink<'_>,
     span: Span,
     name: ast::IdentName,
     optional: bool,
@@ -979,7 +746,7 @@ pub(super) fn write_identifier_parts_with_character(
 /// The `Identifier` fields after the node header: `name`, then the tail.
 #[inline]
 fn write_identifier_fields(
-    w: &mut JsonWriter,
+    w: &mut Sink<'_>,
     span: Span,
     name: ast::IdentName,
     optional: bool,
@@ -995,7 +762,7 @@ fn write_identifier_fields(
 /// `decorators`) and the closing `}`.
 #[inline]
 fn write_identifier_tail(
-    w: &mut JsonWriter,
+    w: &mut Sink<'_>,
     span: Span,
     optional: bool,
     type_annotation: Option<&ast::TSTypeAnnotation>,
@@ -1003,379 +770,26 @@ fn write_identifier_tail(
     ctx: &Ctx<'_>,
 ) {
     if optional {
-        w.raw(",\"optional\":true");
+        raw!(w, ",\"optional\":true");
     }
     write_type_annotation_field(w, type_annotation, ctx);
     if let Some(decs) = decorators
         && !decs.is_empty()
     {
-        w.raw(",\"decorators\":");
+        raw!(w, ",\"decorators\":");
         write_array(w, decs, |w, d| write_decorator(w, d, ctx));
     }
     close_node(w, "Identifier", span, ctx);
 }
-
-/// Emits a plain `Identifier` node: no optional flag, no type annotation, no
-/// decorators — regardless of what the binding carries.
-///
-/// The common identifier — a short unescaped name, no comment attach running —
-/// is written as a single staged run, header through closing `}`: the node has
-/// no child, so nothing has to interrupt the run, and the name's key, quotes
-/// and close ride the header's one append instead of a window write and a
-/// `}` append of their own.
-///
-/// `inline(never)` to keep it out of the recursive writers' frames: once the name
-/// write went out of line this body became small enough to inline, and each inlined
-/// copy parked an `IdentName` in its caller's frame — `write_statement`'s grew from
-/// 88 to 168 bytes, a frame paid at every level of statement nesting. Kept out of
-/// line it costs ~0.03% of the parse→JSON path's instructions on TypeScript.
-#[inline(never)]
-pub(super) fn write_identifier_plain(w: &mut JsonWriter, id: &ast::Identifier, ctx: &Ctx<'_>) {
-    let name = id.ident_name();
-    let name_len = name.raw_len as usize;
-    if name.escaped.is_some()
-        || name_len > StageRun::SHORT_MAX
-        || !matches!(ctx.comments, CommentMode::Off)
-    {
-        write_identifier_parts(w, id.span, name, false, None, None, ctx);
-        return;
-    }
-    // The whole node as one staged run. It is `write_identifier_parts`'s bytes
-    // under the three conditions just tested: a span-identity name is its
-    // source bytes, which hold nothing JSON escapes (`write_name_field`), so it
-    // can be staged where a scanned string could not; a name no longer than
-    // `StageRun::SHORT_MAX` is copied inline, and cannot overrun the scratch
-    // behind a header; and with no comment attach the node's open and close
-    // report to nothing, so the close is the bare `}`.
-    let start = id.span.start as usize;
-    let name = &ctx.source.as_bytes()[start..start + name_len];
-    debug_assert!(
-        name.iter().all(|&b| b != b'"' && b != b'\\' && b >= 0x20),
-        "a span-identity name holds nothing JSON escapes"
-    );
-    let mut run = w.stage_run();
-    run.raw("{\"type\":\"Identifier\"");
-    position_fields::<false>(&mut run, id.span, ctx);
-    run.raw(",\"name\":\"");
-    run.short_bytes(name);
-    run.raw("\"}");
-    run.flush();
-}
-
-/// A node header on the span-only wire (`{"type":"X","start":N,"end":M`), staged
-/// into the caller's open run — the bytes [`header_run`] writes there, for a caller
-/// that stages several nodes into one run. The caller made room
-/// ([`SPAN_HEADER_MAX`]).
-///
-/// Only for a caller already known to run with no comment attach and on the
-/// span-only wire: the node's open reports to no attach, and the header carries
-/// no `loc`. Stated once in the assert rather than tested again per header.
-#[expect(clippy::inline_always)]
-#[inline(always)]
-pub(super) fn stage_span_header(
-    run: &mut StageRun<'_>,
-    node_type: &'static str,
-    span: Span,
-    ctx: &Ctx<'_>,
-) {
-    debug_assert!(
-        matches!(ctx.comments, CommentMode::Off) && ctx.positions.lines().is_none(),
-        "a staged header reports to no comment attach and carries no `loc`"
-    );
-    run.raw("{\"type\":\"");
-    run.short(node_type);
-    run.raw("\",\"start\":");
-    run.u32(ctx.pos(span.start));
-    run.raw(",\"end\":");
-    run.u32(ctx.pos(span.end));
-}
-
-/// The widest [`stage_span_header`] plus the child key a caller stages behind it:
-/// `{"type":"`, the longest node type, `","start":`, an integer, `,"end":`, an
-/// integer, and the longest child key (`,"expression":`). Each integer is counted
-/// at `u64`'s width ([`STAGED_INTEGER_MAX`]), so the bound holds without an
-/// argument about which offsets are reachable.
-pub(super) const SPAN_HEADER_MAX: usize = "{\"type\":\"".len()
-    + LONGEST_NODE_TYPE
-    + "\",\"start\":".len()
-    + STAGED_INTEGER_MAX
-    + ",\"end\":".len()
-    + STAGED_INTEGER_MAX
-    + ",\"expression\":".len();
-
-/// The longest node `type` the writer emits.
-const LONGEST_NODE_TYPE: usize = "TSConstructSignatureDeclaration".len();
-
-/// The widest integer a staged-width bound counts: `u64::MAX`'s digits, wider
-/// than any `u32` offset, so no bound depends on which values are reachable.
-const STAGED_INTEGER_MAX: usize = u64::MAX.ilog10() as usize + 1;
-
-/// The name bytes of an `Identifier` that [`stage_identifier_plain`] may stage
-/// whole, or `None` — the identifiers whose expression emission is
-/// [`write_identifier_plain`]'s run arm.
-///
-/// That is an identifier with no binding extra and no `?` (the expression
-/// dispatch's plain arm), and a name its run arm stages: unescaped, so its
-/// source bytes are the name and hold nothing JSON escapes, and within
-/// [`StageRun::SHORT_MAX`]. For a caller already known to run with no comment
-/// attach, the run arm's third condition.
-#[expect(clippy::inline_always)]
-#[inline(always)]
-pub(super) fn plain_identifier_stage_name<'s>(
-    id: &ast::Identifier,
-    ctx: &Ctx<'s>,
-) -> Option<&'s [u8]> {
-    let name = id.ident_name();
-    let name_len = name.raw_len as usize;
-    if id.extra.is_some() || id.optional || name.escaped.is_some() || name_len > StageRun::SHORT_MAX
-    {
-        return None;
-    }
-    let start = id.span.start as usize;
-    Some(&ctx.source.as_bytes()[start..start + name_len])
-}
-
-/// Stage a plain `Identifier` on the span-only wire, whose name
-/// [`plain_identifier_stage_name`] returned, into the caller's open run —
-/// [`write_identifier_plain`]'s run bytes. The caller made room
-/// ([`PLAIN_IDENTIFIER_MAX`]).
-#[expect(clippy::inline_always)]
-#[inline(always)]
-pub(super) fn stage_identifier_plain(
-    run: &mut StageRun<'_>,
-    span: Span,
-    name: &[u8],
-    ctx: &Ctx<'_>,
-) {
-    run.raw("{\"type\":\"Identifier\",\"start\":");
-    run.u32(ctx.pos(span.start));
-    run.raw(",\"end\":");
-    run.u32(ctx.pos(span.end));
-    run.raw(",\"name\":\"");
-    run.short_bytes(name);
-    run.raw("\"}");
-}
-
-/// The widest [`stage_identifier_plain`]: `{"type":"Identifier","start":`, an
-/// integer, `,"end":`, an integer, `,"name":"`, a name of up to
-/// [`StageRun::SHORT_MAX`] bytes and `"}`, each integer at `u64`'s width
-/// ([`STAGED_INTEGER_MAX`]).
-pub(super) const PLAIN_IDENTIFIER_MAX: usize = "{\"type\":\"Identifier\",\"start\":".len()
-    + STAGED_INTEGER_MAX
-    + ",\"end\":".len()
-    + STAGED_INTEGER_MAX
-    + ",\"name\":\"".len()
-    + StageRun::SHORT_MAX
-    + "\"}".len();
 
 /// An `Identifier` carrying only the binding's `optional` flag (function and
 /// method ids, entity-name-as-expression nodes) — no type annotation or
 /// decorators.
 #[inline]
 pub(super) fn write_identifier_with_optional(
-    w: &mut JsonWriter,
+    w: &mut Sink<'_>,
     id: &ast::Identifier,
     ctx: &Ctx<'_>,
 ) {
     write_identifier_parts(w, id.span, id.ident_name(), id.optional, None, None, ctx);
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    /// The wire variants a test runs: both, unless the build lacks the loc-bearing one
-    /// (`tsv_lang`'s `_locations` feature, off in a bare `cargo test -p tsv_ts`).
-    const WIRES: &[Wire] = &[
-        #[cfg(feature = "locations")]
-        Wire::Loc,
-        Wire::Span,
-    ];
-
-    /// Run `emit` under a standalone-TypeScript context over `source`, for one
-    /// wire variant and one comment role.
-    fn emitted(
-        source: &str,
-        wire: Wire,
-        comments: CommentMode<'_>,
-        view: ast::AstView<'_>,
-        emit: impl FnOnce(&mut JsonWriter, &Ctx<'_>),
-    ) -> String {
-        let tables = WireTables::new(source, crate::WIRE_COORDINATES, wire);
-        let ctx = Ctx::new(source, tables.positions(), comments, view);
-        let mut w = JsonWriter::with_capacity(0);
-        emit(&mut w, &ctx);
-        String::from_utf8(w.into_bytes()).expect("the wire is UTF-8")
-    }
-
-    /// The sole statement of `source` as the `Identifier` its expression is.
-    fn sole_identifier<'a>(
-        view: ast::AstView<'a>,
-        program: &'a ast::Program,
-    ) -> &'a ast::Identifier {
-        let [statement] = view.stmt_list(program.body) else {
-            panic!("one statement expected");
-        };
-        let ast::StatementKind::ExpressionStatement(statement) = &view.stmt(*statement).kind else {
-            panic!("an expression statement expected");
-        };
-        let ast::ExpressionKind::Identifier(id) = &view.expr(statement.expression).kind else {
-            panic!("an identifier expected");
-        };
-        id
-    }
-
-    /// The staged header against `node_header_wide_end`, which writes the same
-    /// header through the direct emitters — over a span whose two ends sit on
-    /// different lines behind a multibyte character, and at node-type lengths
-    /// either side of the staged run's inline copy (a real node type is at most
-    /// 31 bytes; a longer one takes the run's out-of-line copy).
-    #[test]
-    fn node_header_matches_the_direct_emitters() {
-        const TYPE: &str = "TSConstructSignatureDeclarationAndThenSomeMore";
-        let source = "é;\n\n  abc(\n);\n";
-        let start = source.find("abc").expect("present") as u32;
-        let span = Span::new(start, source.len() as u32 - 2);
-        let stores = ast::AstStores::new();
-        for len in [1, 31, 32, 33, TYPE.len()] {
-            let node_type: &'static str = &TYPE[..len];
-            for &wire in WIRES {
-                let staged = emitted(source, wire, CommentMode::Off, stores.view(), |w, ctx| {
-                    node_header(w, node_type, span, ctx);
-                });
-                let direct = emitted(source, wire, CommentMode::Off, stores.view(), |w, ctx| {
-                    node_header_wide_end(w, node_type, span, span.end, ctx);
-                });
-                assert_eq!(staged, direct, "type length {len}, {wire:?}");
-                if wire != Wire::Span {
-                    assert_eq!(
-                        staged,
-                        format!(
-                            "{{\"type\":\"{node_type}\",\"start\":6,\"end\":12,\"loc\":{{\"start\":\
-                             {{\"line\":3,\"column\":2}},\"end\":{{\"line\":4,\"column\":1}}}}"
-                        )
-                    );
-                }
-            }
-        }
-    }
-
-    /// `write_identifier_plain`'s single-run arm against the general identifier
-    /// emission it stands in for, and against the bytes spelled out, at each edge
-    /// of its gate: the name length either side of `StageRun::SHORT_MAX`, a
-    /// non-ASCII name (whose byte length is what the gate reads) either side of
-    /// it too, a name longer than the whole staging scratch, and an escaped
-    /// name, which carries its decoded form.
-    #[test]
-    fn plain_identifier_run_matches_the_general_emission() {
-        let ascii = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
-        // Two bytes and one UTF-16 unit a character.
-        let wide = "éèêëàâäîïôöùûüçñ".repeat(2);
-        let cases: Vec<(String, String)> = [
-            &ascii[..1],
-            &ascii[..2],
-            &ascii[..7],
-            &ascii[..8],
-            &ascii[..16],
-            &ascii[..31],
-            &ascii[..32],
-            &ascii[..33],
-            &ascii[..40],
-            "$",
-            "_$1",
-            &wide[..2],
-            &wide[..30],
-            &wide[..32],
-            &wide[..34],
-        ]
-        .into_iter()
-        .map(|name| (name.to_owned(), name.to_owned()))
-        .chain([(ascii[..50].repeat(8), ascii[..50].repeat(8))])
-        .chain([
-            ("\\u0061bc".to_owned(), "abc".to_owned()),
-            ("a\\u{62}".to_owned(), "ab".to_owned()),
-        ])
-        .collect();
-        for (written, name) in &cases {
-            let source = format!("\n  {written};\n");
-            let program = crate::__private::parse(&source).expect("parses");
-            let id = sole_identifier(program.view(), &program);
-            let end = 3 + written.encode_utf16().count();
-            let column = end - 1;
-            for &wire in WIRES {
-                let plain = emitted(&source, wire, CommentMode::Off, program.view(), |w, ctx| {
-                    write_identifier_plain(w, id, ctx);
-                });
-                let general = emitted(&source, wire, CommentMode::Off, program.view(), |w, ctx| {
-                    write_identifier_parts(w, id.span, id.ident_name(), false, None, None, ctx);
-                });
-                assert_eq!(plain, general, "{written:?}, {wire:?}");
-                let loc = if wire != Wire::Span {
-                    format!(
-                        ",\"loc\":{{\"start\":{{\"line\":2,\"column\":2}},\"end\":\
-                         {{\"line\":2,\"column\":{column}}}}}"
-                    )
-                } else {
-                    String::new()
-                };
-                assert_eq!(
-                    plain,
-                    format!(
-                        "{{\"type\":\"Identifier\",\"start\":3,\"end\":{end}{loc},\
-                         \"name\":\"{name}\"}}"
-                    ),
-                    "{written:?}, {wire:?}"
-                );
-            }
-        }
-    }
-
-    /// Under a comment attach the identifier keeps the general emission: its open
-    /// and close are what hand it its comments, and the single-run arm reports
-    /// neither.
-    #[test]
-    fn plain_identifier_under_a_comment_attach_emits_its_comments() {
-        let source = "/* c */ name";
-        let mut stores = ast::AstStores::new();
-        let (expression, comments) = crate::__private::parse_expression_with_comments(
-            source,
-            0,
-            0,
-            &mut stores,
-            "end of input",
-            |_, _| Ok(()),
-        )
-        .expect("parses");
-        let ast::ExpressionKind::Identifier(id) = &stores.view().expr(expression).kind else {
-            panic!("an identifier expected");
-        };
-        let attach = || {
-            CommentAttach::new(
-                source,
-                IslandComments {
-                    queue: stores.view().comments(comments).iter().collect(),
-                    root_parent_end: None,
-                    root_fallback: true,
-                    html_leading: None,
-                    removes_parens: false,
-                    root_parens: Vec::new(),
-                },
-            )
-        };
-        for &wire in WIRES {
-            let island = attach();
-            let plain = emitted(source, wire, island.mode(), stores.view(), |w, ctx| {
-                write_identifier_plain(w, id, ctx);
-            });
-            let island = attach();
-            let general = emitted(source, wire, island.mode(), stores.view(), |w, ctx| {
-                write_identifier_parts(w, id.span, id.ident_name(), false, None, None, ctx);
-            });
-            assert_eq!(plain, general, "{wire:?}");
-            assert!(
-                plain.contains(",\"name\":\"name\",\"leadingComments\":[{\"type\":\"Block\""),
-                "the leading comment is emitted: {plain}"
-            );
-        }
-    }
 }

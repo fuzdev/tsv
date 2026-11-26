@@ -1939,6 +1939,32 @@ pub fn convert_ast_json_bytes<'a>(parsed: impl Into<ParsedRef<'a>>, source: &str
     ast::convert::write_program_bytes(parsed.into(), source, tsv_lang::Wire::Span)
 }
 
+/// The span-only wire's TAPE (`docs/tape_format.md`), written directly into `sink` by the
+/// wire writer's tape copy — the same walk as [`convert_ast_json_bytes`], its strings
+/// true-offset refs. Finish it with `sink.finish_words()` / `sink.finish_bytes()`, which refuse
+/// a tape the writer left inconsistent.
+#[cfg(feature = "_tape")]
+pub fn write_tape<'a>(
+    parsed: impl Into<ParsedRef<'a>>,
+    source: &str,
+    sink: &mut tsv_lang::tape::TapeSink,
+) {
+    ast::convert::write_program_tape(parsed.into(), source, sink);
+}
+
+/// The TAPE of an embedded expression island written under `env` — the tape twin of
+/// `write_expression_embedded`, its comment attach included (a template island's shape) — for
+/// the tape gates, which grade the comment emitter through it. No host composes it yet: the
+/// Svelte writer still writes JSON.
+#[cfg(feature = "_tape")]
+pub fn write_expression_island_tape(
+    expr: &Expression,
+    env: EmbedWriter<'_>,
+    sink: &mut tsv_lang::tape::TapeSink,
+) {
+    ast::convert::write_expression_island_tape(expr, env, sink);
+}
+
 /// Convert internal AST to compact JSON wire bytes **with** per-node `loc`.
 ///
 /// The `convert_ast_json_bytes` wire plus a `loc` on every node — the line (1-based) and
