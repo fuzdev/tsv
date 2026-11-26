@@ -3,11 +3,19 @@
 //! byte for byte, so the transcoder drops nothing the decoder would need to rebuild the tree —
 //! no number's spelling, no string, no key. `npm run check:tape` grades the same tapes against the
 //! offline JS encoder's and through the shipped decoder.
+//!
+//! The CSS wire writer's direct tape (its tape copy, `tsv_css::__private::write_tape`) is graded
+//! over every CSS document the fixture tree holds — each `.css` input and each `<style>` body —
+//! against the same parse's JSON wire: it prints back to the wire, and the transcoder makes the
+//! same tape of the printback as of the wire (`tsv_debug::tape::grade_css_direct_tape`).
 
 use std::path::Path;
 
 use tsv_arena::tape::Transcoder;
-use tsv_debug::tape::{bytes_difference, fixture_wires, tape_to_json, wire_source};
+use tsv_debug::tape::{
+    bytes_difference, fixture_wires, grade_css_direct_tape, style_bodies, tape_to_json, wire_source,
+};
+use tsv_lang::tape::TapeSink;
 
 #[test]
 fn every_fixture_wire_transcodes_and_prints_back() {
@@ -77,4 +85,52 @@ fn nested_late_refits_from_a_real_source_rewind_once_per_level() {
     );
     let back = tape_to_json(&tape, wire_source("svelte", &source)).expect("prints");
     assert_eq!(bytes_difference(&back, &span), None);
+}
+
+/// The CSS writer's direct tape over every CSS document of the fixture tree: each `.css`
+/// document, and each `<style>` body of a Svelte one read as a stylesheet of its own.
+#[test]
+fn every_fixture_css_document_writes_its_tape_directly() {
+    let mut transcoder = Transcoder::new();
+    let mut sink = TapeSink::new();
+    let mut failures = Vec::new();
+    let (mut files, mut bodies) = (0usize, 0usize);
+    let mut grade = |path: &str, source: &str, json: &[u8]| {
+        if let Err(e) = grade_css_direct_tape(source, json, &mut transcoder, &mut sink) {
+            failures.push(format!("{path}: {e}"));
+        }
+    };
+    fixture_wires(Path::new("tests/fixtures"), |doc| match doc.language {
+        "css" => {
+            files += 1;
+            grade(&doc.path, &doc.source, &doc.span);
+        }
+        "svelte" => {
+            for body in style_bodies(&doc.source) {
+                let Ok(ast) = tsv_css::__private::parse(body) else {
+                    continue;
+                };
+                bodies += 1;
+                let json = tsv_css::__private::convert_ast_json_bytes(&ast, body);
+                grade(&format!("{} <style>", doc.path), body, &json);
+            }
+        }
+        _ => {}
+    })
+    .expect("the fixture tree walks");
+    // floors well under today's counts: a walk that stopped finding CSS must fail, not pass
+    assert!(files >= 5, "only {files} .css documents graded");
+    assert!(bodies >= 1000, "only {bodies} <style> bodies graded");
+    assert!(
+        failures.is_empty(),
+        "{} of {} CSS documents:\n{}",
+        failures.len(),
+        files + bodies,
+        failures
+            .iter()
+            .take(20)
+            .cloned()
+            .collect::<Vec<_>>()
+            .join("\n")
+    );
 }

@@ -1497,14 +1497,21 @@ key order and `-0` included; so does its iterative interpreter alone, the path a
 overflow falls back to; and so does the decoder over the same wire written with every typed
 record entry-generic, so every entry's descriptors are read by the interpreter that serves the
 masks no fast shape covers. It also refuses a committed decoder generated from another table or
-shape list.
+shape list. For a CSS document it grades the **direct** tape as well — the one the CSS wire
+writer writes itself, its refs true offsets (tape_format.md §A direct writer): the Rust half
+holds it to the wire (it prints back byte for byte, and the transcoder canonicalizes that
+printback to the transcoded tape — a failure fails the run), and both decoder paths read it back
+to `JSON.parse`'s tree.
 
 **How.** One `tsv_debug tape` process (`cli/commands/tape.rs`) streams each document's source,
 wire and transcoded tape as NDJSON, split on LF alone. It reports the records whose presence
 mask is off the fast-shape list; that is no failure (the entry-generic record carries any mask),
 and `tape-shapes:update` folds them in. Beside it in `check`, `tests/tape_roundtrip.rs` prints
 every transcoded tape back to its wire byte for byte (`tsv_debug::tape::tape_to_json`), and
-`tests/depth_limit.rs` transcodes and prints every depth-limit shape on the contract's stack.
+`tests/depth_limit.rs` transcodes and prints every depth-limit shape on the contract's stack;
+`tests/tape_roundtrip.rs` also grades the CSS direct tape over every `<style>` body of the
+fixture tree, read as a stylesheet of its own — the CSS `check:tape` sees is the few `.css`
+inputs alone.
 
 **Blind spots.**
 
@@ -1512,8 +1519,10 @@ every transcoded tape back to its wire byte for byte (`tsv_debug::tape::tape_to_
 - **The producers agree on the writers' JSON only.** The offline encoder reads `JSON.parse`'s
   tree, which has lost a number's spelling, a duplicate key and the text order of an
   integer-like key; a wire with any of them still decodes right, but the two tapes may differ.
-- **No binding ships a tape yet**, so the boundary a tape crosses (a WASM view, an N-API buffer)
-  is graded by none of this.
+- **The boundary a tape crosses** (a WASM view, an N-API buffer) is the package suites' and
+  `engines:audit`'s to grade, not this gate's.
+- **The direct tape is CSS's alone, and standalone CSS's**: the TypeScript and Svelte writers
+  have no tape copy yet, so an embedded `<style>`'s direct tape exists nowhere.
 
 ## Tape Corpus Leg (`tape:corpus`)
 
@@ -1527,7 +1536,9 @@ panic, a transcoder refusal, a byte difference between the producers, a decoded 
 `JSON.parse`'s, an empty corpus, or a run that graded no file fails it, and so does any parse
 error but one: a TypeScript file tsv rejects at the module goal yet parses at the script goal (a
 sloppy script) has no wire at the parse's goal and is counted, not graded (its verdict is
-`corpus:compare:parse`'s). No pinned count: it grades a property of every file it reaches. A
+`corpus:compare:parse`'s). A CSS file's direct tape is graded as `check:tape` grades it, a Rust-side
+failure answering `direct: …`; a run whose direct tapes number fewer than its graded CSS files
+fails. No pinned count: it grades a property of every file it reaches. A
 `npm run conformance` leg.
 
 ## Package-Declaration Check (`typecheck:packages`)

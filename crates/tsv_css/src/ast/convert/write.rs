@@ -139,7 +139,9 @@
 //! ⚠️ **To edit a site, edit its spec, never one half.** A literal written straight to
 //! `w.raw` with no spec is a JSON byte the tape cannot see; a new helper both copies call
 //! moves the JSON copy's codegen when the tape copy is built beside it (the reason
-//! `declaration_split.rs` and `prelude_string.rs` are mounted once per copy).
+//! `declaration_split.rs` and `prelude_string.rs` are mounted once per copy). `cargo test
+//! --test tape_roundtrip` grades the tape copy against the JSON copy over every CSS fixture
+//! document and `<style>` body.
 //!
 //! [`JsonWriter::span_words`]: tsv_lang::JsonWriter::span_words
 //! [`JsonWriter::stage_run`]: tsv_lang::JsonWriter::stage_run

@@ -123,7 +123,7 @@ The AST schema table's own gate (`scripts/ast_schema.ts`): the table reads withi
 
 ## `check:tape`
 
-The tape gate (`scripts/check_tape.ts`, docs/audits.md §Tape Gate): every parseable fixture document's span-only wire through the tape and back — the offline JS encoder's tape byte-equal to the Rust transcoder's, and the shipped decoder's tree, by its fast path and by its iterative interpreter alone, deep-equal to `JSON.parse`'s, key order included. One `tsv_debug tape` process streams each document's source, wire and transcoded tape as NDJSON (split on LF alone), so it needs `build:check`'s world and no sidecar, no node_modules beyond the root's.
+The tape gate (`scripts/check_tape.ts`, docs/audits.md §Tape Gate): every parseable fixture document's span-only wire through the tape and back — the offline JS encoder's tape byte-equal to the Rust transcoder's, and the shipped decoder's tree, by its fast path and by its iterative interpreter alone, deep-equal to `JSON.parse`'s, key order included. A CSS document's direct tape (the CSS wire writer's own, docs/tape_format.md §Grading a direct tape) is graded too: the Rust half holds it to the wire and the JS half decodes it by both paths. One `tsv_debug tape` process streams each document's source, wire, transcoded tape and any direct tape as NDJSON (split on LF alone), so it needs `build:check`'s world and no sidecar, no node_modules beyond the root's.
 
 ## `tape-shapes:update`
 
@@ -243,7 +243,7 @@ The import records' corpus differential (`imports:corpus` builds `target/corpus/
 
 ## `tape:corpus`
 
-The tape's CORPUS leg (benches/js/tape_corpus.ts, docs/audits.md §Tape Corpus Leg): `check:tape`'s grades — the two producers byte-equal, both decoder paths equal to `JSON.parse` — over every file of the `gates` view's snapshot tiers in the three languages, failing on a panic, a transcoder refusal, a difference, a parse error other than a TypeScript file that parses only at the script goal (counted, not graded), an empty corpus, or a run that graded nothing. Reads ../corpora, so it is NOT in `check`; a `conformance` leg. tsv's side is one `target/corpus/tsv_debug tape --stdin` process, hence `build:check`; `tape:corpus:run` skips the build (freshness-guarded).
+The tape's CORPUS leg (benches/js/tape_corpus.ts, docs/audits.md §Tape Corpus Leg): `check:tape`'s grades — the two producers byte-equal, both decoder paths equal to `JSON.parse` — over every file of the `gates` view's snapshot tiers in the three languages (a CSS file's direct tape included, as `check:tape` grades it), failing on a panic, a transcoder refusal, a difference, a parse error other than a TypeScript file that parses only at the script goal (counted, not graded), an empty corpus, or a run that graded nothing. Reads ../corpora, so it is NOT in `check`; a `conformance` leg. tsv's side is one `target/corpus/tsv_debug tape --stdin` process, hence `build:check`; `tape:corpus:run` skips the build (freshness-guarded).
 
 ## `tape:corpus:run`
 

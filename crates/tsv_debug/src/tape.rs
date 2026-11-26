@@ -476,6 +476,67 @@ pub fn fixture_wires(root: &Path, mut each: impl FnMut(FixtureWire)) -> Result<u
     Ok(n)
 }
 
+/// The CSS wire writer's DIRECT tape of `source` (`tsv_css::__private::write_tape`, the writer's
+/// tape copy), graded against `json`, the same parse's span-only wire, by the two checks its
+/// true-offset refs admit (docs/tape_format.md §String refs): it prints back to `json` byte for
+/// byte, and the transcoder, as canonicalizer, makes the same tape of that printback as of
+/// `json`. `Ok` is the direct tape, for a caller that decodes it too; `Err` names the failure.
+///
+/// # Errors
+///
+/// A message when the source does not parse, the sink refuses the tape, or either check fails.
+pub fn grade_css_direct_tape(
+    source: &str,
+    json: &[u8],
+    transcoder: &mut tsv_arena::tape::Transcoder,
+    sink: &mut tsv_lang::tape::TapeSink,
+) -> Result<Vec<u8>, String> {
+    let ast = tsv_css::__private::parse(source).map_err(|e| format!("parse: {e:#}"))?;
+    tsv_css::__private::write_tape(&ast, source, sink);
+    let direct = sink
+        .finish_bytes()
+        .map_err(|e| format!("the sink refused the direct tape: {e:?}"))?;
+    let text = wire_source("css", source);
+    let printed = tape_to_json(&direct, text).map_err(|e| format!("print: {e}"))?;
+    if let Some(d) = bytes_difference(&printed, json) {
+        return Err(format!("the direct tape prints back differently {d}"));
+    }
+    let canonical = transcoder
+        .transcode(json, text)
+        .map_err(|e| format!("transcode: {e}"))?
+        .to_vec();
+    let canonicalized = transcoder
+        .transcode(&printed, text)
+        .map_err(|e| format!("transcode of the printback: {e}"))?;
+    if canonicalized != canonical.as_slice() {
+        return Err("transcode(tape_to_json(direct)) differs from transcode(json)".to_owned());
+    }
+    Ok(direct)
+}
+
+/// The body of every `<style>` element in a Svelte `source` (the text between `<style …>` and
+/// `</style>`), each read as a CSS document of its own — the CSS the fixture tree holds beyond
+/// its few `.css` inputs. A plain text scan: a body that is not standalone CSS just fails to
+/// parse, and its caller skips it.
+#[must_use]
+pub fn style_bodies(source: &str) -> Vec<&str> {
+    let mut out = Vec::new();
+    let mut at = 0;
+    while let Some(open) = source[at..].find("<style") {
+        let open = at + open;
+        let Some(gt) = source[open..].find('>') else {
+            break;
+        };
+        let body = open + gt + 1;
+        let Some(close) = source[body..].find("</style>") else {
+            break;
+        };
+        out.push(&source[body..body + close]);
+        at = body + close + "</style>".len();
+    }
+    out
+}
+
 /// Where two byte strings first differ, as the text around that byte on each side; `None` when
 /// they are equal. A test's report of a printed tape against its wire.
 #[must_use]

@@ -15,6 +15,10 @@
  * (`scripts/tape_encode.ts`) differing from the transcoder's by a byte, or on the shipped decoder
  * — its fast path, or its iterative interpreter alone — reading back a tree that differs from
  * `JSON.parse`'s of the wire, key order included (`scripts/check_tape.ts`'s `grade_document`).
+ * A CSS file's direct tape — the CSS wire writer's own — is graded too: the Rust side holds it
+ * to the wire (printback, and the transcoder as canonicalizer — a failure is the reply's
+ * `direct:` error), and both decoder paths must read it back to the same tree
+ * (`grade_direct_tape`).
  * The run fails on an empty corpus, and on a run that graded no file.
  *
  * Takes no arguments; to look at one file, ask `tsv_debug tape --stdin` for it.
@@ -30,7 +34,7 @@ import { readFile } from 'node:fs/promises';
 import { relative, resolve } from 'node:path';
 
 import { parse_ast_schema } from '../../scripts/ast_schema.ts';
-import { grade_document, wire_source } from '../../scripts/check_tape.ts';
+import { grade_direct_tape, grade_document, wire_source } from '../../scripts/check_tape.ts';
 import {
 	build_tape_schema,
 	parse_tape_shapes,
@@ -56,7 +60,9 @@ export interface TapeRequest {
 
 /** One reply line of `tsv_debug tape --stdin`. */
 export type TapeReply =
-	{ span: unknown; tape: string; transcode_ns?: number } | { error: string } | { panic: string };
+	| { span: unknown; tape: string; direct?: string; transcode_ns?: number }
+	| { error: string }
+	| { panic: string };
 
 /** Failing files listed in full before the rest are only counted. */
 const MAX_REPORTED = 20;
@@ -86,6 +92,7 @@ export async function run_tape_corpus(deps: TapeCorpusDeps): Promise<number> {
 	let rejected = 0;
 	let json_bytes = 0;
 	let tape_bytes = 0;
+	let direct = 0;
 	for (const file of files) {
 		const path = relative(collections_root, file.path);
 		const source = file.content.toWellFormed();
@@ -116,7 +123,12 @@ export async function run_tape_corpus(deps: TapeCorpusDeps): Promise<number> {
 		const tape = Buffer.from(reply.tape, 'base64');
 		json_bytes += Buffer.byteLength(JSON.stringify(reply.span));
 		tape_bytes += tape.length;
-		const problems = grade_document(reply.span, wire_source(file.language, source), tape, schema);
+		const text = wire_source(file.language, source);
+		const problems = grade_document(reply.span, text, tape, schema);
+		if (reply.direct !== undefined) {
+			direct++;
+			problems.push(...grade_direct_tape(reply.span, text, Buffer.from(reply.direct, 'base64')));
+		}
 		if (problems.length > 0) failures.push(`${path}: ${problems.join('; ')}`);
 	}
 	try {
@@ -128,9 +140,11 @@ export async function run_tape_corpus(deps: TapeCorpusDeps): Promise<number> {
 	const seconds = ((performance.now() - started) / 1000).toFixed(1);
 	const total = graded.svelte + graded.typescript + graded.css;
 	if (total === 0) failures.push('no file was graded');
+	if (graded.css > 0 && direct !== graded.css)
+		failures.push(`${graded.css} css file(s) graded but ${direct} direct tape(s)`);
 	console.log(
 		`${total} file(s) graded (${graded.svelte} svelte, ${graded.typescript} typescript, ${graded.css} css), ` +
-			`${rejected} tsv rejects at the parse's goal; tapes ${((100 * tape_bytes) / Math.max(json_bytes, 1)).toFixed(0)}% of the JSON's bytes — ${seconds}s`
+			`${rejected} tsv rejects at the parse's goal, ${direct} css direct tapes; tapes ${((100 * tape_bytes) / Math.max(json_bytes, 1)).toFixed(0)}% of the JSON's bytes — ${seconds}s`
 	);
 	if (failures.length > 0) {
 		console.error(`\n✗ ${failures.length} failure(s):`);

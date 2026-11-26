@@ -16,6 +16,12 @@
  *   every typed record entry-generic, so every entry's field descriptors are read by the
  *   interpreter that serves the records no fast shape covers.
  *
+ * A CSS document also carries its **direct** tape — the one the CSS wire writer writes itself,
+ * its strings true-offset refs, which the Rust half has already graded against the wire (it
+ * prints back to it, and the transcoder canonicalizes it to the transcoded tape). This half
+ * decodes it by both decoder paths too (`grade_direct_tape`), so the decoder is held to the
+ * refs a direct writer makes as well as to the transcoder's.
+ *
  * The NDJSON is split on `\n` alone (`lines_of`): a source holding U+2028 is embedded raw, and
  * `node:readline` would end a line there.
  *
@@ -78,6 +84,8 @@ interface TapeRecord {
 	source: string;
 	span: unknown;
 	tape: string;
+	/** A CSS document's direct tape (base64), from the CSS wire writer itself. */
+	direct?: string;
 }
 
 /**
@@ -176,6 +184,33 @@ export function grade_document(
 	return failures;
 }
 
+/**
+ * Grades one direct tape (a writer's own, its refs true-offset — `docs/tape_format.md` §String
+ * refs): both decoder paths read back the tree `JSON.parse` makes of the wire, key order
+ * included. Byte equality with the transcoder's tape is not asked: the refs a direct writer
+ * makes are any slice whose text equals the value.
+ * @returns the failures it finds, none when it passes
+ */
+export function grade_direct_tape(tree: unknown, source: string, direct: Uint8Array): string[] {
+	const failures: string[] = [];
+	const decoders: Array<[string, () => unknown]> = [
+		['decode_tape', () => decode_tape(direct, source)],
+		['decode_tape_iterative', () => decode_tape_iterative(direct, source)]
+	];
+	for (const [name, decode] of decoders) {
+		let decoded: unknown;
+		try {
+			decoded = decode();
+		} catch (error) {
+			failures.push(`direct tape: ${name} threw: ${(error as Error).message}`);
+			continue;
+		}
+		const d = wire_difference(decoded, tree);
+		if (d !== null) failures.push(`direct tape: ${name} vs JSON.parse at ${d}`);
+	}
+	return failures;
+}
+
 /** The tape schema the committed table and shape list make. */
 async function read_tape_schema(checkout: FsDir): Promise<TapeSchema | { errors: string[] }> {
 	const table = parse_ast_schema(await checkout.read_text(AST_SCHEMA_PATH));
@@ -229,6 +264,7 @@ export async function run_check_tape(
 	const outside = new Set<string>();
 	let outside_records = 0;
 	const stats = { fast: 0, generic: 0, escape: 0 };
+	let direct = 0;
 	const failed: string[] = [];
 	for await (const line of lines_of(child.stdout!)) {
 		if (line === '') continue;
@@ -255,6 +291,12 @@ export async function run_check_tape(
 			Buffer.from(record.tape, 'base64'),
 			schema
 		);
+		if (record.direct !== undefined) {
+			direct++;
+			problems.push(
+				...grade_direct_tape(record.span, source, Buffer.from(record.direct, 'base64'))
+			);
+		}
 		if (problems.length > 0)
 			failed.push(`${record.path} (${record.language}): ${problems.join('; ')}`);
 	}
@@ -277,7 +319,7 @@ export async function run_check_tape(
 		return 1;
 	}
 	console.log(
-		`tape: ${total} documents (${graded.svelte} svelte, ${graded.typescript} typescript, ${graded.css} css) in ${seconds}s — ${stats.fast} fast-shape, ${stats.generic} entry-generic, ${stats.escape} self-describing records`
+		`tape: ${total} documents (${graded.svelte} svelte, ${graded.typescript} typescript, ${graded.css} css) in ${seconds}s — ${stats.fast} fast-shape, ${stats.generic} entry-generic, ${stats.escape} self-describing records; ${direct} css direct tapes decoded`
 	);
 	if (outside.size > 0) {
 		console.log(
@@ -290,6 +332,7 @@ export async function run_check_tape(
 		for (const [language, count] of Object.entries(graded)) {
 			if (count === 0) failures.push(`no ${language} document was graded`);
 		}
+		if (direct === 0) failures.push('no css direct tape was graded');
 	} else if (total === 0) failures.push(`no document under ${root} was graded`);
 	if (failed.length > 0) {
 		for (const f of failed.slice(0, MAX_REPORTED)) console.log(`  ${f}`);
