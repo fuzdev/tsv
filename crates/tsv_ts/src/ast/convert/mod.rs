@@ -26,6 +26,13 @@ macro_rules! json_only {
     ($($t:tt)*) => { $($t)* };
 }
 
+/// The JSON copy's half of an expression each copy spells its own way.
+macro_rules! copy_pick {
+    ($json:expr, $tape:expr) => {
+        $json
+    };
+}
+
 // The BigInt helper, mounted once per copy (`bigint.rs` says why).
 mod bigint;
 use bigint::bigint_to_decimal;
@@ -34,7 +41,7 @@ mod comments;
 mod write;
 mod write_json;
 use write_json::{
-    header_run, write_chain_any, write_identifier_plain, write_literal_fields_any,
+    ChildKey, Ent, header_run, write_chain_any, write_identifier_plain, write_literal_fields_any,
     write_name_field, write_number_value,
 };
 #[cfg(feature = "_tape")]

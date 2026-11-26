@@ -15,6 +15,13 @@ use crate::ast;
 use smallvec::SmallVec;
 use tsv_lang::{JsonWriter, Span, StageRun};
 
+/// A run-time entry argument (`ent!`): nothing on the JSON wire, which reads no entry — a
+/// zero-sized argument, which a call passes no register for.
+pub(super) type Ent = ();
+
+/// A spine link's child key (`child_key!`): its literal.
+pub(super) type ChildKey = &'static str;
+
 /// The header's bytes — `{"type":"X"` and the position fields of `span` — as one
 /// staged run: the part of a header that does not report to the comment attach.
 #[expect(clippy::inline_always)]

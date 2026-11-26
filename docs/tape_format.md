@@ -219,13 +219,15 @@ to search for, so it writes:
 - **a string the writer borrowed from the source** as the slice it occupies — its **true
   offset** — whatever the record's scope, and **any other string** appended to the pool at once,
   in write order;
-- every other encoding exactly as above: offsets as emitted, a keyword by its index (looked up
-  by its text; a word outside the vocabulary refuses the tape), a number as its `f64`.
+- every other encoding exactly as above: offsets as emitted, a keyword by its index (resolved
+  from its text at build time, so a word outside the vocabulary fails the writer's build), a
+  number as its `f64`.
 
 Where the canonical rule finds a text's first occurrence in scope, the direct writer has the
 occurrence it read, so the two tapes differ only in refs and pool, and decode to one tree. The
-sink refuses a tape the writer left inconsistent — a keyword outside its vocabulary, a name the
-tables lack, a record or list left open — in every build, so no such tape is handed out.
+sink refuses a tape the writer left inconsistent — a key of an entry other than the open
+record's, a keyword written as its word, a record or list left open — in every build, so no such
+tape is handed out.
 
 ### Grading a direct tape
 

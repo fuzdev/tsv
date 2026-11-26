@@ -25,7 +25,7 @@ pub(super) fn write_import_specifier(w: &mut Sink<'_>, spec: &ast::ImportSpecifi
             write_module_export_name(w, &named_spec.imported, ctx);
             raw!(w, "ImportSpecifier", ",\"local\":");
             write_identifier_plain(w, &named_spec.local, ctx);
-            write_import_kind_field(w, named_spec.import_kind, ctx);
+            write_import_kind_field::<{ at!("ImportSpecifier") }>(w, named_spec.import_kind, ctx);
             close_node(w, "ImportSpecifier", named_spec.span, ctx);
         }
         ast::ImportSpecifier::Namespace(ns_spec) => {
@@ -58,7 +58,7 @@ pub(super) fn write_export_specifier(w: &mut Sink<'_>, spec: &ast::ExportSpecifi
     write_module_export_name(w, &spec.local, ctx);
     raw!(w, "ExportSpecifier", ",\"exported\":");
     write_module_export_name(w, &spec.exported, ctx);
-    write_export_kind_field(w, spec.export_kind, ctx);
+    write_export_kind_field::<{ at!("ExportSpecifier") }>(w, spec.export_kind, ctx);
     close_node(w, "ExportSpecifier", spec.span, ctx);
 }
 

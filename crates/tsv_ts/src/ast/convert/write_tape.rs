@@ -21,6 +21,19 @@ macro_rules! json_only {
     ($($t:tt)*) => {};
 }
 
+/// The tape copy's half of an expression each copy spells its own way.
+macro_rules! copy_pick {
+    ($json:expr, $tape:expr) => {
+        $tape
+    };
+}
+
+/// A run-time entry argument (`ent!`): the entry's id.
+type Ent = u16;
+
+/// A spine link's child key (`child_key!`): the link's entry and the key literal's ops.
+type ChildKey = (u16, &'static [tsv_lang::tape::LitOp]);
+
 #[path = "bigint.rs"]
 #[expect(
     clippy::duplicate_mod,
@@ -89,6 +102,7 @@ fn header_run<const CHARACTER: bool>(
 /// tape copy's hottest.
 #[inline]
 fn write_name_field(w: &mut TapeWriter<'_>, name: ast::IdentName, name_start: u32, ctx: &Ctx<'_>) {
+    #[cfg(debug_assertions)]
     debug_assert!(
         w.t_top_field("name")
             .is_some_and(|f| f.enc == tsv_lang::tape::Enc::Ref && f.bit == tsv_lang::tape::NO_BIT),

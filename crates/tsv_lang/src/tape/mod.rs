@@ -169,10 +169,10 @@ pub fn header_of(entry: u16, mask: u32) -> u32 {
 }
 
 // The compile-time lookups a direct writer's sites make (`tsv_css`'s `entry!` / `bit!` /
-// `keyword!`), each in a `const` so a name the table lacks fails the build. Each is the
-// generated `const fn` match of `shapes` (`entry_named`, `field_named`, `keyword_named`) with
-// the miss turned into that build error; a lookup a site can only make at run time asks the
-// same generated match.
+// `keyword!`, `tsv_ts`'s site macros), each in a `const` so a name the table lacks fails the
+// build. Each is the generated `const fn` match of `shapes` (`entry_named`, `field_named`,
+// `keyword_named`) with the miss turned into that build error. No writer asks them at run time:
+// a shipped tape copy carries none of the generated matches.
 
 /// The id of the tape entry named `name` (`css:Rule`, `~CSSRuleMetadata`).
 #[must_use]
@@ -223,6 +223,61 @@ pub const fn keyword_id(vocab: u16, word: &str) -> u32 {
         Some(index) => index,
         None => panic!("the keyword is outside its vocabulary"),
     }
+}
+
+/// [`COMMENT_BITS`]'s value for an entry without that field.
+#[cfg(feature = "_tape_literals")]
+pub(crate) const NO_COMMENTS: u8 = u8::MAX - 1;
+
+/// Each entry's `leadingComments` and `trailingComments` presence bits ([`NO_COMMENTS`]: the
+/// entry has no such field), built from the tables at build time — the one run-time question
+/// a writer's comment attach asks (it closes every kind of node), answered by an index rather
+/// than a lookup by name.
+#[cfg(feature = "_tape_literals")]
+pub(crate) static COMMENT_BITS: [[u8; 2]; shapes::ENTRIES.len()] = comment_bits();
+
+#[cfg(feature = "_tape_literals")]
+const fn comment_bits() -> [[u8; 2]; shapes::ENTRIES.len()] {
+    const fn is(key: &str, name: &str) -> bool {
+        let (a, b) = (key.as_bytes(), name.as_bytes());
+        if a.len() != b.len() {
+            return false;
+        }
+        let mut i = 0;
+        while i < a.len() {
+            if a[i] != b[i] {
+                return false;
+            }
+            i += 1;
+        }
+        true
+    }
+    let mut bits = [[NO_COMMENTS; 2]; shapes::ENTRIES.len()];
+    let mut e = 0;
+    while e < shapes::ENTRIES.len() {
+        let fields = shapes::ENTRIES[e].fields;
+        let mut i = 0;
+        while i < fields.len() {
+            let f = fields[i];
+            let side = if is(f.key, "leadingComments") {
+                0
+            } else if is(f.key, "trailingComments") {
+                1
+            } else {
+                2
+            };
+            if side < 2 {
+                assert!(
+                    matches!(f.enc, Enc::List) && f.bit != NO_COMMENTS && f.bit != NO_BIT,
+                    "a comment field is a list with a presence bit"
+                );
+                bits[e][side] = f.bit;
+            }
+            i += 1;
+        }
+        e += 1;
+    }
+    bits
 }
 
 /// What a record's header word says.

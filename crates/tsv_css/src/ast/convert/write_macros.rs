@@ -213,22 +213,41 @@ macro_rules! keyed {
     }};
 }
 
-/// A keyword field's value: an escape-free token on the JSON wire, its vocabulary index on the
-/// tape (a word outside the vocabulary refuses the tape — `tsv_lang::tape::SinkError::Keyword`).
+/// A keyword field's value: an escape-free token `$s` on the JSON wire, its vocabulary index `$i`
+/// on the tape (`keyword_index!`, resolved at build time).
 macro_rules! keyword {
-    ($w:ident; $t:ident . $f:ident, $s:expr) => {{
+    ($w:ident; $t:ident . $f:ident, $s:expr, $i:expr) => {{
         let s: &'static str = $s;
         tape! {
-            $w.t_keyword(
+            $w.t_keyword_id(
                 {
                     const A: u16 = ::tsv_lang::tape::field_aux(entry!($t), stringify!($f));
                     A
                 },
-                s,
+                $i,
             );
         }
+        json_only! { let () = $i; }
         $w.token(s);
     }};
+}
+
+/// The build-time index of `$v`'s word (`$v.as_str()`, `$v` of enum `$e`, its variants listed —
+/// a variant left out fails the match) in entry `$t`'s keyword field `$f`: a `u32` in the tape
+/// copy, nothing (`()`) in the JSON copy, which writes the word.
+macro_rules! keyword_index {
+    ($t:ident . $f:ident, $v:expr, $e:path => [$($var:ident),+ $(,)?]) => {
+        copy_pick!((), {
+            use $e as T;
+            const A: u16 = ::tsv_lang::tape::field_aux(entry!($t), stringify!($f));
+            match $v {
+                $(T::$var => {
+                    const I: u32 = ::tsv_lang::tape::keyword_id(A, T::$var.as_str());
+                    I
+                })+
+            }
+        })
+    };
 }
 
 /// A static escape-free string in a ref position: a token on the JSON wire, a ref on the tape.

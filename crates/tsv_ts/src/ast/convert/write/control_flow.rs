@@ -195,7 +195,7 @@ pub(super) fn write_try_statement(
         write_block_statement(w, &clause.body, ctx);
         close_node(w, "CatchClause", clause.span, ctx);
     });
-    raw!(w, ",\"finalizer\":");
+    raw!(w, "TryStatement", ",\"finalizer\":");
     write_or_null(w, try_stmt.finalizer.as_ref(), |w, f| {
         write_block_statement(w, f, ctx);
     });

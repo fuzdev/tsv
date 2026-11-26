@@ -26,7 +26,11 @@ pub(super) fn write_arrow_function_expression(
     ctx: &Ctx<'_>,
 ) {
     node_header!(w, "ArrowFunctionExpression", span, ctx);
-    write_return_type_field(w, arrow.return_type.as_ref(), ctx);
+    write_return_type_field::<{ at!("ArrowFunctionExpression") }>(
+        w,
+        arrow.return_type.as_ref(),
+        ctx,
+    );
     pick!(
         w,
         "ArrowFunctionExpression",
@@ -44,7 +48,11 @@ pub(super) fn write_arrow_function_expression(
     write_expressions(w, ctx.view.exprs(arrow.params), ctx);
     raw!(w, "ArrowFunctionExpression", ",\"body\":");
     write_arrow_body(w, &arrow.body, ctx);
-    write_type_parameters_field(w, arrow.type_parameters.as_ref(), ctx);
+    write_type_parameters_field::<{ at!("ArrowFunctionExpression") }>(
+        w,
+        arrow.type_parameters.as_ref(),
+        ctx,
+    );
     close_node(w, "ArrowFunctionExpression", span, ctx);
 }
 
@@ -71,11 +79,15 @@ pub(super) fn write_function_expression(
     write_or_null(w, func.id.as_ref(), |w, id| {
         write_identifier_with_optional(w, id, ctx);
     });
-    write_function_flags_fields(w, func.generator, func.r#async);
-    write_type_parameters_field(w, func.type_parameters.as_ref(), ctx);
+    write_function_flags_fields::<{ at!("FunctionExpression") }>(w, func.generator, func.r#async);
+    write_type_parameters_field::<{ at!("FunctionExpression") }>(
+        w,
+        func.type_parameters.as_ref(),
+        ctx,
+    );
     raw!(w, "FunctionExpression", ",\"params\":");
     write_expressions(w, ctx.view.exprs(func.params), ctx);
-    write_return_type_field(w, func.return_type.as_ref(), ctx);
+    write_return_type_field::<{ at!("FunctionExpression") }>(w, func.return_type.as_ref(), ctx);
     raw!(w, "FunctionExpression", ",\"body\":");
     write_block_statement(w, &func.body, ctx);
     close_node(w, "FunctionExpression", func.span, ctx);
@@ -93,7 +105,11 @@ pub(super) fn write_new_expression(
     node_header!(w, "NewExpression", span, ctx);
     raw!(w, "NewExpression", ",\"callee\":");
     write_expression(w, ctx.view.expr(new_expr.callee), ctx);
-    write_type_arguments_field(w, new_expr.type_arguments(ctx.view), ctx);
+    write_type_arguments_field::<{ at!("NewExpression") }>(
+        w,
+        new_expr.type_arguments(ctx.view),
+        ctx,
+    );
     raw!(w, "NewExpression", ",\"arguments\":");
     write_expressions(
         w,
@@ -137,7 +153,7 @@ pub(super) fn write_call_expression_tail(
     force_optional: bool,
     strip_optional: bool,
 ) {
-    raw!(w, ",\"arguments\":");
+    raw!(w, "CallExpression", ",\"arguments\":");
     write_expressions(
         w,
         ctx.view
@@ -146,11 +162,11 @@ pub(super) fn write_call_expression_tail(
             .map(|e| ctx.view.expr(*e)),
         ctx,
     );
-    write_type_arguments_field(w, call.type_arguments(ctx.view), ctx);
+    write_type_arguments_field::<{ at!("CallExpression") }>(w, call.type_arguments(ctx.view), ctx);
     if strip_optional {
         // Omitted along an unparenthesized decorator's call/member spine.
     } else if force_optional {
-        raw!(w, ",\"optional\":true");
+        raw!(w, "CallExpression", ",\"optional\":true");
     } else {
         // acorn-typescript omits `optional` on a typeArguments call unless the
         // call is part of an optional chain; the chain test is the call's own
@@ -169,6 +185,7 @@ pub(super) fn write_call_expression_tail(
         {
             pick!(
                 w,
+                "CallExpression",
                 call.optional,
                 ",\"optional\":true",
                 ",\"optional\":false"
@@ -190,7 +207,7 @@ pub(super) fn write_member_expression_tail(
     force_optional: bool,
     strip_optional: bool,
 ) {
-    raw!(w, ",\"property\":");
+    raw!(w, "MemberExpression", ",\"property\":");
     write_expression(w, ctx.view.expr(member.property), ctx);
     // One literal per value, `optional` folded in where it is written: both
     // flags are nearly always `false`, so each branch predicts at its site.
@@ -199,6 +216,7 @@ pub(super) fn write_member_expression_tail(
         // call/member spine.
         pick!(
             w,
+            "MemberExpression",
             member.computed,
             ",\"computed\":true",
             ",\"computed\":false"
@@ -206,6 +224,7 @@ pub(super) fn write_member_expression_tail(
     } else if force_optional || member.optional {
         pick!(
             w,
+            "MemberExpression",
             member.computed,
             ",\"computed\":true,\"optional\":true",
             ",\"computed\":false,\"optional\":true"
@@ -213,6 +232,7 @@ pub(super) fn write_member_expression_tail(
     } else {
         pick!(
             w,
+            "MemberExpression",
             member.computed,
             ",\"computed\":true,\"optional\":false",
             ",\"computed\":false,\"optional\":false"

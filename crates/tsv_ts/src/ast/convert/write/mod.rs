@@ -42,7 +42,7 @@
 use super::bigint_to_decimal;
 // The functions each mount writes its own way (`write_json.rs`, `write_tape.rs`).
 use super::{
-    header_run, write_chain_any, write_identifier_plain, write_literal_fields_any,
+    ChildKey, Ent, header_run, write_chain_any, write_identifier_plain, write_literal_fields_any,
     write_name_field, write_number_value,
 };
 use crate::ast;
@@ -234,7 +234,13 @@ fn write_program(w: &mut Sink<'_>, program: &ast::Program, ctx: &Ctx<'_>) {
         write_statement(w, ctx.view.stmt(*s), ctx);
     });
     raw!(w, "Program", ",\"sourceType\":");
-    w.token(program.goal.source_type());
+    keyword!(
+        w,
+        token,
+        program.goal => source_type,
+        crate::Goal => [Module, Script],
+        "Program"."sourceType"
+    );
     close_node(w, "Program", program.span, ctx);
 }
 
@@ -364,15 +370,17 @@ pub(super) fn close_node(w: &mut Sink<'_>, node_type: &'static str, span: Span, 
 }
 
 /// Emit a node with no fields beyond the universal prefix (`ThisExpression`,
-/// `Super`, keyword types, …).
+/// `Super`, keyword types, …): `node_type` on the JSON wire, `entry` (`ent!`) on the tape.
 #[inline]
 pub(super) fn write_bare_node(
     w: &mut Sink<'_>,
     node_type: &'static str,
+    entry: Ent,
     span: Span,
     ctx: &Ctx<'_>,
 ) {
-    node_header!(w, @dyn node_type, span, ctx);
+    json_only! { let () = entry; }
+    node_header!(w, @dyn node_type => entry, span, ctx);
     close_node(w, node_type, span, ctx);
 }
 
@@ -499,6 +507,7 @@ pub(super) fn node_header(w: &mut Sink<'_>, node_type: &'static str, span: Span,
 pub(super) fn node_header_wide_end(
     w: &mut Sink<'_>,
     node_type: &'static str,
+    entry: Ent,
     span: Span,
     wire_end: u32,
     ctx: &Ctx<'_>,
@@ -506,7 +515,16 @@ pub(super) fn node_header_wide_end(
     let wire_end = wire_end.max(span.end);
     #[cfg(debug_assertions)]
     debug_assert_overhanging_node_is_island_root(node_type, span, wire_end, ctx);
-    tape! { w.t_open_named(node_type); }
+    tape! {
+        #[cfg(debug_assertions)]
+        assert_eq!(
+            ::tsv_lang::tape::shapes::ENTRIES[usize::from(entry)].ty,
+            Some(node_type),
+            "a header's tape entry is its JSON type's"
+        );
+        w.t_open(entry);
+    }
+    json_only! { let () = entry; }
     attach_open(node_type, span, ctx);
     header_run::<false>(w, node_type, Span::new(span.start, wire_end), ctx);
 }
@@ -549,26 +567,26 @@ fn node_header_impl<const CHARACTER: bool>(
 
 /// Emit `,"typeParameters":<declaration>` when present (skip-if-none field).
 #[inline]
-pub(super) fn write_type_parameters_field(
+pub(super) fn write_type_parameters_field<const E: u16>(
     w: &mut Sink<'_>,
     type_parameters: Option<&ast::TSTypeParameterDeclaration>,
     ctx: &Ctx<'_>,
 ) {
     if let Some(tp) = type_parameters {
-        raw!(w, ",\"typeParameters\":");
+        raw!(w, @E, ",\"typeParameters\":");
         write_type_parameter_declaration(w, tp, ctx);
     }
 }
 
 /// Emit `,"typeArguments":<instantiation>` when present (skip-if-none field).
 #[inline]
-pub(super) fn write_type_arguments_field(
+pub(super) fn write_type_arguments_field<const E: u16>(
     w: &mut Sink<'_>,
     type_arguments: Option<&ast::TSTypeParameterInstantiation>,
     ctx: &Ctx<'_>,
 ) {
     if let Some(ta) = type_arguments {
-        raw!(w, ",\"typeArguments\":");
+        raw!(w, @E, ",\"typeArguments\":");
         write_type_parameter_instantiation(w, ta, ctx);
     }
 }
@@ -577,26 +595,26 @@ pub(super) fn write_type_arguments_field(
 /// also the wire name of `TSMethodSignature`/signature-declaration return
 /// types).
 #[inline]
-pub(super) fn write_type_annotation_field(
+pub(super) fn write_type_annotation_field<const E: u16>(
     w: &mut Sink<'_>,
     type_annotation: Option<&ast::TSTypeAnnotation>,
     ctx: &Ctx<'_>,
 ) {
     if let Some(ta) = type_annotation {
-        raw!(w, ",\"typeAnnotation\":");
+        raw!(w, @E, ",\"typeAnnotation\":");
         write_type_annotation(w, ta, ctx);
     }
 }
 
 /// Emit `,"returnType":<annotation>` when present (skip-if-none field).
 #[inline]
-pub(super) fn write_return_type_field(
+pub(super) fn write_return_type_field<const E: u16>(
     w: &mut Sink<'_>,
     return_type: Option<&ast::TSTypeAnnotation>,
     ctx: &Ctx<'_>,
 ) {
     if let Some(rt) = return_type {
-        raw!(w, ",\"returnType\":");
+        raw!(w, @E, ",\"returnType\":");
         write_type_annotation(w, rt, ctx);
     }
 }
@@ -606,9 +624,14 @@ pub(super) fn write_return_type_field(
 /// constant `expression` field, the `generator` field and the `async` key fold
 /// into one literal per `generator` value.
 #[inline]
-pub(super) fn write_function_flags_fields(w: &mut Sink<'_>, generator: bool, r#async: bool) {
+pub(super) fn write_function_flags_fields<const E: u16>(
+    w: &mut Sink<'_>,
+    generator: bool,
+    r#async: bool,
+) {
     pick!(
         w,
+        @E,
         generator,
         ",\"expression\":false,\"generator\":true,\"async\":",
         ",\"expression\":false,\"generator\":false,\"async\":"
@@ -622,30 +645,30 @@ pub(super) fn write_function_flags_fields(w: &mut Sink<'_>, generator: bool, r#a
 /// appends the whole field as one literal rather than the key followed by a
 /// runtime-chosen token.
 #[inline]
-pub(super) fn write_import_kind_field(
+pub(super) fn write_import_kind_field<const E: u16>(
     w: &mut Sink<'_>,
     import_kind: ast::ImportKind,
     ctx: &Ctx<'_>,
 ) {
     match import_kind {
-        ast::ImportKind::Type => raw!(w, ",\"importKind\":\"type\""),
+        ast::ImportKind::Type => raw!(w, @E, ",\"importKind\":\"type\""),
         ast::ImportKind::Value if ctx.vanilla_acorn => {}
-        ast::ImportKind::Value => raw!(w, ",\"importKind\":\"value\""),
+        ast::ImportKind::Value => raw!(w, @E, ",\"importKind\":\"value\""),
     }
 }
 
 /// Emit `,"exportKind":"type"|"value"`, with the same omission rule as
 /// [`write_import_kind_field`].
 #[inline]
-pub(super) fn write_export_kind_field(
+pub(super) fn write_export_kind_field<const E: u16>(
     w: &mut Sink<'_>,
     export_kind: ast::ExportKind,
     ctx: &Ctx<'_>,
 ) {
     match export_kind {
-        ast::ExportKind::Type => raw!(w, ",\"exportKind\":\"type\""),
+        ast::ExportKind::Type => raw!(w, @E, ",\"exportKind\":\"type\""),
         ast::ExportKind::Value if ctx.vanilla_acorn => {}
-        ast::ExportKind::Value => raw!(w, ",\"exportKind\":\"value\""),
+        ast::ExportKind::Value => raw!(w, @E, ",\"exportKind\":\"value\""),
     }
 }
 
@@ -663,7 +686,7 @@ pub(super) fn write_literal(w: &mut Sink<'_>, lit: &ast::Literal, ctx: &Ctx<'_>)
 /// A `Literal`'s `value`, `raw` and (for a BigInt) `bigint` fields, field by
 /// field — every literal's general emission.
 pub(super) fn write_literal_fields(w: &mut Sink<'_>, lit: &ast::Literal, ctx: &Ctx<'_>) {
-    raw!(w, ",\"value\":");
+    raw!(w, "Literal", ",\"value\":");
     // `bigint` is emitted only for BigInt literals (`skip_serializing_if` on
     // `Option`), and shares the decimal string with `value`.
     let mut bigint: Option<String> = None;
@@ -682,7 +705,7 @@ pub(super) fn write_literal_fields(w: &mut Sink<'_>, lit: &ast::Literal, ctx: &C
     }
     let raw = lit.span.extract(ctx.source);
     if let ast::LiteralValue::String(_) = lit.value {
-        raw!(w, ",\"raw\":");
+        raw!(w, "Literal", ",\"raw\":");
         w.string(raw);
     } else {
         // A numeric, BigInt, boolean or `null` token is escape-free by grammar —
@@ -690,12 +713,12 @@ pub(super) fn write_literal_fields(w: &mut Sink<'_>, lit: &ast::Literal, ctx: &C
         // raw text takes the name field's unscanned write.
         json_only! { w.string_escape_free_led(b",\"raw\":", raw.as_bytes()); }
         tape! {
-            raw!(w, ",\"raw\":");
+            raw!(w, "Literal", ",\"raw\":");
             w.string(raw);
         }
     }
     if let Some(decimal) = bigint {
-        raw!(w, ",\"bigint\":");
+        raw!(w, "Literal", ",\"bigint\":");
         w.string(&decimal);
     }
 }
@@ -770,13 +793,13 @@ fn write_identifier_tail(
     ctx: &Ctx<'_>,
 ) {
     if optional {
-        raw!(w, ",\"optional\":true");
+        raw!(w, "Identifier", ",\"optional\":true");
     }
-    write_type_annotation_field(w, type_annotation, ctx);
+    write_type_annotation_field::<{ at!("Identifier") }>(w, type_annotation, ctx);
     if let Some(decs) = decorators
         && !decs.is_empty()
     {
-        raw!(w, ",\"decorators\":");
+        raw!(w, "Identifier", ",\"decorators\":");
         write_array(w, decs, |w, d| write_decorator(w, d, ctx));
     }
     close_node(w, "Identifier", span, ctx);

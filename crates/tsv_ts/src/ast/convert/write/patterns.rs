@@ -4,7 +4,7 @@ use super::declarations::write_decorators_field;
 use super::expressions::{write_expression, write_expressions};
 use super::functions::write_function_expression;
 use super::{
-    Ctx, Sink, close_node, node_header, node_header_wide_end, write_array,
+    Ctx, Ent, Sink, close_node, node_header, node_header_wide_end, write_array,
     write_type_annotation_field,
 };
 use crate::ast;
@@ -20,13 +20,14 @@ use tsv_lang::Span;
 pub(super) fn pattern_header(
     w: &mut Sink<'_>,
     node_type: &'static str,
+    entry: Ent,
     span: Span,
     type_annotation: Option<&ast::TSTypeAnnotation>,
     ctx: &Ctx<'_>,
 ) {
     match type_annotation {
-        Some(ta) => node_header_wide_end(w, node_type, span, ta.span.end, ctx),
-        None => node_header!(w, @dyn node_type, span, ctx),
+        Some(ta) => node_header_wide_end(w, node_type, entry, span, ta.span.end, ctx),
+        None => node_header!(w, @dyn node_type => entry, span, ctx),
     }
 }
 
@@ -100,17 +101,24 @@ pub(super) fn write_object_pattern(
     span: Span,
     ctx: &Ctx<'_>,
 ) {
-    pattern_header(w, "ObjectPattern", span, obj.type_annotation(ctx.view), ctx);
-    raw!(w, ",\"properties\":");
+    pattern_header(
+        w,
+        "ObjectPattern",
+        ent!("ObjectPattern"),
+        span,
+        obj.type_annotation(ctx.view),
+        ctx,
+    );
+    raw!(w, "ObjectPattern", ",\"properties\":");
     write_array(w, ctx.view.pat_props(obj.properties), |w, p| match p {
         ast::ObjectPatternProperty::Property(p) => write_property(w, p, ctx),
         ast::ObjectPatternProperty::RestElement(r) => write_rest_element(w, r, ctx),
     });
     if obj.optional {
-        raw!(w, ",\"optional\":true");
+        raw!(w, "ObjectPattern", ",\"optional\":true");
     }
-    write_type_annotation_field(w, obj.type_annotation(ctx.view), ctx);
-    write_decorators_field(w, obj.decorators(ctx.view), ctx);
+    write_type_annotation_field::<{ at!("ObjectPattern") }>(w, obj.type_annotation(ctx.view), ctx);
+    write_decorators_field::<{ at!("ObjectPattern") }>(w, obj.decorators(ctx.view), ctx);
     close_node(w, "ObjectPattern", span, ctx);
 }
 
@@ -124,7 +132,7 @@ pub(super) fn write_rest_element(w: &mut Sink<'_>, rest: &ast::RestElement, ctx:
     if rest.optional {
         raw!(w, "RestElement", ",\"optional\":true");
     }
-    write_type_annotation_field(w, rest.type_annotation(ctx.view), ctx);
+    write_type_annotation_field::<{ at!("RestElement") }>(w, rest.type_annotation(ctx.view), ctx);
     close_node(w, "RestElement", rest.span, ctx);
 }
 
@@ -176,7 +184,13 @@ pub(super) fn write_property(w: &mut Sink<'_>, prop: &ast::Property, ctx: &Ctx<'
         ast::PropertyKind::Init => raw!(w, "Property", ",\"kind\":\"init\""),
         kind => {
             raw!(w, "Property", ",\"kind\":\"");
-            quoted!(w, kind.as_str());
+            keyword!(
+                w,
+                quoted,
+                kind => as_str,
+                ast::PropertyKind => [Init, Get, Set],
+                "Property"."kind"
+            );
             raw!(w, "\"");
         }
     }
@@ -241,6 +255,10 @@ pub(super) fn write_assignment_pattern(
     write_expression(w, ctx.view.expr(pattern.left), ctx);
     raw!(w, "AssignmentPattern", ",\"right\":");
     write_expression(w, ctx.view.expr(pattern.right), ctx);
-    write_decorators_field(w, ctx.view.opt_decorators(pattern.decorators), ctx);
+    write_decorators_field::<{ at!("AssignmentPattern") }>(
+        w,
+        ctx.view.opt_decorators(pattern.decorators),
+        ctx,
+    );
     close_node(w, "AssignmentPattern", span, ctx);
 }

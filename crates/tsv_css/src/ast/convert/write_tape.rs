@@ -18,6 +18,13 @@ macro_rules! json_only {
     ($($t:tt)*) => {};
 }
 
+/// The tape copy's half of an expression each copy spells its own way.
+macro_rules! copy_pick {
+    ($json:expr, $tape:expr) => {
+        $tape
+    };
+}
+
 #[path = "declaration_split.rs"]
 #[expect(
     clippy::duplicate_mod,

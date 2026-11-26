@@ -4,11 +4,13 @@
 //!
 //! A tape copy's site hands its JSON literal to [`literal_ops`] in a `const` (through its site
 //! macro), so the literal is the site's one statement of its bytes: the JSON copy writes it, the
-//! tape copy replays its ops with [`super::TapeWriter::t_lit`]. When the site names the record
-//! its keys belong to, every key is resolved here, and a key the entry lacks fails the build;
-//! a site shared by several entries leaves the record to run time ([`LitOp::KeyNamed`]). A value
-//! is resolved against the field its key declared ([`super::TapeWriter`]'s pending field), so
-//! `false` is a boolean word where the field is a boolean and a tag where it is a tagged value.
+//! tape copy replays its ops with [`super::TapeWriter::t_lit`]. A literal holding a key names
+//! the entry its keys belong to, and every key is resolved here: a key the entry lacks, or a key
+//! in a literal that names no entry, fails the build — nothing about a literal is looked up by
+//! name at run time. A keyword field's value the literal holds is resolved here too, to its
+//! index in the field's vocabulary ([`LitOp::Keyword`]). Any other value is resolved against
+//! the field its key declared ([`super::TapeWriter`]'s pending field), so `false` is a boolean
+//! word where the field is a boolean and a tag where it is a tagged value.
 //!
 //! The reader takes the writers' literals, not JSON in general: compact, escape-free strings, no
 //! number but an unsigned integer, and a `type`-less object only under a key whose field names
@@ -16,7 +18,7 @@
 //! (`,"operator":"` … `","prefix":true`) — a literal's trailing opening quote and its leading
 //! closing one belong to that value, whose own data call writes it.
 
-use super::{Field, NO_AUX, shapes};
+use super::{Enc, Field, NO_AUX, shapes};
 
 /// One step of a literal on the tape. Module doc.
 #[derive(Clone, Copy)]
@@ -27,15 +29,21 @@ pub enum LitOp {
     OpenObject(u16),
     /// `}`: the open record closes.
     Close,
-    /// `"k":` of a record the literal knows: the entry's field.
+    /// `"k":`: the field `k` of the entry the site names.
     Key {
-        /// The entry the site names (checked against the open record in debug builds).
+        /// The entry the site names (the open record must be its record — checked as the
+        /// tape is written, in every build).
         entry: u16,
         /// Its field `k`.
         field: Field,
     },
-    /// `"k":` of whatever record is open, looked up at run time.
-    KeyNamed(&'static str),
+    /// A keyword field's value: its index in the field's vocabulary.
+    Keyword {
+        /// The vocabulary (the field's `aux`).
+        vocab: u16,
+        /// The word's index in it.
+        index: u32,
+    },
     /// `true`.
     True,
     /// `false`.
@@ -57,7 +65,8 @@ pub enum LitOp {
 /// What the reader knows about one open level of the literal.
 #[derive(Clone, Copy)]
 enum Level {
-    /// A record: its entry, or `None` when it is left to run time.
+    /// A record: its entry, or `None` for one the literal did not open and no key of it has
+    /// read yet (the site's named entry is its keys' record).
     Record(Option<u16>),
     /// A list.
     List,
@@ -65,27 +74,29 @@ enum Level {
 
 const MAX_DEPTH: usize = 16;
 
-/// The ops of literal `lit`, its first keys belonging to entry `start` (`None`: whatever record
-/// is open at run time). `N` must be `literal_len(start, lit)`.
+/// The ops of literal `lit`, its keys belonging to entry `start` (`None`: a literal that holds
+/// no key — one that does fails the build). `N` must be `literal_len(lit)`.
 #[must_use]
 pub const fn literal_ops<const N: usize>(start: Option<u16>, lit: &'static str) -> [LitOp; N] {
     let mut out = [LitOp::Close; N];
     assert!(
-        scan(start, lit, &mut out) == N,
+        scan(start, lit, &mut out, true) == N,
         "a literal's op count must be its `literal_len`"
     );
     out
 }
 
-/// How many ops literal `lit` has ([`literal_ops`]).
+/// How many ops literal `lit` has ([`literal_ops`]) — a count of its tokens alone, whatever
+/// entry its keys belong to, so a site whose entry is a const generic sizes its ops without
+/// naming it.
 ///
 /// `#[inline]`, as every reader here is in effect: a writer evaluates it in a `const`, so no
 /// build carries it as code — the attribute keeps the crate from emitting it (and the reader
 /// beneath it) into every build that enables `_tape`, the bindings' among them.
 #[must_use]
 #[inline]
-pub const fn literal_len(start: Option<u16>, lit: &'static str) -> usize {
-    scan(start, lit, &mut [])
+pub const fn literal_len(lit: &'static str) -> usize {
+    scan(None, lit, &mut [], false)
 }
 
 /// `lit[from..to]`, borrowed for `'static` (the literal is ASCII-checked by [`scan`]).
@@ -110,17 +121,21 @@ const fn push(levels: &mut [Level; MAX_DEPTH], depth: &mut usize, level: Level) 
 }
 
 /// Reads `lit` into `out` (when it is long enough to hold every op; `&mut []` only counts) and
-/// returns the op count.
+/// returns the op count. `resolve`: look each name up (else count tokens only, naming nothing).
 #[expect(
     clippy::panic,
-    reason = "a compile-time reader: evaluated in a `const`, the panic is a build error"
+    clippy::too_many_lines,
+    reason = "a compile-time reader: evaluated in a `const`, the panic is a build error; one \
+              match over the literal's bytes"
 )]
-const fn scan(start: Option<u16>, lit: &'static str, out: &mut [LitOp]) -> usize {
+const fn scan(start: Option<u16>, lit: &'static str, out: &mut [LitOp], resolve: bool) -> usize {
     let bytes = lit.as_bytes();
     let mut levels = [Level::List; MAX_DEPTH];
-    levels[0] = Level::Record(start);
+    levels[0] = Level::Record(None);
     let mut depth = 1;
-    // the field the last key declared, for a `type`-less `{` after it
+    // whether a key has taken the site's named entry
+    let mut start_taken = false;
+    // the field the last key declared, for a `type`-less `{` or a keyword value after it
     let mut last: Option<Field> = None;
     let mut count = 0;
     let mut at = 0;
@@ -138,8 +153,13 @@ const fn scan(start: Option<u16>, lit: &'static str, out: &mut [LitOp]) -> usize
                 } else if starts_with_at(bytes, at + 1, b"\"type\":\"") {
                     let from = at + 9;
                     let to = string_end(bytes, from);
-                    let Some(entry) = shapes::entry_named(slice(lit, from, to).as_bytes()) else {
-                        panic!("no tape entry of that name");
+                    let entry = if resolve {
+                        match shapes::entry_named(slice(lit, from, to).as_bytes()) {
+                            Some(entry) => entry,
+                            None => panic!("no tape entry of that name"),
+                        }
+                    } else {
+                        0
                     };
                     op = LitOp::Open(entry);
                     push(&mut levels, &mut depth, Level::Record(Some(entry)));
@@ -147,26 +167,31 @@ const fn scan(start: Option<u16>, lit: &'static str, out: &mut [LitOp]) -> usize
                 } else {
                     let entry = match last {
                         Some(field) if field.aux != NO_AUX => field.aux,
+                        _ if !resolve => 0,
                         _ => panic!("a type-less object opens under a key that names no entry"),
                     };
                     op = LitOp::OpenObject(entry);
                     push(&mut levels, &mut depth, Level::Record(Some(entry)));
                     at += 1;
                 }
+                last = None;
             }
             b'}' => {
                 op = LitOp::Close;
                 pop(&mut levels, &mut depth);
+                last = None;
                 at += 1;
             }
             b'[' => {
                 op = LitOp::ListOpen;
                 push(&mut levels, &mut depth, Level::List);
+                last = None;
                 at += 1;
             }
             b']' => {
                 op = LitOp::ListClose;
                 pop(&mut levels, &mut depth);
+                last = None;
                 at += 1;
             }
             // a string value's quotes split across two literals, its text a data call between
@@ -185,26 +210,56 @@ const fn scan(start: Option<u16>, lit: &'static str, out: &mut [LitOp]) -> usize
                 let to = string_end(bytes, from);
                 let text = slice(lit, from, to);
                 if to + 1 < bytes.len() && bytes[to + 1] == b':' {
-                    op = match levels[depth - 1] {
-                        Level::Record(Some(entry)) => {
-                            let Some(index) = shapes::field_named(entry, text.as_bytes()) else {
-                                panic!("the tape entry has no field of that key");
-                            };
-                            let field = shapes::ENTRIES[entry as usize].fields[index as usize];
-                            last = Some(field);
-                            LitOp::Key { entry, field }
-                        }
-                        Level::Record(None) => {
-                            last = None;
-                            LitOp::KeyNamed(text)
-                        }
+                    let entry = match levels[depth - 1] {
+                        Level::Record(Some(entry)) => entry,
+                        // the site's named entry: the first key of a record the literal did
+                        // not open
+                        Level::Record(None) => match start {
+                            Some(entry) if !start_taken => {
+                                start_taken = true;
+                                levels[depth - 1] = Level::Record(Some(entry));
+                                entry
+                            }
+                            _ if !resolve => 0,
+                            Some(_) => panic!("a literal's keys belong to two records it names"),
+                            None => panic!("a literal holding a key must name its entry"),
+                        },
                         Level::List => panic!("a key inside a list"),
                     };
+                    let field = if resolve {
+                        match shapes::field_named(entry, text.as_bytes()) {
+                            Some(index) => shapes::ENTRIES[entry as usize].fields[index as usize],
+                            None => panic!("the tape entry has no field of that key"),
+                        }
+                    } else {
+                        Field {
+                            key: "",
+                            enc: Enc::Own,
+                            bit: super::NO_BIT,
+                            aux: NO_AUX,
+                        }
+                    };
+                    last = Some(field);
+                    op = LitOp::Key { entry, field };
                     at = to + 2;
-                } else {
-                    op = LitOp::Str(text);
-                    at = to + 1;
+                    if count < out.len() {
+                        out[count] = op;
+                    }
+                    count += 1;
+                    continue;
                 }
+                op = match last {
+                    Some(Field {
+                        enc: Enc::Keyword,
+                        aux,
+                        ..
+                    }) if resolve => match shapes::keyword_named(aux, text.as_bytes()) {
+                        Some(index) => LitOp::Keyword { vocab: aux, index },
+                        None => panic!("the keyword is outside its field's vocabulary"),
+                    },
+                    _ => LitOp::Str(text),
+                };
+                at = to + 1;
             }
             b't' if starts_with_at(bytes, at, b"true") => {
                 op = LitOp::True;
@@ -228,6 +283,9 @@ const fn scan(start: Option<u16>, lit: &'static str, out: &mut [LitOp]) -> usize
             }
             _ => panic!("a byte the literal reader does not take"),
         }
+        if !matches!(op, LitOp::Open(_) | LitOp::OpenObject(_)) {
+            last = None;
+        }
         if count < out.len() {
             out[count] = op;
         }
@@ -236,7 +294,8 @@ const fn scan(start: Option<u16>, lit: &'static str, out: &mut [LitOp]) -> usize
     count
 }
 
-/// Closes a level; closing past the literal's first level leaves the record below to run time.
+/// Closes a level; closing past the literal's first level reaches a record the literal did not
+/// open, whose keys are the site's named entry's.
 const fn pop(levels: &mut [Level; MAX_DEPTH], depth: &mut usize) {
     if *depth > 1 {
         *depth -= 1;
@@ -280,13 +339,13 @@ const fn string_end(b: &[u8], from: usize) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tape::{Enc, entry_id};
+    use crate::tape::{Enc, entry_id, field_aux, keyword_id};
 
     #[test]
     fn literal_reads_keys_values_and_records() {
         const E: Option<u16> = Some(entry_id("Identifier"));
         const S: &str = ",\"optional\":false,\"typeAnnotation\":";
-        const OPS: [LitOp; literal_len(E, S)] = literal_ops(E, S);
+        const OPS: [LitOp; literal_len(S)] = literal_ops(E, S);
         assert_eq!(OPS.len(), 3);
         assert!(
             matches!(OPS[0], LitOp::Key { field, .. } if field.key == "optional"
@@ -295,22 +354,32 @@ mod tests {
         assert!(matches!(OPS[1], LitOp::False));
         assert!(matches!(OPS[2], LitOp::Key { field, .. } if field.key == "typeAnnotation"));
 
-        const D: &str = "}],\"x\":[]";
-        const DOPS: [LitOp; literal_len(None, D)] = literal_ops(None, D);
+        // a literal that closes a record it did not open: its key is the named entry's
+        const TE: Option<u16> = Some(entry_id("TemplateElement"));
+        const D: &str = "},\"tail\":true";
+        const DOPS: [LitOp; literal_len(D)] = literal_ops(TE, D);
         assert!(matches!(
             DOPS,
-            [
-                LitOp::Close,
-                LitOp::ListClose,
-                LitOp::KeyNamed("x"),
-                LitOp::ListOpen,
-                LitOp::ListClose
-            ]
+            [LitOp::Close, LitOp::Key { entry, field }, LitOp::True]
+                if Some(entry) == TE && field.key == "tail"
         ));
 
         const T: &str = "{\"type\":\"Literal\",\"value\":{}";
-        const TOPS: [LitOp; literal_len(None, T)] = literal_ops(None, T);
+        const TOPS: [LitOp; literal_len(T)] = literal_ops(None, T);
         assert!(matches!(TOPS[0], LitOp::Open(e) if e == entry_id("Literal")));
         assert!(matches!(TOPS[2], LitOp::EmptyObject));
+
+        // a keyword field's value resolves to its index
+        const V: Option<u16> = Some(entry_id("VariableDeclaration"));
+        const K: &str = ",\"kind\":\"let\"";
+        const KOPS: [LitOp; literal_len(K)] = literal_ops(V, K);
+        const VOCAB: u16 = field_aux(entry_id("VariableDeclaration"), "kind");
+        assert!(matches!(
+            KOPS[1],
+            LitOp::Keyword { vocab, index } if vocab == VOCAB && index == keyword_id(VOCAB, "let")
+        ));
+
+        // the count reads no name
+        assert_eq!(literal_len("}],\"x\":[]"), 5);
     }
 }

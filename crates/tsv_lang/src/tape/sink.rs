@@ -17,14 +17,15 @@
 //! transcoder as a canonicalizer (`transcode(tape_to_json(direct)) == transcode(json)`), not
 //! byte for byte against the transcoder's own.
 //!
-//! A writer bug the sink can see — a keyword outside its vocabulary, a name the tables lack, a
-//! record or list left open or closed twice — is recorded as the first [`SinkError`] and refuses
+//! A writer bug the sink can see — a keyword field's value written as a word, a key of an entry
+//! other than the open record's, a record or list left open or closed twice — is recorded as
+//! the first [`SinkError`] and refuses
 //! the tape at [`TapeSink::finish_words`] / [`TapeSink::finish_bytes`], in every build: a tape
 //! that would decode to another tree is never handed out.
 
 #[cfg(feature = "_tape_literals")]
-use super::{Enc, LitOp, TAG_FALSE, TAG_NULL, TAG_NUMBER, TAG_OBJECT, TAG_STRING, TAG_TRUE};
-use super::{Field, HEADER_WORDS, MAGIC, NO_BIT, NULL_REF, header_of, shapes};
+use super::{Enc, Field, LitOp, TAG_FALSE, TAG_NULL, TAG_NUMBER, TAG_OBJECT, TAG_STRING, TAG_TRUE};
+use super::{HEADER_WORDS, MAGIC, NO_BIT, NULL_REF, header_of, shapes};
 use crate::{LeadingBom, SpanWords, WirePositions, WireSink, leading_bom_len};
 
 /// Why a tape could not be finished.
@@ -32,9 +33,12 @@ use crate::{LeadingBom, SpanWords, WirePositions, WireSink, leading_bom_len};
 pub enum SinkError {
     /// A source, tape or pool past the format's sizes.
     TooLarge,
-    /// A keyword field's value outside its vocabulary.
+    /// A keyword field's value written as a word rather than its index (a writer that states
+    /// its keys writes every keyword by its build-time index), or an index of a vocabulary
+    /// other than its field's.
     Keyword,
-    /// An entry name, or a field key of the open record's entry, the tables lack.
+    /// A key written for an entry other than the open record's, or a field the open record's
+    /// entry lacks.
     Name,
     /// A record or list closed with none open, left open at the finish, a field key or a mask
     /// bit with no record open on top, or a JSON-only path taken on the tape.
@@ -279,8 +283,9 @@ impl TapeWriter<'_> {
     }
 
     /// The open record's entry's field `key` (`None` with no record open, or a key it lacks) —
-    /// for a writer's debug assertion about a field it writes without declaring the key.
-    #[cfg(feature = "_tape_literals")]
+    /// for a writer's debug assertion about a field it writes without declaring the key. Debug
+    /// builds alone: it asks the generated lookup by name, which no release build carries.
+    #[cfg(all(feature = "_tape_literals", debug_assertions))]
     #[must_use]
     pub fn t_top_field(&self, key: &str) -> Option<Field> {
         match self.sink.frames.last() {
@@ -290,21 +295,13 @@ impl TapeWriter<'_> {
         }
     }
 
-    /// The open record's entry's field `key`, by the generated lookup.
-    fn top_field(&mut self, key: &str) -> Option<Field> {
-        let entry = match self.sink.frames.last() {
-            Some(f) if f.entry != LIST => f.entry,
-            _ => {
-                self.fail(SinkError::Unbalanced);
-                return None;
-            }
-        };
-        match shapes::field_named(entry, key.as_bytes()) {
-            Some(i) => Some(shapes::ENTRIES[usize::from(entry)].fields[usize::from(i)]),
-            None => {
-                self.fail(SinkError::Name);
-                None
-            }
+    /// The open record's entry, or `None` with no record open on top.
+    #[cfg(feature = "_tape_literals")]
+    #[inline]
+    fn top_entry(&self) -> Option<u16> {
+        match self.sink.frames.last() {
+            Some(f) if f.entry != LIST => Some(f.entry),
+            _ => None,
         }
     }
 
@@ -318,21 +315,6 @@ impl TapeWriter<'_> {
         self.enter_record();
         self.count_item();
         self.push_frame(entry);
-    }
-
-    /// A typed record opens whose entry is known only at run time, by its name
-    /// (`ENTRIES[id].name`). Out of line where a tape copy states its sites through literals
-    /// (it opens many records by name, and the generated lookup is a large match).
-    #[cfg_attr(feature = "_tape_literals", inline(never))]
-    #[cfg_attr(not(feature = "_tape_literals"), inline)]
-    pub fn t_open_named(&mut self, name: &str) {
-        match shapes::entry_named(name.as_bytes()) {
-            Some(entry) => self.t_open(entry),
-            None => {
-                self.fail(SinkError::Name);
-                self.t_open(0);
-            }
-        }
     }
 
     /// A `type`-less record of entry `entry` opens.
@@ -370,15 +352,6 @@ impl TapeWriter<'_> {
             return;
         }
         self.fail(SinkError::Unbalanced);
-    }
-
-    /// The open record's field `key` is present, its bit looked up at run time — a site
-    /// shared by several entries.
-    #[inline]
-    pub fn t_bit_key(&mut self, key: &str) {
-        if let Some(field) = self.top_field(key) {
-            self.t_bit(field.bit);
-        }
     }
 
     /// A list's `[`: its count slot.
@@ -449,27 +422,18 @@ impl TapeWriter<'_> {
         self.sink.tape.push(tag);
     }
 
-    /// A keyword field's value `word`, out of vocabulary `vocab`: its index, by the generated
-    /// lookup. A word outside the vocabulary refuses the tape ([`SinkError::Keyword`]).
+    /// A keyword field's value: `index`, the word's index in vocabulary `vocab`, which the
+    /// site resolved at build time (`tape::keyword_id` in a `const`). Under a declared key, the
+    /// key's field must be a keyword field of that vocabulary, or the tape is refused.
     #[inline]
-    pub fn t_keyword(&mut self, vocab: u16, word: &str) {
-        match shapes::keyword_named(vocab, word.as_bytes()) {
-            Some(index) => self.sink.tape.push(index),
-            None => {
-                self.fail(SinkError::Keyword);
-                self.sink.tape.push(0);
-            }
+    pub fn t_keyword_id(&mut self, vocab: u16, index: u32) {
+        #[cfg(feature = "_tape_literals")]
+        if self.pending.is_some() {
+            self.keyword_keyed(vocab, index);
+            return;
         }
-    }
-
-    /// The open record's keyword field `key` has value `word`, its vocabulary looked up at run
-    /// time.
-    #[inline]
-    pub fn t_keyword_key(&mut self, key: &str, word: &str) {
-        match self.top_field(key) {
-            Some(field) => self.t_keyword(field.aux, word),
-            None => self.sink.tape.push(0),
-        }
+        let _ = vocab;
+        self.sink.tape.push(index);
     }
 
     /// A string value: the source slice it occupies when the writer borrowed it from there,
@@ -500,7 +464,7 @@ impl TapeWriter<'_> {
 
     // ── keyed values: a value written as the field its key declared lays it down ──────────
     //
-    // A writer that states its keys through `t_field` / `t_key_named` / `t_lit` (`tsv_ts`'s)
+    // A writer that states its keys through `t_key` / `t_comments_key` / `t_lit` (`tsv_ts`'s)
     // leaves each value's encoding to the field: its data call writes a ref, a keyword index,
     // nothing (an `own` string, a `null` field) or a tagged value as the field says. With no
     // key declared (`tsv_css`'s writer, which states each value's tape meaning at its site), a
@@ -525,12 +489,57 @@ impl TapeWriter<'_> {
         self.pending = Some((field.enc, field.aux));
     }
 
-    /// A key of the open record looked up at run time (a site shared by several entries).
+    /// A key of entry `entry` — field `field`, resolved at build time — its value next. The
+    /// open record must be `entry`'s, or the tape is refused ([`SinkError::Name`]): the check a
+    /// site's naming of its entry leaves to run time.
     #[cfg(feature = "_tape_literals")]
     #[inline(never)]
-    pub fn t_key_named(&mut self, key: &str) {
-        if let Some(field) = self.top_field(key) {
-            self.t_field(field);
+    pub fn t_key(&mut self, entry: u16, field: Field) {
+        if self.top_entry() != Some(entry) {
+            self.fail(SinkError::Name);
+        }
+        self.t_field(field);
+    }
+
+    /// A site whose record is one of a few entries chosen at run time found the open record is
+    /// none of them: the tape is refused ([`SinkError::Name`]).
+    #[cfg(feature = "_tape_literals")]
+    #[cold]
+    #[inline(never)]
+    pub fn t_wrong_entry(&mut self) {
+        self.fail(SinkError::Name);
+    }
+
+    /// The open record's `leadingComments` (`trailing`: `trailingComments`) key, its value next
+    /// — the comment attach's, which closes every kind of node: the field's presence bit is
+    /// the open record's entry's, read from a table built at build time (the module's
+    /// `COMMENT_BITS`). An entry with no such field refuses the tape.
+    #[cfg(feature = "_tape_literals")]
+    #[inline(never)]
+    pub fn t_comments_key(&mut self, trailing: bool) {
+        let bit = self
+            .top_entry()
+            .and_then(|entry| super::COMMENT_BITS.get(usize::from(entry)))
+            .map_or(super::NO_COMMENTS, |bits| bits[usize::from(trailing)]);
+        if bit == super::NO_COMMENTS {
+            self.fail(SinkError::Name);
+            return;
+        }
+        self.t_field(Field {
+            key: "",
+            enc: Enc::List,
+            bit,
+            aux: super::NO_AUX,
+        });
+    }
+
+    /// [`Self::t_keyword_id`] under a pending field.
+    #[cfg(feature = "_tape_literals")]
+    #[inline(never)]
+    fn keyword_keyed(&mut self, vocab: u16, index: u32) {
+        match self.pending.take() {
+            Some((Enc::Keyword, v)) if v == vocab => self.sink.tape.push(index),
+            _ => self.fail(SinkError::Keyword),
         }
     }
 
@@ -544,15 +553,8 @@ impl TapeWriter<'_> {
             match op {
                 LitOp::Open(entry) | LitOp::OpenObject(entry) => self.t_open(entry),
                 LitOp::Close => self.t_close(),
-                LitOp::Key { entry, field } => {
-                    debug_assert!(
-                        self.sink.frames.last().is_some_and(|f| f.entry == entry),
-                        "a site's key {:?} belongs to the record it names",
-                        field.key
-                    );
-                    self.t_field(field);
-                }
-                LitOp::KeyNamed(key) => self.t_key_named(key),
+                LitOp::Key { entry, field } => self.t_key(entry, field),
+                LitOp::Keyword { vocab, index } => self.t_keyword_id(vocab, index),
                 LitOp::True => self.bool(true),
                 LitOp::False => self.bool(false),
                 LitOp::Null => self.null(),
@@ -639,7 +641,8 @@ impl TapeWriter<'_> {
         match self.pending.take() {
             None | Some((Enc::Ref | Enc::RefNullable, _)) => self.t_ref(s.as_bytes()),
             Some((Enc::Own, _)) => {}
-            Some((Enc::Keyword, vocab)) => self.t_keyword(vocab, s),
+            // a keyword's word: the site writes its build-time index instead (`t_keyword_id`)
+            Some((Enc::Keyword, _)) => self.fail(SinkError::Keyword),
             Some((Enc::Value, _)) => {
                 self.t_tag(TAG_STRING);
                 self.t_ref(s.as_bytes());
@@ -699,6 +702,10 @@ impl TapeWriter<'_> {
     /// A record opens (no field can be pending in a world without the keyed forms).
     #[cfg(not(feature = "_tape_literals"))]
     #[inline]
+    #[expect(
+        clippy::needless_pass_by_ref_mut,
+        reason = "the keyed world's twin writes through it"
+    )]
     fn enter_record(&mut self) {}
 
     /// A `null`: nothing (the site states which `null`).
@@ -868,10 +875,6 @@ impl WireSink for TapeWriter<'_> {
         TapeWriter::t_open(self, entry);
     }
     #[inline]
-    fn t_open_named(&mut self, name: &str) {
-        TapeWriter::t_open_named(self, name);
-    }
-    #[inline]
     fn t_open_object(&mut self, entry: u16) {
         TapeWriter::t_open_object(self, entry);
     }
@@ -883,14 +886,10 @@ impl WireSink for TapeWriter<'_> {
     fn t_bit(&mut self, bit: u8) {
         TapeWriter::t_bit(self, bit);
     }
-    #[inline]
-    fn t_bit_key(&mut self, key: &str) {
-        TapeWriter::t_bit_key(self, key);
-    }
     #[cfg(feature = "_tape_literals")]
     #[inline]
-    fn t_key_named(&mut self, key: &str) {
-        TapeWriter::t_key_named(self, key);
+    fn t_comments_key(&mut self, trailing: bool) {
+        TapeWriter::t_comments_key(self, trailing);
     }
     #[inline]
     fn t_list_open(&mut self) {
@@ -925,12 +924,8 @@ impl WireSink for TapeWriter<'_> {
         TapeWriter::t_tag(self, tag);
     }
     #[inline]
-    fn t_keyword(&mut self, vocab: u16, word: &str) {
-        TapeWriter::t_keyword(self, vocab, word);
-    }
-    #[inline]
-    fn t_keyword_key(&mut self, key: &str, word: &str) {
-        TapeWriter::t_keyword_key(self, key, word);
+    fn t_keyword_id(&mut self, vocab: u16, index: u32) {
+        TapeWriter::t_keyword_id(self, vocab, index);
     }
     #[inline]
     fn t_ref(&mut self, s: &[u8]) {
@@ -940,7 +935,11 @@ impl WireSink for TapeWriter<'_> {
 
 #[cfg(test)]
 mod tests {
-    use super::super::{Header, TAG_NUMBER, entry_id, field_aux, field_bit, read_header};
+    #[cfg(feature = "_tape_literals")]
+    use super::super::field_of;
+    use super::super::{
+        Header, TAG_NUMBER, entry_id, field_aux, field_bit, keyword_id, read_header,
+    };
     use super::*;
     use crate::{LineRule, Wire, WireCoordinates, WireTables};
 
@@ -965,7 +964,8 @@ mod tests {
         let mut w = sink.writer(source, tables.positions(), LeadingBom::Elided);
         w.t_list_open();
         w.t_open(combinator);
-        w.t_keyword(field_aux(combinator, "name"), ">");
+        let vocab = field_aux(combinator, "name");
+        w.t_keyword_id(vocab, keyword_id(vocab, ">"));
         w.span_start_end_field(tables.positions(), 6, 7);
         w.t_close();
         w.t_list_close();
@@ -1051,7 +1051,7 @@ mod tests {
         let mut sink = TapeSink::new();
         let mut w = sink.writer(source, tables.positions(), LeadingBom::Elided);
         w.t_open(comment);
-        w.t_bit_key("position");
+        w.t_bit(bit);
         w.t_close();
         let tape = sink.finish_bytes().expect("finishes");
         assert_eq!(
@@ -1071,7 +1071,11 @@ mod tests {
     fn writer_bugs_refuse_the_tape() {
         let source = "a";
         let tables = WireTables::new(source, COORDS, Wire::Span);
-        let cases: [Case; 9] = [
+        #[cfg_attr(
+            not(feature = "_tape_literals"),
+            expect(unused_mut, reason = "the keyed cases extend it")
+        )]
+        let mut cases: Vec<Case> = vec![
             (
                 "a bit with none open",
                 |w| w.t_bit(0),
@@ -1104,21 +1108,19 @@ mod tests {
                 },
                 SinkError::Unbalanced,
             ),
+        ];
+        #[cfg(feature = "_tape_literals")]
+        cases.extend::<[Case; 5]>([
             (
-                "an out-of-vocabulary keyword",
-                |w| w.t_keyword(field_aux(entry_id("css:Combinator"), "name"), "<"),
-                SinkError::Keyword,
-            ),
-            (
-                "an unknown entry",
-                |w| w.t_open_named("css:Nope"),
-                SinkError::Name,
-            ),
-            (
-                "an unknown key",
+                "a key of another entry than the open record's",
                 |w| {
                     w.t_open(entry_id("css:Combinator"));
-                    w.t_bit_key("nope");
+                    w.t_key(
+                        entry_id("css:Rule"),
+                        field_of(entry_id("css:Rule"), "prelude"),
+                    );
+                    w.t_open(entry_id("css:SelectorList"));
+                    w.t_close();
                     w.t_close();
                 },
                 SinkError::Name,
@@ -1127,12 +1129,43 @@ mod tests {
                 "a key asked of a list",
                 |w| {
                     w.t_list_open();
-                    w.t_bit_key("name");
+                    w.t_comments_key(false);
                     w.t_list_close();
                 },
-                SinkError::Unbalanced,
+                SinkError::Name,
             ),
-        ];
+            (
+                "a keyword written as its word",
+                |w| {
+                    let combinator = entry_id("css:Combinator");
+                    w.t_open(combinator);
+                    w.t_key(combinator, field_of(combinator, "name"));
+                    w.string(">");
+                    w.t_close();
+                },
+                SinkError::Keyword,
+            ),
+            (
+                "a keyword index of another vocabulary",
+                |w| {
+                    let combinator = entry_id("css:Combinator");
+                    w.t_open(combinator);
+                    w.t_key(combinator, field_of(combinator, "name"));
+                    w.t_keyword_id(field_aux(combinator, "name") + 1, 0);
+                    w.t_close();
+                },
+                SinkError::Keyword,
+            ),
+            (
+                "comments on an entry without them",
+                |w| {
+                    w.t_open(entry_id("css:Combinator"));
+                    w.t_comments_key(true);
+                    w.t_close();
+                },
+                SinkError::Name,
+            ),
+        ]);
         let mut sink = TapeSink::new();
         for (name, case, expected) in cases {
             let mut w = sink.writer(source, tables.positions(), LeadingBom::Elided);

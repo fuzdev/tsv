@@ -54,6 +54,13 @@ macro_rules! json_only {
     ($($t:tt)*) => { $($t)* };
 }
 
+/// The JSON copy's half of an expression each copy spells its own way.
+macro_rules! copy_pick {
+    ($json:expr, $tape:expr) => {
+        $json
+    };
+}
+
 mod write;
 #[cfg(feature = "_tape")]
 mod write_tape;

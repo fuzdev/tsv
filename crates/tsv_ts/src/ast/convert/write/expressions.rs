@@ -12,9 +12,9 @@ use super::patterns::{
 };
 use super::types::{write_type, write_type_parameter_instantiation};
 use super::{
-    CommentAttach, CommentMode, Ctx, Sink, close_node, node_header, write_array, write_bare_node,
-    write_chain_any, write_identifier_parts, write_identifier_plain, write_literal,
-    write_name_field, write_type_annotation_field, write_type_arguments_field,
+    ChildKey, CommentAttach, CommentMode, Ctx, Sink, close_node, node_header, write_array,
+    write_bare_node, write_chain_any, write_identifier_parts, write_identifier_plain,
+    write_literal, write_name_field, write_type_annotation_field, write_type_arguments_field,
 };
 use crate::ast;
 use crate::ast::AstView;
@@ -187,7 +187,7 @@ fn write_expression_identifier(
 #[inline(never)]
 fn write_binary_chain(w: &mut Sink<'_>, binary: &ast::BinaryExpression, span: Span, ctx: &Ctx<'_>) {
     // LogicalExpression for `&&`/`||`/`??`, BinaryExpression otherwise.
-    fn node_type(operator: ast::BinaryOperator) -> &'static str {
+    const fn node_type(operator: ast::BinaryOperator) -> &'static str {
         match operator {
             ast::BinaryOperator::AmpersandAmpersand
             | ast::BinaryOperator::PipePipe
@@ -195,11 +195,23 @@ fn write_binary_chain(w: &mut Sink<'_>, binary: &ast::BinaryExpression, span: Sp
             _ => "BinaryExpression",
         }
     }
+    tape! {
+        // The node's tape entry, by its operator (resolved at build time per operator).
+        fn entry_of(operator: ast::BinaryOperator) -> u16 {
+            by_variant!(operator, ast::BinaryOperator => [
+                Plus, Minus, Star, Slash, Percent, LessThan, GreaterThan, LessThanEquals,
+                GreaterThanEquals, EqualsEquals, EqualsEqualsEquals, BangEquals, BangEqualsEquals,
+                AmpersandAmpersand, PipePipe, QuestionQuestion, Ampersand, Pipe, Caret, LeftShift,
+                RightShift, UnsignedRightShift, StarStar, Instanceof, In,
+            ], |op| -> u16 { ::tsv_lang::tape::entry_id(node_type(op)) })
+        }
+    }
     let mut spine: SmallVec<[(&ast::BinaryExpression, Span); 8]> = SmallVec::new();
     let (mut node, mut node_span) = (binary, span);
     loop {
-        node_header!(w, @dyn node_type(node.operator), node_span, ctx);
-        raw!(w, ",\"left\":");
+        tape! { let entry = entry_of(node.operator); }
+        node_header!(w, @dyn node_type(node.operator) => entry, node_span, ctx);
+        raw!(w, @in entry => "LogicalExpression" | "BinaryExpression", ",\"left\":");
         spine.push((node, node_span));
         match &ctx.view.expr(node.left).kind {
             ast::ExpressionKind::BinaryExpression(left) => {
@@ -213,9 +225,22 @@ fn write_binary_chain(w: &mut Sink<'_>, binary: &ast::BinaryExpression, span: Sp
         }
     }
     for &(node, node_span) in spine.iter().rev() {
-        raw!(w, ",\"operator\":\"");
-        quoted!(w, node.operator.as_str());
-        raw!(w, "\",\"right\":");
+        tape! { let entry = entry_of(node.operator); }
+        raw!(w, @in entry => "LogicalExpression" | "BinaryExpression", ",\"operator\":\"");
+        keyword!(
+            w,
+            quoted,
+            node.operator => as_str,
+            ast::BinaryOperator => [
+                Plus, Minus, Star, Slash, Percent, LessThan, GreaterThan, LessThanEquals,
+                GreaterThanEquals, EqualsEquals, EqualsEqualsEquals, BangEquals, BangEqualsEquals,
+                AmpersandAmpersand, PipePipe, QuestionQuestion, Ampersand, Pipe, Caret, LeftShift,
+                RightShift, UnsignedRightShift, StarStar, Instanceof, In,
+            ],
+            |op| node_type(op),
+            "operator"
+        );
+        raw!(w, @in entry => "LogicalExpression" | "BinaryExpression", "\",\"right\":");
         write_expression(w, ctx.view.expr(node.right), ctx);
         close_node(w, node_type(node.operator), node_span, ctx);
     }
@@ -306,7 +331,13 @@ fn write_expression_full_dispatch(
         ast::ExpressionKind::UnaryExpression(unary) => {
             node_header!(w, "UnaryExpression", unary.span, ctx);
             raw!(w, "UnaryExpression", ",\"operator\":\"");
-            quoted!(w, unary.operator.as_str());
+            keyword!(
+                w,
+                quoted,
+                unary.operator => as_str,
+                ast::UnaryOperator => [Minus, Plus, Bang, Typeof, Void, Delete, Tilde],
+                "UnaryExpression"."operator"
+            );
             // Constant: acorn's `UnaryExpression` is always prefix (postfix
             // `++`/`--` is an `UpdateExpression`).
             fixed!(w, "UnaryExpression", "\",\"prefix\":true,\"argument\":");
@@ -316,7 +347,13 @@ fn write_expression_full_dispatch(
         ast::ExpressionKind::UpdateExpression(update) => {
             node_header!(w, "UpdateExpression", expr.span, ctx);
             raw!(w, "UpdateExpression", ",\"operator\":\"");
-            quoted!(w, update.operator.as_str());
+            keyword!(
+                w,
+                quoted,
+                update.operator => as_str,
+                ast::UpdateOperator => [Increment, Decrement],
+                "UpdateExpression"."operator"
+            );
             pick!(
                 w,
                 "UpdateExpression",
@@ -364,7 +401,11 @@ fn write_expression_full_dispatch(
             write_expression(w, ctx.view.expr(tagged.tag), ctx);
             raw!(w, "TaggedTemplateExpression", ",\"quasi\":");
             write_template_literal(w, &tagged.quasi, tagged.quasi_span, ctx);
-            write_type_arguments_field(w, tagged.type_arguments.as_ref(), ctx);
+            write_type_arguments_field::<{ at!("TaggedTemplateExpression") }>(
+                w,
+                tagged.type_arguments.as_ref(),
+                ctx,
+            );
             close_node(w, "TaggedTemplateExpression", expr.span, ctx);
         }
         ast::ExpressionKind::AwaitExpression(await_expr) => {
@@ -401,10 +442,10 @@ fn write_expression_full_dispatch(
             close_node(w, "Literal", expr.span, ctx);
         }
         ast::ExpressionKind::ThisExpression(_) => {
-            write_bare_node(w, "ThisExpression", expr.span, ctx);
+            write_bare_node(w, "ThisExpression", ent!("ThisExpression"), expr.span, ctx);
         }
         ast::ExpressionKind::Super(_) => {
-            write_bare_node(w, "Super", expr.span, ctx);
+            write_bare_node(w, "Super", ent!("Super"), expr.span, ctx);
         }
         ast::ExpressionKind::AssignmentExpression(assign) => {
             // The `=` left keeps its type-assertion wrapper (`(x as T) = 1` →
@@ -413,7 +454,18 @@ fn write_expression_full_dispatch(
             // all in the public AST, and `write_expression` already peels it.
             node_header!(w, "AssignmentExpression", expr.span, ctx);
             raw!(w, "AssignmentExpression", ",\"operator\":\"");
-            quoted!(w, assign.operator.as_str());
+            keyword!(
+                w,
+                quoted,
+                assign.operator => as_str,
+                ast::AssignmentOperator => [
+                    Assign, AddAssign, SubtractAssign, MultiplyAssign, DivideAssign,
+                    RemainderAssign, ExponentiateAssign, LeftShiftAssign, RightShiftAssign,
+                    UnsignedRightShiftAssign, BitwiseOrAssign, BitwiseXorAssign, BitwiseAndAssign,
+                    LogicalOrAssign, LogicalAndAssign, NullishAssign,
+                ],
+                "AssignmentExpression"."operator"
+            );
             raw!(w, "AssignmentExpression", "\",\"left\":");
             write_expression(w, ctx.view.expr(assign.left), ctx);
             raw!(w, "AssignmentExpression", ",\"right\":");
@@ -427,17 +479,26 @@ fn write_expression_full_dispatch(
             super::patterns::pattern_header(
                 w,
                 "ArrayPattern",
+                ent!("ArrayPattern"),
                 expr.span,
                 arr.type_annotation(ctx.view),
                 ctx,
             );
-            raw!(w, ",\"elements\":");
+            raw!(w, "ArrayPattern", ",\"elements\":");
             write_expression_holes(w, ctx.view.expr_opt_list(arr.elements), ctx);
             if arr.optional {
-                raw!(w, ",\"optional\":true");
+                raw!(w, "ArrayPattern", ",\"optional\":true");
             }
-            write_type_annotation_field(w, arr.type_annotation(ctx.view), ctx);
-            super::declarations::write_decorators_field(w, arr.decorators(ctx.view), ctx);
+            write_type_annotation_field::<{ at!("ArrayPattern") }>(
+                w,
+                arr.type_annotation(ctx.view),
+                ctx,
+            );
+            super::declarations::write_decorators_field::<{ at!("ArrayPattern") }>(
+                w,
+                arr.decorators(ctx.view),
+                ctx,
+            );
             close_node(w, "ArrayPattern", expr.span, ctx);
         }
         ast::ExpressionKind::AssignmentPattern(pattern) => {
@@ -495,7 +556,11 @@ fn write_expression_full_dispatch(
             write_expression(w, ctx.view.expr(import_expr.source), ctx);
             if let Some(phase) = import_expr.phase.as_str() {
                 raw!(w, "ImportExpression", ",\"phase\":");
-                w.token(phase);
+                json_only! { w.token(phase); }
+                tape! {
+                    let _ = phase;
+                    phase_keyword!(w, import_expr.phase, "ImportExpression");
+                }
             }
             // The two parser variants spell the second argument differently, and
             // each spells it exclusively. Vanilla acorn (a Svelte non-`lang="ts"`
@@ -556,7 +621,13 @@ fn write_expression_full_dispatch(
             node_header!(w, "TSParameterProperty", expr.span, ctx);
             if let Some(acc) = param_prop.accessibility {
                 raw!(w, "TSParameterProperty", ",\"accessibility\":");
-                w.token(acc.as_str());
+                keyword!(
+                    w,
+                    token,
+                    acc => as_str,
+                    ast::Accessibility => [Public, Private, Protected],
+                    "TSParameterProperty"."accessibility"
+                );
             }
             if param_prop.readonly {
                 raw!(w, "TSParameterProperty", ",\"readonly\":true");
@@ -680,7 +751,7 @@ pub(in crate::ast::convert) fn write_chain_tails(
 pub(in crate::ast::convert) struct ChainLink<'e> {
     pub(in crate::ast::convert) needs_chain: bool,
     pub(in crate::ast::convert) node_type: &'static str,
-    pub(in crate::ast::convert) child_key: &'static str,
+    pub(in crate::ast::convert) child_key: ChildKey,
     pub(in crate::ast::convert) child: ast::ExprId,
     pub(in crate::ast::convert) child_flags: ExprFlags,
     pub(in crate::ast::convert) tail: ChainTail<'e>,
@@ -710,7 +781,7 @@ pub(in crate::ast::convert) fn chain_link<'e>(
             ChainLink {
                 needs_chain,
                 node_type: "CallExpression",
-                child_key: ",\"callee\":",
+                child_key: child_key!("CallExpression", ",\"callee\":"),
                 child: call.callee,
                 child_flags: call_callee_flags(call, callee_chain, strip),
                 tail: ChainTail::Call {
@@ -733,7 +804,7 @@ pub(in crate::ast::convert) fn chain_link<'e>(
             ChainLink {
                 needs_chain,
                 node_type: "MemberExpression",
-                child_key: ",\"object\":",
+                child_key: child_key!("MemberExpression", ",\"object\":"),
                 child: member.object,
                 child_flags: ExprFlags {
                     chain: object_chain,
@@ -760,7 +831,7 @@ pub(in crate::ast::convert) fn chain_link<'e>(
             ChainLink {
                 needs_chain,
                 node_type: "TSNonNullExpression",
-                child_key: ",\"expression\":",
+                child_key: child_key!("TSNonNullExpression", ",\"expression\":"),
                 child: non_null.expression,
                 // force/strip die here: TSNonNullExpression is not a call/member
                 // spine node.
@@ -781,7 +852,7 @@ fn open_chain_link(
     w: &mut Sink<'_>,
     needs_chain: bool,
     node_type: &'static str,
-    child_key: &'static str,
+    child_key: ChildKey,
     span: Span,
     ctx: &Ctx<'_>,
 ) {
@@ -789,7 +860,7 @@ fn open_chain_link(
         node_header!(w, "ChainExpression", span, ctx);
         raw!(w, "ChainExpression", ",\"expression\":");
     }
-    node_header!(w, @dyn node_type, span, ctx);
+    node_header!(w, @dyn node_type => child_key.0, span, ctx);
     key_raw!(w, child_key);
 }
 

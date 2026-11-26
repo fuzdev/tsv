@@ -82,12 +82,6 @@ pub trait WireSink {
     fn t_open(&mut self, entry: u16) {
         let _ = entry;
     }
-    /// A typed record opens whose entry is known only at run time, by its name.
-    #[cfg(feature = "_tape")]
-    #[inline]
-    fn t_open_named(&mut self, name: &str) {
-        let _ = name;
-    }
     /// A `type`-less record of entry `entry` opens.
     #[cfg(feature = "_tape")]
     #[inline]
@@ -104,18 +98,13 @@ pub trait WireSink {
     fn t_bit(&mut self, bit: u8) {
         let _ = bit;
     }
-    /// The open record's field `key` is present, its bit looked up at run time.
+    /// The open record's `leadingComments` (`trailing`: `trailingComments`) key, its value next
+    /// (the value's data call writes it as the field lays it down — `tape::TapeWriter`'s keyed
+    /// values): the comment attach's, which closes every kind of node.
     #[cfg(feature = "_tape")]
     #[inline]
-    fn t_bit_key(&mut self, key: &str) {
-        let _ = key;
-    }
-    /// A key of the open record, looked up at run time, its value next (the value's data call
-    /// writes it as the field lays it down — `tape::TapeWriter`'s keyed values).
-    #[cfg(feature = "_tape")]
-    #[inline]
-    fn t_key_named(&mut self, key: &str) {
-        let _ = key;
+    fn t_comments_key(&mut self, trailing: bool) {
+        let _ = trailing;
     }
     /// A list's `[`.
     #[cfg(feature = "_tape")]
@@ -155,18 +144,12 @@ pub trait WireSink {
     fn t_tag(&mut self, tag: u32) {
         let _ = tag;
     }
-    /// A keyword field's value `word`, out of vocabulary `vocab` (`tape::field_aux`).
+    /// A keyword field's value: its index `index` in vocabulary `vocab` (`tape::keyword_id`,
+    /// resolved at build time).
     #[cfg(feature = "_tape")]
     #[inline]
-    fn t_keyword(&mut self, vocab: u16, word: &str) {
-        let _ = (vocab, word);
-    }
-    /// The open record's keyword field `key` has value `word`, its vocabulary looked up at run
-    /// time.
-    #[cfg(feature = "_tape")]
-    #[inline]
-    fn t_keyword_key(&mut self, key: &str, word: &str) {
-        let _ = (key, word);
+    fn t_keyword_id(&mut self, vocab: u16, index: u32) {
+        let _ = (vocab, index);
     }
     /// A string value: its text (a source slice when borrowed from there, else pooled).
     #[cfg(feature = "_tape")]

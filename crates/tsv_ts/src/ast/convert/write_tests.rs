@@ -60,10 +60,10 @@ fn node_header_matches_the_direct_emitters() {
         let node_type: &'static str = &TYPE[..len];
         for &wire in WIRES {
             let staged = emitted(source, wire, CommentMode::Off, stores.view(), |w, ctx| {
-                node_header!(w, @dyn node_type, span, ctx);
+                node_header!(w, @dyn node_type => (), span, ctx);
             });
             let direct = emitted(source, wire, CommentMode::Off, stores.view(), |w, ctx| {
-                node_header_wide_end(w, node_type, span, span.end, ctx);
+                node_header_wide_end(w, node_type, (), span, span.end, ctx);
             });
             assert_eq!(staged, direct, "type length {len}, {wire:?}");
             if wire != Wire::Span {

@@ -885,7 +885,12 @@ fn write_relative_selector(
     match (&r.combinator, &r.combinator_span) {
         (Some(comb), Some(span)) => {
             raw!(w; open RelativeSelector key RelativeSelector.combinator);
-            write_combinator(w, comb.as_str(), *span, ctx);
+            let index = keyword_index!(
+                Combinator.name,
+                *comb,
+                ast::Combinator => [Descendant, Child, NextSibling, SubsequentSibling, Column]
+            );
+            write_combinator(w, comb.as_str(), index, *span, ctx);
             raw!(w; key RelativeSelector.selectors lopen);
         }
         _ => raw!(w; open RelativeSelector key RelativeSelector.combinator nul_rec
@@ -964,9 +969,24 @@ fn write_type_selector_head(w: &mut Sink<'_>, span: Span, ctx: &Ctx<'_>) {
     put_selector_name(w, ctx.source, span, 0);
 }
 
-fn write_combinator(w: &mut Sink<'_>, name: &'static str, span: Span, ctx: &Ctx<'_>) {
+json_only! {
+    /// A combinator's keyword index (`keyword_index!`): the JSON copy writes the word alone.
+    type CombinatorIndex = ();
+}
+tape! {
+    /// A combinator's keyword index (`keyword_index!`), resolved at build time.
+    type CombinatorIndex = u32;
+}
+
+fn write_combinator(
+    w: &mut Sink<'_>,
+    name: &'static str,
+    index: CombinatorIndex,
+    span: Span,
+    ctx: &Ctx<'_>,
+) {
     raw!(w; open Combinator key Combinator.name);
-    keyword!(w; Combinator.name, name); // ` ` / `>` / `+` / `~` / `||` — escape-free
+    keyword!(w; Combinator.name, name, index); // ` ` / `>` / `+` / `~` / `||` — escape-free
     w.span_start_end_field(ctx.positions, span.start, span.end);
     raw!(w; close);
 }
@@ -1341,7 +1361,14 @@ fn write_synth_relative_selector(
     match combinator {
         // Descendant is the only combinator a synthesized argument produces —
         // Svelte's `read_combinator` hands back exactly the whitespace run it ate.
-        Some(gap) => write_combinator(w, " ", gap, ctx),
+        Some(gap) => {
+            let index = keyword_index!(
+                Combinator.name,
+                ast::Combinator::Descendant,
+                ast::Combinator => [Descendant, Child, NextSibling, SubsequentSibling, Column]
+            );
+            write_combinator(w, " ", index, gap, ctx);
+        }
         None => null_record!(w),
     }
     raw!(w; key RelativeSelector.selectors lopen);

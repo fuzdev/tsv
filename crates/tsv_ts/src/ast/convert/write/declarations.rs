@@ -41,13 +41,13 @@ pub(super) fn write_decorator(w: &mut Sink<'_>, decorator: &ast::Decorator, ctx:
 
 /// Emit a `decorators` field when the internal node carries decorators
 /// (`Option<Vec>` with skip-if-none: present ⇒ emitted, even empty).
-pub(super) fn write_decorators_field(
+pub(super) fn write_decorators_field<const E: u16>(
     w: &mut Sink<'_>,
     decorators: Option<&[ast::Decorator]>,
     ctx: &Ctx<'_>,
 ) {
     if let Some(decs) = decorators {
-        raw!(w, ",\"decorators\":");
+        raw!(w, @E, ",\"decorators\":");
         write_array(w, decs, |w, d| write_decorator(w, d, ctx));
     }
 }
@@ -63,7 +63,11 @@ pub(super) fn write_type_alias_declaration(
     node_header!(w, "TSTypeAliasDeclaration", span, ctx);
     raw!(w, "TSTypeAliasDeclaration", ",\"id\":");
     write_identifier_plain(w, &type_alias.id, ctx);
-    write_type_parameters_field(w, type_alias.type_parameters.as_ref(), ctx);
+    write_type_parameters_field::<{ at!("TSTypeAliasDeclaration") }>(
+        w,
+        type_alias.type_parameters.as_ref(),
+        ctx,
+    );
     raw!(w, "TSTypeAliasDeclaration", ",\"typeAnnotation\":");
     write_type(w, ctx.view.ty(type_alias.type_annotation), ctx);
     if type_alias.declare {
@@ -85,11 +89,23 @@ pub(super) fn write_function_declaration(
     write_or_null(w, func_decl.id.as_ref(), |w, id| {
         write_identifier_plain(w, id, ctx);
     });
-    write_function_flags_fields(w, func_decl.generator, func_decl.r#async);
-    write_type_parameters_field(w, func_decl.type_parameters.as_ref(), ctx);
+    write_function_flags_fields::<{ at!("FunctionDeclaration") }>(
+        w,
+        func_decl.generator,
+        func_decl.r#async,
+    );
+    write_type_parameters_field::<{ at!("FunctionDeclaration") }>(
+        w,
+        func_decl.type_parameters.as_ref(),
+        ctx,
+    );
     raw!(w, "FunctionDeclaration", ",\"params\":");
     write_expressions(w, ctx.view.exprs(func_decl.params), ctx);
-    write_return_type_field(w, func_decl.return_type.as_ref(), ctx);
+    write_return_type_field::<{ at!("FunctionDeclaration") }>(
+        w,
+        func_decl.return_type.as_ref(),
+        ctx,
+    );
     raw!(w, "FunctionDeclaration", ",\"body\":");
     write_block_statement(w, &func_decl.body, ctx);
     close_node(w, "FunctionDeclaration", func_decl.span, ctx);
@@ -121,7 +137,7 @@ fn super_class_wrap_span(
 
 /// Emit the `superClass` (nullable) and `superTypeParameters?` fields, applying
 /// the wrap decision. Shared by class declarations and expressions.
-fn write_super_class_fields(
+fn write_super_class_fields<const E: u16>(
     w: &mut Sink<'_>,
     super_class: Option<&ast::Expression>,
     super_type_parameters: Option<&ast::TSTypeParameterInstantiation>,
@@ -135,7 +151,7 @@ fn write_super_class_fields(
         super_type_parameters.map(|tp| tp.span.end),
         ctx.source,
     );
-    raw!(w, ",\"superClass\":");
+    raw!(w, @E, ",\"superClass\":");
     if let (Some(e), Some(stp), Some(ws)) = (super_class, super_type_parameters, wrap_span) {
         // Wrapped: `superTypeParameters` is consumed into the wrapper.
         node_header!(w, "TSInstantiationExpression", ws, ctx);
@@ -147,7 +163,7 @@ fn write_super_class_fields(
     } else {
         write_or_null(w, super_class, |w, e| write_expression(w, e, ctx));
         if let Some(stp) = super_type_parameters {
-            raw!(w, ",\"superTypeParameters\":");
+            raw!(w, @E, ",\"superTypeParameters\":");
             write_type_parameter_instantiation(w, stp, ctx);
         }
     }
@@ -171,20 +187,32 @@ pub(super) fn write_class_declaration(
     if class_decl.r#abstract {
         raw!(w, "ClassDeclaration", ",\"abstract\":true");
     }
-    write_decorators_field(w, ctx.view.opt_decorators(class_decl.decorators), ctx);
+    write_decorators_field::<{ at!("ClassDeclaration") }>(
+        w,
+        ctx.view.opt_decorators(class_decl.decorators),
+        ctx,
+    );
     raw!(w, "ClassDeclaration", ",\"id\":");
     write_or_null(w, class_decl.id.as_ref(), |w, id| {
         write_identifier_plain(w, id, ctx);
     });
-    write_type_parameters_field(w, class_decl.type_parameters.as_ref(), ctx);
-    write_super_class_fields(
+    write_type_parameters_field::<{ at!("ClassDeclaration") }>(
+        w,
+        class_decl.type_parameters.as_ref(),
+        ctx,
+    );
+    write_super_class_fields::<{ at!("ClassDeclaration") }>(
         w,
         ctx.view.opt_expr(class_decl.super_class),
         class_decl.super_type_parameters.as_ref(),
         class_decl.type_parameters.as_ref().map(|tp| tp.span),
         ctx,
     );
-    write_implements_field(w, ctx.view.heritages(class_decl.implements), ctx);
+    write_implements_field::<{ at!("ClassDeclaration") }>(
+        w,
+        ctx.view.heritages(class_decl.implements),
+        ctx,
+    );
     raw!(w, "ClassDeclaration", ",\"body\":");
     write_class_body(w, &class_decl.body, ctx);
     close_node(w, "ClassDeclaration", class_decl.span, ctx);
@@ -198,7 +226,11 @@ pub(super) fn write_class_expression(
     ctx: &Ctx<'_>,
 ) {
     node_header!(w, "ClassExpression", span, ctx);
-    write_decorators_field(w, ctx.view.opt_decorators(class_expr.decorators), ctx);
+    write_decorators_field::<{ at!("ClassExpression") }>(
+        w,
+        ctx.view.opt_decorators(class_expr.decorators),
+        ctx,
+    );
     if class_expr.r#abstract {
         raw!(w, "ClassExpression", ",\"abstract\":true");
     }
@@ -206,15 +238,23 @@ pub(super) fn write_class_expression(
     write_or_null(w, class_expr.id.as_ref(), |w, id| {
         write_identifier_plain(w, id, ctx);
     });
-    write_type_parameters_field(w, class_expr.type_parameters.as_ref(), ctx);
-    write_super_class_fields(
+    write_type_parameters_field::<{ at!("ClassExpression") }>(
+        w,
+        class_expr.type_parameters.as_ref(),
+        ctx,
+    );
+    write_super_class_fields::<{ at!("ClassExpression") }>(
         w,
         ctx.view.opt_expr(class_expr.super_class),
         class_expr.super_type_parameters.as_ref(),
         class_expr.type_parameters.as_ref().map(|tp| tp.span),
         ctx,
     );
-    write_implements_field(w, ctx.view.heritages(class_expr.implements), ctx);
+    write_implements_field::<{ at!("ClassExpression") }>(
+        w,
+        ctx.view.heritages(class_expr.implements),
+        ctx,
+    );
     raw!(w, "ClassExpression", ",\"body\":");
     write_class_body(w, &class_expr.body, ctx);
     close_node(w, "ClassExpression", span, ctx);
@@ -222,7 +262,7 @@ pub(super) fn write_class_expression(
 
 /// The `implements` field is skip-if-empty — an empty internal list emits no
 /// field.
-fn write_implements_field(
+fn write_implements_field<const E: u16>(
     w: &mut Sink<'_>,
     implements: &[ast::TSInterfaceHeritage],
     ctx: &Ctx<'_>,
@@ -230,7 +270,7 @@ fn write_implements_field(
     if implements.is_empty() {
         return;
     }
-    raw!(w, ",\"implements\":");
+    raw!(w, @E, ",\"implements\":");
     write_array(w, implements, |w, h| {
         write_expression_with_type_arguments(w, h, ctx);
     });
@@ -255,7 +295,11 @@ fn write_class_body(w: &mut Sink<'_>, body: &ast::ClassBody, ctx: &Ctx<'_>) {
             });
             // acorn-typescript attaches a member's decorators once it has built it,
             // so a static block's list follows its `body`.
-            write_decorators_field(w, ctx.view.opt_decorators(block.decorators), ctx);
+            write_decorators_field::<{ at!("StaticBlock") }>(
+                w,
+                ctx.view.opt_decorators(block.decorators),
+                ctx,
+            );
             close_node(w, "StaticBlock", block.span, ctx);
         }
         ast::ClassMember::IndexSignature(sig) => {
@@ -270,12 +314,17 @@ fn write_class_body(w: &mut Sink<'_>, body: &ast::ClassBody, ctx: &Ctx<'_>) {
 /// A class member's modifier fields take one order (the member writers' docs), where
 /// acorn-typescript's `tsParseModifiers` stamps each as it reads its keyword, so its wire
 /// follows the member's source order; `static` is (re-)assigned after that loop, last.
-fn write_accessibility_field(w: &mut Sink<'_>, accessibility: Option<ast::Accessibility>) {
+fn write_accessibility_field<const E: u16>(
+    w: &mut Sink<'_>,
+    accessibility: Option<ast::Accessibility>,
+) {
     match accessibility {
         None => {}
-        Some(ast::Accessibility::Public) => raw!(w, ",\"accessibility\":\"public\""),
-        Some(ast::Accessibility::Private) => raw!(w, ",\"accessibility\":\"private\""),
-        Some(ast::Accessibility::Protected) => raw!(w, ",\"accessibility\":\"protected\""),
+        Some(ast::Accessibility::Public) => raw!(w, @E, ",\"accessibility\":\"public\""),
+        Some(ast::Accessibility::Private) => raw!(w, @E, ",\"accessibility\":\"private\""),
+        Some(ast::Accessibility::Protected) => {
+            raw!(w, @E, ",\"accessibility\":\"protected\"");
+        }
     }
 }
 
@@ -289,7 +338,7 @@ fn write_method_definition(w: &mut Sink<'_>, method: &ast::MethodDefinition, ctx
     if method.r#abstract {
         raw!(w, "MethodDefinition", ",\"abstract\":true");
     }
-    write_accessibility_field(w, method.accessibility);
+    write_accessibility_field::<{ at!("MethodDefinition") }>(w, method.accessibility);
     if method.r#override {
         raw!(w, "MethodDefinition", ",\"override\":true");
     }
@@ -303,9 +352,19 @@ fn write_method_definition(w: &mut Sink<'_>, method: &ast::MethodDefinition, ctx
         raw!(w, "MethodDefinition", ",\"optional\":true");
     }
     raw!(w, "MethodDefinition", ",\"kind\":");
-    w.token(method.kind.as_str());
+    keyword!(
+        w,
+        token,
+        method.kind => as_str,
+        ast::MethodKind => [Constructor, Method, Get, Set],
+        "MethodDefinition"."kind"
+    );
     let func = &method.value;
-    write_type_parameters_field(w, func.type_parameters.as_ref(), ctx);
+    write_type_parameters_field::<{ at!("MethodDefinition") }>(
+        w,
+        func.type_parameters.as_ref(),
+        ctx,
+    );
     // Abstract methods and overload signatures emit TSDeclareMethod (no
     // body): abstract flag OR an empty body with a zero-width (synthetic)
     // span. The value span starts at the `(`, not at the method keyword.
@@ -321,22 +380,49 @@ fn write_method_definition(w: &mut Sink<'_>, method: &ast::MethodDefinition, ctx
     };
     raw!(w, "MethodDefinition", ",\"value\":");
     let value_span = Span::new(func.params_start, func.span.end);
-    node_header!(w, @dyn value_type, value_span, ctx);
-    raw!(w, ",\"id\":");
+    tape! {
+        let entry = if is_bodyless {
+            entry!("TSDeclareMethod")
+        } else {
+            entry!("FunctionExpression")
+        };
+    }
+    node_header!(w, @dyn value_type => entry, value_span, ctx);
+    raw!(w, @in entry => "TSDeclareMethod" | "FunctionExpression", ",\"id\":");
     write_or_null(w, func.id.as_ref(), |w, id| {
         write_identifier_with_optional(w, id, ctx);
     });
-    write_function_flags_fields(w, func.generator, func.r#async);
-    raw!(w, ",\"params\":");
+    json_only! { write_function_flags_fields::<0>(w, func.generator, func.r#async); }
+    tape! {
+        let (generator, r#async) = (func.generator, func.r#async);
+        if is_bodyless {
+            write_function_flags_fields::<{ entry!("TSDeclareMethod") }>(w, generator, r#async);
+        } else {
+            write_function_flags_fields::<{ entry!("FunctionExpression") }>(w, generator, r#async);
+        }
+    }
+    raw!(w, @in entry => "TSDeclareMethod" | "FunctionExpression", ",\"params\":");
     write_expressions(w, ctx.view.exprs(func.params), ctx);
-    write_return_type_field(w, func.return_type.as_ref(), ctx);
+    json_only! { write_return_type_field::<0>(w, func.return_type.as_ref(), ctx); }
+    tape! {
+        let return_type = func.return_type.as_ref();
+        if is_bodyless {
+            write_return_type_field::<{ entry!("TSDeclareMethod") }>(w, return_type, ctx);
+        } else {
+            write_return_type_field::<{ entry!("FunctionExpression") }>(w, return_type, ctx);
+        }
+    }
     if let Some(body) = body {
-        raw!(w, ",\"body\":");
+        raw!(w, "FunctionExpression", ",\"body\":");
         write_block_statement(w, body, ctx);
     }
     // Close the `value` function node, then the `MethodDefinition`.
     close_node(w, value_type, value_span, ctx);
-    write_decorators_field(w, ctx.view.opt_decorators(method.decorators), ctx);
+    write_decorators_field::<{ at!("MethodDefinition") }>(
+        w,
+        ctx.view.opt_decorators(method.decorators),
+        ctx,
+    );
     close_node(w, "MethodDefinition", method.span, ctx);
 }
 
@@ -355,7 +441,7 @@ fn write_property_definition(w: &mut Sink<'_>, prop: &ast::PropertyDefinition, c
     if prop.accessor {
         raw!(w, "PropertyDefinition", ",\"accessor\":true");
     }
-    write_accessibility_field(w, prop.accessibility);
+    write_accessibility_field::<{ at!("PropertyDefinition") }>(w, prop.accessibility);
     if prop.readonly {
         raw!(w, "PropertyDefinition", ",\"readonly\":true");
     }
@@ -374,12 +460,20 @@ fn write_property_definition(w: &mut Sink<'_>, prop: &ast::PropertyDefinition, c
     if matches!(prop.modifier, ast::PropertyModifier::Definite) {
         raw!(w, "PropertyDefinition", ",\"definite\":true");
     }
-    write_type_annotation_field(w, prop.type_annotation.as_ref(), ctx);
+    write_type_annotation_field::<{ at!("PropertyDefinition") }>(
+        w,
+        prop.type_annotation.as_ref(),
+        ctx,
+    );
     raw!(w, "PropertyDefinition", ",\"value\":");
     write_or_null(w, prop.value.as_ref(), |w, v| {
         write_expression(w, ctx.view.expr(*v), ctx);
     });
-    write_decorators_field(w, ctx.view.opt_decorators(prop.decorators), ctx);
+    write_decorators_field::<{ at!("PropertyDefinition") }>(
+        w,
+        ctx.view.opt_decorators(prop.decorators),
+        ctx,
+    );
     close_node(w, "PropertyDefinition", prop.span, ctx);
 }
 

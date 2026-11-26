@@ -885,7 +885,7 @@ impl<'a> CommentAttach<'a> {
             return;
         }
         #[cfg(feature = "_tape")]
-        w.t_key_named("leadingComments");
+        w.t_comments_key(false);
         w.raw(",\"leadingComments\":[");
         #[cfg(feature = "_tape")]
         w.t_list_open();
@@ -918,7 +918,7 @@ impl<'a> CommentAttach<'a> {
             return;
         }
         #[cfg(feature = "_tape")]
-        w.t_key_named("trailingComments");
+        w.t_comments_key(true);
         w.raw(",\"trailingComments\":[");
         #[cfg(feature = "_tape")]
         w.t_list_open();
