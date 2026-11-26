@@ -26,7 +26,7 @@
 //! share (`tsv_lang::WirePositions`), in the coordinates `crate::WIRE_COORDINATES`
 //! states. Each position is translated via the byte→UTF-16 map (identity on ASCII). Dynamic
 //! strings are escaped by
-//! [`write_string`] (byte-identical to `serde_json`, and to `JsonWriter::string`:
+//! `write_string` (byte-identical to `serde_json`, and to `JsonWriter::string`:
 //! one shared copy of `JsonWriter::string_led_words` with an empty lead, whose short clean
 //! path is a single window append, which pays on this writer's many short strings); static
 //! structure/tokens are written verbatim; integers are hand-formatted.
@@ -110,62 +110,103 @@
 //! The windows are the span-only wire's shape. On the wire that carries `loc`, which sits
 //! between `end` and the closing constant, [`Ctx::head`] / [`Ctx::tail`] write the same burst
 //! piecewise with the `loc` field in place.
+//!
+//! # One walk, two products
+//!
+//! This file is mounted twice: as `convert::write`, the JSON copy, writing into a
+//! [`tsv_lang::JsonWriter`]; and behind `_tape` as `convert::write_tape::write`, the tape copy,
+//! writing the tape (`docs/tape_format.md`) into a `tsv_lang::tape::TapeWriter` (`write_tape.rs`).
+//! Each copy is concrete — `Sink` names its sink — so the JSON copy is the code it is with no
+//! tape at all, item for item: a writer generic over the sink inlined its JSON instance
+//! differently. What differs between the two copies is stated in the file, in two macros each
+//! mount defines before mounting it: `tape! { … }` holds what only the tape copy compiles (its
+//! sink, its string sites, its entry point, and every site's tape-structure call — through the
+//! site macros, `write_macros.rs`), and `json_only! { … }` what only the JSON copy does (its
+//! sink, its escapers, its entry points). The JSON mount expands `tape!` to nothing, so the
+//! JSON copy holds no tape call. Code inside `tape! {}` / `json_only! {}` is invisible to
+//! rustfmt (a brace macro's body is left as written), so keep those blocks to aliases and entry
+//! points, and their lines within the width by hand.
+//!
+//! A site states its bytes ONCE, as a token spec (`raw!(w; open Rule key Rule.prelude)`): the
+//! JSON copy writes the `concat!`'d literal, the tape copy the record's open and the field's
+//! mask bit, from the same tokens, so the two cannot drift. Every entry, key and keyword a spec
+//! names is looked up in the tape's tables in a `const` — a name the tables lack fails the
+//! tape copy's build. A data call (`w.span_start_end(…)`, `put_string(w, …)`) is the same call
+//! in both copies: `tsv_lang::WireSink` is the contract the two sinks keep, and the tape writes
+//! the data's words. The span-words chain is the JSON copy's alone — the tape sink makes no
+//! words, so its explicit-offset arms are the tape's path.
+//!
+//! ⚠️ **To edit a site, edit its spec, never one half.** A literal written straight to
+//! `w.raw` with no spec is a JSON byte the tape cannot see; a new helper both copies call
+//! moves the JSON copy's codegen when the tape copy is built beside it (the reason
+//! `declaration_split.rs` and `prelude_string.rs` are mounted once per copy).
+//!
+//! [`JsonWriter::span_words`]: tsv_lang::JsonWriter::span_words
+//! [`JsonWriter::stage_run`]: tsv_lang::JsonWriter::stage_run
+//! [`JsonWriter::start_end`]: tsv_lang::JsonWriter::start_end
+//! [`JsonWriter::start_end_field`]: tsv_lang::JsonWriter::start_end_field
+//! [`JsonWriter::start_end_head`]: tsv_lang::JsonWriter::start_end_head
+//! [`JsonWriter::start_end_head_words`]: tsv_lang::JsonWriter::start_end_head_words
+//! [`JsonWriter::start_end_tail`]: tsv_lang::JsonWriter::start_end_tail
+//! [`JsonWriter::start_end_tail_words`]: tsv_lang::JsonWriter::start_end_tail_words
 
-use super::{
-    WireComment, convert_prelude_to_string, raw_selector_name, selector_contains_invalid,
-    split_declaration_svelte_compat, strip_css_comments_collecting, trim_wire_end, trim_wire_start,
-};
+use super::{convert_prelude_to_string, split_declaration_svelte_compat};
 use crate::ast;
-use std::borrow::Cow;
-use tsv_lang::{
-    JsonWriter, Span, SpanHalf, SpanWords, Wire, WirePositions, WireTables, write_array,
-    write_or_null,
+use crate::ast::convert::{
+    WireComment, raw_selector_name, selector_contains_invalid, strip_css_comments_collecting,
+    trim_wire_end, trim_wire_start,
 };
+use std::borrow::Cow;
+use tsv_lang::{Span, SpanHalf, SpanWords, Wire, WirePositions, WireTables};
 
-/// Declares one `parseCss()` metadata payload twice from a single literal: bare
-/// (`$bare`), and as the constant burst that closes its node (`$closing` — `$lead`,
-/// the payload, the node's `}`), so a walked node ends in one append.
-macro_rules! metadata_payload {
-    ($bare:ident, $closing:ident = $lead:literal, $payload:literal) => {
-        const $bare: &str = $payload;
-        const $closing: &str = concat!($lead, $payload, "}");
+json_only! {
+    /// The JSON copy's sink and its string sites: this module's out-of-line escapers and
+    /// `tsv_lang`'s list helpers.
+    type Sink<'a> = JsonWriter;
+    use self::{
+        write_keyed_string as put_keyed_string, write_selector_name as put_selector_name,
+        write_string as put_string,
+    };
+    use tsv_lang::{
+        JsonWriter, write_array as put_list, write_or_null as put_record_or_null,
+        write_or_null as put_ref_or_null,
     };
 }
 
-// `parseCss()` constant metadata payloads — always the `Default` (all-`false`,
-// `null` unit) shapes, emitted only on standalone CSS (`Ctx::has_metadata`).
-// The `,"metadata":…` prefix folds the leading comma into the constant.
+tape! {
+    /// The tape copy's sink, and its string sites and list helpers (`write_tape.rs`).
+    type Sink<'a> = tsv_lang::tape::TapeWriter<'a>;
+    use super::{
+        put_keyed_string, put_list, put_record_or_null, put_ref_or_null, put_selector_name,
+        put_string,
+    };
+}
 
-/// A `Rule`'s metadata and its closing `}`.
-const RULE_META_CLOSE: &str = ",\"metadata\":{\"parent_rule\":null,\"has_local_selectors\":false,\"has_global_selectors\":false,\"is_global_block\":false}}";
-// `COMPLEX_META_CLOSE` leads with the `]` that ends the selector's `children`.
-metadata_payload!(
-    COMPLEX_META,
-    COMPLEX_META_CLOSE = "]",
-    ",\"metadata\":{\"rule\":null,\"is_global\":false,\"used\":false}"
-);
-metadata_payload!(
-    RELATIVE_META,
-    RELATIVE_META_CLOSE = "",
-    ",\"metadata\":{\"is_global\":false,\"is_global_like\":false,\"scoped\":false}"
-);
-
-/// An array's opening and items: `open` — a literal ending in the array's `[`, or empty where the
-/// node's head burst already wrote it — then the comma-separated items. The caller writes the `]`,
-/// as the first byte of whatever constant follows the array, so a node's array costs it no append
-/// of its own on either side (`tsv_lang::write_array` spends one on each bracket).
+/// An array's opening and items: `open`, then the comma-separated items. The caller writes the
+/// `]`, as the first byte of whatever constant follows the array, so a node's array costs it no
+/// append of its own on either side (`tsv_lang::write_array` spends one on each bracket).
+///
+/// `open` is always empty — the node's head burst writes the `[` as a spec (`lopen`), which the
+/// tape sees, where a literal here would be a JSON byte the tape cannot see — and a compile-time
+/// assertion holds every caller to it.
 #[inline]
 fn write_array_open<T, const N: usize>(
-    w: &mut JsonWriter,
+    w: &mut Sink<'_>,
     open: &[u8; N],
     items: impl IntoIterator<Item = T>,
-    mut f: impl FnMut(&mut JsonWriter, T),
+    mut f: impl FnMut(&mut Sink<'_>, T),
 ) {
+    const {
+        assert!(
+            N == 0,
+            "a literal `open` is a JSON byte the tape cannot see"
+        );
+    };
     w.raw_fixed(open);
     let mut first = true;
     for item in items {
         if !first {
-            w.raw(",");
+            raw!(w; sep);
         }
         first = false;
         f(w, item);
@@ -193,13 +234,13 @@ impl Ctx<'_> {
     }
 
     /// A node's closing burst (`lead`, `"start":` N `,"end":` M, `close`) as
-    /// [`JsonWriter::start_end_tail`]'s one window — or, on a wire that carries `loc`,
+    /// [`tsv_lang::JsonWriter::start_end_tail`]'s one window — or, on a wire that carries `loc`,
     /// the same bytes with `loc` after `end`, written piecewise.
     #[expect(clippy::inline_always)]
     #[inline(always)]
     fn tail<const L: usize, const C: usize>(
         &self,
-        w: &mut JsonWriter,
+        w: &mut Sink<'_>,
         lead: &[u8; L],
         start: u32,
         end: u32,
@@ -216,13 +257,13 @@ impl Ctx<'_> {
     }
 
     /// A node's opening burst (`lead` ending in `"start":`, N `,"end":` M, `close`) as
-    /// [`JsonWriter::start_end_head`]'s one window — or, on a wire that carries `loc`,
+    /// [`tsv_lang::JsonWriter::start_end_head`]'s one window — or, on a wire that carries `loc`,
     /// the same bytes with `loc` after `end`, written piecewise.
     #[expect(clippy::inline_always)]
     #[inline(always)]
     fn head<const L: usize, const C: usize>(
         &self,
-        w: &mut JsonWriter,
+        w: &mut Sink<'_>,
         lead: &[u8; L],
         start: u32,
         end: u32,
@@ -238,109 +279,114 @@ impl Ctx<'_> {
     }
 }
 
-/// Convert the internal CSS nodes straight to standalone-`StyleSheetFile` wire
-/// bytes on `wire` — one AST walk, with byte→char offset translation fused in, in
-/// the coordinates `crate::WIRE_COORDINATES` states. (An embedded `<style>` takes the
-/// Svelte writer's positions.)
-pub(crate) fn write_stylesheet_file_bytes(
-    parsed: ast::CssParsedRef<'_>,
-    source: &str,
-    wire: Wire,
-) -> Vec<u8> {
-    let tables = WireTables::new(source, crate::WIRE_COORDINATES, wire);
-    let ctx = Ctx {
-        source,
-        view: parsed.view,
-        positions: tables.positions(),
-        has_metadata: true,
-    };
-    let mut w = JsonWriter::with_capacity(tsv_lang::estimated_json_capacity(source.len(), wire));
-    write_stylesheet_file(&mut w, parsed.stylesheet, &ctx);
-    w.into_bytes()
-}
-
-/// Emit an embedded-`<style>` stylesheet's `children` array (no `metadata`) into
-/// a caller-owned writer, handing back the `comments` run the same walk gathered
-/// — the composition entry the Svelte writer uses for a `<style>` element, whose
-/// wire puts those two arrays side by side. `positions` must be the host
-/// document's (spans are in host-file coordinates, and the line table is the
-/// Svelte document's).
-pub fn write_css_children<'a>(
-    w: &mut JsonWriter,
-    stylesheet: impl Into<ast::CssParsedRef<'a>>,
-    source: &str,
-    positions: WirePositions<'_>,
-) -> CssComments {
-    let parsed = stylesheet.into();
-    let ctx = Ctx {
-        source,
-        view: parsed.view,
-        positions,
-        has_metadata: false,
-    };
-    write_children(w, parsed.stylesheet, &ctx)
-}
-
-/// Emit the `comments` array `write_css_children` collected. Split from it
-/// because the wire writes `children` first and the two are separate keys.
-pub fn write_css_comments(
-    w: &mut JsonWriter,
-    comments: &CssComments,
-    source: &str,
-    positions: WirePositions<'_>,
-) {
-    write_comments(w, comments, source, positions);
-}
-
-/// A dynamic string value, escaped byte-identical to `serde_json`: one shared out-of-line
-/// copy of [`JsonWriter::string_led_words`] with an empty lead, so a clean string shorter
-/// than a word is written as one window append with no call, and one of up to two words by
-/// a tail call that saves no register.
-#[inline(never)]
-fn write_string(w: &mut JsonWriter, s: &str) {
-    w.string_led_words(&[], s.as_bytes());
-}
-
-/// A selector name written from source: `span` less `prefix_len` bytes of sigil, with
-/// [`raw_selector_name`]'s escape scan and [`write_string`]'s JSON-escape scan asked as
-/// one. A name with no `\`, `"`, control or non-ASCII byte is written straight.
-#[inline(never)]
-fn write_selector_name(w: &mut JsonWriter, source: &str, span: Span, prefix_len: usize) {
-    let (start, end) = (span.start as usize + prefix_len, span.end as usize);
-    let bytes = source.as_bytes();
-    if start <= end
-        && end <= bytes.len()
-        && tsv_lang::swar::next_byte_below_or_of(bytes, start, end, 0x20, [b'\\', b'"']) == end
-    {
-        w.string_escape_free_led(b"", &bytes[start..end]);
-        return;
+json_only! {
+    /// Convert the internal CSS nodes straight to standalone-`StyleSheetFile` wire
+    /// bytes on `wire` — one AST walk, with byte→char offset translation fused in, in
+    /// the coordinates `crate::WIRE_COORDINATES` states. (An embedded `<style>` takes the
+    /// Svelte writer's positions.)
+    pub(crate) fn write_stylesheet_file_bytes(
+        parsed: ast::CssParsedRef<'_>,
+        source: &str,
+        wire: Wire,
+    ) -> Vec<u8> {
+        let tables = WireTables::new(source, crate::WIRE_COORDINATES, wire);
+        let ctx = Ctx {
+            source,
+            view: parsed.view,
+            positions: tables.positions(),
+            has_metadata: true,
+        };
+        let mut w =
+            JsonWriter::with_capacity(tsv_lang::estimated_json_capacity(source.len(), wire));
+        write_stylesheet_file(&mut w, parsed.stylesheet, &ctx);
+        w.into_bytes()
     }
-    write_string(w, &raw_selector_name(source, span, prefix_len));
+
+    /// Emit an embedded-`<style>` stylesheet's `children` array (no `metadata`) into
+    /// a caller-owned writer, handing back the `comments` run the same walk gathered
+    /// — the composition entry the Svelte writer uses for a `<style>` element, whose
+    /// wire puts those two arrays side by side. `positions` must be the host
+    /// document's (spans are in host-file coordinates, and the line table is the
+    /// Svelte document's).
+    pub fn write_css_children<'a>(
+        w: &mut JsonWriter,
+        stylesheet: impl Into<ast::CssParsedRef<'a>>,
+        source: &str,
+        positions: WirePositions<'_>,
+    ) -> CssComments {
+        let parsed = stylesheet.into();
+        let ctx = Ctx {
+            source,
+            view: parsed.view,
+            positions,
+            has_metadata: false,
+        };
+        write_children(w, parsed.stylesheet, &ctx)
+    }
+
+    /// Emit the `comments` array `write_css_children` collected. Split from it
+    /// because the wire writes `children` first and the two are separate keys.
+    pub fn write_css_comments(
+        w: &mut JsonWriter,
+        comments: &CssComments,
+        source: &str,
+        positions: WirePositions<'_>,
+    ) {
+        write_comments(w, comments, source, positions);
+    }
 }
 
-/// [`write_string`] behind its field's key `lead` (`,"property":`), written as part of the
-/// string's own window append rather than as an append of its own — one out-of-line copy per
-/// key, for the two fields every declaration carries.
-#[inline(never)]
-fn write_keyed_string<const K: usize>(w: &mut JsonWriter, lead: &[u8; K], s: &[u8]) {
-    w.string_led_words(lead, s);
+json_only! {
+    /// A dynamic string value, escaped byte-identical to `serde_json`: one shared out-of-line
+    /// copy of [`JsonWriter::string_led_words`] with an empty lead, so a clean string shorter
+    /// than a word is written as one window append with no call, and one of up to two words by
+    /// a tail call that saves no register.
+    #[inline(never)]
+    fn write_string(w: &mut JsonWriter, s: &str) {
+        w.string_led_words(&[], s.as_bytes());
+    }
+
+    /// A selector name written from source: `span` less `prefix_len` bytes of sigil, with
+    /// [`raw_selector_name`]'s escape scan and [`write_string`]'s JSON-escape scan asked as
+    /// one. A name with no `\`, `"`, control or non-ASCII byte is written straight.
+    #[inline(never)]
+    fn write_selector_name(w: &mut JsonWriter, source: &str, span: Span, prefix_len: usize) {
+        let (start, end) = (span.start as usize + prefix_len, span.end as usize);
+        let bytes = source.as_bytes();
+        if start <= end
+            && end <= bytes.len()
+            && tsv_lang::swar::next_byte_below_or_of(bytes, start, end, 0x20, [b'\\', b'"']) == end
+        {
+            w.string_escape_free_led(b"", &bytes[start..end]);
+            return;
+        }
+        write_string(w, &raw_selector_name(source, span, prefix_len));
+    }
+
+    /// [`write_string`] behind its field's key `lead` (`,"property":`), written as part of the
+    /// string's own window append rather than as an append of its own — one out-of-line copy per
+    /// key, for the two fields every declaration carries.
+    #[inline(never)]
+    fn write_keyed_string<const K: usize>(w: &mut JsonWriter, lead: &[u8; K], s: &[u8]) {
+        w.string_led_words(lead, s);
+    }
 }
 
 /// The standalone `StyleSheetFile` root: `type`, `start` (0), `end` (source
 /// length), `children`, `comments`.
-fn write_stylesheet_file(w: &mut JsonWriter, stylesheet: &ast::CssStyleSheet, ctx: &Ctx<'_>) {
-    w.raw("{\"type\":\"StyleSheetFile\",\"start\":");
+fn write_stylesheet_file(w: &mut Sink<'_>, stylesheet: &ast::CssStyleSheet, ctx: &Ctx<'_>) {
+    raw!(w; open StyleSheetFile key StyleSheetFile.start);
     w.span_start_end(ctx.positions, 0, ctx.source.len() as u32);
-    w.raw(",\"children\":");
+    raw!(w; key StyleSheetFile.children);
     let comments = write_children(w, stylesheet, ctx);
-    w.raw(",\"comments\":");
+    raw!(w; key StyleSheetFile.comments);
     write_comments(w, &comments, ctx.source, ctx.positions);
-    w.raw("}");
+    raw!(w; close);
 }
 
 /// Every comment Svelte's CSS parser captures on a stylesheet root, in source
 /// order — gathered by the `children` walk, opaque to its caller, spent by
-/// [`write_css_comments`].
+/// `write_css_comments`.
 ///
 /// `#[must_use]` because it is the *only* way to reach those comments: the walk
 /// that gathers them has already written its children, so dropping the value
@@ -369,13 +415,9 @@ pub struct CssComments(Vec<WireComment>);
 /// keeps the **positioned** reading: `position` is the field only the strip can
 /// supply, and Svelte captures such a comment through `read_value`, which always
 /// sets it.
-fn write_children(
-    w: &mut JsonWriter,
-    stylesheet: &ast::CssStyleSheet,
-    ctx: &Ctx<'_>,
-) -> CssComments {
+fn write_children(w: &mut Sink<'_>, stylesheet: &ast::CssStyleSheet, ctx: &Ctx<'_>) -> CssComments {
     let mut out = Vec::new();
-    write_array(w, ctx.view.nodes(stylesheet.nodes), |w, n| {
+    put_list(w, ctx.view.nodes(stylesheet.nodes), |w, n| {
         write_node(w, n, ctx, &mut out);
     });
     out.extend(stylesheet.comments.iter().map(|c| WireComment {
@@ -390,29 +432,29 @@ fn write_children(
 /// Emit `comments` as the wire's `CSSComment` array. It reads no tree, only the run the
 /// `children` walk gathered, so it takes the source and the positions and no view.
 fn write_comments(
-    w: &mut JsonWriter,
+    w: &mut Sink<'_>,
     comments: &CssComments,
     source: &str,
     positions: WirePositions<'_>,
 ) {
-    write_array(w, &comments.0, |w, c| {
+    put_list(w, &comments.0, |w, c| {
         // `value` is the comment's interior — Svelte's `read_comment` reads it
         // between the delimiters it has already eaten.
         let interior = Span::new(c.span.start + 2, c.span.end - 2);
-        w.raw("{\"type\":\"CSSComment\",\"value\":");
-        write_string(w, interior.extract(source));
+        raw!(w; open CSSComment key CSSComment.value);
+        put_string(w, interior.extract(source));
         w.span_start_end_field(positions, c.span.start, c.span.end);
         if let Some(position) = c.position {
-            w.raw(",\"position\":");
+            raw!(w; key CSSComment.position);
             w.u32(position);
         }
-        w.raw("}");
+        raw!(w; close);
     });
 }
 
 /// Emit a CSS node (a `Rule` or an `Atrule`).
 fn write_node(
-    w: &mut JsonWriter,
+    w: &mut Sink<'_>,
     node: &ast::CssNode,
     ctx: &Ctx<'_>,
     comments: &mut Vec<WireComment>,
@@ -433,14 +475,14 @@ fn write_node(
 /// written from the two halves' words when both made them (module doc, §Shared span
 /// words).
 fn write_rule(
-    w: &mut JsonWriter,
+    w: &mut Sink<'_>,
     rule: &ast::CssRule,
     ctx: &Ctx<'_>,
     comments: &mut Vec<WireComment>,
 ) {
-    w.raw("{\"type\":\"Rule\",\"prelude\":");
+    raw!(w; open Rule key Rule.prelude);
     let prelude_start = write_selector_list(w, &rule.selector, ctx);
-    w.raw(",\"block\":");
+    raw!(w; key Rule.block);
     let block_end = write_block(
         w,
         rule.block_span,
@@ -458,14 +500,14 @@ fn write_rule(
         Some(words) => {
             #[cfg(debug_assertions)]
             assert_words_of(words, rule.span, ctx, "rule");
-            w.start_end_tail_words(b",", words, b"");
+            tail_words!(w; [sep] words; []);
         }
-        None => ctx.tail(w, b",", rule.span.start, rule.span.end, b""),
+        None => tail!(ctx, w; [sep] rule.span.start, rule.span.end; []),
     }
     if ctx.has_metadata {
-        w.raw(RULE_META_CLOSE);
+        raw!(w; rule_meta close);
     } else {
-        w.raw("}");
+        raw!(w; close);
     }
 }
 
@@ -473,24 +515,24 @@ fn write_rule(
 /// `prelude`, `block` (unlike `Rule`, whose positions trail — parseCss
 /// constructs the two literals differently). `Atrule` carries no `metadata`.
 fn write_atrule(
-    w: &mut JsonWriter,
+    w: &mut Sink<'_>,
     atrule: &ast::CssAtrule,
     ctx: &Ctx<'_>,
     comments: &mut Vec<WireComment>,
 ) {
-    w.raw("{\"type\":\"Atrule\",\"start\":");
+    raw!(w; open Atrule key Atrule.start);
     w.span_start_end(ctx.positions, atrule.span.start, atrule.span.end);
-    w.raw(",\"name\":");
+    raw!(w; key Atrule.name);
     // Half-decoded from source, like a selector name: parseCss reads both with
     // `read_identifier`, so an identity escape keeps its backslash (`@a\?b` → `a\?b`)
     // where the internal `name` is fully decoded.
-    write_string(w, &raw_selector_name(ctx.source, atrule.name_span, 0));
-    w.raw(",\"prelude\":");
+    put_string(w, &raw_selector_name(ctx.source, atrule.name_span, 0));
+    raw!(w; key Atrule.prelude);
     let prelude = convert_prelude_to_string(&atrule.prelude, ctx.source);
-    write_string(w, &prelude);
+    put_string(w, &prelude);
     collect_prelude_comments(atrule, ctx.source, comments);
-    w.raw(",\"block\":");
-    write_or_null(w, atrule.block.as_ref(), |w, b| {
+    raw!(w; key Atrule.block);
+    put_record_or_null(w, atrule.block.as_ref(), |w, b| {
         // An at-rule's positions lead, so nothing it writes after the block shares its end.
         let _ = write_block(
             w,
@@ -500,7 +542,7 @@ fn write_atrule(
             comments,
         );
     });
-    w.raw("}");
+    raw!(w; close);
 }
 
 /// Record the comments Svelte lifts out of an at-rule prelude, which the emitted
@@ -543,7 +585,7 @@ fn collect_prelude_comments(
 /// Returns the `end` half of the words its head was written from, for the rule that
 /// closes where the block does ([`SpanHalf::NONE`] when the head made none).
 fn write_block(
-    w: &mut JsonWriter,
+    w: &mut Sink<'_>,
     block_span: Span,
     children: &[ast::CssBlockChild],
     ctx: &Ctx<'_>,
@@ -552,18 +594,14 @@ fn write_block(
     let words = if ctx.positions.has_locations() {
         None
     } else {
-        JsonWriter::span_words(ctx.pos(block_span.start), ctx.pos(block_span.end))
+        Sink::span_words(ctx.pos(block_span.start), ctx.pos(block_span.end))
     };
-    let lead = b"{\"type\":\"Block\",\"start\":";
     match words {
-        Some(words) => w.start_end_head_words(lead, words, b",\"children\":["),
-        None => ctx.head(
-            w,
-            lead,
-            block_span.start,
-            block_span.end,
-            b",\"children\":[",
-        ),
+        Some(words) => head_words!(w;
+            [open Block key Block.start] words; [key Block.children lopen]),
+        None => head!(ctx, w;
+            [open Block key Block.start] block_span.start, block_span.end;
+            [key Block.children lopen]),
     }
     let mut first = true;
     for child in children {
@@ -575,17 +613,17 @@ fn write_block(
             continue;
         }
         if !first {
-            w.raw(",");
+            raw!(w; sep);
         }
         first = false;
         write_block_child(w, child, ctx, comments);
     }
-    w.raw("]}");
+    raw!(w; lclose close);
     words.map_or(SpanHalf::NONE, SpanWords::end_half)
 }
 
 fn write_block_child(
-    w: &mut JsonWriter,
+    w: &mut Sink<'_>,
     child: &ast::CssBlockChild,
     ctx: &Ctx<'_>,
     comments: &mut Vec<WireComment>,
@@ -655,7 +693,7 @@ fn split_declaration<'a>(decl: &ast::CssDeclaration, source: &'a str) -> Declara
 /// never lexed as `Comment`s — so it doubles as their collector, which is what
 /// keeps each recorded `position` indexing the very `value` emitted here.
 fn write_declaration(
-    w: &mut JsonWriter,
+    w: &mut Sink<'_>,
     decl: &ast::CssDeclaration,
     ctx: &Ctx<'_>,
     comments: &mut Vec<WireComment>,
@@ -682,16 +720,12 @@ fn write_declaration(
                 || tsv_lang::stop_byte_may_be_js_whitespace(value.first())
                 || tsv_lang::stop_byte_may_be_js_whitespace(value.last()))
             {
-                ctx.head(
-                    w,
-                    b"{\"type\":\"Declaration\",\"start\":",
-                    decl.span.start,
-                    end as u32,
-                    b"",
-                );
-                write_keyed_string(w, b",\"property\":", property);
-                write_keyed_string(w, b",\"value\":", value);
-                w.raw("}");
+                head!(ctx, w;
+                    [open Declaration key Declaration.start]
+                    decl.span.start, end as u32; []);
+                keyed!(w; [key Declaration.property] property);
+                keyed!(w; [key Declaration.value] value);
+                raw!(w; close);
                 return;
             }
         }
@@ -705,38 +739,30 @@ fn write_declaration(
         Cow::Borrowed(trim_wire_end(split.value))
     };
 
-    ctx.head(
-        w,
-        b"{\"type\":\"Declaration\",\"start\":",
-        decl.span.start,
-        split.end,
-        b"",
-    );
-    write_keyed_string(
-        w,
-        b",\"property\":",
-        trim_wire_end(split.property).as_bytes(),
-    );
-    write_keyed_string(w, b",\"value\":", value.as_bytes());
-    w.raw("}");
+    head!(ctx, w;
+        [open Declaration key Declaration.start]
+        decl.span.start, split.end; []);
+    keyed!(w; [key Declaration.property] trim_wire_end(split.property).as_bytes());
+    keyed!(w; [key Declaration.value] value.as_bytes());
+    raw!(w; close);
 }
 
 /// Emits a `SelectorList` node (rule preludes — parsed non-forgivingly, no
 /// `Invalid`), returning the `start` half of its words for the rule that opens where
 /// the list does.
-fn write_selector_list(w: &mut JsonWriter, sl: &ast::SelectorList, ctx: &Ctx<'_>) -> SpanHalf {
+fn write_selector_list(w: &mut Sink<'_>, sl: &ast::SelectorList, ctx: &Ctx<'_>) -> SpanHalf {
     write_selector_list_inner(w, sl, ctx, false)
 }
 
 /// Emits a `SelectorList` node for pseudo-class args — drops complex selectors
 /// containing a forgiving-parse `Invalid`.
-fn write_selector_list_filtered(w: &mut JsonWriter, sl: &ast::SelectorList, ctx: &Ctx<'_>) {
+fn write_selector_list_filtered(w: &mut Sink<'_>, sl: &ast::SelectorList, ctx: &Ctx<'_>) {
     let _ = write_selector_list_inner(w, sl, ctx, true);
 }
 
 /// Returns the `start` half of the list's words ([`SpanHalf::NONE`] when it made none).
 fn write_selector_list_inner(
-    w: &mut JsonWriter,
+    w: &mut Sink<'_>,
     sl: &ast::SelectorList,
     ctx: &Ctx<'_>,
     filter_invalid: bool,
@@ -749,12 +775,15 @@ fn write_selector_list_inner(
     let words = if ctx.positions.has_locations() {
         None
     } else {
-        JsonWriter::span_words(ctx.pos(sl.span.start), ctx.pos(sl.span.end))
+        Sink::span_words(ctx.pos(sl.span.start), ctx.pos(sl.span.end))
     };
-    let lead = b"{\"type\":\"SelectorList\",\"start\":";
     match words {
-        Some(words) => w.start_end_head_words(lead, words, b",\"children\":["),
-        None => ctx.head(w, lead, sl.span.start, sl.span.end, b",\"children\":["),
+        Some(words) => head_words!(w;
+            [open SelectorList key SelectorList.start] words;
+            [key SelectorList.children lopen]),
+        None => head!(ctx, w;
+            [open SelectorList key SelectorList.start] sl.span.start, sl.span.end;
+            [key SelectorList.children lopen]),
     }
     let shared = match selectors {
         [c] if c.span == sl.span => words,
@@ -768,7 +797,7 @@ fn write_selector_list_inner(
             .filter(|c| !filter_invalid || !selector_contains_invalid(c, ctx.view)),
         |w, c| write_complex_selector(w, c, ctx, shared),
     );
-    w.raw("]}");
+    raw!(w; lclose close);
     words.map_or(SpanHalf::NONE, SpanWords::start_half)
 }
 
@@ -782,7 +811,7 @@ fn write_selector_list_inner(
 #[expect(clippy::inline_always)]
 #[inline(always)]
 fn write_complex_selector(
-    w: &mut JsonWriter,
+    w: &mut Sink<'_>,
     c: &ast::ComplexSelector,
     ctx: &Ctx<'_>,
     shared: Option<SpanWords>,
@@ -794,12 +823,15 @@ fn write_complex_selector(
     let words = match shared {
         Some(words) => Some(words),
         None if ctx.positions.has_locations() => None,
-        None => JsonWriter::span_words(ctx.pos(c.span.start), ctx.pos(c.span.end)),
+        None => Sink::span_words(ctx.pos(c.span.start), ctx.pos(c.span.end)),
     };
-    let lead = b"{\"type\":\"ComplexSelector\",\"start\":";
     match words {
-        Some(words) => w.start_end_head_words(lead, words, b",\"children\":["),
-        None => ctx.head(w, lead, c.span.start, c.span.end, b",\"children\":["),
+        Some(words) => head_words!(w;
+            [open ComplexSelector key ComplexSelector.start] words;
+            [key ComplexSelector.children lopen]),
+        None => head!(ctx, w;
+            [open ComplexSelector key ComplexSelector.start] c.span.start, c.span.end;
+            [key ComplexSelector.children lopen]),
     }
     let children = ctx.view.relative_selectors(c.children);
     let shared = match children {
@@ -812,15 +844,15 @@ fn write_complex_selector(
     let mut first = true;
     for r in children {
         if !first {
-            w.raw(",");
+            raw!(w; sep);
         }
         first = false;
         write_relative_selector(w, r, ctx, shared);
     }
     if ctx.has_metadata {
-        w.raw(COMPLEX_META_CLOSE);
+        raw!(w; lclose complex_meta close);
     } else {
-        w.raw("]}");
+        raw!(w; lclose close);
     }
 }
 
@@ -835,7 +867,7 @@ fn write_complex_selector(
 #[expect(clippy::inline_always)]
 #[inline(always)]
 fn write_relative_selector(
-    w: &mut JsonWriter,
+    w: &mut Sink<'_>,
     r: &ast::RelativeSelector,
     ctx: &Ctx<'_>,
     shared: Option<SpanWords>,
@@ -848,11 +880,12 @@ fn write_relative_selector(
     // through the `selectors` array's `[`.
     match (&r.combinator, &r.combinator_span) {
         (Some(comb), Some(span)) => {
-            w.raw("{\"type\":\"RelativeSelector\",\"combinator\":");
+            raw!(w; open RelativeSelector key RelativeSelector.combinator);
             write_combinator(w, comb.as_str(), *span, ctx);
-            w.raw(",\"selectors\":[");
+            raw!(w; key RelativeSelector.selectors lopen);
         }
-        _ => w.raw("{\"type\":\"RelativeSelector\",\"combinator\":null,\"selectors\":["),
+        _ => raw!(w; open RelativeSelector key RelativeSelector.combinator nul_rec
+            key RelativeSelector.selectors lopen),
     }
     // A compound of one class or one unprefixed type selector — `.a`, `div`, the
     // commonest compounds — that spans the whole relative selector closes on the same
@@ -862,7 +895,7 @@ fn write_relative_selector(
             #[cfg(debug_assertions)]
             assert_words_of(words, *span, ctx, "class selector");
             write_class_selector_head(w, *span, ctx);
-            w.start_end_tail_words(b",", words, b"}");
+            tail_words!(w; [sep] words; [close]);
         }
         (
             Some(words),
@@ -876,20 +909,20 @@ fn write_relative_selector(
             #[cfg(debug_assertions)]
             assert_words_of(words, *span, ctx, "type selector");
             write_type_selector_head(w, *span, ctx);
-            w.start_end_tail_words(b",", words, b"}");
+            tail_words!(w; [sep] words; [close]);
         }
         (_, simples) => write_array_open(w, b"", simples, |w, s| {
             write_simple_selector(w, s, ctx);
         }),
     }
     match shared {
-        Some(words) => w.start_end_tail_words(b"],", words, b""),
-        None => ctx.tail(w, b"],", r.span.start, r.span.end, b""),
+        Some(words) => tail_words!(w; [lclose sep] words; []),
+        None => tail!(ctx, w; [lclose sep] r.span.start, r.span.end; []),
     }
     if ctx.has_metadata {
-        w.raw(RELATIVE_META_CLOSE);
+        raw!(w; relative_meta close);
     } else {
-        w.raw("}");
+        raw!(w; close);
     }
 }
 
@@ -899,7 +932,7 @@ fn write_relative_selector(
 fn assert_words_of(words: SpanWords, span: Span, ctx: &Ctx<'_>, node: &str) {
     assert_eq!(
         Some(words),
-        JsonWriter::span_words(ctx.pos(span.start), ctx.pos(span.end)),
+        Sink::span_words(ctx.pos(span.start), ctx.pos(span.end)),
         "shared span words reused for a {node} of another span"
     );
 }
@@ -912,26 +945,26 @@ fn assert_words_of(words: SpanWords, span: Span, ctx: &Ctx<'_>, node: &str) {
 /// head came out of line between them — a call on the commonest selector of all.
 #[expect(clippy::inline_always)]
 #[inline(always)]
-fn write_class_selector_head(w: &mut JsonWriter, span: Span, ctx: &Ctx<'_>) {
+fn write_class_selector_head(w: &mut Sink<'_>, span: Span, ctx: &Ctx<'_>) {
     let name_start = crate::comments::class_name_start(ctx.source.as_bytes(), span.start);
-    w.raw("{\"type\":\"ClassSelector\",\"name\":");
-    write_selector_name(w, ctx.source, span, (name_start - span.start) as usize);
+    raw!(w; open ClassSelector key ClassSelector.name);
+    put_selector_name(w, ctx.source, span, (name_start - span.start) as usize);
 }
 
 /// An unprefixed `TypeSelector` through its `name`, read from source. The caller writes
 /// the tail.
 #[expect(clippy::inline_always)]
 #[inline(always)]
-fn write_type_selector_head(w: &mut JsonWriter, span: Span, ctx: &Ctx<'_>) {
-    w.raw("{\"type\":\"TypeSelector\",\"name\":");
-    write_selector_name(w, ctx.source, span, 0);
+fn write_type_selector_head(w: &mut Sink<'_>, span: Span, ctx: &Ctx<'_>) {
+    raw!(w; open TypeSelector key TypeSelector.name);
+    put_selector_name(w, ctx.source, span, 0);
 }
 
-fn write_combinator(w: &mut JsonWriter, name: &'static str, span: Span, ctx: &Ctx<'_>) {
-    w.raw("{\"type\":\"Combinator\",\"name\":");
-    w.token(name); // ` ` / `>` / `+` / `~` / `||` — escape-free
+fn write_combinator(w: &mut Sink<'_>, name: &'static str, span: Span, ctx: &Ctx<'_>) {
+    raw!(w; open Combinator key Combinator.name);
+    keyword!(w; Combinator.name, name); // ` ` / `>` / `+` / `~` / `||` — escape-free
     w.span_start_end_field(ctx.positions, span.start, span.end);
-    w.raw("}");
+    raw!(w; close);
 }
 
 /// Emit a simple selector (type/universal/class/id/nesting/attribute/pseudo/percentage).
@@ -942,7 +975,7 @@ fn write_combinator(w: &mut JsonWriter, name: &'static str, span: Span, ctx: &Ct
 /// compound that reaches it, and the list's own frame, which the pseudo-class argument
 /// recursion repeats, stays narrow. Inline, the list function is twice the size.
 #[inline(never)]
-fn write_simple_selector(w: &mut JsonWriter, simple: &ast::SimpleSelector, ctx: &Ctx<'_>) {
+fn write_simple_selector(w: &mut Sink<'_>, simple: &ast::SimpleSelector, ctx: &Ctx<'_>) {
     match simple {
         ast::SimpleSelector::Type {
             namespace_span,
@@ -951,7 +984,7 @@ fn write_simple_selector(w: &mut JsonWriter, simple: &ast::SimpleSelector, ctx: 
             let name = match namespace_span {
                 None => {
                     write_type_selector_head(w, *span, ctx);
-                    ctx.tail(w, b",", span.start, span.end, b"}");
+                    tail!(ctx, w; [sep] span.start, span.end; [close]);
                     return;
                 }
                 // Step forward from the prefix token rather than scanning for a `|`: the
@@ -975,15 +1008,15 @@ fn write_simple_selector(w: &mut JsonWriter, simple: &ast::SimpleSelector, ctx: 
         }
         ast::SimpleSelector::Class { span } => {
             write_class_selector_head(w, *span, ctx);
-            ctx.tail(w, b",", span.start, span.end, b"}");
+            tail!(ctx, w; [sep] span.start, span.end; [close]);
         }
         ast::SimpleSelector::Id { span } => {
-            w.raw("{\"type\":\"IdSelector\",\"name\":");
-            write_selector_name(w, ctx.source, *span, 1);
-            ctx.tail(w, b",", span.start, span.end, b"}");
+            raw!(w; open IdSelector key IdSelector.name);
+            put_selector_name(w, ctx.source, *span, 1);
+            tail!(ctx, w; [sep] span.start, span.end; [close]);
         }
         ast::SimpleSelector::Nesting { span } => {
-            w.raw("{\"type\":\"NestingSelector\",\"name\":");
+            raw!(w; open NestingSelector key NestingSelector.name);
             write_named_selector(w, "&", *span, ctx);
         }
         ast::SimpleSelector::Attribute {
@@ -1003,25 +1036,25 @@ fn write_simple_selector(w: &mut JsonWriter, simple: &ast::SimpleSelector, ctx: 
             // Half-decoded from the prefix's own span, like every other selector name —
             // `*` and the empty prefix fall out of the same slice.
             let namespace = namespace_span.map(|ns| raw_selector_name(ctx.source, ns, 0));
-            w.raw("{\"type\":\"AttributeSelector\",\"start\":");
+            raw!(w; open AttributeSelector key AttributeSelector.start);
             w.span_start_end(ctx.positions, span.start, span.end);
-            w.raw(",\"name\":");
-            write_string(w, &name);
-            w.raw(",\"matcher\":");
+            raw!(w; key AttributeSelector.name);
+            put_string(w, &name);
+            raw!(w; key AttributeSelector.matcher);
             // `as_str()` is a static escape-free operator (`=`/`~=`/`|=`/…), like
             // the sibling `Combinator` name — skip the escape scan.
-            write_or_null(w, matcher.as_ref(), |w, m| w.token(m.as_str()));
-            w.raw(",\"value\":");
-            write_or_null(w, value.as_ref(), |w, v| write_string(w, v));
-            w.raw(",\"flags\":");
-            write_or_null(w, flags.as_ref(), |w, &f| {
-                write_string(w, ctx.view.text(f));
+            put_ref_or_null(w, matcher.as_ref(), |w, m| token_ref!(w; m.as_str()));
+            raw!(w; key AttributeSelector.value);
+            put_ref_or_null(w, value.as_ref(), |w, v| put_string(w, v));
+            raw!(w; key AttributeSelector.flags);
+            put_ref_or_null(w, flags.as_ref(), |w, &f| {
+                put_string(w, ctx.view.text(f));
             });
             if let Some(ns) = &namespace {
-                w.raw(",\"namespace\":");
-                write_string(w, ns);
+                raw!(w; key AttributeSelector.namespace);
+                put_string(w, ns);
             }
-            w.raw("}");
+            raw!(w; close);
         }
         ast::SimpleSelector::PseudoClass {
             args,
@@ -1032,12 +1065,12 @@ fn write_simple_selector(w: &mut JsonWriter, simple: &ast::SimpleSelector, ctx: 
                 start: crate::comments::pseudo_name_start(ctx.source.as_bytes(), span.start),
                 end: *name_end,
             };
-            w.raw("{\"type\":\"PseudoClassSelector\",\"name\":");
-            write_selector_name(w, ctx.source, name_span, 0);
-            w.raw(",\"args\":");
-            write_or_null(w, args.as_ref(), |w, a| write_pseudo_args(w, a, ctx));
+            raw!(w; open PseudoClassSelector key PseudoClassSelector.name);
+            put_selector_name(w, ctx.source, name_span, 0);
+            raw!(w; key PseudoClassSelector.args);
+            put_record_or_null(w, args.as_ref(), |w, a| write_pseudo_args(w, a, ctx));
             w.span_start_end_field(ctx.positions, span.start, span.end);
-            w.raw("}");
+            raw!(w; close);
         }
         ast::SimpleSelector::PseudoElement {
             args,
@@ -1051,8 +1084,8 @@ fn write_simple_selector(w: &mut JsonWriter, simple: &ast::SimpleSelector, ctx: 
                 start: crate::comments::pseudo_name_start(ctx.source.as_bytes(), span.start),
                 end: name_end,
             };
-            w.raw("{\"type\":\"PseudoElementSelector\",\"name\":");
-            write_selector_name(w, ctx.source, name_span, 0);
+            raw!(w; open PseudoElementSelector key PseudoElementSelector.name);
+            put_selector_name(w, ctx.source, name_span, 0);
             w.span_start_end_field(ctx.positions, span.start, span.end);
             // `args` is emitted only when present — Svelte spreads the key in
             // conditionally (`...(args && { args })`), so an argument-less
@@ -1063,10 +1096,10 @@ fn write_simple_selector(w: &mut JsonWriter, simple: &ast::SimpleSelector, ctx: 
                 .as_ref()
                 .filter(|a| !matches!(a, ast::PseudoClassArgs::AnyValue { .. }));
             if let Some(args) = args {
-                w.raw(",\"args\":");
+                raw!(w; key PseudoElementSelector.args);
                 write_pseudo_args(w, args, ctx);
             }
-            w.raw("}");
+            raw!(w; close);
         }
         ast::SimpleSelector::Percentage { value, span } => {
             let value = value.get();
@@ -1075,10 +1108,10 @@ fn write_simple_selector(w: &mut JsonWriter, simple: &ast::SimpleSelector, ctx: 
             } else {
                 format!("{value}%")
             };
-            w.raw("{\"type\":\"Percentage\",\"value\":");
-            write_string(w, &value_str);
+            raw!(w; open Percentage key Percentage.value);
+            put_string(w, &value_str);
             w.span_start_end_field(ctx.positions, span.start, span.end);
-            w.raw("}");
+            raw!(w; close);
         }
         ast::SimpleSelector::Nth { span } => {
             // An An+B term inside pseudo-class args. parseCss stores the value
@@ -1088,10 +1121,10 @@ fn write_simple_selector(w: &mut JsonWriter, simple: &ast::SimpleSelector, ctx: 
             // selectors rather than a nested list — so no `selector` is emitted
             // here (only the dedicated `:nth-*()` path nests `S` under
             // `Nth.selector`).
-            w.raw("{\"type\":\"Nth\",\"value\":");
-            write_string(w, span.extract(ctx.source));
+            raw!(w; open Nth key Nth.value);
+            put_string(w, span.extract(ctx.source));
             w.span_start_end_field(ctx.positions, span.start, span.end);
-            w.raw("}");
+            raw!(w; close);
         }
         // Forgiving-list `Invalid`s are filtered before convert (see
         // `write_selector_list_filtered`); the non-filtering path (rule preludes)
@@ -1123,26 +1156,26 @@ fn wq_name_start(source: &str, prefix: Span, limit: u32) -> usize {
 /// gives `"*"` and the no-namespace `|a` gives `""` — distinct from an absent key, which
 /// is a bare `a` (any namespace, or the default one).
 fn write_type_selector(
-    w: &mut JsonWriter,
+    w: &mut Sink<'_>,
     name: &str,
     namespace_span: Option<Span>,
     span: Span,
     ctx: &Ctx<'_>,
 ) {
-    w.raw("{\"type\":\"TypeSelector\",\"name\":");
+    raw!(w; open TypeSelector key TypeSelector.name);
     let Some(prefix) = namespace_span else {
         write_named_selector(w, name, span, ctx);
         return;
     };
-    write_string(w, name);
-    w.raw(",\"namespace\":");
-    write_string(w, &raw_selector_name(ctx.source, prefix, 0));
-    ctx.tail(w, b",", span.start, span.end, b"}");
+    put_string(w, name);
+    raw!(w; key TypeSelector.namespace);
+    put_string(w, &raw_selector_name(ctx.source, prefix, 0));
+    tail!(ctx, w; [sep] span.start, span.end; [close]);
 }
 
 /// The shared `{type, name, start, end}` shape for a name already in hand — the nesting
 /// `&` and a universal `*` with no namespace — from the name on (a name read from source
-/// is [`write_selector_name`]'s, followed by the same tail): the caller has written the node's head,
+/// is `write_selector_name`'s, followed by the same tail): the caller has written the node's head,
 /// `{"type":"…","name":`, as one literal of its own — a constant-width store at each
 /// site, where a node type handed down here would be three appends, the middle one a
 /// runtime-length copy.
@@ -1150,19 +1183,19 @@ fn write_type_selector(
 /// The trailing `start`/`end`/`}` burst is one in-place window (module doc, §The
 /// `start`/`end` bursts) — this node carries no `metadata`, so the closing brace joins
 /// it.
-fn write_named_selector(w: &mut JsonWriter, name: &str, span: Span, ctx: &Ctx<'_>) {
-    write_string(w, name);
-    ctx.tail(w, b",", span.start, span.end, b"}");
+fn write_named_selector(w: &mut Sink<'_>, name: &str, span: Span, ctx: &Ctx<'_>) {
+    put_string(w, name);
+    tail!(ctx, w; [sep] span.start, span.end; [close]);
 }
 
 /// Emit a functional pseudo-class's or pseudo-element's args (an `Nth` node, a
 /// nested `SelectorList`, or a `::part()` ident run projected onto one).
-fn write_pseudo_args(w: &mut JsonWriter, args: &ast::PseudoClassArgs, ctx: &Ctx<'_>) {
+fn write_pseudo_args(w: &mut Sink<'_>, args: &ast::PseudoClassArgs, ctx: &Ctx<'_>) {
     match args {
         // A kept `<any-value>` has no wire node: parseCss rejects a non-selector argument,
         // and tsv keeps Svelte's shape for the accepted one — `args: null` on a
         // pseudo-class (a pseudo-element drops the key, filtered at its call site).
-        ast::PseudoClassArgs::AnyValue { .. } => w.null(),
+        ast::PseudoClassArgs::AnyValue { .. } => null_record!(w),
         ast::PseudoClassArgs::Nth {
             value,
             of_selector,
@@ -1187,14 +1220,14 @@ fn write_pseudo_args(w: &mut JsonWriter, args: &ast::PseudoClassArgs, ctx: &Ctx<
                 .map_or(value_span.end, |sel| sel.span.end);
             let public_span = Span::new(value_span.start, content_end);
             write_wrap_single_selector(w, public_span, ctx, |w, ctx| {
-                w.raw("{\"type\":\"Nth\",\"value\":");
-                write_string(w, ctx.view.text(*value));
+                raw!(w; open Nth key Nth.value);
+                put_string(w, ctx.view.text(*value));
                 w.span_start_end_field(ctx.positions, public_span.start, public_span.end);
                 if let Some(sel) = of_selector {
-                    w.raw(",\"selector\":");
+                    raw!(w; key Nth.selector);
                     write_selector_list_filtered(w, sel, ctx);
                 }
-                w.raw("}");
+                raw!(w; close);
             });
         }
         ast::PseudoClassArgs::SelectorList { selectors, .. } => {
@@ -1219,13 +1252,13 @@ fn write_pseudo_args(w: &mut JsonWriter, args: &ast::PseudoClassArgs, ctx: &Ctx<
 /// exactly the whitespace run it consumed — and its `RelativeSelector` starts at
 /// that combinator. `ident_spans` is always non-empty (the parser rejects an empty
 /// `::part()`).
-fn write_part_args(w: &mut JsonWriter, ident_spans: &[Span], ctx: &Ctx<'_>) {
+fn write_part_args(w: &mut Sink<'_>, ident_spans: &[Span], ctx: &Ctx<'_>) {
     #[expect(clippy::unreachable)]
     let (Some(first), Some(last)) = (ident_spans.first(), ident_spans.last()) else {
         unreachable!("::part() always names at least one part — the parser rejects an empty arg")
     };
     write_synth_selector_list(w, Span::new(first.start, last.end), ctx, |w, ctx| {
-        write_array(w, ident_spans.iter().enumerate(), |w, (i, span)| {
+        put_list(w, ident_spans.iter().enumerate(), |w, (i, span)| {
             // The compound's own extent starts at the combinator, so the first name
             // starts at itself and every later one at the end of its predecessor.
             let rel_start = if i == 0 {
@@ -1240,9 +1273,9 @@ fn write_part_args(w: &mut JsonWriter, ident_spans: &[Span], ctx: &Ctx<'_>) {
                 Span::new(rel_start, span.end),
                 ctx,
                 |w, ctx| {
-                    w.raw("{\"type\":\"TypeSelector\",\"name\":");
-                    write_selector_name(w, ctx.source, *span, 0);
-                    ctx.tail(w, b",", span.start, span.end, b"}");
+                    raw!(w; open TypeSelector key TypeSelector.name);
+                    put_selector_name(w, ctx.source, *span, 0);
+                    tail!(ctx, w; [sep] span.start, span.end; [close]);
                 },
             );
         });
@@ -1253,15 +1286,15 @@ fn write_part_args(w: &mut JsonWriter, ident_spans: &[Span], ctx: &Ctx<'_>) {
 /// SelectorList → ComplexSelector → RelativeSelector → `[<simple>]`, all sharing
 /// `span`. The inner simple selector is emitted by `emit_simple`.
 fn write_wrap_single_selector(
-    w: &mut JsonWriter,
+    w: &mut Sink<'_>,
     span: Span,
     ctx: &Ctx<'_>,
-    emit_simple: impl FnOnce(&mut JsonWriter, &Ctx<'_>),
+    emit_simple: impl FnOnce(&mut Sink<'_>, &Ctx<'_>),
 ) {
     write_synth_selector_list(w, span, ctx, |w, ctx| {
-        w.raw("[");
+        raw!(w; lopen);
         write_synth_relative_selector(w, None, span, ctx, emit_simple);
-        w.raw("]");
+        raw!(w; lclose);
     });
 }
 
@@ -1272,21 +1305,21 @@ fn write_wrap_single_selector(
 /// Two arguments are synthesized rather than walked (an `Nth` term, a `::part()`
 /// ident run) and they differ only in that array, so the shell is stated once.
 fn write_synth_selector_list(
-    w: &mut JsonWriter,
+    w: &mut Sink<'_>,
     span: Span,
     ctx: &Ctx<'_>,
-    emit_relatives: impl FnOnce(&mut JsonWriter, &Ctx<'_>),
+    emit_relatives: impl FnOnce(&mut Sink<'_>, &Ctx<'_>),
 ) {
-    w.raw("{\"type\":\"SelectorList\",\"start\":");
+    raw!(w; open SelectorList key SelectorList.start);
     w.span_start_end(ctx.positions, span.start, span.end);
-    w.raw(",\"children\":[{\"type\":\"ComplexSelector\",\"start\":");
+    raw!(w; key SelectorList.children lopen open ComplexSelector key ComplexSelector.start);
     w.span_start_end(ctx.positions, span.start, span.end);
-    w.raw(",\"children\":");
+    raw!(w; key ComplexSelector.children);
     emit_relatives(w, ctx);
     if ctx.has_metadata {
-        w.raw(COMPLEX_META);
+        raw!(w; complex_meta);
     }
-    w.raw("}]}"); // close ComplexSelector, SelectorList.children, SelectorList
+    raw!(w; close lclose close); // close ComplexSelector, SelectorList.children, SelectorList
 }
 
 /// One synthesized `RelativeSelector` holding the single simple selector
@@ -1294,25 +1327,47 @@ fn write_synth_selector_list(
 /// **combinator** rather than at the selector; `combinator` is the gap that
 /// combinator covers, `None` for the first compound in a chain.
 fn write_synth_relative_selector(
-    w: &mut JsonWriter,
+    w: &mut Sink<'_>,
     combinator: Option<Span>,
     span: Span,
     ctx: &Ctx<'_>,
-    emit_simple: impl FnOnce(&mut JsonWriter, &Ctx<'_>),
+    emit_simple: impl FnOnce(&mut Sink<'_>, &Ctx<'_>),
 ) {
-    w.raw("{\"type\":\"RelativeSelector\",\"combinator\":");
+    raw!(w; open RelativeSelector key RelativeSelector.combinator);
     match combinator {
         // Descendant is the only combinator a synthesized argument produces —
         // Svelte's `read_combinator` hands back exactly the whitespace run it ate.
         Some(gap) => write_combinator(w, " ", gap, ctx),
-        None => w.null(),
+        None => null_record!(w),
     }
-    w.raw(",\"selectors\":[");
+    raw!(w; key RelativeSelector.selectors lopen);
     emit_simple(w, ctx);
-    w.raw("],\"start\":");
+    raw!(w; lclose key RelativeSelector.start);
     w.span_start_end(ctx.positions, span.start, span.end);
     if ctx.has_metadata {
-        w.raw(RELATIVE_META);
+        raw!(w; relative_meta);
     }
-    w.raw("}");
+    raw!(w; close);
+}
+
+tape! {
+    /// The standalone `StyleSheetFile` TAPE of `parsed`, written into `sink` — the same walk
+    /// as `write_stylesheet_file_bytes` on the span-only wire, in the coordinates
+    /// `crate::WIRE_COORDINATES` states. Finish it with `sink.finish_words()` /
+    /// `sink.finish_bytes()`.
+    pub(crate) fn write_stylesheet_file_tape(
+        parsed: ast::CssParsedRef<'_>,
+        source: &str,
+        sink: &mut tsv_lang::tape::TapeSink,
+    ) {
+        let tables = WireTables::new(source, crate::WIRE_COORDINATES, Wire::Span);
+        let ctx = Ctx {
+            source,
+            view: parsed.view,
+            positions: tables.positions(),
+            has_metadata: true,
+        };
+        let mut w = sink.writer(source, ctx.positions, crate::WIRE_COORDINATES.bom);
+        write_stylesheet_file(&mut w, parsed.stylesheet, &ctx);
+    }
 }

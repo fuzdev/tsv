@@ -32,9 +32,35 @@ use tsv_lang::Span;
 use tsv_lang::is_js_whitespace;
 use tsv_lang::{trim_end_js_whitespace, trim_js_whitespace, trim_start_js_whitespace};
 
+mod declaration_split;
+mod prelude_string;
+use declaration_split::split_declaration_svelte_compat;
+pub(in crate::ast) use prelude_string::convert_prelude_to_string;
+
+// The wire writer (`write.rs`), mounted once per sink: here the JSON copy, and behind `_tape`
+// the tape copy (`write_tape.rs`). Each mount defines `tape!` and `json_only!` before mounting
+// the file — `write.rs`'s module doc §One walk, two products — and the site macros
+// (`write_macros.rs`) are shared.
+#[macro_use]
+mod write_macros;
+
+/// The JSON copy compiles no tape code.
+macro_rules! tape {
+    ($($t:tt)*) => {};
+}
+
+/// The JSON copy's own code.
+macro_rules! json_only {
+    ($($t:tt)*) => { $($t)* };
+}
+
 mod write;
+#[cfg(feature = "_tape")]
+mod write_tape;
 pub(crate) use write::write_stylesheet_file_bytes;
 pub use write::{write_css_children, write_css_comments};
+#[cfg(feature = "_tape")]
+pub(crate) use write_tape::write_stylesheet_file_tape;
 
 /// Trim a wire STRING the way `parseCss` does.
 ///
@@ -72,51 +98,6 @@ pub(super) fn trim_wire_start(s: &str) -> &str {
 #[inline]
 pub(super) fn trim_wire_end(s: &str) -> &str {
     trim_end_js_whitespace(s)
-}
-
-/// Split a declaration source into property and value, matching Svelte's quirky behavior.
-///
-/// SVELTE QUIRK: When there's a CSS comment between the property name and the colon,
-/// Svelte puts the comment AND the colon into the value instead of the property.
-///
-/// Example: `color /* comment */ : red`
-/// - Normal split: property=`color /* comment */ `, value=`red`
-/// - Svelte quirk: property=`color`, value=`/* comment */ : red`
-///
-/// This is a tokenization bug in Svelte's CSS parser, but we replicate it for compatibility.
-/// Our internal AST remains semantically correct; this quirk is only applied in conversion.
-///
-/// Note: the writer runs `strip_css_comments` on the returned value, so the
-/// public AST for `color /* c */ : red` ends up as property=`color`, value=`": red"`
-/// (Svelte 5.55+ strips block comments from value strings post-split).
-///
-/// `colon_pos` is the declaration-relative byte offset of the real
-/// `property : value` colon, recorded at parse time (`CssDeclaration::colon_offset`
-/// minus the declaration start) — the writer only calls this on the comment-bearing
-/// path, so the no-comment common case never re-derives it. A property comment may
-/// itself contain a `:` (`color /* x:y */: red`), which is why the parser's colon is
-/// the authority rather than a naive `find(':')`.
-pub(super) fn split_declaration_svelte_compat(decl_source: &str, colon_pos: usize) -> (&str, &str) {
-    let before_colon = &decl_source[..colon_pos];
-
-    // Look for /* that appears after some property text
-    if let Some(comment_idx) = before_colon.find("/*") {
-        // Only apply quirk if there's actual property content before the comment
-        let before_comment = &before_colon[..comment_idx];
-        if !trim_wire(before_comment).is_empty() {
-            // SVELTE QUIRK: Comment between property and colon
-            // Property = just the text before the comment (trimmed)
-            // Value = comment + colon + actual value (everything from comment onward)
-            let property = trim_wire(before_comment);
-            let value = &decl_source[comment_idx..];
-            return (property, value);
-        }
-    }
-
-    // Normal case: split at colon
-    let property = &decl_source[..colon_pos];
-    let value = trim_wire_start(&decl_source[colon_pos + 1..]);
-    (property, value)
 }
 
 /// Remove all `/* ... */` block comments from a CSS string, then trim outer whitespace.
@@ -295,45 +276,6 @@ fn starts_with_url_open(s: &str) -> bool {
         && bytes[1].eq_ignore_ascii_case(&b'r')
         && bytes[2].eq_ignore_ascii_case(&b'l')
         && bytes[3] == b'('
-}
-
-/// Convert PreludeValue to string representation for the public AST.
-///
-/// Svelte 5.55.x strips `/* ... */` block comments from at-rule preludes (surrounding
-/// whitespace preserved, then trimmed). Applied to all source-extracted variants;
-/// `Values` is built from parsed tokens that never contained comments.
-pub(super) fn convert_prelude_to_string<'src>(
-    prelude: &ast::PreludeValue,
-    source: &'src str,
-) -> Cow<'src, str> {
-    match prelude {
-        ast::PreludeValue::Values { span, .. } => {
-            // Extract the prelude verbatim from source and strip comments, matching
-            // Svelte (which removes `/* ... */` from the `@import` prelude string while
-            // preserving the surrounding whitespace, then trims). Extracting from the
-            // span (rather than rejoining the structured values) keeps the public AST
-            // byte-for-byte with Svelte even when comments sit between the url/string and
-            // the media query — the structured values exist for the printer's quote
-            // normalization and media-query wrapping.
-            strip_css_comments(span.extract(source))
-        }
-        // Extract verbatim from source (comments stripped, outer-trimmed) so the public
-        // AST matches Svelte, which stores the raw prelude — e.g. `@layer a , b` → `a , b`
-        // and `@namespace url(  x  )` → `url(  x  )`. The internal `content` string is a
-        // normalized (printer-facing) form; the AST must stay source-faithful, like the
-        // `Media`/`Supports`/`Container`/`Values` branches.
-        ast::PreludeValue::Raw { span, .. } => strip_css_comments(span.extract(source)),
-        // @scope selector lists: `[(root)]? [to (limit)]?`. Extracted verbatim from
-        // `span` for fidelity (a bare `@scope` has a zero-width span → `""`), like the
-        // sibling raw/condition branches.
-        ast::PreludeValue::Selectors { span, .. } => strip_css_comments(span.extract(source)),
-        // `@custom-selector`: the span is the raw reader's, so the routed and the
-        // verbatim-fallback preludes emit the same bytes.
-        ast::PreludeValue::CustomSelector { span, .. } => strip_css_comments(span.extract(source)),
-        ast::PreludeValue::Supports { span, .. } => strip_css_comments(span.extract(source)),
-        ast::PreludeValue::Container { span, .. } => strip_css_comments(span.extract(source)),
-        ast::PreludeValue::Media { span, .. } => strip_css_comments(span.extract(source)),
-    }
 }
 
 /// Check if a complex selector contains Invalid simple selectors (from forgiving parsing)

@@ -245,6 +245,19 @@ pub fn convert_ast_json_bytes<'a>(
     ast::convert::write_stylesheet_file_bytes(stylesheet.into(), source, tsv_lang::Wire::Span)
 }
 
+/// The span-only wire's TAPE (`docs/tape_format.md`), written directly into `sink` by the
+/// wire writer's tape copy — the same walk as [`convert_ast_json_bytes`], its strings
+/// true-offset refs. Finish it with `sink.finish_words()` / `sink.finish_bytes()`, which refuse
+/// a tape the writer left inconsistent.
+#[cfg(feature = "_tape")]
+pub fn write_tape<'a>(
+    stylesheet: impl Into<CssParsedRef<'a>>,
+    source: &str,
+    sink: &mut tsv_lang::tape::TapeSink,
+) {
+    ast::convert::write_stylesheet_file_tape(stylesheet.into(), source, sink);
+}
+
 /// Convert internal AST to compact JSON wire bytes **with** per-node `loc`.
 ///
 /// The `convert_ast_json_bytes` wire plus a `loc` on every object carrying `start`/`end` —

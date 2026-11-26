@@ -28,6 +28,10 @@ json = ["tsv_lang/_json"]
 # The loc-bearing wire (`JsonOptions::locations`) — see `tsv_lang`'s
 # `_locations` feature. Off in every binding.
 locations = ["json", "tsv_lang/_locations"]
+# The wire writer's tape copy (`__private::write_tape`): the span-only wire's tape
+# (docs/tape_format.md) written directly by the writer's own walk. tsv's own plumbing — the
+# underscore keeps it out of the semver surface. No binding enables it yet.
+_tape = ["json", "tsv_lang/_tape"]
 # Exposes `debug_token_stream` for the differential lexer harness (`tsv_debug
 # lex_diff`). Off in production builds; enabled only by `tsv_debug`.
 _internal_debug_lex = []

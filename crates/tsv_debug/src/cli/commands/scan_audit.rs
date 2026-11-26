@@ -104,7 +104,7 @@ const DEFERRED_BUG: &str = "delimiter-deferred-bug";
 const ALLOW: &[Allow] = &[
     // ── tsv_css ──────────────────────────────────────────────────────────────
     (
-        "tsv_css/src/ast/convert/mod.rs",
+        "tsv_css/src/ast/convert/declaration_split.rs",
         "if let Some(comment_idx) = before_colon.find(\"/*\") {",
         "comment-marker",
     ),
