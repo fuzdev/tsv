@@ -201,7 +201,7 @@ impl ScanAuditCommand {
             let rel = crate_relative(file);
             // a `tests.rs` / `*_tests.rs` is a test module mounted out of line (`#[cfg(test)]`),
             // skipped whole as an inline one is
-            if rel.ends_with("tests.rs") {
+            if rel.ends_with("/tests.rs") || rel.ends_with("_tests.rs") {
                 continue;
             }
             scan_file(&rel, &text, &mut sites);
