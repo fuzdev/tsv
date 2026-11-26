@@ -361,12 +361,17 @@ impl<'a> Ctx<'a> {
 /// The type and span mirror the node's own `node_header` call.
 /// `CommentMode::Off` (every ordinary emission) makes this exactly
 /// `w.raw("}")` after one never-taken branch.
+///
+/// On the tape the `}` is the record's close called directly, not a `raw!` literal: every node
+/// closes here, so the literal interpreter's loop and dispatch were the single largest share of
+/// its replays, for one op whose checks (a key left pending, the balance) the close itself makes.
 #[inline]
 pub(super) fn close_node(w: &mut Sink<'_>, node_type: &'static str, span: Span, ctx: &Ctx<'_>) {
     if let CommentMode::Attach(attach) = ctx.comments {
         attach.close_and_emit(w, node_type, span, ctx.positions);
     }
-    raw!(w, "}");
+    tape! { w.t_close(); }
+    json_only! { w.raw("}"); }
 }
 
 /// Emit a node with no fields beyond the universal prefix (`ThisExpression`,
