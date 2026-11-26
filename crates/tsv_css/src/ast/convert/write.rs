@@ -178,6 +178,8 @@ json_only! {
 tape! {
     /// The tape copy's sink, and its string sites and list helpers (`write_tape.rs`).
     type Sink<'a> = tsv_lang::tape::TapeWriter<'a>;
+    // the JSON-only literals (`raw`, `raw_fixed`) are the sink trait's alone
+    use tsv_lang::WireSink as _;
     use super::{
         put_keyed_string, put_list, put_record_or_null, put_ref_or_null, put_selector_name,
         put_string,

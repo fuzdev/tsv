@@ -16,10 +16,12 @@
 //!   or ref, a keyword, a tag. The JSON impl's are empty. A mounted copy's sites reach them
 //!   through its `tape!` macro, which the JSON mount expands to nothing, so the JSON copy holds
 //!   no call to one; they are on the trait for code shared by both mounts and generic over the
-//!   sink.
+//!   sink (`tsv_ts`'s comment emitter).
 //!
 //! [`crate::tape::TapeWriter`] carries each method inherently too, so a tape copy calls them with
-//! no trait in scope, as the JSON copy calls [`JsonWriter`]'s.
+//! no trait in scope, as the JSON copy calls [`JsonWriter`]'s — all but `raw` / `raw_fixed`,
+//! which are this impl's alone: a tape copy that must write no literal past its site macros
+//! (`tsv_ts`'s) leaves the trait out of scope, and a stray literal fails its build.
 
 use crate::{JsonWriter, SpanWords, WirePositions};
 
@@ -106,6 +108,13 @@ pub trait WireSink {
     #[cfg(feature = "_tape")]
     #[inline]
     fn t_bit_key(&mut self, key: &str) {
+        let _ = key;
+    }
+    /// A key of the open record, looked up at run time, its value next (the value's data call
+    /// writes it as the field lays it down — `tape::TapeWriter`'s keyed values).
+    #[cfg(feature = "_tape")]
+    #[inline]
+    fn t_key_named(&mut self, key: &str) {
         let _ = key;
     }
     /// A list's `[`.

@@ -22,7 +22,9 @@
 //! the tape at [`TapeSink::finish_words`] / [`TapeSink::finish_bytes`], in every build: a tape
 //! that would decode to another tree is never handed out.
 
-use super::{HEADER_WORDS, MAGIC, NO_BIT, NULL_REF, header_of, shapes};
+#[cfg(feature = "_tape_literals")]
+use super::{Enc, LitOp, TAG_FALSE, TAG_NULL, TAG_NUMBER, TAG_OBJECT, TAG_STRING, TAG_TRUE};
+use super::{Field, HEADER_WORDS, MAGIC, NO_BIT, NULL_REF, header_of, shapes};
 use crate::{LeadingBom, SpanWords, WirePositions, WireSink, leading_bom_len};
 
 /// Why a tape could not be finished.
@@ -126,6 +128,8 @@ impl TapeSink {
             source,
             positions,
             skip,
+            #[cfg(feature = "_tape_literals")]
+            pending: None,
         }
     }
 
@@ -221,6 +225,13 @@ pub struct TapeWriter<'a> {
     positions: WirePositions<'a>,
     /// The leading bytes no source ref may start in: an elided byte-order mark's.
     skip: usize,
+    /// The field a key declared whose value is not written yet — its encoding and `aux` — so
+    /// the value's data call writes it as that field lays it down (§Keyed values below).
+    /// `None` between fields, and always for a writer that declares no key (`tsv_css`'s,
+    /// which states each value's tape meaning at its site). Behind `_tape_literals`, with every
+    /// keyed form: in a world without it the sink is the plain one, compiled as before.
+    #[cfg(feature = "_tape_literals")]
+    pending: Option<(Enc, u16)>,
 }
 
 impl TapeWriter<'_> {
@@ -267,8 +278,20 @@ impl TapeWriter<'_> {
         self.sink.tape.push(0);
     }
 
+    /// The open record's entry's field `key` (`None` with no record open, or a key it lacks) —
+    /// for a writer's debug assertion about a field it writes without declaring the key.
+    #[cfg(feature = "_tape_literals")]
+    #[must_use]
+    pub fn t_top_field(&self, key: &str) -> Option<Field> {
+        match self.sink.frames.last() {
+            Some(f) if f.entry != LIST => shapes::field_named(f.entry, key.as_bytes())
+                .map(|i| shapes::ENTRIES[usize::from(f.entry)].fields[usize::from(i)]),
+            _ => None,
+        }
+    }
+
     /// The open record's entry's field `key`, by the generated lookup.
-    fn top_field(&mut self, key: &str) -> Option<super::Field> {
+    fn top_field(&mut self, key: &str) -> Option<Field> {
         let entry = match self.sink.frames.last() {
             Some(f) if f.entry != LIST => f.entry,
             _ => {
@@ -292,13 +315,16 @@ impl TapeWriter<'_> {
     /// A typed record of entry `entry` opens.
     #[inline]
     pub fn t_open(&mut self, entry: u16) {
+        self.enter_record();
         self.count_item();
         self.push_frame(entry);
     }
 
     /// A typed record opens whose entry is known only at run time, by its name
-    /// (`ENTRIES[id].name`).
-    #[inline]
+    /// (`ENTRIES[id].name`). Out of line where a tape copy states its sites through literals
+    /// (it opens many records by name, and the generated lookup is a large match).
+    #[cfg_attr(feature = "_tape_literals", inline(never))]
+    #[cfg_attr(not(feature = "_tape_literals"), inline)]
     pub fn t_open_named(&mut self, name: &str) {
         match shapes::entry_named(name.as_bytes()) {
             Some(entry) => self.t_open(entry),
@@ -318,6 +344,10 @@ impl TapeWriter<'_> {
     /// The open record closes: its header is written.
     #[inline]
     pub fn t_close(&mut self) {
+        #[cfg(feature = "_tape_literals")]
+        if self.pending.is_some() {
+            self.fail(SinkError::Unbalanced);
+        }
         match self.sink.frames.pop() {
             Some(f) if f.entry != LIST => {
                 self.sink.tape[f.slot as usize] = header_of(f.entry, f.mask);
@@ -354,6 +384,12 @@ impl TapeWriter<'_> {
     /// A list's `[`: its count slot.
     #[inline]
     pub fn t_list_open(&mut self) {
+        #[cfg(feature = "_tape_literals")]
+        if let Some((enc, _)) = self.pending.take()
+            && !matches!(enc, Enc::List | Enc::Strings)
+        {
+            self.fail(SinkError::Unbalanced);
+        }
         self.push_frame(LIST);
     }
 
@@ -369,6 +405,7 @@ impl TapeWriter<'_> {
     /// A `null` in a record position.
     #[inline]
     pub fn t_null_record(&mut self) {
+        self.enter_record();
         self.count_item();
         self.sink.tape.push(0);
     }
@@ -376,6 +413,7 @@ impl TapeWriter<'_> {
     /// An empty self-describing record (`{}` where no entry is named).
     #[inline]
     pub fn t_empty_object(&mut self) {
+        self.enter_record();
         self.count_item();
         self.push2(super::HEADER_ESCAPE, 0);
     }
@@ -383,6 +421,12 @@ impl TapeWriter<'_> {
     /// A `null` in a nullable-ref position.
     #[inline]
     pub fn t_null_ref(&mut self) {
+        #[cfg(feature = "_tape_literals")]
+        if let Some((enc, _)) = self.pending.take()
+            && enc != Enc::RefNullable
+        {
+            self.fail(SinkError::Unbalanced);
+        }
         self.push2(NULL_REF, 0);
     }
 
@@ -454,29 +498,228 @@ impl TapeWriter<'_> {
     // Inherent, so the tape copy of a writer calls them as the JSON copy calls `JsonWriter`'s,
     // with no trait in scope; the `WireSink` impl below forwards to them.
 
-    /// JSON-only bytes.
-    #[inline]
-    pub fn raw(&mut self, _: &str) {}
+    // ── keyed values: a value written as the field its key declared lays it down ──────────
+    //
+    // A writer that states its keys through `t_field` / `t_key_named` / `t_lit` (`tsv_ts`'s)
+    // leaves each value's encoding to the field: its data call writes a ref, a keyword index,
+    // nothing (an `own` string, a `null` field) or a tagged value as the field says. With no
+    // key declared (`tsv_css`'s writer, which states each value's tape meaning at its site), a
+    // data call keeps its plain meaning: a string a ref, a `u32` a number, `null` and `token`
+    // nothing. A key declared while another's value is still unwritten, or a value its field
+    // cannot hold, refuses the tape.
 
-    /// JSON-only bytes.
-    #[inline]
-    pub fn raw_fixed<const N: usize>(&mut self, _: &[u8; N]) {}
+    //
+    // The keyed bodies are out of line: a tape copy's sites are many and its recursion deep, and
+    // inlined, each site carried the whole field-encoding match — the tape copy's frames and code
+    // grew several-fold over its JSON copy's. Each keyed site is a short run of calls instead;
+    // the plain meaning (no key pending) stays inline, as `tsv_css`'s copy relies on.
 
-    /// JSON-only bytes (the site states the token's tape meaning).
-    #[inline]
-    pub fn token(&mut self, _: &str) {}
+    /// A key: field `field` of the open record is present, its value next.
+    #[cfg(feature = "_tape_literals")]
+    #[inline(never)]
+    pub fn t_field(&mut self, field: Field) {
+        if self.pending.is_some() {
+            self.fail(SinkError::Unbalanced);
+        }
+        self.t_bit(field.bit);
+        self.pending = Some((field.enc, field.aux));
+    }
 
-    /// JSON-only bytes (the site states which `null` it is).
+    /// A key of the open record looked up at run time (a site shared by several entries).
+    #[cfg(feature = "_tape_literals")]
+    #[inline(never)]
+    pub fn t_key_named(&mut self, key: &str) {
+        if let Some(field) = self.top_field(key) {
+            self.t_field(field);
+        }
+    }
+
+    /// A literal's ops (`tape::literal_ops`), in order. One shared interpreter, out of line: a
+    /// site hands it its constant ops, so a tape copy's site is one call (inlined per site, the
+    /// loop and its match were not folded away and every site carried them).
+    #[cfg(feature = "_tape_literals")]
+    #[inline(never)]
+    pub fn t_lit(&mut self, ops: &[LitOp]) {
+        for &op in ops {
+            match op {
+                LitOp::Open(entry) | LitOp::OpenObject(entry) => self.t_open(entry),
+                LitOp::Close => self.t_close(),
+                LitOp::Key { entry, field } => {
+                    debug_assert!(
+                        self.sink.frames.last().is_some_and(|f| f.entry == entry),
+                        "a site's key {:?} belongs to the record it names",
+                        field.key
+                    );
+                    self.t_field(field);
+                }
+                LitOp::KeyNamed(key) => self.t_key_named(key),
+                LitOp::True => self.bool(true),
+                LitOp::False => self.bool(false),
+                LitOp::Null => self.null(),
+                LitOp::EmptyObject => self.t_empty_object(),
+                LitOp::Str(text) => self.string(text),
+                LitOp::Int(n) => self.u32(n),
+                LitOp::ListOpen => self.t_list_open(),
+                LitOp::ListClose => self.t_list_close(),
+            }
+        }
+    }
+
+    /// A record opens: under a tagged-value field, its tag first.
+    #[cfg(feature = "_tape_literals")]
+    #[inline]
+    fn enter_record(&mut self) {
+        if self.pending.is_some() {
+            self.enter_record_keyed();
+        }
+    }
+
+    /// [`Self::enter_record`] under a pending field.
+    #[cfg(feature = "_tape_literals")]
+    #[inline(never)]
+    fn enter_record_keyed(&mut self) {
+        match self.pending.take() {
+            None | Some((Enc::Record | Enc::List, _)) => {}
+            Some((Enc::Value, _)) => self.sink.tape.push(TAG_OBJECT),
+            Some(_) => self.fail(SinkError::Unbalanced),
+        }
+    }
+
+    /// A boolean value.
+    #[cfg(feature = "_tape_literals")]
+    #[inline(never)]
+    pub fn bool(&mut self, b: bool) {
+        match self.pending.take() {
+            Some((Enc::Boolean, _)) => self.t_bool(b),
+            Some((Enc::Value, _)) => self.t_tag(if b { TAG_TRUE } else { TAG_FALSE }),
+            _ => self.fail(SinkError::Unbalanced),
+        }
+    }
+
+    /// A `null`: nothing for a writer that declared no key (the site states which `null`).
+    #[cfg(feature = "_tape_literals")]
+    #[inline]
+    pub fn null(&mut self) {
+        if self.pending.is_some() {
+            self.null_keyed();
+        }
+    }
+
+    /// [`Self::null`] under a pending field.
+    #[cfg(feature = "_tape_literals")]
+    #[inline(never)]
+    fn null_keyed(&mut self) {
+        match self.pending {
+            None | Some((Enc::Null, _)) => self.pending = None,
+            Some((Enc::Record, _)) => self.t_null_record(),
+            Some((Enc::RefNullable, _)) => self.t_null_ref(),
+            Some((Enc::Value, _)) => {
+                self.pending = None;
+                self.t_tag(TAG_NULL);
+            }
+            Some(_) => self.fail(SinkError::Unbalanced),
+        }
+    }
+
+    /// A string value: a ref, or as its field lays it down.
+    #[cfg(feature = "_tape_literals")]
+    #[inline]
+    pub fn string(&mut self, s: &str) {
+        if self.pending.is_some() {
+            self.string_keyed(s);
+        } else {
+            self.t_ref(s.as_bytes());
+        }
+    }
+
+    /// [`Self::string`] under a pending field.
+    #[cfg(feature = "_tape_literals")]
+    #[inline(never)]
+    fn string_keyed(&mut self, s: &str) {
+        match self.pending.take() {
+            None | Some((Enc::Ref | Enc::RefNullable, _)) => self.t_ref(s.as_bytes()),
+            Some((Enc::Own, _)) => {}
+            Some((Enc::Keyword, vocab)) => self.t_keyword(vocab, s),
+            Some((Enc::Value, _)) => {
+                self.t_tag(TAG_STRING);
+                self.t_ref(s.as_bytes());
+            }
+            Some(_) => self.fail(SinkError::Unbalanced),
+        }
+    }
+
+    /// An escape-free token: nothing for a writer that declared no key (the site states its
+    /// meaning), else the string its field holds.
+    #[cfg(feature = "_tape_literals")]
+    #[inline]
+    pub fn token(&mut self, s: &str) {
+        if self.pending.is_some() {
+            self.string_keyed(s);
+        }
+    }
+
+    /// An unsigned integer: a number for a writer that declared no key, else as its field lays
+    /// it down.
+    #[cfg(feature = "_tape_literals")]
+    #[inline]
+    pub fn u32(&mut self, n: u32) {
+        if self.pending.is_some() {
+            self.u32_keyed(n);
+        } else {
+            self.t_number(f64::from(n));
+        }
+    }
+
+    /// [`Self::u32`] under a pending field.
+    #[cfg(feature = "_tape_literals")]
+    #[inline(never)]
+    fn u32_keyed(&mut self, n: u32) {
+        if let Some((Enc::Offset, _)) = self.pending {
+            self.pending = None;
+            self.sink.tape.push(n);
+        } else {
+            self.number(f64::from(n));
+        }
+    }
+
+    /// A number value.
+    #[cfg(feature = "_tape_literals")]
+    #[inline(never)]
+    pub fn number(&mut self, n: f64) {
+        match self.pending.take() {
+            None | Some((Enc::Number, _)) => self.t_number(n),
+            Some((Enc::Value, _)) => {
+                self.t_tag(TAG_NUMBER);
+                self.t_number(n);
+            }
+            Some(_) => self.fail(SinkError::Unbalanced),
+        }
+    }
+
+    /// A record opens (no field can be pending in a world without the keyed forms).
+    #[cfg(not(feature = "_tape_literals"))]
+    #[inline]
+    fn enter_record(&mut self) {}
+
+    /// A `null`: nothing (the site states which `null`).
+    #[cfg(not(feature = "_tape_literals"))]
     #[inline]
     pub fn null(&mut self) {}
 
     /// A string value: a ref.
+    #[cfg(not(feature = "_tape_literals"))]
     #[inline]
     pub fn string(&mut self, s: &str) {
         self.t_ref(s.as_bytes());
     }
 
+    /// An escape-free token: nothing (the site states its meaning).
+    #[cfg(not(feature = "_tape_literals"))]
+    #[inline]
+    pub fn token(&mut self, _: &str) {}
+
     /// A `number` field.
+    #[cfg(not(feature = "_tape_literals"))]
     #[inline]
     pub fn u32(&mut self, n: u32) {
         self.t_number(f64::from(n));
@@ -550,13 +793,9 @@ impl TapeWriter<'_> {
 
 impl WireSink for TapeWriter<'_> {
     #[inline]
-    fn raw(&mut self, s: &str) {
-        TapeWriter::raw(self, s);
-    }
+    fn raw(&mut self, _: &str) {}
     #[inline]
-    fn raw_fixed<const N: usize>(&mut self, s: &[u8; N]) {
-        TapeWriter::raw_fixed(self, s);
-    }
+    fn raw_fixed<const N: usize>(&mut self, _: &[u8; N]) {}
     #[inline]
     fn token(&mut self, s: &str) {
         TapeWriter::token(self, s);
@@ -647,6 +886,11 @@ impl WireSink for TapeWriter<'_> {
     #[inline]
     fn t_bit_key(&mut self, key: &str) {
         TapeWriter::t_bit_key(self, key);
+    }
+    #[cfg(feature = "_tape_literals")]
+    #[inline]
+    fn t_key_named(&mut self, key: &str) {
+        TapeWriter::t_key_named(self, key);
     }
     #[inline]
     fn t_list_open(&mut self) {

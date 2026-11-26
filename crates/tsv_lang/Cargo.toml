@@ -76,6 +76,12 @@ _locations = ["_json"]
 # format-only builds never compile the tables. Underscored, like `_json`: tsv's plumbing,
 # outside the semver surface.
 _tape = []
+# The literal reader a writer's tape copy states its sites through (`tape::literal_ops`), and the
+# sink's keyed forms beneath it (`TapeWriter::t_lit`, `t_field`, the keyed values): neither is
+# needed by a binding, and their presence in a crate world moved unrelated functions' codegen in
+# the C FFI, so only the worlds with a tape copy that reads literals (`tsv_ts`'s `_tape`) carry
+# them.
+_tape_literals = ["_tape", "_json"]
 
 # Opt-in parser allocation-demand counters for `tsv_debug ast_demand_census` (diagnostic). Off by
 # default and outside the `_internal_audits` umbrella; every call site is `#[cfg]`-removed without
