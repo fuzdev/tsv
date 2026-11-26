@@ -1,7 +1,7 @@
 /**
  * The tape's generated code, from the tape schema (`tape_schema.ts`): the JS decoder the npm
  * facade ships (`crates/tsv_wasm/npm/tape_decode.js`) and the Rust tables the transcoder and
- * `tsv_debug`'s printer read (`crates/tsv_arena/src/tape/shapes.rs`).
+ * `tsv_debug`'s printer read (`crates/tsv_lang/src/tape/shapes.rs`).
  *
  * Both are output: `npm run ast-schema:update` regenerates them with the `.d.ts`, and
  * `npm run check:ast-schema` holds each byte-for-byte to the committed file. The decoder is laid
@@ -36,8 +36,8 @@ const AST_SCHEMA_PATH = 'crates/tsv_wasm/types/tsv_ast_schema.json';
 /** The decoder's path, from the checkout root. */
 export const TAPE_DECODER_PATH = 'crates/tsv_wasm/npm/tape_decode.js';
 
-/** The transcoder tables' path, from the checkout root. */
-export const TAPE_RUST_TABLES_PATH = 'crates/tsv_arena/src/tape/shapes.rs';
+/** The Rust tape tables' path, from the checkout root. */
+export const TAPE_RUST_TABLES_PATH = 'crates/tsv_lang/src/tape/shapes.rs';
 
 const hex = (n: number): string => `0x${n.toString(16).padStart(8, '0')}`;
 

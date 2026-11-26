@@ -24,9 +24,10 @@
 //!
 //! # The tape
 //!
-//! Behind the `tape` feature, the `tape` module holds the binary parse wire's schema tables and
-//! its producer, the JSON → tape `tape::Transcoder` (`docs/tape_format.md`), with the thread's
-//! parked transcoder (`tape::with_transcoder`) the bindings' `parse_tape!` export body runs on.
+//! Behind the `tape` feature, the `tape` module holds the binary parse wire's producer, the
+//! JSON → tape `tape::Transcoder` (`docs/tape_format.md`), over the format's types and schema
+//! tables in `tsv_lang::tape`, with the thread's parked transcoder (`tape::with_transcoder`) the
+//! bindings' `parse_tape!` export body runs on.
 
 #[cfg(feature = "tape")]
 pub mod tape;

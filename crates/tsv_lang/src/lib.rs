@@ -7,7 +7,7 @@
 //! [`run_with_stack`].
 //! Everything else here — the source spans, the wire coordinates, the doc IR, the printing
 //! helpers, the wire-JSON writer, the comment scans, the depth limits, every item hidden from these docs — and the
-//! underscored features (`_json`, `_locations`, `_internal_*`) are tsv's own plumbing for its sibling crates, which pin each other
+//! underscored features (`_json`, `_locations`, `_tape`, `_internal_*`) are tsv's own plumbing for its sibling crates, which pin each other
 //! exactly; they change in any release, outside semver.
 //!
 //! Part of [tsv](https://github.com/fuzdev/tsv).
@@ -45,6 +45,8 @@
 // - `packed` - `PackedF64`, an `f64` at 4-byte alignment for the AST enums that hold one
 // - `swar` - word-at-a-time byte-search kernels shared by the line scans, the
 //   wire-JSON escape prescan, and the lexers' token-body scans
+// - `tape` - the binary parse wire's types, constants and generated schema tables
+//   (`_tape` feature)
 // - `value_runs` - the `value_runs!` declaration of a language crate's stores of the
 //   lists built by value, and the field shapes a store set's tests read
 
@@ -95,6 +97,9 @@ pub mod store;
 // See `doc` above.
 #[expect(rustdoc::private_intra_doc_links)]
 pub mod swar;
+#[cfg(feature = "_tape")]
+#[doc(hidden)]
+pub mod tape;
 #[doc(hidden)]
 pub mod value_runs;
 mod whitespace;

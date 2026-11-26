@@ -70,6 +70,12 @@ _json = ["dep:zmij"]
 # and drop out of those artifacts; `tsv_cli` (`tsv parse --locations`) and `tsv_debug`
 # turn it on through each language crate's own `locations` feature.
 _locations = ["_json"]
+# The tape's format (`tape`): the binary parse wire's types, constants and generated schema
+# tables, shared by every producer and reader of a tape. Pulls nothing in; the bindings
+# reach it from their `parse` features through `tsv_arena`'s `tape` (the transcoder), so
+# format-only builds never compile the tables. Underscored, like `_json`: tsv's plumbing,
+# outside the semver surface.
+_tape = []
 
 # Opt-in parser allocation-demand counters for `tsv_debug ast_demand_census` (diagnostic). Off by
 # default and outside the `_internal_audits` umbrella; every call site is `#[cfg]`-removed without

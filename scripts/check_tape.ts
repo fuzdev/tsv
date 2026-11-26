@@ -21,7 +21,7 @@
  *
  * `--update-shapes` instead rewrites the committed fast-shape list (`tsv_tape_shapes.json`) from
  * the masks the fixture wire carries — every (entry, mask) a record of the wire takes — for
- * `npm run ast-schema:update` to regenerate the decoder and the transcoder's tables from. A run
+ * `npm run ast-schema:update` to regenerate the decoder and the Rust tape tables from. A run
  * reports how many records fell outside the list, which an update folds in; that count is no
  * failure, since the entry-generic record carries any mask.
  *

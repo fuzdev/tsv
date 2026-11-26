@@ -27,11 +27,11 @@
  * the wire key by key.
  *
  * The tape's generated code rides the same check: the table and the tape's committed shape list
- * (`tsv_tape_shapes.json`, beside the table) generate the JS tape decoder and the Rust
- * transcoder's tables (`tape_gen.ts`), so a table edit regenerates every reader of the wire.
+ * (`tsv_tape_shapes.json`, beside the table) generate the JS tape decoder and the Rust tape
+ * tables (`tape_gen.ts`), so a table edit regenerates every reader of the wire.
  *
  * Its reach: the checkout's `crates/tsv_wasm/types/`, `crates/tsv_wasm/npm/` and
- * `crates/tsv_arena/src/tape/`, read always and written under `--update` (`AstSchemaDeps`,
+ * `crates/tsv_lang/src/tape/`, read always and written under `--update` (`AstSchemaDeps`,
  * built by `scripts/roots/ast_schema.ts`).
  */
 
@@ -505,7 +505,7 @@ export interface AstSchemaDeps {
 	types: FsDir;
 	/** The checkout's `crates/tsv_wasm/npm/`, holding the generated tape decoder. */
 	npm: FsDir;
-	/** The checkout's `crates/tsv_arena/src/tape/`, holding the generated transcoder tables. */
+	/** The checkout's `crates/tsv_lang/src/tape/`, holding the generated tape tables. */
 	tape: FsDir;
 }
 
@@ -518,7 +518,7 @@ const RUST_TABLES_FILE = 'shapes.rs';
 /**
  * Checks the table reads, sits in canonical layout, and generates the committed `.d.ts`, and
  * that the table with the tape's committed shape list generates the committed tape decoder and
- * transcoder tables (`tape_gen.ts`) — or with `update`, rewrites every file that drifted.
+ * Rust tape tables (`tape_gen.ts`) — or with `update`, rewrites every file that drifted.
  * @returns the exit code: `1` when the table or shape list does not read or generate, or a
  * file drifted without `update`, else `0`
  */

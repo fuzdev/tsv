@@ -8,11 +8,12 @@ repository.workspace = true
 publish = false
 
 [dependencies]
-# Only the `format` feature needs tsv_lang — `parse_format!`'s line-terminator fold and
-# the thread's doc-arena slot (`tsv_lang::doc::arena::with_doc_arena`), both reached
-# through the hidden `__tsv_lang` re-export, so the bindings' code needs no tsv_lang edge
-# for them (tsv_wasm keeps one for its wasm32 layout pins) — so the dep is optional and
-# pulled by `format`: a parse-only binding gets neither.
+# Only the `format` and `tape` features need tsv_lang. `format`: `parse_format!`'s
+# line-terminator fold and the thread's doc-arena slot (`tsv_lang::doc::arena::with_doc_arena`),
+# both reached through the hidden `__tsv_lang` re-export, so the bindings' code needs no
+# tsv_lang edge for them (tsv_wasm keeps one for its wasm32 layout pins). `tape`: the tape's
+# format and tables (`tsv_lang::tape`, its `_tape` feature), which the transcoder writes
+# against. So the dep is optional: a binding with neither feature gets none of it.
 tsv_lang = { workspace = true, optional = true }
 
 [features]
@@ -21,10 +22,10 @@ tsv_lang = { workspace = true, optional = true }
 # from their own `format` feature.
 default = ["format"]
 format = ["dep:tsv_lang"]
-# `tape` adds the tape module: the binary parse wire's schema tables and the JSON → tape
-# transcoder (docs/tape_format.md). It pulls nothing in, so a binding enables it from its
-# `parse` feature without reaching the format-only build.
-tape = []
+# `tape` adds the tape module: the JSON → tape transcoder (docs/tape_format.md), over the
+# tape's format and schema tables in `tsv_lang::tape`. A binding enables it from its `parse`
+# feature, so the format-only build never compiles the tables.
+tape = ["dep:tsv_lang", "tsv_lang/_tape"]
 
 [lints]
 workspace = true

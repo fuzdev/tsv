@@ -743,7 +743,7 @@ what that would write. Plain JSON, so every consumer reads it with nothing new â
 generators with `JSON.parse`, `tsv_debug schema_audit` with `serde_json` â€” named for the `.d.ts`
 it sits beside. The layout is the generator's (`scripts/ast_schema.ts`), never a JSON formatter's.
 
-**The tape's code is generated from the same table.** The binary parse wire ([../../docs/tape_format.md](../../docs/tape_format.md)) is the table compiled: `scripts/tape_gen.ts` writes the JS decoder `npm/tape_decode.js` and the transcoder's tables `crates/tsv_arena/src/tape/shapes.rs` from the table plus `types/tsv_tape_shapes.json`, the committed fast-shape list `npm run tape-shapes:update` regenerates from the fixture wire; `ast-schema:update` regenerates both and `check:ast-schema` holds them byte-for-byte, so a table edit reaches the tape with no hand step. Edit neither generated file. `npm run check:tape` grades the tape over every fixture document.
+**The tape's code is generated from the same table.** The binary parse wire ([../../docs/tape_format.md](../../docs/tape_format.md)) is the table compiled: `scripts/tape_gen.ts` writes the JS decoder `npm/tape_decode.js` and the Rust tape tables `crates/tsv_lang/src/tape/shapes.rs` from the table plus `types/tsv_tape_shapes.json`, the committed fast-shape list `npm run tape-shapes:update` regenerates from the fixture wire; `ast-schema:update` regenerates both and `check:ast-schema` holds them byte-for-byte, so a table edit reaches the tape with no hand step. Edit neither generated file. `npm run check:tape` grades the tape over every fixture document.
 
 **What the table says.** `sections` (the `.d.ts`'s `//` headers, in order) hold three kinds of
 item:

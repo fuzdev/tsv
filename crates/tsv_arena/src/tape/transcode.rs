@@ -14,15 +14,15 @@
 //! candidate but where the schema's variants differ from their base, so a rewind is rare and
 //! shallow.
 
-use super::shapes::{
+use super::{candidates_of_type, eq_short, first_of_type, next_of_type};
+use std::collections::HashMap;
+use tsv_lang::tape::shapes::{
     ENTRIES, KEYWORDS, PRE_TYPE_MAX, SHAPES_HASH, TAPE_FORMAT_VERSION, pre_type_encoding,
 };
-use super::{
+use tsv_lang::tape::{
     Enc, HEADER_ESCAPE, HEADER_NULL, HEADER_WORDS, MAGIC, NO_AUX, NO_BIT, NULL_REF, TAG_ARRAY,
-    TAG_FALSE, TAG_NULL, TAG_NUMBER, TAG_OBJECT, TAG_STRING, TAG_TRUE, candidates_of_type,
-    eq_short, first_of_type, generic_header, next_of_type, shape_id,
+    TAG_FALSE, TAG_NULL, TAG_NUMBER, TAG_OBJECT, TAG_STRING, TAG_TRUE, generic_header, shape_id,
 };
-use std::collections::HashMap;
 
 /// Why a JSON text could not be transcoded. A wire the writers emit never fails; these are the
 /// texts no tape can carry.

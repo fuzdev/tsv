@@ -13,12 +13,12 @@
 use crate::fixtures::validation::parsed_input::{ParsedInput, parse_input};
 use crate::fixtures::{self, Fixture};
 use std::path::Path;
-use tsv_arena::tape::shapes::{ENTRIES, KEYWORDS, SHAPES_HASH, TAPE_FORMAT_VERSION};
-use tsv_arena::tape::{
+use tsv_lang::JsonWriter;
+use tsv_lang::tape::shapes::{ENTRIES, KEYWORDS, SHAPES_HASH, TAPE_FORMAT_VERSION};
+use tsv_lang::tape::{
     Enc, HEADER_WORDS, Header, MAGIC, NO_BIT, NULL_REF, TAG_ARRAY, TAG_FALSE, TAG_NULL, TAG_NUMBER,
     TAG_OBJECT, TAG_STRING, TAG_TRUE, read_header,
 };
-use tsv_lang::JsonWriter;
 
 /// The text a wire's offsets index: the source, less a leading byte-order mark for a Svelte or
 /// CSS document (those wires elide it, as Svelte's `parse` and `parseCss` do).

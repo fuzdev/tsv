@@ -1,6 +1,6 @@
 /**
  * `check:ast-schema`' and `ast-schema:update`'s root (`scripts/ast_schema.ts`). Its reach: the
- * checkout's `crates/tsv_wasm/types/`, `crates/tsv_wasm/npm/` and `crates/tsv_arena/src/tape/`,
+ * checkout's `crates/tsv_wasm/types/`, `crates/tsv_wasm/npm/` and `crates/tsv_lang/src/tape/`,
  * read always and written under `--update`; it runs no program.
  *
  * @module
@@ -23,7 +23,7 @@ if (unknown.length > 0) {
 			{
 				types: checkout.dir('crates/tsv_wasm/types'),
 				npm: checkout.dir('crates/tsv_wasm/npm'),
-				tape: checkout.dir('crates/tsv_arena/src/tape')
+				tape: checkout.dir('crates/tsv_lang/src/tape')
 			},
 			args.includes('--update')
 		)
