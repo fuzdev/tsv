@@ -1,19 +1,24 @@
 /**
  * The addon's in-process half of the PGO pipeline, run by Node because it loads a staged
- * N-API addon through the `@fuzdev/tsv` loader: per listed file, each named operation's
- * answer — the span-only wire `parse_<lang>_json` returns, the type strip's code
- * (`strip_typescript`, TypeScript paths), the import records (`parse_imports_typescript` /
- * `parse_imports_svelte`) — as a sha256 of the output, or the failure. `pgo.ts train`
- * runs it to train the strip and the import records (`--require-ok`), and `pgo.ts byteid`
- * to compare their outputs.
+ * N-API addon through the `@fuzdev/tsv` loader (its root, and the `./parse` entry beside it):
+ * per listed file, each named operation's answer — the span-only wire `parse_<lang>_json`
+ * returns (`parse`), the tree `parse_<lang>` decodes from the addon's tape (`tape`, the
+ * packages' default parse), the type strip's code (`strip_typescript`, TypeScript paths), the
+ * import records (`parse_imports_typescript` / `parse_imports_svelte`) — as a sha256 of the
+ * output, or the failure. `pgo.ts train` runs it to train the strip, the import records and
+ * the tape route (`--require-ok`), and `pgo.ts byteid` to compare their outputs.
  *
  * The hashes are spelled as the native CLI prints the same answer, so they compare to its
  * stdout without holding either: the parse wire plus the newline `tsv parse` prints after
- * it, the strip's code as `tsv strip` prints it. A `.mts` path strips at the module goal,
- * as the CLI reads that extension; every other path reads the goal as a format does.
+ * it, the strip's code as `tsv strip` prints it. The tape route's tree is hashed as
+ * `JSON.stringify` writes it, plus that newline — the CLI's wire read back through
+ * `JSON.parse` and written the same way (`pgo.ts byteid`'s `canon`), since JS spells a number
+ * as the Rust writer need not; key order counts on both sides. A `.mts` path strips at the
+ * module goal, as the CLI reads that extension; every other path reads the goal as a format
+ * does.
  *
  * Usage: node scripts/pgo/addon_ops.ts --loader <loader index.js> --list <list file>
- *          --out <out.ndjson> --ops <parse,strip,imports> [--require-ok]
+ *          --out <out.ndjson> --ops <parse,tape,strip,imports> [--require-ok]
  *
  * @module
  */
@@ -28,7 +33,9 @@ import { parseArgs } from 'node:util';
 import { parse_language } from './layout.ts';
 
 /** An operation the addon is asked per file. */
-export type AddonOp = 'parse' | 'strip' | 'imports';
+export type AddonOp = 'parse' | 'tape' | 'strip' | 'imports';
+
+const ADDON_OPS: readonly AddonOp[] = ['parse', 'tape', 'strip', 'imports'];
 
 /** One answer: a file's operation, its output's hash or its failure. */
 export interface AddonRecord {
@@ -45,16 +52,20 @@ export interface AddonRecord {
 	thrown?: string;
 }
 
+/** The prefix of a record's `thrown` when the answer came back but could not be hashed. */
+export const UNHASHABLE = 'unhashable answer: ';
+
 /** Whether `tsv strip` takes the path (it refuses JavaScript paths). */
 export const is_strip_path = (path: string): boolean => /\.(?:c|m)?ts$/i.test(path);
 
-/** The ops that apply to a path: the strip to TypeScript paths, the import records to
- * TypeScript and Svelte. */
+/** The ops that apply to a path: both parses to every path, the strip to TypeScript paths,
+ * the import records to TypeScript and Svelte. */
 export const ops_for = (path: string, ops: readonly AddonOp[]): AddonOp[] => {
 	const language = parse_language(path);
 	return ops.filter(
 		(op) =>
 			op === 'parse' ||
+			op === 'tape' ||
 			(op === 'strip' && is_strip_path(path)) ||
 			(op === 'imports' && language !== 'css')
 	);
@@ -71,23 +82,15 @@ const main = async (): Promise<void> => {
 		}
 	});
 	const ops = values.ops!.split(',').filter(Boolean) as AddonOp[];
-	if (
-		!values.loader ||
-		!values.list ||
-		!values.out ||
-		ops.some((op) => !['parse', 'strip', 'imports'].includes(op))
-	) {
+	if (!values.loader || !values.list || !values.out || ops.some((op) => !ADDON_OPS.includes(op))) {
 		console.error(
-			'usage: node scripts/pgo/addon_ops.ts --loader <index.js> --list <file> --out <ndjson> --ops <parse,strip,imports> [--require-ok]'
+			'usage: node scripts/pgo/addon_ops.ts --loader <index.js> --list <file> --out <ndjson> --ops <parse,tape,strip,imports> [--require-ok]'
 		);
 		process.exit(2);
 	}
 
-	// deno-lint-ignore no-explicit-any
 	// the loader's root and its `./parse` entry beside it (the parse family), one addon between them
-	// TODO: train the tape route (`parse_<lang>`, the `./parse` entry's default) as an op of its
-	// own, with its `HOT_FUNCTIONS` floor and byte-identity — the shipped addon's profile does
-	// not yet see the transcoder
+	// deno-lint-ignore no-explicit-any
 	const tsv: any = {
 		...(await import(pathToFileURL(values.loader).href)),
 		...(await import(pathToFileURL(join(dirname(values.loader), 'parse.js')).href))
@@ -103,22 +106,37 @@ const main = async (): Promise<void> => {
 			result =
 				op === 'parse'
 					? tsv[`parse_${language}_json`](source)
-					: op === 'strip'
-						? tsv.strip_typescript(
-								source,
-								/\.mts$/i.test(path) ? { sourceType: 'module' } : undefined
-							)
-						: tsv[`parse_imports_${language}`](source);
+					: op === 'tape'
+						? tsv[`parse_${language}`](source)
+						: op === 'strip'
+							? tsv.strip_typescript(
+									source,
+									/\.mts$/i.test(path) ? { sourceType: 'module' } : undefined
+								)
+							: tsv[`parse_imports_${language}`](source);
 		} catch (e) {
 			return { thrown: String((e as Error).message ?? e) };
 		}
 		if (!result.ok) return { ok: false, kind: result.error.kind, message: result.error.message };
-		const text =
-			op === 'parse'
-				? `${result.json}\n`
-				: op === 'strip'
-					? result.code
-					: JSON.stringify({ hasModuleSyntax: result.hasModuleSyntax, imports: result.imports });
+		let text: string;
+		try {
+			text =
+				op === 'parse'
+					? `${result.json}\n`
+					: op === 'tape'
+						? `${JSON.stringify(result.ast)}\n`
+						: op === 'strip'
+							? result.code
+							: JSON.stringify({
+									hasModuleSyntax: result.hasModuleSyntax,
+									imports: result.imports
+								});
+		} catch (e) {
+			// `JSON.stringify` refusing the answer (a stack overflow, the one way a decoded tree
+			// can make it throw) is the harness's limit, never tsv's: recorded as `unhashable`,
+			// which `pgo.ts byteid` accepts only where the CLI's wire is unhashable the same way
+			return { thrown: `${UNHASHABLE}${String((e as Error).message ?? e)}` };
+		}
 		return { ok: true, hash: sha256(text) };
 	};
 

@@ -211,8 +211,8 @@ export const TSV_ARTIFACTS = {
 		build: 'plain'
 	},
 	// The native mirror of @fuzdev/tsv-parse-wasm: keeps the parse exports + the
-	// convert/JSON layer and drops the printers, scope-matched to oxc-parser
-	// (napi), which also materializes a JSON AST.
+	// convert/JSON layer and the tape's transcoder and drops the printers, scope-matched
+	// to oxc-parser (napi), which also materializes the whole AST.
 	tsv_parse_ffi: {
 		label: 'tsv parse (ffi)',
 		kind: 'native',

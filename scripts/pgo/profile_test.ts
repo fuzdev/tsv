@@ -56,6 +56,13 @@ test('demangle_legacy_path', () => {
 		demangle_legacy_path('__ZN7tsv_css9__private5parse17hf2f2b828515a6dbeE'),
 		'tsv_css::__private::parse'
 	);
+	// an inherent method in a private module: the type is one more path component
+	strictEqual(
+		demangle_legacy_path(
+			'_ZN9tsv_arena4tape9transcode10Transcoder15transcode_words17h4a10f23c2491e48aE'
+		),
+		'tsv_arena::tape::transcode::Transcoder::transcode_words'
+	);
 	// a generic component keeps its escaped spelling
 	strictEqual(
 		demangle_legacy_path(
@@ -122,7 +129,8 @@ const TRAINED: TrainedCounts = {
 	css: 2,
 	strip: 4,
 	imports_typescript: 5,
-	imports_svelte: 3
+	imports_svelte: 3,
+	tape: 10
 };
 
 /** The napi world's hot functions, each run `times` times. */
@@ -136,14 +144,14 @@ test('grade_profile passes a profile whose hot functions reach their floors', ()
 	const verdict = grade_profile(show(napi_hot((h) => TRAINED[h.per])), 'napi', TRAINED);
 	deepStrictEqual(verdict.failures, []);
 	strictEqual(verdict.executed, verdict.hot.length);
-	// the CLI ships no import records, so its world does not ask for them
+	// the CLI ships no import records and no tape, so its world asks for neither
 	const cli = grade_profile(
 		show(HOT_FUNCTIONS.filter((h) => h.worlds.includes('cli')).map((h) => [mangle(h.path), [99]])),
 		'cli',
 		TRAINED
 	);
 	deepStrictEqual(cli.failures, []);
-	ok(cli.hot.every((h) => !h.path.includes('imports')));
+	ok(cli.hot.every((h) => !h.path.includes('imports') && !h.path.includes('tape')));
 	// the FFI library has neither the import records nor the type strip
 	const ffi = grade_profile(
 		show(HOT_FUNCTIONS.filter((h) => h.worlds.includes('ffi')).map((h) => [mangle(h.path), [99]])),

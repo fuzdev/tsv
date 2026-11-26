@@ -112,10 +112,10 @@ source-type refusals, a source over the 4 GiB cap (a plain `Error`), a caught pa
 trap (`RuntimeError`) or stack exhaustion (`RangeError`). A format parses the CR-folded text
 through the language's `parse_folded` (`FoldedSource::parse_with`), which maps the error back
 onto the caller's source, so it reports the span a parse of that source would. Where the facade
-`JSON.parse`s an engine's wire itself (an engine table with no `parse` — the bench's hand-built
-ones; every published entry takes the tape route), a failure there is thrown as
-`Error('internal error: AST serialized to invalid JSON', {cause})` — the WASM engine's own text
-for that case — never returned as a parse failure.
+`JSON.parse`s an engine's wire itself (an engine table with no `parse` — every published entry
+and the bench's tables take the tape route, so only a test's fake builds one), a failure there
+is thrown as `Error('internal error: AST serialized to invalid JSON', {cause})` — the WASM
+engine's own text for that case — never returned as a parse failure.
 
 **The strip family** (`npm/api_strip.js` + `npm/facade_strip.d.ts`, in `@fuzdev/tsv-wasm` and the
 native `@fuzdev/tsv` alone — [docs/strip.md](../../docs/strip.md)). `strip_typescript(source,
@@ -171,7 +171,7 @@ the `JsValue`, a value that is not a string throws by its kind (`invalid sourceT
 expected a string ('script' or 'module'), got a number`) — where N-API refuses it at its own
 conversion. `JsValue` is wasm-bindgen's own, so the format-only build still links no
 `js-sys`. The raw `parse_<lang>` returns `{ok: true, ast}`, the object `js_sys::JSON::parse` made
-of the wire, so the bench's fairness probe reads the raw module directly.
+of the wire; no published entry and no bench row calls it (both take the tape route).
 
 **The parse family is its own entry, `./parse`, and `parse_<lang>` takes the tape route.**
 In `@fuzdev/tsv-wasm` and the native `@fuzdev/tsv` the root carries format, the strip, the
@@ -187,8 +187,9 @@ wire indexes (a Svelte or CSS source less its leading BOM) — into `{ok: true, 
 a tape that does not decode throws `Error('internal error: the engine returned a tape that
 does not decode', {cause})`. `{locations: true}` is unchanged (`reconstruct_locations` over the
 decoded object); `parse_<lang>_json` keeps the JSON route. `create_parse_api` itself is
-unchanged: an engine table with no `parse` (the bench's hand-built tables) still `JSON.parse`s
-the string.
+unchanged: an engine table with no `parse` still `JSON.parse`s the string
+(`scripts/npm_api_test.ts`'s fakes build one; the bench's tables pass the tape route,
+`benches/js/lib/tsv_api.ts`).
 
 The generated wasm entries (`scripts/patch_npm_package.ts`) for the parse-capable variants:
 `./parse` is `parse.js` under the `node` condition (it imports `node_init.js`, the

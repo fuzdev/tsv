@@ -63,11 +63,12 @@ const PGO_DIR = '.pgo';
 const TRAINED_THROUGH: Record<PgoBenchWorld, string> = {
 	ffi:
 		'the library itself, in process under Deno through the bench’s own FFI wrapper — ' +
-		'parse, parse_internal and format on every file',
+		'every export on every file: the JSON parse, the tape route (the tape export and its ' +
+		'decode), parse_internal and format',
 	napi:
 		'the addon itself — parse on every file and format --jobs 1 over the tree through the ' +
-		'@fuzdev/tsv loader’s cli.js, the type strip and import records in process — the ' +
-		'training the published addon gets'
+		'@fuzdev/tsv loader’s cli.js, the type strip, the import records and the tape route ' +
+		'(parse_<lang> from @fuzdev/tsv/parse) in process — the training the published addon gets'
 };
 
 /** What `run_pgo_bench` reaches. */

@@ -305,10 +305,11 @@ release side is the root [CLAUDE.md §Publishing](../../CLAUDE.md#publishing).
   (`scripts/pgo/build.sh`, the one spelling of the PGO RUSTFLAGS) trains **on the target**,
   each binary as itself over the snapshot's `origin: own` collections (the manifest read
   from the pinned commit) as authored, over every surface it ships — the CLI directly, the
-  addon through the loader's `cli.js` and, for the strip and the import records, in
-  process; `parse` on every file (the CLI also with `--locations`), the type strip on every
-  TypeScript file, the import records on every TypeScript and Svelte file (the addon's
-  alone), then `format --jobs 1` — on the host for the gnu rows (their 2.28-floor binaries
+  addon through the loader's `cli.js` and, for the strip, the import records and the tape
+  route, in process; `parse` on every file (the CLI also with `--locations`), the type strip
+  on every TypeScript file, the import records on every TypeScript and Svelte file and the
+  tape route (`parse_<lang>` from `./parse`: the transcoder and the decode) on every file
+  (the addon's alone), then `format --jobs 1` — on the host for the gnu rows (their 2.28-floor binaries
   run there), in node:alpine for musl. `--jobs 1` fixes WHAT runs, not the profile's bytes: address-keyed
   and per-process-seeded hash tables count differently run to run, so two trainings write
   different profiles and the binaries' bytes differ. That is the contract: the
@@ -318,13 +319,14 @@ release side is the root [CLAUDE.md §Publishing](../../CLAUDE.md#publishing).
   instrumenting rustc's, which on a container row is the container's), and a merged
   profile fails unless it counts function entries (the instrumented builds pass
   `-pgo-instrument-entry`) and every hot function — the renderer, every parse entry, the
-  strip, the import records — was entered once for every input of its class it trained on
-  (a CLI run that exits non-zero leaves through `std::process::exit`, which on Windows writes
-  no profile, so there the strip's floor leaves out the refused strips). The use
-  builds turn LLVM's cost-benefit inliner off (`-inline-enable-cost-benefit-analysis=false`),
-  the size lever. Then the PGO gates: `-Cprofile-use` on every workspace crate's rustc
-  command line, and no profile diagnostic in the use builds' logs but the build scripts' and
-  those for dead code (a hash mismatch, or a missing function the instrumented binary's own
+  strip, the import records, the tape's transcoder — was entered once for every input of its
+  class it trained on (a CLI run that exits non-zero leaves through `std::process::exit`,
+  which on Windows writes no profile, so there the strip's floor leaves out the refused
+  strips). The use builds turn LLVM's cost-benefit inliner off
+  (`-inline-enable-cost-benefit-analysis=false`), the size lever. Then the PGO gates:
+  `-Cprofile-use` on every workspace crate's rustc command line (`tsv_arena`, the
+  transcoder's crate, among the addon's), and no profile diagnostic in the use builds' logs
+  but the build scripts' and those for dead code (a hash mismatch, or a missing function the instrumented binary's own
   profile records in the module diagnosed, is a stale profile, silently no PGO; a missing
   function is dead code only on Mach-O and COFF, whose links drop a dead function's records,
   and only when the instrumented binary records nothing of it in the module the diagnostic
@@ -336,8 +338,9 @@ release side is the root [CLAUDE.md §Publishing](../../CLAUDE.md#publishing).
   `Cargo.lock`); instrumentation sections in the trained binaries and none in the shipped
   ones; the PGO CLI and addon byte-identical to the plain `release` CLI over the whole
   snapshot and every fixture (format) and over the fixture inputs plus a stride of the
-  snapshot (parse, `parse --locations`, strip), and the PGO addon's import records equal to
-  the instrumented addon's (the CLI has none); and the depth limits' stack contract in the
+  snapshot (parse, `parse --locations`, strip — the addon's tape route held to the plain
+  CLI's wire read back through `JSON.parse`, key order included), and the PGO addon's import
+  records equal to the instrumented addon's (the CLI has none); and the depth limits' stack contract in the
   staged addon itself (`scripts/pgo/addon_depth.ts`: every shape at its accepted depth on a
   `worker_threads` worker sized to the contract less its margin, after a control pass on a
   far smaller thread has overflowed — the setting is a live limit — and, on Windows, where

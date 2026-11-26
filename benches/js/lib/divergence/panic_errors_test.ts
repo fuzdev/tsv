@@ -102,6 +102,7 @@ class FakeBinding extends TsvBinding {
 		super();
 		const each = <T>() => ({ svelte: export_fn, typescript: export_fn, css: export_fn }) as T;
 		this.bind({
+			parse_tape: each<TsvEngine['parse_tape']>(),
 			parse_json: each<TsvEngine['parse_json']>(),
 			format: each<TsvEngine['format']>(),
 			parse_internal: each<TsvEngine['parse_internal']>()

@@ -5,8 +5,8 @@
  * The published surface of every tsv npm package is one hand-written facade
  * (`crates/tsv_wasm/npm/api.js` + `api_parse.js`): per call it checks the source is a
  * well-formed UTF-16 string, reads the options bag, checks the `{ok: false, error}` an engine
- * returns and hands it back as it is (`read_failure`), wraps a success into `{ok: true, …}`,
- * and for the native package `JSON.parse`s the wire inside a try/catch. The bench's `tsv` /
+ * returns and hands it back as it is (`read_failure`) and wraps a success into `{ok: true, …}`;
+ * its `parse_<lang>` decodes the engine's tape (`tape_engine.js`). The bench's `tsv` /
  * `tsv-wasm` / `+locations` rows time that facade over each binding (`lib/tsv_api.ts`),
  * unwrapping the result as a consumer does. This probe prices it, per binding, operation and language,
  * under whichever runtime runs it.
@@ -16,17 +16,38 @@
  *   - `row`      the bench row's own call, through the harness class the row uses
  *   - `control`  that same call from a second closure — the in-run A/A noise floor
  *   - `engine`   the flat exports beneath the facade (`TsvBinding.engine`), called as a
- *                caller with no facade would: the wire `JSON.parse`d bare where the
- *                engine hands back a string, `reconstruct_locations` composed by hand
+ *                caller with no facade would: the raw tape export decoded through the
+ *                tape route's adapter alone (`create_tape_parse`, no argument checks),
+ *                `reconstruct_locations` composed by hand
  *   - `package`  (wasm only) the staged `@fuzdev/tsv-wasm` entry itself — the web-target
  *                glue plus the facade, where `row` runs this runtime's `deno` / `nodejs`
  *                target glue over the same engine
  *
- * Three readings come out of them, each a per-round RATIO taken inside one round:
+ * With `--transfer`, the `parse` cells add three arms that split the tape route itself —
+ * diagnostics, not rows, each a raw export called bare:
  *
- *   - `floor`    control ÷ row — the row against itself
- *   - `facade`   row ÷ engine — what the facade adds (>1 = the facade costs)
- *   - `package`  package ÷ row — what separates the row from the installed package
+ *   - `internal` `parse_internal_<lang>`: the parse alone, nothing written or handed over
+ *   - `json`     `parse_<lang>_json`'s export: the JSON wire written and crossed as a string
+ *   - `tape`     `parse_tape_<lang>`'s export: that wire transcoded to the tape and handed
+ *                over as words, undecoded
+ *
+ * The identity gate holds `json` (through `JSON.parse`) and `tape` (through the decoder) to
+ * the row's tree; `internal` returns no tree, so it is timed ungated.
+ *
+ * The readings, each a per-round RATIO taken inside one round:
+ *
+ *   - `floor`     control ÷ row — the row against itself
+ *   - `facade`    row ÷ engine — what the facade adds (>1 = the facade costs)
+ *   - `package`   package ÷ row — what separates the row from the installed package
+ *   - `wire`      json ÷ internal — the JSON writer and the string crossing (`--transfer`)
+ *   - `transcode` tape ÷ json — the transcoder and the words' hand-over over the string's
+ *                 crossing; its `ns` is the transcoder plus the words' hand-over, less the
+ *                 string's crossing (`--transfer`)
+ *   - `decode`    row ÷ tape — the generated decoder plus the facade (`--transfer`)
+ *
+ * Every arm is timed in one process whose bindings ran their unscoped init probes, so the
+ * tape probe's routing twin shares the `create_tape_parse` closure site with the `row` and
+ * `engine` arms alike — unlike a bench row's own process, which skips the twin.
  *
  * The `row` arm goes through the wrapper's method, as every bench row does, where
  * `engine` and `package` are called directly. That one method call is invisible on the
@@ -64,8 +85,9 @@
  *
  * Flags: `--rounds N` (15), `--warmup N` (3), `--lang <language>`, `--binding
  * <napi|ffi|wasm>`, `--op <parse|parse+locations|format>`, `--set <corpus|small|tiny>`,
- * `--no-package`, `--json` (one JSON document on stdout; the tables go to stderr
- * either way). The `package` arm needs `npm run build:npm:all`.
+ * `--no-package`, `--transfer` (the tape route's split, above), `--json` (one JSON document
+ * on stdout; the tables go to stderr either way). The `package` arm needs
+ * `npm run build:npm:all`.
  */
 
 import { stat } from 'node:fs/promises';
@@ -74,6 +96,7 @@ import { argv, exit } from 'node:process';
 import { pathToFileURL } from 'node:url';
 
 import { reconstruct_locations } from '../../../crates/tsv_wasm/npm/locations.js';
+import { create_tape_parse } from '../../../crates/tsv_wasm/npm/tape_engine.js';
 import { check_executed_artifacts } from '../lib/check_artifact_freshness.ts';
 import { CorpusLoader, group_by_language } from '../lib/corpus.ts';
 import {
@@ -92,8 +115,8 @@ import { type Call, grade_identity } from './facade_identity.ts';
 type Binding = 'napi' | 'ffi' | 'wasm';
 type Operation = 'parse' | 'parse+locations' | 'format';
 type SetName = 'corpus' | 'small' | 'tiny';
-type ArmName = 'row' | 'control' | 'engine' | 'package';
-type ReadingName = 'floor' | 'facade' | 'package';
+type ArmName = 'row' | 'control' | 'engine' | 'package' | 'internal' | 'json' | 'tape';
+type ReadingName = 'floor' | 'facade' | 'package' | 'wire' | 'transcode' | 'decode';
 
 /** A package entry's published functions, by export name. */
 type Package = Record<string, (source: string, options?: object) => unknown>;
@@ -105,8 +128,14 @@ const SETS: SetName[] = ['corpus', 'small', 'tiny'];
 const READINGS: ReadonlyArray<readonly [ReadingName, ArmName, ArmName]> = [
 	['floor', 'control', 'row'],
 	['facade', 'row', 'engine'],
-	['package', 'package', 'row']
+	['package', 'package', 'row'],
+	['wire', 'json', 'internal'],
+	['transcode', 'tape', 'json'],
+	['decode', 'row', 'tape']
 ];
+
+/** The readings printed beside the floor, in order. */
+const PRINTED: readonly ReadingName[] = ['facade', 'package', 'wire', 'transcode', 'decode'];
 
 /** A minimal valid source per language — the `tiny` set's one call. */
 const TINY_SOURCES: Record<Language, string> = {
@@ -129,6 +158,7 @@ let binding_filter: Binding | null = null;
 let op_filter: Operation | null = null;
 let set_filter: SetName | null = null;
 let with_package = true;
+let with_transfer = false;
 let json = false;
 const args = argv.slice(2);
 for (let i = 0; i < args.length; i++) {
@@ -140,6 +170,7 @@ for (let i = 0; i < args.length; i++) {
 	else if (arg === '--op') op_filter = args[++i] as Operation;
 	else if (arg === '--set') set_filter = args[++i] as SetName;
 	else if (arg === '--no-package') with_package = false;
+	else if (arg === '--transfer') with_transfer = true;
 	else if (arg === '--json') json = true;
 	else {
 		console.error(`unknown argument ${arg}`);
@@ -155,12 +186,19 @@ const log = (line = ''): void => console.error(line);
 const runtime = current_runtime();
 await check_executed_artifacts();
 
+/** An arm's call for one cell, or `undefined` where the arm has none (the transfer arms off
+ * the `parse` operation). */
+type ArmFactory = (operation: Operation, language: Language) => Call | undefined;
+
 /** One binding's arms, as factories so `row` and `control` are separate closures. */
 interface BindingArms {
 	binding: Binding;
 	/** What the binding loaded, for the header. */
 	artifact: string;
-	arms: Partial<Record<ArmName, (operation: Operation, language: Language) => Call>>;
+	arms: Partial<Record<ArmName, ArmFactory>>;
+	/** What the identity gate compares an arm by, where that is not the arm's own product
+	 * (the transfer arms', which hand back the wire or the tape rather than the tree). */
+	gates: Partial<Record<ArmName, ArmFactory>>;
 }
 
 /** The bench rows' own calls over a harness wrapper (`lib/implementations.ts`). */
@@ -177,13 +215,10 @@ const engine_call = (impl: TsvBinding, operation: Operation, language: Language)
 		const format = engine.format[language];
 		return (source) => format(source);
 	}
-	const parse_object = engine.parse?.[language];
-	const parse_json = engine.parse_json[language];
 	// the engines return a failure rather than throw; the gate keeps only files `row`
 	// accepts, so a failure here is never compared (each arm is one call, as the row is)
-	const parse: Call = parse_object
-		? (source) => (parse_object(source) as { ast: unknown }).ast
-		: (source) => JSON.parse(parse_json(source) as string);
+	const tape_parse = create_tape_parse(engine.parse_tape)[language]!;
+	const parse: Call = (source) => (tape_parse(source) as { ast: unknown }).ast;
 	if (operation === 'parse') return parse;
 	return (source) => reconstruct_locations(parse(source), source, { language });
 };
@@ -211,8 +246,47 @@ const package_call = (pkg: Package, operation: Operation, language: Language): C
 const harness_arms = (impl: TsvBinding): BindingArms['arms'] => ({
 	row: (operation, language) => row_call(impl, operation, language),
 	control: (operation, language) => row_call(impl, operation, language),
-	engine: (operation, language) => engine_call(impl, operation, language)
+	engine: (operation, language) => engine_call(impl, operation, language),
+	...(with_transfer ? transfer_arms(impl) : {})
 });
+
+/** The tape route's split (`--transfer`): the raw exports beneath the default parse, bare. */
+const transfer_arms = (impl: TsvBinding): BindingArms['arms'] => {
+	const { engine } = impl;
+	return {
+		internal: (operation, language) => {
+			if (operation !== 'parse') return undefined;
+			const internal = engine.parse_internal[language];
+			// its success hands back nothing; `pass` refuses an `undefined`
+			return (source) => (internal(source), true);
+		},
+		json: (operation, language) => {
+			if (operation !== 'parse') return undefined;
+			const parse_json = engine.parse_json[language];
+			return (source) => parse_json(source);
+		},
+		tape: (operation, language) => {
+			if (operation !== 'parse') return undefined;
+			const parse_tape = engine.parse_tape[language];
+			return (source) => parse_tape(source);
+		}
+	};
+};
+
+/** The identity gate's reading of the transfer arms: the tree each product stands for. */
+const transfer_gates = (impl: TsvBinding): BindingArms['gates'] => {
+	if (!with_transfer) return {};
+	const { engine } = impl;
+	return {
+		json: (operation, language) => {
+			if (operation !== 'parse') return undefined;
+			const parse_json = engine.parse_json[language];
+			return (source) => JSON.parse(parse_json(source) as string);
+		},
+		tape: (operation, language) =>
+			operation === 'parse' ? engine_call(impl, operation, language) : undefined
+	};
+};
 
 const bindings: BindingArms[] = [];
 
@@ -222,7 +296,8 @@ if (runtime === 'deno') {
 	bindings.push({
 		binding: 'ffi',
 		artifact: 'tsv_ffi (release), lib/ffi.ts',
-		arms: harness_arms(ffi)
+		arms: harness_arms(ffi),
+		gates: transfer_gates(ffi)
 	});
 } else {
 	const napi = new NapiImplementation();
@@ -230,7 +305,8 @@ if (runtime === 'deno') {
 	bindings.push({
 		binding: 'napi',
 		artifact: 'tsv_napi (napi profile), lib/napi.ts',
-		arms: harness_arms(napi)
+		arms: harness_arms(napi),
+		gates: transfer_gates(napi)
 	});
 }
 
@@ -255,7 +331,7 @@ if (runtime === 'deno') {
 		arms.package = (operation, language) => package_call(pkg, operation, language);
 		artifact += ' + pkg/all/npm/index.js';
 	}
-	bindings.push({ binding: 'wasm', artifact, arms });
+	bindings.push({ binding: 'wasm', artifact, arms, gates: transfer_gates(wasm) });
 }
 
 //
@@ -283,10 +359,10 @@ for (const b of active_bindings) {
 	for (const language of languages) {
 		const calls = operations.map((operation) => ({
 			operation,
-			row: b.arms.row!(operation, language),
-			others: (['engine', 'package'] as const).flatMap((arm) => {
-				const make = b.arms[arm];
-				return make === undefined ? [] : [{ arm, call: make(operation, language) }];
+			row: b.arms.row!(operation, language)!,
+			others: (['engine', 'package', 'json', 'tape'] as const).flatMap((arm) => {
+				const call = (b.gates[arm] ?? b.arms[arm])?.(operation, language);
+				return call === undefined ? [] : [{ arm, call }];
 			})
 		}));
 		const grade = grade_identity(`${b.binding}/${language}`, calls, corpus[language]);
@@ -373,9 +449,10 @@ const measure = (
 	}
 	if (sources.length === 0) return null;
 
-	const arm_calls = Object.entries(b.arms).map(
-		([name, make]) => [name as ArmName, make(operation, language)] as const
-	);
+	const arm_calls = Object.entries(b.arms).flatMap(([name, make]) => {
+		const call = make(operation, language);
+		return call === undefined ? [] : [[name as ArmName, call] as const];
+	});
 
 	// size the repeat so a pass is long enough to time, from the row
 	const row = arm_calls.find(([name]) => name === 'row')![1];
@@ -433,7 +510,7 @@ const print_cell = (cell: CellReading): void => {
 		`${cell.set.padEnd(6)} ${String(cell.files).padStart(5)}f ${fixed(cell.kb, 1, 9)}KB ` +
 		`row ${fixed(cell.row_ns, 0, 9)}ns/call  ` +
 		`floor ${fixed(floor.ratio, 4, 6)} [${fixed(floor.min, 3, 5)},${fixed(floor.max, 3, 5)}]`;
-	for (const name of ['facade', 'package'] as const) {
+	for (const name of PRINTED) {
 		const reading = cell.readings[name];
 		if (!reading) continue;
 		line +=
@@ -450,8 +527,9 @@ log(
 for (const b of active_bindings) log(`  ${b.binding}: ${b.artifact}`);
 log(
 	`\nfloor = control÷row (the row against itself) · facade = row÷engine (what the facade ` +
-		`adds over the flat exports) · package = package÷row · net = ratio÷floor · ` +
-		`ns = median per-call difference\n`
+		`adds over the flat exports) · package = package÷row` +
+		(with_transfer ? ` · wire = json÷internal · transcode = tape÷json · decode = row÷tape` : '') +
+		` · net = ratio÷floor · ns = median per-call difference\n`
 );
 
 const cells: CellReading[] = [];

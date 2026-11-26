@@ -99,6 +99,15 @@ export const loader_entries = (node_modules: string): { index: string; cli: stri
 	cli: join(node_modules, '@fuzdev', 'tsv', 'cli.js')
 });
 
+/**
+ * What the FFI world asks the library per file (`ffi_ops.ts`, in this order), every export by
+ * name: `parse` the span-only wire `tsv_parse_<lang>` returns, `tape` the bench row's parse —
+ * `tsv_parse_tape_<lang>` decoded through the facade — `parse_internal` and `format`. Here so
+ * `pgo.ts`, which runs under Node, and `ffi_ops.ts`, under Deno, name one list.
+ */
+export const FFI_OPS = ['parse', 'tape', 'parse_internal', 'format'] as const;
+export type FfiOp = (typeof FFI_OPS)[number];
+
 /** The parse language `tsv parse` reads a path as — by extension, as the CLI detects it. */
 export const parse_language = (path: string): 'svelte' | 'css' | 'typescript' => {
 	const lower = path.toLowerCase();

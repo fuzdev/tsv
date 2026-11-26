@@ -606,8 +606,15 @@ export async function run_compose_reports(deps: ComposeReportsDeps): Promise<num
 	 * `native_build`, the first recorded), `mixed_native_build` when the siblings did not all
 	 * load the one stamp's profile-guided pair (two stamps, a sibling whose loaded library the
 	 * stamp does not name, or one recording none), and `sources[].native_build` per sibling.
+	 *
+	 * 20: no field moved, but the parse rows `tsv` / `tsv-wasm` (and `+locations`) name
+	 * another mechanism: from per-runtime report `version` 24 they time the packages' tape
+	 * route (the binary tape, decoded by the generated decoder) where earlier siblings timed
+	 * the JSON wire and `JSON.parse`. A combined report over siblings of both vintages is
+	 * `mixed_vintage` already; this is for a consumer comparing a row against an older
+	 * committed report under the same name.
 	 */
-	const COMBINED_SCHEMA_VERSION = 19;
+	const COMBINED_SCHEMA_VERSION = 20;
 
 	// JSON: metadata + provenance per source + the comparison rows.
 	/**

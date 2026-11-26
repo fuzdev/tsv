@@ -206,11 +206,11 @@ import {
 	generate_group_coverage_only_markdown,
 	generate_group_files_markdown,
 	generate_group_throughput_markdown,
-	generate_json_overhead_note,
 	generate_locations_note,
 	generate_skipped_files_markdown,
 	generate_skipped_files_report,
 	generate_summary_report,
+	generate_transfer_overhead_note,
 	generate_versions_info,
 	type GroupResults,
 	parse_payload_tier,
@@ -1079,8 +1079,15 @@ interface BaselineVersions extends ReportVersions {
  * collections, and whether no training collection is one the run's corpus loaded (`null`
  * when the corpus holds no snapshot collection). And `binary_sizes[].build` (`pgo` | `plain`)
  * on tsv's native size rows, read the same way, since the size-only subset builds stay plain.
+ *
+ * 24: no field moved, but what the parse groups' `tsv` / `tsv-wasm` rows (and their
+ * `+locations` siblings) time did: the packages' `parse_<lang>` takes the tape route — the
+ * wire transcoded to the binary tape, handed over as words and decoded by the generated
+ * decoder (`docs/tape_format.md`) — where 23 and below timed the JSON wire and `JSON.parse`.
+ * Same names, same tree, another transfer, so a row compared across the two versions
+ * compares two mechanisms. The `.md`'s `**JSON overhead**` line is `**Transfer overhead**`.
  */
-const REPORT_SCHEMA_VERSION = 23;
+const REPORT_SCHEMA_VERSION = 24;
 
 interface Baseline {
 	/** See `REPORT_SCHEMA_VERSION`. */
@@ -1688,8 +1695,8 @@ function generate_markdown_report(data: Baseline, groups: GroupResults[]): strin
 		if (coverage_only) lines.push(coverage_only, '');
 
 		if (operation === 'parse') {
-			const json_note = generate_json_overhead_note(group.results);
-			if (json_note) lines.push(json_note, '');
+			const transfer_note = generate_transfer_overhead_note(group.results);
+			if (transfer_note) lines.push(transfer_note, '');
 		}
 	}
 

@@ -149,8 +149,8 @@ Things the published numbers measure that aren't quite what they look like.
   pipeline builds (`npm run build:bench:pgo` runs that pipeline, every gate but
   the depth one). The C FFI ships in no package, so its library is profile-guided
   by the same recipe as a third training world: trained as itself, in process
-  through the bench's own FFI wrapper (parse, `parse_internal`, format on every
-  file), since a profile applies only to the build it was trained on — neither
+  through the bench's own FFI wrapper (every export on every file: the JSON
+  parse, the tape route the row times, `parse_internal`, format), since a profile applies only to the build it was trained on — neither
   the CLI's (another feature set) nor the addon's (another profile) reaches it.
   The two size-only FFI subset builds (`tsv format (ffi)`, `tsv parse (ffi)`)
   stay plain: no row times them, and each would need a training of its own.
@@ -269,15 +269,21 @@ Things the published numbers measure that aren't quite what they look like.
 - **tsv's rows call the packages' published API, not the engine exports beneath
   it.** Every tsv npm package publishes through one hand-written facade
   (`crates/tsv_wasm/npm/api.js` + `api_parse.js`): per call it checks the source is
-  a well-formed UTF-16 string, reads the options bag, wraps the product in an
-  `{ok: true, …}` result, and over the native engine runs the `JSON.parse`; a row unwraps
-  the result as a consumer does, throwing a failure as its rejection. The
-  `tsv` / `tsv-wasm` rows and their `+locations` siblings time that facade over each
-  binding (`lib/tsv_api.ts`), wired as the package's entry wires it — so a row is
+  a well-formed UTF-16 string, reads the options bag and wraps the product in an
+  `{ok: true, …}` result, and its `parse_<lang>` takes the tape route — the engine's raw
+  `parse_tape_<lang>` lays the span-only wire down as the binary tape and the generated
+  decoder builds the tree from it ([tape_format.md](tape_format.md)); a row unwraps the
+  result as a consumer does, throwing a failure as its rejection. The `tsv` / `tsv-wasm`
+  rows and their `+locations` siblings time that facade over each binding
+  (`lib/tsv_api.ts`), wired as the package's `./parse` entry wires it — so a row is
   the call a consumer makes (`parse_<lang>(source)`, `parse_<lang>(source,
   {locations: true})`, `format_<lang>(source)`) and pays its own front door, as
   every third-party row pays its package's. The `-internal` rows stay on the raw
-  export: bench-only, published by no package, behind no facade.
+  export: bench-only, published by no package, behind no facade. The bench builds those
+  tables by hand, so each binding's init asks, untimed, that the row's parse runs through
+  the tape export and returns the tree `JSON.parse` makes of the `_json` export's wire, key
+  order included (`lib/tape_probe.ts`); a wiring that fell back to the JSON wire would
+  otherwise be timed under the tape route's name.
 
   Three distances from an installed package remain, each deliberate. The facade is
   imported from the source tree — the files the packages stage verbatim, not a
@@ -354,7 +360,7 @@ Things the published numbers measure that aren't quite what they look like.
 - **Ratio convention (universal).** Every `Nx` in the report is **speedup form**:
   `>1` means self is faster than the named opponent. Column headers spell this
   out (`vs prettier (speedup)`, `vs Best (speedup)`). The only exception is
-  `JSON overhead` rows, explicitly labeled `json_ns / internal_ns` (higher = more
+  `Transfer overhead` rows, explicitly labeled `parse_ns / internal_ns` (higher = more
   cost) because overhead is inherently a slowdown ratio. Every `Nx` is a ratio of
   MEANS — the right rate estimator — and each group table carries the same ratio
   over the medians beside it (`by p50`) as a reading aid: on a stationary row the
@@ -490,22 +496,25 @@ Things the published numbers measure that aren't quite what they look like.
   major-GC stalls). Default off because published ratios should reflect what
   users see in real code (opportunistic GC); enable it for the stability of
   forced GC on a noisy high-allocation workload. A report generated with the hook
-  on has a narrower internal-vs-JSON spread, so don't diff numbers across the two
+  on has a narrower internal-vs-default-parse spread, so don't diff numbers across the two
   configurations line-for-line.
-- **The `-json` parse rows and `oxc-parser` match in mechanism and in kind of
-  payload; the `oxc-parser` "lazy" story is a myth for the path we benchmark.** In
-  oxc-parser's _default_ mode (what we call), the AST is serialized to a JSON
-  string in Rust and deserialized in JS — the native package's `index.js`
-  `wrap()` runs `JSON.parse` on `.program` access (verified: `typeof program ===
-  'object'`), exactly the model `tsv`'s parse row uses (Rust → JSON string →
-  FFI → `JSON.parse`) and `tsv-wasm`'s uses (Rust → JSON string →
-  boundary decode → engine `JSON.parse` via `js_sys`). And both deliverables are
-  span-only — tsv's wire, the one every binding ships, carries `start`/`end` and no
-  per-node `loc`, as oxc's default AST does (oxc pads `decorators`/`optional`/
-  `typeAnnotation` where tsv omits them, so its tree is the larger). Measured with
-  `loc` stripped, tsv's wire is _smaller_ than oxc's and `JSON.parse`s _faster_, and
-  the two Rust parse+serialize sides are at parity. The per-node `loc` the acorn /
-  Svelte drop-in shape carries is a view tsv computes on request (`{locations: true}`,
+- **tsv's default parse rows and `oxc-parser` match in kind of payload and in tier
+  (the whole tree, eagerly), not in transfer; the `oxc-parser` "lazy" story is a myth
+  for the path we benchmark.** In oxc-parser's _default_ mode (what we call), the AST
+  is serialized to a JSON string in Rust and deserialized in JS — the native package's
+  `index.js` `wrap()` runs `JSON.parse` on `.program` access (verified: `typeof program
+  === 'object'`). tsv's rows take the packages' tape route instead: Rust writes the
+  span-only JSON wire, transcodes it to the binary tape, and hands the tape over as
+  words (copied into a JS-owned buffer by N-API and the FFI wrapper, a view of linear
+  memory for `tsv-wasm`), which the generated decoder builds the tree from
+  ([tape_format.md](tape_format.md)) — the tree `JSON.parse` would make of the wire, key
+  order included.
+  And both deliverables are span-only — tsv's wire, the one every binding ships, carries
+  `start`/`end` and no per-node `loc`, as oxc's default AST does (oxc pads
+  `decorators`/`optional`/`typeAnnotation` where tsv omits them, so its tree is the
+  larger). Measured with `loc` stripped, tsv's JSON wire is _smaller_ than oxc's and
+  `JSON.parse`s _faster_, and the two Rust parse+serialize sides are at parity. The
+  per-node `loc` the acorn / Svelte drop-in shape carries is a view tsv computes on request (`{locations: true}`,
   reconstructed in JS) rather than a wire it ships — measured on the loc-bearing Rust
   emitter: 46–48% of TS wire bytes and ~61% of its `JSON.parse` time, three nested
   objects per node — and the `+locations` rows below price it. Three further
@@ -552,15 +561,18 @@ Things the published numbers measure that aren't quite what they look like.
     guard on the default side), so a renamed key cannot time JSON under the raw name.
     A probe at oxc-parser 0.150.0 measured it ~2.8x faster than the JSON path with
     `.program` materialized (fuz_util's `src/lib` `.ts`: 10.8 vs 30.7 ms per sweep) —
-    enough to likely reverse the native `parse/typescript` ratio against `tsv`, which
-    is why the row is published rather than footnoted: tsv ships no such transfer, so
-    `tsv` vs `oxc-parser-raw` is the same tree delivered by a mechanism tsv lacks.
+    enough to reverse a native `parse/typescript` ratio against a `tsv` that crossed as
+    JSON, which is why the row is published rather than footnoted. tsv's rows cross by
+    the same kind of transfer — a binary buffer and a generated decoder — so
+    `tsv` vs `oxc-parser-raw` is the pair closest in mechanism, one difference left:
+    oxc writes its buffer straight from the AST, where tsv writes its JSON wire first
+    and transcodes it.
     Absent under Bun, where `rawTransferSupported()` is false (its own impl slot, so
     the absence is recorded in `unavailable` rather than read as a missing row).
 - **The `+locations` rows price `{locations: true}`, and they are not opponents of
   tsv's own rows.** `tsv+locations` and its wasm sibling call the published
-  `parse_<lang>(source, {locations: true})`: the default row's parse (`JSON.parse`
-  included), then the facade's own call of the shipped `reconstruct_locations`
+  `parse_<lang>(source, {locations: true})`: the default row's parse (the tape's
+  decode included), then the facade's own call of the shipped `reconstruct_locations`
   (`crates/tsv_wasm/npm/locations.js`, the source every parse-capable package bundles)
   over that tree, the line-table build inside the timed region. The facade names the
   export's language to the helper
@@ -791,9 +803,9 @@ prettier. Load-bearing on two axes:
   third-party engine on the `parse/svelte` surface**: the rest of that group is
   `svelte/compiler` (the oracle) and tsv's own variants, so without it tsv is
   measured against its own reference and nothing else. Two rows. `rsvelte-parse` matches
-  tsv's default parse rows in **mechanism** (each returns a compact JSON string the caller
-  `JSON.parse`s, so both pay the same serialize + boundary + parse cost) but not in
-  **payload**: it emits Svelte's own wire — `loc` on the acorn-parsed nodes plus
+  tsv's default parse rows in **tier** (each hands JS the whole tree, eagerly: rsvelte as a
+  compact JSON string the caller `JSON.parse`s, tsv as the binary tape its generated
+  decoder reads) but not in **payload**: it emits Svelte's own wire — `loc` on the acorn-parsed nodes plus
   `name_loc` — where `tsv` carries no `loc` at all and its
   `+locations` sibling a `loc` on every positioned object. Neither tsv row is
   payload-matched to it, so it gets no curated comparison line; the report's fairness

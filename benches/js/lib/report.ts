@@ -49,29 +49,32 @@ function create_bar(value: number, max: number, width = 40): string {
 
 /**
  * The parse-only row beside the row that materializes the same AST into JS, as
- * `[internal, json]` — one pair per tsv tier. The ratio between the two IS the
- * JSON-materialization cost, which is the only thing either reader below renders.
+ * `[internal, materializing]` — one pair per tsv tier. The ratio between the two IS the
+ * transfer cost (the wire written, crossed and built into objects), which is the only thing
+ * either reader below renders.
  *
  * ONE table because this is one fact with three readers, not three
- * separate statements: which rows are internal, which json row each internal row
+ * separate statements: which rows are internal, which materializing row each internal row
  * pairs with (terminal summary), and the same pairing again (markdown note). The
- * partner lookup was the fragile one — it chose the json row by testing the
+ * partner lookup was the fragile one — it chose the partner row by testing the
  * internal row's NAME for `wasm`, so the correctness of every rendered overhead
  * ratio rested on no other internal row ever containing that substring. A third
  * tier would have paired silently to the native row and rendered a wrong number,
  * with nothing in the output looking off.
  *
  * The materializing half is each binding's default row — the span-only wire, the one
- * parse wire the bindings ship — so the ratio is what turning the parse into JS
- * objects costs.
+ * parse wire the bindings ship, written as JSON, transcoded to the binary tape, handed over
+ * and decoded into objects (`docs/tape_format.md`) — so the ratio is what turning the parse
+ * into JS objects costs.
  *
  * tsv-only by ARGUMENT, not for lack of looking: no alternative parser has a
  * comparably cheap parse-only mode — oxc's JS API always serializes to cross into
  * JS (`experimentalLazy` is setup-dominated, see `oxc.ts`), and yuku's lazy
  * `parse()` has already serialized the AST to a binary buffer by the time it
- * returns (see `yuku.ts`) — so neither yields a pair that belongs here.
+ * returns (see `yuku.ts`) — the work tsv's tape route pays inside its materializing
+ * row — so neither yields a pair that belongs here.
  */
-const INTERNAL_PARSE_PAIRS: ReadonlyArray<readonly [internal: string, json: string]> = [
+const INTERNAL_PARSE_PAIRS: ReadonlyArray<readonly [internal: string, materializing: string]> = [
 	['tsv-internal', 'tsv'],
 	['tsv-wasm-internal', 'tsv-wasm']
 ];
@@ -419,7 +422,7 @@ export function generate_summary_report(
 					] as const);
 		for (const [ours, opponent, note] of [
 			['tsv', 'oxc-parser', 'span-only, theirs larger'],
-			['tsv', 'oxc-parser-raw', 'span-only, theirs larger, no JSON'],
+			['tsv', 'oxc-parser-raw', 'span-only, theirs larger, binary transfer both'],
 			['tsv', 'yuku-parser', 'span-only, theirs larger'],
 			['tsv-wasm', 'oxc-parser-wasm', 'span-only, theirs larger'],
 			['tsv-wasm', 'yuku-parser-wasm', 'span-only, theirs larger'],
@@ -437,20 +440,20 @@ export function generate_summary_report(
 			}
 		}
 
-		// Show internal variants (JSON overhead measurement)
+		// Show internal variants (transfer overhead measurement)
 		for (const internal_result of sort_by_display_order(internal_results)) {
-			// The json row materializing the same AST, by table rather than by name shape.
-			const json_name = internal_parse_partner(internal_result.name);
-			const json_result =
-				json_name === undefined ? undefined : results.find((r) => r.name === json_name);
+			// The row materializing the same AST, by table rather than by name shape.
+			const partner_name = internal_parse_partner(internal_result.name);
+			const partner_result =
+				partner_name === undefined ? undefined : results.find((r) => r.name === partner_name);
 
-			if (json_result) {
-				const json_overhead = json_result.stats.mean_ns / internal_result.stats.mean_ns;
+			if (partner_result) {
+				const overhead = partner_result.stats.mean_ns / internal_result.stats.mean_ns;
 				lines.push(
 					`    ${internal_result.name.padEnd(max_name_len)} ${create_bar(
 						internal_result.stats.mean_ns,
 						max_time
-					)} ${fmt(internal_result.stats.mean_ns)} (${json_overhead.toFixed(1)}x JSON overhead)`
+					)} ${fmt(internal_result.stats.mean_ns)} (${overhead.toFixed(1)}x transfer overhead)`
 				);
 			}
 		}
@@ -808,31 +811,34 @@ const OXC_RAW_NOTE: FairnessNote = {
 		'  (oxc-parser-raw is the same native parse and the same tree as oxc-parser, crossing as a',
 		'   shared buffer a generated JS deserializer builds the objects from — no JSON string. Every',
 		'   node is materialized before the call returns, so it is the full-tree tier tsv’s default',
-		'   rows are, by a cheaper transfer tsv does not ship; native only, and absent under Bun)'
+		'   rows are, by the same kind of transfer: a binary buffer and a generated decoder, where',
+		'   tsv still writes its JSON wire first and transcodes it; native only, absent under Bun)'
 	],
 	markdown:
-		'oxc-parser-raw is the same native parse as oxc-parser and hands JS the identical tree (byte parity graded per file), but crosses the boundary as a shared buffer that a generated JS deserializer builds the objects from instead of a JSON string — oxc’s undocumented `experimentalRawTransfer`. Deserialization is eager and complete before `parseSync` returns, so the row materializes the full tree like tsv’s default rows, by a transfer mechanism tsv does not ship. Native only, and absent under Bun, where oxc does not support raw transfer'
+		'oxc-parser-raw is the same native parse as oxc-parser and hands JS the identical tree (byte parity graded per file), but crosses the boundary as a shared buffer that a generated JS deserializer builds the objects from instead of a JSON string — oxc’s undocumented `experimentalRawTransfer`. Deserialization is eager and complete before `parseSync` returns, so the row materializes the full tree like tsv’s default rows, by the same kind of transfer: tsv’s rows also cross as a binary buffer (the tape) that a generated decoder builds the objects from, though tsv writes its JSON wire first and transcodes it to the tape, where oxc writes its buffer directly. Native only, and absent under Bun, where oxc does not support raw transfer'
 };
 
 const OXC_NOTE: FairnessNote = {
 	terminal: [
 		'  (oxc-parser — native and wasm — serializes the AST to JSON in Rust and deserializes',
-		'   in JS, the same eager materialization as tsv’s default rows; both ASTs are span-only,',
-		'   though oxc’s writes out default-valued fields tsv omits, so its tree is the larger)'
+		'   in JS: eager materialization like tsv’s default rows, which cross as a binary tape',
+		'   instead; both ASTs are span-only, though oxc’s writes out default-valued fields tsv',
+		'   omits, so its tree is the larger)'
 	],
 	markdown:
-		'oxc-parser (native and wasm) serializes the AST to JSON in Rust and deserializes it in JS — the same eager materialization as tsv/tsv-wasm, so these parse rows are mechanism-matched, and both ASTs are span-only (`start`/`end`, no per-node `loc`); oxc’s writes out default-valued fields tsv omits, so its tree is the larger of the two'
+		'oxc-parser (native and wasm) serializes the AST to JSON in Rust and deserializes it in JS — eager full-tree materialization like tsv/tsv-wasm, whose rows cross as a binary tape decoded in JS rather than a JSON string, so the cells match in product but not in transfer; both ASTs are span-only (`start`/`end`, no per-node `loc`), and oxc’s writes out default-valued fields tsv omits, so its tree is the larger of the two'
 };
 
 const YUKU_NOTE: FairnessNote = {
 	terminal: [
 		'  (yuku-parser — native and wasm — decodes a binary AST buffer into JS objects,',
-		'   also full eager materialization; its parse() is lazy, so the bench forces it —',
+		'   the transfer tsv’s default rows take too, and full eager materialization like',
+		'   theirs; its parse() is lazy, so the bench forces it —',
 		'   verified: no lazy accessors survive, and its tree serializes to oxc-parser’s size,',
 		'   so it is span-only like oxc and like tsv’s own rows)'
 	],
 	markdown:
-		'yuku-parser (native and wasm) decodes a binary AST buffer into JS objects — also full eager materialization (verified: no lazy accessors survive, and the tree serializes to within 3 bytes of oxc-parser, so it is span-only like oxc and like tsv’s own rows), but its `parse()` is lazy, so the bench reads `.program` to force it — an unforced row would report a throughput for a tree nobody built'
+		'yuku-parser (native and wasm) decodes a binary AST buffer into JS objects — the kind of transfer tsv’s default rows take too (a binary tape and a generated decoder), and full eager materialization like theirs (verified: no lazy accessors survive, and the tree serializes to within 3 bytes of oxc-parser, so it is span-only like oxc and like tsv’s own rows), but its `parse()` is lazy, so the bench reads `.program` to force it — an unforced row would report a throughput for a tree nobody built'
 };
 
 const SWC_NOTE: FairnessNote = {
@@ -841,17 +847,18 @@ const SWC_NOTE: FairnessNote = {
 		'   so it emits neither tsv’s span-only wire nor the acorn shape `{locations: true}` returns)'
 	],
 	markdown:
-		'swc parses to its own AST dialect (root `Module`, `span` rather than `loc`, `Ts`-prefixed kinds) — the mechanism matches tsv’s default rows (serialize, cross, materialize) while the tree it produces is neither tsv’s span-only wire nor the acorn shape `{locations: true}` returns, so the cell is mechanism-matched only'
+		'swc parses to its own AST dialect (root `Module`, `span` rather than `loc`, `Ts`-prefixed kinds) — like tsv’s default rows it serializes, crosses and materializes the whole tree (as JSON, where tsv crosses a binary tape), while the tree it produces is neither tsv’s span-only wire nor the acorn shape `{locations: true}` returns, so the cell matches in tier only'
 };
 
 const RSVELTE_PARSE_NOTE: FairnessNote = {
 	terminal: [
-		'  (rsvelte-parse returns a JSON string the caller parses — the mechanism tsv’s default',
-		'   rows measure — but carries Svelte’s own wire, `loc` on the acorn-parsed nodes plus',
-		'   `name_loc`, where tsv’s default row carries no `loc`: mechanism-matched, not payload-matched)'
+		'  (rsvelte-parse returns a JSON string the caller parses — a full-tree materialization',
+		'   like tsv’s default rows, which cross as a binary tape instead — and carries Svelte’s',
+		'   own wire, `loc` on the acorn-parsed nodes plus `name_loc`, where tsv’s default row',
+		'   carries no `loc`: matched in tier, not in payload)'
 	],
 	markdown:
-		'rsvelte-parse returns a compact JSON string the caller parses — the same serialize + boundary + `JSON.parse` mechanism tsv’s default rows measure — but not the same payload: it carries Svelte’s own wire, `loc` on the acorn-parsed nodes plus `name_loc`, where `tsv` carries no `loc` at all and its `+locations` sibling a `loc` on every node, so neither tsv row is payload-matched to it and this cell carries the `loc` on rsvelte’s side. Its `skipExpressionLoc` variant is deliberately not compared: that reduction is not tsv’s span-only wire either'
+		'rsvelte-parse returns a compact JSON string the caller parses — serialize + boundary + `JSON.parse`, a full-tree materialization like tsv’s default rows, which cross as a binary tape decoded in JS instead — but not the same payload: it carries Svelte’s own wire, `loc` on the acorn-parsed nodes plus `name_loc`, where `tsv` carries no `loc` at all and its `+locations` sibling a `loc` on every node, so neither tsv row is payload-matched to it and this cell carries the `loc` on rsvelte’s side. Its `skipExpressionLoc` variant is deliberately not compared: that reduction is not tsv’s span-only wire either'
 };
 
 /**
@@ -1297,7 +1304,7 @@ function comparison_notes(
 	if (seen.has(OXC_NOTE) || seen.has(YUKU_NOTE)) {
 		if (surface === 'markdown') {
 			notes.push(
-				'tsv-internal/tsv-wasm-internal are parse-only (no JS materialization) and have no counterpart row — oxc always serializes to cross into JS (experimentalLazy is setup-dominated), and yuku still serializes to a binary buffer before its decode, so neither is the same tier'
+				'tsv-internal/tsv-wasm-internal are parse-only (no JS materialization) and have no counterpart row — oxc always serializes to cross into JS (experimentalLazy is setup-dominated), and yuku’s lazy parse() has already serialized to a binary buffer, the step tsv’s default rows pay inside their transfer, so neither is the same tier'
 			);
 		} else {
 			notes.push(
@@ -1711,28 +1718,28 @@ export function generate_coverage_by_source_markdown(
 }
 
 /**
- * One-line JSON serialization overhead note for parse groups.
+ * One-line transfer overhead note for parse groups.
  *
  * Compares each binding's default parse row (which materializes the full AST as JS
- * objects, over a JSON wire) against its `-internal` variant (parse only, no serialization).
- * Ratio is `json_ns / internal_ns` — read as "the JSON variant takes Nx as
- * long as the internal one." Not speedup form (this is intrinsically an
- * overhead/cost ratio, where higher = more expensive); the label spells out
- * the direction.
+ * objects: the wire written, transcoded to the binary tape, handed over and decoded)
+ * against its `-internal` variant (parse only, nothing written or handed over).
+ * Ratio is `parse_ns / internal_ns` — read as "the default parse takes Nx as long as
+ * the internal one." Not speedup form (this is intrinsically an overhead/cost ratio,
+ * where higher = more expensive); the label spells out the direction.
  */
-export function generate_json_overhead_note(results: BenchmarkResult[]): string | null {
+export function generate_transfer_overhead_note(results: BenchmarkResult[]): string | null {
 	// The pairs, and the argument for why they are tsv-only, live on
 	// `INTERNAL_PARSE_PAIRS` — this note is one of its three readers.
 	const notes: string[] = [];
-	for (const [internal_name, json_name] of INTERNAL_PARSE_PAIRS) {
+	for (const [internal_name, parse_name] of INTERNAL_PARSE_PAIRS) {
 		const internal = results.find((r) => r.name === internal_name);
-		const json = results.find((r) => r.name === json_name);
-		if (!internal || !json) continue;
-		const overhead = json.stats.mean_ns / internal.stats.mean_ns;
-		notes.push(`${json_name} ${overhead.toFixed(1)}x ${internal_name}`);
+		const parse = results.find((r) => r.name === parse_name);
+		if (!internal || !parse) continue;
+		const overhead = parse.stats.mean_ns / internal.stats.mean_ns;
+		notes.push(`${parse_name} ${overhead.toFixed(1)}x ${internal_name}`);
 	}
 	if (notes.length === 0) return null;
-	return `**JSON overhead** (json_ns / internal_ns, higher = more cost): ${notes.join(', ')}`;
+	return `**Transfer overhead** (parse_ns / internal_ns, higher = more cost): ${notes.join(', ')}`;
 }
 
 /**

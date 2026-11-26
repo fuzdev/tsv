@@ -162,10 +162,15 @@ delta on the same row is the detector.
 - **tsv's rows call the packages' published API over each binding.** The three wrappers
   (`ffi.ts`, `napi.ts`, `wasm.ts`) hand their flat exports to `lib/tsv_api.ts`, which builds
   the packages' own facade over them (`crates/tsv_wasm/npm/api.js` + `api_parse.js`, wired as
-  each package's entry wires it), so `parse` / `parse_with_locations` / `format` are a
+  each package's entry wires it: `parse_<lang>` over the raw `parse_tape_<lang>`, decoded by
+  `tape_engine.js`), so `parse` / `parse_with_locations` / `format` are a
   consumer's `parse_<lang>(source)` / `parse_<lang>(source, {locations: true})` /
   `format_<lang>(source)`, argument checks included — every third-party row pays its own
   package's front door, and so do these. `parse_internal` stays the raw bench-only export.
+  A wrapper whose engine table carries no tape exports fails to type-check
+  (`TsvEngine.parse_tape`), and each binding's init asks the tape probe
+  (`lib/tape_probe.ts`) that the row's parse runs through the tape and decodes to the tree
+  `JSON.parse` makes of the `_json` wire, key order included.
   The C FFI ships in no package, so its facade is the one tsv would publish;
   `diagnostics/facade_probe.ts` prices the facade against the flat exports
   (../../docs/benchmarks.md §Fairness caveats).
@@ -1063,7 +1068,7 @@ loud.
 
 **tsv's rows are named for the packages' API.** `tsv` (the native binding — FFI under Deno,
 N-API under Node/Bun) and `tsv-wasm` are each package's default call, made through the packages'
-facade (`lib/tsv_api.ts`): the span-only parse in the
+facade (`lib/tsv_api.ts`): the span-only parse (on the tape route) in the
 `parse/*` groups, the format in the `format/*` groups. So a row is identified by `group` + `name`,
 never `name` alone. A variant is named for what it adds — `+locations` for the option
 (`{locations: true}`: the default parse plus `loc` rebuilt in JS; perf surface only), `-internal`
@@ -1766,6 +1771,11 @@ benches/js/
     │                      # tsv binding's init: no `loc` / `name_loc`, numeric root offsets, so
     │                      # a binding still emitting `loc` can't be timed as the span-only
     │                      # default; unit-tested by locations_probe_test.ts
+    ├── tape_probe.ts      # Behavioral "does the parse run through the TAPE" check, asked at each
+    │                      # tsv binding's init: the published table's routing (an untimed twin,
+    │                      # pre-flight only), the row's tree equal to the `_json` wire's with key
+    │                      # order, a stale tape named with its artifact; unit-tested by
+    │                      # tape_probe_test.ts
     ├── malva.ts           # malva WASM wrapper (CSS only; dprint's CSS plugin, shared formatter host)
     ├── markup.ts          # markup_fmt WASM wrapper (Svelte only; dprint's Svelte plugin composed with
     │                      # the dprint + malva plugins in one host context; COVERAGE-ONLY, never timed)
@@ -1925,19 +1935,22 @@ state) shows in the coverage report and skip counts without `--verbose`.
   diff the sorted `.safety[].path` lists before/after (a real regression is a _new
   path_, not a count bump); a change scoped to one printer/crate can't lose content
   in unrelated languages.
-- **Parse benchmark overhead**: JSON materialization, not parsing, dominates tsv's
-  default parse rows (see `results/report.<runtime>.md` for current ratios). Use
-  `tsv-internal` for raw parse speed. Both the native and WASM rows go through
-  `convert_ast_json_string` — the span-only wire-JSON writer emitting directly from the
-  internal AST in one walk, no intermediate `serde_json::Value` or typed public tree
-  ([../../docs/architecture.md §Closed Scope, Open
-  Convention](../../docs/architecture.md#closed-scope-open-convention)). They differ
-  only at the boundary: native crosses via FFI copy + `JSON.parse` in JS (the packages'
-  facade runs it — `lib/tsv_api.ts`); WASM
-  decodes the string across the boundary and runs the engine's `JSON.parse` from Rust
-  via `js_sys` (measurably faster than a `serde_wasm_bindgen`-built object graph).
-  Rust-side parse-vs-write timing: `cargo run --release -p tsv_debug -- json_profile
-  <paths>`; `wasm_json_probe.ts` covers the end-to-end view including the JS boundary.
+- **Parse benchmark overhead**: the transfer — the wire written, transcoded, handed over
+  and decoded — not parsing, dominates tsv's default parse rows (the report's
+  **Transfer overhead** line, `parse_ns / internal_ns`). Use `tsv-internal` for raw parse
+  speed. Every binding's default row takes the packages' tape route
+  ([../../docs/tape_format.md](../../docs/tape_format.md)): the span-only wire-JSON writer
+  (`convert_ast_json_bytes`, emitting directly from the internal AST in one walk, no
+  intermediate `serde_json::Value` or typed public tree — [../../docs/architecture.md
+  §Closed Scope, Open Convention](../../docs/architecture.md#closed-scope-open-convention)),
+  then `tsv_arena`'s transcoder to the tape, handed over as words, then the generated
+  decoder (`crates/tsv_wasm/npm/tape_decode.js`) in the packages' facade (`lib/tsv_api.ts`).
+  They differ only at the hand-over: N-API copies the words into a buffer the JS engine owns,
+  the FFI wrapper copies them out of the library's allocation, WASM returns a view of its
+  linear memory. Rust-side parse-vs-write timing: `cargo run --release -p tsv_debug --
+  json_profile <paths>`; the transcoder against the decoder, `npm run tape:bench`; the
+  end-to-end split, `diagnostics/facade_probe.ts --transfer` (per binding: the parse alone,
+  the `_json` export, the raw tape export, the row) and `wasm_json_probe.ts`.
 - **yuku's native core (the `yuku-parser` N-API row) SEGFAULTS on long braced-escape identifiers, so
   its row is conformance-excluded.** An identifier built from a run of braced unicode
   escapes faults the host process inside the Zig parse call once the decoded
@@ -2086,8 +2099,8 @@ Documented above, though they live here: the parse-conformance gates
 | `css_over_acceptance.ts` | the `parse/css` sibling of the row below — per-tool accepts over the files `svelte/compiler`'s `parseCss` rejects, computed live from the conformance corpus (no harvest cache: nothing else consumes the list). Its reason to exist is sharper than the TS one's, because CSS is the surface that CANNOT filter to valid inputs — `parseCss` accepts malformed CSS and rejects valid modern CSS it doesn't implement, so filtering would drop files tsv also fails. The reject count is PINNED (`CSS_REJECTS_PIN`), which is what makes the reference row's grammar moving visible instead of silently reshaping the published coverage. The `svelte/compiler` row must read 0 (it built the list). `--pin-only` grades the pin alone, oracle only and stamped — the `bench:pins:suites` leg | `css:over-acceptance`, `css:over-acceptance:pin` |
 | `ts_repo_over_acceptance.ts` | per-tool OVER-ACCEPTANCE over the tsc corpus — the files tsc's own PARSER rejects (`.cache/ts_repo_rejects.json`). The axis coverage structurally cannot show: coverage counts accepts, so it can only reward permissiveness, and every conformance corpus is therefore filtered to VALID inputs. Read inverted (lower is better) and as a PROFILE, not a gate — a deferred early error is a documented tsv posture, and the per-file gate on tsv alone is `conformance:ts-repo`. The `tsc` row must read 0 (it built the list); anything else fails the run as a stale cache | `ts-repo:over-acceptance` |
 | `biome_oxfmt_diff.ts` | 4-way formatter differential (tsv vs prettier vs biome-wasm vs oxfmt) so a tsv-vs-prettier divergence can be bucketed *tsv alone* (candidate bug) vs *tsv + another agree* (candidate sanctioned divergence). Prettier is routed through the **typescript** parser, never babel | — |
-| `wasm_json_probe.ts` | splits parse cost into pure-parse vs materialization for native + WASM, isolating JS-side `JSON.parse` | — |
+| `wasm_json_probe.ts` | splits the default parse rows' cost into pure parse vs materialization (the tape route) for native + WASM, beside `JSON.parse` of the same wire for reference | — |
 | `wasm_format_probe.ts` | WASM **format** wall-time A/B at single-digit-% resolution (paired discipline: interleaved pairs, in-run A/A noise floor, byte-identity gate) | — |
 | `wasm_memory_probe.ts` | WASM **linear-memory high-water** for `format()` — the axis the wall-time probe can't see, and the gate for doc-IR memory work. `--cold` (per-file cold-start peak) or default steady-state | — |
-| `facade_probe.ts` | what the packages' facade costs per call over the flat exports beneath it, per binding × operation × language, and what separates a `tsv-wasm` row from the staged `@fuzdev/tsv-wasm` entry (which needs `npm run build:npm:all`). Same paired discipline (rotated interleaved arms, in-run A/A floor, byte-identity gate, `facade_identity.ts`, which a tsv crash in any arm fails) over three sets — the perf corpus, its smallest tenth, one minimal source — plus the facade's one O(source) step (`isWellFormed`) priced alone. Runs under **all three runtimes** (its own load path, not `init_implementations`) | — |
+| `facade_probe.ts` | what the packages' facade costs per call over the flat exports beneath it, per binding × operation × language, and what separates a `tsv-wasm` row from the staged `@fuzdev/tsv-wasm` entry (which needs `npm run build:npm:all`). Same paired discipline (rotated interleaved arms, in-run A/A floor, byte-identity gate, `facade_identity.ts`, which a tsv crash in any arm fails) over three sets — the perf corpus, its smallest tenth, one minimal source — plus the facade's one O(source) step (`isWellFormed`) priced alone; `--transfer` adds the tape route's split — the parse alone, the raw `_json` export, the raw tape export — as diagnostic arms (`wire` / `transcode` / `decode` readings; `transcode`'s ns is the transcoder plus the words' hand-over less the JSON string's crossing, not the transcoder alone — `npm run tape:bench` times that). Runs under **all three runtimes** (its own load path, not `init_implementations`) | — |
 | `biome_heap_probe.ts` | does biome's sweep time move with its leaked wasm linear memory, per runtime? N consecutive full sweeps of one format row under a reset regime (`never` / `every` / the production rule), wall beside heap size, grow count and JSC's own heap stats per sweep; `--prelude prettier,oxfmt,…` first runs the group's earlier rows in the same process — a SHARED process, which the bench no longer is (§Process model), and the state that decided the answer on bun. Runs under **node and bun** (not `deno task`: `node --expose-gc --disable-warning=ExperimentalWarning …` / `bun --expose-gc …`); what sized `RESET_GROWTH_BYTES` | — |

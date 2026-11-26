@@ -731,12 +731,14 @@ export function get_benchmark_tasks(
 		);
 
 		// Native + WASM parsers: the span-only wire (`start`/`end` offsets, no per-node
-		// `loc`) — the one parse wire every tsv binding emits, `JSON.parse`d into objects.
+		// `loc`) — the one parse wire every tsv binding emits, materialized into objects.
 		// The payload-matched opponent to oxc-parser and yuku-parser, whose default ASTs
 		// are also span-only. Each row is the package's published `parse_<lang>(source)`
 		// over its binding — the facade's argument checks included, as every third-party
-		// row pays its own front door (`lib/tsv_api.ts`) — materialized by the facade for
-		// the native binding and engine-side (via `js_sys`) for wasm. A package's default
+		// row pays its own front door (`lib/tsv_api.ts`) — on the tape route: the wire
+		// transcoded to the binary tape in Rust, handed over as words (copied by N-API and
+		// the FFI wrapper, a view of linear memory for wasm) and decoded by the generated
+		// decoder (`docs/tape_format.md`). A package's default
 		// call takes the bare row name, as every third-party row does and as the format
 		// rows do, and a variant is named for its option (`+locations` below); no row
 		// times a loc-bearing wire, which no binding ships.
@@ -790,8 +792,8 @@ export function get_benchmark_tasks(
 			locations_call
 		);
 
-		// Internal parsing variants (no JSON serialization, and no facade: the export is
-		// bench-only, published by no package) - shows JSON overhead
+		// Internal parsing variants (nothing written or handed over, and no facade: the
+		// export is bench-only, published by no package) - shows the transfer overhead
 		const internal_call = { binding_call: 'parse_internal' } as const;
 		add(
 			'native',
@@ -894,11 +896,11 @@ export function get_benchmark_tasks(
 
 		// rsvelte's parser (Svelte only) — the ONLY third-party engine on this surface;
 		// the rest of the group is `svelte/compiler` (the oracle) and tsv's own
-		// variants. `parse()` returns JSON the caller parses — the mechanism tsv's default
-		// rows measure — but not the same payload: rsvelte emits Svelte's own wire,
-		// `loc` on the acorn-parsed nodes plus `name_loc`, where tsv's default row
-		// carries no `loc` and its `+locations` sibling a `loc` on every node, so
-		// neither tsv row is payload-matched to it (report.ts discloses each row's
+		// variants. `parse()` returns JSON the caller parses — the whole tree, eagerly,
+		// as tsv's default rows hand it over the tape — but not the same payload: rsvelte
+		// emits Svelte's own wire, `loc` on the acorn-parsed nodes plus `name_loc`, where
+		// tsv's default row carries no `loc` and its `+locations` sibling a `loc` on every
+		// node, so neither tsv row is payload-matched to it (report.ts discloses each row's
 		// payload tier). It also claims tsv's own drop-in contract, which makes the row
 		// a conformance datum as much as a speed one. See lib/rsvelte_parse.ts.
 		add(

@@ -23,15 +23,16 @@
  * 5. `train` — each binary AS ITSELF over its own fresh corpus copy, every shipped
  *    surface: `parse` on every file (the wire-JSON path, which a format never takes;
  *    the CLI also with `--locations`, its `loc` writer), the type strip on every
- *    TypeScript file, the import records on every TypeScript and Svelte file (the
- *    addon's alone: the CLI has none), then `format --jobs 1` over the tree; the CLI
- *    directly, the addon through `cli.js` and, for the strip and the import records, in
- *    process (`addon_ops.ts`). `--jobs 1` keeps WHAT runs fixed — the same calls in the
- *    same order — but not the profile's bytes: hash tables keyed on addresses or seeded
- *    per process count differently run to run, so two trainings write different
- *    profiles and the binaries' bytes differ. That is the contract, not a gap:
- *    what is gated is the OUTPUT (step 11). Every file must parse, every strip must answer
- *    or refuse, and the format must exit 0, or the step fails.
+ *    TypeScript file, the import records on every TypeScript and Svelte file and the
+ *    tape route — `parse_<lang>` from `@fuzdev/tsv/parse`, the transcoder and the decode —
+ *    on every file (the addon's alone: the CLI has neither), then `format --jobs 1` over the
+ *    tree; the CLI directly, the addon through `cli.js` and, for the strip, the import
+ *    records and the tape route, in process (`addon_ops.ts`). `--jobs 1` keeps WHAT runs fixed —
+ *    the same calls in the same order — but not the profile's bytes: hash tables keyed on addresses
+ *    or seeded per process count differently run to run, so two trainings write different profiles
+ *    and the binaries' bytes differ. That is the contract, not a gap: what is gated is the OUTPUT
+ *    (step 11). Every file must parse, every strip must answer or refuse, and the format must exit
+ *    0, or the step fails.
  * 6. `merge` — `llvm-profdata merge` per world, with the pinned toolchain's own
  *    `llvm-profdata` (`llvm-tools-preview`; its LLVM must be the one the instrumenting
  *    rustc reported, which a container row ran), then the NON-EMPTY gate: the profile
@@ -65,7 +66,8 @@
  *     (through `cli.js`) must format the whole snapshot and every fixture to the plain
  *     CLI's bytes (trees, exit codes, output); over the fixture inputs plus a stride of
  *     the snapshot, the PGO CLI must parse (with and without `--locations`) and strip to
- *     the plain CLI's bytes, and the PGO addon parse and strip to them in process; the
+ *     the plain CLI's bytes, and the PGO addon parse and strip to them in process — its
+ *     tape route's tree to the plain CLI's wire read back through `JSON.parse`; the
  *     PGO addon's import records must equal the instrumented addon's (the same source
  *     and optimization without the profile — the CLI has no import records).
  * 12. the size bands (`scripts/roots/validate_napi_artifact.ts --pgo`), so a silently
@@ -73,9 +75,10 @@
  * With `--ffi` (the bench's build, `scripts/pgo/bench.ts`) a third world rides every step
  * above: the C-FFI library (`tsv_ffi`, `release`) the Deno bench row loads — built plain
  * beside the CLI as its byte-identity reference, instrumented, trained AS ITSELF through the
- * bench's own FFI wrapper (`ffi_ops.ts`, under Deno: `parse`, `parse_internal` and `format`
- * on every file, in order, in one process), merged and gated like the others, rebuilt with
- * its profile, and held byte-identical to the plain library and to a size band of it
+ * bench's own FFI wrapper (`ffi_ops.ts`, under Deno: every export by name — `parse` (the JSON
+ * wire), `tape` (the tape export and its decode, the bench row's parse), `parse_internal` and
+ * `format` — on every file, in order, in one process), merged and gated like the others,
+ * rebuilt with its profile, and held byte-identical to the plain library and to a size band of it
  * (`byteid-ffi`). It ships nowhere;
  * the release rows never pass the flag.
  *
@@ -136,7 +139,7 @@ import { GATE_CHECKOUT_IDS } from '../../benches/js/lib/gate_counts.ts';
 import { write_shape_limits } from '../depth_shapes.ts';
 import { walk_import_closure } from '../import_closure.ts';
 import { node_host_triple } from '../napi_host.ts';
-import { type AddonRecord, is_strip_path } from './addon_ops.ts';
+import { type AddonRecord, is_strip_path, UNHASHABLE } from './addon_ops.ts';
 import {
 	CANNOT_GRADE_EXIT,
 	CANNOT_GRADE_LINE,
@@ -152,6 +155,7 @@ import {
 import {
 	ALL_WORLDS,
 	cargo_artifacts,
+	FFI_OPS,
 	loader_entries,
 	parse_language,
 	pgo_paths,
@@ -182,6 +186,15 @@ const PARSE_SAMPLE_STRIDE = 8;
 /** The workspace crates both shipped binaries compile, each of whose rustc invocations
  * must carry the world's `-Cprofile-use` (`gate-builds`). */
 const PROFILED_CRATES = ['tsv_lang', 'tsv_ts', 'tsv_css', 'tsv_svelte'] as const;
+
+/** The workspace crates a world compiles beyond `PROFILED_CRATES` and its own crate, held to the
+ * same flag: the bindings' shared substrate, `tsv_arena`, whose transcoder the tape route runs
+ * (the CLI links no binding substrate). */
+const WORLD_EXTRA_CRATES: Record<World, readonly string[]> = {
+	cli: [],
+	napi: ['tsv_arena'],
+	ffi: ['tsv_arena']
+};
 
 /** The band the PGO FFI library's size must sit in, as a multiple of the plain library the same
  * run built (`byteid-ffi`): wide enough for the profile to move between trainings, narrow enough
@@ -550,13 +563,14 @@ const cmd_train = (): void => {
 			css: by_language('css').length,
 			strip: world === 'ffi' ? 0 : strip_files.length,
 			imports_typescript: 0,
-			imports_svelte: 0
+			imports_svelte: 0,
+			tape: world === 'cli' ? 0 : files.length
 		};
 		const failures: string[] = [];
 		let format: RunResult = { status: 0, stdout: '', stderr: '' };
 		if (world === 'ffi') {
 			// the library itself, in process under Deno, through the bench's own FFI wrapper:
-			// every file's parse, parse_internal and format, in order — each must succeed
+			// every export by name on every file, in order — each must succeed
 			const list = join(paths.train(world), 'ffi_ops.txt');
 			writeFileSync(list, files.join('\n') + '\n');
 			const ops = capture(
@@ -565,7 +579,7 @@ const cmd_train = (): void => {
 					...FFI_OPS_RUN,
 					...['--lib', instr.ffi, '--list', list],
 					...['--out', join(paths.train(world), 'ffi_ops.ndjson')],
-					...['--ops', 'parse,parse_internal,format', '--require-ok']
+					...['--ops', FFI_OPS.join(','), '--require-ok']
 				],
 				env
 			);
@@ -593,7 +607,7 @@ const cmd_train = (): void => {
 					);
 				}
 			} else {
-				// the strip and the import records, in process through the loader
+				// the strip, the import records and the tape route, in process through the loader
 				const list = join(paths.train(world), 'addon_ops.txt');
 				writeFileSync(list, files.join('\n') + '\n');
 				const ops = capture(
@@ -602,13 +616,15 @@ const cmd_train = (): void => {
 						'scripts/pgo/addon_ops.ts',
 						...['--loader', loader.index, '--list', list],
 						...['--out', join(paths.train(world), 'addon_ops.ndjson')],
-						...['--ops', 'strip,imports', '--require-ok']
+						...['--ops', 'strip,imports,tape', '--require-ok']
 					],
 					env
 				);
 				process.stdout.write(ops.stdout);
 				if (ops.status !== 0)
-					fail(`train ${world}: the addon's strip or import records failed:\n${ops.stderr}`);
+					fail(
+						`train ${world}: the addon's strip, import records or tape route failed:\n${ops.stderr}`
+					);
 				trained.imports_typescript = trained.typescript;
 				trained.imports_svelte = trained.svelte;
 			}
@@ -745,7 +761,9 @@ const cmd_gate_builds = (): void => {
 		// below could mean a profile that never reached the build
 		const crate = WORLD_CRATE[world];
 		const used = profile_use_crates(log, `${world}.profdata`);
-		const unprofiled = [...PROFILED_CRATES, crate].filter((c) => !used.has(c));
+		const unprofiled = [...PROFILED_CRATES, ...WORLD_EXTRA_CRATES[world], crate].filter(
+			(c) => !used.has(c)
+		);
 		if (unprofiled.length > 0) {
 			fail(
 				`gate-builds ${world}: no -Cprofile-use=…${world}.profdata on the rustc command line of ` +
@@ -968,7 +986,16 @@ const cmd_byteid = (): void => {
 
 	// the CLI: plain vs PGO, the whole run (exit, stdout, stderr); the plain CLI's answer is
 	// also what the addon is held to below
-	const plain_answers = new Map<string, RunResult & { hash: string }>();
+	const plain_answers = new Map<string, RunResult & { hash: string; canon?: string }>();
+	// the plain CLI's wire as the tape route's tree is hashed (`addon_ops.ts`): read back
+	// through `JSON.parse` and written by `JSON.stringify`, key order kept
+	const canonical_tree_hash = (wire: string): string | undefined => {
+		try {
+			return sha256(`${JSON.stringify(JSON.parse(wire))}\n`);
+		} catch {
+			return undefined;
+		}
+	};
 	const cli_runs: [string, string[], string[]][] = [
 		['parse', ['parse'], sample],
 		['parse --locations', ['parse', '--locations'], sample],
@@ -979,7 +1006,12 @@ const cmd_byteid = (): void => {
 			const r = capture(reference, [...cmd_args, file]);
 			const p = capture(pgo.cli, [...cmd_args, file]);
 			if (name !== 'parse --locations') {
-				plain_answers.set(`${name} ${file}`, { ...r, hash: sha256(r.stdout), stdout: '' });
+				plain_answers.set(`${name} ${file}`, {
+					...r,
+					hash: sha256(r.stdout),
+					canon: name === 'parse' && r.status === 0 ? canonical_tree_hash(r.stdout) : undefined,
+					stdout: ''
+				});
 			}
 			if (r.status !== p.status || r.stdout !== p.stdout || r.stderr !== p.stderr) {
 				mismatches.push(`${name} cli: ${file}`);
@@ -987,27 +1019,37 @@ const cmd_byteid = (): void => {
 		}
 	}
 
-	// the addon's parse and strip, in process, held to the plain CLI's answer for the file
-	const addon_records = addon_ops(loader.index, sample, 'parse,strip', 'addon_pgo');
-	const expected = sample.length + strip_sample.length;
+	// the addon's parse, tape route and strip, in process, held to the plain CLI's answer for
+	// the file — the tape route's to its parse
+	const addon_records = addon_ops(loader.index, sample, 'parse,tape,strip', 'addon_pgo');
+	const expected = sample.length * 2 + strip_sample.length;
 	if (addon_records.length !== expected) {
-		fail(`byteid: the addon answered ${addon_records.length} of ${expected} parse and strip calls`);
+		fail(
+			`byteid: the addon answered ${addon_records.length} of ${expected} ` +
+				'parse, tape and strip calls'
+		);
 	}
 	for (const rec of addon_records) {
+		const ref_op = rec.op === 'tape' ? 'parse' : rec.op;
 		const ref =
-			plain_answers.get(`${rec.op} ${rec.path}`) ??
+			plain_answers.get(`${ref_op} ${rec.path}`) ??
 			fail(`byteid: the addon answered an unasked ${rec.op} of ${rec.path}`);
 		// a returned failure: a strip refusal is the CLI's exit 1, a parse failure its exit 1
 		// from `parse` and 2 from `strip`; its message is in the CLI's stderr either way
 		const failure_status = rec.op === 'strip' && rec.kind !== 'unsupported' ? 2 : 1;
+		// a tape tree `JSON.stringify` could not write agrees with a CLI wire it could not
+		// write either (`canonical_tree_hash` undefined on a parsed file): the same harness
+		// limit on both sides, not a PGO difference
 		const agrees = rec.unreadable
 			? ref.status === 2
-			: rec.ok
-				? ref.status === 0 && rec.hash === ref.hash
-				: rec.ok === false &&
-					ref.status === failure_status &&
-					rec.message !== undefined &&
-					ref.stderr.includes(rec.message);
+			: rec.thrown?.startsWith(UNHASHABLE)
+				? rec.op === 'tape' && ref.status === 0 && ref.canon === undefined
+				: rec.ok
+					? ref.status === 0 && rec.hash === (rec.op === 'tape' ? ref.canon : ref.hash)
+					: rec.ok === false &&
+						ref.status === failure_status &&
+						rec.message !== undefined &&
+						ref.stderr.includes(rec.message);
 		if (!agrees) {
 			mismatches.push(
 				`${rec.op} addon: ${rec.path} (cli exit ${ref.status}; addon ${JSON.stringify({ ...rec, path: undefined })})`
@@ -1042,7 +1084,8 @@ const cmd_byteid = (): void => {
 		}
 	}
 	console.log(
-		`byteid per file: ${sample.length} parsed, ${strip_sample.length} stripped, ` +
+		`byteid per file: ${sample.length} parsed (wire and tape route), ` +
+			`${strip_sample.length} stripped, ` +
 			`${imports_sample.length} import-recorded (${fixture_inputs.length} fixture inputs, every ` +
 			`${PARSE_SAMPLE_STRIDE}th of ${CORPORA_TREE})`
 	);
@@ -1057,9 +1100,9 @@ const cmd_byteid = (): void => {
 /**
  * The FFI world's byte identity (`--ffi`): the PGO library and the plain `release` one —
  * the same source and features without the profile — called through the bench's FFI
- * wrapper (`ffi_ops.ts`) on every fixture input and every file of the snapshot, `parse`,
- * `parse_internal` and `format` each, must give the same answer to every call (the
- * output's hash, or the same failure).
+ * wrapper (`ffi_ops.ts`) on every fixture input and every file of the snapshot, every export
+ * by name (`FFI_OPS`), must give the same answer to every call (the output's hash, or the
+ * same failure).
  */
 const cmd_byteid_ffi = (): void => {
 	const plain = resolve(cargo_artifacts('target', triple).ffi);
@@ -1084,7 +1127,7 @@ const cmd_byteid_ffi = (): void => {
 		run(DENO, [
 			...FFI_OPS_RUN,
 			...['--lib', lib, '--list', list, '--out', out],
-			...['--ops', 'parse,parse_internal,format']
+			...['--ops', FFI_OPS.join(',')]
 		]);
 		return readFileSync(out, 'utf8').split('\n').filter(Boolean);
 	};
@@ -1103,14 +1146,17 @@ const cmd_byteid_ffi = (): void => {
 	}
 	const plain_answers = answers('plain', plain);
 	const pgo_answers = answers('pgo', pgo);
-	if (plain_answers.length !== files.length * 3 || pgo_answers.length !== plain_answers.length) {
+	if (
+		plain_answers.length !== files.length * FFI_OPS.length ||
+		pgo_answers.length !== plain_answers.length
+	) {
 		fail(
 			`byteid-ffi: ${plain_answers.length} plain / ${pgo_answers.length} PGO answers for ` +
-				`${files.length} files × 3 calls`
+				`${files.length} files × ${FFI_OPS.length} calls`
 		);
 	}
 	const mismatches = plain_answers.filter((line, i) => line !== pgo_answers[i]);
-	console.log(`byteid-ffi: ${files.length} files × parse, parse_internal, format compared`);
+	console.log(`byteid-ffi: ${files.length} files × ${FFI_OPS.join(', ')} compared`);
 	if (mismatches.length > 0) {
 		fail(
 			`byteid-ffi: the PGO FFI library's answers differ from the plain library's:\n  ${mismatches

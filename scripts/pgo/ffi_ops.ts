@@ -3,9 +3,11 @@
  * loads a `tsv_ffi` build through `Deno.dlopen` — through the bench's own FFI wrapper
  * (`benches/js/lib/ffi.ts` `NativeImplementation`, its facade included), so a library is
  * called exactly as the Deno bench row calls it: per listed file, in order, each named
- * operation — `parse` (the package's default parse, the span-only wire through the
- * facade's `JSON.parse`), `parse_internal` (the parse that hands JS nothing) and `format`
- * — recorded as a sha256 of its output, or its failure. `pgo.ts train` runs it over the
+ * operation, every export by name (`FFI_OPS`) — `parse` (`tsv_parse_<lang>`'s span-only wire,
+ * the string `parse_<lang>_json` publishes), `tape` (the package's default parse, the bench
+ * row's: `tsv_parse_tape_<lang>`'s tape decoded through the facade, hashed as
+ * `JSON.stringify` writes the tree), `parse_internal` (the parse that hands JS nothing) and
+ * `format` — recorded as a sha256 of its output, or its failure. `pgo.ts train` runs it over the
  * instrumented library (`--require-ok`: every call must succeed, or the input did not
  * train), and `pgo.ts byteid-ffi` over the plain and the profile-guided library, whose
  * records must be identical.
@@ -15,7 +17,7 @@
  *
  * Usage: deno run --no-lock --allow-ffi --allow-read --allow-write --allow-env
  *          scripts/pgo/ffi_ops.ts --lib <library> --list <list file> --out <out.ndjson>
- *          --ops <parse,parse_internal,format> [--require-ok]
+ *          --ops <parse,tape,parse_internal,format> [--require-ok]
  *
  * @module
  */
@@ -25,11 +27,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 
 import { NativeImplementation } from '../../benches/js/lib/ffi.ts';
-import { parse_language } from './layout.ts';
-
-/** An operation the library is asked per file. */
-type FfiOp = 'parse' | 'parse_internal' | 'format';
-const FFI_OPS: readonly FfiOp[] = ['parse', 'parse_internal', 'format'];
+import { FFI_OPS, type FfiOp, parse_language } from './layout.ts';
 
 /** One answer: a file's operation, its output's hash or its failure. */
 interface FfiRecord {
@@ -53,10 +51,15 @@ const { values } = parseArgs({
 	}
 });
 const ops = values.ops!.split(',').filter(Boolean) as FfiOp[];
-if (!values.lib || !values.list || !values.out || ops.some((op) => !FFI_OPS.includes(op))) {
+if (
+	!values.lib ||
+	!values.list ||
+	!values.out ||
+	ops.some((op) => !(FFI_OPS as readonly string[]).includes(op))
+) {
 	console.error(
 		'usage: deno run … scripts/pgo/ffi_ops.ts --lib <library> --list <file> --out <ndjson> ' +
-			'--ops <parse,parse_internal,format> [--require-ok]'
+			`--ops <${FFI_OPS.join(',')}> [--require-ok]`
 	);
 	Deno.exit(2);
 }
@@ -71,10 +74,12 @@ const call = (op: FfiOp, path: string, source: string): Omit<FfiRecord, 'path' |
 	try {
 		const text =
 			op === 'parse'
-				? JSON.stringify(binding.parse(source, language))
-				: op === 'format'
-					? binding.format(source, language)
-					: (binding.parse_internal(source, language), '');
+				? (binding.engine.parse_json[language](source) as string)
+				: op === 'tape'
+					? JSON.stringify(binding.parse(source, language))
+					: op === 'format'
+						? binding.format(source, language)
+						: (binding.parse_internal(source, language), '');
 		return { ok: true, hash: sha256(text) };
 	} catch (e) {
 		return { ok: false, error: String((e as Error).message ?? e).split('\n')[0] };

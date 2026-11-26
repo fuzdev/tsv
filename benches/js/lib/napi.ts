@@ -11,20 +11,20 @@
  * rather than times loads a cargo profile's plain build instead, by passing its path
  * (`napi_library_path` in `lib/tsv_artifacts.ts`).
  *
- * Unlike FFI there are no raw pointers and no manual free: napi-rs marshals the
- * JS string in and the returned `String` out. `parse_<lang>_json` returns the span-only
- * wire as a JSON string. A failure the source causes (a parse failure, a format's refusal)
- * is RETURNED in the product's place as `{ok: false, error}`; only an argument refusal, the
- * size cap and a caught panic surface as thrown JS errors (napi-rs converts the
- * `napi::Error`), so there is no status out-param to read (the FFI shape). A Rust PANIC
- * surfaces the same way: every export catches one and the `napi` profile unwinds, so a
- * panic throws an `Error` whose message is `panic: <payload>`, the C FFI's text, instead
- * of aborting the host (stack overflow excepted — that still aborts).
+ * Unlike FFI there are no raw pointers and no manual free: napi-rs marshals the JS string in and
+ * the returned `String` out. `parse_<lang>_json` returns the span-only wire as a JSON string, and
+ * `parse_tape_<lang>` the same wire laid down as the tape's words, copied into a `Uint32Array` the
+ * JS engine owns. A failure the source causes (a parse failure, a format's refusal) is RETURNED in
+ * the product's place as `{ok: false, error}`; only an argument refusal, the size cap and a caught
+ * panic surface as thrown JS errors (napi-rs converts the `napi::Error`), so there is no status
+ * out-param to read (the FFI shape). A Rust PANIC surfaces the same way: every export catches one
+ * and the `napi` profile unwinds, so a panic throws an `Error` whose message is `panic: <payload>`,
+ * the C FFI's text, instead of aborting the host (stack overflow excepted — that still aborts).
  *
  * The `parse` and `format` rows call the published API over these exports — the
- * packages' facade, wired as the `@fuzdev/tsv` loader wires it
- * (`crates/tsv_napi/npm/index.js`: `parse_<lang>_json` handed over as the engine, so
- * the facade runs the `JSON.parse`). See `lib/tsv_api.ts`.
+ * packages' facade, wired as the `@fuzdev/tsv` loader wires it (`crates/tsv_napi/npm/parse.js`:
+ * `parse_<lang>` decodes `parse_tape_<lang>`'s tape, `parse_<lang>_json` keeps the wire
+ * string; `index.js` the format). See `lib/tsv_api.ts`.
  *
  * Only instantiated under Node/Bun (see `implementations.ts`); importing this
  * module under Deno is harmless because `process.dlopen` is only touched in
@@ -46,12 +46,15 @@ import type { InitScope } from './types.ts';
  */
 export interface NapiAddon {
 	parse_svelte_json: EngineFn<string | EngineFailure>;
+	parse_tape_svelte: EngineFn<Uint32Array | EngineFailure>;
 	parse_internal_svelte: EngineFn<EngineFailure | undefined>;
 	format_svelte: EngineFn<string | EngineFailure>;
 	parse_typescript_json: EngineFn<string | EngineFailure>;
+	parse_tape_typescript: EngineFn<Uint32Array | EngineFailure>;
 	parse_internal_typescript: EngineFn<EngineFailure | undefined>;
 	format_typescript: EngineFn<string | EngineFailure>;
 	parse_css_json: EngineFn<string | EngineFailure>;
+	parse_tape_css: EngineFn<Uint32Array | EngineFailure>;
 	parse_internal_css: EngineFn<EngineFailure | undefined>;
 	format_css: EngineFn<string | EngineFailure>;
 	// test-only panic-contract probes — present only when built with the
@@ -89,10 +92,15 @@ export class NapiImplementation extends TsvBinding {
 		const mod: { exports: NapiAddon } = { exports: {} as NapiAddon };
 		process.dlopen(mod, path);
 
-		// The addon's flat exports, with `parse_<lang>_json` as the facade's parse
-		// engine — the loader's own wiring.
+		// The addon's flat exports, the tape exports beneath `parse_<lang>` and the wire
+		// beneath `parse_<lang>_json` — the loader's own wiring.
 		const addon = mod.exports;
 		this.bind({
+			parse_tape: {
+				svelte: addon.parse_tape_svelte,
+				typescript: addon.parse_tape_typescript,
+				css: addon.parse_tape_css
+			},
 			parse_json: {
 				svelte: addon.parse_svelte_json,
 				typescript: addon.parse_typescript_json,
@@ -114,7 +122,7 @@ export class NapiImplementation extends TsvBinding {
 		// as the row's rejection (`rejected`, `lib/tsv_api.ts`); probed anyway so the three
 		// bindings can't come to disagree about what surfacing a refusal MEANS. And the parse wire is
 		// span-only, so a stale addon whose parse still emits `loc` can't be timed as the
-		// span-only default.
+		// span-only default, and it runs through the tape, decoding to the wire's tree.
 		this.probe('tsv (N-API)', { path, rebuild }, scope);
 	}
 }

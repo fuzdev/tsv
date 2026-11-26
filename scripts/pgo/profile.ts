@@ -25,6 +25,9 @@ export interface TrainedCounts {
 	/** Files the import records ran on, per language (the addon's alone: the CLI has none). */
 	imports_typescript: number;
 	imports_svelte: number;
+	/** Files the tape route ran on — the bindings' alone (the CLI ships no tape): the packages'
+	 * `parse_<lang>` in the addon, the tape export and its decode in the FFI library. */
+	tape: number;
 }
 
 /** A function a trained profile must carry real counts on. */
@@ -33,8 +36,8 @@ export interface HotFunction {
 	path: string;
 	/** The trained count its floor is read from (`floor_of`). */
 	per: keyof TrainedCounts;
-	/** The worlds that compile it (the CLI has no import records; the FFI library neither
-	 * those nor the type strip). */
+	/** The worlds that compile it (the CLI has no import records and no tape; the FFI library
+	 * neither the import records nor the type strip). */
 	worlds: readonly ProfileWorld[];
 }
 
@@ -46,13 +49,14 @@ const EVERY = ['cli', 'napi', 'ffi'] as const;
 /**
  * The functions a trained profile must carry real counts on, by demangled path: the doc
  * renderer every format walks, each language's parse entries — `parse_folded_into` (the
- * parse a format runs) and the parse the wire-JSON path runs, the one-shot form in the CLI
- * and the warm `*_into` form in the bindings — the type strip, and the import records'
- * entries. A profile that misses any of them trained nothing that
- * matters, however many records it holds: "zero hash mismatches" passes VACUOUSLY on an
- * empty profile, since every function then reads as missing rather than mismatched. Each
- * is held to a floor read from the inputs of its class it trained on (`floor_of`). A
- * rename here is a rename in the gate (the gate fails, naming the path).
+ * parse a format runs) and the parse the wire-JSON path runs, the one-shot form in the CLI and the
+ * warm `*_into` form in the bindings — the type strip, the import records' entries, and the
+ * transcoder the bindings' tape export runs (`transcode_words`, the form `tsv_arena`'s
+ * `parse_tape!` calls, once per tape). A profile that misses any of them trained nothing that
+ * matters, however many records it holds: "zero hash mismatches" passes VACUOUSLY on an empty
+ * profile, since every function then reads as missing rather than mismatched. Each is held to a
+ * floor read from the inputs of its class it trained on (`floor_of`). A rename here is a rename in
+ * the gate (the gate fails, naming the path).
  */
 export const HOT_FUNCTIONS: readonly HotFunction[] = [
 	{ path: 'tsv_lang::doc::arena_render::render_doc_iterative', per: 'files', worlds: EVERY },
@@ -67,7 +71,12 @@ export const HOT_FUNCTIONS: readonly HotFunction[] = [
 	{ path: 'tsv_css::__private::parse_folded_into', per: 'css', worlds: EVERY },
 	{ path: 'tsv_ts::strip::strip_into', per: 'strip', worlds: ['cli', 'napi'] },
 	{ path: 'tsv_ts::imports::parse_imports_into', per: 'imports_typescript', worlds: ['napi'] },
-	{ path: 'tsv_svelte::__private::parse_imports_into', per: 'imports_svelte', worlds: ['napi'] }
+	{ path: 'tsv_svelte::__private::parse_imports_into', per: 'imports_svelte', worlds: ['napi'] },
+	{
+		path: 'tsv_arena::tape::transcode::Transcoder::transcode_words',
+		per: 'tape',
+		worlds: ['napi', 'ffi']
+	}
 ];
 
 /**

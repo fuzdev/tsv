@@ -3,14 +3,18 @@
  *
  * Every tsv npm package publishes through one hand-written facade
  * (`crates/tsv_wasm/npm/api.js` + `api_parse.js`): per call it checks the source is a
- * well-formed UTF-16 string, reads the options bag, wraps the product in a `{ok: true, …}`
- * result (a parse failure is `{ok: false, error}`), and — over an engine that hands back
- * the wire as a string — `JSON.parse`s it. A consumer's `parse_typescript(source)` pays
- * that, as every third-party row here pays its own package's front door, so the three tsv
- * bindings (`lib/ffi.ts`, `lib/napi.ts`, `lib/wasm.ts`) hand their flat exports to
- * `TsvBinding.bind` and time the result: the same two factories, wired the way each
- * package's entry wires them (`crates/tsv_napi/npm/index.js`, the staged wasm
- * `index.js`), imported from the source the packages stage verbatim.
+ * well-formed UTF-16 string, reads the options bag and wraps the product in a `{ok: true, …}`
+ * result (a parse failure is `{ok: false, error}`). Its `parse_<lang>` takes the TAPE route:
+ * the engine's raw `parse_tape_<lang>` lays the span-only wire down as the binary tape, and
+ * the generated decoder (`tape_engine.js` over `tape_decode.js`) builds the tree from it
+ * (`docs/tape_format.md`). A consumer's `parse_typescript(source)` pays all of that, as
+ * every third-party row here pays its own package's front door, so the three tsv bindings
+ * (`lib/ffi.ts`, `lib/napi.ts`, `lib/wasm.ts`) hand their flat exports to `TsvBinding.bind`
+ * and time the result: the same factories, wired the way each package's `./parse` entry
+ * wires them (`crates/tsv_napi/npm/parse.js`, the staged wasm `parse.js`) by one function
+ * here (`publish_parse`), imported from the source the packages stage verbatim. A binding
+ * that hands over no tape export fails to type-check (`TsvEngine.parse_tape` is required),
+ * and the init probe (`lib/tape_probe.ts`) fails a row whose parse does not run through it.
  *
  * The C FFI ships in no npm package, so over it the facade is the one tsv WOULD
  * publish rather than one it does — taken so the `tsv` row means the published API
@@ -25,9 +29,11 @@
 
 import { create_format_api, PARSE_KINDS, read_failure } from '../../../crates/tsv_wasm/npm/api.js';
 import { create_parse_api } from '../../../crates/tsv_wasm/npm/api_parse.js';
+import { create_tape_parse } from '../../../crates/tsv_wasm/npm/tape_engine.js';
 import { TsvRejection } from './divergence/panic_errors.ts';
 import { assert_binding_emits_span_only, type LocationsProbeArtifact } from './locations_probe.ts';
 import { assert_binding_reports_rejection } from './reject_probe.ts';
+import { assert_binding_parses_through_tape, type TapeProbeEngine } from './tape_probe.ts';
 import {
 	BaseImplementation,
 	type BindingCall,
@@ -59,27 +65,40 @@ export interface EngineFailure {
  * One binding's flat exports, keyed by language and resolved once, so a timed call
  * allocates no table.
  *
- * `parse_json`, `parse` and `format` are what the facade's two factories take.
- * `parse_json` returns the span-only wire as a string. `parse` is present only for an
- * engine that materializes the wire itself (the WASM bindings run `JSON.parse`
- * engine-side, returning `{ok: true, ast}`); without it the facade parses `parse_json`'s
- * string, as it does over the N-API addon. `parse_internal` is the bench-only parse that
- * converts nothing: no package publishes it, so it is called as is — its success value
- * `undefined` (or the FFI's empty payload), its failure returned as the others' is.
+ * `parse_tape`, `parse_json` and `format` are what the facade's factories take.
+ * `parse_tape` returns the tape as words (`docs/tape_format.md`) — over the WASM engine a
+ * view of its linear memory and over the C FFI a view of the wrapper's result buffer, each
+ * valid only until the binding's next call, which the facade's decode never outlives.
+ * `parse_json` returns the span-only wire as a string (`parse_<lang>_json`). `parse_internal`
+ * is the bench-only parse that converts nothing: no package publishes it, so it is called
+ * as is — its success value `undefined` (or the FFI's empty payload), its failure returned
+ * as the others' is.
  */
 export interface TsvEngine {
+	parse_tape: Record<Language, EngineFn<Uint32Array | EngineFailure>>;
 	parse_json: Record<Language, EngineFn<string | EngineFailure>>;
-	parse?: Record<Language, EngineFn<{ ok: true; ast: unknown } | EngineFailure>>;
 	format: Record<Language, EngineFn<string | EngineFailure>>;
 	parse_internal: Record<Language, EngineFn<unknown>>;
 }
 
 /** A published function: the source, then the options bag. */
-type Published<T> = (source: string, options?: object) => T;
+export type Published<T> = (source: string, options?: object) => T;
 
 /** What a published function returns: its product under `key`, or the source's failure. */
 type Outcome<K extends string, T> =
 	({ ok: true } & { [key in K]: T }) | { ok: false; error: { message: string; frame: string } };
+
+/**
+ * The parse family `engine` publishes, wired as every package's `./parse` entry wires it:
+ * `parse_<lang>` over the tape route (`create_tape_parse` over the raw tape exports),
+ * `parse_<lang>_json` over the JSON wire. One function for the timed table (`bind`) and the
+ * tape probe's untimed twin (`lib/tape_probe.ts`), so the probe asks the wiring the rows run.
+ */
+export const publish_parse = (engine: TapeProbeEngine): Record<string, Published<unknown>> =>
+	create_parse_api({
+		parse_json: engine.parse_json,
+		parse: create_tape_parse(engine.parse_tape)
+	});
 
 /** What `bind` leaves: the engine as given, and the facade's functions over it. */
 interface Bound {
@@ -145,7 +164,7 @@ export abstract class TsvBinding extends BaseImplementation {
 	/** Publish `engine` — the wrapper's `init()` calls this once its binding has loaded. */
 	protected bind(engine: TsvEngine): void {
 		const published: Record<string, Published<unknown>> = {
-			...create_parse_api({ parse_json: engine.parse_json, parse: engine.parse }),
+			...publish_parse(engine),
 			...create_format_api(engine.format)
 		};
 		this.#bound = {
@@ -161,17 +180,21 @@ export abstract class TsvBinding extends BaseImplementation {
 
 	/**
 	 * The wrapper's init self-checks, run once `bind` has published the engine: every
-	 * row's call still THROWS on a source tsv rejects (`lib/reject_probe.ts`), and
-	 * the parse wire is the span-only one (`lib/locations_probe.ts`). Through the
-	 * wrapper's own methods, so each probes the call the rows make, facade included.
+	 * row's call still THROWS on a source tsv rejects (`lib/reject_probe.ts`), the
+	 * parse wire is the span-only one (`lib/locations_probe.ts`), and the parse runs
+	 * through the tape and decodes to the `_json` wire's tree (`lib/tape_probe.ts`).
+	 * Through the wrapper's own methods, so each probes the call the rows make, facade
+	 * included.
 	 *
 	 * Unscoped (pre-flight, the gates), the whole call × language matrix. With a
 	 * `scope` — a timed row's own process — only that row's call and language: this
 	 * binding is one slot behind every tsv row, and probing the rest would send the
 	 * other engine functions, or the row's own under another option, through the
 	 * facade's shared call sites ahead of the clock — the cross-row confound the row's
-	 * process exists to remove. So the span-only probe, which asks the default parse,
-	 * runs there only for the default parse's own row; pre-flight has asked it of this
+	 * process exists to remove. So the span-only and tape probes, which ask the default
+	 * parse, run there only for the default parse's own row, and the tape probe's routing
+	 * half — an untimed twin of the published table, which would share the timed
+	 * closures' type feedback — runs only unscoped; pre-flight has asked both of this
 	 * artifact for every row, and each row's process checks it loads that artifact.
 	 *
 	 * @param binding - the row-facing name, so a throw names which binding failed
@@ -186,11 +209,14 @@ export abstract class TsvBinding extends BaseImplementation {
 	): void {
 		assert_binding_reports_rejection(binding, this, scope);
 		if (scope === undefined || scope_call(scope) === 'parse') {
-			assert_binding_emits_span_only(
+			const languages = scope === undefined ? LANGUAGES : [scope.language];
+			assert_binding_emits_span_only(binding, artifact, this, languages);
+			assert_binding_parses_through_tape(
 				binding,
 				artifact,
 				this,
-				scope === undefined ? LANGUAGES : [scope.language]
+				languages,
+				scope === undefined ? publish_parse : null
 			);
 		}
 	}

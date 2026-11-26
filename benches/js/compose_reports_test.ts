@@ -45,7 +45,7 @@ const sibling = (
 	timestamp = '2026-01-01T00:00:00.000Z'
 ) =>
 	JSON.stringify({
-		version: 23,
+		version: 24,
 		runtime,
 		timestamp,
 		git_commit,
@@ -95,7 +95,7 @@ describe('run_compose_reports', () => {
 		strictEqual(await run_compose_reports({ results }), 0);
 		deepStrictEqual([...results.writes.keys()], ['report.json', 'report.md']);
 		const combined = JSON.parse(results.writes.get('report.json')!);
-		strictEqual(combined.version, 19);
+		strictEqual(combined.version, 20);
 		deepStrictEqual(combined.runtimes, ['deno', 'node']);
 		deepStrictEqual(combined.rows, [
 			{

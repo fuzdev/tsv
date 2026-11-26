@@ -21,12 +21,12 @@
  * wasm-bindgen, no WASI — so unlike the oxc WASM binding one entry point works
  * under all three runtimes. `load()` compiles and instantiates it (async, in
  * `init()` where every other impl's setup lives). Its parse path copies the
- * encoded source into linear memory, calls in, then copies the result buffer back
- * out — a boundary tax of the same shape `tsv-wasm` pays, and the reason that row
- * belongs beside `tsv-wasm`'s parse row and `oxc-parser-wasm` rather than
- * beside the native ones. ⚠ Both cores are yuku's SHARED engine: each also carries
- * the analyzer its sibling packages run on, so their size rows are not parse-only
- * builds (`lib/binary_sizes.ts`).
+ * encoded source into linear memory, calls in, then copies the result buffer back out — a boundary
+ * tax `tsv-wasm` pays half of (it copies the source in the same way but hands its result back as a
+ * view of linear memory, the tape decoded in place, where yuku copies its buffer out), and the
+ * reason that row belongs beside `tsv-wasm`'s parse row and `oxc-parser-wasm` rather than beside
+ * the native ones. ⚠ Both cores are yuku's SHARED engine: each also carries the analyzer its
+ * sibling packages run on, so their size rows are not parse-only builds (`lib/binary_sizes.ts`).
  *
  * ⚠ **The native core is not memory-safe on adversarial input, so the N-API row
  * is excluded from the CONFORMANCE surface** (`get_benchmark_tasks`). An identifier

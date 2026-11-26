@@ -4,9 +4,10 @@
  * Uses Deno.dlopen to call the Rust library directly for maximum performance.
  *
  * The `parse` and `format` rows call the published API over these entry points — the
- * packages' facade, taken over `call_ffi` as it is over the N-API addon (the wire
- * string handed over, so the facade runs the `JSON.parse`). No npm package ships the
- * C FFI, so this is the facade tsv WOULD publish over it; see `lib/tsv_api.ts`.
+ * packages' facade, taken as it is over the N-API addon: `parse_<lang>` decodes the tape
+ * `tsv_parse_tape_<lang>` returns (`call_ffi_tape`), `parse_<lang>_json` keeps the wire
+ * string `tsv_parse_<lang>` returns (`call_ffi`). No npm package ships the C FFI, so this is
+ * the facade tsv WOULD publish over it; see `lib/tsv_api.ts`.
  */
 
 import { ffi_loaded_path, ffi_rebuild_task } from './tsv_artifacts.ts';
@@ -40,7 +41,9 @@ import type { InitScope } from './types.ts';
 // Every entry point has the same C signature — `(source_ptr, source_len, source_type,
 // out_len, out_status) -> payload_ptr` — so the table is one shape per name,
 // with no goal-aware variants to keep in step. `goal` is 0 = Module, 1 = Script;
-// Svelte and CSS reject a non-zero code rather than ignoring it.
+// Svelte and CSS reject a non-zero code rather than ignoring it. The tape family's
+// payloads (the tape, or its error) are word allocations freed by `tsv_free_tape`, every
+// other payload a byte allocation freed by `tsv_free` — `*out_len` a byte length either way.
 const ENTRY_POINT = {
 	parameters: ['pointer', 'usize', 'u32', 'pointer', 'pointer'],
 	result: 'pointer'
@@ -48,15 +51,22 @@ const ENTRY_POINT = {
 
 const symbols = {
 	tsv_parse_svelte: ENTRY_POINT,
+	tsv_parse_tape_svelte: ENTRY_POINT,
 	tsv_parse_internal_svelte: ENTRY_POINT,
 	tsv_format_svelte: ENTRY_POINT,
 	tsv_parse_typescript: ENTRY_POINT,
+	tsv_parse_tape_typescript: ENTRY_POINT,
 	tsv_parse_internal_typescript: ENTRY_POINT,
 	tsv_format_typescript: ENTRY_POINT,
 	tsv_parse_css: ENTRY_POINT,
+	tsv_parse_tape_css: ENTRY_POINT,
 	tsv_parse_internal_css: ENTRY_POINT,
 	tsv_format_css: ENTRY_POINT,
 	tsv_free: {
+		parameters: ['pointer', 'usize'],
+		result: 'void'
+	},
+	tsv_free_tape: {
 		parameters: ['pointer', 'usize'],
 		result: 'void'
 	}
@@ -127,7 +137,13 @@ interface MarshalState {
 	/** Grow-only UTF-8 staging for the source; re-pointed only on growth. */
 	source_buffer: Uint8Array;
 	source_ptr: Deno.PointerValue;
-	/** Grow-only staging for the result copy-out (no pointer needed — `copyInto` takes the view). */
+	/**
+	 * Grow-only staging for the result copy-out (no pointer needed — `copyInto` takes the
+	 * view). A fresh `ArrayBuffer` at offset 0 of a capacity that is a power of two times
+	 * `INITIAL_BUFFER_CAPACITY`, so a tape copied in is 4-aligned and is handed on as a
+	 * `Uint32Array` over it with no copy — valid until the next call, which the facade's
+	 * decode never outlives.
+	 */
 	result_buffer: Uint8Array;
 }
 
@@ -139,6 +155,22 @@ const next_capacity = (needed: number, current: number): number => {
 };
 
 const INITIAL_BUFFER_CAPACITY = 1 << 16;
+
+/**
+ * Throw the error a non-OK payload carries: `error_result`'s compact `serde_json` object.
+ * Parsed only once the status has already said this is an error, so a formatted file never
+ * reaches `JSON.parse` — the loose prefix test this replaced ran one over a whole `{#if …}`
+ * file's output on every timed call.
+ */
+const throw_payload_error = (payload: string): never => {
+	let parsed;
+	try {
+		parsed = JSON.parse(payload);
+	} catch {
+		throw new Error(`tsv reported an error with an unparseable payload: ${payload}`);
+	}
+	throw new Error(parsed.error ?? payload);
+};
 
 export class NativeImplementation extends TsvBinding {
 	/**
@@ -200,9 +232,14 @@ export class NativeImplementation extends TsvBinding {
 			result_buffer: new Uint8Array(new ArrayBuffer(INITIAL_BUFFER_CAPACITY))
 		};
 
-		// Every entry point as a flat `(source, source_type?) => string` — the shape the
-		// other two bindings export — with the parse entry points (the span-only wire, as
-		// a string) as the facade's parse engine. A `parse_internal` payload is empty.
+		// Every entry point as a flat `(source, source_type?) => …` — the shape the other two
+		// bindings export: the tape entry points as the words beneath the facade's
+		// `parse_<lang>`, the JSON ones (the span-only wire, as a string) beneath
+		// `parse_<lang>_json`. A `parse_internal` payload is empty.
+		const tape =
+			(fn: FfiFn): EngineFn<Uint32Array> =>
+			(source, source_type) =>
+				this.call_ffi_tape(fn, source, parse_source_type_code(source_type));
 		const parse =
 			(fn: FfiFn): EngineFn<string> =>
 			(source, source_type) =>
@@ -212,6 +249,11 @@ export class NativeImplementation extends TsvBinding {
 			(source, source_type) =>
 				this.call_ffi(fn, source, format_source_type_code(source_type));
 		this.bind({
+			parse_tape: {
+				svelte: tape(this.symbols.tsv_parse_tape_svelte as FfiFn),
+				typescript: tape(this.symbols.tsv_parse_tape_typescript as FfiFn),
+				css: tape(this.symbols.tsv_parse_tape_css as FfiFn)
+			},
 			parse_json: {
 				svelte: parse(this.symbols.tsv_parse_svelte as FfiFn),
 				typescript: parse(this.symbols.tsv_parse_typescript as FfiFn),
@@ -232,13 +274,14 @@ export class NativeImplementation extends TsvBinding {
 		// This binding returns a payload either way, so the `out_status` word is the
 		// only thing that tells a refusal from a formatted file — the reject probe is
 		// what proves it still fires. And the parse wire is span-only, so a stale
-		// library whose parse still emits `loc` can't be timed as the span-only default.
+		// library whose parse still emits `loc` can't be timed as the span-only default, and
+		// it runs through the tape, decoding to the wire's tree.
 		this.probe('tsv (FFI)', { path: lib_path, rebuild }, scope);
 	}
 
 	/**
-	 * Drive one entry point at `goal` and return its payload, throwing when the
-	 * call reported an error.
+	 * Drive one byte-payload entry point at `goal` and return its payload as text, throwing
+	 * when the call reported an error.
 	 *
 	 * The verdict comes from `out_status`, read as one typed-array load the moment
 	 * the call returns. It used to come from a `startsWith('{"error"')` test on the
@@ -247,6 +290,55 @@ export class NativeImplementation extends TsvBinding {
 	 * arbitrary formatted source (`lib/reject_probe.ts`).
 	 */
 	private call_ffi(fn: FfiFn, source: string, source_type_code: number): string {
+		const ptr = this.invoke(fn, source, source_type_code);
+		const m = this._marshal!;
+		const status = m.out_status_buffer[0];
+		const len = m.out_len_buffer[0];
+		const bytes = this.copy_out(ptr, Number(len));
+		this.symbols.tsv_free(ptr, len);
+		const result = this.decoder.decode(bytes);
+		if (status !== STATUS_OK) throw_payload_error(result);
+		return result;
+	}
+
+	/**
+	 * Drive one tape entry point (`tsv_parse_tape_<lang>`) at `goal` and return the tape's
+	 * words, throwing when the call reported an error.
+	 *
+	 * The payload is a word allocation of `ceil(len / 4)` words (`tsv_ffi`'s `words_to_ptr`),
+	 * `len` the tape's byte length, so the whole allocation is copied — the tape plus its
+	 * last word's padding, the `Uint32Array` an engine hands the facade — and freed by
+	 * `tsv_free_tape` with the length the call wrote. The words are a view of the persistent
+	 * result buffer, valid until the next call; the facade decodes them before it returns.
+	 * An error's payload is the same `{"error": …}` JSON the other exports return, in a
+	 * word allocation too.
+	 */
+	private call_ffi_tape(fn: FfiFn, source: string, source_type_code: number): Uint32Array {
+		const ptr = this.invoke(fn, source, source_type_code);
+		const m = this._marshal!;
+		const status = m.out_status_buffer[0];
+		const len = m.out_len_buffer[0];
+		const byte_count = Number(len);
+		const word_count = Math.ceil(byte_count / 4);
+		const bytes = this.copy_out(ptr, word_count * 4);
+		this.symbols.tsv_free_tape(ptr, len);
+		if (status !== STATUS_OK) {
+			throw_payload_error(this.decoder.decode(bytes.subarray(0, byte_count)));
+		}
+		return new Uint32Array(bytes.buffer, bytes.byteOffset, word_count);
+	}
+
+	/**
+	 * Marshal `source` in, call `fn`, and check the call wrote its verdict — what every entry
+	 * point shares. Returns the payload's pointer, its status and length left in the
+	 * marshalling buffers for the caller to read (no result object: this runs inside every
+	 * timed call), and the payload the caller's to copy out and free.
+	 */
+	private invoke(
+		fn: FfiFn,
+		source: string,
+		source_type_code: number
+	): NonNullable<Deno.PointerValue> {
 		const m = this._marshal;
 		if (!m) throw new Error('Native library not initialized');
 
@@ -266,55 +358,41 @@ export class NativeImplementation extends TsvBinding {
 		}
 
 		m.out_status_buffer[0] = STATUS_UNWRITTEN;
-		const result_ptr = fn(m.source_ptr, written, source_type_code, m.out_len_ptr, m.out_status_ptr);
+		const ptr = fn(m.source_ptr, written, source_type_code, m.out_len_ptr, m.out_status_ptr);
 
-		if (result_ptr === null) {
+		if (ptr === null) {
 			throw new Error('FFI function returned null pointer');
 		}
 
-		// The verdict BEFORE `out_len` is touched. One site writes both (`tsv_ffi`'s
-		// `bytes_to_ptr`), so an unwritten status means an unwritten length too — and
-		// the stale one left by the previous call would size a `copyInto` past this
-		// allocation and hand `tsv_free` a length that isn't the payload's, which is
-		// UB rather than a failed assertion. Leaking the pointer is the right trade:
-		// a length this call did not write cannot be freed.
-		const status = m.out_status_buffer[0];
-		if (status === STATUS_UNWRITTEN) {
+		// The verdict BEFORE `out_len` is touched. One site per payload form writes both
+		// (`tsv_ffi`'s `bytes_to_ptr` / `words_to_ptr`), so an unwritten status means an
+		// unwritten length too — and the stale one left by the previous call would size a
+		// `copyInto` past this allocation and hand the free function a length that isn't the
+		// payload's, which is UB rather than a failed assertion. Leaking the pointer is the
+		// right trade: a length this call did not write cannot be freed.
+		if (m.out_status_buffer[0] === STATUS_UNWRITTEN) {
 			throw new Error(
 				`tsv left out_status unwritten — the call's verdict is unknowable, so this ` +
 					`row's coverage would be fabricated. See lib/reject_probe.ts.`
 			);
 		}
+		return ptr;
+	}
 
-		const result_len = m.out_len_buffer[0];
-		const result_byte_count = Number(result_len);
-		if (result_byte_count > m.result_buffer.length) {
+	/**
+	 * Copy `count` bytes at `ptr` into the persistent result buffer (grown first if it is too
+	 * small) and return the view of them, at offset 0.
+	 */
+	private copy_out(ptr: NonNullable<Deno.PointerValue>, count: number): Uint8Array {
+		const m = this._marshal!;
+		if (count > m.result_buffer.length) {
 			m.result_buffer = new Uint8Array(
-				new ArrayBuffer(next_capacity(result_byte_count, m.result_buffer.length))
+				new ArrayBuffer(next_capacity(count, m.result_buffer.length))
 			);
 		}
-
-		// Read the result into the staging buffer, then free the native allocation
-		// (length stays bigint through the free call).
-		const result_bytes = m.result_buffer.subarray(0, result_byte_count);
-		new Deno.UnsafePointerView(result_ptr).copyInto(result_bytes);
-		this.symbols.tsv_free(result_ptr, result_len);
-
-		const result = this.decoder.decode(result_bytes);
-		if (status !== STATUS_OK) {
-			// The error payload is `error_result`'s compact `serde_json` object.
-			// Parsed only once the status has already said this is an error, so a
-			// formatted file never reaches `JSON.parse` — the loose prefix test this
-			// replaced ran one over a whole `{#if …}` file's output on every timed call.
-			let parsed;
-			try {
-				parsed = JSON.parse(result);
-			} catch {
-				throw new Error(`tsv reported an error with an unparseable payload: ${result}`);
-			}
-			throw new Error(parsed.error ?? result);
-		}
-		return result;
+		const bytes = m.result_buffer.subarray(0, count);
+		new Deno.UnsafePointerView(ptr).copyInto(bytes);
+		return bytes;
 	}
 
 	override dispose(): void {

@@ -63,6 +63,7 @@
 		"benches/js/lib/prettier_fixtures_test.ts",
 		"benches/js/lib/reject_probe_test.ts",
 		"benches/js/lib/source_mtime_test.ts",
+		"benches/js/lib/tape_probe_test.ts",
 		"benches/js/lib/text_lines_test.ts",
 		"benches/js/lib/tsv_artifacts_test.ts",
 		"benches/js/lib/tsv_debug_server_test.ts",
