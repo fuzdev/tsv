@@ -1,0 +1,903 @@
+//! The direct tape producer: what a language crate's wire writer writes the tape into, from
+//! the same walk and the same sites that write the JSON wire (`docs/tape_format.md` §Producing a
+//! tape).
+//!
+//! [`TapeSink`] owns the buffers, which keep their capacity from call to call; [`TapeWriter`] is
+//! one document's view of it (the source, the emitted-offset map), the sink a writer's tape copy
+//! is written against. A writer states what each of its JSON sites means on the tape — a record
+//! opening, a field present, a list's brackets — through the `t_*` methods, and its data
+//! through the [`WireSink`] methods it calls on the JSON wire, which here write the words the
+//! data carries and nothing for the JSON-only bytes.
+//!
+//! Records are written pre-order, each header slot reserved when the record opens and filled
+//! when it closes (§Records), and each list's count slot patched when it closes. Strings are
+//! **true-offset** refs: a string the writer borrowed from the source is the slice it occupies,
+//! any other is appended to the pool at once, in write order — the relaxed refs the format
+//! accepts (§String refs). Such a tape is graded by printing it back to the JSON wire and by the
+//! transcoder as a canonicalizer (`transcode(tape_to_json(direct)) == transcode(json)`), not
+//! byte for byte against the transcoder's own.
+//!
+//! A writer bug the sink can see — a keyword outside its vocabulary, a name the tables lack, a
+//! record or list left open or closed twice — is recorded as the first [`SinkError`] and refuses
+//! the tape at [`TapeSink::finish_words`] / [`TapeSink::finish_bytes`], in every build: a tape
+//! that would decode to another tree is never handed out.
+
+use super::{HEADER_WORDS, MAGIC, NO_BIT, NULL_REF, header_of, shapes};
+use crate::{LeadingBom, SpanWords, WirePositions, WireSink, leading_bom_len};
+
+/// Why a tape could not be finished.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SinkError {
+    /// A source, tape or pool past the format's sizes.
+    TooLarge,
+    /// A keyword field's value outside its vocabulary.
+    Keyword,
+    /// An entry name, or a field key of the open record's entry, the tables lack.
+    Name,
+    /// A record or list closed with none open, left open at the finish, a field key or a mask
+    /// bit with no record open on top, or a JSON-only path taken on the tape.
+    Unbalanced,
+}
+
+/// [`Frame::entry`] of a list frame.
+const LIST: u16 = u16::MAX;
+
+/// An open record or list.
+#[derive(Clone, Copy)]
+struct Frame {
+    /// The header slot (a record) or the count slot (a list).
+    slot: u32,
+    /// The record's entry, or [`LIST`].
+    entry: u16,
+    /// The record's presence mask so far.
+    mask: u32,
+    /// The list's items so far.
+    count: u32,
+}
+
+/// The direct producer's reusable buffers. Module doc.
+#[derive(Default)]
+pub struct TapeSink {
+    /// The header and the body, as words.
+    tape: Vec<u32>,
+    pool: Vec<u8>,
+    /// The pool's length in UTF-16 code units.
+    pool_units: u32,
+    /// The tape text's length in UTF-16 code units (header word 7).
+    units: u32,
+    frames: Vec<Frame>,
+    error: Option<SinkError>,
+    /// The finished tape's byte length once `finish_words` has laid the words out in place
+    /// (body stored little-endian, the pool packed after it) — so a later finish reads the
+    /// laid-out words rather than laying them out again.
+    finished: Option<usize>,
+}
+
+impl std::fmt::Debug for TapeSink {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TapeSink").finish_non_exhaustive()
+    }
+}
+
+/// UTF-16 units in UTF-8 `bytes`.
+#[inline]
+fn utf16_len(bytes: &[u8]) -> u32 {
+    if bytes.is_ascii() {
+        return bytes.len() as u32;
+    }
+    let mut n = 0u32;
+    for &c in bytes {
+        n += u32::from((c & 0xC0) != 0x80) + u32::from(c >= 0xF0);
+    }
+    n
+}
+
+impl TapeSink {
+    /// A sink with empty buffers.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Starts a document. `source` is the text the writer reads (a leading byte-order mark
+    /// included), `positions` its span-only wire's emitted-offset map, and `bom` how that wire
+    /// counts a leading mark — the language's `WIRE_COORDINATES.bom`: an [`LeadingBom::Elided`]
+    /// mark is not part of the tape's text, so no source ref reaches into it.
+    pub fn writer<'a>(
+        &'a mut self,
+        source: &'a str,
+        positions: WirePositions<'a>,
+        bom: LeadingBom,
+    ) -> TapeWriter<'a> {
+        self.tape.clear();
+        self.tape.resize(HEADER_WORDS, 0);
+        self.pool.clear();
+        self.pool_units = 0;
+        self.frames.clear();
+        self.error = None;
+        self.finished = None;
+        self.units = positions.pos(source.len() as u32);
+        let skip = match bom {
+            LeadingBom::Elided => leading_bom_len(source),
+            LeadingBom::Counted => 0,
+        };
+        TapeWriter {
+            sink: self,
+            source,
+            positions,
+            skip,
+        }
+    }
+
+    /// The header of the finished tape, or why it cannot be finished.
+    fn header(&self) -> Result<[u32; HEADER_WORDS], SinkError> {
+        if let Some(e) = self.error {
+            return Err(e);
+        }
+        if !self.frames.is_empty() {
+            return Err(SinkError::Unbalanced);
+        }
+        // past `i32::MAX` UTF-16 units a pool ref's first word would read as a source slice
+        if self.pool_units >= i32::MAX as u32 || self.units >= i32::MAX as u32 {
+            return Err(SinkError::TooLarge);
+        }
+        let words =
+            u32::try_from(self.tape.len() - HEADER_WORDS).map_err(|_| SinkError::TooLarge)?;
+        let pool_bytes = u32::try_from(self.pool.len()).map_err(|_| SinkError::TooLarge)?;
+        Ok([
+            MAGIC,
+            shapes::TAPE_FORMAT_VERSION,
+            shapes::SHAPES_HASH,
+            words,
+            pool_bytes,
+            0,
+            self.pool_units,
+            self.units,
+        ])
+    }
+
+    /// The finished tape as words, the form `tsv_arena::tape::Transcoder::transcode_words`
+    /// hands a binding: the header and body stored little-endian, the pool packed after them,
+    /// the last word zero-padded. Returns the words and the tape's length in bytes; the sink
+    /// keeps the words until its next document, and asking again — either finish — reads them
+    /// as laid out.
+    ///
+    /// # Errors
+    ///
+    /// The first [`SinkError`] the document recorded, [`SinkError::Unbalanced`] for a record or
+    /// list left open, [`SinkError::TooLarge`] past the format's sizes.
+    pub fn finish_words(&mut self) -> Result<(&[u32], usize), SinkError> {
+        if let Some(len) = self.finished {
+            return Ok((&self.tape, len));
+        }
+        let header = self.header()?;
+        let len = self.tape.len() * 4 + self.pool.len();
+        self.tape[..HEADER_WORDS].copy_from_slice(&header);
+        for word in &mut self.tape {
+            *word = word.to_le();
+        }
+        let mut chunks = self.pool.chunks_exact(4);
+        self.tape.extend(
+            chunks
+                .by_ref()
+                .map(|c| u32::from_ne_bytes([c[0], c[1], c[2], c[3]])),
+        );
+        let rest = chunks.remainder();
+        if !rest.is_empty() {
+            let mut last = [0u8; 4];
+            last[..rest.len()].copy_from_slice(rest);
+            self.tape.push(u32::from_ne_bytes(last));
+        }
+        self.finished = Some(len);
+        Ok((&self.tape, len))
+    }
+
+    /// The finished tape as bytes, the form `tsv_arena::tape::Transcoder::transcode` returns.
+    ///
+    /// # Errors
+    ///
+    /// As [`TapeSink::finish_words`].
+    pub fn finish_bytes(&self) -> Result<Vec<u8>, SinkError> {
+        if let Some(len) = self.finished {
+            // already laid out: each word's bytes in memory are the tape's bytes in order
+            let mut out: Vec<u8> = self.tape.iter().flat_map(|w| w.to_ne_bytes()).collect();
+            out.truncate(len);
+            return Ok(out);
+        }
+        let header = self.header()?;
+        let mut out = Vec::with_capacity(self.tape.len() * 4 + self.pool.len());
+        for word in header.iter().chain(&self.tape[HEADER_WORDS..]) {
+            out.extend_from_slice(&word.to_le_bytes());
+        }
+        out.extend_from_slice(&self.pool);
+        Ok(out)
+    }
+}
+
+/// One document being written into a [`TapeSink`]. Module doc.
+pub struct TapeWriter<'a> {
+    sink: &'a mut TapeSink,
+    source: &'a str,
+    positions: WirePositions<'a>,
+    /// The leading bytes no source ref may start in: an elided byte-order mark's.
+    skip: usize,
+}
+
+impl TapeWriter<'_> {
+    /// Records `e` unless an earlier error stands.
+    #[cold]
+    #[inline(never)]
+    fn fail(&mut self, e: SinkError) {
+        self.sink.error.get_or_insert(e);
+    }
+
+    /// The byte offset of `s` in the source, when the writer borrowed it from there (past an
+    /// elided byte-order mark).
+    #[inline]
+    fn offset_of(&self, s: &[u8]) -> Option<usize> {
+        let base = self.source.as_ptr() as usize;
+        let p = s.as_ptr() as usize;
+        (p >= base + self.skip && p - base + s.len() <= self.source.len()).then(|| p - base)
+    }
+
+    #[inline]
+    fn push2(&mut self, a: u32, b: u32) {
+        self.sink.tape.extend_from_slice(&[a, b]);
+    }
+
+    /// Counts an item opening under a list frame.
+    #[inline]
+    fn count_item(&mut self) {
+        if let Some(f) = self.sink.frames.last_mut()
+            && f.entry == LIST
+        {
+            f.count += 1;
+        }
+    }
+
+    #[inline]
+    fn push_frame(&mut self, entry: u16) {
+        let frame = Frame {
+            slot: self.sink.tape.len() as u32,
+            entry,
+            mask: 0,
+            count: 0,
+        };
+        self.sink.frames.push(frame);
+        self.sink.tape.push(0);
+    }
+
+    /// The open record's entry's field `key`, by the generated lookup.
+    fn top_field(&mut self, key: &str) -> Option<super::Field> {
+        let entry = match self.sink.frames.last() {
+            Some(f) if f.entry != LIST => f.entry,
+            _ => {
+                self.fail(SinkError::Unbalanced);
+                return None;
+            }
+        };
+        match shapes::field_named(entry, key.as_bytes()) {
+            Some(i) => Some(shapes::ENTRIES[usize::from(entry)].fields[usize::from(i)]),
+            None => {
+                self.fail(SinkError::Name);
+                None
+            }
+        }
+    }
+
+    // ── tape structure: what a site's JSON literal means on the tape ──────────────────────
+    //
+    // A record or a `null` record, opening under a list, counts as one of its items.
+
+    /// A typed record of entry `entry` opens.
+    #[inline]
+    pub fn t_open(&mut self, entry: u16) {
+        self.count_item();
+        self.push_frame(entry);
+    }
+
+    /// A typed record opens whose entry is known only at run time, by its name
+    /// (`ENTRIES[id].name`).
+    #[inline]
+    pub fn t_open_named(&mut self, name: &str) {
+        match shapes::entry_named(name.as_bytes()) {
+            Some(entry) => self.t_open(entry),
+            None => {
+                self.fail(SinkError::Name);
+                self.t_open(0);
+            }
+        }
+    }
+
+    /// A `type`-less record of entry `entry` opens.
+    #[inline]
+    pub fn t_open_object(&mut self, entry: u16) {
+        self.t_open(entry);
+    }
+
+    /// The open record closes: its header is written.
+    #[inline]
+    pub fn t_close(&mut self) {
+        match self.sink.frames.pop() {
+            Some(f) if f.entry != LIST => {
+                self.sink.tape[f.slot as usize] = header_of(f.entry, f.mask);
+            }
+            _ => self.fail(SinkError::Unbalanced),
+        }
+    }
+
+    /// A field with presence-mask bit `bit` is present ([`NO_BIT`]: a required field, nothing
+    /// to record). A bit with no record open on top refuses the tape.
+    #[inline]
+    pub fn t_bit(&mut self, bit: u8) {
+        if bit == NO_BIT {
+            return;
+        }
+        if let Some(f) = self.sink.frames.last_mut()
+            && f.entry != LIST
+        {
+            f.mask |= 1 << bit;
+            return;
+        }
+        self.fail(SinkError::Unbalanced);
+    }
+
+    /// The open record's field `key` is present, its bit looked up at run time — a site
+    /// shared by several entries.
+    #[inline]
+    pub fn t_bit_key(&mut self, key: &str) {
+        if let Some(field) = self.top_field(key) {
+            self.t_bit(field.bit);
+        }
+    }
+
+    /// A list's `[`: its count slot.
+    #[inline]
+    pub fn t_list_open(&mut self) {
+        self.push_frame(LIST);
+    }
+
+    /// A list's `]`: its count.
+    #[inline]
+    pub fn t_list_close(&mut self) {
+        match self.sink.frames.pop() {
+            Some(f) if f.entry == LIST => self.sink.tape[f.slot as usize] = f.count,
+            _ => self.fail(SinkError::Unbalanced),
+        }
+    }
+
+    /// A `null` in a record position.
+    #[inline]
+    pub fn t_null_record(&mut self) {
+        self.count_item();
+        self.sink.tape.push(0);
+    }
+
+    /// An empty self-describing record (`{}` where no entry is named).
+    #[inline]
+    pub fn t_empty_object(&mut self) {
+        self.count_item();
+        self.push2(super::HEADER_ESCAPE, 0);
+    }
+
+    /// A `null` in a nullable-ref position.
+    #[inline]
+    pub fn t_null_ref(&mut self) {
+        self.push2(NULL_REF, 0);
+    }
+
+    /// A boolean field's word.
+    #[inline]
+    pub fn t_bool(&mut self, b: bool) {
+        self.sink.tape.push(u32::from(b));
+    }
+
+    /// A number's two words.
+    #[inline]
+    pub fn t_number(&mut self, n: f64) {
+        let bits = n.to_bits();
+        self.push2(bits as u32, (bits >> 32) as u32);
+    }
+
+    /// A tagged value's tag word (`TAG_*`), its payload written after it.
+    #[inline]
+    pub fn t_tag(&mut self, tag: u32) {
+        self.sink.tape.push(tag);
+    }
+
+    /// A keyword field's value `word`, out of vocabulary `vocab`: its index, by the generated
+    /// lookup. A word outside the vocabulary refuses the tape ([`SinkError::Keyword`]).
+    #[inline]
+    pub fn t_keyword(&mut self, vocab: u16, word: &str) {
+        match shapes::keyword_named(vocab, word.as_bytes()) {
+            Some(index) => self.sink.tape.push(index),
+            None => {
+                self.fail(SinkError::Keyword);
+                self.sink.tape.push(0);
+            }
+        }
+    }
+
+    /// The open record's keyword field `key` has value `word`, its vocabulary looked up at run
+    /// time.
+    #[inline]
+    pub fn t_keyword_key(&mut self, key: &str, word: &str) {
+        match self.top_field(key) {
+            Some(field) => self.t_keyword(field.aux, word),
+            None => self.sink.tape.push(0),
+        }
+    }
+
+    /// A string value: the source slice it occupies when the writer borrowed it from there,
+    /// else a pool entry.
+    #[inline]
+    pub fn t_ref(&mut self, s: &[u8]) {
+        if let Some(p) = self.offset_of(s) {
+            let (a, b) = (
+                self.positions.pos(p as u32),
+                self.positions.pos((p + s.len()) as u32),
+            );
+            self.push2(a, b);
+        } else {
+            let sink = &mut *self.sink;
+            sink.tape
+                .extend_from_slice(&[(1 + sink.pool_units).wrapping_neg(), 0]);
+            sink.pool.extend_from_slice(s);
+            sink.pool_units += utf16_len(s);
+            let end = sink.tape.len() - 1;
+            sink.tape[end] = sink.pool_units;
+        }
+    }
+
+    // ── data: the `JsonWriter` calls a writer makes, as the tape reads them ───────────────
+    //
+    // Inherent, so the tape copy of a writer calls them as the JSON copy calls `JsonWriter`'s,
+    // with no trait in scope; the `WireSink` impl below forwards to them.
+
+    /// JSON-only bytes.
+    #[inline]
+    pub fn raw(&mut self, _: &str) {}
+
+    /// JSON-only bytes.
+    #[inline]
+    pub fn raw_fixed<const N: usize>(&mut self, _: &[u8; N]) {}
+
+    /// JSON-only bytes (the site states the token's tape meaning).
+    #[inline]
+    pub fn token(&mut self, _: &str) {}
+
+    /// JSON-only bytes (the site states which `null` it is).
+    #[inline]
+    pub fn null(&mut self) {}
+
+    /// A string value: a ref.
+    #[inline]
+    pub fn string(&mut self, s: &str) {
+        self.t_ref(s.as_bytes());
+    }
+
+    /// A `number` field.
+    #[inline]
+    pub fn u32(&mut self, n: u32) {
+        self.t_number(f64::from(n));
+    }
+
+    /// A node's closing burst: its two emitted offsets.
+    #[inline]
+    pub fn start_end_tail<const L: usize, const C: usize>(
+        &mut self,
+        _: &[u8; L],
+        start: u32,
+        end: u32,
+        _: &[u8; C],
+    ) {
+        self.push2(start, end);
+    }
+
+    /// A node's opening burst: its two emitted offsets.
+    #[inline]
+    pub fn start_end_head<const L: usize, const C: usize>(
+        &mut self,
+        _: &[u8; L],
+        start: u32,
+        end: u32,
+        _: &[u8; C],
+    ) {
+        self.push2(start, end);
+    }
+
+    /// The tape makes no span words, so a writer's shared-words arms are the JSON copy's
+    /// alone and its explicit-offset arms the tape's path.
+    #[inline]
+    pub fn span_words(_: u32, _: u32) -> Option<SpanWords> {
+        None
+    }
+
+    /// Unreached: the tape makes no span words.
+    #[inline]
+    pub fn start_end_head_words<const L: usize, const C: usize>(
+        &mut self,
+        _: &[u8; L],
+        _: SpanWords,
+        _: &[u8; C],
+    ) {
+        self.fail(SinkError::Unbalanced);
+    }
+
+    /// Unreached: the tape makes no span words.
+    #[inline]
+    pub fn start_end_tail_words<const L: usize, const C: usize>(
+        &mut self,
+        _: &[u8; L],
+        _: SpanWords,
+        _: &[u8; C],
+    ) {
+        self.fail(SinkError::Unbalanced);
+    }
+
+    /// A `start`/`end` pair from byte offsets: its two emitted offsets.
+    #[inline]
+    pub fn span_start_end(&mut self, positions: WirePositions<'_>, start: u32, end: u32) {
+        self.push2(positions.pos(start), positions.pos(end));
+    }
+
+    /// A `start`/`end` pair from byte offsets, behind its key: its two emitted offsets.
+    #[inline]
+    pub fn span_start_end_field(&mut self, positions: WirePositions<'_>, start: u32, end: u32) {
+        self.push2(positions.pos(start), positions.pos(end));
+    }
+}
+
+impl WireSink for TapeWriter<'_> {
+    #[inline]
+    fn raw(&mut self, s: &str) {
+        TapeWriter::raw(self, s);
+    }
+    #[inline]
+    fn raw_fixed<const N: usize>(&mut self, s: &[u8; N]) {
+        TapeWriter::raw_fixed(self, s);
+    }
+    #[inline]
+    fn token(&mut self, s: &str) {
+        TapeWriter::token(self, s);
+    }
+    #[inline]
+    fn null(&mut self) {
+        TapeWriter::null(self);
+    }
+    #[inline]
+    fn string(&mut self, s: &str) {
+        TapeWriter::string(self, s);
+    }
+    #[inline]
+    fn u32(&mut self, n: u32) {
+        TapeWriter::u32(self, n);
+    }
+    #[inline]
+    fn start_end_tail<const L: usize, const C: usize>(
+        &mut self,
+        lead: &[u8; L],
+        start: u32,
+        end: u32,
+        close: &[u8; C],
+    ) {
+        TapeWriter::start_end_tail(self, lead, start, end, close);
+    }
+    #[inline]
+    fn start_end_head<const L: usize, const C: usize>(
+        &mut self,
+        lead: &[u8; L],
+        start: u32,
+        end: u32,
+        close: &[u8; C],
+    ) {
+        TapeWriter::start_end_head(self, lead, start, end, close);
+    }
+    #[inline]
+    fn span_words(start: u32, end: u32) -> Option<SpanWords> {
+        TapeWriter::span_words(start, end)
+    }
+    #[inline]
+    fn start_end_head_words<const L: usize, const C: usize>(
+        &mut self,
+        lead: &[u8; L],
+        words: SpanWords,
+        close: &[u8; C],
+    ) {
+        TapeWriter::start_end_head_words(self, lead, words, close);
+    }
+    #[inline]
+    fn start_end_tail_words<const L: usize, const C: usize>(
+        &mut self,
+        lead: &[u8; L],
+        words: SpanWords,
+        close: &[u8; C],
+    ) {
+        TapeWriter::start_end_tail_words(self, lead, words, close);
+    }
+    #[inline]
+    fn span_start_end(&mut self, positions: WirePositions<'_>, start: u32, end: u32) {
+        TapeWriter::span_start_end(self, positions, start, end);
+    }
+    #[inline]
+    fn span_start_end_field(&mut self, positions: WirePositions<'_>, start: u32, end: u32) {
+        TapeWriter::span_start_end_field(self, positions, start, end);
+    }
+
+    #[inline]
+    fn t_open(&mut self, entry: u16) {
+        TapeWriter::t_open(self, entry);
+    }
+    #[inline]
+    fn t_open_named(&mut self, name: &str) {
+        TapeWriter::t_open_named(self, name);
+    }
+    #[inline]
+    fn t_open_object(&mut self, entry: u16) {
+        TapeWriter::t_open_object(self, entry);
+    }
+    #[inline]
+    fn t_close(&mut self) {
+        TapeWriter::t_close(self);
+    }
+    #[inline]
+    fn t_bit(&mut self, bit: u8) {
+        TapeWriter::t_bit(self, bit);
+    }
+    #[inline]
+    fn t_bit_key(&mut self, key: &str) {
+        TapeWriter::t_bit_key(self, key);
+    }
+    #[inline]
+    fn t_list_open(&mut self) {
+        TapeWriter::t_list_open(self);
+    }
+    #[inline]
+    fn t_list_close(&mut self) {
+        TapeWriter::t_list_close(self);
+    }
+    #[inline]
+    fn t_null_record(&mut self) {
+        TapeWriter::t_null_record(self);
+    }
+    #[inline]
+    fn t_empty_object(&mut self) {
+        TapeWriter::t_empty_object(self);
+    }
+    #[inline]
+    fn t_null_ref(&mut self) {
+        TapeWriter::t_null_ref(self);
+    }
+    #[inline]
+    fn t_bool(&mut self, b: bool) {
+        TapeWriter::t_bool(self, b);
+    }
+    #[inline]
+    fn t_number(&mut self, n: f64) {
+        TapeWriter::t_number(self, n);
+    }
+    #[inline]
+    fn t_tag(&mut self, tag: u32) {
+        TapeWriter::t_tag(self, tag);
+    }
+    #[inline]
+    fn t_keyword(&mut self, vocab: u16, word: &str) {
+        TapeWriter::t_keyword(self, vocab, word);
+    }
+    #[inline]
+    fn t_keyword_key(&mut self, key: &str, word: &str) {
+        TapeWriter::t_keyword_key(self, key, word);
+    }
+    #[inline]
+    fn t_ref(&mut self, s: &[u8]) {
+        TapeWriter::t_ref(self, s);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::super::{Header, TAG_NUMBER, entry_id, field_aux, field_bit, read_header};
+    use super::*;
+    use crate::{LineRule, Wire, WireCoordinates, WireTables};
+
+    const COORDS: WireCoordinates = WireCoordinates::new(LineRule::Lf, LeadingBom::Elided);
+
+    fn words(bytes: &[u8]) -> Vec<u32> {
+        bytes
+            .chunks_exact(4)
+            .map(|c| u32::from_le_bytes([c[0], c[1], c[2], c[3]]))
+            .collect()
+    }
+
+    /// One `css:Combinator` record in a one-item list, its name a keyword, under a header the
+    /// tables describe; a borrowed string is a source slice in UTF-16 units past an elided BOM,
+    /// an owned one a pool entry.
+    #[test]
+    fn writes_records_lists_refs_and_keywords() {
+        let source = "\u{FEFF}é > b";
+        let tables = WireTables::new(source, COORDS, Wire::Span);
+        let mut sink = TapeSink::new();
+        let combinator = entry_id("css:Combinator");
+        let mut w = sink.writer(source, tables.positions(), LeadingBom::Elided);
+        w.t_list_open();
+        w.t_open(combinator);
+        w.t_keyword(field_aux(combinator, "name"), ">");
+        w.span_start_end_field(tables.positions(), 6, 7);
+        w.t_close();
+        w.t_list_close();
+        w.t_ref(&source.as_bytes()[3..5]); // `é`, borrowed
+        w.t_ref(b"pooled");
+        w.t_ref(&source.as_bytes()[..3]); // the elided BOM itself: never a source slice
+        w.t_tag(TAG_NUMBER);
+        w.u32(7);
+        let tape = sink.finish_bytes().expect("finishes");
+        let w = words(&tape);
+        assert_eq!(w[0], MAGIC);
+        assert_eq!(w[3], 14, "body words");
+        assert_eq!(w[4], 9, "pool bytes");
+        assert_eq!(w[6], 7, "pool units");
+        assert_eq!(w[7], 5, "tape text units: the BOM elided");
+        let body = &w[HEADER_WORDS..];
+        assert_eq!(body[0], 1, "one list item");
+        assert_eq!(
+            read_header(body[1]),
+            Some(Header::Typed {
+                entry: combinator,
+                mask: 0
+            })
+        );
+        assert_eq!(body[2], 1, "`>` is the vocabulary's second word");
+        assert_eq!(&body[3..5], &[2, 3], "`>` is source units [2, 3)");
+        assert_eq!(&body[5..7], &[0, 1], "`é` is source units [0, 1)");
+        assert_eq!(&body[7..9], &[u32::MAX, 6], "the first pool entry");
+        assert_eq!(&body[9..11], &[(1u32 + 6).wrapping_neg(), 7]);
+        assert_eq!(body[11], TAG_NUMBER);
+        assert_eq!(
+            &body[12..14],
+            &[0, 7.0f64.to_bits().wrapping_shr(32) as u32]
+        );
+    }
+
+    /// `finish_words` is `finish_bytes` as words, and asking either again gives the same tape.
+    #[test]
+    fn finish_words_is_finish_bytes_and_repeatable() {
+        let source = "a b";
+        let tables = WireTables::new(source, COORDS, Wire::Span);
+        let mut sink = TapeSink::new();
+        let mut w = sink.writer(source, tables.positions(), LeadingBom::Elided);
+        w.t_ref(&source.as_bytes()[..1]);
+        w.t_ref(b"pooled text");
+        let bytes = sink.finish_bytes().expect("finishes");
+        let (words_1, len) = sink
+            .finish_words()
+            .map(|(w, l)| (w.to_vec(), l))
+            .expect("finishes");
+        assert_eq!(len, bytes.len());
+        let as_bytes: Vec<u8> = words_1.iter().flat_map(|w| w.to_ne_bytes()).collect();
+        assert_eq!(&as_bytes[..len], &bytes[..]);
+        let again = sink.finish_bytes().expect("finishes again");
+        assert_eq!(again, bytes, "finish_bytes after finish_words");
+        let (words_2, len_2) = sink
+            .finish_words()
+            .map(|(w, l)| (w.to_vec(), l))
+            .expect("finishes again");
+        assert_eq!((words_2, len_2), (words_1, len), "finish_words twice");
+        // a new document drops the laid-out words
+        let mut w = sink.writer(source, tables.positions(), LeadingBom::Elided);
+        w.t_ref(b"other text");
+        let next = sink.finish_bytes().expect("finishes the next document");
+        let mut fresh = TapeSink::new();
+        let mut w = fresh.writer(source, tables.positions(), LeadingBom::Elided);
+        w.t_ref(b"other text");
+        assert_eq!(
+            next,
+            fresh.finish_bytes().expect("finishes"),
+            "a document after finish_words"
+        );
+    }
+
+    /// A present optional field sets its bit in the header's mask.
+    #[test]
+    fn a_present_bit_moves_the_header() {
+        let source = "a";
+        let tables = WireTables::new(source, COORDS, Wire::Span);
+        let comment = entry_id("css:CSSComment");
+        let bit = field_bit(comment, "position");
+        assert_ne!(bit, NO_BIT);
+        let mut sink = TapeSink::new();
+        let mut w = sink.writer(source, tables.positions(), LeadingBom::Elided);
+        w.t_open(comment);
+        w.t_bit_key("position");
+        w.t_close();
+        let tape = sink.finish_bytes().expect("finishes");
+        assert_eq!(
+            read_header(words(&tape)[HEADER_WORDS]),
+            Some(Header::Typed {
+                entry: comment,
+                mask: 1 << bit
+            })
+        );
+    }
+
+    /// One writer-bug case: its name, the calls that make it, the error it must record.
+    type Case = (&'static str, fn(&mut TapeWriter<'_>), SinkError);
+
+    /// Every writer bug the sink sees refuses the tape, in every build.
+    #[test]
+    fn writer_bugs_refuse_the_tape() {
+        let source = "a";
+        let tables = WireTables::new(source, COORDS, Wire::Span);
+        let cases: [Case; 9] = [
+            (
+                "a bit with none open",
+                |w| w.t_bit(0),
+                SinkError::Unbalanced,
+            ),
+            (
+                "a bit on a list",
+                |w| {
+                    w.t_list_open();
+                    w.t_bit(0);
+                    w.t_list_close();
+                },
+                SinkError::Unbalanced,
+            ),
+            (
+                "open at the finish",
+                |w| w.t_list_open(),
+                SinkError::Unbalanced,
+            ),
+            (
+                "close with none open",
+                |w| w.t_close(),
+                SinkError::Unbalanced,
+            ),
+            (
+                "a list closed as a record",
+                |w| {
+                    w.t_list_open();
+                    w.t_close();
+                },
+                SinkError::Unbalanced,
+            ),
+            (
+                "an out-of-vocabulary keyword",
+                |w| w.t_keyword(field_aux(entry_id("css:Combinator"), "name"), "<"),
+                SinkError::Keyword,
+            ),
+            (
+                "an unknown entry",
+                |w| w.t_open_named("css:Nope"),
+                SinkError::Name,
+            ),
+            (
+                "an unknown key",
+                |w| {
+                    w.t_open(entry_id("css:Combinator"));
+                    w.t_bit_key("nope");
+                    w.t_close();
+                },
+                SinkError::Name,
+            ),
+            (
+                "a key asked of a list",
+                |w| {
+                    w.t_list_open();
+                    w.t_bit_key("name");
+                    w.t_list_close();
+                },
+                SinkError::Unbalanced,
+            ),
+        ];
+        let mut sink = TapeSink::new();
+        for (name, case, expected) in cases {
+            let mut w = sink.writer(source, tables.positions(), LeadingBom::Elided);
+            case(&mut w);
+            assert_eq!(sink.finish_bytes(), Err(expected), "{name}");
+            assert_eq!(sink.finish_words().map(|_| ()), Err(expected), "{name}");
+        }
+        // a fresh document clears the error
+        let _ = sink.writer(source, tables.positions(), LeadingBom::Elided);
+        assert!(sink.finish_bytes().is_ok());
+    }
+}

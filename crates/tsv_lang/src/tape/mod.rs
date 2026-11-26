@@ -17,6 +17,10 @@
 
 #[rustfmt::skip]
 pub mod shapes;
+#[cfg(feature = "_json")]
+mod sink;
+#[cfg(feature = "_json")]
+pub use sink::{SinkError, TapeSink, TapeWriter};
 
 /// How a field is laid down on the tape (`docs/tape_format.md` §Field encodings). The
 /// discriminants are the codes the generated JS decoder's tables carry.
@@ -148,6 +152,75 @@ pub fn generic_header(entry: u16, mask: u32) -> u32 {
     (2 + mask * MAX_ENTRIES + u32::from(entry)).wrapping_neg()
 }
 
+/// The header word of a record of `entry` with presence mask `mask`: its fast shape's id, else
+/// its entry-generic header. Every entry's all-required mask (`0`) is a fast shape, the first of
+/// its entry's run.
+#[must_use]
+#[inline]
+pub fn header_of(entry: u16, mask: u32) -> u32 {
+    if mask == 0 {
+        return u32::from(SHAPE_STARTS[usize::from(entry)]) + 1;
+    }
+    shape_id(entry, mask).unwrap_or_else(|| generic_header(entry, mask))
+}
+
+// The compile-time lookups a direct writer's sites make (`tsv_css`'s `entry!` / `bit!` /
+// `keyword!`), each in a `const` so a name the table lacks fails the build. Each is the
+// generated `const fn` match of `shapes` (`entry_named`, `field_named`, `keyword_named`) with
+// the miss turned into that build error; a lookup a site can only make at run time asks the
+// same generated match.
+
+/// The id of the tape entry named `name` (`css:Rule`, `~CSSRuleMetadata`).
+#[must_use]
+#[expect(
+    clippy::panic,
+    reason = "a compile-time lookup: evaluated in a `const`, the panic is a build error"
+)]
+pub const fn entry_id(name: &str) -> u16 {
+    match shapes::entry_named(name.as_bytes()) {
+        Some(entry) => entry,
+        None => panic!("no tape entry of that name"),
+    }
+}
+
+/// Entry `entry`'s field `key`.
+#[must_use]
+#[expect(
+    clippy::panic,
+    reason = "a compile-time lookup: evaluated in a `const`, the panic is a build error"
+)]
+pub const fn field_of(entry: u16, key: &str) -> Field {
+    match shapes::field_named(entry, key.as_bytes()) {
+        Some(index) => shapes::ENTRIES[entry as usize].fields[index as usize],
+        None => panic!("the tape entry has no field of that key"),
+    }
+}
+
+/// The presence-mask bit of entry `entry`'s field `key` ([`NO_BIT`] for a required one).
+#[must_use]
+pub const fn field_bit(entry: u16, key: &str) -> u8 {
+    field_of(entry, key).bit
+}
+
+/// The `aux` of entry `entry`'s field `key` (a keyword field's vocabulary).
+#[must_use]
+pub const fn field_aux(entry: u16, key: &str) -> u16 {
+    field_of(entry, key).aux
+}
+
+/// The index of the keyword `word` in vocabulary `vocab`.
+#[must_use]
+#[expect(
+    clippy::panic,
+    reason = "a compile-time lookup: evaluated in a `const`, the panic is a build error"
+)]
+pub const fn keyword_id(vocab: u16, word: &str) -> u32 {
+    match shapes::keyword_named(vocab, word.as_bytes()) {
+        Some(index) => index,
+        None => panic!("the keyword is outside its vocabulary"),
+    }
+}
+
 /// What a record's header word says.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Header {
@@ -203,5 +276,60 @@ mod tests {
         for entry in 0..=shapes::ENTRIES.len() as u16 + 1 {
             assert_eq!(shape_id(entry, 0), search(entry, 0), "({entry}, 0)");
         }
+    }
+
+    /// `header_of` is the fast shape's id where the list holds the pair, else the entry-generic
+    /// header, and `read_header` reads either back to the pair.
+    #[test]
+    fn header_of_reads_back() {
+        for entry in 0..shapes::ENTRIES.len() as u16 {
+            for mask in [0, 1, 2, 3, 0x7ff] {
+                let header = header_of(entry, mask);
+                assert_eq!(
+                    header,
+                    shape_id(entry, mask).unwrap_or_else(|| generic_header(entry, mask))
+                );
+                assert_eq!(read_header(header), Some(Header::Typed { entry, mask }));
+            }
+        }
+    }
+
+    /// The generated name lookups answer what a scan of the tables answers, for every name,
+    /// key and word, and miss for one the tables lack.
+    #[test]
+    fn generated_lookups_are_the_tables_answers() {
+        for (id, entry) in shapes::ENTRIES.iter().enumerate() {
+            let id = id as u16;
+            assert_eq!(shapes::entry_named(entry.name.as_bytes()), Some(id));
+            assert_eq!(entry_id(entry.name), id);
+            for (i, field) in entry.fields.iter().enumerate() {
+                let first = entry.fields.iter().position(|f| f.key == field.key);
+                assert_eq!(first, Some(i), "{}: key {:?} twice", entry.name, field.key);
+                assert_eq!(shapes::field_named(id, field.key.as_bytes()), Some(i as u8));
+                assert_eq!(field_bit(id, field.key), field.bit);
+                assert_eq!(field_aux(id, field.key), field.aux);
+            }
+            assert_eq!(shapes::field_named(id, b"no such key"), None);
+        }
+        assert_eq!(shapes::entry_named(b"no such entry"), None);
+        assert_eq!(
+            shapes::field_named(shapes::ENTRIES.len() as u16, b"type"),
+            None
+        );
+        for (vocab, words) in shapes::KEYWORDS.iter().enumerate() {
+            let vocab = vocab as u16;
+            for (i, word) in words.iter().enumerate() {
+                assert_eq!(
+                    shapes::keyword_named(vocab, word.as_bytes()),
+                    Some(i as u32)
+                );
+                assert_eq!(keyword_id(vocab, word), i as u32);
+            }
+            assert_eq!(shapes::keyword_named(vocab, b"no such word"), None);
+        }
+        assert_eq!(
+            shapes::keyword_named(shapes::KEYWORDS.len() as u16, b"var"),
+            None
+        );
     }
 }

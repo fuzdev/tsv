@@ -672,10 +672,13 @@ export function generate_tape_rust(schema: TapeSchema): string {
 			` — edit those,`,
 		'//! never this file; `npm run check:ast-schema` holds the two together.',
 		'//!',
-		"//! The tape schema the transcoder writes against and `tsv_debug`'s printer reads: the tape",
-		'//! entries with their fields in wire order, the keyword vocabularies, the fast shapes, and',
+		"//! The tape schema every tape producer writes against and `tsv_debug`'s printer reads: the",
+		'//! tape entries with their fields in wire order, the keyword vocabularies, the fast shapes,',
 		'//! the byte-keyed lookup of the keys an entry carries ahead of its `type` (the transcoder',
-		'//! builds its `type` lookup from `ENTRIES` itself, at compile time).',
+		'//! builds its `type` lookup from `ENTRIES` itself, at compile time), and the name lookups a',
+		"//! direct writer's sites ask — an entry by name, a field by key, a keyword by its text —",
+		'//! as `const fn` matches, answered at compile time in a `const` and as a jump and a compare',
+		'//! at run time.',
 		'',
 		'use super::{Enc, Entry, Field, NO_AUX, NO_BIT};',
 		'',
@@ -738,6 +741,48 @@ export function generate_tape_rust(schema: TapeSchema): string {
 	for (const [key, enc] of [...schema.pre_type].sort((a, b) => by_text(a[0], b[0]))) {
 		out.push(`        b${rust_string(key)} => Some(Enc::${rust_enc(enc)}),`);
 	}
+	out.push('        _ => None,', '    }', '}');
+	out.push(
+		'',
+		'/// The id of the tape entry named `name` (`ENTRIES[id].name`: `Identifier`, `css:Rule`,',
+		'/// `~CSSRuleMetadata`).',
+		'#[must_use]',
+		'pub const fn entry_named(name: &[u8]) -> Option<u16> {',
+		'    match name {'
+	);
+	schema.entries.forEach((e, id) => out.push(`        b${rust_string(e.name)} => Some(${id}),`));
+	out.push(
+		'        _ => None,',
+		'    }',
+		'}',
+		'',
+		"/// The index of the field `key` in entry `entry`'s `fields`.",
+		'#[must_use]',
+		'pub const fn field_named(entry: u16, key: &[u8]) -> Option<u8> {',
+		'    match entry {'
+	);
+	schema.entries.forEach((e, id) => {
+		if (e.fields.length === 0) return;
+		const arms = e.fields.map((f, i) => `b${rust_string(f.key)} => Some(${i})`);
+		out.push(`        ${id} => match key {`);
+		for (const arm of arms) out.push(`            ${arm},`);
+		out.push('            _ => None,', '        },');
+	});
+	out.push(
+		'        _ => None,',
+		'    }',
+		'}',
+		'',
+		'/// The index of the keyword `word` in vocabulary `vocab` (`KEYWORDS[vocab]`).',
+		'#[must_use]',
+		'pub const fn keyword_named(vocab: u16, word: &[u8]) -> Option<u32> {',
+		'    match vocab {'
+	);
+	lists.forEach((list, vocab) => {
+		out.push(`        ${vocab} => match word {`);
+		list.forEach((w, i) => out.push(`            b${rust_string(w)} => Some(${i}),`));
+		out.push('            _ => None,', '        },');
+	});
 	out.push('        _ => None,', '    }', '}');
 	return `${out.join('\n')}\n`;
 }

@@ -103,6 +103,8 @@ pub mod tape;
 #[doc(hidden)]
 pub mod value_runs;
 mod whitespace;
+#[cfg(feature = "_json")]
+mod wire_sink;
 
 #[doc(hidden)]
 pub use comment::{
@@ -152,3 +154,6 @@ pub use whitespace::{
     is_js_whitespace, stop_byte_may_be_js_whitespace, trim_end_js_whitespace, trim_js_whitespace,
     trim_start_js_whitespace,
 };
+#[cfg(feature = "_json")]
+#[doc(hidden)]
+pub use wire_sink::WireSink;
