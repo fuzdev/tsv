@@ -255,28 +255,36 @@ macro_rules! parse_internal {
 
 /// A binding's whole **tape** export body: [`parse_convert!`]'s span-only wire
 /// (`convert_ast_json_bytes`), transcoded on this thread's parked transcoder
-/// ([`tape::with_transcoder`]) into `$out` as the tape's words
+/// ([`tape::with_transcoder`]) to the tape's words
 /// ([`tape::Transcoder::transcode_words`]) — the binary parse wire (`docs/tape_format.md`) a
 /// JS host decodes to the tree `JSON.parse` makes of the same wire. The transcoder reads the
 /// text the wire's offsets index, `$lang::WIRE_COORDINATES.wire_text(source)`: a Svelte or CSS
 /// document less the leading byte-order mark its wire elides.
 ///
-/// A parse error goes through `$map_err` as in [`parse_convert!`] (the goal read as it reads
-/// it); a transcode error, through `$map_tape_err` — a wire the writers emit never fails one
-/// but on size (a source too long for a string ref's signed offset). Expands to
-/// `Result<usize, _>`, the tape's length in bytes; `$out` is a `&mut Vec<u32>` the binding
-/// owns (a fresh one it gives away whole, or a parked one it lends the host a view of).
-/// Behind the `tape` feature.
+/// The words are the transcoder's own buffer, lent to `$take` — `|words: &[u32], len: usize|`,
+/// `len` the tape's length in bytes — which takes what the binding hands its host: a copy it
+/// gives away whole, or the address a view over the parked buffer reads (valid until the
+/// thread's next transcode). A parse error goes through `$map_err` as in [`parse_convert!`]
+/// (the goal read as it reads it); a transcode error, through `$map_tape_err` — a wire the
+/// writers emit never fails one but on size (a source too long for a string ref's signed
+/// offset). Expands to `Result<R, _>`, `R` what `$take` returns. Behind the `tape` feature.
 ///
 /// ```ignore
-/// parse_tape!(goal, tsv_ts, source, goal, &mut words, |e| Failure::parse(&e), |e| internal(e))
+/// parse_tape!(
+///     goal,
+///     tsv_ts,
+///     source,
+///     goal,
+///     |words: &[u32], _len: usize| words.to_vec(),
+///     |e| Failure::parse(&e),
+///     |e| internal(e)
+/// )
 /// ```
 #[cfg(feature = "tape")]
 #[macro_export]
 macro_rules! parse_tape {
-    ($goalness:ident, $lang:ident, $source:expr, $goal:expr, $out:expr, $map_err:expr, $map_tape_err:expr) => {{
+    ($goalness:ident, $lang:ident, $source:expr, $goal:expr, $take:expr, $map_err:expr, $map_tape_err:expr) => {{
         let source: &str = $source;
-        let out: &mut ::std::vec::Vec<u32> = $out;
         $crate::parse_convert!(
             $goalness,
             $lang,
@@ -287,7 +295,9 @@ macro_rules! parse_tape {
         )
         .and_then(|json| {
             $crate::tape::with_transcoder(|transcoder| {
-                transcoder.transcode_words(&json, $lang::WIRE_COORDINATES.wire_text(source), out)
+                transcoder
+                    .transcode_words(&json, $lang::WIRE_COORDINATES.wire_text(source))
+                    .map(|(words, len)| ($take)(words, len))
             })
             .map_err($map_tape_err)
         })

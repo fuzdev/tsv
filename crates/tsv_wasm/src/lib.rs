@@ -665,42 +665,34 @@ macro_rules! wire_json {
     };
 }
 
-#[cfg(feature = "parse")]
-thread_local! {
-    /// The last tape a `parse_tape_<lang>` export wrote, parked between calls: the export hands
-    /// its host a view of these words in linear memory rather than a copy.
-    static TAPE: std::cell::Cell<Option<Vec<u32>>> = const { std::cell::Cell::new(None) };
-}
-
-/// Run a tape export's body over the parked tape buffer and hand back a view of what it
-/// wrote: a `Uint32Array` over the words in this instance's linear memory, no copy, its
-/// exact bytes the header's length.
+/// A view of a tape's words in this instance's linear memory, no copy: a `Uint32Array` over
+/// `words` (`(offset, len)`, the address and word count [`tape_words_at`] reads off the words
+/// `parse_tape!` lends it), its exact bytes the header's length.
 ///
-/// Take and park, as the stores and the doc arena are held: the buffer leaves the slot for
-/// the call and goes back, full, before the view is built — so a trap inside `fill` leaves
-/// the slot empty rather than locked (the next call starts a fresh buffer), and the view's
-/// words stay where they are once the export returns. The view is built last, from the
-/// memory's buffer as it stands after every growth the call made, and reads through the
-/// safe typed-array constructor over that buffer, never `Uint32Array::view`.
+/// The words are the thread's parked transcoder's own buffer (`tsv_arena::tape::with_transcoder`,
+/// take and park, so a trap inside the export leaves the slot empty — the next call starts a
+/// fresh transcoder — rather than locked), so the one buffer the transcoder keeps is the one the
+/// host reads, and they stay where they are once the export returns. The view is built last,
+/// from the memory's buffer as it stands after every growth the call made, and reads through
+/// the safe typed-array constructor over that buffer, never `Uint32Array::view`.
 ///
 /// **The view's lifetime is the host's to keep short.** It reads valid words until the next
-/// call into this instance: that call takes the slot and overwrites it, and any growth of
-/// the memory detaches the view's buffer. The npm facade decodes it synchronously, calling
-/// nothing in between; a host reading the raw export directly must do the same, or copy.
-/// The buffer is parked uncapped — an instance keeps what its largest input grew, like its
-/// stores and doc arena (`reinstantiate()` is the release valve).
+/// call into this instance: a tape export overwrites the buffer, and any growth of the memory
+/// detaches the view's buffer. The npm facade decodes it synchronously, calling nothing in
+/// between; a host reading the raw export directly must do the same, or copy. The buffer is
+/// parked uncapped — an instance keeps what its largest input grew, like its stores and doc
+/// arena (`reinstantiate()` is the release valve).
 #[cfg(feature = "parse")]
-fn tape_view(
-    fill: impl FnOnce(&mut Vec<u32>) -> Result<usize, Failure>,
-) -> Result<JsValue, Failure> {
-    let mut words = TAPE.take().unwrap_or_default();
-    let filled = fill(&mut words);
-    // a pointer into linear memory is a 32-bit offset on the shipped target
-    let (offset, len) = (words.as_ptr() as usize as u32, words.len() as u32);
-    TAPE.set(Some(words));
-    filled?;
+fn tape_view((offset, len): (u32, u32)) -> JsValue {
     let memory = wasm_bindgen::memory().unchecked_into::<js_sys::WebAssembly::Memory>();
-    Ok(js_sys::Uint32Array::new_with_byte_offset_and_length(&memory.buffer(), offset, len).into())
+    js_sys::Uint32Array::new_with_byte_offset_and_length(&memory.buffer(), offset, len).into()
+}
+
+/// Where a tape's words sit in linear memory, for [`tape_view`]: a pointer into linear memory
+/// is a 32-bit offset on the shipped target.
+#[cfg(feature = "parse")]
+fn tape_words_at(words: &[u32], _len: usize) -> (u32, u32) {
+    (words.as_ptr() as usize as u32, words.len() as u32)
 }
 
 /// A transcode the tape export could not finish, thrown as a plain `Error`: a wire the
@@ -803,17 +795,16 @@ macro_rules! lang_bindings {
                 Family::Parse,
             )
             .map_err(err)?;
-            tape_view(|words| {
-                parse_tape!(
-                    $goalness,
-                    $lang,
-                    source,
-                    goal,
-                    words,
-                    |e: Error| parse_failure(&e),
-                    tape_failure
-                )
-            })
+            parse_tape!(
+                $goalness,
+                $lang,
+                source,
+                goal,
+                tape_words_at,
+                |e: Error| parse_failure(&e),
+                tape_failure
+            )
+            .map(tape_view)
             .or_else(Failure::into_return)
         }
 

@@ -674,7 +674,8 @@ export function generate_tape_rust(schema: TapeSchema): string {
 		'//!',
 		"//! The tape schema the transcoder writes against and `tsv_debug`'s printer reads: the tape",
 		'//! entries with their fields in wire order, the keyword vocabularies, the fast shapes, and',
-		"//! the two byte-keyed lookups the transcoder resolves an object's entry with.",
+		'//! the byte-keyed lookup of the keys an entry carries ahead of its `type` (the transcoder',
+		'//! builds its `type` lookup from `ENTRIES` itself, at compile time).',
 		'',
 		'use super::{Enc, Entry, Field, NO_AUX, NO_BIT};',
 		'',
@@ -728,19 +729,6 @@ export function generate_tape_rust(schema: TapeSchema): string {
 	for (const s of schema.shapes) out.push(`    (${s.entry}, ${s.mask}),`);
 	out.push(
 		'];',
-		'',
-		'/// The candidate entries of a `type` value, in table order.',
-		'#[must_use]',
-		"pub fn entries_of_type(ty: &[u8]) -> &'static [u16] {",
-		'    match ty {'
-	);
-	for (const [type, ids] of [...schema.by_type].sort((a, b) => by_text(a[0], b[0]))) {
-		out.push(`        b${rust_string(type)} => &[${ids.join(', ')}],`);
-	}
-	out.push(
-		'        _ => &[],',
-		'    }',
-		'}',
 		'',
 		'/// The encoding of a key some typed entry carries ahead of its `type`.',
 		'#[must_use]',

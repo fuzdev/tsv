@@ -337,15 +337,17 @@ The binary parse wire ([../../docs/tape_format.md](../../docs/tape_format.md)): 
 `parse_tape_<lang>(source, source_type?)` lays the span-only wire down as words (`tsv_arena`'s
 `parse_tape!`, the body all three bindings share) and returns a `Uint32Array` **view** of this
 instance's linear memory — no copy — or the `{ok: false, error}` every parse export returns.
-The words live in a parked thread-local buffer (`TAPE`, `src/lib.rs`): taken for the call and
-parked back full before the view is built (take and park, so a trap leaves the slot empty, never
-locked), and the view is made last, by the safe `js_sys::Uint32Array::new_with_byte_offset_and_length`
-over `wasm_bindgen::memory()`'s buffer as it stands after every growth the call made — never the
-unsafe `Uint32Array::view`. A `u32` buffer makes the view 4-aligned by type; the tape's exact
-bytes are its header's length, the array padded to a whole word.
+The words are the thread's parked transcoder's own buffer (`tsv_arena::tape::with_transcoder`,
+`tape_view` in `src/lib.rs`), the one the tape was written into, so the instance keeps one
+tape-sized buffer: the transcoder is taken for the call and parked back before the view is built
+(take and park, so a trap leaves the slot empty, never locked), and the view is made last, by
+the safe `js_sys::Uint32Array::new_with_byte_offset_and_length` over `wasm_bindgen::memory()`'s
+buffer as it stands after every growth the call made — never the unsafe `Uint32Array::view`. A
+`u32` buffer makes the view 4-aligned by type; the tape's exact bytes are its header's length,
+the array padded to a whole word.
 
-**The view is valid until the next call into the instance** — that call takes the slot and
-overwrites it, and any memory growth detaches the view's buffer. A reader decodes it
+**The view is valid until the next call into the instance** — a tape export there overwrites
+the buffer, and any memory growth detaches the view's buffer. A reader decodes it
 synchronously, calling nothing in between, or copies it. The buffer, like the stores and the doc
 arena, is parked uncapped ([Memory Residency](#memory-residency)). Like `parse_internal_*`, the
 export is engine plumbing: `patch_npm_package.ts` names it in `ENGINE_ONLY_PREFIXES`, so no

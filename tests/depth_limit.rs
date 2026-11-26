@@ -649,10 +649,13 @@ fn assert_tape(name: &str, language: &str, span: &[u8], source: &str) {
         "{name}: the tape prints back to another wire"
     );
     // the bindings' form: the same tape as words, on the thread's parked transcoder
-    let mut words = Vec::new();
-    let len = tsv_arena::tape::with_transcoder(|t| t.transcode_words(span, source, &mut words))
-        .unwrap_or_else(|e| panic!("{name}: the parked transcoder refused the wire: {e}"));
-    let laid: Vec<u8> = words.iter().flat_map(|w| w.to_ne_bytes()).collect();
+    let (laid, len) = tsv_arena::tape::with_transcoder(|t| {
+        t.transcode_words(span, source).map(|(words, len)| {
+            let laid: Vec<u8> = words.iter().flat_map(|w| w.to_ne_bytes()).collect();
+            (laid, len)
+        })
+    })
+    .unwrap_or_else(|e| panic!("{name}: the parked transcoder refused the wire: {e}"));
     assert!(
         laid.get(..len) == Some(tape),
         "{name}: the word tape is not the byte tape"

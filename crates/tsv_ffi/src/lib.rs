@@ -204,8 +204,8 @@ where
     }
 }
 
-/// [`with_source_string`] for the tape exports: `f` writes the tape's words into a fresh
-/// buffer and returns its length in bytes, and every payload — the tape, or an error's
+/// [`with_source_string`] for the tape exports: `f` returns the tape's words, an exact copy
+/// it owns, and their length in bytes, and every payload — the tape, or an error's
 /// `{"error": "…"}` JSON — is a word allocation ([`words_to_ptr`]), 4-aligned by its type so
 /// a host can view the tape's words in place, and freed by [`tsv_free_tape`].
 ///
@@ -226,13 +226,10 @@ unsafe fn with_source_tape<F>(
     f: F,
 ) -> *mut u8
 where
-    F: FnOnce(&str, &mut Vec<u32>) -> Result<usize, String> + panic::UnwindSafe,
+    F: FnOnce(&str) -> Result<(Vec<u32>, usize), String> + panic::UnwindSafe,
 {
     let render = |source: &str| {
-        let written = panic::catch_unwind(|| {
-            let mut words = Vec::new();
-            f(source, &mut words).map(|len| (words, len))
-        });
+        let written = panic::catch_unwind(|| f(source));
         match written {
             // SAFETY: `words_to_ptr` needs `out_len` / `out_status` aligned and valid for
             // writes, which is this function's own contract, and `len` is the tape's byte
@@ -312,7 +309,7 @@ unsafe fn error_result(message: &str, out_len: *mut usize, out_status: *mut u32)
 }
 
 /// A word payload as the tape exports return it: `words` leaked as a `Box<[u32]>` (its
-/// length is its capacity — `transcode_words` and [`pack_words`] fill a fresh buffer exactly,
+/// length is its capacity — a copy of `transcode_words`' words and [`pack_words`] are exact,
 /// so no reallocation happens here) and its address returned as the uniform `*mut u8`,
 /// 4-aligned by the allocation's type; `len`, the payload's length in BYTES (the last word's
 /// padding not counted), written to `out_len` and `status` to `out_status`.
@@ -574,26 +571,20 @@ macro_rules! lang_bindings {
             // out-params) is this export's own, the module-level safety contract,
             // forwarded verbatim.
             unsafe {
-                with_source_tape(
-                    source_ptr,
-                    source_len,
-                    out_len,
-                    out_status,
-                    |source, words| {
-                        // parse export: the unspecified code is refused (see the first arm)
-                        let goal =
-                            ffi_source_type(source_type, goal_allowed!($goalness), Family::Parse)?;
-                        parse_tape!(
-                            $goalness,
-                            $lang,
-                            source,
-                            goal,
-                            words,
-                            |e| format!("{e:#}"),
-                            |e| format!("the parse does not fit a tape: {e}")
-                        )
-                    },
-                )
+                with_source_tape(source_ptr, source_len, out_len, out_status, |source| {
+                    // parse export: the unspecified code is refused (see the first arm)
+                    let goal =
+                        ffi_source_type(source_type, goal_allowed!($goalness), Family::Parse)?;
+                    parse_tape!(
+                        $goalness,
+                        $lang,
+                        source,
+                        goal,
+                        |words: &[u32], len: usize| (words.to_vec(), len),
+                        |e| format!("{e:#}"),
+                        |e| format!("the parse does not fit a tape: {e}")
+                    )
+                })
             }
         }
 

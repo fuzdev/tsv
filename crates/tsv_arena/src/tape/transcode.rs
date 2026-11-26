@@ -15,12 +15,12 @@
 //! shallow.
 
 use super::shapes::{
-    ENTRIES, KEYWORDS, PRE_TYPE_MAX, SHAPES_HASH, TAPE_FORMAT_VERSION, entries_of_type,
-    pre_type_encoding,
+    ENTRIES, KEYWORDS, PRE_TYPE_MAX, SHAPES_HASH, TAPE_FORMAT_VERSION, pre_type_encoding,
 };
 use super::{
     Enc, HEADER_ESCAPE, HEADER_NULL, HEADER_WORDS, MAGIC, NO_AUX, NO_BIT, NULL_REF, TAG_ARRAY,
-    TAG_FALSE, TAG_NULL, TAG_NUMBER, TAG_OBJECT, TAG_STRING, TAG_TRUE, generic_header, shape_id,
+    TAG_FALSE, TAG_NULL, TAG_NUMBER, TAG_OBJECT, TAG_STRING, TAG_TRUE, candidates_of_type,
+    eq_short, first_of_type, generic_header, next_of_type, shape_id,
 };
 use std::collections::HashMap;
 
@@ -67,8 +67,15 @@ pub struct Transcoder {
     frames: Vec<Frame>,
     /// The attempt each object refitted to, by its opening brace and position context: a re-read
     /// of an enclosing object starts it there, so an object is refitted at most once per
-    /// candidate however many times its ancestors are rewound.
+    /// candidate however many times its ancestors are rewound. Each rewind still re-reads its
+    /// object's whole text, so a chain of objects each refused at its close costs time
+    /// quadratic in the chain's depth — crafted JSON only: the parsers' depth limits bound a
+    /// writer's wire, where a refusal after an object's children is rare and never nests.
     settled: HashMap<(usize, u16), (u16, bool)>,
+    /// Where the furthest refused step began: every object [`Transcoder::settled`] holds
+    /// opened before it, so an object opening at or past it is read for the first time and
+    /// needs no lookup.
+    reread_end: usize,
     /// How many object rewinds the last transcode took.
     refits: usize,
     scratch: Vec<u8>,
@@ -352,6 +359,55 @@ fn find(haystack: &[u8], needle: &[u8]) -> Option<usize> {
 /// `u32`: its value and end.
 #[inline]
 fn plain_u32(json: &[u8], p: usize) -> Option<(u32, usize)> {
+    const L: u64 = 0x0101_0101_0101_0101;
+    const H: u64 = 0x8080_8080_8080_8080;
+    // fewer than eight digits, read eight bytes at a time with no branch per digit: the
+    // non-digit bytes found word-wise (exact up to the first one, all this needs), the digits
+    // ahead of it shifted to the word's top as leading zeros and combined pairwise
+    if let Some(chunk) = json.get(p..p + 8) {
+        let w = u64::from_le_bytes([
+            chunk[0], chunk[1], chunk[2], chunk[3], chunk[4], chunk[5], chunk[6], chunk[7],
+        ]);
+        let non_digit = ((w.wrapping_sub(0x30 * L) & !w) | w.wrapping_add(0x46 * L) | w) & H;
+        let n = (non_digit.trailing_zeros() / 8) as usize;
+        if (1..8).contains(&n) {
+            if matches!(chunk[n], b'.' | b'e' | b'E') {
+                return None;
+            }
+            let mut v = w.wrapping_sub(0x30 * L) << (8 * (8 - n));
+            v = (v.wrapping_mul(10) + (v >> 8)) & 0x00FF_00FF_00FF_00FF;
+            v = (v.wrapping_mul(100) + (v >> 16)) & 0x0000_FFFF_0000_FFFF;
+            v = (v.wrapping_mul(10000) + (v >> 32)) & 0xFFFF_FFFF;
+            return Some((v as u32, p + n));
+        }
+        if n == 0 {
+            return None;
+        }
+    }
+    // up to ten digits accumulate in a `u64` with no overflow, checked once at the end
+    let mut q = p;
+    let mut v: u64 = 0;
+    while q < p + 10 {
+        match json.get(q) {
+            Some(&c) if c.is_ascii_digit() => {
+                v = v * 10 + u64::from(c - b'0');
+                q += 1;
+            }
+            _ => break,
+        }
+    }
+    if q == p + 10 && at(json, q).is_ascii_digit() {
+        return plain_u32_long(json, p);
+    }
+    if q == p || v > u64::from(u32::MAX) || matches!(at(json, q), b'.' | b'e' | b'E') {
+        return None;
+    }
+    Some((v as u32, q))
+}
+
+/// [`plain_u32`] past ten digits, which only leading zeros keep in range.
+#[cold]
+fn plain_u32_long(json: &[u8], p: usize) -> Option<(u32, usize)> {
     let mut q = p;
     let mut v: u64 = 0;
     while let Some(&c) = json.get(q) {
@@ -448,17 +504,19 @@ impl Transcoder {
         self.finish()
     }
 
-    /// [`Transcoder::transcode`], the tape written into `out` as words — the form a binding
-    /// hands a host, since a `u32` buffer is 4-aligned by its type and a JS host views the tape
-    /// in place (a `Uint32Array`, then the exact bytes over the same memory). Each word's bytes
-    /// in memory are the tape's bytes in order, on any host: the header and body words are
-    /// stored little-endian and the pool packed into the words after them, its last word
-    /// zero-padded. Returns the tape's length in bytes, the pool's last byte included and the
-    /// padding not.
+    /// [`Transcoder::transcode`], the tape as words — the form a binding hands a host, since a
+    /// `u32` buffer is 4-aligned by its type and a JS host views the tape in place (a
+    /// `Uint32Array`, then the exact bytes over the same memory). Each word's bytes in memory
+    /// are the tape's bytes in order, on any host: the header and body words are stored
+    /// little-endian and the pool packed into the words after them, its last word
+    /// zero-padded. Returns the words and the tape's length in bytes, the pool's last byte
+    /// included and the padding not.
     ///
-    /// `out` is cleared first and grown to the tape's exact word count (`reserve_exact`), so a
-    /// fresh `Vec` comes back with no spare capacity — one a binding gives away whole — and a
-    /// reused one keeps the capacity it has.
+    /// The words are the transcoder's own buffer, the one the transcode wrote the body into —
+    /// the tape is laid out where it was written, never copied — and stay valid until the next
+    /// transcode. A caller that must own them copies the slice (an exact allocation); a caller
+    /// that hands the host a view over them, as the WASM binding does, holds the one buffer a
+    /// parked transcoder already keeps.
     ///
     /// # Errors
     ///
@@ -467,20 +525,17 @@ impl Transcoder {
         &mut self,
         json: &[u8],
         source: &str,
-        out: &mut Vec<u32>,
-    ) -> Result<usize, TapeError> {
+    ) -> Result<(&[u32], usize), TapeError> {
         self.run(json, source)?;
         let header = self.header()?;
-        out.clear();
-        out.reserve_exact(HEADER_WORDS + self.tape.len() + self.pool.len().div_ceil(4));
-        out.extend(
-            header
-                .iter()
-                .chain(self.tape.iter())
-                .map(|word| word.to_le()),
-        );
+        let len = self.tape.len() * 4 + self.pool.len();
+        self.tape[..HEADER_WORDS].copy_from_slice(&header);
+        // a no-op on a little-endian host, the loop with it
+        for word in &mut self.tape {
+            *word = word.to_le();
+        }
         let mut chunks = self.pool.chunks_exact(4);
-        out.extend(
+        self.tape.extend(
             chunks
                 .by_ref()
                 .map(|c| u32::from_ne_bytes([c[0], c[1], c[2], c[3]])),
@@ -489,13 +544,13 @@ impl Transcoder {
         if !rest.is_empty() {
             let mut last = [0u8; 4];
             last[..rest.len()].copy_from_slice(rest);
-            out.push(u32::from_ne_bytes(last));
+            self.tape.push(u32::from_ne_bytes(last));
         }
-        Ok(HEADER_WORDS * 4 + self.tape.len() * 4 + self.pool.len())
+        Ok((&self.tape, len))
     }
 
-    /// Reads the JSON text into `tape` and `pool`: everything a transcode does but lay out its
-    /// output.
+    /// Reads the JSON text into `tape` (after the header's words, which it leaves unwritten) and
+    /// `pool`: everything a transcode does but lay out its output.
     fn run(&mut self, json: &[u8], source: &str) -> Result<(), TapeError> {
         self.start(source)?;
         let mut p = self.open_record(json, 0, NO_ENTRY, Some((0, self.units)))?;
@@ -507,7 +562,7 @@ impl Transcoder {
             };
             p = match step {
                 Ok(p) => p,
-                Err(Stop::Refit) => self.refit()?,
+                Err(Stop::Refit) => self.refit(p)?,
                 Err(Stop::Hard(e)) => return Err(e),
             };
         }
@@ -519,11 +574,13 @@ impl Transcoder {
 
     fn start(&mut self, source: &str) -> Result<(), TapeError> {
         self.tape.clear();
+        self.tape.resize(HEADER_WORDS, 0);
         self.pool.clear();
         self.pool_units = 0;
         self.pending.clear();
         self.frames.clear();
         self.settled.clear();
+        self.reread_end = 0;
         self.refits = 0;
         self.ascii = source.is_ascii();
         self.u2b.clear();
@@ -551,7 +608,7 @@ impl Transcoder {
 
     /// The tape's header words (`docs/tape_format.md` §The tape).
     fn header(&self) -> Result<[u32; HEADER_WORDS], TapeError> {
-        let (words, pool_bytes) = sizes(self.tape.len(), self.pool.len(), self.pool_units)?;
+        let (words, pool_bytes) = sizes(self.body_words(), self.pool.len(), self.pool_units)?;
         Ok([
             MAGIC,
             TAPE_FORMAT_VERSION,
@@ -564,12 +621,17 @@ impl Transcoder {
         ])
     }
 
+    /// The body's word count: the tape buffer past the header's words.
+    #[inline]
+    fn body_words(&self) -> usize {
+        self.tape.len() - HEADER_WORDS
+    }
+
     fn finish(&mut self) -> Result<&[u8], TapeError> {
         let header = self.header()?;
         self.out.clear();
-        self.out
-            .reserve(HEADER_WORDS * 4 + self.tape.len() * 4 + self.pool.len());
-        for word in header.iter().chain(self.tape.iter()) {
+        self.out.reserve(self.tape.len() * 4 + self.pool.len());
+        for word in header.iter().chain(&self.tape[HEADER_WORDS..]) {
             self.out.extend_from_slice(&word.to_le_bytes());
         }
         self.out.extend_from_slice(&self.pool);
@@ -689,8 +751,8 @@ impl Transcoder {
     /// Pushes the frame of an object met in the read: at its first candidate, or at the attempt an
     /// earlier read of it settled on.
     fn open_settled(&mut self, open: usize, context: u16, scope: Scope) {
-        // a rewind is rare, so the map is nearly always empty: skip the hash then
-        let (attempt, escape) = if self.settled.is_empty() {
+        // only a re-read meets an object an earlier read settled: skip the hash otherwise
+        let (attempt, escape) = if open >= self.reread_end {
             (0, false)
         } else {
             self.settled
@@ -723,8 +785,11 @@ impl Transcoder {
     }
 
     /// Rewinds the object a refusal belongs to (popping a list frame above it) and opens it again
-    /// on its next candidate, or self-describing once none is left.
-    fn refit(&mut self) -> Result<usize, TapeError> {
+    /// on its next candidate, or self-describing once none is left; `at` is where the refused
+    /// step began (a step reads every member up to a nested frame), past the rewound object's
+    /// opening brace.
+    fn refit(&mut self, at: usize) -> Result<usize, TapeError> {
+        self.reread_end = self.reread_end.max(at);
         while self.frames.last().is_some_and(|f| f.kind == Kind::List) {
             self.frames.pop();
         }
@@ -745,17 +810,101 @@ impl Transcoder {
         Ok(frame.open + 1)
     }
 
-    /// One member of the object on top, or its close.
+    /// The members of the object on top, up to its close or the first value that opens a frame
+    /// of its own (a nested object or array), which the loop in [`Transcoder::run`] steps next.
     fn step_object(&mut self, json: &[u8], mut p: usize, source: &str) -> Step {
         let top = self.frames.len() - 1;
-        if at(json, p) == b'}' {
-            return self.close_object(json, p, source);
+        loop {
+            if at(json, p) == b'}' {
+                return self.close_object(json, p, source);
+            }
+            if !self.frames[top].first {
+                p = expect(json, p, b',')?;
+            }
+            self.frames[top].first = false;
+            p = expect(json, p, b'"')?;
+            p = match self.predicted_member(json, p, source)? {
+                Some(q) => q,
+                None => self.member(json, p, source)?,
+            };
+            if self.frames.len() != top + 1 {
+                return Ok(p);
+            }
         }
-        if !self.frames[top].first {
-            p = expect(json, p, b',')?;
+    }
+
+    /// A member of a typed object whose key is spelled, unescaped, as one of the fields its
+    /// entry can take next — nearly every member a writer emits: the key is matched against the
+    /// field order's prediction in place, never scanned. `None` leaves the member, unread, to
+    /// [`Transcoder::member`], which gives any key the same answer the slow way.
+    #[inline]
+    fn predicted_member(
+        &mut self,
+        json: &[u8],
+        p: usize,
+        source: &str,
+    ) -> Result<Option<usize>, Stop> {
+        let top = self.frames.len() - 1;
+        let frame = &self.frames[top];
+        if frame.kind != Kind::Typed {
+            return Ok(None);
         }
-        self.frames[top].first = false;
-        p = expect(json, p, b'"')?;
+        if frame.entry == NO_ENTRY {
+            // the `type` that opens nearly every object
+            if json.get(p..p + 5) == Some(&b"type\""[..]) {
+                let q = expect(json, p + 5, b':')?;
+                return self.resolve_type(json, q).map(Some);
+            }
+            return Ok(None);
+        }
+        let fields = ENTRIES[usize::from(frame.entry)].fields;
+        let mut cursor = usize::from(frame.cursor);
+        let field = loop {
+            let Some(field) = fields.get(cursor) else {
+                return Ok(None);
+            };
+            let key = field.key.as_bytes();
+            if json
+                .get(p..p + key.len())
+                .is_some_and(|spelled| eq_short(spelled, key))
+                && at(json, p + key.len()) == b'"'
+            {
+                break *field;
+            }
+            if field.bit == NO_BIT {
+                return Ok(None);
+            }
+            cursor += 1;
+        };
+        let q = expect(json, p + field.key.len() + 1, b':')?;
+        let frame = &mut self.frames[top];
+        frame.cursor = cursor as u16 + 1;
+        if field.bit != NO_BIT {
+            frame.mask |= 1 << field.bit;
+        }
+        if field.enc == Enc::Offset {
+            // `Enc::Offset` in place, the own span's `start` and `end` read from its one parse
+            let (v, end) = plain_u32(json, q).ok_or(Stop::Refit)?;
+            match field.key {
+                "start" => frame.start = Some(v),
+                "end" => frame.end = Some(v),
+                _ => {}
+            }
+            self.tape.push(v);
+            return Ok(Some(end));
+        }
+        // the own span, as `member` reads it
+        match field.key {
+            "start" => frame.start = plain_u32(json, q).map(|(v, _)| v),
+            "end" => frame.end = plain_u32(json, q).map(|(v, _)| v),
+            _ => {}
+        }
+        self.field(json, q, field.enc, field.aux, source).map(Some)
+    }
+
+    /// One member of the object on top, its key read whatever its spelling.
+    fn member(&mut self, json: &[u8], mut p: usize, source: &str) -> Step {
+        let top = self.frames.len() - 1;
         let key = scan_string(json, p)?;
         p = expect(json, key.end + 1, b':')?;
         let key_bytes: &[u8] = if key.escaped {
@@ -802,7 +951,7 @@ impl Transcoder {
             let Some(field) = fields.get(cursor) else {
                 return Err(Stop::Refit);
             };
-            if field.key.as_bytes() == key_bytes {
+            if eq_short(field.key.as_bytes(), key_bytes) {
                 break;
             }
             if field.bit == NO_BIT {
@@ -826,13 +975,31 @@ impl Transcoder {
             return Err(Stop::Refit);
         }
         let s = scan_string(json, p + 1)?;
-        let candidates = entries_of_type(decoded(json, s, &mut self.scratch)?);
+        let first = first_of_type(decoded(json, s, &mut self.scratch)?);
         let frame = &mut self.frames[top];
-        frame.candidates = candidates.len() as u16;
-        let Some(&entry) = candidates.get(usize::from(frame.attempt)) else {
+        frame.candidates = first.map_or(0, candidates_of_type);
+        let mut candidate = first;
+        for _ in 0..frame.attempt {
+            candidate = candidate.and_then(next_of_type);
+        }
+        let Some(entry) = candidate else {
             return Err(Stop::Refit);
         };
         let fields = ENTRIES[usize::from(entry)].fields;
+        if frame.pre_len == 0
+            && let Some(field) = fields.first()
+            && field.key == "type"
+        {
+            // nothing read ahead of a leading `type`: the loop below, unrolled
+            frame.entry = entry;
+            frame.cursor = 1;
+            frame.mask = if field.bit == NO_BIT {
+                0
+            } else {
+                1 << field.bit
+            };
+            return Ok(s.end + 1);
+        }
         let mut cursor = 0;
         let mut mask = 0u32;
         let pre = frame.pre;
@@ -846,7 +1013,7 @@ impl Transcoder {
                     return Err(Stop::Refit);
                 };
                 cursor += 1;
-                if field.key.as_bytes() == name {
+                if eq_short(field.key.as_bytes(), name) {
                     if field.bit != NO_BIT {
                         mask |= 1 << field.bit;
                     }
@@ -920,7 +1087,7 @@ impl Transcoder {
                 let bytes = decoded(json, s, &mut self.scratch)?;
                 let index = KEYWORDS[usize::from(aux)]
                     .iter()
-                    .position(|v| v.as_bytes() == bytes)
+                    .position(|v| eq_short(v.as_bytes(), bytes))
                     .ok_or(Stop::Refit)?;
                 self.tape.push(index as u32);
                 Ok(s.end + 1)
@@ -1083,7 +1250,8 @@ impl Transcoder {
     /// Closes the object on top: checks its entry is complete, resolves its refs and writes its
     /// header.
     fn close_object(&mut self, json: &[u8], p: usize, source: &str) -> Step {
-        let frame = self.frames[self.frames.len() - 1];
+        let frame = &self.frames[self.frames.len() - 1];
+        let (tape_mark, pending_mark) = (frame.tape_mark, frame.pending_mark);
         let header = if frame.kind == Kind::Escape {
             self.tape[frame.count_slot] = frame.count;
             HEADER_ESCAPE
@@ -1098,11 +1266,11 @@ impl Transcoder {
             shape_id(frame.entry, frame.mask)
                 .unwrap_or_else(|| generic_header(frame.entry, frame.mask))
         };
-        let scope = self.own_span(&frame).or(frame.scope);
-        self.resolve(json, source, frame.pending_mark, scope);
-        self.tape[frame.tape_mark] = header;
+        let scope = self.own_span(frame).or(frame.scope);
+        self.resolve(json, source, pending_mark, scope);
+        self.tape[tape_mark] = header;
         self.frames.pop();
-        if self.tape.len() >= u32::MAX as usize {
+        if self.body_words() >= u32::MAX as usize {
             return Err(Stop::Hard(TapeError::TooLarge));
         }
         Ok(p + 1)
@@ -1208,7 +1376,6 @@ mod tests {
     #[test]
     fn the_word_tape_is_the_byte_tape() {
         let mut t = Transcoder::new();
-        let mut out = vec![7; 3];
         for (json, source) in [
             (r#"{"a":1}"#, ""),
             (r#"{"a":"xyz"}"#, ""),
@@ -1217,23 +1384,89 @@ mod tests {
             (r#"{"type":"Identifier","start":0,"end":1,"name":"a"}"#, "a"),
         ] {
             let bytes = t.transcode(json.as_bytes(), source).unwrap().to_vec();
-            let len = t
-                .transcode_words(json.as_bytes(), source, &mut out)
-                .unwrap();
+            let (words, len) = t.transcode_words(json.as_bytes(), source).unwrap();
             assert_eq!(len, bytes.len(), "{json}");
-            assert_eq!(out.len(), bytes.len().div_ceil(4), "{json}");
-            let laid: Vec<u8> = out.iter().flat_map(|w| w.to_ne_bytes()).collect();
+            assert_eq!(words.len(), bytes.len().div_ceil(4), "{json}");
+            let laid: Vec<u8> = words.iter().flat_map(|w| w.to_ne_bytes()).collect();
             assert_eq!(&laid[..len], &bytes[..], "{json}");
             assert!(
                 laid[len..].iter().all(|&b| b == 0),
                 "{json}: the padding is zero"
             );
         }
-        // a fresh buffer comes back holding the tape alone
-        let mut fresh = Vec::new();
-        t.transcode_words(br#"{"a":"xyz"}"#, "", &mut fresh)
-            .unwrap();
-        assert_eq!(fresh.capacity(), fresh.len());
+        // the byte form after the word form, over the same buffers, is still the tape
+        let (_, len) = t.transcode_words(br#"{"a":"xyz"}"#, "").unwrap();
+        let bytes = t.transcode(br#"{"a":"xyz"}"#, "").unwrap();
+        assert_eq!(bytes.len(), len);
+    }
+
+    /// The inline integer reader agrees with the plain digit loop it shortcuts.
+    #[test]
+    fn plain_u32_reads_as_the_digit_loop_does() {
+        let reference = |text: &[u8]| -> Option<(u32, usize)> {
+            let digits = text.iter().take_while(|c| c.is_ascii_digit()).count();
+            if digits == 0 || matches!(text.get(digits), Some(b'.' | b'e' | b'E')) {
+                return None;
+            }
+            let mut v: u64 = 0;
+            for &c in &text[..digits] {
+                v = v * 10 + u64::from(c - b'0');
+                if v > u64::from(u32::MAX) {
+                    return None;
+                }
+            }
+            Some((v as u32, digits))
+        };
+        let mut cases: Vec<String> = Vec::new();
+        for n in [
+            0u64,
+            7,
+            42,
+            999,
+            1_234_567,
+            12_345_678,
+            99_999_999,
+            123_456_789,
+            u64::from(u32::MAX),
+            u64::from(u32::MAX) + 1,
+            99_999_999_999,
+        ] {
+            for tail in ["", ",", "}", "]", ".5", "e3", "E", ":", "\"", "x", "\u{80}"] {
+                cases.push(format!("{n}{tail}"));
+                cases.push(format!("{n}{tail}{}", ",\"start\":12345678901"));
+                cases.push(format!("000{n}{tail}"));
+            }
+        }
+        cases.extend(["", ",", "-1", "/0", ":0", "00000000000000000001,"].map(String::from));
+        for case in &cases {
+            for pad in ["", "x"] {
+                let json = format!("{pad}{case}");
+                let at = pad.len();
+                assert_eq!(
+                    plain_u32(json.as_bytes(), at),
+                    reference(&json.as_bytes()[at..]).map(|(v, n)| (v, at + n)),
+                    "{json:?}"
+                );
+            }
+        }
+    }
+
+    /// The inline compare agrees with the slice compare at every length it branches on.
+    #[test]
+    fn eq_short_is_equality() {
+        let text: Vec<u8> = (0..40u8).map(|i| b'a' + i % 26).collect();
+        for n in 0..=text.len() {
+            let a = &text[..n];
+            assert!(eq_short(a, a), "{n}");
+            for i in 0..n {
+                let mut b = a.to_vec();
+                b[i] ^= 1;
+                assert!(!eq_short(a, &b), "{n} at {i}");
+            }
+            if n > 0 {
+                assert!(!eq_short(a, &a[..n - 1]), "{n} against a prefix");
+            }
+        }
     }
 
     #[test]

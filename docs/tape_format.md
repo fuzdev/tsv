@@ -236,7 +236,11 @@ explicit frame stack — an open object or array is a frame, so a nested value c
   pending refs, read position — and writes it again against the next candidate, then
   self-describing; the attempt it settles on is remembered by its opening brace, so a rewind of an
   enclosing object re-reads it at that attempt, and each object is rewound at most once per
-  candidate however deep the rewinds nest;
+  candidate however deep the rewinds nest. A rewind still re-reads its object's whole text, so
+  a chain of objects each refused only at its close costs time quadratic in the chain's depth —
+  a shape only crafted JSON takes: the parsers' depth limits bound a writer's wire, and in it a
+  refusal after an object's children (a type annotation carrying comments, which its comment-free
+  variant refuses only at the comments) is rare and never nests;
 - the keys ahead of an object's `type` are held until the `type` names a candidate, at most the
   most any entry carries (`PRE_TYPE_MAX`, generated with the tables);
 - refs are reserved as they are read and resolved when their record closes, searched in the
@@ -263,17 +267,20 @@ binding's hand-over relies on:
   (`tape::with_transcoder`, take and park) with `Transcoder::transcode_words`: the tape as
   `u32` words, the header and body stored little-endian and the pool packed after them, the
   last word zero-padded — so the buffer is 4-aligned by its type on every binding, and each
-  word's bytes in memory are the tape's bytes in order. The tape's exact length is its
-  header's (`32 + 4 × words + pool bytes`), which the adapter views before decoding.
-- **N-API** (`tsv_napi`): a `Vec<u32>` of exactly the tape's words, copied into a `Uint32Array`
-  the engine owns (napi-rs's `Uint32ArraySlice::copy_from`). Not an external arraybuffer over the
-  addon's allocation: its napi finalizer runs only once the event loop turns, so a synchronous
-  loop of parses would hold every tape it made until it yielded, beyond the garbage collector's
-  reach.
-- **WASM** (`tsv_wasm`): a parked thread-local `Vec<u32>`, taken for the call and parked back
-  full; the export returns a `Uint32Array` view of linear memory over it
+  word's bytes in memory are the tape's bytes in order. The words are the transcoder's own
+  buffer, the one the body was written into, lent to the binding for the call. The tape's
+  exact length is its header's (`32 + 4 × words + pool bytes`), which the adapter views
+  before decoding.
+- **N-API** (`tsv_napi`): a `Vec<u32>` copy of exactly the tape's words, copied into a
+  `Uint32Array` the engine owns (napi-rs's `Uint32ArraySlice::copy_from`). Not an external
+  arraybuffer over the addon's allocation: its napi finalizer runs only once the event loop
+  turns, so a synchronous loop of parses would hold every tape it made until it yielded, beyond
+  the garbage collector's reach.
+- **WASM** (`tsv_wasm`): no copy — the export returns a `Uint32Array` view of linear memory
+  over the parked transcoder's own words
   (`js_sys::Uint32Array::new_with_byte_offset_and_length` over `wasm_bindgen::memory()`'s
-  buffer, never `Uint32Array::view`), valid until the next call into the instance.
+  buffer, never `Uint32Array::view`), valid until the next call into the instance; the
+  instance keeps one tape-sized buffer, the transcoder's.
 - **C FFI** (`tsv_ffi`): `tsv_parse_tape_<lang>`, the uniform signature, its payload — the tape,
   or the `{"error": …}` JSON — a `Box<[u32]>` freed by `tsv_free_tape(ptr, len)`, with
   `*out_len` the byte length.

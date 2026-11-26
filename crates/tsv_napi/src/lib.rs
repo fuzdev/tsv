@@ -349,17 +349,15 @@ macro_rules! lang_bindings {
                 source_type: Option<String>,
             ) -> Result<Vec<u32>, Failure> {
                 let goal = napi_source_type(source_type, goal_allowed!($goalness), Family::Parse)?;
-                let mut words = Vec::new();
                 parse_tape!(
                     $goalness,
                     $lang,
                     source,
                     goal,
-                    &mut words,
+                    |words: &[u32], _len: usize| words.to_vec(),
                     |e| Failure::parse(&e),
                     tape_failure
-                )?;
-                Ok(words)
+                )
             }
 
             /// The formatted source.
@@ -1253,9 +1251,9 @@ mod tests {
             } else {
                 good.strip_prefix('\u{FEFF}').unwrap()
             };
-            let mut expected = Vec::new();
-            let len = tsv_arena::tape::Transcoder::new()
-                .transcode_words(json.as_bytes(), wire_text, &mut expected)
+            let mut transcoder = tsv_arena::tape::Transcoder::new();
+            let (expected, len) = transcoder
+                .transcode_words(json.as_bytes(), wire_text)
                 .unwrap();
             let words = tape_fn(good, None).unwrap_or_else(|e| panic!("{label}: {}", e.message()));
             assert_eq!(words, expected, "{label}: the tape of the JSON wire");
