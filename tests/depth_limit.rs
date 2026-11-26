@@ -10,7 +10,8 @@
 //!   the path each repetition and the count does not see — fails here, whether or not its
 //!   walks happen to fit the stack ([`check_wire`]);
 //! - the deepest accepted input runs **parse, both wire writers (span-only and `loc`), the
-//!   span-only wire's tape transcode and its print back, format, the imports walk (TypeScript
+//!   span-only wire's tape transcode and its print back, the writers' direct tape (TypeScript
+//!   and CSS), format, the imports walk (TypeScript
 //!   and Svelte) and the type strip (TypeScript)** on
 //!   a thread nine tenths of the contract's size ([`GATE_STACK`]), which it must survive: a
 //!   stack overflow aborts this test binary, which fails the gate;
@@ -561,6 +562,16 @@ fn run_walks_on(name: String, stack: usize, lang: Lang, source: String) {
                 let program = tsv_ts::__private::parse(&source).expect("parses");
                 let span = tsv_ts::__private::convert_ast_json_bytes(&program, &source);
                 assert_tape(&name, "typescript", &span, &source);
+                assert_direct_tape(
+                    &name,
+                    tsv_debug::tape::grade_ts_direct_tape(
+                        &source,
+                        tsv_ts::Goal::Module,
+                        &span,
+                        &mut tsv_arena::tape::Transcoder::new(),
+                        &mut tsv_lang::tape::TapeSink::new(),
+                    ),
+                );
                 assert!(
                     !tsv_ts::__private::convert_ast_json_bytes_with_locations(&program, &source)
                         .is_empty()
@@ -603,6 +614,15 @@ fn run_walks_on(name: String, stack: usize, lang: Lang, source: String) {
                 let sheet = tsv_css::__private::parse(&source).expect("parses");
                 let span = tsv_css::__private::convert_ast_json_bytes(&sheet, &source);
                 assert_tape(&name, "css", &span, &source);
+                assert_direct_tape(
+                    &name,
+                    tsv_debug::tape::grade_css_direct_tape(
+                        &source,
+                        &span,
+                        &mut tsv_arena::tape::Transcoder::new(),
+                        &mut tsv_lang::tape::TapeSink::new(),
+                    ),
+                );
                 assert!(
                     !tsv_css::__private::convert_ast_json_bytes_with_locations(&sheet, &source)
                         .is_empty()
@@ -660,6 +680,15 @@ fn assert_tape(name: &str, language: &str, span: &[u8], source: &str) {
         laid.get(..len) == Some(tape),
         "{name}: the word tape is not the byte tape"
     );
+}
+
+/// The wire writer's own tape (its tape copy, the walk the JSON wire's writer recurses through
+/// a second time) is written on the walks' thread and graded against the wire
+/// (`tsv_debug::tape::grade_ts_direct_tape` / `grade_css_direct_tape`).
+fn assert_direct_tape(name: &str, graded: Result<Vec<u8>, String>) {
+    if let Err(e) = graded {
+        panic!("{name}: the direct tape: {e}");
+    }
 }
 
 /// The format of an accepted input must parse again and be its own format (F1): every pair

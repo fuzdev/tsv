@@ -51,11 +51,18 @@
 //!   import inside another's argument), every span in bounds and on character boundaries,
 //!   a specifier or attributes span inside its record's, and every specifier decoding (the
 //!   writer's `specifier_value`, which panics on one that does not).
+//! - **The direct tape.** Every TypeScript-family and CSS input the parser accepts is also
+//!   written through its wire writer's tape copy (`tsv_ts::__private::write_tape`, at the
+//!   goal the parse took; `tsv_css::__private::write_tape`) and graded against the same
+//!   parse's span-only wire (`tsv_debug::tape::grade_direct_tape`: it prints back to the
+//!   wire, and the transcoder canonicalizes the printback to the wire's tape) — a
+//!   `tape_direct` finding when it does not.
 //!
 //! Each leg's graded count is floored: a run whose locations leg graded nothing, whose
-//! strip leg stripped nothing although it had TypeScript seeds, or whose imports leg
-//! collected nothing although it had TypeScript or Svelte seeds, fails rather than
-//! reporting a clean run it never made.
+//! strip leg stripped nothing although it had TypeScript seeds, whose imports leg
+//! collected nothing although it had TypeScript or Svelte seeds, or whose tape leg wrote
+//! nothing although it had TypeScript or CSS seeds, fails rather than reporting a clean run
+//! it never made.
 //!
 //! **`--embedded css|ts`** reseeds the run from the `<style>` / `<script>` bodies of the
 //! Svelte seeds (plus the standalone files of that language), so the CSS parser and
@@ -457,6 +464,8 @@ enum Outcome {
     StripContract,
     /// The import records break their own contract (the finding's detail names which).
     ImportsContract,
+    /// A wire writer's direct tape is not its JSON wire (the finding's detail says how).
+    TapeDirect,
     /// The shared F1 checks ([`f1_check`]) ran to a verdict.
     Checked(F1Outcome),
 }
@@ -472,6 +481,8 @@ enum Leg {
     Strip,
     /// `parse_imports` and its JSON writer on a TypeScript-family or Svelte input.
     Imports,
+    /// A wire writer's tape copy on an accepted TypeScript-family or CSS input.
+    Tape,
 }
 
 impl Outcome {
@@ -481,7 +492,7 @@ impl Outcome {
     /// canonical-confirmation-needing bucket (see [`FuzzCommand::strict`]).
     fn is_hard(self) -> bool {
         match self {
-            Self::Panic(_) | Self::StripContract | Self::ImportsContract => true,
+            Self::Panic(_) | Self::StripContract | Self::ImportsContract | Self::TapeDirect => true,
             Self::Checked(outcome) => outcome.is_hard(),
         }
     }
@@ -494,6 +505,8 @@ impl Outcome {
             Self::StripContract => "strip_contract",
             Self::Panic(Leg::Imports) => "imports_panic",
             Self::ImportsContract => "imports_contract",
+            Self::Panic(Leg::Tape) => "tape_panic",
+            Self::TapeDirect => "tape_direct",
             Self::Checked(outcome) => outcome.label(),
         }
     }
@@ -502,6 +515,10 @@ impl Outcome {
 /// What one guarded attempt produced: its [`Outcome`], the finding's detail (a strip or
 /// imports contract break), and which of the extra legs graded the input — the counts
 /// their vacuity floors read.
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "one flag per leg the attempt graded, each counted apart by `LegCounts`"
+)]
 struct Attempt {
     outcome: Outcome,
     detail: Option<String>,
@@ -511,6 +528,8 @@ struct Attempt {
     stripped: bool,
     /// The import records were collected (the input parsed).
     imports: bool,
+    /// A direct tape was written and graded (the input parsed).
+    taped: bool,
 }
 
 /// One guarded attempt: write the last-input repro, clear the panic slot, run every leg
@@ -529,6 +548,7 @@ fn attempt(src: &str, parser: ParserType, render: bool, last: &mut LastInput) ->
     let mut locations = false;
     let mut stripped = false;
     let mut imports = false;
+    let mut taped = false;
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         let f1 = f1_check(src, parser, render);
         if f1.is_hard() {
@@ -554,6 +574,14 @@ fn attempt(src: &str, parser: ParserType, render: bool, last: &mut LastInput) ->
                 return (Outcome::ImportsContract, Some(detail));
             }
         }
+        if f1 != F1Outcome::Rejected && parser != ParserType::Svelte {
+            leg = Leg::Tape;
+            let (graded, broken) = tape_check(src, parser);
+            taped = graded;
+            if let Some(detail) = broken {
+                return (Outcome::TapeDirect, Some(detail));
+            }
+        }
         (Outcome::Checked(f1), None)
     }));
     let (outcome, detail) = result.unwrap_or((Outcome::Panic(leg), None));
@@ -563,7 +591,40 @@ fn attempt(src: &str, parser: ParserType, render: bool, last: &mut LastInput) ->
         locations,
         stripped,
         imports,
+        taped,
     }
+}
+
+/// Write `src`'s direct tape (its wire writer's tape copy — TypeScript at the goal the
+/// unset-goal fallback takes, as the strip; CSS) and grade it against the same parse's
+/// span-only wire. Returns whether it was written (the input parsed), and why it failed.
+fn tape_check(src: &str, parser: ParserType) -> (bool, Option<String>) {
+    let mut transcoder = tsv_arena::tape::Transcoder::new();
+    let mut sink = tsv_lang::tape::TapeSink::new();
+    let graded = match parser {
+        ParserType::TypeScript => {
+            let Ok(ast) = tsv_ts::__private::parse_with_goal_or_fallback(src, None) else {
+                return (false, None);
+            };
+            let json = tsv_ts::__private::convert_ast_json_bytes(&ast, src);
+            tsv_ts::__private::write_tape(&ast, src, &mut sink);
+            crate::tape::grade_direct_tape(
+                &mut sink,
+                crate::tape::wire_source("typescript", src),
+                &json,
+                &mut transcoder,
+            )
+        }
+        ParserType::Css => {
+            let Ok(ast) = tsv_css::__private::parse(src) else {
+                return (false, None);
+            };
+            let json = tsv_css::__private::convert_ast_json_bytes(&ast, src);
+            crate::tape::grade_css_direct_tape(src, &json, &mut transcoder, &mut sink)
+        }
+        ParserType::Svelte => return (false, None),
+    };
+    (true, graded.err())
 }
 
 /// Write the `locations` wire of `src` — the `{locations: true}` / `--locations`
@@ -932,6 +993,8 @@ struct LegCounts {
     stripped: usize,
     /// Inputs whose import records were collected (a parse error grades none).
     imports: usize,
+    /// Inputs whose direct tape was written and graded.
+    taped: usize,
 }
 
 impl LegCounts {
@@ -940,6 +1003,7 @@ impl LegCounts {
         self.locations += usize::from(attempt.locations);
         self.stripped += usize::from(attempt.stripped);
         self.imports += usize::from(attempt.imports);
+        self.taped += usize::from(attempt.taped);
         attempt
     }
 }
@@ -1001,6 +1065,7 @@ impl FuzzCommand {
         check_graded_nonzero(seeds.len(), "readable non-empty seed files")?;
         let has_ts_seeds = seeds.iter().any(|s| s.parser == ParserType::TypeScript);
         let has_imports_seeds = seeds.iter().any(|s| s.parser != ParserType::Css);
+        let has_tape_seeds = seeds.iter().any(|s| s.parser != ParserType::Svelte);
 
         if let Some(dir) = &self.dump_dir
             && let Err(e) = std::fs::create_dir_all(dir)
@@ -1186,6 +1251,12 @@ impl FuzzCommand {
                 "TypeScript and Svelte inputs whose import records were collected",
             )?;
         }
+        if has_tape_seeds {
+            check_graded_nonzero(
+                stats.legs.taped,
+                "TypeScript and CSS inputs whose direct tape was written",
+            )?;
+        }
         Ok(())
     }
 
@@ -1248,6 +1319,7 @@ impl FuzzCommand {
                 "locations_graded": stats.legs.locations,
                 "strip_graded": stats.legs.stripped,
                 "imports_graded": stats.legs.imports,
+                "tape_graded": stats.legs.taped,
                 "evolved": stats.evolved,
                 "hard_findings": stats.hard_count,
                 "soft_findings": stats.soft_count,
@@ -1288,6 +1360,10 @@ impl FuzzCommand {
             "  {:>7}  import records collected (no panic, the records' contract held)",
             stats.legs.imports
         );
+        println!(
+            "  {:>7}  direct tapes written (no panic, each printed back to its wire)",
+            stats.legs.taped
+        );
         if self.evolve {
             println!(
                 "  {:>7}  accepted mutants evolved into the seed pool",
@@ -1299,7 +1375,7 @@ impl FuzzCommand {
             stats.reflow_paths.count()
         );
         println!(
-            "  {:>7}  HARD findings (panic / locations_panic / strip_panic / strip_contract /\n           imports_panic / imports_contract / format_error / unreparseable / node_loss /\n           leaf_value_corruption / non_idempotent)",
+            "  {:>7}  HARD findings (panic / locations_panic / strip_panic / strip_contract /\n           imports_panic / imports_contract / tape_panic / tape_direct /\n           format_error / unreparseable / node_loss / leaf_value_corruption /\n           non_idempotent)",
             stats.hard_count
         );
         println!(

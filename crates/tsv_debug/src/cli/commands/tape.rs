@@ -22,16 +22,19 @@
 //! by exactly one line on stdout, flushed before the next request is read:
 //!
 //! - `{"span": <wire>, "tape": "<base64>", "direct"?: "<base64>", "transcode_ns"?}` — the
-//!   span-only wire and its tape, a CSS source's direct tape (as above), and with `repeat` the
-//!   fastest of that many transcodes of the wire on a warm transcoder, in nanoseconds;
+//!   span-only wire and its tape, a CSS or TypeScript source's direct tape (as above), and
+//!   with `repeat` the fastest of that many transcodes of the wire on a warm transcoder, in
+//!   nanoseconds;
 //! - `{"error": "<message>"}` — tsv rejected the source, the transcoder refused the wire, or a
-//!   CSS source's direct tape failed its grade (`direct: …`);
+//!   CSS or TypeScript source's direct tape failed its grade (`direct: …`);
 //! - `{"panic": "<payload>"}` — tsv panicked (each request runs under `catch_unwind`).
 //!
 //! A malformed request is a harness bug, not a tsv verdict: it ends the process with an error.
 
 use crate::cli::CliError;
-use crate::tape::{base64, fixture_wires, grade_css_direct_tape, wire_source};
+use crate::tape::{
+    base64, fixture_wires, grade_css_direct_tape, grade_ts_direct_tape, wire_source,
+};
 use argh::FromArgs;
 use std::io::Write;
 use std::path::PathBuf;
@@ -80,16 +83,29 @@ impl TapeCommand {
                     return;
                 }
             };
-            let direct = if doc.language == "css" {
-                match grade_css_direct_tape(&doc.source, &doc.span, &mut transcoder, &mut sink) {
-                    Ok(direct) => Some(base64(&direct)),
-                    Err(e) => {
-                        failure = Some(format!("{}: direct: {e}", doc.path));
-                        return;
-                    }
+            let graded = match doc.language {
+                "css" => Some(grade_css_direct_tape(
+                    &doc.source,
+                    &doc.span,
+                    &mut transcoder,
+                    &mut sink,
+                )),
+                "typescript" => Some(grade_ts_direct_tape(
+                    &doc.source,
+                    doc.goal,
+                    &doc.span,
+                    &mut transcoder,
+                    &mut sink,
+                )),
+                _ => None,
+            };
+            let direct = match graded {
+                Some(Ok(direct)) => Some(base64(&direct)),
+                Some(Err(e)) => {
+                    failure = Some(format!("{}: direct: {e}", doc.path));
+                    return;
                 }
-            } else {
-                None
+                None => None,
             };
             let mut line = Vec::with_capacity(doc.span.len() * 2 + doc.source.len() + 64);
             line.extend_from_slice(b"{\"path\":");
@@ -149,7 +165,7 @@ struct TapeRequest {
     repeat: Option<u32>,
 }
 
-/// One request's product: the span-only wire, its tape, a CSS source's direct tape (base64
+/// One request's product: the span-only wire, its tape, a direct tape (base64
 /// both), and the timed transcode's nanoseconds.
 type Produced = (Vec<u8>, String, Option<String>, Option<u128>);
 
@@ -200,13 +216,26 @@ fn answer(request: &TapeRequest) -> Result<Vec<u8>, String> {
                 .min()
                 .unwrap_or(0)
         });
-        let direct = if language == "css" {
-            let direct =
-                grade_css_direct_tape(source, &span, &mut transcoder, &mut TapeSink::new())
-                    .map_err(|e| format!("direct: {e}"))?;
-            Some(base64(&direct))
-        } else {
-            None
+        let mut sink = TapeSink::new();
+        let direct = match language {
+            "css" => Some(grade_css_direct_tape(
+                source,
+                &span,
+                &mut transcoder,
+                &mut sink,
+            )),
+            "typescript" => Some(grade_ts_direct_tape(
+                source,
+                goal,
+                &span,
+                &mut transcoder,
+                &mut sink,
+            )),
+            _ => None,
+        };
+        let direct = match direct {
+            Some(graded) => Some(base64(&graded.map_err(|e| format!("direct: {e}"))?)),
+            None => None,
         };
         Ok((span, tape, direct, fastest))
     });

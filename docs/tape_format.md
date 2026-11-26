@@ -208,8 +208,11 @@ keys; the transcoder reads the text. Both decode to the same tree either way.
 A language crate's wire writer can write the tape itself, from the walk that writes its JSON
 wire, into `tsv_lang::tape::TapeSink` (crates/tsv_lang/CLAUDE.md §Modules, `tape`): the writer's
 body is mounted a second time with the tape as its sink, each site naming what its JSON literal
-means on the tape (crates/tsv_css/CLAUDE.md §Distinctives, the twin-mounted writer). It knows
-what the transcoder has to search for, so it writes:
+means on the tape — `tsv_css` as a token spec per site, `tsv_ts` by handing the literal itself to
+a compile-time reader (`tsv_lang::tape::literal_ops`) that resolves its keys against the schema
+and leaves each value to the field its key declared (crates/tsv_css/CLAUDE.md and
+crates/tsv_ts/CLAUDE.md §Distinctives, the twin-mounted writer). It knows what the transcoder has
+to search for, so it writes:
 
 - **records** pre-order, each header slot reserved when the record opens and written when it
   closes, from the presence bits its fields set; each list's count slot patched at its close;
@@ -236,10 +239,13 @@ canonicalizer: for the same parse's JSON wire `json`,
   order included.
 
 `tests/tape_roundtrip.rs` runs the first two over every CSS document of the fixture tree (each
-`.css` input, and each `<style>` body read as a stylesheet of its own); `npm run check:tape` all
-three over the fixture tree's CSS documents, the Rust half's failures failing the run; and
-`npm run tape:corpus` all three over the corpus's CSS files
-(`tsv_debug::tape::grade_css_direct_tape` is the Rust half of each).
+`.css` input, and each `<style>` body read as a stylesheet of its own) and every TypeScript one
+(each `.ts` input at both goals where it parses at both, each `<script>` body, and expression
+islands under a comment attach); `npm run check:tape` all three over the fixture tree's CSS and
+TypeScript documents, the Rust half's failures failing the run; and `npm run tape:corpus` all
+three over the corpus's CSS and TypeScript files (`tsv_debug::tape::grade_css_direct_tape` /
+`grade_ts_direct_tape` is the Rust half of each); `tests/depth_limit.rs` writes both at the
+parsers' depth limits on the contract's stack.
 
 ## Decoding
 
