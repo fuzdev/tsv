@@ -21,13 +21,16 @@
  * 4. `stage --phase instrument` — the instrumented pair as an installed loader +
  *    platform package, so the addon trains through the loader's own `cli.js`.
  * 5. `train` — each binary AS ITSELF over its own fresh corpus copy, every shipped
- *    surface: `parse` on every file (the wire-JSON path, which a format never takes;
- *    the CLI also with `--locations`, its `loc` writer), the type strip on every
- *    TypeScript file, the import records on every TypeScript and Svelte file and the
- *    tape route — `parse_<lang>` from `@fuzdev/tsv/parse`, the transcoder and the decode —
- *    on every file (the addon's alone: the CLI has neither), then `format --jobs 1` over the
- *    tree; the CLI directly, the addon through `cli.js` and, for the strip, the import
- *    records and the tape route, in process (`addon_ops.ts`). `--jobs 1` keeps WHAT runs fixed —
+ *    surface: `parse` on every file (the CLI's wire-JSON path, which a format never takes,
+ *    also with `--locations`, its `loc` writer; the addon's `cli.js parse` decodes the tape
+ *    route), the type strip on every TypeScript file, the import records on every
+ *    TypeScript and Svelte file and the tape route — `parse_<lang>` from
+ *    `@fuzdev/tsv/parse`, the writers' tape copies and the decode — on every file (the
+ *    addon's alone: the CLI has neither), then `format --jobs 1` over the tree; the CLI
+ *    directly, the addon through `cli.js` and, for the strip, the import records and the
+ *    tape route, in process (`addon_ops.ts`). So the addon runs the tape route twice per
+ *    file, and its tape-route floors count both legs (`TrainedCounts.tape_legs`); the FFI
+ *    library runs it once. `--jobs 1` keeps WHAT runs fixed —
  *    the same calls in the same order — but not the profile's bytes: hash tables keyed on addresses
  *    or seeded per process count differently run to run, so two trainings write different profiles
  *    and the binaries' bytes differ. That is the contract, not a gap: what is gated is the OUTPUT
@@ -38,9 +41,10 @@
  *    rustc reported, which a container row ran), then the NON-EMPTY gate: the profile
  *    counts function entries (`build.sh instrument` passes `-pgo-instrument-entry`), and
  *    every hot function (`HOT_FUNCTIONS`) was entered once for every input of its class
- *    it trained on (`floor_of`) — whose profile was written: the CLI exits non-zero through
- *    `std::process::exit`, which on Windows writes no profile, so where a refused strip's
- *    rerun writes none (`run_writes_profile`) the strip's floor leaves the refusals out.
+ *    it trained on, per tape leg on the tape route (`floor_of`) — whose profile was
+ *    written: the CLI exits non-zero through `std::process::exit`, which on Windows
+ *    writes no profile, so where a refused strip's rerun writes none
+ *    (`run_writes_profile`) the strip's floor leaves the refusals out.
  * 7. `build.sh use` — both binaries with `-Cprofile-use` and the cost-benefit
  *    inliner off.
  * 8. `gate-builds` — the profile reached every workspace crate's compile (the
@@ -188,8 +192,8 @@ const PARSE_SAMPLE_STRIDE = 8;
 const PROFILED_CRATES = ['tsv_lang', 'tsv_ts', 'tsv_css', 'tsv_svelte'] as const;
 
 /** The workspace crates a world compiles beyond `PROFILED_CRATES` and its own crate, held to the
- * same flag: the bindings' shared substrate, `tsv_arena`, whose transcoder the tape route runs
- * (the CLI links no binding substrate). */
+ * same flag: the bindings' shared substrate, `tsv_arena` — its format path and the tape route's
+ * parked sink (the CLI links no binding substrate). */
 const WORLD_EXTRA_CRATES: Record<World, readonly string[]> = {
 	cli: [],
 	napi: ['tsv_arena'],
@@ -564,7 +568,9 @@ const cmd_train = (): void => {
 			strip: world === 'ffi' ? 0 : strip_files.length,
 			imports_typescript: 0,
 			imports_svelte: 0,
-			tape: world === 'cli' ? 0 : files.length
+			tape: world === 'cli' ? 0 : files.length,
+			// counted below, one per leg that runs the tape route on every file
+			tape_legs: 0
 		};
 		const failures: string[] = [];
 		let format: RunResult = { status: 0, stdout: '', stderr: '' };
@@ -586,10 +592,13 @@ const cmd_train = (): void => {
 			process.stdout.write(ops.stdout);
 			if (ops.status !== 0)
 				fail(`train ${world}: the FFI library's training calls failed:\n${ops.stderr}`);
+			trained.tape_legs += FFI_OPS.filter((op) => op === 'tape').length;
 		} else {
 			const cmd = world === 'cli' ? [instr.cli] : [NODE, loader.cli];
 			// the parse (and the CLI's `loc` writer), on every file: each must parse
 			failures.push(...per_file(cmd, ['parse'], files, env, [0]).failures);
+			// the addon's `cli.js parse` decodes the tape route; the CLI's writes the wire JSON
+			if (world === 'napi') trained.tape_legs += 1;
 			if (world === 'cli') {
 				failures.push(...per_file(cmd, ['parse', '--locations'], files, env, [0]).failures);
 				// the strip: 0 stripped, 1 refused — both verdicts; 2 is a parse error
@@ -610,13 +619,14 @@ const cmd_train = (): void => {
 				// the strip, the import records and the tape route, in process through the loader
 				const list = join(paths.train(world), 'addon_ops.txt');
 				writeFileSync(list, files.join('\n') + '\n');
+				const addon_ops = ['strip', 'imports', 'tape'] as const;
 				const ops = capture(
 					NODE,
 					[
 						'scripts/pgo/addon_ops.ts',
 						...['--loader', loader.index, '--list', list],
 						...['--out', join(paths.train(world), 'addon_ops.ndjson')],
-						...['--ops', 'strip,imports,tape', '--require-ok']
+						...['--ops', addon_ops.join(','), '--require-ok']
 					],
 					env
 				);
@@ -627,6 +637,7 @@ const cmd_train = (): void => {
 					);
 				trained.imports_typescript = trained.typescript;
 				trained.imports_svelte = trained.svelte;
+				trained.tape_legs += addon_ops.filter((op) => op === 'tape').length;
 			}
 			format = capture(cmd[0]!, [...cmd.slice(1), 'format', '--jobs', '1', root], env);
 		}

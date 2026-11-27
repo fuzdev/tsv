@@ -26,16 +26,28 @@ export interface TrainedCounts {
 	imports_typescript: number;
 	imports_svelte: number;
 	/** Files the tape route ran on — the bindings' alone (the CLI ships no tape): the packages'
-	 * `parse_<lang>` in the addon, the tape export and its decode in the FFI library. */
+	 * `parse_<lang>` in the addon, the tape export and its decode in the FFI library. A file
+	 * counts once here however many of the world's legs ran it (`tape_legs`). */
 	tape: number;
+	/** How many legs of the world's training run the tape route on each file, each one call
+	 * of every tape-route hot function (`HotFunction.tape_route`): the addon's two, since
+	 * `cli.js parse` decodes the tape and `addon_ops.ts --ops tape` runs it again, the FFI
+	 * library's one (its `tape` op), the CLI's none. */
+	tape_legs: number;
 }
+
+/** A trained count a hot function's floor is read from: every count but the leg multiplier. */
+export type TrainedClass = Exclude<keyof TrainedCounts, 'tape_legs'>;
 
 /** A function a trained profile must carry real counts on. */
 export interface HotFunction {
 	/** Its demangled path. */
 	path: string;
 	/** The trained count its floor is read from (`floor_of`). */
-	per: keyof TrainedCounts;
+	per: TrainedClass;
+	/** On the tape route, so every input of its class enters it once per tape leg
+	 * (`TrainedCounts.tape_legs`). */
+	tape_route?: true;
 	/** The worlds that compile it (the CLI has no import records and no tape; the FFI library
 	 * neither the import records nor the type strip). */
 	worlds: readonly ProfileWorld[];
@@ -51,11 +63,16 @@ const EVERY = ['cli', 'napi', 'ffi'] as const;
  * renderer every format walks, each language's parse entries — `parse_folded_into` (the
  * parse a format runs) and the parse the wire-JSON path runs, the one-shot form in the CLI and the
  * warm `*_into` form in the bindings — the type strip, the import records' entries, and the
- * transcoder the bindings' tape export runs (`transcode_words`, the form `tsv_arena`'s
- * `parse_tape!` calls, once per tape). A profile that misses any of them trained nothing that
- * matters, however many records it holds: "zero hash mismatches" passes VACUOUSLY on an empty
- * profile, since every function then reads as missing rather than mismatched. Each is held to a
- * floor read from the inputs of its class it trained on (`floor_of`). A rename here is a rename in
+ * bindings' tape route: the root of each language's wire-writer tape copy (the document entry
+ * its `__private::write_tape` forwards to — that generic wrapper is monomorphized in the
+ * binding and inlined ahead of instrumentation, so it keeps no record — called once per tape
+ * through `tsv_arena`'s `parse_tape!`) and the sink's `finish_words`, which lays out every
+ * tape whatever its language (the per-language roots' floors sum to its own, but it is the
+ * sink's record, compiled in another crate). A profile that misses any of them trained
+ * nothing that matters, however many records it holds: "zero hash mismatches" passes
+ * VACUOUSLY on an empty profile, since every function then reads as missing rather than
+ * mismatched. Each is held to a floor read from the inputs of its class it trained on
+ * (`floor_of`). A rename here is a rename in
  * the gate (the gate fails, naming the path).
  */
 export const HOT_FUNCTIONS: readonly HotFunction[] = [
@@ -73,14 +90,34 @@ export const HOT_FUNCTIONS: readonly HotFunction[] = [
 	{ path: 'tsv_ts::imports::parse_imports_into', per: 'imports_typescript', worlds: ['napi'] },
 	{ path: 'tsv_svelte::__private::parse_imports_into', per: 'imports_svelte', worlds: ['napi'] },
 	{
-		path: 'tsv_arena::tape::transcode::Transcoder::transcode_words',
+		path: 'tsv_ts::ast::convert::write_tape::write::write_program_tape',
+		per: 'typescript',
+		tape_route: true,
+		worlds: ['napi', 'ffi']
+	},
+	{
+		path: 'tsv_svelte::ast::convert::write_tape::write::write_root_tape',
+		per: 'svelte',
+		tape_route: true,
+		worlds: ['napi', 'ffi']
+	},
+	{
+		path: 'tsv_css::ast::convert::write_tape::write::write_stylesheet_file_tape',
+		per: 'css',
+		tape_route: true,
+		worlds: ['napi', 'ffi']
+	},
+	{
+		path: 'tsv_lang::tape::sink::TapeSink::finish_words',
 		per: 'tape',
+		tape_route: true,
 		worlds: ['napi', 'ffi']
 	}
 ];
 
 /**
- * A hot function's floor: every input of its class the training ran. The count graded is
+ * A hot function's floor: every input of its class the training ran, times the world's tape
+ * legs for a function on the tape route (`HotFunction.tape_route`). The count graded is
  * the function's ENTRY count — how many times it was called — which every input of its
  * class adds at least one to (each is parsed, formatted, stripped or recorded through it),
  * however it leaves. A block counter could not be held to it: IR instrumentation counts
@@ -89,7 +126,7 @@ export const HOT_FUNCTIONS: readonly HotFunction[] = [
  * that missed any input of its class, which a non-zero count would pass.
  */
 export const floor_of = (h: HotFunction, trained: TrainedCounts): number =>
-	Math.max(1, trained[h.per]);
+	Math.max(1, trained[h.per] * (h.tape_route ? trained.tape_legs : 1));
 
 /** The `x.y.z` LLVM version in a tool's `--version` text (`LLVM version 21.1.8-rust-…`)
  * or in `rustc -vV`'s `LLVM version: 21.1.8` line, or `null` when it names none. */
@@ -194,10 +231,12 @@ export interface ProfileVerdict {
 	 * largest count over them (0 when absent), and the floor the entry count is held to. */
 	hot: {
 		path: string;
-		per: keyof TrainedCounts;
+		per: TrainedClass;
 		entry_count: number;
 		max_count: number;
 		floor: number;
+		/** The tape legs its floor multiplies by, `null` off the tape route. */
+		legs: number | null;
 		found: boolean;
 	}[];
 	/** The gate's failures, empty when it passes. */
@@ -228,6 +267,7 @@ export function grade_profile(
 		entry_count: by_path.get(h.path)?.entry ?? 0,
 		max_count: by_path.get(h.path)?.max ?? 0,
 		floor: floor_of(h, trained),
+		legs: h.tape_route ? trained.tape_legs : null,
 		found: by_path.has(h.path)
 	}));
 	const failures: string[] = [];
@@ -246,7 +286,7 @@ export function grade_profile(
 		else if (h.max_count === 0) failures.push(`${h.path} never ran in training (all counts 0)`);
 		else if (h.entry_count < h.floor) {
 			failures.push(
-				`${h.path} was entered ${h.entry_count} times, under its floor of ${h.floor} (the ${trained[h.per]} inputs of its class trained)`
+				`${h.path} was entered ${h.entry_count} times, under its floor of ${h.floor} (the ${trained[h.per]} inputs of its class trained${h.legs === null ? '' : `, ${h.legs} tape legs each`})`
 			);
 		}
 	}

@@ -58,10 +58,8 @@ test('demangle_legacy_path', () => {
 	);
 	// an inherent method in a private module: the type is one more path component
 	strictEqual(
-		demangle_legacy_path(
-			'_ZN9tsv_arena4tape9transcode10Transcoder15transcode_words17h4a10f23c2491e48aE'
-		),
-		'tsv_arena::tape::transcode::Transcoder::transcode_words'
+		demangle_legacy_path('_ZN8tsv_lang4tape4sink8TapeSink12finish_words17h4a10f23c2491e48aE'),
+		'tsv_lang::tape::sink::TapeSink::finish_words'
 	);
 	// a generic component keeps its escaped spelling
 	strictEqual(
@@ -130,7 +128,8 @@ const TRAINED: TrainedCounts = {
 	strip: 4,
 	imports_typescript: 5,
 	imports_svelte: 3,
-	tape: 10
+	tape: 10,
+	tape_legs: 2
 };
 
 /** The napi world's hot functions, each run `times` times. */
@@ -141,7 +140,7 @@ const napi_hot = (times: (h: HotFunction) => number): [string, number[]][] =>
 	]);
 
 test('grade_profile passes a profile whose hot functions reach their floors', () => {
-	const verdict = grade_profile(show(napi_hot((h) => TRAINED[h.per])), 'napi', TRAINED);
+	const verdict = grade_profile(show(napi_hot((h) => floor_of(h, TRAINED))), 'napi', TRAINED);
 	deepStrictEqual(verdict.failures, []);
 	strictEqual(verdict.executed, verdict.hot.length);
 	// the CLI ships no import records and no tape, so its world asks for neither
@@ -176,7 +175,7 @@ test('grade_profile fails an empty profile, a missing, a never-run and an under-
 		show([
 			[mangle(first!.path), [0, 0]],
 			[mangle(third!.path), [under, 1000]],
-			...rest.map((h): [string, number[]] => [mangle(h.path), [TRAINED[h.per]]])
+			...rest.map((h): [string, number[]] => [mangle(h.path), [floor_of(h, TRAINED)]])
 		]),
 		'napi',
 		TRAINED
@@ -188,26 +187,45 @@ test('grade_profile fails an empty profile, a missing, a never-run and an under-
 	]);
 });
 
+test('grade_profile holds a tape-route function to every tape leg the world trained', () => {
+	const tape = HOT_FUNCTIONS.filter((h) => h.tape_route && h.worlds.includes('napi'));
+	ok(tape.some((h) => h.path.endsWith('finish_words')));
+	for (const h of tape) strictEqual(floor_of(h, TRAINED), TRAINED[h.per] * TRAINED.tape_legs);
+	// off the route the legs do not multiply
+	const render = HOT_FUNCTIONS.find((h) => h.path.includes('render_doc_iterative'))!;
+	strictEqual(floor_of(render, TRAINED), TRAINED.files);
+	// one leg's worth of entries is under the floor of two
+	const [first] = tape;
+	const verdict = grade_profile(
+		show(napi_hot((h) => (h === first ? TRAINED[h.per] : floor_of(h, TRAINED)))),
+		'napi',
+		TRAINED
+	);
+	deepStrictEqual(verdict.failures, [
+		`${first!.path} was entered ${TRAINED[first!.per]} times, under its floor of ${floor_of(first!, TRAINED)} (the ${TRAINED[first!.per]} inputs of its class trained, ${TRAINED.tape_legs} tape legs each)`
+	]);
+});
+
 test('grade_profile sums the entries of a function over its records', () => {
 	const [first, ...rest] = HOT_FUNCTIONS.filter((h) => h.worlds.includes('napi'));
-	const half = Math.ceil(TRAINED[first!.per] / 2);
+	const half = Math.ceil(floor_of(first!, TRAINED) / 2);
 	const verdict = grade_profile(
 		show([
 			[mangle(first!.path), [half]],
-			[`other.cgu.0;${mangle(first!.path)}`, [TRAINED[first!.per] - half]],
-			...rest.map((h): [string, number[]] => [mangle(h.path), [TRAINED[h.per]]])
+			[`other.cgu.0;${mangle(first!.path)}`, [floor_of(first!, TRAINED) - half]],
+			...rest.map((h): [string, number[]] => [mangle(h.path), [floor_of(h, TRAINED)]])
 		]),
 		'napi',
 		TRAINED
 	);
 	deepStrictEqual(verdict.failures, []);
-	strictEqual(verdict.hot[0]!.entry_count, TRAINED[first!.per]);
+	strictEqual(verdict.hot[0]!.entry_count, floor_of(first!, TRAINED));
 });
 
 test('grade_profile fails a profile that does not count function entries', () => {
 	const verdict = grade_profile(
 		show(
-			napi_hot((h) => TRAINED[h.per]),
+			napi_hot((h) => floor_of(h, TRAINED)),
 			0
 		),
 		'napi',
