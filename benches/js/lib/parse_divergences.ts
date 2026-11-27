@@ -1024,9 +1024,9 @@ export const DOCUMENTED_MATCHERS: DocumentedMatcher[] = [
 		// Svelte's comment walk visits keys in order, so on that route the head's comments
 		// land on other nodes of the arrow — with no parameter, on the body. Admitted only as
 		// that: a comment array (or a field of one of its comments) owned by the type
-		// parameters, a parameter, the return type or the body of a canonical async arrow
-		// whose type parameters start after the arrow does — and only
-		// when every comment it names lies between the arrow's start and its body's. What
+		// parameters, a parameter, the return type or the body itself (never a node inside
+		// it) of a canonical async arrow whose type parameters start after the arrow does —
+		// and only when every comment it names lies between the arrow's start and its body's. What
 		// this cannot see — the matcher reads canonical's tree, not tsv's — is a head comment
 		// tsv drops: the missing attachment reads like a moved one.
 		name: 'generic_async_arrow_comment_order',
@@ -1048,7 +1048,10 @@ export const DOCUMENTED_MATCHERS: DocumentedMatcher[] = [
 					body?: { start?: unknown } | null;
 				} | null;
 				if (arrow?.type !== 'ArrowFunctionExpression') continue;
-				if (!/^(typeParameters|params\[\d+\]|returnType|body)$/.test(segments[i]!)) return false;
+				const head_node = segments[i]!;
+				if (!/^(typeParameters|params\[\d+\]|returnType|body)$/.test(head_node)) return false;
+				// a moved head comment leads the body itself, never a node inside it
+				if (head_node === 'body' && i !== segments.length - 1) return false;
 				const start = arrow.start;
 				const body_start = arrow.body?.start;
 				if (

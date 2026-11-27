@@ -123,6 +123,8 @@ test("generic_async_arrow_comment_order: a head comment moved by the arrow's one
 	strictEqual(order(moved_on([c], 'body')), true);
 	const in_body = { type: 'Block', value: ' e ', start: 37, end: 38 };
 	strictEqual(order(moved_on([in_body], 'body')), false);
+	// the body's own array alone: a head comment on a node inside the body is no move
+	strictEqual(order(moved_on([c], 'body.object')), false);
 	// a comment array on the arrow itself is not a head node's
 	strictEqual(
 		claims(
